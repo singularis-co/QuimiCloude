@@ -179,6 +179,8 @@ export type OrderRowSheetActionsProps = {
   readonly canEditCustomer?: boolean;
   /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
   readonly canDeliver?: boolean;
+  /** Si el actor puede anular entregas; lo resuelve el servidor. */
+  readonly canVoidDelivery?: boolean;
 };
 
 /**
@@ -217,6 +219,7 @@ export function OrderRowSheetActions({
   const [distributionOpen, setDistributionOpen] = useState(false);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
+  const [, setDeliveriesOpen] = useState(false);
   // Atado a la instancia de `order`: cuando llega el refresco trae otra y lo guardado se descarta.
   const [savedDistribution, setSavedDistribution] = useState<{
     readonly order: OrderSummary;
@@ -249,6 +252,7 @@ export function OrderRowSheetActions({
         onCustomer={() => setCustomerOpen(true)}
         canDeliver={canDeliver}
         onDeliver={() => setDeliverOpen(true)}
+        onDeliveries={() => setDeliveriesOpen(true)}
       />
       <OrderSheet
         order={order}

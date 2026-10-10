@@ -520,7 +520,64 @@ describe('la accion «Entregar»', () => {
       'order-action-delete',
       RESPONSABLES_TESTID,
       ORDER_ACTION_CUSTOMER_TESTID,
+      // QC-224 2026-10-09: «Entregas» se ofrece en TERMINADO y va justo delante de «Entregar».
+      'order-action-deliveries',
       ORDER_ACTION_DELIVER_TESTID,
     ]);
+  });
+});
+
+describe('la accion «Entregas»', () => {
+  const ENTREGAS_TESTID = 'order-action-deliveries';
+  const CON_ENTREGAS = ['TERMINADO', 'ENTREGADO'] as const satisfies readonly OrderStatus[];
+  const SIN_ENTREGAS = ORDER_STATUS_VALUES.filter(
+    (status) => !(CON_ENTREGAS as readonly OrderStatus[]).includes(status),
+  );
+
+  it('R5: los otros ocho estados del contrato no ofrecen la lista de entregas', () => {
+    expect(SIN_ENTREGAS).toHaveLength(8);
+  });
+
+  it.each(CON_ENTREGAS)(
+    'R5: aparece en %s, habilitada y sin pedir permiso propio, y emite su enganche con la fila',
+    async (status) => {
+      const onDeliveries = vi.fn();
+      render(<OrderRowActions order={pedido(status)} onDeliveries={onDeliveries} />);
+
+      abrirMenu();
+
+      const item = await screen.findByTestId(ENTREGAS_TESTID);
+      expect(item).not.toHaveAttribute('aria-disabled');
+      fireEvent.click(item);
+      expect(onDeliveries).toHaveBeenCalledExactlyOnceWith(pedido(status));
+    },
+  );
+
+  it.each(SIN_ENTREGAS)('R5: no esta en el DOM en %s', async (status) => {
+    render(
+      <OrderRowActions
+        order={pedido(status)}
+        canDeliver
+        canEditCustomer
+        canEditDistribution
+        onDeliveries={vi.fn()}
+      />,
+    );
+
+    abrirMenu();
+
+    await screen.findByTestId('order-action-edit');
+    expect(screen.queryByTestId(ENTREGAS_TESTID)).toBeNull();
+    expect(document.querySelector(`[data-testid="${ENTREGAS_TESTID}"]`)).toBeNull();
+  });
+
+  it('R5: va justo delante de «Entregar», que sigue al final del menu', async () => {
+    render(<OrderRowActions order={pedido('TERMINADO')} canDeliver />);
+
+    abrirMenu();
+    await screen.findByTestId(ENTREGAS_TESTID);
+
+    const ids = screen.getAllByRole('menuitem').map((item) => item.getAttribute('data-testid'));
+    expect(ids.slice(-2)).toEqual([ENTREGAS_TESTID, ORDER_ACTION_DELIVER_TESTID]);
   });
 });
