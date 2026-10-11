@@ -597,9 +597,10 @@ div role=dialog style="" class="bg-popover data-[side=bottom]:slide-in-from-top-
 
 exports[`paridad de campos — fecha > R1 R16 — F2 filtro de fecha de la tabla: cerrado 1`] = `
 "
-button role=button name="Creado" aria-expanded="false" aria-haspopup="dialog" data-testid="data-table-filter-date-creado" type="button" class="bg-background border border-input focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring gap-1.5 hover:bg-muted inline-flex items-center min-h-11 min-w-11 outline-none px-2.5 rounded-lg text-sm"
-  svg aria-hidden="true" height="24" width="24" class="lucide lucide-calendar size-4"
-  "Creado"
+button role=button name="Creado" aria-expanded="false" aria-haspopup="dialog" data-testid="data-table-filter-date-creado" type="button" class="[&_svg]:pointer-events-none [&_svg]:shrink-0 active:scale-[0.98] bg-transparent border border-dashed border-input btn-veil cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid font-medium gap-2 inline-flex items-center min-h-11 min-w-11 outline-none px-3 rounded-lg select-none shrink-0 text-[13px] text-foreground whitespace-nowrap"
+  svg aria-hidden="true" height="24" width="24" class="lucide lucide-plus size-4"
+  span role=generic
+    "Creado"
 controles:
 
 "
