@@ -60,7 +60,7 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   *Hecho:* test en verde; los tests actuales de `assignment-view-tabs`, `usuarios-tabs-switch` y
   `product-type-tabs` siguen en verde sin tocarlos.
 
-- [~] **T9. RowActionsMenu y DataTable (R32–R39).** Depende de T2 (talla del botón «Acciones»).
+- [x] **T9. RowActionsMenu y DataTable (R32–R39).** Depende de T2 (talla del botón «Acciones»).
   - T9a. `RowActionsMenu`: `presentation`, `title`, `texts`; menú desplegable con `side="bottom"` y
     volteo (verificar el nombre de la prop de Base UI). Test nuevo
     `row-actions-menu-centrado.test.tsx`; `row-actions-menu-href.test.tsx` sigue en verde.

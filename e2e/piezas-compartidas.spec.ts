@@ -27,7 +27,12 @@ const RUN_ID = randomUUID().replace(/-/g, '').slice(0, 16);
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
 const UNIT_ROW_ACTIONS_TESTID = 'unit-row-actions';
-const UNIT_COUNT = 4;
+/**
+ * Las filas tienen que desbordar la ventana baja: si la página no tiene scroll, `scrollIntoView`
+ * no puede llevar el último disparador al borde inferior y debajo queda sitio para el menú (con 4
+ * unidades quedaban 117 px). 15 caben en una sola página con `pageSize=25` (`MAX_PAGE_SIZE`).
+ */
+const UNIT_COUNT = 15;
 
 /** Ventana baja: la última fila queda cerca del borde inferior. */
 const LOW_VIEWPORT = { width: 1280, height: 420 };
@@ -126,28 +131,66 @@ test.describe('menú de fila', () => {
     await expect(triggers).toHaveCount(UNIT_COUNT, { timeout: 60_000 });
     const lastTrigger = triggers.last();
 
-    // Lleva el disparador al borde inferior de la ventana: debajo no cabe el menú.
-    await lastTrigger.evaluate((element) => element.scrollIntoView({ block: 'end' }));
-
-    const menu = page.getByRole('menu');
-    await expect(async () => {
-      if ((await menu.count()) === 0) await lastTrigger.click();
-      await expect(menu).toBeVisible({ timeout: 5_000 });
-    }).toPass({ timeout: 60_000 });
-
     const viewport = page.viewportSize();
     expect(viewport).not.toBeNull();
     const viewportHeight = viewport?.height ?? 0;
 
+    const menu = page.getByRole('menu');
+    let beforeBox: { x: number; y: number; width: number; height: number } | null = null;
+
+    // Lleva el disparador al borde inferior de lo VISIBLE: justo encima de la paginación de la
+    // tabla, que es `sticky` abajo. Con `scrollIntoView({ block: 'end' })` a secas el disparador
+    // queda tapado por esa barra; `locator.click()` entonces desplaza la página hasta destaparlo
+    // (al final, ~117 px sobre el borde) y debajo ya cabe el menú; en WebKit lo desplaza aunque
+    // ya esté destapado. Por eso se sube el disparador lo justo para que asome sobre la
+    // paginación, se comprueba que el punto de clic es suyo y se pulsa con el ratón en esas
+    // coordenadas, que no desplaza la página. Se repite por si el layout aún se asienta.
+    await expect(async () => {
+      if ((await menu.count()) > 0) await page.keyboard.press('Escape');
+      await expect(menu).toHaveCount(0);
+      const clickable = await lastTrigger.evaluate((element) => {
+        element.scrollIntoView({ block: 'end' });
+        const pagination = document.querySelector('[data-testid="data-table-pagination"]');
+        const overlap =
+          pagination === null
+            ? 0
+            : element.getBoundingClientRect().bottom - pagination.getBoundingClientRect().top;
+        if (overlap > 0) window.scrollBy(0, Math.ceil(overlap));
+        const rect = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        return hit !== null && element.contains(hit);
+      });
+      expect(clickable).toBe(true);
+      const box = await lastTrigger.boundingBox();
+      expect(box).not.toBeNull();
+      if (box === null) return;
+      beforeBox = box;
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await expect(menu).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
+
+    const openedSide = await menu.getAttribute('data-side');
+    const openedTriggerBox = await lastTrigger.boundingBox();
+    test.info().annotations.push({
+      type: 'R33',
+      description: JSON.stringify({ beforeBox, openedTriggerBox, dataSide: openedSide }),
+    });
+
     await expect(async () => {
       const triggerBox = await lastTrigger.boundingBox();
       const menuBox = await menu.boundingBox();
+      expect(beforeBox).not.toBeNull();
       expect(triggerBox).not.toBeNull();
       expect(menuBox).not.toBeNull();
-      if (triggerBox === null || menuBox === null) return;
+      if (beforeBox === null || triggerBox === null || menuBox === null) return;
+      const before: { y: number; height: number } = beforeBox;
+
+      // Abrir el menú no mueve la página: el disparador sigue donde estaba antes del clic (WebKit
+      // lo deja a ~1,3 px por redondeo; el salto que esto vigila es de decenas de píxeles).
+      expect(Math.abs(triggerBox.y - before.y)).toBeLessThan(4);
 
       // Precondición: debajo del disparador no había sitio para el menú.
-      expect(viewportHeight - (triggerBox.y + triggerBox.height)).toBeLessThan(menuBox.height);
+      expect(viewportHeight - (before.y + before.height)).toBeLessThan(menuBox.height);
 
       expect(menuBox.y).toBeGreaterThanOrEqual(0);
       expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(viewportHeight);

@@ -258,9 +258,23 @@ Salida real (`pnpm exec vitest run` de los 25 archivos de la tabla, 2026-10-10):
   barra. Un test o E2E que escriba en ellos tiene que abrir antes el chip
   (`data-table-filter-chip-<columna>`). La X de cada filtro solo existe con el filtro activo.
 
-### Pendiente
-- E2E de R33 sin correr. El leader autorizó correrlo con el `.env` del principal si los datos se
-  crean con los helpers que limpian. El spec crea la empresa y las unidades con `prisma` directamente
-  y las borra en su propio `afterAll` (más un barrido de huérfanos). QC-255 solo ofrece
-  `createFixtureUser`; no hay helper de compañía. Por la condición del leader («si necesita algo que
-  esos helpers no limpian, PARA»), no se corrió.
+### E2E de R33 (autorizado por el leader 2026-10-10)
+- Marcador comprobado antes de correr: empresa, unidades y usuario llevan `qc256_e2e_` + RUN_ID. El
+  afterAll borra por los nombres exactos de la ejecución y el barrido de huérfanos solo toca
+  `qc256_e2e_*` con más de 1 h de antigüedad.
+- El `.env` del principal se copió al worktree para cada ejecución, se exportó al proceso
+  (`set -a; . ./.env`, como hace el CI con `$GITHUB_ENV`) y se borró al terminar. No se commiteó.
+- Dos ajustes del montaje del spec. Primero: `UNIT_COUNT` pasa de 4 a 15 para que la lista desborde
+  los 420 px. Segundo: la paginación `sticky` tapaba el último ⋯ y `locator.click()` bajaba la
+  página antes de pulsar (scrollY 736→848), así que el menú cabía debajo y salía `bottom`. Ahora el
+  test asoma el disparador sobre la paginación, comprueba con `elementFromPoint` que el punto de clic
+  es suyo y pulsa con `page.mouse.click`. Además afirma que abrir no mueve el disparador (< 4 px).
+  Las aserciones de R33 no cambian.
+- Base UI 1.7.0 voltea por defecto (`side: 'flip'`); no se tocó `row-actions-menu.tsx`.
+- Salida real (`pnpm exec playwright test e2e/piezas-compartidas.spec.ts --project=chromium --project=webkit`):
+```
+[1/2] [chromium] › e2e\piezas-compartidas.spec.ts:123:7 › menú de fila › R33: ... queda entero dentro de la ventana
+[2/2] [webkit] › e2e\piezas-compartidas.spec.ts:123:7 › menú de fila › R33: ... queda entero dentro de la ventana
+  2 passed (8.7s)
+```
+- Después de la ejecución, la base tiene 0 unidades, 0 usuarios y 0 empresas con prefijo `qc256_e2e_`.
