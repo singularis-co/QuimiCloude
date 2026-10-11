@@ -339,3 +339,8 @@ Ver progress/review_QC-116-sesion-revocada-en-el-mismo-segundo.md: m1 `tests/uni
 ## QC-255 — menores del review (2026-10-10)
 
 Ver progress/review_QC-255-sanear-suite-e2e.md: m1 citas de ficha/requisito en comentarios y describe de tests nuevos; m2 cabeceras largas; m3 guardia de usuarios no ve create<Tipo> ni creaciones anidadas; m4 guardia de saltos solo mira *.spec.ts y no ve .skip( partido; m5 guardia de presupuesto no fija nombre `e2e` ni condición de disparo; m6 R14 por focus() programático.
+
+## QC-257 (review, 2026-10-10)
+- m2: `e2e/marca-componentes.spec.ts` no reinicia la sesión guardada en `beforeAll`/`afterAll`; con `fullyParallel` un worker que vuelve al archivo podría reutilizar la sesión de un usuario borrado y caer en `/login?sesion=fin`. Arreglo de una línea (`session = null`, como `shell-rediseno.spec.ts`). Previo a QC-257 (viene de QC-227).
+- m1: `tests/unit/pedidos-ui/pedidos-viewport.test.tsx` pasó de CRLF a LF (lo impone `.gitattributes`); el diff es de archivo entero: posible conflicto con ramas que toquen ese test.
+- m4: `tests/guards/guard-identificador-de-request.test.ts` quedó fuera de «Archivos esperados» de `specs/QC-257-shell-rediseno/tasks.md` (declarado en la bitácora).
