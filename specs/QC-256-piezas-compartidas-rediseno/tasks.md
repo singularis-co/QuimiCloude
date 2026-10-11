@@ -208,6 +208,11 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
 - `tests/guards/guard-catalogo-de-componentes.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `components/shared/date-picker.tsx`
+- `tests/unit/clientes-ui/data-table-intacta-clientes.test.ts`
+- `tests/unit/configuracion-ui/data-table-intacta-unidades.test.ts`
+- `tests/unit/configuracion-ui/data-table-intacta-usuarios.test.ts`
+- `tests/unit/configuracion-ui/data-table-intacta.test.ts`
+- `tests/unit/shared/data-table-alcance.test.ts`
 - `tests/unit/shared-ui/campos.test.tsx`
 - `e2e/piezas-compartidas.spec.ts`
 - `progress/impl_QC-256.md`

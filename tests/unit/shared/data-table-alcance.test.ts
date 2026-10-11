@@ -586,7 +586,12 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // cabecera (`data-table-head-*`), la fuente de las celdas (`data-table-cell-*`), la columna fijada
   // por su menu y el foco de `data-table-search`. El centinela pasa de TREINTA Y CINCO a TREINTA Y
   // SEIS; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y seis', () => {
+  //
+  // 2026-10-10 (ENMIENDA QC-256, R33): entra `e2e/piezas-compartidas.spec.ts`, y no afloja la
+  // lista. No estrena tabla: mide el menu de fila (`RowActionsMenu`) de la lista de unidades, ya en
+  // esta lista, y localiza la paginacion sticky por `data-table-pagination`. El centinela pasa de
+  // TREINTA Y SEIS a TREINTA Y SIETE; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y siete', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -596,7 +601,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos treinta y seis E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos treinta y siete E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
@@ -668,6 +673,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // «Terminados»; ver la nota de arriba.
       'e2e/pedidos-terminados.spec.ts',
       'e2e/pedidos.spec.ts',
+      // Ver la nota de arriba (2026-10-10, ENMIENDA QC-256). Entre `pedidos` y `presentaciones`
+      // porque la lista esta ORDENADA: 'e' precede a 'i', e 'i' precede a 'r'.
+      'e2e/piezas-compartidas.spec.ts',
       // La CUARTA entrada la trae QC-45 el 2026-09-07: su E2E localiza la tabla compartida porque
       // la pantalla de presentaciones la consume (QC-45 R8, R36). La lista sigue CERRADA: un
       // sexto spec que referencie `data-table` vuelve a ponerla en rojo.
