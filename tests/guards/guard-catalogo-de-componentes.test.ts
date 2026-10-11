@@ -76,7 +76,6 @@ export const PIEZAS_PREVIAS_AL_REDISENO: readonly string[] = [
   'components/shared/compress-image.ts',
   'components/shared/confirm-dialog.tsx',
   'components/shared/countdown-timer.tsx',
-  'components/shared/credential-field.tsx',
   'components/shared/credential-requirements.tsx',
   'components/shared/credential-rule-labels.ts',
   'components/shared/data-table/index.ts',

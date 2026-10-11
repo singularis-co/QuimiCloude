@@ -1,8 +1,8 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
+import { ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import type { CompanyOrderView } from '@/lib/modules/asignaciones';
-import type { OrderPriority, OrderStatus } from '@/lib/modules/pedidos';
 import { formatCivilDate } from '@/lib/shared/ui/date-civil';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
@@ -34,25 +34,9 @@ export const COMPANY_ORDER_STATUS_COLUMN_ID = 'status';
 export const COMPANY_ORDER_DATE_COLUMN_ID = 'finishedAt';
 export const COMPANY_ORDER_RESPONSIBLES_COLUMN_ID = 'responsibles';
 
-export const COMPANY_ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
-  PENDIENTE: 'Pendiente',
-  EN_CURSO: 'En curso',
-  POR_EMPACAR: 'Por empacar',
-  EN_EMPAQUE: 'En empaque',
-  ENTREGADO: 'Entregado',
-  CANCELADO: 'Cancelado',
-  BLOQUEADO: 'Bloqueado',
-  POR_ACONDICIONAR: 'Por acondicionar',
-  EN_ACONDICIONAMIENTO: 'En acondicionamiento',
-  TERMINADO: 'Terminado',
-};
+export const COMPANY_ORDER_STATUS_LABELS = ORDER_STATUS_LABELS;
 
-export const COMPANY_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {
-  BAJA: 'Baja',
-  MEDIA: 'Media',
-  ALTA: 'Alta',
-  CRITICA: 'Crítica',
-};
+export const COMPANY_ORDER_PRIORITY_LABELS = ORDER_PRIORITY_LABELS;
 
 /** Las opciones del filtro «Estado», derivadas del mismo conjunto que la URL reconoce. */
 export const COMPANY_ORDER_STATUS_FILTER_OPTIONS: readonly { value: string; label: string }[] =

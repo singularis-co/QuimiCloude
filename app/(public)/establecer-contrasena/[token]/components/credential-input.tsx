@@ -2,11 +2,7 @@
 
 // QC-79 T19 — El campo de contrasena de la pagina publica, con su boton de mostrar/ocultar.
 //
-// Vive en la ruta y no en `components/shared/` porque hoy lo usa UNA pantalla: `CredentialField`
-// de QC-21 es el compuesto compartido y NO trae control de mostrar/ocultar (su R17 lo dejo fuera,
-// pregunta abierta 2 de aquella ficha). Esta feature no lo reabre ni lo modifica: R25 le pide a
-// ESTA pantalla un mostrar/ocultar accesible sin `:hover`, y eso se resuelve aqui. El dia que una
-// segunda pantalla lo necesite, subir este archivo a `components/shared/` es moverlo de carpeta.
+// El campo compartido equivalente es `PasswordField`; esta pantalla aún no lo ha adoptado.
 //
 // Multiplataforma (R25, `docs/architecture.md > Componentes > Regla: multiplataforma`):
 //   - `text-base md:text-base`: 16 px SIEMPRE. El primitivo `Input` trae `text-base md:text-sm`,

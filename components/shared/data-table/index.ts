@@ -12,7 +12,7 @@
 export { DataTable, DATA_TABLE_FEATURES, DATA_TABLE_OPTED_FEATURES } from './data-table';
 
 export { actionsColumn } from './actions-column';
-export type { ActionsColumnOptions } from './actions-column';
+export type { ActionsColumnOptions, RowActionsSpec } from './actions-column';
 
 export {
   createDefaultParams,
@@ -26,6 +26,7 @@ export {
 } from './data-table-params';
 
 export type {
+  DataTableCardLayout,
   DataTableColumn,
   DataTableFilterSpec,
   DataTableFilterValue,
