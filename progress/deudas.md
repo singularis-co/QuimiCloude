@@ -344,3 +344,11 @@ Ver progress/review_QC-255-sanear-suite-e2e.md: m1 citas de ficha/requisito en c
 - m2: `e2e/marca-componentes.spec.ts` no reinicia la sesión guardada en `beforeAll`/`afterAll`; con `fullyParallel` un worker que vuelve al archivo podría reutilizar la sesión de un usuario borrado y caer en `/login?sesion=fin`. Arreglo de una línea (`session = null`, como `shell-rediseno.spec.ts`). Previo a QC-257 (viene de QC-227).
 - m1: `tests/unit/pedidos-ui/pedidos-viewport.test.tsx` pasó de CRLF a LF (lo impone `.gitattributes`); el diff es de archivo entero: posible conflicto con ramas que toquen ese test.
 - m4: `tests/guards/guard-identificador-de-request.test.ts` quedó fuera de «Archivos esperados» de `specs/QC-257-shell-rediseno/tasks.md` (declarado en la bitácora).
+
+## QC-256 (review, 2026-10-11)
+Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
+- R45: la redacción del requisito no encaja con los apoyos sin UI (`lib/shared/ui/order-status.ts`, `STATUS_TONES`, `avatarTone`), que en el catálogo llevan `sin UI` en lugar de un tablero.
+- «Acciones» (tarjetas de `DataTable`): su nombre accesible depende de `triggerLabel`; si el texto visible y el nombre accesible divergen, se incumple WCAG 2.5.3 (Label in Name).
+- Modo `card` de `DataTable`: tabla y tarjetas se pintan a la vez y se duplican los `data-testid`. Aviso puesto en la fila `DataTable` de `CATALOGO.md` para las fichas QC-260..267.
+- `numberRange`: los campos mínimo y máximo comparten el mismo nombre accesible. Previo a QC-256 (ya venía de dev).
+- Foco tapado: el foco en la última fila puede quedar bajo la paginación `sticky` de `DataTable` (WCAG 2.4.11). Arreglo con `scroll-padding-bottom`; va en una ficha aparte.

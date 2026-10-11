@@ -22,7 +22,7 @@ const TONES: Readonly<Record<NoticeTone, { readonly icon: LucideIcon; readonly c
 };
 
 // Compone el Alert de shadcn: el layout del tablero (flex, gap 12, padding 12/14, radio 10)
-// sustituye al grid base vía tailwind-merge, y el role de Alert se sobrescribe por props (R17).
+// sustituye al grid base vía tailwind-merge, y el role de Alert se sobrescribe por props.
 export function Notice({ tone, title, children, className, testId }: NoticeProps) {
   const { icon: Icon, classes } = TONES[tone];
   return (
