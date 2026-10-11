@@ -11,11 +11,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
+import { DataTableFilterChip, formatFilterChipValue } from './data-table-filter-chip';
 import { DataTableFilterDate } from './data-table-filter-date';
-import { SEARCH_DEBOUNCE_MS, withFilter, withSearch } from './data-table-params';
+import { SEARCH_DEBOUNCE_MS, withFilter, withoutFilters, withSearch } from './data-table-params';
 import type {
   DataTableColumn,
   DataTableFilterValue,
@@ -121,6 +123,137 @@ function DataTableFilterClearButton({
   );
 }
 
+const CLEAR_FILTERS_FALLBACK = 'Limpiar filtros';
+
+type FilterControlProps<TRow> = {
+  readonly column: DataTableColumn<TRow>;
+  readonly value: DataTableFilterValue | undefined;
+  readonly chipValue: string | null;
+  readonly texts: DataTableTexts;
+  readonly onChange: (next: DataTableFilterValue | null) => void;
+};
+
+function SelectFilter<TRow>({ column, value, chipValue, onChange }: FilterControlProps<TRow>) {
+  if (column.filter?.kind !== 'select') return null;
+  const { options } = column.filter;
+  const values = value?.kind === 'select' ? value.values : [];
+
+  const toggle = (optionValue: string) => {
+    const next = values.includes(optionValue)
+      ? values.filter((current) => current !== optionValue)
+      : [...values, optionValue];
+    onChange(next.length === 0 ? null : { kind: 'select', values: next });
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<DataTableFilterChip label={column.label} value={chipValue} />}
+        data-testid={`data-table-filter-${column.id}`}
+      />
+      <DropdownMenuContent>
+        {options.map((option) => (
+          <DropdownMenuCheckboxItem
+            key={option.value}
+            checked={values.includes(option.value)}
+            onCheckedChange={() => toggle(option.value)}
+            data-testid={`data-table-filter-option-${column.id}-${option.value}`}
+          >
+            {option.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function TextFilter<TRow>({ column, value, chipValue, onChange }: FilterControlProps<TRow>) {
+  const textValue = value?.kind === 'text' ? value.value : '';
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={<DataTableFilterChip label={column.label} value={chipValue} />}
+        data-testid={`data-table-filter-chip-${column.id}`}
+      />
+      <PopoverContent align="start">
+        <Input
+          type="text"
+          aria-label={column.label}
+          value={textValue}
+          data-testid={`data-table-filter-${column.id}`}
+          className={cn(touchTarget, FIELD_TEXT)}
+          onChange={(event) => {
+            const next = event.target.value;
+            onChange(next === '' ? null : { kind: 'text', value: next });
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function NumberRangeFilter<TRow>({ column, value, chipValue, onChange }: FilterControlProps<TRow>) {
+  const min = value?.kind === 'numberRange' ? value.min : null;
+  const max = value?.kind === 'numberRange' ? value.max : null;
+
+  const emitRange = (nextMin: number | null, nextMax: number | null) => {
+    onChange(nextMin === null && nextMax === null ? null : { kind: 'numberRange', min: nextMin, max: nextMax });
+  };
+  const toNumber = (raw: string) => (raw === '' ? null : Number(raw));
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={<DataTableFilterChip label={column.label} value={chipValue} />}
+        data-testid={`data-table-filter-chip-${column.id}`}
+      />
+      <PopoverContent align="start" className="w-auto">
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            inputMode="decimal"
+            aria-label={column.label}
+            value={min === null ? '' : min}
+            data-testid={`data-table-filter-min-${column.id}`}
+            className={cn(touchTarget, FIELD_TEXT, 'w-28')}
+            onChange={(event) => emitRange(toNumber(event.target.value), max)}
+          />
+          <span aria-hidden="true">–</span>
+          <Input
+            type="number"
+            inputMode="decimal"
+            aria-label={column.label}
+            value={max === null ? '' : max}
+            data-testid={`data-table-filter-max-${column.id}`}
+            className={cn(touchTarget, FIELD_TEXT, 'w-28')}
+            onChange={(event) => emitRange(min, toNumber(event.target.value))}
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function DateFilter<TRow>({ column, value, texts, onChange }: FilterControlProps<TRow>) {
+  return (
+    <DataTableFilterDate
+      columnId={column.id}
+      label={column.label}
+      value={value?.kind === 'dateRange' ? value : undefined}
+      texts={texts}
+      onChange={onChange}
+    />
+  );
+}
+
+const FILTER_CONTROLS = {
+  select: SelectFilter,
+  text: TextFilter,
+  numberRange: NumberRangeFilter,
+  dateRange: DateFilter,
+} as const;
+
 export function DataTableFilters<TRow>({
   columns,
   params,
@@ -129,157 +262,63 @@ export function DataTableFilters<TRow>({
   toolbarActions,
   searchable = true,
 }: DataTableFiltersProps<TRow>) {
-  const filterableColumns = columns.filter((column) => column.filter !== undefined);
+  const filters = columns.flatMap((column) =>
+    column.filter === undefined
+      ? []
+      : [{ column, filter: column.filter, chipValue: formatFilterChipValue(column.filter, params.filters[column.id]) }],
+  );
+  const anyActive = filters.some(({ chipValue }) => chipValue !== null);
 
   return (
-    <div className="flex flex-col gap-3" data-testid="data-table-filters">
-      <div className="flex flex-wrap items-center gap-3">
-        {searchable ? (
+    <div className="@container flex flex-wrap items-center gap-2" data-testid="data-table-filters">
+      {searchable ? (
+        <div className="max-w-[380px] flex-[1_1_220px] @max-[760px]:max-w-none @max-[760px]:basis-full">
           <DataTableSearchField params={params} texts={texts} onParamsChange={onParamsChange} />
-        ) : null}
+        </div>
+      ) : null}
 
-        {toolbarActions === undefined ? null : (
-          <div className="flex items-center gap-2" data-testid="data-table-toolbar-actions">
-            {toolbarActions}
-          </div>
-        )}
-      </div>
+      {toolbarActions === undefined ? null : (
+        <div className="flex items-center gap-2" data-testid="data-table-toolbar-actions">
+          {toolbarActions}
+        </div>
+      )}
 
-      {filterableColumns.length === 0 ? null : (
-        <div className="flex flex-wrap items-end gap-3">
-          {filterableColumns.map((column) => {
-            const { filter } = column;
-            if (filter === undefined) return null;
-
-            const activeValue = params.filters[column.id];
-            const clear = () => onParamsChange(withFilter(params, column.id, null));
-
-            if (filter.kind === 'dateRange') {
-              const dateValue = activeValue?.kind === 'dateRange' ? activeValue : undefined;
-              return (
-                <div key={column.id} className="flex items-end gap-1">
-                  <DataTableFilterDate
-                    columnId={column.id}
-                    label={column.label}
-                    value={dateValue}
-                    texts={texts}
-                    onChange={(next) => onParamsChange(withFilter(params, column.id, next))}
-                  />
-                  <DataTableFilterClearButton columnId={column.id} texts={texts} onClear={clear} />
-                </div>
-              );
-            }
-
-            if (filter.kind === 'numberRange') {
-              const min = activeValue?.kind === 'numberRange' ? activeValue.min : null;
-              const max = activeValue?.kind === 'numberRange' ? activeValue.max : null;
-
-              const emitRange = (nextMin: number | null, nextMax: number | null) => {
-                const next: DataTableFilterValue = { kind: 'numberRange', min: nextMin, max: nextMax };
-                onParamsChange(withFilter(params, column.id, next));
-              };
-
-              return (
-                <div key={column.id} className="flex items-end gap-1">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">{column.label}</span>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        aria-label={column.label}
-                        value={min === null ? '' : min}
-                        data-testid={`data-table-filter-min-${column.id}`}
-                        className={cn(touchTarget, FIELD_TEXT, 'w-24')}
-                        onChange={(event) =>
-                          emitRange(event.target.value === '' ? null : Number(event.target.value), max)
-                        }
-                      />
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        aria-label={column.label}
-                        value={max === null ? '' : max}
-                        data-testid={`data-table-filter-max-${column.id}`}
-                        className={cn(touchTarget, FIELD_TEXT, 'w-24')}
-                        onChange={(event) =>
-                          emitRange(min, event.target.value === '' ? null : Number(event.target.value))
-                        }
-                      />
-                    </div>
-                  </div>
-                  <DataTableFilterClearButton columnId={column.id} texts={texts} onClear={clear} />
-                </div>
-              );
-            }
-
-            if (filter.kind === 'select') {
-              const values = activeValue?.kind === 'select' ? activeValue.values : [];
-
-              const toggle = (optionValue: string) => {
-                const next = values.includes(optionValue)
-                  ? values.filter((value) => value !== optionValue)
-                  : [...values, optionValue];
-                onParamsChange(
-                  withFilter(params, column.id, next.length === 0 ? null : { kind: 'select', values: next }),
-                );
-              };
-
-              return (
-                <div key={column.id} className="flex items-end gap-1">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      className={cn(
-                        'inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm hover:bg-muted outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring',
-                        touchTarget,
-                      )}
-                      data-testid={`data-table-filter-${column.id}`}
-                    >
-                      {column.label}
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      {filter.options.map((option) => (
-                        <DropdownMenuCheckboxItem
-                          key={option.value}
-                          checked={values.includes(option.value)}
-                          onCheckedChange={() => toggle(option.value)}
-                          data-testid={`data-table-filter-option-${column.id}-${option.value}`}
-                        >
-                          {option.label}
-                        </DropdownMenuCheckboxItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <DataTableFilterClearButton columnId={column.id} texts={texts} onClear={clear} />
-                </div>
-              );
-            }
-
-            // filter.kind === 'text'
-            const textValue = activeValue?.kind === 'text' ? activeValue.value : '';
-
+      {filters.length === 0 ? null : (
+        <div className="flex flex-wrap items-center gap-2 @max-[760px]:basis-full" data-testid="data-table-chips">
+          {filters.map(({ column, filter, chipValue }) => {
+            const Control = FILTER_CONTROLS[filter.kind] as (props: FilterControlProps<TRow>) => ReactNode;
             return (
-              <div key={column.id} className="flex items-end gap-1">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">{column.label}</span>
-                  <Input
-                    type="text"
-                    aria-label={column.label}
-                    value={textValue}
-                    data-testid={`data-table-filter-${column.id}`}
-                    className={cn(touchTarget, FIELD_TEXT)}
-                    onChange={(event) => {
-                      const next = event.target.value;
-                      onParamsChange(
-                        withFilter(params, column.id, next === '' ? null : { kind: 'text', value: next }),
-                      );
-                    }}
+              <div key={column.id} className="flex items-center gap-1">
+                <Control
+                  column={column}
+                  value={params.filters[column.id]}
+                  chipValue={chipValue}
+                  texts={texts}
+                  onChange={(next) => onParamsChange(withFilter(params, column.id, next))}
+                />
+                {chipValue === null ? null : (
+                  <DataTableFilterClearButton
+                    columnId={column.id}
+                    texts={texts}
+                    onClear={() => onParamsChange(withFilter(params, column.id, null))}
                   />
-                </div>
-                <DataTableFilterClearButton columnId={column.id} texts={texts} onClear={clear} />
+                )}
               </div>
             );
           })}
+
+          {anyActive ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              touch
+              data-testid="data-table-clear-filters"
+              onClick={() => onParamsChange(withoutFilters(params))}
+            >
+              {texts.clearFilters ?? CLEAR_FILTERS_FALLBACK}
+            </Button>
+          ) : null}
         </div>
       )}
     </div>

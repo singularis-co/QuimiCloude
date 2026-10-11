@@ -257,7 +257,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
    * DOM (p. ej. dentro de un `Popover` cerrado): simplemente no mueve el foco.
    */
   function focusColumnFilter(columnId: string) {
-    const selector = `[data-testid="data-table-filter-${columnId}"], [data-testid="data-table-filter-date-${columnId}"], [data-testid="data-table-filter-min-${columnId}"]`;
+    const selector = `[data-testid="data-table-filter-${columnId}"], [data-testid="data-table-filter-date-${columnId}"], [data-testid="data-table-filter-chip-${columnId}"]`;
     document.querySelector<HTMLElement>(selector)?.focus();
   }
 

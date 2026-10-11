@@ -172,3 +172,26 @@ T6, T7 y T8 hechos y en verde; solo quedan rojos dos snapshots de paridad ajenos
 - Salida: typecheck limpio; lint 0 errores (7 avisos previos ajenos); los 3 tests nuevos 31/31 verdes y `row-actions-menu-href` 6/6; `vitest related` sobre los archivos tocados 224 archivos / 3590 tests verdes (+1 skipped), paridad incluida; `vitest run guard` 71 / 977 (+18 skipped) verdes.
 - E2E: BLOQUEO. `pnpm exec playwright test e2e/piezas-compartidas.spec.ts` → `PrismaClientInitializationError: Environment variable not found: DATABASE_URL` en el `beforeAll`: el worktree no tiene `.env` y ni `docs/verification.md` ni `docs/worktrees.md` dicen cómo se monta el entorno de un worktree. Spec escrito, sin correr en verde.
 - Veredicto: T9a y T9b hechas y en verde; T9c escrita y bloqueada por el entorno.
+
+## Tanda 4 — snapshots de paridad de la barra en chips (decisión del leader 2026-10-10)
+- `vitest -u` sobre `tests/unit/paridad/`: 21 archivos y 376 tests en verde, 27 snapshots actualizados en 12 archivos.
+- Control mecánico: en cada entrada, antes y después, se quita el subárbol con raíz en
+  `data-testid="data-table-filters"`, `data-table-chips` o `data-table-filter-*`, y el resto debe
+  ser idéntico. Resultado: 27 de 27 entradas iguales fuera de la barra. Una sola entrada
+  (`campos-paridad`, «F2 filtro de fecha de la tabla: cerrado») renderiza el `DataTableFilterDate`
+  suelto: su raíz es el propio disparador del filtro, que en la app vive dentro de la barra.
+- Revisión manual (antes → después):
+  - Select, `usuarios-paridad` «personas con filas»: el botón «Estado» con su X «Limpiar filtro»
+    siempre visible → el chip «Estado» con icono + y `span` de etiqueta, dentro de
+    `data-table-chips`, sin X (el filtro está inactivo). El buscador no cambia.
+  - Fecha, `pedidos-paridad` «con filas»: Estado, Prioridad y «Fecha de solicitud» tenían cada uno
+    su X → tres chips sin X en `data-table-chips`. El chip de fecha conserva `aria-haspopup="dialog"`
+    y su testid. `data-table-toolbar-actions` (filtro de cliente) pasa a ser hermano del buscador
+    dentro de la barra, con su contenido intacto.
+  - Rango numérico, `inventario-paridad` «productos con filas»: «Existencia» y «Alerta de cantidad»
+    eran una etiqueta, dos `spinbutton` mín/máx y una X → un chip por filtro
+    (`data-table-filter-chip-stock`, `-qtyAlert`, `aria-haspopup="dialog"`); los campos salen de la
+    barra y se abren desde el chip.
+- Desviaciones de T9d aceptadas por el leader: `trigger` opcional en `DatePicker` (regla 2,
+  extender) y `campos.test.tsx`. Ajustes de la tanda 3 anotados en tasks.md: alta del E2E en
+  `guard-identificador-de-request`, y el volteo, que Base UI 1.7.0 ya trae por defecto.

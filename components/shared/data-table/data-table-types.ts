@@ -160,6 +160,8 @@ export type DataTableTexts = {
   readonly filterColumn: string;
   /** Etiqueta de la accion de limpiar un filtro (R16). */
   readonly clearFilter: string;
+  /** Texto del botón que quita todos los filtros. Sin valor, «Limpiar filtros». */
+  readonly clearFilters?: string;
   /** Atajo de rango de fechas: ultima semana (R18). */
   readonly lastWeek: string;
   /** Atajo de rango de fechas: ultimo mes (R18). */

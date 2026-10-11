@@ -74,7 +74,7 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   *Hecho:* los tres tests unitarios y el E2E en verde; los tests de las tablas existentes en verde
   sin tocarlos (R38).
 
-- [ ] **T9d. Barra de filtros en chips (R52–R58).** Depende de T2 (talla de «Limpiar filtros») y
+- [x] **T9d. Barra de filtros en chips (R52–R58).** Depende de T2 (talla de «Limpiar filtros») y
   conviene después de T9b (mismo directorio). Crear `data-table-filter-chip.tsx` (chip y
   `formatFilterChipValue`), reescribir el aspecto de `data-table-filters.tsx` según
   `design.md > 7.5`, adaptar `data-table-filter-date.tsx` para que su disparador sea el chip, añadir
@@ -207,5 +207,7 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
 - `app/(public)/establecer-contrasena/[token]/components/credential-input.tsx`
 - `tests/guards/guard-catalogo-de-componentes.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
+- `components/shared/date-picker.tsx`
+- `tests/unit/shared-ui/campos.test.tsx`
 - `e2e/piezas-compartidas.spec.ts`
 - `progress/impl_QC-256.md`

@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarIcon } from 'lucide-react';
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange, Matcher } from 'react-day-picker';
 
 import { Calendar } from '@/components/ui/calendar';
@@ -32,7 +32,9 @@ type DatePickerSingleProps = {
 type DatePickerRangeProps = {
   readonly mode: 'range';
   /** Contenido del disparador, detrás del icono. */
-  readonly triggerContent: ReactNode;
+  readonly triggerContent?: ReactNode;
+  /** Disparador propio, en lugar del botón con icono; debe pintar un `<button>`. */
+  readonly trigger?: ReactElement;
   readonly selected: DateRange | undefined;
   readonly onSelect: (range: DateRange | undefined) => void;
   readonly numberOfMonths?: number;
@@ -115,6 +117,7 @@ function SingleDatePicker({
 
 function RangeDatePicker({
   triggerContent,
+  trigger,
   selected,
   onSelect,
   numberOfMonths,
@@ -123,14 +126,18 @@ function RangeDatePicker({
 }: DatePickerRangeProps) {
   return (
     <Popover>
-      <PopoverTrigger
-        type="button"
-        className={cn(TRIGGER_CLASS, touchTarget)}
-        data-testid={triggerTestId}
-      >
-        <CalendarIcon className="size-4" aria-hidden="true" />
-        {triggerContent}
-      </PopoverTrigger>
+      {trigger === undefined ? (
+        <PopoverTrigger
+          type="button"
+          className={cn(TRIGGER_CLASS, touchTarget)}
+          data-testid={triggerTestId}
+        >
+          <CalendarIcon className="size-4" aria-hidden="true" />
+          {triggerContent}
+        </PopoverTrigger>
+      ) : (
+        <PopoverTrigger render={trigger} data-testid={triggerTestId} />
+      )}
 
       <PopoverContent className="w-auto">
         {header}

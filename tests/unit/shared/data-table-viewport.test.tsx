@@ -124,12 +124,13 @@ describe.each([
     expect(screen.getByTestId('data-table-filter-open-nombre')).toBeInTheDocument()
   })
 
-  it('la barra de filtros aparece y emite un cambio de filtro', () => {
+  it('la barra de filtros aparece y emite un cambio de filtro', async () => {
     const { onParamsChange } = renderTabla()
 
     expect(screen.getByTestId('data-table-filters')).toBeInTheDocument()
 
-    const campoNombre = screen.getByTestId('data-table-filter-nombre')
+    fireEvent.click(screen.getByTestId('data-table-filter-chip-nombre'))
+    const campoNombre = await screen.findByTestId('data-table-filter-nombre')
     fireEvent.change(campoNombre, { target: { value: 'ac' } })
 
     expect(onParamsChange).toHaveBeenCalled()
