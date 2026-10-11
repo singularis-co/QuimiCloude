@@ -101,12 +101,12 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   `Avisos.dc.html`).
   *Hecho:* tests en verde; Grep de `animate-spin` y `Loader2Icon` solo en `spinner.tsx`.
 
-- [ ] **T11. Catálogo (R45, R46).** Depende de T2–T10b. Test nuevo
+- [x] **T11. Catálogo (R45, R46).** Depende de T2–T10b. Test nuevo
   `tests/unit/shared-ui/catalogo-qc256.test.ts`: cada pieza de R45 y R46 tiene fila con su tablero
   en `Diseño`, y no hay fila de `CredentialField`. Revisar que ninguna fila quedó a medias.
   *Hecho:* `catalogo-qc256` y `pnpm exec vitest run guard` en verde.
 
-- [ ] **T12. Cierre.** Depende de todo. `./init.sh` en verde. Escribir `progress/impl_QC-256.md` con
+- [x] **T12. Cierre.** Depende de todo. `./init.sh` en verde. Escribir `progress/impl_QC-256.md` con
   el mapa R → test de `design.md > 14`, las enmiendas a QC-21, QC-30, QC-55 y QC-232, el aviso del
   DOM doble de las tarjetas y el de los filtros que ahora se abren desde su chip, para las fichas de
   módulo.

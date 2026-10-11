@@ -195,3 +195,72 @@ T6, T7 y T8 hechos y en verde; solo quedan rojos dos snapshots de paridad ajenos
 - Desviaciones de T9d aceptadas por el leader: `trigger` opcional en `DatePicker` (regla 2,
   extender) y `campos.test.tsx`. Ajustes de la tanda 3 anotados en tasks.md: alta del E2E en
   `guard-identificador-de-request`, y el volteo, que Base UI 1.7.0 ya trae por defecto.
+
+## Cierre (T11, T12) — implementer
+
+### Integración
+`origin/dev` (QC-257, #207) integrado en 1e69acf3. Conflicto trivial en
+`tests/guards/guard-identificador-de-request.test.ts`: se conservan las dos altas
+(`piezas-compartidas.spec.ts` y `shell-rediseno.spec.ts`). `CATALOGO.md` se mezcló solo; la fila
+`SidebarProvider…` de QC-257 sigue presente. Sin migraciones.
+
+### Mapa R → test (design.md § 14, con D17)
+| R | Test |
+| --- | --- |
+| R1–R5 | `tests/unit/shared-ui/button-tallas.test.tsx` (+ `button-touch.test.tsx`, R3) |
+| R6–R9 | `tests/unit/shared-ui/status-badge.test.tsx` |
+| R10, R11 | `tests/unit/shared-ui/order-status.test.ts` (mapa en `lib/shared/ui/order-status.ts`, `expectTypeOf` en los dos sentidos) |
+| R12–R14 | `tests/unit/shared-ui/priority-mark.test.tsx` (`level` 1–4 + `label`) |
+| R15–R18 | `tests/unit/shared-ui/notice.test.tsx` |
+| R19–R24, R26 | `tests/unit/shared-ui/password-field.test.tsx` |
+| R25 | `tests/unit/shared-ui/password-field-requisitos.test.tsx` |
+| R27–R30 | `tests/unit/shared-ui/page-header.test.tsx` |
+| R31 | `tests/unit/shared-ui/url-tabs.test.tsx` |
+| R32, R38 | `tests/unit/shared-ui/data-table-acciones.test.tsx` |
+| R33 | `e2e/piezas-compartidas.spec.ts` (**escrito, SIN CORRER**; ver abajo) |
+| R34, R35, R39 | `tests/unit/shared-ui/data-table-tarjetas.test.tsx` |
+| R36, R37 | `tests/unit/shared-ui/row-actions-menu-centrado.test.tsx` |
+| R40, R41 | `tests/unit/shared-ui/avatar-tone.test.ts` (+ `tokens-rediseno.test.ts`) |
+| R42 | `tests/unit/shared-ui/responsible-avatars.test.tsx` |
+| R43, R44 | `tests/unit/shared-ui/spinner.test.tsx` |
+| R6, R15, R41 (tokens) | `tests/unit/shared-ui/tokens-rediseno.test.ts` |
+| R45, R46 | `tests/guards/guard-catalogo-de-componentes.test.ts` y `tests/unit/shared-ui/catalogo-qc256.test.ts` |
+| R47 | `tests/unit/marca/badges-estado.test.tsx` (sin cambios) |
+| R48 | `tests/guards/guard-dependencias-aprobadas.test.ts` |
+| R49–R51 | `tests/unit/shared-ui/arrow-link.test.tsx` |
+| R52–R55, R57, R58 | `tests/unit/shared/data-table-filters.test.tsx` y `tests/unit/shared-ui/data-table-filter-chip.test.ts` |
+| R56 | `tests/unit/shared/data-table-filters.test.tsx` y `tests/unit/shared/data-table-params.test.ts` |
+
+Salida real (`pnpm exec vitest run` de los 25 archivos de la tabla, 2026-10-10):
+```
+ Test Files  25 passed (25)
+      Tests  371 passed (371)
+```
+
+### Enmiendas a specs cerrados (design.md § 10)
+- QC-21: `CredentialField` desaparece y pasa a `PasswordField`; sale de `PIEZAS_PREVIAS_AL_REDISENO`.
+- QC-30: `login-skin` pasa de `h-8` a `h-9`.
+- QC-55: barra de filtros en chips. Los filtros `text`/`numberRange` se abren desde su chip, la X
+  solo aparece con el filtro activo y nace «Limpiar filtros». Un `numberRange` vacío ya no emite
+  `{min:null,max:null}`, sino que quita la clave (R53).
+- QC-232: `RowActionsMenu` y `actionsColumn` ganan props opcionales.
+- QC-231/232/233: snapshots de paridad regenerados en tres commits propios con control (Button D7,
+  Spinner/Avatar R41/R43, barra en chips D14).
+- QC-33/34/35: no se enmiendan. Ante su choque, el humano eligió la opción 2 (D17): las piezas
+  compartidas no conocen el dominio.
+
+### Avisos para las fichas de módulo
+- **DOM doble de las tarjetas:** con `card`, `DataTable` pinta la tabla y las tarjetas a la vez y
+  las alterna por `@container` (≤ 760 px). Los tests de pantalla que busquen por texto o testid
+  dentro de una tabla con `card` encontrarán dos coincidencias: deben acotar al cuerpo visible.
+  Sin `card` no cambia nada (R38).
+- **Filtros que se abren desde su chip:** los filtros `text` y `numberRange` ya no están en la
+  barra. Un test o E2E que escriba en ellos tiene que abrir antes el chip
+  (`data-table-filter-chip-<columna>`). La X de cada filtro solo existe con el filtro activo.
+
+### Pendiente
+- E2E de R33 sin correr. El leader autorizó correrlo con el `.env` del principal si los datos se
+  crean con los helpers que limpian. El spec crea la empresa y las unidades con `prisma` directamente
+  y las borra en su propio `afterAll` (más un barrido de huérfanos). QC-255 solo ofrece
+  `createFixtureUser`; no hay helper de compañía. Por la condición del leader («si necesita algo que
+  esos helpers no limpian, PARA»), no se corrió.
