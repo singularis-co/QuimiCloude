@@ -21,6 +21,7 @@ import { TableSkeleton } from '@/components/shared/table-skeleton';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
+import { DataTableCards } from './data-table-cards';
 import { DataTableColumnDivider } from './data-table-divider';
 import { DataTableFilters } from './data-table-filters';
 import { DataTableHeaderCell, DataTableHeaderMenu } from './data-table-header-menu';
@@ -127,6 +128,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
     toolbarActions,
     searchable,
     states,
+    card,
   } = props;
 
   const columnIds = useMemo(() => columns.map((column) => column.id), [columns]);
@@ -297,7 +299,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
   };
 
   return (
-    <div data-testid="data-table" className="flex flex-col gap-4">
+    <div data-testid="data-table" className={cn('flex flex-col gap-4', card !== undefined && '@container')}>
       {showToolbars ? (
         <DataTableFilters
           columns={columns}
@@ -316,7 +318,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
       ) : visibleState === 'empty' ? (
         <DataTableEmpty texts={texts} emptyAction={emptyAction} />
       ) : (
-        <div ref={tableWrapRef} className="relative">
+        <div ref={tableWrapRef} className={cn('relative', card !== undefined && '@max-[760px]:hidden')}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -400,6 +402,17 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
           />
         </div>
       )}
+
+      {card !== undefined && visibleState === 'rows' ? (
+        <DataTableCards
+          columns={columns}
+          rows={rows}
+          getRowId={getRowId}
+          layout={card}
+          texts={texts}
+          className="hidden @max-[760px]:flex"
+        />
+      ) : null}
 
       {showToolbars ? (
         <DataTablePagination

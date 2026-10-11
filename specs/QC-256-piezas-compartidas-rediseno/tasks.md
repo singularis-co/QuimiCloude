@@ -32,7 +32,7 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   (`Diseño`: `Estados.dc.html`).
   *Hecho:* test en verde.
 
-- [ ] **T5 [P]. Alert y Notice (R15–R18, R48).** Depende de T1. `pnpm exec shadcn add alert`
+- [x] **T5 [P]. Alert y Notice (R15–R18, R48).** Depende de T1. `pnpm exec shadcn add alert`
   (comprobar con `git diff -- package.json` que no añade nada; si añade, parar y preguntar). Crear
   `components/shared/notice.tsx`. Test nuevo `notice.test.tsx`. Filas nuevas `Alert` y `Notice`
   (`Diseño`: `Avisos.dc.html`).
@@ -60,7 +60,7 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   *Hecho:* test en verde; los tests actuales de `assignment-view-tabs`, `usuarios-tabs-switch` y
   `product-type-tabs` siguen en verde sin tocarlos.
 
-- [ ] **T9. RowActionsMenu y DataTable (R32–R39).** Depende de T2 (talla del botón «Acciones»).
+- [~] **T9. RowActionsMenu y DataTable (R32–R39).** Depende de T2 (talla del botón «Acciones»).
   - T9a. `RowActionsMenu`: `presentation`, `title`, `texts`; menú desplegable con `side="bottom"` y
     volteo (verificar el nombre de la prop de Base UI). Test nuevo
     `row-actions-menu-centrado.test.tsx`; `row-actions-menu-href.test.tsx` sigue en verde.
@@ -206,5 +206,6 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
 - `e2e/pedidos-terminados.spec.ts`
 - `app/(public)/establecer-contrasena/[token]/components/credential-input.tsx`
 - `tests/guards/guard-catalogo-de-componentes.test.ts`
+- `tests/guards/guard-identificador-de-request.test.ts`
 - `e2e/piezas-compartidas.spec.ts`
 - `progress/impl_QC-256.md`
