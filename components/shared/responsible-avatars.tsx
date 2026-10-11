@@ -2,6 +2,7 @@
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { avatarTone } from '@/lib/shared/ui/avatar-tone';
 import { getInitials } from '@/lib/shared/ui/initials';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
@@ -100,6 +101,7 @@ function ResponsibleAvatar({ responsible }: { readonly responsible: AvatarGroupP
           // (R21). No hay ningun elemento `img` en este arbol y no puede haberlo: no hay foto.
           <Avatar
             role="img"
+            tone={avatarTone(responsible.userId)}
             aria-label={responsible.displayName}
             data-testid={RESPONSIBLE_AVATAR_TESTID}
             data-user-id={responsible.userId}

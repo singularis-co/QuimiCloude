@@ -82,6 +82,7 @@ usen sin crear nada.
 | D14 (P4) | **Entra** la barra de filtros en chips de `DataTable` (chip punteado → sólido con el valor dentro, «Limpiar filtros»; tablero `Tabla`), porque la heredan todas las listas | humano, 2026-10-10 (aprobación del spec) | QC-55 (la barra de filtros de `DataTable` y sus tests) | R52, R53, R54, R55, R56, R57, R58 |
 | D15 (P6) | Los textos del ojo para keys los pone el consumidor (`PasswordField` acepta textos propios); los decide QC-237 o la ficha de Integraciones | humano, 2026-10-10 (aprobación del spec) | — | R21 |
 | D16 (P7) | Tarjetas y acciones a todo el ancho con contenedor ≤ 760 px; `touch="mobile"` y el relleno de `PageShell` con ventana < 768 px | humano, 2026-10-10 (aprobación del spec) | — | R4, R27, R30, R34 |
+| D17 | Las piezas compartidas no conocen el dominio: `StatusBadge` recibe `tone` + `label` y `PriorityMark` recibe `level` (1–4) + `label`, sin importar `lib/modules/*`. El mapa único de pedido sale de `components/shared/` y va a `lib/shared/ui/order-status.ts`, porque `components/` no puede importar `@/lib/modules/pedidos` (scope.test de QC-34/35 y module-contract de QC-33) | el humano, opción 2, 2026-10-10 (durante la implementación) | — | R10, R11, R12, R13 |
 
 ## Requisitos (EARS)
 
@@ -110,7 +111,7 @@ usen sin crear nada.
 - **R9.** CUANDO cambie el tono de un `StatusBadge` ya pintado, el sistema DEBE pasar el fondo y el
   color del texto al nuevo tono en 200 ms con la curva estándar, sin animar el ancho.
 - **R10.** El sistema DEBE tener **una sola** fuente de etiqueta y tono para el estado, la cobertura
-  y la prioridad de un pedido, en `components/shared/`, con este reparto de tonos: Pendiente
+  y la prioridad de un pedido, en `lib/shared/ui/order-status.ts` (D17), con este reparto de tonos: Pendiente
   `neutral`; En curso, En empaque y En acondicionamiento `progress`; Por empacar y Por acondicionar
   `waiting`; Terminado y Entregado `success`; Cancelado `muted`; Bloqueado `danger`; Apartado
   `success`; Sin apartar `neutral`; Sin cobertura completa `waiting`.
@@ -123,10 +124,10 @@ usen sin crear nada.
 
 ### PriorityMark (tablero `Estados.dc.html`)
 
-- **R12.** El sistema DEBE ofrecer un `PriorityMark` que pinte la prioridad de un pedido como tres
-  barras de alturas crecientes más la etiqueta visible, con una barra llena en Baja, dos en Media y
-  tres en Alta, y las vacías atenuadas.
-- **R13.** SI la prioridad es Crítica, ENTONCES el sistema DEBE pintar un triángulo de aviso en lugar
+- **R12.** El sistema DEBE ofrecer un `PriorityMark` que reciba un nivel (1–4) y una etiqueta, sin
+  conocer el dominio (D17), y pinte tres barras de alturas crecientes más la etiqueta visible, con
+  una barra llena en el nivel 1 (Baja), dos en el 2 (Media) y tres en el 3 (Alta), y las vacías atenuadas.
+- **R13.** SI el nivel es 4 (Crítica), ENTONCES el sistema DEBE pintar un triángulo de aviso en lugar
   de las barras, con la etiqueta y el icono en el color de texto de peligro y la etiqueta en peso
   600; las otras tres prioridades NO DEBEN llevar color de estado.
 - **R14.** El sistema DEBE ocultar a los lectores de pantalla el icono de `PriorityMark`, dejar la

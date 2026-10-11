@@ -20,14 +20,14 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   `docs/diseno/canvas/Botones.dc.html`.
   *Hecho:* `button-tallas`, `button-touch` y `login-skin` en verde; ningún consumidor cambiado.
 
-- [ ] **T3 [P]. StatusBadge y mapa de pedido (R6–R11, R47).** Depende de T1. Crear
-  `components/shared/status-badge.tsx` y `components/shared/order-status.ts`; pasar las cuatro rutas
+- [x] **T3 [P]. StatusBadge y mapa de pedido (R6–R11, R47).** Depende de T1. Crear
+  `components/shared/status-badge.tsx`, `lib/shared/ui/status-tone.ts` y `lib/shared/ui/order-status.ts` (D17: el mapa fuera de `components/shared/`); pasar las cuatro rutas
   de `design.md > 3.3` a leer del mapa. Tests nuevos `status-badge.test.tsx` y
   `order-status.test.ts`. Filas nuevas `StatusBadge` y mapa de pedido (`Diseño`: `Estados.dc.html`).
   *Hecho:* los dos tests en verde; `badges-estado.test.tsx` y los tests de pedidos, asignación y
   dashboard que importan esas constantes, en verde sin tocarlos.
 
-- [ ] **T4 [P]. PriorityMark (R12–R14).** Depende de T3 (usa `ORDER_PRIORITY_LABELS`). Crear
+- [x] **T4 [P]. PriorityMark (R12–R14).** Depende de T3 (usa `ORDER_PRIORITY_LABELS`). Crear
   `components/shared/priority-mark.tsx`. Test nuevo `priority-mark.test.tsx`. Fila nueva
   (`Diseño`: `Estados.dc.html`).
   *Hecho:* test en verde.
@@ -38,7 +38,7 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   (`Diseño`: `Avisos.dc.html`).
   *Hecho:* test en verde; `package.json` sin cambios.
 
-- [ ] **T6 [P]. PasswordField (R19–R26).** Crear `components/shared/password-field.tsx`; ajustar el
+- [x] **T6 [P]. PasswordField (R19–R26).** Crear `components/shared/password-field.tsx`; ajustar el
   estilo de regla cumplida en `components/shared/credential-requirements.tsx`; borrar
   `components/shared/credential-field.tsx`. Migrar `tests/unit/credential-field.test.tsx` a
   `tests/unit/shared-ui/password-field-requisitos.test.tsx` y actualizar
@@ -48,12 +48,12 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   *Hecho:* los dos tests de `PasswordField` y `credential-requirements.test.tsx` en verde; Grep de
   `CredentialField` en `app/`, `components/` y `tests/` sin resultados.
 
-- [ ] **T7 [P]. PageShell y PageHeader (R27–R30).** Crear `components/shared/page-shell.tsx` y
+- [x] **T7 [P]. PageShell y PageHeader (R27–R30).** Crear `components/shared/page-shell.tsx` y
   `components/shared/page-header.tsx`. Test nuevo `page-header.test.tsx` (cubre los dos). Filas
   nuevas (`Diseño`: `Superficies.dc.html`).
   *Hecho:* test en verde.
 
-- [ ] **T8 [P]. Tabs y UrlTabs (R31).** Añadir `TabsIndicator` a `components/ui/tabs.tsx` (verificar
+- [x] **T8 [P]. Tabs y UrlTabs (R31).** Añadir `TabsIndicator` a `components/ui/tabs.tsx` (verificar
   antes las variables CSS de `Tabs.Indicator` en la versión instalada). Crear
   `components/shared/url-tabs.tsx`. Test nuevo `url-tabs.test.tsx`. Filas: `Tabs` actualizada,
   `UrlTabs` nueva (`Diseño`: `Superficies.dc.html`).
@@ -88,12 +88,12 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   `texts.clearFilters`; `Diseño`: `Tabla.dc.html`).
   *Hecho:* tests de la barra en verde; ningún test de pantalla en rojo por la barra.
 
-- [ ] **T10b [P]. ArrowLink (R49–R51).** Depende de T2. Crear `components/shared/arrow-link.tsx`.
+- [x] **T10b [P]. ArrowLink (R49–R51).** Depende de T2. Crear `components/shared/arrow-link.tsx`.
   Test nuevo `tests/unit/shared-ui/arrow-link.test.tsx`. Fila nueva `ArrowLink` (`Diseño`:
   `Botones.dc.html`).
   *Hecho:* test en verde.
 
-- [ ] **T10 [P]. Avatar y Spinner (R40–R44).** Depende de T1. Crear `lib/shared/ui/avatar-tone.ts`;
+- [x] **T10 [P]. Avatar y Spinner (R40–R44).** Depende de T1. Crear `lib/shared/ui/avatar-tone.ts`;
   `tone` en `components/ui/avatar.tsx`; `ResponsibleAvatars` lo pasa. `Spinner` con `lg` y 0,9 s;
   `components/ui/sonner.tsx` usa `Spinner`. Tests: nuevo `avatar-tone.test.ts`; ampliar
   `responsible-avatars.test.tsx` y `spinner.test.tsx`. Filas: `avatarTone` nueva (`sin UI`),
@@ -122,7 +122,8 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
 - `components/ui/sonner.tsx`
 - `components/shared/CATALOGO.md`
 - `components/shared/status-badge.tsx`
-- `components/shared/order-status.ts`
+- `lib/shared/ui/order-status.ts`
+- `lib/shared/ui/status-tone.ts`
 - `components/shared/priority-mark.tsx`
 - `components/shared/notice.tsx`
 - `components/shared/password-field.tsx`
@@ -203,5 +204,7 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
 - `tests/unit/recetas-ui/recipe-page.test.tsx`
 - `tests/unit/pedidos-ui/order-table.test.tsx`
 - `e2e/pedidos-terminados.spec.ts`
+- `app/(public)/establecer-contrasena/[token]/components/credential-input.tsx`
+- `tests/guards/guard-catalogo-de-componentes.test.ts`
 - `e2e/piezas-compartidas.spec.ts`
 - `progress/impl_QC-256.md`

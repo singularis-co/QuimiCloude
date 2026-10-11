@@ -38,3 +38,120 @@
 ### Notas (desviaciones aceptadas por el leader)
 - En `qc.css`, `--d-b` se declara dos veces en el tema claro (borde `oklch(0.86 0.06 27)` y, más abajo, la duración `200ms`). Se usa el color de design.md; el test toma la primera declaración. Aceptado.
 - `gap-2` en `xl` (el `gap` de 8 px de `.b` en `qc.css`), que design.md no menciona. Aceptado.
+
+## Tanda 2 · T3, T4, T5 (frontend_dev)
+
+### Archivos
+- Nuevos: `components/shared/status-badge.tsx`, `components/shared/order-status.ts`,
+  `components/shared/priority-mark.tsx`, `tests/unit/shared-ui/status-badge.test.tsx`,
+  `tests/unit/shared-ui/order-status.test.ts`, `tests/unit/shared-ui/priority-mark.test.tsx`.
+- Modificados: `app/(private)/pedidos/components/order-status-badge.tsx`,
+  `app/(private)/asignacion/components/company-orders-columns.tsx`,
+  `app/(private)/asignacion/components/assigned-orders-columns.tsx`,
+  `app/(private)/dashboard/components/execution-trace-format.ts`, `components/shared/CATALOGO.md`
+  (filas nuevas: mapa de pedido, `PriorityMark`, `StatusBadge`).
+
+### R → test
+| R | Test |
+| --- | --- |
+| R6–R9 | `tests/unit/shared-ui/status-badge.test.tsx` |
+| R10, R11 | `tests/unit/shared-ui/order-status.test.ts` |
+| R12–R14 | `tests/unit/shared-ui/priority-mark.test.tsx` |
+| R47 | `tests/unit/marca/badges-estado.test.tsx` (sin tocar, en verde dentro de `vitest related`) |
+
+### Salida de los comandos
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores, 7 avisos previos ajenos (exit 0).
+- `vitest run` de los 3 tests nuevos: 3 archivos, 30 tests en verde.
+- `vitest related --run` de los archivos de T3/T4: 91 archivos, 1523 en verde, 17 en rojo, todos
+  snapshots de `tests/unit/paridad/` por cambios de T10 (no de T3/T4): 16 en
+  `buscadores-paridad` (`animate-spin` → `animate-[spin_0.9s_linear_infinite]` en `Spinner`) y 1 en
+  `asignacion-paridad` («mis asignados, con filas»: `AvatarFallback` gana las clases
+  `group-data-[tone=N]/avatar:*`). No se actualizaron.
+- `vitest run guard`: 71 archivos, 977 en verde, 18 omitidos.
+
+### T5: BLOQUEO
+- `pnpm exec shadcn add alert` añadió la dependencia `cn@^0.4.0` a `package.json` y
+  `pnpm-lock.yaml`, y el `components/ui/alert.tsx` generado importaba `cn` de `"cn"` en vez de
+  `@/lib/utils` (alias de `components.json` mal resuelto por la CLI). Revertidos `package.json` y
+  `pnpm-lock.yaml` con `git restore` y borrado `alert.tsx`. `node_modules/cn` quedó instalado
+  (enlace de pnpm); no está en `package.json`. `Notice`, su test y las filas `Alert`/`Notice`, sin
+  hacer.
+
+### Veredicto
+T3 y T4 hechos y en verde; T5 bloqueado por la CLI de shadcn (pide decisión del leader).
+
+## Tanda 2 · T6, T7, T8 (frontend_dev)
+
+### Archivos
+- Nuevos: `components/shared/password-field.tsx`, `components/shared/page-shell.tsx`,
+  `components/shared/page-header.tsx`, `components/shared/url-tabs.tsx`,
+  `tests/unit/shared-ui/password-field.test.tsx`, `tests/unit/shared-ui/password-field-requisitos.test.tsx`
+  (migrado de `tests/unit/credential-field.test.tsx`), `tests/unit/shared-ui/page-header.test.tsx`,
+  `tests/unit/shared-ui/url-tabs.test.tsx`.
+- Modificados: `components/shared/credential-requirements.tsx` (estilo de regla cumplida),
+  `components/ui/tabs.tsx` (`TabsIndicator`), `tests/unit/credential-help-contract.test.ts`
+  (`password-field.tsx` sustituye a `credential-field.tsx` en `NEW_FILES`),
+  `components/shared/CATALOGO.md` (filas `Tabs`, `CredentialRequirements`, `TextField` [solo la
+  referencia «ver `PasswordField`»], nuevas `PageHeader`, `PageShell`, `PasswordField`, `UrlTabs`;
+  borrada `CredentialField`).
+- Borrados: `components/shared/credential-field.tsx`, `tests/unit/credential-field.test.tsx`.
+- Fuera de «Archivos esperados», obligados por el borrado: `tests/guards/guard-catalogo-de-componentes.test.ts`
+  (quita `credential-field.tsx` de `PIEZAS_PREVIAS_AL_REDISENO`, lo exige la regla `previa-muerta`) y
+  `app/(public)/establecer-contrasena/[token]/components/credential-input.tsx` (solo el comentario que
+  nombraba el componente borrado, para que el Grep de «Hecho» de T6 quede vacío).
+- Verificado en `node_modules/@base-ui/react` 1.7.0: `Tabs.Indicator` publica `--active-tab-left`,
+  `-right`, `-top`, `-bottom`, `-width` y `-height`, relativas a la lista.
+
+### R → test
+| R | Test |
+| --- | --- |
+| R19–R24, R26 | `tests/unit/shared-ui/password-field.test.tsx` |
+| R25 | `tests/unit/shared-ui/password-field-requisitos.test.tsx` |
+| R27–R30 | `tests/unit/shared-ui/page-header.test.tsx` |
+| R31 | `tests/unit/shared-ui/url-tabs.test.tsx` |
+
+### Salida de los comandos
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores, 7 avisos previos ajenos.
+- Tests propios + `credential-requirements` + `credential-help-contract`: 6 archivos en verde.
+- `vitest related --run` de los archivos de T6–T8: 118 archivos, 1914 en verde, 2 en rojo, ambos
+  snapshots de T10 (`AvatarFallback` gana `group-data-[tone=N]/avatar:*`):
+  `asignacion-paridad` «R1 — mis asignados, con filas» y `grupos-paridad` «R1 R16-R18 — con filas».
+  No se actualizaron. Tres tests de `order-form`, `order-form-quote` y `campos-paridad` cayeron por
+  tiempo con la máquina cargada; relanzados solos: 111 en verde.
+- `vitest run guard`: 71 archivos, 977 en verde, 18 omitidos.
+
+### Veredicto
+T6, T7 y T8 hechos y en verde; solo quedan rojos dos snapshots de paridad ajenos (T10).
+
+## Tanda 2 — cierre del implementer
+
+### Snapshots de paridad de T10 (decisión del leader 2026-10-10)
+- 18 snapshots regenerados con `vitest -u` (21 archivos, 376 tests en verde): `buscadores-paridad` (16),
+  `asignacion-paridad` (1) y `grupos-paridad` (1). Van en un commit propio.
+- Control con script sobre `git diff -U0`: fuera de `class` todo igual; dentro, solo
+  `animate-spin`→`animate-[spin_0.9s_linear_infinite]` (Spinner, R43) o la adición de
+  `group-data-[tone=1..6]/avatar:{bg-avatar-N,text-avatar-N-text}` en `AvatarFallback` (R41).
+  Resultado: 18 líneas correctas, 0 fuera. Enmienda en `design.md > 10`.
+
+### T5 y el CLI de shadcn (R48)
+- `pnpm exec shadcn add alert` añadió `"cn": "^0.4.0"` a package.json y al lockfile, y generó
+  `alert.tsx` con `import { cn } from "cn"`: resolvió mal el alias `utils: @/lib/utils` de
+  components.json. Se descartó porque mete una dependencia nueva sin aprobar (regla 7, R48) y además
+  es incorrecta. Se revirtió con `git restore` y se purgó node_modules con `pnpm install --frozen-lockfile`.
+- Decisión del leader: `components/ui/alert.tsx` se escribe a mano a partir del fuente de shadcn para
+  Base UI, con `import { cn } from "@/lib/utils"`, sin volver a ejecutar el CLI.
+
+### Desviaciones aceptadas por el leader (tanda 2)
+- `credential-field.tsx` sale de `PIEZAS_PREVIAS_AL_REDISENO` (guard-catalogo, regla `previa-muerta`).
+- Comentario de `credential-input.tsx` reescrito para que no nombre `CredentialField`.
+- `StatusBadge` con `border-0 py-0` y `data-tone`; `ArrowLink` saca sus tipos con `VariantProps`.
+
+## Ajuste T3/T4 — piezas compartidas sin dominio (opción 2)
+
+- Creados: `lib/shared/ui/status-tone.ts`, `lib/shared/ui/order-status.ts`. Borrado: `components/shared/order-status.ts`.
+- Modificados: `components/shared/status-badge.tsx` (reexporta `StatusTone`/`STATUS_TONES`; props `tone` + `label` + `children?`, que mandan sobre `label`), `components/shared/priority-mark.tsx` (props `level: PriorityLevel` 1–4 + `label`; `data-level` en vez de `data-priority`), las 4 rutas (importan de `@/lib/shared/ui/order-status`), `components/shared/CATALOGO.md` (fila del mapa movida a Apoyos, fila nueva `STATUS_TONES` de `status-tone.ts`), tests `status-badge`, `priority-mark`, `order-status`.
+- R6 → status-badge.test (reexport de la lista); R7 → status-badge.test (children mandan sobre label); R10 → order-status.test (`ORDER_PRIORITY_LEVELS`; `expectTypeOf` en los dos sentidos contra `OrderStatus`/`OrderPriority`/`OrderCoverage`; `tsc` incluye `tests/`); R12–R14 → priority-mark.test por nivel.
+- Salida: typecheck limpio; lint 0 errores (7 avisos previos en tests ajenos); `vitest related` 91 archivos / 1544 tests verdes; `vitest run guard` 71 / 977 (+18 skipped) verdes; `scope.test` + `module-contract.test` 2 / 19 verdes.
+- Veredicto: piezas compartidas sin imports de `lib/modules/*`; todo en verde.

@@ -68,6 +68,21 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
   )
 }
 
+// Base UI publica la caja de la pestaña activa en `--active-tab-*`, relativa a la lista: la lista
+// necesita `relative` y el indicador va antes que las pestañas para quedar debajo.
+function TabsIndicator({ className, ...props }: TabsPrimitive.Indicator.Props) {
+  return (
+    <TabsPrimitive.Indicator
+      data-slot="tabs-indicator"
+      className={cn(
+        "absolute top-(--active-tab-top) left-0 h-(--active-tab-height) w-(--active-tab-width) translate-x-(--active-tab-left) rounded-lg bg-card shadow-xs ring-1 ring-border transition-[translate,width] duration-(--dur-base) ease-(--ease-standard)",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
 function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
   return (
     <TabsPrimitive.Panel
@@ -78,4 +93,4 @@ function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
   )
 }
 
-export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants }
+export { Tabs, TabsList, TabsTrigger, TabsIndicator, TabsContent, tabsListVariants }

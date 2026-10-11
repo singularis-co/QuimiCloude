@@ -42,7 +42,7 @@ tiene índice de este worktree, ver nota al final): `StatusBadge`, `*_STATUS_LAB
 | `ArrowLink` | `Button`, `buttonVariants` | 3 · compone | `Button` no navega; `buttonVariants` sobre `Link` ya es el patrón del repo (`EmptyState`, `ErrorState`), y esta pieza le añade la flecha y su movimiento |
 | `Alert` | — (no está) | shadcn | Regla 1 de `frontend_dev`: existe en shadcn/ui; `pnpm exec shadcn add alert` |
 | `StatusBadge` | `Badge` | 3 · compone | `Badge` no tiene tonos con punto ni pulso, y cambiar sus variantes cambiaría las pantallas de hoy (R47) |
-| Mapa de pedido (`order-status.ts`) | `Badge`, `OrderDistributionLabel` | 4 · crea (sin UI) | No hay fuente compartida; tres rutas la copian |
+| Mapa de pedido (`lib/shared/ui/order-status.ts`, D17) | `Badge`, `OrderDistributionLabel` | 4 · crea (sin UI) | No hay fuente compartida; tres rutas la copian |
 | `PriorityMark` | `Badge` | 3 · compone | Es texto + SVG; `Badge` es justo lo que D1 descarta |
 | `Notice` | `ErrorAlert`, `ErrorState`, `UnexpectedErrorNotice` | 3 · compone (`Alert`) | Esos tres son solo de error; `Notice` lleva cuatro tonos |
 | `PasswordField` | `CredentialField`, `CredentialRequirements`, `TextField`, `Input`, `Label`, `FieldError` | 3 · compone | `TextField` no admite contraseña ni ojo; `CredentialField` no tiene ojo |
@@ -97,10 +97,11 @@ primario, velo, pulsado a 98 %, foco de 2 px. No se tocan.
 ### 3.1 `components/shared/status-badge.tsx`
 
 ```ts
+// StatusTone y STATUS_TONES viven en lib/shared/ui/status-tone.ts y se re-exportan aquí (D17)
 export type StatusTone = 'neutral' | 'progress' | 'waiting' | 'success' | 'danger' | 'info' | 'muted';
 export const STATUS_TONES: readonly StatusTone[];
-export type StatusBadgeProps = { readonly tone: StatusTone; readonly children: ReactNode }
-  & Omit<ComponentProps<'span'>, 'children'>;   // data-testid y data-* pasan tal cual
+export type StatusBadgeProps = { readonly tone: StatusTone; readonly label: string; readonly children?: ReactNode }
+  & Omit<ComponentProps<'span'>, 'children'>;   // pinta {children ?? label}; data-* pasan tal cual
 export function StatusBadge(props: StatusBadgeProps): JSX.Element;
 ```
 
@@ -116,23 +117,34 @@ Tonos → tokens (§ 5): `neutral` y `progress` usan tokens nuevos; `waiting`, `
 `info` reutilizan `--warning-*`, `--success-*`, `--destructive-*`, `--info-*`; `muted` es fondo
 transparente, texto `muted-foreground` y borde interior de 1 px en `--border`.
 
-### 3.2 `components/shared/order-status.ts` (fuente única, sin UI)
+### 3.2 `lib/shared/ui/order-status.ts` (fuente única, sin UI) — D17, opción 2 del humano
+
+Las piezas compartidas no conocen el dominio: `StatusBadge` recibe `tone` + `label` y `PriorityMark`
+recibe `level` + `label`; ninguna importa `lib/modules/*`. El mapa sale de `components/shared/` porque
+`tests/unit/pedidos/scope.test.ts` (R57 de QC-34/QC-35) y `module-contract.test.ts` (QC-33) prohíben
+importar `@/lib/modules/pedidos` desde `components/`. Va a `lib/shared/ui/`, la única ubicación
+existente que pueden importar pedidos, asignación **y dashboard** sin tocar reglas
+(`docs/architecture.md > La regla de dependencias`: `app/**` y `components/**` importan
+`lib/shared/ui/**`; `lib/shared/**` solo importa npm y otro `lib/shared`). `lib/modules/pedidos` no
+sirve: el dashboard no puede importar ese módulo.
 
 ```ts
-import type { OrderPriority, OrderStatus } from '@/lib/modules/pedidos';
-import type { OrderCoverage } from '@/lib/modules/inventario';
-import type { StatusTone } from './status-badge';
-
-export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>>;
-export const ORDER_STATUS_TONES: Readonly<Record<OrderStatus, StatusTone>>;
-export const ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>>;
-export const ORDER_COVERAGE_LABELS: Readonly<Record<OrderCoverage, string>>;
-export const ORDER_COVERAGE_TONES: Readonly<Record<OrderCoverage, StatusTone>>;
+import type { StatusTone } from './status-tone';
+export type OrderStatusKey = 'PENDIENTE' | 'EN_CURSO' | … ;   // mismas claves que OrderStatus
+export type OrderPriorityKey = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA';
+export type OrderCoverageKey = 'full' | 'none' | 'partial';
+export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatusKey, string>>;
+export const ORDER_STATUS_TONES: Readonly<Record<OrderStatusKey, StatusTone>>;
+export const ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriorityKey, string>>;
+export const ORDER_PRIORITY_LEVELS: Readonly<Record<OrderPriorityKey, 1 | 2 | 3 | 4>>;
+export const ORDER_COVERAGE_LABELS: Readonly<Record<OrderCoverageKey, string>>;
+export const ORDER_COVERAGE_TONES: Readonly<Record<OrderCoverageKey, StatusTone>>;
 ```
 
-`components/**` puede importar el barrel de un módulo (`docs/architecture.md > La regla de
-dependencias`); `lib/shared/` no, por eso el mapa no va allí (alternativa A3). Los textos son los de
-hoy, sin cambiar ni uno. Los tonos, los de R10.
+Lo que A3 temía perder —que falte una clave y no compile— se conserva en
+`tests/unit/shared-ui/order-status.test.ts` con `expectTypeOf<OrderStatusKey>().toEqualTypeOf<OrderStatus>()`
+en los dos sentidos (y lo mismo con prioridad y cobertura). `tsc` incluye `tests/`, así que una clave
+de más o de menos rompe el typecheck. Los textos son los de hoy, sin cambiar ni uno. Los tonos, los de R10.
 
 ### 3.3 Las copias de las rutas (R11)
 
@@ -141,7 +153,7 @@ importando), pero deja de declarar texto:
 
 | Archivo | Queda |
 | --- | --- |
-| `pedidos/components/order-status-badge.tsx` | `export { ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS, ORDER_COVERAGE_LABELS } from '@/components/shared/order-status'` y los tres badges siguen leyendo de ahí. Sus mapas de **variante** de `Badge` no cambian (R47) |
+| `pedidos/components/order-status-badge.tsx` | `export { ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS, ORDER_COVERAGE_LABELS } from '@/lib/shared/ui/order-status'` y los tres badges siguen leyendo de ahí. Sus mapas de **variante** de `Badge` no cambian (R47) |
 | `asignacion/components/company-orders-columns.tsx` | `COMPANY_ORDER_STATUS_LABELS = ORDER_STATUS_LABELS`, `COMPANY_ORDER_PRIORITY_LABELS = ORDER_PRIORITY_LABELS` |
 | `asignacion/components/assigned-orders-columns.tsx` | `ASSIGNED_ORDER_STATUS_LABELS` se deriva eligiendo sus tres claves de `ORDER_STATUS_LABELS`; prioridad = `ORDER_PRIORITY_LABELS` |
 | `dashboard/components/execution-trace-format.ts` | `TRACE_ORDER_STATUS_LABELS = ORDER_STATUS_LABELS` (el tipo de la traza es el estado de pedido) |
@@ -155,13 +167,15 @@ El test de R11 recorre `app/**/*.{ts,tsx}` y falla si encuentra un literal de ob
 ### 4.1 `components/shared/priority-mark.tsx` (R12–R14)
 
 ```ts
-export type PriorityMarkProps = { readonly priority: OrderPriority } & Omit<ComponentProps<'span'>, 'children'>;
+export type PriorityLevel = 1 | 2 | 3 | 4;   // 4 = crítica
+export type PriorityMarkProps = { readonly level: PriorityLevel; readonly label: string } & Omit<ComponentProps<'span'>, 'children'>;
 ```
 
 `inline-flex items-center gap-2 text-[13px] whitespace-nowrap`. SVG de 14 px, `aria-hidden`: tres
 `rect` de 3 px de ancho y alturas 5/9/13, las vacías con opacidad 0,2 (copiado de `Estados.dc.html`).
-Crítica: triángulo con signo de exclamación, `text-destructive-text font-semibold`. La etiqueta sale
-de `ORDER_PRIORITY_LABELS`.
+Nivel 4 (crítica): triángulo con signo de exclamación, `text-destructive-text font-semibold`. Los niveles 1–3
+llenan esa cantidad de barras. Expone `data-level`. La etiqueta la pasa el consumidor (para pedidos,
+`ORDER_PRIORITY_LABELS` y `ORDER_PRIORITY_LEVELS` de § 3.2); la pieza no conoce el dominio (D17).
 
 ### 4.2 `components/ui/alert.tsx` + `components/shared/notice.tsx` (R15–R18)
 
@@ -448,6 +462,8 @@ de R44 recorre `app/` y `components/` y falla si encuentra `animate-spin` o `Loa
 | QC-21 (`ayuda-visual-de-contrasena`) | `CredentialField` desaparece; sus requisitos pasan a `PasswordField` con `requirements`. R17 de QC-21 («sin mostrar/ocultar») queda superado | D5 (D12 del humano) |
 | QC-30 (`rediseno-login`) | `tests/unit/login-skin.test.tsx` fija que `button.tsx` contiene `h-8`; pasa a la talla nueva | D4 (D7 del humano) |
 | QC-231, QC-232, QC-233 (snapshots de `tests/unit/paridad/`) | Los 17 `__snapshots__/*-paridad.test.tsx.snap` que pintan un `Button` se regeneran con `vitest -u` en un commit propio. Un script sobre `git diff` comprueba que cada línea cambiada difiere solo en las clases de talla de § 2 (`default`, `sm`, `icon`, `icon-sm`): 721 líneas, 0 fuera de ese mapa. Cumple la regla de `login-paridad` («el cambio de talla se aplica sobre el snapshot en su propio commit») | D4 (D7 del humano); decisión del leader del 2026-10-10 |
+| QC-231, QC-233 (snapshots de `tests/unit/paridad/`, tanda 2) | `buscadores-paridad` (16), `asignacion-paridad` (1) y `grupos-paridad` (1) se regeneran con `vitest -u` en un commit propio. El control de diff admite solo dos cambios: `animate-spin` → `animate-[spin_0.9s_linear_infinite]` en el `Spinner` (R43) y las clases `group-data-[tone=1..6]/avatar:bg-avatar-N`/`text-avatar-N-text` añadidas a `AvatarFallback` (R41). Resultado: 18 líneas, 0 fuera de esos dos cambios | R41, R43; decisión del leader del 2026-10-10 |
+| QC-21 (guardia de catálogo) | `credential-field.tsx` sale de `PIEZAS_PREVIAS_AL_REDISENO` en `tests/guards/guard-catalogo-de-componentes.test.ts`, porque la regla `previa-muerta` lo exige al borrar la pieza. El comentario de `credential-input.tsx` deja de nombrar `CredentialField` | D5; aceptado por el leader |
 | QC-232 (`componentizacion-formularios-y-acciones`) | `RowActionsMenu` y `actionsColumn` ganan props opcionales; su contrato se amplía, no cambia | D2 |
 | QC-55 (`tabla-de-datos-compartida`) | La barra de filtros pasa a chips: los filtros `text` y `numberRange` se abren desde su chip, la X de cada filtro solo aparece con el filtro activo y nace «Limpiar filtros». Los tests que escribían directamente en esos campos o daban por hecha la X abren antes el chip | D14 |
 
@@ -468,7 +484,9 @@ evaluación marcaba como posible cruce, **no** lo toca esta ficha.
 - **A2. Los siete tonos como variantes nuevas de `Badge`.** `Badge` ya tiene `success`, `warning`,
   `info` y `neutral` y las usan las pantallas de hoy: redefinirlas cambiaría su aspecto antes de
   tiempo (R47, D7), y meter el punto y el pulso en el primitivo mezcla dos piezas.
-- **A3. El mapa de pedido en `lib/shared/ui/`.** `lib/shared` es hoja del grafo y no puede importar
+- **A3. El mapa de pedido en `lib/shared/ui/`. ELEGIDA por el humano (opción 2, D17, 2026-10-10)**, tras
+  ver que el mapa en `components/shared/` rompía `scope.test` y `module-contract.test` de pedidos. La
+  objeción de abajo se resuelve con la comprobación de tipos de § 3.2. Texto original: `lib/shared` es hoja del grafo y no puede importar
   `OrderStatus` de `@/lib/modules/pedidos`; habría que copiar las claves a mano y se perdería que
   falte una y no compile.
 - **A4. `UrlTabs` como `nav` con enlaces y un indicador medido a mano.** Es la semántica del

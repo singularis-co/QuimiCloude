@@ -1,8 +1,8 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
+import { ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import type { AssignedOrderView } from '@/lib/modules/asignaciones';
-import type { OrderPriority } from '@/lib/modules/pedidos';
 
 import { AssignedOrderEnterTrigger } from './assigned-order-enter-trigger';
 import {
@@ -18,17 +18,12 @@ export { EMPTY_MARK as MISSING_VALUE_MARK } from '@/lib/shared/ui/empty-mark';
 
 export const ASSIGNED_ORDER_STATUS_LABELS: Readonly<Record<AssignedOrderView['status'], string>> =
   {
-    PENDIENTE: 'Pendiente',
-    EN_CURSO: 'En curso',
-    BLOQUEADO: 'Bloqueado',
+    PENDIENTE: ORDER_STATUS_LABELS.PENDIENTE,
+    EN_CURSO: ORDER_STATUS_LABELS.EN_CURSO,
+    BLOQUEADO: ORDER_STATUS_LABELS.BLOQUEADO,
   };
 
-export const ASSIGNED_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {
-  BAJA: 'Baja',
-  MEDIA: 'Media',
-  ALTA: 'Alta',
-  CRITICA: 'Crítica',
-};
+export const ASSIGNED_ORDER_PRIORITY_LABELS = ORDER_PRIORITY_LABELS;
 
 export const ASSIGNED_ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 export const ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID = 'recipeName';
