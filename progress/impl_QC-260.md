@@ -165,7 +165,28 @@ enlace `min-h-11`.
   (R8 «Ir a iniciar sesión»), `establecer-contrasena:182`, `login:366/387/432/459/486`,
   `session:248/296/359`. Ver B2.
 
+### Desbloqueo (2026-10-12, tras la decisión del humano)
+
+- **B1 resuelto (C8):** `tests/unit/login-form.test.tsx:444` cuenta solo los botones
+  `type="submit"` (exactamente 1), con nota `ENMIENDA QC-260`; filas en `design.md > 10` (QC-75 y,
+  por O1, QC-226 R26 de `brand-logo`) y C8 en `requirements.md > Decisiones cerradas`.
+  `pnpm exec vitest run tests/unit/login-form.test.tsx tests/ui/login-form-uncontrolled-warning.test.tsx`
+  → `Test Files 2 passed (2)` · `Tests 30 passed (30)`; eslint del archivo sin avisos.
+- **B2 resuelto:** con `quimicloude-pg17` en 5433 y el `.env` cargado en el entorno del comando
+  (Playwright no lee el `.env`: `docs/verification.md`, l. 104–107),
+  `pnpm exec playwright test e2e/acceso-rediseno.spec.ts e2e/login-skin.spec.ts e2e/login.spec.ts e2e/establecer-contrasena.spec.ts e2e/theme.spec.ts e2e/session.spec.ts`
+  (chromium + webkit):
+  ```
+  Running 74 tests using 6 workers
+    74 passed (2.6m)
+  ```
+  Incluye los 20 que antes caían en el seed: `acceso-rediseno:413`, `establecer-contrasena:182`,
+  `login:366/387/432/459/486` y `session:248/296/359`, en los dos navegadores. `login`, `session`,
+  `theme` y `establecer-contrasena` pasan sin cambios.
+
 ## Bloqueos
+
+Ninguno abierto (B1 y B2 resueltos; ver «Desbloqueo»). Histórico:
 
 - **B1 (T6) — `tests/unit/login-form.test.tsx > «no introduce ningun cambio visual»` (l. 444)
   en rojo.** Es un caso de QC-75 (campo oculto `next`) que exige

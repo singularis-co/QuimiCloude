@@ -90,7 +90,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
   `feature/QC-260-rediseno-acceso`, `skip` ruidoso, como `guard-piezas-base`. *Hecho:* verde en la
   rama; el caso sintético de cada regla da rojo.
 
-- [ ] **T10. E2E** (depende de T6, T7). `e2e/acceso-rediseno.spec.ts` en chromium y webkit, a 390,
+- [x] **T10. E2E** (depende de T6, T7). `e2e/acceso-rediseno.spec.ts` en chromium y webkit, a 390,
   820 y 1440 px, con estilo computado y sin capturas: R3, R4, R6, R7, R8 en las dos pantallas, el
   ojo del login (R10) y R20 si T3 lo pide. Enmienda de `e2e/login-skin.spec.ts`: quitar los casos
   que QC-226 R17–R22 fijaban y que este spec sustituye, con nota `ENMIENDA QC-260`.
