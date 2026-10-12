@@ -192,6 +192,8 @@ Verificación de cada tanda (`docs/perfil-agentes.md > Todos los agentes`): `pnp
 - `app/(private)/pedidos/components/order-responsibles.tsx`
 - `components/shared/countdown-gated-button.tsx` (nuevo)
 - `components/shared/confirm-dialog.tsx`
+- `components/shared/delete-confirm-dialog.tsx` (review v1, m3: tipo de `confirmSlot`)
+- `app/(private)/asignacion/empaque/[id]/page.tsx` (review v1, M1: `backHref`)
 - `components/shared/order-distribution-label.tsx`
 - `components/shared/CATALOGO.md`
 - `lib/shared/ui/responsible-groups.ts` (nuevo)
@@ -213,6 +215,9 @@ Verificación de cada tanda (`docs/perfil-agentes.md > Todos los agentes`): `pnp
 - `tests/unit/asignaciones-ui/start-conditioning-dialog.test.tsx`
 - `tests/unit/asignaciones-ui/conditioning-order-screen.test.tsx`
 - `tests/unit/asignaciones-ui/packing-order-screen.test.tsx`
+- `tests/unit/asignaciones-ui/packing-order-page.test.tsx` (review v1, M1)
+- `tests/unit/asignaciones-ui/qc195-lineas-antiguas.test.tsx` (review v1, M1: prop `backHref`)
+- `tests/unit/paridad/confirmaciones-paridad.test.tsx` (review v1, m3)
 - `tests/unit/shared/countdown-gated-button.test.tsx` (nuevo, movido)
 - `tests/unit/shared-ui/responsible-groups.test.ts` (nuevo)
 - `tests/unit/shared-ui/order-distribution-line-text.test.ts` (nuevo)

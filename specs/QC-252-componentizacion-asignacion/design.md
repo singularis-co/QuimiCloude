@@ -73,6 +73,11 @@ idéntica. Recibe `DataTableParams` completos; los llamadores ya los tienen (`{ 
 `(p) => assignedOrdersListHref(p, view)`; su prop `view` pasa a tiparse con `AssignmentViewKind`
 acotado a sus dos vistas (`Extract<…>`), y `ConditioningListView` desaparece.
 
+*Enmienda (review vuelta 1, M1):* `PackingOrderScreen` es de cliente y el barrel de
+`asignacion/components` arrastra secciones de servidor. Por eso `empaque/[id]/page.tsx` (servidor)
+importa `assignmentViewHref` por el barrel y pasa `backHref` a la pantalla como prop. La pantalla no
+importa nada de `asignacion/components` y la dirección es la misma.
+
 ## 4. Decisiones
 
 **D1 — Direcciones (punto 1, R1–R3).** Tabla de § 3. Se borra
@@ -92,6 +97,9 @@ acotado a sus dos vistas (`Extract<…>`), y `ConditioningListView` desaparece.
 - «Por empacar» pinta su vacío con `AssignmentListEmpty` y `testIdPrefix="packing-orders"`: el
   mensaje, el enlace y sus `data-testid` son los de hoy y el contenedor gana
   `packing-orders-empty` (§ 6). Cierra D47.
+- *Enmienda (review vuelta 1, m4):* `CONDITIONING_ORDERS_PAGE_PAST_END_TEXT` y
+  `CONDITIONING_ORDERS_FIRST_PAGE_TEXT` se borran: tras delegar, el texto sale de
+  `assignment-list-parts.tsx` y esas constantes ya no gobernaban lo que se pinta.
 
 **D3 — Paridad de vacíos.** Las clases del contenedor de hoy (`flex flex-col items-center gap-3
 rounded-lg border border-dashed p-8 text-center`) son el `DEFAULT_CLASS_NAME` de `EmptyState`, y
@@ -191,6 +199,15 @@ Se anotan en la fila de `ConfirmDialog` del catálogo. Lo que la paridad tiene q
 «Cancelar» queda con el mismo `type` que hoy (hoy lo pone explícito); si `AlertDialogCancel` sin
 `type` no da el mismo árbol, el diálogo lo pasa y no se acepta diferencia.
 
+*Desviación en la implementación (review vuelta 1, m2).* El diálogo se compone con
+`ConfirmDialogFrame` + `ConfirmDialogBody` —las piezas de la misma fila del catálogo— y no con
+`ConfirmDialog` entero. Motivo: no mover el `useActionState` de sitio. Hoy vive en
+`FinishConditioningForm`, dentro del contenido del diálogo; `ConfirmDialog` recibe `error` y el estado
+de envío como props, así que el `useActionState` tendría que subir a `FinishConditioningDialog`, por
+encima del marco. El reinicio por apertura no depende de esto (lo da el `key={opening}` de
+`conditioning-actions.tsx`). El árbol es el mismo (paridad del diálogo idéntica). Con `confirmSlot`,
+`testIds.confirm` no se pide (m3).
+
 **D10 — `CountdownGatedButton` a `components/shared/countdown-gated-button.tsx` (punto 5, R19).**
 Excepción declarada a «sube con la segunda ruta»: la pide la ficha y su tablero aprobado ya lo anuncia
 (`docs/diseno/canvas/Dominio.dc.html`: «CountdownGatedButton (hoy en la ruta; sube a shared)»).
@@ -286,7 +303,7 @@ Las únicas. Cualquier otra diferencia en un snapshot de paridad es un fallo:
 
 | Dónde | Diferencia | Por qué se acepta | Requisito |
 | --- | --- | --- | --- |
-| Vacío de «Por empacar» (3 snapshots en `asignacion-listas-paridad`, 1 en `asignacion-paridad`) | el contenedor gana `data-testid="packing-orders-empty"` | Es un gancho de test sin efecto para nadie; lo llevan las otras cuatro listas y hacer opcional el `testId` de `EmptyState` solo para esta empeoraría la pieza (A2) | R5 |
+| Vacío de «Por empacar» (3 snapshots en `asignacion-listas-paridad`, 2 en `asignacion-paridad`: primera página y página posterior) | el contenedor gana `data-testid="packing-orders-empty"` | Es un gancho de test sin efecto para nadie; lo llevan las otras cuatro listas y hacer opcional el `testId` de `EmptyState` solo para esta empeoraría la pieza (A2) | R5 |
 | Esqueletos del acondicionador | sin `data-list` | `arbolAccesible` no lo captura; solo lo leía una aserción unitaria (D4) | R6 |
 | Estado del detalle con un estado imposible | etiqueta en vez del código crudo | No se alcanza con los datos que devuelven `getConditioningOrder` y `getPackingOrder` | R12 |
 
