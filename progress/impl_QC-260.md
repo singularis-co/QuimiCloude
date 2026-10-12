@@ -67,19 +67,103 @@ estado para ese valor. El campo es controlado y React restaura su valor tras el 
 en jsdom; si el navegador se comporta distinto, lo cubre `e2e/acceso-rediseno.spec.ts`
 (`design.md > 11`, fila R20).
 
-## Archivos creados / modificados
+## Archivos creados / modificados (consolidado, frontend_dev en todas las tareas)
 
-- `tests/unit/acceso/establecer-contrasena-rediseno.test.tsx` (T3; caso R20, ampliable por T7)
+- **Piezas compartidas:** `components/shared/access-screen.tsx` (nuevo, T5), `notice.tsx` (`id`, T2),
+  `submit-button.tsx` (`Spinner`, T4), `credential-rule-labels.ts` (tildes, T8), `CATALOGO.md`
+  (filas `Notice`, `SubmitButton`, `AccessScreen`).
+- **CSS:** `app/globals.css` (bloque «Pantallas de acceso — INICIO/FIN», T5).
+- **Login (T6):** `app/(public)/login/page.tsx`, `components/login-form.tsx`, `components/index.ts`;
+  borrado `components/login-background.tsx`.
+- **Establecer contraseña (T7):** `app/(public)/establecer-contrasena/[token]/page.tsx`,
+  `components/set-credential-form.tsx`, `components/set-credential-labels.ts`, `components/index.ts`;
+  borrados `components/credential-input.tsx` y `components/submit-button.tsx`.
+- **Tests nuevos:** `tests/unit/acceso/{access-screen,login-rediseno,establecer-contrasena-rediseno,textos-acceso}.test.tsx`,
+  `tests/guards/guard-qc260-limites-de-la-ficha.test.ts`, `e2e/acceso-rediseno.spec.ts`.
+- **Tests enmendados (`ENMIENDA QC-260`):** `tests/unit/login-skin.test.tsx`,
+  `tests/unit/identity/login-page-marca.test.tsx`, `tests/unit/theme/color-tokens.test.ts`,
+  `tests/unit/theme/motion-tokens.test.ts`, `tests/unit/brand/brand-logo.test.tsx` (O1),
+  `tests/unit/identity-ui/set-credential-form.test.tsx`, `tests/unit/identity/credencial/scope.test.ts`,
+  `tests/guards/guard-movimiento.test.ts`, `e2e/login-skin.spec.ts` (fuera los 4 casos de QC-226
+  R17–R22; quedan los 3 de medidas); casos nuevos en `tests/unit/shared-ui/notice.test.tsx` y
+  `submit-button.test.tsx`. Snapshot `tests/unit/paridad/__snapshots__/login-paridad.test.tsx.snap`
+  regenerado en commit propio (`c9d2e746`).
+
+### Control de diff del snapshot de paridad (T6)
+
++65/−40, solo lo esperado: `main` sin `dark`/`min-h-svh p-6`, con `min-h-dvh`; 5 moléculas en vez de 3;
+tarjeta `region` con `aria-labelledby="login-heading"` (sin `CardHeader/Content/Footer`); `h1` con
+isotipo claro y oscuro (`alt=""`) + «Quimi»«Cloude», nombre accesible `QuimiCloude`; «Usuario»
+`h-11 md:text-base`; `PasswordField` con ojo («Mostrar la contraseña», `aria-pressed`,
+`aria-controls="password"`); spinner `aria-hidden` + «Entrando…» al enviar; pie con `border-t` y
+enlace `min-h-11`.
+
+### Desviaciones declaradas por frontend_dev (para el reviewer)
+
+- T5: tarjeta con `role="region"` cuando recibe `labelledBy`; `gap` 20/18 px de los tableros;
+  movimiento reducido con `animation: none` en hijos de la tarjeta.
+- T6: el formulario cuenta como un solo bloque de la entrada escalonada (h1, form, pie); enlace de
+  recuperación con `buttonVariants({ variant: 'link', touch: true })`.
+- T7: isotipo, cabecera y `form` son hermanos (hijos directos de la tarjeta) para que la entrada
+  escalonada los anime; el paso a éxito remonta los bloques con `key` en cada rama, no la tarjeta
+  (la pinta la página de servidor); `set-credential-success` está en el bloque del título y texto;
+  testids nuevos `set-credential-brand`, `set-credential-success-icon`, `set-credential-feedback`;
+  el relleno 36/28/28 del éxito del tablero no se aplica (la tarjeta es de `AccessScreen`).
+- T8: el mensaje inesperado del catálogo («Ocurrio un error inesperado…») vive en `lib/` (R27 lo
+  prohíbe tocar) y no lleva tildes; no es ninguna de las formas que R25 veta.
+- T10: el éxito («Ir a iniciar sesión») se alcanza en E2E con el buzón de archivos y el caso de uso de
+  `establecer-contrasena.spec.ts`, datos `qc260_e2e_*` que se borran; R20 se ejerce con contraseñas
+  que no coinciden (no necesita base).
 
 ## Mapa R<n> -> test
 
-(se rellena al cerrar)
+| R | Test |
+|---|---|
+| R1, R2, R5, R6 | `tests/unit/acceso/access-screen.test.tsx > R1/R2/R5/R6` |
+| R3, R4, R6, R7, R8 | `e2e/acceso-rediseno.spec.ts > R3, R4, R6, R7 (390/820/1440), R8 (390/820/1440)` en las dos pantallas, chromium y webkit; R8 del enlace de éxito: `> estado de éxito > R8 — «Ir a iniciar sesión»` |
+| R9, R10, R11, R12, R13 | `tests/unit/acceso/login-rediseno.test.tsx > R9…R13`; R10 además `e2e/acceso-rediseno.spec.ts > ojo del login > R10`; R11 además `tests/unit/login-form.test.tsx` y `e2e/login.spec.ts` |
+| R14–R22 | `tests/unit/acceso/establecer-contrasena-rediseno.test.tsx > R14…R22` (R20: T3 + formulario real); `tests/unit/identity-ui/set-credential-form.test.tsx`; R20 además `e2e/acceso-rediseno.spec.ts > R20`; R12/R21 de la pieza: `tests/unit/shared-ui/submit-button.test.tsx`; R18 `id`: `tests/unit/shared-ui/notice.test.tsx` |
+| R23, R24 | `tests/unit/identity-ui/set-credential-form.test.tsx`, `e2e/establecer-contrasena.spec.ts` |
+| R25, R26 | `tests/unit/acceso/textos-acceso.test.tsx` |
+| R27, R29 | `tests/guards/guard-qc260-limites-de-la-ficha.test.ts > R27 / R29` (8 casos, incl. sintéticos en rojo) |
+| R28 | `tests/guards/guard-catalogo-de-componentes.test.ts` |
 
 ## Salida de los tests
 
 - T3: `pnpm exec vitest run tests/unit/acceso/establecer-contrasena-rediseno.test.tsx` →
   `Test Files 1 passed (1)`, `Tests 1 passed (1)`. `pnpm run typecheck` → sin errores.
   `pnpm run lint` → `0 errors, 7 warnings` (preexistentes, ninguno en el archivo nuevo).
+- T6/T7/T8/T9: cada frontend_dev corrió typecheck, lint, `vitest related` y guardias: verdes salvo
+  B1.
+
+### Cierre (implementer, 2026-10-12, tras T10)
+
+- `pnpm run typecheck` → OK. `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)` (preexistentes
+  en `confirm-catalog-import.test.ts` y `order-service.test.ts`).
+- `pnpm exec vitest run guard` → `Test Files 72 passed (72)` · `Tests 985 passed | 18 skipped (1003)`.
+- **Barrido (lección QC-256):** grep en `tests/` (sin integración, que no nombra nada tocado) de
+  `shared/notice`, `submit-button`, `access-screen`, `credential-rule-labels`, `Notice`,
+  `SubmitButton`, `AccessScreen`, `globals.css`, `CATALOGO.md`, `(public)/login`,
+  `establecer-contrasena`, `login-form`, `SetCredentialForm`, `SET_CREDENTIAL_LABELS`,
+  `data-access`, `PasswordField` → 44 archivos, corridos todos:
+  ```
+  × no introduce ningun cambio visual 87ms
+  FAIL |ui| tests/unit/login-form.test.tsx > destino de vuelta (QC-9 R7, R8, R9) > no introduce ningun cambio visual
+  Test Files  1 failed | 42 passed (43)
+       Tests  1 failed | 725 passed | 7 skipped (733)
+  ```
+  El único rojo es B1.
+- **E2E** (`pnpm exec playwright test e2e/acceso-rediseno.spec.ts e2e/login-skin.spec.ts e2e/login.spec.ts e2e/establecer-contrasena.spec.ts e2e/theme.spec.ts e2e/session.spec.ts`,
+  chromium + webkit):
+  ```
+  20 failed
+  54 passed (1.2m)
+  ```
+  Verdes: `acceso-rediseno` 20/21 por proyecto (R3, R4, R6, R7, R8 en las dos pantallas y las tres
+  anchuras, R10, R20), `login-skin` 3/3, `theme` 4/4. Los 20 rojos (10 por proyecto) caen todos al
+  sembrar datos con `PrismaClientInitializationError` (falta `DATABASE_URL`): `acceso-rediseno:413`
+  (R8 «Ir a iniciar sesión»), `establecer-contrasena:182`, `login:366/387/432/459/486`,
+  `session:248/296/359`. Ver B2.
 
 ## Bloqueos
 
@@ -92,6 +176,12 @@ en jsdom; si el navegador se comporta distinto, lo cubre `e2e/acceso-rediseno.sp
   esta enmienda. No se edita. Opciones: (a) enmendar a 2 con nota `ENMIENDA QC-260`, (b) contar
   solo los `button[type=submit]` (sigue probando que el oculto no añade controles). Decide el
   leader/humano. T6 queda sin `[x]` hasta entonces; el resto de T6 está verde.
+- **B2 (T10) — entorno E2E sin base.** El worktree no tiene `.env` (no se copió al montarlo) y
+  Docker Desktop está apagado: el Postgres 17 de `localhost:5433` no responde. Los 10 casos por
+  proyecto que siembran datos fallan en el seed, no en la UI; no se puede confirmar que
+  `login`, `session` y `establecer-contrasena` pasan sin cambios. No se improvisa infraestructura:
+  con `.env` y la base de la feature arriba (`docs/verification.md`), repetir el comando de T10.
+  T10 queda sin `[x]`.
 - **O1 (T6, informativo) — enmienda fuera de `design.md > 10`.** `tests/unit/brand/brand-logo.test.tsx`
   R26 (QC-226) exigía precargar el logo vertical del login; `design.md > 5` decide dejarlo sin
   precarga. frontend_dev lo enmendó con nota `ENMIENDA QC-260` y se añadió a `## Archivos
