@@ -131,6 +131,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
 - `tests/unit/paridad/__snapshots__/login-paridad.test.tsx.snap`
 - `tests/guards/guard-movimiento.test.ts`
 - `tests/unit/identity/credencial/scope.test.ts`
+- `tests/unit/brand/brand-logo.test.tsx`
 - `tests/guards/guard-qc260-limites-de-la-ficha.test.ts`
 - `e2e/acceso-rediseno.spec.ts`
 - `e2e/login-skin.spec.ts`
