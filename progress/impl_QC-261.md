@@ -1,0 +1,51 @@
+# QC-261 — Bitácora de implementación
+
+Rama `feature/QC-261-rediseno-dashboard`, worktree `.worktrees/QC-261-rediseno-dashboard`.
+Spec: `specs/QC-261-rediseno-dashboard/` (P1–P7 cerradas con la opción por defecto).
+
+## T1 — Barrido de tests afectados (2026-10-12)
+
+`Grep` sobre `tests/` y `e2e/` por los términos de T1. 43 archivos con alguna coincidencia; los que
+no tocan estas pantallas se descartan con motivo.
+
+### Se editan (con nota `ENMIENDA QC-261` donde cambian aserciones)
+
+| Archivo | Motivo |
+|---|---|
+| `tests/ui/dashboard/execution-trace-table.test.tsx` | Enlace «Ver recorrido» → ítem del menú; R26 de QC-167 → disparador 44×44. Aserciones de URL (R6–R11) sin editar |
+| `tests/ui/dashboard/execution-trace-detail.test.tsx` | «Vuelta atrás» → `data-go-back` + `sr-only`; «Motivo:» → «Motivo · » |
+| `tests/unit/paridad/recorridos-paridad.test.tsx` + `.snap` | Snapshot regenerado en su commit (estado, columnas, error con reintento) |
+| `tests/unit/marca/tablas-marca.test.tsx` | Lista cerrada de `execution-trace-columns.tsx`: + «Duración» |
+| `tests/unit/shared-ui/empty-state.test.tsx` | Casos nuevos de `icon` y `heading` |
+| `tests/guards/guard-identificador-de-request.test.ts` | Alta de `e2e/dashboard-rediseno.spec.ts` en `E2E_ESPERADOS` |
+| `e2e/recorrido-ejecucion.spec.ts` | Líneas 435 y 503: `getByRole('link', { name: traceLinkName })` → menú «Acciones del pedido {n}» → «Ver recorrido»; línea 447: `getByText(GO_BACK_MARK)` visible → `[data-go-back="true"]`. Localiza filas por `data-table-row-<id>` (prefijo en línea 148, `rowsLocator`/`rowOf` en 170–176): con `card` el T8 comprueba si ese testid se duplica en la tarjeta y acota al cuerpo visible sin tocar aserciones |
+
+### Se corren sin editar (deben seguir verdes)
+
+| Archivo | Motivo |
+|---|---|
+| `tests/unit/dashboard-page.test.tsx` | Un `h1`, sin landmarks, `dashboard-content` |
+| `tests/unit/navegacion/private-not-found.test.tsx` | testid, mensaje, sin palabras de permiso, sin enlace |
+| `tests/unit/dashboard/execution-trace-format.test.ts` | Alias `TRACE_ORDER_STATUS_LABELS` se conserva |
+| `tests/unit/dashboard/execution-trace-list-params.test.ts` | Parámetros de URL, sin cambios |
+| `tests/guards/guard-piezas-base.test.ts` | `MISSING_PERSON_MARK` se conserva; regla 4 (sin esqueleto local) |
+| `tests/guards/guard-catalogo-de-componentes.test.ts` | Fila de `EmptyState` actualizada |
+| `tests/guards/guard-movimiento.test.ts` | Clase `motion-safe:animate-[…]` de la línea de tiempo |
+| `tests/guards/guard-pantallas-exigen-permiso.test.ts` | `requirePagePermission` sigue primera línea |
+| **Nuevo en el barrido:** `tests/unit/dashboard-route-contract.test.ts` | Lee la fuente de `page.tsx`, `dashboard-content.tsx`, sección, tabla, página y componente del detalle: sin `use client`/`useState`/`onClick` en página y contenido, `page.tsx` importa de `./components` y sin literal `/dashboard`, sin `100vh`, y **ninguna línea con `hover:` puede llevar `hidden`/`invisible`/`opacity-0`/`sr-only`** |
+| **Nuevo en el barrido:** `tests/unit/navegacion/qc75-convenciones.test.ts` | Lee `app/(private)/not-found.tsx`: debe contener `private-not-found` |
+| **Nuevo en el barrido:** `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` | Renderiza las páginas con las acciones del recorrido espiadas |
+| Los trece E2E con `private-not-found` | testid conservado; sin cambios |
+
+Los tres «nuevos en el barrido» solo se leen y se corren: no se editan, así que **no** se añaden a
+`tasks.md > ## Archivos esperados` (añadirlos crearía choques de candado falsos con otras fichas).
+
+### Descartados
+
+`tests/unit/asignaciones/*` (módulo de dominio `execution-trace`, sin UI), `tests/unit/composition/
+asignaciones-facade.test.ts`, `tests/unit/identity/session-once-per-request-actions.test.ts`,
+`tests/integration/identity/*` (`resetIdentityToEmptyState`), `tests/unit/documentos/process-pdf-by-strategy.test.ts`
+(«Motivo:» de otro dominio), `tests/unit/pedidos/order-view.test.ts`, `tests/unit/shared-ui/order-status.test.ts`,
+`tests/unit/shared/data-table-states-sustituyen.test.tsx`: no leen ni renderizan nada que esta ficha cambie.
+
+## Tandas

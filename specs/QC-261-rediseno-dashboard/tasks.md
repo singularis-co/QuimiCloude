@@ -10,7 +10,7 @@ la cita antes de empezar su tanda.
 
 ## Tanda 1
 
-- [ ] **T1. Barrido de tests afectados (antes de tocar código).** Con `Grep` sobre `tests/` y
+- [x] **T1. Barrido de tests afectados (antes de tocar código).** Con `Grep` sobre `tests/` y
   `e2e/`, por: `execution-trace`, `ExecutionTrace`, `TRACE_LINK_TEXT`, `traceLinkName`,
   `GO_BACK_MARK`, `DELETED_ORDER_MARK`, `ACTIVE_ORDER_MARK`, `BACK_TO_LIST_TEXT`, `Motivo:`,
   `dashboard-title`, `dashboard-content`, `private-not-found`, `PrivateNotFound`, `EmptyState`,
