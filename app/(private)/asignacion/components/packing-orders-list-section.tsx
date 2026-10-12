@@ -17,7 +17,12 @@ import { runInRequestScope } from '@/lib/shared/request-scope';
 import { cn } from '@/lib/utils';
 
 import { assignedOrdersListHref } from './assigned-orders-list-params';
-import { AssignmentListError, AssignmentListSectionFrame } from './assignment-list-parts';
+import {
+  AssignmentListEmpty,
+  AssignmentListError,
+  AssignmentListSectionFrame,
+  firstPageHrefWhenPast,
+} from './assignment-list-parts';
 import { FIRST_PAGE } from './assignment-view-params';
 import { buildPackingOrdersColumns } from './packing-orders-columns';
 
@@ -81,23 +86,13 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
   if (items.length === 0) {
     return (
       <AssignmentListSectionFrame testId={PACKING_ORDERS_SECTION_TESTID}>
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm text-muted-foreground" data-testid="packing-orders-empty-message">
-            {currentPage > FIRST_PAGE
-              ? 'Esta página ya no tiene pedidos.'
-              : 'No hay pedidos por empacar en tu empresa.'}
-          </p>
-          {currentPage > FIRST_PAGE ? (
-            <Link
-              href={assignedOrdersListHref({ ...params, page: FIRST_PAGE }, 'por_empacar')}
-              data-slot="button"
-              data-testid="packing-orders-first-page"
-              className={cn(buttonVariants({ variant: 'outline', touch: true }))}
-            >
-              Volver a la primera página
-            </Link>
-          ) : null}
-        </div>
+        <AssignmentListEmpty
+          testIdPrefix="packing-orders"
+          message="No hay pedidos por empacar en tu empresa."
+          firstPageHref={firstPageHrefWhenPast(currentPage, FIRST_PAGE, () =>
+            assignedOrdersListHref({ ...params, page: FIRST_PAGE }, 'por_empacar'),
+          )}
+        />
       </AssignmentListSectionFrame>
     );
   }

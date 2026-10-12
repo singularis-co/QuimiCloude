@@ -1,10 +1,12 @@
 import Link from 'next/link';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import type { ConditioningOrderDetail, ConditioningTeamCandidates } from '@/lib/modules/asignaciones';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import type { OrderStatus } from '@/lib/modules/pedidos';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { cn } from '@/lib/utils';
 
 import { OrderDistributionFull, assignmentViewHref, orderDistributionFullText } from '../../../components';
 
@@ -42,8 +44,6 @@ export const CONDITIONING_ORDER_SCREEN_TEXTS = {
 } as const;
 
 const BATCH_DATA_MISSING_ID = 'conditioning-order-batch-data-missing';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
  * Solo los cuatro estados que puede devolver `getConditioningOrder`; cualquier otro es imposible
@@ -184,23 +184,17 @@ export function ConditioningOrderScreen({
       ) : null}
 
       {candidatesError === null ? null : (
-        <div
-          role="alert"
+        <ErrorAlert
+          error={candidatesError}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid={CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID}
-          data-code={candidatesError.code}
-        >
-          {candidatesError.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={candidatesError} />
-          ) : (
-            <p>{candidatesError.message}</p>
-          )}
-        </div>
+          testId={CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID}
+          withDataCode
+        />
       )}
 
       <Link
         href={back.href}
-        className={`inline-flex w-fit items-center ${TOUCH_TARGET} text-base font-medium underline`}
+        className={cn(touchTarget, 'inline-flex w-fit items-center text-base font-medium underline')}
         data-testid={CONDITIONING_ORDER_BACK_LINK_TESTID}
       >
         {back.label}

@@ -1,13 +1,11 @@
-import Link from 'next/link';
+import { AssignmentListEmpty } from './assignment-list-parts';
 
-import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-
-/** El estado vacío de las dos listas del acondicionador, calcado de `FinishedOrdersEmpty`. */
+/** El estado vacío de las listas del acondicionador. */
 
 export const CONDITIONING_ORDERS_EMPTY_TEXTS = {
   por_acondicionar: 'No hay pedidos por acondicionar en tu empresa.',
   acondicionados: 'Todavía no has terminado ningún acondicionamiento.',
+  acondicionados_entregados: 'Todavía no se ha entregado ningún pedido que acondicionaste.',
 } as const;
 
 export const CONDITIONING_ORDERS_PAGE_PAST_END_TEXT = 'Esta página ya no tiene pedidos.';
@@ -22,25 +20,10 @@ export type ConditioningOrdersEmptyProps = {
 
 export function ConditioningOrdersEmpty({ list, firstPageHref }: ConditioningOrdersEmptyProps) {
   return (
-    <div
-      data-testid="conditioning-orders-empty"
-      className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center"
-    >
-      <p className="text-sm text-muted-foreground" data-testid="conditioning-orders-empty-message">
-        {firstPageHref === undefined
-          ? CONDITIONING_ORDERS_EMPTY_TEXTS[list]
-          : CONDITIONING_ORDERS_PAGE_PAST_END_TEXT}
-      </p>
-      {firstPageHref === undefined ? null : (
-        <Link
-          href={firstPageHref}
-          data-slot="button"
-          data-testid="conditioning-orders-first-page"
-          className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
-        >
-          {CONDITIONING_ORDERS_FIRST_PAGE_TEXT}
-        </Link>
-      )}
-    </div>
+    <AssignmentListEmpty
+      testIdPrefix="conditioning-orders"
+      message={CONDITIONING_ORDERS_EMPTY_TEXTS[list]}
+      firstPageHref={firstPageHref}
+    />
   );
 }
