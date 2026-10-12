@@ -8,8 +8,8 @@ import { setupUser } from '../../helpers/user-event';
 import {
   DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID,
   DeliveredConditionedOrdersListSection,
+  assignedOrdersListHref,
   buildConditionedOrdersColumns,
-  deliveredConditionedOrdersHref,
 } from '@/app/(private)/asignacion/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
@@ -158,7 +158,7 @@ describe('«Entregados» del acondicionador', () => {
     const href = routerMock.push.mock.calls[0]?.[0] ?? '';
     expect(href).toContain('vista=acondicionados_entregados');
     expect(href).toContain('page=2');
-    expect(deliveredConditionedOrdersHref({ page: 1, pageSize: 50 })).toBe(
+    expect(assignedOrdersListHref(parametros({ page: 1, pageSize: 50 }), 'acondicionados_entregados')).toBe(
       '/asignacion?page=1&pageSize=50&vista=acondicionados_entregados',
     );
   });

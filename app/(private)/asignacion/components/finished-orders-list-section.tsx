@@ -1,6 +1,7 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listFinishedOrdersAction } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 
+import { assignedOrdersListHref } from './assigned-orders-list-params';
 import {
   AssignmentListError,
   AssignmentListSectionFrame,
@@ -8,7 +9,7 @@ import {
 } from './assignment-list-parts';
 import { FIRST_PAGE } from './assignment-view-params';
 import { FinishedOrdersEmpty } from './finished-orders-empty';
-import { FinishedOrdersTable, finishedOrdersHref } from './finished-orders-table';
+import { FinishedOrdersTable } from './finished-orders-table';
 
 export const FINISHED_ORDERS_SECTION_TESTID = 'finished-orders-list-section';
 
@@ -40,7 +41,7 @@ export async function FinishedOrdersListSection({ params }: FinishedOrdersListSe
       <AssignmentListSectionFrame testId={FINISHED_ORDERS_SECTION_TESTID}>
         <FinishedOrdersEmpty
           firstPageHref={firstPageHrefWhenPast(currentPage, FIRST_PAGE, () =>
-            finishedOrdersHref({ ...params, page: FIRST_PAGE }),
+            assignedOrdersListHref({ ...params, page: FIRST_PAGE }, 'terminados'),
           )}
         />
       </AssignmentListSectionFrame>

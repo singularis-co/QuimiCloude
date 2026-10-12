@@ -6,10 +6,10 @@ import { createErrorStateTranslator } from '@/lib/modules/errores';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 import { AssignedOrdersError } from './assigned-orders-error';
+import { assignedOrdersListHref } from './assigned-orders-list-params';
 import { FIRST_PAGE } from './assignment-view-params';
 import { ConditionedOrdersTable } from './conditioned-orders-table';
 import { CONDITIONING_ORDERS_FIRST_PAGE_TEXT, CONDITIONING_ORDERS_PAGE_PAST_END_TEXT } from './conditioning-orders-empty';
-import { deliveredConditionedOrdersHref } from './conditioning-orders-href';
 
 export const DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID = 'delivered-conditioned-orders-list-section';
 export const DELIVERED_CONDITIONED_ORDERS_EMPTY_TEXT = 'Todavía no se ha entregado ningún pedido que acondicionaste.';
@@ -73,7 +73,7 @@ export async function DeliveredConditionedOrdersListSection({
           firstPage={
             pastEnd
               ? {
-                  href: deliveredConditionedOrdersHref({ ...params, page: FIRST_PAGE }),
+                  href: assignedOrdersListHref({ ...params, page: FIRST_PAGE }, 'acondicionados_entregados'),
                   label: CONDITIONING_ORDERS_FIRST_PAGE_TEXT,
                   testId: 'conditioning-orders-first-page',
                 }

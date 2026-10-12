@@ -11,8 +11,7 @@ import {
   CONDITIONING_ORDERS_SECTION_TESTID,
   ConditionedOrdersListSection,
   ConditioningOrdersListSection,
-  conditionedOrdersHref,
-  conditioningOrdersHref,
+  assignedOrdersListHref,
 } from '@/app/(private)/asignacion/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type { ConditioningOrderRow, FinishedOrderView } from '@/lib/modules/asignaciones';
@@ -167,7 +166,7 @@ describe('«Por acondicionar»: la sección pide la página y pinta la tabla com
   });
 
   it('R10: la dirección de «Por acondicionar» lleva siempre su vista, también al cambiar de tamaño', () => {
-    expect(conditioningOrdersHref({ page: 1, pageSize: 25 })).toBe(
+    expect(assignedOrdersListHref(parametros({ page: 1, pageSize: 25 }), 'por_acondicionar')).toBe(
       '/asignacion?page=1&pageSize=25&vista=por_acondicionar',
     );
   });
@@ -236,7 +235,7 @@ describe('«Terminados» del acondicionador', () => {
     const href = routerMock.push.mock.calls[0]?.[0] ?? '';
     expect(href).toContain('vista=acondicionados');
     expect(href).toContain('page=2');
-    expect(conditionedOrdersHref({ page: 1, pageSize: 50 })).toContain('vista=acondicionados');
+    expect(assignedOrdersListHref(parametros({ page: 1, pageSize: 50 }), 'acondicionados')).toContain('vista=acondicionados');
   });
 
   it('un fallo del caso de uso pinta el estado de error', async () => {

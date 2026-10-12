@@ -4,10 +4,10 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useTransition } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
-import type { FinishedOrderView } from '@/lib/modules/asignaciones';
+import type { AssignmentViewKind, FinishedOrderView } from '@/lib/modules/asignaciones';
 
+import { assignedOrdersListHref } from './assigned-orders-list-params';
 import { buildConditionedOrdersColumns } from './conditioned-orders-columns';
-import { conditionedOrdersHref, deliveredConditionedOrdersHref } from './conditioning-orders-href';
 
 export const CONDITIONED_ORDERS_TABLE_ID = 'asignacion-acondicionados';
 
@@ -39,13 +39,8 @@ export type ConditionedOrdersTableProps = {
   readonly params: DataTableParams;
   readonly totalPages: number;
   /** La vista a la que vuelve al paginar: «Terminados» y «Entregados» comparten tabla. */
-  readonly view?: 'acondicionados' | 'acondicionados_entregados';
+  readonly view?: Extract<AssignmentViewKind, 'acondicionados' | 'acondicionados_entregados'>;
 };
-
-const PAGE_HREF = {
-  acondicionados: conditionedOrdersHref,
-  acondicionados_entregados: deliveredConditionedOrdersHref,
-} as const;
 
 export function ConditionedOrdersTable({
   rows,
@@ -79,7 +74,7 @@ export function ConditionedOrdersTable({
         getRowId={(order) => order.id}
         params={params}
         totalPages={totalPages}
-        onParamsChange={(next) => navigate(PAGE_HREF[view](next))}
+        onParamsChange={(next) => navigate(assignedOrdersListHref(next, view))}
         status="idle"
         texts={CONDITIONED_ORDERS_TABLE_TEXTS}
         searchable={false}

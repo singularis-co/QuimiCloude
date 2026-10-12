@@ -19,10 +19,12 @@ import {
   type StartPackingResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-packing-actions';
 import type { OrderStatus } from '@/lib/modules/pedidos';
-import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
+
+// Por su ruta exacta, no por el barrel: el barrel arrastra las secciones de servidor a esta pantalla de cliente.
+import { assignmentViewHref } from '../../../components/assignment-view-params';
 
 /**
  * La pantalla de un pedido de empaque. Sin control de edicion: los datos del pedido se leen tal
@@ -100,8 +102,6 @@ const FINISH_PENDING_LABEL = 'Terminando…';
 const PACKING_STEPS_TITLE = 'Pasos de envasado';
 const PACKING_MIN_STEP_SECONDS = 5;
 const BACK_LABEL = 'Volver a «Por empacar»';
-/** `?vista=por_empacar` es el mismo nombre de parametro que `assignment-view-params.ts`. */
-const BACK_HREF = `${ASSIGNED_ORDERS_ROUTE}?vista=por_empacar`;
 const PACKER_UNKNOWN_TEXT = 'Lo esta empacando otra persona.';
 
 function distributionLineText(line: OrderDistributionLineView): string {
@@ -322,7 +322,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
       ) : null}
 
       <Link
-        href={BACK_HREF}
+        href={assignmentViewHref('por_empacar')}
         className={`inline-flex w-fit items-center ${touchTarget} text-sm font-medium underline`}
         data-testid={PACKING_ORDER_BACK_LINK_TESTID}
       >
