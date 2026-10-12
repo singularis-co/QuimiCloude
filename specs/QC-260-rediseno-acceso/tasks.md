@@ -79,7 +79,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
   (R14–R22). Enmienda de `tests/unit/identity-ui/set-credential-form.test.tsx` (`design.md > 10`).
   *Hecho:* unit verde; R23 y R24 siguen cubiertos por el test de QC-79.
 
-- [ ] **T8. Textos** (depende de T6, T7; `design.md > 7`). `credential-rule-labels.ts` con tildes;
+- [x] **T8. Textos** (depende de T6, T7; `design.md > 7`). `credential-rule-labels.ts` con tildes;
   `tests/unit/acceso/textos-acceso.test.tsx` (R25, R26): tabla exacta de R25 y ninguna forma sin
   tilde en el texto pintado de las dos pantallas. `tests/unit/credential-help-contract.test.ts` y
   `tests/unit/credential-requirements.test.tsx` en verde. *Hecho:* tests verdes.
