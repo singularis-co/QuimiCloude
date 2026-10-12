@@ -30,12 +30,22 @@ Los siete puntos de la ficha:
 - `currentActor()` repetido en las secciones de servidor, los dos módulos de parseo de URL
   (`assignment-view-params.ts` y `assigned-orders-list-params.ts`) y `companyOrdersHref` (lleva el
   filtro de estado): no los nombra la ficha.
-- Ver `## Preguntas abiertas > P6` para los duplicados vistos que la ficha no nombra.
+- Ver `## Decisiones cerradas (no reabrir) > P6` para los duplicados vistos que la ficha no nombra.
 
 ## Decisiones cerradas (no reabrir)
 
-Ninguna: la ficha llega sin `/afinar-feature`. Las decisiones del spec están en `design.md > 4` y
-las que piden confirmación del humano, en `## Preguntas abiertas`.
+La ficha llegó sin `/afinar-feature`. Las decisiones del spec están en `design.md > 4`. Las seis
+preguntas que pedían confirmación del humano se cerraron con la opción por defecto del spec al
+aprobarlo (`progress/features/QC-252.md > Decisiones`); su texto es el de la pregunta original.
+
+| # | Decisión | Quién y cuándo | Enmienda a | Cubierta por |
+| --- | --- | --- | --- | --- |
+| P1 | **`ConfirmActionDialog` ya no existe.** QC-232 lo borró y `ConfirmDialog` ocupa su lugar; `guard-formularios-y-acciones` impide que vuelva. Por defecto, el diálogo de terminar se basa en `ConfirmDialog` (R17). ¿Es lo que pedía la ficha? → Sí, opción por defecto. | humano, al aprobar el spec, 2026-10-12 | — | R17, R18 |
+| P2 | **El mapa de estados ya es server-safe.** QC-256 dejó `ORDER_STATUS_LABELS` en `lib/shared/ui/order-status.ts`, sin `'use client'`, y `COMPANY_ORDER_STATUS_LABELS` ya es un alias suyo. Por defecto, ese es el destino (R11) y no se mueve nada más. ¿Confirmado? → Sí, opción por defecto. | humano, al aprobar el spec, 2026-10-12 | — | R11, R12 |
+| P3 | **Qué del selector de equipo se construye sobre `order-responsibles`.** El agrupado (`groupResponsiblesByOrigin`) solo lo usa la lista de equipo; lo que el selector comparte con el panel de responsables es el filtro de personas por nombre. Por defecto se comparten el agrupado y el filtro (R8–R10), y el marcado del selector (fieldsets, pistas de grupo, campos ocultos, `data-testid`) no cambia. Unificar también el marcado cambia el árbol y los E2E de una de las dos pantallas y sería cambio visual (pase `/design`). ¿Basta con el agrupado y el filtro? → Sí, opción por defecto. | humano, al aprobar el spec, 2026-10-12 | — | R8, R9, R10 |
+| P4 | **`Notice` no se adopta.** Cambiaría el aspecto de los avisos (icono, tokens, animación), y eso es de QC-265. Por defecto, la pieza única conserva el marcado de hoy (R15). ¿De acuerdo? → Sí, opción por defecto. | humano, al aprobar el spec, 2026-10-12 | — | R15 |
+| P5 | **`CountdownGatedButton` sube a `components/shared` con una sola ruta consumidora.** Es una excepción declarada a «sube con la segunda ruta» (`design.md > 4 > D10`). La guardia del catálogo exige un tablero para toda pieza nueva de Compuestos: por defecto la fila cita `docs/diseno/canvas/Dominio.dc.html`, que ya dice «CountdownGatedButton (hoy en la ruta; sube a shared)» y dibuja el anillo que pondrá QC-265. ¿Vale ese tablero, o hace falta un pase `/design` propio? → Vale ese tablero, opción por defecto. | humano, al aprobar el spec, 2026-10-12 | — | R19, R23 |
+| P6 | **Duplicados vistos que la ficha no nombra.** `AssignedOrderDeliveredNotice` tiene el mismo marcado que los dos avisos de R15; `AssignedOrdersError` y `AssignmentListError` son la misma pieza; el barrel reexporta el alias `MISSING_VALUE_MARK`, que solo usa `tests/unit/asignaciones-ui/assigned-orders-columns.test.tsx`. Por defecto **quedan fuera** y la guardia conserva una única exclusión estrecha para el alias (R22). ¿Entran en esta ficha? → Quedan fuera, opción por defecto; deuda en `progress/deudas.md`. | humano, al aprobar el spec, 2026-10-12 | — | R22 |
 
 ## Requisitos (EARS)
 
@@ -122,7 +132,7 @@ las que piden confirmación del humano, en `## Preguntas abiertas`.
   `Button`/`buttonVariants` con `touch`, con el mismo conjunto de clases resultante.
 - **R22.** `tests/guards/guard-piezas-base.test.ts` NO DEBE excluir ningún archivo de
   `app/(private)/asignacion/`, salvo la reexportación `MISSING_VALUE_MARK` del barrel de la ruta
-  (`## Preguntas abiertas > P6`).
+  (`## Decisiones cerradas (no reabrir) > P6`).
 
 ### Catálogo (punto 7)
 
@@ -139,31 +149,4 @@ las que piden confirmación del humano, en `## Preguntas abiertas`.
 
 ## Preguntas abiertas
 
-Ninguna bloquea la implementación: cada una lleva la opción que el spec toma por defecto. Se
-confirman en la aprobación del spec.
-
-- **P1. `ConfirmActionDialog` ya no existe.** QC-232 lo borró y `ConfirmDialog` ocupa su lugar;
-  `guard-formularios-y-acciones` impide que vuelva. Por defecto, el diálogo de terminar se basa en
-  `ConfirmDialog` (R17). ¿Es lo que pedía la ficha?
-- **P2. El mapa de estados ya es server-safe.** QC-256 dejó `ORDER_STATUS_LABELS` en
-  `lib/shared/ui/order-status.ts`, sin `'use client'`, y `COMPANY_ORDER_STATUS_LABELS` ya es un alias
-  suyo. Por defecto, ese es el destino (R11) y no se mueve nada más. ¿Confirmado?
-- **P3. Qué del selector de equipo se construye sobre `order-responsibles`.** El agrupado
-  (`groupResponsiblesByOrigin`) solo lo usa la lista de equipo; lo que el selector comparte con el
-  panel de responsables es el filtro de personas por nombre. Por defecto se comparten el agrupado y el
-  filtro (R8–R10), y el marcado del selector (fieldsets, pistas de grupo, campos ocultos,
-  `data-testid`) no cambia. Unificar también el marcado cambia el árbol y los E2E de una de las dos
-  pantallas y sería cambio visual (pase `/design`). ¿Basta con el agrupado y el filtro?
-- **P4. `Notice` no se adopta.** Cambiaría el aspecto de los avisos (icono, tokens, animación), y eso
-  es de QC-265. Por defecto, la pieza única conserva el marcado de hoy (R15). ¿De acuerdo?
-- **P5. `CountdownGatedButton` sube a `components/shared` con una sola ruta consumidora.** Es una
-  excepción declarada a «sube con la segunda ruta» (`design.md > 4 > D10`). La guardia del catálogo
-  exige un tablero para toda pieza nueva de Compuestos: por defecto la fila cita
-  `docs/diseno/canvas/Dominio.dc.html`, que ya dice «CountdownGatedButton (hoy en la ruta; sube a
-  shared)» y dibuja el anillo que pondrá QC-265. ¿Vale ese tablero, o hace falta un pase `/design`
-  propio?
-- **P6. Duplicados vistos que la ficha no nombra.** `AssignedOrderDeliveredNotice` tiene el mismo
-  marcado que los dos avisos de R15; `AssignedOrdersError` y `AssignmentListError` son la misma pieza;
-  el barrel reexporta el alias `MISSING_VALUE_MARK`, que solo usa
-  `tests/unit/asignaciones-ui/assigned-orders-columns.test.tsx`. Por defecto **quedan fuera** y la
-  guardia conserva una única exclusión estrecha para el alias (R22). ¿Entran en esta ficha?
+Ninguna: P1–P6 se cerraron al aprobar el spec (`## Decisiones cerradas (no reabrir)`).

@@ -271,6 +271,18 @@
   no estaba en Archivos esperados.
 - **Dueño:** sin asignar.
 
+### D51 — Duplicados de `/asignacion` que QC-252 deja fuera (QC-252, P6)
+- **Origen:** QC-252 (2026-10-12), decisión P6 del humano al aprobar el spec
+  (`specs/QC-252-componentizacion-asignacion/requirements.md > Decisiones cerradas > P6`).
+- **Qué falta:**
+  - `AssignedOrderDeliveredNotice` tiene el mismo marcado que `OrderOutcomeNotice` (la pieza que
+    funde `PackedOrderNotice` y `ConditionedOrderNotice`); podría ser un `kind` más.
+  - `AssignedOrdersError` y `AssignmentListError` son la misma pieza.
+  - El barrel de `app/(private)/asignacion/components/` reexporta el alias `MISSING_VALUE_MARK`, que
+    solo usa `tests/unit/asignaciones-ui/assigned-orders-columns.test.tsx`; por él
+    `tests/guards/guard-piezas-base.test.ts` conserva una exclusión estrecha (R22 de QC-252).
+- **Dueño:** sin asignar.
+
 ## Pendientes humanos de fichas cerradas
 Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *Deudas*, pero se habrían perdido al congelarlo.
 
