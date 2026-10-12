@@ -8,9 +8,6 @@ export const CONDITIONING_ORDERS_EMPTY_TEXTS = {
   acondicionados_entregados: 'Todavía no se ha entregado ningún pedido que acondicionaste.',
 } as const;
 
-export const CONDITIONING_ORDERS_PAGE_PAST_END_TEXT = 'Esta página ya no tiene pedidos.';
-export const CONDITIONING_ORDERS_FIRST_PAGE_TEXT = 'Volver a la primera página';
-
 export type ConditioningOrdersEmptyProps = {
   /** Qué lista está vacía: decide el texto cuando no hay ningún pedido. */
   readonly list: keyof typeof CONDITIONING_ORDERS_EMPTY_TEXTS;

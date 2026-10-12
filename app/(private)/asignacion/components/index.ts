@@ -106,8 +106,6 @@ export {
 } from './conditioning-orders-columns';
 export {
   CONDITIONING_ORDERS_EMPTY_TEXTS,
-  CONDITIONING_ORDERS_FIRST_PAGE_TEXT,
-  CONDITIONING_ORDERS_PAGE_PAST_END_TEXT,
   ConditioningOrdersEmpty,
   type ConditioningOrdersEmptyProps,
 } from './conditioning-orders-empty';
