@@ -12,6 +12,7 @@ export type NoticeProps = {
   readonly children?: ReactNode;
   readonly className?: string;
   readonly testId?: string;
+  readonly id?: string;
 };
 
 const TONES: Readonly<Record<NoticeTone, { readonly icon: LucideIcon; readonly classes: string }>> = {
@@ -23,10 +24,11 @@ const TONES: Readonly<Record<NoticeTone, { readonly icon: LucideIcon; readonly c
 
 // Compone el Alert de shadcn: el layout del tablero (flex, gap 12, padding 12/14, radio 10)
 // sustituye al grid base vía tailwind-merge, y el role de Alert se sobrescribe por props.
-export function Notice({ tone, title, children, className, testId }: NoticeProps) {
+export function Notice({ tone, title, children, className, testId, id }: NoticeProps) {
   const { icon: Icon, classes } = TONES[tone];
   return (
     <Alert
+      id={id}
       role={tone === 'danger' ? 'alert' : 'status'}
       data-tone={tone}
       data-testid={testId}
