@@ -4,7 +4,7 @@ Orden: T1 antes que nada (fija qué tests se tocan). T2–T5 son piezas y pueden
 T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run typecheck`,
 `pnpm run lint`, `pnpm exec vitest related --run <archivos>` y `pnpm exec vitest run guard`.
 
-- [ ] **T1. Barrido de tests afectados (antes de tocar código).** Con `Grep` sobre `tests/` y
+- [x] **T1. Barrido de tests afectados (antes de tocar código).** Con `Grep` sobre `tests/` y
   `e2e/`, por los nombres y textos que cambia la ficha: `LoginForm`, `LoginBackground`,
   `data-login`, `login-card-enter`, `login-molecule-float`, `login-card-fade`,
   `--login-screen-background`, `Pantalla de login — INICIO`, `SetCredentialForm`,
@@ -130,6 +130,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
 - `tests/unit/theme/motion-tokens.test.ts`
 - `tests/unit/paridad/__snapshots__/login-paridad.test.tsx.snap`
 - `tests/guards/guard-movimiento.test.ts`
+- `tests/unit/identity/credencial/scope.test.ts`
 - `tests/guards/guard-qc260-limites-de-la-ficha.test.ts`
 - `e2e/acceso-rediseno.spec.ts`
 - `e2e/login-skin.spec.ts`
