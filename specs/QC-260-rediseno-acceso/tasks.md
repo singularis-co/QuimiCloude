@@ -73,7 +73,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
   comportamiento**. Snapshot de `login-paridad` regenerado en su propio commit, con el control de
   diff anotado en `progress/impl_QC-260.md`. *Hecho:* todo lo anterior verde.
 
-- [ ] **T7. Establecer contraseña** (depende de T2, T3, T4, T5; `design.md > 6`). `page.tsx`,
+- [x] **T7. Establecer contraseña** (depende de T2, T3, T4, T5; `design.md > 6`). `page.tsx`,
   `set-credential-form.tsx`, `set-credential-labels.ts`, barrel; borrar `credential-input.tsx` y
   `submit-button.tsx` de la ruta. Tests en `tests/unit/acceso/establecer-contrasena-rediseno.test.tsx`
   (R14–R22). Enmienda de `tests/unit/identity-ui/set-credential-form.test.tsx` (`design.md > 10`).
