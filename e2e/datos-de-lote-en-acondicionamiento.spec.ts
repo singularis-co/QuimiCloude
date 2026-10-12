@@ -50,17 +50,15 @@ import {
   CONDITIONING_ORDER_SCREEN_TEXTS,
   CONDITIONING_ORDER_STATUS_TESTID,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-order-screen';
-import {
-  CONDITIONING_WAIT_SECONDS,
-  COUNTDOWN_GATED_BUTTON_TESTID,
-} from '@/app/(private)/asignacion/acondicionamiento/[id]/components/countdown-gated-button';
+import { CONDITIONING_WAIT_SECONDS } from '@/app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-wait';
 import { FINISH_CONDITIONING_DIALOG_TESTID } from '@/app/(private)/asignacion/acondicionamiento/[id]/components/finish-conditioning-dialog';
 import { VIEW_PARAM } from '@/app/(private)/asignacion/components/assignment-view-params';
+import { orderDistributionFullText } from '@/app/(private)/asignacion/components/order-distribution-full';
 import {
   CONDITIONED_ORDER_NOTICE_TESTID,
   conditionedOrderNoticeText,
-} from '@/app/(private)/asignacion/components/conditioned-order-notice';
-import { orderDistributionFullText } from '@/app/(private)/asignacion/components/order-distribution-full';
+} from '@/app/(private)/asignacion/components/order-outcome-notice';
+import { COUNTDOWN_GATED_BUTTON_TESTID } from '@/components/shared/countdown-gated-button';
 import { errorMessage, type ErrorCode } from '@/lib/modules/errores';
 import {
   DOCUMENT_TYPE_CC,
