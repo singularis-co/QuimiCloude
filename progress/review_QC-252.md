@@ -122,3 +122,57 @@ la paridad congelada se mantiene, los E2E solo cambian sus import y la trazabili
 cerrar M1 basta con sacar el import profundo de `packing-order-screen.tsx`; la opción recomendada es
 pasar la dirección por prop desde `page.tsx`. Los menores se corrigen en el design, en el catálogo o como
 deuda, a criterio del leader.
+
+## Vuelta 2 (acotada a 9223d3fc..93ee31f3)
+
+Revisados los commits `78fff63b` (M1), `c8e14a8c` (m3), `fe917e3e` (m4, m5), `6b5359c9` (design: M1, m1,
+m2, m4) y `4a5eb087` (bitácora). Del merge `380295f8` solo reviso cómo se resolvió `components/shared/CATALOGO.md`.
+Amplío la revisión a los otros usos de `ConfirmDialog`/`ConfirmDialogBody`/`DeleteConfirmDialog`, porque m3 cambia sus tipos
+(`docs/gate.md > La vuelta 2 del reviewer`).
+
+### Verificación ejecutable (corrida por el reviewer)
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm run typecheck` | exit 0. Cubre los 18 consumidores de `confirm-dialog`/`delete-confirm-dialog` en `app/` |
+| `eslint` sobre `app/(private)/asignacion`, los dos diálogos compartidos y los tests tocados | exit 0, sin salida |
+| `vitest related --run` sobre los 8 archivos de producción tocados en el rango | 213 archivos, 3453 pasan y 1 se salta |
+| `vitest run` de `confirm-dialog{,-montado,-extension}`, `confirmaciones-paridad`, `countdown-gated-button`, `guard-catalogo-de-componentes`, `guard-formularios-y-acciones`, `guard-asignacion-componentizada`, `guard-piezas-base` y `tests/unit/asignaciones-ui` | 46 archivos, 682 pasan y 4 se saltan |
+| `git status` después de correr los tests | limpio: no se escribió ningún snapshot. En el rango, el único `.snap` que cambia es `login-paridad`, que viene de dev (QC-260) |
+
+### Checklist
+
+- [x] **M1 cerrado.** `packing-order-screen.tsx` ya no importa nada de `asignacion/components`: recibe `backHref`.
+      `empaque/[id]/page.tsx`, que es de servidor, importa `assignmentViewHref` por el barrel `../../components`.
+      Busqué con grep imports por ruta profunda a `components/<archivo>` en `app/` y no queda ninguno. El caso R2 nuevo de
+      `packing-order-page.test.tsx` comprueba la prop y el `href` pintado, con la cadena escrita a mano. Añadir `observabilidad`
+      al mock está justificado: el barrel arrastra las secciones de servidor. Los demás render de `PackingOrderScreen`
+      (pantalla, qc195, paridades) pasan la misma dirección y los snapshots no cambian.
+- [x] **m1 cerrado.** § 6 dice ahora «2 en `asignacion-paridad`: primera página y página posterior».
+- [x] **m2 cerrado.** La desviación está anotada en D9 con el motivo correcto: no mover el `useActionState`. Además
+      dice que el reinicio sale del `key={opening}`.
+- [x] **m3 cerrado.** `ConfirmSlotChoice` es una unión discriminada: con `confirmSlot`, `testIds.confirm?: never`; sin él,
+      es obligatorio. `finish-conditioning-dialog.tsx` deja de pasar el testid falso. Los dos sentidos tienen test de tipos
+      con `@ts-expect-error`, que el typecheck valida. La fila del catálogo lo documenta.
+- [x] **Usos compartidos de m3 sin cambio de comportamiento.** En tiempo de ejecución, `ConfirmDialogBody` solo lee
+      `testIds.{message,errorMessage,error,dismiss,confirm,form}` y nunca reparte `testIds` con spread. Por eso,
+      que `ConfirmDialog` le pase ahora el objeto con `dialog` incluido no cambia el DOM. El frame sigue recibiendo
+      `testIds.dialog`. `DeleteConfirmDialog`/`DeleteConfirmDialogBody` aplican el `Omit` sobre la base, no sobre la unión,
+      así que la unión no se pierde. Ningún otro archivo usa los tipos `*ConfirmDialog*Props`. Los 18 consumidores
+      compilan, y `confirm-dialog`, `confirm-dialog-montado` y la paridad de confirmaciones siguen verdes con el snapshot intacto.
+- [x] **m4 cerrado.** Las dos constantes se borran del archivo y del barrel, sin usos restantes, y hay una enmienda en D2. Al borrarlas
+      en lugar de llevarlas a deuda no hace falta anotar nada en D51.
+- [x] **m5 cerrado.** El test de `CountdownGatedButton` usa `SECONDS = 5` propio y los títulos citan R19 de esta ficha.
+      La espera real de 5 s de la ruta sigue cubierta por `start-`/`finish-conditioning-dialog.test.tsx` («00:05»).
+- [x] **Merge de `CATALOGO.md`.** Junta las dos filas: `Notice` toma el `id` que viene de dev y `OrderDistributionLabel`
+      conserva `orderDistributionLineText` de esta ficha. La fila de `ConfirmDialog` mantiene el texto de m3. No quedan marcas de
+      conflicto. Frente a `origin/dev` (`8adc1e5a`), el catálogo solo cambia en las 2 filas de esta ficha.
+- [x] `tasks.md` sigue sin ninguna casilla `[ ]` y su lista de archivos incluye los nuevos del rango.
+
+### Hallazgos
+
+Ninguno nuevo. M1 y m1–m5 están cerrados y no veo regresiones.
+
+### Veredicto
+
+**OK.**
