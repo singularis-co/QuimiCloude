@@ -196,6 +196,10 @@
   `order-distribution-full.tsx` (`marca-en-constante`) y el barrel (`simbolo-borrado`,
   la reexportación `MISSING_VALUE_MARK`).
 - **Dueño:** ficha **QC-217**.
+- **Resuelta (2026-10-12, QC-252, D7):** `OrderDistributionFull` se queda en la ruta (solo la usa
+  `/asignacion`); su `MISSING_NAME_MARK` desapareció al componer con `orderDistributionLineText` y
+  `guard-piezas-base` ya no excluye el archivo. El barrel conserva solo la exclusión estrecha del
+  alias `MISSING_VALUE_MARK` (D51).
 
 ### D43 — Asignación: el quinto conjunto (acondicionamiento) sin parametrizar (QC-232 → QC-217)
 - **Origen:** QC-232 (2026-10-09), `design.md > 7` y `guard-piezas-base`.
@@ -208,6 +212,10 @@
     `conditioning-orders-columns.tsx` (`simbolo-borrado`, `marca-en-constante`, `par-en-constante`);
   - D7: `conditioning-orders-empty.tsx` (`par-literal`), en `VACIOS_Y_ESQUELETOS_D7_PENDIENTES`.
 - **Dueño:** ficha **QC-217**.
+- **Resuelta (2026-10-12, QC-252, D2/D11/D12/D13):** vacíos y esqueletos de acondicionamiento delegan
+  en `AssignmentListEmpty`/`AssignmentListSkeleton`; talla con `touchTarget`; `MissingValue` y
+  `ErrorAlert` compartidos. Los archivos pasaron a `D11_SIN_HALLAZGOS` y
+  `VACIOS_Y_ESQUELETOS_D7_PENDIENTES` quedó vacía.
 
 ### D44 — `step-document-view.tsx` conserva su `TOUCH_TARGET` local (QC-232, P5)
 - **Origen:** QC-232 (2026-10-09), `design.md > 6` y P5 (decisión del humano: pasa a deuda si obliga a
@@ -241,6 +249,9 @@
   `data-testid` en el envoltorio y no en el enlace. Ya no escribe el par táctil como literal: la
   exclusión de `guard-piezas-base` se retiró en T5b.
 - **Dueño:** sin asignar.
+- **Resuelta (2026-10-12, QC-252, D2):** «Por empacar» pinta su vacío con `AssignmentListEmpty`
+  (`testIdPrefix="packing-orders"`); el enlace conserva `packing-orders-first-page` y el contenedor
+  gana `packing-orders-empty` (diferencia aceptada, R5).
 
 ### D48 — Etiquetas de fila exportadas sin uso tras el menú (QC-232, R5)
 - **Origen:** QC-232 (2026-10-09), tanda 3.

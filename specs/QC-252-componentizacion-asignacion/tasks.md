@@ -74,18 +74,18 @@ Verificación de cada tanda (`docs/perfil-agentes.md > Todos los agentes`): `pnp
 
 ## Tanda 3 — Vacíos, esqueletos, marcas y talla (depende de T2)
 
-- [ ] **T3a.** (D2, D3, D4, R4–R7) `ConditioningOrdersEmpty` y `ConditioningOrdersSkeleton` delegan en
+- [x] **T3a.** (D2, D3, D4, R4–R7) `ConditioningOrdersEmpty` y `ConditioningOrdersSkeleton` delegan en
   `AssignmentListEmpty` / `AssignmentListSkeleton`; «Entregados» usa `ConditioningOrdersEmpty`;
   «Por empacar» usa `AssignmentListEmpty`. Retirar la aserción de `data-list` de
   `asignacion-page.test.tsx`. Actualizar **solo** las entradas de vacío de «Por empacar» en
   `asignacion-listas-paridad.test.tsx.snap` y `asignacion-paridad.test.tsx.snap`.
   *Hecho:* el diff de los `.snap` es exactamente la línea `data-testid="packing-orders-empty"` en
   cada entrada de vacío de «Por empacar»; la paridad nueva sin cambios.
-- [ ] **T3b.** (D11, D12, R14, R21) Talla táctil en `assignment-view-tabs.tsx`,
+- [x] **T3b.** (D11, D12, R14, R21) Talla táctil en `assignment-view-tabs.tsx`,
   `conditioning-orders-columns.tsx` y `conditioning-order-screen.tsx`; `MissingValue` compartido en
   `conditioning-orders-columns.tsx`; `ErrorAlert` para el error de candidatos.
   *Hecho:* paridad sin cambios; `a11y-tactil.test.tsx` verde.
-- [ ] **T3c.** (D13, R22) Enmendar `tests/guards/guard-piezas-base.test.ts`: los cinco archivos de
+- [x] **T3c.** (D13, R22) Enmendar `tests/guards/guard-piezas-base.test.ts`: los cinco archivos de
   `/asignacion` a `D11_SIN_HALLAZGOS` salvo el barrel, exclusión estrecha del alias del barrel,
   `VACIOS_Y_ESQUELETOS_D7_PENDIENTES` vacía. Comprobar que muerde: reintroducir a mano el par en
   `assignment-view-tabs.tsx` pone la guardia en rojo (se deshace antes de commitear).
@@ -93,11 +93,11 @@ Verificación de cada tanda (`docs/perfil-agentes.md > Todos los agentes`): `pnp
 
 ## Tanda 4 — Equipo y etiquetas (depende de T1a, T1b)
 
-- [ ] **T4a.** (D5, R8–R10) `conditioning-team-list.tsx` usa `groupResponsiblesByOrigin` y borra
+- [x] **T4a.** (D5, R8–R10) `conditioning-team-list.tsx` usa `groupResponsiblesByOrigin` y borra
   `groupTeamByOrigin`; `conditioning-team-picker.tsx` usa `filterByDisplayName`.
   *Hecho:* paridad de lista y selector sin cambios; `start-conditioning-dialog.test.tsx` y
   `conditioning-order-screen.test.tsx` verdes.
-- [ ] **T4b.** (D6, D7, R11–R13) Borrar los `statusLabel` y `distributionLineText`; usar
+- [x] **T4b.** (D6, D7, R11–R13) Borrar los `statusLabel` y `distributionLineText`; usar
   `ORDER_STATUS_LABELS` y `orderDistributionLineText`; `orderDistributionFullText` usa la función de
   línea. Casos nuevos en `conditioning-order-screen.test.tsx` y `packing-order-screen.test.tsx`: cada
   estado posible con su texto de hoy (R11) y un estado imposible con su etiqueta del mapa (R12).
@@ -106,27 +106,27 @@ Verificación de cada tanda (`docs/perfil-agentes.md > Todos los agentes`): `pnp
 
 ## Tanda 5 — Avisos y diálogo (depende de T1c, T1d)
 
-- [ ] **T5a.** (D8, R15, R16) Crear `order-outcome-notice.tsx`, borrar los dos avisos, actualizar
+- [x] **T5a.** (D8, R15, R16) Crear `order-outcome-notice.tsx`, borrar los dos avisos, actualizar
   barrel y `page.tsx`; enmendar `packed-order-notice.test.tsx`, `conditioned-order-notice.test.tsx` y,
   si los nombra, `asignacion-page.test.tsx`. *Hecho:* paridad de avisos sin cambios.
-- [ ] **T5b.** (D9, D10, R17, R19) `FinishConditioningDialog` sobre `ConfirmDialog` con
+- [x] **T5b.** (D9, D10, R17, R19) `FinishConditioningDialog` sobre `ConfirmDialog` con
   `confirmSlot={<CountdownGatedButton seconds={CONDITIONING_WAIT_SECONDS} …/>}`;
   `start-conditioning-dialog.tsx` importa el botón de shared; borrar la copia de la ruta y sus
   exports del barrel; actualizar imports de `finish-conditioning-dialog.test.tsx` y
   `start-conditioning-dialog.test.tsx`. *Hecho:* paridad del diálogo sin cambios (vigilar el `type` de
   «Cancelar»); `finish-conditioning-dialog.test.tsx` verde con las mismas aserciones.
-- [ ] **T5c.** (R3, R7, R9, R16, R19) Guardia nueva `tests/guards/guard-asignacion-componentizada.test.ts`
+- [x] **T5c.** (R3, R7, R9, R16, R19) Guardia nueva `tests/guards/guard-asignacion-componentizada.test.ts`
   con muestras que la violan y que la cumplen. *Hecho:* verde sobre el repo y roja con cada muestra.
 
 ## Tanda 6 — E2E y cierre (depende de todas)
 
-- [ ] **T6a.** (R25) Actualizar solo los `import` de `e2e/datos-de-lote-en-acondicionamiento.spec.ts`.
+- [x] **T6a.** (R25) Actualizar solo los `import` de `e2e/datos-de-lote-en-acondicionamiento.spec.ts`.
   Correr `pnpm exec playwright test` sobre `e2e/acondicionamiento.spec.ts`,
   `e2e/acondicionar-con-equipo.spec.ts`, `e2e/datos-de-lote-en-acondicionamiento.spec.ts`,
   `e2e/empaque.spec.ts`, `e2e/pasos-de-envasado.spec.ts`, `e2e/envases-del-pedido.spec.ts`,
   `e2e/pedido-en-varias-presentaciones.spec.ts`, `e2e/pedidos-asignados.spec.ts` y
   `e2e/pedidos-terminados.spec.ts`. *Hecho:* verdes; `git diff` de `e2e/` sin líneas de aserción.
-- [ ] **T6b.** Repetir el censo de T0b sobre el árbol final: ningún test ni guardia nombra un archivo o
+- [x] **T6b.** Repetir el censo de T0b sobre el árbol final: ningún test ni guardia nombra un archivo o
   símbolo borrado. Marcar D42, D43 y D47 resueltas en `progress/deudas.md`. Mapa `R<n> → test` en
   `progress/impl_QC-252-componentizacion-asignacion.md` (abajo, el de partida).
   *Hecho:* `./init.sh` en verde.
