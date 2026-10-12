@@ -46,6 +46,9 @@ Lo que NO entra:
 | C5 | Solo presentación: sin cambios de backend ni de lógica de autenticación; si el diseño exige lógica nueva, va a preguntas abiertas | leader, 2026-10-12 (encargo de la ficha) | R11, R24, R27 |
 | C6 | «¿Olvidaste tu contraseña?» se queda: la ruta la construye QC-259 | humano, 2026-10-10 (D8) | R13 |
 | C7 | Se reutiliza antes de crear (reutiliza, extiende, compón, crea) y toda pieza nueva o con cambio visual cita su tablero | humano, 2026-10-10 (regla dura) | R28, R29 |
+| P1 | **Tema del acceso.** El tablero tiene variante clara y oscura y su tarjeta sigue el tema; QC-226 R17 (humano, 2026-10-08) pintaba el login siempre con los tokens oscuros. Este spec sigue el tablero (R6), que es posterior y está aprobado por D14. Se confirma que el acceso sigue el tema de la app: se enmienda QC-226 R17 | humano, al aprobar el spec, 2026-10-12 | R6 |
+| P2 | **Alto de los campos.** Los tableros piden campos de 48 px (`in-touch`); `PasswordField` y `TextField` miden 44 px por la decisión D12 de QC-256. El spec usa 44 px (R8 exige ≥ 44 px). Se quedan en 44 px; pasar a 48 px sería un cambio visual de `PasswordField` para todos sus usos, en ficha aparte | humano, al aprobar el spec, 2026-10-12 | R8 |
+| P3 | **Enlace caducado o error inesperado.** El tablero no diseña este estado («el token caducado no tiene pantalla propia»). El spec conserva el mensaje y la referencia de hoy dentro de la tarjeta (R23), como está hasta una ficha propia | humano, al aprobar el spec, 2026-10-12 | R23 |
 
 ## Requisitos (EARS)
 
@@ -199,14 +202,4 @@ propios.
 
 ## Preguntas abiertas
 
-- **P1 — Tema del acceso.** El tablero tiene variante clara y oscura y su tarjeta sigue el tema;
-  QC-226 R17 (humano, 2026-10-08) pintaba el login siempre con los tokens oscuros. Este spec sigue
-  el tablero (R6), que es posterior y está aprobado por D14. ¿Se confirma que el acceso sigue el
-  tema de la app?
-- **P2 — Alto de los campos.** Los tableros piden campos de 48 px (`in-touch`); `PasswordField` y
-  `TextField` miden 44 px por la decisión D12 de QC-256. El spec usa 44 px (R8 exige ≥ 44 px). ¿Se
-  quieren 48 px en el acceso? Sería un cambio visual de `PasswordField` para todos sus usos.
-- **P3 — Enlace caducado o error inesperado.** El tablero no diseña este estado («el token caducado
-  no tiene pantalla propia»). El spec conserva el mensaje y la referencia de hoy dentro de la
-  tarjeta (R23). ¿Se pinta con `Notice` de peligro o `ErrorAlert`, o se deja como está hasta una
-  ficha propia?
+Ninguna. P1–P3 se cerraron al aprobar el spec (ver `## Decisiones cerradas`).
