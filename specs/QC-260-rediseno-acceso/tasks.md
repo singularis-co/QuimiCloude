@@ -57,7 +57,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
   `docs/diseno/canvas/Botones.dc.html` y `Spinner` en `Base de`. *Hecho:* test y guardia del
   catálogo verdes.
 
-- [ ] **T5 [P]. `AccessScreen` y el bloque CSS de acceso** (`design.md > 3.1, 4`).
+- [x] **T5 [P]. `AccessScreen` y el bloque CSS de acceso** (`design.md > 3.1, 4`).
   `components/shared/access-screen.tsx`, fila en el catálogo con
   `docs/diseno/canvas/Login.dc.html`; bloque «Pantallas de acceso — INICIO/FIN» en
   `app/globals.css`; enmienda de los delimitadores en `tests/guards/guard-movimiento.test.ts`.

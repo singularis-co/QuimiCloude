@@ -100,3 +100,66 @@ Ninguno.
   único añadido `svg aria-hidden="true" … lucide-loader-circle size-4`. Esperado; se regenera en T6.
 - Guardias catálogo + catalogo-qc256 + formularios-y-acciones → 85 passed, 3 skipped.
 - Veredicto: T2 y T4 hechas; solo queda el snapshot de paridad para T6.
+
+## T5 — `AccessScreen` y el bloque CSS de acceso (frontend_dev, 2026-10-12)
+
+### Archivos
+
+- `components/shared/access-screen.tsx` (nuevo, Server Component): `main data-access="screen"`
+  con `min-h-dvh` y centrado flex; capa `data-access="molecules" aria-hidden="true"` con las cinco
+  moléculas del tablero `Login` (`svg data-access="molecule" data-access-index="1..5"`,
+  `focusable="false"`, `currentColor`); `Card data-access="card" data-width`.
+- `components/shared/CATALOGO.md`: fila `AccessScreen` en Compuestos (`Base de` `Card`, `Diseño`
+  `docs/diseno/canvas/Login.dc.html`).
+- `app/globals.css`: «Pantalla de login — INICIO/FIN» → «Pantallas de acceso — INICIO/FIN». Fuera
+  `--login-*`, vidrio, `@supports`, `prefers-reduced-transparency`, `login-card-enter`,
+  `login-card-fade`, `login-molecule-float`, los 44 px forzados. Dentro: `--shadow-dlg` (valor de
+  `qc.css`, acotado a `[data-access='screen']`), fondo `var(--sidebar-panel-gradient)`, padding
+  `40px 16px`, cinco moléculas (70/55/90/48/40 s, lineal, sentido alterno), `@keyframes
+  access-molecule-spin`, tarjeta 400/440 px, radio 18 px, relleno `32px 28px 20px` /
+  `28px 28px 24px`, entrada escalonada con `screen-enter` (0/40/80/120/160/200 ms) y movimiento
+  reducido (`animation: none` en moléculas e hijos de la tarjeta).
+- `tests/guards/guard-movimiento.test.ts`: delimitadores y caso negativo a «Pantallas de acceso»,
+  nota `ENMIENDA QC-260`.
+- `tests/unit/acceso/access-screen.test.tsx` (nuevo).
+
+### Desviaciones
+
+- `gap` de la tarjeta 20 px (default) / 18 px (wide): no está en design § 3.1, sale de los tableros
+  `Login` y `EstablecerContrasena`.
+- Con `labelledBy`, la tarjeta lleva `role="region"`: un `div` sin rol no admite nombre accesible
+  (ARIA 1.2 lo prohíbe en `generic`). Sin `labelledBy`, sin rol.
+- El estado de éxito del tablero `EstablecerContrasena` usa relleno `36px 28px 28px` y centrado;
+  el spec no lo recoge y no se implementa (T7 decide si lo pide).
+- Movimiento reducido: `animation: none` en los hijos de la tarjeta (en vez de anular solo el
+  retardo): aparecen en su sitio, sin desplazamiento ni fundido.
+
+### Mapa R → test
+
+| R | Test |
+|---|---|
+| R1 | `tests/unit/acceso/access-screen.test.tsx > R1: …` (5 casos) |
+| R2 | `tests/unit/acceso/access-screen.test.tsx > R2: …` (4 casos) |
+| R5 | `tests/unit/acceso/access-screen.test.tsx > R5: …` (2 casos) |
+| R6 | `tests/unit/acceso/access-screen.test.tsx > R6: …` (2 casos) |
+
+### Salida
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)` (avisos preexistentes en
+  `tests/unit/documentos/confirm-catalog-import.test.ts` y `tests/unit/pedidos/order-service.test.ts`).
+- `pnpm exec vitest related --run <archivos de T5>`: `Test Files 5 passed (5) · Tests 68 passed (68)`.
+- `pnpm exec vitest run guard`: `Test Files 71 passed (71) · Tests 977 passed | 18 skipped (995)`.
+- Rojos esperados (los enmienda T6), `vitest run` de esos archivos: `Tests 28 failed | 85 passed`.
+  - `tests/unit/login-skin.test.tsx`: 23 casos del «nivel 1 · contrato de texto del CSS» (R17–R23,
+    R32 de QC-226 y las medidas de QC-30).
+  - `tests/unit/theme/color-tokens.test.ts`: «R32 (ENMIENDA QC-228): el bloque del login conserva
+    su movimiento…».
+  - `tests/unit/theme/motion-tokens.test.ts`: R21 (0.01 ms; indicadores en bucle) y R22 (la regla
+    global no cambia el nombre de ninguna animación): ya no excluyen el bloque renombrado.
+  - `tests/unit/paridad/login-paridad.test.tsx`: «R1 R2 — enviando», por el `Spinner` de T4, no
+    por T5.
+  - `tests/unit/identity/login-page-marca.test.tsx`: verde (lee el `data-login` del JSX, que T5 no
+    toca).
+
+Veredicto: T5 hecha; unit, guardia de movimiento y guardia del catálogo en verde.
