@@ -35,13 +35,13 @@ la cita antes de empezar su tanda.
 
 ## Tanda 2
 
-- [ ] **T2 [P]. `EmptyState` gana `icon` y `heading` opcionales** (`design.md > 3.1`). Casos nuevos
+- [x] **T2 [P]. `EmptyState` gana `icon` y `heading` opcionales** (`design.md > 3.1`). Casos nuevos
   en `tests/unit/shared-ui/empty-state.test.tsx` (recuadro oculto a lectores, `h1`/`h2` según
   `level`, `eyebrow` antes del encabezado, tallas `default` y `lg`; sin las props, árbol idéntico al
   de hoy). Fila del catálogo con los puntos de extensión y `docs/diseno/canvas/NoEncontrada.dc.html`
   en `Diseño`. *Hecho:* test y guardia del catálogo verdes; los consumidores de hoy sin cambios.
 
-- [ ] **T3 [P]. `ExecutionTimeline`** (`design.md > 3.3`, `4`).
+- [x] **T3 [P]. `ExecutionTimeline`** (`design.md > 3.3`, `4`).
   `app/(private)/dashboard/recorrido/[id]/components/execution-timeline.tsx`: `h2` «Anotaciones» con
   contador, `ol` con nombre «Anotaciones», un `li` por paso con `data-testid`, `data-action`,
   `data-go-back`, punto con icono y tono por acción (tabla de § 3.3), acción, `<time>`, «Paso {n}»,

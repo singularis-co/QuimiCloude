@@ -49,3 +49,22 @@ asignaciones-facade.test.ts`, `tests/unit/identity/session-once-per-request-acti
 `tests/unit/shared/data-table-states-sustituyen.test.tsx`: no leen ni renderizan nada que esta ficha cambie.
 
 ## Tandas
+
+### Tanda 1 (T1)
+Solo el barrido de arriba. `./init.sh`: init OK (111 archivos, 1543 tests pasados, 36 omitidos).
+
+### Tanda 2 (T2, T3) — frontend_dev, en paralelo
+- T2: `components/shared/empty-state.tsx` (props `icon` y `heading` opcionales; sin ellas, árbol de
+  hoy), `components/shared/CATALOGO.md` (fila `EmptyState`: puntos de extensión y diseño
+  `NoEncontrada.dc.html`), `tests/unit/shared-ui/empty-state.test.tsx` (5 casos nuevos «R19: …»; los
+  5 existentes sin editar).
+- T3: `app/(private)/dashboard/recorrido/[id]/components/execution-timeline.tsx` (nuevo,
+  `ExecutionTimeline`, Server Component) y `tests/ui/dashboard/recorrido-rediseno.test.tsx`
+  (`describe('ExecutionTimeline')`, 18 casos de R13–R16).
+- Desvío menor de T3 (anotado): `design.md > 3.3` habla de tokens `--status-<tono>-*`, que no
+  existen para `waiting`/`success`/`danger`; se usan `warning-*`, `success-*` y `destructive-*`, igual
+  que `StatusBadge`. Ningún token nuevo; `app/globals.css` sin tocar.
+- Salidas: vitest related T3 18/18; `guard-movimiento` + `dashboard-route-contract` 27/27; vitest
+  related T2 3646 pasados; `guard-catalogo-de-componentes` + `private-not-found` 63/63; typecheck y
+  lint 0 errores (7 avisos previos, ninguno en estos archivos).
+- `./init.sh`: init OK (111 archivos, 1543 pasados, 36 omitidos).
