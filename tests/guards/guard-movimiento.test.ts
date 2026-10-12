@@ -2,8 +2,9 @@
 //
 // La guía de marca §08 fija cuánto y cómo se mueve la interfaz: nada dura más de 400 ms, toda
 // curva sale de los tres tokens `--ease-standard`, `--ease-enter` y `--ease-exit`, nada rebota y
-// nada se repite en bucle sobre el contenido. La única excepción es el fondo del login de QC-226
-// (D7), que vive entre los delimitadores «Pantalla de login — INICIO/FIN» de `app/globals.css`;
+// nada se repite en bucle sobre el contenido. La única excepción es el fondo de las pantallas de
+// acceso (QC-226 D7), que vive entre los delimitadores «Pantallas de acceso — INICIO/FIN» de
+// `app/globals.css`;
 // y, según P2, los indicadores de carga (`animate-spin`, `animate-pulse`), cuyo bucle lo declara
 // Tailwind y no este repo.
 //
@@ -52,8 +53,10 @@ const SIN_ANIMACION = ['components/ui/table.tsx', 'components/ui/badge.tsx', 'co
  */
 const ARCHIVOS_MINIMOS = 50
 
-const LOGIN_INICIO = /\/\*\s*══[^*]*pantalla de login — INICIO[^*]*\*\//i
-const LOGIN_FIN = /\/\*\s*══[^*]*pantalla de login — FIN[^*]*\*\//i
+// ENMIENDA QC-260: el bloque exento pasa de «Pantalla de login» a «Pantallas de acceso», porque
+// ahora lo usan el login y establecer contraseña.
+const LOGIN_INICIO = /\/\*\s*══[^*]*pantallas de acceso — INICIO[^*]*\*\//i
+const LOGIN_FIN = /\/\*\s*══[^*]*pantallas de acceso — FIN[^*]*\*\//i
 
 function archivos(carpeta: string): string[] {
   const base = join(repoRoot, carpeta)
@@ -237,7 +240,7 @@ describe('guardia de movimiento: los detectores muerden (casos negativos)', () =
     deja('app/x.css', ':root { --ease-standard: cubic-bezier(0.2, 0, 0, 1); }')
     deja(
       'app/x.css',
-      '/* ══ Pantalla de login — INICIO ══ */\n.m { animation: f 22s cubic-bezier(0.2, 0, 0, 1) infinite; }\n/* ══ Pantalla de login — FIN ══ */',
+      '/* ══ Pantallas de acceso — INICIO ══ */\n.m { animation: f 22s cubic-bezier(0.2, 0, 0, 1) infinite; }\n/* ══ Pantallas de acceso — FIN ══ */',
     )
   })
 

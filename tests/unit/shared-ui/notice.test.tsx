@@ -105,6 +105,26 @@ describe('Notice', () => {
     );
   });
 
+  it('QC-260 R18 — el id opcional va al contenedor del aviso para citarlo desde aria-describedby', () => {
+    render(
+      <>
+        <Notice tone="danger" id="aviso-requisitos" testId="con-id">
+          Falta una mayúscula.
+        </Notice>
+        <input aria-label="Contraseña nueva" aria-describedby="aviso-requisitos" />
+      </>,
+    );
+
+    expect(screen.getByTestId('con-id')).toHaveAttribute('id', 'aviso-requisitos');
+    expect(screen.getByLabelText('Contraseña nueva')).toHaveAccessibleDescription('Falta una mayúscula.');
+  });
+
+  it('QC-260 R18 — sin id, el aviso no pinta atributo id', () => {
+    render(<Notice tone="info" testId="sin-id">Cuerpo</Notice>);
+
+    expect(screen.getByTestId('sin-id')).not.toHaveAttribute('id');
+  });
+
   it('R18 — la duración lenta del tema son 300 ms', () => {
     const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 

@@ -2,6 +2,7 @@
 
 import { useFormStatus } from 'react-dom';
 
+import { Spinner } from '@/components/shared/spinner';
 import { Button } from '@/components/ui/button';
 
 type SubmitButtonProps = {
@@ -25,7 +26,14 @@ export function SubmitButton({ label, pendingLabel, testId, className }: SubmitB
       aria-busy={pending}
       data-testid={testId}
     >
-      {pending ? pendingLabel : label}
+      {pending ? (
+        <>
+          <Spinner size="sm" />
+          {pendingLabel}
+        </>
+      ) : (
+        label
+      )}
     </Button>
   );
 }

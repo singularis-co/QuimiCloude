@@ -53,11 +53,12 @@ function cuerpoDelBloque(texto: string, prelude: string): string {
   throw new Error(`${prelude} sin cerrar`);
 }
 
-/** El CSS sin el bloque del login, que tiene su propio movimiento (QC-226). */
+/** El CSS sin el bloque de las pantallas de acceso, que tiene su propio movimiento. */
+// ENMIENDA QC-260: el bloque «Pantalla de login» de QC-226 pasa a «Pantallas de acceso».
 function fueraDelLogin(texto: string): string {
-  const inicio = texto.search(/\/\*\s*══[^*]*pantalla de login — INICIO/i);
-  const fin = /\/\*\s*══[^*]*pantalla de login — FIN[^*]*\*\//i.exec(texto);
-  if (inicio === -1 || !fin) throw new Error('No estan los delimitadores del bloque del login');
+  const inicio = texto.search(/\/\*\s*══[^*]*pantallas de acceso — INICIO/i);
+  const fin = /\/\*\s*══[^*]*pantallas de acceso — FIN[^*]*\*\//i.exec(texto);
+  if (inicio === -1 || !fin) throw new Error('No estan los delimitadores del bloque de acceso');
   return texto.slice(0, inicio) + texto.slice(fin.index + fin[0].length);
 }
 
@@ -122,11 +123,16 @@ describe('motion-tokens', () => {
     expect(reducido).not.toMatch(/animation\s*:|animation-name\s*:/);
     expect(fuera.match(/@media \(prefers-reduced-motion: reduce\)/g)).toHaveLength(1);
 
-    const inicio = css.search(/\/\*\s*══[^*]*pantalla de login — INICIO/i);
-    const fin = css.search(/\/\*\s*══[^*]*pantalla de login — FIN/i);
-    const login = normalizar(css.slice(inicio, fin));
-    expect(login).toContain("[data-login='screen'] [data-login='molecule'] { animation: none; }");
-    expect(login).toContain("[data-login='screen'] [data-slot='card'] { animation: login-card-fade 150ms linear both; }");
+    // ENMIENDA QC-260: el bloque pasa a «Pantallas de acceso»; con movimiento reducido las
+    // moléculas se paran y los bloques de la tarjeta aparecen sin desplazamiento (QC-260 R4), en
+    // lugar del fundido de la tarjeta de QC-226 R22.
+    const inicio = css.search(/\/\*\s*══[^*]*pantallas de acceso — INICIO/i);
+    const fin = css.search(/\/\*\s*══[^*]*pantallas de acceso — FIN/i);
+    expect(inicio).toBeGreaterThan(-1);
+    expect(fin).toBeGreaterThan(inicio);
+    const acceso = normalizar(css.slice(inicio, fin));
+    expect(acceso).toContain("[data-access='molecule'] { animation: none; }");
+    expect(acceso).toContain("[data-access='card'] > :nth-child(n) { animation: none; }");
   });
 
   describe('R10: toasts', () => {

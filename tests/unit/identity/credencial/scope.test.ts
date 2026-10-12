@@ -127,14 +127,17 @@ const EXCEPCIONES_DE_REGISTRO = [
   'lib/modules/identity/adapters/driven/mail/credential-setup-mailer-smtp.ts',
 ] as const;
 
-/** La UNICA superficie de interfaz que aporta la ficha (R17, R40). */
+/**
+ * La UNICA superficie de interfaz que aporta la ficha (R17, R40).
+ *
+ * ENMIENDA QC-260: `credential-input.tsx` y `submit-button.tsx` se borran (los sustituyen
+ * `PasswordField` y `SubmitButton` de `components/shared`), asi que salen de la lista.
+ */
 const SUPERFICIE_PUBLICA = [
   'app/(public)/establecer-contrasena/[token]/page.tsx',
   'app/(public)/establecer-contrasena/[token]/components/index.ts',
   'app/(public)/establecer-contrasena/[token]/components/set-credential-form.tsx',
   'app/(public)/establecer-contrasena/[token]/components/set-credential-labels.ts',
-  'app/(public)/establecer-contrasena/[token]/components/credential-input.tsx',
-  'app/(public)/establecer-contrasena/[token]/components/submit-button.tsx',
 ] as const;
 
 /** La carpeta de la pagina publica, para censar en disco lo que haya dentro. */

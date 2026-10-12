@@ -23,10 +23,11 @@ function extractThemeInline(css: string): string {
   return css.slice(start, css.indexOf('}', start));
 }
 
-/** Quita el bloque del login (de su delimitador INICIO a su FIN) y los comentarios. */
+/** Quita el bloque de las pantallas de acceso (de su delimitador INICIO a su FIN) y los comentarios. */
+// ENMIENDA QC-260: el bloque «Pantalla de login» de QC-226 pasa a «Pantallas de acceso».
 function cssOutsideLoginBlock(css: string): string {
-  const inicio = css.search(/\/\*\s*══[^*]*pantalla de login — INICIO/i);
-  const finMatch = /\/\*\s*══[^*]*pantalla de login — FIN[^*]*\*\//i.exec(css);
+  const inicio = css.search(/\/\*\s*══[^*]*pantallas de acceso — INICIO/i);
+  const finMatch = /\/\*\s*══[^*]*pantallas de acceso — FIN[^*]*\*\//i.exec(css);
   const sinLogin =
     inicio === -1 || !finMatch
       ? css
@@ -315,29 +316,36 @@ describe('color-tokens', () => {
 
   // ENMIENDA QC-228 (D5): la regla global de movimiento reducido y el movimiento fuera del login
   // son ahora de QC-228 (R19, R21) y dejan de estar prohibidos. Lo que se conserva de este caso
-  // es que el bloque del login siga como lo dejo QC-226 y que nada de fuera lo pise.
-  it('R32 (ENMIENDA QC-228): el bloque del login conserva su movimiento y su regla local de movimiento reducido', () => {
-    const inicio = css.search(/\/\*\s*══[^*]*pantalla de login — INICIO/i);
-    const fin = css.search(/\/\*\s*══[^*]*pantalla de login — FIN/i);
+  // es que el bloque de acceso tenga su movimiento y su regla local, y que nada de fuera lo pise.
+  // ENMIENDA QC-260 (R3, R4, R5): sustituye la entrada única de la tarjeta, los tres isotipos que
+  // flotan 22/30/26 s y el fundido de QC-226 por la entrada escalonada de los bloques, las cinco
+  // moléculas que giran 40–90 s y la regla que las para y quita el desplazamiento.
+  it('R32 (ENMIENDA QC-228, QC-260): el bloque de acceso conserva su movimiento y su regla local de movimiento reducido', () => {
+    const inicio = css.search(/\/\*\s*══[^*]*pantallas de acceso — INICIO/i);
+    const fin = css.search(/\/\*\s*══[^*]*pantallas de acceso — FIN/i);
     expect(inicio).toBeGreaterThan(-1);
     expect(fin).toBeGreaterThan(inicio);
-    const login = css.slice(inicio, fin).replace(/\s+/g, ' ');
+    const acceso = css.slice(inicio, fin).replace(/\s+/g, ' ');
 
-    expect(login).toContain(
-      "[data-login='screen'] [data-slot='card'] { animation: login-card-enter var(--dur-slow) var(--ease-enter) both; }",
+    expect(acceso).toContain(
+      "[data-access='card'] > * { animation: screen-enter var(--dur-slow) var(--ease-enter) both; }",
     );
-    expect(login).toContain('animation: login-molecule-float 22s cubic-bezier(0.2, 0, 0, 1) infinite alternate;');
-    expect(login).toContain(
-      'animation: login-molecule-float 30s cubic-bezier(0.2, 0, 0, 1) infinite alternate-reverse;',
-    );
-    expect(login).toContain('animation: login-molecule-float 26s cubic-bezier(0.2, 0, 0, 1) infinite alternate;');
-    expect(login).toContain(
-      "@media (prefers-reduced-motion: reduce) { [data-login='screen'] [data-login='molecule'] { animation: none; } [data-login='screen'] [data-slot='card'] { animation: login-card-fade 150ms linear both; } }",
+    for (const giro of [
+      'access-molecule-spin 70s linear infinite;',
+      'access-molecule-spin 55s linear infinite reverse;',
+      'access-molecule-spin 90s linear infinite;',
+      'access-molecule-spin 48s linear infinite reverse;',
+      'access-molecule-spin 40s linear infinite;',
+    ]) {
+      expect(acceso).toContain(`animation: ${giro}`);
+    }
+    expect(acceso).toContain(
+      "@media (prefers-reduced-motion: reduce) { [data-access='molecule'] { animation: none; } [data-access='card'] > :nth-child(n) { animation: none; } }",
     );
 
-    // Fuera del login nadie nombra sus animaciones ni anima en bucle.
+    // Fuera del bloque nadie nombra sus animaciones ni anima en bucle.
     const outside = cssOutsideLoginBlock(css);
-    expect(outside).not.toMatch(/login-(card|molecule)/);
+    expect(outside).not.toMatch(/login-(card|molecule)|access-molecule/);
     expect(outside).not.toMatch(/\binfinite\b/);
     expect(outside).not.toMatch(/animation-name\s*:/);
   });
