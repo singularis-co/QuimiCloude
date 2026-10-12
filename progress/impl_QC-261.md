@@ -68,3 +68,30 @@ Solo el barrido de arriba. `./init.sh`: init OK (111 archivos, 1543 tests pasado
   related T2 3646 pasados; `guard-catalogo-de-componentes` + `private-not-found` 63/63; typecheck y
   lint 0 errores (7 avisos previos, ninguno en estos archivos).
 - `./init.sh`: init OK (111 archivos, 1543 pasados, 36 omitidos).
+
+### Tanda 3 (T4, T5, T6) — frontend_dev, en paralelo
+- T4: `app/(private)/dashboard/page.tsx` (`PageShell` + `PageHeader`), `components/execution-trace-columns.tsx`
+  (`StatusBadge` en estado, marcas y vueltas atrás; Mono tabular y alineación al final;
+  `actionsColumn({ menu })` con «Ver recorrido» en lugar del `Link`), `components/execution-trace-table.tsx`
+  (`card` y `retry`), `components/index.ts` (+ `TRACE_ACTIONS_LABEL_PREFIX`, `TRACE_MENU_TITLE_PREFIX`;
+  fuera `TRACE_LINK_COLUMN_ID`, sin usos). Tests: `tests/ui/dashboard/dashboard-rediseno.test.tsx` (nuevo,
+  14 casos R1, R3–R9), ENMIENDA en `execution-trace-table.test.tsx` (R2/R12 por el menú, R26 el disparador;
+  URL de R6–R11 sin editar) y `tablas-marca.test.tsx` (+ «Duración"). Snapshot de `recorridos-paridad`
+  regenerado en commit propio: solo cambian las 6 cabeceras (`div`+`h1` → `PageShell`+`PageHeader`); ese
+  test solo pinta «Cargando…», así que badge/menú/reintento no aparecen en él. `recorridos-paridad.test.tsx`,
+  `execution-trace-list-section.tsx` y `execution-trace-format.ts` sin cambios.
+  Notas: «En curso» exige `!row.deleted` (R6); el título del menú va en `<span>` (no fragmento) porque
+  `guard-formularios-y-acciones` R28 lo tomaba como acción de fila suelta.
+- T5: `recorrido/[id]/components/execution-trace-detail.tsx` (`PageShell`, `ArrowLink`, `PageHeader`, `dl` de
+  tres datos, `ExecutionTimeline`; error con `ArrowLink` + h1 «Recorrido» + `ErrorState`). `index.ts` y
+  `page.tsx` sin cambios; `BACK_TO_LIST_TEXT` y `MISSING_PERSON_MARK` conservados. Tests:
+  `describe('ExecutionTraceDetail')` en `recorrido-rediseno.test.tsx` (R10, R11×2, R12×4, R17) y ENMIENDA en
+  `execution-trace-detail.test.tsx` (R13 «Motivo · …», R16 `data-go-back` + `sr-only`); R12, R17, R18, R20
+  de QC-167 sin editar.
+  Observación: el detalle pinta «Dado de baja»/«En curso» con `StatusBadge` directamente, en paralelo a las
+  marcas de las columnas (mismos tonos y testids). Duplicación pequeña, posible unificación; no la exige el spec.
+- T6: `app/(private)/not-found.tsx` (`EmptyState` con `icon` y `heading`, como `design.md > 3.4`) y
+  `tests/unit/navegacion/no-encontrada-rediseno.test.tsx` (6 casos R19). `private-not-found.test.tsx` sin editar.
+- Salidas de los subagentes: T4 related 154/154, lote del dashboard 165/165, `vitest run guard` 997 pasados;
+  T5 related 88/88, lote 140 pasados; T6 related 10/10, `tests/unit/navegacion` 123 pasados. typecheck y lint
+  0 errores (7 avisos previos ajenos).

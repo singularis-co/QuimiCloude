@@ -54,7 +54,7 @@ la cita antes de empezar su tanda.
 
 ## Tanda 3
 
-- [ ] **T4. Dashboard** (depende de T1; `design.md > 3.2`). `page.tsx` con `PageShell` y
+- [x] **T4. Dashboard** (depende de T1; `design.md > 3.2`). `page.tsx` con `PageShell` y
   `PageHeader`; `execution-trace-list-section.tsx` sin landmark; `execution-trace-columns.tsx` con
   `StatusBadge`, marcas, alineación, `tabular` en «Duración» y `actionsColumn({ menu })` en lugar del
   `Link`; `execution-trace-table.tsx` con `card` y `retry`. Tests en
@@ -66,14 +66,14 @@ la cita antes de empezar su tanda.
   `tests/unit/dashboard-page.test.tsx` en verde **sin editar aserciones**. *Hecho:* todo lo anterior
   verde.
 
-- [ ] **T5. Recorrido** (depende de T3; `design.md > 3.3`). `execution-trace-detail.tsx` con
+- [x] **T5. Recorrido** (depende de T3; `design.md > 3.3`). `execution-trace-detail.tsx` con
   `PageShell`, `ArrowLink`, `PageHeader`, los tres datos y `ExecutionTimeline`; error con `ArrowLink`;
   barrel. Tests en `tests/ui/dashboard/recorrido-rediseno.test.tsx` (R10, R11, R12, R17). Ajuste con
   nota `ENMIENDA QC-261` de `tests/ui/dashboard/execution-trace-detail.test.tsx` (marca de vuelta
   atrás, «Motivo · »); sus casos de R12, R17, R18 y R20 de QC-167 **sin editar**. *Hecho:* tests
   verdes; `page.tsx` del detalle sin cambios.
 
-- [ ] **T6. Página no encontrada** (depende de T2; `design.md > 3.4`). `app/(private)/not-found.tsx`
+- [x] **T6. Página no encontrada** (depende de T2; `design.md > 3.4`). `app/(private)/not-found.tsx`
   con `EmptyState` extendido. Tests en `tests/unit/navegacion/no-encontrada-rediseno.test.tsx`
   (R19: icono oculto, «404» en Mono, un `h1`, texto, ningún enlace ni botón, ningún `main`).
   `tests/unit/navegacion/private-not-found.test.tsx` en verde **sin editar**. *Hecho:* tests verdes.

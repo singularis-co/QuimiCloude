@@ -5,6 +5,7 @@ import { useId, useMemo, useTransition } from 'react';
 
 import {
   DataTable,
+  type DataTableCardLayout,
   type DataTableParams,
   type DataTableStates,
   type DataTableTexts,
@@ -15,8 +16,16 @@ import type { ErrorState } from '@/lib/modules/errores';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
-import { buildExecutionTraceColumns } from './execution-trace-columns';
 import {
+  TRACE_DURATION_COLUMN_ID,
+  TRACE_FIRST_AT_COLUMN_ID,
+  TRACE_GO_BACK_COLUMN_ID,
+  TRACE_NUMBER_COLUMN_ID,
+  TRACE_STATUS_COLUMN_ID,
+  buildExecutionTraceColumns,
+} from './execution-trace-columns';
+import {
+  PERSON_COLUMN_ID,
   executionTraceListHref,
   fromDataTableParams,
   toDataTableParams,
@@ -51,6 +60,14 @@ export const EXECUTION_TRACE_TABLE_TEXTS: DataTableTexts = {
 
 const EXECUTION_TRACE_ERROR_TESTID = 'execution-trace-error';
 const EXECUTION_TRACE_ERROR_MESSAGE_TESTID = 'execution-trace-error-message';
+const EXECUTION_TRACE_RETRY_TESTID = 'execution-trace-retry';
+
+const EXECUTION_TRACE_CARD: DataTableCardLayout = {
+  primary: TRACE_NUMBER_COLUMN_ID,
+  status: TRACE_STATUS_COLUMN_ID,
+  meta: [TRACE_FIRST_AT_COLUMN_ID, TRACE_DURATION_COLUMN_ID, TRACE_GO_BACK_COLUMN_ID],
+  footer: PERSON_COLUMN_ID,
+};
 
 type ExecutionTraceTableStatusProps =
   | { readonly status?: 'idle'; readonly error?: undefined }
@@ -74,6 +91,8 @@ function buildStates(error: ErrorState | undefined): DataTableStates | undefined
       testId: EXECUTION_TRACE_ERROR_TESTID,
       messageTestId: EXECUTION_TRACE_ERROR_MESSAGE_TESTID,
       withCode: false,
+      retry: { kind: 'refresh' },
+      retryTestId: EXECUTION_TRACE_RETRY_TESTID,
       className: 'flex flex-col items-start gap-2 rounded-lg border border-destructive/40 p-4',
     },
   };
@@ -137,6 +156,7 @@ export function ExecutionTraceTable({
         status="error"
         texts={EXECUTION_TRACE_TABLE_TEXTS}
         states={states}
+        card={EXECUTION_TRACE_CARD}
       />
     );
   }
@@ -161,6 +181,7 @@ export function ExecutionTraceTable({
         status="idle"
         texts={EXECUTION_TRACE_TABLE_TEXTS}
         toolbarActions={cancelledToggle}
+        card={EXECUTION_TRACE_CARD}
       />
     </div>
   );

@@ -12,6 +12,7 @@ import {
   ExecutionTraceTable,
   LAST_AT_COLUMN_ID,
   PERSON_COLUMN_ID,
+  TRACE_ACTIONS_LABEL_PREFIX,
   TRACE_LINK_TEXT,
   createDefaultExecutionTraceListParams,
   executionTraceListHref,
@@ -128,8 +129,10 @@ afterEach(() => {
   resetViewport();
 });
 
+// ENMIENDA QC-261 (2026-10-12): el enlace «Ver recorrido» de la fila pasa a ser el ítem del menú de
+// acciones (QC-261 R7). La columna «Recorrido» es ahora «Acciones»; las URL no cambian.
 describe('R2 - columnas de la fila', () => {
-  it('R2 - numero, estado, personas, primera y ultima anotacion, una duracion, vueltas y enlace', () => {
+  it('R2 - numero, estado, personas, primera y ultima anotacion, una duracion, vueltas y acciones', () => {
     montar();
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
     for (const etiqueta of [
@@ -140,7 +143,7 @@ describe('R2 - columnas de la fila', () => {
       'Última anotación',
       'Duración',
       'Vueltas atrás',
-      'Recorrido',
+      'Acciones',
     ]) {
       expect(cabeceras.some((texto) => texto.includes(etiqueta))).toBe(true);
     }
@@ -284,10 +287,21 @@ describe('R6 - R7 - R8 - R9 - R11 - los filtros navegan a la URL desde la pagina
   });
 });
 
+function disparador(row: ExecutionTraceRow): HTMLElement {
+  return within(fila(row.orderId)).getByRole('button', {
+    name: `${TRACE_ACTIONS_LABEL_PREFIX}${row.numberText}`,
+  });
+}
+
+// ENMIENDA QC-261 (2026-10-12): el enlace vive en el ítem «Ver recorrido» del menú de la fila
+// (QC-261 R7); se abre el menú y se mide el mismo href, con las mismas aserciones.
 describe('R12 - R17 - el enlace de cada fila', () => {
-  it('R12 - el enlace es executionTraceRoute(id) con la consulta actual', () => {
+  it('R12 - el enlace es executionTraceRoute(id) con la consulta actual', async () => {
+    const user = setupUser();
     const p = montar(params({ page: 2, orderNumber: '42' }));
-    const enlace = within(fila(ACTIVO.orderId)).getByRole('link', { name: new RegExp(TRACE_LINK_TEXT) });
+    await user.click(disparador(ACTIVO));
+    const enlace = await screen.findByTestId('execution-trace-link');
+    expect(enlace).toHaveTextContent(TRACE_LINK_TEXT);
     const href = enlace.getAttribute('href') ?? '';
     expect(href.startsWith(`${executionTraceRoute(ACTIVO.orderId)}?`)).toBe(true);
     expect(href.split('?')[1]).toBe(executionTraceListHref(p).split('?')[1]);
@@ -305,12 +319,14 @@ describe('R26 - controles tactiles y de teclado', () => {
     expect(ultimoDestino()).toContain('cancelados=1');
   });
 
-  it('R26 - el enlace de cada fila mide 44x44 y es enfocable', () => {
+  // ENMIENDA QC-261 (2026-10-12): el control táctil de la fila es el disparador del menú de
+  // acciones, no el enlace (QC-261 R7).
+  it('R26 - el disparador del menu de cada fila mide 44x44 y es enfocable', () => {
     montar();
-    const enlace = within(fila(ACTIVO.orderId)).getByRole('link', { name: new RegExp(TRACE_LINK_TEXT) });
-    expect(enlace).toHaveClass('min-h-11', 'min-w-11');
-    enlace.focus();
-    expect(enlace).toHaveFocus();
+    const boton = disparador(ACTIVO);
+    expect(boton).toHaveClass('min-h-11', 'min-w-11');
+    boton.focus();
+    expect(boton).toHaveFocus();
   });
 });
 

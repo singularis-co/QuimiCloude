@@ -309,7 +309,8 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
         personOptions: [],
         params: createDefaultExecutionTraceListParams(),
       }),
-    esperadas: ['Primera anotación', 'Última anotación'],
+    // ENMIENDA QC-261 (2026-10-12): el tablero Dashboard pinta también «Duración» en Mono.
+    esperadas: ['Primera anotación', 'Última anotación', 'Duración'],
   },
 ];
 
