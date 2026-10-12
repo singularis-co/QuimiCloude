@@ -1,16 +1,12 @@
-// QC-79 T19 — Todo el copy de la pantalla publica, en UNA sola fuente.
-//
-// Ningun componente de esta ruta escribe un literal de cara al usuario: lo recibe de aqui, o por
-// el prop `labels` de `SetCredentialForm`, que lo sustituye entero o en parte. Es el mismo patron
-// de `components/shared/credential-rule-labels.ts` (QC-21) y por el mismo motivo: el dia que
-// llegue QC-72 (`internacionalizacion-de-textos`, hoy `pending`) migrar esta pantalla sera mover
-// un objeto a un archivo de idioma, no peinar el JSX buscando cadenas.
-//
-// El texto de cada REGLA incumplida no se escribe aqui: lo compone la UI a partir del codigo
-// estable que devuelve el dominio (QC-19 R23), con `CREDENTIAL_RULE_LABELS`, que ya existe.
-//
-// **Ningun texto nombra a nadie** (R24): no hay ni un hueco donde quepa el nombre, el correo, el
-// nombre de usuario, el rol o la empresa de la persona.
+// Todo el copy de la pantalla en una sola fuente, para que migrarlo a un archivo de idioma sea
+// mover un objeto. El texto de cada regla incumplida no vive aquí: sale de `CREDENTIAL_RULE_LABELS`
+// a partir del código estable que devuelve el dominio. Ningún texto tiene hueco para un dato de la
+// persona.
+
+// Vive aquí y no en el formulario: una constante exportada desde un módulo `'use client'` llega a
+// la página de servidor como referencia de cliente, no como texto.
+/** El `h1` del formulario y el del éxito comparten id: la tarjeta se nombra con él en los dos. */
+export const SET_CREDENTIAL_HEADING_ID = 'set-credential-heading';
 
 export type SetCredentialLabels = {
   readonly title: string;
@@ -30,18 +26,18 @@ export type SetCredentialLabels = {
 };
 
 export const SET_CREDENTIAL_LABELS: SetCredentialLabels = {
-  title: 'Establece tu contrasena',
-  intro: 'Escribe la contrasena con la que vas a entrar y repitela para confirmarla.',
-  credentialLabel: 'Contrasena nueva',
-  confirmationLabel: 'Repite la contrasena',
-  showCredential: 'Mostrar la contrasena',
-  hideCredential: 'Ocultar la contrasena',
-  submit: 'Guardar contrasena',
+  title: 'Establece tu contraseña',
+  intro: 'Escribe la contraseña con la que vas a entrar y repítela para confirmarla.',
+  credentialLabel: 'Contraseña nueva',
+  confirmationLabel: 'Repite la contraseña',
+  showCredential: 'Mostrar la contraseña',
+  hideCredential: 'Ocultar la contraseña',
+  submit: 'Guardar contraseña',
   submitPending: 'Guardando…',
-  mismatch: 'Las dos contrasenas no coinciden.',
-  unmetIntro: 'La contrasena todavia no cumple estos requisitos:',
-  successTitle: 'Contrasena establecida',
+  mismatch: 'Las dos contraseñas no coinciden.',
+  unmetIntro: 'La contraseña todavía no cumple estos requisitos:',
+  successTitle: 'Contraseña establecida',
   successBody: 'Ya puedes entrar con ella.',
-  goToLogin: 'Ir a iniciar sesion',
+  goToLogin: 'Ir a iniciar sesión',
   errorReference: 'Referencia del fallo:',
 };

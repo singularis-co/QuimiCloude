@@ -55,6 +55,17 @@ export function hallazgosDeVersionDeNext(
 // Lista cerrada y no un rango de git: `git diff origin/dev...HEAD` esta vacio en `dev` y la guardia
 // fallaria alli. Un `.spec.ts` nuevo se nombra aqui a mano.
 export const E2E_ESPERADOS = [
+  // Alta el 2026-10-12 (QC-260) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en `/login` y `/establecer-contrasena/<token>`
+  // las moleculas giran en bucle y quedan quietas con movimiento reducido, la tarjeta toma los
+  // tokens del tema claro y del oscuro, respeta bordes y ancho maximo a 390, 820 y 1440 px, y
+  // campos y controles miden 44 px; el ojo del login alterna el campo sin enviar el formulario,
+  // la lista de requisitos sigue al valor visible tras un rechazo, y «Ir a iniciar sesion» mide
+  // 44 x 44 px. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee
+  // ni afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71
+  // R21 sigue INTACTO.
+  'acceso-rediseno.spec.ts',
   // Alta el 2026-10-08 por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA
   // y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el archivo
   // se nombra, uno a uno-. Lo que ejercita: el Administrador de acondicionamiento ve en
