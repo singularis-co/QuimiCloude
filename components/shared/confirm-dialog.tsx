@@ -107,9 +107,17 @@ export function ConfirmDialogFrame({
   );
 }
 
-export type ConfirmDialogBodyProps = {
+/** Con `confirmSlot` el testid del botón lo pone quien pasa el slot: `testIds.confirm` no se admite. */
+export type ConfirmSlotChoice<TTestIds extends { readonly confirm: string }> =
+  | { readonly confirmSlot?: undefined; readonly testIds: TTestIds }
+  | {
+      /** Sustituye al botón de confirmar; su `type`, `disabled` y `data-testid` los pone quien lo pasa. */
+      readonly confirmSlot: NonNullable<ReactNode>;
+      readonly testIds: Omit<TTestIds, 'confirm'> & { readonly confirm?: never };
+    };
+
+export type ConfirmDialogBodyBaseProps = {
   readonly texts: ConfirmDialogTexts;
-  readonly testIds: Omit<ConfirmDialogTestIds, 'dialog'>;
   readonly variant?: 'default' | 'destructive';
   /** Con form (Server Action) o con transición. Sin él, se usa `onConfirm`. */
   readonly submit?: ConfirmDialogSubmit;
@@ -125,8 +133,6 @@ export type ConfirmDialogBodyProps = {
   readonly confirmDescribedBy?: string;
   /** `button` pinta un `Button` que no cierra el diálogo por sí mismo. */
   readonly confirmAs?: 'action' | 'button';
-  /** Sustituye al botón de confirmar; su `type`, `disabled` y `data-testid` los pone quien lo pasa. */
-  readonly confirmSlot?: ReactNode;
   readonly dismissDisabled?: boolean;
   readonly error?: ErrorState;
   readonly errorId?: string;
@@ -138,6 +144,9 @@ export type ConfirmDialogBodyProps = {
   /** Dentro del form tras los campos ocultos; sin form, antes del pie. */
   readonly children?: ReactNode;
 };
+
+export type ConfirmDialogBodyProps = ConfirmDialogBodyBaseProps &
+  ConfirmSlotChoice<Omit<ConfirmDialogTestIds, 'dialog'>>;
 
 /** Cabecera, error, form y pie. No guarda estado: el de la operación es de cada diálogo. */
 export function ConfirmDialogBody({
@@ -286,10 +295,10 @@ export function ConfirmDialogBody({
   );
 }
 
-export type ConfirmDialogProps = Omit<ConfirmDialogFrameProps, 'testId' | 'children'> &
-  Omit<ConfirmDialogBodyProps, 'testIds' | 'onOpenChange'> & {
-    readonly testIds: ConfirmDialogTestIds;
-  };
+export type ConfirmDialogBaseProps = Omit<ConfirmDialogFrameProps, 'testId' | 'children'> &
+  Omit<ConfirmDialogBodyBaseProps, 'onOpenChange'>;
+
+export type ConfirmDialogProps = ConfirmDialogBaseProps & ConfirmSlotChoice<ConfirmDialogTestIds>;
 
 /**
  * Base de los diálogos de confirmación. Pinta; el `useActionState`, la transición y el efecto de
@@ -300,19 +309,17 @@ export function ConfirmDialog({
   onOpenChange,
   trigger,
   contentClassName,
-  testIds,
   ...body
 }: ConfirmDialogProps) {
-  const { dialog, ...bodyTestIds } = testIds;
   return (
     <ConfirmDialogFrame
       open={open}
       onOpenChange={onOpenChange}
       trigger={trigger}
       contentClassName={contentClassName}
-      testId={dialog}
+      testId={body.testIds.dialog}
     >
-      <ConfirmDialogBody {...body} testIds={bodyTestIds} onOpenChange={onOpenChange} />
+      <ConfirmDialogBody {...body} onOpenChange={onOpenChange} />
     </ConfirmDialogFrame>
   );
 }

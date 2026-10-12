@@ -3,10 +3,7 @@
 import { useActionState } from 'react';
 
 import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
-import {
-  COUNTDOWN_GATED_BUTTON_TESTID,
-  CountdownGatedButton,
-} from '@/components/shared/countdown-gated-button';
+import { CountdownGatedButton } from '@/components/shared/countdown-gated-button';
 import {
   finishConditioningAction,
   type FinishConditioningResult,
@@ -82,7 +79,6 @@ function FinishConditioningForm({ orderId, orderNumber }: FinishConditioningForm
       testIds={{
         form: FINISH_CONDITIONING_FORM_TESTID,
         dismiss: FINISH_CONDITIONING_CANCEL_TESTID,
-        confirm: COUNTDOWN_GATED_BUTTON_TESTID,
         error: FINISH_CONDITIONING_ERROR_TESTID,
       }}
       submit={{

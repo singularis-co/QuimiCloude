@@ -13,6 +13,12 @@ const TEST_IDS = {
   form: 'extension-form',
 } as const;
 
+const TEST_IDS_CON_SLOT = {
+  dialog: TEST_IDS.dialog,
+  dismiss: TEST_IDS.dismiss,
+  form: TEST_IDS.form,
+} as const;
+
 const TEXTS = {
   title: 'Terminar',
   description: 'Se va a terminar.',
@@ -29,18 +35,19 @@ function Dialogo({
   confirmSlot,
 }: {
   readonly contentClassName?: string;
-  readonly confirmSlot?: ReactNode;
+  readonly confirmSlot?: NonNullable<ReactNode>;
 }) {
-  return (
-    <ConfirmDialog
-      open
-      texts={TEXTS}
-      testIds={TEST_IDS}
-      submit={{ kind: 'action', action: () => undefined }}
-      layout="form-wraps-all"
-      contentClassName={contentClassName}
-      confirmSlot={confirmSlot}
-    />
+  const comunes = {
+    open: true,
+    texts: TEXTS,
+    submit: { kind: 'action', action: () => undefined },
+    layout: 'form-wraps-all',
+    contentClassName,
+  } as const;
+  return confirmSlot === undefined ? (
+    <ConfirmDialog {...comunes} testIds={TEST_IDS} />
+  ) : (
+    <ConfirmDialog {...comunes} testIds={TEST_IDS_CON_SLOT} confirmSlot={confirmSlot} />
   );
 }
 
@@ -87,6 +94,24 @@ describe('ConfirmDialog: contentClassName y confirmSlot', () => {
     expect(screen.queryByTestId(TEST_IDS.confirm)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: TEXTS.confirm })).not.toBeInTheDocument();
     expect(slot.parentElement).toBe(within(form).getByTestId(TEST_IDS.dismiss).parentElement);
+  });
+
+  it('R18: con confirmSlot no se admite testIds.confirm; sin él sigue siendo obligatorio', () => {
+    const slot = <button type="submit">Terminar ya</button>;
+    const conSlotYConfirm = () => (
+      // @ts-expect-error con confirmSlot el testid del botón lo pone quien pasa el slot
+      <ConfirmDialog open texts={TEXTS} testIds={TEST_IDS} confirmSlot={slot} />
+    );
+    const sinSlotNiConfirm = () => (
+      // @ts-expect-error sin confirmSlot el botón propio necesita su testid
+      <ConfirmDialog open texts={TEXTS} testIds={TEST_IDS_CON_SLOT} />
+    );
+
+    render(<ConfirmDialog open texts={TEXTS} testIds={TEST_IDS_CON_SLOT} confirmSlot={slot} />);
+
+    expect(screen.getByRole('button', { name: 'Terminar ya' })).toBeInTheDocument();
+    expect(conSlotYConfirm).toBeTypeOf('function');
+    expect(sinSlotNiConfirm).toBeTypeOf('function');
   });
 
   it('R18: con contentClassName la clase llega al contenido sin quitar las suyas', () => {
