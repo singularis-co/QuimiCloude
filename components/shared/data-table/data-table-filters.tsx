@@ -34,7 +34,8 @@ import type {
  * objeto en vez de emitirla vacia (R16, via `withFilter`).
  */
 
-const FIELD_TEXT = 'text-base';
+/** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md`, y R20 no distingue por ancho. */
+const FIELD_TEXT = 'text-base md:text-base';
 
 export type DataTableFiltersProps<TRow> = {
   readonly columns: readonly DataTableColumn<TRow>[];

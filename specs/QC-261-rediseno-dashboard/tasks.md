@@ -87,7 +87,7 @@ la cita antes de empezar su tanda.
   `app/(private)/dashboard/` (R18); fuera de la rama, `skip` ruidoso como `guard-qc260-…`. *Hecho:*
   verde en la rama; el caso sintético de cada regla da rojo.
 
-- [ ] **T8. E2E** (depende de T4, T5, T6).
+- [x] **T8. E2E** (depende de T4, T5, T6).
   - Nuevo `e2e/dashboard-rediseno.spec.ts`, en chromium y webkit, a 390, 820 y 1440 px, con estilo
     computado y sin capturas, sembrando como `e2e/recorrido-ejecucion.spec.ts` (empresa propia,
     pedidos con anotaciones, uno con retroceder): R8 (tarjetas a 390, «Acciones» abre el menú
@@ -108,7 +108,7 @@ la cita antes de empezar su tanda.
   *Hecho:* `pnpm exec playwright test e2e/dashboard-rediseno.spec.ts e2e/recorrido-ejecucion.spec.ts e2e/permisos.spec.ts`
   verde; `pnpm exec vitest run guard` verde.
 
-- [ ] **T9. Cierre.** Mapa `R<n> -> test` completo en `progress/impl_QC-261.md` (el de
+- [x] **T9. Cierre.** Mapa `R<n> -> test` completo en `progress/impl_QC-261.md` (el de
   `design.md > 11`, con el nombre de cada caso); filas del catálogo revisadas; `./init.sh` verde.
   *Hecho:* los tres puntos.
 
@@ -125,6 +125,7 @@ la cita antes de empezar su tanda.
 - `app/(private)/dashboard/recorrido/[id]/components/execution-timeline.tsx`
 - `app/(private)/not-found.tsx`
 - `components/shared/empty-state.tsx`
+- `components/shared/data-table/data-table-filters.tsx`
 - `components/shared/CATALOGO.md`
 - `tests/ui/dashboard/dashboard-rediseno.test.tsx`
 - `tests/ui/dashboard/recorrido-rediseno.test.tsx`
@@ -136,6 +137,16 @@ la cita antes de empezar su tanda.
 - `tests/unit/marca/tablas-marca.test.tsx`
 - `tests/unit/paridad/recorridos-paridad.test.tsx`
 - `tests/unit/paridad/__snapshots__/recorridos-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/catalogo-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/clientes-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/formularios-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/grupos-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/inventario-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/pedidos-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/presentaciones-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/recetas-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/unidades-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/usuarios-paridad.test.tsx.snap`
 - `tests/guards/guard-qc261-limites-de-la-ficha.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `e2e/dashboard-rediseno.spec.ts`

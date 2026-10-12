@@ -313,6 +313,8 @@ Sin excepciones. Objetivos de 44 px (disparador ⋯, «Acciones», `ArrowLink to
 con `hover: hover`, tooltip de avatar con su nombre también como nombre accesible, ninguna
 `100vh`. Se verifica en webkit (`playwright.config.ts`).
 
+> **Nota 2026-10-12 (Tanda 4b):** el supuesto «ya en `DataTable`» era falso desde 768 px (`md:text-sm` de `Input` anulaba `FIELD_TEXT`); se corrige en `components/shared/data-table/data-table-filters.tsx`.
+
 ## 13. Dependencias
 
 Ninguna nueva. `lucide-react`, `@base-ui/react` y `@tanstack/react-table` ya están; las fichas de
