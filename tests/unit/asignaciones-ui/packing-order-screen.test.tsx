@@ -61,7 +61,9 @@ function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
 }
 
 function pintar(order: PackingOrderDetail) {
-  render(<PackingOrderScreen order={order} actorId={ACTOR_ID} />);
+  render(
+    <PackingOrderScreen order={order} actorId={ACTOR_ID} backHref="/asignacion?vista=por_empacar" />,
+  );
 }
 
 afterEach(() => {

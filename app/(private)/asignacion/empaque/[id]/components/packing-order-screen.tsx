@@ -20,9 +20,6 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-// Por su ruta exacta, no por el barrel: el barrel arrastra las secciones de servidor a esta pantalla de cliente.
-import { assignmentViewHref } from '../../../components/assignment-view-params';
-
 /**
  * La pantalla de un pedido de empaque. Sin control de edicion: los datos del pedido se leen tal
  * cual llegaron por props. Se compara SIEMPRE `packedById` con el actor, nunca por nombre, porque
@@ -112,9 +109,10 @@ export type PackingOrderScreenProps = {
   readonly order: PackingOrderDetail;
   /** El id del actor de la sesion, nunca su nombre: se decide comparando `packedById`. */
   readonly actorId: string;
+  readonly backHref: string;
 };
 
-export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) {
+export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScreenProps) {
   const startFormRef = useRef<HTMLFormElement>(null);
   const finishFormRef = useRef<HTMLFormElement>(null);
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
@@ -307,7 +305,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
       ) : null}
 
       <Link
-        href={assignmentViewHref('por_empacar')}
+        href={backHref}
         className={`inline-flex w-fit items-center ${touchTarget} text-sm font-medium underline`}
         data-testid={PACKING_ORDER_BACK_LINK_TESTID}
       >

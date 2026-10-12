@@ -504,7 +504,9 @@ describe('paridad del acondicionador — el dialogo de terminar', () => {
 
 describe('paridad del empaque — la pantalla del pedido', () => {
   function pintar(order: PackingOrderDetail) {
-    render(<PackingOrderScreen order={order} actorId={ACTOR_ID} />);
+    render(
+      <PackingOrderScreen order={order} actorId={ACTOR_ID} backHref="/asignacion?vista=por_empacar" />,
+    );
   }
 
   it('R11 R13 R24 — por empacar: «Comenzar»', () => {
