@@ -185,12 +185,33 @@ Plex Mono; el `h1` a 26 px como el tablero.
 
 ## 4. CSS
 
-Por defecto, **sin cambios en `app/globals.css`**: la entrada de cada anotación reutiliza
-`@keyframes screen-enter` con `--dur-slow` y `--ease-enter` (valores arbitrarios de Tailwind) y el
-retardo en línea; el bloque global de movimiento reducido ya anula animación y retardo (R16). El
-realce va con la variante `hover:` de Tailwind 4, que solo aplica con `@media (hover: hover)`.
-Si `tests/guards/guard-movimiento.test.ts` no admite la animación en línea, se declara en
-`app/globals.css` un bloque `[data-timeline-step]` junto a `screen-enter`, sin `infinite`.
+**Sin cambios en `app/globals.css`** (decisión cerrada el 2026-10-12; motivo: candado de archivos
+con QC-265, que sí edita ese archivo). La entrada de cada anotación reutiliza `@keyframes
+screen-enter` (ya declarado en `app/globals.css`) con una clase arbitraria de Tailwind,
+`motion-safe:animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]`, y el retardo en
+línea (`style={{ animationDelay: \`${i * 40}ms\` }}`).
+
+Por qué pasa `tests/guards/guard-movimiento.test.ts` (leída el 2026-10-12):
+
+- R1: la guardia mide `duration-N`, `duration-[…]` y `duration-(--x)` en `.tsx`; las duraciones
+  literales (`animation`, `animation-delay`…) solo las mira en `.css`. La clase no usa ninguna
+  de esas formas, y `--dur-slow` vale 300 ms (≤ 400).
+- R2: los detectores de curva exigen `ease-` sin guion delante (`(?<![\w-])`); `var(--ease-enter)`
+  lleva `--` delante y no casa con `ease-in|out|linear`, ni con `ease-(--x)` ni con `ease-[…]`.
+  No hay `cubic-bezier` literal.
+- R23: sin `infinite`, sin `animate-bounce|ping`; `execution-timeline.tsx` no está en
+  `SIN_ANIMACION` (tabla, badge, logo).
+
+Movimiento reducido (R16): la variante `motion-safe:` hace que, con `prefers-reduced-motion:
+reduce`, la anotación no tenga animación, así que ni sube ni espera su retardo (el `animation-delay`
+en línea no tiene efecto sin animación). No se depende del bloque global de movimiento reducido,
+que pone la duración a 0.01 ms pero solo anula el retardo de `[data-screen-enter]`, no el de la
+línea de tiempo.
+
+El realce va con la variante `hover:` de Tailwind 4, que solo aplica con `@media (hover: hover)`.
+
+Descartado: declarar en `app/globals.css` un bloque `[data-timeline-step]` junto a `screen-enter`.
+Funcionaría, pero no hace falta para pasar la guardia y bloquearía QC-261 por el candado con QC-265.
 
 ## 5. Textos
 

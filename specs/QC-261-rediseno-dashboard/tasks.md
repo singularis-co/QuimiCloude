@@ -46,10 +46,11 @@ la cita antes de empezar su tanda.
   contador, `ol` con nombre «Anotaciones», un `li` por paso con `data-testid`, `data-action`,
   `data-go-back`, punto con icono y tono por acción (tabla de § 3.3), acción, `<time>`, «Paso {n}»,
   avatar con `avatarTone` + `getInitials` o «—» con «Sin dato», «Motivo · …», «Hasta la siguiente:
-  …» salvo en la última, «Vuelta atrás» `sr-only` en cada retroceder, retardo de 40 ms por índice,
-  realce solo con `hover:`. Tests en `tests/ui/dashboard/recorrido-rediseno.test.tsx` (R13, R14,
-  R15, R16 en jsdom: retardos y clases). *Hecho:* tests y `guard-movimiento` verdes; si la guardia
-  pide el bloque CSS de `design.md > 4`, se añade y se anota en `progress/impl_QC-261.md`.
+  …» salvo en la última, «Vuelta atrás» `sr-only` en cada retroceder, entrada con
+  `motion-safe:animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]` y retardo en línea de
+  40 ms por índice, realce solo con `hover:`. Tests en `tests/ui/dashboard/recorrido-rediseno.test.tsx`
+  (R13, R14, R15, R16 en jsdom: retardos y clases). *Hecho:* tests y `guard-movimiento` verdes, y
+  `app/globals.css` sin tocar (`design.md > 4`: candado con QC-265).
 
 ## Tanda 3
 
@@ -123,7 +124,6 @@ la cita antes de empezar su tanda.
 - `app/(private)/dashboard/recorrido/[id]/components/execution-trace-detail.tsx`
 - `app/(private)/dashboard/recorrido/[id]/components/execution-timeline.tsx`
 - `app/(private)/not-found.tsx`
-- `app/globals.css`
 - `components/shared/empty-state.tsx`
 - `components/shared/CATALOGO.md`
 - `tests/ui/dashboard/dashboard-rediseno.test.tsx`
