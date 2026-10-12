@@ -84,3 +84,19 @@ en jsdom; si el navegador se comporta distinto, lo cubre `e2e/acceso-rediseno.sp
 ## Bloqueos
 
 Ninguno.
+
+## T2 y T4 (frontend_dev)
+
+- Archivos: `components/shared/notice.tsx` (prop `id`), `components/shared/submit-button.tsx`
+  (`Spinner size="sm"` delante del texto pendiente), `components/shared/CATALOGO.md` (filas de
+  `Notice` y `SubmitButton`), `tests/unit/shared-ui/notice.test.tsx`,
+  `tests/unit/shared-ui/submit-button.test.tsx`.
+- Mapa: R18 (id citable) → `notice.test.tsx > QC-260 R18 — el id opcional va al contenedor…`;
+  R12, R21 (indicador de la pieza) → `submit-button.test.tsx > QC-260 R12, R21 — mientras envía
+  pinta el Spinner…` (los casos de pantalla van en T6/T7).
+- `pnpm run typecheck` → verde (tras `pnpm exec next typegen`; sin él falla `LayoutProps` en
+  `app/layout.tsx`, ajeno). `pnpm run lint` → 0 errors, 7 warnings preexistentes.
+- `vitest related` → 119 passed, 1 failed: `login-paridad > R1 R2 — enviando`, snapshot con el
+  único añadido `svg aria-hidden="true" … lucide-loader-circle size-4`. Esperado; se regenera en T6.
+- Guardias catálogo + catalogo-qc256 + formularios-y-acciones → 85 passed, 3 skipped.
+- Veredicto: T2 y T4 hechas; solo queda el snapshot de paridad para T6.

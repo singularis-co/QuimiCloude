@@ -41,7 +41,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
   *Hecho:* la lista está en `progress/impl_QC-260.md` con cada caso y su motivo; cualquier test que
   no esté en este spec y aparezca se añade a la lista y a `## Archivos esperados`.
 
-- [ ] **T2 [P]. `Notice` gana `id` opcional** (`design.md > 3.2`). Caso nuevo en
+- [x] **T2 [P]. `Notice` gana `id` opcional** (`design.md > 3.2`). Caso nuevo en
   `tests/unit/shared-ui/notice.test.tsx`; fila del catálogo actualizada (puntos de extensión).
   *Hecho:* test verde; consumidores sin cambios.
 
@@ -52,7 +52,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
   formulario de la ruta (T7), no en `PasswordField`. *Hecho:* resultado anotado en
   `progress/impl_QC-260.md` y caso de R20 escrito (rojo o verde, según lo medido).
 
-- [ ] **T4 [P]. `SubmitButton` con `Spinner` mientras envía** (`design.md > 3.3`). Caso en
+- [x] **T4 [P]. `SubmitButton` con `Spinner` mientras envía** (`design.md > 3.3`). Caso en
   `tests/unit/shared-ui/submit-button.test.tsx`; fila del catálogo con
   `docs/diseno/canvas/Botones.dc.html` y `Spinner` en `Base de`. *Hecho:* test y guardia del
   catálogo verdes.
