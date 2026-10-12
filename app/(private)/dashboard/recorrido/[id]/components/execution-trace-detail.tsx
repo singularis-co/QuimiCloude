@@ -6,8 +6,8 @@ import { PageHeader } from '@/components/shared/page-header';
 import { PageShell } from '@/components/shared/page-shell';
 import { StatusBadge } from '@/components/shared/status-badge';
 import {
-  ACTIVE_ORDER_MARK,
-  DELETED_ORDER_MARK,
+  ActiveOrderMark,
+  DeletedOrderMark,
   TRACE_ORDER_STATUS_LABELS,
   formatTraceDuration,
 } from '@/app/(private)/dashboard/components';
@@ -52,7 +52,7 @@ function Stat({ label, children }: { readonly label: string; readonly children: 
 function GoBackCount({ count }: { readonly count: number }) {
   if (count === 0) {
     return (
-      <span data-testid="execution-trace-go-backs" className="text-muted-foreground tabular-nums">
+      <span data-testid="execution-trace-go-backs" className="font-mono text-muted-foreground tabular-nums">
         {count}
       </span>
     );
@@ -86,12 +86,8 @@ export function ExecutionTraceDetail({ trace, backHref }: ExecutionTraceDetailPr
               data-testid="execution-trace-status"
               data-status={trace.status}
             />
-            {trace.deleted ? (
-              <StatusBadge tone="muted" label={DELETED_ORDER_MARK} data-testid="execution-trace-deleted" />
-            ) : null}
-            {!trace.deleted && trace.duration.kind === 'open' ? (
-              <StatusBadge tone="progress" label={ACTIVE_ORDER_MARK} data-testid="execution-trace-active" />
-            ) : null}
+            {trace.deleted ? <DeletedOrderMark /> : null}
+            {!trace.deleted && trace.duration.kind === 'open' ? <ActiveOrderMark /> : null}
           </Stat>
           <Stat label={STAT_LABELS.duration}>
             <span className="font-mono" data-testid="execution-trace-duration" data-kind={trace.duration.kind}>

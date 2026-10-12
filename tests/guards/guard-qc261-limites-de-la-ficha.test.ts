@@ -1,4 +1,4 @@
-// QC-261 T7 — Guardia: los limites de ESTA ficha (R22, R7, R18; `design.md > 7`).
+// QC-261 T7 — Guardia: los limites de ESTA ficha (R22, R7, R18, R23; `design.md > 7`).
 //
 //   R22 — la ficha es solo presentacion: su diff no toca `lib/`, `db/`, `middleware.ts` ni
 //         `package.json` (ninguna dependencia nueva).
@@ -7,13 +7,15 @@
 //   R18 — el 404 del dashboard y de su detalle sigue saliendo con codigo 404: no hay ningun
 //         `loading.tsx` bajo `app/(private)/dashboard/`, que haria empezar el streaming antes de
 //         `requirePagePermission` y de `notFound()` (`design.md > 8`, riesgo 1).
+//   R23 — la pieza nueva del detalle, `execution-timeline.tsx`, vive en la carpeta `components/`
+//         de su ruta y el `index.ts` de esa carpeta la reexporta (`ExecutionTimeline`).
 //
 // R22 es un censo del DIFF DE RAMA y se acota a su rama, como `guard-qc260-limites-de-la-ficha`:
 // fuera de `feature/QC-261-rediseno-dashboard` hace `ctx.skip` RUIDOSO diciendo que no ha
 // comprobado nada, en vez de ponerse rojo sobre el trabajo legitimo de la ficha siguiente. El rango
 // es el merge-base de la rama con `origin/dev` (o `dev`), no la punta de `dev`.
 //
-// R7 y R18 son censos del ARBOL, no del diff, y corren en toda rama: si una ficha futura vuelve a
+// R7, R18 y R23 son censos del ARBOL, no del diff, y corren en toda rama: si una ficha futura vuelve a
 // poner el enlace en la celda o un esqueleto de ruta, debe ponerse roja.
 //
 // El detector de R7 lee el AST de TypeScript, no el texto: un comentario que diga `next/link` no es
@@ -60,6 +62,11 @@ const ARCHIVO_DE_COLUMNAS = 'app/(private)/dashboard/components/execution-trace-
 /** R18: la carpeta donde no puede haber `loading.*`. */
 const CARPETA_DEL_DASHBOARD = 'app/(private)/dashboard'
 const LOADING = /^loading\.(tsx|ts|jsx|js)$/
+
+/** R23: la carpeta de componentes del detalle, su barrel y la pieza nueva que debe reexportar. */
+const CARPETA_DEL_RECORRIDO = 'app/(private)/dashboard/recorrido/[id]/components'
+const PIEZA_NUEVA = 'execution-timeline'
+const NOMBRE_EXPORTADO = 'ExecutionTimeline'
 
 function git(args: readonly string[]): string | null {
   try {
@@ -193,6 +200,27 @@ export function archivosDeCarga(archivos: readonly string[]): readonly string[] 
   return archivos.filter((archivo) => LOADING.test(archivo.split('/').pop() ?? ''))
 }
 
+// ---------------------------------------------------------------------------------------------
+// R23 — el barrel reexporta la pieza
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * R23: ¿el barrel reexporta `nombre` desde `./<modulo>`? Lee el AST: vale `export { X } from`,
+ * `export { X as X } from` y `export * from`; un comentario o un import sin reexportar no. Pura.
+ */
+export function barrelReexporta(fuente: string, modulo: string, nombre: string): boolean {
+  const sf = ts.createSourceFile('index.ts', fuente, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  return sf.statements.some((sentencia) => {
+    if (!ts.isExportDeclaration(sentencia) || sentencia.isTypeOnly) return false
+    const origen = sentencia.moduleSpecifier
+    if (origen === undefined || !ts.isStringLiteral(origen) || origen.text !== `./${modulo}`) return false
+    const clausula = sentencia.exportClause
+    if (clausula === undefined) return true
+    if (!ts.isNamedExports(clausula)) return false
+    return clausula.elements.some((el) => !el.isTypeOnly && el.name.text === nombre)
+  })
+}
+
 const rama = ramaActual()
 const base = mergeBaseDeLaRama()
 
@@ -311,5 +339,32 @@ describe('QC-261 — R18: sin `loading.tsx` bajo `app/(private)/dashboard/`', ()
       'app/(private)/dashboard/loading.tsx',
       'app/(private)/dashboard/recorrido/[id]/loading.js',
     ])
+  })
+})
+
+describe('QC-261 — R23: la pieza nueva del detalle vive en su ruta y la exporta su barrel', () => {
+  it('R23: `execution-timeline.tsx` vive en `recorrido/[id]/components/` y su `index.ts` reexporta `ExecutionTimeline`', () => {
+    const pieza = join(repoRoot, CARPETA_DEL_RECORRIDO, `${PIEZA_NUEVA}.tsx`)
+    const barrel = join(repoRoot, CARPETA_DEL_RECORRIDO, 'index.ts')
+    expect(existsSync(pieza), `no existe ${CARPETA_DEL_RECORRIDO}/${PIEZA_NUEVA}.tsx`).toBe(true)
+    expect(existsSync(barrel), `no existe ${CARPETA_DEL_RECORRIDO}/index.ts`).toBe(true)
+    expect(
+      barrelReexporta(readFileSync(barrel, 'utf8'), PIEZA_NUEVA, NOMBRE_EXPORTADO),
+      `QC-261 R23: ${CARPETA_DEL_RECORRIDO}/index.ts no reexporta \`${NOMBRE_EXPORTADO}\` desde ` +
+        `\`./${PIEZA_NUEVA}\`. Toda pieza nueva sale por el barrel de su carpeta.`,
+    ).toBe(true)
+  })
+
+  it('R23 (caso sintetico): un barrel sin la reexportacion da rojo', () => {
+    expect(barrelReexporta("export { ExecutionTraceDetail } from './execution-trace-detail'", PIEZA_NUEVA, NOMBRE_EXPORTADO)).toBe(false)
+    expect(barrelReexporta("// export { ExecutionTimeline } from './execution-timeline'", PIEZA_NUEVA, NOMBRE_EXPORTADO)).toBe(false)
+    expect(barrelReexporta("import { ExecutionTimeline } from './execution-timeline'", PIEZA_NUEVA, NOMBRE_EXPORTADO)).toBe(false)
+    expect(barrelReexporta("export type { ExecutionTimelineProps } from './execution-timeline'", PIEZA_NUEVA, NOMBRE_EXPORTADO)).toBe(false)
+    expect(barrelReexporta("export { ExecutionTimeline } from './otra-pieza'", PIEZA_NUEVA, NOMBRE_EXPORTADO)).toBe(false)
+  })
+
+  it('R23: el detector acepta las formas validas de reexportar', () => {
+    expect(barrelReexporta("export { ExecutionTimeline, type ExecutionTimelineProps } from './execution-timeline'", PIEZA_NUEVA, NOMBRE_EXPORTADO)).toBe(true)
+    expect(barrelReexporta("export * from './execution-timeline'", PIEZA_NUEVA, NOMBRE_EXPORTADO)).toBe(true)
   })
 })

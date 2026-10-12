@@ -6,3 +6,4 @@ export {
   MISSING_PERSON_MARK,
   type ExecutionTraceDetailProps,
 } from './execution-trace-detail';
+export { ExecutionTimeline, type ExecutionTimelineProps } from './execution-timeline';

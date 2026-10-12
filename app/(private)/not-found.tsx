@@ -9,6 +9,9 @@ import { EmptyState } from '@/components/shared/empty-state';
  * El copy no menciona permisos, roles ni módulos, y no hay enlace ni botón: un destino fijo o
  * «la primera pantalla disponible» delataría qué pantallas existen o cuáles puede ver esa persona.
  *
+ * Nunca se llama a `notFound()` desde `app/(private)/layout.tsx`: un `notFound()` en el layout lo
+ * hace fallar, responde el límite de arriba y el 404 saldría sin el armazón del layout privado.
+ *
  * Contenedor `div` y no `main`: el layout privado ya pinta el único `main`.
  */
 export default function PrivateNotFound() {

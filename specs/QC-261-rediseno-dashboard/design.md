@@ -164,9 +164,11 @@ export type ExecutionTimelineProps = {
   | `pack_finish` | `success` | `Package` |
   | `cancel` | `danger` | `Ban` |
 
-  Los colores salen de los tokens `--status-<tono>-subtle|text|dot` de `app/globals.css`; no se
-  declara ningún token nuevo.
-- `index.ts`: exporta lo de hoy; `ExecutionTimeline` es interno (lo usa solo el detalle).
+  Los colores salen de los tokens `warning-*` (tono `waiting`), `success-*` y `destructive-*` (tono
+  `danger`) de `app/globals.css`, los mismos que usa `StatusBadge`; no se declara ningún token nuevo
+  (enmienda 2026-10-12, review v1: los `--status-<tono>-*` citados antes no existen).
+- `index.ts`: exporta lo de hoy y `ExecutionTimeline` (R23: toda pieza nueva se exporta por el barrel
+  de su ruta; enmienda 2026-10-12, review v1). Solo la usa el detalle.
 
 ### 3.4 No encontrada — `app/(private)/not-found.tsx`
 

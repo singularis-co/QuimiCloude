@@ -145,6 +145,18 @@ Decisión del leader: `data-table-filters.tsx` entra en alcance. Cambio: `FIELD_
 - E2E reejecutado (implementer): `pnpm exec playwright test e2e/dashboard-rediseno.spec.ts e2e/recorrido-ejecucion.spec.ts e2e/permisos.spec.ts`
   -> `22 passed (1.2m)` (chromium y webkit; R8, R16, R20 a 390/820/1440 px, R18, R24). T8 y T9 cerradas.
 
+### Arreglos de la review v1 (2026-10-12)
+- M1: `data-table-filters.tsx`, comentario de `FIELD_TEXT` sin `R20` (solo el porqué de iOS).
+- M2: `recorrido/[id]/components/index.ts` reexporta `ExecutionTimeline` y `ExecutionTimelineProps`; guardia
+  `guard-qc261-limites-de-la-ficha.test.ts` gana el bloque R23 (caso real, sintético rojo, formas de reexportar).
+  `design.md > 3.3` alineado (barrel y tokens `warning-*`/`success-*`/`destructive-*`).
+- m1: `app/(private)/not-found.tsx` recupera el aviso de no llamar a `notFound()` desde el layout privado.
+- m2: `execution-trace-detail.tsx` reutiliza `DeletedOrderMark` y `ActiveOrderMark` (mismos testids, ningún test
+  ajustado) y el «0» de vueltas atrás lleva `font-mono`.
+- Ficha: estado de cabecera `pending` → `in_progress`.
+- `./init.sh`: init OK (related 234 archivos, 3770 pasados; rápidos y guardias 112 archivos, 1554 pasados).
+- E2E `pnpm exec playwright test e2e/dashboard-rediseno.spec.ts e2e/recorrido-ejecucion.spec.ts`: `20 passed (55.1s)`.
+
 ## Mapa R<n> -> test
 
 | R | Test |
@@ -171,7 +183,7 @@ Decisión del leader: `data-table-filters.tsx` entra en alcance. Cambio: `FIELD_
 | R20 | `e2e/dashboard-rediseno.spec.ts` R20 × 390/820/1440 — verde en 390, 820 y 1440 (chromium y webkit) tras la Tanda 4b |
 | R21 | `tests/ui/dashboard/textos-dashboard.test.tsx` (13 casos) |
 | R22 | `guard-qc261-limites-de-la-ficha.test.ts` (diff sin `lib/`, `db/`, `middleware.ts`, `package.json`) |
-| R23 | `tests/guards/guard-catalogo-de-componentes.test.ts`, `guard-qc261-limites-de-la-ficha.test.ts` |
+| R23 | `tests/guards/guard-catalogo-de-componentes.test.ts` (fila de `EmptyState`); `guard-qc261-limites-de-la-ficha.test.ts` «R23: `execution-timeline.tsx` vive en `recorrido/[id]/components/` y su `index.ts` reexporta `ExecutionTimeline`» + sintético (review v1) |
 | R24 | `e2e/recorrido-ejecucion.spec.ts` (verde; solo apertura por menú y `data-go-back`) |
 
 `./init.sh` de la Tanda 4: init OK (related 231 archivos, 3709 pasados, 1 omitido; rápidos y guardias 112
