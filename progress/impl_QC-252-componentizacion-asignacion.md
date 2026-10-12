@@ -246,6 +246,33 @@ inestabilidad (pasa al reintentar sin cambios); si CI lo repite, mirarlo.
 
 `./init.sh` (T6b) lo corre el leader al cerrar la tanda.
 
+## Review vuelta 1: arreglos (2026-10-12)
+
+- M1 (`78fff63b`): `empaque/[id]/page.tsx` importa `assignmentViewHref` por el barrel y pasa
+  `backHref` a `PackingOrderScreen`; fuera el import profundo. `packing-order-page.test.tsx` gana el
+  caso R2 de `backHref` y el `observabilidad` en su mock de `@/lib/composition` (mismo patrón que
+  `conditioning-order-page.test.tsx`).
+- m3 (`c8e14a8c`): con `confirmSlot`, `ConfirmDialog`/`ConfirmDialogBody` no admiten
+  `testIds.confirm` (tipo discriminado); `delete-confirm-dialog.tsx` ajustado sin cambio de conducta;
+  fila del catálogo al día.
+- m4, m5 (`fe917e3e`): fuera `CONDITIONING_ORDERS_PAGE_PAST_END_TEXT` y
+  `CONDITIONING_ORDERS_FIRST_PAGE_TEXT`; el test del botón con espera usa un literal propio.
+- m1, m2 y las enmiendas de M1 y m4 (`6b5359c9`): en `design.md`. `tasks.md > Archivos esperados`
+  suma los archivos nuevos del arreglo.
+- F2.3 (`380295f8`): merge de `origin/dev` (QC-260). Un conflicto trivial en `CATALOGO.md` (fila
+  `Notice` de dev + fila `OrderDistributionLabel` de esta rama). Sin migraciones.
+
+```
+pnpm run typecheck -> exit 0
+pnpm run lint      -> ✖ 7 problems (0 errors, 7 warnings)  (ajenos)
+pnpm exec vitest related --run <producción tocada desde origin/dev>
+ Test Files  215 passed (215)
+      Tests  3461 passed | 1 skipped (3462)
+pnpm exec vitest run guard tests/unit/paridad
+ Test Files  95 passed (95)
+      Tests  1409 passed | 19 skipped (1428)
+```
+
 ## Bloqueos
 
 Ninguno. Para el reviewer: `packing-order-screen.tsx` (pantalla de cliente) importa
