@@ -246,6 +246,8 @@ numéricos en ese archivo, en `credential-requirements.tsx` y en `password-field
 | QC-79 (`set-credential-form.test.tsx`) | `set-credential-mismatch` → `set-credential-confirmation-error`; `aria-describedby` se comprueba por inclusión; desaparecen los casos de `CredentialInput` como pieza local | § 3.4 |
 | QC-21 | Redacción de `CREDENTIAL_RULE_LABELS` con tildes | D9 — R26 |
 | QC-10 (`login-paridad`) | El snapshot se regenera en su propio commit, con control de diff | § 5 |
+| QC-75 (`login-form.test.tsx` «no introduce ningun cambio visual») | Cuenta solo los botones `type="submit"` (exactamente 1) en vez de todos los botones del form | El ojo de R10 es un `<button>` del form; humano, 2026-10-12 (C8) |
+| QC-226 R26 (`brand-logo.test.tsx`) | Deja de exigir la precarga del logo vertical en el login | § 5: el login pinta el isotipo con `tone="auto"` y se deja sin precarga — R9 |
 
 ## 11. Trazabilidad prevista
 

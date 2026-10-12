@@ -64,7 +64,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
   Tests en `tests/unit/acceso/access-screen.test.tsx` (R1, R2, R5, R6). *Hecho:* unit, guardia de
   movimiento y guardia del catálogo verdes.
 
-- [ ] **T6. Login** (depende de T4, T5; `design.md > 5`). `page.tsx`, `login-form.tsx`, barrel;
+- [x] **T6. Login** (depende de T4, T5; `design.md > 5`). `page.tsx`, `login-form.tsx`, barrel;
   borrar `login-background.tsx`. Tests en `tests/unit/acceso/login-rediseno.test.tsx` (R9–R13).
   Enmiendas: `tests/unit/login-skin.test.tsx`, `tests/unit/identity/login-page-marca.test.tsx`,
   `tests/unit/theme/color-tokens.test.ts`, `tests/unit/theme/motion-tokens.test.ts` con nota
@@ -132,6 +132,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
 - `tests/guards/guard-movimiento.test.ts`
 - `tests/unit/identity/credencial/scope.test.ts`
 - `tests/unit/brand/brand-logo.test.tsx`
+- `tests/unit/login-form.test.tsx`
 - `tests/guards/guard-qc260-limites-de-la-ficha.test.ts`
 - `e2e/acceso-rediseno.spec.ts`
 - `e2e/login-skin.spec.ts`
