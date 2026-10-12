@@ -39,7 +39,7 @@
 | `SubmitButton` | 2, extiende | Gana el `Spinner` mientras envía (§ 3.3) |
 | `AccessScreen` (nueva) | 3, compón | Fondo, moléculas y tarjeta, compuesta con `Card`; sube a `shared` porque la usan dos rutas (§ 3.1) |
 | `TextField` | descartada | Ver § 9, A4 |
-| `ErrorAlert` | sin decidir | Ver P3 |
+| `ErrorAlert` | descartada | P3 cerrada: el error de catálogo / inesperado se queda como hoy dentro de la tarjeta (R23) |
 
 **Pase `/design`.** Todos los tableros están aprobados (D14) y versionados:
 `docs/diseno/canvas/Login.dc.html`, `docs/diseno/canvas/LoginTablet.dc.html`,
@@ -100,8 +100,9 @@ Pinta:
   (padding del `main`: `40px 16px`) (R7).
 - **Entrada escalonada:** los hijos directos de la tarjeta usan `@keyframes screen-enter` (ya
   existe, QC-228) con retardos 0/40/80/120/160/200 ms del tablero; con movimiento reducido el
-  bloque global de QC-228 corta el desplazamiento (R4, R5). Al pasar al éxito, la tarjeta se monta
-  de nuevo (`key`) y la entrada se repite (R5).
+  bloque global de QC-228 corta el desplazamiento (R4, R5). Al pasar al éxito, el formulario remonta
+  sus bloques (hijos directos de la tarjeta) con un `key` por rama y la entrada se repite (R5); la
+  tarjeta no se remonta, porque la pinta la página de servidor.
 - **Sin estado, sin `'use client'`**: es un Server Component que se puede pintar desde `page.tsx` y
   desde el formulario cliente.
 
@@ -244,6 +245,7 @@ numéricos en ese archivo, en `credential-requirements.tsx` y en `password-field
 | QC-228 (`guard-movimiento`) | Los delimitadores del bloque exento pasan a «Pantallas de acceso — INICIO/FIN» | § 4 |
 | QC-30 | Se mantienen 400 px y radio 18 px; el relleno pasa a `32px 28px 20px` | Tablero `Login` |
 | QC-79 (`set-credential-form.test.tsx`) | `set-credential-mismatch` → `set-credential-confirmation-error`; `aria-describedby` se comprueba por inclusión; desaparecen los casos de `CredentialInput` como pieza local | § 3.4 |
+| QC-79 (`tests/unit/identity/credencial/scope.test.ts`) | `SUPERFICIE_PUBLICA` deja de listar `credential-input.tsx` y `submit-button.tsx` de la ruta | § 6: se borran; su ancla exige que cada archivo listado exista |
 | QC-21 | Redacción de `CREDENTIAL_RULE_LABELS` con tildes | D9 — R26 |
 | QC-10 (`login-paridad`) | El snapshot se regenera en su propio commit, con control de diff | § 5 |
 | QC-75 (`login-form.test.tsx` «no introduce ningun cambio visual») | Cuenta solo los botones `type="submit"` (exactamente 1) en vez de todos los botones del form | El ojo de R10 es un `<button>` del form; humano, 2026-10-12 (C8) |
