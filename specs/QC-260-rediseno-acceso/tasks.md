@@ -45,7 +45,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
   `tests/unit/shared-ui/notice.test.tsx`; fila del catálogo actualizada (puntos de extensión).
   *Hecho:* test verde; consumidores sin cambios.
 
-- [ ] **T3 [P]. Riesgo 1: `PasswordField` controlado y reinicio del formulario** (`design.md > 8`).
+- [x] **T3 [P]. Riesgo 1: `PasswordField` controlado y reinicio del formulario** (`design.md > 8`).
   Test en `tests/unit/acceso/establecer-contrasena-rediseno.test.tsx` que monta un formulario con
   `useActionState` y una action que rechaza, escribe en el campo con `requirements`, envía y
   compara el valor visible con el estado de la lista. Si se desincroniza, la corrección va en el

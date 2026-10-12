@@ -55,9 +55,21 @@ los textos de las dos pantallas como literal: los tests las leen por `SET_CREDEN
 `CREDENTIAL_RULE_LABELS` o `data-testid`. Las apariciones de `contrasena`/`sesion` en `tests/` son
 comentarios, nombres de caso o mensajes de guardias.
 
+## T3 — Riesgo 1 medido (frontend_dev, 2026-10-12)
+
+Formulario de prueba: `useActionState` + `<form action>` + `PasswordField name="credential"
+requirements={{}}`, action que rechaza. Se teclea `Abcdefg1#`, se envía, se espera al rechazo.
+
+**Resultado (jsdom, React 19): NO se desincroniza.** Tras el rechazo el input conserva
+`"Abcdefg1#"` y la lista dice las seis `met` + `breached: unknown`, lo mismo que la lista sin
+estado para ese valor. El campo es controlado y React restaura su valor tras el reinicio del
+`<form>`. Caso de R20 en verde; T7 no necesita el `key` por intento por este motivo. Límite: medido
+en jsdom; si el navegador se comporta distinto, lo cubre `e2e/acceso-rediseno.spec.ts`
+(`design.md > 11`, fila R20).
+
 ## Archivos creados / modificados
 
-(se rellena por tarea)
+- `tests/unit/acceso/establecer-contrasena-rediseno.test.tsx` (T3; caso R20, ampliable por T7)
 
 ## Mapa R<n> -> test
 
@@ -65,7 +77,9 @@ comentarios, nombres de caso o mensajes de guardias.
 
 ## Salida de los tests
 
-(se rellena por tarea)
+- T3: `pnpm exec vitest run tests/unit/acceso/establecer-contrasena-rediseno.test.tsx` →
+  `Test Files 1 passed (1)`, `Tests 1 passed (1)`. `pnpm run typecheck` → sin errores.
+  `pnpm run lint` → `0 errors, 7 warnings` (preexistentes, ninguno en el archivo nuevo).
 
 ## Bloqueos
 
