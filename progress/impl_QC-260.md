@@ -286,3 +286,13 @@ Ninguno abierto (B1 y B2 resueltos; ver «Desbloqueo»). Histórico:
     toca).
 
 Veredicto: T5 hecha; unit, guardia de movimiento y guardia del catálogo en verde.
+
+## Gate: alta de `e2e/acceso-rediseno.spec.ts` en `E2E_ESPERADOS` (2026-10-12)
+
+`tests/guards/guard-identificador-de-request.test.ts` (lista CERRADA `E2E_ESPERADOS`, QC-71 R21)
+daba rojo por el archivo nuevo de T10. frontend_dev lo da de alta (l. 58–68) con el comentario
+«Alta el 2026-10-12 (QC-260) por el MISMO motivo…», patrón de QC-92/QC-219/QC-138: el spec no lee
+ni afirma nada sobre el identificador ni `reference`. Se añade a `## Archivos esperados`.
+- `pnpm exec vitest run tests/guards/guard-identificador-de-request.test.ts` → `Test Files 1 passed (1)` · `Tests 23 passed (23)`.
+- `pnpm exec vitest run tests/guards` → `Test Files 64 passed (64)` · `Tests 884 passed | 12 skipped (896)`.
+- eslint del archivo → sin incidencias.

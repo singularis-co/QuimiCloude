@@ -133,6 +133,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
 - `tests/unit/identity/credencial/scope.test.ts`
 - `tests/unit/brand/brand-logo.test.tsx`
 - `tests/unit/login-form.test.tsx`
+- `tests/guards/guard-identificador-de-request.test.ts`
 - `tests/guards/guard-qc260-limites-de-la-ficha.test.ts`
 - `e2e/acceso-rediseno.spec.ts`
 - `e2e/login-skin.spec.ts`
