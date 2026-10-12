@@ -5,22 +5,19 @@ import { useActionState, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
 import { StepReader } from '@/components/shared/step-reader';
 import { Button } from '@/components/ui/button';
-import type {
-  OrderDistributionLineView,
-  PackingOrderDetail,
-  PackingOrderRow,
-} from '@/lib/modules/asignaciones';
+import type { PackingOrderDetail, PackingOrderRow } from '@/lib/modules/asignaciones';
 import {
   finishPackingAction,
   startPackingAction,
   type FinishPackingResult,
   type StartPackingResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-packing-actions';
-import type { OrderStatus } from '@/lib/modules/pedidos';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 // Por su ruta exacta, no por el barrel: el barrel arrastra las secciones de servidor a esta pantalla de cliente.
@@ -104,20 +101,8 @@ const PACKING_MIN_STEP_SECONDS = 5;
 const BACK_LABEL = 'Volver a «Por empacar»';
 const PACKER_UNKNOWN_TEXT = 'Lo esta empacando otra persona.';
 
-function distributionLineText(line: OrderDistributionLineView): string {
-  return `${line.packages} × ${line.packagingName ?? line.presentationName ?? EMPTY_MARK}`;
-}
-
 function packerLabel(order: PackingOrderRow): string {
   return order.packedByName === null ? PACKER_UNKNOWN_TEXT : `Lo esta empacando ${order.packedByName}.`;
-}
-
-/** Solo se pintan los dos estados que `getPackingOrder` puede devolver; cualquier otro es
- *  imposible en esta pantalla y se muestra tal cual sin tumbarla. */
-function statusLabel(status: OrderStatus): string {
-  if (status === 'POR_EMPACAR') return 'Por empacar';
-  if (status === 'EN_EMPAQUE') return 'En empaque';
-  return status;
 }
 
 const START_INITIAL_STATE: StartPackingResult = { status: 'success' };
@@ -191,7 +176,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
                 className="text-base"
                 data-testid={PACKING_ORDER_PRESENTATION_LINE_TESTID}
               >
-                {distributionLineText(line)}
+                {orderDistributionLineText(line)}
               </li>
             ))}
           </ul>
@@ -216,7 +201,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
         data-testid={PACKING_ORDER_STATUS_TESTID}
         data-status={order.status}
       >
-        {statusLabel(order.status)}
+        {ORDER_STATUS_LABELS[order.status]}
       </p>
 
       {canStart ? (

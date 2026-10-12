@@ -5,11 +5,11 @@ import Link from 'next/link';
 import type { DataTableColumn } from '@/components/shared/data-table';
 import type { ConditioningOrderRow } from '@/lib/modules/asignaciones';
 import { conditioningOrderRoute } from '@/lib/shared/routes';
+import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import { MissingValue } from './assignment-list-parts';
-import { COMPANY_ORDER_STATUS_LABELS } from './company-orders-columns';
 import { OrderDistributionFull } from './order-distribution-full';
 
 /**
@@ -74,7 +74,7 @@ export function buildConditioningOrdersColumns(): readonly DataTableColumn<Condi
       align: 'start',
       cell: (order) => (
         <span data-testid="conditioning-order-status" data-status={order.status}>
-          {COMPANY_ORDER_STATUS_LABELS[order.status]}
+          {ORDER_STATUS_LABELS[order.status]}
         </span>
       ),
     },

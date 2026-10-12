@@ -5,6 +5,7 @@ import type { ConditioningOrderDetail, ConditioningTeamCandidates } from '@/lib/
 import type { ErrorState } from '@/lib/modules/errores';
 import type { OrderStatus } from '@/lib/modules/pedidos';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
@@ -44,19 +45,6 @@ export const CONDITIONING_ORDER_SCREEN_TEXTS = {
 } as const;
 
 const BATCH_DATA_MISSING_ID = 'conditioning-order-batch-data-missing';
-
-/**
- * Solo los cuatro estados que puede devolver `getConditioningOrder`; cualquier otro es imposible
- * aquí y se pinta tal cual sin tumbar la pantalla. Etiquetas locales porque las de la tabla viven
- * en un módulo de cliente.
- */
-function statusLabel(status: OrderStatus): string {
-  if (status === 'POR_ACONDICIONAR') return 'Por acondicionar';
-  if (status === 'EN_ACONDICIONAMIENTO') return 'En acondicionamiento';
-  if (status === 'TERMINADO') return 'Terminado';
-  if (status === 'ENTREGADO') return 'Entregado';
-  return status;
-}
 
 function backLink(status: OrderStatus): { readonly href: string; readonly label: string } {
   if (status === 'TERMINADO') {
@@ -134,7 +122,7 @@ export function ConditioningOrderScreen({
         data-testid={CONDITIONING_ORDER_STATUS_TESTID}
         data-status={order.status}
       >
-        {statusLabel(order.status)}
+        {ORDER_STATUS_LABELS[order.status]}
       </p>
 
       {order.conditionedByName === null ? null : (

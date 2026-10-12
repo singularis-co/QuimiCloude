@@ -127,6 +127,7 @@ export const D11_SIN_HALLAZGOS = [
   'app/(private)/asignacion/components/conditioned-orders-list-section.tsx',
   'app/(private)/asignacion/components/conditioning-orders-columns.tsx',
   'app/(private)/asignacion/components/conditioning-orders-list-section.tsx',
+  'app/(private)/asignacion/components/order-distribution-full.tsx',
   'tests/unit/asignaciones-ui/conditioning-orders-list-section.test.tsx',
   'app/(private)/pedidos/components/order-list-section.tsx',
 ] as const
@@ -147,7 +148,6 @@ const COMPONENTES_CREDENCIAL = [
 const CARPETA_ASISTENTE = ['components', 'shared', 'step-reader'].join('/')
 
 const BARREL_ASIGNACION = 'app/(private)/asignacion/components/index.ts'
-const ORDER_DISTRIBUTION_FULL = 'app/(private)/asignacion/components/order-distribution-full.tsx'
 
 type Exclusion = {
   readonly archivo: string
@@ -166,12 +166,6 @@ export const EXCLUSIONES_ESTRECHAS_D11: readonly Exclusion[] = [
     reglas: ['simbolo-borrado'],
     simbolo: 'MISSING_VALUE_MARK',
     motivo: 'reexporta el alias de EMPTY_MARK que aun usa assigned-orders-columns.test.tsx (P6)',
-  },
-  {
-    archivo: ORDER_DISTRIBUTION_FULL,
-    reglas: ['marca-en-constante'],
-    simbolo: 'MISSING_NAME_MARK',
-    motivo: 'la constante se va al componer con orderDistributionLineText (T4b, D7)',
   },
 ]
 
@@ -841,8 +835,6 @@ describe('QC-231 — las reglas MUERDEN (muestras sinteticas)', () => {
     expect(reglasDe("export { EMPTY_MARK as MISSING_VALUE_MARK } from 'x'", BARREL_ASIGNACION)).toEqual([])
     expect(reglasDe("const T = 'min-h-11 min-w-11'", BARREL_ASIGNACION)).toEqual(['par-en-constante'])
     expect(reglasDe("export { EMPTY_CELL } from 'x'", BARREL_ASIGNACION)).toEqual(['simbolo-borrado'])
-    expect(reglasDe("const T = 'min-h-11 min-w-11'", ORDER_DISTRIBUTION_FULL)).toEqual(['par-en-constante'])
-    expect(reglasDe("const OTRA = '—'", ORDER_DISTRIBUTION_FULL)).toEqual(['marca-en-constante'])
   })
 
   it('R33: el detector ve D11, credencial, la carpeta de establecer-contrasena y D7', () => {

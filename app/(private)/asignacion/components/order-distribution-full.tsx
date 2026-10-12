@@ -6,6 +6,8 @@
  * antigua no lo tiene, la presentacion.
  */
 
+import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
+
 export type OrderDistributionFullLine = {
   readonly presentationId: string;
   readonly presentationName: string | null;
@@ -22,16 +24,10 @@ export const ORDER_DISTRIBUTION_FULL_TESTID = 'order-distribution-full';
 export const ORDER_DISTRIBUTION_FULL_SEPARATOR = ' / ';
 
 const EMPTY_TEXT = 'Sin presentación';
-const MISSING_NAME_MARK = '—';
 
 export function orderDistributionFullText(lines: readonly OrderDistributionFullLine[]): string {
   if (lines.length === 0) return EMPTY_TEXT;
-  return lines
-    .map(
-      (line) =>
-        `${line.packages} × ${line.packagingName ?? line.presentationName ?? MISSING_NAME_MARK}`,
-    )
-    .join(ORDER_DISTRIBUTION_FULL_SEPARATOR);
+  return lines.map(orderDistributionLineText).join(ORDER_DISTRIBUTION_FULL_SEPARATOR);
 }
 
 export function OrderDistributionFull({ lines }: OrderDistributionFullProps) {
