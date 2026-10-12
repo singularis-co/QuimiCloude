@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   PACKED_ORDER_NOTICE_TESTID,
-  PackedOrderNotice,
+  OrderOutcomeNotice,
   packedOrderNoticeText,
 } from '@/app/(private)/asignacion/components';
 
@@ -11,9 +11,9 @@ afterEach(() => {
   cleanup();
 });
 
-describe('PackedOrderNotice — confirmacion visible al terminar el empaque', () => {
+describe('OrderOutcomeNotice kind="packed" — confirmacion visible al terminar el empaque', () => {
   it('R7 - nombra el pedido empacado y nunca dice «entregado»', () => {
-    render(<PackedOrderNotice orderNumber="2026-0000012" />);
+    render(<OrderOutcomeNotice kind="packed" orderNumber="2026-0000012" />);
 
     const aviso = screen.getByTestId(PACKED_ORDER_NOTICE_TESTID);
     expect(aviso).toBeVisible();
@@ -27,7 +27,7 @@ describe('PackedOrderNotice — confirmacion visible al terminar el empaque', ()
   });
 
   it('usa `role="status"` para que un lector de pantalla lo anuncie sin foco', () => {
-    render(<PackedOrderNotice orderNumber="2026-0000014" />);
+    render(<OrderOutcomeNotice kind="packed" orderNumber="2026-0000014" />);
 
     expect(screen.getByTestId(PACKED_ORDER_NOTICE_TESTID)).toHaveAttribute('role', 'status');
   });

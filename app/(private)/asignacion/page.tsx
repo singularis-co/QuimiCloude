@@ -26,14 +26,13 @@ import {
   AssignmentViewTabs,
   CompanyOrdersListSection,
   CompanyOrdersSkeleton,
-  ConditionedOrderNotice,
   ConditionedOrdersListSection,
   ConditioningOrdersListSection,
   ConditioningOrdersSkeleton,
   DeliveredConditionedOrdersListSection,
   FinishedOrdersListSection,
   FinishedOrdersSkeleton,
-  PackedOrderNotice,
+  OrderOutcomeNotice,
   PackingOrdersListSection,
   PackingOrdersSkeleton,
   VIEW_PARAM,
@@ -107,10 +106,10 @@ export default async function AsignacionPage({
         <AssignedOrderCancelledNotice orderNumber={cancelledOrderNumber} />
       ) : null}
       {vista === 'por_empacar' && packedOrderNumber !== undefined ? (
-        <PackedOrderNotice orderNumber={packedOrderNumber} />
+        <OrderOutcomeNotice kind="packed" orderNumber={packedOrderNumber} />
       ) : null}
       {vista === 'por_acondicionar' && conditionedOrderNumber !== undefined ? (
-        <ConditionedOrderNotice orderNumber={conditionedOrderNumber} />
+        <OrderOutcomeNotice kind="conditioned" orderNumber={conditionedOrderNumber} />
       ) : null}
       {views.length > 1 ? <AssignmentViewTabs current={vista} views={views} /> : null}
       {vista === 'asignados' ? (

@@ -196,15 +196,14 @@ export {
 } from './packing-orders-list-section';
 export { PackingOrdersSkeleton } from './packing-orders-skeleton';
 export {
-  PACKED_ORDER_NOTICE_TESTID,
-  PackedOrderNotice,
-  packedOrderNoticeText,
-} from './packed-order-notice';
-export {
   CONDITIONED_ORDER_NOTICE_TESTID,
-  ConditionedOrderNotice,
+  OrderOutcomeNotice,
+  PACKED_ORDER_NOTICE_TESTID,
   conditionedOrderNoticeText,
-} from './conditioned-order-notice';
+  packedOrderNoticeText,
+  type OrderOutcomeKind,
+  type OrderOutcomeNoticeProps,
+} from './order-outcome-notice';
 export {
   ORDER_DISTRIBUTION_FULL_SEPARATOR,
   ORDER_DISTRIBUTION_FULL_TESTID,

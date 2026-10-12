@@ -9,7 +9,6 @@ import {
   CONDITIONING_TEAM_PEOPLE_TESTID,
   CONDITIONING_TEAM_USER_IDS_FIELD,
   CONDITIONING_TEAM_WORK_GROUP_IDS_FIELD,
-  COUNTDOWN_GATED_BUTTON_TESTID,
   ConditioningActions,
   START_CONDITIONING_DIALOG_TESTID,
   START_CONDITIONING_ERROR_TESTID,
@@ -17,6 +16,7 @@ import {
   START_CONDITIONING_ORDER_ID_FIELD,
   START_CONDITIONING_TEXTS,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
+import { COUNTDOWN_GATED_BUTTON_TESTID } from '@/components/shared/countdown-gated-button';
 import type { ConditioningTeamCandidates } from '@/lib/modules/asignaciones';
 import type { StartConditioningResult } from '@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions';
 

@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CONDITIONING_ACTIONS_TEXTS,
-  COUNTDOWN_GATED_BUTTON_TESTID,
   ConditioningActions,
   FINISH_CONDITIONING_DIALOG_TESTID,
   FINISH_CONDITIONING_ERROR_TESTID,
   FINISH_CONDITIONING_ORDER_ID_FIELD,
   FINISH_CONDITIONING_TEXTS,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
+import { COUNTDOWN_GATED_BUTTON_TESTID } from '@/components/shared/countdown-gated-button';
 import type { FinishConditioningResult } from '@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions';
 
 const { finishConditioningActionMock } = vi.hoisted(() => ({

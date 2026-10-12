@@ -9,12 +9,11 @@ import {
   type ConditioningTeamSelection,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
 import {
-  ConditionedOrderNotice,
   ConditionedOrdersListSection,
   ConditioningOrdersListSection,
   ConditioningOrdersSkeleton,
   DeliveredConditionedOrdersListSection,
-  PackedOrderNotice,
+  OrderOutcomeNotice,
 } from '@/app/(private)/asignacion/components';
 import { PackingOrderScreen } from '@/app/(private)/asignacion/empaque/[id]/components';
 import type { DataTableParams } from '@/components/shared/data-table';
@@ -337,12 +336,12 @@ describe('paridad del acondicionador — sus tres listas', () => {
 
 describe('paridad del acondicionador — avisos de resultado', () => {
   it('R15 R24 — pedido empacado', () => {
-    render(<PackedOrderNotice orderNumber="2026-0000030" />);
+    render(<OrderOutcomeNotice kind="packed" orderNumber="2026-0000030" />);
     expect(arbolAccesible()).toMatchSnapshot();
   });
 
   it('R15 R24 — pedido acondicionado', () => {
-    render(<ConditionedOrderNotice orderNumber="2026-0000040" />);
+    render(<OrderOutcomeNotice kind="conditioned" orderNumber="2026-0000040" />);
     expect(arbolAccesible()).toMatchSnapshot();
   });
 });
