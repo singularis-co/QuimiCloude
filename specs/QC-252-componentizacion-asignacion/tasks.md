@@ -8,12 +8,12 @@ Verificación de cada tanda (`docs/perfil-agentes.md > Todos los agentes`): `pnp
 
 ## Tanda 0 — Congelar y censar (antes de tocar producción)
 
-- [ ] **T0a. Paridad nueva** (D14). Crear
+- [x] **T0a. Paridad nueva** (D14). Crear
   `tests/unit/paridad/asignacion-acondicionamiento-paridad.test.tsx` con los casos de
   `design.md > 4 > D14`, sobre el código **sin tocar**, y generar sus snapshots.
   *Hecho:* los snapshots existen, el archivo pasa en verde y se commitea solo (`test(QC-252): …`)
   antes de cualquier cambio de producción. Cada caso lleva en su nombre los `R<n>` que congela.
-- [ ] **T0b. Censo con grep de lo que se toca o se borra.** Buscar en `tests/unit`, `tests/guards`,
+- [x] **T0b. Censo con grep de lo que se toca o se borra.** Buscar en `tests/unit`, `tests/guards`,
   `tests/integration` y `e2e` cada archivo y símbolo que esta ficha borra, mueve o cambia de firma:
   `conditioning-orders-href`, `conditioningOrdersHref`, `conditionedOrdersHref`,
   `deliveredConditionedOrdersHref`, `ConditioningListView`, `finishedOrdersHref`, `packingOrdersHref`,
@@ -33,36 +33,36 @@ Verificación de cada tanda (`docs/perfil-agentes.md > Todos los agentes`): `pnp
 
 ## Tanda 1 — Piezas compartidas (depende de T0a)
 
-- [ ] **T1a [P]. Agrupado y filtro** (D5, R8–R10). Crear `lib/shared/ui/responsible-groups.ts` con
+- [x] **T1a [P]. Agrupado y filtro** (D5, R8–R10). Crear `lib/shared/ui/responsible-groups.ts` con
   `groupResponsiblesByOrigin`, `filterByDisplayName` y sus tipos; test
   `tests/unit/shared-ui/responsible-groups.test.ts` (orden por primera aparición, «directos» primero,
   sin directos, filtro con mayúsculas y espacios, búsqueda vacía) y test de tipos que ata
   `ResponsibleOrigin` a `AssignmentOrigin` y al `origin` de `ConditioningTeamMemberView` en los dos
   sentidos. `pedidos/components/order-responsibles.tsx` importa de ahí y conserva sus exports.
   *Hecho:* `order-responsibles.test.tsx` y `order-route-contract.test.ts` siguen verdes sin tocarlos.
-- [ ] **T1b [P]. Función de línea de reparto** (D7, R13). Exportar `orderDistributionLineText` de
+- [x] **T1b [P]. Función de línea de reparto** (D7, R13). Exportar `orderDistributionLineText` de
   `components/shared/order-distribution-label.tsx`; test en
   `tests/unit/shared-ui/order-distribution-line-text.test.ts` (envase, respaldo a presentación, `—`).
   *Hecho:* la pieza pinta igual (sus tests y la paridad de las listas sin cambios).
-- [ ] **T1c [P]. `ConfirmDialog` extendido** (D9, R18). `contentClassName?` y `confirmSlot?`; test
+- [x] **T1c [P]. `ConfirmDialog` extendido** (D9, R18). `contentClassName?` y `confirmSlot?`; test
   `tests/unit/shared-ui/confirm-dialog-extension.test.tsx` (sin las props, mismo árbol; con
   `confirmSlot`, el pie pinta el nodo dado y no el botón propio; con `contentClassName`, la clase llega
   al contenido). *Hecho:* `tests/unit/paridad/confirmaciones-paridad.test.tsx` sin cambios en su
   snapshot.
-- [ ] **T1d [P]. `CountdownGatedButton` en shared** (D10, R19). Crear
+- [x] **T1d [P]. `CountdownGatedButton` en shared** (D10, R19). Crear
   `components/shared/countdown-gated-button.tsx` con `seconds`; mover
   `tests/unit/asignaciones-ui/countdown-gated-button.test.tsx` a
   `tests/unit/shared/countdown-gated-button.test.tsx`. Crear
   `app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-wait.ts` con
   `CONDITIONING_WAIT_SECONDS`. *Hecho:* el test movido pasa con las mismas aserciones.
-- [ ] **T1e. Catálogo** (R23, depende de T1a–T1d). Filas nuevas de `CountdownGatedButton` (Compuestos,
+- [x] **T1e. Catálogo** (R23, depende de T1a–T1d). Filas nuevas de `CountdownGatedButton` (Compuestos,
   `Diseño` = `docs/diseno/canvas/Dominio.dc.html`) y de `groupResponsiblesByOrigin`,
   `filterByDisplayName` (Apoyos, `sin UI`); puntos de extensión nuevos en `ConfirmDialog` y
   `OrderDistributionLabel`. *Hecho:* `pnpm exec vitest run guard-catalogo-de-componentes` en verde.
 
 ## Tanda 2 — Direcciones (depende de T0a)
 
-- [ ] **T2.** (D1, R1–R3) Sustituir los constructores por `assignedOrdersListHref` /
+- [x] **T2.** (D1, R1–R3) Sustituir los constructores por `assignedOrdersListHref` /
   `assignmentViewHref` en `finished-orders-table.tsx`, `finished-orders-list-section.tsx`,
   `packing-orders-list-section.tsx`, `conditioning-orders-table.tsx`,
   `conditioning-orders-list-section.tsx`, `conditioned-orders-table.tsx`,
