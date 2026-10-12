@@ -1,11 +1,11 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CONDITIONING_WAIT_SECONDS } from '@/app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-wait';
 import {
-  CONDITIONING_WAIT_SECONDS,
   COUNTDOWN_GATED_BUTTON_TESTID,
   CountdownGatedButton,
-} from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
+} from '@/components/shared/countdown-gated-button';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -32,7 +32,7 @@ describe('CountdownGatedButton', () => {
   });
 
   it('R9 R10: al montar está deshabilitado y la cuenta empieza en «00:05»', () => {
-    render(<CountdownGatedButton label="Comenzar" />);
+    render(<CountdownGatedButton seconds={CONDITIONING_WAIT_SECONDS} label="Comenzar" />);
 
     expect(boton()).toBeDisabled();
     expect(boton()).toHaveTextContent('Comenzar');
@@ -40,7 +40,7 @@ describe('CountdownGatedButton', () => {
   });
 
   it('R9 R10: sigue deshabilitado a los 4 s y se habilita a los 5 s, sin cuenta visible', () => {
-    render(<CountdownGatedButton label="Terminar" />);
+    render(<CountdownGatedButton seconds={CONDITIONING_WAIT_SECONDS} label="Terminar" />);
 
     avanzar(4000);
     expect(boton()).toBeDisabled();
@@ -52,18 +52,22 @@ describe('CountdownGatedButton', () => {
   });
 
   it('R9: sigue deshabilitado pasada la espera si `disabled`', () => {
-    render(<CountdownGatedButton label="Comenzar" disabled />);
+    render(<CountdownGatedButton seconds={CONDITIONING_WAIT_SECONDS} label="Comenzar" disabled />);
 
     avanzar(5000);
     expect(boton()).toBeDisabled();
   });
 
   it('R9 R10: una `key` nueva reinicia la cuenta en «00:05»', () => {
-    const { rerender } = render(<CountdownGatedButton key="apertura-1" label="Comenzar" />);
+    const { rerender } = render(
+      <CountdownGatedButton seconds={CONDITIONING_WAIT_SECONDS} key="apertura-1" label="Comenzar" />,
+    );
     avanzar(5000);
     expect(boton()).toBeEnabled();
 
-    rerender(<CountdownGatedButton key="apertura-2" label="Comenzar" />);
+    rerender(
+      <CountdownGatedButton seconds={CONDITIONING_WAIT_SECONDS} key="apertura-2" label="Comenzar" />,
+    );
 
     expect(boton()).toBeDisabled();
     expect(screen.getByRole('timer')).toHaveTextContent('00:05');
@@ -74,7 +78,7 @@ describe('CountdownGatedButton', () => {
   it('R11: es un botón de envío corriente, sin nada que mande la espera al servidor', () => {
     render(
       <form>
-        <CountdownGatedButton label="Comenzar" />
+        <CountdownGatedButton seconds={CONDITIONING_WAIT_SECONDS} label="Comenzar" />
       </form>,
     );
 
