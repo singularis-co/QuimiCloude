@@ -83,7 +83,19 @@ en jsdom; si el navegador se comporta distinto, lo cubre `e2e/acceso-rediseno.sp
 
 ## Bloqueos
 
-Ninguno.
+- **B1 (T6) — `tests/unit/login-form.test.tsx > «no introduce ningun cambio visual»` (l. 444)
+  en rojo.** Es un caso de QC-75 (campo oculto `next`) que exige
+  `within(form).getAllByRole('button')).toHaveLength(1)`: los controles del formulario «siguen
+  siendo los tres de QC-7». R10 (aprobado) añade el ojo de `PasswordField`, un `<button>` dentro
+  del form, así que ahora hay 2. `tasks.md > T6` exige que ese archivo quede verde **sin editar
+  aserciones de comportamiento**: el spec se contradice consigo mismo y `design.md > 10` no lista
+  esta enmienda. No se edita. Opciones: (a) enmendar a 2 con nota `ENMIENDA QC-260`, (b) contar
+  solo los `button[type=submit]` (sigue probando que el oculto no añade controles). Decide el
+  leader/humano. T6 queda sin `[x]` hasta entonces; el resto de T6 está verde.
+- **O1 (T6, informativo) — enmienda fuera de `design.md > 10`.** `tests/unit/brand/brand-logo.test.tsx`
+  R26 (QC-226) exigía precargar el logo vertical del login; `design.md > 5` decide dejarlo sin
+  precarga. frontend_dev lo enmendó con nota `ENMIENDA QC-260` y se añadió a `## Archivos
+  esperados`, pero la fila no está en la tabla de enmiendas de `design.md > 10`: conviene añadirla.
 
 ## T2 y T4 (frontend_dev)
 

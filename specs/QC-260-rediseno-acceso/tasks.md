@@ -84,7 +84,7 @@ T6–T7 dependen de ellas. T8–T10 cierran. Cada tanda termina con `pnpm run ty
   tilde en el texto pintado de las dos pantallas. `tests/unit/credential-help-contract.test.ts` y
   `tests/unit/credential-requirements.test.tsx` en verde. *Hecho:* tests verdes.
 
-- [ ] **T9. Límites de la ficha** (`design.md > 11`). `tests/guards/guard-qc260-limites-de-la-ficha.test.ts`:
+- [x] **T9. Límites de la ficha** (`design.md > 11`). `tests/guards/guard-qc260-limites-de-la-ficha.test.ts`:
   el diff contra el merge-base con `origin/dev` no toca `lib/`, `db/` ni `middleware.ts` (R27), y
   ningún archivo de `app/` pinta un `type="password"` ni un ojo propio (R29). Fuera de la rama
   `feature/QC-260-rediseno-acceso`, `skip` ruidoso, como `guard-piezas-base`. *Hecho:* verde en la
