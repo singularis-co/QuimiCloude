@@ -4,6 +4,8 @@ import Link from 'next/link';
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { AssignmentViewKind } from '@/lib/modules/asignaciones';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { cn } from '@/lib/utils';
 
 import { assignmentViewHref } from './assignment-view-params';
 
@@ -29,9 +31,6 @@ export const ASSIGNMENT_VIEW_TAB_TESTIDS: Readonly<Record<AssignmentViewKind, st
   acondicionados: 'assignment-view-tab-acondicionados',
   acondicionados_entregados: 'assignment-view-tab-acondicionados_entregados',
 };
-
-/** Objetivo tactil minimo de 44x44 px: la primitiva mide 32 px de alto por defecto. */
-const TOUCH_TARGET = 'h-auto min-h-11 min-w-11 px-4 text-base';
 
 export type AssignmentViewTabsProps = {
   /** La vista vigente, ya resuelta en el servidor a partir de la direccion. */
@@ -61,7 +60,8 @@ export function AssignmentViewTabs({ current, views }: AssignmentViewTabsProps) 
             value={view}
             nativeButton={false}
             data-testid={ASSIGNMENT_VIEW_TAB_TESTIDS[view]}
-            className={TOUCH_TARGET}
+            // La primitiva mide 32 px de alto por defecto.
+            className={cn(touchTarget, 'h-auto px-4 text-base')}
             render={<Link href={assignmentViewHref(view)} />}
           >
             {ASSIGNMENT_VIEW_LABELS[view]}

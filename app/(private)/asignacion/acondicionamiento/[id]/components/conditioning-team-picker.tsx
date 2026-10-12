@@ -9,6 +9,7 @@ import type {
   ConditioningTeamCandidateGroup,
   ConditioningTeamCandidates,
 } from '@/lib/modules/asignaciones';
+import { filterByDisplayName } from '@/lib/shared/ui/responsible-groups';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 export const CONDITIONING_TEAM_PICKER_TESTID = 'conditioning-team-picker';
@@ -76,13 +77,9 @@ export function ConditioningTeamPicker({
   const baseId = useId();
   const [search, setSearch] = useState('');
 
-  const term = search.trim().toLocaleLowerCase();
   const people = useMemo(
-    () =>
-      term === ''
-        ? candidates.people
-        : candidates.people.filter((person) => person.displayName.toLocaleLowerCase().includes(term)),
-    [candidates.people, term],
+    () => filterByDisplayName(candidates.people, search),
+    [candidates.people, search],
   );
 
   return (

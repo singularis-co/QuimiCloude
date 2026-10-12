@@ -5,23 +5,19 @@ import { useActionState, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
 import { StepReader } from '@/components/shared/step-reader';
 import { Button } from '@/components/ui/button';
-import type {
-  OrderDistributionLineView,
-  PackingOrderDetail,
-  PackingOrderRow,
-} from '@/lib/modules/asignaciones';
+import type { PackingOrderDetail, PackingOrderRow } from '@/lib/modules/asignaciones';
 import {
   finishPackingAction,
   startPackingAction,
   type FinishPackingResult,
   type StartPackingResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-packing-actions';
-import type { OrderStatus } from '@/lib/modules/pedidos';
-import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
@@ -100,24 +96,10 @@ const FINISH_PENDING_LABEL = 'Terminando…';
 const PACKING_STEPS_TITLE = 'Pasos de envasado';
 const PACKING_MIN_STEP_SECONDS = 5;
 const BACK_LABEL = 'Volver a «Por empacar»';
-/** `?vista=por_empacar` es el mismo nombre de parametro que `assignment-view-params.ts`. */
-const BACK_HREF = `${ASSIGNED_ORDERS_ROUTE}?vista=por_empacar`;
 const PACKER_UNKNOWN_TEXT = 'Lo esta empacando otra persona.';
-
-function distributionLineText(line: OrderDistributionLineView): string {
-  return `${line.packages} × ${line.packagingName ?? line.presentationName ?? EMPTY_MARK}`;
-}
 
 function packerLabel(order: PackingOrderRow): string {
   return order.packedByName === null ? PACKER_UNKNOWN_TEXT : `Lo esta empacando ${order.packedByName}.`;
-}
-
-/** Solo se pintan los dos estados que `getPackingOrder` puede devolver; cualquier otro es
- *  imposible en esta pantalla y se muestra tal cual sin tumbarla. */
-function statusLabel(status: OrderStatus): string {
-  if (status === 'POR_EMPACAR') return 'Por empacar';
-  if (status === 'EN_EMPAQUE') return 'En empaque';
-  return status;
 }
 
 const START_INITIAL_STATE: StartPackingResult = { status: 'success' };
@@ -127,9 +109,10 @@ export type PackingOrderScreenProps = {
   readonly order: PackingOrderDetail;
   /** El id del actor de la sesion, nunca su nombre: se decide comparando `packedById`. */
   readonly actorId: string;
+  readonly backHref: string;
 };
 
-export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) {
+export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScreenProps) {
   const startFormRef = useRef<HTMLFormElement>(null);
   const finishFormRef = useRef<HTMLFormElement>(null);
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
@@ -191,7 +174,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
                 className="text-base"
                 data-testid={PACKING_ORDER_PRESENTATION_LINE_TESTID}
               >
-                {distributionLineText(line)}
+                {orderDistributionLineText(line)}
               </li>
             ))}
           </ul>
@@ -216,7 +199,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
         data-testid={PACKING_ORDER_STATUS_TESTID}
         data-status={order.status}
       >
-        {statusLabel(order.status)}
+        {ORDER_STATUS_LABELS[order.status]}
       </p>
 
       {canStart ? (
@@ -322,7 +305,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
       ) : null}
 
       <Link
-        href={BACK_HREF}
+        href={backHref}
         className={`inline-flex w-fit items-center ${touchTarget} text-sm font-medium underline`}
         data-testid={PACKING_ORDER_BACK_LINK_TESTID}
       >

@@ -9,17 +9,16 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Botón que no se puede pulsar hasta que pasa la espera. La cuenta arranca al montar: quien lo usa
- * lo monta con una `key` nueva en cada apertura del modal para que la espera empiece de nuevo.
- * Es `submit` porque los dos modales que lo usan lo ponen dentro de su `<form>`.
+ * lo monta con una `key` nueva en cada apertura para que la espera empiece de nuevo.
+ * Es `submit` porque va dentro del `<form>` de quien lo usa.
  * La espera es solo de cliente; el servidor no la comprueba.
  */
-
-export const CONDITIONING_WAIT_SECONDS = 5;
 
 export const COUNTDOWN_GATED_BUTTON_TESTID = 'countdown-gated-button';
 
 export type CountdownGatedButtonProps = {
   readonly label: string;
+  readonly seconds: number;
   /** Deshabilita el botón por motivos ajenos a la espera (sin selección, envío en curso...). */
   readonly disabled?: boolean;
   readonly className?: string;
@@ -27,6 +26,7 @@ export type CountdownGatedButtonProps = {
 
 export function CountdownGatedButton({
   label,
+  seconds,
   disabled = false,
   className,
 }: CountdownGatedButtonProps) {
@@ -41,11 +41,7 @@ export function CountdownGatedButton({
     >
       {label}
       {waiting ? (
-        <CountdownTimer
-          seconds={CONDITIONING_WAIT_SECONDS}
-          onEnd={() => setWaiting(false)}
-          className="text-current"
-        />
+        <CountdownTimer seconds={seconds} onEnd={() => setWaiting(false)} className="text-current" />
       ) : null}
     </Button>
   );

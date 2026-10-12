@@ -14,11 +14,16 @@ import { asignaciones, identity, observabilidad } from '@/lib/composition';
 import { AsignacionesError, type Actor } from '@/lib/modules/asignaciones';
 import { createErrorStateTranslator } from '@/lib/modules/errores';
 import { runInRequestScope } from '@/lib/shared/request-scope';
-import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
-import { AssignmentListError, AssignmentListSectionFrame } from './assignment-list-parts';
-import { FIRST_PAGE, PAGE_PARAM, PAGE_SIZE_PARAM, VIEW_PARAM } from './assignment-view-params';
+import { assignedOrdersListHref } from './assigned-orders-list-params';
+import {
+  AssignmentListEmpty,
+  AssignmentListError,
+  AssignmentListSectionFrame,
+  firstPageHrefWhenPast,
+} from './assignment-list-parts';
+import { FIRST_PAGE } from './assignment-view-params';
 import { buildPackingOrdersColumns } from './packing-orders-columns';
 
 export const PACKING_ORDERS_SECTION_TESTID = 'packing-orders-list-section';
@@ -42,15 +47,6 @@ async function currentActor(): Promise<Actor | null> {
     companyId: sessionContext.companyId,
     permissions: sessionUser.permissions,
   };
-}
-
-/** Pagina «Por empacar» sin perder la vista vigente (`?vista=por_empacar`). */
-function packingOrdersHref(page: number, pageSize: number): string {
-  const query = new URLSearchParams();
-  query.set(PAGE_PARAM, String(page));
-  query.set(PAGE_SIZE_PARAM, String(pageSize));
-  query.set(VIEW_PARAM, 'por_empacar');
-  return `${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`;
 }
 
 type PackingOrdersListSectionProps = {
@@ -90,23 +86,13 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
   if (items.length === 0) {
     return (
       <AssignmentListSectionFrame testId={PACKING_ORDERS_SECTION_TESTID}>
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm text-muted-foreground" data-testid="packing-orders-empty-message">
-            {currentPage > FIRST_PAGE
-              ? 'Esta página ya no tiene pedidos.'
-              : 'No hay pedidos por empacar en tu empresa.'}
-          </p>
-          {currentPage > FIRST_PAGE ? (
-            <Link
-              href={packingOrdersHref(FIRST_PAGE, params.pageSize)}
-              data-slot="button"
-              data-testid="packing-orders-first-page"
-              className={cn(buttonVariants({ variant: 'outline', touch: true }))}
-            >
-              Volver a la primera página
-            </Link>
-          ) : null}
-        </div>
+        <AssignmentListEmpty
+          testIdPrefix="packing-orders"
+          message="No hay pedidos por empacar en tu empresa."
+          firstPageHref={firstPageHrefWhenPast(currentPage, FIRST_PAGE, () =>
+            assignedOrdersListHref({ ...params, page: FIRST_PAGE }, 'por_empacar'),
+          )}
+        />
       </AssignmentListSectionFrame>
     );
   }
@@ -149,7 +135,10 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
         <div className="flex gap-2">
           <Link
             aria-disabled={!hasPrevious}
-            href={packingOrdersHref(Math.max(FIRST_PAGE, currentPage - 1), params.pageSize)}
+            href={assignedOrdersListHref(
+              { ...params, page: Math.max(FIRST_PAGE, currentPage - 1) },
+              'por_empacar',
+            )}
             data-slot="button"
             data-testid="packing-orders-prev-page"
             className={cn(
@@ -161,7 +150,10 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
           </Link>
           <Link
             aria-disabled={!hasNext}
-            href={packingOrdersHref(Math.min(totalPages, currentPage + 1), params.pageSize)}
+            href={assignedOrdersListHref(
+              { ...params, page: Math.min(totalPages, currentPage + 1) },
+              'por_empacar',
+            )}
             data-slot="button"
             data-testid="packing-orders-next-page"
             className={cn(

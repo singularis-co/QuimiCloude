@@ -5,9 +5,8 @@ import { useMemo, useTransition } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
-import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 
-import { PAGE_PARAM, PAGE_SIZE_PARAM, VIEW_PARAM } from './assignment-view-params';
+import { assignedOrdersListHref } from './assigned-orders-list-params';
 import {
   buildFinishedOrdersColumns,
 } from './finished-orders-columns';
@@ -36,15 +35,6 @@ export const FINISHED_ORDERS_TABLE_TEXTS: DataTableTexts = {
   lastMonth: 'Último mes',
   lastYear: 'Último año',
 };
-
-/** Pagina «Terminados» sin perder la vista vigente (`?vista=terminados`). No hay filtro que llevar. */
-export function finishedOrdersHref(params: Pick<DataTableParams, 'page' | 'pageSize'>): string {
-  const query = new URLSearchParams();
-  query.set(PAGE_PARAM, String(params.page));
-  query.set(PAGE_SIZE_PARAM, String(params.pageSize));
-  query.set(VIEW_PARAM, 'terminados');
-  return `${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`;
-}
 
 export type FinishedOrdersTableProps = {
   readonly rows: readonly FinishedOrderView[];
@@ -79,7 +69,7 @@ export function FinishedOrdersTable({ rows, params, totalPages }: FinishedOrders
         getRowId={(order) => order.id}
         params={params}
         totalPages={totalPages}
-        onParamsChange={(next) => navigate(finishedOrdersHref(next))}
+        onParamsChange={(next) => navigate(assignedOrdersListHref(next, 'terminados'))}
         status="idle"
         texts={FINISHED_ORDERS_TABLE_TEXTS}
         searchable={false}

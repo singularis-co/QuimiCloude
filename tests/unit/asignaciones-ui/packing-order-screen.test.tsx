@@ -18,10 +18,12 @@ import {
   PACKING_ORDER_START_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TEXTS,
   PACKING_ORDER_START_DIALOG_TESTID,
+  PACKING_ORDER_STATUS_TESTID,
   PACKING_ORDER_STEPS_TESTID,
   PackingOrderScreen,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
 import type { PackingOrderDetail } from '@/lib/modules/asignaciones';
+import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 
 const { startPackingActionMock, finishPackingActionMock } = vi.hoisted(() => ({
   startPackingActionMock: vi.fn(),
@@ -59,7 +61,9 @@ function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
 }
 
 function pintar(order: PackingOrderDetail) {
-  render(<PackingOrderScreen order={order} actorId={ACTOR_ID} />);
+  render(
+    <PackingOrderScreen order={order} actorId={ACTOR_ID} backHref="/asignacion?vista=por_empacar" />,
+  );
 }
 
 afterEach(() => {
@@ -473,5 +477,26 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
 
     expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 2');
     expect(screen.getByRole('checkbox')).toHaveAttribute('aria-checked', 'false');
+  });
+});
+
+describe('QC-252: la etiqueta de estado sale del mapa compartido', () => {
+  it.each([
+    ['POR_EMPACAR', 'Por empacar'],
+    ['EN_EMPAQUE', 'En empaque'],
+  ] as const)('R11: %s se lee «%s», el texto de antes', (status, texto) => {
+    pintar(fila({ status }));
+
+    const estado = screen.getByTestId(PACKING_ORDER_STATUS_TESTID);
+    expect(estado.textContent).toBe(texto);
+    expect(estado).toHaveAttribute('data-status', status);
+  });
+
+  it('R12: un estado imposible aquí (CANCELADO) se pinta con su etiqueta del mapa, no con el código', () => {
+    pintar(fila({ status: 'CANCELADO' }));
+
+    const estado = screen.getByTestId(PACKING_ORDER_STATUS_TESTID);
+    expect(estado.textContent).toBe(ORDER_STATUS_LABELS.CANCELADO);
+    expect(estado.textContent).toBe('Cancelado');
   });
 });

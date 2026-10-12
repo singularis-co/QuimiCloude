@@ -18,6 +18,11 @@ import {
 } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 import type { ErrorState } from '@/lib/modules/errores';
 import { getInitials } from '@/lib/shared/ui/initials';
+import {
+  filterByDisplayName,
+  groupResponsiblesByOrigin,
+  type ResponsibleGroup as SharedResponsibleGroup,
+} from '@/lib/shared/ui/responsible-groups';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
@@ -124,18 +129,9 @@ export function removeWorkGroupSuccessMessage(removed: number): string {
     : `Se retiraron ${removed} personas con el grupo.`;
 }
 
-/**
- * El agrupado por origen (R25, `design.md > 3.1`). Union discriminada: «grupo sin nombre
- * congelado» es inexpresable, igual que en `AssignmentOrigin`.
- */
-export type ResponsibleGroup =
-  | { readonly kind: 'direct'; readonly responsibles: readonly OrderResponsible[] }
-  | {
-      readonly kind: 'workGroup';
-      readonly workGroupId: string;
-      readonly workGroupName: string;
-      readonly responsibles: readonly OrderResponsible[];
-    };
+export type ResponsibleGroup = SharedResponsibleGroup<OrderResponsible>;
+
+export { groupResponsiblesByOrigin };
 
 /** Una persona del catalogo que el panel ofrece para asignar. Llega por props (R27). */
 export type ResponsiblePersonOption = {
@@ -177,57 +173,6 @@ export const EMPTY_RESPONSIBLES_CATALOG: OrderResponsiblesCatalog = {
   people: [],
   workGroups: [],
 };
-
-/**
- * Reparte a los responsables por su ORIGEN, **en memoria y en una sola pasada** (R25).
- *
- * El orden de los grupos es el de su **primera aparicion** en la lista que el servidor devolvio:
- * ese orden ya es determinista y estable (QC-87 R37 y QC-102 R6), asi que reordenar aqui seria
- * inventar un segundo criterio que podria discrepar del suyo.
- *
- * El nombre del grupo sale del `origin` de **la fila** (R12). Nunca de un catalogo, nunca de una
- * consulta: por eso un renombrado posterior del grupo no altera lo que este pedido muestra.
- */
-export function groupResponsiblesByOrigin(
-  responsibles: readonly OrderResponsible[],
-): readonly ResponsibleGroup[] {
-  const direct: OrderResponsible[] = [];
-  const byWorkGroup = new Map<string, { name: string; responsibles: OrderResponsible[] }>();
-  const order: string[] = [];
-
-  for (const responsible of responsibles) {
-    if (responsible.origin.kind === 'direct') {
-      direct.push(responsible);
-      continue;
-    }
-
-    const { workGroupId, workGroupName } = responsible.origin;
-    const existing = byWorkGroup.get(workGroupId);
-    if (existing === undefined) {
-      order.push(workGroupId);
-      byWorkGroup.set(workGroupId, { name: workGroupName, responsibles: [responsible] });
-      continue;
-    }
-    existing.responsibles.push(responsible);
-  }
-
-  const groups: ResponsibleGroup[] = [];
-  if (direct.length > 0) {
-    groups.push({ kind: 'direct', responsibles: direct });
-  }
-  for (const workGroupId of order) {
-    const group = byWorkGroup.get(workGroupId);
-    if (group === undefined) continue;
-    groups.push({
-      kind: 'workGroup',
-      workGroupId,
-      workGroupName: group.name,
-      responsibles: group.responsibles,
-    });
-  }
-
-  return groups;
-}
 
 export type OrderResponsiblesProps = {
   /** El pedido al que pertenecen. Es lo unico que las tres operaciones necesitan del pedido. */
@@ -294,15 +239,8 @@ export function OrderResponsibles({
    */
   const showWriteControls = canWrite && !isFinal;
 
-  const term = search.trim().toLocaleLowerCase();
-  /** El filtro es SOBRE EL CATALOGO QUE YA LLEGO por props (R27): no se consulta nada al teclear. */
-  const candidates = useMemo(
-    () =>
-      term === ''
-        ? people
-        : people.filter((person) => person.displayName.toLocaleLowerCase().includes(term)),
-    [people, term],
-  );
+  // Se filtra el catalogo que ya llego por props: teclear no consulta nada.
+  const candidates = useMemo(() => filterByDisplayName(people, search), [people, search]);
 
   /**
    * El unico sitio donde esta seccion decide algo sobre un resultado: si fue error, se guarda

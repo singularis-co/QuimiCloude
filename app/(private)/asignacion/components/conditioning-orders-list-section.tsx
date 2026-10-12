@@ -5,9 +5,9 @@ import { createErrorStateTranslator } from '@/lib/modules/errores';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 import { AssignedOrdersError } from './assigned-orders-error';
+import { assignedOrdersListHref } from './assigned-orders-list-params';
 import { FIRST_PAGE } from './assignment-view-params';
 import { ConditioningOrdersEmpty } from './conditioning-orders-empty';
-import { conditioningOrdersHref } from './conditioning-orders-href';
 import { ConditioningOrdersTable } from './conditioning-orders-table';
 
 export const CONDITIONING_ORDERS_SECTION_TESTID = 'conditioning-orders-list-section';
@@ -69,7 +69,7 @@ export async function ConditioningOrdersListSection({ params }: ConditioningOrde
           list="por_acondicionar"
           firstPageHref={
             currentPage > FIRST_PAGE
-              ? conditioningOrdersHref({ ...params, page: FIRST_PAGE })
+              ? assignedOrdersListHref({ ...params, page: FIRST_PAGE }, 'por_acondicionar')
               : undefined
           }
         />

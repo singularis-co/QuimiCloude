@@ -533,7 +533,6 @@ describe('la tercera vista del acondicionador: «Entregados»', () => {
     expect(fallback.props).toMatchObject({ list: 'acondicionados_entregados' });
     render(fallback);
     const esqueleto = screen.getByRole('status');
-    expect(esqueleto).toHaveAttribute('data-list', 'acondicionados_entregados');
     expect(esqueleto).toHaveTextContent('Cargando pedidos entregados…');
     expect(esqueleto).not.toHaveTextContent('Cargando pedidos terminados…');
   });

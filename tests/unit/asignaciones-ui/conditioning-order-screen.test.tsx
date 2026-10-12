@@ -28,6 +28,7 @@ import type {
   ConditioningOrderDetail,
   ConditioningTeamCandidates,
 } from '@/lib/modules/asignaciones';
+import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions', () => ({
   startConditioningAction: vi.fn(),
@@ -401,5 +402,28 @@ describe('«Datos de lote» en el detalle', () => {
     expect(back).toHaveTextContent('Volver a «Entregados»');
     expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados_entregados');
     expect(back.className).toContain('min-h-11');
+  });
+});
+
+describe('QC-252: la etiqueta de estado sale del mapa compartido', () => {
+  it.each([
+    ['POR_ACONDICIONAR', 'Por acondicionar'],
+    ['EN_ACONDICIONAMIENTO', 'En acondicionamiento'],
+    ['TERMINADO', 'Terminado'],
+    ['ENTREGADO', 'Entregado'],
+  ] as const)('R11: %s se lee «%s», el texto de antes', (status, texto) => {
+    render(<ConditioningOrderScreen order={{ ...ROW, status }} />);
+
+    const estado = screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID);
+    expect(estado.textContent).toBe(texto);
+    expect(estado).toHaveAttribute('data-status', status);
+  });
+
+  it('R12: un estado imposible aquí (PENDIENTE) se pinta con su etiqueta del mapa, no con el código', () => {
+    render(<ConditioningOrderScreen order={{ ...ROW, status: 'PENDIENTE' }} />);
+
+    const estado = screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID);
+    expect(estado.textContent).toBe(ORDER_STATUS_LABELS.PENDIENTE);
+    expect(estado.textContent).toBe('Pendiente');
   });
 });
