@@ -80,7 +80,7 @@ la cita antes de empezar su tanda.
 
 ## Tanda 4
 
-- [ ] **T7. Textos y límites** (depende de T4, T5, T6). `tests/ui/dashboard/textos-dashboard.test.tsx`
+- [x] **T7. Textos y límites** (depende de T4, T5, T6). `tests/ui/dashboard/textos-dashboard.test.tsx`
   (R21: la tabla exacta en las tres pantallas). `tests/guards/guard-qc261-limites-de-la-ficha.test.ts`
   (`design.md > 7`): nada bajo `lib/`, `db/`, `middleware.ts` ni `package.json` (R22); sin
   `next/link` en `execution-trace-columns.tsx` (R7); sin `loading.tsx` bajo

@@ -95,3 +95,73 @@ Solo el barrido de arriba. `./init.sh`: init OK (111 archivos, 1543 tests pasado
 - Salidas de los subagentes: T4 related 154/154, lote del dashboard 165/165, `vitest run guard` 997 pasados;
   T5 related 88/88, lote 140 pasados; T6 related 10/10, `tests/unit/navegacion` 123 pasados. typecheck y lint
   0 errores (7 avisos previos ajenos).
+
+### Tanda 4 (T7, T8; T9 parcial) — frontend_dev
+- T7: `tests/ui/dashboard/textos-dashboard.test.tsx` (13 casos R21, textos literales en las tres pantallas,
+  sin discrepancias) y `tests/guards/guard-qc261-limites-de-la-ficha.test.ts` (8 casos: R22 diff contra el
+  merge-base sin `lib/`, `db/`, `middleware.ts`, `package.json` + sintético + skip ruidoso fuera de la rama;
+  R7 sin `next/link` en `execution-trace-columns.tsx` (AST) + sintético; R18 sin `loading.*` bajo
+  `app/(private)/dashboard/` + sintético). `vitest run guard`: 74 archivos, 1005 pasados, 19 omitidos.
+- T8: `e2e/dashboard-rediseno.spec.ts` (nuevo; 6 casos × chromium/webkit: R8 a 390, R16 normal y reducido,
+  R20 a 390/820/1440); alta al final de `E2E_ESPERADOS` en `tests/guards/guard-identificador-de-request.test.ts`
+  (23/23); `e2e/recorrido-ejecucion.spec.ts` con `ENMIENDA QC-261`: `openTrace` (menú «Acciones del pedido
+  {n}» → «Ver recorrido», helper existente `openRowActionsMenuItem`) en lugar de `traceLinkName` (antiguas
+  líneas 435 y 503), y la vuelta atrás por `[data-go-back="true"]` con el mismo `toBeVisible()` (antigua 447).
+  `data-table-row-<id>` no se duplica (las tarjetas usan `data-table-card-<id>`): sin acotar nada.
+- Ajuste de medición en R8: el `Dialog` entra con `zoom-in-96`; el ítem medía 47,1 px a mitad de animación.
+  Se espera a que no haya animaciones `running` antes de medir; umbral de 48 px intacto.
+
+#### Salida E2E (2026-10-12)
+`pnpm exec playwright test e2e/dashboard-rediseno.spec.ts e2e/recorrido-ejecucion.spec.ts e2e/permisos.spec.ts`:
+```
+  4 failed
+    [chromium] › e2e\dashboard-rediseno.spec.ts:411:9 › R20 — a 820 px › … el buscador tiene 16 px de letra
+    [chromium] › e2e\dashboard-rediseno.spec.ts:411:9 › R20 — a 1440 px › … el buscador tiene 16 px de letra
+    [webkit] › e2e\dashboard-rediseno.spec.ts:411:9 › R20 — a 820 px › …
+    [webkit] › e2e\dashboard-rediseno.spec.ts:411:9 › R20 — a 1440 px › …
+    Expected: >= 16   Received: 14
+  18 passed (1.1m)
+```
+`recorrido-ejecucion.spec.ts` (R18, R24) y `permisos.spec.ts`: verdes. R8, R16 y R20 a 390 px: verdes.
+
+#### BLOQUEO (R20 a 820 y 1440 px)
+El buscador de `DataTable` mide 14 px desde 768 px: `components/ui/input.tsx` lleva `md:text-sm` y
+`components/shared/data-table/data-table-filters.tsx` añade `FIELD_TEXT = "text-base"`, que no anula la
+variante `md:`. `design.md > 12` daba por hecho «buscador a 16 px (ya en `DataTable`)»; no es así por encima
+de 768 px. El arreglo (p. ej. añadir `md:text-base` a `FIELD_TEXT`) cae en
+`components/shared/data-table/data-table-filters.tsx`, **fuera de `## Archivos esperados`** y compartido por
+todas las tablas. No se toca sin decisión del leader/humano; el test no se rebaja. Las aserciones de R20
+posteriores a la del buscador (44 px de los controles, el detalle y el 404 a 820/1440) quedan sin ejecutar
+hasta que pase esa línea.
+
+## Mapa R<n> -> test
+
+| R | Test |
+|---|---|
+| R1 | `tests/ui/dashboard/dashboard-rediseno.test.tsx` «R1 PageShell, un h1, bloque div con h2 y sin landmarks»; `tests/unit/dashboard-page.test.tsx` (sin editar) |
+| R2 | `tests/ui/dashboard/execution-trace-table.test.tsx` (aserciones de URL sin editar; R12 por el menú) |
+| R3 | `dashboard-rediseno.test.tsx` «R3 orden de columnas», «R3 Mono tabular y alineación al final»; `tests/unit/marca/tablas-marca.test.tsx` |
+| R4 | `dashboard-rediseno.test.tsx` «R4 StatusBadge con su tono» |
+| R5 | `dashboard-rediseno.test.tsx` «R5 waiting con la cifra», «R5 0 sin insignia y atenuado» |
+| R6 | `dashboard-rediseno.test.tsx` «R6 baja muted sin En curso», «R6 activo progress» |
+| R7 | `dashboard-rediseno.test.tsx` «R7 sin enlace en celda, disparador 44×44», «R7 ítem único con la misma URL»; `tests/guards/guard-qc261-limites-de-la-ficha.test.ts` (sin `next/link`) |
+| R8 | `dashboard-rediseno.test.tsx` «R8 tarjeta», «R8 menú centrado, Cerrar, ítem de 48 px y foco de vuelta»; `e2e/dashboard-rediseno.spec.ts` «R8 — a 390 px …» (verde) |
+| R9 | `dashboard-rediseno.test.tsx` «R9 vacío», «R9 error con Reintentar (router.refresh)» |
+| R10 | `tests/ui/dashboard/recorrido-rediseno.test.tsx` «R10: dentro de PageShell, un único h1 … número en Mono» |
+| R11 | `recorrido-rediseno.test.tsx` «R11: Volver a la lista … 44×44 …», «R11: también en el estado de error» |
+| R12 | `recorrido-rediseno.test.tsx` 4 casos R12 (dl de tres datos, 0 atenuado, marcas, orden con la línea de tiempo) |
+| R13 | `recorrido-rediseno.test.tsx` 2 casos R13; `tests/ui/dashboard/execution-trace-detail.test.tsx` R13 (ENMIENDA «Motivo · ») |
+| R14 | `recorrido-rediseno.test.tsx` casos R14 (acción, `<time>`, «Paso {n}», avatar, «Sin dato», «Motivo · », «Hasta la siguiente») |
+| R15 | `recorrido-rediseno.test.tsx` «$action lleva el tono $tone y su icono propio» (8), «cada retroceder lleva Vuelta atrás solo para lectores»; `execution-trace-detail.test.tsx` R16 (ENMIENDA) |
+| R16 | `recorrido-rediseno.test.tsx` «entrada con motion-safe y screen-enter, retardo de 40 ms por índice», «el realce va solo con hover:»; `e2e/dashboard-rediseno.spec.ts` R16 normal y reducido (verdes) |
+| R17 | `recorrido-rediseno.test.tsx` «R17: error con un único h1 Recorrido …»; `execution-trace-detail.test.tsx` R17 (sin editar) |
+| R18 | `e2e/recorrido-ejecucion.spec.ts` (404, verde); `guard-qc261-limites-de-la-ficha.test.ts` (sin `loading.*`) |
+| R19 | `tests/unit/navegacion/no-encontrada-rediseno.test.tsx` (6 casos); `tests/unit/navegacion/private-not-found.test.tsx` (sin editar); `tests/unit/shared-ui/empty-state.test.tsx` (5 casos) |
+| R20 | `e2e/dashboard-rediseno.spec.ts` R20 × 390/820/1440 — **390 verde; 820 y 1440 rojos (BLOQUEO arriba)** |
+| R21 | `tests/ui/dashboard/textos-dashboard.test.tsx` (13 casos) |
+| R22 | `guard-qc261-limites-de-la-ficha.test.ts` (diff sin `lib/`, `db/`, `middleware.ts`, `package.json`) |
+| R23 | `tests/guards/guard-catalogo-de-componentes.test.ts`, `guard-qc261-limites-de-la-ficha.test.ts` |
+| R24 | `e2e/recorrido-ejecucion.spec.ts` (verde; solo apertura por menú y `data-go-back`) |
+
+`./init.sh` de la Tanda 4: init OK (related 231 archivos, 3709 pasados, 1 omitido; rápidos y guardias 112
+archivos, 1551 pasados, 36 omitidos).

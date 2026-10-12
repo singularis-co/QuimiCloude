@@ -27,11 +27,8 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Prisma } from '@prisma/client';
 
-import { TRACE_LINK_TEXT } from '@/app/(private)/dashboard/components/execution-trace-columns';
-import {
-  DELETED_ORDER_MARK,
-  GO_BACK_MARK,
-} from '@/app/(private)/dashboard/components/execution-trace-format';
+import { TRACE_ACTIONS_LABEL_PREFIX } from '@/app/(private)/dashboard/components/execution-trace-columns';
+import { DELETED_ORDER_MARK } from '@/app/(private)/dashboard/components/execution-trace-format';
 import {
   ORDER_NUMBER_PARAM,
   PERSON_PARAM,
@@ -51,6 +48,7 @@ import { DASHBOARD_ROUTE, executionTraceRoute } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc167_e2e_';
@@ -175,8 +173,16 @@ function rowOf(page: Page, order: SeededOrder): Locator {
   return page.getByTestId(`${TABLE_ROW_TESTID_PREFIX}${order.id}`);
 }
 
-function traceLinkName(order: SeededOrder): string {
-  return `${TRACE_LINK_TEXT} del pedido ${order.numberText}`;
+// ENMIENDA QC-261 (2026-10-12): el recorrido ya no se abre con un enlace en la celda, sino con el
+// ítem «Ver recorrido» del menú «Acciones del pedido {n}» de la fila. Cambia solo cómo se localiza
+// el acceso; las aserciones siguen intactas. El disparador se busca dentro de la fila de la tabla
+// porque la tarjeta del mismo pedido repite el disparador en el DOM.
+const TRACE_LINK_TESTID = 'execution-trace-link';
+
+async function openTrace(page: Page, row: Locator, order: SeededOrder): Promise<void> {
+  const trigger = row.getByRole('button', { name: `${TRACE_ACTIONS_LABEL_PREFIX}${order.numberText}` });
+  const item = await openRowActionsMenuItem(page, trigger, TRACE_LINK_TESTID);
+  await item.click();
 }
 
 function displayNameOf(user: SeedUser): string {
@@ -432,7 +438,7 @@ test.describe('el recorrido de ejecucion en el dashboard', () => {
     const listUrl = page.url();
 
     // Abre el recorrido: anotaciones en orden cronologico y la vuelta atras marcada.
-    await page.getByRole('link', { name: traceLinkName(a) }).click();
+    await openTrace(page, rowOf(page, a), a);
     await page.waitForURL((url) => url.pathname === executionTraceRoute(a.id), { timeout: 60_000 });
     await expect(page.getByTestId(TRACE_TITLE_TESTID)).toContainText(a.numberText, {
       timeout: 60_000,
@@ -444,7 +450,9 @@ test.describe('el recorrido de ejecucion en el dashboard', () => {
       items.map((item) => item.getAttribute('data-action')),
     );
     expect(actions).toEqual(ENTRIES_A.map((entry) => DOMAIN_ACTION[entry.action]));
-    await expect(page.getByText(GO_BACK_MARK, { exact: true })).toBeVisible();
+    // ENMIENDA QC-261 (2026-10-12): la vuelta atrás se marca con `data-go-back` y un texto solo
+    // para lectores de pantalla, que no es visible; se localiza por el atributo.
+    await expect(steps.and(page.locator('[data-go-back="true"]'))).toBeVisible();
 
     // «Volver» devuelve a la MISMA URL de lista, con los mismos filtros.
     await page.getByRole('link', { name: BACK_LINK_NAME }).click();
@@ -500,7 +508,7 @@ test.describe('el recorrido de ejecucion en el dashboard', () => {
     await expect(row).toContainText(deleted.numberText);
     await expect(row.getByText(DELETED_ORDER_MARK, { exact: true })).toBeVisible();
 
-    await row.getByRole('link', { name: traceLinkName(deleted) }).click();
+    await openTrace(page, row, deleted);
     await page.waitForURL((url) => url.pathname === executionTraceRoute(deleted.id), {
       timeout: 60_000,
     });
