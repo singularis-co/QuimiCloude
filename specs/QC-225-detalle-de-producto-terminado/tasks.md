@@ -63,7 +63,7 @@ Archivos:
 
 ## Bloque B — backend (`backend_dev`)
 
-### B1 [P] — Adaptador de lectura de `inventario` (depende de T0)
+### [x] B1 [P] — Adaptador de lectura de `inventario` (depende de T0)
 
 Archivos:
 - `lib/modules/inventario/adapters/driven/persistence/finished-product-detail-prisma.ts` (nuevo),

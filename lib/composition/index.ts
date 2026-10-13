@@ -131,6 +131,14 @@ import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/d
 import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
+  findAliveFinishedProduct,
+  findProducedFinishedProducts,
+  listFinishedProductBatches,
+  listFinishedProductCosts,
+  listFinishedProductDeliveryMovements,
+  listFinishedProductMovements,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-product-detail-prisma';
+import {
   claimImport,
   findAliveFinishedProducts,
   findAliveProductsByNormalizedNames,
@@ -931,23 +939,19 @@ const presentationRepository: PresentationRepository = {
  *  cableado: un `const` no existe antes de su linea. */
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
-// Dobles vacios hasta que existan sus adaptadores.
+// Doble vacio hasta que exista su adaptador.
 const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
   findDeliveryDetails: async () => new Map(),
   summarizeDelivered: async () => ({ quantity: '0.0000', packages: 0 }),
 };
 
-function emptyFinishedProductPage<T>(request: { page: number; pageSize?: number }) {
-  return buildPage<T>([], 0, request.page, toOffsetLimit(request.page, request.pageSize).limit);
-}
-
 const finishedProductDetailRepository: FinishedProductDetailRepository = {
-  findAliveFinished: async () => null,
-  listBatches: async (_productId, page) => emptyFinishedProductPage(page),
-  listMovements: async (_productId, _direction, page) => emptyFinishedProductPage(page),
-  listDeliveryMovements: async (_productId, page) => emptyFinishedProductPage(page),
-  listProductionCosts: async (_productId, page) => emptyFinishedProductPage(page),
-  findProducedProducts: async () => [],
+  findAliveFinished: findAliveFinishedProduct,
+  listBatches: listFinishedProductBatches,
+  listMovements: listFinishedProductMovements,
+  listDeliveryMovements: listFinishedProductDeliveryMovements,
+  listProductionCosts: listFinishedProductCosts,
+  findProducedProducts: findProducedFinishedProducts,
 };
 
 /**
