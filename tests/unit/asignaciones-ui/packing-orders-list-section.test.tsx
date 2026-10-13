@@ -15,7 +15,7 @@ vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
 }));
 
-// `AssignedOrdersError` llama `useRouter()` para el reintento y jsdom no monta el App Router.
+// `AssignmentListError` llama `useRouter()` para el reintento y jsdom no monta el App Router.
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({

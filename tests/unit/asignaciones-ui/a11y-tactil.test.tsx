@@ -6,12 +6,12 @@ import {
   ASSIGNED_ORDER_ENTER_TESTID,
   AssignedOrderEnterTrigger,
   AssignedOrdersEmpty,
-  AssignedOrdersError,
+  AssignmentListError,
   CompanyOrdersEmpty,
   FinishedOrdersEmpty,
 } from '@/app/(private)/asignacion/components';
 
-// `AssignedOrdersError` llama `useRouter()` para el reintento y jsdom no monta el App Router.
+// `AssignmentListError` llama `useRouter()` para el reintento y jsdom no monta el App Router.
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({
@@ -56,7 +56,7 @@ describe('objetivos tactiles de 44x44 en todo lo que esta feature monta (R32)', 
 
   it('el boton de «reintentar» del estado de error', () => {
     render(
-      <AssignedOrdersError
+      <AssignmentListError
         error={{ status: 'error', code: 'unexpected', message: 'fallo inesperado', reference: 'r-1' }}
       />,
     );

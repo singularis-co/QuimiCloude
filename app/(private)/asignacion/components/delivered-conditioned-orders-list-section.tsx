@@ -4,9 +4,8 @@ import { AsignacionesError, type Actor } from '@/lib/modules/asignaciones';
 import { createErrorStateTranslator } from '@/lib/modules/errores';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
-import { AssignedOrdersError } from './assigned-orders-error';
 import { assignedOrdersListHref } from './assigned-orders-list-params';
-import { firstPageHrefWhenPast } from './assignment-list-parts';
+import { AssignmentListError, firstPageHrefWhenPast } from './assignment-list-parts';
 import { FIRST_PAGE } from './assignment-view-params';
 import { ConditionedOrdersTable } from './conditioned-orders-table';
 import { CONDITIONING_ORDERS_EMPTY_TEXTS, ConditioningOrdersEmpty } from './conditioning-orders-empty';
@@ -56,7 +55,7 @@ export async function DeliveredConditionedOrdersListSection({
   } catch (error) {
     return (
       <div data-testid={DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID}>
-        <AssignedOrdersError error={await toErrorState(error)} />
+        <AssignmentListError error={await toErrorState(error)} />
       </div>
     );
   }

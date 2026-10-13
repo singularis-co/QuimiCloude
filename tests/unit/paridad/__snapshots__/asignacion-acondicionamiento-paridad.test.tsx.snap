@@ -3,16 +3,26 @@
 exports[`paridad del acondicionador — avisos de resultado > R15 R24 — pedido acondicionado 1`] = `
 "
 div role=generic
-  p role=status data-testid="conditioned-order-notice" class="bg-emerald-50 border border-emerald-400/40 font-medium p-3 rounded-lg text-emerald-900 text-sm"
-    "Pedido 2026-0000040 acondicionado"
+  div role=status data-testid="conditioned-order-notice" class="*:[svg:not([class*='size-'])]:size-4 *:[svg]:row-span-2 *:[svg]:text-current *:[svg]:translate-y-0 animate-in bg-success-subtle border border-success-border duration-(--dur-slow) ease-(--ease-enter) fade-in flex gap-3 group/alert has-[>svg]:gap-x-3 has-[>svg]:grid-cols-[auto_1fr] has-data-[slot=alert-action]:pr-18 has-data-[slot=alert-action]:relative items-start leading-[1.45] px-3.5 py-3 relative rounded-[10px] slide-in-from-bottom-[10px] text-left text-sm text-success-text w-full"
+    svg aria-hidden="true" height="24" width="24" class="lucide lucide-circle-check mt-px shrink-0 size-[18px]"
+    div role=generic class="min-w-0"
+      div role=generic class="[&_a]:hover:text-foreground [&_a]:underline [&_a]:underline-offset-3 [&_p:not(:last-child)]:mb-4 md:text-pretty text-balance text-current text-sm"
+        "Pedido 2026-0000040 acondicionado"
+    button role=button name="Cerrar" aria-label="Cerrar" data-testid="conditioned-order-notice-close" type="button" class="-mr-2 -my-2.5 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:scale-[0.98] aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent btn-veil cursor-pointer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid font-medium group/button inline-flex items-center justify-center ml-auto outline-none rounded-lg select-none shrink-0 size-11 text-current text-sm transition-all whitespace-nowrap"
+      svg aria-hidden="true" height="24" width="24" class="lucide lucide-x"
 "
 `;
 
 exports[`paridad del acondicionador — avisos de resultado > R15 R24 — pedido empacado 1`] = `
 "
 div role=generic
-  p role=status data-testid="packed-order-notice" class="bg-emerald-50 border border-emerald-400/40 font-medium p-3 rounded-lg text-emerald-900 text-sm"
-    "Pedido 2026-0000030 empacado"
+  div role=status data-testid="packed-order-notice" class="*:[svg:not([class*='size-'])]:size-4 *:[svg]:row-span-2 *:[svg]:text-current *:[svg]:translate-y-0 animate-in bg-success-subtle border border-success-border duration-(--dur-slow) ease-(--ease-enter) fade-in flex gap-3 group/alert has-[>svg]:gap-x-3 has-[>svg]:grid-cols-[auto_1fr] has-data-[slot=alert-action]:pr-18 has-data-[slot=alert-action]:relative items-start leading-[1.45] px-3.5 py-3 relative rounded-[10px] slide-in-from-bottom-[10px] text-left text-sm text-success-text w-full"
+    svg aria-hidden="true" height="24" width="24" class="lucide lucide-circle-check mt-px shrink-0 size-[18px]"
+    div role=generic class="min-w-0"
+      div role=generic class="[&_a]:hover:text-foreground [&_a]:underline [&_a]:underline-offset-3 [&_p:not(:last-child)]:mb-4 md:text-pretty text-balance text-current text-sm"
+        "Pedido 2026-0000030 empacado"
+    button role=button name="Cerrar" aria-label="Cerrar" data-testid="packed-order-notice-close" type="button" class="-mr-2 -my-2.5 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:scale-[0.98] aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent btn-veil cursor-pointer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid font-medium group/button inline-flex items-center justify-center ml-auto outline-none rounded-lg select-none shrink-0 size-11 text-current text-sm transition-all whitespace-nowrap"
+      svg aria-hidden="true" height="24" width="24" class="lucide lucide-x"
 "
 `;
 

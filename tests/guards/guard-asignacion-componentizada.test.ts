@@ -1,4 +1,4 @@
-// Guardia: lo que la componentización de `/asignacion` quitó no vuelve (R3, R7, R9, R16, R19).
+// Guardia: lo que la componentización de `/asignacion` quitó no vuelve (R3, R7, R9, R16, R19; y R14, R42 del rediseño del operario).
 //
 // Vigila, sobre el código de producción (`app/`, `components/`, `hooks/`, `lib/`):
 //
@@ -56,6 +56,9 @@ export const ARCHIVOS_BORRADOS = [
   'app/(private)/asignacion/components/packed-order-notice.tsx',
   'app/(private)/asignacion/components/conditioned-order-notice.tsx',
   'app/(private)/asignacion/acondicionamiento/[id]/components/countdown-gated-button.tsx',
+  'app/(private)/asignacion/components/assigned-order-delivered-notice.tsx',
+  'app/(private)/asignacion/components/assigned-order-cancelled-notice.tsx',
+  'app/(private)/asignacion/components/assigned-orders-error.tsx',
 ] as const
 
 export const SIMBOLOS_BORRADOS = [
@@ -68,7 +71,16 @@ export const SIMBOLOS_BORRADOS = [
   'ConditioningListView',
   'PackedOrderNotice',
   'ConditionedOrderNotice',
+  'AssignedOrderDeliveredNotice',
+  'AssignedOrderCancelledNotice',
+  'AssignedOrdersError',
 ] as const
+
+/** Los cuatro avisos de `/asignacion` salen de esta pieza, y el error de lista de esta otra. */
+const HOGAR_AVISO = 'app/(private)/asignacion/components/order-outcome-notice.tsx'
+const AVISO = 'OrderOutcomeNotice'
+const HOGAR_ERROR_DE_LISTA = 'app/(private)/asignacion/components/assignment-list-parts.tsx'
+const ERROR_DE_LISTA = 'AssignmentListError'
 
 const MODULOS_PROHIBIDOS_EN_VACIOS = ['next/link', '@/components/ui/table', '@/components/ui/skeleton']
 const NOMBRES_PROHIBIDOS_EN_VACIOS = ['Table', 'Skeleton', 'Link']
@@ -319,6 +331,27 @@ describe('guard-asignacion-componentizada — muestras', () => {
   })
 })
 
+describe('guard-asignacion-componentizada — avisos y error de lista en una pieza', () => {
+  it('R14 (rediseño del operario) — definir AssignedOrderDeliveredNotice o AssignedOrderCancelledNotice es hallazgo', () => {
+    for (const simbolo of ['AssignedOrderDeliveredNotice', 'AssignedOrderCancelledNotice']) {
+      expect(
+        analizar('app/(private)/asignacion/components/a.tsx', `export function ${simbolo}() { return null }`),
+      ).toEqual([{ archivo: 'app/(private)/asignacion/components/a.tsx', regla: 'simbolo-borrado', detalle: simbolo }])
+    }
+    expect(
+      archivosQueVolvieron(['app/(private)/asignacion/components/assigned-order-delivered-notice.tsx']),
+    ).toHaveLength(1)
+  })
+
+  it('R42 (rediseño del operario) — volver a definir AssignedOrdersError junto a AssignmentListError es hallazgo', () => {
+    const fuente = 'export function AssignedOrdersError() { return null }'
+    expect(analizar('app/(private)/asignacion/components/b.tsx', fuente).map((h) => h.detalle)).toEqual([
+      'AssignedOrdersError',
+    ])
+    expect(archivosQueVolvieron(['app/(private)/asignacion/components/assigned-orders-error.tsx'])).toHaveLength(1)
+  })
+})
+
 describe('guard-asignacion-componentizada — repositorio', () => {
   it('R3 R16 R19 — ningún archivo retirado vuelve', () => {
     expect(archivosQueVolvieron(PRODUCCION)).toEqual([])
@@ -340,5 +373,24 @@ describe('guard-asignacion-componentizada — repositorio', () => {
       })
     for (const helper of HELPERS_UNICOS) expect(definiciones(helper)).toEqual([HOGAR_HELPERS])
     expect(definiciones(BOTON)).toEqual([HOGAR_BOTON])
+  })
+
+  it('R14 (rediseño del operario) — los avisos de /asignacion salen de una sola pieza', () => {
+    const definiciones = (nombre: string) =>
+      PRODUCCION.filter((archivo) =>
+        nombresDeclarados(archivo, readFileSync(join(repoRoot, archivo), 'utf8'), false).includes(nombre),
+      )
+    expect(definiciones(AVISO)).toEqual([HOGAR_AVISO])
+    expect(definiciones('AssignedOrderDeliveredNotice')).toEqual([])
+    expect(definiciones('AssignedOrderCancelledNotice')).toEqual([])
+  })
+
+  it('R42 (rediseño del operario) — /asignacion tiene una sola pieza de error de lista', () => {
+    const definiciones = (nombre: string) =>
+      PRODUCCION.filter((archivo) =>
+        nombresDeclarados(archivo, readFileSync(join(repoRoot, archivo), 'utf8'), false).includes(nombre),
+      )
+    expect(definiciones(ERROR_DE_LISTA)).toEqual([HOGAR_ERROR_DE_LISTA])
+    expect(definiciones('AssignedOrdersError')).toEqual([])
   })
 })

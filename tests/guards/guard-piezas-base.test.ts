@@ -673,7 +673,7 @@ describe('QC-231 — las piezas base no vuelven a copiarse', () => {
       ['app/(private)/pedidos/components/order-list-empty.tsx', "from '@/components/shared/empty-state'"],
       ['app/(private)/pedidos/components/order-list-error.tsx', "from '@/components/shared/error-state'"],
       ['app/(private)/pedidos/components/order-list-skeleton.tsx', "from '@/components/shared/table-skeleton'"],
-      ['app/(private)/asignacion/components/assigned-orders-error.tsx', "from '@/components/shared/error-state'"],
+      ['app/(private)/asignacion/components/assignment-list-parts.tsx', "from '@/components/shared/error-state'"],
       ['app/(private)/pedidos/components/order-recipe-image.tsx', "from '@/components/shared/entity-image'"],
     ] as const
     for (const [archivo, importa] of delegaciones) {

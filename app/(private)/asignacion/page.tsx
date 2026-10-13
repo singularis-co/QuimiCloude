@@ -19,11 +19,10 @@ import {
 } from '@/lib/shared/routes';
 
 import {
-  AssignedOrderCancelledNotice,
-  AssignedOrderDeliveredNotice,
   AssignedOrdersListSection,
   AssignedOrdersSkeleton,
   AssignmentViewTabs,
+  AssignmentViewTabsSection,
   CompanyOrdersListSection,
   CompanyOrdersSkeleton,
   ConditionedOrdersListSection,
@@ -96,14 +95,15 @@ export default async function AsignacionPage({
         </h1>
       </div>
       {deliveredOrderNumber !== undefined ? (
-        <AssignedOrderDeliveredNotice
+        <OrderOutcomeNotice
+          kind="delivered"
           orderNumber={deliveredOrderNumber}
           packages={deliveredOrderPackages}
           productName={deliveredOrderProductName}
         />
       ) : null}
       {cancelledOrderNumber !== undefined ? (
-        <AssignedOrderCancelledNotice orderNumber={cancelledOrderNumber} />
+        <OrderOutcomeNotice kind="cancelled" orderNumber={cancelledOrderNumber} />
       ) : null}
       {vista === 'por_empacar' && packedOrderNumber !== undefined ? (
         <OrderOutcomeNotice kind="packed" orderNumber={packedOrderNumber} />
@@ -111,7 +111,11 @@ export default async function AsignacionPage({
       {vista === 'por_acondicionar' && conditionedOrderNumber !== undefined ? (
         <OrderOutcomeNotice kind="conditioned" orderNumber={conditionedOrderNumber} />
       ) : null}
-      {views.length > 1 ? <AssignmentViewTabs current={vista} views={views} /> : null}
+      {views.length > 1 ? (
+        <Suspense fallback={<AssignmentViewTabs current={vista} views={views} />}>
+          <AssignmentViewTabsSection current={vista} views={views} />
+        </Suspense>
+      ) : null}
       {vista === 'asignados' ? (
         <Suspense
           fallback={

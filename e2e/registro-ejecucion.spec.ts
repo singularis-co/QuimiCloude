@@ -15,7 +15,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Prisma } from '@prisma/client';
 
-import { assignedOrderCancelledNoticeText } from '@/app/(private)/asignacion/components/assigned-order-cancelled-notice';
+import { assignedOrderCancelledNoticeText } from '@/app/(private)/asignacion/components/order-outcome-notice';
 import { normalizeCompanyName, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizePresentationName, normalizeProductName } from '@/lib/modules/inventario';

@@ -135,7 +135,7 @@ describe('con pedidos, pinta la tabla y no el estado vacio', () => {
   });
 });
 
-describe('un error de la accion se pinta con `AssignedOrdersError`, nunca una tabla vacia', () => {
+describe('un error de la accion se pinta con `AssignmentListError`, nunca una tabla vacia', () => {
   it('pinta el estado de error', async () => {
     listCompanyOrdersActionMock.mockResolvedValue({
       status: 'error',

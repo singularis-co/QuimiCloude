@@ -1,17 +1,6 @@
 // Sin `'use client'` a proposito: la frontera se declara en cada componente, y asi `page.tsx`
 // sigue siendo Server Component aunque importe desde aqui.
 export {
-  ASSIGNED_ORDER_CANCELLED_TESTID,
-  AssignedOrderCancelledNotice,
-  assignedOrderCancelledNoticeText,
-} from './assigned-order-cancelled-notice';
-export {
-  ASSIGNED_ORDER_DELIVERED_TESTID,
-  AssignedOrderDeliveredNotice,
-  assignedOrderDeliveredNoticeText,
-  assignedOrderDeliveredWithPackagesText,
-} from './assigned-order-delivered-notice';
-export {
   ASSIGNED_ORDER_ENTER_REASON_TESTID,
   ASSIGNED_ORDER_ENTER_TESTID,
   AssignedOrderEnterTrigger,
@@ -40,7 +29,6 @@ export {
   type AssignedOrdersColumnsOptions,
 } from './assigned-orders-columns';
 export { AssignedOrdersEmpty } from './assigned-orders-empty';
-export { AssignedOrdersError } from './assigned-orders-error';
 export {
   FIRST_PAGE,
   PAGE_PARAM,
@@ -63,14 +51,24 @@ export {
   AssignedOrdersTable,
   type AssignedOrdersTableProps,
 } from './assigned-orders-table';
+export { AssignmentListError } from './assignment-list-parts';
+export {
+  VIEW_COUNT_QUERY,
+  readViewCounts,
+  toViewCounts,
+  type ViewCountReader,
+  type ViewCountReaders,
+} from './assignment-view-counts';
 export {
   ASSIGNMENT_VIEW_LABELS,
   ASSIGNMENT_VIEW_TAB_TESTIDS,
   ASSIGNMENT_VIEW_TABS_LABEL,
   ASSIGNMENT_VIEW_TABS_TESTID,
   AssignmentViewTabs,
+  type AssignmentViewCounts,
   type AssignmentViewTabsProps,
 } from './assignment-view-tabs';
+export { AssignmentViewTabsSection } from './assignment-view-tabs-section';
 export {
   ROUTE_ORDER_STATUS_VALUES,
   STATUS_PARAM,
@@ -194,9 +192,15 @@ export {
 } from './packing-orders-list-section';
 export { PackingOrdersSkeleton } from './packing-orders-skeleton';
 export {
+  ASSIGNED_ORDER_CANCELLED_TESTID,
+  ASSIGNED_ORDER_DELIVERED_TESTID,
   CONDITIONED_ORDER_NOTICE_TESTID,
+  ORDER_OUTCOME_NOTICE_CLOSE_LABEL,
   OrderOutcomeNotice,
   PACKED_ORDER_NOTICE_TESTID,
+  assignedOrderCancelledNoticeText,
+  assignedOrderDeliveredNoticeText,
+  assignedOrderDeliveredWithPackagesText,
   conditionedOrderNoticeText,
   packedOrderNoticeText,
   type OrderOutcomeKind,

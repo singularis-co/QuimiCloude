@@ -4,13 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ASSIGNED_ORDERS_SKELETON_COLUMN_COUNT,
   AssignedOrdersEmpty,
-  AssignedOrdersError,
+  AssignmentListError,
   AssignedOrdersSkeleton,
   buildAssignedOrdersColumns,
 } from '@/app/(private)/asignacion/components';
 import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 
-// `AssignedOrdersError` usa `useRouter` para reintentar y en jsdom no hay router montado.
+// `AssignmentListError` usa `useRouter` para reintentar y en jsdom no hay router montado.
 const { routerMock } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
@@ -50,7 +50,7 @@ describe('R29 - el estado vacio, fuera de la tabla y distinguible del error', ()
 describe('R28 - el estado de error, fuera de la tabla y sin ningun dato', () => {
   it('un error catalogado pinta su mensaje y su codigo', () => {
     const error: ErrorState = { status: 'error', code: 'unauthorized', message: 'No autorizado' };
-    render(<AssignedOrdersError error={error} />);
+    render(<AssignmentListError error={error} />);
 
     expect(screen.getByTestId('assigned-orders-error')).toBeInTheDocument();
     expect(screen.getByTestId('assigned-orders-error-message')).toHaveTextContent('No autorizado');
@@ -64,7 +64,7 @@ describe('R28 - el estado de error, fuera de la tabla y sin ningun dato', () => 
       message: 'Fallo inesperado',
       reference: 'req-123',
     };
-    render(<AssignedOrdersError error={error} />);
+    render(<AssignmentListError error={error} />);
 
     expect(screen.queryByTestId('assigned-orders-error-code')).not.toBeInTheDocument();
     expect(screen.getByText(/req-123/)).toBeInTheDocument();
