@@ -4,7 +4,7 @@
 // montar las secciones de cada vista (son Server Components `async`); el aviso hallado si se monta,
 // para afirmar su texto y su `role`.
 import { cleanup, render, screen } from '@testing-library/react';
-import type { ReactElement, ReactNode } from 'react';
+import { Suspense, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SessionUser } from '@/lib/modules/identity';
@@ -22,8 +22,8 @@ vi.mock('@/lib/composition', () => ({
 
 import {
   ASSIGNED_ORDER_CANCELLED_TESTID,
-  AssignedOrderCancelledNotice,
-  AssignmentViewTabs,
+  AssignmentViewTabsSection,
+  OrderOutcomeNotice,
 } from '@/app/(private)/asignacion/components';
 import AsignacionPage from '@/app/(private)/asignacion/page';
 import { CANCELLED_ORDER_PARAM } from '@/lib/shared/routes';
@@ -64,6 +64,19 @@ function encontrarPorTipo(
   return hallazgos;
 }
 
+function avisosDeCancelado(arbol: ReactNode): ReactElement[] {
+  return encontrarPorTipo(arbol, OrderOutcomeNotice).filter(
+    (aviso) => (aviso.props as { kind: string }).kind === 'cancelled',
+  );
+}
+
+/** El `Suspense` que envuelve las pestañas con contador. */
+function limiteDeLasPestanas(arbol: ReactNode): ReactElement | undefined {
+  return encontrarPorTipo(arbol, Suspense).find(
+    (limite) => encontrarPorTipo(limite, AssignmentViewTabsSection).length > 0,
+  );
+}
+
 /** Hijos directos del contenedor de la pagina, aplanados, para comparar el orden. */
 function hijosDeLaPagina(arbol: ReactElement): unknown[] {
   const raiz = arbol as ReactElement<{ children?: ReactNode }>;
@@ -90,17 +103,17 @@ describe('lista de pedidos asignados: confirmacion de cancelacion', () => {
     { permisos: CON_TRES_VISTAS, vista: 'por_empacar' },
     { permisos: CON_TODOS, vista: 'todos' },
   ])(
-    'R25: con el parametro, en la vista $vista enseña «Pedido 2026-0000007 cancelado» con role="status", encima de las pestañas',
+    'R13, R25: con el parametro, en la vista $vista enseña «Pedido 2026-0000007 cancelado» con role="status", encima de las pestañas',
     async ({ permisos, vista }) => {
       getSessionUserMock.mockResolvedValue(sesionCon(permisos));
 
       const arbol = await invocar({ vista, [CANCELLED_ORDER_PARAM]: '2026-0000007' });
 
-      const avisos = encontrarPorTipo(arbol, AssignedOrderCancelledNotice);
+      const avisos = avisosDeCancelado(arbol);
       expect(avisos).toHaveLength(1);
 
       const hijos = hijosDeLaPagina(arbol);
-      const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+      const pestanas = limiteDeLasPestanas(arbol);
       expect(pestanas).toBeDefined();
       expect(hijos.indexOf(avisos[0])).toBeGreaterThanOrEqual(0);
       expect(hijos.indexOf(avisos[0])).toBeLessThan(hijos.indexOf(pestanas));
@@ -108,6 +121,8 @@ describe('lista de pedidos asignados: confirmacion de cancelacion', () => {
       render(avisos[0]);
       const aviso = screen.getByTestId(ASSIGNED_ORDER_CANCELLED_TESTID);
       expect(aviso).toHaveAttribute('role', 'status');
+      expect(aviso).toHaveAttribute('data-slot', 'alert');
+      expect(aviso).toHaveAttribute('data-tone', 'info');
       expect(aviso).toHaveTextContent('Pedido 2026-0000007 cancelado');
       expect(screen.getByRole('status')).toBe(aviso);
     },
@@ -118,6 +133,6 @@ describe('lista de pedidos asignados: confirmacion de cancelacion', () => {
 
     const arbol = await invocar({});
 
-    expect(encontrarPorTipo(arbol, AssignedOrderCancelledNotice)).toHaveLength(0);
+    expect(avisosDeCancelado(arbol)).toHaveLength(0);
   });
 });

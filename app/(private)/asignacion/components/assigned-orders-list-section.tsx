@@ -17,6 +17,7 @@ type AssignedOrdersListSectionProps = {
   /** La vista vigente: viaja a cada `href` de paginacion para que no se pierda al navegar. */
   readonly vista: AssignmentViewKind;
   readonly canExecute: boolean;
+  readonly canViewTrace?: boolean;
 };
 
 /** La accion se importa por su ruta exacta: el barrel del modulo no la reexporta a proposito. */
@@ -24,6 +25,7 @@ export async function AssignedOrdersListSection({
   params,
   vista,
   canExecute,
+  canViewTrace = false,
 }: AssignedOrdersListSectionProps) {
   const result = await listAssignedOrdersAction(toAssignedOrdersQuery(params));
 
@@ -50,6 +52,7 @@ export async function AssignedOrdersListSection({
       totalPages={totalPages}
       vista={vista}
       canExecute={canExecute}
+      canViewTrace={canViewTrace}
     />
   );
 }

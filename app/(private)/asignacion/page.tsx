@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import { identity } from '@/lib/composition';
 import {
   canExecuteAssignedOrders,
   resolveAssignmentView,
   resolveAssignmentViews,
 } from '@/lib/modules/asignaciones';
+import { assertPermission, type PermissionBearer } from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { ASSIGNED_ORDERS_LABEL, BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import {
@@ -19,21 +22,19 @@ import {
 } from '@/lib/shared/routes';
 
 import {
-  AssignedOrderCancelledNotice,
-  AssignedOrderDeliveredNotice,
   AssignedOrdersListSection,
   AssignedOrdersSkeleton,
   AssignmentViewTabs,
+  AssignmentViewTabsSection,
   CompanyOrdersListSection,
   CompanyOrdersSkeleton,
-  ConditionedOrderNotice,
   ConditionedOrdersListSection,
   ConditioningOrdersListSection,
   ConditioningOrdersSkeleton,
   DeliveredConditionedOrdersListSection,
   FinishedOrdersListSection,
   FinishedOrdersSkeleton,
-  PackedOrderNotice,
+  OrderOutcomeNotice,
   PackingOrdersListSection,
   PackingOrdersSkeleton,
   VIEW_PARAM,
@@ -48,6 +49,22 @@ import {
 function firstSearchParamValue(raw: string | readonly string[] | undefined): string | undefined {
   if (raw === undefined) return undefined;
   return typeof raw === 'string' ? raw : raw[0];
+}
+
+const PERMISO_DENEGADO = new Error('permiso denegado');
+
+/**
+ * Presentación, no autorización: solo decide si el menú de cada fila ofrece «Ver recorrido». La
+ * pertenencia la resuelve `assertPermission`, como en las vistas de `resolveAssignmentViews`.
+ */
+function canViewExecutionTrace(sessionUser: PermissionBearer | null): boolean {
+  try {
+    assertPermission(sessionUser, 'dashboard.consultar', () => PERMISO_DENEGADO);
+    return true;
+  } catch (error) {
+    if (error !== PERMISO_DENEGADO) throw error;
+    return false;
+  }
 }
 
 export const metadata: Metadata = {
@@ -70,6 +87,7 @@ export default async function AsignacionPage({
   const sessionUser = await identity.getSessionUser();
   const views = resolveAssignmentViews(sessionUser);
   const canExecute = canExecuteAssignedOrders(sessionUser);
+  const canViewTrace = canViewExecutionTrace(sessionUser);
   const vista = resolveAssignmentView(firstSearchParamValue(resolvedSearchParams[VIEW_PARAM]), views);
 
   const deliveredOrderNumber = firstSearchParamValue(
@@ -90,29 +108,30 @@ export default async function AsignacionPage({
   const statuses = parseStatusFilter(resolvedSearchParams);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 data-testid="asignacion-title" className="text-2xl font-semibold">
-          {ASSIGNED_ORDERS_LABEL}
-        </h1>
-      </div>
+    <PageShell>
+      <PageHeader title={ASSIGNED_ORDERS_LABEL} titleTestId="asignacion-title" />
       {deliveredOrderNumber !== undefined ? (
-        <AssignedOrderDeliveredNotice
+        <OrderOutcomeNotice
+          kind="delivered"
           orderNumber={deliveredOrderNumber}
           packages={deliveredOrderPackages}
           productName={deliveredOrderProductName}
         />
       ) : null}
       {cancelledOrderNumber !== undefined ? (
-        <AssignedOrderCancelledNotice orderNumber={cancelledOrderNumber} />
+        <OrderOutcomeNotice kind="cancelled" orderNumber={cancelledOrderNumber} />
       ) : null}
       {vista === 'por_empacar' && packedOrderNumber !== undefined ? (
-        <PackedOrderNotice orderNumber={packedOrderNumber} />
+        <OrderOutcomeNotice kind="packed" orderNumber={packedOrderNumber} />
       ) : null}
       {vista === 'por_acondicionar' && conditionedOrderNumber !== undefined ? (
-        <ConditionedOrderNotice orderNumber={conditionedOrderNumber} />
+        <OrderOutcomeNotice kind="conditioned" orderNumber={conditionedOrderNumber} />
       ) : null}
-      {views.length > 1 ? <AssignmentViewTabs current={vista} views={views} /> : null}
+      {views.length > 1 ? (
+        <Suspense fallback={<AssignmentViewTabs current={vista} views={views} />}>
+          <AssignmentViewTabsSection current={vista} views={views} />
+        </Suspense>
+      ) : null}
       {vista === 'asignados' ? (
         <Suspense
           fallback={
@@ -123,12 +142,13 @@ export default async function AsignacionPage({
             params={assignedOrdersParams}
             vista={vista}
             canExecute={canExecute}
+            canViewTrace={canViewTrace}
           />
         </Suspense>
       ) : null}
       {vista === 'terminados' ? (
         <Suspense fallback={<FinishedOrdersSkeleton rows={genericListParams.pageSize} />}>
-          <FinishedOrdersListSection params={genericListParams} />
+          <FinishedOrdersListSection params={genericListParams} canViewTrace={canViewTrace} />
         </Suspense>
       ) : null}
       {vista === 'todos' ? (
@@ -140,12 +160,16 @@ export default async function AsignacionPage({
             />
           }
         >
-          <CompanyOrdersListSection params={genericListParams} statuses={statuses} />
+          <CompanyOrdersListSection
+            params={genericListParams}
+            statuses={statuses}
+            canViewTrace={canViewTrace}
+          />
         </Suspense>
       ) : null}
       {vista === 'por_empacar' ? (
         <Suspense fallback={<PackingOrdersSkeleton rows={genericListParams.pageSize} />}>
-          <PackingOrdersListSection params={genericListParams} />
+          <PackingOrdersListSection params={genericListParams} canViewTrace={canViewTrace} />
         </Suspense>
       ) : null}
       {vista === 'por_acondicionar' ? (
@@ -154,7 +178,7 @@ export default async function AsignacionPage({
             <ConditioningOrdersSkeleton rows={genericListParams.pageSize} list="por_acondicionar" />
           }
         >
-          <ConditioningOrdersListSection params={genericListParams} />
+          <ConditioningOrdersListSection params={genericListParams} canViewTrace={canViewTrace} />
         </Suspense>
       ) : null}
       {vista === 'acondicionados' ? (
@@ -163,7 +187,7 @@ export default async function AsignacionPage({
             <ConditioningOrdersSkeleton rows={genericListParams.pageSize} list="acondicionados" />
           }
         >
-          <ConditionedOrdersListSection params={genericListParams} />
+          <ConditionedOrdersListSection params={genericListParams} canViewTrace={canViewTrace} />
         </Suspense>
       ) : null}
       {vista === 'acondicionados_entregados' ? (
@@ -175,9 +199,12 @@ export default async function AsignacionPage({
             />
           }
         >
-          <DeliveredConditionedOrdersListSection params={genericListParams} />
+          <DeliveredConditionedOrdersListSection
+            params={genericListParams}
+            canViewTrace={canViewTrace}
+          />
         </Suspense>
       ) : null}
-    </div>
+    </PageShell>
   );
 }

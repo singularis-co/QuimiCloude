@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import type { EmptyStateProps } from '@/components/shared/empty-state';
 import type { ErrorStateProps } from '@/components/shared/error-state';
+import type { RowActionsMenuProps } from '@/components/shared/row-actions-menu';
 import type { TableSkeletonProps } from '@/components/shared/table-skeleton';
 
 /**
@@ -60,6 +61,9 @@ export type DataTableFilterSpec =
   | { readonly kind: 'select'; readonly options: readonly { value: string; label: string }[] }
   | { readonly kind: 'dateRange' };
 
+/** Las acciones de una fila como datos: las pinta el menú de la fila y, en tarjeta, su «Acciones». */
+export type RowActionsSpec = Pick<RowActionsMenuProps, 'items' | 'triggerLabel' | 'triggerTestId' | 'title'>;
+
 /**
  * Configuracion declarativa de una columna (R3, R4): datos, no marcado incrustado. `TRow` es
  * generico porque el componente no conoce ninguna entidad concreta.
@@ -98,6 +102,19 @@ export type DataTableColumn<TRow> = {
    * (`whitespace-normal` + `break-words`), util junto a `width`.
    */
   readonly hideText?: boolean;
+  /** Celda de lote, cantidad o fecha: Plex Mono con cifras tabulares. Solo el cuerpo. */
+  readonly tabular?: boolean;
+  /** Acciones de la fila como datos (ver `actionsColumn`). */
+  readonly menu?: (row: TRow) => RowActionsSpec;
+};
+
+/** Qué columna va en cada hueco de la tarjeta; las que no se nombran no salen en ella. */
+export type DataTableCardLayout = {
+  readonly primary: string;
+  readonly status?: string;
+  readonly title?: string;
+  readonly meta?: readonly string[];
+  readonly footer?: string;
 };
 
 /**
@@ -143,6 +160,8 @@ export type DataTableTexts = {
   readonly filterColumn: string;
   /** Etiqueta de la accion de limpiar un filtro (R16). */
   readonly clearFilter: string;
+  /** Texto del botón que quita todos los filtros. Sin valor, «Limpiar filtros». */
+  readonly clearFilters?: string;
   /** Atajo de rango de fechas: ultima semana (R18). */
   readonly lastWeek: string;
   /** Atajo de rango de fechas: ultimo mes (R18). */
@@ -160,6 +179,10 @@ export type DataTableTexts = {
    * horizontalmente. Opcional con valor interno por defecto (ver `scrollLeft`).
    */
   readonly scrollRight?: string;
+  /** Texto visible del botón de acciones de una tarjeta. Sin valor, «Acciones». */
+  readonly cardActions?: string;
+  /** Nombre del botón que cierra el menú centrado de una tarjeta. Sin valor, «Cerrar». */
+  readonly closeMenu?: string;
 };
 
 /**
@@ -216,4 +239,6 @@ export type DataTableProps<TRow> = {
   readonly searchable?: boolean;
   /** Ausente = los estados internos de siempre, para que ningun consumidor existente cambie. */
   readonly states?: DataTableStates;
+  /** Con valor, por debajo de 760 px de contenedor cada fila se pinta como tarjeta. */
+  readonly card?: DataTableCardLayout;
 };

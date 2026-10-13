@@ -441,7 +441,13 @@ describe('destino de vuelta (QC-9 R7, R8, R9)', () => {
     // Los controles visibles del formulario siguen siendo los tres de QC-7: usuario,
     // contrasena y boton de envio.
     expect(within(form).getAllByRole('textbox')).toHaveLength(1);
-    expect(within(form).getAllByRole('button')).toHaveLength(1);
+    // ENMIENDA QC-260 (humano, 2026-10-12): el ojo de `PasswordField` (R10) es un `<button>`
+    // dentro del form; el campo oculto sigue sin añadir controles si hay un solo envío.
+    expect(
+      within(form)
+        .getAllByRole('button')
+        .filter((boton) => boton.getAttribute('type') === 'submit'),
+    ).toHaveLength(1);
     expect(within(form).getByTestId(testId.password)).toBeVisible();
   });
 

@@ -25,6 +25,14 @@
     "backend": 3,
     "fullstack": 3
   },
+  "equipo": {
+    "archivos_compartidos": [
+      "tests/baseline-rojos.json",
+      "progress/deudas.md",
+      "components/shared/CATALOGO.md",
+      "tests/guards/guard-identificador-de-request.test.ts"
+    ]
+  },
   "perfil": {
     "max_dias_sin_revisar": 60,
     "docs": [

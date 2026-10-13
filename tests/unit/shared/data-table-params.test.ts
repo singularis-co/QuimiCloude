@@ -9,6 +9,7 @@ import {
   SEARCH_DEBOUNCE_MS,
   createDefaultParams,
   withFilter,
+  withoutFilters,
   withPage,
   withPageSize,
   withSearch,
@@ -154,6 +155,44 @@ describe('parametros de la tabla compartida: transiciones', () => {
     withSearch(base, 'y')
 
     expect(base).toEqual(createDefaultParams())
+  })
+})
+
+describe('parametros de la tabla compartida: quitar todos los filtros', () => {
+  it('R56 withoutFilters deja filters vacio y conserva busqueda, orden, pagina y tamano', () => {
+    const base = withPageSize(
+      withSort(
+        withSearch(
+          withFilter(
+            withFilter(createDefaultParams(), 'nombre', { kind: 'text', value: 'acido' }),
+            'estado',
+            { kind: 'select', values: ['activo'] },
+          ),
+          'citrico',
+        ),
+        { columnId: 'nombre', direction: 'desc' },
+      ),
+      MAX_PAGE_SIZE,
+    )
+    const conPagina = withPage(base, 3)
+
+    const limpio = withoutFilters(conPagina)
+
+    expect(limpio).toEqual({ ...conPagina, filters: {} })
+    expect(limpio.search).toBe('citrico')
+    expect(limpio.sort).toEqual({ columnId: 'nombre', direction: 'desc' })
+    expect(limpio.page).toBe(3)
+    expect(limpio.pageSize).toBe(MAX_PAGE_SIZE)
+  })
+
+  it('R56 withoutFilters devuelve un objeto nuevo y no muta el que recibe', () => {
+    const conFiltro = withFilter(createDefaultParams(), 'nombre', { kind: 'text', value: 'x' })
+    const copia = structuredClone(conFiltro)
+
+    const limpio = withoutFilters(conFiltro)
+
+    expect(limpio).not.toBe(conFiltro)
+    expect(conFiltro).toEqual(copia)
   })
 })
 

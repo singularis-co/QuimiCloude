@@ -54,6 +54,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
   asignaciones: { getPackingOrder: getPackingOrderMock },
+  observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-packing-actions', () => ({
@@ -219,6 +220,19 @@ describe('pagina del pedido de empaque — errores de Comenzar y Terminar visibl
 
     expect(await screen.findByTestId(PACKING_ORDER_FINISH_ERROR_TESTID)).toHaveTextContent(
       'Otro empacador está empacando este pedido.',
+    );
+  });
+});
+
+describe('pagina del pedido de empaque — la vuelta a «Por empacar» la decide el servidor', () => {
+  it('R2 — pasa `backHref` con la direccion de la vista «Por empacar» y el enlace la usa', async () => {
+    const arbol = await arbolDeLaPagina();
+
+    expect((arbol.props as { backHref: string }).backHref).toBe('/asignacion?vista=por_empacar');
+    render(arbol);
+    expect(screen.getByTestId(PACKING_ORDER_BACK_LINK_TESTID)).toHaveAttribute(
+      'href',
+      '/asignacion?vista=por_empacar',
     );
   });
 });

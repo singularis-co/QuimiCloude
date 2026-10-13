@@ -1,4 +1,6 @@
+import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { ConditioningTeamMemberView } from '@/lib/modules/asignaciones';
+import { groupResponsiblesByOrigin } from '@/lib/shared/ui/responsible-groups';
 
 export const CONDITIONING_TEAM_LIST_TESTID = 'conditioning-team-list';
 export const CONDITIONING_TEAM_LIST_GROUP_TESTID = 'conditioning-team-list-group';
@@ -10,53 +12,27 @@ export const CONDITIONING_TEAM_LIST_TEXTS = {
   directLabel: 'Personas sueltas',
 } as const;
 
-type TeamGroup =
-  | { readonly kind: 'direct'; readonly members: readonly ConditioningTeamMemberView[] }
-  | {
-      readonly kind: 'workGroup';
-      readonly workGroupId: string;
-      readonly workGroupName: string;
-      readonly members: readonly ConditioningTeamMemberView[];
-    };
-
-function groupTeamByOrigin(team: readonly ConditioningTeamMemberView[]): readonly TeamGroup[] {
-  const direct: ConditioningTeamMemberView[] = [];
-  const byWorkGroup = new Map<string, { name: string; members: ConditioningTeamMemberView[] }>();
-
-  for (const member of team) {
-    if (member.origin.kind === 'direct') {
-      direct.push(member);
-      continue;
-    }
-    const { workGroupId, workGroupName } = member.origin;
-    const existing = byWorkGroup.get(workGroupId);
-    if (existing === undefined) byWorkGroup.set(workGroupId, { name: workGroupName, members: [member] });
-    else existing.members.push(member);
-  }
-
-  const groups: TeamGroup[] = direct.length > 0 ? [{ kind: 'direct', members: direct }] : [];
-  for (const [workGroupId, group] of byWorkGroup) {
-    groups.push({ kind: 'workGroup', workGroupId, workGroupName: group.name, members: group.members });
-  }
-  return groups;
-}
-
 export type ConditioningTeamListProps = {
   readonly team: readonly ConditioningTeamMemberView[];
 };
 
 export function ConditioningTeamList({ team }: ConditioningTeamListProps) {
-  const groups = groupTeamByOrigin(team);
+  const groups = groupResponsiblesByOrigin(team);
 
   return (
     <section
       aria-labelledby="conditioning-team-heading"
-      className="flex flex-col gap-2"
+      className="flex flex-col gap-3"
       data-testid={CONDITIONING_TEAM_LIST_TESTID}
     >
-      <h2 id="conditioning-team-heading" className="text-base font-medium">
-        {CONDITIONING_TEAM_LIST_TEXTS.title}
-      </h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="conditioning-team-heading" className="text-base font-medium">
+          {CONDITIONING_TEAM_LIST_TEXTS.title}
+        </h2>
+        <ResponsibleAvatars
+          responsibles={team.map((member) => ({ userId: member.userId, displayName: member.displayName }))}
+        />
+      </div>
       <ul className="flex flex-col gap-3">
         {groups.map((group) => (
           <li
@@ -69,7 +45,7 @@ export function ConditioningTeamList({ team }: ConditioningTeamListProps) {
               {group.kind === 'direct' ? CONDITIONING_TEAM_LIST_TEXTS.directLabel : group.workGroupName}
             </span>
             <ul className="flex flex-col gap-1">
-              {group.members.map((member) => (
+              {group.responsibles.map((member) => (
                 <li
                   key={member.userId}
                   className="text-base"

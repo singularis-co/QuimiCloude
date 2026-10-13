@@ -42,6 +42,7 @@ import {
   PACKING_ORDER_START_CONFIRM_TESTID,
   clickAndConfirm,
 } from './helpers/confirm-dialog';
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
 
@@ -110,8 +111,9 @@ const STEP_WAIT_REASON_TESTID = 'step-reader-wait-reason';
 const STEP_NEXT_TESTID = 'step-reader-next';
 const STEP_FINISH_TESTID = 'step-reader-finish';
 const PACKING_ORDERS_SECTION_TESTID = 'packing-orders-list-section';
-const PACKING_ORDER_ROW_TESTID = 'packing-order-row';
-const PACKING_ORDER_LINK_TESTID = 'packing-order-link';
+/** El menú ⋯ de la fila (`assignment-row-actions.tsx`) y su ítem «Entrar». */
+const ROW_ACTIONS_TESTID = 'assignment-row-actions';
+const ROW_ENTER_TESTID = 'assignment-row-enter';
 const PACKING_ORDER_SCREEN_TESTID = 'packing-order-screen';
 const PACKING_ORDER_STEPS_TESTID = 'packing-order-steps';
 const PACKING_ORDER_START_BUTTON_TESTID = 'packing-order-start-button';
@@ -141,11 +143,13 @@ function rowByNumber(page: Page, numberText: string): Locator {
     });
 }
 
+/** La fila de «Por empacar», que es la tabla compartida dentro de su sección. */
 function packingRowByNumber(page: Page, numberText: string): Locator {
   return page
-    .getByTestId(PACKING_ORDER_ROW_TESTID)
+    .getByTestId(PACKING_ORDERS_SECTION_TESTID)
+    .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({
-      has: page.getByTestId(PACKING_ORDER_LINK_TESTID).filter({ hasText: exactText(numberText) }),
+      has: page.getByTestId(ORDER_NUMBER_CELL_TESTID).filter({ hasText: exactText(numberText) }),
     });
 }
 
@@ -163,7 +167,7 @@ async function expectNoneOf(page: Page, texts: readonly string[]): Promise<void>
 async function createUser(user: Credentials, roleId: string): Promise<string> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames,
       lastNames: LAST_NAMES_BY_USERNAME[user.username] ?? 'Fixture',
@@ -568,7 +572,8 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
 
     const packingRow = packingRowByNumber(page, orderNumber);
     await expect(packingRow).toHaveCount(1, { timeout: 60_000 });
-    await packingRow.getByTestId(PACKING_ORDER_LINK_TESTID).click();
+    await packingRow.getByTestId(ROW_ACTIONS_TESTID).click();
+    await page.getByTestId(ROW_ENTER_TESTID).click();
     await page.waitForURL((url) => url.pathname === packingOrderRoute(orderId), {
       timeout: 60_000,
     });

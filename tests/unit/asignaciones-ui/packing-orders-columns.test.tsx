@@ -12,6 +12,7 @@ import {
   buildPackingOrdersColumns,
 } from '@/app/(private)/asignacion/components';
 import type { PackingOrderRow } from '@/lib/modules/asignaciones';
+import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 
 afterEach(() => {
   cleanup();
@@ -46,8 +47,8 @@ function renderCell(columnId: string, order: PackingOrderRow) {
   return render(<>{column.cell(order)}</>);
 }
 
-describe('R14 - las seis columnas de «Por empacar»', () => {
-  it('declara numero, receta, presentacion, envases, estado y quien empaca, en ese orden', () => {
+describe('R14 - las seis columnas de «Por empacar», y el menú', () => {
+  it('declara numero, receta, presentacion, envases, estado y quien empaca, en ese orden, y el menú al final', () => {
     const columns = buildPackingOrdersColumns();
 
     expect(columns.map((column) => column.id)).toEqual([
@@ -57,34 +58,31 @@ describe('R14 - las seis columnas de «Por empacar»', () => {
       PACKING_ORDER_PACKAGES_COLUMN_ID,
       PACKING_ORDER_STATUS_COLUMN_ID,
       PACKING_ORDER_PACKER_COLUMN_ID,
+      'actions',
     ]);
-    expect(columns).toHaveLength(PACKING_ORDERS_COLUMN_COUNT);
+    expect(columns.filter((column) => column.menu === undefined)).toHaveLength(PACKING_ORDERS_COLUMN_COUNT);
   });
 });
 
-describe('R17 - la columna del numero abre la pantalla de empaque del pedido', () => {
-  it('el numero es un enlace a `/asignacion/empaque/<id>`', () => {
-    renderCell(PACKING_ORDER_NUMBER_COLUMN_ID, POR_EMPACAR_ORDER);
+describe('QC-265 R19 - el número deja de ser enlace', () => {
+  it('R19: el número es texto; a la pantalla de empaque se entra por el menú', () => {
+    const { container } = renderCell(PACKING_ORDER_NUMBER_COLUMN_ID, POR_EMPACAR_ORDER);
 
-    const enlace = screen.getByTestId('packing-order-link');
-    expect(enlace.tagName).toBe('A');
-    expect(enlace).toHaveAttribute('href', '/asignacion/empaque/order-1');
-    expect(enlace).toHaveTextContent('2026-0000021');
-  });
-
-  it('R43 - el objetivo tactil mide al menos 44x44 y no depende de hover', () => {
-    renderCell(PACKING_ORDER_NUMBER_COLUMN_ID, POR_EMPACAR_ORDER);
-
-    const enlace = screen.getByTestId('packing-order-link');
-    expect(enlace.className).toContain('min-h-11');
-    expect(enlace.className).toContain('min-w-11');
+    expect(container).toHaveTextContent('2026-0000021');
+    expect(container.querySelector('a')).toBeNull();
+    expect(screen.queryByTestId('packing-order-link')).toBeNull();
   });
 });
 
-describe('R14 - estado y quien empaca', () => {
+describe('R14, QC-265 R16 - estado (`StatusBadge` con tono) y quien empaca', () => {
   it('POR_EMPACAR: la etiqueta es «Por empacar» y quien empaca queda vacio', () => {
     renderCell(PACKING_ORDER_STATUS_COLUMN_ID, POR_EMPACAR_ORDER);
     expect(screen.getByTestId('packing-order-status')).toHaveTextContent('Por empacar');
+    expect(screen.getByTestId('packing-order-status')).toHaveAttribute('data-status', 'POR_EMPACAR');
+    expect(screen.getByTestId('packing-order-status')).toHaveAttribute(
+      'data-tone',
+      ORDER_STATUS_TONES.POR_EMPACAR,
+    );
     cleanup();
 
     renderCell(PACKING_ORDER_PACKER_COLUMN_ID, POR_EMPACAR_ORDER);
@@ -94,6 +92,10 @@ describe('R14 - estado y quien empaca', () => {
   it('EN_EMPAQUE: la etiqueta es «En empaque» y trae el nombre de quien empaca', () => {
     renderCell(PACKING_ORDER_STATUS_COLUMN_ID, EN_EMPAQUE_ORDER);
     expect(screen.getByTestId('packing-order-status')).toHaveTextContent('En empaque');
+    expect(screen.getByTestId('packing-order-status')).toHaveAttribute(
+      'data-tone',
+      ORDER_STATUS_TONES.EN_EMPAQUE,
+    );
     cleanup();
 
     renderCell(PACKING_ORDER_PACKER_COLUMN_ID, EN_EMPAQUE_ORDER);

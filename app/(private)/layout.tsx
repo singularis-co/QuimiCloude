@@ -6,7 +6,9 @@ import { AppSidebar } from '@/components/private/app-sidebar';
 import { BrandLogo } from '@/components/shared/brand-logo';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { identity } from '@/lib/composition';
+import { navItemHrefs } from '@/lib/shared/navigation/nav-module';
 import {
   BRAND_LABEL,
   filterNavItemsByPermissions,
@@ -15,7 +17,7 @@ import {
 import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
-import { LogoutButton, SidebarToggle, ThemeToggle } from './components';
+import { LogoutButton, ScreenEnter, SidebarToggle, ThemeToggle } from './components';
 
 /**
  * Layout compartido por toda la zona privada (R1, `design.md > 5.2`).
@@ -126,20 +128,17 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
             <SidebarToggle />
             <BrandLogo variant="isotipo" tone="auto" height={28} alt={BRAND_LABEL} />
           </div>
-          {/* `ml-auto` y no solo el `justify-between` del header: en escritorio el control de
-              la izquierda esta oculto y no ocupa espacio, asi que sin esto los de la derecha se
-              quedarian pegados al borde izquierdo.
-
-              El cierre de sesion vive AQUI desde el 2026-09-07 (decision humana), junto al de
-              tema, y ya no dentro del menu del pie de la barra lateral: era el unico item de ese
-              menu, costaba dos gestos y en modo icono era el unico camino. Detalle en
-              `./components/logout-button.tsx`. */}
-          <div className="ml-auto flex items-center gap-2">
-            <ThemeToggle />
-            <LogoutButton />
-          </div>
+          {/* `ml-auto`: en escritorio el grupo de la izquierda esta oculto y sin esto este se
+              pegaria al borde izquierdo. El proveedor quita la espera por defecto de Base UI
+              antes de mostrar los tooltips. */}
+          <TooltipProvider>
+            <div className="ml-auto flex items-center gap-2">
+              <ThemeToggle />
+              <LogoutButton />
+            </div>
+          </TooltipProvider>
         </header>
-        {children}
+        <ScreenEnter hrefs={navItemHrefs(navItems)}>{children}</ScreenEnter>
       </SidebarInset>
       {/* R22 de QC-22 (decision humana del 2026-09-03, supera a R36/D9 de QC-11): region de
           avisos de la zona privada, hermana del contenido para que ningun toast quede dentro

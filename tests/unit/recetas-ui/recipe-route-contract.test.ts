@@ -1295,6 +1295,8 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'tests/unit/recetas-ui/recipe-route-contract.test.ts',
     'tests/guards/guard-editor-aislado.test.ts',
     'tests/unit/asignaciones-ui/order-execution-screen.test.tsx',
+    // Lo nombra en su lista de piezas del catalogo, no lo monta.
+    'tests/guards/guard-catalogo-de-componentes.test.ts',
   ] as const;
 
   it('ninguna page.tsx del repo monta el asistente', () => {
@@ -1419,6 +1421,12 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'AI_PROVIDER_INTEGRATION_ROUTE',
         'INVENTORY_INTEGRATION_ROUTE',
         'WHATSAPP_INTEGRATION_ROUTE',
+        // Alta el 2026-10-09 (QC-237): la URL publica del webhook de Meta para una conexion de
+        // WhatsApp (`/api/integraciones/whatsapp/webhook/<id>`), su base y la funcion que la
+        // arma. Es un endpoint de API, no una pantalla ni una ruta del asistente de lectura: no
+        // la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
+        'WHATSAPP_WEBHOOK_ROUTE_BASE',
+        'whatsappWebhookPath',
       ].sort(),
     );
   });

@@ -1,169 +1,178 @@
 'use client';
 
-// QC-79 T19 — El formulario de la pagina publica (`design.md > 5.1`, R17, R23, R24, R25).
+// La action se importa por su ruta exacta y no por el barrel del módulo: el contrato del módulo no
+// reexporta adaptadores driving y un `'use server'` en su cierre transitivo rompería a cualquier
+// componente de cliente que lo importe.
 //
-// Formulario HTML real: `<form action={formAction}>` con `useActionState` sobre
-// `setCredentialWithLinkAction`, campos NO controlados y sin ninguna peticion a mano. Mismo patron
-// que `app/(public)/login/components/login-form.tsx`.
-//
-// **La action se importa por su RUTA EXACTA y no por el barrel del modulo**: el contrato
-// `lib/modules/identity/index.ts` no reexporta adaptadores driving (R32) y un `'use server'` en su
-// cierre transitivo romperia a cualquier componente de cliente que lo importe.
-//
-// Tres cosas que este componente NO hace, y las tres son requisitos:
-//   - **No muestra ningun dato de la persona** (R24): no los pide por props, no los recibe de la
-//     action —`SetCredentialFormState` no tiene ningun campo que los transporte— y no los pinta
-//     ni antes, ni durante, ni despues. No hay hueco por el que puedan llegar.
-//   - **No valida el enlace al montarse** (`design.md > 11.4`): el secreto viaja en un campo
-//     oculto y solo se comprueba donde se escribe, dentro del `UPDATE` condicional del adaptador.
-//     Comprobarlo aqui seria un oraculo de lectura y un segundo camino que puede divergir del real.
-//   - **No inicia sesion al terminar** (`design.md > 11.5`): pinta el exito y un ENLACE al login.
-//
-// El texto de cada regla incumplida lo compone la UI con `CREDENTIAL_RULE_LABELS` a partir del
-// codigo que devuelve el dominio (`design.md > 5.3`, QC-19 R23): los codigos son estables e
-// independientes del idioma, y esto es exactamente para lo que se disenaron. El estado
-// `invalid_credential` NO es un `ErrorState` justamente por esto (`design.md > 11.3`).
+// El formulario no recibe ni pinta ningún dato de la persona (el estado de la action no tiene campo
+// que los transporte), no valida el enlace al montarse (el secreto solo se comprueba donde se
+// escribe) y no abre sesión al terminar: ofrece un enlace al login.
 
-import Link from 'next/link';
-import { useActionState } from 'react';
+import { CircleCheck } from 'lucide-react';
+import { Fragment, useActionState } from 'react';
 
+import { ArrowLink } from '@/components/shared/arrow-link';
+import { BrandLogo } from '@/components/shared/brand-logo';
 import { CREDENTIAL_RULE_LABELS } from '@/components/shared/credential-rule-labels';
-import { buttonVariants } from '@/components/ui/button';
+import { Notice } from '@/components/shared/notice';
+import { PasswordField } from '@/components/shared/password-field';
+import { SubmitButton } from '@/components/shared/submit-button';
 import {
   setCredentialWithLinkAction,
   type SetCredentialFormState,
 } from '@/lib/modules/identity/adapters/driving/credential-setup-actions';
+import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { LOGIN_ROUTE } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
-import { CredentialInput } from './credential-input';
-import { SET_CREDENTIAL_LABELS, type SetCredentialLabels } from './set-credential-labels';
-import { SubmitButton } from './submit-button';
+import {
+  SET_CREDENTIAL_HEADING_ID,
+  SET_CREDENTIAL_LABELS,
+  type SetCredentialLabels,
+} from './set-credential-labels';
 
-/**
- * El estado inicial se construye aqui: `credential-setup-actions.ts` lleva `'use server'` y un
- * archivo asi solo puede exportar funciones async, asi que no puede publicar la constante.
- */
+// Un archivo `'use server'` solo puede exportar funciones async: el estado inicial no puede vivir
+// junto a la action.
 const INITIAL_STATE: SetCredentialFormState = { status: 'idle' };
 
 const CREDENTIAL_ID = 'credential';
 const CONFIRMATION_ID = 'credential-confirmation';
 const FEEDBACK_ID = 'set-credential-feedback';
 
+// Sin `breachedState`: la séptima regla solo la comprueba el servidor y queda pendiente.
+const LIVE_REQUIREMENTS = {};
+
 type SetCredentialFormProps = {
-  /** El secreto del enlace, tal y como llego en el segmento de la URL. */
+  /** El secreto del enlace, tal y como llegó en el segmento de la URL. */
   readonly secret: string;
-  /** Sustituye entero o en parte el copy por defecto. Preparado para QC-72. */
+  /** Sustituye entero o en parte el copy por defecto. */
   readonly labels?: Partial<SetCredentialLabels>;
 };
+
+type HeadingProps = {
+  readonly title: string;
+  readonly body: string;
+  readonly centered?: boolean;
+  readonly testId?: string;
+};
+
+function Heading({ title, body, centered, testId }: HeadingProps) {
+  return (
+    <div className={cn('flex flex-col gap-1.5', centered && 'text-center')} data-testid={testId}>
+      <h1
+        id={SET_CREDENTIAL_HEADING_ID}
+        className="text-2xl leading-[1.15] font-semibold tracking-[-0.015em]"
+      >
+        {title}
+      </h1>
+      <p className="text-sm leading-normal text-muted-foreground">{body}</p>
+    </div>
+  );
+}
+
+function SuccessState({ texto }: { readonly texto: SetCredentialLabels }) {
+  return (
+    <>
+      <div
+        aria-hidden="true"
+        className="flex size-11 items-center justify-center self-center rounded-[12px] bg-success-subtle text-success-text"
+        data-testid="set-credential-success-icon"
+      >
+        <CircleCheck className="size-5" />
+      </div>
+      <Heading
+        title={texto.successTitle}
+        body={texto.successBody}
+        centered
+        testId="set-credential-success"
+      />
+      <ArrowLink
+        direction="forward"
+        touch
+        href={LOGIN_ROUTE}
+        className="w-full"
+        testId="set-credential-login-link"
+      >
+        {texto.goToLogin}
+      </ArrowLink>
+    </>
+  );
+}
 
 export function SetCredentialForm({ secret, labels }: SetCredentialFormProps) {
   const [state, formAction] = useActionState(setCredentialWithLinkAction, INITIAL_STATE);
   const texto: SetCredentialLabels = { ...SET_CREDENTIAL_LABELS, ...labels };
 
+  // Los bloques son hijos directos de la tarjeta para que entren escalonados; el `key` de cada rama
+  // los monta de nuevo al pasar al éxito y la entrada se repite.
   if (state.status === 'success') {
-    return (
-      <div className="flex flex-col gap-4" data-testid="set-credential-success">
-        <p className="font-medium">{texto.successTitle}</p>
-        <p className="text-sm text-muted-foreground">{texto.successBody}</p>
-        {/*
-          El enlace al login, y NO una sesion abierta sola (`design.md > 11.5`): fabricar una
-          sesion desde una superficie publica, a partir de un secreto que pudo llegar por un
-          correo reenviado, no lo pide ningun requisito.
-
-          **Es un `<Link>` real pintado con `buttonVariants`**, no el primitivo `Button` con
-          `render`: lo que hace es navegar. Pasar un enlace por el boton de Base UI dispara su
-          aviso de `nativeButton`, y callarlo con `nativeButton={false}` le pone `role="button"`
-          al `<a>` (`useButton`: cuando no es nativo el merge anade `role: 'button'`), que es
-          mentir sobre lo que el control hace y perder la semantica de enlace justo donde R25 y
-          `design.md > 11.5` piden que sea un enlace. Mismo patron que los estados vacios del
-          repo. `data-slot="button"` se conserva porque de el cuelgan los selectores de estilo, y
-          `min-h-11 w-full` deja el objetivo tactil de 44 px de R25 en el propio `<a>`, que es lo
-          que se toca.
-        */}
-        <Link
-          href={LOGIN_ROUTE}
-          data-slot="button"
-          data-testid="set-credential-login-link"
-          className={cn(buttonVariants(), 'min-h-11 w-full')}
-        >
-          {texto.goToLogin}
-        </Link>
-      </div>
-    );
+    return <SuccessState key="success" texto={texto} />;
   }
 
-  const conFallo = state.status === 'invalid_credential' || state.status === 'mismatch';
+  const invalid = state.status === 'invalid_credential';
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" data-testid="set-credential-form">
-      {/*
-        El secreto viaja OCULTO en el `FormData` y no reescribiendo la URL (`design.md > 4.4`).
-        Que sea oculto no lo hace de fiar: quien lo juzga es el `UPDATE` condicional del
-        adaptador, que es el unico sitio donde un enlace se comprueba.
-      */}
-      <input type="hidden" name="secret" defaultValue={secret} data-testid="set-credential-secret" />
+    <Fragment key="form">
+      <div data-testid="set-credential-brand">
+        <BrandLogo variant="isotipo" tone="auto" height={40} alt={BRAND_LABEL} />
+      </div>
+      <Heading title={texto.title} body={texto.intro} />
+      <form action={formAction} className="flex flex-col gap-4" data-testid="set-credential-form">
+        {/* Que sea oculto no lo hace de fiar: lo juzga el `UPDATE` condicional del adaptador. */}
+        <input type="hidden" name="secret" defaultValue={secret} data-testid="set-credential-secret" />
 
-      <CredentialInput
-        name="credential"
-        id={CREDENTIAL_ID}
-        label={texto.credentialLabel}
-        showLabel={texto.showCredential}
-        hideLabel={texto.hideCredential}
-        describedBy={conFallo ? FEEDBACK_ID : undefined}
-        testId="set-credential-credential"
-      />
+        <PasswordField
+          name="credential"
+          id={CREDENTIAL_ID}
+          label={texto.credentialLabel}
+          autoComplete="new-password"
+          texts={{ show: texto.showCredential, hide: texto.hideCredential }}
+          describedBy={invalid ? FEEDBACK_ID : undefined}
+          testId="set-credential-credential"
+          requirements={LIVE_REQUIREMENTS}
+        />
 
-      <CredentialInput
-        name="credentialConfirmation"
-        id={CONFIRMATION_ID}
-        label={texto.confirmationLabel}
-        showLabel={texto.showCredential}
-        hideLabel={texto.hideCredential}
-        describedBy={state.status === 'mismatch' ? FEEDBACK_ID : undefined}
-        testId="set-credential-confirmation"
-      />
+        <PasswordField
+          name="credentialConfirmation"
+          id={CONFIRMATION_ID}
+          label={texto.confirmationLabel}
+          autoComplete="new-password"
+          texts={{ show: texto.showCredential, hide: texto.hideCredential }}
+          error={state.status === 'mismatch' ? texto.mismatch : undefined}
+          testId="set-credential-confirmation"
+        />
 
-      {state.status === 'invalid_credential' ? (
-        <div id={FEEDBACK_ID} role="alert" className="flex flex-col gap-1 text-sm text-destructive">
-          <p>{texto.unmetIntro}</p>
-          <ul className="flex flex-col gap-1" data-testid="set-credential-unmet">
-            {state.unmet.map((rule) => (
-              <li key={rule} data-rule={rule}>
-                {CREDENTIAL_RULE_LABELS[rule]}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+        {invalid ? (
+          <Notice tone="danger" id={FEEDBACK_ID} title={texto.unmetIntro} testId="set-credential-feedback">
+            <ul className="mt-1 list-disc pl-[18px]" data-testid="set-credential-unmet">
+              {state.unmet.map((rule) => (
+                <li key={rule} data-rule={rule}>
+                  {CREDENTIAL_RULE_LABELS[rule]}
+                </li>
+              ))}
+            </ul>
+          </Notice>
+        ) : null}
 
-      {state.status === 'mismatch' ? (
-        <p
-          id={FEEDBACK_ID}
-          role="alert"
-          className="text-sm text-destructive"
-          data-testid="set-credential-mismatch"
-        >
-          {texto.mismatch}
-        </p>
-      ) : null}
+        {state.status === 'error' ? (
+          <div role="alert" className="flex flex-col gap-1 text-sm text-destructive">
+            <p data-testid="set-credential-error">{state.message}</p>
+            {/* La referencia solo existe en el error inesperado; se pinta para poder citarla al reportar. */}
+            {'reference' in state ? (
+              <p className="text-muted-foreground" data-testid="set-credential-error-reference">
+                {`${texto.errorReference} ${state.reference}`}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
-      {state.status === 'error' ? (
-        <div role="alert" className="flex flex-col gap-1 text-sm text-destructive">
-          <p data-testid="set-credential-error">{state.message}</p>
-          {/*
-            El identificador de QC-71 solo existe en la rama del error inesperado —el tipo lo hace
-            inexpresable en las demas—, y se pinta para que la persona pueda citarlo al reportar.
-          */}
-          {'reference' in state ? (
-            <p className="text-muted-foreground" data-testid="set-credential-error-reference">
-              {`${texto.errorReference} ${state.reference}`}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
-      <SubmitButton label={texto.submit} pendingLabel={texto.submitPending} />
-    </form>
+        <SubmitButton
+          label={texto.submit}
+          pendingLabel={texto.submitPending}
+          testId="set-credential-submit"
+          className="w-full"
+        />
+      </form>
+    </Fragment>
   );
 }

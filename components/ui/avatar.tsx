@@ -3,19 +3,23 @@
 import * as React from "react"
 import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar"
 
+import type { AvatarTone } from "@/lib/shared/ui/avatar-tone"
 import { cn } from "@/lib/utils"
 
 function Avatar({
   className,
   size = "default",
+  tone,
   ...props
 }: AvatarPrimitive.Root.Props & {
   size?: "default" | "sm" | "lg"
+  tone?: AvatarTone
 }) {
   return (
     <AvatarPrimitive.Root
       data-slot="avatar"
       data-size={size}
+      data-tone={tone}
       className={cn(
         "group/avatar relative flex size-8 shrink-0 rounded-full select-none after:absolute after:inset-0 after:rounded-full after:border after:border-border after:mix-blend-darken data-[size=lg]:size-10 data-[size=sm]:size-6 dark:after:mix-blend-lighten",
         className
@@ -47,6 +51,12 @@ function AvatarFallback({
       data-slot="avatar-fallback"
       className={cn(
         "flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs",
+        "group-data-[tone=1]/avatar:bg-avatar-1 group-data-[tone=1]/avatar:text-avatar-1-text",
+        "group-data-[tone=2]/avatar:bg-avatar-2 group-data-[tone=2]/avatar:text-avatar-2-text",
+        "group-data-[tone=3]/avatar:bg-avatar-3 group-data-[tone=3]/avatar:text-avatar-3-text",
+        "group-data-[tone=4]/avatar:bg-avatar-4 group-data-[tone=4]/avatar:text-avatar-4-text",
+        "group-data-[tone=5]/avatar:bg-avatar-5 group-data-[tone=5]/avatar:text-avatar-5-text",
+        "group-data-[tone=6]/avatar:bg-avatar-6 group-data-[tone=6]/avatar:text-avatar-6-text",
         className
       )}
       {...props}

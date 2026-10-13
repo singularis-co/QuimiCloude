@@ -38,7 +38,13 @@ afterEach(() => {
 
 describe('pantalla de empaque con lineas antiguas', () => {
   it('R33: la linea antigua se pinta con sus envases y el nombre de su presentacion', () => {
-    render(<PackingOrderScreen order={fila()} actorId="11111111-1111-4111-8111-111111111111" />);
+    render(
+      <PackingOrderScreen
+        order={fila()}
+        actorId="11111111-1111-4111-8111-111111111111"
+        backHref="/asignacion?vista=por_empacar"
+      />,
+    );
 
     expect(screen.getByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID)).toHaveTextContent(
       '5 × Botella 200 ml',

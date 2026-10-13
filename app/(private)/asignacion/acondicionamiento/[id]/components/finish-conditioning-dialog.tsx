@@ -2,23 +2,14 @@
 
 import { useActionState } from 'react';
 
-import { ErrorAlert } from '@/components/shared/error-alert';
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
+import { CountdownGatedButton } from '@/components/shared/countdown-gated-button';
 import {
   finishConditioningAction,
   type FinishConditioningResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-import { CountdownGatedButton } from './countdown-gated-button';
+import { CONDITIONING_WAIT_SECONDS } from './conditioning-wait';
 
 export const FINISH_CONDITIONING_DIALOG_TESTID = 'finish-conditioning-dialog';
 export const FINISH_CONDITIONING_FORM_TESTID = 'finish-conditioning-form';
@@ -52,14 +43,14 @@ export function FinishConditioningDialog({
   orderNumber,
 }: FinishConditioningDialogProps) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent
-        className="max-h-[100dvh] overflow-y-auto"
-        data-testid={FINISH_CONDITIONING_DIALOG_TESTID}
-      >
-        <FinishConditioningForm orderId={orderId} orderNumber={orderNumber} />
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialogFrame
+      open={open}
+      onOpenChange={onOpenChange}
+      contentClassName="max-h-[100dvh] overflow-y-auto"
+      testId={FINISH_CONDITIONING_DIALOG_TESTID}
+    >
+      <FinishConditioningForm orderId={orderId} orderNumber={orderNumber} />
+    </ConfirmDialogFrame>
   );
 }
 
@@ -78,34 +69,35 @@ function FinishConditioningForm({ orderId, orderNumber }: FinishConditioningForm
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" data-testid={FINISH_CONDITIONING_FORM_TESTID}>
-      <AlertDialogHeader>
-        <AlertDialogTitle>{FINISH_CONDITIONING_TEXTS.title}</AlertDialogTitle>
-        <AlertDialogDescription>{FINISH_CONDITIONING_TEXTS.description(orderNumber)}</AlertDialogDescription>
-      </AlertDialogHeader>
-
-      <input type="hidden" name={FINISH_CONDITIONING_ORDER_ID_FIELD} value={orderId} />
-
-      {error === undefined ? null : (
-        <ErrorAlert
-          error={error}
-          className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          testId={FINISH_CONDITIONING_ERROR_TESTID}
-          withDataCode
-        />
-      )}
-
-      <AlertDialogFooter>
-        <AlertDialogCancel
-          type="button"
-          className={touchTarget}
+    <ConfirmDialogBody
+      texts={{
+        title: FINISH_CONDITIONING_TEXTS.title,
+        description: FINISH_CONDITIONING_TEXTS.description(orderNumber),
+        dismiss: FINISH_CONDITIONING_TEXTS.cancel,
+        confirm: FINISH_CONDITIONING_TEXTS.confirm,
+      }}
+      testIds={{
+        form: FINISH_CONDITIONING_FORM_TESTID,
+        dismiss: FINISH_CONDITIONING_CANCEL_TESTID,
+        error: FINISH_CONDITIONING_ERROR_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [{ name: FINISH_CONDITIONING_ORDER_ID_FIELD, value: orderId, controlled: true }],
+        formClassName: 'flex flex-col gap-4',
+      }}
+      layout="form-wraps-all"
+      error={error}
+      errorStyle="region"
+      dismissDisabled={isPending}
+      confirmSlot={
+        <CountdownGatedButton
+          seconds={CONDITIONING_WAIT_SECONDS}
+          label={FINISH_CONDITIONING_TEXTS.confirm}
           disabled={isPending}
-          data-testid={FINISH_CONDITIONING_CANCEL_TESTID}
-        >
-          {FINISH_CONDITIONING_TEXTS.cancel}
-        </AlertDialogCancel>
-        <CountdownGatedButton label={FINISH_CONDITIONING_TEXTS.confirm} disabled={isPending} />
-      </AlertDialogFooter>
-    </form>
+        />
+      }
+    />
   );
 }

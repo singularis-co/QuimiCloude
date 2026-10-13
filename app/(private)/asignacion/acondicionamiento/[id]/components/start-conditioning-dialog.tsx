@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 
+import { CountdownGatedButton } from '@/components/shared/countdown-gated-button';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +26,7 @@ import {
   hasConditioningTeamSelection,
   type ConditioningTeamSelection,
 } from './conditioning-team-picker';
-import { CountdownGatedButton } from './countdown-gated-button';
+import { CONDITIONING_WAIT_SECONDS } from './conditioning-wait';
 
 export const START_CONDITIONING_DIALOG_TESTID = 'start-conditioning-dialog';
 export const START_CONDITIONING_FORM_TESTID = 'start-conditioning-form';
@@ -137,6 +138,7 @@ function StartConditioningForm({ orderId, orderNumber, candidates, onStarted }: 
           {START_CONDITIONING_TEXTS.cancel}
         </DialogClose>
         <CountdownGatedButton
+          seconds={CONDITIONING_WAIT_SECONDS}
           label={START_CONDITIONING_TEXTS.confirm}
           disabled={isPending || !hasConditioningTeamSelection(selection)}
         />

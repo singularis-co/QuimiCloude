@@ -295,6 +295,10 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
   // dos clientes por Prisma -la entrega exige uno y el recorrido lo cambia- con la normalizacion
   // del barrel de `clientes`, la unica definicion. No recorre la pantalla de clientes. La lista
   // sigue CERRADA.
+  // `movimiento.spec.ts` navega a Clientes y da de alta uno: necesita un panel y un toast reales
+  // para medir el movimiento de entrada y salida.
+  // `marca-componentes.spec.ts` (QC-227) siembra un cliente para que la lista de Clientes tenga
+  // una fila y mide en ella cabecera, celdas y foco del buscador con el navegador.
   // 2026-10-13: entra `anular-entrega.spec.ts`, el E2E de anular una entrega. Siembra un cliente
   // por Prisma -la entrega que se anula exige uno- con la normalizacion del barrel de `clientes`,
   // la unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
@@ -302,6 +306,8 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
     'clientes.spec.ts',
     'pedido-con-cliente.spec.ts',
     'entregar-producto-terminado.spec.ts',
+    'movimiento.spec.ts',
+    'marca-componentes.spec.ts',
     'anular-entrega.spec.ts',
   ])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/

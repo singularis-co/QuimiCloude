@@ -37,10 +37,13 @@ vi.mock('@/lib/composition', () => ({
 }));
 
 import AsignacionPage from '@/app/(private)/asignacion/page';
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import {
   AssignedOrdersListSection,
   AssignedOrdersSkeleton,
   AssignmentViewTabs,
+  AssignmentViewTabsSection,
   COMPANY_ORDERS_SKELETON_BASE_COLUMN_COUNT,
   CompanyOrdersListSection,
   CompanyOrdersSkeleton,
@@ -49,8 +52,16 @@ import {
   ConditioningOrdersSkeleton,
   DeliveredConditionedOrdersListSection,
   FinishedOrdersListSection,
+  OrderOutcomeNotice,
   PackingOrdersListSection,
 } from '@/app/(private)/asignacion/components';
+import {
+  CANCELLED_ORDER_PARAM,
+  DELIVERED_ORDER_PACKAGES_PARAM,
+  DELIVERED_ORDER_PARAM,
+  DELIVERED_ORDER_PRODUCT_PARAM,
+  PACKED_ORDER_PARAM,
+} from '@/lib/shared/routes';
 
 function sesionCon(permissions: readonly string[]): SessionUser {
   return {
@@ -90,6 +101,15 @@ function encontrarPorTipo(nodo: ReactNode, objetivo: unknown, hallazgos: ReactEl
   return hallazgos;
 }
 
+/** El `Suspense` de la lista vigente: el de las pestañas va aparte y no cuenta. */
+function limiteDeLaLista(arbol: ReactNode): ReactElement {
+  const limites = encontrarPorTipo(arbol, Suspense).filter(
+    (limite) => encontrarPorTipo(limite, AssignmentViewTabsSection).length === 0,
+  );
+  expect(limites).toHaveLength(1);
+  return limites[0] as ReactElement;
+}
+
 async function invocar(vista?: string) {
   return AsignacionPage({
     searchParams: Promise.resolve(vista === undefined ? {} : { vista }),
@@ -114,7 +134,7 @@ describe('R11 — Operador: solo «Mis asignados», sin pestañas', () => {
 
     const arbol = await invocar();
 
-    expect(encontrarPorTipo(arbol, AssignmentViewTabs)).toHaveLength(0);
+    expect(encontrarPorTipo(arbol, AssignmentViewTabsSection)).toHaveLength(0);
     const [seccion] = encontrarPorTipo(arbol, AssignedOrdersListSection);
     expect(seccion).toBeDefined();
     expect(seccion.props).toMatchObject({ vista: 'asignados' });
@@ -129,7 +149,7 @@ describe('R12 — quien ejecuta y ve terminados: «Mis asignados» + «Terminado
 
     const arbol = await invocar();
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect(pestanas).toBeDefined();
     expect(pestanas.props).toMatchObject({ current: 'asignados', views: ['asignados', 'terminados'] });
     expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(1);
@@ -141,7 +161,7 @@ describe('R12 — quien ejecuta y ve terminados: «Mis asignados» + «Terminado
 
     const arbol = await invocar('terminados');
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect(pestanas.props).toMatchObject({ current: 'terminados' });
     expect(encontrarPorTipo(arbol, FinishedOrdersListSection)).toHaveLength(1);
     expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(0);
@@ -154,7 +174,7 @@ describe('R13 — con `pedidos.consultar`: solo «Todos», sin pestañas', () =>
 
     const arbol = await invocar();
 
-    expect(encontrarPorTipo(arbol, AssignmentViewTabs)).toHaveLength(0);
+    expect(encontrarPorTipo(arbol, AssignmentViewTabsSection)).toHaveLength(0);
     expect(encontrarPorTipo(arbol, CompanyOrdersListSection)).toHaveLength(1);
     expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(0);
     expect(encontrarPorTipo(arbol, FinishedOrdersListSection)).toHaveLength(0);
@@ -175,7 +195,7 @@ describe('R15 — una vista inexistente o no permitida cae a la primera, sin err
 
     const arbol = await invocar('todos');
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect(pestanas.props).toMatchObject({ current: 'asignados', views: ['asignados', 'terminados'] });
     expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(1);
     expect(encontrarPorTipo(arbol, CompanyOrdersListSection)).toHaveLength(0);
@@ -212,7 +232,7 @@ describe('R32 — el skeleton de «Todos» suma la columna de fecha con el filtr
         status === undefined ? { vista: 'todos' } : { vista: 'todos', status },
       ),
     });
-    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const limite = limiteDeLaLista(arbol);
     const fallback = (limite.props as { fallback: ReactElement }).fallback;
     expect(fallback.type).toBe(CompanyOrdersSkeleton);
     return fallback.props as { showFinishedAt?: boolean };
@@ -247,7 +267,7 @@ describe('R39 — la pestaña «Por empacar» solo aparece con `empaque.modifica
 
     const arbol = await invocar();
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect(pestanas.props).toMatchObject({ views: ['asignados', 'terminados'] });
     expect(encontrarPorTipo(arbol, PackingOrdersListSection)).toHaveLength(0);
   });
@@ -257,7 +277,7 @@ describe('R39 — la pestaña «Por empacar» solo aparece con `empaque.modifica
 
     const arbol = await invocar('por_empacar');
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect(pestanas.props).toMatchObject({ views: ['asignados', 'terminados', 'por_empacar'] });
     expect(encontrarPorTipo(arbol, PackingOrdersListSection)).toHaveLength(1);
   });
@@ -287,7 +307,7 @@ describe('QC-201 — el Empacador sembrado no ejecuta: sin «Mis asignados»', (
 
     const arbol = await invocar();
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect(pestanas.props).toMatchObject({ current: 'terminados', views: ['terminados', 'por_empacar'] });
     expect(encontrarPorTipo(arbol, FinishedOrdersListSection)).toHaveLength(1);
     expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(0);
@@ -298,7 +318,7 @@ describe('QC-201 — el Empacador sembrado no ejecuta: sin «Mis asignados»', (
 
     const arbol = await invocar('asignados');
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect(pestanas.props).toMatchObject({ current: 'terminados', views: ['terminados', 'por_empacar'] });
     expect(encontrarPorTipo(arbol, FinishedOrdersListSection)).toHaveLength(1);
     expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(0);
@@ -322,7 +342,7 @@ describe('QC-201 — `canExecute` baja por props desde la sesion (R10, R11, R11a
 
     const [seccion] = encontrarPorTipo(arbol, AssignedOrdersListSection);
     expect(seccion.props).toMatchObject({ canExecute: true });
-    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const limite = limiteDeLaLista(arbol);
     const fallback = (limite.props as { fallback: ReactElement }).fallback;
     expect(fallback.type).toBe(AssignedOrdersSkeleton);
     expect(fallback.props).toMatchObject({ canExecute: true });
@@ -340,7 +360,7 @@ describe('QC-201 — `canExecute` baja por props desde la sesion (R10, R11, R11a
 
     const [seccion] = encontrarPorTipo(arbol, AssignedOrdersListSection);
     expect(seccion.props).toMatchObject({ canExecute: false });
-    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const limite = limiteDeLaLista(arbol);
     const fallback = (limite.props as { fallback: ReactElement }).fallback;
     expect(fallback.props).toMatchObject({ canExecute: false });
   });
@@ -357,19 +377,19 @@ describe('QC-201 — `canExecute` baja por props desde la sesion (R10, R11, R11a
   });
 });
 
-describe('las pestañas miden al menos 44x44 px (`design.md > 6.6`)', () => {
+describe('las pestañas miden al menos 44 px de alto y son enlaces con etiqueta', () => {
   afterEach(() => {
     cleanup();
   });
 
-  it('cada disparador de `AssignmentViewTabs` cumple el objetivo tactil minimo y es un enlace real', () => {
+  it('cada disparador de `AssignmentViewTabs` cumple el alto tactil minimo y es un enlace real', () => {
     render(<AssignmentViewTabs current="asignados" views={['asignados', 'terminados']} />);
 
     const disparadores = screen.getAllByRole('tab');
     expect(disparadores).toHaveLength(2);
     for (const boton of disparadores) {
       expect(boton.className).toContain('min-h-11');
-      expect(boton.className).toContain('min-w-11');
+      expect(boton.textContent).not.toBe('');
       expect(boton.tagName).toBe('A');
       expect(boton).toHaveAttribute('href');
     }
@@ -387,7 +407,6 @@ describe('las pestañas miden al menos 44x44 px (`design.md > 6.6`)', () => {
     expect(disparadores).toHaveLength(3);
     expect(disparadores.at(-1)).toHaveTextContent('Por empacar');
     expect(disparadores.at(-1)?.className).toContain('min-h-11');
-    expect(disparadores.at(-1)?.className).toContain('min-w-11');
   });
 });
 
@@ -398,13 +417,13 @@ describe('las dos vistas del acondicionador', () => {
     cleanup();
   });
 
-  it('R2: el rol sembrado ve exactamente «Por acondicionar» y «Terminados» y aterriza en la primera', async () => {
+  it('R2: el rol sembrado ve exactamente «Por acondicionar» y «Acondicionados» y aterriza en la primera', async () => {
     expect(ACONDICIONADOR).toContain('acondicionamiento.modificar');
     getSessionUserMock.mockResolvedValue(sesionCon(ACONDICIONADOR));
 
     const arbol = await invocar();
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect(pestanas.props).toMatchObject({
       current: 'por_acondicionar',
       views: ['por_acondicionar', 'acondicionados', 'acondicionados_entregados'],
@@ -422,7 +441,7 @@ describe('las dos vistas del acondicionador', () => {
 
     const arbol = await invocar('por_acondicionar');
 
-    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const limite = limiteDeLaLista(arbol);
     const fallback = (limite.props as { fallback: ReactElement }).fallback;
     expect(fallback.type).toBe(ConditioningOrdersSkeleton);
     expect(fallback.props).toMatchObject({ list: 'por_acondicionar' });
@@ -430,16 +449,16 @@ describe('las dos vistas del acondicionador', () => {
     expect(seccion.props).toMatchObject({ params: { page: 1, pageSize: 10 } });
   });
 
-  it('R5: `?vista=acondicionados` marca «Terminados» y monta su sección con su esqueleto', async () => {
+  it('R5: `?vista=acondicionados` marca «Acondicionados» y monta su sección con su esqueleto', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(ACONDICIONADOR));
 
     const arbol = await invocar('acondicionados');
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect(pestanas.props).toMatchObject({ current: 'acondicionados' });
     expect(encontrarPorTipo(arbol, ConditionedOrdersListSection)).toHaveLength(1);
     expect(encontrarPorTipo(arbol, ConditioningOrdersListSection)).toHaveLength(0);
-    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const limite = limiteDeLaLista(arbol);
     const fallback = (limite.props as { fallback: ReactElement }).fallback;
     expect(fallback.type).toBe(ConditioningOrdersSkeleton);
     expect(fallback.props).toMatchObject({ list: 'acondicionados' });
@@ -456,7 +475,7 @@ describe('las dos vistas del acondicionador', () => {
 
         expect(encontrarPorTipo(arbol, ConditioningOrdersListSection)).toHaveLength(0);
         expect(encontrarPorTipo(arbol, ConditionedOrdersListSection)).toHaveLength(0);
-        for (const pestanas of encontrarPorTipo(arbol, AssignmentViewTabs)) {
+        for (const pestanas of encontrarPorTipo(arbol, AssignmentViewTabsSection)) {
           const props = pestanas.props as { views: readonly string[] };
           expect(props.views).not.toContain('por_acondicionar');
           expect(props.views).not.toContain('acondicionados');
@@ -466,11 +485,11 @@ describe('las dos vistas del acondicionador', () => {
     },
   );
 
-  it('R5: las dos pestañas se rotulan «Por acondicionar» y «Terminados», son enlaces a su vista, marcan la vigente y miden 44x44', () => {
+  it('R5, R7: las dos pestañas se rotulan «Por acondicionar» y «Acondicionados», son enlaces a su vista, marcan la vigente y miden 44 px de alto', () => {
     render(<AssignmentViewTabs current="acondicionados" views={['por_acondicionar', 'acondicionados']} />);
 
     const disparadores = screen.getAllByRole('tab');
-    expect(disparadores.map((tab) => tab.textContent)).toEqual(['Por acondicionar', 'Terminados']);
+    expect(disparadores.map((tab) => tab.textContent)).toEqual(['Por acondicionar', 'Acondicionados']);
     expect(screen.getByTestId('assignment-view-tab-por_acondicionar')).toHaveAttribute(
       'href',
       '/asignacion?vista=por_acondicionar',
@@ -481,7 +500,6 @@ describe('las dos vistas del acondicionador', () => {
     for (const tab of disparadores) {
       expect(tab.tagName).toBe('A');
       expect(tab.className).toContain('min-h-11');
-      expect(tab.className).toContain('min-w-11');
     }
   });
 });
@@ -493,12 +511,12 @@ describe('la tercera vista del acondicionador: «Entregados»', () => {
     cleanup();
   });
 
-  it('R20: el rol sembrado ve tres pestañas y «Entregados» va detrás de «Terminados»', async () => {
+  it('R20: el rol sembrado ve tres pestañas y «Entregados» va detrás de «Acondicionados»', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(ACONDICIONADOR));
 
     const arbol = await invocar();
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect((pestanas.props as { views: readonly string[] }).views).toEqual([
       'por_acondicionar',
       'acondicionados',
@@ -512,13 +530,13 @@ describe('la tercera vista del acondicionador: «Entregados»', () => {
 
     const arbol = await invocar('acondicionados_entregados');
 
-    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabsSection);
     expect(pestanas.props).toMatchObject({ current: 'acondicionados_entregados' });
     const [seccion] = encontrarPorTipo(arbol, DeliveredConditionedOrdersListSection);
     expect(seccion.props).toMatchObject({ params: { page: 1, pageSize: 10 } });
     expect(encontrarPorTipo(arbol, ConditionedOrdersListSection)).toHaveLength(0);
     expect(encontrarPorTipo(arbol, ConditioningOrdersListSection)).toHaveLength(0);
-    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const limite = limiteDeLaLista(arbol);
     const fallback = (limite.props as { fallback: ReactElement }).fallback;
     expect(fallback.type).toBe(ConditioningOrdersSkeleton);
   });
@@ -528,12 +546,11 @@ describe('la tercera vista del acondicionador: «Entregados»', () => {
 
     const arbol = await invocar('acondicionados_entregados');
 
-    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const limite = limiteDeLaLista(arbol);
     const fallback = (limite.props as { fallback: ReactElement }).fallback;
     expect(fallback.props).toMatchObject({ list: 'acondicionados_entregados' });
     render(fallback);
     const esqueleto = screen.getByRole('status');
-    expect(esqueleto).toHaveAttribute('data-list', 'acondicionados_entregados');
     expect(esqueleto).toHaveTextContent('Cargando pedidos entregados…');
     expect(esqueleto).not.toHaveTextContent('Cargando pedidos terminados…');
   });
@@ -547,14 +564,14 @@ describe('la tercera vista del acondicionador: «Entregados»', () => {
       const arbol = await invocar('acondicionados_entregados');
 
       expect(encontrarPorTipo(arbol, DeliveredConditionedOrdersListSection)).toHaveLength(0);
-      for (const pestanas of encontrarPorTipo(arbol, AssignmentViewTabs)) {
+      for (const pestanas of encontrarPorTipo(arbol, AssignmentViewTabsSection)) {
         expect((pestanas.props as { views: readonly string[] }).views).not.toContain('acondicionados_entregados');
       }
       expect(JSON.stringify(arbol)).toBe(JSON.stringify(porDefecto));
     },
   );
 
-  it('R20: las tres pestañas se rotulan en orden, «Entregados» enlaza a su vista y mide 44x44', () => {
+  it('R20: las tres pestañas se rotulan en orden, «Entregados» enlaza a su vista y mide 44 px de alto', () => {
     render(
       <AssignmentViewTabs
         current="acondicionados_entregados"
@@ -563,12 +580,157 @@ describe('la tercera vista del acondicionador: «Entregados»', () => {
     );
 
     const disparadores = screen.getAllByRole('tab');
-    expect(disparadores.map((tab) => tab.textContent)).toEqual(['Por acondicionar', 'Terminados', 'Entregados']);
+    expect(disparadores.map((tab) => tab.textContent)).toEqual(['Por acondicionar', 'Acondicionados', 'Entregados']);
     const entregados = screen.getByTestId('assignment-view-tab-acondicionados_entregados');
     expect(entregados).toHaveAttribute('href', '/asignacion?vista=acondicionados_entregados');
     expect(entregados).toHaveAttribute('aria-selected', 'true');
     expect(entregados.tagName).toBe('A');
     expect(entregados.className).toContain('min-h-11');
-    expect(entregados.className).toContain('min-w-11');
+  });
+});
+
+describe('R11 — las pestañas con contador cargan aparte de la lista vigente', () => {
+  it('R11: las pestañas van en su propio Suspense, con las pestañas sin contador de reserva, y la lista no cuelga de él', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_EMPAQUE));
+
+    const arbol = await invocar('por_empacar');
+
+    const delasPestanas = encontrarPorTipo(arbol, Suspense).filter(
+      (limite) => encontrarPorTipo(limite, AssignmentViewTabsSection).length > 0,
+    );
+    expect(delasPestanas).toHaveLength(1);
+    const [limite] = delasPestanas;
+    const vistas = { current: 'por_empacar', views: ['asignados', 'terminados', 'por_empacar'] };
+    const fallback = (limite.props as { fallback: ReactElement }).fallback;
+    expect(fallback.type).toBe(AssignmentViewTabs);
+    expect(fallback.props).toEqual(vistas);
+    const [seccion] = encontrarPorTipo(limite, AssignmentViewTabsSection);
+    expect(seccion.props).toEqual(vistas);
+    expect(encontrarPorTipo(limite, PackingOrdersListSection)).toHaveLength(0);
+    expect(encontrarPorTipo(limiteDeLaLista(arbol), PackingOrdersListSection)).toHaveLength(1);
+  });
+
+  it('R11: con una sola vista no hay pestañas ni lecturas de contador', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(OPERADOR));
+
+    const arbol = await invocar();
+
+    expect(encontrarPorTipo(arbol, AssignmentViewTabsSection)).toHaveLength(0);
+    expect(encontrarPorTipo(arbol, AssignmentViewTabs)).toHaveLength(0);
+  });
+});
+
+describe('R13 — qué aviso sale con cada parámetro', () => {
+  async function avisos(searchParams: Record<string, string>) {
+    const arbol = await AsignacionPage({ searchParams: Promise.resolve(searchParams) });
+    return encontrarPorTipo(arbol, OrderOutcomeNotice).map((aviso) => aviso.props);
+  }
+
+  it('R13: `entregado` pinta el aviso `delivered` con los envases y el producto', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(OPERADOR));
+
+    expect(
+      await avisos({
+        [DELIVERED_ORDER_PARAM]: '2026-0000001',
+        [DELIVERED_ORDER_PACKAGES_PARAM]: '3',
+        [DELIVERED_ORDER_PRODUCT_PARAM]: 'Jarabe · Botella 1L',
+      }),
+    ).toEqual([
+      {
+        kind: 'delivered',
+        orderNumber: '2026-0000001',
+        packages: '3',
+        productName: 'Jarabe · Botella 1L',
+      },
+    ]);
+  });
+
+  it('R13: `cancelado` pinta el aviso `cancelled`', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(OPERADOR));
+
+    expect(await avisos({ [CANCELLED_ORDER_PARAM]: '2026-0000002' })).toEqual([
+      { kind: 'cancelled', orderNumber: '2026-0000002' },
+    ]);
+  });
+
+  it('R13: `empacado` solo en «Por empacar» pinta el aviso `packed`', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_EMPAQUE));
+
+    expect(await avisos({ vista: 'por_empacar', [PACKED_ORDER_PARAM]: '2026-0000003' })).toEqual([
+      { kind: 'packed', orderNumber: '2026-0000003' },
+    ]);
+    expect(await avisos({ vista: 'asignados', [PACKED_ORDER_PARAM]: '2026-0000003' })).toEqual([]);
+  });
+
+  it('R13: sin parámetros no hay aviso', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_EMPAQUE));
+
+    expect(await avisos({})).toEqual([]);
+  });
+});
+
+describe('QC-265 R22 — el título es el único `h1`, con `PageHeader` dentro de `PageShell`', () => {
+  it('R22: la página es un `PageShell` con un único `PageHeader` «Asignación» y su testid de hoy', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_EMPAQUE));
+
+    const arbol = (await invocar()) as ReactElement;
+
+    expect(arbol.type).toBe(PageShell);
+    const cabeceras = encontrarPorTipo(arbol, PageHeader);
+    expect(cabeceras).toHaveLength(1);
+    expect(cabeceras[0].props).toMatchObject({ title: 'Asignación', titleTestId: 'asignacion-title' });
+    expect(encontrarPorTipo(arbol, 'h1')).toHaveLength(0);
+  });
+
+  it('R22: `PageHeader` pinta «Asignación» como único `h1`, con `asignacion-title`', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(OPERADOR));
+
+    const [cabecera] = encontrarPorTipo(await invocar(), PageHeader);
+    render(cabecera);
+
+    const titulos = screen.getAllByRole('heading', { level: 1 });
+    expect(titulos).toHaveLength(1);
+    expect(titulos[0]).toHaveTextContent('Asignación');
+    expect(titulos[0]).toHaveAttribute('data-testid', 'asignacion-title');
+  });
+});
+
+describe('QC-265 R20 — `canViewTrace` se decide en servidor con `dashboard.consultar` y baja a cada sección', () => {
+  const ACONDICIONA = SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? [];
+  const SECCIONES = [
+    ['asignados', OPERADOR, AssignedOrdersListSection],
+    ['terminados', EJECUTOR_CON_TERMINADOS, FinishedOrdersListSection],
+    ['todos', ADMINISTRADOR, CompanyOrdersListSection],
+    ['por_empacar', EJECUTOR_CON_EMPAQUE, PackingOrdersListSection],
+    ['por_acondicionar', ACONDICIONA, ConditioningOrdersListSection],
+    ['acondicionados', ACONDICIONA, ConditionedOrdersListSection],
+    [
+      'acondicionados_entregados',
+      ACONDICIONA,
+      DeliveredConditionedOrdersListSection,
+    ],
+  ] as const;
+
+  it.each(SECCIONES)('R20: «%s» recibe `canViewTrace: true` con el permiso', async (vista, permisos, seccion) => {
+    getSessionUserMock.mockResolvedValue(sesionCon([...permisos, 'dashboard.consultar']));
+
+    const [elemento] = encontrarPorTipo(await invocar(vista), seccion);
+    expect(elemento).toBeDefined();
+    expect(elemento.props).toMatchObject({ canViewTrace: true });
+  });
+
+  it.each(SECCIONES)('R20: «%s» recibe `canViewTrace: false` sin el permiso', async (vista, permisos, seccion) => {
+    getSessionUserMock.mockResolvedValue(sesionCon(permisos.filter((p) => p !== 'dashboard.consultar')));
+
+    const [elemento] = encontrarPorTipo(await invocar(vista), seccion);
+    expect(elemento).toBeDefined();
+    expect(elemento.props).toMatchObject({ canViewTrace: false });
+  });
+
+  it('R20: la página decide con `assertPermission`, no con un `includes` propio', () => {
+    const fuente = readFileSync(path.join(process.cwd(), 'app', '(private)', 'asignacion', 'page.tsx'), 'utf8');
+
+    expect(fuente).toMatch(/assertPermission\(sessionUser, 'dashboard\.consultar'/);
+    expect(fuente).not.toMatch(/permissions\.includes/);
   });
 });

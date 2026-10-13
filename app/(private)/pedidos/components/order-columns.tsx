@@ -240,6 +240,7 @@ export function buildOrderColumns({
     {
       id: QUANTITY_COLUMN_ID,
       label: 'Cantidad',
+      tabular: true,
       align: 'center',
       // Se pinta redondeada a dos decimales y el `title` lleva el valor exacto, para el caso
       // en que el redondeo esconda una diferencia real.
@@ -262,6 +263,7 @@ export function buildOrderColumns({
     {
       id: CREATED_AT_COLUMN_ID,
       label: 'Fecha de solicitud',
+      tabular: true,
       align: 'start',
       sortable: true,
       filter: { kind: 'dateRange' },

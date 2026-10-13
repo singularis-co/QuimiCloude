@@ -77,6 +77,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 
@@ -225,6 +226,11 @@ function rowByNumber(page: Page, numberText: string): Locator {
 }
 
 /** Un elemento por `data-testid` **y** por el identificador que lleva en su atributo de datos. */
+/** Lo visible de un testid de las pestañas de `/asignacion`. */
+function visibleTab(page: Page, testId: string): Locator {
+  return page.getByTestId(testId).filter({ visible: true });
+}
+
 function byTestIdAndUserId(scope: Page | Locator, testId: string, userId: string): Locator {
   return scope.locator(`[data-testid="${testId}"][data-user-id="${userId}"]`);
 }
@@ -247,7 +253,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
     );
   }
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames,
       lastNames: LAST_NAMES_BY_USERNAME[user.username] ?? 'Fixture',
@@ -503,13 +509,15 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     // Sin `asignaciones.ejecutar` no hay «Mis asignados»: «Terminados» y «Por empacar», nunca «Todos».
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)).toBeVisible({ timeout: 60_000 });
+    // Las pestañas van en `Suspense` con ellas mismas, sin contador, de respaldo: mientras llega el
+    // contador conviven la de respaldo y la resuelta, oculta. Se mira solo lo visible.
+    await expect(visibleTab(page, ASSIGNMENT_VIEW_TABS_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.asignados)).toHaveCount(0);
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.terminados)).toBeVisible();
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.por_empacar)).toBeVisible();
+    await expect(visibleTab(page, ASSIGNMENT_VIEW_TAB_TESTID.terminados)).toBeVisible();
+    await expect(visibleTab(page, ASSIGNMENT_VIEW_TAB_TESTID.por_empacar)).toBeVisible();
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.todos)).toHaveCount(0);
 
-    await page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.terminados).click();
+    await visibleTab(page, ASSIGNMENT_VIEW_TAB_TESTID.terminados).click();
     await expect(page.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
 
     // No esta asignado al Empacador pero lo empaco el: aparece, con su fecha y su responsable,
@@ -609,7 +617,9 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await expect(rowByNumber(page, inProgressNumber)).toHaveCount(0);
     await expect(rowByNumber(page, cancelledNumber)).toHaveCount(0);
 
-    const dateCells = page.getByTestId(COMPANY_ORDER_DATE_TESTID);
+    // La tabla monta también sus tarjetas (ocultas en escritorio), que repiten la fecha: se cuenta
+    // solo lo visible.
+    const dateCells = page.getByTestId(COMPANY_ORDER_DATE_TESTID).filter({ visible: true });
     await expect(dateCells).toHaveCount(1);
     await expect(rowByNumber(page, noDateNumber).getByTestId(COMPANY_ORDER_DATE_TESTID)).toHaveText(
       MISSING_DATE_TEXT,

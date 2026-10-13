@@ -80,9 +80,12 @@ export function CredentialRequirements({
             key={rule}
             data-rule={rule}
             data-state={state}
-            className="flex items-center gap-2 text-sm text-muted-foreground data-[state=met]:text-foreground"
+            className="group/rule flex items-center gap-2 text-sm text-muted-foreground transition-colors duration-(--dur-base) ease-(--ease-standard) data-[state=met]:text-foreground"
           >
-            <StatusIcon aria-hidden="true" className="size-4 shrink-0" />
+            <StatusIcon
+              aria-hidden="true"
+              className="size-4 shrink-0 text-muted-foreground transition-colors duration-(--dur-base) ease-(--ease-standard) group-data-[state=met]/rule:text-success-text"
+            />
             <span>{label}</span>
             <span className="sr-only">{STATE_TEXT[state]}</span>
           </li>

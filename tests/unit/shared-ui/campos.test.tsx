@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProductBatchDateField } from '@/app/(private)/inventario/components/product-batch-date-field';
 import { OrderField } from '@/app/(private)/pedidos/components';
 import { UnitSelect } from '@/app/(private)/proveedores/[id]/components';
+import { DataTableFilterChip } from '@/components/shared/data-table/data-table-filter-chip';
 import { DataTableFilterDate } from '@/components/shared/data-table/data-table-filter-date';
 import type { DataTableTexts } from '@/components/shared/data-table/data-table-types';
 import { DatePicker } from '@/components/shared/date-picker';
@@ -510,7 +511,7 @@ describe('DatePicker', () => {
     const pieza = render(
       <DatePicker
         mode="range"
-        triggerContent="Creado"
+        trigger={<DataTableFilterChip label="Creado" value="2026-10-01 – 2026-10-05" />}
         triggerTestId="data-table-filter-date-creado"
         selected={{ from: new Date(2026, 9, 1), to: new Date(2026, 9, 5) }}
         onSelect={onSelect}
