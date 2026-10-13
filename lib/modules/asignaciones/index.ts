@@ -337,3 +337,13 @@ export {
 } from './domain/request-evidence-upload';
 export type { EvidenceTargetDeps } from './domain/evidence-target';
 export type { EvidenceStorageWarning } from './domain/evidence-photos';
+export {
+  createRegisterEvidence,
+  type RegisterEvidenceDeps,
+  type RegisterEvidenceResult,
+} from './domain/register-evidence';
+export {
+  createRemoveEvidence,
+  type RemoveEvidenceDeps,
+  type RemoveEvidenceResult,
+} from './domain/remove-evidence';
