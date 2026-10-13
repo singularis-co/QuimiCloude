@@ -16,6 +16,7 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
 import { OrderCustomerDialog } from './order-customer-dialog';
+import { OrderDeliveriesSheet } from './order-deliveries-sheet';
 import { OrderDeliverySheet } from './order-delivery-sheet';
 import { OrderDistributionDialog, type OrderDistributionDraft } from './order-distribution-dialog';
 import { OrderForm, type OrderSheetSection } from './order-form';
@@ -179,6 +180,8 @@ export type OrderRowSheetActionsProps = {
   readonly canEditCustomer?: boolean;
   /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
   readonly canDeliver?: boolean;
+  /** Si el actor puede anular entregas; lo resuelve el servidor. */
+  readonly canVoidDelivery?: boolean;
 };
 
 /**
@@ -209,6 +212,7 @@ export function OrderRowSheetActions({
   canEditDistribution = false,
   canEditCustomer = false,
   canDeliver = false,
+  canVoidDelivery = false,
 }: OrderRowSheetActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
   // `null` mientras no se ha abierto nunca; despues el dialogo queda montado para animar su cierre.
@@ -217,6 +221,7 @@ export function OrderRowSheetActions({
   const [distributionOpen, setDistributionOpen] = useState(false);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
+  const [deliveriesOpen, setDeliveriesOpen] = useState(false);
   // Atado a la instancia de `order`: cuando llega el refresco trae otra y lo guardado se descarta.
   const [savedDistribution, setSavedDistribution] = useState<{
     readonly order: OrderSummary;
@@ -249,6 +254,7 @@ export function OrderRowSheetActions({
         onCustomer={() => setCustomerOpen(true)}
         canDeliver={canDeliver}
         onDeliver={() => setDeliverOpen(true)}
+        onDeliveries={() => setDeliveriesOpen(true)}
       />
       <OrderSheet
         order={order}
@@ -283,6 +289,14 @@ export function OrderRowSheetActions({
       ) : null}
       {deliverOpen ? (
         <OrderDeliverySheet order={order} open onOpenChange={setDeliverOpen} />
+      ) : null}
+      {deliveriesOpen ? (
+        <OrderDeliveriesSheet
+          order={order}
+          open
+          onOpenChange={setDeliveriesOpen}
+          canVoid={canVoidDelivery}
+        />
       ) : null}
     </>
   );

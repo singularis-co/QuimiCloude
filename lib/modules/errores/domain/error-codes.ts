@@ -31,6 +31,7 @@
  * `conditioning_batch_data_missing`.
  * **2026-10-09**: `whatsapp_connection_not_found`, `whatsapp_connection_exists`,
  * `whatsapp_phone_number_taken`.
+ * **2026-10-09**: `delivery_not_found`, `delivery_already_voided`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -185,6 +186,11 @@ export const ERROR_CODES = [
   'whatsapp_connection_not_found',
   'whatsapp_connection_exists',
   'whatsapp_phone_number_taken',
+  // Distinto de `order_not_found`: lo que falta es la entrega, no el pedido.
+  'delivery_not_found',
+  // Distinto de `action_not_allowed`: el pedido admite anular, pero alguna presentacion elegida ya
+  // estaba anulada en esa entrega.
+  'delivery_already_voided',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

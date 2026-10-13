@@ -90,6 +90,8 @@ export const ERROR_MESSAGE_KEY = {
   whatsapp_connection_not_found: 'errors.whatsapp_connection_not_found',
   whatsapp_connection_exists: 'errors.whatsapp_connection_exists',
   whatsapp_phone_number_taken: 'errors.whatsapp_phone_number_taken',
+  delivery_not_found: 'errors.delivery_not_found',
+  delivery_already_voided: 'errors.delivery_already_voided',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -228,4 +230,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.whatsapp_connection_exists': 'La empresa ya tiene una conexión de WhatsApp.',
   'errors.whatsapp_phone_number_taken':
     'Ese número de WhatsApp ya está conectado en otra cuenta.',
+  'errors.delivery_not_found': 'La entrega no existe.',
+  'errors.delivery_already_voided':
+    'Alguna presentacion elegida ya estaba anulada: revisa la lista y vuelve a intentarlo.',
 } as const satisfies Record<ErrorMessageKey, string>;

@@ -396,6 +396,11 @@ export const E2E_ESPERADOS = [
   // rechazada por Meta, alta valida, recarga sin el verify token, edicion, deshabilitar y
   // habilitar. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'integraciones-whatsapp.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la anulacion de una presentacion de una entrega
+  // desde «Entregas»: motivo vacio que no envia nada, anulacion con motivo que devuelve el lote y
+  // reabre el pedido, la presentacion otra vez pendiente en «Entregar» y usuario sin permiso. No lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'anular-entrega.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -591,8 +596,13 @@ export const MIGRACIONES_ESPERADAS = [
   '20261008150050_inventory_movement_kind_delivery',
   '20261008150100_order_deliveries',
   '20261008150200_delivery_permission',
+  // 2026-10-09: la anulacion de entregas (valor de enum, tablas y permiso); ninguna toca el
+  // identificador.
+  '20261009120000_inventory_movement_kind_delivery_void',
   // El dia de produccion del lote; no toca el identificador.
   '20261009120000_product_batches_production_date',
+  '20261009120100_order_delivery_voids',
+  '20261009120200_delivery_void_permission',
   // 2026-10-09: la tabla de conexiones de WhatsApp; no toca el identificador.
   '20261009130000_whatsapp_connections',
 ] as const
