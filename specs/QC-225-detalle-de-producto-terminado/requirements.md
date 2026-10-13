@@ -23,7 +23,7 @@
 Las etiquetas entre corchetes remiten a las filas de `## Decisiones cerradas (no reabrir)` por su
 tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visibles],
 [Solo consulta], [Permiso], [Borrado], [E2E], [Unidades], [Lote→orden], [Paginación],
-[Identificadores]. La tabla de cobertura está al final de esta sección.
+[Identificadores], [Anulación]. La tabla de cobertura está al final de esta sección.
 
 ### Glosario
 
@@ -36,6 +36,11 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
   envase guardado en su lote (`package_content`); el **resto** es lo que no llena un envase, en la
   unidad base.
 - **Pedido de origen de un lote**: el pedido del asiento `production` de ese lote.
+- **Fila anulada de Entregas**: una fila de Entregas cuya línea de entrega (la de ese lote en esa
+  entrega) fue anulada en /pedidos con «Anular entrega» (QC-224). La anulación es por presentación
+  dentro de una entrega, así que una misma entrega puede tener filas anuladas y filas que no.
+- **Total entregado**: la suma de la cantidad y de los envases de las filas no anuladas de todas las
+  entregas del producto.
 
 ### Acceso
 
@@ -177,25 +182,45 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
 - **R32** [Lote→orden, Identificadores] La feature NO DEBE crear tablas, columnas, valores de enum ni
   migraciones, NO DEBE escribir en ninguna tabla y NO DEBE añadir dependencias a `package.json`.
 
+### Entregas anuladas
+
+*(Añadido el 2026-10-13, al cerrar P2 con QC-224 ya en `dev`.)*
+
+- **R33** [Anulación] CUANDO una fila de Entregas es una fila anulada, el sistema DEBE seguir
+  mostrándola en su lugar del orden de R23, con su fecha, cliente, pedido, lote, envases y cantidad,
+  la marca «Anulada» y el motivo de la anulación. Una fila no anulada NO DEBE llevar la marca ni
+  motivo.
+- **R34** [Anulación, Unidades] MIENTRAS el tab Entregas tenga filas, el sistema DEBE mostrar el total
+  entregado del producto, en unidad base y en envases, calculado en decimal exacto sobre todas sus
+  entregas y no solo sobre la página visible. La cantidad y los envases de una fila anulada NO DEBEN
+  contar en el total. SI todas las filas están anuladas, ENTONCES el total DEBE ser cero.
+- **R35** [Anulación, Entradas] El asiento `delivery_void` DEBE aparecer en Entradas con el origen
+  «Anulación de entrega» y el número de su pedido. La salida de la entrega anulada DEBE seguir
+  apareciendo en Salidas, sin cambios.
+- **R36** [Anulación, Permiso, Solo consulta] La marca «Anulada», su motivo y el total entregado NO
+  DEBEN exigir ningún permiso además de `inventario.consultar` (ni `pedidos.consultar` ni
+  `entregas.anular`), y la ficha NO DEBE ofrecer ningún control para anular una entrega.
+
 ### Cobertura de las decisiones cerradas
 
 | Decisión (tema) | Requisitos |
 |---|---|
 | ¿Desde dónde se llega? [Llegada] | R26, R27, R28, R29, R30 |
 | ¿Cómo se organiza la ficha? [Tabs] | R8, R9, R10 |
-| ¿Qué es «Entradas»? [Entradas] | R15, R16, R18 |
+| ¿Qué es «Entradas»? [Entradas] | R15, R16, R18, R35 |
 | «Salidas» frente a «Entregas» [Salidas] | R17, R18, R19, R20 |
 | «Ventas» [Ventas] | R17 |
 | ¿Qué muestra «Costo de producción»? [Costo] | R21, R22 |
 | ¿Se muestran costos? [Costos visibles] | R4, R21 |
-| ¿Solo consulta o con acciones? [Solo consulta] | R7 |
-| ¿Quién puede ver la ficha? [Permiso] | R1, R2, R3, R4, R25, R29 |
+| ¿Solo consulta o con acciones? [Solo consulta] | R7, R36 |
+| ¿Quién puede ver la ficha? [Permiso] | R1, R2, R3, R4, R25, R29, R36 |
 | Producto borrado [Borrado] | R5, R6 |
 | ¿Lleva E2E? [E2E] | R31 |
-| Unidades [Unidades] | R11, R12, R13, R15, R17, R19, R21 |
+| Unidades [Unidades] | R11, R12, R13, R15, R17, R19, R21, R34 |
 | Lote → orden que lo produjo [Lote→orden] | R13, R14, R21, R32 |
 | Listados largos [Paginación] | R23, R24 |
 | Identificadores y borrado [Identificadores] | R5 (borrado lógico), R32 (sin identificadores nuevos en la base) |
+| Entrega anulada en Entregas y en Entradas [Anulación] (2026-10-13) | R33, R34, R35, R36 |
 
 ## Preguntas abiertas
 
@@ -205,14 +230,6 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
   también tienen `inventario.consultar`, así que el caso solo aparece con un conjunto de permisos
   hecho a mano. Si el humano prefiere pintar el enlace siempre, R29 se reduce a «la lista se pinta
   igual si la consulta falla».
-- **P2 (no bloquea el spec; choque con QC-224 en vuelo).** QC-224 (`anular-entrega`, in_progress, sin
-  mergear) añade el tipo de asiento `delivery_void`, que suma existencia, y dice en su design que
-  QC-225 «reutiliza» su lista de entregas por pedido. Este spec no depende de QC-224: clasifica los
-  asientos por signo (R18), así que una anulación saldría en Entradas sin cambiar nada aquí, y no
-  reutiliza la lista de QC-224 (design §9, A5). Lo que queda abierto es cómo se ve en el tab Entregas
-  una entrega anulada: no hay modelo de anulación en `dev` hoy. Propuesta: lo resuelve la ficha que
-  mergee segunda, con una fila en su propia tabla de decisiones. Además, los dos specs tocan los
-  mismos archivos de contrato (design §11).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -233,3 +250,4 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
 | 2026-10-09 | Lote → orden que lo produjo | Heredado: se resuelve por el `InventoryMovement` de tipo `production` del lote (`orderId`, `orderPresentationLineId`). Sin migración nueva. |
 | 2026-10-09 | Listados largos | Heredado: los tabs de historial se paginan con `lib/shared/pagination.ts` y `DataTable`. |
 | 2026-10-09 | Identificadores y borrado | Heredado de QC-150 D10 / QC-4: identificadores en inglés, borrado lógico. |
+| 2026-10-13 | ¿Cómo se ve una entrega anulada? (era P2; QC-224 ya está en `dev`) | En Entregas, una entrega con presentaciones anuladas conserva su fila, marcada «Anulada» con su motivo, y lo anulado no cuenta en el total entregado. El asiento `delivery_void` sale en Entradas con la etiqueta «Anulación de entrega». |
