@@ -109,7 +109,7 @@
       verde. Cubre R11, R16, R22, R23, R29, R30, R35, R38, R41 (activación), R42 (`.env.example`).
       Depende de: T11.
 
-- [ ] **T13.** Cierre: mapa `R<n> -> test` completo en `progress/impl_QC-237.md`; comprobar R43
+- [x] **T13.** Cierre: mapa `R<n> -> test` completo en `progress/impl_QC-237.md`; comprobar R43
       (`package.json`, permisos, seed y `private-nav.ts` intactos en el diff); `./init.sh` en verde.
       Anotar en el progreso que `WHATSAPP_GRAPH_API_VERSION` e `INTEGRATIONS_ENCRYPTION_*` deben
       existir en Vercel antes de desplegar, y que `APP_BASE_URL` se fija por entorno para que una
