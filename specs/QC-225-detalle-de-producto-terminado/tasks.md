@@ -113,7 +113,7 @@ Archivos:
 **Hecho cuando:** la suite está en verde y `pnpm exec vitest run guard` también (el ámbito de
 `pedidos` y la arquitectura de módulos).
 
-### B3 — Cuerpos de los casos de uso y actions (depende de T0; usa dobles de puerto, no espera a B1/B2)
+### [x] B3 — Cuerpos de los casos de uso y actions (depende de T0; usa dobles de puerto, no espera a B1/B2)
 
 Archivos:
 - Los seis archivos de dominio de T0, con el cuerpo de `design.md > 2.3`.
