@@ -294,7 +294,7 @@ function NavGroupInline({ group, pathname, onNavigate }: NavGroupProps) {
         >
           {Icon ? <Icon aria-hidden="true" /> : null}
           <span>{group.label}</span>
-          <ChevronRightIcon className="ml-auto transition-transform duration-(--dur-base) ease-(--ease-standard) group-data-open/menu-button:rotate-90" />
+          <ChevronRightIcon className="ml-auto transition-transform duration-(--dur-base) ease-(--ease-standard) group-data-panel-open/menu-button:rotate-90" />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarActiveIndicator variant="sub">
