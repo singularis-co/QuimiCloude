@@ -451,11 +451,17 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // segunda pantalla del catalogo: recorre la entrega de un pedido terminado desde Pedidos y solo
     // siembra lotes de producto terminado por Prisma. La guardia no se afloja; se le añade un
     // renglon.
+    // ACTUALIZADO 2026-10-13 (ficha de producto terminado): entra `detalle-de-producto-terminado.spec.ts`, en el
+    // orden que el matcher devuelve (alfabetico). Casa por la palabra «product» del nombre. No es
+    // una segunda pantalla del catalogo: recorre la ficha de solo lectura de un producto terminado,
+    // a la que llega desde Pedidos y desde la pestaña de terminados, y solo siembra por Prisma el
+    // pedido terminado y su lote. La guardia no se afloja; se le añade un renglon.
     const E2E_DE_AISLAMIENTO = 'aislamiento-inventario.spec.ts'
     const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
     expect(e2eMatches, `spec E2E de catalogo inesperado: ${e2eMatches.join(', ')}`).toEqual([
       E2E_DE_AISLAMIENTO,
       'ajuste-de-inventario.spec.ts',
+      'detalle-de-producto-terminado.spec.ts',
       'entregar-producto-terminado.spec.ts',
       'fixtures/inventario-importar-mixto.csv',
       'helpers/product-name-cell.ts',

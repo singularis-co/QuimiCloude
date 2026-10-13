@@ -266,7 +266,7 @@ Archivos:
 
 **Hecho cuando:** todo lo anterior está en verde y `./init.sh` termina en verde.
 
-## TI — E2E (depende de TC)
+## [x] TI — E2E (depende de TC)
 
 Archivos:
 - `e2e/detalle-de-producto-terminado.spec.ts` (nuevo). Reutiliza los helpers de
@@ -334,6 +334,11 @@ Producción:
 - `app/(private)/inventario/producto-terminado/[id]/components/finished-product-costs-table.tsx`
 - `app/(private)/inventario/components/finished-stock-columns.tsx`
 - `app/(private)/pedidos/components/order-produced-presentations.tsx`
+- `app/(private)/inventario/components/movement-reason-label.ts`, `batch-history.tsx`,
+  `adjust-batch-dialog.tsx` e `index.ts` (añadidos 2026-10-13 en TI: el E2E destapó que la sección
+  de la ficha, componente de servidor, llamaba a `movementReasonLabel`, que vivía en un módulo
+  `'use client'`, y la página caía para todos. La función pura pasa a un módulo sin la directiva;
+  mismo nombre y misma salida)
 - `app/(private)/pedidos/components/order-columns.tsx`
 - `app/(private)/pedidos/components/order-table.tsx`
 - `app/(private)/pedidos/components/order-list-section.tsx`
@@ -372,6 +377,9 @@ Tests, fixtures y E2E:
   excluye por nombre `order-produced-presentations.tsx`, que casa con el barrido por «presentation»
   sin ser pantalla de catálogo, y en TI suma el E2E nuevo a su lista de specs; el segundo suma
   `finishedProductDetailRoute` a la lista exacta de exportaciones de `routes.ts`)
+- `tests/unit/clientes/scope.test.ts` y `tests/unit/shared/data-table-alcance.test.ts` (añadidos
+  2026-10-13 en TI: listas cerradas de E2E; el spec nuevo normaliza el cliente que siembra con
+  `@/lib/modules/clientes` y usa `data-table-row-`)
 - `tests/guards/guard-pantallas-exigen-permiso.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `tests/integration/aislamiento.json`

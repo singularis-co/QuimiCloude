@@ -401,6 +401,11 @@ export const E2E_ESPERADOS = [
   // reabre el pedido, la presentacion otra vez pendiente en «Entregar» y usuario sin permiso. No lee
   // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'anular-entrega.spec.ts',
+  // Alta el 2026-10-13 (ficha de producto terminado) por el mismo motivo que las demas. Recorre la ficha de un producto
+  // terminado: entrega parcial desde Pedidos, llegada por el enlace de /pedidos y por la pestana de
+  // terminados de /inventario, sus tabs Lotes, Entradas, Salidas y Entregas, y usuario sin permiso
+  // que recibe el 404. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'detalle-de-producto-terminado.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
