@@ -136,6 +136,7 @@ export async function listFinishedProductBatches(
         movements: {
           where: { AND: [movementCompanyScope(scope), { kind: 'production' }] },
           select: { orderId: true },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           take: 1,
         },
       },
