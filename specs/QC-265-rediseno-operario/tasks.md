@@ -10,7 +10,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 0 — Censo y comprobaciones (antes de tocar producción)
 
-- [ ] **T0a. Censo con grep.** Repetir el barrido de `design.md > 7` en `tests/unit`, `tests/guards`,
+- [x] **T0a. Censo con grep.** Repetir el barrido de `design.md > 7` en `tests/unit`, `tests/guards`,
   `tests/integration` y `e2e` para cada símbolo, texto o testid que la ficha cambia o borra:
   `ASSIGNMENT_VIEW_LABELS`, `'Terminados'`, `backToFinished`, `Volver a «Terminados»`,
   `AssignedOrderDeliveredNotice`, `AssignedOrderCancelledNotice`, `assigned-order-delivered-notice`,
@@ -22,7 +22,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
   *Hecho:* `progress/impl_QC-265-rediseno-operario.md` tiene la tabla «archivo → qué nombra → qué le
   pasa»; todo archivo que salga y no esté en `## Archivos esperados` se añade a esa sección en el
   mismo commit.
-- [ ] **T0b. Comprobar el selector de D2.** Con el servidor de desarrollo, en `/asignacion/<id>`,
+- [x] **T0b. Comprobar el selector de D2.** Con el servidor de desarrollo, en `/asignacion/<id>`,
   confirmar qué elemento lleva el hueco de la barra (`[data-slot="sidebar"]` u otro) y que, oculto con
   `display: none`, `SidebarInset` empieza en x = 0. *Hecho:* el selector exacto queda escrito en el
   impl; si difiere del de `design.md > D2`, se anota allí como desviación antes de la tanda 2.
@@ -312,6 +312,6 @@ E2E:
 
 Estado:
 
-- `progress/impl_QC-265-rediseno-operario.md`
+- `progress/impl_QC-265.md`
 - `progress/deudas.md`
 - `progress/features/QC-265.md`
