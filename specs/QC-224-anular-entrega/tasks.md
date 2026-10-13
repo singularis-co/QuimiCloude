@@ -264,7 +264,7 @@ fecha.
 
 ---
 
-## [ ] TC — Barrido de censos y guardias
+## [x] TC — Barrido de censos y guardias
 Depende de: B1–B5 y F1–F4.
 
 - `tests/unit/pedidos/order-delivery-append-only.test.ts` (R33), con nota fechada:

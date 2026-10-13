@@ -531,3 +531,55 @@ Verificación (implementer, 2026-10-13; máquina con poca memoria: sin `vitest r
 - Rojo aceptado sin tocar: `tests/unit/pedidos/order-delivery-append-only.test.ts` (lo enmienda TC).
 
 Pendiente: TC, TI, TZ (sin empezar).
+
+## TC — barrido de censos y guardias (backend_dev, 2026-10-13)
+
+Archivos modificados:
+- `tests/unit/pedidos/order-delivery-append-only.test.ts` (R33), nota fechada QC-224 2026-10-13 (TC)
+  en la cabecera; aserciones R32 previas intactas.
+  - `NOMBRE_MUTANTE` filtra por una lista explicita `NOMBRES_ADMITIDOS` = {`createVoidDelivery`,
+    `voidDeliveryAction`}; cualquier otro nombre `void…Deliver` sigue en rojo. Motivo: el caso de uso
+    y la Server Action de la anulacion caian en el patron `void…Deliver` de QC-223.
+  - `PRISMA_MUTANTE` + `orderDeliveryVoid`, `orderDeliveryVoidLine`; `SQL_MUTANTE` +
+    `order_delivery_voids`, `order_delivery_void_lines`.
+  - Casos nuevos (R33): los dos nombres admitidos existen como export unico en `lib/`
+    (`lib/modules/pedidos/domain/void-delivery.ts`, `lib/modules/pedidos/adapters/driving/order-actions.ts`)
+    y su archivo no modifica ni borra; el adaptador `order-delivery-void-prisma.ts` solo usa
+    `findUnique`/`findFirst`/`findMany`/`create`/`createMany`; sintetico con
+    `orderDeliveryVoid.update`, `orderDeliveryVoidLine.deleteMany`, `orderDeliveryVoid.upsert`, SQL
+    `UPDATE`/`DELETE` sobre las dos tablas, `voidOrderDeliveryAction` y `voidDeliveries` → 7 rojos;
+    legitimo con los dos nombres admitidos, lecturas e INSERT → sin rojo.
+- Ningun otro censo necesito enmienda: todos verdes con la rama.
+- `void-delivery.ts` no llama a `assertTransition` (grep sin coincidencias); `module-contract` verde sin cambio.
+
+Mapa: R33 → `order-delivery-append-only.test.ts > la anulacion de una entrega es solo de insercion (R33)` (4 casos).
+
+Salidas:
+- Censos (`vitest run tests/guards tests/unit/pedidos tests/unit/inventario/{scope,company-scope,schema/inventario-schema} tests/unit/identity/{permissions,session-once-per-request-actions} tests/unit/composition`):
+  `Test Files  194 passed (194)` / `Tests  3576 passed | 15 skipped (3591)`
+- `pnpm run typecheck` (`tsc --noEmit`): exit 0, sin errores.
+- `pnpm exec eslint tests/unit/pedidos/order-delivery-append-only.test.ts`: exit 0, sin avisos.
+
+Veredicto: TC en verde; el unico censo enmendado es el de solo-insercion de la entrega (R33).
+
+## Tanda 3 — rojos de CI del PR #196 (run 38412170723) y TC (implementer, 2026-10-13)
+
+Arreglos (sin tocar las guardias):
+- `guard-piezas-base` (QC-231 R7): `order-delivery-list.tsx` quitó la constante local `TOUCH_TARGET`; el botón
+  «Anular» usa `Button touch`. Commit `96e1050a`.
+- `pedidos-convenciones` (R40): `tests/unit/pedidos-ui/order-delivery-list.test.tsx` importa `OrderDeliveryList`
+  por el barril `@/app/(private)/pedidos/components` (ya lo exportaba). Commit `3893ea2e`.
+- Revisados sin cambio: `delivery-void-dialog.tsx` (ya usa `touchTarget`), `order-deliveries-sheet.tsx`, y los
+  tests de dialogo, sheet y `batch-history` (ya importan por barril). `batch-history.tsx` conserva su
+  `TOUCH_TARGET` local: viene de QC-92 y la guardia lo exime (`ARCHIVOS_D11`); queda fuera de esta rama.
+- `order-delivery-append-only`: enmendado en TC (seccion de backend_dev arriba).
+
+Verificacion (maquina con poca memoria: sin `vitest related` ni E2E):
+- `pnpm run typecheck`: exit 0. `pnpm exec eslint` de los archivos tocados: exit 0.
+- `vitest run tests/guards/guard-piezas-base.test.ts tests/unit/pedidos-ui tests/unit/inventario/batch-history.test.tsx`:
+  `Test Files  49 passed (49)` / `Tests  857 passed | 4 skipped (861)`.
+- Censos de TC (`tests/guards tests/unit/pedidos` + scope/company-scope/schema de inventario, identity
+  permissions y session-once-per-request-actions, `tests/unit/composition`), tras los arreglos:
+  `Test Files  194 passed (194)` / `Tests  3576 passed | 15 skipped (3591)`.
+
+Pendiente: TI, TZ.
