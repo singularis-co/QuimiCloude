@@ -29,20 +29,20 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 1 — Piezas compartidas (depende de T0a)
 
-- [ ] **T1a [P]. `CountdownRing`** (D6, R38). Crear `components/shared/countdown-ring.tsx`; `step-reader.tsx`
+- [x] **T1a [P]. `CountdownRing`** (D6, R38). Crear `components/shared/countdown-ring.tsx`; `step-reader.tsx`
   lo importa con `testId="step-reader-wait-ring"` y borra `WaitRing`. Test
   `tests/unit/shared/countdown-ring.test.tsx`: `aria-hidden`, `stroke-dashoffset` lleno al montar y
   vacío tras un fotograma, `transition` con los `seconds`, `size`, sin animación con movimiento
   reducido. *Hecho:* `tests/unit/recetas-ui/step-reader.test.tsx` y `order-execution-screen.test.tsx`
   (incluida la lista cerrada R18) en verde.
-- [ ] **T1b. Anillo en `CountdownGatedButton`** (D6, R37; depende de T1a). Test en
+- [x] **T1b. Anillo en `CountdownGatedButton`** (D6, R37; depende de T1a). Test en
   `tests/unit/shared/countdown-gated-button.test.tsx`: mientras espera hay `countdown-ring` y la cuenta;
   al acabar no hay ninguno y el botón se habilita; con `disabled` sigue deshabilitado.
-- [ ] **T1c [P]. `Notice` con cierre** (D7, R15). Prop `dismissible`; test
+- [x] **T1c [P]. `Notice` con cierre** (D7, R15). Prop `dismissible`; test
   `tests/unit/shared-ui/notice-dismiss.test.tsx`: sin la prop el árbol es el de hoy (snapshot de los
   consumidores sin cambios); con ella hay un botón «Cerrar» de 44 × 44 px y al pulsarlo el aviso
   desaparece.
-- [ ] **T1d. Catálogo** (R44; depende de T1a–T1c). Fila nueva de `CountdownRing` (Compuestos,
+- [x] **T1d. Catálogo** (R44; depende de T1a–T1c). Fila nueva de `CountdownRing` (Compuestos,
   `Diseño` = `docs/diseno/canvas/Dominio.dc.html`); `Alcance` de `CountdownGatedButton` sin «el anillo
   todavía no está»; punto de extensión `dismissible` en `Notice` y su `Diseño` con
   `docs/diseno/canvas/Asignacion.dc.html`. *Hecho:* `pnpm exec vitest run guard-catalogo-de-componentes`
@@ -50,7 +50,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 2 — Marco del operario (depende de T0b)
 
-- [ ] **T2a. `OperatorScreenFrame` y regla de CSS** (D2, D3, R1–R4). Crear
+- [x] **T2a. `OperatorScreenFrame` y regla de CSS** (D2, D3, R1–R4). Crear
   `app/(private)/asignacion/components/operator-screen-frame.tsx` y la regla `:has()` en
   `app/globals.css`; `ThemeToggle` gana `className?` si no lo tiene. Test
   `tests/unit/asignaciones-ui/operator-screen-frame.test.tsx`: `data-operator-screen` en la raíz,

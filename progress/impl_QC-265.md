@@ -43,4 +43,58 @@ comprobación en navegador la cubre el e2e de R1 (T8a: x de `private-content` = 
 
 | Tanda | Commit | Gate |
 | --- | --- | --- |
-| 0 | (este) | init OK |
+| 0 | `63f89d15` | init OK |
+| 1 y 2 | ver `git log` (un commit por tanda) | init OK (un solo `./init.sh` tras las dos, corridas en paralelo) |
+
+## Tanda 1 — Piezas compartidas (frontend_dev)
+
+Archivos:
+- creados `components/shared/countdown-ring.tsx`, `tests/unit/shared/countdown-ring.test.tsx`,
+  `tests/unit/shared-ui/notice-dismiss.test.tsx`
+- modificados `components/shared/step-reader/step-reader.tsx` (usa `CountdownRing` con
+  `testId="step-reader-wait-ring"`; `WaitRing` borrado), `components/shared/countdown-gated-button.tsx`,
+  `components/shared/notice.tsx` (`'use client'`, `dismissible?`),
+  `tests/unit/shared/countdown-gated-button.test.tsx`, `components/shared/CATALOGO.md`
+- snapshot `tests/unit/paridad/__snapshots__/asignacion-acondicionamiento-paridad.test.tsx.snap`:
+  una línea, el `svg` del anillo en el diálogo de terminar (fila de `design.md > 6`, R37).
+  `confirmaciones-paridad` no cambió.
+
+Mapa R → test: R15 → `notice-dismiss.test.tsx` (3 casos) · R37 → `countdown-gated-button.test.tsx`
+(3 casos `R37:`) · R38 → `countdown-ring.test.tsx` (6 casos) y `step-reader.test.tsx` · R44 →
+`guard-catalogo-de-componentes`.
+
+Verificación: typecheck OK; lint 0 errores (7 avisos ajenos); `vitest related` 912 pasan + el
+snapshot de arriba actualizado (36/36); `vitest run guard` 74 archivos OK; `step-reader` +
+`order-execution-screen` + `notice` OK.
+
+Desvíos: (1) el anillo del botón no lleva `key` propia: `CountdownTimer` tampoco la lleva y la `key`
+del botón reinicia los dos; (2) `size-5` en el anillo porque `Button` fuerza los `svg` a 16 px;
+(3) catálogo: `StepReader` gana `CountdownRing` en `Base de` y `Notice` gana `Button`.
+
+## Tanda 2 — Marco del operario (frontend_dev)
+
+### T2a. `OperatorScreenFrame` y regla de CSS
+
+Archivos:
+- creado `app/(private)/asignacion/components/operator-screen-frame.tsx` (sin `'use client'`; fuera del barrel `index.ts`, D3)
+- modificado `app/(private)/components/theme-toggle.tsx` (`className?` opcional vía `cn`; sin cambio de salida para los usos de hoy)
+- modificado `app/globals.css` (regla `body:has([data-operator-screen])` sobre `[data-slot="sidebar"]` y `[data-testid="private-header"]`)
+- creado `tests/unit/asignaciones-ui/operator-screen-frame.test.tsx`
+- creado `tests/unit/theme/operator-chrome-css.test.ts`
+
+Mapa R → test:
+- R1 → `operator-chrome-css.test.ts` (dos casos R1) + `operator-screen-frame.test.tsx` «R1: la raíz lleva data-operator-screen…»
+- R2 → `operator-screen-frame.test.tsx` «R2: la cabecera es pegajosa…», «R2, R3: … Cambiar tema …», «R2, R3: el pie es fijo…»
+- R3 → `operator-screen-frame.test.tsx` «R3: con back pinta un ArrowLink…» y los dos «R2, R3»
+- R4 → `operator-screen-frame.test.tsx` «R4: la raíz es contenedor de consultas» (las columnas las pinta cada pantalla en T4–T6)
+- R6 → `operator-chrome-css.test.ts` «R6: la regla depende de la marca del operario»
+
+Verificación:
+- `pnpm run typecheck` → sin errores
+- `pnpm run lint` → 0 errors, 7 warnings (preexistentes, en `confirm-catalog-import.test.ts` y `order-service.test.ts`)
+- `pnpm exec vitest related --run <archivos>` → 22 files, 325 passed
+- `pnpm exec vitest run guard` → 74 files, 1007 passed, 20 skipped
+
+Desvíos: ninguno. El pie reserva 132 px + margen seguro (alto del pie del tablero). Ningún snapshot cambió.
+
+Veredicto: T2a hecha, en verde; ninguna pantalla usa el marco todavía.

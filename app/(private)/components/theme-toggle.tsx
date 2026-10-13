@@ -5,6 +5,11 @@ import { MoonIcon, SunIcon } from 'lucide-react';
 import { useFallbackThemeState, useOptionalTheme } from '@/components/shared/theme-provider';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
+
+export type ThemeToggleProps = {
+  readonly className?: string;
+};
 
 /**
  * Nombre accesible del control de tema (R13, R23, R31).
@@ -25,7 +30,7 @@ export const THEME_TOGGLE_LABEL = 'Cambiar tema';
  * `dark:` decide cual se ve, asi el HTML del servidor y el de la hidratacion son iguales. El modo
  * solo se lee dentro del manejador de clic.
  */
-export function ThemeToggle() {
+export function ThemeToggle({ className }: ThemeToggleProps = {}) {
   // Sin `ThemeProvider` ancestro el control se auto-gestiona; `active` evita suscribir el
   // respaldo a `matchMedia` cuando si hay contexto.
   const context = useOptionalTheme();
@@ -39,7 +44,7 @@ export function ThemeToggle() {
         render={
           <Button
             variant="outline"
-            className="relative size-11"
+            className={cn('relative size-11', className)}
             aria-label={THEME_TOGGLE_LABEL}
             data-testid="theme-toggle-trigger"
             // `resolved` y no la preferencia: partiendo de `system`, el primer clic va al
