@@ -47,6 +47,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
 
@@ -240,7 +241,7 @@ async function voidFootprint(id: string, entryId: string) {
 }
 
 async function createUser(user: Credentials, roleId: string): Promise<string> {
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: `Qc224${RUN_ID.slice(0, 8)}`,
       lastNames: 'Anulacion',
