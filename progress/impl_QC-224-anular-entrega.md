@@ -659,13 +659,13 @@ rama: lo cubre la guardia preexistente `tests/guards/guard-dependencias-aprobada
 | R18 | integration/pedidos/order-delivery-void-repository.int.test.ts:322 `R18: create con el ambito de B no puede apuntar a la entrega de A`<br>integration/pedidos/order-delivery-void.int.test.ts:182 `R18: la entrega de la empresa B y una que no existe son delivery_not_found, sin escribir nada`<br>unit/pedidos/order-actions-delivery-void.test.ts:153 `R6, R16, R18, R19, R21: ${action.nombre} traduce ${state.code} al ErrorState del catalogo`<br>unit/pedidos/void-delivery.test.ts:249 `voidDelivery — entrega y pedido (R18, R19)` |
 | R19 | integration/pedidos/order-delivery-void.int.test.ts:213 `R19: un pedido que ya no esta TERMINADO ni ENTREGADO es action_not_allowed, sin escribir nada`<br>unit/pedidos/order-actions-delivery-void.test.ts:153 `R6, R16, R18, R19, R21: ${action.nombre} traduce ${state.code} al ErrorState del catalogo`<br>unit/pedidos/void-delivery.test.ts:249 `voidDelivery — entrega y pedido (R18, R19)` |
 | R20 | integration/pedidos/order-delivery-void.int.test.ts:227 `R20, R21: una presentacion que no es de la entrega es invalid_input, y una ya anulada es delivery_already_voided sin anu`<br>unit/pedidos/void-delivery.test.ts:286 `voidDelivery — presentaciones pedidas (R20, R21)` |
-| R21 | integration/pedidos/order-delivery-void-repository.int.test.ts:347 `R21, R22: findDeliveryLines trae todas las lineas con su cantidad y su marca de anulada; con el ambito de B, ninguna`<br>integration/pedidos/order-delivery-void.int.test.ts:227 `R20, R21: una presentacion que no es de la entrega es invalid_input, y una ya anulada es delivery_already_voided sin anu`<br>unit/inventario/qc91-alcance.test.ts:515 `R21: el alta y el agregado de lote siguen creando; los unicos update viven en adjustBatchStock, writeFinishedBatchLabels`<br>unit/pedidos/order-actions-delivery-void.test.ts:153 `R6, R16, R18, R19, R21: ${action.nombre} traduce ${state.code} al ErrorState del catalogo`<br>unit/pedidos/void-delivery.test.ts:286 `voidDelivery — presentaciones pedidas (R20, R21)` |
+| R21 | integration/pedidos/order-delivery-void-repository.int.test.ts:347 `R21, R22: findDeliveryLines trae todas las lineas con su cantidad y su marca de anulada; con el ambito de B, ninguna`<br>integration/pedidos/order-delivery-void.int.test.ts:227 `R20, R21: una presentacion que no es de la entrega es invalid_input, y una ya anulada es delivery_already_voided sin anu`<br>unit/pedidos/order-actions-delivery-void.test.ts:153 `R6, R16, R18, R19, R21: ${action.nombre} traduce ${state.code} al ErrorState del catalogo`<br>unit/pedidos/void-delivery.test.ts:286 `voidDelivery — presentaciones pedidas (R20, R21)` |
 | R22 | integration/pedidos/order-delivery-void-repository.int.test.ts:265 `R22: create guarda la anulacion con su empresa, entrega, clave, motivo, autor e instante`<br>integration/pedidos/order-delivery-void.int.test.ts:242 `R22, R23, R24, R25: guarda la anulacion y sus lineas, devuelve a cada lote lo que salio, asienta delivery_void y deja la`<br>unit/pedidos/void-delivery.test.ts:314 `voidDelivery — registro (R22, R23, R24)` |
 | R23 | integration/inventario/finished-goods-return.int.test.ts:216 `R23: cada lote queda en antes + cantidad y products.stock es la suma de todos sus lotes`<br>integration/inventario/ledger-cuadre.int.test.ts:396 `QC-224 R23, R24: cuadra con un lote del que sale una entrega y vuelve con su anulacion`<br>integration/pedidos/order-delivery-void.int.test.ts:242 `R22, R23, R24, R25: guarda la anulacion y sus lineas, devuelve a cada lote lo que salio, asienta delivery_void y deja la`<br>unit/inventario/finished-goods-return-prisma.test.ts:72 `R23: lotes -> bloqueo de productos -> (incremento -> asiento) por linea -> un recalculo por producto`<br>unit/pedidos/void-delivery.test.ts:314 `voidDelivery — registro (R22, R23, R24)` |
 | R24 | integration/inventario/finished-goods-return.int.test.ts:236 `R24: un asiento delivery_void por lote, en positivo, con pedido, anulacion, autor y sin motivo`<br>integration/inventario/ledger-cuadre.int.test.ts:396 `QC-224 R23, R24: cuadra con un lote del que sale una entrega y vuelve con su anulacion`<br>integration/pedidos/order-delivery-void-constraints.int.test.ts:423 `R24, R32: delivery_void exige su anulacion, su pedido, cantidad positiva y ningun motivo`<br>integration/pedidos/order-delivery-void.int.test.ts:242 `R22, R23, R24, R25: guarda la anulacion y sus lineas, devuelve a cada lote lo que salio, asienta delivery_void y deja la`<br>unit/inventario/finished-goods-return-prisma.test.ts:126 `R24: writeMovement recibe delivery_void, cantidad positiva, pedido, anulacion y reason null`<br>unit/pedidos/schema/order-delivery-voids-migration.test.ts:255 `R24: el UP solo anade el valor delivery_void al tipo`<br>unit/pedidos/void-delivery.test.ts:314 `voidDelivery — registro (R22, R23, R24)` |
 | R25 | integration/pedidos/order-delivery-void.int.test.ts:242 `R22, R23, R24, R25: guarda la anulacion y sus lineas, devuelve a cada lote lo que salio, asienta delivery_void y deja la` |
 | R26 | integration/pedidos/order-delivery-repository.int.test.ts:426 `R26: sumDeliveredPackages no suma las lineas anuladas, y una linea con todo anulado no aparece`<br>integration/pedidos/order-delivery-void.int.test.ts:303 `R26: tras anular, getOrderDelivery vuelve a ofrecer lo anulado y deliverOrder lo entrega de nuevo y deja el pedido ENTRE` |
-| R27 | integration/pedidos/order-delivery-void-concurrency.int.test.ts:208 `R27, R30: una anulacion y la entrega que completaria el pedido, a la vez: se aplican las dos una detras de otra, el pedi`<br>integration/pedidos/order-delivery-void.int.test.ts:284 `R27: un pedido ENTREGADO pasa a TERMINADO con finished_at, packed_by y conditioned_by intactos; uno TERMINADO sigue TERM`<br>unit/inventario/qc91-alcance.test.ts:606 `R27: update en adjustBatchStock y returnFinishedGoods no es hallazgo; uno en una tercera funcion si`<br>unit/pedidos/order-actions-delivery-void.test.ts:114 `R27, R28: success lleva el VoidDeliveryResult del caso de uso (${nombre})`<br>unit/pedidos/void-delivery.test.ts:357 `voidDelivery — estado del pedido (R27)` |
+| R27 | integration/pedidos/order-delivery-void-concurrency.int.test.ts:208 `R27, R30: una anulacion y la entrega que completaria el pedido, a la vez: se aplican las dos una detras de otra, el pedi`<br>integration/pedidos/order-delivery-void.int.test.ts:284 `R27: un pedido ENTREGADO pasa a TERMINADO con finished_at, packed_by y conditioned_by intactos; uno TERMINADO sigue TERM`<br>unit/pedidos/order-actions-delivery-void.test.ts:114 `R27, R28: success lleva el VoidDeliveryResult del caso de uso (${nombre})`<br>unit/pedidos/void-delivery.test.ts:357 `voidDelivery — estado del pedido (R27)` |
 | R28 | integration/pedidos/order-delivery-void-concurrency.int.test.ts:188 `R28, R30: dos envios a la vez con la misma clave: uno voided y el otro already_registered, y una sola anulacion escrita`<br>integration/pedidos/order-delivery-void-repository.int.test.ts:284 `R28: la misma clave en la misma empresa da duplicate_key y no deja una segunda fila`<br>integration/pedidos/order-delivery-void.int.test.ts:342 `R28: la misma clave dos veces deja un solo juego de filas y un solo asiento por lote, y la segunda es already_registered`<br>unit/pedidos/order-actions-delivery-void.test.ts:114 `R27, R28: success lleva el VoidDeliveryResult del caso de uso (${nombre})`<br>unit/pedidos/void-delivery.test.ts:382 `voidDelivery — idempotencia (R28)` |
 | R29 | integration/inventario/finished-goods-return.int.test.ts:302 `R29: un lote de la empresa B pedido con el ambito de A da batch_not_found y no toca nada`<br>integration/pedidos/order-delivery-void.int.test.ts:414 `R29: un fallo forzado (${donde}) no deja nada escrito: ni anulacion, ni lineas, ni asientos, ni existencia, ni estado`<br>unit/inventario/finished-goods-return-prisma.test.ts:162 `R29: un lote que no vuelve (ausente o de otra empresa) da batch_not_found con ese lote y no escribe nada`<br>unit/pedidos/order-actions-delivery-void.test.ts:160 `R29: ${action.nombre} devuelve un error ajeno como unexpected, sin su detalle`<br>unit/pedidos/void-delivery.test.ts:350 `R29: batch_not_found en la devolucion lanza dentro de la transaccion y no cambia el estado` |
 | R30 | integration/pedidos/order-delivery-void-concurrency.int.test.ts:161 `R30: anulaciones simultaneas`<br>integration/pedidos/order-delivery-void-repository.int.test.ts:397 `R21, R30: addLines sobre una linea ya anulada responde already_voided y no escribe ninguna de las pedidas`<br>unit/inventario/finished-goods-return-prisma.test.ts:91 `R30, R31: bloquea los productos de la empresa ordenados por id, FOR NO KEY UPDATE y sin filtrar por deleted_at` |
@@ -684,8 +684,10 @@ Contraste con `design.md > 10` (archivo previsto -> aparece en la fila):
   nombre. Lo cubren `void-delivery.test.ts` y `order-actions-delivery-void.test.ts`.
 - Archivos no previstos que también mapean: `unit/pedidos/order-actions-delivery-void.test.ts` (actions),
   `integration/pedidos/order-delivery-void-repository.int.test.ts` (adaptador).
-- Los censos enmendados cuyas etiquetas `R<n>` son de otras fichas (p. ej. `qc91-alcance` > `R21`, `R27`) salen
-  en la tabla por el patrón; no son evidencia de esta feature.
+- Corregido 2026-10-13 (review vuelta 1, m4): las filas R21 y R27 ya no listan los casos de
+  `unit/inventario/qc91-alcance.test.ts` (`:515` y `:606`), cuyas etiquetas `R21`/`R27` son de otra ficha. El
+  censo enmendado respalda R31 (el único `update` admitido en `returnFinishedGoods`); R21 y R27 conservan sus
+  casos propios.
 - El resto de archivos previstos aparece en su fila.
 
 ### Censos y guardias enmendados (cada uno conserva sus aserciones previas, nota fechada 2026-10-09 o 2026-10-13)
@@ -727,3 +729,36 @@ salida completa en la seccion TI. La suite E2E entera corre en CI en el PR a pro
 - `identity-seed.int.test.ts` y `ledger-cuadre.int.test.ts`: no corridos en local (sin base configurada en esta
   sesion); cambio solo de comentarios, los corre CI.
 - `./init.sh` y `gate-completo`: los confirma el leader.
+
+## Vuelta 1 del review — correcciones (implementer, 2026-10-13)
+
+Decisiones humanas del 2026-10-13 sobre `progress/review_QC-224.md`.
+
+### M1 — `tests/unit/clientes/scope.test.ts` rojo por el E2E (commit `27101518`)
+- Desviación: `e2e/anular-entrega.spec.ts` importa `normalizeCustomerText` del barrel de `clientes` para
+  sembrar el cliente que exige la entrega. `E2E_PERMITIDOS` admite `anular-entrega.spec.ts` con nota fechada
+  2026-10-13 (sin citas de ficha), igual que entró `entregar-producto-terminado.spec.ts`. La lista sigue cerrada.
+- Anotada en `design.md > 8` (fila nueva) y en `tasks.md > ## Archivos esperados`.
+- `pnpm exec vitest run tests/unit/clientes/scope.test.ts`: `Test Files 1 passed (1)` / `Tests 28 passed (28)`.
+
+### m1 — timestamp compartido con `20261009120000_product_batches_production_date` (commit `ee1a68cf`)
+- `20261009120000_inventory_movement_kind_delivery_void` -> **`20261009120050_inventory_movement_kind_delivery_void`**
+  (`git mv`, contenido intacto). Orden relativo propio conservado: 120050 < `20261009120100_order_delivery_voids`
+  < `20261009120200_delivery_void_permission`; queda detrás de la de dev (120000).
+- Referencias: `guard-identificador-de-request.test.ts` (`MIGRACIONES_ESPERADAS`, reordenada por nombre),
+  `design.md > 3.1`, `tasks.md` (3 líneas). `order-delivery-voids-migration.test.ts` busca por sufijo: sin cambio.
+- Base `qc224_anular_entrega` (DATABASE_URL/DIRECT_URL en el entorno del comando; nunca `QuimiCloude`):
+  1. `pnpm run db:rollback` -> `20261009120200_delivery_void_permission revertida` (down + fila borrada).
+     Una segunda llamada volvió a elegir la misma carpeta (el script toma la última del directorio) y reaplicó
+     su `down.sql` sin fila que borrar (aviso del script; el DOWN es idempotente). Sin efecto.
+  2. `prisma db execute --schema db/schema.prisma --file .../20261009120100_order_delivery_voids/down.sql` y
+     `DELETE FROM _prisma_migrations WHERE migration_name='20261009120100_order_delivery_voids'`: `Script executed successfully.` x2.
+  3. Igual con `20261009120000_inventory_movement_kind_delivery_void/down.sql` y su fila: `Script executed successfully.` x2.
+  4. `migrate status`: las tres de la anulación pendientes. Renombrado de la carpeta.
+  5. `prisma migrate deploy`: aplica `20261009120050_…`, `20261009120100_…`, `20261009120200_…`;
+     `All migrations have been successfully applied.`
+  6. `prisma migrate status`: `Database schema is up to date!`
+- `vitest run` guard-identificador-de-request, order-delivery-voids-migration, finished-product-enum-values-migration,
+  order-assignments-migration: `Test Files 4 passed (4)` / `Tests 96 passed (96)`.
+
+### m2, m3: sin cambio de código (decisión humana). m4: corregido en el mapa de TZ (arriba).
