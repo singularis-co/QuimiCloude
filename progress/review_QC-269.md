@@ -121,3 +121,27 @@ un motivo, el verdadero.
 **RECHAZADO (CAMBIOS)** por H1 (implementer: una línea de comentario; aprovechar para H3) y H2
 (leader: citar QC-270, marcar T3b/T3c). El resto del trabajo está bien: los tres arreglos siguen
 el diseño, los tests muerden y las cuatro desviaciones están justificadas.
+
+## Vuelta 2 (acotada a 4da54ad7~3..HEAD; comprobado también el diff contra origin/dev)
+
+### Checklist
+- [x] H1: `order-execution-lines.tsx` ya no cita `(QC-269 R9, R10)`; el porqué se queda. Ninguna
+      línea añadida en `app/`, `components/` o `lib/` contra `origin/dev` cita ficha o requisito (grep).
+- [x] H2: `progress/features/QC-269.md` cita QC-270 (T3b); T3b y T3c en `[x]`; todas las tasks en `[x]`.
+      `./init.sh --completo` en verde, según el leader (no lo vuelvo a correr: lo corre el CI).
+- [x] H3: el JSDoc de `STEP_READER_SIDE_COLUMN_RESERVE` nombra `order-execution-screen.test.tsx`.
+- [x] H4: el E2E de R10 mide el grupo de cifras (`name.nextElementSibling`, que en el componente es
+      el `<span>` de cifras) y el ancho interior del `li`. Si las cifras bajan, exige que el nombre
+      ocupe toda la fila (±1 px) y `wrappedRows > 0`, así que la aserción no queda vacía.
+- [x] H5: un solo motivo para el literal, y se comprueba: `order-execution-lines.test.tsx:302` fija
+      el valor de `ORDER_EXECUTION_LINE_NAME_TESTID`.
+- [x] Sin regresiones: el diff de la vuelta solo toca dos comentarios de producción y el E2E.
+- [x] Verificación propia: eslint de los 3 archivos sin avisos; `tsc --noEmit` sin errores;
+      `vitest run order-execution-lines.test.tsx` 22/22. E2E 20/20 chromium+webkit según la bitácora
+      (no lo vuelvo a correr).
+
+### Hallazgos
+Ninguno nuevo.
+
+### Veredicto
+**OK**
