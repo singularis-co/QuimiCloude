@@ -32,16 +32,21 @@ import type { PermissionCode } from './permissions';
  *
  * `permissions` son los codigos del rol de la persona, leidos en la MISMA consulta que ya trae el
  * resto de la fila: es lo que permite decidir si una persona puede ser responsable de un pedido
- * sin una segunda ida a la base y sin mirar nunca el nombre de su rol.
+ * sin una segunda ida a la base.
  *
- * Lo que este tipo **no** lleva —correo, documento, el nombre del rol, ninguna marca de baja y
- * ningun dato de credencial— lo fija el TIPO, no una promesa.
+ * `roleName` es el nombre del rol de la persona (`ROLE_*` de `./roles`). QC-274: quien puede ser
+ * responsable de un pedido se decide por nombre de rol (Operador y Empacador), y el camino de
+ * ESCRITURA tiene que poder comprobarlo sobre la misma fila que ya lee.
+ *
+ * Lo que este tipo **no** lleva —correo, documento, ninguna marca de baja y ningun dato de
+ * credencial— lo fija el TIPO, no una promesa.
  */
 export type PersonRef = {
   readonly id: string;
   readonly displayName: string;
   readonly isActive: boolean;
   readonly permissions: readonly PermissionCode[];
+  readonly roleName: string;
 };
 
 /**
@@ -54,9 +59,15 @@ export type PersonRef = {
  * compara contra `effectiveAccountStatus(view, now)` en la implementacion (R21, QC-78),
  * asi que una `blocked` con plazo vencido cuenta como activa y una `active` con bloqueo
  * vigente no.
+ *
+ * `roles` son NOMBRES de rol (`ROLE_*` de `./roles`) y multivalor. Ausente o vacio = todos. Se
+ * aplica en la consulta, antes del tope (QC-274).
+ *
+ * Los dos filtros se aplican ANTES del tope: con filtro, el tope cuenta solo filas que pasan.
  */
 export type PeopleRefFilters = {
   readonly accountStatus?: readonly UserAccountStatus[];
+  readonly roles?: readonly string[];
 };
 
 /** Solo cuentas efectivamente activas: el filtro con nombre que usan otros modulos. */
@@ -109,8 +120,8 @@ export interface PeopleDirectory {
    *
    * `filters` es opcional y abierto (`PeopleRefFilters`): quien necesita acotar —p. ej. solo
    * cuentas efectivas `['active']`— lo pide aqui en vez de filtrar fuera o de exigir un metodo
-   * nuevo. El tope se aplica ANTES de filtrar en memoria, asi que con filtro la respuesta puede
-   * traer menos de `limit` filas (decision consciente: simple y predecible).
+   * nuevo. El tope se aplica DESPUES de filtrar (QC-274): ninguna fila que pasa el filtro queda
+   * fuera porque otra que no lo pasa ocupara su hueco.
    */
   listAliveInCompany(
     companyId: string,

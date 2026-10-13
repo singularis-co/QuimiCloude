@@ -6,9 +6,10 @@
  * asignacion se pinta o no, no un permiso de lectura nuevo. La lista de personas depende SOLO de
  * ese permiso; no vuelve a comprobar `usuarios.consultar` ni degrada a vacio si falta.
  *
- * Devuelve las personas vivas de la empresa que pueden ser responsables (`canBeResponsible`).
- * Solo entran cuentas activas: el filtro lo define y lo aplica `identity`. El rechazo de
- * `assignResponsibles` al asignar queda como segunda barrera.
+ * Devuelve las personas vivas de la empresa que pueden ser responsables: la lista sale de
+ * `listAliveInCompany` con `ORDER_RESPONSIBLE_FILTERS` (cuenta activa y rol Operador o
+ * Empacador, QC-274), que `identity` aplica antes del tope. El rechazo de `assignResponsibles`
+ * al asignar queda como segunda barrera, con la misma definicion.
  *
  * Dominio PURO: `zod` y tipos del propio modulo o del contrato publico de `identity`. Sin
  * `next/*`, sin `@prisma/client`, sin adaptadores y sin `@/lib/shared/**`.
@@ -17,9 +18,9 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
-import { canBeResponsible } from './responsible-eligibility';
+import { ORDER_RESPONSIBLE_FILTERS } from './responsible-eligibility';
 
-import { ACTIVE_ACCOUNTS_ONLY, type PeopleDirectory } from '@/lib/modules/identity';
+import type { PeopleDirectory } from '@/lib/modules/identity';
 
 /**
  * Tope de personas devueltas. Mismo numero que `MAX_PAGE_SIZE` (`lib/shared/pagination.ts`);
@@ -56,11 +57,9 @@ export function createListResponsibleCandidates(
       actor.companyId,
       now,
       MAX_CANDIDATES,
-      ACTIVE_ACCOUNTS_ONLY,
+      ORDER_RESPONSIBLE_FILTERS,
     );
 
-    return people
-      .filter((person) => canBeResponsible(person))
-      .map((person) => ({ id: person.id, displayName: person.displayName }));
+    return people.map((person) => ({ id: person.id, displayName: person.displayName }));
   };
 }

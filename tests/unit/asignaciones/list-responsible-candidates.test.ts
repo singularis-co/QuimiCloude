@@ -15,13 +15,11 @@ import {
   MAX_CANDIDATES,
   type ListResponsibleCandidatesDeps,
 } from '@/lib/modules/asignaciones/domain/list-responsible-candidates';
+import { ORDER_RESPONSIBLE_FILTERS } from '@/lib/modules/asignaciones/domain/responsible-eligibility';
 import {
-  ROLE_ADMINISTRADOR,
   ROLE_EMPACADOR,
   ROLE_OPERADOR,
-  SEED_ROLE_PERMISSIONS,
   type PeopleDirectory,
-  type PermissionCode,
   type PersonRef,
 } from '@/lib/modules/identity';
 
@@ -35,8 +33,8 @@ function actorCon(...permissions: readonly string[]): Actor {
   return { id: ANA, companyId: EMPRESA, permissions };
 }
 
-function persona(id: string, displayName: string, permissions: readonly PermissionCode[] = []): PersonRef {
-  return { id, displayName, isActive: true, permissions };
+function persona(id: string, displayName: string, roleName: string = ROLE_OPERADOR): PersonRef {
+  return { id, displayName, isActive: true, permissions: [], roleName };
 }
 
 function montar(personas: readonly PersonRef[]): {
@@ -72,17 +70,18 @@ describe('listResponsibleCandidates', () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it('excluye a quien tiene `pedidos.consultar` y conserva al resto, en el mismo orden', async () => {
+  it('QC-274: devuelve lo que `identity` filtra, en el mismo orden y sin volver a filtrar', async () => {
     const m = montar([
-      persona(ANA, 'Ana'),
-      persona(BRUNO, 'Bruno', ['pedidos.consultar']),
-      persona(CARLOS, 'Carlos'),
+      persona(ANA, 'Ana', ROLE_OPERADOR),
+      persona(BRUNO, 'Bruno', ROLE_EMPACADOR),
+      persona(CARLOS, 'Carlos', ROLE_OPERADOR),
     ]);
 
     const candidatos = await m.listar(actorCon('asignaciones.modificar'), {});
 
     expect(candidatos).toEqual([
       { id: ANA, displayName: 'Ana' },
+      { id: BRUNO, displayName: 'Bruno' },
       { id: CARLOS, displayName: 'Carlos' },
     ]);
   });
@@ -95,32 +94,16 @@ describe('listResponsibleCandidates', () => {
     expect(Object.keys(candidato as object).sort()).toEqual(['displayName', 'id']);
   });
 
-  it('pide a `identity` la empresa del actor, el reloj inyectado, el tope de 25 y solo cuentas `active`', async () => {
+  it('QC-274: pide a `identity` la empresa del actor, el reloj, el tope de 25 y `ORDER_RESPONSIBLE_FILTERS` (activas, Operador y Empacador)', async () => {
     const m = montar([]);
 
     await m.listar(actorCon('asignaciones.modificar'), {});
 
-    expect(m.listAliveInCompany).toHaveBeenCalledWith(EMPRESA, AHORA, MAX_CANDIDATES, {
+    expect(m.listAliveInCompany).toHaveBeenCalledWith(EMPRESA, AHORA, MAX_CANDIDATES, ORDER_RESPONSIBLE_FILTERS);
+    expect(ORDER_RESPONSIBLE_FILTERS).toEqual({
       accountStatus: ['active'],
+      roles: [ROLE_OPERADOR, ROLE_EMPACADOR],
     });
     expect(MAX_CANDIDATES).toBe(25);
-  });
-
-  it('R22: un usuario con exactamente los permisos sembrados del Empacador sigue siendo candidato a responsable', async () => {
-    const delEmpacador = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR] ?? [];
-    expect(delEmpacador.length).toBeGreaterThan(0);
-    expect(delEmpacador).not.toContain('asignaciones.ejecutar');
-    const m = montar([
-      persona(ANA, 'Ana', SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []),
-      persona(BRUNO, 'Bruno', delEmpacador),
-      persona(CARLOS, 'Carlos', SEED_ROLE_PERMISSIONS[ROLE_OPERADOR] ?? []),
-    ]);
-
-    const candidatos = await m.listar(actorCon('asignaciones.modificar'), {});
-
-    expect(candidatos).toEqual([
-      { id: BRUNO, displayName: 'Bruno' },
-      { id: CARLOS, displayName: 'Carlos' },
-    ]);
   });
 });

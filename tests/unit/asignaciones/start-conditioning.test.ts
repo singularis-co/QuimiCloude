@@ -53,7 +53,7 @@ const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['acondicionami
 const ENTRADA = { orderId: PEDIDO, userIds: [BETO], workGroupIds: [] as string[] };
 
 function persona(id: string, overrides?: Partial<PersonRef>): PersonRef {
-  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive: true, permissions: [], ...overrides };
+  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive: true, permissions: [], roleName: 'Operador', ...overrides };
 }
 
 type Escritura = 'ok' | 'already_mine' | 'taken' | 'not_conditionable' | 'not_found';

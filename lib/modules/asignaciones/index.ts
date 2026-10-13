@@ -183,10 +183,9 @@ export {
 } from './domain/list-finished-orders';
 export type { FinishedOrderView } from './domain/finished-order-view';
 
-// Quien puede ser responsable de un pedido, por permiso. Se publica para que
-// `list-responsible-candidates.ts` (mismo modulo) y cualquier lector externo apliquen el
-// MISMO criterio que usa `assign-responsibles.ts`.
-export { canBeResponsible } from './domain/responsible-eligibility';
+// Quien puede ser responsable de un pedido, por nombre de rol (QC-274). Se publica para que
+// cualquier lector externo aplique el MISMO criterio que usa `assign-responsibles.ts`.
+export { canBeResponsible, ORDER_RESPONSIBLE_FILTERS } from './domain/responsible-eligibility';
 
 // La vista «Todos»: los pedidos de la empresa en cualquier estado, sin filtro por usuario.
 export {

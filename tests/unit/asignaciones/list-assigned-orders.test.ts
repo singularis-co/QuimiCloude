@@ -63,7 +63,7 @@ function receta(overrides?: Partial<RecipeRef>): RecipeRef {
 }
 
 function persona(id: string): PersonRef {
-  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive: true, permissions: [] };
+  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive: true, permissions: [], roleName: 'Operador' };
 }
 
 const PRESENTACION = uuid('7');

@@ -11,10 +11,28 @@ import {
   UserNotAssignableError,
   UserNotFoundError,
 } from './errors';
-import { canBeResponsible } from './responsible-eligibility';
+
+import { assertPermission, type PermissionBearer, type PermissionCode } from '@/lib/modules/identity';
 
 import type { NewConditioningTeamMember } from '../ports/conditioning-team-repository';
 import type { PersonRef, WorkGroupSnapshot } from '@/lib/modules/identity';
+
+const PEDIDOS_CONSULTAR: PermissionCode = 'pedidos.consultar';
+const DENEGADO = new Error('asignaciones: pedidos.consultar ausente al comprobar el equipo');
+
+/**
+ * El equipo de acondicionamiento conserva el criterio por PERMISO de QC-145: queda fuera quien
+ * supervisa los pedidos de toda la empresa. QC-274 cambio solo el de responsables de un pedido
+ * (por rol), que dejaria fuera a los de Acondicionamiento.
+ */
+function isNotOrdersSupervisor(person: PermissionBearer): boolean {
+  try {
+    assertPermission(person, PEDIDOS_CONSULTAR, () => DENEGADO);
+    return false;
+  } catch {
+    return true;
+  }
+}
 
 // Copia de la de `assignment-input.ts`, que no la exporta: un repetido se rechaza, no se deduplica.
 const uniqueIdList = z
@@ -37,7 +55,7 @@ export type StartConditioningInput = z.infer<typeof startConditioningSchema>;
 
 /** Elegible para el equipo: cuenta activa y no supervisa los pedidos de toda la empresa. */
 export function isConditioningTeamEligible(person: PersonRef): boolean {
-  return person.isActive && canBeResponsible(person);
+  return person.isActive && isNotOrdersSupervisor(person);
 }
 
 /**
@@ -50,7 +68,7 @@ export function assertLooseTeamMembers(loose: readonly PersonRef[], requestedUse
     const person = looseById.get(userId);
     if (person === undefined) throw new UserNotFoundError();
     if (!person.isActive) throw new UserNotAssignableError();
-    if (!canBeResponsible(person)) throw new ConditioningTeamMemberNotAllowedError();
+    if (!isNotOrdersSupervisor(person)) throw new ConditioningTeamMemberNotAllowedError();
   }
 }
 

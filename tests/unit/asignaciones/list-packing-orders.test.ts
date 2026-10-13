@@ -75,7 +75,7 @@ function montar(): Dobles {
     { orderId: PEDIDO_1, packages: '5' },
     { orderId: PEDIDO_2, packages: '3' },
   ]);
-  const findRefsIncludingDeletedInCompany = vi.fn(async () => [{ id: BETO, displayName: 'Beto', isActive: true, permissions: [] }]);
+  const findRefsIncludingDeletedInCompany = vi.fn(async () => [{ id: BETO, displayName: 'Beto', isActive: true, permissions: [], roleName: 'Operador' }]);
   const listByOrdersInCompany = vi.fn(async () => []);
 
   const deps = {
