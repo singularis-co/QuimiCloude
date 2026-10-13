@@ -406,3 +406,4 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Origen:** review de QC-234 (menor M2, 2026-10-09) y de nuevo en QC-237 (2026-10-09).
 - **Qué falta:** la regex del guard usa `\s*` después del `=`, y `\s` también casa saltos de línea. Una variable vacía al final de `.env.example` (`NOMBRE=`) se lee con el valor de la línea siguiente. QC-237 lo esquiva escribiendo `INTEGRATIONS_E2E_DOUBLES=""`. Arreglo: cambiar `\s*` por `[ \t]*` en `tests/guards/guard-dobles-e2e.test.ts` y volver a dejar las variables como `NOMBRE=`.
 - **Dueño:** sin asignar.
+- **Resuelta (2026-10-13, QC-237):** la regex de `guard-dobles-e2e` usa `[ \t]*` tras el `=` y `.env.example` vuelve a `INTEGRATIONS_E2E_DOUBLES=` (lo exige `storage-config` R32).

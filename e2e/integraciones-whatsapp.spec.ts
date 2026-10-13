@@ -33,6 +33,7 @@ import {
 import { prisma } from '@/lib/shared/db/prisma';
 import { WHATSAPP_INTEGRATION_ROUTE, whatsappWebhookPath } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 const USERNAME_PREFIX = 'qc237_e2e_';
@@ -79,7 +80,7 @@ async function createAdministrador(
   /** Contrasena conocida del usuario de prueba. Solo vive aqui; nunca se escribe en consola. */
   const password = `Qc237-E2E-${RUN_ID.slice(0, 12)}`;
 
-  const user = await prisma.user.create({
+  const user = await createFixtureUser({
     data: {
       firstNames: `Qc237${RUN_ID.slice(0, 8)}${suffix}`,
       lastNames: 'WhatsApp',

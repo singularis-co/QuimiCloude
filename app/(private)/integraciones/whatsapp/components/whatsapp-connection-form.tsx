@@ -3,6 +3,7 @@
 import { useActionState, useId } from 'react';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { PasswordField } from '@/components/shared/password-field';
 import { SubmitButton } from '@/components/shared/submit-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -179,17 +180,15 @@ export function WhatsappConnectionForm(props: WhatsappConnectionFormProps) {
         const hintId = `${id}-hint`;
         return (
           <div key={field} className="flex flex-col gap-2">
-            <Label htmlFor={id}>{WHATSAPP_FIELD_LABELS[field]}</Label>
-            <Input
+            <PasswordField
               id={id}
               name={field}
-              type="password"
+              label={WHATSAPP_FIELD_LABELS[field]}
+              variant="secret"
               autoComplete="off"
               required={!isEdit}
-              aria-required={!isEdit}
-              aria-describedby={isEdit ? hintId : undefined}
-              className={WHATSAPP_FIELD_CLASS}
-              data-testid={WHATSAPP_FIELD_TESTIDS[field]}
+              describedBy={isEdit ? hintId : undefined}
+              testId={WHATSAPP_FIELD_TESTIDS[field]}
             />
             {isEdit ? (
               <p id={hintId} className="text-sm text-muted-foreground">

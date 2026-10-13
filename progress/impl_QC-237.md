@@ -224,3 +224,19 @@ redeclaró al final. Si QC-224 crea una migración, hay que cuidar su orden con
 - `pnpm exec playwright test e2e/integraciones-whatsapp.spec.ts e2e/integraciones.spec.ts` → `14 passed (2.4m)`.
   T12 queda cerrada (review B1).
 - Textos de UI fuera del spec (review, sección «textos a confirmar»): el humano los aprueba tal cual el 2026-10-09.
+
+## Rojos de `gate-completo` tras sincronizar con dev (2026-10-13)
+
+- **QC-260 R29:** Access Token y App Secret pasan a `PasswordField` (`variant="secret"`, mismo
+  label, `name`, `testId`, `autoComplete="off"`, hint «Déjalo vacío…» por `describedBy`).
+  `PasswordField` gana un `required` opcional (alta exige los secretos; edición no).
+  `whatsapp-connection-form.tsx`, `components/shared/password-field.tsx`,
+  `tests/unit/integraciones-ui/whatsapp-connection-form.test.tsx` (R40 acepta `h-11` del campo
+  compartido y comprueba `size-11` del ojo).
+- **QC-255:** `e2e/integraciones-whatsapp.spec.ts` crea su usuario con `createFixtureUser`.
+- **storage-config R32 / D54:** `.env.example` vuelve a `INTEGRATIONS_E2E_DOUBLES=`;
+  `guard-dobles-e2e` usa `[ \t]*` tras el signo; D54 resuelta en `progress/deudas.md`.
+- Salida: `typecheck` limpio; `lint` 0 errores (7 warnings previos ajenos); vitest (guardias,
+  storage-config, integraciones, integraciones-ui, shared-ui) 135 archivos, 1910 passed, 15 skipped;
+  Playwright `e2e/integraciones-whatsapp.spec.ts` chromium 2 passed.
+- Veredicto: los tres rojos corregidos sin tocar baseline ni debilitar guardias.

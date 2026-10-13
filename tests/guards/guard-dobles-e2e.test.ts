@@ -150,10 +150,11 @@ const CENSO = new Map<string, string>(
  * `process.env.NOMBRE = 'valor'`. El nombre tiene que estar a la IZQUIERDA de la asignacion, asi
  * que la linea que lo declara como literal —el `const` del lector de entorno— no cuenta, y la linea
  * vacia y documentada de `.env.example` —el nombre, el signo y fin de linea— tampoco: detras del
- * signo no queda nada.
+ * signo no queda nada. Tras el signo solo se admiten espacios y tabuladores, no saltos de linea:
+ * con `\s*` una `NOMBRE=` vacia se leia con el valor de la linea siguiente (D54).
  */
 function patronDeActivacion(variable: string): RegExp {
-  return new RegExp(`${variable}\\s*[:=]\\s*['"\`]?[^\\s'"\`,;)}]`);
+  return new RegExp(`${variable}\\s*[:=][ \\t]*['"\`]?[^\\s'"\`,;)}]`);
 }
 
 /** Los archivos de un censo cualquiera que ACTIVAN la variable. Puro, para poder alimentarlo a mano. */

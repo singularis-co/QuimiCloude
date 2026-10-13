@@ -264,7 +264,13 @@ describe('WhatsappConnectionForm en alta', () => {
       expect(campo(field).className).toMatch(/(^|\s)text-base(\s|$)/);
       expect(campo(field).className).toMatch(/(^|\s)md:text-base(\s|$)/);
       expect(campo(field).className).not.toMatch(/(^|\s)md:text-sm(\s|$)/);
-      expect(campo(field).className).toMatch(/(^|\s)min-h-11(\s|$)/);
+      // Los publicos llevan `min-h-11`; los secretos son `PasswordField` (QC-260 R29), que fija `h-11`.
+      expect(campo(field).className).toMatch(/(^|\s)(min-h-11|h-11)(\s|$)/);
+    }
+    for (const field of WHATSAPP_SECRET_FIELDS) {
+      expect(screen.getByTestId(`${WHATSAPP_FIELD_TESTIDS[field]}-toggle`).className).toMatch(
+        /(^|\s)size-11(\s|$)/,
+      );
     }
     const boton = screen.getByTestId(WHATSAPP_CONNECTION_FORM_SUBMIT_TESTID);
     expect(boton.className).toMatch(/(^|\s)min-h-11(\s|$)/);

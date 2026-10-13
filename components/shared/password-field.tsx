@@ -30,6 +30,7 @@ export type PasswordFieldProps = {
   readonly error?: string;
   readonly describedBy?: string;
   readonly testId?: string;
+  readonly required?: boolean;
   readonly requirements?: PasswordFieldRequirements;
 };
 
@@ -56,6 +57,7 @@ function FieldShell({
   error,
   describedBy,
   testId,
+  required,
   requirementsId,
   value,
   onChange,
@@ -75,6 +77,8 @@ function FieldShell({
           name={name}
           type={visible ? 'text' : 'password'}
           autoComplete={autoComplete}
+          required={required}
+          aria-required={required ? true : undefined}
           spellCheck={variant === 'secret' ? false : undefined}
           aria-invalid={error ? true : undefined}
           aria-describedby={joinIds(describedBy, requirementsId, error ? errorId : undefined)}
