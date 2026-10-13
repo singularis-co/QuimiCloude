@@ -97,7 +97,7 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
   animación de `FormulaEvidenciaMovil.dc.html`; fila nueva en `CATALOGO.md` con su tablero.
   *Hecho:* `tests/unit/shared-ui/switch.test.tsx` (`role="switch"`, `aria-checked`, teclado,
   deshabilitado); guardia del catálogo verde.
-- [ ] **T16. Extensión de `StepReader`** [P] (R15, R16, R22). Props `renderStepAddon`,
+- [x] **T16. Extensión de `StepReader`** [P] (R15, R16, R22). Props `renderStepAddon`,
   `stepBlockReason`, `stepRequest` (`design.md > 8.2`); fila del catálogo actualizada.
   *Hecho:* casos nuevos en `tests/unit/recetas-ui/step-reader.test.tsx` (motivo extra bloquea
   Siguiente y Finalizar; prioridad del motivo de elementos pendientes; `stepRequest` navega y avisa
