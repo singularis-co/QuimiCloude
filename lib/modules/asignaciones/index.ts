@@ -307,3 +307,20 @@ export {
   type ConditioningTeamCandidates,
   type ListConditioningTeamCandidatesDeps,
 } from './domain/list-conditioning-team-candidates';
+
+// ---------------------------------------------------------------------------------------
+// Evidencia por paso: tope, ruta y pasos sin fotos. Puro, tambien para la pantalla.
+// ---------------------------------------------------------------------------------------
+export {
+  EVIDENCE_PHASES,
+  EVIDENCE_READ_LINK_TTL_SECONDS,
+  MAX_EVIDENCE_PER_STEP,
+  buildEvidencePath,
+  isEvidencePathOf,
+  missingEvidencePositions,
+  stepRequiresEvidence,
+  type EvidencePhase,
+  type EvidenceStep,
+  type StepEvidencePhotoView,
+  type StepEvidenceView,
+} from './domain/step-evidence';
