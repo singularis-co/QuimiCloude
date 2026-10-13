@@ -289,7 +289,7 @@ Archivos:
 **Hecho cuando:** `pnpm exec playwright test e2e/detalle-de-producto-terminado.spec.ts` está en verde
 en local y la guardia también.
 
-## TZ — Cierre (depende de TI)
+## [x] TZ — Cierre (depende de TI)
 
 - `progress/impl_QC-225-detalle-de-producto-terminado.md`: el mapa `R<n> → test` completo, de R1 a
   R36, con la ruta y el nombre de cada caso (`design.md > 10`).

@@ -244,3 +244,148 @@ Pendientes de TI: R31 (E2E) y el recorrido de R26/R27.
   (`Popover`, `Button`, `Link`, `OrderDistributionLabel`), pero añade enlaces visibles. Que lo
   confirme el reviewer.
 - Comentario «Los TRES lotes» de `order-list-section.tsx` ya estaba desactualizado; no se tocó.
+
+## Tanda 3 (2026-10-13): TC, TI y TZ
+
+TC, TI y TZ marcadas `[x]` en `tasks.md`. Las ediciones las hizo `frontend_dev` (tres pasadas); la
+verificación y los commits, el implementer. Por memoria baja, ni `./init.sh` ni la suite entera: el
+gate completo lo corre CI.
+
+Commits:
+- `7d9dac70` TC: censos cerrados `inventario/scope` (excluye por nombre `order-produced-presentations.tsx`,
+  que casa con el barrido por «presentation» sin ser pantalla de catálogo; defensa: existe y no lleva
+  `ProductListSection`/`product-table`) y `recetas-ui/recipe-route-contract` (+ `finishedProductDetailRoute`
+  en la lista exacta de exportaciones de `routes.ts`).
+- `64ce1a3a` fix: el E2E destapó que la página caía para todos (también para el usuario sin permiso):
+  `finished-product-list-section.tsx` (servidor) llamaba al cargar a `movementReasonLabel`, definida en
+  `batch-history.tsx` (`'use client'`). Error de Next: «Attempted to call movementReasonLabel() from the
+  server but movementReasonLabel is on the client». La función pura pasa a
+  `app/(private)/inventario/components/movement-reason-label.ts` (sin directiva), mismo nombre y salida;
+  el barrel la exporta de ahí. Regresión en `finished-product-route-contract.test.ts` (dos casos R16).
+  Ningún test unitario lo cazaba: los de la página mockean el barrel. Entró en `337c5aa0` (F2).
+- `de9a371a` TI: `e2e/detalle-de-producto-terminado.spec.ts` y listas cerradas de E2E
+  (`guard-identificador-de-request > E2E_ESPERADOS`, `inventario/scope > e2eMatches`,
+  `clientes/scope > E2E_PERMITIDOS`, `shared/data-table-alcance`, 41 → 42).
+- el siguiente: esta bitácora y `tasks.md` (TZ).
+
+**Fuera de «Archivos esperados», añadidos con fecha y motivo:** `tests/unit/inventario/scope.test.ts`,
+`tests/unit/recetas-ui/recipe-route-contract.test.ts`, `tests/unit/clientes/scope.test.ts`,
+`tests/unit/shared/data-table-alcance.test.ts` y, de producción,
+`app/(private)/inventario/components/{movement-reason-label.ts,batch-history.tsx,adjust-batch-dialog.tsx,index.ts}`.
+
+### TC: tabla de `design.md > 7`, fila a fila
+
+| Fila | Estado |
+|---|---|
+| `inventario-schema` (24 factorías), `product-route-contract`, `finished-product-route-contract`, `guard-pantallas-exigen-permiso` (26), `session-once-per-request-actions`, `aislamiento.json`, `company-scope` | hechas en T0/B/F; verdes en `vitest related` y en `vitest run guard` |
+| `guard-identificador-de-request > E2E_ESPERADOS` | hecha en TI |
+| `guard-arquitectura-modulos` (sin ciclo `inventario → clientes`) | sin cambio, verde |
+| `guard-pantalla-pedidos-se-amplia` | sin cambio, verde |
+| `guard-dependencias-aprobadas` | sin cambio, verde; `package.json` y `pnpm-lock.yaml` sin diff vs `origin/dev` |
+| `MIGRACIONES_ESPERADAS` (R32) | sin cambio: `guard-identificador-de-request.test.ts` solo cambia en `E2E_ESPERADOS`; `db/` y `prisma/` sin diff vs `origin/dev` |
+
+Censos que `vitest related` no relaciona, corridos aparte: `clientes/scope`, `shared/data-table-alcance`,
+`guard-piezas-base`, `pedidos-ui/pedidos-convenciones`, `pedidos/module-contract`, `inventario/scope`
+(no hay otros `scope*` en inventario), `guard-identificador-de-request`, `guard-e2e-fixture-user`.
+
+### Salida de la verificación (tanda 3)
+
+- `pnpm run typecheck`: limpio al final de TC y en TZ (en TZ con `NODE_OPTIONS=--max-old-space-size=4096`;
+  sin él `tsc` se quedó una vez sin memoria en la pasada de `frontend_dev`).
+- `pnpm exec eslint` sobre los archivos del diff vs `origin/dev` y los tocados en esta tanda: sin hallazgos.
+- Tests del diff, directo: `Test Files 26 passed (26) / Tests 459 passed (459)`.
+- `vitest related --run` (proyectos `ui` y `node`) sobre `lib/` del diff:
+  `Test Files 2 failed | 502 passed (504) / Tests 2 failed | 8654 passed | 52 skipped (8708)`, 1478 s.
+  Los dos rojos: `inventario/scope.test.ts:247` y `recetas-ui/recipe-route-contract.test.ts:1339`
+  (ninguno en `baseline-rojos.json`); arreglados en `7d9dac70`.
+- `vitest related --run` sobre `app/` del diff: `Test Files 82 passed (82) / Tests 1500 passed (1500)`.
+- Tras `7d9dac70`, los dos rojos y los censos de arriba: `Test Files 9 passed (9) / Tests 159 passed | 6 skipped (165)`.
+- Tras el fix (frontend_dev): batch-history, finished-product-route-contract, product-route-contract,
+  finished-product-tables, finished-product-page, inventario/scope, adjust-batch-dialog,
+  product-batches-sheet, stock-adjustment, decimal-quantity-convenciones: `Test Files 10 passed (10) / Tests 153 passed (153)`.
+- Tras TI, listas cerradas de E2E y contrato de la ruta: `Test Files 7 passed (7) / Tests 102 passed | 2 skipped (104)`.
+  `frontend_dev` corrió además las otras listas que miran `e2e/` (scope de pedidos, proveedores y recetas,
+  grupos/alcance, catalogo-sin-total-fijo, unidades-convenciones, guard-editor-aislado,
+  guard-e2e-presupuesto, guard-e2e-landing, guard-e2e-sin-saltos, guard-dobles-e2e): todas verdes.
+- `pnpm exec vitest run guard` (TC, tras el fix y en TZ): `Test Files 75 passed (75) / Tests 1050 passed | 20 skipped (1070)`.
+
+### E2E (`pnpm exec playwright test e2e/detalle-de-producto-terminado.spec.ts --project <p> --workers=1`)
+
+Base: `qct_qc225_e2ae854a_mv754018_bvg`, copia de la plantilla `qct_tpl_7c42b3e164a6` con
+`createRunDatabase`; borrada con `destroyRunDatabase` al terminar. `DATABASE_URL`/`DIRECT_URL` a esa base
+y `SESSION_SECRET` aleatorio en el entorno del comando. Nunca `QuimiCloude`, preview ni producción.
+
+Antes del fix, chromium: `2 failed` (la página no pintaba `finished-product-name`). Después:
+
+```
+✓  1 [chromium] › e2e\detalle-de-producto-terminado.spec.ts:476:7 › ficha de producto terminado › R31, R27, R26: tras una entrega parcial, la ficha abierta desde /pedidos y desde /inventario muestra lote, produccion, salida y entrega (18.4s)
+✓  2 [chromium] › e2e\detalle-de-producto-terminado.spec.ts:555:7 › ficha de producto terminado › R31, R1: un usuario sin inventario.consultar que abre la ficha recibe el 404 (2.9s)
+2 passed (34.3s)
+✓  1 [webkit] › e2e\detalle-de-producto-terminado.spec.ts:476:7 › ficha de producto terminado › R31, R27, R26: tras una entrega parcial, la ficha abierta desde /pedidos y desde /inventario muestra lote, produccion, salida y entrega (36.9s)
+✓  2 [webkit] › e2e\detalle-de-producto-terminado.spec.ts:555:7 › ficha de producto terminado › R31, R1: un usuario sin inventario.consultar que abre la ficha recibe el 404 (4.7s)
+2 passed (49.3s)
+```
+
+El spec siembra por Prisma el pedido `TERMINADO`, sus lotes y el asiento `production` (como la
+preparación de `entregar-producto-terminado.spec.ts`); la entrega parcial va por la UI de /pedidos. El
+usuario sin permiso tiene un rol efímero sin permisos (como `ejecucion-receta.spec.ts`), creado con
+`createFixtureUser`.
+
+### Mapa R<n> → test completo (TZ)
+
+Rutas: **u** `tests/unit/inventario/`, **ui** `tests/unit/inventario-ui/`, **pui** `tests/unit/pedidos-ui/`,
+**int** `tests/integration/`, **e2e** `e2e/detalle-de-producto-terminado.spec.ts`. Caso por su prefijo.
+
+| R | Test (archivo › caso) |
+|---|---|
+| R1 | u `producto-terminado/finished-product-route-contract.test.ts` › «R1 — requirePagePermission('inventario.consultar') es la primera linea de la pagina»; ui `finished-product-page.test.tsx` › «R1 — exige inventario.consultar antes de leer el producto»; e2e › «R31, R1: un usuario sin inventario.consultar que abre la ficha recibe el 404» |
+| R2 | u `get-finished-product.test.ts`, `list-finished-product-{batches,movements,deliveries,costs}.test.ts`, `list-produced-products.test.ts` › «R2: sin inventario.consultar responde unauthorized … y no llama …»; u `finished-product-actions.test.ts` › «R2: traduce unauthorized a su ErrorState» |
+| R3 | los seis tests de caso de uso › «R3: un actor de otro rol con el permiso es aceptado» y «R3: un Administrador sin inventario.consultar en su conjunto es rechazado» |
+| R4 | u `list-finished-product-deliveries.test.ts` › «R4: con solo inventario.consultar, sin pedidos ni clientes, ve el cliente y el pedido …»; u `list-finished-product-costs.test.ts` › «R4: con solo inventario.consultar, sin recetas ni pedidos, ve el costo y el pedido» |
+| R5 | u `get-finished-product.test.ts` › «R5: un id sin forma de uuid responde product_not_found sin consultar», «R5: si el repositorio no lo encuentra vivo …»; u `list-finished-product-*.test.ts` › «R5: …»; u `finished-product-actions.test.ts` › «R5: traduce product_not_found a su ErrorState»; int `inventario/finished-product-detail.int.test.ts` › «R5: devuelve null para un producto borrado, un insumo, uno de otra empresa y uno inexistente» |
+| R6 | ui `finished-product-page.test.tsx` › «R6 — product_not_found pinta «no encontrado» …», «R6 — cualquier otro error pinta ErrorState …» |
+| R7 | u `producto-terminado/finished-product-route-contract.test.ts` › «R7, R36 — ningun archivo de la ruta importa una Server Action de escritura …», «R7, R36 — la guardia de escritura muerde con una fuente fabricada» |
+| R8 | ui `finished-product-tabs.test.tsx` › «R8 — siete tabs en este orden: General, Stock, Lotes, Entradas, Salidas, Entregas y Costo …»; ui `finished-product-page.test.tsx` › «R8 — el exito pinta el nombre del producto y las siete pestañas» |
+| R9 | ui `finished-product-params.test.ts` › «R9 — un tab desconocido o ausente abre General», «R9 — page y pageSize que no son enteros validos caen al defecto», «R9 — el enlace de tab lleva el tab y no lleva pagina»; ui `finished-product-tabs.test.tsx` › casos R9 |
+| R10 | u `get-finished-product.test.ts` › «R10: resuelve la unidad base y la de la presentacion en una sola llamada al catalogo»; ui `finished-product-page.test.tsx` › «R10 — General muestra nombre, imagen, presentacion …» |
+| R11 | u `finished-product-detail.test.ts` › «R11, R12: suma el total exacto, agrupa por contenido ascendente …»; u `get-finished-product.test.ts` › «R11, R12: el stock sale de los lotes del registro …»; ui `finished-product-page.test.tsx` › «R11, R12 — Stock muestra el total en unidad base …»; int › «R5, R11: trae el producto vivo …» |
+| R12 | u `finished-product-detail.test.ts` › «R12: restos exactos, sin coma flotante (0.1 + 0.2 da 0.3)», «R12: un resto que suma cero sale como null»; ui `finished-product-page.test.tsx` › «R12 — sin lotes sin envase no hay entrada «sin envase» …» |
+| R13 | u `list-finished-product-batches.test.ts` › «R13: lista todos los lotes, el agotado y el sin pedido incluidos …»; ui `finished-product-tables.test.tsx` › «R13 — columnas de Lotes …», «R13 — un lote agotado sigue en la lista …»; int › «R13, R14: todos los lotes, agotado incluido …»; e2e › «R31, R27, R26: …» (Lotes) |
+| R14 | u `list-finished-product-batches.test.ts` › «R14: un pedido sin numero en el directorio sale como null y la fila sigue»; int › «R13, R14: …» |
+| R15 | u `list-finished-product-movements.test.ts` › casos R15; ui `finished-product-tables.test.tsx` › «R15, R16 — Entradas con su origen …»; int › «R15, R16, R35: in trae solo los asientos positivos …»; e2e › «R31, R27, R26: …» (Entradas) |
+| R16 | ui `finished-product-tables.test.tsx` › «R16 — los motivos llegan con la etiqueta de /inventario»; u `producto-terminado/finished-product-route-contract.test.ts` › «R16 — la ruta solo llama desde el servidor a valores del barrel de /inventario que no vienen de un modulo de cliente», «R16 — la guardia de modulo de cliente muerde con fuentes fabricadas»; int › «R15, R16, R35: …» |
+| R17 | ui `finished-product-tables.test.tsx` › «R17 — Salidas con la entrega y el ajuste que resta, cantidad sin signo»; int › «R17, R18, R35: out trae solo los negativos …»; e2e › «R31, R27, R26: …» (Salidas) |
+| R18 | u `list-finished-product-movements.test.ts` › «R18: la direccion pedida llega tal cual al puerto, que clasifica por el signo»; int › «R18: ningun asiento sale en los dos lados» |
+| R19 | int `inventario/…` › «R19: los asientos delivery traen su orderDeliveryId …»; int `pedidos/order-delivery-directory.int.test.ts` › «R19: trae el cliente de la entrega y los envases de cada uno de sus dos lotes»; ui › «R19, R20 — Entregas con cliente, pedido, lote, envases y cantidad …»; e2e › «R31, R27, R26: …» (Entregas) |
+| R20 | u `list-finished-product-deliveries.test.ts` › «R20: un cliente dado de baja sale con su marca …», «R20: un cliente que no vuelve sale como null y la fila sigue»; ui › «R19, R20 — …» |
+| R21 | u `finished-product-detail.test.ts` › «R21: redondea mitad arriba cuando el quinto decimal es 5»; ui › «R21 — Costo con lote, pedido, cantidad, envases, unitario y total»; int › «R21, R22: solo los lotes con asiento production …» |
+| R22 | u `list-finished-product-costs.test.ts` › «R22: el total sale de unitCost x cantidad del registro, sin ningun puerto de recetas ni de costos»; int › «R21, R22: …» |
+| R23 | u de cada listado › casos R23 (`invalid_input`); ui › «R23 — la paginacion navega cambiando page …»; int › «R23: orden createdAt desc e id desc, 10 por defecto, tope de 25 y total correcto» |
+| R24 | ui `finished-product-tables.test.tsx` › «R24 — cada tab sin filas muestra su estado vacio propio, distinto del error», «R24 — cada tab en error muestra su estado de error, no el vacio» |
+| R25 | int `inventario/…` › «R25: con el ambito de A, nada de B aparece en ningun metodo aunque se pase un id de B»; int `pedidos/…` › «R25: una entrega de B no vuelve con la empresa A aunque se pida su id» |
+| R26 | u `finished-stock-table.test.tsx` › «R26: el nombre de cada sub-fila enlaza a la ficha de su producto y la fila de grupo no lleva enlace»; e2e › «R31, R27, R26: …» (vuelta desde /inventario) |
+| R27 | u `list-produced-products.test.ts` › «R27: devuelve el enlace de cada presentacion producida por cada pedido …»; pui `order-produced-presentations.test.tsx` y `order-columns.test.tsx` › casos R27; int › «R27, R28: (pedido, presentacion, producto) por los asientos production …»; e2e › «R31, R27, R26: …» (enlace de /pedidos) |
+| R28 | u `list-produced-products.test.ts` › «R28: un par pedido-presentacion con dos productos se omite …»; pui `order-produced-presentations.test.tsx`, `order-columns.test.tsx` › casos R28; int › «R27, R28: …» |
+| R29 | pui `order-list-section-produced.test.tsx` › «R29: si la consulta de productos falla, la lista se pinta igual y sin enlaces», «R29: sin pedidos TERMINADO ni ENTREGADO en la página no se consultan …» |
+| R30 | u `producto-terminado/finished-product-route-contract.test.ts` › «R30 — ningun archivo de la ruta incrusta la direccion de la ficha»; `tests/unit/recetas-ui/recipe-route-contract.test.ts` › «lib/shared/routes.ts no gana ninguna constante para el asistente y publica exactamente las de hoy» (el builder vive solo en `routes.ts`) |
+| R31 | e2e › «R31, R27, R26: tras una entrega parcial, la ficha abierta desde /pedidos y desde /inventario muestra lote, produccion, salida y entrega»; «R31, R1: un usuario sin inventario.consultar que abre la ficha recibe el 404» |
+| R32 | `tests/guards/guard-dependencias-aprobadas.test.ts` (sin cambio, verde); `tests/guards/guard-identificador-de-request.test.ts` (`MIGRACIONES_ESPERADAS` sin cambio, verde). Sin caso con «R32» en el nombre: son guardias existentes, como prevé `design.md > 10` |
+| R33 | u `list-finished-product-deliveries.test.ts` › casos R33; int `pedidos/…` › «R33: en una entrega con dos presentaciones y una anulada, solo la linea anulada trae su motivo»; ui › «R33 — una fila anulada lleva «Anulada», su motivo y data-voided …» |
+| R34 | u `list-finished-product-deliveries.test.ts` › casos R34; int `pedidos/…` › «R34: suma cantidad y envases solo de las lineas sin anulacion …», «R34: con todas las lineas de esos lotes anuladas el total es cero», «R34: con lotes vacios devuelve cero sin consultar»; ui › caso R34 (`finished-product-deliveries-total`) |
+| R35 | u `list-finished-product-movements.test.ts` › caso R35; int › «R15, R16, R35: …», «R17, R18, R35: …»; ui › «R35 — Entradas etiqueta el delivery_void como «Anulación de entrega» con su pedido» |
+| R36 | u `list-finished-product-deliveries.test.ts` › «R36: un actor con solo inventario.consultar recibe la anulacion y el total entregado»; ui › «R36 — ninguna fila de Entregas lleva un boton o enlace, tampoco para anular»; u `producto-terminado/finished-product-route-contract.test.ts` › «R7, R36 — …» |
+
+Ningún `R<n>` queda sin test. R32 se cubre con guardias existentes, sin caso propio.
+
+### Decisiones a validar (tanda 3)
+
+- El fix de `movementReasonLabel` toca tres archivos de /inventario fuera de la ficha (mover una función
+  pura; sin cambio de comportamiento). Alternativa descartada: duplicar las etiquetas en la ruta.
+- `inventario/scope.test.ts` excluye `order-produced-presentations.tsx` por nombre en vez de afinar el
+  barrido, como las exclusiones previas.
+- Las notas fechadas de esta tanda en los censos describen la ficha en palabras, sin la clave. Las de
+  tandas anteriores (`guard-pantallas-exigen-permiso:262`, `product-route-contract:111`,
+  `aislamiento.json`) citan la clave del ticket, como el resto de notas de esos archivos; no se tocaron.
+- `./init.sh` no se corrió (memoria baja, por indicación del leader): lo sustituyen los comandos de
+  arriba; el gate completo queda para CI.
+- `origin/dev` va 28 commits por delante de la rama; no se sincronizó (F2.3 la pide el leader).
