@@ -859,6 +859,32 @@
    "title": "CountrySelect (QC-235)",
    "page": "fundamentos",
    "is_interactive": true
+  },
+  "ProveedorIA.dc.html": {
+   "x": 0,
+   "y": 11740,
+   "w": 1440,
+   "h": 1100,
+   "title": "Proveedor IA (QC-275)",
+   "page": "configuracion",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "ProveedorIATablet.dc.html": {
+   "x": 1520,
+   "y": 11740,
+   "w": 904,
+   "h": 1300,
+   "title": "ProveedorIATablet",
+   "page": "configuracion"
+  },
+  "ProveedorIAMovil.dc.html": {
+   "x": 2504,
+   "y": 11740,
+   "w": 960,
+   "h": 1300,
+   "title": "ProveedorIAMovil",
+   "page": "configuracion"
   }
  },
  "order": [
@@ -949,7 +975,10 @@
   "IntegracionesTablet.dc.html",
   "IntegracionesMovil.dc.html",
   "ModalesConfiguracion.dc.html",
-  "CountrySelect.dc.html"
+  "CountrySelect.dc.html",
+  "ProveedorIA.dc.html",
+  "ProveedorIATablet.dc.html",
+  "ProveedorIAMovil.dc.html"
  ],
  "notes": {
   "t1": {
@@ -1334,6 +1363,17 @@
    "text": "Modales del módulo",
    "kind": "title1",
    "maxW": 1440,
+   "page": "configuracion"
+  },
+  "c_ProveedorIA": {
+   "x": 0,
+   "y": 11630,
+   "text": "Proveedor IA (QC-275)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
    "page": "configuracion"
   }
  },
