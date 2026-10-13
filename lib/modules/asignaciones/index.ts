@@ -324,3 +324,9 @@ export {
   type StepEvidencePhotoView,
   type StepEvidenceView,
 } from './domain/step-evidence';
+export {
+  EvidenceInvalidFileError,
+  EvidenceLimitError,
+  EvidenceNotFoundError,
+  EvidenceRequiredError,
+} from './domain/errors';

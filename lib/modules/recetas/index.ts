@@ -125,3 +125,6 @@ export {
   createListRecipeVersions,
   type ListRecipeVersionsDeps,
 } from './domain/list-recipe-versions';
+
+// Mover o quitar pasos con pedidos en curso que ya tienen fotos de evidencia.
+export { RecipeStepsLockedError } from './domain/errors';
