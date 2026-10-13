@@ -42,7 +42,7 @@ los prueba en navegador. La 3 es el cierre. Cada tanda termina con `./init.sh` e
 
 ## Tanda 2 — E2E (depende de T1a, T1b y T1c)
 
-- [ ] **T2a. Fixture** en el `beforeAll` de `e2e/operario-rediseno.spec.ts` (`design.md > 7`).
+- [x] **T2a. Fixture** en el `beforeAll` de `e2e/operario-rediseno.spec.ts` (`design.md > 7`).
   - Productos y recetas:
     - `MANY_LINES = 24` productos con nombres largos, sembrados con `createMany`;
     - receta «muchos materiales»: 24 líneas que sumen 100,00 y un paso de una casilla;
@@ -51,7 +51,7 @@ los prueba en navegador. La 3 es el cierre. Cada tanda termina con `./init.sh` e
     al Operador.
   - `deleteCompanyData` borra líneas de receta y productos en el orden de sus FK.
   - *Hecho:* los 17 casos existentes siguen en verde en Chromium.
-- [ ] **T2b. Casos nuevos** de `design.md > 7`:
+- [x] **T2b. Casos nuevos** de `design.md > 7`:
   - `R1, R2, R3 — «Entrar» alineado en sus tres estados`;
   - `R4, R6, R9, R10 — panel con muchos materiales`;
   - `R5 — paso largo`.
