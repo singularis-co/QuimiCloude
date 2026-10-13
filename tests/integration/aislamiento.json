@@ -626,6 +626,11 @@
       "archivo": "recetas/step-evidence-flag.int.test.ts",
       "motivo": "QC-214 T1: ejercita `createRecipe`, `createRecipeVersion`, `replaceAliveRecipe` y `findAliveRecipeById` de `recipe-prisma.ts` y `findRecipeExecutionContentById` / `findRecipePackingStepsById` de `recipe-catalog-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria. Una empresa efimera (randomUUID) nace en `beforeAll` y muere en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-13"
+    },
+    {
+      "archivo": "asignaciones/step-evidence-repository.int.test.ts",
+      "motivo": "QC-214 T5 (R29, R38, R39): ejercita `createStepEvidenceRepository` (step-evidence-prisma.ts) con el cliente Prisma GLOBAL: `replace` abre su PROPIA `prisma.$transaction` y lo que se mide en R29 es la carrera de varios registros simultaneos sobre el mismo paso, que necesita conexiones distintas, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en `beforeAll` y mueren en `afterAll` en el orden de las FK: fotos -> pedidos -> recetas -> usuarios -> roles -> tipos de documento -> empresas. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-13"
     }
   ]
 }
