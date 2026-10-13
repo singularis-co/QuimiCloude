@@ -50,6 +50,7 @@ comprobación en navegador la cubre el e2e de R1 (T8a: x de `private-content` = 
 | 4 | ver `git log` | init OK |
 | 5 | ver `git log` | init OK (un solo `./init.sh` tras 5 y 6) |
 | 6 | ver `git log` (lleva el `.snap` compartido) | init OK |
+| 7 | ver `git log` | init OK (al segundo intento; ver Tanda 7) |
 
 ## Bloqueos para el leader
 
@@ -255,3 +256,32 @@ el no aplicable deshabilitado, así que `e2e/acondicionar-con-equipo.spec.ts` (�
 (3) «Cantidad:» y «Lo acondiciona …» van al subtítulo junto al reparto (D12 solo pedía el reparto; no
 se pierde dato); el aviso de lote que falta pasa al pie, encima de los botones, y sigue describiendo
 «Terminar»; (4) `conditioning-order-page.test.tsx`: «no ofrece el botón» pasa a «deshabilitado».
+
+## Tanda 7 — Textos y toast (frontend_dev)
+
+Archivos: `components/shared/step-reader/step-reader.tsx` («ningún paso»);
+`app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-batch-data-form.tsx` (un
+`toast.success('Datos de lote guardados.')` por envío; sin el `<p>` de éxito);
+`tests/unit/asignaciones-ui/conditioning-batch-data-form.test.tsx`;
+`tests/guards/guard-asignacion-componentizada.test.ts` (reglas R38 y R39, muestra + repositorio).
+El resto de R39 ya venía de T4/T5.
+
+Mapa R → test: R38 → guardia «anillo y textos del operario > R38 …» y «repositorio > R38 … una sola
+definición» (+ `countdown-ring.test.tsx` de T1) · R39 → guardia «… R39 …» (muestras) y «repositorio >
+R39 … app/ y components/» · R40 → `conditioning-batch-data-form.test.tsx` «R1 R40 … un solo toast»,
+«R40: un toast por envío…» y los dos «R5» (con error, sin toast) · el E2E de R40 se migra en T8.
+
+Verificación: typecheck OK; lint 0 errores; `vitest related` 46 archivos, 900 verdes; guard 74
+archivos, 1017 verdes. **Primer `./init.sh` en rojo**: `tests/unit/recetas-ui/recipe-route-contract.test.ts`
+(QC-64 R12, lista cerrada de quién nombra el asistente; no está en `baseline-rojos.json`). Causa: la
+muestra de R38 en la guardia usaba la ruta hipotética `components/shared/step-reader/step-reader.tsx`.
+Arreglo (implementer, una línea): la muestra pasa a `components/shared/otra-pieza.tsx`; no se toca la
+lista cerrada ni se relaja el ancla. Segundo `./init.sh`: **init OK**.
+
+Desvíos: (1) R39 en `requirements.md` dice «código de producción»; la guardia mira `app/` y
+`components/`, como `tasks.md` T7a y `design.md > D15`. Quedan «ningun paso» en comentarios de
+`lib/modules/identity/.../session-token.ts:257`, `lib/modules/pedidos/domain/order-cost.ts:38` y
+`lib/modules/recetas/domain/recipe-percentage.ts:3` (otros módulos, sin texto visible): sin tocar.
+(2) `CONDITIONING_BATCH_DATA_SUCCESS_TESTID` sigue exportado hasta T8b, porque
+`e2e/datos-de-lote-en-acondicionamiento.spec.ts` lo importa (línea 40); las líneas 727–731 esperan el
+testid y pasan al toast en T8b.

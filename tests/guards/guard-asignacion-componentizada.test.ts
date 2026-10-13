@@ -1,4 +1,4 @@
-// Guardia: lo que la componentización de `/asignacion` quitó no vuelve (R3, R7, R9, R16, R19; y R14, R42 del rediseño del operario).
+// Guardia: lo que la componentización de `/asignacion` quitó no vuelve (R3, R7, R9, R16, R19; y R14, R38, R39, R42 del rediseño del operario).
 //
 // Vigila, sobre el código de producción (`app/`, `components/`, `hooks/`, `lib/`):
 //
@@ -9,6 +9,11 @@
 //   4. `helper-duplicado`    — `groupResponsiblesByOrigin` o `filterByDisplayName` se definen fuera de
 //                              `lib/shared/ui/responsible-groups.ts`.
 //   5. `boton-duplicado`     — `CountdownGatedButton` se define fuera de `components/shared`.
+//   6. `anillo-duplicado`    — un `<circle>` con `strokeDashoffset` fuera de
+//                              `components/shared/countdown-ring.tsx` (R38: una sola definición del anillo).
+//   7. `texto-sin-tilde`     — en `app/` o `components/`, una de las tres formas sin tilde de R39
+//                              («Lo esta empacando», «receta esta dada de baja», «ningun paso»). Esta
+//                              regla lee el texto tal cual, comentarios incluidos.
 //
 // Misma forma que `guard-piezas-base`: funciones puras que reciben ruta y texto, analizadas con el
 // compilador de TypeScript (un comentario o una cadena que nombra el símbolo no cuenta), una muestra
@@ -43,6 +48,8 @@ export type Regla =
   | 'vacio-con-tabla'
   | 'helper-duplicado'
   | 'boton-duplicado'
+  | 'anillo-duplicado'
+  | 'texto-sin-tilde'
 
 export type Hallazgo = { readonly archivo: string; readonly regla: Regla; readonly detalle: string }
 
@@ -90,6 +97,12 @@ export const HELPERS_UNICOS = ['groupResponsiblesByOrigin', 'filterByDisplayName
 
 const HOGAR_BOTON = 'components/shared/countdown-gated-button.tsx'
 const BOTON = 'CountdownGatedButton'
+
+const HOGAR_ANILLO = 'components/shared/countdown-ring.tsx'
+
+/** R39 (rediseño del operario): mira solo `app/` y `components/`, como dice la ficha. */
+const CARPETAS_DE_TEXTOS = ['app/', 'components/'] as const
+export const FORMAS_SIN_TILDE = ['Lo esta empacando', 'receta esta dada de baja', 'ningun paso'] as const
 
 // ---------------------------------------------------------------------------------------------
 // Análisis
@@ -153,7 +166,37 @@ function importaciones(archivo: string, fuente: string): { modulos: string[]; no
   return { modulos, nombres }
 }
 
-/** Reglas 2 a 5 sobre un archivo. */
+/** Etiquetas `<circle …>` del archivo que llevan el atributo `strokeDashoffset`. */
+export function circulosConDashoffset(archivo: string, fuente: string): number {
+  if (!archivo.endsWith('.tsx')) return 0
+  const sf = ts.createSourceFile(archivo, fuente, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let cuenta = 0
+  const visitar = (nodo: ts.Node): void => {
+    if (
+      (ts.isJsxOpeningElement(nodo) || ts.isJsxSelfClosingElement(nodo)) &&
+      nodo.tagName.getText(sf) === 'circle' &&
+      nodo.attributes.properties.some(
+        (atributo) =>
+          ts.isJsxAttribute(atributo) &&
+          ['strokeDashoffset', 'stroke-dashoffset'].includes(atributo.name.getText(sf)),
+      )
+    ) {
+      cuenta += 1
+    }
+    ts.forEachChild(nodo, visitar)
+  }
+  visitar(sf)
+  return cuenta
+}
+
+/** Formas de R39 que aparecen en el texto del archivo, sin distinguir mayúsculas. */
+export function formasSinTilde(archivo: string, fuente: string): string[] {
+  if (!CARPETAS_DE_TEXTOS.some((carpeta) => archivo.startsWith(carpeta))) return []
+  const texto = fuente.toLowerCase()
+  return FORMAS_SIN_TILDE.filter((forma) => texto.includes(forma.toLowerCase()))
+}
+
+/** Reglas 2 a 7 sobre un archivo. */
 export function analizar(archivo: string, fuente: string): Hallazgo[] {
   const hallazgos: Hallazgo[] = []
   const declarados = nombresDeclarados(archivo, fuente)
@@ -176,6 +219,14 @@ export function analizar(archivo: string, fuente: string): Hallazgo[] {
 
   if (archivo !== HOGAR_BOTON && definidos.includes(BOTON)) {
     hallazgos.push({ archivo, regla: 'boton-duplicado', detalle: BOTON })
+  }
+
+  if (archivo !== HOGAR_ANILLO && circulosConDashoffset(archivo, fuente) > 0) {
+    hallazgos.push({ archivo, regla: 'anillo-duplicado', detalle: 'circle strokeDashoffset' })
+  }
+
+  for (const forma of formasSinTilde(archivo, fuente)) {
+    hallazgos.push({ archivo, regla: 'texto-sin-tilde', detalle: forma })
   }
 
   if (esVacioOEsqueletoDeLaRuta(archivo)) {
@@ -352,6 +403,57 @@ describe('guard-asignacion-componentizada — avisos y error de lista en una pie
   })
 })
 
+describe('guard-asignacion-componentizada — anillo y textos del operario', () => {
+  const ANILLO = '<svg><circle r={10} strokeDasharray={63} strokeDashoffset={0} /></svg>'
+
+  it('R38 (rediseño del operario) — un <circle> con strokeDashoffset fuera de countdown-ring.tsx es hallazgo', () => {
+    // Ruta de muestra cualquiera fuera de countdown-ring.tsx. NO la del paso a paso: nombrarla aqui
+    // contaria como importador en la lista cerrada de recipe-route-contract (QC-64 R12).
+    const archivo = 'components/shared/otra-pieza.tsx'
+    expect(analizar(archivo, `export const W = () => ${ANILLO}`)).toEqual([
+      { archivo, regla: 'anillo-duplicado', detalle: 'circle strokeDashoffset' },
+    ])
+    expect(
+      analizar('app/x/ring.tsx', 'export const W = () => <circle r={4} stroke-dashoffset="2"></circle>').map(
+        (h) => h.regla,
+      ),
+    ).toEqual(['anillo-duplicado'])
+  })
+
+  it('R38 (rediseño del operario) — en su hogar, sin strokeDashoffset o en un <path>, cumple', () => {
+    expect(analizar(HOGAR_ANILLO, `export const W = () => ${ANILLO}`)).toEqual([])
+    expect(analizar('app/x/a.tsx', 'export const W = () => <circle r={4} />')).toEqual([])
+    expect(analizar('app/x/a.tsx', 'export const W = () => <path strokeDashoffset={3} />')).toEqual([])
+    expect(
+      analizar('app/x/a.tsx', "// <circle strokeDashoffset={0} />\nexport const n = 'circle strokeDashoffset'"),
+    ).toEqual([])
+  })
+
+  it('R39 (rediseño del operario) — las tres formas sin tilde en app/ o components/ son hallazgo', () => {
+    const fuente = [
+      "export const a = 'Lo esta empacando María.'",
+      "export const b = 'Esta receta esta dada de baja.'",
+      '// no tiene ningun paso',
+    ].join('\n')
+    for (const archivo of ['app/(private)/asignacion/x.tsx', 'components/shared/y.tsx']) {
+      expect(analizar(archivo, fuente).map((h) => h.detalle)).toEqual([...FORMAS_SIN_TILDE])
+    }
+    expect(analizar('app/x.tsx', "export const c = 'lo esta empacando'").map((h) => h.regla)).toEqual([
+      'texto-sin-tilde',
+    ])
+  })
+
+  it('R39 (rediseño del operario) — con tilde cumple, y fuera de app/ y components/ no se mira', () => {
+    const conTilde = [
+      "export const a = 'Lo está empacando María.'",
+      "export const b = 'Esta receta está dada de baja.'",
+      "export const c = 'Esta receta no tiene ningún paso que leer.'",
+    ].join('\n')
+    expect(analizar('app/(private)/asignacion/x.tsx', conTilde)).toEqual([])
+    expect(analizar('lib/modules/x/y.ts', '// ningun paso intermedio')).toEqual([])
+  })
+})
+
 describe('guard-asignacion-componentizada — repositorio', () => {
   it('R3 R16 R19 — ningún archivo retirado vuelve', () => {
     expect(archivosQueVolvieron(PRODUCCION)).toEqual([])
@@ -383,6 +485,21 @@ describe('guard-asignacion-componentizada — repositorio', () => {
     expect(definiciones(AVISO)).toEqual([HOGAR_AVISO])
     expect(definiciones('AssignedOrderDeliveredNotice')).toEqual([])
     expect(definiciones('AssignedOrderCancelledNotice')).toEqual([])
+  })
+
+  it('R38 (rediseño del operario) — el anillo de espera tiene una sola definición, en countdown-ring.tsx', () => {
+    const conAnillo = PRODUCCION.filter(
+      (archivo) => circulosConDashoffset(archivo, readFileSync(join(repoRoot, archivo), 'utf8')) > 0,
+    )
+    expect(conAnillo).toEqual([HOGAR_ANILLO])
+  })
+
+  it('R39 (rediseño del operario) — app/ y components/ no contienen ninguna de las tres formas sin tilde', () => {
+    const hallazgos = PRODUCCION.flatMap((archivo) =>
+      formasSinTilde(archivo, readFileSync(join(repoRoot, archivo), 'utf8')).map((forma) => `${archivo}: ${forma}`),
+    )
+    expect(hallazgos).toEqual([])
+    expect(PRODUCCION.some((archivo) => archivo.startsWith('components/'))).toBe(true)
   })
 
   it('R42 (rediseño del operario) — /asignacion tiene una sola pieza de error de lista', () => {

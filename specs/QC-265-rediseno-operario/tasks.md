@@ -127,14 +127,14 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 7 — Textos y toast (depende de 4, 5 y 6)
 
-- [ ] **T7a [P]. Tildes** (D13, R39). Constantes de `packing-order-screen.tsx`,
+- [x] **T7a [P]. Tildes** (D13, R39). Constantes de `packing-order-screen.tsx`,
   `order-execution-screen.tsx` y `step-reader.tsx`. Guardia: regla R39 en
   `guard-asignacion-componentizada.test.ts` (ninguna de las tres formas en `app/` ni en
   `components/`). Tests que afirmaban el texto viejo, actualizados.
-- [ ] **T7b [P]. Toast de datos de lote** (D13, R40). `conditioning-batch-data-form.test.tsx`: con
+- [x] **T7b [P]. Toast de datos de lote** (D13, R40). `conditioning-batch-data-form.test.tsx`: con
   `success` se llama una vez a `toast.success('Datos de lote guardados.')` y no existe
   `conditioning-batch-data-success`; con error, ningún toast y el `ErrorAlert` de hoy.
-- [ ] **T7c. Guardia del anillo** (R38). Regla en `guard-asignacion-componentizada.test.ts`: ningún
+- [x] **T7c. Guardia del anillo** (R38). Regla en `guard-asignacion-componentizada.test.ts`: ningún
   `<circle>` con `strokeDashoffset` fuera de `components/shared/countdown-ring.tsx`.
 
 ## Tanda 8 — E2E (depende de todas)
