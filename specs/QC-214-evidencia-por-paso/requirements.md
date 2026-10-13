@@ -25,7 +25,21 @@ _Pendiente: los escribe spec_author (F1.2)._
 
 ## Preguntas abiertas
 
-Ninguna.
+1. **Falta el pase `/design` (bloqueante, 2026-10-13, `spec_author` F1.2).** La ficha introduce UI
+   visible nueva y ningún tablero de `docs/diseno/canvas/` la cubre (buscado `evidencia`, `foto`,
+   `switch`, `requiere` en `Formula*`, `FormulaVersion*`, `Ejecucion*`, `Empaque*`,
+   `ModalesOperario`, `ModalesProduccion`: nada). Por `docs/perfil-agentes.md > Pase de diseño para
+   componentes nuevos`, el spec no se escribe hasta que el humano apruebe y se copien a
+   `docs/diseno/canvas/` los tableros (escritorio, tablet y teléfono) de:
+   - **El switch «requiere evidencia» en el editor de pasos** (fabricación y envasado). No hay
+     primitivo `Switch` en `components/shared/CATALOGO.md` (solo `Checkbox`): el tablero decide si es
+     un primitivo nuevo o se pinta con `Checkbox`, y dónde va en la fila del paso.
+   - **El bloque de evidencia del paso en Ejecución y en Empaque**: subir con cámara o archivo
+     (1 a 3 fotos), miniaturas, quitar y cambiar una foto, progreso de subida, error de formato o
+     tamaño, el estado «no puedes avanzar sin evidencia» del botón Siguiente (gate `blocked` de
+     `StepReader`), el rechazo al finalizar con un paso sin fotos y la vista de solo lectura tras
+     finalizar.
+   Cuando estén, se cita cada tablero en `design.md` y se relanza F1.2.
 
 ## Decisiones cerradas (no reabrir)
 
