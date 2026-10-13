@@ -181,7 +181,7 @@ div role=generic
                             svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                         span role=generic aria-hidden="true" data-testid="data-table-head-divider-members" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                       th role=columnheader name="Acciones" data-testid="data-table-head-actions" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                        div role=generic class="flex gap-2 items-center min-w-0"
+                        div role=generic class="flex gap-2 items-center justify-end min-w-0"
                           span role=generic
                             "Acciones"
                   tbody role=rowgroup class="[&_tr:last-child]:border-0"
