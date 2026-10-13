@@ -2,11 +2,16 @@
 // para que la hoja global oculte la barra lateral y la cabecera privada.
 
 import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { THEME_TOGGLE_LABEL } from '@/app/(private)/components/theme-toggle';
-import { OperatorScreenFrame } from '@/app/(private)/asignacion/components/operator-screen-frame';
+import {
+  OperatorScreenFrame,
+  STEP_READER_SIDE_COLUMN_RESERVE,
+} from '@/app/(private)/asignacion/components/operator-screen-frame';
+import { StepReader } from '@/components/shared/step-reader';
 import { Button } from '@/components/ui/button';
+import type { RecipeStepDocument } from '@/lib/modules/recetas';
 
 afterEach(cleanup);
 
@@ -147,5 +152,23 @@ describe('OperatorScreenFrame', () => {
     );
 
     expect(screen.getByTestId('order-execution-screen').className).toMatch(/(^|\s)@container(\s|$)/);
+  });
+
+  it('QC-269 R4, R7, R8: la reserva lateral solo vale con dos columnas y usa el mismo calc que el pie de StepReader', () => {
+    const steps: readonly RecipeStepDocument[] = [
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Paso único' }] }] },
+    ];
+    render(<StepReader steps={steps} onFinish={vi.fn()} title="Receta" mode="ejecucion" />);
+
+    const readerReserve = /(?:^|\s)pb-\[(calc\([^\]]+\))\](?:\s|$)/.exec(
+      screen.getByTestId('step-reader').className,
+    )?.[1];
+    const sideReserve = /^@min-\[1101px\]:mb-\[(calc\([^\]]+\))\]$/.exec(
+      STEP_READER_SIDE_COLUMN_RESERVE,
+    )?.[1];
+
+    expect(STEP_READER_SIDE_COLUMN_RESERVE.startsWith('@min-[1101px]:')).toBe(true);
+    expect(readerReserve).toBeDefined();
+    expect(sideReserve).toBe(readerReserve);
   });
 });

@@ -5,14 +5,14 @@ los prueba en navegador. La 3 es el cierre. Cada tanda termina con `./init.sh` e
 
 ## Tanda 1 — Producción y unit [T1a, T1b, T1c en paralelo]
 
-- [ ] **T1a [P]. «Entrar» hereda la alineación de su contenedor** (R1–R3, `design.md > 2.2`).
+- [x] **T1a [P]. «Entrar» hereda la alineación de su contenedor** (R1–R3, `design.md > 2.2`).
   - En `assigned-order-enter-trigger.tsx`, los dos envoltorios de BLOQUEADO y EN_CURSO dejan de ser
     `flex flex-col items-start gap-1` y pasan a un bloque normal, con el aviso a `mt-1`.
   - Textos, `aria-describedby` y `data-testid` no cambian.
   - Se amplía `assigned-order-enter-trigger.test.tsx`: el envoltorio no lleva `flex` ni `items-*`, y
     el botón y el aviso siguen enlazados por `aria-describedby`.
   - *Hecho:* `pnpm exec vitest related --run` sobre los dos archivos, en verde.
-- [ ] **T1b [P]. Reserva del pie en la columna lateral** (R4, R6–R8, `design.md > 4.2`).
+- [x] **T1b [P]. Reserva del pie en la columna lateral** (R4, R6–R8, `design.md > 4.2`).
   - En `operator-screen-frame.tsx` se crea `STEP_READER_SIDE_COLUMN_RESERVE`, con el literal y el
     comentario de § 4.2.
   - `OrderExecutionToolsPanel` gana `className?: string`, que compone con `cn` sobre su `Card`.
@@ -28,7 +28,7 @@ los prueba en navegador. La 3 es el cierre. Cada tanda termina con `./init.sh` e
     - el caso R4 de QC-265 (`:653-661`) sigue sin tocarse.
   - *Hecho:* `vitest related` de los cinco archivos, en verde. `git diff --stat` no muestra
     `components/shared/step-reader/`.
-- [ ] **T1c [P]. La fila de material no se solapa** (R9, R10, `design.md > 3.2`).
+- [x] **T1c [P]. La fila de material no se solapa** (R9, R10, `design.md > 3.2`).
   - En `order-execution-lines.tsx`:
     - el nombre pasa a `min-w-0 flex-[1_1_12rem] break-words` y lleva
       `ORDER_EXECUTION_LINE_NAME_TESTID`;
