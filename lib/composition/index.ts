@@ -457,6 +457,8 @@ import {
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
+import { createSetCompanyCountry } from '@/lib/modules/identity';
+import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
@@ -873,6 +875,8 @@ export const identity = {
     sessions: sessionWriter,
     ids: sessionIds,
   }),
+  // Operacion de plataforma: el actor no lleva empresa.
+  setCompanyCountry: createSetCompanyCountry({ companies: createCompanyCountryRepository() }),
 } as const;
 
 /**

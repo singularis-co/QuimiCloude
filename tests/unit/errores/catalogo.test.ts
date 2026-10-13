@@ -69,7 +69,8 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-237 2026-10-09: 85 y no 82: entran `whatsapp_connection_not_found`,
       // `whatsapp_connection_exists` y `whatsapp_phone_number_taken`.
       // 2026-10-09: 87 y no 85: entran `delivery_not_found` y `delivery_already_voided`.
-      expect(ERROR_CODES).toHaveLength(87)
+      // QC-235 2026-10-13: 88 y no 87: entra `company_not_found`.
+      expect(ERROR_CODES).toHaveLength(88)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

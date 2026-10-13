@@ -83,6 +83,13 @@ export const EXCEPCIONES: readonly Excepcion[] = [
     reglas: ['hook-fuera'],
     motivo: 'es la definicion del hook',
   },
+  {
+    // Enmienda QC-235 (2026-10-13, decision del humano): cuarta excepcion de R20.
+    archivo: 'components/shared/country-select.tsx',
+    reglas: ['primitivo-fuera'],
+    motivo:
+      'CountrySelect filtra una lista local fija y no consulta al servidor, que es lo que AsyncAutocomplete compone',
+  },
 ]
 
 // ---------------------------------------------------------------------------------------------
@@ -427,11 +434,12 @@ describe('los buscadores componen los primitivos en un solo sitio', () => {
     expect(llamadasAFilter(COMPOSITOR, fuente), 'R19: llamada a filter en el compositor').toEqual([])
   })
 
-  it('R20: las excepciones son exactamente tres, con motivo, y apuntan a archivos que existen', () => {
+  it('R20: las excepciones son exactamente cuatro, con motivo, y apuntan a archivos que existen', () => {
     expect(EXCEPCIONES.map((e) => [e.archivo, [...e.reglas]])).toEqual([
       [COMPOSITOR, ['primitivo-fuera', 'hook-fuera']],
       ['components/ui/autocomplete.tsx', ['primitivo-fuera']],
       ['hooks/use-async-paginated-options.ts', ['hook-fuera']],
+      ['components/shared/country-select.tsx', ['primitivo-fuera']],
     ])
     for (const e of EXCEPCIONES) expect(e.motivo.length, `${e.archivo} sin motivo`).toBeGreaterThan(0)
     const muertas = excepcionesMuertas(EXCEPCIONES, (a) => existsSync(join(repoRoot, a)))
