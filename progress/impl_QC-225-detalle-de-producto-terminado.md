@@ -389,3 +389,36 @@ Ningún `R<n>` queda sin test. R32 se cubre con guardias existentes, sin caso pr
 - `./init.sh` no se corrió (memoria baja, por indicación del leader): lo sustituyen los comandos de
   arriba; el gate completo queda para CI.
 - `origin/dev` va 28 commits por delante de la rama; no se sincronizó (F2.3 la pide el leader).
+
+## Tanda 4 (2026-10-13): correcciones de revisión
+
+Revisión: `progress/review_QC-225-detalle-de-producto-terminado.md` (CHANGES_REQUIRED). M3 (pase
+`/design`) no se toca: lo decide el humano, por el leader.
+
+| Hallazgo | Arreglo | Archivos | Commit |
+|---|---|---|---|
+| M1 | El censo admite `count` (solo lee; pagina la ficha), con nota fechada; sigue cerrado | `tests/unit/inventario/schema/inventory-movements-migration.test.ts`; añadido a `tasks.md > Archivos esperados` y a `design.md §7` | `a2a3eb6a` |
+| M2 | `VOIDED_DELIVERY_LABEL` → `DELIVERY_VOIDED_LABEL`; el censo no se toca. El patrón `NOMBRE_MUTANTE` sobre `app/` y `lib/` ya solo casa con `createVoidDelivery` y `voidDeliveryAction`, que el test permite | `app/(private)/inventario/producto-terminado/[id]/components/finished-product-deliveries-table.tsx`, `app/(private)/inventario/producto-terminado/[id]/components/index.ts` | `a4e9f060` |
+| m1 | Notas sin clave de ficha; la fecha y la descripción en palabras se quedan | `tests/guards/guard-pantallas-exigen-permiso.test.ts`, `tests/unit/inventario/product-route-contract.test.ts` | `0b73a77b` |
+| m2 | Rutas completas de `batch-history.tsx`, `adjust-batch-dialog.tsx` e `index.ts` | `specs/QC-225-detalle-de-producto-terminado/tasks.md` | `0bfddd97` |
+| m3 | Enmiendas fechadas: P1 cerrada en la cabecera; nueva ubicación de `movementReasonLabel` (tabla de lo que existe y §6.2); `UrlTabs` en §6.2 y en lo que existe; §7 suma `inventory-movements-migration`, `order-delivery-append-only`, `inventario/scope`, `recipe-route-contract`, `clientes/scope`, `data-table-alcance`, `pedidos/module-contract` y las cuatro suites de /pedidos con doble | `specs/QC-225-detalle-de-producto-terminado/design.md` | `0bfddd97` |
+| m4 | §6.4 nombra el paso 3 (componer). Por qué no el paso 2, solo con lo que dice el código: `order-distribution-label.tsx` no lleva `'use client'` y el `Popover` sí lo necesita, y la usan tres archivos de /asignacion; además su fila del catálogo dice «No cubre: la lista desplegada». Queda **abierto** si eso basta para descartar el paso 2: lo decide el humano junto con M3 | `specs/QC-225-detalle-de-producto-terminado/design.md` | `0bfddd97` |
+| m5 | `orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]` en el `take: 1` del origen del lote; §4.1 enmendado | `lib/modules/inventario/adapters/driven/persistence/finished-product-detail-prisma.ts` | `078fee47` |
+
+### Verificación (salida real, árbol final `0bfddd97`)
+
+No se corrió `./init.sh`, ni la suite completa ni el E2E (memoria baja, por indicación del leader).
+
+| Comando | Resultado |
+|---|---|
+| `NODE_OPTIONS=--max-old-space-size=4096 pnpm run typecheck` | exit 0 |
+| `pnpm exec eslint` sobre los 6 archivos de código y test tocados | exit 0 |
+| `vitest run tests/unit/inventario` | Test Files 114 passed (114); Tests 1756 passed, 5 skipped (1761) |
+| `vitest run tests/unit/inventario-ui` | Test Files 7 passed (7); Tests 56 passed (56) |
+| `vitest run tests/unit/pedidos` | Test Files 130 passed (130); Tests 2545 passed, 3 skipped (2548) |
+| `vitest run tests/unit/pedidos-ui` | Test Files 49 passed (49); Tests 834 passed, 3 skipped (837) |
+| `vitest run tests/unit/paridad tests/unit/clientes/scope.test.ts tests/unit/shared/data-table-alcance.test.ts tests/unit/recetas-ui/recipe-route-contract.test.ts` | Test Files 25 passed (25); Tests 486 passed, 2 skipped (488) |
+| `vitest run guard` | Test Files 75 passed (75); Tests 1050 passed, 20 skipped (1070) |
+| `vitest run --project integration tests/integration/inventario/finished-product-detail.int.test.ts` (lo corrió backend_dev después de m5) | Test Files 1 passed (1); Tests 13 passed (13). Base efímera `qct_qc225_e2ae854a_mv78a0kv_bjk`, copia de la plantilla `qct_tpl_7c42b3e164a6`, y borrada al terminar |
+
+El mapa `R<n> → test` de la tanda 3 no cambia. Ningún caso se ha quitado ni renombrado.
