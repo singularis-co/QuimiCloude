@@ -17,6 +17,7 @@ import {
   START_CONDITIONING_TEXTS,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
 import { COUNTDOWN_GATED_BUTTON_TESTID } from '@/components/shared/countdown-gated-button';
+import { COUNTDOWN_RING_TESTID } from '@/components/shared/countdown-ring';
 import type { ConditioningTeamCandidates } from '@/lib/modules/asignaciones';
 import type { StartConditioningResult } from '@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions';
 
@@ -62,7 +63,7 @@ afterEach(() => {
 
 function pintar() {
   return render(
-    <ConditioningActions kind="start" orderId={ORDER_ID} orderNumber="2026-0000040" candidates={CANDIDATES} />,
+    <ConditioningActions orderId={ORDER_ID} orderNumber="2026-0000040" startCandidates={CANDIDATES} />,
   );
 }
 
@@ -185,6 +186,23 @@ describe('«Comenzar»: la espera y la selección', () => {
     expect(comenzar()).toBeDisabled();
     avanzar(1000);
     expect(comenzar()).toBeEnabled();
+  });
+
+  it('R35: «Acondicionar el pedido <número>» con el selector dentro y «Comenzar» bloqueado 5 s con el anillo', () => {
+    pintar();
+    const dialogo = abrir();
+
+    expect(within(dialogo).getByRole('heading', { name: 'Acondicionar el pedido 2026-0000040' })).toBeInTheDocument();
+    expect(within(dialogo).getByTestId(CONDITIONING_TEAM_PEOPLE_TESTID)).toBeInTheDocument();
+    expect(within(dialogo).getByTestId(CONDITIONING_TEAM_GROUPS_TESTID)).toBeInTheDocument();
+    marcar(dialogo, 'Ana López');
+    expect(within(dialogo).getByTestId(COUNTDOWN_GATED_BUTTON_TESTID)).toBe(comenzar());
+    expect(comenzar()).toBeDisabled();
+    expect(within(comenzar()).getByTestId(COUNTDOWN_RING_TESTID)).toHaveAttribute('aria-hidden', 'true');
+
+    avanzar(5000);
+    expect(comenzar()).toBeEnabled();
+    expect(within(comenzar()).queryByTestId(COUNTDOWN_RING_TESTID)).toBeNull();
   });
 
   it('R8: pasada la espera sigue deshabilitado sin nada marcado y se habilita al marcar', () => {

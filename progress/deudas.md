@@ -293,6 +293,21 @@
     solo usa `tests/unit/asignaciones-ui/assigned-orders-columns.test.tsx`; por él
     `tests/guards/guard-piezas-base.test.ts` conserva una exclusión estrecha (R22 de QC-252).
 - **Dueño:** sin asignar.
+- **Resuelta (2026-10-12, QC-265, D8 y D14; R13, R14, R42 y R43):** los cuatro avisos salen de
+  `OrderOutcomeNotice` con su `kind` sobre `Notice` (se borran `AssignedOrderDeliveredNotice` y
+  `AssignedOrderCancelledNotice`); `AssignedOrdersError` se borra y queda solo `AssignmentListError`;
+  el barrel deja de reexportar `MISSING_VALUE_MARK` y `EXCLUSIONES_ESTRECHAS_D11` de
+  `guard-piezas-base` queda vacía. Las guardias `guard-asignacion-componentizada` (R14, R42) y
+  `guard-piezas-base` (R43) lo vigilan.
+
+### D52 — `/asignacion` sin el buscador «Buscar» del tablero (QC-265, P11)
+- **Origen:** QC-265 (2026-10-12), pregunta P11 cerrada con su opción por defecto
+  (`specs/QC-265-rediseno-operario/requirements.md > Lo que NO entra`).
+- **Qué falta:** el tablero `Asignacion.dc.html` pinta un buscador «Buscar» sobre las listas de
+  `/asignacion`, pero las listas del módulo `asignaciones` no admiten búsqueda: añadirla es trabajo de
+  módulo (puerto de lectura, caso de uso y parámetro de la dirección), no de la capa de UI. Hoy las
+  tablas se montan con `searchable={false}`.
+- **Dueño:** sin asignar (ficha propia del módulo `asignaciones`).
 
 ## Pendientes humanos de fichas cerradas
 Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *Deudas*, pero se habrían perdido al congelarlo.
@@ -375,3 +390,13 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - Modo `card` de `DataTable`: tabla y tarjetas se pintan a la vez y se duplican los `data-testid`. Aviso puesto en la fila `DataTable` de `CATALOGO.md` para las fichas QC-260..267.
 - `numberRange`: los campos mínimo y máximo comparten el mismo nombre accesible. Previo a QC-256 (ya venía de dev).
 - Foco tapado: el foco en la última fila puede quedar bajo la paginación `sticky` de `DataTable` (WCAG 2.4.11). Arreglo con `scroll-padding-bottom`; va en una ficha aparte.
+
+### D53 — Los esqueletos de `/asignacion` no casan con la lista que cargan (QC-265, m1)
+- **Origen:** QC-265 (2026-10-13), menor m1 de la revisión (`progress/review_QC-265.md > Vuelta 1`).
+- **Qué falta:** los esqueletos de `app/(private)/asignacion/components/*-skeleton.tsx`:
+  - pintan una columna menos que la tabla cuando esta lleva «Acciones» (siempre en «Por empacar» y
+    en las tres vistas del acondicionador; en las demás, con `canViewTrace`);
+  - no pasan a tarjeta en teléfono, como sí hace la lista;
+  - por las dos cosas, al llegar la lista hay un salto de maquetación (CLS).
+  No rompe ningún requisito: R21 habla de la lista, no de la carga.
+- **Dueño:** sin asignar.

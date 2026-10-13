@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { CountdownRing } from '@/components/shared/countdown-ring';
 import { CountdownTimer } from '@/components/shared/countdown-timer';
 import { Button } from '@/components/ui/button';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
@@ -37,11 +38,11 @@ import { StepDocumentView } from './step-document-view';
  * ampare. Quien busque trazabilidad completa, que la pida — hoy no existe.
  */
 
-/** Objetivo tactil de la accion primaria en `'ejecucion'`: 64px minimo, texto mayor. */
-const PRIMARY_TOUCH_TARGET_EJECUCION = 'min-h-16 min-w-11 text-lg font-semibold';
+/** En `'ejecucion'` los botones van en talla `xl` y llenan su columna del pie. */
+const PRIMARY_TOUCH_TARGET_EJECUCION = 'w-full min-w-11';
 
 const TEXTS = {
-  empty: 'Esta receta no tiene ningun paso que leer.',
+  empty: 'Esta receta no tiene ningún paso que leer.',
   previous: 'Anterior',
   next: 'Siguiente',
   finish: 'Finalizar',
@@ -113,50 +114,6 @@ function countPendingItems(
     );
     return pending + sinMarcar.length;
   }, 0);
-}
-
-/** Radio del anillo de espera. Fijo: el anillo no tiene tamanos variables en este diseno. */
-const WAIT_RING_RADIUS = 20;
-const WAIT_RING_CIRCUMFERENCE = 2 * Math.PI * WAIT_RING_RADIUS;
-
-/**
- * Anillo SVG que se vacia a lo largo de `seconds`. El numero sigue saliendo de
- * `CountdownTimer`: esto solo dibuja la espera, con una transicion CSS que arranca un frame
- * despues de montar para que el navegador tenga el estado inicial pintado antes de animar.
- */
-function WaitRing({ seconds }: { readonly seconds: number }) {
-  const [depleted, setDepleted] = useState(false);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setDepleted(true));
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  return (
-    <svg
-      width="40"
-      height="40"
-      viewBox="0 0 48 48"
-      aria-hidden="true"
-      data-testid="step-reader-wait-ring"
-      className="shrink-0"
-    >
-      <circle cx="24" cy="24" r={WAIT_RING_RADIUS} fill="none" strokeWidth="4" className="stroke-muted" />
-      <circle
-        cx="24"
-        cy="24"
-        r={WAIT_RING_RADIUS}
-        fill="none"
-        strokeWidth="4"
-        strokeLinecap="round"
-        transform="rotate(-90 24 24)"
-        className="stroke-primary"
-        strokeDasharray={WAIT_RING_CIRCUMFERENCE}
-        strokeDashoffset={depleted ? WAIT_RING_CIRCUMFERENCE : 0}
-        style={{ transition: `stroke-dashoffset ${seconds}s linear` }}
-      />
-    </svg>
-  );
 }
 
 /** Progreso segmentado (solo `'ejecucion'`): un tramo por paso, con su estado. */
@@ -313,7 +270,13 @@ export function StepReader({
 
   const waitReason = waiting && (
     <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
-      {isEjecucion && <WaitRing key={`ring-${arrival}`} seconds={minStepSeconds ?? 0} />}
+      {isEjecucion && (
+        <CountdownRing
+          key={`ring-${arrival}`}
+          seconds={minStepSeconds ?? 0}
+          testId="step-reader-wait-ring"
+        />
+      )}
       {TEXTS.waitPrefix}{' '}
       <CountdownTimer key={`timer-${arrival}`} seconds={minStepSeconds} onEnd={() => setWaitedArrival(arrival)} />
       {' '}
@@ -321,11 +284,15 @@ export function StepReader({
     </p>
   );
 
+  const buttonSize = isEjecucion ? 'xl' : 'default';
+
   const previousButton = (
     <Button
       type="button"
       variant="outline"
+      size={buttonSize}
       touch
+      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : undefined}
       data-testid="step-reader-previous"
       disabled={isFirst}
       onClick={goPrevious}
@@ -337,7 +304,9 @@ export function StepReader({
   const primaryButton = isLast ? (
     <Button
       type="button"
+      size={buttonSize}
       className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : touchTarget}
+      touch={isEjecucion}
       data-testid="step-reader-finish"
       disabled={blocked || finishBusy}
       aria-busy={finishBusy || undefined}
@@ -349,7 +318,9 @@ export function StepReader({
   ) : (
     <Button
       type="button"
+      size={buttonSize}
       className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : touchTarget}
+      touch={isEjecucion}
       data-testid="step-reader-next"
       disabled={blocked}
       aria-describedby={describedBy}
@@ -361,7 +332,11 @@ export function StepReader({
 
   if (isEjecucion) {
     return (
-      <section data-testid="step-reader" className="flex flex-col gap-4">
+      // El relleno inferior reserva el alto del pie fijo para que el paso no quede debajo.
+      <section
+        data-testid="step-reader"
+        className="flex flex-col gap-4 pb-[calc(140px+env(safe-area-inset-bottom,0px))]"
+      >
         <div
           ref={headingRef}
           tabIndex={-1}
@@ -388,25 +363,28 @@ export function StepReader({
 
         {documentView}
 
-        {/* Reserva su alto aunque no haya motivo: marcar el ultimo item no debe mover el boton. */}
-        <div data-testid="step-reader-reason-slot" className="min-h-6">
-          <p
-            id={reasonId}
-            data-testid="step-reader-blocked-reason"
-            className={cn('text-base', pending === 0 && 'invisible')}
-          >
-            {TEXTS.blocked(pending)}
-          </p>
-        </div>
-
         {waitReason}
 
         <div
           data-testid="step-reader-actions"
-          className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t bg-background pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-4 pt-3 pb-[calc(14px+env(safe-area-inset-bottom,0px))]"
         >
-          {previousButton}
-          {primaryButton}
+          <div className="mx-auto flex w-full max-w-[720px] flex-col gap-2">
+            {/* Reserva su alto aunque no haya motivo: marcar el ultimo item no debe mover el boton. */}
+            <div data-testid="step-reader-reason-slot" className="min-h-6">
+              <p
+                id={reasonId}
+                data-testid="step-reader-blocked-reason"
+                className={cn('text-center text-base', pending === 0 && 'invisible')}
+              >
+                {TEXTS.blocked(pending)}
+              </p>
+            </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3">
+              {previousButton}
+              {primaryButton}
+            </div>
+          </div>
         </div>
       </section>
     );

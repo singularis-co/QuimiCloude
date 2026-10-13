@@ -15,7 +15,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Prisma } from '@prisma/client';
 
-import { assignedOrderCancelledNoticeText } from '@/app/(private)/asignacion/components/assigned-order-cancelled-notice';
+import { assignedOrderCancelledNoticeText } from '@/app/(private)/asignacion/components/order-outcome-notice';
 import { normalizeCompanyName, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizePresentationName, normalizeProductName } from '@/lib/modules/inventario';
@@ -85,6 +85,9 @@ const STEP_NEXT_TESTID = 'step-reader-next';
 const STEP_POSITION_TESTID = 'step-reader-position';
 
 const CANCEL_ORDER_BUTTON_NAME = 'Cancelar pedido';
+/** «Cancelar pedido» vive en el menú ⋯ de la cabecera de la ejecución (R23 de QC-265). */
+const EXECUTION_ACTIONS_TESTID = 'order-execution-actions';
+const CANCEL_ORDER_TRIGGER_TESTID = 'order-cancel-trigger';
 const CANCEL_REASON_LABEL = /motivo/i;
 
 let companyId: string | null = null;
@@ -387,11 +390,17 @@ test.describe('el registro de ejecucion de un pedido asignado', () => {
 
     await openFromList(page, order);
 
-    // En WebKit un clic antes de hidratar se pierde sin error: se repite hasta ver el dialogo.
-    const trigger = page.getByRole('button', { name: CANCEL_ORDER_BUTTON_NAME, exact: true });
+    // «Cancelar pedido» se pide desde el menú ⋯ de la cabecera. En WebKit un clic antes de hidratar
+    // se pierde sin error: se repite (abrir el menú si hace falta y elegir el ítem) hasta ver el dialogo.
+    const actions = page.getByTestId(EXECUTION_ACTIONS_TESTID);
+    const trigger = page.getByTestId(CANCEL_ORDER_TRIGGER_TESTID);
     const dialog = page.getByRole('alertdialog');
     await expect(async () => {
-      if ((await dialog.count()) === 0) await trigger.click();
+      if ((await dialog.count()) === 0) {
+        if (!(await trigger.isVisible())) await actions.click();
+        await expect(trigger).toHaveText(CANCEL_ORDER_BUTTON_NAME, { timeout: 5_000 });
+        await trigger.click({ timeout: 5_000 });
+      }
       await expect(dialog).toBeVisible({ timeout: 5_000 });
     }).toPass({ timeout: 60_000 });
 

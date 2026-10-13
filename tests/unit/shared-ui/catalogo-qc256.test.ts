@@ -41,7 +41,13 @@ const PIEZAS_NUEVAS: readonly PiezaEsperada[] = [
     diseno: tablero('Estados'),
     menciona: ['`level`', '`label`'],
   },
-  { pieza: 'Notice', archivo: 'components/shared/notice.tsx', diseno: tablero('Avisos') },
+  // QC-265 (D7) le dio a Notice el cierre opcional `dismissible`, dibujado en Asignacion.dc.html,
+  // y su fila cita los dos tableros.
+  {
+    pieza: 'Notice',
+    archivo: 'components/shared/notice.tsx',
+    diseno: `${tablero('Avisos')}, ${tablero('Asignacion')}`,
+  },
   {
     pieza: 'PasswordField',
     archivo: 'components/shared/password-field.tsx',

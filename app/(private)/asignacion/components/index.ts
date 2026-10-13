@@ -1,17 +1,6 @@
 // Sin `'use client'` a proposito: la frontera se declara en cada componente, y asi `page.tsx`
 // sigue siendo Server Component aunque importe desde aqui.
 export {
-  ASSIGNED_ORDER_CANCELLED_TESTID,
-  AssignedOrderCancelledNotice,
-  assignedOrderCancelledNoticeText,
-} from './assigned-order-cancelled-notice';
-export {
-  ASSIGNED_ORDER_DELIVERED_TESTID,
-  AssignedOrderDeliveredNotice,
-  assignedOrderDeliveredNoticeText,
-  assignedOrderDeliveredWithPackagesText,
-} from './assigned-order-delivered-notice';
-export {
   ASSIGNED_ORDER_ENTER_REASON_TESTID,
   ASSIGNED_ORDER_ENTER_TESTID,
   AssignedOrderEnterTrigger,
@@ -35,12 +24,10 @@ export {
   ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID,
   ASSIGNED_ORDER_STATUS_COLUMN_ID,
   ASSIGNED_ORDER_STATUS_LABELS,
-  MISSING_VALUE_MARK,
   buildAssignedOrdersColumns,
   type AssignedOrdersColumnsOptions,
 } from './assigned-orders-columns';
 export { AssignedOrdersEmpty } from './assigned-orders-empty';
-export { AssignedOrdersError } from './assigned-orders-error';
 export {
   FIRST_PAGE,
   PAGE_PARAM,
@@ -63,14 +50,35 @@ export {
   AssignedOrdersTable,
   type AssignedOrdersTableProps,
 } from './assigned-orders-table';
+export { AssignmentListError } from './assignment-list-parts';
+export {
+  ASSIGNMENT_ROW_ACTIONS_TESTID,
+  ASSIGNMENT_ROW_ACTIONS_TEXTS,
+  ASSIGNMENT_ROW_ENTER_TESTID,
+  ASSIGNMENT_ROW_TRACE_TESTID,
+  AssignmentRowActions,
+  assignmentActionsColumn,
+  assignmentRowActions,
+  type AssignmentActionsColumnOptions,
+  type AssignmentRowActionsProps,
+} from './assignment-row-actions';
+export {
+  VIEW_COUNT_QUERY,
+  readViewCounts,
+  toViewCounts,
+  type ViewCountReader,
+  type ViewCountReaders,
+} from './assignment-view-counts';
 export {
   ASSIGNMENT_VIEW_LABELS,
   ASSIGNMENT_VIEW_TAB_TESTIDS,
   ASSIGNMENT_VIEW_TABS_LABEL,
   ASSIGNMENT_VIEW_TABS_TESTID,
   AssignmentViewTabs,
+  type AssignmentViewCounts,
   type AssignmentViewTabsProps,
 } from './assignment-view-tabs';
+export { AssignmentViewTabsSection } from './assignment-view-tabs-section';
 export {
   ROUTE_ORDER_STATUS_VALUES,
   STATUS_PARAM,
@@ -83,7 +91,10 @@ export {
   type AssignmentSearchParams,
   type RouteOrderStatus,
 } from './assignment-view-params';
-export { buildConditionedOrdersColumns } from './conditioned-orders-columns';
+export {
+  buildConditionedOrdersColumns,
+  type ConditionedOrdersColumnsOptions,
+} from './conditioned-orders-columns';
 export {
   CONDITIONED_ORDERS_SECTION_TESTID,
   ConditionedOrdersListSection,
@@ -96,13 +107,13 @@ export {
 } from './conditioned-orders-table';
 export {
   CONDITIONING_ORDER_CONDITIONER_COLUMN_ID,
-  CONDITIONING_ORDER_LINK_TESTID,
   CONDITIONING_ORDER_NUMBER_COLUMN_ID,
   CONDITIONING_ORDER_PACKAGES_COLUMN_ID,
   CONDITIONING_ORDER_RECIPE_NAME_COLUMN_ID,
   CONDITIONING_ORDER_STATUS_COLUMN_ID,
-  ConditioningOrderLink,
+  CONDITIONING_ORDERS_CARD,
   buildConditioningOrdersColumns,
+  type ConditioningOrdersColumnsOptions,
 } from './conditioning-orders-columns';
 export {
   CONDITIONING_ORDERS_EMPTY_TEXTS,
@@ -141,6 +152,7 @@ export {
   COMPANY_ORDER_STATUS_COLUMN_ID,
   COMPANY_ORDER_STATUS_FILTER_OPTIONS,
   COMPANY_ORDER_STATUS_LABELS,
+  COMPANY_ORDERS_CARD,
   buildCompanyOrdersColumns,
   type CompanyOrdersColumnsDeps,
 } from './company-orders-columns';
@@ -164,7 +176,9 @@ export {
   FINISHED_ORDER_QUANTITY_COLUMN_ID,
   FINISHED_ORDER_RECIPE_NAME_COLUMN_ID,
   FINISHED_ORDER_RESPONSIBLES_COLUMN_ID,
+  FINISHED_ORDERS_CARD,
   buildFinishedOrdersColumns,
+  type FinishedOrdersColumnsOptions,
 } from './finished-orders-columns';
 export { FinishedOrdersEmpty, type FinishedOrdersEmptyProps } from './finished-orders-empty';
 export { FINISHED_ORDERS_SECTION_TESTID, FinishedOrdersListSection } from './finished-orders-list-section';
@@ -185,8 +199,10 @@ export {
   PACKING_ORDER_PRESENTATION_COLUMN_ID,
   PACKING_ORDER_RECIPE_NAME_COLUMN_ID,
   PACKING_ORDER_STATUS_COLUMN_ID,
+  PACKING_ORDERS_CARD,
   PACKING_ORDERS_COLUMN_COUNT,
   buildPackingOrdersColumns,
+  type PackingOrdersColumnsOptions,
 } from './packing-orders-columns';
 export {
   PACKING_ORDERS_SECTION_TESTID,
@@ -194,9 +210,21 @@ export {
 } from './packing-orders-list-section';
 export { PackingOrdersSkeleton } from './packing-orders-skeleton';
 export {
+  PACKING_ORDERS_TABLE_ID,
+  PACKING_ORDERS_TABLE_TEXTS,
+  PackingOrdersTable,
+  type PackingOrdersTableProps,
+} from './packing-orders-table';
+export {
+  ASSIGNED_ORDER_CANCELLED_TESTID,
+  ASSIGNED_ORDER_DELIVERED_TESTID,
   CONDITIONED_ORDER_NOTICE_TESTID,
+  ORDER_OUTCOME_NOTICE_CLOSE_LABEL,
   OrderOutcomeNotice,
   PACKED_ORDER_NOTICE_TESTID,
+  assignedOrderCancelledNoticeText,
+  assignedOrderDeliveredNoticeText,
+  assignedOrderDeliveredWithPackagesText,
   conditionedOrderNoticeText,
   packedOrderNoticeText,
   type OrderOutcomeKind,

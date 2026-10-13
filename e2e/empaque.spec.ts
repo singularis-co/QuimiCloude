@@ -158,9 +158,9 @@ const ASSIGNMENT_VIEW_TABS_TESTID = 'assignment-view-tabs';
 const ASSIGNED_ORDERS_EMPTY_TESTID = 'assigned-orders-empty';
 const PACKING_ORDERS_SECTION_TESTID = 'packing-orders-list-section';
 
-/** «Por empacar»: la fila y el enlace de `packing-orders-columns.tsx`. */
-const PACKING_ORDER_ROW_TESTID = 'packing-order-row';
-const PACKING_ORDER_LINK_TESTID = 'packing-order-link';
+/** El menú ⋯ de la fila (`assignment-row-actions.tsx`) y su ítem «Entrar». */
+const ROW_ACTIONS_TESTID = 'assignment-row-actions';
+const ROW_ENTER_TESTID = 'assignment-row-enter';
 const ASSIGNMENT_VIEW_TAB_TERMINADOS_TESTID = 'assignment-view-tab-terminados';
 
 /** La pantalla de un pedido de empaque, `packing-order-screen.tsx`. */
@@ -204,11 +204,13 @@ function rowByNumber(page: Page, numberText: string): Locator {
     });
 }
 
+/** La fila de «Por empacar», que es la tabla compartida dentro de su sección. */
 function packingRowByNumber(page: Page, numberText: string): Locator {
   return page
-    .getByTestId(PACKING_ORDER_ROW_TESTID)
+    .getByTestId(PACKING_ORDERS_SECTION_TESTID)
+    .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({
-      has: page.getByTestId(PACKING_ORDER_LINK_TESTID).filter({ hasText: exactText(numberText) }),
+      has: page.getByTestId(ORDER_NUMBER_CELL_TESTID).filter({ hasText: exactText(numberText) }),
     });
 }
 
@@ -655,7 +657,8 @@ test.describe('el recorrido de empaque (R48)', () => {
 
     const packingRow = packingRowByNumber(page, orderNumber);
     await expect(packingRow).toHaveCount(1, { timeout: 60_000 });
-    await packingRow.getByTestId(PACKING_ORDER_LINK_TESTID).click();
+    await packingRow.getByTestId(ROW_ACTIONS_TESTID).click();
+    await page.getByTestId(ROW_ENTER_TESTID).click();
     await page.waitForURL((url) => url.pathname === packingOrderRoute(orderId!), {
       timeout: 60_000,
     });
@@ -690,7 +693,9 @@ test.describe('el recorrido de empaque (R48)', () => {
     await expect(packedNotice).toContainText(orderNumber);
 
     // --- 5. Queda por acondicionar: todavia NO aparece en «Terminados».
-    await page.getByTestId(ASSIGNMENT_VIEW_TAB_TERMINADOS_TESTID).click();
+    // La pestaña va en `Suspense` con ella misma de respaldo: mientras llega el contador conviven
+    // las dos, la resuelta oculta.
+    await page.getByTestId(ASSIGNMENT_VIEW_TAB_TERMINADOS_TESTID).filter({ visible: true }).click();
     await expect(page.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(rowByNumber(page, orderNumber)).toHaveCount(0);
   });

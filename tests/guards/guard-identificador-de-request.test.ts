@@ -380,6 +380,18 @@ export const E2E_ESPERADOS = [
   // URL privada que da 404 no desbordan en horizontal, con objetivos de 44 px y buscador a 16 px.
   // No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'dashboard-rediseno.spec.ts',
+  // Alta el 2026-10-12 (QC-265) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en chromium y webkit, la ejecucion, el empaque
+  // y el acondicionamiento de un pedido se pintan sin barra lateral ni cabecera privada y a todo el
+  // ancho, y su 404 y `/asignacion` las conservan; a 390 x 844 su cabecera queda pegada arriba, su
+  // pie fijo abajo con botones de 52 px y sus controles miden 44 px; pasan de dos columnas a 1440 px
+  // a una a 820 px; las pestanas del acondicionador llevan contador; «Cerrar» oculta un aviso sin
+  // navegar; las listas se pintan en tarjetas con «Entrar» de 44 px y «Acciones» abre el menu
+  // centrado; los siete dialogos del operario quedan enteros y centrados; y el anillo del boton con
+  // espera se vacia y desaparece. No lee ni afirma nada sobre el identificador de peticion ni sobre
+  // `reference`.
+  'operario-rediseno.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

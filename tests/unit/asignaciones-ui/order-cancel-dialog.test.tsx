@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ORDER_CANCEL_DIALOG_TESTID,
   ORDER_CANCEL_DISMISS_TESTID,
   ORDER_CANCEL_ERROR_TESTID,
   ORDER_CANCEL_ORDER_ID_FIELD,
@@ -10,7 +11,7 @@ import {
   ORDER_CANCEL_STEP_POSITION_FIELD,
   ORDER_CANCEL_TEXTS,
   ORDER_CANCEL_TRIGGER_TESTID,
-  ORDER_EXECUTION_SCREEN_TESTID,
+  OrderCancelDialog,
   OrderExecutionScreen,
 } from '@/app/(private)/asignacion/[id]/components';
 import type { StartedOrderExecution } from '@/lib/modules/asignaciones';
@@ -63,12 +64,14 @@ const EXECUTION: StartedOrderExecution = {
   resumeStepPosition: 3,
 };
 
+/** El menú ⋯ de la cabecera: «Cancelar pedido» vive dentro. */
 function disparador(): HTMLElement {
-  return screen.getByRole('button', { name: ORDER_CANCEL_TEXTS.trigger });
+  return screen.getByRole('button', { name: `Acciones del pedido ${EXECUTION.numberText}` });
 }
 
 async function abrir(user: ReturnType<typeof setupUser>): Promise<HTMLElement> {
-  await user.click(disparador());
+  await user.click(await esperarInteractiva(disparador()));
+  await user.click(await screen.findByRole('menuitem', { name: ORDER_CANCEL_TEXTS.trigger }));
   return screen.findByRole('alertdialog');
 }
 
@@ -146,12 +149,12 @@ describe('dialogo de cancelar — envio', () => {
     expect(formData.get(ORDER_CANCEL_STEP_POSITION_FIELD)).toBe('2');
   });
 
-  it('R22 — el boton esta en el primer y en el ultimo paso, fuera del lector de pasos', () => {
+  it('R22 — el menu esta en el primer y en el ultimo paso, fuera del lector de pasos', () => {
     const { unmount } = render(
       <OrderExecutionScreen execution={{ ...EXECUTION, resumeStepPosition: 1 }} />,
     );
     expect(disparador()).toBeVisible();
-    expect(within(screen.getByTestId(ORDER_EXECUTION_SCREEN_TESTID)).queryByTestId(ORDER_CANCEL_TRIGGER_TESTID)).toBeNull();
+    expect(screen.getByTestId('step-reader').contains(disparador())).toBe(false);
     unmount();
 
     render(<OrderExecutionScreen execution={{ ...EXECUTION, resumeStepPosition: 4 }} />);
@@ -214,13 +217,14 @@ describe('dialogo de cancelar — multiplataforma', () => {
   it('R36 — objetivos tactiles de 44 px, campo a 16 px y nada en title', async () => {
     const user = setupUser();
     render(<OrderExecutionScreen execution={EXECUTION} />);
-    expect(disparador()).toHaveClass('min-h-11', 'min-w-11');
+    const menu = disparador();
+    expect(menu).toHaveClass('min-h-11', 'min-w-11');
 
     const dialogo = await abrir(user);
     expect(confirmar(dialogo)).toHaveClass('min-h-11', 'min-w-11');
     expect(within(dialogo).getByTestId(ORDER_CANCEL_DISMISS_TESTID)).toHaveClass('min-h-11', 'min-w-11');
     expect(within(dialogo).getByTestId(ORDER_CANCEL_REASON_TESTID)).toHaveClass('text-base');
-    expect(disparador().closest('[title]')).toBeNull();
+    expect(menu.closest('[title]')).toBeNull();
     expect(dialogo.querySelector('[title]')).toBeNull();
   });
 
@@ -228,7 +232,10 @@ describe('dialogo de cancelar — multiplataforma', () => {
     const user = setupUser();
     render(<OrderExecutionScreen execution={EXECUTION} />);
 
-    disparador().focus();
+    (await esperarInteractiva(disparador())).focus();
+    await user.keyboard('{Enter}');
+    const item = await screen.findByRole('menuitem', { name: ORDER_CANCEL_TEXTS.trigger });
+    await waitFor(() => expect(document.activeElement).toBe(item));
     await user.keyboard('{Enter}');
     const dialogo = await screen.findByRole('alertdialog');
 
@@ -254,5 +261,45 @@ describe('dialogo de cancelar — multiplataforma', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(screen.queryByRole('textbox', { name: /motivo/i })).toBeNull();
     expect(cancelAssignedOrderActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('dialogo de cancelar — QC-265 R23: modo controlado', () => {
+  it('QC-265 R23: sin open ni onOpenChange pinta su disparador de hoy y se abre con el', async () => {
+    const user = setupUser();
+    render(<OrderCancelDialog orderId="order-1" stepPosition={2} />);
+
+    const boton = screen.getByTestId(ORDER_CANCEL_TRIGGER_TESTID);
+    expect(boton).toHaveTextContent(ORDER_CANCEL_TEXTS.trigger);
+    await user.click(await esperarInteractiva(boton));
+
+    expect(await screen.findByRole('alertdialog')).toHaveAttribute(
+      'data-testid',
+      ORDER_CANCEL_DIALOG_TESTID,
+    );
+  });
+
+  it('QC-265 R23: con open y onOpenChange no hay disparador y la apertura la decide quien lo usa', async () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <OrderCancelDialog orderId="order-1" stepPosition={2} open={false} onOpenChange={onOpenChange} />,
+    );
+
+    expect(screen.queryByTestId(ORDER_CANCEL_TRIGGER_TESTID)).toBeNull();
+    expect(screen.queryByRole('button', { name: ORDER_CANCEL_TEXTS.trigger })).toBeNull();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+
+    rerender(
+      <OrderCancelDialog orderId="order-1" stepPosition={2} open onOpenChange={onOpenChange} />,
+    );
+    const dialogo = await screen.findByRole('alertdialog');
+    expect(dialogo).toHaveTextContent(ORDER_CANCEL_TEXTS.title);
+    expect(motivo(dialogo)).toBeVisible();
+
+    const user = setupUser();
+    await user.click(
+      await esperarInteractiva(within(dialogo).getByTestId(ORDER_CANCEL_DISMISS_TESTID)),
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false, expect.anything());
   });
 });

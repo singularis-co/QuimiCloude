@@ -666,3 +666,10 @@
     box-shadow: 0 0 0 4px transparent;
   }
 }
+
+/* Las pantallas del operario ocupan todo el ancho: fuera la barra lateral (con su hueco) y la
+   cabecera privada. Sin soporte de `:has()` se siguen viendo, como antes. */
+body:has([data-operator-screen]) [data-slot="sidebar"],
+body:has([data-operator-screen]) [data-testid="private-header"] {
+  display: none;
+}

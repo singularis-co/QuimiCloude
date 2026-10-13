@@ -1,10 +1,10 @@
 // Las dos secciones del acondicionador son Server Components `async`: se llaman como funcion y se
 // renderiza lo que devuelven. La fachada esta mockeada: es el borde que permite ejercitar error,
 // vacio y lista sin base de datos.
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 import {
   CONDITIONED_ORDERS_SECTION_TESTID,
@@ -123,7 +123,10 @@ describe('«Por acondicionar»: la sección pide la página y pinta la tabla com
     );
     expect(screen.getByTestId(CONDITIONING_ORDERS_SECTION_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId('conditioning-orders-table')).toBeInTheDocument();
-    expect(screen.getByTestId('order-distribution-full')).toHaveTextContent('12 × 500 g / 4 × 1 kg');
+    // Con tarjetas, cada celda está dos veces en el DOM: se mira la tabla.
+    expect(within(screen.getByRole('table')).getByTestId('order-distribution-full')).toHaveTextContent(
+      '12 × 500 g / 4 × 1 kg',
+    );
   });
 
   it('R9: sin pedidos dice «No hay pedidos por acondicionar en tu empresa.» y no pinta tabla', async () => {
@@ -183,8 +186,9 @@ describe('«Por acondicionar»: la sección pide la página y pinta la tabla com
 });
 
 describe('«Terminados» del acondicionador', () => {
-  it('R12: pide listConditionedOrders con el actor y pinta la tabla con el número enlazado', async () => {
+  it('R12, QC-265 R19: pide listConditionedOrders con el actor; el número es texto y el menú entra al detalle', async () => {
     listConditionedOrdersMock.mockResolvedValue(pagina([FINISHED_ROW]));
+    const user = setupUser();
 
     render(await ConditionedOrdersListSection({ params: parametros() }));
 
@@ -194,10 +198,11 @@ describe('«Terminados» del acondicionador', () => {
     );
     expect(listConditioningOrdersMock).not.toHaveBeenCalled();
     expect(screen.getByTestId(CONDITIONED_ORDERS_SECTION_TESTID)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '2026-0000041' })).toHaveAttribute(
-      'href',
-      '/asignacion/acondicionamiento/order-c',
-    );
+    const tabla = screen.getByRole('table');
+    expect(within(tabla).queryByRole('link', { name: '2026-0000041' })).toBeNull();
+    await user.click(within(tabla).getByRole('button', { name: 'Acciones del pedido 2026-0000041' }));
+    const entrar = await esperarInteractiva(await screen.findByTestId('assignment-row-enter'));
+    expect(entrar).toHaveAttribute('href', '/asignacion/acondicionamiento/order-c');
   });
 
   it('R12: vacía dice «Todavía no has terminado ningún acondicionamiento.»', async () => {

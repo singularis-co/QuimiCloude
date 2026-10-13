@@ -111,8 +111,9 @@ const STEP_WAIT_REASON_TESTID = 'step-reader-wait-reason';
 const STEP_NEXT_TESTID = 'step-reader-next';
 const STEP_FINISH_TESTID = 'step-reader-finish';
 const PACKING_ORDERS_SECTION_TESTID = 'packing-orders-list-section';
-const PACKING_ORDER_ROW_TESTID = 'packing-order-row';
-const PACKING_ORDER_LINK_TESTID = 'packing-order-link';
+/** El menú ⋯ de la fila (`assignment-row-actions.tsx`) y su ítem «Entrar». */
+const ROW_ACTIONS_TESTID = 'assignment-row-actions';
+const ROW_ENTER_TESTID = 'assignment-row-enter';
 const PACKING_ORDER_SCREEN_TESTID = 'packing-order-screen';
 const PACKING_ORDER_STEPS_TESTID = 'packing-order-steps';
 const PACKING_ORDER_START_BUTTON_TESTID = 'packing-order-start-button';
@@ -142,11 +143,13 @@ function rowByNumber(page: Page, numberText: string): Locator {
     });
 }
 
+/** La fila de «Por empacar», que es la tabla compartida dentro de su sección. */
 function packingRowByNumber(page: Page, numberText: string): Locator {
   return page
-    .getByTestId(PACKING_ORDER_ROW_TESTID)
+    .getByTestId(PACKING_ORDERS_SECTION_TESTID)
+    .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({
-      has: page.getByTestId(PACKING_ORDER_LINK_TESTID).filter({ hasText: exactText(numberText) }),
+      has: page.getByTestId(ORDER_NUMBER_CELL_TESTID).filter({ hasText: exactText(numberText) }),
     });
 }
 
@@ -569,7 +572,8 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
 
     const packingRow = packingRowByNumber(page, orderNumber);
     await expect(packingRow).toHaveCount(1, { timeout: 60_000 });
-    await packingRow.getByTestId(PACKING_ORDER_LINK_TESTID).click();
+    await packingRow.getByTestId(ROW_ACTIONS_TESTID).click();
+    await page.getByTestId(ROW_ENTER_TESTID).click();
     await page.waitForURL((url) => url.pathname === packingOrderRoute(orderId), {
       timeout: 60_000,
     });

@@ -1,13 +1,16 @@
 'use client';
 
-import Link from 'next/link';
+import { CheckIcon, PlayIcon } from 'lucide-react';
 import { useActionState, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { Notice } from '@/components/shared/notice';
 import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { StepReader } from '@/components/shared/step-reader';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import type { PackingOrderDetail, PackingOrderRow } from '@/lib/modules/asignaciones';
 import {
   finishPackingAction,
@@ -17,17 +20,23 @@ import {
 } from '@/lib/modules/asignaciones/adapters/driving/order-packing-actions';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
-import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
+
+import { OperatorScreenFrame } from '../../../components/operator-screen-frame';
 
 /**
- * La pantalla de un pedido de empaque. Sin control de edicion: los datos del pedido se leen tal
- * cual llegaron por props. Se compara SIEMPRE `packedById` con el actor, nunca por nombre, porque
- * dos usuarios pueden llamarse igual. Solo tres desenlaces posibles:
+ * La pantalla de un pedido de empaque, sobre el marco del operario. Sin control de edicion: los
+ * datos del pedido se leen tal cual llegaron por props. Se compara SIEMPRE `packedById` con el
+ * actor, nunca por nombre, porque dos usuarios pueden llamarse igual. El pie pinta siempre
+ * «Comenzar» y «Terminar», y solo uno queda habilitado:
  *
- *   1. `POR_EMPACAR` -> boton **Comenzar**.
- *   2. `EN_EMPAQUE` a nombre del propio actor -> boton **Terminar**.
- *   3. `EN_EMPAQUE` a nombre de otro -> ningun boton, se muestra quien empaca.
+ *   1. `POR_EMPACAR` -> **Comenzar**.
+ *   2. `EN_EMPAQUE` a nombre del propio actor -> **Terminar**; si hay pasos de envasado, el pie es
+ *      el del paso a paso y su ultimo boton abre la misma confirmacion.
+ *   3. `EN_EMPAQUE` a nombre de otro -> los dos deshabilitados y un aviso con quien empaca.
+ *
+ * El boton que no aplica se pinta deshabilitado y SIN `data-testid`: el testid sigue marcando
+ * solo el boton que abre su confirmacion, dentro de su `<form>`, como antes.
  *
  * `startPackingAction` vuelve a la MISMA pantalla (revalida su ruta); `finishPackingAction`
  * termina, en el servidor, con una redireccion a «Por empacar» -su camino feliz nunca resuelve
@@ -35,7 +44,6 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
  */
 
 export const PACKING_ORDER_SCREEN_TESTID = 'packing-order-screen';
-export const PACKING_ORDER_NUMBER_TESTID = 'packing-order-number';
 export const PACKING_ORDER_RECIPE_TESTID = 'packing-order-recipe';
 export const PACKING_ORDER_QUANTITY_TESTID = 'packing-order-quantity';
 export const PACKING_ORDER_PRESENTATION_TESTID = 'packing-order-presentation';
@@ -73,6 +81,23 @@ export const PACKING_ORDER_FINISH_CONFIRM_TEXTS = {
   confirm: 'Terminar',
 } as const;
 
+export const PACKING_ORDER_TEXTS = {
+  back: 'Volver a «Por empacar»',
+  recipeMissing: 'Esta receta está dada de baja.',
+  quantity: 'Cantidad:',
+  distribution: 'Reparto',
+  emptyDistribution: 'Sin presentación',
+  missingDistribution: 'Falta el reparto: lo define quien edita pedidos',
+  packages: 'Envases:',
+  start: 'Comenzar',
+  startPending: 'Comenzando…',
+  finish: 'Terminar',
+  finishPending: 'Terminando…',
+  packingSteps: 'Pasos de envasado',
+  packerUnknown: 'Lo está empacando otra persona.',
+  packer: (name: string) => `Lo está empacando ${name}.`,
+} as const;
+
 function confirmTexts(
   texts: typeof PACKING_ORDER_START_CONFIRM_TEXTS | typeof PACKING_ORDER_FINISH_CONFIRM_TEXTS,
 ) {
@@ -84,26 +109,18 @@ function confirmTexts(
   };
 }
 
-const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
-const QUANTITY_LABEL = 'Cantidad:';
-const DISTRIBUTION_LABEL = 'Reparto';
-const EMPTY_DISTRIBUTION_TEXT = 'Sin presentación';
-const MISSING_DISTRIBUTION_TEXT = 'Falta el reparto: lo define quien edita pedidos';
-const START_LABEL = 'Comenzar';
-const START_PENDING_LABEL = 'Comenzando…';
-const FINISH_LABEL = 'Terminar';
-const FINISH_PENDING_LABEL = 'Terminando…';
-const PACKING_STEPS_TITLE = 'Pasos de envasado';
 const PACKING_MIN_STEP_SECONDS = 5;
-const BACK_LABEL = 'Volver a «Por empacar»';
-const PACKER_UNKNOWN_TEXT = 'Lo esta empacando otra persona.';
 
 function packerLabel(order: PackingOrderRow): string {
-  return order.packedByName === null ? PACKER_UNKNOWN_TEXT : `Lo esta empacando ${order.packedByName}.`;
+  return order.packedByName === null
+    ? PACKING_ORDER_TEXTS.packerUnknown
+    : PACKING_ORDER_TEXTS.packer(order.packedByName);
 }
 
 const START_INITIAL_STATE: StartPackingResult = { status: 'success' };
 const FINISH_INITIAL_STATE: FinishPackingResult = { status: 'success' };
+
+const FOOTER_BUTTON_CLASS = 'w-full';
 
 export type PackingOrderScreenProps = {
   readonly order: PackingOrderDetail;
@@ -137,180 +154,228 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
   const lacksDistribution = order.status === 'POR_EMPACAR' && order.presentationLines.length === 0;
   const showsPackingSteps = canFinish && order.packingSteps.length > 0;
 
-  return (
-    <div className="flex min-h-dvh flex-col gap-4 p-4 md:p-6" data-testid={PACKING_ORDER_SCREEN_TESTID}>
-      <h1 className="text-2xl font-semibold" data-testid={PACKING_ORDER_NUMBER_TESTID}>
-        {order.numberText}
-      </h1>
+  const startDialog = (
+    <ConfirmDialog
+      open={startConfirmOpen}
+      onOpenChange={setStartConfirmOpen}
+      onConfirm={() => startFormRef.current?.requestSubmit()}
+      texts={confirmTexts(PACKING_ORDER_START_CONFIRM_TEXTS)}
+      testIds={{
+        dialog: PACKING_ORDER_START_DIALOG_TESTID,
+        dismiss: `${PACKING_ORDER_START_DIALOG_TESTID}-cancel`,
+        confirm: PACKING_ORDER_START_CONFIRM_TESTID,
+      }}
+    />
+  );
 
-      <p className="text-base text-muted-foreground" data-testid={PACKING_ORDER_RECIPE_TESTID}>
-        {order.recipeName ?? RECIPE_MISSING_TEXT}
-      </p>
+  const finishDialog = (
+    <ConfirmDialog
+      open={finishConfirmOpen}
+      onOpenChange={setFinishConfirmOpen}
+      onConfirm={() => finishFormRef.current?.requestSubmit()}
+      texts={confirmTexts(PACKING_ORDER_FINISH_CONFIRM_TEXTS)}
+      testIds={{
+        dialog: PACKING_ORDER_FINISH_DIALOG_TESTID,
+        dismiss: `${PACKING_ORDER_FINISH_DIALOG_TESTID}-cancel`,
+        confirm: PACKING_ORDER_FINISH_CONFIRM_TESTID,
+      }}
+    />
+  );
 
-      <p
-        className="text-base font-medium"
-        data-testid={PACKING_ORDER_QUANTITY_TESTID}
-        title={exactDecimalTitle(order.quantity)}
+  const startIcon = <PlayIcon aria-hidden="true" />;
+  const finishIcon = <CheckIcon aria-hidden="true" />;
+
+  const startCell = canStart ? (
+    <form
+      ref={startFormRef}
+      action={startFormAction}
+      data-testid={PACKING_ORDER_START_FORM_TESTID}
+      className="flex"
+    >
+      <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
+      <Button
+        type="button"
+        size="xl"
+        touch
+        className={FOOTER_BUTTON_CLASS}
+        onClick={() => setStartConfirmOpen(true)}
+        disabled={startPending}
+        aria-busy={startPending}
+        data-testid={PACKING_ORDER_START_BUTTON_TESTID}
       >
-        {QUANTITY_LABEL} {formatDecimalDisplay(order.quantity)}
-        {order.unitLabel === null ? null : ` ${order.unitLabel}`}
-      </p>
+        {startIcon}
+        {startPending ? PACKING_ORDER_TEXTS.startPending : PACKING_ORDER_TEXTS.start}
+      </Button>
+      {startDialog}
+    </form>
+  ) : (
+    <Button type="button" size="xl" touch variant="outline" className={FOOTER_BUTTON_CLASS} disabled>
+      {startIcon}
+      {PACKING_ORDER_TEXTS.start}
+    </Button>
+  );
 
-      <section
-        aria-labelledby="packing-order-distribution-heading"
-        className="flex flex-col gap-2"
-        data-testid={PACKING_ORDER_PRESENTATION_TESTID}
+  const finishCell =
+    canFinish && !showsPackingSteps ? (
+      <form
+        ref={finishFormRef}
+        action={finishFormAction}
+        data-testid={PACKING_ORDER_FINISH_FORM_TESTID}
+        className="flex"
       >
-        <h2 id="packing-order-distribution-heading" className="text-base font-medium">
-          {DISTRIBUTION_LABEL}
-        </h2>
-        {order.presentationLines.length === 0 ? (
-          <p className="text-base text-muted-foreground">{EMPTY_DISTRIBUTION_TEXT}</p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {order.presentationLines.map((line) => (
-              <li
-                key={line.presentationId}
-                className="text-base"
-                data-testid={PACKING_ORDER_PRESENTATION_LINE_TESTID}
-              >
-                {orderDistributionLineText(line)}
-              </li>
-            ))}
-          </ul>
-        )}
-        {lacksDistribution ? (
-          <p
-            role="status"
-            className="rounded-lg border bg-muted p-3 text-base"
-            data-testid={PACKING_ORDER_MISSING_DISTRIBUTION_TESTID}
-          >
-            {MISSING_DISTRIBUTION_TEXT}
-          </p>
-        ) : null}
-      </section>
-
-      <p className="text-base" data-testid={PACKING_ORDER_PACKAGES_TESTID}>
-        Envases: {order.packages ?? EMPTY_MARK}
-      </p>
-
-      <p
-        className="text-base font-medium"
-        data-testid={PACKING_ORDER_STATUS_TESTID}
-        data-status={order.status}
-      >
-        {ORDER_STATUS_LABELS[order.status]}
-      </p>
-
-      {canStart ? (
-        <form
-          ref={startFormRef}
-          action={startFormAction}
-          data-testid={PACKING_ORDER_START_FORM_TESTID}
-          className="flex flex-col gap-2"
+        <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
+        <Button
+          type="button"
+          size="xl"
+          touch
+          className={FOOTER_BUTTON_CLASS}
+          onClick={() => setFinishConfirmOpen(true)}
+          disabled={finishPending}
+          aria-busy={finishPending}
+          data-testid={PACKING_ORDER_FINISH_BUTTON_TESTID}
         >
-          <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
-          <Button
-            type="button"
-            touch
-            onClick={() => setStartConfirmOpen(true)}
-            disabled={startPending}
-            aria-busy={startPending}
-            data-testid={PACKING_ORDER_START_BUTTON_TESTID}
-          >
-            {startPending ? START_PENDING_LABEL : START_LABEL}
-          </Button>
-          <ConfirmDialog
-            open={startConfirmOpen}
-            onOpenChange={setStartConfirmOpen}
-            onConfirm={() => startFormRef.current?.requestSubmit()}
-            texts={confirmTexts(PACKING_ORDER_START_CONFIRM_TEXTS)}
-            testIds={{
-              dialog: PACKING_ORDER_START_DIALOG_TESTID,
-              dismiss: `${PACKING_ORDER_START_DIALOG_TESTID}-cancel`,
-              confirm: PACKING_ORDER_START_CONFIRM_TESTID,
-            }}
-          />
-        </form>
+          {finishIcon}
+          {finishPending ? PACKING_ORDER_TEXTS.finishPending : PACKING_ORDER_TEXTS.finish}
+        </Button>
+        {finishDialog}
+      </form>
+    ) : (
+      <Button type="button" size="xl" touch variant="outline" className={FOOTER_BUTTON_CLASS} disabled>
+        {finishIcon}
+        {PACKING_ORDER_TEXTS.finish}
+      </Button>
+    );
+
+  // Con paso a paso el pie es el de `StepReader`: el marco no pinta el suyo.
+  const footer = showsPackingSteps ? undefined : (
+    <div className="grid grid-cols-1 gap-x-6 @min-[1101px]:grid-cols-[300px_minmax(0,720px)] @min-[1101px]:justify-center">
+      <div aria-hidden="true" className="hidden @min-[1101px]:block" />
+      <div className="grid grid-cols-2 gap-3">
+        {startCell}
+        {finishCell}
+      </div>
+    </div>
+  );
+
+  return (
+    <OperatorScreenFrame
+      testId={PACKING_ORDER_SCREEN_TESTID}
+      back={{ href: backHref, label: PACKING_ORDER_TEXTS.back, testId: PACKING_ORDER_BACK_LINK_TESTID }}
+      eyebrow={order.numberText}
+      title={order.recipeName ?? PACKING_ORDER_TEXTS.recipeMissing}
+      titleTestId={PACKING_ORDER_RECIPE_TESTID}
+      status={
+        <StatusBadge
+          tone={ORDER_STATUS_TONES[order.status]}
+          label={ORDER_STATUS_LABELS[order.status]}
+          data-testid={PACKING_ORDER_STATUS_TESTID}
+          data-status={order.status}
+        />
+      }
+      footer={footer}
+    >
+      {showsOtherPacker ? (
+        <Notice tone="info" testId={PACKING_ORDER_PACKER_TESTID}>
+          {packerLabel(order)}
+        </Notice>
       ) : null}
+
+      <div className="grid grid-cols-1 items-start gap-5 @min-[1101px]:grid-cols-[300px_minmax(0,720px)] @min-[1101px]:justify-center @min-[1101px]:gap-x-6">
+        <Card className="gap-4 p-4">
+          <p
+            className="text-base font-medium"
+            data-testid={PACKING_ORDER_QUANTITY_TESTID}
+            title={exactDecimalTitle(order.quantity)}
+          >
+            {PACKING_ORDER_TEXTS.quantity} {formatDecimalDisplay(order.quantity)}
+            {order.unitLabel === null ? null : ` ${order.unitLabel}`}
+          </p>
+
+          <section
+            aria-labelledby="packing-order-distribution-heading"
+            className="flex flex-col gap-2"
+            data-testid={PACKING_ORDER_PRESENTATION_TESTID}
+          >
+            <h2 id="packing-order-distribution-heading" className="text-base font-semibold">
+              {PACKING_ORDER_TEXTS.distribution}
+            </h2>
+            {order.presentationLines.length === 0 ? (
+              <p className="text-base text-muted-foreground">
+                {PACKING_ORDER_TEXTS.emptyDistribution}
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {order.presentationLines.map((line) => (
+                  <li
+                    key={line.presentationId}
+                    className="text-base"
+                    data-testid={PACKING_ORDER_PRESENTATION_LINE_TESTID}
+                  >
+                    {orderDistributionLineText(line)}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {lacksDistribution ? (
+              <Notice tone="warning" testId={PACKING_ORDER_MISSING_DISTRIBUTION_TESTID}>
+                {PACKING_ORDER_TEXTS.missingDistribution}
+              </Notice>
+            ) : null}
+          </section>
+
+          <p className="text-base" data-testid={PACKING_ORDER_PACKAGES_TESTID}>
+            {PACKING_ORDER_TEXTS.packages} {order.packages ?? EMPTY_MARK}
+          </p>
+        </Card>
+
+        <div className="flex min-w-0 flex-col gap-4">
+          {/* Encima del contenido y no al final: el pie fijo taparía lo último. */}
+          {startError !== undefined ? (
+            <ErrorAlert
+              error={startError}
+              testId={PACKING_ORDER_START_ERROR_TESTID}
+              className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+            />
+          ) : null}
+
+          {finishError !== undefined ? (
+            <ErrorAlert
+              error={finishError}
+              testId={PACKING_ORDER_FINISH_ERROR_TESTID}
+              className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+            />
+          ) : null}
+
+          {showsPackingSteps ? (
+            <div data-testid={PACKING_ORDER_STEPS_TESTID}>
+              <StepReader
+                steps={order.packingSteps}
+                title={PACKING_ORDER_TEXTS.packingSteps}
+                onFinish={() => setFinishConfirmOpen(true)}
+                minStepSeconds={PACKING_MIN_STEP_SECONDS}
+                mode="ejecucion"
+                finishLabel={
+                  finishPending ? PACKING_ORDER_TEXTS.finishPending : PACKING_ORDER_TEXTS.finish
+                }
+                finishBusy={finishPending}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
 
       {showsPackingSteps ? (
-        <div data-testid={PACKING_ORDER_STEPS_TESTID}>
-          <StepReader
-            steps={order.packingSteps}
-            title={PACKING_STEPS_TITLE}
-            onFinish={() => setFinishConfirmOpen(true)}
-            minStepSeconds={PACKING_MIN_STEP_SECONDS}
-            mode="ejecucion"
-            finishLabel={finishPending ? FINISH_PENDING_LABEL : FINISH_LABEL}
-            finishBusy={finishPending}
-          />
-        </div>
-      ) : null}
-
-      {canFinish ? (
+        // El ultimo boton del paso a paso abre la confirmacion; el `<form>` de hoy envia.
         <form
           ref={finishFormRef}
           action={finishFormAction}
           data-testid={PACKING_ORDER_FINISH_FORM_TESTID}
-          className={showsPackingSteps ? 'hidden' : 'flex flex-col gap-2'}
+          className="hidden"
         >
           <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
-          {showsPackingSteps ? null : (
-            <Button
-              type="button"
-              touch
-              onClick={() => setFinishConfirmOpen(true)}
-              disabled={finishPending}
-              aria-busy={finishPending}
-              data-testid={PACKING_ORDER_FINISH_BUTTON_TESTID}
-            >
-              {finishPending ? FINISH_PENDING_LABEL : FINISH_LABEL}
-            </Button>
-          )}
-          <ConfirmDialog
-            open={finishConfirmOpen}
-            onOpenChange={setFinishConfirmOpen}
-            onConfirm={() => finishFormRef.current?.requestSubmit()}
-            texts={confirmTexts(PACKING_ORDER_FINISH_CONFIRM_TEXTS)}
-            testIds={{
-              dialog: PACKING_ORDER_FINISH_DIALOG_TESTID,
-              dismiss: `${PACKING_ORDER_FINISH_DIALOG_TESTID}-cancel`,
-              confirm: PACKING_ORDER_FINISH_CONFIRM_TESTID,
-            }}
-          />
+          {finishDialog}
         </form>
       ) : null}
-
-      {showsOtherPacker ? (
-        <p className="text-base text-muted-foreground" data-testid={PACKING_ORDER_PACKER_TESTID}>
-          {packerLabel(order)}
-        </p>
-      ) : null}
-
-      {startError !== undefined ? (
-        <ErrorAlert
-          error={startError}
-          testId={PACKING_ORDER_START_ERROR_TESTID}
-          className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-        />
-      ) : null}
-
-      {finishError !== undefined ? (
-        <ErrorAlert
-          error={finishError}
-          testId={PACKING_ORDER_FINISH_ERROR_TESTID}
-          className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-        />
-      ) : null}
-
-      <Link
-        href={backHref}
-        className={`inline-flex w-fit items-center ${touchTarget} text-sm font-medium underline`}
-        data-testid={PACKING_ORDER_BACK_LINK_TESTID}
-      >
-        {BACK_LABEL}
-      </Link>
-    </div>
+    </OperatorScreenFrame>
   );
 }

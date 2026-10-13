@@ -4,8 +4,8 @@ import { AsignacionesError, type Actor } from '@/lib/modules/asignaciones';
 import { createErrorStateTranslator } from '@/lib/modules/errores';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
-import { AssignedOrdersError } from './assigned-orders-error';
 import { assignedOrdersListHref } from './assigned-orders-list-params';
+import { AssignmentListError } from './assignment-list-parts';
 import { FIRST_PAGE } from './assignment-view-params';
 import { ConditioningOrdersEmpty } from './conditioning-orders-empty';
 import { ConditioningOrdersTable } from './conditioning-orders-table';
@@ -36,6 +36,7 @@ async function currentActor(): Promise<Actor | null> {
 type ConditioningOrdersListSectionProps = {
   /** Ya acotados por `parseAssignmentListParams`. */
   readonly params: DataTableParams;
+  readonly canViewTrace?: boolean;
 };
 
 /**
@@ -43,7 +44,10 @@ type ConditioningOrdersListSectionProps = {
  * empresa. Llama a la fachada desde el servidor, como «Por empacar», para no abrir una Server
  * Action más que arme el actor.
  */
-export async function ConditioningOrdersListSection({ params }: ConditioningOrdersListSectionProps) {
+export async function ConditioningOrdersListSection({
+  params,
+  canViewTrace = false,
+}: ConditioningOrdersListSectionProps) {
   const actor = await currentActor();
 
   let result;
@@ -55,7 +59,7 @@ export async function ConditioningOrdersListSection({ params }: ConditioningOrde
   } catch (error) {
     return (
       <div data-testid={CONDITIONING_ORDERS_SECTION_TESTID}>
-        <AssignedOrdersError error={await toErrorState(error)} />
+        <AssignmentListError error={await toErrorState(error)} />
       </div>
     );
   }
@@ -79,7 +83,12 @@ export async function ConditioningOrdersListSection({ params }: ConditioningOrde
 
   return (
     <div data-testid={CONDITIONING_ORDERS_SECTION_TESTID}>
-      <ConditioningOrdersTable rows={items} params={params} totalPages={totalPages} />
+      <ConditioningOrdersTable
+        rows={items}
+        params={params}
+        totalPages={totalPages}
+        canViewTrace={canViewTrace}
+      />
     </div>
   );
 }

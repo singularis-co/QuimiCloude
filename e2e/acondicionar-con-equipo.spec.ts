@@ -6,9 +6,9 @@
  * pestaña, pulsa «Acondicionar», comprueba que el selector no ofrece al Administrador y sí al
  * Operador, espera los 5 s REALES con una persona y un grupo marcados, comienza, ve el estado, el
  * equipo y «Terminar», espera otros 5 s REALES en el modal de Terminar, confirma, aterriza en «Por
- * acondicionar» con el aviso y encuentra el pedido en «Terminados».
+ * acondicionar» con el aviso y encuentra el pedido en «Acondicionados».
  * R34, entre comenzar y terminar, abre el mismo detalle con el acondicionador 2 en otro contexto de
- * navegador: no ve «Terminar» ni «Acondicionar» y sí «Lo acondiciona <nombre del 1>.».
+ * navegador: ve «Terminar» y «Acondicionar» deshabilitados y sí «Lo acondiciona <nombre del 1>.».
  *
  * EL PEDIDO SE SIEMBRA DIRECTAMENTE con `prisma`, ya «Por acondicionar» y con `packed_by`, cumpliendo
  * los CHECK de `orders`: el recorrido de empaque que lo deja ahí lo cubre `e2e/empaque.spec.ts`.
@@ -93,6 +93,12 @@ const LAST_NAMES_BY_USERNAME: Readonly<Record<string, string>> = {
   [operatorUser.username]: 'Operador',
 };
 
+function rowByNumber(scope: Locator, numberText: string): Locator {
+  return scope.locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`).filter({
+    has: scope.page().getByTestId(ORDER_NUMBER_CELL_TESTID).filter({ hasText: exactText(numberText) }),
+  });
+}
+
 function displayNameOf(user: Credentials): string {
   return buildDisplayName(firstNames, LAST_NAMES_BY_USERNAME[user.username]!, user.username);
 }
@@ -108,7 +114,11 @@ const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const TAB_ACONDICIONADOS_TESTID = 'assignment-view-tab-acondicionados';
 const CONDITIONING_SECTION_TESTID = 'conditioning-orders-list-section';
 const CONDITIONED_SECTION_TESTID = 'conditioned-orders-list-section';
-const CONDITIONING_ORDER_LINK_TESTID = 'conditioning-order-link';
+/** La fila de la tabla compartida, su celda de número y su menú ⋯ con «Entrar». */
+const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
+const ORDER_NUMBER_CELL_TESTID = 'data-table-cell-orderNumber';
+const ROW_ACTIONS_TESTID = 'assignment-row-actions';
+const ROW_ENTER_TESTID = 'assignment-row-enter';
 const CONDITIONED_ORDER_NOTICE_TESTID = 'conditioned-order-notice';
 const VIEW_PARAM = 'vista';
 const VIEW_POR_ACONDICIONAR = 'por_acondicionar';
@@ -267,10 +277,11 @@ async function expectConditioner2SeesItReadOnly(browser: Browser, orderId: strin
     await expect(screen.getByTestId(SCREEN_CONDITIONER_TESTID)).toHaveText(
       exactText(`Lo acondiciona ${displayNameOf(conditioner1User)}.`),
     );
-    await expect(page.getByTestId(FINISH_BUTTON_TESTID)).toHaveCount(0);
-    await expect(page.getByTestId(START_BUTTON_TESTID)).toHaveCount(0);
-    await expect(screen.getByRole('button', { name: 'Terminar' })).toHaveCount(0);
-    await expect(screen.getByRole('button', { name: 'Acondicionar' })).toHaveCount(0);
+    // El pie pinta siempre los dos botones (R34 de QC-265): para él, los dos deshabilitados.
+    await expect(page.getByTestId(FINISH_BUTTON_TESTID)).toBeDisabled();
+    await expect(page.getByTestId(START_BUTTON_TESTID)).toBeDisabled();
+    await expect(screen.getByRole('button', { name: 'Terminar' })).toBeDisabled();
+    await expect(screen.getByRole('button', { name: 'Acondicionar' })).toBeDisabled();
   } finally {
     await context.close();
   }
@@ -392,7 +403,7 @@ test.afterAll(async () => {
 test.setTimeout(240_000);
 
 test.describe('acondicionar con equipo (R33, R34)', () => {
-  test('R33 y R34 - el acondicionador 1 comienza con una persona y un grupo tras la espera, el 2 no puede tocar el pedido, y el 1 lo termina y lo ve en Terminados', async ({
+  test('R33 y R34 - el acondicionador 1 comienza con una persona y un grupo tras la espera, el 2 no puede tocar el pedido, y el 1 lo termina y lo ve en Acondicionados', async ({
     page,
     browser,
   }) => {
@@ -405,11 +416,10 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
 
     const queue = page.getByTestId(CONDITIONING_SECTION_TESTID);
     await expect(queue).toBeVisible({ timeout: 60_000 });
-    const queueLink = queue
-      .getByTestId(CONDITIONING_ORDER_LINK_TESTID)
-      .filter({ hasText: exactText(numberText) });
-    await expect(queueLink).toHaveCount(1, { timeout: 60_000 });
-    await queueLink.click();
+    const queueRow = rowByNumber(queue, numberText);
+    await expect(queueRow).toHaveCount(1, { timeout: 60_000 });
+    await queueRow.getByTestId(ROW_ACTIONS_TESTID).click();
+    await page.getByTestId(ROW_ENTER_TESTID).click();
     await page.waitForURL((url) => url.pathname === conditioningOrderRoute(orderId), {
       timeout: 60_000,
     });
@@ -463,7 +473,8 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
     );
     await expect(screen.getByTestId(SCREEN_STATUS_TESTID)).toHaveText(exactText('En acondicionamiento'));
     await expect(screen.getByTestId(FINISH_BUTTON_TESTID)).toHaveText(exactText('Terminar'));
-    await expect(screen.getByTestId(START_BUTTON_TESTID)).toHaveCount(0);
+    await expect(screen.getByTestId(FINISH_BUTTON_TESTID)).toBeEnabled();
+    await expect(screen.getByTestId(START_BUTTON_TESTID)).toBeDisabled();
 
     const team = screen.getByTestId(TEAM_LIST_TESTID);
     await expect(team).toBeVisible();
@@ -483,7 +494,7 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
     await expect(team).not.toContainText(displayNameOf(adminUser));
 
     // --- 5. R34: el acondicionador 2, aun estando en el equipo, solo mira.
-    await test.step('R34 - el acondicionador 2 no ve «Terminar» ni «Acondicionar» y ve quién acondiciona', async () => {
+    await test.step('R34 - el acondicionador 2 ve «Terminar» y «Acondicionar» deshabilitados y ve quién acondiciona', async () => {
       await expectConditioner2SeesItReadOnly(browser, orderId);
     });
 
@@ -507,20 +518,14 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
       exactText(`Pedido ${numberText} acondicionado`),
       { timeout: 60_000 },
     );
-    await expect(
-      page
-        .getByTestId(CONDITIONING_SECTION_TESTID)
-        .getByTestId(CONDITIONING_ORDER_LINK_TESTID)
-        .filter({ hasText: exactText(numberText) }),
-    ).toHaveCount(0);
+    await expect(rowByNumber(page.getByTestId(CONDITIONING_SECTION_TESTID), numberText)).toHaveCount(0);
 
-    // --- 8. En «Terminados» está el pedido.
-    await page.getByTestId(TAB_ACONDICIONADOS_TESTID).click();
+    // --- 8. En «Acondicionados» está el pedido. La pestaña va en `Suspense` con ella misma de
+    //        respaldo: mientras llega el contador conviven las dos, la resuelta oculta.
+    await page.getByTestId(TAB_ACONDICIONADOS_TESTID).filter({ visible: true }).click();
     const finished = page.getByTestId(CONDITIONED_SECTION_TESTID);
     await expect(finished).toBeVisible({ timeout: 60_000 });
-    await expect(
-      finished.getByTestId(CONDITIONING_ORDER_LINK_TESTID).filter({ hasText: exactText(numberText) }),
-    ).toHaveCount(1, { timeout: 60_000 });
+    await expect(rowByNumber(finished, numberText)).toHaveCount(1, { timeout: 60_000 });
 
     // --- 9. Lo que quedó en la base: TERMINADO con fecha, y el equipo conservado.
     const stored = await prisma.order.findUniqueOrThrow({

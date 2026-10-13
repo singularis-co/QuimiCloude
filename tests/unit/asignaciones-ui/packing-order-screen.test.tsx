@@ -20,6 +20,12 @@ import {
   PACKING_ORDER_START_DIALOG_TESTID,
   PACKING_ORDER_STATUS_TESTID,
   PACKING_ORDER_STEPS_TESTID,
+  PACKING_ORDER_BACK_LINK_TESTID,
+  PACKING_ORDER_PACKER_TESTID,
+  PACKING_ORDER_PACKAGES_TESTID,
+  PACKING_ORDER_RECIPE_TESTID,
+  PACKING_ORDER_START_FORM_TESTID,
+  PACKING_ORDER_TEXTS,
   PackingOrderScreen,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
 import type { PackingOrderDetail } from '@/lib/modules/asignaciones';
@@ -328,6 +334,19 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
   });
 
+  it('QC-265 R30: con pasos, el pie es el del paso a paso y no se pintan «Comenzar» ni «Terminar» de R29', () => {
+    pintar(enEmpaquePropio());
+
+    const raiz = screen.getByTestId(PACKING_ORDER_SCREEN_TESTID);
+    expect(raiz.querySelector('[data-slot="operator-footer"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Comenzar' })).toBeNull();
+    expect(screen.queryByTestId(PACKING_ORDER_START_BUTTON_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
+    expect(screen.getByTestId('step-reader-previous')).toBeInTheDocument();
+    expect(screen.getByTestId('step-reader-next')).toBeInTheDocument();
+    expect(screen.getByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toHaveClass('hidden');
+  });
+
   it('R21: el ultimo boton dice «Terminar» y pasa por la misma confirmacion que el boton de hoy', async () => {
     finishPackingActionMock.mockResolvedValue({ status: 'success' });
     await recorrerHastaElUltimo();
@@ -444,7 +463,7 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     cleanup();
 
     pintar(fila({ status: 'EN_EMPAQUE', packedById: 'otro', packedByName: 'Otra' }));
-    expect(screen.getByText('Lo esta empacando Otra.')).toBeInTheDocument();
+    expect(screen.getByText('Lo está empacando Otra.')).toBeInTheDocument();
     expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
     expect(screen.queryByTestId(PACKING_ORDER_STEPS_TESTID)).toBeNull();
   });
@@ -498,5 +517,170 @@ describe('QC-252: la etiqueta de estado sale del mapa compartido', () => {
     const estado = screen.getByTestId(PACKING_ORDER_STATUS_TESTID);
     expect(estado.textContent).toBe(ORDER_STATUS_LABELS.CANCELADO);
     expect(estado.textContent).toBe('Cancelado');
+  });
+});
+
+describe('QC-265 — el empaque sobre el marco del operario', () => {
+  const OTRO_ID = '22222222-2222-4222-8222-222222222222';
+
+  function cabecera(): HTMLElement {
+    const nodo = screen
+      .getByTestId(PACKING_ORDER_SCREEN_TESTID)
+      .querySelector<HTMLElement>('[data-slot="operator-header"]');
+    expect(nodo).not.toBeNull();
+    return nodo!;
+  }
+
+  function pie(): HTMLElement {
+    const nodo = screen
+      .getByTestId(PACKING_ORDER_SCREEN_TESTID)
+      .querySelector<HTMLElement>('[data-slot="operator-footer"]');
+    expect(nodo).not.toBeNull();
+    return nodo!;
+  }
+
+  /** `default` pinta `bg-primary`; `outline`, `btn-veil` con borde. */
+  function esPrincipal(boton: HTMLElement): boolean {
+    return boton.className.split(/\s+/).includes('bg-primary');
+  }
+
+  it('R2: número en la cabecera, la receta como único h1 con su testid y «Cambiar tema»', () => {
+    pintar(fila());
+
+    expect(screen.getByTestId(PACKING_ORDER_SCREEN_TESTID)).toHaveAttribute('data-operator-screen');
+    expect(within(cabecera()).getByText('2026-0000030')).toBeInTheDocument();
+    const titulos = screen.getAllByRole('heading', { level: 1 });
+    expect(titulos).toHaveLength(1);
+    expect(titulos[0]).toHaveTextContent('Jarabe simple');
+    expect(titulos[0]).toHaveAttribute('data-testid', PACKING_ORDER_RECIPE_TESTID);
+    expect(within(cabecera()).getByRole('button', { name: 'Cambiar tema' })).toBeInTheDocument();
+  });
+
+  it('R39: con la receta dada de baja el h1 dice «Esta receta está dada de baja.»', () => {
+    pintar(fila({ recipeName: null }));
+
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(
+      'Esta receta está dada de baja.',
+    );
+  });
+
+  it('R27: «Volver a «Por empacar»» es un botón con flecha en la cabecera, con su testid y dirección', () => {
+    pintar(fila());
+
+    const volver = within(cabecera()).getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
+    expect(volver).toHaveAttribute('href', '/asignacion?vista=por_empacar');
+    expect(volver).toHaveAttribute('data-direction', 'back');
+    expect(volver).toHaveTextContent('Volver a «Por empacar»');
+    expect(volver.textContent).toBe(PACKING_ORDER_TEXTS.back);
+    expect(volver.querySelector('svg')).not.toBeNull();
+  });
+
+  it('R27: el estado va en la cabecera con `StatusBadge`, su testid y `data-status`', () => {
+    pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo' }));
+
+    const estado = within(cabecera()).getByTestId(PACKING_ORDER_STATUS_TESTID);
+    expect(estado).toHaveAttribute('data-status', 'EN_EMPAQUE');
+    expect(estado).toHaveAttribute('data-tone');
+    expect(estado.querySelector('[data-slot="status-dot"]')).not.toBeNull();
+    expect(estado.textContent).toBe('En empaque');
+  });
+
+  it('R28: el resumen pinta cantidad, reparto con sus líneas y envases, con sus testids', () => {
+    pintar(fila());
+
+    expect(screen.getByTestId(PACKING_ORDER_QUANTITY_TESTID)).toHaveTextContent('Cantidad: 12.5 kg');
+    const reparto = screen.getByTestId(PACKING_ORDER_PRESENTATION_TESTID);
+    expect(within(reparto).getByRole('heading', { level: 2, name: 'Reparto' })).toBeInTheDocument();
+    expect(within(reparto).getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID)).toHaveLength(3);
+    expect(screen.getByTestId(PACKING_ORDER_PACKAGES_TESTID)).toHaveTextContent('Envases: 8');
+  });
+
+  it('R28: sin líneas dice «Sin presentación» y la falta de reparto es un `Notice` `warning`', () => {
+    pintar(fila({ presentationLines: [] }));
+
+    const reparto = screen.getByTestId(PACKING_ORDER_PRESENTATION_TESTID);
+    expect(within(reparto).getByText('Sin presentación')).toBeInTheDocument();
+    const aviso = screen.getByTestId(PACKING_ORDER_MISSING_DISTRIBUTION_TESTID);
+    expect(aviso).toHaveAttribute('data-tone', 'warning');
+    expect(aviso).toHaveAttribute('role', 'status');
+    expect(aviso).toHaveTextContent(MISSING_DISTRIBUTION_TEXT);
+  });
+
+  it('R29: `POR_EMPACAR` pinta en el pie «Comenzar» y «Terminar», y solo «Comenzar» habilitado', () => {
+    pintar(fila());
+
+    const comenzar = within(pie()).getByRole('button', { name: 'Comenzar' });
+    const terminar = within(pie()).getByRole('button', { name: 'Terminar' });
+    expect(comenzar).toBeEnabled();
+    expect(comenzar).toHaveAttribute('data-testid', PACKING_ORDER_START_BUTTON_TESTID);
+    expect(esPrincipal(comenzar)).toBe(true);
+    expect(within(pie()).getByTestId(PACKING_ORDER_START_FORM_TESTID)).toContainElement(comenzar);
+    expect(terminar).toBeDisabled();
+    expect(esPrincipal(terminar)).toBe(false);
+    expect(screen.queryByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toBeNull();
+  });
+
+  it('R29: `EN_EMPAQUE` propio sin pasos habilita solo «Terminar», dentro de su formulario', () => {
+    pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo' }));
+
+    const comenzar = within(pie()).getByRole('button', { name: 'Comenzar' });
+    const terminar = within(pie()).getByRole('button', { name: 'Terminar' });
+    expect(comenzar).toBeDisabled();
+    expect(esPrincipal(comenzar)).toBe(false);
+    expect(terminar).toBeEnabled();
+    expect(terminar).toHaveAttribute('data-testid', PACKING_ORDER_FINISH_BUTTON_TESTID);
+    expect(esPrincipal(terminar)).toBe(true);
+    expect(within(pie()).getByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toContainElement(terminar);
+    expect(screen.queryByTestId(PACKING_ORDER_START_FORM_TESTID)).toBeNull();
+  });
+
+  it('R3: los botones del pie miden 52 px de alto y cumplen el mínimo táctil', () => {
+    pintar(fila());
+
+    const botones = within(pie()).getAllByRole('button');
+    expect(botones).toHaveLength(2);
+    for (const boton of botones) {
+      const clases = boton.className.split(/\s+/);
+      expect(clases).toContain('h-13');
+      expect(clases).toContain('min-h-11');
+      expect(clases).toContain('min-w-11');
+    }
+    const volver = screen.getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
+    expect(volver.className).toContain('min-h-11');
+    expect(volver.className).toContain('min-w-11');
+  });
+
+  it('R4: el cuerpo pasa a dos columnas (300 px y hasta 720 px) por encima de 1100 px', () => {
+    pintar(fila());
+
+    const resumen = screen.getByTestId(PACKING_ORDER_QUANTITY_TESTID).closest('[data-slot="card"]');
+    expect(resumen).not.toBeNull();
+    const rejilla = resumen!.parentElement!;
+    expect(rejilla.className).toContain('grid-cols-1');
+    expect(rejilla.className).toContain('@min-[1101px]:grid-cols-[300px_minmax(0,720px)]');
+  });
+
+  it.each([
+    ['Otra Persona', 'Lo está empacando Otra Persona.'],
+    [null, 'Lo está empacando otra persona.'],
+  ] as const)(
+    'R31: otra persona empaca (%s) → `Notice` `info` «%s» y los dos botones deshabilitados',
+    (packedByName, texto) => {
+      pintar(fila({ status: 'EN_EMPAQUE', packedById: OTRO_ID, packedByName }));
+
+      const aviso = screen.getByTestId(PACKING_ORDER_PACKER_TESTID);
+      expect(aviso).toHaveAttribute('data-tone', 'info');
+      expect(aviso).toHaveAttribute('role', 'status');
+      expect(aviso.textContent).toBe(texto);
+      expect(within(pie()).getByRole('button', { name: 'Comenzar' })).toBeDisabled();
+      expect(within(pie()).getByRole('button', { name: 'Terminar' })).toBeDisabled();
+      expect(screen.queryByTestId(PACKING_ORDER_START_FORM_TESTID)).toBeNull();
+      expect(screen.queryByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toBeNull();
+    },
+  );
+
+  it('R39: los textos de quien empaca llevan tilde', () => {
+    expect(PACKING_ORDER_TEXTS.packerUnknown).toBe('Lo está empacando otra persona.');
+    expect(PACKING_ORDER_TEXTS.packer('Ana')).toBe('Lo está empacando Ana.');
   });
 });

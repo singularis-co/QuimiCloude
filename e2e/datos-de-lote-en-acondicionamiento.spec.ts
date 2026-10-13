@@ -37,7 +37,6 @@ import {
   CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_BATCH_DATA_SUBMIT_TESTID,
-  CONDITIONING_BATCH_DATA_SUCCESS_TESTID,
   CONDITIONING_BATCH_DATA_TEXTS,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-batch-data-form';
 import {
@@ -185,6 +184,9 @@ type Seeded = {
 };
 let fixture: Seeded | null = null;
 
+/** El aviso del `<Toaster />` de sonner que monta el layout privado. */
+const TOAST_SELECTOR = '[data-sonner-toast]';
+
 /** Igualdad EXACTA de texto: un correlativo no puede casar con un prefijo suyo. */
 function exactText(value: string): RegExp {
   return new RegExp(`^\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
@@ -329,7 +331,9 @@ async function saveAndExpectRejection(
   await expect(alert).toHaveAttribute('data-code', code, { timeout: 60_000 });
   await expect(alert).toHaveAttribute('role', 'alert');
   await expect(section.getByRole('alert')).toContainText(errorMessage(code));
-  await expect(section.getByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID)).toHaveCount(0);
+  await expect(
+    page.locator(TOAST_SELECTOR).filter({ hasText: CONDITIONING_BATCH_DATA_TEXTS.saved }),
+  ).toHaveCount(0);
 
   for (const line of lines) {
     const block = lineBlock(section, line.batchId);
@@ -724,11 +728,12 @@ test.describe('datos de lote en el acondicionamiento (R28)', () => {
     //        habilita (R4, R6).
     await fillLine(lineBlock(section, line2.batchId), valid2);
     await section.getByTestId(CONDITIONING_BATCH_DATA_SUBMIT_TESTID).click();
-    await expect(section.getByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID)).toHaveText(
-      exactText(CONDITIONING_BATCH_DATA_TEXTS.saved),
-      { timeout: 60_000 },
-    );
-    await expect(section.getByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID)).toHaveAttribute('role', 'status');
+    // El éxito se avisa con un toast del `<Toaster />` del layout privado (R40 de QC-265).
+    const savedToast = page
+      .locator(TOAST_SELECTOR)
+      .filter({ hasText: CONDITIONING_BATCH_DATA_TEXTS.saved });
+    await expect(savedToast).toHaveCount(1, { timeout: 60_000 });
+    await expect(savedToast).toBeVisible();
     await expect(section.getByTestId(CONDITIONING_BATCH_DATA_ERROR_TESTID)).toHaveCount(0);
     await expect(screen.getByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toHaveCount(0, {
       timeout: 60_000,

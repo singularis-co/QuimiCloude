@@ -145,6 +145,9 @@ const BLOCKED_ORDER_CONFIRM_TESTID = 'blocked-order-confirm';
 /** Asignacion, ejecucion y empaque. */
 const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
+/** La ejecución: el `h1` es solo la receta y el número va en el rótulo de la cabecera (R23 de QC-265). */
+const EXECUTION_SCREEN_TESTID = 'order-execution-screen';
+const EXECUTION_EYEBROW_SELECTOR = '[data-slot="operator-eyebrow"]';
 const EXECUTION_DISTRIBUTION_TESTID = 'order-execution-presentation';
 const ORDER_DISTRIBUTION_LABEL_TESTID = 'order-distribution';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
@@ -612,10 +615,10 @@ test.describe('envases del pedido como productos', () => {
     await switchUser(page, operatorUser);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     await page.goto(assignedOrderRoute(first.id));
-    await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(
-      `${firstNumber} - ${RECIPE_NAME}`,
-      { timeout: 60_000 },
-    );
+    await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(RECIPE_NAME, { timeout: 60_000 });
+    await expect(
+      page.getByTestId(EXECUTION_SCREEN_TESTID).locator(EXECUTION_EYEBROW_SELECTOR),
+    ).toHaveText(firstNumber);
 
     // R44: la ejecucion nombra los envases.
     const executionLabel = page

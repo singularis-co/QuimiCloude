@@ -72,6 +72,14 @@ describe('OrderOutcomeNotice kind="conditioned" — el aviso al volver de Termin
 
     expect(screen.getByTestId(CONDITIONED_ORDER_NOTICE_TESTID)).toHaveAttribute('role', 'status');
   });
+
+  it('R13: se pinta con `Notice` en tono success', () => {
+    render(<OrderOutcomeNotice kind="conditioned" orderNumber="2026-0000043" />);
+
+    const aviso = screen.getByTestId(CONDITIONED_ORDER_NOTICE_TESTID);
+    expect(aviso).toHaveAttribute('data-slot', 'alert');
+    expect(aviso).toHaveAttribute('data-tone', 'success');
+  });
 });
 
 describe('/asignacion pinta el aviso al aterrizar desde Terminar', () => {

@@ -7,9 +7,7 @@ import { DataTable, type DataTableParams, type DataTableTexts } from '@/componen
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
 
 import { assignedOrdersListHref } from './assigned-orders-list-params';
-import {
-  buildFinishedOrdersColumns,
-} from './finished-orders-columns';
+import { FINISHED_ORDERS_CARD, buildFinishedOrdersColumns } from './finished-orders-columns';
 
 export const FINISHED_ORDERS_TABLE_ID = 'asignacion-terminados';
 
@@ -40,12 +38,18 @@ export type FinishedOrdersTableProps = {
   readonly rows: readonly FinishedOrderView[];
   readonly params: DataTableParams;
   readonly totalPages: number;
+  readonly canViewTrace?: boolean;
 };
 
-export function FinishedOrdersTable({ rows, params, totalPages }: FinishedOrdersTableProps) {
+export function FinishedOrdersTable({
+  rows,
+  params,
+  totalPages,
+  canViewTrace = false,
+}: FinishedOrdersTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const columns = useMemo(() => buildFinishedOrdersColumns(), []);
+  const columns = useMemo(() => buildFinishedOrdersColumns({ canViewTrace }), [canViewTrace]);
 
   const navigate = (href: string) => {
     startTransition(() => {
@@ -73,6 +77,7 @@ export function FinishedOrdersTable({ rows, params, totalPages }: FinishedOrders
         status="idle"
         texts={FINISHED_ORDERS_TABLE_TEXTS}
         searchable={false}
+        card={FINISHED_ORDERS_CARD}
       />
     </div>
   );

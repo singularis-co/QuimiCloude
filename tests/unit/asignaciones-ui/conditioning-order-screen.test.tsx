@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CONDITIONING_ACTIONS_TEXTS,
   CONDITIONING_BATCH_DATA_LINE_TESTID,
+  CONDITIONING_FINISH_BUTTON_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_ORDER_BACK_LINK_TESTID,
   CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID,
@@ -16,13 +17,16 @@ import {
   CONDITIONING_ORDER_NUMBER_TESTID,
   CONDITIONING_ORDER_QUANTITY_TESTID,
   CONDITIONING_ORDER_RECIPE_TESTID,
+  CONDITIONING_ORDER_SCREEN_TESTID,
   CONDITIONING_ORDER_STATUS_TESTID,
+  CONDITIONING_START_BUTTON_TESTID,
   CONDITIONING_TEAM_LIST_GROUP_NAME_TESTID,
   CONDITIONING_TEAM_LIST_GROUP_TESTID,
   CONDITIONING_TEAM_LIST_TESTID,
   ConditioningOrderScreen,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
 import { buildConditioningOrdersColumns } from '@/app/(private)/asignacion/components';
+import { RESPONSIBLE_AVATAR_TESTID, RESPONSIBLE_OVERFLOW_TESTID } from '@/components/shared/responsible-avatars';
 import type {
   ConditioningBatchLineView,
   ConditioningOrderDetail,
@@ -66,13 +70,24 @@ const CANDIDATES: ConditioningTeamCandidates = {
 };
 
 describe('el detalle muestra los datos del pedido', () => {
-  it('R15: número (h1), receta, cantidad con unidad, reparto entero, estado y quién acondiciona', () => {
+  it('R15 R32: número, receta (único h1), cantidad con unidad, reparto entero, estado y quién acondiciona', () => {
     render(<ConditioningOrderScreen order={ROW} />);
 
     const numero = screen.getByTestId(CONDITIONING_ORDER_NUMBER_TESTID);
-    expect(numero.tagName).toBe('H1');
     expect(numero).toHaveTextContent('2026-0000040');
-    expect(screen.getByTestId(CONDITIONING_ORDER_RECIPE_TESTID)).toHaveTextContent('Jarabe simple');
+    const receta = screen.getByTestId(CONDITIONING_ORDER_RECIPE_TESTID);
+    expect(receta.tagName).toBe('H1');
+    expect(screen.getAllByRole('heading', { level: 1 })).toEqual([receta]);
+    expect(receta).toHaveTextContent('Jarabe simple');
+    const cabecera = numero.closest('[data-slot="operator-header"]');
+    expect(cabecera).not.toBeNull();
+    for (const testId of [
+      CONDITIONING_ORDER_DISTRIBUTION_TESTID,
+      CONDITIONING_ORDER_STATUS_TESTID,
+      CONDITIONING_ORDER_CONDITIONER_TESTID,
+    ]) {
+      expect(cabecera?.contains(screen.getByTestId(testId))).toBe(true);
+    }
     expect(screen.getByTestId(CONDITIONING_ORDER_QUANTITY_TESTID)).toHaveTextContent('20.5 kg');
     expect(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID)).toHaveTextContent(
       '12 × 500 g / 4 × 1 kg',
@@ -124,12 +139,34 @@ describe('el detalle muestra los datos del pedido', () => {
   });
 });
 
-describe('las acciones del detalle', () => {
-  function botones(): string[] {
-    return screen.queryAllByRole('button').map((boton) => boton.textContent ?? '');
+describe('las acciones del pie', () => {
+  function inicio(): HTMLElement {
+    return screen.getByTestId(CONDITIONING_START_BUTTON_TESTID);
+  }
+  function terminar(): HTMLElement {
+    return screen.getByTestId(CONDITIONING_FINISH_BUTTON_TESTID);
+  }
+  function pie(): HTMLElement {
+    const footer = screen
+      .getByTestId(CONDITIONING_ORDER_SCREEN_TESTID)
+      .querySelector('[data-slot="operator-footer"]');
+    if (!(footer instanceof HTMLElement)) throw new Error('falta el pie');
+    return footer;
   }
 
-  it('R1: en POR_ACONDICIONAR ofrece solo «Acondicionar»', () => {
+  it('R34 R2 R3: el pie fijo pinta siempre «Acondicionar» y «Terminar», de 52 px', () => {
+    render(<ConditioningOrderScreen order={{ ...ROW, status: 'TERMINADO' }} />);
+
+    expect(screen.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID)).toHaveAttribute('data-operator-screen');
+    expect(within(pie()).getAllByRole('button').map((boton) => boton.textContent)).toEqual([
+      CONDITIONING_ACTIONS_TEXTS.start,
+      CONDITIONING_ACTIONS_TEXTS.finish,
+    ]);
+    expect(inicio().className).toContain('h-13');
+    expect(terminar().className).toContain('h-13');
+  });
+
+  it('R1 R34: en POR_ACONDICIONAR con candidatos solo «Acondicionar» está habilitado', () => {
     render(
       <ConditioningOrderScreen
         order={{ ...ROW, status: 'POR_ACONDICIONAR', conditionedByName: null, conditionedById: null }}
@@ -138,35 +175,37 @@ describe('las acciones del detalle', () => {
       />,
     );
 
-    expect(botones()).toEqual([CONDITIONING_ACTIONS_TEXTS.start]);
-    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+    expect(inicio()).toBeEnabled();
+    expect(terminar()).toBeDisabled();
   });
 
-  it('R2: en EN_ACONDICIONAMIENTO de quien lo acondiciona ofrece solo «Terminar»', () => {
+  it('R2 R34: en EN_ACONDICIONAMIENTO de quien lo acondiciona solo «Terminar» está habilitado', () => {
     render(<ConditioningOrderScreen order={ROW} canFinish />);
 
-    expect(botones()).toEqual([CONDITIONING_ACTIONS_TEXTS.finish]);
-    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+    expect(terminar()).toBeEnabled();
+    expect(inicio()).toBeDisabled();
   });
 
-  it('R3: en EN_ACONDICIONAMIENTO con otra persona no ofrece ninguna acción y dice quién lo acondiciona', () => {
+  it('R3 R34: en EN_ACONDICIONAMIENTO con otra persona los dos están deshabilitados y dice quién lo acondiciona', () => {
     const { container } = render(<ConditioningOrderScreen order={ROW} />);
 
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(inicio()).toBeDisabled();
+    expect(terminar()).toBeDisabled();
     expect(container.querySelectorAll('form')).toHaveLength(0);
     expect(screen.getByTestId(CONDITIONING_ORDER_CONDITIONER_TESTID)).toHaveTextContent(
       'Lo acondiciona Berta Ruiz.',
     );
   });
 
-  it('R3: en TERMINADO no ofrece ninguna acción', () => {
+  it('R3 R34: en TERMINADO los dos están deshabilitados', () => {
     const { container } = render(<ConditioningOrderScreen order={{ ...ROW, status: 'TERMINADO' }} />);
 
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(inicio()).toBeDisabled();
+    expect(terminar()).toBeDisabled();
     expect(container.querySelectorAll('form')).toHaveLength(0);
   });
 
-  it('R1: sin candidatos no ofrece «Acondicionar» y pinta el error del catálogo en role="alert"', () => {
+  it('R1: sin candidatos «Acondicionar» queda deshabilitado y pinta el error del catálogo en role="alert"', () => {
     render(
       <ConditioningOrderScreen
         order={{ ...ROW, status: 'POR_ACONDICIONAR', conditionedByName: null, conditionedById: null }}
@@ -176,7 +215,8 @@ describe('las acciones del detalle', () => {
       />,
     );
 
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(inicio()).toBeDisabled();
+    expect(terminar()).toBeDisabled();
     const alerta = screen.getByTestId(CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID);
     expect(alerta).toHaveAttribute('role', 'alert');
     expect(alerta).toHaveTextContent('No tienes permiso.');
@@ -221,9 +261,22 @@ describe('el equipo guardado', () => {
         'Turno mañana',
       );
       expect(nombres(grupo)).toEqual(['Dario Pérez', 'Fermín Ruiz']);
-      expect(within(equipo).queryAllByRole('button')).toHaveLength(0);
+      // El único botón es el «+N» de los avatares: la lista no ofrece acciones.
+      expect(within(equipo).getAllByRole('button')).toEqual([within(equipo).getByTestId(RESPONSIBLE_OVERFLOW_TESTID)]);
     },
   );
+
+  it('R33: «Equipo» es una tarjeta con los avatares del equipo en su cabecera', () => {
+    render(<ConditioningOrderScreen order={{ ...ROW, team: TEAM.slice(0, 2) }} />);
+
+    const equipo = screen.getByTestId(CONDITIONING_TEAM_LIST_TESTID);
+    expect(equipo.closest('[data-slot="card"]')).not.toBeNull();
+    expect(
+      within(equipo)
+        .getAllByTestId(RESPONSIBLE_AVATAR_TESTID)
+        .map((avatar) => avatar.getAttribute('aria-label')),
+    ).toEqual(['Carla Gómez', 'Dario Pérez']);
+  });
 
   it('R25: pinta el nombre que trae el equipo, también el de una persona dada de baja', () => {
     render(
@@ -263,11 +316,13 @@ describe('enlace de vuelta según el estado', () => {
     },
   );
 
-  it('R16: en TERMINADO la vuelta es «Volver a «Terminados»»', () => {
+  it('R8 R32: en TERMINADO la vuelta es «Volver a «Acondicionados»», un botón con flecha en la cabecera', () => {
     render(<ConditioningOrderScreen order={{ ...ROW, status: 'TERMINADO' }} />);
 
     const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
-    expect(back).toHaveTextContent('Volver a «Terminados»');
+    expect(back).toHaveTextContent('Volver a «Acondicionados»');
+    expect(back.closest('[data-slot="operator-header"]')).not.toBeNull();
+    expect(back.querySelector('svg')).not.toBeNull();
     expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados');
   });
 
@@ -309,13 +364,14 @@ describe('«Datos de lote» en el detalle', () => {
   const MINE = { ...ROW, conditionedById: 'user-1', conditionedByName: 'Ana Ruiz' };
 
   it.each(['EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'] as const)(
-    'R1 R18 R21: en %s, con batchData, pinta la sección con un bloque por línea en orden de alta',
+    'R1 R18 R21 R33: en %s, con batchData, pinta la tarjeta con un bloque por línea en orden de alta',
     (status) => {
       render(
         <ConditioningOrderScreen order={{ ...MINE, status, batchData: { lines: [LINE, SECOND], missingCount: 2 } }} />,
       );
 
       const seccion = screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID);
+      expect(seccion.closest('[data-slot="card"]')).not.toBeNull();
       expect(within(seccion).getByRole('heading', { name: 'Datos de lote' })).toBeInTheDocument();
       expect(
         within(seccion)
@@ -345,7 +401,7 @@ describe('«Datos de lote» en el detalle', () => {
     expect(container.querySelectorAll('input')).toHaveLength(0);
   });
 
-  it('R4: con una línea sin datos dice «Faltan los datos de lote de 1 línea.» y «Terminar» va deshabilitado', () => {
+  it('R4 R34: con una línea sin datos dice «Faltan los datos de lote de 1 línea.» y «Terminar» va deshabilitado', () => {
     render(
       <ConditioningOrderScreen
         order={{ ...MINE, batchData: { lines: [LINE], missingCount: 1 } }}
@@ -388,15 +444,15 @@ describe('«Datos de lote» en el detalle', () => {
     expect(terminar).not.toHaveAttribute('aria-describedby');
   });
 
-  it('R21: en ENTREGADO no ofrece «Acondicionar» ni «Terminar» y la vuelta es «Volver a «Entregados»»', () => {
+  it('R21: en ENTREGADO no habilita «Acondicionar» ni «Terminar» y la vuelta es «Volver a «Entregados»»', () => {
     render(
       <ConditioningOrderScreen
         order={{ ...MINE, status: 'ENTREGADO', batchData: { lines: [LINE], missingCount: 1 } }}
       />,
     );
 
-    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
-    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
     expect(screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID)).toHaveTextContent('Entregado');
     const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
     expect(back).toHaveTextContent('Volver a «Entregados»');
@@ -411,11 +467,13 @@ describe('QC-252: la etiqueta de estado sale del mapa compartido', () => {
     ['EN_ACONDICIONAMIENTO', 'En acondicionamiento'],
     ['TERMINADO', 'Terminado'],
     ['ENTREGADO', 'Entregado'],
-  ] as const)('R11: %s se lee «%s», el texto de antes', (status, texto) => {
+  ] as const)('R11 R32: %s se lee «%s», el texto de antes, en un StatusBadge', (status, texto) => {
     render(<ConditioningOrderScreen order={{ ...ROW, status }} />);
 
     const estado = screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID);
     expect(estado.textContent).toBe(texto);
+    expect(estado).toHaveAttribute('data-tone');
+    expect(estado.querySelector('[data-slot="status-dot"]')).not.toBeNull();
     expect(estado).toHaveAttribute('data-status', status);
   });
 
