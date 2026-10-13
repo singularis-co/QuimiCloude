@@ -4,6 +4,7 @@
 import type { EvidenceStorage } from '@/lib/modules/asignaciones/ports/evidence-storage';
 import type { StepEvidenceRepository } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
 import type { RecipeCatalog, RecipePackingStepsReader } from '@/lib/modules/recetas';
+import type { RecipeStepLockReader } from '@/lib/modules/recetas/ports/recipe-step-lock-reader';
 
 function noUsado(operation: string): () => Promise<never> {
   return () => Promise.reject(new Error(`este test no ejercita la evidencia: ${operation}`));
@@ -33,4 +34,9 @@ export const recipesWithoutEvidence = {
 /** Lector de pasos de envasado sin pasos. */
 export const packingStepsWithoutEvidence: RecipePackingStepsReader = {
   findPackingStepsById: async () => null,
+};
+
+/** Ningun pedido en curso con fotos: mover y quitar pasos se acepta como siempre. */
+export const noEvidenceLocks: RecipeStepLockReader = {
+  countOrdersWithEvidenceInProgress: async () => 0,
 };

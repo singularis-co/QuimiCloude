@@ -128,3 +128,9 @@ export {
 
 // Mover o quitar pasos con pedidos en curso que ya tienen fotos de evidencia.
 export { RecipeStepsLockedError } from './domain/errors';
+export { detectLockedStepChange, type LockedStepChange } from './domain/recipe-step-lock';
+export {
+  createGetRecipeStepLock,
+  type GetRecipeStepLockDeps,
+  type RecipeStepLock,
+} from './domain/get-recipe-step-lock';

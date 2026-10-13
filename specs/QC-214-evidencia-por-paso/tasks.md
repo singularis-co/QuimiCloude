@@ -80,7 +80,7 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
 
 ## Bloque C — `recetas` (depende de T1, T4, T10)
 
-- [ ] **T14. Bloqueo al guardar** (R7, R9–R12). `recipe-step-lock.ts`, puerto
+- [x] **T14. Bloqueo al guardar** (R7, R9–R12). `recipe-step-lock.ts`, puerto
   `recipe-step-lock-reader.ts`, `listVersionIdsIncludingDeleted` en el repositorio y en
   `recipe-prisma.ts`, `update-recipe.ts`, `get-recipe-step-lock.ts`,
   `getRecipeStepLockAction` (`design.md > 5.8`).
@@ -90,6 +90,11 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
   se acepta; edición sin mover/quitar no consulta el lector; sin `recetas.modificar` rechaza);
   `tests/unit/recetas/get-recipe-step-lock.test.ts`; integración de
   `listVersionIdsIncludingDeleted` en `tests/integration/recetas/step-evidence-flag.int.test.ts`.
+  `RecipeStepLockReader` cableado en la composición sobre `createCountEvidenceLockingOrders`;
+  `getRecipeStepLock` sobre una versión responde por su original; casos de
+  `getRecipeStepLockAction` y de `recipe_steps_locked` en `recipe-actions.test.ts`. Los dobles de
+  `RecipeRepository` y las llamadas a `createUpdateRecipe` de 18 tests ganan
+  `listVersionIdsIncludingDeleted` / `stepLocks: noEvidenceLocks` (`tests/helpers/evidence-off.ts`).
 
 ## Bloque D — UI (depende de B y C)
 

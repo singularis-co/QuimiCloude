@@ -195,6 +195,7 @@ import {
   createListRecipes,
   createUpdateRecipe,
   createUpdateRecipeVersion,
+  createGetRecipeStepLock,
 } from '@/lib/modules/recetas';
 import {
   createRecipe,
@@ -205,6 +206,7 @@ import {
   replaceAliveRecipe,
   replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
+  listRecipeVersionIdsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import {
   recipeImagePublicUrl,
@@ -214,6 +216,7 @@ import {
 import type { ListQueryLog as RecetasListQueryLog } from '@/lib/modules/recetas/ports/list-query-log';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
+import type { RecipeStepLockReader } from '@/lib/modules/recetas/ports/recipe-step-lock-reader';
 import {
   createCreateCatalogLine,
   createCreateSupplier,
@@ -442,6 +445,7 @@ import {
   createRequestEvidenceUpload,
   createRegisterEvidence,
   createRemoveEvidence,
+  createCountEvidenceLockingOrders,
 } from '@/lib/modules/asignaciones';
 import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -1105,6 +1109,7 @@ const recipeRepository: RecipeRepository = {
   createVersion: createRecipeVersion,
   listAliveVersions: listAliveRecipeVersions,
   replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
+  listVersionIdsIncludingDeleted: listRecipeVersionIdsIncludingDeleted,
 };
 
 /** `RecipeImageStorage` cableado con el adaptador de Supabase Storage (T11). Ninguna de
@@ -1121,6 +1126,14 @@ const recipeImageStorage: RecipeImageStorage = {
 /** QC-57 (T7, R6): el MISMO `logIgnoredListQueryFields` que `inventario`, visto por el puerto
  *  que declara `recetas`. Cinco puertos con la misma forma, una sola implementacion. */
 const recetasListQueryLog: RecetasListQueryLog = { ignoredFields: logIgnoredListQueryFields };
+
+/**
+ * `recetas` pregunta por los pedidos en curso con fotos sin importar `asignaciones`, que ya importa
+ * `recetas`. El conteo se resuelve al llamar: se construye mas abajo, con el resto de la evidencia.
+ */
+const recipeStepLockReader: RecipeStepLockReader = {
+  countOrdersWithEvidenceInProgress: (recipeIds, companyId) => countEvidenceLockingOrders(companyId, recipeIds),
+};
 
 /**
  * Fachada del modulo `recetas` ya cableada (T12, `design.md > 3`, `> 11`). Es lo que
@@ -1152,11 +1165,13 @@ export const recetas = {
     recipes: recipeRepository,
     products: productCatalog,
     images: recipeImageStorage,
+    stepLocks: recipeStepLockReader,
   }),
   deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
   createRecipeVersion: createCreateRecipeVersion({ recipes: recipeRepository, products: productCatalog }),
   updateRecipeVersion: createUpdateRecipeVersion({ recipes: recipeRepository, products: productCatalog }),
   listRecipeVersions: createListRecipeVersions({ recipes: recipeRepository }),
+  getRecipeStepLock: createGetRecipeStepLock({ recipes: recipeRepository, stepLocks: recipeStepLockReader }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -1679,6 +1694,11 @@ const evidenceStorage: EvidenceStorage = {
   download: (path) => selectedEvidenceStorage().download(path),
   remove: (path) => selectedEvidenceStorage().remove(path),
 };
+
+const countEvidenceLockingOrders = createCountEvidenceLockingOrders({
+  orders: orderCatalog,
+  evidence: stepEvidenceRepository,
+});
 
 const evidenceTargetDeps = {
   assignments: orderAssignmentRepository,

@@ -21,6 +21,7 @@ import {
   createRecipe,
   createRecipeVersion,
   findAliveRecipeById,
+  listRecipeVersionIdsIncludingDeleted,
   replaceAliveRecipe,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import { createRecipeSchema, updateRecipeSchema } from '@/lib/modules/recetas/domain/recipe-input';
@@ -252,5 +253,35 @@ describe('versiones (R6)', () => {
     expect(flags((await findRecipeExecutionContentById(versionId, A.companyId))?.steps)).toEqual([true]);
     expect(flags((await findRecipePackingStepsById(versionId, A.companyId)) ?? undefined)).toEqual([true]);
     expect(flags((await findAliveRecipeById(versionId, A.scope))?.original?.steps)).toEqual([true]);
+  });
+});
+
+describe('versiones que cuentan para el bloqueo de pasos (R9-R12)', () => {
+  it('R9, R10: lista las versiones vivas y las dadas de baja de la original, y nada mas', async () => {
+    const originalId = await original([MEZCLAR, REPOSAR], [ENVASAR]);
+    const viva = await version(originalId);
+    const deBaja = await version(originalId);
+    await prisma.recipe.update({ where: { id: deBaja }, data: { deletedAt: new Date() } });
+    const otraOriginal = await original([REPOSAR], []);
+    const ajena = await version(otraOriginal);
+
+    const ids = await listRecipeVersionIdsIncludingDeleted(originalId, A.scope);
+
+    expect([...ids].sort()).toEqual([viva, deBaja].sort());
+    expect(ids).not.toContain(originalId);
+    expect(ids).not.toContain(ajena);
+  });
+
+  it('R12: una original sin versiones devuelve la lista vacia', async () => {
+    const originalId = await original([REPOSAR], []);
+
+    await expect(listRecipeVersionIdsIncludingDeleted(originalId, A.scope)).resolves.toEqual([]);
+  });
+
+  it('el ambito de otra empresa no ve las versiones', async () => {
+    const originalId = await original([REPOSAR], []);
+    await version(originalId);
+
+    await expect(listRecipeVersionIdsIncludingDeleted(originalId, { companyId: randomUUID() })).resolves.toEqual([]);
   });
 });

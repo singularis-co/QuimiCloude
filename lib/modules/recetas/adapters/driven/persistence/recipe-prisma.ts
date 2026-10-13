@@ -618,6 +618,17 @@ export async function listAliveRecipeVersions(
   return rows.map(toRecipeRow);
 }
 
+export async function listRecipeVersionIdsIncludingDeleted(
+  originalId: string,
+  scope: RecipeScope,
+): Promise<readonly string[]> {
+  const rows = await prisma.recipe.findMany({
+    where: { parentRecipeId: originalId, ...recipeCompanyScope(scope) },
+    select: { id: true },
+  });
+  return rows.map((row) => row.id);
+}
+
 function toLineData(line: { productId: string; percentage: Prisma.Decimal }): RecipeLineData {
   return { productId: line.productId, percentage: fromDecimalPercentage(line.percentage) };
 }

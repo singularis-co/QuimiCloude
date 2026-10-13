@@ -38,6 +38,7 @@ import {
   replaceAliveRecipe,
   replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
+  listRecipeVersionIdsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
 import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
@@ -51,6 +52,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { RecipeScope } from '@/lib/modules/recetas';
 import type { ProductCatalog } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/recetas/domain/actor';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 /**
  * QC-57: `listAliveRecipes` recibe ahora, ademas de la ventana, el CONTRATO GENERICO de
@@ -640,6 +642,7 @@ const realRecipeRepository: RecipeRepository = {
   softDeleteAlive: softDeleteAliveRecipe,
   createVersion: createRecipeVersion,
   listAliveVersions: listAliveRecipeVersions,
+  listVersionIdsIncludingDeleted: listRecipeVersionIdsIncludingDeleted,
   replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
 };
 
@@ -685,6 +688,7 @@ describe('R23: editar una receta sembrada sin lineas se rechaza', () => {
         recipes: realRecipeRepository,
         products: realProductCatalog,
         images: imagenesMudas,
+        stepLocks: noEvidenceLocks,
       });
 
       await expect(
