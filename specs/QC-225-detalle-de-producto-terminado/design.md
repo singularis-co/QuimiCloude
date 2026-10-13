@@ -330,13 +330,23 @@ El adaptador aplica el defecto de 10 y el tope de 25 con `toOffsetLimit`, como l
 deduplicados y una llamada por directorio y por página, nunca una por fila. Si un id no vuelve del
 directorio, el número de pedido sale como `null` (marcador de ausencia) y la fila no desaparece.
 
-**Entregas anuladas y total (R33, R34, R36).** `createListFinishedProductDeliveries` hace, en un
-mismo `Promise.all` y después del paso 3:
-- la página de `listDeliveryMovements`;
-- `deliveries.summarizeDelivered(companyId, record.batches.map((b) => b.id))`, con los lotes que ya
-  trajo `findAliveFinished`. El total no depende de la página.
+**Entregas anuladas y total (R33, R34, R36).** `createListFinishedProductDeliveries`, después del
+paso 3:
+1. lee la página de `listDeliveryMovements`;
+2. con la página, en un mismo `Promise.all`:
+   - `deliveries.summarizeDelivered(companyId, record.batches.map((b) => b.id))`, con los lotes que
+     ya trajo `findAliveFinished`. El total no depende de la página;
+   - `deliveries.findDeliveryDetails`, una vez, con los ids de entrega de la página;
+   - `orders.findNumberTexts`, una vez, con los ids de pedido de la página;
+3. con los detalles, `customers.findRefsIncludingDeleted`, una vez, con los clientes de esas
+   entregas.
 
-Con la página, llama una vez a `deliveries.findDeliveryDetails` y a los otros directorios. Cada fila
+> Enmienda 2026-10-13 (decisión del leader): esta sección decía a la vez que `summarizeDelivered` iba
+> en paralelo con la página y que no se llamaba cuando la página trae `total: 0`. Las dos cosas no
+> caben juntas; manda la segunda, que es lo que implementó B3. La página va primero y el resto sale
+> de ella.
+
+Cada fila
 toma `packages` y `void` de `linesByBatch.get(batchId)`. Si la entrega o la línea no vuelve, salen
 `packages: null` y `void: null` y la fila no desaparece. El caso de uso no filtra ni reordena por
 `void`: una fila anulada ocupa su lugar en la página (R33). No hay más permiso que el del paso 0
