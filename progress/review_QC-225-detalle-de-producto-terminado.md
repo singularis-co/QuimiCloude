@@ -227,3 +227,63 @@ Qué falta para pasar:
 4. Los menores m1–m4 se corrigen en la misma vuelta (son de texto). m5 es opcional.
 5. Antes de volver: correr otra vez los barridos de disco de `tests/unit/inventario` y `tests/unit/pedidos`,
    que `vitest related` no relaciona.
+
+## Segunda revisión (2026-10-13, acotada a a4e9f060~1..35c5cb9d)
+
+Rango: tanda 4 (`a4e9f060..4194b072`), tableros `/design` aprobados (`08118a98`) y su cita (`35c5cb9d`).
+No se corrió `./init.sh` ni la suite completa ni el E2E, por la memoria. Sí se corrió, en serie:
+
+- `pnpm exec vitest run tests/unit/inventario/schema/inventory-movements-migration.test.ts tests/unit/pedidos/order-delivery-append-only.test.ts`: 2 archivos, 16 tests, verde.
+- `pnpm exec vitest run guard`: 75 archivos, 1050 tests en verde y 20 omitidos.
+- Unit afectados por el renombre y por los tableros (`finished-product-tables`, `list-finished-product-deliveries`,
+  `catalogo-qc256`, `login-skin`, `product-route-contract`, `finished-product-detail*`): 6 archivos, 109 tests, verde.
+- `eslint` sobre los cuatro archivos de código y test del rango: limpio.
+
+### Hallazgos de la primera vuelta
+
+- [x] **M1, resuelto.** El censo admite `['count','create','findMany']`, con una nota fechada que conserva la
+  intención: ninguna operación que modifique, y el censo sigue cerrado. Las aserciones de sensibilidad se
+  conservan. El archivo está en `tasks.md > Archivos esperados` y en la tabla de enmienda de `design.md §7`.
+- [x] **M2, resuelto.** La constante se llama `DELIVERY_VOIDED_LABEL`, en el componente y en el barrel. El
+  censo no se tocó y está en verde. `grep VOIDED_DELIVERY_LABEL` en `app lib tests e2e specs` da 0 resultados.
+- [x] **M3, resuelto por la vía (a).** Los seis tableros `ProductoTerminado{,Tablet,Movil}.dc.html` y
+  `PedidosPresentaciones{,Tablet,Movil}.dc.html` están en `docs/diseno/canvas/`.
+  - `canvas.json` los lista. Las dos líneas que quita el diff solo cambian la coma final.
+  - `README.md` pasa a 93 tableros, que coincide con el disco.
+  - `sistema.css` y `qc.css` siguen siendo iguales byte a byte.
+  - `design.md §6` cita los seis y deja fechada la aprobación del humano, «Por confirmar» incluidos y sin
+    cambios de UI.
+  - La no aplicación del paso 6 (catálogo) está justificada: todas las piezas viven en `app/`.
+- [x] **m1, resuelto.** Ya no hay clave en los dos comentarios de test. El título `R15(b): …` del test de
+  migración es anterior al rango y es un nombre de test, no un comentario.
+- [x] **m2, resuelto.** Las tres rutas de `tasks.md` están completas.
+- [x] **m3, resuelto.** Las enmiendas fechadas de `design.md` cubren lo que faltaba:
+  - la cabecera: P1 y P2 cerradas;
+  - `movementReasonLabel` en `movement-reason-label.ts`, en la tabla de «Lo que ya existe» y en §6.2;
+  - `UrlTabs`, en «Lo que ya existe» y en la tabla de §6.2;
+  - la tabla de enmienda de §7, con los censos nuevos y los de M1 y M2.
+- [x] **m4, cerrado por decisión del humano.** §6.4 nombra el paso 3 y explica por qué no basta el 2:
+  `OrderDistributionLabel` es de servidor, con tres consumidores en /asignacion, y su fila del catálogo dice
+  «No cubre: la lista desplegada». El cierre está fechado.
+- [x] **m5, resuelto.** `orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]` antes de `take: 1`. Está reflejado
+  en `design.md §4`.
+
+### Regresiones y puntos de la regla en el rango
+
+- [x] Comentarios de producción y de test sin `QC-…` ni `R<n>` nuevos.
+- [x] Todos los archivos del rango están en `tasks.md > Archivos esperados`, salvo los propios `design.md` y
+  `tasks.md` del spec. El bloque nuevo «Diseño» lista los tableros, `canvas.json` y `README.md`.
+- [x] `tasks.md`: 0 tareas sin marcar.
+- [x] `design.md` es coherente con el código en lo que toca el rango: el renombre, `orderBy`, `count`, la
+  ubicación de `movementReasonLabel` y `UrlTabs`.
+- [x] `canvas.json` solo suma los seis tableros de esta ficha. Los tableros de otras features del canvas vivo
+  quedan fuera a propósito: no es hallazgo.
+
+### Hallazgos nuevos
+
+Ninguno bloqueante ni menor.
+
+### Veredicto
+
+**APPROVED** (OK). Quedan pendientes, fuera del alcance del reviewer: el `./init.sh` de cierre del leader y
+el check `gate-completo` del CI con la suite completa. Por la memoria, aquí no se corrió ninguno de los dos.
