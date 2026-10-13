@@ -70,12 +70,13 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
   `get-packing-order.ts` (`packingEvidence`), vistas y barrel.
   *Hecho:* casos nuevos en `get-assigned-order-execution.test.ts` y `get-packing-order.test.ts`:
   URL firmadas por foto; en empaque, sin fotos si empaca otro.
-- [ ] **T13. Server Actions y composición** (R18, R26, R27). `step-evidence-actions.ts`; cableado en
+- [x] **T13. Server Actions y composición** (R18, R26, R27). `step-evidence-actions.ts`; cableado en
   `lib/composition/index.ts` (repositorio, storage elegido por `evidenceE2EDoublesEnabled()`,
   casos de uso, `RecipeStepLockReader`).
   *Hecho:* `tests/unit/asignaciones/step-evidence-actions.test.ts` (traducción de errores, una
   lectura de sesión); el test de una lectura de sesión por petición sigue verde con el archivo
-  nuevo; guardia de arquitectura verde.
+  nuevo; guardia de arquitectura verde. Las advertencias de borrado del bucket van a
+  `forModule('asignaciones').warn`. El `RecipeStepLockReader` se cablea en T14, con su puerto.
 
 ## Bloque C — `recetas` (depende de T1, T4, T10)
 

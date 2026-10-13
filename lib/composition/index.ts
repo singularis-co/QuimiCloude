@@ -439,6 +439,9 @@ import {
   createListConditioningTeamCandidates,
   createListDeliveredConditionedOrders,
   createSaveConditioningBatchData,
+  createRequestEvidenceUpload,
+  createRegisterEvidence,
+  createRemoveEvidence,
 } from '@/lib/modules/asignaciones';
 import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -1677,6 +1680,13 @@ const evidenceStorage: EvidenceStorage = {
   remove: (path) => selectedEvidenceStorage().remove(path),
 };
 
+const evidenceTargetDeps = {
+  assignments: orderAssignmentRepository,
+  orders: orderCatalog,
+  recipes: recipeCatalog,
+  packingSteps: { findPackingStepsById: findRecipePackingStepsById },
+};
+
 /**
  * La transaccion de ejecucion la abre `asignaciones`, y `pedidos` se une a ella sin abrir otra:
  * la escritura del pedido, lo que `pedidos` escriba en `inventario` y la anotacion se confirman
@@ -1961,6 +1971,21 @@ export const asignaciones = {
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
     now: () => new Date(),
+  }),
+  requestEvidenceUpload: createRequestEvidenceUpload({
+    ...evidenceTargetDeps,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  registerEvidence: createRegisterEvidence({
+    ...evidenceTargetDeps,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  removeEvidence: createRemoveEvidence({
+    ...evidenceTargetDeps,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
 } as const;
 
