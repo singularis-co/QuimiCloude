@@ -64,7 +64,7 @@ Cubre: base de R1, R2, R4, R35.
 Depende de: T0.
 
 Archivos:
-- `db/migrations/20261009120050_inventory_movement_kind_delivery_void/migration.sql` y `down.sql`.
+- `db/migrations/20261009120000_inventory_movement_kind_delivery_void/migration.sql` y `down.sql`.
 - `db/migrations/20261009120100_order_delivery_voids/migration.sql` y `down.sql`.
 - `db/migrations/20261009120200_delivery_void_permission/migration.sql` y `down.sql`.
 - Las tres según `design.md > 3`. Antes: el timestamp va detrás de la última migración de
@@ -351,8 +351,8 @@ Producción:
 - `lib/modules/errores/domain/error-catalog.ts`
 - `lib/composition/index.ts`
 - `db/schema.prisma`
-- `db/migrations/20261009120050_inventory_movement_kind_delivery_void/migration.sql`
-- `db/migrations/20261009120050_inventory_movement_kind_delivery_void/down.sql`
+- `db/migrations/20261009120000_inventory_movement_kind_delivery_void/migration.sql`
+- `db/migrations/20261009120000_inventory_movement_kind_delivery_void/down.sql`
 - `db/migrations/20261009120100_order_delivery_voids/migration.sql`
 - `db/migrations/20261009120100_order_delivery_voids/down.sql`
 - `db/migrations/20261009120200_delivery_void_permission/migration.sql`

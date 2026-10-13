@@ -824,3 +824,23 @@ las tablas de `public`, `LIKE 'qc224_e2e_%'`): `TOTAL qc224_e2e_ filas: 0`.
 
 Los numeros de linea de los casos pasan de `:592`/`:752` (TI) a `:593`/`:753` por el import de `createFixtureUser`.
 La fila R36 del mapa de TZ (`e2e/anular-entrega.spec.ts:540`) no se toca aqui.
+
+## Correcciones tras CI de `c60151df` (implementer, 2026-10-13)
+
+### 1. Se deshace el renombre de m1 (decisión humana, 2026-10-13)
+- Motivo: el deploy de preview falló; la base de preview compartida (Supabase) ya tenía aplicada
+  `20261009120000_inventory_movement_kind_delivery_void` de un preview anterior del PR, y `20261009120050_…`
+  rompía con `ERROR: enum label "delivery_void" already exists`.
+- `git mv db/migrations/20261009120050_inventory_movement_kind_delivery_void -> 20261009120000_inventory_movement_kind_delivery_void`
+  (contenido intacto). Revertidas las referencias de `ee1a68cf`: `guard-identificador-de-request.test.ts`
+  (`MIGRACIONES_ESPERADAS`, la guardia compara como conjunto: el nombre compartido de timestamp es aceptado),
+  `design.md > 3.1`, `tasks.md` (3 líneas). Orden: Prisma ordena por nombre completo,
+  `20261009120000_inventory_…` < `20261009120000_product_batches_production_date` < `20261009120100_…` < `20261009120200_…`.
+- Base `qc224_anular_entrega` (DATABASE_URL/DIRECT_URL en el entorno del comando, sin comillas; nunca `QuimiCloude`,
+  ni preview ni producción). Opción elegida: actualizar la fila, sin rollback (el contenido y el checksum no cambian):
+  `UPDATE _prisma_migrations SET migration_name='20261009120000_inventory_movement_kind_delivery_void' WHERE migration_name='20261009120050_inventory_movement_kind_delivery_void';`
+  vía `prisma db execute` -> `Script executed successfully.`; `prisma migrate status` -> `86 migrations found` /
+  `Database schema is up to date!`.
+- **m1 queda como deuda aceptada** (fila 2026-10-13 en `requirements.md > Decisiones cerradas`): el timestamp
+  compartido se queda porque preview ya lo aplicó.
+- `vitest run tests/guards`: `Test Files 67 passed (67)` / `Tests 946 passed | 14 skipped (960)`.

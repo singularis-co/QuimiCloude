@@ -315,7 +315,7 @@ transacción), igual que QC-223. Los timestamps son orientativos: al crearlas se
 detrás de la última de `origin/dev` (hoy `20261008150200_delivery_permission`) y que no chocan con
 otra feature en vuelo.
 
-### 3.1 `20261009120050_inventory_movement_kind_delivery_void`
+### 3.1 `20261009120000_inventory_movement_kind_delivery_void`
 
 ```sql
 ALTER TYPE "InventoryMovementKind" ADD VALUE 'delivery_void';
