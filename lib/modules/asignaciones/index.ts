@@ -347,3 +347,8 @@ export {
   type RemoveEvidenceDeps,
   type RemoveEvidenceResult,
 } from './domain/remove-evidence';
+export {
+  createCountEvidenceLockingOrders,
+  type CountEvidenceLockingOrders,
+  type CountEvidenceLockingOrdersDeps,
+} from './domain/count-evidence-locking-orders';
