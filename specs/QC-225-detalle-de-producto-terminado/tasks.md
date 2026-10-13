@@ -152,7 +152,7 @@ sintético con el permiso y otro rol (aceptado) y un Administrador sin él (rech
 
 ## Bloque F — frontend (`frontend_dev`)
 
-### F1 [P] — Ruta, página, tabs y estados (depende de T0; trabaja contra actions mockeadas y fixtures)
+### [x] F1 [P] — Ruta, página, tabs y estados (depende de T0; trabaja contra actions mockeadas y fixtures)
 
 Archivos:
 - `app/(private)/inventario/producto-terminado/[id]/page.tsx` (nuevo), según `design.md > 6.1`.
@@ -192,7 +192,7 @@ Archivos:
 - `product-route-contract` está en verde sin perder ninguna aserción;
 - la página pinta con las fixtures.
 
-### F2 [P] — Tablas de los cinco listados (depende de F1)
+### [x] F2 [P] — Tablas de los cinco listados (depende de F1)
 
 Archivos:
 - `app/(private)/inventario/producto-terminado/[id]/components/`:
@@ -219,7 +219,7 @@ Archivos:
 
 **Hecho cuando:** el test está en verde y cada caso lleva su `R<n>`.
 
-### F3 [P] — Enlace desde /inventario (depende de T0)
+### [x] F3 [P] — Enlace desde /inventario (depende de T0)
 
 Archivos:
 - `app/(private)/inventario/components/finished-stock-columns.tsx`: el nombre de la línea pasa a ser
@@ -230,7 +230,7 @@ Archivos:
 **Hecho cuando:** `finished-stock-table.test.tsx` y `product-route-contract.test.ts` están en
 verde.
 
-### F4 [P] — Enlace desde /pedidos (depende de T0)
+### [x] F4 [P] — Enlace desde /pedidos (depende de T0)
 
 Archivos:
 - `app/(private)/pedidos/components/order-produced-presentations.tsx` (nuevo), según
@@ -362,6 +362,11 @@ Tests, fixtures y E2E:
 - `tests/unit/pedidos-ui/order-list-section-produced.test.tsx`
 - `tests/unit/identity/session-once-per-request-actions.test.ts`
 - `tests/unit/pedidos/module-contract.test.ts` (añadido 2026-10-13 en B2: censo cerrado de quién abre el cliente Prisma en `pedidos`)
+- `tests/unit/pedidos-ui/order-list-section.test.tsx`, `tests/unit/pedidos-ui/pedidos-viewport.test.tsx`,
+  `tests/unit/pedidos-ui/order-sheet.test.tsx` y `tests/unit/paridad/pedidos-paridad.test.tsx`
+  (añadidos 2026-10-13 en F4: sustituyen `@/lib/composition` por un doble sin `observabilidad`, y la
+  sección de /pedidos pasa a importar la action de productos producidos; reciben el doble de esa
+  action, como ya tienen el de `work-group-actions`)
 - `tests/guards/guard-pantallas-exigen-permiso.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `tests/integration/aislamiento.json`
