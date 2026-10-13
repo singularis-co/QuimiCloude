@@ -133,3 +133,30 @@ R20, R22–R25, y la Server Action (T13).
 ### Arreglo tras `./init.sh` rápido (2026-10-13)
 
 - `a2dace42`: `recetas-constraints.int.test.ts` excluye por nombre exacto `order_step_evidence` del invariante «sin tabla de pasos» (cualquier otra tabla `%step%` sigue fallando); `pedidos/company-scope.int.test.ts` retira y restaura la FK `order_step_evidence_order_id_company_id_fkey` junto a las otras 5 dependientes de `orders_id_company_id_key`. Sin tocar migraciones. `npx vitest run --project integration` de los dos → `Test Files 2 passed (2)`, `Tests 36 passed (36)`; typecheck limpio, lint 0 errores.
+
+## Tanda 2 · frontend_dev · T15 y T16 (2026-10-13)
+
+Archivos: `components/ui/switch.tsx` (nuevo), `tests/unit/shared-ui/switch.test.tsx` (nuevo),
+`components/shared/step-reader/step-reader.tsx`, `tests/unit/recetas-ui/step-reader.test.tsx`
+(casos añadidos al final; los existentes sin tocar), `components/shared/CATALOGO.md` (fila nueva
+`Switch`, fila `StepReader` con los tres puntos de extensión), `tasks.md` (T15, T16 en [x]).
+Commits: `d4873ebe` (T15), `f6c18518` (T15: el test usa `setupUser`, lo pedía
+`guard-teclear-y-plazo`), `0c96e0e0` (T16).
+
+| R | Test |
+|---|---|
+| R1 | `tests/unit/shared-ui/switch.test.tsx` (role switch, aria-checked, teclado, deshabilitado, medidas, 44 px) |
+| R15 | `tests/unit/recetas-ui/step-reader.test.tsx` > «puntos de extension de la evidencia por paso» (motivo bloquea Siguiente y Finalizar, prioridad de pendientes, null no bloquea, addon) |
+| R16 | ídem (motivo de subida bloquea; prioridad de pendientes) |
+| R22 | ídem (`stepRequest` navega aunque el paso esté bloqueado y avisa a `onStepChange`; id de montaje, id repetido y paso actual no avisan) |
+
+Salida real: `pnpm run typecheck` sin errores; `pnpm run lint` 0 errores, 7 avisos en archivos
+ajenos (`confirm-catalog-import.test.ts`, `order-service.test.ts`); `vitest related --run` de
+`step-reader.tsx` y `switch.tsx`: 41 archivos, 818 tests verdes; `vitest run guard`: 75 archivos
+verdes tras el arreglo de `setupUser` (antes, 2 rojos en `guard-teclear-y-plazo`).
+
+Decisiones para el reviewer: el `Switch` mide 44 px de alto por debajo de 768 px y 36 px desde
+ahí (como `touch="mobile"` de `Button`; el tablero usa 760 px de contenedor). `stepRequest` se
+sigue con `useEffectEvent`; el `id` con el que se monta no navega.
+
+Veredicto: T15 y T16 hechas, verdes en typecheck, lint, related y guardias.
