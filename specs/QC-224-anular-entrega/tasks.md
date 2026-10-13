@@ -397,6 +397,8 @@ Tests, fixtures y E2E:
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `tests/unit/clientes/scope.test.ts` (añadido 2026-10-13: `E2E_PERMITIDOS` admite
   `anular-entrega.spec.ts`; review vuelta 1, M1)
+- `tests/unit/shared/data-table-alcance.test.ts` (añadido 2026-10-13: la lista cerrada de E2E que
+  referencian `data-table` admite `e2e/anular-entrega.spec.ts`, de cuarenta a cuarenta y uno; rojo de CI)
 - `tests/integration/aislamiento.json`
 - `tests/integration/identity/identity-seed.int.test.ts`
 - `tests/integration/clientes/customers-migration.int.test.ts` (añadido 2026-10-09: el DOWN de

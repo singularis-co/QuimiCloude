@@ -612,7 +612,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // tarjetas por `data-table-cards`, `data-table-card-<id>` y `data-table-card-field-status`, y
   // afirma que ninguna `data-table-row-<id>` queda a la vista. El centinela pasa de TREINTA Y NUEVE a
   // CUARENTA; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta', () => {
+  //
+  // 2026-10-13: entra `e2e/anular-entrega.spec.ts`, y no afloja la lista. No estrena tabla: recorre
+  // la lista de pedidos, ya en esta lista, espera a `data-table` y localiza la fila del pedido por
+  // `data-table-row-<id>` para abrir «Entregas» y anular una entrega. El centinela pasa de CUARENTA
+  // a CUARENTA Y UNO; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve a
+  // ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y uno', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -622,7 +628,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cuarenta E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cuarenta y uno E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -638,6 +644,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/aislamiento-pedidos.spec.ts',
       // Las filas servidas de la lista de recetas con sesion en una empresa: ver la nota de arriba.
       'e2e/aislamiento-recetas.spec.ts',
+      // Ver la nota de arriba (2026-10-13). Tras `aislamiento-...` porque la lista esta ORDENADA:
+      // 'ai' precede a 'an'.
+      'e2e/anular-entrega.spec.ts',
       // Ver la nota de arriba (2026-09-24). Va antes
       // que `e2e/clientes.spec.ts` porque la lista esta ORDENADA y 'a' precede a 'l'.
       'e2e/catalogo-desde-pdf.spec.ts',

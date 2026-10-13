@@ -633,6 +633,7 @@ Cada enmienda conserva sus aserciones previas y lleva una nota fechada.
 | `tests/unit/errores/*` | textos únicos | dos códigos nuevos | T0 |
 | `tests/integration/pedidos/order-delivery-repository.int.test.ts` | `sumDeliveredPackages` | + caso: una línea anulada no suma | B3 |
 | `tests/unit/clientes/scope.test.ts` | `E2E_PERMITIDOS`: los únicos E2E que nombran clientes | desviación 2026-10-13 (review vuelta 1, M1): + `anular-entrega.spec.ts`, que siembra un cliente con `normalizeCustomerText` del barrel de `clientes`; mismo camino que siguió el E2E de la entrega. La lista sigue cerrada | TI |
+| `tests/unit/shared/data-table-alcance.test.ts` | lista cerrada de E2E que referencian `data-table` | desviación 2026-10-13 (rojo de CI): + `e2e/anular-entrega.spec.ts`, que localiza la fila del pedido por `data-table-row-<id>`; el centinela pasa de cuarenta a cuarenta y uno. La lista sigue cerrada | TI |
 
 Llamadores de tipos que cambian, todos en `typecheck`:
 - `BatchHistoryEntry['kind']`: `batch-history.tsx` (`KIND_LABELS`) y las fixtures que lo enumeren.

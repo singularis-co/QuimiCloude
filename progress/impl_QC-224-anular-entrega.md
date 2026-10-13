@@ -844,3 +844,14 @@ La fila R36 del mapa de TZ (`e2e/anular-entrega.spec.ts:540`) no se toca aqui.
 - **m1 queda como deuda aceptada** (fila 2026-10-13 en `requirements.md > Decisiones cerradas`): el timestamp
   compartido se queda porque preview ya lo aplicó.
 - `vitest run tests/guards`: `Test Files 67 passed (67)` / `Tests 946 passed | 14 skipped (960)`.
+
+### 2. Rojo de CI en `tests/unit/shared/data-table-alcance.test.ts` (40 esperados, 41 reales)
+- `e2e/anular-entrega.spec.ts` referencia `data-table` (`DATA_TABLE_TESTID`, `data-table-row-<id>`). Mismo trato que
+  `clientes/scope` (M1): alta en la lista cerrada (ordenada, tras `aislamiento-recetas`), titulo y mensaje de
+  `cuarenta` a `cuarenta y uno`, nota fechada 2026-10-13 sin citas de ficha. Anotado en `design.md > 8` y en
+  `tasks.md > ## Archivos esperados`.
+- Barrido de otros censos cerrados de specs E2E en `tests/` (grep de `'<nombre>.spec.ts'`): 23 archivos. Solo
+  `guard-identificador-de-request` (`E2E_ESPERADOS`), `clientes/scope` y `data-table-alcance` nombran el spec nuevo; los
+  demas no lo exigen. Corrida de los 18 de `tests/unit` del barrido: `Test Files 18 passed (18)` /
+  `Tests 238 passed | 69 skipped (307)`; los 5 de `tests/guards` ya estaban en la corrida de guardias (67 passed).
+- `vitest run tests/unit/shared/data-table-alcance.test.ts`: `Tests 18 passed | 2 skipped (20)`.
