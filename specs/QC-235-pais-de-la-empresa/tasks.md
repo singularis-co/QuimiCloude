@@ -16,7 +16,7 @@ Cuando T1 está hecha, la rama de servidor (T2–T6) y la de componente (T7–T9
 
 ## Tasks
 
-- [ ] **T1 · Dependencia `libphonenumber-js`** (R12). Bloquea al resto.
+- [x] **T1 · Dependencia `libphonenumber-js`** (R12). Bloquea al resto.
   - Verificar los cuatro checks con datos reales (`npm view libphonenumber-js deprecated
     time.modified license version` y descargas semanales de la API de npm). **Si alguno falla,
     parar y devolver al leader. No instalar.**
@@ -31,7 +31,7 @@ Cuando T1 está hecha, la rama de servidor (T2–T6) y la de componente (T7–T9
   - **Hecho:** la guardia de dependencias aprobadas, la de arquitectura y `scope.test.ts` en verde;
     la fila tiene los cuatro checks con fecha y fuente.
 
-- [ ] **T2 · Columna `companies.country`** (R1, R10, R11). Depende de T1 (solo por el orden de
+- [x] **T2 · Columna `companies.country`** (R1, R10, R11). Depende de T1 (solo por el orden de
   commits; no importa la librería).
   - `db/schema.prisma`: `country String? @db.VarChar(2)` en `Company`, sin comentario de ficha.
   - `db/migrations/20261013120000_companies_country/migration.sql` y `down.sql` (`design.md > 2.2`).
@@ -41,13 +41,13 @@ Cuando T1 está hecha, la rama de servidor (T2–T6) y la de componente (T7–T9
   - **Hecho:** `pnpm run db:migrate` aplica sobre la base de test; el rollback deja `companies` como
     antes; el test está en verde.
 
-- [ ] **T3 · Error `company_not_found`** (R8). Depende de T2.
+- [x] **T3 · Error `company_not_found`** (R8). Depende de T2.
   - `lib/modules/errores/domain/error-codes.ts` (código y línea de enmienda) y `error-catalog.ts`
     (`'errors.company_not_found': 'La empresa solicitada no existe.'`).
   - `lib/modules/identity/domain/errors.ts`: `CompanyNotFoundError`.
   - **Hecho:** `tests/unit/errores/catalogo.test.ts` en verde sin cambios en sus aserciones.
 
-- [ ] **T4 · Dominio: actor de plataforma, entrada y caso de uso** (R2–R8). Depende de T3.
+- [x] **T4 · Dominio: actor de plataforma, entrada y caso de uso** (R2–R8). Depende de T3.
   - `domain/platform-actor.ts`, `domain/company-country-input.ts`, `domain/set-company-country.ts`,
     `ports/company-country-repository.ts` (`design.md > 3, 4`).
   - Reexportar desde `lib/modules/identity/index.ts` lo que lista `design.md > 5.1`.
@@ -64,7 +64,7 @@ Cuando T1 está hecha, la rama de servidor (T2–T6) y la de componente (T7–T9
   - **Hecho:** test verde; `pnpm exec vitest run guard` verde, con el dominio importando
     `libphonenumber-js` y `zod` solamente.
 
-- [ ] **T5 · Adaptador driven** (R1, R2, R3, R8, R10). Depende de T4.
+- [x] **T5 · Adaptador driven** (R1, R2, R3, R8, R10). Depende de T4.
   - `adapters/driven/persistence/company-country-prisma.ts` (`updateMany` con `deletedAt: null`).
   - `tests/integration/identity/company-country.int.test.ts` (aislamiento `transaccion`; añadirlo
     a `tests/integration/aislamiento.json`):
@@ -75,7 +75,7 @@ Cuando T1 está hecha, la rama de servidor (T2–T6) y la de componente (T7–T9
     - R10: `'co'`, `'COL'` y `'C1'` por SQL crudo → `23514`, bajo `SAVEPOINT`.
   - **Hecho:** el `.int` en verde contra la base de test; `guard-aislamiento-integracion` en verde.
 
-- [ ] **T6 · Composición y Server Action** (R5, R9). Depende de T5.
+- [x] **T6 · Composición y Server Action** (R5, R9). Depende de T5.
   - `lib/composition/index.ts`: `identity.setCompanyCountry`.
   - `lib/modules/identity/adapters/driving/company-actions.ts` (`design.md > 5.2`): actor solo de
     `getSessionUser()`, sin `revalidatePath`, no reexportada desde `index.ts`.
@@ -87,7 +87,7 @@ Cuando T1 está hecha, la rama de servidor (T2–T6) y la de componente (T7–T9
     - R5: usuario de sesión sin empresa con `empresas.modificar` → `success`.
   - **Hecho:** test verde; `maestro-sin-empresa-actions.test.ts` sigue verde sin cambios.
 
-- [ ] **T7 [P] · Datos de países** (R13, R16, R17, R18). Depende de T1.
+- [x] **T7 [P] · Datos de países** (R13, R16, R17, R18). Depende de T1.
   - `components/shared/country-options.ts` (`design.md > 7.4`).
   - `tests/unit/shared-ui/country-options.test.ts`:
     - R13: una opción por código de `getCountries()`, orden `localeCompare('es')`, `+1` como
@@ -98,7 +98,7 @@ Cuando T1 está hecha, la rama de servidor (T2–T6) y la de componente (T7–T9
   - Fila «sin UI» en `components/shared/CATALOGO.md`.
   - **Hecho:** test verde; `guard-catalogo-de-componentes` en verde.
 
-- [ ] **T8 [P] · Extensiones de piezas existentes** (soporte de R22 y R23). Depende de T1.
+- [x] **T8 [P] · Extensiones de piezas existentes** (soporte de R22 y R23). Depende de T1.
   - `components/ui/autocomplete.tsx`: exportar `AutocompleteTrigger` (`design.md > 7.5`).
   - `hooks/use-mobile.ts`: parámetro opcional `breakpoint = 768` (`design.md > 7.6`).
   - Filas de `Autocomplete` y `useIsMobile` en `components/shared/CATALOGO.md`.
