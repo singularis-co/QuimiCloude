@@ -15,8 +15,6 @@ export const ORDER_DELIVERY_ENTRY_BATCH_TESTID = 'order-delivery-entry-batch';
 export const ORDER_DELIVERY_ENTRY_VOIDED_TESTID = 'order-delivery-entry-voided';
 export const ORDER_DELIVERY_VOID_TESTID = 'order-delivery-void';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const EMPTY_TEXT = 'Este pedido todavía no tiene entregas.';
 const LIST_LABEL = 'Entregas del pedido';
 const DATE_LABEL = 'Fecha';
@@ -99,7 +97,7 @@ export function OrderDeliveryList({ deliveries, canVoid, orderStatus, onVoid }: 
                 <Button
                   type="button"
                   variant="outline"
-                  className={TOUCH_TARGET}
+                  touch
                   data-testid={ORDER_DELIVERY_VOID_TESTID}
                   aria-label={`${VOID_ACTION_LABEL} la entrega del ${dateText}`}
                   onClick={() => onVoid?.(delivery)}
