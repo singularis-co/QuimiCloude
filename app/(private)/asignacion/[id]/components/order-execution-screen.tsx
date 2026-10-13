@@ -2,13 +2,14 @@
 
 import { useActionState, useRef, useState } from 'react';
 
+import { BanIcon } from 'lucide-react';
+
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
+import { RowActionsMenu } from '@/components/shared/row-actions-menu';
 import { StepReader } from '@/components/shared/step-reader';
 import { clampStepPosition } from '@/components/shared/step-reader/step-reader';
-import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import type { StartedOrderExecution } from '@/lib/modules/asignaciones';
 import {
   finishAssignedOrderAction,
@@ -17,9 +18,10 @@ import {
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
-import { OrderCancelDialog } from './order-cancel-dialog';
-import { OrderExecutionLines } from './order-execution-lines';
-import { OrderExecutionTools } from './order-execution-tools';
+import { OperatorScreenFrame } from '../../components/operator-screen-frame';
+
+import { ORDER_CANCEL_TEXTS, ORDER_CANCEL_TRIGGER_TESTID, OrderCancelDialog } from './order-cancel-dialog';
+import { OrderExecutionToolsPanel } from './order-execution-tools-panel';
 
 /**
  * El recorrido completo de la pantalla: monta `StepReader` por props y termina en
@@ -37,9 +39,7 @@ export const ORDER_EXECUTION_FINISH_FORM_TESTID = 'order-execution-finish-form';
 export const ORDER_EXECUTION_ORDER_ID_FIELD = 'orderId';
 export const ORDER_EXECUTION_STEP_POSITION_FIELD = 'stepPosition';
 export const ORDER_EXECUTION_TITLE_TESTID = 'order-execution-title';
-export const ORDER_EXECUTION_RECIPE_MISSING_TESTID = 'order-execution-recipe-missing';
-export const ORDER_EXECUTION_MATERIALS_TESTID = 'order-execution-materials';
-export const ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID = 'order-execution-materials-divider';
+export const ORDER_EXECUTION_ACTIONS_TESTID = 'order-execution-actions';
 export const ORDER_EXECUTION_ORDER_QUANTITY_TESTID = 'order-execution-order-quantity';
 export const ORDER_EXECUTION_PRESENTATION_TESTID = 'order-execution-presentation';
 export const ORDER_EXECUTION_FINISH_DIALOG_TESTID = 'order-execution-finish-dialog';
@@ -52,8 +52,13 @@ export const ORDER_EXECUTION_FINISH_CONFIRM_TEXTS = {
   confirm: 'Terminar',
 } as const;
 
-const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
-const ORDER_QUANTITY_LABEL = 'Pedido';
+export const ORDER_EXECUTION_TEXTS = {
+  recipeMissing: 'Esta receta está dada de baja.',
+  orderQuantity: 'Pedido',
+  presentation: 'Presentación:',
+  actions: (numberText: string) => `Acciones del pedido ${numberText}`,
+} as const;
+
 const MIN_STEP_SECONDS = 5;
 
 type FinishFormState = { readonly status: 'idle' } | FinishAssignedOrderResult;
@@ -65,11 +70,6 @@ const IGNORED_PREV_STATE: FinishAssignedOrderResult = { status: 'success' };
 
 type StepChange = { readonly direction: 'advance' | 'go_back'; readonly position: number };
 
-/** Con la receta dada de baja el titulo queda solo con el numero: el aviso va aparte. */
-export function formatOrderExecutionTitle(numberText: string, recipeName: string | null): string {
-  return recipeName === null ? numberText : `${numberText} - ${recipeName}`;
-}
-
 export type OrderExecutionScreenProps = {
   readonly execution: StartedOrderExecution;
 };
@@ -77,6 +77,7 @@ export type OrderExecutionScreenProps = {
 export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [stepPosition, setStepPosition] = useState(() =>
     clampStepPosition(execution.resumeStepPosition, execution.steps.length),
   );
@@ -98,61 +99,77 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         () => undefined,
       );
   }
-  const title = formatOrderExecutionTitle(execution.numberText, execution.recipeName);
+  const actionsLabel = ORDER_EXECUTION_TEXTS.actions(execution.numberText);
 
   return (
-    <div className="flex min-h-dvh flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <h1 className="text-2xl font-semibold" data-testid={ORDER_EXECUTION_TITLE_TESTID}>
-          {title}
-        </h1>
-        <OrderCancelDialog orderId={execution.orderId} stepPosition={stepPosition} />
-      </div>
-
-      <p
-        className="text-base font-medium"
-        data-testid={ORDER_EXECUTION_ORDER_QUANTITY_TESTID}
-        title={exactDecimalTitle(execution.orderQuantity)}
-      >
-        {ORDER_QUANTITY_LABEL} {formatDecimalDisplay(execution.orderQuantity)}
-        {execution.unitLabel === null ? null : ` ${execution.unitLabel}`}
-      </p>
-
-      {execution.recipeName === null ? (
-        <p
-          className="text-base text-muted-foreground"
-          data-testid={ORDER_EXECUTION_RECIPE_MISSING_TESTID}
-        >
-          {RECIPE_MISSING_TEXT}
-        </p>
-      ) : null}
-
-      <p className="text-base text-muted-foreground" data-testid={ORDER_EXECUTION_PRESENTATION_TESTID}>
-        Presentación: <OrderDistributionLabel lines={execution.presentationLines} />
-      </p>
-
-      <Card data-testid={ORDER_EXECUTION_MATERIALS_TESTID}>
-        <CardContent className="flex flex-col gap-4">
-          <OrderExecutionLines lines={execution.lines} />
-          {/* OrderExecutionTools no pinta nada sin herramientas: el divisor quedaria colgando. */}
-          {execution.tools.length > 0 ? (
-            <Separator data-testid={ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID} />
-          ) : null}
-          <OrderExecutionTools tools={execution.tools} />
-        </CardContent>
-      </Card>
-
-      <div data-testid={ORDER_EXECUTION_SCREEN_TESTID}>
-        <StepReader
-          steps={execution.steps}
-          title={title}
-          onFinish={() => setConfirmOpen(true)}
-          minStepSeconds={MIN_STEP_SECONDS}
-          mode="ejecucion"
-          initialStepPosition={execution.resumeStepPosition ?? 1}
-          onStepChange={handleStepChange}
+    <OperatorScreenFrame
+      testId={ORDER_EXECUTION_SCREEN_TESTID}
+      eyebrow={execution.numberText}
+      title={execution.recipeName ?? ORDER_EXECUTION_TEXTS.recipeMissing}
+      titleTestId={ORDER_EXECUTION_TITLE_TESTID}
+      subtitle={
+        <>
+          <span
+            data-testid={ORDER_EXECUTION_ORDER_QUANTITY_TESTID}
+            title={exactDecimalTitle(execution.orderQuantity)}
+          >
+            {ORDER_EXECUTION_TEXTS.orderQuantity} {formatDecimalDisplay(execution.orderQuantity)}
+            {execution.unitLabel === null ? null : ` ${execution.unitLabel}`}
+          </span>
+          <span aria-hidden="true">{' · '}</span>
+          <span data-testid={ORDER_EXECUTION_PRESENTATION_TESTID}>
+            {ORDER_EXECUTION_TEXTS.presentation}{' '}
+            <OrderDistributionLabel lines={execution.presentationLines} />
+          </span>
+        </>
+      }
+      headerActions={
+        <RowActionsMenu
+          triggerLabel={actionsLabel}
+          triggerTestId={ORDER_EXECUTION_ACTIONS_TESTID}
+          title={actionsLabel}
+          items={[
+            {
+              key: 'cancel',
+              label: ORDER_CANCEL_TEXTS.trigger,
+              icon: BanIcon,
+              destructive: true,
+              testId: ORDER_CANCEL_TRIGGER_TESTID,
+              onSelect: () => setCancelOpen(true),
+            },
+          ]}
         />
+      }
+    >
+      <div className="grid grid-cols-1 items-start gap-5 @min-[1101px]:grid-cols-[300px_minmax(0,720px)] @min-[1101px]:justify-center @min-[1101px]:gap-x-6">
+        <OrderExecutionToolsPanel tools={execution.tools} lines={execution.lines} />
+
+        <div className="flex min-w-0 flex-col gap-4">
+          {/* Encima del paso y no al final: el pie fijo del paso a paso taparía lo último. */}
+          {error !== undefined ? (
+            <ErrorAlert
+              error={error}
+              testId={ORDER_EXECUTION_FINISH_ERROR_TESTID}
+              className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+            />
+          ) : null}
+          <StepReader
+            steps={execution.steps}
+            onFinish={() => setConfirmOpen(true)}
+            minStepSeconds={MIN_STEP_SECONDS}
+            mode="ejecucion"
+            initialStepPosition={execution.resumeStepPosition ?? 1}
+            onStepChange={handleStepChange}
+          />
+        </div>
       </div>
+
+      <OrderCancelDialog
+        orderId={execution.orderId}
+        stepPosition={stepPosition}
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+      />
 
       <form ref={formRef} action={formAction} data-testid={ORDER_EXECUTION_FINISH_FORM_TESTID}>
         <input
@@ -184,13 +201,6 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         }}
       />
 
-      {error !== undefined ? (
-        <ErrorAlert
-          error={error}
-          testId={ORDER_EXECUTION_FINISH_ERROR_TESTID}
-          className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-        />
-      ) : null}
-    </div>
+    </OperatorScreenFrame>
   );
 }

@@ -38,8 +38,8 @@ import { StepDocumentView } from './step-document-view';
  * ampare. Quien busque trazabilidad completa, que la pida — hoy no existe.
  */
 
-/** Objetivo tactil de la accion primaria en `'ejecucion'`: 64px minimo, texto mayor. */
-const PRIMARY_TOUCH_TARGET_EJECUCION = 'min-h-16 min-w-11 text-lg font-semibold';
+/** En `'ejecucion'` los botones van en talla `xl` y llenan su columna del pie. */
+const PRIMARY_TOUCH_TARGET_EJECUCION = 'w-full min-w-11';
 
 const TEXTS = {
   empty: 'Esta receta no tiene ningun paso que leer.',
@@ -284,11 +284,15 @@ export function StepReader({
     </p>
   );
 
+  const buttonSize = isEjecucion ? 'xl' : 'default';
+
   const previousButton = (
     <Button
       type="button"
       variant="outline"
+      size={buttonSize}
       touch
+      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : undefined}
       data-testid="step-reader-previous"
       disabled={isFirst}
       onClick={goPrevious}
@@ -300,7 +304,9 @@ export function StepReader({
   const primaryButton = isLast ? (
     <Button
       type="button"
+      size={buttonSize}
       className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : touchTarget}
+      touch={isEjecucion}
       data-testid="step-reader-finish"
       disabled={blocked || finishBusy}
       aria-busy={finishBusy || undefined}
@@ -312,7 +318,9 @@ export function StepReader({
   ) : (
     <Button
       type="button"
+      size={buttonSize}
       className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : touchTarget}
+      touch={isEjecucion}
       data-testid="step-reader-next"
       disabled={blocked}
       aria-describedby={describedBy}
@@ -324,7 +332,11 @@ export function StepReader({
 
   if (isEjecucion) {
     return (
-      <section data-testid="step-reader" className="flex flex-col gap-4">
+      // El relleno inferior reserva el alto del pie fijo para que el paso no quede debajo.
+      <section
+        data-testid="step-reader"
+        className="flex flex-col gap-4 pb-[calc(140px+env(safe-area-inset-bottom,0px))]"
+      >
         <div
           ref={headingRef}
           tabIndex={-1}
@@ -351,25 +363,28 @@ export function StepReader({
 
         {documentView}
 
-        {/* Reserva su alto aunque no haya motivo: marcar el ultimo item no debe mover el boton. */}
-        <div data-testid="step-reader-reason-slot" className="min-h-6">
-          <p
-            id={reasonId}
-            data-testid="step-reader-blocked-reason"
-            className={cn('text-base', pending === 0 && 'invisible')}
-          >
-            {TEXTS.blocked(pending)}
-          </p>
-        </div>
-
         {waitReason}
 
         <div
           data-testid="step-reader-actions"
-          className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t bg-background pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-4 pt-3 pb-[calc(14px+env(safe-area-inset-bottom,0px))]"
         >
-          {previousButton}
-          {primaryButton}
+          <div className="mx-auto flex w-full max-w-[720px] flex-col gap-2">
+            {/* Reserva su alto aunque no haya motivo: marcar el ultimo item no debe mover el boton. */}
+            <div data-testid="step-reader-reason-slot" className="min-h-6">
+              <p
+                id={reasonId}
+                data-testid="step-reader-blocked-reason"
+                className={cn('text-center text-base', pending === 0 && 'invisible')}
+              >
+                {TEXTS.blocked(pending)}
+              </p>
+            </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3">
+              {previousButton}
+              {primaryButton}
+            </div>
+          </div>
         </div>
       </section>
     );

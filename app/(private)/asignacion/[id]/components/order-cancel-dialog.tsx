@@ -55,25 +55,39 @@ function readString(formData: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-export type OrderCancelDialogProps = {
+type OrderCancelFormProps = {
   readonly orderId: string;
   readonly stepPosition: number | null;
 };
 
-export function OrderCancelDialog({ orderId, stepPosition }: OrderCancelDialogProps) {
+export type OrderCancelDialogProps = OrderCancelFormProps & {
+  /** Con `open` y `onOpenChange` la apertura la decide quien lo usa y no se pinta disparador. */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
+};
+
+export function OrderCancelDialog({ orderId, stepPosition, open, onOpenChange }: OrderCancelDialogProps) {
+  const controlled = open !== undefined && onOpenChange !== undefined;
+
   return (
     <ConfirmDialogFrame
-      trigger={{
-        render: (
-          <Button
-            type="button"
-            variant="outline"
-            touch
-            data-testid={ORDER_CANCEL_TRIGGER_TESTID}
-          />
-        ),
-        children: ORDER_CANCEL_TEXTS.trigger,
-      }}
+      open={controlled ? open : undefined}
+      onOpenChange={controlled ? onOpenChange : undefined}
+      trigger={
+        controlled
+          ? undefined
+          : {
+              render: (
+                <Button
+                  type="button"
+                  variant="outline"
+                  touch
+                  data-testid={ORDER_CANCEL_TRIGGER_TESTID}
+                />
+              ),
+              children: ORDER_CANCEL_TEXTS.trigger,
+            }
+      }
       testId={ORDER_CANCEL_DIALOG_TESTID}
     >
       {/* El popup se desmonta al cerrar: cada apertura empieza sin motivo ni error previos. */}
@@ -82,7 +96,7 @@ export function OrderCancelDialog({ orderId, stepPosition }: OrderCancelDialogPr
   );
 }
 
-function OrderCancelForm({ orderId, stepPosition }: OrderCancelDialogProps) {
+function OrderCancelForm({ orderId, stepPosition }: OrderCancelFormProps) {
   const fieldId = useId();
   const reasonId = `${fieldId}-reason`;
   const errorId = `${fieldId}-error`;

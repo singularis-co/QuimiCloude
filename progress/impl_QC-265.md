@@ -44,7 +44,22 @@ comprobación en navegador la cubre el e2e de R1 (T8a: x de `private-content` = 
 | Tanda | Commit | Gate |
 | --- | --- | --- |
 | 0 | `63f89d15` | init OK |
-| 1 y 2 | ver `git log` (un commit por tanda) | init OK (un solo `./init.sh` tras las dos, corridas en paralelo) |
+| 1 | `24e1affb` | init OK (un solo `./init.sh` tras 1 y 2, corridas en paralelo) |
+| 2 | `c245a423` | init OK |
+| 3 (T3a, T3b) | ver `git log` | init OK (un solo `./init.sh` tras 3 y 4) |
+| 4 | ver `git log` | init OK |
+
+## Bloqueos para el leader
+
+1. **T3c/T3d (y lo que dependa en T8b).** «Por empacar» no es `DataTable`: es una tabla de servidor
+   sin archivo `*-table.tsx`. Para el menú ⋯ y las tarjetas (D9, R18–R21) hace falta (a) un archivo de
+   cliente nuevo, p. ej. `app/(private)/asignacion/components/assignment-row-actions.tsx` (el spec ya
+   nombra `assignment-row-actions.test.tsx`), y (b) decidir si «Por empacar» pasa a `DataTable` con
+   un `packing-orders-table.tsx` nuevo, lo que obliga a tocar `tests/unit/marca/tablas-marca.test.tsx`.
+   Ninguno de los tres está en `## Archivos esperados`, y (b) es una decisión de diseño.
+2. **E2E fuera de la lista (T4, desvío 2).** El `h1` de la ejecución es ahora la receta (R23, D3), y
+   `e2e/envases-del-pedido.spec.ts` y `e2e/pedido-en-varias-presentaciones.spec.ts` afirman
+   «<n> - <receta>». Hay que añadirlos a `## Archivos esperados` para migrarlos en T8b.
 
 ## Tanda 1 — Piezas compartidas (frontend_dev)
 
@@ -98,3 +113,92 @@ Verificación:
 Desvíos: ninguno. El pie reserva 132 px + margen seguro (alto del pie del tablero). Ningún snapshot cambió.
 
 Veredicto: T2a hecha, en verde; ninguna pantalla usa el marco todavía.
+
+## Tanda 3 — Asignación (frontend_dev) · T3a y T3b hechas; T3c y T3d paradas
+
+Archivos:
+- creados `app/(private)/asignacion/components/assignment-view-counts.ts`,
+  `assignment-view-tabs-section.tsx`, `tests/unit/asignaciones-ui/assignment-view-tabs.test.tsx`,
+  `tests/unit/asignaciones-ui/assignment-view-counts.test.ts`
+- borrados `assigned-order-delivered-notice.tsx`, `assigned-order-cancelled-notice.tsx`,
+  `assigned-orders-error.tsx`
+- modificados `page.tsx` (pestañas en su `Suspense`, avisos con `OrderOutcomeNotice`),
+  `components/index.ts`, `assignment-view-tabs.tsx` (sobre `UrlTabs`, `counts?`, sin `'use client'`),
+  `order-outcome-notice.tsx` (cuatro `kind` sobre `Notice` con `dismissible` «Cerrar»),
+  `conditioning-`/`conditioned-`/`delivered-conditioned-orders-list-section.tsx` (`AssignmentListError`),
+  `e2e/registro-ejecucion.spec.ts` (solo el `import`), tests de avisos, `asignacion-page`,
+  `a11y-tactil`, `assigned-orders-states`, comentarios en `company-`/`finished-`/`packing-orders-list-section.test.tsx`,
+  `asignacion-paridad.test.tsx` (comentario), `guard-asignacion-componentizada.test.ts` (R14, R42),
+  `guard-piezas-base.test.ts` (la fila de delegación de `assigned-orders-error.tsx` pasa a
+  `assignment-list-parts.tsx`, que es quien delega ahora en `ErrorState`)
+- snapshot `asignacion-acondicionamiento-paridad`: los dos avisos (`packed`, `conditioned`) pasan de
+  `<p>` verde a `Notice` `success` con icono y «Cerrar» (fila de `design.md > 6`, R13). Nada más cambió;
+  `asignacion-paridad` y `asignacion-listas-paridad` no pintan pestañas ni avisos y no cambiaron.
+
+Mapa R → test: R7 → `assignment-view-tabs.test.tsx` «R7» y `asignacion-page.test.tsx` «R5, R7» ·
+R9 → `assignment-view-tabs.test.tsx` «R9», «R9, R11» · R10 → `assignment-view-counts.test.ts` (3 «R10»)
+y `assignment-view-tabs.test.tsx` «R10» · R11 → `assignment-view-counts.test.ts` (2 «R11»),
+`asignacion-page.test.tsx` «R11: las pestañas van en su propio Suspense…» · R12 →
+`assignment-view-tabs.test.tsx` (3 «R12») · R13 → los cuatro tests de avisos («R13») y
+`asignacion-page.test.tsx` «R13 — qué aviso sale con cada parámetro» · R14, R42 →
+`guard-asignacion-componentizada.test.ts` (2 muestras + 2 repositorio) · R15 →
+`packed-order-notice.test.tsx` «R15» (los cuatro `kind`).
+
+Verificación:
+- `pnpm run typecheck` → 0 errores
+- `pnpm run lint` → 0 errors, 7 warnings (preexistentes)
+- `pnpm exec vitest related --run <archivos>` → 36 files, 468 passed (tras actualizar el snapshot de arriba)
+- `pnpm exec vitest run guard` → 74 files, 1011 passed, 20 skipped
+
+Desvíos: (1) las pestañas de `UrlTabs` llevan `min-h-11` pero no `min-w-11`; los tests de
+`asignacion-page` afirman el alto y que hay etiqueta (el ancho lo dan el relleno y el texto).
+(2) **T3c parada**: «Por empacar» es una tabla de servidor (sin `DataTable`) y `RowActionsMenu` pide
+el icono como componente, que no cruza de servidor a cliente; hace falta un archivo de cliente nuevo
+(`assignment-row-actions.tsx`) fuera de `## Archivos esperados`, y decidir las tarjetas de «Por
+empacar» (pasarla a `DataTable` rompe `tests/unit/marca/tablas-marca.test.tsx`, fuera de la lista).
+T3d depende de T3c.
+
+## Tanda 4 — Ejecución (frontend_dev)
+
+Archivos:
+- nuevo `app/(private)/asignacion/[id]/components/order-execution-tools-panel.tsx` (`Card` +
+  `Collapsible`, abierto al entrar, contenido montado al plegar; testids `order-execution-materials` y
+  `-divider` se mudan aquí)
+- modificados `order-execution-screen.tsx` (sobre `OperatorScreenFrame`, importado por su archivo;
+  menú `RowActionsMenu` «Acciones del pedido <n>» con «Cancelar pedido»; dos columnas con
+  `@min-[1101px]`; `RECIPE_MISSING_TEXT` → `ORDER_EXECUTION_TEXTS.recipeMissing` «Esta receta está dada
+  de baja.»), `order-cancel-dialog.tsx` (`open?`/`onOpenChange?`), `order-execution-tools.tsx`
+  (`labelledBy?`), `index.ts`, `components/shared/step-reader/step-reader.tsx` (solo `ejecucion`:
+  `size="xl"`, rejilla 1fr/2fr, motivo encima, barra `fixed` con margen seguro y la sección reserva
+  su alto) y `app/(private)/asignacion/components/operator-screen-frame.tsx` (`titleTestId?`, desvío 1)
+- tests: `order-execution-screen`, `order-execution-page`, `order-cancel-dialog`,
+  `order-execution-tools`, nuevo `order-execution-tools-panel`, `recetas-ui/step-reader`
+
+Mapa R → test: R2 → `order-execution-screen` «QC-265 R2, R23: pinta el número…», `order-execution-page`
+«QC-265 R1, R2» · R3 → `order-execution-screen` «R26: objetivos tactiles…» (xl/`size-11`/44) y
+`order-execution-tools-panel` «QC-265 R3» · R23 → `order-execution-screen` (4 casos «QC-265 R23»),
+`order-cancel-dialog` (2 «QC-265 R23: modo controlado» + flujo por el menú) · R24 →
+`order-execution-tools-panel` (5 «QC-265 R24»), `order-execution-screen` «QC-265 R24: divisor»,
+`order-execution-tools` «QC-265 R24» · R25 → `step-reader` (5 «QC-265 R25», incluido `lectura` sin
+cambios) y `order-execution-screen` (2 «QC-265 R25»); bloqueo y espera: «R19», «R4», «R13» de hoy ·
+R26 → `order-execution-screen` «Finalizar pide confirmar…» (3 casos) y «R18: el envio…» · R45 → los
+casos de envío/errores de hoy en `order-execution-screen` y `order-cancel-dialog`, sin cambios.
+
+Verificación:
+- `pnpm run typecheck` → 0 errores
+- `pnpm run lint` → 0 errors, 7 warnings (preexistentes, otros archivos)
+- `pnpm exec vitest related --run <7 archivos de producción>` → 41 files, 790 passed
+- `pnpm exec vitest run guard` → 74 files, 1011 passed, 20 skipped
+- `confirmaciones-paridad` en verde sin regenerar: no cambió ningún caso (cancelar se pinta suelto
+  con su disparador; finalizar solo afirma el portal del diálogo)
+
+Desvíos: (1) `OperatorScreenFrame` gana `titleTestId?` (una prop opcional, como `PageHeader`) para
+que el `h1` conserve `order-execution-title`, que leen 10 E2E; el archivo es de la tanda 2 y la tanda 3
+no lo toca. (2) El `h1` es la receta (R23): los E2E que afirman `toHaveText('<n> - <receta>')`
+(`envases-del-pedido`, `pedido-en-varias-presentaciones`) cambian en T8b; `formatOrderExecutionTitle`
+y `ORDER_EXECUTION_RECIPE_MISSING_TESTID` se borran (solo los usaba el test unitario). (3) El menú ⋯
+lleva `order-execution-actions`; su ítem conserva `order-cancel-trigger`. Los E2E que cancelen deben
+abrir antes el menú (T8b). (4) `StepReader` ya no recibe `title` en la ejecución (el `h1` nombra la
+receta). (5) El `ErrorAlert` de Finalizar va encima del paso y no al final, para que no lo tape el pie
+fijo. (6) El pie fijo de `StepReader` afecta ya al empaque con pasos (la sección reserva su alto); T5
+lo integra en el marco.

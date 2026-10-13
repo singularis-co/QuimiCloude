@@ -9,6 +9,7 @@ export type OperatorScreenFrameProps = {
   readonly back?: { readonly href: string; readonly label: string; readonly testId: string };
   readonly eyebrow: string;
   readonly title: string;
+  readonly titleTestId?: string;
   readonly subtitle?: ReactNode;
   readonly status?: ReactNode;
   readonly headerActions?: ReactNode;
@@ -28,6 +29,7 @@ export function OperatorScreenFrame({
   back,
   eyebrow,
   title,
+  titleTestId,
   subtitle,
   status,
   headerActions,
@@ -51,7 +53,9 @@ export function OperatorScreenFrame({
         >
           {eyebrow}
         </span>
-        <h1 className="m-0 text-[22px] leading-tight font-semibold">{title}</h1>
+        <h1 className="m-0 text-[22px] leading-tight font-semibold" data-testid={titleTestId}>
+          {title}
+        </h1>
         {subtitle ? <div className="text-sm text-muted-foreground">{subtitle}</div> : null}
       </div>
       {status ? <div className="flex-none">{status}</div> : null}

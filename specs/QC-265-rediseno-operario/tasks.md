@@ -62,7 +62,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 3 — Asignación (depende de T1c)
 
-- [ ] **T3a [P]. Pestañas, renombrado y contadores** (D1, D4, D5, R7, R9–R12). `AssignmentViewTabs`
+- [x] **T3a [P]. Pestañas, renombrado y contadores** (D1, D4, D5, R7, R9–R12). `AssignmentViewTabs`
   sobre `UrlTabs` con `counts?`; `assignment-view-counts.ts` y `assignment-view-tabs-section.tsx`;
   `page.tsx` la monta en `Suspense`. Tests:
   `tests/unit/asignaciones-ui/assignment-view-tabs.test.tsx` (etiqueta «Acondicionados», contador junto
@@ -70,7 +70,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
   `tests/unit/asignaciones-ui/assignment-view-counts.test.ts` (llama a cada lista con `{ page: 1,
   pageSize: 1 }` sin filtros, toma `total`, una vista que falla queda sin contador y no lanza).
   `asignacion-page.test.tsx` comprueba que la lista vigente no espera al `Suspense` de las pestañas.
-- [ ] **T3b [P]. Avisos en una pieza** (D8, D14, R13, R14, R42). `OrderOutcomeNotice` con los cuatro
+- [x] **T3b [P]. Avisos en una pieza** (D8, D14, R13, R14, R42). `OrderOutcomeNotice` con los cuatro
   tipos sobre `Notice` con `dismissible`; borrar `assigned-order-delivered-notice.tsx`,
   `assigned-order-cancelled-notice.tsx` y `AssignedOrdersError`. Tests: los cuatro de avisos de
   `design.md > 7` (tono, texto, `role="status"`, testid) y `asignacion-page.test.tsx` (qué aviso sale
@@ -90,14 +90,14 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 4 — Ejecución (depende de T1a, T2a) [P con 5 y 6]
 
-- [ ] **T4a. Cabecera, menú y panel** (D10, R23, R24). `OrderExecutionScreen` sobre el marco;
+- [x] **T4a. Cabecera, menú y panel** (D10, R23, R24). `OrderExecutionScreen` sobre el marco;
   `OrderCancelDialog` con `open?`/`onOpenChange?`; `order-execution-tools-panel.tsx`. Tests:
   `order-execution-screen.test.tsx` (cabecera con número, receta o «Esta receta está dada de baja.»,
   «Pedido … · Presentación: …», menú «Acciones del pedido <n>» con «Cancelar pedido» que abre el
   diálogo), `order-cancel-dialog.test.tsx` (modo controlado sin disparador; sin las props, el de hoy) y
   `tests/unit/asignaciones-ui/order-execution-tools-panel.test.tsx` (abierto al entrar, contador,
   plegar no cambia el paso ni lo marcado).
-- [ ] **T4b. Pie del paso a paso** (D10, R25, R26). `step-reader.tsx` en `ejecucion`: botones `xl`,
+- [x] **T4b. Pie del paso a paso** (D10, R25, R26). `step-reader.tsx` en `ejecucion`: botones `xl`,
   proporción 1/3–2/3, motivo encima, barra anclada al pie. Tests: `step-reader.test.tsx` (modo
   `lectura` sin cambios; `ejecucion` con `size="xl"`) y `order-execution-screen.test.tsx` (bloqueo,
   espera, registro de paso y diálogo «¿Terminar el pedido?» como hoy).

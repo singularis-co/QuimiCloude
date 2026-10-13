@@ -136,6 +136,13 @@ describe('pagina de ejecucion — el corte por permiso ocurre ANTES de leer nada
     expect(startAssignedOrderActionMock).toHaveBeenCalledWith('order-1');
     expect(screen.getByTestId(ORDER_EXECUTION_SCREEN_TESTID)).toBeInTheDocument();
   });
+
+  it('QC-265 R1, R2: la pantalla se monta sobre el marco del operario, con un solo h1', async () => {
+    render(await arbolDeLaPagina());
+
+    expect(screen.getByTestId(ORDER_EXECUTION_SCREEN_TESTID)).toHaveAttribute('data-operator-screen');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
 });
 
 describe('pagina de ejecucion — «no existe» y «no es tuyo» pintan lo mismo (R6)', () => {
