@@ -185,3 +185,71 @@ de integración está en verde.
 
 ### Veredicto
 **OK.** B1 y B2 quedan resueltos y no hay bloqueantes. Los tres hallazgos son menores; M1 hay que hacerlo antes de abrir el PR.
+
+## Vuelta 3 (acotada a c5361f20..729fe8ef)
+
+Alcance: quitar `metaAppId`/`meta_app_id` (D17, humano, 2026-10-13). La migración `20261009130000` se
+edita en sitio.
+
+### Verificación ejecutada por el reviewer
+
+- `pnpm typecheck`: limpio. El cliente Prisma generado ya no tiene `metaAppId`: si lo tuviera como
+  requerido, el `create` del adaptador no compilaría.
+- `eslint` sobre los 21 `.ts/.tsx` del diff: 0 errores.
+- `vitest` unit (`integraciones/whatsapp`, `integraciones-ui`, `composition/integraciones-graph-doubles`):
+  20 archivos, 252 passed.
+- `vitest --project integration` (`whatsapp-connection-{migration,prisma}.int.test.ts`) en una base
+  efímera creada desde la plantilla: 2 archivos, 25 passed. El `INSERT` sin `meta_app_id` entra, así
+  que la plantilla refleja la migración editada.
+- `grep -rni "meta_?app_?id|app id|meta-app-id"` en todo el repo (sin `node_modules`): solo quedan
+  D17 en `progress/features/QC-237.md`, la bitácora y las notas fechadas del spec. No quedan restos
+  en código, tests, e2e, seeds ni docs.
+- `git ls-tree origin/dev` y `origin/master`: la migración `20261009130000` no está en ninguna de las
+  dos. Editarla en sitio es legítimo.
+
+### Checklist
+
+- [x] **La eliminación está completa.** Cubre el dominio (record, view, `toWhatsappConnectionView`),
+  el input zod (create/update), el alta, la edición, el puerto (fila nueva y patch), el adaptador
+  Prisma (select, `toRecord`, insert, update), las Server Actions (`buildCreate/UpdateCandidate`), el
+  formulario (campos, etiquetas, testids), la guía y el E2E.
+- [x] **La migración, el schema y el adaptador son coherentes.** Se quita la línea en el SQL y en
+  `schema.prisma` y el resto de columnas no cambia. Lo confirma el int test.
+- [x] **No se debilita otro campo.**
+  - En R24, «metaAppId vacío» se retira junto con su campo. «Campo ausente» pasa a `wabaId` y sigue
+    probando lo mismo.
+  - En el test de IDs libres se pierde el caso `' abc-1 '` (recorte de `metaAppId`). El recorte
+    sigue cubierto por `phoneNumberId`, y `wabaId` nunca lo verificó, así que no hay regresión.
+  - R27 sigue afirmando que no se llama a Graph, que no se descifra y que el patch no lleva
+    `status`, con `displayName` y `wabaId`.
+  - R36 envía y pinta los cinco campos con `toEqual` estricto, igual que antes.
+  - En `connection-view`, la lista exacta de claves de la vista sigue con `toEqual`.
+- [x] **R24, R25 y R27 siguen mapeados.** Están en `create-whatsapp-connection.test.ts` (R24) y en
+  `update-whatsapp-connection.test.ts` (R25 y R27). Todos pasan y la tabla de trazabilidad de
+  `impl_QC-237.md` se actualizó para R27.
+- [x] **Las notas del spec son correctas.** `requirements.md` y `design.md` llevan la nota fechada
+  2026-10-13. El texto de R24, R25 y R27, la D14, el resumen de la ficha, el modelo, los tipos, la
+  tabla de acciones, las etiquetas y la guía quedan sin App ID. D17 está registrada en
+  `progress/features/QC-237.md`.
+
+### Hallazgos
+
+- **menor M1. La base local compartida queda desalineada.**
+  - El humano autorizó `db:migrate` en la base local compartida el 2026-10-09 (F2.2), así que esa
+    base ya aplicó la versión vieja de `20261009130000`. Conserva `meta_app_id NOT NULL` y el
+    checksum viejo en `_prisma_migrations`.
+  - Con el código nuevo, un alta desde la app local fallará por `NOT NULL`, y `prisma migrate`
+    marcará la migración como modificada.
+  - CI y las bases efímeras no se ven afectados.
+  - Requiere una decisión humana sobre cómo realinear esa base. El reviewer no la toca. Conviene
+    anotarlo en `progress/features/QC-237.md` para que QC-224 y el resto del equipo lo sepan.
+- **menor M2.** En `create-whatsapp-connection.test.ts:147` falta un espacio:
+  `['phoneNumberId vacio',{ phoneNumberId: '\t' }]`. Es solo estilo. El lint pasa y Prettier no
+  está en el gate (el archivo ya no cumplía Prettier antes de este commit).
+- **menor M3, opcional.** Ningún int test afirma que `meta_app_id` ya no existe. El `INSERT` de la
+  migración lo cubre de forma indirecta: con la columna `NOT NULL` fallaría. No hace falta añadir
+  nada.
+
+### Veredicto
+
+**OK.** No hay bloqueantes. M1 es una tarea operativa para el humano o el leader, no del código.
