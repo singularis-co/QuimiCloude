@@ -69,7 +69,7 @@ los prueba en navegador. La 3 es el cierre. Cada tanda termina con `./init.sh` e
 ## Tanda 3 — Cierre (depende de la tanda 2)
 
 - [x] **T3a. Trazabilidad** en `progress/impl_QC-269.md`, con la tabla de abajo verificada caso a caso.
-- [ ] **T3b. Ficha aparte para P1**, si P1 se queda en su defecto. El leader la abre en el board:
+- [x] **T3b. Ficha aparte para P1**, si P1 se queda en su defecto. El leader la abre en el board:
   «Alinear la cabecera de `DataTable` con su columna (`end` y `center`)», con la causa de
   `requirements.md > P1`. *Hecho:* la key nueva queda citada en `progress/features/QC-269.md`.
 - [ ] **T3c. Gate.** *Hecho:* `./init.sh` en verde y `./init.sh --completo` en verde antes del PR.
