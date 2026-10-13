@@ -21,6 +21,11 @@ export type OperatorScreenFrameProps = {
 
 const CONTENT_WIDTH = 'mx-auto w-full max-w-[1064px]';
 
+/** Reserva del pie fijo de `StepReader` (`mode="ejecucion"`) en la columna lateral, solo con dos
+ *  columnas. Mismo `calc` que el `pb-[…]` de `step-reader.tsx`: lo vigila order-execution-screen.test.tsx. */
+export const STEP_READER_SIDE_COLUMN_RESERVE =
+  '@min-[1101px]:mb-[calc(140px+env(safe-area-inset-bottom,0px))]';
+
 /**
  * Marco de pantalla del operario: cabecera pegada arriba, pie fijo abajo y, entre ambos, el
  * contenido. La raíz es contenedor de consultas para que las pantallas pasen a dos columnas
