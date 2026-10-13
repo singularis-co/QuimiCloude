@@ -247,24 +247,8 @@ en `docs/dependencias.md`, y NO DEBE añadir permisos nuevos ni entradas de men�
 
 ## Preguntas abiertas
 
-- Identificadores exactos de los dos modelos (receta, catálogo) de cada proveedor: los propone el
-  spec, verificados contra la documentación vigente de cada proveedor, y los aprueba el humano en
-  F1.4. No se inventan. **Estado tras F1.2:** propuesta y fuentes en `design.md > 3`; los ocho
-  quedan `[POR VERIFICAR]` (el spec se escribió sin red; los de Claude salen de los tipos del SDK
-  instalado, no de la documentación).
 - QC-175 (respaldo de Gemini por variable de entorno) pierde sentido con el corte de D1: ¿se cancela
   absorbida por QC-276? Lo decide el humano al acotar QC-276; no bloquea esta ficha.
-- **(spec_author, 2026-10-13) R27 y R28 interpretan el tablero, no una decisión escrita.** El aviso
-  de error aprobado dice «Hasta que la reemplaces **o vuelva a responder**, no se pueden leer PDF».
-  El spec lo lee así: con la conexión en `ERROR` se sigue intentando leer con la key guardada (R28)
-  y una lectura buena la devuelve a `ACTIVE` (R27); el bloqueo duro es solo «sin conexión». La
-  alternativa —que `ERROR` bloquee la subida igual que «sin conexión»— obliga a pasar por «Probar
-  conexión» para desbloquear, y una cuota agotada que se recarga sola dejaría la empresa bloqueada
-  hasta que alguien entre a Integraciones. Confirmar en F1.4.
-- **(spec_author, 2026-10-13) Textos nuevos que el tablero no trae:** los mensajes del proveedor por
-  tipo de fallo (`design.md > 4.4`), los textos de error del catálogo para `ai_provider_missing` y
-  `ai_provider_error` (`design.md > 11`) y la línea «Última prueba» (`design.md > 12.3`). Se aprueban
-  con el spec en F1.4.
 - **(spec_author, 2026-10-13) Logos oficiales** `[POR CONFIRMAR]`: de dónde sale cada SVG y si su
   uso de marca lo permite en una pantalla de configuración (`design.md > 12.5`). Sin confirmar, la
   pantalla sale con el monograma del tablero (C, G, O, R) y R35 queda sin cumplir hasta que lleguen.
@@ -283,4 +267,7 @@ en `docs/dependencias.md`, y NO DEBE añadir permisos nuevos ni entradas de men�
 | 2026-10-13 | ¿Qué pasa si la key falla en uso? | La lectura falla con «Error con tu proveedor» y la conexión queda en estado Error con su último error visible en Integraciones (patrón QC-237 D13). No se reintenta con la key de la plataforma. |
 | 2026-10-13 | ¿Se devuelve la key al navegador? | Nunca (heredado de QC-237 D4). Cifrada con el `SecretContext` de QC-234 (QC-237 D8). |
 | 2026-10-13 | ¿Diseño? | Tableros `docs/diseno/canvas/ProveedorIA.dc.html`, `ProveedorIATablet.dc.html` y `ProveedorIAMovil.dc.html`, aprobados por el humano. Con el logo oficial de cada proveedor (SVG del kit de marca). |
+| 2026-10-13 | ¿Qué modelos siembra cada proveedor? (F1.4) | Buen equilibrio calidad/precio, porque el cliente no los elige: Claude `claude-haiku-5-5` (receta y catálogo); Gemini `gemini-3.8-flash` (receta) y `gemini-3.5-flash-lite` (catálogo); OpenAI GPT-6 Luna (receta y catálogo); OpenRouter `anthropic/claude-haiku-5.5` (receta y catálogo). Fuente: catálogo público de OpenRouter (`/api/v1/models`), 2026-10-13. Sustituye la propuesta de `design.md > 3`. Los ids nativos de Gemini y OpenAI se confirman en T0 contra la API de cada proveedor; si alguno no existe con ese nombre, se para y se pregunta. |
+| 2026-10-13 | ¿Una conexión en Error bloquea subir PDF? (F1.4) | No: R27 y R28 aprobados como están. Solo bloquea «sin conexión». |
+| 2026-10-13 | Textos nuevos que el tablero no trae (F1.4) | Aprobados como están en `design.md > 4.4`, `> 11` y `> 12.3`. |
 | — | Identificadores de DB | En inglés (heredado de QC-4). |
