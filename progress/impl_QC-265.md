@@ -285,3 +285,12 @@ Desvíos: (1) R39 en `requirements.md` dice «código de producción»; la guard
 (2) `CONDITIONING_BATCH_DATA_SUCCESS_TESTID` sigue exportado hasta T8b, porque
 `e2e/datos-de-lote-en-acondicionamiento.spec.ts` lo importa (línea 40); las líneas 727–731 esperan el
 testid y pasan al toast en T8b.
+
+## `./init.sh --completo` (tras la tanda 7; T3c, T3d y T8 pendientes)
+
+Primer intento: **rojo nuevo** (fuera del baseline) en `tests/unit/shared-ui/catalogo-qc256.test.ts`.
+Ese test fija con igualdad exacta la celda `Diseño` de `Notice` en `Avisos.dc.html`, y T1d (D7)
+añade `Asignacion.dc.html`. El gate rápido no lo vio porque `vitest related` no relaciona un `.md`.
+Es una lista cerrada de filas del catálogo que el cambio obliga a ajustar. La expectativa de `Notice`
+pasa a los dos tableros y el archivo se añade a `## Archivos esperados`. Resultado: el test queda en
+verde (6/6). Segundo `--completo`: **init OK**, 1160/1160 archivos y 17 310 tests en verde (141 saltados).

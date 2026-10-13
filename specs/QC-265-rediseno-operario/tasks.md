@@ -297,6 +297,7 @@ Tests y guardias:
 - `tests/guards/guard-asignacion-componentizada.test.ts`
 - `tests/guards/guard-piezas-base.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
+- `tests/unit/shared-ui/catalogo-qc256.test.ts` (alta en F2.1: fija la celda `Diseño` de `Notice`; ver `progress/impl_QC-265.md`)
 
 E2E:
 
