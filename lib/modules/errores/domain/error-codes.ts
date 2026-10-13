@@ -29,6 +29,8 @@
  * **2026-10-09**: `integration_secret_unreadable`.
  * **2026-10-09**: `batch_expiry_not_future`, `batch_production_date_future`,
  * `conditioning_batch_data_missing`.
+ * **2026-10-09**: `whatsapp_connection_not_found`, `whatsapp_connection_exists`,
+ * `whatsapp_phone_number_taken`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -180,6 +182,9 @@ export const ERROR_CODES = [
   // los envases enteros que la entrega le pide.
   'delivery_batch_insufficient',
   'integration_secret_unreadable',
+  'whatsapp_connection_not_found',
+  'whatsapp_connection_exists',
+  'whatsapp_phone_number_taken',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

@@ -1,7 +1,7 @@
-// El modulo `integraciones` guarda el cifrado de los secretos de las integraciones: un contrato con
-// sus errores y el contexto de un secreto, dos puertos y sus adaptadores driven, y un unico
-// importador de fuera, `lib/composition`. Su permiso solo lo exigen las tres paginas de
-// integraciones y lo declara el menu.
+// El modulo `integraciones` guarda el cifrado de los secretos de las integraciones y la conexion de
+// WhatsApp: un contrato con sus errores, tipos y fabricas, sus puertos y adaptadores, y un unico
+// importador de produccion de fuera, `lib/composition`. Su permiso lo exigen las tres paginas de
+// integraciones y el actor del modulo, y lo declara el menu.
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -114,6 +114,7 @@ const EXACT_HOLDERS_OUTSIDE_THE_CATALOG = [
   'app/(private)/integraciones/inventarios/page.tsx',
   'app/(private)/integraciones/whatsapp/page.tsx',
   'lib/shared/navigation/private-nav.ts',
+  'lib/modules/integraciones/domain/actor.ts',
 ] as const
 
 /** Lo que el permiso tiene permitido: el catalogo, las migraciones y las rutas exactas de arriba. */
@@ -127,15 +128,40 @@ export function isAllowedHolderOfTheCode(relativePath: string): boolean {
 
 /** Los archivos de codigo del modulo, uno a uno. Un archivo nuevo entra aqui con su ruta exacta. */
 const MODULE_CODE_FILES = [
+  'adapters/driven/config/e2e-doubles-env.ts',
   'adapters/driven/config/encryption-keys-env.ts',
+  'adapters/driven/config/public-base-url-env.ts',
+  'adapters/driven/config/whatsapp-config-env.ts',
+  'adapters/driven/graph/whatsapp-graph-client-canned.ts',
+  'adapters/driven/graph/whatsapp-graph-client-fetch.ts',
+  'adapters/driven/persistence/company-scope.ts',
+  'adapters/driven/persistence/whatsapp-connection-prisma.ts',
+  'adapters/driven/security/random-source-node.ts',
   'adapters/driven/security/secret-cipher-aes-gcm.ts',
   'adapters/driven/security/secret-digest-sha256.ts',
+  'adapters/driving/whatsapp-connection-actions.ts',
+  'domain/actor.ts',
+  'domain/connection-secrets.ts',
+  'domain/connection-status.ts',
+  'domain/create-whatsapp-connection.ts',
   'domain/errors.ts',
+  'domain/get-whatsapp-connection.ts',
+  'domain/graph-failure.ts',
+  'domain/integraciones-scope.ts',
+  'domain/regenerate-whatsapp-verify-token.ts',
   'domain/secret-context.ts',
+  'domain/set-whatsapp-connection-enabled.ts',
   'domain/stored-secret.ts',
+  'domain/test-whatsapp-connection.ts',
+  'domain/update-whatsapp-connection.ts',
+  'domain/whatsapp-connection-input.ts',
+  'domain/whatsapp-connection.ts',
   'index.ts',
+  'ports/random-source.ts',
   'ports/secret-cipher.ts',
   'ports/secret-digest.ts',
+  'ports/whatsapp-connection-repository.ts',
+  'ports/whatsapp-graph-client.ts',
 ] as const
 
 /** ¿El fuente importa la criptografia de Node, con o sin prefijo `node:`? */
@@ -286,17 +312,36 @@ describe('la forma del modulo integraciones', () => {
     expect(adaptadores).toEqual(['driven/', 'driving/'])
   })
 
-  it('R20: el contrato reexporta exactamente los tres errores y el tipo SecretContext, y solo desde ./domain', () => {
+  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso, y solo desde ./domain', () => {
     const { otherStatements, reexports } = contractReexports(readFileSync(join(moduleDir, 'index.ts'), 'utf8'))
 
     expect(otherStatements, 'el contrato solo reexporta: ni declaraciones ni export *').toBe(0)
     expect(reexports.map((r) => r.name).sort()).toEqual([
+      'ActionNotAllowedError',
+      'Actor',
       'IntegracionesError',
       'SecretContext',
       'SecretUnreadableError',
+      'UnauthorizedError',
       'ValidationError',
+      'WhatsappConnectionExistsError',
+      'WhatsappConnectionNotFoundError',
+      'WhatsappConnectionStatus',
+      'WhatsappConnectionView',
+      'WhatsappPhoneNumberTakenError',
+      'createCreateWhatsappConnection',
+      'createGetWhatsappConnection',
+      'createRegenerateWhatsappVerifyToken',
+      'createSetWhatsappConnectionEnabled',
+      'createTestWhatsappConnection',
+      'createUpdateWhatsappConnection',
     ])
-    expect(reexports.filter((r) => r.typeOnly).map((r) => r.name)).toEqual(['SecretContext'])
+    expect(reexports.filter((r) => r.typeOnly).map((r) => r.name).sort()).toEqual([
+      'Actor',
+      'SecretContext',
+      'WhatsappConnectionStatus',
+      'WhatsappConnectionView',
+    ])
     for (const reexport of reexports) {
       expect(reexport.from, reexport.name).toMatch(/^\.\/domain(\/|$)/)
     }
@@ -310,7 +355,7 @@ describe('la forma del modulo integraciones', () => {
     expect(reexports).toEqual([{ name: 'SecretCipher', typeOnly: true, from: './ports/secret-cipher' }])
   })
 
-  it('R18: los archivos de codigo del modulo son exactamente los del cifrado de secretos', () => {
+  it('R18: los archivos de codigo del modulo son exactamente los del cifrado de secretos y los de la conexion de WhatsApp', () => {
     const relativos = listFiles(moduleDir).map((file) => toPosix(relative(moduleDir, file)))
     expect(codeFilesAmong(relativos).sort()).toEqual([...MODULE_CODE_FILES])
   })
@@ -356,8 +401,16 @@ describe('la forma del modulo integraciones', () => {
     expect(hallazgos.join('\n')).toContain('node:crypto')
   })
 
-  it('R19: el unico archivo de produccion fuera del modulo que lo importa es lib/composition/index.ts', () => {
-    expect(filesImportingTheModule()).toEqual(['lib/composition/index.ts'])
+  it('R19: fuera del modulo solo lo importan lib/composition/index.ts y, por ruta exacta, la pantalla de WhatsApp y sus componentes', () => {
+    expect(filesImportingTheModule()).toEqual([
+      'lib/composition/index.ts',
+      'app/(private)/integraciones/whatsapp/components/whatsapp-connection-actions.tsx',
+      'app/(private)/integraciones/whatsapp/components/whatsapp-connection-card.tsx',
+      'app/(private)/integraciones/whatsapp/components/whatsapp-connection-form.tsx',
+      'app/(private)/integraciones/whatsapp/components/whatsapp-status-badge.tsx',
+      'app/(private)/integraciones/whatsapp/components/whatsapp-webhook-panel.tsx',
+      'app/(private)/integraciones/whatsapp/page.tsx',
+    ])
   })
 
   it('R12: el detector reconoce un import por contrato, uno profundo y uno relativo, y no uno ajeno', () => {
@@ -375,13 +428,26 @@ describe('la forma del modulo integraciones', () => {
     ])
   })
 
-  it('R19: lib/composition exporta integraciones con exactamente secretCipher y secretDigest, tipados con sus puertos', () => {
+  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de la conexion y la URL del webhook, con sus puertos tipados', () => {
     const cableado = integracionesWiring(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8'))
 
     expect(cableado, 'lib/composition/index.ts deberia exportar const integraciones = { ... }').not.toBeNull()
-    expect([...(cableado?.members ?? [])].sort()).toEqual(['secretCipher', 'secretDigest'])
+    expect([...(cableado?.members ?? [])].sort()).toEqual([
+      'createWhatsappConnection',
+      'getWhatsappConnection',
+      'regenerateWhatsappVerifyToken',
+      'secretCipher',
+      'secretDigest',
+      'setWhatsappConnectionEnabled',
+      'testWhatsappConnection',
+      'updateWhatsappConnection',
+      'whatsappWebhookUrl',
+    ])
     expect(cableado?.typeOf.secretCipher).toBe('SecretCipher')
     expect(cableado?.typeOf.secretDigest).toBe('SecretDigest')
+    expect(cableado?.typeOf.whatsappGraphClient).toBe('WhatsappGraphClient')
+    expect(cableado?.typeOf.whatsappConnectionRepository).toBe('WhatsappConnectionRepository')
+    expect(cableado?.typeOf.randomSource).toBe('RandomSource')
   })
 
   it('R19: el lector del cableado ve un miembro de mas y un tipo que no es el puerto', () => {
@@ -445,9 +511,16 @@ describe('la forma del modulo integraciones', () => {
     expect(branchRange(FEATURE_BRANCH, 'abc')).toEqual({ mergeBase: 'abc' })
   })
 
-  it('R13: db/schema.prisma no tiene ningun modelo de integraciones', () => {
-    const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8')
-    expect(esquema).not.toMatch(/@module\s+integraciones\b/)
+  it('R13: db/schema.prisma tiene exactamente un modelo de integraciones, WhatsappConnection', () => {
+    const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8').replace(/\r\n/g, '\n')
+    // El `/// @module` va encima del `model`, con solo lineas `///` entre medias.
+    const modelos = [
+      ...esquema.matchAll(
+        /\/\/\/\s*@module\s+integraciones\b[^\n]*\n(?:[ \t]*\/\/\/[^\n]*\n)*[ \t]*model\s+(\w+)/g,
+      ),
+    ].map((match) => match[1])
+    expect(modelos).toEqual(['WhatsappConnection'])
+    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(1)
     expect(esquema).toMatch(/@module\s+identity\b/)
   })
 })
@@ -469,7 +542,7 @@ describe('la autorizacion del modulo es por permiso', () => {
     expect(findForbiddenPatternsInSource(sintetico).length).toBeGreaterThan(0)
   })
 
-  it('R17: el codigo del permiso solo aparece en el catalogo, en db/migrations/, en las tres paginas de integraciones y en el menu privado', () => {
+  it('R17: el codigo del permiso solo aparece en el catalogo, en db/migrations/, en las tres paginas de integraciones, en el menu privado y en el actor del modulo', () => {
     const conElCodigo = productionFilesContaining(CODIGO)
 
     expect(conElCodigo, 'el barrido deberia ver el catalogo de permisos').toContain(
@@ -483,20 +556,22 @@ describe('la autorizacion del modulo es por permiso', () => {
     ).toEqual([])
   })
 
-  it('R17: el barrido ve el codigo del permiso en cada una de las cuatro rutas exactas admitidas', () => {
+  it('R17: el barrido ve el codigo del permiso en cada una de las cinco rutas exactas admitidas', () => {
     const conElCodigo = productionFilesContaining(CODIGO)
     for (const ruta of EXACT_HOLDERS_OUTSIDE_THE_CATALOG) {
       expect(conElCodigo, ruta).toContain(ruta)
     }
   })
 
-  it('R17: la regla admite el catalogo, las migraciones y las cuatro rutas exactas, y rechaza un archivo vecino', () => {
+  it('R17: la regla admite el catalogo, las migraciones y las cinco rutas exactas, y rechaza un archivo vecino', () => {
     expect(isAllowedHolderOfTheCode('lib/modules/identity/domain/permissions.ts')).toBe(true)
     expect(isAllowedHolderOfTheCode('db/migrations/x_integrations_permission/migration.sql')).toBe(true)
     expect(isAllowedHolderOfTheCode('app/(private)/integraciones/proveedor-ia/page.tsx')).toBe(true)
     expect(isAllowedHolderOfTheCode('app/(private)/integraciones/inventarios/page.tsx')).toBe(true)
     expect(isAllowedHolderOfTheCode('app/(private)/integraciones/whatsapp/page.tsx')).toBe(true)
     expect(isAllowedHolderOfTheCode('lib/shared/navigation/private-nav.ts')).toBe(true)
+    expect(isAllowedHolderOfTheCode('lib/modules/integraciones/domain/actor.ts')).toBe(true)
+    expect(isAllowedHolderOfTheCode('lib/modules/integraciones/domain/errors.ts')).toBe(false)
     expect(
       isAllowedHolderOfTheCode('app/(private)/integraciones/components/integration-placeholder.tsx'),
     ).toBe(false)
