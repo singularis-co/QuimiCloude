@@ -254,7 +254,7 @@ Archivos:
 
 **Hecho cuando:** los tres tests están en verde y `guard-pantalla-pedidos-se-amplia` está en verde.
 
-## TC — Barrido de censos (depende de B1–B3 y F1–F4)
+## [x] TC — Barrido de censos (depende de B1–B3 y F1–F4)
 
 - Repasa la tabla de `design.md > 7` fila a fila y confirma cada «sin cambio (verificar)»:
   - `guard-arquitectura-modulos` (sin ciclo con la arista `inventario → clientes`);
@@ -367,6 +367,11 @@ Tests, fixtures y E2E:
   (añadidos 2026-10-13 en F4: sustituyen `@/lib/composition` por un doble sin `observabilidad`, y la
   sección de /pedidos pasa a importar la action de productos producidos; reciben el doble de esa
   action, como ya tienen el de `work-group-actions`)
+- `tests/unit/inventario/scope.test.ts` y `tests/unit/recetas-ui/recipe-route-contract.test.ts`
+  (añadidos 2026-10-13 en TC: censos cerrados que `vitest related` relaciona con el diff. El primero
+  excluye por nombre `order-produced-presentations.tsx`, que casa con el barrido por «presentation»
+  sin ser pantalla de catálogo, y en TI suma el E2E nuevo a su lista de specs; el segundo suma
+  `finishedProductDetailRoute` a la lista exacta de exportaciones de `routes.ts`)
 - `tests/guards/guard-pantallas-exigen-permiso.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `tests/integration/aislamiento.json`
