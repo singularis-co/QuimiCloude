@@ -22,11 +22,11 @@
 
 ## Bloque 1 — Datos
 
-- [ ] **T1. Catálogo de errores.** Medir el conteo de `ERROR_CODES` en `dev`; añadir
+- [x] **T1. Catálogo de errores.** Medir el conteo de `ERROR_CODES` en `dev`; añadir
   `ai_provider_missing` y `ai_provider_error` con sus textos (`design.md > 11`); `catalogo.test.ts`
   sube en 2. *Depende de:* —. `[P]`
   *Hecho:* `catalogo.test.ts` y `guard-catalogo-de-errores` verdes.
-- [ ] **T2. Esquema y migración.** Enums, `AiProvider` y `AiProviderConnection` en
+- [x] **T2. Esquema y migración.** Enums, `AiProvider` y `AiProviderConnection` en
   `db/schema.prisma` con `/// @module integraciones`; migración `20261013150000_ai_providers` con el
   orden de `design.md > 2.2`, las cuatro filas con los modelos **cerrados en F1.4** y su `down.sql`.
   `ai_providers` en `EXENTAS` de `guard-empresa-en-esquema` y en el bullet de
@@ -37,7 +37,7 @@
 
 ## Bloque 2 — Dominio de `integraciones`
 
-- [ ] **T3. Tipos, fallo y entrada.** `domain/ai-provider.ts`, `ai-provider-failure.ts` (mensajes de
+- [x] **T3. Tipos, fallo y entrada.** `domain/ai-provider.ts`, `ai-provider-failure.ts` (mensajes de
   `design.md > 4.4`), `ai-provider-input.ts` (zod), `hasConfigurePermission` en `actor.ts`; puertos
   `ai-provider-connection-repository.ts`, `ai-provider-catalog.ts`, `ai-provider-probe.ts`.
   *Depende de:* T1. *Hecho:* `ai-provider-failure.test.ts` y `connection-view.test.ts` verdes.
@@ -55,7 +55,7 @@
   `company-scope.ts`, `P2002` → error de carrera) y `catalog/ai-provider-catalog-prisma.ts`.
   *Depende de:* T2, T3. *Hecho:* `ai-provider-connection-prisma.int.test.ts` verde;
   `guard-ambito-empresa-integraciones` verde. *Cubre:* R2, R4, R5, R7, R19.
-- [ ] **T7. Doble de la prueba.** `adapters/driven/ai/ai-provider-probe-canned.ts`.
+- [x] **T7. Doble de la prueba.** `adapters/driven/ai/ai-provider-probe-canned.ts`.
   *Depende de:* T3. `[P]` *Hecho:* `ai-provider-probe-canned.test.ts` verde. *Cubre:* R40.
 
 ## Bloque 3 — `documentos`

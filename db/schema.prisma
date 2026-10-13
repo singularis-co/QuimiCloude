@@ -1102,3 +1102,53 @@ model WhatsappConnection {
   @@index([createdById], map: "whatsapp_connections_created_by_idx")
   @@map("whatsapp_connections")
 }
+
+enum AiProviderCode {
+  ANTHROPIC
+  GOOGLE
+  OPENAI
+  OPENROUTER
+
+  @@map("ai_provider_code")
+}
+
+enum AiProviderConnectionStatus {
+  ACTIVE
+  ERROR
+
+  @@map("ai_provider_connection_status")
+}
+
+/// Catalogo global sembrado por migracion: cambiar un modelo es otra migracion con su `down.sql`.
+/// @module integraciones
+model AiProvider {
+  code         AiProviderCode @id
+  name         String
+  recipeModel  String         @map("recipe_model")
+  catalogModel String         @map("catalog_model")
+  sortOrder    Int            @map("sort_order")
+
+  @@map("ai_providers")
+}
+
+/// Una por empresa. Sin `@relation`: las FK de `company_id`, `provider`, `created_by` y
+/// `updated_by` estan escritas a mano en la migracion.
+/// @module integraciones
+model AiProviderConnection {
+  id            String                     @id @db.Uuid
+  companyId     String                     @unique(map: "ai_provider_connections_company_id_key") @map("company_id") @db.Uuid
+  provider      AiProviderCode
+  apiKeyEnc     String                     @map("api_key_enc")
+  status        AiProviderConnectionStatus @default(ACTIVE)
+  lastError     String?                    @map("last_error")
+  lastErrorAt   DateTime?                  @map("last_error_at") @db.Timestamptz(6)
+  lastCheckedAt DateTime?                  @map("last_checked_at") @db.Timestamptz(6)
+  keyUpdatedAt  DateTime                   @map("key_updated_at") @db.Timestamptz(6)
+  createdById   String                     @map("created_by") @db.Uuid
+  updatedById   String                     @map("updated_by") @db.Uuid
+  createdAt     DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([provider], map: "ai_provider_connections_provider_idx")
+  @@map("ai_provider_connections")
+}

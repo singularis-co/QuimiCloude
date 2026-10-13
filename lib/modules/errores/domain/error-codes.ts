@@ -193,6 +193,8 @@ export const ERROR_CODES = [
   // estaba anulada en esa entrega.
   'delivery_already_voided',
   'company_not_found',
+  'ai_provider_missing',
+  'ai_provider_error',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

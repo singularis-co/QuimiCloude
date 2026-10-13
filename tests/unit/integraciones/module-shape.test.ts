@@ -128,6 +128,7 @@ export function isAllowedHolderOfTheCode(relativePath: string): boolean {
 
 /** Los archivos de codigo del modulo, uno a uno. Un archivo nuevo entra aqui con su ruta exacta. */
 const MODULE_CODE_FILES = [
+  'adapters/driven/ai/ai-provider-probe-canned.ts',
   'adapters/driven/config/e2e-doubles-env.ts',
   'adapters/driven/config/encryption-keys-env.ts',
   'adapters/driven/config/public-base-url-env.ts',
@@ -141,6 +142,9 @@ const MODULE_CODE_FILES = [
   'adapters/driven/security/secret-digest-sha256.ts',
   'adapters/driving/whatsapp-connection-actions.ts',
   'domain/actor.ts',
+  'domain/ai-provider-failure.ts',
+  'domain/ai-provider-input.ts',
+  'domain/ai-provider.ts',
   'domain/connection-secrets.ts',
   'domain/connection-status.ts',
   'domain/create-whatsapp-connection.ts',
@@ -157,6 +161,9 @@ const MODULE_CODE_FILES = [
   'domain/whatsapp-connection-input.ts',
   'domain/whatsapp-connection.ts',
   'index.ts',
+  'ports/ai-provider-catalog.ts',
+  'ports/ai-provider-connection-repository.ts',
+  'ports/ai-provider-probe.ts',
   'ports/random-source.ts',
   'ports/secret-cipher.ts',
   'ports/secret-digest.ts',
@@ -511,7 +518,7 @@ describe('la forma del modulo integraciones', () => {
     expect(branchRange(FEATURE_BRANCH, 'abc')).toEqual({ mergeBase: 'abc' })
   })
 
-  it('R13: db/schema.prisma tiene exactamente un modelo de integraciones, WhatsappConnection', () => {
+  it('R13: db/schema.prisma tiene exactamente tres modelos de integraciones: WhatsappConnection, AiProvider y AiProviderConnection', () => {
     const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8').replace(/\r\n/g, '\n')
     // El `/// @module` va encima del `model`, con solo lineas `///` entre medias.
     const modelos = [
@@ -519,8 +526,8 @@ describe('la forma del modulo integraciones', () => {
         /\/\/\/\s*@module\s+integraciones\b[^\n]*\n(?:[ \t]*\/\/\/[^\n]*\n)*[ \t]*model\s+(\w+)/g,
       ),
     ].map((match) => match[1])
-    expect(modelos).toEqual(['WhatsappConnection'])
-    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(1)
+    expect(modelos).toEqual(['WhatsappConnection', 'AiProvider', 'AiProviderConnection'])
+    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(3)
     expect(esquema).toMatch(/@module\s+identity\b/)
   })
 })

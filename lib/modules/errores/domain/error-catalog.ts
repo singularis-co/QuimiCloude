@@ -93,6 +93,8 @@ export const ERROR_MESSAGE_KEY = {
   delivery_not_found: 'errors.delivery_not_found',
   delivery_already_voided: 'errors.delivery_already_voided',
   company_not_found: 'errors.company_not_found',
+  ai_provider_missing: 'errors.ai_provider_missing',
+  ai_provider_error: 'errors.ai_provider_error',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -235,4 +237,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.delivery_already_voided':
     'Alguna presentacion elegida ya estaba anulada: revisa la lista y vuelve a intentarlo.',
   'errors.company_not_found': 'La empresa solicitada no existe.',
+  'errors.ai_provider_missing': 'Para leer PDF, conecta el proveedor IA de tu empresa.',
+  'errors.ai_provider_error':
+    'Error con tu proveedor IA. Revisa la conexión en Integraciones > Proveedor IA.',
 } as const satisfies Record<ErrorMessageKey, string>;
