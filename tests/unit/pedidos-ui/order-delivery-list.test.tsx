@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { OrderDeliveryList } from '@/app/(private)/pedidos/components/order-delivery-list';
+import { OrderDeliveryList } from '@/app/(private)/pedidos/components';
 import { ORDER_STATUS_VALUES, type OrderStatus } from '@/lib/modules/pedidos';
 import {
   FIRST_BATCH_ID,
