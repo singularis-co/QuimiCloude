@@ -153,3 +153,41 @@ Conviene un test pequeño con los lectores falsos.
 Bloquean M1 (comentarios con `R<n>` en producción) y M2 (la fila `StepReader` del catálogo no
 refleja su cambio visual ni su tablero). Los dos son cambios pequeños, sin conducta nueva. m1 y m2
 se arreglan aquí o quedan anotados como deuda, a criterio del leader.
+
+## Vuelta 2 (acotada a adc64e1c..fd7f142b)
+
+Reviewer, 2026-10-13. Solo reviso los arreglos de la vuelta 1 y lo que puedan haber roto.
+
+### Verificación
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm run typecheck` | 0 errores |
+| `pnpm run lint` | 0 errores; los 7 avisos ajenos de siempre |
+| `vitest related` de los 4 archivos de producción tocados + `catalogo-qc256` | 12 archivos, 250 tests en verde |
+| `pnpm exec vitest run guard` (incluye `guard-catalogo-de-componentes`) | 74 archivos, 1017 tests en verde y 20 saltados |
+
+### Hallazgos de la vuelta 1
+
+- [x] **M1 resuelto.** Los dos comentarios que citaban `R4` y `R30` ya no lo hacen, y el de `R40` se borró junto con su constante. Volví a correr el grep sobre todas las líneas añadidas en `app/` y `components/` respecto de `origin/dev`: ningún comentario cita `QC-<n>`, `R<n>`, `design.md` ni «decisión cerrada».
+- [x] **M2 resuelto.** La fila de `StepReader` (`components/shared/CATALOGO.md:86`) ya está completa:
+  - en `Alcance` describe el pie fijo a todo el ancho con el margen seguro, la reserva de alto, los botones `xl` en 1/3 y 2/3 y el motivo del bloqueo dentro del pie;
+  - dice que `lectura` no cambia;
+  - en `Diseño` cita `Ejecucion.dc.html` y `EjecucionMovil.dc.html`, que existen en `docs/diseno/canvas/`.
+  La guardia del catálogo sigue en verde.
+- [x] **m1 resuelto.** `progress/deudas.md` tiene la deuda D53: los esqueletos pintan una columna menos, no pasan a tarjeta en teléfono y provocan un salto de maquetación. Tiene origen, qué falta y dueño (sin asignar).
+- [x] **m2 resuelto.**
+  - El código ya no contiene `CONDITIONING_BATCH_DATA_SUCCESS_TESTID` ni `conditioning-batch-data-success`: se borraron la constante y su reexportación del barrel, y no queda ninguna referencia en `app/`, `components/`, `e2e/` ni `tests/`.
+  - En `e2e/datos-de-lote-en-acondicionamiento.spec.ts:334-336`, el camino de rechazo comprueba ahora que no hay ningún toast de sonner con el texto «Datos de lote guardados.». Es la conducta real de R40.
+  - El test unitario solo pierde las dos aserciones sobre el testid borrado. Sigue comprobando que no hay texto de éxito en línea y que el toast se lanza una vez, o ninguna si hay error.
+
+### Notas
+
+- **n6 — nota.** En el E2E, la comprobación `toHaveCount(0)` del toast se cumple en cuanto no hay ninguno, sin esperar. Aun así mide algo: corre después de que el `ErrorAlert` ya muestre el resultado de la acción, y el toast se lanzaría con ese mismo resultado. No bloquea.
+
+### Regresiones
+
+Ninguna. El diff solo borra código muerto, reescribe dos comentarios y actualiza el catálogo, la
+bitácora, la ficha y las deudas.
+
+### Veredicto vuelta 2: **OK**
