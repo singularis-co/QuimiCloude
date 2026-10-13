@@ -792,3 +792,35 @@ Verificación:
 - `eslint` de los archivos tocados y en conflicto: 0 problemas.
 - `vitest run tests/guards tests/unit/clientes/scope.test.ts tests/unit/errores` + las tres pruebas de migración:
   `Test Files 74 passed (74)` / `Tests 1125 passed | 14 skipped (1139)`.
+
+## E2E tras merge (implementer, 2026-10-13)
+
+Corrida local de `e2e/anular-entrega.spec.ts` sobre el head `c60151df` (incluye `45b7eeb3`, `createFixtureUser`).
+Base `qc224_anular_entrega` (`DATABASE_URL`/`DIRECT_URL` en el entorno del comando, sin comillas; nunca
+`QuimiCloude`). `prisma migrate status`: 86 migrations found… `Database schema is up to date!`
+Memoria baja: un navegador por corrida, `--workers=1`, puerto 3117 libre antes y despues de cada una.
+
+Primer intento en chromium: 2 failed en `loginAndLand` (`page.waitForURL` timeout 60s). Causa de entorno, no
+del test: el worktree no tiene `.env` y el servidor del E2E lanzaba
+`SESSION_SECRET ausente o mas corto de 32 caracteres: no se emite sesion.`. Repetido con un `SESSION_SECRET`
+aleatorio de un solo uso (48 bytes, base64) en el entorno del comando, junto a las dos URLs. Sin cambios en el spec.
+
+```
+pnpm exec playwright test e2e/anular-entrega.spec.ts --project=chromium --workers=1
+Running 2 tests using 1 worker
+  ✓  1 [chromium] › e2e\anular-entrega.spec.ts:593:7 › anular una entrega de un pedido › el motivo vacio no envia nada y la anulacion con motivo devuelve el lote, reabre el pedido y deja la presentacion pendiente (R36) (10.1s)
+  ✓  2 [chromium] › e2e\anular-entrega.spec.ts:753:7 › anular una entrega de un pedido › un usuario sin permiso de anular entregas abre «Entregas» y no ve «Anular» (R36) (4.1s)
+  2 passed (21.3s)
+
+pnpm exec playwright test e2e/anular-entrega.spec.ts --project=webkit --workers=1
+Running 2 tests using 1 worker
+  ✓  1 [webkit] › e2e\anular-entrega.spec.ts:593:7 › anular una entrega de un pedido › el motivo vacio no envia nada y la anulacion con motivo devuelve el lote, reabre el pedido y deja la presentacion pendiente (R36) (16.1s)
+  ✓  2 [webkit] › e2e\anular-entrega.spec.ts:753:7 › anular una entrega de un pedido › un usuario sin permiso de anular entregas abre «Entregas» y no ve «Anular» (R36) (5.9s)
+  2 passed (27.8s)
+```
+
+Filas con prefijo tras las dos corridas (psql contra `qc224_anular_entrega`, todas las columnas de texto de todas
+las tablas de `public`, `LIKE 'qc224_e2e_%'`): `TOTAL qc224_e2e_ filas: 0`.
+
+Los numeros de linea de los casos pasan de `:592`/`:752` (TI) a `:593`/`:753` por el import de `createFixtureUser`.
+La fila R36 del mapa de TZ (`e2e/anular-entrega.spec.ts:540`) no se toca aqui.
