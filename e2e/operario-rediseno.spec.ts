@@ -165,7 +165,8 @@ const TESTIDS = {
   countdownRing: 'countdown-ring',
   assignedEnterReason: 'assigned-order-enter-reason',
   executionLine: 'order-execution-line',
-  // Literal y no la constante de `order-execution-lines.tsx`: el archivo es de cliente.
+  // Literal como el resto de TESTIDS; el unit de `order-execution-lines` fija el valor de la
+  // constante, así que una deriva la detecta Vitest.
   executionLineName: 'order-execution-line-name',
   executionLinePercentage: 'order-execution-line-percentage',
   executionLineQuantity: 'order-execution-line-quantity',
@@ -1168,6 +1169,10 @@ type LineRects = {
   readonly nameText: Rect;
   readonly percentage: Rect | null;
   readonly quantity: Rect | null;
+  /** El grupo de cifras (porcentaje y cantidad), hermano del nombre en la fila. */
+  readonly figures: Rect | null;
+  /** Ancho de contenido de la fila (sin padding horizontal): la fila es el contenedor flex. */
+  readonly rowInnerWidth: number;
 };
 
 test.describe('QC-269 R4, R6, R9, R10 — ejecución con muchos materiales', () => {
@@ -1176,6 +1181,7 @@ test.describe('QC-269 R4, R6, R9, R10 — ejecución con muchos materiales', () 
     await page.setViewportSize(DESKTOP);
     await loginAndLand(page, operatorUser);
 
+    let wrappedRows = 0;
     for (const width of OPERATOR_WIDTHS) {
       await page.setViewportSize(width.size);
       const screen = await openScreen(page, assignedOrderRoute(execMany.id), TESTIDS.executionScreen);
@@ -1222,6 +1228,11 @@ test.describe('QC-269 R4, R6, R9, R10 — ejecución con muchos materiales', () 
               nameText: { x: text.x, y: text.y, width: text.width, height: text.height },
               percentage: rect(el.querySelector(`[data-testid="${ids.percentage}-${index}"]`)),
               quantity: rect(el.querySelector(`[data-testid="${ids.quantity}-${index}"]`)),
+              figures: rect(name.nextElementSibling),
+              rowInnerWidth:
+                row.clientWidth -
+                parseFloat(window.getComputedStyle(row).paddingLeft) -
+                parseFloat(window.getComputedStyle(row).paddingRight),
             });
           }
           return result;
@@ -1249,6 +1260,16 @@ test.describe('QC-269 R4, R6, R9, R10 — ejecución con muchos materiales', () 
           line.nameBox.width,
           `R10 ${label}: el nombre mide al menos 12 rem o la fila entera`,
         ).toBeGreaterThanOrEqual(Math.min(192, line.row.width) - EDGE_TOLERANCE_PX);
+        expect(line.figures, `${label}: tiene grupo de cifras`).not.toBeNull();
+        const figuresWrapped =
+          line.figures!.y >= line.nameBox.y + line.nameBox.height - EDGE_TOLERANCE_PX;
+        if (figuresWrapped) {
+          wrappedRows += 1;
+          expect(
+            Math.abs(line.nameBox.width - line.rowInnerWidth),
+            `R10 ${label}: con las cifras debajo, el nombre ocupa toda la fila`,
+          ).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+        }
       }
 
       // R4, R6: el último material y el borde inferior del panel quedan por encima del pie.
@@ -1257,6 +1278,8 @@ test.describe('QC-269 R4, R6, R9, R10 — ejecución con muchos materiales', () 
         { testId: TESTIDS.executionMaterials, what: 'R4 el borde inferior del panel' },
       ]);
     }
+    // Sin esto, la comprobación de las cifras debajo podría no ejercitarse nunca.
+    expect(wrappedRows, 'R10: en algún ancho las cifras bajan bajo el nombre').toBeGreaterThan(0);
   });
 });
 

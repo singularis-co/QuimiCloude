@@ -51,8 +51,10 @@ Tests:
    comprueba `scrollHeight === clientHeight` y que `overflow-y` no sea `auto` ni `scroll`.
 3. **Medida tras desplazar:** durante la hidratación la página vuelve arriba entre desplazar y medir;
    el E2E desplaza y mide en una sola llamada `evaluate`, con reintento `toPass` de 30 s.
-4. **Testid en el E2E:** el spec usa el literal `'order-execution-line-name'` (no importa la
-   constante), para poder hacer la prueba de mordida con el código viejo.
+4. **Testid en el E2E:** el spec usa el literal `'order-execution-line-name'`, como el resto de
+   `TESTIDS`; el unit `order-execution-lines.test.tsx` fija
+   `ORDER_EXECUTION_LINE_NAME_TESTID === 'order-execution-line-name'`, así que una deriva la detecta
+   Vitest. (Vuelta 2, H5: único motivo, el mismo que el comentario del E2E.)
 
 ## Trazabilidad R → test (verificada caso a caso)
 
@@ -143,6 +145,27 @@ Restaurado con `git checkout HEAD -- <archivos>`; `git status` limpio salvo el s
   `pnpm exec prisma generate`; además `next typegen` para `.next/types`. Nada versionado cambia.
 - Docker Desktop estaba apagado; se arrancó y subió `quimicloude-pg17`. Arrancaron también, solos,
   contenedores supabase de otros proyectos (crediflow, ordenex-app).
+
+## Vuelta 2 (review_QC-269.md)
+
+- **H1:** `order-execution-lines.tsx`, el comentario de la base de 12 rem ya no cita ficha ni
+  requisitos; conserva el porqué. Ningún otro comentario nuevo de producción del diff cita fichas o
+  requisitos (las menciones restantes están en `e2e/`, código de test).
+- **H3:** el JSDoc de `STEP_READER_SIDE_COLUMN_RESERVE` nombra `order-execution-screen.test.tsx`.
+- **H4:** el E2E de R10 mide además el grupo de cifras y el ancho interior de la fila (`li`,
+  `clientWidth` menos padding). Si las cifras bajan bajo el nombre, exige
+  `|ancho del nombre − ancho interior| ≤ 1 px`; y tras los anchos exige que el caso se haya dado al
+  menos una vez (`wrappedRows > 0`), para que la aserción no quede vacía. Se da y pasa.
+- **H5:** comentario del E2E y desviación 4 con un solo motivo (arriba).
+
+Archivos: `app/(private)/asignacion/[id]/components/order-execution-lines.tsx`,
+`app/(private)/asignacion/components/operator-screen-frame.tsx`, `e2e/operario-rediseno.spec.ts`.
+
+Salida real:
+
+- `./init.sh` (rápido): `Test Files 47 passed (47) | Tests 725 passed (725)`;
+  `Test Files 112 passed (112) | Tests 1563 passed | 37 skipped (1600)`; `== init OK ==`.
+- E2E `e2e/operario-rediseno.spec.ts`, Chromium: `20 passed (57.6s)`; WebKit: `20 passed (46.0s)`.
 
 ## Pendiente del leader
 

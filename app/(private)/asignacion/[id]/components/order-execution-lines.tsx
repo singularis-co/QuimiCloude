@@ -66,7 +66,7 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
   return (
     <li data-testid={rowTestId} className="flex flex-wrap items-center gap-3 py-2">
       {/* Base de 12 rem: el nombre manda y, si no cabe con las cifras, las cifras bajan enteras
-          a la linea siguiente (QC-269 R9, R10). */}
+          a la linea siguiente. */}
       <span
         data-testid={`${ORDER_EXECUTION_LINE_NAME_TESTID}-${index}`}
         className="min-w-0 flex-[1_1_12rem] break-words text-base"
