@@ -156,8 +156,8 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
       groups: assignmentDirectoryPrisma,
       ...execution,
       now: () => NOW,
-    recipes: recipesWithoutEvidence,
-    evidence: evidenceRepositoryUnused,
+      recipes: recipesWithoutEvidence,
+      evidence: evidenceRepositoryUnused,
     }),
     // R27: Comenzar y Terminar, mismos `orders` y mismo reloj que el resto del fixture.
     startPacking: createStartPacking({ orders, ...execution, now: () => NOW }),

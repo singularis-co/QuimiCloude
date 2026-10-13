@@ -69,6 +69,7 @@ const EXECUTION: StartedOrderExecution = {
   presentationLines: [],
   unitId: null,
   unitLabel: null,
+  evidence: [],
   resumeStepPosition: 1,
 };
 

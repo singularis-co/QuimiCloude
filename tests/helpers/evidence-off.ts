@@ -1,6 +1,7 @@
 // Para los tests que no ejercitan las fotos de evidencia: ningun paso las pide, asi que avanzar,
 // finalizar y terminar el empaque siguen haciendo lo de siempre y ninguna foto se lee. Si un caso
 // llegara a tocar el repositorio de fotos, falla en vez de pasar en vacio.
+import type { EvidenceStorage } from '@/lib/modules/asignaciones/ports/evidence-storage';
 import type { StepEvidenceRepository } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
 import type { RecipeCatalog, RecipePackingStepsReader } from '@/lib/modules/recetas';
 
@@ -15,6 +16,13 @@ export const evidenceRepositoryUnused: StepEvidenceRepository = {
   replace: noUsado('replace'),
   delete: noUsado('delete'),
   listOrderIdsWithEvidence: noUsado('listOrderIdsWithEvidence'),
+};
+
+export const evidenceStorageUnused: EvidenceStorage = {
+  createSignedUpload: noUsado('createSignedUpload'),
+  createSignedReadUrl: noUsado('createSignedReadUrl'),
+  download: noUsado('download'),
+  remove: noUsado('remove'),
 };
 
 /** Lector de pasos de fabricacion sin contenido: ningun paso pide evidencia. */

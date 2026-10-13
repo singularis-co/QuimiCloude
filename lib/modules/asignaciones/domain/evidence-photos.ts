@@ -96,3 +96,20 @@ export async function assertEvidenceComplete(
   const missing = missingEvidencePositions(steps, rows);
   if (missing.length > 0) throw new EvidenceRequiredError(`pasos sin evidencia: ${missing.join(', ')}`);
 }
+
+/**
+ * Las fotos de un pedido en curso, agrupadas por paso y firmadas. Si ningun paso de la lista
+ * actual pide evidencia, la pantalla no pinta ningun bloque: no se consulta ni se firma nada.
+ */
+export async function readStepEvidence(
+  evidence: StepEvidenceRepository,
+  storage: EvidenceStorage,
+  companyId: string,
+  orderId: string,
+  phase: EvidencePhase,
+  steps: readonly EvidenceStep[],
+): Promise<readonly StepEvidenceView[]> {
+  if (!steps.some((step) => step.requiresEvidence === true)) return [];
+  const rows = await evidence.listByOrder(companyId, orderId, phase);
+  return toStepEvidenceViews(storage, rows);
+}

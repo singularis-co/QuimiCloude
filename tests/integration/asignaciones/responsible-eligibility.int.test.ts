@@ -64,7 +64,7 @@ import {
 } from './use-case-fixture';
 import { realOrderSummaries } from '../../helpers/order-summaries';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
-import { evidenceRepositoryUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
+import { evidenceRepositoryUnused, evidenceStorageUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
 
 const summaryReaders = realOrderSummaries();
 
@@ -145,6 +145,8 @@ function wireExecutionUseCases(fixture: Fixture) {
     units: unitsQueNoSeLlaman,
     products: productsQueNoSeLlaman,
     presentations: presentationsQueNoSeLlaman,
+    evidence: evidenceRepositoryUnused,
+    storage: evidenceStorageUnused,
   };
 
   return {
@@ -157,8 +159,8 @@ function wireExecutionUseCases(fixture: Fixture) {
       groups: assignmentDirectoryPrisma,
       ...execution,
       now: () => NOW,
-    recipes: recipesWithoutEvidence,
-    evidence: evidenceRepositoryUnused,
+      recipes: recipesWithoutEvidence,
+      evidence: evidenceRepositoryUnused,
     }),
   };
 }

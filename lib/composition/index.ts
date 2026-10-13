@@ -449,6 +449,10 @@ import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/ex
 import type { ExecutionTransaction } from '@/lib/modules/asignaciones/ports/execution-transaction';
 import { createStepEvidenceRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/step-evidence-prisma';
 import type { StepEvidenceRepository } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
+import { evidenceE2EDoublesEnabled } from '@/lib/modules/asignaciones/adapters/driven/config/evidence-e2e-doubles-env';
+import { evidenceStorageMemory } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-memory';
+import { evidenceStorageSupabase } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-supabase';
+import type { EvidenceStorage } from '@/lib/modules/asignaciones/ports/evidence-storage';
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
@@ -1658,6 +1662,22 @@ const executionLogRepository: ExecutionLogRepository = createExecutionLogReposit
 const stepEvidenceRepository: StepEvidenceRepository = createStepEvidenceRepository();
 
 /**
+ * El bucket de las fotos: el real salvo con `EVIDENCE_E2E_DOUBLES` puesta, que solo pone
+ * `playwright.config.ts`. Se consulta en cada llamada: importar este archivo no lee el entorno.
+ */
+function selectedEvidenceStorage(): EvidenceStorage {
+  return evidenceE2EDoublesEnabled() ? evidenceStorageMemory : evidenceStorageSupabase;
+}
+
+const evidenceStorage: EvidenceStorage = {
+  createSignedUpload: (path) => selectedEvidenceStorage().createSignedUpload(path),
+  createSignedReadUrl: (path, expiresInSeconds) =>
+    selectedEvidenceStorage().createSignedReadUrl(path, expiresInSeconds),
+  download: (path) => selectedEvidenceStorage().download(path),
+  remove: (path) => selectedEvidenceStorage().remove(path),
+};
+
+/**
  * La transaccion de ejecucion la abre `asignaciones`, y `pedidos` se une a ella sin abrir otra:
  * la escritura del pedido, lo que `pedidos` escriba en `inventario` y la anotacion se confirman
  * juntas o no se confirma ninguna. Comenzar empaque no va por la unidad de trabajo, asi que su
@@ -1764,6 +1784,8 @@ export const asignaciones = {
     units: unitCatalog,
     products: productCatalog,
     presentations: presentationCatalog,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
   startAssignedOrder: createStartAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1775,6 +1797,8 @@ export const asignaciones = {
     log: executionLogRepository,
     transaction: executionTransaction,
     now: () => new Date(),
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
   finishAssignedOrder: createFinishAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1837,6 +1861,8 @@ export const asignaciones = {
     products: productCatalog,
     packingSteps: { findPackingStepsById: findRecipePackingStepsById },
     now: () => new Date(),
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
   startPacking: createStartPackingOrder({
     orders: orderCatalog,
