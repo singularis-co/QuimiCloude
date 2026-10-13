@@ -1035,7 +1035,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
     });
   });
 
-  // QC-224 2026-10-09: el permiso de anulacion de entregas, solo del Administrador.
+  // 2026-10-09: el permiso de anulacion de entregas, solo del Administrador.
   it('QC-224 R1: sobre la base ya sembrada salvo entregas.anular, el seed crea ese permiso y solo la asignacion del Administrador; ningun otro rol lo tiene y la segunda corrida no cambia nada', async () => {
     await inRolledBackTransaction(async (tx) => {
       const ANULAR = 'entregas.anular';

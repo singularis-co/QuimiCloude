@@ -49,7 +49,7 @@ const CODIGOS_DEL_REQUISITO = [
   'integraciones.modificar',
   // QC-223 2026-10-08: entra `entregas.modificar`, al final.
   'entregas.modificar',
-  // QC-224 2026-10-09: entra `entregas.anular`, al final.
+  // 2026-10-09: entra `entregas.anular`, al final.
   'entregas.anular',
 ] as const
 
@@ -62,8 +62,8 @@ const INTEGRACIONES = 'integraciones.modificar'
 // QC-223 2026-10-08: `entregas.modificar` entra al final del catalogo y del Administrador. Los
 // casos de fichas previas que fijan «el catalogo previo» lo comparan sin el.
 const ENTREGAS = 'entregas.modificar'
-// QC-224 2026-10-09: `entregas.anular` entra detras de `entregas.modificar`. `sinEntregas` sigue
-// devolviendo el catalogo previo a `entregas`, ahora sin ninguno de los dos; los casos de QC-223
+// 2026-10-09: `entregas.anular` entra detras de `entregas.modificar`. `sinEntregas` sigue
+// devolviendo el catalogo previo a `entregas`, ahora sin ninguno de los dos; los casos previos
 // comparan sin `entregas.anular` con `sinAnular`.
 const ANULAR = 'entregas.anular'
 const sinAnular = (codigo: string): boolean => codigo !== ANULAR
@@ -236,7 +236,7 @@ const MODULOS_SOLO_ESCRITURA = ['empaque', 'acondicionamiento', 'integraciones',
 const codigos = PERMISSIONS.map((permiso) => permiso.code)
 
 /** Toda accion es `consultar` o `modificar`, salvo `ejecutar`, que solo se admite en `asignaciones`. */
-// QC-224 2026-10-09: y `anular`, que solo se admite en `entregas`.
+// 2026-10-09: y `anular`, que solo se admite en `entregas`.
 const esAnularEntregas = (permiso: { module: string; action: string }): boolean =>
   permiso.action === 'anular' && permiso.module === 'entregas'
 function accionAdmitida(permiso: { module: string; action: string }): boolean {
@@ -349,7 +349,7 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
 
   it('R34: `empaque` declara UNICAMENTE modificar, sin consultar', () => {
     for (const modulo of MODULOS_SOLO_ESCRITURA) {
-      // QC-224 2026-10-09: `entregas.anular` no es consulta; se compara sin ella.
+      // 2026-10-09: `entregas.anular` no es consulta; se compara sin ella.
       const acciones = PERMISSIONS.filter((p) => p.module === modulo && !esAnularEntregas(p)).map(
         (p) => p.action,
       )
@@ -892,7 +892,7 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
     expect(PERMISSIONS.filter((p) => p.action === 'ejecutar').map((p) => p.module)).toEqual([
       'asignaciones',
     ])
-    // QC-224 2026-10-09: `entregas.anular` es la otra excepcion; tiene su propio caso.
+    // 2026-10-09: `entregas.anular` es la otra excepcion; tiene su propio caso.
     for (const permiso of PERMISSIONS.filter((p) => p.module !== 'asignaciones' && !esAnularEntregas(p))) {
       expect(['consultar', 'modificar'], permiso.code).toContain(permiso.action)
     }
@@ -1329,7 +1329,7 @@ describe('QC-223 — el permiso entregas.modificar', () => {
   }
 
   it('R1: el catalogo contiene entregas.modificar con su modulo, accion y descripcion exactos, al final y una sola vez', () => {
-    // QC-224 2026-10-09: se compara sin `entregas.anular`, que entra detras.
+    // 2026-10-09: se compara sin `entregas.anular`, que entra detras.
     expect(PERMISSIONS.filter((permiso) => sinAnular(permiso.code)).at(-1)).toEqual(ENTRADA_DE_ENTREGAS)
     expect(codigos.filter((codigo) => codigo.startsWith('entregas.') && sinAnular(codigo))).toEqual([ENTREGAS])
   })

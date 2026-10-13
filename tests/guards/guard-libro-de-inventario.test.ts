@@ -24,7 +24,7 @@ const CAMINOS_ESPERADOS = [
   'addImportedFinishedGoodsBatch',
   // QC-223 2026-10-08: la salida de producto terminado hacia un cliente, septimo camino.
   'dispatchFinishedGoods',
-  // QC-224 2026-10-09: la vuelta al lote de una entrega anulada, octavo camino.
+  // 2026-10-09: la vuelta al lote de una entrega anulada, octavo camino.
   'returnFinishedGoods',
 ] as const;
 // Nota (2026-10-09, QC-219 R27): excepcion nombrada a «todo camino asienta con writeMovement».
@@ -259,7 +259,7 @@ describe('guardia: censo de caminos de escritura de product_batches bajo lib/ (R
 
   // QC-223 2026-10-08: + dispatchFinishedGoods en el titulo, igual que en CAMINOS_ESPERADOS.
   // QC-219 2026-10-09: + writeFinishedBatchLabels, de CAMINOS_SIN_ASIENTO.
-  // QC-224 2026-10-09: + returnFinishedGoods en el titulo, igual que en CAMINOS_ESPERADOS.
+  // 2026-10-09: + returnFinishedGoods en el titulo, igual que en CAMINOS_ESPERADOS.
   it('el censo de caminos de escritura es exactamente { createWithFirstBatch, addBatchToAlive, adjustBatchStock, consumeBatchStock, receiveFinishedGoods, addImportedFinishedGoodsBatch, dispatchFinishedGoods, returnFinishedGoods, writeFinishedBatchLabels }', () => {
     const real = censoReal();
     expect(

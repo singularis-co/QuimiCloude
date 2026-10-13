@@ -79,7 +79,7 @@ export const CODIGOS_QC74 = [
   'integraciones.modificar',
   // QC-223 2026-10-08
   'entregas.modificar',
-  // QC-224 2026-10-09
+  // 2026-10-09
   'entregas.anular',
 ] as const;
 
@@ -175,7 +175,7 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
   });
 
   it('las acciones del catalogo son solo consultar y modificar, mas ejecutar unicamente en asignaciones (QC-201 R2)', () => {
-    // QC-224 2026-10-09: entra `anular`, unicamente en `entregas`.
+    // 2026-10-09: entra `anular`, unicamente en `entregas`.
     const acciones = [...new Set(catalogo.map((permiso) => permiso.action))].sort();
     expect(acciones).toEqual(['anular', 'consultar', 'ejecutar', 'modificar']);
     expect(

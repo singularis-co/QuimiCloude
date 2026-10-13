@@ -520,7 +520,7 @@ describe('la accion «Entregar»', () => {
       'order-action-delete',
       RESPONSABLES_TESTID,
       ORDER_ACTION_CUSTOMER_TESTID,
-      // QC-224 2026-10-09: «Entregas» se ofrece en TERMINADO y va justo delante de «Entregar».
+      // 2026-10-09: «Entregas» se ofrece en TERMINADO y va justo delante de «Entregar».
       'order-action-deliveries',
       ORDER_ACTION_DELIVER_TESTID,
     ]);

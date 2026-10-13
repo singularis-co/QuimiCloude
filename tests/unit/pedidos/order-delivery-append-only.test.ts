@@ -5,7 +5,7 @@
 // tablas, y ningun caso de uso ni Server Action cuyo nombre ofrezca editar, anular o borrar una
 // entrega. Las migraciones (`db/`) quedan fuera: su `down.sql` borra las tablas a proposito.
 //
-// QC-224 2026-10-13 (TC) — La anulacion de una entrega es un registro nuevo que solo inserta. El
+// 2026-10-13 (TC) — La anulacion de una entrega es un registro nuevo que solo inserta. El
 // barrido admite exactamente dos nombres `void…Deliver`: el caso de uso `createVoidDelivery` y la
 // Server Action `voidDeliveryAction`; cualquier otro nombre que ofrezca anular una entrega sigue en
 // rojo. Ademas, ningun camino modifica ni borra una anulacion ni sus lineas: `PRISMA_MUTANTE` y

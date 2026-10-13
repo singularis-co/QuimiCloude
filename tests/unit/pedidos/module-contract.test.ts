@@ -481,7 +481,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `@prisma/client` -`Prisma.Decimal` y el `P2002` de la clave de entrega- y el cliente
     // compartido como defecto de su fabrica. Las dos listas siguen CERRADAS.
     const ENTREGAS = 'lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma.ts'
-    // QC-224 2026-10-09: `order-delivery-void-prisma.ts` (anulacion de entregas) importa
+    // 2026-10-09: `order-delivery-void-prisma.ts` (anulacion de entregas) importa
     // `@prisma/client` -el `P2002` de la clave y de la linea ya anulada- y el cliente compartido
     // como defecto de sus dos fabricas. Las dos listas siguen CERRADAS.
     const ANULACIONES = 'lib/modules/pedidos/adapters/driven/persistence/order-delivery-void-prisma.ts'

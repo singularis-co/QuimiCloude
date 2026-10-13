@@ -301,7 +301,7 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         ],
       }),
   },
-  // QC-224 2026-10-09: la lista de entregas y la anulacion resuelven el actor con `currentActor()`.
+  // 2026-10-09: la lista de entregas y la anulacion resuelven el actor con `currentActor()`.
   {
     archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
     nombre: 'listOrderDeliveriesAction',

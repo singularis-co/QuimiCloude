@@ -62,7 +62,7 @@ describe('db/migrations/*_finished_product_enum_values', () => {
       'consumption',
       'production',
     ])
-    // QC-224 2026-10-09: `delivery_void` se anade al final, detras de `delivery`, sin reordenar.
+    // 2026-10-09: `delivery_void` se anade al final, detras de `delivery`, sin reordenar.
     expect(parseEnum('InventoryMovementKind')).toEqual([
       'opening',
       'adjustment',

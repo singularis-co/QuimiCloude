@@ -393,7 +393,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
     }
   });
 
-  // QC-224 2026-10-09: la anulacion de la entrega devuelve el producto y el libro sigue cuadrado.
+  // 2026-10-09: la anulacion de la entrega devuelve el producto y el libro sigue cuadrado.
   it('QC-224 R23, R24: cuadra con un lote del que sale una entrega y vuelve con su anulacion', async () => {
     const fixture = await createFixture();
     const marker = token();

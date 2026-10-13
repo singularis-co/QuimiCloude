@@ -625,7 +625,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .sort()
     // QC-223 2026-10-08: + `OrderDelivery` y `OrderDeliveryLine`, la entrega y sus lotes.
     expect(pedidosModels).toEqual(expect.arrayContaining(['Order', 'OrderDelivery', 'OrderDeliveryLine', 'OrderPresentationLine']))
-    // QC-224 2026-10-09: + `OrderDeliveryVoid` y `OrderDeliveryVoidLine`, la anulacion y sus lineas.
+    // 2026-10-09: + `OrderDeliveryVoid` y `OrderDeliveryVoidLine`, la anulacion y sus lineas.
     expect(pedidosModels).toEqual([
       'Order',
       'OrderDelivery',
@@ -743,7 +743,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .sort()
     // QC-223 2026-10-08: + `OrderDelivery` y `OrderDeliveryLine`, la entrega y sus lotes.
     expect(pedidosModels).toEqual(expect.arrayContaining(['Order', 'OrderDelivery', 'OrderDeliveryLine', 'OrderPresentationLine']))
-    // QC-224 2026-10-09: + `OrderDeliveryVoid` y `OrderDeliveryVoidLine`, la anulacion y sus lineas.
+    // 2026-10-09: + `OrderDeliveryVoid` y `OrderDeliveryVoidLine`, la anulacion y sus lineas.
     expect(pedidosModels).toEqual([
       'Order',
       'OrderDelivery',

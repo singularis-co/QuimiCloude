@@ -279,7 +279,7 @@ const CAMINOS_ESPERADOS = [
   'writeFinishedBatchLabels',
   // QC-223 2026-10-08: la salida de producto terminado recalcula en su cuerpo; no es excepcion.
   'dispatchFinishedGoods',
-  // QC-224 2026-10-09: la vuelta al lote de una entrega anulada recalcula en su cuerpo; no es excepcion.
+  // 2026-10-09: la vuelta al lote de una entrega anulada recalcula en su cuerpo; no es excepcion.
   'returnFinishedGoods',
 ];
 const CENSO_ESPERADO = CAMINOS_ESPERADOS.map((nombre) => `${PRODUCT_PRISMA}::${nombre}`).sort();
@@ -298,7 +298,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
   /** Los nueve caminos fabricados; `sinRecalculoEn` deja ese uno sin la llamada.
    *  `consumeBatchStock` nace SIN recalculo -es la excepcion-, salvo que se pida a el
    *  explicitamente. QC-223 2026-10-08: + `dispatchFinishedGoods`. QC-219 2026-10-09: +
-   *  `writeFinishedBatchLabels` (excepcion: no cambia existencias). QC-224 2026-10-09: +
+   *  `writeFinishedBatchLabels` (excepcion: no cambia existencias). 2026-10-09: +
    *  `returnFinishedGoods`. Son nueve. */
   const fuenteCuatroCaminos = (sinRecalculoEn: string | null): string =>
     [
@@ -313,7 +313,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
       construirCamino('returnFinishedGoods', 'update', sinRecalculoEn !== 'returnFinishedGoods'),
     ].join('\n\n');
 
-  // QC-219 + QC-224 2026-10-09: siete -> nueve.
+  // 2026-10-09: siete -> nueve.
   it('verde: los nueve caminos fabricados, cada uno con su recalculo (o su excepcion)', () => {
     const fuente = fuenteCuatroCaminos(null);
     expect(funcionesQueEscribenLotes(fuente)).toEqual(CAMINOS_ESPERADOS.slice().sort());
@@ -338,7 +338,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
   });
 
   // QC-223 2026-10-08: con siete caminos reales, el fabricado de mas es el octavo.
-  // QC-219 + QC-224 2026-10-09: con nueve caminos reales, el fabricado de mas es el decimo.
+  // 2026-10-09: con nueve caminos reales, el fabricado de mas es el decimo.
   it('rojo: un decimo camino fabricado sin recalculo tambien queda marcado', () => {
     const fuente = `${fuenteCuatroCaminos(null)}\n\n${construirCamino('rogueWrite', 'create', false)}`;
     expect(funcionesSinRecalculo(fuente)).toEqual(['rogueWrite']);
@@ -351,7 +351,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
   });
 
   // QC-223 2026-10-08: seis -> siete. QC-219 2026-10-09: siete -> ocho.
-  // QC-224 2026-10-09: ocho -> nueve.
+  // 2026-10-09: ocho -> nueve.
   it('el censo real bajo lib/ es exactamente esos nueve caminos, ni uno mas', () => {
     const archivos = archivosBajoCarpeta('lib');
     expect(archivos.length).toBeGreaterThan(50);

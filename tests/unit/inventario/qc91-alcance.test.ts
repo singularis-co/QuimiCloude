@@ -274,7 +274,7 @@ function llamaAMetodoFueraDe(
 }
 
 /** El `update` (singular) del ajuste: sigue viviendo SOLO en `adjustBatchStock`. */
-// QC-224 2026-10-09: admite tambien una lista de nombres, para el `update` de `returnFinishedGoods`;
+// 2026-10-09: admite tambien una lista de nombres, para el `update` de `returnFinishedGoods`;
 // con un solo nombre se comporta exactamente igual.
 export function llamaAUpdateFueraDe(
   fuente: string,
@@ -283,7 +283,7 @@ export function llamaAUpdateFueraDe(
   return llamaAMetodoFueraDe(fuente, 'update', nombreFuncionPermitida);
 }
 
-/** QC-224 2026-10-09 (D12, R31): las dos funciones donde el `update` simple es legitimo. */
+/** 2026-10-09: las dos funciones donde el `update` simple es legitimo. */
 const UPDATE_PERMITIDO = ['adjustBatchStock', 'returnFinishedGoods'] as const;
 
 /** El `updateMany` del decremento condicional: vive SOLO en `consumeBatchStock` y, desde
@@ -487,7 +487,7 @@ describe('QC-91 R11 — ProductRef expone stockByUnit; ProductView expone la exi
 // tener un `update` -esta guardia no fija ese estado-, solo que si hay uno en el archivo, no
 // puede estar en ningun otro sitio.
 //
-// Nota (2026-10-09, QC-224 D12/R31): se admite exactamente UN `update` mas sobre `productBatch`,
+// Nota (2026-10-09): se admite exactamente UN `update` mas sobre `productBatch`,
 // dentro del cuerpo de `returnFinishedGoods` (la devolucion de producto terminado al anular una
 // entrega: incremento no condicional del lote). Fuera de `adjustBatchStock` y `returnFinishedGoods`
 // sigue prohibido; `delete`, `deleteMany`, `upsert`, el SQL crudo y el censo de `updateMany` no
@@ -509,9 +509,9 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
     expect(llamaAUpdateFueraDe(leer(PRODUCT_CATALOG_PRISMA), 'adjustBatchStock')).toBe(false);
   });
 
-  // QC-219 2026-10-09: + writeFinishedBatchLabels (UPDATES_PERMITIDOS).
-  // QC-224 2026-10-09: el update se admite tambien en returnFinishedGoods, exactamente uno. Solo
-  // adjustBatchStock ya NO basta: el real tiene los tres (QC-219 + QC-224).
+  // 2026-10-09: + writeFinishedBatchLabels (UPDATES_PERMITIDOS).
+  // 2026-10-09: el update se admite tambien en returnFinishedGoods, exactamente uno. Solo
+  // adjustBatchStock ya NO basta: el real tiene los tres.
   it('R21: el alta y el agregado de lote siguen creando; los unicos update viven en adjustBatchStock, writeFinishedBatchLabels y returnFinishedGoods', () => {
     const fuente = leer(PRODUCT_PRISMA);
     expect(fuente).toMatch(/tx\.productBatch\.create\s*\(/);
@@ -603,7 +603,7 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
       ).not.toEqual([]);
     });
 
-    // QC-224 2026-10-09: con dos funciones permitidas, un update en una tercera sigue en rojo.
+    // 2026-10-09: con dos funciones permitidas, un update en una tercera sigue en rojo.
     it('R27: update en adjustBatchStock y returnFinishedGoods no es hallazgo; uno en una tercera funcion si', () => {
       const permitidas = [
         'export async function adjustBatchStock(batchId) {',
