@@ -79,3 +79,36 @@ No hay `.int` afectados: el diff no toca `lib/` ni `db/`.
 ### Veredicto
 
 **CAMBIOS.** M1 y M2 bloquean. Lo demás está en verde: R1–R22 y R24 tienen tests reales, los cuatro desvíos están bien hechos, typecheck, lint y guardias pasan, y los E2E también.
+
+## Vuelta 2 (acotada a 89b94092..c662c92b)
+
+Revisados solo los arreglos de la vuelta 1: fccee471 (M1, M2, m1, m2) y c662c92b (la ficha).
+
+### Verificación ejecutada
+
+| Comando | Resultado |
+|---|---|
+| `pnpm run typecheck` | exit 0 |
+| `pnpm run lint` | 0 errores, los 7 avisos previos en archivos ajenos |
+| `vitest run guard tests/ui/dashboard tests/unit/navegacion tests/unit/paridad/recorridos-paridad.test.tsx tests/unit/dashboard-route-contract.test.ts` | 90 archivos, 1238 pasados, 22 omitidos |
+| Búsqueda de `QC-<n>`, `R<n>`, `design.md` o «decisión cerrada» en las líneas añadidas en `app/` y `components/` | ninguna |
+
+### Hallazgos de la vuelta 1
+
+- [x] **M1 resuelto.** `components/shared/data-table/data-table-filters.tsx:37`: el comentario ya no cita ningún requisito; ahora da el motivo (iOS hace zoom con menos de 16 px).
+- [x] **M2 resuelto.**
+  - `app/(private)/dashboard/recorrido/[id]/components/index.ts` reexporta `ExecutionTimeline` y `ExecutionTimelineProps`.
+  - `tests/guards/guard-qc261-limites-de-la-ficha.test.ts` tiene ahora un `describe` de R23 que lee el barrel real, comprueba que existen la pieza y el `index.ts`, y analiza el AST.
+  - El caso sintético da rojo con un barrel sin la reexportación, con la línea comentada, con un `import` sin reexportar, con un `export type` y con otro módulo de origen. Si se quita la línea real, el barrel cae en el primer de esos casos, así que el caso real se pondría rojo.
+  - `design.md > 3.3` queda alineado: el barrel exporta `ExecutionTimeline`, y el texto de los tokens dice `warning-*`, `success-*` y `destructive-*`. Esto cierra también n1.
+- [x] **m1 resuelto.** `app/(private)/not-found.tsx:12-13` recupera el aviso de que `notFound()` nunca se llama desde el layout privado, con su motivo.
+- [x] **m2 resuelto.** `execution-trace-detail.tsx` reutiliza `DeletedOrderMark` y `ActiveOrderMark` con la misma condición: un pedido dado de baja nunca lleva «En curso». El «0» lleva ahora `font-mono`.
+- [x] **n3 resuelto.** c662c92b deja la ficha en `in_progress`.
+
+### Regresiones
+
+Ninguna. El diff no toca nada fuera de lo que arregla, y los tests del detalle y del recorrido siguen en verde con las marcas reutilizadas.
+
+### Veredicto
+
+**OK.**
