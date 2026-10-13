@@ -27,6 +27,7 @@ import {
   ROLE_OPERADOR,
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { normalizeProductName } from '@/lib/modules/inventario';
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -85,6 +86,41 @@ const RECIPE_STEPS: readonly RecipeStepDocument[] = [
   },
 ];
 
+/**
+ * QC-269: receta «muchos materiales». Con 24 líneas el panel lateral es más alto que el lector más
+ * su reserva, que es cuando su final quedaba bajo el pie fijo.
+ */
+const MANY_LINES = 24;
+const MANY_RECIPE_NAME = `${SHARED_TOKEN}_receta_muchos`;
+/** 23 × 4,00 + 8,00 = 100,00. */
+const MANY_LINE_PERCENTAGE = '4.00';
+const MANY_LAST_LINE_PERCENTAGE = '8.00';
+/** Más de 20 caracteres: sin `break-words` se sale de la caja del nombre y pisa al porcentaje. */
+const LONG_WORD = 'Polihidroxietilcelulosaestabilizada';
+
+function manyLineProductName(index: number): string {
+  const head = index === 0 ? LONG_WORD : 'Lauril éter sulfato de sodio';
+  return `${head} grado industrial de alta pureza ${index + 1}`;
+}
+
+/** QC-269: receta «paso largo». Un solo paso con 30 casillas, más alto que la ventana. */
+const LONG_STEP_ITEMS = 30;
+const LONG_STEP_RECIPE_NAME = `${SHARED_TOKEN}_receta_paso_largo`;
+const LONG_STEP_PRODUCT_NAME = `${SHARED_TOKEN}_producto_paso_largo`;
+const LONG_RECIPE_STEPS: readonly RecipeStepDocument[] = [
+  {
+    blocks: [
+      {
+        kind: 'checklist',
+        items: Array.from({ length: LONG_STEP_ITEMS }, (_, itemIndex) => ({
+          spans: [{ text: `${SHARED_TOKEN}_comprobar ${itemIndex + 1}` }],
+        })),
+      },
+    ],
+  },
+];
+const LAST_LONG_STEP_ITEM = `step-reader-item-0-${LONG_STEP_ITEMS - 1}`;
+
 const PHONE = { width: 390, height: 844 } as const;
 const DESKTOP = { width: 1440, height: 900 } as const;
 const TABLET = { width: 820, height: 1180 } as const;
@@ -127,6 +163,13 @@ const TESTIDS = {
   cards: 'data-table-cards',
   countdownButton: 'countdown-gated-button',
   countdownRing: 'countdown-ring',
+  assignedEnterReason: 'assigned-order-enter-reason',
+  executionLine: 'order-execution-line',
+  // Literal como el resto de TESTIDS; el unit de `order-execution-lines` fija el valor de la
+  // constante, así que una deriva la detecta Vitest.
+  executionLineName: 'order-execution-line-name',
+  executionLinePercentage: 'order-execution-line-percentage',
+  executionLineQuantity: 'order-execution-line-quantity',
 } as const;
 
 const TAB_TESTIDS = {
@@ -156,6 +199,12 @@ type SeededOrders = {
   readonly condRunning: SeededOrder;
   /** TERMINADO del acondicionador: el único de «Acondicionados». */
   readonly condDone: SeededOrder;
+  /** QC-269: EN_CURSO del Operador con la receta «muchos materiales». */
+  readonly execMany: SeededOrder;
+  /** QC-269: EN_CURSO del Operador con la receta «paso largo». */
+  readonly execLongStep: SeededOrder;
+  /** QC-269: BLOQUEADO del Operador: «Entrar» deshabilitado con su aviso. */
+  readonly execBlocked: SeededOrder;
 };
 
 let companyId: string | null = null;
@@ -199,7 +248,11 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.order.deleteMany({ where: { companyId: { in: ids } } }),
+    // `recipe_lines.product_id` RESTRINGE el borrado del producto: las líneas caen antes (también
+    // caerían con la receta, por CASCADE), y los productos después de la receta.
+    () => prisma.recipeLine.deleteMany({ where: { recipe: { companyId: { in: ids } } } }),
     () => prisma.recipe.deleteMany({ where: { companyId: { in: ids } } }),
+    () => prisma.product.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.user.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.company.deleteMany({ where: { id: { in: ids } } }),
   ];
@@ -262,6 +315,55 @@ test.beforeAll(async () => {
     })
   ).id;
 
+  // QC-269: los materiales de las dos recetas nuevas. Con la unidad del pedido, para que cada
+  // fila pinte su cantidad. Los `id` se fijan aquí porque `createMany` no los devuelve.
+  const manyProductIds = Array.from({ length: MANY_LINES }, () => randomUUID());
+  const longStepProductId = randomUUID();
+  await prisma.product.createMany({
+    data: [
+      ...manyProductIds.map((id, index) => ({ id, name: manyLineProductName(index) })),
+      { id: longStepProductId, name: LONG_STEP_PRODUCT_NAME },
+    ].map((product) => ({
+      ...product,
+      nameNormalized: normalizeProductName(product.name),
+      unitId: unit.id,
+      companyId: companyId!,
+    })),
+  });
+  // Las líneas por `INSERT` directo, como `e2e/ejecucion-receta.spec.ts`: no pasan por el
+  // servicio, así que la suma de 100 % no la valida nadie.
+  const manyRecipeId = (
+    await prisma.recipe.create({
+      data: {
+        name: MANY_RECIPE_NAME,
+        nameNormalized: normalizeRecipeName(MANY_RECIPE_NAME),
+        createdBy: operatorId,
+        companyId,
+        steps: RECIPE_STEPS as unknown as Prisma.InputJsonValue,
+        lines: {
+          create: manyProductIds.map((productId, index) => ({
+            productId,
+            percentage: index === MANY_LINES - 1 ? MANY_LAST_LINE_PERCENTAGE : MANY_LINE_PERCENTAGE,
+          })),
+        },
+      },
+      select: { id: true },
+    })
+  ).id;
+  const longStepRecipeId = (
+    await prisma.recipe.create({
+      data: {
+        name: LONG_STEP_RECIPE_NAME,
+        nameNormalized: normalizeRecipeName(LONG_STEP_RECIPE_NAME),
+        createdBy: operatorId,
+        companyId,
+        steps: LONG_RECIPE_STEPS as unknown as Prisma.InputJsonValue,
+        lines: { create: [{ productId: longStepProductId, percentage: '100.00' }] },
+      },
+      select: { id: true },
+    })
+  ).id;
+
   // El CHECK `orders_order_year_matches_created_at` ata el año a `created_at`; los de `packed_by`
   // y `conditioned_by` piden quién empacó y quién acondiciona según el estado.
   const year = new Date().getUTCFullYear();
@@ -272,6 +374,7 @@ test.beforeAll(async () => {
       readonly packedBy?: string;
       readonly conditionedBy?: string;
       readonly finishedAt?: Date;
+      readonly recipeId?: string;
     },
   ): Promise<SeededOrder> {
     const sequence = BASE_SEQUENCE + offset;
@@ -280,7 +383,7 @@ test.beforeAll(async () => {
         companyId: companyId!,
         orderYear: year,
         orderSequence: sequence,
-        recipeId,
+        recipeId: data.recipeId ?? recipeId,
         quantity: ORDER_QUANTITY,
         unitId: unit.id,
         status: data.status,
@@ -311,10 +414,20 @@ test.beforeAll(async () => {
       conditionedBy: conditionerId,
       finishedAt,
     }),
+    execMany: await seedOrder(7, { status: 'EN_CURSO', recipeId: manyRecipeId }),
+    execLongStep: await seedOrder(8, { status: 'EN_CURSO', recipeId: longStepRecipeId }),
+    // El CHECK de `conditioned_by` admite BLOQUEADO sin él.
+    execBlocked: await seedOrder(9, { status: 'BLOQUEADO' }),
   };
 
   await prisma.orderAssignment.createMany({
-    data: [seededOrders.execPending, seededOrders.execRunning].map((order) => ({
+    data: [
+      seededOrders.execPending,
+      seededOrders.execRunning,
+      seededOrders.execMany,
+      seededOrders.execLongStep,
+      seededOrders.execBlocked,
+    ].map((order) => ({
       orderId: order.id,
       userId: operatorId,
       companyId: companyId!,
@@ -905,5 +1018,286 @@ test.describe('R37 — el anillo del botón con espera', () => {
     await expect(ring).toHaveCount(0, { timeout: CONDITIONING_WAIT_MS * 3 });
     await expect(button).toBeEnabled();
     await expect(button).toHaveText('Terminar');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// QC-269 — defectos de layout del operario tras QC-265.
+// ---------------------------------------------------------------------------------------------
+
+type Rect = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+
+/** Dos cajas se cortan si se solapan más de la tolerancia en los dos ejes. */
+function rectsOverlap(a: Rect, b: Rect): boolean {
+  const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+  const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+  return overlapX > EDGE_TOLERANCE_PX && overlapY > EDGE_TOLERANCE_PX;
+}
+
+/** Cuánto esperar a que la página deje de moverse (hidratación, entrada de pantalla). */
+const SETTLE_TIMEOUT_MS = 30_000;
+
+/**
+ * Desplaza la página hasta el final y mide, en la misma ida al navegador, el pie fijo del lector
+ * y los elementos pedidos por `data-testid`. Todo junto porque, hasta que termina de hidratar, la
+ * pantalla puede devolver el desplazamiento arriba entre un paso y el siguiente.
+ */
+async function measureAtEnd(
+  page: Page,
+  testIds: readonly string[],
+): Promise<{ readonly gap: number; readonly footer: Rect | null; readonly targets: ReadonlyArray<Rect | null> }> {
+  return page.evaluate(
+    ({ footerId, ids }) => {
+      const rect = (node: Element | null) => {
+        if (node === null) return null;
+        const found = node.getBoundingClientRect();
+        return { x: found.x, y: found.y, width: found.width, height: found.height };
+      };
+      const root = document.documentElement;
+      window.scrollTo(0, root.scrollHeight);
+      return {
+        gap: root.scrollHeight - (window.scrollY + window.innerHeight),
+        footer: rect(document.querySelector(`[data-testid="${footerId}"]`)),
+        targets: ids.map((id) => rect(document.querySelector(`[data-testid="${id}"]`))),
+      };
+    },
+    { footerId: TESTIDS.stepReaderActions, ids: [...testIds] },
+  );
+}
+
+/**
+ * Con la página desplazada hasta el final, el pie fijo del lector queda pegado al borde inferior
+ * de la ventana (R6) y cada elemento pedido termina por encima de él (R4, R5). Se reintenta
+ * mientras corre la entrada de pantalla: con ella el pie se mide desplazado.
+ */
+async function expectWholeAboveFooter(
+  page: Page,
+  label: string,
+  targets: ReadonlyArray<{ readonly testId: string; readonly what: string }>,
+): Promise<void> {
+  const viewport = page.viewportSize() as NonNullable<ReturnType<Page['viewportSize']>>;
+  await expect(async () => {
+    await waitForScreenEnterToSettle(page);
+    const measured = await measureAtEnd(
+      page,
+      targets.map((target) => target.testId),
+    );
+    expect(measured.gap, `${label}: la página llega a su final`).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+    expect(measured.footer, `${label}: hay pie fijo`).not.toBeNull();
+    const footer = measured.footer!;
+    expect(
+      Math.abs(footer.y + footer.height - viewport.height),
+      `R6 ${label}: el pie fijo pegado al borde inferior de la ventana`,
+    ).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+    for (const [index, target] of targets.entries()) {
+      const found = measured.targets[index];
+      expect(found, `${label}: ${target.what} existe`).not.toBeNull();
+      expect(found!.y + found!.height, `${label}: ${target.what} por encima del pie fijo`).toBeLessThanOrEqual(
+        footer.y + EDGE_TOLERANCE_PX,
+      );
+    }
+  }).toPass({ timeout: SETTLE_TIMEOUT_MS });
+}
+
+const OPERATOR_WIDTHS = [
+  { name: '1440 × 900', size: DESKTOP },
+  { name: '390 × 844', size: PHONE },
+] as const;
+
+test.describe('QC-269 R1, R2, R3 — «Entrar» en «Mis asignados»', () => {
+  test('R1, R2, R3 — «Entrar» alineado en sus tres estados', async ({ page }) => {
+    const { execPending, execRunning, execBlocked } = seeded();
+    const threeStates = [
+      { label: 'PENDIENTE', order: execPending, hasReason: false },
+      { label: 'EN_CURSO', order: execRunning, hasReason: true },
+      { label: 'BLOQUEADO', order: execBlocked, hasReason: true },
+    ] as const;
+
+    await page.setViewportSize(DESKTOP);
+    await loginAndLand(page, operatorUser);
+    await expect(page.getByTestId(TESTIDS.asignacionTitle)).toBeVisible({ timeout: 60_000 });
+
+    // R1, R2: en la tabla, los tres botones y sus avisos comparten el borde derecho.
+    const rightEdges: Array<{ readonly enter: number; readonly reason: number | null }> = [];
+    for (const state of threeStates) {
+      const row = page.getByTestId(`data-table-row-${state.order.id}`);
+      await expect(row, `fila ${state.label}`).toBeVisible({ timeout: 60_000 });
+      const enterBox = await box(row.getByTestId(TESTIDS.assignedEnter));
+      const reasonBox = state.hasReason ? await box(row.getByTestId(TESTIDS.assignedEnterReason)) : null;
+      rightEdges.push({
+        enter: enterBox.x + enterBox.width,
+        reason: reasonBox === null ? null : reasonBox.x + reasonBox.width,
+      });
+    }
+    for (const [index, edge] of rightEdges.entries()) {
+      expect(
+        Math.abs(edge.enter - rightEdges[0]!.enter),
+        `R1: el borde derecho de «Entrar» en ${threeStates[index]!.label} es el de PENDIENTE`,
+      ).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+    }
+    for (const [index, edge] of rightEdges.entries()) {
+      if (edge.reason === null) continue;
+      expect(
+        Math.abs(edge.reason - edge.enter),
+        `R2: el aviso de ${threeStates[index]!.label} termina en el borde de su «Entrar»`,
+      ).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+    }
+
+    // R3: en las tarjetas, los tres botones comparten el borde izquierdo.
+    await page.setViewportSize(PHONE);
+    await expect(page.getByTestId(TESTIDS.cards)).toBeVisible({ timeout: 60_000 });
+    const leftEdges: number[] = [];
+    for (const state of threeStates) {
+      const card = page.getByTestId(`data-table-card-${state.order.id}`);
+      await expect(card, `tarjeta ${state.label}`).toBeVisible();
+      leftEdges.push((await box(card.getByTestId(TESTIDS.assignedEnter))).x);
+    }
+    for (const [index, edge] of leftEdges.entries()) {
+      expect(
+        Math.abs(edge - leftEdges[0]!),
+        `R3: el borde izquierdo de «Entrar» en ${threeStates[index]!.label} es el de PENDIENTE`,
+      ).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+    }
+  });
+});
+
+type LineRects = {
+  readonly index: number;
+  readonly row: Rect;
+  readonly nameBox: Rect;
+  /** La caja del texto pintado: si una palabra se sale de su caja, esta la cubre. */
+  readonly nameText: Rect;
+  readonly percentage: Rect | null;
+  readonly quantity: Rect | null;
+  /** El grupo de cifras (porcentaje y cantidad), hermano del nombre en la fila. */
+  readonly figures: Rect | null;
+  /** Ancho de contenido de la fila (sin padding horizontal): la fila es el contenedor flex. */
+  readonly rowInnerWidth: number;
+};
+
+test.describe('QC-269 R4, R6, R9, R10 — ejecución con muchos materiales', () => {
+  test('R4, R6, R9, R10 — panel con muchos materiales', async ({ page }) => {
+    const { execMany } = seeded();
+    await page.setViewportSize(DESKTOP);
+    await loginAndLand(page, operatorUser);
+
+    let wrappedRows = 0;
+    for (const width of OPERATOR_WIDTHS) {
+      await page.setViewportSize(width.size);
+      const screen = await openScreen(page, assignedOrderRoute(execMany.id), TESTIDS.executionScreen);
+      await waitForScreenEnterToSettle(page);
+
+      const panel = screen.getByTestId(TESTIDS.executionMaterials);
+      await expect(panel.locator(`li[data-testid^="${TESTIDS.executionLine}-"]`)).toHaveCount(MANY_LINES);
+      const lastLine = panel.getByTestId(`${TESTIDS.executionLine}-${MANY_LINES - 1}`);
+      await expect(lastLine).toBeAttached();
+
+      // R6: el panel no tiene desplazamiento propio; crece con su contenido.
+      const panelScroll = await panel.evaluate((el) => ({
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+        overflowY: window.getComputedStyle(el).overflowY,
+      }));
+      expect(panelScroll.scrollHeight, `R6 ${width.name}: el panel no recorta su contenido`).toBe(
+        panelScroll.clientHeight,
+      );
+      expect(panelScroll.overflowY, `R6 ${width.name}: el panel no es un área desplazable`).not.toMatch(
+        /^(auto|scroll)$/,
+      );
+
+      // R9, R10: las medidas de todas las filas en una sola ida al navegador.
+      const lines = await panel.evaluate(
+        (el, ids): LineRects[] => {
+          const rect = (node: Element | null) => {
+            if (node === null) return null;
+            const found = node.getBoundingClientRect();
+            return { x: found.x, y: found.y, width: found.width, height: found.height };
+          };
+          const result: LineRects[] = [];
+          for (let index = 0; index < ids.count; index += 1) {
+            const row = el.querySelector(`[data-testid="${ids.line}-${index}"]`);
+            const name = el.querySelector(`[data-testid="${ids.name}-${index}"]`);
+            if (row === null || name === null) continue;
+            const range = document.createRange();
+            range.selectNodeContents(name);
+            const text = range.getBoundingClientRect();
+            result.push({
+              index,
+              row: rect(row)!,
+              nameBox: rect(name)!,
+              nameText: { x: text.x, y: text.y, width: text.width, height: text.height },
+              percentage: rect(el.querySelector(`[data-testid="${ids.percentage}-${index}"]`)),
+              quantity: rect(el.querySelector(`[data-testid="${ids.quantity}-${index}"]`)),
+              figures: rect(name.nextElementSibling),
+              rowInnerWidth:
+                row.clientWidth -
+                parseFloat(window.getComputedStyle(row).paddingLeft) -
+                parseFloat(window.getComputedStyle(row).paddingRight),
+            });
+          }
+          return result;
+        },
+        {
+          count: MANY_LINES,
+          line: TESTIDS.executionLine,
+          name: TESTIDS.executionLineName,
+          percentage: TESTIDS.executionLinePercentage,
+          quantity: TESTIDS.executionLineQuantity,
+        },
+      );
+      expect(lines, `${width.name}: cada fila tiene su nombre`).toHaveLength(MANY_LINES);
+      for (const line of lines) {
+        const label = `${width.name}, material ${line.index}`;
+        expect(line.percentage, `${label}: tiene porcentaje`).not.toBeNull();
+        expect(line.quantity, `${label}: tiene cantidad`).not.toBeNull();
+        for (const name of [line.nameBox, line.nameText]) {
+          expect(rectsOverlap(name, line.percentage!), `R9 ${label}: el nombre no pisa al porcentaje`).toBe(
+            false,
+          );
+          expect(rectsOverlap(name, line.quantity!), `R9 ${label}: el nombre no pisa a la cantidad`).toBe(false);
+        }
+        expect(
+          line.nameBox.width,
+          `R10 ${label}: el nombre mide al menos 12 rem o la fila entera`,
+        ).toBeGreaterThanOrEqual(Math.min(192, line.row.width) - EDGE_TOLERANCE_PX);
+        expect(line.figures, `${label}: tiene grupo de cifras`).not.toBeNull();
+        const figuresWrapped =
+          line.figures!.y >= line.nameBox.y + line.nameBox.height - EDGE_TOLERANCE_PX;
+        if (figuresWrapped) {
+          wrappedRows += 1;
+          expect(
+            Math.abs(line.nameBox.width - line.rowInnerWidth),
+            `R10 ${label}: con las cifras debajo, el nombre ocupa toda la fila`,
+          ).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+        }
+      }
+
+      // R4, R6: el último material y el borde inferior del panel quedan por encima del pie.
+      await expectWholeAboveFooter(page, width.name, [
+        { testId: `${TESTIDS.executionLine}-${MANY_LINES - 1}`, what: 'R4 el último material' },
+        { testId: TESTIDS.executionMaterials, what: 'R4 el borde inferior del panel' },
+      ]);
+    }
+    // Sin esto, la comprobación de las cifras debajo podría no ejercitarse nunca.
+    expect(wrappedRows, 'R10: en algún ancho las cifras bajan bajo el nombre').toBeGreaterThan(0);
+  });
+});
+
+test.describe('QC-269 R5 — ejecución con un paso largo', () => {
+  test('R5 — paso largo', async ({ page }) => {
+    const { execLongStep } = seeded();
+    await page.setViewportSize(DESKTOP);
+    await loginAndLand(page, operatorUser);
+
+    for (const width of OPERATOR_WIDTHS) {
+      await page.setViewportSize(width.size);
+      const screen = await openScreen(page, assignedOrderRoute(execLongStep.id), TESTIDS.executionScreen);
+      await waitForScreenEnterToSettle(page);
+
+      await expect(screen.getByTestId(LAST_LONG_STEP_ITEM)).toBeAttached();
+      await expectWholeAboveFooter(page, width.name, [
+        { testId: LAST_LONG_STEP_ITEM, what: 'R5 el último elemento del paso' },
+      ]);
+    }
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ClipboardListIcon,
   PackageIcon,
   PencilIcon,
   TrashIcon,
@@ -148,9 +149,24 @@ export function acceptsDelivery(status: OrderStatus): boolean {
   return ORDER_STATUS_ACCEPTS_DELIVERY[status];
 }
 
+// No pide permiso propio: ver la lista ya lo cubre el permiso de consultar la pantalla.
+const ORDER_STATUS_HAS_DELIVERIES: Readonly<Record<OrderStatus, boolean>> = {
+  PENDIENTE: false,
+  EN_CURSO: false,
+  POR_EMPACAR: false,
+  EN_EMPAQUE: false,
+  ENTREGADO: true,
+  CANCELADO: false,
+  BLOQUEADO: false,
+  POR_ACONDICIONAR: false,
+  EN_ACONDICIONAMIENTO: false,
+  TERMINADO: true,
+};
+
 export const ORDER_ACTION_DISTRIBUTION_TESTID = 'order-action-distribution';
 export const ORDER_ACTION_DELIVER_TESTID = 'order-action-deliver';
 export const ORDER_ACTION_CUSTOMER_TESTID = 'order-action-customer';
+export const ORDER_ACTION_DELIVERIES_TESTID = 'order-action-deliveries';
 
 export type OrderRowActionsProps = {
   readonly order: OrderSummary;
@@ -174,6 +190,7 @@ export type OrderRowActionsProps = {
   /** Lo decide el servidor con el permiso de entregas; sin el, la accion no se pinta. */
   readonly canDeliver?: boolean;
   readonly onDeliver?: (order: OrderSummary) => void;
+  readonly onDeliveries?: (order: OrderSummary) => void;
 };
 
 export function OrderRowActions({
@@ -188,6 +205,7 @@ export function OrderRowActions({
   onCustomer,
   canDeliver = false,
   onDeliver,
+  onDeliveries,
 }: OrderRowActionsProps) {
   const isFinal = isFinalOrderStatus(order.status);
   const showDistribution = canEditDistribution && acceptsDistributionEdit(order.status);
@@ -248,6 +266,16 @@ export function OrderRowActions({
       icon: PackageIcon,
       onSelect: () => onDistribution?.(order),
       testId: ORDER_ACTION_DISTRIBUTION_TESTID,
+    });
+  }
+
+  if (ORDER_STATUS_HAS_DELIVERIES[order.status]) {
+    items.push({
+      key: 'deliveries',
+      label: 'Entregas',
+      icon: ClipboardListIcon,
+      onSelect: () => onDeliveries?.(order),
+      testId: ORDER_ACTION_DELIVERIES_TESTID,
     });
   }
 

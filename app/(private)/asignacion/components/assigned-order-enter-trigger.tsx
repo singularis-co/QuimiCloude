@@ -25,12 +25,13 @@ export function AssignedOrderEnterTrigger({
   readonly order: Pick<AssignedOrderView, 'id' | 'status'>;
 }) {
   // El aviso va visible y no en `title`: un tooltip por `:hover` no llega en tactil.
+  // Envoltorio en bloque y no flex: boton y aviso heredan la alineacion de la celda o del pie.
   if (order.status === 'BLOQUEADO') {
     const noticeId = `${ASSIGNED_ORDER_ENTER_REASON_TESTID}-${order.id}`;
 
     // Sin enlace: la ruta de ejecucion rechaza un bloqueado, no tiene sentido ofrecerla.
     return (
-      <div className="flex flex-col items-start gap-1">
+      <div>
         <Button
           type="button"
           variant="outline"
@@ -43,7 +44,7 @@ export function AssignedOrderEnterTrigger({
         </Button>
         <p
           id={noticeId}
-          className="text-xs text-muted-foreground"
+          className="mt-1 text-xs text-muted-foreground"
           data-testid={ASSIGNED_ORDER_ENTER_REASON_TESTID}
         >
           {assignedOrderBlockedNoticeText()}
@@ -56,7 +57,7 @@ export function AssignedOrderEnterTrigger({
     const noticeId = `${ASSIGNED_ORDER_ENTER_REASON_TESTID}-${order.id}`;
 
     return (
-      <div className="flex flex-col items-start gap-1">
+      <div>
         <Link
           href={assignedOrderRoute(order.id)}
           data-slot="button"
@@ -68,7 +69,7 @@ export function AssignedOrderEnterTrigger({
         </Link>
         <p
           id={noticeId}
-          className="text-xs text-muted-foreground"
+          className="mt-1 text-xs text-muted-foreground"
           data-testid={ASSIGNED_ORDER_ENTER_REASON_TESTID}
         >
           {assignedOrderEnterNoticeText()}
