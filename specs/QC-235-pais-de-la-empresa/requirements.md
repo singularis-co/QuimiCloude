@@ -132,4 +132,5 @@ esa librería da para el país (`57` para `CO`), escrito con `+` delante al most
 | 2026-10-13 | ¿Ruta? | `/maestro/empresas`, inaugurada por QC-166. |
 | 2026-10-13 | ¿E2E? | Diferido a QC-166. Aquí: unitarios e integración del service, y test del componente. |
 | 2026-10-13 | ¿Diseño de CountrySelect? | Tablero `docs/diseno/canvas/CountrySelect.dc.html`, aprobado por el humano. |
+| 2026-10-13 | ¿CountrySelect como excepción de guard-buscadores? | Sí, cuarta excepción de R20 de QC-233; lista local, sin servidor. |
 | — | Identificadores de DB | En inglés (heredado de QC-4). |

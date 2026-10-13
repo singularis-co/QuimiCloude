@@ -105,7 +105,7 @@ Cuando T1 está hecha, la rama de servidor (T2–T6) y la de componente (T7–T9
   - **Hecho:** los tests que ya existen de `AsyncAutocomplete`, `async-autocomplete-ampliado` y la
     barra lateral siguen verdes; `guard-catalogo-de-componentes` en verde.
 
-- [ ] **T9 · `CountrySelect`** (R13–R26). Depende de T7 y T8.
+- [x] **T9 · `CountrySelect`** (R13–R26). Depende de T7 y T8.
   - `components/shared/country-select.tsx` según `design.md > 7.3, 7.5, 7.7`, contra el tablero.
   - Verificar en `@base-ui/react` instalado cómo queda `aria-selected` y si el resaltado inicial
     puede ir a la opción elegida. Anotarlo en `progress/impl_QC-235-pais-de-la-empresa.md`

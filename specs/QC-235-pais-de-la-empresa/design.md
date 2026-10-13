@@ -264,6 +264,7 @@ Lo que falta verificar del paquete, también en T1:
 instalación se pondría rojo. Se quita `'libphonenumber-js'` de `CANDIDATAS_DESCARTADAS` y su
 mención del JSDoc. Las otras cuatro candidatas y el ancla `bcryptjs` no cambian. Es una enmienda
 explícita a un test ajeno, aprobada con este spec. No es un test que se debilita a escondidas.
+La otra enmienda a un test ajeno es la de QC-233 R20 (`guard-buscadores`, § 7.2).
 
 ## 7. `CountrySelect`
 
@@ -294,6 +295,14 @@ excepción declarada»): hoy no lo consume ninguna ruta. Nace compartido porque 
 identificados en el board: **QC-166** (`/maestro/empresas`, edición del país de la empresa) y
 **QC-236** (formulario de cliente, país del teléfono). La decisión cerrada «Un solo
 `CountrySelect`, reutilizado en QC-236» lo pide así.
+
+**Enmienda QC-233 R20 (2026-10-13, decisión del humano).** `tests/guards/guard-buscadores.test.ts`
+(QC-233) solo deja importar los primitivos de `components/ui/autocomplete` a `AsyncAutocomplete` y a
+su definición, y su caso R20 congela las excepciones en tres. Componer `Autocomplete` aquí lo pone
+rojo (regla `primitivo-fuera`). Se añade `components/shared/country-select.tsx` como **cuarta
+excepción**, solo para `primitivo-fuera`, con motivo: filtra una lista local fija y no consulta al
+servidor, que es lo que `AsyncAutocomplete` compone. El caso R20 pasa de tres a cuatro. Es una
+enmienda explícita a un test ajeno, como la de QC-66 R47 (§ 6.3).
 
 ### 7.3 Contrato
 
