@@ -92,7 +92,7 @@ En modo revisión, por cada doc del perfil:
 
 ## 4. Verifica y entrega
 
-1. Si falta `.arnes.local.json`, corre `/jira-connect`.
+1. Si falta `.arnes.local.json`, corre `/tracker-connect`.
 2. `./init.sh`: debe salir en verde, y el perfil en `N/N docs revisados`.
 3. Muestra al humano el diff del perfil (`git diff --stat` y lo esencial de cada doc). **No
    hagas commit sin su visto bueno.**

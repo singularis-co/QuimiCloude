@@ -13,7 +13,7 @@ paso. Los detalles viven en `docs/` y se leen por sección, bajo demanda (`docs/
 | `backend_dev` | Servicios, repositorios, migraciones, autorización, Server Actions | No toca UI ni componentes |
 | `reviewer` | Verifica trazabilidad `R<n>`→test y revisa contra `docs/` y `CHECKPOINTS.md`; escribe `progress/review_<key>.md` | No edita código |
 | `extractor` | Inventaria un módulo ya construido y escribe su prompt portable + cuestionario en `extracciones/<slug>/` | No modifica el módulo ni escribe specs |
-| `leader` (tú) | Orquesta, transiciona estados, toma y suelta features en Jira, corre el gate, abre el PR | No edita código |
+| `leader` (tú) | Orquesta, transiciona estados, toma y suelta features en el tracker, corre el gate, abre el PR | No edita código |
 
 **Tres comandos alrededor del ciclo.** Son la misma herramienta aplicada a tres sujetos:
 - `/afinar-regla` afina el **arnés**. Las mejoras al arnés no se aplican en caliente: entran por
@@ -25,7 +25,8 @@ paso. Los detalles viven en `docs/` y se leen por sección, bajo demanda (`docs/
   SDD.
 
 Además, `/arnes-init` monta el arnés en un proyecto nuevo o revisa el perfil de uno existente, y
-`/jira-connect` fija tu identidad de Jira (`.arnes.local.json`).
+`/tracker-connect` fija tu identidad en el tracker (`.arnes.local.json`; con Jira, delega en
+`/jira-connect`).
 
 ## Estrategia de ramas
 
@@ -106,24 +107,29 @@ frontmatter.** Lo hace cumplir `tests/guards/guard-modelos-de-agentes.test.ts`.
 
 ### F0 — Importar el board
 
-Al arrancar sesión, con el MCP de `atlassian`:
+Al arrancar sesión, con el cliente del tracker (`arnes.config.json > tracker.tipo`; sin
+`tracker`, Jira): MCP `atlassian` para Jira (`docs/jira.md`), `node scripts/trello.mjs importar`
+para Trello (`docs/trello.md`).
 
 - Regenera la lista `features` de `feature_list.json` (en la raíz del worktree principal; no se
-  versiona). La consulta es `project = <arnes.config.json > jira.project> AND issuetype != Epic`.
+  versiona). En Jira, la consulta es
+  `project = <arnes.config.json > jira.project> AND issuetype != Epic`.
 - Por cada ficha importa:
-  - `description` y `status`: este último, por el **nombre del estado** del issue, traducido con
-    `arnes.config.json > jira.estados`. Un estado que no esté en esa tabla **detiene F0** con un
-    mensaje que lo nombre: nunca se adivina (`docs/jira.md > Los estados del board`);
-  - `depends_on` (links "is blocked by");
+  - `description` y `status`: este último, por el **nombre del estado** (en Trello, de la lista),
+    traducido con `tracker.estados` (o `jira.estados`). Un estado que no esté en esa tabla
+    **detiene F0** con un mensaje que lo nombre: nunca se adivina
+    (`docs/jira.md > Los estados del board`);
+  - `depends_on` (en Jira, links "is blocked by"; en Trello, el checklist «Depende de»);
   - `epic` + `epic_name`;
   - **`assignee: {accountId, displayName}`** (o `null`).
 - `branch` y `spec_path` se derivan del `key` (`feature/<key>-<slug>`, `specs/<key>-<slug>`); no
-  se guardan en Jira.
-- **No degrades** una feature `in_progress`, ni una `zone`/`complexity` ya evaluada cuyo issue
-  perdió las labels. Conserva el valor, reescríbelo en Jira y anótalo en `progress/deudas.md`.
-- Si el MCP no responde, **no inventes el estado**: trabaja con la copia en disco y avisa.
+  se guardan en el tracker.
+- **No degrades** una feature `in_progress`, ni una `zone`/`complexity` ya evaluada cuya tarjeta
+  perdió las labels. Conserva el valor, reescríbelo en el tracker y anótalo en
+  `progress/deudas.md`.
+- Si el tracker no responde, **no inventes el estado**: trabaja con la copia en disco y avisa.
 
-Contrato completo: `docs/jira.md`.
+Contrato completo: `docs/jira.md` o `docs/trello.md`.
 
 ### F1 — Especificación
 
@@ -134,10 +140,11 @@ Contrato completo: `docs/jira.md`.
      - no tiene `depends_on` pendiente;
      - tu cupo en su zona no está lleno;
      - no choca en archivos (si ya tiene `tasks.md` sembrado).
-   - **Tómala** siguiendo `docs/equipo.md > Tomar una feature`: releer el issue en vivo →
-     asignártela → releer → `./scripts/wt.sh new <key> <slug>`. Si `wt.sh` sale con **4
-     (TOMADA)**, suelta el assignee y vuelve a elegir.
-   - Escribe `zone:<z>` y `complexity:<c>` como labels del issue. Sin eso, el F0 siguiente
+   - **Tómala** siguiendo `docs/equipo.md > Tomar una feature`: releer la tarjeta en vivo →
+     asignártela → releer → `./scripts/wt.sh new <key> <slug>` (en Trello, los tres primeros los
+     hace `node scripts/trello.mjs tomar <key>`). Si `wt.sh` sale con **4 (TOMADA)**, suelta el
+     assignee y vuelve a elegir.
+   - Escribe `zone:<z>` y `complexity:<c>` como labels de la tarjeta. Sin eso, el F0 siguiente
      borraría la evaluación.
    - Crea `progress/features/<key>.md` desde `progress/features/_plantilla.md`.
    - Indexa el worktree en el grafo (`docs/grafo-de-codigo.md`).
@@ -152,10 +159,11 @@ Contrato completo: `docs/jira.md`.
      (`docs/specs.md > Antes de especificar: lo que ya existe`). Relanza `spec_author` con su
      decisión: él la escribe como fila en `Decisiones cerradas`.
 3. **(F1.3)** Cambia a `spec_ready`, mueve la tarjeta al estado de `spec_ready` (según
-   `jira.estados`), comenta en el issue la ruta del spec y haz `git push`.
+   `tracker.estados` o `jira.estados`), comenta en la tarjeta la ruta del spec y haz `git push`.
 4. **(F1.4) PARA. Pide aprobación humana.**
    - La forma canónica de aprobar es mover la tarjeta del estado de `spec_ready` al de
-     `in_progress` (según `jira.estados`). Un "aprobado" escrito también vale.
+     `in_progress` (según `tracker.estados` o `jira.estados`). Un "aprobado" escrito también vale.
+     En Trello, `node scripts/trello.mjs aprobacion <key>` dice quién la movió y cuándo.
    - Si el humano pide cambios, vuelve a F1.2.
    - Si el `design.md` propone una librería nueva, la aprobación del spec la incluye: el leader
      añade su fila a `docs/dependencias.md`.
@@ -197,7 +205,7 @@ Contrato completo: `docs/jira.md`.
        reproduce en local.
      - Solo con verde reporta la URL del PR al humano para el merge.
 10. **(F2.5) Cerrar.** Cuando el humano mergea:
-    - cambia a `done`, mueve la tarjeta al estado de `done` y comenta la URL del PR en el issue;
+    - cambia a `done`, mueve la tarjeta al estado de `done` y comenta la URL del PR en la tarjeta;
     - `./scripts/wt.sh done <key>-<slug>` (con `--assume-merged` si el merge fue squash);
     - borra el proyecto del grafo (`delete_project`).
 

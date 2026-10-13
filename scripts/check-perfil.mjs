@@ -6,8 +6,9 @@
  * convenciones, dependencias) vive en los docs que lista `arnes.config.json > perfil.docs`.
  * Esos docs envejecen en silencio: nadie los relee porque nada lo pide. Este check lo pide.
  *
- *   - FALLA si `arnes.config.json` falta o no declara `jira.project`: sin eso el arnes no sabe
- *     a que proyecto pertenece (lo genera `/arnes-init`).
+ *   - FALLA si `arnes.config.json` falta o no declara el prefijo del tracker (`tracker.prefijo`,
+ *     o `jira.project` en un perfil sin `tracker`): sin eso el arnes no sabe a que proyecto
+ *     pertenece (lo genera `/arnes-init`).
  *   - AVISA si un doc del perfil no existe, no lleva el marcador
  *     `<!-- perfil: revisado=AAAA-MM-DD ... -->` en su primera linea, o lo lleva vencido
  *     (`perfil.max_dias_sin_revisar`, 60 por defecto). Avisa y no falla: bloquear un PR porque
@@ -41,8 +42,10 @@ try {
   console.error(`${CONFIG} no es JSON valido: ${err.message}`);
   process.exit(1);
 }
-if (!config.jira?.project) {
-  console.error(`${CONFIG} no declara "jira.project". Corre /arnes-init.`);
+// `tracker.prefijo` manda; un perfil sin `tracker` sigue declarando el proyecto en `jira.project`.
+const proyecto = config.tracker?.prefijo ?? config.jira?.project;
+if (!proyecto) {
+  console.error(`${CONFIG} no declara "tracker.prefijo" ni "jira.project". Corre /arnes-init.`);
   process.exit(1);
 }
 
@@ -102,4 +105,4 @@ for (const doc of docs) {
   }
 }
 
-console.log(`perfil del proyecto ${config.jira.project}: ${docs.length - vencidos}/${docs.length} docs revisados en los ultimos ${maxDias} dias`);
+console.log(`perfil del proyecto ${proyecto}: ${docs.length - vencidos}/${docs.length} docs revisados en los ultimos ${maxDias} dias`);
