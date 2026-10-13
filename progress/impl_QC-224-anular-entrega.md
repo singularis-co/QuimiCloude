@@ -762,3 +762,33 @@ Decisiones humanas del 2026-10-13 sobre `progress/review_QC-224.md`.
   order-assignments-migration: `Test Files 4 passed (4)` / `Tests 96 passed (96)`.
 
 ### m2, m3: sin cambio de código (decisión humana). m4: corregido en el mapa de TZ (arriba).
+
+## F2.3 — merge de origin/dev, vuelta 2 (implementer, 2026-10-13)
+
+`git fetch origin dev` (`e8c58c61..a864f26b`) y `git merge origin/dev`, sin rebase. Merge `ff6eca8c`.
+Seis conflictos de contenido, todos con ambos lados conservados:
+- `error-codes.ts` / `error-catalog.ts`: dev (`whatsapp_connection_not_found`, `whatsapp_connection_exists`,
+  `whatsapp_phone_number_taken`) primero, y `delivery_not_found`, `delivery_already_voided` detrás.
+- `tests/unit/errores/catalogo.test.ts`: conteo **recalculado a 87** (85 de dev + 2 de la anulación).
+- `guard-identificador-de-request.test.ts`: `E2E_ESPERADOS` con los siete de dev y `anular-entrega.spec.ts`
+  al final; `MIGRACIONES_ESPERADAS` en orden de nombre: `…120000_product_batches_production_date`,
+  `…120050_inventory_movement_kind_delivery_void`, `…120100_…`, `…120200_…`, `…130000_whatsapp_connections`.
+- `tests/integration/aislamiento.json`: las dos suites de la anulación y `integraciones/whatsapp-connection-prisma.int.test.ts`.
+- `tests/unit/clientes/scope.test.ts`: `E2E_PERMITIDOS` = los tres previos + `movimiento.spec.ts`,
+  `marca-componentes.spec.ts` (dev) + `anular-entrega.spec.ts`; las notas de ambos lados.
+
+Efecto semántico del merge (sin conflicto textual): dev trae `tests/guards/guard-e2e-fixture-user.test.ts`,
+que exige crear los usuarios de `e2e/` con `createFixtureUser`. Salía rojo en `e2e/anular-entrega.spec.ts:243`
+(`prisma.user.create`). Commit `45b7eeb3`: import del helper y `createFixtureUser({...})` con los mismos
+argumentos, como `entregar-producto-terminado.spec.ts`. El E2E no se ha vuelto a correr (sin E2E por memoria);
+typecheck y lint del archivo, verdes.
+
+Migración de dev aplicada a `qc224_anular_entrega`: `20261009130000_whatsapp_connections`
+(`migrate deploy`: `All migrations have been successfully applied.`; `migrate status`: `Database schema is up to date!`).
+`prisma generate` tras el merge (el cliente no tenía `whatsappConnection`).
+
+Verificación:
+- `pnpm exec tsc --noEmit -p .`: 0 errores.
+- `eslint` de los archivos tocados y en conflicto: 0 problemas.
+- `vitest run tests/guards tests/unit/clientes/scope.test.ts tests/unit/errores` + las tres pruebas de migración:
+  `Test Files 74 passed (74)` / `Tests 1125 passed | 14 skipped (1139)`.
