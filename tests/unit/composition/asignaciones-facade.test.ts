@@ -16,7 +16,7 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-215) — la fachada de `asignaciones` lista sus VEINTIDOS operaciones', () => {
+describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-215, QC-218, QC-219 y QC-214) — la fachada de `asignaciones` lista sus TREINTA Y UNA operaciones', () => {
   // El censo CRECE, no se afloja: primero llegaron las tres de la pantalla de ejecucion, luego
   // las tres de las vistas nuevas -`listFinishedOrders`, `listCompanyOrders`,
   // `listResponsibleCandidates`- y ahora las CUATRO del empaque de QC-168. Siguen nombradas UNA A
@@ -29,7 +29,10 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-
   // 2026-10-08: crece con `listConditioningOrders`, `listConditionedOrders` y `getConditioningOrder`.
   // 2026-10-08 (QC-218): crece con `listConditioningTeamCandidates`.
   // 2026-10-09 (QC-219): crece con `saveConditioningBatchData` y `listDeliveredConditionedOrders`.
-  it('R31: expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167, las DOS de QC-215, las TRES del acondicionamiento, los candidatos del equipo y las DOS de QC-219, y ninguna mas', () => {
+  // 2026-10-13 (QC-214): crece con TRES operaciones de la evidencia por paso, `registerEvidence`,
+  // `removeEvidence` y `requestEvidenceUpload` (T13, `design.md` de QC-214). Ninguna previa se
+  // quita; el censo pasa de veintiocho a TREINTA Y UNA.
+  it('R31: expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167, las DOS de QC-215, las TRES del acondicionamiento, los candidatos del equipo, las DOS de QC-219 y las TRES de QC-214, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
       'cancelAssignedOrder',
@@ -53,7 +56,10 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-
       'listResponsibleCandidates',
       'listResponsiblesForOrders',
       'recordStepMove',
+      'registerEvidence',
+      'removeEvidence',
       'removeWorkGroupFromOrder',
+      'requestEvidenceUpload',
       'saveConditioningBatchData',
       'startAssignedOrder',
       'startConditioning',
