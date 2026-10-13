@@ -136,6 +136,7 @@ la cita antes de empezar su tanda.
 - `tests/unit/shared-ui/empty-state.test.tsx`
 - `tests/unit/marca/tablas-marca.test.tsx`
 - `tests/unit/paridad/recorridos-paridad.test.tsx`
+- `tests/unit/shared/data-table-alcance.test.ts`
 - `tests/unit/paridad/__snapshots__/recorridos-paridad.test.tsx.snap`
 - `tests/unit/paridad/__snapshots__/catalogo-paridad.test.tsx.snap`
 - `tests/unit/paridad/__snapshots__/clientes-paridad.test.tsx.snap`
