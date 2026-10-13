@@ -36,10 +36,14 @@ async function currentActor(): Promise<Actor | null> {
 type ConditionedOrdersListSectionProps = {
   /** Ya acotados por `parseAssignmentListParams`. */
   readonly params: DataTableParams;
+  readonly canViewTrace?: boolean;
 };
 
 /** `/asignacion?vista=acondicionados`: los `TERMINADO` que acondicionó el propio actor. */
-export async function ConditionedOrdersListSection({ params }: ConditionedOrdersListSectionProps) {
+export async function ConditionedOrdersListSection({
+  params,
+  canViewTrace = false,
+}: ConditionedOrdersListSectionProps) {
   const actor = await currentActor();
 
   let result;
@@ -75,7 +79,12 @@ export async function ConditionedOrdersListSection({ params }: ConditionedOrders
 
   return (
     <div data-testid={CONDITIONED_ORDERS_SECTION_TESTID}>
-      <ConditionedOrdersTable rows={items} params={params} totalPages={totalPages} />
+      <ConditionedOrdersTable
+        rows={items}
+        params={params}
+        totalPages={totalPages}
+        canViewTrace={canViewTrace}
+      />
     </div>
   );
 }

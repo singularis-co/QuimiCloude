@@ -1,7 +1,7 @@
 // `CompanyOrdersListSection` es un Server Component `async`, calcado del test de
 // `FinishedOrdersListSection`. `listCompanyOrdersAction` esta mockeada: es el borde del modulo
 // `asignaciones`.
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -110,7 +110,8 @@ describe('con pedidos, pinta la tabla y no el estado vacio', () => {
     render(await CompanyOrdersListSection({ params: parametros(), statuses: ['ENTREGADO'] }));
 
     expect(screen.getByTestId('company-orders-table')).toBeInTheDocument();
-    expect(screen.getByText('2026-000123')).toBeInTheDocument();
+    // Con tarjetas, cada celda está dos veces en el DOM: se mira la tabla.
+    expect(within(screen.getByRole('table')).getByText('2026-000123')).toBeInTheDocument();
     expect(listCompanyOrdersActionMock).toHaveBeenCalledWith({
       page: 1,
       pageSize: 10,

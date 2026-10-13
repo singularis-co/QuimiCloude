@@ -8,6 +8,7 @@ import type { AssignmentViewKind, FinishedOrderView } from '@/lib/modules/asigna
 
 import { assignedOrdersListHref } from './assigned-orders-list-params';
 import { buildConditionedOrdersColumns } from './conditioned-orders-columns';
+import { FINISHED_ORDERS_CARD } from './finished-orders-columns';
 
 export const CONDITIONED_ORDERS_TABLE_ID = 'asignacion-acondicionados';
 
@@ -40,6 +41,7 @@ export type ConditionedOrdersTableProps = {
   readonly totalPages: number;
   /** La vista a la que vuelve al paginar: «Terminados» y «Entregados» comparten tabla. */
   readonly view?: Extract<AssignmentViewKind, 'acondicionados' | 'acondicionados_entregados'>;
+  readonly canViewTrace?: boolean;
 };
 
 export function ConditionedOrdersTable({
@@ -47,10 +49,11 @@ export function ConditionedOrdersTable({
   params,
   totalPages,
   view = 'acondicionados',
+  canViewTrace = false,
 }: ConditionedOrdersTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const columns = useMemo(() => buildConditionedOrdersColumns(), []);
+  const columns = useMemo(() => buildConditionedOrdersColumns({ canViewTrace }), [canViewTrace]);
 
   const navigate = (href: string) => {
     startTransition(() => {
@@ -78,6 +81,7 @@ export function ConditionedOrdersTable({
         status="idle"
         texts={CONDITIONED_ORDERS_TABLE_TEXTS}
         searchable={false}
+        card={FINISHED_ORDERS_CARD}
       />
     </div>
   );

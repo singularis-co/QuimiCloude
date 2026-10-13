@@ -38,11 +38,13 @@ async function currentActor(): Promise<Actor | null> {
 type DeliveredConditionedOrdersListSectionProps = {
   /** Ya acotados por `parseAssignmentListParams`. */
   readonly params: DataTableParams;
+  readonly canViewTrace?: boolean;
 };
 
 /** `/asignacion?vista=acondicionados_entregados`: los `ENTREGADO` que acondicionó el propio actor. */
 export async function DeliveredConditionedOrdersListSection({
   params,
+  canViewTrace = false,
 }: DeliveredConditionedOrdersListSectionProps) {
   const actor = await currentActor();
 
@@ -82,6 +84,7 @@ export async function DeliveredConditionedOrdersListSection({
         params={params}
         totalPages={totalPages}
         view="acondicionados_entregados"
+        canViewTrace={canViewTrace}
       />
     </div>
   );

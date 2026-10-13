@@ -36,6 +36,7 @@ async function currentActor(): Promise<Actor | null> {
 type ConditioningOrdersListSectionProps = {
   /** Ya acotados por `parseAssignmentListParams`. */
   readonly params: DataTableParams;
+  readonly canViewTrace?: boolean;
 };
 
 /**
@@ -43,7 +44,10 @@ type ConditioningOrdersListSectionProps = {
  * empresa. Llama a la fachada desde el servidor, como «Por empacar», para no abrir una Server
  * Action más que arme el actor.
  */
-export async function ConditioningOrdersListSection({ params }: ConditioningOrdersListSectionProps) {
+export async function ConditioningOrdersListSection({
+  params,
+  canViewTrace = false,
+}: ConditioningOrdersListSectionProps) {
   const actor = await currentActor();
 
   let result;
@@ -79,7 +83,12 @@ export async function ConditioningOrdersListSection({ params }: ConditioningOrde
 
   return (
     <div data-testid={CONDITIONING_ORDERS_SECTION_TESTID}>
-      <ConditioningOrdersTable rows={items} params={params} totalPages={totalPages} />
+      <ConditioningOrdersTable
+        rows={items}
+        params={params}
+        totalPages={totalPages}
+        canViewTrace={canViewTrace}
+      />
     </div>
   );
 }

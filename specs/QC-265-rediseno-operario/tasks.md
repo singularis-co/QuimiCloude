@@ -75,14 +75,14 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
   `assigned-order-cancelled-notice.tsx` y `AssignedOrdersError`. Tests: los cuatro de avisos de
   `design.md > 7` (tono, texto, `role="status"`, testid) y `asignacion-page.test.tsx` (qué aviso sale
   con cada parámetro). Guardia: reglas R14 y R42 en `guard-asignacion-componentizada.test.ts`.
-- [ ] **T3c. Filas: estado, prioridad, menú y tarjetas** (D9, R16–R21; depende de T3b). Columnas de
+- [x] **T3c. Filas: estado, prioridad, menú y tarjetas** (D9, R16–R21; depende de T3b). Columnas de
   las seis tablas; `canViewTrace` desde `page.tsx`; borrar `ConditioningOrderLink` y el `Link` del
   número de «Por empacar»; `card` en cada `DataTable`. Tests: los de columnas de `design.md > 7`
   (`StatusBadge` con tono, `PriorityMark` con nivel, testids y `data-*` de hoy) y
   `tests/unit/asignaciones-ui/assignment-row-actions.test.tsx` («Entrar» del menú por vista y su
   dirección; «Ver recorrido» solo con `canViewTrace`; sin ítems no hay menú; «Entrar» visible solo en
   «Mis asignados»; tarjeta con «Entrar» y «Acciones»).
-- [ ] **T3d. Título y limpieza** (R22, R43; depende de T3c). `PageShell` + `PageHeader` en `page.tsx`;
+- [x] **T3d. Título y limpieza** (R22, R43; depende de T3c). `PageShell` + `PageHeader` en `page.tsx`;
   el barrel deja de reexportar `MISSING_VALUE_MARK`; `assigned-orders-columns.test.tsx` importa
   `EMPTY_MARK`; `guard-piezas-base.test.ts` sin la exclusión del barrel. Snapshots de
   `asignacion-paridad` y `asignacion-listas-paridad` actualizados con las filas de `design.md > 6`.
@@ -213,6 +213,8 @@ Producción:
 - `app/(private)/asignacion/components/finished-orders-table.tsx`
 - `app/(private)/asignacion/components/finished-orders-list-section.tsx`
 - `app/(private)/asignacion/components/packing-orders-columns.tsx`
+- `app/(private)/asignacion/components/packing-orders-table.tsx` (decisión del leader 2026-10-12)
+- `app/(private)/asignacion/components/assignment-row-actions.tsx` (decisión del leader 2026-10-12)
 - `app/(private)/asignacion/components/packing-orders-list-section.tsx`
 - `app/(private)/asignacion/components/conditioning-orders-columns.tsx`
 - `app/(private)/asignacion/components/conditioning-orders-table.tsx`
@@ -298,6 +300,7 @@ Tests y guardias:
 - `tests/guards/guard-piezas-base.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `tests/unit/shared-ui/catalogo-qc256.test.ts` (alta en F2.1: fija la celda `Diseño` de `Notice`; ver `progress/impl_QC-265.md`)
+- `tests/unit/marca/tablas-marca.test.tsx` (decisión del leader 2026-10-12)
 
 E2E:
 
@@ -310,6 +313,8 @@ E2E:
 - `e2e/pedidos-terminados.spec.ts`
 - `e2e/datos-de-lote-en-acondicionamiento.spec.ts`
 - `e2e/registro-ejecucion.spec.ts`
+- `e2e/envases-del-pedido.spec.ts` (decisión del leader 2026-10-12: h1 nuevo, R23)
+- `e2e/pedido-en-varias-presentaciones.spec.ts` (decisión del leader 2026-10-12: h1 nuevo, R23)
 
 Estado:
 

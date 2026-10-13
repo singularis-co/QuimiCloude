@@ -207,6 +207,10 @@ Se borran `assigned-order-delivered-notice.tsx` y `assigned-order-cancelled-noti
 - Tarjetas: cada tabla pasa `card` a `DataTable` (`primary` = número, `status` = estado, `title` =
   receta, `meta` = cantidad / presentación / envases según la vista, `footer` = «Entrar» si la fila
   lo tiene). `RowActionsMenu` usa la presentación centrada en tarjetas (lo hace `DataTable`).
+- Decisión del leader (2026-10-12): el menú ⋯ vive en un componente de cliente
+  `app/(private)/asignacion/components/assignment-row-actions.tsx`, porque el icono no cruza de servidor a cliente.
+- Decisión del leader (2026-10-12): «Por empacar» pasa a `DataTable` con un `packing-orders-table.tsx` nuevo, como las otras cinco tablas.
+- Decisión del leader (2026-10-12): `e2e/envases-del-pedido.spec.ts` y `e2e/pedido-en-varias-presentaciones.spec.ts` se migran al `h1` nuevo (R23).
 
 **D10 — Ejecución (R23–R26).** `OrderExecutionScreen` compone `OperatorScreenFrame`:
 

@@ -37,6 +37,8 @@ vi.mock('@/lib/composition', () => ({
 }));
 
 import AsignacionPage from '@/app/(private)/asignacion/page';
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import {
   AssignedOrdersListSection,
   AssignedOrdersSkeleton,
@@ -664,5 +666,71 @@ describe('R13 — qué aviso sale con cada parámetro', () => {
     getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_EMPAQUE));
 
     expect(await avisos({})).toEqual([]);
+  });
+});
+
+describe('QC-265 R22 — el título es el único `h1`, con `PageHeader` dentro de `PageShell`', () => {
+  it('R22: la página es un `PageShell` con un único `PageHeader` «Asignación» y su testid de hoy', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_EMPAQUE));
+
+    const arbol = (await invocar()) as ReactElement;
+
+    expect(arbol.type).toBe(PageShell);
+    const cabeceras = encontrarPorTipo(arbol, PageHeader);
+    expect(cabeceras).toHaveLength(1);
+    expect(cabeceras[0].props).toMatchObject({ title: 'Asignación', titleTestId: 'asignacion-title' });
+    expect(encontrarPorTipo(arbol, 'h1')).toHaveLength(0);
+  });
+
+  it('R22: `PageHeader` pinta «Asignación» como único `h1`, con `asignacion-title`', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(OPERADOR));
+
+    const [cabecera] = encontrarPorTipo(await invocar(), PageHeader);
+    render(cabecera);
+
+    const titulos = screen.getAllByRole('heading', { level: 1 });
+    expect(titulos).toHaveLength(1);
+    expect(titulos[0]).toHaveTextContent('Asignación');
+    expect(titulos[0]).toHaveAttribute('data-testid', 'asignacion-title');
+  });
+});
+
+describe('QC-265 R20 — `canViewTrace` se decide en servidor con `dashboard.consultar` y baja a cada sección', () => {
+  const ACONDICIONA = SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? [];
+  const SECCIONES = [
+    ['asignados', OPERADOR, AssignedOrdersListSection],
+    ['terminados', EJECUTOR_CON_TERMINADOS, FinishedOrdersListSection],
+    ['todos', ADMINISTRADOR, CompanyOrdersListSection],
+    ['por_empacar', EJECUTOR_CON_EMPAQUE, PackingOrdersListSection],
+    ['por_acondicionar', ACONDICIONA, ConditioningOrdersListSection],
+    ['acondicionados', ACONDICIONA, ConditionedOrdersListSection],
+    [
+      'acondicionados_entregados',
+      ACONDICIONA,
+      DeliveredConditionedOrdersListSection,
+    ],
+  ] as const;
+
+  it.each(SECCIONES)('R20: «%s» recibe `canViewTrace: true` con el permiso', async (vista, permisos, seccion) => {
+    getSessionUserMock.mockResolvedValue(sesionCon([...permisos, 'dashboard.consultar']));
+
+    const [elemento] = encontrarPorTipo(await invocar(vista), seccion);
+    expect(elemento).toBeDefined();
+    expect(elemento.props).toMatchObject({ canViewTrace: true });
+  });
+
+  it.each(SECCIONES)('R20: «%s» recibe `canViewTrace: false` sin el permiso', async (vista, permisos, seccion) => {
+    getSessionUserMock.mockResolvedValue(sesionCon(permisos.filter((p) => p !== 'dashboard.consultar')));
+
+    const [elemento] = encontrarPorTipo(await invocar(vista), seccion);
+    expect(elemento).toBeDefined();
+    expect(elemento.props).toMatchObject({ canViewTrace: false });
+  });
+
+  it('R20: la página decide con `assertPermission`, no con un `includes` propio', () => {
+    const fuente = readFileSync(path.join(process.cwd(), 'app', '(private)', 'asignacion', 'page.tsx'), 'utf8');
+
+    expect(fuente).toMatch(/assertPermission\(sessionUser, 'dashboard\.consultar'/);
+    expect(fuente).not.toMatch(/permissions\.includes/);
   });
 });

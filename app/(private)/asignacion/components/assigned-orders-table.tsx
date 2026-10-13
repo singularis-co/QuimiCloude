@@ -3,10 +3,25 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, useTransition } from 'react';
 
-import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
+import {
+  DataTable,
+  type DataTableCardLayout,
+  type DataTableParams,
+  type DataTableTexts,
+} from '@/components/shared/data-table';
 import type { AssignedOrderView, AssignmentViewKind } from '@/lib/modules/asignaciones';
 
-import { buildAssignedOrdersColumns } from './assigned-orders-columns';
+import {
+  ASSIGNED_ORDER_ENTER_COLUMN_ID,
+  ASSIGNED_ORDER_NUMBER_COLUMN_ID,
+  ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,
+  ASSIGNED_ORDER_PRIORITY_COLUMN_ID,
+  ASSIGNED_ORDER_QUANTITY_COLUMN_ID,
+  ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID,
+  ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID,
+  ASSIGNED_ORDER_STATUS_COLUMN_ID,
+  buildAssignedOrdersColumns,
+} from './assigned-orders-columns';
 import { assignedOrdersListHref } from './assigned-orders-list-params';
 
 export const ASSIGNED_ORDERS_TABLE_ID = 'asignacion';
@@ -34,6 +49,19 @@ export const ASSIGNED_ORDERS_TABLE_TEXTS: DataTableTexts = {
   lastYear: 'Último año',
 };
 
+const ASSIGNED_ORDERS_CARD: DataTableCardLayout = {
+  primary: ASSIGNED_ORDER_NUMBER_COLUMN_ID,
+  status: ASSIGNED_ORDER_STATUS_COLUMN_ID,
+  title: ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID,
+  meta: [
+    ASSIGNED_ORDER_QUANTITY_COLUMN_ID,
+    ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,
+    ASSIGNED_ORDER_PRIORITY_COLUMN_ID,
+    ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID,
+  ],
+  footer: ASSIGNED_ORDER_ENTER_COLUMN_ID,
+};
+
 export type AssignedOrdersTableProps = {
   readonly rows: readonly AssignedOrderView[];
   readonly params: DataTableParams;
@@ -41,6 +69,7 @@ export type AssignedOrdersTableProps = {
   /** La vista vigente: viaja a cada `href` de paginacion para que no se pierda al navegar. */
   readonly vista: AssignmentViewKind;
   readonly canExecute: boolean;
+  readonly canViewTrace?: boolean;
 };
 
 export function AssignedOrdersTable({
@@ -49,10 +78,14 @@ export function AssignedOrdersTable({
   totalPages,
   vista,
   canExecute,
+  canViewTrace = false,
 }: AssignedOrdersTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const columns = useMemo(() => buildAssignedOrdersColumns({ canExecute }), [canExecute]);
+  const columns = useMemo(
+    () => buildAssignedOrdersColumns({ canExecute, canViewTrace }),
+    [canExecute, canViewTrace],
+  );
 
   // El «en vuelo» sale del `isPending` de la transicion y no de una `key` en el `<Suspense>`:
   // remontar ese limite borraria el foco.
@@ -82,6 +115,7 @@ export function AssignedOrdersTable({
         status="idle"
         texts={ASSIGNED_ORDERS_TABLE_TEXTS}
         searchable={false}
+        card={ASSIGNED_ORDERS_CARD}
       />
     </div>
   );

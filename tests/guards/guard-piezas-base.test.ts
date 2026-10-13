@@ -130,6 +130,9 @@ export const D11_SIN_HALLAZGOS = [
   'app/(private)/asignacion/components/order-distribution-full.tsx',
   'tests/unit/asignaciones-ui/conditioning-orders-list-section.test.tsx',
   'app/(private)/pedidos/components/order-list-section.tsx',
+  // Alta el 2026-10-12 (QC-265, R43): el barrel ya no reexporta `MISSING_VALUE_MARK`, asi que su
+  // exclusion estrecha sobraba y se retira; sin esta alta, `EXCLUSIONES` lo excluiria ENTERO.
+  'app/(private)/asignacion/components/index.ts',
 ] as const
 
 /** La credencial sale de QC-231 (D3): solo `components/submit-button.tsx` se toca (D12). */
@@ -159,15 +162,11 @@ type Exclusion = {
   readonly motivo: string
 }
 
-/** Archivos D11 que no quedan limpios del todo: una exclusion por simbolo, no por archivo. */
-export const EXCLUSIONES_ESTRECHAS_D11: readonly Exclusion[] = [
-  {
-    archivo: BARREL_ASIGNACION,
-    reglas: ['simbolo-borrado'],
-    simbolo: 'MISSING_VALUE_MARK',
-    motivo: 'reexporta el alias de EMPTY_MARK que aun usa assigned-orders-columns.test.tsx (P6)',
-  },
-]
+/**
+ * Archivos D11 que no quedan limpios del todo: una exclusion por simbolo, no por archivo. Vacia
+ * desde el 2026-10-12 (QC-265, R43): la del barrel de asignacion se retiro con su alias.
+ */
+export const EXCLUSIONES_ESTRECHAS_D11: readonly Exclusion[] = []
 
 export const EXCLUSIONES: readonly Exclusion[] = [
   ...ARCHIVOS_D11.filter(
@@ -201,13 +200,6 @@ export const EXCLUSIONES: readonly Exclusion[] = [
     reglas: ['compara-inesperado'],
     motivo: 'R12: `UnexpectedErrorNotice` es la otra pieza que la spec deja comparar',
   },
-  // R31: alias de EMPTY_MARK que reexporta un barrel fuera de alcance.
-  {
-    archivo: 'app/(private)/asignacion/components/assigned-orders-columns.tsx',
-    reglas: ['simbolo-borrado'],
-    simbolo: 'MISSING_VALUE_MARK',
-    motivo: 'alias de EMPTY_MARK que reexporta el barrel de asignacion, que es D11',
-  },
 ]
 
 /**
@@ -229,7 +221,6 @@ export const USOS_SOLO_LOGICA = [
  * fuera de la lista. NO estan excluidos: no son el literal `—`, asi que pasan la regla 5.
  */
 export const ALIAS_DE_EMPTY_MARK = [
-  ['app/(private)/asignacion/components/assigned-orders-columns.tsx', 'MISSING_VALUE_MARK'],
   ['components/shared/responsible-avatars.tsx', 'MISSING_RESPONSIBLES_MARK'],
   ['app/(private)/configuracion/unidades/components/unit-equivalence.ts', 'NO_EQUIVALENCE_LABEL'],
   ['app/(private)/dashboard/recorrido/[id]/components/execution-trace-detail.tsx', 'MISSING_PERSON_MARK'],
@@ -829,10 +820,12 @@ describe('QC-231 — las reglas MUERDEN (muestras sinteticas)', () => {
     }
   })
 
-  it('R22: ningun archivo de /asignacion queda excluido entero; el barrel solo por su alias', () => {
+  it('QC-265 R43: ningun archivo de /asignacion queda excluido, tampoco el barrel por su alias', () => {
     const asignacion = EXCLUSIONES.filter((e) => e.archivo.startsWith('app/(private)/asignacion/'))
-    expect(asignacion.every((e) => e.simbolo !== undefined)).toBe(true)
-    expect(reglasDe("export { EMPTY_MARK as MISSING_VALUE_MARK } from 'x'", BARREL_ASIGNACION)).toEqual([])
+    expect(asignacion).toEqual([])
+    expect(reglasDe("export { EMPTY_MARK as MISSING_VALUE_MARK } from 'x'", BARREL_ASIGNACION)).toEqual([
+      'simbolo-borrado',
+    ])
     expect(reglasDe("const T = 'min-h-11 min-w-11'", BARREL_ASIGNACION)).toEqual(['par-en-constante'])
     expect(reglasDe("export { EMPTY_CELL } from 'x'", BARREL_ASIGNACION)).toEqual(['simbolo-borrado'])
   })

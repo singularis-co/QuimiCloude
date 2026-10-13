@@ -294,3 +294,45 @@ añade `Asignacion.dc.html`. El gate rápido no lo vio porque `vitest related` n
 Es una lista cerrada de filas del catálogo que el cambio obliga a ajustar. La expectativa de `Notice`
 pasa a los dos tableros y el archivo se añade a `## Archivos esperados`. Resultado: el test queda en
 verde (6/6). Segundo `--completo`: **init OK**, 1160/1160 archivos y 17 310 tests en verde (141 saltados).
+
+## Decisiones del leader (2026-10-12) y Tanda 3, T3c–T3d (frontend_dev)
+
+Decisiones (también en `progress/features/QC-265.md > Decisiones` y en `design.md > D9`): (a) el menú ⋯
+va en el componente de cliente nuevo `assignment-row-actions.tsx`; (b) «Por empacar» pasa a `DataTable`
+con `packing-orders-table.tsx` nuevo, y entra `tests/unit/marca/tablas-marca.test.tsx`; (c)
+`e2e/envases-del-pedido.spec.ts` y `e2e/pedido-en-varias-presentaciones.spec.ts` entran en la lista
+para T8b. Los cinco archivos se añaden a `## Archivos esperados`.
+
+Archivos: se crean `assignment-row-actions.tsx`, `packing-orders-table.tsx` y
+`tests/unit/asignaciones-ui/assignment-row-actions.test.tsx`. Se modifican `page.tsx` (`PageShell` +
+`PageHeader`, `canViewTrace`), el barrel (sin `MISSING_VALUE_MARK`) y los `*-columns`, `*-table` y
+`*-list-section` de las seis tablas y de `delivered-conditioned-orders-list-section.tsx`. Desaparecen
+`ConditioningOrderLink`, `CONDITIONING_ORDER_LINK_TESTID`, el `Link` de «Por empacar» y su tabla a mano.
+Tests: `guard-piezas-base` (lista cerrada `D11_SIN_HALLAZGOS`: alta del barrel con «Alta el 2026-10-12
+(QC-265)…»; `EXCLUSIONES_ESTRECHAS_D11` queda vacía), `tablas-marca` (solo el caso de la sección de
+empaque), `asignacion-page`, los tests de columnas y de list-sections y `assigned-orders-can-execute`.
+`data-table-alcance` no se toca.
+
+Mapa R → test:
+- R16 → tests de columnas (`data-tone`, `data-status`).
+- R17 → `assigned-`/`company-orders-columns` (`data-level`, `data-priority`).
+- R18–R21 → `assignment-row-actions.test.tsx`. R20, también `asignacion-page.test.tsx`, donde las siete secciones reciben `canViewTrace`.
+- R22 → `asignacion-page.test.tsx` (un único `h1` «Asignación» con `asignacion-title`).
+- R43 → `guard-piezas-base.test.ts` «QC-265 R43».
+
+Snapshots: `asignacion-paridad` (cuatro listas) y `asignacion-acondicionamiento-paridad` (tres listas del
+acondicionador). Todo entra en § 6 R16–R21: `StatusBadge`, `PriorityMark`, «Acciones», tarjetas, número
+sin enlace y «Por empacar» sobre `DataTable`. `asignacion-listas-paridad` no cambia.
+
+Verificación:
+- typecheck OK; lint 0 errores.
+- `vitest related`: 37 archivos, 529 tests en verde.
+- `guard`: 74 archivos, 1017 en verde.
+- `marca` + `data-table-alcance` + `paridad` + `asignaciones-ui`: 73 archivos, 1110 en verde.
+- `./init.sh`: init OK.
+
+Desvíos:
+- (a) Los esqueletos (fuera de la lista) no se tocan y pintan una columna menos que la tabla cuando esta lleva «Acciones»: siempre en «Por empacar» y en las tres vistas de acondicionamiento, y en las demás solo con `canViewTrace`.
+- (b) Las tablas montan el menú con `assignmentActionsColumn` → `actionsColumn({ menu })`, que es de donde `DataTable` saca el «Acciones» de la tarjeta.
+- (c) `canViewTrace` es opcional y vale `false` por defecto, para no tocar `session-once-per-request-render.test.tsx`.
+- (d) Se renombran testids que leen los E2E: `packing-order-row` pasa a `data-table-row-<id>`; la paginación de «Por empacar» pasa a `data-table-next`/`previous`; se quita `packing-orders-page-indicator`. Se migran en T8b.

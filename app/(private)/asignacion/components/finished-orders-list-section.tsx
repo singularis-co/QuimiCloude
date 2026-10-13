@@ -16,6 +16,7 @@ export const FINISHED_ORDERS_SECTION_TESTID = 'finished-orders-list-section';
 type FinishedOrdersListSectionProps = {
   /** Ya acotados por `parseAssignmentListParams`. */
   readonly params: DataTableParams;
+  readonly canViewTrace?: boolean;
 };
 
 /**
@@ -23,7 +24,10 @@ type FinishedOrdersListSectionProps = {
  * o tabla. La accion se importa por su ruta exacta: el barrel del modulo no la reexporta a
  * proposito.
  */
-export async function FinishedOrdersListSection({ params }: FinishedOrdersListSectionProps) {
+export async function FinishedOrdersListSection({
+  params,
+  canViewTrace = false,
+}: FinishedOrdersListSectionProps) {
   const result = await listFinishedOrdersAction({ page: params.page, pageSize: params.pageSize });
 
   if (result.status === 'error') {
@@ -50,7 +54,12 @@ export async function FinishedOrdersListSection({ params }: FinishedOrdersListSe
 
   return (
     <AssignmentListSectionFrame testId={FINISHED_ORDERS_SECTION_TESTID}>
-      <FinishedOrdersTable rows={items} params={params} totalPages={totalPages} />
+      <FinishedOrdersTable
+        rows={items}
+        params={params}
+        totalPages={totalPages}
+        canViewTrace={canViewTrace}
+      />
     </AssignmentListSectionFrame>
   );
 }

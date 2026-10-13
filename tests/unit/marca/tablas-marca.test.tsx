@@ -54,8 +54,8 @@ vi.mock('next/navigation', async (importOriginal) => ({
   }),
 }));
 
-// La seccion de empaque pinta sus propias celdas: se le da una columna marcada para medir
-// que respeta la prop sin depender de que lista de columnas lleve hoy la marca.
+// La seccion de empaque monta la tabla compartida (desde QC-265, 2026-10-12): se le da una columna
+// marcada para medir que respeta la prop sin depender de que lista de columnas lleve hoy la marca.
 vi.mock('@/app/(private)/asignacion/components/packing-orders-columns', async (importOriginal) => {
   const real =
     await importOriginal<typeof import('@/app/(private)/asignacion/components/packing-orders-columns')>();
@@ -219,7 +219,7 @@ describe('tablas con la nueva marca', () => {
     expect(envasesHead).not.toHaveClass('font-mono');
     expect(numeroHead).not.toHaveClass('font-mono');
 
-    const row = screen.getByTestId('packing-order-row');
+    const row = within(table).getByTestId('data-table-row-order-1');
     const [numeroCell, envasesCell] = within(row).getAllByRole('cell');
     expect(envasesCell).toHaveClass('font-mono', 'tabular-nums');
     expect(numeroCell).not.toHaveClass('font-mono');

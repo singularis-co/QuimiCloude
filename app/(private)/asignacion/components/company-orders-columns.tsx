@@ -1,7 +1,14 @@
 'use client';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
-import { ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
+import type { DataTableCardLayout, DataTableColumn } from '@/components/shared/data-table';
+import { PriorityMark } from '@/components/shared/priority-mark';
+import { StatusBadge } from '@/components/shared/status-badge';
+import {
+  ORDER_PRIORITY_LABELS,
+  ORDER_PRIORITY_LEVELS,
+  ORDER_STATUS_LABELS,
+  ORDER_STATUS_TONES,
+} from '@/lib/shared/ui/order-status';
 import type { CompanyOrderView } from '@/lib/modules/asignaciones';
 import { formatCivilDate } from '@/lib/shared/ui/date-civil';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
@@ -13,12 +20,14 @@ import {
   recipeColumn,
   responsiblesColumn,
 } from './assignment-list-parts';
+import { assignmentActionsColumn } from './assignment-row-actions';
 import { ROUTE_ORDER_STATUS_VALUES } from './assignment-view-params';
 
 /**
  * Las columnas de «Todos»: número, receta, cantidad,
  * presentación, prioridad, estado (con filtro `select` de todos los estados) y responsables.
- * **Sin columna «Entrar» ni acciones**, tampoco para los pedidos asignados al propio actor.
+ * Sin «Entrar», tampoco para los pedidos asignados al propio actor; con `canViewTrace` se añade el
+ * menú con «Ver recorrido».
  *
  * La columna de **fecha de terminado** solo aparece cuando el filtro vigente es EXACTAMENTE
  * `['ENTREGADO']` o `['TERMINADO']`: `showFinishedAt` la decide quien construye las columnas a partir de
@@ -57,10 +66,26 @@ function FinishedAtCell({ finishedAt }: { readonly finishedAt: Date | null }) {
 export type CompanyOrdersColumnsDeps = {
   /** Decidido en el servidor a partir del filtro de estado ya parseado. */
   readonly showFinishedAt: boolean;
+  /** Decidido en servidor; sin el, la columna de acciones no se emite: su menú quedaría vacío. */
+  readonly canViewTrace?: boolean;
+};
+
+export const COMPANY_ORDERS_CARD: DataTableCardLayout = {
+  primary: COMPANY_ORDER_NUMBER_COLUMN_ID,
+  status: COMPANY_ORDER_STATUS_COLUMN_ID,
+  title: COMPANY_ORDER_RECIPE_NAME_COLUMN_ID,
+  meta: [
+    COMPANY_ORDER_QUANTITY_COLUMN_ID,
+    COMPANY_ORDER_PRESENTATION_COLUMN_ID,
+    COMPANY_ORDER_PRIORITY_COLUMN_ID,
+    COMPANY_ORDER_DATE_COLUMN_ID,
+    COMPANY_ORDER_RESPONSIBLES_COLUMN_ID,
+  ],
 };
 
 export function buildCompanyOrdersColumns({
   showFinishedAt,
+  canViewTrace = false,
 }: CompanyOrdersColumnsDeps): readonly DataTableColumn<CompanyOrderView>[] {
   const columns: DataTableColumn<CompanyOrderView>[] = [
     orderNumberColumn(COMPANY_ORDER_NUMBER_COLUMN_ID),
@@ -72,9 +97,12 @@ export function buildCompanyOrdersColumns({
       label: 'Prioridad',
       align: 'start',
       cell: (order) => (
-        <span data-testid="company-order-priority" data-priority={order.priority}>
-          {COMPANY_ORDER_PRIORITY_LABELS[order.priority]}
-        </span>
+        <PriorityMark
+          level={ORDER_PRIORITY_LEVELS[order.priority]}
+          label={COMPANY_ORDER_PRIORITY_LABELS[order.priority]}
+          data-testid="company-order-priority"
+          data-priority={order.priority}
+        />
       ),
     },
     {
@@ -83,9 +111,12 @@ export function buildCompanyOrdersColumns({
       align: 'start',
       filter: { kind: 'select', options: COMPANY_ORDER_STATUS_FILTER_OPTIONS },
       cell: (order) => (
-        <span data-testid="company-order-status" data-status={order.status}>
-          {COMPANY_ORDER_STATUS_LABELS[order.status]}
-        </span>
+        <StatusBadge
+          tone={ORDER_STATUS_TONES[order.status]}
+          label={COMPANY_ORDER_STATUS_LABELS[order.status]}
+          data-testid="company-order-status"
+          data-status={order.status}
+        />
       ),
     },
   ];
@@ -101,6 +132,10 @@ export function buildCompanyOrdersColumns({
   }
 
   columns.push(responsiblesColumn(COMPANY_ORDER_RESPONSIBLES_COLUMN_ID, (order) => order.responsibles));
+
+  if (canViewTrace) {
+    columns.push(assignmentActionsColumn<CompanyOrderView>({ canViewTrace }));
+  }
 
   return columns;
 }
