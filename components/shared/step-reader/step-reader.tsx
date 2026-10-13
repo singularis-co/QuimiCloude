@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { CountdownRing } from '@/components/shared/countdown-ring';
 import { CountdownTimer } from '@/components/shared/countdown-timer';
 import { Button } from '@/components/ui/button';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
@@ -113,50 +114,6 @@ function countPendingItems(
     );
     return pending + sinMarcar.length;
   }, 0);
-}
-
-/** Radio del anillo de espera. Fijo: el anillo no tiene tamanos variables en este diseno. */
-const WAIT_RING_RADIUS = 20;
-const WAIT_RING_CIRCUMFERENCE = 2 * Math.PI * WAIT_RING_RADIUS;
-
-/**
- * Anillo SVG que se vacia a lo largo de `seconds`. El numero sigue saliendo de
- * `CountdownTimer`: esto solo dibuja la espera, con una transicion CSS que arranca un frame
- * despues de montar para que el navegador tenga el estado inicial pintado antes de animar.
- */
-function WaitRing({ seconds }: { readonly seconds: number }) {
-  const [depleted, setDepleted] = useState(false);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setDepleted(true));
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  return (
-    <svg
-      width="40"
-      height="40"
-      viewBox="0 0 48 48"
-      aria-hidden="true"
-      data-testid="step-reader-wait-ring"
-      className="shrink-0"
-    >
-      <circle cx="24" cy="24" r={WAIT_RING_RADIUS} fill="none" strokeWidth="4" className="stroke-muted" />
-      <circle
-        cx="24"
-        cy="24"
-        r={WAIT_RING_RADIUS}
-        fill="none"
-        strokeWidth="4"
-        strokeLinecap="round"
-        transform="rotate(-90 24 24)"
-        className="stroke-primary"
-        strokeDasharray={WAIT_RING_CIRCUMFERENCE}
-        strokeDashoffset={depleted ? WAIT_RING_CIRCUMFERENCE : 0}
-        style={{ transition: `stroke-dashoffset ${seconds}s linear` }}
-      />
-    </svg>
-  );
 }
 
 /** Progreso segmentado (solo `'ejecucion'`): un tramo por paso, con su estado. */
@@ -313,7 +270,13 @@ export function StepReader({
 
   const waitReason = waiting && (
     <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
-      {isEjecucion && <WaitRing key={`ring-${arrival}`} seconds={minStepSeconds ?? 0} />}
+      {isEjecucion && (
+        <CountdownRing
+          key={`ring-${arrival}`}
+          seconds={minStepSeconds ?? 0}
+          testId="step-reader-wait-ring"
+        />
+      )}
       {TEXTS.waitPrefix}{' '}
       <CountdownTimer key={`timer-${arrival}`} seconds={minStepSeconds} onEnd={() => setWaitedArrival(arrival)} />
       {' '}

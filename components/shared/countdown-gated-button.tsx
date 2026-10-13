@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { CountdownRing } from '@/components/shared/countdown-ring';
 import { CountdownTimer } from '@/components/shared/countdown-timer';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -41,7 +42,16 @@ export function CountdownGatedButton({
     >
       {label}
       {waiting ? (
-        <CountdownTimer seconds={seconds} onEnd={() => setWaiting(false)} className="text-current" />
+        <>
+          {/* `size-5` evita el `size-4` que Button impone a sus svg; sobre su fondo, el anillo
+              toma el color del texto. */}
+          <CountdownRing
+            seconds={seconds}
+            size={20}
+            className="size-5 [&_[data-slot=countdown-ring-progress]]:stroke-current [&_[data-slot=countdown-ring-track]]:stroke-current/30"
+          />
+          <CountdownTimer seconds={seconds} onEnd={() => setWaiting(false)} className="text-current" />
+        </>
       ) : null}
     </Button>
   );

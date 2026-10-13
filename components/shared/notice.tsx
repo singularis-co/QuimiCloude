@@ -1,7 +1,10 @@
-import type { ReactNode } from 'react';
-import { CircleAlert, CircleCheck, Info, TriangleAlert, type LucideIcon } from 'lucide-react';
+'use client';
+
+import { useState, type ReactNode } from 'react';
+import { CircleAlert, CircleCheck, Info, TriangleAlert, X, type LucideIcon } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export type NoticeTone = 'success' | 'warning' | 'info' | 'danger';
@@ -13,6 +16,8 @@ export type NoticeProps = {
   readonly className?: string;
   readonly testId?: string;
   readonly id?: string;
+  /** Pinta un botón que oculta el aviso; `label` es su nombre accesible. */
+  readonly dismissible?: { readonly label: string; readonly testId?: string };
 };
 
 const TONES: Readonly<Record<NoticeTone, { readonly icon: LucideIcon; readonly classes: string }>> = {
@@ -24,8 +29,10 @@ const TONES: Readonly<Record<NoticeTone, { readonly icon: LucideIcon; readonly c
 
 // Compone el Alert de shadcn: el layout del tablero (flex, gap 12, padding 12/14, radio 10)
 // sustituye al grid base vía tailwind-merge, y el role de Alert se sobrescribe por props.
-export function Notice({ tone, title, children, className, testId, id }: NoticeProps) {
+export function Notice({ tone, title, children, className, testId, id, dismissible }: NoticeProps) {
   const { icon: Icon, classes } = TONES[tone];
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
   return (
     <Alert
       id={id}
@@ -47,6 +54,20 @@ export function Notice({ tone, title, children, className, testId, id }: NoticeP
           <AlertDescription className="text-current">{children}</AlertDescription>
         )}
       </div>
+      {dismissible !== undefined && (
+        // Márgenes negativos: el blanco táctil de 44 px no ensancha el aviso de una línea.
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={dismissible.label}
+          data-testid={dismissible.testId}
+          className="-my-2.5 -mr-2 ml-auto size-11 shrink-0 text-current"
+          onClick={() => setDismissed(true)}
+        >
+          <X aria-hidden="true" />
+        </Button>
+      )}
     </Alert>
   );
 }

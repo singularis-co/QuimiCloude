@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { COUNTDOWN_RING_TESTID } from '@/components/shared/countdown-ring';
 import {
   COUNTDOWN_GATED_BUTTON_TESTID,
   CountdownGatedButton,
@@ -82,5 +83,32 @@ describe('CountdownGatedButton', () => {
     expect(boton()).toHaveAttribute('type', 'submit');
     expect(boton()).not.toHaveAttribute('name');
     expect(document.querySelectorAll('input')).toHaveLength(0);
+  });
+
+  it('R37: mientras espera pinta dentro del botón el anillo oculto a lectores y la cuenta', () => {
+    render(<CountdownGatedButton seconds={SECONDS} label="Terminar" />);
+
+    const anillo = screen.getByTestId(COUNTDOWN_RING_TESTID);
+    expect(boton()).toContainElement(anillo);
+    expect(anillo).toHaveAttribute('aria-hidden', 'true');
+    expect(anillo).toHaveAttribute('width', '20');
+    expect(boton()).toContainElement(screen.getByRole('timer'));
+  });
+
+  it('R37: al acabar la espera no quedan anillo ni cuenta y el botón se habilita', () => {
+    render(<CountdownGatedButton seconds={SECONDS} label="Terminar" />);
+
+    avanzar(5000);
+    expect(screen.queryByTestId(COUNTDOWN_RING_TESTID)).not.toBeInTheDocument();
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    expect(boton()).toBeEnabled();
+  });
+
+  it('R37: con `disabled` sigue deshabilitado al acabar, sin anillo', () => {
+    render(<CountdownGatedButton seconds={SECONDS} label="Terminar" disabled />);
+
+    avanzar(5000);
+    expect(screen.queryByTestId(COUNTDOWN_RING_TESTID)).not.toBeInTheDocument();
+    expect(boton()).toBeDisabled();
   });
 });
