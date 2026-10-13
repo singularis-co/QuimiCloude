@@ -481,3 +481,53 @@ Migracion nueva aplicada a `qc224_anular_entrega`: `20261009120000_product_batch
 
 Verificacion: `tsc --noEmit` 0 errores; `vitest run tests/guards` + catalogo + qc121 + qc91:
 60 archivos, 925 pass, 12 skip, 0 fail.
+
+## Tanda 2 — frontend F1–F4 y arreglo de customers-migration (implementer, 2026-10-13)
+
+Commits (frontend_dev para F1–F4; implementer para el commit):
+- `308260a4` F1 acción «Entregas» en la fila (`order-row-actions`, `order-list-section`, `order-table`,
+  `order-columns`, `order-sheet`; test `order-row-actions.test.tsx`, R5).
+- `c1d9a3fb` F2 lista reutilizable (`order-delivery-list.tsx` + test; R7–R10).
+- `7dc46822` F4 historial del lote (`batch-history.test.tsx`, R35).
+- `81324c77` arreglo del rojo de CI en el PR #196: `tests/integration/clientes/customers-migration.int.test.ts`
+  sigue de forma transitiva las dependientes de `customers` (entra `20261009120100_order_delivery_voids`).
+  Ya está en `## Archivos esperados`.
+- `bf485392` F3 sheet y diálogo (`order-deliveries-sheet.tsx`, `delivery-void-dialog.tsx`, `index.ts`,
+  `order-sheet.tsx` monta el sheet solo cuando está abierto). frontend_dev corrigió solo el test R14: esperaba a
+  que el botón se rehabilitara antes del segundo clic; el componente no cambió.
+
+Mapa R → test (F3):
+- R11–R16: `tests/unit/pedidos-ui/delivery-void-dialog.test.tsx` («R11: lista solo las presentaciones sin
+  anular, todas marcadas y sin campos de cantidad», «R12: sin ninguna marcada avisa y no envia», «R13: con el
+  motivo vacio…», «R13: con mas de 500 caracteres…», «R14: dos confirmaciones del mismo dialogo envian la misma
+  clave», «R14: cerrarlo y reabrirlo envia otra clave», «R15: tras voided / already_registered cierra, avisa,
+  relee la lista y refresca», «R16: con delivery_already_voided muestra el rechazo y relee la lista», «R16: con
+  delivery_not_found / action_not_allowed / unauthorized sigue abierto… conserva lo marcado y el motivo»).
+- Sheet: `tests/unit/pedidos-ui/order-deliveries-sheet.test.tsx` (esqueleto, carga, vacío, sin permiso, error,
+  «R15: tras anular… relee», «R16: tras delivery_already_voided relee…», fallo de relectura conserva la lista).
+
+Decisiones de F3 para validar (reviewer):
+1. Motivo: se valida recortado y se envía tal cual; el servidor recorta (`z.string().trim()`).
+2. Tras un éxito, la relectura no se espera (`void reload()`); tras `delivery_already_voided` sí (`await`).
+3. Si falla la relectura con la lista ya pintada, se conserva la lista y se muestra el error encima (el spec no
+   lo dice).
+
+Verificación (implementer, 2026-10-13; máquina con poca memoria: sin `vitest related` ni E2E):
+- `pnpm exec vitest run --project integration tests/integration/clientes/customers-migration.int.test.ts`,
+  DATABASE_URL/DIRECT_URL apuntando a `qc224_anular_entrega` solo en el entorno del comando:
+  ```
+  test-db: plantilla reutilizada: qct_tpl_f0771a8cdad2 (las migraciones no han cambiado)
+  test-db: la corrida de integracion va contra qct_qc224_6f998c06_mv6rfq0w_rn0 (copia de qct_tpl_f0771a8cdad2).
+   Test Files  1 passed (1)
+        Tests  5 passed (5)
+  test-db: borrada la base de la corrida: qct_qc224_6f998c06_mv6rfq0w_rn0.
+  ```
+- `pnpm run typecheck` (`tsc --noEmit`): exit 0.
+- `pnpm exec eslint` sobre los 15 archivos que toca la tanda: exit 0, sin salida.
+- `pnpm exec vitest run` de `pedidos-ui/{delivery-void-dialog, order-deliveries-sheet, order-delivery-list,
+  order-row-actions, order-columns, order-row-wiring, order-sheet, order-sheet-coverage,
+  order-sheet-responsibles, order-table, order-list-section}` + `inventario/batch-history`:
+  `Test Files  12 passed (12)` / `Tests  291 passed (291)`.
+- Rojo aceptado sin tocar: `tests/unit/pedidos/order-delivery-append-only.test.ts` (lo enmienda TC).
+
+Pendiente: TC, TI, TZ (sin empezar).
