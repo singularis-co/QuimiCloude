@@ -850,6 +850,15 @@
    "title": "ModalesConfiguracion",
    "page": "configuracion",
    "is_interactive": true
+  },
+  "CountrySelect.dc.html": {
+   "x": 0,
+   "y": 6900,
+   "w": 1440,
+   "h": 1240,
+   "title": "CountrySelect (QC-235)",
+   "page": "fundamentos",
+   "is_interactive": true
   }
  },
  "order": [
@@ -939,7 +948,8 @@
   "Integraciones.dc.html",
   "IntegracionesTablet.dc.html",
   "IntegracionesMovil.dc.html",
-  "ModalesConfiguracion.dc.html"
+  "ModalesConfiguracion.dc.html",
+  "CountrySelect.dc.html"
  ],
  "notes": {
   "t1": {
