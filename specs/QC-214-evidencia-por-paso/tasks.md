@@ -47,26 +47,26 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
 - [x] **T7. Acceso: `evidence-target.ts`** (R26, R27, R38, R39). `design.md > 5.2`.
   *Hecho:* cubierto por los tests de T8 y T9: sin permiso, no asignado, otro empacador, otra
   empresa, `POR_EMPACAR`/`CANCELADO`/dado de baja → rechazo sin tocar el storage.
-- [ ] **T8. `request-evidence-upload.ts`** (R26–R30). *Hecho:*
+- [x] **T8. `request-evidence-upload.ts`** (R26–R30). *Hecho:*
   `tests/unit/asignaciones/request-evidence-upload.test.ts`: paso inexistente, paso sin evidencia,
   3 fotos sin sustituir → `evidence_limit`; ruta bajo `<empresa>/<pedido>/`; ningún campo de
   entrada elige la ruta (`strictObject`).
-- [ ] **T9. `register-evidence.ts` y `remove-evidence.ts`** (R19, R21, R28, R29, R31–R33, R38).
+- [x] **T9. `register-evidence.ts` y `remove-evidence.ts`** (R19, R21, R28, R29, R31–R33, R38).
   *Hecho:* `tests/unit/asignaciones/register-evidence.test.ts` y `remove-evidence.test.ts`:
   ruta ajena rechazada, archivo inexistente, PDF renombrado y > 5 MB → `evidence_invalid_file` y
   archivo borrado; `replace` en el mismo `slot`; URL de 15 min; un `remove` que falla vuelve como
   advertencia; pedido terminado o cancelado → rechazo.
-- [ ] **T10. `count-evidence-locking-orders.ts`** (R8–R12). `design.md > 5.6`.
+- [x] **T10. `count-evidence-locking-orders.ts`** (R8–R12). `design.md > 5.6`.
   *Hecho:* `tests/unit/asignaciones/count-evidence-locking-orders.test.ts`: cuenta `EN_CURSO` con
   fotos de fabricación y `EN_EMPAQUE` con fotos de envasado; ignora otros estados, otras recetas y
   pedidos sin fotos; pagina hasta el final.
-- [ ] **T11. Avanzar y terminar** (R34–R37). `record-step-move.ts`, `finish-assigned-order.ts`,
+- [x] **T11. Avanzar y terminar** (R34–R37). `record-step-move.ts`, `finish-assigned-order.ts`,
   `finish-packing.ts` (`design.md > 5.7`).
   *Hecho:* `tests/unit/asignaciones/record-step-move-evidence.test.ts` (avance rechazado sin
   anotar; retroceso nunca se rechaza); casos nuevos en `finish-assigned-order.test.ts` y
   `finish-packing.test.ts` (rechazo sin transición; switch encendido después de empezar también
   se exige, R37; sin pasos con evidencia, igual que hoy).
-- [ ] **T12. Lecturas con fotos** (R14, R33). `get-assigned-order-execution.ts` (`evidence`),
+- [x] **T12. Lecturas con fotos** (R14, R33). `get-assigned-order-execution.ts` (`evidence`),
   `get-packing-order.ts` (`packingEvidence`), vistas y barrel.
   *Hecho:* casos nuevos en `get-assigned-order-execution.test.ts` y `get-packing-order.test.ts`:
   URL firmadas por foto; en empaque, sin fotos si empaca otro.
