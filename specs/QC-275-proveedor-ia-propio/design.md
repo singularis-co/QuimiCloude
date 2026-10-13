@@ -239,25 +239,21 @@ y su `down.sql` con el valor anterior. Lo dice el comentario del modelo; no hay 
 
 ## 3. Modelos del seed (punto 1 del leader)
 
-**Todos `[POR VERIFICAR]`.** Este spec se escribió **sin red** (ni documentación de los
-proveedores ni registro de npm); el humano los cierra en F1.4 contra la documentación oficial y,
-si cambian, se corrige esta tabla antes de T1. Requisito de cada modelo: aceptar PDF (uso receta,
-modo `pdf`) e imágenes PNG (uso catálogo, modo `images`), que es lo que mandan los dos usos.
+**Cerrado en F1.4 (2026-10-13)** por `requirements.md > Decisiones cerradas`, fila «¿Qué modelos
+siembra cada proveedor?», que sustituye la propuesta anterior (Claude `claude-sonnet-5-5`). Requisito
+de cada modelo: aceptar PDF (uso receta, modo `pdf`) e imágenes PNG (uso catálogo, modo `images`).
+Ids nativos confirmados en T0 (2026-10-13, F2.1) contra la documentación oficial de cada proveedor;
+entrada `file` + `image` comprobada en `architecture.input_modalities` del catálogo de OpenRouter.
 
-| Proveedor | Receta | Catálogo | Fuente que se pudo ver | Dónde se verifica |
-|---|---|---|---|---|
-| Claude (`ANTHROPIC`) | `claude-sonnet-5-5` `[POR VERIFICAR]` | `claude-sonnet-5-5` `[POR VERIFICAR]` | Tipo `Model` de `@anthropic-ai/sdk@0.131.0` (la versión instalada, publicada el 2026-09-30), que enumera entre otros `claude-sonnet-5-5`, `claude-opus-5-5` y `claude-haiku-4-5`; `.env.example` lo pone de ejemplo de `ANTHROPIC_MODEL`. **No es la documentación oficial** y el valor real de `ANTHROPIC_MODEL` en producción no se conoce aquí | docs.anthropic.com, «Models overview» |
-| Gemini (`GOOGLE`) | `[POR VERIFICAR]` | `[POR VERIFICAR]` | Ninguna en el repo: `GEMINI_MODEL` no tiene valor versionado y `@google/genai` no enumera modelos. **Candidato natural:** el valor de `GEMINI_MODEL` que hoy tenga producción, que el humano conoce | ai.google.dev, «Gemini models» |
-| OpenAI (`OPENAI`) | `[POR VERIFICAR]` | `[POR VERIFICAR]` | Ninguna (el SDK no está instalado) | platform.openai.com, «Models» (comprobar entrada de archivos PDF) |
-| OpenRouter (`OPENROUTER`) | `[POR VERIFICAR]` | `[POR VERIFICAR]` | Ninguna. Los ids tienen la forma `<vendor>/<modelo>` | openrouter.ai/models (filtrar por entrada de archivo e imagen) |
+| Proveedor | Receta | Catálogo | Confirmado en |
+|---|---|---|---|
+| Claude (`ANTHROPIC`) | `claude-haiku-5-5` | `claude-haiku-5-5` | docs.anthropic.com, «Models overview» |
+| Gemini (`GOOGLE`) | `gemini-3.8-flash` | `gemini-3.5-flash-lite` | ai.google.dev/gemini-api/docs/models |
+| OpenAI (`OPENAI`) | `gpt-6-luna` | `gpt-6-luna` | platform.openai.com/docs/models |
+| OpenRouter (`OPENROUTER`) | `anthropic/claude-haiku-5.5` | `anthropic/claude-haiku-5.5` | openrouter.ai/api/v1/models |
 
-Fecha de la propuesta: 2026-10-13. Receta y catálogo **pueden** ser el mismo id: el seed tiene las
-dos columnas para poder separarlos sin otra ficha. Para Claude se propone el mismo en los dos usos
-porque el catálogo (muchas imágenes, JSON largo) es el uso exigente y la receta no compensa un
-segundo modelo sin datos de calidad; un modelo más barato para receta (`claude-haiku-4-5`) es una
-opción que el humano puede elegir.
-
-**Sin un id verificado no se escribe la migración** (T2 depende de que esta tabla esté cerrada).
+Receta y catálogo **pueden** ser el mismo id: el seed tiene las dos columnas para poder separarlos
+sin otra ficha.
 
 ---
 

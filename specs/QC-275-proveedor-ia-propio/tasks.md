@@ -11,7 +11,7 @@
 
 ## Bloque 0 — Dependencia
 
-- [ ] **T0. Verificar e instalar `openai`.** `npm view openai deprecated time.modified license` y
+- [x] **T0. Verificar e instalar `openai`.** `npm view openai deprecated time.modified license` y
   descargas semanales; si los cuatro checks pasan, completar la fila de `design.md > 18.1` en
   `docs/dependencias.md` con los datos reales y la aprobación de F1.4, `pnpm add openai`. Si alguno
   falla: **parar** y devolver al leader. Enmendar en el mismo commit las filas de
