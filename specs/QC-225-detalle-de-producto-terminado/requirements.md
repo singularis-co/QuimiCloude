@@ -224,12 +224,7 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
 
 ## Preguntas abiertas
 
-- **P1 (R29, no bloquea el spec).** La decisión de llegada desde /pedidos no dice qué pasa si quien ve
-  la lista no tiene `inventario.consultar`. R29 propone no pintar el enlace, porque llevaría a una
-  ficha que responde 404 (R1). Hoy los roles sembrados con `pedidos.consultar` (solo Administrador)
-  también tienen `inventario.consultar`, así que el caso solo aparece con un conjunto de permisos
-  hecho a mano. Si el humano prefiere pintar el enlace siempre, R29 se reduce a «la lista se pinta
-  igual si la consulta falla».
+Ninguna. P1 se cerró el 2026-10-13 tal como se proponía (ver `## Decisiones cerradas`).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -251,3 +246,4 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
 | 2026-10-09 | Listados largos | Heredado: los tabs de historial se paginan con `lib/shared/pagination.ts` y `DataTable`. |
 | 2026-10-09 | Identificadores y borrado | Heredado de QC-150 D10 / QC-4: identificadores en inglés, borrado lógico. |
 | 2026-10-13 | ¿Cómo se ve una entrega anulada? (era P2; QC-224 ya está en `dev`) | En Entregas, una entrega con presentaciones anuladas conserva su fila, marcada «Anulada» con su motivo, y lo anulado no cuenta en el total entregado. El asiento `delivery_void` sale en Entradas con la etiqueta «Anulación de entrega». |
+| 2026-10-13 | ¿Se pinta el enlace desde /pedidos si quien ve la lista no tiene `inventario.consultar`? (era P1) | No: se aprueba la propuesta de R29. Sin `inventario.consultar` no se pinta el enlace, porque llevaría a una ficha que responde 404 (R1); y si la consulta falla, la lista se pinta igual, sin enlaces. |

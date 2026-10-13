@@ -14,7 +14,7 @@
 > - **Enmienda 2026-10-13:** QC-224 ya está en esta rama. Cambian T0, B1, B2, B3, F1, F2 y TZ para
 >   R33–R36 (entregas anuladas). Las cifras de los censos se toman de la rama al editar.
 
-## T0 — Contrato publicado (secuencial; lo hace `backend_dev`)
+## [x] T0 — Contrato publicado (secuencial; lo hace `backend_dev`)
 
 Archivos:
 - `lib/modules/inventario/domain/finished-product-detail.ts` (nuevo). Lleva los tipos de

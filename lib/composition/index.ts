@@ -67,11 +67,17 @@ import {
   createCreateRawMaterial,
   createDeletePresentation,
   createDeleteProduct,
+  createGetFinishedProduct,
   createGetProduct,
   createListBatchMovements,
+  createListFinishedProductBatches,
+  createListFinishedProductCosts,
+  createListFinishedProductDeliveries,
+  createListFinishedProductMovements,
   createListFinishedStock,
   createListOrderBatches,
   createListPresentations,
+  createListProducedProducts,
   createListProductBatches,
   createListProductFormUnits,
   createListProducts,
@@ -144,8 +150,10 @@ import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log
 import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-number-formatter';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
+import type { FinishedProductDetailRepository } from '@/lib/modules/inventario/ports/finished-product-detail-repository';
 import type {
   FinishedBatchCatalog,
+  FinishedDeliveryDirectory,
   OrderNumberDirectory,
   PackagingCatalog,
   PresentationCatalog,
@@ -923,6 +931,25 @@ const presentationRepository: PresentationRepository = {
  *  cableado: un `const` no existe antes de su linea. */
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
+// Dobles vacios hasta que existan sus adaptadores.
+const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
+  findDeliveryDetails: async () => new Map(),
+  summarizeDelivered: async () => ({ quantity: '0.0000', packages: 0 }),
+};
+
+function emptyFinishedProductPage<T>(request: { page: number; pageSize?: number }) {
+  return buildPage<T>([], 0, request.page, toOffsetLimit(request.page, request.pageSize).limit);
+}
+
+const finishedProductDetailRepository: FinishedProductDetailRepository = {
+  findAliveFinished: async () => null,
+  listBatches: async (_productId, page) => emptyFinishedProductPage(page),
+  listMovements: async (_productId, _direction, page) => emptyFinishedProductPage(page),
+  listDeliveryMovements: async (_productId, page) => emptyFinishedProductPage(page),
+  listProductionCosts: async (_productId, page) => emptyFinishedProductPage(page),
+  findProducedProducts: async () => [],
+};
+
 /**
  * El aviso de existencia que sube, atado a la revision de los pedidos bloqueados de `pedidos`.
  * Va antes de la fachada de `inventario`, que lo necesita; `reviewBlockedOrders` se declara mas
@@ -1038,6 +1065,31 @@ export const inventario = {
     stockIncreases: stockIncreaseListener,
     digest: fileDigest,
   }),
+  getFinishedProduct: createGetFinishedProduct({
+    products: finishedProductDetailRepository,
+    units: { findRefs: findUnitRefs },
+  }),
+  listFinishedProductBatches: createListFinishedProductBatches({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+  }),
+  listFinishedProductMovements: createListFinishedProductMovements({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+  }),
+  listFinishedProductDeliveries: createListFinishedProductDeliveries({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+    deliveries: finishedDeliveryDirectory,
+    customers: {
+      findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
+    },
+  }),
+  listFinishedProductCosts: createListFinishedProductCosts({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+  }),
+  listProducedProducts: createListProducedProducts({ products: finishedProductDetailRepository }),
 } as const;
 
 // El modulo `unidades` (QC-32) siembra su catalogo con su propia migracion. `recetas`
