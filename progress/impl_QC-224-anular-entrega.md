@@ -674,7 +674,7 @@ rama: lo cubre la guardia preexistente `tests/guards/guard-dependencias-aprobada
 | R33 | unit/pedidos/order-delivery-append-only.test.ts:112 `la anulacion de una entrega es solo de insercion (R33)`<br>unit/pedidos/schema/order-delivery-voids-migration.test.ts:284 `R33: ninguna de las dos tablas tiene updated_at ni deleted_at` |
 | R34 | unit/pedidos/schema/order-delivery-voids-migration.test.ts:423 `R34: tablas, columnas y valor de enum nuevos estan en ingles y son exactamente los esperados` |
 | R35 | unit/inventario/batch-history.test.tsx:336 `R35 — un asiento de anulacion de entrega se pinta como «Anulación de entrega», con la cantidad en positivo, el pedido, e` |
-| R36 | e2e/anular-entrega.spec.ts:540 `el motivo vacio no envia nada y la anulacion con motivo devuelve el lote, reabre el pedido y deja la presentacion pendie` |
+| R36 | e2e/anular-entrega.spec.ts:593 `el motivo vacio no envia nada y la anulacion con motivo devuelve el lote, reabre el pedido y deja la presentacion pendiente (R36)`; e2e/anular-entrega.spec.ts:753 `un usuario sin permiso de anular entregas abre «Entregas» y no ve «Anular» (R36)` |
 | R37 | guards/guard-dependencias-aprobadas.test.ts (preexistente, 2 casos) + `git diff origin/dev -- package.json pnpm-lock.yaml` vacio |
 
 Contraste con `design.md > 10` (archivo previsto -> aparece en la fila):
@@ -855,3 +855,13 @@ La fila R36 del mapa de TZ (`e2e/anular-entrega.spec.ts:540`) no se toca aqui.
   demas no lo exigen. Corrida de los 18 de `tests/unit` del barrido: `Test Files 18 passed (18)` /
   `Tests 238 passed | 69 skipped (307)`; los 5 de `tests/guards` ya estaban en la corrida de guardias (67 passed).
 - `vitest run tests/unit/shared/data-table-alcance.test.ts`: `Tests 18 passed | 2 skipped (20)`.
+
+### 3. Mapa de TZ, fila R36
+- Corregida: `e2e/anular-entrega.spec.ts:540` -> `:593` (anulacion con motivo) y `:753` (sin permiso), los dos casos
+  verificados en la seccion «E2E tras merge».
+
+### Verificacion de la tanda
+- `pnpm run typecheck` (`tsc --noEmit`): sin errores.
+- `eslint` de `data-table-alcance.test.ts` y `guard-identificador-de-request.test.ts`: limpio.
+- `vitest run tests/guards`: 67 passed (946 tests, 14 skipped); censos de `tests/unit` del barrido (incluye
+  `clientes/scope` y `data-table-alcance`): 18 passed (238 tests, 69 skipped). Sin suite completa.
