@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Presentaciones enlazadas a la ficha</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.plink{display:inline-flex;align-items:center;max-width:100%;min-height:44px;min-width:44px;border-radius:8px;font-weight:500;color:var(--primary);text-decoration:none;text-underline-offset:4px;outline:none}
+.plink:hover,.plink.h{text-decoration:underline}
+.plink:focus-visible,.plink.f{box-shadow:0 0 0 3px var(--ring)}
+.more{min-height:44px;min-width:44px}
+.more.h{background-size:100% 100%;background-position:0 0;color:var(--primary)}
+.more:focus-visible,.more.f{outline:none;box-shadow:0 0 0 3px var(--ring)}
+.ppop{position:absolute;top:calc(100% + 4px);left:0;z-index:20;padding:10px;border-radius:8px;background:var(--popover);box-shadow:0 4px 12px rgb(0 0 0 / .12),0 0 0 1px color-mix(in oklch,var(--fg) 10%,transparent);opacity:0;scale:.95;transform-origin:top left;pointer-events:none;transition:opacity 150ms cubic-bezier(.4,0,1,1),scale 150ms cubic-bezier(.4,0,1,1);white-space:nowrap}
+.ppop.open{opacity:1;scale:1;pointer-events:auto;transition-duration:200ms;transition-timing-function:cubic-bezier(0,0,.2,1)}
+.ppop.static{position:static}
+.ppop ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.chev-r{transition:transform 200ms}
+.chev-r.on{transform:rotate(90deg)}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="min-height: 100%">
+  <div class="page" style="max-width: 1376px; margin: 0 auto; padding: 32px; box-sizing: border-box">
+    <div class="ph"><div class="ph-t"><h1 class="h1">Llegada a la ficha de producto terminado</h1><p class="sub" style="margin: 0">Celda «Presentación» de /pedidos y nombre del producto en /inventario › Producto terminado.</p></div></div>
+
+    <section aria-labelledby="pp-a" style="display: flex; flex-direction: column; gap: 12px">
+      <h2 id="pp-a" class="h2">/pedidos · columna «Presentación»</h2>
+      <div class="tw">
+        <div class="scroll" style="overflow: visible">
+          <table style="min-width: 760px">
+            <thead><tr><th scope="col">Nº de pedido</th><th scope="col">Estado</th><th scope="col">Receta</th><th scope="col">Cliente</th><th scope="col" style="text-align: center">Presentación</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="mono">2026-0000008</td>
+                <td><span class="sb t-success"><i></i>Terminado</span></td>
+                <td class="strong">Limpiador multiusos limón</td>
+                <td>María Pérez</td>
+                <td style="text-align: center">
+                  <span class="anchor" style="display: inline-flex; align-items: center; gap: 4px; position: relative" title="6 × Galón, 2 × Garrafa 20 L, 4 × Botella 1 L">
+                    <a class="plink" href="ProductoTerminado.dc.html">6 × Galón</a>
+                    <button class="b b-gho b-sm more" type="button" aria-label="+2, ver las 3 presentaciones" aria-haspopup="dialog" aria-expanded="{{ openStr }}" onClick="{{ toggle }}">+2</button>
+                    <div class="{{ popCls }}" role="dialog" aria-label="Presentaciones del pedido 2026-0000008">
+                      <ul>
+                        <li><a class="plink" href="ProductoTerminado.dc.html">6 × Galón</a></li>
+                        <li><a class="plink" href="ProductoTerminado.dc.html">2 × Garrafa 20 L</a></li>
+                        <li><span style="display: inline-flex; align-items: center; min-height: 44px">4 × Botella 1 L</span></li>
+                      </ul>
+                    </div>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td class="mono">2026-0000005</td>
+                <td><span class="sb t-success"><i></i>Entregado</span></td>
+                <td class="strong">Blanqueador hipoclorito 5 %</td>
+                <td>Juan Rodríguez</td>
+                <td style="text-align: center"><span title="10 × Galón"><a class="plink" href="ProductoTerminado.dc.html">10 × Galón</a></span></td>
+              </tr>
+              <tr>
+                <td class="mono">2026-0000012</td>
+                <td><span class="sb t-info"><i></i>En curso</span></td>
+                <td class="strong">Desengrasante alcalino</td>
+                <td>Ana Torres</td>
+                <td style="text-align: center"><span title="6 × Garrafa 20 L, 3 × Galón">6 × Garrafa 20 L +1</span></td>
+              </tr>
+              <tr>
+                <td class="mono">2026-0000013</td>
+                <td><span class="sb t-success"><i></i>Terminado</span></td>
+                <td class="strong">Limpiador cítrico</td>
+                <td>María Pérez</td>
+                <td style="text-align: center"><span title="20 × Galón">20 × Galón</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="pp-b" style="display: flex; flex-direction: column; gap: 12px">
+      <h2 id="pp-b" class="h2">Estados del enlace y del «+N»</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px">
+        <div class="card" style="padding: 16px; gap: 10px"><span class="cap">Reposo</span><span style="display: inline-flex; align-items: center; gap: 4px"><a class="plink" href="ProductoTerminado.dc.html">6 × Galón</a><button class="b b-gho b-sm more" type="button" aria-label="+2, ver las 3 presentaciones">+2</button></span></div>
+        <div class="card" style="padding: 16px; gap: 10px"><span class="cap">Hover</span><span style="display: inline-flex; align-items: center; gap: 4px"><a class="plink h" href="ProductoTerminado.dc.html">6 × Galón</a><button class="b b-gho b-sm more h" type="button" aria-label="+2, ver las 3 presentaciones">+2</button></span></div>
+        <div class="card" style="padding: 16px; gap: 10px"><span class="cap">Foco con teclado</span><span style="display: inline-flex; align-items: center; gap: 8px"><a class="plink f" href="ProductoTerminado.dc.html">6 × Galón</a><button class="b b-gho b-sm more f" type="button" aria-label="+2, ver las 3 presentaciones">+2</button></span></div>
+        <div class="card" style="padding: 16px; gap: 10px"><span class="cap">Abierto</span><span style="display: inline-flex; align-items: flex-start; gap: 4px; flex-wrap: wrap"><a class="plink" href="ProductoTerminado.dc.html">6 × Galón</a><button class="b b-gho b-sm more" type="button" aria-label="+2, ver las 3 presentaciones" aria-expanded="true">+2</button>
+          <div class="ppop open static" role="dialog" aria-label="Presentaciones del pedido">
+            <ul>
+              <li><a class="plink" href="ProductoTerminado.dc.html">6 × Galón</a></li>
+              <li><a class="plink" href="ProductoTerminado.dc.html">2 × Garrafa 20 L</a></li>
+              <li><span style="display: inline-flex; align-items: center; min-height: 44px">4 × Botella 1 L</span></li>
+            </ul>
+          </div></span>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="pp-c" style="display: flex; flex-direction: column; gap: 12px">
+      <h2 id="pp-c" class="h2">/inventario › Producto terminado · nombre enlazado</h2>
+      <div class="tw">
+        <div class="scroll">
+          <table style="min-width: 760px">
+            <thead><tr><th scope="col" style="width: 68px">Imagen</th><th scope="col"># Pedido</th><th scope="col">Nombre</th><th scope="col" class="num">Existencia</th><th scope="col" class="num">Alerta de cantidad</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="thumb photo" role="img" aria-label="Limpiador multiusos limón"></span></td>
+                <td class="strong mono">2026-0000008</td>
+                <td><span style="display: flex; align-items: center; gap: 4px"><button class="b b-gho b-ico more" type="button" aria-label="Productos de Pedido 2026-0000008 · Limpiador multiusos limón" aria-expanded="{{ expStr }}" onClick="{{ toggleExp }}"><svg class="{{ chevCls }}" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button><span class="strong">Limpiador multiusos limón</span></span></td>
+                <td class="num mono">10 × Galón + 2 L</td>
+                <td class="num"></td>
+                <td class="rowact"></td>
+              </tr>
+              <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}">
+                <tr class="fade">
+                  <td></td>
+                  <td></td>
+                  <td><span style="display: block; padding-left: 48px"><a class="plink" href="ProductoTerminado.dc.html"><span style="min-width: 0; overflow-wrap: anywhere">Limpiador multiusos limón</span></a></span></td>
+                  <td class="num mono">10 × Galón + 2 L</td>
+                  <td class="num mono dim">20 L</td>
+                  <td class="rowact"><button class="b b-gho b-ico" type="button" aria-label="Acciones de Limpiador multiusos limón"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button></td>
+                </tr>
+              </sc-if>
+              <tr>
+                <td><span class="thumb" role="img" aria-label="Sin imagen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span></td>
+                <td class="strong">Sin pedido</td>
+                <td><span style="display: flex; align-items: center; gap: 4px"><button class="b b-gho b-ico more" type="button" aria-label="Productos de Sin pedido · Limpiador cítrico" aria-expanded="false"><svg class="ic chev-r" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button><span class="strong">Limpiador cítrico</span></span></td>
+                <td class="num mono">14 L</td>
+                <td class="num"></td>
+                <td class="rowact"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = !!this.props.oscuro;
+const open = !!s.open;
+const exp = s.exp !== undefined ? s.exp : true;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+openStr: open ? 'true' : 'false',
+toggle: () => this.setState({ open: !open }),
+popCls: open ? 'ppop open' : 'ppop',
+expanded: exp,
+expStr: exp ? 'true' : 'false',
+toggleExp: () => this.setState({ exp: !exp }),
+chevCls: exp ? 'ic chev-r on' : 'ic chev-r'
+};
+}
+}
+</script>
+</body>
+</html>
