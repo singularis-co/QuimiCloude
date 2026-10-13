@@ -283,7 +283,7 @@ tanda también.
 
 ---
 
-## [ ] TI — E2E
+## [x] TI — E2E
 Depende de: TC.
 
 Archivos:

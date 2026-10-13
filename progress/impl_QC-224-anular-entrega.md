@@ -582,4 +582,49 @@ Verificacion (maquina con poca memoria: sin `vitest related` ni E2E):
   permissions y session-once-per-request-actions, `tests/unit/composition`), tras los arreglos:
   `Test Files  194 passed (194)` / `Tests  3576 passed | 15 skipped (3591)`.
 
-Pendiente: TI, TZ.
+Pendiente: TI, TZ (TI cerrada abajo).
+
+## TI — E2E (frontend_dev, 2026-10-13)
+
+### Archivos
+- `e2e/anular-entrega.spec.ts` (nuevo).
+- `tests/guards/guard-identificador-de-request.test.ts`: `anular-entrega.spec.ts` en `E2E_ESPERADOS`.
+
+### Siembra
+Prisma, prefijo `qc224_e2e_` + `RUN_ID` del worker, empresa propia: Administrador; rol sintetico con
+solo `pedidos.consultar` y su usuario; un cliente; receta con dos presentaciones (contenido 1 y 2);
+producto terminado con un lote por presentacion; pedido `ENTREGADO` (3 + 2 envases) con una entrega
+de las dos presentaciones desde dos lotes, sus dos asientos `delivery` y el stock del lote ya
+descontado. `afterAll` borra solo lo del worker, en orden de FK.
+
+### R -> test (TI)
+| R | Test |
+|---|---|
+| R36 | `e2e/anular-entrega.spec.ts` › «el motivo vacio no envia nada y la anulacion con motivo devuelve el lote, reabre el pedido y deja la presentacion pendiente (R36)» (pasos 1–5: `delivery-void-reason-error` sin escrituras; lote 2 a 6.0000, asiento `delivery_void` +4.0000, fila de `order_delivery_voids` con motivo y actor y solo la linea 2, entrega/lineas/asientos `delivery` identicos antes y despues, pedido `TERMINADO`; lista con la anulada y su motivo, fila `data-status="TERMINADO"`; «Entregar» con la linea 2 pendiente) |
+| R36 | `e2e/anular-entrega.spec.ts` › «un usuario sin permiso de anular entregas abre «Entregas» y no ve «Anular» (R36)» (paso 6; 0 botones `order-delivery-void`) |
+
+### Corrida local (base `qc224_anular_entrega`, variables en el entorno del comando, sin `.env`)
+`prisma migrate status`: 85 migrations found… Database schema is up to date!
+Memoria baja: un proyecto por corrida, `--workers=1`, puerto 3117 libre antes y despues.
+```
+pnpm exec playwright test e2e/anular-entrega.spec.ts --project=chromium --workers=1
+[2/2] [chromium] › e2e\anular-entrega.spec.ts:752:7 › anular una entrega de un pedido › un usuario sin permiso de anular entregas abre «Entregas» y no ve «Anular» (R36)
+  2 passed (56.6s)
+
+pnpm exec playwright test e2e/anular-entrega.spec.ts --project=webkit --workers=1
+Running 2 tests using 1 worker
+[1/2] [webkit] › e2e\anular-entrega.spec.ts:592:7 › anular una entrega de un pedido › el motivo vacio no envia nada y la anulacion con motivo devuelve el lote, reabre el pedido y deja la presentacion pendiente (R36)
+[2/2] [webkit] › e2e\anular-entrega.spec.ts:752:7 › anular una entrega de un pedido › un usuario sin permiso de anular entregas abre «Entregas» y no ve «Anular» (R36)
+  2 passed (32.1s)
+```
+Filas con prefijo tras la corrida (psql): 0 en companies, users, roles, role_permissions, customers,
+presentations, recipes, products, product_batches, inventory_movements, orders y order_delivery_voids.
+
+### Gate
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores, 7 warnings en archivos ajenos (`tests/unit/pedidos/order-service.test.ts`,
+  `tests/unit/documentos/confirm-catalog-import.test.ts`).
+- `pnpm exec vitest run guard`: 65 archivos; 893 passed, 18 skipped.
+- `pnpm exec vitest related --run e2e/anular-entrega.spec.ts tests/guards/guard-identificador-de-request.test.ts`: 1 archivo, 23 passed.
+
+Pendiente: TZ.

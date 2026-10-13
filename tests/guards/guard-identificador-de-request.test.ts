@@ -342,6 +342,11 @@ export const E2E_ESPERADOS = [
   // cliente, entrega que completa y usuario sin permiso. No lee ni afirma nada sobre el
   // identificador de peticion ni sobre `reference`.
   'entregar-producto-terminado.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la anulacion de una presentacion de una entrega
+  // desde «Entregas»: motivo vacio que no envia nada, anulacion con motivo que devuelve el lote y
+  // reabre el pedido, la presentacion otra vez pendiente en «Entregar» y usuario sin permiso. No lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'anular-entrega.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
