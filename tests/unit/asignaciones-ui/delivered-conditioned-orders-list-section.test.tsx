@@ -1,15 +1,15 @@
 // La sección es un Server Component `async`: se llama como funcion y se renderiza lo que devuelve.
 // La fachada esta mockeada: es el borde que permite ejercitar error, vacio y lista sin base de datos.
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 import {
   DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID,
   DeliveredConditionedOrdersListSection,
+  assignedOrdersListHref,
   buildConditionedOrdersColumns,
-  deliveredConditionedOrdersHref,
 } from '@/app/(private)/asignacion/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
@@ -94,8 +94,9 @@ beforeEach(() => {
 });
 
 describe('«Entregados» del acondicionador', () => {
-  it('R20: pide listDeliveredConditionedOrders con el actor y enlaza el número al detalle', async () => {
+  it('R20, QC-265 R19: pide listDeliveredConditionedOrders con el actor; el menú entra al detalle', async () => {
     listDeliveredConditionedOrdersMock.mockResolvedValue(pagina([DELIVERED_ROW]));
+    const user = setupUser();
 
     render(await DeliveredConditionedOrdersListSection({ params: parametros() }));
 
@@ -105,10 +106,11 @@ describe('«Entregados» del acondicionador', () => {
     );
     expect(listConditionedOrdersMock).not.toHaveBeenCalled();
     expect(screen.getByTestId(DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '2026-0000050' })).toHaveAttribute(
-      'href',
-      '/asignacion/acondicionamiento/order-d',
-    );
+    const tabla = screen.getByRole('table');
+    expect(within(tabla).queryByRole('link', { name: '2026-0000050' })).toBeNull();
+    await user.click(within(tabla).getByRole('button', { name: 'Acciones del pedido 2026-0000050' }));
+    const entrar = await esperarInteractiva(await screen.findByTestId('assignment-row-enter'));
+    expect(entrar).toHaveAttribute('href', '/asignacion/acondicionamiento/order-d');
   });
 
   it('R20: las mismas columnas, en el mismo orden, que «Terminados»', async () => {
@@ -158,7 +160,7 @@ describe('«Entregados» del acondicionador', () => {
     const href = routerMock.push.mock.calls[0]?.[0] ?? '';
     expect(href).toContain('vista=acondicionados_entregados');
     expect(href).toContain('page=2');
-    expect(deliveredConditionedOrdersHref({ page: 1, pageSize: 50 })).toBe(
+    expect(assignedOrdersListHref(parametros({ page: 1, pageSize: 50 }), 'acondicionados_entregados')).toBe(
       '/asignacion?page=1&pageSize=50&vista=acondicionados_entregados',
     );
   });

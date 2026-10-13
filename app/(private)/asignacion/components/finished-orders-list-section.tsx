@@ -1,6 +1,7 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listFinishedOrdersAction } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 
+import { assignedOrdersListHref } from './assigned-orders-list-params';
 import {
   AssignmentListError,
   AssignmentListSectionFrame,
@@ -8,13 +9,14 @@ import {
 } from './assignment-list-parts';
 import { FIRST_PAGE } from './assignment-view-params';
 import { FinishedOrdersEmpty } from './finished-orders-empty';
-import { FinishedOrdersTable, finishedOrdersHref } from './finished-orders-table';
+import { FinishedOrdersTable } from './finished-orders-table';
 
 export const FINISHED_ORDERS_SECTION_TESTID = 'finished-orders-list-section';
 
 type FinishedOrdersListSectionProps = {
   /** Ya acotados por `parseAssignmentListParams`. */
   readonly params: DataTableParams;
+  readonly canViewTrace?: boolean;
 };
 
 /**
@@ -22,7 +24,10 @@ type FinishedOrdersListSectionProps = {
  * o tabla. La accion se importa por su ruta exacta: el barrel del modulo no la reexporta a
  * proposito.
  */
-export async function FinishedOrdersListSection({ params }: FinishedOrdersListSectionProps) {
+export async function FinishedOrdersListSection({
+  params,
+  canViewTrace = false,
+}: FinishedOrdersListSectionProps) {
   const result = await listFinishedOrdersAction({ page: params.page, pageSize: params.pageSize });
 
   if (result.status === 'error') {
@@ -40,7 +45,7 @@ export async function FinishedOrdersListSection({ params }: FinishedOrdersListSe
       <AssignmentListSectionFrame testId={FINISHED_ORDERS_SECTION_TESTID}>
         <FinishedOrdersEmpty
           firstPageHref={firstPageHrefWhenPast(currentPage, FIRST_PAGE, () =>
-            finishedOrdersHref({ ...params, page: FIRST_PAGE }),
+            assignedOrdersListHref({ ...params, page: FIRST_PAGE }, 'terminados'),
           )}
         />
       </AssignmentListSectionFrame>
@@ -49,7 +54,12 @@ export async function FinishedOrdersListSection({ params }: FinishedOrdersListSe
 
   return (
     <AssignmentListSectionFrame testId={FINISHED_ORDERS_SECTION_TESTID}>
-      <FinishedOrdersTable rows={items} params={params} totalPages={totalPages} />
+      <FinishedOrdersTable
+        rows={items}
+        params={params}
+        totalPages={totalPages}
+        canViewTrace={canViewTrace}
+      />
     </AssignmentListSectionFrame>
   );
 }

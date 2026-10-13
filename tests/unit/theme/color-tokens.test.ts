@@ -9,25 +9,12 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { contrastRatio, extractColorBlocks, parseOklch, readToken } from './contraste';
+
 const GLOBALS_CSS_PATH = fileURLToPath(new URL('../../../app/globals.css', import.meta.url));
 
 function readGlobalsCss(): string {
   return readFileSync(GLOBALS_CSS_PATH, 'utf8');
-}
-
-/** El primer `:root` y el primer `.dark` del archivo son los de los tokens de color. */
-function extractColorBlocks(css: string): { light: string; dark: string } {
-  const rootStart = css.indexOf(':root {');
-  const darkStart = css.indexOf('.dark {', rootStart);
-
-  if (rootStart === -1 || darkStart === -1) {
-    throw new Error('No se encontraron los bloques :root / .dark esperados en globals.css');
-  }
-
-  return {
-    light: css.slice(rootStart, css.indexOf('}', rootStart)),
-    dark: css.slice(darkStart, css.indexOf('}', darkStart)),
-  };
 }
 
 function extractThemeInline(css: string): string {
@@ -36,16 +23,11 @@ function extractThemeInline(css: string): string {
   return css.slice(start, css.indexOf('}', start));
 }
 
-function readToken(block: string, name: string): string {
-  const match = block.match(new RegExp(`--${name}:\\s*([^;]+);`));
-  if (!match) throw new Error(`Token --${name} no encontrado en el bloque`);
-  return match[1].trim();
-}
-
-/** Quita el bloque del login (de su delimitador INICIO a su FIN) y los comentarios. */
+/** Quita el bloque de las pantallas de acceso (de su delimitador INICIO a su FIN) y los comentarios. */
+// ENMIENDA QC-260: el bloque «Pantalla de login» de QC-226 pasa a «Pantallas de acceso».
 function cssOutsideLoginBlock(css: string): string {
-  const inicio = css.search(/\/\*\s*══[^*]*pantalla de login — INICIO/i);
-  const finMatch = /\/\*\s*══[^*]*pantalla de login — FIN[^*]*\*\//i.exec(css);
+  const inicio = css.search(/\/\*\s*══[^*]*pantallas de acceso — INICIO/i);
+  const finMatch = /\/\*\s*══[^*]*pantallas de acceso — FIN[^*]*\*\//i.exec(css);
   const sinLogin =
     inicio === -1 || !finMatch
       ? css
@@ -232,50 +214,6 @@ const UI_PAIRS: ReadonlyArray<readonly [TokenName, TokenName]> = [
   ['ring', 'card'],
 ];
 
-// --- oklch -> sRGB lineal y contraste WCAG. Vive solo en el test: produccion no convierte. ---
-
-function parseOklch(value: string): { l: number; c: number; h: number } {
-  const match = value.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
-  if (!match) throw new Error(`Valor oklch no reconocido: ${value}`);
-  return { l: Number(match[1]), c: Number(match[2]), h: Number(match[3]) };
-}
-
-/** r,g,b en sRGB lineal (0..1): justo lo que pide la luminancia relativa de WCAG. */
-function oklchToLinearSrgb(value: string): { r: number; g: number; b: number } {
-  const { l, c, h } = parseOklch(value);
-  const hRad = (h * Math.PI) / 180;
-  const a = c * Math.cos(hRad);
-  const b = c * Math.sin(hRad);
-
-  const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
-  const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
-  const s_ = l - 0.0894841775 * a - 1.2914855480 * b;
-
-  const lCubed = l_ ** 3;
-  const mCubed = m_ ** 3;
-  const sCubed = s_ ** 3;
-
-  const r = 4.0767416621 * lCubed - 3.3077115913 * mCubed + 0.2309699292 * sCubed;
-  const g = -1.2684380046 * lCubed + 2.6097574011 * mCubed - 0.3413193965 * sCubed;
-  const b2 = -0.0041960863 * lCubed - 0.7034186147 * mCubed + 1.7076147010 * sCubed;
-
-  const clamp = (n: number) => Math.min(1, Math.max(0, n));
-  return { r: clamp(r), g: clamp(g), b: clamp(b2) };
-}
-
-function relativeLuminance(value: string): number {
-  const { r, g, b } = oklchToLinearSrgb(value);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function contrastRatio(foreground: string, background: string): number {
-  const l1 = relativeLuminance(foreground);
-  const l2 = relativeLuminance(background);
-  const lighter = Math.max(l1, l2);
-  const darker = Math.min(l1, l2);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
 describe('color-tokens', () => {
   const css = readGlobalsCss();
   const { light, dark } = extractColorBlocks(css);
@@ -367,7 +305,8 @@ describe('color-tokens', () => {
       'ease-enter': 'cubic-bezier(0, 0, 0.2, 1)',
       'ease-exit': 'cubic-bezier(0.4, 0, 1, 1)',
     };
-    const motionRootStart = css.lastIndexOf(':root {', css.indexOf('--dur-instant'));
+    // ENMIENDA QC-228 (D5): `@theme inline` ya nombra `var(--dur-instant)`; se busca la declaracion.
+    const motionRootStart = css.lastIndexOf(':root {', css.indexOf('--dur-instant:'));
     expect(motionRootStart).toBeGreaterThan(-1);
     const motionRoot = css.slice(motionRootStart, css.indexOf('}', motionRootStart));
     for (const [name, value] of Object.entries(expected)) {
@@ -375,15 +314,39 @@ describe('color-tokens', () => {
     }
   });
 
-  it('R32: no declara movimiento fuera del bloque del login ni la regla global de movimiento reducido', () => {
-    expect(css).not.toMatch(/animation-duration:\s*0\.01ms/);
-    expect(css).not.toMatch(/transition-duration:\s*0\.01ms/);
-    expect(css).not.toMatch(/\*\s*,\s*\*::before\s*,\s*\*::after/);
+  // ENMIENDA QC-228 (D5): la regla global de movimiento reducido y el movimiento fuera del login
+  // son ahora de QC-228 (R19, R21) y dejan de estar prohibidos. Lo que se conserva de este caso
+  // es que el bloque de acceso tenga su movimiento y su regla local, y que nada de fuera lo pise.
+  // ENMIENDA QC-260 (R3, R4, R5): sustituye la entrada única de la tarjeta, los tres isotipos que
+  // flotan 22/30/26 s y el fundido de QC-226 por la entrada escalonada de los bloques, las cinco
+  // moléculas que giran 40–90 s y la regla que las para y quita el desplazamiento.
+  it('R32 (ENMIENDA QC-228, QC-260): el bloque de acceso conserva su movimiento y su regla local de movimiento reducido', () => {
+    const inicio = css.search(/\/\*\s*══[^*]*pantallas de acceso — INICIO/i);
+    const fin = css.search(/\/\*\s*══[^*]*pantallas de acceso — FIN/i);
+    expect(inicio).toBeGreaterThan(-1);
+    expect(fin).toBeGreaterThan(inicio);
+    const acceso = css.slice(inicio, fin).replace(/\s+/g, ' ');
 
+    expect(acceso).toContain(
+      "[data-access='card'] > * { animation: screen-enter var(--dur-slow) var(--ease-enter) both; }",
+    );
+    for (const giro of [
+      'access-molecule-spin 70s linear infinite;',
+      'access-molecule-spin 55s linear infinite reverse;',
+      'access-molecule-spin 90s linear infinite;',
+      'access-molecule-spin 48s linear infinite reverse;',
+      'access-molecule-spin 40s linear infinite;',
+    ]) {
+      expect(acceso).toContain(`animation: ${giro}`);
+    }
+    expect(acceso).toContain(
+      "@media (prefers-reduced-motion: reduce) { [data-access='molecule'] { animation: none; } [data-access='card'] > :nth-child(n) { animation: none; } }",
+    );
+
+    // Fuera del bloque nadie nombra sus animaciones ni anima en bucle.
     const outside = cssOutsideLoginBlock(css);
-    expect(outside).not.toMatch(/prefers-reduced-motion/);
-    expect(outside).not.toMatch(/@keyframes/);
-    expect(outside).not.toMatch(/(^|[\s;{])animation(-[a-z-]+)?\s*:/m);
-    expect(outside).not.toMatch(/(^|[\s;{])transition(-[a-z-]+)?\s*:/m);
+    expect(outside).not.toMatch(/login-(card|molecule)|access-molecule/);
+    expect(outside).not.toMatch(/\binfinite\b/);
+    expect(outside).not.toMatch(/animation-name\s*:/);
   });
 });

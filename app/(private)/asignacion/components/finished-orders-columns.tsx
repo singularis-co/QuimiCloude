@@ -1,6 +1,6 @@
 'use client';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import type { DataTableCardLayout, DataTableColumn } from '@/components/shared/data-table';
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
 import { formatCivilDate } from '@/lib/shared/ui/date-civil';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
@@ -12,11 +12,12 @@ import {
   recipeColumn,
   responsiblesColumn,
 } from './assignment-list-parts';
+import { assignmentActionsColumn } from './assignment-row-actions';
 
 /**
- * Las SEIS columnas de «Terminados»: número, receta, cantidad,
- * presentación, fecha de terminado y responsables. **Sin columna «Entrar» ni acciones**: esta
- * vista es de solo lectura para toda la empresa, incluido el propio actor.
+ * Las SEIS columnas de «Terminados»: número, receta, cantidad, presentación, fecha de terminado y
+ * responsables. Sin «Entrar»: esta vista es de solo lectura para toda la empresa, incluido el
+ * propio actor; con `canViewTrace` se añade el menú con «Ver recorrido».
  */
 
 export const FINISHED_ORDER_NUMBER_COLUMN_ID = 'orderNumber';
@@ -41,8 +42,27 @@ function FinishedAtCell({ finishedAt }: { readonly finishedAt: Date | null }) {
   );
 }
 
-export function buildFinishedOrdersColumns(): readonly DataTableColumn<FinishedOrderView>[] {
-  return [
+/** Las vistas que pintan pedidos terminados comparten tarjeta. */
+export const FINISHED_ORDERS_CARD: DataTableCardLayout = {
+  primary: FINISHED_ORDER_NUMBER_COLUMN_ID,
+  title: FINISHED_ORDER_RECIPE_NAME_COLUMN_ID,
+  meta: [
+    FINISHED_ORDER_QUANTITY_COLUMN_ID,
+    FINISHED_ORDER_PRESENTATION_COLUMN_ID,
+    FINISHED_ORDER_DATE_COLUMN_ID,
+    FINISHED_ORDER_RESPONSIBLES_COLUMN_ID,
+  ],
+};
+
+export type FinishedOrdersColumnsOptions = {
+  /** Decidido en servidor; sin el, la columna de acciones no se emite: su menú quedaría vacío. */
+  readonly canViewTrace?: boolean;
+};
+
+export function buildFinishedOrdersColumns({
+  canViewTrace = false,
+}: FinishedOrdersColumnsOptions = {}): readonly DataTableColumn<FinishedOrderView>[] {
+  const columns: DataTableColumn<FinishedOrderView>[] = [
     orderNumberColumn(FINISHED_ORDER_NUMBER_COLUMN_ID),
     recipeColumn(FINISHED_ORDER_RECIPE_NAME_COLUMN_ID, 'finished-order'),
     quantityColumn(FINISHED_ORDER_QUANTITY_COLUMN_ID, formatDecimalDisplay),
@@ -50,9 +70,16 @@ export function buildFinishedOrdersColumns(): readonly DataTableColumn<FinishedO
     {
       id: FINISHED_ORDER_DATE_COLUMN_ID,
       label: 'Fecha de terminado',
+      tabular: true,
       align: 'start',
       cell: (order) => <FinishedAtCell finishedAt={order.finishedAt} />,
     },
     responsiblesColumn(FINISHED_ORDER_RESPONSIBLES_COLUMN_ID, (order) => order.responsibles),
   ];
+
+  if (canViewTrace) {
+    columns.push(assignmentActionsColumn<FinishedOrderView>({ canViewTrace }));
+  }
+
+  return columns;
 }

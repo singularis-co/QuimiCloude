@@ -4,6 +4,9 @@
 #   PR hacia `prod`           -> gate-completo + e2e          (los dos, informativos)
 #   workflow_dispatch         -> los dos, a mano, sobre la rama elegida
 #
+# El E2E corre un job por navegador (`e2e-navegador`, matriz chromium/webkit) y el check `e2e` los
+# une y da el veredicto (ver el job).
+#
 # `gate-completo` es el check que manda, pero ya no corre la suite el solo: la reparten los jobs
 # `estatico` y `vitest` (3 shards) y el une los informes y da el veredicto (ver `jobs:`).
 #
@@ -72,7 +75,7 @@ jobs:
 
     steps:
       - name: Checkout (historia completa)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -83,11 +86,11 @@ jobs:
           git branch --force dev origin/dev
 
       - name: pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         # Sin `version`: la toma de `packageManager` en package.json (pnpm@10.10.0).
 
       - name: Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -137,7 +140,7 @@ jobs:
 
     steps:
       - name: Checkout (historia completa)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Historia entera y todas las ramas remotas: varias guardias calculan el merge-base
           # con `dev`/`origin/dev` (tests/guards/guard-qc102-*, guard-pantalla-pedidos-*).
@@ -152,11 +155,11 @@ jobs:
           git branch --force dev origin/dev
 
       - name: pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         # Sin `version`: la toma de `packageManager` en package.json (pnpm@10.10.0).
 
       - name: Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -195,7 +198,7 @@ jobs:
 
       - name: Informe del shard
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: informe-shard-${{ matrix.shard }}
           # `include-hidden-files`: desde upload-artifact v4.4 los archivos que empiezan por `.`
@@ -222,14 +225,17 @@ jobs:
       # Clon superficial: `--unir` solo lee los informes, el baseline y los dos scripts del
       # veredicto; no mira la historia.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Solo Node, sin pnpm ni `pnpm install`: `./init.sh --unir` es Node puro sobre JSON y corre
       # antes de cualquier paso que pida pnpm o node_modules. Una instalacion menos por corrida.
       - name: Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
+          # setup-node v5 activa la cache sola si package.json tiene `packageManager` (pnpm);
+          # aqui no hay pnpm y fallaria al pedir el store. Los jobs con pnpm fijan `cache: pnpm`.
+          package-manager-cache: false
 
       - name: El job estatico y los shards corrieron
         shell: bash
@@ -245,7 +251,7 @@ jobs:
           esac
 
       - name: Informes de los shards
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           # Cada artefacto en su carpeta, informes/informe-shard-<i>/ (sin `merge-multiple`).
           pattern: informe-shard-*
@@ -271,7 +277,7 @@ jobs:
 
       - name: Informe de vitest (unido)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: gate-completo-informe
           # Mismo motivo que en los shards: sin esto `.vitest-rojos.json` no se sube.
@@ -282,14 +288,25 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  e2e:
-    name: e2e
+  # UN JOB POR NAVEGADOR. Con chromium y webkit en el mismo job, la suite no cabia en sus 60 min y
+  # un flake de WebKit tumbaba tambien lo de Chromium (PR #199). Cada job de la matriz es un runner
+  # propio, con su Postgres de servicio, su base `quimicloude_e2e` y su servidor en el 3117: no se
+  # pisan. `fail-fast: false`: si un navegador cae, el otro termina igual y se sabe que paso en el.
+  # El veredicto lo da el job `e2e` de abajo, que es el check que se mira.
+  e2e-navegador:
+    name: e2e (${{ matrix.project }})
     # Solo en el PR de despliegue (base `prod`), fuera de borrador, y a mano.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.base_ref == 'prod' && github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # Los `projects[].name` de playwright.config.ts, exactamente: lo vigila
+        # `tests/guards/guard-e2e-presupuesto.test.ts`.
+        project: [chromium, webkit]
 
     services:
       postgres:
@@ -310,13 +327,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
 
       - name: Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -374,8 +391,9 @@ jobs:
           echo "DIRECT_URL=postgresql://postgres:postgres@localhost:5432/quimicloude_e2e" >> "$GITHUB_ENV"
 
       # Los DOS navegadores de playwright.config.ts, y no solo chromium: WebKit es el motor de
-      # iOS y docs/architecture.md exige ejercitarlo de verdad. Para ahorrar minutos se cachean
-      # los binarios por version de Playwright; las dependencias del sistema se instalan siempre.
+      # iOS y docs/architecture.md exige ejercitarlo de verdad. Cada job de la matriz instala el
+      # suyo. Para ahorrar minutos se cachean los binarios por version de Playwright y navegador;
+      # las dependencias del sistema se instalan siempre.
       - name: Version de Playwright
         id: pw
         shell: bash
@@ -383,30 +401,51 @@ jobs:
 
       - name: Cache de navegadores
         id: pw-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-webkit
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-${{ matrix.project }}
 
       - name: Navegadores de Playwright
         if: steps.pw-cache.outputs.cache-hit != 'true'
         shell: bash
-        run: pnpm exec playwright install --with-deps chromium webkit
+        run: pnpm exec playwright install --with-deps ${{ matrix.project }}
 
       - name: Dependencias de sistema de los navegadores
         if: steps.pw-cache.outputs.cache-hit == 'true'
         shell: bash
-        run: pnpm exec playwright install-deps chromium webkit
+        run: pnpm exec playwright install-deps ${{ matrix.project }}
 
       - name: Playwright
         shell: bash
-        run: pnpm run e2e
+        run: pnpm run e2e --project=${{ matrix.project }}
 
       - name: Trazas de Playwright
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: e2e-test-results
+          name: e2e-test-results-${{ matrix.project }}
           path: test-results/
           if-no-files-found: ignore
           retention-days: 14
+
+  # El check `e2e`: verde solo si los DOS navegadores salieron en verde. Conserva el nombre de
+  # siempre, asi que una regla de rama o un habito que lo nombren no cambian. `always()`: tiene que
+  # correr aunque un navegador falle o se cancele, para ponerse en rojo; sin el quedaria «skipped»,
+  # y un check saltado no es un rojo.
+  e2e:
+    name: e2e
+    needs: e2e-navegador
+    if: >-
+      always() && (github.event_name == 'workflow_dispatch' ||
+      (github.base_ref == 'prod' && github.event.pull_request.draft == false))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Los dos navegadores pasaron
+        shell: bash
+        env:
+          NAVEGADORES: ${{ needs.e2e-navegador.result }}
+        run: |
+          [ "$NAVEGADORES" = "success" ] || { echo "el E2E por navegador salio '$NAVEGADORES': mira los jobs e2e (chromium) y e2e (webkit)"; exit 1; }

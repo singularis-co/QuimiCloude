@@ -40,7 +40,8 @@ describe('R30 (a) — el login se renderiza IGUAL con la marca y sin ella', () =
     // Primero: que se haya renderizado algo. Comparar dos cadenas vacias pasaria en verde sin
     // haber mirado nada, que es la forma mas facil de que este test mienta.
     expect(sinMarca.length).toBeGreaterThan(100);
-    expect(sinMarca).toContain('data-login="screen"');
+    // ENMIENDA QC-260: la pantalla la pinta `AccessScreen`; su ámbito es `data-access`, no `data-login`.
+    expect(sinMarca).toContain('data-access="screen"');
 
     expect(
       conMarca,

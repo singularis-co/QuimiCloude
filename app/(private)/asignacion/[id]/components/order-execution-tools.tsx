@@ -9,24 +9,30 @@ const TOOLS_HEADING = 'Herramientas';
 
 export type OrderExecutionToolsProps = {
   readonly tools: readonly ExecutionToolView[];
+  /** Id del elemento que ya titula el bloque; con él no se pinta el título propio. */
+  readonly labelledBy?: string;
 };
 
 /**
  * Herramientas de la receta, solo lectura. La cantidad es la de la receta: no se escala con la
  * del pedido. Sin herramientas no se monta nada, ni siquiera el título.
  */
-export function OrderExecutionTools({ tools }: OrderExecutionToolsProps) {
+export function OrderExecutionTools({ tools, labelledBy }: OrderExecutionToolsProps) {
   if (tools.length === 0) return null;
+
+  const headingId = `${ORDER_EXECUTION_TOOLS_TESTID}-heading`;
 
   return (
     <section
-      aria-labelledby={`${ORDER_EXECUTION_TOOLS_TESTID}-heading`}
+      aria-labelledby={labelledBy ?? headingId}
       data-testid={ORDER_EXECUTION_TOOLS_TESTID}
       className="flex flex-col gap-2"
     >
-      <h2 id={`${ORDER_EXECUTION_TOOLS_TESTID}-heading`} className="text-lg font-medium">
-        {TOOLS_HEADING}
-      </h2>
+      {labelledBy === undefined ? (
+        <h2 id={headingId} className="text-lg font-medium">
+          {TOOLS_HEADING}
+        </h2>
+      ) : null}
       <ul className="flex flex-col divide-y">
         {tools.map((tool, index) => (
           <li

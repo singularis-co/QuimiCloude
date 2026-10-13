@@ -128,6 +128,7 @@ async function loadRowPermissions() {
   return {
     canModifyOrders: hasPermission(user, 'pedidos.modificar'),
     canDeliver: hasPermission(user, 'entregas.modificar'),
+    canVoidDelivery: hasPermission(user, 'entregas.anular'),
   };
 }
 
@@ -317,7 +318,7 @@ export async function OrderListSection({
     Las tres lecturas de aqui si van en paralelo entre si: ninguna depende de otra, y esperarlas
     en fila solo sumaria latencia.
   */
-  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder, { canModifyOrders, canDeliver }] =
+  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder, { canModifyOrders, canDeliver, canVoidDelivery }] =
     await Promise.all([
       loadResponsibles(items.map((order) => order.id)),
       loadResponsiblesCatalog(),
@@ -349,6 +350,7 @@ export async function OrderListSection({
         canEditDistribution={canEditDistribution}
         canEditCustomer={canEditCustomer}
         canDeliver={canDeliver}
+        canVoidDelivery={canVoidDelivery}
         customerFilter={customerFilter}
       />
     </div>

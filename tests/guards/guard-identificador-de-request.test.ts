@@ -55,6 +55,17 @@ export function hallazgosDeVersionDeNext(
 // Lista cerrada y no un rango de git: `git diff origin/dev...HEAD` esta vacio en `dev` y la guardia
 // fallaria alli. Un `.spec.ts` nuevo se nombra aqui a mano.
 export const E2E_ESPERADOS = [
+  // Alta el 2026-10-12 (QC-260) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en `/login` y `/establecer-contrasena/<token>`
+  // las moleculas giran en bucle y quedan quietas con movimiento reducido, la tarjeta toma los
+  // tokens del tema claro y del oscuro, respeta bordes y ancho maximo a 390, 820 y 1440 px, y
+  // campos y controles miden 44 px; el ojo del login alterna el campo sin enviar el formulario,
+  // la lista de requisitos sigue al valor visible tras un rechazo, y «Ir a iniciar sesion» mide
+  // 44 x 44 px. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee
+  // ni afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71
+  // R21 sigue INTACTO.
+  'acceso-rediseno.spec.ts',
   // Alta el 2026-10-08 por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA
   // y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el archivo
   // se nombra, uno a uno-. Lo que ejercita: el Administrador de acondicionamiento ve en
@@ -342,6 +353,54 @@ export const E2E_ESPERADOS = [
   // cliente, entrega que completa y usuario sin permiso. No lee ni afirma nada sobre el
   // identificador de peticion ni sobre `reference`.
   'entregar-producto-terminado.spec.ts',
+  // Alta el 2026-10-09 (QC-228) por el mismo motivo que las demas. Mide en navegador real las
+  // duraciones y curvas calculadas de un panel, un dialogo y un toast, el indicador del item activo
+  // y la entrada de pantalla, tambien con movimiento reducido. No lee ni afirma nada sobre el
+  // identificador de peticion ni sobre `reference`.
+  'movimiento.spec.ts',
+  // Alta el 2026-10-09 (QC-227, enmienda permitida: es el punto de extension de la lista). Mide en
+  // navegador real las cajas del carril colapsado y el icono de los controles de colapso. No lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'marca-componentes.spec.ts',
+  // Alta el 2026-10-10 (QC-256, punto de extension de la lista). Mide en navegador real que el
+  // menu de una fila, en una ventana baja, se abre hacia arriba y queda dentro de la ventana. No
+  // lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'piezas-compartidas.spec.ts',
+  // Alta el 2026-10-10 (QC-257, enmienda permitida: es el punto de extension de la lista). Mide en
+  // navegador real el giro de la flecha del control de la barra, los tooltips de la cabecera, el
+  // lang del documento y el cruce sol/luna. No lee ni afirma nada sobre el identificador de
+  // peticion ni sobre `reference`.
+  'shell-rediseno.spec.ts',
+  // Alta el 2026-10-12 (QC-261) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en chromium y webkit, a 390, 820 y 1440 px, el
+  // dashboard pinta los pedidos en tarjetas a 390 px, «Acciones» abre el menu centrado, «Ver
+  // recorrido» lleva al detalle y al cerrar el foco vuelve al disparador; las anotaciones del
+  // detalle entran escalonadas y quietas con movimiento reducido; y el dashboard, el detalle y una
+  // URL privada que da 404 no desbordan en horizontal, con objetivos de 44 px y buscador a 16 px.
+  // No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'dashboard-rediseno.spec.ts',
+  // Alta el 2026-10-12 (QC-265) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en chromium y webkit, la ejecucion, el empaque
+  // y el acondicionamiento de un pedido se pintan sin barra lateral ni cabecera privada y a todo el
+  // ancho, y su 404 y `/asignacion` las conservan; a 390 x 844 su cabecera queda pegada arriba, su
+  // pie fijo abajo con botones de 52 px y sus controles miden 44 px; pasan de dos columnas a 1440 px
+  // a una a 820 px; las pestanas del acondicionador llevan contador; «Cerrar» oculta un aviso sin
+  // navegar; las listas se pintan en tarjetas con «Entrar» de 44 px y «Acciones» abre el menu
+  // centrado; los siete dialogos del operario quedan enteros y centrados; y el anillo del boton con
+  // espera se vacia y desaparece. No lee ni afirma nada sobre el identificador de peticion ni sobre
+  // `reference`.
+  'operario-rediseno.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la conexion de WhatsApp de una empresa: alta
+  // rechazada por Meta, alta valida, recarga sin el verify token, edicion, deshabilitar y
+  // habilitar. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'integraciones-whatsapp.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la anulacion de una presentacion de una entrega
+  // desde «Entregas»: motivo vacio que no envia nada, anulacion con motivo que devuelve el lote y
+  // reabre el pedido, la presentacion otra vez pendiente en «Entregar» y usuario sin permiso. No lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'anular-entrega.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -537,8 +596,15 @@ export const MIGRACIONES_ESPERADAS = [
   '20261008150050_inventory_movement_kind_delivery',
   '20261008150100_order_deliveries',
   '20261008150200_delivery_permission',
+  // 2026-10-09: la anulacion de entregas (valor de enum, tablas y permiso); ninguna toca el
+  // identificador.
+  '20261009120000_inventory_movement_kind_delivery_void',
   // El dia de produccion del lote; no toca el identificador.
   '20261009120000_product_batches_production_date',
+  '20261009120100_order_delivery_voids',
+  '20261009120200_delivery_void_permission',
+  // 2026-10-09: la tabla de conexiones de WhatsApp; no toca el identificador.
+  '20261009130000_whatsapp_connections',
 ] as const
 
 export function hallazgosDeMigraciones(

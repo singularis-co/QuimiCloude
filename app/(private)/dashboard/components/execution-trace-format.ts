@@ -1,3 +1,4 @@
+import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import type { ExecutionAction, ExecutionTraceRow, TraceDuration } from '@/lib/modules/asignaciones';
 
 export const DELETED_ORDER_MARK = 'Dado de baja';
@@ -15,18 +16,8 @@ export const EXECUTION_ACTION_LABELS: Readonly<Record<ExecutionAction, string>> 
   pack_finish: 'Terminar empaque',
 };
 
-export const TRACE_ORDER_STATUS_LABELS: Readonly<Record<ExecutionTraceRow['status'], string>> = {
-  PENDIENTE: 'Pendiente',
-  EN_CURSO: 'En curso',
-  POR_EMPACAR: 'Por empacar',
-  EN_EMPAQUE: 'En empaque',
-  POR_ACONDICIONAR: 'Por acondicionar',
-  EN_ACONDICIONAMIENTO: 'En acondicionamiento',
-  TERMINADO: 'Terminado',
-  ENTREGADO: 'Entregado',
-  CANCELADO: 'Cancelado',
-  BLOQUEADO: 'Bloqueado',
-};
+export const TRACE_ORDER_STATUS_LABELS: Readonly<Record<ExecutionTraceRow['status'], string>> =
+  ORDER_STATUS_LABELS;
 
 export const TRACE_DURATION_SUFFIXES: Readonly<Record<TraceDuration['kind'], string>> = {
   closed: '',

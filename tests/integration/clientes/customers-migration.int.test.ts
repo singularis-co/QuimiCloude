@@ -86,19 +86,35 @@ const DOWN_STATEMENTS = statementsOf(DOWN_SOURCE)
  * que esta: sin su `down.sql` delante, el `DROP TABLE "customers"` choca con 2BP01. Se detectan
  * por texto y se leen del disco; los DOWN van de la mas reciente a la mas antigua y los UP al
  * reves.
+ *
+ * Nota 2026-10-09: la dependencia se sigue de forma TRANSITIVA. La anulacion de entregas
+ * (`order_delivery_void_lines`) no apunta a `customers`, pero si a `order_delivery_lines`, que
+ * crea una dependiente directa: sin su `down.sql` delante, el `DROP TABLE` de las lineas de
+ * entrega choca con 2BP01 igual. Se recorre en orden de timestamp y entra toda migracion que
+ * referencie `customers` o una tabla creada por una dependiente ya detectada. Las aserciones de
+ * antes se conservan.
  */
 const timestampDe = (nombre: string): string => nombre.split('_')[0] as string
+const TABLAS_DEPENDIENTES = new Set<string>(['customers'])
 const DEPENDIENTES_POSTERIORES = readdirSync(migrationsDir)
   .filter((nombre) => timestampDe(nombre) > timestampDe(basename(migrationDir)))
-  .filter((nombre) => {
-    const sql = join(migrationsDir, nombre, 'migration.sql')
-    return existsSync(sql) && /REFERENCES\s+"customers"/.test(readFileSync(sql, 'utf8'))
-  })
+  .filter((nombre) => existsSync(join(migrationsDir, nombre, 'migration.sql')))
   .sort()
+  .filter((nombre) => {
+    const sql = readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8')
+    const referenciadas = [...sql.matchAll(/REFERENCES\s+"(\w+)"/g)].map((m) => m[1] as string)
+    if (!referenciadas.some((tabla) => TABLAS_DEPENDIENTES.has(tabla))) return false
+    for (const m of sql.matchAll(/CREATE\s+TABLE\s+"(\w+)"/g)) TABLAS_DEPENDIENTES.add(m[1] as string)
+    return true
+  })
 expect(
   DEPENDIENTES_POSTERIORES,
   'se esperaba encontrar la migracion del cliente del pedido como dependiente',
 ).toContain('20261006160000_orders_customer')
+expect(
+  DEPENDIENTES_POSTERIORES,
+  'se esperaba encontrar la anulacion de entregas como dependiente transitiva',
+).toContain('20261009120100_order_delivery_voids')
 
 const DOWN_DE_DEPENDIENTES = [...DEPENDIENTES_POSTERIORES]
   .reverse()

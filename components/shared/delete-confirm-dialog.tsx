@@ -5,9 +5,11 @@ import type { ReactNode } from 'react';
 import {
   ConfirmDialog,
   ConfirmDialogBody,
-  type ConfirmDialogBodyProps,
-  type ConfirmDialogProps,
+  type ConfirmDialogBaseProps,
+  type ConfirmDialogBodyBaseProps,
+  type ConfirmDialogTestIds,
   type ConfirmDialogTexts,
+  type ConfirmSlotChoice,
 } from '@/components/shared/confirm-dialog';
 
 export const DELETE_CONFIRM_LABEL = 'Eliminar';
@@ -18,9 +20,10 @@ export type DeleteConfirmDialogTexts = Omit<ConfirmDialogTexts, 'confirm' | 'pen
   readonly pending?: ReactNode;
 };
 
-export type DeleteConfirmDialogProps = Omit<ConfirmDialogProps, 'variant' | 'texts'> & {
-  readonly texts: DeleteConfirmDialogTexts;
-};
+export type DeleteConfirmDialogProps = Omit<ConfirmDialogBaseProps, 'variant' | 'texts'> &
+  ConfirmSlotChoice<ConfirmDialogTestIds> & {
+    readonly texts: DeleteConfirmDialogTexts;
+  };
 
 /**
  * Los textos por defecto van en pareja: quien cambia el de confirmar decide también el de
@@ -38,9 +41,10 @@ export function DeleteConfirmDialog({ texts, ...props }: DeleteConfirmDialogProp
   return <ConfirmDialog {...props} variant="destructive" texts={withDeleteDefaults(texts)} />;
 }
 
-export type DeleteConfirmDialogBodyProps = Omit<ConfirmDialogBodyProps, 'variant' | 'texts'> & {
-  readonly texts: DeleteConfirmDialogTexts;
-};
+export type DeleteConfirmDialogBodyProps = Omit<ConfirmDialogBodyBaseProps, 'variant' | 'texts'> &
+  ConfirmSlotChoice<Omit<ConfirmDialogTestIds, 'dialog'>> & {
+    readonly texts: DeleteConfirmDialogTexts;
+  };
 
 /** Variante destructiva de `ConfirmDialogBody`, para usarla dentro de `ConfirmDialogFrame`. */
 export function DeleteConfirmDialogBody({ texts, ...props }: DeleteConfirmDialogBodyProps) {

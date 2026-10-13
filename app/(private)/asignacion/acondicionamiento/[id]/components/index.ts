@@ -68,12 +68,6 @@ export {
   type ConditioningTeamListProps,
 } from './conditioning-team-list';
 export {
-  CONDITIONING_WAIT_SECONDS,
-  COUNTDOWN_GATED_BUTTON_TESTID,
-  CountdownGatedButton,
-  type CountdownGatedButtonProps,
-} from './countdown-gated-button';
-export {
   CONDITIONING_BATCH_DATA_ERROR_TESTID,
   CONDITIONING_BATCH_DATA_FIELDS,
   CONDITIONING_BATCH_DATA_FORM_TESTID,
@@ -81,7 +75,6 @@ export {
   CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_BATCH_DATA_SUBMIT_TESTID,
-  CONDITIONING_BATCH_DATA_SUCCESS_TESTID,
   CONDITIONING_BATCH_DATA_TEXTS,
   ConditioningBatchDataForm,
   type ConditioningBatchDataFormProps,

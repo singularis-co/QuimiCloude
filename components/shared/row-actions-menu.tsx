@@ -1,11 +1,12 @@
 'use client';
 
-import type { ComponentType } from 'react';
+import { useState, type ComponentType, type ReactNode } from 'react';
 
-import { MoreVerticalIcon } from 'lucide-react';
+import { EllipsisIcon, MoreVerticalIcon, XIcon } from 'lucide-react';
 import Link from 'next/link';
 
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { cn } from '@/lib/utils';
 
 /**
  * Menu "de los 3 puntos" para las acciones de una fila: UN disparador siempre presente en el DOM
@@ -63,7 +65,17 @@ export type RowActionsMenuProps = {
    * localizador E2E). El componente no interpreta su contenido: solo los reenvia.
    */
   readonly triggerDataAttributes?: Readonly<Record<`data-${string}`, string>>;
+  /** `centered`: botón «Acciones» que abre los ítems en un diálogo centrado, para las tarjetas. */
+  readonly presentation?: 'dropdown' | 'centered';
+  /** Título del diálogo centrado. Sin valor, `triggerLabel`. */
+  readonly title?: ReactNode;
+  readonly texts?: { readonly actions?: string; readonly close?: string };
 };
+
+const ACTIONS_FALLBACK = 'Acciones';
+const CLOSE_FALLBACK = 'Cerrar';
+
+const CENTERED_ITEM_CLASS = 'min-h-12 w-full justify-start gap-3 px-3 text-base font-normal';
 
 /** Sin items no hay nada que ofrecer: ni disparador, ni menu vacio. */
 export function RowActionsMenu({
@@ -71,8 +83,24 @@ export function RowActionsMenu({
   triggerLabel,
   triggerTestId,
   triggerDataAttributes,
+  presentation = 'dropdown',
+  title,
+  texts,
 }: RowActionsMenuProps) {
   if (items.length === 0) return null;
+
+  if (presentation === 'centered') {
+    return (
+      <CenteredRowActions
+        items={items}
+        triggerLabel={triggerLabel}
+        triggerTestId={triggerTestId}
+        triggerDataAttributes={triggerDataAttributes}
+        title={title}
+        texts={texts}
+      />
+    );
+  }
 
   return (
     <DropdownMenu>
@@ -92,7 +120,7 @@ export function RowActionsMenu({
         <MoreVerticalIcon aria-hidden="true" />
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className={`min-w-[200px] ${CONTENT_PADDING}`}>
+      <DropdownMenuContent side="bottom" align="end" className={`min-w-[200px] ${CONTENT_PADDING}`}>
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -114,5 +142,102 @@ export function RowActionsMenu({
         })}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function CenteredRowActions({
+  items,
+  triggerLabel,
+  triggerTestId,
+  triggerDataAttributes,
+  title,
+  texts,
+}: Omit<RowActionsMenuProps, 'presentation'>) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            touch
+            aria-label={triggerLabel}
+            data-testid={triggerTestId}
+            {...triggerDataAttributes}
+          />
+        }
+      >
+        <EllipsisIcon aria-hidden="true" />
+        {texts?.actions ?? ACTIONS_FALLBACK}
+      </DialogTrigger>
+
+      <DialogContent showCloseButton={false} className="gap-1 p-4">
+        <div className="flex items-start justify-between gap-3 pb-2 pl-1">
+          <DialogTitle className="pt-2.5 text-lg leading-snug font-semibold">
+            {title ?? triggerLabel}
+          </DialogTitle>
+          <DialogClose
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                touch
+                aria-label={texts?.close ?? CLOSE_FALLBACK}
+              />
+            }
+          >
+            <XIcon aria-hidden="true" />
+          </DialogClose>
+        </div>
+
+        <div className="flex flex-col">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const select = () => {
+              item.onSelect?.();
+              setOpen(false);
+            };
+            const className = cn(
+              CENTERED_ITEM_CLASS,
+              item.destructive && 'text-destructive hover:text-destructive',
+            );
+
+            if (item.href !== undefined && item.disabled !== true) {
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  data-testid={item.testId}
+                  className={cn(buttonVariants({ variant: 'ghost' }), className)}
+                  onClick={select}
+                >
+                  <Icon aria-hidden="true" />
+                  {item.label}
+                </Link>
+              );
+            }
+
+            return (
+              <Button
+                key={item.key}
+                type="button"
+                variant="ghost"
+                disabled={item.disabled}
+                data-testid={item.testId}
+                className={className}
+                onClick={select}
+              >
+                <Icon aria-hidden="true" />
+                {item.label}
+              </Button>
+            );
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

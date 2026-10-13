@@ -23,8 +23,8 @@ import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/vi
 import { arbolAccesible, resolverServerComponents } from './arbol-accesible';
 
 /**
- * Paridad de asignacion. `AssignedOrdersError` se conserva y pasa a delegar en la pieza
- * compartida: el error de las seis secciones tiene que seguir dando este arbol, y las secciones
+ * Paridad de asignacion. El error de lista es una sola pieza (`AssignmentListError`) que delega en
+ * la compartida: el error de las seis secciones tiene que seguir dando este arbol, y las secciones
  * no se tocan, asi que se renderizan directas. Las filas y el vacio de las cuatro listas cuyas
  * columnas o seccion se tocan quedan tambien congelados. Mocks de los
  * `tests/unit/asignaciones-ui/*-list-section.test.tsx`.

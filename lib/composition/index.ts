@@ -310,6 +310,16 @@ import type { OrderSummaryReader } from '@/lib/modules/pedidos/ports/order-summa
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderDeliveryUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-unit-of-work';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
+import { createListOrderDeliveries, createVoidDelivery } from '@/lib/modules/pedidos';
+import {
+  createOrderDeliveryHistoryReader,
+  createOrderDeliveryVoidRepository,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-void-prisma';
+import {
+  batchLotDirectoryPrisma,
+  createFinishedGoodsReturn,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma';
+import type { OrderDeliveryVoidUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-void-unit-of-work';
 import {
   createRecipeExecutionReader,
   findAliveRecipeByNormalizedName,
@@ -1399,6 +1409,18 @@ const orderDeliveryUnitOfWork: OrderDeliveryUnitOfWork = {
     ),
 };
 
+/** La anulacion, la devolucion a `inventario` y el regreso del pedido confirman o se deshacen juntos. */
+const orderDeliveryVoidUnitOfWork: OrderDeliveryVoidUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        orders: createOrderWriteRepository(tx),
+        voids: createOrderDeliveryVoidRepository(tx),
+        finishedGoods: createFinishedGoodsReturn(tx),
+      }),
+    ),
+};
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1489,6 +1511,21 @@ export const pedidos = {
     customerCatalog,
     unitOfWork: orderDeliveryUnitOfWork,
     deliveries: createOrderDeliveryRepository(),
+    orders: orderRepository,
+  }),
+  listOrderDeliveries: createListOrderDeliveries({
+    orders: orderRepository,
+    lines: createOrderWriteRepository(),
+    history: createOrderDeliveryHistoryReader(),
+    presentations: presentationCatalog,
+    customerCatalog,
+    // El adaptador importado y no `peopleDirectory`, que se declara mas abajo.
+    people: assignmentDirectoryPrisma,
+    batchLots: batchLotDirectoryPrisma,
+  }),
+  voidDelivery: createVoidDelivery({
+    unitOfWork: orderDeliveryVoidUnitOfWork,
+    voids: createOrderDeliveryVoidRepository(),
     orders: orderRepository,
   }),
 } as const;
@@ -2240,5 +2277,80 @@ import type { SecretDigest } from '@/lib/modules/integraciones/ports/secret-dige
 const secretCipher: SecretCipher = secretCipherAesGcm;
 const secretDigest: SecretDigest = secretDigestSha256;
 
-/** Cifrador y resumidor de las credenciales de integraciones, vistos por sus puertos. */
-export const integraciones = { secretCipher, secretDigest } as const;
+// ---------------------------------------------------------------------------------------
+// `integraciones`: la conexion de WhatsApp. Bloque nuevo al final, con sus imports.
+// ---------------------------------------------------------------------------------------
+
+import {
+  createCreateWhatsappConnection,
+  createGetWhatsappConnection,
+  createRegenerateWhatsappVerifyToken,
+  createSetWhatsappConnectionEnabled,
+  createTestWhatsappConnection,
+  createUpdateWhatsappConnection,
+} from '@/lib/modules/integraciones';
+import { integrationsE2EDoublesEnabled } from '@/lib/modules/integraciones/adapters/driven/config/e2e-doubles-env';
+import { readPublicBaseUrl } from '@/lib/modules/integraciones/adapters/driven/config/public-base-url-env';
+import { whatsappGraphClientCanned } from '@/lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned';
+import { whatsappGraphClientFetch } from '@/lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-fetch';
+import {
+  findLiveWhatsappConnection,
+  findLiveWhatsappConnectionById,
+  insertWhatsappConnection,
+  updateLiveWhatsappConnection,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma';
+import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
+import type { RandomSource } from '@/lib/modules/integraciones/ports/random-source';
+import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository';
+import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client';
+import { whatsappWebhookPath } from '@/lib/shared/routes';
+
+/** El doble se elige en cada llamada: la variable puede cambiar dentro del mismo proceso. */
+const whatsappGraphClient: WhatsappGraphClient = {
+  fetchPhoneNumber: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.fetchPhoneNumber(input)
+      : whatsappGraphClientFetch.fetchPhoneNumber(input),
+};
+
+const whatsappConnectionRepository: WhatsappConnectionRepository = {
+  findLive: findLiveWhatsappConnection,
+  findLiveById: findLiveWhatsappConnectionById,
+  create: insertWhatsappConnection,
+  update: updateLiveWhatsappConnection,
+};
+
+const randomSource: RandomSource = randomSourceNode;
+
+const whatsappDeps = {
+  connections: whatsappConnectionRepository,
+  graph: whatsappGraphClient,
+  cipher: secretCipher,
+  digest: secretDigest,
+  random: randomSource,
+};
+
+type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
+
+/** Sin `APP_BASE_URL` devuelve la ruta relativa: la pantalla avisa en vez de fallar. */
+function whatsappWebhookUrl(connectionId: string): WhatsappWebhookUrl {
+  const path = whatsappWebhookPath(connectionId);
+  const base = readPublicBaseUrl();
+  return base === null ? { url: path, complete: false } : { url: `${base}${path}`, complete: true };
+}
+
+/**
+ * Fachada de `integraciones`. `secretCipher` y `secretDigest` siguen expuestos para quien reciba
+ * los webhooks. El actor no se resuelve aqui: lo resuelve la Server Action.
+ */
+export const integraciones = {
+  secretCipher,
+  secretDigest,
+  getWhatsappConnection: createGetWhatsappConnection(whatsappDeps),
+  createWhatsappConnection: createCreateWhatsappConnection(whatsappDeps),
+  updateWhatsappConnection: createUpdateWhatsappConnection(whatsappDeps),
+  testWhatsappConnection: createTestWhatsappConnection(whatsappDeps),
+  setWhatsappConnectionEnabled: createSetWhatsappConnectionEnabled(whatsappDeps),
+  regenerateWhatsappVerifyToken: createRegenerateWhatsappVerifyToken(whatsappDeps),
+  whatsappWebhookUrl,
+} as const;

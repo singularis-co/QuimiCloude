@@ -15,7 +15,7 @@ import {
   orderDistributionFullText,
 } from '@/app/(private)/asignacion/components';
 import type { ConditioningOrderRow, FinishedOrderView } from '@/lib/modules/asignaciones';
-import { conditioningOrderRoute } from '@/lib/shared/routes';
+import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 
 afterEach(() => {
   cleanup();
@@ -55,8 +55,8 @@ function renderCell(columnId: string, row: ConditioningOrderRow) {
   return render(<>{column.cell(row)}</>);
 }
 
-describe('«Por acondicionar»: cinco columnas', () => {
-  it('R8: Nº de pedido, Receta, Envases, Estado y Quién acondiciona, en ese orden', () => {
+describe('«Por acondicionar»: cinco columnas y el menú', () => {
+  it('R8: Nº de pedido, Receta, Envases, Estado y Quién acondiciona, en ese orden, y el menú al final', () => {
     const columns = buildConditioningOrdersColumns();
 
     expect(columns.map((column) => column.id)).toEqual([
@@ -65,6 +65,7 @@ describe('«Por acondicionar»: cinco columnas', () => {
       CONDITIONING_ORDER_PACKAGES_COLUMN_ID,
       CONDITIONING_ORDER_STATUS_COLUMN_ID,
       CONDITIONING_ORDER_CONDITIONER_COLUMN_ID,
+      'actions',
     ]);
     expect(columns.map((column) => column.label)).toEqual([
       'Nº de pedido',
@@ -72,11 +73,14 @@ describe('«Por acondicionar»: cinco columnas', () => {
       'Envases',
       'Estado',
       'Quién acondiciona',
+      'Acciones',
     ]);
   });
 
-  it('R8: el esqueleto pinta tantas columnas como la tabla', () => {
-    expect(CONDITIONING_ORDERS_SKELETON_COLUMN_COUNT).toBe(buildConditioningOrdersColumns().length);
+  it('R8: el esqueleto pinta tantas columnas como la tabla tiene de datos', () => {
+    expect(CONDITIONING_ORDERS_SKELETON_COLUMN_COUNT).toBe(
+      buildConditioningOrdersColumns().filter((column) => column.menu === undefined).length,
+    );
   });
 
   it('R8: «Envases» es el reparto entero en orden de alta, no un total', () => {
@@ -107,12 +111,14 @@ describe('«Por acondicionar»: cinco columnas', () => {
     const queued = screen.getByTestId('conditioning-order-status');
     expect(queued).toHaveTextContent('Por acondicionar');
     expect(queued).toHaveAttribute('data-status', 'POR_ACONDICIONAR');
+    expect(queued).toHaveAttribute('data-tone', ORDER_STATUS_TONES.POR_ACONDICIONAR);
     cleanup();
 
     renderCell(CONDITIONING_ORDER_STATUS_COLUMN_ID, { ...ROW, status: 'EN_ACONDICIONAMIENTO' });
     const inProgress = screen.getByTestId('conditioning-order-status');
     expect(inProgress).toHaveTextContent('En acondicionamiento');
     expect(inProgress).toHaveAttribute('data-status', 'EN_ACONDICIONAMIENTO');
+    expect(inProgress).toHaveAttribute('data-tone', ORDER_STATUS_TONES.EN_ACONDICIONAMIENTO);
   });
 
   it('R8: sin receta ni quien acondicione, las celdas pintan «—»', () => {
@@ -136,35 +142,31 @@ describe('«Por acondicionar»: cinco columnas', () => {
   });
 });
 
-describe('el número abre el detalle', () => {
-  it('R14: en «Por acondicionar» el número es un enlace al detalle con objetivo de 44 px', () => {
-    renderCell(CONDITIONING_ORDER_NUMBER_COLUMN_ID, ROW);
+describe('QC-265 R19: el número deja de ser enlace (al detalle se entra por el menú)', () => {
+  it('R19: en «Por acondicionar» el número es texto', () => {
+    const { container } = renderCell(CONDITIONING_ORDER_NUMBER_COLUMN_ID, ROW);
 
-    const link = screen.getByRole('link', { name: '2026-0000040' });
-    expect(link).toHaveAttribute('href', conditioningOrderRoute('order-a'));
-    expect(link).toHaveAttribute('href', '/asignacion/acondicionamiento/order-a');
-    expect(link.className).toContain('min-h-11');
-    expect(link.className).toContain('min-w-11');
+    expect(container).toHaveTextContent('2026-0000040');
+    expect(container.querySelector('a')).toBeNull();
   });
 
-  it('R14: en «Terminados» del acondicionador el número es el mismo enlace, con 44 px', () => {
+  it('R19: en «Acondicionados» el número es texto', () => {
     const column = buildConditionedOrdersColumns().find((entry) => entry.id === FINISHED_ORDER_NUMBER_COLUMN_ID);
     if (column === undefined) throw new Error('falta la columna del número');
-    render(<>{column.cell(FINISHED)}</>);
+    const { container } = render(<>{column.cell(FINISHED)}</>);
 
-    const link = screen.getByRole('link', { name: '2026-0000041' });
-    expect(link).toHaveAttribute('href', '/asignacion/acondicionamiento/order-c');
-    expect(link.className).toContain('min-h-11');
-    expect(link.className).toContain('min-w-11');
+    expect(container).toHaveTextContent('2026-0000041');
+    expect(container.querySelector('a')).toBeNull();
   });
 });
 
-describe('«Terminados» del acondicionador: las columnas del Empacador', () => {
-  it('R12: mismos ids, rótulos, alineación, fijado y orden que buildFinishedOrdersColumns()', () => {
+describe('«Acondicionados»: las columnas del Empacador y el menú', () => {
+  it('R12: mismos ids, rótulos, alineación, fijado y orden que buildFinishedOrdersColumns(), y el menú al final', () => {
     const own = buildConditionedOrdersColumns();
     const packer = buildFinishedOrdersColumns();
+    const datos = own.filter((column) => column.menu === undefined);
 
-    expect(own.map(({ id, label, align, defaultPinned }) => ({ id, label, align, defaultPinned }))).toEqual(
+    expect(datos.map(({ id, label, align, defaultPinned }) => ({ id, label, align, defaultPinned }))).toEqual(
       packer.map(({ id, label, align, defaultPinned }) => ({ id, label, align, defaultPinned })),
     );
     expect(own.map((column) => column.label)).toEqual([
@@ -174,11 +176,12 @@ describe('«Terminados» del acondicionador: las columnas del Empacador', () => 
       'Presentación',
       'Fecha de terminado',
       'Responsables',
+      'Acciones',
     ]);
   });
 
-  it('R12: solo la celda del número cambia; las demás pintan lo mismo que las del Empacador', () => {
-    const own = buildConditionedOrdersColumns();
+  it('R12: las celdas de datos pintan lo mismo que las del Empacador', () => {
+    const own = buildConditionedOrdersColumns().filter((column) => column.menu === undefined);
     const packer = buildFinishedOrdersColumns();
 
     own.forEach((column, index) => {
@@ -189,12 +192,7 @@ describe('«Terminados» del acondicionador: las columnas del Empacador', () => 
       const packerHtml = render(<>{packerColumn.cell(FINISHED)}</>).container.innerHTML;
       cleanup();
 
-      if (column.id === FINISHED_ORDER_NUMBER_COLUMN_ID) {
-        expect(ownHtml).not.toBe(packerHtml);
-        expect(ownHtml).toContain('<a');
-      } else {
-        expect(ownHtml, column.id).toBe(packerHtml);
-      }
+      expect(ownHtml, column.id).toBe(packerHtml);
     });
   });
 

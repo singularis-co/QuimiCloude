@@ -793,22 +793,29 @@ primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
 | `CRON_SECRET` | de produccion | ausente (Vercel no ejecuta crons en previews) | segun dev |
 | `INTEGRATIONS_ENCRYPTION_KEYS`, `INTEGRATIONS_ENCRYPTION_ACTIVE` | de produccion | **propias de preview** (la base ya no se comparte) | propias |
 | `DOCUMENTS_E2E_DOUBLES` | ausente | **con valor** (comprobacion previa) | vacia; solo la pone `playwright.config.ts` |
+| `WHATSAPP_GRAPH_API_VERSION` | la fija quien despliega (no es secreto) | la misma que production (no es secreto; decidido por el humano el 2026-10-09, QC-237) | segun dev |
+| `INTEGRATIONS_E2E_DOUBLES` | ausente (cliente real de Graph) | ausente (cliente real de Graph; decidido por el humano el 2026-10-09, QC-237) | vacia; solo la pone `playwright.config.ts` |
 
 `VERCEL` y `VERCEL_ENV` las pone Vercel y no se cargan a mano; `NODE_ENV` la ponen Next y Vercel.
 Las del bloque de servidores MCP de `.env.example` (`ATLASSIAN_MCP_AUTH`, `CONTEXT7_API_KEY`,
 `SUPABASE_PROJECT_REF`) no las lee la app: las lee `.mcp.json` del entorno del proceso.
 
 ## Componentes
+Todo componente nuevo o cambio visual lleva un pase de diseño aprobado antes del spec
+(`docs/perfil-agentes.md > Pase de diseño para componentes nuevos`; fuente en `docs/diseno/`).
+
 - `components/ui/`: primitivas de shadcn/ui. **Nunca crees un componente si ya existe en shadcn/ui.**
   Agregas con: `pnpm exec shadcn add <component>`.
-- `components/shared/`: compuestos construidos con primitivas ui/. Reutilizables entre features.
+- `components/shared/`: compuestos construidos con primitivas ui/. Reutilizables entre rutas.
 - `components/private/`: contienen datos sensibles. El padre (Server Component) valida permisos y
   pasa datos por props. No fetchean datos por si mismos.
 
 ### Regla: sin sobre-ingenieria
 Si un componente se usa en UN SOLO lugar y no tiene logica reutilizable, vive junto
-a la pagina que lo usa. Solo se promueve a `shared/` cuando al menos DOS features
-lo necesitan con la misma API.
+a la pagina que lo usa. Sube a `shared/` cuando la necesita una **segunda ruta** con la misma
+API (orden completo: `docs/perfil-agentes.md > Todos los agentes > Regla de decisión para
+componentes`). Lo que hay en `ui/`, `shared/`, `lib/shared/ui/` y `hooks/` está en
+`components/shared/CATALOGO.md`.
 
 ### Regla: componentes de ruta en `components/` con barrel `index.ts`
 
