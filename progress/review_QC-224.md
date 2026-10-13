@@ -200,3 +200,65 @@ No corrí la suite completa ni el E2E (lo hace CI; el E2E pasó en local en chro
 
 Corregir M1 y volver a correr `tests/unit/clientes/scope.test.ts` y `vitest run guard`. Los menores
 no bloquean.
+
+## Vuelta 2 (acotada a e046833c..c60151df)
+
+Head revisado: `c60151df`. El alcance se amplía por `docs/gate.md > La vuelta 2 del reviewer`, porque el
+rango toca piezas compartidas: el renombre de una migración y el merge de `origin/dev` (`ff6eca8c`)
+con 6 conflictos. No se rehace la trazabilidad completa.
+
+### Checklist
+
+- [x] **M1 (`27101518`):** `anular-entrega.spec.ts` está en `E2E_PERMITIDOS`
+  (`tests/unit/clientes/scope.test.ts:311`), con su comentario de fecha. Sigue tras el merge, junto a
+  `movimiento.spec.ts` y `marca-componentes.spec.ts` de dev, y la lista sigue cerrada.
+  `scope.test.ts` está verde.
+- [x] **m1 (`ee1a68cf`):** el renombre a `db/migrations/20261009120050_inventory_movement_kind_delivery_void/`
+  se hizo con `git mv`, sin cambiar el contenido.
+  - El orden queda: `120000_product_batches_production_date` (dev) < `120050` < `120100_order_delivery_voids`
+    < `120200_delivery_void_permission` < `130000_whatsapp_connections` (dev).
+  - Ya no queda ninguna referencia a `20261009120000_inventory_movement_kind_delivery_void` en código,
+    tests, specs ni docs. Las únicas que quedan están en las secciones históricas de
+    `progress/impl_QC-224-anular-entrega.md`, y son correctas como historia.
+  - `MIGRACIONES_ESPERADAS` respeta el orden por timestamp (`tests/guards/guard-identificador-de-request.test.ts:600-607`).
+  - `order-delivery-voids-migration.test.ts:45` localiza la carpeta por sufijo, así que el renombre no le afecta.
+  - En `design.md:318` y `tasks.md:67,354-355` figura el nombre nuevo.
+  - dev (`a864f26b`) no trae ninguna migración `delivery_void`, así que no hay deriva de nombre en una base compartida.
+- [x] **m2 y m3:** sin cambios, por decisión humana.
+- [x] **m4:** corregido en la bitácora (`7ebf1ee7`).
+- [x] **Merge `ff6eca8c`, los 6 conflictos.** Comparé `git diff a864f26b HEAD` con `git diff merge-base 7ebf1ee7`:
+  - `error-codes.ts`: dev primero (los 3 de WhatsApp), después `delivery_not_found` y
+    `delivery_already_voided`, y una línea de historial por cada lado.
+  - `error-catalog.ts`: igual en `ERROR_MESSAGE_KEY` y en `ERROR_MESSAGES_ES`.
+  - `catalogo.test.ts`: 87 = 85 de dev + 2 nuestros, y conserva el comentario de QC-237.
+  - `guard-identificador-de-request.test.ts`: `anular-entrega.spec.ts` va al final de
+    `E2E_ESPERADOS`, después de `integraciones-whatsapp.spec.ts`; las migraciones, en orden.
+  - `aislamiento.json`: las 3 entradas `transaccion` y las 2 de `commit` de QC-224 se suman a las
+    de dev. Ninguna entrada de dev se pierde y el JSON es válido.
+  - `clientes/scope.test.ts`: ver M1.
+- [x] **Nada se pierde de dev.** En los 14 archivos donde `HEAD` borra líneas respecto a dev, el
+  conjunto de líneas `+`/`-` coincide con el cambio propio de la feature desde la merge-base. La
+  única diferencia es `catalogo.test.ts`, por la resolución del conteo, y es correcta. No quedan
+  conflictos sin resolver.
+- [x] **`45b7eeb3`:** `e2e/anular-entrega.spec.ts:50,244` usa `createFixtureUser` de
+  `e2e/helpers/fixture-user.ts` en lugar de `prisma.user.create`. Mantiene la misma forma de
+  `{ data }` y `guard-e2e-fixture-user` está en verde. No ejecuté el E2E: lo está corriendo el
+  implementer.
+
+### Verificación ejecutada
+
+- `vitest run` sobre `clientes/scope`, `errores/catalogo`, `guard-identificador-de-request`,
+  `guard-e2e-fixture-user`, `order-delivery-voids-migration` y `delivery-void-permission-migration`:
+  6 archivos y 138 tests en verde.
+- `vitest run tests/guards`: 67 archivos, 946 tests en verde y 14 skipped.
+- `tsc --noEmit`: 0 errores.
+- `eslint` sobre los archivos tocados por las correcciones y la resolución de conflictos: 0 errores.
+
+### Hallazgos
+
+Ninguno bloqueante. Ningún menor nuevo.
+
+### Veredicto vuelta 2: **OK**
+
+Queda pendiente el E2E local de `anular-entrega.spec.ts`, que está corriendo el implementer, y el
+`gate-completo` del CI en el PR.
