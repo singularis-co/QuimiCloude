@@ -160,3 +160,56 @@ ahí (como `touch="mobile"` de `Button`; el tablero usa 760 px de contenedor). `
 sigue con `useEffectEvent`; el `id` con el que se monta no navega.
 
 Veredicto: T15 y T16 hechas, verdes en typecheck, lint, related y guardias.
+
+## Tanda 2 (2026-10-13) — backend_dev: T13 y T14
+
+| Task | Commit |
+|---|---|
+| T13 | `0986c991` Server Actions de evidencia y su cableado |
+| T14 | `a3a1cacd` bloqueo de mover/quitar pasos al guardar |
+
+**Nuevos:** `lib/modules/asignaciones/adapters/driving/step-evidence-actions.ts`,
+`lib/modules/recetas/domain/{recipe-step-lock,get-recipe-step-lock}.ts`,
+`lib/modules/recetas/ports/recipe-step-lock-reader.ts`,
+`tests/unit/asignaciones/step-evidence-actions.test.ts`,
+`tests/unit/recetas/{recipe-step-lock,get-recipe-step-lock}.test.ts`.
+
+**Modificados:** `lib/composition/index.ts` (solo añadidos: imports al final de sus bloques,
+`evidenceTargetDeps`, `countEvidenceLockingOrders`, `recipeStepLockReader`, `listVersionIdsIncludingDeleted`
+en `recipeRepository`, `stepLocks` en `updateRecipe`, `getRecipeStepLock` al final de `recetas`, tres
+casos de uso al final de `asignaciones`); `recetas`: `update-recipe.ts`, `recipe-repository.ts`,
+`recipe-prisma.ts` (`listRecipeVersionIdsIncludingDeleted`), `recipe-actions.ts`
+(`getRecipeStepLockAction`), `index.ts`; `tests/helpers/evidence-off.ts` (`noEvidenceLocks`);
+censo de `tests/unit/identity/session-once-per-request-actions.test.ts`; dobles de
+`RecipeRepository` y deps de `createUpdateRecipe` en 15 tests unitarios y 3 de integración;
+`recipe-actions.test.ts`, `update-recipe.test.ts`, `step-evidence-flag.int.test.ts` (casos nuevos).
+
+**Mapa R<n> -> test (esta tanda):**
+
+| R | Test |
+|---|---|
+| R7 | `update-recipe.test.ts` («R7: sin recetas.modificar…»), `authorization.test.ts` |
+| R8 (dato del aviso) | `get-recipe-step-lock.test.ts`, `recipe-actions.test.ts` |
+| R9, R10 | `recipe-step-lock.test.ts`, `update-recipe.test.ts`, `recipe-actions.test.ts`, `step-evidence-flag.int.test.ts` |
+| R11 | `recipe-step-lock.test.ts`, `update-recipe.test.ts` |
+| R12 | `update-recipe.test.ts`, `get-recipe-step-lock.test.ts`, `step-evidence-flag.int.test.ts` |
+| R18 (registro en servidor) | `step-evidence-actions.test.ts` |
+| R26, R27 (borde) | `step-evidence-actions.test.ts` |
+
+**Verificación:** `pnpm run typecheck` sin errores; `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`
+(los mismos 7 ajenos); `vitest run tests/unit/recetas` + actions + censo de sesión →
+`Test Files 69 passed (69)`, `Tests 1198 passed (1198)`; `recipe-actions.test.ts` 35/35;
+`step-evidence-flag.int.test.ts` 8/8 (el primer intento dio 57P03: Postgres local en recuperación;
+al reintentar, verde); `recipe-crud` + `formula-import` + `formula-import-versions` int →
+`Test Files 3 passed (3)`, `Tests 26 passed (26)`; `pnpm exec vitest run guard` →
+`Test Files 75 passed (75)`, `Tests 1054 passed | 20 skipped (1074)`.
+
+**Decisiones para el reviewer:**
+1. Las advertencias de register/remove van a `forModule('asignaciones').warn('evidence_storage_cleanup_failed', {operation, path, message})`; la ruta es `<empresa>/<pedido>/<uuid>`, sin datos de quien usa la app.
+2. `removeEvidenceAction` devuelve `{ photos }` como dice el design § 6 (el caso de uso trae además `stepPosition`, que no se expone).
+3. Forma canónica del paso: claves ordenadas (`jsonb` las reordena) y sin marcas `false`/ausentes; `requiresEvidence` fuera.
+4. Insertar un paso en medio cuenta como mover (desplaza a los de detrás): lo prueba `update-recipe.test.ts`.
+5. `getRecipeStepLock` sobre una versión responde por su original (el design no lo fija; una versión no tiene pasos propios).
+6. `stepLocks` es dependencia obligatoria de `createUpdateRecipe`: si la composición no la diera, no compilaría.
+
+Veredicto: T13 y T14 hechas, verificación verde.
