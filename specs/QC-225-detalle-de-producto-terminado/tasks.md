@@ -334,8 +334,10 @@ Producción:
 - `app/(private)/inventario/producto-terminado/[id]/components/finished-product-costs-table.tsx`
 - `app/(private)/inventario/components/finished-stock-columns.tsx`
 - `app/(private)/pedidos/components/order-produced-presentations.tsx`
-- `app/(private)/inventario/components/movement-reason-label.ts`, `batch-history.tsx`,
-  `adjust-batch-dialog.tsx` e `index.ts` (añadidos 2026-10-13 en TI: el E2E destapó que la sección
+- `app/(private)/inventario/components/movement-reason-label.ts`,
+  `app/(private)/inventario/components/batch-history.tsx`,
+  `app/(private)/inventario/components/adjust-batch-dialog.tsx` y
+  `app/(private)/inventario/components/index.ts` (añadidos 2026-10-13 en TI: el E2E destapó que la sección
   de la ficha, componente de servidor, llamaba a `movementReasonLabel`, que vivía en un módulo
   `'use client'`, y la página caía para todos. La función pura pasa a un módulo sin la directiva;
   mismo nombre y misma salida)
@@ -380,6 +382,9 @@ Tests, fixtures y E2E:
 - `tests/unit/clientes/scope.test.ts` y `tests/unit/shared/data-table-alcance.test.ts` (añadidos
   2026-10-13 en TI: listas cerradas de E2E; el spec nuevo normaliza el cliente que siembra con
   `@/lib/modules/clientes` y usa `data-table-row-`)
+- `tests/unit/inventario/schema/inventory-movements-migration.test.ts` (añadido 2026-10-13 en la
+  revisión: censo cerrado de operaciones sobre `inventoryMovement`; admite `count`, que es de lectura
+  y pagina los listados de la ficha)
 - `tests/guards/guard-pantallas-exigen-permiso.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `tests/integration/aislamiento.json`

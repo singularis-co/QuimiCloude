@@ -1,7 +1,7 @@
 # QC-225 — detalle-de-producto-terminado · design.md
 
-> Zona fullstack · Complejidad medium · Requisitos en `requirements.md` (R1–R36; P1 abierta, no
-> bloquea; P2 cerrada el 2026-10-13). Solo lectura: sin tablas, sin migraciones y sin dependencias
+> Zona fullstack · Complejidad medium · Requisitos en `requirements.md` (R1–R36; P1 y P2
+> cerradas el 2026-10-13; enmienda 2026-10-13 tras la revisión: antes decía «P1 abierta»). Solo lectura: sin tablas, sin migraciones y sin dependencias
 > nuevas (R32). Todo sale de Prisma, la aritmética `BigInt` que ya usa `inventario` y los primitivos de
 > UI que ya están en el repo.
 >
@@ -75,9 +75,9 @@ Busqué los términos `ficha`, `detalle de producto`, `producto terminado`, `kar
 | Ámbito de empresa | `company-scope.ts` de `inventario` y de `pedidos` | R25 |
 | Patrón de página de detalle | `app/(private)/proveedores/[id]/page.tsx` y `supplier-not-found.tsx` | R1, R6 |
 | Tabla | `DataTable` y su paginación (`components/shared/data-table/`) | R23, R24 |
-| Tabs | `components/ui/tabs.tsx` (lo usa `product-type-tabs.tsx`) | R8, R9 |
+| Tabs | `components/ui/tabs.tsx` (lo usa `product-type-tabs.tsx`); se usó `UrlTabs` (`components/shared/url-tabs.tsx`), que lo envuelve y sincroniza la pestaña con la dirección (enmienda 2026-10-13) | R8, R9 |
 | Imagen | `EntityImage` (lo usa `finished-stock-columns.tsx:134`) | R10 |
-| Etiqueta del motivo | `movementReasonLabel` (`app/(private)/inventario/components/batch-history.tsx:47`) | R16, R17 |
+| Etiqueta del motivo | `movementReasonLabel`; al escribir el spec vivía en `app/(private)/inventario/components/batch-history.tsx:47`. Enmienda 2026-10-13: se movió, sin cambiar nombre ni salida, a `app/(private)/inventario/components/movement-reason-label.ts` (módulo sin `'use client'`), porque la sección de la ficha es de servidor | R16, R17 |
 
 ## 1. Encaje en módulos
 
@@ -428,7 +428,9 @@ Solo lectura y sobre el cliente global. Usa los envoltorios de `company-scope.ts
   `@relation` con `Presentation`) y `stock` y `packageContent` de todos sus lotes.
 - `listBatches`: `productBatch.findMany` del producto, en la empresa, con `orderBy [{createdAt:'desc'},{id:'desc'}]`
   y `skip`/`take` de `toOffsetLimit`, más un `count`. El `orderId` sale de su asiento `production`
-  (`movements: { where: { kind: 'production' }, select: { orderId }, take: 1 }`).
+  (`movements: { where: { kind: 'production' }, select: { orderId }, take: 1 }`). Enmienda 2026-10-13, tras la revisión: con
+  `orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]`, porque un solo asiento `production` por lote es
+  un invariante de la escritura y no una restricción de la base; así el resultado es determinista.
 - `listMovements`: `inventoryMovement.findMany` con `batch: { productId, …empresa }`,
   `quantity: { gt: 0 }` o `{ lt: 0 }` según `direction` (R18), el mismo orden y `count`. El lote, su
   `lot` y su `packageContent` salen por la relación `batch`, que es del mismo módulo.
@@ -523,7 +525,7 @@ El contenedor exterior es un `div` sin `main` (R5 de QC-11).
 |---|---|---|
 | `finished-product-not-found.tsx` | Estado «producto no encontrado», con enlace a `productListHref` con el filtro de tipo `FINISHED_PRODUCT` (R6) | `finished-product-not-found`, `finished-product-back` |
 | `finished-product-header.tsx` | Nombre e imagen | `finished-product-name` |
-| `finished-product-tabs.tsx` | Cliente. `Tabs` con los siete disparadores en orden, que navegan cambiando `tab` en la dirección (R8, R9) | `finished-product-tab-<tab>` |
+| `finished-product-tabs.tsx` | `UrlTabs` con los siete disparadores en orden, que navegan cambiando `tab` en la dirección (R8, R9). Enmienda 2026-10-13: decía «Cliente. `Tabs`»; el catálogo remite a `UrlTabs` para sincronizar con la URL | `finished-product-tab-<tab>` |
 | `finished-product-general.tsx` | R10 | `finished-product-general` |
 | `finished-product-stock.tsx` | R11, R12 | `finished-product-stock-total`, `finished-product-stock-packages`, `finished-product-stock-unpackaged` |
 | `finished-product-list-section.tsx` | Servidor. Pide el listado del tab activo y despacha a vacío (R24), error o tabla | `finished-product-<tab>-empty`, `finished-product-<tab>-error` |
@@ -547,8 +549,11 @@ El `Record` de etiquetas es propio de la tabla y no reutiliza `movementKindLabel
 `batch-history.tsx`: su dominio es `BatchHistoryEntry['kind']`, que mezcla el libro de reservas, y sus
 textos de `opening` («Apertura») y `consumption` («Salida por entrega») no son los de R16.
 
-`movementReasonLabel` vive en `app/(private)/inventario/components/batch-history.tsx`. Ya está
-exportado en el barrel de esa ruta (`components/index.ts:7`), y se importa de ahí.
+`movementReasonLabel` se importa del barrel de `app/(private)/inventario/components/`
+(`index.ts`). Enmienda 2026-10-13: vivía en `batch-history.tsx`, un módulo `'use client'`, y la
+sección de la ficha, que es de servidor, no podía llamarla; pasó a
+`app/(private)/inventario/components/movement-reason-label.ts`, con el mismo nombre y la misma
+salida, y `batch-history.tsx` y `adjust-batch-dialog.tsx` solo cambian el import.
 
 Las tablas usan `DataTable` con paginación por servidor, con el molde de `finished-stock-table.tsx`.
 Sin filtros ni orden: el orden es fijo (R23). Las cantidades y los importes se muestran con
@@ -587,6 +592,22 @@ producto.
     con sus enlaces (R27).
   - Los nombres sin producto se pintan como texto.
 
+**Regla de decisión (enmienda 2026-10-13, tras la revisión).** `OrderProducedPresentations` aplica el
+**paso 3, componer**: arma la celda con `OrderDistributionLabel` (para el reparto vacío),
+`orderDistributionLineText`, `Link`, `Button` y `Popover`, sin copiar su lógica.
+
+Por qué no el paso 2 (extender `OrderDistributionLabel` con una prop opcional): el spec solo daba
+«así no se toca el componente compartido», y eso no basta, porque el paso 2 permite tocarlo si los
+consumidores no cambian. Lo que el código muestra:
+- `components/shared/order-distribution-label.tsx` no lleva `'use client'`, y el `Popover` del «+N» lo
+  necesita: la extensión convertiría en módulo de cliente la etiqueta que también pintan
+  `/asignacion` (`assignment-list-parts.tsx`, `order-distribution-full.tsx`) y
+  `/asignacion/[id]` (`order-execution-screen.tsx`);
+- su fila de `components/shared/CATALOGO.md` dice «No cubre: la lista desplegada».
+
+**Abierto:** si eso justifica descartar el paso 2 no lo fija ningún documento. Lo decide el humano,
+junto con el pase de diseño de esta celda.
+
 ## 7. Censos, guardias y llamadores afectados
 
 Cada enmienda conserva las aserciones previas y lleva una nota fechada.
@@ -604,6 +625,19 @@ Cada enmienda conserva las aserciones previas y lleva una nota fechada.
 | `tests/guards/guard-arquitectura-modulos.test.ts` (bloque 15) | ciclos entre módulos | sin cambio: la arista `inventario → clientes` no cierra ciclo (verificar) | TC |
 | `tests/guards/guard-pantalla-pedidos-se-amplia.test.ts` | anclas del barrel de /pedidos | sin cambio: solo se añaden exportaciones (verificar) | TC |
 | `tests/guards/guard-dependencias-aprobadas.test.ts` | `package.json` | sin cambio (R32) | TC |
+
+Enmienda 2026-10-13, tras la revisión: censos que la implementación tocó y que esta tabla no preveía.
+
+| Archivo | Qué censa | Cambio | Task |
+|---|---|---|---|
+| `tests/unit/inventario/schema/inventory-movements-migration.test.ts` | operaciones de Prisma sobre `inventoryMovement` (solo altas y lecturas) | + `count`, de lectura, para paginar (R23); la intención sigue: ninguna operación que modifique | revisión |
+| `tests/unit/pedidos/order-delivery-append-only.test.ts` | ningún nombre exportado que anule o edite entregas | sin cambio en el censo: la constante de la marca «Anulada» se llama `DELIVERY_VOIDED_LABEL` para no casar con el patrón | revisión |
+| `tests/unit/inventario/scope.test.ts` | pantallas de catálogo de presentaciones y lista de specs E2E | excluye por nombre `order-produced-presentations.tsx`; + el E2E nuevo | TC, TI |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | lista exacta de exportaciones de `lib/shared/routes.ts` | + `finishedProductDetailRoute` | TC |
+| `tests/unit/clientes/scope.test.ts` | lista cerrada de E2E que siembran clientes con la normalización de `@/lib/modules/clientes` | + `detalle-de-producto-terminado.spec.ts` | TI |
+| `tests/unit/shared/data-table-alcance.test.ts` | E2E que usan `data-table-row-` | + `detalle-de-producto-terminado.spec.ts` | TI |
+| `tests/unit/pedidos/module-contract.test.ts` | quién abre el cliente Prisma en `pedidos` | + `order-delivery-directory-prisma.ts` | B2 |
+| `tests/unit/pedidos-ui/order-list-section.test.tsx`, `tests/unit/pedidos-ui/pedidos-viewport.test.tsx`, `tests/unit/pedidos-ui/order-sheet.test.tsx`, `tests/unit/paridad/pedidos-paridad.test.tsx` | suites de /pedidos con `@/lib/composition` sustituido por un doble que solo trae `identity` | + un doble de `finished-product-actions` (`listProducedProductsAction` sin enlaces), porque esa action lee `observabilidad` al cargarse | F4 |
 
 Llamadores de tipos que cambian: ninguno. Todos los tipos son nuevos, y `OrderView` y `ProductView`
 no cambian.
