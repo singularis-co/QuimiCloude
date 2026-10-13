@@ -9,7 +9,7 @@ crear o cambiar una pieza de UI (regla de reutilizar del catálogo, `components/
 |---|---|
 | `guia-de-marca.html` | La guía de marca: logo, color, tipografía y tono. Se abre sola en el navegador (no referencia archivos locales). |
 | `sistema.css` | El sistema visual completo: tokens de `app/globals.css` más las piezas. Es **referencia para portar a componentes**; no se importa en la app ni se copia tal cual. |
-| `canvas/` | Copia de todos los tableros del canvas: 93 `*.dc.html`, `canvas.json` y `qc.css`. |
+| `canvas/` | Copia de todos los tableros del canvas: 94 `*.dc.html`, `canvas.json` y `qc.css`. |
 
 `sistema.css` y `canvas/qc.css` son el **mismo archivo, byte a byte**: los tableros cargan `./qc.css`
 y no se tocan, así que el sistema visual vive en los dos sitios. Si cambia, se actualizan juntos (la

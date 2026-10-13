@@ -610,6 +610,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261009120200_delivery_void_permission',
   // 2026-10-09: la tabla de conexiones de WhatsApp; no toca el identificador.
   '20261009130000_whatsapp_connections',
+  // QC-235 2026-10-13: la columna `companies.country`; no toca el identificador.
+  '20261013120000_companies_country',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -674,13 +676,15 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // El 2026-10-07 entro `nodemailer` -transporte SMTP temporal del correo- y, como devDependency,
 // `@types/nodemailer`, pedidas por el humano y con su fila en `docs/dependencias.md`: de 41 a 42
 // y de 21 a 22.
+// El 2026-10-13 entro `libphonenumber-js` -pais y telefono, QC-235-, con los cuatro checks,
+// aprobacion humana y su fila en `docs/dependencias.md`: de 42 a 43.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 42
+export const DEPENDENCIAS_ESPERADAS = 43
 export const DEV_DEPENDENCIAS_ESPERADAS = 22
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */

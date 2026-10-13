@@ -39,7 +39,8 @@ const CREDENTIAL_ID = 'credential';
 const CONFIRMATION_ID = 'credential-confirmation';
 const FEEDBACK_ID = 'set-credential-feedback';
 
-// Sin `breachedState`: la séptima regla solo la comprueba el servidor y queda pendiente.
+// La lista en vivo muestra las seis reglas locales; la de filtradas solo la comprueba el servidor
+// al guardar y, si la rechaza, aparece en el aviso de requisitos incumplidos.
 const LIVE_REQUIREMENTS = {};
 
 type SetCredentialFormProps = {

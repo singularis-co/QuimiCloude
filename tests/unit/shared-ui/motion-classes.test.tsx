@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AppSidebar } from '@/components/private/app-sidebar';
@@ -323,8 +323,50 @@ describe('clases de movimiento de los primitivos', () => {
       'transition-transform',
       'duration-(--dur-base)',
       'ease-(--ease-standard)',
-      'group-data-open/menu-button:rotate-90',
+      'group-data-panel-open/menu-button:rotate-90',
     ]);
+  });
+
+  it('QC-272: con el submenú abierto el trigger lleva data-panel-open, que es lo que gira el chevron', () => {
+    setViewportWidth(WIDE_VIEWPORT);
+    usePathnameMock.mockReturnValue('/ruta-que-no-esta-en-la-navegacion');
+    const grupo: NavGroup = {
+      kind: 'group',
+      label: 'Grupo B',
+      testId: 'grupo-b',
+      section: 'Fixture',
+      items: [
+        {
+          kind: 'link',
+          href: '/fixture/grupo-b/hijo',
+          label: 'Hijo B',
+          testId: 'grupo-b-hijo',
+          permission: 'inventario.consultar',
+        },
+      ],
+    };
+    const usuario: SessionUser = {
+      id: 'u-1',
+      username: 'ana.perez',
+      displayName: 'Ana Perez',
+      roleName: 'Jefa de planta',
+      permissions: [],
+    };
+    render(
+      <SidebarProvider>
+        <AppSidebar user={usuario} navItems={[grupo]} />
+      </SidebarProvider>,
+    );
+
+    const trigger = screen.getByTestId('grupo-b');
+    const chevron = trigger.querySelector('svg.ml-auto');
+    expect(clases(chevron)).toContain('group-data-panel-open/menu-button:rotate-90');
+    expect(clases(trigger)).toContain('group/menu-button');
+    expect(trigger).not.toHaveAttribute('data-panel-open');
+
+    fireEvent.click(trigger);
+
+    expect(trigger).toHaveAttribute('data-panel-open');
   });
 });
 

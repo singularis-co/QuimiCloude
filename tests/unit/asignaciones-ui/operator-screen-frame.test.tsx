@@ -5,7 +5,10 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { THEME_TOGGLE_LABEL } from '@/app/(private)/components/theme-toggle';
-import { OperatorScreenFrame } from '@/app/(private)/asignacion/components/operator-screen-frame';
+import {
+  OperatorScreenFrame,
+  STEP_READER_SIDE_COLUMN_RESERVE,
+} from '@/app/(private)/asignacion/components/operator-screen-frame';
 import { Button } from '@/components/ui/button';
 
 afterEach(cleanup);
@@ -147,5 +150,11 @@ describe('OperatorScreenFrame', () => {
     );
 
     expect(screen.getByTestId('order-execution-screen').className).toMatch(/(^|\s)@container(\s|$)/);
+  });
+
+  it('QC-269 R4, R7, R8: la reserva lateral solo vale con dos columnas y es un margen inferior calculado', () => {
+    // La igualdad con el calc del pie del lector se comprueba en order-execution-screen.test.tsx.
+    expect(STEP_READER_SIDE_COLUMN_RESERVE.startsWith('@min-[1101px]:')).toBe(true);
+    expect(STEP_READER_SIDE_COLUMN_RESERVE).toMatch(/^@min-\[1101px\]:mb-\[calc\([^\]]+\)\]$/);
   });
 });

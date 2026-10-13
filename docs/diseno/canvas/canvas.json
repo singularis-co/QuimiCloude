@@ -851,6 +851,15 @@
    "page": "configuracion",
    "is_interactive": true
   },
+  "CountrySelect.dc.html": {
+   "x": 0,
+   "y": 6900,
+   "w": 1440,
+   "h": 1240,
+   "title": "CountrySelect (QC-235)",
+   "page": "fundamentos",
+   "is_interactive": true
+  },
   "ProductoTerminado.dc.html": {
    "x": 0,
    "y": 8180,
@@ -996,6 +1005,7 @@
   "IntegracionesTablet.dc.html",
   "IntegracionesMovil.dc.html",
   "ModalesConfiguracion.dc.html",
+  "CountrySelect.dc.html",
   "ProductoTerminado.dc.html",
   "ProductoTerminadoTablet.dc.html",
   "ProductoTerminadoMovil.dc.html",
