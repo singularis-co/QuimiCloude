@@ -129,7 +129,7 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
 
 ## Bloque E — E2E y cierre (depende de todo)
 
-- [ ] **T20. E2E del Operador** (R13, R15, R18, R22, R35). Extiende `e2e/ejecucion-receta.spec.ts`
+- [x] **T20. E2E del Operador** (R13, R15, R18, R22, R35). Extiende `e2e/ejecucion-receta.spec.ts`
   con una fórmula cuyo paso 1 exige evidencia: Siguiente bloqueado, subida interceptada en
   `https://evidencias-e2e.invalid/**`, avance, quitar la foto volviendo atrás, «Falta evidencia»
   al finalizar, volver a subir y finalizar.
