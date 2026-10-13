@@ -313,15 +313,15 @@ Archivos:
 
 ---
 
-## [ ] TZ — Cierre
+## [x] TZ — Cierre
 Depende de: TI.
 
-- `./init.sh` en verde, y `gate-completo` de CI en verde en el PR.
-- En `progress/impl_QC-224-anular-entrega.md`: el mapa `R1`–`R37` → test concreto (desde
+- [ ] `./init.sh` en verde, y `gate-completo` de CI en verde en el PR. (lo confirma el leader)
+- [x] En `progress/impl_QC-224-anular-entrega.md`: el mapa `R1`–`R37` → test concreto (desde
   `design.md > 10`, con los nombres reales), los censos enmendados y el resultado del E2E.
-- R37: `git diff origin/dev -- package.json pnpm-lock.yaml` vacío y `guard-dependencias-aprobadas` en
+- [x] R37: `git diff origin/dev -- package.json pnpm-lock.yaml` vacío y `guard-dependencias-aprobadas` en
   verde.
-- Comentarios: en las líneas que toca la rama, ninguno cita `QC-`, `R<n>`, `D<n>` ni el spec.
+- [x] Comentarios: en las líneas que toca la rama, ninguno cita `QC-`, `R<n>`, `D<n>` ni el spec.
 
 **Hecho cuando:** todo lo anterior se cumple y la feature queda lista para `reviewer`.
 
