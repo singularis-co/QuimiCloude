@@ -266,6 +266,12 @@ mención del JSDoc. Las otras cuatro candidatas y el ancla `bcryptjs` no cambian
 explícita a un test ajeno, aprobada con este spec. No es un test que se debilita a escondidas.
 La otra enmienda a un test ajeno es la de QC-233 R20 (`guard-buscadores`, § 7.2).
 
+**Enmienda `maestro-rol.test.ts` R17 (2026-10-13, en T10).** El barrido prohíbe nombrar
+`empresas.*` fuera del catálogo de permisos y pide a la primera ficha que los exija abrir sus rutas
+exactas. Se abre solo `lib/modules/identity/domain/set-company-country.ts` (exige
+`empresas.modificar`, R4/R5), con el anti-cegado intacto. La aplicó el implementer siguiendo la
+instrucción del propio test; la juzga el reviewer.
+
 ## 7. `CountrySelect`
 
 ### 7.1 Referencia de diseño

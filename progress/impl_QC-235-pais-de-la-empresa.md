@@ -181,9 +181,48 @@ Ningún R sin test.
 5. T9: `@base-ui/react` instalado es 1.7.0 (design decía 1.8.0); `aria-haspopup="dialog"` (tablero:
    `listbox`); buscador del popup 44 px (tablero: 40).
 
+   Porqués: el buscador va a 44 px por la regla de 44 px táctiles del perfil; `aria-haspopup` es
+   `dialog` porque el popup del primitivo es `role="dialog"` y anunciar `listbox` sería falso;
+   Base UI 1.7.0 es lo que hay instalado (`^1.7.0`) y las líneas citadas por el design son iguales.
+   `22001` porque `VARCHAR(2)` rechaza `'COL'` por longitud antes de evaluar el `CHECK`; los conteos
+   fijos son aserciones literales de guardias que cuentan dependencias, migraciones y códigos.
+6. Enmienda QC-233 R20 (decisión del humano, 2026-10-13): `components/shared/country-select.tsx` es la
+   cuarta excepción de `tests/guards/guard-buscadores.test.ts`, solo `primitivo-fuera`, con motivo
+   «filtra una lista local fija y no consulta al servidor». Anotada en `design.md > 7.2` (y referida
+   en § 6.3) y en `requirements.md > Decisiones cerradas`. Commit `fda30baf`.
+7. Enmienda `tests/unit/identity/roles/maestro-rol.test.ts` R17 (decidida por el implementer, no por
+   el humano): abre solo `set-company-country.ts`, siguiendo la instrucción literal del test y el
+   precedente de `empacador-rol.test.ts`. Anotada en `design.md > 6.3`.
+
+## Implementer · T9 (cierre del bloqueo) y T10
+
+### Archivos
+- `tests/guards/guard-buscadores.test.ts` (cuarta excepción; caso R20 a cuatro).
+- `specs/QC-235-pais-de-la-empresa/{design,requirements,tasks}.md`.
+
+### Salida
+- `pnpm exec vitest run tests/guards/guard-buscadores.test.ts`: 1 archivo, 16 pass, 3 skipped.
+- `node scripts/archivos-en-vuelo.mjs --candidata QC-235` (exit 1):
+  - CHOCA con QC-214: `docs/architecture.md`, `db/schema.prisma`, `error-codes.ts`,
+    `error-catalog.ts`, `lib/composition/index.ts`.
+  - CHOCA con QC-225: `tests/integration/aislamiento.json`, `lib/composition/index.ts`.
+  - Avisos: QC-96 y QC-270 sin rama publicada; `CATALOGO.md` compartido (apéndice) con QC-214 y QC-262.
+  Lo decide el leader (`docs/equipo.md`); no es de código.
+- `./init.sh` (rápido, 978 s): exit 1. `Test Files 2 failed | 837 passed (839)`,
+  `Tests 2 failed | 13288 passed | 42 skipped`. Rojos nuevos fuera del baseline:
+  1. `tests/unit/identity/roles/maestro-rol.test.ts` R17: lo detonaba `set-company-country.ts`.
+     Arreglado (backend_dev) abriendo solo esa ruta, como pide el propio test; anti-cegado intacto.
+     `vitest run maestro-rol.test.ts`: 11/11. Enmienda anotada en `design.md > 6.3`. Desviación 7.
+  2. `tests/integration/proveedores/catalog-line.int.test.ts` R32: **ajeno a QC-235, de entorno.**
+     Postgres local con `lc_messages = Spanish_Colombia.1252` hace que Prisma devuelva
+     `meta.constraint: null` y el test espera cadena (documentado en `f2be3eb8`; en CI, en_US, pasa;
+     ya visto en QC-221 y QC-218 y en `dev`). QC-235 no toca proveedores, ni Prisma, ni ese test.
+     1 fail / 13 pass en tres corridas. No se arregla aquí; no está en `tests/baseline-rojos.json`.
+- T10 queda **sin marcar**: su «Hecho» pide `./init.sh` verde y localmente sigue rojo por (2). Lo
+  decide el leader.
+
 ## Pendiente
-- **Bloqueo T9:** `guard-buscadores` R7 (QC-233) prohíbe importar `components/ui/autocomplete` fuera
-  de `AsyncAutocomplete` y R20 fija tres excepciones; `design.md > 7.2, 7.5` manda componerlo.
-  Decide el leader/humano: excepción para `country-select.tsx` (R20 → cuatro) o cambiar el design.
-- Revisión visual real a 1440/820/375 px.
-- T10 (`./init.sh` verde, `archivos-en-vuelo --candidata`) espera al bloqueo.
+- **Revisión visual real** de `CountrySelect` a 1440/820/375 px contra el tablero: para el humano
+  (no hay navegador en la sesión y ninguna ruta lo monta hasta QC-166). T9 se marcó hecha por
+  decisión del leader con esto pendiente.
+- Choques de archivos con QC-214 y QC-225 (arriba): decide el leader.
