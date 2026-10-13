@@ -330,3 +330,10 @@ export {
   EvidenceNotFoundError,
   EvidenceRequiredError,
 } from './domain/errors';
+export {
+  createRequestEvidenceUpload,
+  type RequestEvidenceUploadDeps,
+  type RequestEvidenceUploadResult,
+} from './domain/request-evidence-upload';
+export type { EvidenceTargetDeps } from './domain/evidence-target';
+export type { EvidenceStorageWarning } from './domain/evidence-photos';

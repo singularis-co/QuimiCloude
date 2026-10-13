@@ -8,7 +8,7 @@
  * Los pasos son los de la formula ACTUAL, leidos en cada llamada: un switch encendido despues de
  * empezar tambien rige.
  */
-import { requirePermission, type Actor } from './actor';
+import { requireAnyPermission, requirePermission, type Actor } from './actor';
 import { OrderBlockedError, OrderNotFoundError } from './errors';
 
 import type { EvidencePhase } from './step-evidence';
@@ -75,4 +75,12 @@ export async function resolveEvidenceTarget(
   }
   requirePermission(actor, 'empaque.modificar');
   return resolvePacking(deps, actor, orderId);
+}
+
+/**
+ * Primer corte de los casos de uso de fotos, antes de leer la entrada: la fase viaja en ella, asi
+ * que aqui solo se exige poder tocar alguna. `resolveEvidenceTarget` exige despues el de la fase.
+ */
+export function requireEvidenceAccess(actor: Actor | null | undefined): asserts actor is Actor {
+  requireAnyPermission(actor, ['asignaciones.ejecutar', 'empaque.modificar']);
 }
