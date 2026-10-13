@@ -620,6 +620,11 @@
       "archivo": "integraciones/whatsapp-connection-prisma.int.test.ts",
       "motivo": "Ejercita las cuatro funciones de whatsapp-connection-prisma.ts, que llaman al cliente Prisma GLOBAL y no a un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria; ademas R6 necesita dos altas concurrentes de verdad contra el indice unico parcial. Cada caso fabrica sus empresas efimeras con randomUUID (tipo de documento, rol, empresa y usuario) y 'afterAll' borra sus conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-09"
+    },
+    {
+      "archivo": "recetas/step-evidence-flag.int.test.ts",
+      "motivo": "QC-214 T1: ejercita `createRecipe`, `createRecipeVersion`, `replaceAliveRecipe` y `findAliveRecipeById` de `recipe-prisma.ts` y `findRecipeExecutionContentById` / `findRecipePackingStepsById` de `recipe-catalog-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria. Una empresa efimera (randomUUID) nace en `beforeAll` y muere en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-13"
     }
   ]
 }
