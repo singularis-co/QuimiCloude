@@ -21,6 +21,7 @@
     "asignaciones/reapply-work-group.int.test.ts",
     "asignaciones/remove-work-group.int.test.ts",
     "asignaciones/responsible-eligibility.int.test.ts",
+    "asignaciones/step-evidence-constraints.int.test.ts",
     "asignaciones/unassign.int.test.ts",
     "clientes/customers-constraints.int.test.ts",
     "clientes/customers-migration.int.test.ts",

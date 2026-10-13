@@ -605,6 +605,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261009120200_delivery_void_permission',
   // 2026-10-09: la tabla de conexiones de WhatsApp; no toca el identificador.
   '20261009130000_whatsapp_connections',
+  // 2026-10-13: las fotos de evidencia por paso; no toca el identificador.
+  '20261013120000_order_step_evidence',
 ] as const
 
 export function hallazgosDeMigraciones(
