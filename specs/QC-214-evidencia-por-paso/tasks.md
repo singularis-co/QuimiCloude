@@ -120,7 +120,7 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
   `packing-order-evidence.test.tsx`: bloque solo en pasos con evidencia; fotos iniciales; Siguiente
   bloqueado con el motivo; «Falta evidencia» con botón por paso que navega; confirmación con el
   texto de R23; los tests existentes de las dos pantallas siguen verdes.
-- [ ] **T19. Editor de fórmulas** (R1, R2, R5, R6, R8). `recipe-step-editor.tsx`,
+- [x] **T19. Editor de fórmulas** (R1, R2, R5, R6, R8). `recipe-step-editor.tsx`,
   `recipe-steps-field.tsx`, `recipe-form.tsx`, `recipe-version-form.tsx`, `[id]/page.tsx`.
   *Hecho:* casos nuevos en `recipe-step-editor.test.tsx` y `recipe-steps-field.test.tsx` (switch
   apagado por defecto, línea de ayuda, resumen por lista, sin switch si `showEvidenceSwitch` falta);

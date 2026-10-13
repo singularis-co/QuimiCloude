@@ -8,6 +8,7 @@ import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import {
   getRecipeAction,
+  getRecipeStepLockAction,
   listRecipeVersionsAction,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
@@ -71,7 +72,7 @@ export default async function EditarRecetaPage({
 
   // Las versiones se piden a la vez que el detalle aunque el id resulte ser de una version: en ese
   // caso su respuesta se descarta, porque la redireccion se decide con el detalle.
-  const [recipeResult, versionsResult, unitsResult, productsResult, machinesResult] =
+  const [recipeResult, versionsResult, unitsResult, productsResult, machinesResult, lockResult] =
     await Promise.all([
       getRecipeAction(id),
       listRecipeVersionsAction(id),
@@ -86,6 +87,7 @@ export default async function EditarRecetaPage({
         pageSize: MAX_PAGE_SIZE,
         filters: { type: { kind: 'select', values: [PRODUCT_TYPES.MACHINE] } },
       }),
+      getRecipeStepLockAction(id),
     ]);
 
   if (recipeResult.status === 'error') {
@@ -154,6 +156,14 @@ export default async function EditarRecetaPage({
     );
   }
 
+  if (lockResult.status === 'error') {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+        <ErrorState error={lockResult} {...LOAD_ERROR} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <h1 data-testid="recipe-form-title" className="text-2xl font-semibold break-words">
@@ -163,6 +173,7 @@ export default async function EditarRecetaPage({
         mode="edit"
         recipe={recipeResult.data}
         versions={versionsResult.data}
+        lockingOrders={lockResult.data.lockingOrders}
         units={unitsResult.data}
         initialProductPage={{
           items: productsResult.data.items.map((item) => ({
