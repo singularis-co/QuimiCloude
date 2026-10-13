@@ -23,7 +23,7 @@ Tres tandas. Implementa `frontend_dev`. Verificación de cada tanda: `pnpm run t
 
 ## Tanda 2 — Snapshots de paridad (R8)
 
-- [ ] **T4 — Regenerar y revisar.** Depende de T3. `pnpm exec vitest run tests/unit/paridad -u` y
+- [x] **T4 — Regenerar y revisar.** Depende de T3. `pnpm exec vitest run tests/unit/paridad -u` y
   revisión mecánica del diff de los 11 `.snap` de `## Archivos esperados`:
   - toda línea cambiada es un `th … data-testid="data-table-head-<id>"` de una columna `end` o
     `center` o el `div` inmediato que le sigue;
@@ -37,7 +37,7 @@ Tres tandas. Implementa `frontend_dev`. Verificación de cada tanda: `pnpm run t
 
 ## Tanda 3 — Cierre
 
-- [ ] **T5 — Trazabilidad y gate.** Depende de T4. Mapa `R1..R8 -> test` en
+- [x] **T5 — Trazabilidad y gate.** Depende de T4. Mapa `R1..R8 -> test` en
   `progress/impl_QC-270.md` (R8 -> T4: snapshots regenerados + salida de la revisión mecánica).
   Anota ahí, si se observa al revisar las listas en el navegador, alguna etiqueta recortada
   (`requirements.md > P3`). `./init.sh` en verde.
