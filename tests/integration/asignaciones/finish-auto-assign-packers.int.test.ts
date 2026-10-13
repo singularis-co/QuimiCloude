@@ -43,6 +43,7 @@ import {
   actorOf,
 } from './use-case-fixture';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
+import { evidenceRepositoryUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
 
 async function createRoleWithPermissions(
   tx: Prisma.TransactionClient,
@@ -116,6 +117,8 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
+        recipes: recipesWithoutEvidence,
+        evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido, stepPosition: null });
@@ -152,6 +155,8 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
+        recipes: recipesWithoutEvidence,
+        evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido, stepPosition: null });
@@ -188,6 +193,8 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
+        recipes: recipesWithoutEvidence,
+        evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido, stepPosition: null });

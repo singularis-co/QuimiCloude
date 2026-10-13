@@ -54,6 +54,8 @@ function montar(options?: {
   readonly summaryItems?: readonly unknown[];
   readonly resultado?: Resultado;
   readonly appendFalla?: Error;
+  readonly pasos?: readonly { readonly requiresEvidence?: boolean }[] | null;
+  readonly fotos?: readonly { readonly stepPosition: number }[];
 }): {
   readonly deps: FinishPackingDeps;
   readonly findAliveById: ReturnType<typeof vi.fn>;
@@ -65,6 +67,8 @@ function montar(options?: {
   readonly depsAppend: ReturnType<typeof vi.fn>;
   readonly filas: NewExecutionEntry[];
   readonly estado: Estado;
+  readonly findPackingStepsById: ReturnType<typeof vi.fn>;
+  readonly listEvidenceByOrder: ReturnType<typeof vi.fn>;
 } {
   const findAliveById = vi.fn(async () => (options?.target === undefined ? { id: PEDIDO, status: 'EN_EMPAQUE' } : options.target));
   const listAliveSummariesByIds = vi.fn(async () => ({
@@ -106,11 +110,15 @@ function montar(options?: {
 
   const globalFinishPackingAliveById = vi.fn(async () => options?.resultado ?? { kind: 'ok' as const, finishedGoods: [] });
   const depsAppend = vi.fn(async () => undefined);
+  const findPackingStepsById = vi.fn(async () => (options?.pasos === undefined ? [{ blocks: [] }] : options.pasos));
+  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
   const deps = {
     orders: { findAliveById, listAliveSummariesByIds, finishPackingAliveById: globalFinishPackingAliveById },
     log: { append: depsAppend, findLastStepPosition: vi.fn(async () => null) },
     transaction: { run },
     now: () => AHORA,
+    packingSteps: { findPackingStepsById },
+    evidence: { listByOrder: listEvidenceByOrder },
   } as unknown as FinishPackingDeps;
 
   return {
@@ -124,6 +132,8 @@ function montar(options?: {
     depsAppend,
     filas,
     estado,
+    findPackingStepsById,
+    listEvidenceByOrder,
   };
 }
 
@@ -266,9 +276,11 @@ describe('finishPacking — R24: no existe, esta de baja o es de otra empresa', 
 
 describe('finishPacking — R25: ningun puerto de inventario', () => {
   // [2026-10-06] Ganan `log` y `transaction` y nada mas: la lista sigue siendo exacta.
-  it('R25, R42: las dependencias declaradas son solo `orders`, `log` y `transaction`', () => {
+  // [2026-10-13] QC-214 suma `packingSteps` y `evidence` para exigir las fotos (R36): ninguno es
+  // de inventario.
+  it('R25, R42: las dependencias declaradas son solo `orders`, `log`, `transaction` y las dos de la evidencia', () => {
     const { deps } = montar();
-    expect(Object.keys(deps).sort()).toEqual(['log', 'now', 'orders', 'transaction']);
+    expect(Object.keys(deps).sort()).toEqual(['evidence', 'log', 'now', 'orders', 'packingSteps', 'transaction']);
   });
 });
 
@@ -304,9 +316,13 @@ describe('QC-211 — finishPacking no comprueba el recorrido de los pasos de env
     expect(finishPackingAliveById).not.toHaveBeenCalled();
   });
 
-  it('R24: las dependencias no incluyen ningun lector de pasos', () => {
-    const { deps } = montar();
-    expect(Object.keys(deps).filter((key) => /step/i.test(key))).toEqual([]);
+  // [2026-10-13] QC-214 R36 le da el lector de pasos de envasado, solo para saber que pasos piden
+  // fotos: el recorrido sigue sin comprobarse.
+  it('R24: el unico lector de pasos es el de envasado, y sin pasos que pidan evidencia no se consulta ninguna foto', async () => {
+    const { deps, listEvidenceByOrder } = montar();
+    expect(Object.keys(deps).filter((key) => /step/i.test(key))).toEqual(['packingSteps']);
+    await createFinishPacking(deps)(ACTOR, { orderId: PEDIDO });
+    expect(listEvidenceByOrder).not.toHaveBeenCalled();
   });
 });
 
@@ -485,5 +501,66 @@ describe('finishPacking — R24: cualquier otro desenlace aborta sin fila y con 
     expect(m.estado.confirmada).toBe(false);
     await expect(m.run.mock.results[0]!.value).rejects.toBe(fallo);
     expect(m.filas).toEqual([]);
+  });
+});
+
+describe('finishPacking — evidencia (R36, R37)', () => {
+  const RECETA = uuid('a');
+  const EN_EMPAQUE_DE_ANA = [
+    { id: PEDIDO, number: { year: 2026, sequence: 7 }, recipeId: RECETA, status: 'EN_EMPAQUE', packedBy: ANA },
+  ];
+  const CON_EVIDENCIA = [{ requiresEvidence: true }, { blocks: [] }, { requiresEvidence: true }];
+
+  it('R36: un paso de envasado que pide evidencia sin fotos: evidence_required sin abrir la transaccion', async () => {
+    const m = montar({ summaryItems: EN_EMPAQUE_DE_ANA, pasos: CON_EVIDENCIA, fotos: [{ stepPosition: 1 }] });
+    const error = await createFinishPacking(m.deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AsignacionesError);
+    expect((error as AsignacionesError).code).toBe('evidence_required');
+    expect(m.run).not.toHaveBeenCalled();
+    expect(m.finishPackingAliveById).not.toHaveBeenCalled();
+    expect(m.findPackingStepsById).toHaveBeenCalledWith(RECETA, EMPRESA);
+    expect(m.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'packing');
+  });
+
+  it('R36: con al menos una foto en cada paso que la pide, termina', async () => {
+    const m = montar({
+      summaryItems: EN_EMPAQUE_DE_ANA,
+      pasos: CON_EVIDENCIA,
+      fotos: [{ stepPosition: 1 }, { stepPosition: 3 }],
+    });
+    await expect(createFinishPacking(m.deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+      numberText: expect.any(String),
+    });
+    expect(m.finishPackingAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R37: un paso de envasado que se encendio despues de comenzar tambien se exige', async () => {
+    const m = montar({ summaryItems: EN_EMPAQUE_DE_ANA, pasos: [{}, { requiresEvidence: true }], fotos: [] });
+    await expect(createFinishPacking(m.deps)(ACTOR, { orderId: PEDIDO })).rejects.toMatchObject({
+      code: 'evidence_required',
+    });
+    expect(m.run).not.toHaveBeenCalled();
+  });
+
+  it('R36: sin pasos que pidan evidencia (o sin pasos de envasado) termina como hoy, sin consultar fotos', async () => {
+    for (const pasos of [[{}, {}], null]) {
+      const m = montar({ summaryItems: EN_EMPAQUE_DE_ANA, pasos });
+      await createFinishPacking(m.deps)(ACTOR, { orderId: PEDIDO });
+      expect(m.finishPackingAliveById).toHaveBeenCalledTimes(1);
+      expect(m.listEvidenceByOrder).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R36: si empaca otro, no se miran las fotos: la transaccion da su error propio (order_packing_taken)', async () => {
+    const m = montar({
+      summaryItems: [{ ...EN_EMPAQUE_DE_ANA[0], packedBy: uuid('2') }],
+      pasos: CON_EVIDENCIA,
+      resultado: 'not_packer',
+    });
+    await expect(createFinishPacking(m.deps)(ACTOR, { orderId: PEDIDO })).rejects.toMatchObject({
+      code: 'order_packing_taken',
+    });
+    expect(m.findPackingStepsById).not.toHaveBeenCalled();
+    expect(m.listEvidenceByOrder).not.toHaveBeenCalled();
   });
 });

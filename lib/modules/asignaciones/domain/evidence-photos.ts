@@ -1,11 +1,19 @@
 /**
- * Lo que comparten los casos de uso de fotos: firmar la lectura de las fotos de un pedido y borrar
- * un archivo sin que su fallo deshaga lo ya registrado.
+ * Lo que comparten los casos de uso de fotos: firmar la lectura de las fotos de un pedido, borrar
+ * un archivo sin que su fallo deshaga lo ya registrado y exigir fotos antes de terminar.
  */
-import { EVIDENCE_READ_LINK_TTL_SECONDS, type StepEvidencePhotoView, type StepEvidenceView } from './step-evidence';
+import { EvidenceRequiredError } from './errors';
+import {
+  EVIDENCE_READ_LINK_TTL_SECONDS,
+  missingEvidencePositions,
+  type EvidencePhase,
+  type EvidenceStep,
+  type StepEvidencePhotoView,
+  type StepEvidenceView,
+} from './step-evidence';
 
 import type { EvidenceStorage } from '../ports/evidence-storage';
-import type { StepEvidenceRow } from '../ports/step-evidence-repository';
+import type { StepEvidenceRepository, StepEvidenceRow } from '../ports/step-evidence-repository';
 
 /** Un borrado del bucket que fallo despues de registrar. Lo escribe en el log quien llama. */
 export type EvidenceStorageWarning = {
@@ -70,4 +78,21 @@ export async function toStepEvidenceViews(
       photos: await signStepPhotos(storage, rows, stepPosition),
     })),
   );
+}
+
+/**
+ * `EvidenceRequiredError` si algun paso de la lista ACTUAL que pide evidencia no tiene ninguna
+ * foto. Sin pasos que la pidan no consulta nada.
+ */
+export async function assertEvidenceComplete(
+  evidence: StepEvidenceRepository,
+  companyId: string,
+  orderId: string,
+  phase: EvidencePhase,
+  steps: readonly EvidenceStep[],
+): Promise<void> {
+  if (!steps.some((step) => step.requiresEvidence === true)) return;
+  const rows = await evidence.listByOrder(companyId, orderId, phase);
+  const missing = missingEvidencePositions(steps, rows);
+  if (missing.length > 0) throw new EvidenceRequiredError(`pasos sin evidencia: ${missing.join(', ')}`);
 }

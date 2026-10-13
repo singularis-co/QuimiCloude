@@ -447,6 +447,8 @@ import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapter
 import { withExecutionTransaction } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-transaction-prisma';
 import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
 import type { ExecutionTransaction } from '@/lib/modules/asignaciones/ports/execution-transaction';
+import { createStepEvidenceRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/step-evidence-prisma';
+import type { StepEvidenceRepository } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
@@ -1652,6 +1654,9 @@ const orderAssignmentRepository: OrderAssignmentRepository = createOrderAssignme
 /** El registro fuera de transaccion: anotar un paso o el retomar es una sola sentencia. */
 const executionLogRepository: ExecutionLogRepository = createExecutionLogRepository();
 
+/** Las fotos de evidencia por paso: la unica puerta a `order_step_evidence`. */
+const stepEvidenceRepository: StepEvidenceRepository = createStepEvidenceRepository();
+
 /**
  * La transaccion de ejecucion la abre `asignaciones`, y `pedidos` se une a ella sin abrir otra:
  * la escritura del pedido, lo que `pedidos` escriba en `inventario` y la anotacion se confirman
@@ -1779,6 +1784,8 @@ export const asignaciones = {
     log: executionLogRepository,
     transaction: executionTransaction,
     now: () => new Date(),
+    recipes: recipeCatalog,
+    evidence: stepEvidenceRepository,
   }),
   // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
   // `recipeCatalog`, `presentationCatalog`, `orderAssignmentRepository` y `peopleDirectory` que
@@ -1842,6 +1849,8 @@ export const asignaciones = {
     log: executionLogRepository,
     transaction: executionTransaction,
     now: () => new Date(),
+    packingSteps: { findPackingStepsById: findRecipePackingStepsById },
+    evidence: stepEvidenceRepository,
   }),
   cancelAssignedOrder: createCancelAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1854,6 +1863,8 @@ export const asignaciones = {
     orders: orderCatalog,
     log: executionLogRepository,
     now: () => new Date(),
+    recipes: recipeCatalog,
+    evidence: stepEvidenceRepository,
   }),
   listExecutionTraces: createListExecutionTraces({
     log: executionLogRepository,

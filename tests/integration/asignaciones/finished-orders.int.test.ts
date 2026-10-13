@@ -54,6 +54,7 @@ import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classificat
 import { NOW, actorOf, createOrder, createPerson, crearLinea, inRolledBackTransaction } from './use-case-fixture';
 import { realOrderSummaries } from '../../helpers/order-summaries';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
+import { evidenceRepositoryUnused, packingStepsWithoutEvidence, recipesWithoutEvidence } from '../../helpers/evidence-off';
 
 const summaryReaders = realOrderSummaries();
 
@@ -155,10 +156,18 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
       groups: assignmentDirectoryPrisma,
       ...execution,
       now: () => NOW,
+    recipes: recipesWithoutEvidence,
+    evidence: evidenceRepositoryUnused,
     }),
     // R27: Comenzar y Terminar, mismos `orders` y mismo reloj que el resto del fixture.
     startPacking: createStartPacking({ orders, ...execution, now: () => NOW }),
-    finishPacking: createFinishPacking({ orders, ...execution, now: () => NOW }),
+    finishPacking: createFinishPacking({
+      orders,
+      ...execution,
+      now: () => NOW,
+      packingSteps: packingStepsWithoutEvidence,
+      evidence: evidenceRepositoryUnused,
+    }),
     startConditioning: createStartConditioning({
       orders,
       people: assignmentDirectoryPrisma,
