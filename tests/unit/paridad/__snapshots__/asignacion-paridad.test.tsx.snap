@@ -234,7 +234,7 @@ div role=generic
                       svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                   span role=generic aria-hidden="true" data-testid="data-table-head-divider-recipeName" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                 th role=columnheader name="Cantidad" data-testid="data-table-head-quantity" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 relative text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                  div role=generic class="flex gap-2 items-center min-w-0"
+                  div role=generic class="flex gap-2 items-center justify-end min-w-0"
                     span role=generic
                       "Cantidad"
                     button role=button name="Cantidad opciones de la columna" aria-expanded="false" aria-haspopup="menu" aria-label="Cantidad opciones de la columna" data-testid="data-table-header-menu-quantity" type="button" class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:scale-[0.98] aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent btn-veil cursor-pointer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid font-medium group/button inline-flex items-center justify-center min-h-11 min-w-11 outline-none rounded-lg select-none shrink-0 size-9 text-sm transition-all whitespace-nowrap"
@@ -269,7 +269,7 @@ div role=generic
                       svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                   span role=generic aria-hidden="true" data-testid="data-table-head-divider-responsibles" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                 th role=columnheader name="Entrar" data-testid="data-table-head-enter" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                  div role=generic class="flex gap-2 items-center min-w-0"
+                  div role=generic class="flex gap-2 items-center justify-end min-w-0"
                     span role=generic
                       "Entrar"
             tbody role=rowgroup class="[&_tr:last-child]:border-0"
@@ -388,7 +388,7 @@ div role=generic
                         svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                     span role=generic aria-hidden="true" data-testid="data-table-head-divider-presentationName" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                   th role=columnheader name="Envases" data-testid="data-table-head-packages" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 relative text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                    div role=generic class="flex gap-2 items-center min-w-0"
+                    div role=generic class="flex gap-2 items-center justify-end min-w-0"
                       span role=generic
                         "Envases"
                       button role=button name="Envases opciones de la columna" aria-expanded="false" aria-haspopup="menu" aria-label="Envases opciones de la columna" data-testid="data-table-header-menu-packages" type="button" class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:scale-[0.98] aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent btn-veil cursor-pointer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid font-medium group/button inline-flex items-center justify-center min-h-11 min-w-11 outline-none rounded-lg select-none shrink-0 size-9 text-sm transition-all whitespace-nowrap"
@@ -409,7 +409,7 @@ div role=generic
                         svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                     span role=generic aria-hidden="true" data-testid="data-table-head-divider-packedByName" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                   th role=columnheader name="Acciones" data-testid="data-table-head-actions" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                    div role=generic class="flex gap-2 items-center min-w-0"
+                    div role=generic class="flex gap-2 items-center justify-end min-w-0"
                       span role=generic
                         "Acciones"
               tbody role=rowgroup class="[&_tr:last-child]:border-0"
@@ -529,7 +529,7 @@ div role=generic
                         svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                     span role=generic aria-hidden="true" data-testid="data-table-head-divider-recipeName" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                   th role=columnheader name="Cantidad" data-testid="data-table-head-quantity" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 relative text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                    div role=generic class="flex gap-2 items-center min-w-0"
+                    div role=generic class="flex gap-2 items-center justify-end min-w-0"
                       span role=generic
                         "Cantidad"
                       button role=button name="Cantidad opciones de la columna" aria-expanded="false" aria-haspopup="menu" aria-label="Cantidad opciones de la columna" data-testid="data-table-header-menu-quantity" type="button" class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:scale-[0.98] aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent btn-veil cursor-pointer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid font-medium group/button inline-flex items-center justify-center min-h-11 min-w-11 outline-none rounded-lg select-none shrink-0 size-9 text-sm transition-all whitespace-nowrap"
@@ -647,7 +647,7 @@ div role=generic
                         svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                     span role=generic aria-hidden="true" data-testid="data-table-head-divider-recipeName" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                   th role=columnheader name="Cantidad" data-testid="data-table-head-quantity" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 relative text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                    div role=generic class="flex gap-2 items-center min-w-0"
+                    div role=generic class="flex gap-2 items-center justify-end min-w-0"
                       span role=generic
                         "Cantidad"
                       button role=button name="Cantidad opciones de la columna" aria-expanded="false" aria-haspopup="menu" aria-label="Cantidad opciones de la columna" data-testid="data-table-header-menu-quantity" type="button" class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:scale-[0.98] aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent btn-veil cursor-pointer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid font-medium group/button inline-flex items-center justify-center min-h-11 min-w-11 outline-none rounded-lg select-none shrink-0 size-9 text-sm transition-all whitespace-nowrap"

@@ -541,7 +541,7 @@ div role=generic
                           svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                       span role=generic aria-hidden="true" data-testid="data-table-head-divider-unitId" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                     th role=columnheader name="Costo" aria-sort="none" data-testid="data-table-head-cost" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 relative text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                      div role=generic class="flex gap-2 items-center min-w-0"
+                      div role=generic class="flex gap-2 items-center justify-end min-w-0"
                         button role=button name="Costo" type="button" class="flex font-medium gap-1 items-center min-h-11 min-w-11 rounded-md"
                           span role=generic
                             "Costo"
@@ -550,7 +550,7 @@ div role=generic
                           svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                       span role=generic aria-hidden="true" data-testid="data-table-head-divider-cost" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                     th role=columnheader name="Mínimo de compra" aria-sort="none" data-testid="data-table-head-minPurchase" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 relative text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                      div role=generic class="flex gap-2 items-center min-w-0"
+                      div role=generic class="flex gap-2 items-center justify-end min-w-0"
                         button role=button name="Mínimo de compra" type="button" class="flex font-medium gap-1 items-center min-h-11 min-w-11 rounded-md"
                           span role=generic
                             "Mínimo de compra"
@@ -559,7 +559,7 @@ div role=generic
                           svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                       span role=generic aria-hidden="true" data-testid="data-table-head-divider-minPurchase" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                     th role=columnheader name="Tiempo de entrega" aria-sort="none" data-testid="data-table-head-deliveryTime" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 relative text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                      div role=generic class="flex gap-2 items-center min-w-0"
+                      div role=generic class="flex gap-2 items-center justify-end min-w-0"
                         button role=button name="Tiempo de entrega" type="button" class="flex font-medium gap-1 items-center min-h-11 min-w-11 rounded-md"
                           span role=generic
                             "Tiempo de entrega"
@@ -598,7 +598,7 @@ div role=generic
                           svg aria-hidden="true" height="24" width="24" class="lucide lucide-ellipsis-vertical"
                       span role=generic aria-hidden="true" data-testid="data-table-head-divider-updatedAt" class="absolute bg-border h-1/2 pointer-events-none right-0 top-1/4 w-px"
                     th role=columnheader name="Acciones" data-testid="data-table-head-actions" class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 overflow-hidden px-2 text-ellipsis text-muted-foreground text-right whitespace-nowrap"
-                      div role=generic class="flex gap-2 items-center min-w-0"
+                      div role=generic class="flex gap-2 items-center justify-end min-w-0"
                         span role=generic
                           "Acciones"
                 tbody role=rowgroup class="[&_tr:last-child]:border-0"

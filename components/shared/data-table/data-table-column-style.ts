@@ -38,6 +38,24 @@ export function toColumnTextClass<TRow>(
 }
 
 /**
+ * Cabecera y cuerpo comparten esta traduccion para que la etiqueta no se separe de su columna.
+ */
+export function toColumnAlignClass<TRow>(column: Pick<DataTableColumn<TRow>, 'align'>): string {
+  if (column.align === 'end') return 'text-right';
+  if (column.align === 'center') return 'text-center';
+  return '';
+}
+
+/**
+ * El contenido de la cabecera es un `flex`: `text-align` no lo mueve, hace falta `justify-*`.
+ */
+export function toColumnJustifyClass<TRow>(column: Pick<DataTableColumn<TRow>, 'align'>): string {
+  if (column.align === 'end') return 'justify-end';
+  if (column.align === 'center') return 'justify-center';
+  return '';
+}
+
+/**
  * Junta el estilo sticky del fijado con el `width` de la columna. `undefined` si no hay
  * ninguno: asi las celdas sin fijar ni ancho siguen sin estilo en linea (lo mide el test P2
  * de `tests/unit/pedidos-ui/pedidos-viewport.test.tsx`).

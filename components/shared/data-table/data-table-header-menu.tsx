@@ -24,7 +24,7 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import type { DataTableColumn, DataTableSort, DataTableTexts } from './data-table-types';
-import { toColumnTextClass } from './data-table-column-style';
+import { toColumnAlignClass, toColumnJustifyClass, toColumnTextClass } from './data-table-column-style';
 import { DataTableColumnDivider } from './data-table-divider';
 
 /**
@@ -213,13 +213,13 @@ export function DataTableHeaderCell<TRow>({
       data-pinned={pinned === false ? undefined : pinned}
       style={style}
       className={cn(
-        column.align === 'end' && 'text-right',
+        toColumnAlignClass(column),
         pinned !== false && 'bg-muted',
         toColumnTextClass(column),
         divider && 'relative',
       )}
     >
-      <div className="flex min-w-0 items-center gap-2">
+      <div className={cn('flex min-w-0 items-center gap-2', toColumnJustifyClass(column))}>
         {isSortable ? (
           <button
             type="button"
