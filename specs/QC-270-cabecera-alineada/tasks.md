@@ -28,7 +28,9 @@ Tres tandas. Implementa `frontend_dev`. Verificación de cada tanda: `pnpm run t
   - toda línea cambiada es un `th … data-testid="data-table-head-<id>"` de una columna `end` o
     `center` o el `div` inmediato que le sigue;
   - en el `th` solo entra `text-center` (columnas `center`); en el `div` solo entra `justify-end` o
-    `justify-center`; no sale ninguna clase;
+    `justify-center`; no sale ninguna clase, salvo el `text-left` de `TableHead` en el `th` de las
+    columnas `center`, que `twMerge` sustituye por `text-center` (desviación aceptada por el leader
+    el 2026-10-13);
   - el número de líneas `-` y `+` coincide (ninguna línea añadida ni quitada).
   El comando de revisión y su salida van a `progress/impl_QC-270.md`. Un `.snap` fuera de la lista
   que cambie, o una línea que no cumpla lo anterior, para la tanda y se devuelve al leader.
