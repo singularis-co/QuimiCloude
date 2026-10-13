@@ -259,7 +259,7 @@ function describir(infracciones: readonly Infraccion[]): string {
 // `/integraciones/inventarios` y `/integraciones/whatsapp`, las tres pantallas del menu de
 // integraciones. Se dan de alta en la lista como cualquier otra: el barrido las valida igual.
 //
-// TENSADA el 2026-10-13 (QC-225): de veinticinco a VEINTISEIS, con
+// TENSADA el 2026-10-13: de veinticinco a VEINTISEIS, con
 // `/inventario/producto-terminado/[id]`, la ficha de solo consulta de un producto terminado. Llama a
 // `requirePagePermission` UNA sola vez, con `inventario.consultar`, el mismo permiso que `/inventario`.
 const RUTAS_ESPERADAS_HOY = [

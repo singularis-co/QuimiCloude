@@ -108,7 +108,7 @@ const CARPETA_SUBRUTA_IMPORTAR = join(
 const NOMBRE_SUBRUTA_IMPORTAR = INVENTORY_IMPORT_ROUTE.split('/').pop() as string;
 const PREFIJO_SUBRUTA_IMPORTAR = `${CARPETA_SUBRUTA_IMPORTAR.split('\\').join('/')}/`;
 
-// 2026-10-13 (QC-225): la ficha de producto terminado tambien es otra pantalla, con su contrato en
+// 2026-10-13: la ficha de producto terminado tambien es otra pantalla, con su contrato en
 // `producto-terminado/finished-product-route-contract.test.ts`; se excluye igual que `importar/`.
 // Las prohibiciones de aqui (costos, `filter(`, `toFixed(`) son de la pantalla de catalogo.
 const NOMBRE_SUBRUTA_PRODUCTO_TERMINADO = finishedProductDetailRoute('id')
