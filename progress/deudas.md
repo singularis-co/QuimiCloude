@@ -359,10 +359,11 @@ Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *D
 - **Qué falta:** `harnessConfig/` (entonces en la raíz) iba por delante: `docs/orquestacion.md`, la regla «si un subagente falla, el leader NO hace su trabajo», soporte de opencode. Solo se portó la sección de comentarios. Nada avisa de la divergencia. `harnessConfig/` ya no está en la raíz el 2026-10-06; el arnés v2 (con `harness_config/` aparte) debería absorberlo.
 - **Dueño:** arnés v2.
 
-### D33 — `catalog-line.int.test.ts` R32 en rojo en `dev` (resuelta)
+### D33 — `catalog-line.int.test.ts` R32 en rojo en `dev` (reabierta: entorno)
 - **Origen:** primer `./init.sh --completo` del arnés v2 (2026-10-06), sobre `origin/dev` 1a1db86e.
 - **Qué falta:** el caso R32 espera `PrismaClientKnownRequestError` y recibe `ValidationError`. O el test se adapta a la validación previa, o la validación sobra. Entró al baseline con motivo; al arreglarlo, se borra la entrada.
 - **Estado:** resuelta el 2026-10-07 en `chore/rojos-sueltos-d33-packing`. No había validación previa ni la trajeron QC-209/QC-213: el adaptador no cambió desde QC-158. Causa: con un Postgres en inglés (`lc_messages = en_US.utf8`, el de Docker local y el `postgres:17` de CI) Prisma 6.19.3 sí entrega `meta.constraint` en el `P2003`, y el adaptador traduce como pide `QC-52 design.md > 6.2` (presentación/unidad → `invalid_input`, autor → crudo). El test afirmaba el comportamiento degradado de un Postgres en español. Ahora espía el `create` del delegado: exige el rechazo de la base con la restricción de la columna y la traducción correcta; muerde al quitar las FK y al traducir a ciegas o no traducir. Entrada borrada del baseline. Detalle: `progress/fix-rojos-sueltos.md`.
+- **Estado 2026-10-09:** R32 sigue en rojo en local con un Postgres cuyo `lc_messages` está en español (lo vieron QC-234 y QC-237); el CI con `postgres:17` lo pasa. Falta que el test no dependa del idioma o documentar que la base local debe tener `lc_messages=en_US`.
 - **Dueño:** sin asignar.
 
 ### D34 — `credential-setup.int.test.ts` R11 intermitente en CI (resuelta)
@@ -400,3 +401,9 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   - por las dos cosas, al llegar la lista hay un salto de maquetación (CLS).
   No rompe ningún requisito: R21 habla de la lista, no de la carga.
 - **Dueño:** sin asignar.
+
+### D54 — `guard-dobles-e2e` lee `.env.example` con una regex que cruza líneas
+- **Origen:** review de QC-234 (menor M2, 2026-10-09) y de nuevo en QC-237 (2026-10-09).
+- **Qué falta:** la regex del guard usa `\s*` después del `=`, y `\s` también casa saltos de línea. Una variable vacía al final de `.env.example` (`NOMBRE=`) se lee con el valor de la línea siguiente. QC-237 lo esquiva escribiendo `INTEGRATIONS_E2E_DOUBLES=""`. Arreglo: cambiar `\s*` por `[ \t]*` en `tests/guards/guard-dobles-e2e.test.ts` y volver a dejar las variables como `NOMBRE=`.
+- **Dueño:** sin asignar.
+- **Resuelta (2026-10-13, QC-237):** la regex de `guard-dobles-e2e` usa `[ \t]*` tras el `=` y `.env.example` vuelve a `INTEGRATIONS_E2E_DOUBLES=` (lo exige `storage-config` R32).

@@ -392,6 +392,10 @@ export const E2E_ESPERADOS = [
   // espera se vacia y desaparece. No lee ni afirma nada sobre el identificador de peticion ni sobre
   // `reference`.
   'operario-rediseno.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la conexion de WhatsApp de una empresa: alta
+  // rechazada por Meta, alta valida, recarga sin el verify token, edicion, deshabilitar y
+  // habilitar. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'integraciones-whatsapp.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -589,6 +593,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261008150200_delivery_permission',
   // El dia de produccion del lote; no toca el identificador.
   '20261009120000_product_batches_production_date',
+  // 2026-10-09: la tabla de conexiones de WhatsApp; no toca el identificador.
+  '20261009130000_whatsapp_connections',
 ] as const
 
 export function hallazgosDeMigraciones(
