@@ -632,6 +632,7 @@ Cada enmienda conserva sus aserciones previas y lleva una nota fechada.
 | `tests/unit/pedidos/scope.test.ts`, `tests/unit/inventario/scope.test.ts`, `company-scope.test.ts` (los dos) | ámbito de empresa | revisar; enmendar solo si un caso lo exige | TC |
 | `tests/unit/errores/*` | textos únicos | dos códigos nuevos | T0 |
 | `tests/integration/pedidos/order-delivery-repository.int.test.ts` | `sumDeliveredPackages` | + caso: una línea anulada no suma | B3 |
+| `tests/unit/clientes/scope.test.ts` | `E2E_PERMITIDOS`: los únicos E2E que nombran clientes | desviación 2026-10-13 (review vuelta 1, M1): + `anular-entrega.spec.ts`, que siembra un cliente con `normalizeCustomerText` del barrel de `clientes`; mismo camino que siguió el E2E de la entrega. La lista sigue cerrada | TI |
 
 Llamadores de tipos que cambian, todos en `typecheck`:
 - `BatchHistoryEntry['kind']`: `batch-history.tsx` (`KIND_LABELS`) y las fixtures que lo enumeren.

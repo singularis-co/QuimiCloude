@@ -395,6 +395,8 @@ Tests, fixtures y E2E:
 - `tests/unit/errores/catalogo.test.ts`
 - `tests/guards/guard-libro-de-inventario.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
+- `tests/unit/clientes/scope.test.ts` (añadido 2026-10-13: `E2E_PERMITIDOS` admite
+  `anular-entrega.spec.ts`; review vuelta 1, M1)
 - `tests/integration/aislamiento.json`
 - `tests/integration/identity/identity-seed.int.test.ts`
 - `tests/integration/clientes/customers-migration.int.test.ts` (añadido 2026-10-09: el DOWN de

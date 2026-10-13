@@ -295,10 +295,14 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
   // dos clientes por Prisma -la entrega exige uno y el recorrido lo cambia- con la normalizacion
   // del barrel de `clientes`, la unica definicion. No recorre la pantalla de clientes. La lista
   // sigue CERRADA.
+  // 2026-10-13: entra `anular-entrega.spec.ts`, el E2E de anular una entrega. Siembra un cliente
+  // por Prisma -la entrega que se anula exige uno- con la normalizacion del barrel de `clientes`,
+  // la unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
   const E2E_PERMITIDOS: ReadonlySet<string> = new Set([
     'clientes.spec.ts',
     'pedido-con-cliente.spec.ts',
     'entregar-producto-terminado.spec.ts',
+    'anular-entrega.spec.ts',
   ])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 
