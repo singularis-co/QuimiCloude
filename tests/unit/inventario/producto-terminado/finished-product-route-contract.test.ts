@@ -108,6 +108,56 @@ function saltaElBarrel(especificador: string): boolean {
   return /^\.\/components\/[^/]+/.test(especificador) || /producto-terminado\/\[id\]\/components\/[^/]+/.test(especificador);
 }
 
+const COMPONENTES_INVENTARIO = 'app/(private)/inventario/components';
+const BARREL_INVENTARIO = `${COMPONENTES_INVENTARIO}/index.ts`;
+const ESPECIFICADOR_INVENTARIO = '@/app/(private)/inventario/components';
+
+/** La directiva solo cuenta como primera sentencia del modulo, tras comentarios y lineas vacias. */
+function esModuloDeCliente(codigo: string): boolean {
+  const primera = sinComentarios(codigo)
+    .split('\n')
+    .map((linea) => linea.trim())
+    .find((linea) => linea.length > 0);
+  return primera !== undefined && /^['"]use client['"];?$/.test(primera);
+}
+
+/** Nombres de valor (no `type`) importados de un especificador; un `import type {}` no cuenta. */
+function valoresImportadosDe(codigo: string, especificador: string): string[] {
+  const nombres: string[] = [];
+  const patron = /import\s+(type\s+)?\{([^}]*)\}\s+from\s+(['"])([^'"]+)\3/g;
+  let encaje: RegExpExecArray | null;
+  while ((encaje = patron.exec(sinComentarios(codigo))) !== null) {
+    if (encaje[1] !== undefined || encaje[4] !== especificador) continue;
+    for (const parte of encaje[2].split(',')) {
+      const limpia = parte.trim();
+      if (limpia.length === 0 || limpia.startsWith('type ')) continue;
+      nombres.push(limpia.split(/\s+as\s+/)[0]);
+    }
+  }
+  return nombres;
+}
+
+function archivoDelModulo(especificador: string): string | null {
+  const base = especificador.startsWith('@/')
+    ? especificador.slice(2)
+    : `${COMPONENTES_INVENTARIO}/${especificador.replace(/^\.\//, '')}`;
+  for (const candidato of [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`]) {
+    if (existsSync(join(RAIZ, candidato))) return candidato;
+  }
+  return null;
+}
+
+/** El archivo del que el barrel reexporta un nombre, o `null` si no lo reexporta. */
+function origenEnElBarrel(barrel: string, nombre: string): string | null {
+  const patron = /export\s*\{([^}]*)\}\s*from\s*(['"])([^'"]+)\2/g;
+  let encaje: RegExpExecArray | null;
+  while ((encaje = patron.exec(sinComentarios(barrel))) !== null) {
+    const exportados = encaje[1].split(',').map((parte) => parte.trim().split(/\s+as\s+/).pop());
+    if (exportados.includes(nombre)) return archivoDelModulo(encaje[3]);
+  }
+  return null;
+}
+
 const ACCIONES_DE_ESCRITURA = [
   '@/lib/modules/inventario/adapters/driving/product-actions',
   '@/lib/modules/inventario/adapters/driving/batch-actions',
@@ -196,6 +246,47 @@ describe('contrato de la ficha de producto terminado', () => {
       expect(ruta, 'la ruta no declara su propio layout').not.toMatch(/\/layout\.tsx$/);
       expect(sinComentarios(leer(ruta)), `${ruta} no declara un main`).not.toContain('<main');
     }
+  });
+
+  it('R16 — la ruta solo llama desde el servidor a valores del barrel de /inventario que no vienen de un modulo de cliente', () => {
+    const barrel = leer(BARREL_INVENTARIO);
+    const hallazgos: string[] = [];
+    let importados = 0;
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      const codigo = leer(ruta);
+      if (esModuloDeCliente(codigo)) continue;
+      for (const nombre of valoresImportadosDe(codigo, ESPECIFICADOR_INVENTARIO)) {
+        importados += 1;
+        const origen = origenEnElBarrel(barrel, nombre);
+        if (origen === null) {
+          hallazgos.push(`${ruta} -> ${nombre} (no sale del barrel)`);
+          continue;
+        }
+        if (esModuloDeCliente(leer(origen))) hallazgos.push(`${ruta} -> ${nombre} (${origen})`);
+      }
+    }
+
+    expect(importados).toBeGreaterThan(0);
+    expect(hallazgos).toEqual([]);
+
+    const origenDeLaEtiqueta = origenEnElBarrel(barrel, 'movementReasonLabel');
+    expect(origenDeLaEtiqueta).not.toBeNull();
+    expect(esModuloDeCliente(leer(origenDeLaEtiqueta as string))).toBe(false);
+  });
+
+  it('R16 — la guardia de modulo de cliente muerde con fuentes fabricadas', () => {
+    const barrelFabricado = "export { BatchHistory, movementReasonLabel } from './batch-history';";
+    const origen = origenEnElBarrel(barrelFabricado, 'movementReasonLabel');
+    expect(origen).toBe(`${COMPONENTES_INVENTARIO}/batch-history.tsx`);
+    expect(esModuloDeCliente(leer(origen as string))).toBe(true);
+    expect(esModuloDeCliente("// cabecera\n\"use client\";\nexport const x = 1;")).toBe(true);
+    expect(
+      valoresImportadosDe(
+        `import { type A, b as c, D } from '${ESPECIFICADOR_INVENTARIO}';\nimport type { E } from '${ESPECIFICADOR_INVENTARIO}';`,
+        ESPECIFICADOR_INVENTARIO,
+      ),
+    ).toEqual(['b', 'D']);
   });
 
   it('los componentes solo salen por el barrel, que no declara frontera de cliente', () => {

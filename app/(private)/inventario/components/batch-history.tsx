@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { listBatchMovementsAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { ErrorState } from '@/lib/modules/errores';
-import type { BatchHistoryEntry, MovementReason } from '@/lib/modules/inventario';
+import type { BatchHistoryEntry } from '@/lib/modules/inventario';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
+
+import { movementReasonLabel } from './movement-reason-label';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
@@ -40,17 +42,7 @@ const KIND_LABELS: Record<BatchHistoryEntry['kind'], string> = {
   delivery_void: 'Anulación de entrega',
 };
 
-/**
- * Deriva la etiqueta legible de un motivo a partir del propio valor, sin enumerarlo a mano:
- * guion bajo a espacio y primera letra en mayuscula. Exportada porque el dialogo de ajuste
- * necesita la misma etiqueta.
- */
-export function movementReasonLabel(reason: MovementReason): string {
-  const conEspacios = reason.split('_').join(' ');
-  return conEspacios.charAt(0).toUpperCase() + conEspacios.slice(1);
-}
-
-/** Etiqueta del tipo de asiento. Exportada por el mismo motivo que `movementReasonLabel`. */
+/** Etiqueta del tipo de asiento. */
 export function movementKindLabel(kind: BatchHistoryEntry['kind']): string {
   return KIND_LABELS[kind];
 }
