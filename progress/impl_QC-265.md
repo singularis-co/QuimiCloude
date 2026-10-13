@@ -371,3 +371,31 @@ Desvíos:
 - (1) Mientras llega el contador, el streaming de `Suspense` deja dos copias de las pestañas con el mismo testid (el respaldo y la resuelta, aún sin intercambiar), y WebKit falló un clic por modo estricto. Los specs leen las pestañas con `filter({ visible: true })`, y los E2E futuros tendrán que hacer lo mismo.
 - (2) Las tarjetas (ocultas en escritorio) repiten `company-order-date`, así que `pedidos-terminados` cuenta solo lo visible.
 - (3) `CONDITIONING_BATCH_DATA_SUCCESS_TESTID` sigue exportado porque `datos-de-lote` lo importa en la línea 332 (`toHaveCount(0)`), una comprobación que ya no mide nada.
+
+## Tanda 8, T8a y T8c — E2E nuevo y deudas (frontend_dev)
+
+`e2e/operario-rediseno.spec.ts` (nuevo): 17/17 en chromium y 17/17 en webkit, sin saltados. Casos:
+- R1, R5, R6 (3): sin barra ni cabecera y `private-content` en x = 0; el 404 y `/asignacion` las conservan.
+- R2, R3 (3): a 390 × 844, cabecera sticky con un solo `h1` y «Cambiar tema»; pie fijo con botones de 52 px; controles de 44 × 44.
+- R4 (3): dos columnas a 1440 y una a 820.
+- R9 (1): contadores en las pestañas.
+- R15 (1): «Cerrar» oculta el aviso sin recargar.
+- R21 (2): tarjetas a 390 con «Entrar» de 44 px; «Acciones» centrado.
+- R41 (3): los siete diálogos del operario, centrados.
+- R37 (1): anillo `aria-hidden` que se vacía; después, el botón se habilita.
+
+Listas cerradas:
+- `E2E_ESPERADOS` de `tests/guards/guard-identificador-de-request.test.ts`: alta con «Alta el 2026-10-12 (QC-265) por el MISMO motivo…».
+- `tests/unit/shared/data-table-alcance.test.ts`: alta, y el centinela pasa de 39 a 40.
+
+No saltó ninguna otra (29 tests unitarios que leen `e2e/`, todos en verde).
+
+T8c, en `progress/deudas.md`:
+- D51 queda resuelta por QC-265 (D8, D14; R13, R14, R42, R43).
+- Entra D52: el buscador de `/asignacion` queda fuera (P11).
+
+Verificación: typecheck OK; lint 0 errores; guard 74/1017; `data-table-alcance` 18/18; `./init.sh` init OK.
+
+Desvíos:
+- (1) El 404 de la ejecución (R5) se provoca con el Empacador, sin `asignaciones.ejecutar`: un pedido inexistente pinta hoy el error dentro de la pantalla con respuesta 200, y es conducta anterior. Empaque y acondicionamiento usan un id aleatorio.
+- (2) La espera de animaciones del spec solo cuenta `CSSAnimation`, porque la transición de 5 s del anillo bloqueaba la medida del diálogo.

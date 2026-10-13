@@ -139,7 +139,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 8 — E2E (depende de todas)
 
-- [ ] **T8a. E2E nuevo** `e2e/operario-rediseno.spec.ts` con los casos de `design.md > 7` (R1–R6, R9,
+- [x] **T8a. E2E nuevo** `e2e/operario-rediseno.spec.ts` con los casos de `design.md > 7` (R1–R6, R9,
   R15, R21, R37, R41) y su alta en `E2E_ESPERADOS` de
   `tests/guards/guard-identificador-de-request.test.ts` con el comentario «Alta el <fecha> (QC-265)
   por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA y darse de alta en ella es
@@ -150,7 +150,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
   del menú ⋯, a la pestaña «Acondicionados» con contador, al toast de datos de lote y al `import` nuevo
   del aviso de cancelado. *Hecho:* cada spec tocado pasa por separado (`pnpm exec playwright test
   <spec>`); los que solo leen testids de avisos pasan sin cambios.
-- [ ] **T8c. Deudas.** `progress/deudas.md`: D51 resuelta (si P15 por defecto); deuda nueva del
+- [x] **T8c. Deudas.** `progress/deudas.md`: D51 resuelta (si P15 por defecto); deuda nueva del
   buscador (si P11 por defecto).
 
 ## Trazabilidad R → test

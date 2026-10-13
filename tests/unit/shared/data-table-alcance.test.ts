@@ -604,7 +604,15 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // Las listas del acondicionador de `/asignacion`, ya en esta lista, pierden el enlace del numero
   // (QC-265 D9), asi que el spec localiza la fila por `data-table-row-<id>` para abrir «Entrar» en
   // su menu. El centinela pasa de TREINTA Y OCHO a TREINTA Y NUEVE; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y nueve', () => {
+  //
+  // Alta el 2026-10-12 (QC-265) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Entra `e2e/operario-rediseno.spec.ts`: no estrena tabla. Mide a
+  // 390 x 844 las listas de «Mis asignados» y «Por acondicionar», ya en esta lista: localiza las
+  // tarjetas por `data-table-cards`, `data-table-card-<id>` y `data-table-card-field-status`, y
+  // afirma que ninguna `data-table-row-<id>` queda a la vista. El centinela pasa de TREINTA Y NUEVE a
+  // CUARENTA; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -614,7 +622,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos treinta y nueve E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cuarenta E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -668,6 +676,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-10-09). Entre `login` y `pasos-de-envasado` porque la lista esta
       // ORDENADA: 'm' va entre 'l' y 'p'.
       'e2e/movimiento.spec.ts',
+      // Ver la nota de arriba (2026-10-12, QC-265). Entre `movimiento` y `pasos-de-envasado` porque
+      // la lista esta ORDENADA: 'o' va entre 'm' y 'p'.
+      'e2e/operario-rediseno.spec.ts',
       // Ver la nota de arriba (2026-10-05, QC-211). Va antes que `pedido-bloqueado` porque la
       // lista esta ORDENADA y 'a' precede a 'e'.
       'e2e/pasos-de-envasado.spec.ts',

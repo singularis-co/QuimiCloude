@@ -293,6 +293,21 @@
     solo usa `tests/unit/asignaciones-ui/assigned-orders-columns.test.tsx`; por él
     `tests/guards/guard-piezas-base.test.ts` conserva una exclusión estrecha (R22 de QC-252).
 - **Dueño:** sin asignar.
+- **Resuelta (2026-10-12, QC-265, D8 y D14; R13, R14, R42 y R43):** los cuatro avisos salen de
+  `OrderOutcomeNotice` con su `kind` sobre `Notice` (se borran `AssignedOrderDeliveredNotice` y
+  `AssignedOrderCancelledNotice`); `AssignedOrdersError` se borra y queda solo `AssignmentListError`;
+  el barrel deja de reexportar `MISSING_VALUE_MARK` y `EXCLUSIONES_ESTRECHAS_D11` de
+  `guard-piezas-base` queda vacía. Las guardias `guard-asignacion-componentizada` (R14, R42) y
+  `guard-piezas-base` (R43) lo vigilan.
+
+### D52 — `/asignacion` sin el buscador «Buscar» del tablero (QC-265, P11)
+- **Origen:** QC-265 (2026-10-12), pregunta P11 cerrada con su opción por defecto
+  (`specs/QC-265-rediseno-operario/requirements.md > Lo que NO entra`).
+- **Qué falta:** el tablero `Asignacion.dc.html` pinta un buscador «Buscar» sobre las listas de
+  `/asignacion`, pero las listas del módulo `asignaciones` no admiten búsqueda: añadirla es trabajo de
+  módulo (puerto de lectura, caso de uso y parámetro de la dirección), no de la capa de UI. Hoy las
+  tablas se montan con `searchable={false}`.
+- **Dueño:** sin asignar (ficha propia del módulo `asignaciones`).
 
 ## Pendientes humanos de fichas cerradas
 Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *Deudas*, pero se habrían perdido al congelarlo.
