@@ -148,7 +148,7 @@ export function ConditioningOrderScreen({
       )}
 
       {order.team.length === 0 && batchData === null ? null : (
-        // Dos tarjetas lado a lado con más de 1100 px de contenedor; una columna por debajo (R4).
+        // Dos tarjetas lado a lado con más de 1100 px de contenedor; una columna por debajo.
         <div className="grid grid-cols-1 items-start gap-5 @min-[1101px]:grid-cols-2">
           {order.team.length > 0 ? (
             <Card>

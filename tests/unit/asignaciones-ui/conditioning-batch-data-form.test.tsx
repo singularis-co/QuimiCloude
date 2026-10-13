@@ -9,7 +9,6 @@ import {
   CONDITIONING_BATCH_DATA_LINE_TESTID,
   CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
-  CONDITIONING_BATCH_DATA_SUCCESS_TESTID,
   CONDITIONING_BATCH_DATA_TEXTS,
   ConditioningBatchDataForm,
   type ConditioningBatchFormLine,
@@ -200,7 +199,6 @@ describe('guardar', () => {
     expect(enviado?.getAll('productionDate')).toEqual(['2026-10-01', '2026-10-02']);
     await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
     expect(toastExito).toHaveBeenCalledWith('Datos de lote guardados.');
-    expect(screen.queryByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID)).toBeNull();
     expect(screen.queryByText('Datos de lote guardados.')).toBeNull();
     expect(toastError).not.toHaveBeenCalled();
   });
@@ -258,7 +256,6 @@ describe('guardar', () => {
       '2027-11-01',
       '2026-10-02',
     ]);
-    expect(screen.queryByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID)).toBeNull();
     expect(toastExito).not.toHaveBeenCalled();
     expect(toastError).not.toHaveBeenCalled();
   });

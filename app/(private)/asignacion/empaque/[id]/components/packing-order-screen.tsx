@@ -246,7 +246,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
       </Button>
     );
 
-  // Con paso a paso (R30) el pie es el de `StepReader`: el marco no pinta el suyo.
+  // Con paso a paso el pie es el de `StepReader`: el marco no pinta el suyo.
   const footer = showsPackingSteps ? undefined : (
     <div className="grid grid-cols-1 gap-x-6 @min-[1101px]:grid-cols-[300px_minmax(0,720px)] @min-[1101px]:justify-center">
       <div aria-hidden="true" className="hidden @min-[1101px]:block" />

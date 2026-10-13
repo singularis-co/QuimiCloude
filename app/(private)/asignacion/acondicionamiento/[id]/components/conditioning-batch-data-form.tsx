@@ -19,11 +19,6 @@ export const CONDITIONING_BATCH_DATA_LINE_TESTID = 'conditioning-batch-data-line
 export const CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID = 'conditioning-batch-data-provisional';
 export const CONDITIONING_BATCH_DATA_SUBMIT_TESTID = 'conditioning-batch-data-submit';
 export const CONDITIONING_BATCH_DATA_ERROR_TESTID = 'conditioning-batch-data-error';
-/**
- * Ya no se pinta: el éxito se avisa con un toast (R40 del rediseño del operario). Se exporta hasta
- * que la tanda 8 migre `e2e/datos-de-lote-en-acondicionamiento.spec.ts`, que aún lo importa.
- */
-export const CONDITIONING_BATCH_DATA_SUCCESS_TESTID = 'conditioning-batch-data-success';
 
 /** Los nombres que lee la acción, emparejados por posición. */
 export const CONDITIONING_BATCH_DATA_FIELDS = {

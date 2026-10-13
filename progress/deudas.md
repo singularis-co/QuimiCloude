@@ -390,3 +390,13 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - Modo `card` de `DataTable`: tabla y tarjetas se pintan a la vez y se duplican los `data-testid`. Aviso puesto en la fila `DataTable` de `CATALOGO.md` para las fichas QC-260..267.
 - `numberRange`: los campos mínimo y máximo comparten el mismo nombre accesible. Previo a QC-256 (ya venía de dev).
 - Foco tapado: el foco en la última fila puede quedar bajo la paginación `sticky` de `DataTable` (WCAG 2.4.11). Arreglo con `scroll-padding-bottom`; va en una ficha aparte.
+
+### D53 — Los esqueletos de `/asignacion` no casan con la lista que cargan (QC-265, m1)
+- **Origen:** QC-265 (2026-10-13), menor m1 de la revisión (`progress/review_QC-265.md > Vuelta 1`).
+- **Qué falta:** los esqueletos de `app/(private)/asignacion/components/*-skeleton.tsx`:
+  - pintan una columna menos que la tabla cuando esta lleva «Acciones» (siempre en «Por empacar» y
+    en las tres vistas del acondicionador; en las demás, con `canViewTrace`);
+  - no pasan a tarjeta en teléfono, como sí hace la lista;
+  - por las dos cosas, al llegar la lista hay un salto de maquetación (CLS).
+  No rompe ningún requisito: R21 habla de la lista, no de la carga.
+- **Dueño:** sin asignar.

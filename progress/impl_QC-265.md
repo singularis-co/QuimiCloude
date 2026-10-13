@@ -431,3 +431,9 @@ Salida (cola):
 
 Veredicto del implementer: T0–T8 completas, todo R1–R45 mapeado a su test (secciones de cada tanda);
 queda para el reviewer.
+
+## Arreglos de la review v1 (2026-10-13, frontend_dev)
+
+M1: sin IDs de requisito en comentarios de producción (`conditioning-order-screen`, `packing-order-screen`; el de `conditioning-batch-data-form` se va con m2); grep del diff de `app/` y `components/` limpio. M2: fila `StepReader` del catálogo con `Ejecucion.dc.html`/`EjecucionMovil.dc.html` y el `Alcance` del modo `ejecucion` (sin ajustar guardias). m1: deuda **D53** (esqueletos de `/asignacion`), al final de `deudas.md`. m2: borrados `CONDITIONING_BATCH_DATA_SUCCESS_TESTID` y su reexportación; su test unitario y el E2E ya no lo importan; el camino de rechazo del E2E (~335) afirma que el toast «Datos de lote guardados.» **no** sale, y el paso 6 afirma que sí sale al guardar.
+
+Verificación: typecheck y lint OK; `vitest related` 244 en verde; guard + `catalogo-qc256` 1023 en verde; E2E `datos-de-lote-en-acondicionamiento` 2/2 (chromium y webkit); `./init.sh --completo` **init OK** (1161/1161, 17 347 tests).

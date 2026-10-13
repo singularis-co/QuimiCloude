@@ -37,7 +37,6 @@ import {
   CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_BATCH_DATA_SUBMIT_TESTID,
-  CONDITIONING_BATCH_DATA_SUCCESS_TESTID,
   CONDITIONING_BATCH_DATA_TEXTS,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-batch-data-form';
 import {
@@ -332,7 +331,9 @@ async function saveAndExpectRejection(
   await expect(alert).toHaveAttribute('data-code', code, { timeout: 60_000 });
   await expect(alert).toHaveAttribute('role', 'alert');
   await expect(section.getByRole('alert')).toContainText(errorMessage(code));
-  await expect(section.getByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID)).toHaveCount(0);
+  await expect(
+    page.locator(TOAST_SELECTOR).filter({ hasText: CONDITIONING_BATCH_DATA_TEXTS.saved }),
+  ).toHaveCount(0);
 
   for (const line of lines) {
     const block = lineBlock(section, line.batchId);
