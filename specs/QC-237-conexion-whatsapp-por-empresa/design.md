@@ -3,6 +3,8 @@
 > Zona: `fullstack` · Complejidad: `medium` · depends_on: QC-234 · Rama:
 > `feature/QC-237-conexion-whatsapp-por-empresa`
 >
+> _2026-10-13: el humano quita `metaAppId`: ninguna llamada a Graph lo usa._
+>
 > El **qué** está en `requirements.md` (R1–R43). Aquí va el **cómo**. Precedentes que se copian:
 >
 > - **QC-234** (`specs/QC-234-cifrado-de-secretos-de-integraciones/design.md`): puertos
@@ -126,7 +128,6 @@ model WhatsappConnection {
   companyId          String                   @map("company_id") @db.Uuid
   origin             WhatsappConnectionOrigin @default(MANUAL)
   displayName        String                   @map("display_name")
-  metaAppId          String                   @map("meta_app_id")
   wabaId             String                   @map("waba_id")
   phoneNumberId      String                   @map("phone_number_id")
   displayPhoneNumber String?                  @map("display_phone_number")
@@ -162,7 +163,7 @@ model WhatsappConnection {
 - **Ninguna columna de versión de clave** (D9). La versión de cada secreto es el prefijo `v<n>:` de
   su valor cifrado; QC-250 sabe qué filas siguen en una versión vieja con
   `split_part(access_token_enc, ':', 1)` y `split_part(app_secret_enc, ':', 1)`.
-- **IDs de Meta como `text` sin límite de longitud** (D14): `meta_app_id`, `waba_id` y
+- **IDs de Meta como `text` sin límite de longitud** (D14): `waba_id` y
   `phone_number_id` son texto libre no vacío; ni la columna ni zod imponen dígitos ni un máximo.
 - **`createdById`** con `@map("created_by")`, como pide la ficha y como nombra la columna `customers`.
   Sin `updatedBy`: la ficha no lo pide.
@@ -205,7 +206,7 @@ export type WhatsappConnectionStatus = (typeof WHATSAPP_CONNECTION_STATUSES)[num
 /** Lo que el dominio lee y escribe. Lleva los valores cifrados: NUNCA sale del módulo. */
 export type WhatsappConnectionRecord = {
   id: string; companyId: string; origin: 'MANUAL' | 'EMBEDDED_SIGNUP';
-  displayName: string; metaAppId: string; wabaId: string; phoneNumberId: string;
+  displayName: string; wabaId: string; phoneNumberId: string;
   displayPhoneNumber: string | null; verifiedName: string | null;
   accessTokenEnc: string; appSecretEnc: string; verifyTokenHash: string;
   status: WhatsappConnectionStatus; lastError: string | null;
@@ -214,7 +215,7 @@ export type WhatsappConnectionRecord = {
 
 /** Lo único que sale hacia la UI. Sin secretos ni valores cifrados (R10). */
 export type WhatsappConnectionView = {
-  id: string; displayName: string; metaAppId: string; wabaId: string; phoneNumberId: string;
+  id: string; displayName: string; wabaId: string; phoneNumberId: string;
   displayPhoneNumber: string | null; verifiedName: string | null;
   status: WhatsappConnectionStatus; lastError: string | null;
   lastCheckedAt: string | null; lastWebhookAt: string | null;   // ISO, serializable
@@ -428,7 +429,7 @@ mutación con éxito, `revalidatePath(WHATSAPP_INTEGRATION_ROUTE)`.
 | Acción | Entrada | Estados de salida |
 |---|---|---|
 | `getWhatsappConnectionAction()` | — | `{status:'success', data: WhatsappConnectionView \| null, webhook: {url, complete} \| null}` \| `ErrorState` |
-| `createWhatsappConnectionAction(prev, formData)` | `displayName, metaAppId, wabaId, phoneNumberId, accessToken, appSecret` | `{status:'created', verifyToken, webhook}` \| `{status:'test_failed', message}` \| `ErrorState` |
+| `createWhatsappConnectionAction(prev, formData)` | `displayName, wabaId, phoneNumberId, accessToken, appSecret` | `{status:'created', verifyToken, webhook}` \| `{status:'test_failed', message}` \| `ErrorState` |
 | `updateWhatsappConnectionAction(id, prev, formData)` | los mismos; secretos opcionales | `{status:'saved'}` \| `{status:'test_failed', message}` \| `ErrorState` |
 | `testWhatsappConnectionAction(prev, formData{id})` | `id` | `{status:'tested', ok: true}` \| `{status:'tested', ok: false, message}` \| `ErrorState` |
 | `disableWhatsappConnectionAction(prev, formData{id})` / `enableWhatsappConnectionAction(...)` | `id` | `{status:'saved'}` \| `{status:'test_failed', message}` (solo habilitar) \| `ErrorState` |
@@ -493,10 +494,10 @@ Las props son la `WhatsappConnectionView` y `{url, complete}`: nada más (R10).
   no se ve). `TabsList`/`TabsTrigger` con `h-11`: la primitiva mide 32 px de alto y R40 pide 44.
 - **Formulario.** `Input` con `type="password"`, `autoComplete="off"` y sin `defaultValue` para los
   dos secretos; en edición, el texto de ayuda dice «Déjalo vacío para conservar el actual». Etiquetas:
-  «Nombre visible», «App ID», «WABA ID», «Phone Number ID», «Access Token», «App Secret». Botón
+  «Nombre visible», «WABA ID», «Phone Number ID», «Access Token», «App Secret». Botón
   «Guardar y probar».
 - **Guía** (`WhatsappSetupGuide`):
-  - App ID y App Secret: en developers.facebook.com, tu app › Configuración › Básica.
+  - App Secret: en developers.facebook.com, tu app › Configuración › Básica.
   - WABA ID y Phone Number ID: tu app › WhatsApp › Configuración de la API.
   - Access Token: business.facebook.com › Configuración › Usuarios del sistema › Generar token,
     con los permisos `whatsapp_business_management` y `whatsapp_business_messaging`.

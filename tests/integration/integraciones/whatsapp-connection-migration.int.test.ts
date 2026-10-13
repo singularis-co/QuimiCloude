@@ -129,9 +129,9 @@ async function failureOf(tx: Prisma.TransactionClient, statement: string, ...val
 }
 
 const INSERT_CONNECTION =
-  `INSERT INTO "${TABLE}" ("id", "company_id", "display_name", "meta_app_id", "waba_id", ` +
+  `INSERT INTO "${TABLE}" ("id", "company_id", "display_name", "waba_id", ` +
   `"phone_number_id", "access_token_enc", "app_secret_enc", "verify_token_hash", "created_by", ` +
-  `"updated_at") VALUES (gen_random_uuid(), $1::uuid, 'Conexion', 'app', 'waba', $2, 'v1:a', ` +
+  `"updated_at") VALUES (gen_random_uuid(), $1::uuid, 'Conexion', 'waba', $2, 'v1:a', ` +
   `'v1:b', 'hash', $3::uuid, CURRENT_TIMESTAMP)`
 
 async function someUserId(tx: Prisma.TransactionClient): Promise<string> {
@@ -176,7 +176,7 @@ describe('migracion whatsapp_connections contra Postgres real', () => {
   it('R5: los IDs de Meta son text sin limite, el id no tiene default y no hay columna de version de clave', async () => {
     await inRolledBackTransaction(async (tx) => {
       const { columns } = await tableSnapshot(tx)
-      for (const name of ['meta_app_id', 'waba_id', 'phone_number_id']) {
+      for (const name of ['waba_id', 'phone_number_id']) {
         expect(columns.find((column) => column.column_name === name), name).toMatchObject({
           data_type: 'text',
           character_maximum_length: null,

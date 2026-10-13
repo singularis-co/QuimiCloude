@@ -94,7 +94,6 @@ function nuevaFila(empresa: Empresa, overrides: Partial<NewWhatsappConnectionRow
     id: randomUUID(),
     origin: 'MANUAL',
     displayName: 'Ventas',
-    metaAppId: `app-${token()}`,
     wabaId: `waba-${token()}`,
     phoneNumberId: `phone-${token()}`,
     displayPhoneNumber: '+57 300 1234567',
@@ -359,7 +358,6 @@ describe('R9: a la base solo llegan valores cifrados y el resumen del verify tok
     const result = await create(
       {
         displayName: 'Ventas',
-        metaAppId: '1234567890',
         wabaId: '2345678901',
         phoneNumberId: `phone-${token()}`,
         accessToken,

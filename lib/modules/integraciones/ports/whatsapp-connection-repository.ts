@@ -10,7 +10,6 @@ export type NewWhatsappConnectionRow = {
   readonly id: string;
   readonly origin: WhatsappConnectionOrigin;
   readonly displayName: string;
-  readonly metaAppId: string;
   readonly wabaId: string;
   readonly phoneNumberId: string;
   readonly displayPhoneNumber: string | null;
@@ -27,7 +26,6 @@ export type NewWhatsappConnectionRow = {
 /** Solo lo que una operación puede cambiar; un campo ausente se conserva. */
 export type WhatsappConnectionPatch = {
   readonly displayName?: string;
-  readonly metaAppId?: string;
   readonly wabaId?: string;
   readonly phoneNumberId?: string;
   readonly displayPhoneNumber?: string | null;

@@ -7,9 +7,11 @@
 > las credenciales de su propia app de Meta (modo «cliente directo», fase 1). La conexión queda
 > guardada con los secretos cifrados y lista para que Meta envíe los webhooks.
 >
+> _2026-10-13: el humano quita `metaAppId`: ninguna llamada a Graph lo usa._
+>
 > - **Modelo** `WhatsappConnection` (`whatsapp_connections`), con `company_id` y las convenciones del
 >   repo: `origin` (`manual`; `embedded_signup` reservado para la fase 2), `displayName`; IDs de
->   Meta `metaAppId`, `wabaId`, `phoneNumberId` (**único global**), `displayPhoneNumber`,
+>   Meta `wabaId`, `phoneNumberId` (**único global**), `displayPhoneNumber`,
 >   `verifiedName`; secretos `accessTokenEnc` y `appSecretEnc` cifrados con QC-234 (la ficha pedía
 >   además `keyVersion`: **retirada**, D9) y `verifyTokenHash`; estado `status` (`pending|active|error|disabled`), `lastError`,
 >   `lastCheckedAt`, `lastWebhookAt` (lo llenará la recepción); auditoría `createdById`, timestamps,
@@ -17,7 +19,7 @@
 >   `(company_id) WHERE deleted_at IS NULL`; el modelo admite varias.
 > - **Pantalla** `/integraciones/whatsapp` (reemplaza el placeholder de QC-222), con
 >   `integraciones.modificar`. Pestañas «Conexión» | «Plantillas»; «Plantillas» deshabilitada con
->   «Disponible próximamente». «Conexión» sin conexión: formulario (nombre visible, App ID, WABA ID,
+>   «Disponible próximamente». «Conexión» sin conexión: formulario (nombre visible, WABA ID,
 >   Phone Number ID, Access Token, App Secret) y guía corta. Con conexión: tarjeta de estado, URL del
 >   webhook con botón copiar, y acciones.
 > - **Probar conexión** al guardar y con un botón: `GET /{phone_number_id}?fields=display_phone_number,verified_name`.
@@ -61,7 +63,7 @@
 | D11 | Habilitar con prueba fallida deja la conexión `disabled` y la pantalla muestra el mensaje de Meta (humano, 2026-10-09; era P3) | QC-238 no recibe webhooks de una conexión que no pasa la prueba. |
 | D12 | Tras una prueba buena (editar, probar, habilitar): `active` si `lastWebhookAt` no es nulo, `pending` si lo es (humano, 2026-10-09; era P4) | Meta solo hace el handshake al suscribir; un `pending` fijo dejaría así para siempre una conexión que ya recibía. |
 | D13 | Textos de `design.md > 7` y `> 8.3` aprobados como están, con dos cambios: etiqueta de `PENDING` «Pendiente» y de `ERROR` «Error», con el último error (`lastError`) visible junto al estado en la tarjeta (humano, 2026-10-09; era P5) | Etiquetas cortas; el motivo del error se ve donde se ve el estado. |
-| D14 | App ID, WABA ID y Phone Number ID son texto libre no vacío tras recortar, **sin** exigir solo dígitos ni longitud máxima; un ID malo lo detecta la prueba contra Graph (humano, 2026-10-09; era P6) | Que los IDs de Meta sean siempre numéricos no está verificado; la prueba ya valida el que importa. |
+| D14 | WABA ID y Phone Number ID son texto libre no vacío tras recortar, **sin** exigir solo dígitos ni longitud máxima; un ID malo lo detecta la prueba contra Graph (humano, 2026-10-09; era P6) | Que los IDs de Meta sean siempre numéricos no está verificado; la prueba ya valida el que importa. |
 | D15 | La base de la URL del webhook es `APP_BASE_URL`, leída por un lector propio de `integraciones`; si falta, la pantalla avisa (humano, 2026-10-09; era P7) | Variable que ya existe. En Vercel se fija por entorno para que una preview no apunte a producción. |
 | D16 | La unicidad de `phoneNumberId` es un índice único **parcial** `WHERE deleted_at IS NULL` (humano, 2026-10-09; era P8) | Igual que el de empresa; una conexión borrada en el futuro no quema el número. |
 
@@ -180,14 +182,14 @@ el mensaje de Meta para mostrarlo en el formulario, que conserva los campos no s
 
 **R24.** SI algún campo del formulario es inválido (vacío tras recortar; `displayName` de más de 80
 caracteres; un secreto de más de 1024 caracteres), ENTONCES el sistema DEBE rechazar con
-`invalid_input` sin llamar a Graph. App ID, WABA ID y Phone Number ID DEBEN aceptarse como texto
+`invalid_input` sin llamar a Graph. WABA ID y Phone Number ID DEBEN aceptarse como texto
 libre no vacío tras recortar, contengan o no caracteres que no son dígitos; un ID que Meta no
 reconoce DEBE terminar como prueba fallida (R23, R26). [A, D14]
 
 ### Editar
 
 **R25.** CUANDO el Administrador edita la conexión, el sistema DEBE permitir cambiar
-`displayName`, App ID, WABA ID, Phone Number ID y los secretos, con las reglas de R24 (salvo que
+`displayName`, WABA ID, Phone Number ID y los secretos, con las reglas de R24 (salvo que
 cada secreto puede ir vacío, R11). [A]
 
 **R26.** SI la edición escribe algún secreto o cambia el Phone Number ID, ENTONCES el sistema DEBE
@@ -195,7 +197,7 @@ ejecutar la prueba con las credenciales resultantes antes de guardar; SI la prue
 NO DEBE guardar ningún cambio (la conexión conserva sus credenciales, su estado y sus datos
 anteriores) y DEBE devolver el mensaje de Meta para mostrarlo en la pantalla. [A, D6, D10]
 
-**R27.** SI la edición solo cambia `displayName`, App ID o WABA ID, ENTONCES el sistema DEBE
+**R27.** SI la edición solo cambia `displayName` o WABA ID, ENTONCES el sistema DEBE
 guardar sin llamar a Graph y sin cambiar el estado. [A]
 
 ### Probar, deshabilitar, habilitar

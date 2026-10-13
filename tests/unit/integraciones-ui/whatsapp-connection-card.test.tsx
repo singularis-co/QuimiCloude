@@ -39,7 +39,6 @@ function vista(overrides: Partial<WhatsappConnectionView> = {}): WhatsappConnect
   return {
     id: '5f0c6a8e-0000-4000-8000-000000000001',
     displayName: 'Ventas Bogotá',
-    metaAppId: '111',
     wabaId: '222',
     phoneNumberId: '333',
     displayPhoneNumber: '+57 300 0000000',

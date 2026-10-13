@@ -91,7 +91,6 @@ function vista(overrides: Partial<WhatsappConnectionView> = {}): WhatsappConnect
   return {
     id: 'conn-1',
     displayName: 'Ventas',
-    metaAppId: '111',
     wabaId: '222',
     phoneNumberId: '333',
     displayPhoneNumber: '+57 300 0000000',

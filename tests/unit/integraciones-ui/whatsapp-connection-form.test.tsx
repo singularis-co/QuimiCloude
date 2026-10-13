@@ -104,7 +104,6 @@ const WEBHOOK = { url: 'https://app.ejemplo.com/api/integraciones/whatsapp/webho
 
 const ESCRITO = {
   displayName: 'Ventas Bogotá',
-  metaAppId: '1234567890',
   wabaId: 'waba-abc',
   phoneNumberId: '9988776655',
 } as const;
@@ -113,7 +112,6 @@ function vista(overrides: Partial<WhatsappConnectionView> = {}): WhatsappConnect
   return {
     id: 'conn-1',
     displayName: 'Ventas',
-    metaAppId: '111',
     wabaId: '222',
     phoneNumberId: '333',
     displayPhoneNumber: '+57 300 0000000',
@@ -154,7 +152,7 @@ afterEach(() => {
 });
 
 describe('WhatsappConnectionForm en alta', () => {
-  it('R36: pinta los seis campos con sus etiquetas y los secretos como contraseña sin valor inicial', () => {
+  it('R36: pinta los cinco campos con sus etiquetas y los secretos como contraseña sin valor inicial', () => {
     montarAlta();
 
     for (const field of [...WHATSAPP_PUBLIC_FIELDS, ...WHATSAPP_SECRET_FIELDS]) {
@@ -162,7 +160,6 @@ describe('WhatsappConnectionForm en alta', () => {
     }
     expect(Object.values(WHATSAPP_FIELD_LABELS)).toEqual([
       'Nombre visible',
-      'App ID',
       'WABA ID',
       'Phone Number ID',
       'Access Token',
@@ -178,7 +175,7 @@ describe('WhatsappConnectionForm en alta', () => {
     expect(screen.queryByTestId(WHATSAPP_CONNECTION_FORM_CANCEL_TESTID)).toBeNull();
   });
 
-  it('R36: envia los seis campos con los nombres que lee la accion', async () => {
+  it('R36: envia los cinco campos con los nombres que lee la accion', async () => {
     createMock.mockResolvedValue({ status: 'test_failed', message: MENSAJE_META });
     const user = setupUser();
     montarAlta();
@@ -285,7 +282,6 @@ describe('WhatsappConnectionForm en edicion', () => {
     );
 
     expect(campo('displayName').value).toBe('Ventas');
-    expect(campo('metaAppId').value).toBe('111');
     expect(campo('wabaId').value).toBe('222');
     expect(campo('phoneNumberId').value).toBe('333');
     for (const field of WHATSAPP_SECRET_FIELDS) {

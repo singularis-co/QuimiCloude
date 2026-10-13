@@ -1027,7 +1027,6 @@ model WhatsappConnection {
   companyId          String                   @map("company_id") @db.Uuid
   origin             WhatsappConnectionOrigin @default(MANUAL)
   displayName        String                   @map("display_name")
-  metaAppId          String                   @map("meta_app_id")
   wabaId             String                   @map("waba_id")
   phoneNumberId      String                   @map("phone_number_id")
   displayPhoneNumber String?                  @map("display_phone_number")

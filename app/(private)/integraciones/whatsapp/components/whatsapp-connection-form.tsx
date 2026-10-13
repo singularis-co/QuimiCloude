@@ -22,7 +22,7 @@ export const WHATSAPP_CONNECTION_FORM_ERROR_TESTID = 'whatsapp-connection-form-e
 export const WHATSAPP_CONNECTION_FORM_SUBMIT_TESTID = 'whatsapp-connection-form-submit';
 export const WHATSAPP_CONNECTION_FORM_CANCEL_TESTID = 'whatsapp-connection-form-cancel';
 
-export const WHATSAPP_PUBLIC_FIELDS = ['displayName', 'metaAppId', 'wabaId', 'phoneNumberId'] as const;
+export const WHATSAPP_PUBLIC_FIELDS = ['displayName', 'wabaId', 'phoneNumberId'] as const;
 export const WHATSAPP_SECRET_FIELDS = ['accessToken', 'appSecret'] as const;
 
 type PublicField = (typeof WHATSAPP_PUBLIC_FIELDS)[number];
@@ -31,7 +31,6 @@ export type WhatsappFormField = PublicField | SecretField;
 
 export const WHATSAPP_FIELD_LABELS: Readonly<Record<WhatsappFormField, string>> = {
   displayName: 'Nombre visible',
-  metaAppId: 'App ID',
   wabaId: 'WABA ID',
   phoneNumberId: 'Phone Number ID',
   accessToken: 'Access Token',
@@ -40,7 +39,6 @@ export const WHATSAPP_FIELD_LABELS: Readonly<Record<WhatsappFormField, string>> 
 
 export const WHATSAPP_FIELD_TESTIDS: Readonly<Record<WhatsappFormField, string>> = {
   displayName: 'whatsapp-field-display-name',
-  metaAppId: 'whatsapp-field-meta-app-id',
   wabaId: 'whatsapp-field-waba-id',
   phoneNumberId: 'whatsapp-field-phone-number-id',
   accessToken: 'whatsapp-field-access-token',

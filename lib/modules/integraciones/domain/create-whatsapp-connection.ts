@@ -76,7 +76,6 @@ export function createCreateWhatsappConnection(
         id,
         origin: 'MANUAL',
         displayName: data.displayName,
-        metaAppId: data.metaAppId,
         wabaId: data.wabaId,
         phoneNumberId: data.phoneNumberId,
         displayPhoneNumber: probe.phone.displayPhoneNumber,

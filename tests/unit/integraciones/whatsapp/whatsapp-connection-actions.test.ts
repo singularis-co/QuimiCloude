@@ -96,7 +96,6 @@ const ACTOR = { id: SESSION_USER.id, companyId: COMPANY_ID, permissions: SESSION
 const VIEW: WhatsappConnectionView = {
   id: CONNECTION_ID,
   displayName: 'Ventas',
-  metaAppId: '111',
   wabaId: '222',
   phoneNumberId: '333',
   displayPhoneNumber: '+57 300 0000000',
@@ -109,7 +108,6 @@ const VIEW: WhatsappConnectionView = {
 
 const FIELDS = {
   displayName: 'Ventas',
-  metaAppId: '111',
   wabaId: '222',
   phoneNumberId: '333',
   accessToken: ACCESS_TOKEN,
@@ -205,11 +203,10 @@ describe('acciones de la conexion de WhatsApp — estados de salida', () => {
     await updateWhatsappConnectionAction(
       CONNECTION_ID,
       { status: 'idle' },
-      formDataOf({ displayName: 'Ventas', metaAppId: '111', wabaId: '222', phoneNumberId: '333', accessToken: '' }),
+      formDataOf({ displayName: 'Ventas', wabaId: '222', phoneNumberId: '333', accessToken: '' }),
     )
     expect(updateMock.mock.calls[1]?.[1]).toEqual({
       displayName: 'Ventas',
-      metaAppId: '111',
       wabaId: '222',
       phoneNumberId: '333',
       accessToken: '',

@@ -85,7 +85,6 @@ function readOptionalFormString(formData: FormData, name: string): string | unde
 function buildCreateCandidate(formData: FormData): unknown {
   return {
     displayName: readFormString(formData, 'displayName'),
-    metaAppId: readFormString(formData, 'metaAppId'),
     wabaId: readFormString(formData, 'wabaId'),
     phoneNumberId: readFormString(formData, 'phoneNumberId'),
     accessToken: readFormString(formData, 'accessToken'),
@@ -96,7 +95,6 @@ function buildCreateCandidate(formData: FormData): unknown {
 function buildUpdateCandidate(formData: FormData): unknown {
   return {
     displayName: readFormString(formData, 'displayName'),
-    metaAppId: readFormString(formData, 'metaAppId'),
     wabaId: readFormString(formData, 'wabaId'),
     phoneNumberId: readFormString(formData, 'phoneNumberId'),
     accessToken: readOptionalFormString(formData, 'accessToken'),

@@ -53,7 +53,6 @@ export function createUpdateWhatsappConnection(
 
     const textPatch: WhatsappConnectionPatch = {
       displayName: data.displayName,
-      metaAppId: data.metaAppId,
       wabaId: data.wabaId,
       phoneNumberId: data.phoneNumberId,
     };

@@ -16,7 +16,6 @@ const optionalSecretSchema = z
 
 export const createWhatsappConnectionSchema = z.object({
   displayName: displayNameSchema,
-  metaAppId: metaIdSchema,
   wabaId: metaIdSchema,
   phoneNumberId: metaIdSchema,
   accessToken: secretSchema,
@@ -26,7 +25,6 @@ export const createWhatsappConnectionSchema = z.object({
 /** Un secreto vacío o ausente significa «conservar el guardado». */
 export const updateWhatsappConnectionSchema = z.object({
   displayName: displayNameSchema,
-  metaAppId: metaIdSchema,
   wabaId: metaIdSchema,
   phoneNumberId: metaIdSchema,
   accessToken: optionalSecretSchema,

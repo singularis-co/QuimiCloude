@@ -51,7 +51,6 @@ const PHONE_NUMBER_ID = `qc237${RUN_ID}`;
 
 const CONNECTION_INPUT = {
   displayName: `WhatsApp ${RUN_ID.slice(0, 8)}`,
-  metaAppId: '100000000000001',
   wabaId: '200000000000002',
   phoneNumberId: PHONE_NUMBER_ID,
   accessToken: `token-e2e-${RUN_ID}`,
@@ -60,7 +59,6 @@ const CONNECTION_INPUT = {
 
 const FIELD_TESTIDS = {
   displayName: 'whatsapp-field-display-name',
-  metaAppId: 'whatsapp-field-meta-app-id',
   wabaId: 'whatsapp-field-waba-id',
   phoneNumberId: 'whatsapp-field-phone-number-id',
   accessToken: 'whatsapp-field-access-token',
@@ -188,7 +186,6 @@ test.describe('la conexion de WhatsApp de la empresa', () => {
 
     async function fillCreateForm(accessToken: string): Promise<void> {
       await page.getByTestId(FIELD_TESTIDS.displayName).fill(CONNECTION_INPUT.displayName);
-      await page.getByTestId(FIELD_TESTIDS.metaAppId).fill(CONNECTION_INPUT.metaAppId);
       await page.getByTestId(FIELD_TESTIDS.wabaId).fill(CONNECTION_INPUT.wabaId);
       await page.getByTestId(FIELD_TESTIDS.phoneNumberId).fill(CONNECTION_INPUT.phoneNumberId);
       await page.getByTestId(FIELD_TESTIDS.accessToken).fill(accessToken);

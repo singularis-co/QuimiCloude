@@ -10,7 +10,6 @@ export type WhatsappConnectionRecord = {
   readonly companyId: string;
   readonly origin: WhatsappConnectionOrigin;
   readonly displayName: string;
-  readonly metaAppId: string;
   readonly wabaId: string;
   readonly phoneNumberId: string;
   readonly displayPhoneNumber: string | null;
@@ -28,7 +27,6 @@ export type WhatsappConnectionRecord = {
 export type WhatsappConnectionView = {
   readonly id: string;
   readonly displayName: string;
-  readonly metaAppId: string;
   readonly wabaId: string;
   readonly phoneNumberId: string;
   readonly displayPhoneNumber: string | null;
@@ -44,7 +42,6 @@ export function toWhatsappConnectionView(record: WhatsappConnectionRecord): What
   return {
     id: record.id,
     displayName: record.displayName,
-    metaAppId: record.metaAppId,
     wabaId: record.wabaId,
     phoneNumberId: record.phoneNumberId,
     displayPhoneNumber: record.displayPhoneNumber,

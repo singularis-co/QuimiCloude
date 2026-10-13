@@ -83,11 +83,11 @@ describe('editar la conexion de WhatsApp', () => {
     expect(repo.update).not.toHaveBeenCalled()
   })
 
-  it('R25, R27: cambiar solo displayName, App ID y WABA ID guarda sin llamar a Graph y sin cambiar el estado', async () => {
+  it('R25, R27: cambiar solo displayName y WABA ID guarda sin llamar a Graph y sin cambiar el estado', async () => {
     const { repo, graph, cipher, update } = setup({ record: { status: 'ACTIVE', lastWebhookAt: NOW } })
     const result = await update(
       CONNECTION_ID,
-      editInput({ displayName: 'Soporte', metaAppId: 'app-nuevo', wabaId: 'waba-nueva' }),
+      editInput({ displayName: 'Soporte', wabaId: 'waba-nueva' }),
       admin(),
     )
 
@@ -98,7 +98,6 @@ describe('editar la conexion de WhatsApp', () => {
     expect(patch).not.toHaveProperty('status')
     expect(repo.row(CONNECTION_ID)).toMatchObject({
       displayName: 'Soporte',
-      metaAppId: 'app-nuevo',
       wabaId: 'waba-nueva',
       status: 'ACTIVE',
     })

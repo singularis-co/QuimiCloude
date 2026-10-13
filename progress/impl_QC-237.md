@@ -102,7 +102,7 @@ Abreviaturas: `wa/` = `tests/unit/integraciones/whatsapp/`, `ui/` = `tests/unit/
 | R24 | `wa/create-whatsapp-connection.test.ts` (11 casos de invalid_input, límites 80/1024, IDs libres, ID desconocido = prueba fallida) |
 | R25 | `wa/update-whatsapp-connection.test.ts` «R25, R27…», «R25: las reglas de R24 aplican al editar», «R25: el resultado expone la vista sin secretos» |
 | R26 | `wa/update-whatsapp-connection.test.ts` «R26: con prueba fallida no se guarda ningún cambio…» y los casos R12/R26, R26/R19 |
-| R27 | `wa/update-whatsapp-connection.test.ts` «R25, R27: cambiar solo displayName, App ID y WABA ID…» |
+| R27 | `wa/update-whatsapp-connection.test.ts` «R25, R27: cambiar solo displayName y WABA ID…» |
 | R28 | `wa/test-and-enable.test.ts` «R28, R19…», «R28: prueba fallida deja ERROR…», «R28: Meta inalcanzable…» |
 | R29 | `wa/test-and-enable.test.ts` «R29: deshabilitar deja DISABLED…», «R29: deshabilitar una ya deshabilitada…»; `e2e` paso R29 |
 | R30 | `wa/test-and-enable.test.ts` «R30, R19: habilitar una DISABLED…», «R30: habilitar con prueba fallida sigue DISABLED…», «R30: habilitar una que no está DISABLED…»; `e2e` paso R30 |
@@ -240,3 +240,17 @@ redeclaró al final. Si QC-224 crea una migración, hay que cuidar su orden con
   storage-config, integraciones, integraciones-ui, shared-ui) 135 archivos, 1910 passed, 15 skipped;
   Playwright `e2e/integraciones-whatsapp.spec.ts` chromium 2 passed.
 - Veredicto: los tres rojos corregidos sin tocar baseline ni debilitar guardias.
+
+## Se quita `metaAppId` (D17, 2026-10-13)
+
+- Decisión del humano: ninguna llamada a Graph usa el App ID. Se borra `meta_app_id` en sitio en
+  `db/migrations/20261009130000_whatsapp_connections/migration.sql` (sin migración nueva) y en
+  `db/schema.prisma` (+ `prisma generate`); `created_by` y `last_checked_at` no cambian.
+- Código: `lib/modules/integraciones` (dominio, input, alta, edición, puerto, adaptador Prisma, Server
+  Actions) y `app/(private)/integraciones/whatsapp/components` (formulario y guía; la tarjeta no lo
+  mostraba). Spec: `requirements.md` y `design.md` con nota fechada; R24, R25 y R27 sin el App ID.
+- Tests: unit `integraciones`, `integraciones-ui`, `composition`; int `whatsapp-connection-{prisma,migration}`;
+  `e2e/integraciones-whatsapp.spec.ts`. Se retira el caso «metaAppId vacío»; «campo ausente» usa `wabaId`.
+- Salida: `typecheck` limpio; `lint` 0 errores (7 warnings previos ajenos); vitest (integraciones,
+  integraciones-ui, integration/integraciones, guards, errores, composition) 102 archivos, 1571 passed,
+  15 skipped. Playwright no se corrió (lo corre CI). La base compartida «QuimiCloude» no se tocó.

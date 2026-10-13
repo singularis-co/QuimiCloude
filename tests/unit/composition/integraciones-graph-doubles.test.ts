@@ -28,7 +28,6 @@ const ACTOR = {
 
 const INPUT = {
   displayName: 'Ventas',
-  metaAppId: '111',
   wabaId: '222',
   phoneNumberId: '333',
   accessToken: 'E2E_INVALID-token',

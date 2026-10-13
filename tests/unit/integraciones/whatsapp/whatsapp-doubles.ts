@@ -41,7 +41,6 @@ export function admin(overrides: Partial<Actor> = {}): Actor {
 export function validCreateInput(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     displayName: 'Ventas',
-    metaAppId: '1234567890',
     wabaId: '2345678901',
     phoneNumberId: '3456789012',
     accessToken: ACCESS_TOKEN,
@@ -129,7 +128,6 @@ export function makeRepository(initial: (WhatsappConnectionRecord & { deleted?: 
       companyId: scope.companyId,
       origin: row.origin,
       displayName: row.displayName,
-      metaAppId: row.metaAppId,
       wabaId: row.wabaId,
       phoneNumberId: row.phoneNumberId,
       displayPhoneNumber: row.displayPhoneNumber,
@@ -179,7 +177,6 @@ export function storedConnection(
     companyId,
     origin: 'MANUAL',
     displayName: 'Ventas',
-    metaAppId: '1234567890',
     wabaId: '2345678901',
     phoneNumberId: '3456789012',
     displayPhoneNumber: '+57 300 0000000',

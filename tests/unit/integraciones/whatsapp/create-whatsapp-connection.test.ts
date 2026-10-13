@@ -66,7 +66,6 @@ describe('crear la conexion de WhatsApp', () => {
       id: NEW_CONNECTION_ID,
       origin: 'MANUAL',
       displayName: 'Ventas',
-      metaAppId: '1234567890',
       wabaId: '2345678901',
       phoneNumberId: '3456789012',
       displayPhoneNumber: '+57 300 1234567',
@@ -146,15 +145,14 @@ describe('crear la conexion de WhatsApp', () => {
   const INVALIDOS: ReadonlyArray<[string, Record<string, unknown>]> = [
     ['displayName vacio tras recortar', { displayName: '   ' }],
     ['displayName de mas de 80 caracteres', { displayName: 'a'.repeat(WHATSAPP_DISPLAY_NAME_MAX_LENGTH + 1) }],
-    ['metaAppId vacio', { metaAppId: ' ' }],
     ['wabaId vacio', { wabaId: '' }],
-    ['phoneNumberId vacio', { phoneNumberId: '\t' }],
+    ['phoneNumberId vacio',{ phoneNumberId: '\t' }],
     ['accessToken vacio', { accessToken: '  ' }],
     ['appSecret vacio', { appSecret: '' }],
     ['accessToken de mas de 1024 caracteres', { accessToken: 'x'.repeat(WHATSAPP_SECRET_MAX_LENGTH + 1) }],
     ['appSecret de mas de 1024 caracteres', { appSecret: 'x'.repeat(WHATSAPP_SECRET_MAX_LENGTH + 1) }],
     ['un campo que no es texto', { wabaId: 42 }],
-    ['un campo ausente', { metaAppId: undefined }],
+    ['un campo ausente', { wabaId: undefined }],
   ]
   for (const [caso, cambio] of INVALIDOS) {
     it(`R24: ${caso} rechaza con invalid_input sin llamar a Graph ni escribir`, async () => {
@@ -183,10 +181,10 @@ describe('crear la conexion de WhatsApp', () => {
   it('R24: IDs de Meta con letras, simbolos o muy largos se aceptan recortados y llegan a la prueba', async () => {
     const { repo, graph, create } = setup()
     const largo = '9'.repeat(300)
-    await create(validCreateInput({ metaAppId: ' abc-1 ', wabaId: 'waba/2?x', phoneNumberId: ` ${largo}#x ` }), admin())
+    await create(validCreateInput({ wabaId: 'waba/2?x', phoneNumberId: ` ${largo}#x ` }), admin())
 
     expect(graph.fetchPhoneNumber).toHaveBeenCalledWith({ phoneNumberId: `${largo}#x`, accessToken: ACCESS_TOKEN })
-    expect(repo.create.mock.calls[0]?.[0]).toMatchObject({ metaAppId: 'abc-1', wabaId: 'waba/2?x', phoneNumberId: `${largo}#x` })
+    expect(repo.create.mock.calls[0]?.[0]).toMatchObject({ wabaId: 'waba/2?x', phoneNumberId: `${largo}#x` })
   })
 
   it('R24: un ID que Meta no reconoce termina como prueba fallida, no como invalid_input', async () => {

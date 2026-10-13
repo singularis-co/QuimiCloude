@@ -14,7 +14,6 @@ CREATE TABLE "whatsapp_connections" (
     "company_id" UUID NOT NULL,
     "origin" "whatsapp_connection_origin" NOT NULL DEFAULT 'MANUAL',
     "display_name" TEXT NOT NULL,
-    "meta_app_id" TEXT NOT NULL,
     "waba_id" TEXT NOT NULL,
     "phone_number_id" TEXT NOT NULL,
     "display_phone_number" TEXT,
