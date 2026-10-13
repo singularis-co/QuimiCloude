@@ -1,4 +1,5 @@
-// Textos de las dos pantallas de acceso: la tabla exacta de R25, los siete nombres de R26 y
+// Textos de las dos pantallas de acceso: la tabla exacta de R25, los nombres de R26 (seis
+// en la lista en vivo, siete en el aviso del servidor; QC-273) y
 // ninguna forma sin tilde en lo pintado.
 //
 // «Lo pintado» es el `textContent` del documento (incluye el texto solo para lectores de pantalla)
@@ -35,16 +36,21 @@ vi.mock('@/lib/modules/identity/adapters/driving/credential-setup-actions', () =
 
 const SECRETO = 'n5q7Yx0Zt1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r';
 
-/** Los siete nombres de R26, en el orden de la política. */
-const NOMBRES_DE_LOS_REQUISITOS = [
+/** Los seis nombres que la lista comprueba en vivo, en el orden de la política. */
+const NOMBRES_EN_VIVO = [
   'Al menos 8 caracteres',
   'Como máximo 64 caracteres',
   'Al menos una letra mayúscula',
   'Al menos una letra minúscula',
   'Al menos un número',
   'Al menos un símbolo que no sea letra ni número',
-  'No debe figurar en una lista de credenciales filtradas',
 ];
+
+/** La regla que solo comprueba el servidor: no sale en la lista, sí en su aviso (QC-273). */
+const NOMBRE_DE_FILTRADAS = 'No debe figurar en una lista de credenciales filtradas';
+
+/** Los siete nombres de R26, en el orden de la política. */
+const NOMBRES_DE_LOS_REQUISITOS = [...NOMBRES_EN_VIVO, NOMBRE_DE_FILTRADAS];
 
 const FORMAS_SIN_TILDE = /contrasena|sesion|todavia|repitela/i;
 
@@ -250,12 +256,31 @@ describe('R25 — textos de establecer contraseña', () => {
   });
 });
 
-describe('R26 — los siete nombres de la política', () => {
-  it('R26 — la lista de requisitos nombra las siete reglas con la redacción exacta', async () => {
+describe('R26 — los nombres de la política', () => {
+  it('R26 — la lista de requisitos nombra las seis reglas en vivo con la redacción exacta', async () => {
     await pintarEstablecer();
 
     const lista = document.getElementById('credential-requirements') as HTMLElement;
-    expect(nombresDeLaLista(lista)).toEqual(NOMBRES_DE_LOS_REQUISITOS);
+    expect(nombresDeLaLista(lista)).toEqual(NOMBRES_EN_VIVO);
+  });
+
+  it('QC-273 — la lista de requisitos no muestra el de credenciales filtradas', async () => {
+    await pintarEstablecer();
+
+    const lista = document.getElementById('credential-requirements') as HTMLElement;
+    expect(within(lista).queryByText(NOMBRE_DE_FILTRADAS)).toBeNull();
+    expect(lista.querySelector('[data-rule="breached"]')).toBeNull();
+  });
+
+  it('QC-273 — si el servidor la rechaza por filtrada, el aviso lo dice con la redacción exacta', async () => {
+    await enviarEstablecerCon({ status: 'invalid_credential', unmet: ['breached'] });
+
+    const aviso = within(screen.getByTestId('set-credential-feedback')).getByTestId(
+      'set-credential-unmet',
+    );
+    expect(within(aviso).getAllByRole('listitem').map((regla) => regla.textContent)).toEqual([
+      NOMBRE_DE_FILTRADAS,
+    ]);
   });
 
   it('R26 — el aviso de requisitos incumplidos nombra las siete reglas con la redacción exacta', async () => {
