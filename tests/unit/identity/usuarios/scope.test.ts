@@ -299,11 +299,16 @@ const TRES_INDICES_UNICOS = [
 const SENTENCIAS_DE_ESQUEMA = ['ALTER', 'CREATE', 'DROP'] as const;
 
 /**
- * Las CINCO dependencias candidatas que `design.md > 13` descarto, una a una y con su motivo:
+ * Las CUATRO dependencias candidatas que `design.md > 13` descarto, una a una y con su motivo:
  * `generate-password`, `nanoid` y `secure-random-password` para fabricar la credencial -lo hace
  * `randomInt` de `node:crypto` detras de un puerto, y la garantia que importa es la verificacion
- * contra la politica propia de QC-19, que ninguna libreria conoce-, y `libphonenumber-js` y
- * `validator` para validar formatos -aqui NO se valida ningun formato (`design.md > 6.1`)-.
+ * contra la politica propia de QC-19, que ninguna libreria conoce-, y `validator` para validar
+ * formatos -aqui NO se valida ningun formato (`design.md > 6.1`)-.
+ *
+ * Enmienda de QC-235 (`specs/QC-235-pais-de-la-empresa/design.md > 6.3`): una quinta candidata
+ * salio de esta lista porque QC-235 la aprobo e instalo para el pais de la empresa (fila en
+ * `docs/dependencias.md`). El motivo del descarte sigue valiendo aqui: ningun telefono de usuario
+ * se valida.
  *
  * Esto es la mitad de CONTENIDO de R47 y es MAS FUERTE que «`package.json` no esta en el diff»:
  * prohibe LO CONCRETO que la ficha descarto, para siempre y en cualquier rama, en vez de prohibir
@@ -313,7 +318,6 @@ const CANDIDATAS_DESCARTADAS = [
   'generate-password',
   'nanoid',
   'secure-random-password',
-  'libphonenumber-js',
   'validator',
 ] as const;
 
@@ -811,7 +815,7 @@ describe('alcance de QC-66 (crud-de-usuarios) — CONTENIDO: muerde siempre, tam
     ).toEqual([]);
   });
 
-  it('R47 — ninguna de las cinco dependencias que design.md > 13 descarto esta instalada', () => {
+  it('R47 — ninguna de las cuatro dependencias que design.md > 13 descarto esta instalada', () => {
     // R47: «NO DEBE incorporar ninguna dependencia de terceros nueva: la generacion al azar sale
     // del `crypto` de Node detrás de un puerto y el hash de la bcrypt ya instalada». `design.md
     // > 13` lo cierra sin abrir ninguna propuesta, asi que los cuatro checks de salud no llegan
@@ -819,7 +823,7 @@ describe('alcance de QC-66 (crud-de-usuarios) — CONTENIDO: muerde siempre, tam
     //
     // Esta es la mitad de CONTENIDO, y es MAS FUERTE que la que sustituye: antes se afirmaba que
     // `package.json` no estaba en el diff, lo que deja de significar nada el dia que el diff esta
-    // vacio. Ahora se prohibe LO CONCRETO -las cinco candidatas, por nombre-, y eso muerde para
+    // vacio. Ahora se prohibe LO CONCRETO -las cuatro candidatas, por nombre-, y eso muerde para
     // siempre y en cualquier rama. La mitad de rama -«esta rama no toco `package.json`»- sigue
     // existiendo mas abajo.
     const manifiesto = JSON.parse(leer('package.json')) as {

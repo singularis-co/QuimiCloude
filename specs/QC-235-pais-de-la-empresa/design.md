@@ -234,10 +234,13 @@ memoria no cuenta.
 
 | Check | Resultado |
 |---|---|
-| 1. No `deprecated` | **DESCONOCIDO** (sin verificar) |
-| 2. Release en los últimos 12 meses | **DESCONOCIDO** (sin verificar) |
-| 3. ≥ 10.000 descargas semanales | **DESCONOCIDO** (sin verificar) |
-| 4. Licencia MIT / Apache-2.0 / BSD / ISC | **DESCONOCIDO** (sin verificar) |
+| 1. No `deprecated` | Sí: no deprecated |
+| 2. Release en los últimos 12 meses | Sí: 1.13.15, publicada el 2026-10-08 |
+| 3. ≥ 10.000 descargas semanales | Sí: 28.417.096 descargas/semana |
+| 4. Licencia MIT / Apache-2.0 / BSD / ISC | Sí: MIT |
+
+Actualizado el 2026-10-13 (F2.1): verificados por el leader con `npm view` y la API de descargas de
+npm; la fila está en `docs/dependencias.md` (commit `d236b7ec`).
 
 Se cierran en **T1**, antes de instalar, con
 `npm view libphonenumber-js deprecated time.modified license version` y la API de descargas de npm.
@@ -486,8 +489,8 @@ Los nombres de los casos llevan `R<n>` (`docs/perfil-agentes.md > Comentarios`).
 
 ## 10. Riesgos y desconocidos
 
-- **Los cuatro checks de `libphonenumber-js`: DESCONOCIDOS** hasta T1 (§ 6.2). Si alguno falla, se
-  para.
+- **Los cuatro checks de `libphonenumber-js`:** verificados el 2026-10-13, los cuatro pasan
+  (§ 6.2).
 - **Nombres de `Intl.DisplayNames` distintos entre Node y el navegador.** La ICU de Node y la de
   Safari o Chrome pueden diferir en alguna región rara, y el disparador se pinta en el servidor.
   Para los países habituales no se espera diferencia, pero **no está verificado**. Si apareciera un
