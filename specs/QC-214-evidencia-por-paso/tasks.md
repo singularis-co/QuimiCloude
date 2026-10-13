@@ -23,28 +23,28 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
 
 ## Bloque B — Dominio y adaptadores de `asignaciones` (depende de T1, T2)
 
-- [ ] **T3. Puro: `step-evidence.ts`** [P] (R28, R30, R31, R35–R37). Constantes, `buildEvidencePath`,
+- [x] **T3. Puro: `step-evidence.ts`** [P] (R28, R30, R31, R35–R37). Constantes, `buildEvidencePath`,
   `isEvidencePathOf`, `stepRequiresEvidence`, `missingEvidencePositions`; tipos `EvidencePhase`,
   `StepEvidenceView`; exportados por el barrel.
   *Hecho:* `tests/unit/asignaciones/step-evidence.test.ts` (otra empresa, otro pedido, `..`,
   segmentos de más o de menos; posiciones faltantes con la lista actual).
-- [ ] **T4. Errores** [P] (R29, R32, R34–R36, R9). `EvidenceRequiredError`, `EvidenceLimitError`,
+- [x] **T4. Errores** [P] (R29, R32, R34–R36, R9). `EvidenceRequiredError`, `EvidenceLimitError`,
   `EvidenceInvalidFileError`, `EvidenceNotFoundError` en `asignaciones`; `RecipeStepsLockedError` en
   `recetas`; los cinco códigos y mensajes en `lib/modules/errores`.
   *Hecho:* los tests existentes del catálogo de errores siguen verdes con los códigos nuevos.
-- [ ] **T5. Puertos y repositorio Prisma** (R29, R38, R39). `ports/step-evidence-repository.ts` y
+- [x] **T5. Puertos y repositorio Prisma** (R29, R38, R39). `ports/step-evidence-repository.ts` y
   `adapters/driven/persistence/step-evidence-prisma.ts` (`design.md > 4.1`).
   *Hecho:* `tests/integration/asignaciones/step-evidence-repository.int.test.ts`: primer `slot`
   libre, `'limit'` con 3 y con dos inserciones simultáneas, `replace` atómico en el mismo `slot`,
   toda lectura filtrada por empresa (rechazo cruzado), cancelar el pedido no borra filas.
-- [ ] **T6. Storage: puerto, adaptador y doble** [P con T5] (R30, R33). `ports/evidence-storage.ts`,
+- [x] **T6. Storage: puerto, adaptador y doble** [P con T5] (R30, R33). `ports/evidence-storage.ts`,
   `evidence-storage-supabase.ts`, `evidence-storage-memory.ts`, `evidence-storage-config-env.ts`,
   `evidence-e2e-doubles-env.ts`; `EVIDENCE_E2E_DOUBLES` en `playwright.config.ts` y en `VIGILADAS`
   de la guardia; `SUPABASE_EVIDENCE_BUCKET` y `EVIDENCE_E2E_DOUBLES` vacías en `.env.example` y
   con su fila en `docs/architecture.md > Variables por entorno`.
   *Hecho:* `tests/unit/asignaciones/evidence-storage-memory.test.ts` (rechaza rutas no firmadas,
   `download` da un PNG válido para `validateRecipeImage`); guardias de dobles y de variables verdes.
-- [ ] **T7. Acceso: `evidence-target.ts`** (R26, R27, R38, R39). `design.md > 5.2`.
+- [x] **T7. Acceso: `evidence-target.ts`** (R26, R27, R38, R39). `design.md > 5.2`.
   *Hecho:* cubierto por los tests de T8 y T9: sin permiso, no asignado, otro empacador, otra
   empresa, `POR_EMPACAR`/`CANCELADO`/dado de baja → rechazo sin tocar el storage.
 - [ ] **T8. `request-evidence-upload.ts`** (R26–R30). *Hecho:*
