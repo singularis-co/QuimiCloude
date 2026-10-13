@@ -93,7 +93,7 @@ Archivos:
 **Hecho cuando:** la suite de integración está en verde contra la base de test, y
 `tests/unit/inventario/company-scope.test.ts` está en verde.
 
-### B2 [P] — Directorio de entregas en `pedidos` (depende de T0)
+### [x] B2 [P] — Directorio de entregas en `pedidos` (depende de T0)
 
 Archivos:
 - `lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma.ts` (nuevo),
@@ -361,6 +361,7 @@ Tests, fixtures y E2E:
 - `tests/unit/pedidos-ui/order-columns.test.tsx`
 - `tests/unit/pedidos-ui/order-list-section-produced.test.tsx`
 - `tests/unit/identity/session-once-per-request-actions.test.ts`
+- `tests/unit/pedidos/module-contract.test.ts` (añadido 2026-10-13 en B2: censo cerrado de quién abre el cliente Prisma en `pedidos`)
 - `tests/guards/guard-pantallas-exigen-permiso.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `tests/integration/aislamiento.json`

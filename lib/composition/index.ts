@@ -314,6 +314,10 @@ import {
   createOrderConditioningRepository,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
+import {
+  findDeliveryDetailsByIds,
+  summarizeDeliveredByBatchIds,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma';
 import {
   withOrderTransaction,
@@ -939,10 +943,9 @@ const presentationRepository: PresentationRepository = {
  *  cableado: un `const` no existe antes de su linea. */
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
-// Doble vacio hasta que exista su adaptador.
 const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
-  findDeliveryDetails: async () => new Map(),
-  summarizeDelivered: async () => ({ quantity: '0.0000', packages: 0 }),
+  findDeliveryDetails: findDeliveryDetailsByIds,
+  summarizeDelivered: summarizeDeliveredByBatchIds,
 };
 
 const finishedProductDetailRepository: FinishedProductDetailRepository = {
