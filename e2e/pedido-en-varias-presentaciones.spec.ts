@@ -153,6 +153,9 @@ const DISTRIBUTION_DIALOG_ERROR_TESTID = 'order-distribution-dialog-error';
 /** Asignacion y ejecucion. */
 const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
+/** La ejecución: el `h1` es solo la receta y el número va en el rótulo de la cabecera (R23 de QC-265). */
+const EXECUTION_SCREEN_TESTID = 'order-execution-screen';
+const EXECUTION_EYEBROW_SELECTOR = '[data-slot="operator-eyebrow"]';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
 const STEP_FINISH_TESTID = 'step-reader-finish';
 
@@ -312,9 +315,10 @@ async function finishProduction(page: Page, orderId: string, numberText: string)
 
   await page.goto(assignedOrderRoute(orderId));
   await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(
-    `${numberText} - ${RECIPE_NAME}`,
-  );
+  await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(RECIPE_NAME);
+  await expect(
+    page.getByTestId(EXECUTION_SCREEN_TESTID).locator(EXECUTION_EYEBROW_SELECTOR),
+  ).toHaveText(numberText);
 
   // Un clic antes de hidratar se pierde sin error: se repite hasta que la casilla quede marcada.
   const checklistItem = page.getByTestId(STEP_CHECKLIST_ITEM_TESTID);

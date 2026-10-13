@@ -146,7 +146,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
   su punto de extension por diseno. El ancla NO se relaja -el archivo se nombra, uno a uno-. Lo que
   ejercita: …». *Hecho:* pasa en Chromium y WebKit; `pnpm exec vitest run guard-identificador-de-request`
   en verde.
-- [ ] **T8b. E2E existentes** (R45 y los cambios de `design.md > 7`). Migrar los E2E de la tabla a «Entrar»
+- [x] **T8b. E2E existentes** (R45 y los cambios de `design.md > 7`). Migrar los E2E de la tabla a «Entrar»
   del menú ⋯, a la pestaña «Acondicionados» con contador, al toast de datos de lote y al `import` nuevo
   del aviso de cancelado. *Hecho:* cada spec tocado pasa por separado (`pnpm exec playwright test
   <spec>`); los que solo leen testids de avisos pasan sin cambios.
@@ -299,6 +299,7 @@ Tests y guardias:
 - `tests/guards/guard-asignacion-componentizada.test.ts`
 - `tests/guards/guard-piezas-base.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
+- `tests/unit/shared/data-table-alcance.test.ts` (lista cerrada de E2E que nombran `data-table`; altas de QC-265)
 - `tests/unit/shared-ui/catalogo-qc256.test.ts` (alta en F2.1: fija la celda `Diseño` de `Notice`; ver `progress/impl_QC-265.md`)
 - `tests/unit/marca/tablas-marca.test.tsx` (decisión del leader 2026-10-12)
 

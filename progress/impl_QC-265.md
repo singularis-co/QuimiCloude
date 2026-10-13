@@ -336,3 +336,38 @@ Desvíos:
 - (b) Las tablas montan el menú con `assignmentActionsColumn` → `actionsColumn({ menu })`, que es de donde `DataTable` saca el «Acciones» de la tarjeta.
 - (c) `canViewTrace` es opcional y vale `false` por defecto, para no tocar `session-once-per-request-render.test.tsx`.
 - (d) Se renombran testids que leen los E2E: `packing-order-row` pasa a `data-table-row-<id>`; la paginación de «Por empacar» pasa a `data-table-next`/`previous`; se quita `packing-orders-page-indicator`. Se migran en T8b.
+
+## Tanda 8, T8b — E2E existentes migrados (frontend_dev)
+
+Diez specs, cada uno por separado y en los dos navegadores (chromium / webkit), sin saltados:
+- acondicionamiento 4/4 · 4/4
+- acondicionar-con-equipo 1/1 · 1/1
+- empaque 1/1 · 1/1
+- pasos-de-envasado 1/1 · 1/1
+- pedidos-asignados 4/4 · 4/4
+- pedidos-terminados 4/4 · 4/4
+- datos-de-lote-en-acondicionamiento 1/1 · 1/1
+- registro-ejecucion 2/2 · 2/2
+- envases-del-pedido 2/2 · 2/2
+- pedido-en-varias-presentaciones 2/2 · 2/2
+
+No se tocó código de la app.
+
+Cambios:
+- Se entra a los pedidos por «Entrar» del menú ⋯ (`assignment-row-actions` → `assignment-row-enter`), localizando la fila por `data-table-row-<id>`.
+- Las pestañas se leen con contador y «Acondicionados».
+- En el acondicionamiento, el botón que no toca pasa de `toHaveCount(0)` a `toBeDisabled()`.
+- Datos de lote: toast «Datos de lote guardados.».
+- Cancelar el pedido: menú `order-execution-actions` → `order-cancel-trigger`.
+- `h1` = receta, y el número se lee en `[data-slot="operator-eyebrow"]`.
+
+Lista cerrada (implementer): `tests/unit/shared/data-table-alcance.test.ts`. `e2e/acondicionar-con-equipo.spec.ts`
+ahora nombra `data-table-row` y entra con «Alta el 2026-10-12 (QC-265)…»; el centinela pasa de 38 a 39.
+El gate rápido no lo veía. El archivo se añade a `## Archivos esperados`.
+
+Verificación: typecheck OK; lint 0 errores; guard 74/1017 en verde; `data-table-alcance` 18/18; `./init.sh` init OK.
+
+Desvíos:
+- (1) Mientras llega el contador, el streaming de `Suspense` deja dos copias de las pestañas con el mismo testid (el respaldo y la resuelta, aún sin intercambiar), y WebKit falló un clic por modo estricto. Los specs leen las pestañas con `filter({ visible: true })`, y los E2E futuros tendrán que hacer lo mismo.
+- (2) Las tarjetas (ocultas en escritorio) repiten `company-order-date`, así que `pedidos-terminados` cuenta solo lo visible.
+- (3) `CONDITIONING_BATCH_DATA_SUCCESS_TESTID` sigue exportado porque `datos-de-lote` lo importa en la línea 332 (`toHaveCount(0)`), una comprobación que ya no mide nada.
