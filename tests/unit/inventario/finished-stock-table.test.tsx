@@ -13,6 +13,7 @@ import {
   type ProductView,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { clickRowAction, openRowActionsMenu } from '../../helpers/row-actions-menu';
 import { setupUser } from '../../helpers/user-event';
@@ -265,6 +266,37 @@ describe('desplegar', () => {
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('data-table-row-order-1--product-1')).toBeNull();
+  });
+
+  it('R26: el nombre de cada sub-fila enlaza a la ficha de su producto y la fila de grupo no lleva enlace', async () => {
+    const user = setupUser();
+    const otro = producto({ id: 'product-3', name: 'Desengrasante · Botella 1 L' });
+    montar([
+      pedido({
+        products: [
+          { product: producto(), stock: '1.5', packagedStock: [entrada()] },
+          { product: otro, stock: '2', packagedStock: null },
+        ],
+      }),
+    ]);
+
+    const fila = filaDeGrupo('order-1');
+    expect(within(fila).queryByRole('link')).toBeNull();
+    expect(within(fila).queryByTestId('finished-stock-line-link')).toBeNull();
+
+    await user.click(screen.getByTestId('finished-stock-toggle'));
+
+    const primera = within(screen.getByTestId('data-table-row-order-1--product-1')).getByTestId(
+      'finished-stock-line-link',
+    );
+    expect(primera).toHaveAttribute('href', finishedProductDetailRoute('product-1'));
+    expect(primera).toHaveAccessibleName('Desengrasante · Botella 250 ml');
+
+    const segunda = within(screen.getByTestId('data-table-row-order-1--product-3')).getByTestId(
+      'finished-stock-line-link',
+    );
+    expect(segunda).toHaveAttribute('href', finishedProductDetailRoute('product-3'));
+    expect(within(fila).queryByRole('link')).toBeNull();
   });
 
   it('una sub-fila sin envases pinta existencia y unidad', async () => {
