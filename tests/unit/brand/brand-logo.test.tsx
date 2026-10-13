@@ -6,8 +6,20 @@ import { extname, join } from 'node:path';
 
 import { cleanup, render } from '@testing-library/react';
 
+import LoginPage from '@/app/(public)/login/page';
 import { BrandLogo, type BrandLogoProps } from '@/components/shared/brand-logo';
+import type { LoginFormState } from '@/lib/modules/identity/adapters/driving/login-form-state';
 import * as privateNav from '@/lib/shared/navigation/private-nav';
+
+// El formulario del login importa su Server Action; aqui solo se pinta la pantalla.
+const { loginActionMock } = vi.hoisted(() => ({
+  loginActionMock:
+    vi.fn<(prevState: LoginFormState, formData: FormData) => Promise<LoginFormState>>(),
+}));
+
+vi.mock('@/lib/modules/identity/adapters/driving/login-action', () => ({
+  loginAction: loginActionMock,
+}));
 
 // `__dirname` y no `import.meta.url`: en el proyecto `ui` (jsdom) la URL del modulo no es `file:`.
 const RAIZ = join(__dirname, '..', '..', '..');
@@ -117,6 +129,47 @@ describe('BrandLogo', () => {
 
     expect(img.getAttribute('src')).not.toContain('/_next/image');
     expect(img.hasAttribute('srcset')).toBe(false);
+  });
+});
+
+describe('logo del login', () => {
+  const LOGO_LOGIN = '/brand/logo-vertical-dark.svg';
+
+  // ENMIENDA QC-260 (R9; `design.md > 5`): el login ya no pinta el logo vertical sino el isotipo
+  // con `tone="auto"`, que pinta dos imágenes y no admite `preload`. Se deja sin precarga hasta
+  // medir cuál es el LCP con el `h1` de texto; lo que se conserva es que nada precargue un logo
+  // que la pantalla ya no usa.
+  it('R26 (ENMIENDA QC-260): el login pinta el isotipo y no precarga el logo vertical que ya no usa', async () => {
+    const { container } = render(await LoginPage({ searchParams: Promise.resolve({}) }));
+
+    expect(container.querySelector(`img[src="${LOGO_LOGIN}"]`)).toBeNull();
+    expect(container.querySelectorAll('h1 img[src*="isotipo"]').length).toBeGreaterThan(0);
+    expect(
+      document.head.querySelector(`link[rel="preload"][as="image"][href="${LOGO_LOGIN}"]`),
+    ).toBeNull();
+  });
+
+  it('R26: los usos de la barra lateral y del encabezado privado siguen en carga diferida y sin precarga', () => {
+    const otros: BrandLogoProps[] = [
+      { variant: 'horizontal', tone: 'on-dark', height: 28, alt: '' },
+      { variant: 'isotipo', tone: 'on-dark', height: 32, alt: '' },
+      { variant: 'isotipo', tone: 'auto', height: 28, alt: 'QuimiCloude' },
+    ];
+    for (const props of otros) {
+      for (const img of imagenes(props)) {
+        expect(img).toHaveAttribute('loading', 'lazy');
+      }
+      cleanup();
+    }
+
+    for (const ruta of ['components/private/app-sidebar.tsx', 'app/(private)/layout.tsx']) {
+      const fuente = readFileSync(join(RAIZ, ruta), 'utf8');
+      expect(fuente).toMatch(/<BrandLogo\b/);
+      expect({ ruta, precarga: /<BrandLogo\b[^>]*\bpreload\b/.test(fuente) }).toEqual({
+        ruta,
+        precarga: false,
+      });
+    }
   });
 });
 

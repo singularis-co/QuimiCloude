@@ -196,6 +196,10 @@
   `order-distribution-full.tsx` (`marca-en-constante`) y el barrel (`simbolo-borrado`,
   la reexportación `MISSING_VALUE_MARK`).
 - **Dueño:** ficha **QC-217**.
+- **Resuelta (2026-10-12, QC-252, D7):** `OrderDistributionFull` se queda en la ruta (solo la usa
+  `/asignacion`); su `MISSING_NAME_MARK` desapareció al componer con `orderDistributionLineText` y
+  `guard-piezas-base` ya no excluye el archivo. El barrel conserva solo la exclusión estrecha del
+  alias `MISSING_VALUE_MARK` (D51).
 
 ### D43 — Asignación: el quinto conjunto (acondicionamiento) sin parametrizar (QC-232 → QC-217)
 - **Origen:** QC-232 (2026-10-09), `design.md > 7` y `guard-piezas-base`.
@@ -208,6 +212,10 @@
     `conditioning-orders-columns.tsx` (`simbolo-borrado`, `marca-en-constante`, `par-en-constante`);
   - D7: `conditioning-orders-empty.tsx` (`par-literal`), en `VACIOS_Y_ESQUELETOS_D7_PENDIENTES`.
 - **Dueño:** ficha **QC-217**.
+- **Resuelta (2026-10-12, QC-252, D2/D11/D12/D13):** vacíos y esqueletos de acondicionamiento delegan
+  en `AssignmentListEmpty`/`AssignmentListSkeleton`; talla con `touchTarget`; `MissingValue` y
+  `ErrorAlert` compartidos. Los archivos pasaron a `D11_SIN_HALLAZGOS` y
+  `VACIOS_Y_ESQUELETOS_D7_PENDIENTES` quedó vacía.
 
 ### D44 — `step-document-view.tsx` conserva su `TOUCH_TARGET` local (QC-232, P5)
 - **Origen:** QC-232 (2026-10-09), `design.md > 6` y P5 (decisión del humano: pasa a deuda si obliga a
@@ -241,6 +249,9 @@
   `data-testid` en el envoltorio y no en el enlace. Ya no escribe el par táctil como literal: la
   exclusión de `guard-piezas-base` se retiró en T5b.
 - **Dueño:** sin asignar.
+- **Resuelta (2026-10-12, QC-252, D2):** «Por empacar» pinta su vacío con `AssignmentListEmpty`
+  (`testIdPrefix="packing-orders"`); el enlace conserva `packing-orders-first-page` y el contenedor
+  gana `packing-orders-empty` (diferencia aceptada, R5).
 
 ### D48 — Etiquetas de fila exportadas sin uso tras el menú (QC-232, R5)
 - **Origen:** QC-232 (2026-10-09), tanda 3.
@@ -270,6 +281,33 @@
   `components/shared/confirm-action-dialog.tsx`, que ya no existe (hoy es `ConfirmDialog`). El archivo
   no estaba en Archivos esperados.
 - **Dueño:** sin asignar.
+
+### D51 — Duplicados de `/asignacion` que QC-252 deja fuera (QC-252, P6)
+- **Origen:** QC-252 (2026-10-12), decisión P6 del humano al aprobar el spec
+  (`specs/QC-252-componentizacion-asignacion/requirements.md > Decisiones cerradas > P6`).
+- **Qué falta:**
+  - `AssignedOrderDeliveredNotice` tiene el mismo marcado que `OrderOutcomeNotice` (la pieza que
+    funde `PackedOrderNotice` y `ConditionedOrderNotice`); podría ser un `kind` más.
+  - `AssignedOrdersError` y `AssignmentListError` son la misma pieza.
+  - El barrel de `app/(private)/asignacion/components/` reexporta el alias `MISSING_VALUE_MARK`, que
+    solo usa `tests/unit/asignaciones-ui/assigned-orders-columns.test.tsx`; por él
+    `tests/guards/guard-piezas-base.test.ts` conserva una exclusión estrecha (R22 de QC-252).
+- **Dueño:** sin asignar.
+- **Resuelta (2026-10-12, QC-265, D8 y D14; R13, R14, R42 y R43):** los cuatro avisos salen de
+  `OrderOutcomeNotice` con su `kind` sobre `Notice` (se borran `AssignedOrderDeliveredNotice` y
+  `AssignedOrderCancelledNotice`); `AssignedOrdersError` se borra y queda solo `AssignmentListError`;
+  el barrel deja de reexportar `MISSING_VALUE_MARK` y `EXCLUSIONES_ESTRECHAS_D11` de
+  `guard-piezas-base` queda vacía. Las guardias `guard-asignacion-componentizada` (R14, R42) y
+  `guard-piezas-base` (R43) lo vigilan.
+
+### D52 — `/asignacion` sin el buscador «Buscar» del tablero (QC-265, P11)
+- **Origen:** QC-265 (2026-10-12), pregunta P11 cerrada con su opción por defecto
+  (`specs/QC-265-rediseno-operario/requirements.md > Lo que NO entra`).
+- **Qué falta:** el tablero `Asignacion.dc.html` pinta un buscador «Buscar» sobre las listas de
+  `/asignacion`, pero las listas del módulo `asignaciones` no admiten búsqueda: añadirla es trabajo de
+  módulo (puerto de lectura, caso de uso y parámetro de la dirección), no de la capa de UI. Hoy las
+  tablas se montan con `searchable={false}`.
+- **Dueño:** sin asignar (ficha propia del módulo `asignaciones`).
 
 ## Pendientes humanos de fichas cerradas
 Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *Deudas*, pero se habrían perdido al congelarlo.
@@ -334,7 +372,37 @@ Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *D
 - **Estado:** resuelta el 2026-10-07 en `chore/ci-velocidad-y-d34`. Causa: orden de arranque —las emisiones se lanzaban sin esperar a que el `FOR UPDATE` del bloqueo estuviera tomado; si una llegaba antes, ganaba sin esperar y no quedaba nada encolado—. Ahora se lanzan solo con el bloqueo tomado (y se afirma que atrapó 1 fila). Entrada borrada del baseline. Detalle: `progress/fix-d34-credential-setup.md`.
 - **Dueño:** sin asignar.
 
-### D51 — `guard-dobles-e2e` lee `.env.example` con una regex que cruza líneas
+## QC-116 — menores del review (2026-10-10)
+
+Ver progress/review_QC-116-sesion-revocada-en-el-mismo-segundo.md: m1 `tests/unit/inventario/adjust-batch-dialog.test.tsx` (R9, toastExito 0 llamadas) inestable bajo carga, ajeno; m2 JSDoc de isStampedOut no menciona su uso en el login; m3 test de R16 comprueba pureza leyendo texto del archivo.
+## QC-255 — menores del review (2026-10-10)
+
+Ver progress/review_QC-255-sanear-suite-e2e.md: m1 citas de ficha/requisito en comentarios y describe de tests nuevos; m2 cabeceras largas; m3 guardia de usuarios no ve create<Tipo> ni creaciones anidadas; m4 guardia de saltos solo mira *.spec.ts y no ve .skip( partido; m5 guardia de presupuesto no fija nombre `e2e` ni condición de disparo; m6 R14 por focus() programático.
+
+## QC-257 (review, 2026-10-10)
+- m2: `e2e/marca-componentes.spec.ts` no reinicia la sesión guardada en `beforeAll`/`afterAll`; con `fullyParallel` un worker que vuelve al archivo podría reutilizar la sesión de un usuario borrado y caer en `/login?sesion=fin`. Arreglo de una línea (`session = null`, como `shell-rediseno.spec.ts`). Previo a QC-257 (viene de QC-227).
+- m1: `tests/unit/pedidos-ui/pedidos-viewport.test.tsx` pasó de CRLF a LF (lo impone `.gitattributes`); el diff es de archivo entero: posible conflicto con ramas que toquen ese test.
+- m4: `tests/guards/guard-identificador-de-request.test.ts` quedó fuera de «Archivos esperados» de `specs/QC-257-shell-rediseno/tasks.md` (declarado en la bitácora).
+
+## QC-256 (review, 2026-10-11)
+Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
+- R45: la redacción del requisito no encaja con los apoyos sin UI (`lib/shared/ui/order-status.ts`, `STATUS_TONES`, `avatarTone`), que en el catálogo llevan `sin UI` en lugar de un tablero.
+- «Acciones» (tarjetas de `DataTable`): su nombre accesible depende de `triggerLabel`; si el texto visible y el nombre accesible divergen, se incumple WCAG 2.5.3 (Label in Name).
+- Modo `card` de `DataTable`: tabla y tarjetas se pintan a la vez y se duplican los `data-testid`. Aviso puesto en la fila `DataTable` de `CATALOGO.md` para las fichas QC-260..267.
+- `numberRange`: los campos mínimo y máximo comparten el mismo nombre accesible. Previo a QC-256 (ya venía de dev).
+- Foco tapado: el foco en la última fila puede quedar bajo la paginación `sticky` de `DataTable` (WCAG 2.4.11). Arreglo con `scroll-padding-bottom`; va en una ficha aparte.
+
+### D53 — Los esqueletos de `/asignacion` no casan con la lista que cargan (QC-265, m1)
+- **Origen:** QC-265 (2026-10-13), menor m1 de la revisión (`progress/review_QC-265.md > Vuelta 1`).
+- **Qué falta:** los esqueletos de `app/(private)/asignacion/components/*-skeleton.tsx`:
+  - pintan una columna menos que la tabla cuando esta lleva «Acciones» (siempre en «Por empacar» y
+    en las tres vistas del acondicionador; en las demás, con `canViewTrace`);
+  - no pasan a tarjeta en teléfono, como sí hace la lista;
+  - por las dos cosas, al llegar la lista hay un salto de maquetación (CLS).
+  No rompe ningún requisito: R21 habla de la lista, no de la carga.
+- **Dueño:** sin asignar.
+
+### D54 — `guard-dobles-e2e` lee `.env.example` con una regex que cruza líneas
 - **Origen:** review de QC-234 (menor M2, 2026-10-09) y de nuevo en QC-237 (2026-10-09).
 - **Qué falta:** la regex del guard usa `\s*` después del `=`, y `\s` también casa saltos de línea. Una variable vacía al final de `.env.example` (`NOMBRE=`) se lee con el valor de la línea siguiente. QC-237 lo esquiva escribiendo `INTEGRATIONS_E2E_DOUBLES=""`. Arreglo: cambiar `\s*` por `[ \t]*` en `tests/guards/guard-dobles-e2e.test.ts` y volver a dejar las variables como `NOMBRE=`.
 - **Dueño:** sin asignar.

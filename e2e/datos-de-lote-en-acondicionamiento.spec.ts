@@ -37,7 +37,6 @@ import {
   CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_BATCH_DATA_SUBMIT_TESTID,
-  CONDITIONING_BATCH_DATA_SUCCESS_TESTID,
   CONDITIONING_BATCH_DATA_TEXTS,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-batch-data-form';
 import {
@@ -50,17 +49,15 @@ import {
   CONDITIONING_ORDER_SCREEN_TEXTS,
   CONDITIONING_ORDER_STATUS_TESTID,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-order-screen';
-import {
-  CONDITIONING_WAIT_SECONDS,
-  COUNTDOWN_GATED_BUTTON_TESTID,
-} from '@/app/(private)/asignacion/acondicionamiento/[id]/components/countdown-gated-button';
+import { CONDITIONING_WAIT_SECONDS } from '@/app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-wait';
 import { FINISH_CONDITIONING_DIALOG_TESTID } from '@/app/(private)/asignacion/acondicionamiento/[id]/components/finish-conditioning-dialog';
 import { VIEW_PARAM } from '@/app/(private)/asignacion/components/assignment-view-params';
+import { orderDistributionFullText } from '@/app/(private)/asignacion/components/order-distribution-full';
 import {
   CONDITIONED_ORDER_NOTICE_TESTID,
   conditionedOrderNoticeText,
-} from '@/app/(private)/asignacion/components/conditioned-order-notice';
-import { orderDistributionFullText } from '@/app/(private)/asignacion/components/order-distribution-full';
+} from '@/app/(private)/asignacion/components/order-outcome-notice';
+import { COUNTDOWN_GATED_BUTTON_TESTID } from '@/components/shared/countdown-gated-button';
 import { errorMessage, type ErrorCode } from '@/lib/modules/errores';
 import {
   DOCUMENT_TYPE_CC,
@@ -81,9 +78,11 @@ import {
   conditioningOrderRoute,
 } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText } from './helpers/product-name-cell';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc219_e2e_';
@@ -164,6 +163,7 @@ const NAME_CELL_TESTID = 'data-table-cell-name';
 const ORDER_GROUP_NAME_TESTID = 'finished-stock-name';
 const ORDER_GROUP_TOGGLE_TESTID = 'finished-stock-toggle';
 const BATCHES_OPEN_TESTID = 'product-batches-open';
+const PRODUCT_ROW_ACTIONS_TESTID = 'product-row-actions';
 const BATCHES_SHEET_TESTID = 'product-batches-sheet';
 const BATCH_LOT_TESTID = 'product-batch-lot';
 const BATCH_EXPIRY_TESTID = 'product-batch-expiry-date';
@@ -184,6 +184,9 @@ type Seeded = {
 };
 let fixture: Seeded | null = null;
 
+/** El aviso del `<Toaster />` de sonner que monta el layout privado. */
+const TOAST_SELECTOR = '[data-sonner-toast]';
+
 /** Igualdad EXACTA de texto: un correlativo no puede casar con un prefijo suyo. */
 function exactText(value: string): RegExp {
   return new RegExp(`^\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
@@ -197,7 +200,7 @@ function seeded(): Seeded {
 async function createUser(user: Credentials, roleId: string, lastNames: string): Promise<string> {
   if (!companyId) throw new Error('la empresa del fixture no existe: falló el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames,
       lastNames,
@@ -328,7 +331,9 @@ async function saveAndExpectRejection(
   await expect(alert).toHaveAttribute('data-code', code, { timeout: 60_000 });
   await expect(alert).toHaveAttribute('role', 'alert');
   await expect(section.getByRole('alert')).toContainText(errorMessage(code));
-  await expect(section.getByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID)).toHaveCount(0);
+  await expect(
+    page.locator(TOAST_SELECTOR).filter({ hasText: CONDITIONING_BATCH_DATA_TEXTS.saved }),
+  ).toHaveCount(0);
 
   for (const line of lines) {
     const block = lineBlock(section, line.batchId);
@@ -403,11 +408,18 @@ async function expectAdminSeesBatchData(
         .getByTestId(NAME_CELL_TESTID)
         .filter({ hasText: exactProductNameCellText(line.productName) });
       await expect(nameCell).toHaveCount(1, { timeout: 60_000 });
-      await page
+      // «Lotes» vive en el menu de acciones de la fila desde QC-232 (c2d4d46f), igual que en los
+      // otros specs que abren el panel de lotes.
+      const productRow = page
         .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
-        .filter({ has: nameCell })
-        .getByTestId(BATCHES_OPEN_TESTID)
-        .click();
+        .filter({ has: nameCell });
+      await (
+        await openRowActionsMenuItem(
+          page,
+          productRow.getByTestId(PRODUCT_ROW_ACTIONS_TESTID),
+          BATCHES_OPEN_TESTID,
+        )
+      ).click();
 
       const sheet = page.getByTestId(BATCHES_SHEET_TESTID);
       await expect(sheet).toBeVisible({ timeout: 60_000 });
@@ -716,11 +728,12 @@ test.describe('datos de lote en el acondicionamiento (R28)', () => {
     //        habilita (R4, R6).
     await fillLine(lineBlock(section, line2.batchId), valid2);
     await section.getByTestId(CONDITIONING_BATCH_DATA_SUBMIT_TESTID).click();
-    await expect(section.getByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID)).toHaveText(
-      exactText(CONDITIONING_BATCH_DATA_TEXTS.saved),
-      { timeout: 60_000 },
-    );
-    await expect(section.getByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID)).toHaveAttribute('role', 'status');
+    // El éxito se avisa con un toast del `<Toaster />` del layout privado (R40 de QC-265).
+    const savedToast = page
+      .locator(TOAST_SELECTOR)
+      .filter({ hasText: CONDITIONING_BATCH_DATA_TEXTS.saved });
+    await expect(savedToast).toHaveCount(1, { timeout: 60_000 });
+    await expect(savedToast).toBeVisible();
     await expect(section.getByTestId(CONDITIONING_BATCH_DATA_ERROR_TESTID)).toHaveCount(0);
     await expect(screen.getByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toHaveCount(0, {
       timeout: 60_000,

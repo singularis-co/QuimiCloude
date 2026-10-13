@@ -3,21 +3,24 @@ import { esperarInteractiva, setupUser } from '../../helpers/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DataTableFilters } from '@/components/shared/data-table/data-table-filters'
-import { SEARCH_DEBOUNCE_MS, createDefaultParams, withFilter } from '@/components/shared/data-table/data-table-params'
+import {
+  SEARCH_DEBOUNCE_MS,
+  createDefaultParams,
+  withFilter,
+  withSearch,
+  withSort,
+  withoutFilters,
+} from '@/components/shared/data-table/data-table-params'
 import type { DataTableColumn, DataTableParams, DataTableTexts } from '@/components/shared/data-table/data-table-types'
 import { NARROW_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport'
 
 /**
- * `data-table-filters.tsx`: R15, R16, R17, R27 (`design.md`, T8).
- *
- * **Solo se afirma sobre lo emitido** (`DataTableFilterValue`, `data-testid`, roles ARIA), nunca
- * sobre el copy (R21/decision 20 aplicada por analogia: el copy llega por `texts`, aqui de
- * relleno).
+ * Barra de filtros en chips. Se afirma sobre lo emitido, los `data-testid`, los roles y las
+ * clases que fijan el aspecto; nunca sobre el copy, que llega por `texts`.
  */
 
 type Row = { readonly id: string }
 
-// Objeto de relleno: los tests NUNCA afirman sobre el valor de estos textos (R22, decision 20).
 const texts: DataTableTexts = {
   empty: 'vacio',
   loading: 'cargando',
@@ -34,7 +37,7 @@ const texts: DataTableTexts = {
   pinColumn: 'fijar',
   unpinColumn: 'soltar',
   filterColumn: 'filtrar',
-  clearFilter: 'limpiar',
+  clearFilter: 'quitar-filtro',
   lastWeek: 'ultima semana',
   lastMonth: 'ultimo mes',
   lastYear: 'ultimo año',
@@ -57,21 +60,47 @@ const columns: readonly DataTableColumn<Row>[] = [
     },
   },
   { id: 'creado', label: 'Creado', align: 'start', cell: (row) => row.id, filter: { kind: 'dateRange' } },
-  // Sin `filter`: NO debe aparecer en la barra (R15, negativo).
   { id: 'notas', label: 'Notas', align: 'start', cell: (row) => row.id },
 ]
 
-function renderFilters(overrides: Partial<{ params: DataTableParams; onParamsChange: (next: DataTableParams) => void }> = {}) {
+const CHIPS = {
+  nombre: 'data-table-filter-chip-nombre',
+  cantidad: 'data-table-filter-chip-cantidad',
+  estado: 'data-table-filter-estado',
+  creado: 'data-table-filter-date-creado',
+} as const
+
+function renderFilters(
+  overrides: Partial<{ params: DataTableParams; onParamsChange: (next: DataTableParams) => void; texts: DataTableTexts }> = {},
+) {
   const onParamsChange = overrides.onParamsChange ?? vi.fn()
   const params = overrides.params ?? createDefaultParams()
 
-  render(<DataTableFilters columns={columns} params={params} texts={texts} onParamsChange={onParamsChange} />)
+  render(
+    <DataTableFilters
+      columns={columns}
+      params={params}
+      texts={overrides.texts ?? texts}
+      onParamsChange={onParamsChange}
+    />,
+  )
 
   return { onParamsChange: onParamsChange as ReturnType<typeof vi.fn>, params }
 }
 
-// jsdom no implementa `window.matchMedia`: el filtro de fecha anidado lo usa para elegir 1/2
-// meses de calendario. `tests/helpers/viewport.ts` (heredado) lo stubea.
+function ultimaEmision(onParamsChange: ReturnType<typeof vi.fn>): DataTableParams {
+  return onParamsChange.mock.calls.at(-1)?.[0] as DataTableParams
+}
+
+function conTodosActivos(): DataTableParams {
+  let params = createDefaultParams()
+  params = withFilter(params, 'nombre', { kind: 'text', value: 'acido' })
+  params = withFilter(params, 'cantidad', { kind: 'numberRange', min: 1, max: 10 })
+  params = withFilter(params, 'estado', { kind: 'select', values: ['activo', 'inactivo'] })
+  params = withFilter(params, 'creado', { kind: 'dateRange', from: '2026-01-01', to: '2026-01-31' })
+  return params
+}
+
 beforeEach(() => {
   setViewportWidth(NARROW_VIEWPORT)
 })
@@ -80,96 +109,163 @@ afterEach(() => {
   resetViewport()
 })
 
-describe('DataTableFilters: solo aparecen las columnas que declaran filter (R15)', () => {
-  it('la columna sin filter NO aparece en la barra (negativo)', () => {
+describe('DataTableFilters: un chip por columna con filtro (R52)', () => {
+  it('R52 pinta un chip por cada columna que declara filtro, con su etiqueta, y ninguno para la que no', () => {
     renderFilters()
 
+    for (const [columna, testId] of Object.entries(CHIPS)) {
+      const chip = screen.getByTestId(testId)
+      expect(chip.tagName).toBe('BUTTON')
+      expect(chip).toHaveTextContent(columns.find((c) => c.id === columna)?.label ?? '')
+    }
     expect(screen.queryByTestId('data-table-filter-notas')).not.toBeInTheDocument()
-    expect(screen.getByTestId('data-table-filters')).toBeInTheDocument()
+    expect(screen.queryByTestId('data-table-filter-chip-notas')).not.toBeInTheDocument()
   })
 
-  it('las columnas con filter si aparecen, una por forma', () => {
+  it('R52 sin filtro activo el chip es punteado, lleva el icono de añadir oculto al lector y mide al menos 44 px', () => {
     renderFilters()
 
-    expect(screen.getByTestId('data-table-filter-nombre')).toBeInTheDocument()
-    expect(screen.getByTestId('data-table-filter-min-cantidad')).toBeInTheDocument()
-    expect(screen.getByTestId('data-table-filter-max-cantidad')).toBeInTheDocument()
-    expect(screen.getByTestId('data-table-filter-estado')).toBeInTheDocument()
-    expect(screen.getByTestId('data-table-filter-date-creado')).toBeInTheDocument()
+    for (const testId of Object.values(CHIPS)) {
+      const chip = screen.getByTestId(testId)
+      expect(chip.className).toMatch(/\bborder-dashed\b/)
+      expect(chip.className).toMatch(/\bmin-h-11\b/)
+      expect(chip.className).toMatch(/\bmin-w-11\b/)
+      const icono = chip.querySelector('svg')
+      expect(icono).not.toBeNull()
+      expect(icono).toHaveAttribute('aria-hidden', 'true')
+    }
+  })
+
+  it('R52 los campos de text y numberRange no están en la barra hasta abrir su chip', () => {
+    renderFilters()
+
+    expect(screen.queryByTestId('data-table-filter-nombre')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('data-table-filter-min-cantidad')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('data-table-filter-max-cantidad')).not.toBeInTheDocument()
   })
 })
 
-describe('DataTableFilters: un test por forma, afirmando el DataTableFilterValue emitido (R16)', () => {
-  it('forma "text": escribir en el campo emite { kind: "text", value }', async () => {
+describe('DataTableFilters: pulsar un chip abre su control y emite igual que antes (R53)', () => {
+  it('R53 text: el chip abre un campo y escribir emite { kind: "text", value }', async () => {
     const user = setupUser()
     const { onParamsChange, params } = renderFilters()
 
-    // Sin rebote (a diferencia de la busqueda global, R17): cada pulsacion emite de inmediato.
-    // Como el campo es controlado por `params` y este test no lo re-alimenta entre pulsaciones,
-    // se afirma sobre UNA sola tecla en vez de una palabra completa.
-    await user.type(screen.getByTestId('data-table-filter-nombre'), 'a')
+    await user.click(screen.getByTestId(CHIPS.nombre))
+    // Campo controlado por `params`: sin re-alimentarlo, se afirma sobre una sola tecla.
+    await user.type(await esperarInteractiva(await screen.findByTestId('data-table-filter-nombre')), 'a')
 
-    const emitido = onParamsChange.mock.calls.at(-1)?.[0] as DataTableParams
-    expect(emitido.filters.nombre).toEqual({ kind: 'text', value: 'a' })
-    expect(emitido).toEqual(withFilter(params, 'nombre', { kind: 'text', value: 'a' }))
+    expect(ultimaEmision(onParamsChange)).toEqual(withFilter(params, 'nombre', { kind: 'text', value: 'a' }))
   })
 
-  it('forma "numberRange": min y max emiten { kind: "numberRange", min, max }', async () => {
+  it('R53 text: vaciar el campo saca la clave del filtro', async () => {
+    const user = setupUser()
+    const params = withFilter(createDefaultParams(), 'nombre', { kind: 'text', value: 'a' })
+    const { onParamsChange } = renderFilters({ params })
+
+    await user.click(screen.getByTestId(CHIPS.nombre))
+    await user.clear(await esperarInteractiva(await screen.findByTestId('data-table-filter-nombre')))
+
+    expect(ultimaEmision(onParamsChange).filters).toEqual({})
+  })
+
+  it('R53 numberRange: el chip abre mínimo y máximo, y cada uno emite { kind: "numberRange", min, max }', async () => {
     const user = setupUser()
     const { onParamsChange } = renderFilters()
 
-    await user.type(screen.getByTestId('data-table-filter-min-cantidad'), '5')
+    await user.click(screen.getByTestId(CHIPS.cantidad))
+    await user.type(await esperarInteractiva(await screen.findByTestId('data-table-filter-min-cantidad')), '5')
+    expect(ultimaEmision(onParamsChange).filters.cantidad).toEqual({ kind: 'numberRange', min: 5, max: null })
 
-    const trasMin = onParamsChange.mock.calls.at(-1)?.[0] as DataTableParams
-    expect(trasMin.filters.cantidad).toEqual({ kind: 'numberRange', min: 5, max: null })
+    await user.type(screen.getByTestId('data-table-filter-max-cantidad'), '9')
+    expect(ultimaEmision(onParamsChange).filters.cantidad).toEqual({ kind: 'numberRange', min: null, max: 9 })
   })
 
-  it('forma "select": marcar una opcion emite { kind: "select", values }', async () => {
+  it('R53 numberRange: vaciar los dos extremos saca la clave del filtro', async () => {
+    const user = setupUser()
+    const params = withFilter(createDefaultParams(), 'cantidad', { kind: 'numberRange', min: 5, max: null })
+    const { onParamsChange } = renderFilters({ params })
+
+    await user.click(screen.getByTestId(CHIPS.cantidad))
+    await user.clear(await esperarInteractiva(await screen.findByTestId('data-table-filter-min-cantidad')))
+
+    expect(ultimaEmision(onParamsChange).filters).toEqual({})
+  })
+
+  it('R53 select: el chip abre la lista de casillas y marcar una emite { kind: "select", values }', async () => {
     const user = setupUser()
     const { onParamsChange } = renderFilters()
 
-    // `fireEvent.click` (no `userEvent.click`): el menu de Base UI, en jsdom, no abre con la
-    // primera secuencia realista de puntero cuando ya hay otros popups (Popover del filtro de
-    // fecha) montados en el arbol -es un artefacto del entorno de pruebas, no del navegador
-    // real-; un `click` sintetico simple si lo abre de forma fiable.
-    fireEvent.click(screen.getByTestId('data-table-filter-estado'))
-    await user.click(await esperarInteractiva(screen.getByTestId('data-table-filter-option-estado-activo')))
+    // Con otros popups montados, el menú de Base UI en jsdom solo abre fiable con un click sintético.
+    fireEvent.click(screen.getByTestId(CHIPS.estado))
+    await user.click(await esperarInteractiva(await screen.findByTestId('data-table-filter-option-estado-activo')))
 
-    const ultima = onParamsChange.mock.calls.at(-1)?.[0] as DataTableParams
-    expect(ultima.filters.estado).toEqual({ kind: 'select', values: ['activo'] })
+    expect(ultimaEmision(onParamsChange).filters.estado).toEqual({ kind: 'select', values: ['activo'] })
   })
 
-  it('forma "dateRange": un atajo del filtro de fecha emite { kind: "dateRange", from, to }', async () => {
+  it('R53 dateRange: el chip abre el calendario con atajos y un atajo emite { kind: "dateRange", from, to }', async () => {
     const user = setupUser()
     const { onParamsChange } = renderFilters()
 
-    await user.click(screen.getByTestId('data-table-filter-date-creado'))
-    await user.click(await esperarInteractiva(screen.getByTestId('data-table-date-last-week')))
+    await user.click(screen.getByTestId(CHIPS.creado))
+    await user.click(await esperarInteractiva(await screen.findByTestId('data-table-date-last-week')))
 
-    const ultima = onParamsChange.mock.calls.at(-1)?.[0] as DataTableParams
-    expect(ultima.filters.creado?.kind).toBe('dateRange')
-    if (ultima.filters.creado?.kind === 'dateRange') {
-      expect(ultima.filters.creado.from).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-      expect(ultima.filters.creado.to).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    const creado = ultimaEmision(onParamsChange).filters.creado
+    expect(creado?.kind).toBe('dateRange')
+    if (creado?.kind === 'dateRange') {
+      expect(creado.from).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(creado.to).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     }
   })
 })
 
-describe('DataTableFilters: limpiar SACA la clave del objeto en vez de emitirla vacia (R16)', () => {
-  it('el boton de limpiar de un filtro activo saca su clave de `filters`', async () => {
-    const user = setupUser()
-    const conFiltro = withFilter(createDefaultParams(), 'nombre', { kind: 'text', value: 'acido' })
-    const { onParamsChange } = renderFilters({ params: conFiltro })
+describe('DataTableFilters: chip activo (R54, R55)', () => {
+  it('R54 con filtro activo el chip es sólido y primario, sin icono de añadir, con el valor en peso 600', () => {
+    renderFilters({ params: conTodosActivos() })
 
-    await user.click(screen.getByTestId('data-table-filter-clear-nombre'))
-
-    expect(onParamsChange).toHaveBeenCalledTimes(1)
-    const emitido = onParamsChange.mock.calls[0]?.[0] as DataTableParams
-    expect(Object.prototype.hasOwnProperty.call(emitido.filters, 'nombre')).toBe(false)
-    expect(emitido.filters).toEqual({})
+    for (const testId of Object.values(CHIPS)) {
+      const chip = screen.getByTestId(testId)
+      expect(chip.className).toMatch(/\bborder-solid\b/)
+      expect(chip.className).toMatch(/\bborder-primary\b/)
+      expect(chip.className).toMatch(/\btext-primary\b/)
+      expect(chip.className).not.toMatch(/\bborder-dashed\b/)
+      expect(chip.querySelector('svg')).toBeNull()
+      const valor = chip.querySelector('span.font-semibold')
+      expect(valor).not.toBeNull()
+      expect(valor?.className).toMatch(/\bborder-l\b/)
+    }
   })
 
-  it('limpiar un filtro no toca los demas filtros activos', async () => {
+  it('R54 R55 el nombre accesible del chip incluye la etiqueta y el valor', () => {
+    renderFilters({ params: conTodosActivos() })
+
+    expect(screen.getByTestId(CHIPS.nombre)).toHaveAccessibleName('Nombre acido')
+    expect(screen.getByTestId(CHIPS.cantidad)).toHaveAccessibleName('Cantidad 1 – 10')
+    expect(screen.getByTestId(CHIPS.estado)).toHaveAccessibleName('Estado Activo +1')
+    expect(screen.getByTestId(CHIPS.creado)).toHaveAccessibleName('Creado 2026-01-01 – 2026-01-31')
+  })
+})
+
+describe('DataTableFilters: quitar un filtro (R57)', () => {
+  it('R57 sin filtro activo no existe el botón de quitar ese filtro', () => {
+    renderFilters()
+
+    for (const columna of Object.keys(CHIPS)) {
+      expect(screen.queryByTestId(`data-table-filter-clear-${columna}`)).not.toBeInTheDocument()
+    }
+  })
+
+  it('R57 con filtro activo el botón existe, mide 44 × 44 y lleva el nombre de quitar filtro', () => {
+    renderFilters({ params: conTodosActivos() })
+
+    for (const columna of Object.keys(CHIPS)) {
+      const boton = screen.getByTestId(`data-table-filter-clear-${columna}`)
+      expect(boton).toHaveAccessibleName(texts.clearFilter)
+      expect(boton.className).toMatch(/\bmin-h-11\b/)
+      expect(boton.className).toMatch(/\bmin-w-11\b/)
+    }
+  })
+
+  it('R57 pulsarlo saca solo la clave de ese filtro', async () => {
     const user = setupUser()
     const conDos = withFilter(
       withFilter(createDefaultParams(), 'nombre', { kind: 'text', value: 'acido' }),
@@ -178,10 +274,79 @@ describe('DataTableFilters: limpiar SACA la clave del objeto en vez de emitirla 
     )
     const { onParamsChange } = renderFilters({ params: conDos })
 
+    expect(screen.queryByTestId('data-table-filter-clear-estado')).not.toBeInTheDocument()
     await user.click(screen.getByTestId('data-table-filter-clear-nombre'))
 
-    const emitido = onParamsChange.mock.calls[0]?.[0] as DataTableParams
-    expect(emitido.filters).toEqual({ cantidad: { kind: 'numberRange', min: 1, max: 10 } })
+    expect(onParamsChange).toHaveBeenCalledTimes(1)
+    expect(ultimaEmision(onParamsChange).filters).toEqual({ cantidad: { kind: 'numberRange', min: 1, max: 10 } })
+  })
+})
+
+describe('DataTableFilters: «Limpiar filtros» (R56)', () => {
+  it('R56 sin filtros activos el botón no existe', () => {
+    renderFilters({ params: withSearch(createDefaultParams(), 'acido') })
+
+    expect(screen.queryByTestId('data-table-clear-filters')).not.toBeInTheDocument()
+  })
+
+  it('R56 con algún filtro activo aparece al final de la barra de chips', () => {
+    renderFilters({ params: withFilter(createDefaultParams(), 'estado', { kind: 'select', values: ['activo'] }) })
+
+    const boton = screen.getByTestId('data-table-clear-filters')
+    expect(screen.getByTestId('data-table-chips').lastElementChild).toBe(boton)
+    expect(boton.className).toMatch(/\bmin-h-11\b/)
+  })
+
+  it('R56 pulsarlo quita todos los filtros en una emisión y conserva búsqueda, orden y tamaño de página', async () => {
+    const user = setupUser()
+    const params = { ...withSort(withSearch(conTodosActivos(), 'acido'), { columnId: 'nombre', direction: 'asc' }), page: 3, pageSize: 25 } as DataTableParams
+    const { onParamsChange } = renderFilters({ params })
+
+    await user.click(screen.getByTestId('data-table-clear-filters'))
+
+    expect(onParamsChange).toHaveBeenCalledTimes(1)
+    const emitido = ultimaEmision(onParamsChange)
+    expect(emitido).toEqual(withoutFilters(params))
+    expect(emitido.filters).toEqual({})
+    expect(emitido.search).toBe(params.search)
+    expect(emitido.sort).toEqual(params.sort)
+    expect(emitido.pageSize).toBe(params.pageSize)
+  })
+
+  it('R56 usa texts.clearFilters cuando llega', () => {
+    renderFilters({
+      params: withFilter(createDefaultParams(), 'nombre', { kind: 'text', value: 'a' }),
+      texts: { ...texts, clearFilters: 'quitar-todo' },
+    })
+
+    expect(screen.getByTestId('data-table-clear-filters')).toHaveTextContent('quitar-todo')
+  })
+})
+
+describe('DataTableFilters: contenedor estrecho y velo (R58)', () => {
+  it('R58 la barra es contenedor y, a 760 px o menos, la búsqueda y la fila de chips ocupan todo el ancho y parten línea', () => {
+    renderFilters()
+
+    const barra = screen.getByTestId('data-table-filters')
+    expect(barra.className).toMatch(/@container/)
+    expect(barra.className).toMatch(/\bflex-wrap\b/)
+
+    const chips = screen.getByTestId('data-table-chips')
+    expect(chips.className).toMatch(/@max-\[760px\]:basis-full/)
+    expect(chips.className).toMatch(/\bflex-wrap\b/)
+
+    const envoltorioBusqueda = screen.getByTestId('data-table-search').parentElement
+    expect(envoltorioBusqueda?.className).toMatch(/@max-\[760px\]:basis-full/)
+  })
+
+  it('R58 el chip usa el velo que solo se aplica con puntero que puede pasar por encima', () => {
+    renderFilters()
+
+    for (const testId of Object.values(CHIPS)) {
+      const chip = screen.getByTestId(testId)
+      expect(chip.className).toMatch(/\bbtn-veil\b/)
+      expect(chip.className).not.toMatch(/(^|\s)hover:/)
+    }
   })
 })
 
@@ -196,13 +361,9 @@ describe('DataTableFilters: la busqueda global se emite en su propio campo, con 
     const campoBusqueda = screen.getByTestId('data-table-search')
     expect(campoBusqueda).toHaveAttribute('type', 'search')
 
-    // `fireEvent.change` en vez de `userEvent.type`: con temporizadores falseados,
-    // `userEvent`+Vitest 4 en este repo no resuelve su espera interna (cuelga el test) incluso
-    // sobre un `<input>` nativo aislado, sin relacion con este componente. `fireEvent.change`
-    // dispara el mismo evento `onChange` sin esa espera.
+    // Con temporizadores falseados, `userEvent` cuelga en este repo; `fireEvent.change` no.
     fireEvent.change(campoBusqueda, { target: { value: 'acido' } })
 
-    // Antes del rebote, no se emitio nada todavia.
     expect(onParamsChange).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS)
@@ -243,10 +404,6 @@ describe('DataTableFilters: objetivos tactiles minimos (R27)', () => {
   })
 })
 
-/**
- * QC-35 T4 (`design.md > 6.2`, R20): la prop `searchable`. Casos NUEVOS; ningun test previo de
- * este archivo cambia, porque el defecto de la prop es el comportamiento de siempre.
- */
 describe('DataTableFilters: campo de busqueda opcional (QC-35 R20)', () => {
   it('con `searchable={false}` el campo de busqueda NO existe en el DOM', () => {
     render(
@@ -273,8 +430,8 @@ describe('DataTableFilters: campo de busqueda opcional (QC-35 R20)', () => {
       />,
     )
 
-    expect(screen.getByTestId('data-table-filter-nombre')).toBeInTheDocument()
-    expect(screen.getByTestId('data-table-filter-estado')).toBeInTheDocument()
+    expect(screen.getByTestId(CHIPS.nombre)).toBeInTheDocument()
+    expect(screen.getByTestId(CHIPS.estado)).toBeInTheDocument()
   })
 
   it('sin la prop, el campo de busqueda SI existe (ausente = true, comportamiento de siempre)', () => {

@@ -7,6 +7,7 @@ import { DatePicker } from '@/components/shared/date-picker';
 import { Button } from '@/components/ui/button';
 import { formatDateLocalISO, parseDateLocalISO } from '@/lib/shared/ui/date-civil';
 
+import { DataTableFilterChip, formatFilterChipValue } from './data-table-filter-chip';
 import type { DataTableFilterValue, DataTableTexts } from './data-table-types';
 
 /**
@@ -143,7 +144,7 @@ export function DataTableFilterDate({ columnId, label, value, texts, onChange }:
   return (
     <DatePicker
       mode="range"
-      triggerContent={label}
+      trigger={<DataTableFilterChip label={label} value={formatFilterChipValue({ kind: 'dateRange' }, value)} />}
       triggerTestId={`data-table-filter-date-${columnId}`}
       numberOfMonths={numberOfMonths}
       selected={selectedRange}

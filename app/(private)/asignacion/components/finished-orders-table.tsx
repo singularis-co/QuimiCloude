@@ -5,12 +5,9 @@ import { useMemo, useTransition } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
-import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 
-import { PAGE_PARAM, PAGE_SIZE_PARAM, VIEW_PARAM } from './assignment-view-params';
-import {
-  buildFinishedOrdersColumns,
-} from './finished-orders-columns';
+import { assignedOrdersListHref } from './assigned-orders-list-params';
+import { FINISHED_ORDERS_CARD, buildFinishedOrdersColumns } from './finished-orders-columns';
 
 export const FINISHED_ORDERS_TABLE_ID = 'asignacion-terminados';
 
@@ -37,25 +34,22 @@ export const FINISHED_ORDERS_TABLE_TEXTS: DataTableTexts = {
   lastYear: 'Último año',
 };
 
-/** Pagina «Terminados» sin perder la vista vigente (`?vista=terminados`). No hay filtro que llevar. */
-export function finishedOrdersHref(params: Pick<DataTableParams, 'page' | 'pageSize'>): string {
-  const query = new URLSearchParams();
-  query.set(PAGE_PARAM, String(params.page));
-  query.set(PAGE_SIZE_PARAM, String(params.pageSize));
-  query.set(VIEW_PARAM, 'terminados');
-  return `${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`;
-}
-
 export type FinishedOrdersTableProps = {
   readonly rows: readonly FinishedOrderView[];
   readonly params: DataTableParams;
   readonly totalPages: number;
+  readonly canViewTrace?: boolean;
 };
 
-export function FinishedOrdersTable({ rows, params, totalPages }: FinishedOrdersTableProps) {
+export function FinishedOrdersTable({
+  rows,
+  params,
+  totalPages,
+  canViewTrace = false,
+}: FinishedOrdersTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const columns = useMemo(() => buildFinishedOrdersColumns(), []);
+  const columns = useMemo(() => buildFinishedOrdersColumns({ canViewTrace }), [canViewTrace]);
 
   const navigate = (href: string) => {
     startTransition(() => {
@@ -79,10 +73,11 @@ export function FinishedOrdersTable({ rows, params, totalPages }: FinishedOrders
         getRowId={(order) => order.id}
         params={params}
         totalPages={totalPages}
-        onParamsChange={(next) => navigate(finishedOrdersHref(next))}
+        onParamsChange={(next) => navigate(assignedOrdersListHref(next, 'terminados'))}
         status="idle"
         texts={FINISHED_ORDERS_TABLE_TEXTS}
         searchable={false}
+        card={FINISHED_ORDERS_CARD}
       />
     </div>
   );

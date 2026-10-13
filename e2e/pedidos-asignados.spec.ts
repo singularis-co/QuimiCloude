@@ -35,6 +35,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
@@ -136,7 +137,7 @@ function rowByNumber(page: Page, numberText: string): Locator {
 async function createUser(user: Credentials, roleId: string): Promise<string> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames,
       lastNames: LAST_NAMES_BY_USERNAME[user.username] ?? 'Fixture',
@@ -435,8 +436,6 @@ const ASSIGNED_ORDERS_TABLE_TESTID = 'assigned-orders-table';
 const ASSIGNED_ORDERS_EMPTY_TESTID = 'assigned-orders-empty';
 const FINISHED_ORDERS_SECTION_TESTID = 'finished-orders-list-section';
 const PACKING_ORDERS_SECTION_TESTID = 'packing-orders-list-section';
-const PACKING_ORDER_ROW_TESTID = 'packing-order-row';
-const PACKING_ORDER_LINK_TESTID = 'packing-order-link';
 
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const EXECUTION_ERROR_TESTID = 'order-execution-error';
@@ -456,12 +455,22 @@ let deliveredOwn: SeededOrder | null = null;
 let deliveredOther: SeededOrder | null = null;
 let deliveredNoPacker: SeededOrder | null = null;
 
+/** La fila de «Por empacar», que es la tabla compartida dentro de su sección. */
 function packingRowByNumber(page: Page, numberText: string): Locator {
   return page
-    .getByTestId(PACKING_ORDER_ROW_TESTID)
+    .getByTestId(PACKING_ORDERS_SECTION_TESTID)
+    .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({
-      has: page.getByTestId(PACKING_ORDER_LINK_TESTID).filter({ hasText: exactText(numberText) }),
+      has: page.getByTestId(ORDER_NUMBER_CELL_TESTID).filter({ hasText: exactText(numberText) }),
     });
+}
+
+/**
+ * Lo visible de un testid de las pestañas. Van en `Suspense` con ellas mismas, sin contador, de
+ * respaldo: mientras llega el contador conviven la de respaldo y la resuelta, oculta.
+ */
+function visibleTab(page: Page, testId: string): Locator {
+  return page.getByTestId(testId).filter({ visible: true });
 }
 
 function executionLinks(page: Page, orderId: string): Locator {
@@ -493,7 +502,7 @@ async function roleIdByName(roleName: string): Promise<string> {
 async function createPackerFixtureUser(user: Credentials, roleId: string): Promise<string> {
   if (!packerCompanyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: packerFirstNames,
       lastNames: PACKER_LAST_NAMES_BY_USERNAME[user.username] ?? 'Fixture',
@@ -692,9 +701,9 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     await page.goto(assignmentViewUrl('asignados'));
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.terminados)).toBeVisible();
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.por_empacar)).toBeVisible();
+    await expect(visibleTab(page, ASSIGNMENT_VIEW_TABS_TESTID)).toBeVisible({ timeout: 60_000 });
+    await expect(visibleTab(page, ASSIGNMENT_VIEW_TAB_TESTID.terminados)).toBeVisible();
+    await expect(visibleTab(page, ASSIGNMENT_VIEW_TAB_TESTID.por_empacar)).toBeVisible();
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.asignados)).toHaveCount(0);
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.todos)).toHaveCount(0);
 

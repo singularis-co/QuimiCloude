@@ -2,8 +2,8 @@
  * E2E de las pestañas del acondicionador en `/asignacion` (R22) y de quién NO las ve (R23).
  *
  * R22 recorre con el Administrador de acondicionamiento «Por acondicionar» -un pedido con dos
- * líneas de reparto y otro que acondiciona otra persona-, el detalle con un único botón,
- * «Acondicionar», y «Terminados», que lista solo el TERMINADO que acondicionó él: ni el de otro ni un ENTREGADO suyo.
+ * líneas de reparto y otro que acondiciona otra persona-, el detalle con un único botón
+ * habilitado, «Acondicionar», y «Acondicionados», que lista solo el TERMINADO que acondicionó él: ni el de otro ni un ENTREGADO suyo.
  * R23 comprueba, con un `test` por rol, que Administrador, Operador y Empacador no ven la pestaña,
  * tampoco pidiéndola por la dirección, y que el detalle les responde 404.
  *
@@ -37,6 +37,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, conditioningOrderRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
 
@@ -118,12 +119,16 @@ const VIEW_POR_ACONDICIONAR = 'por_acondicionar';
 /** La fila de la tabla compartida y sus celdas. */
 const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
 const ORDER_NUMBER_CELL_TESTID = 'data-table-cell-orderNumber';
-const CONDITIONING_ORDER_LINK_TESTID = 'conditioning-order-link';
+/** El menú ⋯ de la fila (`assignment-row-actions.tsx`) y su ítem «Entrar». */
+const ROW_ACTIONS_TESTID = 'assignment-row-actions';
+const ROW_ENTER_TESTID = 'assignment-row-enter';
 const ORDER_DISTRIBUTION_FULL_TESTID = 'order-distribution-full';
 const ROW_STATUS_TESTID = 'conditioning-order-status';
 
-/** El detalle del pedido, `conditioning-order-screen.tsx`; su único botón es «Acondicionar». */
+/** El detalle del pedido, `conditioning-order-screen.tsx`; de su pie solo se habilita «Acondicionar». */
 const SCREEN_TESTID = 'conditioning-order-screen';
+const START_BUTTON_TESTID = 'conditioning-start-button';
+const FINISH_BUTTON_TESTID = 'conditioning-finish-button';
 const SCREEN_NUMBER_TESTID = 'conditioning-order-number';
 const SCREEN_STATUS_TESTID = 'conditioning-order-status';
 
@@ -140,6 +145,25 @@ let orders: Record<'A' | 'B' | 'C' | 'D' | 'E', SeededOrder> | null = null;
 /** Igualdad EXACTA de texto: un correlativo no puede casar con un prefijo suyo. */
 function exactText(value: string): RegExp {
   return new RegExp(`^\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
+}
+
+/** La etiqueta de una pestaña, seguida de su contador (que puede no haber llegado aún). */
+function tabLabel(label: string): RegExp {
+  return new RegExp(`^\\s*${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\d*\\s*$`);
+}
+
+/**
+ * La pestaña visible. Las pestañas van en `Suspense` con ellas mismas, sin contador, de respaldo:
+ * mientras llega el contador conviven la de respaldo y la resuelta, oculta, con el mismo testid.
+ */
+function viewTab(page: Page, testId: string): Locator {
+  return page.getByTestId(testId).filter({ visible: true });
+}
+
+/** Entra al pedido de la fila por «Entrar» de su menú ⋯. */
+async function enterFromRow(page: Page, row: Locator): Promise<void> {
+  await row.getByTestId(ROW_ACTIONS_TESTID).click();
+  await page.getByTestId(ROW_ENTER_TESTID).click();
 }
 
 function rowByNumber(page: Page, numberText: string): Locator {
@@ -163,7 +187,7 @@ function seeded(): NonNullable<typeof orders> {
 async function createUser(user: Credentials, roleId: string): Promise<string> {
   if (!companyId) throw new Error('la empresa del fixture no existe: falló el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames,
       lastNames: LAST_NAMES_BY_USERNAME[user.username] ?? 'Fixture',
@@ -372,29 +396,30 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('las pestañas del acondicionador (R22)', () => {
-  test('R22 - el acondicionador aterriza en Por acondicionar con el reparto completo y quién acondiciona, abre el detalle con solo el botón Acondicionar, y en Terminados ve solo el TERMINADO suyo', async ({
+  test('R22 - el acondicionador aterriza en Por acondicionar con el reparto completo y quién acondiciona, abre el detalle con solo el botón Acondicionar habilitado, y en Acondicionados ve solo el TERMINADO suyo', async ({
     page,
   }) => {
     const { A, B, C, D, E } = seeded();
 
-    // --- 1. Aterriza en `/asignacion` con exactamente «Por acondicionar», «Terminados» y «Entregados».
+    // --- 1. Aterriza en `/asignacion` con exactamente «Por acondicionar», «Acondicionados» y «Entregados», cada una con su contador.
     const landing = await loginAndLand(page, conditioner1User);
     expect(landing).toBe(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const tabs = page
       .getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)
-      .locator(`[data-testid^="${ASSIGNMENT_VIEW_TAB_TESTID_PREFIX}"]`);
+      .locator(`[data-testid^="${ASSIGNMENT_VIEW_TAB_TESTID_PREFIX}"]`)
+      .filter({ visible: true });
     await expect(tabs).toHaveCount(3);
     await expect(tabs.nth(0)).toHaveAttribute('data-testid', TAB_POR_ACONDICIONAR_TESTID);
-    await expect(tabs.nth(0)).toHaveText(exactText('Por acondicionar'));
+    await expect(tabs.nth(0)).toHaveText(tabLabel('Por acondicionar'));
     await expect(tabs.nth(1)).toHaveAttribute('data-testid', TAB_ACONDICIONADOS_TESTID);
-    await expect(tabs.nth(1)).toHaveText(exactText('Terminados'));
+    await expect(tabs.nth(1)).toHaveText(tabLabel('Acondicionados'));
     await expect(tabs.nth(2)).toHaveAttribute(
       'data-testid',
       `${ASSIGNMENT_VIEW_TAB_TESTID_PREFIX}acondicionados_entregados`,
     );
-    await expect(tabs.nth(2)).toHaveText(exactText('Entregados'));
+    await expect(tabs.nth(2)).toHaveText(tabLabel('Entregados'));
 
     // --- 2. «Por acondicionar»: A con su reparto entero y B con el nombre de quien lo acondiciona.
     await expect(page.getByTestId(CONDITIONING_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -422,8 +447,8 @@ test.describe('las pestañas del acondicionador (R22)', () => {
       ),
     );
 
-    // --- 3. El número de A abre el detalle: número, estado y un único botón, «Acondicionar».
-    await rowA.getByTestId(CONDITIONING_ORDER_LINK_TESTID).click();
+    // --- 3. «Entrar» del menú ⋯ de A abre el detalle: número, estado y un único botón habilitado, «Acondicionar».
+    await enterFromRow(page, rowA);
     await page.waitForURL((url) => url.pathname === conditioningOrderRoute(A.id), {
       timeout: 60_000,
     });
@@ -434,12 +459,15 @@ test.describe('las pestañas del acondicionador (R22)', () => {
       'data-status',
       'POR_ACONDICIONAR',
     );
-    await expect(screenA.locator('button')).toHaveCount(1);
-    await expect(screenA.getByRole('button')).toHaveText([exactText('Acondicionar')]);
+    // El pie pinta siempre «Acondicionar» y «Terminar» (R34): solo el primero está habilitado.
+    await expect(screenA.getByTestId(START_BUTTON_TESTID)).toHaveText(exactText('Acondicionar'));
+    await expect(screenA.getByTestId(START_BUTTON_TESTID)).toBeEnabled();
+    await expect(screenA.getByTestId(FINISH_BUTTON_TESTID)).toHaveText(exactText('Terminar'));
+    await expect(screenA.getByTestId(FINISH_BUTTON_TESTID)).toBeDisabled();
 
-    // --- 4. «Terminados»: C sí; D (de otro) y E (ENTREGADO suyo) no.
+    // --- 4. «Acondicionados»: C sí; D (de otro) y E (ENTREGADO suyo) no.
     await page.goto(ASSIGNED_ORDERS_ROUTE);
-    await page.getByTestId(TAB_ACONDICIONADOS_TESTID).click();
+    await viewTab(page, TAB_ACONDICIONADOS_TESTID).click();
     await expect(page.getByTestId(CONDITIONED_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const rowC = rowByNumber(page, C.numberText);
@@ -447,8 +475,8 @@ test.describe('las pestañas del acondicionador (R22)', () => {
     await expect(rowByNumber(page, D.numberText)).toHaveCount(0);
     await expect(rowByNumber(page, E.numberText)).toHaveCount(0);
 
-    // --- 5. El número de C abre su detalle.
-    await rowC.getByTestId(CONDITIONING_ORDER_LINK_TESTID).click();
+    // --- 5. «Entrar» del menú ⋯ de C abre su detalle.
+    await enterFromRow(page, rowC);
     await page.waitForURL((url) => url.pathname === conditioningOrderRoute(C.id), {
       timeout: 60_000,
     });

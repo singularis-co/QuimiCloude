@@ -1,6 +1,7 @@
 'use client';
 
-import { startTransition, useActionState, useId, useState, type FormEvent } from 'react';
+import { startTransition, useActionState, useEffect, useId, useState, type FormEvent } from 'react';
+import { toast } from 'sonner';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,6 @@ export const CONDITIONING_BATCH_DATA_LINE_TESTID = 'conditioning-batch-data-line
 export const CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID = 'conditioning-batch-data-provisional';
 export const CONDITIONING_BATCH_DATA_SUBMIT_TESTID = 'conditioning-batch-data-submit';
 export const CONDITIONING_BATCH_DATA_ERROR_TESTID = 'conditioning-batch-data-error';
-export const CONDITIONING_BATCH_DATA_SUCCESS_TESTID = 'conditioning-batch-data-success';
 
 /** Los nombres que lee la acción, emparejados por posición. */
 export const CONDITIONING_BATCH_DATA_FIELDS = {
@@ -68,6 +68,12 @@ export function ConditioningBatchDataForm({ orderId, lines }: ConditioningBatchD
   const errorId = `${baseId}-error`;
   const [values, setValues] = useState<LineValues[]>(() => initialValues(lines));
   const [state, formAction, isPending] = useActionState(saveConditioningBatchDataAction, INITIAL_STATE);
+
+  // Cada envío devuelve un estado nuevo: un toast por guardado, sobre el `<Toaster/>` del layout privado.
+  useEffect(() => {
+    if (state.status !== 'success') return;
+    toast.success(CONDITIONING_BATCH_DATA_TEXTS.saved);
+  }, [state]);
 
   const error = state.status === 'error' ? state : undefined;
   const culpritBatchId = error?.batchId;
@@ -191,12 +197,6 @@ export function ConditioningBatchDataForm({ orderId, lines }: ConditioningBatchD
             withDataCode
           />
         )}
-
-        {state.status === 'success' ? (
-          <p role="status" className="text-base" data-testid={CONDITIONING_BATCH_DATA_SUCCESS_TESTID}>
-            {CONDITIONING_BATCH_DATA_TEXTS.saved}
-          </p>
-        ) : null}
 
         <Button
           type="submit"

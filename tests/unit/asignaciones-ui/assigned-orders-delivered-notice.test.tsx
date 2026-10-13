@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ASSIGNED_ORDER_DELIVERED_TESTID,
-  AssignedOrderDeliveredNotice,
+  OrderOutcomeNotice,
 } from '@/app/(private)/asignacion/components';
 import AsignacionPage from '@/app/(private)/asignacion/page';
 import {
@@ -58,7 +58,7 @@ const { getSessionUserMock, listAssignedOrdersActionMock } = vi.hoisted(() => ({
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
   // `packing-orders-list-section.tsx` construye su traductor de errores al cargar el modulo -esta
-  // en el mismo barrel que `AssignedOrderDeliveredNotice`- y sin este doble la carga revienta.
+  // en el mismo barrel que `OrderOutcomeNotice`- y sin este doble la carga revienta.
   observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
 }));
 
@@ -125,14 +125,15 @@ describe('lista de pedidos asignados — R9: aviso de «por empacar» al volver 
   });
 });
 
-describe('AssignedOrderDeliveredNotice — R9: envases y producto en la confirmacion de «por empacar»', () => {
+describe('OrderOutcomeNotice kind="delivered" — R9: envases y producto en la confirmacion de «por empacar»', () => {
   afterEach(() => {
     cleanup();
   });
 
   it('con envases y producto, pinta cuantos envases enteros entraron y de que producto', () => {
     render(
-      <AssignedOrderDeliveredNotice
+      <OrderOutcomeNotice
+        kind="delivered"
         orderNumber="2026-0000007"
         packages="50"
         productName="Desengrasante industrial · Botella 1L"
@@ -146,7 +147,8 @@ describe('AssignedOrderDeliveredNotice — R9: envases y producto en la confirma
 
   it('con un solo envase, usa el singular', () => {
     render(
-      <AssignedOrderDeliveredNotice
+      <OrderOutcomeNotice
+        kind="delivered"
         orderNumber="2026-0000008"
         packages="1"
         productName="Barniz acrílico · Bidón 20L"
@@ -159,11 +161,21 @@ describe('AssignedOrderDeliveredNotice — R9: envases y producto en la confirma
   });
 
   it('sin envases ni producto -URL de antes de esta ficha-, pinta el aviso de siempre', () => {
-    render(<AssignedOrderDeliveredNotice orderNumber="2026-0000009" />);
+    render(<OrderOutcomeNotice kind="delivered" orderNumber="2026-0000009" />);
 
     expect(screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).toHaveTextContent(
       'Pedido 2026-0000009 por empacar',
     );
     expect(screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).not.toHaveTextContent('envases');
+  });
+
+  it('R13: se pinta con `Notice` en tono warning, role="status" y su testid de hoy', () => {
+    render(<OrderOutcomeNotice kind="delivered" orderNumber="2026-0000010" />);
+
+    const aviso = screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID);
+    expect(aviso).toHaveAttribute('data-slot', 'alert');
+    expect(aviso).toHaveAttribute('data-tone', 'warning');
+    expect(aviso).toHaveAttribute('role', 'status');
+    expect(aviso).toHaveTextContent('Pedido 2026-0000010 por empacar');
   });
 });

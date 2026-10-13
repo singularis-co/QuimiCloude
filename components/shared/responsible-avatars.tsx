@@ -2,6 +2,7 @@
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { avatarTone } from '@/lib/shared/ui/avatar-tone';
 import { getInitials } from '@/lib/shared/ui/initials';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
@@ -100,6 +101,7 @@ function ResponsibleAvatar({ responsible }: { readonly responsible: AvatarGroupP
           // (R21). No hay ningun elemento `img` en este arbol y no puede haberlo: no hay foto.
           <Avatar
             role="img"
+            tone={avatarTone(responsible.userId)}
             aria-label={responsible.displayName}
             data-testid={RESPONSIBLE_AVATAR_TESTID}
             data-user-id={responsible.userId}
@@ -154,7 +156,7 @@ export function ResponsibleAvatars({
                   aria-label={overflowLabel(rest.length)}
                   aria-describedby={namesId}
                   onClick={onShowAll}
-                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-full text-sm text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-full text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`}
                   data-testid={RESPONSIBLE_OVERFLOW_TESTID}
                 />
               }

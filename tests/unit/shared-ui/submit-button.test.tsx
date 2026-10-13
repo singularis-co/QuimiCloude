@@ -74,4 +74,32 @@ describe('SubmitButton compartido', () => {
     expect(screen.getByTestId(TESTID)).toHaveAttribute('aria-busy', 'false');
     expect(screen.getByTestId(TESTID)).toHaveTextContent(LABEL);
   });
+
+  it('QC-260 R12, R21 — mientras envía pinta el Spinner oculto a lectores delante del texto de pendiente', async () => {
+    let terminar!: () => void;
+    const action = () =>
+      new Promise<void>((resolve) => {
+        terminar = resolve;
+      });
+    const user = setupUser();
+    renderInForm(action);
+
+    expect(screen.getByTestId(TESTID).querySelector('svg')).toBeNull();
+
+    await user.click(screen.getByTestId(TESTID));
+
+    const boton = screen.getByTestId(TESTID);
+    const icono = boton.querySelector('svg');
+    expect(icono).not.toBeNull();
+    expect(icono).toHaveAttribute('aria-hidden', 'true');
+    expect(classesOf(icono as Element)).toContain('size-4');
+    expect(boton.firstElementChild).toBe(icono);
+    expect(boton).toHaveAccessibleName(PENDING_LABEL);
+
+    await act(async () => {
+      terminar();
+    });
+
+    expect(screen.getByTestId(TESTID).querySelector('svg')).toBeNull();
+  });
 });

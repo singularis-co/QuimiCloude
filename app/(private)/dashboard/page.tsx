@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
@@ -51,11 +53,9 @@ export default async function DashboardPage({
   const params = parseExecutionTraceListParams(await searchParams);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <h1 data-testid="dashboard-title" className="text-2xl font-semibold">
-        Dashboard
-      </h1>
+    <PageShell>
+      <PageHeader title="Dashboard" titleTestId="dashboard-title" />
       <DashboardContent params={params} />
-    </div>
+    </PageShell>
   );
 }

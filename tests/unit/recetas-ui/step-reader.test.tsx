@@ -540,16 +540,72 @@ describe('StepReader — mode="ejecucion" (rediseno de planta, 2026-09-21, fuera
     expect(screen.queryByTestId('step-reader-reason-slot')).toBeNull();
   });
 
-  it('la barra de Anterior/Siguiente queda pegada abajo del contenedor', () => {
+  it('QC-265 R25: la barra de Anterior/Siguiente queda fija al pie de la pantalla con el margen seguro', () => {
     render(
       <StepReader steps={TRES_PASOS} onFinish={vi.fn()} title="Receta de prueba" mode="ejecucion" />,
     );
 
     const barra = screen.getByTestId('step-reader-actions');
-    expect(barra.className).toContain('sticky');
+    expect(barra.className).toContain('fixed');
     expect(barra.className).toContain('bottom-0');
+    expect(barra.className).toContain('env(safe-area-inset-bottom');
     expect(within(barra).getByTestId('step-reader-previous')).toBeVisible();
     expect(within(barra).getByTestId('step-reader-next')).toBeVisible();
+    expect(screen.getByTestId('step-reader').className).toContain('env(safe-area-inset-bottom');
+  });
+
+  it('QC-265 R25: en "ejecucion" los botones van en talla xl, Anterior a 1/3 y la accion a 2/3', () => {
+    render(
+      <StepReader steps={TRES_PASOS} onFinish={vi.fn()} title="Receta de prueba" mode="ejecucion" />,
+    );
+
+    const anterior = screen.getByTestId('step-reader-previous');
+    const siguiente = screen.getByTestId('step-reader-next');
+    for (const boton of [anterior, siguiente]) {
+      expect(boton).toHaveClass('h-13', 'min-h-11', 'min-w-11', 'w-full');
+      expect(boton.className).not.toContain('min-h-16');
+    }
+    const fila = anterior.parentElement as HTMLElement;
+    expect(fila).toBe(siguiente.parentElement);
+    expect(fila.className).toContain('grid-cols-[minmax(0,1fr)_minmax(0,2fr)]');
+    expect(fila.firstElementChild).toBe(anterior);
+  });
+
+  it('QC-265 R25: en "ejecucion" Finalizar tambien va en talla xl', async () => {
+    const user = setupUser();
+    render(<StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode="ejecucion" initialStepPosition={3} />);
+    await marcarTodo(user);
+
+    expect(screen.getByTestId('step-reader-finish')).toHaveClass('h-13');
+  });
+
+  it('QC-265 R25: el motivo del bloqueo va en el pie, encima de los botones', () => {
+    render(
+      <StepReader steps={TRES_PASOS} onFinish={vi.fn()} title="Receta de prueba" mode="ejecucion" />,
+    );
+
+    const barra = screen.getByTestId('step-reader-actions');
+    const motivo = within(barra).getByTestId('step-reader-blocked-reason');
+    expect(motivo).toBeVisible();
+    expect(
+      motivo.compareDocumentPosition(within(barra).getByTestId('step-reader-previous')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('QC-265 R25: el modo "lectura" no cambia: botones de talla por defecto y sin pie fijo', () => {
+    renderReader();
+
+    const anterior = screen.getByTestId('step-reader-previous');
+    const siguiente = screen.getByTestId('step-reader-next');
+    for (const boton of [anterior, siguiente]) {
+      expect(boton).toHaveClass('h-9', 'min-h-11', 'min-w-11');
+      expect(boton).not.toHaveClass('h-13');
+      expect(boton).not.toHaveClass('w-full');
+    }
+    expect(anterior.parentElement?.className).toBe('flex flex-wrap items-center gap-2');
+    expect(screen.getByTestId('step-reader').className).toBe('flex flex-col gap-4');
+    expect(document.querySelector('.fixed')).toBeNull();
   });
 
   it('muestra un tramo de progreso por paso, con el paso actual marcado', async () => {

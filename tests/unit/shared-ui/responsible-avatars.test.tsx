@@ -25,6 +25,7 @@ import {
   responsiblesOverflowLabel,
 } from '@/components/shared/responsible-avatars';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
+import { avatarTone } from '@/lib/shared/ui/avatar-tone';
 import { getInitials } from '@/lib/shared/ui/initials';
 
 const NOMBRES = [
@@ -218,5 +219,34 @@ describe('el `+N` es un boton de 44x44 con `aria-label` y ABRE el panel (R17, R3
     // El boton los REFERENCIA: no es texto suelto que un lector de pantalla pueda no relacionar.
     expect(boton).toHaveAttribute('aria-describedby', nombres.id);
     expect(nombres).toHaveTextContent('Irene Costa');
+  });
+});
+
+describe('cada persona con su color de avatar (QC-256)', () => {
+  it('R42 — cada circulo lleva el tono que avatarTone da a su userId', () => {
+    const personas = responsables(3);
+    render(<ResponsibleAvatars responsibles={personas} />);
+
+    const circulos = screen.getAllByTestId(RESPONSIBLE_AVATAR_TESTID);
+    expect(circulos).toHaveLength(3);
+    circulos.forEach((circulo, indice) => {
+      const persona = personas[indice];
+      if (persona === undefined) throw new Error('falta la persona del circulo');
+      expect(circulo).toHaveAttribute('data-user-id', persona.userId);
+      expect(circulo).toHaveAttribute('data-tone', String(avatarTone(persona.userId)));
+    });
+  });
+
+  it('R42 — el tono depende del userId, no del nombre ni de la posicion', () => {
+    const [primera] = responsables(1);
+    if (primera === undefined) throw new Error('sin persona');
+    render(
+      <ResponsibleAvatars responsibles={[{ ...primera, displayName: 'Otro Nombre' }]} />,
+    );
+
+    expect(screen.getByTestId(RESPONSIBLE_AVATAR_TESTID)).toHaveAttribute(
+      'data-tone',
+      String(avatarTone(primera.userId)),
+    );
   });
 });

@@ -24,7 +24,7 @@ export type OrderDistributionLabelProps = {
 
 const EMPTY_TEXT = 'Sin presentación';
 
-function lineText(line: OrderDistributionLabelLine): string {
+export function orderDistributionLineText(line: OrderDistributionLabelLine): string {
   return `${line.packages} × ${line.packagingName ?? line.presentationName ?? EMPTY_MARK}`;
 }
 
@@ -40,8 +40,8 @@ export function OrderDistributionLabel({ lines }: OrderDistributionLabelProps) {
   }
 
   return (
-    <span data-testid="order-distribution" title={lines.map(lineText).join(', ')}>
-      {lineText(first)}
+    <span data-testid="order-distribution" title={lines.map(orderDistributionLineText).join(', ')}>
+      {orderDistributionLineText(first)}
       {rest.length > 0 ? ` +${rest.length}` : null}
     </span>
   );

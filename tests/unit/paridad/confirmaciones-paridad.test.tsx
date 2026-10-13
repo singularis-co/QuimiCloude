@@ -745,7 +745,11 @@ describe('paridad de confirmaciones — finalizar la ejecucion (ConfirmActionDia
 describe('paridad de confirmaciones — empaque (ConfirmActionDialog)', () => {
   it('R1 R12 — comenzar, abierto: solo el dialogo, en su portal', async () => {
     const { container } = render(
-      <PackingOrderScreen order={pedidoDeEmpaque()} actorId={EMPACADOR_ID} />,
+      <PackingOrderScreen
+        order={pedidoDeEmpaque()}
+        actorId={EMPACADOR_ID}
+        backHref="/asignacion?vista=por_empacar"
+      />,
     );
     fireEvent.click(screen.getByTestId('packing-order-start-button'));
     await screen.findByTestId('packing-order-start-dialog');
@@ -761,6 +765,7 @@ describe('paridad de confirmaciones — empaque (ConfirmActionDialog)', () => {
           packedByName: 'Empacador de Prueba',
         })}
         actorId={EMPACADOR_ID}
+        backHref="/asignacion?vista=por_empacar"
       />,
     );
     fireEvent.click(screen.getByTestId('packing-order-finish-button'));

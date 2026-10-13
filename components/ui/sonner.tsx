@@ -1,7 +1,9 @@
 "use client"
 
 import { Toaster as Sonner, type ToasterProps } from "sonner"
-import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon } from "lucide-react"
+
+import { Spinner } from "@/components/shared/spinner"
 
 // El wrapper generado leia el tema con `useTheme()` de `next-themes`. Ese paquete no forma
 // parte de este proyecto (design.md > 9.5: la decision de modo oscuro sigue abierta), asi
@@ -24,7 +26,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           <OctagonXIcon className="size-4" />
         ),
         loading: (
-          <Loader2Icon className="size-4 animate-spin" />
+          <Spinner />
         ),
       }}
       style={

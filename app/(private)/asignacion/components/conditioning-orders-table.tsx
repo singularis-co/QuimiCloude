@@ -6,8 +6,8 @@ import { useMemo, useTransition } from 'react';
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
 import type { ConditioningOrderRow } from '@/lib/modules/asignaciones';
 
-import { buildConditioningOrdersColumns } from './conditioning-orders-columns';
-import { conditioningOrdersHref } from './conditioning-orders-href';
+import { assignedOrdersListHref } from './assigned-orders-list-params';
+import { CONDITIONING_ORDERS_CARD, buildConditioningOrdersColumns } from './conditioning-orders-columns';
 
 export const CONDITIONING_ORDERS_TABLE_ID = 'asignacion-por-acondicionar';
 
@@ -38,12 +38,18 @@ export type ConditioningOrdersTableProps = {
   readonly rows: readonly ConditioningOrderRow[];
   readonly params: DataTableParams;
   readonly totalPages: number;
+  readonly canViewTrace?: boolean;
 };
 
-export function ConditioningOrdersTable({ rows, params, totalPages }: ConditioningOrdersTableProps) {
+export function ConditioningOrdersTable({
+  rows,
+  params,
+  totalPages,
+  canViewTrace = false,
+}: ConditioningOrdersTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const columns = useMemo(() => buildConditioningOrdersColumns(), []);
+  const columns = useMemo(() => buildConditioningOrdersColumns({ canViewTrace }), [canViewTrace]);
 
   const navigate = (href: string) => {
     startTransition(() => {
@@ -67,10 +73,11 @@ export function ConditioningOrdersTable({ rows, params, totalPages }: Conditioni
         getRowId={(order) => order.id}
         params={params}
         totalPages={totalPages}
-        onParamsChange={(next) => navigate(conditioningOrdersHref(next))}
+        onParamsChange={(next) => navigate(assignedOrdersListHref(next, 'por_acondicionar'))}
         status="idle"
         texts={CONDITIONING_ORDERS_TABLE_TEXTS}
         searchable={false}
+        card={CONDITIONING_ORDERS_CARD}
       />
     </div>
   );

@@ -1,18 +1,18 @@
-import { EmptyState } from '@/components/shared/empty-state';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { asignaciones, identity, observabilidad } from '@/lib/composition';
 import { AsignacionesError, type Actor } from '@/lib/modules/asignaciones';
 import { createErrorStateTranslator } from '@/lib/modules/errores';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
-import { AssignedOrdersError } from './assigned-orders-error';
+import { assignedOrdersListHref } from './assigned-orders-list-params';
+import { AssignmentListError, firstPageHrefWhenPast } from './assignment-list-parts';
 import { FIRST_PAGE } from './assignment-view-params';
 import { ConditionedOrdersTable } from './conditioned-orders-table';
-import { CONDITIONING_ORDERS_FIRST_PAGE_TEXT, CONDITIONING_ORDERS_PAGE_PAST_END_TEXT } from './conditioning-orders-empty';
-import { deliveredConditionedOrdersHref } from './conditioning-orders-href';
+import { CONDITIONING_ORDERS_EMPTY_TEXTS, ConditioningOrdersEmpty } from './conditioning-orders-empty';
 
 export const DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID = 'delivered-conditioned-orders-list-section';
-export const DELIVERED_CONDITIONED_ORDERS_EMPTY_TEXT = 'Todavía no se ha entregado ningún pedido que acondicionaste.';
+export const DELIVERED_CONDITIONED_ORDERS_EMPTY_TEXT =
+  CONDITIONING_ORDERS_EMPTY_TEXTS.acondicionados_entregados;
 
 const toErrorState = createErrorStateTranslator(
   AsignacionesError,
@@ -38,11 +38,13 @@ async function currentActor(): Promise<Actor | null> {
 type DeliveredConditionedOrdersListSectionProps = {
   /** Ya acotados por `parseAssignmentListParams`. */
   readonly params: DataTableParams;
+  readonly canViewTrace?: boolean;
 };
 
 /** `/asignacion?vista=acondicionados_entregados`: los `ENTREGADO` que acondicionó el propio actor. */
 export async function DeliveredConditionedOrdersListSection({
   params,
+  canViewTrace = false,
 }: DeliveredConditionedOrdersListSectionProps) {
   const actor = await currentActor();
 
@@ -55,7 +57,7 @@ export async function DeliveredConditionedOrdersListSection({
   } catch (error) {
     return (
       <div data-testid={DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID}>
-        <AssignedOrdersError error={await toErrorState(error)} />
+        <AssignmentListError error={await toErrorState(error)} />
       </div>
     );
   }
@@ -63,22 +65,13 @@ export async function DeliveredConditionedOrdersListSection({
   const { items, page: currentPage, totalPages } = result;
 
   if (items.length === 0) {
-    const pastEnd = currentPage > FIRST_PAGE;
     return (
       <div data-testid={DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID}>
-        <EmptyState
-          testId="conditioning-orders-empty"
-          messageTestId="conditioning-orders-empty-message"
-          message={pastEnd ? CONDITIONING_ORDERS_PAGE_PAST_END_TEXT : DELIVERED_CONDITIONED_ORDERS_EMPTY_TEXT}
-          firstPage={
-            pastEnd
-              ? {
-                  href: deliveredConditionedOrdersHref({ ...params, page: FIRST_PAGE }),
-                  label: CONDITIONING_ORDERS_FIRST_PAGE_TEXT,
-                  testId: 'conditioning-orders-first-page',
-                }
-              : undefined
-          }
+        <ConditioningOrdersEmpty
+          list="acondicionados_entregados"
+          firstPageHref={firstPageHrefWhenPast(currentPage, FIRST_PAGE, () =>
+            assignedOrdersListHref({ ...params, page: FIRST_PAGE }, 'acondicionados_entregados'),
+          )}
         />
       </div>
     );
@@ -91,6 +84,7 @@ export async function DeliveredConditionedOrdersListSection({
         params={params}
         totalPages={totalPages}
         view="acondicionados_entregados"
+        canViewTrace={canViewTrace}
       />
     </div>
   );

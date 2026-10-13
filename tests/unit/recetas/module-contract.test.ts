@@ -313,7 +313,7 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     // de QC-26 sin que nada de QC-26 estuviera mal. El diff expresa la misma intencion y solo
     // habla de lo que esta rama cambia. Mismo criterio que el caso de R44 en
     // `tests/unit/recetas-ui/recipe-route-contract.test.ts`.
-    let diff: string[] = []
+    let diff: string[]
     try {
       const salida = execSync('git diff --name-only origin/dev...HEAD', {
         cwd: repoRoot,
@@ -324,15 +324,15 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
         .map((linea) => linea.trim())
         .filter((linea) => linea.length > 0)
     } catch {
-      // El rango no esta disponible: `diff` queda vacio a proposito para que la asercion de
-      // abajo ponga el caso ROJO diciendolo, nunca verde en silencio.
-      diff = []
+      // El rango no esta disponible: el caso cae ROJO diciendolo, nunca verde en silencio.
+      expect.fail('el rango git origin/dev...HEAD no estaba disponible: este caso no ha comprobado nada')
     }
 
-    expect(
-      diff.length,
-      'el rango git origin/dev...HEAD no estaba disponible: este caso no ha comprobado nada',
-    ).toBeGreaterThan(0)
+    // Un diff vacio -el PR a produccion, o un checkout de dev- significa que la rama no cambia
+    // nada respecto a dev: no hay nada que vigilar.
+    if (diff.length === 0) {
+      return
+    }
     // ACTUALIZADO 2026-09-04 (QC-34, T10): la lista permitida deja de estar VACIA y pasa a
     // tener exactamente TRES entradas, y no es un aflojamiento. QC-34 necesita el nombre de la
     // receta de un pedido, incluida la dada de baja (R43, R44), y QC-33 R32 le prohibe

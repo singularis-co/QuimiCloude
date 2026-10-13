@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setupUser } from '../../helpers/user-event';
 
@@ -8,7 +9,6 @@ import {
   CONDITIONING_BATCH_DATA_LINE_TESTID,
   CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
-  CONDITIONING_BATCH_DATA_SUCCESS_TESTID,
   CONDITIONING_BATCH_DATA_TEXTS,
   ConditioningBatchDataForm,
   type ConditioningBatchFormLine,
@@ -26,8 +26,18 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions'
   saveConditioningBatchDataAction: saveActionMock,
 }));
 
+let toastExito: ReturnType<typeof vi.spyOn>;
+let toastError: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+  toastExito = vi.spyOn(toast, 'success');
+  toastError = vi.spyOn(toast, 'error');
+});
+
 afterEach(() => {
   cleanup();
+  toast.dismiss();
+  vi.restoreAllMocks();
   vi.resetAllMocks();
 });
 
@@ -167,7 +177,7 @@ describe('la sección «Datos de lote»', () => {
 });
 
 describe('guardar', () => {
-  it('R1: envía orderId y las cuatro listas emparejadas por posición, y confirma en role="status"', async () => {
+  it('R1 R40: envía orderId y las cuatro listas emparejadas por posición, y confirma con un solo toast', async () => {
     saveActionMock.mockResolvedValue({ status: 'success' });
     const user = setupUser();
     pintar();
@@ -187,9 +197,28 @@ describe('guardar', () => {
     expect(enviado?.getAll('lot')).toEqual(['CR-2610-A', 'CR-2610-B']);
     expect(enviado?.getAll('expiryDate')).toEqual(['2027-10-01', '2027-11-01']);
     expect(enviado?.getAll('productionDate')).toEqual(['2026-10-01', '2026-10-02']);
-    const exito = await screen.findByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID);
-    expect(exito).toHaveAttribute('role', 'status');
-    expect(exito).toHaveTextContent('Datos de lote guardados.');
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
+    expect(toastExito).toHaveBeenCalledWith('Datos de lote guardados.');
+    expect(screen.queryByText('Datos de lote guardados.')).toBeNull();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('R40: un toast por envío; volver a pintar sin enviar no repite el aviso', async () => {
+    saveActionMock
+      .mockResolvedValueOnce({ status: 'success' })
+      .mockResolvedValueOnce({ status: 'success' });
+    const user = setupUser();
+    const { rerender } = pintar();
+
+    await user.click(screen.getByRole('button', { name: 'Guardar datos de lote' }));
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
+
+    rerender(<ConditioningBatchDataForm orderId={ORDER_ID} lines={[WITH_DATA, WITHOUT_DATA]} />);
+    expect(toastExito).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Guardar datos de lote' }));
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(2));
+    expect(saveActionMock).toHaveBeenCalledTimes(2);
   });
 
   it('R5: si falla, muestra el mensaje en role="alert", marca aria-invalid la línea culpable y conserva lo escrito', async () => {
@@ -227,7 +256,8 @@ describe('guardar', () => {
       '2027-11-01',
       '2026-10-02',
     ]);
-    expect(screen.queryByTestId(CONDITIONING_BATCH_DATA_SUCCESS_TESTID)).toBeNull();
+    expect(toastExito).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
   });
 
   it('R5: un error sin línea culpable va a role="alert" sin marcar ningún bloque', async () => {
@@ -243,5 +273,7 @@ describe('guardar', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No se encontro el pedido.');
     for (const bloque of bloques()) expect(bloque).not.toHaveAttribute('aria-invalid');
+    expect(toastExito).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
   });
 });

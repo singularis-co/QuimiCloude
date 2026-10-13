@@ -3,7 +3,7 @@
 //
 // `listFinishedOrdersAction` esta mockeada: es el borde del modulo `asignaciones`, y sustituirla
 // es lo unico que permite ejercitar error, vacio y lista sin base de datos.
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -104,7 +104,8 @@ describe('con pedidos, pinta la tabla y no el estado vacio', () => {
     render(await FinishedOrdersListSection({ params: parametros() }));
 
     expect(screen.getByTestId('finished-orders-table')).toBeInTheDocument();
-    expect(screen.getByText('2026-000123')).toBeInTheDocument();
+    // Con tarjetas, cada celda está dos veces en el DOM: se mira la tabla.
+    expect(within(screen.getByRole('table')).getByText('2026-000123')).toBeInTheDocument();
     expect(screen.queryByTestId('finished-orders-empty')).toBeNull();
   });
 
@@ -117,7 +118,7 @@ describe('con pedidos, pinta la tabla y no el estado vacio', () => {
   });
 });
 
-describe('un error de la accion se pinta con `AssignedOrdersError`, nunca una tabla vacia', () => {
+describe('un error de la accion se pinta con `AssignmentListError`, nunca una tabla vacia', () => {
   it('pinta el estado de error', async () => {
     listFinishedOrdersActionMock.mockResolvedValue({
       status: 'error',

@@ -223,7 +223,9 @@ describe('R13 - R14 - R15 - R16 - lo que muestra el detalle', () => {
     expect(within(primero).queryByTestId('execution-trace-step-reason')).toBeNull();
     expect(within(tercero).getByTestId('execution-trace-step-person')).toHaveAccessibleName('Sin dato');
     expect(within(ultimo).getByTestId('execution-trace-step-action')).toHaveTextContent('Cancelar');
-    expect(within(ultimo).getByTestId('execution-trace-step-reason')).toHaveTextContent('Falta materia prima');
+    // ENMIENDA QC-261 (2026-10-12): el tablero `Recorrido` cambia «Motivo: {m}» por «Motivo · {m}»
+    // (QC-261 R14, design.md > 10).
+    expect(within(ultimo).getByTestId('execution-trace-step-reason')).toHaveTextContent('Motivo · Falta materia prima');
   });
 
   it('R14 - cada anotacion salvo la ultima muestra el tramo hasta la siguiente', async () => {
@@ -242,11 +244,16 @@ describe('R13 - R14 - R15 - R16 - lo que muestra el detalle', () => {
     expect(duraciones[0]).toHaveTextContent(formatTraceDuration(TRACE.duration));
   });
 
-  it('R16 - cada retroceder se marca con el texto «Vuelta atrás» y el total coincide', async () => {
+  // ENMIENDA QC-261 (2026-10-12): la marca visual de cada retroceder pasa a ser su tono, su icono y
+  // «Retroceder»; «Vuelta atrás» queda como texto `sr-only` y el retroceder se reconoce por
+  // `data-go-back` (QC-261 R15, P4, design.md > 10).
+  it('R16 - cada retroceder lleva data-go-back y el texto «Vuelta atrás» para lectores, y el total coincide', async () => {
     render(await abrir());
     const marcadas = pasos().filter((li) => li.getAttribute('data-go-back') === 'true');
     expect(marcadas).toHaveLength(1);
-    expect(within(marcadas[0]).getByTestId('execution-trace-step-go-back')).toHaveTextContent(GO_BACK_MARK);
+    const marca = within(marcadas[0]).getByTestId('execution-trace-step-go-back');
+    expect(marca).toHaveTextContent(GO_BACK_MARK);
+    expect(marca).toHaveClass('sr-only');
     expect(screen.getAllByText(GO_BACK_MARK)).toHaveLength(1);
     expect(screen.getByTestId('execution-trace-go-backs')).toHaveTextContent(String(TRACE.goBackCount));
   });

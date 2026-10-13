@@ -17,6 +17,7 @@ type CompanyOrdersListSectionProps = {
   readonly params: DataTableParams;
   /** Ya acotado por `parseStatusFilter`: vacio significa «sin filtro», los cuatro estados. */
   readonly statuses: readonly RouteOrderStatus[];
+  readonly canViewTrace?: boolean;
 };
 
 /**
@@ -24,7 +25,11 @@ type CompanyOrdersListSectionProps = {
  * estado vigente y reparte error, vacio o tabla. La accion se importa por su ruta exacta: el
  * barrel del modulo no la reexporta a proposito.
  */
-export async function CompanyOrdersListSection({ params, statuses }: CompanyOrdersListSectionProps) {
+export async function CompanyOrdersListSection({
+  params,
+  statuses,
+  canViewTrace = false,
+}: CompanyOrdersListSectionProps) {
   const result = await listCompanyOrdersAction({
     page: params.page,
     pageSize: params.pageSize,
@@ -55,7 +60,13 @@ export async function CompanyOrdersListSection({ params, statuses }: CompanyOrde
 
   return (
     <AssignmentListSectionFrame testId={COMPANY_ORDERS_SECTION_TESTID}>
-      <CompanyOrdersTable rows={items} params={params} totalPages={totalPages} statuses={statuses} />
+      <CompanyOrdersTable
+        rows={items}
+        params={params}
+        totalPages={totalPages}
+        statuses={statuses}
+        canViewTrace={canViewTrace}
+      />
     </AssignmentListSectionFrame>
   );
 }
