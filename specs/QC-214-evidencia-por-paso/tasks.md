@@ -92,7 +92,7 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
 
 ## Bloque D — UI (depende de B y C)
 
-- [ ] **T15. `components/ui/switch.tsx`** [P] (R1). Sobre `@base-ui/react` Switch, medidas y
+- [x] **T15. `components/ui/switch.tsx`** [P] (R1). Sobre `@base-ui/react` Switch, medidas y
   animación de `FormulaEvidenciaMovil.dc.html`; fila nueva en `CATALOGO.md` con su tablero.
   *Hecho:* `tests/unit/shared-ui/switch.test.tsx` (`role="switch"`, `aria-checked`, teclado,
   deshabilitado); guardia del catálogo verde.
