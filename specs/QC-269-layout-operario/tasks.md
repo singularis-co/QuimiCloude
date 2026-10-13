@@ -72,7 +72,7 @@ los prueba en navegador. La 3 es el cierre. Cada tanda termina con `./init.sh` e
 - [x] **T3b. Ficha aparte para P1**, si P1 se queda en su defecto. El leader la abre en el board:
   «Alinear la cabecera de `DataTable` con su columna (`end` y `center`)», con la causa de
   `requirements.md > P1`. *Hecho:* la key nueva queda citada en `progress/features/QC-269.md`.
-- [ ] **T3c. Gate.** *Hecho:* `./init.sh` en verde y `./init.sh --completo` en verde antes del PR.
+- [x] **T3c. Gate.** *Hecho:* `./init.sh` en verde y `./init.sh --completo` en verde antes del PR.
 
 ## Trazabilidad R → test
 
