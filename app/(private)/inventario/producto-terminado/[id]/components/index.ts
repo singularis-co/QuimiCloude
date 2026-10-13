@@ -1,4 +1,22 @@
 // Sin la directiva de cliente: la frontera la declara cada componente, no el barrel.
+export {
+  FINISHED_PRODUCT_BATCHES_TABLE_ID,
+  FinishedProductBatchesTable,
+  WITHOUT_ORDER_LABEL,
+  type FinishedProductBatchesTableProps,
+} from './finished-product-batches-table';
+export {
+  FINISHED_PRODUCT_COSTS_TABLE_ID,
+  FinishedProductCostsTable,
+  type FinishedProductCostsTableProps,
+} from './finished-product-costs-table';
+export {
+  DELETED_CUSTOMER_LABEL,
+  FINISHED_PRODUCT_DELIVERIES_TABLE_ID,
+  FinishedProductDeliveriesTable,
+  VOIDED_DELIVERY_LABEL,
+  type FinishedProductDeliveriesTableProps,
+} from './finished-product-deliveries-table';
 export { FinishedProductGeneral, type FinishedProductGeneralProps } from './finished-product-general';
 export { FinishedProductHeader, type FinishedProductHeaderProps } from './finished-product-header';
 export {
@@ -7,6 +25,13 @@ export {
   finishedProductListErrorTestId,
   type FinishedProductListSectionProps,
 } from './finished-product-list-section';
+export {
+  FINISHED_PRODUCT_MOVEMENT_KIND_LABELS,
+  FinishedProductMovementsTable,
+  movementDateText,
+  type FinishedProductMovementsTab,
+  type FinishedProductMovementsTableProps,
+} from './finished-product-movements-table';
 export {
   FinishedProductNotFound,
   type FinishedProductNotFoundProps,

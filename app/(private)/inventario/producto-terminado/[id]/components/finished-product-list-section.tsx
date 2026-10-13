@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 
+import { movementReasonLabel } from '@/app/(private)/inventario/components';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
-import type { Page } from '@/lib/modules/inventario';
+import { MOVEMENT_REASONS, type MovementReason, type Page } from '@/lib/modules/inventario';
 import {
   listFinishedProductBatchesAction,
   listFinishedProductCostsAction,
@@ -11,6 +12,10 @@ import {
   listFinishedProductMovementsAction,
 } from '@/lib/modules/inventario/adapters/driving/finished-product-actions';
 
+import { FinishedProductBatchesTable } from './finished-product-batches-table';
+import { FinishedProductCostsTable } from './finished-product-costs-table';
+import { FinishedProductDeliveriesTable } from './finished-product-deliveries-table';
+import { FinishedProductMovementsTable } from './finished-product-movements-table';
 import {
   finishedProductPageHref,
   type FinishedProductListTab,
@@ -32,6 +37,10 @@ const ERROR_TITLES: Readonly<Record<FinishedProductListTab, string>> = {
   entregas: 'No se pudieron cargar las entregas.',
   costo: 'No se pudo cargar el costo de producción.',
 };
+
+const REASON_LABELS = Object.fromEntries(
+  MOVEMENT_REASONS.map((reason) => [reason, movementReasonLabel(reason)]),
+) as Readonly<Record<MovementReason, string>>;
 
 export function finishedProductListEmptyTestId(tab: FinishedProductListTab): string {
   return `finished-product-${tab}-empty`;
@@ -114,12 +123,14 @@ function dispatch<P extends Page<unknown>>(
 
 /** Pide solo el listado del tab activo. */
 export async function FinishedProductListSection(props: FinishedProductListSectionProps) {
-  const { productId, tab, paging } = props;
+  const { productId, tab, paging, unitLabel } = props;
   const input = { page: paging.page, pageSize: paging.pageSize };
 
   switch (tab) {
     case 'lotes':
-      return dispatch(props, await listFinishedProductBatchesAction(productId, input), () => null);
+      return dispatch(props, await listFinishedProductBatchesAction(productId, input), (page) => (
+        <FinishedProductBatchesTable productId={productId} page={page} unitLabel={unitLabel} />
+      ));
     case 'entradas':
     case 'salidas':
       return dispatch(
@@ -128,11 +139,23 @@ export async function FinishedProductListSection(props: FinishedProductListSecti
           ...input,
           direction: tab === 'entradas' ? 'in' : 'out',
         }),
-        () => null,
+        (page) => (
+          <FinishedProductMovementsTable
+            productId={productId}
+            tab={tab}
+            page={page}
+            unitLabel={unitLabel}
+            reasonLabels={REASON_LABELS}
+          />
+        ),
       );
     case 'entregas':
-      return dispatch(props, await listFinishedProductDeliveriesAction(productId, input), () => null);
+      return dispatch(props, await listFinishedProductDeliveriesAction(productId, input), (page) => (
+        <FinishedProductDeliveriesTable productId={productId} page={page} unitLabel={unitLabel} />
+      ));
     case 'costo':
-      return dispatch(props, await listFinishedProductCostsAction(productId, input), () => null);
+      return dispatch(props, await listFinishedProductCostsAction(productId, input), (page) => (
+        <FinishedProductCostsTable productId={productId} page={page} unitLabel={unitLabel} />
+      ));
   }
 }
