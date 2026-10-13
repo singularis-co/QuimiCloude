@@ -207,7 +207,7 @@ Archivos:
 
 Trabaja contra las actions mockeadas y `tests/fixtures/order-delivery-void.ts`. No toca `lib/`.
 
-### [ ] F1 [P] — Acción «Entregas» en la fila
+### [x] F1 [P] — Acción «Entregas» en la fila
 Depende de: T0. Va en paralelo con F2.
 
 Archivos:
@@ -223,7 +223,7 @@ Archivos:
 **Hecho cuando:** el archivo está en verde, los tests que ya existían de `order-row-actions`,
 `order-columns` y `order-row-wiring` siguen en verde, y el gate de la tanda también.
 
-### [ ] F2 [P] — Lista reutilizable
+### [x] F2 [P] — Lista reutilizable
 Depende de: T0. Va en paralelo con F1.
 
 Archivos:
@@ -235,7 +235,7 @@ Archivos:
 **Hecho cuando:** el archivo está en verde y el componente no importa ninguna action ni
 `lib/composition`.
 
-### [ ] F3 — Sheet y diálogo
+### [x] F3 — Sheet y diálogo
 Depende de: F1 y F2.
 
 Archivos:
@@ -253,7 +253,7 @@ Archivos:
 
 **Hecho cuando:** los archivos están en verde y el gate de la tanda también.
 
-### [ ] F4 [P] — Historial del lote
+### [x] F4 [P] — Historial del lote
 Depende de: T0. Va en paralelo con F1–F3.
 
 Archivos: `tests/unit/inventario/batch-history.test.tsx`. Caso R35: un asiento `delivery_void` se
@@ -397,6 +397,8 @@ Tests, fixtures y E2E:
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `tests/integration/aislamiento.json`
 - `tests/integration/identity/identity-seed.int.test.ts`
+- `tests/integration/clientes/customers-migration.int.test.ts` (añadido 2026-10-09: el DOWN de
+  `customers` debe revertir antes las tablas de anulación; rojo de CI en el PR #196)
 - `tests/integration/identity/delivery-void-permission-migration.int.test.ts`
 - `tests/integration/inventario/finished-goods-return.int.test.ts`
 - `tests/integration/inventario/ledger-cuadre.int.test.ts`
