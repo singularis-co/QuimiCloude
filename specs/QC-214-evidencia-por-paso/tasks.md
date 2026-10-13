@@ -7,12 +7,12 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
 
 ## Bloque A — Datos
 
-- [ ] **T1. Flag en el paso** (R3, R4). `requiresEvidence: z.boolean().optional()` en
+- [x] **T1. Flag en el paso** (R3, R4). `requiresEvidence: z.boolean().optional()` en
   `recipeStepSchema` (`design.md > 2`).
   *Hecho:* `tests/unit/recetas/recipe-input.test.ts` cubre ausente, `true`, `false` y no booleano
   (rechazo); `tests/integration/recetas/step-evidence-flag.int.test.ts` guarda y relee el flag en
   `steps` y `packing_steps`, y en una versión lo devuelve el de su original (R6).
-- [ ] **T2. Tabla, migración y RLS** (R29–R31, R39). Modelo `OrderStepEvidence` con
+- [x] **T2. Tabla, migración y RLS** (R29–R31, R39). Modelo `OrderStepEvidence` con
   `/// @module asignaciones`, enum `EvidencePhase`, migración `20261013120000_order_step_evidence`
   con CHECK, FK compuestas, RLS forzada y `down.sql` (`design.md > 3`).
   *Hecho:* `pnpm run db:migrate` y `pnpm run db:rollback` limpios;
