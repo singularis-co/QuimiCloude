@@ -34,7 +34,8 @@ import type {
  * objeto en vez de emitirla vacia (R16, via `withFilter`).
  */
 
-const FIELD_TEXT = 'text-base';
+/** 16 px en todos los anchos: el primitivo baja a 14 px en `md` y los campos deben tener 16 px para que iOS no haga zoom. */
+const FIELD_TEXT = 'text-base md:text-base';
 
 export type DataTableFiltersProps<TRow> = {
   readonly columns: readonly DataTableColumn<TRow>[];
