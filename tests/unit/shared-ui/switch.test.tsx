@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Switch } from '@/components/ui/switch';
@@ -32,7 +32,7 @@ describe('Switch', () => {
   });
 
   it('R1 — al pulsarlo cambia aria-checked y avisa del nuevo valor', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const onChange = vi.fn();
     render(<Controlado onChange={onChange} />);
     const control = screen.getByRole('switch', { name: 'Requiere evidencia' });
@@ -47,7 +47,7 @@ describe('Switch', () => {
   });
 
   it('R1 — se opera con teclado: Tab lo enfoca y Espacio o Enter lo conmutan', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<Controlado />);
     const control = screen.getByRole('switch', { name: 'Requiere evidencia' });
 
@@ -62,7 +62,7 @@ describe('Switch', () => {
   });
 
   it('R1 — deshabilitado no cambia ni con el puntero ni con el teclado', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const onChange = vi.fn();
     render(
       <Switch disabled onCheckedChange={onChange}>
