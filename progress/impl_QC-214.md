@@ -129,3 +129,7 @@ R20, R22–R25, y la Server Action (T13).
    T13 escribe `warnings` en el log.
 7. La fila `EVIDENCE_E2E_DOUBLES` de la guardia de dobles entró en T12, cuando la composición ya
    elegía el doble (en T6 la guardia exigía ese cableado).
+
+### Arreglo tras `./init.sh` rápido (2026-10-13)
+
+- `a2dace42`: `recetas-constraints.int.test.ts` excluye por nombre exacto `order_step_evidence` del invariante «sin tabla de pasos» (cualquier otra tabla `%step%` sigue fallando); `pedidos/company-scope.int.test.ts` retira y restaura la FK `order_step_evidence_order_id_company_id_fkey` junto a las otras 5 dependientes de `orders_id_company_id_key`. Sin tocar migraciones. `npx vitest run --project integration` de los dos → `Test Files 2 passed (2)`, `Tests 36 passed (36)`; typecheck limpio, lint 0 errores.
