@@ -107,7 +107,7 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
   *Hecho:* casos nuevos en `tests/unit/recetas-ui/step-reader.test.tsx` (motivo extra bloquea
   Siguiente y Finalizar; prioridad del motivo de elementos pendientes; `stepRequest` navega y avisa
   a `onStepChange`); los casos existentes, sin tocar, siguen verdes.
-- [ ] **T17. `components/shared/step-evidence/`** [P] (R13, R16–R21, R24, R25).
+- [x] **T17. `components/shared/step-evidence/`** [P] (R13, R16–R21, R24, R25).
   `StepEvidence`, `upload-evidence.ts`, `EvidenceMissingDialog`, `index.ts`; fila en el catálogo
   con `EvidenciaPaso*.dc.html`.
   *Hecho:* `tests/unit/shared-ui/step-evidence.test.tsx` (estados vacío, subiendo con %, error con
