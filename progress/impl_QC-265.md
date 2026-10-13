@@ -399,3 +399,35 @@ Verificación: typecheck OK; lint 0 errores; guard 74/1017; `data-table-alcance`
 Desvíos:
 - (1) El 404 de la ejecución (R5) se provoca con el Empacador, sin `asignaciones.ejecutar`: un pedido inexistente pinta hoy el error dentro de la pantalla con respuesta 200, y es conducta anterior. Empaque y acondicionamiento usan un id aleatorio.
 - (2) La espera de animaciones del spec solo cuenta `CSSAnimation`, porque la transición de 5 s del anillo bloqueaba la medida del diálogo.
+
+## Cierre — gate completo y E2E afectados (implementer)
+
+`./init.sh --completo` (tras T8): **init OK**. 1161/1161 archivos de test y 17 347 tests en verde (141
+saltados).
+
+E2E: once specs juntos (`--workers=1`, chromium + webkit): `operario-rediseno`, `acondicionamiento`,
+`acondicionar-con-equipo`, `empaque`, `pasos-de-envasado`, `pedidos-asignados`, `pedidos-terminados`,
+`datos-de-lote-en-acondicionamiento`, `registro-ejecucion`, `envases-del-pedido` y
+`pedido-en-varias-presentaciones`.
+
+**Primera corrida: 76 pasados, 2 fallidos**, los dos de `operario-rediseno` y por fragilidad del spec,
+no de la app:
+- (1) [chromium] Pie del empaque desviado 1,17 px. La animación `screen-enter` aplica `transform` a un
+  ancestro y, mientras dura, ese ancestro es el bloque contenedor del `fixed`. El spec ahora espera a
+  que la animación termine (`waitForScreenEnterToSettle`) y la tolerancia sigue en 1 px.
+- (2) [webkit] El clic en «Cancelar pedido» pasó los 30 s: al hidratar se desmonta el ítem. Se arregla
+  con el bucle `toPass` de `registro-ejecucion`.
+
+Con `--repeat-each=3` en los dos navegadores: 102/102.
+
+**Segunda corrida de los once: 78 pasados, 0 fallidos, 0 saltados (10,0 min).** `./init.sh`: init OK.
+
+Salida (cola):
+```
+  ok 78 [webkit] › e2e\registro-ejecucion.spec.ts:384:7 › el registro de ejecucion de un pedido asignado › R40 - el Operador cancela el pedido con un motivo, vuelve a la lista con la confirmacion y el pedido queda CANCELADO con ese motivo (5.6s)
+
+  78 passed (10.0m)
+```
+
+Veredicto del implementer: T0–T8 completas, todo R1–R45 mapeado a su test (secciones de cada tanda);
+queda para el reviewer.

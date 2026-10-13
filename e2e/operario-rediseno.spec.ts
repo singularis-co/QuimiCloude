@@ -375,6 +375,28 @@ async function waitForAnimationsToSettle(locator: Locator): Promise<void> {
     .toBe(0);
 }
 
+/**
+ * Espera a que termine la entrada de pantalla (`screen-enter` en `app/globals.css`): mientras corre,
+ * un ancestro del marco lleva `transform`, que pasa a ser el bloque contenedor del pie `fixed`, y el
+ * pie se mide desplazado unos píxeles respecto al viewport. Se filtra por nombre porque otras
+ * animaciones de la pantalla (el pulso del estado) son infinitas y nunca terminan.
+ */
+async function waitForScreenEnterToSettle(page: Page): Promise<void> {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document
+            .getAnimations()
+            .filter(
+              (anim) =>
+                anim instanceof CSSAnimation && anim.animationName === 'screen-enter' && anim.playState !== 'finished',
+            ).length,
+      ),
+    )
+    .toBe(0);
+}
+
 /** En WebKit un clic antes de hidratar se pierde sin error: se repite hasta que aparece lo esperado. */
 async function clickUntilVisible(trigger: Locator, target: Locator): Promise<void> {
   await expect(async () => {
@@ -548,6 +570,7 @@ for (const frame of FRAMES) {
       await page.setViewportSize(PHONE);
       await loginAndLand(page, frame.user);
       const screen = await openScreen(page, frame.url(seededOrders), frame.screen);
+      await waitForScreenEnterToSettle(page);
 
       const header = screen.locator(OPERATOR_HEADER);
       await expect(header).toBeVisible();
@@ -759,10 +782,20 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
     });
 
     const screen = await openScreen(page, assignedOrderRoute(execRunning.id), TESTIDS.executionScreen);
+    // En WebKit el menú ⋯ puede rehacerse al hidratar y desmontar el ítem entre abrirlo y pulsarlo:
+    // se repite todo (abrir el menú si hace falta y elegir el ítem) hasta ver el diálogo, como en
+    // `e2e/registro-ejecucion.spec.ts`.
+    const actions = screen.getByTestId(TESTIDS.executionActions);
     const cancelItem = page.getByTestId('order-cancel-trigger');
-    await clickUntilVisible(screen.getByTestId(TESTIDS.executionActions), cancelItem);
-    await cancelItem.click();
-    await expect(page.getByTestId('order-cancel-dialog')).toBeVisible();
+    const cancelDialog = page.getByTestId('order-cancel-dialog');
+    await expect(async () => {
+      if ((await cancelDialog.count()) === 0) {
+        if (!(await cancelItem.isVisible())) await actions.click({ timeout: 5_000 });
+        await expect(cancelItem).toBeVisible({ timeout: 5_000 });
+        await cancelItem.click({ timeout: 5_000 });
+      }
+      await expect(cancelDialog).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
     await expectOperatorDialog(page, {
       label: 'cancelar el pedido',
       dialog: 'order-cancel-dialog',
