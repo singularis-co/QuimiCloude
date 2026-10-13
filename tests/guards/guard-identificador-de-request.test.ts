@@ -371,6 +371,15 @@ export const E2E_ESPERADOS = [
   // lang del documento y el cruce sol/luna. No lee ni afirma nada sobre el identificador de
   // peticion ni sobre `reference`.
   'shell-rediseno.spec.ts',
+  // Alta el 2026-10-12 (QC-261) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en chromium y webkit, a 390, 820 y 1440 px, el
+  // dashboard pinta los pedidos en tarjetas a 390 px, «Acciones» abre el menu centrado, «Ver
+  // recorrido» lleva al detalle y al cerrar el foco vuelve al disparador; las anotaciones del
+  // detalle entran escalonadas y quietas con movimiento reducido; y el dashboard, el detalle y una
+  // URL privada que da 404 no desbordan en horizontal, con objetivos de 44 px y buscador a 16 px.
+  // No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'dashboard-rediseno.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

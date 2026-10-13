@@ -70,4 +70,106 @@ describe('EmptyState', () => {
 
     expect(screen.getByTestId('x-empty').className).toBe('p-2');
   });
+
+  it('R19: sin icon ni heading el arbol es identico al de hoy', () => {
+    const { container } = render(
+      <EmptyState
+        testId="x-empty"
+        messageTestId="x-empty-message"
+        message="Sin datos."
+        clearSearch={{ href: '/x', label: 'Limpiar la búsqueda', testId: 'x-clear' }}
+        firstPage={{ href: '/x?page=1', label: 'Volver a la primera página', testId: 'x-first' }}
+      >
+        <button type="button">Crear</button>
+      </EmptyState>,
+    );
+
+    const contenedor = screen.getByTestId('x-empty');
+    expect(container.children).toHaveLength(1);
+    expect(Array.from(contenedor.children).map((hijo) => hijo.tagName)).toEqual([
+      'P',
+      'A',
+      'A',
+      'BUTTON',
+    ]);
+    expect(contenedor.querySelector('[aria-hidden]')).toBeNull();
+    expect(within(contenedor).queryByRole('heading')).toBeNull();
+  });
+
+  it('R19: el recuadro del icono va primero y esta oculto a lectores', () => {
+    render(
+      <EmptyState
+        testId="x-empty"
+        message="Sin datos."
+        icon={{ node: <svg data-testid="x-icon" /> }}
+      />,
+    );
+
+    const primero = screen.getByTestId('x-empty').firstElementChild;
+    expect(primero).toHaveAttribute('aria-hidden', 'true');
+    expect(primero).toContainElement(screen.getByTestId('x-icon'));
+    expect(primero?.className).toContain('bg-muted');
+    expect(primero?.className).toContain('text-muted-foreground');
+  });
+
+  it('R19: el recuadro mide 44 px por defecto y 64 px con lg', () => {
+    render(
+      <>
+        <EmptyState testId="x-default" message="A." icon={{ node: <svg /> }} />
+        <EmptyState testId="x-lg" message="B." icon={{ node: <svg />, size: 'lg' }} />
+      </>,
+    );
+
+    const porDefecto = screen.getByTestId('x-default').firstElementChild;
+    expect(porDefecto).toHaveAttribute('data-size', 'default');
+    expect(porDefecto?.className.split(' ')).toEqual(
+      expect.arrayContaining(['size-11', 'rounded-[12px]']),
+    );
+    const grande = screen.getByTestId('x-lg').firstElementChild;
+    expect(grande).toHaveAttribute('data-size', 'lg');
+    expect(grande?.className.split(' ')).toEqual(
+      expect.arrayContaining(['size-16', 'rounded-[16px]']),
+    );
+  });
+
+  it('R19: el encabezado es h1 o h2 segun level y va antes del mensaje', () => {
+    render(
+      <>
+        <EmptyState
+          testId="x-uno"
+          message="Mensaje uno."
+          heading={{ level: 1, text: 'Titulo uno' }}
+        />
+        <EmptyState
+          testId="x-dos"
+          message="Mensaje dos."
+          heading={{ level: 2, text: 'Titulo dos' }}
+        />
+      </>,
+    );
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Titulo uno' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Titulo dos' })).toBeInTheDocument();
+    expect(
+      Array.from(screen.getByTestId('x-uno').children).map((hijo) => hijo.tagName),
+    ).toEqual(['H1', 'P']);
+  });
+
+  it('R19: el eyebrow va antes del encabezado, en monoespaciada', () => {
+    render(
+      <EmptyState
+        testId="x-empty"
+        message="Revisa la dirección."
+        icon={{ node: <svg />, size: 'lg' }}
+        heading={{ level: 1, eyebrow: '404', text: 'No encontrada' }}
+      />,
+    );
+
+    const hijos = Array.from(screen.getByTestId('x-empty').children);
+    expect(hijos.map((hijo) => hijo.tagName)).toEqual(['SPAN', 'SPAN', 'H1', 'P']);
+    expect(hijos[1]).toHaveTextContent('404');
+    expect(hijos[1]?.className).toContain('font-mono');
+    expect(hijos[1]).not.toHaveAttribute('aria-hidden');
+    expect(within(screen.getByTestId('x-empty')).queryByRole('link')).toBeNull();
+  });
 });

@@ -29,7 +29,8 @@
     "archivos_compartidos": [
       "tests/baseline-rojos.json",
       "progress/deudas.md",
-      "components/shared/CATALOGO.md"
+      "components/shared/CATALOGO.md",
+      "tests/guards/guard-identificador-de-request.test.ts"
     ]
   },
   "perfil": {

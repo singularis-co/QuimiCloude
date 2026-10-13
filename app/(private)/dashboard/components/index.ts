@@ -16,7 +16,9 @@ export {
 export {
   ActiveOrderMark,
   DeletedOrderMark,
+  TRACE_ACTIONS_LABEL_PREFIX,
   TRACE_LINK_TEXT,
+  TRACE_MENU_TITLE_PREFIX,
   buildExecutionTraceColumns,
   type ExecutionTraceColumnsDeps,
 } from './execution-trace-columns';

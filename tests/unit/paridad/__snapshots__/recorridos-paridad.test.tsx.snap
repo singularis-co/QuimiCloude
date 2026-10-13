@@ -3,9 +3,11 @@
 exports[`paridad de recorridos (dashboard) > R1 R17 — error de catalogo 1`] = `
 "
 div role=generic
-  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
-    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
-      "Dashboard"
+  div role=generic class="@container flex flex-1 flex-col gap-5 md:pb-8 md:pt-6 md:px-7 pb-6 pt-4 px-4"
+    div role=generic class="flex flex-wrap gap-4 items-end justify-between"
+      div role=generic class="flex flex-col gap-1 min-w-0"
+        h1 role=heading name="Dashboard" data-testid="dashboard-title" class="@max-[760px]:text-2xl font-semibold text-[30px] tracking-tight"
+          "Dashboard"
     div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
       p role=status class="text-muted-foreground text-sm"
         "Cargando pedidos ejecutados…"
@@ -15,9 +17,11 @@ div role=generic
 exports[`paridad de recorridos (dashboard) > R1 R17 — error inesperado, con su identificador 1`] = `
 "
 div role=generic
-  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
-    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
-      "Dashboard"
+  div role=generic class="@container flex flex-1 flex-col gap-5 md:pb-8 md:pt-6 md:px-7 pb-6 pt-4 px-4"
+    div role=generic class="flex flex-wrap gap-4 items-end justify-between"
+      div role=generic class="flex flex-col gap-1 min-w-0"
+        h1 role=heading name="Dashboard" data-testid="dashboard-title" class="@max-[760px]:text-2xl font-semibold text-[30px] tracking-tight"
+          "Dashboard"
     div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
       p role=status class="text-muted-foreground text-sm"
         "Cargando pedidos ejecutados…"
@@ -27,9 +31,11 @@ div role=generic
 exports[`paridad de recorridos (dashboard) > R1 — cargando 1`] = `
 "
 div role=generic
-  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
-    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
-      "Dashboard"
+  div role=generic class="@container flex flex-1 flex-col gap-5 md:pb-8 md:pt-6 md:px-7 pb-6 pt-4 px-4"
+    div role=generic class="flex flex-wrap gap-4 items-end justify-between"
+      div role=generic class="flex flex-col gap-1 min-w-0"
+        h1 role=heading name="Dashboard" data-testid="dashboard-title" class="@max-[760px]:text-2xl font-semibold text-[30px] tracking-tight"
+          "Dashboard"
     div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
       p role=status class="text-muted-foreground text-sm"
         "Cargando pedidos ejecutados…"
@@ -39,9 +45,11 @@ div role=generic
 exports[`paridad de recorridos (dashboard) > R1 — con filas 1`] = `
 "
 div role=generic
-  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
-    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
-      "Dashboard"
+  div role=generic class="@container flex flex-1 flex-col gap-5 md:pb-8 md:pt-6 md:px-7 pb-6 pt-4 px-4"
+    div role=generic class="flex flex-wrap gap-4 items-end justify-between"
+      div role=generic class="flex flex-col gap-1 min-w-0"
+        h1 role=heading name="Dashboard" data-testid="dashboard-title" class="@max-[760px]:text-2xl font-semibold text-[30px] tracking-tight"
+          "Dashboard"
     div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
       p role=status class="text-muted-foreground text-sm"
         "Cargando pedidos ejecutados…"
@@ -51,9 +59,11 @@ div role=generic
 exports[`paridad de recorridos (dashboard) > R1 — sin resultados, con filtro activo 1`] = `
 "
 div role=generic
-  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
-    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
-      "Dashboard"
+  div role=generic class="@container flex flex-1 flex-col gap-5 md:pb-8 md:pt-6 md:px-7 pb-6 pt-4 px-4"
+    div role=generic class="flex flex-wrap gap-4 items-end justify-between"
+      div role=generic class="flex flex-col gap-1 min-w-0"
+        h1 role=heading name="Dashboard" data-testid="dashboard-title" class="@max-[760px]:text-2xl font-semibold text-[30px] tracking-tight"
+          "Dashboard"
     div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
       p role=status class="text-muted-foreground text-sm"
         "Cargando pedidos ejecutados…"
@@ -63,9 +73,11 @@ div role=generic
 exports[`paridad de recorridos (dashboard) > R1 — vacio, sin filtro 1`] = `
 "
 div role=generic
-  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
-    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
-      "Dashboard"
+  div role=generic class="@container flex flex-1 flex-col gap-5 md:pb-8 md:pt-6 md:px-7 pb-6 pt-4 px-4"
+    div role=generic class="flex flex-wrap gap-4 items-end justify-between"
+      div role=generic class="flex flex-col gap-1 min-w-0"
+        h1 role=heading name="Dashboard" data-testid="dashboard-title" class="@max-[760px]:text-2xl font-semibold text-[30px] tracking-tight"
+          "Dashboard"
     div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
       p role=status class="text-muted-foreground text-sm"
         "Cargando pedidos ejecutados…"

@@ -591,7 +591,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // lista. No estrena tabla: mide el menu de fila (`RowActionsMenu`) de la lista de unidades, ya en
   // esta lista, y localiza la paginacion sticky por `data-table-pagination`. El centinela pasa de
   // TREINTA Y SEIS a TREINTA Y SIETE; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y siete', () => {
+  //
+  // Alta el 2026-10-12 (QC-261): entra `e2e/dashboard-rediseno.spec.ts`, y no afloja la lista. No
+  // estrena tabla: mide la lista de recorridos de `/dashboard`, que ya consumia la tabla compartida,
+  // a 390, 820 y 1440 px: localiza las tarjetas por `data-table-cards` y `data-table-card-<id>` y
+  // las filas por `data-table-row-<id>`. El centinela pasa de TREINTA Y SIETE a TREINTA Y
+  // OCHO; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y ocho', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -601,7 +607,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos treinta y siete E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos treinta y ocho E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
@@ -620,6 +626,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba. Va antes que `e2e/ejecucion-receta.spec.ts` porque la lista esta
       // ORDENADA y 'c' precede a 'e'.
       'e2e/clientes.spec.ts',
+      // Ver la nota de arriba (2026-10-12, QC-261). Entre `clientes` y `datos-de-lote-...` porque la
+      // lista esta ORDENADA: 'das' precede a 'dat'.
+      'e2e/dashboard-rediseno.spec.ts',
       // Ver la nota de arriba (2026-10-09, QC-219). Entre `clientes` y `ejecucion-receta` porque
       // la lista esta ORDENADA: 'd' va entre 'c' y 'e'.
       'e2e/datos-de-lote-en-acondicionamiento.spec.ts',
