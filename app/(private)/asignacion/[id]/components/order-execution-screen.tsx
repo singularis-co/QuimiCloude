@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { RowActionsMenu } from '@/components/shared/row-actions-menu';
+import { EvidenceMissingDialog, STEP_EVIDENCE_TEXTS } from '@/components/shared/step-evidence';
 import { StepReader } from '@/components/shared/step-reader';
 import { clampStepPosition } from '@/components/shared/step-reader/step-reader';
 import type { StartedOrderExecution } from '@/lib/modules/asignaciones';
@@ -19,6 +20,7 @@ import {
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import { OperatorScreenFrame } from '../../components/operator-screen-frame';
+import { useStepEvidence } from '../../components/use-step-evidence';
 
 import { ORDER_CANCEL_TEXTS, ORDER_CANCEL_TRIGGER_TESTID, OrderCancelDialog } from './order-cancel-dialog';
 import { OrderExecutionToolsPanel } from './order-execution-tools-panel';
@@ -78,6 +80,9 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [missingOpen, setMissingOpen] = useState(false);
+  const [missingPositions, setMissingPositions] = useState<readonly number[]>([]);
+  const [stepRequest, setStepRequest] = useState<{ position: number; id: number }>();
   const [stepPosition, setStepPosition] = useState(() =>
     clampStepPosition(execution.resumeStepPosition, execution.steps.length),
   );
@@ -89,6 +94,22 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
   );
 
   const error = state.status === 'error' ? state : undefined;
+  const evidence = useStepEvidence({
+    orderId: execution.orderId,
+    phase: 'manufacturing',
+    steps: execution.steps,
+    initial: execution.evidence,
+  });
+
+  function handleFinish() {
+    const missing = evidence.missingPositions();
+    if (missing.length > 0) {
+      setMissingPositions(missing);
+      setMissingOpen(true);
+      return;
+    }
+    setConfirmOpen(true);
+  }
 
   function handleStepChange({ direction, position }: StepChange) {
     setStepPosition(position);
@@ -155,11 +176,14 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
           ) : null}
           <StepReader
             steps={execution.steps}
-            onFinish={() => setConfirmOpen(true)}
+            onFinish={handleFinish}
             minStepSeconds={MIN_STEP_SECONDS}
             mode="ejecucion"
             initialStepPosition={execution.resumeStepPosition ?? 1}
             onStepChange={handleStepChange}
+            renderStepAddon={evidence.renderStepAddon}
+            stepBlockReason={evidence.stepBlockReason}
+            stepRequest={stepRequest}
           />
         </div>
       </div>
@@ -190,7 +214,9 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         onConfirm={() => formRef.current?.requestSubmit()}
         texts={{
           title: ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.title,
-          description: ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.description,
+          description: evidence.hasEvidenceSteps
+            ? STEP_EVIDENCE_TEXTS.finishWarning
+            : ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.description,
           dismiss: ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.cancel,
           confirm: ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.confirm,
         }}
@@ -201,6 +227,14 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         }}
       />
 
+      <EvidenceMissingDialog
+        open={missingOpen}
+        onOpenChange={setMissingOpen}
+        positions={missingPositions}
+        onGoToStep={(position) =>
+          setStepRequest((previous) => ({ position, id: (previous?.id ?? 0) + 1 }))
+        }
+      />
     </OperatorScreenFrame>
   );
 }

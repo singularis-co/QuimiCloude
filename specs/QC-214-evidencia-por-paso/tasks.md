@@ -114,7 +114,7 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
   Quitar, 1–2 y 3 fotos, solo lectura, visor, área táctil, `accept` y `capture`);
   `tests/unit/shared-ui/upload-evidence.test.ts` (compresión antes de subir, `PUT` con progreso,
   registro al final, error en cada paso, nunca llama a la acción con bytes).
-- [ ] **T18. Pantallas de Ejecución y Empaque** (R13–R16, R22, R23). `order-execution-screen.tsx`,
+- [x] **T18. Pantallas de Ejecución y Empaque** (R13–R16, R22, R23). `order-execution-screen.tsx`,
   `packing-order-screen.tsx`.
   *Hecho:* `tests/unit/asignaciones-ui/order-execution-evidence.test.tsx` y
   `packing-order-evidence.test.tsx`: bloque solo en pasos con evidencia; fotos iniciales; Siguiente
