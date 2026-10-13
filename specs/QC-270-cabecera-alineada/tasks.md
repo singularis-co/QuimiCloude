@@ -5,15 +5,15 @@ Tres tandas. Implementa `frontend_dev`. Verificación de cada tanda: `pnpm run t
 
 ## Tanda 1 — La cabecera sigue a su columna (R1–R7)
 
-- [ ] **T1 — Tests en rojo.** En `tests/unit/shared/data-table-header-menu.test.tsx`, un `describe`
+- [x] **T1 — Tests en rojo.** En `tests/unit/shared/data-table-header-menu.test.tsx`, un `describe`
   nuevo con los casos de `design.md > 2` (R1–R7) y los de `toColumnAlignClass` /
   `toColumnJustifyClass`, con `R<n>` en el nombre de cada caso.
   *Hecho:* los casos de R1, R2 y las funciones puras fallan contra el código de hoy; R3–R7 pasan
   (fijan lo que no debe romperse). El fallo se anota en `progress/impl_QC-270.md`.
-- [ ] **T2 — Funciones puras.** Depende de T1. `toColumnAlignClass` y `toColumnJustifyClass` en
+- [x] **T2 — Funciones puras.** Depende de T1. `toColumnAlignClass` y `toColumnJustifyClass` en
   `components/shared/data-table/data-table-column-style.ts` (`design.md > 1.1`).
   *Hecho:* sus casos de T1 en verde.
-- [ ] **T3 — Cabecera y cuerpo usan la misma traducción.** Depende de T2.
+- [x] **T3 — Cabecera y cuerpo usan la misma traducción.** Depende de T2.
   `DataTableHeaderCell` aplica `toColumnAlignClass` al `<th>` y `toColumnJustifyClass` al
   contenedor de la etiqueta; `data-table.tsx` sustituye `columnAlign` por `toColumnAlignClass`.
   Sin comentarios que citen fichas ni requisitos.
