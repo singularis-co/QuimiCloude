@@ -8,6 +8,7 @@ import { ThemeToggle } from '../../components/theme-toggle';
 export type OperatorScreenFrameProps = {
   readonly back?: { readonly href: string; readonly label: string; readonly testId: string };
   readonly eyebrow: string;
+  readonly eyebrowTestId?: string;
   readonly title: string;
   readonly titleTestId?: string;
   readonly subtitle?: ReactNode;
@@ -28,6 +29,7 @@ const CONTENT_WIDTH = 'mx-auto w-full max-w-[1064px]';
 export function OperatorScreenFrame({
   back,
   eyebrow,
+  eyebrowTestId,
   title,
   titleTestId,
   subtitle,
@@ -50,6 +52,7 @@ export function OperatorScreenFrame({
         <span
           className="font-mono text-xs text-muted-foreground tabular-nums"
           data-slot="operator-eyebrow"
+          data-testid={eyebrowTestId}
         >
           {eyebrow}
         </span>

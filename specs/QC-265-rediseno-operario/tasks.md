@@ -104,7 +104,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 5 — Empaque (depende de T2a) [P con 4 y 6]
 
-- [ ] **T5a.** (D11, R27–R31) `PackingOrderScreen` sobre el marco. Tests en
+- [x] **T5a.** (D11, R27–R31) `PackingOrderScreen` sobre el marco. Tests en
   `packing-order-screen.test.tsx`: `ArrowLink` «Volver a «Por empacar»» con su testid y dirección;
   `StatusBadge` con `data-status`; resumen y reparto con sus testids; falta de reparto con `Notice`
   `warning`; pie con los dos botones y solo uno habilitado por estado (R29); con pasos de envasado, el
@@ -115,7 +115,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 6 — Acondicionamiento (depende de T1b, T2a) [P con 4 y 5]
 
-- [ ] **T6a.** (D1, D12, R8, R32–R36) `ConditioningOrderScreen` y `ConditioningActions` sobre el marco.
+- [x] **T6a.** (D1, D12, R8, R32–R36) `ConditioningOrderScreen` y `ConditioningActions` sobre el marco.
   Tests en `conditioning-order-screen.test.tsx`: enlace de vuelta por estado con «Volver a
   «Acondicionados»» para `TERMINADO` (R8); cabecera con reparto, `StatusBadge` y «Lo acondiciona …»;
   tarjetas «Equipo» y «Datos de lote»; pie con solo un botón habilitado por estado y «Terminar»

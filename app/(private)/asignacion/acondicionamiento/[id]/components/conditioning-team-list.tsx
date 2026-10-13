@@ -1,3 +1,4 @@
+import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { ConditioningTeamMemberView } from '@/lib/modules/asignaciones';
 import { groupResponsiblesByOrigin } from '@/lib/shared/ui/responsible-groups';
 
@@ -21,12 +22,17 @@ export function ConditioningTeamList({ team }: ConditioningTeamListProps) {
   return (
     <section
       aria-labelledby="conditioning-team-heading"
-      className="flex flex-col gap-2"
+      className="flex flex-col gap-3"
       data-testid={CONDITIONING_TEAM_LIST_TESTID}
     >
-      <h2 id="conditioning-team-heading" className="text-base font-medium">
-        {CONDITIONING_TEAM_LIST_TEXTS.title}
-      </h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="conditioning-team-heading" className="text-base font-medium">
+          {CONDITIONING_TEAM_LIST_TEXTS.title}
+        </h2>
+        <ResponsibleAvatars
+          responsibles={team.map((member) => ({ userId: member.userId, displayName: member.displayName }))}
+        />
+      </div>
       <ul className="flex flex-col gap-3">
         {groups.map((group) => (
           <li

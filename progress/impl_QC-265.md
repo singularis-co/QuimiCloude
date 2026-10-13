@@ -48,6 +48,8 @@ comprobación en navegador la cubre el e2e de R1 (T8a: x de `private-content` = 
 | 2 | `c245a423` | init OK |
 | 3 (T3a, T3b) | ver `git log` | init OK (un solo `./init.sh` tras 3 y 4) |
 | 4 | ver `git log` | init OK |
+| 5 | ver `git log` | init OK (un solo `./init.sh` tras 5 y 6) |
+| 6 | ver `git log` (lleva el `.snap` compartido) | init OK |
 
 ## Bloqueos para el leader
 
@@ -202,3 +204,54 @@ abrir antes el menú (T8b). (4) `StepReader` ya no recibe `title` en la ejecuci�
 receta). (5) El `ErrorAlert` de Finalizar va encima del paso y no al final, para que no lo tape el pie
 fijo. (6) El pie fijo de `StepReader` afecta ya al empaque con pasos (la sección reserva su alto); T5
 lo integra en el marco.
+
+## Tanda 5 — Empaque (frontend_dev)
+
+Archivos: `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx` (sobre
+`OperatorScreenFrame` importado por archivo; textos en `PACKING_ORDER_TEXTS`, con tildes de R31/R39) e
+`index.ts`; `tests/unit/asignaciones-ui/packing-order-screen.test.tsx`; 4 casos «paridad del empaque»
+del snapshot `asignacion-acondicionamiento-paridad` (regenerados con `-u -t`, fila de § 6: marco,
+`StatusBadge`, `Notice`, pie con dos `xl`; R2, R27–R31). `page.tsx` y `packing-order-page.test.tsx`
+sin cambios (R45). `confirmaciones-paridad` sin cambios.
+
+Mapa R → test (`packing-order-screen.test.tsx`, bloque «QC-265 — el empaque sobre el marco del
+operario»): R2, R3, R4 (un caso cada uno) · R27 (2) · R28 (2) · R29 (2 + los de confirmar/enviar de
+hoy) · R30 «QC-265 R30: con pasos, el pie es el del paso a paso…» · R31 (2, con y sin nombre) · R39
+(2) · R45: casos de envío y error de hoy + `packing-order-page.test.tsx` intacto (56/56).
+
+Verificación (del subagente, con T6 a medias): lint 0 errores; guard 74 archivos OK; sus 4 archivos
+en verde. Gate conjunto tras T5+T6: init OK.
+
+Desvíos: (1) el botón no aplicable se pinta deshabilitado y **sin** `data-testid` (el testid sigue
+marcando el botón que abre la confirmación dentro de su `<form>`); (2) se borra
+`PACKING_ORDER_NUMBER_TESTID` (`packing-order-number`): el número pasa al rótulo del marco; grep:
+nadie más lo lee; (3) los `ErrorAlert` van encima del paso a paso para que el pie fijo no los tape;
+con paso a paso el marco no pinta pie (R30); (4) sin pasos, la columna derecha queda vacía a > 1100 px
+(R4/D11 al pie de la letra).
+
+## Tanda 6 — Acondicionamiento (frontend_dev)
+
+Archivos: en `app/(private)/asignacion/acondicionamiento/[id]/components/`
+`conditioning-order-screen.tsx`, `conditioning-actions.tsx` (los dos botones `xl` del pie y los
+diálogos), `conditioning-team-list.tsx` (avatares en la cabecera de la tarjeta);
+`operator-screen-frame.tsx` gana `eyebrowTestId?` (aditivo; conserva `conditioning-order-number`, que
+lee `e2e/acondicionamiento.spec.ts`); tests `conditioning-order-screen`, `conditioning-order-page`,
+`start-conditioning-dialog`, `finish-conditioning-dialog`; 10 casos del snapshot
+`asignacion-acondicionamiento-paridad` (con `-u -t`, fila de § 6: marco, R2, R32–R34). `page.tsx`,
+`index.ts` y los dos diálogos no cambian de código. `confirmaciones-paridad` sin cambios.
+
+Mapa R → test (`conditioning-order-screen.test.tsx` salvo indicación): R8 «R8 R32: en TERMINADO la
+vuelta es «Volver a «Acondicionados»»…» · R32 «R15 R32: número, receta (único h1)…», «R11 R32: … en
+un StatusBadge» · R33 «R33: «Equipo» es una tarjeta con los avatares…» · R34 los seis de «las acciones
+del pie» y «R4 R34» · R35 `start-conditioning-dialog.test.tsx` «R35: … «Comenzar» bloqueado 5 s con el
+anillo» · R36 `finish-conditioning-dialog.test.tsx` «R36: … bloqueado 5 s con el anillo».
+
+Verificación: typecheck verde; lint 0 errores; `vitest related` 19 archivos, 351 verdes (incluye los
+casos de empaque del snapshot compartido); guard 74 archivos, 1011 verdes. Gate: init OK.
+
+Desvíos: (1) `eyebrowTestId?` en el marco (arriba); (2) por R34 el pie pinta siempre los dos botones,
+el no aplicable deshabilitado, así que `e2e/acondicionar-con-equipo.spec.ts` (≈ líneas 270–273 y 466,
+`toHaveCount(0)`) pasa a `toBeDisabled()` en T8b (§ 7 no lo recogía; el archivo sí está en la lista);
+(3) «Cantidad:» y «Lo acondiciona …» van al subtítulo junto al reparto (D12 solo pedía el reparto; no
+se pierde dato); el aviso de lote que falta pasa al pie, encima de los botones, y sigue describiendo
+«Terminar»; (4) `conditioning-order-page.test.tsx`: «no ofrece el botón» pasa a «deshabilitado».
