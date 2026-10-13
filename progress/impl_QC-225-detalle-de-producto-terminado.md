@@ -422,3 +422,24 @@ No se corrió `./init.sh`, ni la suite completa ni el E2E (memoria baja, por ind
 | `vitest run --project integration tests/integration/inventario/finished-product-detail.int.test.ts` (lo corrió backend_dev después de m5) | Test Files 1 passed (1); Tests 13 passed (13). Base efímera `qct_qc225_e2ae854a_mv78a0kv_bjk`, copia de la plantilla `qct_tpl_7c42b3e164a6`, y borrada al terminar |
 
 El mapa `R<n> → test` de la tanda 3 no cambia. Ningún caso se ha quitado ni renombrado.
+
+## Tanda 5 (2026-10-13): cita de los tableros /design aprobados (M3, m4)
+
+Solo docs. El humano aprobó el 2026-10-13 los tableros tal como están dibujados (canvas
+https://claude.ai/artifact/Voiri77bod5p5EuzCUkPaq), incluidos sus «Por confirmar» tal como están
+implementados: no hay cambios de UI. Los tableros entraron en `08118a98`.
+
+| Archivo | Cambio |
+|---|---|
+| `specs/QC-225-detalle-de-producto-terminado/design.md` | §6 abre con la nota «2026-10-13: pase /design aprobado por el humano» y cita los seis tableros `docs/diseno/canvas/ProductoTerminado{,Tablet,Movil}.dc.html` y `PedidosPresentaciones{,Tablet,Movil}.dc.html`. §6.4 cierra m4: se acepta el paso 3 (componer `OrderProducedPresentations`) porque la etiqueta es de servidor, la usan tres archivos de /asignacion y su fila del catálogo dice «No cubre: la lista desplegada» |
+| `specs/QC-225-detalle-de-producto-terminado/tasks.md` | `Archivos esperados` suma un bloque «Diseño» con los seis tableros, `canvas.json` y `docs/diseno/README.md` |
+| `components/shared/CATALOGO.md` | Sin cambios: el catálogo solo cubre `components/ui`, `components/shared`, `lib/shared/ui` y `hooks`. `OrderProducedPresentations` y las piezas de la ficha viven en `app/`, así que el paso 6 de `docs/diseno/README.md` no les aplica (lo dice la nota de §6) |
+
+### Verificación (salida real)
+
+| Comando | Resultado |
+|---|---|
+| `pnpm exec vitest run guard` | Test Files 75 passed (75); Tests 1050 passed, 20 skipped (1070) |
+| `pnpm exec vitest run tests/unit/login-skin.test.tsx tests/unit/shared-ui/catalogo-qc256.test.ts tests/unit/shared-ui/password-field.test.tsx` (los tests que leen `CATALOGO.md` o `docs/diseno/canvas`) | Test Files 3 passed (3); Tests 53 passed (53) |
+
+No se corrió `./init.sh`, ni typecheck ni lint (no hay código), ni la suite completa (memoria baja).

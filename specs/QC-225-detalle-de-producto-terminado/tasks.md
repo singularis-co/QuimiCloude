@@ -392,5 +392,15 @@ Tests, fixtures y E2E:
 - `tests/integration/pedidos/order-delivery-directory.int.test.ts`
 - `e2e/detalle-de-producto-terminado.spec.ts`
 
+Diseño (añadidos 2026-10-13: tableros /design aprobados por el humano, copiados a la rama de la ficha):
+- `docs/diseno/canvas/ProductoTerminado.dc.html`
+- `docs/diseno/canvas/ProductoTerminadoTablet.dc.html`
+- `docs/diseno/canvas/ProductoTerminadoMovil.dc.html`
+- `docs/diseno/canvas/PedidosPresentaciones.dc.html`
+- `docs/diseno/canvas/PedidosPresentacionesTablet.dc.html`
+- `docs/diseno/canvas/PedidosPresentacionesMovil.dc.html`
+- `docs/diseno/canvas/canvas.json`
+- `docs/diseno/README.md`
+
 Progreso:
 - `progress/impl_QC-225-detalle-de-producto-terminado.md`

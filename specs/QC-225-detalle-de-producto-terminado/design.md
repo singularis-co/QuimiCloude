@@ -503,6 +503,22 @@ presentación anulada y otra no muestra filas de los dos tipos (R33).
 
 ## 6. UI
 
+> 2026-10-13: pase /design aprobado por el humano. Los tableros aprobados, copiados a la rama de la
+> ficha (`docs/diseno/README.md > Flujo /design`, pasos 4 y 5), son la referencia visual de esta
+> sección (canvas https://claude.ai/artifact/Voiri77bod5p5EuzCUkPaq):
+> - ficha de producto terminado (§6.1–§6.3): `docs/diseno/canvas/ProductoTerminado.dc.html`,
+>   `docs/diseno/canvas/ProductoTerminadoTablet.dc.html` y
+>   `docs/diseno/canvas/ProductoTerminadoMovil.dc.html`;
+> - presentaciones producidas en /pedidos (§6.4): `docs/diseno/canvas/PedidosPresentaciones.dc.html`,
+>   `docs/diseno/canvas/PedidosPresentacionesTablet.dc.html` y
+>   `docs/diseno/canvas/PedidosPresentacionesMovil.dc.html`.
+>
+> La aprobación cubre también los puntos «Por confirmar» de los tableros tal como están
+> implementados: no hay cambios de UI. Ninguna pieza de esta feature entra en
+> `components/shared/CATALOGO.md`: todas viven en `app/` (ruta de la ficha y
+> `app/(private)/pedidos/components/`), fuera de las tres tablas del catálogo, así que el paso 6 del
+> flujo no aplica.
+
 ### 6.1 Página `app/(private)/inventario/producto-terminado/[id]/page.tsx`
 
 Es un Server Component con el molde de `proveedores/[id]/page.tsx`:
@@ -605,8 +621,11 @@ consumidores no cambian. Lo que el código muestra:
   `/asignacion/[id]` (`order-execution-screen.tsx`);
 - su fila de `components/shared/CATALOGO.md` dice «No cubre: la lista desplegada».
 
-**Abierto:** si eso justifica descartar el paso 2 no lo fija ningún documento. Lo decide el humano,
-junto con el pase de diseño de esta celda.
+**Cerrado (2026-10-13, decisión del humano con el pase /design de esta celda):** se acepta el paso 3
+(componer `OrderProducedPresentations`) en lugar de extender `OrderDistributionLabel`, porque la
+etiqueta es un componente de servidor que usan tres archivos de /asignacion y su fila del catálogo
+dice «No cubre: la lista desplegada». Tablero de la celda:
+`docs/diseno/canvas/PedidosPresentaciones.dc.html` (más sus variantes `Tablet` y `Movil`).
 
 ## 7. Censos, guardias y llamadores afectados
 
