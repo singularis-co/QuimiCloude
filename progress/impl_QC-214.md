@@ -213,3 +213,102 @@ al reintentar, verde); `recipe-crud` + `formula-import` + `formula-import-versio
 6. `stepLocks` es dependencia obligatoria de `createUpdateRecipe`: si la composición no la diera, no compilaría.
 
 Veredicto: T13 y T14 hechas, verificación verde.
+
+## Tanda 2 (2026-10-13): T17 a T21, consolidado del implementer
+
+### Commits
+
+| Task | Commit |
+|---|---|
+| T17 | `943fb849` pieza compartida `step-evidence` (subida firmada, diálogo «Falta evidencia») |
+| T19 | `fc97a1cc` editor de fórmulas: switch «Requiere evidencia» y bloqueo de mover/quitar |
+| T18 | `ce9af14b` evidencia por paso en Ejecución y Empaque |
+| contrato | `f19bf71c` `recipe-route-contract.test.ts` admite las ampliaciones de QC-214 (2 rojos que destapó T18) |
+| T20 | `915fcecf` E2E del operador con evidencia por paso |
+
+### Archivos
+
+- **T17:** `components/shared/step-evidence/{step-evidence.tsx,upload-evidence.ts,evidence-missing-dialog.tsx,index.ts}`,
+  fila nueva en `components/shared/CATALOGO.md` (tableros `EvidenciaPaso*.dc.html`),
+  `tests/unit/shared-ui/{step-evidence.test.tsx,upload-evidence.test.ts}`.
+- **T18:** `app/(private)/asignacion/components/use-step-evidence.tsx` (hook nuevo, compartido por las
+  dos subrutas y reexportado en `components/index.ts`), `order-execution-screen.tsx` y
+  `packing-order-screen.tsx`; tests nuevos `tests/unit/asignaciones-ui/{order-execution-evidence,packing-order-evidence}.test.tsx`;
+  ajustes de fixture/mock en `order-execution-page.test.tsx` y `packing-order-page.test.tsx`.
+- **T19:** `app/(private)/produccion/formulas/components/{recipe-step-editor,recipe-steps-field,recipe-form,recipe-version-form}.tsx`,
+  `[id]/page.tsx`; tests nuevos `tests/unit/recetas-ui/{recipe-form-evidence-lock,recipe-version-form-evidence}.test.tsx`,
+  casos añadidos en `recipe-step-editor.test.tsx` y `recipe-steps-field.test.tsx`; una línea de mock
+  (`getRecipeStepLockAction`) en `recipe-form.test.tsx`, `tests/unit/paridad/recetas-paridad.test.tsx` y
+  `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`.
+- **Contrato:** `tests/unit/recetas-ui/recipe-route-contract.test.ts`, con `getRecipeStepLockAction` en
+  `permitidas`, `EVIDENCIA_POR_PASO_QC214` (10 archivos de `lib/modules/recetas`) y `MIGRACION_QC214`
+  añadidos al final de sus listas.
+- **T20:** `e2e/ejecucion-receta.spec.ts` (un caso nuevo y limpieza de fotos en `beforeAll`/`afterAll`).
+
+### Mapa R<n> -> test (completo, R1 a R39)
+
+| R | Test |
+|---|---|
+| R1 | `tests/unit/shared-ui/switch.test.tsx`, `tests/unit/recetas-ui/{recipe-step-editor,recipe-steps-field,recipe-form-evidence-lock}.test.tsx` |
+| R2 | `recipe-steps-field.test.tsx`, `recipe-form-evidence-lock.test.tsx` |
+| R3, R4 | `tests/unit/recetas/recipe-input.test.ts`, `tests/integration/recetas/step-evidence-flag.int.test.ts` |
+| R5 | `recipe-step-editor.test.tsx`, `recipe-steps-field.test.tsx`, `recipe-form-evidence-lock.test.tsx` |
+| R6 | `step-evidence-flag.int.test.ts`, `tests/unit/recetas-ui/recipe-version-form-evidence.test.tsx` |
+| R7 | `tests/unit/recetas/update-recipe.test.ts` |
+| R8 | `recipe-form-evidence-lock.test.tsx`, `recipe-steps-field.test.tsx`; dato: `get-recipe-step-lock.test.ts`, `recipe-actions.test.ts`, `count-evidence-locking-orders.test.ts` |
+| R9, R10 | `recipe-step-lock.test.ts`, `update-recipe.test.ts`, `recipe-actions.test.ts`, `step-evidence-flag.int.test.ts`, `count-evidence-locking-orders.test.ts` |
+| R11 | `recipe-step-lock.test.ts`, `update-recipe.test.ts` |
+| R12 | `update-recipe.test.ts`, `get-recipe-step-lock.test.ts`, `step-evidence-flag.int.test.ts` |
+| R13 | `tests/unit/shared-ui/step-evidence.test.tsx`, `tests/unit/asignaciones-ui/{order-execution-evidence,packing-order-evidence}.test.tsx`, `e2e/ejecucion-receta.spec.ts` |
+| R14 | `order-execution-evidence.test.tsx`, `packing-order-evidence.test.tsx`, `get-assigned-order-execution.test.ts`, `get-packing-order.test.ts` |
+| R15 | `step-reader.test.tsx`, `order-execution-evidence.test.tsx`, `packing-order-evidence.test.tsx`, `e2e/ejecucion-receta.spec.ts` |
+| R16 | `step-reader.test.tsx`, `step-evidence.test.tsx`, `upload-evidence.test.ts`, `order-execution-evidence.test.tsx` |
+| R17 | `step-evidence.test.tsx`, `upload-evidence.test.ts`, `order-execution-evidence.test.tsx` |
+| R18 | `upload-evidence.test.ts`, `step-evidence.test.tsx`, `step-evidence-actions.test.ts`, `e2e/ejecucion-receta.spec.ts` |
+| R19 | `step-evidence.test.tsx`, `upload-evidence.test.ts`, `order-execution-evidence.test.tsx`, `packing-order-evidence.test.tsx`, `register-evidence.test.ts`, `remove-evidence.test.ts` |
+| R20 | `step-evidence.test.tsx` (visor) |
+| R21 | `step-evidence.test.tsx`, `register-evidence.test.ts`, `remove-evidence.test.ts`, `record-step-move-evidence.test.ts` |
+| R22 | `step-reader.test.tsx`, `step-evidence.test.tsx` (diálogo), `order-execution-evidence.test.tsx`, `packing-order-evidence.test.tsx`, `e2e/ejecucion-receta.spec.ts` |
+| R23 | `order-execution-evidence.test.tsx`, `packing-order-evidence.test.tsx`, `e2e/ejecucion-receta.spec.ts` |
+| R24 | `step-evidence.test.tsx` (modo solo lectura de la pieza; su consumidor es QC-271, design § «Lo que ya existe») |
+| R25 | `step-evidence.test.tsx` (44 px, `accept`, `capture="environment"`) |
+| R26, R27 | `request-evidence-upload.test.ts`, `register-evidence.test.ts`, `remove-evidence.test.ts`, `evidence-target.test.ts`, `step-evidence-actions.test.ts` |
+| R28 | `step-evidence.test.ts`, `request-evidence-upload.test.ts`, `register-evidence.test.ts` |
+| R29 | `request-evidence-upload.test.ts`, `register-evidence.test.ts`, `step-evidence-repository.int.test.ts`, `step-evidence-constraints.int.test.ts` |
+| R30, R31 | `step-evidence.test.ts`, `register-evidence.test.ts`, `evidence-storage-memory.test.ts`, `step-evidence-constraints.int.test.ts` |
+| R32 | `register-evidence.test.ts`, `step-evidence-constraints.int.test.ts` |
+| R33 | `get-assigned-order-execution.test.ts`, `get-packing-order.test.ts`, `register-evidence.test.ts`, `evidence-storage-memory.test.ts` |
+| R34 | `record-step-move-evidence.test.ts` |
+| R35 | `finish-assigned-order.test.ts`, `step-evidence.test.ts`, `e2e/ejecucion-receta.spec.ts` (rechazo `evidence_required` de punta a punta) |
+| R36 | `finish-packing.test.ts`, `step-evidence.test.ts` |
+| R37 | `record-step-move-evidence.test.ts`, `finish-assigned-order.test.ts`, `finish-packing.test.ts` |
+| R38 | `evidence-target.test.ts`, `register-evidence.test.ts`, `step-evidence-repository.int.test.ts` |
+| R39 | `evidence-target.test.ts`, `step-evidence-repository.int.test.ts`, `step-evidence-constraints.int.test.ts` |
+
+### Salida real
+
+- T17: `vitest related --run` de sus 4 archivos → `Test Files 2 passed (2)`, `Tests 31 passed (31)`.
+- T19: `vitest related --run` → `Test Files 28 passed (28)`, `Tests 480 passed (480)`.
+- T18: `order-execution-evidence` 13/13, `packing-order-evidence` 10/10, los dos tests de página 18/18.
+  Destapó 2 rojos en `recipe-route-contract.test.ts` (no estaban en `baseline-rojos.json`), que se arreglaron en `f19bf71c` → `Tests 28 passed (28)`.
+- T20: `pnpm exec playwright test e2e/ejecucion-receta.spec.ts` → `8 passed (2.3m)` (3 casos existentes y el nuevo, en chromium y webkit).
+- `pnpm exec vitest run guard` (tras T20) → `Test Files 75 passed (75)`, `Tests 1054 passed | 20 skipped (1074)`.
+- Typecheck sin errores y lint con 0 errores (7 avisos ajenos), en cada task.
+- `./init.sh` (rápido), T21: typecheck limpio, lint `✖ 7 problems (0 errors, 7 warnings)`, guardias
+  verdes, `test:rapido` → `Test Files 3 failed | 844 passed (847)`, `Tests 3 failed | 13472 passed | 34 skipped (13509)`.
+  Los 3 rojos nuevos: `catalog-line.int.test.ts` R32 (deuda D33 de entorno, ajena) y dos contratos
+  que QC-214 desfasó, `asignaciones-facade.test.ts` (tres operaciones nuevas) y
+  `recetas/module-contract.test.ts` (tres archivos nuevos). Los arregló `8916f0ae`, solo en los tests:
+  `vitest run` de los dos → `Test Files 2 passed (2)`, `Tests 31 passed (31)`. No relancé `./init.sh`
+  entero (más de 10 min). Lo vuelve a correr el leader en el gate.
+
+### Decisiones para el reviewer (T17 a T20)
+
+1. T17: valida y comprime **antes** de pedir el enlace (design § 7 lo pone después) para que un archivo inválido no llegue al servidor.
+2. T17: `stepPosition` es una prop extra de `StepEvidence`, para los nombres accesibles del tablero. El visor usa un `DialogClose` propio de 44 px con el texto «Cerrar». Las fotos firmadas se pintan con `<img>`, como en `entity-image`.
+3. T18: el bloque del Empaque solo aparece con `showsPackingSteps`; quien no empaca no ve el paso a paso (pregunta abierta 5). El modo de solo lectura (R24) queda en la pieza para QC-271.
+4. T18: si «Cambiar» o «Quitar» fallan en el servidor, la foto original se queda y se añade una casilla en error. Con 3 fotos pueden verse 4 casillas un momento; el tablero no define este caso.
+5. T18: con algún paso que exige evidencia, la confirmación cambia su texto por el de R23.
+6. T19: `locked` va en `recipe-steps-field`, donde viven mover y quitar, no en el editor. El switch queda fuera del `role="toolbar"` de formato. Con bloqueo, «Quitar» también se deshabilita en los pasos nuevos. El aviso usa `Notice` en tono warning.
+7. T20: el orden del E2E cambia respecto a tasks.md. Con el paso 1 sin foto, Siguiente queda bloqueado y la UI no deja llegar a Finalizar. El caso parte de un pedido ya en curso en el paso 2: «Falta evidencia» → «Paso 1» → subir → avanzar. Una segunda pestaña quita la foto, Finalizar se rechaza con `evidence_required` (R35), luego se sube otra vez y se finaliza.
+8. Switch (T15): mide 44 px por debajo de 768 px de ventana; el tablero corta a 760 px de contenedor.

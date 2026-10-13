@@ -134,8 +134,11 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
   `https://evidencias-e2e.invalid/**`, avance, quitar la foto volviendo atrás, «Falta evidencia»
   al finalizar, volver a subir y finalizar.
   *Hecho:* `pnpm exec playwright test e2e/ejecucion-receta.spec.ts` verde en local.
-- [ ] **T21. Cierre.** `./init.sh` verde; `progress/impl_QC-214.md` con el mapa `R<n> -> test`
+- [x] **T21. Cierre.** `./init.sh` verde; `progress/impl_QC-214.md` con el mapa `R<n> -> test`
   (`design.md > 10`); catálogo con las tres filas (switch, step-evidence, StepReader).
+  *Hecho:* mapa R1–R39 completo en la bitácora; las tres filas están en el catálogo. Los dos
+  contratos que desfasó QC-214 se arreglan en `8916f0ae`. El único rojo restante de `./init.sh`
+  rápido es `catalog-line.int.test.ts` R32 (D33, entorno).
 
 ## Archivos esperados
 
