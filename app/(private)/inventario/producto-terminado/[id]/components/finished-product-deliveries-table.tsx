@@ -21,7 +21,7 @@ import {
 import { packagesText, quantityText } from './finished-product-stock';
 
 export const FINISHED_PRODUCT_DELIVERIES_TABLE_ID = 'inventario-producto-terminado-entregas';
-export const VOIDED_DELIVERY_LABEL = 'Anulada';
+export const DELIVERY_VOIDED_LABEL = 'Anulada';
 export const DELETED_CUSTOMER_LABEL = 'Dado de baja';
 
 function CustomerCell({ customer }: { readonly customer: FinishedProductDeliveryRow['customer'] }) {
@@ -54,7 +54,7 @@ function VoidCell({ voided }: { readonly voided: FinishedProductDeliveryRow['voi
   if (voided === null) return null;
   return (
     <span data-testid="finished-product-delivery-void" className="inline-flex flex-col gap-1">
-      <StatusBadge tone="danger" label={VOIDED_DELIVERY_LABEL} />
+      <StatusBadge tone="danger" label={DELIVERY_VOIDED_LABEL} />
       <span
         className="whitespace-normal text-xs text-muted-foreground"
         data-testid="finished-product-delivery-void-reason"

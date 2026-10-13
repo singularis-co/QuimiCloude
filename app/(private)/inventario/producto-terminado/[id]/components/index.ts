@@ -14,7 +14,7 @@ export {
   DELETED_CUSTOMER_LABEL,
   FINISHED_PRODUCT_DELIVERIES_TABLE_ID,
   FinishedProductDeliveriesTable,
-  VOIDED_DELIVERY_LABEL,
+  DELIVERY_VOIDED_LABEL,
   type FinishedProductDeliveriesTableProps,
 } from './finished-product-deliveries-table';
 export { FinishedProductGeneral, type FinishedProductGeneralProps } from './finished-product-general';
