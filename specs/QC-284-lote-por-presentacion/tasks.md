@@ -7,7 +7,7 @@
 
 ## Bloque A — Base de datos (backend_dev)
 
-- [ ] **T1. Migración de los índices** (R1, R2, R28, R29).
+- [x] **T1. Migración de los índices** (R1, R2, R28, R29).
   `db/migrations/20261014200000_product_batches_lot_per_presentation/migration.sql` y `down.sql`
   según `design.md > 1.2`. Quitar `@@unique([companyId, lot])` y reescribir el comentario de
   `ProductBatch` en `db/schema.prisma`. Añadir el nombre a
@@ -20,7 +20,7 @@
 
 ## Bloque B — `inventario` (backend_dev), depende de T1
 
-- [ ] **T2. `isDuplicateBatchLot` con los dos índices** (R1, R2, R6, R7).
+- [x] **T2. `isDuplicateBatchLot` con los dos índices** (R1, R2, R6, R7).
   `design.md > 2.1`. **Hecho:** integración contra base real: misma clave → `P2002` reconocido en
   los dos índices; mismo código con otro producto, otra presentación, o con y sin presentación →
   se escribe (R3); `cr-2610` vs `CR-2610` y otra empresa → se escribe (R4); dos altas tecleadas
@@ -28,10 +28,10 @@
   tecleada con clave existente → `batch_duplicate_lot` sin producto ni lote (R7). Unit del
   reintento actualizado a las columnas nuevas.
 
-- [ ] **T3. [P] Correlativo intacto** (R5). Integración: con `7` en un producto y `50` en otro, el
+- [x] **T3. [P] Correlativo intacto** (R5). Integración: con `7` en un producto y `50` en otro, el
   siguiente generado es `51`. **Hecho:** test verde sin cambiar `resolveLot`.
 
-- [ ] **T4. [P] Texto de `batch_duplicate_lot`** (R8). `error-catalog.ts` y
+- [x] **T4. [P] Texto de `batch_duplicate_lot`** (R8). `error-catalog.ts` y
   `tests/unit/errores/catalogo.test.ts`. **Hecho:** el catálogo devuelve el texto exacto de
   `design.md > 5.3`; el código no cambia.
 

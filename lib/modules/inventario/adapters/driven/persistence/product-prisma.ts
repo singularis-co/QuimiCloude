@@ -696,8 +696,12 @@ function translateBatchWriteError(error: unknown): never {
 }
 
 /** Por columnas y no por el nombre del indice: con esta version de Prisma, `meta.target` trae las
- *  columnas (igual que en `unit-write-prisma.ts`). */
-const BATCH_LOT_UNIQUE_COLUMNS: ReadonlySet<string> = new Set(['company_id', 'lot']);
+ *  columnas (igual que en `unit-write-prisma.ts`). Un conjunto por indice parcial: con presentacion
+ *  y sin ella. */
+const BATCH_LOT_UNIQUE_COLUMN_SETS: readonly ReadonlySet<string>[] = [
+  new Set(['company_id', 'product_id', 'presentation_id', 'lot']),
+  new Set(['company_id', 'product_id', 'lot']),
+];
 
 function uniqueTargetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string[] {
   const target: unknown = error.meta?.target;
@@ -711,8 +715,9 @@ function uniqueTargetsOf(error: Prisma.PrismaClientKnownRequestError): readonly 
 export function isDuplicateBatchLot(error: unknown): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
   const targets = new Set(uniqueTargetsOf(error));
-  if (targets.size !== BATCH_LOT_UNIQUE_COLUMNS.size) return false;
-  return [...BATCH_LOT_UNIQUE_COLUMNS].every((column) => targets.has(column));
+  return BATCH_LOT_UNIQUE_COLUMN_SETS.some(
+    (columns) => targets.size === columns.size && [...columns].every((column) => targets.has(column)),
+  );
 }
 
 /** Acotado: el lock ya evita el choque, y uno que se repite no es mala suerte. */
@@ -755,7 +760,7 @@ async function writeBatchWithLotRetry<T>(
   }
 
   throw new Error(
-    `no se pudo escribir un lote generado sin chocar con el indice unico (company_id, lot): empresa ${companyId}, ultimo lote intentado '${attemptLog.lastLot ?? '(sin resolver)'}', ${BATCH_LOT_MAX_ATTEMPTS} intentos`,
+    `no se pudo escribir un lote generado sin chocar con la unicidad del lote: empresa ${companyId}, ultimo lote intentado '${attemptLog.lastLot ?? '(sin resolver)'}', ${BATCH_LOT_MAX_ATTEMPTS} intentos`,
     { cause: lastCollision },
   );
 }

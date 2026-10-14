@@ -640,6 +640,9 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-10-14: migracion de datos que quita `asignaciones.consultar` al Administrador; no toca el
   // identificador.
   '20261014180000_admin_without_assigned_orders_view',
+  // QC-284 2026-10-14: la unicidad del lote pasa a producto + presentacion + codigo; no toca el
+  // identificador.
+  '20261014200000_product_batches_lot_per_presentation',
 ] as const
 
 export function hallazgosDeMigraciones(
