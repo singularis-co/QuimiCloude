@@ -271,6 +271,13 @@ describe('documentos — contrato del modulo y frontera', () => {
       expect(new contrato.UnauthorizedError()).toBeInstanceOf(contrato.DocumentosError);
       expect(new contrato.UnauthorizedError().code).toBe('unauthorized');
       expect(new contrato.ValidationError().code).toBe('invalid_input');
+      expect(new contrato.AiProviderMissingError()).toBeInstanceOf(contrato.DocumentosError);
+      expect(new contrato.AiProviderMissingError().code).toBe('ai_provider_missing');
+      const fallo = { kind: 'rejected_key', httpStatus: 401, model: null } as const;
+      const deCuenta = new contrato.AiProviderError(fallo);
+      expect(deCuenta).toBeInstanceOf(contrato.DocumentosError);
+      expect(deCuenta.code).toBe('ai_provider_error');
+      expect(deCuenta.failure).toEqual(fallo);
 
       // Y NO sale por aqui el codigo del permiso: lo que sale del modulo es la comprobacion.
       expect('DOCUMENT_UPLOAD_PERMISSION' in contrato).toBe(false);
@@ -318,6 +325,8 @@ const EXPORTACIONES_DE_EJECUCION = [
   'AI_READ_TIMEOUT_SECONDS',
   'aiReadInputSchema',
   'AiUnavailableError',
+  'AiProviderError',
+  'AiProviderMissingError',
   'createReadPdfWithAi',
   'pdfStrategySchema',
   'createProcessPdfByStrategy',
@@ -371,6 +380,8 @@ const EXPORTACIONES_DE_TIPO = [
   'EnqueuedBatch',
   'RunDocumentJobMessage',
   'RunDocumentJobResult',
+  'AiProviderGateway',
+  'AiReaderLookup',
   'CropCatalogImagesDeps',
   'CropCatalogImagesInput',
   'CropCatalogImagesResult',

@@ -98,6 +98,8 @@ export const ERROR_MESSAGE_KEY = {
   evidence_invalid_file: 'errors.evidence_invalid_file',
   evidence_not_found: 'errors.evidence_not_found',
   recipe_steps_locked: 'errors.recipe_steps_locked',
+  ai_provider_missing: 'errors.ai_provider_missing',
+  ai_provider_error: 'errors.ai_provider_error',
   company_duplicate_name: 'errors.company_duplicate_name',
   company_duplicate_tax_id: 'errors.company_duplicate_tax_id',
   company_name_mismatch: 'errors.company_name_mismatch',
@@ -252,6 +254,9 @@ export const ERROR_MESSAGES_ES = {
   'errors.evidence_not_found': 'La foto de evidencia no existe.',
   'errors.recipe_steps_locked':
     'Hay pedidos en curso con fotos de evidencia: mientras sigan en curso no puedes mover ni quitar pasos.',
+  'errors.ai_provider_missing': 'Para leer PDF, conecta el proveedor IA de tu empresa.',
+  'errors.ai_provider_error':
+    'Error con tu proveedor IA. Revisa la conexión en Integraciones > Proveedor IA.',
   'errors.company_duplicate_name': 'Ya existe una empresa activa con ese nombre.',
   'errors.company_duplicate_tax_id':
     'Ya existe una empresa activa con esa identificación fiscal.',

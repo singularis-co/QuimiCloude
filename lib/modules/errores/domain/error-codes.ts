@@ -210,6 +210,8 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: la formula es valida, pero mover o quitar pasos dejaria fotos de
   // pedidos en curso atadas a otro paso.
   'recipe_steps_locked',
+  'ai_provider_missing',
+  'ai_provider_error',
   'company_duplicate_name',
   'company_duplicate_tax_id',
   'company_name_mismatch',

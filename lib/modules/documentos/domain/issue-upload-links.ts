@@ -2,19 +2,22 @@
  * El caso de uso de la EMISION DE ENLACES: por cada archivo de la tanda, una ruta dentro del bucket
  * y un enlace firmado con el que el navegador subira los bytes por su cuenta.
  *
- * LOS CUATRO PASOS, EN ESTE ORDEN, y el orden ES el requisito:
+ * LOS CINCO PASOS, EN ESTE ORDEN, y el orden ES el requisito:
  *
  *   1. `requirePermission` — PRIMERA LINEA, antes del esquema y antes de tocar ningun puerto. Si la
  *      validacion fuera antes, un actor sin derecho a pedir nada recibiria `invalid_input` y sabria
  *      algo del sistema solo por haber preguntado mal; y si el puerto sonara antes, el rechazo ya
  *      habria dejado una firma emitida.
- *   2. El esquema de la tanda. Tambien SIN tocar ningun puerto: una tanda por encima del tope se
+ *   2. La conexion del proveedor IA de la empresa. Va despues del permiso para que quien no puede
+ *      subir no aprenda nada de la empresa, y antes del esquema para que quien si puede reciba el
+ *      motivo real y no un `invalid_input`. Rechazar aqui evita PDFs subidos sin nada que los lea.
+ *   3. El esquema de la tanda. Tambien SIN tocar ningun puerto: una tanda por encima del tope se
  *      rechaza ENTERA, y eso solo es cierto si el tope se aplica antes del primer `createSignedUpload`
  *      y no dentro del bucle que va firmando.
- *   3. Las rutas, construidas AQUI con la empresa del actor. **El cliente no propone ruta**: no hay
+ *   4. Las rutas, construidas AQUI con la empresa del actor. **El cliente no propone ruta**: no hay
  *      ningun campo de entrada por el que una ruta pueda llegar hasta el puerto, asi que elegir donde
  *      se escribe —o escribir en la carpeta de otra empresa— es inexpresable, no «esta validado».
- *   4. Un enlace firmado por archivo.
+ *   5. Un enlace firmado por archivo.
  *
  * **La caducidad que se informa es la del reloj de ESTA operacion, no la de cada firma.** Toda la
  * tanda recibe un unico instante, calculado una sola vez: diez archivos no pueden vencer en diez
@@ -26,21 +29,25 @@
  * **Lo que esta operacion NO hace, y se dice porque la ausencia es el requisito:** no recibe, no lee
  * y no reenvia los BYTES de ningun PDF —viajan del navegador al bucket sin atravesar la aplicacion—;
  * no convierte nada; no devuelve ninguna URL completa de lectura; y no escribe ni lee ninguna fila.
- * No tiene por donde: sus unicas dependencias son el puerto de almacenamiento y un reloj.
+ * No tiene por donde: sus dependencias son el puerto de almacenamiento, la pregunta de si hay
+ * proveedor IA y un reloj.
  *
  * Dominio puro: solo su propio `domain/`, sus `ports/` y el tipo del reloj.
  */
 import { requirePermission, type Actor, DOCUMENT_UPLOAD_PERMISSION } from './actor';
 import { buildDocumentPath } from './document-path';
-import { ValidationError } from './errors';
+import { AiProviderMissingError, ValidationError } from './errors';
 import { MILLISECONDS_PER_SECOND, PROVIDER_UPLOAD_LINK_TTL_SECONDS } from './limits';
 import { issueUploadLinksSchema } from './upload-input';
 
+import type { AiProviderGateway } from '../ports/ai-provider-gateway';
 import type { DocumentStorage, SignedUpload } from '../ports/document-storage';
 
 export type IssueUploadLinksDeps = {
-  /** El bucket, dicho sin nombrarlo. Es el UNICO puerto de esta operacion. */
+  /** El bucket, dicho sin nombrarlo. */
   readonly storage: DocumentStorage;
+  /** Solo la pregunta de si la empresa tiene proveedor IA: aqui no se lee nada. */
+  readonly aiProvider: Pick<AiProviderGateway, 'isConfigured'>;
   /**
    * El instante de emision, inyectable, con `() => new Date()` por defecto.
    *
@@ -71,7 +78,12 @@ export function createIssueUploadLinks(
     // 1. Antes que nada, y sin excepcion.
     requirePermission(actor, DOCUMENT_UPLOAD_PERMISSION);
 
-    // 2. Ningun puerto se ha tocado todavia: un rechazo aqui no deja ninguna firma emitida.
+    // 2. Sin proveedor IA no hay quien lea lo que se suba.
+    if (!(await deps.aiProvider.isConfigured(actor.companyId))) {
+      throw new AiProviderMissingError();
+    }
+
+    // 3. Ningun puerto de almacenamiento se ha tocado todavia: un rechazo aqui no deja firmas.
     const parsed = issueUploadLinksSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
@@ -84,7 +96,7 @@ export function createIssueUploadLinks(
       now().getTime() + PROVIDER_UPLOAD_LINK_TTL_SECONDS * MILLISECONDS_PER_SECOND,
     ).toISOString();
 
-    // 3 y 4. Una ruta nueva por archivo, SIEMPRE bajo la empresa del actor. El nombre que mando
+    // 4 y 5. Una ruta nueva por archivo, SIEMPRE bajo la empresa del actor. El nombre que mando
     // quien sube no entra en la ruta; solo sirve para que la pantalla sepa de que archivo es cada
     // enlace, y por eso ni siquiera se lee aqui.
     const uploads = await Promise.all(
