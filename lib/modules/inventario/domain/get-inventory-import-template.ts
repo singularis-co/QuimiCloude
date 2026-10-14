@@ -3,6 +3,7 @@ import {
   buildInventoryImportTemplateSheets,
   IMPORT_TEMPLATE_FILE_NAME,
   IMPORT_TEMPLATE_MIME_TYPE,
+  type ImportTemplateValues,
 } from './inventory-import-downloads';
 
 import type { ImportTemplateValuesReader } from '../ports/import-template-values';
@@ -21,19 +22,34 @@ export type GetInventoryImportTemplateDeps = {
   readonly writer: SpreadsheetWriter;
 };
 
+export type GetInventoryImportValues = (actor: Actor | null | undefined) => Promise<ImportTemplateValues>;
+
+export type GetInventoryImportValuesDeps = Pick<GetInventoryImportTemplateDeps, 'values'>;
+
+async function readValues(reader: ImportTemplateValuesReader, companyId: string): Promise<ImportTemplateValues> {
+  const [units, presentations, formulas] = await Promise.all([
+    reader.listUnitNames(companyId),
+    reader.listPresentationNames(companyId),
+    reader.listFormulaNames(companyId),
+  ]);
+  return { units, presentations, formulas };
+}
+
+/** Los mismos valores que la segunda hoja de la plantilla, para mostrarlos en la pantalla. */
+export function createGetInventoryImportValues(deps: GetInventoryImportValuesDeps): GetInventoryImportValues {
+  return async function getInventoryImportValues(actor) {
+    requirePermission(actor, 'inventario.modificar');
+    return readValues(deps.values, actor.companyId);
+  };
+}
+
 /** La plantilla con los valores de la empresa de ahora: el mismo permiso que importar. */
 export function createGetInventoryImportTemplate(deps: GetInventoryImportTemplateDeps): GetInventoryImportTemplate {
   return async function getInventoryImportTemplate(actor) {
     requirePermission(actor, 'inventario.modificar');
-    const { companyId } = actor;
 
-    const [units, presentations, formulas] = await Promise.all([
-      deps.values.listUnitNames(companyId),
-      deps.values.listPresentationNames(companyId),
-      deps.values.listFormulaNames(companyId),
-    ]);
-
-    const bytes = await deps.writer.write(buildInventoryImportTemplateSheets({ units, presentations, formulas }));
+    const values = await readValues(deps.values, actor.companyId);
+    const bytes = await deps.writer.write(buildInventoryImportTemplateSheets(values));
     return { fileName: IMPORT_TEMPLATE_FILE_NAME, mimeType: IMPORT_TEMPLATE_MIME_TYPE, bytes };
   };
 }

@@ -129,7 +129,14 @@ export const RESULT_TOTAL_LABELS = {
 } as const;
 
 export const EXAMPLE_ROW_IGNORED_NOTICE =
-  'La fila de ejemplo de la plantilla venía en el archivo y se ignoró: no se importa.';
+  'Las filas de ejemplo de la plantilla venían en el archivo y se ignoraron: no se importan.';
+
+export const IGNORED_COLUMNS_SUMMARY_TESTID = 'inventory-import-ignored-columns-summary';
+export function ignoredColumnsSummary(rows: number): string {
+  return rows === 1
+    ? '1 fila trae valores en columnas que su tipo no usa: esos valores se ignoran y la fila se importa igual.'
+    : `${formatCount(rows)} filas traen valores en columnas que su tipo no usa: esos valores se ignoran y las filas se importan igual.`;
+}
 
 export function confirmLabel(validRows: number): string {
   return validRows === 1 ? 'Importar 1 fila válida' : `Importar ${formatCount(validRows)} filas válidas`;
@@ -150,6 +157,14 @@ export const ERROR_FILE_BUTTON_TESTID = 'inventory-import-error-file';
 export const STATUS_FILTER_TESTID = 'inventory-import-status-filter';
 export const ROW_STATUS_TESTID = 'inventory-import-row-status';
 export const ROW_DETAIL_TESTID = 'inventory-import-row-detail';
+export const ROW_IGNORED_COLUMNS_TESTID = 'inventory-import-row-ignored-columns';
+
+export function ignoredColumnsNotice(headers: readonly string[]): string {
+  const list = headers.map((header) => `«${header}»`).join(', ');
+  return headers.length === 1
+    ? `Se ignoró ${list}: no aplica a este tipo.`
+    : `Se ignoraron ${list}: no aplican a este tipo.`;
+}
 export const ROW_ISSUE_TESTID = 'inventory-import-row-issue';
 
 export function totalTestId(key: string): string {
@@ -278,3 +293,43 @@ export const ALREADY_IMPORTED_TESTID = 'inventory-import-already-imported';
 export const NOTHING_IMPORTED_TESTID = 'inventory-import-nothing-imported';
 export const NOTHING_IMPORTED_MESSAGE_TESTID = 'inventory-import-nothing-imported-message';
 export const RESTART_TESTID = 'inventory-import-restart';
+
+export const GUIDE_TESTID = 'inventory-import-guide';
+export const GUIDE_TITLE = 'Cómo llenar la plantilla';
+export const GUIDE_DESCRIPTION =
+  'Las mismas reglas y valores que trae la hoja «Valores disponibles» de la plantilla descargada.';
+export const GUIDE_TABS = {
+  rules: 'Campos por tipo',
+  values: 'Valores disponibles',
+  examples: 'Ejemplos',
+} as const;
+export const GUIDE_RULES_TESTID = 'inventory-import-guide-rules';
+export const GUIDE_VALUES_TESTID = 'inventory-import-guide-values';
+export const GUIDE_EXAMPLES_TESTID = 'inventory-import-guide-examples';
+export const GUIDE_COLUMN_HEADER = 'Columna';
+export const GUIDE_RULE_LABELS = {
+  required: 'Obligatoria',
+  optional: 'Opcional',
+  forbidden: 'Se ignora',
+} as const;
+export const GUIDE_RULES_NOTES: readonly string[] = [
+  '«Se ignora»: si la columna trae un valor, no se importa y la fila sigue; la vista previa lo avisa.',
+  '«Costo unitario» es obligatorio para Insumo, Envase y Producto terminado; el Instrumento puede ir sin costo.',
+  'Producto terminado no lleva «Nombre»: se arma como «Fórmula · Presentación». La presentación debe tener contenido declarado.',
+  'Envase y Producto terminado cuentan la existencia en envases enteros; en Producto terminado, mayor que 0.',
+  '«Unidad» se reconoce por su nombre o por su símbolo.',
+  'Si el producto ya existe (mismo nombre y unidad; en envases, misma presentación), la fila le suma un lote.',
+  '«Lote» vacío: se genera solo. «Fecha de compra» vacía: hoy; no puede ser futura.',
+  'Números con coma o punto decimal, sin separador de miles y hasta 4 decimales. Fechas AAAA-MM-DD o DD/MM/AAAA.',
+];
+export const GUIDE_VALUES_HEADERS = {
+  types: 'Tipo',
+  units: 'Unidad',
+  presentations: 'Presentación',
+  formulas: 'Fórmula',
+} as const;
+export const GUIDE_VALUES_EMPTY = 'Ninguna registrada.';
+export const GUIDE_VALUES_UNAVAILABLE =
+  'No se pudieron cargar los valores de la empresa; la plantilla descargada sí los trae.';
+export const GUIDE_EXAMPLES_NOTE =
+  'Una fila por tipo. Si las dejas en el archivo, se reconocen y se ignoran al importar.';

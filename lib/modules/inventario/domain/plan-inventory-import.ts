@@ -79,7 +79,6 @@ const DATE_RULE = 'no es una fecha valida (AAAA-MM-DD o DD/MM/AAAA).';
 const ISSUE_TEXT: Readonly<Record<ImportRowIssueCode, string>> = {
   type_invalid: 'debe ser Insumo, Envase, Instrumento o Producto terminado.',
   value_required: 'es obligatoria para este tipo.',
-  column_not_applicable: 'debe ir vacia para este tipo.',
   name_too_long: `admite hasta ${PRODUCT_NAME_MAX_LENGTH} caracteres.`,
   unit_not_found: 'la unidad no existe en la empresa.',
   unit_ambiguous: 'coincide con mas de una unidad; escribe su nombre completo.',
@@ -183,13 +182,29 @@ function ruleFor(rules: ColumnRules, type: ImportRowType | null): ColumnRules[Im
   return first !== undefined && rest.every((rule) => rule === first) ? first : null;
 }
 
-function checkApplicability(row: ParsedImportRow, type: ImportRowType | null, issues: RowIssues): void {
+function checkRequired(row: ParsedImportRow, type: ImportRowType | null, issues: RowIssues): void {
   for (const column of INVENTORY_IMPORT_COLUMNS) {
     const filled = row.cells[column.key].trim() !== '';
-    const rule = ruleFor(column.rules, type);
-    if (rule === 'forbidden' && filled) issues.add('column_not_applicable', column.key);
-    if (rule === 'required' && !filled) issues.add('value_required', column.key);
+    if (ruleFor(column.rules, type) === 'required' && !filled) issues.add('value_required', column.key);
   }
+}
+
+/**
+ * Una columna que el tipo no usa no rompe la fila: se ignora y se avisa. La fila se planifica como
+ * si esa celda viniera vacia; las celdas originales se conservan para mostrarlas y para el archivo
+ * de errores.
+ */
+function withoutIgnoredColumns(
+  row: ParsedImportRow,
+  type: ImportRowType,
+): { readonly row: ParsedImportRow; readonly ignoredColumns: readonly ImportColumnKey[] } {
+  const ignoredColumns = INVENTORY_IMPORT_COLUMNS.filter(
+    (column) => column.rules[type] === 'forbidden' && row.cells[column.key].trim() !== '',
+  ).map((column) => column.key);
+  if (ignoredColumns.length === 0) return { row, ignoredColumns };
+  const cells = { ...row.cells };
+  for (const key of ignoredColumns) cells[key] = '';
+  return { row: { ...row, cells }, ignoredColumns };
 }
 
 function readValues(row: ParsedImportRow, type: ImportRowType | null, today: string, issues: RowIssues): RowValues {
@@ -518,21 +533,27 @@ function finishedWrite(values: RowValues, refs: Resolved): ImportFinishedGoodsIn
 
 type PlannedRow = { readonly preview: ImportPreviewRow; readonly write: ImportRowWrite | null };
 
-function planRow(row: ParsedImportRow, state: PlanState, today: string): PlannedRow {
-  const type = parseImportType(row.cells.type);
-  const base = { rowNumber: row.rowNumber, cells: row.cells };
+function planRow(parsed: ParsedImportRow, state: PlanState, today: string): PlannedRow {
+  const type = parseImportType(parsed.cells.type);
   if (type === null) {
+    const base = { rowNumber: parsed.rowNumber, cells: parsed.cells };
     const issues = new RowIssues();
     issues.add('type_invalid', 'type');
-    checkApplicability(row, null, issues);
-    validateWithoutType(readValues(row, null, today, issues), issues);
+    checkRequired(parsed, null, issues);
+    validateWithoutType(readValues(parsed, null, today, issues), issues);
     const [first, ...rest] = issues.list();
     const all: [ImportRowIssue, ...ImportRowIssue[]] = [first ?? importRowIssue('type_invalid', 'type'), ...rest];
     return { preview: { ...base, type: null, productName: null, status: 'error', issues: all }, write: null };
   }
 
+  const { row, ignoredColumns } = withoutIgnoredColumns(parsed, type);
+  const base = {
+    rowNumber: parsed.rowNumber,
+    cells: parsed.cells,
+    ...(ignoredColumns.length === 0 ? {} : { ignoredColumns }),
+  };
   const issues = new RowIssues();
-  checkApplicability(row, type, issues);
+  checkRequired(row, type, issues);
   const values = readValues(row, type, today, issues);
   validateWithSchema(type, values, issues);
   const refs = resolveReferences(row, type, state, issues);

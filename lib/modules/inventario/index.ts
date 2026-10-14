@@ -293,8 +293,11 @@ export type {
 } from './domain/plan-reservation';
 export {
   createGetInventoryImportTemplate,
+  createGetInventoryImportValues,
   type GetInventoryImportTemplate,
   type GetInventoryImportTemplateDeps,
+  type GetInventoryImportValues,
+  type GetInventoryImportValuesDeps,
   type InventoryImportTemplate,
 } from './domain/get-inventory-import-template';
 // Los datos de lote del producto terminado que escribe el acondicionamiento: el contrato y la

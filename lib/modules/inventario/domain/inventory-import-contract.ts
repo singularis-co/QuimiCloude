@@ -47,7 +47,6 @@ export type ImportCells = Readonly<Record<ImportColumnKey, string>>;
 export const IMPORT_ROW_ISSUE_CODES = [
   'type_invalid',
   'value_required',
-  'column_not_applicable',
   'name_too_long',
   'unit_not_found',
   'unit_ambiguous',
@@ -88,6 +87,8 @@ type ImportRowBase = {
   readonly type: ImportRowType | null;
   /** Nombre con el que queda el producto (en terminado, el derivado). `null` si no se pudo resolver. */
   readonly productName: string | null;
+  /** Columnas con valor que el tipo no usa: no se importan y la fila sigue. Ausente si no hay. */
+  readonly ignoredColumns?: readonly ImportColumnKey[];
 };
 
 /** A qué producto se suma el lote: uno que ya existe, o el que crea una fila anterior del mismo archivo. */

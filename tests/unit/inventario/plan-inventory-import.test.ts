@@ -166,7 +166,7 @@ describe('planInventoryImport — reglas de campo del alta manual', () => {
 });
 
 describe('planInventoryImport — columnas que no aplican', () => {
-  it('R11 un valor en una columna prohibida para el tipo deja la fila en error nombrandola', () => {
+  it('R11 un valor en una columna que el tipo no usa se ignora y se avisa, sin dejar la fila en error', () => {
     const result = plan(
       sheet(
         { ...ROW_INSTRUMENTO, qtyAlert: '3', unit: 'kg' },
@@ -175,19 +175,26 @@ describe('planInventoryImport — columnas que no aplican', () => {
         { ...ROW_TERMINADO, name: 'Algo', unit: 'kg' },
       ),
     );
-    expect(codes(result.rows[0])).toEqual([
-      ['column_not_applicable', 'unit'],
-      ['column_not_applicable', 'qtyAlert'],
+    expect(result.rows.map((r) => r.status)).toEqual(['create', 'create', 'create', 'create']);
+    expect(result.rows.map((r) => r.ignoredColumns)).toEqual([
+      ['unit', 'qtyAlert'],
+      ['expiryDate'],
+      ['presentation', 'formula'],
+      ['name', 'unit'],
     ]);
-    expect(codes(result.rows[1])).toEqual([['column_not_applicable', 'expiryDate']]);
-    expect(codes(result.rows[2])).toEqual([
-      ['column_not_applicable', 'presentation'],
-      ['column_not_applicable', 'formula'],
-    ]);
-    expect(codes(result.rows[3])).toEqual([
-      ['column_not_applicable', 'name'],
-      ['column_not_applicable', 'unit'],
-    ]);
+    expect([...result.writes.keys()]).toEqual([2, 3, 4, 5]);
+  });
+
+  it('R11 lo ignorado no llega a lo que se escribe y las celdas originales se conservan', () => {
+    const result = plan(sheet({ ...ROW_INSTRUMENTO, qtyAlert: '3' }, { ...ROW_TERMINADO, name: 'Algo' }));
+    const machine = result.writes.get(2);
+    expect(machine?.kind === 'product' && machine.candidate).not.toHaveProperty('qtyAlert');
+    expect(result.rows[0]?.cells.qtyAlert).toBe('3');
+    expect(result.rows[1]?.productName).toBe('Desengrasante · Botella 1 L');
+  });
+
+  it('R11 una fila sin nada que ignorar no trae la marca', () => {
+    expect(plan(sheet(ROW_INSUMO)).rows[0]).not.toHaveProperty('ignoredColumns');
   });
 });
 

@@ -743,8 +743,9 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // `createListFinishedProductMovements`, `createListFinishedProductDeliveries`,
     // `createListFinishedProductCosts` y `createListProducedProducts`-, y el barrel pasa de
     // dieciocho a veinticuatro. Sus tipos y funciones puras van en una sentencia sin `...Deps`.
-    // 2026-10-14: entra `createGetInventoryImportTemplate` (plantilla .xlsx con la hoja de valores
-    // disponibles), y el barrel pasa de veinticuatro a veinticinco.
+    // 2026-10-14: entran `createGetInventoryImportTemplate` (plantilla .xlsx con la hoja de valores
+    // disponibles) y `createGetInventoryImportValues` (los mismos valores en la pantalla), y el
+    // barrel pasa de veinticuatro a veintiseis.
     expect(
       [...FACTORIAS_DE_CASO_DE_USO].sort(),
       'no se pudieron derivar las factorias de caso de uso del barrel: sin ellas esta guardia no mira nada',
@@ -758,6 +759,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       'createDeleteProduct',
       'createGetFinishedProduct',
       'createGetInventoryImportTemplate',
+      'createGetInventoryImportValues',
       'createGetProduct',
       'createListBatchMovements',
       'createListFinishedProductBatches',

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { UnauthorizedError, createGetInventoryImportTemplate, type ImportTemplateSheet } from '@/lib/modules/inventario';
+import {
+  UnauthorizedError,
+  createGetInventoryImportTemplate,
+  createGetInventoryImportValues,
+  type ImportTemplateSheet,
+} from '@/lib/modules/inventario';
 
 const ACTOR = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar'] };
 const BYTES = new Uint8Array([0x50, 0x4b]);
@@ -40,5 +45,23 @@ describe('getInventoryImportTemplate', () => {
     await expect(getTemplate(null)).rejects.toBeInstanceOf(UnauthorizedError);
     expect(values.listUnitNames).not.toHaveBeenCalled();
     expect(writer.write).not.toHaveBeenCalled();
+  });
+});
+
+describe('getInventoryImportValues', () => {
+  it('R3 devuelve los mismos valores que la segunda hoja, de la empresa del actor', async () => {
+    const { values } = build();
+    const getValues = createGetInventoryImportValues({ values });
+
+    expect(await getValues(ACTOR)).toEqual({ units: ['gramo'], presentations: ['Bidón 20 L'], formulas: ['Desengrasante'] });
+    expect(values.listFormulaNames).toHaveBeenCalledWith('company-1');
+  });
+
+  it('R3 sin permiso de inventario no lee nada', async () => {
+    const { values } = build();
+    const getValues = createGetInventoryImportValues({ values });
+
+    await expect(getValues(null)).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(values.listUnitNames).not.toHaveBeenCalled();
   });
 });

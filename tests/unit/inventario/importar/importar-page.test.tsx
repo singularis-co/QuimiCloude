@@ -8,7 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import InventarioPage from '@/app/(private)/inventario/page';
 import InventoryImportPage, { maxDuration } from '@/app/(private)/inventario/importar/page';
-import { IMPORT_SCREEN_TESTID, IMPORT_TITLE_TESTID } from '@/app/(private)/inventario/importar/components';
+import {
+  GUIDE_TESTID,
+  IMPORT_SCREEN_TESTID,
+  IMPORT_TITLE_TESTID,
+} from '@/app/(private)/inventario/importar/components';
 import { PERMISSIONS } from '@/lib/modules/identity';
 import type { ProductFormUnitsResult } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
@@ -54,6 +58,11 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 vi.mock('@/lib/modules/inventario/adapters/driving/inventory-import-actions', () => ({
   previewInventoryImportAction: vi.fn(),
   confirmInventoryImportAction: vi.fn(),
+  getInventoryImportTemplateAction: vi.fn(),
+  getInventoryImportValuesAction: vi.fn(async () => ({
+    status: 'success',
+    data: { units: ['kilogramo'], presentations: ['Bidón 20 L'], formulas: ['Desengrasante'] },
+  })),
 }));
 
 const TODOS_LOS_PERMISOS = PERMISSIONS.map((permiso) => permiso.code);
@@ -118,6 +127,7 @@ describe('pantalla /inventario/importar', () => {
     expect(screen.getByTestId(IMPORT_TITLE_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId(IMPORT_SCREEN_TESTID)).toBeInTheDocument();
     expect(listUnitsActionMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId(GUIDE_TESTID)).toBeInTheDocument();
   });
 
   it('si las unidades no se pueden leer, la pantalla se pinta igual', async () => {

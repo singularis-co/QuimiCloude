@@ -12,6 +12,7 @@ import {
   InventarioError,
   requirePermission,
   type Actor,
+  type ImportTemplateValues,
   type InventoryImportConfirmOutcome,
   type InventoryImportPreviewOutcome,
 } from '@/lib/modules/inventario';
@@ -110,6 +111,19 @@ export async function getInventoryImportTemplateAction(): Promise<InventoryImpor
         base64: Buffer.from(template.bytes).toString('base64'),
       },
     };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type InventoryImportValuesResult = { status: 'success'; data: ImportTemplateValues } | ErrorState;
+
+/** Los valores que la importacion reconoce, para la guia de la pantalla. */
+export async function getInventoryImportValuesAction(): Promise<InventoryImportValuesResult> {
+  const actor = await currentActor();
+
+  try {
+    return { status: 'success', data: await inventario.getInventoryImportValues(actor) };
   } catch (error) {
     return toErrorState(error);
   }
