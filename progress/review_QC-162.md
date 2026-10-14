@@ -139,3 +139,60 @@ La primera opcion es la preferida: es lo aprobado y cierra la clase de error, no
 **RECHAZADO** (CAMBIOS): un bloqueante, B1. Todo lo demas —seguridad multiempresa, permisos,
 migracion, RLS, atomicidad, correo, enmiendas, comentarios— pasa. Con B1 resuelto (preferente:
 `scope` obligatorio) y el gate verde, la ficha queda en OK; m1–m6 no bloquean.
+
+## Vuelta 2 (acotada a 11a513f8~1..11a513f8)
+
+Revisado solo el diff de los arreglos (mas el commit de la review 6939d4fb, que solo toca este
+archivo). m4 y m5 quedan fuera a proposito, como se acordo.
+
+### Checklist
+- [x] **B1 cerrado.** `SeedInitialAccessDeps.scope` es obligatorio (sin `?`, sin `?? 'full'`).
+      Comprobado de forma ejecutable: una sonda de tipos en el scratchpad que llama a
+      `seedInitialAccess` con `Omit<SeedInitialAccessDeps, 'scope'>` da `TS2345 Property 'scope'
+      is missing`. Asi, quitar `scope: readSeedScopeFromEnv()` de `lib/composition/index.ts:831`
+      rompe el typecheck. Es el unico llamador de produccion (`scripts/seed.ts` pasa por
+      `identity.seedInitialAccess()`).
+- [x] **Enmiendas mecanicas.** Unitarios: 40 literales `scope: 'full'`. `.int`: 50, contando las
+      llamadas `{ ...deps, scope: 'full' }`. Ninguna asercion cambia ni se relaja: filtre el diff
+      quitando las lineas `+ scope: 'full',` y solo quedan las llamadas reescritas.
+- [x] **Caso R41** (`seed-initial-access.test.ts:1553`). Ya compara `full` con `full`, asi que la
+      igualdad `llamadas`/`outcome` sale siempre verdadera. Aun asi, R41 queda verificado:
+      - el mismo caso afirma `scope === 'full'`, `createdAdmin`, `createdCompany === QuimiCloud` y
+        `createdMaestro`;
+      - todos los casos previos, ahora con `full`, siguen verdes y fijan el «como hasta hoy»;
+      - `seed-scope-env.test.ts` fija que fuera de produccion el alcance es `full`.
+      Basta. Ver m7.
+- [x] **m2 cerrado.** `writingEvent` se pone a `true` justo antes de `recordCompanyEvent`. Con eso,
+      un `P2003` del autor se relanza en vez de traducirse a `invalid_document_type`. El caso
+      `.int` «R14, R34: autor del evento inexistente» exige `PrismaClientKnownRequestError` con
+      `P2003`, y que no queden ni empresa, ni usuario, ni evento. Sin el arreglo, el caso sale rojo:
+      la promesa resolveria `'invalid_document_type'`. El caso existente de tipo de documento
+      inexistente sigue verde.
+- [x] **m3 cerrado.** `ROLLBACK TO SAVEPOINT ... .catch(() => undefined)`, y despues se relanza el
+      original. El caso `.int` suelta el savepoint `company_write` dentro, asi que el rollback falla
+      de verdad. Ademas exige `rejects.toBe(original)`, la misma instancia. Sin el arreglo, el caso
+      sale rojo.
+- [x] **m1 y m6** (documentales): R45 ya figura en la tabla de decisiones y en el design § 9, y la
+      cabecera dice R1–R45.
+- [x] **Regla 9 (comentarios).** Las lineas anadidas en `lib/` no citan `QC-`, `R<n>`, `design.md`
+      ni «decision cerrada».
+- [x] **Verificacion ejecutable:**
+      - `pnpm run typecheck`: verde.
+      - `eslint` sobre los 5 archivos tocados: verde.
+      - `vitest run` de `tests/unit/identity/seed`, `company.int` e `identity-seed.int` contra la
+        base de test: 6 archivos, 142 tests verdes. Los dos casos nuevos `.int` corren y pasan, no
+        se saltan.
+      - `vitest run guard`: 75 archivos verdes.
+      - No corri `./init.sh --completo` (lo corre el leader).
+
+### Hallazgos
+- m7 — menor: el caso R41 se llama «full hace las mismas llamadas y devuelve lo mismo que sin
+  alcance», pero ya no existe «sin alcance». La igualdad entre los dos repositorios es tautologica,
+  y lo que verifica R41 son las aserciones directas. Conviene renombrarlo (p. ej. «full siembra
+  QuimiCloud, el Administrador y el Maestro») y quitar el segundo repositorio. No bloquea.
+- Sin regresiones ni hallazgos mayores nuevos.
+
+### Veredicto
+**OK.** B1 cerrado, y el typecheck protege ahora el cableado del alcance. m2 y m3 estan cerrados y
+cada uno tiene un caso `.int` que falla sin el arreglo. Solo queda el menor m7, mas m4 y m5, que se
+dejaron fuera a proposito.
