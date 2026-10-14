@@ -511,3 +511,14 @@ protegido por el typecheck.
   14171 passed | 37 skipped (14208); `gate.siempre` 115 passed, 1621 passed | 37 skipped.
 - `.int` de empresas, uno a uno: `company` 38/38, `company-country` 8/8, `order-company-stats` 4/4,
   `identity-seed` 35/35.
+
+## Segunda sincronización con dev (F2.3), 2026-10-14 (entran QC-275, QC-214 y QC-274)
+
+- Merge `6773c2dd`. Mismos cuatro conflictos de solo añadir; lo de dev primero y lo de esta ficha al final;
+  recuento del catálogo 95 (dev) + 4 = 99.
+- Migración nueva de dev: `20261013150000_ai_providers`, anterior a `20261014120000_companies_management`, que
+  sigue siendo la última. Aplicada en :5433; la de esta ficha se revirtió y se reaplicó encima sin error.
+- `./init.sh` rápido, exit 0: Test Files 899 passed (899), Tests 14461 passed | 37 skipped (14498);
+  `gate.siempre` 115 passed, 1623 passed | 37 skipped.
+- `.int` de empresas, uno a uno: `company` 38/38, `company-country` 8/8, `order-company-stats` 4/4,
+  `identity-seed` 35/35.
