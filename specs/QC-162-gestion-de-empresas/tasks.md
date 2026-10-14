@@ -157,7 +157,7 @@ Cierre:                        T12
 
 ### Cierre
 
-- [ ] **T12 · Cierre.** Depende de T10 y T11.
+- [x] **T12 · Cierre.** Depende de T10 y T11.
   - Mapa `R<n> → test` completo en `progress/impl_QC-162-gestion-de-empresas.md`
     (`design.md > 9`).
   - Repetir `node scripts/archivos-en-vuelo.mjs --candidata QC-162`.

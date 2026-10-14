@@ -413,3 +413,17 @@ Abreviaturas: `companies/` = `tests/unit/identity/companies/`; `int` = `tests/in
 
 Veredicto: Tanda D (T10, T11) en verde; las ocho acciones estan cableadas, el seed de produccion solo siembra la
 plataforma y todos los R1-R45 tienen test.
+
+## Cierre (T12)
+
+- `node scripts/archivos-en-vuelo.mjs --candidata QC-162`: choca con QC-214 y QC-275 (schema, catalogo de
+  errores, composicion, aislamiento.json, architecture.md), choques ya aceptados por el humano; con QC-262..267
+  solo comparte el apendice `guard-identificador-de-request.test.ts`, que no choca.
+- `./init.sh` (rapido), exit 0, `== init OK ==`:
+  - lint: 0 errores, 7 warnings ajenos.
+  - `vitest related` sobre el diff: Test Files 858 passed (858), Tests 13650 passed | 37 skipped (13687).
+  - `gate.siempre` (guard, module-contract, route-contract, scope.test): Test Files 114 passed (114), Tests 1608
+    passed | 37 skipped (1645).
+  - todas las migraciones tienen down.sql.
+
+Veredicto: T1-T12 hechas; ningun R1-R45 sin test.
