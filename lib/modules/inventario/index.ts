@@ -74,7 +74,18 @@ export {
   createCreateRawMaterial,
   type CreateRawMaterialDeps,
 } from './domain/create-raw-material';
-export { createUpdateProduct, type UpdateProductDeps } from './domain/update-product';
+export {
+  createUpdateProduct,
+  type ProductImageWarning,
+  type UpdateProductDeps,
+  type UpdateProductResult,
+} from './domain/update-product';
+export {
+  MAX_PRODUCT_IMAGE_BYTES,
+  validateProductImage,
+  type ProductImageFormat,
+  type ProductImageValidation,
+} from './domain/product-image';
 export { createDeleteProduct, type DeleteProductDeps } from './domain/delete-product';
 export { createGetProduct, type GetProductDeps } from './domain/get-product';
 export { createListProducts, type ListProductsDeps } from './domain/list-products';
@@ -278,6 +289,15 @@ export {
   type ImportTemplateValues,
 } from './domain/inventory-import-downloads';
 export {
+  createGetInventoryImportTemplate,
+  createGetInventoryImportValues,
+  type GetInventoryImportTemplate,
+  type GetInventoryImportTemplateDeps,
+  type GetInventoryImportValues,
+  type GetInventoryImportValuesDeps,
+  type InventoryImportTemplate,
+} from './domain/get-inventory-import-template';
+export {
   createPreviewInventoryImport,
   type PreviewInventoryImportDeps,
 } from './domain/preview-inventory-import';
@@ -291,15 +311,6 @@ export type {
   ReservationAllocation,
   ReservationPlan,
 } from './domain/plan-reservation';
-export {
-  createGetInventoryImportTemplate,
-  createGetInventoryImportValues,
-  type GetInventoryImportTemplate,
-  type GetInventoryImportTemplateDeps,
-  type GetInventoryImportValues,
-  type GetInventoryImportValuesDeps,
-  type InventoryImportTemplate,
-} from './domain/get-inventory-import-template';
 // Los datos de lote del producto terminado que escribe el acondicionamiento: el contrato y la
 // regla del lote tecleado y de la fecha civil, para que quien los valida use la misma definicion.
 export { typedLotSchema, civilDateSchema } from './domain/product-batch-input';

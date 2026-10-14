@@ -3,15 +3,20 @@ import { ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { PRODUCT_QUERYABLE } from './product-queryable';
 
+import { withImageUrl } from './product-image-url';
+
 import type { Page } from './page';
 import type { ProductView } from './product-view';
 
 import type { ListQueryLog } from '../ports/list-query-log';
+import type { ProductImageStorage } from '../ports/product-image-storage';
 import type { ProductRepository } from '../ports/product-repository';
 
 export type ListProductsDeps = {
   readonly products: ProductRepository;
   readonly log: ListQueryLog;
+  /** Compone `imageUrl` de cada fila. Sin el, las filas salen sin ella. */
+  readonly images?: Pick<ProductImageStorage, 'publicUrl'>;
 };
 
 /** Nombre con el que este listado se identifica en el log de campos omitidos (R6). */
@@ -63,6 +68,9 @@ export function createListProducts(
     const { query, ignored } = sanitizeListQuery(parsed.data, PRODUCT_QUERYABLE);
     deps.log.ignoredFields(LIST_NAME, ignored);
 
-    return deps.products.listAlive(query, { companyId: actor.companyId });
+    const page = await deps.products.listAlive(query, { companyId: actor.companyId });
+    if (deps.images === undefined) return page;
+    const images = deps.images;
+    return { ...page, items: page.items.map((product) => withImageUrl(product, images)) };
   };
 }

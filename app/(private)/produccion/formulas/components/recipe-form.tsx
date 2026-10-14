@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { StepReader } from '@/components/shared/step-reader';
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { ImageField } from '@/components/shared/image-field';
 import { Notice } from '@/components/shared/notice';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -23,8 +24,10 @@ import { Textarea } from '@/components/ui/textarea';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createRecipeSchema,
+  MAX_IMAGE_BYTES,
   sumPercentages,
   updateRecipeSchema,
+  validateRecipeImage,
   type CreateRecipeInput,
   type RecipeDetail,
   type RecipeVersionSummary,
@@ -41,7 +44,6 @@ import { cn } from '@/lib/utils';
 
 import type { ProductPickerOption } from './product-picker';
 import { PropagateVersionsDialog } from './propagate-versions-dialog';
-import { RecipeImageField } from './recipe-image-field';
 import { RECIPE_TOOL_ERROR_MESSAGES, RecipeLinesField } from './recipe-lines-field';
 import { RecipeStepsField } from './recipe-steps-field';
 import {
@@ -390,11 +392,14 @@ export function RecipeForm(props: RecipeFormProps) {
       {/* La imagen manda a la izquierda (3 de 12) y los datos de texto la acompanan (9). */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
         <div className="sm:col-span-3">
-          <RecipeImageField
+          <ImageField
             mode={props.mode}
             initialImageUrl={props.mode === 'edit' ? props.recipe.imageUrl : null}
             value={state.image}
             onChange={(image) => setState((previous) => ({ ...previous, image }))}
+            maxBytes={MAX_IMAGE_BYTES}
+            validate={validateRecipeImage}
+            testIdPrefix="recipe-image"
           />
         </div>
 

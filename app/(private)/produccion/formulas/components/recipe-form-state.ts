@@ -1,5 +1,8 @@
 import type { ZodIssue } from 'zod';
 
+// Solo el tipo: se borra al compilar, asi que este archivo sigue sin arrastrar React.
+import type { ImageFieldState } from '@/components/shared/image-field';
+
 import {
   formatPercentage,
   type RecipeLineView,
@@ -19,19 +22,7 @@ import {
 /** Modo del formulario: determina qué esquema del contrato valida el payload. */
 export type RecipeFormMode = 'create' | 'edit';
 
-/**
- * Los TRES estados del campo de imagen (R35, R36), representados como una unión discriminada
- * -nunca como `File | null | undefined`, que colapsaría "no tocado" y "quitado"-.
- *
- * `untouched`: el usuario no tocó el campo -> el payload NO lleva la clave `image`.
- * `replaced`: el usuario eligió un archivo -> el payload lleva `image: { bytes }`.
- * `cleared`: el usuario pidió quitar la imagen -> el payload lleva `image: null` EXPLÍCITO.
- * Solo válido en edición: el control de quitar no se ofrece en el alta (R36).
- */
-export type ImageFieldState =
-  | { readonly kind: 'untouched' }
-  | { readonly kind: 'replaced'; readonly bytes: Uint8Array }
-  | { readonly kind: 'cleared' };
+export type { ImageFieldState };
 
 /**
  * Línea de producto tal como vive en el ESTADO del formulario (no el payload que se envía).

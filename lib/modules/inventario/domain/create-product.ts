@@ -6,12 +6,14 @@ import {
   createProductSchema,
   type CreateProductInput,
 } from './product-input';
+import { validateProductImage } from './product-image';
 import { PRODUCT_TYPES, type ProductType } from './product-type';
 import { deriveUnitCost } from './unit-cost';
 
 import type { NewProductBatch } from './product-batch';
 import type { NewProduct } from './product-view';
 import type { StockIncreaseListener } from './stock-increase-listener';
+import type { ProductImageStorage, ProductImageUpload } from '../ports/product-image-storage';
 import type { ProductRepository } from '../ports/product-repository';
 
 export type CreateProductDeps = {
@@ -22,9 +24,31 @@ export type CreateProductDeps = {
   readonly packageUnit?: PackageUnitSource;
   /** Comprueba la unidad del alta de insumo. Sin el, el alta de un insumo falla. */
   readonly units?: Pick<UnitCatalog, 'findRefs'>;
+  /** Donde se sube la imagen. Sin el, un alta con imagen falla. */
+  readonly images?: ProductImageStorage;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
 };
+
+/** La imagen ya validada, pendiente de subir; `null` si el alta no trae ninguna. */
+type ImagenPendiente = ProductImageUpload | null;
+
+/** Valida antes de tocar el puerto: una imagen invalida no deja nada escrito. */
+function validarImagen(deps: CreateProductDeps, image: { bytes: Uint8Array } | undefined): ImagenPendiente {
+  if (image === undefined) return null;
+  const validation = validateProductImage(image.bytes);
+  if (!validation.ok) throw new ValidationError(`image: ${validation.reason}`);
+  if (deps.images === undefined) {
+    throw new Error('alta de producto con imagen sin almacenamiento: falta el cableado');
+  }
+  return { bytes: image.bytes, contentType: validation.contentType, extension: validation.extension };
+}
+
+/** Solo se sube cuando el producto nace: a un homonimo existente se le agrega el lote y nada mas. */
+async function subirImagen(deps: CreateProductDeps, imagen: ImagenPendiente): Promise<string | null> {
+  if (imagen === null || deps.images === undefined) return null;
+  return deps.images.upload(imagen);
+}
 
 type EntradaConLote = Extract<CreateProductInput, { type: (typeof PRODUCT_TYPES)[keyof typeof PRODUCT_TYPES] }>;
 
@@ -105,13 +129,14 @@ export function createCreateProduct(
     const instante = now();
 
     const purchaseDate = resolverFechaDeCompra(entrada, instante);
+    const imagen = validarImagen(deps, entrada.image);
 
     if (entrada.type === PRODUCT_TYPES.PACKAGING) {
-      return createPackaging(deps, entrada, actor, instante, purchaseDate, scope);
+      return createPackaging(deps, entrada, actor, instante, purchaseDate, scope, imagen);
     }
 
     if (entrada.type === PRODUCT_TYPES.PRODUCT) {
-      return createSupply(deps, entrada, actor, instante, purchaseDate, scope);
+      return createSupply(deps, entrada, actor, instante, purchaseDate, scope, imagen);
     }
 
     const batch: NewProductBatch = {
@@ -133,7 +158,15 @@ export function createCreateProduct(
     );
 
     // El instrumento no declara qtyAlert: el producto se queda en null.
-    return addOrCreate(deps, existente, { name: entrada.name, type: PRODUCT_TYPES.MACHINE }, batch, instante, scope);
+    return addOrCreate(
+      deps,
+      existente,
+      { name: entrada.name, type: PRODUCT_TYPES.MACHINE },
+      batch,
+      instante,
+      scope,
+      imagen,
+    );
   };
 }
 
@@ -147,6 +180,7 @@ async function addOrCreate(
   batch: NewProductBatch,
   instante: Date,
   scope: Scope,
+  imagen: ImagenPendiente,
 ): Promise<{ id: string; lot?: string }> {
   if (existente !== null) {
     // El homonimo vivo es un producto terminado. Se rechaza aqui, antes de tocar el
@@ -166,7 +200,13 @@ async function addOrCreate(
 
   // Una sola operacion del puerto para producto y lote, para que el dominio no pueda dejar
   // escrita solo la mitad.
-  const creado = await deps.products.createWithFirstBatch(producto, batch, instante, scope);
+  const imagePath = await subirImagen(deps, imagen);
+  const creado = await deps.products.createWithFirstBatch(
+    imagePath === null ? producto : { ...producto, imagePath },
+    batch,
+    instante,
+    scope,
+  );
   await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
   return { id: creado.id, lot: creado.lot };
 }
@@ -185,6 +225,7 @@ async function createSupply(
   instante: Date,
   purchaseDate: string,
   scope: Scope,
+  imagen: ImagenPendiente,
 ): Promise<{ id: string; lot?: string }> {
   if (deps.units === undefined) {
     throw new Error('alta de insumo sin el catalogo de unidades: falta el cableado');
@@ -214,6 +255,7 @@ async function createSupply(
     batch,
     instante,
     scope,
+    imagen,
   );
 }
 type EntradaEnvase = Extract<CreateProductInput, { type: typeof PRODUCT_TYPES.PACKAGING }>;
@@ -230,6 +272,7 @@ async function createPackaging(
   instante: Date,
   purchaseDate: string,
   scope: { readonly companyId: string },
+  imagen: ImagenPendiente,
 ): Promise<{ id: string; lot?: string }> {
   const batch: NewProductBatch = {
     presentationId: null,
@@ -260,8 +303,14 @@ async function createPackaging(
     throw new Error('alta de envase sin la unidad de sistema de envases: falta la siembra o el cableado');
   }
 
+  const imagePath = await subirImagen(deps, imagen);
   const creado = await deps.products.createWithFirstBatch(
-    { name: entrada.name, qtyAlert: entrada.qtyAlert, type: PRODUCT_TYPES.PACKAGING },
+    {
+      name: entrada.name,
+      qtyAlert: entrada.qtyAlert,
+      type: PRODUCT_TYPES.PACKAGING,
+      ...(imagePath === null ? {} : { imagePath }),
+    },
     batch,
     instante,
     scope,

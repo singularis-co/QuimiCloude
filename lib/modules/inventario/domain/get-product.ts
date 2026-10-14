@@ -1,11 +1,15 @@
 import { requirePermission, type Actor } from './actor';
 import { ProductNotFoundError } from './errors';
+import { withImageUrl } from './product-image-url';
 import type { ProductView } from './product-view';
 
+import type { ProductImageStorage } from '../ports/product-image-storage';
 import type { ProductRepository } from '../ports/product-repository';
 
 export type GetProductDeps = {
   readonly products: ProductRepository;
+  /** Compone `imageUrl`. Sin el, la ficha sale sin ella. */
+  readonly images?: Pick<ProductImageStorage, 'publicUrl'>;
 };
 
 /**
@@ -33,6 +37,6 @@ export function createGetProduct(
     const product = await deps.products.findAliveById(id, { companyId: actor.companyId });
     if (product === null) throw new ProductNotFoundError();
 
-    return product;
+    return withImageUrl(product, deps.images);
   };
 }

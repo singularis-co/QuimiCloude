@@ -154,6 +154,8 @@ import { readCsv } from '@/lib/modules/inventario/adapters/driven/spreadsheet/cs
 import { fileDigest } from '@/lib/modules/inventario/adapters/driven/spreadsheet/file-digest';
 import { readXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader';
 import { writeXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-writer';
+import { createProductImageStorageSupabase } from '@/lib/modules/inventario/adapters/driven/storage/product-image-supabase';
+import type { ProductImageStorage } from '@/lib/modules/inventario/ports/product-image-storage';
 import type { ImportFormulaLookup } from '@/lib/modules/inventario/ports/import-formula-lookup';
 import type { ImportTemplateValuesReader } from '@/lib/modules/inventario/ports/import-template-values';
 import type { InventoryImportRepository } from '@/lib/modules/inventario/ports/inventory-import-repository';
@@ -234,6 +236,7 @@ import {
   removeRecipeImage,
   uploadRecipeImage,
 } from '@/lib/modules/recetas/adapters/driven/storage/recipe-image-supabase';
+import { readRecipeImageStorageConfigFromEnv } from '@/lib/modules/recetas/adapters/driven/config/storage-config-env';
 import type { ListQueryLog as RecetasListQueryLog } from '@/lib/modules/recetas/ports/list-query-log';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
@@ -351,10 +354,10 @@ import type { OrderDeliveryVoidUnitOfWork } from '@/lib/modules/pedidos/ports/or
 import {
   createRecipeExecutionReader,
   findAliveRecipeByNormalizedName,
+  listAliveOriginalRecipeNames,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipePackingStepsById,
-  listAliveOriginalRecipeNames,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -1066,11 +1069,18 @@ const stockIncreaseListener: StockIncreaseListener = {
  * `{ id, roleName }` con lo que devuelve `SessionUser`. `lib/composition` no conoce
  * cookies ni sesion; solo ata puerto -> adaptador.
  */
+/** Mismo bucket y credenciales que la imagen de receta; la carpeta es `productos/`. Construirlo
+ *  no lee el entorno: la configuracion se resuelve en cada llamada. */
+const productImageStorage: ProductImageStorage = createProductImageStorageSupabase(
+  readRecipeImageStorageConfigFromEnv,
+);
+
 const createProductUseCase = createCreateProduct({
   products: productRepository,
   stockIncreases: stockIncreaseListener,
   packageUnit: { findPackageUnitId },
   units: { findRefs: findUnitRefs },
+  images: productImageStorage,
 });
 
 const inventoryImportRepository: InventoryImportRepository = {
@@ -1109,10 +1119,14 @@ const inventoryImportReadDeps = {
 export const inventario = {
   createProduct: createProductUseCase,
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
-  updateProduct: createUpdateProduct({ products: productRepository }),
+  updateProduct: createUpdateProduct({ products: productRepository, images: productImageStorage }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
-  getProduct: createGetProduct({ products: productRepository }),
-  listProducts: createListProducts({ products: productRepository, log: inventarioListQueryLog }),
+  getProduct: createGetProduct({ products: productRepository, images: productImageStorage }),
+  listProducts: createListProducts({
+    products: productRepository,
+    log: inventarioListQueryLog,
+    images: productImageStorage,
+  }),
   createPresentation: createCreatePresentation({ presentations: presentationRepository }),
   updatePresentation: createUpdatePresentation({ presentations: presentationRepository }),
   deletePresentation: createDeletePresentation({ presentations: presentationRepository }),
@@ -1144,6 +1158,11 @@ export const inventario = {
   // El adaptador y no `unitCatalog`, que se declara mas abajo.
   listProductFormUnits: createListProductFormUnits({ units: { listVisibleRefs: listVisibleUnitRefs } }),
   previewInventoryImport: createPreviewInventoryImport(inventoryImportReadDeps),
+  getInventoryImportTemplate: createGetInventoryImportTemplate({
+    values: importTemplateValuesReader,
+    writer: { write: writeXlsx },
+  }),
+  getInventoryImportValues: createGetInventoryImportValues({ values: importTemplateValuesReader }),
   confirmInventoryImport: createConfirmInventoryImport({
     ...inventoryImportReadDeps,
     createProduct: createProductUseCase,
@@ -1158,11 +1177,6 @@ export const inventario = {
     products: finishedProductDetailRepository,
     orders: orderNumberDirectory,
   }),
-  getInventoryImportTemplate: createGetInventoryImportTemplate({
-    values: importTemplateValuesReader,
-    writer: { write: writeXlsx },
-  }),
-  getInventoryImportValues: createGetInventoryImportValues({ values: importTemplateValuesReader }),
   listFinishedProductMovements: createListFinishedProductMovements({
     products: finishedProductDetailRepository,
     orders: orderNumberDirectory,

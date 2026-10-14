@@ -69,4 +69,34 @@ describe('ProductBatchDateField', () => {
     // El intento de elegir un dia futuro no cambia lo que viaja en el FormData.
     expect(screen.getByTestId('product-batch-date-value')).toHaveValue('2026-06-15');
   });
+
+  it('la fecha de expiracion arranca vacia, deshabilita hoy y ayer, y deja elegir mañana', async () => {
+    const user = setupUser();
+    render(<ProductBatchDateField name="expiryDate" label="Fecha de expiración" />);
+
+    expect(screen.getByTestId('product-value-expiryDate')).toHaveValue('');
+    expect(screen.getByTestId('product-value-expiryDate')).toHaveAttribute('name', 'expiryDate');
+
+    await user.click(screen.getByTestId('product-field-expiryDate'));
+
+    const hoy = await esperarInteractiva(getDayButton('2026-06-15'));
+    expect(getDayButton('2026-06-14')).toBeDisabled();
+    expect(hoy).toBeDisabled();
+    expect(getDayButton('2026-06-16')).toBeEnabled();
+
+    await user.click(hoy);
+    expect(screen.getByTestId('product-value-expiryDate')).toHaveValue('');
+
+    await user.click(getDayButton('2026-06-16'));
+    expect(screen.getByTestId('product-value-expiryDate')).toHaveValue('2026-06-16');
+  });
+
+  it('la fecha de compra sigue usando el mismo selector y su cota es la contraria', async () => {
+    const user = setupUser();
+    render(<ProductBatchDateField />);
+
+    await user.click(screen.getByTestId('product-field-purchaseDate'));
+    // Ayer si vale para la compra: la cota de expiracion no se le aplica.
+    expect(await esperarInteractiva(getDayButton('2026-06-14'))).toBeEnabled();
+  });
 });
