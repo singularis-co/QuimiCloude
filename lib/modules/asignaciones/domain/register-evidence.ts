@@ -74,6 +74,11 @@ export function createRegisterEvidence(
     if (replacesEvidenceId !== undefined && replaced?.stepPosition !== stepPosition) {
       return rejectUpload(path, (diagnostic) => new EvidenceNotFoundError(diagnostic));
     }
+    // Sustituir por su propia ruta borraria del bucket el archivo de la fila nueva. Ese archivo es
+    // el de la foto vigente, asi que no se toca.
+    if (replaced !== null && replaced.path === path) {
+      throw new ValidationError('la ruta nueva es la de la foto que se sustituye');
+    }
 
     const bytes = await deps.storage.download(path);
     if (bytes === null) throw new EvidenceInvalidFileError('no hay nada subido en esa ruta');

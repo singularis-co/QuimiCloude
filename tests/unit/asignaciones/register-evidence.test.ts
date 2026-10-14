@@ -258,6 +258,17 @@ describe('registerEvidence — tope, sustitucion y lectura (R29, R19, R21, R33)'
     expect(d.storage.remove).not.toHaveBeenCalledWith(vieja.path);
   });
 
+  it('R19: Cambiar con la misma ruta de la foto sustituida: invalid_input sin descargar, sin escribir y sin borrar nada', async () => {
+    const vieja = filaFoto({ id: uuid('2'), slot: 2 });
+    const d = montar({ filas: [vieja] });
+    await expect(
+      d.register(OPERADOR, { ...FABRICACION, path: vieja.path, replacesEvidenceId: vieja.id }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(d.storage.download).not.toHaveBeenCalled();
+    sinEscrituras(d);
+    expect(d.filas).toEqual([vieja]);
+  });
+
   it('R19: un remove del archivo viejo que falla no deshace el registro: vuelve como advertencia', async () => {
     const vieja = filaFoto({ id: uuid('2'), slot: 2 });
     const d = montar({ filas: [vieja], borradoFalla: new Error('bucket caido') });
