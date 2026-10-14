@@ -38,6 +38,11 @@ export const INVENTORY_ROUTE = '/inventario';
 /** Cuelga de `INVENTORY_ROUTE`, así que su prefijo privado ya la cubre. */
 export const INVENTORY_IMPORT_ROUTE = '/inventario/importar';
 
+/** Cuelga de `INVENTORY_ROUTE`; el segmento estatico no choca con `importar`. */
+export function finishedProductDetailRoute(id: string): string {
+  return `${INVENTORY_ROUTE}/producto-terminado/${id}`;
+}
+
 /**
  * Pantalla de recetas de produccion (QC-26, R3).
  *
@@ -350,3 +355,10 @@ export const PRIVATE_ROUTE_PREFIXES = [
   INVENTORY_INTEGRATION_ROUTE,
   WHATSAPP_INTEGRATION_ROUTE,
 ] as const;
+
+/** Ruta publica del webhook de WhatsApp: Meta la llama sin sesion, con el id de la conexion al final. */
+export const WHATSAPP_WEBHOOK_ROUTE_BASE = '/api/integraciones/whatsapp/webhook';
+
+export function whatsappWebhookPath(connectionId: string): string {
+  return `${WHATSAPP_WEBHOOK_ROUTE_BASE}/${connectionId}`;
+}

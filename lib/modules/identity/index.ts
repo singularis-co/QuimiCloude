@@ -356,3 +356,10 @@ export {
   type CurrentSession,
   type EndOtherSessionsDeps,
 } from './domain/end-other-sessions';
+
+// El pais de la empresa: la primera operacion de plataforma, hecha por un actor sin empresa.
+// La Server Action no sale por aqui (la pantalla la importa por su ruta exacta), y el puerto
+// tampoco: el contrato solo reexporta `./domain`, y la composicion lo importa desde `ports/`.
+export type { PlatformActor } from './domain/platform-actor';
+export { CompanyNotFoundError } from './domain/errors';
+export { createSetCompanyCountry, type SetCompanyCountryDeps } from './domain/set-company-country';

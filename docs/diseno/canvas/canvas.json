@@ -850,6 +850,71 @@
    "title": "ModalesConfiguracion",
    "page": "configuracion",
    "is_interactive": true
+  },
+  "CountrySelect.dc.html": {
+   "x": 0,
+   "y": 6900,
+   "w": 1440,
+   "h": 1240,
+   "title": "CountrySelect (QC-235)",
+   "page": "fundamentos",
+   "is_interactive": true
+  },
+  "ProductoTerminado.dc.html": {
+   "x": 0,
+   "y": 8180,
+   "w": 1440,
+   "h": 1000,
+   "title": "Ficha de producto terminado (QC-225)",
+   "page": "inventario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "ProductoTerminadoTablet.dc.html": {
+   "x": 1520,
+   "y": 8180,
+   "w": 904,
+   "h": 1300,
+   "title": "ProductoTerminadoTablet",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "ProductoTerminadoMovil.dc.html": {
+   "x": 2504,
+   "y": 8180,
+   "w": 960,
+   "h": 1300,
+   "title": "ProductoTerminadoMovil",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "PedidosPresentaciones.dc.html": {
+   "x": 0,
+   "y": 6100,
+   "w": 1440,
+   "h": 1100,
+   "title": "Presentaciones enlazadas y llegada a la ficha (QC-225)",
+   "page": "pedidos",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "PedidosPresentacionesTablet.dc.html": {
+   "x": 1520,
+   "y": 6100,
+   "w": 904,
+   "h": 1300,
+   "title": "PedidosPresentacionesTablet",
+   "page": "pedidos",
+   "is_interactive": true
+  },
+  "PedidosPresentacionesMovil.dc.html": {
+   "x": 2504,
+   "y": 6100,
+   "w": 960,
+   "h": 1300,
+   "title": "PedidosPresentacionesMovil",
+   "page": "pedidos",
+   "is_interactive": true
   }
  },
  "order": [
@@ -939,7 +1004,14 @@
   "Integraciones.dc.html",
   "IntegracionesTablet.dc.html",
   "IntegracionesMovil.dc.html",
-  "ModalesConfiguracion.dc.html"
+  "ModalesConfiguracion.dc.html",
+  "CountrySelect.dc.html",
+  "ProductoTerminado.dc.html",
+  "ProductoTerminadoTablet.dc.html",
+  "ProductoTerminadoMovil.dc.html",
+  "PedidosPresentaciones.dc.html",
+  "PedidosPresentacionesTablet.dc.html",
+  "PedidosPresentacionesMovil.dc.html"
  ],
  "notes": {
   "t1": {
@@ -1325,6 +1397,28 @@
    "kind": "title1",
    "maxW": 1440,
    "page": "configuracion"
+  },
+  "c_ProductoTerminado": {
+   "x": 0,
+   "y": 8070,
+   "text": "Ficha de producto terminado (QC-225)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "inventario"
+  },
+  "c_PedidosPresentaciones": {
+   "x": 0,
+   "y": 5990,
+   "text": "Presentaciones enlazadas a la ficha (QC-225)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "pedidos"
   }
  },
  "designSystems": [],

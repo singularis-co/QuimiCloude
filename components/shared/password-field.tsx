@@ -6,17 +6,16 @@ import { useEffect, useId, useState, type ChangeEvent, type ReactNode } from 're
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { evaluateCredentialRules, type CredentialRule } from '@/lib/modules/identity';
+import { evaluateCredentialRules } from '@/lib/modules/identity';
 
-import { CredentialRequirements, type CredentialRuleState } from './credential-requirements';
+import { CredentialRequirements, type LiveCredentialRule } from './credential-requirements';
 import { FieldError } from './field-error';
 
 export const PASSWORD_FIELD_SHOW_LABEL = 'Mostrar la contraseña';
 export const PASSWORD_FIELD_HIDE_LABEL = 'Ocultar la contraseña';
 
 export type PasswordFieldRequirements = {
-  readonly breachedState?: CredentialRuleState;
-  readonly labels?: Partial<Record<CredentialRule, string>>;
+  readonly labels?: Partial<Record<LiveCredentialRule, string>>;
   readonly onOwnRulesMetChange?: (met: boolean) => void;
 };
 
@@ -30,6 +29,7 @@ export type PasswordFieldProps = {
   readonly error?: string;
   readonly describedBy?: string;
   readonly testId?: string;
+  readonly required?: boolean;
   readonly requirements?: PasswordFieldRequirements;
 };
 
@@ -56,6 +56,7 @@ function FieldShell({
   error,
   describedBy,
   testId,
+  required,
   requirementsId,
   value,
   onChange,
@@ -75,6 +76,8 @@ function FieldShell({
           name={name}
           type={visible ? 'text' : 'password'}
           autoComplete={autoComplete}
+          required={required}
+          aria-required={required ? true : undefined}
           spellCheck={variant === 'secret' ? false : undefined}
           aria-invalid={error ? true : undefined}
           aria-describedby={joinIds(describedBy, requirementsId, error ? errorId : undefined)}
@@ -139,7 +142,6 @@ function FieldWithRequirements({
       <CredentialRequirements
         id={requirementsId}
         candidate={candidate}
-        breachedState={requirements.breachedState}
         labels={requirements.labels}
       />
     </FieldShell>

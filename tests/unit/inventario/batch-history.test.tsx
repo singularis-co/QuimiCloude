@@ -333,4 +333,33 @@ describe('BatchHistory', () => {
     expect(within(fila).getByTestId('batch-history-entry-date')).toHaveTextContent('2026-10-08');
     expect(within(fila).queryByTestId('batch-history-entry-reason')).toBeNull();
   });
+
+  it('R35 — un asiento de anulacion de entrega se pinta como «Anulación de entrega», con la cantidad en positivo, el pedido, el autor y la fecha', async () => {
+    const anulacion = asiento({
+      id: 'anulacion-1',
+      kind: 'delivery_void',
+      quantity: '3.0000',
+      reason: null,
+      orderNumberText: '2026-0000024',
+      authorName: 'Laura Gomez',
+      createdAt: '2026-10-09T09:00:00.000Z',
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [anulacion] });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    const fila = await screen.findByTestId('batch-history-entry-anulacion-1');
+    expect(within(fila).getByTestId('batch-history-entry-kind')).toHaveTextContent('Anulación de entrega');
+    expect(movementKindLabel('delivery_void')).toBe('Anulación de entrega');
+    expect(movementKindLabel('delivery_void')).not.toBe(movementKindLabel('delivery'));
+    const cantidad = within(fila).getByTestId('batch-history-entry-quantity');
+    expect(cantidad).toHaveAttribute('aria-label', '3');
+    expect(cantidad.textContent).toMatch(/^3/);
+    expect(cantidad.textContent).not.toContain('-');
+    expect(within(fila).getByTestId('batch-history-entry-order')).toHaveTextContent('2026-0000024');
+    expect(within(fila).getByTestId('batch-history-entry-author')).toHaveTextContent('Laura Gomez');
+    expect(within(fila).getByTestId('batch-history-entry-date')).toHaveTextContent('2026-10-09 09:00');
+    expect(within(fila).queryByTestId('batch-history-entry-reason')).toBeNull();
+  });
 });

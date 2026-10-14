@@ -285,7 +285,7 @@ export function classifyImportTarget(
 // BLOQUE 4 — Pureza del dominio (R7, R8, R9)
 // ---------------------------------------------------------------------------
 
-export const PURE_PACKAGES: readonly string[] = ['zod', 'papaparse']
+export const PURE_PACKAGES: readonly string[] = ['zod', 'papaparse', 'libphonenumber-js']
 
 const FRAMEWORK_PACKAGE_PATTERN = /^(next(\/.*)?|react(-dom)?(\/.*)?|react)$/
 

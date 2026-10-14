@@ -1,6 +1,6 @@
 // QC-21 — T4: `CredentialRequirements` renderizado directo con props.
 //
-// Cubre R1, R2 (parte), R3, R4, R5, R7, R8, R9, R15, R16, R20, R21.
+// Cubre R1, R2 (parte), R3, R4, R5, R15 (enmendada por QC-273), R16, R20, R21.
 //
 // El test ITERA `CREDENTIAL_RULES` importado del barrel `@/lib/modules/identity`: si QC-19
 // anade, quita o reordena un codigo, este archivo lo exige sin editarse (R3). El estado
@@ -10,25 +10,28 @@
 
 import { render, screen } from '@testing-library/react';
 
-import { CredentialRequirements, type CredentialRuleState } from '@/components/shared/credential-requirements';
+import {
+  CredentialRequirements,
+  LIVE_CREDENTIAL_RULES,
+  type CredentialRuleState,
+} from '@/components/shared/credential-requirements';
 import { CREDENTIAL_RULE_LABELS } from '@/components/shared/credential-rule-labels';
 import { CREDENTIAL_RULES, evaluateCredentialRules, type CredentialRule } from '@/lib/modules/identity';
 
-/** Todas las reglas salvo la septima: las seis comprobables en vivo, en orden del catalogo. */
+/** Todas las reglas salvo la de filtradas: las seis comprobables en vivo, en orden del catalogo. */
 const LIVE_RULES = CREDENTIAL_RULES.filter((rule) => rule !== 'breached');
 
-function stateFor(rule: CredentialRule, candidate: string, breachedState: CredentialRuleState): CredentialRuleState {
-  if (rule === 'breached') return breachedState;
+function stateFor(rule: CredentialRule, candidate: string): CredentialRuleState {
   return evaluateCredentialRules(candidate).unmet.includes(rule) ? 'unmet' : 'met';
 }
 
 describe('CredentialRequirements — catalogo y orden (R1, R3)', () => {
-  it('renderiza una entrada por cada codigo de CREDENTIAL_RULES y en su orden', () => {
+  it('renderiza una entrada por cada regla en vivo de CREDENTIAL_RULES y en su orden', () => {
     const { container } = render(<CredentialRequirements candidate="" />);
     const items = container.querySelectorAll('li[data-rule]');
 
-    expect(items).toHaveLength(CREDENTIAL_RULES.length);
-    for (const [index, rule] of CREDENTIAL_RULES.entries()) {
+    expect(items).toHaveLength(LIVE_RULES.length);
+    for (const [index, rule] of LIVE_RULES.entries()) {
       expect(items[index]?.getAttribute('data-rule')).toBe(rule);
     }
   });
@@ -40,7 +43,8 @@ describe('CredentialRequirements — catalogo y orden (R1, R3)', () => {
     const renderedRules = [...container.querySelectorAll('li[data-rule]')].map((li) =>
       li.getAttribute('data-rule'),
     );
-    expect(renderedRules).toEqual([...CREDENTIAL_RULES]);
+    expect(renderedRules).toEqual([...LIVE_RULES]);
+    expect([...LIVE_CREDENTIAL_RULES]).toEqual(LIVE_RULES);
   });
 });
 
@@ -86,7 +90,7 @@ describe('CredentialRequirements — marcado en vivo de las seis (R2, R4, R5)', 
     ).toEqual(LIVE_RULES);
 
     // Visible desde el primer render: nada de foco, escritura ni ratón.
-    expect(screen.getAllByRole('listitem')).toHaveLength(CREDENTIAL_RULES.length);
+    expect(screen.getAllByRole('listitem')).toHaveLength(LIVE_RULES.length);
   });
 
   // Test espejo (R2 obliga a que `evaluateCredentialRules` sea la unica fuente de verdad,
@@ -103,7 +107,7 @@ describe('CredentialRequirements — marcado en vivo de las seis (R2, R4, R5)', 
       const { container, unmount } = render(<CredentialRequirements candidate={candidate} />);
       for (const rule of LIVE_RULES) {
         const item = container.querySelector(`li[data-rule="${rule}"]`);
-        const expected = stateFor(rule, candidate, 'unknown');
+        const expected = stateFor(rule, candidate);
         expect(item?.getAttribute('data-state'), `regla ${rule} con candidata ${JSON.stringify(candidate)}`).toBe(
           expected,
         );
@@ -119,58 +123,36 @@ describe('CredentialRequirements — marcado en vivo de las seis (R2, R4, R5)', 
     const { container, rerender } = render(<CredentialRequirements candidate="a" />);
     for (const rule of LIVE_RULES) {
       const item = container.querySelector(`li[data-rule="${rule}"]`);
-      expect(item?.getAttribute('data-state')).toBe(stateFor(rule, 'a', 'unknown'));
+      expect(item?.getAttribute('data-state')).toBe(stateFor(rule, 'a'));
     }
 
     const otraCandidata = 'Abcdefg1#';
     rerender(<CredentialRequirements candidate={otraCandidata} />);
     for (const rule of LIVE_RULES) {
       const item = container.querySelector(`li[data-rule="${rule}"]`);
-      expect(item?.getAttribute('data-state')).toBe(stateFor(rule, otraCandidata, 'unknown'));
+      expect(item?.getAttribute('data-state')).toBe(stateFor(rule, otraCandidata));
     }
   });
 });
 
-describe('CredentialRequirements — la septima, neutra hasta que responde el servidor (R7, R8, R9)', () => {
-  it('la regla de filtradas arranca en estado neutro', () => {
-    const { container } = render(<CredentialRequirements candidate="Abcdefg1#" />);
-    const item = container.querySelector('li[data-rule="breached"]');
-    expect(item?.getAttribute('data-state')).toBe('unknown');
-  });
-
-  it('sin veredicto del servidor la regla de filtradas nunca sale cumplida ni incumplida', () => {
-    // Ninguna candidata, por si sola, mueve la septima: es el prop `breachedState` el unico
-    // que la cambia (R8).
+describe('CredentialRequirements — sin el requisito de filtradas (QC-273)', () => {
+  it('la lista no muestra el requisito de credenciales filtradas para ninguna candidata', () => {
+    // La regla la comprueba solo el servidor al guardar: la lista en vivo no la promete.
     const candidatas = ['', 'a', 'Abcdefg1#', 'z'.repeat(70)];
     for (const candidate of candidatas) {
       const { container, unmount } = render(<CredentialRequirements candidate={candidate} />);
-      const item = container.querySelector('li[data-rule="breached"]');
-      expect(item?.getAttribute('data-state'), `candidata ${JSON.stringify(candidate)}`).toBe('unknown');
+      expect(container.querySelector('li[data-rule="breached"]'), `candidata ${JSON.stringify(candidate)}`).toBeNull();
+      expect(screen.queryByText(CREDENTIAL_RULE_LABELS.breached)).not.toBeInTheDocument();
+      expect(screen.queryByText('Requisito pendiente de comprobar')).not.toBeInTheDocument();
       unmount();
     }
-  });
-
-  it('con el veredicto de filtrada la septima sale incumplida y las seis no cambian', () => {
-    const candidate = 'Abcdefg1#';
-    const { container: neutro } = render(<CredentialRequirements candidate={candidate} />);
-    const estadosPrevios = LIVE_RULES.map(
-      (rule) => neutro.querySelector(`li[data-rule="${rule}"]`)?.getAttribute('data-state'),
-    );
-
-    const { container: filtrada } = render(<CredentialRequirements candidate={candidate} breachedState="unmet" />);
-    expect(filtrada.querySelector('li[data-rule="breached"]')?.getAttribute('data-state')).toBe('unmet');
-
-    const estadosTrasVeredicto = LIVE_RULES.map(
-      (rule) => filtrada.querySelector(`li[data-rule="${rule}"]`)?.getAttribute('data-state'),
-    );
-    expect(estadosTrasVeredicto).toEqual(estadosPrevios);
   });
 });
 
 describe('CredentialRequirements — copy desde una unica fuente (R15)', () => {
   it('el texto de cada regla sale de CREDENTIAL_RULE_LABELS', () => {
     render(<CredentialRequirements candidate="" />);
-    for (const rule of CREDENTIAL_RULES) {
+    for (const rule of LIVE_RULES) {
       expect(screen.getByText(CREDENTIAL_RULE_LABELS[rule])).toBeInTheDocument();
     }
   });
@@ -186,18 +168,18 @@ describe('CredentialRequirements — copy desde una unica fuente (R15)', () => {
   });
 });
 
-describe('CredentialRequirements — tres estados distinguibles sin color (R16)', () => {
+describe('CredentialRequirements — estados distinguibles sin color (R16)', () => {
   it('cada entrada expone su estado de forma consultable y con texto, no solo por color', () => {
-    const { container } = render(<CredentialRequirements candidate="" breachedState="unmet" />);
+    const { container } = render(<CredentialRequirements candidate="Abc" />);
     const listItems = screen.getAllByRole('listitem');
-    expect(listItems).toHaveLength(CREDENTIAL_RULES.length);
+    expect(listItems).toHaveLength(LIVE_RULES.length);
 
-    for (const rule of CREDENTIAL_RULES) {
+    for (const rule of LIVE_RULES) {
       const item = container.querySelector(`li[data-rule="${rule}"]`);
       expect(item).not.toBeNull();
       // Consultable programaticamente: el atributo `data-state`, no un color de CSS.
       const state = item?.getAttribute('data-state');
-      expect(state).toMatch(/^(met|unmet|unknown)$/);
+      expect(state).toMatch(/^(met|unmet)$/);
       // Y con texto, no solo icono: el `li` contiene un texto de estado no vacio.
       expect(item?.textContent?.trim().length ?? 0).toBeGreaterThan(0);
     }

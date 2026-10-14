@@ -169,3 +169,25 @@ describe('R31 - BLOQUEADO: el disparador esta deshabilitado y explica por que', 
     expect(assignedOrderBlockedNoticeText()).not.toBe(assignedOrderEnterNoticeText());
   });
 });
+
+describe('R1, R2, R3 (QC-269) - el envoltorio hereda la alineacion de su contenedor', () => {
+  it.each(['BLOQUEADO', 'EN_CURSO'] as const)(
+    '%s: el envoltorio no es flex ni fija items-*, y boton y aviso siguen enlazados',
+    (status) => {
+      render(<AssignedOrderEnterTrigger order={{ id: 'order-5', status }} />);
+
+      const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
+      const reason = screen.getByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID);
+      const wrapper = trigger.parentElement;
+
+      expect(wrapper).not.toBeNull();
+      expect(wrapper).toBe(reason.parentElement);
+      const classes = Array.from(wrapper?.classList ?? []);
+      expect(classes).not.toContain('flex');
+      expect(classes).not.toContain('inline-flex');
+      expect(classes.filter((c) => c.startsWith('items-'))).toEqual([]);
+      expect(reason).toHaveClass('mt-1');
+      expect(trigger.getAttribute('aria-describedby')).toBe(reason.id);
+    },
+  );
+});

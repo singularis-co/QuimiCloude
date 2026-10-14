@@ -481,12 +481,21 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `@prisma/client` -`Prisma.Decimal` y el `P2002` de la clave de entrega- y el cliente
     // compartido como defecto de su fabrica. Las dos listas siguen CERRADAS.
     const ENTREGAS = 'lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma.ts'
-    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, ENTREGAS, DUENO_DE_PRISMA, UNIDAD_DE_TRABAJO]
+    // 2026-10-09: `order-delivery-void-prisma.ts` (anulacion de entregas) importa
+    // `@prisma/client` -el `P2002` de la clave y de la linea ya anulada- y el cliente compartido
+    // como defecto de sus dos fabricas. Las dos listas siguen CERRADAS.
+    const ANULACIONES = 'lib/modules/pedidos/adapters/driven/persistence/order-delivery-void-prisma.ts'
+    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, ENTREGAS, ANULACIONES, DUENO_DE_PRISMA, UNIDAD_DE_TRABAJO]
     // `order-number-directory-prisma.ts` (`OrderNumberDirectory` de `inventario`) tambien abre
     // el cliente compartido, sin importar `@prisma/client`.
+    // 2026-10-13: `order-delivery-directory-prisma.ts` (`FinishedDeliveryDirectory` de
+    // `inventario`, solo lectura) abre el cliente compartido, sin importar `@prisma/client`.
+    // Las dos listas siguen CERRADAS.
     const DUENOS_DEL_CLIENTE = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      'lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma.ts',
       ENTREGAS,
+      ANULACIONES,
       'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
       DUENO_DE_PRISMA,
       UNIDAD_DE_TRABAJO,

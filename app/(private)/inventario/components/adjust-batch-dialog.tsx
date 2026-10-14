@@ -44,7 +44,7 @@ import {
 } from '@/lib/shared/ui/decimal-display';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-import { movementReasonLabel } from './batch-history';
+import { movementReasonLabel } from './movement-reason-label';
 
 const FIELD_TEXT = 'text-base md:text-base';
 

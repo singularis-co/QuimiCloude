@@ -128,6 +128,49 @@ export {
   createListBatchMovements,
   type ListBatchMovementsDeps,
 } from './domain/list-batch-movements';
+export {
+  FINISHED_PRODUCT_MOVEMENT_DIRECTIONS,
+  packagedQuantityOf,
+  summarizeFinishedStock,
+  productionCostTotal,
+  type FinishedProductMovementDirection,
+  type PackagedQuantity,
+  type FinishedStockSummary,
+  type FinishedProductDetail,
+  type FinishedProductBatchRow,
+  type FinishedProductMovementKind,
+  type FinishedProductMovementRow,
+  type FinishedProductDeliveryRow,
+  type DeliveredTotal,
+  type FinishedProductDeliveriesPage,
+  type FinishedProductCostRow,
+  type ProducedProductLink,
+  type FinishedDeliveryDirectory,
+} from './domain/finished-product-detail';
+export {
+  createGetFinishedProduct,
+  type GetFinishedProductDeps,
+} from './domain/get-finished-product';
+export {
+  createListFinishedProductBatches,
+  type ListFinishedProductBatchesDeps,
+} from './domain/list-finished-product-batches';
+export {
+  createListFinishedProductMovements,
+  type ListFinishedProductMovementsDeps,
+} from './domain/list-finished-product-movements';
+export {
+  createListFinishedProductDeliveries,
+  type ListFinishedProductDeliveriesDeps,
+} from './domain/list-finished-product-deliveries';
+export {
+  createListFinishedProductCosts,
+  type ListFinishedProductCostsDeps,
+} from './domain/list-finished-product-costs';
+export {
+  createListProducedProducts,
+  type ListProducedProductsDeps,
+} from './domain/list-produced-products';
 
 export {
   addQuantities,
@@ -151,6 +194,12 @@ export {
   type FinishedGoodsDispatchInput,
   type FinishedGoodsDispatchOutcome,
 } from './domain/finished-goods-dispatch';
+export type {
+  BatchLotDirectory,
+  FinishedGoodsReturn,
+  FinishedGoodsReturnInput,
+  FinishedGoodsReturnOutcome,
+} from './domain/finished-goods-return';
 // `pedidos` deriva el coste unitario unico del pedido con la MISMA division que ya usa
 // este modulo para un lote sin costo de compra -mismo criterio de redondeo, misma escala-.
 export { deriveUnitCost } from './domain/unit-cost';

@@ -1395,6 +1395,11 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // `DASHBOARD_ROUTE` (`/dashboard/recorrido/<id>`). No es del asistente de lectura: no la
         // marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
         'executionTraceRoute',
+        // Alta el 2026-10-13 (ficha de producto terminado): la ficha de un producto terminado,
+        // derivada de `INVENTORY_ROUTE` (`/inventario/producto-terminado/<id>`). No es del
+        // asistente de lectura: no la marca el patron de arriba ni apunta a ninguna de sus URL. La
+        // lista sigue CERRADA.
+        'finishedProductDetailRoute',
         // Vive en /asignacion (pantalla de empaque), no en Pedidos: no estrena ninguna ruta del
         // asistente de lectura.
         'packingOrderRoute',
@@ -1421,6 +1426,12 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'AI_PROVIDER_INTEGRATION_ROUTE',
         'INVENTORY_INTEGRATION_ROUTE',
         'WHATSAPP_INTEGRATION_ROUTE',
+        // Alta el 2026-10-09 (QC-237): la URL publica del webhook de Meta para una conexion de
+        // WhatsApp (`/api/integraciones/whatsapp/webhook/<id>`), su base y la funcion que la
+        // arma. Es un endpoint de API, no una pantalla ni una ruta del asistente de lectura: no
+        // la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
+        'WHATSAPP_WEBHOOK_ROUTE_BASE',
+        'whatsappWebhookPath',
       ].sort(),
     );
   });

@@ -8,6 +8,7 @@ import {
 } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 import { assertPermission, type PermissionCode, type SessionUser } from '@/lib/modules/identity';
 import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
+import { listProducedProductsAction } from '@/lib/modules/inventario/adapters/driving/finished-product-actions';
 import { withFilter } from '@/components/shared/data-table';
 import {
   getOrderCustomerFilterOptionAction,
@@ -26,13 +27,14 @@ import {
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
 import { OrderListError } from './order-list-error';
+import type { ProducedProductsByOrder } from './order-produced-presentations';
 import {
   CUSTOMER_COLUMN_ID,
   CUSTOMER_PRESENCE_COLUMN_ID,
   FIRST_PAGE,
   orderListHref,
 } from './order-list-params';
-import { OrderTable } from './order-table';
+import { OrderTable, type OrderTableProps } from './order-table';
 import type { RecipePickerPage } from './recipe-picker';
 
 type OrderListSectionProps = {
@@ -128,6 +130,7 @@ async function loadRowPermissions() {
   return {
     canModifyOrders: hasPermission(user, 'pedidos.modificar'),
     canDeliver: hasPermission(user, 'entregas.modificar'),
+    canVoidDelivery: hasPermission(user, 'entregas.anular'),
   };
 }
 
@@ -189,6 +192,28 @@ async function loadCoverage(
   const byOrder: Record<string, OrderCoverage> = {};
   for (const entry of result.data) {
     byOrder[entry.orderId] = entry.coverage;
+  }
+  return byOrder;
+}
+
+/**
+ * Solo los pedidos producidos pueden tener producto terminado. Sin ninguno no se pregunta; si la
+ * lectura falla, también por permiso, la lista se pinta sin enlaces.
+ */
+async function loadProducedProducts(
+  orders: OrderTableProps['orders'],
+): Promise<ProducedProductsByOrder> {
+  const orderIds = orders
+    .filter((order) => order.status === 'TERMINADO' || order.status === 'ENTREGADO')
+    .map((order) => order.id);
+  if (orderIds.length === 0) return {};
+
+  const result = await listProducedProductsAction(orderIds);
+  if (result.status === 'error') return {};
+
+  const byOrder: Record<string, Record<string, string>> = {};
+  for (const link of result.data) {
+    (byOrder[link.orderId] ??= {})[link.presentationId] = link.productId;
   }
   return byOrder;
 }
@@ -317,13 +342,19 @@ export async function OrderListSection({
     Las tres lecturas de aqui si van en paralelo entre si: ninguna depende de otra, y esperarlas
     en fila solo sumaria latencia.
   */
-  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder, { canModifyOrders, canDeliver }] =
-    await Promise.all([
-      loadResponsibles(items.map((order) => order.id)),
-      loadResponsiblesCatalog(),
-      loadCoverage(items.map((order) => order.id)),
-      loadRowPermissions(),
-    ]);
+  const [
+    responsiblesByOrder,
+    responsiblesCatalog,
+    coverageByOrder,
+    { canModifyOrders, canDeliver, canVoidDelivery },
+    producedProductsByOrder,
+  ] = await Promise.all([
+    loadResponsibles(items.map((order) => order.id)),
+    loadResponsiblesCatalog(),
+    loadCoverage(items.map((order) => order.id)),
+    loadRowPermissions(),
+    loadProducedProducts(items),
+  ]);
   const canEditDistribution = canModifyOrders;
   const canEditCustomer = canModifyOrders;
 
@@ -349,6 +380,8 @@ export async function OrderListSection({
         canEditDistribution={canEditDistribution}
         canEditCustomer={canEditCustomer}
         canDeliver={canDeliver}
+        canVoidDelivery={canVoidDelivery}
+        producedProductsByOrder={producedProductsByOrder}
         customerFilter={customerFilter}
       />
     </div>

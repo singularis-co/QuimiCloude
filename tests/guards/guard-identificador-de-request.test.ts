@@ -392,6 +392,20 @@ export const E2E_ESPERADOS = [
   // espera se vacia y desaparece. No lee ni afirma nada sobre el identificador de peticion ni sobre
   // `reference`.
   'operario-rediseno.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la conexion de WhatsApp de una empresa: alta
+  // rechazada por Meta, alta valida, recarga sin el verify token, edicion, deshabilitar y
+  // habilitar. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'integraciones-whatsapp.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la anulacion de una presentacion de una entrega
+  // desde «Entregas»: motivo vacio que no envia nada, anulacion con motivo que devuelve el lote y
+  // reabre el pedido, la presentacion otra vez pendiente en «Entregar» y usuario sin permiso. No lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'anular-entrega.spec.ts',
+  // Alta el 2026-10-13 (ficha de producto terminado) por el mismo motivo que las demas. Recorre la ficha de un producto
+  // terminado: entrega parcial desde Pedidos, llegada por el enlace de /pedidos y por la pestana de
+  // terminados de /inventario, sus tabs Lotes, Entradas, Salidas y Entregas, y usuario sin permiso
+  // que recibe el 404. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'detalle-de-producto-terminado.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -587,8 +601,17 @@ export const MIGRACIONES_ESPERADAS = [
   '20261008150050_inventory_movement_kind_delivery',
   '20261008150100_order_deliveries',
   '20261008150200_delivery_permission',
+  // 2026-10-09: la anulacion de entregas (valor de enum, tablas y permiso); ninguna toca el
+  // identificador.
+  '20261009120000_inventory_movement_kind_delivery_void',
   // El dia de produccion del lote; no toca el identificador.
   '20261009120000_product_batches_production_date',
+  '20261009120100_order_delivery_voids',
+  '20261009120200_delivery_void_permission',
+  // 2026-10-09: la tabla de conexiones de WhatsApp; no toca el identificador.
+  '20261009130000_whatsapp_connections',
+  // QC-235 2026-10-13: la columna `companies.country`; no toca el identificador.
+  '20261013120000_companies_country',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -653,13 +676,15 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // El 2026-10-07 entro `nodemailer` -transporte SMTP temporal del correo- y, como devDependency,
 // `@types/nodemailer`, pedidas por el humano y con su fila en `docs/dependencias.md`: de 41 a 42
 // y de 21 a 22.
+// El 2026-10-13 entro `libphonenumber-js` -pais y telefono, QC-235-, con los cuatro checks,
+// aprobacion humana y su fila en `docs/dependencias.md`: de 42 a 43.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 42
+export const DEPENDENCIAS_ESPERADAS = 43
 export const DEV_DEPENDENCIAS_ESPERADAS = 22
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */
