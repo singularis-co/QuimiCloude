@@ -38,6 +38,8 @@ on:
 
 permissions:
   contents: read
+  # Leer la imagen de Postgres de GHCR (QC-279).
+  packages: read
 
 # Un push nuevo al mismo PR cancela la corrida anterior: su veredicto ya no describe la punta.
 concurrency:
@@ -121,9 +123,13 @@ jobs:
 
     services:
       postgres:
-        # Espejo publico de AWS de la imagen oficial: Docker Hub limita las descargas anonimas
-        # del runner (`toomanyrequests`, 2026-10-09, PR #193). Misma imagen, otro registro.
-        image: public.ecr.aws/docker/library/postgres:17
+        # Copia en GHCR de la imagen oficial (QC-279, `mirror-postgres.yml`): Docker Hub (2026-10-09,
+        # PR #193) y ECR Public (2026-10-14, PR #232) cortaron las descargas anonimas con
+        # `toomanyrequests`. GHCR se lee con el `GITHUB_TOKEN` del repo, sin ese limite.
+        image: ghcr.io/singularis-co/postgres:17
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           # Superusuario a proposito: la integracion hace CREATE/DROP DATABASE y
           # pg_advisory_lock contra la base `postgres` (tests/helpers/test-database.ts).
@@ -310,9 +316,13 @@ jobs:
 
     services:
       postgres:
-        # Espejo publico de AWS de la imagen oficial: Docker Hub limita las descargas anonimas
-        # del runner (`toomanyrequests`, 2026-10-09, PR #193). Misma imagen, otro registro.
-        image: public.ecr.aws/docker/library/postgres:17
+        # Copia en GHCR de la imagen oficial (QC-279, `mirror-postgres.yml`): Docker Hub (2026-10-09,
+        # PR #193) y ECR Public (2026-10-14, PR #232) cortaron las descargas anonimas con
+        # `toomanyrequests`. GHCR se lee con el `GITHUB_TOKEN` del repo, sin ese limite.
+        image: ghcr.io/singularis-co/postgres:17
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
