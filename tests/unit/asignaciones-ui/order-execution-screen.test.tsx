@@ -422,7 +422,7 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
     expect(linea).toHaveTextContent('5 × Caja x 12');
   });
 
-  it('QC-170 R26: con varias lineas pinta la primera y «+N»', () => {
+  it('QC-170 R26: con varias lineas pinta todas separadas por coma', () => {
     render(
       <OrderExecutionScreen
         execution={{
@@ -436,7 +436,7 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
     );
 
     expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
-      'Presentación: 5 × Botella 200 ml +1',
+      'Presentación: 5 × Botella 200 ml, 1 × Bidón 20L',
     );
   });
 
@@ -732,7 +732,7 @@ describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
     );
 
     const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
-    expect(linea.textContent).toBe('Presentación: 5 × Caja cartón 12 u +1');
+    expect(linea.textContent).toBe('Presentación: 5 × Caja cartón 12 u, 1 × Bidón 20L');
     expect(within(linea).getByTestId('order-distribution')).toHaveAttribute(
       'title',
       '5 × Caja cartón 12 u, 1 × Bidón 20L',

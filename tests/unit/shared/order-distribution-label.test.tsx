@@ -16,7 +16,7 @@ describe('OrderDistributionLabel', () => {
     expect(label).not.toHaveAttribute('data-empty');
   });
 
-  it('R26: con varias lineas pinta la primera y «+N» con el resto; el title las lista todas', () => {
+  it('R26: con varias lineas pinta todas separadas por coma, sin «+N»; el title las lista todas', () => {
     render(
       <OrderDistributionLabel
         lines={[
@@ -28,8 +28,10 @@ describe('OrderDistributionLabel', () => {
     );
 
     const label = screen.getByTestId('order-distribution');
-    expect(label.textContent).toBe('5 × Botella 200 ml +2');
+    expect(label.textContent).toBe('5 × Botella 200 ml, 2 × Bidón 20L, 1 × Caja x 12');
     expect(label).toHaveAttribute('title', '5 × Botella 200 ml, 2 × Bidón 20L, 1 × Caja x 12');
+    // El texto largo salta de linea dentro de un ancho maximo, no ensancha la celda de la tabla.
+    expect(label).toHaveClass('max-w-xs', 'whitespace-normal', 'break-words');
   });
 
   it('R27: con el reparto vacio pinta «Sin presentación»', () => {
@@ -57,7 +59,7 @@ describe('OrderDistributionLabel', () => {
     );
 
     const label = screen.getByTestId('order-distribution');
-    expect(label.textContent).toBe('5 × Botella PET ámbar 200 ml +1');
+    expect(label.textContent).toBe('5 × Botella PET ámbar 200 ml, 2 × Bidón 20L');
     expect(label).toHaveAttribute('title', '5 × Botella PET ámbar 200 ml, 2 × Bidón 20L');
   });
 });
