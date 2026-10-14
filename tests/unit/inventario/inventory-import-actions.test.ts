@@ -5,7 +5,6 @@ import {
   INVENTORY_IMPORT_COLUMNS,
   UnauthorizedError,
   buildInventoryImportErrorFile,
-  buildInventoryImportTemplate,
   type ImportCells,
   type ImportAlreadyDone,
   type ImportNothingImported,
@@ -14,6 +13,7 @@ import {
 } from '@/lib/modules/inventario';
 import {
   confirmInventoryImportAction,
+  getInventoryImportTemplateAction,
   previewInventoryImportAction,
 } from '@/lib/modules/inventario/adapters/driving/inventory-import-actions';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
@@ -21,6 +21,7 @@ import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 const {
   previewMock,
   confirmMock,
+  templateMock,
   getSessionUserMock,
   getSessionContextMock,
   readRequestIdHeaderMock,
@@ -28,6 +29,7 @@ const {
 } = vi.hoisted(() => ({
   previewMock: vi.fn(),
   confirmMock: vi.fn(),
+  templateMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   readRequestIdHeaderMock: vi.fn(async (): Promise<string | null> => null),
@@ -37,13 +39,18 @@ const {
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
   identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
-  inventario: { previewInventoryImport: previewMock, confirmInventoryImport: confirmMock },
+  inventario: {
+    previewInventoryImport: previewMock,
+    confirmInventoryImport: confirmMock,
+    getInventoryImportTemplate: templateMock,
+  },
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }));
 
 const IMPORT_KEY = '9b2f7c1e-4a3d-4e5f-8a6b-1c2d3e4f5a6b';
 const BYTES = [0x50, 0x4b, 0x03, 0x04];
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 const SESSION_USER = {
   id: 'user-1',
@@ -337,14 +344,25 @@ describe('confirmInventoryImportAction', () => {
 });
 
 describe('descargas', () => {
-  it('R32 la plantilla lleva BOM, la cabecera en orden con ";" y una fila de ejemplo', () => {
-    const template = buildInventoryImportTemplate();
-    expect(template.fileName).toBe('plantilla-inventario.csv');
-    expect(template.mimeType).toBe('text/csv;charset=utf-8');
-    expect(template.content.startsWith('﻿')).toBe(true);
-    const lines = template.content.slice(1).split('\r\n').filter((line) => line !== '');
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toBe(INVENTORY_IMPORT_COLUMNS.map((column) => column.header).join(';'));
+  it('R32 la plantilla viaja en base64 con su nombre y su tipo', async () => {
+    const bytes = new Uint8Array(BYTES);
+    templateMock.mockResolvedValue({ fileName: 'plantilla-inventario.xlsx', mimeType: XLSX_MIME, bytes });
+
+    const result = await getInventoryImportTemplateAction();
+
+    expect(templateMock).toHaveBeenCalledWith(ACTOR);
+    expect(result).toEqual({
+      status: 'success',
+      data: { fileName: 'plantilla-inventario.xlsx', mimeType: XLSX_MIME, base64: Buffer.from(bytes).toString('base64') },
+    });
+  });
+
+  it('R32 sin permiso la plantilla no se arma y vuelve el error', async () => {
+    templateMock.mockRejectedValue(new UnauthorizedError());
+
+    const result = await getInventoryImportTemplateAction();
+
+    expect(result).toMatchObject({ status: 'error', code: 'unauthorized' });
   });
 
   it('R32 el archivo de errores lleva Fila + columnas + Motivo y solo las filas en error', () => {

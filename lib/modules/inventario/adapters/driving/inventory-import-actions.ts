@@ -26,6 +26,11 @@ export type ConfirmInventoryImportResult =
   | { status: 'success'; data: InventoryImportConfirmOutcome }
   | ErrorState;
 
+/** Los bytes viajan en base64: el cliente los vuelve a armar para descargarlos. */
+export type InventoryImportTemplateResult =
+  | { status: 'success'; data: { fileName: string; mimeType: string; base64: string } }
+  | ErrorState;
+
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const INVALID_INPUT_MESSAGE = errorMessage(INVALID_INPUT_CODE);
 
@@ -87,6 +92,24 @@ export async function confirmInventoryImportAction(formData: FormData): Promise<
     const data = await inventario.confirmInventoryImport({ ...file, importKey: parsed.data.importKey }, actor);
     if (data.kind === 'imported') revalidatePath(INVENTORY_ROUTE);
     return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export async function getInventoryImportTemplateAction(): Promise<InventoryImportTemplateResult> {
+  const actor = await currentActor();
+
+  try {
+    const template = await inventario.getInventoryImportTemplate(actor);
+    return {
+      status: 'success',
+      data: {
+        fileName: template.fileName,
+        mimeType: template.mimeType,
+        base64: Buffer.from(template.bytes).toString('base64'),
+      },
+    };
   } catch (error) {
     return toErrorState(error);
   }

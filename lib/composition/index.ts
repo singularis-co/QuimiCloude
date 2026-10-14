@@ -81,6 +81,7 @@ import {
   createListProductBatches,
   createListProductFormUnits,
   createListProducts,
+  createGetInventoryImportTemplate,
   createPreviewInventoryImport,
   createUpdatePresentation,
   createUpdateProduct,
@@ -120,6 +121,7 @@ import {
 import {
   findPresentationRefs,
   findPresentationsByNormalizedNames,
+  listPresentationNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   createMaterialReservations,
@@ -150,6 +152,7 @@ import {
 import { readCsv } from '@/lib/modules/inventario/adapters/driven/spreadsheet/csv-reader';
 import { fileDigest } from '@/lib/modules/inventario/adapters/driven/spreadsheet/file-digest';
 import { readXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader';
+import { writeXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-writer';
 import type { ImportFormulaLookup } from '@/lib/modules/inventario/ports/import-formula-lookup';
 import type { InventoryImportRepository } from '@/lib/modules/inventario/ports/inventory-import-repository';
 import type { SpreadsheetReader } from '@/lib/modules/inventario/ports/spreadsheet-reader';
@@ -349,6 +352,7 @@ import {
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipePackingStepsById,
+  listAliveOriginalRecipeNames,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -1145,6 +1149,14 @@ export const inventario = {
   listFinishedProductBatches: createListFinishedProductBatches({
     products: finishedProductDetailRepository,
     orders: orderNumberDirectory,
+  }),
+  getInventoryImportTemplate: createGetInventoryImportTemplate({
+    values: {
+      listUnitNames: async (companyId) => (await listVisibleUnitRefs(companyId)).map((unit) => unit.name),
+      listPresentationNames,
+      listFormulaNames: listAliveOriginalRecipeNames,
+    },
+    writer: { write: writeXlsx },
   }),
   listFinishedProductMovements: createListFinishedProductMovements({
     products: finishedProductDetailRepository,

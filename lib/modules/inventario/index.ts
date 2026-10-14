@@ -266,8 +266,12 @@ export {
   type ConfirmInventoryImport,
 } from './domain/inventory-import-contract';
 export {
-  IMPORT_EXAMPLE_ROW,
-  buildInventoryImportTemplate,
+  IMPORT_EXAMPLE_ROWS,
+  IMPORT_TEMPLATE_FILE_NAME,
+  IMPORT_TEMPLATE_MIME_TYPE,
+  IMPORT_TEMPLATE_SHEET_NAME,
+  IMPORT_VALUES_SHEET_NAME,
+  buildInventoryImportTemplateSheets,
   buildInventoryImportErrorFile,
   type ImportDownload,
 } from './domain/inventory-import-downloads';
@@ -281,7 +285,15 @@ export {
 } from './domain/confirm-inventory-import';
 export type {
   ReservationCandidateBatch,
+  type ImportTemplateSheet,
+  type ImportTemplateValues,
   PlanReservationInput,
+export {
+  createGetInventoryImportTemplate,
+  type GetInventoryImportTemplate,
+  type GetInventoryImportTemplateDeps,
+  type InventoryImportTemplate,
+} from './domain/get-inventory-import-template';
   ReservationAllocation,
   ReservationPlan,
 } from './domain/plan-reservation';

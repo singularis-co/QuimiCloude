@@ -28,7 +28,6 @@ export const INVENTORY_IMPORT_COLUMNS = [
   { key: 'formula',      header: 'Fórmula',              headerRequired: false, rules: { PRODUCT: 'forbidden', PACKAGING: 'forbidden', MACHINE: 'forbidden', FINISHED_PRODUCT: 'required'  } },
   { key: 'stock',        header: 'Existencia',           headerRequired: true,  rules: { PRODUCT: 'required',  PACKAGING: 'required',  MACHINE: 'required',  FINISHED_PRODUCT: 'required'  } },
   { key: 'unitCost',     header: 'Costo unitario',       headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
-  { key: 'totalCost',    header: 'Costo total',          headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
   { key: 'lot',          header: 'Lote',                 headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
   { key: 'purchaseDate', header: 'Fecha de compra',      headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
   { key: 'expiryDate',   header: 'Fecha de vencimiento', headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'forbidden', MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },

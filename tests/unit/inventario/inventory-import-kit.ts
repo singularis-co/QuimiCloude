@@ -62,7 +62,7 @@ export const ROW_ENVASE: Partial<ImportCells> = {
   name: 'Bidón',
   presentation: 'Bidón 20 L',
   stock: '10',
-  totalCost: '100',
+  unitCost: '10',
   qtyAlert: '2',
 };
 export const ROW_INSTRUMENTO: Partial<ImportCells> = { type: 'Instrumento', name: 'Balanza', stock: '1' };

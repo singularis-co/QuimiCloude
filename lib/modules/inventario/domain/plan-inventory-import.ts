@@ -9,7 +9,6 @@ import {
 import {
   importFinishedGoodsRowSchema,
   packagesOf,
-  resolveFinishedGoodsUnitCost,
   type ImportFinishedGoodsInput,
 } from './import-finished-goods';
 import {
@@ -140,10 +139,6 @@ class RowIssues {
     return this.byColumn.has(column);
   }
 
-  hasCode(code: ImportRowIssueCode): boolean {
-    return [...this.byColumn.values()].some((issue) => issue.code === code);
-  }
-
   get size(): number {
     return this.byColumn.size;
   }
@@ -234,7 +229,7 @@ function readValues(row: ParsedImportRow, type: ImportRowType | null, today: str
     name: row.cells.name,
     stock: readDecimal(row, 'stock', issues) ?? '',
     unitCost: readDecimal(row, 'unitCost', issues),
-    totalCost: readDecimal(row, 'totalCost', issues),
+    totalCost: null,
     qtyAlert: applies('qtyAlert') ? (readDecimal(row, 'qtyAlert', issues) ?? '') : '',
     lot: lotText === '' ? null : row.cells.lot,
     purchaseDate,
@@ -258,15 +253,12 @@ function addSchemaIssue(field: string, type: ImportRowType, values: RowValues, i
       else issues.add('stock_invalid', 'stock', STOCK_ZERO_FOR_TOTAL);
       return;
     }
+    // Sin «Costo total» en el archivo, todo rechazo de costo cae en «Costo unitario».
     case 'unitCost':
-    case 'totalCost': {
-      const value = field === 'unitCost' ? values.unitCost : values.totalCost;
-      if (value === null) {
-        if (!issues.hasCode('cost_required')) issues.add('cost_required', field);
-      } else if (!isAcceptedAmount(value.trim())) issues.add('cost_invalid', field);
-      else issues.add('total_cost_too_low', field);
+    case 'totalCost':
+      if (values.unitCost === null) issues.add('cost_required', 'unitCost');
+      else issues.add('cost_invalid', 'unitCost');
       return;
-    }
     case 'qtyAlert':
       issues.add(values.qtyAlert.trim() === '' ? 'value_required' : 'qty_alert_invalid', 'qtyAlert');
       return;
@@ -311,7 +303,6 @@ function validateWithoutType(values: RowValues, issues: RowIssues): void {
   const stock = values.stock.trim();
   if (stock !== '' && !DECIMAL_PATTERN.test(stock)) issues.add('stock_invalid', 'stock');
   if (values.unitCost !== null && !isAcceptedAmount(values.unitCost.trim())) issues.add('cost_invalid', 'unitCost');
-  if (values.totalCost !== null && !isAcceptedAmount(values.totalCost.trim())) issues.add('cost_invalid', 'totalCost');
   const qtyAlert = values.qtyAlert.trim();
   if (qtyAlert !== '' && !DECIMAL_PATTERN.test(qtyAlert)) issues.add('qty_alert_invalid', 'qtyAlert');
   if (values.lot !== null && !typedLotSchema.safeParse(values.lot).success) issues.add('lot_invalid', 'lot');
@@ -545,19 +536,6 @@ function planRow(row: ParsedImportRow, state: PlanState, today: string): Planned
   const values = readValues(row, type, today, issues);
   validateWithSchema(type, values, issues);
   const refs = resolveReferences(row, type, state, issues);
-
-  if (type === PRODUCT_TYPES.FINISHED_PRODUCT && !issues.has('stock') && !issues.has('totalCost')) {
-    const content = refs.presentation?.content ?? null;
-    if (content !== null && values.unitCost === null && values.totalCost !== null) {
-      const unitCost = resolveFinishedGoodsUnitCost({
-        packages: packagesOf(values.stock),
-        content,
-        unitCost: null,
-        totalCost: values.totalCost,
-      });
-      if (unitCost === null) issues.add('total_cost_too_low', 'totalCost');
-    }
-  }
 
   const productName =
     type === PRODUCT_TYPES.FINISHED_PRODUCT

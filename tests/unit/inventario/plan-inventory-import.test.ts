@@ -111,11 +111,6 @@ describe('planInventoryImport — reglas de campo del alta manual', () => {
     expect(result.rows[0]?.status).toBe('create');
   });
 
-  it('R10 un costo total que deja el unitario en 0 se rechaza en «Costo total»', () => {
-    const result = plan(sheet({ ...ROW_INSUMO, unitCost: '', totalCost: '0,0001', stock: '3' }));
-    expect(codes(result.rows[0])).toEqual([['total_cost_too_low', 'totalCost']]);
-  });
-
   it('R10 la existencia de un envase es entera', () => {
     const result = plan(sheet({ ...ROW_ENVASE, stock: '2,5' }));
     expect(codes(result.rows[0])).toEqual([['stock_not_whole', 'stock']]);
@@ -335,13 +330,11 @@ describe('planInventoryImport — producto terminado', () => {
         { ...ROW_TERMINADO, stock: '2,5' },
         { ...ROW_TERMINADO, stock: '0' },
         { ...ROW_TERMINADO, unitCost: '' },
-        { ...ROW_TERMINADO, unitCost: '', totalCost: '0,0001', presentation: 'Bidón 20 L' },
       ),
     );
     expect(codes(result.rows[0])).toEqual([['stock_not_whole', 'stock']]);
     expect(codes(result.rows[1])).toEqual([['stock_not_whole', 'stock']]);
     expect(codes(result.rows[2])).toEqual([['cost_required', 'unitCost']]);
-    expect(codes(result.rows[3])).toEqual([['total_cost_too_low', 'totalCost']]);
   });
 
   it('R17 un insumo con el nombre derivado de un terminado que crea el archivo queda en error', () => {
