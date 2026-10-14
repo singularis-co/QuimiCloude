@@ -19,6 +19,11 @@ import {
   RecipeVersionList,
 } from '@/app/(private)/produccion/formulas/components';
 import { Badge, badgeVariants } from '@/components/ui/badge';
+import {
+  ORDER_COVERAGE_TONES,
+  ORDER_PRIORITY_LEVELS,
+  ORDER_STATUS_TONES,
+} from '@/lib/shared/ui/order-status';
 import type { UserAccountStatus } from '@/lib/modules/identity';
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import type { OrderPriority, OrderStatus } from '@/lib/modules/pedidos';
@@ -72,32 +77,6 @@ function expectTone(element: HTMLElement, tone: Tone): void {
   }
 }
 
-const STATUS_TONES: Readonly<Record<OrderStatus, Tone>> = {
-  PENDIENTE: 'neutral',
-  EN_CURSO: 'info',
-  EN_EMPAQUE: 'info',
-  EN_ACONDICIONAMIENTO: 'info',
-  POR_EMPACAR: 'warning',
-  POR_ACONDICIONAR: 'warning',
-  TERMINADO: 'success',
-  ENTREGADO: 'success',
-  CANCELADO: 'destructive',
-  BLOQUEADO: 'destructive',
-};
-
-const PRIORITY_TONES: Readonly<Record<OrderPriority, Tone>> = {
-  BAJA: 'neutral',
-  MEDIA: 'info',
-  ALTA: 'warning',
-  CRITICA: 'destructive',
-};
-
-const COVERAGE_TONES: Readonly<Record<OrderCoverage, Tone>> = {
-  full: 'success',
-  none: 'neutral',
-  partial: 'warning',
-};
-
 const USER_TONES: Readonly<Record<UserAccountStatus, Tone>> = {
   active: 'success',
   pending: 'warning',
@@ -133,26 +112,32 @@ describe('badges de estado con la nueva marca', () => {
     expect(classes.some((cls) => /(ring|outline)-ring\/\d+/.test(cls))).toBe(false);
   });
 
-  it('R3: cada estado de pedido se pinta con su tono', () => {
-    for (const status of Object.keys(STATUS_TONES) as OrderStatus[]) {
+  it('R3: cada estado de pedido es un StatusBadge con el tono de ORDER_STATUS_TONES', () => {
+    for (const status of Object.keys(ORDER_STATUS_TONES) as OrderStatus[]) {
       const { unmount } = render(<OrderStatusBadge status={status} />);
-      expectTone(screen.getByTestId('order-status'), STATUS_TONES[status]);
+      const badge = screen.getByTestId('order-status');
+      expect(badge).toHaveAttribute('data-slot', 'badge');
+      expect(badge).toHaveAttribute('data-tone', ORDER_STATUS_TONES[status]);
       unmount();
     }
   });
 
-  it('R4: cada prioridad de pedido se pinta con su tono', () => {
-    for (const priority of Object.keys(PRIORITY_TONES) as OrderPriority[]) {
+  it('R4: cada prioridad de pedido es un PriorityMark con el nivel de ORDER_PRIORITY_LEVELS', () => {
+    for (const priority of Object.keys(ORDER_PRIORITY_LEVELS) as OrderPriority[]) {
       const { unmount } = render(<OrderPriorityBadge priority={priority} />);
-      expectTone(screen.getByTestId('order-priority'), PRIORITY_TONES[priority]);
+      const mark = screen.getByTestId('order-priority');
+      expect(mark).not.toHaveAttribute('data-slot', 'badge');
+      expect(mark).toHaveAttribute('data-level', String(ORDER_PRIORITY_LEVELS[priority]));
       unmount();
     }
   });
 
-  it('R5: cada cobertura de pedido se pinta con su tono', () => {
-    for (const coverage of Object.keys(COVERAGE_TONES) as OrderCoverage[]) {
+  it('R5: cada cobertura de pedido es un StatusBadge con el tono de ORDER_COVERAGE_TONES', () => {
+    for (const coverage of Object.keys(ORDER_COVERAGE_TONES) as OrderCoverage[]) {
       const { unmount } = render(<OrderCoverageBadge coverage={coverage} />);
-      expectTone(screen.getByTestId('order-coverage'), COVERAGE_TONES[coverage]);
+      const badge = screen.getByTestId('order-coverage');
+      expect(badge).toHaveAttribute('data-slot', 'badge');
+      expect(badge).toHaveAttribute('data-tone', ORDER_COVERAGE_TONES[coverage]);
       unmount();
     }
   });

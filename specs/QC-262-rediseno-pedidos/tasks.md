@@ -44,7 +44,7 @@ P1–P12 de `requirements.md` (o acepta los valores por defecto).
   tono; `data-testid` y `data-*` de hoy. Guardia `tests/guards/guard-pedidos-rediseno.test.ts` (R8),
   con un caso que demuestra que muerde. Enmienda de `tests/unit/marca/badges-estado.test.tsx` R3–R5
   (`design.md > 10`). Tests de `design.md > 7` que afirmaban la variante, actualizados.
-- [ ] **T2b [P]. Marca de la versión** (D4, R9). `recipe-version-select.tsx`; test en
+- [x] **T2b [P]. Marca de la versión** (D4, R9). `recipe-version-select.tsx`; test en
   `recipe-version-select.test.tsx`: «por revisar» en `waiting`, «dada de baja» en `muted`, mismo valor
   enviado.
 

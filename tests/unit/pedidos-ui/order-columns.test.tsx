@@ -39,7 +39,6 @@ import {
   buildOrderColumns,
   parseOrderListParams,
 } from '@/app/(private)/pedidos/components';
-import { Badge } from '@/components/ui/badge';
 import {
   ORDER_PRIORITY_VALUES,
   ORDER_QUERYABLE,
@@ -501,20 +500,16 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
   });
 
   it.each([
-    // ENMIENDA QC-227: variantes secondary/default/secondary -> warning/info/success, los tonos de estado de la marca.
-    ['POR_ACONDICIONAR', 'Por acondicionar', 'warning'],
-    ['EN_ACONDICIONAMIENTO', 'En acondicionamiento', 'info'],
+    // ENMIENDA QC-262: de variante de Badge a tono de StatusBadge.
+    ['POR_ACONDICIONAR', 'Por acondicionar', 'waiting'],
+    ['EN_ACONDICIONAMIENTO', 'En acondicionamiento', 'progress'],
     ['TERMINADO', 'Terminado', 'success'],
   ] as const)(
-    'R29, R32: la celda pinta %s como «%s», con su valor en `data-status` y la variante %s',
-    (status, etiqueta, variante) => {
+    'R29, R32: la celda pinta %s como «%s», con su valor en `data-status` y el tono %s',
+    (status, etiqueta, tono) => {
       // El texto acordado en R28/R29/R32 se afirma una vez aqui, contra la constante exportada,
       // y la celda se compara con la constante: si alguien reescribe la etiqueta, falla el primero.
       expect(ORDER_STATUS_LABELS[status]).toBe(etiqueta);
-
-      const { container: referencia } = render(<Badge variant={variante} />);
-      const claseEsperada = referencia.firstElementChild?.className;
-      cleanup();
 
       pintarCelda(STATUS_COLUMN_ID, pedido({ status }));
 
@@ -522,8 +517,7 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
       expect(badge).toHaveAttribute('data-status', status);
       expect(badge).toHaveTextContent(ORDER_STATUS_LABELS[status]);
       expect(badge.textContent).not.toBe(status);
-      expect(claseEsperada).toBeTruthy();
-      expect(badge.className).toBe(claseEsperada);
+      expect(badge).toHaveAttribute('data-tone', tono);
     },
   );
 

@@ -109,3 +109,64 @@ motores dan lo mismo salvo donde se indica. Servidor apagado al terminar.
    «Archivos esperados»). Lo que se ve en el código de hoy es que el resto de botones mide 44 px.
 3. **D2:** sin desviación. Hoy el filtro tampoco llena la barra (252/285 px), así que el cambio a
    256 px fijo casi no se ve en teléfono.
+
+## Tanda 1 — T1a y T1b (frontend_dev)
+
+Archivos:
+- `components/shared/row-actions-menu.tsx`: `separatorBefore?` por ítem; `DropdownMenuSeparator` en el
+  desplegable y `Separator` en el diálogo centrado, envueltos en `Fragment` (sin la prop, el DOM no cambia).
+  Nunca delante del primer ítem (`hasSeparatorBefore`).
+- `tests/unit/shared-ui/row-actions-menu-separator.test.tsx` (nuevo).
+- `components/shared/CATALOGO.md`: fila `RowActionsMenu` con `separatorBefore` en «Cubre» y en «Puntos de
+  extensión»; `Separator` añadido a «Base de»; «Diseño» sigue en `Tabla.dc.html`. `catalogo-qc256` sin cambios.
+
+Mapa:
+- R14 → `tests/unit/shared-ui/row-actions-menu-separator.test.tsx` (6 casos: desplegable y centrado × con prop,
+  primer ítem, sin prop).
+- R24 → `tests/guards/guard-catalogo-de-componentes.test.ts`, `tests/unit/shared-ui/catalogo-qc256.test.ts`.
+
+Salida:
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errores, 7 warnings previos (confirm-catalog-import.test.ts, order-service.test.ts).
+- `pnpm exec vitest related --run components/shared/row-actions-menu.tsx`: 250/251 archivos, 4032 pasados,
+  1 fallo en `tests/unit/paridad/pedidos-paridad.test.tsx` (snapshot que la Tanda 2 en paralelo estaba
+  actualizando); relanzado solo: 7/7 en verde.
+- `pnpm exec vitest run guard-catalogo-de-componentes catalogo-qc256 row-actions-menu`: 5 archivos, 89/89.
+
+Veredicto: T1a y T1b hechas, en verde.
+
+## Tanda 2 — T2a y T2b (frontend_dev, 2026-10-13)
+
+**Archivos.** Producción: `app/(private)/pedidos/components/order-status-badge.tsx` (sobre
+`StatusBadge` y `PriorityMark`; fuera `STATUS_VARIANTS`, `PRIORITY_VARIANTS`, `COVERAGE_VARIANTS` y el
+import de `Badge`; mismos exports, testids y `data-*`), `recipe-version-select.tsx` (marca con
+`StatusBadge`: `waiting` / `muted`, testid `recipe-version-select-mark`; el `input` oculto y su valor
+no cambian). Tests: nuevos `tests/unit/pedidos-ui/order-status-badges.test.tsx` y
+`tests/guards/guard-pedidos-rediseno.test.ts`; enmendados `tests/unit/marca/badges-estado.test.tsx`
+(R3–R5 a `data-tone` / `data-level`), `order-columns.test.tsx` (tono en vez de variante),
+`order-sheet-coverage.test.tsx` (tono en el panel), `recipe-version-select.test.tsx` (R9).
+Snapshot: `tests/unit/paridad/__snapshots__/pedidos-paridad.test.tsx.snap`, 8+/4−: solo
+`order-status` (clases de `StatusBadge` + punto) y `order-priority` (clases de `PriorityMark` + svg),
+fila de `design.md > 6`. `formularios-paridad` no cambió.
+
+**R → test.** R5, R6, R7 → `order-status-badges.test.tsx`, `badges-estado.test.tsx` R3–R5,
+`order-sheet-coverage.test.tsx` (R7, tono y ausencia en el panel; la ausencia en la lista sigue en
+`order-columns.test.tsx`). R8 → `guard-pedidos-rediseno.test.ts` (caso inventado que muerde + barrido).
+R9 → `recipe-version-select.test.tsx` (dos casos R9).
+
+**Salida.** `pnpm run typecheck`: sin errores. `pnpm run lint`: 0 errores, 7 avisos en
+`confirm-catalog-import.test.ts` y `order-service.test.ts` (ajenos). `vitest related` de los dos
+archivos de producción: 63 archivos, 1222 pasan, 1 falla (snapshot de `pedidos-paridad`, actualizado
+con `-u` en ese archivo: 7/7). `vitest run guard`: 76 archivos, 1051 pasan, 20 omitidos, **1 falla**:
+`guard-pedidos-rediseno` R8 con `app/(private)/pedidos/components/order-delivery-list.tsx:5 importa
+Badge` (`<Badge variant="destructive">` de «Anulada», línea 150).
+
+**Desviaciones.**
+1. `order-delivery-list.tsx` importa `Badge` y no está en `## Archivos esperados`: no se tocó. R8 lo
+   prohíbe en toda la ruta. Decide el leader: añadirlo a la lista y pasar «Anulada» a `StatusBadge`
+   (tono `danger`), o acotar R8.
+2. En la versión, la marca sustituye al paréntesis de hoy («A medias (por revisar)» pasa a «A medias»
+   + insignia «por revisar»); los textos son los mismos. Una `note` dada por quien llama (ningún
+   llamador de producción la pasa) sale en `muted` mientras el listado no llega.
+
+Veredicto: T2a y T2b hechas; gate de guardias rojo solo por `order-delivery-list.tsx` (fuera de lista).
