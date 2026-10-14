@@ -36,7 +36,7 @@
 
 ### D6 — Flakes de saturación: la regla 5 no converge repitiendo
 - **Origen:** QC-103, QC-110 (PR #105 abierto sin gate verde por decisión humana, 2026-09-22), QC-141.
-- **Qué falta:** la suite completa tumba un archivo distinto por corrida bajo carga: `user-table.test.tsx` (27/27 aislado), `credential-setup.int.test.ts` (15/15 aislado), `product-page.test.tsx` (timeout 20 s; hoy además está en el baseline por otro caso). «Gate completo verde antes de cada PR» no se puede cumplir repitiendo. **No meter flakes en el baseline** (apaga sus casos sanos). Si un flake se repite: subir `testTimeout` del archivo o aligerar su setup.
+- **Qué falta:** la suite completa tumba un archivo distinto por corrida bajo carga: `user-table.test.tsx` (27/27 aislado), `credential-setup.int.test.ts` (15/15 aislado), `product-page.test.tsx` (timeout 20 s; hoy además está en el baseline por otro caso), `confirmaciones-paridad.test.tsx` («estado de usuario > con error», snapshot del popup del Select y `aria-busy`; rojo en el run 38482106564 del PR #227, verde en el siguiente; entró al baseline en QC-274 y se podó en su F2.6, 2026-10-14). «Gate completo verde antes de cada PR» no se puede cumplir repitiendo. **No meter flakes en el baseline** (apaga sus casos sanos). Si un flake se repite: subir `testTimeout` del archivo o aligerar su setup.
 - **Dueño:** fichas **QC-126** (`flake-tabla-de-usuarios-navegacion-jsdom`) y **QC-143** (`flake-credential-setup-bajo-carga`), pending.
 
 ### D7 — El baseline de rojos va por archivo, no por caso
