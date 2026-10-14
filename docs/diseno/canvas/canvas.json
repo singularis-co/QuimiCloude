@@ -997,6 +997,62 @@
    "title": "PedidosPresentacionesMovil",
    "page": "pedidos",
    "is_interactive": true
+  },
+  "AltaConversion.dc.html": {
+   "x": 0,
+   "y": 9710,
+   "w": 1440,
+   "h": 1000,
+   "title": "Alta con conversión de unidad (QC-203)",
+   "page": "inventario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "AltaConversionTablet.dc.html": {
+   "x": 1520,
+   "y": 9710,
+   "w": 904,
+   "h": 1300,
+   "title": "AltaConversionTablet",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "AltaConversionMovil.dc.html": {
+   "x": 2504,
+   "y": 9710,
+   "w": 960,
+   "h": 1300,
+   "title": "AltaConversionMovil",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "ImportarFormulaUnidad.dc.html": {
+   "x": 0,
+   "y": 11270,
+   "w": 1440,
+   "h": 1000,
+   "title": "Unidad de la materia prima nueva (QC-203)",
+   "page": "formulas",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "ImportarFormulaUnidadTablet.dc.html": {
+   "x": 1520,
+   "y": 11270,
+   "w": 904,
+   "h": 1300,
+   "title": "ImportarFormulaUnidadTablet",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "ImportarFormulaUnidadMovil.dc.html": {
+   "x": 2504,
+   "y": 11270,
+   "w": 960,
+   "h": 1300,
+   "title": "ImportarFormulaUnidadMovil",
+   "page": "formulas",
+   "is_interactive": true
   }
  },
  "order": [
@@ -1102,7 +1158,13 @@
   "EvidenciaPasoMovil.dc.html",
   "FormulaEvidencia.dc.html",
   "FormulaEvidenciaTablet.dc.html",
-  "FormulaEvidenciaMovil.dc.html"
+  "FormulaEvidenciaMovil.dc.html",
+  "AltaConversion.dc.html",
+  "AltaConversionTablet.dc.html",
+  "AltaConversionMovil.dc.html",
+  "ImportarFormulaUnidad.dc.html",
+  "ImportarFormulaUnidadTablet.dc.html",
+  "ImportarFormulaUnidadMovil.dc.html"
  ],
  "notes": {
   "t1": {
@@ -1543,6 +1605,28 @@
    "maxH": 70,
    "fill": "gray",
    "page": "pedidos"
+  },
+  "c_AltaConversion": {
+   "x": 0,
+   "y": 9600,
+   "text": "Alta con conversión de unidad (QC-203)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "inventario"
+  },
+  "c_ImportarFormulaUnidad": {
+   "x": 0,
+   "y": 11160,
+   "text": "Unidad de la materia prima nueva al importar fórmula (QC-203)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "formulas"
   }
  },
  "designSystems": [],
