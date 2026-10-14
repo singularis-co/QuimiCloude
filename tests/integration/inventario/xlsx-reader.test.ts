@@ -58,7 +58,7 @@ describe('lector .xlsx con mixto.xlsx', () => {
     expect(cell(all, 2, 'Costo unitario')).toEqual({ text: '3.5', origin: 'number' });
     expect(cell(all, 3, 'Costo unitario')).toEqual({ text: '0.0001', origin: 'number' });
     expect(cell(all, 5, 'Existencia')).toEqual({ text: '1234567', origin: 'number' });
-    expect(cell(all, 5, 'Costo total')).toEqual({ text: '100.25', origin: 'number' });
+    expect(cell(all, 5, 'Costo unitario')).toEqual({ text: '100.25', origin: 'number' });
   });
 
   it('R4 R12 un numero nativo con mas de 4 decimales no se redondea: queda number_format_invalid', async () => {
