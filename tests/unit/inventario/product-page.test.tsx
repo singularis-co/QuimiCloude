@@ -437,7 +437,7 @@ const ALTA_VALIDA: Readonly<Record<string, string>> = {
 
 /**
  * Campos del PRIMER LOTE que el alta pide desde el 2026-09-10. Solo el costo esta aqui: es el
- * unico obligatorio de los cinco -y basta con el unitario O el total-. La presentacion se elige
+ * unico obligatorio de los cinco -el unitario; el total es de solo lectura y sale de el-. La presentacion se elige
  * en su selector, no se teclea, y el lote y la caducidad son opcionales.
  */
 const LOTE_VALIDO: Readonly<Record<string, string>> = {
@@ -1618,9 +1618,9 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect((screen.getByTestId('product-field-stock') as HTMLInputElement).value).toBe('');
   });
 
-  it('el alta pide el primer lote: unidad obligatoria y uno de los dos costos', async () => {
-    // El alta de insumo exige la unidad y el costo unitario O total (basta con uno); lote y
-    // caducidad son opcionales.
+  it('el alta pide el primer lote: unidad obligatoria y el costo unitario', async () => {
+    // El alta de insumo exige la unidad y el costo unitario -el total es de solo lectura y sale
+    // de el-; lote y caducidad son opcionales.
     const user = setupUser();
 
     await renderPantalla();
@@ -1637,13 +1637,15 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(createProductActionMock).not.toHaveBeenCalled();
     expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
 
-    // Con unidad pero sin ningun costo: se rechaza sin llamar a la operacion, y la falta se dice
-    // en LOS DOS campos, porque cualquiera de ellos la resuelve.
+    // Con unidad pero sin costo: se rechaza sin llamar a la operacion, y la falta se dice SOLO en
+    // el unitario, que es el unico que se escribe.
     await elegirUnidad(user);
     await user.click(screen.getByTestId(testId.enviar));
 
-    expect(await screen.findByTestId('product-error-unitCost')).toHaveTextContent('basta con uno');
-    expect(screen.getByTestId('product-error-totalCost')).toHaveTextContent('basta con uno');
+    expect(await screen.findByTestId('product-error-unitCost')).toHaveTextContent(
+      'Escribe el costo unitario.',
+    );
+    expect(screen.queryByTestId('product-error-totalCost')).toBeNull();
     expect(createProductActionMock).not.toHaveBeenCalled();
 
     // Lote y caducidad son opcionales: estan en pantalla y el alta pasa con los dos vacios.
@@ -1652,8 +1654,8 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId('product-field-expiryDate').tagName).toBe('BUTTON');
     expect(screen.getByTestId('product-value-expiryDate')).toHaveValue('');
 
-    // Con SOLO el costo total -sin el unitario- ya no hay ningun error de campo.
-    await user.type(screen.getByTestId('product-field-totalCost'), '150.00');
+    // Con el costo unitario ya no hay ningun error de campo.
+    await user.type(screen.getByTestId('product-field-unitCost'), '12.50');
     await user.click(screen.getByTestId(testId.enviar));
 
     await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
@@ -1715,7 +1717,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
   });
 
-  it('los dos importes no dejan escribir texto, ni un tercer decimal, ni una coma suelta', async () => {
+  it('el costo unitario no deja escribir texto, ni un tercer decimal, ni una coma suelta', async () => {
     // Lo que antes se rechazaba AL GUARDAR -mas de 4 decimales, o coma- ahora ni llega a entrar,
     // asi que lo que se mide es lo que queda escrito. El esquema no se toco: sigue admitiendo
     // hasta 4 decimales para el resto de llamantes.
@@ -1730,7 +1732,6 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await rellenarFormulario(user);
 
     const unitario = screen.getByTestId('product-field-unitCost') as HTMLInputElement;
-    const total = screen.getByTestId('product-field-totalCost') as HTMLInputElement;
 
     await user.clear(unitario);
     await user.type(unitario, '12.34567');
@@ -1740,9 +1741,9 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await user.type(unitario, 'abc12x.5y0z');
     expect(unitario.value, 'las letras no entran').toBe('12.50');
 
-    await user.clear(total);
-    await user.type(total, '150,00');
-    expect(total.value, 'la coma entra como punto decimal').toBe('150.00');
+    await user.clear(unitario);
+    await user.type(unitario, '12,50');
+    expect(unitario.value, 'la coma entra como punto decimal').toBe('12.50');
 
     // Y con importes que el campo si admite, el alta sale adelante: el filtro no bloquea nada
     // legitimo.
@@ -1750,9 +1751,10 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
   });
 
-  it('escribir el costo unitario rellena el total, y escribir el total rellena el unitario', async () => {
-    // total = unitario x existencia, unitario = total / existencia redondeado a 2 decimales mitad
-    // arriba. La aritmetica va con `BigInt` sobre la cadena, nunca con coma flotante.
+  it('el costo total es de solo lectura y muestra unitario x existencia', async () => {
+    // El unitario es la UNICA entrada: el total = unitario x existencia, redondeado a 2 decimales
+    // mitad arriba, y se recalcula tambien al cambiar la existencia. `readOnly` y no `disabled`:
+    // el valor se sigue viendo y viajando en el FormData.
     const user = setupUser();
 
     await renderPantalla();
@@ -1763,30 +1765,35 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     const unitario = screen.getByTestId('product-field-unitCost') as HTMLInputElement;
     const total = screen.getByTestId('product-field-totalCost') as HTMLInputElement;
 
+    expect(total).toHaveAttribute('readonly');
+    expect(total).not.toBeDisabled();
+    // Sigue nombrado por su etiqueta visible.
+    expect(screen.getByRole('textbox', { name: 'Costo total' })).toBe(total);
+
     await user.clear(existencia);
     await user.type(existencia, '7');
-
     await user.type(unitario, '3.50');
-    // El derivado se escribe sin ceros de relleno: «24.50» se rellena «24.5». Lo tecleado no se
-    // toca -el unitario sigue leyendose «3.50», tal cual se escribio-, porque reescribir el campo
-    // bajo el cursor moveria el punto de insercion.
+    // El derivado se escribe sin ceros de relleno: «24.50» se pinta «24.5».
     expect(total.value, '3.50 x 7').toBe('24.5');
     expect(unitario.value, 'lo tecleado no se reescribe').toBe('3.50');
 
-    // Y al reves. La division no cae redonda a proposito: 150 / 7 es 21.428571..., que a dos
-    // decimales y mitad arriba es 21.43.
-    await user.clear(total);
-    await user.type(total, '150');
-    expect(unitario.value, '150 / 7 redondeado a 2 decimales').toBe('21.43');
+    // Cambiar la existencia recalcula el total.
+    await user.clear(existencia);
+    await user.type(existencia, '1.5');
+    expect(total.value, '3.50 x 1.5').toBe('5.25');
 
-    // Vaciar un importe NO borra el otro: es el camino de «escribi el unitario» a «escribo solo
-    // el total», y borrarlo ahi haria perder lo ya escrito.
+    // Teclear en el total no cambia nada: no es una entrada.
+    await user.type(total, '999');
+    expect(total.value, 'el total no se escribe').toBe('5.25');
+    expect(unitario.value, 'el total no deriva el unitario').toBe('3.50');
+
+    // Vaciar el unitario vacia el total: sin unitario no hay total.
     await user.clear(unitario);
-    expect(total.value, 'el total sobrevive a vaciar el unitario').toBe('150');
+    expect(total.value, 'sin unitario no hay total').toBe('');
   });
 
-  it('sin existencia utilizable el importe derivado se queda vacio, no obsoleto', async () => {
-    // El derivado se vacia cuando no se puede calcular -existencia en blanco, o 0-. Un total
+  it('sin existencia utilizable el costo total se queda vacio, no obsoleto', async () => {
+    // El total se vacia cuando no se puede calcular -existencia en blanco, o 0-. Un total
     // obsoleto engana mas que uno en blanco, y ademas el esquema entiende «vacio» como campo
     // omitido, que es exactamente lo que ese estado significa.
     const user = setupUser();
@@ -1804,38 +1811,11 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(total.value, 'sin existencia no hay total que escribir').toBe('');
 
     await user.type(existencia, '0');
-    await user.clear(total);
-    await user.type(total, '150.00');
-    expect(unitario.value, 'con existencia 0 no hay unitario que escribir').toBe('');
-  });
+    expect(total.value, 'con existencia 0 no hay total que escribir').toBe('');
 
-  it('con solo costo total y existencia 0 el rechazo se pinta en el campo de la EXISTENCIA', async () => {
-    // QC-90 R8 — el caso que justifica que el esquema sea COMPARTIDO. No hay costo unitario
-    // posible (`total / 0`) y la columna es NOT NULL, asi que lo que hay que corregir es la
-    // EXISTENCIA, no el costo: el `superRefine` cuelga el issue de `['stock']` y el formulario,
-    // que ya reparte por `issue.path[0]`, lo pinta ahi sin una sola linea de reparto nueva.
-    const user = setupUser();
-
-    await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirAlta));
-    await screen.findByTestId(testId.formulario);
-
-    await rellenarFormulario(user, { stock: '0', unitCost: '', totalCost: '150.00' });
-    await user.click(screen.getByTestId(testId.enviar));
-
-    await waitFor(() => expect(screen.getByTestId('product-error-stock')).toBeInTheDocument());
-    expect(screen.getByTestId('product-field-stock')).toHaveAttribute('aria-invalid', 'true');
-    // Y NO en los costos: el total escrito esta bien, y marcarlo mandaria a corregir lo que no es.
-    expect(screen.queryByTestId('product-error-totalCost')).toBeNull();
-    expect(screen.queryByTestId('product-error-unitCost')).toBeNull();
-    expect(createProductActionMock).not.toHaveBeenCalled();
-
-    // Corregir la existencia -lo que el mensaje pide- basta para que el mismo alta salga adelante.
-    await user.clear(screen.getByTestId('product-field-stock'));
-    await user.type(screen.getByTestId('product-field-stock'), '3');
-    await user.click(screen.getByTestId(testId.enviar));
-
-    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+    await user.clear(existencia);
+    await user.type(existencia, '2');
+    expect(total.value, '9.99 x 2').toBe('19.98');
   });
 
   it('el alta hace viajar los CINCO campos del primer lote en el FormData', async () => {
@@ -1864,9 +1844,8 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(enviado.get('unitCost')).toBe(LOTE_VALIDO.unitCost);
     expect(enviado.get('lot')).toBe('LT-4471');
     expect(enviado.get('expiryDate')).toBe(MANANA_ISO);
-    // El costo total NO se escribio, y aun asi viaja escrito: el panel lo rellena al teclear el
-    // unitario (`12.50 x 12`). Antes viajaba vacio -"campo omitido"-, y esa premisa cayo: hoy solo
-    // viaja vacio si se dejan los dos importes en blanco, que es un rechazo.
+    // El costo total NO se escribe -es de solo lectura- y aun asi viaja escrito: sale del
+    // unitario (`12.50 x 12`). Solo viaja vacio si falta el unitario, que es un rechazo.
     //
     // Viaja SIN ceros de relleno («150», no «150.00»): es el mismo importe y el esquema lo acepta
     // igual -sus decimales son opcionales-, porque el campo manda lo que el panel rellena.
@@ -1911,11 +1890,8 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
 
-    // Da igual el valor que se escriba: el helper teclea el unitario DESPUES y eso recalcula el
-    // total. Se escribe el mismo numero al que se llega para que el caso siga hablando de lo que
-    // mide -que un rechazo no borra lo escrito- y no del recalculo. El
-    // recalculado se escribe sin relleno («150»), que es lo que queda en el campo.
-    await rellenarFormulario(user, { totalCost: '150.00', lot: 'LT-4471' });
+    // El total no se teclea: sale del unitario (`12.50 x 12`) y se pinta sin relleno («150»).
+    await rellenarFormulario(user, { lot: 'LT-4471' });
     await elegirExpiracion(user, MANANA_ISO);
     await user.click(screen.getByTestId(testId.enviar));
 

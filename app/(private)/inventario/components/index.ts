@@ -53,7 +53,7 @@ export {
   multiplyCost,
   sanitizeCostInput,
 } from './product-cost-amount';
-export { COST_QUANTITY_FIELD, ProductCostFields } from './product-cost-fields';
+export { ProductCostFields } from './product-cost-fields';
 export { ProductField, ProductFieldHelper } from './product-field';
 export { ProductForm } from './product-form';
 export {

@@ -18,6 +18,8 @@ type ProductFieldProps = {
   /** Tipo del `<input>`. `number` es el unico que ademas fija `inputMode`, `min` y `step`. */
   readonly type: 'text' | 'number' | 'date';
   readonly required?: boolean;
+  /** Campo derivado: se ve y se envia, pero no se escribe. */
+  readonly readOnly?: boolean;
   /** Si viene, la etiqueta gana un boton de ayuda que lo muestra en un tooltip. */
   readonly helper?: ReactNode;
   /** Valor inicial del campo sin controlar. No se pasa junto con `value`. */
@@ -44,6 +46,7 @@ export function ProductField({
   label,
   type,
   required,
+  readOnly,
   helper,
   defaultValue,
   error,
@@ -65,6 +68,7 @@ export function ProductField({
       step={isNumber ? 1 : undefined}
       min={isNumber ? 0 : undefined}
       required={required}
+      readOnly={readOnly}
       defaultValue={defaultValue}
       value={value}
       onChange={onChange}

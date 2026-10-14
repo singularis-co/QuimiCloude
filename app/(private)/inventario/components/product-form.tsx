@@ -128,8 +128,8 @@ const PACKAGING_LEGACY_LABEL = 'Envase sin presentación fija';
 const PACKAGING_LEGACY_NOTE =
   'Se dio de alta antes de los envases con presentación: no se ofrece en el reparto de pedidos.';
 
-/** Falta el par de costos entero. Se pinta en LOS DOS campos: cualquiera de ellos resuelve. */
-const COST_REQUIRED_MESSAGE = 'Escribe el costo unitario o el costo total; basta con uno.';
+/** Falta el costo unitario: es la unica entrada del par, el total se calcula a partir de el. */
+const COST_REQUIRED_MESSAGE = 'Escribe el costo unitario.';
 
 /** Los unicos tipos que el select ofrece: un producto terminado no nace a mano. */
 const TYPE_OPTION_LABELS: Record<(typeof MANUAL_PRODUCT_TYPE_VALUES)[number], string> = {
@@ -278,16 +278,16 @@ function readOptionalText(raw: string): string | undefined {
  * campo (R8: el de «solo total sin existencia» cuelga de `stock`), asi que se muestran tal cual.
  *
  * La unica excepcion es R11 -no viene ningun costo-: el esquema cuelga ese issue de los DOS
- * campos de costo y aqui tiene copy propio, porque decir «basta con uno» es lo que resuelve el
- * problema. Se reconoce por que los dos costos venian vacios, no por el texto del issue.
+ * campos de costo, pero el total es de solo lectura, asi que se pinta solo en el unitario y con
+ * copy propio. Se reconoce por que el unitario venia vacio, no por el texto del issue.
  */
 function fieldMessage(
   field: ProductFieldName,
   issue: { readonly code: string; readonly message: string },
-  faltanLosDosCostos: boolean,
+  faltaElCostoUnitario: boolean,
 ): string {
   if (issue.code !== 'custom') return FIELD_MESSAGES[field];
-  if (faltanLosDosCostos && (field === 'unitCost' || field === 'totalCost')) {
+  if (faltaElCostoUnitario && field === 'unitCost') {
     return COST_REQUIRED_MESSAGE;
   }
   return issue.message;
@@ -451,12 +451,14 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
         );
 
     if (!parsed.success) {
-      const faltanLosDosCostos = isCreate && unitCost === undefined && totalCost === undefined;
+      const faltaElCostoUnitario = isCreate && unitCost === undefined;
 
       for (const issue of parsed.error.issues) {
-        const field = String(issue.path[0] ?? '') as ProductFieldName;
+        const path = String(issue.path[0] ?? '') as ProductFieldName;
+        // El total es de solo lectura: un rechazo suyo se arregla en el unitario, que es de donde sale.
+        const field: ProductFieldName = path === 'totalCost' ? 'unitCost' : path;
         if (field in FIELD_MESSAGES && fieldErrors[field] === undefined) {
-          fieldErrors[field] = fieldMessage(field, issue, faltanLosDosCostos);
+          fieldErrors[field] = fieldMessage(field, issue, faltaElCostoUnitario);
         }
       }
     }
@@ -773,7 +775,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           type="text"
           inputMode="decimal"
           required
-          helper="Cantidad a partir de la cual quieres que se avise de que queda poco. Hoy solo se guarda: todavía no dispara ningún aviso."
+          helper="Cantidad a partir de la cual quieres que se avise de que queda poco."
           value={qtyAlertValue}
           onChange={(event) => setQtyAlertValue(sanitizeQuantityInput(event.currentTarget.value))}
           error={fieldErrors.qtyAlert}
@@ -781,13 +783,13 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
       )}
 
       {/*
-        Resto del primer lote (2026-09-10). Solo en el ALTA, y todos opcionales salvo la regla del
-        par de costos: tiene que venir el unitario O el total, y basta con uno.
+        Resto del primer lote (2026-09-10). Solo en el ALTA, y todos opcionales salvo el costo
+        unitario, que es obligatorio.
 
         Los dos costos son `type="text"` con teclado decimal, NO `type="number"`: un importe no
         pasa por el binario de coma flotante -es la misma razon por la que el dominio lo mueve
-        como cadena decimal-. Van juntos en `ProductCostFields` porque se rellenan el uno al otro
-        con la existencia y filtran lo tecleado: son un par, no dos campos sueltos.
+        como cadena decimal-. Van juntos en `ProductCostFields` porque el total, de solo lectura,
+        se calcula del unitario y la existencia: son un par, no dos campos sueltos.
       */}
       {isEdit ? null : (
         <>
@@ -797,9 +799,8 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
               unitCostLabel={FIELD_LABELS.unitCost}
               totalCostLabel={FIELD_LABELS.totalCost}
               initialUnitCost={initialValue('unitCost', '')}
-              initialTotalCost={initialValue('totalCost', '')}
+              quantity={stockValue}
               unitCostError={fieldErrors.unitCost}
-              totalCostError={fieldErrors.totalCost}
             />
           )}
 
@@ -822,7 +823,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
               key={`expiryDate-${resetCount}`}
               name="expiryDate"
               label={FIELD_LABELS.expiryDate}
-              helper="La fecha en la que este lote caduca. Opcional: hoy solo se guarda, todavía no dispara ningún aviso."
+              helper="La fecha en la que este lote caduca."
               initialValue={initialValue('expiryDate', '')}
               error={fieldErrors.expiryDate}
             />
