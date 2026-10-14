@@ -49,7 +49,7 @@ Cierre:                        T12
 
 ### Tanda B
 
-- [ ] **T3 · Dominio puro: entradas, lista, historial, vistas y alcance del seed** (R4–R7, R30,
+- [x] **T3 · Dominio puro: entradas, lista, historial, vistas y alcance del seed** (R4–R7, R30,
   R32, R35, R39, R40).
   - `domain/company-input.ts`, `domain/company-queryable.ts`, `domain/company-event.ts`,
     `domain/company-view.ts`, `domain/seed-scope.ts` (`design.md > 3.1–3.4`, `> 7`).
@@ -60,11 +60,11 @@ Cierre:                        T12
     `null` frente a texto, sin cambios → `[]`); los cuatro tipos cumplen `EVENT_KIND_FORMAT`.
   - **Hecho:** tests verdes; `guard-arquitectura-modulos` y `guard-contrato-listados` en verde.
 
-- [ ] **T4 · Puertos** (soporte de R11–R38). Depende de T3.
+- [x] **T4 · Puertos** (soporte de R11–R38). Depende de T3.
   - `ports/company-repository.ts`, `ports/company-open-orders-counter.ts` (`design.md > 4`).
   - **Hecho:** typecheck verde; ningún puerto importa fuera de `domain/`.
 
-- [ ] **T5 [P] · Casos de uso de escritura** (R1, R2, R5, R7–R9, R11–R19, R21–R23, R26–R28).
+- [x] **T5 [P] · Casos de uso de escritura** (R1, R2, R5, R7–R9, R11–R19, R21–R23, R26–R28).
   Depende de T4.
   - `domain/create-company.ts`, `domain/update-company.ts`, `domain/delete-company.ts`,
     `domain/reactivate-company.ts` (`design.md > 3.5`).
@@ -81,7 +81,7 @@ Cierre:                        T12
   - Reexportar desde `lib/modules/identity/index.ts` (`design.md > 6.1`).
   - **Hecho:** tests verdes; el dominio solo importa `zod`, su `domain/` y sus `ports/`.
 
-- [ ] **T6 [P] · Casos de uso de lectura** (R1, R2, R20, R29–R33, R37). Depende de T4.
+- [x] **T6 [P] · Casos de uso de lectura** (R1, R2, R20, R29–R33, R37). Depende de T4.
   - `domain/list-companies.ts`, `domain/get-company.ts`, `domain/get-company-deletion-impact.ts`,
     `domain/list-company-events.ts`.
   - Tests en `tests/unit/identity/companies/`: R1/R2 (solo `empresas.modificar` →
@@ -173,6 +173,7 @@ Añadidos por el leader el 2026-10-13 (bloqueo de la Tanda A, enmiendas mecánic
 - `tests/unit/identity/schema/account-status-schema.test.ts` (ídem)
 - `tests/unit/identity/credential-policy-contract.test.ts` (ídem)
 - `tests/unit/identity/schema/identity-schema.test.ts` (ídem; `CompanyEvent` fuera del caso R12: un historial no es tabla intermedia)
+- `tests/unit/identity/credencial/scope.test.ts` (`create-company.ts` en `EMISORES_LEGITIMOS`, con comentario)
 
 
 - `db/schema.prisma`
