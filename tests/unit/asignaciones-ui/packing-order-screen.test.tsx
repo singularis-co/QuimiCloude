@@ -63,6 +63,7 @@ function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
     packedByName: null,
     packedById: null,
     packingSteps: [],
+    packingEvidence: [],
     ...overrides,
   };
 }

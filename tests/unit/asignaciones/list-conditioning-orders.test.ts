@@ -174,7 +174,7 @@ describe('R7 — cada fila trae numero, receta, reparto completo, estado y quien
   it('R7: quien acondiciona dada de baja sigue con su nombre, porque el directorio la incluye', async () => {
     const { deps } = montar({
       items: [resumen(PEDIDO_2, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA })],
-      people: [{ id: ANA, displayName: 'Ana Baja', isActive: false, permissions: [] }],
+      people: [{ id: ANA, displayName: 'Ana Baja', isActive: false, permissions: [], roleName: 'Operador' }],
     });
 
     const [fila] = (await createListConditioningOrders(deps)(ACONDICIONADOR, { page: 1 })).items;

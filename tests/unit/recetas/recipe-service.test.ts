@@ -18,6 +18,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 // QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
 // Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
@@ -82,6 +83,7 @@ function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRep
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     createVersion: vi.fn<RecipeRepository['createVersion']>(async () => 'not_found'),
     listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(async () => []),
     replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => 'not_found'),
     ...overrides,
   };
@@ -139,7 +141,7 @@ describe('R5, R6 — alta de receta', () => {
     const images = montarAlmacenamiento();
 
     const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
     const deleteRecipe = createDeleteRecipe({ recipes, now: () => AHORA });
 
     await createRecipe(RECETA_VALIDA, ADMIN);
@@ -191,7 +193,7 @@ describe('R11 — la edicion recibe la lista final completa', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     const nuevaListaCompleta = {
       ...RECETA_VALIDA,
@@ -266,7 +268,7 @@ describe('R29 — un producto terminado no puede ser ingrediente', () => {
       ]),
     });
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     await expect(updateRecipe('receta-1', edicionConTerminado, ADMIN)).rejects.toBeInstanceOf(
       ActionNotAllowedError,
@@ -281,7 +283,7 @@ describe('R21 — receta sin imagen', () => {
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
     const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     await createRecipe(RECETA_VALIDA, ADMIN);
     await updateRecipe('receta-1', RECETA_VALIDA, ADMIN);
@@ -314,7 +316,7 @@ describe('R26 — reemplazo de imagen', () => {
     });
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     const llamadas: string[] = [];
     (recipes.replaceAlive as ReturnType<typeof vi.fn>).mockImplementation(async () => {
@@ -513,7 +515,7 @@ describe('R23 — editar una receta sembrada sin lineas se rechaza', () => {
     });
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     await expect(
       updateRecipe('receta-1', { ...RECETA_VALIDA, name: 'Nuevo nombre', lines: [] }, ADMIN),

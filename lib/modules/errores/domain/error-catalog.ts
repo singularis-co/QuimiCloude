@@ -93,6 +93,11 @@ export const ERROR_MESSAGE_KEY = {
   delivery_not_found: 'errors.delivery_not_found',
   delivery_already_voided: 'errors.delivery_already_voided',
   company_not_found: 'errors.company_not_found',
+  evidence_required: 'errors.evidence_required',
+  evidence_limit: 'errors.evidence_limit',
+  evidence_invalid_file: 'errors.evidence_invalid_file',
+  evidence_not_found: 'errors.evidence_not_found',
+  recipe_steps_locked: 'errors.recipe_steps_locked',
   ai_provider_missing: 'errors.ai_provider_missing',
   ai_provider_error: 'errors.ai_provider_error',
 } as const satisfies Record<ErrorCode, string>;
@@ -237,6 +242,14 @@ export const ERROR_MESSAGES_ES = {
   'errors.delivery_already_voided':
     'Alguna presentacion elegida ya estaba anulada: revisa la lista y vuelve a intentarlo.',
   'errors.company_not_found': 'La empresa solicitada no existe.',
+  'errors.evidence_required':
+    'Falta evidencia: algun paso que la exige no tiene ninguna foto.',
+  'errors.evidence_limit': 'Ese paso ya tiene 3 fotos: cambia o quita una antes de subir otra.',
+  'errors.evidence_invalid_file':
+    'No se pudo registrar la foto: debe ser JPG, PNG o WebP y pesar como maximo 5 MB.',
+  'errors.evidence_not_found': 'La foto de evidencia no existe.',
+  'errors.recipe_steps_locked':
+    'Hay pedidos en curso con fotos de evidencia: mientras sigan en curso no puedes mover ni quitar pasos.',
   'errors.ai_provider_missing': 'Para leer PDF, conecta el proveedor IA de tu empresa.',
   'errors.ai_provider_error':
     'Error con tu proveedor IA. Revisa la conexión en Integraciones > Proveedor IA.',

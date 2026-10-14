@@ -14,6 +14,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 // QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
 // Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
@@ -68,6 +69,7 @@ function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRep
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     createVersion: vi.fn<RecipeRepository['createVersion']>(async () => 'not_found'),
     listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(async () => []),
     replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => 'not_found'),
     ...overrides,
   };
@@ -94,7 +96,7 @@ describe('R45 — la linea preexistente se admite sin preguntar al catalogo por 
       }),
     };
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     // La receta solo reenvia la linea que YA tenia, ahora al 100 %: ningun producto nuevo que validar.
     const lineaViejaCompleta = { productId: LINEA_VIEJA.productId, percentage: '100.00' };
@@ -128,7 +130,7 @@ describe('R45 — la linea preexistente se admite sin preguntar al catalogo por 
       }),
     };
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     await updateRecipe(
       'receta-1',
@@ -156,7 +158,7 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
       }),
     };
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     await expect(
       updateRecipe(

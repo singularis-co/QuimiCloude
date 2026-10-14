@@ -69,7 +69,7 @@ export function receta(overrides?: Partial<RecipeRef>): RecipeRef {
 }
 
 export function persona(id: string, displayName: string): PersonRef {
-  return { id, displayName, isActive: true, permissions: [] };
+  return { id, displayName, isActive: true, permissions: [], roleName: 'Operador' };
 }
 
 type Opciones = {

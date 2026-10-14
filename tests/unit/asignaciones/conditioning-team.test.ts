@@ -31,7 +31,7 @@ const GRUPO_A = uuid('8');
 const GRUPO_B = uuid('9');
 
 function persona(id: string, overrides?: Partial<PersonRef>): PersonRef {
-  return { id, displayName: id, isActive: true, permissions: SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]!, ...overrides };
+  return { id, displayName: id, isActive: true, permissions: SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]!, roleName: ROLE_OPERADOR, ...overrides };
 }
 
 const ADMINISTRADOR: Partial<PersonRef> = { permissions: SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]! };

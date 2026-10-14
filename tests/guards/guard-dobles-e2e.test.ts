@@ -1,6 +1,6 @@
 // Guardia: los dobles de E2E de cada modulo no se encienden solos y no se eligen a ciegas.
-// Vigila una VARIABLE por fila de `VIGILADAS`: hoy la de `documentos` y la de `integraciones`. Cada
-// fila dice donde esta escrita su decision.
+// Vigila una VARIABLE por fila de `VIGILADAS`: hoy la de `documentos`, la de `integraciones` y
+// la de `asignaciones`. Cada fila dice donde esta escrita su decision.
 //
 // Dos motivos de rojo por fila, y uno por cada mitad de la decision:
 //
@@ -70,6 +70,14 @@ const VIGILADAS: readonly Vigilada[] = [
     design: 'specs/QC-237-conexion-whatsapp-por-empresa/design.md > 9',
     requisito: 'R41',
     ejemplo: 'whatsappGraphClientCanned',
+  },
+  {
+    variable: 'EVIDENCE_E2E_DOUBLES',
+    consulta: 'evidenceE2EDoublesEnabled(',
+    dobles: ['lib/modules/asignaciones/adapters/driven/storage/evidence-storage-memory'],
+    design: 'specs/QC-214-evidencia-por-paso/design.md > 4.2',
+    requisito: 'R30',
+    ejemplo: 'evidenceStorageMemory',
   },
 ];
 

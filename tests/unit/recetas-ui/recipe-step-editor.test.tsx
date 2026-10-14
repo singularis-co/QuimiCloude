@@ -495,3 +495,64 @@ describe('RecipeStepEditor', () => {
     });
   });
 });
+
+function EvidenceHarness({ inicial = false }: { readonly inicial?: boolean }) {
+  const [documento, setDocumento] = useState<RecipeStepDocument>(DOC_VACIO);
+  const [marcado, setMarcado] = useState(inicial);
+  return (
+    <RecipeStepEditor
+      document={documento}
+      onChange={setDocumento}
+      label="Paso 1"
+      editableTestId={TEST_ID}
+      evidence={{
+        checked: marcado,
+        onCheckedChange: setMarcado,
+        label: 'Requiere evidencia en el paso 1',
+      }}
+    />
+  );
+}
+
+describe('RecipeStepEditor — «Requiere evidencia»', () => {
+  it('R1: sin la prop evidence no hay interruptor', async () => {
+    await montar();
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByText('Requiere evidencia')).toBeNull();
+  });
+
+  it('R2: con la prop evidence apagada, el interruptor sale apagado y sin línea de ayuda', async () => {
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    const control = screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1' });
+    expect(control).toHaveAttribute('aria-checked', 'false');
+    expect(control).toHaveTextContent('Requiere evidencia');
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
+  });
+
+  it('R1, R5: se enciende con teclado y muestra la línea de ayuda; se apaga y la quita', async () => {
+    const user = setupUser();
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+    const control = screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1' });
+
+    control.focus();
+    await user.keyboard(' ');
+    expect(control).toHaveAttribute('aria-checked', 'true');
+    const ayuda = screen.getByTestId(`${TEST_ID}-evidence-help`);
+    expect(ayuda).toHaveTextContent('Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.');
+    expect(control).toHaveAttribute('aria-describedby', ayuda.id);
+
+    await user.click(control);
+    expect(control).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
+  });
+
+  it('R1: el interruptor no entra en la barra de formato, que sigue con tres acciones', async () => {
+    render(<EvidenceHarness inicial />);
+    const barra = await screen.findByTestId(`${TEST_ID}-toolbar`);
+    expect(barra.querySelector('[role="switch"]')).toBeNull();
+    expect(screen.getAllByRole('button')).toHaveLength(3);
+  });
+});

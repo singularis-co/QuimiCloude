@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Evidencia por paso en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="EvidenciaPaso" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Evidencia por paso · ficha</h2>
+    <dl class="spec">
+      <dt>Dónde</dt><dd>Debajo de las casillas del paso, en Ejecución (fabricación) y en Empaque (envasado). Solo en los pasos con «Requiere evidencia» encendido; el resto de la pantalla no cambia</dd>
+      <dt>Reutiliza</dt><dd><span class="mono">shared/step-reader</span> (gate <span class="mono">blocked</span> con motivo, mismo pie Anterior / Siguiente / Finalizar) · <span class="mono">ui/card · confirm-dialog · shared/compress-image · shared/file-types</span> · clases <span class="mono">drop · progress · nt · count · dlg</span></dd>
+      <dt>Pieza nueva</dt><dd><span class="mono">step-evidence</span> (cuadrícula de 3 casillas cuadradas: foto, subiendo, error, añadir). Entrada real: <span class="mono">&lt;input type="file" accept="image/jpeg,image/png,image/webp" capture="environment"&gt;</span> detrás del botón «Añadir foto»</dd>
+      <dt>Librerías</dt><dd>Ninguna nueva: <span class="mono">@base-ui/react</span> (AlertDialog, Dialog) · <span class="mono">lucide-react</span> (camera, refresh-cw, trash-2, triangle-alert) · <span class="mono">@supabase/storage-js</span> (subida firmada)</dd>
+      <dt>Estados</dt><dd>Sin fotos (solo «Añadir foto») · subiendo (anillo + barra + %, Siguiente bloqueado: «Espera a que termine de subir la foto.») · error de formato o tamaño (casilla roja con «Quitar») · 1–2 fotos (+ «Añadir otra foto») · 3 fotos (sin casilla de añadir) · terminado (sin botones, «Fijada al terminar»)</dd>
+      <dt>Bloqueos</dt><dd>«Siguiente» deshabilitado con 0 fotos: «Sube al menos 1 foto de evidencia para continuar.» · al «Finalizar» con un paso anterior sin fotos: diálogo «Falta evidencia» con un botón por paso que lleva a él</dd>
+      <dt>Escritorio</dt><dd>Columna de 720 px · casillas de ~220 px · «Añadir foto» abre el selector de archivos (también acepta arrastrar)</dd>
+      <dt>Tablet</dt><dd>Igual que escritorio a todo el ancho · la cámara del dispositivo se ofrece en el selector</dd>
+      <dt>Teléfono</dt><dd>Casillas de ~110 px · botones de foto de 44 px (cambiar y quitar) arriba a la derecha · «Añadir foto» abre directamente la cámara trasera, con opción de galería · tocar una foto la abre a pantalla completa</dd>
+      <dt>Animación</dt><dd>Cada casilla entra con <span class="mono">qc-rise</span> (200 ms) · la barra de subida crece 300 ms · el anillo gira mientras sube</dd>
+      <dt>Por confirmar</dt><dd>Texto exacto de los mensajes · si la compresión baja también la resolución (aquí: máx. 1600 px por lado) · las fotos son degradados de ejemplo</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

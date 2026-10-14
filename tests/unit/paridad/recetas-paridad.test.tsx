@@ -87,6 +87,7 @@ vi.mock('@/lib/composition', () => ({
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipesAction: listRecipesActionMock,
   getRecipeAction: getRecipeActionMock,
+  getRecipeStepLockAction: vi.fn(async () => ({ status: 'success' as const, data: { lockingOrders: 0 } })),
   deleteRecipeAction: vi.fn(),
   listRecipeVersionsAction: listRecipeVersionsActionMock,
   createRecipeVersionAction: vi.fn(),

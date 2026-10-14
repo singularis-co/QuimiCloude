@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useEffectEvent, useId, useRef, useState } from 'react';
 
 import { CountdownRing } from '@/components/shared/countdown-ring';
 import { CountdownTimer } from '@/components/shared/countdown-timer';
@@ -72,6 +72,14 @@ export type StepReaderProps = {
     direction: 'advance' | 'go_back';
     position: number;
   }) => void;
+  /** Contenido extra del paso actual (posición desde 1), debajo del documento del paso. */
+  readonly renderStepAddon?: (position: number) => ReactNode;
+  /** Motivo extra que bloquea el paso actual (posición desde 1); `null` si no bloquea. Se muestra
+   *  solo cuando no quedan elementos por marcar. */
+  readonly stepBlockReason?: (position: number) => string | null;
+  /** Cada `id` nuevo lleva al paso `position` (desde 1), aunque el actual esté bloqueado, y avisa
+   *  a `onStepChange` si el paso cambia. El `id` con el que se monta no navega. */
+  readonly stepRequest?: { readonly position: number; readonly id: number };
 };
 
 /**
@@ -150,6 +158,9 @@ export function StepReader({
   finishBusy = false,
   initialStepPosition,
   onStepChange,
+  renderStepAddon,
+  stepBlockReason,
+  stepRequest,
 }: StepReaderProps) {
   const isEjecucion = mode === 'ejecucion';
   const baseId = useId();
@@ -181,6 +192,25 @@ export function StepReader({
     }
   }, [arrival, isEjecucion]);
 
+  const requestId = stepRequest?.id;
+  const handledRequestId = useRef(requestId);
+
+  const followStepRequest = useEffectEvent(() => {
+    if (stepRequest === undefined || steps.length === 0) return;
+    const from = Math.min(index, steps.length - 1);
+    const target = (clampStepPosition(stepRequest.position, steps.length) ?? 1) - 1;
+    if (target === from) return;
+    setArrival((previous) => previous + 1);
+    setIndex(target);
+    onStepChange?.({ direction: target > from ? 'advance' : 'go_back', position: target + 1 });
+  });
+
+  useEffect(() => {
+    if (requestId === undefined || requestId === handledRequestId.current) return;
+    handledRequestId.current = requestId;
+    followStepRequest();
+  }, [requestId]);
+
   if (steps.length === 0) {
     // R21: estado vacio explicito y NINGUNA navegacion entre pasos.
     return (
@@ -207,8 +237,10 @@ export function StepReader({
   const isFirst = currentIndex === 0;
   const pending = countPendingItems(current, currentIndex, checkedItems);
   const waiting = waitEnabled && waitedArrival !== arrival;
-  const blocked = pending > 0 || waiting;
-  const reasonIds = [pending > 0 ? reasonId : undefined, waiting ? waitReasonId : undefined]
+  const extraReason = stepBlockReason?.(currentIndex + 1) ?? null;
+  const reasonText = pending > 0 ? TEXTS.blocked(pending) : extraReason;
+  const blocked = pending > 0 || extraReason !== null || waiting;
+  const reasonIds = [reasonText !== null ? reasonId : undefined, waiting ? waitReasonId : undefined]
     .filter((id): id is string => id !== undefined)
     .join(' ');
   const describedBy = reasonIds === '' ? undefined : reasonIds;
@@ -267,6 +299,8 @@ export function StepReader({
       onToggleItem={toggleItem}
     />
   );
+
+  const stepAddon = renderStepAddon?.(currentIndex + 1);
 
   const waitReason = waiting && (
     <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
@@ -363,6 +397,8 @@ export function StepReader({
 
         {documentView}
 
+        {stepAddon}
+
         {waitReason}
 
         <div
@@ -375,9 +411,9 @@ export function StepReader({
               <p
                 id={reasonId}
                 data-testid="step-reader-blocked-reason"
-                className={cn('text-center text-base', pending === 0 && 'invisible')}
+                className={cn('text-center text-base', reasonText === null && 'invisible')}
               >
-                {TEXTS.blocked(pending)}
+                {reasonText ?? TEXTS.blocked(pending)}
               </p>
             </div>
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3">
@@ -410,9 +446,11 @@ export function StepReader({
       {/* R14: solo `steps[currentIndex]` esta en el DOM; los demas NO se renderizan. */}
       {documentView}
 
-      {pending > 0 && (
+      {stepAddon}
+
+      {reasonText !== null && (
         <p id={reasonId} data-testid="step-reader-blocked-reason" className="text-base">
-          {TEXTS.blocked(pending)}
+          {reasonText}
         </p>
       )}
 
