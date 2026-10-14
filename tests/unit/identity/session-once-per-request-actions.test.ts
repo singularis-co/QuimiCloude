@@ -551,6 +551,16 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       }),
   },
   {
+    // La accion captura el error y devuelve un estado, asi que un `orderId` invalido no rompe la
+    // invocacion.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-evidence-actions.ts',
+    nombre: 'getOrderEvidenceAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-evidence-actions')
+      ).getOrderEvidenceAction('no-es-un-uuid'),
+  },
+  {
     archivo: 'lib/modules/integraciones/adapters/driving/ai-provider-actions.ts',
     nombre: 'getAiProviderConnectionAction',
     invocar: async () =>

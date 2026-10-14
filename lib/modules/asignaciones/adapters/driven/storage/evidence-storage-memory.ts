@@ -48,6 +48,10 @@ export const evidenceStorageMemory: EvidenceStorage = {
     );
   },
 
+  createSignedReadUrls(paths: readonly string[], expiresInSeconds: number): Promise<readonly string[]> {
+    return Promise.all(paths.map((path) => evidenceStorageMemory.createSignedReadUrl(path, expiresInSeconds)));
+  },
+
   download(path: string): Promise<Uint8Array | null> {
     return whenSigned(path, 'la descarga', () => MINIMAL_PNG.slice());
   },

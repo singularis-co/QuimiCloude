@@ -49,6 +49,13 @@ async function createSignedReadUrl(path: string, expiresInSeconds: number): Prom
   return data.signedUrl;
 }
 
+async function createSignedReadUrls(
+  paths: readonly string[],
+  expiresInSeconds: number,
+): Promise<readonly string[]> {
+  throw new Error(`not implemented: createSignedReadUrls (${String(paths.length)} rutas, ${String(expiresInSeconds)} s)`);
+}
+
 async function download(path: string): Promise<Uint8Array | null> {
   const { data, error } = await bucketApi().download(path);
   if (error) {
@@ -68,6 +75,7 @@ async function remove(path: string): Promise<void> {
 export const evidenceStorageSupabase: EvidenceStorage = {
   createSignedUpload,
   createSignedReadUrl,
+  createSignedReadUrls,
   download,
   remove,
 };

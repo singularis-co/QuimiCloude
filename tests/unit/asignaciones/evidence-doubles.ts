@@ -135,6 +135,14 @@ export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
           .filter((c) => de(companyId, c.orderId, c.phase).length > 0)
           .map((c) => c.orderId),
     ),
+    countByOrders: vi.fn<StepEvidenceRepository['countByOrders']>(async (companyId, orderIds) => {
+      const conteo = new Map<string, number>();
+      for (const orderId of new Set(orderIds)) {
+        const total = filas.filter((f) => f.companyId === companyId && f.orderId === orderId).length;
+        if (total > 0) conteo.set(orderId, total);
+      }
+      return conteo;
+    }),
   } satisfies StepEvidenceRepository;
 
   return { repo, filas };
@@ -158,6 +166,9 @@ export function bucket(options?: {
     })),
     createSignedReadUrl: vi.fn<EvidenceStorage['createSignedReadUrl']>(
       async (path, expiresInSeconds) => `https://bucket.test/read/${path}?ttl=${String(expiresInSeconds)}`,
+    ),
+    createSignedReadUrls: vi.fn<EvidenceStorage['createSignedReadUrls']>(async (paths, expiresInSeconds) =>
+      paths.map((path) => `https://bucket.test/read/${path}?ttl=${String(expiresInSeconds)}`),
     ),
     download: vi.fn<EvidenceStorage['download']>(async () =>
       options?.descarga === undefined ? PNG_VALIDO : options.descarga,

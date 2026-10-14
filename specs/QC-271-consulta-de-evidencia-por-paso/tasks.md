@@ -18,7 +18,7 @@
 > - Si el humano responde P1 o P2 con algo distinto de la propuesta, para y avisa: cambian R4, R14 y
 >   R17.
 
-## T0 — Contrato publicado (secuencial; lo hace `backend_dev`)
+## [x] T0 — Contrato publicado (secuencial; lo hace `backend_dev`)
 
 Archivos:
 - `lib/modules/asignaciones/domain/order-evidence.ts` (nuevo), con los tipos de `design.md > 2.1`

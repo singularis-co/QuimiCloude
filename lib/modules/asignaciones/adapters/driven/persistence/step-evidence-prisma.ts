@@ -177,5 +177,9 @@ export function createStepEvidenceRepository(db: PrismaClient = prisma): StepEvi
       });
       return rows.map((row) => row.orderId);
     },
+
+    async countByOrders(companyId, orderIds) {
+      throw new Error(`not implemented: countByOrders (${companyId}, ${String(orderIds.length)} pedidos)`);
+    },
   };
 }

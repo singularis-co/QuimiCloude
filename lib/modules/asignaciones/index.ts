@@ -351,3 +351,22 @@ export {
   type CountEvidenceLockingOrders,
   type CountEvidenceLockingOrdersDeps,
 } from './domain/count-evidence-locking-orders';
+
+// ---------------------------------------------------------------------------------------
+// Consulta de las fotos de un pedido ya ejecutado. Las Server Actions no salen por aqui.
+// ---------------------------------------------------------------------------------------
+export {
+  groupEvidenceRows,
+  type OrderEvidence,
+  type OrderEvidenceCount,
+  type OrderEvidenceGroup,
+  type OrderEvidenceRead,
+} from './domain/order-evidence';
+export type { ReadOrderEvidenceDeps } from './domain/read-order-evidence';
+export {
+  createGetExecutionEvidence,
+  type GetExecutionEvidenceDeps,
+} from './domain/get-execution-evidence';
+export { createGetOrderEvidence, type GetOrderEvidenceDeps } from './domain/get-order-evidence';
+export { createCountOrderEvidence, type CountOrderEvidenceDeps } from './domain/count-order-evidence';
+export { canConsultOrderEvidence } from './domain/actor';

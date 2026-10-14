@@ -466,6 +466,9 @@ import {
   createRegisterEvidence,
   createRemoveEvidence,
   createCountEvidenceLockingOrders,
+  createGetExecutionEvidence,
+  createGetOrderEvidence,
+  createCountOrderEvidence,
 } from '@/lib/modules/asignaciones';
 import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -1763,6 +1766,8 @@ const evidenceStorage: EvidenceStorage = {
   createSignedUpload: (path) => selectedEvidenceStorage().createSignedUpload(path),
   createSignedReadUrl: (path, expiresInSeconds) =>
     selectedEvidenceStorage().createSignedReadUrl(path, expiresInSeconds),
+  createSignedReadUrls: (paths, expiresInSeconds) =>
+    selectedEvidenceStorage().createSignedReadUrls(paths, expiresInSeconds),
   download: (path) => selectedEvidenceStorage().download(path),
   remove: (path) => selectedEvidenceStorage().remove(path),
 };
@@ -2079,6 +2084,17 @@ export const asignaciones = {
     evidence: stepEvidenceRepository,
     storage: evidenceStorage,
   }),
+  getExecutionEvidence: createGetExecutionEvidence({
+    orders: orderCatalog,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  getOrderEvidence: createGetOrderEvidence({
+    orders: orderCatalog,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  countOrderEvidence: createCountOrderEvidence({ evidence: stepEvidenceRepository }),
 } as const;
 
 // ---------------------------------------------------------------------------------------

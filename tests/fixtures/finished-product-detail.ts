@@ -59,6 +59,7 @@ export function finishedProductBatchRow(overrides: Partial<FinishedProductBatchR
   return {
     id: LITER_BATCH_ID,
     lot: 'L-2026-0225',
+    orderId: FINISHED_ORDER_ID,
     orderNumberText: FINISHED_ORDER_NUMBER,
     purchaseDate: '2026-10-10',
     productionDate: '2026-10-10',
@@ -75,6 +76,7 @@ export function finishedProductBatchRow(overrides: Partial<FinishedProductBatchR
 export const UNPACKAGED_BATCH_ROW = finishedProductBatchRow({
   id: UNPACKAGED_BATCH_ID,
   lot: 'L-2026-0227',
+  orderId: null,
   orderNumberText: null,
   productionDate: null,
   expiryDate: null,

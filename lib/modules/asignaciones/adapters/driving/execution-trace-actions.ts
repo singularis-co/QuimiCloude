@@ -16,6 +16,7 @@ import {
   type ExecutionTraceDetail,
   type ExecutionTraceList,
   type ExecutionTraceListInput,
+  type OrderEvidence,
 } from '@/lib/modules/asignaciones';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
@@ -63,6 +64,20 @@ export async function getExecutionTraceAction(orderId: string): Promise<Executio
   try {
     const data = await asignaciones.getExecutionTrace(actor, { orderId }, new Date());
     return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type ExecutionEvidenceResult = { status: 'success'; data: OrderEvidence } | ErrorState;
+
+/** Las fotos del pedido del recorrido. Un pedido inexistente o de otra empresa vuelve como `order_not_found`. */
+export async function getExecutionEvidenceAction(orderId: string): Promise<ExecutionEvidenceResult> {
+  const actor = await currentActor();
+
+  try {
+    const { evidence } = await asignaciones.getExecutionEvidence(actor, { orderId });
+    return { status: 'success', data: evidence };
   } catch (error) {
     return toErrorState(error);
   }
