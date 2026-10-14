@@ -22,8 +22,12 @@ import {
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
+import { cn } from '@/lib/utils';
 
-import { OperatorScreenFrame } from '../../../components/operator-screen-frame';
+import {
+  OperatorScreenFrame,
+  STEP_READER_SIDE_COLUMN_RESERVE,
+} from '../../../components/operator-screen-frame';
 import { useStepEvidence } from '../../../components/use-step-evidence';
 
 /**
@@ -310,7 +314,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
       ) : null}
 
       <div className="grid grid-cols-1 items-start gap-5 @min-[1101px]:grid-cols-[300px_minmax(0,720px)] @min-[1101px]:justify-center @min-[1101px]:gap-x-6">
-        <Card className="gap-4 p-4">
+        <Card className={cn('gap-4 p-4', showsPackingSteps && STEP_READER_SIDE_COLUMN_RESERVE)}>
           <p
             className="text-base font-medium"
             data-testid={PACKING_ORDER_QUANTITY_TESTID}

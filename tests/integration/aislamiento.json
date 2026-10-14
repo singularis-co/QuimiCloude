@@ -27,6 +27,7 @@
     "clientes/customers-migration.int.test.ts",
     "clientes/customers-search-migration.int.test.ts",
     "documentos/document-batches-and-files-constraints.int.test.ts",
+    "identity/company-country.int.test.ts",
     "identity/conditioning-role-migration.int.test.ts",
     "identity/delivery-permission-migration.int.test.ts",
     "identity/delivery-void-permission-migration.int.test.ts",
@@ -630,6 +631,16 @@
     {
       "archivo": "asignaciones/step-evidence-repository.int.test.ts",
       "motivo": "QC-214 T5 (R29, R38, R39): ejercita `createStepEvidenceRepository` (step-evidence-prisma.ts) con el cliente Prisma GLOBAL: `replace` abre su PROPIA `prisma.$transaction` y lo que se mide en R29 es la carrera de varios registros simultaneos sobre el mismo paso, que necesita conexiones distintas, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en `beforeAll` y mueren en `afterAll` en el orden de las FK: fotos -> pedidos -> recetas -> usuarios -> roles -> tipos de documento -> empresas. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-13"
+    },
+    {
+      "archivo": "inventario/finished-product-detail.int.test.ts",
+      "motivo": "QC-225 B1: el adaptador de lectura de la ficha de producto terminado (finished-product-detail-prisma.ts) lee con el cliente Prisma GLOBAL, que no ve lo que una transaccion abierta no confirmo. 'beforeAll' fabrica dos empresas efimeras con randomUUID (tipo de documento, rol, usuario, cliente, unidad, recetas, presentaciones, pedidos, lineas, productos, lotes, entregas, anulacion y asientos) y 'afterAll' las borra por 'company_id' en orden de FK (asientos -> lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> recetas -> presentaciones -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-13"
+    },
+    {
+      "archivo": "pedidos/order-delivery-directory.int.test.ts",
+      "motivo": "QC-225 B2: el directorio de entregas para la ficha de producto terminado (order-delivery-directory-prisma.ts) lee con el cliente Prisma GLOBAL, que no ve lo que una transaccion abierta no confirmo. 'beforeAll' fabrica dos empresas efimeras con randomUUID (tipo de documento, rol, usuario, cliente, unidad, receta, presentaciones, pedidos, lineas, productos, lotes, entregas, lineas de entrega, anulaciones y sus lineas) y 'afterAll' las borra por 'company_id' en orden de FK (lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> recetas -> presentaciones -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-13"
     }
   ]

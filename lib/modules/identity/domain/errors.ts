@@ -394,3 +394,12 @@ export class WorkGroupMemberSelfError extends IdentityError {
     super('work_group_member_self', diagnostic);
   }
 }
+
+/** La empresa no existe o esta dada de baja: las dos comparten codigo, como el resto de `*_not_found`. */
+export class CompanyNotFoundError extends IdentityError {
+  readonly code = 'company_not_found';
+
+  constructor(diagnostic?: string) {
+    super('company_not_found', diagnostic);
+  }
+}

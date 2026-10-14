@@ -399,3 +399,13 @@ export {
   OrderTable,
   type OrderTableProps,
 } from './order-table';
+export {
+  ORDER_PRODUCED_LIST_TESTID,
+  ORDER_PRODUCED_MORE_TESTID,
+  ORDER_PRODUCED_PRESENTATIONS_TESTID,
+  ORDER_PRODUCED_PRODUCT_LINK_TESTID,
+  OrderProducedPresentations,
+  type OrderProducedPresentationsProps,
+  type OrderProducedPresentationsTexts,
+  type ProducedProductsByOrder,
+} from './order-produced-presentations';

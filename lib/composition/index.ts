@@ -67,11 +67,17 @@ import {
   createCreateRawMaterial,
   createDeletePresentation,
   createDeleteProduct,
+  createGetFinishedProduct,
   createGetProduct,
   createListBatchMovements,
+  createListFinishedProductBatches,
+  createListFinishedProductCosts,
+  createListFinishedProductDeliveries,
+  createListFinishedProductMovements,
   createListFinishedStock,
   createListOrderBatches,
   createListPresentations,
+  createListProducedProducts,
   createListProductBatches,
   createListProductFormUnits,
   createListProducts,
@@ -125,6 +131,14 @@ import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/d
 import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
+  findAliveFinishedProduct,
+  findProducedFinishedProducts,
+  listFinishedProductBatches,
+  listFinishedProductCosts,
+  listFinishedProductDeliveryMovements,
+  listFinishedProductMovements,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-product-detail-prisma';
+import {
   claimImport,
   findAliveFinishedProducts,
   findAliveProductsByNormalizedNames,
@@ -144,8 +158,10 @@ import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log
 import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-number-formatter';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
+import type { FinishedProductDetailRepository } from '@/lib/modules/inventario/ports/finished-product-detail-repository';
 import type {
   FinishedBatchCatalog,
+  FinishedDeliveryDirectory,
   OrderNumberDirectory,
   PackagingCatalog,
   PresentationCatalog,
@@ -301,6 +317,10 @@ import {
   createOrderConditioningRepository,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
+import {
+  findDeliveryDetailsByIds,
+  summarizeDeliveredByBatchIds,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma';
 import {
   withOrderTransaction,
@@ -470,6 +490,8 @@ import {
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
+import { createSetCompanyCountry } from '@/lib/modules/identity';
+import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
@@ -886,6 +908,8 @@ export const identity = {
     sessions: sessionWriter,
     ids: sessionIds,
   }),
+  // Operacion de plataforma: el actor no lleva empresa.
+  setCompanyCountry: createSetCompanyCountry({ companies: createCompanyCountryRepository() }),
 } as const;
 
 /**
@@ -935,6 +959,20 @@ const presentationRepository: PresentationRepository = {
  *  junto al resto de lo de `pedidos`, mas abajo- porque `listBatchMovements` lo necesita ya
  *  cableado: un `const` no existe antes de su linea. */
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
+
+const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
+  findDeliveryDetails: findDeliveryDetailsByIds,
+  summarizeDelivered: summarizeDeliveredByBatchIds,
+};
+
+const finishedProductDetailRepository: FinishedProductDetailRepository = {
+  findAliveFinished: findAliveFinishedProduct,
+  listBatches: listFinishedProductBatches,
+  listMovements: listFinishedProductMovements,
+  listDeliveryMovements: listFinishedProductDeliveryMovements,
+  listProductionCosts: listFinishedProductCosts,
+  findProducedProducts: findProducedFinishedProducts,
+};
 
 /**
  * El aviso de existencia que sube, atado a la revision de los pedidos bloqueados de `pedidos`.
@@ -1051,6 +1089,31 @@ export const inventario = {
     stockIncreases: stockIncreaseListener,
     digest: fileDigest,
   }),
+  getFinishedProduct: createGetFinishedProduct({
+    products: finishedProductDetailRepository,
+    units: { findRefs: findUnitRefs },
+  }),
+  listFinishedProductBatches: createListFinishedProductBatches({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+  }),
+  listFinishedProductMovements: createListFinishedProductMovements({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+  }),
+  listFinishedProductDeliveries: createListFinishedProductDeliveries({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+    deliveries: finishedDeliveryDirectory,
+    customers: {
+      findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
+    },
+  }),
+  listFinishedProductCosts: createListFinishedProductCosts({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+  }),
+  listProducedProducts: createListProducedProducts({ products: finishedProductDetailRepository }),
 } as const;
 
 // El modulo `unidades` (QC-32) siembra su catalogo con su propia migracion. `recetas`

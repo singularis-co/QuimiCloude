@@ -4,7 +4,7 @@
 // Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente,
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
 export { AdjustBatchDialog, type AdjustBatchDialogProps } from './adjust-batch-dialog';
-export { BatchHistory, movementKindLabel, movementReasonLabel } from './batch-history';
+export { BatchHistory, movementKindLabel } from './batch-history';
 export { DeleteProductDialog } from './delete-product-dialog';
 export {
   buildFinishedStockColumns,
@@ -15,6 +15,7 @@ export {
   type FinishedStockTableRow,
 } from './finished-stock-columns';
 export { FinishedStockListSection } from './finished-stock-list-section';
+export { movementReasonLabel } from './movement-reason-label';
 export {
   FINISHED_STOCK_TABLE_ID,
   FINISHED_STOCK_TABLE_TEXTS,

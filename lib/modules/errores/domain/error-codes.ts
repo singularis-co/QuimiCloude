@@ -32,6 +32,7 @@
  * **2026-10-09**: `whatsapp_connection_not_found`, `whatsapp_connection_exists`,
  * `whatsapp_phone_number_taken`.
  * **2026-10-09**: `delivery_not_found`, `delivery_already_voided`.
+ * **2026-10-13**: `company_not_found`.
  * **2026-10-13**: `evidence_required`, `evidence_limit`, `evidence_invalid_file`,
  * `evidence_not_found`, `recipe_steps_locked`.
  */
@@ -193,6 +194,7 @@ export const ERROR_CODES = [
   // Distinto de `action_not_allowed`: el pedido admite anular, pero alguna presentacion elegida ya
   // estaba anulada en esa entrega.
   'delivery_already_voided',
+  'company_not_found',
   // Distinto de `invalid_transition`: el pedido admite la accion, lo que falta es al menos una foto
   // en un paso que la exige.
   'evidence_required',

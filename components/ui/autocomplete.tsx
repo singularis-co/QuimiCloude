@@ -21,6 +21,16 @@ function AutocompleteInput({ className, ...props }: AutocompletePrimitive.Input.
   )
 }
 
+function AutocompleteTrigger({ className, ...props }: AutocompletePrimitive.Trigger.Props) {
+  return (
+    <AutocompletePrimitive.Trigger
+      data-slot="autocomplete-trigger"
+      className={className}
+      {...props}
+    />
+  )
+}
+
 function AutocompleteInputGroup({
   className,
   ...props
@@ -195,4 +205,5 @@ export {
   AutocompleteList,
   AutocompleteSeparator,
   AutocompleteStatus,
+  AutocompleteTrigger,
 }

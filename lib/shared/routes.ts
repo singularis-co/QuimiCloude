@@ -38,6 +38,11 @@ export const INVENTORY_ROUTE = '/inventario';
 /** Cuelga de `INVENTORY_ROUTE`, así que su prefijo privado ya la cubre. */
 export const INVENTORY_IMPORT_ROUTE = '/inventario/importar';
 
+/** Cuelga de `INVENTORY_ROUTE`; el segmento estatico no choca con `importar`. */
+export function finishedProductDetailRoute(id: string): string {
+  return `${INVENTORY_ROUTE}/producto-terminado/${id}`;
+}
+
 /**
  * Pantalla de recetas de produccion (QC-26, R3).
  *

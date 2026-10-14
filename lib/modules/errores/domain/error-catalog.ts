@@ -92,6 +92,7 @@ export const ERROR_MESSAGE_KEY = {
   whatsapp_phone_number_taken: 'errors.whatsapp_phone_number_taken',
   delivery_not_found: 'errors.delivery_not_found',
   delivery_already_voided: 'errors.delivery_already_voided',
+  company_not_found: 'errors.company_not_found',
   evidence_required: 'errors.evidence_required',
   evidence_limit: 'errors.evidence_limit',
   evidence_invalid_file: 'errors.evidence_invalid_file',
@@ -238,6 +239,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.delivery_not_found': 'La entrega no existe.',
   'errors.delivery_already_voided':
     'Alguna presentacion elegida ya estaba anulada: revisa la lista y vuelve a intentarlo.',
+  'errors.company_not_found': 'La empresa solicitada no existe.',
   'errors.evidence_required':
     'Falta evidencia: algun paso que la exige no tiene ninguna foto.',
   'errors.evidence_limit': 'Ese paso ya tiene 3 fotos: cambia o quita una antes de subir otra.',

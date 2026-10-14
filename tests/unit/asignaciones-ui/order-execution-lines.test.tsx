@@ -8,6 +8,7 @@ import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 import {
   ORDER_EXECUTION_LINE_APPROXIMATE_TESTID,
+  ORDER_EXECUTION_LINE_NAME_TESTID,
   ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID,
   ORDER_EXECUTION_LINE_PERCENTAGE_TESTID,
   ORDER_EXECUTION_LINE_QUANTITY_TESTID,
@@ -290,6 +291,69 @@ describe('linea de ejecucion — unidad desconocida (R24)', () => {
     expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`)).toHaveTextContent(
       '20',
     );
+  });
+});
+
+describe('linea de ejecucion — el nombre no se solapa con las cifras (QC-269 R9, R10)', () => {
+  it('QC-269 R9: el nombre tiene su testid y una base de 12 rem que no encoge por debajo', () => {
+    render(<OrderExecutionLines lines={[linea()]} />);
+
+    const nombre = screen.getByTestId(`${ORDER_EXECUTION_LINE_NAME_TESTID}-0`);
+    expect(ORDER_EXECUTION_LINE_NAME_TESTID).toBe('order-execution-line-name');
+    expect(nombre).toHaveTextContent('Hipoclorito');
+    expect(nombre).toHaveClass('min-w-0', 'flex-[1_1_12rem]', 'break-words');
+    expect(nombre).not.toHaveClass('flex-1');
+    expect(nombre.parentElement).toBe(screen.getByTestId('order-execution-line-0'));
+  });
+
+  it('QC-269 R10: las cifras van en un grupo propio, hermano del nombre, en el orden de lectura', () => {
+    render(
+      <OrderExecutionLines
+        lines={[linea({ need: 'approximate', alternativeUnits: [] })]}
+      />,
+    );
+
+    const fila = screen.getByTestId('order-execution-line-0');
+    const nombre = screen.getByTestId(`${ORDER_EXECUTION_LINE_NAME_TESTID}-0`);
+    const porcentaje = screen.getByTestId(`${ORDER_EXECUTION_LINE_PERCENTAGE_TESTID}-0`);
+    const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
+    const unidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_UNIT_TESTID}-0`);
+    const aproximado = screen.getByTestId(`${ORDER_EXECUTION_LINE_APPROXIMATE_TESTID}-0`);
+
+    const grupo = porcentaje.parentElement;
+    if (grupo === null) throw new Error('el porcentaje no tiene grupo');
+    expect(grupo).not.toBe(fila);
+    expect(grupo.parentElement).toBe(fila);
+    expect(grupo).toHaveClass('flex', 'min-w-0', 'flex-wrap', 'items-center', 'gap-3');
+    expect(grupo).not.toContainElement(nombre);
+    expect(Array.from(fila.children)).toEqual([nombre, grupo]);
+
+    // Los testid de siempre siguen en sus elementos, todos hijos directos del grupo.
+    for (const cifra of [porcentaje, cantidad, unidad, aproximado]) {
+      expect(cifra.parentElement).toBe(grupo);
+    }
+    expect(porcentaje).toHaveTextContent('10,00 %');
+    expect(cantidad).toHaveTextContent('20');
+    expect(unidad).toHaveTextContent('L');
+    expect(aproximado).toHaveTextContent('aprox.');
+
+    const hijos = Array.from(grupo.children);
+    const posiciones = [porcentaje, cantidad, unidad, aproximado].map((el) => hijos.indexOf(el));
+    expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
+
+    const separadores = hijos.filter((el) => el.getAttribute('aria-hidden') === 'true');
+    expect(separadores).toHaveLength(2);
+  });
+
+  it('QC-269 R10: con selector de unidad, el selector y su testid siguen dentro del grupo de cifras', () => {
+    render(<OrderExecutionLines lines={[linea()]} />);
+
+    const porcentaje = screen.getByTestId(`${ORDER_EXECUTION_LINE_PERCENTAGE_TESTID}-0`);
+    const selector = screen.getByTestId(`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-0`);
+    const grupo = porcentaje.parentElement;
+
+    expect(grupo).toContainElement(selector);
+    expect(selector).toContainElement(screen.getByTestId(`${ORDER_EXECUTION_LINE_UNIT_TESTID}-0`));
   });
 });
 
