@@ -32,7 +32,30 @@ _Pendiente: los escribe spec_author (F1.2)._
 
 ## Preguntas abiertas
 
-Ninguna.
+- **BLOQUEADO (spec_author, F1.2, 2026-10-14): falta el pase `/design`** de dos cambios visuales
+  que el alcance exige (`docs/perfil-agentes.md > Pase de diseño para componentes nuevos` y
+  `> spec_author`). Ninguno está en los tableros aprobados de `docs/diseno/canvas/`:
+  1. **Aviso de conversión en el formulario de alta de producto**
+     (`app/(private)/inventario/components/product-form.tsx`): «Ya existe Glicerina en l: 500 ml
+     se guardarán como 0,5 l». Reutilizaría `Notice` (`components/shared/notice.tsx`, paso 1 de la
+     regla de decisión), pero es UI visible nueva en el formulario: `ModalesInventario.dc.html`,
+     `Inventario.dc.html` y sus variantes no la recogen (buscado «aviso», «ya existe», «convert»).
+  2. **Selector de unidad de la materia prima nueva** en la revisión de fórmula
+     (`app/(private)/produccion/formulas/importar/[documentoId]/components/formula-ingredient-row.tsx`,
+     modo «Crear materia prima»), con su estado «sin sugerencia: elige una unidad».
+     `ImportarFormula.dc.html` y `ImportarFormulaMovil.dc.html` solo pintan «Nombre de la materia
+     prima».
+
+  Qué hace falta: el tablero de esas dos piezas (escritorio, tablet y teléfono, con estados)
+  aprobado por el humano y copiado a `docs/diseno/canvas/`. Con él, se relanza `spec_author`.
+  Investigación ya hecha (no se repite): «Lo que ya existe» sin duplicados en board, specs ni
+  código (QC-121, QC-199, QC-204, QC-205 relacionadas, ninguna lo resuelve); el criterio de familia
+  `baseUnitId ?? id` está repetido sin helper exportado (`convert-quantity.ts:93`,
+  `convert-with-approximation.ts:12`, `get-assigned-order-execution.ts:36`,
+  `compatible-unit-ids.ts:16`, `unit-prisma.ts:228`); la confirmación del Excel ya pasa por
+  `createProduct` (`confirm-inventory-import.ts:112`), pero la vista previa
+  (`plan-inventory-import.ts:451-454`) necesita la existencia de cada homónimo, que
+  `ImportProductRef` no trae hoy.
 
 ## Decisiones cerradas (no reabrir)
 
