@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
-import { AiProviderRequiredNotice } from '@/components/shared/ai-provider-required-notice';
+import { AiProviderRequiredTooltip } from '@/components/shared/ai-provider-required-tooltip';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { identity } from '@/lib/composition';
@@ -49,7 +49,9 @@ export default async function FormulasPage({
           {readiness === null ? null : readiness.configured ? (
             <FormulaPdfUpload />
           ) : (
-            <AiProviderRequiredNotice canConfigure={readiness.canConfigure} />
+            <AiProviderRequiredTooltip>
+              <FormulaPdfUpload disabled />
+            </AiProviderRequiredTooltip>
           )}
         </div>
       </div>

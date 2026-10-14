@@ -266,10 +266,16 @@ export {
   type ConfirmInventoryImport,
 } from './domain/inventory-import-contract';
 export {
-  IMPORT_EXAMPLE_ROW,
-  buildInventoryImportTemplate,
+  IMPORT_EXAMPLE_ROWS,
+  IMPORT_TEMPLATE_FILE_NAME,
+  IMPORT_TEMPLATE_MIME_TYPE,
+  IMPORT_TEMPLATE_SHEET_NAME,
+  IMPORT_VALUES_SHEET_NAME,
+  buildInventoryImportTemplateSheets,
   buildInventoryImportErrorFile,
   type ImportDownload,
+  type ImportTemplateSheet,
+  type ImportTemplateValues,
 } from './domain/inventory-import-downloads';
 export {
   createPreviewInventoryImport,
@@ -285,6 +291,15 @@ export type {
   ReservationAllocation,
   ReservationPlan,
 } from './domain/plan-reservation';
+export {
+  createGetInventoryImportTemplate,
+  createGetInventoryImportValues,
+  type GetInventoryImportTemplate,
+  type GetInventoryImportTemplateDeps,
+  type GetInventoryImportValues,
+  type GetInventoryImportValuesDeps,
+  type InventoryImportTemplate,
+} from './domain/get-inventory-import-template';
 // Los datos de lote del producto terminado que escribe el acondicionamiento: el contrato y la
 // regla del lote tecleado y de la fecha civil, para que quien los valida use la misma definicion.
 export { typedLotSchema, civilDateSchema } from './domain/product-batch-input';

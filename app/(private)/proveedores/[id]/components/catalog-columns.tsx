@@ -158,7 +158,7 @@ export function buildCatalogColumns({
     {
       id: IMAGE_COLUMN_ID,
       label: CATALOG_IMAGE_COLUMN_LABEL,
-      align: 'start',
+      align: 'center',
       // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
       defaultPinned: 'left',
       cell: (line) => (

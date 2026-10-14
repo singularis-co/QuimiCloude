@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { parseImportSheet } from '@/lib/modules/inventario/domain/import-sheet';
 import type { SpreadsheetCell, SpreadsheetReadResult } from '@/lib/modules/inventario/ports/spreadsheet-reader';
 import {
-  IMPORT_EXAMPLE_ROW,
+  IMPORT_EXAMPLE_ROWS,
   INVENTORY_IMPORT_COLUMNS,
   INVENTORY_IMPORT_MAX_ROWS,
 } from '@/lib/modules/inventario';
 
 const HEADER = INVENTORY_IMPORT_COLUMNS.map((column) => column.header);
-const EXAMPLE = INVENTORY_IMPORT_COLUMNS.map((column) => IMPORT_EXAMPLE_ROW[column.key]);
+const [EXAMPLE_ROW] = IMPORT_EXAMPLE_ROWS;
+const EXAMPLE = INVENTORY_IMPORT_COLUMNS.map((column) => EXAMPLE_ROW[column.key]);
 
 function text(value: string): SpreadsheetCell {
   return { text: value, origin: 'text' };
@@ -118,9 +119,9 @@ describe('fila de ejemplo de la plantilla', () => {
       if (column.key === 'stock') return { text: '25', origin: 'number' };
       if (column.key === 'qtyAlert') return { text: '5', origin: 'number' };
       if (column.key === 'purchaseDate' || column.key === 'expiryDate') {
-        return { text: IMPORT_EXAMPLE_ROW[column.key], origin: 'date' };
+        return { text: EXAMPLE_ROW[column.key], origin: 'date' };
       }
-      return text(IMPORT_EXAMPLE_ROW[column.key]);
+      return text(EXAMPLE_ROW[column.key]);
     });
     const outcome = parseImportSheet(sheet([HEADER, fromXlsx, item('Sal')]));
     expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(true);
@@ -144,7 +145,7 @@ describe('fila de ejemplo de la plantilla', () => {
 
   it('R8 una fila de ejemplo con un costo unitario distinto (3.51) no se ignora', () => {
     const changed = INVENTORY_IMPORT_COLUMNS.map((column): SpreadsheetCell =>
-      column.key === 'unitCost' ? { text: '3.51', origin: 'number' } : text(IMPORT_EXAMPLE_ROW[column.key]),
+      column.key === 'unitCost' ? { text: '3.51', origin: 'number' } : text(EXAMPLE_ROW[column.key]),
     );
     const outcome = parseImportSheet(sheet([HEADER, changed]));
     expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(false);

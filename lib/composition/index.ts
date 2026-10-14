@@ -81,6 +81,8 @@ import {
   createListProductBatches,
   createListProductFormUnits,
   createListProducts,
+  createGetInventoryImportTemplate,
+  createGetInventoryImportValues,
   createPreviewInventoryImport,
   createUpdatePresentation,
   createUpdateProduct,
@@ -120,6 +122,7 @@ import {
 import {
   findPresentationRefs,
   findPresentationsByNormalizedNames,
+  listPresentationNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   createMaterialReservations,
@@ -150,7 +153,9 @@ import {
 import { readCsv } from '@/lib/modules/inventario/adapters/driven/spreadsheet/csv-reader';
 import { fileDigest } from '@/lib/modules/inventario/adapters/driven/spreadsheet/file-digest';
 import { readXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader';
+import { writeXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-writer';
 import type { ImportFormulaLookup } from '@/lib/modules/inventario/ports/import-formula-lookup';
+import type { ImportTemplateValuesReader } from '@/lib/modules/inventario/ports/import-template-values';
 import type { InventoryImportRepository } from '@/lib/modules/inventario/ports/inventory-import-repository';
 import type { SpreadsheetReader } from '@/lib/modules/inventario/ports/spreadsheet-reader';
 import type { FinishedOrderRepository } from '@/lib/modules/inventario/ports/finished-order-repository';
@@ -349,6 +354,7 @@ import {
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipePackingStepsById,
+  listAliveOriginalRecipeNames,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -1081,6 +1087,12 @@ const spreadsheetReader: SpreadsheetReader = {
   read: async (bytes, format) => (format === 'csv' ? readCsv(bytes) : readXlsx(bytes)),
 };
 
+const importTemplateValuesReader: ImportTemplateValuesReader = {
+  listUnitNames: async (companyId) => (await listVisibleUnitRefs(companyId)).map((unit) => unit.name),
+  listPresentationNames,
+  listFormulaNames: listAliveOriginalRecipeNames,
+};
+
 const importFormulaLookup: ImportFormulaLookup = {
   findAliveOriginalByName: findAliveRecipeByNormalizedName,
 };
@@ -1146,6 +1158,11 @@ export const inventario = {
     products: finishedProductDetailRepository,
     orders: orderNumberDirectory,
   }),
+  getInventoryImportTemplate: createGetInventoryImportTemplate({
+    values: importTemplateValuesReader,
+    writer: { write: writeXlsx },
+  }),
+  getInventoryImportValues: createGetInventoryImportValues({ values: importTemplateValuesReader }),
   listFinishedProductMovements: createListFinishedProductMovements({
     products: finishedProductDetailRepository,
     orders: orderNumberDirectory,

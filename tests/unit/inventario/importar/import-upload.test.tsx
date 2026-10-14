@@ -20,20 +20,31 @@ import {
   INVENTORY_IMPORT_ACCEPT,
   INVENTORY_IMPORT_MAX_FILE_BYTES,
   INVENTORY_IMPORT_MAX_ROWS,
-  buildInventoryImportTemplate,
-  type ImportDownload,
   type ImportFileRejection as Rejection,
 } from '@/lib/modules/inventario';
 
+import type { DownloadableFile } from '@/app/(private)/inventario/importar/components/download-file';
+
 import { setupUser } from '../../../helpers/user-event';
 
-const { downloadFileMock } = vi.hoisted(() => ({
-  downloadFileMock: vi.fn<(download: ImportDownload) => void>(),
+const { downloadFileMock, templateActionMock, toastErrorMock } = vi.hoisted(() => ({
+  downloadFileMock: vi.fn<(download: DownloadableFile) => void>(),
+  templateActionMock: vi.fn(),
+  toastErrorMock: vi.fn(),
 }));
 
-vi.mock('@/app/(private)/inventario/importar/components/download-file', () => ({
+vi.mock('@/app/(private)/inventario/importar/components/download-file', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/(private)/inventario/importar/components/download-file')>()),
   downloadFile: downloadFileMock,
 }));
+
+vi.mock('@/lib/modules/inventario/adapters/driving/inventory-import-actions', () => ({
+  getInventoryImportTemplateAction: templateActionMock,
+}));
+
+vi.mock('sonner', () => ({ toast: { error: toastErrorMock } }));
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 function archivo(nombre: string, bytes: number): File {
   return new File([new Uint8Array(bytes)], nombre, { type: 'text/csv' });
@@ -161,14 +172,30 @@ describe('rechazo del archivo entero', () => {
 });
 
 describe('plantilla', () => {
-  it('R3 descarga lo que construye buildInventoryImportTemplate', async () => {
+  it('R3 descarga la plantilla que arma el servidor, con sus bytes, nombre y tipo', async () => {
+    const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
+    templateActionMock.mockResolvedValue({
+      status: 'success',
+      data: { fileName: 'plantilla-inventario.xlsx', mimeType: XLSX_MIME, base64: Buffer.from(bytes).toString('base64') },
+    });
     const user = setupUser();
     render(<ImportTemplateButton />);
 
     await user.click(screen.getByTestId(TEMPLATE_BUTTON_TESTID));
 
-    expect(downloadFileMock).toHaveBeenCalledTimes(1);
-    expect(downloadFileMock).toHaveBeenCalledWith(buildInventoryImportTemplate());
+    await vi.waitFor(() => expect(downloadFileMock).toHaveBeenCalledTimes(1));
+    expect(downloadFileMock).toHaveBeenCalledWith({ fileName: 'plantilla-inventario.xlsx', mimeType: XLSX_MIME, content: bytes });
+  });
+
+  it('R3 si el servidor rechaza, no descarga y avisa', async () => {
+    templateActionMock.mockResolvedValue({ status: 'error', code: 'unauthorized', message: 'Sin permiso.' });
+    const user = setupUser();
+    render(<ImportTemplateButton />);
+
+    await user.click(screen.getByTestId(TEMPLATE_BUTTON_TESTID));
+
+    await vi.waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('Sin permiso.'));
+    expect(downloadFileMock).not.toHaveBeenCalled();
   });
 });
 
@@ -191,7 +218,7 @@ describe('downloadFile', () => {
         clicks.push(this);
       });
 
-    const plantilla = buildInventoryImportTemplate();
+    const plantilla = { fileName: 'plantilla-inventario.xlsx', mimeType: XLSX_MIME, content: new Uint8Array([1, 2]) };
     downloadFile(plantilla);
 
     expect(creados).toHaveLength(1);

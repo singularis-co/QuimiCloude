@@ -13,6 +13,7 @@ import {
   ERROR_FILE_BUTTON_TESTID,
   EXAMPLE_ROW_IGNORED_NOTICE,
   EXAMPLE_ROW_NOTICE_TESTID,
+  IGNORED_COLUMNS_SUMMARY_TESTID,
   NO_VALID_ROWS_NOTICE,
   NO_VALID_ROWS_TESTID,
   PARTIAL_IMPORT_NOTICE,
@@ -20,6 +21,7 @@ import {
   PREVIEW_TOTAL_LABELS,
   confirmLabel,
   formatCount,
+  ignoredColumnsSummary,
   totalTestId,
 } from './import-texts';
 
@@ -86,6 +88,7 @@ export function ImportPreviewSummary({
 }: ImportPreviewSummaryProps) {
   const { totals } = preview;
   const validRows = totals.create + totals.addBatch;
+  const rowsWithIgnoredColumns = preview.rows.filter((row) => row.ignoredColumns !== undefined).length;
   const hasSkippedRows =
     totals.error + totals.duplicate > 0 ||
     preview.missingUnits.length + preview.missingPresentations.length > 0;
@@ -94,6 +97,16 @@ export function ImportPreviewSummary({
     <section className="flex flex-col gap-3" data-testid={PREVIEW_SUMMARY_TESTID}>
       <ImportTotals totals={totals} labels={PREVIEW_TOTAL_LABELS} />
       {preview.exampleRowIgnored ? <ExampleRowIgnoredNotice /> : null}
+      {rowsWithIgnoredColumns === 0 ? null : (
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-lg border bg-muted/40 p-3 text-sm"
+          data-testid={IGNORED_COLUMNS_SUMMARY_TESTID}
+        >
+          <InfoIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+          {ignoredColumnsSummary(rowsWithIgnoredColumns)}
+        </p>
+      )}
       {validRows === 0 ? (
         <p role="status" className="text-sm text-muted-foreground" data-testid={NO_VALID_ROWS_TESTID}>
           {NO_VALID_ROWS_NOTICE}

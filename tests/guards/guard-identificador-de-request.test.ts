@@ -705,13 +705,16 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // aprobacion humana y su fila en `docs/dependencias.md`: de 42 a 43.
 // El 2026-10-13 entro `openai` -SDK de OpenAI y OpenRouter, QC-275-, con los cuatro checks,
 // aprobacion humana y su fila en `docs/dependencias.md`: de 43 a 44.
+// El 2026-10-14 entro `write-excel-file` -escribir la plantilla .xlsx de la importacion de
+// inventario con su hoja de valores disponibles-, con los cuatro checks, aprobacion humana y su
+// fila en `docs/dependencias.md`: de 44 a 45.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 44
+export const DEPENDENCIAS_ESPERADAS = 45
 export const DEV_DEPENDENCIAS_ESPERADAS = 22
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */

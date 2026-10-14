@@ -10,13 +10,15 @@ import { supplierCatalogImportRoute } from '@/lib/shared/routes';
  */
 export type CatalogPdfUploadProps = {
   readonly supplierId: string;
+  readonly disabled?: boolean;
 };
 
-export function CatalogPdfUpload({ supplierId }: CatalogPdfUploadProps) {
+export function CatalogPdfUpload({ supplierId, disabled }: CatalogPdfUploadProps) {
   return (
     <DocumentUploadDialog
       strategy="catalogo"
       reviewHrefFor={(documentFileId) => supplierCatalogImportRoute(supplierId, documentFileId)}
+      disabled={disabled}
     />
   );
 }

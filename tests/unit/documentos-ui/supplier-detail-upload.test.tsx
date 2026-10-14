@@ -117,10 +117,10 @@ vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () =
 
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
 import {
-  AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID,
-  AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID,
-  AI_PROVIDER_REQUIRED_NOTICE_TESTID,
-} from '@/components/shared/ai-provider-required-notice';
+  AI_PROVIDER_REQUIRED_TOOLTIP_LINK_TESTID,
+  AI_PROVIDER_REQUIRED_TOOLTIP_TESTID,
+  AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID,
+} from '@/components/shared/ai-provider-required-tooltip';
 import {
   DOCUMENT_UPLOAD_INPUT_TESTID,
   DOCUMENT_UPLOAD_OPEN_TESTID,
@@ -316,7 +316,7 @@ describe('el montaje en la pantalla de proveedores', () => {
     await renderPantalla();
 
     expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
-    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).not.toBeInTheDocument();
     expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
   });
 
@@ -348,61 +348,67 @@ describe('el montaje en la pantalla de proveedores', () => {
   });
 });
 
-describe('el aviso de proveedor IA en el detalle de proveedor', () => {
+describe('el boton de subida sin proveedor IA en el detalle de proveedor', () => {
   const conSubida = ['proveedores.consultar', 'documentos.modificar'];
 
-  it('R37: con la empresa conectada hay boton y no aviso', async () => {
+  it('con la empresa conectada el boton esta habilitado y sin globo de proveedor IA', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(conSubida));
     getAiProviderReadinessActionMock.mockResolvedValue({ configured: true, canConfigure: false });
 
     await renderPantalla();
 
-    expect(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeVisible();
-    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID)).not.toBeInTheDocument();
+    const abrir = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
+    expect(abrir).toBeVisible();
+    expect(abrir).toBeEnabled();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).not.toBeInTheDocument();
     expect(getAiProviderReadinessActionMock).toHaveBeenCalledTimes(1);
   });
 
-  it('R37: sin conexion y con integraciones.modificar, el aviso con enlace va donde el boton, entre la cabecera y el catalogo', async () => {
-    getSessionUserMock.mockResolvedValue(sesionCon(conSubida));
-    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: true });
-
-    await renderPantalla();
-
-    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
-    expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeInTheDocument();
-    const aviso = screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID);
-    expect(aviso).toHaveTextContent(
-      'Para leer PDF, conecta el proveedor IA de tu empresa. La lectura usa tu propia API key.',
-    );
-    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID)).toHaveAttribute(
-      'href',
-      AI_PROVIDER_INTEGRATION_ROUTE,
-    );
-    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID)).not.toBeInTheDocument();
-
-    const cabecera = screen.getByTestId('supplier-detail');
-    const catalogo = screen.getByTestId('catalog-list');
-    expect(cabecera.compareDocumentPosition(aviso) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-    expect(aviso.compareDocumentPosition(catalogo) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-  });
-
-  it('R37: sin conexion y sin integraciones.modificar, el aviso pide a un administrador y no enlaza', async () => {
+  it('sin conexion el boton deshabilitado va donde siempre, entre la cabecera y el catalogo, y no abre la ventana', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(conSubida));
     getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: false });
 
     await renderPantalla();
 
-    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
-    const aviso = screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID);
-    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID)).toHaveTextContent(
-      'Pídele a un administrador que lo configure',
+    const abrir = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
+    expect(abrir).toBeDisabled();
+    const envoltorio = screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID);
+    expect(envoltorio).toContainElement(abrir);
+    expect(envoltorio.parentElement).toHaveClass('flex', 'justify-end');
+    expect(screen.queryByTestId('ai-provider-required-notice')).not.toBeInTheDocument();
+
+    const cabecera = screen.getByTestId('supplier-detail');
+    const catalogo = screen.getByTestId('catalog-list');
+    expect(cabecera.compareDocumentPosition(abrir) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(aviso.querySelector('a')).toBeNull();
-    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID)).not.toBeInTheDocument();
+    expect(abrir.compareDocumentPosition(catalogo) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+
+    const user = setupUser();
+    await user.click(abrir);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeVisible();
+  });
+
+  it('sin conexion, al pasar el puntero por el boton bloqueado, el globo enlaza a Proveedor IA aunque falte integraciones.modificar', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(conSubida));
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: false });
+
+    await renderPantalla();
+
+    const envoltorio = screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID);
+    const user = setupUser();
+    await user.hover(envoltorio);
+
+    expect(await screen.findByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TESTID)).toHaveTextContent(
+      'Para leer PDF, conecta el proveedor IA de tu empresa',
+    );
+    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_LINK_TESTID)).toHaveAttribute(
+      'href',
+      AI_PROVIDER_INTEGRATION_ROUTE,
+    );
   });
 
   it('R38: proveedor inexistente: ni boton ni aviso, y no se consulta', async () => {
@@ -415,7 +421,7 @@ describe('el aviso de proveedor IA en el detalle de proveedor', () => {
 
     await renderPantalla();
 
-    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).not.toBeInTheDocument();
     expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
   });
 });
