@@ -165,6 +165,16 @@ Cierre:                        T12
 
 ## Archivos esperados
 
+Añadidos por el leader el 2026-10-13 (bloqueo de la Tanda A, enmiendas mecánicas a tests cerrados):
+
+- `tests/unit/errores/catalogo.test.ts` (recuento 88 → 92, con comentario)
+- `tests/guards/guard-identificador-de-request.test.ts` (`20261014120000_companies_management` al final de `MIGRACIONES_ESPERADAS`)
+- `tests/unit/proveedores/module-contract.test.ts` (relaciones de `User`: + `companyEvents`)
+- `tests/unit/identity/schema/account-status-schema.test.ts` (ídem)
+- `tests/unit/identity/credential-policy-contract.test.ts` (ídem)
+- `tests/unit/identity/schema/identity-schema.test.ts` (ídem; `CompanyEvent` fuera del caso R12: un historial no es tabla intermedia)
+
+
 - `db/schema.prisma`
 - `db/migrations/20261014120000_companies_management/migration.sql`
 - `db/migrations/20261014120000_companies_management/down.sql`
