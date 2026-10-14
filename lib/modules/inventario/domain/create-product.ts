@@ -97,14 +97,19 @@ function rechazarFechaFutura(purchaseDate: string, instante: Date): void {
 }
 
 /**
- * Mismo «hoy» y misma comparacion de cadenas que la fecha de compra. Estrictamente posterior: un
- * lote que vence hoy ya no se puede usar. Ausente es valido; el envase nunca lo trae.
+ * Mismo «hoy» UTC y misma comparacion de cadenas que la fecha de compra. Ausente es valido; el
+ * envase nunca lo trae.
+ *
+ * Tolerancia deliberada de un dia: solo se rechaza lo anterior a hoy UTC, no hoy UTC. El servidor
+ * corre en UTC y no hay zona horaria por empresa; en UTC-5, de 19:00 a 24:00 locales el «manana»
+ * local ya es «hoy» UTC y un `<=` lo rechazaria. Nunca rechaza de mas; a cambio, durante el dia
+ * local puede aceptar el «hoy» local. La regla estricta (posterior a hoy local) la impone el picker.
  */
 function rechazarVencimientoNoFuturo(entrada: EntradaConLote, instante: Date): void {
   if (entrada.type === PRODUCT_TYPES.PACKAGING || entrada.expiryDate == null) return;
   const hoy = fechaCivilUtc(instante);
-  if (entrada.expiryDate <= hoy) {
-    throw new ExpiryDateNotFutureError(`expiryDate: vencimiento no posterior a hoy (${entrada.expiryDate} <= ${hoy})`);
+  if (entrada.expiryDate < hoy) {
+    throw new ExpiryDateNotFutureError(`expiryDate: vencimiento anterior a hoy UTC (${entrada.expiryDate} < ${hoy})`);
   }
 }
 

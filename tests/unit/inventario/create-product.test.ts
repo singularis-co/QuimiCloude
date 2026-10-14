@@ -401,14 +401,14 @@ describe('MACHINE — crea producto con primer lote, sin qtyAlert', () => {
   });
 });
 
-describe('vencimiento del alta: estrictamente posterior a hoy', () => {
+describe('vencimiento del alta: no anterior a hoy UTC (tolerancia de un dia)', () => {
   // `now` fijo a media manana UTC: «hoy» es 2026-09-10 en la fecha civil UTC.
   const AHORA_VTO = new Date('2026-09-10T10:00:00.000Z');
   const HOY = '2026-09-10';
   const AYER = '2026-09-09';
   const MANANA = '2026-09-11';
 
-  function alta(deps: { acceptsPastExpiry?: boolean } = {}) {
+  function alta(deps: { acceptsPastExpiry?: boolean; now?: () => Date } = {}) {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({
       units: unidadesVisibles(),
@@ -419,13 +419,10 @@ describe('vencimiento del alta: estrictamente posterior a hoy', () => {
     return { products, createProduct };
   }
 
-  it.each([
-    ['hoy', HOY],
-    ['ayer', AYER],
-  ])('rechaza un vencimiento de %s sin tocar el puerto', async (_nombre, expiryDate) => {
+  it('rechaza un vencimiento de ayer UTC sin tocar el puerto', async () => {
     const { products, createProduct } = alta();
 
-    const intento = createProduct({ ...ALTA_VALIDA, expiryDate }, ADMIN);
+    const intento = createProduct({ ...ALTA_VALIDA, expiryDate: AYER }, ADMIN);
 
     await expect(intento).rejects.toBeInstanceOf(ExpiryDateNotFutureError);
     await expect(intento).rejects.toMatchObject({
@@ -435,12 +432,24 @@ describe('vencimiento del alta: estrictamente posterior a hoy', () => {
     afirmarPuertoIntacto(products);
   });
 
-  it('acepta un vencimiento de manana y lo guarda en el lote', async () => {
+  it.each([
+    ['hoy UTC (tolerancia)', HOY],
+    ['manana', MANANA],
+  ])('acepta un vencimiento de %s y lo guarda en el lote', async (_nombre, expiryDate) => {
     const { products, createProduct } = alta();
 
-    await createProduct({ ...ALTA_VALIDA, expiryDate: MANANA }, ADMIN);
+    await createProduct({ ...ALTA_VALIDA, expiryDate }, ADMIN);
 
-    expect(loteCreado(products).expiryDate).toBe(MANANA);
+    expect(loteCreado(products).expiryDate).toBe(expiryDate);
+  });
+
+  it('a las 01:00 UTC (20:00 del dia anterior en UTC-5) acepta el «manana» local, que ya es hoy UTC', async () => {
+    // Local UTC-5: 2026-09-09 20:00, «manana» local = 2026-09-10 = hoy UTC.
+    const { products, createProduct } = alta({ now: () => new Date('2026-09-10T01:00:00.000Z') });
+
+    await createProduct({ ...ALTA_VALIDA, expiryDate: '2026-09-10' }, ADMIN);
+
+    expect(loteCreado(products).expiryDate).toBe('2026-09-10');
   });
 
   it.each([
@@ -458,7 +467,7 @@ describe('vencimiento del alta: estrictamente posterior a hoy', () => {
     const { products, createProduct } = alta();
 
     await expect(
-      createProduct({ name: 'Balanza', type: PRODUCT_TYPES.MACHINE, stock: '1', expiryDate: HOY }, ADMIN),
+      createProduct({ name: 'Balanza', type: PRODUCT_TYPES.MACHINE, stock: '1', expiryDate: AYER }, ADMIN),
     ).rejects.toBeInstanceOf(ExpiryDateNotFutureError);
     afirmarPuertoIntacto(products);
   });
