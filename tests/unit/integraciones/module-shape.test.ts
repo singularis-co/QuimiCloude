@@ -471,13 +471,34 @@ describe('la forma del modulo integraciones', () => {
       'lib/modules/documentos/domain/errors.ts',
       'lib/modules/documentos/domain/run-document-job.ts',
       'lib/modules/documentos/ports/ai-provider-gateway.ts',
+      'app/(private)/integraciones/proveedor-ia/components/ai-provider-brand.ts',
+      'app/(private)/integraciones/proveedor-ia/components/ai-provider-card.tsx',
+      'app/(private)/integraciones/proveedor-ia/components/ai-provider-form.tsx',
+      'app/(private)/integraciones/proveedor-ia/components/ai-provider-logo.tsx',
+      'app/(private)/integraciones/proveedor-ia/components/ai-provider-picker.tsx',
+      'app/(private)/integraciones/proveedor-ia/page.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-connection-actions.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-connection-card.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-connection-form.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-status-badge.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-webhook-panel.tsx',
       'app/(private)/integraciones/whatsapp/page.tsx',
+      'app/(private)/produccion/formulas/page.tsx',
+      'app/(private)/proveedores/[id]/page.tsx',
     ])
+  })
+
+  it('R19: Formulas y el detalle de proveedor solo importan de integraciones la accion de readiness, por su ruta exacta', () => {
+    const ACCIONES = '@/lib/modules/integraciones/adapters/driving/ai-provider-actions'
+    for (const file of ['app/(private)/produccion/formulas/page.tsx', 'app/(private)/proveedores/[id]/page.tsx']) {
+      const abs = join(repoRoot, file)
+      const fuente = readFileSync(abs, 'utf8')
+      const specs = importSpecifiers(fuente).filter((spec) => resolvesIntoTheModule(abs, spec))
+      expect(specs, file).toEqual([ACCIONES])
+      expect(fuente, file).toMatch(
+        /import \{ getAiProviderReadinessAction \} from '@\/lib\/modules\/integraciones\/adapters\/driving\/ai-provider-actions'/,
+      )
+    }
   })
 
   it('R19: documentos importa integraciones SOLO por su contrato, nunca por una ruta profunda', () => {

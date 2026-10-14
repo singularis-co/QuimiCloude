@@ -94,12 +94,12 @@
 
 ## Bloque 5 — Pantalla
 
-- [ ] **T12. Página Proveedor IA.** `page.tsx` reescrita y `components/` (`ai-provider-brand.ts`,
+- [x] **T12. Página Proveedor IA.** `page.tsx` reescrita y `components/` (`ai-provider-brand.ts`,
   `ai-provider-logo.tsx`, `ai-provider-picker.tsx`, `ai-provider-form.tsx`, `ai-provider-card.tsx`,
   `index.ts`) según los tres tableros. Adaptar `integration-pages.test.tsx`.
   *Depende de:* T11. *Hecho:* `ai-provider-page`, `ai-provider-form`, `ai-provider-card` verdes.
   *Cubre:* R3, R8, R30–R36.
-- [ ] **T13. Aviso de bloqueo.** `components/shared/ai-provider-required-notice.tsx` (+ `index.ts`,
+- [x] **T13. Aviso de bloqueo.** `components/shared/ai-provider-required-notice.tsx` (+ `index.ts`,
   fila en `CATALOGO.md`); ramas en `produccion/formulas/page.tsx` y `proveedores/[id]/page.tsx`.
   Ampliar `formulas-upload.test.tsx`, `supplier-detail-upload.test.tsx`,
   `document-upload-errors.test.tsx`; simular la readiness en los tests de página de
@@ -113,7 +113,7 @@
   build de preview (`design.md > 9`). *Depende de:* T9. `[P]`
   *Hecho:* `guard-variables-por-entorno` verde; `ai-model-literals.test.ts` (R22) verde.
   *Cubre:* R22.
-- [ ] **T15. Logos.** Si el humano entregó los SVG oficiales con su uso de marca confirmado,
+- [x] **T15. Logos.** Si el humano entregó los SVG oficiales con su uso de marca confirmado,
   versionarlos en `public/brand/ai-providers/` y mapearlos en `ai-provider-brand.ts`; si no, dejar
   el monograma y anotar R35 como pendiente en `progress/impl_QC-275.md`. *Depende de:* T12.
   *Hecho:* `ai-provider-card.test.tsx` afirma el `alt` (con SVG) o el `aria-label` (monograma).

@@ -7,6 +7,7 @@ import type {
   GetBatchStatusResult,
 } from '@/lib/modules/documentos/adapters/driving/document-batch-actions';
 import type { IssueUploadLinksResult } from '@/lib/modules/documentos/adapters/driving/document-upload-actions';
+import type { AiProviderReadiness } from '@/lib/modules/integraciones';
 import type { CatalogLineListResult } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
 import type {
   CreateSupplierFormState,
@@ -30,6 +31,7 @@ const {
   issueUploadLinksActionMock,
   enqueueBatchActionMock,
   getBatchStatusActionMock,
+  getAiProviderReadinessActionMock,
 } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   usePathnameMock: vi.fn<() => string>(),
@@ -61,6 +63,7 @@ const {
   issueUploadLinksActionMock: vi.fn<(input: unknown) => Promise<IssueUploadLinksResult>>(),
   enqueueBatchActionMock: vi.fn<(input: unknown) => Promise<EnqueueBatchResult>>(),
   getBatchStatusActionMock: vi.fn<(batchId: string) => Promise<GetBatchStatusResult>>(),
+  getAiProviderReadinessActionMock: vi.fn<() => Promise<AiProviderReadiness>>(),
 }));
 
 // `requirePagePermission` resuelve la sesion por `@/lib/composition`; sin este doble la pantalla
@@ -108,7 +111,16 @@ vi.mock('@/lib/modules/documentos/adapters/driving/document-batch-actions', () =
   getBatchStatusAction: getBatchStatusActionMock,
 }));
 
+vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () => ({
+  getAiProviderReadinessAction: getAiProviderReadinessActionMock,
+}));
+
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
+import {
+  AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID,
+  AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID,
+  AI_PROVIDER_REQUIRED_NOTICE_TESTID,
+} from '@/components/shared/ai-provider-required-notice';
 import {
   DOCUMENT_UPLOAD_INPUT_TESTID,
   DOCUMENT_UPLOAD_OPEN_TESTID,
@@ -117,7 +129,7 @@ import {
 } from '@/components/shared/document-upload';
 import { PERMISSIONS } from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
-import { supplierDetailRoute } from '@/lib/shared/routes';
+import { AI_PROVIDER_INTEGRATION_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
 import { setupUser } from '../../helpers/user-event';
 import { batch, entry, okResponse, pdf, signedUploads } from './helpers';
@@ -244,6 +256,7 @@ beforeEach(() => {
     data: { uploads: signedUploads(1) },
   });
   enqueueBatchActionMock.mockResolvedValue({ status: 'success', data: { batchId: 'batch-1' } });
+  getAiProviderReadinessActionMock.mockResolvedValue({ configured: true, canConfigure: true });
   getBatchStatusActionMock.mockResolvedValue({
     status: 'success',
     data: batch([entry({ path: signedUploads(1)[0]?.path, status: 'done' })]),
@@ -294,6 +307,19 @@ describe('el montaje en la pantalla de proveedores', () => {
     expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeInTheDocument();
   });
 
+  it('R38: sin documentos.modificar no hay aviso de proveedor IA aunque la empresa no lo tenga, y ni se consulta', async () => {
+    getSessionUserMock.mockResolvedValue(
+      sesionCon(['proveedores.consultar', 'proveedores.modificar', 'integraciones.modificar']),
+    );
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: true });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID)).not.toBeInTheDocument();
+    expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
+  });
+
   it('proveedor inexistente: sin boton (R7)', async () => {
     getSupplierActionMock.mockResolvedValue({
       status: 'error',
@@ -319,5 +345,77 @@ describe('el montaje en la pantalla de proveedores', () => {
     expect(boton.compareDocumentPosition(catalogo) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
+  });
+});
+
+describe('el aviso de proveedor IA en el detalle de proveedor', () => {
+  const conSubida = ['proveedores.consultar', 'documentos.modificar'];
+
+  it('R37: con la empresa conectada hay boton y no aviso', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(conSubida));
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: true, canConfigure: false });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeVisible();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID)).not.toBeInTheDocument();
+    expect(getAiProviderReadinessActionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('R37: sin conexion y con integraciones.modificar, el aviso con enlace va donde el boton, entre la cabecera y el catalogo', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(conSubida));
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: true });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeInTheDocument();
+    const aviso = screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID);
+    expect(aviso).toHaveTextContent(
+      'Para leer PDF, conecta el proveedor IA de tu empresa. La lectura usa tu propia API key.',
+    );
+    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID)).toHaveAttribute(
+      'href',
+      AI_PROVIDER_INTEGRATION_ROUTE,
+    );
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID)).not.toBeInTheDocument();
+
+    const cabecera = screen.getByTestId('supplier-detail');
+    const catalogo = screen.getByTestId('catalog-list');
+    expect(cabecera.compareDocumentPosition(aviso) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(aviso.compareDocumentPosition(catalogo) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it('R37: sin conexion y sin integraciones.modificar, el aviso pide a un administrador y no enlaza', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(conSubida));
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: false });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
+    const aviso = screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID);
+    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID)).toHaveTextContent(
+      'Pídele a un administrador que lo configure',
+    );
+    expect(aviso.querySelector('a')).toBeNull();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID)).not.toBeInTheDocument();
+  });
+
+  it('R38: proveedor inexistente: ni boton ni aviso, y no se consulta', async () => {
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: true });
+    getSupplierActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'supplier_not_found',
+      message: 'Proveedor no encontrado',
+    });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID)).not.toBeInTheDocument();
+    expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
   });
 });

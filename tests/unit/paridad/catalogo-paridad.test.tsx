@@ -42,6 +42,11 @@ const {
   listPresentationsActionMock: vi.fn(),
 }));
 
+// La empresa tiene proveedor IA conectado: la pantalla pinta el boton de subida de siempre.
+vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () => ({
+  getAiProviderReadinessAction: vi.fn(async () => ({ configured: true, canConfigure: true })),
+}));
+
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock, endSession: vi.fn() },
 }));

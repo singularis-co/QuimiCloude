@@ -260,3 +260,113 @@ Veredicto: T8 y T9 hechas y en verde; la composición queda con un gateway provi
 
 Veredicto: T10, T11 y T14 hechas y en verde; sale el gateway provisional y la lectura usa la
 conexión de cada empresa.
+
+## Tanda 5 — T13 (frontend_dev, 2026-10-13)
+
+### Archivos
+- Creados: `components/shared/ai-provider-required-notice.tsx`,
+  `tests/unit/shared/ai-provider-required-notice.test.tsx`.
+- Modificados: `app/(private)/produccion/formulas/page.tsx` y `app/(private)/proveedores/[id]/page.tsx`
+  (con `canUpload` piden `getAiProviderReadinessAction()`: `configured` ⇒ el botón de siempre; si no,
+  el aviso en su sitio; sin `canUpload` no se consulta), `components/shared/CATALOGO.md` (fila nueva).
+- Tests ampliados: `formulas-upload.test.tsx`, `supplier-detail-upload.test.tsx`,
+  `document-upload-errors.test.tsx`, `module-shape.test.ts` (R19: + las dos páginas en la lista de
+  importadores y un caso que exige que solo importen la acción de readiness por su ruta exacta).
+- Tests tensados (solo un doble de la acción con `configured: true`; nada de lo que afirman cambia):
+  `recipe-page`, `supplier-detail-page`, `recetas-paridad`, `catalogo-paridad`,
+  `pantallas-exigen-permiso` y, fuera de la lista de `design.md > 15.3` pero confirmados por
+  `vitest related`, `acciones-por-fila`, `catalog-line-form`, `catalog-line-sheet`,
+  `delete-catalog-line-dialog`.
+
+### R → test
+- R37 → `ai-provider-required-notice.test.tsx` (con y sin `canConfigure`, enlace a
+  `AI_PROVIDER_INTEGRATION_ROUTE`, talla táctil); `formulas-upload.test.tsx` y
+  `supplier-detail-upload.test.tsx` (configurada ⇒ botón; sin configurar con y sin `canConfigure` ⇒
+  aviso en el sitio del botón)
+- R38 → `formulas-upload.test.tsx` y `supplier-detail-upload.test.tsx` (sin `documentos.modificar`, ni
+  botón ni aviso y la readiness no se consulta; proveedor inexistente, tampoco)
+- R39 → `document-upload-errors.test.tsx` (`ai_provider_missing` y `ai_provider_error`: texto del
+  catálogo en la fila, distinto entre sí y sin el motivo libre)
+
+### Desviaciones
+- **`components/shared/index.ts` no se creó.** No existe barrel raíz de `components/shared` (cada pieza
+  se importa por su archivo y la guardia del catálogo trataría un `index.ts` suelto como una entrada
+  más con fila propia). `design.md > 1` y `tasks.md > Archivos esperados` lo listan; queda para que el
+  leader decida si se corrige el spec o se crea.
+- El aviso usa `Notice` tal cual (icono de `info`, no el candado del tablero), como fija `design.md > 12.6`.
+- Prop `labels` opcional (textos para i18n) además de `canConfigure`.
+
+### Verificación
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes (`confirm-catalog-import.test.ts`,
+  `order-service.test.ts`).
+- `pnpm exec vitest related --run` (2 páginas, el componente y 14 tests): 14 archivos, 345 verdes,
+  1 omitido, 0 rojos. Una vuelta intermedia dio rojo `module-shape` R19 por los archivos a medias de
+  T12 en `proveedor-ia/`; en la siguiente, con su lista ya añadida, verde.
+- `pnpm exec vitest run tests/guards/guard-catalogo-de-componentes.test.ts`: 59 verdes.
+
+Veredicto: T13 hecha y en verde; falta decidir el `components/shared/index.ts` del spec.
+
+## Tanda 6 — T12, T15 (frontend_dev, 2026-10-13)
+
+### Archivos
+- Reescrito: `app/(private)/integraciones/proveedor-ia/page.tsx` (`PageShell` + `PageHeader` con miga,
+  párrafo del tablero, `ErrorState` / `AiProviderForm` / `AiProviderCard`).
+- Creados en `app/(private)/integraciones/proveedor-ia/components/`: `index.ts`,
+  `ai-provider-brand.ts`, `ai-provider-logo.tsx`, `ai-provider-picker.tsx`, `ai-provider-form.tsx`,
+  `ai-provider-card.tsx`.
+- Creados: `tests/unit/integraciones-ui/ai-provider-page.test.tsx`, `ai-provider-form.test.tsx`,
+  `ai-provider-card.test.tsx`.
+- Tensados (solo añadir): `tests/unit/integraciones-ui/integration-pages.test.tsx` (cascarón: solo
+  inventarios; `proveedor-ia` y `whatsapp` afirman que no importan `IntegrationPlaceholder`,
+  `INTEGRATION_EMPTY_MESSAGE` ni el barrel compartido; el corte por permiso sigue en las tres),
+  `tests/unit/integraciones/module-shape.test.ts` (R19: + los seis archivos de la pantalla, ruta
+  exacta), `specs/.../tasks.md` (T12, T15).
+
+### R → test
+- R3 → `ai-provider-page.test.tsx` (notFound sin permiso y sin consultar; login sin sesión; primera
+  sentencia) e `integration-pages.test.tsx` (R11–R13 de QC-222 siguen en las tres)
+- R8 → `ai-provider-page.test.tsx` (props y HTML sin `apiKey*`/cifrado, campos vacíos) y
+  `ai-provider-form.test.tsx` (campo vacío y key fuera del HTML tras cada tipo de respuesta)
+- R30 → `ai-provider-page.test.tsx` y `ai-provider-form.test.tsx` (cuatro radios con logo, nombre y
+  subtítulo; flechas; campo oculto con ojo; ayuda con enlace y modelos; botones deshabilitados)
+- R31 → `ai-provider-card.test.tsx` y `ai-provider-page.test.tsx`
+- R32 → `ai-provider-form.test.tsx` y `ai-provider-card.test.tsx`
+- R33 → `ai-provider-card.test.tsx` (título, texto, cancelar sin cambios)
+- R34 → `ai-provider-form.test.tsx`, `ai-provider-card.test.tsx`, `ai-provider-page.test.tsx`
+- R35 → `ai-provider-card.test.tsx` (`aria-label` del monograma). **R35 queda PENDIENTE de los logos
+  oficiales**: no hay SVG entregados ni uso de marca confirmado (`design.md > 12.5`); no se crea
+  `public/brand/ai-providers/`. Al llegar, solo cambian `ai-provider-brand.ts` y
+  `ai-provider-logo.tsx` y el test pasa a afirmar el `alt`.
+- R36 → `ai-provider-form.test.tsx` y `ai-provider-card.test.tsx` (16 px y 44 px en el campo, ojo
+  44 × 44, botones 44 px, opciones 64 px, sin `hover:` en las opciones, columnas y apilado ≤ 760 px)
+
+### Desviaciones y abiertos
+- **Selector**: `RadioGroup` y `Radio` de `@base-ui/react` (ya aprobada; el tablero móvil la nombra)
+  en vez de escribir a mano las flechas. Sin `name`: el proveedor viaja en un `<input hidden>`.
+- **Sin `SubmitButton`**: no admite `disabled` ni `formAction`, y los dos botones envían a acciones
+  distintas. Son `Button` con `Spinner` y el pendiente de cada `useActionState`.
+- **Placeholder «Pega aquí tu API key» sin pintar**: `PasswordField` no tiene `placeholder` y
+  extenderlo exige tocar su fila de `CATALOGO.md`, que estaba en manos de T13. Abierto: paso 2 de la
+  regla (prop opcional) en una tanda que pueda tocar el catálogo.
+- **Textos que el spec no trae**: título del `ErrorState` de carga «No se pudo cargar el proveedor
+  IA.» y nombre de la miga «Ruta» (este sale de `Superficies.dc.html`). El texto del enlace a la
+  consola es la URL sin protocolo (el tablero trae `[ENLACE A LA CONSOLA]`). A confirmar por el humano.
+- **Sin «Cancelar»** al cambiar de key o proveedor: el tablero no lo trae; se sale guardando o
+  recargando.
+- El aviso en `ERROR` pinta solo `lastError` (`design.md > 12.3`), no la coletilla del tablero
+  «Hasta que la reemplaces…», que contradice R28.
+- Tras una prueba fallida de la guardada, el mensaje va en el aviso de la tarjeta; debajo solo
+  mientras el aviso aún no lo trae (evita el duplicado tras revalidar). Con `not_connected`, la
+  tarjeta hace `router.refresh()` (la acción no revalida en ese caso).
+- Guardias no corridas en esta tanda (el leader acotó la verificación a los tres comandos).
+
+### Verificación
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes (`confirm-catalog-import.test.ts`,
+  `order-service.test.ts`).
+- `pnpm exec vitest related --run` (7 de la pantalla + 5 tests): 5 archivos, 168 verdes,
+  1 omitido, 0 rojos. Sueltos: `ai-provider-page` + `integration-pages` 25/25, `ai-provider-form`
+  21/21, `ai-provider-card` 19/19.
+
+Veredicto: T12 y T15 hechas y en verde; R35 pendiente de los logos oficiales.

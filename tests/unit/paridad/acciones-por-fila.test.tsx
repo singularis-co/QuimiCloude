@@ -91,6 +91,11 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 vi.mock('next/headers', () => ({ cookies: entorno.cookiesMock }));
 
+// La empresa tiene proveedor IA conectado: la pantalla pinta el boton de subida de siempre.
+vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () => ({
+  getAiProviderReadinessAction: vi.fn(async () => ({ configured: true, canConfigure: true })),
+}));
+
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: vi.fn(async () => null) },
   identity: { getSessionUser: entorno.getSessionUserMock, endSession: vi.fn() },
