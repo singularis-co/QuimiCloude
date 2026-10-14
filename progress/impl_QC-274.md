@@ -49,3 +49,21 @@ tests: `unit/asignaciones/{responsible-eligibility,list-responsible-candidates,a
 - Preexistente, no de este cambio: `tests/integration/proveedores/catalog-line.int.test.ts` R32 falla igual sin el diff (comprobado con `git stash`).
 
 Veredicto: hecho; la regla vale en selector y servidor con una sola definicion en `identity`.
+
+## Vuelta 2026-10-13: dos rojos del gate-completo del PR #227 (run 38482106564)
+
+- `tests/unit/identity/account-status-scope.test.ts` (censo cerrado, 43 frente a 42): el archivo
+  nuevo era `identity/domain/order-responsible.ts`, que escribia `accountStatus: ['active']` literal.
+  Evitable: ahora hace spread de `ACTIVE_ACCOUNTS_ONLY` (el filtro con nombre de `people-directory.ts`,
+  ya en la lista). El censo no se toca.
+- `tests/unit/paridad/confirmaciones-paridad.test.tsx` («estado de usuario > con error»): snapshot
+  mismatched solo en CI. Ajeno a esta rama (no toca UI). Pasa en local 3 de 3, en la rama y tras
+  fusionar `origin/dev`. Intermitente: el snapshot fija estilos del popup del Select y `aria-busy`, que
+  se asientan de forma asincrona. Va a `tests/baseline-rojos.json` con motivo y `desde` 2026-10-13
+  (el leader debe decirlo en el PR).
+- Comentarios de `lib/` sin citas de ficha ni de requisito.
+- Merge de `origin/dev` sin conflictos; `pnpm install --frozen-lockfile` y `prisma generate`.
+- Verificacion: typecheck limpio; eslint limpio en los 9 archivos de `lib/` tocados; los dos archivos
+  rojos 66 verdes/3 skipped; `tests/unit/identity` 110 archivos, 2062 verdes/31 skipped;
+  `tests/unit/asignaciones` 94, 1931 verdes; `tests/unit/paridad` 22, 412 verdes; `guard` 75, 1050
+  verdes/20 skipped.
