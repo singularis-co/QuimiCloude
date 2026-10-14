@@ -27,12 +27,12 @@ P1–P12 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 1 — Pieza compartida (depende de T0a)
 
-- [ ] **T1a. Separador en `RowActionsMenu`** (D7, R14). `separatorBefore?` en `RowActionMenuItem`;
+- [x] **T1a. Separador en `RowActionsMenu`** (D7, R14). `separatorBefore?` en `RowActionMenuItem`;
   separador en el desplegable y en el diálogo centrado, nunca delante del primer ítem. Test
   `tests/unit/shared-ui/row-actions-menu-separator.test.tsx`: con la prop hay un `role="separator"`
   antes del ítem en las dos presentaciones; en el primer ítem no; sin la prop el árbol es el de hoy
   (`row-actions-menu-centrado.test.tsx` y `row-actions-menu-href.test.tsx` sin cambios).
-- [ ] **T1b. Catálogo** (R24; depende de T1a). Fila de `RowActionsMenu`: `separatorBefore` en
+- [x] **T1b. Catálogo** (R24; depende de T1a). Fila de `RowActionsMenu`: `separatorBefore` en
   «Puntos de extensión» y en «Cubre»; `Diseño` sigue `docs/diseno/canvas/Tabla.dc.html`. *Hecho:*
   `pnpm exec vitest run guard-catalogo-de-componentes catalogo-qc256` en verde.
 
