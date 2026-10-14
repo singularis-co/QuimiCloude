@@ -295,6 +295,9 @@ describe('QC-19 — esta feature no toca la persistencia (R21)', () => {
         //    `..._session_revocation` no emite ni un `ALTER TABLE "users"` por el.
         'sessionsValidFrom',
         'revokedSessions',
+        // RETENSADO 2026-10-14 (QC-162). `companyEvents` es VIRTUAL: el lado inverso que Prisma
+        // EXIGE para el autor de `CompanyEvent`. No es columna de `users` ni guarda credencial.
+        'companyEvents',
       ].sort(),
     );
   });

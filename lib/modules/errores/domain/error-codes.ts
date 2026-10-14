@@ -35,6 +35,8 @@
  * **2026-10-13**: `company_not_found`.
  * **2026-10-13**: `evidence_required`, `evidence_limit`, `evidence_invalid_file`,
  * `evidence_not_found`, `recipe_steps_locked`.
+ * **2026-10-14**: `company_duplicate_name`, `company_duplicate_tax_id`, `company_name_mismatch`,
+ * `company_not_deleted`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -210,6 +212,11 @@ export const ERROR_CODES = [
   'recipe_steps_locked',
   'ai_provider_missing',
   'ai_provider_error',
+  'company_duplicate_name',
+  'company_duplicate_tax_id',
+  'company_name_mismatch',
+  // Distinto de `company_not_found`: la empresa existe, pero no esta de baja.
+  'company_not_deleted',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

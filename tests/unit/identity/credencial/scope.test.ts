@@ -734,6 +734,9 @@ describe('R39 — no hay ninguna forma de pedir un enlace desde fuera', () => {
     'lib/modules/identity/domain/create-user.ts',
     // R14: el reenvio, que exige `usuarios.modificar` como primera linea y falla cerrado.
     'lib/modules/identity/domain/issue-credential-setup-link.ts',
+    // QC-162: el alta de empresa, que exige `empresas.modificar` y emite UNO para el Administrador
+    // que acaba de crear.
+    'lib/modules/identity/domain/create-company.ts',
   ] as const;
 
   it('los UNICOS que llaman a `issueForPendingUser` son el alta y el reenvio', () => {

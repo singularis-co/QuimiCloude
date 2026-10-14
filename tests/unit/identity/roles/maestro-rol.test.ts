@@ -206,6 +206,16 @@ describe('R4 — el rol Maestro es global: Role no lleva campo de empresa', () =
 const RUTAS_ABIERTAS_EMPRESAS = new Set([
   CATALOGO_DE_PERMISOS,
   'lib/modules/identity/domain/set-company-country.ts',
+  // Enmienda QC-162 (2026-10-14): los ocho casos de uso de gestion de empresas exigen
+  // `empresas.*` en su primera linea. Se abren solo sus rutas exactas.
+  'lib/modules/identity/domain/create-company.ts',
+  'lib/modules/identity/domain/update-company.ts',
+  'lib/modules/identity/domain/delete-company.ts',
+  'lib/modules/identity/domain/reactivate-company.ts',
+  'lib/modules/identity/domain/list-companies.ts',
+  'lib/modules/identity/domain/get-company.ts',
+  'lib/modules/identity/domain/get-company-deletion-impact.ts',
+  'lib/modules/identity/domain/list-company-events.ts',
 ]);
 
 describe('R17 — ningun archivo de produccion fuera del catalogo (y las rutas abiertas) nombra los permisos de empresas', () => {

@@ -634,6 +634,9 @@ export const MIGRACIONES_ESPERADAS = [
   // QC-275 2026-10-13: el catalogo de proveedores de IA y la conexion por empresa; no toca el
   // identificador.
   '20261013150000_ai_providers',
+  // QC-162 2026-10-14: indices de unicidad de empresas y la tabla `company_events`; no toca el
+  // identificador.
+  '20261014120000_companies_management',
 ] as const
 
 export function hallazgosDeMigraciones(

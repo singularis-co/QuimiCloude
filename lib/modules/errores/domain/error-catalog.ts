@@ -100,6 +100,10 @@ export const ERROR_MESSAGE_KEY = {
   recipe_steps_locked: 'errors.recipe_steps_locked',
   ai_provider_missing: 'errors.ai_provider_missing',
   ai_provider_error: 'errors.ai_provider_error',
+  company_duplicate_name: 'errors.company_duplicate_name',
+  company_duplicate_tax_id: 'errors.company_duplicate_tax_id',
+  company_name_mismatch: 'errors.company_name_mismatch',
+  company_not_deleted: 'errors.company_not_deleted',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -253,4 +257,9 @@ export const ERROR_MESSAGES_ES = {
   'errors.ai_provider_missing': 'Para leer PDF, conecta el proveedor IA de tu empresa.',
   'errors.ai_provider_error':
     'Error con tu proveedor IA. Revisa la conexión en Integraciones > Proveedor IA.',
+  'errors.company_duplicate_name': 'Ya existe una empresa activa con ese nombre.',
+  'errors.company_duplicate_tax_id':
+    'Ya existe una empresa activa con esa identificación fiscal.',
+  'errors.company_name_mismatch': 'El nombre escrito no coincide con el de la empresa.',
+  'errors.company_not_deleted': 'La empresa ya está activa.',
 } as const satisfies Record<ErrorMessageKey, string>;

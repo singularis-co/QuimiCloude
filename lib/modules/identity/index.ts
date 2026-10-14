@@ -365,3 +365,38 @@ export {
 export type { PlatformActor } from './domain/platform-actor';
 export { CompanyNotFoundError } from './domain/errors';
 export { createSetCompanyCountry, type SetCompanyCountryDeps } from './domain/set-company-country';
+
+// Gestion de empresas por el Maestro: casos de uso de plataforma, sus vistas y el historial.
+export {
+  CompanyDuplicateNameError,
+  CompanyDuplicateTaxIdError,
+  CompanyNameMismatchError,
+  CompanyNotDeletedError,
+} from './domain/errors';
+export type {
+  CompanyDeletionImpact,
+  CompanyDetail,
+  CompanyEventView,
+  CompanyRow,
+  CompanyStatus,
+} from './domain/company-view';
+export {
+  COMPANY_EVENT_KINDS,
+  type CompanyEventKind,
+  type CompanyField,
+} from './domain/company-event';
+export {
+  createCreateCompany,
+  type CreateCompanyDeps,
+  type CreateCompanyResult,
+} from './domain/create-company';
+export { createUpdateCompany, type UpdateCompanyDeps } from './domain/update-company';
+export { createDeleteCompany, type DeleteCompanyDeps } from './domain/delete-company';
+export { createReactivateCompany, type ReactivateCompanyDeps } from './domain/reactivate-company';
+export { createListCompanies, type ListCompaniesDeps } from './domain/list-companies';
+export { createGetCompany, type GetCompanyDeps } from './domain/get-company';
+export {
+  createGetCompanyDeletionImpact,
+  type GetCompanyDeletionImpactDeps,
+} from './domain/get-company-deletion-impact';
+export { createListCompanyEvents, type ListCompanyEventsDeps } from './domain/list-company-events';
