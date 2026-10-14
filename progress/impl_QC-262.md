@@ -448,3 +448,18 @@ pasada con registro temporal, retirado después; WebKit pasa las mismas asercion
 Veredicto: T6a y T6b hechas; el spec nuevo pasa en chromium y webkit, los 17 specs de pedidos pasan
 en chromium, y typecheck, lint y guardias están en verde. Queda un hallazgo de producción
 (desbordamiento de palabras largas en la tarjeta) para el leader.
+
+## Cierre — `./init.sh` (rápido), 2026-10-13
+
+Typecheck, lint y guardias en verde. `test:rapido`: 115 archivos, 2 fallan, 113 pasan
+(1606 tests pasan, 2 fallan, 37 omitidos). Los dos rojos son NUEVOS, fuera del baseline, y vienen de
+dos listas cerradas de E2E que no estan en «Archivos esperados»:
+
+- `tests/unit/pedidos/scope.test.ts` (R57 de QC-34): «los specs E2E de pedidos son estos SEIS»; ahora
+  hay 7 con `e2e/pedidos-rediseno.spec.ts`.
+- `tests/unit/clientes/scope.test.ts` (R28): `e2e/pedidos-rediseno.spec.ts` importa
+  `normalizeCustomerText` de `@/lib/modules/clientes` para sembrar un cliente; la marca
+  `/clientes\b` muerde. Se resuelve como hicieron `anular-entrega` y `detalle-de-producto-terminado`
+  (alta en `E2E_PERMITIDOS` con su nota).
+
+BLOQUEADO hasta que el leader añada los dos archivos a «Archivos esperados». T6c queda sin cerrar.
