@@ -4,6 +4,7 @@ import { normalizeCompanyName } from './company-name';
 import { DOCUMENT_TYPE_CC } from './document-type';
 import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from './permissions';
 import { ROLE_ADMINISTRADOR, ROLE_MAESTRO, SEED_ROLES } from './roles';
+import type { SeedScope } from './seed-scope';
 
 import type { CredentialPolicyResult } from './credential-policy';
 
@@ -42,6 +43,8 @@ export interface SeedOutcome {
    * no una lista porque lo unico que hace `scripts/seed.ts` con el es resumirlo.
    */
   readonly createdRolePermissions: number;
+  /** El alcance con el que corrio; solo lo lee la linea de resumen de `scripts/seed.ts`. */
+  readonly scope: SeedScope;
 }
 
 export type SeedInitialAccessDeps = {
@@ -57,6 +60,8 @@ export type SeedInitialAccessDeps = {
    * adaptador: quien la ata es `lib/composition` (`design.md > 7`).
    */
   readonly checkCredentialPolicy: (candidate: string) => Promise<CredentialPolicyResult>;
+  /** Sin valor, `full`. Con `platform-only` no se mira ni se crea nada de la empresa inicial. */
+  readonly scope?: SeedScope;
 };
 
 /**
@@ -81,15 +86,16 @@ type HashedInitialUser = { username: string; email: string; passwordHash: string
 
 export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<SeedOutcome> {
   const { repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy } = deps;
+  const scope = deps.scope ?? 'full';
 
   // 1. Leer estado: roles existentes por nombre + usuarios vivos con rol Administrador y Maestro.
   const roleNames = SEED_ROLES.map((role) => role.name);
   const existingRoleIds = await repository.findRoleIdsByName(roleNames);
-  const liveAdminCount = await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR);
+  const needsAdmin =
+    scope === 'full' && (await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR)) === 0;
   const liveMaestroCount = await repository.countLiveUsersWithRole(ROLE_MAESTRO);
 
   // 2. faltaAdmin / faltaMaestro.
-  const needsAdmin = liveAdminCount === 0;
   const needsMaestro = liveMaestroCount === 0;
 
   // 3. Resolver credenciales y hashear ANTES de escribir nada: si cualquiera de los pasos
@@ -224,6 +230,7 @@ export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<Se
     createdCompany,
     createdPermissions,
     createdRolePermissions,
+    scope,
   };
 }
 

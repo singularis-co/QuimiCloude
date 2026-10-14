@@ -127,7 +127,7 @@ Cierre:                        T12
 
 ### Tanda D
 
-- [ ] **T10 · Composición y Server Actions** (R1–R3). Depende de T7, T8 y T9.
+- [x] **T10 · Composición y Server Actions** (R1–R3). Depende de T7, T8 y T9.
   - `lib/composition/index.ts` (`design.md > 6.1`).
   - `lib/modules/identity/adapters/driving/company-actions.ts`: las ocho acciones
     (`design.md > 6.2`).
@@ -137,7 +137,7 @@ Cierre:                        T12
   - **Hecho:** tests verdes; `maestro-sin-empresa-actions.test.ts` y
     `session-once-per-request-actions.test.ts` siguen verdes sin cambios.
 
-- [ ] **T11 [P] · Seed por entorno** (R40–R42). Depende de T3.
+- [x] **T11 [P] · Seed por entorno** (R40–R42). Depende de T3.
   - `domain/seed-initial-access.ts` (`scope` en `deps`, `scope` en `SeedOutcome`),
     `adapters/driven/config/seed-scope-env.ts`, el cableado de `seedInitialAccess` en
     `lib/composition/index.ts` y la línea de resumen de `scripts/seed.ts` (`design.md > 7`).

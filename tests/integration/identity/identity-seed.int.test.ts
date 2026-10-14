@@ -1555,6 +1555,7 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
         createdCompany: null,
         createdPermissions: [],
         createdRolePermissions: 0,
+        scope: 'full',
       });
       expect(await fotoDeLoQueSiembra(tx)).toEqual(fotoTrasLaPrimera);
 
@@ -1758,6 +1759,122 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
         'faltan las variables de entorno: SEED_MAESTRO_USERNAME, SEED_MAESTRO_PASSWORD, SEED_MAESTRO_EMAIL',
       );
       expect(await fotoDeLoQueSiembra(tx)).toEqual(antes);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QC-162 — el seed en produccion (`platform-only`) solo siembra la plataforma.
+// ---------------------------------------------------------------------------
+
+/** Un proveedor que hace fallar el caso si alguien lo invoca: con `platform-only` nadie debe. */
+const credencialesQueNoDebenLeerse: InitialAdminCredentialsProvider = () => {
+  throw new Error('platform-only no debe leer las credenciales del Administrador inicial');
+};
+
+describe('seedInitialAccess contra base real — alcance platform-only (QC-162)', () => {
+  it('QC-162 R40, R42: dos corridas platform-only sobre una base con QuimiCloud y su Administrador no borran ni cambian nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+      const repository = createInitialAccessRepository(tx);
+      const completa = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+        scope: 'full',
+      });
+      expect(completa.createdCompany).toBe(INITIAL_COMPANY_NAME);
+      expect(completa.createdAdmin).toBe(true);
+      const quimicloud = await tx.company.findFirstOrThrow({
+        where: { nameNormalized: normalizeCompanyName(INITIAL_COMPANY_NAME), deletedAt: null },
+      });
+      const admin = (await findLiveAdmin(tx))!;
+      expect(admin.companyId).toBe(quimicloud.id);
+      const antes = await fotoDeLoQueSiembra(tx);
+
+      const deps = {
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: credencialesQueNoDebenLeerse,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+        scope: 'platform-only' as const,
+      };
+      for (const corrida of [1, 2]) {
+        const outcome = await seedInitialAccess(deps);
+        expect(outcome, `corrida ${corrida}`).toEqual({
+          createdRoles: [],
+          createdAdmin: false,
+          createdMaestro: false,
+          createdCompany: null,
+          createdPermissions: [],
+          createdRolePermissions: 0,
+          scope: 'platform-only',
+        });
+        expect(await fotoDeLoQueSiembra(tx), `corrida ${corrida}`).toEqual(antes);
+      }
+
+      // QuimiCloud y su Administrador siguen vivos y sin tocar.
+      expect(await tx.company.findUniqueOrThrow({ where: { id: quimicloud.id } })).toEqual(quimicloud);
+      expect(await findLiveAdmin(tx)).toEqual(admin);
+    });
+  });
+
+  it('QC-162 R40: platform-only sobre una base vacia crea roles, permisos y Maestro, y ninguna empresa ni Administrador', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+      expect(await tx.company.count()).toBe(0);
+
+      const outcome = await seedInitialAccess({
+        repository: createInitialAccessRepository(tx),
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: credencialesQueNoDebenLeerse,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+        scope: 'platform-only',
+      });
+
+      expect(outcome.createdMaestro).toBe(true);
+      expect(outcome.createdAdmin).toBe(false);
+      expect(outcome.createdCompany).toBeNull();
+      expect(outcome.scope).toBe('platform-only');
+      expect([...(await seedRoleNames(tx))].sort()).toEqual(SEED_ROLES.map((role) => role.name).sort());
+      for (const role of SEED_ROLES) {
+        expect(await codigosEnBaseDe(tx, role.name), `permisos en base del rol «${role.name}»`).toEqual(
+          codigosSembradosDe(role.name),
+        );
+      }
+      expect(await tx.company.count()).toBe(0);
+      expect(await findLiveAdmin(tx)).toBeNull();
+      const maestros = await findLiveMaestros(tx);
+      expect(maestros).toHaveLength(1);
+      expect(maestros[0]!.companyId).toBeNull();
+    });
+  });
+
+  it('QC-162 R40, R42: con QuimiCloud y su Administrador pero sin Maestro, platform-only solo crea el Maestro', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repository = await sembradaSinMaestro(tx);
+      const antes = await fotoDeLoQueSiembra(tx);
+
+      const outcome = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: credencialesQueNoDebenLeerse,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+        scope: 'platform-only',
+      });
+
+      expect(outcome.createdMaestro).toBe(true);
+      expect(outcome.createdAdmin).toBe(false);
+      const despues = await fotoDeLoQueSiembra(tx);
+      expect(despues.empresas).toEqual(antes.empresas);
+      expect(despues.roles).toEqual(antes.roles);
+      expect(despues.usuarios).toHaveLength(antes.usuarios.length + 1);
+      expect(despues.usuarios).toEqual(expect.arrayContaining(antes.usuarios));
     });
   });
 });

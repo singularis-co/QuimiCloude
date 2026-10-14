@@ -658,6 +658,12 @@ migracion se aplica sobre un estado que Prisma cree que es otro.
   - *Nota 2026-10-09 (QC-249):* desde QC-249 `VERCEL_ENV=preview` tambien migra y siembra, contra
     la base de preview y tras una comprobacion previa; ver `## Previews (QC-249)`. Con
     development, vacio o ausente sigue sin tocar la base.
+  - *Nota 2026-10-13 (QC-162):* el seed lee su alcance de `VERCEL_ENV`
+    (`lib/modules/identity/adapters/driven/config/seed-scope-env.ts`). Con `production` (recortado)
+    solo siembra roles, permisos y el Maestro: no lee `SEED_ADMIN_*`, no lee ni crea la empresa
+    inicial y no crea el Administrador inicial; las empresas las da de alta el Maestro. Nunca borra
+    ni modifica: la QuimiCloud que ya exista en produccion se queda. Con cualquier otro valor
+    (preview, development, vacio o ausente) siembra todo, como antes. `scripts/build.mjs` no cambia.
 
 `tests/guards/guard-despliegue-produccion.test.ts` lo fija.
 
@@ -776,7 +782,8 @@ primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
 | `DATABASE_URL`, `DIRECT_URL` | base de produccion | base del proyecto de preview (contienen `PREVIEW_SUPABASE_REF`) | base local |
 | `PREVIEW_SUPABASE_REF` | ausente | Reference ID del proyecto de Supabase de preview | ausente |
 | `SESSION_SECRET` | propio | **propio de preview**, distinto del de produccion | propio |
-| `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_EMAIL`, `SEED_MAESTRO_USERNAME`, `SEED_MAESTRO_PASSWORD`, `SEED_MAESTRO_EMAIL` | de produccion | propias de preview | propias |
+| `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_EMAIL` | no se leen: en produccion el seed solo crea al Maestro (QC-162) | propias de preview | propias |
+| `SEED_MAESTRO_USERNAME`, `SEED_MAESTRO_PASSWORD`, `SEED_MAESTRO_EMAIL` | de produccion | propias de preview | propias |
 | `SEED_DEMO_OPERADOR_PASSWORD`, `SEED_DEMO_EMPACADOR_PASSWORD`, `SEED_DEMO_ACONDICIONAMIENTO_PASSWORD` | ausentes | **obligatorias** (el seed de demostracion falla sin ellas) | en el entorno del comando |
 | `SUPABASE_STORAGE_URL`, `SUPABASE_STORAGE_KEY` | de produccion | del proyecto de preview (la URL contiene `PREVIEW_SUPABASE_REF`) | segun dev |
 | `SUPABASE_STORAGE_BUCKET`, `SUPABASE_DOCUMENTS_BUCKET`, `SUPABASE_CROPS_BUCKET` | de produccion | buckets del proyecto de preview | segun dev |

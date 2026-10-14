@@ -479,6 +479,20 @@ import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/drive
 import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import { createSetCompanyCountry } from '@/lib/modules/identity';
 import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
+import {
+  createCreateCompany,
+  createDeleteCompany,
+  createGetCompany,
+  createGetCompanyDeletionImpact,
+  createListCompanies,
+  createListCompanyEvents,
+  createReactivateCompany,
+  createUpdateCompany,
+} from '@/lib/modules/identity';
+import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
+import { readSeedScopeFromEnv } from '@/lib/modules/identity/adapters/driven/config/seed-scope-env';
+import type { CompanyOpenOrdersCounter } from '@/lib/modules/identity/ports/company-open-orders-counter';
+import { countOpenOrdersInCompany } from '@/lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
@@ -774,6 +788,13 @@ const workGroupMemberPagination: PaginationPolicy = { toOffsetLimit, buildPage }
 
 const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAliveInCompany };
 
+const companyRepository = createCompanyRepository();
+
+// `orders` es de `pedidos`: `identity` solo ve el puerto.
+const companyOpenOrdersCounter: CompanyOpenOrdersCounter = {
+  countOpenOrders: (companyId) => countOpenOrdersInCompany(companyId),
+};
+
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
 export const identity = {
   // La clave conserva nombre y firma: por eso `login-action.ts` no cambia (R16).
@@ -806,6 +827,8 @@ export const identity = {
         // R18: el seed evalua la politica antes de hashear; aqui se le entrega la misma
         // funcion que expone la fachada.
         checkCredentialPolicy,
+        // Se lee en la invocacion y no al importar, como el transporte del correo.
+        scope: readSeedScopeFromEnv(),
       }),
     ),
   // QC-66 T15 (`design.md > 11`) — los SEIS casos de uso de la administracion de usuarios, ya
@@ -897,6 +920,23 @@ export const identity = {
   }),
   // Operacion de plataforma: el actor no lleva empresa.
   setCompanyCountry: createSetCompanyCountry({ companies: createCompanyCountryRepository() }),
+  // Operaciones de plataforma sobre empresas: el actor no lleva empresa.
+  createCompany: createCreateCompany({
+    companies: companyRepository,
+    secrets: credentialSetupSecrets,
+    links: credentialSetupLinkRepository,
+    mailer: credentialSetupMailer,
+  }),
+  updateCompany: createUpdateCompany({ companies: companyRepository }),
+  deleteCompany: createDeleteCompany({ companies: companyRepository }),
+  reactivateCompany: createReactivateCompany({ companies: companyRepository }),
+  listCompanies: createListCompanies({ companies: companyRepository, log: identityListQueryLog }),
+  getCompany: createGetCompany({ companies: companyRepository }),
+  getCompanyDeletionImpact: createGetCompanyDeletionImpact({
+    companies: companyRepository,
+    openOrders: companyOpenOrdersCounter,
+  }),
+  listCompanyEvents: createListCompanyEvents({ companies: companyRepository }),
 } as const;
 
 /**

@@ -1470,6 +1470,86 @@ describe('seedInitialAccess', () => {
     expect(maestro.email).toBe(CREDENCIALES_POR_DEFECTO.email);
   });
 
+  // QC-162: alcance del seed por entorno.
+  function depsDelSeed(repository: InitialAccessRepository) {
+    return {
+      repository,
+      passwordHasher: crearHasherFalso(),
+      credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+      maestroCredentials: vi.fn(() => CREDENCIALES_DEL_MAESTRO),
+      checkCredentialPolicy: crearPoliticaFalsa(),
+    };
+  }
+
+  it('QC-162 R40: platform-only sobre una base vacia crea roles, permisos y Maestro, y nada de la empresa inicial', async () => {
+    const repository = crearRepositorioFalso();
+    const deps = depsDelSeed(repository);
+
+    const outcome = await seedInitialAccess({ ...deps, scope: 'platform-only' });
+
+    expect(altasDelMaestro(repository.llamadas)).toHaveLength(1);
+    expect(deps.maestroCredentials).toHaveBeenCalledTimes(1);
+    expect(outcome.createdMaestro).toBe(true);
+    expect(outcome.createdRoles.slice().sort()).toEqual([...NOMBRES_DE_SEED_ROLES].sort());
+    expect(outcome.createdPermissions.slice().sort()).toEqual([...TODOS_LOS_CODIGOS_DEL_CATALOGO].sort());
+    expect(outcome.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
+
+    expect(outcome.createdAdmin).toBe(false);
+    expect(outcome.createdCompany).toBeNull();
+    expect(outcome.scope).toBe('platform-only');
+    expect(deps.credentials).not.toHaveBeenCalled();
+    // La comprobacion del correo del Maestro mira `users` sin empresa, no `companies`.
+    expect(
+      llamadasSobreEmpresas(repository.llamadas).filter(
+        (llamada) => llamada.metodo !== 'countLiveUsersWithoutCompanyWithEmail',
+      ),
+    ).toEqual([]);
+    expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createInitialAdmin')).toEqual([]);
+    expect(
+      repository.llamadas.filter(
+        (llamada) => llamada.metodo === 'countLiveUsersWithRole' && llamada.args[0] === ROLE_ADMINISTRADOR,
+      ),
+    ).toEqual([]);
+  });
+
+  it('QC-162 R40, R42: platform-only sobre una base sembrada no escribe nada ni toca companies', async () => {
+    const repository = crearRepositorioFalso({
+      rolesExistentes: ROLES_YA_SEMBRADOS,
+      usuariosVivosConAdministrador: 1,
+      usuariosVivosConMaestro: 1,
+      empresasVivas: new Map([[NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL, 'empresa-quimicloud']]),
+      permisosExistentes: TODOS_LOS_CODIGOS_DEL_CATALOGO,
+      asignacionesExistentes: asignacionesDelSeed(ROLES_YA_SEMBRADOS),
+    });
+    const deps = depsDelSeed(repository);
+
+    const outcome = await seedInitialAccess({ ...deps, scope: 'platform-only' });
+
+    expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
+    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
+    expect(llamadasSobreEmpresas(repository.llamadas)).toEqual([]);
+    expect(repository.empresasVivas.get(NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL)).toBe('empresa-quimicloud');
+    expect(deps.credentials).not.toHaveBeenCalled();
+    expect(deps.maestroCredentials).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ createdAdmin: false, createdMaestro: false, createdCompany: null });
+  });
+
+  it('QC-162 R41: full hace las mismas llamadas y devuelve lo mismo que sin alcance', async () => {
+    const sinAlcance = crearRepositorioFalso();
+    const conFull = crearRepositorioFalso();
+
+    const esperado = await seedInitialAccess(depsDelSeed(sinAlcance));
+    const obtenido = await seedInitialAccess({ ...depsDelSeed(conFull), scope: 'full' });
+
+    expect(conFull.llamadas.length).toBeGreaterThan(0);
+    expect(conFull.llamadas).toEqual(sinAlcance.llamadas);
+    expect(obtenido).toEqual(esperado);
+    expect(obtenido.scope).toBe('full');
+    expect(obtenido.createdAdmin).toBe(true);
+    expect(obtenido.createdCompany).toBe(INITIAL_COMPANY_NAME);
+    expect(obtenido.createdMaestro).toBe(true);
+  });
+
   // Caso 9 (R18) — corre AL FINAL a proposito: revisa lo acumulado por todos los casos
   // anteriores, credencial incluida en el error del caso 7.
   it('la credencial no aparece en ninguna salida de consola acumulada de los ocho casos anteriores', () => {

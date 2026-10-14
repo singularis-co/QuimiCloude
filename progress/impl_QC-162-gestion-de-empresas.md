@@ -275,3 +275,141 @@ Las marcas `tax_id_normalized` y `name_normalized` no aparecen en ningun `target
   Test Files 597 passed (597), Tests 10426 passed | 13 skipped (10439).
 
 Veredicto: Tanda C (T7, T8, T9) en verde; `meta.target` medido y fijado en un caso del `.int`.
+
+## Tanda D (T10, T11) — backend_dev, 2026-10-13
+
+### Archivos
+- `lib/composition/index.ts` (solo anadidos): imports nuevos tras los de QC-235; `companyRepository` y
+  `companyOpenOrdersCounter` (ata `countOpenOrdersInCompany` de `pedidos` al puerto de `identity`) justo antes de la
+  fachada `identity`; ocho claves nuevas al final del objeto (`createCompany` ... `listCompanyEvents`);
+  `scope: readSeedScopeFromEnv()` dentro de la flecha de `seedInitialAccess` (se lee en la invocacion).
+- `lib/modules/identity/adapters/driving/company-actions.ts`: las ocho acciones de design 6.2, sus tipos de estado
+  (`CreateCompanyFormState`, `CompanyMutationFormState`, `CompanyListResult`, `CompanyDetailResult`,
+  `CompanyDeletionImpactResult`, `CompanyEventListResult`) y dos ayudas que leen el `FormData` crudo. Mismo
+  `currentPlatformActor()` y `toErrorState`; sin `revalidatePath`; no se reexporta desde `index.ts`.
+- `lib/modules/identity/domain/seed-initial-access.ts`: `scope` en `SeedInitialAccessDeps` y en `SeedOutcome`.
+- `lib/modules/identity/adapters/driven/config/seed-scope-env.ts` (nuevo): `readSeedScopeFromEnv(env = process.env)`.
+- `scripts/seed.ts`: con `platform-only`, la linea de resumen dice `empresa inicial: no se siembra en produccion`
+  (y `usuario inicial: no se siembra en produccion`, ver desviacion 3).
+- `docs/architecture.md`: la fila `SEED_*` se parte en dos (`SEED_ADMIN_*`: «no se leen: en produccion el seed solo
+  crea al Maestro»; `SEED_MAESTRO_*`: igual que antes) y nota del 2026-10-13 en `## Despliegue a produccion`.
+- Tests: `tests/unit/identity/company-actions.test.ts` (ampliado, 6 → 55 casos),
+  `tests/unit/identity/seed/seed-initial-access.test.ts` (+3), `tests/unit/identity/seed/seed-scope-env.test.ts`
+  (nuevo, 9), `tests/integration/identity/identity-seed.int.test.ts` (+3).
+- `tests/unit/identity/roles/maestro-rol.test.ts`: comprobado; ya abria las ocho rutas de design 8.1 desde la Tanda B,
+  con el anti-cegado. Sin cambios.
+- `specs/QC-162-gestion-de-empresas/tasks.md`: T10 y T11 marcadas.
+
+### Desviaciones respecto al design
+1. `SeedInitialAccessDeps.scope` es **opcional** (`scope?: SeedScope`; sin valor, `'full'`). Obligatorio habria roto
+   el typecheck de unas 76 llamadas existentes en `seed-initial-access.test.ts` e `identity-seed.int.test.ts`. Con el
+   opcional, esas llamadas siguen probando el comportamiento `full` tal cual. El unico llamador de produccion (la
+   composicion) siempre lo pasa, leido de `VERCEL_ENV`. `SeedOutcome.scope` si es obligatorio.
+2. Con `platform-only` tampoco se cuenta a los Administradores vivos (`countLiveUsersWithRole(ROLE_ADMINISTRADOR)`):
+   es el «`needsAdmin` es `false` sin consultar» de design 7.
+3. `scripts/seed.ts`: ademas de la linea de la empresa, la del usuario inicial dice `no se siembra en produccion` con
+   `platform-only`; si no, diria `ya existia` sin haber mirado.
+4. La fila de `docs/architecture.md` se parte en dos, porque `SEED_MAESTRO_*` si se siguen leyendo en produccion.
+5. `readSeedScopeFromEnv` recibe `Readonly<Record<string, string | undefined>>` y no `NodeJS.ProcessEnv`, para que el
+   test pueda pasar objetos sueltos.
+6. Enmienda mecanica en `identity-seed.int.test.ts` (caso QC-161 R10, R18, R4): el `toEqual` exacto de la segunda
+   corrida gana `scope: 'full'`, consecuencia directa de que `SeedOutcome` gane `scope` (design 7). Solo anade una
+   clave al literal cerrado; lo que el caso afirma (la segunda corrida no crea nada) no cambia. El archivo ya estaba en
+   «Archivos esperados».
+7. `tests/unit/identity/catalogo-sin-total-fijo.test.ts` vio un falso total fijo: su ventana tras
+   `TOTAL_DE_ASIGNACIONES_DEL_SEED` alcanzaba un `toHaveLength(1)` del Maestro en el caso nuevo. Se reordenaron las
+   aserciones de ese caso; la guardia no se toca.
+
+### R -> test, R1 a R45 (consolidado de las cuatro tandas)
+Abreviaturas: `companies/` = `tests/unit/identity/companies/`; `int` = `tests/integration/identity/company.int.test.ts`;
+`acciones` = `tests/unit/identity/company-actions.test.ts`; `migracion` =
+`tests/unit/identity/schema/companies-management-migration.test.ts`.
+- R1 -> los ocho unitarios de casos de uso en `companies/` (null, sin permisos, permiso equivocado → `unauthorized`,
+  dobles que fallan si los llaman) + `acciones` (`R3: $clave sin sesion ...` y `R3: $clave con un usuario de sesion
+  sin permisos ...`, x8).
+- R2 -> los mismos ocho unitarios (actor sin empresa con el permiso → pasa) + `acciones` (el actor de sesion no lleva
+  empresa y `getSessionContext` no se llama, x8) + `acciones > R5` (de QC-235).
+- R3 -> `acciones`: `R3: $clave pasa al caso de uso el actor de getSessionUser, sin getSessionContext ni revalidatePath`
+  (x8, con `id`/`actorId`/`permissions` colados en la entrada), `R3: $clave sin sesion ...` (x8), `R3: $clave con un
+  usuario de sesion sin permisos ...` (x8), `R3: el censo cubre las ocho acciones`, y por accion exito con datos y
+  error con `code`. FormData del alta en `{ company, administrator }`: `R3, R11: arma el FormData ...`. Campo ausente →
+  `invalid_input`: `R3, R5` (alta y edicion), `R3, R12` (Administrador), `R3, R22` (baja), `R3: sin companyId ...`
+  (reactivacion) y `R3: una entrada sin companyId ...` (historial).
+- R4 -> `companies/company-input.test.ts` (topes) + `migracion` (columnas).
+- R5 -> `company-input.test.ts`, `create-company.test.ts`, `update-company.test.ts` + `acciones > R3, R5` (dos).
+- R6 -> `company-input.test.ts`.
+- R7 -> `company-input.test.ts`, `create-company.test.ts`, `update-company.test.ts`.
+- R8, R9 -> `create-company`, `update-company`, `reactivate-company` (unitarios) + `int` (`createWithAdministrator >
+  R8, R9, R14`, `update > R8, R9`, `restricciones > R8, R9 (meta.target)`, `R9: dos empresas sin identificacion fiscal
+  conviven`) + `acciones > R3, R8`.
+- R10 -> `int > restricciones > R10` (dos) y `> R10, R25` + `migracion`.
+- R11 -> `create-company.test.ts` + `int > createWithAdministrator > R11, R12, R34` + `acciones > R3, R11`.
+- R12 -> `create-company.test.ts`, `company-input.test.ts` + `int > R11, R12, R34` + `acciones > R3, R12` (dos).
+- R13 -> `create-company.test.ts` + `int > createWithAdministrator > R13, R14`.
+- R14 -> `int`: los tres choques del alta (empresa, usuario y evento a cero).
+- R15 -> `create-company.test.ts` + `acciones > R3, R15`.
+- R16 -> `update-company.test.ts` + `int > update > R16, R34, R35` + `acciones > R3, R16`.
+- R17 -> `update-company.test.ts` + `int > update > R17`.
+- R18 -> `update-company.test.ts` + `int > update > R18`.
+- R19 -> `update-company.test.ts` + `int > update > R19` + `acciones > R3, R19`.
+- R20 -> `get-company-deletion-impact.test.ts` + `int > countLiveUsersOfAlive > R20` (dos) +
+  `tests/integration/pedidos/order-company-stats.int.test.ts` (cuatro) + `acciones > R3, R20` (dos).
+- R21 -> `delete-company.test.ts` + `int > softDelete > R21, R24, R34` + `acciones > R3, R21`.
+- R22 -> `delete-company.test.ts`, `company-input.test.ts` + `int > softDelete > R22` + `acciones > R3, R22` (dos).
+- R23 -> `delete-company.test.ts` + `int > softDelete > R23`.
+- R24 -> `int > softDelete > R21, R24, R34` + los existentes, sin cambios, `tests/unit/identity/resolve-session.test.ts`
+  (QC-48 R15) y `tests/unit/identity/verify-credentials.test.ts` (QC-48 R3).
+- R25 -> `int > createWithAdministrator > R25` y `restricciones > R10, R25`.
+- R26 -> `reactivate-company.test.ts` + `int > reactivate > R26, R34` + `acciones > R3, R26`.
+- R27 -> `reactivate-company.test.ts` + `int > reactivate > R27`.
+- R28 -> `reactivate-company.test.ts` + `int > reactivate > R28` + `acciones > R3, R28`.
+- R29 -> `list-companies.test.ts` + `int > list > R29, R30` + `acciones > R3, R29`.
+- R30 -> `list-companies.test.ts`, `company-event.test.ts` (queryable) + `int > list > R29, R30` y `> R30`.
+- R31 -> `list-companies.test.ts` + `int > list > R31`.
+- R32 -> `list-companies.test.ts` + `int > list > R32` (dos).
+- R33 -> `get-company.test.ts` + `int > findById > R33` + `acciones > R3, R33` (dos).
+- R34 -> `company-event.test.ts` (tipos) + `int` (un evento por operacion; un evento imposible deshace el cambio en
+  `update`, `softDelete` y `reactivate`).
+- R35 -> `company-event.test.ts` + `int > update > R16, R34, R35`.
+- R36 -> `tests/unit/identity/set-company-country.test.ts > R36` +
+  `tests/integration/identity/company-country.int.test.ts > R36` (tres).
+- R37 -> `list-company-events.test.ts` + `int > listEvents` (tres) + `acciones > R3, R37` (dos).
+- R38 -> `companies/company-events-append-only.test.ts`.
+- R39 -> `company-event.test.ts` (cruce CHECK ↔ `EVENT_KIND_FORMAT`) + `int > restricciones > R39` + `migracion`.
+- R40 -> `tests/unit/identity/seed/seed-initial-access.test.ts > QC-162 R40: platform-only sobre una base vacia crea
+  roles, permisos y Maestro, y nada de la empresa inicial` y `> QC-162 R40, R42: platform-only sobre una base sembrada
+  no escribe nada ni toca companies`; `tests/unit/identity/seed/seed-scope-env.test.ts` (`production`,
+  ` production `, sin `VERCEL`, `process.env` leido en la invocacion);
+  `tests/integration/identity/identity-seed.int.test.ts > QC-162 R40: platform-only sobre una base vacia ...` y los
+  dos `QC-162 R40, R42`.
+- R41 -> `seed-initial-access.test.ts > QC-162 R41: full hace las mismas llamadas y devuelve lo mismo que sin alcance`
+  (y todos los casos anteriores, que corren sin alcance, o sea `full`); `seed-scope-env.test.ts` (`preview`,
+  `development`, vacio, ausente, `Production`).
+- R42 -> `identity-seed.int.test.ts > QC-162 R40, R42: dos corridas platform-only sobre una base con QuimiCloud y su
+  Administrador no borran ni cambian nada` y `> QC-162 R40, R42: con QuimiCloud y su Administrador pero sin Maestro,
+  platform-only solo crea el Maestro`; `seed-initial-access.test.ts > QC-162 R40, R42`.
+- R43 -> `migracion` + `company-event.test.ts` (cruce del CHECK).
+- R44 -> `migracion` + `tests/guards/guard-rls-force.test.ts` (existente).
+- R45 -> `company-input.test.ts`, `create-company.test.ts`, `update-company.test.ts` (un caso R45 en cada uno).
+
+**Ningun R sin test.**
+
+### Verificacion (salida real)
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`; los 7 preexistentes (`confirm-catalog-import.test.ts`,
+  `order-service.test.ts`).
+- `pnpm exec vitest run` de `company-actions`, `roles/maestro-rol`, `maestro-sin-empresa-actions`,
+  `session-once-per-request-actions`, `seed/seed-initial-access`, `seed/seed-scope-env`, `seed/deploy-hook` y
+  `tests/unit/scripts/build.test.ts`: Test Files 8 passed (8), Tests 238 passed (238).
+- `pnpm exec vitest run --project integration tests/integration/identity/identity-seed.int.test.ts`: Test Files 1
+  passed (1), Tests 35 passed (35); la base efimera se creo y se borro.
+- `pnpm exec vitest run guard`: Test Files 75 passed (75), Tests 1052 passed | 20 skipped (1072).
+- `pnpm exec vitest run --project node tests/unit/identity tests/unit/scripts`: Test Files 124 passed (124), Tests
+  2385 passed | 31 skipped (2416). Una primera corrida dio 1 fail en `catalogo-sin-total-fijo.test.ts`; ver desviacion 7.
+- Extra: los 16 tests fuera de `identity` que nombran `lib/composition/index.ts` o archivos tocados (module-contract de
+  `pedidos`, `proveedores`, `unidades` y `asignaciones`; convenciones de UI; `composition/identity-facade`;
+  `test-database/nombres-y-huella`; alcances de `inventario` y `documentos`): Test Files 16 passed (16), Tests 347
+  passed | 26 skipped (373).
+
+Veredicto: Tanda D (T10, T11) en verde; las ocho acciones estan cableadas, el seed de produccion solo siembra la
+plataforma y todos los R1-R45 tienen test.
