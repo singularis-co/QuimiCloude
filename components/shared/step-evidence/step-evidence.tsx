@@ -11,7 +11,7 @@ import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
-import { EVIDENCE_ACCEPTED_TYPES } from './upload-evidence';
+import { EVIDENCE_ACCEPTED_TYPES, EVIDENCE_MAX_SIZE_LABEL } from './upload-evidence';
 
 export const MAX_STEP_EVIDENCE_PHOTOS = 3;
 
@@ -21,7 +21,7 @@ export const STEP_EVIDENCE_TEXTS = {
   countLabel: (ok: number) => `${ok} de ${MAX_STEP_EVIDENCE_PHOTOS} fotos`,
   required: 'Obligatoria · de 1 a 3 fotos',
   fixed: 'Fijada al terminar',
-  hint: 'JPG, PNG o WebP · hasta 5 MB · se comprime antes de subir.',
+  hint: `JPG, PNG o WebP · hasta ${EVIDENCE_MAX_SIZE_LABEL} · se comprime antes de subir.`,
   fixedHint: 'El pedido ya terminó: las fotos no se pueden cambiar ni quitar.',
   add: 'Añadir foto',
   addAnother: 'Añadir otra foto',

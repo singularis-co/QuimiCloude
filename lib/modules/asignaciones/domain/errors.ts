@@ -429,7 +429,7 @@ export class EvidenceLimitError extends AsignacionesError {
   }
 }
 
-/** Lo subido no existe, o por su contenido no es JPEG, PNG ni WebP de hasta 5 MB. */
+/** Lo subido no existe, o por su contenido no es JPEG, PNG ni WebP de hasta 4.4 MB. */
 export class EvidenceInvalidFileError extends AsignacionesError {
   readonly code = 'evidence_invalid_file';
 

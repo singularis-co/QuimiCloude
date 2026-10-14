@@ -54,11 +54,13 @@ export {
   sanitizeCostInput,
 } from './product-cost-amount';
 export { COST_QUANTITY_FIELD, ProductCostFields } from './product-cost-fields';
-export { ProductField } from './product-field';
+export { ProductField, ProductFieldHelper } from './product-field';
 export { ProductForm } from './product-form';
 export {
+  EXPIRY_DATE_FIELD,
   PURCHASE_DATE_FIELD,
   ProductBatchDateField,
+  type ProductBatchDateFieldName,
 } from './product-batch-date-field';
 export {
   ProductBatchesPanel,

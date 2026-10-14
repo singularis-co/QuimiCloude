@@ -205,11 +205,10 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       // Nace fijada: es la que identifica la fila de un vistazo y la que menos ancho ocupa.
       // Es un defecto, con preferencia guardada gana la del usuario.
       defaultPinned: 'left',
-      // La miniatura sale de `products.image_path`. Hoy esa columna esta vacia en todas las
-      // filas -nada la llena todavia-, asi que lo que se ve es el marcador; ese caso NO es un
-      // hueco: es el estado normal por ahora.
+      // `imageUrl` y no `imagePath`: la ruta del bucket no es una URL servible. Sin imagen sale
+      // el marcador.
       cell: (product) => (
-        <EntityImage path={product.imagePath} name={product.name} testId="product-image" />
+        <EntityImage path={product.imageUrl ?? null} name={product.name} testId="product-image" />
       ),
     },
     {

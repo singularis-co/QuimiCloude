@@ -642,7 +642,12 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // el mismo `data-order-id`, asi que su localizador de pagina entera encontraba dos y ahora se
   // acota a `data-table-row-<id>`. El centinela pasa de CUARENTA Y TRES a CUARENTA Y CINCO; la lista
   // sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y cinco', () => {
+  //
+  // 2026-10-14: entra `e2e/helpers/product-name-cell.ts`, y no afloja la lista. No estrena tabla:
+  // localiza la fila por `data-table-row-<id>` y la celda `data-table-cell-presentationName` de
+  // inventario, ya en esta lista. El centinela pasa de CUARENTA Y CINCO a CUARENTA Y SEIS; la lista
+  // sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y seis', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -652,7 +657,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cuarenta y cinco E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cuarenta y seis E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -700,6 +705,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-10-13, QC-262). Tras `grupos-de-trabajo` porque la lista esta
       // ORDENADA: 'g' precede a 'h'.
       'e2e/helpers/order-distribution.ts',
+      // Ver la nota de arriba (2026-10-14). Tras `helpers/order-distribution` porque la lista esta
+      // ORDENADA: 'o' precede a 'p'.
+      'e2e/helpers/product-name-cell.ts',
       // QC-199: ver la nota de arriba.
       'e2e/insumo-por-unidad.spec.ts',
       // Ver la nota de arriba (2026-10-06, QC-209). Va antes que `inventario.spec.ts` porque la

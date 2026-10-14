@@ -99,6 +99,8 @@ export function wireImport(options: { readonly createProduct?: CreateProductUseC
     stockIncreases,
     packageUnit: { findPackageUnitId },
     units: { findRefs: findUnitRefs },
+    // Como en la composicion: el importador acepta lotes ya vencidos.
+    acceptsPastExpiry: true,
   });
   const createProductSpy = vi.fn(options.createProduct ?? manualCreate);
   return {

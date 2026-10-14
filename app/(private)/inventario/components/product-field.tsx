@@ -73,23 +73,7 @@ export function ProductField({
       labelRowClassName="flex items-center gap-1.5"
       labelAdornment={
         helper === undefined ? undefined : (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label={`Qué es ${label}`}
-                  // 44x44 de toque, como el gemelo de `PresentationSelect` en el mismo panel; el
-                  // icono sigue en `size-4`. `shrink-0` impide que el flex le recorte el ancho.
-                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`}
-                  data-testid={`product-helper-${name}`}
-                />
-              }
-            >
-              <CircleAlertIcon className="size-4" />
-            </TooltipTrigger>
-            <TooltipContent data-testid={`product-helper-text-${name}`}>{helper}</TooltipContent>
-          </Tooltip>
+          <ProductFieldHelper name={name} label={label} helper={helper} />
         )
       }
       error={error}
@@ -97,5 +81,40 @@ export function ProductField({
       errorAlert={false}
       testId={`product-field-${name}`}
     />
+  );
+}
+
+/**
+ * Boton de ayuda junto a la etiqueta de un campo del formulario de producto. Lo comparten los
+ * campos de texto y los de fecha (`ProductBatchDateField`), para que la ayuda se vea y se nombre
+ * igual en todo el panel.
+ */
+export function ProductFieldHelper({
+  name,
+  label,
+  helper,
+}: {
+  readonly name: string;
+  readonly label: string;
+  readonly helper: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`Qué es ${label}`}
+            // 44x44 de toque, como el gemelo de `PresentationSelect` en el mismo panel; el
+            // icono sigue en `size-4`. `shrink-0` impide que el flex le recorte el ancho.
+            className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`}
+            data-testid={`product-helper-${name}`}
+          />
+        }
+      >
+        <CircleAlertIcon className="size-4" />
+      </TooltipTrigger>
+      <TooltipContent data-testid={`product-helper-text-${name}`}>{helper}</TooltipContent>
+    </Tooltip>
   );
 }
