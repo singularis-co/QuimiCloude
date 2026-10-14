@@ -98,8 +98,9 @@ frontmatter.** Lo hace cumplir `tests/guards/guard-modelos-de-agentes.test.ts`.
   node scripts/archivos-en-vuelo.mjs --candidata <key>   # exit 1 = choca
   ```
 
-  Si choca, la candidata espera a que la otra pase a `done`. Si la candidata aún no tiene
-  `tasks.md`, se repite la comprobación en F2.0, antes de implementar.
+  Si choca con otra persona, la candidata espera a que la otra pase a `done`, salvo que el humano
+  acepte el choque (`--acepto`, `docs/equipo.md`). Con fichas propias da AVISO. Si la candidata
+  aún no tiene `tasks.md`, se repite la comprobación en F2.0, antes de implementar.
 - **Dependencias:** una feature con `depends_on` no arranca hasta que su dependencia esté `done`.
 
 ## Flujo de una feature
@@ -133,7 +134,8 @@ Contrato completo: `docs/jira.md`.
      - está sin asignar o asignada a ti;
      - no tiene `depends_on` pendiente;
      - tu cupo en su zona no está lleno;
-     - no choca en archivos (si ya tiene `tasks.md` sembrado).
+     - no choca en archivos con otra persona, o el humano aceptó el choque (si ya tiene
+       `tasks.md` sembrado; con tus propias fichas solo avisa).
    - **Tómala** siguiendo `docs/equipo.md > Tomar una feature`: releer el issue en vivo →
      asignártela → releer → `./scripts/wt.sh new <key> <slug>`. Si `wt.sh` sale con **4
      (TOMADA)**, suelta el assignee y vuelve a elegir.
@@ -163,7 +165,7 @@ Contrato completo: `docs/jira.md`.
 ### F2 — Implementación
 
 5. **(F2.0)** Cambia a `in_progress` y asegura la tarjeta en el estado de `in_progress`. Repite
-   `archivos-en-vuelo.mjs --candidata <key>`: si ahora choca, espera.
+   `archivos-en-vuelo.mjs --candidata <key>`: si ahora choca, espera o pide la aceptación del humano.
 6. **(F2.1)** Lanza `implementer` en el worktree.
    - Sigue `tasks.md` una por una, marcando `[x]`, y escribe `progress/impl_<key>.md` (archivos
      tocados, mapa `R<n> -> test`, salida de los tests que corrió).
