@@ -132,3 +132,71 @@ Veredicto: tanda 2 verde en typecheck, lint y unit; falta correr la integración
   - Corrido solo, ese archivo da 84/84 verdes.
 
 Veredicto: tanda 2 verde; T4, T5 y T6 hechas. Queda abierto el borde de R7 descrito arriba.
+
+## Tanda 3 — aviso en «Nuevo producto» (T7, T8) · 2026-10-14
+
+### Archivos
+- `components/shared/presentation-unit-select.tsx`: prop opcional `hint` (texto visible bajo el campo, `PRESENTATION_UNIT_HINT_TESTID`, enlazado por `aria-describedby` junto al del error). Sin `hint` el árbol no cambia.
+- `components/shared/CATALOGO.md`: fila de `PresentationUnitSelect` con `hint` en Alcance y en Puntos de extensión.
+- `app/(private)/inventario/components/use-supply-homonyms.ts` (nuevo): `findSupplyHomonymsAction` con rebote de 400 ms, solo al cambiar el nombre y solo en alta de insumo. El nombre vive en una referencia: teclear no repinta el formulario (medido: sin eso, el caso de 201 caracteres de `product-page.test.tsx` pasaba de ~4,5 s a ~6,7 s). Un fallo de lectura deja la lista vacía.
+- `app/(private)/inventario/components/supply-conversion-notice.tsx` (nuevo): compone `Notice tone="info"`; `resolveSupplyDestination` (usa `pickSupplyTarget`), `checkConvertedSupplyBatch` (usa `convertSupplyBatch`), `supplyUnitHint`, `displayDecimal` (`trimDecimal` + coma) y `unitDisplayLabel`. Textos de `design.md > 6`.
+- `app/(private)/inventario/components/product-form.tsx`: unidad controlada; aviso entre «Unidad» y «Existencia»; `hint` en «Unidad» solo cuando convierte; validación previa con el mismo destino (error en `stock` o `unitCost`, no envía); `converted_stock_out_of_range` → `stock` y `converted_cost_out_of_range` → `unitCost` desde el servidor; `onSaved({ lot, conversion })` (`ProductSaved`).
+- `app/(private)/inventario/components/product-sheet.tsx`: toast `Se agregó un lote de {e'} {ud} a {n} · {ud}.` con `conversion` del servidor; si la unidad no está en `formUnits`, queda el aviso de siempre.
+- `app/(private)/inventario/components/product-name-picker.tsx`: `onNameChange`.
+- `app/(private)/inventario/components/product-cost-fields.tsx`: `onUnitCostChange` (avisa del unitario que viajará, tecleado o deducido del total).
+- Tests: `tests/unit/configuracion-ui/presentation-unit-select.test.tsx` (3 casos nuevos; el archivo tenía finales mixtos en el índice y queda en LF), `tests/unit/inventario-ui/product-form-conversion.test.tsx` (nuevo).
+
+### Mapa R -> test (tanda 3)
+| R | Test |
+|---|---|
+| R13 | `product-form-conversion.test.tsx`: `R13 con homónimo en l y alta en ml muestra aviso con cantidad y costo convertidos y la ayuda bajo Unidad`, `R13 se recalcula al cambiar la unidad o la existencia sin volver a pedir`, `R13 sin costo unitario el aviso no trae la línea de costo`; `presentation-unit-select.test.tsx`: `con \`hint\` pinta el texto visible y el campo lo referencia por aria-describedby` |
+| R14 | `R14 con varios homónimos nombra cada uno y el destino` |
+| R15 | `R15 sin homónimo o con uno en la misma unidad no hay aviso`; `presentation-unit-select.test.tsx`: `sin \`hint\` el árbol no cambia: ni texto de ayuda ni descripción añadida` |
+| R16 | `R16 cantidad que no cabe: error bajo Existencia y no envía`, `R16 costo que no cabe: error bajo Costo unitario`, `R16 el rechazo del servidor con converted_stock_out_of_range va a Existencia` |
+| R17 | `R17 el toast nombra la cantidad convertida y el destino` |
+
+### Verificación (tanda 3)
+- `pnpm run typecheck` → `tsc --noEmit`, exit 0.
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`; los mismos 7 warnings ajenos.
+- `pnpm exec vitest run` sobre presentation-unit-select, todo `tests/unit/inventario-ui/` (incluye product-form-conversion, product-form-unidad, product-form-tipo-autocomplete), product-page, product-field, scope, import-missing-catalog, configuracion-convenciones, paridad (buscadores, error-alert, formularios), pedidos-ui (order-form ×3, order-sheet, toasts, viewport), proveedores-ui (catalog-import-review, catalog-line-sheet) y shared (presentation-select-helper, presentation-select-unit-filter) → 27 archivos, 544 verdes, 3 saltados.
+- `pnpm exec vitest run guard` → 76 archivos, 1064 verdes, 20 saltados.
+- Finales de línea: LF en todo lo tocado (0 bytes CR).
+
+Notas:
+- El tablero pinta «4,0000 por l»; `design.md > 5` pide sin ceros sobrantes, así que sale «4 por l».
+- La línea de costo sale cuando el campo «Costo unitario» tiene valor, también si se dedujo del total: es lo que se envía y lo que el servidor convierte.
+
+Veredicto: tanda 3 verde; T7 y T8 hechas.
+
+## Tanda 4 — importación desde Excel (T9) · 2026-10-14
+
+### Archivos
+- `lib/modules/inventario/ports/inventory-import-repository.ts`: `ImportProductRef.stock`.
+- `lib/modules/inventario/adapters/driven/persistence/inventory-import-prisma.ts`: `stock` en el `select` común (lo usan las dos consultas), como texto con 4 decimales.
+- `lib/modules/inventario/domain/inventory-import-contract.ts`: `converted_stock_out_of_range` y `converted_cost_out_of_range` en `IMPORT_ROW_ISSUE_CODES`.
+- `lib/modules/inventario/domain/plan-inventory-import.ts`: textos de §6 en `ISSUE_TEXT`; `resolveSupplyIdentity` (clave `P|{nombre}|{familia}`, destino con `pickSupplyTarget`); `FileProduct.unitId`; `alsoOccupies` del terminado por familia; `checkConversion` (vista previa: `convertSupplyBatch` y `deriveUnitCost` sobre la existencia convertida).
+- `lib/modules/inventario/domain/confirm-inventory-import.ts`: `writeRow` traduce `ConvertedStockOutOfRangeError` y `ConvertedCostOutOfRangeError`.
+- `tests/unit/inventario/inventory-import-kit.ts`: unidad `ML` (deriva de `LITRO`, factor 0.001) en el snapshot y en `listVisibleRefs`; `productRef` con `stock`.
+- `tests/integration/inventario/inventory-import-repository.int.test.ts`: caso R19 nuevo; el caso R17 que fijaba el objeto entero gana `stock: '0.0000'`.
+- Nuevos: `tests/unit/inventario/plan-inventory-import-familia.test.ts`, `tests/unit/inventario/confirm-inventory-import-familia.test.ts`.
+- `tests/integration/inventario/inventory-import-wiring.ts`: sin cambios; la tanda 2 ya lo dejó con `findAliveSupplyHomonyms` y `units.findRefs`.
+- `plan-inventory-import.test.ts`: sin cambios; ningún caso fijaba «nombre + unidad» entre unidades de la misma familia.
+
+### Mapa R -> test (tanda 4)
+| R | Test |
+|---|---|
+| R18 | `plan-inventory-import-familia.test.ts`: `R18 fila en ml con homónimo en l queda en sumar lote sobre ese producto`, `R18 segunda fila del archivo en otra unidad de la familia suma sobre la primera`, `R18 otra familia queda en crear` |
+| R19 | `confirm-inventory-import-familia.test.ts`: `R19 la confirmación escribe el lote convertido sobre el destino`; `inventory-import-repository.int.test.ts`: `R19 findAliveProductsByNormalizedNames devuelve la existencia` |
+| R20 | `plan-inventory-import-familia.test.ts`: `R20 existencia convertida que no cabe deja la fila en error en Existencia`, `R20 costo convertido que no cabe deja la fila en error en Costo unitario`, `R20 total derivado en 0 tras convertir deja la fila en error en Costo total`; `confirm-inventory-import-familia.test.ts`: `R20 la confirmación no escribe la fila que no cabe` (fila en error desde la vista previa y filas que el alta rechaza porque la base cambió) |
+
+### Verificación (tanda 4)
+- `pnpm run typecheck` → `tsc --noEmit`, exit 0.
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`; los mismos 7 warnings ajenos de la tanda 2.
+- `pnpm exec vitest run` sobre plan-inventory-import-familia, confirm-inventory-import-familia, plan-inventory-import, confirm-inventory-import, preview-inventory-import, create-product-familia y guard-ambito-empresa-inventario → 7 archivos, 123 verdes.
+- `pnpm exec vitest run --project integration` sobre los 5 `inventory-import-*.int.test.ts` (repository, confirm, finished-goods, idempotency, isolation) → 36 verdes, 1 saltado (el `skipIf` preexistente `QC209_MEDIR_2000`).
+- `pnpm exec vitest run guard` → 76 archivos, 1064 verdes, 20 saltados.
+- Finales de línea: LF en todo lo tocado.
+
+Nota: el borde de R7 de la tanda 2 (el esquema rechaza el costo total sobre la existencia sin convertir) se ve igual en la vista previa, porque la planificación valida con el mismo `createProductSchema`. Vista previa y confirmación siguen coincidiendo.
+
+Veredicto: tanda 4 verde; T9 hecha.

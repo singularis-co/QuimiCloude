@@ -28,6 +28,7 @@ const IMPORT_PRODUCT_REF_SELECT = {
   unitId: true,
   presentationId: true,
   recipeId: true,
+  stock: true,
 } satisfies Prisma.ProductSelect;
 
 type ImportProductRefRow = Prisma.ProductGetPayload<{ select: typeof IMPORT_PRODUCT_REF_SELECT }>;
@@ -40,6 +41,7 @@ function toImportProductRef(row: ImportProductRefRow): ImportProductRef {
     unitId: row.unitId,
     presentationId: row.presentationId,
     recipeId: row.recipeId,
+    stock: row.stock.toFixed(4),
   };
 }
 

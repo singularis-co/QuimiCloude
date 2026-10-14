@@ -1,4 +1,4 @@
-import { normalizeUnitName, type UnitRef } from '@/lib/modules/unidades';
+import { normalizeUnitName, unitFamilyId, type UnitRef } from '@/lib/modules/unidades';
 
 import {
   parseImportDate,
@@ -26,6 +26,8 @@ import { normalizePresentationName } from './presentation-name';
 import { createProductSchema, isWholeQuantity, PRODUCT_NAME_MAX_LENGTH } from './product-input';
 import { normalizeProductName } from './product-name';
 import { PRODUCT_TYPES } from './product-type';
+import { convertSupplyBatch, pickSupplyTarget, type SupplyHomonym } from './supply-family';
+import { deriveUnitCost } from './unit-cost';
 
 import type { ParsedImportRow, ParsedImportSheet } from './import-sheet';
 import type { ImportProductRef } from '../ports/inventory-import-repository';
@@ -90,8 +92,10 @@ const ISSUE_TEXT: Readonly<Record<ImportRowIssueCode, string>> = {
   finished_product_homonym: 'ya existe un producto terminado con ese nombre.',
   stock_invalid: `debe ser un numero mayor o igual que 0, ${NUMBER_RULE}.`,
   stock_not_whole: 'debe ser un numero entero de envases.',
+  converted_stock_out_of_range: 'convertida a la unidad del producto no cabe en 4 decimales; escríbela en esa unidad.',
   cost_required: 'indica el costo unitario o el costo total.',
   cost_invalid: `debe ser un importe mayor que 0, ${NUMBER_RULE}.`,
+  converted_cost_out_of_range: 'convertido a la unidad del producto no cabe en 4 decimales; escribe el lote en esa unidad.',
   total_cost_too_low: 'es demasiado bajo para esa existencia: el costo unitario quedaria en 0.',
   qty_alert_invalid: `debe ser un numero mayor o igual que 0, ${NUMBER_RULE}.`,
   number_format_invalid: 'usa un solo separador decimal (coma o punto), sin separador de miles y hasta 4 decimales.',
@@ -335,7 +339,13 @@ class MissingCatalog {
   }
 }
 
-type FileProduct = { readonly rowNumber: number; readonly presentationId: string | null; readonly finished: boolean };
+type FileProduct = {
+  readonly rowNumber: number;
+  readonly presentationId: string | null;
+  /** La unidad de la fila que lo crea: a ella se convierten las filas que le suman lote. */
+  readonly unitId: string | null;
+  readonly finished: boolean;
+};
 type FileLot = { readonly identity: string; readonly target: ImportBatchTarget };
 
 type PlanState = {
@@ -354,6 +364,8 @@ type Identity = {
   readonly target: ImportBatchTarget | null;
   /** Otra identidad que la creacion de esta fila ocupa: el nombre derivado de un terminado. */
   readonly alsoOccupies?: string;
+  /** Unidad del producto al que se suma el lote, si es un insumo. */
+  readonly targetUnitId?: string;
 };
 
 type Resolved = {
@@ -407,6 +419,31 @@ function fileTarget(product: FileProduct): ImportBatchTarget {
   return { kind: 'file_row', rowNumber: product.rowNumber };
 }
 
+function familyKey(unitId: string, units: readonly UnitRef[]): string {
+  const unit = units.find((candidate) => candidate.id === unitId);
+  return unit === undefined ? unitId : unitFamilyId(unit);
+}
+
+/** Insumo: nombre + familia de unidad, con el mismo destino que el alta manual. */
+function resolveSupplyIdentity(normalized: string, unitId: string, state: PlanState, issues: RowIssues): Identity | null {
+  const { products, units } = state.snapshot;
+  const key = `P|${normalized}|${familyKey(unitId, units)}`;
+  const candidates: SupplyHomonym[] = products.flatMap((product) =>
+    product.nameNormalized === normalized && product.unitId !== null
+      ? [{ id: product.id, name: product.nameNormalized, type: product.type, unitId: product.unitId, stock: product.stock }]
+      : [],
+  );
+  const existing = pickSupplyTarget(unitId, candidates, units)?.target;
+  const inFile = state.fileProducts.get(key);
+  if (existing?.type === PRODUCT_TYPES.FINISHED_PRODUCT || (existing === undefined && inFile?.finished === true)) {
+    issues.add('finished_product_homonym', 'name');
+    return null;
+  }
+  if (existing !== undefined) return { key, target: existingTarget(existing.id), targetUnitId: existing.unitId };
+  if (inFile === undefined) return { key, target: null };
+  return { key, target: fileTarget(inFile), targetUnitId: inFile.unitId ?? unitId };
+}
+
 /** La misma regla de identidad que el alta manual de cada tipo, contra la base y contra el archivo. */
 function resolveIdentity(
   type: ImportRowType,
@@ -422,7 +459,7 @@ function resolveIdentity(
     if (refs.formula === null || refs.presentation === null) return null;
     const key = `F|${refs.formula.id}|${refs.presentation.id}`;
     const derived = normalizeProductName(`${refs.formula.name} · ${refs.presentation.name}`);
-    const alsoOccupies = `P|${derived}|${refs.presentation.unitId}`;
+    const alsoOccupies = `P|${derived}|${familyKey(refs.presentation.unitId, state.snapshot.units)}`;
     const existing = finishedProducts.find(
       (product) => product.recipeId === refs.formula?.id && product.presentationId === refs.presentation?.id,
     );
@@ -448,10 +485,12 @@ function resolveIdentity(
     return { key, target: inFile === undefined ? null : fileTarget(inFile) };
   }
 
-  const unitId = type === PRODUCT_TYPES.PRODUCT ? refs.unitId : null;
-  if (type === PRODUCT_TYPES.PRODUCT && unitId === null) return null;
-  const key = type === PRODUCT_TYPES.PRODUCT ? `P|${normalized}|${unitId}` : `M|${normalized}`;
-  const existing = products.find((product) => product.nameNormalized === normalized && product.unitId === unitId);
+  if (type === PRODUCT_TYPES.PRODUCT) {
+    return refs.unitId === null ? null : resolveSupplyIdentity(normalized, refs.unitId, state, issues);
+  }
+
+  const key = `M|${normalized}`;
+  const existing = products.find((product) => product.nameNormalized === normalized && product.unitId === null);
   const inFile = state.fileProducts.get(key);
   if (existing?.type === PRODUCT_TYPES.FINISHED_PRODUCT || (existing === undefined && inFile?.finished === true)) {
     issues.add('finished_product_homonym', 'name');
@@ -459,6 +498,27 @@ function resolveIdentity(
   }
   if (existing !== undefined) return { key, target: existingTarget(existing.id) };
   return { key, target: inFile === undefined ? null : fileTarget(inFile) };
+}
+
+/** Lo que el alta manual rechazaria al convertir el lote a la unidad del destino. */
+function checkConversion(values: RowValues, fromId: string, toId: string, state: PlanState, issues: RowIssues): void {
+  if (fromId === toId || issues.has('stock')) return;
+  const from = state.snapshot.units.find((unit) => unit.id === fromId);
+  const to = state.snapshot.units.find((unit) => unit.id === toId);
+  if (from === undefined || to === undefined) return;
+
+  const unitCost = issues.has('unitCost') ? null : values.unitCost;
+  const converted = convertSupplyBatch({ stock: values.stock, unitCost }, from, to);
+  if (converted.kind === 'stock_out_of_range') issues.add('converted_stock_out_of_range', 'stock');
+  else if (converted.kind === 'cost_out_of_range') issues.add('converted_cost_out_of_range', 'unitCost');
+  else if (
+    values.unitCost === null &&
+    values.totalCost !== null &&
+    !issues.has('totalCost') &&
+    deriveUnitCost(values.totalCost, converted.stock) === null
+  ) {
+    issues.add('total_cost_too_low', 'totalCost');
+  }
 }
 
 /** El codigo de lote es unico en la empresa: solo se repite sobre el mismo producto. */
@@ -536,6 +596,9 @@ function planRow(row: ParsedImportRow, state: PlanState, today: string): Planned
       : values.name.trim() || null;
 
   const identity = resolveIdentity(type, values.name, refs, state, issues);
+  if (identity?.targetUnitId !== undefined && refs.unitId !== null) {
+    checkConversion(values, refs.unitId, identity.targetUnitId, state, issues);
+  }
   const lot = values.lot?.trim() ?? null;
   const duplicateOf = identity !== null && lot !== null && !issues.has('lot') ? checkLot(lot, identity, state, issues) : null;
 
@@ -554,6 +617,7 @@ function planRow(row: ParsedImportRow, state: PlanState, today: string): Planned
     const created: FileProduct = {
       rowNumber: row.rowNumber,
       presentationId: refs.presentation?.id ?? null,
+      unitId: type === PRODUCT_TYPES.FINISHED_PRODUCT ? (refs.presentation?.unitId ?? null) : refs.unitId,
       finished: type === PRODUCT_TYPES.FINISHED_PRODUCT,
     };
     state.fileProducts.set(identity.key, created);

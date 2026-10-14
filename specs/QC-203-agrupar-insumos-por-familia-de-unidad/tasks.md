@@ -113,7 +113,7 @@
 
 ## Tanda 4 — importación desde Excel (depende de T5) [P con la tanda 3]
 
-- [ ] **T9 — Identidad por familia y conversión en el plan** (`design.md > 7`).
+- [x] **T9 — Identidad por familia y conversión en el plan** (`design.md > 7`).
   - `stock` en `ImportProductRef` y en el adaptador.
   - Clave de familia y `FileProduct.unitId`.
   - Dos códigos de motivo con sus textos.
