@@ -338,3 +338,7 @@ Ojo: las dos migraciones comparten el prefijo `20261013120000`. Prisma las orden
 - `pnpm run lint`: 0 errores y 7 avisos, todos en archivos ajenos.
 - `pnpm exec vitest run` sobre catalogo, guard-identificador-de-request, guard-aislamiento-integracion, order-execution-screen, packing-order-screen y register-evidence: 6 archivos, 197 tests en verde. `guard-catalogo-de-errores`: 34 en verde.
 - Por falta de memoria no se corrieron `./init.sh`, la suite completa ni el E2E: el gate completo lo da CI.
+
+### Rojo de CI en el PR #230: R26 de storage-js (2026-10-13)
+`4fdb2b77`: elegimos la opción B. `tests/unit/documentos/storage-config.test.ts` admite `lib/modules/asignaciones/adapters/driven/storage/evidence-storage-supabase.ts` como quinto importador de `@supabase/storage-js`. El design aprobado (`specs/QC-214-evidencia-por-paso/design.md`, sección del adaptador) fija ese adaptador propio, y reusar el de documentos cruzaría la frontera entre módulos. Un sexto importador sigue siendo hallazgo. No cambia código de producción.
+Salida: `vitest run` sobre storage-config, evidence-storage-memory, guard-dobles-e2e, module-contract (documentos) y scope (recetas) da 5 archivos y 70 tests en verde. `pnpm run typecheck`: exit 0.
