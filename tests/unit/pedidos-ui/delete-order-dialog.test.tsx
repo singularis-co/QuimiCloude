@@ -234,3 +234,13 @@ describe('el identificador del error inesperado (QC-71 R17, R18)', () => {
     esperarSinIdentificador();
   });
 });
+
+describe('los textos del dialogo son los de hoy (QC-262 R20)', () => {
+  it('R20: «Eliminar el pedido» con «Volver» y «Eliminar»', () => {
+    montar();
+
+    expect(screen.getByRole('alertdialog', { name: 'Eliminar el pedido' })).toBeInTheDocument();
+    expect(screen.getByTestId(DELETE_ORDER_DISMISS_TESTID)).toHaveTextContent(/^Volver$/);
+    expect(screen.getByTestId(DELETE_ORDER_CONFIRM_TESTID)).toHaveTextContent(/^Eliminar$/);
+  });
+});
