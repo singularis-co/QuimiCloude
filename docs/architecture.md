@@ -257,7 +257,8 @@ guarda**, y la razon escrita fue «el ERP es de un solo tenant». Esa premisa ya
 - **Deploy:** Vercel. Secretos en variables de entorno, nunca en repo.
 - **Integraciones externas** (cada una con su cliente en `lib/modules/<modulo>/adapters/driven/` y
   su fila en `docs/dependencias.md`):
-  - Anthropic (`@anthropic-ai/sdk`) y Google Gemini (`@google/genai`): lectura de PDFs con IA.
+  - Anthropic, Google Gemini y OpenAI/OpenRouter (`openai`): lectura de PDF con la key de cada
+    empresa.
   - Upstash QStash (`@upstash/qstash`): cola de procesamiento de PDFs.
   - Supabase Storage (`@supabase/storage-js`): imagenes de recetas.
   - Resend (`resend`): correo para establecer la contrasena.
@@ -724,7 +725,8 @@ Con `VERCEL` definida y `VERCEL_ENV=preview`, `scripts/build.mjs` primero llama 
   `DOCUMENTS_E2E_DOUBLES` tiene valor; `RESEND_API_KEY`, `SMTP_PASS`, `ANTHROPIC_API_KEY`,
   `GEMINI_API_KEY` y `QSTASH_TOKEN` estan vacias o ausentes. Elegir los dobles y quitar las
   credenciales son dos cerrojos independientes: aunque uno falle, no hay con que llamar al
-  proveedor.
+  proveedor. `ANTHROPIC_API_KEY` y `GEMINI_API_KEY` ya no las lee la app; se siguen rechazando por
+  si quedan en Vercel.
 
 Si cumple, corre en orden `prisma migrate deploy`, `prisma generate`, el seed base, el seed de
 demostracion (`tsx scripts/seed-demo.ts`, sin `--forzar`) y `next build`, y para en el primer paso
@@ -784,8 +786,6 @@ primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
 | `RESEND_API_KEY`, `SMTP_PASS` | de produccion | **ausentes** (comprobacion previa) | segun dev |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `MAIL_FROM_ADDRESS`, `APP_BASE_URL` | de produccion | ausentes (solo las lee el correo) | segun dev |
 | `MAIL_OUTBOX_DIR` | ausente | ausente | solo con `outbox` |
-| `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` | de produccion | **ausentes** (comprobacion previa) | segun dev |
-| `ANTHROPIC_MODEL`, `GEMINI_MODEL` | de produccion | ausentes | segun dev |
 | `QSTASH_TOKEN` | de produccion | **ausente** (comprobacion previa) | segun dev |
 | `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`, `QSTASH_TARGET_URL` | de produccion | ausentes (sin ellas, el webhook rechaza todo) | segun dev |
 | `DOCUMENT_PROCESSING_TIMEOUT_SECONDS`, `DOCUMENT_PROCESSING_MAX_RETRIES` | opcionales | vacias (valores por defecto) | vacias |

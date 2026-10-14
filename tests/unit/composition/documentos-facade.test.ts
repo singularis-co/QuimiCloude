@@ -1,9 +1,9 @@
-// La FACHADA ya cableada del modulo `documentos` con su lectura por IA.
+// La FACHADA ya cableada del modulo `documentos`.
 //
-// Lo que se afirma aqui es el CABLEADO, no el dominio: que `lib/composition` publica
-// `readPdfWithAi` y `processPdfByStrategy` junto a las cuatro claves que ya tenia, que construir la
-// fachada NO lee las variables del proveedor de IA ni las del texto de los prompts (R2) ni toca la red, y
-// que el adaptador de IA no se invoca al importar.
+// Lo que se afirma aqui es el CABLEADO, no el dominio: el censo cerrado de claves, que construir la
+// fachada NO lee las variables del texto de los prompts ni toca la red, y que ningun adaptador de IA
+// se invoca al importar. La lectura con IA ya no sale por la fachada: el lector es de cada empresa y
+// lo construye el trabajo de la cola (`tests/unit/composition/ai-provider-wiring.test.ts`).
 //
 // Mismo criterio que `tests/unit/composition/asignaciones-facade.test.ts`: se sustituye el
 // cliente Prisma entero -`lib/composition` arrastra todos los adaptadores del repo- y no hace
@@ -11,19 +11,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { readWithAnthropicMock, descargaRealMock, descargaDobleMock } = vi.hoisted(() => {
-  // Borradas ANTES del `import` de mas abajo. Desde 2026-09-21 estas cuatro ya no se
-  // verifican con `expect` (ver el caso de R22/R26/R2 de QC-129 mas abajo: Vitest recarga
-  // `.env` despues de este borrado, asi que la ausencia no se sostiene). El borrado se deja
-  // igual, como intencion declarada, y siguen vivos los mocks de mas abajo.
-  delete process.env.ANTHROPIC_API_KEY;
-  delete process.env.ANTHROPIC_MODEL;
-  delete process.env.GEMINI_API_KEY;
-  delete process.env.GEMINI_MODEL;
+const { createAnthropicReaderMock, descargaRealMock, descargaDobleMock } = vi.hoisted(() => {
   delete process.env.CATALOG_PROMPT;
   delete process.env.FORMULA_PROMPT;
   return {
-    readWithAnthropicMock: vi.fn(),
+    createAnthropicReaderMock: vi.fn(),
     descargaRealMock: vi.fn(async () => new Uint8Array([1])),
     descargaDobleMock: vi.fn(async () => new Uint8Array([2])),
   };
@@ -31,7 +23,8 @@ const { readWithAnthropicMock, descargaRealMock, descargaDobleMock } = vi.hoiste
 
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 vi.mock('@/lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic', () => ({
-  readWithAnthropic: readWithAnthropicMock,
+  createAnthropicReader: createAnthropicReaderMock,
+  probeAnthropic: vi.fn(),
 }));
 // Los DOS adaptadores del almacenamiento, doblados a la vez: la eleccion se observa mirando cual
 // de los dos recibio la llamada, que es la unica forma de afirmar sobre el cableado sin bucket.
@@ -52,8 +45,8 @@ vi.mock('@/lib/modules/documentos/adapters/driven/storage/document-storage-memor
 
 import { documentos } from '@/lib/composition';
 
-describe('documentos — la fachada expone la lectura con IA (fachada cableada)', () => {
-  it('R21 — expone exactamente las catorce claves del censo, y cada una con la forma que promete', () => {
+describe('documentos — el censo de la fachada cableada', () => {
+  it('R21 — expone exactamente las doce claves del censo, y cada una con la forma que promete', () => {
     // 2026-09-18 (QC-111, `@upstash/qstash` y su Route Handler ya aprobados): el procesamiento en
     // cola suma cuatro claves legitimas al censo -- `enqueueBatch`, `getBatchStatus`,
     // `queueSignature` y `runDocumentJob` --. La lista sigue siendo un censo CERRADO comparado con
@@ -65,6 +58,9 @@ describe('documentos — la fachada expone la lectura con IA (fachada cableada)'
     //
     // 2026-09-25 (QC-159, importacion de formula desde PDF): suma `previewFormulaImport` y
     // `confirmFormulaImport`, los dos casos de uso de esta revision.
+    //
+    // 2026-10-13 (QC-275): salen `readPdfWithAi` y `processPdfByStrategy`; el lector es de cada
+    // empresa y la cadena se construye por trabajo.
     expect(Object.keys(documentos).sort()).toEqual(
       [
         'confirmCatalogImport',
@@ -78,8 +74,6 @@ describe('documentos — la fachada expone la lectura con IA (fachada cableada)'
         'issueReadLink',
         'issueUploadLinks',
         'queueSignature',
-        'readPdfWithAi',
-        'processPdfByStrategy',
         'runDocumentJob',
       ].sort(),
     );
@@ -96,19 +90,13 @@ describe('documentos — la fachada expone la lectura con IA (fachada cableada)'
     expect(typeof documentos.queueSignature.messageIdOf).toBe('function');
   });
 
-  it('R22 de QC-129 — la fachada expone readPdfWithAi y processPdfByStrategy ya cableadas', () => {
-    // Retirado 2026-09-21 por decision humana: aqui habia cuatro `expect(process.env.X).toBeUndefined()`
-    // para GEMINI_API_KEY, GEMINI_MODEL, CATALOG_PROMPT y FORMULA_PROMPT. Vitest recarga `.env` en
-    // `process.env` despues del `delete` del bloque `vi.hoisted` de arriba, asi que esa precondicion
-    // era inalcanzable mientras exista `.env` y no probaba nada del codigo de produccion, solo que el
-    // borrado habia funcionado. R2 de QC-129 -"construir la fachada no lee las variables de Gemini"-
-    // queda SIN GUARDIA en este archivo a partir de ahora.
-    expect(typeof documentos.readPdfWithAi).toBe('function');
-    expect(typeof documentos.processPdfByStrategy).toBe('function');
+  it('R22 — la fachada ya no expone readPdfWithAi ni processPdfByStrategy: no hay lector global', () => {
+    expect(Object.keys(documentos)).not.toContain('readPdfWithAi');
+    expect(Object.keys(documentos)).not.toContain('processPdfByStrategy');
   });
 
   it('R26 — el cableado no invoca el adaptador de IA al construirse', () => {
-    expect(readWithAnthropicMock).not.toHaveBeenCalled();
+    expect(createAnthropicReaderMock).not.toHaveBeenCalled();
   });
 });
 

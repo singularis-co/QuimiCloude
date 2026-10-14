@@ -527,6 +527,14 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/integraciones/adapters/driving/whatsapp-connection-actions')
       ).getWhatsappConnectionAction(),
   },
+  {
+    archivo: 'lib/modules/integraciones/adapters/driving/ai-provider-actions.ts',
+    nombre: 'getAiProviderConnectionAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/ai-provider-actions')
+      ).getAiProviderConnectionAction(),
+  },
 ];
 
 /**

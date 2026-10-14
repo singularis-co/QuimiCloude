@@ -482,7 +482,16 @@ import {
   type CatalogImportDeps,
   type FormulaImportDeps,
 } from '@/lib/modules/documentos';
+import { createAnthropicReader, probeAnthropic } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic';
+import { createGenaiReader, probeGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
+import {
+  OPENROUTER_BASE_URL,
+  createOpenAiReader,
+  probeOpenAi,
+  probeOpenRouter,
+} from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-openai';
 import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
+import type { AiProviderCode } from '@/lib/modules/integraciones';
 import { documentsE2EDoublesEnabled } from '@/lib/modules/documentos/adapters/driven/config/e2e-doubles-env';
 import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
 import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
@@ -1990,32 +1999,45 @@ const pdfConverter: PdfConverter = {
   renderPages,
 };
 
-/**
- * Provisional mientras el proveedor IA de cada empresa no esta cableado: ya no hay key global, asi
- * que fuera de los dobles E2E no hay lector y ninguna empresa cuenta como conectada.
- */
-const aiReader: AiReader = {
-  read: (request) =>
-    documentsE2EDoublesEnabled()
-      ? readCannedText(request)
-      : Promise.reject(new Error('lectura con IA sin proveedor cableado')),
+type ReaderFactory = (config: { apiKey: string; model: string }) => AiReader;
+
+/** Un proveedor nuevo sin lector no compila. */
+const READER_BY_PROVIDER: Record<AiProviderCode, ReaderFactory> = {
+  ANTHROPIC: createAnthropicReader,
+  GOOGLE: createGenaiReader,
+  OPENAI: (config) => createOpenAiReader(config),
+  OPENROUTER: (config) => createOpenAiReader({ ...config, baseURL: OPENROUTER_BASE_URL }),
 };
 
+/**
+ * El lector sale de la conexion de cada empresa. `integraciones` se declara mas abajo y solo se
+ * usa dentro de estas funciones, ya con el modulo evaluado. Con el doble de lectura no se descifra
+ * nada, pero sigue haciendo falta una conexion.
+ */
 const aiProviderGateway: AiProviderGateway = {
-  isConfigured: async () => documentsE2EDoublesEnabled(),
-  readerFor: async () =>
-    documentsE2EDoublesEnabled()
-      ? { status: 'ready', reader: aiReader, connectionStatus: 'ACTIVE' }
-      : { status: 'missing' },
-  reportAccountFailure: async () => {},
-  reportRecovered: async () => {},
+  isConfigured: async (companyId) => (await integraciones.getAiProviderStatus(companyId)) !== null,
+  readerFor: async (companyId, use) => {
+    if (documentsE2EDoublesEnabled()) {
+      const status = await integraciones.getAiProviderStatus(companyId);
+      return status === null
+        ? { status: 'missing' }
+        : { status: 'ready', reader: { read: readCannedText }, connectionStatus: status.connectionStatus };
+    }
+    const resolution = await integraciones.resolveAiProviderForReading(companyId, use);
+    if (resolution.status !== 'ready') return { status: resolution.status };
+    return {
+      status: 'ready',
+      reader: READER_BY_PROVIDER[resolution.provider]({
+        apiKey: resolution.apiKey,
+        model: resolution.model,
+      }),
+      connectionStatus: resolution.connectionStatus,
+    };
+  },
+  reportAccountFailure: (companyId, failure) =>
+    integraciones.reportAiProviderOutcome(companyId, { kind: 'account_failure', failure }),
+  reportRecovered: (companyId) => integraciones.reportAiProviderOutcome(companyId, { kind: 'recovered' }),
 };
-
-/**
- * La lectura con IA, construida UNA vez: la publica la fachada y la reutiliza el procesamiento por
- * estrategia. Dos construcciones serian dos cableados que pueden divergir.
- */
-const readPdfWithAi = createReadPdfWithAi({ ai: aiReader, converter: pdfConverter });
 
 /** `StrategyRunLog` cableado con la unica implementacion que hay: una linea en el registro. */
 const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
@@ -2025,17 +2047,6 @@ const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
  * se invoca: construir esta fachada no lee ninguna variable.
  */
 const strategyPrompt: StrategyPrompt = { promptFor: readStrategyPromptFromEnv };
-
-/**
- * El procesamiento por estrategia, construido UNA vez: lo usa la fachada de abajo y lo necesita
- * `runDocumentJob`. Dos construcciones serian dos cableados que pueden divergir.
- */
-const processPdfByStrategy = createProcessPdfByStrategy({
-  readPdfWithAi,
-  countPages: pdfConverter.countPages,
-  log: strategyRunLog,
-  prompt: strategyPrompt,
-});
 
 // ---------------------------------------------------------------------------------------
 // `documentos` — el procesamiento en cola. Bloque nuevo dentro del mismo modulo, no reordena nada
@@ -2078,14 +2089,28 @@ const cropCatalog: CropCatalog = {
 /** `CropRegionLog` cableado con la unica implementacion que hay: una linea en el registro. */
 const cropRegionLog: CropRegionLog = createCropRegionLogConsole();
 
-/** Reutiliza el MISMO `pdfConverter` y el MISMO `aiReader` que ya cablea el resto del modulo. */
-const cropCatalogImages = createCropCatalogImages({
-  converter: pdfConverter,
-  ai: aiReader,
-  cropper: imageCropper,
-  storage: cropStorage,
-  log: cropRegionLog,
-});
+/**
+ * La cadena de lectura de un trabajo, con el lector de su empresa y su uso. Se construye en cada
+ * trabajo porque el lector cambia con la empresa; las fabricas solo cierran funciones, sin E/S.
+ */
+function documentPipelineFor(reader: AiReader) {
+  const readPdfWithAi = createReadPdfWithAi({ ai: reader, converter: pdfConverter });
+  return {
+    processPdfByStrategy: createProcessPdfByStrategy({
+      readPdfWithAi,
+      countPages: pdfConverter.countPages,
+      log: strategyRunLog,
+      prompt: strategyPrompt,
+    }),
+    cropCatalogImages: createCropCatalogImages({
+      converter: pdfConverter,
+      ai: reader,
+      cropper: imageCropper,
+      storage: cropStorage,
+      log: cropRegionLog,
+    }),
+  };
+}
 
 /**
  * El trabajo de la cola, construido UNA vez: lo publica la fachada y lo necesita la cola en linea,
@@ -2098,7 +2123,7 @@ const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
   aiProvider: aiProviderGateway,
-  pipelineFor: () => ({ processPdfByStrategy, cropCatalogImages }),
+  pipelineFor: documentPipelineFor,
   log: documentJobLog,
 });
 
@@ -2209,11 +2234,6 @@ export const documentos = {
   // una variable ni tocar la red.
   issueReadLink: createIssueReadLink({ storage: documentStorage }),
   downloadDocument: createDownloadDocument({ storage: documentStorage }),
-  readPdfWithAi,
-  // El procesamiento por estrategia recibe la LECTURA ya construida, no el puerto de IA: el plazo y
-  // el tope de paginas son de ella. `countPages` es solo para el resumen que se registra. Tampoco
-  // recibe actor, por el mismo motivo que `convertPdfs`.
-  processPdfByStrategy,
   // Las TRES capacidades nuevas del procesamiento en cola. `enqueueBatch` es la unica que recibe
   // actor -- lo construye el adaptador driving con las dos caras de la sesion --, y las otras dos
   // ninguna: `runDocumentJob` porque no hay usuario delante, y `queueSignature` porque verificar
@@ -2352,6 +2372,78 @@ function whatsappWebhookUrl(connectionId: string): WhatsappWebhookUrl {
   return base === null ? { url: path, complete: false } : { url: `${base}${path}`, complete: true };
 }
 
+// ---------------------------------------------------------------------------------------
+// `integraciones`: el proveedor IA de la empresa. Bloque nuevo al final, con sus imports.
+// ---------------------------------------------------------------------------------------
+
+import {
+  createDisconnectAiProvider,
+  createGetAiProviderConnection,
+  createGetAiProviderReadiness,
+  createGetAiProviderStatus,
+  createReportAiProviderOutcome,
+  createResolveAiProviderForReading,
+  createSaveAiProviderConnection,
+  createTestAiProviderKey,
+  createTestSavedAiProvider,
+  type AiProviderProbeResult,
+} from '@/lib/modules/integraciones';
+import { aiProviderProbeCanned } from '@/lib/modules/integraciones/adapters/driven/ai/ai-provider-probe-canned';
+import {
+  getAiProvider,
+  listAiProviders,
+} from '@/lib/modules/integraciones/adapters/driven/catalog/ai-provider-catalog-prisma';
+import {
+  deleteAiProviderConnection,
+  findAiProviderConnection,
+  insertAiProviderConnection,
+  updateAiProviderConnection,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/ai-provider-connection-prisma';
+import type { AiProviderCatalog } from '@/lib/modules/integraciones/ports/ai-provider-catalog';
+import type { AiProviderConnectionRepository } from '@/lib/modules/integraciones/ports/ai-provider-connection-repository';
+import type { AiProviderProbe } from '@/lib/modules/integraciones/ports/ai-provider-probe';
+
+type ProviderProbe = (input: {
+  apiKey: string;
+  models: readonly string[];
+}) => Promise<AiProviderProbeResult>;
+
+/** Un proveedor nuevo sin prueba no compila. */
+const PROBE_BY_PROVIDER: Record<AiProviderCode, ProviderProbe> = {
+  ANTHROPIC: probeAnthropic,
+  GOOGLE: probeGenai,
+  OPENAI: probeOpenAi,
+  OPENROUTER: probeOpenRouter,
+};
+
+/** El doble se elige en cada llamada: la variable puede cambiar dentro del mismo proceso. */
+const aiProviderProbe: AiProviderProbe = {
+  probe: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? aiProviderProbeCanned.probe(input)
+      : PROBE_BY_PROVIDER[input.provider]({ apiKey: input.apiKey, models: input.models }),
+};
+
+const aiProviderConnectionRepository: AiProviderConnectionRepository = {
+  find: findAiProviderConnection,
+  create: insertAiProviderConnection,
+  update: updateAiProviderConnection,
+  delete: deleteAiProviderConnection,
+};
+
+const aiProviderCatalog: AiProviderCatalog = {
+  list: listAiProviders,
+  get: getAiProvider,
+};
+
+const aiProviderDeps = {
+  connections: aiProviderConnectionRepository,
+  catalog: aiProviderCatalog,
+  probe: aiProviderProbe,
+  cipher: secretCipher,
+  random: randomSource,
+};
+
 /**
  * Fachada de `integraciones`. `secretCipher` y `secretDigest` siguen expuestos para quien reciba
  * los webhooks. El actor no se resuelve aqui: lo resuelve la Server Action.
@@ -2366,4 +2458,13 @@ export const integraciones = {
   setWhatsappConnectionEnabled: createSetWhatsappConnectionEnabled(whatsappDeps),
   regenerateWhatsappVerifyToken: createRegenerateWhatsappVerifyToken(whatsappDeps),
   whatsappWebhookUrl,
+  getAiProviderConnection: createGetAiProviderConnection(aiProviderDeps),
+  testAiProviderKey: createTestAiProviderKey(aiProviderDeps),
+  testSavedAiProvider: createTestSavedAiProvider(aiProviderDeps),
+  saveAiProviderConnection: createSaveAiProviderConnection(aiProviderDeps),
+  disconnectAiProvider: createDisconnectAiProvider(aiProviderDeps),
+  getAiProviderReadiness: createGetAiProviderReadiness(aiProviderDeps),
+  getAiProviderStatus: createGetAiProviderStatus(aiProviderDeps),
+  resolveAiProviderForReading: createResolveAiProviderForReading(aiProviderDeps),
+  reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
 } as const;

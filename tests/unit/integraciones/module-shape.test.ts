@@ -142,6 +142,7 @@ const MODULE_CODE_FILES = [
   'adapters/driven/security/random-source-node.ts',
   'adapters/driven/security/secret-cipher-aes-gcm.ts',
   'adapters/driven/security/secret-digest-sha256.ts',
+  'adapters/driving/ai-provider-actions.ts',
   'adapters/driving/whatsapp-connection-actions.ts',
   'domain/actor.ts',
   'domain/ai-provider-failure.ts',
@@ -504,17 +505,26 @@ describe('la forma del modulo integraciones', () => {
     ])
   })
 
-  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de la conexion y la URL del webhook, con sus puertos tipados', () => {
+  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones y la URL del webhook, con sus puertos tipados', () => {
     const cableado = integracionesWiring(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8'))
 
     expect(cableado, 'lib/composition/index.ts deberia exportar const integraciones = { ... }').not.toBeNull()
     expect([...(cableado?.members ?? [])].sort()).toEqual([
       'createWhatsappConnection',
+      'disconnectAiProvider',
+      'getAiProviderConnection',
+      'getAiProviderReadiness',
+      'getAiProviderStatus',
       'getWhatsappConnection',
       'regenerateWhatsappVerifyToken',
+      'reportAiProviderOutcome',
+      'resolveAiProviderForReading',
+      'saveAiProviderConnection',
       'secretCipher',
       'secretDigest',
       'setWhatsappConnectionEnabled',
+      'testAiProviderKey',
+      'testSavedAiProvider',
       'testWhatsappConnection',
       'updateWhatsappConnection',
       'whatsappWebhookUrl',
@@ -524,6 +534,10 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.typeOf.whatsappGraphClient).toBe('WhatsappGraphClient')
     expect(cableado?.typeOf.whatsappConnectionRepository).toBe('WhatsappConnectionRepository')
     expect(cableado?.typeOf.randomSource).toBe('RandomSource')
+    expect(cableado?.typeOf.aiProviderConnectionRepository).toBe('AiProviderConnectionRepository')
+    expect(cableado?.typeOf.aiProviderCatalog).toBe('AiProviderCatalog')
+    expect(cableado?.typeOf.aiProviderProbe).toBe('AiProviderProbe')
+    expect(cableado?.typeOf.aiProviderGateway).toBe('AiProviderGateway')
   })
 
   it('R19: el lector del cableado ve un miembro de mas y un tipo que no es el puerto', () => {

@@ -205,3 +205,58 @@ oficial (descargada el 2026-10-13) y se marca como tal.
   `guard-catalogo-de-errores` R9 queda verde con `AiProviderMissingError` y `AiProviderError`.
 
 Veredicto: T8 y T9 hechas y en verde; la composición queda con un gateway provisional hasta T10.
+
+## Tanda 4 — T10, T11, T14 (2026-10-13)
+
+### Archivos
+- Modificados: `lib/composition/index.ts` (fuera el lector y el gateway provisionales y las
+  construcciones globales de `readPdfWithAi`/`processPdfByStrategy`/`cropCatalogImages`; dentro
+  `READER_BY_PROVIDER`, `aiProviderGateway` y `documentPipelineFor` en el bloque de documentos, y
+  `PROBE_BY_PROVIDER`, `aiProviderProbe`, repositorio, catálogo y los nueve miembros en un bloque
+  nuevo al final de `integraciones`; nada ajeno reordenado), `.env.example` (bloque de IA fuera),
+  `docs/architecture.md` (línea de integraciones externas, frase del build de preview, dos filas
+  de la tabla de variables), `specs/.../tasks.md` (T10, T11, T14).
+- Creados: `lib/modules/integraciones/adapters/driving/ai-provider-actions.ts`;
+  `tests/unit/composition/ai-provider-wiring.test.ts`;
+  `tests/unit/integraciones/ai-provider/ai-provider-actions.test.ts`.
+- Tests tensados (solo añadir): `documentos-facade.test.ts` (censo 14 → 12; afirma que las dos
+  claves no están; mock de `createAnthropicReader`; el `vi.hoisted` ya no borra las cuatro de IA),
+  `module-shape.test.ts` (R18 + el archivo de acciones; R19 fachada + nueve miembros y los tipos
+  de los puertos nuevos), `guard-dobles-e2e.test.ts` (fila de integraciones + el doble de la
+  prueba), `session-once-per-request-actions.test.ts` (+ la acción de consulta al final),
+  `integraciones-graph-doubles.test.ts` y `encryption-keys-env.test.ts` (censos cerrados de la
+  fachada `integraciones`, + nueve; no estaban en `design.md > 15.3`).
+
+### R → test (de esta tanda)
+- R1 → `ai-provider-actions.test.ts` (errores traducidos sin revalidar)
+- R8 → `ai-provider-actions.test.ts` (ningún estado con la key ni el cifrado, también con un caso
+  de uso que filtrara la fila)
+- R13–R18, R20 → `ai-provider-actions.test.ts` (borde de cada acción)
+- R21, R22 (lector por código y modelo por uso), R23, R24 → `ai-provider-wiring.test.ts`
+- R37 → `ai-provider-actions.test.ts` (readiness que no lanza)
+- R40, R41, R42 → `ai-provider-wiring.test.ts` (R42 con `process.env` vigilado y caso de
+  sensibilidad; probado por mutación: una lectura en la composición lo pone rojo)
+- R22 (variables) → `ai-model-literals.test.ts` y `guard-variables-por-entorno` verdes tras T14
+
+### Desviaciones del design
+- `documentPipelineFor` sin anotación de retorno: `DocumentPipeline` no sale por el contrato de
+  `documentos` y la composición no importa de `domain/`; el tipo se infiere y casa con `pipelineFor`.
+- `readerFor` devuelve `{ status }` para `missing`/`unreadable` (no la resolución entera).
+- `guard-dobles-e2e`: la fila de `documentos` ya listaba `ai-reader-canned`; su elección vive ahora
+  en `aiProviderGateway`, que consulta `documentsE2EDoublesEnabled(`. No se añadió nada a esa fila.
+- Acciones: `testSavedAiProviderAction` revalida tras un resultado `tested` (bueno o fallido, la
+  prueba escribe estado) y no con `not_connected`; `testAiProviderKeyAction` no revalida (no
+  escribe). La readiness atrapa también un fallo al leer la sesión.
+- `docs/architecture.md > Lo que hace el humano` sigue pidiendo borrar `ANTHROPIC_API_KEY`,
+  `GEMINI_API_KEY` y los modelos de preview: no se tocó.
+
+### Verificación
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes (`confirm-catalog-import.test.ts`,
+  `order-service.test.ts`).
+- `pnpm exec vitest related --run` (2 de `lib/` + 9 tests): 346 archivos, 5542 verdes, 3 omitidos,
+  1 rojo: `encryption-keys-env.test.ts` (censo de la fachada), tensado y verde después (28/28).
+- `pnpm exec vitest run guard`: 75 archivos, 1048 verdes, 20 omitidos, 0 rojos.
+
+Veredicto: T10, T11 y T14 hechas y en verde; sale el gateway provisional y la lectura usa la
+conexión de cada empresa.

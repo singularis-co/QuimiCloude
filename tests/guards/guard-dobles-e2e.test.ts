@@ -63,7 +63,10 @@ const VIGILADAS: readonly Vigilada[] = [
   {
     variable: 'INTEGRATIONS_E2E_DOUBLES',
     consulta: 'integrationsE2EDoublesEnabled(',
-    dobles: ['lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned'],
+    dobles: [
+      'lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned',
+      'lib/modules/integraciones/adapters/driven/ai/ai-provider-probe-canned',
+    ],
     design: 'specs/QC-237-conexion-whatsapp-por-empresa/design.md > 9',
     requisito: 'R41',
     ejemplo: 'whatsappGraphClientCanned',

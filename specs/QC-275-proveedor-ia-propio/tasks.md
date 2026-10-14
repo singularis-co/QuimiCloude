@@ -81,14 +81,14 @@
 
 ## Bloque 4 — Composición y acciones
 
-- [ ] **T10. Cableado.** `lib/composition/index.ts` según `design.md > 8`: `READER_BY_PROVIDER`,
+- [x] **T10. Cableado.** `lib/composition/index.ts` según `design.md > 8`: `READER_BY_PROVIDER`,
   `PROBE_BY_PROVIDER`, `aiProviderProbe`, `aiProviderGateway`, `documentPipelineFor`; `documentos`
   pierde dos claves y `issueUploadLinks`/`runDocumentJob` reciben sus deps nuevas; `integraciones`
   gana nueve miembros. Adaptar `documentos-facade.test.ts`, `module-shape.test.ts` y
   `guard-dobles-e2e.test.ts` (`design.md > 15.3`).
   *Depende de:* T4–T9. *Hecho:* `ai-provider-wiring.test.ts` y los adaptados verdes;
   `pnpm exec vitest run guard` verde. *Cubre:* R40, R41, R42.
-- [ ] **T11. Server Actions.** `adapters/driving/ai-provider-actions.ts` (`design.md > 10`).
+- [x] **T11. Server Actions.** `adapters/driving/ai-provider-actions.ts` (`design.md > 10`).
   *Depende de:* T10. *Hecho:* `ai-provider-actions.test.ts` verde; el barrido de
   `session-once-per-request-actions.test.ts` sigue verde. *Cubre:* R1, R8, R13–R20, R37.
 
@@ -108,7 +108,7 @@
 
 ## Bloque 6 — Corte, documentación y E2E
 
-- [ ] **T14. Corte de variables.** Quitar el bloque de IA de `.env.example`; en
+- [x] **T14. Corte de variables.** Quitar el bloque de IA de `.env.example`; en
   `docs/architecture.md`, filas de la tabla de variables, línea de integraciones externas y frase del
   build de preview (`design.md > 9`). *Depende de:* T9. `[P]`
   *Hecho:* `guard-variables-por-entorno` verde; `ai-model-literals.test.ts` (R22) verde.
