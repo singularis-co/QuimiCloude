@@ -13,8 +13,9 @@ import {
   ORDER_CUSTOMER_DIALOG_TESTID,
   ORDER_CUSTOMER_DIALOG_TOUCH_TARGET,
   OrderCustomerDialog,
-  OrderRowSheetActions,
+  OrderTable,
 } from '@/app/(private)/pedidos/components';
+import { createDefaultParams } from '@/components/shared/data-table';
 import { errorMessage } from '@/lib/modules/errores';
 import {
   formatOrderNumber,
@@ -27,6 +28,7 @@ import type {
   OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { setupUser } from '../../helpers/user-event';
+import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { setCustomerMock, searchCustomersMock, routerMock } = vi.hoisted(() => ({
   setCustomerMock: vi.fn<(id: string, input: unknown) => Promise<OrderMutationFormState>>(),
@@ -212,11 +214,17 @@ describe('dialogo «Cliente»', () => {
 });
 
 describe('montaje desde la fila', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
   it('R39: solo se monta mientras esta abierto, y la accion lo abre en un pedido TERMINADO, cerrado a la edicion', async () => {
     const user = setupUser();
     render(
-      <OrderRowSheetActions
-        order={pedido('TERMINADO')}
+      <OrderTable
+        orders={[pedido('TERMINADO')]}
+        params={createDefaultParams()}
+        totalPages={1}
         recipes={{ items: [], totalPages: 1 }}
         units={[]}
         bridge={null}

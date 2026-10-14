@@ -11,7 +11,7 @@ P1–P12 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 0 — Censo y medidas (antes de tocar producción)
 
-- [ ] **T0a. Censo con grep.** En `tests/unit`, `tests/ui`, `tests/guards`, `tests/integration` y
+- [x] **T0a. Censo con grep.** En `tests/unit`, `tests/ui`, `tests/guards`, `tests/integration` y
   `e2e`, cada símbolo, texto o testid que la ficha cambia o duplica: `OrderStatusBadge`,
   `OrderPriorityBadge`, `OrderCoverageBadge`, `STATUS_VARIANTS`, `variant=` sobre `order-status`,
   `order-priority`, `order-coverage`, `order-row-actions`, `data-order-id`, `order-action-`,
@@ -38,7 +38,7 @@ P1–P12 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 2 — Estado, prioridad, cobertura y versión (depende de T0a) [P con 1]
 
-- [ ] **T2a [P]. Badges de la ruta** (D3, R5–R8). `order-status-badge.tsx` sobre `StatusBadge` y
+- [x] **T2a [P]. Badges de la ruta** (D3, R5–R8). `order-status-badge.tsx` sobre `StatusBadge` y
   `PriorityMark`, mismos exports. Test `tests/unit/pedidos-ui/order-status-badges.test.tsx`: cada
   estado con su tono y etiqueta, cada prioridad con su nivel (Crítica = 4) y cada cobertura con su
   tono; `data-testid` y `data-*` de hoy. Guardia `tests/guards/guard-pedidos-rediseno.test.ts` (R8),
@@ -50,11 +50,11 @@ P1–P12 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 3 — Menú como datos y anfitrión (depende de T1a, T2a)
 
-- [ ] **T3a. `orderRowActionsSpec`** (D5, R10–R12). Función pura en `order-row-actions.tsx`;
+- [x] **T3a. `orderRowActionsSpec`** (D5, R10–R12). Función pura en `order-row-actions.tsx`;
   `OrderRowActions` pasa a envoltorio. Tests en `order-row-actions.test.tsx`: orden del R11,
   `separatorBefore` en «Cancelar», «Cancelar» y «Eliminar» destructivos, tabla de reglas del R12 por
   estado y permiso, `triggerLabel`, `title` «Pedido <n>», testids de hoy.
-- [ ] **T3b. Columna y anfitrión** (D5, R13; depende de T3a). `order-columns.tsx` con
+- [x] **T3b. Columna y anfitrión** (D5, R13; depende de T3a). `order-columns.tsx` con
   `actionsColumn({ menu })` y `onAction`; `order-table.tsx` con el pedido activo y un solo
   `OrderRowSheetActions`; `order-sheet.tsx` con el contrato nuevo. Tests en
   `order-row-wiring.test.tsx`: cada ítem abre su panel o diálogo para su pedido, «Editar» y

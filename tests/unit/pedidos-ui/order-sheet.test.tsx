@@ -26,7 +26,7 @@ import {
   ORDER_FORM_TESTID,
   ORDER_FORM_TITLE_TESTID,
   ORDER_SHEET_TESTID,
-  OrderRowSheetActions,
+  OrderTable,
   PAGE_PARAM,
   PAGE_SIZE_PARAM,
   RECIPE_PICKER_TESTID,
@@ -35,6 +35,7 @@ import {
   STATUS_PARAM,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
+import { createDefaultParams } from '@/components/shared/data-table';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type {
@@ -541,11 +542,20 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
   });
 
   it('la accion de editar de la fila abre el panel con el pedido precargado', async () => {
-    // R25, R28 — `onEdit` de `OrderRowActions` (T8) cableado al panel lateral. Con el pedido en
-    // estado final `OrderRowActions` no llega a emitir nada (R24) y el panel no se abre.
+    // R25, R28 — «Editar» del menu de la fila cableado al panel lateral. Con el pedido en estado
+    // final el item no emite nada (R24) y el panel no se abre.
     const user = setupUser();
     const elPedido = pedido();
-    render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} units={UNIDADES} bridge={null} />);
+    render(
+      <OrderTable
+        orders={[elPedido]}
+        params={createDefaultParams()}
+        totalPages={1}
+        recipes={RECETAS}
+        units={UNIDADES}
+        bridge={null}
+      />,
+    );
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
 
@@ -569,7 +579,14 @@ it('con el pedido en estado final la accion de editar no abre ningun panel', asy
     // R24 — la pantalla anticipa la regla en vez de dejar intentarlo contra el servidor.
     const user = setupUser();
     render(
-      <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} units={[]} bridge={null} />,
+      <OrderTable
+        orders={[pedido({ status: 'ENTREGADO' })]}
+        params={createDefaultParams()}
+        totalPages={1}
+        recipes={RECETAS}
+        units={[]}
+        bridge={null}
+      />,
     );
 
     await user.click(screen.getByTestId('order-row-actions'));

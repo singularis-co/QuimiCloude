@@ -170,3 +170,59 @@ Badge` (`<Badge variant="destructive">` de «Anulada», línea 150).
    llamador de producción la pasa) sale en `muted` mientras el listado no llega.
 
 Veredicto: T2a y T2b hechas; gate de guardias rojo solo por `order-delivery-list.tsx` (fuera de lista).
+
+## Cierre T2a y Tanda 3 (frontend_dev, 2026-10-13)
+
+**Archivos.** Producción: `order-delivery-list.tsx` («Anulada» pasa a `StatusBadge` tono `danger`;
+mismo texto, testids y `data-*`), `order-row-actions.tsx` (`OrderRowAction`, `orderRowActionsSpec`,
+`OrderRowActionsSpec`, `OrderRowActionsSpecInput`; `OrderRowActions` es un envoltorio de
+`RowActionsMenu` y gana `onAction`, y conserva sus callbacks de antes), `order-columns.tsx`
+(`actionsColumn({ id: ACTIONS_COLUMN_ID, menu })`, `onAction` opcional en `OrderColumnsDeps`; sale
+`canVoidDelivery`, que ya no usa ninguna columna), `order-table.tsx` (pedido activo
+`{ order, action, open } | null` y un solo `OrderRowSheetActions`), `order-sheet.tsx`
+(`OrderRowSheetActions` con el contrato nuevo), `index.ts` (exporta lo nuevo).
+Tests: `order-row-actions.test.tsx`, `order-row-wiring.test.tsx`, `order-columns.test.tsx` y
+`order-table.test.tsx` (casos nuevos); `order-customer-dialog`, `order-delivery-sheet`,
+`order-distribution-dialog`, `order-sheet` y `shared-ui/confirm-dialog-montado` (montaban
+`OrderRowSheetActions` suelto y pasan a montar `OrderTable`); `guard-pantalla-pedidos-se-amplia`
+(anclas nuevas: `OrderRowAction`, `orderRowActionsSpec`; no se quita ninguna).
+
+**R → test.**
+- R10 → `order-row-actions.test.tsx` (disparador, `title`, emisión, diálogo centrado) y
+  `order-columns.test.tsx` (`menu` de la columna, permisos, `onAction`, `data-order-id` en la celda).
+- R11 → `order-row-actions.test.tsx` (orden, separador solo en «Cancelar», destructivos, testids).
+- R12 → `order-row-actions.test.tsx` (tabla escrita a mano: 10 estados × 8 combinaciones de permisos).
+- R13 → `order-row-wiring.test.tsx` (cada ítem abre lo suyo para su pedido, «Editar» y «Responsables»
+  abren el mismo panel, nunca dos, el cerrado sigue montado) y `order-table.test.tsx`.
+
+**Salida.**
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errores; 7 avisos ajenos (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest related --run` sobre los 6 archivos de producción: 63 archivos, 1358 pasan, 0 fallan.
+- `pnpm exec vitest run guard`: 76 archivos, 1052 pasan, 20 omitidos, 0 fallan.
+  `guard-pedidos-rediseno` pasa sin acotarla.
+- `pnpm exec vitest run tests/unit/paridad`: 22 archivos, 412 pasan. **No cambió ningún snapshot**:
+  ni `pedidos-paridad` ni `confirmaciones-paridad`. La celda pinta el mismo desplegable y, cerrado,
+  el anfitrión no pinta nada.
+- `tests/unit/pedidos-ui` + `confirm-dialog-montado` + `tablas-marca` + `badges-estado`:
+  53 archivos, 1048 pasan, 3 omitidos.
+
+**Desviaciones.**
+1. **«Entregas»** (`order-action-deliveries`, `ENTREGADO`/`TERMINADO`) no aparece en el R11 ni en el
+   `OrderRowAction` de D5, pero existe hoy y lo usa `e2e/anular-entrega.spec.ts`. Se conserva como
+   `'deliveries'`, justo antes de «Entregar» (como hoy). Su posición la confirma el leader.
+2. **`RowActionsSpec`** (`data-table-types.ts`, fuera de lista) no incluye `triggerDataAttributes`.
+   `orderRowActionsSpec` devuelve `RowActionsSpec & { triggerDataAttributes }`, y `actionsColumn` y
+   `DataTableCards` lo propagan a `RowActionsMenu`, así que `data-order-id` llega a la fila y a la
+   tarjeta. El tipo compartido no lo declara.
+3. Con el anfitrión único, «Cliente», «Reparto y unidad», «Entregar» y «Entregas» quedan montados
+   (cerrados) al cerrar, como ya pasaba con el panel, «Cancelar» y «Eliminar». Antes se
+   desmontaban. Cada apertura los remonta (`key`), así que el estado no pasa de una apertura a
+   otra. El borrador guardado de reparto se conserva hasta el refresco, como hoy.
+4. Tras un refresco, el anfitrión toma la fila nueva del mismo id. Si el pedido ya no está en la
+   página, sigue con el de antes.
+5. Ninguna exclusión de `guard-piezas-base` dejó de morder: no se retiró ninguna.
+6. Cierre de T2a: ningún test afirmaba la variante de «Anulada» (`order-delivery-list.test.tsx`
+   solo mira el texto). No se tocó.
+
+Veredicto: T2a cerrada y Tanda 3 (T3a, T3b) hecha; typecheck, lint, related y guardias en verde.

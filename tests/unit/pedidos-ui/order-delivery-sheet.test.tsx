@@ -24,10 +24,11 @@ import {
   ORDER_DELIVERY_SUBMIT_TESTID,
   ORDER_DELIVERY_WHOLE_ERROR_TESTID,
   OrderDeliverySheet,
-  OrderRowSheetActions,
+  OrderTable,
   orderDeliveryDraftKey,
   packagesKey,
 } from '@/app/(private)/pedidos/components';
+import { createDefaultParams } from '@/components/shared/data-table';
 import {
   formatOrderNumber,
   type OrderDeliveryView,
@@ -52,6 +53,7 @@ import {
   deliveryView,
 } from '../../fixtures/order-delivery';
 import { setupUser } from '../../helpers/user-event';
+import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { getDeliveryMock, deliverMock, searchCustomersMock, routerMock } = vi.hoisted(() => ({
   getDeliveryMock: vi.fn<(orderId: string) => Promise<OrderDeliveryResult>>(),
@@ -558,6 +560,10 @@ describe('borrador', () => {
 });
 
 describe('montaje desde la fila', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
   function pedidoTerminado(): OrderSummary {
     return {
       id: DELIVERY_ORDER_ID,
@@ -585,8 +591,10 @@ describe('montaje desde la fila', () => {
   it('R4: solo se monta al pulsar «Entregar» en la fila y pide la entrega de ese pedido', async () => {
     const user = setupUser();
     render(
-      <OrderRowSheetActions
-        order={pedidoTerminado()}
+      <OrderTable
+        orders={[pedidoTerminado()]}
+        params={createDefaultParams()}
+        totalPages={1}
         recipes={{ items: [], totalPages: 1 }}
         units={[]}
         bridge={null}

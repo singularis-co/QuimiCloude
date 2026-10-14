@@ -1,6 +1,6 @@
 'use client';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import {
@@ -25,7 +25,8 @@ import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
-import { OrderRowResponsibles, OrderRowSheetActions } from './order-sheet';
+import { orderRowActionsSpec, type OrderRowAction } from './order-row-actions';
+import { OrderRowResponsibles } from './order-sheet';
 import type { RecipePickerPage } from './recipe-picker';
 import {
   ORDER_PRIORITY_FILTER_OPTIONS,
@@ -47,14 +48,11 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
  * serializables y es esta declaracion la que vive del lado del navegador.
  *
  * **Se declaran con una FACTORIA, `buildOrderColumns`** (y no como un array del modulo): la
- * celda de acciones monta el panel de edicion y los dos dialogos, que necesitan el catalogo de
- * recetas por props (R43). Mientras fue un array estatico ese catalogo no tenia por donde llegar
- * y los tres botones de la fila no abrian nada.
+ * celda de responsables abre el panel, que necesita los catalogos por props, y el menu de
+ * acciones necesita los permisos y `onAction`.
  *
- * **La columna de acciones es una columna NORMAL** (`design.md > 6.1`, alternativa B descartada):
- * `DataTableColumn.cell` ya devuelve `ReactNode` y `DataTable` lo pinta directamente. No se
- * anade ninguna prop `renderRowActions` al componente compartido, que seria una segunda manera
- * de hacer lo que `cell` ya hace. Esto es lo que QC-56 adopta.
+ * **La columna de acciones declara su menu como datos** (`actionsColumn({ menu })`): la fila y la
+ * tarjeta pintan el mismo menu, y los paneles los monta la tabla una sola vez.
  *
  * **Solo cuatro columnas ordenan** (R12): correlativo, estado, prioridad y fecha de solicitud.
  * Son `ORDER_QUERYABLE.sortable` **menos** `quantity`, que la decision cerrada no pide: declarar
@@ -163,19 +161,12 @@ export type OrderColumnsDeps = {
   readonly canEditCustomer?: boolean;
   /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
   readonly canDeliver?: boolean;
-  /** Si el actor puede anular entregas; lo resuelve el servidor. */
-  readonly canVoidDelivery?: boolean;
   /** Por pedido, el producto terminado de cada presentación; `{}` si no se pudo resolver. */
   readonly producedProductsByOrder?: ProducedProductsByOrder;
+  /** Lo que la persona elige en el menu de la fila. Sin valor, los items no abren nada. */
+  readonly onAction?: (action: OrderRowAction, order: OrderSummary) => void;
 };
 
-/**
- * **Factoria, y no un array estatico**, por una razon concreta: la celda de acciones tiene que
- * montar el panel de edicion y los dos dialogos, y esos necesitan los catalogos de recetas y
- * unidades. Un array declarado en el modulo no puede recibirlos, asi que las acciones quedaban
- * sin cablear -los botones existian y no abrian nada-. Las columnas siguen siendo DATOS: lo que
- * cambia es que se construyen con sus dependencias.
- */
 /** Una linea con envase se nombra por el envase; una antigua, o sin nombre de envase, por su presentacion. */
 function distributionLabelLine(line: OrderPresentationLineView) {
   return { presentationName: line.packagingName ?? line.presentationName, packages: line.packages };
@@ -197,6 +188,8 @@ function producedProductsOf(
   return products;
 }
 
+function ignoreAction(): void {}
+
 export function buildOrderColumns({
   recipes,
   units,
@@ -207,8 +200,8 @@ export function buildOrderColumns({
   canEditDistribution = false,
   canEditCustomer = false,
   canDeliver = false,
-  canVoidDelivery = false,
   producedProductsByOrder = {},
+  onAction = ignoreAction,
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -348,31 +341,10 @@ export function buildOrderColumns({
         />
       ),
     },
-    {
+    actionsColumn({
       id: ACTIONS_COLUMN_ID,
-      label: 'Acciones',
-      align: 'end',
-      // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros).
-      // `pinnable: false` para que el usuario no pueda fijarla y tapar la del correlativo.
-      pinnable: false,
-      cell: (order) => (
-        <OrderRowSheetActions
-          order={order}
-          recipes={recipes}
-          units={units}
-          bridge={bridge}
-          // QC-102 R24, R26: la entrada «Responsables» abre el panel con lo que el lote YA trajo
-          // para esta fila. Sin esto, el panel abriria vacio y tendria que consultar.
-          responsibles={responsiblesByOrder[order.id] ?? []}
-          responsiblesCatalog={responsiblesCatalog}
-          // La hoja pinta la cobertura de ESTA fila, ya traida por el lote.
-          coverage={coverageByOrder[order.id]}
-          canEditDistribution={canEditDistribution}
-          canEditCustomer={canEditCustomer}
-          canDeliver={canDeliver}
-          canVoidDelivery={canVoidDelivery}
-        />
-      ),
-    },
+      menu: (order) =>
+        orderRowActionsSpec({ order, canEditDistribution, canEditCustomer, canDeliver, onAction }),
+    }),
   ];
 }

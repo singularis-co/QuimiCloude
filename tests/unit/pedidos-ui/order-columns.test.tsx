@@ -37,6 +37,7 @@ import {
   RECIPE_NAME_COLUMN_ID,
   STATUS_PARAM,
   buildOrderColumns,
+  orderRowActionsSpec,
   parseOrderListParams,
 } from '@/app/(private)/pedidos/components';
 import {
@@ -236,6 +237,53 @@ describe('el fijado por defecto y la columna de acciones (R19, `design.md > 6.1`
     const noFijables = ORDER_COLUMNS.filter((column) => column.pinnable === false).map((c) => c.id);
 
     expect(noFijables).toEqual([ACTIONS_COLUMN_ID]);
+  });
+
+  it('R10: la columna de acciones declara su menu como datos, para la fila y la tarjeta', () => {
+    const acciones = ORDER_COLUMNS.find((column) => column.id === ACTIONS_COLUMN_ID);
+    const elPedido = pedido();
+
+    const spec = acciones?.menu?.(elPedido);
+
+    expect(spec?.triggerTestId).toBe('order-row-actions');
+    expect(spec?.title).toBe(`Pedido ${elPedido.numberText}`);
+    expect(spec?.items.map((item) => item.key)).toEqual(
+      orderRowActionsSpec({
+        order: elPedido,
+        canEditDistribution: false,
+        canEditCustomer: false,
+        canDeliver: false,
+        onAction: vi.fn(),
+      }).items.map((item) => item.key),
+    );
+  });
+
+  it('R10: el menu lleva los permisos del servidor y emite `onAction` con el pedido de la fila', () => {
+    const onAction = vi.fn();
+    const columnas = buildOrderColumns({
+      recipes: { items: [], totalPages: 1 },
+      units: [],
+      bridge: null,
+      canEditCustomer: true,
+      onAction,
+    });
+    const elPedido = pedido();
+    const spec = columnas.find((column) => column.id === ACTIONS_COLUMN_ID)?.menu?.(elPedido);
+    const cliente = spec?.items.find((item) => item.key === 'customer');
+
+    cliente?.onSelect?.();
+
+    expect(cliente?.testId).toBe('order-action-customer');
+    expect(onAction).toHaveBeenCalledExactlyOnceWith('customer', elPedido);
+  });
+
+  it('R10: la celda pinta el disparador del menu con el id del pedido como dato', () => {
+    const acciones = ORDER_COLUMNS.find((column) => column.id === ACTIONS_COLUMN_ID);
+    const elPedido = pedido();
+
+    render(<>{acciones?.cell(elPedido)}</>);
+
+    expect(screen.getByTestId('order-row-actions')).toHaveAttribute('data-order-id', elPedido.id);
   });
 });
 

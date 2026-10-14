@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition, type MouseEvent } from 'react';
+import { useCallback, useMemo, useState, useTransition, type MouseEvent } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
 import { buttonVariants } from '@/components/ui/button';
@@ -18,6 +18,8 @@ import { OrderCustomerFilter } from './order-customer-filter';
 import type { OrderCustomerChoice } from './order-customer-label';
 import type { ProducedProductsByOrder } from './order-produced-presentations';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
+import type { OrderRowAction } from './order-row-actions';
+import { OrderRowSheetActions } from './order-sheet';
 import { FIRST_PAGE, orderListHref, withSearchResetsPage } from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
 
@@ -96,6 +98,12 @@ const CLEAR_SEARCH_LABEL = 'Limpiar la búsqueda';
 function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 }
+
+type ActiveOrderAction = {
+  readonly order: OrderSummary;
+  readonly action: OrderRowAction;
+  readonly open: boolean;
+};
 
 export type OrderTableProps = {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega (R13). */
@@ -191,6 +199,18 @@ export function OrderTable({
     // vigente: `clearing` deja de forzarlo para no pisar un cambio externo posterior (Atras).
     if (clearing) setClearing(false);
   }
+  const [active, setActive] = useState<ActiveOrderAction | null>(null);
+  const handleAction = useCallback((action: OrderRowAction, order: OrderSummary) => {
+    setActive({ order, action, open: true });
+  }, []);
+  // Cerrar no suelta el pedido: el panel sigue montado para animar su salida.
+  const handleActiveOpenChange = useCallback((open: boolean) => {
+    setActive((current) => (current === null ? null : { ...current, open }));
+  }, []);
+  // Tras un refresco, el pedido activo es la fila nueva; si ya no esta en la pagina, el de antes.
+  const activeOrder =
+    active === null ? null : (orders.find((order) => order.id === active.order.id) ?? active.order);
+
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
   const columns = useMemo(
@@ -205,8 +225,8 @@ export function OrderTable({
         canEditDistribution,
         canEditCustomer,
         canDeliver,
-        canVoidDelivery,
         producedProductsByOrder,
+        onAction: handleAction,
       }),
     [
       recipes,
@@ -218,8 +238,8 @@ export function OrderTable({
       canEditDistribution,
       canEditCustomer,
       canDeliver,
-      canVoidDelivery,
       producedProductsByOrder,
+      handleAction,
     ],
   );
 
@@ -310,6 +330,21 @@ export function OrderTable({
           )
         }
       />
+      {active === null || activeOrder === null ? null : (
+        <OrderRowSheetActions
+          order={activeOrder}
+          action={active.action}
+          open={active.open}
+          onOpenChange={handleActiveOpenChange}
+          recipes={recipes}
+          units={units}
+          bridge={bridge}
+          responsibles={responsiblesByOrder?.[activeOrder.id] ?? []}
+          responsiblesCatalog={responsiblesCatalog}
+          coverage={coverageByOrder?.[activeOrder.id]}
+          canVoidDelivery={canVoidDelivery}
+        />
+      )}
     </div>
   );
 }

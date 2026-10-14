@@ -12,6 +12,8 @@ import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  CANCEL_ORDER_DIALOG_TESTID,
+  CANCEL_ORDER_ID_TESTID,
   ORDER_CUSTOMER_FILTER_TESTID,
   ORDER_LIST_CLEAR_SEARCH_TESTID,
   ORDER_LIST_NO_MATCHES_TESTID,
@@ -647,5 +649,48 @@ describe('el filtro «Cliente» vive en la barra de la tabla', () => {
     expect(within(screen.getByTestId(ORDER_CUSTOMER_FILTER_TESTID)).getByRole('combobox')).toHaveValue(
       'Ana Garcia (eliminado)',
     );
+  });
+});
+
+describe('R13: la tabla monta un solo panel o dialogo, el del pedido elegido', () => {
+  function tabla(orders: readonly OrderSummary[]) {
+    return (
+      <OrderTable
+        orders={orders}
+        params={parametros()}
+        totalPages={1}
+        recipes={RECETAS}
+        units={UNIDADES}
+        bridge={null}
+      />
+    );
+  }
+
+  it('R13: sin elegir nada no hay dialogo; al elegir «Cancelar» en una fila, se abre el de ese pedido', async () => {
+    const user = setupUser();
+    render(tabla(PEDIDOS));
+
+    expect(screen.queryByTestId(CANCEL_ORDER_DIALOG_TESTID)).toBeNull();
+
+    const fila = screen.getByTestId('data-table-row-o1');
+    await user.click(within(fila).getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId('order-action-cancel'));
+
+    expect(await screen.findByTestId(CANCEL_ORDER_ID_TESTID)).toHaveValue('o1');
+    expect(screen.getAllByTestId(CANCEL_ORDER_DIALOG_TESTID)).toHaveLength(1);
+  });
+
+  it('R13: si tras el refresco el pedido ya no esta en la pagina, el dialogo abierto lo conserva', async () => {
+    const user = setupUser();
+    const { rerender } = render(tabla(PEDIDOS));
+
+    const fila = screen.getByTestId('data-table-row-o2');
+    await user.click(within(fila).getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId('order-action-cancel'));
+    await screen.findByTestId(CANCEL_ORDER_ID_TESTID);
+
+    rerender(tabla(PEDIDOS.filter((order) => order.id !== 'o2')));
+
+    expect(screen.getByTestId(CANCEL_ORDER_ID_TESTID)).toHaveValue('o2');
   });
 });

@@ -18,8 +18,9 @@ import {
   ORDER_DISTRIBUTION_WARNING_TESTID,
   OrderDistributionDialog,
   OrderRowActions,
-  OrderRowSheetActions,
+  OrderTable,
 } from '@/app/(private)/pedidos/components';
+import { createDefaultParams } from '@/components/shared/data-table';
 import {
   ORDER_STATUS_VALUES,
   formatOrderNumber,
@@ -29,6 +30,7 @@ import {
 import type { OrderMutationFormState } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type { UnitView } from '@/lib/modules/unidades';
 import { setupUser } from '../../helpers/user-event';
+import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { updateDistributionMock, quoteAvailabilityMock, routerMock } = vi.hoisted(() => ({
   updateDistributionMock:
@@ -65,7 +67,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
   };
 });
 
-// `OrderRowSheetActions` monta tambien el panel de edicion general, que pide la receta.
+// La tabla monta tambien el panel de edicion general, que pide la receta.
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   getRecipeAction: vi.fn(async () => ({
     status: 'error' as const,
@@ -157,6 +159,10 @@ afterEach(() => {
 });
 
 describe('accion de fila «Reparto y unidad»', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
   it('R11: con permiso de modificar pedidos y en POR_EMPACAR se pinta', async () => {
     render(<OrderRowActions order={pedido('POR_EMPACAR')} canEditDistribution />);
 
@@ -198,8 +204,10 @@ describe('accion de fila «Reparto y unidad»', () => {
   it('R11: pulsarla abre el dialogo acotado de esa fila', async () => {
     const user = setupUser();
     render(
-      <OrderRowSheetActions
-        order={pedido('POR_EMPACAR')}
+      <OrderTable
+        orders={[pedido('POR_EMPACAR')]}
+        params={createDefaultParams()}
+        totalPages={1}
         recipes={{ items: [], totalPages: 1 }}
         units={UNIDADES}
         bridge={null}
@@ -350,10 +358,16 @@ describe('dialogo «Reparto y unidad»', () => {
 });
 
 describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
   function accionesDeFila(order: OrderSummary) {
     return (
-      <OrderRowSheetActions
-        order={order}
+      <OrderTable
+        orders={[order]}
+        params={createDefaultParams()}
+        totalPages={1}
         recipes={{ items: [], totalPages: 1 }}
         units={UNIDADES}
         bridge={null}

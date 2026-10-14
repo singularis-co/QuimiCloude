@@ -24,7 +24,7 @@ import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
-import { OrderRowActions } from './order-row-actions';
+import type { OrderRowAction } from './order-row-actions';
 import type { RecipePickerPage } from './recipe-picker';
 
 /**
@@ -59,7 +59,7 @@ import type { RecipePickerPage } from './recipe-picker';
  * **Dos modos de apertura, un solo panel.** Sin `open`, el panel trae su propio disparador y su
  * propio estado -es el alta, y es lo que la seccion pone en la cabecera de la lista y en el slot
  * del estado vacio-. Con `open`/`onOpenChange`, el panel es CONTROLADO y no monta disparador: es
- * el enganche de la edicion desde la fila, donde quien dispara es `OrderRowActions`.
+ * el enganche de la edicion desde el menu de la fila.
  */
 
 export const ORDER_CREATE_OPEN_TESTID = 'order-create-open';
@@ -164,64 +164,51 @@ export function OrderSheet({
 }
 
 export type OrderRowSheetActionsProps = {
+  /** El pedido de la acción elegida. Se conserva al cerrar para que el panel anime su salida. */
   readonly order: OrderSummary;
+  readonly action: OrderRowAction;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
   readonly bridge: MassVolumeBridge | null;
-  /** Los responsables de ESTA fila, ya traidos por el lote de la seccion. */
+  /** Los responsables de este pedido, ya traídos por el lote de la sección. */
   readonly responsibles?: readonly OrderResponsible[];
-  /** Catalogos y `canWrite`, compuestos una vez en el servidor. */
+  /** Catálogos y `canWrite`, compuestos una vez en el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
-  /** La cobertura de ESTA fila, ya traida por el lote de la seccion. */
+  /** La cobertura de este pedido, ya traída por el lote de la sección. */
   readonly coverage?: OrderCoverage;
-  /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
-  readonly canEditDistribution?: boolean;
-  /** Si el actor puede cambiar el cliente; lo resuelve el servidor. */
-  readonly canEditCustomer?: boolean;
-  /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
-  readonly canDeliver?: boolean;
   /** Si el actor puede anular entregas; lo resuelve el servidor. */
   readonly canVoidDelivery?: boolean;
 };
 
 /**
- * Las acciones de la fila con **las tres ya cableadas**: editar al panel lateral, cancelar al
- * dialogo de motivo y borrar a la confirmacion.
+ * Monta el panel o el diálogo de la acción elegida en el menú de una fila. Uno por tabla: así
+ * nunca hay dos abiertos y la tarjeta y la fila abren lo mismo.
  *
- * Es la pieza que une las acciones de la fila con sus paneles y dialogos:
- * `OrderRowActions` emite `onEdit`/`onCancel`/`onDelete` y aqui cada uno abre su panel o su
- * dialogo, CONTROLADO, con ese mismo pedido. Con el pedido en estado final `OrderRowActions` no
- * llega a emitir nada, asi que **no se monta ninguno de los tres**.
- *
- * **Los dialogos de cancelar y borrar se montan en su primera apertura y ya no se desmontan**, para
- * que el cierre anime su salida. Su contenido si se desmonta al cerrar: cada apertura arranca con
- * el estado de accion limpio -un `not_cancellable` de un intento anterior no reaparece- y el arbol
- * de una fila cerrada no contiene ningun formulario de cancelacion ni de borrado.
- *
- * Es lo que la celda de acciones de `buildOrderColumns` renderiza por fila: sin esta pieza, los
- * tres botones de `OrderRowActions` no abririan nada.
+ * «Editar» y «Responsables» abren el mismo `OrderSheet`, en el formulario o en su sección.
+ * Cerrado, lo montado sigue en el árbol para animar la salida; cada apertura lo remonta para que
+ * arranque sin el estado de la anterior.
  */
 export function OrderRowSheetActions({
   order,
+  action,
+  open,
+  onOpenChange,
   recipes,
   units,
   bridge,
   responsibles = [],
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
-  canEditDistribution = false,
-  canEditCustomer = false,
-  canDeliver = false,
   canVoidDelivery = false,
 }: OrderRowSheetActionsProps) {
-  const [editOpen, setEditOpen] = useState(false);
-  // `null` mientras no se ha abierto nunca; despues el dialogo queda montado para animar su cierre.
-  const [cancelOpen, setCancelOpen] = useState<boolean | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState<boolean | null>(null);
-  const [distributionOpen, setDistributionOpen] = useState(false);
-  const [customerOpen, setCustomerOpen] = useState(false);
-  const [deliverOpen, setDeliverOpen] = useState(false);
-  const [deliveriesOpen, setDeliveriesOpen] = useState(false);
+  const [opening, setOpening] = useState(0);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setOpening((count) => count + 1);
+  }
   // Atado a la instancia de `order`: cuando llega el refresco trae otra y lo guardado se descarta.
   const [savedDistribution, setSavedDistribution] = useState<{
     readonly order: OrderSummary;
@@ -229,79 +216,57 @@ export function OrderRowSheetActions({
   } | null>(null);
   const pendingDistribution =
     savedDistribution?.order === order ? savedDistribution.draft : undefined;
-  /**
-   * EN QUE SECCION abre el UNICO panel de esta fila. No hay un segundo `OrderSheet`
-   * para responsables: editar y responsables abren **el mismo**, y esto es lo que los distingue.
-   */
-  const [section, setSection] = useState<OrderSheetSection>('form');
 
-  const openSection = (next: OrderSheetSection) => {
-    setSection(next);
-    setEditOpen(true);
-  };
-
-  return (
-    <>
-      <OrderRowActions
-        order={order}
-        onEdit={() => openSection('form')}
-        onCancel={() => setCancelOpen(true)}
-        onDelete={() => setDeleteOpen(true)}
-        onResponsibles={() => openSection('responsibles')}
-        canEditDistribution={canEditDistribution}
-        onDistribution={() => setDistributionOpen(true)}
-        canEditCustomer={canEditCustomer}
-        onCustomer={() => setCustomerOpen(true)}
-        canDeliver={canDeliver}
-        onDeliver={() => setDeliverOpen(true)}
-        onDeliveries={() => setDeliveriesOpen(true)}
-      />
-      <OrderSheet
-        order={order}
-        recipes={recipes}
-        units={units}
-        bridge={bridge}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        responsibles={responsibles}
-        responsiblesCatalog={responsiblesCatalog}
-        coverage={coverage}
-        section={section}
-      />
-      {cancelOpen === null ? null : (
-        <CancelOrderDialog order={order} open={cancelOpen} onOpenChange={setCancelOpen} />
-      )}
-      {deleteOpen === null ? null : (
-        <DeleteOrderDialog order={order} open={deleteOpen} onOpenChange={setDeleteOpen} />
-      )}
-      {distributionOpen ? (
+  switch (action) {
+    case 'edit':
+    case 'responsibles':
+      return (
+        <OrderSheet
+          key={opening}
+          order={order}
+          recipes={recipes}
+          units={units}
+          bridge={bridge}
+          open={open}
+          onOpenChange={onOpenChange}
+          responsibles={responsibles}
+          responsiblesCatalog={responsiblesCatalog}
+          coverage={coverage}
+          section={action === 'responsibles' ? 'responsibles' : 'form'}
+        />
+      );
+    case 'cancel':
+      return <CancelOrderDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
+    case 'delete':
+      return <DeleteOrderDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
+    case 'distribution':
+      return (
         <OrderDistributionDialog
+          key={opening}
           order={order}
           units={units}
-          open
-          onOpenChange={setDistributionOpen}
+          open={open}
+          onOpenChange={onOpenChange}
           saved={pendingDistribution}
           onSaved={(draft) => setSavedDistribution({ order, draft })}
         />
-      ) : null}
-      {customerOpen ? (
-        <OrderCustomerDialog order={order} open onOpenChange={setCustomerOpen} />
-      ) : null}
-      {deliverOpen ? (
-        <OrderDeliverySheet order={order} open onOpenChange={setDeliverOpen} />
-      ) : null}
-      {deliveriesOpen ? (
+      );
+    case 'customer':
+      return <OrderCustomerDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
+    case 'deliver':
+      return <OrderDeliverySheet key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
+    case 'deliveries':
+      return (
         <OrderDeliveriesSheet
+          key={opening}
           order={order}
-          open
-          onOpenChange={setDeliveriesOpen}
+          open={open}
+          onOpenChange={onOpenChange}
           canVoid={canVoidDelivery}
         />
-      ) : null}
-    </>
-  );
+      );
+  }
 }
-
 
 export type OrderRowResponsiblesProps = {
   readonly order: OrderSummary;
