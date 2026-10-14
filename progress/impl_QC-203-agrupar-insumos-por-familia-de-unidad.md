@@ -120,3 +120,15 @@ Salida real:
   tocados compilan (typecheck verde).
 
 Veredicto: tanda 2 verde en typecheck, lint y unit; falta correr la integración contra Postgres.
+### Verificación (tanda 2)
+
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes en archivos no tocados.
+- `pnpm exec vitest run guard`: 76 archivos, 1064 verdes, 20 saltados. Un primer intento dio 2 rojos (`guard-ambito-empresa-pedidos`, `guard-dobles-e2e`). La causa fue un CRLF que mis ediciones metieron en `lib/composition/index.ts` y otros 6 archivos; volvieron a LF y las dos guardias quedaron verdes.
+- Unit tocados por ruta (9 archivos): 207 verdes.
+- Integración contra Postgres (`--project integration`): `supply-homonyms`, `product-unit-without-presentation`, `product-batch-lot`, `qc195-packaging-product`: 4 archivos, 37 verdes. Los 4 `inventory-import-*` que usan `inventory-import-wiring.ts`: 23 verdes y 1 saltado, el `skipIf` preexistente `QC209_MEDIR_2000`.
+- `pnpm exec vitest related --run <7 archivos de producción> --project node --project ui`: 474 archivos, 8488 verdes, 7 saltados, 1 rojo (836 s).
+  - El rojo es `product-page.test.tsx > un guardado rechazado por un campo…`, que excedió el tiempo límite de 20000 ms bajo carga. No está en `baseline-rojos.json`.
+  - Corrido solo, ese archivo da 84/84 verdes.
+
+Veredicto: tanda 2 verde; T4, T5 y T6 hechas. Queda abierto el borde de R7 descrito arriba.
