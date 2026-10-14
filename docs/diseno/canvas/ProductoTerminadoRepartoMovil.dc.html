@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Tab Reparto en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="ProductoTerminado" tab="Reparto" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Producto terminado · tab «Reparto» · ficha (QC-281)</h2>
+    <dl class="spec">
+      <dt>Dónde</dt><dd>Tab nueva «Reparto», la última de la ficha de producto terminado (QC-225): General · Stock · Lotes · Entradas · Salidas · Entregas · Costo de producción · Reparto. Es de solo consulta</dd>
+      <dt>Contenido</dt><dd>Una fila por pedido empacado con este producto, del más reciente al más antiguo: Pedido · Presentación · Plan · Envases reales · Diferencia · Motivo. El dato sale de la línea del reparto (plan, envases reales, motivo y texto de «Otro»); en pantalla solo se calcula la diferencia</dd>
+      <dt>Reutiliza</dt><dd>La misma tabla de las otras tabs: <span class="mono">url-tabs · shared/data-table</span> (sin búsqueda ni filtros, 10/25 filas, paginación) · <span class="mono">table-skeleton · empty-state · error-state</span> · <span class="mono">status-badge</span> (±N en tono de espera) · <span class="mono">movementReasonLabel</span> para el motivo</dd>
+      <dt>Librerías</dt><dd>Ninguna nueva: <span class="mono">@tanstack/react-table</span> (vía DataTable) · <span class="mono">@base-ui/react</span> (Tabs) · <span class="mono">lucide-react</span></dd>
+      <dt>Estados de fila</dt><dd>Igual al plan: «—» en Diferencia y Motivo · menos envases: «−N» + motivo · más envases: «+N» + motivo · «Otro»: el texto escrito entre comillas bajo el motivo · línea en 0: «−N» y «Sin lote» · pedido empacado antes de QC-281: envases reales = plan, sin motivo y sin diferencia visible (nota «Empacado antes de QC-281» bajo el «—»)</dd>
+      <dt>Estados de la tab</dt><dd>Los de las demás tabs de listado: con datos · cargando (esqueleto) · vacío «Ningún pedido empacado tiene este producto.» · página vacía · error «No se pudo cargar el reparto.» con «Reintentar»</dd>
+      <dt>Escritorio</dt><dd>Tabla de 6 columnas a todo el ancho del contenido; números alineados a la derecha en mono</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · la tabla se desplaza en horizontal dentro de su caja</dd>
+      <dt>Teléfono</dt><dd>Como las otras tabs de la ficha: la fila de tabs se desplaza en horizontal (cada tab a 44 px) y la tabla NO pasa a tarjetas: se desplaza en horizontal</dd>
+      <dt>Animación</dt><dd>La de las demás tabs: color de la tab 200 ms · al entrar pasa por el esqueleto (Suspense) y las filas entran con fundido</dd>
+      <dt>Por confirmar</dt><dd>Nada abierto por QC-281 (los «Por confirmar» de QC-225 siguen en su ficha)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
