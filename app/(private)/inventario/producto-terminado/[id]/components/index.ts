@@ -1,8 +1,17 @@
 // Sin la directiva de cliente: la frontera la declara cada componente, no el barrel.
+export { BatchEvidenceButton, type BatchEvidenceButtonProps } from './batch-evidence-button';
+export {
+  BATCH_EVIDENCE_DIALOG_CLASS,
+  BATCH_EVIDENCE_DIALOG_TESTID,
+  BATCH_EVIDENCE_TEXTS,
+  BatchEvidenceDialog,
+  type BatchEvidenceDialogProps,
+} from './batch-evidence-dialog';
 export {
   FINISHED_PRODUCT_BATCHES_TABLE_ID,
   FinishedProductBatchesTable,
   WITHOUT_ORDER_LABEL,
+  type EvidenceCounts,
   type FinishedProductBatchesTableProps,
 } from './finished-product-batches-table';
 export {

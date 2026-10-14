@@ -3,8 +3,16 @@ import type { ReactNode } from 'react';
 import { movementReasonLabel } from '@/app/(private)/inventario/components';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
+import { identity } from '@/lib/composition';
+import { canConsultOrderEvidence } from '@/lib/modules/asignaciones';
+import { countOrderEvidenceAction } from '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
-import { MOVEMENT_REASONS, type MovementReason, type Page } from '@/lib/modules/inventario';
+import {
+  MOVEMENT_REASONS,
+  type FinishedProductBatchRow,
+  type MovementReason,
+  type Page,
+} from '@/lib/modules/inventario';
 import {
   listFinishedProductBatchesAction,
   listFinishedProductCostsAction,
@@ -12,7 +20,7 @@ import {
   listFinishedProductMovementsAction,
 } from '@/lib/modules/inventario/adapters/driving/finished-product-actions';
 
-import { FinishedProductBatchesTable } from './finished-product-batches-table';
+import { FinishedProductBatchesTable, type EvidenceCounts } from './finished-product-batches-table';
 import { FinishedProductCostsTable } from './finished-product-costs-table';
 import { FinishedProductDeliveriesTable } from './finished-product-deliveries-table';
 import { FinishedProductMovementsTable } from './finished-product-movements-table';
@@ -121,16 +129,44 @@ function dispatch<P extends Page<unknown>>(
   return renderRows(result.data);
 }
 
+/**
+ * Presentación, no autorización: sin el permiso la columna no se pinta y el conteo no se pide; la
+ * action vuelve a exigirlo. Un conteo fallido deja la tabla sin columna, porque «—» diría que el
+ * pedido no tiene fotos.
+ */
+async function loadEvidenceCounts(
+  rows: readonly FinishedProductBatchRow[],
+): Promise<EvidenceCounts | undefined> {
+  if (rows.length === 0) return undefined;
+  if (!canConsultOrderEvidence(await identity.getSessionUser())) return undefined;
+
+  const orderIds = [...new Set(rows.flatMap((row) => (row.orderId === null ? [] : [row.orderId])))];
+  if (orderIds.length === 0) return new Map();
+
+  const result = await countOrderEvidenceAction(orderIds);
+  if (result.status === 'error') return undefined;
+  return new Map(result.data.map((count) => [count.orderId, count.photoCount]));
+}
+
 /** Pide solo el listado del tab activo. */
 export async function FinishedProductListSection(props: FinishedProductListSectionProps) {
   const { productId, tab, paging, unitLabel } = props;
   const input = { page: paging.page, pageSize: paging.pageSize };
 
   switch (tab) {
-    case 'lotes':
-      return dispatch(props, await listFinishedProductBatchesAction(productId, input), (page) => (
-        <FinishedProductBatchesTable productId={productId} page={page} unitLabel={unitLabel} />
+    case 'lotes': {
+      const result = await listFinishedProductBatchesAction(productId, input);
+      const evidenceCounts =
+        result.status === 'success' ? await loadEvidenceCounts(result.data.items) : undefined;
+      return dispatch(props, result, (page) => (
+        <FinishedProductBatchesTable
+          productId={productId}
+          page={page}
+          unitLabel={unitLabel}
+          evidenceCounts={evidenceCounts}
+        />
       ));
+    }
     case 'entradas':
     case 'salidas':
       return dispatch(

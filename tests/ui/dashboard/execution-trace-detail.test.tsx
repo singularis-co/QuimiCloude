@@ -18,10 +18,12 @@ import {
 } from '@/app/(private)/dashboard/components';
 import type { ExecutionTraceDetail as ExecutionTraceDetailData } from '@/lib/modules/asignaciones';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { ORDER_EVIDENCE_EMPTY, ORDER_EVIDENCE_ERROR_STATES } from '@/tests/fixtures/order-evidence';
 
-const { requirePagePermissionMock, getExecutionTraceActionMock, notFoundMock } = vi.hoisted(() => ({
+const { requirePagePermissionMock, getExecutionTraceActionMock, getExecutionEvidenceActionMock, notFoundMock } = vi.hoisted(() => ({
   requirePagePermissionMock: vi.fn<(code: string) => Promise<void>>(),
   getExecutionTraceActionMock: vi.fn<(orderId: string) => Promise<unknown>>(),
+  getExecutionEvidenceActionMock: vi.fn<(orderId: string) => Promise<unknown>>(),
   notFoundMock: vi.fn<() => never>(() => {
     throw new Error('NEXT_NOT_FOUND');
   }),
@@ -30,6 +32,8 @@ const { requirePagePermissionMock, getExecutionTraceActionMock, notFoundMock } =
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   notFound: notFoundMock,
+  // 2026-10-14 (QC-271): el aviso de fotos del detalle reintenta con `router.refresh`.
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 
 vi.mock('@/lib/modules/identity/adapters/driving/require-page-permission', () => ({
@@ -38,6 +42,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/require-page-permission', () =>
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', () => ({
   getExecutionTraceAction: getExecutionTraceActionMock,
+  getExecutionEvidenceAction: getExecutionEvidenceActionMock,
   listExecutionTracesAction: vi.fn(),
 }));
 
@@ -120,6 +125,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   requirePagePermissionMock.mockResolvedValue(undefined);
   getExecutionTraceActionMock.mockResolvedValue({ status: 'success', data: TRACE });
+  getExecutionEvidenceActionMock.mockResolvedValue({ status: 'success', data: ORDER_EVIDENCE_EMPTY });
 });
 
 afterEach(() => {
@@ -164,6 +170,31 @@ describe('R12 - R18 - R20 - la pagina del recorrido', () => {
     });
     await expect(abrir()).rejects.toThrow('NEXT_NOT_FOUND');
     expect(notFoundMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('QC-271 R15 - pide las fotos del mismo id a la vez que el recorrido, despues del permiso', async () => {
+    await abrir();
+    expect(getExecutionEvidenceActionMock).toHaveBeenCalledWith(ORDER_ID);
+    expect(requirePagePermissionMock.mock.invocationCallOrder[0]).toBeLessThan(
+      getExecutionEvidenceActionMock.mock.invocationCallOrder[0],
+    );
+    const source = readFileSync(resolve(process.cwd(), 'app/(private)/dashboard/recorrido/[id]/page.tsx'), 'utf8');
+    expect(source).toMatch(/Promise\.all\(\[getExecutionTraceAction\(id\), getExecutionEvidenceAction\(id\)\]\)/);
+  });
+
+  it('QC-271 R15 - sin permiso tampoco lee las fotos', async () => {
+    requirePagePermissionMock.mockRejectedValue(new Error('NEXT_NOT_FOUND'));
+    await expect(abrir()).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(getExecutionEvidenceActionMock).not.toHaveBeenCalled();
+  });
+
+  it('QC-271 R15 - el 404 sale solo del recorrido: las fotos en order_not_found no lo provocan', async () => {
+    getExecutionEvidenceActionMock.mockResolvedValue(ORDER_EVIDENCE_ERROR_STATES.orderNotFound);
+    render(await abrir());
+    expect(notFoundMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('execution-trace-detail')).toBeInTheDocument();
+    expect(screen.getAllByTestId('execution-trace-step')).toHaveLength(TRACE.steps.length);
+    expect(screen.getByTestId('trace-evidence-read-error')).toBeInTheDocument();
   });
 
   it('R18 - un pedido dado de baja con anotaciones abre su recorrido marcado', async () => {

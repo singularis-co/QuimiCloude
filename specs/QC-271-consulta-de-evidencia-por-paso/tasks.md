@@ -159,7 +159,7 @@ en verde.
 **Hecho cuando:** los dos tests están en verde, `step-evidence` sigue verde en los tests de
 ejecución y empaque que ya lo usan, y la fila del catálogo está al día.
 
-### F1 [P] — Recorrido (depende de F0; trabaja contra la action mockeada y la fixture)
+### [x] F1 [P] — Recorrido (depende de F0; trabaja contra la action mockeada y la fixture)
 
 - `app/(private)/dashboard/recorrido/[id]/page.tsx`: `Promise.all` con
   `getExecutionEvidenceAction`; `notFound()` solo por el recorrido.
@@ -190,7 +190,7 @@ ejecución y empaque que ya lo usan, y la fila del catálogo está al día.
 **Hecho cuando:** los tests nombrados están en verde y se comprueba a mano en escritorio, tablet y
 teléfono contra `RecorridoEvidencia*.dc.html`.
 
-### F2 [P] — Ficha, pestaña Lotes (depende de F0; trabaja contra las actions mockeadas)
+### [x] F2 [P] — Ficha, pestaña Lotes (depende de F0; trabaja contra las actions mockeadas)
 
 - `app/(private)/inventario/producto-terminado/[id]/components/finished-product-list-section.tsx`:
   `canConsultOrderEvidence` y `countOrderEvidenceAction` (`design.md > 6.3`).
