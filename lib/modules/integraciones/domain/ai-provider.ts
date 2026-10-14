@@ -1,3 +1,6 @@
+import type { IntegracionesScope } from './integraciones-scope';
+import type { SecretContext } from './secret-context';
+
 export const AI_PROVIDER_CODES = ['ANTHROPIC', 'GOOGLE', 'OPENAI', 'OPENROUTER'] as const;
 export type AiProviderCode = (typeof AI_PROVIDER_CODES)[number];
 
@@ -64,4 +67,11 @@ export function toAiProviderConnectionView(
     lastCheckedAt: isoOrNull(record.lastCheckedAt),
     keyUpdatedAt: record.keyUpdatedAt.toISOString(),
   };
+}
+
+export const AI_PROVIDER_API_KEY_FIELD = 'api_key';
+
+/** Liga la key cifrada a su empresa y a su fila: con otro id no se descifra. */
+export function aiProviderKeyContext(connectionId: string, scope: IntegracionesScope): SecretContext {
+  return { companyId: scope.companyId, recordId: connectionId, field: AI_PROVIDER_API_KEY_FIELD };
 }

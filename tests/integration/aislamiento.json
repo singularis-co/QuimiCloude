@@ -622,6 +622,11 @@
       "archivo": "integraciones/whatsapp-connection-prisma.int.test.ts",
       "motivo": "Ejercita las cuatro funciones de whatsapp-connection-prisma.ts, que llaman al cliente Prisma GLOBAL y no a un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria; ademas R6 necesita dos altas concurrentes de verdad contra el indice unico parcial. Cada caso fabrica sus empresas efimeras con randomUUID (tipo de documento, rol, empresa y usuario) y 'afterAll' borra sus conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-09"
+    },
+    {
+      "archivo": "integraciones/ai-provider-connection-prisma.int.test.ts",
+      "motivo": "Ejercita las cuatro funciones de ai-provider-connection-prisma.ts y el catalogo, que llaman al cliente Prisma GLOBAL y no a un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria; ademas R19 necesita dos altas y dos guardados concurrentes de verdad contra el indice unico de empresa. Cada caso fabrica sus empresas efimeras con randomUUID (tipo de documento, rol, empresa y usuario) y 'afterAll' borra sus conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. El catalogo 'ai_providers' solo se lee. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-13"
     }
   ]
 }

@@ -42,16 +42,16 @@
   `ai-provider-connection-repository.ts`, `ai-provider-catalog.ts`, `ai-provider-probe.ts`.
   *Depende de:* T1. *Hecho:* `ai-provider-failure.test.ts` y `connection-view.test.ts` verdes.
   *Cubre:* R8, R11, R18.
-- [ ] **T4. Casos de uso de actor.** `get-ai-provider-connection`, `test-ai-provider-key`,
+- [x] **T4. Casos de uso de actor.** `get-ai-provider-connection`, `test-ai-provider-key`,
   `test-saved-ai-provider`, `save-ai-provider-connection` (con la segunda vuelta de la carrera),
   `disconnect-ai-provider`, `get-ai-provider-readiness`; exportados por `index.ts`.
   *Depende de:* T3. *Hecho:* `authorization`, `test-ai-provider-key`, `test-saved-ai-provider`,
   `save-ai-provider-connection`, `disconnect-ai-provider` verdes con puertos simulados.
   *Cubre:* R1, R2, R7, R9, R10–R20.
-- [ ] **T5. Casos de uso de sistema.** `resolve-ai-provider-for-reading`, `getAiProviderStatus`,
+- [x] **T5. Casos de uso de sistema.** `resolve-ai-provider-for-reading`, `getAiProviderStatus`,
   `report-ai-provider-outcome`. *Depende de:* T3. `[P]` con T4.
   *Hecho:* `resolve-and-report.test.ts` verde. *Cubre:* R6, R9, R21, R25, R27.
-- [ ] **T6. Persistencia y catálogo.** `persistence/ai-provider-connection-prisma.ts` (ámbito por
+- [x] **T6. Persistencia y catálogo.** `persistence/ai-provider-connection-prisma.ts` (ámbito por
   `company-scope.ts`, `P2002` → error de carrera) y `catalog/ai-provider-catalog-prisma.ts`.
   *Depende de:* T2, T3. *Hecho:* `ai-provider-connection-prisma.int.test.ts` verde;
   `guard-ambito-empresa-integraciones` verde. *Cubre:* R2, R4, R5, R7, R19.

@@ -48,3 +48,62 @@
 - `ai-provider-migration.int.test.ts`: 10/10 en base efímera.
 
 Veredicto: T1, T2, T3, T7 hechas; la guardia R9 de errores queda roja hasta T8.
+
+## Tanda 2 — T4, T5, T6 (2026-10-13)
+
+### Archivos
+- Creados (dominio): `lib/modules/integraciones/domain/{get-ai-provider-connection,test-ai-provider-key,
+  test-saved-ai-provider,save-ai-provider-connection,disconnect-ai-provider,get-ai-provider-readiness,
+  resolve-ai-provider-for-reading,report-ai-provider-outcome}.ts`.
+- Creados (adaptadores): `adapters/driven/persistence/ai-provider-connection-prisma.ts`,
+  `adapters/driven/catalog/ai-provider-catalog-prisma.ts`.
+- Modificados: `domain/ai-provider.ts` (+ `AI_PROVIDER_API_KEY_FIELD`, `aiProviderKeyContext`),
+  `index.ts` (+ 9 fábricas, `isAccountFailure` y tipos), `specs/.../tasks.md` (T4–T6 marcadas).
+- Tests creados: `tests/unit/integraciones/ai-provider/{ai-provider-doubles.ts,test-ai-provider-key,
+  test-saved-ai-provider,save-ai-provider-connection,disconnect-ai-provider,resolve-and-report}.test.ts`,
+  `tests/integration/integraciones/ai-provider-connection-prisma.int.test.ts`.
+- Tests ampliados (solo añadir): `authorization.test.ts`, `module-shape.test.ts` (R18: + 12 archivos;
+  R20: + 32 símbolos del contrato), `tests/integration/aislamiento.json` (+ entrada `commit` al final).
+
+### R → test (de esta tanda)
+- R1 → `authorization.test.ts` (5 operaciones × 5 actores rechazados; antes de validar)
+- R2 → `authorization.test.ts`, `resolve-and-report.test.ts`, `ai-provider-connection-prisma.int.test.ts`
+- R4 → `ai-provider-connection-prisma.int.test.ts` (catálogo por el adaptador)
+- R5 → `ai-provider-connection-prisma.int.test.ts` (RLS forzada en las dos, índice único → carrera)
+- R6, R21, R24, R25, R26, R27, R28 → `resolve-and-report.test.ts`
+- R7 → `save-ai-provider-connection.test.ts`, `ai-provider-connection-prisma.int.test.ts`
+- R9 → `test-saved-ai-provider.test.ts`, `resolve-and-report.test.ts`
+- R10, R11, R12, R13, R18 → `test-ai-provider-key.test.ts` (R18 también en save)
+- R14 → `test-saved-ai-provider.test.ts`
+- R15, R16, R17, R19 → `save-ai-provider-connection.test.ts`; R19 también en el de integración
+  (dos altas y dos guardados concurrentes reales)
+- R20 → `disconnect-ai-provider.test.ts`, `ai-provider-connection-prisma.int.test.ts`
+- R23 (`getAiProviderStatus`), R37 (readiness) → `resolve-and-report.test.ts`, `authorization.test.ts`
+
+### Desviaciones del design
+- `getAiProviderStatus` es `createGetAiProviderStatus` en `resolve-ai-provider-for-reading.ts`:
+  «Archivos esperados» no le da archivo propio.
+- El adaptador toma el ámbito con `companyScopeColumns(scope)` (en `where` y en `data`) y NO añade
+  una envoltura nueva a `company-scope.ts`: `guard-ambito-empresa-integraciones` fija exactamente
+  dos exportaciones allí. Una envoltura propia exigiría tocar la guardia.
+- Segunda vuelta de la carrera: `persist` se repite una vez si `create` lanza
+  `AiProviderConnectionRaceError` **o** si `update` devuelve `null` (fila borrada entre leer y
+  escribir); a la tercera, lanza `AiProviderConnectionRaceError`.
+- `reportAiProviderOutcome` recibe `AiProviderFailure` y no marca si `!isAccountFailure` (el puerto
+  del gateway de §6.3 pasa un `AiProviderFailure`).
+- Si el catálogo no trae el proveedor de una conexión existente (la FK lo impide), los casos de uso
+  lanzan `Error` llano (inesperado).
+- `parseKeyInput`/`runProbe` (en `test-ai-provider-key.ts`) y `decryptStoredKey` (en
+  `test-saved-ai-provider.ts`) se reutilizan desde guardar y resolver.
+- `ai-provider-doubles.ts` es un helper de tests nuevo, calcado de `whatsapp-doubles.ts`.
+
+### Verificación
+- typecheck: 0 errores. lint: 0 errores, 7 warnings preexistentes (no son de esta tanda).
+- `vitest related` (12 de `lib/` + tests tocados + `aislamiento.json`): 354 archivos, 5686 verdes,
+  3 omitidos, 0 rojos.
+- `vitest run guard`: 75 archivos, 1 rojo, el conocido `guard-catalogo-de-errores` R9 (se cierra con
+  T8); `guard-ambito-empresa-integraciones` verde, con el adaptador nuevo dentro del barrido.
+- `ai-provider-connection-prisma.int.test.ts`: 13/13 en base efímera.
+- `vitest run tests/unit/integraciones`: 35 archivos, 578 verdes.
+
+Veredicto: T4, T5 y T6 hechas y en verde; solo sigue rojo R9 de errores, que se cierra en T8.
