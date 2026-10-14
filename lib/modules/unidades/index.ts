@@ -54,7 +54,7 @@ export type { DeleteUnitDeps } from './domain/delete-unit';
 // contrato la publica y `inventario`, `recetas` y `pedidos` siguen tratando la unidad como
 // anotativa. La escala del resultado cuando la division no termina —12 decimales, truncando—
 // vive en `CONVERSION_SCALE`, documentada en `domain/convert-quantity.ts`.
-export { convertQuantity } from './domain/convert-quantity';
+export { convertQuantity, unitFamilyId } from './domain/convert-quantity';
 export type { UnitConversion } from './domain/convert-quantity';
 export { IncompatibleUnitsError } from './domain/errors';
 export { convertWithApproximation } from './domain/convert-with-approximation';

@@ -125,6 +125,22 @@ export class AdjustmentReasonNotAllowedError extends InventarioError {
   }
 }
 
+export class ConvertedStockOutOfRangeError extends InventarioError {
+  readonly code = 'converted_stock_out_of_range';
+
+  constructor(diagnostic?: string) {
+    super('converted_stock_out_of_range', diagnostic);
+  }
+}
+
+export class ConvertedCostOutOfRangeError extends InventarioError {
+  readonly code = 'converted_cost_out_of_range';
+
+  constructor(diagnostic?: string) {
+    super('converted_cost_out_of_range', diagnostic);
+  }
+}
+
 export class ValidationError extends InventarioError {
   readonly code = 'invalid_input';
 

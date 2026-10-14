@@ -7,12 +7,12 @@
 
 ## Tanda 1 — dominio puro (unidades + inventario)
 
-- [ ] **T1 — Publicar la familia de una unidad.** En `convert-quantity.ts`, `effectiveBaseId` pasa a
+- [x] **T1 — Publicar la familia de una unidad.** En `convert-quantity.ts`, `effectiveBaseId` pasa a
   ser la exportada `unitFamilyId`, y `convertQuantity` la usa por dentro. El barrel de `unidades`
   la reexporta (`design.md > 3.1`).
   Test `tests/unit/unidades/domain/unit-family.test.ts`: base, derivada y unidad suelta.
   *Hecho:* verde; `convert-quantity.test.ts` sigue verde sin tocarlo.
-- [ ] **T2 — `supply-family.ts`, `compareDecimals` e `isStoredDecimal`** (`design.md > 3.2`).
+- [x] **T2 — `supply-family.ts`, `compareDecimals` e `isStoredDecimal`** (`design.md > 3.2`).
   Depende de T1.
   - `pickSupplyTarget` y `convertSupplyBatch`, puras, publicadas por el barrel de `inventario`.
   - `compareDecimals`, exacta, en `decimal-quantity.ts`.
@@ -30,7 +30,7 @@
     - `misma unidad devuelve la entrada`.
 
   *Hecho:* verde; ningún import de `@prisma/client` ni `next/*` (guardia de módulos verde).
-- [ ] **T3 — Errores y códigos nuevos** (`design.md > 4.3`).
+- [x] **T3 — Errores y códigos nuevos** (`design.md > 4.3`).
   - `ConvertedStockOutOfRangeError` y `ConvertedCostOutOfRangeError` en `inventario/domain/errors.ts`,
     publicadas por el barrel.
   - `converted_stock_out_of_range` y `converted_cost_out_of_range` en `error-codes.ts`, con la

@@ -16,6 +16,8 @@ export {
   BatchNotFoundError,
   BatchStockNegativeError,
   ActionNotAllowedError,
+  ConvertedStockOutOfRangeError,
+  ConvertedCostOutOfRangeError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
 export {
@@ -50,6 +52,7 @@ export {
   updateProductSchema,
   productNameSchema,
   PRODUCT_NAME_MAX_LENGTH,
+  isStoredDecimal,
   type CreateProductInput,
   type UpdateProductInput,
 } from './domain/product-input';
@@ -176,9 +179,17 @@ export {
   addQuantities,
   subtractQuantities,
   compareQuantities,
+  compareDecimals,
   minQuantity,
   ceilToScale4,
 } from './domain/decimal-quantity';
+export {
+  pickSupplyTarget,
+  convertSupplyBatch,
+  type SupplyHomonym,
+  type SupplyTarget,
+  type ConvertedSupplyBatch,
+} from './domain/supply-family';
 export { compareBatchesOldestFirst, type OrderableBatch } from './domain/batch-order';
 export {
   planFinishedGoodsLine,

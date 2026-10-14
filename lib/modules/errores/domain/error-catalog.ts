@@ -100,6 +100,8 @@ export const ERROR_MESSAGE_KEY = {
   recipe_steps_locked: 'errors.recipe_steps_locked',
   ai_provider_missing: 'errors.ai_provider_missing',
   ai_provider_error: 'errors.ai_provider_error',
+  converted_stock_out_of_range: 'errors.converted_stock_out_of_range',
+  converted_cost_out_of_range: 'errors.converted_cost_out_of_range',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -253,4 +255,8 @@ export const ERROR_MESSAGES_ES = {
   'errors.ai_provider_missing': 'Para leer PDF, conecta el proveedor IA de tu empresa.',
   'errors.ai_provider_error':
     'Error con tu proveedor IA. Revisa la conexión en Integraciones > Proveedor IA.',
+  'errors.converted_stock_out_of_range':
+    'La existencia convertida a la unidad del producto no cabe en 4 decimales. Ingrésala en la unidad del producto.',
+  'errors.converted_cost_out_of_range':
+    'El costo unitario convertido a la unidad del producto no cabe en 4 decimales. Ingresa el lote en la unidad del producto.',
 } as const satisfies Record<ErrorMessageKey, string>;
