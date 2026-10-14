@@ -65,7 +65,7 @@ function montar(order: OrderAssignmentTarget | null): {
   };
   const people = {
     findAliveRefsInCompany: vi.fn(async (_c: string, ids: readonly string[]) =>
-      ids.map((id) => ({ id, displayName: `Persona ${id}`, isActive: true })),
+      ids.map((id) => ({ id, displayName: `Persona ${id}`, isActive: true, roleName: 'Operador' })),
     ),
     findRefsIncludingDeletedInCompany: vi.fn(async () => []),
   };

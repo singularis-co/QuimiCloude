@@ -64,8 +64,8 @@ const CLIENTE: CustomerRef = { id: CLIENTE_ID, firstNames: 'Ana', lastNames: 'Pe
 
 /** Laura esta dada de baja (inactiva): su nombre se sigue mostrando. */
 const PERSONAS: readonly PersonRef[] = [
-  { id: LAURA, displayName: 'Laura Gomez', isActive: false, permissions: [] },
-  { id: CARLOS, displayName: 'Carlos Ruiz', isActive: true, permissions: [] },
+  { id: LAURA, displayName: 'Laura Gomez', isActive: false, permissions: [], roleName: 'Operador' },
+  { id: CARLOS, displayName: 'Carlos Ruiz', isActive: true, permissions: [], roleName: 'Operador' },
 ]
 
 const LOTES = new Map([
@@ -186,7 +186,7 @@ describe('listOrderDeliveries — acceso (R4)', () => {
     const listar = createListOrderDeliveries(m.deps)
     const soloEntregas: Actor = { ...CONSULTOR, permissions: ['entregas.anular', 'entregas.modificar', 'pedidos.modificar'] }
 
-    for (const actor of [null, undefined, { ...CONSULTOR, permissions: [] }, soloEntregas]) {
+    for (const actor of [null, undefined, { ...CONSULTOR, permissions: [], roleName: 'Operador' }, soloEntregas]) {
       expect(await codigoDelFallo(() => listar(VOID_ORDER_ID, actor))).toBe('unauthorized')
       expect(await codigoDelFallo(() => listar('no-es-uuid', actor))).toBe('unauthorized')
     }
@@ -324,7 +324,7 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
     )
     const m = montar({
       filas,
-      personas: [...PERSONAS, { id: OTRA, displayName: 'Marta Diaz', isActive: true, permissions: [] }],
+      personas: [...PERSONAS, { id: OTRA, displayName: 'Marta Diaz', isActive: true, permissions: [], roleName: 'Operador' }],
     })
     const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
     expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledWith(EMPRESA, [LAURA, CARLOS, OTRA], AHORA)

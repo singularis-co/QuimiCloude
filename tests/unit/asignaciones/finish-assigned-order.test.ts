@@ -97,7 +97,7 @@ function persona(
   permissions: readonly PermissionCode[],
   isActive = true,
 ): PersonRef {
-  return { id, displayName: `Persona ${id.slice(0, 8)}`, isActive, permissions };
+  return { id, displayName: `Persona ${id.slice(0, 8)}`, isActive, permissions, roleName: 'Operador' };
 }
 
 function grupo(id: string, name: string, activeMemberIds: readonly string[]): WorkGroupSnapshot {

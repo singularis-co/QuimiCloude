@@ -52,10 +52,10 @@ import type { WorkGroupDirectory, WorkGroupSnapshot } from '../../../domain/work
 
 /**
  * Exactamente lo que `PersonRef` necesita: los tres campos que consume `buildDisplayName`, los
- * DOS que consume `effectiveAccountStatus` y los codigos de permiso del rol, en la MISMA consulta
- * (por la relacion `Role.permissions`, igual que `session-user-prisma.ts`). Ni correo, ni
- * documento, ni el nombre del rol, ni `passwordHash`: lo que no esta en esta lista no puede
- * escaparse a un payload del navegador.
+ * DOS que consume `effectiveAccountStatus`, el nombre del rol y los codigos de permiso
+ * del rol, en la MISMA consulta (por la relacion `Role.permissions`, igual que
+ * `session-user-prisma.ts`). Ni correo, ni documento, ni `passwordHash`: lo que no esta en esta
+ * lista no puede escaparse a un payload del navegador.
  *
  * Es la misma forma que `MEMBER_CANDIDATE_SELECT` de `work-group-prisma.ts` y **no se reutiliza a
  * proposito**: aquel es la proyeccion del puerto de grupos y este es la de este contrato; atarlos
@@ -68,7 +68,7 @@ const PERSON_REF_SELECT = {
   username: true,
   accountStatus: true,
   lockedUntil: true,
-  role: { select: { permissions: { select: { permissionCode: true } } } },
+  role: { select: { name: true, permissions: { select: { permissionCode: true } } } },
 } satisfies Prisma.UserSelect;
 
 type PersonRefPayload = Prisma.UserGetPayload<{ select: typeof PERSON_REF_SELECT }>;
@@ -115,6 +115,7 @@ function toPersonRef(row: PersonRefPayload, now: Date): PersonRef {
     // el TIPO, y `assertPermission` compara por pertenencia exacta, asi que un codigo que ya no
     // exista en el catalogo simplemente no concederia nada.
     permissions: row.role.permissions.map((asignacion) => asignacion.permissionCode) as PermissionCode[],
+    roleName: row.role.name,
   };
 }
 
@@ -170,14 +171,17 @@ export async function findRefsIncludingDeletedInCompany(
  * Las personas VIVAS de la empresa, sin filtrar por identificador, para poblar un selector. El
  * orden y el tope son los que ya tenia el selector de responsables antes de este archivo.
  *
- * `filters?.accountStatus` se aplica AQUI, en memoria y contra el estado EFECTIVO
- * (`effectiveAccountStatus`), nunca como `WHERE` sobre la columna: la columna miente en los
- * dos sentidos de QC-78 y R21 prohibe la segunda definicion. Los literales que no son estados
- * se descartan y, si no queda ninguno, el filtro se omite (mismo criterio QC-57 R5 que
- * `userFilterWhere` en `user-admin-prisma.ts`).
+ * El tope se aplica DESPUES de los dos filtros, para que ninguna fila que los pasa quede
+ * fuera porque otra que no los pasa ocupara su hueco:
  *
- * El `take` va ANTES del filtro: con filtro la respuesta puede traer menos de `limit` filas.
- * Es la decision consciente del contrato (`people-directory.ts`).
+ *   - `filters?.roles` va en el `WHERE` (nombre del rol), antes del `take`.
+ *   - `filters?.accountStatus` se aplica en memoria contra el estado EFECTIVO
+ *     (`effectiveAccountStatus`), nunca como `WHERE` sobre la columna: la columna miente en los
+ *     dos sentidos de QC-78 y R21 prohibe la segunda definicion. Por eso, con ese filtro, la
+ *     consulta no lleva `take` y el tope se corta tras filtrar; sin el, el `take` va en la consulta.
+ *
+ * Los literales que no son estados se descartan y, si no queda ninguno, el filtro se omite (mismo
+ * criterio QC-57 R5 que `userFilterWhere` en `user-admin-prisma.ts`). Un `roles` vacio no acota.
  */
 export async function listAliveInCompany(
   companyId: string,
@@ -185,16 +189,24 @@ export async function listAliveInCompany(
   limit: number,
   filters?: PeopleRefFilters,
 ): Promise<readonly PersonRef[]> {
+  const allowed = sanitizeAccountStatuses(filters?.accountStatus);
+  const roles = filters?.roles ?? [];
+
   const rows = await prisma.user.findMany({
-    where: { companyId, deletedAt: null },
+    where: {
+      companyId,
+      deletedAt: null,
+      ...(roles.length > 0 ? { role: { name: { in: [...roles] } } } : {}),
+    },
     select: PERSON_REF_SELECT,
     orderBy: [{ lastNames: 'asc' }, { firstNames: 'asc' }, { id: 'asc' }],
-    take: limit,
+    ...(allowed === null ? { take: limit } : {}),
   });
 
-  const allowed = sanitizeAccountStatuses(filters?.accountStatus);
   const inScope =
-    allowed === null ? rows : rows.filter((row) => allowed.has(effectiveAccountStatus(row, now)));
+    allowed === null
+      ? rows
+      : rows.filter((row) => allowed.has(effectiveAccountStatus(row, now))).slice(0, Math.max(limit, 0));
 
   return inScope.map((row) => toPersonRef(row, now));
 }
