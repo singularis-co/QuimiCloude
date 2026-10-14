@@ -42,24 +42,188 @@ Decisiones del humano tomadas el 2026-10-13 y escritas en la descripción del is
 
 | # | Decisión | Quién y cuándo | Enmienda a | Cubierta por |
 | --- | --- | --- | --- | --- |
-| D1 | Módulos **enteros**, no permisos sueltos. «Integraciones» es un solo interruptor: Proveedor IA, Inventarios y WhatsApp; arrastra la lectura de PDF, Contactos y las notificaciones | humano, 2026-10-13 (QC-277) | — | |
-| D2 | **Núcleo, no se apaga nunca:** usuarios y grupos, unidades, presentaciones, inventario (lotes, reservas, terminado, herramientas y máquinas), fórmulas, pedidos, asignación y ejecución, empaque, acondicionamiento, terminados, entregas y clientes | humano, 2026-10-13 (QC-277) | — | |
-| D3 | **Añadidos:** dashboard y recorrido; proveedores; lectura de PDF con IA; importación desde Excel; integraciones. En el futuro: evidencia por paso (QC-214), notificaciones (QC-137) y proveedores de lo que falta (QC-139) | humano, 2026-10-13 (QC-277) | — | |
-| D4 | La lectura de PDF con IA depende de Integraciones > Proveedor IA (QC-275 pasa la key a cada empresa y bloquea la lectura sin proveedor) | humano, 2026-10-13 (`progress/modulos-por-empresa.md`) | — | |
-| D5 | **Un añadido apagado desaparece del todo:** sin menú ni botón, y 404 si se entra por URL | humano, 2026-10-13 (QC-277) | — | |
-| D6 | **Al apagar, se descarta lo pendiente:** los trabajos en cola no se procesan y las revisiones sin confirmar dejan de verse. Lo ya confirmado se conserva | humano, 2026-10-13 (QC-277) | — | |
-| D7 | **Una empresa nueva nace solo con el núcleo** | humano, 2026-10-13 (QC-277) | QC-162 (alta de empresa) | |
-| D8 | El permiso efectivo es rol ∩ módulos activos, resuelto en la sesión en cada petición: efecto inmediato | humano, 2026-10-13 (QC-277) | `docs/architecture.md:43`, `:557` | |
-| D9 | El Maestro prende y apaga uno a uno o todos a la vez, con `empresas.modificar` | humano, 2026-10-13 (QC-277) | — | |
-| D10 | Todos los huecos se cierran: puntos cruzados con permiso de otro módulo, logo y aterrizaje fijos, webhook y crons fuera de sesión | humano, 2026-10-13 (QC-277) | — | |
-| D11 | **Validación en el servidor y en el menú.** Lleva E2E | humano, 2026-10-13 (QC-277) | — | |
+| D1 | Módulos **enteros**, no permisos sueltos. «Integraciones» es un solo interruptor: Proveedor IA, Inventarios y WhatsApp; arrastra la lectura de PDF, Contactos y las notificaciones | humano, 2026-10-13 (QC-277) | — | R1, R2, R4 |
+| D2 | **Núcleo, no se apaga nunca:** usuarios y grupos, unidades, presentaciones, inventario (lotes, reservas, terminado, herramientas y máquinas), fórmulas, pedidos, asignación y ejecución, empaque, acondicionamiento, terminados, entregas y clientes | humano, 2026-10-13 (QC-277) | — | R1, R3, R32 |
+| D3 | **Añadidos:** dashboard y recorrido; proveedores; lectura de PDF con IA; importación desde Excel; integraciones. En el futuro: evidencia por paso (QC-214), notificaciones (QC-137) y proveedores de lo que falta (QC-139) | humano, 2026-10-13 (QC-277) | — | R2 |
+| D4 | La lectura de PDF con IA depende de Integraciones > Proveedor IA (QC-275 pasa la key a cada empresa y bloquea la lectura sin proveedor) | humano, 2026-10-13 (`progress/modulos-por-empresa.md`) | — | R4, R22 |
+| D5 | **Un añadido apagado desaparece del todo:** sin menú ni botón, y 404 si se entra por URL | humano, 2026-10-13 (QC-277) | — | R12, R13, R14, R15, R16, R17 |
+| D6 | **Al apagar, se descarta lo pendiente:** los trabajos en cola no se procesan y las revisiones sin confirmar dejan de verse. Lo ya confirmado se conserva | humano, 2026-10-13 (QC-277) | — | R22, R23, R24 |
+| D7 | **Una empresa nueva nace solo con el núcleo** | humano, 2026-10-13 (QC-277) | QC-162 (alta de empresa) | R5 |
+| D8 | El permiso efectivo es rol ∩ módulos activos, resuelto en la sesión en cada petición: efecto inmediato | humano, 2026-10-13 (QC-277) | `docs/architecture.md:43`, `:557` | R8, R9, R10, R11, R37 |
+| D9 | El Maestro prende y apaga uno a uno o todos a la vez, con `empresas.modificar` | humano, 2026-10-13 (QC-277) | — | R27, R28, R29, R30, R31, R32, R33, R34 |
+| D10 | Todos los huecos se cierran: puntos cruzados con permiso de otro módulo, logo y aterrizaje fijos, webhook y crons fuera de sesión | humano, 2026-10-13 (QC-277) | — | R15, R16, R17, R18, R19, R20, R21, R22, R25, R26 |
+| D11 | **Validación en el servidor y en el menú.** Lleva E2E | humano, 2026-10-13 (QC-277) | — | R12, R13, R14, R35, R36 |
+| D12 | El cron de caducidad de pedidos es **núcleo**: corre para toda empresa activa, sin depender de añadidos | humano, 2026-10-14 (cierra P1) | — | R25, R26 |
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe `spec_author`. Cada fila de la tabla anterior acaba cubierta por al menos
-un `R<n>`._
+Vocabulario de este documento:
+
+- **Añadido:** un módulo apagable de D3. **Interruptor:** lo que el Maestro guarda para un
+  añadido de una empresa (prendido o apagado).
+- **Añadido activo:** el que tiene el interruptor prendido **y** cumple sus dependencias (R4).
+- **Permiso efectivo:** el que el sistema usa para autorizar, mostrar el menú y elegir el
+  aterrizaje (R8).
+
+### Catálogo
+
+- **R1** — El sistema DEBE clasificar cada permiso del catálogo en exactamente uno de estos grupos:
+  el núcleo o un único añadido. Un permiso sin clasificar o clasificado dos veces es un error que
+  se detecta antes de desplegar.
+- **R2** — El sistema DEBE reconocer exactamente cinco añadidos, cada uno con los permisos que
+  arrastra:
+  - **dashboard y recorrido:** `dashboard.consultar`;
+  - **proveedores:** `proveedores.consultar` y `proveedores.modificar`;
+  - **lectura de PDF con IA:** `documentos.consultar` y `documentos.modificar`;
+  - **importación desde Excel:** ningún permiso propio;
+  - **integraciones (Proveedor IA, Inventarios y WhatsApp):** `integraciones.modificar`.
+- **R3** — El sistema DEBE tratar como núcleo todos los demás permisos del catálogo, y ninguna
+  operación DEBE poder apagar un permiso del núcleo.
+- **R4** — MIENTRAS el añadido integraciones no esté activo en una empresa, el sistema DEBE tratar
+  la lectura de PDF con IA como no activa en esa empresa, aunque su interruptor esté prendido.
+
+### Estado de cada empresa
+
+- **R5** — CUANDO el Maestro da de alta una empresa, el sistema DEBE crearla sin ningún añadido
+  prendido.
+- **R6** — CUANDO se aplica la migración de esta ficha, el sistema DEBE dejar prendidos los cinco
+  añadidos en toda empresa que ya exista (sujeto a P2).
+- **R7** — CUANDO el seed crea la empresa inicial fuera de producción, el sistema DEBE crearla con
+  los cinco añadidos prendidos (sujeto a P2).
+
+### Permiso efectivo
+
+- **R8** — MIENTRAS un usuario con empresa tenga sesión, el sistema DEBE calcular en cada petición
+  su permiso efectivo:
+  - son los permisos de su rol, menos los de cada añadido que no esté activo en su empresa;
+  - se calcula en la misma lectura de sesión que ya existe, sin ninguna consulta adicional.
+- **R9** — CUANDO cambian los añadidos de una empresa, el sistema DEBE aplicar el permiso efectivo
+  nuevo desde la siguiente petición de cada usuario de esa empresa, sin cerrar ni volver a iniciar
+  su sesión.
+- **R10** — SI el usuario no tiene empresa, ENTONCES el sistema DEBE usar los permisos de su rol
+  sin recortar.
+- **R11** — El sistema NO DEBE conceder a un usuario ningún permiso que su rol no tenga, esté
+  activo o no el añadido de ese permiso.
+
+### Menú, pantallas y operaciones
+
+- **R12** — MIENTRAS un añadido no esté activo en la empresa del usuario, el sistema NO DEBE
+  incluir en el menú ningún enlace de ese añadido. Un grupo del menú al que no le quede ningún
+  enlace NO DEBE aparecer.
+- **R13** — CUANDO un usuario pide por URL una pantalla de un añadido que no está activo en su
+  empresa, el sistema DEBE responder 404 dentro de la zona privada, igual que sin permiso.
+  - Son pantallas de añadido: dashboard y recorrido, proveedores y su detalle, la revisión de una
+    importación de fórmula o de catálogo desde PDF, la importación desde Excel y las tres pantallas
+    de integraciones.
+- **R14** — CUANDO un usuario invoca una operación de un añadido que no está activo en su empresa,
+  el sistema DEBE rechazarla:
+  - con el mismo error de autorización que daría sin permiso;
+  - sin leer ni escribir datos de la empresa.
+- **R15** — MIENTRAS la lectura de PDF con IA no esté activa en la empresa del usuario, el sistema
+  DEBE comportarse así, aunque el usuario tenga `recetas.modificar` o `proveedores.modificar`:
+  - NO DEBE mostrar el botón de subir PDF en Fórmulas ni en el detalle de proveedor;
+  - DEBE rechazar la vista previa y la confirmación de una importación de fórmula o de catálogo.
+- **R16** — MIENTRAS la importación desde Excel no esté activa en la empresa del usuario, el
+  sistema DEBE comportarse así, aunque el usuario tenga `inventario.modificar`:
+  - NO DEBE mostrar el botón «Importar» de Inventario;
+  - DEBE rechazar la plantilla, los valores reconocidos, la vista previa y la confirmación de la
+    importación.
+- **R17** — MIENTRAS el añadido dashboard no esté activo en la empresa del usuario, el sistema NO
+  DEBE ofrecer «Ver recorrido» en las filas de Asignación.
+
+### Logo y aterrizaje
+
+- **R18** — CUANDO un usuario con sesión pulsa el logo de la barra lateral, el sistema DEBE
+  llevarlo al primer enlace de su menú efectivo.
+- **R19** — CUANDO un usuario con sesión válida entra al login sin destino de vuelta, el sistema
+  DEBE llevarlo al primer enlace de su menú efectivo.
+- **R20** — CUANDO un usuario inicia sesión sin destino de vuelta válido, el sistema DEBE
+  aterrizarlo en el primer enlace de su menú calculado con el permiso efectivo.
+- **R21** — SI al resolver el destino de R18 o R19 la sesión ya no es válida, ENTONCES el sistema
+  DEBE llevar al login con la marca de sesión terminada, sin entrar en un bucle de redirecciones.
+
+### Lo que corre fuera de la sesión
+
+- **R22** — CUANDO la cola entrega el trabajo de un PDF de una empresa cuya lectura de PDF con IA
+  no está activa, el sistema DEBE terminarlo como fallo definitivo:
+  - sin descargar el PDF y sin llamar a la IA;
+  - sin pedir a la cola que lo reintente.
+- **R23** — MIENTRAS la lectura de PDF con IA no esté activa, una revisión de importación sin
+  confirmar NO DEBE poder verse ni confirmarse.
+- **R24** — CUANDO se apaga un añadido, el sistema NO DEBE borrar ni modificar ningún dato ya
+  confirmado: recetas, proveedores, líneas de catálogo, inventario importado ni conexiones de
+  integración.
+- **R25** — El proceso diario de caducidad de pedidos DEBE recorrer toda empresa viva, sin
+  consultar sus añadidos.
+- **R26** — El sistema DEBE clasificar como núcleo o como de un añadido cada ruta del servidor que
+  corre sin sesión.
+  - Una ruta de añadido DEBE comprobar que el añadido está activo en la empresa del trabajo antes
+    de actuar.
+  - Una ruta nueva sin clasificar es un error que se detecta antes de desplegar.
+
+### Operación del Maestro
+
+- **R27** — CUANDO el Maestro pide los añadidos de una empresa, viva o de baja, el sistema DEBE
+  devolver por cada añadido su interruptor y si está activo. Exige `empresas.consultar`.
+- **R28** — CUANDO el Maestro prende o apaga un añadido de una empresa viva, el sistema DEBE
+  guardar el interruptor. Exige `empresas.modificar`.
+- **R29** — CUANDO el Maestro prende o apaga todos los añadidos de una empresa viva a la vez, el
+  sistema DEBE dejar los cinco en ese estado en una sola operación: o cambian todos los que deban
+  cambiar, o ninguno.
+- **R30** — SI quien pide no tiene el permiso exigido, ENTONCES el sistema DEBE rechazar con
+  `unauthorized` sin leer ni escribir. Vale también sin sesión y para cualquier rol de empresa.
+- **R31** — SI la empresa no existe, o está de baja y la operación escribe, ENTONCES el sistema
+  DEBE rechazar con `company_not_found` sin escribir.
+- **R32** — SI la clave pedida no es uno de los cinco añadidos (incluido cualquier nombre del
+  núcleo), ENTONCES el sistema DEBE rechazar con `invalid_input` sin escribir.
+- **R33** — CUANDO una operación cambia el interruptor de un añadido, el sistema DEBE registrar en
+  el historial de la empresa un evento por cada añadido cambiado:
+  - con tipo `addon.enabled` o `addon.disabled`, el autor, el instante y la clave del añadido;
+  - en la misma transacción que el cambio.
+  Un añadido que ya estaba en el estado pedido no genera escritura ni evento.
+- **R34** — CUANDO el Maestro lee el historial de una empresa, el sistema DEBE devolver la clave del
+  añadido en cada evento de añadido.
+
+### Validación, documentación y migración
+
+- **R35** — El sistema DEBE aplicar el recorte en el servidor y en el menú: en la sesión, en el
+  corte de cada pantalla, en cada caso de uso y en cada trabajo fuera de sesión. Ningún componente
+  de cliente decide qué añadido está activo.
+- **R36** — Un E2E DEBE cubrir una empresa sin añadidos:
+  - menú sin dashboard, proveedores ni integraciones, y sin el botón «Importar»;
+  - 404 al entrar por URL a una pantalla de cada añadido;
+  - aterrizaje y logo en el primer enlace del menú efectivo;
+  - al prender los añadidos, todo aparece en la siguiente petición, sin volver a iniciar sesión.
+- **R37** — `docs/architecture.md` DEBE decir que el permiso efectivo es rol ∩ añadidos activos,
+  resuelto en cada petición:
+  - la regla «nada de permisos por empresa más allá de su rol» queda enmendada;
+  - la viñeta «los permisos de la sesión son una foto del instante del login» queda sustituida.
+- **R38** — La migración de esta ficha DEBE tener un `down.sql` que deshaga exactamente lo que hace.
 
 ## Preguntas abiertas
 
-- **P1. Cron de caducidad de pedidos.** El mapa lo propone como núcleo (protege las reservas) y
-  pedidos es núcleo según D2, pero el humano no lo confirmó de forma explícita. Le toca al humano.
+P1 (cron de caducidad de pedidos) se cerró el 2026-10-14 como D12. Las que siguen no bloquean el
+spec: cada una lleva el defecto con el que se diseñó, y cambiarlo toca solo lo que se cita.
+
+- **P2 — Empresas que ya existen y empresa del seed.** D7 fija la empresa **nueva**, pero no dice
+  qué pasa con las que ya existen (en producción, QuimiCloud: QC-162 P5). Si la migración las deja
+  solo con el núcleo, en producción pierden dashboard, proveedores, PDF, Excel e integraciones al
+  desplegar, y el Maestro no tiene pantalla para prenderlos hasta QC-278. **Defecto:** la migración
+  prende los cinco añadidos en las que ya existen (R6), y el seed de desarrollo, preview y E2E crea
+  QuimiCloud con los cinco (R7). Cambiarlo toca R6, R7, el `UPDATE` de la migración y el seed.
+- **P3 — Prender la lectura de PDF con integraciones apagada.** D1 dice que integraciones
+  «arrastra» la lectura de PDF, pero no dice si el Maestro puede prender la lectura con
+  integraciones apagado. **Defecto:** se guarda el interruptor pero no surte efecto hasta que
+  integraciones se prenda (R4). Apagar integraciones tampoco toca el interruptor de la lectura: al
+  volver a prender integraciones, la lectura vuelve como estaba. La alternativa (rechazar el
+  cambio, o apagar en cascada) cambia R4, R28 y R29.
+- **P4 — Volver a prender la lectura de PDF.** D6 dice que las revisiones sin confirmar «dejan de
+  verse», pero no dice si vuelven al prender otra vez. **Defecto:** no se borra ni se marca nada, así
+  que una revisión sin confirmar vuelve a abrirse por su enlace. Los trabajos que llegaron con la
+  lectura apagada sí quedan terminados en error y no vuelven (R22). Si deben descartarse para
+  siempre, hace falta una escritura en `documentos` al apagar, que esta ficha no tiene.
+- **P5 — Evidencia por paso (QC-214).** D3 la lista entre los añadidos «en el futuro», pero QC-214
+  ya está en `dev`. Sus operaciones cuelgan de permisos del núcleo (`asignaciones.ejecutar`,
+  `empaque.modificar`, `recetas.modificar`). **Defecto:** queda fuera de esta ficha y sigue siendo
+  núcleo de hecho hasta que una ficha propia la convierta en el sexto añadido. El catálogo de R2
+  está hecho para que eso sea una entrada más y sus guardas.
