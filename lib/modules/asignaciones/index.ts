@@ -183,7 +183,7 @@ export {
 } from './domain/list-finished-orders';
 export type { FinishedOrderView } from './domain/finished-order-view';
 
-// Quien puede ser responsable de un pedido, por nombre de rol (QC-274). Se publica para que
+// Quien puede ser responsable de un pedido, por nombre de rol. Se publica para que
 // cualquier lector externo aplique el MISMO criterio que usa `assign-responsibles.ts`.
 export { canBeResponsible, ORDER_RESPONSIBLE_FILTERS } from './domain/responsible-eligibility';
 

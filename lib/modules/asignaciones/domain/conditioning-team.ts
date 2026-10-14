@@ -21,9 +21,9 @@ const PEDIDOS_CONSULTAR: PermissionCode = 'pedidos.consultar';
 const DENEGADO = new Error('asignaciones: pedidos.consultar ausente al comprobar el equipo');
 
 /**
- * El equipo de acondicionamiento conserva el criterio por PERMISO de QC-145: queda fuera quien
- * supervisa los pedidos de toda la empresa. QC-274 cambio solo el de responsables de un pedido
- * (por rol), que dejaria fuera a los de Acondicionamiento.
+ * El equipo de acondicionamiento conserva el criterio por PERMISO: queda fuera quien
+ * supervisa los pedidos de toda la empresa. El de responsables de un pedido se decide por rol, y
+ * ese criterio dejaria fuera a los de Acondicionamiento.
  */
 function isNotOrdersSupervisor(person: PermissionBearer): boolean {
   try {

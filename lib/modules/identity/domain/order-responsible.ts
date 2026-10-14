@@ -2,19 +2,19 @@
 /**
  * Quien puede ser responsable de un pedido, como filtro del directorio de personas.
  *
- * QC-274 (2026-10-13): por nombre de rol, Operador y Empacador; enmienda QC-145 R32/D13.
- *
  * Vive en `identity` porque el nombre del rol es suyo (`./roles`): los modulos de negocio no lo
  * leen (`guard-autorizacion-por-permiso`). `asignaciones` pasa `ORDER_RESPONSIBLE_FILTERS` a
  * `PeopleDirectory.listAliveInCompany` para el selector y pregunta `isOrderResponsible` al validar
  * la asignacion: la lista de roles se escribe UNA vez, aqui.
+ *
+ * La parte de «cuenta activa» se toma de `ACTIVE_ACCOUNTS_ONLY`, el filtro con nombre que ya
+ * publica el directorio: este archivo no escribe el estado por su cuenta.
  */
+import { ACTIVE_ACCOUNTS_ONLY, type PeopleRefFilters, type PersonRef } from './people-directory';
 import { ROLE_EMPACADOR, ROLE_OPERADOR } from './roles';
 
-import type { PeopleRefFilters, PersonRef } from './people-directory';
-
 export const ORDER_RESPONSIBLE_FILTERS = {
-  accountStatus: ['active'],
+  ...ACTIVE_ACCOUNTS_ONLY,
   roles: [ROLE_OPERADOR, ROLE_EMPACADOR],
 } as const satisfies PeopleRefFilters;
 

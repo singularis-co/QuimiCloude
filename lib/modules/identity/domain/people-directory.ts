@@ -34,7 +34,7 @@ import type { PermissionCode } from './permissions';
  * resto de la fila: es lo que permite decidir si una persona puede ser responsable de un pedido
  * sin una segunda ida a la base.
  *
- * `roleName` es el nombre del rol de la persona (`ROLE_*` de `./roles`). QC-274: quien puede ser
+ * `roleName` es el nombre del rol de la persona (`ROLE_*` de `./roles`): quien puede ser
  * responsable de un pedido se decide por nombre de rol (Operador y Empacador), y el camino de
  * ESCRITURA tiene que poder comprobarlo sobre la misma fila que ya lee.
  *
@@ -61,7 +61,7 @@ export type PersonRef = {
  * vigente no.
  *
  * `roles` son NOMBRES de rol (`ROLE_*` de `./roles`) y multivalor. Ausente o vacio = todos. Se
- * aplica en la consulta, antes del tope (QC-274).
+ * aplica en la consulta, antes del tope.
  *
  * Los dos filtros se aplican ANTES del tope: con filtro, el tope cuenta solo filas que pasan.
  */
@@ -120,7 +120,7 @@ export interface PeopleDirectory {
    *
    * `filters` es opcional y abierto (`PeopleRefFilters`): quien necesita acotar —p. ej. solo
    * cuentas efectivas `['active']`— lo pide aqui en vez de filtrar fuera o de exigir un metodo
-   * nuevo. El tope se aplica DESPUES de filtrar (QC-274): ninguna fila que pasa el filtro queda
+   * nuevo. El tope se aplica DESPUES de filtrar: ninguna fila que pasa el filtro queda
    * fuera porque otra que no lo pasa ocupara su hueco.
    */
   listAliveInCompany(

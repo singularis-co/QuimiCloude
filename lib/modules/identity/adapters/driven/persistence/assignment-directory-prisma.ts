@@ -52,7 +52,7 @@ import type { WorkGroupDirectory, WorkGroupSnapshot } from '../../../domain/work
 
 /**
  * Exactamente lo que `PersonRef` necesita: los tres campos que consume `buildDisplayName`, los
- * DOS que consume `effectiveAccountStatus`, el nombre del rol (QC-274) y los codigos de permiso
+ * DOS que consume `effectiveAccountStatus`, el nombre del rol y los codigos de permiso
  * del rol, en la MISMA consulta (por la relacion `Role.permissions`, igual que
  * `session-user-prisma.ts`). Ni correo, ni documento, ni `passwordHash`: lo que no esta en esta
  * lista no puede escaparse a un payload del navegador.
@@ -171,7 +171,7 @@ export async function findRefsIncludingDeletedInCompany(
  * Las personas VIVAS de la empresa, sin filtrar por identificador, para poblar un selector. El
  * orden y el tope son los que ya tenia el selector de responsables antes de este archivo.
  *
- * El tope se aplica DESPUES de los dos filtros (QC-274), para que ninguna fila que los pasa quede
+ * El tope se aplica DESPUES de los dos filtros, para que ninguna fila que los pasa quede
  * fuera porque otra que no los pasa ocupara su hueco:
  *
  *   - `filters?.roles` va en el `WHERE` (nombre del rol), antes del `take`.

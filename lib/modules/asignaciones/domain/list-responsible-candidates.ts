@@ -8,7 +8,7 @@
  *
  * Devuelve las personas vivas de la empresa que pueden ser responsables: la lista sale de
  * `listAliveInCompany` con `ORDER_RESPONSIBLE_FILTERS` (cuenta activa y rol Operador o
- * Empacador, QC-274), que `identity` aplica antes del tope. El rechazo de `assignResponsibles`
+ * Empacador), que `identity` aplica antes del tope. El rechazo de `assignResponsibles`
  * al asignar queda como segunda barrera, con la misma definicion.
  *
  * Dominio PURO: `zod` y tipos del propio modulo o del contrato publico de `identity`. Sin
