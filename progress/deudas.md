@@ -407,3 +407,8 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Qué falta:** la regex del guard usa `\s*` después del `=`, y `\s` también casa saltos de línea. Una variable vacía al final de `.env.example` (`NOMBRE=`) se lee con el valor de la línea siguiente. QC-237 lo esquiva escribiendo `INTEGRATIONS_E2E_DOUBLES=""`. Arreglo: cambiar `\s*` por `[ \t]*` en `tests/guards/guard-dobles-e2e.test.ts` y volver a dejar las variables como `NOMBRE=`.
 - **Dueño:** sin asignar.
 - **Resuelta (2026-10-13, QC-237):** la regex de `guard-dobles-e2e` usa `[ \t]*` tras el `=` y `.env.example` vuelve a `INTEGRATIONS_E2E_DOUBLES=` (lo exige `storage-config` R32).
+
+### D55 — La X de cerrar de `Dialog` y `Sheet` compartidos mide 32 px
+- **Origen:** censo de QC-262 (T0b, 2026-10-13), medido a 390 px en «Cliente», «Reparto y unidad» y el panel de entrega de `/pedidos`.
+- **Qué falta:** el botón de cerrar de las primitivas compartidas `Dialog` y `Sheet` no llega al objetivo táctil de 44 px que cumplen los botones de acción. Se arregla en la primitiva compartida, una sola vez para todas las pantallas, con la revisión visual de cada diálogo. El leader decidió dejarlo fuera de QC-262 (R18 cuenta los botones de acción).
+- **Dueño:** sin asignar.
