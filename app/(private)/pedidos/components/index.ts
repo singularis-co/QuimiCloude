@@ -305,7 +305,11 @@ export {
   acceptsDelivery,
   acceptsDistributionEdit,
   isFinalOrderStatus,
+  orderRowActionsSpec,
+  type OrderRowAction,
   type OrderRowActionsProps,
+  type OrderRowActionsSpec,
+  type OrderRowActionsSpecInput,
 } from './order-row-actions';
 export {
   ORDER_CREATE_OPEN_TESTID,

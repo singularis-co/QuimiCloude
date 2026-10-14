@@ -10,7 +10,7 @@
 //
 // **Ningun assert sobre copy** (R44).
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -26,7 +26,7 @@ import {
   ORDER_FORM_TESTID,
   ORDER_FORM_TITLE_TESTID,
   ORDER_SHEET_TESTID,
-  OrderRowSheetActions,
+  OrderTable,
   PAGE_PARAM,
   PAGE_SIZE_PARAM,
   RECIPE_PICKER_TESTID,
@@ -35,6 +35,7 @@ import {
   STATUS_PARAM,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
+import { createDefaultParams } from '@/components/shared/data-table';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type {
@@ -415,6 +416,25 @@ async function rellenarAlta(user: ReturnType<typeof setupUser>) {
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 }
 
+/**
+ * jsdom no pinta: se afirman las clases que dan la medida. `w-full` y `data-[side=right]:w-full`
+ * sin prefijo valen por debajo de 640 px (el tope `sm:max-w-md` y el `min-width` en `vw` actuan
+ * desde ahi), `h-full` llega por el lado derecho y el relleno con `safe-area-inset-bottom` deja el
+ * pie por encima del margen inferior seguro.
+ */
+function afirmarPanelAnchoCompleto(panel: HTMLElement): void {
+  expect(panel).toHaveAttribute('data-side', 'right');
+  for (const clase of [
+    'w-full',
+    'data-[side=right]:w-full',
+    'data-[side=right]:inset-y-0',
+    'data-[side=right]:h-full',
+    'pb-[env(safe-area-inset-bottom)]',
+  ]) {
+    expect(panel).toHaveClass(clase);
+  }
+}
+
 describe('panel lateral de pedidos (R25, R35, R36)', () => {
   it('el alta se abre en un panel lateral SOBRE la lista, sin navegar a otra URL', async () => {
     // R25 — ni dialogo modal centrado ni pagina aparte, y ninguna navegacion.
@@ -429,6 +449,37 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     expect(screen.getByTestId('order-list')).toBeInTheDocument();
     expect(routerMock.push).not.toHaveBeenCalled();
     expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it('R19: el panel de alta ocupa todo el ancho y el alto por debajo de 640 px, con el pie sobre el margen seguro', async () => {
+    const user = setupUser();
+    await renderPantalla();
+
+    await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
+
+    afirmarPanelAnchoCompleto(await screen.findByTestId(ORDER_SHEET_TESTID));
+  });
+
+  it('R19: el panel de edicion ocupa todo el ancho y el alto por debajo de 640 px, con el pie sobre el margen seguro', async () => {
+    const user = setupUser();
+    const elPedido = pedido();
+    render(
+      <OrderTable
+        orders={[elPedido]}
+        params={createDefaultParams()}
+        totalPages={1}
+        recipes={RECETAS}
+        units={UNIDADES}
+        bridge={null}
+      />,
+    );
+
+    await user.click(
+      within(screen.getByTestId(`data-table-row-${elPedido.id}`)).getByTestId('order-row-actions'),
+    );
+    await user.click(await esperarInteractiva(await screen.findByTestId('order-action-edit')));
+
+    afirmarPanelAnchoCompleto(await screen.findByTestId(ORDER_SHEET_TESTID));
   });
 
   it('al cerrar el panel la URL conserva pagina, tamano, orden y filtros', async () => {
@@ -541,15 +592,26 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
   });
 
   it('la accion de editar de la fila abre el panel con el pedido precargado', async () => {
-    // R25, R28 — `onEdit` de `OrderRowActions` (T8) cableado al panel lateral. Con el pedido en
-    // estado final `OrderRowActions` no llega a emitir nada (R24) y el panel no se abre.
+    // R25, R28 — «Editar» del menu de la fila cableado al panel lateral. Con el pedido en estado
+    // final el item no emite nada (R24) y el panel no se abre.
     const user = setupUser();
     const elPedido = pedido();
-    render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} units={UNIDADES} bridge={null} />);
+    render(
+      <OrderTable
+        orders={[elPedido]}
+        params={createDefaultParams()}
+        totalPages={1}
+        recipes={RECETAS}
+        units={UNIDADES}
+        bridge={null}
+      />,
+    );
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(
+      within(screen.getByTestId(`data-table-row-${elPedido.id}`)).getByTestId('order-row-actions'),
+    );
     await user.click(await screen.findByTestId('order-action-edit'));
 
     await screen.findByTestId(ORDER_FORM_TESTID);
@@ -569,10 +631,17 @@ it('con el pedido en estado final la accion de editar no abre ningun panel', asy
     // R24 — la pantalla anticipa la regla en vez de dejar intentarlo contra el servidor.
     const user = setupUser();
     render(
-      <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} units={[]} bridge={null} />,
+      <OrderTable
+        orders={[pedido({ status: 'ENTREGADO' })]}
+        params={createDefaultParams()}
+        totalPages={1}
+        recipes={RECETAS}
+        units={[]}
+        bridge={null}
+      />,
     );
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(/^data-table-row-/)).getByTestId('order-row-actions'));
     const item = await screen.findByTestId('order-action-edit');
     expect(item).toHaveAttribute('aria-disabled', 'true');
     // El item deshabilitado sigue en el arbol: el evento nativo se dispara a mano, sin pasar por
@@ -626,7 +695,7 @@ describe('el termino de busqueda sobrevive al panel lateral (R4, R9)', () => {
 
     expect(screen.getByTestId('data-table-search')).toHaveValue(termino);
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(/^data-table-row-/)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId('order-action-edit'));
     await screen.findByTestId(ORDER_FORM_TESTID);
 

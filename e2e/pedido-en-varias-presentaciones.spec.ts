@@ -213,8 +213,11 @@ function ordersUrl(): string {
   return `${ORDERS_ROUTE}?${query.toString()}`;
 }
 
+/** Dentro de la fila: la tarjeta de la lista repite el disparador con el mismo `data-order-id`. */
 function rowActions(page: Page, orderId: string): Locator {
-  return page.locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${orderId}"]`);
+  return page
+    .getByTestId(`data-table-row-${orderId}`)
+    .locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${orderId}"]`);
 }
 
 function distributionLine(scope: Locator, presentationId: string): Locator {

@@ -2,7 +2,7 @@
 
 import { BanIcon } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
 import type { OrderDeliveryHistoryView, OrderStatus } from '@/lib/modules/pedidos';
 
@@ -147,7 +147,7 @@ export function OrderDeliveryList({ deliveries, canVoid, orderStatus, onVoid }: 
                       className="flex flex-col gap-1 rounded-md bg-muted p-2"
                       data-testid={ORDER_DELIVERY_ENTRY_VOIDED_TESTID}
                     >
-                      <Badge variant="destructive">{VOIDED_LABEL}</Badge>
+                      <StatusBadge tone="danger" label={VOIDED_LABEL} />
                       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                         <dt className="text-muted-foreground">{VOID_REASON_LABEL}</dt>
                         <dd className="break-words" data-testid="order-delivery-entry-void-reason">

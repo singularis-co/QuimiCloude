@@ -640,7 +640,7 @@ describe('QC-102 — si el lote falla, la lista NO se cae (R20)', () => {
       expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
       expect(screen.getByRole('table')).toBeInTheDocument();
       // La fila del pedido sigue viva, con sus acciones: no es una tabla sin filas.
-      expect(screen.getByTestId('order-row-actions')).toHaveAttribute('data-order-id', pedido().id);
+      expect(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions')).toHaveAttribute('data-order-id', pedido().id);
 
       // La columna, sin resolver: el marcador de ausencia, nunca un identificador tecnico.
       expect(screen.getByTestId('order-missing-responsibles')).toBeInTheDocument();
@@ -865,7 +865,7 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
 
     // Las acciones de fila viven dentro del menu "de los 3 puntos" (RowActionsMenu): hay que
     // abrir el disparador antes de que el item exista en el documento (via portal).
-    fireEvent.click(screen.getByTestId('order-row-actions'));
+    fireEvent.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     expect(await screen.findByTestId(ACCION)).toBeInTheDocument();
   });
 
@@ -879,7 +879,7 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
     render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('order-row-actions'));
+    fireEvent.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     expect(screen.queryByTestId(ACCION)).toBeNull();
   });
 });
@@ -980,7 +980,7 @@ describe('el filtro «Cliente» de la barra', () => {
 
       render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
-      fireEvent.click(screen.getByTestId('order-row-actions'));
+      fireEvent.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
       await screen.findByTestId('order-action-edit');
       expect(screen.queryByTestId(ORDER_ACTION_CUSTOMER_TESTID) !== null).toBe(visible);
       expect(screen.queryByTestId('order-action-distribution') !== null).toBe(visible);

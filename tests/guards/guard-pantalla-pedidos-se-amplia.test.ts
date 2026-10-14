@@ -212,7 +212,13 @@ const ANCLAS_DE_LA_PANTALLA: Readonly<Record<string, readonly string[]>> = {
   ],
   'order-list-section.tsx': ['OrderListSection'],
   'order-list-skeleton.tsx': ['ORDER_SKELETON_COLUMN_COUNT', 'OrderListSkeleton'],
-  'order-row-actions.tsx': ['OrderRowActions', 'isFinalOrderStatus', 'OrderRowActionsProps'],
+  'order-row-actions.tsx': [
+    'OrderRowAction',
+    'OrderRowActions',
+    'OrderRowActionsProps',
+    'isFinalOrderStatus',
+    'orderRowActionsSpec',
+  ],
   'order-sheet.tsx': [
     'ORDER_CREATE_OPEN_TESTID',
     'ORDER_SHEET_TESTID',

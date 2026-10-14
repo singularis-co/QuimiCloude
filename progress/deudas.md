@@ -157,6 +157,10 @@
   `guard-piezas-base` sigue excluyendo, con motivo que cita QC-232 (D11), `order-columns.tsx`
   (`simbolo-borrado`, `marca-en-constante`) y `order-table.tsx` (`par-literal`).
 - **Dueño:** ficha **QC-223** (al cerrar, o quien adopte sus archivos después).
+- **Resuelta (2026-10-13, QC-262, D5):** la columna se declara con
+  `actionsColumn({ id: ACTIONS_COLUMN_ID, menu })` sobre `orderRowActionsSpec`, y la tabla monta un
+  único anfitrión de paneles para el pedido activo. Las exclusiones de `guard-piezas-base` siguen
+  mordiendo y no se retiraron.
 
 ### D38 — Pedidos: locales de lista, `OrderRecipeImage` y el barrel sin limpiar (QC-232 → QC-223)
 - **Origen:** QC-232 (2026-10-09), `design.md > 7` (D4).
@@ -166,20 +170,20 @@
   toca `ORDER_CUSTOMER_DIALOG_TOUCH_TARGET`, ni entra la enmienda de
   `tests/guards/guard-qc102-limites-de-la-ficha.test.ts`. `guard-piezas-base` sigue excluyendo el
   barrel (`simbolo-borrado`) por D11.
-- **Dueño:** ficha **QC-223**.
+- **Dueño:** sin asignar (QC-223 está `done`; QC-262 la deja fuera, P9).
 
 ### D39 — Pedidos: `order-sheet.tsx` conserva su `TOUCH_TARGET` local (QC-232)
 - **Origen:** QC-232 (2026-10-09), `guard-piezas-base > ARCHIVOS_D11` y `design.md > 7` (P1).
 - **Qué falta:** `app/(private)/pedidos/components/order-sheet.tsx` adoptó `FormSheet` en QC-232, pero
   conserva `const TOUCH_TARGET = 'min-h-11 min-w-11'` y sigue en `ARCHIVOS_D11`, con exclusión que
   cita QC-232. Pasar a `touchTarget` y retirar la exclusión.
-- **Dueño:** **QC-232**, esta rama: tocó `order-sheet.tsx` y no lo resolvió. Al cerrar P1 el leader constató que el diff de QC-223 ya no toca este archivo, así que no es suya.
+- **Dueño:** sin asignar (QC-262 tocó `order-sheet.tsx` y la deja fuera, P9).
 
 ### D40 — Pedidos: el panel de entrega no adopta `FormSheet` (QC-232 → QC-223)
 - **Origen:** QC-232 (2026-10-09), `design.md > 7`.
 - **Qué falta:** `app/(private)/pedidos/components/order-delivery-sheet.tsx` es un décimo formulario
   en panel que no adopta `FormSheet` porque es de QC-223.
-- **Dueño:** ficha **QC-223**.
+- **Dueño:** sin asignar (QC-223 está `done`; QC-262 la deja fuera, P9).
 
 ### D41 — Inventario: `batch-history.tsx` conserva su constante táctil (QC-232 → QC-223)
 - **Origen:** QC-232 (2026-10-09), `design.md > 7`; deuda de QC-231 D11.
@@ -400,6 +404,8 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   - no pasan a tarjeta en teléfono, como sí hace la lista;
   - por las dos cosas, al llegar la lista hay un salto de maquetación (CLS).
   No rompe ningún requisito: R21 habla de la lista, no de la carga.
+- **Ampliada (2026-10-13, QC-262, P12):** `/pedidos` igual. `OrderListSkeleton` pinta filas de
+  tabla también en teléfono, donde la lista ya sale en tarjetas.
 - **Dueño:** sin asignar.
 
 ### D54 — `guard-dobles-e2e` lee `.env.example` con una regex que cruza líneas
@@ -407,3 +413,31 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Qué falta:** la regex del guard usa `\s*` después del `=`, y `\s` también casa saltos de línea. Una variable vacía al final de `.env.example` (`NOMBRE=`) se lee con el valor de la línea siguiente. QC-237 lo esquiva escribiendo `INTEGRATIONS_E2E_DOUBLES=""`. Arreglo: cambiar `\s*` por `[ \t]*` en `tests/guards/guard-dobles-e2e.test.ts` y volver a dejar las variables como `NOMBRE=`.
 - **Dueño:** sin asignar.
 - **Resuelta (2026-10-13, QC-237):** la regex de `guard-dobles-e2e` usa `[ \t]*` tras el `=` y `.env.example` vuelve a `INTEGRATIONS_E2E_DOUBLES=` (lo exige `storage-config` R32).
+
+### D55 — La X de cerrar de `Dialog` y `Sheet` compartidos mide 32 px
+- **Origen:** censo de QC-262 (T0b, 2026-10-13), medido a 390 px en «Cliente», «Reparto y unidad» y el panel de entrega de `/pedidos`.
+- **Qué falta:** el botón de cerrar de las primitivas compartidas `Dialog` y `Sheet` no llega al objetivo táctil de 44 px que cumplen los botones de acción. Se arregla en la primitiva compartida, una sola vez para todas las pantallas, con la revisión visual de cada diálogo. El leader decidió dejarlo fuera de QC-262 (R18 cuenta los botones de acción).
+- **Dueño:** sin asignar.
+
+### D56 — `ConfirmDialog` sin icono en la cabecera (QC-262, P5)
+- **Origen:** QC-262 (2026-10-13), P5 por defecto.
+- **Qué falta:** el tablero `ModalesPedidos.dc.html` pone un icono de peligro o aviso sobre el
+  título de «Cancelar el pedido», «Eliminar el pedido» y «Material insuficiente» (`dlg-ic`).
+  `ConfirmDialog` no lo admite y lo usan todos los módulos: es una ficha transversal sobre la pieza
+  compartida, con la revisión visual de cada confirmación.
+- **Dueño:** sin asignar.
+
+### D57 — Selector de prioridad del pedido sin `PriorityMark` (QC-262, P10)
+- **Origen:** QC-262 (2026-10-13), P10 por defecto.
+- **Qué falta:** el tablero pinta `PriorityMark` en las opciones del selector de prioridad del
+  formulario de pedido. `SelectField` solo admite opciones de texto; extenderlo es trabajo de pieza
+  compartida (todos los formularios), con su valor en el disparador de Base UI.
+- **Dueño:** sin asignar.
+
+### D58 — Una palabra larga sin espacios desborda la tarjeta de `DataTable` en teléfono
+- **Origen:** E2E de QC-262 (2026-10-13), a 390 px en `/pedidos`.
+- **Qué falta:** con una receta de 50 caracteres sin espacios, `scrollWidth` llega a 478 px sobre
+  390. El texto de los campos de `components/shared/data-table/data-table-cards.tsx` no se parte
+  (le faltan `break-words` / `min-w-0`). Es de la pieza compartida, así que afecta a todas las
+  listas con tarjetas. Los nombres reales llevan espacios y no lo provocan.
+- **Dueño:** sin asignar.

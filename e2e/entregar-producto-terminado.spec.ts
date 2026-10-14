@@ -619,7 +619,7 @@ test.describe('entregar el producto terminado de un pedido', () => {
     await page.goto(ordersUrl());
     await expect(page.getByTestId(PRIVATE_NOT_FOUND_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ORDERS_TITLE_TESTID)).toHaveCount(0);
-    await expect(page.locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${id}"]`)).toHaveCount(0);
+    await expect(orderRow(page, id).getByTestId(ORDER_ROW_ACTIONS_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(ORDER_ACTION_DELIVER_TESTID)).toHaveCount(0);
   });
 });

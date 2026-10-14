@@ -64,7 +64,7 @@ export function OrderCustomerFilter({ params, value }: OrderCustomerFilterProps)
   }
 
   return (
-    <div className="w-full sm:w-64" data-testid={ORDER_CUSTOMER_FILTER_TESTID}>
+    <div className="w-64 max-w-full" data-testid={ORDER_CUSTOMER_FILTER_TESTID}>
       <OrderCustomerPicker
         // Remonta el campo cuando la direccion trae otro valor (Atras, otro enlace).
         key={choiceKey(value)}

@@ -24,10 +24,11 @@ import {
   ORDER_DELIVERY_SUBMIT_TESTID,
   ORDER_DELIVERY_WHOLE_ERROR_TESTID,
   OrderDeliverySheet,
-  OrderRowSheetActions,
+  OrderTable,
   orderDeliveryDraftKey,
   packagesKey,
 } from '@/app/(private)/pedidos/components';
+import { createDefaultParams } from '@/components/shared/data-table';
 import {
   formatOrderNumber,
   type OrderDeliveryView,
@@ -52,6 +53,7 @@ import {
   deliveryView,
 } from '../../fixtures/order-delivery';
 import { setupUser } from '../../helpers/user-event';
+import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { getDeliveryMock, deliverMock, searchCustomersMock, routerMock } = vi.hoisted(() => ({
   getDeliveryMock: vi.fn<(orderId: string) => Promise<OrderDeliveryResult>>(),
@@ -558,6 +560,10 @@ describe('borrador', () => {
 });
 
 describe('montaje desde la fila', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
   function pedidoTerminado(): OrderSummary {
     return {
       id: DELIVERY_ORDER_ID,
@@ -585,8 +591,10 @@ describe('montaje desde la fila', () => {
   it('R4: solo se monta al pulsar «Entregar» en la fila y pide la entrega de ese pedido', async () => {
     const user = setupUser();
     render(
-      <OrderRowSheetActions
-        order={pedidoTerminado()}
+      <OrderTable
+        orders={[pedidoTerminado()]}
+        params={createDefaultParams()}
+        totalPages={1}
         recipes={{ items: [], totalPages: 1 }}
         units={[]}
         bridge={null}
@@ -597,10 +605,25 @@ describe('montaje desde la fila', () => {
     expect(screen.queryByTestId(ORDER_DELIVERY_SHEET_TESTID)).toBeNull();
     expect(getDeliveryMock).not.toHaveBeenCalled();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${DELIVERY_ORDER_ID}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID));
 
     expect(await screen.findByTestId(ORDER_DELIVERY_SHEET_TESTID)).toBeInTheDocument();
     expect(getDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID);
+  });
+});
+
+describe('los textos del panel son los de hoy (QC-262 R20)', () => {
+  it('R20: «Entregar pedido <numero>» con su descripcion, «Cancelar» y «Entregar»', async () => {
+    montar();
+
+    expect(
+      await screen.findByRole('dialog', { name: `Entregar pedido ${ORDER.numberText}` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Elige el cliente y, por presentación, de qué lotes salen los envases.'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_DELIVERY_CANCEL_TESTID)).toHaveTextContent(/^Cancelar$/);
+    expect(await screen.findByTestId(ORDER_DELIVERY_SUBMIT_TESTID)).toHaveTextContent(/^Entregar$/);
   });
 });
