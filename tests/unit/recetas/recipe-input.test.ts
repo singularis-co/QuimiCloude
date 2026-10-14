@@ -580,3 +580,49 @@ describe('packingSteps en los esquemas de receta — pasos de envasado (QC-211)'
     expect(edicion).not.toHaveProperty('packingSteps');
   });
 });
+
+describe('requiresEvidence en el paso — evidencia por paso (QC-214)', () => {
+  const conFlag = (text: string, requiresEvidence: unknown) => ({ ...paso(text), requiresEvidence });
+
+  it('R3: el paso sin requiresEvidence se acepta y sale sin la clave (ausente = apagado)', () => {
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      const parsed = schema.parse({ ...RECETA_VALIDA, packingSteps: [paso('Envasar')] });
+      expect(parsed.steps[0]).not.toHaveProperty('requiresEvidence');
+      expect(parsed.packingSteps[0]).not.toHaveProperty('requiresEvidence');
+    }
+  });
+
+  it('R3: conserva requiresEvidence true y false en steps y en packingSteps', () => {
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      const parsed = schema.parse({
+        ...RECETA_VALIDA,
+        steps: [conFlag('Mezclar', true), conFlag('Reposar', false)],
+        packingSteps: [conFlag('Envasar', false), conFlag('Sellar', true)],
+      });
+      expect(parsed.steps.map((step) => step.requiresEvidence)).toEqual([true, false]);
+      expect(parsed.packingSteps.map((step) => step.requiresEvidence)).toEqual([false, true]);
+    }
+  });
+
+  it('R4: rechaza un requiresEvidence que no es booleano, en steps y en packingSteps', () => {
+    const noBooleanos: readonly unknown[] = ['true', 1, 0, null, {}, []];
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      for (const valor of noBooleanos) {
+        const enSteps = schema.safeParse({ ...RECETA_VALIDA, steps: [paso('Mezclar'), conFlag('Reposar', valor)] });
+        expect(enSteps.success, JSON.stringify(valor)).toBe(false);
+        if (!enSteps.success) {
+          expect(enSteps.error.issues.map((issue) => issue.path)).toContainEqual(['steps', 1, 'requiresEvidence']);
+        }
+        const enEnvasado = schema.safeParse({ ...RECETA_VALIDA, packingSteps: [conFlag('Envasar', valor)] });
+        expect(enEnvasado.success, JSON.stringify(valor)).toBe(false);
+        if (!enEnvasado.success) {
+          expect(enEnvasado.error.issues.map((issue) => issue.path)).toContainEqual([
+            'packingSteps',
+            0,
+            'requiresEvidence',
+          ]);
+        }
+      }
+    }
+  });
+});

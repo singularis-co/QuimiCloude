@@ -211,6 +211,7 @@ import {
   createListRecipes,
   createUpdateRecipe,
   createUpdateRecipeVersion,
+  createGetRecipeStepLock,
 } from '@/lib/modules/recetas';
 import {
   createRecipe,
@@ -221,6 +222,7 @@ import {
   replaceAliveRecipe,
   replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
+  listRecipeVersionIdsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import {
   recipeImagePublicUrl,
@@ -230,6 +232,7 @@ import {
 import type { ListQueryLog as RecetasListQueryLog } from '@/lib/modules/recetas/ports/list-query-log';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
+import type { RecipeStepLockReader } from '@/lib/modules/recetas/ports/recipe-step-lock-reader';
 import {
   createCreateCatalogLine,
   createCreateSupplier,
@@ -459,6 +462,10 @@ import {
   createListConditioningTeamCandidates,
   createListDeliveredConditionedOrders,
   createSaveConditioningBatchData,
+  createRequestEvidenceUpload,
+  createRegisterEvidence,
+  createRemoveEvidence,
+  createCountEvidenceLockingOrders,
 } from '@/lib/modules/asignaciones';
 import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -467,6 +474,12 @@ import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapter
 import { withExecutionTransaction } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-transaction-prisma';
 import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
 import type { ExecutionTransaction } from '@/lib/modules/asignaciones/ports/execution-transaction';
+import { createStepEvidenceRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/step-evidence-prisma';
+import type { StepEvidenceRepository } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
+import { evidenceE2EDoublesEnabled } from '@/lib/modules/asignaciones/adapters/driven/config/evidence-e2e-doubles-env';
+import { evidenceStorageMemory } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-memory';
+import { evidenceStorageSupabase } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-supabase';
+import type { EvidenceStorage } from '@/lib/modules/asignaciones/ports/evidence-storage';
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
@@ -1159,6 +1172,7 @@ const recipeRepository: RecipeRepository = {
   createVersion: createRecipeVersion,
   listAliveVersions: listAliveRecipeVersions,
   replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
+  listVersionIdsIncludingDeleted: listRecipeVersionIdsIncludingDeleted,
 };
 
 /** `RecipeImageStorage` cableado con el adaptador de Supabase Storage (T11). Ninguna de
@@ -1175,6 +1189,14 @@ const recipeImageStorage: RecipeImageStorage = {
 /** QC-57 (T7, R6): el MISMO `logIgnoredListQueryFields` que `inventario`, visto por el puerto
  *  que declara `recetas`. Cinco puertos con la misma forma, una sola implementacion. */
 const recetasListQueryLog: RecetasListQueryLog = { ignoredFields: logIgnoredListQueryFields };
+
+/**
+ * `recetas` pregunta por los pedidos en curso con fotos sin importar `asignaciones`, que ya importa
+ * `recetas`. El conteo se resuelve al llamar: se construye mas abajo, con el resto de la evidencia.
+ */
+const recipeStepLockReader: RecipeStepLockReader = {
+  countOrdersWithEvidenceInProgress: (recipeIds, companyId) => countEvidenceLockingOrders(companyId, recipeIds),
+};
 
 /**
  * Fachada del modulo `recetas` ya cableada (T12, `design.md > 3`, `> 11`). Es lo que
@@ -1206,11 +1228,13 @@ export const recetas = {
     recipes: recipeRepository,
     products: productCatalog,
     images: recipeImageStorage,
+    stepLocks: recipeStepLockReader,
   }),
   deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
   createRecipeVersion: createCreateRecipeVersion({ recipes: recipeRepository, products: productCatalog }),
   updateRecipeVersion: createUpdateRecipeVersion({ recipes: recipeRepository, products: productCatalog }),
   listRecipeVersions: createListRecipeVersions({ recipes: recipeRepository }),
+  getRecipeStepLock: createGetRecipeStepLock({ recipes: recipeRepository, stepLocks: recipeStepLockReader }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -1715,6 +1739,37 @@ const orderAssignmentRepository: OrderAssignmentRepository = createOrderAssignme
 /** El registro fuera de transaccion: anotar un paso o el retomar es una sola sentencia. */
 const executionLogRepository: ExecutionLogRepository = createExecutionLogRepository();
 
+/** Las fotos de evidencia por paso: la unica puerta a `order_step_evidence`. */
+const stepEvidenceRepository: StepEvidenceRepository = createStepEvidenceRepository();
+
+/**
+ * El bucket de las fotos: el real salvo con `EVIDENCE_E2E_DOUBLES` puesta, que solo pone
+ * `playwright.config.ts`. Se consulta en cada llamada: importar este archivo no lee el entorno.
+ */
+function selectedEvidenceStorage(): EvidenceStorage {
+  return evidenceE2EDoublesEnabled() ? evidenceStorageMemory : evidenceStorageSupabase;
+}
+
+const evidenceStorage: EvidenceStorage = {
+  createSignedUpload: (path) => selectedEvidenceStorage().createSignedUpload(path),
+  createSignedReadUrl: (path, expiresInSeconds) =>
+    selectedEvidenceStorage().createSignedReadUrl(path, expiresInSeconds),
+  download: (path) => selectedEvidenceStorage().download(path),
+  remove: (path) => selectedEvidenceStorage().remove(path),
+};
+
+const countEvidenceLockingOrders = createCountEvidenceLockingOrders({
+  orders: orderCatalog,
+  evidence: stepEvidenceRepository,
+});
+
+const evidenceTargetDeps = {
+  assignments: orderAssignmentRepository,
+  orders: orderCatalog,
+  recipes: recipeCatalog,
+  packingSteps: { findPackingStepsById: findRecipePackingStepsById },
+};
+
 /**
  * La transaccion de ejecucion la abre `asignaciones`, y `pedidos` se une a ella sin abrir otra:
  * la escritura del pedido, lo que `pedidos` escriba en `inventario` y la anotacion se confirman
@@ -1822,6 +1877,8 @@ export const asignaciones = {
     units: unitCatalog,
     products: productCatalog,
     presentations: presentationCatalog,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
   startAssignedOrder: createStartAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1833,6 +1890,8 @@ export const asignaciones = {
     log: executionLogRepository,
     transaction: executionTransaction,
     now: () => new Date(),
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
   finishAssignedOrder: createFinishAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1842,6 +1901,8 @@ export const asignaciones = {
     log: executionLogRepository,
     transaction: executionTransaction,
     now: () => new Date(),
+    recipes: recipeCatalog,
+    evidence: stepEvidenceRepository,
   }),
   // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
   // `recipeCatalog`, `presentationCatalog`, `orderAssignmentRepository` y `peopleDirectory` que
@@ -1893,6 +1954,8 @@ export const asignaciones = {
     products: productCatalog,
     packingSteps: { findPackingStepsById: findRecipePackingStepsById },
     now: () => new Date(),
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
   startPacking: createStartPackingOrder({
     orders: orderCatalog,
@@ -1905,6 +1968,8 @@ export const asignaciones = {
     log: executionLogRepository,
     transaction: executionTransaction,
     now: () => new Date(),
+    packingSteps: { findPackingStepsById: findRecipePackingStepsById },
+    evidence: stepEvidenceRepository,
   }),
   cancelAssignedOrder: createCancelAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1917,6 +1982,8 @@ export const asignaciones = {
     orders: orderCatalog,
     log: executionLogRepository,
     now: () => new Date(),
+    recipes: recipeCatalog,
+    evidence: stepEvidenceRepository,
   }),
   listExecutionTraces: createListExecutionTraces({
     log: executionLogRepository,
@@ -1987,6 +2054,21 @@ export const asignaciones = {
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
     now: () => new Date(),
+  }),
+  requestEvidenceUpload: createRequestEvidenceUpload({
+    ...evidenceTargetDeps,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  registerEvidence: createRegisterEvidence({
+    ...evidenceTargetDeps,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  removeEvidence: createRemoveEvidence({
+    ...evidenceTargetDeps,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
 } as const;
 

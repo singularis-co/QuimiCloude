@@ -31,7 +31,9 @@ import type {
   AssignmentRow,
   OrderAssignmentRepository,
 } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import type { StepEvidenceRepository } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
 import type { OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
+import type { RecipeCatalog, RecipeStepView } from '@/lib/modules/recetas';
 import type {
   PeopleDirectory,
   PermissionCode,
@@ -80,6 +82,8 @@ type Dobles = {
   readonly append: ReturnType<typeof vi.fn>;
   readonly run: ReturnType<typeof vi.fn>;
   readonly anotaciones: Anotacion[];
+  readonly findExecutionContentById: ReturnType<typeof vi.fn>;
+  readonly listEvidenceByOrder: ReturnType<typeof vi.fn>;
 };
 
 type Anotacion = { readonly entry: NewExecutionEntry; readonly dentroDeRun: boolean };
@@ -97,7 +101,7 @@ function persona(
   permissions: readonly PermissionCode[],
   isActive = true,
 ): PersonRef {
-  return { id, displayName: `Persona ${id.slice(0, 8)}`, isActive, permissions };
+  return { id, displayName: `Persona ${id.slice(0, 8)}`, isActive, permissions, roleName: 'Operador' };
 }
 
 function grupo(id: string, name: string, activeMemberIds: readonly string[]): WorkGroupSnapshot {
@@ -112,6 +116,8 @@ function montar(options?: {
   readonly snapshots?: readonly (WorkGroupSnapshot | null)[];
   readonly personas?: readonly PersonRef[];
   readonly appendFalla?: boolean;
+  readonly pasos?: readonly RecipeStepView[];
+  readonly fotos?: readonly { readonly stepPosition: number }[];
 }): Dobles {
   const estados = [...(options?.ordenDeEstados ?? ['EN_CURSO'])];
   const resultados = [...(options?.transitionResults ?? ['ok' as const])];
@@ -159,6 +165,10 @@ function montar(options?: {
     }
   });
 
+  // Sin pasos que pidan evidencia salvo que el caso los pase: los casos de siempre no cambian.
+  const findExecutionContentById = vi.fn(async () => ({ steps: options?.pasos ?? [{ blocks: [] }] }));
+  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+
   const deps: FinishAssignedOrderDeps = {
     assignments: {
       insertMissing,
@@ -178,6 +188,8 @@ function montar(options?: {
     log,
     transaction: { run } as unknown as ExecutionTransaction,
     now: () => new Date('2026-09-17T12:00:00.000Z'),
+    recipes: { findExecutionContentById } as unknown as RecipeCatalog,
+    evidence: { listByOrder: listEvidenceByOrder } as unknown as StepEvidenceRepository,
   };
 
   return {
@@ -194,6 +206,8 @@ function montar(options?: {
     append,
     run,
     anotaciones,
+    findExecutionContentById,
+    listEvidenceByOrder,
   };
 }
 
@@ -841,5 +855,53 @@ describe('QC-82 — finishAssignedOrder: el prologo no cambia', () => {
     ).rejects.toThrow(UnauthorizedError);
     expect(run).not.toHaveBeenCalled();
     expect(append).not.toHaveBeenCalled();
+  });
+});
+
+describe('finishAssignedOrder — evidencia (R35, R37)', () => {
+  const CON_EVIDENCIA: readonly RecipeStepView[] = [
+    { blocks: [] },
+    { blocks: [], requiresEvidence: true },
+    { blocks: [], requiresEvidence: true },
+  ];
+
+  it('R35: un paso que pide evidencia sin fotos: evidence_required sin transicion, sin anotar y sin auto-asignar', async () => {
+    const d = montar({ pasos: CON_EVIDENCIA, fotos: [{ stepPosition: 2 }] });
+    const error = await createFinishAssignedOrder(d.deps)(ACTOR, ENTRADA).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AsignacionesError);
+    expect((error as AsignacionesError).code).toBe('evidence_required');
+    expect(d.run).not.toHaveBeenCalled();
+    expect(d.transitionAliveById).not.toHaveBeenCalled();
+    expect(d.append).not.toHaveBeenCalled();
+    expect(d.listByOrderInCompany).not.toHaveBeenCalled();
+    expect(d.insertMissing).not.toHaveBeenCalled();
+    expect(d.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'manufacturing');
+    expect(d.findExecutionContentById).toHaveBeenCalledWith('receta-1', EMPRESA);
+  });
+
+  it('R35: con al menos una foto en cada paso que la pide, finaliza', async () => {
+    const d = montar({ pasos: CON_EVIDENCIA, fotos: [{ stepPosition: 2 }, { stepPosition: 3 }, { stepPosition: 3 }] });
+    await expect(createFinishAssignedOrder(d.deps)(ACTOR, ENTRADA)).resolves.toEqual({ numberText: expect.any(String) });
+    expect(d.transitionAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R37: un paso que se encendio despues de empezar tambien se exige al finalizar', async () => {
+    const d = montar({ pasos: [{ blocks: [] }, { blocks: [], requiresEvidence: true }], fotos: [] });
+    await expect(createFinishAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toMatchObject({ code: 'evidence_required' });
+    expect(d.transitionAliveById).not.toHaveBeenCalled();
+  });
+
+  it('R35: sin pasos que pidan evidencia finaliza como hoy, sin consultar fotos', async () => {
+    const d = montar({ pasos: [{ blocks: [] }, { blocks: [] }] });
+    await createFinishAssignedOrder(d.deps)(ACTOR, ENTRADA);
+    expect(d.transitionAliveById).toHaveBeenCalledTimes(1);
+    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+  });
+
+  it('R35: una receta sin contenido legible no pide evidencia', async () => {
+    const d = montar();
+    d.findExecutionContentById.mockResolvedValueOnce(null);
+    await createFinishAssignedOrder(d.deps)(ACTOR, ENTRADA);
+    expect(d.transitionAliveById).toHaveBeenCalledTimes(1);
   });
 });

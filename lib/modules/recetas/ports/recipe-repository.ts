@@ -173,4 +173,6 @@ export interface RecipeRepository {
     now: Date,
     scope: RecipeScope,
   ): Promise<ReplaceWithPropagationResult>;
+  /** Ids de sus versiones, tambien las dadas de baja: pueden tener pedidos en curso. */
+  listVersionIdsIncludingDeleted(originalId: string, scope: RecipeScope): Promise<readonly string[]>;
 }

@@ -21,6 +21,13 @@
  * `asignaciones.consultar`, y ninguno de los dos roles del seed sirve -Administrador y Operador lo
  * tienen los dos-, asi que este spec crea un rol efimero sin ningun permiso, igual que
  * `e2e/inventario.spec.ts`.
+ *
+ * EVIDENCIA POR PASO (QC-214): una segunda receta con el paso 1 que exige evidencia y un pedido
+ * propio ya EN_CURSO en el paso 2, el ultimo. Ese punto de partida es el de una fabricacion que
+ * paso el paso 1 antes de que la formula pidiera fotos: la pantalla no deja avanzar desde un paso
+ * que exige evidencia sin fotos, asi que es la forma de llegar a Finalizar con un paso sin ella.
+ * El almacenamiento es el doble en memoria (`EVIDENCE_E2E_DOUBLES`, en `playwright.config.ts`):
+ * firma enlaces bajo `https://evidencias-e2e.invalid`, y este spec intercepta ahi subida y lectura.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -30,6 +37,7 @@ import type { Prisma } from '@prisma/client';
 import { normalizeCompanyName, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizePresentationName, normalizeProductName } from '@/lib/modules/inventario';
+import { errorMessage } from '@/lib/modules/errores';
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -104,6 +112,7 @@ const BASE_SEQUENCE = 800_000 + Math.floor(Math.random() * 90_000);
 
 const SEQUENCE_PENDING = BASE_SEQUENCE;
 const SEQUENCE_IN_PROGRESS = BASE_SEQUENCE + 1;
+const SEQUENCE_EVIDENCE = BASE_SEQUENCE + 2;
 
 /**
  * El documento de los pasos de la receta del fixture: un primer paso con una lista de
@@ -123,6 +132,43 @@ const RECIPE_STEPS: readonly RecipeStepDocument[] = [
     blocks: [{ kind: 'paragraph', spans: [{ text: `${SHARED_TOKEN}_mezcla_lista` }] }],
   },
 ];
+
+/** La receta de QC-214: el paso 1 exige evidencia; el 2, el ultimo, no. */
+const EVIDENCE_RECIPE_NAME = `${SHARED_TOKEN}_receta_evidencia`;
+
+const EVIDENCE_RECIPE_STEPS: readonly RecipeStepDocument[] = [
+  {
+    blocks: [{ kind: 'paragraph', spans: [{ text: `${SHARED_TOKEN}_fotografiar_reactor` }] }],
+    requiresEvidence: true,
+  },
+  {
+    blocks: [{ kind: 'paragraph', spans: [{ text: `${SHARED_TOKEN}_envasar` }] }],
+  },
+];
+
+/** El mismo origen que firma `evidence-storage-memory.ts`. No resuelve: sin interceptar, falla. */
+const EVIDENCE_STORAGE_ORIGIN = 'https://evidencias-e2e.invalid';
+
+/** PNG de 1 x 1 pixel: pesa mucho menos de 5 MB, asi que el navegador lo sube sin recomprimir. */
+const EVIDENCE_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64',
+);
+
+const EVIDENCE_REGION_NAME = 'Evidencia';
+const EVIDENCE_COUNT_TESTID = 'step-evidence-count';
+const EVIDENCE_INPUT_TESTID = 'step-evidence-input';
+const EVIDENCE_ADD_TESTID = 'step-evidence-add';
+const EVIDENCE_MISSING_DIALOG_NAME = 'Falta evidencia';
+const EVIDENCE_MISSING_STEP_1_TESTID = 'evidence-missing-step-1';
+const STEP_PREVIOUS_TESTID = 'step-reader-previous';
+const STEP_BLOCKED_REASON_TESTID = 'step-reader-blocked-reason';
+const STEP_TITLE_TESTID = 'step-reader-position';
+const FINISH_DIALOG_TESTID = 'order-execution-finish-dialog';
+const FINISH_ERROR_TESTID = 'order-execution-finish-error';
+
+const EVIDENCE_MISSING_REASON = 'Sube al menos 1 foto de evidencia para continuar.';
+const EVIDENCE_FINISH_WARNING = 'Al terminar, las fotos de evidencia quedan fijas. No se puede deshacer.';
 
 const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const ORDER_NUMBER_CELL_TESTID = 'data-table-cell-orderNumber';
@@ -147,6 +193,8 @@ let presentationId: string | null = null;
 let operatorUserId: string | null = null;
 let orderPendingId: string | null = null;
 let orderInProgressId: string | null = null;
+let evidenceRecipeId: string | null = null;
+let orderEvidenceId: string | null = null;
 
 let orderPendingNumber: string | null = null;
 
@@ -169,6 +217,63 @@ async function orderStatus(orderId: string): Promise<string> {
     select: { status: true },
   });
   return order.status;
+}
+
+/** La ultima anotacion con paso del pedido y cuantos avances lleva: de ahi retoma la pantalla. */
+async function lastStepEntry(
+  orderId: string,
+): Promise<{ action: string; stepPosition: number | null; advances: number }> {
+  const [last, advances] = await Promise.all([
+    prisma.orderExecutionEntry.findFirst({
+      where: { orderId, stepPosition: { not: null } },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+      select: { action: true, stepPosition: true },
+    }),
+    prisma.orderExecutionEntry.count({ where: { orderId, action: 'ADVANCE' } }),
+  ]);
+  return { action: last?.action ?? '', stepPosition: last?.stepPosition ?? null, advances };
+}
+
+async function evidenceRowCount(orderId: string): Promise<number> {
+  return prisma.orderStepEvidence.count({ where: { orderId, stepPosition: 1 } });
+}
+
+/**
+ * Atiende el origen del doble: el `PUT` de la subida responde 200 sin guardar nada -el doble
+ * devuelve siempre la misma imagen al registrar- y el `GET` de la lectura firmada sirve el PNG.
+ * Devuelve cuantas subidas llegaron, para demostrar que los bytes salen directos al almacenamiento.
+ */
+async function interceptEvidenceStorage(page: Page): Promise<{ uploads: () => number }> {
+  let uploads = 0;
+  await page.route(`${EVIDENCE_STORAGE_ORIGIN}/**`, async (route) => {
+    const request = route.request();
+    const headers = {
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'PUT, GET, OPTIONS',
+      'access-control-allow-headers': 'content-type',
+    };
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+    if (request.method() === 'PUT' && new URL(request.url()).pathname.startsWith('/upload/')) {
+      uploads += 1;
+      await route.fulfill({ status: 200, headers, body: '' });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      headers: { ...headers, 'content-type': 'image/png' },
+      body: EVIDENCE_PNG,
+    });
+  });
+  return { uploads: () => uploads };
+}
+
+async function uploadEvidencePhoto(page: Page): Promise<void> {
+  await page
+    .getByTestId(EVIDENCE_INPUT_TESTID)
+    .setInputFiles([{ name: 'evidencia.png', mimeType: 'image/png', buffer: EVIDENCE_PNG }]);
 }
 
 async function createUser(user: Credentials, roleId: string): Promise<string> {
@@ -201,9 +306,11 @@ async function createUser(user: Credentials, roleId: string): Promise<string> {
 async function seedOrder(params: {
   sequence: number;
   status: 'PENDIENTE' | 'EN_CURSO';
+  recipeId?: string;
 }): Promise<{ id: string; numberText: string }> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
-  if (!recipeId) throw new Error('la receta del fixture no existe: fallo el beforeAll');
+  const orderRecipeId = params.recipeId ?? recipeId;
+  if (!orderRecipeId) throw new Error('la receta del fixture no existe: fallo el beforeAll');
   if (!presentationId) throw new Error('la presentacion del fixture no existe: fallo el beforeAll');
 
   const { unitId } = await prisma.presentation.findUniqueOrThrow({
@@ -216,7 +323,7 @@ async function seedOrder(params: {
       companyId,
       orderYear: year,
       orderSequence: params.sequence,
-      recipeId,
+      recipeId: orderRecipeId,
       quantity: ORDER_QUANTITY,
       unitId,
       presentationLines: {
@@ -283,6 +390,8 @@ test.beforeAll(async () => {
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    // Las fotos de evidencia RESTRINGEN el borrado del pedido y de quien las subio.
+    await prisma.orderStepEvidence.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // Todos los lotes de la empresa huerfana, del producto de formula y del terminado: sus
     // movimientos ya cayeron arriba, y sin lotes ningun producto queda restringido por ellos.
@@ -291,6 +400,13 @@ test.beforeAll(async () => {
   if (orphanRecipeIds.length > 0) {
     await prisma.orderPresentationLine.deleteMany({
       where: { order: { recipeId: { in: orphanRecipeIds } } },
+    });
+    const orphanOrders = await prisma.order.findMany({
+      where: { recipeId: { in: orphanRecipeIds } },
+      select: { id: true },
+    });
+    await prisma.orderStepEvidence.deleteMany({
+      where: { orderId: { in: orphanOrders.map((order) => order.id) } },
     });
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
     // El producto terminado (`products.recipe_id`) RESTRINGE el borrado de la receta: se borra
@@ -431,6 +547,41 @@ test.beforeAll(async () => {
       companyId: companyId!,
     })),
   });
+
+  // QC-214: la receta con el paso 1 que exige evidencia, con la misma linea al 100 % que la otra.
+  evidenceRecipeId = (
+    await prisma.recipe.create({
+      data: {
+        name: EVIDENCE_RECIPE_NAME,
+        nameNormalized: normalizeRecipeName(EVIDENCE_RECIPE_NAME),
+        createdBy: operatorUserId,
+        companyId,
+        steps: EVIDENCE_RECIPE_STEPS as unknown as Prisma.InputJsonValue,
+        lines: { create: [{ productId, percentage: '100.00' }] },
+      },
+      select: { id: true },
+    })
+  ).id;
+
+  orderEvidenceId = (
+    await seedOrder({ sequence: SEQUENCE_EVIDENCE, status: 'EN_CURSO', recipeId: evidenceRecipeId })
+  ).id;
+  await prisma.orderAssignment.create({
+    data: { orderId: orderEvidenceId, userId: operatorUserId, companyId },
+  });
+  // Ya paso el paso 1 sin fotos: la pantalla lo retoma en el paso 2, el ultimo.
+  const startedAt = Date.now() - 120_000;
+  await prisma.orderExecutionEntry.createMany({
+    data: [
+      { action: 'START' as const, stepPosition: 1, occurredAt: new Date(startedAt) },
+      { action: 'ADVANCE' as const, stepPosition: 2, occurredAt: new Date(startedAt + 60_000) },
+    ].map((entry) => ({
+      ...entry,
+      orderId: orderEvidenceId!,
+      userId: operatorUserId!,
+      companyId: companyId!,
+    })),
+  });
 });
 
 test.afterAll(async () => {
@@ -438,6 +589,7 @@ test.afterAll(async () => {
   // (Chromium/WebKit) sigue corriendo. Cada paso corre aunque falle el anterior.
   const scopedCompanyId = companyId;
   const scopedRecipeId = recipeId;
+  const scopedEvidenceRecipeId = evidenceRecipeId;
   // Uno de los casos entrega el pedido, y entregar consume: deja filas en `reservation_movements` e
   // `inventory_movements` que hay que borrar antes que el pedido y el lote (FK RESTRICT).
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
@@ -461,6 +613,11 @@ test.afterAll(async () => {
       scopedCompanyId
         ? prisma.orderExecutionEntry.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
+    // Las fotos de evidencia RESTRINGEN el borrado del pedido y del Operador que las subio.
+    () =>
+      scopedCompanyId
+        ? prisma.orderStepEvidence.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
     () =>
       scopedCompanyId
         ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } })
@@ -479,7 +636,11 @@ test.afterAll(async () => {
       scopedRecipeId
         ? prisma.product.deleteMany({ where: { recipeId: scopedRecipeId } })
         : Promise.resolve(),
-    () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
+    () =>
+      scopedEvidenceRecipeId
+        ? prisma.product.deleteMany({ where: { recipeId: scopedEvidenceRecipeId } })
+        : Promise.resolve(),
+    () => prisma.recipe.deleteMany({ where: { name: { in: [RECIPE_NAME, EVIDENCE_RECIPE_NAME] } } }),
     () =>
       scopedCompanyId
         ? prisma.product.deleteMany({ where: { companyId: scopedCompanyId } })
@@ -609,5 +770,117 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(EXECUTION_ERROR_TESTID)).toHaveCount(0);
     expect(await orderStatus(orderInProgressId)).toBe('EN_CURSO');
+  });
+
+  test('R13 R15 R18 R22 R35 - el Operador no termina con un paso sin evidencia, sube la foto, avanza, la quita volviendo atras, el servidor rechaza terminar sin ella y termina tras volver a subirla', async ({
+    page,
+    context,
+  }) => {
+    expect(orderEvidenceId, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
+    if (orderEvidenceId === null) return;
+    const orderId = orderEvidenceId;
+
+    const storage = await interceptEvidenceStorage(page);
+    await loginAndLand(page, operatorUser);
+    await page.goto(assignedOrderRoute(orderId));
+    await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
+    const region = page.getByRole('region', { name: EVIDENCE_REGION_NAME });
+
+    // Retoma en el paso 2, que no exige evidencia: sin bloque (R13).
+    await expect(page.getByTestId(STEP_TITLE_TESTID)).toHaveText('Paso 2 de 2', { timeout: 60_000 });
+    await expect(region).toHaveCount(0);
+
+    // R22: Finalizar abre «Falta evidencia» y no la confirmacion. El pedido sigue EN_CURSO.
+    const missing = page.getByRole('alertdialog', { name: EVIDENCE_MISSING_DIALOG_NAME });
+    await expect(async () => {
+      if ((await missing.count()) === 0) await page.getByTestId(STEP_FINISH_TESTID).click();
+      await expect(missing).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
+    await expect(page.getByTestId(FINISH_DIALOG_TESTID)).toHaveCount(0);
+    expect(await orderStatus(orderId)).toBe('EN_CURSO');
+
+    // «Paso 1» lleva al paso que falta: bloque con 0/3, Siguiente bloqueado y su motivo (R13, R15).
+    await missing.getByTestId(EVIDENCE_MISSING_STEP_1_TESTID).click();
+    await expect(missing).toHaveCount(0);
+    await expect(region).toBeVisible({ timeout: 60_000 });
+    await expect(region.getByTestId(EVIDENCE_COUNT_TESTID)).toHaveText('0/3');
+    await expect(region).toContainText('Obligatoria · de 1 a 3 fotos');
+    await expect(region.getByTestId(EVIDENCE_ADD_TESTID)).toContainText('Añadir foto');
+    await expect(page.getByTestId(STEP_BLOCKED_REASON_TESTID)).toHaveText(EVIDENCE_MISSING_REASON);
+    await expect(page.getByTestId(STEP_NEXT_TESTID)).toBeDisabled();
+
+    // R18: la foto sube directa al almacenamiento firmado y cuenta cuando el servidor la registra.
+    await uploadEvidencePhoto(page);
+    await expect(region.getByTestId(EVIDENCE_COUNT_TESTID)).toHaveText('1/3', { timeout: 60_000 });
+    await expect(region.getByRole('button', { name: 'Foto 1 del paso 1', exact: true })).toBeVisible();
+    expect(storage.uploads()).toBe(1);
+    expect(await evidenceRowCount(orderId)).toBe(1);
+
+    // Avanza: el motivo de evidencia desaparece y Siguiente se habilita al acabar la espera.
+    await expect(page.getByTestId(STEP_BLOCKED_REASON_TESTID)).toBeHidden();
+    await expect(page.getByTestId(STEP_NEXT_TESTID)).toBeEnabled({ timeout: 60_000 });
+    await page.getByTestId(STEP_NEXT_TESTID).click();
+    await expect(region).toHaveCount(0);
+    // El avance se anota en segundo plano: la otra pestana retoma de esa anotacion.
+    await expect.poll(() => lastStepEntry(orderId), { timeout: 30_000 }).toEqual({
+      action: 'ADVANCE',
+      stepPosition: 2,
+      advances: 2,
+    });
+
+    // Una segunda pestana del mismo Operador vuelve al paso 1 y quita la foto. La primera sigue
+    // en el paso 2 creyendo que la tiene: solo el servidor puede frenar el Finalizar (R35).
+    const other = await context.newPage();
+    await interceptEvidenceStorage(other);
+    await other.goto(assignedOrderRoute(orderId));
+    await expect(other.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
+    await other.getByTestId(STEP_PREVIOUS_TESTID).click();
+    const otherRegion = other.getByRole('region', { name: EVIDENCE_REGION_NAME });
+    await expect(otherRegion.getByTestId(EVIDENCE_COUNT_TESTID)).toHaveText('1/3', { timeout: 60_000 });
+    await otherRegion.getByRole('button', { name: 'Quitar la foto 1 del paso 1', exact: true }).click();
+    await expect(otherRegion.getByTestId(EVIDENCE_COUNT_TESTID)).toHaveText('0/3', { timeout: 60_000 });
+    await expect(other.getByTestId(STEP_BLOCKED_REASON_TESTID)).toHaveText(EVIDENCE_MISSING_REASON);
+    expect(await evidenceRowCount(orderId)).toBe(0);
+    await expect.poll(async () => (await lastStepEntry(orderId)).action, { timeout: 30_000 }).toBe(
+      'GO_BACK',
+    );
+    await other.close();
+
+    // R35: la confirmacion avisa de que las fotos quedan fijas, pero el servidor rechaza terminar
+    // con `evidence_required` y el pedido no se mueve.
+    await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
+    await expect(page.getByTestId(FINISH_ERROR_TESTID)).toContainText(errorMessage('evidence_required'), {
+      timeout: 60_000,
+    });
+    expect(await orderStatus(orderId)).toBe('EN_CURSO');
+
+    // Al recargar, retoma donde la otra pestana lo dejo: el paso 1, de nuevo sin fotos y bloqueado.
+    await page.reload();
+    await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
+    await expect(region.getByTestId(EVIDENCE_COUNT_TESTID)).toHaveText('0/3', { timeout: 60_000 });
+    await expect(page.getByTestId(STEP_NEXT_TESTID)).toBeDisabled();
+
+    // Vuelve a subirla, avanza y termina: la confirmacion lleva el aviso de las fotos fijas.
+    await uploadEvidencePhoto(page);
+    await expect(region.getByTestId(EVIDENCE_COUNT_TESTID)).toHaveText('1/3', { timeout: 60_000 });
+    expect(await evidenceRowCount(orderId)).toBe(1);
+    await expect(page.getByTestId(STEP_NEXT_TESTID)).toBeEnabled({ timeout: 60_000 });
+    await page.getByTestId(STEP_NEXT_TESTID).click();
+    await expect(page.getByTestId(STEP_FINISH_TESTID)).toBeEnabled({ timeout: 60_000 });
+
+    const finishDialog = page.getByTestId(FINISH_DIALOG_TESTID);
+    await expect(async () => {
+      if ((await finishDialog.count()) === 0) await page.getByTestId(STEP_FINISH_TESTID).click();
+      await expect(finishDialog).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
+    await expect(finishDialog).toContainText(EVIDENCE_FINISH_WARNING);
+    await page.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID).click();
+    await page.waitForURL(
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      { timeout: 60_000 },
+    );
+
+    expect(await orderStatus(orderId)).toBe('POR_EMPACAR');
+    expect(await evidenceRowCount(orderId)).toBe(1);
   });
 });

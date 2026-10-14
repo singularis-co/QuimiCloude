@@ -1,5 +1,6 @@
 'use client';
 
+import { CameraIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
@@ -53,6 +54,7 @@ const SAVE_SUCCESS_CREATE = 'Versión creada.';
 const SAVE_SUCCESS_EDIT = 'Versión actualizada.';
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const INVALID_INPUT_MESSAGE = 'Revisa los campos marcados.';
+const REQUIRES_EVIDENCE_MARK = 'Requiere evidencia';
 
 export type RecipeVersionFormOriginal = {
   readonly id: string;
@@ -97,6 +99,18 @@ function buildInitialState(props: RecipeVersionFormProps): RecipeVersionFormStat
 
 function noop(): void {}
 
+function RequiresEvidenceMark({ testId }: { readonly testId: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary"
+      data-testid={testId}
+    >
+      <CameraIcon aria-hidden="true" className="size-4" />
+      {REQUIRES_EVIDENCE_MARK}
+    </span>
+  );
+}
+
 function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) {
   return (
     <section
@@ -137,7 +151,12 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
           <ol className="flex flex-col gap-4">
             {version.steps.map((step, index) => (
               <li key={index} className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Paso {index + 1}</span>
+                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  Paso {index + 1}
+                  {step.requiresEvidence === true ? (
+                    <RequiresEvidenceMark testId={`recipe-version-step-${index}-evidence`} />
+                  ) : null}
+                </span>
                 <StepDocumentView
                   document={step}
                   isItemChecked={() => false}
@@ -165,7 +184,12 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
           <ol className="flex flex-col gap-4">
             {version.packingSteps.map((step, index) => (
               <li key={index} className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Paso {index + 1}</span>
+                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  Paso {index + 1}
+                  {step.requiresEvidence === true ? (
+                    <RequiresEvidenceMark testId={`recipe-version-packing-step-${index}-evidence`} />
+                  ) : null}
+                </span>
                 <StepDocumentView
                   document={step}
                   isItemChecked={() => false}

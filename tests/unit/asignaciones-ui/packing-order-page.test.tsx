@@ -89,6 +89,7 @@ function filaCon(overrides: Partial<Record<string, unknown>> = {}) {
     packedByName: null,
     packedById: null,
     packingSteps: [],
+    packingEvidence: [],
     ...overrides,
   };
 }

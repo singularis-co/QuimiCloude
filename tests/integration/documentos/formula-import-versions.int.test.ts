@@ -38,6 +38,7 @@ import {
   replaceAliveRecipe,
   replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
+  listRecipeVersionIdsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import {
   findAliveRecipeByNormalizedName,
@@ -50,6 +51,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -66,6 +68,7 @@ const recipeRepository: RecipeRepository = {
   softDeleteAlive: softDeleteAliveRecipe,
   createVersion: createRecipeVersion,
   listAliveVersions: listAliveRecipeVersions,
+  listVersionIdsIncludingDeleted: listRecipeVersionIdsIncludingDeleted,
   replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
 };
 
@@ -93,7 +96,7 @@ const deps: FormulaImportDeps = {
   productNames: productNameLookup,
   createRawMaterial: createCreateRawMaterial({ products: { create: createProduct } }),
   createRecipe: createCreateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage }),
-  updateRecipe: createUpdateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage }),
+  updateRecipe: createUpdateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage, stepLocks: noEvidenceLocks }),
 };
 
 type Empresa = {

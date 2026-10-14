@@ -10,6 +10,7 @@
  */
 import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
 import type { OrderDistributionLineView } from './order-distribution-view';
+import type { StepEvidenceView } from './step-evidence';
 
 import type { AssignedOrderSummary } from '@/lib/modules/pedidos';
 import type { RecipeStepView } from '@/lib/modules/recetas';
@@ -46,6 +47,8 @@ export type PackingOrderRow = {
 export type PackingOrderDetail = PackingOrderRow & {
   /** Vacio salvo `EN_EMPAQUE` a nombre del actor. Nunca trae pasos del operador. */
   readonly packingSteps: readonly RecipeStepView[];
+  /** Las fotos de envasado por paso, con URL firmada. Vacio en los mismos casos que `packingSteps`. */
+  readonly packingEvidence: readonly StepEvidenceView[];
 };
 
 export async function composePackingOrderRows(

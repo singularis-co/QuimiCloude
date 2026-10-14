@@ -45,7 +45,7 @@ const ACONDICIONADOR: Actor = {
 };
 
 function persona(id: string, displayName: string, overrides?: Partial<PersonRef>): PersonRef {
-  return { id, displayName, isActive: true, permissions: SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]!, ...overrides };
+  return { id, displayName, isActive: true, permissions: SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]!, roleName: ROLE_OPERADOR, ...overrides };
 }
 
 const ADMINISTRADOR: Partial<PersonRef> = { permissions: SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]! };

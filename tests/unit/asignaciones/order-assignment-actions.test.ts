@@ -951,8 +951,8 @@ describe('QC-145 T11 — listResponsibleCandidatesAction', () => {
 // catalogo: esta capa no lo reconoce por su texto ni por ningun `if` especial.
 // ---------------------------------------------------------------------------------------------
 
-describe('QC-145 R33 — assignResponsiblesAction traduce user_cannot_be_responsible por su code', () => {
-  it('una persona con `pedidos.consultar` sale con su propio code, sin filtrar el texto', async () => {
+describe('QC-145 R33, QC-274 — assignResponsiblesAction traduce user_cannot_be_responsible por su code', () => {
+  it('QC-274: asignar a alguien de Acondicionamiento (rol no responsable) sale con su propio code, sin filtrar el texto', async () => {
     const error = new UserCannotBeResponsibleError();
     Object.defineProperty(error, 'message', { value: 'un texto que nadie debe mirar' });
     assignResponsiblesMock.mockRejectedValue(error);

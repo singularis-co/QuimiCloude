@@ -3,15 +3,18 @@ import {
   ActionNotAllowedError,
   RecipeDuplicateNameError,
   RecipeNotFoundError,
+  RecipeStepsLockedError,
   ValidationError,
 } from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { updateRecipeSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
+import { detectLockedStepChange } from './recipe-step-lock';
 import { assertToolsValid } from './recipe-tools';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
-import type { NewRecipe, PropagatedVersion, RecipeRepository } from '../ports/recipe-repository';
+import type { NewRecipe, PropagatedVersion, RecipeRepository, RecipeRow } from '../ports/recipe-repository';
+import type { RecipeStepLockReader } from '../ports/recipe-step-lock-reader';
 
 import { isIngredientType, type ProductCatalog } from '@/lib/modules/inventario';
 
@@ -33,6 +36,7 @@ export type UpdateRecipeDeps = {
   readonly recipes: RecipeRepository;
   readonly products: ProductCatalog;
   readonly images: RecipeImageStorage;
+  readonly stepLocks: RecipeStepLockReader;
   /** Ver el comentario identico en `create-recipe.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
 };
@@ -88,6 +92,8 @@ export function createUpdateRecipe(
     if (existing === null) throw new RecipeNotFoundError();
     // Una version tiene su propia operacion de edicion, que no admite pasos, descripcion ni imagen.
     if (existing.original !== null) throw new ActionNotAllowedError();
+
+    await assertStepsNotLocked(deps, existing, data, scope);
 
     // R45, R46 (`design.md > 6`): diferencia de conjuntos. Solo se valida contra el
     // catalogo la linea NUEVA -la que no estaba ya en la receta-; la preexistente se
@@ -164,6 +170,29 @@ export function createUpdateRecipe(
 
     return { id, warnings, propagated };
   };
+}
+
+/**
+ * Mover o quitar pasos con pedidos en curso que ya tienen fotos las dejaria en el paso equivocado.
+ * Solo se pregunta por los pedidos si la edicion mueve o quita algo: guardar texto no paga la consulta.
+ */
+async function assertStepsNotLocked(
+  deps: UpdateRecipeDeps,
+  existing: RecipeRow,
+  data: Pick<NewRecipe, 'steps' | 'packingSteps'>,
+  scope: RecipeScope,
+): Promise<void> {
+  const change =
+    detectLockedStepChange(existing.steps, data.steps) ??
+    detectLockedStepChange(existing.packingSteps, data.packingSteps);
+  if (change === null) return;
+
+  const versionIds = await deps.recipes.listVersionIdsIncludingDeleted(existing.id, scope);
+  const locking = await deps.stepLocks.countOrdersWithEvidenceInProgress(
+    [existing.id, ...versionIds],
+    scope.companyId,
+  );
+  if (locking > 0) throw new RecipeStepsLockedError(`${change}; ${locking} pedidos en curso con fotos`);
 }
 
 async function persist(

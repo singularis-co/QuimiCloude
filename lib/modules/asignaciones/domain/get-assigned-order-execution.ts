@@ -3,10 +3,13 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
+import { readStepEvidence } from './evidence-photos';
 import { toDistributionLines, unitLabelOf } from './order-distribution-view';
 
 import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-order-execution-view';
+import type { EvidenceStorage } from '../ports/evidence-storage';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
+import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 
 import { formatOrderNumber, resolveLineNeed, type OrderCatalog } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -24,6 +27,8 @@ export type GetAssignedOrderExecutionDeps = {
   readonly units: UnitCatalog;
   readonly products: ProductCatalog;
   readonly presentations: PresentationCatalog;
+  readonly evidence: StepEvidenceRepository;
+  readonly storage: EvidenceStorage;
 };
 
 /** La base efectiva de una unidad: la que declara, o ella misma si no deriva de nadie. */
@@ -136,6 +141,12 @@ export function createGetAssignedOrderExecution(
         : await deps.presentations.findRefs(presentationIds, actor.companyId);
     const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
 
+    // Un pedido PENDIENTE todavia no puede tener fotos.
+    const evidence =
+      target.status === 'EN_CURSO'
+        ? await readStepEvidence(deps.evidence, deps.storage, actor.companyId, orderId, 'manufacturing', steps)
+        : [];
+
     return {
       orderId: summary.id,
       numberText: formatOrderNumber(summary.number),
@@ -151,6 +162,7 @@ export function createGetAssignedOrderExecution(
       presentationLines: toDistributionLines(summary.presentationLines, presentationNames),
       unitId: summary.unitId,
       unitLabel: orderUnit === null ? null : unitLabelOf(orderUnit),
+      evidence,
     };
   };
 }

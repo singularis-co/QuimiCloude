@@ -410,3 +410,39 @@ export class ConditioningBatchNotFoundError extends AsignacionesError {
     this.batchId = batchId;
   }
 }
+
+/** Avanzar o terminar con un paso que exige evidencia y no tiene ninguna foto. */
+export class EvidenceRequiredError extends AsignacionesError {
+  readonly code = 'evidence_required';
+
+  constructor(diagnostic?: string) {
+    super('evidence_required', diagnostic);
+  }
+}
+
+/** El paso ya tiene sus 3 fotos y la peticion no sustituye a ninguna. */
+export class EvidenceLimitError extends AsignacionesError {
+  readonly code = 'evidence_limit';
+
+  constructor(diagnostic?: string) {
+    super('evidence_limit', diagnostic);
+  }
+}
+
+/** Lo subido no existe, o por su contenido no es JPEG, PNG ni WebP de hasta 5 MB. */
+export class EvidenceInvalidFileError extends AsignacionesError {
+  readonly code = 'evidence_invalid_file';
+
+  constructor(diagnostic?: string) {
+    super('evidence_invalid_file', diagnostic);
+  }
+}
+
+/** La foto no existe en ese pedido, fase y paso, o es de otra empresa. */
+export class EvidenceNotFoundError extends AsignacionesError {
+  readonly code = 'evidence_not_found';
+
+  constructor(diagnostic?: string) {
+    super('evidence_not_found', diagnostic);
+  }
+}
