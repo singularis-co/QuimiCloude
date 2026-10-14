@@ -374,13 +374,15 @@ que vigila `tests/guards/guard-variables-por-entorno.test.ts`):
 
 ## 7. Subida desde el navegador
 
-1. `requestEvidenceUploadAction` → enlace firmado.
-2. `compressImage(file, { maxBytes: MAX_IMAGE_BYTES, maxDimension: 1600, accept })` (pregunta
-   abierta 2). `not_compressible`, tipo no admitido o > 5 MB → casilla en error, sin subir (R17).
+1. `compressImage(file, { maxBytes: MAX_IMAGE_BYTES, maxDimension: 1600, accept })` (pregunta
+   abierta 2). `not_compressible`, tipo no admitido o > 5 MB → casilla en error, sin pedir enlace
+   ni subir (R17). Comprimir primero evita gastar una firma en un archivo inválido; el servidor
+   sigue validando por contenido (R32).
+2. `requestEvidenceUploadAction` → enlace firmado.
 3. `PUT` al `uploadUrl` con `XMLHttpRequest` —no `fetch`—, porque solo `xhr.upload.onprogress` da
    el porcentaje que pinta la casilla (R16). API del navegador, soportada en Safari iOS y Chrome
    Android: sin dependencia.
-4. `registerEvidenceAction` → la foto cuenta (R18). Un fallo en 1, 3 o 4 deja la casilla en error.
+4. `registerEvidenceAction` → la foto cuenta (R18). Un fallo en 2, 3 o 4 deja la casilla en error.
 
 Un archivo subido y nunca registrado (pantalla cerrada a medias) queda en el bucket sin fila: no se
 lee nunca. Su limpieza, como la de los pedidos cancelados, va aparte.

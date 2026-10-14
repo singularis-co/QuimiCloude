@@ -130,9 +130,10 @@ Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
 ## Bloque E — E2E y cierre (depende de todo)
 
 - [x] **T20. E2E del Operador** (R13, R15, R18, R22, R35). Extiende `e2e/ejecucion-receta.spec.ts`
-  con una fórmula cuyo paso 1 exige evidencia: Siguiente bloqueado, subida interceptada en
-  `https://evidencias-e2e.invalid/**`, avance, quitar la foto volviendo atrás, «Falta evidencia»
-  al finalizar, volver a subir y finalizar.
+  con una fórmula cuyo paso 1 exige evidencia, partiendo de un pedido en curso en el paso 2
+  (R37): «Falta evidencia», volver al paso 1, subir (interceptada en
+  `https://evidencias-e2e.invalid/**`), avanzar, quitar la foto desde una segunda pestaña,
+  rechazo `evidence_required` del servidor al finalizar (R35), volver a subir y finalizar.
   *Hecho:* `pnpm exec playwright test e2e/ejecucion-receta.spec.ts` verde en local.
 - [x] **T21. Cierre.** `./init.sh` verde; `progress/impl_QC-214.md` con el mapa `R<n> -> test`
   (`design.md > 10`); catálogo con las tres filas (switch, step-evidence, StepReader).
