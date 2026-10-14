@@ -10,7 +10,8 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   `db/schema.prisma`; `pnpm run db:migrate:create` → `..._order_presentation_lines_packed_count`;
   escribir los cuatro `CHECK` de `design.md § 1` en `migration.sql` y su `down.sql`.
 - Test de esquema: la migración declara los cuatro `CHECK`; la lista de `packed_reason_in_catalog`
-  es igual a `PACKING_DIFFERENCE_REASONS`; `down.sql` revierte columnas y constraints.
+  es igual a `PACKING_DIFFERENCE_REASONS`; el tope `char_length(...) <= 200` del `CHECK` coincide con
+  `PACKING_REASON_OTHER_MAX`; `down.sql` revierte columnas y constraints.
 - **Hecho:** `db:migrate` y `db:rollback` limpios en local; test de esquema verde. (R16, R25)
 
 ## T2 — Dominio puro del conteo (depende de T1)
@@ -20,7 +21,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
 - Exportar `STOCK_INCREASE_REASONS` en `lib/modules/inventario/index.ts`; exportar lo nuevo en
   `lib/modules/pedidos/index.ts`. Documentar `DistributionLine.packages` como entero ≥ 0.
 - Tests unitarios: conjunto exacto de líneas; entero ≥ 0 con 0 aceptado; motivo sí/no según
-  diferencia; sentido (Merma/Rotura no valen para más); «Otro» con texto 1..500 tras trim; total en
+  diferencia; sentido (Merma/Rotura no valen para más); «Otro» con texto 1..200 tras trim (201 rechazado); total en
   unidad del pedido con mezcla de unidades; máximo por línea; `effectivePackages` con `null`.
 - **Hecho:** tests verdes. (R2–R8, R13, R15, R25)
 
@@ -40,7 +41,8 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
 - `AssignedOrderPresentationLine` gana `id` y `packedPackages` (`domain/order-catalog.ts`,
   `adapters/driven/persistence/order-catalog-prisma.ts`).
 - Tests de integración: escribe solo líneas del pedido y la empresa dados; una línea de otro pedido
-  u otra empresa no cambia; el `CHECK` rechaza motivo incoherente escrito a mano.
+  u otra empresa no cambia; el `CHECK` rechaza motivo incoherente y un texto de «Otro» de 201
+  caracteres escritos a mano.
 - **Hecho:** tests verdes. (R16, R29)
 
 ## T5 — Terminar con conteo real en `pedidos` (depende de T2, T3, T4)
@@ -50,10 +52,11 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
 - Tests unitarios (`tests/unit/pedidos/order-packing.test.ts`) e integración
   (`tests/integration/pedidos/finish-with-finished-goods.int.test.ts` u hermano nuevo):
   `invalid_packing_count`; `packed_exceeds_quantity` con unidades mixtas; igual a la cantidad se
-  acepta; lote con `real × contenido`; línea en 0 sin lote; coste por unidad = coste / total real y
-  suma de lotes = coste; rechazo deja estado, líneas, reservas y existencias intactas; segundo envío
-  → `not_packable`; envase que también es ingrediente conserva lo de hoy.
-- **Hecho:** tests verdes. (R15, R16, R18–R22, R30)
+  acepta; lote con `real × contenido`; línea en 0 sin lote; todas las líneas en 0 → `POR_ACONDICIONAR`
+  sin lotes y envases liberados; coste total igual que con el plan, coste por unidad = coste / total
+  real y suma de lotes = coste; rechazo deja estado, líneas, reservas y existencias intactas; segundo
+  envío → `not_packable`; envase que también es ingrediente conserva lo de hoy.
+- **Hecho:** tests verdes. (R15, R16, R18–R22, R30, R32)
 
 ## T6 — Caso de uso y acción en `asignaciones` (depende de T5)
 - `finish-packing.ts`: zod con `lines`, paso de `counts`, mapeo de resultados nuevos;
@@ -93,12 +96,13 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   último paso) abre el diálogo; `index.ts` del barrel de la ruta.
 - `app/(private)/asignacion/components/packing-orders-columns.tsx`: fuera la columna «Envases».
 - Tests de componente (`tests/unit/asignaciones-ui/`): prellenado; insignia ±N; motivos por sentido
-  y vaciado al cambiar de sentido; «Otro» con texto; «Elige un motivo.»/«Escribe el motivo.» y no
-  envía; pie siempre visible; error de tope con máximo; error de stock; ayudas de liberar/salir;
-  línea en 0; Cancelar no envía; sin «Envases:» ni columna. Actualizar
+  y vaciado al cambiar de sentido; «Otro» con texto y tope de 200 caracteres; «Elige un
+  motivo.»/«Escribe el motivo.» y no envía; pie siempre visible; error de tope con máximo; error de
+  stock; ayudas de liberar/salir; línea en 0; todas en 0 se puede Terminar; con pasos con foto la
+  descripción acaba en el aviso de evidencias; Cancelar no envía; sin «Envases:» ni columna. Actualizar
   `packing-order-screen.test.tsx`, `packing-orders-columns.test.tsx`,
   `packing-order-evidence.test.tsx` y el snapshot de `confirmaciones-paridad`.
-- **Hecho:** tests verdes; revisión visual contra los tableros en 1440/1024/390. (R1–R12)
+- **Hecho:** tests verdes; revisión visual contra los tableros en 1440/1024/390. (R1–R13, R32, R33)
 
 ## T10 [P] — Tab «Reparto» (depende de T4)
 - `FinishedDistributionDirectory` en `lib/modules/inventario/domain/finished-product-detail.ts`;
@@ -131,7 +135,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
 ## T13 — Cierre
 - Mapa `R<n> → test` en `progress/impl_QC-281-envases-reales-al-terminar-empaque.md`.
 - `./init.sh` verde (o `gate-completo` en el PR).
-- **Hecho:** cada R1–R31 con su test; R31 lo cubre la guardia de dependencias del gate.
+- **Hecho:** cada R1–R33 con su test; R31 lo cubre la guardia de dependencias del gate.
 
 ## Archivos esperados
 

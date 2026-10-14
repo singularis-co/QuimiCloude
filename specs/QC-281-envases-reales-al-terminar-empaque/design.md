@@ -17,7 +17,7 @@ escribir el spec se buscó también en el grafo `finishPackingAliveById`, `packe
 | Libro de reservas | `MaterialReservations` (`lib/modules/inventario/domain/reservation.ts`), `reservation-prisma.ts` (`consumeForOrder`, `planReservation`, `netReservedByBatch`, `consumeBatchStock`) | Se añade **un** método que liquida los envases con el conteo real reutilizando esas piezas internas (ver § 4). |
 | Disponible libre de un envase | `PackagingCatalog.findRefs(...).available` (sin `excludeOrderId` descuenta todo lo apartado) | Alimenta «quedan L libres» del diálogo (R9, R10). |
 | Motivos | `MOVEMENT_REASONS`, `STOCK_INCREASE_REASONS` (`lib/modules/inventario/domain/movement-reason.ts`); `movementReasonLabel` (`app/(private)/inventario/components/movement-reason-label.ts`) | Fuente de la lista (D7). `STOCK_INCREASE_REASONS` se exporta por el barrel de `inventario` (hoy no lo está). |
-| Tope de texto libre | `z.string().trim().min(1).max(500)` en `order-input.ts:177` y `void-delivery.ts:44` | Mismo tope para «Otro» (pregunta abierta 3). |
+| Patrón de texto libre | `z.string().trim().min(1).max(...)` en `order-input.ts:177` y `void-delivery.ts:44` | Mismo patrón para «Otro», con tope de **200** (D21), no el 500 de esos dos. |
 | Detalle de producto terminado (QC-225) | `app/(private)/inventario/producto-terminado/[id]/` + `list-finished-product-*.ts` | Tab 8.ª calcada de «Entregas»: misma sección, mismo `DataTable`, mismo patrón de directorio hacia `pedidos` (`FinishedDeliveryDirectory` ↔ `order-delivery-directory-prisma.ts`). |
 | Bloqueo de acondicionamiento por datos de lote | `missingBatchDataLines`, `lib/modules/asignaciones/domain/conditioning-batch-data.ts` | Se ajusta para que una línea en 0 no bloquee (R23). |
 | Tope de entrega por línea | `orderedPackages: line.packages` en `deliver-order.ts:118` y `get-order-delivery.ts:75` | Pasa a los envases reales (R24). |
@@ -104,11 +104,12 @@ ALTER TABLE "order_presentation_lines"
     OR ("packed_packages" > "packages" AND "packed_reason" IN ('conteo_fisico', 'error_de_carga', 'otro'))
   );
 
--- Texto si y solo si el motivo es «Otro», y nunca vacío.
+-- Texto si y solo si el motivo es «Otro», nunca vacío y de 200 caracteres como mucho (D21).
 ALTER TABLE "order_presentation_lines"
   ADD CONSTRAINT "order_presentation_lines_packed_reason_other_matches"
   CHECK (
-       ("packed_reason" = 'otro' AND "packed_reason_other" IS NOT NULL AND btrim("packed_reason_other") <> '')
+       ("packed_reason" = 'otro' AND "packed_reason_other" IS NOT NULL
+        AND btrim("packed_reason_other") <> '' AND char_length("packed_reason_other") <= 200)
     OR ("packed_reason" IS DISTINCT FROM 'otro' AND "packed_reason_other" IS NULL)
   );
 ```
@@ -136,7 +137,7 @@ ALTER TABLE "order_presentation_lines"
 export const PACKING_DIFFERENCE_REASONS = [...MOVEMENT_REASONS, 'otro'] as const;      // menos
 export const PACKING_INCREASE_REASONS = [...STOCK_INCREASE_REASONS, 'otro'] as const;  // más
 export type PackingDifferenceReason = (typeof PACKING_DIFFERENCE_REASONS)[number];
-export const PACKING_REASON_OTHER_MAX = 500;
+export const PACKING_REASON_OTHER_MAX = 200;                                          // D21
 ```
 
 Un test compara estas listas con las del `CHECK` de la migración (mismo patrón que
@@ -156,7 +157,7 @@ type FinishPackingInput = {
     lineId: string;                 // uuid de order_presentation_lines
     packedPackages: number;         // entero >= 0
     reason: PackingDifferenceReason | null;
-    reasonOther: string | null;     // trim, 1..500, solo con reason === 'otro'
+    reasonOther: string | null;     // trim, 1..200, solo con reason === 'otro'
   }>;
 };
 ```
@@ -174,7 +175,7 @@ Camino feliz: igual que hoy, `redirect` a «Por empacar» con el número del ped
 
 1. `requirePermission(actor, 'empaque.modificar')` — antes de todo (R14).
 2. zod `strictObject({ orderId: uuid, lines: array(strictObject({...})).min(1) })` con la forma de
-   2.1 (R13: tipos, entero ≥ 0, `reasonOther` 1..500 tras `trim`). Que el array sea exactamente el
+   2.1 (R13: tipos, entero ≥ 0, `reasonOther` 1..200 tras `trim`). Que el array sea exactamente el
    conjunto de líneas del pedido lo comprueba `pedidos` (§ 3, paso 3), que es quien las lee.
 3. Lee el pedido y comprueba fotos, como hoy.
 4. `transaction.run` → `packing.finishPackingAliveById(orderId, companyId, actorId, now, counts)`.
@@ -278,7 +279,7 @@ export interface FinishedDistributionDirectory {
   `order_presentation_lines` ⨝ `orders` por `(order_id, company_id)`, `orders.company_id = $1`,
   `orders.deleted_at IS NULL`, `orders.recipe_id = $recipe`, `line.presentation_id = $presentation`,
   `orders.status IN ('POR_ACONDICIONAR','EN_ACONDICIONAMIENTO','TERMINADO','ENTREGADO')`, orden
-  `order_year DESC, order_sequence DESC` (pregunta abierta 4), paginación con el defecto y tope de
+  `order_year DESC, order_sequence DESC` (D22), paginación con el defecto y tope de
   `lib/shared/pagination`.
 - La fila de la UI (`FinishedProductDistributionRow`) añade la presentación (la del producto, una
   sola para toda la tab) y calcula la diferencia en pantalla (R27).
@@ -302,7 +303,8 @@ export interface FinishedDistributionDirectory {
    company_id = $company` (R16, R29).
 6. **Envases** (§ 4) con los envases reales. `insufficient` → `'packaging_stock_insufficient'` (R18).
 7. Coste: `lotCost` como hoy; `unitCostByPresentationUnit` con `packages = packedPackages` (R21).
-   Si el total real es 0 no hay lotes y el coste no se reparte (pregunta abierta 1).
+   El coste total no se recalcula con los envases reales (D20). Si el total real es 0 (todas las
+   líneas en 0, permitido por D19 / R32) no hay lotes y el coste no se reparte.
 8. Por cada línea con `packedPackages > 0`, `finishedGoods.receiveFromOrder({ ..., packages:
    packedPackages })` (R20); las de 0 se saltan (R19).
 
@@ -375,7 +377,9 @@ del contrato de `pedidos`** (cliente-seguras: el barrel no arrastra servidor):
 Al pulsar «Terminar» sin errores serializa `lines` en el campo oculto y hace `requestSubmit()` del
 `<form>` de hoy (mismos testids `packing-order-finish-form`, `packing-order-finish-confirm`). Todos
 los textos salen de una constante `PACKING_FINISH_DIALOG_TEXTS` copiada del tablero (D18). Con pasos
-con foto, la descripción se ajusta según la pregunta abierta 5.
+con foto, la última frase de la descripción («Terminar el empaque no se puede deshacer.») se
+sustituye por `STEP_EVIDENCE_TEXTS.finishWarning` (D23, R33). El `TextField` de «Otro» lleva
+`maxLength={PACKING_REASON_OTHER_MAX}` (200, D21).
 
 ## 7. Autorización y empresa (R14, R29)
 

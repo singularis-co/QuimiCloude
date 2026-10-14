@@ -49,6 +49,11 @@ aprobados el 2026-10-14 (`docs/diseno/canvas/EmpaqueTerminar*.dc.html`,
 | D16 | Pedidos empacados antes de QC-281: real = plan, sin motivo. | R25, R27 |
 | D17 | Pie «Envasado: N de M» del diálogo visible siempre. | R7 |
 | D18 | Textos del tablero aprobados tal cual. | R1–R12, R27, R28 |
+| D19 | (2026-10-14) Se puede Terminar con todas las líneas en 0: el pedido pasa a `POR_ACONDICIONAR` sin ningún lote y con todos sus envases liberados. | R32 |
+| D20 | (2026-10-14) El coste total del pedido queda igual que hoy (incluye los envases del plan); solo cambia el reparto, que se hace sobre lo envasado real. | R21 |
+| D21 | (2026-10-14) El texto de «Otro» tiene un tope de **200 caracteres**. | R13 |
+| D22 | (2026-10-14) La tab «Reparto» se ordena por número de pedido descendente. | R26 |
+| D23 | (2026-10-14) Con pasos con foto de evidencia, la última frase de la descripción del diálogo («Terminar el empaque no se puede deshacer.») se sustituye por «Al terminar, las fotos de evidencia quedan fijas. No se puede deshacer.». | R33 |
 
 ## Requisitos (EARS)
 
@@ -104,10 +109,11 @@ aprobados el 2026-10-14 (`docs/diseno/canvas/EmpaqueTerminar*.dc.html`,
 
 - **R13**: CUANDO llega una petición de Terminar el empaque, el sistema DEBE exigir, por cada línea
   del reparto del pedido y solo por ellas, un número de envases reales entero ≥ 0, y un motivo SI y
-  solo SI ese número difiere del plan, válido para su sentido (D7), con texto no vacío de hasta 500
-  caracteres SI y solo SI el motivo es «Otro». SI falta o sobra alguna línea, o cualquiera de esas
-  reglas no se cumple, ENTONCES el sistema DEBE rechazar la petición con error de validación sin
-  cambiar nada. [D6, D7]
+  solo SI ese número difiere del plan, válido para su sentido (D7), con texto no vacío de hasta 200
+  caracteres (tras recortar espacios) SI y solo SI el motivo es «Otro». SI falta o sobra alguna
+  línea, o cualquiera de esas reglas no se cumple, ENTONCES el sistema DEBE rechazar la petición con
+  error de validación sin cambiar nada. El campo «Describe el motivo» del diálogo NO DEBE admitir más
+  de 200 caracteres. [D6, D7, D21]
 - **R14**: El sistema DEBE permitir Terminar solo a un actor con `empaque.modificar` que sea quien
   tiene el pedido en `EN_EMPAQUE`; con cualquier otro actor DEBE rechazar como hoy (sin permiso,
   pedido de otro empacador o pedido no empacable), sin permiso nuevo. [D10]
@@ -134,7 +140,7 @@ aprobados el 2026-10-14 (`docs/diseno/canvas/EmpaqueTerminar*.dc.html`,
   realmente envasado en la unidad del pedido (suma de envases reales × contenido convertidos con
   `sumInOrderUnit`), de modo que todos los lotes del pedido lleven el mismo coste por unidad del
   pedido y la suma de `existencia × coste unitario` de sus lotes sea el coste del pedido (salvo
-  redondeo a 4 decimales). [D9, D11]
+  redondeo a 4 decimales). El coste total NO DEBE recalcularse con los envases reales. [D9, D11, D20]
 - **R22**: SI Terminar se rechaza por cualquier motivo, ENTONCES el sistema NO DEBE cambiar el estado
   del pedido, sus líneas, sus reservas, la existencia de ningún lote ni dar de alta ningún lote.
 
@@ -157,7 +163,7 @@ aprobados el 2026-10-14 (`docs/diseno/canvas/EmpaqueTerminar*.dc.html`,
   línea del reparto de cada pedido empacado (estado `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO`,
   `TERMINADO` o `ENTREGADO`) de la receta y presentación de ese producto, ordenadas por número de
   pedido descendente, con las columnas Pedido · Presentación · Plan · Envases reales · Diferencia ·
-  Motivo, y paginada como las demás tabs (10 o 25 filas). [D14]
+  Motivo, y paginada como las demás tabs (10 o 25 filas). [D14, D22]
 - **R27**: El sistema DEBE pintar cada fila así: igual al plan → «—» en Diferencia y Motivo; menos
   envases → «−N» y el motivo; más envases → «+N» y el motivo; «Otro» → el texto escrito entre
   comillas bajo el motivo; 0 envases reales → «−N» y «Sin lote»; línea sin conteo real guardado →
@@ -176,26 +182,14 @@ aprobados el 2026-10-14 (`docs/diseno/canvas/EmpaqueTerminar*.dc.html`,
   ya salió de `EN_EMPAQUE` DEBE rechazarse como hoy (`not_packable`) sin consumir ni dar de alta
   nada más.
 - **R31**: La feature NO DEBE añadir dependencias de terceros. [D12]
+- **R32**: CUANDO Terminar se acepta con todas las líneas del reparto en 0 envases reales, el sistema
+  DEBE pasar el pedido a `POR_ACONDICIONAR` sin dar de alta ningún lote y liberando todo lo apartado
+  de sus envases. [D19]
+- **R33**: MIENTRAS el pedido tiene pasos de envasado con foto de evidencia, el diálogo «¿Terminar el
+  empaque?» DEBE mostrar como descripción «Cuenta los envases que salieron de verdad. Ya vienen con
+  el plan: cambia solo los que no coinciden. Al terminar, las fotos de evidencia quedan fijas. No se
+  puede deshacer.»; sin esos pasos, la del tablero tal cual. [D23]
 
 ## Preguntas abiertas
 
-Ninguna bloquea el diseño; cada una lleva la propuesta con la que está escrito el spec. Se
-confirman al aprobarlo.
-
-1. **Todas las líneas en 0.** El spec lo **permite** (cada línea en 0 está permitida, D4): el pedido
-   pasa a `POR_ACONDICIONAR` sin ningún lote y con todos sus envases liberados. ¿Vale, o con todas en
-   0 no se deja Terminar?
-2. **Coste total con envases distintos del plan.** `orders.ingredients_cost` incluye
-   `packaging_cost`, calculado con los envases del plan. El spec (R21) mantiene el coste total como
-   hoy y solo cambia el divisor (D9). Con eso, los envases liberados siguen dentro del coste y los
-   de más no entran. ¿Se acepta, o el coste de envases debe recalcularse con los reales? (sería otro
-   requisito y cambia `resolve-ingredients-cost.ts`).
-3. **Tope de «Otro».** 500 caracteres (R13), el mismo que el motivo de cancelación
-   (`order-input.ts:177`) y el de anulación de entrega (`void-delivery.ts:44`). El tablero no lo fija.
-4. **Orden de la tab «Reparto».** El tablero dice «del más reciente al más antiguo». La línea no
-   guarda cuándo se empacó; el spec ordena por **número de pedido descendente** (R26). ¿Vale, o hace
-   falta guardar la fecha de empaque en la línea?
-5. **Aviso de fotos de evidencia.** Hoy, con pasos con foto, la confirmación de Terminar cambia su
-   texto por «Al terminar, las fotos de evidencia quedan fijas. No se puede deshacer.». El tablero
-   no lo contempla. Propuesta: con pasos con foto, la descripción del diálogo nuevo sustituye su
-   última frase («Terminar el empaque no se puede deshacer.») por ese aviso.
+Ninguna. Las cinco que dejó el spec las cerró el humano el 2026-10-14 (D19–D23).
