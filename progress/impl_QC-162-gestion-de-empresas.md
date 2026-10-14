@@ -497,3 +497,17 @@ protegido por el typecheck.
 - `./init.sh` (rapido), exit 0, `== init OK ==`: lint 0 errores (7 warnings ajenos); `vitest related`: Test Files
   858 passed (858), Tests 13652 passed | 37 skipped (13689); `gate.siempre`: Test Files 114 passed (114), Tests
   1608 passed | 37 skipped (1645).
+
+## Sincronización con dev (F2.3), 2026-10-14
+
+- Merge `42f44f5a`. Conflictos de solo añadir en `error-catalog.ts`, `error-codes.ts`,
+  `guard-identificador-de-request.test.ts` y `catalogo.test.ts`: lo de dev primero, lo de esta ficha al final;
+  recuento del catálogo 88 + 5 (dev) + 4 = 97.
+- Migración nueva de dev: `20261013120000_order_step_evidence` (comparte timestamp con
+  `20261013120000_companies_country`, ambas de dev; no choca con `20261014120000_companies_management`).
+  Aplicada en :5433; la de esta ficha se revirtió y se reaplicó encima sin error; `migrate status` al día.
+- `./init.sh` rápido: primera corrida con 1 rojo inestable ajeno (`tests/unit/inventario/adjust-batch-dialog.test.tsx`
+  R9, un mock sin llamar bajo carga; solo pasa 30/30); segunda corrida exit 0: Test Files 882 passed (882), Tests
+  14171 passed | 37 skipped (14208); `gate.siempre` 115 passed, 1621 passed | 37 skipped.
+- `.int` de empresas, uno a uno: `company` 38/38, `company-country` 8/8, `order-company-stats` 4/4,
+  `identity-seed` 35/35.
