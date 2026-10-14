@@ -31,7 +31,29 @@ _Pendiente: los escribe spec_author (F1.2)._
 
 ## Preguntas abiertas
 
-Ninguna.
+- **P1 (bloqueante, 2026-10-14, spec_author F1.2) — falta el pase `/design`.** La feature cambia
+  lo visual de dos pantallas que ya tienen tablero, y ninguno de esos tableros incluye fotos:
+  `docs/diseno/canvas/Recorrido*.dc.html` y `docs/diseno/canvas/ProductoTerminado*.dc.html`
+  (buscado «evidencia», «foto», «Envasado»: nada). La pieza `StepEvidence` y su modo de solo
+  lectura sí tienen tablero (`EvidenciaPaso*.dc.html`), pero dónde y cómo entra en cada pantalla
+  es UI visible nueva, así que no aplica la excepción de `docs/perfil-agentes.md > Pase de diseño
+  para componentes nuevos`. El spec no se escribe hasta que el humano apruebe el tablero y se copie
+  a `docs/diseno/canvas/`. El pase tiene que fijar, en escritorio, tablet y teléfono:
+  1. **Recorrido, fabricación.** Junto a qué anotación van las fotos de «Paso N» cuando ese paso
+     sale varias veces en la línea de tiempo (avanzar, volver atrás y volver a avanzar): ¿en la
+     primera, en la última o en un solo bloque por paso fuera de las anotaciones? Y dónde van las
+     fotos de un paso que no tiene ninguna anotación con ese número (la decisión «nunca se esconde
+     evidencia» obliga a mostrarlas).
+  2. **Recorrido, envasado.** Dónde va el bloque «Envasado» (antes o después de «Anotaciones») y
+     cómo se rotula cada paso dentro de él.
+  3. **Ficha, pestaña Lotes.** Cómo se abren las fotos de un lote dentro de la tabla paginada:
+     fila desplegable, panel o diálogo por lote, o una pestaña nueva. Y qué ve el Administrador en
+     un lote con pedido de origen pero sin fotos (la decisión «sin hueco» dice que no se muestra
+     nada).
+  4. **Textos del modo solo lectura.** `StepEvidence` en `readOnly` dice «Fijada al terminar». Si
+     ese texto vale para un pedido cancelado o dado de baja, o si hace falta otro para la
+     consulta.
+  5. **Estados** cargando, vacío y error de las fotos en las dos pantallas.
 
 ## Decisiones cerradas (no reabrir)
 
