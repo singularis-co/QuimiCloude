@@ -312,3 +312,29 @@ Veredicto: T13 y T14 hechas, verificación verde.
 6. T19: `locked` va en `recipe-steps-field`, donde viven mover y quitar, no en el editor. El switch queda fuera del `role="toolbar"` de formato. Con bloqueo, «Quitar» también se deshabilita en los pasos nuevos. El aviso usa `Notice` en tono warning.
 7. T20: el orden del E2E cambia respecto a tasks.md. Con el paso 1 sin foto, Siguiente queda bloqueado y la UI no deja llegar a Finalizar. El caso parte de un pedido ya en curso en el paso 2: «Falta evidencia» → «Paso 1» → subir → avanzar. Una segunda pestaña quita la foto, Finalizar se rechaza con `evidence_required` (R35), luego se sube otra vez y se finaliza.
 8. Switch (T15): mide 44 px por debajo de 768 px de ventana; el tablero corta a 760 px de contenedor.
+
+## Menores del review y F2.3 (2026-10-13)
+
+### Menores (review OK, a592db7c)
+- `6186d14b` m1 y m2: `design.md > 7` cuenta el orden real (comprimir, luego el enlace firmado) y `tasks.md > T20` el flujo real del E2E. Solo cambia la redacción.
+- `d50ffab9` m3: si «Cambiar» trae la ruta de la foto sustituida, `register-evidence.ts` lanza `ValidationError` (`invalid_input`) antes de descargar: no hay escritura ni borrado en el bucket. Test en `tests/unit/asignaciones/register-evidence.test.ts` (R19).
+- `5e046719` m4: el P2002 sobre `order_step_evidence_company_path_key` devuelve `'path_taken'` en `insert`/`replace` (puerto y adaptador); el dominio lo traduce a `ValidationError` y no borra el archivo de otra foto. No se añadió ningún código al catálogo. Tests unitarios en `register-evidence.test.ts` y de integración en `tests/integration/asignaciones/step-evidence-repository.int.test.ts` (R19, R31).
+
+### Merge de origin/dev (`1355d5f2`)
+Entraron QC-235, QC-225, QC-269, QC-270, QC-272 y QC-273. Todos los conflictos se resolvieron uniendo las dos partes; no se descartó nada:
+- `app/(private)/asignacion/[id]/components/order-execution-screen.tsx` y `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx`: import de `OperatorScreenFrame` + `STEP_READER_SIDE_COLUMN_RESERVE` (QC-269) más `useStepEvidence` (QC-214).
+- `docs/diseno/canvas/canvas.json` (`order`): primero los tableros de dev (CountrySelect, ProductoTerminado*, PedidosPresentaciones*) y después los de QC-214 (EvidenciaPaso*, FormulaEvidencia*).
+- `lib/modules/errores/domain/error-codes.ts` y `error-catalog.ts`: primero `company_not_found` (QC-235, ya en dev) y después los cinco códigos de QC-214.
+- `tests/unit/errores/catalogo.test.ts`: longitud 93 (87 + 1 de QC-235 + 5 de QC-214).
+- `tests/guards/guard-identificador-de-request.test.ts`: `MIGRACIONES_ESPERADAS` con `20261013120000_companies_country` y `20261013120000_order_step_evidence`.
+- `tests/integration/aislamiento.json`: las dos entradas de QC-214 y las dos de QC-225.
+- Se fusionaron solos: `lib/composition/index.ts`, `db/schema.prisma`, `components/shared/CATALOGO.md`, `docs/architecture.md`.
+
+Migración aplicada a la base local (`pnpm run db:migrate`): `20261013120000_companies_country`. Hecho también: `pnpm install --frozen-lockfile` (trae `libphonenumber-js`, aprobada en QC-235) y `prisma generate`.
+Ojo: las dos migraciones comparten el prefijo `20261013120000`. Prisma las ordena por nombre (`companies_country` antes que `order_step_evidence`) y son independientes entre sí.
+
+### Salida real
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores y 7 avisos, todos en archivos ajenos.
+- `pnpm exec vitest run` sobre catalogo, guard-identificador-de-request, guard-aislamiento-integracion, order-execution-screen, packing-order-screen y register-evidence: 6 archivos, 197 tests en verde. `guard-catalogo-de-errores`: 34 en verde.
+- Por falta de memoria no se corrieron `./init.sh`, la suite completa ni el E2E: el gate completo lo da CI.
