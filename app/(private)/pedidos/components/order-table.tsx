@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { buildOrderColumns } from './order-columns';
 import { OrderCustomerFilter } from './order-customer-filter';
 import type { OrderCustomerChoice } from './order-customer-label';
+import type { ProducedProductsByOrder } from './order-produced-presentations';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
 import { FIRST_PAGE, orderListHref, withSearchResetsPage } from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
@@ -131,6 +132,8 @@ export type OrderTableProps = {
   readonly canDeliver?: boolean;
   /** Si el actor puede anular entregas; lo resuelve el servidor. */
   readonly canVoidDelivery?: boolean;
+  /** Por pedido, el producto terminado de cada presentación, ya resuelto en el servidor. */
+  readonly producedProductsByOrder?: ProducedProductsByOrder;
   /** El valor del filtro de cliente, ya resuelto por el servidor a partir de la direccion. */
   readonly customerFilter?: OrderCustomerChoice | null;
   /**
@@ -154,6 +157,7 @@ export function OrderTable({
   canEditCustomer,
   canDeliver,
   canVoidDelivery,
+  producedProductsByOrder,
   customerFilter = null,
   noMatches,
 }: OrderTableProps) {
@@ -202,6 +206,7 @@ export function OrderTable({
         canEditCustomer,
         canDeliver,
         canVoidDelivery,
+        producedProductsByOrder,
       }),
     [
       recipes,
@@ -214,6 +219,7 @@ export function OrderTable({
       canEditCustomer,
       canDeliver,
       canVoidDelivery,
+      producedProductsByOrder,
     ],
   );
 

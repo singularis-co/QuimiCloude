@@ -618,7 +618,14 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // `data-table-row-<id>` para abrir «Entregas» y anular una entrega. El centinela pasa de CUARENTA
   // a CUARENTA Y UNO; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve a
   // ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y uno', () => {
+  //
+  // 2026-10-13: entra `e2e/detalle-de-producto-terminado.spec.ts` (ficha de producto terminado), y no afloja la lista.
+  // No estrena pantalla de tabla compartida propia en la lista: recorre la lista de pedidos y la
+  // pestana de terminados de `/inventario`, ya en esta lista, localiza sus filas por
+  // `data-table-row-<id>` y cuenta las filas de cada tab de la ficha por el mismo prefijo. El
+  // centinela pasa de CUARENTA Y UNO a CUARENTA Y DOS; la lista sigue CERRADA, y un spec mas que
+  // referencie `data-table` vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y dos', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -628,7 +635,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cuarenta y uno E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cuarenta y dos E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -659,6 +666,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-10-09, QC-219). Entre `clientes` y `ejecucion-receta` porque
       // la lista esta ORDENADA: 'd' va entre 'c' y 'e'.
       'e2e/datos-de-lote-en-acondicionamiento.spec.ts',
+      // Ver la nota de arriba (2026-10-13). Entre `datos-de-lote-...` y `ejecucion-receta`
+      // porque la lista esta ORDENADA: 'dat' precede a 'det', y 'd' precede a 'e'.
+      'e2e/detalle-de-producto-terminado.spec.ts',
       // La DECIMOSEXTA la trae QC-63 el 2026-09-17 (R29, R30): ver la nota de arriba. Llega a la
       // tabla por la lista de pedidos asignados, que ya la consumia.
       'e2e/ejecucion-receta.spec.ts',

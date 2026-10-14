@@ -488,8 +488,12 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, ENTREGAS, ANULACIONES, DUENO_DE_PRISMA, UNIDAD_DE_TRABAJO]
     // `order-number-directory-prisma.ts` (`OrderNumberDirectory` de `inventario`) tambien abre
     // el cliente compartido, sin importar `@prisma/client`.
+    // 2026-10-13: `order-delivery-directory-prisma.ts` (`FinishedDeliveryDirectory` de
+    // `inventario`, solo lectura) abre el cliente compartido, sin importar `@prisma/client`.
+    // Las dos listas siguen CERRADAS.
     const DUENOS_DEL_CLIENTE = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      'lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma.ts',
       ENTREGAS,
       ANULACIONES,
       'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',

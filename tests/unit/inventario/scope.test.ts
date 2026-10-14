@@ -214,6 +214,25 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // de la pantalla de proveedores. Cualquier otro archivo de esa carpeta que case sigue en rojo.
     const SELECTOR_DE_UNIDAD_DE_LA_IMPORTACION =
       '(private)/proveedores/[id]/importar/[documentoId]/components/new-presentation-units.tsx'
+    // 2026-10-13 (ficha de producto terminado): SEXTO falso positivo por nombre, y otra vez se
+    // excluye un ARCHIVO, no una carpeta. En /pedidos, la celda de un pedido TERMINADO o ENTREGADO
+    // pinta cada presentacion producida como un enlace a la ficha de ese producto terminado
+    // (`finishedProductDetailRoute` de `@/lib/shared/routes`); casa con `screenPattern` solo por
+    // llamarse `*presentations*`. No lista ni edita el catalogo de productos. Abajo se exige que
+    // exista y que no lleve ninguna senal real de pantalla de catalogo, para que no sea una puerta
+    // trasera. Cualquier otro archivo de esa carpeta que case sigue en rojo.
+    const ENLACES_A_LA_FICHA_DE_PRODUCTO_TERMINADO =
+      '(private)/pedidos/components/order-produced-presentations.tsx'
+    expect(
+      existsSync(join(repoRoot, 'app', ENLACES_A_LA_FICHA_DE_PRODUCTO_TERMINADO)),
+      `la exclusion apunta a un archivo que ya no existe: ${ENLACES_A_LA_FICHA_DE_PRODUCTO_TERMINADO}`,
+    ).toBe(true)
+    expect(
+      /ProductListSection|product-table/.test(
+        readFileSync(join(repoRoot, 'app', ENLACES_A_LA_FICHA_DE_PRODUCTO_TERMINADO), 'utf8'),
+      ),
+      `pantalla de catalogo escondida tras la exclusion de ${ENLACES_A_LA_FICHA_DE_PRODUCTO_TERMINADO}`,
+    ).toBe(false)
     // 2026-10-08 (menu de integraciones): QUINTO falso positivo por nombre. Bajo la carpeta de
     // integraciones viven paginas cascaron, una por integracion; la de inventarios casa con
     // `screenPattern` solo por llamarse «inventarios». No lista ni edita el catalogo de productos.
@@ -239,7 +258,8 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
         !relPath.startsWith(`${RECIPES_ROUTE_DIR}/`) &&
         !relPath.startsWith(`${PRESENTATIONS_ROUTE_DIR}/`) &&
         !relPath.startsWith(`${INTEGRATIONS_ROUTE_DIR}/`) &&
-        relPath !== SELECTOR_DE_UNIDAD_DE_LA_IMPORTACION,
+        relPath !== SELECTOR_DE_UNIDAD_DE_LA_IMPORTACION &&
+        relPath !== ENLACES_A_LA_FICHA_DE_PRODUCTO_TERMINADO,
     )
     expect(
       fueraDeSuCarpeta,
@@ -431,11 +451,17 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // segunda pantalla del catalogo: recorre la entrega de un pedido terminado desde Pedidos y solo
     // siembra lotes de producto terminado por Prisma. La guardia no se afloja; se le añade un
     // renglon.
+    // ACTUALIZADO 2026-10-13 (ficha de producto terminado): entra `detalle-de-producto-terminado.spec.ts`, en el
+    // orden que el matcher devuelve (alfabetico). Casa por la palabra «product» del nombre. No es
+    // una segunda pantalla del catalogo: recorre la ficha de solo lectura de un producto terminado,
+    // a la que llega desde Pedidos y desde la pestaña de terminados, y solo siembra por Prisma el
+    // pedido terminado y su lote. La guardia no se afloja; se le añade un renglon.
     const E2E_DE_AISLAMIENTO = 'aislamiento-inventario.spec.ts'
     const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
     expect(e2eMatches, `spec E2E de catalogo inesperado: ${e2eMatches.join(', ')}`).toEqual([
       E2E_DE_AISLAMIENTO,
       'ajuste-de-inventario.spec.ts',
+      'detalle-de-producto-terminado.spec.ts',
       'entregar-producto-terminado.spec.ts',
       'fixtures/inventario-importar-mixto.csv',
       'helpers/product-name-cell.ts',

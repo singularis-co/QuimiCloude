@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ficha de producto terminado en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="ProductoTerminado" tab="Entregas" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Ficha de producto terminado · QC-225</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">shared/page-shell · page-header</span> (título + ruta de navegación) · <span class="mono">entity-image</span> (miniatura y «fill» en General) · <span class="mono">url-tabs</span> · <span class="mono">shared/data-table</span> (sin búsqueda ni filtros, solo paginación) · <span class="mono">table-skeleton · empty-state · error-state · status-badge · arrow-link</span> · <span class="mono">movementReasonLabel</span> (extraída de batch-history)</dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table</span> (vía DataTable) · <span class="mono">@base-ui/react</span> (Tabs, Select del tamaño de página) · <span class="mono">lucide-react</span> (ChevronRight de la ruta) · <span class="mono">next/link</span> · ninguna dependencia nueva</dd>
+      <dt>Escritorio</dt><dd>Miniatura + ruta «Inventario › Producto terminado › nombre» + h1 · siete tabs en este orden: General, Stock, Lotes, Entradas, Salidas, Entregas, Costo de producción · General: imagen grande (máx. 192 px) y «Datos generales» (Nombre, Presentación, Unidad base, Alerta de cantidad) · Stock: total en unidad base, «En envases» por contenido, «Sin envase» solo si hay · listados con 10 filas por defecto (10 o 25), «Página 1 de 1» y anterior/siguiente · Entregas: «Total entregado: 56 L · 14 envases» encima de la tabla; la fila anulada sigue en su sitio con «Anulada» y su motivo y no suma · cliente dado de baja con la marca «Dado de baja» · Entradas muestra «Anulación de entrega» con su pedido · sin ningún control que modifique datos</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · las tablas de 7–8 columnas se desplazan en horizontal dentro de su caja</dd>
+      <dt>Teléfono</dt><dd>Tabs en una sola fila con desplazamiento horizontal, cada tab a 44 px · General y Stock en una columna (imagen arriba, etiquetas sobre valores) · los listados NO pasan a tarjetas: la tabla se desplaza en horizontal con sus flechas de desplazamiento · paginación y selector de filas a 44 px</dd>
+      <dt>Estados</dt><dd>Con datos · Cargando (esqueleto de 10 filas × 6 columnas, «Cargando…») · Vacío propio de cada tab · Página vacía con «Volver a la primera página» · Error del listado con «Reintentar» · Producto no encontrado (sin tabs, «Volver a producto terminado») · Error de carga de la ficha · sin permiso <span class="mono">inventario.consultar</span>: la ruta responde 404 genérico (ver Página no encontrada), sin nombrar módulo ni permiso</dd>
+      <dt>Animación</dt><dd>Entrada de la página escalonada (qc-rise) · tab: color 200 ms · cambiar de tab de listado pasa por el esqueleto (Suspense) y las filas entran con fundido · sin toasts: la ficha es de solo consulta</dd>
+      <dt>Por confirmar</dt><dd>[Por confirmar: el motivo de ajuste sale sin tilde, «Conteo fisico», porque la etiqueta se deriva del valor] · [Por confirmar: si la paginación se pinta también con una sola página] · [Por confirmar: el texto y el código del error del catálogo, aquí como marcador] · [Por confirmar: moneda del costo unitario y total; el código pinta el número sin símbolo] · [Por confirmar: formato de fechas en ISO (2026-10-03, 2026-10-10 15:20) frente al dd/mm/aaaa de otras tablas]</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

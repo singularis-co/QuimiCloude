@@ -13,6 +13,10 @@ import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal
 
 import { orderCustomerLabel } from './order-customer-label';
 import {
+  OrderProducedPresentations,
+  type ProducedProductsByOrder,
+} from './order-produced-presentations';
+import {
   CREATED_AT_COLUMN_ID,
   PRIORITY_COLUMN_ID,
   STATUS_COLUMN_ID,
@@ -161,6 +165,8 @@ export type OrderColumnsDeps = {
   readonly canDeliver?: boolean;
   /** Si el actor puede anular entregas; lo resuelve el servidor. */
   readonly canVoidDelivery?: boolean;
+  /** Por pedido, el producto terminado de cada presentación; `{}` si no se pudo resolver. */
+  readonly producedProductsByOrder?: ProducedProductsByOrder;
 };
 
 /**
@@ -175,6 +181,22 @@ function distributionLabelLine(line: OrderPresentationLineView) {
   return { presentationName: line.packagingName ?? line.presentationName, packages: line.packages };
 }
 
+const PRODUCED_ORDER_STATUSES: ReadonlySet<OrderSummary['status']> = new Set([
+  'TERMINADO',
+  'ENTREGADO',
+]);
+
+/** El mapa puede traer pedidos que ya cambiaron de estado: el estado de la fila manda. */
+function producedProductsOf(
+  order: OrderSummary,
+  producedProductsByOrder: ProducedProductsByOrder,
+): Readonly<Record<string, string>> | null {
+  if (!PRODUCED_ORDER_STATUSES.has(order.status)) return null;
+  const products = producedProductsByOrder[order.id];
+  if (products === undefined || Object.keys(products).length === 0) return null;
+  return products;
+}
+
 export function buildOrderColumns({
   recipes,
   units,
@@ -186,6 +208,7 @@ export function buildOrderColumns({
   canEditCustomer = false,
   canDeliver = false,
   canVoidDelivery = false,
+  producedProductsByOrder = {},
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -256,9 +279,17 @@ export function buildOrderColumns({
       label: 'Presentación',
       align: 'center',
       // Solo informa, como el importe: sin `sortable` y sin `filter`.
-      cell: (order) => (
-        <OrderDistributionLabel lines={order.presentationLines.map(distributionLabelLine)} />
-      ),
+      cell: (order) => {
+        const products = producedProductsOf(order, producedProductsByOrder);
+        return products === null ? (
+          <OrderDistributionLabel lines={order.presentationLines.map(distributionLabelLine)} />
+        ) : (
+          <OrderProducedPresentations
+            lines={order.presentationLines}
+            productByPresentation={products}
+          />
+        );
+      },
     },
     {
       id: CREATED_AT_COLUMN_ID,
