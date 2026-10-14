@@ -211,6 +211,15 @@ describe('R15 — una vista inexistente o no permitida cae a la primera, sin err
   });
 });
 
+describe('el Administrador sembrado no entra a `/asignacion`', () => {
+  it('sin `asignaciones.consultar` la pantalla responde 404 antes de resolver ninguna vista', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []));
+
+    await expect(invocar()).rejects.toMatchObject({ digest: expect.stringContaining('404') });
+    await expect(invocar('todos')).rejects.toMatchObject({ digest: expect.stringContaining('404') });
+  });
+});
+
 describe('R27 — «Terminados» y «Todos» reciben los mismos parametros de pagina tolerantes', () => {
   it('un `page`/`pageSize` invalidos no hacen fallar la pantalla y llegan acotados a la seccion', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_TERMINADOS));
@@ -464,7 +473,7 @@ describe('las dos vistas del acondicionador', () => {
     expect(fallback.props).toMatchObject({ list: 'acondicionados' });
   });
 
-  it.each([ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR])(
+  it.each([ROLE_OPERADOR, ROLE_EMPACADOR])(
     'R4: %s pidiendo `?vista=por_acondicionar` o `?vista=acondicionados` cae a su vista por defecto, sin pestaña ni sección',
     async (rol) => {
       getSessionUserMock.mockResolvedValue(sesionCon(SEED_ROLE_PERMISSIONS[rol] ?? []));
@@ -555,7 +564,7 @@ describe('la tercera vista del acondicionador: «Entregados»', () => {
     expect(esqueleto).not.toHaveTextContent('Cargando pedidos terminados…');
   });
 
-  it.each([ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR])(
+  it.each([ROLE_OPERADOR, ROLE_EMPACADOR])(
     'R20: %s pidiendo `?vista=acondicionados_entregados` cae a su vista por defecto, sin pestaña ni sección',
     async (rol) => {
       getSessionUserMock.mockResolvedValue(sesionCon(SEED_ROLE_PERMISSIONS[rol] ?? []));

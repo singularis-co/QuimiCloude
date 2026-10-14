@@ -262,8 +262,10 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
   // El dashboard va SEGUNDO, detras de «Asignación», y no primero a proposito:
   // `firstVisibleNavHref` aterriza en el primer enlace visible, y asi quien tiene
   // `asignaciones.consultar` sigue aterrizando en `/asignacion` aunque tambien vea el dashboard.
-  // En el seed el unico rol con `dashboard.consultar` es el Administrador, que tiene ademas
-  // `asignaciones.consultar`, asi que el item no cambia el aterrizaje de ningun rol sembrado.
+  // En el seed el unico rol con `dashboard.consultar` es el Administrador, y NO tiene
+  // `asignaciones.consultar` (`ADMIN_EXCLUDED_PERMISSIONS`: «Asignación» duplicaria «Pedidos»), asi
+  // que aterriza aqui, en `/dashboard`. Los roles operativos no ven el dashboard y siguen
+  // aterrizando en `/asignacion`.
   {
     kind: 'link',
     href: DASHBOARD_ROUTE,

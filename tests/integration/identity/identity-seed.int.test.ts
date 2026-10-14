@@ -383,6 +383,30 @@ function sentenciasDePermisosDeLaMigracion(): readonly string[] {
     .filter((statement) => /^INSERT INTO "(permissions|role_permissions)"/i.test(statement));
 }
 
+/**
+ * Las sentencias de la migracion posterior que retira `asignaciones.consultar` al Administrador.
+ * Va detras de la de asignaciones en cualquier `migrate deploy`, asi que el estado que deja la
+ * cadena de las dos es el que tiene que coincidir con el seed.
+ */
+function sentenciasDeLaMigracionAdministradorSinAsignacion(): readonly string[] {
+  const migrationsDir = join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), 'db', 'migrations');
+  const carpetas = readdirSync(migrationsDir).filter((name) =>
+    /_admin_without_assigned_orders_view$/.test(name),
+  );
+  expect(carpetas, 'debe existir exactamente una migracion que retire la consulta al Administrador').toHaveLength(1);
+
+  const sql = readFileSync(join(migrationsDir, carpetas[0] as string, 'migration.sql'), 'utf8')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/--.*$/, ''))
+    .join('\n');
+
+  return sql
+    .split(';')
+    .map((statement) => statement.replace(/\s+/g, ' ').trim())
+    .filter((statement) => statement.length > 0);
+}
+
 /** Una foto comparable de TODO el catalogo y TODAS las asignaciones, filas completas. */
 async function fotoDePermisos(tx: Prisma.TransactionClient) {
   return {
@@ -1447,10 +1471,14 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const sentencias = sentenciasDePermisosDeLaMigracion();
       // Las TRES del paso 5: el catalogo, el Administrador y el Operador (design.md > 4.2).
       expect(sentencias).toHaveLength(3);
+      // La migracion posterior que retira `asignaciones.consultar` al Administrador: un
+      // `migrate deploy` la aplica siempre detras, asi que se encadena igual.
+      const posteriores = sentenciasDeLaMigracionAdministradorSinAsignacion();
+      expect(posteriores).toHaveLength(1);
 
       // Se aplica DOS VECES seguidas: R28 pide que la segunda deje exactamente el mismo estado.
       for (const pasada of [1, 2]) {
-        for (const sentencia of sentencias) {
+        for (const sentencia of [...sentencias, ...posteriores]) {
           await tx.$executeRawUnsafe(sentencia);
         }
 

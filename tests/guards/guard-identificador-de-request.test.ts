@@ -637,6 +637,9 @@ export const MIGRACIONES_ESPERADAS = [
   // QC-162 2026-10-14: indices de unicidad de empresas y la tabla `company_events`; no toca el
   // identificador.
   '20261014120000_companies_management',
+  // 2026-10-14: migracion de datos que quita `asignaciones.consultar` al Administrador; no toca el
+  // identificador.
+  '20261014180000_admin_without_assigned_orders_view',
 ] as const
 
 export function hallazgosDeMigraciones(
