@@ -106,6 +106,8 @@ model OrderExecutionEntry {
 
 - Lo que se guarda es lo que se escribió en ese guardado, **no** lo que hay hoy en
   `product_batches` (DC «¿Foto del momento?»).
+- De la presentación solo entra el **nombre**: ni envase ni unidades (DC «¿Qué entra de la
+  presentación en la foto?»).
 - Corregir el lote después solo añade otra fila `CONDITIONING_BATCH_SAVE` con su propia foto.
 
 **C1.4 — Restricciones nuevas** (a mano en la migración, como las tres de QC-82):
@@ -267,7 +269,8 @@ Las firmas del puerto no cambian. Cambia lo que hacen:
   ```
 
   La segunda rama exige `CONDITIONING_START`: sin él no se reconstruye nada hacia atrás (DC
-  «¿Pedidos ya acondicionados?»). El rango sobre el Comenzar está abierto en P7.
+  «¿Pedidos ya acondicionados?»). Para el equipo, el rango `desde`/`hasta` se mide sobre el
+  instante de ese Comenzar (DC «¿Filtro por persona del equipo con rango de fechas?»).
 - `listUserIdsWithEntries(companyId)`: **sin cambios**. El supervisor ya entra, porque firma
   `CONDITIONING_START`. Los miembros del equipo no se listan aparte (DC «¿Opciones del filtro por
   persona?»).
@@ -315,6 +318,8 @@ export function createFinishedBatchLabels(db?: Prisma.TransactionClient): Finish
 
 - **Sin `db`:** igual que hoy, `writeForOrder` abre su `prisma.$transaction`.
 - **Con `db`:** escribe con `writeFinishedBatchLabels(db, …)` **sin abrir** otra transacción.
+- QC-283 va antes que QC-284. QC-284 se adapta después a esta firma y a la de C2.7 (DC «¿Orden
+  con QC-284?»).
 - Si choca el índice único de lote, devuelve `{ kind: 'duplicate_lot', batchId: null }` igual que
   hoy. La transacción queda abortada en Postgres, así que quien la abrió **debe** lanzar (C2.7).
 - `listOfOrder` lee por `db` si se le pasa.
@@ -457,9 +462,41 @@ export type GetExecutionTraceDeps = ListExecutionTracesDeps & {
 
 - Lee el equipo solo si hay una anotación `conditioning_start`.
 - Los `userId` del equipo se suman a `findPeopleByIds` (los dados de baja también, como hoy).
+- Los nombres son los **actuales** del directorio, como para quien firma. Solo `workGroupName` es
+  foto (DC «¿Nombre de las personas como era o como es?»).
 - Cableado: `team: createConditioningTeamRepository()`.
 
-`createListExecutionTraces` no cambia de deps.
+#### C2.11 — `createListExecutionTraces` (MOD de deps) y `ConditioningTeamRepository` (método NUEVO)
+
+La fila muestra al equipo entre las personas (DC «¿El equipo sale en las personas de la fila?»).
+Para leerlo en lote, sin una consulta por pedido:
+
+```ts
+// ConditioningTeamRepository, NUEVO metodo
+/** Filas de esos pedidos, por pedido y luego por `position`. Con `orderIds` vacio no consulta. */
+listByOrdersInCompany(
+  companyId: string,
+  orderIds: readonly string[],
+): Promise<readonly (ConditioningTeamMemberRow & { readonly orderId: string })[]>;
+
+// ANTES
+export type ListExecutionTracesDeps = { log; orders; people };
+// DESPUES
+export type ListExecutionTracesDeps = {
+  readonly log: ExecutionLogRepository;
+  readonly orders: OrderCatalog;
+  readonly people: PeopleDirectory;
+  readonly team: Pick<ConditioningTeamRepository, 'listByOrdersInCompany'>;
+};
+// y entonces
+export type GetExecutionTraceDeps = ListExecutionTracesDeps & {
+  readonly team: Pick<ConditioningTeamRepository, 'listByOrdersInCompany' | 'listByOrderInCompany'>;
+};
+```
+
+- Solo se consulta el equipo de los pedidos de la página que tienen `conditioning_start`. Un equipo
+  sin Comenzar anotado no sale: no se reconstruye nada hacia atrás.
+- Cableado: `team: createConditioningTeamRepository()` en los dos casos de uso.
 
 ### C3. Contrato hacia el front (lo que consume frontend_dev)
 
@@ -562,13 +599,48 @@ Reglas:
   - `production` y `packing` también pueden ser `null`, por ejemplo en pedidos de antes de QC-82.
 - **`closed`:** la fase tiene la anotación que la cierra. `ms` va de la anotación que la abre a la
   que la cierra.
-- **`open`:** no hay cierre, el pedido está vivo y su estado es el de esa fase. `ms` va de la
-  anotación que la abre a `now`. Qué estado es «el de esa fase» está abierto en P6.
+- **`open`:** no hay cierre, el pedido está vivo (`!deleted`) y su estado es el de esa fase. `ms`
+  va de la anotación que la abre a `now`. El estado de cada fase:
+
+  | Fase | Estado |
+  |---|---|
+  | `production` | `EN_CURSO` |
+  | `packing` | `EN_EMPAQUE` |
+  | `conditioning` | `EN_ACONDICIONAMIENTO` |
+
+  `BLOQUEADO` no es estado de ninguna fase.
 - **`unclosed`:** no hay cierre y el pedido ya no está en la fase. `ms` va de la anotación que la
   abre a la última anotación de esa fase.
 
-Los conjuntos de estados por fase y a qué fase se atribuye `cancel` están abiertos (P6). Las
-**formas** de arriba no dependen de esa respuesta.
+**`cancel`** (DC «¿A qué cifra cierra un cancel?»):
+
+- Cierra **solo** la fase que está en curso en el instante del `cancel`: la de la anotación
+  anterior al `cancel` que abre o continúa una fase.
+- Esa fase pasa a `closed`, con `ms` hasta el `cancel`.
+- Las otras fases se quedan como estaban: `closed` si ya lo estaban, y `null` si no se abrieron.
+- Hoy solo se cancela desde la ejecución (`cancel-assigned-order.ts`, con el pedido en
+  producción). Así que en la práctica cierra `production`. La regla no se escribe solo para ese
+  caso.
+
+**Tiempo en `BLOQUEADO`** (DC «¿Cuenta el tiempo bloqueado en producción?», enmienda QC-167
+D11/R15). La regla es:
+
+```text
+production.ms = (cierre o now o última anotación de la fase) − start − Σ tramos BLOQUEADO dentro de [start, fin]
+```
+
+**Problema, P10:** ninguna anotación marca la entrada ni la salida de `BLOQUEADO`.
+
+- `BLOQUEADO` lo ponen y lo quitan Pedidos y la revisión de bloqueados (`create-order.ts`,
+  `update-order-presentation-lines.ts`, `review-blocked-orders.ts`), y ninguno escribe en
+  `order_execution_entries`.
+- Además, la matriz (`order-transitions.ts`) solo conecta `BLOQUEADO` con `PENDIENTE`, y
+  `start-assigned-order.ts` rechaza un `BLOQUEADO`. Por eso **no puede haber un tramo bloqueado
+  entre `start` y el cierre de producción**.
+
+Con el código actual, Σ tramos = 0 siempre y la cifra no cambia. El contrato fija la fórmula, pero
+**no** añade acciones `BLOCK`/`UNBLOCK` al registro mientras P10 siga abierta
+(`requirements.md > Preguntas abiertas`).
 
 #### C3.4 — Fila de la lista: `ExecutionTraceRow` (MOD, en `list-execution-traces.ts`)
 
@@ -581,7 +653,9 @@ export type ExecutionTraceRow = {
   readonly status: OrderStatus;
   readonly deleted: boolean;
   readonly active: boolean;                         // NUEVO
-  readonly people: readonly ExecutionTracePerson[]; // sin cambios: quien firma anotaciones (supervisor incluido); el equipo NO (P8)
+  /** Quien firma anotaciones (supervisor incluido) y DESPUES el equipo del Comenzar anotado, en
+   *  orden de `position`, sin repetir a quien ya esta. Nombres actuales del directorio. */
+  readonly people: readonly ExecutionTracePerson[];
   readonly firstAt: Date;
   readonly lastAt: Date;
   readonly durations: TraceDurations;               // sustituye a `duration`

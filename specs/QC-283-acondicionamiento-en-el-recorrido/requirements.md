@@ -75,6 +75,13 @@ _Pendiente: depende del pase `/design` (ver «Estado del spec»)._
 | 2026-10-14 | ¿Día de producción en la foto? | Sí: cada guardado muestra también el día de producción, y se guarda en la foto del momento junto al lote, las presentaciones y el vencimiento |
 | 2026-10-14 | ¿Pedidos sin Comenzar anotado (previos a la feature)? | No muestran duración de acondicionamiento |
 | 2026-10-14 | ¿Opciones del filtro por persona? | Solo el supervisor entra como opción nueva del filtro. Los miembros del equipo no se listan aparte |
+| 2026-10-14 | ¿Orden con QC-284? (P4) | QC-283 va primero. QC-284 se adapta después a las firmas nuevas (`design.md > C2.5, C2.7`) |
+| 2026-10-14 | ¿Qué entra de la presentación en la foto? (P5) | Solo el nombre de la presentación, sin envase ni unidades |
+| 2026-10-14 | ¿Cuenta el tiempo bloqueado en producción? (P6a) | No: el tiempo en `BLOQUEADO` se descuenta de la duración de producción. **Enmienda QC-167 D11 y R15** (duración de reloj con todo dentro) |
+| 2026-10-14 | ¿A qué cifra cierra un cancel? (P6b) | Solo a la de la fase en curso. Las demás quedan como estaban |
+| 2026-10-14 | ¿Filtro por persona del equipo con rango de fechas? (P7) | Cuenta la fecha del Comenzar |
+| 2026-10-14 | ¿El equipo sale en las personas de la fila? (P8) | Sí: la fila del dashboard muestra al equipo entre las personas del pedido |
+| 2026-10-14 | ¿Nombre de las personas como era o como es? (P9) | Los nombres actuales, como hoy. Solo el nombre del grupo queda como foto |
 
 ## Preguntas abiertas
 
@@ -86,32 +93,17 @@ _Pendiente: depende del pase `/design` (ver «Estado del spec»)._
 
   Lo aprueba el humano antes del spec.
 - P1, P2 y P3 las cerró el humano el 2026-10-14: ahora son filas de `Decisiones cerradas`.
-- **P4 — choque con QC-284 (pending).** «Lote por presentación» cambia el acondicionamiento a un
-  solo formulario por pedido, que se guarda en todas las líneas. La foto por guardado sigue
-  sirviendo, pero hay que acordar el orden entre las dos fichas por los archivos que comparten:
-  `save-conditioning-batch-data.ts` y `finished-batch-labels`. Con los contratos, el choque crece:
-  QC-283 cambia las deps de `createSaveConditioningBatchData` y la firma de
-  `createFinishedBatchLabels(db?)` (`design.md > C2.5, C2.7`).
-- **P5 — ¿Qué entra de la presentación en la foto?** El contrato guarda `presentationId` y el
-  **nombre** de la presentación en ese instante (`design.md > C1.3`). La vista de acondicionamiento
-  (QC-219) muestra además el envase (`packagingName`) y las unidades (`packages`). ¿Entran en la
-  foto? Si entran, se añaden a C1.3 antes de implementar.
-- **P6 — Reglas de cada duración.** Las formas están cerradas (`design.md > C3.3`); las reglas no:
-  - ¿qué estados del pedido cuentan como «la fase está en curso» para la cifra abierta? La propuesta
-    es producción = `EN_CURSO` (¿y `BLOQUEADO`?), empaque = `EN_EMPAQUE` y acondicionamiento =
-    `EN_ACONDICIONAMIENTO`;
-  - ¿a qué fase cierra un `cancel`? La propuesta es a la que esté abierta en ese momento.
-
-  Ni el código ni QC-167 lo fijan para tres cifras.
-- **P7 — Filtro por persona y rango de fechas para el equipo.** Para un miembro del equipo, el
-  contrato exige que el `CONDITIONING_START` del pedido caiga dentro de `desde`/`hasta`
-  (`design.md > C2.3`). La alternativa sería exigir cualquier anotación del pedido dentro del
-  rango. ¿Cuál?
-- **P8 — ¿El equipo sale en las personas de la fila?** Hoy `ExecutionTraceRow.people` son solo
-  quienes firman anotaciones. Con la DC del filtro, buscar a un miembro del equipo devuelve
-  pedidos en cuya fila esa persona no aparece. ¿Se suma el equipo a `people`? Depende también del
-  tablero.
-- **P9 — ¿Nombre de las personas como era o como es?** El equipo guarda la foto del **nombre del
-  grupo** (`workGroupName`), pero no la del nombre de cada persona. El recorrido, igual que hoy
-  para quien firma, muestra el nombre **actual** del directorio. ¿Basta así, o la DC «¿Foto del
-  momento?» alcanza también a los nombres de las personas?
+- P4 a P9 las cerró el humano el 2026-10-14: también son filas de `Decisiones cerradas`.
+- **P10 — No hay tramos `BLOQUEADO` que descontar** (de la decisión P6a; `design.md > C3.3`).
+  - El registro no anota cuándo un pedido entra o sale de `BLOQUEADO`. Lo cambian
+    `create-order.ts`, `update-order-presentation-lines.ts` y `review-blocked-orders.ts`, y
+    ninguno escribe en `order_execution_entries`.
+  - La matriz de `order-transitions.ts` solo conecta `BLOQUEADO` con `PENDIENTE`, y
+    `start-assigned-order.ts` rechaza Comenzar sobre un `BLOQUEADO`. Así que, desde que hay
+    `start`, el pedido ya no puede bloquearse: con el código actual, el descuento es siempre 0.
+  - El tiempo bloqueado previo a `start` ya queda fuera de la cifra.
+  - ¿Basta con eso, y la regla queda escrita para cuando la matriz cambie? ¿O el humano se
+    refería a otro tiempo, por ejemplo el de `PENDIENTE` + `BLOQUEADO` antes de empezar, o pausas
+    entre `start` y `resume`?
+  - Si hay que anotar entrada y salida de `BLOQUEADO`, son dos acciones nuevas en el registro que
+    escribe `pedidos`. Eso amplía el alcance y hay que decidirlo.
