@@ -466,3 +466,22 @@ Veredicto: placeholder hecho y en verde; T16 escrita pero sin E2E verdes (base s
 ### Verificación final (implementer)
 - `pnpm exec vitest run guard`: 75 archivos, 1049 verdes, 20 omitidos, 0 rojos (tras la tanda 7).
 - typecheck y lint: 0 errores en cada tanda (7 avisos previos).
+
+## F2.3 — Sincronizacion con dev (2026-10-13)
+
+`git fetch origin dev` + `git merge origin/dev` (dev en 8ecfff69). Los choques esperados con
+QC-214 (schema.prisma, .env.example, architecture.md, composition, error-codes/catalog,
+catalogo.test, guard-dobles-e2e) se auto-mezclaron sin conflicto. Conflictos reales, todos de registro:
+
+- `docs/diseno/canvas/canvas.json`: tres bloques (pantallas, `order`, notas) — se conservan las
+  entradas ProveedorIA* (QC-275) y ProductoTerminado*/PedidosPresentaciones* (QC-225). JSON valido.
+- `tests/guards/guard-identificador-de-request.test.ts`: `E2E_ESPERADOS` — se conservan
+  `integraciones-proveedor-ia.spec.ts` y `detalle-de-producto-terminado.spec.ts`.
+- `tests/integration/aislamiento.json`: se conservan la entrada de `ai-provider-connection-prisma`
+  y las dos de QC-225 (`finished-product-detail`, `order-delivery-directory`).
+
+Migraciones: dev no trae ninguna posterior; `20261013150000_ai_providers` sigue siendo la ultima. Sin renombrar.
+
+Verificacion: `tsc --noEmit` 0 errores; `pnpm lint` 0 errores (7 warnings previos);
+`vitest run guard` 75 archivos / 1055 passed, 20 skipped; `vitest related` de los archivos en
+conflicto 1 archivo / 23 passed.

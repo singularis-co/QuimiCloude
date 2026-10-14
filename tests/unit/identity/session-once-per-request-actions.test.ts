@@ -390,6 +390,15 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).listProductBatchesAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
   },
   {
+    // Anadida el 2026-10-13: la ficha de producto terminado resuelve las dos caras de la sesion.
+    archivo: 'lib/modules/inventario/adapters/driving/finished-product-actions.ts',
+    nombre: 'getFinishedProductAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/inventario/adapters/driving/finished-product-actions')
+      ).getFinishedProductAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
+  },
+  {
     archivo: 'lib/modules/recetas/adapters/driving/recipe-actions.ts',
     nombre: 'listRecipesAction',
     invocar: async () =>

@@ -25,6 +25,8 @@ import {
   ORDER_CUSTOMER_NAME_COLUMN_ID,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_LABELS,
+  ORDER_PRODUCED_PRESENTATIONS_TESTID,
+  ORDER_PRODUCED_PRODUCT_LINK_TESTID,
   ORDER_SKELETON_COLUMN_COUNT,
   ORDER_STATUS_LABELS,
   PRESENTATION_NAME_COLUMN_ID,
@@ -45,6 +47,7 @@ import {
   formatOrderNumber,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
+import { finishedProductDetailRoute } from '@/lib/shared/routes';
 
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
   const noDebeInvocarse = (nombre: string) => () => {
@@ -716,5 +719,79 @@ describe('la columna «Cliente»', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
 
     expect(ids.indexOf(ORDER_CUSTOMER_NAME_COLUMN_ID)).toBe(ids.indexOf(RECIPE_NAME_COLUMN_ID) + 1);
+  });
+});
+
+// 2026-10-13 — la celda de «Presentación» enlaza a la ficha del producto terminado en los pedidos
+// producidos. Los casos de arriba, sin mapa, siguen afirmando el reparto de siempre.
+describe('la columna «Presentación» enlaza al producto terminado del pedido producido', () => {
+  const PEDIDO_ID = '11111111-1111-4111-8111-111111111111';
+  const PRESENTACION_ID = 'p-1';
+  const PRODUCTO_ID = '33333333-3333-4333-8333-333333333333';
+  const LINEAS = [
+    { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null },
+  ];
+
+  function pintarPresentacionConMapa(order: OrderSummary) {
+    const columnas = buildOrderColumns({
+      recipes: { items: [], totalPages: 1 },
+      units: [],
+      bridge: null,
+      producedProductsByOrder: { [PEDIDO_ID]: { [PRESENTACION_ID]: PRODUCTO_ID } },
+    });
+    const columna = columnas.find((candidate) => candidate.id === PRESENTATION_NAME_COLUMN_ID);
+    if (columna === undefined) throw new Error('No existe la columna de presentación');
+    return render(<>{columna.cell(order)}</>);
+  }
+
+  it.each(['TERMINADO', 'ENTREGADO'] as const)(
+    'R27: un pedido %s con mapa enlaza la presentación a la ficha de su producto',
+    (status) => {
+      pintarPresentacionConMapa(pedido({ id: PEDIDO_ID, status, presentationLines: LINEAS }));
+
+      const enlace = screen.getByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID);
+      expect(enlace).toHaveAttribute('href', finishedProductDetailRoute(PRODUCTO_ID));
+      expect(enlace).toHaveTextContent('2 × Bidón 20L');
+    },
+  );
+
+  it.each(['EN_EMPAQUE', 'CANCELADO'] as const)(
+    'R28: un pedido %s con mapa pinta el reparto de siempre, sin enlace',
+    (status) => {
+      const { container } = pintarPresentacionConMapa(
+        pedido({ id: PEDIDO_ID, status, presentationLines: LINEAS }),
+      );
+
+      expect(screen.queryByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toBeNull();
+      expect(screen.queryByTestId(ORDER_PRODUCED_PRESENTATIONS_TESTID)).toBeNull();
+      expect(container.textContent).toBe('2 × Bidón 20L');
+    },
+  );
+
+  it.each(['TERMINADO', 'ENTREGADO'] as const)(
+    'R28: un pedido %s sin mapa pinta el reparto de siempre, sin enlace',
+    (status) => {
+      const { container } = pintarCelda(
+        PRESENTATION_NAME_COLUMN_ID,
+        pedido({ id: PEDIDO_ID, status, presentationLines: LINEAS }),
+      );
+
+      expect(screen.queryByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toBeNull();
+      expect(screen.queryByTestId(ORDER_PRODUCED_PRESENTATIONS_TESTID)).toBeNull();
+      expect(container.textContent).toBe('2 × Bidón 20L');
+    },
+  );
+
+  it('R28: un pedido TERMINADO cuyo id no está en el mapa pinta el reparto de siempre', () => {
+    const { container } = pintarPresentacionConMapa(
+      pedido({
+        id: '44444444-4444-4444-8444-444444444444',
+        status: 'TERMINADO',
+        presentationLines: LINEAS,
+      }),
+    );
+
+    expect(screen.queryByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toBeNull();
+    expect(container.textContent).toBe('2 × Bidón 20L');
   });
 });
