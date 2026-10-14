@@ -304,6 +304,17 @@ describe('la lectura: el lector de la empresa o el doble segun DOCUMENTS_E2E_DOU
 
 describe('importar la composicion', () => {
   it('R42 — no lee ninguna variable de entorno, no consulta la base ni llama a un proveedor', async () => {
+    // QC-275 2026-10-13: el vigilante ve TODA lectura de `process.env` del proceso, no solo las
+    // de la app. En CI (Node 24) el cargador CJS de Node lee `WATCH_REPORT_DEPENDENCIES` en cada
+    // `require` (modo --watch) y el caso salia rojo con 40 lecturas que no son de la app; en local
+    // (Node 22) no ocurre. Se ignoran SOLO las variables del runtime de esta lista explicita y
+    // cerrada; cualquier otra lectura -toda variable del proyecto- sigue poniendo esto en rojo.
+    const RUNTIME_ENV_VARS: ReadonlySet<string> = new Set([
+      // Node `lib/internal/modules/cjs/loader.js` (reportModuleToWatchMode).
+      'WATCH_REPORT_DEPENDENCIES',
+    ]);
+    const ofTheApp = (keys: readonly string[]): string[] =>
+      keys.filter((key) => !RUNTIME_ENV_VARS.has(key));
     vi.resetModules();
     const read: string[] = [];
     const original = process.env;
@@ -323,12 +334,16 @@ describe('importar la composicion', () => {
       readByImport = [...read];
       // Sensibilidad: el vigilante si ve una lectura, asi que la lista vacia no es por vacuidad.
       void process.env.VARIABLE_CENTINELA_QC275;
+      // Simula la lectura del runtime que hace Node 24 en CI: la ve el vigilante, pero el filtro
+      // la descarta sin descartar la centinela.
+      void process.env.WATCH_REPORT_DEPENDENCIES;
     } finally {
       process.env = original;
     }
 
-    expect(readByImport).toEqual([]);
-    expect(read).toEqual(['VARIABLE_CENTINELA_QC275']);
+    expect(ofTheApp(readByImport)).toEqual([]);
+    expect(read).toContain('WATCH_REPORT_DEPENDENCIES');
+    expect(ofTheApp(read.slice(readByImport.length))).toEqual(['VARIABLE_CENTINELA_QC275']);
     expect(m.findConnection).not.toHaveBeenCalled();
     expect(m.getProvider).not.toHaveBeenCalled();
     for (const probe of ALL_PROBES) expect(probe).not.toHaveBeenCalled();

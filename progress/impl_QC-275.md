@@ -485,3 +485,17 @@ Migraciones: dev no trae ninguna posterior; `20261013150000_ai_providers` sigue 
 Verificacion: `tsc --noEmit` 0 errores; `pnpm lint` 0 errores (7 warnings previos);
 `vitest run guard` 75 archivos / 1055 passed, 20 skipped; `vitest related` de los archivos en
 conflicto 1 archivo / 23 passed.
+
+## Rojos de CI en gate-completo (run 38500812990, commit b1cf1e13) — 2026-10-13
+
+Cuatro rojos de esta feature, arreglados en los tests (no en la baseline). Cada cambio lleva el comentario de enmienda `QC-275 2026-10-13`:
+
+- `tests/unit/proveedores/scope.test.ts` (alcance QC-43): sigue el precedente QC-222 T10 (`1bb7fc85`) y excluye la carpeta `integraciones/proveedor-ia/`; todo lo demas bajo integraciones sigue en rojo. La comprobacion por la palabra «proveedor» (que la pantalla usa como texto) se cambia por un barrido de `supplier`, `modules/proveedores` y `SUPPLIERS_ROUTE`. El E2E `integraciones-proveedor-ia.spec.ts` entra en la lista cerrada.
+- `tests/unit/recetas-ui/recipe-route-contract.test.ts`: `getAiProviderReadinessAction` pasa a ser una operacion permitida; la lista `MIGRACION_QC275` (schema.prisma + migracion `ai_providers`) se excluye del barrido de db/.
+- `tests/unit/composition/ai-provider-wiring.test.ts` R42: se ignora solo `WATCH_REPORT_DEPENDENCIES`, que lee el cargador CJS de Node 24, mediante un conjunto cerrado `RUNTIME_ENV_VARS`. Cualquier otra lectura sigue en rojo, y el test simula la lectura del runtime para comprobar que el filtro no oculta la centinela.
+
+Verificacion:
+- `WATCH_REPORT_DEPENDENCIES=1 vitest run` de los 3 archivos: 3 archivos / 45 passed.
+- `vitest run guard`: 1062 passed, 20 skipped.
+- `tsc`: 0 errores.
+- lint: 0 errores (7 avisos previos).

@@ -555,6 +555,15 @@ const MIGRACION_QC214 = [
   'db/migrations/20261013120000_order_step_evidence/down.sql',
 ];
 
+// QC-275 2026-10-13: la tabla `ai_providers` (proveedor IA propio por empresa) y
+// `db/schema.prisma` con el modelo nuevo. No toca ninguna tabla de recetas. Lista nombrada como
+// las demas: cualquier otro archivo de `db/` en el diff sigue en rojo.
+const MIGRACION_QC275 = [
+  'db/schema.prisma',
+  'db/migrations/20261013150000_ai_providers/migration.sql',
+  'db/migrations/20261013150000_ai_providers/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
@@ -585,6 +594,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC194,
   ...MIGRACION_QC211,
   ...MIGRACION_QC214,
+  ...MIGRACION_QC275,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
@@ -873,6 +883,9 @@ describe('contrato de la ruta de recetas', () => {
       'updateRecipeVersionAction',
       // QC-214 (design § 5.8): conteo de pedidos con fotos para el aviso de bloqueo.
       'getRecipeStepLockAction',
+      // QC-275 2026-10-13: la pagina de formulas consulta si la empresa tiene proveedor IA
+      // configurado para habilitar la lectura de PDF. Solo lectura; la lista sigue CERRADA.
+      'getAiProviderReadinessAction',
     ]);
 
     for (const ruta of FUENTES_DE_LA_RUTA_SIN_IMPORTAR) {
