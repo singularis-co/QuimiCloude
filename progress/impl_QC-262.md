@@ -328,3 +328,123 @@ tabla, y filtro de cliente `max-w-full w-64`. Nada fuera de la fila de `design.m
 
 Veredicto: T4a, T4b y T4c hechas. Typecheck, lint y guardias en verde. Quedan 6 rojos de duplicado
 de tarjeta en tres tests de diálogos de la Tanda 5.
+
+## Tanda 6 — E2E (frontend_dev, 2026-10-13)
+
+**Archivos.**
+- `e2e/pedidos-rediseno.spec.ts` (nuevo, T6a): seis casos, fixture propio `qc262_e2e_`. Hay un
+  PENDIENTE con cliente, un POR_EMPACAR y un TERMINADO con una línea, y un insumo con lote de 500
+  para «Material insuficiente». No confirma nada.
+- `e2e/helpers/order-distribution.ts` (T6b): `orderMenuTrigger` acotado a `data-table-row-<id>`.
+- `e2e/pedido-en-varias-presentaciones.spec.ts` (T6b): `rowActions` acotado a `data-table-row-<id>`.
+- `e2e/entregar-producto-terminado.spec.ts` (T6b): el `toHaveCount(0)` de :622 se acota a
+  `orderRow(page, id)`, y sigue valiendo.
+- `tests/guards/guard-identificador-de-request.test.ts`: alta de `pedidos-rediseno.spec.ts` en
+  `E2E_ESPERADOS`, con el comentario de T6a y «Lo que ejercita: …».
+- `tests/unit/shared/data-table-alcance.test.ts`: alta de `e2e/pedidos-rediseno.spec.ts`, con el
+  comentario de T6a. Además entran `e2e/helpers/order-distribution.ts` y
+  `e2e/pedido-en-varias-presentaciones.spec.ts`, porque al acotarlos nombran `data-table-row-`
+  (nota propia). El centinela pasa de 42 a 45, no de 40 a 41 como dice `design.md > 7`:
+  `anular-entrega` y `detalle-de-producto-terminado` ya habían entrado antes.
+
+**R → test** (`e2e/pedidos-rediseno.spec.ts`):
+
+| R | Caso |
+| --- | --- |
+| R2, R11, R14, R16 | «a 1440 px: una sola barra en orden, menú con separador y destructivos, y doce columnas con el número fijado» |
+| R15 | «a 820 px: la lista se pinta en tarjetas» y «a 390 px: la barra no desborda y «Acciones» abre el menú centrado…» |
+| R3 | «a 390 px: la barra no desborda…» |
+| R18 | «a 390 px: «Cancelar el pedido», «Eliminar el pedido», «Cliente» y «Reparto y unidad»…» y «a 390 px: «Material insuficiente»…» |
+| R19 | «a 390 px: los paneles de alta, edición y entrega ocupan toda la pantalla con el pie visible» |
+
+**Salida** (cada spec por separado; `pnpm exec playwright test e2e/<spec>.spec.ts --project=<p>`):
+
+| Spec | chromium | webkit |
+| --- | --- | --- |
+| `pedidos-rediseno` | 6 passed (27.0s) | 6 passed (32.2s) |
+| `pedidos` | 2 passed (17.5s) | — |
+| `pedido-con-cliente` | 4 passed (23.8s) | — |
+| `pedido-en-varias-presentaciones` | 2 passed (40.3s) | — |
+| `entregar-producto-terminado` | 2 passed (20.8s) | — |
+| `pedidos-responsables` | 1 passed (20.8s) | — |
+| `reserva-de-material` | 1 passed (49.1s) | — |
+| `pedidos-busqueda` | 5 passed (26.4s) | — |
+| `anular-entrega` | 2 passed (15.7s) | — |
+| `detalle-de-producto-terminado` | 2 passed (18.2s) | — |
+| `pedidos-cotizacion` | 2 passed (25.9s) | — |
+| `pedido-bloqueado` | 1 passed (21.6s) | — |
+| `aislamiento-pedidos` | 1 passed (15.8s) | — |
+| `empaque` | 1 passed (26.2s) | — |
+| `envases-del-pedido` | 2 passed (37.7s) | — |
+| `pedido-conversion-de-unidad` | 2 passed (12.7s) | — |
+| `producto-terminado` | 1 passed (38.4s) | — |
+| `pedidos-terminados` | 4 passed (15.4s) | — |
+
+Además, sin fallos:
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores; 7 avisos ajenos (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest run guard-identificador-de-request data-table-alcance`: 2 archivos, 41 pasan y
+  2 omitidos.
+- `pnpm exec vitest run guard`: 76 archivos, 1052 pasan y 20 omitidos.
+
+**Medidas que afirma el spec** (Chromium, caja `boundingBox` en px). Los valores se sacaron en una
+pasada con registro temporal, retirado después; WebKit pasa las mismas aserciones.
+
+- **1440 × 900**
+  - Barra, de izquierda a derecha:
+    - buscador: x 300, ancho 380, alto 44;
+    - cliente: x 688, ancho 256;
+    - chips: x 952, ancho 369; dentro van «Estado», «Prioridad» y «Fecha de solicitud».
+  - Tabla:
+    - Las doce `data-table-head-<id>` están en el orden de R16.
+    - El número va con `data-pinned="left"` y `position: sticky`.
+    - La caja de la tabla tiene `overflow-x: auto`, con `scrollWidth` 2478 y `clientWidth` 1112.
+    - Desplazada hasta el final, la celda del número sigue en x 300.
+    - El documento no desborda.
+  - Menú de la fila:
+    - POR_EMPACAR: Editar, Responsables, Cliente, Reparto y unidad, separador, Cancelar y Eliminar.
+    - TERMINADO: Editar, Responsables, Cliente, Entregas, Entregar, separador, Cancelar y Eliminar.
+    - Cancelar y Eliminar llevan `data-variant="destructive"`; el resto, no.
+- **820 × 1180**
+  - Tarjetas a la vista y filas ocultas.
+  - «Acciones» mide 97.7 × 44.
+- **390 × 844**
+  - Barra (x 16, ancho 358):
+    - buscador: 358 × 44;
+    - cliente: y 236, ancho 256, debajo del buscador;
+    - chips: y 288, 358 × 96.
+    - Nada sale de la barra y el documento no desborda.
+  - «Acciones» mide 97.7 × 44 y lleva `data-order-id`.
+  - El diálogo «Pedido <n>» mide 358 × 385, va en x 16 → 374 e y 229.5 → 614.5, y tiene un separador.
+    Sus ítems miden 326 × 48.
+  - Diálogos, todos con botones de 44 px de alto:
+
+    | Diálogo | Caja | y |
+    | --- | --- | --- |
+    | «Cancelar el pedido» | 320 × 335 | 254.5 → 589.5 |
+    | «Eliminar el pedido» | 320 × 231 | 306.5 → 537.5 |
+    | «Cliente» (con «Quitar cliente») | 358 × 345 | 249.5 → 594.5 |
+    | «Reparto y unidad» | 358 × 517 | 163.5 → 680.5 |
+    | «Material insuficiente» | 320 × 251 | 296.5 → 547.5 |
+
+    Todos quedan enteros y centrados con 2 px de tolerancia. En «Material insuficiente», «Volver»
+    no escribe el pedido: el recuento de la base no cambia.
+  - Paneles:
+    - alta, edición y entrega miden 390 × 844, en x 0 e y 0;
+    - los botones del pie («Cancelar» y «Guardar» / «Entregar») miden 44 de alto, con el borde
+      inferior en 828, por debajo de 844.
+
+**Desviaciones y hallazgos.**
+1. **Hallazgo de producción, sin tocar.** A 390 px, una receta cuyo nombre es una sola palabra
+   larga desborda el documento. Con el fixture `qc262_e2e_<32 hex>_receta` (50 caracteres sin
+   espacios), `scrollWidth` llegó a 478. El texto de `data-table-card-field-recipeName`
+   (`components/shared/data-table/data-table-cards.tsx`) no se parte, porque la tarjeta no lleva
+   `break-words` ni `min-w-0`. El spec usa un nombre con espacios, como uno real
+   (`Receta <12 hex> pedidos`). Decide el leader: deuda, o arreglo en la pieza compartida, que
+   está fuera de «Archivos esperados».
+2. `data-table-alcance` gana dos entradas más de las previstas, por el acotado de T6b (arriba).
+3. R18 mide solo los botones de acción. La X de 32 px queda fuera (D55, decisión del leader).
+
+Veredicto: T6a y T6b hechas; el spec nuevo pasa en chromium y webkit, los 17 specs de pedidos pasan
+en chromium, y typecheck, lint y guardias están en verde. Queda un hallazgo de producción
+(desbordamiento de palabras largas en la tarjeta) para el leader.

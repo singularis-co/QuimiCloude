@@ -90,14 +90,14 @@ P1–P12 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 6 — E2E y cierre (depende de todas)
 
-- [ ] **T6a. E2E nuevo** `e2e/pedidos-rediseno.spec.ts` con los casos de `design.md > 7` (R2, R3,
+- [x] **T6a. E2E nuevo** `e2e/pedidos-rediseno.spec.ts` con los casos de `design.md > 7` (R2, R3,
   R11, R14–R16, R18, R19) y sus altas en `E2E_ESPERADOS` de
   `tests/guards/guard-identificador-de-request.test.ts` y en la lista cerrada de
   `tests/unit/shared/data-table-alcance.test.ts`, con el comentario «Alta el <fecha> (QC-262) por el
   MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA y darse de alta en ella es su
   punto de extension por diseno. El ancla NO se relaja -el archivo se nombra, uno a uno-. Lo que
   ejercita: …». *Hecho:* pasa en Chromium y WebKit; las dos guardias en verde.
-- [ ] **T6b. E2E existentes** (R4, R22, R23). Acotar a `data-table-row-<id>` los localizadores de
+- [x] **T6b. E2E existentes** (R4, R22, R23). Acotar a `data-table-row-<id>` los localizadores de
   página que T0a marcó (`e2e/helpers/order-distribution.ts`, `pedido-en-varias-presentaciones`,
   `entregar-producto-terminado` y los que salgan). *Hecho:* cada spec tocado pasa por separado; los
   de la tabla de `design.md > 7` que no se tocan pasan sin cambios.
