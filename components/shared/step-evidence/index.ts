@@ -4,6 +4,7 @@
  */
 
 export {
+  EvidenceGroupHeader,
   MAX_STEP_EVIDENCE_PHOTOS,
   STEP_EVIDENCE_TEXTS,
   StepEvidence,

@@ -274,6 +274,20 @@ describe('R23 - R24 - reintentar y recargar', () => {
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
   });
 
+  it('R23 — el grupo ilegible bajo su anotacion se rotula «Evidencia», no «Paso N», con su contador y «Reintentar»', () => {
+    montar(success(ORDER_EVIDENCE_UNSIGNED));
+    const paso1 = within(anotacion(2)).getByRole('group', {
+      name: STEP_EVIDENCE_TEXTS.groupLabel('fabricación', 1),
+    });
+    expect(within(paso1).getByText(STEP_EVIDENCE_TEXTS.heading)).toBeVisible();
+    expect(paso1).not.toHaveTextContent(STEP_EVIDENCE_TEXTS.stepHeading(1));
+    expect(within(anotacion(2)).queryByTestId('evidence-step-row')).toBeNull();
+    expect(within(paso1).getByTestId('step-evidence-count')).toHaveTextContent('2/3');
+    expect(within(paso1).getByRole('alert')).toHaveTextContent(STEP_EVIDENCE_TEXTS.readError);
+    fireEvent.click(within(paso1).getByRole('button', { name: STEP_EVIDENCE_TEXTS.retry }));
+    expect(routerMock.refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('R23 - «Reintentar» en «Otros pasos con fotos» y en «Envasado» llama a router.refresh', () => {
     montar(success(ORDER_EVIDENCE_UNSIGNED));
     fireEvent.click(within(grupo('fabricación', 4)).getByRole('button', { name: STEP_EVIDENCE_TEXTS.retry }));

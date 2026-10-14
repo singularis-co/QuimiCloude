@@ -31,3 +31,21 @@ Salida real:
 - `pnpm exec vitest run guard` → 76 files, 1064 passed, 20 skipped
 
 Veredicto: F2 hecha; queda la comprobación visual en escritorio, tablet y teléfono contra `ProductoTerminadoEvidencia*.dc.html`.
+
+## Arreglo tras F1 — grupo ilegible bajo la anotación (frontend_dev, 2026-10-14)
+
+Archivos:
+- `components/shared/step-evidence/index.ts` (exporta `EvidenceGroupHeader`)
+- `components/shared/CATALOGO.md` (mención aditiva en la fila de `StepEvidence`: pieza y props `title`, `count`, `titleId`; la guardia del catálogo la exigía)
+- `app/(private)/dashboard/recorrido/[id]/components/trace-step-evidence.tsx` (con `photos: null` pinta grupo `role="group"` «Evidencia de fabricación, paso N» + `EvidenceGroupHeader` «Evidencia» n/3 + `EvidenceReadError` → `router.refresh()`; ya no usa `EvidenceStepList`)
+- `tests/ui/dashboard/execution-trace-evidence.test.tsx` (caso nuevo)
+
+Mapa: R23 → `tests/ui/dashboard/execution-trace-evidence.test.tsx` > «R23 — el grupo ilegible bajo su anotacion se rotula «Evidencia», no «Paso N», con su contador y «Reintentar»»
+
+Salida:
+- `pnpm run typecheck` → sin errores
+- `pnpm run lint` → 0 errores, 7 warnings (preexistentes, en confirm-catalog-import.test.ts y order-service.test.ts)
+- `pnpm exec vitest run` (4 archivos: execution-trace-evidence, execution-trace-detail, step-evidence, evidence-step-list) → 4 files, 70 passed
+- `pnpm exec vitest run guard` → 76 files, 1064 passed, 20 skipped
+
+Veredicto: arreglo hecho; el grupo ilegible bajo la anotación dice «Evidencia» con su contador, como el tablero.

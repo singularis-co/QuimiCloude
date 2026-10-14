@@ -2,7 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 
-import { EvidenceStepList, StepEvidence, type StepEvidenceTile } from '@/components/shared/step-evidence';
+import {
+  EvidenceGroupHeader,
+  EvidenceReadError,
+  STEP_EVIDENCE_TEXTS,
+  StepEvidence,
+  type StepEvidenceTile,
+} from '@/components/shared/step-evidence';
 import type { OrderEvidenceGroup } from '@/lib/modules/asignaciones';
 
 export const MANUFACTURING_PHASE_LABEL = 'fabricación';
@@ -22,7 +28,14 @@ export function TraceStepEvidence({ group }: TraceStepEvidenceProps) {
   if (group.photos === null) {
     return (
       <div className={WRAPPER_CLASS} data-testid="trace-step-evidence">
-        <EvidenceStepList groups={[group]} phaseLabel={MANUFACTURING_PHASE_LABEL} onRetry={refresh} />
+        <div
+          role="group"
+          aria-label={STEP_EVIDENCE_TEXTS.groupLabel(MANUFACTURING_PHASE_LABEL, group.stepPosition)}
+          className="flex flex-col gap-2"
+        >
+          <EvidenceGroupHeader title={STEP_EVIDENCE_TEXTS.heading} count={group.photoCount} />
+          <EvidenceReadError onRetry={refresh} />
+        </div>
       </div>
     );
   }
