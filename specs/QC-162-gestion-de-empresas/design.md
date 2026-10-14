@@ -1,6 +1,6 @@
 # QC-162 — Gestión de empresas por el Maestro · design
 
-Requisitos: `specs/QC-162-gestion-de-empresas/requirements.md` (R1–R44). Sin UI: no hay
+Requisitos: `specs/QC-162-gestion-de-empresas/requirements.md` (R1–R45). Sin UI: no hay
 componentes ni pase `/design` (la pantalla es de QC-166).
 
 ## Lo que ya existe
@@ -560,6 +560,7 @@ No hay E2E (decisión cerrada, va en QC-166). Los nombres de los casos llevan `R
 | R40–R42 | `tests/unit/identity/seed/seed-initial-access.test.ts` (alcance `platform-only`: `credentials` no se llama, ni empresa ni Administrador; `full` igual que hoy) + `tests/unit/identity/seed/seed-scope-env.test.ts` (`production`, ` production `, `preview`, vacío, ausente) + `tests/integration/identity/identity-seed.int.test.ts` (dos corridas `platform-only` sobre una base con QuimiCloud: nada borrado ni cambiado) |
 | R43 | `tests/unit/identity/schema/companies-management-migration.test.ts`: `down.sql` deshace exactamente lo de `migration.sql`; el `CHECK` del tipo coincide con `EVENT_KIND_FORMAT` |
 | R44 | `companies-management-migration.test.ts` + `guard-rls-force` (existente) |
+| R45 | `company-input.test.ts` (`toCompanyWrite` rechaza un nombre cuya forma normalizada queda vacía) + `create-company.test.ts` y `update-company.test.ts` («!!!» → `invalid_input` sin tocar el puerto) |
 
 ## 10. Alternativas descartadas
 

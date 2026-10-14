@@ -60,8 +60,11 @@ export type SeedInitialAccessDeps = {
    * adaptador: quien la ata es `lib/composition` (`design.md > 7`).
    */
   readonly checkCredentialPolicy: (candidate: string) => Promise<CredentialPolicyResult>;
-  /** Sin valor, `full`. Con `platform-only` no se mira ni se crea nada de la empresa inicial. */
-  readonly scope?: SeedScope;
+  /**
+   * Obligatorio a proposito: un llamador que lo omitiera sembraria la empresa inicial sin
+   * haberlo decidido. Con `platform-only` no se mira ni se crea nada de la empresa inicial.
+   */
+  readonly scope: SeedScope;
 };
 
 /**
@@ -85,8 +88,8 @@ const MAESTRO_EMAIL_IN_USE = 'el correo del maestro inicial ya esta en uso';
 type HashedInitialUser = { username: string; email: string; passwordHash: string };
 
 export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<SeedOutcome> {
-  const { repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy } = deps;
-  const scope = deps.scope ?? 'full';
+  const { repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy, scope } =
+    deps;
 
   // 1. Leer estado: roles existentes por nombre + usuarios vivos con rol Administrador y Maestro.
   const roleNames = SEED_ROLES.map((role) => role.name);

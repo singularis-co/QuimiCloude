@@ -48,7 +48,8 @@ export async function atomically<T>(
     await db.$executeRawUnsafe(`RELEASE SAVEPOINT ${SAVEPOINT}`);
     return result;
   } catch (error) {
-    await db.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${SAVEPOINT}`);
+    // Si el rollback tambien falla, se relanza el error de la operacion: es el que explica el fallo.
+    await db.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${SAVEPOINT}`).catch(() => undefined);
     throw error;
   }
 }
@@ -170,6 +171,7 @@ function isCompanyField(value: unknown): value is CompanyField {
 export function createCompanyRepository(db: PrismaLike = prisma): CompanyRepository {
   return {
     async createWithAdministrator({ company, administrator, actorId, now }) {
+      let writingEvent = false;
       try {
         return await atomically(db, async (tx) => {
           const role = await tx.role.findUnique({
@@ -203,6 +205,7 @@ export function createCompanyRepository(db: PrismaLike = prisma): CompanyReposit
             },
             select: { id: true },
           });
+          writingEvent = true;
           await recordCompanyEvent(tx, { companyId: created.id, kind: 'company.created', actorId, now });
           return { companyId: created.id, administratorId: user.id };
         });
@@ -213,9 +216,10 @@ export function createCompanyRepository(db: PrismaLike = prisma): CompanyReposit
           const key: DuplicateKey | null = duplicateKeyOf(error);
           if (key !== null) return key;
         }
-        // El rol se resolvio dentro: la unica clave ajena que la entrada puede romper es la del
-        // tipo de documento.
-        if (isKnownError(error, 'P2003')) return 'invalid_document_type';
+        // Antes del evento, la unica clave ajena que la entrada puede romper es la del tipo de
+        // documento (el rol se resolvio dentro). La del evento es su autor: si no existe, el fallo
+        // es inesperado y se relanza, como en el resto de escrituras con evento.
+        if (isKnownError(error, 'P2003') && !writingEvent) return 'invalid_document_type';
         throw error;
       }
     },

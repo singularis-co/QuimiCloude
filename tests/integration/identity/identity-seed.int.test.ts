@@ -410,6 +410,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       const first = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -441,6 +442,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       // Segunda corrida: no debe duplicar ni modificar nada.
       const second = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -482,6 +484,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       const outcome = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -508,6 +511,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       const outcome = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -537,6 +541,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       const first = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -566,6 +571,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const roleAfterEdit = await tx.role.findUniqueOrThrow({ where: { id: administradorRole.id } });
 
       const second = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -596,6 +602,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       const first = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -620,6 +627,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(await tx.role.findUnique({ where: { name: ROLE_OPERADOR } })).toBeNull();
 
       const second = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -658,6 +666,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       const bootstrap = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -672,6 +681,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       const outcome = await withSeedAdminEnvVarsCleared(() =>
         seedInitialAccess({
+          scope: 'full',
           repository,
           passwordHasher: identity.passwordHasher,
           checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -699,6 +709,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       await expect(
         withSeedAdminEnvVarsCleared(() =>
           seedInitialAccess({
+            scope: 'full',
             repository,
             passwordHasher: identity.passwordHasher,
             checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -725,6 +736,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       const first = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -738,6 +750,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(first.createdAdmin).toBe(true);
 
       const second = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
@@ -765,6 +778,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       const first = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -792,6 +806,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       // R22: la segunda corrida no crea una segunda empresa ni toca la que hay.
       const second = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -815,6 +830,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       const first = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -859,6 +875,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       // R10: la segunda corrida no crea nada y no cambia ni un conteo ni una fila.
       const second = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -900,6 +917,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       const repository = createInitialAccessRepository(tx);
       const first = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -919,6 +937,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       // Y la segunda corrida, ya con el catalogo completo, no cambia ningun conteo.
       const second = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -945,6 +964,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       const repository = createInitialAccessRepository(tx);
       const first = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -969,6 +989,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(maestroAntes).not.toContain(EJECUTAR);
 
       const second = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -996,6 +1017,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       const repository = createInitialAccessRepository(tx);
       const first = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1022,6 +1044,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(asignadas.map((fila) => fila.role.name)).toEqual([ROLE_ADMINISTRADOR]);
 
       const second = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1049,6 +1072,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       const repository = createInitialAccessRepository(tx);
       const first = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1075,6 +1099,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(asignadas.map((fila) => fila.role.name)).toEqual([ROLE_ADMINISTRADOR]);
 
       const second = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1096,6 +1121,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1126,6 +1152,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const repository = createInitialAccessRepository(tx);
 
       await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1164,7 +1191,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         maestroCredentials: fakeMaestroCredentialsProvider,
       };
 
-      const first = await seedInitialAccess(deps);
+      const first = await seedInitialAccess({ ...deps, scope: 'full' });
       expect(first.createdRoles).toContain(ROLE_ACONDICIONAMIENTO);
       expect(first.createdPermissions).toContain('acondicionamiento.modificar');
 
@@ -1181,7 +1208,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         }),
       ).toEqual([{ role: { name: ROLE_ACONDICIONAMIENTO } }]);
 
-      await seedInitialAccess(deps);
+      await seedInitialAccess({ ...deps, scope: 'full' });
       expect(await tx.role.count({ where: { name: ROLE_ACONDICIONAMIENTO } })).toBe(1);
     });
   });
@@ -1209,7 +1236,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         maestroCredentials: fakeMaestroCredentialsProvider,
       };
 
-      const first = await seedInitialAccess(deps);
+      const first = await seedInitialAccess({ ...deps, scope: 'full' });
       expect(first.createdRoles).toEqual([ROLE_ACONDICIONAMIENTO]);
       expect(first.createdPermissions).toEqual([CODIGO]);
       expect(first.createdRolePermissions).toBe(codigosSembradosDe(ROLE_ACONDICIONAMIENTO).length);
@@ -1236,7 +1263,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const rolesTrasLaPrimera = await tx.role.findMany({ orderBy: { id: 'asc' } });
       const permisosTrasLaPrimera = await tx.permission.findMany({ orderBy: { code: 'asc' } });
 
-      const second = await seedInitialAccess(deps);
+      const second = await seedInitialAccess({ ...deps, scope: 'full' });
       expect(second.createdRoles).toEqual([]);
       expect(second.createdPermissions).toEqual([]);
       expect(second.createdRolePermissions).toBe(0);
@@ -1261,7 +1288,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         maestroCredentials: fakeMaestroCredentialsProvider,
       };
 
-      const first = await seedInitialAccess(deps);
+      const first = await seedInitialAccess({ ...deps, scope: 'full' });
       expect(first.createdPermissions).toContain(CODIGO);
 
       expect(
@@ -1276,7 +1303,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(codigosSembradosDe(ROLE_ADMINISTRADOR)).toContain(CODIGO);
 
       const trasLaPrimera = await fotoDeLoQueSiembra(tx);
-      const second = await seedInitialAccess(deps);
+      const second = await seedInitialAccess({ ...deps, scope: 'full' });
       expect(second.createdRoles).toEqual([]);
       expect(second.createdPermissions).toEqual([]);
       expect(second.createdRolePermissions).toBe(0);
@@ -1305,7 +1332,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         maestroCredentials: fakeMaestroCredentialsProvider,
       };
 
-      const first = await seedInitialAccess(deps);
+      const first = await seedInitialAccess({ ...deps, scope: 'full' });
       expect(first.createdRoles).toEqual([]);
       expect(first.createdPermissions).toEqual([CODIGO]);
       expect(first.createdRolePermissions).toBe(1);
@@ -1327,7 +1354,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       ).toEqual([{ role: { name: ROLE_ADMINISTRADOR } }]);
 
       const trasLaPrimera = await fotoDeLoQueSiembra(tx);
-      const second = await seedInitialAccess(deps);
+      const second = await seedInitialAccess({ ...deps, scope: 'full' });
       expect(second.createdPermissions).toEqual([]);
       expect(second.createdRolePermissions).toBe(0);
       expect(await fotoDeLoQueSiembra(tx)).toEqual(trasLaPrimera);
@@ -1344,6 +1371,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       await resetIdentityToEmptyState(tx);
 
       const outcome = await seedInitialAccess({
+        scope: 'full',
         repository: createInitialAccessRepository(tx),
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1387,6 +1415,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       await resetIdentityToEmptyState(tx);
 
       const bootstrap = await seedInitialAccess({
+        scope: 'full',
         repository: createInitialAccessRepository(tx),
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1491,6 +1520,7 @@ async function sembradaSinMaestro(tx: Prisma.TransactionClient) {
   await resetIdentityToEmptyState(tx);
   const repository = createInitialAccessRepository(tx);
   await seedInitialAccess({
+    scope: 'full',
     repository,
     passwordHasher: identity.passwordHasher,
     checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1542,12 +1572,12 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
         maestroCredentials: fakeMaestroCredentialsProvider,
       };
 
-      const first = await seedInitialAccess(deps);
+      const first = await seedInitialAccess({ ...deps, scope: 'full' });
       expect(first.createdMaestro).toBe(true);
       expect(first.createdAdmin).toBe(true);
       const fotoTrasLaPrimera = await fotoDeLoQueSiembra(tx);
 
-      const second = await seedInitialAccess(deps);
+      const second = await seedInitialAccess({ ...deps, scope: 'full' });
       expect(second).toEqual({
         createdRoles: [],
         createdAdmin: false,
@@ -1598,6 +1628,7 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
       const antes = await fotoDeLoQueSiembra(tx);
 
       const outcome = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1627,6 +1658,7 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
       let mensaje = '';
       try {
         await seedInitialAccess({
+          scope: 'full',
           repository,
           passwordHasher: identity.passwordHasher,
           checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1654,6 +1686,7 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
       await tx.user.update({ where: { id: otro.id }, data: { deletedAt: new Date() } });
 
       const outcome = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1675,6 +1708,7 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
       });
 
       const outcome = await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1701,6 +1735,7 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
       expect(await repository.countLiveUsersWithoutCompanyWithEmail(FAKE_MAESTRO_EMAIL)).toBe(0);
 
       await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1717,6 +1752,7 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
       await resetIdentityToEmptyState(tx);
       const repository = createInitialAccessRepository(tx);
       await seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1727,6 +1763,7 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
 
       const outcome = await withSeedAdminEnvVarsCleared(() =>
         seedInitialAccess({
+          scope: 'full',
           repository,
           passwordHasher: identity.passwordHasher,
           checkCredentialPolicy: identity.checkCredentialPolicy,
@@ -1748,6 +1785,7 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
       await expect(
         withSeedAdminEnvVarsCleared(() =>
           seedInitialAccess({
+            scope: 'full',
             repository,
             passwordHasher: identity.passwordHasher,
             checkCredentialPolicy: identity.checkCredentialPolicy,

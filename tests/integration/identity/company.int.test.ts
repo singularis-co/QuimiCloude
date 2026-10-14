@@ -15,7 +15,10 @@ import { Prisma } from '@prisma/client'
 import { describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
-import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma'
+import {
+  atomically,
+  createCompanyRepository,
+} from '@/lib/modules/identity/adapters/driven/persistence/company-prisma'
 import { normalizeTaxId } from '@/lib/modules/identity/domain/company-input'
 import { NO_CREDENTIAL_SENTINEL } from '@/lib/modules/identity/domain/credential-setup-link'
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type'
@@ -516,6 +519,28 @@ describe('createWithAdministrator', () => {
       const result = await repo.createWithAdministrator({ company: data, administrator: admin, actorId, now: NOW })
 
       expect(result).toBe('invalid_document_type')
+      expect(await tx.company.count({ where: { name: data.name } })).toBe(0)
+      expect(await tx.user.count({ where: { username: admin.username } })).toBe(0)
+      expect(await tx.companyEvent.count({ where: { actorId } })).toBe(0)
+    })
+  })
+
+  it('R14, R34: autor del evento inexistente → se relanza el error de la base (no invalid_document_type), sin empresa, usuario ni evento', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createCompanyRepository(tx)
+      const actorId = randomUUID()
+      const data = write(`Autor inexistente ${tag()}`)
+      const admin = administrator()
+
+      const error = await repo
+        .createWithAdministrator({ company: data, administrator: admin, actorId, now: NOW })
+        .then(
+          (result) => ({ resolved: result }),
+          (reason: unknown) => reason,
+        )
+
+      expect(error).toBeInstanceOf(Prisma.PrismaClientKnownRequestError)
+      expect((error as Prisma.PrismaClientKnownRequestError).code).toBe('P2003')
       expect(await tx.company.count({ where: { name: data.name } })).toBe(0)
       expect(await tx.user.count({ where: { username: admin.username } })).toBe(0)
       expect(await tx.companyEvent.count({ where: { actorId } })).toBe(0)
@@ -1057,6 +1082,22 @@ describe('listEvents', () => {
       expect(porDefecto.items).toHaveLength(10)
       expect(grande.items).toHaveLength(25)
       expect(await repo.listEvents(randomUUID(), {})).toBe('not_found')
+    })
+  })
+})
+
+describe('atomically', () => {
+  it('si deshacer el savepoint tambien falla, se relanza el error original de la operacion', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const original = new Error('fallo de la operacion')
+
+      // Soltar el savepoint dentro hace que el ROLLBACK TO SAVEPOINT posterior falle.
+      await expect(
+        atomically(tx, async (inner) => {
+          await inner.$executeRawUnsafe('RELEASE SAVEPOINT company_write')
+          throw original
+        }),
+      ).rejects.toBe(original)
     })
   })
 })

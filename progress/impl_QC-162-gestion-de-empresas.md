@@ -91,8 +91,6 @@ Veredicto: Tanda A (T1, T2) cerrada en verde.
 - `SEED_SCOPES` (constante) ademas del tipo `SeedScope`.
 - El cruce CHECK ↔ `EVENT_KIND_FORMAT` (pendiente de T1) va en `company-event.test.ts`, que lee
   `migration.sql`; el test de migracion de la Tanda A no se toca.
-- Observacion, sin cambio: un nombre de empresa que normaliza a vacio (p. ej. «!!!») pasa la
-  validacion; ningun R lo prohibe.
 
 ### R -> test (lo cubierto en esta tanda)
 - R1, R2 -> los ocho `*.test.ts` de casos de uso (null, undefined, sin permisos, vacio, permiso
@@ -427,3 +425,75 @@ plataforma y todos los R1-R45 tienen test.
   - todas las migraciones tienen down.sql.
 
 Veredicto: T1-T12 hechas; ningun R1-R45 sin test.
+
+## Vuelta 2 (review CAMBIOS: B1, m1, m2, m3, m6) — backend_dev, 2026-10-14
+
+### Hallazgos cerrados
+- **B1.** `SeedInitialAccessDeps.scope` pasa a obligatorio (`readonly scope: SeedScope`) y se quita el
+  `?? 'full'`; se desestructura con el resto. Enmienda mecanica autorizada: `scope: 'full'` en las 87
+  llamadas que dejaron de compilar (39 en `seed-initial-access.test.ts`, 48 en
+  `identity-seed.int.test.ts`; en las que pasan una variable `deps`, `{ ...deps, scope: 'full' }`).
+  Ninguna asercion cambia. Cableado protegido, comprobado por mutacion: borrando
+  `scope: readSeedScopeFromEnv(),` de `lib/composition/index.ts`, `tsc` falla con `TS2345` en
+  `lib/composition/index.ts(822,25)`; restaurado. Ademas, en ejecucion un `scope` ausente ya no es
+  `full`: `needsAdmin` solo es cierto con `scope === 'full'`, asi que cae del lado seguro.
+  Nota: el caso `QC-162 R41: full hace las mismas llamadas y devuelve lo mismo que sin alcance`
+  compara ahora `full` con `full` (la llamada «sin alcance» gano `scope: 'full'` y ya no puede
+  existir); sus aserciones siguen iguales y siguen fijando que `full` crea Administrador, empresa y
+  Maestro. R41 queda cubierto ademas por todos los casos previos, que pasan `full` explicito.
+- **m1.** `requirements.md > Cobertura de las decisiones cerradas`: R45 en «¿Datos de la empresa?».
+  `design.md`: cabecera `R1–R45` y fila R45 en la tabla del § 9.
+- **m2.** `createWithAdministrator` marca cuando empieza a escribir el evento; un `P2003` antes de
+  ese punto sigue siendo `invalid_document_type` y uno durante el evento (FK `actor_id`) se relanza.
+  Por que relanzar y no un codigo: el modulo no tiene un error de «autor inexistente», y `update`,
+  `softDelete` y `reactivate` ya tratan el autor inexistente del evento como fallo inesperado (sus
+  `.int` esperan `PrismaClientKnownRequestError`); el alta queda igual. Sin codigos nuevos. Se marca
+  por etapa y no por `meta` de Prisma para no depender del formato de `field_name`.
+  Test: `company.int.test.ts > createWithAdministrator > R14, R34: autor del evento inexistente → se
+  relanza el error de la base (no invalid_document_type), sin empresa, usuario ni evento`.
+- **m3.** `atomically`: el `ROLLBACK TO SAVEPOINT` lleva `.catch(() => undefined)` y se relanza
+  siempre el error original. Test: `company.int.test.ts > atomically > si deshacer el savepoint
+  tambien falla, se relanza el error original de la operacion` (suelta el savepoint dentro para que
+  el rollback falle de verdad en Postgres).
+  Mutacion: quitando las dos correcciones (m2 y m3) caen justo esos 2 casos (2 failed | 36 passed);
+  restaurado.
+- **m6.** Quitada la observacion superada de la Tanda B («un nombre que normaliza a vacio pasa la
+  validacion; ningun R lo prohibe»): era una sola entrada.
+- m4 y m5: sin tocar, como decidio el leader.
+
+### Archivos
+- `lib/modules/identity/domain/seed-initial-access.ts`
+- `lib/modules/identity/adapters/driven/persistence/company-prisma.ts`
+- `tests/unit/identity/seed/seed-initial-access.test.ts` (solo `scope: 'full'`)
+- `tests/integration/identity/identity-seed.int.test.ts` (solo `scope: 'full'`)
+- `tests/integration/identity/company.int.test.ts` (import de `atomically`, +2 casos)
+- `specs/QC-162-gestion-de-empresas/requirements.md`, `design.md`
+- `progress/impl_QC-162-gestion-de-empresas.md`
+Todos ya estaban en `tasks.md > Archivos esperados`: no hay archivos nuevos que anadir.
+
+### R -> test (cambios)
+- R14, R34: + `createWithAdministrator > R14, R34: autor del evento inexistente ...`.
+- R40: ademas, el typecheck protege el cableado de la composicion (ver B1).
+
+### Verificacion (salida real, uno detras de otro)
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, los 7 preexistentes
+  (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest run tests/unit/identity/seed tests/unit/identity/companies tests/unit/composition`:
+  Test Files 20 passed (20), Tests 297 passed (297).
+- `pnpm exec vitest run --project integration tests/integration/identity/company.int.test.ts`:
+  Test Files 1 passed (1), Tests 38 passed (38).
+- `pnpm exec vitest run --project integration tests/integration/identity/identity-seed.int.test.ts`:
+  Test Files 1 passed (1), Tests 35 passed (35).
+- `pnpm exec vitest run guard`: Test Files 75 passed (75), Tests 1052 passed | 20 skipped (1072).
+- `pnpm exec vitest run --project node tests/unit/identity`: Test Files 120 passed (120), Tests 2284
+  passed | 31 skipped (2315).
+
+Veredicto: B1, m1, m2, m3 y m6 cerrados en verde; `scope` obligatorio y el cableado del seed
+protegido por el typecheck.
+
+### Vuelta 2: gate
+
+- `./init.sh` (rapido), exit 0, `== init OK ==`: lint 0 errores (7 warnings ajenos); `vitest related`: Test Files
+  858 passed (858), Tests 13652 passed | 37 skipped (13689); `gate.siempre`: Test Files 114 passed (114), Tests
+  1608 passed | 37 skipped (1645).

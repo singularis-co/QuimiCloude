@@ -214,7 +214,7 @@ Vocabulario de este archivo:
 
 | Decisión | Requisitos |
 |---|---|
-| ¿Datos de la empresa? | R4, R5, R6, R16 |
+| ¿Datos de la empresa? | R4, R5, R6, R16, R45 |
 | ¿Identificación fiscal? | R4, R7, R9, R10, R25 |
 | ¿Alta? | R11, R12, R13, R14, R15 |
 | ¿Baja con gente trabajando? | R20, R21, R22, R23, R24 |
