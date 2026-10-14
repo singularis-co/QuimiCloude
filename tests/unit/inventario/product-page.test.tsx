@@ -503,6 +503,47 @@ async function rellenarFormulario(
   }
 }
 
+/**
+ * "Hoy" fijo para los casos que eligen la fecha de expiracion en el calendario: solo se falsea
+ * `Date` -no los temporizadores que usa el popover de Base UI-, y asi el dia de mañana esta
+ * siempre en el mes que el calendario abre.
+ */
+const HOY_FIJO = new Date(2026, 5, 15, 10, 0, 0); // 2026-06-15
+const MANANA_ISO = '2026-06-16';
+
+function fijarHoy() {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(HOY_FIJO);
+}
+
+/** El boton de un dia del calendario abierto, por el `data-day` ISO de su celda. */
+function botonDelDia(iso: string): HTMLElement {
+  const boton = document.querySelector(`td[data-day="${iso}"] button`);
+  if (!(boton instanceof HTMLElement)) throw new Error(`No hay boton para el dia ${iso}`);
+  return boton;
+}
+
+/** Abre el calendario de la fecha de expiracion. */
+async function abrirExpiracion(user: ReturnType<typeof setupUser>) {
+  const disparador = screen.getByTestId('product-field-expiryDate');
+  await user.click(disparador);
+  await waitFor(() => expect(disparador).toHaveAttribute('aria-expanded', 'true'));
+}
+
+/** Cierra el calendario de la fecha de expiracion sin tocar nada mas del panel. */
+async function cerrarExpiracion(user: ReturnType<typeof setupUser>) {
+  const disparador = screen.getByTestId('product-field-expiryDate');
+  await user.keyboard('{Escape}');
+  await waitFor(() => expect(disparador).toHaveAttribute('aria-expanded', 'false'));
+}
+
+/** Abre el calendario de la fecha de expiracion, elige el dia dado y lo cierra. */
+async function elegirExpiracion(user: ReturnType<typeof setupUser>, iso: string) {
+  await abrirExpiracion(user);
+  await user.click(await esperarInteractiva(botonDelDia(iso)));
+  await cerrarExpiracion(user);
+}
+
 let toastExito: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
@@ -529,6 +570,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   toast.dismiss();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   resetViewport();
   clearSidebarStateCookie();
@@ -623,29 +665,32 @@ describe('pantalla de productos — lista', () => {
     }
   });
 
-  it('la primera columna es la imagen del producto, y la RUTA no se pinta como texto', async () => {
-    // Decision humana del 2026-09-07. La imagen es marcado, asi que se afirma sobre la miniatura
-    // y sobre el orden de las cabeceras, no sobre `PRODUCT_COLUMNS`.
+  it('la primera columna es la imagen del producto: pinta su URL publica, no la RUTA', async () => {
+    // La imagen es marcado, asi que se afirma sobre la miniatura y sobre el orden de las
+    // cabeceras, no sobre `PRODUCT_COLUMNS`.
     const RUTA = 'productos/hidroxido.png';
-    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto({ imagePath: RUTA })]));
+    const URL_PUBLICA = 'https://storage.example/productos/hidroxido.png';
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ imagePath: RUTA, imageUrl: URL_PUBLICA })]),
+    );
 
     await renderPantalla();
 
     const tabla = within(screen.getByTestId(testId.tabla));
     const miniatura = tabla.getAllByTestId('product-image')[0] as HTMLImageElement;
 
-    expect(miniatura).toHaveAttribute('src', RUTA);
-    // La ruta es de la imagen, nunca texto de una celda.
+    expect(miniatura).toHaveAttribute('src', URL_PUBLICA);
+    // La ruta no es servible: ni va a `src` ni se pinta como texto de una celda.
     expect(document.body.textContent, RUTA).not.toContain(RUTA);
 
     const cabeceras = tabla.getAllByRole('columnheader');
     expect(cabeceras[0]).toHaveAttribute('data-testid', 'data-table-head-image');
   });
 
-  it('sin ruta de imagen, la miniatura cae al marcador de `public/`', async () => {
-    // El caso NORMAL hoy: `products.image_path` esta vacia en todas las filas, asi que lo que se
-    // ve es el marcador. No es un hueco: es el estado normal mientras nadie suba imagenes.
-    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto({ imagePath: null })]));
+  it('sin imagen, la miniatura cae al marcador de `public/`', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ imagePath: null, imageUrl: null })]),
+    );
 
     await renderPantalla();
 
@@ -1603,7 +1648,9 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     // Lote y caducidad son opcionales: estan en pantalla y el alta pasa con los dos vacios.
     expect((screen.getByTestId('product-field-lot') as HTMLInputElement).value).toBe('');
-    expect(screen.getByTestId('product-field-expiryDate')).toHaveAttribute('type', 'date');
+    // La caducidad es el mismo selector de calendario que la fecha de compra, y arranca vacia.
+    expect(screen.getByTestId('product-field-expiryDate').tagName).toBe('BUTTON');
+    expect(screen.getByTestId('product-value-expiryDate')).toHaveValue('');
 
     // Con SOLO el costo total -sin el unitario- ya no hay ningun error de campo.
     await user.type(screen.getByTestId('product-field-totalCost'), '150.00');
@@ -1795,6 +1842,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // QC-90 R25 — hasta hoy los cinco se pintaban y se validaban, pero la operacion no los veia.
     // Van en el `FormData` porque estan en el DOM del `<form>`; lo que se vigila aqui es que
     // ninguno se quede fuera y que los importes lleguen COMO CADENA, sin normalizar ni convertir.
+    fijarHoy();
     const user = setupUser();
 
     await renderPantalla();
@@ -1802,7 +1850,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await screen.findByTestId(testId.formulario);
 
     await rellenarFormulario(user, { lot: 'LT-4471' });
-    await user.type(screen.getByTestId('product-field-expiryDate'), '2027-03-15');
+    await elegirExpiracion(user, MANANA_ISO);
     await user.click(screen.getByTestId(testId.enviar));
 
     await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
@@ -1815,7 +1863,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(enviado.get('presentationId')).toBeNull();
     expect(enviado.get('unitCost')).toBe(LOTE_VALIDO.unitCost);
     expect(enviado.get('lot')).toBe('LT-4471');
-    expect(enviado.get('expiryDate')).toBe('2027-03-15');
+    expect(enviado.get('expiryDate')).toBe(MANANA_ISO);
     // El costo total NO se escribio, y aun asi viaja escrito: el panel lo rellena al teclear el
     // unitario (`12.50 x 12`). Antes viajaba vacio -"campo omitido"-, y esa premisa cayo: hoy solo
     // viaja vacio si se dejan los dos importes en blanco, que es un rechazo.
@@ -1851,6 +1899,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // QC-90 R28 — el rechazo llega de la operacion (no de la validacion previa), asi que va a la
     // region de error del formulario; lo que no puede pasar es que se lleve por delante lo
     // escrito en el lote, que es donde mas hay que teclear de todo el panel.
+    fijarHoy();
     const user = setupUser();
     createProductActionMock.mockResolvedValue({
       status: 'error',
@@ -1867,7 +1916,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // mide -que un rechazo no borra lo escrito- y no del recalculo. El
     // recalculado se escribe sin relleno («150»), que es lo que queda en el campo.
     await rellenarFormulario(user, { totalCost: '150.00', lot: 'LT-4471' });
-    await user.type(screen.getByTestId('product-field-expiryDate'), '2027-03-15');
+    await elegirExpiracion(user, MANANA_ISO);
     await user.click(screen.getByTestId(testId.enviar));
 
     await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
@@ -1878,7 +1927,30 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId('product-field-unitCost')).toHaveValue(LOTE_VALIDO.unitCost);
     expect(screen.getByTestId('product-field-totalCost')).toHaveValue('150');
     expect(screen.getByTestId('product-field-lot')).toHaveValue('LT-4471');
-    expect(screen.getByTestId('product-field-expiryDate')).toHaveValue('2027-03-15');
+    expect(screen.getByTestId('product-value-expiryDate')).toHaveValue(MANANA_ISO);
+  });
+
+  it('alta: la fecha de expiracion es opcional y se puede volver a vaciar', async () => {
+    fijarHoy();
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    // Elegir mañana y volver a pulsarlo deja el campo vacio otra vez.
+    await abrirExpiracion(user);
+    await user.click(await esperarInteractiva(botonDelDia(MANANA_ISO)));
+    expect(screen.getByTestId('product-value-expiryDate')).toHaveValue(MANANA_ISO);
+    await user.click(botonDelDia(MANANA_ISO));
+    expect(screen.getByTestId('product-value-expiryDate')).toHaveValue('');
+    await cerrarExpiracion(user);
+
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+    expect(createProductActionMock.mock.calls[0][1].get('expiryDate')).toBe('');
   });
 
   it('el panel de alta nunca permite enviar sin fecha de compra escrita (R3)', async () => {
@@ -2156,12 +2228,13 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     const ayuda = screen.getByTestId('product-helper-stock');
     expect(ayuda).toHaveAttribute('type', 'button');
-    expect(ayuda).toHaveAccessibleName('Qué es Existencia');
+    expect(ayuda).toHaveAccessibleName('Qué es Cantidad');
+    expect(screen.getByLabelText('Cantidad')).toHaveAttribute('name', 'stock');
     expect(screen.queryByTestId('product-helper-text-stock')).toBeNull();
 
     await user.hover(ayuda);
     const texto = await screen.findByTestId('product-helper-text-stock', {}, { timeout: 3_000 });
-    expect(texto).toHaveTextContent('este lote');
+    expect(texto).toHaveTextContent('Cantidad que se va a ingresar al inventario.');
 
     // Pedir ayuda no envia el formulario.
     expect(createProductActionMock).not.toHaveBeenCalled();

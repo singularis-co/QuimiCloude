@@ -203,17 +203,17 @@ describe('ejecucion — el bloque de evidencia', () => {
     mocks.uploadEvidence.mockResolvedValue({
       status: 'error',
       stage: 'file',
-      message: 'No se pudo subir: pesa más de 5 MB. Elige otra foto.',
+      message: 'No se pudo subir: pesa más de 4.4 MB. Elige otra foto.',
     });
     render(<OrderExecutionScreen execution={ejecucion()} />);
     const user = setupUser();
 
     await user.upload(screen.getByTestId('step-evidence-input'), archivo());
 
-    const error = await screen.findByText('No se pudo subir: pesa más de 5 MB. Elige otra foto.');
+    const error = await screen.findByText('No se pudo subir: pesa más de 4.4 MB. Elige otra foto.');
     expect(screen.getByTestId('step-evidence-count')).toHaveTextContent('0/3');
     await user.click(within(error.closest('li')!).getByRole('button', { name: 'Quitar' }));
-    expect(screen.queryByText('No se pudo subir: pesa más de 5 MB. Elige otra foto.')).toBeNull();
+    expect(screen.queryByText('No se pudo subir: pesa más de 4.4 MB. Elige otra foto.')).toBeNull();
     expect(mocks.removeEvidenceAction).not.toHaveBeenCalled();
   });
 

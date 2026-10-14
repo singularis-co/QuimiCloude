@@ -11,6 +11,7 @@ import {
   type ProductFormUnits,
   type ProductView,
 } from '@/lib/modules/inventario';
+import { forModule } from '@/lib/shared/observability/logger';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 // Aqui no se repite `requirePermission`: es la primera linea de cada caso de uso.
@@ -40,6 +41,12 @@ export type FinishedStockListResult =
 export type ProductFormUnitsResult =
   | { status: 'success'; data: ProductFormUnits }
   | ErrorState;
+
+/**
+ * La imagen viaja aparte del `FormData`, con la forma de la de recetas: los bytes del archivo
+ * elegido. En la edicion, `undefined` no la toca y `null` la quita.
+ */
+export type ProductImageInput = { readonly bytes: Uint8Array };
 
 // Sin constante `INITIAL_STATE`: un archivo con `'use server'` solo puede exportar funciones async.
 
@@ -76,6 +83,14 @@ function readOptionalFormDecimal(
 }
 
 const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
+
+const log = forModule('inventario');
+
+/** Agrega la clave solo si viene: ausente y `null` significan cosas distintas en la edicion. */
+function withImage(candidate: unknown, image: ProductImageInput | null | undefined): unknown {
+  if (image === undefined || candidate === null || typeof candidate !== 'object') return candidate;
+  return { ...candidate, image };
+}
 
 /**
  * La empresa sale de la sesion del servidor y nunca de la entrada: si viajara en el `FormData`,
@@ -179,6 +194,7 @@ function buildUpdateProductCandidate(formData: FormData): unknown | typeof INVAL
 export async function createProductAction(
   prevState: CreateProductFormState,
   formData: FormData,
+  image?: ProductImageInput,
 ): Promise<CreateProductFormState> {
   void prevState;
 
@@ -190,7 +206,7 @@ export async function createProductAction(
   const actor = await currentActor();
 
   try {
-    const { id, lot } = await inventario.createProduct(candidate, actor);
+    const { id, lot } = await inventario.createProduct(withImage(candidate, image), actor);
     return { status: 'success', id, lot };
   } catch (error) {
     return toErrorState(error);
@@ -201,6 +217,7 @@ export async function updateProductAction(
   id: string,
   prevState: ProductMutationFormState,
   formData: FormData,
+  image?: ProductImageInput | null,
 ): Promise<ProductMutationFormState> {
   void prevState;
 
@@ -212,7 +229,11 @@ export async function updateProductAction(
   const actor = await currentActor();
 
   try {
-    await inventario.updateProduct(id, candidate, actor);
+    const { warnings } = await inventario.updateProduct(id, withImage(candidate, image), actor);
+    // El producto ya quedo guardado: un archivo anterior sin borrar no convierte la edicion en error.
+    for (const warning of warnings) {
+      log.warn('product_image_remove_failed', { path: warning.path, message: warning.message });
+    }
     return { status: 'success' };
   } catch (error) {
     return toErrorState(error);

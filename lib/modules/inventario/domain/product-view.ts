@@ -27,6 +27,8 @@ export type NewProduct = {
   readonly type?: ProductType;
   /** Sin ella, la unidad sale de la presentacion del lote o del envase. */
   readonly unitId?: string;
+  /** Ruta en el almacenamiento. Ausente en la edicion = la columna no se toca; `null` = se vacia. */
+  readonly imagePath?: string | null;
 };
 
 /**
@@ -39,16 +41,17 @@ export type ProductView = {
   readonly id: string;
   readonly name: string;
   /**
-   * Ruta de la imagen del producto, o `null` si no tiene (2026-09-07).
+   * Ruta guardada en `products.image_path`, o `null` si no tiene. Es una ruta del bucket, no
+   * una URL servible: para pintar esta `imageUrl`.
    *
-   * Es la RUTA guardada en `products.image_path`, tal cual: este modulo no compone URL publica
-   * -no tiene puerto de almacenamiento, a diferencia de `recetas`- y no inventa ninguna. Quien
-   * pinta decide que hacer con ella; hoy la pantalla cae al marcador cuando es `null` y cuando
-   * la ruta no resuelve.
-   *
-   * Sigue SIN ordenarse ni filtrarse (`PRODUCT_QUERYABLE`): no se ordena por una ruta de archivo.
+   * Sin orden ni filtro (`PRODUCT_QUERYABLE`): no se ordena por una ruta de archivo.
    */
   readonly imagePath: string | null;
+  /**
+   * URL publica de `imagePath`. La rellenan `getProduct` y `listProducts` cuando tienen el
+   * almacenamiento cableado; el adaptador de persistencia no la conoce.
+   */
+  readonly imageUrl?: string | null;
   /** Existencia guardada en `products.stock`: la suma de los lotes en la unidad del producto,
    *  con sus cuatro decimales. */
   readonly stock: string;

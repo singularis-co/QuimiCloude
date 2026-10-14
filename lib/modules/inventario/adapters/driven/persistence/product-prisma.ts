@@ -94,6 +94,7 @@ export async function createProduct(
       nameNormalized: normalizeProductName(data.name),
       qtyAlert: data.qtyAlert ?? null,
       type: data.type ?? PRODUCT_TYPES.PRODUCT,
+      imagePath: data.imagePath ?? null,
       ...companyScopeColumns(scope),
       createdAt: now,
       updatedAt: now,
@@ -154,6 +155,7 @@ export async function updateAliveProduct(
         name: data.name,
         nameNormalized: normalizeProductName(data.name),
         qtyAlert: data.qtyAlert ?? null,
+        ...(data.imagePath !== undefined ? { imagePath: data.imagePath } : {}),
         updatedAt: now,
       },
     });
@@ -799,6 +801,7 @@ export async function createWithFirstBatch(
         qtyAlert: product.qtyAlert ?? null,
         type: product.type ?? PRODUCT_TYPES.PRODUCT,
         presentationId: packaging?.presentationId ?? null,
+        imagePath: product.imagePath ?? null,
         ...companyScopeColumns(scope),
         createdAt: now,
         updatedAt: now,

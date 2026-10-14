@@ -4,16 +4,19 @@ import { useActionState, useEffect, useId, useState } from 'react';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { FormSheet } from '@/components/shared/form-sheet';
+import { ImageField, type ImageFieldState } from '@/components/shared/image-field';
 import { Label } from '@/components/ui/label';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createProductSchema,
   updateProductSchema,
   MANUAL_PRODUCT_TYPE_VALUES,
+  MAX_PRODUCT_IMAGE_BYTES,
   PRODUCT_TYPES,
   type ProductFormUnits,
   type ProductView,
   type ProductType,
+  validateProductImage,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
@@ -145,7 +148,7 @@ const FINISHED_PRODUCT_LABEL = 'Producto terminado';
 const FIELD_LABELS: Record<ProductFieldName, string> = {
   name: 'Nombre',
   type: 'Tipo',
-  stock: 'Existencia',
+  stock: 'Cantidad',
   qtyAlert: 'Alerta de cantidad',
   presentationId: 'Presentación',
   unitId: 'Unidad',
@@ -343,6 +346,10 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
 
+  // Fuera del `FormData`: los bytes viajan como argumento aparte de la action. Es estado de React,
+  // asi que un rechazo no lo pierde.
+  const [image, setImage] = useState<ImageFieldState>({ kind: 'untouched' });
+
   /** Tipo de producto seleccionado. Parte del tipo del producto que se edita (o PRODUCT en alta). */
   const [productType, setProductType] = useState<ProductType>(product?.type ?? PRODUCT_TYPES.PRODUCT);
 
@@ -473,9 +480,24 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
     // `isCreate` no estrecha el TIPO de un `result` ya unificado. Separar la rama es lo que deja
     // leer `result.lot` sin un `as`.
     if (isCreate) {
-      const result = await createProductAction({ status: 'idle' }, formData);
+      // Sin imagen no se pasa el argumento: el alta no admite `null`.
+      const result =
+        image.kind === 'replaced'
+          ? await createProductAction({ status: 'idle' }, formData, { bytes: image.bytes })
+          : await createProductAction({ status: 'idle' }, formData);
 
       if (result.status === 'error') {
+        // El vencimiento no posterior a hoy SI identifica campo: el servidor es quien conoce
+        // "hoy" (fecha civil UTC), asi que su mensaje se pinta bajo la fecha de expiracion.
+        if (result.code === 'batch_expiry_not_future') {
+          return {
+            status: 'error',
+            serverError: result,
+            fieldErrors: { expiryDate: result.message },
+            values,
+          };
+        }
+
         // `invalid_input`, `product_not_found` y `unauthorized` NO identifican campo: van a la
         // region de error del formulario.
         //
@@ -489,7 +511,16 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
       return result.status === 'success' ? { status: 'success', lot: result.lot } : { status: 'success' };
     }
 
-    const result = await updateProductAction(product.id, { status: 'idle' }, formData);
+    // `untouched` no pasa el argumento (la imagen guardada se queda); `cleared` pasa `null`.
+    const result =
+      image.kind === 'untouched'
+        ? await updateProductAction(product.id, { status: 'idle' }, formData)
+        : await updateProductAction(
+            product.id,
+            { status: 'idle' },
+            formData,
+            image.kind === 'replaced' ? { bytes: image.bytes } : null,
+          );
 
     if (result.status === 'error') {
       return { status: 'error', serverError: result, fieldErrors: {}, values };
@@ -600,6 +631,16 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           )}
         />
       )}
+
+      <ImageField
+        mode={isEdit ? 'edit' : 'create'}
+        initialImageUrl={product?.imageUrl ?? null}
+        value={image}
+        onChange={setImage}
+        maxBytes={MAX_PRODUCT_IMAGE_BYTES}
+        validate={validateProductImage}
+        testIdPrefix="product-form-image"
+      />
 
       {/*
         En el ALTA el nombre es un autocomplete que busca productos existentes; al elegir uno se
@@ -717,7 +758,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           helper={
             isPackaging
               ? PACKAGING_STOCK_HELPER
-              : 'La existencia con la que entra este lote al inventario.'
+              : 'Cantidad que se va a ingresar al inventario.'
           }
           value={stockValue}
           onChange={(event) => setStockValue(sanitizeQuantityInput(event.currentTarget.value))}
@@ -775,13 +816,14 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           )}
 
           {shouldShowField('expiryDate', productType) && (
-            <ProductField
+            // El mismo selector de calendario que la fecha de compra. Opcional: arranca vacio, y
+            // el calendario solo deja elegir de manana en adelante.
+            <ProductBatchDateField
               key={`expiryDate-${resetCount}`}
               name="expiryDate"
               label={FIELD_LABELS.expiryDate}
-              type="date"
               helper="La fecha en la que este lote caduca. Opcional: hoy solo se guarda, todavía no dispara ningún aviso."
-              defaultValue={initialValue('expiryDate', '')}
+              initialValue={initialValue('expiryDate', '')}
               error={fieldErrors.expiryDate}
             />
           )}
@@ -794,6 +836,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           {shouldShowField('purchaseDate', productType) && (
             <ProductBatchDateField
               key={`purchaseDate-${resetCount}`}
+              label={FIELD_LABELS.purchaseDate}
               initialValue={initialValue('purchaseDate', formatDateLocalISO(new Date()))}
               error={fieldErrors.purchaseDate}
             />

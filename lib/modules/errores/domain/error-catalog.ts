@@ -250,7 +250,7 @@ export const ERROR_MESSAGES_ES = {
     'Falta evidencia: algun paso que la exige no tiene ninguna foto.',
   'errors.evidence_limit': 'Ese paso ya tiene 3 fotos: cambia o quita una antes de subir otra.',
   'errors.evidence_invalid_file':
-    'No se pudo registrar la foto: debe ser JPG, PNG o WebP y pesar como maximo 5 MB.',
+    'No se pudo registrar la foto: debe ser JPG, PNG o WebP y pesar como maximo 4.4 MB.',
   'errors.evidence_not_found': 'La foto de evidencia no existe.',
   'errors.recipe_steps_locked':
     'Hay pedidos en curso con fotos de evidencia: mientras sigan en curso no puedes mover ni quitar pasos.',

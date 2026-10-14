@@ -406,7 +406,7 @@ describe('QC-49 R15/R16 — lo ajeno se responde como lo inexistente, nunca como
     await expect(m.getProduct(PRODUCTO_DE_A, ACTOR_A)).resolves.toMatchObject({
       id: PRODUCTO_DE_A,
     });
-    await expect(m.updateProduct(PRODUCTO_DE_A, EDICION_VALIDA, ACTOR_A)).resolves.toBeUndefined();
+    await expect(m.updateProduct(PRODUCTO_DE_A, EDICION_VALIDA, ACTOR_A)).resolves.toEqual({ warnings: [] });
     await expect(
       m.updatePresentation(PRESENTACION_DE_A, PRESENTACION_VALIDA, ACTOR_A),
     ).resolves.toBeUndefined();
