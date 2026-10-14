@@ -31,29 +31,7 @@ _Pendiente: los escribe spec_author (F1.2)._
 
 ## Preguntas abiertas
 
-- **P1 (bloqueante, 2026-10-14, spec_author F1.2) — falta el pase `/design`.** La feature cambia
-  lo visual de dos pantallas que ya tienen tablero, y ninguno de esos tableros incluye fotos:
-  `docs/diseno/canvas/Recorrido*.dc.html` y `docs/diseno/canvas/ProductoTerminado*.dc.html`
-  (buscado «evidencia», «foto», «Envasado»: nada). La pieza `StepEvidence` y su modo de solo
-  lectura sí tienen tablero (`EvidenciaPaso*.dc.html`), pero dónde y cómo entra en cada pantalla
-  es UI visible nueva, así que no aplica la excepción de `docs/perfil-agentes.md > Pase de diseño
-  para componentes nuevos`. El spec no se escribe hasta que el humano apruebe el tablero y se copie
-  a `docs/diseno/canvas/`. El pase tiene que fijar, en escritorio, tablet y teléfono:
-  1. **Recorrido, fabricación.** Junto a qué anotación van las fotos de «Paso N» cuando ese paso
-     sale varias veces en la línea de tiempo (avanzar, volver atrás y volver a avanzar): ¿en la
-     primera, en la última o en un solo bloque por paso fuera de las anotaciones? Y dónde van las
-     fotos de un paso que no tiene ninguna anotación con ese número (la decisión «nunca se esconde
-     evidencia» obliga a mostrarlas).
-  2. **Recorrido, envasado.** Dónde va el bloque «Envasado» (antes o después de «Anotaciones») y
-     cómo se rotula cada paso dentro de él.
-  3. **Ficha, pestaña Lotes.** Cómo se abren las fotos de un lote dentro de la tabla paginada:
-     fila desplegable, panel o diálogo por lote, o una pestaña nueva. Y qué ve el Administrador en
-     un lote con pedido de origen pero sin fotos (la decisión «sin hueco» dice que no se muestra
-     nada).
-  4. **Textos del modo solo lectura.** `StepEvidence` en `readOnly` dice «Fijada al terminar». Si
-     ese texto vale para un pedido cancelado o dado de baja, o si hace falta otro para la
-     consulta.
-  5. **Estados** cargando, vacío y error de las fotos en las dos pantallas.
+Ninguna. P1 (falta el pase `/design`) se cerró el 2026-10-14: tableros aprobados por el humano y copiados a `docs/diseno/canvas/` (ver `## Decisiones cerradas`).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -68,3 +46,9 @@ _Pendiente: los escribe spec_author (F1.2)._
 | 2026-10-14 | Estados de la vista | Vacío, cargando y error como en QC-35/QC-102/QC-174. Un pedido o paso sin fotos no muestra hueco. |
 | 2026-10-14 | ¿Hace falta E2E? | Sí, porque toca permisos (`docs/checkpoints-proyecto.md`): el Administrador ve las fotos en el recorrido y en la ficha; el Operador abre la ficha y no ve fotos. Más el test de rechazo entre empresas. |
 | 2026-10-14 | Identificadores | En inglés (heredado de QC-82, QC-214). |
+| 2026-10-14 | Pase `/design` (P1) | Aprobado. Tableros: `docs/diseno/canvas/RecorridoEvidencia.dc.html` (+`Tablet`, +`Movil`) y `docs/diseno/canvas/ProductoTerminadoEvidencia.dc.html` (+`Tablet`, +`Movil`). Canvas vivo: https://claude.ai/artifact/9idfocrGmuPeDeGWbRJaUZ. |
+| 2026-10-14 | Recorrido, fabricación: ¿junto a qué anotación van las fotos de un paso repetido? | Bajo la ÚLTIMA anotación con ese número de paso. Las fotos de un paso sin ninguna anotación con su número van en un bloque «Otros pasos con fotos» al final, rotuladas «Paso N». |
+| 2026-10-14 | Recorrido, envasado | Tarjeta «Envasado» después de las anotaciones, una fila por paso «Paso N · <nombre>» (el nombre solo si se conoce). Sin fotos de envasado, la tarjeta no aparece. |
+| 2026-10-14 | Ficha, pestaña Lotes | Columna «Evidencia» al final, solo para quien tiene `pedidos.consultar`: botón con cámara y conteo total (fabricación + envasado, «6 fotos»); «—» en lotes sin fotos o sin pedido. Abre un diálogo «Evidencia · Lote <n> · Pedido <n>» con grupos Fabricación y Envasado (un grupo vacío no se pinta); en teléfono ocupa la pantalla. Sin el permiso, la columna no se pinta. La tabla en teléfono sigue con desplazamiento horizontal (QC-225). |
+| 2026-10-14 | Texto «Fijada al terminar» de `StepEvidence` | No se muestra en consulta. Un pedido cancelado o dado de baja se reconoce por el badge de estado que ya tiene la pantalla. |
+| 2026-10-14 | Estados de las fotos | Cargando: miniaturas esqueleto. Error de lectura: aviso en línea «No se pudieron cargar las fotos.» con «Reintentar». URL firmada vencida: la miniatura muestra «Vista vencida · Recargar». Sin fotos: no se pinta nada. El visor ampliado es el de `EvidenciaPaso` (sin animación nueva ni librería nueva). |
