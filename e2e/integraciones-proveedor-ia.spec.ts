@@ -1,16 +1,17 @@
 /**
- * E2E del proveedor IA de una empresa en `/integraciones/proveedor-ia` y del aviso de bloqueo que
- * sustituye a «Subir PDFs» en «Fórmulas» mientras la empresa no tiene conexion.
+ * E2E del proveedor IA de una empresa en `/integraciones/proveedor-ia` y del bloqueo de «Subir PDFs»
+ * en «Fórmulas» mientras la empresa no tiene conexion: boton deshabilitado con un globo que enlaza
+ * a la pantalla.
  *
  * Que aporta sobre unit e integracion:
  * - **El corte del flujo de subida con la base real**: sin fila en `ai_provider_connections` la
- *   pagina de «Fórmulas» pinta el aviso y no el boton; con fila, el boton vuelve.
+ *   pagina de «Fórmulas» pinta el boton deshabilitado con el globo; con fila, el boton se habilita.
  * - **El doble de la prueba cableado por la variable de `playwright.config.ts`**: una key con el
  *   prefijo marcado la rechaza; cualquier otra la acepta, sin red.
  * - **Que la key no vuelve**: tras guardar y recargar no esta ni en la pagina ni en el HTML servido,
  *   y la columna cifrada no la contiene.
  * - **Los permisos reales**: el Administrador del seed configura; un rol que sube PDF pero no tiene
- *   `integraciones.modificar` ve el aviso sin enlace y recibe 404 en la pantalla.
+ *   `integraciones.modificar` ve el mismo enlace y recibe 404 en la pantalla.
  * - Corre en Chromium y en WebKit (proyectos de `playwright.config.ts`).
  *
  * DATOS: la EMPRESA de cada worker, sus USUARIOS y el ROL sin permiso de integraciones son efimeros,
@@ -67,9 +68,9 @@ const TESTIDS = {
   disconnectConfirm: 'ai-provider-disconnect-confirm',
   recipesTitle: 'recipes-title',
   uploadOpen: 'document-upload-open',
-  notice: 'ai-provider-required-notice',
-  noticeLink: 'ai-provider-required-notice-link',
-  noticeAsk: 'ai-provider-required-notice-ask',
+  lockedTrigger: 'ai-provider-required-tooltip-trigger',
+  lockedTooltip: 'ai-provider-required-tooltip',
+  lockedLink: 'ai-provider-required-tooltip-link',
 } as const;
 
 /** Textos del tablero que el recorrido afirma (`design.md > 12.3` y `> 12.6`). */
@@ -79,8 +80,8 @@ const TEXTS = {
   testOk: 'Conexión correcta',
   saved: 'Proveedor IA conectado',
   disconnected: 'Proveedor IA desconectado',
-  goToProvider: 'Ir a Proveedor IA',
-  askAdmin: 'Pídele a un administrador que lo configure',
+  lockedMessage: 'Para leer PDF, conecta el proveedor IA de tu empresa',
+  enrollProvider: 'Inscribir proveedor',
 } as const;
 
 const REJECTED_KEY_MESSAGE = probeFailureMessage({
@@ -205,7 +206,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('el proveedor IA de la empresa', () => {
-  test('R37, R30, R13, R16, R34, R17, R31, R8, R33, R20: aviso en Fórmulas, key rechazada sin guardar, prueba y alta con el doble, la key fuera del HTML y desconectar', async ({
+  test('R37, R30, R13, R16, R34, R17, R31, R8, R33, R20: «Subir PDFs» bloqueado en Fórmulas, key rechazada sin guardar, prueba y alta con el doble, la key fuera del HTML y desconectar', async ({
     page,
   }) => {
     if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -219,18 +220,18 @@ test.describe('el proveedor IA de la empresa', () => {
     const keyField = page.getByTestId(TESTIDS.keyField);
     const formResult = page.getByTestId(TESTIDS.formResult);
 
-    await test.step('R37: sin conexion, Fórmulas pinta el aviso con «Ir a Proveedor IA» y no «Subir PDFs»', async () => {
+    await test.step('R37: sin conexion, Fórmulas pinta «Subir PDFs» deshabilitado con el globo «Inscribir proveedor»', async () => {
       await page.goto(FORMULAS_ROUTE);
       await expect(page.getByTestId(TESTIDS.recipesTitle)).toBeVisible({ timeout: 60_000 });
 
-      await expect(page.getByTestId(TESTIDS.notice)).toBeVisible();
-      await expect(page.getByTestId(TESTIDS.noticeLink)).toHaveText(TEXTS.goToProvider);
-      await expect(page.getByTestId(TESTIDS.noticeAsk)).toHaveCount(0);
-      await expect(page.getByTestId(TESTIDS.uploadOpen)).toHaveCount(0);
+      await expect(page.getByTestId(TESTIDS.uploadOpen)).toBeDisabled();
+      await page.getByTestId(TESTIDS.lockedTrigger).hover();
+      await expect(page.getByTestId(TESTIDS.lockedTooltip)).toContainText(TEXTS.lockedMessage);
+      await expect(page.getByTestId(TESTIDS.lockedLink)).toHaveText(TEXTS.enrollProvider);
     });
 
     await test.step('R30: el enlace lleva a la pantalla, «Sin configurar» y los cuatro proveedores', async () => {
-      await page.getByTestId(TESTIDS.noticeLink).click();
+      await page.getByTestId(TESTIDS.lockedLink).click();
       await page.waitForURL((url) => url.pathname === AI_PROVIDER_INTEGRATION_ROUTE, { timeout: 60_000 });
 
       await expect(form).toBeVisible({ timeout: 60_000 });
@@ -317,11 +318,11 @@ test.describe('el proveedor IA de la empresa', () => {
       expect((await page.content()).includes(VALID_KEY)).toBe(false);
     });
 
-    await test.step('R37: con conexion, Fórmulas vuelve a pintar «Subir PDFs» y no el aviso', async () => {
+    await test.step('R37: con conexion, Fórmulas pinta «Subir PDFs» habilitado y sin globo', async () => {
       await page.goto(FORMULAS_ROUTE);
       await expect(page.getByTestId(TESTIDS.recipesTitle)).toBeVisible({ timeout: 60_000 });
-      await expect(page.getByTestId(TESTIDS.uploadOpen)).toBeVisible({ timeout: 60_000 });
-      await expect(page.getByTestId(TESTIDS.notice)).toHaveCount(0);
+      await expect(page.getByTestId(TESTIDS.uploadOpen)).toBeEnabled({ timeout: 60_000 });
+      await expect(page.getByTestId(TESTIDS.lockedTrigger)).toHaveCount(0);
     });
 
     await test.step('R33, R20, R34: «Desconectar», tras confirmar, vuelve a «Sin configurar» y borra la fila', async () => {
@@ -343,7 +344,7 @@ test.describe('el proveedor IA de la empresa', () => {
     });
   });
 
-  test('R37, R3: quien sube PDF sin `integraciones.modificar` ve el aviso sin enlace y la pantalla le responde 404', async ({
+  test('R37, R3: quien sube PDF sin `integraciones.modificar` ve el enlace «Inscribir proveedor» igual y la pantalla le responde 404', async ({
     page,
   }) => {
     if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -354,10 +355,10 @@ test.describe('el proveedor IA de la empresa', () => {
 
     await page.goto(FORMULAS_ROUTE);
     await expect(page.getByTestId(TESTIDS.recipesTitle)).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId(TESTIDS.notice)).toBeVisible();
-    await expect(page.getByTestId(TESTIDS.noticeAsk)).toHaveText(TEXTS.askAdmin);
-    await expect(page.getByTestId(TESTIDS.noticeLink)).toHaveCount(0);
-    await expect(page.getByTestId(TESTIDS.uploadOpen)).toHaveCount(0);
+    await expect(page.getByTestId(TESTIDS.uploadOpen)).toBeDisabled();
+    await page.getByTestId(TESTIDS.lockedTrigger).focus();
+    await expect(page.getByTestId(TESTIDS.lockedTooltip)).toContainText(TEXTS.lockedMessage);
+    await expect(page.getByTestId(TESTIDS.lockedLink)).toHaveAttribute('href', AI_PROVIDER_INTEGRATION_ROUTE);
 
     const response = await page.goto(AI_PROVIDER_INTEGRATION_ROUTE);
     expect(response?.status(), 'sin el permiso la pantalla responde 404').toBe(404);
