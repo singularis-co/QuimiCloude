@@ -107,3 +107,101 @@ Veredicto: T1, T2, T3, T7 hechas; la guardia R9 de errores queda roja hasta T8.
 - `vitest run tests/unit/integraciones`: 35 archivos, 578 verdes.
 
 Veredicto: T4, T5 y T6 hechas y en verde; solo sigue rojo R9 de errores, que se cierra en T8.
+
+## Tanda 3 — T8, T9 (2026-10-13)
+
+### `[POR VERIFICAR]` 3–5 de `design.md > 19`, cerrados contra los paquetes instalados
+Versiones: `openai@7.32.0`, `@anthropic-ai/sdk@0.131.0`, `@google/genai@2.23.0`. Lo que el paquete
+no puede decir (comportamiento del servidor de OpenRouter/Gemini) se contrastó con su documentación
+oficial (descargada el 2026-10-13) y se marca como tal.
+- **3a. Parte PDF de Chat Completions** — `openai/resources/chat/completions/completions.d.ts:990-1023`:
+  `ChatCompletionContentPart.File = { type: 'file'; file: { file_data?, file_id?, filename? } }`;
+  imagen `{ type: 'image_url'; image_url: { url } }` (l. 1041-1065). El `.d.ts` dice solo «base64
+  encoded file data»; el prefijo `data:application/pdf;base64,` sale de la doc de OpenAI
+  (developers.openai.com/api/docs/guides/file-inputs: «Chat Completions accepts only PDF files as
+  `file` content parts», ejemplo con `file_data: "data:application/pdf;base64,..."`).
+- **3b. OpenRouter acepta la misma forma** — doc oficial openrouter.ai/docs/features/multimodal/pdfs:
+  `{ type: 'file', file: { filename, file_data: 'data:application/pdf;base64,…' } }`. **No sale del paquete.**
+- **3c. Campo de tokens** — `completions.d.ts:1790` `max_completion_tokens`; `:1801` `max_tokens` es
+  `@deprecated`. OpenRouter acepta los dos con la misma semántica (openrouter.ai/docs/api-reference/parameters).
+  Se usa `max_completion_tokens: 16000` (el mismo tope que Claude).
+- **4a. `client.get('/key')`** — `openai/client.d.ts:272` `get<Rsp>(path, opts?)` es público; la URL se
+  arma en `client.js` `buildURL` (base `…/api/v1` + `/key`, sin doble barra). La ruta `GET /api/v1/key`
+  sale de openrouter.ai/docs/api-reference/limits; `curl` sin key a `https://openrouter.ai/api/v1/key`
+  responde 401 y a `/api/v1/models` 200 (listado público, confirma que no valida la key).
+- **4b. `baseURL`** — `client.d.ts:85` `baseURL?`; `https://openrouter.ai/api/v1` según la quickstart de
+  OpenRouter. El listado sin `offset`/`limit` viene entero (doc de `GET /models`); `models.list()`
+  devuelve `Page` con `data` (`core/pagination.d.ts:46-47`).
+- **5a. Gemini 400 `API_KEY_INVALID`** — paquete: `ApiError { status }` (`genai.d.ts:544`) y
+  `throwErrorIfNotOK` (`dist/node/index.mjs:14076-14104`) copia el cuerpo JSON entero en `message`,
+  así que el motivo, si viene, está en `error.message`. **Que el servidor lo mande en un 400 NO está
+  verificado**: la doc actual (ai.google.dev/gemini-api/docs/api-errors) da 401 `authentication` para
+  key inválida (401 ya es `rejected_key`). La regla del design se implementa tal cual (no estorba).
+- **5b. OpenRouter 402** — doc de limits: 402 Payment Required por saldo negativo o límite de crédito
+  de la key ⇒ `quota`. **No sale del paquete.**
+- Otros: Gemini sin `retryOptions` no reintenta (`index.mjs:13891`, `if (!retryOptions || …) return
+  response`); `GetModelConfig { httpOptions, abortSignal }` (`genai.d.ts:6941-6951`).
+  OpenAI/Anthropic: `APIConnectionError`, `APIUserAbortError` son `APIError` sin `status`
+  (`core/error.d.ts:19-31`); `models.retrieve(model, options?)` en `openai/resources/models.d.ts:13`.
+
+### Archivos
+- Creados: `lib/modules/documentos/domain/ai-read-use.ts`, `ports/ai-provider-gateway.ts`,
+  `adapters/driven/ai/ai-reader-openai.ts`; tests `run-document-job-ai-provider.test.ts`,
+  `issue-upload-links-ai-provider.test.ts`, `run-document-job-doubles.ts` (helper),
+  `ai-reader-openai-adapter.test.ts`, `ai-model-literals.test.ts`, `openai-sdk-isolation.test.ts`.
+- Modificados: `documentos/domain/{errors,failure-kind,issue-upload-links,run-document-job}.ts`,
+  `documentos/index.ts`, `adapters/driven/ai/{ai-reader-anthropic,ai-reader-genai}.ts`,
+  `lib/composition/index.ts` (ajuste mínimo, abajo).
+- Borrados: `adapters/driven/config/ai-config-env.ts`, `tests/unit/documentos/ai-config.test.ts`
+  (borrado preparado en el índice: los `qc158/qc159-alcance` leen `git ls-files`).
+- Tests adaptados (tensados): `run-document-job`, `run-document-job-log`, `document-job-route`
+  (cadena + proveedor `ACTIVE`; el helper además falla si la cadena no recibe el lector observado),
+  `issue-upload-links`, `authorization` (+ «la conexión no se consulta sin permiso"),
+  `document-upload-actions`, `failure-kind` (5 códigos; `ai_unavailable` único reintentable),
+  `module-contract` (+2 runtime, +2 tipos; clases nuevas con su `code` y `failure`),
+  `qc111-alcance` R22 (lista exacta 5 → 7 clases), `ai-reader-anthropic-adapter`, `ai-reader-adapter`,
+  `integraciones/module-shape` R19 (+7 archivos de documentos y un caso nuevo: solo por contrato).
+- Sin tocar y verdes: `read-pdf-with-ai`, `process-pdf-by-strategy`, `crop-catalog-images`, `ai-reader-canned`.
+
+### R → test (de esta tanda)
+- R9 (al leer) → `run-document-job-ai-provider.test.ts` («key ilegible … ai_provider_error»)
+- R10 → `ai-reader-{anthropic-adapter,adapter,openai-adapter}.test.ts` («la prueba de la conexión»)
+- R11 → los tres adaptadores («la clasificación de un fallo» y probes)
+- R21 → `run-document-job-ai-provider.test.ts` (uso por estrategia, mismo lector en el recorte)
+- R22 → `ai-model-literals.test.ts` (variables en `lib/`+`app/`), los tres adaptadores (sin `process.env`,
+  key por lector), `ai-reader-adapter` (aislamiento de `@google/genai`)
+- R23 → `issue-upload-links-ai-provider.test.ts`
+- R24, R25, R26, R27, R28 → `run-document-job-ai-provider.test.ts`; R24/R25/R26 también
+  `failure-kind.test.ts`; R25/R26 (lanzar o no `AiProviderError`) en los tres adaptadores
+- R29 → `ai-reader-openai-adapter.test.ts`, `openai-sdk-isolation.test.ts`
+- R43 → `ai-model-literals.test.ts` (barrido de `lib/` + sensibilidad)
+
+### Desviaciones del design
+- **Contrato y puerto**: `AiProviderGateway`/`AiReaderLookup` viven en `ports/` pero el barril solo
+  reexporta de `./domain` (`module-contract` (b)); se reexportan desde `domain/run-document-job.ts`.
+  `DocumentPipeline` (tipo de `pipelineFor`) se exporta del dominio pero no por el barril.
+- **402 ⇒ `quota` también en Gemini** (doc oficial de errores de Gemini: `payment_required`, prepago
+  agotado) y en el clasificador único de OpenAI/OpenRouter (OpenAI no documenta 402; la tabla del
+  design lo daba solo para OpenRouter y el lector comparte función). Anthropic 402 ⇒ `unexpected`.
+- **Gemini: todo lo que no es `ApiError` ⇒ `unreachable`** (la librería convierte toda respuesta de
+  error en `ApiError` y deja pasar tal cual los fallos de `fetch`).
+- Los probes deduplican modelos (receta = catálogo ⇒ una sola consulta).
+- En OpenRouter, si la key falla gana su fallo aunque el listado responda.
+- 403 de OpenRouter también es «presupuesto agotado» (doc de limits); el design lo mapea a
+  `rejected_key` y así queda.
+- **Composición (ajuste mínimo para compilar, T10 lo reemplaza)**: `aiReader` global ya no usa
+  Claude: fuera de `DOCUMENTS_E2E_DOUBLES` rechaza; un `aiProviderGateway` provisional dice
+  `missing`/no configurado fuera del doble E2E y `ready` con el lector de guion dentro; `runDocumentJob`
+  recibe `pipelineFor: () => ({ processPdfByStrategy, cropCatalogImages })` (ignora el lector) e
+  `issueUploadLinks` el gateway. `readPdfWithAi`/`processPdfByStrategy` siguen en la fachada (su
+  retirada y `documentos-facade.test.ts` son de T10). **Hasta T10, fuera de E2E ninguna empresa lee PDF.**
+
+### Verificación
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest related --run` (11 de `lib/` + 20 tests tocados): 380 archivos, 6068 verdes,
+  6 omitidos, 0 rojos (727 s).
+- `pnpm exec vitest run guard`: 75 archivos, 1048 verdes, 20 omitidos, **0 rojos**:
+  `guard-catalogo-de-errores` R9 queda verde con `AiProviderMissingError` y `AiProviderError`.
+
+Veredicto: T8 y T9 hechas y en verde; la composición queda con un gateway provisional hasta T10.

@@ -60,7 +60,7 @@
 
 ## Bloque 3 — `documentos`
 
-- [ ] **T8. Dominio de documentos.** `errors.ts` (+2 clases), `ai-read-use.ts`, `failure-kind.ts`
+- [x] **T8. Dominio de documentos.** `errors.ts` (+2 clases), `ai-read-use.ts`, `failure-kind.ts`
   (+2 códigos definitivos), `ports/ai-provider-gateway.ts`, `issue-upload-links.ts` (paso de
   conexión), `run-document-job.ts` (`pipelineFor`, lookup, observador, informe); contrato en
   `index.ts`. Adaptar los tests existentes de `design.md > 15.3` (run-document-job, issue-upload-links,
@@ -69,7 +69,7 @@
   `issue-upload-links-ai-provider.test.ts` y los adaptados verdes; los tests de `read-pdf-with-ai`,
   `process-pdf-by-strategy`, `crop-catalog-images` y `ai-reader-canned` **sin tocar** y verdes.
   *Cubre:* R21, R23–R28.
-- [ ] **T9. Adaptadores de SDK.** Reescribir `ai-reader-anthropic.ts` y `ai-reader-genai.ts` (config
+- [x] **T9. Adaptadores de SDK.** Reescribir `ai-reader-anthropic.ts` y `ai-reader-genai.ts` (config
   por parámetro, `probeX`, `classifyXError`); crear `ai-reader-openai.ts` (OpenAI y OpenRouter).
   **Primero** cerrar contra los paquetes instalados los `[POR VERIFICAR]` 3–5 de `design.md > 19`
   y anotarlos en `progress/impl_QC-275.md`. Borrar `config/ai-config-env.ts` y

@@ -478,10 +478,10 @@ import {
   createProcessPdfByStrategy,
   createReadPdfWithAi,
   createRunDocumentJob,
+  type AiProviderGateway,
   type CatalogImportDeps,
   type FormulaImportDeps,
 } from '@/lib/modules/documentos';
-import { readWithAnthropic } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic';
 import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
 import { documentsE2EDoublesEnabled } from '@/lib/modules/documentos/adapters/driven/config/e2e-doubles-env';
 import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
@@ -1991,16 +1991,24 @@ const pdfConverter: PdfConverter = {
 };
 
 /**
- * `AiReader` cableado con el adaptador de Claude; el de Gemini se conserva sin cablear como
- * futuro respaldo. La clave del objeto es la del PUERTO
- * (`read`) y el valor, la funcion del adaptador (`readWithAnthropic`) —se llaman distinto a
- * proposito, igual que `documentStorage` y `pdfConverter` arriba—. Aqui no se invoca nada,
- * solo se referencia, asi que construir esta fachada no lee ninguna variable de entorno ni
- * toca la red: la suite entera arranca sin claves de IA.
+ * Provisional mientras el proveedor IA de cada empresa no esta cableado: ya no hay key global, asi
+ * que fuera de los dobles E2E no hay lector y ninguna empresa cuenta como conectada.
  */
 const aiReader: AiReader = {
   read: (request) =>
-    documentsE2EDoublesEnabled() ? readCannedText(request) : readWithAnthropic(request),
+    documentsE2EDoublesEnabled()
+      ? readCannedText(request)
+      : Promise.reject(new Error('lectura con IA sin proveedor cableado')),
+};
+
+const aiProviderGateway: AiProviderGateway = {
+  isConfigured: async () => documentsE2EDoublesEnabled(),
+  readerFor: async () =>
+    documentsE2EDoublesEnabled()
+      ? { status: 'ready', reader: aiReader, connectionStatus: 'ACTIVE' }
+      : { status: 'missing' },
+  reportAccountFailure: async () => {},
+  reportRecovered: async () => {},
 };
 
 /**
@@ -2089,8 +2097,8 @@ const documentJobLog: DocumentJobLog = forModule('documentos');
 const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
-  processPdfByStrategy,
-  cropCatalogImages,
+  aiProvider: aiProviderGateway,
+  pipelineFor: () => ({ processPdfByStrategy, cropCatalogImages }),
   log: documentJobLog,
 });
 
@@ -2187,6 +2195,7 @@ const confirmFormulaImport = createConfirmFormulaImport(formulaImportDeps);
 export const documentos = {
   issueUploadLinks: createIssueUploadLinks({
     storage: documentStorage,
+    aiProvider: aiProviderGateway,
     now: () => new Date(),
   }),
   convertPdfs: createConvertPdfs({ converter: pdfConverter }),

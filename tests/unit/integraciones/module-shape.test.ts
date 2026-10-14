@@ -460,9 +460,16 @@ describe('la forma del modulo integraciones', () => {
     expect(hallazgos.join('\n')).toContain('node:crypto')
   })
 
-  it('R19: fuera del modulo solo lo importan lib/composition/index.ts y, por ruta exacta, la pantalla de WhatsApp y sus componentes', () => {
+  it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes', () => {
     expect(filesImportingTheModule()).toEqual([
       'lib/composition/index.ts',
+      'lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic.ts',
+      'lib/modules/documentos/adapters/driven/ai/ai-reader-genai.ts',
+      'lib/modules/documentos/adapters/driven/ai/ai-reader-openai.ts',
+      'lib/modules/documentos/domain/ai-read-use.ts',
+      'lib/modules/documentos/domain/errors.ts',
+      'lib/modules/documentos/domain/run-document-job.ts',
+      'lib/modules/documentos/ports/ai-provider-gateway.ts',
       'app/(private)/integraciones/whatsapp/components/whatsapp-connection-actions.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-connection-card.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-connection-form.tsx',
@@ -470,6 +477,16 @@ describe('la forma del modulo integraciones', () => {
       'app/(private)/integraciones/whatsapp/components/whatsapp-webhook-panel.tsx',
       'app/(private)/integraciones/whatsapp/page.tsx',
     ])
+  })
+
+  it('R19: documentos importa integraciones SOLO por su contrato, nunca por una ruta profunda', () => {
+    const desdeDocumentos = filesImportingTheModule().filter((file) => file.startsWith('lib/modules/documentos/'))
+    expect(desdeDocumentos.length).toBeGreaterThan(0)
+    for (const file of desdeDocumentos) {
+      const abs = join(repoRoot, file)
+      const specs = importSpecifiers(readFileSync(abs, 'utf8')).filter((spec) => resolvesIntoTheModule(abs, spec))
+      expect(specs.every((spec) => spec === '@/lib/modules/integraciones'), `${file}: ${specs.join(', ')}`).toBe(true)
+    }
   })
 
   it('R12: el detector reconoce un import por contrato, uno profundo y uno relativo, y no uno ajeno', () => {
