@@ -164,6 +164,18 @@ describe('listFinishedProductBatches', () => {
     expect(pagina.items[0]).toMatchObject({ id: LITER_BATCH_ID, orderNumberText: null });
   });
 
+  it('R16: cada fila devuelve el orderId de su pedido, o null en un lote sin pedido', async () => {
+    const m = montar();
+
+    const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+    expect(pagina.items.map((item) => [item.id, item.orderId])).toEqual([
+      [LITER_BATCH_ID, FINISHED_ORDER_ID],
+      [UNPACKAGED_BATCH_ID, null],
+      [EMPTY_BATCH_ID, FINISHED_ORDER_ID],
+    ]);
+  });
+
   it('R23: una pagina o un tamano que no son enteros >= 1, o un campo de mas, responden invalid_input', async () => {
     for (const entrada of [{ page: 0 }, { page: 1.5 }, { pageSize: 0 }, { page: '1' }, { page: 1, extra: true }, null]) {
       const m = montar();

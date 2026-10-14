@@ -75,6 +75,36 @@ describe('evidenceStorageMemory (R30, R33)', () => {
   });
 });
 
+describe('evidenceStorageMemory.createSignedReadUrls (QC-271 R10)', () => {
+  it('R10: firma varias rutas en el orden pedido, con su plazo', async () => {
+    const paths = [newPath(), newPath(), newPath()];
+    for (const path of paths) await evidenceStorageMemory.createSignedUpload(path);
+
+    const urls = await evidenceStorageMemory.createSignedReadUrls(
+      [paths[2]!, paths[0]!, paths[1]!],
+      EVIDENCE_READ_LINK_TTL_SECONDS,
+    );
+
+    expect(urls).toEqual(
+      [paths[2]!, paths[0]!, paths[1]!].map((path) => `${ORIGIN}/read/${path}?expiresIn=900`),
+    );
+  });
+
+  it('R10: con la lista vacia devuelve una lista vacia', async () => {
+    await expect(evidenceStorageMemory.createSignedReadUrls([], EVIDENCE_READ_LINK_TTL_SECONDS)).resolves.toEqual([]);
+  });
+
+  it('R11: rechaza el lote entero si una de las rutas no la firmo', async () => {
+    const signed = newPath();
+    const unknown = newPath();
+    await evidenceStorageMemory.createSignedUpload(signed);
+
+    await expect(
+      evidenceStorageMemory.createSignedReadUrls([signed, unknown], EVIDENCE_READ_LINK_TTL_SECONDS),
+    ).rejects.toThrow(unknown);
+  });
+});
+
 describe('evidenceE2EDoublesEnabled', () => {
   it('ausente, vacia o solo espacios: el bucket real', () => {
     vi.stubEnv('EVIDENCE_E2E_DOUBLES', undefined);

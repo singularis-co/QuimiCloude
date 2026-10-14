@@ -16,12 +16,15 @@ import {
   type OrderEvidence,
   type OrderEvidenceCount,
 } from '@/lib/modules/asignaciones';
+import { forModule } from '@/lib/shared/observability/logger';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 const toErrorState = createErrorStateTranslator(
   AsignacionesError,
   observabilidad.readRequestIdHeader,
 );
+
+const log = forModule('asignaciones');
 
 /** El actor, de las dos caras de la sesion, compartiendo una sola lectura por peticion. */
 async function currentActor(): Promise<Actor | null> {
@@ -43,7 +46,9 @@ export async function getOrderEvidenceAction(orderId: string): Promise<OrderEvid
   const actor = await currentActor();
 
   try {
-    const { evidence } = await asignaciones.getOrderEvidence(actor, { orderId });
+    const { evidence, signingFailure } = await asignaciones.getOrderEvidence(actor, { orderId });
+    // La firma caida no es un error de la lectura: los grupos salen sin fotos y la causa, al log.
+    if (signingFailure !== null) log.warn('evidence_read_signing_failed', { orderId, message: signingFailure });
     return { status: 'success', data: evidence };
   } catch (error) {
     return toErrorState(error);

@@ -68,7 +68,7 @@ Archivos:
 
 ## Bloque B — backend (`backend_dev`)
 
-### B1 [P] — Adaptadores driven (depende de T0)
+### [x] B1 [P] — Adaptadores driven (depende de T0)
 
 - `step-evidence-prisma.ts`: `countByOrders` con `groupBy` filtrado por `companyId`. Con la lista
   vacía no consulta.
@@ -88,7 +88,7 @@ Archivos:
 
 **Hecho cuando:** los tres tests están en verde y `guard-dobles-e2e` está en verde.
 
-### B2 [P] — Casos de uso y actions (depende de T0; trabaja con dobles de puerto)
+### [x] B2 [P] — Casos de uso y actions (depende de T0; trabaja con dobles de puerto)
 
 - `read-order-evidence.ts` (cuerpo real, `design.md > 2.2`).
 - `get-execution-evidence.ts`, `get-order-evidence.ts` y `count-order-evidence.ts` (cuerpos reales,

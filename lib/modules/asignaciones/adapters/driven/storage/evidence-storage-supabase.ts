@@ -53,7 +53,21 @@ async function createSignedReadUrls(
   paths: readonly string[],
   expiresInSeconds: number,
 ): Promise<readonly string[]> {
-  throw new Error(`not implemented: createSignedReadUrls (${String(paths.length)} rutas, ${String(expiresInSeconds)} s)`);
+  if (paths.length === 0) return [];
+  const { data, error } = await bucketApi().createSignedUrls([...paths], expiresInSeconds);
+  if (error) {
+    throw new Error(`fallo al firmar la lectura de ${String(paths.length)} fotos de evidencia: ${error.message}`);
+  }
+  // Ni el tipo ni el cliente garantizan el orden de la respuesta: se empareja por ruta.
+  const byPath = new Map(data.map((item) => [item.path, item]));
+  return paths.map((path) => {
+    const item = byPath.get(path);
+    if (item === undefined || item.error !== null || item.signedUrl === null) {
+      const reason = item === undefined ? 'sin respuesta' : (item.error ?? 'sin URL');
+      throw new Error(`fallo al firmar la lectura de la foto de evidencia en la ruta ${path}: ${reason}`);
+    }
+    return item.signedUrl;
+  });
 }
 
 async function download(path: string): Promise<Uint8Array | null> {

@@ -179,7 +179,13 @@ export function createStepEvidenceRepository(db: PrismaClient = prisma): StepEvi
     },
 
     async countByOrders(companyId, orderIds) {
-      throw new Error(`not implemented: countByOrders (${companyId}, ${String(orderIds.length)} pedidos)`);
+      if (orderIds.length === 0) return new Map();
+      const groups = await db.orderStepEvidence.groupBy({
+        by: ['orderId'],
+        where: { companyId, orderId: { in: [...orderIds] } },
+        _count: { _all: true },
+      });
+      return new Map(groups.map((group) => [group.orderId, group._count._all]));
     },
   };
 }
