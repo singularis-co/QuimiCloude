@@ -223,6 +223,8 @@ Añadidos por el leader el 2026-10-13 (censo de T0a):
 - `tests/unit/shared-ui/confirm-dialog-montado.test.tsx`
 - `tests/unit/pedidos-ui/order-list-section-produced.test.tsx`
 - `tests/unit/pedidos-ui/order-list-skeleton.test.tsx`
+- `tests/unit/pedidos/scope.test.ts` (R57: alta de `e2e/pedidos-rediseno.spec.ts`)
+- `tests/unit/clientes/scope.test.ts` (R28: alta en `E2E_PERMITIDOS` con su nota)
 
 Estado:
 
