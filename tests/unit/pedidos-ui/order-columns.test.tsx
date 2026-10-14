@@ -407,7 +407,7 @@ describe('R20: la columna Presentación pinta el reparto o Sin presentación', (
     expect(container.textContent).toBe('2 × Bidón 20L');
   });
 
-  it('QC-170 R26: con varias lineas pinta la primera y «+N»', () => {
+  it('QC-170 R26: con varias lineas pinta todas separadas por coma', () => {
     const { container } = pintarCelda(
       PRESENTATION_NAME_COLUMN_ID,
       pedido({
@@ -418,7 +418,7 @@ describe('R20: la columna Presentación pinta el reparto o Sin presentación', (
       }),
     );
 
-    expect(container.textContent).toBe('5 × Botella 200 ml +1');
+    expect(container.textContent).toBe('5 × Botella 200 ml, 1 × Bidón 20L');
   });
 
   it('QC-170 R27: sin reparto se pinta «Sin presentación»', () => {
