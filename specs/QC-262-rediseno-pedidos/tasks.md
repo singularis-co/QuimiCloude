@@ -20,7 +20,7 @@ P1–P12 de `requirements.md` (o acepta los valores por defecto).
   Marcar los localizadores de página entera que con tarjetas encuentran dos elementos.
   *Hecho:* `progress/impl_QC-262.md` tiene la tabla «archivo → qué nombra → qué le pasa»; todo archivo
   que salga y no esté en `## Archivos esperados` se añade a esa sección en el mismo commit.
-- [ ] **T0b. Medidas.** Con el servidor de desarrollo, en `/pedidos` a 390 × 844: ancho del filtro de
+- [x] **T0b. Medidas.** Con el servidor de desarrollo, en `/pedidos` a 390 × 844: ancho del filtro de
   cliente con `w-64 max-w-full` (D2), ancho del panel de alta con `max-sm:w-full` (D8) y si algún
   diálogo no cabe. *Hecho:* lo medido queda en el impl; si difiere de `design.md > D2` o `> D8`, se
   anota como desviación antes de la tanda 3.
