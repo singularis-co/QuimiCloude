@@ -10,6 +10,8 @@ import {
   type Page,
   type ProductFormUnits,
   type ProductView,
+  type SupplyConversion,
+  type SupplyHomonym,
 } from '@/lib/modules/inventario';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
@@ -17,7 +19,7 @@ import { runInRequestScope } from '@/lib/shared/request-scope';
 
 export type CreateProductFormState =
   | { status: 'idle' }
-  | { status: 'success'; id: string; lot?: string }
+  | { status: 'success'; id: string; lot?: string; conversion?: SupplyConversion }
   | ErrorState;
 
 export type ProductMutationFormState =
@@ -39,6 +41,10 @@ export type FinishedStockListResult =
 
 export type ProductFormUnitsResult =
   | { status: 'success'; data: ProductFormUnits }
+  | ErrorState;
+
+export type SupplyHomonymsResult =
+  | { status: 'success'; data: readonly SupplyHomonym[] }
   | ErrorState;
 
 // Sin constante `INITIAL_STATE`: un archivo con `'use server'` solo puede exportar funciones async.
@@ -190,8 +196,8 @@ export async function createProductAction(
   const actor = await currentActor();
 
   try {
-    const { id, lot } = await inventario.createProduct(candidate, actor);
-    return { status: 'success', id, lot };
+    const { id, lot, conversion } = await inventario.createProduct(candidate, actor);
+    return conversion === undefined ? { status: 'success', id, lot } : { status: 'success', id, lot, conversion };
   } catch (error) {
     return toErrorState(error);
   }
@@ -280,6 +286,18 @@ export async function listProductFormUnitsAction(): Promise<ProductFormUnitsResu
 
   try {
     const data = await inventario.listProductFormUnits(actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** `name` llega `unknown`: lo valida el caso de uso. */
+export async function findSupplyHomonymsAction(name: unknown): Promise<SupplyHomonymsResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await inventario.findSupplyHomonyms(name, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

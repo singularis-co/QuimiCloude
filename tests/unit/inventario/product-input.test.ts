@@ -170,7 +170,7 @@ describe('createProductSchema', () => {
       softDeleteAlive: vi.fn(),
       listAlive: vi.fn(),
       findAliveIdByNameInPresentationUnit: vi.fn(),
-      findAliveIdByNameInUnit: vi.fn(),
+      findAliveSupplyHomonyms: vi.fn(),
       findAlivePackagingByName: vi.fn(),
       createWithFirstBatch: vi.fn(),
       addBatchToAlive: vi.fn(),
@@ -196,7 +196,7 @@ describe('createProductSchema', () => {
     expect((error as ValidationError).code).toBe('invalid_input');
     expect(products.create).not.toHaveBeenCalled();
     expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
-    expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
+    expect(products.findAliveSupplyHomonyms).not.toHaveBeenCalled();
     expect(products.createWithFirstBatch).not.toHaveBeenCalled();
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
   });
@@ -232,7 +232,7 @@ describe('createProductSchema', () => {
 
   it('R6 el caso de uso rechaza con invalid_input el alta de insumo con presentationId sin consultar ni escribir', async () => {
     const products = {
-      findAliveIdByNameInUnit: vi.fn(),
+      findAliveSupplyHomonyms: vi.fn(),
       findAliveIdByNameInPresentationUnit: vi.fn(),
       createWithFirstBatch: vi.fn(),
       addBatchToAlive: vi.fn(),
@@ -248,7 +248,7 @@ describe('createProductSchema', () => {
     expect(error).toBeInstanceOf(ValidationError);
     expect((error as ValidationError).code).toBe('invalid_input');
     expect(units.findRefs).not.toHaveBeenCalled();
-    expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
+    expect(products.findAliveSupplyHomonyms).not.toHaveBeenCalled();
     expect(products.createWithFirstBatch).not.toHaveBeenCalled();
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
   });

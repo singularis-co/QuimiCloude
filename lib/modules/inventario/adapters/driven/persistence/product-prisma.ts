@@ -44,6 +44,7 @@ import type { Page } from '../../../domain/page';
 import type { NewProductBatch } from '../../../domain/product-batch';
 import type { ProductBatchView } from '../../../domain/product-batch-view';
 import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../../../domain/stock-adjustment';
+import type { SupplyHomonym } from '../../../domain/supply-family';
 import type { NewProduct, PackagingIdentity, ProductView, ProductType } from '../../../domain/product-view';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
 import { PRODUCT_PRESENTATION_UNIT_FILTER, PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
@@ -416,13 +417,30 @@ export async function findAliveIdByNameInPresentationUnit(
   return findAliveIdByNameAndUnitId(name, unitId, scope);
 }
 
-/** La unidad llega ya validada por el caso de uso. Mismo desempate que la de arriba. */
-export async function findAliveIdByNameInUnit(
+/** `stock` es la columna que el alta y el ajuste recalculan como suma de los lotes. */
+export async function findAliveSupplyHomonyms(
   name: string,
-  unitId: string,
   scope: InventoryScope,
-): Promise<{ id: string; type: ProductType } | null> {
-  return findAliveIdByNameAndUnitId(name, unitId, scope);
+): Promise<readonly SupplyHomonym[]> {
+  const rows = await prisma.product.findMany({
+    where: {
+      AND: [
+        productCompanyScope(scope),
+        {
+          nameNormalized: normalizeProductName(name),
+          unitId: { not: null },
+          deletedAt: null,
+        },
+      ],
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: { id: true, name: true, type: true, unitId: true, stock: true },
+  });
+  return rows.flatMap((row) =>
+    row.unitId === null
+      ? []
+      : [{ id: row.id, name: row.name, type: row.type as ProductType, unitId: row.unitId, stock: row.stock.toFixed(4) }],
+  );
 }
 
 async function findAliveIdByNameAndUnitId(

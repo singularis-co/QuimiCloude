@@ -40,7 +40,7 @@
 
 ## Tanda 2 — alta manual en el servidor (depende de la tanda 1)
 
-- [ ] **T4 — Puerto y adaptador `findAliveSupplyHomonyms`; se retira `findAliveIdByNameInUnit`**
+- [x] **T4 — Puerto y adaptador `findAliveSupplyHomonyms`; se retira `findAliveIdByNameInUnit`**
   (`design.md > 4.1`).
   - Se actualizan todos sus dobles y llamantes en tests (lista en «Archivos esperados») y la
     entrada de `tests/integration/aislamiento.json`.
@@ -50,7 +50,7 @@
     - `R12 no devuelve el homónimo de otra empresa`.
 
   *Hecho:* verde; `guard-aislamiento-integracion.test.ts` verde.
-- [ ] **T5 — `createSupply` por familia** (`design.md > 4.2`). Depende de T4.
+- [x] **T5 — `createSupply` por familia** (`design.md > 4.2`). Depende de T4.
   - Devuelve `conversion` cuando convierte.
   - Test `tests/unit/inventario/create-product-familia.test.ts`, casos:
     - `R1 un homónimo de otra familia no cuenta y crea`;
@@ -70,7 +70,7 @@
     para mismas familias (QC-121 R6, QC-199 R10). Entre familias distintas se conservan.
 
   *Hecho:* verde.
-- [ ] **T6 — Consulta de homónimos y action** (`design.md > 4.4`). Depende de T4.
+- [x] **T6 — Consulta de homónimos y action** (`design.md > 4.4`). Depende de T4.
   - `find-supply-homonyms.ts`, `findSupplyHomonymsAction`, `conversion` en el estado de éxito de
     `createProductAction` y cableado en `lib/composition/index.ts`.
   - Test `tests/unit/inventario/find-supply-homonyms.test.ts`, casos:

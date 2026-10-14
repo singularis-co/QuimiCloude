@@ -526,7 +526,7 @@
     },
     {
       "archivo": "inventario/product-unit-without-presentation.int.test.ts",
-      "motivo": "Alta de insumo por unidad: ejercita 'createWithFirstBatch', 'addBatchToAlive', 'findAliveIdByNameInUnit' y 'findBatchesOfAliveProduct' (product-prisma.ts), que usan el cliente Prisma GLOBAL y abren su propia transaccion: una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica su empresa efimera con randomUUID (usuario, rol, tipo de documento, presentacion, receta, productos, lotes y un pedido con su apartado) y la limpia en un 'finally' en orden de FK (apartados -> pedidos -> asientos -> lotes -> productos -> receta -> presentacion -> usuario -> rol -> tipo de documento -> empresa). Las unidades son las de sistema y solo se leen. Se apoya en que la base de la corrida es suya.",
+      "motivo": "Alta de insumo por unidad: ejercita 'createWithFirstBatch', 'addBatchToAlive', 'findAliveSupplyHomonyms' y 'findBatchesOfAliveProduct' (product-prisma.ts), que usan el cliente Prisma GLOBAL y abren su propia transaccion: una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica su empresa efimera con randomUUID (usuario, rol, tipo de documento, presentacion, receta, productos, lotes y un pedido con su apartado) y la limpia en un 'finally' en orden de FK (apartados -> pedidos -> asientos -> lotes -> productos -> receta -> presentacion -> usuario -> rol -> tipo de documento -> empresa). Las unidades son las de sistema y solo se leen. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-05"
     },
     {
@@ -648,6 +648,11 @@
       "archivo": "pedidos/order-delivery-directory.int.test.ts",
       "motivo": "QC-225 B2: el directorio de entregas para la ficha de producto terminado (order-delivery-directory-prisma.ts) lee con el cliente Prisma GLOBAL, que no ve lo que una transaccion abierta no confirmo. 'beforeAll' fabrica dos empresas efimeras con randomUUID (tipo de documento, rol, usuario, cliente, unidad, receta, presentaciones, pedidos, lineas, productos, lotes, entregas, lineas de entrega, anulaciones y sus lineas) y 'afterAll' las borra por 'company_id' en orden de FK (lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> recetas -> presentaciones -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-13"
+    },
+    {
+      "archivo": "inventario/supply-homonyms.int.test.ts",
+      "motivo": "Homonimos del alta de insumo por familia de unidad: ejercita 'findAliveSupplyHomonyms' y 'createWithFirstBatch' (product-prisma.ts) y el alta convertida por 'inventario.createProduct' de lib/composition ('addBatchToAlive' abre su propia transaccion), que usan el cliente Prisma GLOBAL: una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica su empresa efimera con randomUUID (usuario, rol, tipo de documento, productos, lotes y asientos) y la limpia en un 'finally' en orden de FK (asientos -> lotes -> productos -> usuario -> rol -> tipo de documento -> empresa). Las unidades son las de sistema y solo se leen. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-14"
     }
   ]
 }

@@ -71,7 +71,17 @@ export { type ProductBatchView } from './domain/product-batch-view';
 export { type InventoryMovementView, type NewInventoryMovement } from './domain/inventory-movement';
 export { MOVEMENT_REASONS, type MovementReason } from './domain/movement-reason';
 
-export { createCreateProduct, type CreateProductDeps } from './domain/create-product';
+export {
+  createCreateProduct,
+  type CreateProductDeps,
+  type CreateProductResult,
+  type SupplyConversion,
+} from './domain/create-product';
+export {
+  createFindSupplyHomonyms,
+  type FindSupplyHomonyms,
+  type FindSupplyHomonymsDeps,
+} from './domain/find-supply-homonyms';
 export type { StockIncreaseListener } from './domain/stock-increase-listener';
 export {
   createCreateRawMaterial,
