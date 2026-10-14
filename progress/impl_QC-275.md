@@ -370,3 +370,72 @@ Veredicto: T13 hecha y en verde; falta decidir el `components/shared/index.ts` d
   21/21, `ai-provider-card` 19/19.
 
 Veredicto: T12 y T15 hechas y en verde; R35 pendiente de los logos oficiales.
+
+## Tanda 6 — guardia de dobles, fila de documentos (backend_dev, 2026-10-13)
+
+- Modificado (solo añadir, al final): `tests/guards/guard-dobles-e2e.test.ts`.
+- Hallazgo: la fila de `documentos` ya exigía la consulta en el camino por empresa:
+  `aiProviderGateway.readerFor` elige `readCannedText` (doble de la fila) dentro de
+  `documentsE2EDoublesEnabled()`, y el caso genérico de ELECCIÓN lo cubre. No se tocó la fila.
+- Añadido: un caso de SENSIBILIDAD sobre el fuente real de `lib/composition/index.ts`, mutado en
+  memoria: localiza `aiProviderGateway`, afirma que tiene `readCannedText`, `READER_BY_PROVIDER` y la
+  consulta, y que al quitar la consulta `eleccionesSinConsulta` lo marca.
+- R41 → `guard-dobles-e2e.test.ts` («SENSIBILIDAD: el lector por empresa de documentos consulta
+  DOCUMENTS_E2E_DOUBLES…»), además de `ai-provider-wiring.test.ts`.
+- `pnpm run typecheck`: 0 errores. `pnpm run lint`: 0 errores, 7 warnings preexistentes.
+  `pnpm exec vitest run guard`: 75 archivos, 1049 verdes, 20 omitidos, 0 rojos.
+
+Veredicto: la fila de `documentos` cubre el lector por empresa y un caso de sensibilidad lo demuestra.
+
+## Tanda 7 — placeholder de la key y T16 (frontend_dev, 2026-10-13)
+
+### Archivos
+- `components/shared/password-field.tsx`: prop opcional `placeholder` (paso 2 de la regla; sus
+  consumidores no cambian). Fila de `PasswordField` en `components/shared/CATALOGO.md`: alcance y
+  punto de extensión `placeholder`.
+- `app/(private)/integraciones/proveedor-ia/components/ai-provider-form.tsx`: «Pega aquí tu API key».
+- `tests/unit/integraciones-ui/ai-provider-form.test.tsx`: el caso R30 del campo afirma el placeholder.
+- Creado: `e2e/integraciones-proveedor-ia.spec.ts` (`design.md > 15.4`, puntos 1–7 en dos casos).
+- Fila sembrada de `ai_provider_connections` (`ANTHROPIC`, `ACTIVE`, `v1:e2e-sin-descifrar`) en el
+  `beforeAll`, y su borrado antes que usuarios y empresa (también en la limpieza de huérfanos), en
+  `e2e/documentos.spec.ts`, `e2e/formula-desde-pdf.spec.ts`, `e2e/catalogo-desde-pdf.spec.ts`.
+- `e2e/integraciones.spec.ts` (caso Administrador): Proveedor IA muestra el formulario «Conecta tu
+  proveedor» y no `integration-empty`.
+- `tests/guards/guard-identificador-de-request.test.ts`: + `integraciones-proveedor-ia.spec.ts` en
+  `E2E_ESPERADOS` (solo añadir).
+- `specs/.../tasks.md > Archivos esperados`: + `components/shared/password-field.tsx`.
+
+### R → test (E2E)
+- R37 → `integraciones-proveedor-ia.spec.ts` (aviso con enlace sin conexión; botón con conexión;
+  aviso sin enlace con «Pídele…» para un rol con `recetas.consultar` + `documentos.modificar`)
+- R30 → idem (cuatro radios, «Sin configurar», botones deshabilitados) e `integraciones.spec.ts`
+- R16, R13, R17, R31, R8, R33, R20, R34 → caso largo de `integraciones-proveedor-ia.spec.ts`
+- R3 → caso del rol sin `integraciones.modificar` (404)
+- R41 / R23 → los tres E2E de documentos con la fila sembrada
+- R30 (placeholder) → `ai-provider-form.test.tsx`
+
+### Desviaciones y abiertos
+- **`e2e/movimiento.spec.ts` NO se toca** (orden del leader: solo si sube PDF, y no sube). Pero abre
+  y cierra el diálogo de subida de Fórmulas (`document-upload-open`), que sin conexión ya no se pinta
+  (R37): **ese spec se pondrá rojo**. Decide el leader: sembrar allí también la fila (lo que ya lista
+  `tasks.md > Archivos esperados`) o cambiar de diálogo.
+- R32 («Cambiar key o proveedor») y R14 no tienen paso E2E: `design.md > 15.4` no los pide.
+
+### Verificación
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes.
+- `pnpm exec vitest related --run` (password-field, ai-provider-form y su test): 20 archivos,
+  256 verdes.
+- `pnpm exec vitest run guard-identificador guard-catalogo-de-componentes guard-e2e`: 6 archivos,
+  109 verdes.
+- **E2E NO corrieron en verde: la base local no tiene la migración de la ficha.**
+  `pnpm exec playwright test e2e/integraciones-proveedor-ia.spec.ts` → 4 rojos (chromium y webkit),
+  todos en el `beforeAll`:
+  `Invalid prisma.aiProviderConnection.deleteMany() invocation … The table (not available) does not exist in the current database.`
+  `prisma migrate status`: `20261013150000_ai_providers` sin aplicar, y la base trae tres migraciones
+  de otras ramas que no están aquí (`…inventory_movement_kind_consumption`,
+  `…reservations_and_decimal_stock`, `…order_step_evidence`): es una base compartida. No se migró (fuera
+  del alcance de frontend_dev). Los otros cuatro specs tocados no se corrieron: fallarían por la misma
+  tabla (siembran la fila o abren la pantalla). Para cerrarlos hace falta una base con la migración.
+
+Veredicto: placeholder hecho y en verde; T16 escrita pero sin E2E verdes (base sin migrar), T16 sigue `[ ]`.

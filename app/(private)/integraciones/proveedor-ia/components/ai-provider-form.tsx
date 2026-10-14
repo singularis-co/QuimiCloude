@@ -35,6 +35,7 @@ export const AI_PROVIDER_FORM_TEXTS = {
   description: 'Sin proveedor configurado no se pueden leer PDF.',
   status: 'Sin configurar',
   keyLabel: (name: string) => `API key de ${name}`,
+  keyPlaceholder: 'Pega aquí tu API key',
   showKey: 'Mostrar la key',
   hideKey: 'Ocultar la key',
   helpBeforeLink: (name: string) => `Créala en la consola de ${name}: `,
@@ -209,6 +210,7 @@ export function AiProviderForm({ providers, initialProvider, onSaved }: AiProvid
             label={AI_PROVIDER_FORM_TEXTS.keyLabel(selected.name)}
             variant="secret"
             autoComplete="off"
+            placeholder={AI_PROVIDER_FORM_TEXTS.keyPlaceholder}
             texts={{ show: AI_PROVIDER_FORM_TEXTS.showKey, hide: AI_PROVIDER_FORM_TEXTS.hideKey }}
             describedBy={helpId}
             testId={AI_PROVIDER_KEY_FIELD_TESTID}

@@ -185,6 +185,7 @@
 - `components/shared/ai-provider-required-notice.tsx`
 - `components/shared/index.ts`
 - `components/shared/CATALOGO.md`
+- `components/shared/password-field.tsx`
 - `public/brand/ai-providers/anthropic.svg`
 - `public/brand/ai-providers/google.svg`
 - `public/brand/ai-providers/openai.svg`

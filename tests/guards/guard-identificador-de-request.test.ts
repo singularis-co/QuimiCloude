@@ -401,6 +401,11 @@ export const E2E_ESPERADOS = [
   // reabre el pedido, la presentacion otra vez pendiente en «Entregar» y usuario sin permiso. No lee
   // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'anular-entrega.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el proveedor IA de una empresa: aviso de bloqueo
+  // en «Fórmulas» con y sin permiso de configurarlo, key rechazada que no guarda nada, prueba y alta
+  // con el doble, el HTML sin la key y desconectar. No lee ni afirma nada sobre el identificador de
+  // peticion ni sobre `reference`.
+  'integraciones-proveedor-ia.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

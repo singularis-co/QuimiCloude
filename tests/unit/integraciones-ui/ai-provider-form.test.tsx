@@ -142,6 +142,7 @@ describe('AiProviderForm', () => {
     expect(campo().type).toBe('password');
     expect(campo().value).toBe('');
     expect(campo().getAttribute('autocomplete')).toBe('off');
+    expect(campo()).toHaveAttribute('placeholder', 'Pega aquí tu API key');
 
     const ojo = screen.getByRole('button', { name: 'Mostrar la key' });
     await user.click(ojo);
