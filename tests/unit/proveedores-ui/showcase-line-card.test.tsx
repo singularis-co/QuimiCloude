@@ -24,8 +24,8 @@ describe('ShowcaseLineCard', () => {
     render(<ShowcaseLineCard line={linea1} />);
 
     const imagen = screen.getByRole('img', { name: linea1.name });
-    expect(imagen).toHaveAttribute('width', '60');
-    expect(imagen).toHaveAttribute('height', '60');
+    expect(imagen).toHaveAttribute('width', '80');
+    expect(imagen).toHaveAttribute('height', '80');
     expect(imagen).toHaveAttribute('src', linea1.imageUrl as string);
     expect(screen.getByText(linea1.name)).toBeInTheDocument();
   });
@@ -38,7 +38,7 @@ describe('ShowcaseLineCard', () => {
     const imagen = screen.getByRole('img', { name: linea1.name });
     expect(imagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
     expect(imagen).toHaveAttribute('data-missing', 'true');
-    expect(imagen).toHaveAttribute('width', '60');
+    expect(imagen).toHaveAttribute('width', '80');
   });
 
   it('R9 — con imageUrl en cadena vacía pinta el marcador con data-missing', () => {

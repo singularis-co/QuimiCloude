@@ -130,7 +130,7 @@ export function buildFinishedStockColumns({
     {
       id: IMAGE_COLUMN_ID,
       label: IMAGE_COLUMN_LABEL,
-      align: 'start',
+      align: 'center',
       defaultPinned: 'left',
       cell: (item) =>
         item.kind === 'group' ? (

@@ -36,8 +36,16 @@ function resultTotals(rows: readonly ImportResultRow[]): ImportResultTotals {
   };
 }
 
-function baseOf(row: ImportPreviewRow): Pick<ImportResultRow, 'rowNumber' | 'cells' | 'type' | 'productName'> {
-  return { rowNumber: row.rowNumber, cells: row.cells, type: row.type, productName: row.productName };
+function baseOf(
+  row: ImportPreviewRow,
+): Pick<ImportResultRow, 'rowNumber' | 'cells' | 'type' | 'productName' | 'ignoredColumns'> {
+  return {
+    rowNumber: row.rowNumber,
+    cells: row.cells,
+    type: row.type,
+    productName: row.productName,
+    ...(row.ignoredColumns === undefined ? {} : { ignoredColumns: row.ignoredColumns }),
+  };
 }
 
 function lotOf(write: ImportRowWrite): string | null {

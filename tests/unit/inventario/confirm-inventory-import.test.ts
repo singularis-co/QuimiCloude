@@ -157,7 +157,7 @@ describe('confirmInventoryImport — que se escribe', () => {
 
     expect(createProduct.mock.calls).toEqual([
       [expect.objectContaining({ type: 'PRODUCT', name: 'Sal fina', unitId: KG.id, stock: '25', unitCost: '3.5', lot: 'L-1' }), ADMIN],
-      [expect.objectContaining({ type: 'PACKAGING', name: 'Bidón', presentationId: expect.any(String), totalCost: '100' }), ADMIN],
+      [expect.objectContaining({ type: 'PACKAGING', name: 'Bidón', presentationId: expect.any(String), unitCost: '10' }), ADMIN],
       [expect.objectContaining({ type: 'MACHINE', name: 'Balanza', stock: '1' }), ADMIN],
     ]);
     expect(outcome.kind === 'imported' && outcome.rows.map((row) => row.status === 'created' && [row.productId, row.lot])).toEqual([
@@ -167,8 +167,8 @@ describe('confirmInventoryImport — que se escribe', () => {
     ]);
   });
 
-  it('R26 el terminado entra con quien importa como autor, el costo resuelto y aviso de existencias', async () => {
-    const { confirm, imports, stockIncreases } = build([{ ...ROW_TERMINADO, unitCost: '', totalCost: '24', lot: 'T-1' }]);
+  it('R26 el terminado entra con quien importa como autor, su costo unitario y aviso de existencias', async () => {
+    const { confirm, imports, stockIncreases } = build([{ ...ROW_TERMINADO, lot: 'T-1' }]);
 
     const outcome = await confirm(FILE, ADMIN);
 
@@ -178,7 +178,7 @@ describe('confirmInventoryImport — que se escribe', () => {
         recipeName: FORMULA.name,
         presentationId: BOTELLA.id,
         packages: 12,
-        unitCost: '2.0000',
+        unitCost: '2',
         lot: 'T-1',
         purchaseDate: '2026-10-06',
         expiryDate: null,

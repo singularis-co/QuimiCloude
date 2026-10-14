@@ -10,6 +10,7 @@ export {
   type ImportCreateUnitDialogProps,
 } from './import-create-unit-dialog';
 export { ImportFileRejection, describeRejection } from './import-file-rejection';
+export { ImportGuide, type ImportGuideProps } from './import-guide';
 export { ImportMissingCatalog, type ImportMissingCatalogProps } from './import-missing-catalog';
 export {
   ErrorFileButton,

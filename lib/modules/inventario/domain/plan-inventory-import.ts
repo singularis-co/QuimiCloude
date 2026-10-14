@@ -9,7 +9,6 @@ import {
 import {
   importFinishedGoodsRowSchema,
   packagesOf,
-  resolveFinishedGoodsUnitCost,
   type ImportFinishedGoodsInput,
 } from './import-finished-goods';
 import {
@@ -23,6 +22,7 @@ import {
   type ImportRowType,
 } from './inventory-import-contract';
 import { normalizePresentationName } from './presentation-name';
+import { typedLotSchema } from './product-batch-input';
 import { createProductSchema, isWholeQuantity, PRODUCT_NAME_MAX_LENGTH } from './product-input';
 import { normalizeProductName } from './product-name';
 import { PRODUCT_TYPES } from './product-type';
@@ -79,7 +79,6 @@ const DATE_RULE = 'no es una fecha valida (AAAA-MM-DD o DD/MM/AAAA).';
 const ISSUE_TEXT: Readonly<Record<ImportRowIssueCode, string>> = {
   type_invalid: 'debe ser Insumo, Envase, Instrumento o Producto terminado.',
   value_required: 'es obligatoria para este tipo.',
-  column_not_applicable: 'debe ir vacia para este tipo.',
   name_too_long: `admite hasta ${PRODUCT_NAME_MAX_LENGTH} caracteres.`,
   unit_not_found: 'la unidad no existe en la empresa.',
   unit_ambiguous: 'coincide con mas de una unidad; escribe su nombre completo.',
@@ -139,10 +138,6 @@ class RowIssues {
     return this.byColumn.has(column);
   }
 
-  hasCode(code: ImportRowIssueCode): boolean {
-    return [...this.byColumn.values()].some((issue) => issue.code === code);
-  }
-
   get size(): number {
     return this.byColumn.size;
   }
@@ -175,18 +170,49 @@ function readDecimal(row: ParsedImportRow, key: ImportColumnKey, issues: RowIssu
   return parsed.value;
 }
 
-function checkApplicability(row: ParsedImportRow, type: ImportRowType, issues: RowIssues): void {
+type ColumnRules = (typeof INVENTORY_IMPORT_COLUMNS)[number]['rules'];
+
+/**
+ * La regla de la columna para el tipo. Sin tipo valido, solo la regla en la que coinciden todos los
+ * tipos: lo demas depende de un tipo que la fila no dice.
+ */
+function ruleFor(rules: ColumnRules, type: ImportRowType | null): ColumnRules[ImportRowType] | null {
+  if (type !== null) return rules[type];
+  const [first, ...rest] = Object.values(rules);
+  return first !== undefined && rest.every((rule) => rule === first) ? first : null;
+}
+
+function checkRequired(row: ParsedImportRow, type: ImportRowType | null, issues: RowIssues): void {
   for (const column of INVENTORY_IMPORT_COLUMNS) {
     const filled = row.cells[column.key].trim() !== '';
-    const rule = column.rules[type];
-    if (rule === 'forbidden' && filled) issues.add('column_not_applicable', column.key);
-    if (rule === 'required' && !filled) issues.add('value_required', column.key);
+    if (ruleFor(column.rules, type) === 'required' && !filled) issues.add('value_required', column.key);
   }
 }
 
-function readValues(row: ParsedImportRow, type: ImportRowType, today: string, issues: RowIssues): RowValues {
-  const applies = (key: ImportColumnKey): boolean =>
-    INVENTORY_IMPORT_COLUMNS.find((column) => column.key === key)?.rules[type] !== 'forbidden';
+/**
+ * Una columna que el tipo no usa no rompe la fila: se ignora y se avisa. La fila se planifica como
+ * si esa celda viniera vacia; las celdas originales se conservan para mostrarlas y para el archivo
+ * de errores.
+ */
+function withoutIgnoredColumns(
+  row: ParsedImportRow,
+  type: ImportRowType,
+): { readonly row: ParsedImportRow; readonly ignoredColumns: readonly ImportColumnKey[] } {
+  const ignoredColumns = INVENTORY_IMPORT_COLUMNS.filter(
+    (column) => column.rules[type] === 'forbidden' && row.cells[column.key].trim() !== '',
+  ).map((column) => column.key);
+  if (ignoredColumns.length === 0) return { row, ignoredColumns };
+  const cells = { ...row.cells };
+  for (const key of ignoredColumns) cells[key] = '';
+  return { row: { ...row, cells }, ignoredColumns };
+}
+
+function readValues(row: ParsedImportRow, type: ImportRowType | null, today: string, issues: RowIssues): RowValues {
+  const applies = (key: ImportColumnKey): boolean => {
+    const rules = INVENTORY_IMPORT_COLUMNS.find((column) => column.key === key)?.rules;
+    if (rules === undefined) return true;
+    return type === null ? Object.values(rules).some((rule) => rule !== 'forbidden') : rules[type] !== 'forbidden';
+  };
 
   let purchaseDate: string | null = null;
   const purchaseText = row.cells.purchaseDate;
@@ -218,7 +244,7 @@ function readValues(row: ParsedImportRow, type: ImportRowType, today: string, is
     name: row.cells.name,
     stock: readDecimal(row, 'stock', issues) ?? '',
     unitCost: readDecimal(row, 'unitCost', issues),
-    totalCost: readDecimal(row, 'totalCost', issues),
+    totalCost: null,
     qtyAlert: applies('qtyAlert') ? (readDecimal(row, 'qtyAlert', issues) ?? '') : '',
     lot: lotText === '' ? null : row.cells.lot,
     purchaseDate,
@@ -242,15 +268,12 @@ function addSchemaIssue(field: string, type: ImportRowType, values: RowValues, i
       else issues.add('stock_invalid', 'stock', STOCK_ZERO_FOR_TOTAL);
       return;
     }
+    // Sin «Costo total» en el archivo, todo rechazo de costo cae en «Costo unitario».
     case 'unitCost':
-    case 'totalCost': {
-      const value = field === 'unitCost' ? values.unitCost : values.totalCost;
-      if (value === null) {
-        if (!issues.hasCode('cost_required')) issues.add('cost_required', field);
-      } else if (!isAcceptedAmount(value.trim())) issues.add('cost_invalid', field);
-      else issues.add('total_cost_too_low', field);
+    case 'totalCost':
+      if (values.unitCost === null) issues.add('cost_required', 'unitCost');
+      else issues.add('cost_invalid', 'unitCost');
       return;
-    }
     case 'qtyAlert':
       issues.add(values.qtyAlert.trim() === '' ? 'value_required' : 'qty_alert_invalid', 'qtyAlert');
       return;
@@ -287,6 +310,17 @@ function productCandidate(
     return { type, name: values.name, qtyAlert: values.qtyAlert, presentationId: refs.presentationId, ...batch };
   }
   return { type, name: values.name, ...batch, expiryDate: values.expiryDate };
+}
+
+/** Sin tipo no hay esquema que aplicar: solo las reglas de campo que valen para todos los tipos. */
+function validateWithoutType(values: RowValues, issues: RowIssues): void {
+  if (values.name.trim().length > PRODUCT_NAME_MAX_LENGTH) issues.add('name_too_long', 'name');
+  const stock = values.stock.trim();
+  if (stock !== '' && !DECIMAL_PATTERN.test(stock)) issues.add('stock_invalid', 'stock');
+  if (values.unitCost !== null && !isAcceptedAmount(values.unitCost.trim())) issues.add('cost_invalid', 'unitCost');
+  const qtyAlert = values.qtyAlert.trim();
+  if (qtyAlert !== '' && !DECIMAL_PATTERN.test(qtyAlert)) issues.add('qty_alert_invalid', 'qtyAlert');
+  if (values.lot !== null && !typedLotSchema.safeParse(values.lot).success) issues.add('lot_invalid', 'lot');
 }
 
 function validateWithSchema(type: ImportRowType, values: RowValues, issues: RowIssues): void {
@@ -499,34 +533,30 @@ function finishedWrite(values: RowValues, refs: Resolved): ImportFinishedGoodsIn
 
 type PlannedRow = { readonly preview: ImportPreviewRow; readonly write: ImportRowWrite | null };
 
-function planRow(row: ParsedImportRow, state: PlanState, today: string): PlannedRow {
-  const type = parseImportType(row.cells.type);
-  const base = { rowNumber: row.rowNumber, cells: row.cells };
+function planRow(parsed: ParsedImportRow, state: PlanState, today: string): PlannedRow {
+  const type = parseImportType(parsed.cells.type);
   if (type === null) {
-    return {
-      preview: { ...base, type: null, productName: null, status: 'error', issues: [importRowIssue('type_invalid', 'type')] },
-      write: null,
-    };
+    const base = { rowNumber: parsed.rowNumber, cells: parsed.cells };
+    const issues = new RowIssues();
+    issues.add('type_invalid', 'type');
+    checkRequired(parsed, null, issues);
+    validateWithoutType(readValues(parsed, null, today, issues), issues);
+    const [first, ...rest] = issues.list();
+    const all: [ImportRowIssue, ...ImportRowIssue[]] = [first ?? importRowIssue('type_invalid', 'type'), ...rest];
+    return { preview: { ...base, type: null, productName: null, status: 'error', issues: all }, write: null };
   }
 
+  const { row, ignoredColumns } = withoutIgnoredColumns(parsed, type);
+  const base = {
+    rowNumber: parsed.rowNumber,
+    cells: parsed.cells,
+    ...(ignoredColumns.length === 0 ? {} : { ignoredColumns }),
+  };
   const issues = new RowIssues();
-  checkApplicability(row, type, issues);
+  checkRequired(row, type, issues);
   const values = readValues(row, type, today, issues);
   validateWithSchema(type, values, issues);
   const refs = resolveReferences(row, type, state, issues);
-
-  if (type === PRODUCT_TYPES.FINISHED_PRODUCT && !issues.has('stock') && !issues.has('totalCost')) {
-    const content = refs.presentation?.content ?? null;
-    if (content !== null && values.unitCost === null && values.totalCost !== null) {
-      const unitCost = resolveFinishedGoodsUnitCost({
-        packages: packagesOf(values.stock),
-        content,
-        unitCost: null,
-        totalCost: values.totalCost,
-      });
-      if (unitCost === null) issues.add('total_cost_too_low', 'totalCost');
-    }
-  }
 
   const productName =
     type === PRODUCT_TYPES.FINISHED_PRODUCT

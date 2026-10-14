@@ -199,7 +199,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
     {
       id: IMAGE_COLUMN_ID,
       label: IMAGE_COLUMN_LABEL,
-      align: 'start',
+      align: 'center',
       // Nace fijada: es la que identifica la fila de un vistazo y la que menos ancho ocupa.
       // Es un defecto, con preferencia guardada gana la del usuario.
       defaultPinned: 'left',

@@ -79,7 +79,7 @@ async function escenarioMixto(): Promise<Escenario> {
     loteExistente,
     filas: [
       { type: 'Insumo', name: 'Sal nueva', unit: unidad, stock: '25', unitCost: '3,5', qtyAlert: '5', lot: lote },
-      { type: 'Insumo', name: 'SAL EXISTENTE', unit: unidad, stock: '4', totalCost: '10', qtyAlert: '1' },
+      { type: 'Insumo', name: 'SAL EXISTENTE', unit: unidad, stock: '4', unitCost: '2,5', qtyAlert: '1' },
       { type: 'Insumo', name: 'Sal existente', unit: unidad, stock: '9', unitCost: '1', qtyAlert: '1', lot: loteExistente },
       { type: 'Insumo', name: 'Mal', unit: unidad, stock: 'abc', unitCost: '1', qtyAlert: '1' },
       { type: 'Envase', name: 'Bidon azul', presentation: presentacion, stock: '30', unitCost: '2', qtyAlert: '3' },
