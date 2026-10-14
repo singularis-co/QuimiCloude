@@ -1,4 +1,5 @@
-// El doble en memoria del bucket de evidencias: solo responde a rutas que firmo, su descarga pasa
+// El doble en memoria del bucket de evidencias: solo responde a rutas que firmo (la instancia del E2E
+// lee ademas rutas bien formadas sembradas por otro proceso), su descarga pasa
 // la validacion por contenido de las imagenes y sus URL no salen a ningun servidor real. Tambien
 // el lector de la variable que lo enciende y el de la configuracion del bucket real.
 import { randomUUID } from 'node:crypto';
@@ -7,7 +8,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { evidenceE2EDoublesEnabled } from '@/lib/modules/asignaciones/adapters/driven/config/evidence-e2e-doubles-env';
 import { readEvidenceStorageConfigFromEnv } from '@/lib/modules/asignaciones/adapters/driven/config/evidence-storage-config-env';
-import { evidenceStorageMemory } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-memory';
+import {
+  evidenceStorageMemory,
+  evidenceStorageMemoryForE2E,
+} from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-memory';
 import { EVIDENCE_READ_LINK_TTL_SECONDS, buildEvidencePath } from '@/lib/modules/asignaciones';
 import { validateRecipeImage } from '@/lib/modules/recetas';
 
@@ -102,6 +106,48 @@ describe('evidenceStorageMemory.createSignedReadUrls (QC-271 R10)', () => {
     await expect(
       evidenceStorageMemory.createSignedReadUrls([signed, unknown], EVIDENCE_READ_LINK_TTL_SECONDS),
     ).rejects.toThrow(unknown);
+  });
+});
+
+describe('evidenceStorageMemoryForE2E: rutas sembradas por otro proceso (QC-271 R27)', () => {
+  it('R27: firma la lectura de una ruta bien formada que no paso por createSignedUpload', async () => {
+    const path = newPath();
+    await expect(evidenceStorageMemoryForE2E.createSignedReadUrl(path, EVIDENCE_READ_LINK_TTL_SECONDS)).resolves.toBe(
+      `${ORIGIN}/read/${path}?expiresIn=900`,
+    );
+    await expect(
+      evidenceStorageMemoryForE2E.createSignedReadUrls([path, newPath()], EVIDENCE_READ_LINK_TTL_SECONDS),
+    ).resolves.toHaveLength(2);
+  });
+
+  it('R27: rechaza firmar la lectura de una ruta mal formada', async () => {
+    const company = randomUUID();
+    const order = randomUUID();
+    const malformed = [
+      `${company}/${order}`,
+      `${company}/${order}/`,
+      `${company}/${order}/${randomUUID()}/extra`,
+      `no-es-uuid/${order}/${randomUUID()}`,
+      `${company}/no-es-uuid/${randomUUID()}`,
+      `${company}/${order}/..`,
+      `../${order}/${randomUUID()}`,
+    ];
+    for (const path of malformed) {
+      await expect(
+        evidenceStorageMemoryForE2E.createSignedReadUrl(path, EVIDENCE_READ_LINK_TTL_SECONDS),
+      ).rejects.toThrow(path);
+    }
+  });
+
+  it('R27: descargar o borrar una ruta bien formada sin firmar sigue rechazandose', async () => {
+    const path = newPath();
+    await expect(evidenceStorageMemoryForE2E.download(path)).rejects.toThrow(path);
+    await expect(evidenceStorageMemoryForE2E.remove(path)).rejects.toThrow(path);
+  });
+
+  it('R27: la instancia por defecto no firma rutas bien formadas que no firmo', async () => {
+    const path = newPath();
+    await expect(evidenceStorageMemory.createSignedReadUrl(path, EVIDENCE_READ_LINK_TTL_SECONDS)).rejects.toThrow(path);
   });
 });
 
