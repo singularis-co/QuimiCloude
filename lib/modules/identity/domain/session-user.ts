@@ -26,4 +26,9 @@ export type SessionUser = {
    * no un hueco, y asi quien compara nunca tiene que distinguir dos formas de lo mismo (R14).
    */
   readonly permissions: readonly string[];
+  /**
+   * Los añadidos activos de su empresa. Opcional para no obligar a cada doble de prueba a
+   * declararlo: quien pregunta por un añadido falla cerrado si no está.
+   */
+  readonly addons?: readonly string[];
 };

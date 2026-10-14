@@ -163,6 +163,8 @@ model Company {
   taxIdNormalized String?   @map("tax_id_normalized")
   contactEmail    String?   @map("contact_email")
   contactPhone    String?   @map("contact_phone")
+  /// Interruptores prendidos de los añadidos. Lo que cuenta como activo lo decide el dominio.
+  addons          String[]  @default([])
 
   users      User[]
   workGroups WorkGroup[]

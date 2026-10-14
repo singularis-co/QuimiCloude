@@ -400,3 +400,16 @@ export {
   type GetCompanyDeletionImpactDeps,
 } from './domain/get-company-deletion-impact';
 export { createListCompanyEvents, type ListCompanyEventsDeps } from './domain/list-company-events';
+export {
+  ADDONS,
+  ADDON_PERMISSIONS,
+  ADDON_REQUIRES,
+  CORE_PERMISSIONS,
+  assertAddon,
+  effectiveAddons,
+  effectivePermissions,
+  hasAddon,
+  isAddon,
+  type Addon,
+  type AddonBearer,
+} from './domain/company-addons';

@@ -9,33 +9,34 @@
 ## Bloque A — Datos y catálogo
 
 - [ ] **T1 — Catálogo de añadidos** (R1–R4, R11). Depende de: —
+  - _Hecho en código y tests; pendiente: 4 tests de otras fichas en rojo (lista cerrada de archivos que nombran permisos), a la espera de decisión humana._
   - `identity/domain/company-addons.ts` según `design.md > 2.1`, reexportado en `identity/index.ts`.
   - Tests: `tests/unit/identity/addons/company-addons.test.ts`.
   - **Hecho:**
     - partición del catálogo, dependencia de un nivel y `effectivePermissions` solo resta;
     - `assertAddon`/`hasAddon` fallan cerrado.
-- [ ] **T2 — Columna y migración** (R5, R6, R38). Depende de: —
+- [x] **T2 — Columna y migración** (R5, R6, R38). Depende de: —
   - `Company.addons` en `db/schema.prisma`.
-  - `db/migrations/20261014180000_company_addons/` con `migration.sql` y `down.sql`
-    (`design.md > 2.3`). Se re-fecha si `dev` trae una posterior.
+  - `db/migrations/20261014190000_company_addons/` con `migration.sql` y `down.sql`
+    (`design.md > 2.3`). Re-fechada a `20261014190000`: `20261014180000` ya lo usa `admin_without_assigned_orders_view`.
   - Tests: `tests/unit/identity/schema/company-addons-migration.test.ts`.
   - **Hecho:**
     - el `UPDATE` lista exactamente `ADDONS`;
     - `down.sql` quita solo la columna;
     - `prisma migrate` aplica y revierte sobre la base de test.
-- [ ] **T3 — Seed con los cinco añadidos** (R7). Depende de: T1, T2
+- [x] **T3 — Seed con los cinco añadidos** (R7). Depende de: T1, T2
   - `initial-access-repository-prisma.ts` crea la empresa inicial con `addons: [...ADDONS]`.
   - Tests: `seed-initial-access.test.ts` e `identity-seed.int.test.ts` ampliados.
   - **Hecho:** con alcance `full`, la empresa nace con los cinco; con `platform-only`, nada cambia.
 
 ## Bloque B — Sesión (el cruce rol ∩ añadidos)
 
-- [ ] **T4 — Lectura en la sesión** (R8). Depende de: T2
+- [x] **T4 — Lectura en la sesión** (R8). Depende de: T2
   - `SessionUserRecord.companyAddons`.
   - `session-user-prisma.ts` lo saca del mismo `JOIN` (`design.md > 3.1`).
   - Tests: `session-user.int.test.ts` ampliado.
   - **Hecho:** el contador de invocaciones no sube y llegan los interruptores crudos.
-- [ ] **T5 — Recorte en `resolveSession`** (R8, R10, R11). Depende de: T1, T4
+- [x] **T5 — Recorte en `resolveSession`** (R8, R10, R11). Depende de: T1, T4
   - Paso 9 de `resolve-session.ts`.
   - `SessionUser.addons` opcional (`design.md > 3.2`).
   - Tests: `resolve-session.test.ts` ampliado.
@@ -199,8 +200,8 @@
 Producción:
 
 - `db/schema.prisma`
-- `db/migrations/20261014180000_company_addons/migration.sql`
-- `db/migrations/20261014180000_company_addons/down.sql`
+- `db/migrations/20261014190000_company_addons/migration.sql`
+- `db/migrations/20261014190000_company_addons/down.sql`
 - `lib/modules/identity/index.ts`
 - `lib/modules/identity/domain/company-addons.ts`
 - `lib/modules/identity/domain/company-addon-input.ts`

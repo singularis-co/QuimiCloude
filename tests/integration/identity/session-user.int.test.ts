@@ -39,6 +39,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
 import {
+  ADDONS,
+  CORE_PERMISSIONS,
   DOCUMENT_TYPE_CC,
   normalizeCompanyName,
   ROLE_ACONDICIONAMIENTO,
@@ -83,7 +85,13 @@ beforeAll(async () => {
 
   // QC-47: empresa PROPIA del fixture, nunca la de instalacion.
   const empresa = await prisma.company.create({
-    data: { name: nombreDeEmpresa, nameNormalized: normalizeCompanyName(nombreDeEmpresa) },
+    // Con todos los añadidos, como toda empresa que ya existía al llegar los interruptores: así
+    // los permisos de la sesión siguen siendo los del rol, que es lo que miden los casos de abajo.
+    data: {
+      name: nombreDeEmpresa,
+      nameNormalized: normalizeCompanyName(nombreDeEmpresa),
+      addons: [...ADDONS],
+    },
     select: { id: true },
   });
   empresaId = empresa.id;
@@ -169,6 +177,7 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       // QC-48 R13: la empresa de la ficha y su estado, en la misma fila.
       companyId: empresaId,
       companyDeletedAt: null,
+      companyAddons: [...ADDONS],
       // QC-74 R7: los permisos del rol, en la misma fila. `arrayContaining` porque la consulta
       // no lleva `orderBy` —el adaptador no ordena a proposito— y el orden de `role_permissions`
       // lo decide Postgres; el `toHaveLength` de abajo cierra la puerta a que sobre alguno.
@@ -341,6 +350,30 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       espia.mockRestore();
     }
   });
+
+  it('QC-277 R8: trae los interruptores de añadidos de la empresa, crudos, sin una segunda consulta', async () => {
+    // Crudos: con una clave desconocida y una repetida, que solo el dominio sabe ignorar.
+    const guardados = ['lectura_pdf', 'dashboard', 'x', 'dashboard'];
+    await prisma.company.update({ where: { id: empresaId }, data: { addons: guardados } });
+    const espiaUsuario = vi.spyOn(prisma.user, 'findFirst');
+    const espiasEmpresa = [
+      vi.spyOn(prisma.company, 'findFirst'),
+      vi.spyOn(prisma.company, 'findUnique'),
+      vi.spyOn(prisma.company, 'findMany'),
+    ];
+
+    try {
+      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
+
+      expect(resultado?.companyAddons).toEqual(guardados);
+      expect(espiaUsuario).toHaveBeenCalledTimes(1);
+      for (const espia of espiasEmpresa) expect(espia).not.toHaveBeenCalled();
+    } finally {
+      espiaUsuario.mockRestore();
+      for (const espia of espiasEmpresa) espia.mockRestore();
+      await prisma.company.update({ where: { id: empresaId }, data: { addons: [...ADDONS] } });
+    }
+  });
 });
 
 // La ficha de quien no tiene empresa (el Maestro). Fixture propio, creado y borrado en el
@@ -389,6 +422,7 @@ describe('findActiveSessionUserById sin empresa (QC-161)', () => {
         roleName: ROLE_MAESTRO,
         companyId: null,
         companyDeletedAt: null,
+        companyAddons: [],
         permissions: expect.arrayContaining([...(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? [])]),
         accountStatus: 'active',
         lockedUntil: null,
@@ -563,6 +597,23 @@ describe('findActiveSessionUserById y el permiso integraciones.modificar', () =>
 
     expect(permisos).toContain(CODIGO);
     expect(permisos).toEqual([...(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [])].sort());
+  });
+
+  it('QC-277 R8: con la empresa sin añadidos, la sesión real del Administrador queda en su parte del núcleo', async () => {
+    await prisma.company.update({ where: { id: empresaId }, data: { addons: [] } });
+    try {
+      const permisos = await permisosDeLaSesionDe(ROLE_ADMINISTRADOR);
+
+      expect(permisos.length).toBeGreaterThan(0);
+      expect(permisos).not.toContain(CODIGO);
+      expect(permisos).toEqual(
+        [...(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [])]
+          .filter((codigo) => (CORE_PERMISSIONS as readonly string[]).includes(codigo))
+          .sort(),
+      );
+    } finally {
+      await prisma.company.update({ where: { id: empresaId }, data: { addons: [...ADDONS] } });
+    }
   });
 
   it('R7: la sesion de un Operador, un Empacador o un Administrador de acondicionamiento no incluye integraciones.modificar', async () => {

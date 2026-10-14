@@ -84,7 +84,7 @@ export async function findActiveSessionUserById(
       lastNames: true,
       role: { select: { name: true, permissions: { select: { permissionCode: true } } } },
       companyId: true,
-      company: { select: { deletedAt: true } },
+      company: { select: { deletedAt: true, addons: true } },
       // QC-78 R20, R21: columnas de `users`, en el MISMO `findFirst`.
       accountStatus: true,
       lockedUntil: true,
@@ -108,6 +108,7 @@ export async function findActiveSessionUserById(
     companyId: usuario.companyId,
     // La marca cruda; sin empresa no hay marca. Quien decide si «esta viva» es el dominio.
     companyDeletedAt: usuario.company?.deletedAt ?? null,
+    companyAddons: usuario.company?.addons ?? [],
     // QC-74 R7: los permisos salen de la ASIGNACION rol-permiso, nunca del nombre del rol.
     permissions: usuario.role.permissions.map((asignacion) => asignacion.permissionCode),
     // QC-78 R7, R20: los dos crudos. Quien traduce «lo que la columna dice» a «lo que significa

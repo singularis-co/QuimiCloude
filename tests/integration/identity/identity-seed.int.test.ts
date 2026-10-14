@@ -56,6 +56,7 @@ import {
   withInitialAccessTransaction,
 } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
 import {
+  ADDONS,
   DOCUMENT_TYPE_CC,
   INITIAL_COMPANY_NAME,
   INITIAL_USER_ACCOUNT_STATUS,
@@ -841,6 +842,28 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(second.createdCompany).toBeNull();
       expect(await tx.company.findMany()).toEqual(empresas);
       expect(await tx.user.count()).toBe(2); // el Administrador y el Maestro.
+    });
+  });
+
+  it('QC-277 R7: con alcance full la empresa inicial nace con los cinco añadidos prendidos, y la segunda corrida no los toca', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+      const deps = {
+        scope: 'full' as const,
+        repository: createInitialAccessRepository(tx),
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      };
+
+      const first = await seedInitialAccess(deps);
+      expect(first.createdCompany).toBe(INITIAL_COMPANY_NAME);
+      const empresa = await tx.company.findFirstOrThrow({ where: { deletedAt: null } });
+      expect(empresa.addons).toEqual([...ADDONS]);
+
+      await seedInitialAccess(deps);
+      expect((await tx.company.findUniqueOrThrow({ where: { id: empresa.id } })).addons).toEqual([...ADDONS]);
     });
   });
 
