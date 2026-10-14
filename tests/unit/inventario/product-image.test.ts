@@ -125,10 +125,20 @@ describe('validateProductImage', () => {
     expect(validateProductImage(PDF)).toEqual({ ok: false, reason: 'unsupported_format' });
   });
 
-  it('rechaza mas de 5 MB', () => {
+  it('rechaza mas de 4.4 MB', () => {
     const grande = new Uint8Array(MAX_PRODUCT_IMAGE_BYTES + 1);
     grande.set(JPEG);
     expect(validateProductImage(grande)).toEqual({ ok: false, reason: 'too_large' });
+  });
+
+  it('el corte es 4 400 000 bytes decimales: acepta 4_400_000 y rechaza 4_400_001', () => {
+    expect(MAX_PRODUCT_IMAGE_BYTES).toBe(4_400_000);
+    const justo = new Uint8Array(4_400_000);
+    justo.set(JPEG);
+    expect(validateProductImage(justo)).toEqual({ ok: true, contentType: 'image/jpeg', extension: 'jpg' });
+    const unoMas = new Uint8Array(4_400_001);
+    unoMas.set(JPEG);
+    expect(validateProductImage(unoMas)).toEqual({ ok: false, reason: 'too_large' });
   });
 });
 

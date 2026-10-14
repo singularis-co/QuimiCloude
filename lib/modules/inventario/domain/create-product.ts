@@ -1,7 +1,7 @@
 import type { PackageUnitSource, UnitCatalog } from '@/lib/modules/unidades';
 
 import { requirePermission, type Actor } from './actor';
-import { ActionNotAllowedError, ProductNotFoundError, ValidationError } from './errors';
+import { ActionNotAllowedError, ExpiryDateNotFutureError, ProductNotFoundError, ValidationError } from './errors';
 import {
   createProductSchema,
   type CreateProductInput,
@@ -28,6 +28,11 @@ export type CreateProductDeps = {
   readonly images?: ProductImageStorage;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
+  /**
+   * `true` deja pasar un vencimiento de hoy o anterior. Solo lo pasa el importador: un inventario
+   * que ya existe puede traer lotes vencidos. El alta del formulario lo omite y la regla aplica.
+   */
+  readonly acceptsPastExpiry?: boolean;
 };
 
 /** La imagen ya validada, pendiente de subir; `null` si el alta no trae ninguna. */
@@ -91,6 +96,18 @@ function rechazarFechaFutura(purchaseDate: string, instante: Date): void {
   }
 }
 
+/**
+ * Mismo «hoy» y misma comparacion de cadenas que la fecha de compra. Estrictamente posterior: un
+ * lote que vence hoy ya no se puede usar. Ausente es valido; el envase nunca lo trae.
+ */
+function rechazarVencimientoNoFuturo(entrada: EntradaConLote, instante: Date): void {
+  if (entrada.type === PRODUCT_TYPES.PACKAGING || entrada.expiryDate == null) return;
+  const hoy = fechaCivilUtc(instante);
+  if (entrada.expiryDate <= hoy) {
+    throw new ExpiryDateNotFutureError(`expiryDate: vencimiento no posterior a hoy (${entrada.expiryDate} <= ${hoy})`);
+  }
+}
+
 function resolverFechaDeCompra(entrada: EntradaConLote, instante: Date): string {
   if (entrada.purchaseDate == null) return fechaCivilUtc(instante);
   rechazarFechaFutura(entrada.purchaseDate, instante);
@@ -104,8 +121,9 @@ function resolverFechaDeCompra(entrada: EntradaConLote, instante: Date): string 
  * a producto existente). `purchaseDate` vive solo en el lote.
  *
  * El permiso va antes de zod, del reloj y del puerto: un actor sin permiso no dispara nada.
- * La fecha de compra se resuelve antes de tocar el puerto, asi una fecha futura se rechaza sin
- * consultar el nombre ni escribir.
+ * La fecha de compra y el vencimiento se comprueban antes de tocar el puerto, asi una fecha
+ * futura de compra o un vencimiento que no es posterior a hoy se rechazan sin consultar el nombre
+ * ni escribir.
  */
 export function createCreateProduct(
   deps: CreateProductDeps,
@@ -129,6 +147,7 @@ export function createCreateProduct(
     const instante = now();
 
     const purchaseDate = resolverFechaDeCompra(entrada, instante);
+    if (deps.acceptsPastExpiry !== true) rechazarVencimientoNoFuturo(entrada, instante);
     const imagen = validarImagen(deps, entrada.image);
 
     if (entrada.type === PRODUCT_TYPES.PACKAGING) {

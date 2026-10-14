@@ -8,6 +8,7 @@ import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import {
   ActionNotAllowedError,
+  ExpiryDateNotFutureError,
   ProductNotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -397,6 +398,77 @@ describe('MACHINE — crea producto con primer lote, sin qtyAlert', () => {
       createProduct({ ...ALTA_INSTRUMENTO, qtyAlert: 3 }, ADMIN),
     ).rejects.toBeInstanceOf(ValidationError);
     afirmarPuertoIntacto(products);
+  });
+});
+
+describe('vencimiento del alta: estrictamente posterior a hoy', () => {
+  // `now` fijo a media manana UTC: «hoy» es 2026-09-10 en la fecha civil UTC.
+  const AHORA_VTO = new Date('2026-09-10T10:00:00.000Z');
+  const HOY = '2026-09-10';
+  const AYER = '2026-09-09';
+  const MANANA = '2026-09-11';
+
+  function alta(deps: { acceptsPastExpiry?: boolean } = {}) {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({
+      units: unidadesVisibles(),
+      products,
+      now: () => AHORA_VTO,
+      ...deps,
+    });
+    return { products, createProduct };
+  }
+
+  it.each([
+    ['hoy', HOY],
+    ['ayer', AYER],
+  ])('rechaza un vencimiento de %s sin tocar el puerto', async (_nombre, expiryDate) => {
+    const { products, createProduct } = alta();
+
+    const intento = createProduct({ ...ALTA_VALIDA, expiryDate }, ADMIN);
+
+    await expect(intento).rejects.toBeInstanceOf(ExpiryDateNotFutureError);
+    await expect(intento).rejects.toMatchObject({
+      code: 'batch_expiry_not_future',
+      message: 'La fecha de vencimiento debe ser posterior a hoy.',
+    });
+    afirmarPuertoIntacto(products);
+  });
+
+  it('acepta un vencimiento de manana y lo guarda en el lote', async () => {
+    const { products, createProduct } = alta();
+
+    await createProduct({ ...ALTA_VALIDA, expiryDate: MANANA }, ADMIN);
+
+    expect(loteCreado(products).expiryDate).toBe(MANANA);
+  });
+
+  it.each([
+    ['ausente', {}],
+    ['null', { expiryDate: null }],
+  ])('acepta el vencimiento %s', async (_nombre, extra) => {
+    const { products, createProduct } = alta();
+
+    await createProduct({ ...ALTA_VALIDA, ...extra }, ADMIN);
+
+    expect(loteCreado(products).expiryDate).toBeNull();
+  });
+
+  it('aplica tambien al instrumento', async () => {
+    const { products, createProduct } = alta();
+
+    await expect(
+      createProduct({ name: 'Balanza', type: PRODUCT_TYPES.MACHINE, stock: '1', expiryDate: HOY }, ADMIN),
+    ).rejects.toBeInstanceOf(ExpiryDateNotFutureError);
+    afirmarPuertoIntacto(products);
+  });
+
+  it('con acceptsPastExpiry (el importador) deja pasar un vencimiento ya pasado', async () => {
+    const { products, createProduct } = alta({ acceptsPastExpiry: true });
+
+    await createProduct({ ...ALTA_VALIDA, expiryDate: AYER }, ADMIN);
+
+    expect(loteCreado(products).expiryDate).toBe(AYER);
   });
 });
 

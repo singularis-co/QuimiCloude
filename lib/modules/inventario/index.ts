@@ -16,6 +16,7 @@ export {
   BatchNotFoundError,
   BatchStockNegativeError,
   ActionNotAllowedError,
+  ExpiryDateNotFutureError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
 export {

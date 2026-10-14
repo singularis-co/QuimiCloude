@@ -2,7 +2,7 @@
 
 import { MISSING_IMAGE_SRC } from './entity-image';
 import { FileField } from './file-field';
-import type { UploadableFileType } from './file-types';
+import { formatMegabytes, type UploadableFileType } from './file-types';
 
 /**
  * Campo de la imagen de una entidad (receta, producto) sobre `FileField`, con tres estados en vez
@@ -54,7 +54,7 @@ export function ImageField({
   label = 'Imagen',
   placeholder = 'Arrastra la imagen aquí o haz clic para elegirla',
   clearLabel = 'Quitar imagen',
-  tooLargeMessage = `El archivo supera el tamaño máximo (${maxBytes / (1024 * 1024)} MB).`,
+  tooLargeMessage = `El archivo supera el tamaño máximo (${formatMegabytes(maxBytes)} MB).`,
   unsupportedFormatMessage = 'Formato no admitido: usa JPEG, PNG o WebP.',
 }: ImageFieldProps) {
   return (

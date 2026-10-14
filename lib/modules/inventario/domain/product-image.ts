@@ -6,7 +6,11 @@
  * `inventario`, y el ciclo entre contratos no compensa por treinta lineas.
  */
 
-export const MAX_PRODUCT_IMAGE_BYTES = 5 * 1024 * 1024;
+/**
+ * 4.4 MB decimales: el cuerpo de una Server Action en Vercel se corta en 4.5 MB y el resto del
+ * formulario necesita margen.
+ */
+export const MAX_PRODUCT_IMAGE_BYTES = 4_400_000;
 
 export type ProductImageFormat = {
   readonly contentType: 'image/jpeg' | 'image/png' | 'image/webp';

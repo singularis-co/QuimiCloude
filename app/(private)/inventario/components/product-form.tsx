@@ -487,6 +487,17 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           : await createProductAction({ status: 'idle' }, formData);
 
       if (result.status === 'error') {
+        // El vencimiento no posterior a hoy SI identifica campo: el servidor es quien conoce
+        // "hoy" (fecha civil UTC), asi que su mensaje se pinta bajo la fecha de expiracion.
+        if (result.code === 'batch_expiry_not_future') {
+          return {
+            status: 'error',
+            serverError: result,
+            fieldErrors: { expiryDate: result.message },
+            values,
+          };
+        }
+
         // `invalid_input`, `product_not_found` y `unauthorized` NO identifican campo: van a la
         // region de error del formulario.
         //

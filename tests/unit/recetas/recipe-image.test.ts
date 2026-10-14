@@ -2,7 +2,7 @@
 //
 // `validateRecipeImage` es pura: sin red, sin bucket, sin credenciales (R43). Se prueba
 // con una tabla de firmas -los tres formatos aceptados y tres formatos rechazados
-// renombrados a `.jpg`, aunque la extension no entre en la funcion- y el corte de 5 MB.
+// renombrados a `.jpg`, aunque la extension no entre en la funcion- y el corte de 4.4 MB.
 
 import { describe, expect, it } from 'vitest'
 
@@ -71,7 +71,7 @@ describe('validateRecipeImage (R23)', () => {
     }
   })
 
-  it('rechaza un archivo de mas de 5 MB aunque su contenido sea un JPEG valido', () => {
+  it('rechaza un archivo de mas de 4.4 MB aunque su contenido sea un JPEG valido', () => {
     const bytes = bytesWithSignature([0xff, 0xd8, 0xff], MAX_IMAGE_BYTES + 1)
 
     const result = validateRecipeImage(bytes)
@@ -82,11 +82,20 @@ describe('validateRecipeImage (R23)', () => {
     }
   })
 
-  it('acepta un JPEG de exactamente 5 MB (el corte es estrictamente mayor que)', () => {
+  it('acepta un JPEG de exactamente 4.4 MB (el corte es estrictamente mayor que)', () => {
     const bytes = bytesWithSignature([0xff, 0xd8, 0xff], MAX_IMAGE_BYTES)
 
     const result = validateRecipeImage(bytes)
 
     expect(result.ok).toBe(true)
+  })
+
+  it('el corte es 4 400 000 bytes decimales: acepta 4_400_000 y rechaza 4_400_001', () => {
+    expect(MAX_IMAGE_BYTES).toBe(4_400_000)
+    expect(validateRecipeImage(bytesWithSignature([0xff, 0xd8, 0xff], 4_400_000)).ok).toBe(true)
+    expect(validateRecipeImage(bytesWithSignature([0xff, 0xd8, 0xff], 4_400_001))).toEqual({
+      ok: false,
+      reason: 'too_large',
+    })
   })
 })

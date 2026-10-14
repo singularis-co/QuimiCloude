@@ -1075,13 +1075,18 @@ const productImageStorage: ProductImageStorage = createProductImageStorageSupaba
   readRecipeImageStorageConfigFromEnv,
 );
 
-const createProductUseCase = createCreateProduct({
+const createProductDeps = {
   products: productRepository,
   stockIncreases: stockIncreaseListener,
   packageUnit: { findPackageUnitId },
   units: { findRefs: findUnitRefs },
   images: productImageStorage,
-});
+};
+
+const createProductUseCase = createCreateProduct(createProductDeps);
+
+/** El importador carga inventario que ya existe: sus lotes pueden venir vencidos. */
+const createImportedProductUseCase = createCreateProduct({ ...createProductDeps, acceptsPastExpiry: true });
 
 const inventoryImportRepository: InventoryImportRepository = {
   findAliveProductsByNormalizedNames,
@@ -1165,7 +1170,7 @@ export const inventario = {
   getInventoryImportValues: createGetInventoryImportValues({ values: importTemplateValuesReader }),
   confirmInventoryImport: createConfirmInventoryImport({
     ...inventoryImportReadDeps,
-    createProduct: createProductUseCase,
+    createProduct: createImportedProductUseCase,
     stockIncreases: stockIncreaseListener,
     digest: fileDigest,
   }),

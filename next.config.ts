@@ -11,12 +11,13 @@ const nextConfig: NextConfig = {
    */
   serverExternalPackages: ['@napi-rs/canvas', 'sharp'],
   /**
-   * Por defecto Next corta las Server Actions en 1 MB. Las imagenes de recetas y productos
-   * admiten hasta 5 MB (validacion en sus modulos), asi que el limite se alinea a 5 MB.
+   * Por defecto Next corta las Server Actions en 1 MB. Vercel corta el cuerpo de una peticion en
+   * 4.5 MB, asi que el limite se alinea a ese techo, y las imagenes de recetas y productos se
+   * validan en sus modulos a 4.4 MB para dejar margen al resto del formulario.
    */
   experimental: {
     serverActions: {
-      bodySizeLimit: '5mb',
+      bodySizeLimit: '4.5mb',
     },
   },
 };

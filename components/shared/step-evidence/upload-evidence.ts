@@ -1,5 +1,5 @@
 import { compressImage } from '@/components/shared/compress-image';
-import { isAcceptedType, type UploadableFileType } from '@/components/shared/file-types';
+import { formatMegabytes, isAcceptedType, type UploadableFileType } from '@/components/shared/file-types';
 import type { EvidencePhase, StepEvidencePhotoView } from '@/lib/modules/asignaciones';
 import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import { MAX_IMAGE_BYTES } from '@/lib/modules/recetas';
@@ -12,9 +12,12 @@ export const EVIDENCE_ACCEPTED_TYPES: readonly UploadableFileType[] = [
 
 export const EVIDENCE_MAX_DIMENSION = 1600;
 
+/** «4.4 MB»: el limite se lee del dominio para que el texto no se desfase del corte real. */
+export const EVIDENCE_MAX_SIZE_LABEL = `${formatMegabytes(MAX_IMAGE_BYTES)} MB`;
+
 export const UPLOAD_EVIDENCE_TEXTS = {
   invalidType: 'No se pudo subir: no es una foto JPG, PNG ni WebP. Elige otra foto.',
-  tooLarge: 'No se pudo subir: pesa más de 5 MB. Elige otra foto.',
+  tooLarge: `No se pudo subir: pesa más de ${EVIDENCE_MAX_SIZE_LABEL}. Elige otra foto.`,
 } as const;
 
 export type EvidenceUploadTarget = {

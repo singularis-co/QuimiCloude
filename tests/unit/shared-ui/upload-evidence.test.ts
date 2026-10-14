@@ -244,7 +244,7 @@ describe('uploadEvidence', () => {
     const invalid: ErrorState = {
       status: 'error',
       code: 'evidence_invalid_file',
-      message: 'No se pudo registrar la foto: debe ser JPG, PNG o WebP y pesar como maximo 5 MB.',
+      message: 'No se pudo registrar la foto: debe ser JPG, PNG o WebP y pesar como maximo 4.4 MB.',
     };
     register.mockResolvedValueOnce(invalid);
 
