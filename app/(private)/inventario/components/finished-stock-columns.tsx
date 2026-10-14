@@ -29,6 +29,7 @@ import {
   stockAmountCell,
   unitLabel,
 } from './product-columns';
+import { productNameWithoutPresentation } from './product-base-name';
 
 /** Fila que pinta la tabla: la del pedido (o sin pedido) y, desplegada, una por producto. */
 export type FinishedStockTableRow =
@@ -65,8 +66,15 @@ export function finishedStockRowTitle(row: FinishedStockRow): string {
 
 /** Lo que pinta la columna «Nombre» en la fila agrupadora: el producto, sin el pedido. */
 export function finishedStockRowName(row: FinishedStockRow): string {
-  if (row.kind === 'withoutOrder') return row.products[0].product.name;
+  if (row.kind === 'withoutOrder') return productNameWithoutPresentation(row.products[0].product);
   return row.recipeName ?? EMPTY_MARK;
+}
+
+/** La presentacion va en su columna; la fila de un pedido no tiene una sola. */
+function presentationCell(item: FinishedStockTableRow): ReactNode {
+  if (item.kind === 'line') return item.line.product.presentationName ?? EMPTY_MARK;
+  if (item.row.kind === 'order') return null;
+  return item.row.products[0].product.presentationName ?? EMPTY_MARK;
 }
 
 function orderNumberCell(row: FinishedStockRow): ReactNode {
@@ -172,7 +180,7 @@ export function buildFinishedStockColumns({
                 )}
               >
                 <span className="min-w-0 break-words" data-testid="finished-stock-line-name">
-                  {item.line.product.name}
+                  {productNameWithoutPresentation(item.line.product)}
                 </span>
               </Link>
             </span>
@@ -203,6 +211,12 @@ export function buildFinishedStockColumns({
           </div>
         );
       },
+    },
+    {
+      id: 'presentationName',
+      label: 'Presentación',
+      align: 'start',
+      cell: presentationCell,
     },
     {
       id: 'stock',
