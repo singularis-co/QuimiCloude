@@ -107,7 +107,7 @@ function evidence(
   };
 }
 
-function inserted(result: StepEvidenceRow | 'limit' | 'not_found'): StepEvidenceRow {
+function inserted(result: StepEvidenceRow | 'limit' | 'not_found' | 'path_taken'): StepEvidenceRow {
   if (typeof result === 'string') throw new Error(`se esperaba una fila y llego ${result}`);
   return result;
 }
@@ -205,6 +205,15 @@ describe('insert: primer slot libre y tope de 3 (R29)', () => {
     ]);
   });
 
+  it('R31: una ruta ya registrada en la empresa devuelve path_taken sin escribir', async () => {
+    const orderId = await createOrder(a.companyId);
+    const photo = inserted(await repo.insert(evidence(a, orderId)));
+
+    expect(await repo.insert(evidence(a, orderId, { stepPosition: 2, path: photo.path }))).toBe('path_taken');
+
+    expect(await repo.listByOrder(a.companyId, orderId, 'manufacturing')).toEqual([photo]);
+  });
+
   it('R29: dos registros simultaneos sobre el ultimo slot libre dejan 3 fotos y un limit', async () => {
     const orderId = await createOrder(a.companyId);
     for (let i = 0; i < 2; i += 1) inserted(await repo.insert(evidence(a, orderId)));
@@ -256,13 +265,13 @@ describe('replace: sustituir en el mismo slot, todo o nada (R19, R29)', () => {
     expect(await repo.listByOrder(a.companyId, otherOrderId, 'manufacturing')).toEqual([]);
   });
 
-  it('R19: si la insercion nueva falla, la vieja sigue en su sitio (atomico)', async () => {
+  it('R19, R31: si la ruta nueva ya es de otra foto: path_taken y la vieja sigue en su sitio (atomico)', async () => {
     const orderId = await createOrder(a.companyId);
     const keep = inserted(await repo.insert(evidence(a, orderId)));
     const photo = inserted(await repo.insert(evidence(a, orderId)));
 
     // La ruta repetida choca con el indice unico de la ruta despues de borrar la vieja.
-    await expect(repo.replace(photo.id, evidence(a, orderId, { path: keep.path }))).rejects.toThrow();
+    expect(await repo.replace(photo.id, evidence(a, orderId, { path: keep.path }))).toBe('path_taken');
 
     expect(await repo.listByOrder(a.companyId, orderId, 'manufacturing')).toEqual([keep, photo]);
   });

@@ -27,11 +27,12 @@ export interface StepEvidenceRepository {
   listByOrder(companyId: string, orderId: string, phase: EvidencePhase): Promise<readonly StepEvidenceRow[]>;
   findById(companyId: string, orderId: string, phase: EvidencePhase, id: string): Promise<StepEvidenceRow | null>;
   /** En el primer `slot` libre del paso; `'limit'` si ya no queda ninguno, tambien si otra peticion
-   *  ocupo el ultimo a la vez. */
-  insert(row: NewStepEvidence): Promise<StepEvidenceRow | 'limit'>;
+   *  ocupo el ultimo a la vez. `'path_taken'` si otra fila de la empresa ya tiene esa ruta. */
+  insert(row: NewStepEvidence): Promise<StepEvidenceRow | 'limit' | 'path_taken'>;
   /** Borra `replacedId` e inserta la nueva en su mismo `slot`, todo o nada. `'not_found'` si
-   *  `replacedId` no es una foto de ese pedido, fase y paso en esa empresa. */
-  replace(replacedId: string, row: NewStepEvidence): Promise<StepEvidenceRow | 'not_found'>;
+   *  `replacedId` no es una foto de ese pedido, fase y paso en esa empresa; `'path_taken'` si otra
+   *  fila de la empresa ya tiene la ruta nueva, y entonces la vieja sigue en su sitio. */
+  replace(replacedId: string, row: NewStepEvidence): Promise<StepEvidenceRow | 'not_found' | 'path_taken'>;
   /** La fila borrada, o `null` si no existia. */
   delete(companyId: string, orderId: string, phase: EvidencePhase, id: string): Promise<StepEvidenceRow | null>;
   /** De esos pedidos, los que tienen al menos una foto en la fase indicada para cada uno. */

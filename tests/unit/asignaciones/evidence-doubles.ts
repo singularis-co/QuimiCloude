@@ -55,13 +55,16 @@ export function filaFoto(
 
 type FilaGuardada = StepEvidenceRow & { readonly companyId: string };
 
-/** Repositorio en memoria: filtra por empresa como el real y respeta el tope de 3 por paso. */
+/** Repositorio en memoria: filtra por empresa como el real y respeta el tope de 3 por paso y la
+ *  ruta unica por empresa. */
 export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
   const filas: FilaGuardada[] = [...iniciales];
   let secuencia = 0;
   const nuevaId = () => uuid('e').replace(/e{12}$/, String(++secuencia).padStart(12, '0'));
   const de = (companyId: string, orderId: string, phase: EvidencePhase) =>
     filas.filter((f) => f.companyId === companyId && f.orderId === orderId && f.phase === phase);
+  const rutaOcupada = (companyId: string, path: string, salvo?: string) =>
+    filas.some((f) => f.companyId === companyId && f.path === path && f.id !== salvo);
   const sinEmpresa = (fila: FilaGuardada): StepEvidenceRow => ({
     id: fila.id,
     orderId: fila.orderId,
@@ -89,6 +92,7 @@ export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
       );
       const slot = [1, 2, 3].find((s) => !ocupados.has(s));
       if (slot === undefined) return 'limit';
+      if (rutaOcupada(row.companyId, row.path)) return 'path_taken';
       const fila: FilaGuardada = {
         id: nuevaId(),
         companyId: row.companyId,
@@ -112,6 +116,7 @@ export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
       );
       if (index < 0) return 'not_found';
       const vieja = filas[index]!;
+      if (rutaOcupada(row.companyId, row.path, vieja.id)) return 'path_taken';
       const fila: FilaGuardada = { ...vieja, id: nuevaId(), path: row.path };
       filas.splice(index, 1, fila);
       return sinEmpresa(fila);

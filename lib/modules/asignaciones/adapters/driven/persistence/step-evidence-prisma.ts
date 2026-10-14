@@ -50,12 +50,13 @@ function firstFreeSlot(taken: readonly { readonly slot: number }[]): number | nu
   return null;
 }
 
-/** El unico indice unico con `slot` es el del tope por paso; el de la ruta no lo nombra. */
-function isSlotTaken(error: unknown): boolean {
+/** Que indice unico salto: el del tope por paso es el unico que nombra `slot`, el de la ruta el
+ *  unico que nombra `path`. */
+function uniqueViolationOn(error: unknown, column: 'slot' | 'path'): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
   const target = error.meta?.target;
   const targets = typeof target === 'string' ? [target] : Array.isArray(target) ? target : [];
-  return targets.some((item) => typeof item === 'string' && item.includes('slot'));
+  return targets.some((item) => typeof item === 'string' && item.includes(column));
 }
 
 function createData(row: NewStepEvidence, slot: number): Prisma.OrderStepEvidenceUncheckedCreateInput {
@@ -110,38 +111,45 @@ export function createStepEvidenceRepository(db: PrismaClient = prisma): StepEvi
           const created = await db.orderStepEvidence.create({ data: createData(row, slot), select: ROW_SELECT });
           return toRow(created);
         } catch (error) {
-          if (!isSlotTaken(error)) throw error;
+          if (uniqueViolationOn(error, 'path')) return 'path_taken';
+          if (!uniqueViolationOn(error, 'slot')) throw error;
         }
       }
       return 'limit';
     },
 
     async replace(replacedId, row) {
-      return db.$transaction(async (tx) => {
-        const previous = await tx.orderStepEvidence.findFirst({
-          where: {
-            id: replacedId,
-            companyId: row.companyId,
-            orderId: row.orderId,
-            phase: TO_DB_PHASE[row.phase],
-            stepPosition: row.stepPosition,
-          },
-          select: { id: true, slot: true },
-        });
-        if (previous === null) return 'not_found' as const;
+      try {
+        return await db.$transaction(async (tx) => {
+          const previous = await tx.orderStepEvidence.findFirst({
+            where: {
+              id: replacedId,
+              companyId: row.companyId,
+              orderId: row.orderId,
+              phase: TO_DB_PHASE[row.phase],
+              stepPosition: row.stepPosition,
+            },
+            select: { id: true, slot: true },
+          });
+          if (previous === null) return 'not_found' as const;
 
-        // Otra peticion pudo borrarla entre la lectura y aqui: entonces no hay nada que sustituir.
-        const removed = await tx.orderStepEvidence.deleteMany({
-          where: { id: previous.id, companyId: row.companyId },
-        });
-        if (removed.count === 0) return 'not_found' as const;
+          // Otra peticion pudo borrarla entre la lectura y aqui: entonces no hay nada que sustituir.
+          const removed = await tx.orderStepEvidence.deleteMany({
+            where: { id: previous.id, companyId: row.companyId },
+          });
+          if (removed.count === 0) return 'not_found' as const;
 
-        const created = await tx.orderStepEvidence.create({
-          data: createData(row, previous.slot),
-          select: ROW_SELECT,
+          const created = await tx.orderStepEvidence.create({
+            data: createData(row, previous.slot),
+            select: ROW_SELECT,
+          });
+          return toRow(created);
         });
-        return toRow(created);
-      });
+      } catch (error) {
+        // Fuera de la transaccion: el choque ya la deshizo y la vieja sigue en su sitio.
+        if (uniqueViolationOn(error, 'path')) return 'path_taken';
+        throw error;
+      }
     },
 
     async delete(companyId, orderId, phase, id) {

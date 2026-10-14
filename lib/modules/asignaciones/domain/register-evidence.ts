@@ -102,12 +102,16 @@ export function createRegisterEvidence(
       uploadedBy: actor.id,
     };
 
+    // Una ruta ya registrada es el archivo de otra foto que cuenta: se rechaza sin borrarlo.
+    const pathTaken = () => new ValidationError('la ruta ya esta registrada en otra foto');
     const warnings: EvidenceStorageWarning[] = [];
     if (replaced === null) {
       const inserted = await deps.evidence.insert(row);
+      if (inserted === 'path_taken') throw pathTaken();
       if (inserted === 'limit') return rejectUpload(path, (diagnostic) => new EvidenceLimitError(diagnostic));
     } else {
       const outcome = await deps.evidence.replace(replaced.id, row);
+      if (outcome === 'path_taken') throw pathTaken();
       if (outcome === 'not_found') return rejectUpload(path, (diagnostic) => new EvidenceNotFoundError(diagnostic));
       const warning = await removeEvidenceSafely(deps.storage, replaced.path);
       if (warning !== null) warnings.push(warning);

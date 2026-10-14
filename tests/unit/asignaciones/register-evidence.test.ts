@@ -269,6 +269,29 @@ describe('registerEvidence — tope, sustitucion y lectura (R29, R19, R21, R33)'
     expect(d.filas).toEqual([vieja]);
   });
 
+  it('R31: una ruta ya registrada en otra foto: invalid_input y el archivo de esa foto no se borra', async () => {
+    const otra = filaFoto({ id: uuid('1'), slot: 1, stepPosition: 3 });
+    const d = montar({ filas: [otra] });
+    const error = await d.register(OPERADOR, { ...FABRICACION, path: otra.path }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as ValidationError).code).toBe('invalid_input');
+    expect(d.repo.insert).toHaveBeenCalledTimes(1);
+    expect(d.storage.remove).not.toHaveBeenCalled();
+    expect(d.filas).toEqual([otra]);
+  });
+
+  it('R19, R31: Cambiar a una ruta ya registrada en otra foto: invalid_input, la sustituida sigue y no se borra nada', async () => {
+    const otra = filaFoto({ id: uuid('1'), slot: 1 });
+    const vieja = filaFoto({ id: uuid('2'), slot: 2 });
+    const d = montar({ filas: [otra, vieja] });
+    await expect(
+      d.register(OPERADOR, { ...FABRICACION, path: otra.path, replacesEvidenceId: vieja.id }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(d.repo.replace).toHaveBeenCalledTimes(1);
+    expect(d.storage.remove).not.toHaveBeenCalled();
+    expect(d.filas).toEqual([otra, vieja]);
+  });
+
   it('R19: un remove del archivo viejo que falla no deshace el registro: vuelve como advertencia', async () => {
     const vieja = filaFoto({ id: uuid('2'), slot: 2 });
     const d = montar({ filas: [vieja], borradoFalla: new Error('bucket caido') });
