@@ -265,11 +265,18 @@ comprueban los tests actuales de `step-evidence.test.tsx`, que siguen verdes.
 | Prop | Efecto | R |
 |---|---|---|
 | `consult?: boolean` | Implica `readOnly`. Quita «Fijada al terminar», «Obligatoria…» y los dos textos de ayuda. Pinta sin `Card`, como `div role="group"` con `aria-label` «Evidencia de <fase>, paso N», como en los tableros (`.ev-ro`). | R20, R21 |
+| `phaseLabel?: string` | Solo se usa con `consult`: da la fase del `aria-label` «Evidencia de <phaseLabel>, paso N». `EvidenceStepList` lo pasa desde su `phaseLabel`; `TraceStepEvidence` pasa «fabricación». Decisión P-F0-1, 2026-10-14. | R20 |
 | `heading?: string` | Sustituye «Evidencia» en la cabecera, p. ej. «Paso 3». Por defecto, `STEP_EVIDENCE_TEXTS.heading`. | R8, R13, R14 |
 | `onReload?: () => void` | Si una miniatura `ok` dispara `onError` en el `<img>`, la casilla pasa a «Vista vencida» con «Recargar» (44 px), que llama a `onReload`. Sin `onReload` no se pinta «Recargar». | R24 |
 
 **Comportamiento nuevo en modo consulta.** Mientras el `<img>` de una casilla `ok` no dispara
 `onLoad`, la casilla muestra `Skeleton` y un `sr-only` «Cargando fotos…» (R22).
+
+**Decisiones del 2026-10-14 (F0).**
+- «Vista vencida» solo existe en modo consulta. Ejecución y empaque no cambian (R21).
+- En modo consulta, el contador `n/3` cuenta las casillas que no son `error`, incluidas las
+  `loading`, para que la ficha muestre `n/3` como el tablero. En ejecución y empaque sigue contando
+  solo las `ok`.
 
 **Tile nuevo** `{ id, status: 'loading' }`. Pinta la casilla esqueleto sin foto. Lo usa el diálogo
 mientras la lectura está en vuelo (R22).

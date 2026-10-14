@@ -128,7 +128,7 @@ en verde.
 
 ## Bloque F — frontend (`frontend_dev`)
 
-### F0 [P] — Extensión de `StepEvidence` y piezas compartidas (depende de T0; en paralelo con B1/B2)
+### [x] F0 [P] — Extensión de `StepEvidence` y piezas compartidas (depende de T0; en paralelo con B1/B2)
 
 - `components/shared/step-evidence/step-evidence.tsx`:
   - props `consult`, `heading` y `onReload`;

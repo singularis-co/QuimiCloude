@@ -11,6 +11,10 @@ export {
   type StepEvidenceTile,
 } from './step-evidence';
 
+export { EvidenceReadError, type EvidenceReadErrorProps } from './evidence-read-error';
+
+export { EvidenceStepList, type EvidenceStepListProps } from './evidence-step-list';
+
 export {
   EVIDENCE_MISSING_TEXTS,
   EvidenceMissingDialog,
