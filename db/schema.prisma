@@ -800,6 +800,14 @@ model OrderPresentationLine {
   /// nombrara envases. Sin `@relation`: `Product` es de `inventario`; FK compuesta
   /// `(company_id, packaging_product_id)` escrita a mano, drift.
   packagingProductId String? @map("packaging_product_id") @db.Uuid
+  /// Envases contados al terminar el empaque. NULL = sin terminar, o terminado antes de que se
+  /// contaran: se lee como igual a `packages`. Los CHECK de coherencia con el motivo van a mano.
+  packedPackages    Int?    @map("packed_packages")
+  /// `merma`, `rotura`, `conteo_fisico`, `error_de_carga` u `otro`; TEXT + CHECK y no enum para
+  /// no recrear el tipo al anadir valores.
+  packedReason      String? @map("packed_reason")
+  /// Texto del motivo `otro`, ya recortado.
+  packedReasonOther String? @map("packed_reason_other")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

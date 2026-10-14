@@ -67,7 +67,7 @@ export { productDisplayName } from './domain/product-display-name';
 export { type PresentationView } from './domain/presentation-view';
 export { type ProductBatchView } from './domain/product-batch-view';
 export { type InventoryMovementView, type NewInventoryMovement } from './domain/inventory-movement';
-export { MOVEMENT_REASONS, type MovementReason } from './domain/movement-reason';
+export { MOVEMENT_REASONS, STOCK_INCREASE_REASONS, type MovementReason } from './domain/movement-reason';
 
 export { createCreateProduct, type CreateProductDeps } from './domain/create-product';
 export type { StockIncreaseListener } from './domain/stock-increase-listener';

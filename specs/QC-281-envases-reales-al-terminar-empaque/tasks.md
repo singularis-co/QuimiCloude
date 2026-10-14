@@ -5,7 +5,7 @@ Orden: T1 → T2 → (T3 ∥ T4) → T5 → T6 → (T7 ∥ T8 ∥ T9 ∥ T10) �
 `pnpm run typecheck`, `pnpm run lint` y `pnpm exec vitest related --run <archivos tocados>`; el
 nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
 
-## T1 — Migración y esquema
+## [x] T1 — Migración y esquema
 - Añadir `packedPackages`, `packedReason`, `packedReasonOther` a `OrderPresentationLine` en
   `db/schema.prisma`; `pnpm run db:migrate:create` → `..._order_presentation_lines_packed_count`;
   escribir los cuatro `CHECK` de `design.md § 1` en `migration.sql` y su `down.sql`.
@@ -14,7 +14,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   `PACKING_REASON_OTHER_MAX`; `down.sql` revierte columnas y constraints.
 - **Hecho:** `db:migrate` y `db:rollback` limpios en local; test de esquema verde. (R16, R25)
 
-## T2 — Dominio puro del conteo (depende de T1)
+## [x] T2 — Dominio puro del conteo (depende de T1)
 - `lib/modules/pedidos/domain/packing-count.ts`: `PACKING_DIFFERENCE_REASONS`,
   `PACKING_INCREASE_REASONS`, `PACKING_REASON_OTHER_MAX`, `checkPackingCounts`, `effectivePackages`,
   `packedTotalInOrderUnit` (envuelve `sumInOrderUnit`), `maxPackagesForLine`.

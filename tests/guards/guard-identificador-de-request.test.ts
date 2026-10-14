@@ -640,6 +640,9 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-10-14: migracion de datos que quita `asignaciones.consultar` al Administrador; no toca el
   // identificador.
   '20261014180000_admin_without_assigned_orders_view',
+  // QC-281 2026-10-15: el conteo real de envases en `order_presentation_lines`; no toca el
+  // identificador.
+  '20261015120000_order_presentation_lines_packed_count',
 ] as const
 
 export function hallazgosDeMigraciones(
