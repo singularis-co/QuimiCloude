@@ -23,6 +23,7 @@ import {
   type ImportRowType,
 } from './inventory-import-contract';
 import { normalizePresentationName } from './presentation-name';
+import { typedLotSchema } from './product-batch-input';
 import { createProductSchema, isWholeQuantity, PRODUCT_NAME_MAX_LENGTH } from './product-input';
 import { normalizeProductName } from './product-name';
 import { PRODUCT_TYPES } from './product-type';
@@ -175,18 +176,33 @@ function readDecimal(row: ParsedImportRow, key: ImportColumnKey, issues: RowIssu
   return parsed.value;
 }
 
-function checkApplicability(row: ParsedImportRow, type: ImportRowType, issues: RowIssues): void {
+type ColumnRules = (typeof INVENTORY_IMPORT_COLUMNS)[number]['rules'];
+
+/**
+ * La regla de la columna para el tipo. Sin tipo valido, solo la regla en la que coinciden todos los
+ * tipos: lo demas depende de un tipo que la fila no dice.
+ */
+function ruleFor(rules: ColumnRules, type: ImportRowType | null): ColumnRules[ImportRowType] | null {
+  if (type !== null) return rules[type];
+  const [first, ...rest] = Object.values(rules);
+  return first !== undefined && rest.every((rule) => rule === first) ? first : null;
+}
+
+function checkApplicability(row: ParsedImportRow, type: ImportRowType | null, issues: RowIssues): void {
   for (const column of INVENTORY_IMPORT_COLUMNS) {
     const filled = row.cells[column.key].trim() !== '';
-    const rule = column.rules[type];
+    const rule = ruleFor(column.rules, type);
     if (rule === 'forbidden' && filled) issues.add('column_not_applicable', column.key);
     if (rule === 'required' && !filled) issues.add('value_required', column.key);
   }
 }
 
-function readValues(row: ParsedImportRow, type: ImportRowType, today: string, issues: RowIssues): RowValues {
-  const applies = (key: ImportColumnKey): boolean =>
-    INVENTORY_IMPORT_COLUMNS.find((column) => column.key === key)?.rules[type] !== 'forbidden';
+function readValues(row: ParsedImportRow, type: ImportRowType | null, today: string, issues: RowIssues): RowValues {
+  const applies = (key: ImportColumnKey): boolean => {
+    const rules = INVENTORY_IMPORT_COLUMNS.find((column) => column.key === key)?.rules;
+    if (rules === undefined) return true;
+    return type === null ? Object.values(rules).some((rule) => rule !== 'forbidden') : rules[type] !== 'forbidden';
+  };
 
   let purchaseDate: string | null = null;
   const purchaseText = row.cells.purchaseDate;
@@ -287,6 +303,18 @@ function productCandidate(
     return { type, name: values.name, qtyAlert: values.qtyAlert, presentationId: refs.presentationId, ...batch };
   }
   return { type, name: values.name, ...batch, expiryDate: values.expiryDate };
+}
+
+/** Sin tipo no hay esquema que aplicar: solo las reglas de campo que valen para todos los tipos. */
+function validateWithoutType(values: RowValues, issues: RowIssues): void {
+  if (values.name.trim().length > PRODUCT_NAME_MAX_LENGTH) issues.add('name_too_long', 'name');
+  const stock = values.stock.trim();
+  if (stock !== '' && !DECIMAL_PATTERN.test(stock)) issues.add('stock_invalid', 'stock');
+  if (values.unitCost !== null && !isAcceptedAmount(values.unitCost.trim())) issues.add('cost_invalid', 'unitCost');
+  if (values.totalCost !== null && !isAcceptedAmount(values.totalCost.trim())) issues.add('cost_invalid', 'totalCost');
+  const qtyAlert = values.qtyAlert.trim();
+  if (qtyAlert !== '' && !DECIMAL_PATTERN.test(qtyAlert)) issues.add('qty_alert_invalid', 'qtyAlert');
+  if (values.lot !== null && !typedLotSchema.safeParse(values.lot).success) issues.add('lot_invalid', 'lot');
 }
 
 function validateWithSchema(type: ImportRowType, values: RowValues, issues: RowIssues): void {
@@ -503,10 +531,13 @@ function planRow(row: ParsedImportRow, state: PlanState, today: string): Planned
   const type = parseImportType(row.cells.type);
   const base = { rowNumber: row.rowNumber, cells: row.cells };
   if (type === null) {
-    return {
-      preview: { ...base, type: null, productName: null, status: 'error', issues: [importRowIssue('type_invalid', 'type')] },
-      write: null,
-    };
+    const issues = new RowIssues();
+    issues.add('type_invalid', 'type');
+    checkApplicability(row, null, issues);
+    validateWithoutType(readValues(row, null, today, issues), issues);
+    const [first, ...rest] = issues.list();
+    const all: [ImportRowIssue, ...ImportRowIssue[]] = [first ?? importRowIssue('type_invalid', 'type'), ...rest];
+    return { preview: { ...base, type: null, productName: null, status: 'error', issues: all }, write: null };
   }
 
   const issues = new RowIssues();

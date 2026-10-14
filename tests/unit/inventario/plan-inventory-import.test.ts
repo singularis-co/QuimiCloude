@@ -62,6 +62,19 @@ describe('planInventoryImport — un estado por fila', () => {
     }
   });
 
+  it('R9 sin tipo la fila sigue validando los campos que no dependen del tipo', () => {
+    const result = plan(
+      sheet({ ...ROW_INSUMO, type: 'Reactivo', stock: 'abc', unitCost: '0', qtyAlert: '-1', lot: '9'.repeat(60) }),
+    );
+    expect(codes(result.rows[0])).toEqual([
+      ['type_invalid', 'type'],
+      ['stock_invalid', 'stock'],
+      ['cost_invalid', 'unitCost'],
+      ['lot_invalid', 'lot'],
+      ['qty_alert_invalid', 'qtyAlert'],
+    ]);
+  });
+
   it('R9 el tipo se lee sin mayusculas, tildes ni espacios de los extremos', () => {
     const result = plan(sheet({ ...ROW_TERMINADO, type: '  PRODUCTO TERMINÁDO ' }));
     expect(result.rows[0]?.type).toBe('FINISHED_PRODUCT');
