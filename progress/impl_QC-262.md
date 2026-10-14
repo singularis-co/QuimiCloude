@@ -463,3 +463,10 @@ dos listas cerradas de E2E que no estan en «Archivos esperados»:
   (alta en `E2E_PERMITIDOS` con su nota).
 
 BLOQUEADO hasta que el leader añada los dos archivos a «Archivos esperados». T6c queda sin cerrar.
+
+### Desbloqueo (decisión del leader, 2026-10-13)
+
+Altas mecánicas en listas cerradas: `e2e/pedidos-rediseno.spec.ts` en R57 de
+`tests/unit/pedidos/scope.test.ts` (seis a siete) y en `E2E_PERMITIDOS` de
+`tests/unit/clientes/scope.test.ts`, cada una con su nota. `./init.sh` rápido: `init OK`;
+`test:rapido` 115/115 archivos, 1608 tests pasan, 37 omitidos, 0 fallan.

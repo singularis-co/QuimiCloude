@@ -101,7 +101,7 @@ P1–P12 de `requirements.md` (o acepta los valores por defecto).
   página que T0a marcó (`e2e/helpers/order-distribution.ts`, `pedido-en-varias-presentaciones`,
   `entregar-producto-terminado` y los que salgan). *Hecho:* cada spec tocado pasa por separado; los
   de la tabla de `design.md > 7` que no se tocan pasan sin cambios.
-- [ ] **T6c. Deudas y cierre.** `progress/deudas.md`: D37 resuelta; dueño de D38–D40 a «sin
+- [x] **T6c. Deudas y cierre.** `progress/deudas.md`: D37 resuelta; dueño de D38–D40 a «sin
   asignar»; D53 ampliada a `/pedidos`; nuevas de P5 y P10 si quedan por defecto.
   `./init.sh --completo` en verde.
 
