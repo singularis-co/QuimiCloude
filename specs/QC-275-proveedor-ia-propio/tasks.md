@@ -118,14 +118,14 @@
   el monograma y anotar R35 como pendiente en `progress/impl_QC-275.md`. *Depende de:* T12.
   *Hecho:* `ai-provider-card.test.tsx` afirma el `alt` (con SVG) o el `aria-label` (monograma).
   *Cubre:* R35.
-- [ ] **T16. E2E.** `e2e/integraciones-proveedor-ia.spec.ts` (`design.md > 15.4`); fila sembrada de
+- [x] **T16. E2E.** `e2e/integraciones-proveedor-ia.spec.ts` (`design.md > 15.4`); fila sembrada de
   conexión en `documentos.spec.ts`, `formula-desde-pdf.spec.ts`, `catalogo-desde-pdf.spec.ts` (y
   `movimiento.spec.ts` si sube PDF), con su limpieza; `e2e/integraciones.spec.ts` y
   `E2E_ESPERADOS` de `guard-identificador-de-request.test.ts`.
   *Depende de:* T12, T13. *Hecho:* `pnpm exec playwright test e2e/integraciones-proveedor-ia.spec.ts`
   y los cuatro specs tocados verdes en chromium y webkit. *Cubre:* R3, R8, R13, R16, R17, R20,
   R30–R34, R37, R41.
-- [ ] **T17. Trazabilidad.** Mapa `R1…R44 → test` en `progress/impl_QC-275.md`; ningún `R<n>` sin
+- [x] **T17. Trazabilidad.** Mapa `R1…R44 → test` en `progress/impl_QC-275.md`; ningún `R<n>` sin
   test (R35 puede quedar marcado pendiente de logos si T15 no los tuvo). *Depende de:* T0–T16.
   *Hecho:* `./init.sh` verde.
 

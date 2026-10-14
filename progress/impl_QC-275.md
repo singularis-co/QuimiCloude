@@ -499,3 +499,4 @@ Verificacion:
 - `vitest run guard`: 1062 passed, 20 skipped.
 - `tsc`: 0 errores.
 - lint: 0 errores (7 avisos previos).
+- 2026-10-14 · `gate-completo` verde en CI (run 38502283958, commit `e9c8145a`): cierra T16 (el E2E corre en CI solo en el PR a prod; escrito y excluido de los tests de alcance) y T17.
