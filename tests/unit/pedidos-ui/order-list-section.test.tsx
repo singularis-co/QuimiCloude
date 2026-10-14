@@ -216,6 +216,13 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => ({
   listWorkGroupsAction: listWorkGroupsActionMock,
 }));
 
+// 2026-10-13 — la seccion pide tambien los productos terminados de los pedidos producidos, y esa
+// action lee `observabilidad` de `@/lib/composition` al cargarse, que aqui solo trae `identity`.
+// El doble responde sin enlaces: esta suite no mira esa columna.
+vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', () => ({
+  listProducedProductsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
+}));
+
 const testId = {
   lista: 'order-list',
   vacio: 'order-list-empty',

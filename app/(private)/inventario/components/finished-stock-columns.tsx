@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
@@ -12,7 +13,9 @@ import type {
   PackagedStockEntry,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import {
@@ -159,8 +162,19 @@ export function buildFinishedStockColumns({
       cell: (item) => {
         if (item.kind === 'line') {
           return (
-            <span className="block pl-12" data-testid="finished-stock-line-name">
-              {item.line.product.name}
+            <span className="block pl-12">
+              <Link
+                href={finishedProductDetailRoute(item.line.product.id)}
+                data-testid="finished-stock-line-link"
+                className={cn(
+                  'inline-flex max-w-full items-center rounded-lg font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none',
+                  touchTarget,
+                )}
+              >
+                <span className="min-w-0 break-words" data-testid="finished-stock-line-name">
+                  {item.line.product.name}
+                </span>
+              </Link>
             </span>
           );
         }

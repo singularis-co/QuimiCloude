@@ -738,6 +738,11 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // QC-199: entra `createListProductFormUnits` (unidades del alta de insumo) y pasa a dieciseis.
     // 2026-10-06 (QC-209): entran `createPreviewInventoryImport` y `createConfirmInventoryImport`
     // (importar inventario desde Excel), y el barrel pasa de dieciseis a dieciocho.
+    // 2026-10-13 (detalle de producto terminado): entran las seis factorias de la ficha
+    // -`createGetFinishedProduct`, `createListFinishedProductBatches`,
+    // `createListFinishedProductMovements`, `createListFinishedProductDeliveries`,
+    // `createListFinishedProductCosts` y `createListProducedProducts`-, y el barrel pasa de
+    // dieciocho a veinticuatro. Sus tipos y funciones puras van en una sentencia sin `...Deps`.
     expect(
       [...FACTORIAS_DE_CASO_DE_USO].sort(),
       'no se pudieron derivar las factorias de caso de uso del barrel: sin ellas esta guardia no mira nada',
@@ -749,11 +754,17 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       'createCreateRawMaterial',
       'createDeletePresentation',
       'createDeleteProduct',
+      'createGetFinishedProduct',
       'createGetProduct',
       'createListBatchMovements',
+      'createListFinishedProductBatches',
+      'createListFinishedProductCosts',
+      'createListFinishedProductDeliveries',
+      'createListFinishedProductMovements',
       'createListFinishedStock',
       'createListOrderBatches',
       'createListPresentations',
+      'createListProducedProducts',
       'createListProductBatches',
       'createListProductFormUnits',
       'createListProducts',
