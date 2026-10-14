@@ -565,7 +565,7 @@ describe('pedidos: cancelar y borrar desde la fila (R33)', () => {
   }
 
   async function abrir(user: ReturnType<typeof setupUser>, accion: string) {
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO.id}`)).getByTestId('order-row-actions'));
     await user.click(await esperarInteractiva(await screen.findByTestId(accion)));
   }
 

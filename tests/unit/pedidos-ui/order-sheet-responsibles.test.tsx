@@ -217,7 +217,7 @@ describe('la seccion vive DENTRO del panel que ya existe (R23)', () => {
     // Cerrada la fila, no hay ningun panel montado.
     expect(screen.queryByTestId(ORDER_SHEET_TESTID)).toBeNull();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
     await user.click(
       await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
     );
@@ -254,7 +254,7 @@ describe('la seccion vive DENTRO del panel que ya existe (R23)', () => {
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
     await user.click(await esperarInteractiva(await screen.findByTestId('order-action-edit')));
 
     const paneles = await screen.findAllByTestId(ORDER_SHEET_TESTID);
@@ -270,7 +270,7 @@ describe('la seccion vive DENTRO del panel que ya existe (R23)', () => {
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
     await user.click(
       await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
     );
@@ -286,7 +286,7 @@ describe('abrir el panel NO emite ninguna consulta de responsables (R26)', () =>
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
     await user.click(
       await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
     );
@@ -334,7 +334,7 @@ describe('con el pedido ENTREGADO o CANCELADO la seccion CALLA (R29)', () => {
       // permiso. Si se cayera el corte por estado, este caso lo dice.
       montarLista(status);
 
-      await user.click(screen.getByTestId('order-row-actions'));
+      await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
       await user.click(
         await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
       );
@@ -368,7 +368,7 @@ describe('con el pedido ENTREGADO o CANCELADO la seccion CALLA (R29)', () => {
       const user = setupUser();
       montarLista(status);
 
-      await user.click(screen.getByTestId('order-row-actions'));
+      await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
       await user.click(
         await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
       );

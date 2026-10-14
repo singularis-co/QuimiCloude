@@ -4,7 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState, useTransition, type MouseEvent } from 'react';
 
-import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
+import {
+  DataTable,
+  type DataTableCardLayout,
+  type DataTableParams,
+  type DataTableTexts,
+} from '@/components/shared/data-table';
 import { buttonVariants } from '@/components/ui/button';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
@@ -13,14 +18,27 @@ import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { cn } from '@/lib/utils';
 
-import { buildOrderColumns } from './order-columns';
+import {
+  buildOrderColumns,
+  ORDER_CUSTOMER_NAME_COLUMN_ID,
+  ORDER_NUMBER_COLUMN_ID,
+  QUANTITY_COLUMN_ID,
+  RECIPE_NAME_COLUMN_ID,
+} from './order-columns';
 import { OrderCustomerFilter } from './order-customer-filter';
 import type { OrderCustomerChoice } from './order-customer-label';
 import type { ProducedProductsByOrder } from './order-produced-presentations';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
 import type { OrderRowAction } from './order-row-actions';
 import { OrderRowSheetActions } from './order-sheet';
-import { FIRST_PAGE, orderListHref, withSearchResetsPage } from './order-list-params';
+import {
+  CREATED_AT_COLUMN_ID,
+  FIRST_PAGE,
+  orderListHref,
+  PRIORITY_COLUMN_ID,
+  STATUS_COLUMN_ID,
+  withSearchResetsPage,
+} from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
 
 /**
@@ -84,6 +102,16 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   lastWeek: 'Última semana',
   lastMonth: 'Último mes',
   lastYear: 'Último año',
+  cardActions: 'Acciones',
+  closeMenu: 'Cerrar',
+};
+
+const ORDER_TABLE_CARD: DataTableCardLayout = {
+  primary: ORDER_NUMBER_COLUMN_ID,
+  status: STATUS_COLUMN_ID,
+  title: RECIPE_NAME_COLUMN_ID,
+  meta: [ORDER_CUSTOMER_NAME_COLUMN_ID, QUANTITY_COLUMN_ID, CREATED_AT_COLUMN_ID],
+  footer: PRIORITY_COLUMN_ID,
 };
 
 /** Copy del estado «sin coincidencias», distinto del de «no hay pedidos». */
@@ -309,6 +337,7 @@ export function OrderTable({
         totalPages={totalPages}
         onParamsChange={handleParamsChange}
         status="idle"
+        card={ORDER_TABLE_CARD}
         toolbarActions={<OrderCustomerFilter params={visibleParams} value={customerFilter} />}
         texts={noMatches === undefined ? ORDER_TABLE_TEXTS : { ...ORDER_TABLE_TEXTS, empty: ORDER_NO_MATCHES_MESSAGE }}
         emptyAction={

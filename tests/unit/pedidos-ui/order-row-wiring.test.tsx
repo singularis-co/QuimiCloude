@@ -200,7 +200,7 @@ function montarLista(status: OrderStatus = 'PENDIENTE') {
  * `order-row-actions.tsx`): se abre el disparador antes de buscar cualquier accion por testid.
  */
 function abrirMenu(): void {
-  fireEvent.click(screen.getByTestId('order-row-actions'));
+  fireEvent.click(within(screen.getByTestId('data-table-row-o1')).getByTestId('order-row-actions'));
 }
 
 beforeEach(() => {
@@ -218,7 +218,7 @@ describe('desde una fila viva, cada accion abre lo suyo (R23, R25, R37, R38)', (
   it('la fila trae el disparador y, cerrada, no monta ningun panel ni dialogo', () => {
     montarLista();
 
-    expect(screen.getByTestId('order-row-actions')).toBeInTheDocument();
+    expect(within(screen.getByTestId('data-table-row-o1')).getByTestId('order-row-actions')).toBeInTheDocument();
     abrirMenu();
     expect(screen.getByTestId('order-action-edit')).toBeEnabled();
     expect(screen.getByTestId('order-action-cancel')).toBeEnabled();

@@ -605,10 +605,25 @@ describe('montaje desde la fila', () => {
     expect(screen.queryByTestId(ORDER_DELIVERY_SHEET_TESTID)).toBeNull();
     expect(getDeliveryMock).not.toHaveBeenCalled();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${DELIVERY_ORDER_ID}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID));
 
     expect(await screen.findByTestId(ORDER_DELIVERY_SHEET_TESTID)).toBeInTheDocument();
     expect(getDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID);
+  });
+});
+
+describe('los textos del panel son los de hoy (QC-262 R20)', () => {
+  it('R20: «Entregar pedido <numero>» con su descripcion, «Cancelar» y «Entregar»', async () => {
+    montar();
+
+    expect(
+      await screen.findByRole('dialog', { name: `Entregar pedido ${ORDER.numberText}` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Elige el cliente y, por presentación, de qué lotes salen los envases.'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_DELIVERY_CANCEL_TESTID)).toHaveTextContent(/^Cancelar$/);
+    expect(await screen.findByTestId(ORDER_DELIVERY_SUBMIT_TESTID)).toHaveTextContent(/^Entregar$/);
   });
 });

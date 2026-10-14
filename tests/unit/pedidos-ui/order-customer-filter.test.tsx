@@ -9,6 +9,7 @@ import {
   CUSTOMER_PARAM,
   ORDER_CUSTOMER_NONE_LABEL,
   ORDER_CUSTOMER_PICKER_TOUCH_CLASSES,
+  ORDER_CUSTOMER_FILTER_TESTID,
   OrderCustomerFilter,
   PRIORITY_COLUMN_ID,
   STATUS_COLUMN_ID,
@@ -215,6 +216,31 @@ describe('valor inicial', () => {
     montar(vigentes());
 
     expect(screen.getByRole('combobox')).toHaveValue('');
+  });
+});
+
+describe('ancho del filtro en la barra', () => {
+  it('R3: el contenedor mide 256 px sin pasar del ancho de la barra y no se estira a todo el ancho', () => {
+    montar(vigentes());
+
+    const contenedor = screen.getByTestId(ORDER_CUSTOMER_FILTER_TESTID);
+    expect(contenedor).toHaveClass('w-64', 'max-w-full');
+    expect(contenedor.className.split(/\s+/)).not.toContain('w-full');
+    expect(contenedor.className).not.toMatch(/(^|\s)\S*:w-full(\s|$)/);
+  });
+
+  it('R4: con el ancho nuevo, elegir un cliente pide la misma direccion de hoy', async () => {
+    const user = setupUser();
+    const params = vigentes();
+    montar(params);
+
+    await elegir(user, 'Ana Garcia');
+    expect(parametroCliente()).toBe(ANA.id);
+    expect(destino()).toEqual({
+      ...params,
+      page: 1,
+      filters: { ...params.filters, customerId: { kind: 'select', values: [ANA.id] } },
+    });
   });
 });
 

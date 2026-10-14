@@ -226,3 +226,105 @@ Tests: `order-row-actions.test.tsx`, `order-row-wiring.test.tsx`, `order-columns
    solo mira el texto). No se tocó.
 
 Veredicto: T2a cerrada y Tanda 3 (T3a, T3b) hecha; typecheck, lint, related y guardias en verde.
+
+## Tanda 5 — T5a y T5b (frontend_dev, 2026-10-13)
+
+Solo tests; ningún cambio de producción (decisión del leader: D8 sin `max-sm:w-full`, T5a afirma
+el ancho de hoy, que T0b midió en 390 × 844).
+
+Archivos tocados (solo añadidos, al final de cada archivo):
+
+- `tests/unit/pedidos-ui/order-form.test.tsx`: R19 (clase del panel bajo 640 px: `w-full` y
+  `data-[side=right]:w-full` como únicas clases de ancho sin breakpoint, tope `sm:max-w-md`, sin
+  `data-[side=right]:w-3/4`, `min-width: 70vw`, `pb-[env(safe-area-inset-bottom)]`) y R20 (título y
+  descripción del alta; título «<receta> × <cantidad>» y descripción de la edición).
+- `tests/unit/pedidos-ui/cancel-order-dialog.test.tsx`, `delete-order-dialog.test.tsx`,
+  `blocked-order-dialog.test.tsx`, `order-customer-dialog.test.tsx`,
+  `order-distribution-dialog.test.tsx`, `order-delivery-sheet.test.tsx`: un caso R20 cada uno con
+  título (por rol y nombre accesible) y los textos de sus botones.
+- `tests/unit/pedidos-ui/pedidos-toasts.test.tsx` (nuevo): `sonner` simulado; 13 éxitos, cada uno
+  con un único `toast.success` y su texto exacto (alta, edición, cancelar, eliminar, cliente,
+  reparto, entrega completa, entrega parcial «Entrega registrada», asignar 1 y 3, retirar
+  responsable, retirar grupo de 1 y de 3), y los mismos 13 con error: región de error pintada y
+  ningún `toast.success`.
+
+R → test:
+
+| R | Test |
+| --- | --- |
+| R19 | `order-form.test.tsx` > «R19: por debajo de 640 px el panel ocupa todo el ancho con su clase de hoy» |
+| R20 | `order-form.test.tsx` (2 casos R20), `cancel-order-dialog`, `delete-order-dialog`, `blocked-order-dialog`, `order-customer-dialog`, `order-distribution-dialog`, `order-delivery-sheet` (un caso R20 cada uno) |
+| R21 | `pedidos-toasts.test.tsx` (26 casos) |
+
+Salida:
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes, ninguno en los archivos tocados.
+- `pnpm exec vitest run` de los 8 archivos + `paridad/formularios-paridad.test.tsx`: 240 pasados,
+  6 fallados. Los 6 son casos «montaje desde la fila» que montan `OrderTable`
+  (`order-customer-dialog` R39, `order-delivery-sheet` R4, `order-distribution-dialog` R11 ×4) y
+  fallan con «Found multiple elements by: [data-testid="order-row-actions"]»: vienen del
+  `order-table.tsx` que la Tanda 4 está cambiando en paralelo, no de lo añadido aquí (los casos
+  nuevos pasan todos). Los casos R19, R20 y R21 nuevos: 3 + 6 + 26, todos en verde.
+- `formularios-paridad`: en verde, snapshot sin cambios.
+
+Veredicto: T5a y T5b hechas, solo tests; 6 rojos ajenos que dependen de que la Tanda 4 cierre `order-table.tsx`.
+
+## Tanda 4 — T4a, T4b y T4c (frontend_dev, 2026-10-13)
+
+**Archivos.** Producción: `app/(private)/pedidos/page.tsx` (`PageShell` > `PageHeader` con
+`title={ORDERS_LABEL}`, `titleTestId="pedidos-title"` y `actions={<OrderSheet … />}`; fuera el `div`
+y el `h1` propios; el `Suspense` queda igual), `order-customer-filter.tsx` (`w-full sm:w-64` →
+`w-64 max-w-full`), `order-table.tsx` (`card` de D6 como constante del módulo y
+`cardActions: 'Acciones'`, `closeMenu: 'Cerrar'` en `ORDER_TABLE_TEXTS`).
+Tests nuevos: `tests/unit/pedidos-ui/pedidos-page-header.test.tsx` (3), `order-cards.test.tsx` (12).
+Tests ampliados: `order-customer-filter.test.tsx` (R3, R4), `order-table.test.tsx` (R2 ×2),
+`order-sheet.test.tsx` (R19 alta y edición: `data-side="right"`, `w-full`,
+`data-[side=right]:w-full`, `data-[side=right]:inset-y-0`, `data-[side=right]:h-full`,
+`pb-[env(safe-area-inset-bottom)]`; sin `max-sm:w-full`, decisión del leader).
+Acotados a `data-table-row-<id>` (duplicados de tarjeta): `order-row-wiring` (2), `order-sheet` (3),
+`order-sheet-coverage` (3), `order-sheet-responsibles` (6), `read-only` (1), `order-list-section` (4),
+`order-list-section-produced` (2, `getByText` del número), `shared-ui/confirm-dialog-montado` (1).
+`pedidos-viewport`, `a11y-tactil` y `tablas-marca` pasan sin cambios.
+Snapshot: `tests/unit/paridad/__snapshots__/pedidos-paridad.test.tsx.snap` (7 actualizados,
++123/−54): cabecera `PageShell`/`PageHeader` (clases del `h1` y contenedores), `ul data-table-cards`
+con una tarjeta por pedido, `@container` en `data-table` y `@max-[760px]:hidden` en la caja de la
+tabla, y filtro de cliente `max-w-full w-64`. Nada fuera de la fila de `design.md > 6`.
+
+**R → test.**
+- R1 → `pedidos-page-header.test.tsx` (PageShell > PageHeader; único `h1` «Pedidos» con
+  `pedidos-title`; «Nuevo pedido» en `page-header-actions`, 44 px, abre el panel).
+- R2 → `order-table.test.tsx` (una sola barra; buscador, cliente y chips Estado, Prioridad, Fecha de
+  solicitud en ese orden; ningún control de filtro fuera).
+- R3 → `order-customer-filter.test.tsx` (contenedor `w-64 max-w-full`, sin `w-full` ni `*:w-full`).
+- R4 → `order-customer-filter.test.tsx` (misma dirección al elegir) + los R34 de hoy.
+- R15 → `order-cards.test.tsx` (campos, orden, monoespaciada, «Acciones» de 44 px con
+  `data-order-id`, diálogo «Pedido <n>» con ítems de 48 px y «Cerrar», el ítem abre lo suyo).
+- R17 → `order-cards.test.tsx` (vacío, sin coincidencias, paginación única). El aviso «en vuelo» y el
+  error siguen cubiertos por `order-table.test.tsx` y `order-list-section.test.tsx`, en verde con
+  tarjetas.
+- R19 → `order-sheet.test.tsx` (2 casos).
+
+**Salida.**
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errores, 7 avisos ajenos (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest related --run` de los 3 archivos de producción: 66 archivos, 1408 pasan,
+  **6 fallan**.
+- `pnpm exec vitest run guard`: 76 archivos, 1052 pasan, 20 omitidos, 0 fallan.
+- `pnpm exec vitest run tests/unit/pedidos-ui tests/unit/paridad/pedidos-paridad tests/unit/marca`:
+  61 archivos, 1151 pasan, 3 omitidos, **6 fallan**.
+- Los 6 rojos son los mismos en los dos comandos: archivos de la Tanda 5, que no se tocan aquí.
+  Fallan con «Found multiple elements by: [data-testid="order-row-actions"]», que es el duplicado
+  de tarjeta. Falta acotar a `data-table-row-<id>`:
+  - `order-customer-dialog.test.tsx:238`
+  - `order-delivery-sheet.test.tsx:608`
+  - `order-distribution-dialog.test.tsx:219, 398, 409`, y probablemente también 172, 196, 381 y
+    440, que usan el mismo localizador.
+
+**Desviaciones.**
+1. Los 6 rojos de arriba están en archivos de la Tanda 5. Según el brief no se tocan.
+2. R19 queda afirmado dos veces: aquí en `order-sheet.test.tsx` y en `order-form.test.tsx`
+   (Tanda 5).
+
+Veredicto: T4a, T4b y T4c hechas. Typecheck, lint y guardias en verde. Quedan 6 rojos de duplicado
+de tarjeta en tres tests de diálogos de la Tanda 5.

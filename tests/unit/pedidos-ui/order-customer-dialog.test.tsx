@@ -1,12 +1,13 @@
 // El dialogo «Cliente» de la fila: guardar, quitar, exito y error, y que solo se monta abierto.
 // Las Server Actions que no le tocan son dobles que fallan si se les llama.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ORDER_ACTION_CUSTOMER_TESTID,
+  ORDER_CUSTOMER_DIALOG_DISMISS_TESTID,
   ORDER_CUSTOMER_DIALOG_ERROR_TESTID,
   ORDER_CUSTOMER_DIALOG_REMOVE_TESTID,
   ORDER_CUSTOMER_DIALOG_SUBMIT_TESTID,
@@ -234,9 +235,20 @@ describe('montaje desde la fila', () => {
 
     expect(screen.queryByTestId(ORDER_CUSTOMER_DIALOG_TESTID)).toBeNull();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID));
 
     expect(await screen.findByTestId(ORDER_CUSTOMER_DIALOG_TESTID)).toBeInTheDocument();
+  });
+});
+
+describe('los textos del dialogo son los de hoy (QC-262 R20)', () => {
+  it('R20: «Cliente» con «Quitar cliente», «Cancelar» y «Guardar»', () => {
+    montarDialogo();
+
+    expect(screen.getByRole('dialog', { name: 'Cliente' })).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_CUSTOMER_DIALOG_REMOVE_TESTID)).toHaveTextContent(/^Quitar cliente$/);
+    expect(screen.getByTestId(ORDER_CUSTOMER_DIALOG_DISMISS_TESTID)).toHaveTextContent(/^Cancelar$/);
+    expect(screen.getByTestId(ORDER_CUSTOMER_DIALOG_SUBMIT_TESTID)).toHaveTextContent(/^Guardar$/);
   });
 });

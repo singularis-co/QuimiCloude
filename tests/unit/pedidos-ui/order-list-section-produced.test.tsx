@@ -5,7 +5,7 @@
 // devuelve. Los bordes de los módulos que no se ejercitan aquí se sustituyen igual que en
 // `order-list-section.test.tsx`.
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -223,8 +223,16 @@ describe('la sección de /pedidos y el producto terminado de sus pedidos produci
 
     expect(screen.getByTestId('order-list')).toBeInTheDocument();
     expect(screen.queryByTestId('order-list-error')).toBeNull();
-    expect(screen.getByText(formatOrderNumber({ year: 2026, sequence: 2 }))).toBeInTheDocument();
-    expect(screen.getByText(formatOrderNumber({ year: 2026, sequence: 3 }))).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId(`data-table-row-${PEDIDO_TERMINADO}`)).getByText(
+        formatOrderNumber({ year: 2026, sequence: 2 }),
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId(`data-table-row-${PEDIDO_ENTREGADO}`)).getByText(
+        formatOrderNumber({ year: 2026, sequence: 3 }),
+      ),
+    ).toBeInTheDocument();
     expect(screen.getAllByText('2 × Bidón 20L').length).toBeGreaterThan(0);
     expect(screen.queryAllByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toHaveLength(0);
   });

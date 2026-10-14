@@ -11,6 +11,7 @@ import {
   BLOCKED_ORDER_DISMISS_TESTID,
   BLOCKED_ORDER_MESSAGE_TESTID,
   ORDER_ACTION_DISTRIBUTION_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_DISMISS_TESTID,
   ORDER_DISTRIBUTION_AVAILABLE_TESTID,
   ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID,
   ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID,
@@ -215,7 +216,7 @@ describe('accion de fila «Reparto y unidad»', () => {
       />,
     );
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeInTheDocument();
@@ -377,7 +378,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
   }
 
   async function guardarEnvases(user: ReturnType<typeof setupUser>, envases: string) {
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
     const campo = await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
     await user.clear(campo);
@@ -394,7 +395,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     render(accionesDeFila(pedido()));
 
     await guardarEnvases(user, '5');
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(5);
@@ -405,7 +406,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     render(accionesDeFila(pedido()));
 
     await guardarEnvases(user, '5');
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
     await user.click(await screen.findByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
 
@@ -436,7 +437,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
         }),
       ),
     );
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(7);
@@ -499,5 +500,15 @@ describe('«Reparto y unidad» con falta de envases (R17, R37)', () => {
     expect(updateDistributionMock).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeInTheDocument();
     expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('los textos del dialogo son los de hoy (QC-262 R20)', () => {
+  it('R20: «Reparto y unidad» con «Cancelar» y «Guardar»', () => {
+    montarDialogo();
+
+    expect(screen.getByRole('dialog', { name: 'Reparto y unidad' })).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_DISMISS_TESTID)).toHaveTextContent(/^Cancelar$/);
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toHaveTextContent(/^Guardar$/);
   });
 });

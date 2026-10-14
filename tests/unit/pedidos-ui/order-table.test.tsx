@@ -630,6 +630,49 @@ describe('el filtro «Cliente» vive en la barra de la tabla', () => {
     expect(within(barra).getByTestId(ORDER_CUSTOMER_FILTER_TESTID)).toBeInTheDocument();
   });
 
+  it('R2: una sola barra con el buscador, el cliente y los chips de estado, prioridad y fecha, en ese orden', () => {
+    montar();
+
+    const barras = screen.getAllByTestId('data-table-filters');
+    expect(barras).toHaveLength(1);
+    const barra = barras[0]!;
+
+    const buscador = within(barra).getByTestId('data-table-search');
+    expect(buscador).toHaveAccessibleName(ORDER_TABLE_TEXTS.search);
+    const cliente = within(barra).getByTestId(ORDER_CUSTOMER_FILTER_TESTID);
+    expect(within(cliente).getByRole('combobox')).toHaveAccessibleName('Filtrar por cliente');
+    const chips = within(barra).getByTestId('data-table-chips');
+
+    const antes = (a: Element, b: Element) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(antes(buscador, cliente)).toBe(true);
+    expect(antes(cliente, chips)).toBe(true);
+
+    const etiquetas = Array.from(chips.children, (chip) => chip.textContent ?? '');
+    expect(etiquetas).toHaveLength(3);
+    expect(etiquetas[0]).toContain('Estado');
+    expect(etiquetas[1]).toContain('Prioridad');
+    expect(etiquetas[2]).toContain('Fecha de solicitud');
+  });
+
+  it('R2: ningun control de filtro de la lista queda fuera de la barra', () => {
+    montar();
+
+    const barra = screen.getByTestId('data-table-filters');
+    const controles = document.querySelectorAll(
+      [
+        '[data-testid="data-table-search"]',
+        `[data-testid="${ORDER_CUSTOMER_FILTER_TESTID}"]`,
+        '[data-testid^="data-table-filter-"]',
+        '[data-testid="data-table-chips"]',
+      ].join(', '),
+    );
+    expect(controles.length).toBeGreaterThan(0);
+    for (const control of controles) {
+      expect(barra.contains(control), control.getAttribute('data-testid') ?? '').toBe(true);
+    }
+  });
+
   it('R29: arranca con el valor que resolvio el servidor', () => {
     render(
       <OrderTable

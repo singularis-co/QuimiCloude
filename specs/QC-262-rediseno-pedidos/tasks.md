@@ -65,13 +65,13 @@ P1–P12 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 4 — Página, barra y tarjetas (depende de T3b)
 
-- [ ] **T4a [P]. Cabecera** (D1, R1). `page.tsx` con `PageShell` y `PageHeader`. Test
+- [x] **T4a [P]. Cabecera** (D1, R1). `page.tsx` con `PageShell` y `PageHeader`. Test
   `tests/unit/pedidos-ui/pedidos-page-header.test.tsx`: un único `h1` «Pedidos» con `pedidos-title`
   y «Nuevo pedido» en las acciones de la cabecera.
-- [ ] **T4b [P]. Filtro de cliente** (D2, R2–R4). `order-customer-filter.tsx`; test en
+- [x] **T4b [P]. Filtro de cliente** (D2, R2–R4). `order-customer-filter.tsx`; test en
   `order-customer-filter.test.tsx` (contenedor sin `w-full`) y en `order-table.test.tsx` (una sola
   `data-table-filters` con buscador, cliente y los tres chips, en ese orden; nada fuera).
-- [ ] **T4c. Tarjetas** (D6, R15–R17; depende de T4a). `card` y textos en `order-table.tsx`. Test
+- [x] **T4c. Tarjetas** (D6, R15–R17; depende de T4a). `card` y textos en `order-table.tsx`. Test
   `tests/unit/pedidos-ui/order-cards.test.tsx`: tarjeta con número, estado, receta, cliente,
   cantidad, fecha, prioridad y «Acciones» que abre el diálogo centrado «Pedido <n>»; vacío, sin
   coincidencias y paginación como hoy. Acotar al cuerpo visible los tests de `design.md > 7`
@@ -80,11 +80,11 @@ P1–P12 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 5 — Paneles en teléfono y avisos (depende de T3b) [P con 4]
 
-- [ ] **T5a [P]. Panel a todo el ancho** (D8, R19, R20). `order-form.tsx` (clase del panel por debajo
+- [x] **T5a [P]. Panel a todo el ancho** (D8, R19, R20). `order-form.tsx` (clase del panel por debajo
   de 640 px); los diálogos solo si T0b encontró algo. Tests en `order-sheet.test.tsx` y
   `order-form.test.tsx`: clase del panel y textos del R20. Snapshot de `formularios-paridad` si
   cambia (fila de `design.md > 6`).
-- [ ] **T5b [P]. Avisos emergentes** (D9, R21). Test `tests/unit/pedidos-ui/pedidos-toasts.test.tsx`:
+- [x] **T5b [P]. Avisos emergentes** (D9, R21). Test `tests/unit/pedidos-ui/pedidos-toasts.test.tsx`:
   cada éxito lanza un único `toast.success` con su texto, incluidos la entrega parcial y el plural de
   grupos; un error no lanza ninguno.
 
