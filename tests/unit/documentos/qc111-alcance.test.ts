@@ -516,13 +516,21 @@ describe('QC-111 R20 — ninguna operacion del repositorio Prisma borra fisicame
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-111 R22 — ningun codigo de error nuevo sale del modulo', () => {
-  it('R22: domain/errors.ts sigue declarando exactamente las cinco clases que ya tenia', () => {
+  it('R22: domain/errors.ts declara exactamente sus siete clases (las dos ultimas, del proveedor IA de cada empresa)', () => {
     const fuente = enDisco('lib/modules/documentos/domain/errors.ts');
     const clases = [...fuente.matchAll(/\bclass\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1]).sort();
     expect(
       clases,
       `R22: una clase nueva en errors.ts es, casi siempre, un codigo nuevo. Clases encontradas:\n${clases.join('\n')}`,
-    ).toEqual(['AiUnavailableError', 'DocumentosError', 'UnauthorizedError', 'UnexpectedError', 'ValidationError']);
+    ).toEqual([
+      'AiProviderError',
+      'AiProviderMissingError',
+      'AiUnavailableError',
+      'DocumentosError',
+      'UnauthorizedError',
+      'UnexpectedError',
+      'ValidationError',
+    ]);
   });
 
   it('R22: failure-kind.ts y run-document-job.ts solo nombran codigos del catalogo cerrado', () => {

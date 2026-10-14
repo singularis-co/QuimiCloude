@@ -110,7 +110,10 @@ function almacenamientoQueNoDebeLlamarse() {
  *  que la accion invoque dominio de verdad en vez de otro doble. */
 function cablearCasoDeUsoReal() {
   const puerto = almacenamientoQueNoDebeLlamarse();
-  const emitir = createIssueUploadLinks({ storage: puerto.storage });
+  const emitir = createIssueUploadLinks({
+    storage: puerto.storage,
+    aiProvider: { isConfigured: async (): Promise<boolean> => true },
+  });
   issueUploadLinksMock.mockImplementation((actor: Actor | null, input: unknown) =>
     emitir(actor, input),
   );

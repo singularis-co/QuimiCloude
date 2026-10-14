@@ -91,6 +91,10 @@ export { aiReadInputSchema, type AiReadInput } from './domain/ai-read-input';
 // DocumentosError` de siempre.
 export { AiUnavailableError } from './domain/errors';
 
+// Sin proveedor IA conectado no se emite ningun enlace; con la cuenta rechazada la lectura falla
+// con su propio codigo. Los dos se reconocen por el mismo `instanceof DocumentosError`.
+export { AiProviderError, AiProviderMissingError } from './domain/errors';
+
 // La lectura de un PDF con IA, publicada como FABRICA por el mismo motivo que las de arriba: quien
 // la usa recibe el caso de uso ya construido y nunca ve al puerto ni a su adaptador. Atar puerto ->
 // adaptador sigue siendo trabajo exclusivo de `lib/composition`.
@@ -136,8 +140,12 @@ export { queueMessageSchema, type QueueMessageBody } from './domain/queue-messag
 // que ejecuta el Route Handler por cada mensaje; `getBatchStatus` consulta y caduca. Atar puerto ->
 // adaptador sigue siendo trabajo exclusivo de `lib/composition`.
 export { createEnqueueBatch, type EnqueuedBatch } from './domain/enqueue-batch';
+// El lector de cada trabajo sale del proveedor IA de la empresa: la composicion implementa este
+// puerto atando `integraciones`, y por eso es el unico puerto que el contrato nombra.
 export {
   createRunDocumentJob,
+  type AiProviderGateway,
+  type AiReaderLookup,
   type RunDocumentJobMessage,
   type RunDocumentJobResult,
 } from './domain/run-document-job';

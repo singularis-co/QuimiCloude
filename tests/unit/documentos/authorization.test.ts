@@ -294,12 +294,14 @@ describe('documentos — autorizacion', () => {
 
     it('R10 — issueUploadLinks rechaza a un actor con solo `proveedores.modificar`', async () => {
       const storage = dobleDeAlmacenamiento();
-      const issueUploadLinks = createIssueUploadLinks({ storage });
+      const aiProvider = { isConfigured: vi.fn(async (): Promise<boolean> => true) };
+      const issueUploadLinks = createIssueUploadLinks({ storage, aiProvider });
 
       await expect(issueUploadLinks(actorSoloProveedores(), { paths: [] })).rejects.toBeInstanceOf(
         UnauthorizedError,
       );
       for (const metodo of Object.values(storage)) expect(metodo).not.toHaveBeenCalled();
+      expect(aiProvider.isConfigured).not.toHaveBeenCalled();
     });
 
     it('R10 — enqueueBatch rechaza a un actor con solo `proveedores.modificar`', async () => {

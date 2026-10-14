@@ -72,7 +72,8 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-235 2026-10-13: 88 y no 87: entra `company_not_found`.
       // QC-214 2026-10-13: 93 y no 88: entran `evidence_required`, `evidence_limit`,
       // `evidence_invalid_file`, `evidence_not_found` y `recipe_steps_locked`.
-      expect(ERROR_CODES).toHaveLength(93)
+      // QC-275 2026-10-13: 95 y no 93: entran `ai_provider_missing` y `ai_provider_error`.
+      expect(ERROR_CODES).toHaveLength(95)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

@@ -38,15 +38,20 @@ const RAIZ = join(__dirname, '..', '..', '..');
 
 const PERMISO = 'integraciones.modificar';
 
-// WhatsApp dejo de ser cascaron: su pantalla la cubre `whatsapp-page.test.tsx`. Aqui sigue en el
-// corte por permiso, que es el mismo para las tres.
+// WhatsApp y Proveedor IA dejaron de ser cascaron: sus pantallas las cubren `whatsapp-page.test.tsx`
+// y `ai-provider-page.test.tsx`. Aqui siguen en el corte por permiso, que es el mismo para las tres.
 const PAGINAS_CASCARON = [
-  { ruta: AI_PROVIDER_INTEGRATION_ROUTE, Pagina: AiProviderIntegrationPage },
   { ruta: INVENTORY_INTEGRATION_ROUTE, Pagina: InventoryIntegrationPage },
+] as const;
+
+const PAGINAS_CON_PANTALLA = [
+  { ruta: AI_PROVIDER_INTEGRATION_ROUTE },
+  { ruta: WHATSAPP_INTEGRATION_ROUTE },
 ] as const;
 
 const PAGINAS = [
   ...PAGINAS_CASCARON,
+  { ruta: AI_PROVIDER_INTEGRATION_ROUTE, Pagina: AiProviderIntegrationPage },
   { ruta: WHATSAPP_INTEGRATION_ROUTE, Pagina: WhatsappIntegrationPage },
 ] as const;
 
@@ -151,12 +156,23 @@ describe('la pagina cascaron de cada integracion', () => {
     },
   );
 
-  it('R9: whatsapp ya no es cascaron: su pagina no importa IntegrationPlaceholder ni el barrel compartido', () => {
-    const fuente = sinComentarios(fuenteDe(WHATSAPP_INTEGRATION_ROUTE));
+  it.each(PAGINAS_CON_PANTALLA)(
+    'R9: $ruta ya no es cascaron: su pagina no importa IntegrationPlaceholder ni el barrel compartido',
+    ({ ruta }) => {
+      const fuente = sinComentarios(fuenteDe(ruta));
 
-    expect(fuente).not.toMatch(/\bIntegrationPlaceholder\b/);
-    expect(fuente).not.toMatch(/from '\.\.\/components'/);
-    expect(fuente).toMatch(/from '\.\/components'/);
+      expect(fuente).not.toMatch(/\bIntegrationPlaceholder\b/);
+      expect(fuente).not.toMatch(/\bINTEGRATION_EMPTY_MESSAGE\b/);
+      expect(fuente).not.toMatch(/from '\.\.\/components'/);
+      expect(fuente).toMatch(/from '\.\/components'/);
+    },
+  );
+
+  it('R9: solo inventarios sigue siendo cascaron', () => {
+    expect(PAGINAS_CASCARON.map(({ ruta }) => ruta)).toEqual([INVENTORY_INTEGRATION_ROUTE]);
+    expect(PAGINAS.map(({ ruta }) => ruta).sort()).toEqual(
+      [AI_PROVIDER_INTEGRATION_ROUTE, INVENTORY_INTEGRATION_ROUTE, WHATSAPP_INTEGRATION_ROUTE].sort(),
+    );
   });
 
   it.each(PAGINAS)(

@@ -98,6 +98,8 @@ export const ERROR_MESSAGE_KEY = {
   evidence_invalid_file: 'errors.evidence_invalid_file',
   evidence_not_found: 'errors.evidence_not_found',
   recipe_steps_locked: 'errors.recipe_steps_locked',
+  ai_provider_missing: 'errors.ai_provider_missing',
+  ai_provider_error: 'errors.ai_provider_error',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -248,4 +250,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.evidence_not_found': 'La foto de evidencia no existe.',
   'errors.recipe_steps_locked':
     'Hay pedidos en curso con fotos de evidencia: mientras sigan en curso no puedes mover ni quitar pasos.',
+  'errors.ai_provider_missing': 'Para leer PDF, conecta el proveedor IA de tu empresa.',
+  'errors.ai_provider_error':
+    'Error con tu proveedor IA. Revisa la conexión en Integraciones > Proveedor IA.',
 } as const satisfies Record<ErrorMessageKey, string>;

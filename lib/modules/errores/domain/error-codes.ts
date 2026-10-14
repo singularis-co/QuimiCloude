@@ -208,6 +208,8 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: la formula es valida, pero mover o quitar pasos dejaria fotos de
   // pedidos en curso atadas a otro paso.
   'recipe_steps_locked',
+  'ai_provider_missing',
+  'ai_provider_error',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

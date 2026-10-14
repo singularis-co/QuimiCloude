@@ -41,6 +41,7 @@
     "identity/packing-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
     "integraciones/whatsapp-connection-migration.int.test.ts",
+    "integraciones/ai-provider-migration.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
     "inventario/inventory-movements-constraints.int.test.ts",
@@ -631,6 +632,11 @@
     {
       "archivo": "asignaciones/step-evidence-repository.int.test.ts",
       "motivo": "QC-214 T5 (R29, R38, R39): ejercita `createStepEvidenceRepository` (step-evidence-prisma.ts) con el cliente Prisma GLOBAL: `replace` abre su PROPIA `prisma.$transaction` y lo que se mide en R29 es la carrera de varios registros simultaneos sobre el mismo paso, que necesita conexiones distintas, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en `beforeAll` y mueren en `afterAll` en el orden de las FK: fotos -> pedidos -> recetas -> usuarios -> roles -> tipos de documento -> empresas. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-13"
+    },
+    {
+      "archivo": "integraciones/ai-provider-connection-prisma.int.test.ts",
+      "motivo": "Ejercita las cuatro funciones de ai-provider-connection-prisma.ts y el catalogo, que llaman al cliente Prisma GLOBAL y no a un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria; ademas R19 necesita dos altas y dos guardados concurrentes de verdad contra el indice unico de empresa. Cada caso fabrica sus empresas efimeras con randomUUID (tipo de documento, rol, empresa y usuario) y 'afterAll' borra sus conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. El catalogo 'ai_providers' solo se lee. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-13"
     },
     {

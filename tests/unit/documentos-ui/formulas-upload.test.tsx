@@ -7,6 +7,7 @@ import type {
   GetBatchStatusResult,
 } from '@/lib/modules/documentos/adapters/driving/document-batch-actions';
 import type { IssueUploadLinksResult } from '@/lib/modules/documentos/adapters/driving/document-upload-actions';
+import type { AiProviderReadiness } from '@/lib/modules/integraciones';
 import type { DeleteRecipeFormState, RecipeListResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 
 const {
@@ -19,6 +20,7 @@ const {
   issueUploadLinksActionMock,
   enqueueBatchActionMock,
   getBatchStatusActionMock,
+  getAiProviderReadinessActionMock,
 } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   usePathnameMock: vi.fn<() => string>(),
@@ -36,6 +38,7 @@ const {
   issueUploadLinksActionMock: vi.fn<(input: unknown) => Promise<IssueUploadLinksResult>>(),
   enqueueBatchActionMock: vi.fn<(input: unknown) => Promise<EnqueueBatchResult>>(),
   getBatchStatusActionMock: vi.fn<(batchId: string) => Promise<GetBatchStatusResult>>(),
+  getAiProviderReadinessActionMock: vi.fn<() => Promise<AiProviderReadiness>>(),
 }));
 
 // `requirePagePermission` resuelve la sesion por `@/lib/composition`; sin este doble la pantalla
@@ -69,7 +72,16 @@ vi.mock('@/lib/modules/documentos/adapters/driving/document-batch-actions', () =
   getBatchStatusAction: getBatchStatusActionMock,
 }));
 
+vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () => ({
+  getAiProviderReadinessAction: getAiProviderReadinessActionMock,
+}));
+
 import FormulasPage from '@/app/(private)/produccion/formulas/page';
+import {
+  AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID,
+  AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID,
+  AI_PROVIDER_REQUIRED_NOTICE_TESTID,
+} from '@/components/shared/ai-provider-required-notice';
 import {
   DOCUMENT_UPLOAD_DIALOG_TESTID,
   DOCUMENT_UPLOAD_INPUT_TESTID,
@@ -79,7 +91,7 @@ import {
 } from '@/components/shared/document-upload';
 import { PERMISSIONS } from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
-import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { AI_PROVIDER_INTEGRATION_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
 
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, clearSidebarStateCookie, resetViewport, setViewportWidth } from '../../helpers/viewport';
@@ -133,6 +145,7 @@ beforeEach(() => {
     data: { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE, totalPages: 1 },
   });
   deleteRecipeActionMock.mockResolvedValue({ status: 'success' });
+  getAiProviderReadinessActionMock.mockResolvedValue({ configured: true, canConfigure: false });
 
   issueUploadLinksActionMock.mockResolvedValue({
     status: 'success',
@@ -199,6 +212,23 @@ describe('el boton de subida en el listado de formulas', () => {
     expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).toBeNull();
   });
 
+  it('R38: sin documentos.modificar no hay aviso de proveedor IA aunque la empresa no lo tenga, y ni se consulta', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: 'u-test-43',
+      username: 'nora.paz',
+      displayName: 'Nora Paz',
+      roleName: 'Operador',
+      permissions: ['recetas.consultar', 'documentos.consultar', 'integraciones.modificar'],
+    });
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: true });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID)).toBeNull();
+    expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
+  });
+
   it('el boton comparte contenedor padre con «Nueva formula» (R22)', async () => {
     getSessionUserMock.mockResolvedValue({
       id: 'u-test-42',
@@ -238,5 +268,64 @@ describe('el boton de subida en el listado de formulas', () => {
     const abrir = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
 
     expect(abrir.parentElement).toBe(crear.parentElement);
+  });
+});
+
+describe('el aviso de proveedor IA en el listado de formulas', () => {
+  const conSubida = {
+    id: 'u-test-42',
+    username: 'carla.duarte',
+    displayName: 'Carla Duarte Salas',
+    roleName: 'Administrador',
+    permissions: ['recetas.consultar', 'documentos.modificar'],
+  };
+
+  it('R37: con la empresa conectada hay boton y no aviso', async () => {
+    getSessionUserMock.mockResolvedValue(conSubida);
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: true, canConfigure: true });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeVisible();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID)).toBeNull();
+    expect(getAiProviderReadinessActionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('R37: sin conexion y con integraciones.modificar, el aviso con enlace ocupa el sitio del boton', async () => {
+    getSessionUserMock.mockResolvedValue(conSubida);
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: true });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).toBeNull();
+    const aviso = screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID);
+    expect(aviso).toHaveTextContent(
+      'Para leer PDF, conecta el proveedor IA de tu empresa. La lectura usa tu propia API key.',
+    );
+    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID)).toHaveAttribute(
+      'href',
+      AI_PROVIDER_INTEGRATION_ROUTE,
+    );
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID)).toBeNull();
+    // En el sitio del boton: la misma fila de acciones que «Nueva formula».
+    expect(
+      aviso.parentElement?.querySelector(':scope > [data-testid="recipe-create-open"]'),
+    ).not.toBeNull();
+  });
+
+  it('R37: sin conexion y sin integraciones.modificar, el aviso pide a un administrador y no enlaza', async () => {
+    getSessionUserMock.mockResolvedValue(conSubida);
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: false });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
+    const aviso = screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID);
+    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID)).toHaveTextContent(
+      'Pídele a un administrador que lo configure',
+    );
+    expect(aviso.querySelector('a')).toBeNull();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID)).toBeNull();
   });
 });

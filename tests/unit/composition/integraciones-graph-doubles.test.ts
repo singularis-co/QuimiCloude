@@ -107,14 +107,23 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('la fachada expone exactamente el cifrado y los casos de uso de la conexion', () => {
+  it('la fachada expone exactamente el cifrado y los casos de uso de las dos conexiones', () => {
     expect(Object.keys(integraciones).sort()).toEqual([
       'createWhatsappConnection',
+      'disconnectAiProvider',
+      'getAiProviderConnection',
+      'getAiProviderReadiness',
+      'getAiProviderStatus',
       'getWhatsappConnection',
       'regenerateWhatsappVerifyToken',
+      'reportAiProviderOutcome',
+      'resolveAiProviderForReading',
+      'saveAiProviderConnection',
       'secretCipher',
       'secretDigest',
       'setWhatsappConnectionEnabled',
+      'testAiProviderKey',
+      'testSavedAiProvider',
       'testWhatsappConnection',
       'updateWhatsappConnection',
       'whatsappWebhookUrl',

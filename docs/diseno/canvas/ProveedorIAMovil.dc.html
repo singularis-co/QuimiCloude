@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Proveedor IA en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="ProveedorIA" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Proveedor IA · ficha (QC-275)</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">shared/password-field</span> (PasswordField) · <span class="mono">shared/status-badge</span> · <span class="mono">shared/confirm-dialog</span> (desconectar) · la tarjeta de conexión de WhatsApp (QC-237) como patrón · <span class="mono">sonner</span> para el toast</dd>
+      <dt>Nuevo</dt><dd>Selector de proveedor: grupo de radios en tarjetas con logo, nombre y pista (2 columnas en escritorio y tablet, 1 en teléfono) · aviso de bloqueo de lectura de PDF, reutilizable en Fórmulas e Inventario</dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (RadioGroup) · <span class="mono">lucide-react</span> · logos oficiales en SVG de cada proveedor, sin librería</dd>
+      <dt>Escritorio</dt><dd>Tarjeta de 760 px como máximo · tres estados: sin configurar (elegir proveedor + key + probar + guardar), conectado (logo, modelos del seed, última prueba, probar, cambiar, desconectar) y error («Error con tu proveedor» con el último error)</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · las tarjetas de proveedor siguen en 2 columnas</dd>
+      <dt>Teléfono</dt><dd>Proveedores en 1 columna, tarjetas de 64 px · botones apilados a todo el ancho con 44 px · el ojo de la key es un objetivo de 44 px</dd>
+      <dt>Animación</dt><dd>Al elegir proveedor, el borde y el anillo pasan a primario en 100 ms y aparece el check · «Probar conexión» muestra el giro y el resultado entra con el aviso (150 ms) · el ojo cruza la barra · toast al conectar y al desconectar</dd>
+      <dt>Por confirmar</dt><dd>[LOGO OFICIAL] de cada proveedor (kit de marca) · [MODELO RECETA] y [MODELO CATÁLOGO] por proveedor, que fija el spec · [ENLACE A LA CONSOLA] de cada proveedor</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

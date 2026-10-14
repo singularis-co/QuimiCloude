@@ -128,35 +128,53 @@ export function isAllowedHolderOfTheCode(relativePath: string): boolean {
 
 /** Los archivos de codigo del modulo, uno a uno. Un archivo nuevo entra aqui con su ruta exacta. */
 const MODULE_CODE_FILES = [
+  'adapters/driven/ai/ai-provider-probe-canned.ts',
+  'adapters/driven/catalog/ai-provider-catalog-prisma.ts',
   'adapters/driven/config/e2e-doubles-env.ts',
   'adapters/driven/config/encryption-keys-env.ts',
   'adapters/driven/config/public-base-url-env.ts',
   'adapters/driven/config/whatsapp-config-env.ts',
   'adapters/driven/graph/whatsapp-graph-client-canned.ts',
   'adapters/driven/graph/whatsapp-graph-client-fetch.ts',
+  'adapters/driven/persistence/ai-provider-connection-prisma.ts',
   'adapters/driven/persistence/company-scope.ts',
   'adapters/driven/persistence/whatsapp-connection-prisma.ts',
   'adapters/driven/security/random-source-node.ts',
   'adapters/driven/security/secret-cipher-aes-gcm.ts',
   'adapters/driven/security/secret-digest-sha256.ts',
+  'adapters/driving/ai-provider-actions.ts',
   'adapters/driving/whatsapp-connection-actions.ts',
   'domain/actor.ts',
+  'domain/ai-provider-failure.ts',
+  'domain/ai-provider-input.ts',
+  'domain/ai-provider.ts',
   'domain/connection-secrets.ts',
   'domain/connection-status.ts',
   'domain/create-whatsapp-connection.ts',
+  'domain/disconnect-ai-provider.ts',
   'domain/errors.ts',
+  'domain/get-ai-provider-connection.ts',
+  'domain/get-ai-provider-readiness.ts',
   'domain/get-whatsapp-connection.ts',
   'domain/graph-failure.ts',
   'domain/integraciones-scope.ts',
   'domain/regenerate-whatsapp-verify-token.ts',
+  'domain/report-ai-provider-outcome.ts',
+  'domain/resolve-ai-provider-for-reading.ts',
+  'domain/save-ai-provider-connection.ts',
   'domain/secret-context.ts',
   'domain/set-whatsapp-connection-enabled.ts',
   'domain/stored-secret.ts',
+  'domain/test-ai-provider-key.ts',
+  'domain/test-saved-ai-provider.ts',
   'domain/test-whatsapp-connection.ts',
   'domain/update-whatsapp-connection.ts',
   'domain/whatsapp-connection-input.ts',
   'domain/whatsapp-connection.ts',
   'index.ts',
+  'ports/ai-provider-catalog.ts',
+  'ports/ai-provider-connection-repository.ts',
+  'ports/ai-provider-probe.ts',
   'ports/random-source.ts',
   'ports/secret-cipher.ts',
   'ports/secret-digest.ts',
@@ -319,9 +337,25 @@ describe('la forma del modulo integraciones', () => {
     expect(reexports.map((r) => r.name).sort()).toEqual([
       'ActionNotAllowedError',
       'Actor',
+      'AiProviderCode',
+      'AiProviderConnectionOverview',
+      'AiProviderConnectionStatus',
+      'AiProviderConnectionView',
+      'AiProviderEntry',
+      'AiProviderFailure',
+      'AiProviderFailureKind',
+      'AiProviderProbeResult',
+      'AiProviderReadiness',
+      'AiProviderReadingOutcome',
+      'AiProviderReadingResolution',
+      'AiProviderStatus',
+      'AiProviderTestResult',
+      'AiReadUse',
       'IntegracionesError',
+      'SaveAiProviderConnectionResult',
       'SecretContext',
       'SecretUnreadableError',
+      'TestSavedAiProviderResult',
       'UnauthorizedError',
       'ValidationError',
       'WhatsappConnectionExistsError',
@@ -330,15 +364,41 @@ describe('la forma del modulo integraciones', () => {
       'WhatsappConnectionView',
       'WhatsappPhoneNumberTakenError',
       'createCreateWhatsappConnection',
+      'createDisconnectAiProvider',
+      'createGetAiProviderConnection',
+      'createGetAiProviderReadiness',
+      'createGetAiProviderStatus',
       'createGetWhatsappConnection',
       'createRegenerateWhatsappVerifyToken',
+      'createReportAiProviderOutcome',
+      'createResolveAiProviderForReading',
+      'createSaveAiProviderConnection',
       'createSetWhatsappConnectionEnabled',
+      'createTestAiProviderKey',
+      'createTestSavedAiProvider',
       'createTestWhatsappConnection',
       'createUpdateWhatsappConnection',
+      'isAccountFailure',
     ])
     expect(reexports.filter((r) => r.typeOnly).map((r) => r.name).sort()).toEqual([
       'Actor',
+      'AiProviderCode',
+      'AiProviderConnectionOverview',
+      'AiProviderConnectionStatus',
+      'AiProviderConnectionView',
+      'AiProviderEntry',
+      'AiProviderFailure',
+      'AiProviderFailureKind',
+      'AiProviderProbeResult',
+      'AiProviderReadiness',
+      'AiProviderReadingOutcome',
+      'AiProviderReadingResolution',
+      'AiProviderStatus',
+      'AiProviderTestResult',
+      'AiReadUse',
+      'SaveAiProviderConnectionResult',
       'SecretContext',
+      'TestSavedAiProviderResult',
       'WhatsappConnectionStatus',
       'WhatsappConnectionView',
     ])
@@ -401,16 +461,54 @@ describe('la forma del modulo integraciones', () => {
     expect(hallazgos.join('\n')).toContain('node:crypto')
   })
 
-  it('R19: fuera del modulo solo lo importan lib/composition/index.ts y, por ruta exacta, la pantalla de WhatsApp y sus componentes', () => {
+  it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes', () => {
     expect(filesImportingTheModule()).toEqual([
       'lib/composition/index.ts',
+      'lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic.ts',
+      'lib/modules/documentos/adapters/driven/ai/ai-reader-genai.ts',
+      'lib/modules/documentos/adapters/driven/ai/ai-reader-openai.ts',
+      'lib/modules/documentos/domain/ai-read-use.ts',
+      'lib/modules/documentos/domain/errors.ts',
+      'lib/modules/documentos/domain/run-document-job.ts',
+      'lib/modules/documentos/ports/ai-provider-gateway.ts',
+      'app/(private)/integraciones/proveedor-ia/components/ai-provider-brand.ts',
+      'app/(private)/integraciones/proveedor-ia/components/ai-provider-card.tsx',
+      'app/(private)/integraciones/proveedor-ia/components/ai-provider-form.tsx',
+      'app/(private)/integraciones/proveedor-ia/components/ai-provider-logo.tsx',
+      'app/(private)/integraciones/proveedor-ia/components/ai-provider-picker.tsx',
+      'app/(private)/integraciones/proveedor-ia/page.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-connection-actions.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-connection-card.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-connection-form.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-status-badge.tsx',
       'app/(private)/integraciones/whatsapp/components/whatsapp-webhook-panel.tsx',
       'app/(private)/integraciones/whatsapp/page.tsx',
+      'app/(private)/produccion/formulas/page.tsx',
+      'app/(private)/proveedores/[id]/page.tsx',
     ])
+  })
+
+  it('R19: Formulas y el detalle de proveedor solo importan de integraciones la accion de readiness, por su ruta exacta', () => {
+    const ACCIONES = '@/lib/modules/integraciones/adapters/driving/ai-provider-actions'
+    for (const file of ['app/(private)/produccion/formulas/page.tsx', 'app/(private)/proveedores/[id]/page.tsx']) {
+      const abs = join(repoRoot, file)
+      const fuente = readFileSync(abs, 'utf8')
+      const specs = importSpecifiers(fuente).filter((spec) => resolvesIntoTheModule(abs, spec))
+      expect(specs, file).toEqual([ACCIONES])
+      expect(fuente, file).toMatch(
+        /import \{ getAiProviderReadinessAction \} from '@\/lib\/modules\/integraciones\/adapters\/driving\/ai-provider-actions'/,
+      )
+    }
+  })
+
+  it('R19: documentos importa integraciones SOLO por su contrato, nunca por una ruta profunda', () => {
+    const desdeDocumentos = filesImportingTheModule().filter((file) => file.startsWith('lib/modules/documentos/'))
+    expect(desdeDocumentos.length).toBeGreaterThan(0)
+    for (const file of desdeDocumentos) {
+      const abs = join(repoRoot, file)
+      const specs = importSpecifiers(readFileSync(abs, 'utf8')).filter((spec) => resolvesIntoTheModule(abs, spec))
+      expect(specs.every((spec) => spec === '@/lib/modules/integraciones'), `${file}: ${specs.join(', ')}`).toBe(true)
+    }
   })
 
   it('R12: el detector reconoce un import por contrato, uno profundo y uno relativo, y no uno ajeno', () => {
@@ -428,17 +526,26 @@ describe('la forma del modulo integraciones', () => {
     ])
   })
 
-  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de la conexion y la URL del webhook, con sus puertos tipados', () => {
+  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones y la URL del webhook, con sus puertos tipados', () => {
     const cableado = integracionesWiring(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8'))
 
     expect(cableado, 'lib/composition/index.ts deberia exportar const integraciones = { ... }').not.toBeNull()
     expect([...(cableado?.members ?? [])].sort()).toEqual([
       'createWhatsappConnection',
+      'disconnectAiProvider',
+      'getAiProviderConnection',
+      'getAiProviderReadiness',
+      'getAiProviderStatus',
       'getWhatsappConnection',
       'regenerateWhatsappVerifyToken',
+      'reportAiProviderOutcome',
+      'resolveAiProviderForReading',
+      'saveAiProviderConnection',
       'secretCipher',
       'secretDigest',
       'setWhatsappConnectionEnabled',
+      'testAiProviderKey',
+      'testSavedAiProvider',
       'testWhatsappConnection',
       'updateWhatsappConnection',
       'whatsappWebhookUrl',
@@ -448,6 +555,10 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.typeOf.whatsappGraphClient).toBe('WhatsappGraphClient')
     expect(cableado?.typeOf.whatsappConnectionRepository).toBe('WhatsappConnectionRepository')
     expect(cableado?.typeOf.randomSource).toBe('RandomSource')
+    expect(cableado?.typeOf.aiProviderConnectionRepository).toBe('AiProviderConnectionRepository')
+    expect(cableado?.typeOf.aiProviderCatalog).toBe('AiProviderCatalog')
+    expect(cableado?.typeOf.aiProviderProbe).toBe('AiProviderProbe')
+    expect(cableado?.typeOf.aiProviderGateway).toBe('AiProviderGateway')
   })
 
   it('R19: el lector del cableado ve un miembro de mas y un tipo que no es el puerto', () => {
@@ -511,7 +622,7 @@ describe('la forma del modulo integraciones', () => {
     expect(branchRange(FEATURE_BRANCH, 'abc')).toEqual({ mergeBase: 'abc' })
   })
 
-  it('R13: db/schema.prisma tiene exactamente un modelo de integraciones, WhatsappConnection', () => {
+  it('R13: db/schema.prisma tiene exactamente tres modelos de integraciones: WhatsappConnection, AiProvider y AiProviderConnection', () => {
     const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8').replace(/\r\n/g, '\n')
     // El `/// @module` va encima del `model`, con solo lineas `///` entre medias.
     const modelos = [
@@ -519,8 +630,8 @@ describe('la forma del modulo integraciones', () => {
         /\/\/\/\s*@module\s+integraciones\b[^\n]*\n(?:[ \t]*\/\/\/[^\n]*\n)*[ \t]*model\s+(\w+)/g,
       ),
     ].map((match) => match[1])
-    expect(modelos).toEqual(['WhatsappConnection'])
-    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(1)
+    expect(modelos).toEqual(['WhatsappConnection', 'AiProvider', 'AiProviderConnection'])
+    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(3)
     expect(esquema).toMatch(/@module\s+identity\b/)
   })
 })
