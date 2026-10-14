@@ -470,3 +470,19 @@ Altas mecánicas en listas cerradas: `e2e/pedidos-rediseno.spec.ts` en R57 de
 `tests/unit/pedidos/scope.test.ts` (seis a siete) y en `E2E_PERMITIDOS` de
 `tests/unit/clientes/scope.test.ts`, cada una con su nota. `./init.sh` rápido: `init OK`;
 `test:rapido` 115/115 archivos, 1608 tests pasan, 37 omitidos, 0 fallan.
+
+### Menor m1 (foco)
+
+- Test nuevo en `tests/unit/pedidos-ui/order-cards.test.tsx`, bloque «el foco pasa al modal que abre el
+  item elegido en la tarjeta» (R15): desde el diálogo centrado de «Acciones», «Editar» y «Cliente». Espera a
+  que el diálogo de «Acciones» se desmonte (su cierre ya hizo lo que iba a hacer con el foco) y afirma con
+  `waitFor` que `document.activeElement` está dentro del panel o del diálogo de cliente y no es «Acciones».
+- Con el código previo: los dos pasan (2/2, y otras dos corridas iguales). El primer intento de «Editar»
+  rompió por un doble, no por el foco: `getRecipeAction` era `vi.fn()` sin valor y el panel lo llama al
+  abrirse; ahora devuelve `recipe_not_found`. Se añadió también el doble de `searchOrderCustomersAction`.
+- Arreglo: ninguno. Base UI deja el foco en el modal nuevo; `RowActionsMenu` no se toca.
+- Verificación: `pnpm run typecheck` sin errores; `pnpm run lint` 0 errores, 7 avisos ya existentes (ninguno
+  en el archivo tocado); `pnpm exec vitest run tests/unit/pedidos-ui/order-cards tests/unit/shared-ui`
+  46 archivos, 531 tests pasan; `pnpm exec vitest run guard` 76 archivos, 1052 pasan, 20 omitidos, 0 fallan.
+
+`./init.sh` rápido tras m1: `init OK`; related 260/260 archivos (4315 pasan), guardias y suites 115/115 (1608 pasan).

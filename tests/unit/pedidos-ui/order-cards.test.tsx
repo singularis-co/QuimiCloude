@@ -2,11 +2,13 @@
 // y las tarjetas estan las dos en el arbol: aqui se mira la tarjeta y su menu centrado, y que los
 // estados de la lista no cambian por tenerla.
 
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CANCEL_ORDER_ID_TESTID,
+  ORDER_ACTION_CUSTOMER_TESTID,
+  ORDER_CUSTOMER_DIALOG_TESTID,
   ORDER_LIST_NO_MATCHES_TESTID,
   ORDER_NO_MATCHES_MESSAGE,
   ORDER_PRIORITY_LABELS,
@@ -49,6 +51,11 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
     updateOrderAction: vi.fn(noDebeInvocarse('updateOrderAction')),
     cancelOrderAction: vi.fn(noDebeInvocarse('cancelOrderAction')),
     deleteOrderAction: vi.fn(noDebeInvocarse('deleteOrderAction')),
+    // El dialogo «Cliente» busca clientes al abrirse; aqui basta con una lista vacia.
+    searchOrderCustomersAction: vi.fn(async () => ({
+      status: 'success' as const,
+      data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
+    })),
   };
 });
 
@@ -58,7 +65,8 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
     status: 'success' as const,
     data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
   })),
-  getRecipeAction: vi.fn(),
+  // «Editar» abre el panel, que pide los ingredientes de la receta del pedido.
+  getRecipeAction: vi.fn(async () => ({ status: 'error', code: 'recipe_not_found', message: 'sin receta' })),
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
@@ -108,11 +116,13 @@ function montar({
   params = parametros(),
   totalPages = 1,
   noMatches,
+  canEditCustomer,
 }: {
   readonly orders?: readonly OrderSummary[];
   readonly params?: DataTableParams;
   readonly totalPages?: number;
   readonly noMatches?: { readonly clearHref: string };
+  readonly canEditCustomer?: boolean;
 } = {}) {
   render(
     <OrderTable
@@ -123,6 +133,7 @@ function montar({
       units={[]}
       bridge={null}
       noMatches={noMatches}
+      canEditCustomer={canEditCustomer}
     />,
   );
 }
@@ -242,6 +253,41 @@ describe('«Acciones» abre el menu en un dialogo centrado', () => {
     await user.click(await esperarInteractiva(within(dialogo).getByTestId('order-action-cancel')));
 
     expect(await screen.findByTestId(CANCEL_ORDER_ID_TESTID)).toHaveValue(SIN_CLIENTE.id);
+  });
+});
+
+// Al elegir un item que abre otro modal, el cierre del dialogo de «Acciones» no debe devolver el
+// foco a su boton: quedaria fuera del modal nuevo. Se mira cuando el dialogo de «Acciones» ya no
+// esta, que es cuando su cierre ha hecho todo lo que iba a hacer con el foco.
+describe('el foco pasa al modal que abre el item elegido en la tarjeta', () => {
+  async function elegirEnTarjeta(order: OrderSummary, testId: string) {
+    const user = setupUser();
+    const acciones = within(tarjeta(order)).getByTestId('order-row-actions');
+    await user.click(acciones);
+    const dialogo = await screen.findByRole('dialog', { name: `Pedido ${order.numberText}` });
+    await user.click(await esperarInteractiva(within(dialogo).getByTestId(testId)));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: `Pedido ${order.numberText}` })).toBeNull());
+    return acciones;
+  }
+
+  it('R15: «Editar» deja el foco dentro del panel del pedido', async () => {
+    montar();
+
+    const acciones = await elegirEnTarjeta(CON_CLIENTE, 'order-action-edit');
+
+    const panel = await screen.findByRole('dialog');
+    await waitFor(() => expect(panel.contains(document.activeElement)).toBe(true));
+    expect(document.activeElement).not.toBe(acciones);
+  });
+
+  it('R15: «Cliente» deja el foco dentro del dialogo de cliente', async () => {
+    montar({ canEditCustomer: true });
+
+    const acciones = await elegirEnTarjeta(CON_CLIENTE, ORDER_ACTION_CUSTOMER_TESTID);
+
+    const dialogo = await screen.findByTestId(ORDER_CUSTOMER_DIALOG_TESTID);
+    await waitFor(() => expect(dialogo.contains(document.activeElement)).toBe(true));
+    expect(document.activeElement).not.toBe(acciones);
   });
 });
 
