@@ -46,6 +46,12 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-execution-actions', (
   finishAssignedOrderAction: vi.fn(),
 }));
 
+vi.mock('@/lib/modules/asignaciones/adapters/driving/step-evidence-actions', () => ({
+  requestEvidenceUploadAction: vi.fn(),
+  registerEvidenceAction: vi.fn(),
+  removeEvidenceAction: vi.fn(),
+}));
+
 function sesionCon(permissions: readonly string[]) {
   return {
     id: '99999999-9999-4999-8999-999999999999',
@@ -68,6 +74,7 @@ const EXECUCION_MINIMA = {
   presentationLines: [],
   unitId: null,
   unitLabel: null,
+  evidence: [],
 };
 
 function arbolDeLaPagina(id = 'order-1') {

@@ -33,6 +33,8 @@
  * `whatsapp_phone_number_taken`.
  * **2026-10-09**: `delivery_not_found`, `delivery_already_voided`.
  * **2026-10-13**: `company_not_found`.
+ * **2026-10-13**: `evidence_required`, `evidence_limit`, `evidence_invalid_file`,
+ * `evidence_not_found`, `recipe_steps_locked`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -193,6 +195,19 @@ export const ERROR_CODES = [
   // estaba anulada en esa entrega.
   'delivery_already_voided',
   'company_not_found',
+  // Distinto de `invalid_transition`: el pedido admite la accion, lo que falta es al menos una foto
+  // en un paso que la exige.
+  'evidence_required',
+  // Distinto de `invalid_input`: la peticion es valida, pero el paso ya tiene sus 3 fotos.
+  'evidence_limit',
+  // Distinto de `invalid_input`: la peticion es valida; lo que no sirve es el archivo subido, leido
+  // por su contenido.
+  'evidence_invalid_file',
+  // Distinto de `order_not_found`: el pedido existe, lo que falta es la foto.
+  'evidence_not_found',
+  // Distinto de `invalid_input`: la formula es valida, pero mover o quitar pasos dejaria fotos de
+  // pedidos en curso atadas a otro paso.
+  'recipe_steps_locked',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

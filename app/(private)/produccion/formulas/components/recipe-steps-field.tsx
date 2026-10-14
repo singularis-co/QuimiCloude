@@ -67,6 +67,31 @@ function emptyStepDocument(): RecipeStepDocument {
   return { blocks: [{ kind: 'paragraph', spans: [] }] };
 }
 
+const EVIDENCE_TEXTS = {
+  summary: (count: number) =>
+    count === 0
+      ? 'Ningún paso pide evidencia'
+      : count === 1
+        ? '1 paso pide evidencia'
+        : `${count} pasos piden evidencia`,
+  switchLabel: (position: number) => `Requiere evidencia en el paso ${position}`,
+  lockedHandle: (position: number) =>
+    `No se puede mover el paso ${position}: hay pedidos en curso con fotos`,
+  lockedRemove: (position: number) =>
+    `No se puede quitar el paso ${position}: hay pedidos en curso con fotos`,
+} as const;
+
+/**
+ * El editor devuelve solo el contenido del paso; la marca se copia aparte para que escribir no la
+ * apague. Apagada, la clave desaparece: el JSON de una fórmula que nunca la usó no cambia.
+ */
+function withEvidence(document: RecipeStepDocument, on: boolean): RecipeStepDocument {
+  const next: RecipeStepDocument = { ...document };
+  if (on) next.requiresEvidence = true;
+  else delete next.requiresEvidence;
+  return next;
+}
+
 export type RecipeStepsFieldProps = {
   readonly steps: readonly RecipeStepFormValue[];
   readonly onChange: (steps: readonly RecipeStepFormValue[]) => void;
@@ -76,6 +101,10 @@ export type RecipeStepsFieldProps = {
   /** Raiz de los `data-testid` y de los `id` de error: dos instancias en la misma pagina no
    *  deben colisionar. */
   readonly testIdPrefix?: string;
+  /** Pinta el interruptor «Requiere evidencia» en cada paso y el resumen de la lista. */
+  readonly showEvidenceSwitch?: boolean;
+  /** Deshabilita mover y quitar pasos; editar el texto, la marca y añadir siguen activos. */
+  readonly locked?: boolean;
 };
 
 /**
@@ -113,8 +142,11 @@ export function RecipeStepsField({
   title = 'Pasos',
   addLabel = 'Añadir paso',
   testIdPrefix = 'recipe-step',
+  showEvidenceSwitch = false,
+  locked = false,
 }: RecipeStepsFieldProps) {
   const headingId = useId();
+  const evidenceCount = steps.filter((step) => step.document.requiresEvidence === true).length;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -154,9 +186,19 @@ export function RecipeStepsField({
       className="flex flex-col gap-3"
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 id={headingId} className="text-lg font-medium">
-          {title}
-        </h2>
+        <div className="flex flex-col gap-0.5">
+          <h2 id={headingId} className="text-lg font-medium">
+            {title}
+          </h2>
+          {showEvidenceSwitch ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid={`${testIdPrefix}-evidence-summary`}
+            >
+              {EVIDENCE_TEXTS.summary(evidenceCount)}
+            </p>
+          ) : null}
+        </div>
         <Button type="button" touch data-testid={`${testIdPrefix}-add`} onClick={addStep}>
           {addLabel}
         </Button>
@@ -178,7 +220,16 @@ export function RecipeStepsField({
                 total={steps.length}
                 testIdPrefix={testIdPrefix}
                 error={errors?.[index]}
-                onChangeDocument={(document) => updateStep(index, { document })}
+                showEvidenceSwitch={showEvidenceSwitch}
+                locked={locked}
+                onChangeDocument={(document) =>
+                  updateStep(index, {
+                    document: withEvidence(document, step.document.requiresEvidence === true),
+                  })
+                }
+                onChangeEvidence={(on) =>
+                  updateStep(index, { document: withEvidence(step.document, on) })
+                }
                 onRemove={() => removeStep(index)}
               />
             ))}
@@ -195,7 +246,10 @@ type RecipeStepRowProps = {
   readonly total: number;
   readonly testIdPrefix: string;
   readonly error?: string;
+  readonly showEvidenceSwitch: boolean;
+  readonly locked: boolean;
   readonly onChangeDocument: (document: RecipeStepDocument) => void;
+  readonly onChangeEvidence: (on: boolean) => void;
   readonly onRemove: () => void;
 };
 
@@ -205,12 +259,17 @@ function RecipeStepRow({
   total,
   testIdPrefix,
   error,
+  showEvidenceSwitch,
+  locked,
   onChangeDocument,
+  onChangeEvidence,
   onRemove,
 }: RecipeStepRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: step.key,
+    disabled: locked,
   });
+  const evidenceOn = showEvidenceSwitch && step.document.requiresEvidence === true;
   const style = { transform: CSS.Transform.toString(transform), transition };
   const errorId = `${testIdPrefix}-error-${index}`;
 
@@ -219,15 +278,22 @@ function RecipeStepRow({
       ref={setNodeRef}
       style={style}
       data-testid={`${testIdPrefix}-row`}
-      className={`flex items-start gap-2 rounded-lg border p-2 ${isDragging ? 'opacity-70' : ''}`}
+      className={`flex items-start gap-2 rounded-lg border p-2 ${isDragging ? 'opacity-70' : ''} ${
+        evidenceOn ? 'border-[color-mix(in_oklch,var(--primary)_45%,var(--border))]' : ''
+      }`}
     >
       {/* Asa de arrastre: SIEMPRE visible, >= 44x44 px, y con nombre accesible que INCLUYE la posición (R34, R50). */}
       <button
         type="button"
         {...attributes}
         {...listeners}
-        className={`${touchTarget} flex shrink-0 touch-none items-center justify-center rounded-lg border bg-muted`}
-        aria-label={`Arrastrar el paso en la posición ${index + 1} de ${total}`}
+        className={`${touchTarget} flex shrink-0 touch-none items-center justify-center rounded-lg border bg-muted disabled:cursor-not-allowed disabled:opacity-50`}
+        disabled={locked}
+        aria-label={
+          locked
+            ? EVIDENCE_TEXTS.lockedHandle(index + 1)
+            : `Arrastrar el paso en la posición ${index + 1} de ${total}`
+        }
         data-testid={`${testIdPrefix}-handle-${index}`}
       >
         <GripVerticalIcon aria-hidden="true" />
@@ -250,6 +316,15 @@ function RecipeStepRow({
           editableTestId={`${testIdPrefix}-text-${index}`}
           error={error}
           errorId={errorId}
+          evidence={
+            showEvidenceSwitch
+              ? {
+                  checked: evidenceOn,
+                  onCheckedChange: onChangeEvidence,
+                  label: EVIDENCE_TEXTS.switchLabel(index + 1),
+                }
+              : undefined
+          }
         />
         {error === undefined ? null : (
           <p id={errorId} className="text-sm text-destructive" data-testid={`${testIdPrefix}-field-error-${index}`}>
@@ -262,7 +337,8 @@ function RecipeStepRow({
         type="button"
         variant="ghost"
         touch
-        aria-label={`Quitar paso ${index + 1}`}
+        disabled={locked}
+        aria-label={locked ? EVIDENCE_TEXTS.lockedRemove(index + 1) : `Quitar paso ${index + 1}`}
         data-testid={`${testIdPrefix}-remove-${index}`}
         onClick={onRemove}
       >

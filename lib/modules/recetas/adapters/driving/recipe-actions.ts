@@ -16,6 +16,7 @@ import {
   type Actor,
   type Page,
   type RecipeDetail,
+  type RecipeStepLock,
   type RecipeSummary,
   type RecipeVersionSummary,
   type UpdateRecipeResult,
@@ -265,6 +266,22 @@ export async function listRecipeVersionsAction(originalId: string): Promise<Reci
 
   try {
     const data = await recetas.listRecipeVersions(originalId, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type RecipeStepLockResult =
+  | { status: 'success'; data: RecipeStepLock }
+  | ErrorState;
+
+/** Cuantos pedidos en curso con fotos impiden mover o quitar pasos de la formula. */
+export async function getRecipeStepLockAction(id: string): Promise<RecipeStepLockResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await recetas.getRecipeStepLock(id, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

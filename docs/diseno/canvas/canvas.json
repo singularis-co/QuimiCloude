@@ -609,6 +609,62 @@
    "page": "operario",
    "is_interactive": true
   },
+  "EvidenciaPaso.dc.html": {
+   "x": 0,
+   "y": 8840,
+   "w": 1440,
+   "h": 1000,
+   "title": "Evidencia por paso (QC-214)",
+   "page": "operario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "EvidenciaPasoTablet.dc.html": {
+   "x": 1520,
+   "y": 8840,
+   "w": 904,
+   "h": 1300,
+   "title": "EvidenciaPasoTablet",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "EvidenciaPasoMovil.dc.html": {
+   "x": 2504,
+   "y": 8840,
+   "w": 960,
+   "h": 1300,
+   "title": "EvidenciaPasoMovil",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "FormulaEvidencia.dc.html": {
+   "x": 0,
+   "y": 9740,
+   "w": 1440,
+   "h": 1000,
+   "title": "Switch «Requiere evidencia» (QC-214)",
+   "page": "formulas",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "FormulaEvidenciaTablet.dc.html": {
+   "x": 1520,
+   "y": 9740,
+   "w": 904,
+   "h": 1300,
+   "title": "FormulaEvidenciaTablet",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "FormulaEvidenciaMovil.dc.html": {
+   "x": 2504,
+   "y": 9740,
+   "w": 960,
+   "h": 1300,
+   "title": "FormulaEvidenciaMovil",
+   "page": "formulas",
+   "is_interactive": true
+  },
   "Proveedores.dc.html": {
    "x": 0,
    "y": 0,
@@ -1011,7 +1067,13 @@
   "ProductoTerminadoMovil.dc.html",
   "PedidosPresentaciones.dc.html",
   "PedidosPresentacionesTablet.dc.html",
-  "PedidosPresentacionesMovil.dc.html"
+  "PedidosPresentacionesMovil.dc.html",
+  "EvidenciaPaso.dc.html",
+  "EvidenciaPasoTablet.dc.html",
+  "EvidenciaPasoMovil.dc.html",
+  "FormulaEvidencia.dc.html",
+  "FormulaEvidenciaTablet.dc.html",
+  "FormulaEvidenciaMovil.dc.html"
  ],
  "notes": {
   "t1": {
@@ -1277,6 +1339,28 @@
    "kind": "title1",
    "maxW": 1440,
    "page": "operario"
+  },
+  "c_EvidenciaPaso": {
+   "x": 0,
+   "y": 8730,
+   "text": "Evidencia por paso en Ejecución y Empaque (QC-214)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "operario"
+  },
+  "c_FormulaEvidencia": {
+   "x": 0,
+   "y": 9630,
+   "text": "Switch «Requiere evidencia» en los pasos (QC-214)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "formulas"
   },
   "t_proveedores": {
    "x": 0,

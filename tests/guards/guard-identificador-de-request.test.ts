@@ -612,6 +612,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261009130000_whatsapp_connections',
   // QC-235 2026-10-13: la columna `companies.country`; no toca el identificador.
   '20261013120000_companies_country',
+  // 2026-10-13: las fotos de evidencia por paso; no toca el identificador.
+  '20261013120000_order_step_evidence',
 ] as const
 
 export function hallazgosDeMigraciones(

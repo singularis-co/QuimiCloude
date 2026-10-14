@@ -310,6 +310,7 @@ const EJECUCION: StartedOrderExecution = {
   presentationLines: [],
   unitId: null,
   unitLabel: null,
+  evidence: [],
   resumeStepPosition: null,
 };
 
@@ -331,6 +332,7 @@ function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOr
     packedByName: null,
     packedById: null,
     packingSteps: [],
+    packingEvidence: [],
     ...overrides,
   };
 }

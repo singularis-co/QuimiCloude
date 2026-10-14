@@ -10,6 +10,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog } from '@/lib/modules/inventario';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 // QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
 // Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
@@ -60,6 +61,7 @@ function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRep
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     createVersion: vi.fn<RecipeRepository['createVersion']>(async () => 'not_found'),
     listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(async () => []),
     replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => 'not_found'),
     ...overrides,
   };
@@ -91,7 +93,7 @@ describe('R47 — image omitido conserva la imagen sin tocar el almacenamiento',
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     await updateRecipe('receta-1', RECETA_VALIDA, ADMIN);
 
@@ -110,7 +112,7 @@ describe('R47 — image null deja la receta sin ruta y borra el archivo', () => 
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     const resultado = await updateRecipe('receta-1', { ...RECETA_VALIDA, image: null }, ADMIN);
 
@@ -130,7 +132,7 @@ describe('R47 — image null deja la receta sin ruta y borra el archivo', () => 
     });
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     await updateRecipe('receta-1', { ...RECETA_VALIDA, image: null }, ADMIN);
 
@@ -143,7 +145,7 @@ describe('R26 — image { bytes } sube, persiste la ruta nueva y borra la anteri
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     const resultado = await updateRecipe(
       'receta-1',
@@ -173,6 +175,7 @@ describe('R48 — un solo remove para los dos caminos de borrado', () => {
       recipes: recipesReemplazo,
       products,
       images: imagesReemplazo,
+      stepLocks: noEvidenceLocks,
       now: () => AHORA,
     });
     await updateReemplazo('receta-1', { ...RECETA_VALIDA, image: { bytes: JPEG_BYTES } }, ADMIN);
@@ -184,6 +187,7 @@ describe('R48 — un solo remove para los dos caminos de borrado', () => {
       recipes: recipesQuitar,
       products,
       images: imagesQuitar,
+      stepLocks: noEvidenceLocks,
       now: () => AHORA,
     });
     await updateQuitar('receta-1', { ...RECETA_VALIDA, image: null }, ADMIN);
@@ -207,7 +211,7 @@ describe('R49 — un remove que falla no revierte la edicion', () => {
         throw new Error('el bucket no respondio');
       }),
     });
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     // No debe lanzar ni propagar el fallo de `remove`: la edicion resuelve igual.
     const resultado = await updateRecipe('receta-1', { ...RECETA_VALIDA, image: null }, ADMIN);
@@ -232,7 +236,7 @@ describe('R49 — un remove que falla no revierte la edicion', () => {
         throw new Error('timeout de red');
       }),
     });
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA });
 
     const resultado = await updateRecipe(
       'receta-1',

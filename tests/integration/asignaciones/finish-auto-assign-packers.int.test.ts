@@ -42,6 +42,7 @@ import {
   findSeedRoleId,
 } from './use-case-fixture';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
+import { evidenceRepositoryUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
 
 /**
  * Transicion doblada: exito sin pasar por inventario. El `'ok'` del puerto es el literal: el
@@ -101,6 +102,8 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
+        recipes: recipesWithoutEvidence,
+        evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido, stepPosition: null });
@@ -137,6 +140,8 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
+        recipes: recipesWithoutEvidence,
+        evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido, stepPosition: null });
@@ -173,6 +178,8 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
+        recipes: recipesWithoutEvidence,
+        evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido, stepPosition: null });

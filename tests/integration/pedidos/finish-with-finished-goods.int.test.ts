@@ -71,6 +71,7 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
+import { evidenceRepositoryUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
 
 const customerCatalog = {
@@ -191,6 +192,8 @@ function finishAssignedOrderPara(orderId: string) {
     // Este archivo confirma de verdad: la anotacion del Finalizar se escribe y `borrarFixture` la borra.
     ...executionOnClient(prisma, orderCatalog),
     now: () => new Date(),
+    recipes: recipesWithoutEvidence,
+    evidence: evidenceRepositoryUnused,
   });
 }
 

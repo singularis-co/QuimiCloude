@@ -24,11 +24,14 @@ import {
   ValidationError,
   type AsignacionesError,
 } from './errors';
+import { assertEvidenceComplete } from './evidence-photos';
 import { ExecutionAbortedError, isExecutionSuccess, type ExecutionWriteOutcome } from './execution-entry';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
+import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 import { formatOrderNumber, type OrderAssignmentTarget, type OrderCatalog } from '@/lib/modules/pedidos';
+import type { RecipePackingStepsReader } from '@/lib/modules/recetas';
 
 const finishPackingSchema = z.strictObject({
   orderId: z.string().uuid(),
@@ -38,6 +41,8 @@ export type FinishPackingDeps = {
   readonly orders: OrderCatalog;
   readonly log: ExecutionLogRepository;
   readonly transaction: ExecutionTransaction;
+  readonly packingSteps: RecipePackingStepsReader;
+  readonly evidence: StepEvidenceRepository;
   readonly now?: () => Date;
 };
 
@@ -72,6 +77,13 @@ export function createFinishPacking(
     const summary = summaryPage.items[0];
     if (summary === undefined) throw new OrderNotFoundError();
     const numberText = formatOrderNumber(summary.number);
+
+    // Solo quien lo tiene en empaque puede tener fotos; cualquier otro caso lo rechaza la
+    // transaccion con su error propio.
+    if (summary.status === 'EN_EMPAQUE' && summary.packedBy === actor.id) {
+      const steps = await deps.packingSteps.findPackingStepsById(summary.recipeId, actor.companyId);
+      await assertEvidenceComplete(deps.evidence, actor.companyId, orderId, 'packing', steps ?? []);
+    }
 
     const now = deps.now?.() ?? new Date();
     try {

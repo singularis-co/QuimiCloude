@@ -16,6 +16,7 @@ import {
   createRecipeVersionAction,
   deleteRecipeAction,
   getRecipeAction,
+  getRecipeStepLockAction,
   listRecipesAction,
   listRecipeVersionsAction,
   updateRecipeAction,
@@ -25,6 +26,7 @@ import {
   ActionNotAllowedError,
   RecipeDuplicateNameError,
   RecipeNotFoundError,
+  RecipeStepsLockedError,
   UnauthorizedError,
 } from '@/lib/modules/recetas';
 import { errorMessage } from '@/lib/modules/errores';
@@ -40,6 +42,7 @@ const {
   listRecipeVersionsMock,
   getSessionUserMock,
   getSessionContextMock,
+  getRecipeStepLockMock,
 } = vi.hoisted(() => ({
   createRecipeMock: vi.fn(),
   getRecipeMock: vi.fn(),
@@ -51,6 +54,7 @@ const {
   listRecipeVersionsMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
+  getRecipeStepLockMock: vi.fn(),
 }));
 
 // QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
@@ -73,6 +77,7 @@ vi.mock('@/lib/composition', () => ({
     createRecipeVersion: createRecipeVersionMock,
     updateRecipeVersion: updateRecipeVersionMock,
     listRecipeVersions: listRecipeVersionsMock,
+    getRecipeStepLock: getRecipeStepLockMock,
   },
 }));
 
@@ -510,5 +515,34 @@ describe('R39 — no existe ningun route handler de recetas', () => {
     const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
     expect(existsSync(join(repoRoot, 'app', 'api', 'recetas'))).toBe(false);
     expect(existsSync(join(repoRoot, 'app', 'api', 'recipes'))).toBe(false);
+  });
+});
+
+describe('pasos bloqueados por fotos de evidencia', () => {
+  it('R8: getRecipeStepLockAction devuelve cuantos pedidos en curso con fotos tiene la formula', async () => {
+    getRecipeStepLockMock.mockResolvedValue({ lockingOrders: 3 });
+
+    const resultado = await getRecipeStepLockAction('receta-1');
+
+    expect(resultado).toEqual({ status: 'success', data: { lockingOrders: 3 } });
+    expect(getRecipeStepLockMock).toHaveBeenCalledWith('receta-1', ADMIN_ACTOR);
+  });
+
+  it('R8: una receta que no existe se traduce por su codigo', async () => {
+    getRecipeStepLockMock.mockRejectedValue(new RecipeNotFoundError());
+
+    expect(await getRecipeStepLockAction('receta-x')).toMatchObject({ status: 'error', code: 'recipe_not_found' });
+  });
+
+  it('R9, R10: updateRecipeAction devuelve recipe_steps_locked con el mensaje del catalogo', async () => {
+    updateRecipeMock.mockRejectedValue(new RecipeStepsLockedError());
+
+    const resultado = await updateRecipeAction('receta-1', VALID_RECIPE_INPUT);
+
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'recipe_steps_locked',
+      message: errorMessage('recipe_steps_locked'),
+    });
   });
 });

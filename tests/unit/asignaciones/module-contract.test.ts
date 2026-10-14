@@ -446,6 +446,9 @@ const CASOS_DE_USO_QC63 = [
   // de `asignaciones`.
   `${ASIGNACIONES}/domain/cancel-assigned-order.ts`,
   `${ASIGNACIONES}/domain/record-step-move.ts`,
+  // 2026-10-13 (QC-214): las fotos de evidencia de fabricacion exigen el mismo permiso que
+  // ejecutar; las de envasado, `empaque.modificar`. El archivo exacto, no la carpeta.
+  `${ASIGNACIONES}/domain/evidence-target.ts`,
 ]
 
 const CONSUMO_LEGITIMO: ReadonlyArray<ConsumoLegitimo> = [

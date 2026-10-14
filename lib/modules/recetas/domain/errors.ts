@@ -87,3 +87,12 @@ export class ValidationError extends RecetasError {
     super('invalid_input', diagnostic);
   }
 }
+
+/** Guardar moveria o quitaria pasos de una formula con pedidos en curso que ya tienen fotos. */
+export class RecipeStepsLockedError extends RecetasError {
+  readonly code = 'recipe_steps_locked';
+
+  constructor(diagnostic?: string) {
+    super('recipe_steps_locked', diagnostic);
+  }
+}
