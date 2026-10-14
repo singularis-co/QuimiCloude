@@ -217,6 +217,13 @@ E2E:
 - `e2e/producto-terminado.spec.ts`
 - `e2e/pedidos-terminados.spec.ts`
 
+Añadidos por el leader el 2026-10-13 (censo de T0a):
+
+- `app/(private)/pedidos/components/order-delivery-list.tsx`
+- `tests/unit/shared-ui/confirm-dialog-montado.test.tsx`
+- `tests/unit/pedidos-ui/order-list-section-produced.test.tsx`
+- `tests/unit/pedidos-ui/order-list-skeleton.test.tsx`
+
 Estado:
 
 - `progress/impl_QC-262.md`
