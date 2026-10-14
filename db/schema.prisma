@@ -134,6 +134,7 @@ model User {
   company               Company?               @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   credentialSetupTokens CredentialSetupToken[]
   revokedSessions       RevokedSession[]
+  companyEvents         CompanyEvent[]
 
   @@unique([id, companyId], map: "users_id_company_id_key")
   @@index([roleId], map: "users_role_id_idx")
@@ -156,11 +157,38 @@ model Company {
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
   country        String?   @db.VarChar(2)
+  taxId           String?   @map("tax_id")
+  /// Unica entre empresas vivas por `companies_tax_id_unique`, parcial y escrito a mano en la
+  /// migracion, por la misma razon que el nombre.
+  taxIdNormalized String?   @map("tax_id_normalized")
+  contactEmail    String?   @map("contact_email")
+  contactPhone    String?   @map("contact_phone")
 
   users      User[]
   workGroups WorkGroup[]
+  events     CompanyEvent[]
 
   @@map("companies")
+}
+
+/// Sin `updatedAt` ni `deletedAt`: un evento no se corrige ni se borra. `kind` es texto con forma
+/// `<ambito>.<accion>` y no un enum, para admitir tipos nuevos sin migrar.
+/// @module identity
+model CompanyEvent {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  kind       String
+  actorId    String   @map("actor_id") @db.Uuid
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  actor   User    @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([companyId, occurredAt(sort: Desc), id(sort: Desc)], map: "company_events_company_id_occurred_at_idx")
+  @@index([actorId], map: "company_events_actor_id_idx")
+  @@map("company_events")
 }
 
 /// La unicidad del nombre no es `@@unique`: `work_groups_name_unique` es compuesto con

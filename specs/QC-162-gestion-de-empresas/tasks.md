@@ -26,7 +26,7 @@ Cierre:                        T12
 
 ### Tanda A
 
-- [ ] **T1 · Migración y esquema** (R4, R10, R39, R43, R44).
+- [x] **T1 · Migración y esquema** (R4, R10, R39, R43, R44).
   - `db/schema.prisma`: cuatro columnas en `Company`, modelo `CompanyEvent` con `/// @module
     identity`, lado inverso en `User` y `Company` (`design.md > 2.1`). Sin citas de fichas en los
     comentarios.
@@ -40,7 +40,7 @@ Cierre:                        T12
     como antes; el test, `guard-rls-force`, `guard-empresa-en-esquema` y
     `guard-arquitectura-modulos` en verde.
 
-- [ ] **T2 · Errores** (R8, R9, R22, R28). Depende de T1 solo por orden de commits.
+- [x] **T2 · Errores** (R8, R9, R22, R28). Depende de T1 solo por orden de commits.
   - `lib/modules/errores/domain/error-codes.ts` (cuatro códigos y su línea de enmienda) y
     `error-catalog.ts` (textos de `design.md > 3.6`).
   - `lib/modules/identity/domain/errors.ts`: las cuatro clases.

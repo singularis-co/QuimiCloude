@@ -608,6 +608,10 @@ describe('db/schema.prisma — la columna de empresa del usuario (QC-47)', () =>
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1] as string)
       .filter((name) => name !== 'User' && name !== 'Company')
+      // QC-162 2026-10-14: `CompanyEvent` apunta a `Company` (la empresa del evento) y a `User`
+      // (su autor), pero es un historial y no una tabla intermedia: no da a nadie una segunda
+      // empresa. La pertenencia sigue siendo la unica relacion escalar de arriba.
+      .filter((name) => name !== 'CompanyEvent')
     for (const name of modelNames) {
       const otro = parseModel(name)
       const apunta = (tipo: string): boolean =>

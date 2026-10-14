@@ -93,6 +93,10 @@ export const ERROR_MESSAGE_KEY = {
   delivery_not_found: 'errors.delivery_not_found',
   delivery_already_voided: 'errors.delivery_already_voided',
   company_not_found: 'errors.company_not_found',
+  company_duplicate_name: 'errors.company_duplicate_name',
+  company_duplicate_tax_id: 'errors.company_duplicate_tax_id',
+  company_name_mismatch: 'errors.company_name_mismatch',
+  company_not_deleted: 'errors.company_not_deleted',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -235,4 +239,9 @@ export const ERROR_MESSAGES_ES = {
   'errors.delivery_already_voided':
     'Alguna presentacion elegida ya estaba anulada: revisa la lista y vuelve a intentarlo.',
   'errors.company_not_found': 'La empresa solicitada no existe.',
+  'errors.company_duplicate_name': 'Ya existe una empresa activa con ese nombre.',
+  'errors.company_duplicate_tax_id':
+    'Ya existe una empresa activa con esa identificación fiscal.',
+  'errors.company_name_mismatch': 'El nombre escrito no coincide con el de la empresa.',
+  'errors.company_not_deleted': 'La empresa ya está activa.',
 } as const satisfies Record<ErrorMessageKey, string>;

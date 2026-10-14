@@ -612,6 +612,9 @@ export const MIGRACIONES_ESPERADAS = [
   '20261009130000_whatsapp_connections',
   // QC-235 2026-10-13: la columna `companies.country`; no toca el identificador.
   '20261013120000_companies_country',
+  // QC-162 2026-10-14: indices de unicidad de empresas y la tabla `company_events`; no toca el
+  // identificador.
+  '20261014120000_companies_management',
 ] as const
 
 export function hallazgosDeMigraciones(
