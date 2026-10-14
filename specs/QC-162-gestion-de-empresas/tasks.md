@@ -92,7 +92,7 @@ Cierre:                        T12
 
 ### Tanda C
 
-- [ ] **T7 · Adaptador driven de empresas** (R8–R14, R16–R35, R37, R39). Depende de T5 y T6.
+- [x] **T7 · Adaptador driven de empresas** (R8–R14, R16–R35, R37, R39). Depende de T5 y T6.
   - `adapters/driven/persistence/company-prisma.ts` (`design.md > 5.1`).
   - `adapters/driven/persistence/user-admin-prisma.ts`: exportar `duplicateKeyOf`, sin cambiar su
     cuerpo.
@@ -105,7 +105,7 @@ Cierre:                        T12
   - **Hecho:** el `.int` verde contra la base de test; `guard-aislamiento-integracion`,
     `guard-sesiones-cortadas` y `guard-password-never-plaintext` en verde.
 
-- [ ] **T8 [P] · Pedidos en curso** (R20). Depende de T4.
+- [x] **T8 [P] · Pedidos en curso** (R20). Depende de T4.
   - `lib/modules/pedidos/domain/order-classification.ts`: `ORDER_STATUSES_NOT_IN_PROGRESS`.
   - `lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma.ts`
     (`design.md > 5.2`).
@@ -115,7 +115,7 @@ Cierre:                        T12
   - **Hecho:** `.int` verde; `guard-ambito-empresa-pedidos` y `tests/unit/pedidos/module-contract.test.ts`
     en verde.
 
-- [ ] **T9 [P] · País con historial** (R36; enmienda a QC-235). Depende de T7. Se cae si el
+- [x] **T9 [P] · País con historial** (R36; enmienda a QC-235). Depende de T7. Se cae si el
   humano responde «no» a P4.
   - `ports/company-country-repository.ts`, `domain/set-company-country.ts`,
     `adapters/driven/persistence/company-country-prisma.ts` (`design.md > 3.5`, `> 5.3`).
@@ -174,6 +174,11 @@ Añadidos por el leader el 2026-10-13 (bloqueo de la Tanda A, enmiendas mecánic
 - `tests/unit/identity/credential-policy-contract.test.ts` (ídem)
 - `tests/unit/identity/schema/identity-schema.test.ts` (ídem; `CompanyEvent` fuera del caso R12: un historial no es tabla intermedia)
 - `tests/unit/identity/credencial/scope.test.ts` (`create-company.ts` en `EMISORES_LEGITIMOS`, con comentario)
+
+Añadidos por backend_dev en la Tanda C (enmiendas mecánicas autorizadas por el leader, solo añaden a una lista cerrada):
+
+- `tests/unit/identity/account-status-scope.test.ts` (`company-prisma.ts` en `SITIOS_PERMITIDOS`: el Administrador nace `pending`)
+- `tests/unit/pedidos/module-contract.test.ts` (`order-company-stats-prisma.ts` en `DUENOS_DE_ORDERS` y `DUENOS_DEL_CLIENTE`)
 
 
 - `db/schema.prisma`

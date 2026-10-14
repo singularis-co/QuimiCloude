@@ -87,7 +87,7 @@ describe('setCompanyCountryAction', () => {
       { id: MAESTRO.id, permissions: MAESTRO.permissions },
       { companyId: COMPANY_ID, country: 'CO' },
     );
-    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, 'CO');
+    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, 'CO', MAESTRO.id, expect.any(Date));
     expect(getSessionUserMock).toHaveBeenCalled();
     expect(getSessionContextMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
@@ -127,7 +127,7 @@ describe('setCompanyCountryAction', () => {
     );
 
     expect(resultado).toMatchObject({ status: 'error', code: 'company_not_found' });
-    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, null);
+    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, null, MAESTRO.id, expect.any(Date));
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
@@ -148,6 +148,6 @@ describe('setCompanyCountryAction', () => {
     );
 
     expect(resultado).toEqual({ status: 'success' });
-    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, 'PE');
+    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, 'PE', MAESTRO.id, expect.any(Date));
   });
 });

@@ -168,3 +168,110 @@ la enmienda de `scope.test.ts`.
 
 Veredicto: Tanda B en verde; el rojo de R39 queda resuelto con la enmienda y R45 esta implementado
 y cubierto.
+
+## Tanda C (T7, T8, T9) — backend_dev, 2026-10-13
+
+### Archivos
+- `lib/modules/identity/adapters/driven/persistence/company-prisma.ts` (nuevo): `createCompanyRepository(db)`
+  con las ocho operaciones del puerto; exporta `atomically` y `recordCompanyEvent` (los usa el pais).
+- `lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts`: `export` en `duplicateKeyOf`, cuerpo intacto.
+- `lib/modules/identity/ports/company-country-repository.ts`, `domain/set-company-country.ts` (`now?` inyectable,
+  pasa `actor.id` y `now()`), `adapters/driven/persistence/company-country-prisma.ts` (transaccion, fila viva
+  bloqueada, mismo pais sin escribir, evento `company.updated` con `{ fields: ['country'] }`).
+- `lib/modules/pedidos/domain/order-classification.ts`: `ORDER_STATUSES_NOT_IN_PROGRESS`.
+- `lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma.ts` (nuevo): `countOpenOrdersInCompany`.
+- Tests nuevos: `tests/integration/identity/company.int.test.ts` (36 casos),
+  `tests/integration/pedidos/order-company-stats.int.test.ts` (4),
+  `tests/unit/identity/companies/company-events-append-only.test.ts` (3).
+- Tests enmendados por el cambio de firma del puerto del pais (design 8.2, P4 = si):
+  - `tests/integration/identity/company-country.int.test.ts`: autor y `now` en cada llamada, +3 casos R36; los 5
+    casos de QC-235 siguen, y el de R8 gana «sin evento» en la empresa de baja.
+  - `tests/unit/identity/set-company-country.test.ts`: `now` fijo; los tres `toHaveBeenCalledWith` ganan `actorId` y
+    `now` (el codigo sigue llegando tal cual); +1 caso R36.
+  - `tests/unit/identity/company-actions.test.ts`: los tres `toHaveBeenCalledWith` del puerto ganan
+    `MAESTRO.id, expect.any(Date)` (el autor sale de la sesion, no de la entrada).
+- Censos (enmienda mecanica autorizada, solo anaden; anotados en `tasks.md > Archivos esperados`):
+  - `tests/integration/aislamiento.json`: `identity/company.int.test.ts` y `pedidos/order-company-stats.int.test.ts`
+    en `transaccion`, en su sitio alfabetico.
+  - `tests/unit/identity/account-status-scope.test.ts`: `company-prisma.ts` al final de `SITIOS_PERMITIDOS`
+    (el Administrador nace `pending`).
+  - `tests/unit/pedidos/module-contract.test.ts`: `order-company-stats-prisma.ts` en `DUENOS_DE_ORDERS` y
+    `DUENOS_DEL_CLIENTE`.
+- `specs/QC-162-gestion-de-empresas/tasks.md`: T7-T9 marcadas; los dos censos nuevos en «Archivos esperados».
+
+### `meta.target` medido (`@prisma/client@6.19.3`)
+Medido con un script suelto contra la base local (:5433) dentro de una transaccion revertida, y fijado como
+caso del `.int` (`R8, R9: Prisma anuncia en meta.target ...`), que pasa contra la base efimera:
+- `companies_tax_id_unique` → `P2002`, `meta = {"modelName":"Company","target":["tax_id_normalized"]}`.
+- `companies_name_unique` → `P2002`, `meta = {"modelName":"Company","target":["lower(name_normalized)"]}`.
+- `companies_tax_id_pair` (CHECK) → no es `P2002`: error crudo con SQLSTATE `23514`.
+- `'$transaction' in tx` es `false` en el cliente de una transaccion interactiva y `true` en el raiz: asi
+  distingue `atomically` los dos casos.
+
+Las marcas `tax_id_normalized` y `name_normalized` no aparecen en ningun `target` de `users`, y ninguna marca de
+`users` (`email`, `username`, `document_number`) aparece en los de `companies`.
+
+### Desviaciones respecto al design
+1. `atomically` sobre una transaccion ajena no hace `fn(db)` a secas: abre `SAVEPOINT company_write` y, si falla,
+   hace `ROLLBACK TO SAVEPOINT` antes de relanzar. En Postgres una sentencia fallida aborta la transaccion entera;
+   sin el savepoint, tras traducir el `P2002` el llamante se quedaria con una transaccion inservible (`25P02`). Con
+   el cliente raiz sigue siendo `db.$transaction(fn, { maxWait: 10_000, timeout: 30_000 })`. Gracias a esto el
+   `.int` prueba la atomicidad de verdad (R14, R34): tras un choque, cuenta empresa, usuario y evento en la misma
+   transaccion. Comprobado por mutacion: quitando el `ROLLBACK TO SAVEPOINT` caen 8 de los 36 casos.
+2. `countOpenOrdersInCompany(companyId, tx = prisma)`: el parametro se llama `tx` y no `db`, con tipo
+   `Pick<typeof prisma, 'order'>`. Con `db.` la guardia `guard-ambito-empresa-pedidos` no veria la consulta (su
+   patron solo mira `prisma.` y `tx.`) y pasaria sin mirar; con `tx.` la analiza y exige el ambito, que entra por
+   `orderCompanyScope({ companyId })`. El `Pick` evita importar `@prisma/client`, asi que `DUENOS_DE_PRISMA` de
+   `module-contract.test.ts` no cambia.
+3. `createWithAdministrator`: un `P2002` que no es de `companies` pasa por `duplicateKeyOf`; un `target` sin marca
+   se relanza.
+4. La busqueda de la lista normaliza con `normalizeCompanyName` (su cuerpo es `normalizeKey`, design 3.2); el
+   desempate del orden es `c.id ASC` en cualquier direccion.
+
+### R -> test (lo de esta tanda; archivo `company.int.test.ts` salvo que se diga otro)
+- R8, R9 -> `createWithAdministrator > R8, R9, R14`; `update > R8, R9`; `restricciones > R8, R9 (meta.target)`;
+  `createWithAdministrator > R9: dos empresas sin identificacion fiscal conviven`.
+- R10 -> `restricciones > R10` (dos casos: `23505`; `23514` en las cuatro combinaciones) y `> R10, R25`.
+- R11, R12 -> `createWithAdministrator > R11, R12, R34`.
+- R13 -> `createWithAdministrator > R13, R14` (usuario del Maestro → `username`; documento inexistente →
+  `invalid_document_type`).
+- R14 -> los tres casos de choque del alta: empresa, usuario y evento a cero tras cada uno.
+- R16 -> `update > R16, R34, R35`; R17 -> `update > R17`; R18 -> `update > R18`; R19 -> `update > R19`.
+- R20 -> `countLiveUsersOfAlive > R20` (dos casos) + `order-company-stats.int.test.ts` (cuatro casos R20).
+- R21, R24 -> `softDelete > R21, R24, R34`; R22 -> `softDelete > R22`; R23 -> `softDelete > R23`.
+- R25 -> `createWithAdministrator > R25` y `restricciones > R10, R25`.
+- R26 -> `reactivate > R26, R34`; R27 -> `reactivate > R27`; R28 -> `reactivate > R28`.
+- R29, R30 -> `list > R29, R30` y `list > R30`; R31 -> `list > R31`; R32 -> `list > R32` (dos casos).
+- R33 -> `findById > R33`.
+- R34 -> un evento por operacion en `R11, R12, R34`, `R16, R34, R35`, `R21, R24, R34`, `R26, R34` y
+  `listEvents > R34, R37`; un evento imposible deshace el cambio: `update > R34`, `softDelete > R34`,
+  `reactivate > R34`.
+- R35 -> `update > R16, R34, R35` (`{ fields: ['name', 'contactEmail'] }`, sin valores).
+- R36 -> `set-company-country.test.ts > R36 (QC-162)` + `company-country.int.test.ts > R36 (QC-162)` (tres casos:
+  evento con `country`; mismo pais sin evento ni `updated_at`; evento imposible deja el pais como estaba).
+- R37 -> `listEvents > R34, R37`, `> R37: mismo instante ...`, `> R37: 10 por defecto, tope de 25 ...`.
+- R38 -> `tests/unit/identity/companies/company-events-append-only.test.ts` (barrido de `lib/` y autocomprobacion
+  con fuentes sinteticos).
+- R39 -> `restricciones > R39`.
+
+### Verificacion (salida real)
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `ESLint: 0 errors, 7 warnings in 2 files` (los 7 preexistentes, en
+  `confirm-catalog-import.test.ts` y `order-service.test.ts`).
+- `pnpm exec vitest run --project integration tests/integration/identity/company.int.test.ts`:
+  Test Files 1 passed (1), Tests 36 passed (36).
+- `pnpm exec vitest run --project integration tests/integration/identity/company-country.int.test.ts`:
+  Test Files 1 passed (1), Tests 8 passed (8).
+- `pnpm exec vitest run --project integration tests/integration/pedidos/order-company-stats.int.test.ts`:
+  Test Files 1 passed (1), Tests 4 passed (4).
+  Los tres uno detras de otro; cada corrida creo y borro su base efimera.
+- `pnpm exec vitest run` de `company-events-append-only`, `set-company-country`, `company-actions`,
+  `account-status-scope` y `tests/unit/pedidos/module-contract.test.ts`: Test Files 5 passed (5), Tests 47 passed |
+  3 skipped (50).
+- `pnpm exec vitest run guard`: Test Files 75 passed (75), Tests 1052 passed | 20 skipped (1072).
+- `pnpm exec vitest run --project node tests/unit/identity tests/unit/pedidos`: Test Files 211 passed (211),
+  Tests 4071 passed | 34 skipped (4105).
+- `pnpm exec vitest related --run --project node --project ui` sobre los 7 archivos de `lib/` tocados:
+  Test Files 597 passed (597), Tests 10426 passed | 13 skipped (10439).
+
+Veredicto: Tanda C (T7, T8, T9) en verde; `meta.target` medido y fijado en un caso del `.int`.

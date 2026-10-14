@@ -192,7 +192,7 @@ function targetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string
  * todavia, se anunciara con un mensaje que es mentira y que no deja rastro
  * (`docs/conventions.md > Manejo de errores`).
  */
-function duplicateKeyOf(error: Prisma.PrismaClientKnownRequestError): DuplicateKey | null {
+export function duplicateKeyOf(error: Prisma.PrismaClientKnownRequestError): DuplicateKey | null {
   const targets = targetsOf(error);
   const mentions = (marker: string): boolean => targets.some((target) => target.includes(marker));
 

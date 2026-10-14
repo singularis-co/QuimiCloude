@@ -358,6 +358,8 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // ningun script tocan `orders`.
     const DUENOS_DE_ORDERS = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      // 2026-10-14: el contador de pedidos en curso de una empresa, para el impacto de su baja.
+      'lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma.ts',
       // `OrderNumberDirectory` de `inventario` -el numero visible de un pedido para el
       // historial de un lote-, tercer y ultimo dueno.
       'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
@@ -493,6 +495,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // Las dos listas siguen CERRADAS.
     const DUENOS_DEL_CLIENTE = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      'lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma.ts',
       'lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma.ts',
       ENTREGAS,
       ANULACIONES,
