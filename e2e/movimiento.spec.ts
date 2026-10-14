@@ -54,6 +54,9 @@ const RUN_ID = randomUUID().replace(/-/g, '');
 /** Edad minima de un resto de otra ejecucion: el otro proyecto corre a la vez con sus filas. */
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
+/** Valor de la columna cifrada de la conexion sembrada; nunca se descifra (ver `beforeAll`). */
+const E2E_AI_PROVIDER_KEY_ENC = 'v1:e2e-sin-descifrar';
+
 /** Viewport de escritorio: la barra lateral es fija (no un `Sheet`) y la pastilla de colapso existe. */
 const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
 
@@ -388,6 +391,7 @@ test.beforeAll(async () => {
   const orphanIds = orphans.map((c) => c.id);
   if (orphanIds.length > 0) {
     await prisma.customer.deleteMany({ where: { companyId: { in: orphanIds } } });
+    await prisma.aiProviderConnection.deleteMany({ where: { companyId: { in: orphanIds } } });
     await prisma.user.deleteMany({ where: { companyId: { in: orphanIds } } });
     await prisma.company.deleteMany({ where: { id: { in: orphanIds } } });
   }
@@ -406,7 +410,7 @@ test.beforeAll(async () => {
   if (!role) {
     throw new Error(`falta el rol "${ROLE_ADMINISTRADOR}": siembra la base con \`pnpm run db:seed\``);
   }
-  await createFixtureUser({
+  const admin = await createFixtureUser({
     data: {
       firstNames: `Qc228${RUN_ID.slice(0, 8)}`,
       lastNames: 'Movimiento',
@@ -425,6 +429,22 @@ test.beforeAll(async () => {
     select: { id: true },
   });
 
+  // Sin conexion de proveedor IA el dialogo de subida de formulas no se pinta (QC-275 R37): la
+  // pagina muestra el aviso de bloqueo en su lugar. La key no se descifra nunca: abrir y cerrar el
+  // dialogo no lee nada.
+  await prisma.aiProviderConnection.create({
+    data: {
+      id: randomUUID(),
+      companyId,
+      provider: 'ANTHROPIC',
+      apiKeyEnc: E2E_AI_PROVIDER_KEY_ENC,
+      status: 'ACTIVE',
+      keyUpdatedAt: new Date(),
+      createdById: admin.id,
+      updatedById: admin.id,
+    },
+  });
+
   await prisma.customer.create({
     data: {
       ...seededCustomer,
@@ -438,10 +458,12 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  // Orden de la FK restrictiva: clientes -> usuarios -> empresa, solo de ESTE worker.
+  // Orden de la FK restrictiva: clientes -> conexion IA -> usuarios -> empresa, solo de ESTE worker.
   try {
     if (companyId) {
       await prisma.customer.deleteMany({ where: { companyId } });
+      // Antes que el usuario (`created_by`) y que la empresa: las dos FK son RESTRICT.
+      await prisma.aiProviderConnection.deleteMany({ where: { companyId } });
       await prisma.user.deleteMany({ where: { companyId } });
     }
   } finally {

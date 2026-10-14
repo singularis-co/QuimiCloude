@@ -404,6 +404,7 @@ Veredicto: la fila de `documentos` cubre el lector por empresa y un caso de sens
 - `tests/guards/guard-identificador-de-request.test.ts`: + `integraciones-proveedor-ia.spec.ts` en
   `E2E_ESPERADOS` (solo añadir).
 - `specs/.../tasks.md > Archivos esperados`: + `components/shared/password-field.tsx`.
+- Adenda (orden del leader): `e2e/movimiento.spec.ts` siembra la misma fila en su `beforeAll` y la borra antes que usuarios y empresa (también en huérfanos), así su diálogo de subida de Fórmulas se pinta. typecheck 0 errores; lint 0 errores, 7 warnings preexistentes; E2E no corrido (base sin migrar).
 
 ### R → test (E2E)
 - R37 → `integraciones-proveedor-ia.spec.ts` (aviso con enlace sin conexión; botón con conexión;
@@ -439,3 +440,29 @@ Veredicto: la fila de `documentos` cubre el lector por empresa y un caso de sens
   tabla (siembran la fila o abren la pantalla). Para cerrarlos hace falta una base con la migración.
 
 Veredicto: placeholder hecho y en verde; T16 escrita pero sin E2E verdes (base sin migrar), T16 sigue `[ ]`.
+
+## Cierre (implementer, 2026-10-13) — T17 trazabilidad
+
+### Mapa R → test (consolidado; detalle por tanda arriba)
+- R1, R2, R37 → `tests/unit/integraciones/ai-provider/authorization.test.ts`; R1, R8, R13–R20, R37 → `ai-provider-actions.test.ts`
+- R3, R8 → `tests/unit/integraciones-ui/ai-provider-page.test.tsx`; R8, R30, R32, R34, R36 → `ai-provider-form.test.tsx`; R31–R36 → `ai-provider-card.test.tsx`
+- R4, R5 → `tests/integration/integraciones/ai-provider-migration.int.test.ts`; R2, R4, R5, R7, R19, R20 → `ai-provider-connection-prisma.int.test.ts`
+- R6, R9, R21, R23–R28 → `resolve-and-report.test.ts`; R9, R21, R24–R28 → `run-document-job-ai-provider.test.ts`; R23 → `issue-upload-links-ai-provider.test.ts`
+- R8 → `connection-view.test.ts`; R9, R11, R25, R26 → `ai-provider-failure.test.ts`; R18 → `ai-provider-input.test.ts`
+- R10–R13, R18 → `test-ai-provider-key.test.ts`; R9, R14 → `test-saved-ai-provider.test.ts`; R7, R15–R19 → `save-ai-provider-connection.test.ts`; R20 → `disconnect-ai-provider.test.ts`
+- R10, R11, R25, R26, R29 → `ai-reader-{anthropic-adapter,adapter,openai-adapter}.test.ts`; R29 → `openai-sdk-isolation.test.ts`
+- R22, R43 → `ai-model-literals.test.ts`; R22 → `guard-variables-por-entorno`
+- R37–R39 → `ai-provider-required-notice.test.tsx`, `formulas-upload.test.tsx`, `supplier-detail-upload.test.tsx`, `document-upload-errors.test.tsx`
+- R40 → `ai-provider-probe-canned.test.ts`; R40–R42 → `tests/unit/composition/ai-provider-wiring.test.ts`; R41 → `guard-dobles-e2e.test.ts` (caso nuevo)
+- R44 → `tests/guards/guard-dependencias-aprobadas.test.ts` (T0: 2/2 verde)
+- E2E (escritos, sin correr en local): R3, R8, R13, R16, R17, R20, R30, R31, R33, R34, R37 → `e2e/integraciones-proveedor-ia.spec.ts`; R23, R41 → `documentos`, `formula-desde-pdf`, `catalogo-desde-pdf`, `movimiento`
+
+### Pendientes
+- **R35 pendiente de logos oficiales** (`[POR CONFIRMAR]`): hoy se cubre con el `aria-label` del monograma en `ai-provider-card.test.tsx`.
+- **T16 sin correr:** la base local es compartida y no tiene `20261013150000_ai_providers`; no se migró. Los E2E corren en CI (PR a producción) o tras migrar una base propia.
+- `proveedores/catalog-line.int.test.ts` R32: rojo previo a la feature (comprobado con stash en la tanda 1) y no está en `tests/baseline-rojos.json`.
+- Spec: `components/shared/index.ts` no existe (no hay barril raíz) y no se creó; `design.md > 1` y `tasks.md` lo listan.
+
+### Verificación final (implementer)
+- `pnpm exec vitest run guard`: 75 archivos, 1049 verdes, 20 omitidos, 0 rojos (tras la tanda 7).
+- typecheck y lint: 0 errores en cada tanda (7 avisos previos).
