@@ -20,6 +20,8 @@ type ProductCostFieldsProps = {
   readonly initialTotalCost: string;
   readonly unitCostError?: string;
   readonly totalCostError?: string;
+  /** Avisa del costo unitario que viajará, escrito o deducido del total. */
+  readonly onUnitCostChange?: (unitCost: string) => void;
 };
 
 /** La misma cantidad que valida el esquema del lote: decimal sin signo, hasta 4 decimales. */
@@ -55,9 +57,15 @@ export function ProductCostFields({
   initialTotalCost,
   unitCostError,
   totalCostError,
+  onUnitCostChange,
 }: ProductCostFieldsProps) {
-  const [unitCost, setUnitCost] = useState(initialUnitCost);
+  const [unitCost, setUnitCostState] = useState(initialUnitCost);
   const [totalCost, setTotalCost] = useState(initialTotalCost);
+
+  function setUnitCost(next: string) {
+    setUnitCostState(next);
+    onUnitCostChange?.(next);
+  }
 
   function handleUnitCostChange(event: ChangeEvent<HTMLInputElement>) {
     const typed = sanitizeCostInput(event.currentTarget.value);

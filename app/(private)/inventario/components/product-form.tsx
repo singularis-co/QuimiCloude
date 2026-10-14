@@ -11,9 +11,11 @@ import {
   updateProductSchema,
   MANUAL_PRODUCT_TYPE_VALUES,
   PRODUCT_TYPES,
+  isStoredDecimal,
   type ProductFormUnits,
   type ProductView,
   type ProductType,
+  type SupplyConversion,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
@@ -34,6 +36,13 @@ import { ProductCostFields } from './product-cost-fields';
 import { ProductField } from './product-field';
 import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
 import { productUnitLabel } from './product-columns';
+import {
+  checkConvertedSupplyBatch,
+  resolveSupplyDestination,
+  supplyUnitHint,
+  SupplyConversionNotice,
+} from './supply-conversion-notice';
+import { useSupplyHomonyms } from './use-supply-homonyms';
 
 /**
  * Campos de texto del producto.
@@ -199,7 +208,7 @@ type FieldValues = Record<ProductFieldName, string>;
  */
 type ProductFormState =
   | { status: 'idle' }
-  | { status: 'success'; lot?: string }
+  | { status: 'success'; lot?: string; conversion?: SupplyConversion }
   | {
       status: 'error';
       /** El error TAL CUAL: el de la operacion, o el `invalid_input` que fabrica la validacion previa. */
@@ -304,10 +313,18 @@ type ProductFormProps = {
   /**
    * Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar.
    *
-   * El argumento es el lote que devolvio el servidor, para que el aviso pueda nombrarlo. La
-   * edicion no conoce ningun lote y llama sin argumento: por eso es opcional.
+   * Recibe lo que devolvio el servidor para que el aviso lo nombre. La edicion no devuelve nada.
    */
-  readonly onSaved: (lot?: string) => void;
+  readonly onSaved: (saved?: ProductSaved) => void;
+};
+
+/** Lo que el alta devolvió: el lote y, si el lote se sumó convertido a un homónimo, a cuál. */
+export type ProductSaved = { readonly lot?: string; readonly conversion?: SupplyConversion };
+
+/** Rechazos del servidor que se pintan en un campo y no en la región del formulario. */
+const SERVER_FIELD_ERRORS: Partial<Record<ErrorCode, ProductFieldName>> = {
+  converted_stock_out_of_range: 'stock',
+  converted_cost_out_of_range: 'unitCost',
 };
 
 /**
@@ -346,6 +363,14 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
   /** Tipo de producto seleccionado. Parte del tipo del producto que se edita (o PRODUCT en alta). */
   const [productType, setProductType] = useState<ProductType>(product?.type ?? PRODUCT_TYPES.PRODUCT);
 
+  // Unidad y costo unitario se siguen aqui para el aviso de conversion del alta.
+  const [unitValue, setUnitValue] = useState('');
+  const [unitCostValue, setUnitCostValue] = useState('');
+  const supplyHomonyms = useSupplyHomonyms(
+    product === undefined && productType === PRODUCT_TYPES.PRODUCT,
+  );
+  const homonyms = supplyHomonyms.homonyms;
+
   /**
    * Lo que se copia al elegir un producto existente: alerta, tipo, unidad y presentacion. La
    * existencia y los costos no, porque son del lote que se esta dando de alta.
@@ -367,6 +392,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
       type: option.type ?? PRODUCT_TYPES.PRODUCT,
     });
     setQtyAlertValue(trimDecimal(option.qtyAlert ?? ''));
+    setUnitValue(option.unitId ?? '');
   }
 
   async function save(_previous: ProductFormState, formData: FormData): Promise<ProductFormState> {
@@ -458,6 +484,16 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
     // pantalla -el `unrecognized_keys` de arriba es el unico que hoy podria- no puede acabar
     // llamando a la operacion en silencio. Sin campo que marcar, se pinta en la region del
     // formulario, que es justo para lo que esta.
+    // Lo que no cabe tras convertir se dice en su campo antes de enviar; el servidor lo revalida.
+    if (parsed.success && isCreate && type === PRODUCT_TYPES.PRODUCT && decimals.stock !== undefined) {
+      const destination = resolveSupplyDestination(values.unitId, homonyms, formUnits);
+      const misfit =
+        destination === null
+          ? null
+          : checkConvertedSupplyBatch(destination, decimals.stock, unitCost?.trim() ?? null);
+      if (misfit !== null) fieldErrors[misfit.field] = misfit.message;
+    }
+
     if (!parsed.success || Object.keys(fieldErrors).length > 0) {
       // Rechazo de la validacion previa: ni se llama a la operacion. El panel sigue abierto.
       return {
@@ -481,12 +517,20 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
         //
         // El estado de la operacion se guarda ENTERO. Antes se copiaban `code` y `message` a
         // mano, y esa copia tiraba el `reference` del error inesperado por el camino.
-        return { status: 'error', serverError: result, fieldErrors: {}, values };
+        const field = SERVER_FIELD_ERRORS[result.code];
+        return {
+          status: 'error',
+          serverError: result,
+          fieldErrors: field === undefined ? {} : { [field]: result.message },
+          values,
+        };
       }
 
       // `status === 'idle'` no lo devuelve nunca la action en la practica, pero el tipo lo
       // incluye: sin lote que guardar, se trata igual que la edicion.
-      return result.status === 'success' ? { status: 'success', lot: result.lot } : { status: 'success' };
+      return result.status === 'success'
+        ? { status: 'success', lot: result.lot, conversion: result.conversion }
+        : { status: 'success' };
     }
 
     const result = await updateProductAction(product.id, { status: 'idle' }, formData);
@@ -502,7 +546,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
 
   useEffect(() => {
     if (state.status !== 'success') return;
-    onSaved(state.lot);
+    onSaved({ lot: state.lot, conversion: state.conversion });
   }, [state, onSaved]);
 
   /**
@@ -533,6 +577,11 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
   const [qtyAlertValue, setQtyAlertValue] = useState(() =>
     initialValue('qtyAlert', trimDecimal(template?.qtyAlert ?? product?.qtyAlert ?? '')),
   );
+  const noticeDestination =
+    product !== undefined || productType !== PRODUCT_TYPES.PRODUCT || !isStoredDecimal(stockValue)
+      ? null
+      : resolveSupplyDestination(unitValue, homonyms, formUnits);
+
   // Solo en la edicion: en el alta la unidad del selector puede cambiar y la etiqueta mentiria.
   const editUnitLabel = product === undefined ? null : productUnitLabel(product, units);
   const qtyAlertLabel =
@@ -561,6 +610,9 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
     setTemplate(null);
     setStockValue('');
     setQtyAlertValue('');
+    supplyHomonyms.onNameChange('');
+    setUnitValue('');
+    setUnitCostValue('');
     setValoresDescartados(state.status === 'error' ? state.values : undefined);
     setResetCount((count) => count + 1);
   }
@@ -621,6 +673,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           defaultValue={initialValue('name', '')}
           error={fieldErrors.name}
           onSelect={applyTemplate}
+          onNameChange={supplyHomonyms.onNameChange}
           productType={productType}
         />
       )}
@@ -664,18 +717,20 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
       )}
 
       {/*
-        Unidad del insumo y presentacion del envase: solo en el alta. La `key` remonta el selector
-        al elegir un producto existente o al recuperar lo escrito tras un rechazo, porque fija su
-        valor inicial al montarse.
+        Unidad del insumo y presentacion del envase: solo en el alta. La `key` remonta la
+        presentacion al elegir un producto existente o al recuperar lo escrito tras un rechazo,
+        porque fija su valor inicial al montarse. La unidad es controlada: el aviso de conversion
+        la necesita mientras se escribe.
       */}
       {isEdit ? null : shouldShowField('unitId', productType) && (
         <PresentationUnitSelect
-          key={`${initialValue('unitId', '')}-${template?.unitId ?? ''}`}
           name="unitId"
           units={formUnits}
-          defaultValue={initialValue('unitId', template?.unitId ?? '') || undefined}
+          value={unitValue}
+          onValueChange={setUnitValue}
           error={fieldErrors.unitId}
           helper={UNIT_HELPER}
+          hint={supplyUnitHint(noticeDestination)}
         />
       )}
 
@@ -706,6 +761,14 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           {PACKAGING_PRESENTATION_NOTE}
         </p>
       ) : null}
+
+      {isEdit || productType !== PRODUCT_TYPES.PRODUCT ? null : (
+        <SupplyConversionNotice
+          destination={noticeDestination}
+          stock={stockValue}
+          unitCost={unitCostValue}
+        />
+      )}
 
       {isEdit ? null : shouldShowField('stock', productType) && (
         <ProductField
@@ -759,6 +822,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
               initialTotalCost={initialValue('totalCost', '')}
               unitCostError={fieldErrors.unitCost}
               totalCostError={fieldErrors.totalCost}
+              onUnitCostChange={setUnitCostValue}
             />
           )}
 

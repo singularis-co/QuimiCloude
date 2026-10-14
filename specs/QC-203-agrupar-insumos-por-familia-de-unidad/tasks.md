@@ -84,12 +84,12 @@
 
 ## Tanda 3 — aviso en «Nuevo producto» (depende de T6)
 
-- [ ] **T7 — `PresentationUnitSelect` gana `hint`** (paso 2: prop opcional, sin romper usos) y su
+- [x] **T7 — `PresentationUnitSelect` gana `hint`** (paso 2: prop opcional, sin romper usos) y su
   fila de `components/shared/CATALOGO.md` anota el punto de extensión.
   Casos nuevos en `tests/unit/configuracion-ui/presentation-unit-select.test.tsx` (el test que ya
   tiene): el texto visible enlazado por `aria-describedby`; sin `hint`, el árbol no cambia.
   *Hecho:* verde; `guard-catalogo-de-componentes.test.ts` verde.
-- [ ] **T8 — Aviso, errores de campo y toast** (`design.md > 5` y `> 6`; tableros
+- [x] **T8 — Aviso, errores de campo y toast** (`design.md > 5` y `> 6`; tableros
   `AltaConversion*.dc.html`). Depende de T7.
   - `onNameChange` en `ProductNamePicker`; `onUnitCostChange` en `ProductCostFields`; unidad
     controlada.

@@ -22,6 +22,7 @@ export const PRESENTATION_UNIT_OPTION_TESTID = 'presentation-unit-option';
 export const PRESENTATION_UNIT_ERROR_TESTID = 'presentation-error-unit';
 export const PRESENTATION_UNIT_HELPER_TESTID = 'presentation-unit-helper';
 export const PRESENTATION_UNIT_HELPER_TEXT_TESTID = 'presentation-unit-helper-text';
+export const PRESENTATION_UNIT_HINT_TESTID = 'presentation-unit-hint';
 
 const PRESENTATION_UNIT_HELPER_LABEL = 'Qué es';
 
@@ -67,6 +68,8 @@ type PresentationUnitSelectProps = {
   readonly onValueChange?: (unitId: string) => void;
   /** Ayuda opcional junto a la etiqueta; sin ella no se pinta nada. */
   readonly helper?: ReactNode;
+  /** Ayuda visible bajo el campo; sin ella no se pinta nada. */
+  readonly hint?: ReactNode;
 };
 
 /**
@@ -117,9 +120,15 @@ export function PresentationUnitSelect({
   value,
   onValueChange,
   helper,
+  hint,
 }: PresentationUnitSelectProps) {
   const labelId = useId();
   const errorId = useId();
+  const hintId = useId();
+  const describedBy =
+    [hint === undefined ? null : hintId, error === undefined ? null : errorId]
+      .filter((id) => id !== null)
+      .join(' ') || undefined;
 
   const seleccion: UnitSelection =
     onValueChange === undefined
@@ -169,7 +178,7 @@ export function PresentationUnitSelect({
         <SelectTrigger
           aria-labelledby={labelId}
           aria-invalid={error === undefined ? undefined : true}
-          aria-describedby={error === undefined ? undefined : errorId}
+          aria-describedby={describedBy}
           className={`w-full ${touchTarget} ${FIELD_TEXT}`}
           data-testid={PRESENTATION_UNIT_SELECT_TESTID}
         >
@@ -190,6 +199,16 @@ export function PresentationUnitSelect({
           ))}
         </SelectContent>
       </Select>
+
+      {hint === undefined ? null : (
+        <p
+          id={hintId}
+          className="text-sm text-muted-foreground"
+          data-testid={PRESENTATION_UNIT_HINT_TESTID}
+        >
+          {hint}
+        </p>
+      )}
 
       {error === undefined ? null : (
         <p
