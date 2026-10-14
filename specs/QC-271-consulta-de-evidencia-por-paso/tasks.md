@@ -218,7 +218,7 @@ teléfono contra `RecorridoEvidencia*.dc.html`.
 **Hecho cuando:** los tests nombrados están en verde y se comprueba a mano en escritorio, tablet y
 teléfono contra `ProductoTerminadoEvidencia*.dc.html`.
 
-## TC — Barrido de censos (depende de B1, B2, F0, F1 y F2)
+## [x] TC — Barrido de censos (depende de B1, B2, F0, F1 y F2)
 
 - Repasa `design.md > 7` fila a fila y confirma cada «verificar»:
   - `module-contract` de `asignaciones`;
