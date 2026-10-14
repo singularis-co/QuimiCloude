@@ -590,6 +590,7 @@ describe('pantalla de productos — lista', () => {
     expect(columnas.map((columna) => columna.id)).toEqual([
       'image',
       'name',
+      'presentationName',
       'stock',
       'qtyAlert',
       'reserved',
@@ -598,7 +599,7 @@ describe('pantalla de productos — lista', () => {
     ]);
   });
 
-  it('la unidad no es su propia columna: se lee junto al nombre y junto a la existencia', async () => {
+  it('la unidad no es su propia columna: se lee junto a la existencia', async () => {
     // Test **en negativo**: el id de unidad esta en los datos y no puede llegar a la pantalla
     // crudo, ni como columna propia. La unidad se pinta resuelta a nombre o simbolo (R18), nunca
     // como el UUID de `ProductView.unitId`.
@@ -734,16 +735,50 @@ describe('pantalla de productos — lista', () => {
     }
   });
 
-  it('R18 — el nombre del producto se pinta junto a la unidad guardada', async () => {
+  it('la columna Nombre pinta solo el nombre: la unidad va junto a la existencia', async () => {
     const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
     listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ name: 'Hipoclorito', unitId: UNIDAD_KG.id })]),
+      paginaDeProductos([producto({ name: 'Glicerina', stock: '3', unitId: UNIDAD_KG.id })]),
     );
 
     await renderPantalla();
 
-    expect(screen.getByTestId('data-table-cell-name')).toHaveTextContent('Hipoclorito · kg');
+    expect(screen.getByTestId('data-table-cell-name').textContent).toBe('Glicerina');
+    expect(screen.getByTestId('product-stock')).toHaveTextContent('3 kg');
+  });
+
+  it('un terminado pinta el nombre sin su presentacion, y la presentacion en su columna', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({
+          name: 'Jabón líquido de manos · Botella 500 ml',
+          type: PRODUCT_TYPES.FINISHED_PRODUCT,
+          presentationId: crypto.randomUUID(),
+          presentationName: 'Botella 500 ml',
+        }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('data-table-cell-name').textContent).toBe('Jabón líquido de manos');
+    expect(screen.getByTestId('data-table-cell-presentationName').textContent).toBe('Botella 500 ml');
+  });
+
+  it('sin presentacion, la columna Presentación pinta el marcador de vacio y no ordena', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ name: 'Glicerina', presentationId: null, presentationName: null })]),
+    );
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('data-table-cell-presentationName')).toHaveTextContent(EMPTY_MARK);
+    const columna = buildProductColumns({ rowActions: () => null }).find(
+      (candidata) => candidata.id === 'presentationName',
+    );
+    expect(columna?.sortable).toBeFalsy();
+    expect(columna?.filter).toBeUndefined();
   });
 
   it('R18 — sin unidad guardada o sin catalogo de unidades, el nombre se pinta solo', async () => {
