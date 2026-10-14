@@ -18,9 +18,9 @@
  *
  * El rol `Operador` es el REAL del seed, nunca un fixture: sus permisos son el dato bajo prueba
  * del camino feliz y de la reentrada. Para el camino negativo hace falta un actor SIN
- * `asignaciones.consultar`, y ninguno de los dos roles del seed sirve -Administrador y Operador lo
- * tienen los dos-, asi que este spec crea un rol efimero sin ningun permiso, igual que
- * `e2e/inventario.spec.ts`.
+ * `asignaciones.consultar`. El Operador lo tiene y el Administrador no, pero el Administrador tiene
+ * otros permisos que no son el dato bajo prueba, asi que este spec crea un rol efimero sin ningun
+ * permiso, igual que `e2e/inventario.spec.ts`.
  *
  * EVIDENCIA POR PASO (QC-214): una segunda receta con el paso 1 que exige evidencia y un pedido
  * propio ya EN_CURSO en el paso 2, el ultimo. Ese punto de partida es el de una fabricacion que
@@ -449,8 +449,8 @@ test.beforeAll(async () => {
     })
   ).id;
 
-  // Rol efimero SIN ningun permiso: ni Administrador ni Operador sirven para el camino negativo,
-  // los dos tienen `asignaciones.consultar`.
+  // Rol efimero SIN ningun permiso: el camino negativo no depende de lo que tenga cualquier rol
+  // del seed.
   const noPermissionsRole = await prisma.role.create({
     data: {
       name: NO_PERMISSIONS_ROLE_NAME,

@@ -18,6 +18,8 @@
 // dashboard esta oculto del menu, asi que se aterriza en asignacion. El borde no conoce los
 // permisos: quien no tenga el de esa pantalla recibe el 404 del layout privado, con su menu a la
 // izquierda para seguir. Resolverlo aqui exigiria una consulta en el borde, que es lo prohibido.
+// El Administrador es uno de esos casos (no tiene `asignaciones.consultar`): el aterrizaje normal,
+// el del login, si filtra por permisos (`firstVisibleNavHref`) y lo lleva a `/dashboard`.
 //
 // Lo que este archivo NO puede hacer, y por que:
 // - **No toca la cookie (R5).** Solo `NextResponse.next()` y `NextResponse.redirect()`. Ni

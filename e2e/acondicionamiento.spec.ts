@@ -488,8 +488,9 @@ test.describe('las pestañas del acondicionador (R22)', () => {
 });
 
 test.describe('quien no tiene acondicionamiento.modificar no ve las pestañas (R23)', () => {
+  // El Administrador no entra a `/asignacion` (no tiene `asignaciones.consultar`); ese corte lo
+  // cubre `e2e/pedidos-terminados.spec.ts`.
   const ROLES_WITHOUT_PERMISSION: ReadonlyArray<{ readonly role: string; readonly user: Credentials }> = [
-    { role: ROLE_ADMINISTRADOR, user: adminUser },
     { role: ROLE_OPERADOR, user: operatorUser },
     { role: ROLE_EMPACADOR, user: empacadorUser },
   ];
@@ -512,8 +513,6 @@ test.describe('quien no tiene acondicionamiento.modificar no ve las pestañas (R
       await page.goto(porAcondicionarUrl());
       await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
       await expect(page.getByTestId(TAB_POR_ACONDICIONAR_TESTID)).toHaveCount(0);
-      // Sin afirmar sobre la fila de A: el Administrador cae en «Todos», que lista los pedidos
-      // de la empresa en cualquier estado.
       await expect(page.getByTestId(CONDITIONING_SECTION_TESTID)).toHaveCount(0);
 
       // --- 3. El detalle de un POR_ACONDICIONAR de su empresa responde el 404 de la zona privada.
