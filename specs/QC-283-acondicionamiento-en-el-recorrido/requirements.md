@@ -36,8 +36,23 @@ de UI que pide la feature son:
 - `ExecutionTraceDetail` y la lista del dashboard (`execution-trace-columns.tsx`) pasan de una
   duración a tres: producción, empaque y acondicionamiento.
 
-Por eso `## Requisitos (EARS)`, `design.md` y `tasks.md` todavía no se escriben. Se escribirán
-cuando el tablero aprobado esté en `docs/diseno/canvas/`.
+Por eso `## Requisitos (EARS)`, el resto de `design.md` y `tasks.md` todavía no se escriben. Se
+escribirán cuando el tablero aprobado esté en `docs/diseno/canvas/`.
+
+**Actualización 2026-10-14 (spec_author, a petición del humano).** Los **contratos** ya están
+cerrados en `design.md > Contratos`, para que backend_dev y frontend_dev puedan trabajar en
+paralelo cuando se apruebe el tablero. Los contratos son:
+
+- el esquema;
+- los servicios backend, con la firma de antes y la de después;
+- los tipos de lectura hacia el front;
+- dónde vive cada tipo y los fixtures.
+
+Siguen **pendientes de P0**:
+
+- los requisitos `R<n>`;
+- el resto de `design.md` (UI, catálogo, plan de tests);
+- `tasks.md`.
 
 ## Requisitos (EARS)
 
@@ -74,4 +89,29 @@ _Pendiente: depende del pase `/design` (ver «Estado del spec»)._
 - **P4 — choque con QC-284 (pending).** «Lote por presentación» cambia el acondicionamiento a un
   solo formulario por pedido, que se guarda en todas las líneas. La foto por guardado sigue
   sirviendo, pero hay que acordar el orden entre las dos fichas por los archivos que comparten:
-  `save-conditioning-batch-data.ts` y `finished-batch-labels`.
+  `save-conditioning-batch-data.ts` y `finished-batch-labels`. Con los contratos, el choque crece:
+  QC-283 cambia las deps de `createSaveConditioningBatchData` y la firma de
+  `createFinishedBatchLabels(db?)` (`design.md > C2.5, C2.7`).
+- **P5 — ¿Qué entra de la presentación en la foto?** El contrato guarda `presentationId` y el
+  **nombre** de la presentación en ese instante (`design.md > C1.3`). La vista de acondicionamiento
+  (QC-219) muestra además el envase (`packagingName`) y las unidades (`packages`). ¿Entran en la
+  foto? Si entran, se añaden a C1.3 antes de implementar.
+- **P6 — Reglas de cada duración.** Las formas están cerradas (`design.md > C3.3`); las reglas no:
+  - ¿qué estados del pedido cuentan como «la fase está en curso» para la cifra abierta? La propuesta
+    es producción = `EN_CURSO` (¿y `BLOQUEADO`?), empaque = `EN_EMPAQUE` y acondicionamiento =
+    `EN_ACONDICIONAMIENTO`;
+  - ¿a qué fase cierra un `cancel`? La propuesta es a la que esté abierta en ese momento.
+
+  Ni el código ni QC-167 lo fijan para tres cifras.
+- **P7 — Filtro por persona y rango de fechas para el equipo.** Para un miembro del equipo, el
+  contrato exige que el `CONDITIONING_START` del pedido caiga dentro de `desde`/`hasta`
+  (`design.md > C2.3`). La alternativa sería exigir cualquier anotación del pedido dentro del
+  rango. ¿Cuál?
+- **P8 — ¿El equipo sale en las personas de la fila?** Hoy `ExecutionTraceRow.people` son solo
+  quienes firman anotaciones. Con la DC del filtro, buscar a un miembro del equipo devuelve
+  pedidos en cuya fila esa persona no aparece. ¿Se suma el equipo a `people`? Depende también del
+  tablero.
+- **P9 — ¿Nombre de las personas como era o como es?** El equipo guarda la foto del **nombre del
+  grupo** (`workGroupName`), pero no la del nombre de cada persona. El recorrido, igual que hoy
+  para quien firma, muestra el nombre **actual** del directorio. ¿Basta así, o la DC «¿Foto del
+  momento?» alcanza también a los nombres de las personas?
