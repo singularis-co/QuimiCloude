@@ -56,7 +56,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // `companies.name_normalized` se calcula con esta y con ninguna otra.
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
-import { PRODUCT_TYPES, productDisplayName } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
@@ -307,8 +307,7 @@ function textoNormalizado(texto: string | null): string {
 }
 
 /**
- * El nombre y la existencia de CADA fila cuyo nombre es exactamente `name` (con o sin la unidad
- * detras), recargando la lista desde la primera pagina. Los homonimos salen contiguos (nombre y
+ * El nombre y la existencia de CADA fila cuyo nombre es exactamente `name`, recargando la lista desde la primera pagina. Los homonimos salen contiguos (nombre y
  * luego id), pero pueden partirse entre dos paginas: si la ultima fila de una pagina es uno, se
  * sigue en la siguiente.
  */
@@ -339,9 +338,9 @@ async function filasDeHomonimos(page: Page, name: string): Promise<FilaDeInventa
   }
 }
 
-/** Orden estable para comparar filas sin depender del orden de la lista. */
-function porNombre(filas: readonly FilaDeInventario[]): FilaDeInventario[] {
-  return [...filas].sort((a, b) => a.nombre.localeCompare(b.nombre));
+/** Orden estable para comparar homonimos sin depender del orden de la lista. */
+function porExistencia(filas: readonly FilaDeInventario[]): FilaDeInventario[] {
+  return [...filas].sort((a, b) => a.existencia.localeCompare(b.existencia));
 }
 
 /** Abre el panel lateral de alta y espera a que este montado. */
@@ -915,17 +914,15 @@ test.describe('catalogo de productos', () => {
       .locator('xpath=ancestor::tr[1]');
     await expect(filasHomonimas).toHaveCount(2, { timeout: 60_000 });
 
-    // --- 3. El listado muestra DOS filas, «X · kg» y «X · <litro>»: cada celda de nombre lleva
-    // su propia unidad, y cada fila su propia existencia.
-    const kgRowName = productDisplayName(sameNameProductName, kg.label);
-    const literRowName = productDisplayName(sameNameProductName, liter.label);
+    // --- 3. El listado muestra DOS filas «X»: el nombre va solo y la unidad se lee en la
+    // existencia de cada fila.
     expect(
-      porNombre(await filasDeHomonimos(page, sameNameProductName)),
-      'dos filas con el mismo nombre, cada una con su unidad en el nombre y su propia existencia',
+      porExistencia(await filasDeHomonimos(page, sameNameProductName)),
+      'dos filas con el mismo nombre, cada una con su propia existencia y unidad',
     ).toEqual(
-      porNombre([
-        { nombre: kgRowName, existencia: `${sameNameKgFirstStock} ${kg.label}` },
-        { nombre: literRowName, existencia: `${sameNameLiterStock} ${liter.label}` },
+      porExistencia([
+        { nombre: sameNameProductName, existencia: `${sameNameKgFirstStock} ${kg.label}` },
+        { nombre: sameNameProductName, existencia: `${sameNameLiterStock} ${liter.label}` },
       ]),
     );
 
@@ -973,12 +970,12 @@ test.describe('catalogo de productos', () => {
       filasHomonimas.getByTestId('product-stock').filter({ hasText: kg.label }),
     ).toHaveText(`${kgStockAfter} ${kg.label}`, { timeout: 60_000 });
     expect(
-      porNombre(await filasDeHomonimos(page, sameNameProductName)),
+      porExistencia(await filasDeHomonimos(page, sameNameProductName)),
       'sube solo la fila en kg; la de L queda igual y no aparece una tercera',
     ).toEqual(
-      porNombre([
-        { nombre: kgRowName, existencia: `${kgStockAfter} ${kg.label}` },
-        { nombre: literRowName, existencia: `${sameNameLiterStock} ${liter.label}` },
+      porExistencia([
+        { nombre: sameNameProductName, existencia: `${kgStockAfter} ${kg.label}` },
+        { nombre: sameNameProductName, existencia: `${sameNameLiterStock} ${liter.label}` },
       ]),
     );
 

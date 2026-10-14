@@ -37,6 +37,7 @@ export {
   type ProductColumnsDeps,
 } from './product-columns';
 export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
+export { productNameWithoutPresentation } from './product-base-name';
 export {
   PRODUCT_ACTION_BATCHES_TESTID,
   PRODUCT_ACTION_DELETE_TESTID,

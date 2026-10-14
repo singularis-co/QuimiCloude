@@ -4,10 +4,12 @@ import type { ReactNode } from 'react';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
-import { compareQuantities, productDisplayName, type ProductView } from '@/lib/modules/inventario';
+import { compareQuantities, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+
+import { productNameWithoutPresentation } from './product-base-name';
 
 /**
  * Declaracion de las columnas de la tabla de productos (R6, R7, R8, `design.md > 7`).
@@ -37,8 +39,8 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 /**
  * Campos de `ProductView` que quedan FUERA de la tabla como columna propia: el identificador
  * tecnico, la ruta de la imagen y el id de la unidad -un UUID que esta pantalla no resuelve a
- * nombre por si solo-. La unidad no desaparece: se pinta junto al nombre (`nameCell`) y junto a
- * la existencia (`existenceLabel`), resuelta contra el catalogo que recibe la columna.
+ * nombre por si solo-. La unidad no desaparece: se pinta junto a la existencia y las demas
+ * cantidades, resuelta contra el catalogo que recibe la columna.
  *
  * `imagePath` esta fuera por el mismo criterio: la RUTA no se pinta como texto. La imagen se ve
  * -es la primera columna-, pero su columna se llama `image` y pinta una miniatura, no la cadena.
@@ -99,8 +101,8 @@ export function isBelowAlert(product: ProductView): boolean {
 /**
  * Etiqueta de la unidad del producto, o `null` sin unidad o sin catalogo.
  *
- * Exportada para que otras pantallas de esta ruta -el panel de lotes, por ejemplo- compongan el
- * mismo «nombre · unidad» que esta columna, sin duplicar la regla.
+ * Exportada para que otras pantallas de esta ruta -el panel de lotes, por ejemplo- resuelvan la
+ * unidad con la misma regla que esta tabla.
  */
 export function productUnitLabel(
   product: ProductView,
@@ -217,7 +219,14 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       sortable: true,
       width: 500,
       hideText: false,
-      cell: (product) => productDisplayName(product.name, productUnitLabel(product, units)),
+      cell: (product) => productNameWithoutPresentation(product),
+    },
+    {
+      id: 'presentationName',
+      label: 'Presentación',
+      align: 'start',
+      // Sin `sortable` ni `filter`: `PRODUCT_QUERYABLE` no los admite para esta columna.
+      cell: (product) => product.presentationName ?? EMPTY_MARK,
     },
     {
       id: 'stock',

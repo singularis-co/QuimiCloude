@@ -48,7 +48,7 @@ import { INVENTORY_IMPORT_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
-import { exactProductNameCellText } from './helpers/product-name-cell';
+import { exactProductNameCellText, PRESENTATION_CELL_TESTID } from './helpers/product-name-cell';
 
 const FIXTURE_PREFIX = 'qc209_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -73,7 +73,6 @@ const PACKAGING = `${TOKEN}_envase`;
 const MACHINE = `${TOKEN}_instrumento`;
 const PRESENTATION = `${TOKEN}_botella`;
 const FORMULA = `${TOKEN}_formula`;
-const FINISHED_PRODUCT = `${FORMULA} · ${PRESENTATION}`;
 const ERROR_PRODUCT = `${TOKEN}_insumo_error`;
 const MISSING_UNIT = `${TOKEN}_tambor`;
 const MISSING_UNIT_PRODUCT = `${TOKEN}_insumo_tambor`;
@@ -494,8 +493,10 @@ test.describe('importar inventario desde un archivo', () => {
     });
     await page.goto(`${INVENTORY_ROUTE}?${finishedQuery.toString()}`);
     await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
-    const finishedRow = inventoryRow(page, 'finished-stock-name', FINISHED_PRODUCT);
+    // La celda pinta el nombre sin la presentacion, que va en su propia columna.
+    const finishedRow = inventoryRow(page, 'finished-stock-name', FORMULA);
     await expect(finishedRow, 'el terminado importado, sin pedido').toHaveCount(1, { timeout: 60_000 });
+    await expect(finishedRow.getByTestId(PRESENTATION_CELL_TESTID)).toHaveText(PRESENTATION);
     await expect(finishedRow.getByTestId('product-stock')).toHaveAttribute('aria-label', stockLabel('12'));
 
     // --- 7. Contra Postgres: cada lote con su existencia y un solo asiento de esa cantidad.

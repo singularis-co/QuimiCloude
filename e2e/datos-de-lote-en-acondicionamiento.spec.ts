@@ -81,7 +81,7 @@ import {
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
-import { exactProductNameCellText } from './helpers/product-name-cell';
+import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
@@ -173,6 +173,7 @@ let companyId: string | null = null;
 type SeededLine = {
   readonly batchId: string;
   readonly productName: string;
+  readonly presentationName: string;
   readonly label: string;
   readonly provisionalLot: string;
 };
@@ -404,15 +405,14 @@ async function expectAdminSeesBatchData(
       await toggle.click();
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
+      // La celda de nombre pinta la receta sin la presentacion: la fila la distingue su columna.
       const nameCell = page
         .getByTestId(NAME_CELL_TESTID)
-        .filter({ hasText: exactProductNameCellText(line.productName) });
-      await expect(nameCell).toHaveCount(1, { timeout: 60_000 });
+        .filter({ hasText: exactProductNameCellText(RECIPE_NAME) });
       // «Lotes» vive en el menu de acciones de la fila desde QC-232 (c2d4d46f), igual que en los
       // otros specs que abren el panel de lotes.
-      const productRow = page
-        .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
-        .filter({ has: nameCell });
+      const productRow = productRowByNameAndPresentation(page, nameCell, line.presentationName);
+      await expect(productRow).toHaveCount(1, { timeout: 60_000 });
       await (
         await openRowActionsMenuItem(
           page,
@@ -604,6 +604,7 @@ test.beforeAll(async () => {
     return {
       batchId: batch.id,
       productName,
+      presentationName,
       label: orderDistributionFullText([{ presentationId, presentationName, packagingName: null, packages }]),
       provisionalLot,
     };
