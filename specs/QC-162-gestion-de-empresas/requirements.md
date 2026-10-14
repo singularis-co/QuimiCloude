@@ -204,6 +204,12 @@ Vocabulario de este archivo:
   exactamente como estaba antes.
 - **R44.** La tabla del historial DEBE tener RLS activado y forzado.
 
+### Nombre sin forma comparable
+
+- **R45.** SI el nombre de la empresa no es vacío pero su forma normalizada queda vacía (p. ej.
+  «!!!»), ENTONCES el sistema DEBE rechazar el alta o la edición con `invalid_input`, sin escribir
+  nada, igual que R7 con la identificación fiscal.
+
 ### Cobertura de las decisiones cerradas
 
 | Decisión | Requisitos |
