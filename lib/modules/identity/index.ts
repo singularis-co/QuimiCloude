@@ -333,6 +333,8 @@ export {
 // ---------------------------------------------------------------------------------------
 export type { PersonRef, PeopleDirectory, PeopleRefFilters } from './domain/people-directory';
 export { ACTIVE_ACCOUNTS_ONLY } from './domain/people-directory';
+// Quien puede ser responsable de un pedido: filtro del directorio y su pregunta.
+export { ORDER_RESPONSIBLE_FILTERS, isOrderResponsible } from './domain/order-responsible';
 export type { WorkGroupSnapshot, WorkGroupDirectory } from './domain/work-group-directory';
 
 // ---------------------------------------------------------------------------------------

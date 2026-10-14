@@ -183,10 +183,9 @@ export {
 } from './domain/list-finished-orders';
 export type { FinishedOrderView } from './domain/finished-order-view';
 
-// Quien puede ser responsable de un pedido, por permiso. Se publica para que
-// `list-responsible-candidates.ts` (mismo modulo) y cualquier lector externo apliquen el
-// MISMO criterio que usa `assign-responsibles.ts`.
-export { canBeResponsible } from './domain/responsible-eligibility';
+// Quien puede ser responsable de un pedido, por nombre de rol. Se publica para que
+// cualquier lector externo aplique el MISMO criterio que usa `assign-responsibles.ts`.
+export { canBeResponsible, ORDER_RESPONSIBLE_FILTERS } from './domain/responsible-eligibility';
 
 // La vista «Todos»: los pedidos de la empresa en cualquier estado, sin filtro por usuario.
 export {
@@ -307,3 +306,48 @@ export {
   type ConditioningTeamCandidates,
   type ListConditioningTeamCandidatesDeps,
 } from './domain/list-conditioning-team-candidates';
+
+// ---------------------------------------------------------------------------------------
+// Evidencia por paso: tope, ruta y pasos sin fotos. Puro, tambien para la pantalla.
+// ---------------------------------------------------------------------------------------
+export {
+  EVIDENCE_PHASES,
+  EVIDENCE_READ_LINK_TTL_SECONDS,
+  MAX_EVIDENCE_PER_STEP,
+  buildEvidencePath,
+  isEvidencePathOf,
+  missingEvidencePositions,
+  stepRequiresEvidence,
+  type EvidencePhase,
+  type EvidenceStep,
+  type StepEvidencePhotoView,
+  type StepEvidenceView,
+} from './domain/step-evidence';
+export {
+  EvidenceInvalidFileError,
+  EvidenceLimitError,
+  EvidenceNotFoundError,
+  EvidenceRequiredError,
+} from './domain/errors';
+export {
+  createRequestEvidenceUpload,
+  type RequestEvidenceUploadDeps,
+  type RequestEvidenceUploadResult,
+} from './domain/request-evidence-upload';
+export type { EvidenceTargetDeps } from './domain/evidence-target';
+export type { EvidenceStorageWarning } from './domain/evidence-photos';
+export {
+  createRegisterEvidence,
+  type RegisterEvidenceDeps,
+  type RegisterEvidenceResult,
+} from './domain/register-evidence';
+export {
+  createRemoveEvidence,
+  type RemoveEvidenceDeps,
+  type RemoveEvidenceResult,
+} from './domain/remove-evidence';
+export {
+  createCountEvidenceLockingOrders,
+  type CountEvidenceLockingOrders,
+  type CountEvidenceLockingOrdersDeps,
+} from './domain/count-evidence-locking-orders';

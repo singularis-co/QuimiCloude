@@ -61,7 +61,7 @@ function resumen(id: string, overrides?: Partial<OrderHistorySummary>): OrderHis
 }
 
 function persona(id: string, displayName: string): PersonRef {
-  return { id, displayName, isActive: true, permissions: [] };
+  return { id, displayName, isActive: true, permissions: [], roleName: 'Operador' };
 }
 
 function pagina(items: readonly OrderHistorySummary[], page = 1, pageSize = 10): Page<OrderHistorySummary> {

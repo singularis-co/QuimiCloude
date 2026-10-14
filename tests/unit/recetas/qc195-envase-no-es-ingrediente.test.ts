@@ -8,6 +8,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import { isIngredientType, PRODUCT_TYPES, type ProductCatalog, type ProductRef } from '@/lib/modules/inventario';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 const EMPRESA = 'empresa-1';
 const ACTOR: Actor = { id: 'actor-1', companyId: EMPRESA, permissions: ['recetas.consultar', 'recetas.modificar'] };
@@ -65,6 +66,7 @@ function repositorio(fila: RecipeRow): RecipeRepository {
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     createVersion: vi.fn<RecipeRepository['createVersion']>(async () => ({ id: 'version-nueva' })),
     listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(async () => []),
     replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => ({ kind: 'ok', propagated: [] })),
   };
 }
@@ -150,7 +152,7 @@ describe('QC-195 — el envase no es ingrediente', () => {
 
   it('R40 — editar una receta anadiendo un envase que no tenia se rechaza sin modificarla', async () => {
     const recipes = repositorio({ ...ORIGINAL_CON_ENVASE, lines: [{ id: 'l-1', productId: MATERIA, percentage: '100.00' }] });
-    const run = createUpdateRecipe({ recipes, products: catalogo(), images: almacenamiento(), now: () => AHORA });
+    const run = createUpdateRecipe({ recipes, products: catalogo(), images: almacenamiento(), stepLocks: noEvidenceLocks, now: () => AHORA });
 
     await expect(
       run(
@@ -165,7 +167,7 @@ describe('QC-195 — el envase no es ingrediente', () => {
 
   it('P4 — editar una receta que ya tenia un envase como ingrediente lo conserva y se guarda', async () => {
     const recipes = repositorio(ORIGINAL_CON_ENVASE);
-    const run = createUpdateRecipe({ recipes, products: catalogo(), images: almacenamiento(), now: () => AHORA });
+    const run = createUpdateRecipe({ recipes, products: catalogo(), images: almacenamiento(), stepLocks: noEvidenceLocks, now: () => AHORA });
 
     await run(
       ORIGINAL_CON_ENVASE.id,

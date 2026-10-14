@@ -38,6 +38,8 @@ type Dobles = {
   readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
   readonly findFinishedGoodsReceipts: ReturnType<typeof vi.fn>;
   readonly findPackingStepsById: ReturnType<typeof vi.fn>;
+  readonly listEvidenceByOrder: ReturnType<typeof vi.fn>;
+  readonly createSignedReadUrl: ReturnType<typeof vi.fn>;
   readonly todos: readonly ReturnType<typeof vi.fn>[];
 };
 
@@ -52,6 +54,7 @@ const MEZCLAR_OPERADOR = 'Mezclar en frio 10 minutos';
 function montar(options?: {
   readonly items?: readonly unknown[];
   readonly packingSteps?: readonly unknown[] | null;
+  readonly fotos?: readonly unknown[];
 }): Dobles {
   const listAliveSummariesByIds = vi.fn(async () => ({
     items: options?.items ?? [RESUMEN],
@@ -73,6 +76,9 @@ function montar(options?: {
   ]);
   const findUnitRefs = vi.fn(async () => [{ id: 'unidad-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }]);
 
+  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+  const createSignedReadUrl = vi.fn(async (path: string, ttl: number) => `https://bucket.test/${path}?ttl=${String(ttl)}`);
+
   const deps = {
     orders: { listAliveSummariesByIds },
     assignments: { listByOrdersInCompany },
@@ -83,6 +89,8 @@ function montar(options?: {
     products: { findFinishedGoodsReceipts },
     packingSteps: { findPackingStepsById },
     now: () => new Date('2026-09-25T12:00:00.000Z'),
+    evidence: { listByOrder: listEvidenceByOrder },
+    storage: { createSignedReadUrl },
   } as unknown as GetPackingOrderDeps;
 
   return {
@@ -90,6 +98,8 @@ function montar(options?: {
     listAliveSummariesByIds,
     findFinishedGoodsReceipts,
     findPackingStepsById,
+    listEvidenceByOrder,
+    createSignedReadUrl,
     todos: [
       listAliveSummariesByIds,
       listByOrdersInCompany,
@@ -99,6 +109,8 @@ function montar(options?: {
       findUnitRefs,
       findFinishedGoodsReceipts,
       findPackingStepsById,
+      listEvidenceByOrder,
+      createSignedReadUrl,
     ],
   };
 }
@@ -143,6 +155,7 @@ describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
       packedByName: null,
       packedById: null,
       packingSteps: [],
+      packingEvidence: [],
     });
   });
 
@@ -330,4 +343,56 @@ describe('getPackingOrder — un pedido en un estado de acondicionamiento no tie
       expect(findPackingStepsById).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('getPackingOrder — evidencia (R14, R27, R33)', () => {
+  const PASOS_CON_EVIDENCIA = [{ ...ENVASAR, requiresEvidence: true }, ETIQUETAR];
+  const EN_EMPAQUE_DE_ANA = { ...RESUMEN_EN_EMPAQUE, recipeId: 'receta-1', packedBy: ANA };
+
+  function fila(id: string, stepPosition: number, slot: number) {
+    return { id, orderId: PEDIDO, phase: 'packing', stepPosition, slot, path: `${EMPRESA}/${PEDIDO}/${id}` };
+  }
+
+  it('R14, R33: quien empaca recibe las fotos de envasado por paso, cada una con URL firmada de 15 minutos', async () => {
+    const d = montar({
+      items: [EN_EMPAQUE_DE_ANA],
+      packingSteps: PASOS_CON_EVIDENCIA,
+      fotos: [fila('f2', 1, 2), fila('f1', 1, 1)],
+    });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    expect(order.packingEvidence).toEqual([
+      {
+        stepPosition: 1,
+        photos: [
+          { id: 'f1', slot: 1, url: `https://bucket.test/${EMPRESA}/${PEDIDO}/f1?ttl=900` },
+          { id: 'f2', slot: 2, url: `https://bucket.test/${EMPRESA}/${PEDIDO}/f2?ttl=900` },
+        ],
+      },
+    ]);
+    expect(d.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'packing');
+    for (const call of d.createSignedReadUrl.mock.calls) expect(call[1]).toBe(15 * 60);
+  });
+
+  it('R27, R33: si empaca otro, ni pasos ni fotos: no consulta ni firma nada', async () => {
+    const d = montar({ items: [RESUMEN_EN_EMPAQUE], packingSteps: PASOS_CON_EVIDENCIA, fotos: [fila('f1', 1, 1)] });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    expect(order.packingSteps).toEqual([]);
+    expect(order.packingEvidence).toEqual([]);
+    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.createSignedReadUrl).not.toHaveBeenCalled();
+  });
+
+  it('R14: antes de Comenzar (POR_EMPACAR) no hay fotos que leer', async () => {
+    const d = montar({ packingSteps: PASOS_CON_EVIDENCIA });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    expect(order.packingEvidence).toEqual([]);
+    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+  });
+
+  it('R14: sin pasos de envasado que pidan evidencia no consulta fotos', async () => {
+    const d = montar({ items: [EN_EMPAQUE_DE_ANA] });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    expect(order.packingEvidence).toEqual([]);
+    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+  });
 });

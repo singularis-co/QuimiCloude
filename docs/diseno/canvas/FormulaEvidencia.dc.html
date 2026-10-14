@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Switch Requiere evidencia</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.sw{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 8px;border:0;border-radius:8px;background:none;color:var(--fg);font:500 13px 'IBM Plex Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.sw:hover{background:var(--muted)}
+.sw:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.sw-t{position:relative;width:36px;height:20px;flex:none;border-radius:999px;background:var(--input);transition:background-color var(--d-b) var(--e-std)}
+.sw-t i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:var(--card);box-shadow:0 1px 2px rgb(0 0 0 / .3);transition:translate var(--d-b) var(--e-std)}
+.sw[aria-checked="true"] .sw-t{background:var(--primary)}
+.sw[aria-checked="true"] .sw-t i{translate:16px 0}
+.st-row{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:10px;align-items:start;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--card);animation:qc-rise var(--d-s) var(--e-in) both}
+.st-row.ev{border-color:color-mix(in oklch,var(--primary) 45%,var(--border))}
+@container (max-width: 760px){.sw{min-height:44px}.st-row{grid-template-columns:36px minmax(0,1fr) 44px;padding:10px}}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="scroller" style="padding-bottom: 120px">
+    <div style="max-width: 880px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
+        <div class="ph-t" style="gap: 2px"><span class="cap">Fórmulas / Editar</span><h1 class="h1">Desengrasante alcalino</h1></div>
+        <button class="b b-out b-ico b-touch" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span></button>
+      </div>
+
+      <sc-if value="{{ locked }}" hint-placeholder-val="{{ false }}">
+        <div class="nt n-w enter" role="status">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4M5 11h14v10H5z"></path></svg>
+          <div><b>2 pedidos en curso ya tienen fotos de evidencia</b>Mientras sigan en curso no puedes mover ni quitar pasos. Sí puedes cambiar el texto, encender o apagar «Requiere evidencia» y añadir pasos al final.</div>
+        </div>
+      </sc-if>
+
+      <sc-for list="{{ lists }}" as="L" hint-placeholder-count="2">
+        <section class="card" aria-label="{{ L.name }}">
+          <div class="card-hd"><h2 class="h2">{{ L.name }}</h2><span class="cap">{{ L.summary }}</span></div>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+            <sc-for list="{{ L.steps }}" as="s" hint-placeholder-count="3">
+              <li class="{{ s.rowCls }}">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><button class="b b-gho b-ico" type="button" aria-label="{{ s.gripLabel }}" disabled="{{ locked }}" style="cursor: grab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"></path></svg></button><span class="num-dot mono">{{ s.n }}</span></div>
+                <div class="ed" style="min-width: 0">
+                  <div class="ed-tb" role="toolbar" aria-label="Formato del paso" style="align-items: center; flex-wrap: wrap">
+                    <button type="button" aria-label="Negrilla"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z"></path></svg></button>
+                    <button type="button" aria-label="Cursiva"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5h8M6 19h8M14 5l-4 14"></path></svg></button>
+                    <button type="button" aria-label="Lista de verificación"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 7 2 2 4-4M3 17l2 2 4-4M13 7h8M13 17h8"></path></svg></button>
+                    <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap">
+                      <button class="sw" type="button" role="switch" aria-checked="{{ s.evOn }}" aria-label="{{ s.swLabel }}" onClick="{{ s.toggleEv }}"><span class="sw-t"><i></i></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Requiere evidencia</button>
+                    </span>
+                  </div>
+                  <div class="ed-bd" contenteditable="true" role="textbox" aria-multiline="true" aria-label="{{ s.edLabel }}">{{ s.text }}</div>
+                  <sc-if value="{{ s.ev }}" hint-placeholder-val="{{ false }}">
+                    <p class="cap enter" style="margin: 0; padding: 0 12px 10px; display: flex; align-items: center; gap: 6px; color: var(--primary)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.</p>
+                  </sc-if>
+                </div>
+                <button class="b b-gho b-ico" type="button" aria-label="{{ s.rmLabel }}" disabled="{{ locked }}" onClick="{{ s.remove }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></button>
+              </li>
+            </sc-for>
+          </ol>
+          <button class="b b-dash" type="button" onClick="{{ L.add }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>{{ L.addTxt }}</button>
+        </section>
+      </sc-for>
+    </div>
+  </div>
+  <footer class="op-ft">
+    <div style="max-width: 880px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap">
+      <button class="b b-out b-touch" type="button">Cancelar</button>
+      <button class="b b-out b-touch" type="button">Guardar y salir</button>
+      <button class="b b-pri b-touch" type="button">Guardar</button>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"pedidosConFotos":{"editor":"boolean","default":false},"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const locked = !!this.props.pedidosConFotos;
+const init = {
+fab: [['Prepara la mezcladora: revisa que esté limpia y seca.', true], ['Agrega el 60 % del agua y enciende la agitación.', false], ['Agrega el tensoactivo poco a poco.', false], ['Mide el pH y anótalo en la etiqueta.', true]],
+env: [['Llena las garrafas hasta la marca de 20 L.', true], ['Pega la etiqueta del lote.', false]]
+};
+const data = s.data || init;
+const set = (key, arr) => this.setState({ data: Object.assign({}, data, { [key]: arr }) });
+const mk = (key, name, addTxt, extra) => {
+const arr = data[key];
+const on = arr.filter((x) => x[1]).length;
+return {
+name: name, addTxt: addTxt,
+summary: on ? on + (on === 1 ? ' paso pide evidencia' : ' pasos piden evidencia') : 'Ningún paso pide evidencia',
+add: () => set(key, arr.concat([[extra, false]])),
+steps: arr.map((x, j) => ({
+n: j + 1, text: x[0], ev: x[1], evOn: x[1] ? 'true' : 'false',
+rowCls: x[1] ? 'st-row ev' : 'st-row',
+swLabel: 'Requiere evidencia en el paso ' + (j + 1),
+gripLabel: locked ? 'No se puede mover el paso ' + (j + 1) + ': hay pedidos en curso con fotos' : 'Mover el paso ' + (j + 1),
+rmLabel: locked ? 'No se puede quitar el paso ' + (j + 1) + ': hay pedidos en curso con fotos' : 'Quitar el paso ' + (j + 1),
+edLabel: 'Texto del paso ' + (j + 1),
+toggleEv: () => set(key, arr.map((y, m) => m === j ? [y[0], !y[1]] : y)),
+remove: () => { if (!locked) set(key, arr.filter((y, m) => m !== j)); }
+}))
+};
+};
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+locked: locked,
+lists: [mk('fab', 'Pasos', 'Añadir paso', 'Nuevo paso.'), mk('env', 'Pasos de envasado', 'Añadir paso de envasado', 'Nuevo paso de envasado.')]
+};
+}
+}
+</script>
+</body>
+</html>

@@ -802,6 +802,8 @@ primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
 | `DOCUMENTS_E2E_DOUBLES` | ausente | **con valor** (comprobacion previa) | vacia; solo la pone `playwright.config.ts` |
 | `WHATSAPP_GRAPH_API_VERSION` | la fija quien despliega (no es secreto) | la misma que production (no es secreto; decidido por el humano el 2026-10-09, QC-237) | segun dev |
 | `INTEGRATIONS_E2E_DOUBLES` | ausente (cliente real de Graph) | ausente (cliente real de Graph; decidido por el humano el 2026-10-09, QC-237) | vacia; solo la pone `playwright.config.ts` |
+| `SUPABASE_EVIDENCE_BUCKET` | bucket privado de produccion | bucket privado del proyecto de preview | segun dev |
+| `EVIDENCE_E2E_DOUBLES` | ausente | ausente (bucket real del proyecto de preview, QC-214) | vacia; solo la pone `playwright.config.ts` |
 
 `VERCEL` y `VERCEL_ENV` las pone Vercel y no se cargan a mano; `NODE_ENV` la ponen Next y Vercel.
 Las del bloque de servidores MCP de `.env.example` (`ATLASSIAN_MCP_AUTH`, `CONTEXT7_API_KEY`,

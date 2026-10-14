@@ -135,3 +135,22 @@ export function canExecuteAssignedOrders(actor: PermissionBearer | null | undefi
     return false;
   }
 }
+
+/**
+ * Basta con UNO de los codigos. Mismo criterio y mismo error que `requirePermission`: cada codigo
+ * se pregunta a `assertPermission` de `identity`, sin una segunda comparacion propia.
+ */
+export function requireAnyPermission(
+  actor: Actor | null | undefined,
+  permissions: readonly [PermissionCode, ...PermissionCode[]],
+): asserts actor is Actor {
+  const holdsOne = permissions.some((permission) => {
+    try {
+      assertPermission(actor, permission, () => DENEGADO);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (!holdsOne) throw new UnauthorizedError();
+}

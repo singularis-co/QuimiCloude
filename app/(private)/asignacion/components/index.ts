@@ -238,3 +238,8 @@ export {
   type OrderDistributionFullLine,
   type OrderDistributionFullProps,
 } from './order-distribution-full';
+export {
+  useStepEvidence,
+  type StepEvidenceController,
+  type UseStepEvidenceOptions,
+} from './use-step-evidence';

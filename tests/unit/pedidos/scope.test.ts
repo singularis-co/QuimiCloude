@@ -394,7 +394,7 @@ describe('QC-34 — limite de alcance de la feature', () => {
     ])
   })
 
-  it('los specs E2E de pedidos son estos SEIS -QC-35, QC-102, QC-60, QC-145, QC-122 y QC-151-, y la lista sigue cerrada (R57)', () => {
+  it('los specs E2E de pedidos son estos SIETE -QC-35, QC-102, QC-60, QC-145, QC-122, QC-151 y QC-262-, y la lista sigue cerrada (R57)', () => {
     // CENTINELA INVERTIDO el 2026-09-07 (QC-35). El E2E estaba diferido a esa ficha y el
     // humano lo aprobo el 2026-09-06 (R48, R49). La lista es CERRADA: un spec de pedidos sin
     // ficha que lo respalde vuelve a poner esto en rojo.
@@ -445,11 +445,21 @@ describe('QC-34 — limite de alcance de la feature', () => {
     // cosa: la cotizacion del coste. La lista se AMPLIA y se TENSA -el ancla pasa de cinco entradas
     // a seis-, nunca se afloja: sigue CERRADA y un SEPTIMO spec de pedidos sin ficha que lo
     // respalde vuelve a ponerla en rojo.
+    //
+    // AMPLIADA el 2026-10-13 (QC-262, rediseno-pedidos, T6a): entra la SEPTIMA entrada, el spec
+    // e2e/pedidos-rediseno.spec.ts. Mide la pantalla a 1440, 820 y 390 px: una sola barra de filtros
+    // en orden y sin desbordar, el menu de fila con su orden, separador y destructivos, la tabla con
+    // el numero fijado, las tarjetas con «Acciones» en dialogo centrado, los dialogos enteros y los
+    // paneles a todo el ancho. No sustituye a ninguno de los seis anteriores porque lo que ejercita
+    // es otra cosa: la maquetacion del rediseno. La lista se AMPLIA y se TENSA -el ancla pasa de seis
+    // entradas a siete-, nunca se afloja: sigue CERRADA y un OCTAVO spec de pedidos sin ficha que lo
+    // respalde vuelve a ponerla en rojo.
     expect(rutasE2e.length).toBeGreaterThan(0)
     expect(specsE2eDePedidos(rutasE2e)).toEqual([
       'e2e/aislamiento-pedidos.spec.ts',
       'e2e/pedidos-busqueda.spec.ts',
       'e2e/pedidos-cotizacion.spec.ts',
+      'e2e/pedidos-rediseno.spec.ts',
       'e2e/pedidos-responsables.spec.ts',
       'e2e/pedidos-terminados.spec.ts',
       'e2e/pedidos.spec.ts',
@@ -458,6 +468,7 @@ describe('QC-34 — limite de alcance de la feature', () => {
       'e2e/aislamiento-pedidos.spec.ts',
       'e2e/pedidos-busqueda.spec.ts',
       'e2e/pedidos-cotizacion.spec.ts',
+      'e2e/pedidos-rediseno.spec.ts',
       'e2e/pedidos-responsables.spec.ts',
       'e2e/pedidos-terminados.spec.ts',
       'e2e/pedidos.spec.ts',

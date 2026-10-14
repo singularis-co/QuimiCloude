@@ -74,7 +74,12 @@ export function rowMenuTrigger(row: Locator): Locator {
   return row.getByTestId(ORDER_ROW_ACTIONS_TESTID);
 }
 
-/** El disparador del menu de 3 puntos del pedido, por su identificador. */
+/**
+ * El disparador del menu de 3 puntos del pedido, por su identificador, dentro de su fila: la
+ * tarjeta de la lista repite el disparador con el mismo `data-order-id`.
+ */
 export function orderMenuTrigger(page: Page, orderId: string): Locator {
-  return page.locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${orderId}"]`);
+  return page
+    .getByTestId(`data-table-row-${orderId}`)
+    .locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${orderId}"]`);
 }

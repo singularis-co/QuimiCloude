@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Switch Requiere evidencia en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="FormulaEvidencia" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Switch «Requiere evidencia» · ficha</h2>
+    <dl class="spec">
+      <dt>Dónde</dt><dd>En la barra de cada paso del editor de fórmulas, a la derecha, en «Pasos» y en «Pasos de envasado» (alta, edición y lectura de versiones: las versiones heredan los pasos de la original)</dd>
+      <dt>Reutiliza</dt><dd><span class="mono">recipe-steps-field · recipe-step-editor</span> (fila del paso, barra <span class="mono">ed-tb</span>) · clases <span class="mono">nt n-w · num-dot · card</span></dd>
+      <dt>Pieza nueva</dt><dd><span class="mono">components/ui/switch</span>: primitivo que hoy no está en el catálogo (solo hay <span class="mono">ui/checkbox</span>). Pista 36 × 20, botón 16 px, color <span class="mono">--primary</span> encendido y <span class="mono">--input</span> apagado</dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> Switch (ya aprobada; da <span class="mono">role="switch"</span> y teclado) · <span class="mono">lucide-react</span> (camera, lock)</dd>
+      <dt>Estados</dt><dd>Apagado (por defecto) · encendido (borde del paso en tono primario + línea «Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.») · resumen por lista en la cabecera («2 pasos piden evidencia») · bloqueado (prop <span class="mono">pedidosConFotos</span>): aviso arriba, mover y quitar deshabilitados; el switch, el texto y «Añadir paso» siguen activos</dd>
+      <dt>Escritorio</dt><dd>Switch con texto «Requiere evidencia» en la barra del paso, alineado a la derecha</dd>
+      <dt>Tablet</dt><dd>Igual que escritorio</dd>
+      <dt>Teléfono</dt><dd>La barra se parte en dos líneas: formato arriba y el switch debajo · área táctil de 44 px</dd>
+      <dt>Animación</dt><dd>El botón del switch se desliza 16 px y la pista cambia de color en 200 ms · la línea de ayuda entra con <span class="mono">qc-rise</span></dd>
+      <dt>Por confirmar</dt><dd>Texto del aviso de bloqueo y si nombra los pedidos · el servidor también rechaza mover o quitar pasos en ese caso (el aviso de error al guardar usa el mismo texto)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

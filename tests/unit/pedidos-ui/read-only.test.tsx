@@ -277,7 +277,7 @@ describe('QC-102 — sin `asignaciones.modificar` el panel es de SOLO LECTURA (R
       />,
     );
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
     await user.click(
       await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
     );

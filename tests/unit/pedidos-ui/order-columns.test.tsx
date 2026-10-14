@@ -37,9 +37,9 @@ import {
   RECIPE_NAME_COLUMN_ID,
   STATUS_PARAM,
   buildOrderColumns,
+  orderRowActionsSpec,
   parseOrderListParams,
 } from '@/app/(private)/pedidos/components';
-import { Badge } from '@/components/ui/badge';
 import {
   ORDER_PRIORITY_VALUES,
   ORDER_QUERYABLE,
@@ -237,6 +237,53 @@ describe('el fijado por defecto y la columna de acciones (R19, `design.md > 6.1`
     const noFijables = ORDER_COLUMNS.filter((column) => column.pinnable === false).map((c) => c.id);
 
     expect(noFijables).toEqual([ACTIONS_COLUMN_ID]);
+  });
+
+  it('R10: la columna de acciones declara su menu como datos, para la fila y la tarjeta', () => {
+    const acciones = ORDER_COLUMNS.find((column) => column.id === ACTIONS_COLUMN_ID);
+    const elPedido = pedido();
+
+    const spec = acciones?.menu?.(elPedido);
+
+    expect(spec?.triggerTestId).toBe('order-row-actions');
+    expect(spec?.title).toBe(`Pedido ${elPedido.numberText}`);
+    expect(spec?.items.map((item) => item.key)).toEqual(
+      orderRowActionsSpec({
+        order: elPedido,
+        canEditDistribution: false,
+        canEditCustomer: false,
+        canDeliver: false,
+        onAction: vi.fn(),
+      }).items.map((item) => item.key),
+    );
+  });
+
+  it('R10: el menu lleva los permisos del servidor y emite `onAction` con el pedido de la fila', () => {
+    const onAction = vi.fn();
+    const columnas = buildOrderColumns({
+      recipes: { items: [], totalPages: 1 },
+      units: [],
+      bridge: null,
+      canEditCustomer: true,
+      onAction,
+    });
+    const elPedido = pedido();
+    const spec = columnas.find((column) => column.id === ACTIONS_COLUMN_ID)?.menu?.(elPedido);
+    const cliente = spec?.items.find((item) => item.key === 'customer');
+
+    cliente?.onSelect?.();
+
+    expect(cliente?.testId).toBe('order-action-customer');
+    expect(onAction).toHaveBeenCalledExactlyOnceWith('customer', elPedido);
+  });
+
+  it('R10: la celda pinta el disparador del menu con el id del pedido como dato', () => {
+    const acciones = ORDER_COLUMNS.find((column) => column.id === ACTIONS_COLUMN_ID);
+    const elPedido = pedido();
+
+    render(<>{acciones?.cell(elPedido)}</>);
+
+    expect(screen.getByTestId('order-row-actions')).toHaveAttribute('data-order-id', elPedido.id);
   });
 });
 
@@ -501,20 +548,16 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
   });
 
   it.each([
-    // ENMIENDA QC-227: variantes secondary/default/secondary -> warning/info/success, los tonos de estado de la marca.
-    ['POR_ACONDICIONAR', 'Por acondicionar', 'warning'],
-    ['EN_ACONDICIONAMIENTO', 'En acondicionamiento', 'info'],
+    // ENMIENDA QC-262: de variante de Badge a tono de StatusBadge.
+    ['POR_ACONDICIONAR', 'Por acondicionar', 'waiting'],
+    ['EN_ACONDICIONAMIENTO', 'En acondicionamiento', 'progress'],
     ['TERMINADO', 'Terminado', 'success'],
   ] as const)(
-    'R29, R32: la celda pinta %s como «%s», con su valor en `data-status` y la variante %s',
-    (status, etiqueta, variante) => {
+    'R29, R32: la celda pinta %s como «%s», con su valor en `data-status` y el tono %s',
+    (status, etiqueta, tono) => {
       // El texto acordado en R28/R29/R32 se afirma una vez aqui, contra la constante exportada,
       // y la celda se compara con la constante: si alguien reescribe la etiqueta, falla el primero.
       expect(ORDER_STATUS_LABELS[status]).toBe(etiqueta);
-
-      const { container: referencia } = render(<Badge variant={variante} />);
-      const claseEsperada = referencia.firstElementChild?.className;
-      cleanup();
 
       pintarCelda(STATUS_COLUMN_ID, pedido({ status }));
 
@@ -522,8 +565,7 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
       expect(badge).toHaveAttribute('data-status', status);
       expect(badge).toHaveTextContent(ORDER_STATUS_LABELS[status]);
       expect(badge.textContent).not.toBe(status);
-      expect(claseEsperada).toBeTruthy();
-      expect(badge.className).toBe(claseEsperada);
+      expect(badge).toHaveAttribute('data-tone', tono);
     },
   );
 

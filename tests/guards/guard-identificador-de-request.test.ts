@@ -406,6 +406,18 @@ export const E2E_ESPERADOS = [
   // terminados de /inventario, sus tabs Lotes, Entradas, Salidas y Entregas, y usuario sin permiso
   // que recibe el 404. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'detalle-de-producto-terminado.spec.ts',
+  // Alta el 2026-10-13 (QC-262) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en chromium y webkit, la lista de `/pedidos` a
+  // 1440 px pinta una sola barra de filtros con buscador, cliente y chips en orden, el menu de la
+  // fila con su orden, su separador y «Cancelar» y «Eliminar» destructivos, y la tabla con doce
+  // columnas y el numero fijado sin desbordar el documento; a 820 y 390 px pinta tarjetas; a 390 px
+  // la barra no desborda, «Acciones» mide 44 px y abre el dialogo centrado «Pedido <n>» con items de
+  // 48 px, los dialogos de cancelar, eliminar, cliente, reparto y material insuficiente quedan enteros
+  // y centrados con botones de 44 px, y los paneles de alta, edicion y entrega ocupan la pantalla
+  // con el pie visible. No confirma nada. No lee ni afirma nada sobre el identificador de peticion
+  // ni sobre `reference`.
+  'pedidos-rediseno.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -612,6 +624,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261009130000_whatsapp_connections',
   // QC-235 2026-10-13: la columna `companies.country`; no toca el identificador.
   '20261013120000_companies_country',
+  // 2026-10-13: las fotos de evidencia por paso; no toca el identificador.
+  '20261013120000_order_step_evidence',
   // QC-162 2026-10-14: indices de unicidad de empresas y la tabla `company_events`; no toca el
   // identificador.
   '20261014120000_companies_management',

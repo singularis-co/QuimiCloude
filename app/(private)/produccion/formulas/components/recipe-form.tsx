@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { StepReader } from '@/components/shared/step-reader';
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { Notice } from '@/components/shared/notice';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
@@ -108,6 +109,13 @@ const PREVIEW_TITLE = 'Vista previa';
 const PREVIEW_DESCRIPTION =
   'Asi se leera esta receta, paso a paso. Nada de lo que hagas aqui se guarda.';
 
+const STEP_LOCK_TITLE = (orders: number) =>
+  orders === 1
+    ? '1 pedido en curso ya tiene fotos de evidencia'
+    : `${orders} pedidos en curso ya tienen fotos de evidencia`;
+const STEP_LOCK_BODY =
+  'Mientras sigan en curso no puedes mover ni quitar pasos. Sí puedes cambiar el texto, encender o apagar «Requiere evidencia» y añadir pasos al final.';
+
 const SAVE_SUCCESS_CREATE = 'Receta creada.';
 const SAVE_SUCCESS_EDIT = 'Receta actualizada.';
 /**
@@ -134,6 +142,8 @@ export type RecipeFormProps =
       readonly mode: 'edit';
       readonly recipe: RecipeDetail;
       readonly versions: readonly RecipeVersionSummary[];
+      /** Pedidos en curso con fotos de evidencia de esta fórmula; con más de 0 no se mueven ni quitan pasos. */
+      readonly lockingOrders?: number;
       readonly units: readonly UnitRef[];
       readonly initialProductPage: RecipeFormProductPage;
       readonly initialMachinePage: RecipeFormProductPage;
@@ -214,6 +224,8 @@ export function RecipeForm(props: RecipeFormProps) {
   const [underReview, setUnderReview] = useState<readonly UnderReviewVersion[]>([]);
 
   const isEdit = props.mode === 'edit';
+  const lockingOrders = props.mode === 'edit' ? (props.lockingOrders ?? 0) : 0;
+  const stepsLocked = lockingOrders > 0;
 
   // Se recalcula en CADA render con la misma función que el indicador de suma y que el
   // esquema del contrato -nunca una copia local de la regla-, también con cero líneas. La
@@ -346,6 +358,12 @@ export function RecipeForm(props: RecipeFormProps) {
         />
       )}
 
+      {stepsLocked ? (
+        <Notice tone="warning" title={STEP_LOCK_TITLE(lockingOrders)} testId="recipe-form-steps-locked">
+          {STEP_LOCK_BODY}
+        </Notice>
+      ) : null}
+
       {props.mode === 'edit' && underReview.length > 0 ? (
         <div
           role="status"
@@ -445,6 +463,8 @@ export function RecipeForm(props: RecipeFormProps) {
         steps={state.steps}
         onChange={(steps) => setState((previous) => ({ ...previous, steps }))}
         errors={fieldErrors.steps}
+        showEvidenceSwitch
+        locked={stepsLocked}
       />
 
       <RecipeStepsField
@@ -454,6 +474,8 @@ export function RecipeForm(props: RecipeFormProps) {
         title={PACKING_STEPS_TITLE}
         addLabel={PACKING_STEPS_ADD_LABEL}
         testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
+        showEvidenceSwitch
+        locked={stepsLocked}
       />
 
       <div className="flex justify-end gap-2">

@@ -533,6 +533,28 @@ const MIGRACION_QC211 = [
   'db/migrations/20261005120000_recipe_packing_steps/down.sql',
 ];
 
+// QC-214 (2026-10-13): evidencia por paso. Exactamente los archivos que el diff de esta rama toca
+// bajo `lib/modules/recetas/`, ninguno mas.
+const EVIDENCIA_POR_PASO_QC214 = [
+  'lib/modules/recetas/index.ts',
+  'lib/modules/recetas/domain/errors.ts',
+  'lib/modules/recetas/domain/get-recipe-step-lock.ts',
+  'lib/modules/recetas/domain/recipe-input.ts',
+  'lib/modules/recetas/domain/recipe-step-lock.ts',
+  'lib/modules/recetas/domain/update-recipe.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+  'lib/modules/recetas/ports/recipe-step-lock-reader.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+  'lib/modules/recetas/adapters/driving/recipe-actions.ts',
+];
+
+// La tabla `order_step_evidence` y `db/schema.prisma` con el modelo nuevo.
+const MIGRACION_QC214 = [
+  'db/schema.prisma',
+  'db/migrations/20261013120000_order_step_evidence/migration.sql',
+  'db/migrations/20261013120000_order_step_evidence/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
@@ -541,6 +563,7 @@ export const RECETAS_PERMITIDAS: readonly string[] = [
   ...CANTIDADES_EN_PORCENTAJE_QC147,
   ...HERRAMIENTAS_DE_LA_RECETA_QC194,
   ...PASOS_DE_ENVASADO_QC211,
+  ...EVIDENCIA_POR_PASO_QC214,
 ];
 
 export const DB_PERMITIDAS: readonly string[] = [
@@ -561,6 +584,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC147,
   ...MIGRACION_QC194,
   ...MIGRACION_QC211,
+  ...MIGRACION_QC214,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
@@ -847,6 +871,8 @@ describe('contrato de la ruta de recetas', () => {
       'listRecipeVersionsAction',
       'createRecipeVersionAction',
       'updateRecipeVersionAction',
+      // QC-214 (design § 5.8): conteo de pedidos con fotos para el aviso de bloqueo.
+      'getRecipeStepLockAction',
     ]);
 
     for (const ruta of FUENTES_DE_LA_RUTA_SIN_IMPORTAR) {
@@ -856,7 +882,7 @@ describe('contrato de la ruta de recetas', () => {
       while ((encaje = patron.exec(codigo)) !== null) {
         expect(
           permitidas.has(encaje[1]),
-          `${ruta}: «${encaje[1]}» no es una de las diez operaciones publicadas`,
+          `${ruta}: «${encaje[1]}» no es una de las operaciones publicadas`,
         ).toBe(true);
       }
     }

@@ -15,6 +15,11 @@ import {
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones/domain/assigned-order-execution-view';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import type { EvidenceStorage } from '@/lib/modules/asignaciones/ports/evidence-storage';
+import type {
+  StepEvidenceRepository,
+  StepEvidenceRow,
+} from '@/lib/modules/asignaciones/ports/step-evidence-repository';
 import type { AssignedOrderSummary, OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
 import type { PresentationCatalog, PresentationRef, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
@@ -93,6 +98,8 @@ type Dobles = {
   readonly findMassVolumeBridge: ReturnType<typeof vi.fn>;
   readonly productFindRefs: ReturnType<typeof vi.fn>;
   readonly findRefsPresentations: ReturnType<typeof vi.fn>;
+  readonly listEvidenceByOrder: ReturnType<typeof vi.fn>;
+  readonly createSignedReadUrl: ReturnType<typeof vi.fn>;
   readonly todos: readonly ReturnType<typeof vi.fn>[];
 };
 
@@ -106,6 +113,7 @@ function montar(options?: {
   readonly sisterUnits?: readonly UnitRef[];
   readonly presentations?: readonly PresentationRef[];
   readonly bridge?: MassVolumeBridge | null;
+  readonly fotos?: readonly StepEvidenceRow[];
 }): Dobles {
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
   const listByOrderInCompany = vi.fn(async () => {
@@ -148,6 +156,9 @@ function montar(options?: {
 
   const findRefsPresentations = vi.fn(async () => options?.presentations ?? []);
 
+  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+  const createSignedReadUrl = vi.fn(async (path: string, ttl: number) => `https://bucket.test/${path}?ttl=${String(ttl)}`);
+
   const deps: GetAssignedOrderExecutionDeps = {
     assignments: {
       insertMissing,
@@ -168,6 +179,8 @@ function montar(options?: {
       findFinishedGoodsReceipts: vi.fn(async () => []),
     } as ProductCatalog,
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
+    evidence: { listByOrder: listEvidenceByOrder } as unknown as StepEvidenceRepository,
+    storage: { createSignedReadUrl } as unknown as EvidenceStorage,
   };
 
   return {
@@ -181,6 +194,8 @@ function montar(options?: {
     findMassVolumeBridge,
     productFindRefs,
     findRefsPresentations,
+    listEvidenceByOrder,
+    createSignedReadUrl,
     todos: [
       listOrderIdsByUserInCompany,
       listByOrderInCompany,
@@ -198,6 +213,8 @@ function montar(options?: {
       findMassVolumeBridge,
       productFindRefs,
       findRefsPresentations,
+      listEvidenceByOrder,
+      createSignedReadUrl,
     ],
   };
 }
@@ -366,6 +383,8 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
         'presentationLines',
         'unitId',
         'unitLabel',
+        // QC-214 R14: las fotos de evidencia por paso.
+        'evidence',
       ].sort(),
     );
     for (const line of view.lines) {
@@ -859,5 +878,60 @@ describe('QC-211 — la ejecucion del operador no lleva pasos de envasado', () =
 
     expect(view).not.toHaveProperty('packingSteps');
     expect(JSON.stringify(view)).not.toContain(ENVASAR);
+  });
+});
+
+describe('getAssignedOrderExecution — evidencia (R14, R33)', () => {
+  const PASOS_CON_EVIDENCIA = [{ blocks: [] }, { blocks: [], requiresEvidence: true }, { blocks: [], requiresEvidence: true }];
+  const EN_CURSO = { order: { id: PEDIDO, status: 'EN_CURSO' as const }, summary: resumen({ status: 'EN_CURSO' }) };
+
+  function fila(id: string, stepPosition: number, slot: number): StepEvidenceRow {
+    return { id, orderId: PEDIDO, phase: 'manufacturing', stepPosition, slot, path: `${EMPRESA}/${PEDIDO}/${id}` };
+  }
+
+  it('R14, R33: un pedido EN_CURSO trae sus fotos por paso, cada una con URL firmada de 15 minutos', async () => {
+    const d = montar({
+      ...EN_CURSO,
+      content: contenido({ steps: PASOS_CON_EVIDENCIA }),
+      fotos: [fila('f3', 3, 1), fila('f2b', 2, 2), fila('f2a', 2, 1)],
+    });
+    const view = await createGetAssignedOrderExecution(d.deps)(ACTOR, { orderId: PEDIDO });
+    expect(view.evidence).toEqual([
+      {
+        stepPosition: 2,
+        photos: [
+          { id: 'f2a', slot: 1, url: `https://bucket.test/${EMPRESA}/${PEDIDO}/f2a?ttl=900` },
+          { id: 'f2b', slot: 2, url: `https://bucket.test/${EMPRESA}/${PEDIDO}/f2b?ttl=900` },
+        ],
+      },
+      { stepPosition: 3, photos: [{ id: 'f3', slot: 1, url: `https://bucket.test/${EMPRESA}/${PEDIDO}/f3?ttl=900` }] },
+    ]);
+    expect(d.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'manufacturing');
+    expect(d.createSignedReadUrl).toHaveBeenCalledTimes(3);
+    for (const call of d.createSignedReadUrl.mock.calls) expect(call[1]).toBe(15 * 60);
+  });
+
+  it('R14: un pedido PENDIENTE todavia no tiene fotos: no consulta ni firma', async () => {
+    const d = montar({ content: contenido({ steps: PASOS_CON_EVIDENCIA }) });
+    const view = await createGetAssignedOrderExecution(d.deps)(ACTOR, { orderId: PEDIDO });
+    expect(view.evidence).toEqual([]);
+    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.createSignedReadUrl).not.toHaveBeenCalled();
+  });
+
+  it('R14: sin pasos que pidan evidencia no consulta ni firma nada', async () => {
+    const d = montar({ ...EN_CURSO, content: contenido({ steps: [{ blocks: [] }] }) });
+    const view = await createGetAssignedOrderExecution(d.deps)(ACTOR, { orderId: PEDIDO });
+    expect(view.evidence).toEqual([]);
+    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+  });
+
+  it('R33: quien no es responsable asignado no recibe ninguna URL firmada', async () => {
+    const d = montar({ ...EN_CURSO, ids: [], content: contenido({ steps: PASOS_CON_EVIDENCIA }) });
+    await expect(createGetAssignedOrderExecution(d.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.createSignedReadUrl).not.toHaveBeenCalled();
   });
 });

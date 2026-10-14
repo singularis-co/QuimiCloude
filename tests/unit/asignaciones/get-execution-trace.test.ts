@@ -88,8 +88,8 @@ function montar(options?: {
   const orders = { listSummariesByIdsIncludingDeleted } as unknown as OrderCatalog;
 
   const directorio = options?.people ?? [
-    { id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [] },
-    { id: BEA, displayName: 'Bea Gomez', isActive: false, permissions: [] },
+    { id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [], roleName: 'Operador' },
+    { id: BEA, displayName: 'Bea Gomez', isActive: false, permissions: [], roleName: 'Operador' },
   ];
   const findRefsIncludingDeletedInCompany = vi.fn(
     async (_companyId: string, ids: readonly string[]) => directorio.filter((ref) => ids.includes(ref.id)),
@@ -122,7 +122,7 @@ describe('getExecutionTrace — autorizacion antes de todo', () => {
     ['ausente (null)', null],
     ['ausente (undefined)', undefined],
     ['sin conjunto de permisos', { id: ANA, companyId: EMPRESA } as unknown as Actor],
-    ['con el conjunto vacio', { id: ANA, companyId: EMPRESA, permissions: [] }],
+    ['con el conjunto vacio', { id: ANA, companyId: EMPRESA, permissions: [], roleName: 'Operador' }],
     ['con todo el catalogo menos dashboard.consultar', { id: ANA, companyId: EMPRESA, permissions: sinElPermiso }],
   ])('R19: un actor %s se rechaza sin llamar a ningun puerto', async (_caso, actor) => {
     const m = montar();
@@ -215,7 +215,7 @@ describe('getExecutionTrace — lo que muestra', () => {
   });
 
   it('R13: una persona que el directorio ya no devuelve sale sin nombre, no rompe el recorrido', async () => {
-    const m = montar({ people: [{ id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [] }] });
+    const m = montar({ people: [{ id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [], roleName: 'Operador' }] });
     const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
     expect(recorrido.steps.map((step) => step.userDisplayName)).toEqual(['Ana Perez', 'Ana Perez', null, null]);
   });

@@ -536,6 +536,20 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/integraciones/adapters/driving/whatsapp-connection-actions')
       ).getWhatsappConnectionAction(),
   },
+  {
+    // Las fotos de evidencia por paso: la accion captura el error de un pedido inexistente y
+    // devuelve un estado, asi que la invocacion no rompe.
+    archivo: 'lib/modules/asignaciones/adapters/driving/step-evidence-actions.ts',
+    nombre: 'requestEvidenceUploadAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/step-evidence-actions')
+      ).requestEvidenceUploadAction({
+        orderId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        phase: 'manufacturing',
+        stepPosition: 1,
+      }),
+  },
 ];
 
 /**

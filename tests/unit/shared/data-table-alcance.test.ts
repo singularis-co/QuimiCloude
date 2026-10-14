@@ -625,7 +625,24 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // `data-table-row-<id>` y cuenta las filas de cada tab de la ficha por el mismo prefijo. El
   // centinela pasa de CUARENTA Y UNO a CUARENTA Y DOS; la lista sigue CERRADA, y un spec mas que
   // referencie `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y dos', () => {
+  //
+  // Alta el 2026-10-13 (QC-262) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: entra `e2e/pedidos-rediseno.spec.ts`, que no
+  // estrena tabla. Mide la lista de pedidos, ya en esta lista, a 1440, 820 y 390 px: una sola
+  // `data-table-filters` con buscador, cliente y `data-table-chips` en orden, las doce cabeceras
+  // `data-table-head-<id>` con el numero fijado, el menu de la fila `data-table-row-<id>` con su
+  // separador, las tarjetas `data-table-card-<id>` dentro de `data-table-cards` y los dialogos y
+  // paneles que abre «Acciones». El centinela pasa de CUARENTA Y DOS a CUARENTA Y TRES; la lista
+  // sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
+  //
+  // 2026-10-13 (QC-262): entran `e2e/helpers/order-distribution.ts` y
+  // `e2e/pedido-en-varias-presentaciones.spec.ts`, y no aflojan la lista. Ninguno estrena tabla: la
+  // tarjeta de la lista de pedidos, ya en esta lista, repite el disparador `order-row-actions` con
+  // el mismo `data-order-id`, asi que su localizador de pagina entera encontraba dos y ahora se
+  // acota a `data-table-row-<id>`. El centinela pasa de CUARENTA Y TRES a CUARENTA Y CINCO; la lista
+  // sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y cinco', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -635,7 +652,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cuarenta y dos E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cuarenta y cinco E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -680,6 +697,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/entregar-producto-terminado.spec.ts',
       // La OCTAVA la trae QC-85 el 2026-09-12 (R42): ver la nota de arriba.
       'e2e/grupos-de-trabajo.spec.ts',
+      // Ver la nota de arriba (2026-10-13, QC-262). Tras `grupos-de-trabajo` porque la lista esta
+      // ORDENADA: 'g' precede a 'h'.
+      'e2e/helpers/order-distribution.ts',
       // QC-199: ver la nota de arriba.
       'e2e/insumo-por-unidad.spec.ts',
       // Ver la nota de arriba (2026-10-06, QC-209). Va antes que `inventario.spec.ts` porque la
@@ -707,6 +727,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-10-06, QC-156). Entre `pedido-bloqueado` y `pedidos-asignados`
       // porque la lista esta ORDENADA: 'b' precede a 'c', y '-' precede a 's'.
       'e2e/pedido-con-cliente.spec.ts',
+      // Ver la nota de arriba (2026-10-13, QC-262). Entre `pedido-con-cliente` y `pedidos-asignados`
+      // porque la lista esta ORDENADA: 'c' precede a 'e', y '-' precede a 's'.
+      'e2e/pedido-en-varias-presentaciones.spec.ts',
       // Ver la nota de arriba. Va antes que `pedidos-busqueda` porque la lista esta ORDENADA.
       'e2e/pedidos-asignados.spec.ts',
       // La VIGESIMA la trae QC-122 el 2026-09-23: ver la nota de arriba. Va antes que
@@ -715,6 +738,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La VIGESIMOPRIMERA la trae QC-151 el 2026-09-23 (R11): ver la nota de arriba. Va antes que
       // `pedidos-responsables` porque la lista esta ORDENADA y 'c' precede a 'r'.
       'e2e/pedidos-cotizacion.spec.ts',
+      // Ver la nota de arriba (2026-10-13, QC-262). Entre `pedidos-cotizacion` y
+      // `pedidos-responsables` porque la lista esta ORDENADA: 'red' precede a 'res'.
+      'e2e/pedidos-rediseno.spec.ts',
       // La NOVENA la trae QC-102 el 2026-09-13 (T16, R37): ver la nota de arriba. Va antes que
       // `e2e/pedidos.spec.ts` porque la lista esta ORDENADA y '-' precede a '.'.
       'e2e/pedidos-responsables.spec.ts',

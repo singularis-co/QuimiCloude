@@ -1,8 +1,10 @@
 'use client';
 
 import { EditorContent, useEditor, useEditorState, type Content } from '@tiptap/react';
+import { CameraIcon, CheckIcon } from 'lucide-react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
+import { Switch } from '@/components/ui/switch';
 import {
   MAX_STEP_ELEMENTS,
   countRecipeStepElements,
@@ -42,6 +44,8 @@ const TEXTS = {
   italic: 'Cursiva',
   checklist: 'Lista de verificacion',
   toolbar: 'Formato del paso',
+  requiresEvidence: 'Requiere evidencia',
+  evidenceHelp: 'Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.',
   tooManyElements: (count: number, max: number) =>
     `Este paso tiene ${count} elementos y el maximo es ${max}. Quita elementos antes de guardar.`,
 } as const;
@@ -55,6 +59,15 @@ export type RecipeStepEditorProps = {
   readonly editableTestId: string;
   readonly error?: string;
   readonly errorId?: string;
+  /** Sin ella no se pinta el interruptor «Requiere evidencia». */
+  readonly evidence?: RecipeStepEvidenceControl;
+};
+
+export type RecipeStepEvidenceControl = {
+  readonly checked: boolean;
+  readonly onCheckedChange: (checked: boolean) => void;
+  /** Nombre accesible del interruptor, por ejemplo «Requiere evidencia en el paso 1». */
+  readonly label: string;
 };
 
 /** Lo que la barra necesita de la seleccion. Se lee del editor; no se duplica en un `useState`. */
@@ -73,8 +86,11 @@ export function RecipeStepEditor({
   editableTestId,
   error,
   errorId,
+  evidence,
 }: RecipeStepEditorProps) {
   const warningId = useId();
+  const evidenceHelpId = useId();
+  const evidenceOn = evidence?.checked === true;
 
   // `onChange` puede cambiar de identidad en cada render del formulario, pero el editor se crea
   // UNA vez: sin esta referencia, `onUpdate` se quedaria con la primera version para siempre.
@@ -142,37 +158,54 @@ export function RecipeStepEditor({
       {/* R2: la barra ofrece TRES acciones y ninguna mas. No hay control ni menu de encabezado,
           enlace, imagen, tabla, cita, lista numerada ni bloque de codigo, aqui ni en ningun otro
           sitio del componente. */}
-      <div
-        role="toolbar"
-        aria-label={TEXTS.toolbar}
-        aria-orientation="horizontal"
-        className="flex flex-wrap gap-1"
-        data-testid={`${editableTestId}-toolbar`}
-      >
-        <ToolbarButton
-          label={TEXTS.bold}
-          pressed={estado.bold}
-          testId={`${editableTestId}-bold`}
-          onActivate={() => editor?.chain().focus().toggleBold().run()}
+      <div className="flex flex-wrap items-center gap-1">
+        <div
+          role="toolbar"
+          aria-label={TEXTS.toolbar}
+          aria-orientation="horizontal"
+          className="flex flex-wrap gap-1"
+          data-testid={`${editableTestId}-toolbar`}
         >
-          <strong aria-hidden="true">N</strong>
-        </ToolbarButton>
-        <ToolbarButton
-          label={TEXTS.italic}
-          pressed={estado.italic}
-          testId={`${editableTestId}-italic`}
-          onActivate={() => editor?.chain().focus().toggleItalic().run()}
-        >
-          <em aria-hidden="true">C</em>
-        </ToolbarButton>
-        <ToolbarButton
-          label={TEXTS.checklist}
-          pressed={estado.checklist}
-          testId={`${editableTestId}-checklist`}
-          onActivate={() => editor?.chain().focus().toggleTaskList().run()}
-        >
-          <span aria-hidden="true">&#9745;</span>
-        </ToolbarButton>
+          <ToolbarButton
+            label={TEXTS.bold}
+            pressed={estado.bold}
+            testId={`${editableTestId}-bold`}
+            onActivate={() => editor?.chain().focus().toggleBold().run()}
+          >
+            <strong aria-hidden="true">N</strong>
+          </ToolbarButton>
+          <ToolbarButton
+            label={TEXTS.italic}
+            pressed={estado.italic}
+            testId={`${editableTestId}-italic`}
+            onActivate={() => editor?.chain().focus().toggleItalic().run()}
+          >
+            <em aria-hidden="true">C</em>
+          </ToolbarButton>
+          <ToolbarButton
+            label={TEXTS.checklist}
+            pressed={estado.checklist}
+            testId={`${editableTestId}-checklist`}
+            onActivate={() => editor?.chain().focus().toggleTaskList().run()}
+          >
+            <span aria-hidden="true">&#9745;</span>
+          </ToolbarButton>
+        </div>
+        {evidence === undefined ? null : (
+          // En teléfono el interruptor baja a su propia línea; desde md se alinea a la derecha.
+          <div className="flex w-full md:ml-auto md:w-auto">
+            <Switch
+              checked={evidenceOn}
+              onCheckedChange={(checked) => evidence.onCheckedChange(checked)}
+              aria-label={evidence.label}
+              aria-describedby={evidenceOn ? evidenceHelpId : undefined}
+              data-testid={`${editableTestId}-evidence`}
+            >
+              <CameraIcon aria-hidden="true" className="size-4" />
+              {TEXTS.requiresEvidence}
+            </Switch>
+          </div>
+        )}
       </div>
 
       <EditorContent
@@ -190,6 +223,17 @@ export function RecipeStepEditor({
           {TEXTS.tooManyElements(elementos, MAX_STEP_ELEMENTS)}
         </p>
       )}
+
+      {evidenceOn ? (
+        <p
+          id={evidenceHelpId}
+          className="flex animate-in items-center gap-1.5 text-xs text-primary duration-(--dur-slow) ease-(--ease-enter) fade-in slide-in-from-bottom-[10px]"
+          data-testid={`${editableTestId}-evidence-help`}
+        >
+          <CheckIcon aria-hidden="true" className="size-4 shrink-0" />
+          {TEXTS.evidenceHelp}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -1,42 +1,60 @@
 // tests/unit/asignaciones/responsible-eligibility.test.ts
 //
-// `canBeResponsible`: quien puede ser responsable de un pedido, decidido por permiso, nunca por
-// rol.
+// `canBeResponsible` y `ORDER_RESPONSIBLE_FILTERS`: quien puede ser responsable de un pedido.
+// QC-274 (2026-10-13): por nombre de rol, Operador y Empacador; enmienda QC-145 R32/D13.
 
 import { describe, expect, it } from 'vitest';
 
-import { canBeResponsible } from '@/lib/modules/asignaciones/domain/responsible-eligibility';
+import {
+  canBeResponsible,
+  ORDER_RESPONSIBLE_FILTERS,
+} from '@/lib/modules/asignaciones/domain/responsible-eligibility';
+import {
+  ROLE_ACONDICIONAMIENTO,
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  ROLE_MAESTRO,
+  ROLE_OPERADOR,
+  type PersonRef,
+} from '@/lib/modules/identity';
 
-import type { PermissionBearer } from '@/lib/modules/identity';
-
-function bearer(permissions: readonly string[]): PermissionBearer {
-  return { permissions };
+function conRol(roleName: string): PersonRef {
+  return { id: 'p', displayName: 'Persona', isActive: true, permissions: [], roleName };
 }
 
-describe('canBeResponsible', () => {
-  it("R33: con `pedidos.consultar` -> false", () => {
-    expect(canBeResponsible(bearer(['pedidos.consultar']))).toBe(false);
+describe('canBeResponsible (QC-274)', () => {
+  it('Operador -> true', () => {
+    expect(canBeResponsible(conRol(ROLE_OPERADOR))).toBe(true);
   });
 
-  it('R33: con `pedidos.consultar` y otros permisos -> false igualmente', () => {
-    expect(canBeResponsible(bearer(['pedidos.consultar', 'asignaciones.modificar']))).toBe(false);
+  it('Empacador -> true', () => {
+    expect(canBeResponsible(conRol(ROLE_EMPACADOR))).toBe(true);
   });
 
-  it('R34: sin `pedidos.consultar` -> true', () => {
-    expect(canBeResponsible(bearer(['asignaciones.modificar']))).toBe(true);
+  it('Administrador de acondicionamiento -> false', () => {
+    expect(canBeResponsible(conRol(ROLE_ACONDICIONAMIENTO))).toBe(false);
   });
 
-  it('R34: sin ningun permiso -> true (no lanza)', () => {
-    expect(canBeResponsible(bearer([]))).toBe(true);
+  it('Administrador -> false', () => {
+    expect(canBeResponsible(conRol(ROLE_ADMINISTRADOR))).toBe(false);
   });
 
-  it('un conjunto de permisos ausente o invalido no lanza: se lee como sin el permiso -> true', () => {
-    expect(canBeResponsible({} as unknown as PermissionBearer)).toBe(true);
-    expect(canBeResponsible({ permissions: null } as unknown as PermissionBearer)).toBe(true);
+  it('Maestro y un rol desconocido -> false', () => {
+    expect(canBeResponsible(conRol(ROLE_MAESTRO))).toBe(false);
+    expect(canBeResponsible(conRol('operador'))).toBe(false);
+    expect(canBeResponsible(conRol(''))).toBe(false);
+  });
+});
+
+describe('ORDER_RESPONSIBLE_FILTERS (QC-274)', () => {
+  it('pide solo cuentas efectivamente activas y los roles Operador y Empacador', () => {
+    expect(ORDER_RESPONSIBLE_FILTERS).toEqual({
+      accountStatus: ['active'],
+      roles: [ROLE_OPERADOR, ROLE_EMPACADOR],
+    });
   });
 
-  it('la firma no admite ningun dato de rol: `PermissionBearer` solo tiene `permissions`', () => {
-    const soloPermisos: PermissionBearer = { permissions: [] };
-    expect(() => canBeResponsible(soloPermisos)).not.toThrow();
+  it('es la misma lista que decide `canBeResponsible`', () => {
+    for (const role of ORDER_RESPONSIBLE_FILTERS.roles) expect(canBeResponsible(conRol(role))).toBe(true);
   });
 });

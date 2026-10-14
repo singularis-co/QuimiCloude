@@ -8,6 +8,7 @@ import { ErrorAlert } from '@/components/shared/error-alert';
 import { Notice } from '@/components/shared/notice';
 import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { EvidenceMissingDialog, STEP_EVIDENCE_TEXTS } from '@/components/shared/step-evidence';
 import { StepReader } from '@/components/shared/step-reader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -27,6 +28,7 @@ import {
   OperatorScreenFrame,
   STEP_READER_SIDE_COLUMN_RESERVE,
 } from '../../../components/operator-screen-frame';
+import { useStepEvidence } from '../../../components/use-step-evidence';
 
 /**
  * La pantalla de un pedido de empaque, sobre el marco del operario. Sin control de edicion: los
@@ -138,6 +140,9 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
   const finishFormRef = useRef<HTMLFormElement>(null);
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
   const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
+  const [missingOpen, setMissingOpen] = useState(false);
+  const [missingPositions, setMissingPositions] = useState<readonly number[]>([]);
+  const [stepRequest, setStepRequest] = useState<{ position: number; id: number }>();
 
   const [startState, startFormAction, startPending] = useActionState<
     StartPackingResult,
@@ -158,6 +163,30 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
   const lacksDistribution = order.status === 'POR_EMPACAR' && order.presentationLines.length === 0;
   const showsPackingSteps = canFinish && order.packingSteps.length > 0;
 
+  const evidence = useStepEvidence({
+    orderId: order.id,
+    phase: 'packing',
+    steps: order.packingSteps,
+    initial: order.packingEvidence,
+  });
+
+  function handleStepsFinish() {
+    const missing = evidence.missingPositions();
+    if (missing.length > 0) {
+      setMissingPositions(missing);
+      setMissingOpen(true);
+      return;
+    }
+    setFinishConfirmOpen(true);
+  }
+
+  const finishTexts = {
+    ...confirmTexts(PACKING_ORDER_FINISH_CONFIRM_TEXTS),
+    ...(evidence.hasEvidenceSteps
+      ? { description: STEP_EVIDENCE_TEXTS.finishWarning }
+      : {}),
+  };
+
   const startDialog = (
     <ConfirmDialog
       open={startConfirmOpen}
@@ -177,7 +206,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
       open={finishConfirmOpen}
       onOpenChange={setFinishConfirmOpen}
       onConfirm={() => finishFormRef.current?.requestSubmit()}
-      texts={confirmTexts(PACKING_ORDER_FINISH_CONFIRM_TEXTS)}
+      texts={finishTexts}
       testIds={{
         dialog: PACKING_ORDER_FINISH_DIALOG_TESTID,
         dismiss: `${PACKING_ORDER_FINISH_DIALOG_TESTID}-cancel`,
@@ -355,13 +384,16 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
               <StepReader
                 steps={order.packingSteps}
                 title={PACKING_ORDER_TEXTS.packingSteps}
-                onFinish={() => setFinishConfirmOpen(true)}
+                onFinish={handleStepsFinish}
                 minStepSeconds={PACKING_MIN_STEP_SECONDS}
                 mode="ejecucion"
                 finishLabel={
                   finishPending ? PACKING_ORDER_TEXTS.finishPending : PACKING_ORDER_TEXTS.finish
                 }
                 finishBusy={finishPending}
+                renderStepAddon={evidence.renderStepAddon}
+                stepBlockReason={evidence.stepBlockReason}
+                stepRequest={stepRequest}
               />
             </div>
           ) : null}
@@ -379,6 +411,17 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
           <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
           {finishDialog}
         </form>
+      ) : null}
+
+      {showsPackingSteps ? (
+        <EvidenceMissingDialog
+          open={missingOpen}
+          onOpenChange={setMissingOpen}
+          positions={missingPositions}
+          onGoToStep={(position) =>
+            setStepRequest((previous) => ({ position, id: (previous?.id ?? 0) + 1 }))
+          }
+        />
       ) : null}
     </OperatorScreenFrame>
   );
