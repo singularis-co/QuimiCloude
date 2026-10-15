@@ -86,7 +86,14 @@ export function ConditioningOrderScreen({
   return (
     <OperatorScreenFrame
       testId={CONDITIONING_ORDER_SCREEN_TESTID}
-      back={{ href: back.href, label: back.label, testId: CONDITIONING_ORDER_BACK_LINK_TESTID }}
+      // `canFinish` es «en acondicionamiento a nombre del propio actor»: ya comenzado, la vuelta
+      // queda deshabilitada hasta terminar.
+      back={{
+        href: back.href,
+        label: back.label,
+        testId: CONDITIONING_ORDER_BACK_LINK_TESTID,
+        disabled: canFinish,
+      }}
       eyebrow={order.numberText}
       eyebrowTestId={CONDITIONING_ORDER_NUMBER_TESTID}
       title={order.recipeName ?? CONDITIONING_ORDER_SCREEN_TEXTS.recipeMissing}

@@ -626,6 +626,38 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
     expect(volver.querySelector('svg')).not.toBeNull();
   });
 
+  it('POR_EMPACAR: la vuelta es un enlace habilitado', () => {
+    pintar(fila({ status: 'POR_EMPACAR' }));
+
+    const volver = screen.getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
+    expect(volver.tagName).toBe('A');
+    expect(volver).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('EN_EMPAQUE a nombre propio: la vuelta se ve deshabilitada, sin href', () => {
+    pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH }));
+
+    const volver = screen.getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
+    expect(volver.tagName).not.toBe('A');
+    expect(volver).not.toHaveAttribute('href');
+    expect(volver).toHaveAttribute('aria-disabled', 'true');
+    expect(volver.textContent).toBe(PACKING_ORDER_TEXTS.back);
+  });
+
+  it('EN_EMPAQUE a nombre de otro: la vuelta sigue habilitada, quien mira no lo comenzo', () => {
+    pintar(
+      fila({
+        status: 'EN_EMPAQUE',
+        packedById: '22222222-2222-4222-8222-222222222222',
+        packedByName: 'Otra persona',
+      }),
+    );
+
+    const volver = screen.getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
+    expect(volver.tagName).toBe('A');
+    expect(volver).toHaveAttribute('href', '/asignacion?vista=por_empacar');
+  });
+
   it('R27: el estado va en la cabecera con `StatusBadge`, su testid y `data-status`', () => {
     pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo' }));
 
