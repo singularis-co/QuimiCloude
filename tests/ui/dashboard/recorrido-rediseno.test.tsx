@@ -33,8 +33,7 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 const ORDER_ID = '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718';
 const MIN = 60 * 1000;
 
-// Ajustado el 2026-10-14 (QC-283): el paso es una union por `action`; estos casos solo usan pasos de
-// produccion y empaque, que ya no llevan `batchLines`.
+// Estos casos solo usan pasos de produccion y empaque, que no llevan `batchLines`.
 type ProductionStep = Exclude<ExecutionTraceDetailStep, { readonly action: ConditioningAction }>;
 
 function step(overrides: Partial<ProductionStep> & Pick<ProductionStep, 'id' | 'action'>): ProductionStep {
@@ -325,8 +324,6 @@ describe('ExecutionTraceDetail', () => {
     expect(back).toHaveClass('min-h-11', 'min-w-11');
   });
 
-  // Ajustado el 2026-10-14 (QC-283): «Duración» pasa a una tarjeta por fase con duración y la
-  // rejilla deja de ser de tres columnas fijas (5 en una fila, 3 + 2 o 2 columnas).
   it('R12: dl con «Estado», una duración por fase y «Vueltas atrás» en una rejilla que se reparte', () => {
     const { container } = renderDetail();
 

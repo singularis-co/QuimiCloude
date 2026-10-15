@@ -1,9 +1,5 @@
 // El calculo puro del recorrido de un pedido: tramos, duraciones por fase, total, vueltas atras y
 // personas.
-//
-// Enmendado el 2026-10-14 (QC-283): la duracion unica de reloj (`duration`, QC-167 R15) se sustituye
-// por una duracion por fase (`durations`), su suma (`totalDuration`) y la marca `active`. Los casos
-// R15 y R3 de QC-167 se migran a esos campos con la regla nueva.
 
 import { describe, expect, it } from 'vitest'
 

@@ -54,7 +54,6 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', (
 
 const PERSONA = { userId: 'user-1', displayName: 'Ana López García' };
 
-// Ajustado el 2026-10-14 (QC-283): la fila trae `active` y `totalDuration` en vez de `duration`.
 const FILAS: readonly ExecutionTraceRow[] = [
   {
     orderId: 'order-1',
@@ -163,8 +162,7 @@ describe('paridad de recorridos (dashboard)', () => {
   });
 });
 
-// Añadido el 2026-10-14 (QC-283): congela el detalle con las tres anotaciones de acondicionamiento,
-// una por variante del tablero `RecorridoAcondicionamiento` (terminado, en curso y anterior).
+// Una variante por cada una del tablero `RecorridoAcondicionamiento`: terminado, en curso y anterior.
 describe('paridad del detalle del recorrido con acondicionamiento', () => {
   it.each([
     ['terminado', FINISHED_CONDITIONING_TRACE],

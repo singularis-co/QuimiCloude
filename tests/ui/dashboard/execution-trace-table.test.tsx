@@ -57,7 +57,6 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', (
 const ANA: ExecutionTracePerson = { userId: '3f2b8c1e-5d4a-4b7e-9c2f-1a2b3c4d5e6f', displayName: 'Ana Ruiz' };
 const LUIS: ExecutionTracePerson = { userId: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d', displayName: 'Luis Gil' };
 
-// Ajustado el 2026-10-14 (QC-283): la fila trae `active` y `totalDuration` en vez de `duration`.
 const ACTIVO: ExecutionTraceRow = {
   orderId: 'o-activo',
   numberText: '2026-0000042',
@@ -183,7 +182,7 @@ describe('R2 - columnas de la fila', () => {
   });
 });
 
-// Ajustado el 2026-10-14 (QC-283): el total de la lista se trunca a minutos, sin segundos.
+// El total de la lista se trunca a minutos, sin segundos.
 describe('R3 - R15 - en curso y duracion', () => {
   it('R3 - la fila activa se marca «En curso» y su duracion es abierta', () => {
     montar();

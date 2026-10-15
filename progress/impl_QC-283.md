@@ -451,3 +451,26 @@ su titulo en el archivo (grep) y los archivos se corrieron (salida abajo).
   trabajo. Si se queria dos grupos de una persona, es un cambio menor en el fixture.
 
 Veredicto: R1–R36 con test existente y en verde. T9 y T10 cerradas.
+
+## Correcciones del review (2026-10-14)
+
+Informe: `progress/review_QC-283.md`. Delegado en `backend_dev`.
+
+- **B1:** alta de `recorrido-acondicionamiento.spec.ts` al final de `E2E_ESPERADOS` en
+  `tests/guards/guard-identificador-de-request.test.ts`, con su motivo (lo que ejercita; no lee
+  ni afirma nada sobre el identificador de peticion ni `reference`, comprobado con grep).
+- **Menor 7:** sin `as` en `lib/modules/asignaciones/domain/save-conditioning-batch-data.ts`.
+  Tipo `BatchLabelsRejection = Exclude<FinishedBatchLabelsOutcome, { kind: 'written' }>` y
+  subclase `BatchLabelsAbortedError extends ExecutionAbortedError` con `outcome` tipado; el
+  `catch` estrecha con `instanceof`. Sin cambio de comportamiento.
+- **M1:** quitadas las citas a `QC-<n>`, `R<n>` y notas historicas de los comentarios anadidos por
+  la rama en `tests/` y `e2e/`; se conserva solo el porque no evidente. Sin tocar comentarios
+  preexistentes. Quedan fuera (no son comentarios): tres nombres de `describe` con «QC-283 — …»
+  y el `motivo` de `tests/integration/aislamiento.json`.
+
+Verificacion (salida real):
+- `pnpm exec vitest run guard`: Test Files 76 passed (76); Tests 1066 passed, 20 skipped.
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errors, 7 warnings (archivos no tocados).
+- `vitest related --run` (dominio + tests ui/unit tocados): Test Files 384 passed; Tests 6536 passed, 2 skipped.
+- `--project integration` (3 `.int` tocados + `conditioning-execution-log`): Test Files 4 passed; Tests 33 passed.

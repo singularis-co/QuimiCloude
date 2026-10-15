@@ -1,5 +1,5 @@
 /**
- * E2E del acondicionamiento en el recorrido de ejecución (QC-283 R36).
+ * E2E del acondicionamiento en el recorrido de ejecución.
  *
  * Recorre, con los roles REALES del seed, el flujo completo de un pedido «Por acondicionar»:
  *
@@ -10,13 +10,13 @@
  *
  * Después el Administrador, en su propio contexto, abre el dashboard y comprueba:
  *
- * - el total de la fila, sin sufijo (todas las fases cerradas, R26);
- * - que el miembro del equipo que no firma ninguna anotación no es opción del filtro (R31) y que
- *   filtrar por él encuentra el pedido (R30);
+ * - el total de la fila, sin sufijo (todas las fases cerradas);
+ * - que el miembro del equipo que no firma ninguna anotación no es opción del filtro y que
+ *   filtrar por él encuentra el pedido;
  * - en el detalle, las tres anotaciones nuevas en orden cronológico tras las de producción y
- *   empaque (R12, R13, R15, R17);
- * - que la foto del primer guardado conserva el lote original tras la corrección (R5);
- * - las tres tarjetas de duración (R25).
+ *   empaque;
+ * - que la foto del primer guardado conserva el lote original tras la corrección;
+ * - las tres tarjetas de duración.
  *
  * EL PEDIDO SE SIEMBRA DIRECTAMENTE con `prisma`, ya «Por acondicionar», con su reparto, sus dos
  * productos terminados, sus dos lotes, sus asientos `production` y las anotaciones de producción y
@@ -154,7 +154,7 @@ const adminUser = seedUser('admin', 'Admin', 'Administra');
 const producerUser = seedUser('produce', 'Produce', 'Produce');
 /** Miembro del equipo marcado suelto. No firma nada. */
 const directMemberUser = seedUser('directo', 'Directo', 'Directo');
-/** Miembro del equipo que entra por el grupo. No firma nada: es el del filtro (R30, R31). */
+/** Miembro del equipo que entra por el grupo. No firma nada: es el del filtro. */
 const groupMemberUser = seedUser('grupo', 'Grupo', 'Engrupo');
 
 const ALL_USERS = [conditionerUser, adminUser, producerUser, directMemberUser, groupMemberUser];
@@ -340,7 +340,7 @@ async function saveBatchData(section: Locator, orderId: string, expectedSaves: n
 
 /**
  * Las líneas de un guardado tal como se ven: la tabla en contenedores anchos o una tarjeta por línea
- * en los estrechos (R18). Solo una de las dos variantes es visible.
+ * en los estrechos. Solo una de las dos variantes es visible.
  */
 function visibleBatchLines(step: Locator): Locator {
   return step.locator(
@@ -641,7 +641,6 @@ async function expectAdminSeesTrace(
     await expect(row).toHaveCount(1, { timeout: 60_000 });
     await expect(decoyRow).toHaveCount(1);
 
-    // --- El total de la fila: la suma de las tres fases, en minutos y sin sufijo (R26).
     await test.step('R26 - el total de la fila suma las tres fases, sin sufijo', async () => {
       const total = row.getByTestId(TRACE_DURATION_TESTID);
       await expect(total).toHaveAttribute('data-kind', 'closed');
@@ -650,8 +649,6 @@ async function expectAdminSeesTrace(
       );
     });
 
-    // --- El miembro del equipo que no firma no es opción del filtro (R31), pero filtrar por él
-    //     encuentra el pedido y deja fuera el señuelo (R30).
     await test.step('R30 R31 - filtrar por el miembro del equipo que no firma encuentra el pedido', async () => {
       await page.getByRole('button', { name: PERSON_FILTER_LABEL, exact: true }).click();
       await expect(page.getByRole('menuitemcheckbox', { name: displayNameOf(conditionerUser) })).toBeVisible({
@@ -682,7 +679,6 @@ async function expectAdminSeesTrace(
     const correction = steps.nth(6);
     const finishStep = steps.nth(7);
 
-    // --- Comenzar: supervisor y equipo en el orden en que se compuso, con el grupo (R12, R13).
     await test.step('R12 R13 - Comenzar muestra al supervisor y al equipo con su grupo', async () => {
       await expect(startStep.getByTestId('execution-trace-step-action')).toHaveText(
         exactText(EXECUTION_ACTION_LABELS.conditioning_start),
@@ -699,8 +695,6 @@ async function expectAdminSeesTrace(
       await expect(members.nth(1).getByTestId('execution-trace-team-group')).toContainText(WORK_GROUP_NAME);
     });
 
-    // --- Los dos guardados: la foto del primero conserva los lotes originales tras la corrección
-    //     (R5, R15).
     await test.step('R5 R15 - la foto del primer guardado conserva el lote original', async () => {
       for (const save of [firstSave, correction]) {
         await expect(save.getByTestId('execution-trace-step-action')).toHaveText(
@@ -719,7 +713,6 @@ async function expectAdminSeesTrace(
       }
     });
 
-    // --- Terminar: solo quién (R17).
     await test.step('R17 - Terminar muestra solo quién terminó', async () => {
       await expect(finishStep.getByTestId('execution-trace-step-action')).toHaveText(
         exactText(EXECUTION_ACTION_LABELS.conditioning_finish),
@@ -736,7 +729,6 @@ async function expectAdminSeesTrace(
       await expect(finishStep.getByTestId('execution-trace-batch-save')).toHaveCount(0);
     });
 
-    // --- Las tres tarjetas de duración, cerradas y sin insignia (R25).
     await test.step('R25 - las tres tarjetas de duración', async () => {
       const cards = page.getByTestId(TRACE_DURATION_TESTID);
       await expect(cards).toHaveCount(PHASES.length);

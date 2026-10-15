@@ -1,6 +1,5 @@
 // QC-219 T7 — Guardar los datos de lote: el orden de las reglas, con puertos simulados.
-// Nota 2026-10-14 (QC-283): la escritura pasa a la transaccion de ejecucion (`writers.batches`) y
-// anota una foto del guardado; `listOfOrder` y `findRefs` se leen antes, fuera de ella.
+// `listOfOrder` y `findRefs` se leen antes de la transaccion de ejecucion, fuera de ella.
 import { describe, expect, it, vi } from 'vitest';
 
 import {

@@ -68,8 +68,6 @@ function entradaDe(action: (typeof EXECUTION_ACTIONS)[number]): NewExecutionEntr
   return { ...base, action, stepPosition: 3 }
 }
 
-// Enmendado el 2026-10-14 (QC-283): el enum gana las tres acciones del acondicionamiento; el mapa
-// pasa de ocho a once pares y sigue cubriendo exactamente el dominio y el enum.
 describe('execution-log-prisma: el mapa al enum (R1)', () => {
   it('R1: el mapa tiene exactamente once pares, uno por accion del dominio', () => {
     expect(Object.keys(EXECUTION_ACTION_TO_PRISMA)).toHaveLength(11)
@@ -183,7 +181,7 @@ describe('execution-log-prisma: el mapa inverso del enum (QC-167 T4a)', () => {
   })
 })
 
-// Nota 2026-10-14 (QC-283): con persona, el filtro tambien lee el equipo de acondicionamiento.
+// Con persona, el filtro tambien lee el equipo de acondicionamiento.
 function clienteDeLectura() {
   const findMany = vi.fn()
   const groupBy = vi.fn()

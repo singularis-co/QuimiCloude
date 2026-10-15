@@ -22,9 +22,6 @@ const MIN = 60 * S;
 const H = 60 * MIN;
 const D = 24 * H;
 
-// Ajustado el 2026-10-14 (QC-283): `formatTraceDuration` se borra porque la lista pasa a
-// `formatTraceTotal` y el detalle a una cifra por fase con `formatElapsed`; los casos de formato
-// pasan a `formatElapsed` y los de la marca a `formatTraceTotal`.
 describe('R15 - formato de una duracion por debajo de 24 h', () => {
   it.each([
     [0, '0 s'],
@@ -72,7 +69,6 @@ describe('R13 - instantes, acciones y estados', () => {
     expect(formatTraceInstant(new Date('2026-10-07T23:05:09.123Z'))).toBe('2026-10-07 23:05:09');
   });
 
-  // Enmendado el 2026-10-14 (QC-283): las tres acciones del acondicionamiento ganan su etiqueta.
   it('R13 - las once acciones tienen su etiqueta en espanol', () => {
     expect(EXECUTION_ACTION_LABELS).toEqual({
       start: 'Arrancar',

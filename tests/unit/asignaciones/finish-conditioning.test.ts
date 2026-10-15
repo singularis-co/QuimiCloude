@@ -1,6 +1,4 @@
 // tests/unit/asignaciones/finish-conditioning.test.ts
-// Nota 2026-10-14 (QC-283): la transicion pasa a `writers.conditioning` dentro de la transaccion de
-// ejecucion, seguida de la anotacion; `orders` ya solo se lee.
 import { describe, expect, it, vi } from 'vitest';
 
 import {

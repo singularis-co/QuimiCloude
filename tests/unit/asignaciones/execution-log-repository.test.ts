@@ -116,8 +116,6 @@ describe('NewExecutionEntry: el empaque va sin posicion (R5bis)', () => {
   })
 })
 
-// Enmendado el 2026-10-14 (QC-283): el enum gana las tres acciones del acondicionamiento; de ocho
-// pasan a once. El dominio y el enum de Prisma siguen teniendo exactamente las mismas.
 describe('ExecutionAction: total sobre las once del enum (R1)', () => {
   it('R1: el dominio declara exactamente once acciones, y el enum de Prisma tambien', () => {
     expect(EXECUTION_ACTIONS).toHaveLength(11)
@@ -195,8 +193,6 @@ describe('ExecutionLogRepository: solo anexar (R31)', () => {
 })
 
 describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () => {
-  // Nota 2026-10-14 (QC-283): los escritores ganan `batches` y `conditioning.finishConditioningAliveById`,
-  // para que guardar datos de lote y Terminar anoten en la misma transaccion.
   it('R24: `run` entrega exactamente `orders`, `packing`, `log`, `conditioning`, `team` y `batches`, y devuelve lo que devuelve `work`', async () => {
     const writers: ExecutionWriters = {
       orders: {

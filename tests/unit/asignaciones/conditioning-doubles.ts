@@ -198,7 +198,7 @@ export function loteDeLinea(
 }
 
 /**
- * QC-283: la transaccion de ejecucion de los casos de uso que escriben en el acondicionamiento, con
+ * La transaccion de ejecucion de los casos de uso que escriben en el acondicionamiento, con
  * los tres escritores que usan. `pasos` deja el orden: `transaccion`, `escribe-lotes`,
  * `escribe-pedido` y `anota`.
  */

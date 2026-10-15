@@ -228,7 +228,6 @@ describe('startConditioning — el orden auth -> zod -> pedido -> equipo -> tran
 
     expect(pasos[0]).toBe('pedido');
     expect(pasos.slice(1, 3).sort()).toEqual(['grupo', 'personas']);
-    // Nota 2026-10-14 (QC-283): la transaccion termina ahora con la anotacion de Comenzar.
     expect(pasos.slice(3)).toEqual(['personas', 'transaccion', 'escribe-pedido', 'escribe-equipo', 'anota']);
     expect(startConditioningAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
     expect(insertAll).toHaveBeenCalledWith([

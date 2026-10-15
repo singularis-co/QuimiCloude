@@ -423,6 +423,13 @@ export const E2E_ESPERADOS = [
   // con el pie visible. No confirma nada. No lee ni afirma nada sobre el identificador de peticion
   // ni sobre `reference`.
   'pedidos-rediseno.spec.ts',
+  // Lo que ejercita: el Administrador de acondicionamiento comienza un pedido sembrado «Por
+  // acondicionar» con un equipo -una persona suelta y otra por grupo-, guarda los datos de lote, los
+  // corrige y lo termina; el Administrador ve en el dashboard el total de la fila y el filtro por un
+  // miembro que no firma, y en el recorrido las tres anotaciones nuevas, la foto del primer guardado
+  // y las tres duraciones. No lee ni afirma nada sobre el identificador de peticion ni sobre
+  // `reference`.
+  'recorrido-acondicionamiento.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -640,8 +647,8 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-10-14: migracion de datos que quita `asignaciones.consultar` al Administrador; no toca el
   // identificador.
   '20261014180000_admin_without_assigned_orders_view',
-  // QC-283 2026-10-14: las acciones del acondicionamiento en el registro de ejecucion y la columna
-  // `batch_lines`; no tocan el identificador.
+  // Las acciones del acondicionamiento en el registro de ejecucion y la columna `batch_lines`; no
+  // tocan el identificador.
   '20261015120000_order_execution_conditioning_actions',
   '20261015120100_order_execution_batch_lines',
 ] as const

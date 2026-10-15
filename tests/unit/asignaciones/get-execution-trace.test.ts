@@ -2,10 +2,6 @@
 //
 // El recorrido de un pedido, con los puertos simulados: autorizacion primero, un solo error para
 // los tres casos de «no hay recorrido» y los dados de baja que si lo abren.
-//
-// Enmendado el 2026-10-14 (QC-283): el detalle cambia `duration` por `active` y `durations`, y sus
-// pasos son una union por accion (equipo en el Comenzar, foto en el guardado); los casos de la
-// duracion se migran a esos campos.
 
 import { describe, expect, it, vi } from 'vitest';
 

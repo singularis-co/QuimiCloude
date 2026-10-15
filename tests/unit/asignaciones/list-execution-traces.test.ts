@@ -2,9 +2,6 @@
 //
 // La lista de pedidos ejecutados del dashboard, con los puertos simulados: autorizacion primero,
 // la frontera zod, los filtros que viajan a cada puerto y la fila que sale de `buildExecutionTrace`.
-//
-// Enmendado el 2026-10-14 (QC-283): la fila cambia `duration` por `active` y `totalDuration`, y sus
-// personas suman el equipo del Comenzar anotado; los casos de la fila se migran a esos campos.
 
 import { describe, expect, it, vi } from 'vitest';
 

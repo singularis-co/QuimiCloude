@@ -22,7 +22,7 @@ import {
   ValidationError,
   type AsignacionesError,
 } from './errors';
-import { ExecutionAbortedError, type ExecutionWriteOutcome } from './execution-entry';
+import { ExecutionAbortedError } from './execution-entry';
 
 import type { ConditioningBatchSnapshotLine } from './conditioning-trace';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -106,9 +106,15 @@ async function composeSnapshot(
   });
 }
 
-/** Solo llegan aqui los desenlaces de `writeForOrder` que no son `written`. */
-function batchLabelsError(outcome: ExecutionWriteOutcome): AsignacionesError {
-  const rejected = outcome as Exclude<FinishedBatchLabelsOutcome, { kind: 'written' }>;
+type BatchLabelsRejection = Exclude<FinishedBatchLabelsOutcome, { kind: 'written' }>;
+
+class BatchLabelsAbortedError extends ExecutionAbortedError {
+  constructor(override readonly outcome: BatchLabelsRejection) {
+    super(outcome);
+  }
+}
+
+function batchLabelsError(rejected: BatchLabelsRejection): AsignacionesError {
   if (rejected.kind === 'batch_not_found') return new ConditioningBatchNotFoundError(rejected.batchId);
   return new ConditioningBatchDuplicateLotError(rejected.batchId ?? undefined);
 }
@@ -153,7 +159,7 @@ export function createSaveConditioningBatchData(
       await deps.transaction.run(async ({ batches, log }) => {
         const outcome = await batches.writeForOrder({ companyId, orderId, labels: lines, actorId: actor.id, now });
         // Tras un `duplicate_lot` la transaccion queda abortada en Postgres: hay que lanzar, no seguir.
-        if (outcome.kind !== 'written') throw new ExecutionAbortedError(outcome);
+        if (outcome.kind !== 'written') throw new BatchLabelsAbortedError(outcome);
         await log.append({
           action: 'conditioning_batch_save',
           companyId,
@@ -165,7 +171,7 @@ export function createSaveConditioningBatchData(
         });
       });
     } catch (error) {
-      if (error instanceof ExecutionAbortedError) throw batchLabelsError(error.outcome);
+      if (error instanceof BatchLabelsAbortedError) throw batchLabelsError(error.outcome);
       throw error;
     }
   };

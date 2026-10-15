@@ -130,7 +130,7 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   const companyId = fixture.companyId;
   const products = await prisma.product.findMany({ where: { companyId }, select: { id: true } });
   const productIds = products.map((product) => product.id);
-  // Nota 2026-10-14 (QC-283): guardar y Terminar anotan en el registro, y sus filas apuntan al pedido.
+  // Guardar y Terminar anotan en el registro, y sus filas apuntan al pedido: se borran antes.
   await prisma.orderExecutionEntry.deleteMany({ where: { companyId } });
   await prisma.orderConditioningTeamMember.deleteMany({ where: { companyId } });
   await prisma.reservationMovement.deleteMany({ where: { companyId } });

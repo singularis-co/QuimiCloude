@@ -100,8 +100,6 @@ const TEXTOS = {
   recorrido: {
     volver: 'Volver a la lista',
     titulo: (numero: string) => `Recorrido del pedido ${numero}`,
-    // Ajustado el 2026-10-14 (QC-283): «Duración» pasa a una tarjeta por fase, con insignia si la
-    // fase sigue abierta o quedó sin cierre.
     datos: [
       'Estado',
       'Duración de producción',
@@ -144,7 +142,6 @@ const TEXTOS = {
 
 const ANA: ExecutionTracePerson = { userId: '3f2b8c1e-5d4a-4b7e-9c2f-1a2b3c4d5e6f', displayName: 'Ana Ruiz' };
 
-// Ajustado el 2026-10-14 (QC-283): la fila trae `active` y `totalDuration` en vez de `duration`.
 const ACTIVO: ExecutionTraceRow = {
   orderId: 'o-activo',
   numberText: '2026-0000042',
@@ -217,8 +214,7 @@ async function resolverPagina(nodo: ReactNode): Promise<ReactNode> {
 const ORDER_ID = '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718';
 const MIN = 60 * 1000;
 
-// Ajustado el 2026-10-14 (QC-283): el paso es una union por `action`; los pasos de produccion y
-// empaque ya no llevan `batchLines`.
+// Los pasos de produccion y empaque no llevan `batchLines`.
 type ProductionStep = Exclude<ExecutionTraceDetailStep, { readonly action: ConditioningAction }>;
 
 function step(overrides: Partial<ProductionStep> & Pick<ProductionStep, 'id' | 'action'>): ProductionStep {
@@ -410,8 +406,8 @@ describe('R21 - textos del recorrido', () => {
     );
   });
 
-  // Enmendado el 2026-10-14 (QC-283): `TEXTOS.acciones` gana las tres del acondicionamiento, que
-  // este recorrido no anota; se comparan las ocho que si pinta.
+  // `TEXTOS.acciones` tiene tambien las tres del acondicionamiento, que este recorrido no anota; se
+  // comparan las ocho que si pinta.
   it('R21 - las ocho acciones dicen «Arrancar», «Retomar», «Avanzar», «Retroceder», «Cancelar», «Finalizar», «Comenzar empaque», «Terminar empaque»', () => {
     render(<ExecutionTraceDetail trace={TRACE} backHref={BACK_HREF} />);
     const vistas = screen

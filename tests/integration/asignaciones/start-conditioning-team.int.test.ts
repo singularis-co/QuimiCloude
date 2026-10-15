@@ -167,7 +167,7 @@ async function crearFixture(): Promise<Fixture> {
 
 async function borrarFixture(fixture: Fixture): Promise<void> {
   const companyId = fixture.companyId;
-  // Nota 2026-10-14 (QC-283): Comenzar anota en el registro, y sus filas apuntan al pedido.
+  // Comenzar anota en el registro, y sus filas apuntan al pedido: se borran antes.
   await prisma.orderExecutionEntry.deleteMany({ where: { companyId } });
   await prisma.orderConditioningTeamMember.deleteMany({ where: { companyId } });
   await prisma.orderAssignment.deleteMany({ where: { companyId } });

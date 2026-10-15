@@ -56,8 +56,6 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', (
 const ORDER_ID = '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718';
 const MIN = 60 * 1000;
 
-// Ajustado el 2026-10-14 (QC-283): el detalle trae `active` y `durations` por fase en vez de
-// `duration`, y los pasos de produccion ya no llevan `batchLines`.
 const TRACE: ExecutionTraceDetailData = {
   orderId: ORDER_ID,
   numberText: '2026-0000042',
@@ -252,8 +250,7 @@ describe('R13 - R14 - R15 - R16 - lo que muestra el detalle', () => {
     expect(tramos[3]).toBeNull();
   });
 
-  // Ajustado el 2026-10-14 (QC-283): «una sola duracion» pasa a una tarjeta por fase con cifra;
-  // aqui solo hay produccion.
+  // Aqui solo hay produccion.
   it('R15 - solo la fase con duracion se pinta, con su cifra sin sufijo', async () => {
     render(await abrir());
     const duraciones = screen.getAllByTestId('execution-trace-duration');

@@ -218,7 +218,7 @@ describe('listUserIdsWithEntries', () => {
   });
 });
 
-// QC-283: con persona, el filtro tambien encuentra los pedidos en cuyo equipo de acondicionamiento
+// Con persona, el filtro tambien encuentra los pedidos en cuyo equipo de acondicionamiento
 // esta, si su Comenzar esta anotado; el rango se mide sobre el instante de ese Comenzar.
 describe('listExecutedOrderIds: el equipo de acondicionamiento', () => {
   type EscenaEquipo = Escena & {
