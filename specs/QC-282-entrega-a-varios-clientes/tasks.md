@@ -95,7 +95,7 @@ suma y dos líneas de salida; el cuadre está en verde; hay commit.
 
 ---
 
-## [ ] B3 [P] — Entrega con varios clientes (depende de B1 y B2)
+## [x] B3 [P] — Entrega con varios clientes (depende de B1 y B2)
 
 - `lib/modules/pedidos/domain/deliver-order.ts`: `design.md > 2.4` y `> 4`.
 - Tests: `tests/unit/pedidos/deliver-order.test.ts` (R2, R21–R23, R27, R28),
