@@ -63,6 +63,7 @@
     "pedidos/order-delivery-repository.int.test.ts",
     "pedidos/order-delivery-void-constraints.int.test.ts",
     "pedidos/order-delivery-void-repository.int.test.ts",
+    "pedidos/order-packed-counts.int.test.ts",
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",
     "pedidos/order-status-blocked-rollback.int.test.ts",
@@ -285,6 +286,11 @@
       "archivo": "inventario/reservation.int.test.ts",
       "motivo": "QC-141 T7: llama a 'createMaterialReservations' (reservation-prisma.ts) y a 'createWithFirstBatch'/'addBatchToAlive'/'adjustBatchStock'/'consumeBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL -las tres primeras abren cada una SU PROPIA 'prisma.$transaction'-, igual que 'product-stock.int.test.ts' y 'ledger-cuadre.int.test.ts': envolver la corrida en una transaccion del test seria aislamiento de mentira. Cada caso fabrica su propia empresa efimera con randomUUID (receta, presentacion, producto, lotes y pedidos), escribe solo en ella y la limpia en un 'finally' en orden de FK (los dos libros -> pedidos -> lotes -> productos -> receta -> presentacion -> usuario). El caso de R30/R15 que comprueba 'sin cambiar nada' ante 'insufficient' SI abre su propia 'prisma.$transaction' con una senal de rollback, sobre el mismo fixture ya committeado, para simular el contorno que abrira 'pedidos' (T10) y demostrar que no queda nada escrito. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-23"
+    },
+    {
+      "archivo": "inventario/settle-packaging.int.test.ts",
+      "motivo": "QC-281 T3: llama a 'settlePackagingForOrder' de 'reservation-prisma.ts' sobre productos y lotes dados de alta con 'createWithFirstBatch'/'addBatchToAlive', que abren cada uno SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, igual que 'reservation.int.test.ts': envolver la corrida en una transaccion del test seria aislamiento de mentira. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, presentacion, receta, productos, lotes y pedidos) y la limpia en un 'finally' por 'company_id' en orden de FK. Los casos de 'insufficient' abren su propia 'prisma.$transaction' con una senal de rollback para demostrar que no queda nada escrito. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-14"
     },
     {
       "archivo": "inventario/product-stock.int.test.ts",

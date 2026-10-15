@@ -65,8 +65,10 @@ export async function findAliveOrderTargetById(
 /** Una fila de `order_presentation_lines`, ya en el orden de alta: la
  *  consulta pide `createdAt asc, id asc`, asi que este adaptador no reordena nada en memoria. */
 type AssignedOrderPresentationLineRow = {
+  readonly id: string;
   readonly presentationId: string;
   readonly packages: number;
+  readonly packedPackages: number | null;
   readonly packagingProductId: string | null;
 };
 
@@ -102,7 +104,7 @@ const SUMMARY_SELECT = {
   status: true,
   unitId: true,
   presentationLines: {
-    select: { presentationId: true, packages: true, packagingProductId: true },
+    select: { id: true, presentationId: true, packages: true, packedPackages: true, packagingProductId: true },
     orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
   },
   finishedAt: true,
@@ -143,8 +145,10 @@ export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummary
     unitId: row.unitId,
     presentationLines: row.presentationLines.map(
       (line): OrderSummaryLineRecord => ({
+        id: line.id,
         presentationId: line.presentationId,
         packages: line.packages,
+        packedPackages: line.packedPackages,
         packagingProductId: line.packagingProductId,
       }),
     ),

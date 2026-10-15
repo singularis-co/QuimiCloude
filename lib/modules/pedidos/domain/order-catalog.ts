@@ -238,8 +238,12 @@ export interface OrderCatalog {
  * copiado ni nada mas que quien reparte no necesite para pintarlo.
  */
 export type AssignedOrderPresentationLine = {
+  readonly id: string;
   readonly presentationId: string;
   readonly packages: number;
+  /** Envases contados al terminar el empaque; `null` = sin terminar, o terminado antes de que se
+   *  contaran (se lee como `packages`). */
+  readonly packedPackages: number | null;
   /** `null` = linea guardada antes de que el reparto nombrara envases, o envase que ya no vuelve
    *  del catalogo. */
   readonly packagingName: string | null;

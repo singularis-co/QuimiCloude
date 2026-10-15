@@ -33,8 +33,8 @@ import {
 } from './conditioning-doubles';
 
 const LINEAS = [
-  { presentationId: 'pres-500', packages: 12, packagingName: '500 g' },
-  { presentationId: 'pres-1k', packages: 4, packagingName: '1 kg' },
+  { id: 'linea-1', presentationId: 'pres-500', packages: 12, packedPackages: null, packagingName: '500 g' },
+  { id: 'linea-2', presentationId: 'pres-1k', packages: 4, packedPackages: null, packagingName: '1 kg' },
 ];
 
 function montarCon(item: AssignedOrderSummary | null, batches?: readonly FinishedBatchOfOrderLine[]) {

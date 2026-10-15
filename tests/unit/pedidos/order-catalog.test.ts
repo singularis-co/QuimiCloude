@@ -223,16 +223,16 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       status: 'PENDIENTE',
       unitId: 'u-1',
       presentationLines: [
-        { presentationId: 'p-1', packages: 5, packagingProductId: null },
-        { presentationId: 'p-2', packages: 1, packagingProductId: null },
+        { id: 'lp-1', presentationId: 'p-1', packages: 5, packedPackages: null, packagingProductId: null },
+        { id: 'lp-2', presentationId: 'p-2', packages: 1, packedPackages: null, packagingProductId: null },
       ],
       finishedAt: null,
       packedBy: null,
       conditionedBy: null,
     })
     expect(conReparto.presentationLines).toEqual([
-      { presentationId: 'p-1', packages: 5, packagingProductId: null },
-      { presentationId: 'p-2', packages: 1, packagingProductId: null },
+      { id: 'lp-1', presentationId: 'p-1', packages: 5, packedPackages: null, packagingProductId: null },
+      { id: 'lp-2', presentationId: 'p-2', packages: 1, packedPackages: null, packagingProductId: null },
     ])
 
     const sinReparto = toOrderSummaryRecord({
@@ -644,7 +644,7 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     const seleccion = findMany.mock.calls[0]?.[0]?.select
     expect(seleccion.unitId).toBe(true)
     expect(seleccion.presentationLines).toEqual({
-      select: { presentationId: true, packages: true, packagingProductId: true },
+      select: { id: true, presentationId: true, packages: true, packedPackages: true, packagingProductId: true },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     })
     // Y ya no pide la columna que retiro T10: el reparto vive en `order_presentation_lines`.

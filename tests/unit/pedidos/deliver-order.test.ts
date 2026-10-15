@@ -46,8 +46,8 @@ const ENTREGADOR: Actor = { id: 'u-entrega', companyId: EMPRESA, permissions: ['
 const CLIENTE: CustomerRef = { id: DELIVERY_CUSTOMER_ID, firstNames: 'Ana', lastNames: 'Perez', isDeleted: false }
 
 const LINEAS: readonly FinishPackingLine[] = [
-  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null },
-  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null },
+  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null },
+  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null },
 ]
 
 /** Pedidos 4 + 10; entregados 4 + 3: a la segunda linea le faltan 7. */

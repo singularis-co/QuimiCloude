@@ -25,7 +25,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   unidad del pedido con mezcla de unidades; máximo por línea; `effectivePackages` con `null`.
 - **Hecho:** tests verdes. (R2–R8, R13, R15, R25)
 
-## T3 [P] — Liquidar envases con conteo real en `inventario` (depende de T2)
+## [x] T3 [P] — Liquidar envases con conteo real en `inventario` (depende de T2)
 - `MaterialReservations.settlePackagingForOrder` en `lib/modules/inventario/domain/reservation.ts`
   e implementación en `reservation-prisma.ts` (`design.md § 4`).
 - Tests de integración: menos → consume real y asiento `release` por la diferencia, disponible del
@@ -34,7 +34,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   ajeno no se toca; otra empresa no se ve.
 - **Hecho:** tests verdes. (R17, R18, R19, R29)
 
-## T4 [P] — Puerto y adaptador de líneas en `pedidos` (depende de T1)
+## [x] T4 [P] — Puerto y adaptador de líneas en `pedidos` (depende de T1)
 - `OrderWriteRepository.recordPackedCounts` y `FinishPackingLine.packedPackages`
   (`ports/order-write-repository.ts`); implementación en `order-prisma.ts`
   (`findPresentationLinesForFinishOrder` lee `packed_packages`).

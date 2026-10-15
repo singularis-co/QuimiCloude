@@ -35,8 +35,8 @@ describe('QC-170 — order-distribution-view: el reparto en solo lectura', () =>
     expect(
       toDistributionLines(
         [
-          { presentationId: 'p-2', packages: 5, packagingName: null },
-          { presentationId: 'p-1', packages: 1, packagingName: null },
+          { id: 'linea-1', presentationId: 'p-2', packages: 5, packedPackages: null, packagingName: null },
+          { id: 'linea-2', presentationId: 'p-1', packages: 1, packedPackages: null, packagingName: null },
         ],
         names,
       ),
@@ -47,7 +47,7 @@ describe('QC-170 — order-distribution-view: el reparto en solo lectura', () =>
   });
 
   it('R26: una presentacion que no vuelve del catalogo deja `presentationName: null` y no se descarta', () => {
-    expect(toDistributionLines([{ presentationId: 'p-x', packages: 2, packagingName: null }], new Map())).toEqual([
+    expect(toDistributionLines([{ id: 'linea-3', presentationId: 'p-x', packages: 2, packedPackages: null, packagingName: null }], new Map())).toEqual([
       { presentationId: 'p-x', presentationName: null, packages: 2, packagingName: null },
     ]);
   });
@@ -61,8 +61,8 @@ describe('QC-170 — order-distribution-view: el reparto en solo lectura', () =>
     expect(
       toDistributionLines(
         [
-          { presentationId: 'p-1', packages: 4, packagingName: 'Envase PET 1L' },
-          { presentationId: 'p-2', packages: 2, packagingName: null },
+          { id: 'linea-4', presentationId: 'p-1', packages: 4, packedPackages: null, packagingName: 'Envase PET 1L' },
+          { id: 'linea-5', presentationId: 'p-2', packages: 2, packedPackages: null, packagingName: null },
         ],
         names,
       ),
@@ -79,9 +79,9 @@ describe('QC-170 — order-distribution-view: el reparto en solo lectura', () =>
   it('R26: los ids de presentacion de toda la pagina salen unicos, para una sola llamada al catalogo', () => {
     expect(
       distributionPresentationIds([
-        { presentationLines: [{ presentationId: 'p-1', packages: 1, packagingName: null }, { presentationId: 'p-2', packages: 2, packagingName: null }] },
+        { presentationLines: [{ id: 'linea-6', presentationId: 'p-1', packages: 1, packedPackages: null, packagingName: null }, { id: 'linea-7', presentationId: 'p-2', packages: 2, packedPackages: null, packagingName: null }] },
         { presentationLines: [] },
-        { presentationLines: [{ presentationId: 'p-1', packages: 3, packagingName: null }] },
+        { presentationLines: [{ id: 'linea-8', presentationId: 'p-1', packages: 3, packedPackages: null, packagingName: null }] },
       ]),
     ).toEqual(['p-1', 'p-2']);
   });

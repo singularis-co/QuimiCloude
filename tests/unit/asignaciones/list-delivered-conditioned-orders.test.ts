@@ -88,7 +88,7 @@ describe('R20 — solo ENTREGADO, solo los que acondiciono el actor, con el orde
           status: 'ENTREGADO',
           conditionedBy: ANA,
           finishedAt: entregado,
-          presentationLines: [{ presentationId: 'pres-1', packages: 3, packagingName: 'Garrafa' }],
+          presentationLines: [{ id: 'linea-1', presentationId: 'pres-1', packages: 3, packedPackages: null, packagingName: 'Garrafa' }],
         }),
       ],
       total: 12,
