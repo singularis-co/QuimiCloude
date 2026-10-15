@@ -259,3 +259,42 @@ describe('getOrderDelivery — cliente precargado (R9)', () => {
     expect(vista.customer).toBeNull()
   })
 })
+
+describe('QC-281 — getOrderDelivery con los envases reales del empaque', () => {
+  it('R24: pedidos y faltan salen del real; una linea con 0 reales no pide nada ni busca lotes', async () => {
+    const m = montar({
+      lineas: [
+        { ...LINEAS[0]!, packedPackages: null },
+        { ...LINEAS[1]!, packedPackages: 7 },
+        { ...LINEAS[2]!, packedPackages: 0 },
+      ],
+    })
+    const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)
+
+    expect(
+      vista.lines.map(({ presentationLineId, orderedPackages, deliveredPackages, remainingPackages, batches }) => ({
+        presentationLineId,
+        orderedPackages,
+        deliveredPackages,
+        remainingPackages,
+        lotes: batches.length,
+      })),
+    ).toEqual([
+      { presentationLineId: COMPLETE_LINE_ID, orderedPackages: 4, deliveredPackages: 4, remainingPackages: 0, lotes: 0 },
+      { presentationLineId: PENDING_LINE_ID, orderedPackages: 7, deliveredPackages: 3, remainingPackages: 4, lotes: 2 },
+      { presentationLineId: OTHER_PENDING_LINE_ID, orderedPackages: 0, deliveredPackages: 0, remainingPackages: 0, lotes: 0 },
+    ])
+    expect(m.findDeliverableBatches).toHaveBeenCalledWith(RECETA, [PENDING_PRESENTATION], EMPRESA)
+  })
+
+  it('R25: una linea sin conteo real guardado muestra el plan como pedidos', async () => {
+    const m = montar({ lineas: LINEAS.map((linea) => ({ ...linea, packedPackages: null })) })
+    const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)
+
+    expect(vista.lines.map((linea) => [linea.orderedPackages, linea.remainingPackages])).toEqual([
+      [4, 0],
+      [10, 7],
+      [2, 2],
+    ])
+  })
+})
