@@ -291,3 +291,60 @@ T11 parte frontend hecha; verde.
     no está en el diff y solo pasa 30/30: inestabilidad por carga.
   - 2.ª pasada: related 883/883 archivos (14098 pasados, 59 saltados); test:rapido 117/117 (1641 pasados, 37 saltados);
     `== init OK ==`.
+
+## Tanda 4 — T18 helpers E2E (backend_dev, 2026-10-15)
+- Archivos: `e2e/helpers/landing.ts` (modificado: `permissionsForUsername` lee `company.addons` y devuelve
+  `effectivePermissions(rol, effectiveAddons(addons))`, sin empresa pasa el rol entero; `landingRouteForPermissions`
+  delega en `homeHrefFor`; misma firma pública), `e2e/helpers/addons.ts` (nuevo, `enableAllAddons(companyId)`),
+  `tests/unit/e2e-helpers/landing.test.ts` (ampliado). `guard-e2e-landing.test.ts` no fija el cuerpo del helper: sin cambios.
+- R20 → `tests/unit/e2e-helpers/landing.test.ts` (describe «QC-277 — el aterrizaje E2E usa el permiso efectivo»:
+  Administrador sin añadidos → `/inventario`; con todos → `/dashboard`; dependencia apagada; Maestro sin empresa;
+  consulta pide `company.addons`; `landingRouteForPermissions` = `homeHrefFor` por rol; `enableAllAddons`).
+- Verificación: `pnpm run typecheck` exit 0; `pnpm run lint` exit 0 (avisos previos en otros archivos);
+  `vitest run tests/unit/e2e-helpers/landing.test.ts tests/guards/guard-e2e-landing.test.ts` 2 archivos, 30/30.
+- Veredicto: T18 hecha; sin desvíos de `## Archivos esperados`.
+
+## Tanda 4 — T15 casos de uso y Server Actions del Maestro (backend_dev, 2026-10-15)
+
+### Archivos
+- Nuevos (dominio): `identity/domain/company-addon-input.ts` (`companyAddonsQuerySchema`, `setCompanyAddonSchema` con
+  `addon: z.enum(ADDONS)` y `enabled: z.boolean()`, `setAllCompanyAddonsSchema`; todos `strictObject`),
+  `company-addons-view.ts` (`CompanyAddonsView`, `toCompanyAddonsView`: orden de `ADDONS`, `enabled` = interruptor,
+  `active` de `effectiveAddons`, `requires` de `ADDON_REQUIRES`), `get-company-addons.ts` (`empresas.consultar`; viva o
+  de baja), `set-company-addon.ts` y `set-all-company-addons.ts` (`empresas.modificar`; una sola llamada a `apply`;
+  `not_found` → `company_not_found`; devuelven la vista con lo guardado). Orden: permiso → `safeParse` → puerto → vista.
+- Modificados: `identity/adapters/driving/company-actions.ts` (`getCompanyAddonsAction`, `setCompanyAddonAction`,
+  `setAllCompanyAddonsAction` al final; `enabled` solo traduce `'true'`/`'false'`, cualquier otro valor llega crudo y
+  lo rechaza el esquema), `identity/index.ts` (barril: esquemas, vista y las tres factories), `lib/composition/index.ts`
+  (tres claves al final de `identity` sobre `companyAddonRepository`).
+- Tests nuevos: `tests/unit/identity/companies/get-company-addons.test.ts`, `set-company-addon.test.ts`,
+  `set-all-company-addons.test.ts`. Ampliado: `tests/unit/identity/company-actions.test.ts` (bloques nuevos; el censo de
+  las ocho acciones de QC-162 no se toca). Enmienda §10.3.1: `maestro-rol.test.ts` R17 gana las tres rutas; el
+  anti-cegado sigue igual.
+
+### R -> test
+- R27 → `get-company-addons.test.ts` (vista por añadido con interruptor/activo/dependencia; de baja se lee; basta
+  `consultar`) + `company-actions.test.ts > getCompanyAddonsAction`.
+- R28 → `set-company-addon.test.ts` (enable/disable con actor e instante; vista actualizada) + `setCompanyAddonAction`
+  (`'true'`/`'false'`; `'1'`, `'0'`, `'TRUE'`, `'on'`, `'si'`, `' true'`, `''` y ausente → `invalid_input` sin puerto).
+- R29 → `set-all-company-addons.test.ts` (una sola llamada con los cinco) + `setAllCompanyAddonsAction`. La atomicidad en
+  base la cubre ya `company-addons.int.test.ts` (T13).
+- R30 → los tres unitarios (null, undefined, sin permisos, vacío, el permiso contrario, rol de empresa; con entrada
+  válida e inválida, dobles que lanzan si se llaman) + `company-actions.test.ts` (sin sesión y rol de empresa).
+- R31 → los tres unitarios (`company_not_found`) + las tres acciones.
+- R32 → `set-company-addon.test.ts` (`pedidos`, `inventario`, `usuarios`, `x`, `''`, mayúsculas, espacio y los 22
+  `CORE_PERMISSIONS` → `invalid_input` sin puerto) + `setCompanyAddonAction` (`pedidos`, `inventario`, `x`).
+- R34 → `company-actions.test.ts > listCompanyEventsAction: eventos de añadido` (llega `addon`), además de lo de T13.
+
+### Salida
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores, 7 avisos ya existentes (`confirm-catalog-import.test.ts`, `order-service.test.ts`);
+  eslint de lo tocado: sin incidencias.
+- Los 5 archivos de test tocados: 5 archivos, 192 pasados, 0 fallidos.
+- `pnpm exec vitest related --run --project node --project ui` sobre los 8 archivos de producción: 660 archivos,
+  11644 pasados, 13 saltados, 0 fallidos.
+- Proyecto `integration` no corrido: Docker Desktop apagado (`ECONNREFUSED :5433`). T15 no toca adaptadores ni `.int`.
+- `pnpm exec vitest run guard`: 78 archivos, 1082 pasados, 20 saltados.
+
+### Veredicto
+T15 hecha; sin desvíos de `## Archivos esperados` ni tests ajenos rotos.

@@ -513,7 +513,12 @@ import {
 } from '@/lib/modules/identity';
 import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
 import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma';
-import { createIsCompanyAddonActive } from '@/lib/modules/identity';
+import {
+  createGetCompanyAddons,
+  createIsCompanyAddonActive,
+  createSetAllCompanyAddons,
+  createSetCompanyAddon,
+} from '@/lib/modules/identity';
 import { readSeedScopeFromEnv } from '@/lib/modules/identity/adapters/driven/config/seed-scope-env';
 import type { CompanyOpenOrdersCounter } from '@/lib/modules/identity/ports/company-open-orders-counter';
 import { countOpenOrdersInCompany } from '@/lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma';
@@ -973,6 +978,9 @@ export const identity = {
   listCompanyEvents: createListCompanyEvents({ companies: companyRepository }),
   // Sin actor: la usan los trabajos que corren sin sesión.
   isCompanyAddonActive: createIsCompanyAddonActive({ addons: companyAddonRepository }),
+  getCompanyAddons: createGetCompanyAddons({ addons: companyAddonRepository }),
+  setCompanyAddon: createSetCompanyAddon({ addons: companyAddonRepository }),
+  setAllCompanyAddons: createSetAllCompanyAddons({ addons: companyAddonRepository }),
 } as const;
 
 /**

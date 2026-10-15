@@ -1,24 +1,31 @@
 // QC-93 T4 — el helper de aterrizaje de los E2E (R2, R3, R4, R5).
+// QC-277 T18 — el helper usa el permiso efectivo (rol recortado por los añadidos) y `homeHrefFor`
+// (R20); nace `enableAllAddons`.
 //
 // La base se mockea: aqui se prueba la regla y la forma de la consulta. Que la consulta devuelva
 // lo sembrado de verdad lo cierra la corrida E2E real.
-const { findFirstMock } = vi.hoisted(() => ({ findFirstMock: vi.fn() }));
-
-vi.mock('@/lib/shared/db/prisma', () => ({
-  prisma: { user: { findFirst: findFirstMock } },
+const { findFirstMock, companyUpdateMock } = vi.hoisted(() => ({
+  findFirstMock: vi.fn(),
+  companyUpdateMock: vi.fn(),
 }));
 
+vi.mock('@/lib/shared/db/prisma', () => ({
+  prisma: { user: { findFirst: findFirstMock }, company: { update: companyUpdateMock } },
+}));
+
+import { enableAllAddons } from '@/e2e/helpers/addons';
 import {
   expectedLandingRoute,
   landingRouteForPermissions,
   permissionsForUsername,
 } from '@/e2e/helpers/landing';
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 import {
-  PRIVATE_NAV_ITEMS,
-  filterNavItemsByPermissions,
-  firstVisibleNavHref,
-} from '@/lib/shared/navigation/private-nav';
+  ADDONS,
+  ROLE_ADMINISTRADOR,
+  ROLE_OPERADOR,
+  SEED_ROLE_PERMISSIONS,
+} from '@/lib/modules/identity';
+import { homeHrefFor } from '@/lib/shared/navigation/private-nav';
 import { DASHBOARD_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 function seedPermissionsOf(role: string): readonly string[] {
@@ -44,16 +51,13 @@ describe('QC-93 — landingRouteForPermissions deriva el destino con la regla de
     expect(landingRouteForPermissions(['modulo-inventado.consultar'])).toBe(DASHBOARD_ROUTE);
   });
 
-  it('coincide con la composicion de produccion para cada rol del catalogo, sin regla propia (R2)', () => {
+  it('coincide con homeHrefFor, la regla de produccion, para cada rol del catalogo, sin regla propia (R2, QC-277 R20)', () => {
     const roles = Object.keys(SEED_ROLE_PERMISSIONS);
     expect(roles.length).toBeGreaterThan(0);
 
     for (const role of roles) {
       const permissions = seedPermissionsOf(role);
-      const fromProduction =
-        firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permissions)) ??
-        DASHBOARD_ROUTE;
-      expect(landingRouteForPermissions(permissions), role).toBe(fromProduction);
+      expect(landingRouteForPermissions(permissions), role).toBe(homeHrefFor(permissions));
     }
   });
 });
@@ -71,6 +75,7 @@ describe('QC-93 — permissionsForUsername lee los permisos del usuario vivo en 
           { permissionCode: 'asignaciones.consultar' },
         ],
       },
+      company: { addons: [] },
     });
 
     await expect(permissionsForUsername('qc93_operador')).resolves.toEqual([
@@ -93,8 +98,103 @@ describe('QC-93 — permissionsForUsername lee los permisos del usuario vivo en 
   it('deriva el destino esperado de los permisos que devuelve la base (R4)', async () => {
     findFirstMock.mockResolvedValue({
       role: { permissions: [{ permissionCode: 'inventario.consultar' }] },
+      company: { addons: [] },
     });
 
     await expect(expectedLandingRoute('qc93_operador')).resolves.toBe(INVENTORY_ROUTE);
+  });
+});
+
+function seedRoleRows(role: string): { permissionCode: string }[] {
+  return seedPermissionsOf(role).map((permissionCode) => ({ permissionCode }));
+}
+
+describe('QC-277 — el aterrizaje E2E usa el permiso efectivo: rol recortado por los añadidos (R20)', () => {
+  beforeEach(() => {
+    findFirstMock.mockReset();
+  });
+
+  it('pide en la misma consulta los interruptores de la empresa del usuario (R20)', async () => {
+    findFirstMock.mockResolvedValue({ role: { permissions: [] }, company: { addons: [] } });
+
+    await permissionsForUsername('qc277_admin');
+
+    expect(findFirstMock.mock.calls[0]?.[0]).toMatchObject({
+      select: { company: { select: { addons: true } } },
+    });
+  });
+
+  it('aterriza en /inventario a un Administrador cuya empresa no tiene añadidos (R20, hecho de T18)', async () => {
+    findFirstMock.mockResolvedValue({
+      role: { permissions: seedRoleRows(ROLE_ADMINISTRADOR) },
+      company: { addons: [] },
+    });
+
+    const permissions = await permissionsForUsername('qc277_admin');
+    expect(permissions).not.toContain('dashboard.consultar');
+    expect(permissions).not.toContain('proveedores.consultar');
+    expect(permissions).not.toContain('integraciones.modificar');
+    expect(permissions).toContain('inventario.consultar');
+    await expect(expectedLandingRoute('qc277_admin')).resolves.toBe(INVENTORY_ROUTE);
+  });
+
+  it('aterriza en el dashboard a un Administrador cuya empresa tiene todos los añadidos (R20)', async () => {
+    findFirstMock.mockResolvedValue({
+      role: { permissions: seedRoleRows(ROLE_ADMINISTRADOR) },
+      company: { addons: [...ADDONS] },
+    });
+
+    await expect(permissionsForUsername('qc277_admin')).resolves.toEqual(
+      seedPermissionsOf(ROLE_ADMINISTRADOR),
+    );
+    await expect(expectedLandingRoute('qc277_admin')).resolves.toBe(DASHBOARD_ROUTE);
+  });
+
+  it('no cuenta un interruptor cuya dependencia esta apagada, igual que la sesion (R20)', async () => {
+    findFirstMock.mockResolvedValue({
+      role: {
+        permissions: [
+          { permissionCode: 'documentos.consultar' },
+          { permissionCode: 'inventario.consultar' },
+        ],
+      },
+      company: { addons: ['lectura_pdf'] },
+    });
+
+    await expect(permissionsForUsername('qc277_admin')).resolves.toEqual(['inventario.consultar']);
+  });
+
+  it('deja enteros los permisos del rol de quien no tiene empresa, el Maestro (R20)', async () => {
+    findFirstMock.mockResolvedValue({
+      role: {
+        permissions: [
+          { permissionCode: 'empresas.consultar' },
+          { permissionCode: 'dashboard.consultar' },
+        ],
+      },
+      company: null,
+    });
+
+    await expect(permissionsForUsername('qc277_maestro')).resolves.toEqual([
+      'empresas.consultar',
+      'dashboard.consultar',
+    ]);
+  });
+});
+
+describe('QC-277 — enableAllAddons prende los cinco añadidos a la empresa de fixture (R20)', () => {
+  beforeEach(() => {
+    companyUpdateMock.mockReset();
+    companyUpdateMock.mockResolvedValue({});
+  });
+
+  it('guarda todos los interruptores en la empresa indicada y en ninguna otra', async () => {
+    await enableAllAddons('00000000-0000-0000-0000-000000000277');
+
+    expect(companyUpdateMock).toHaveBeenCalledTimes(1);
+    expect(companyUpdateMock).toHaveBeenCalledWith({
+      where: { id: '00000000-0000-0000-0000-000000000277' },
+      data: { addons: [...ADDONS] },
+    });
   });
 });

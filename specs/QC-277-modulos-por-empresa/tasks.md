@@ -145,7 +145,7 @@
     - empresa de baja → `not_found`;
     - nada más de la empresa cambia;
     - alta nueva → `addons = {}` (R5).
-- [ ] **T15 — Casos de uso y Server Actions** (R27–R32, R34). Depende de: T13
+- [x] **T15 — Casos de uso y Server Actions** (R27–R32, R34). Depende de: T13
   - `get-company-addons.ts`, `set-company-addon.ts`, `set-all-company-addons.ts`,
     `company-addon-input.ts` y `company-addons-view.ts`.
   - Las tres acciones en `company-actions.ts` y su cableado en la composición.
@@ -169,7 +169,7 @@
 - [x] **T17 [P] — Ninguna decisión en el cliente** (R35). Depende de: T1
   - Tests: `tests/unit/identity/addons/sin-decision-en-cliente.test.ts`.
   - **Hecho:** rojo con un `'use client'` sintético que importe `hasAddon`.
-- [ ] **T18 — Helpers E2E** (R20). Depende de: T1, T2
+- [x] **T18 — Helpers E2E** (R20). Depende de: T1, T2
   - `e2e/helpers/landing.ts` usa el permiso efectivo y `homeHrefFor`.
   - Nace `e2e/helpers/addons.ts` (`enableAllAddons`).
   - Tests: `tests/unit/e2e-helpers/landing.test.ts` ampliado; `guard-e2e-landing.test.ts` ajustado

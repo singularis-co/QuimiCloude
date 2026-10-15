@@ -9,13 +9,10 @@
 // runner de Playwright.
 import type { Page } from '@playwright/test';
 
+import { effectiveAddons, effectivePermissions } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
-import {
-  PRIVATE_NAV_ITEMS,
-  filterNavItemsByPermissions,
-  firstVisibleNavHref,
-} from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE, LOGIN_ROUTE } from '@/lib/shared/routes';
+import { homeHrefFor } from '@/lib/shared/navigation/private-nav';
+import { LOGIN_ROUTE } from '@/lib/shared/routes';
 
 export type Credentials = {
   username: string;
@@ -23,21 +20,21 @@ export type Credentials = {
 };
 
 /**
- * El destino que el login dara a ESTOS permisos (R2, R3). Es literalmente la composicion de
- * `login-action.ts:122-126`: sin regla propia ni segunda lista, asi que si el menu se reordena o
- * cambia el permiso de un item, este destino cambia con el.
+ * El destino que el login dara a ESTOS permisos (R2, R3). Delega en `homeHrefFor`, la misma regla
+ * que usan el login y `/inicio` (QC-277 R20): sin regla propia ni segunda lista, asi que si el menu
+ * se reordena o cambia el permiso de un item, este destino cambia con el.
  */
 export function landingRouteForPermissions(permissions: readonly string[]): string {
-  return (
-    firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permissions)) ??
-    DASHBOARD_ROUTE
-  );
+  return homeHrefFor(permissions);
 }
 
 /**
- * Los permisos del usuario VIVO con ese username, leidos de la base: usuario -> rol ->
- * `role_permissions` (R4). De la base y no del catalogo del seed, porque hay fixtures con roles
- * efimeros que el seed no conoce.
+ * Los permisos EFECTIVOS del usuario VIVO con ese username, leidos de la base: usuario -> rol ->
+ * `role_permissions` (R4), recortados por los añadidos activos de su empresa (QC-277 R20). De la
+ * base y no del catalogo del seed, porque hay fixtures con roles efimeros que el seed no conoce.
+ *
+ * El recorte es el mismo que hace la sesion (`resolve-session.ts`): sin empresa (el Maestro) los
+ * permisos del rol pasan enteros.
  *
  * Sin usuario vivo, falla nombrando el username (R5): un fixture mal sembrado tiene que romper,
  * no convertirse en un aterrizaje por defecto que no afirma nada.
@@ -45,7 +42,10 @@ export function landingRouteForPermissions(permissions: readonly string[]): stri
 export async function permissionsForUsername(username: string): Promise<readonly string[]> {
   const user = await prisma.user.findFirst({
     where: { username, deletedAt: null },
-    select: { role: { select: { permissions: { select: { permissionCode: true } } } } },
+    select: {
+      role: { select: { permissions: { select: { permissionCode: true } } } },
+      company: { select: { addons: true } },
+    },
   });
 
   if (user === null) {
@@ -54,10 +54,12 @@ export async function permissionsForUsername(username: string): Promise<readonly
     );
   }
 
-  return user.role.permissions.map((permission) => permission.permissionCode);
+  const rolePermissions = user.role.permissions.map((permission) => permission.permissionCode);
+  if (user.company === null) return rolePermissions;
+  return effectivePermissions(rolePermissions, effectiveAddons(user.company.addons));
 }
 
-/** El destino esperado para ese usuario: sus permisos reales pasados por la regla del login. */
+/** El destino esperado para ese usuario: sus permisos efectivos pasados por la regla del login. */
 export async function expectedLandingRoute(username: string): Promise<string> {
   return landingRouteForPermissions(await permissionsForUsername(username));
 }

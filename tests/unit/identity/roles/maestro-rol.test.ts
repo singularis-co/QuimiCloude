@@ -218,6 +218,10 @@ const RUTAS_ABIERTAS_EMPRESAS = new Set([
   'lib/modules/identity/domain/get-company.ts',
   'lib/modules/identity/domain/get-company-deletion-impact.ts',
   'lib/modules/identity/domain/list-company-events.ts',
+  // Enmienda QC-277 (design §10.3.1): los tres casos de uso de añadidos exigen `empresas.*`.
+  'lib/modules/identity/domain/get-company-addons.ts',
+  'lib/modules/identity/domain/set-company-addon.ts',
+  'lib/modules/identity/domain/set-all-company-addons.ts',
 ]);
 
 describe('R17 — ningun archivo de produccion fuera del catalogo (y las rutas abiertas) nombra los permisos de empresas', () => {

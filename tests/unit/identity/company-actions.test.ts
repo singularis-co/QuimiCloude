@@ -5,12 +5,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createCreateCompany,
+  ADDONS,
   createDeleteCompany,
   createGetCompany,
+  createGetCompanyAddons,
   createGetCompanyDeletionImpact,
   createListCompanies,
   createListCompanyEvents,
   createReactivateCompany,
+  createSetAllCompanyAddons,
+  createSetCompanyAddon,
   createSetCompanyCountry,
   createUpdateCompany,
   type CompanyDetail,
@@ -22,14 +26,18 @@ import {
   createCompanyAction,
   deleteCompanyAction,
   getCompanyAction,
+  getCompanyAddonsAction,
   getCompanyDeletionImpactAction,
   listCompaniesAction,
   listCompanyEventsAction,
   reactivateCompanyAction,
+  setAllCompanyAddonsAction,
+  setCompanyAddonAction,
   setCompanyCountryAction,
   updateCompanyAction,
 } from '@/lib/modules/identity/adapters/driving/company-actions';
 
+import type { CompanyAddonRepository } from '@/lib/modules/identity/ports/company-addon-repository';
 import type { CompanyCountryRepository } from '@/lib/modules/identity/ports/company-country-repository';
 import type { CompanyRepository } from '@/lib/modules/identity/ports/company-repository';
 import type { CredentialSetupLinkRepository } from '@/lib/modules/identity/ports/credential-setup-link-repository';
@@ -88,6 +96,9 @@ vi.mock('@/lib/composition', () => {
       getCompany: porClave('getCompany'),
       getCompanyDeletionImpact: porClave('getCompanyDeletionImpact'),
       listCompanyEvents: porClave('listCompanyEvents'),
+      getCompanyAddons: porClave('getCompanyAddons'),
+      setCompanyAddon: porClave('setCompanyAddon'),
+      setAllCompanyAddons: porClave('setAllCompanyAddons'),
     },
   };
 });
@@ -756,5 +767,338 @@ describe('listCompanyEventsAction', () => {
 
     expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
     ningunPuertoTocado();
+  });
+});
+
+describe('listCompanyEventsAction: eventos de añadido', () => {
+  it('R34: el evento de añadido llega al Maestro con su clave', async () => {
+    const evento: CompanyEventView = {
+      id: 'e1f2a3b4-0000-4000-8000-000000000002',
+      kind: 'addon.disabled',
+      occurredAt: new Date('2026-10-15T00:00:00.000Z'),
+      actor: { id: MAESTRO.id, firstNames: 'Plataforma', lastNames: 'Inicial' },
+      fields: [],
+      addon: 'proveedores',
+    };
+    puertos.companies.listEvents.mockResolvedValue({ ...PAGINA_DE_EVENTOS, items: [evento] });
+
+    const resultado = await listCompanyEventsAction({ companyId: COMPANY_ID });
+
+    expect(resultado).toMatchObject({
+      status: 'success',
+      data: { items: [{ kind: 'addon.disabled', addon: 'proveedores', fields: [] }] },
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Las tres acciones de añadidos: casos de uso reales sobre un puerto espia.
+// ---------------------------------------------------------------------------------------------
+
+const CLAVES_DE_ANADIDOS = ['getCompanyAddons', 'setCompanyAddon', 'setAllCompanyAddons'] as const;
+type ClaveDeAnadidos = (typeof CLAVES_DE_ANADIDOS)[number];
+
+type PuertosDeAnadidos = {
+  findByCompany: ReturnType<typeof vi.fn<CompanyAddonRepository['findByCompany']>>;
+  apply: ReturnType<typeof vi.fn<CompanyAddonRepository['apply']>>;
+  casos: Record<ClaveDeAnadidos, ReturnType<typeof vi.fn<CasoDeUso>>>;
+};
+
+let anadidos: PuertosDeAnadidos;
+
+function cablearAnadidos(): PuertosDeAnadidos {
+  const findByCompany = vi.fn<CompanyAddonRepository['findByCompany']>(async () => ({
+    stored: ['dashboard', 'lectura_pdf'],
+    alive: true,
+  }));
+  const apply = vi.fn<CompanyAddonRepository['apply']>(async () => ({
+    stored: ['dashboard', 'proveedores'],
+    changed: [{ addon: 'proveedores', enabled: true }],
+  }));
+  const repo: CompanyAddonRepository = { findByCompany, apply };
+  const reales: Record<ClaveDeAnadidos, CasoDeUso> = {
+    getCompanyAddons: createGetCompanyAddons({ addons: repo }) as CasoDeUso,
+    setCompanyAddon: createSetCompanyAddon({ addons: repo }) as CasoDeUso,
+    setAllCompanyAddons: createSetAllCompanyAddons({ addons: repo }) as CasoDeUso,
+  };
+  const casos = {} as Record<ClaveDeAnadidos, ReturnType<typeof vi.fn<CasoDeUso>>>;
+  for (const clave of CLAVES_DE_ANADIDOS) {
+    casos[clave] = vi.fn<CasoDeUso>((actor, input) => reales[clave](actor, input));
+    cableado.empresas[clave] = casos[clave];
+  }
+  return { findByCompany, apply, casos };
+}
+
+function ningunPuertoDeAnadidosTocado(): void {
+  expect(anadidos.findByCompany).not.toHaveBeenCalled();
+  expect(anadidos.apply).not.toHaveBeenCalled();
+}
+
+const INVOCACIONES_DE_ANADIDOS: ReadonlyArray<{
+  readonly clave: ClaveDeAnadidos;
+  readonly invocar: () => Promise<unknown>;
+}> = [
+  { clave: 'getCompanyAddons', invocar: () => getCompanyAddonsAction(COMPANY_ID) },
+  {
+    clave: 'setCompanyAddon',
+    invocar: () =>
+      setCompanyAddonAction(
+        IDLE,
+        formData({ companyId: COMPANY_ID, addon: 'proveedores', enabled: 'true', ...CAMPOS_COLADOS }),
+      ),
+  },
+  {
+    clave: 'setAllCompanyAddons',
+    invocar: () =>
+      setAllCompanyAddonsAction(IDLE, formData({ companyId: COMPANY_ID, enabled: 'true', ...CAMPOS_COLADOS })),
+  },
+];
+
+describe('acciones de añadidos: el actor sale solo de la sesion', () => {
+  beforeEach(() => {
+    anadidos = cablearAnadidos();
+  });
+
+  it('R27, R28, R29: el censo cubre las tres acciones', () => {
+    expect(INVOCACIONES_DE_ANADIDOS.map((i) => i.clave)).toEqual([...CLAVES_DE_ANADIDOS]);
+  });
+
+  it.each(INVOCACIONES_DE_ANADIDOS)(
+    'R27, R28, R29: $clave pasa al caso de uso el actor de getSessionUser, sin getSessionContext ni revalidatePath',
+    async ({ clave, invocar }) => {
+      const resultado = await invocar();
+
+      expect(resultado).toMatchObject({ status: 'success' });
+      expect(anadidos.casos[clave]).toHaveBeenCalledTimes(1);
+      expect(anadidos.casos[clave]).toHaveBeenCalledWith(ACTOR_DE_SESION, expect.anything());
+      const entrada = anadidos.casos[clave].mock.calls[0]![1];
+      expect(JSON.stringify(entrada)).not.toContain(OTRO_ID);
+      soloSesionSinRevalidar();
+    },
+  );
+
+  it.each(INVOCACIONES_DE_ANADIDOS)(
+    'R30: $clave sin sesion responde unauthorized sin tocar ningun puerto',
+    async ({ clave, invocar }) => {
+      getSessionUserMock.mockResolvedValue(null);
+
+      const resultado = await invocar();
+
+      expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+      expect(anadidos.casos[clave]).toHaveBeenCalledWith(null, expect.anything());
+      ningunPuertoDeAnadidosTocado();
+      soloSesionSinRevalidar();
+    },
+  );
+
+  it.each(INVOCACIONES_DE_ANADIDOS)(
+    'R30: $clave con un rol de empresa (sin empresas.*) responde unauthorized sin tocar ningun puerto',
+    async ({ invocar }) => {
+      getSessionUserMock.mockResolvedValue({
+        ...MAESTRO,
+        roleName: 'Administrador',
+        permissions: ['usuarios.consultar', 'usuarios.modificar', 'integraciones.modificar'],
+      });
+
+      const resultado = await invocar();
+
+      expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+      ningunPuertoDeAnadidosTocado();
+    },
+  );
+});
+
+describe('getCompanyAddonsAction', () => {
+  beforeEach(() => {
+    anadidos = cablearAnadidos();
+  });
+
+  it('R27: envuelve el id y responde success con la vista de los cinco añadidos', async () => {
+    const resultado = await getCompanyAddonsAction(COMPANY_ID);
+
+    expect(resultado).toEqual({
+      status: 'success',
+      data: {
+        companyId: COMPANY_ID,
+        addons: [
+          { addon: 'dashboard', enabled: true, active: true, requires: [] },
+          { addon: 'proveedores', enabled: false, active: false, requires: [] },
+          { addon: 'lectura_pdf', enabled: true, active: false, requires: ['integraciones'] },
+          { addon: 'importacion_excel', enabled: false, active: false, requires: [] },
+          { addon: 'integraciones', enabled: false, active: false, requires: [] },
+        ],
+      },
+    });
+    expect(anadidos.casos.getCompanyAddons).toHaveBeenCalledWith(ACTOR_DE_SESION, { companyId: COMPANY_ID });
+    expect(anadidos.findByCompany).toHaveBeenCalledWith(COMPANY_ID);
+  });
+
+  it('R27: solo con empresas.modificar responde unauthorized', async () => {
+    getSessionUserMock.mockResolvedValue({ ...MAESTRO, permissions: ['empresas.modificar'] });
+
+    const resultado = await getCompanyAddonsAction(COMPANY_ID);
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+    ningunPuertoDeAnadidosTocado();
+  });
+
+  it('R31: una empresa inexistente vuelve como company_not_found', async () => {
+    anadidos.findByCompany.mockResolvedValue(null);
+
+    const resultado = await getCompanyAddonsAction(COMPANY_ID);
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'company_not_found' });
+  });
+});
+
+describe('setCompanyAddonAction', () => {
+  beforeEach(() => {
+    anadidos = cablearAnadidos();
+  });
+
+  it("R28: enabled 'true' prende: pasa companyId, addon y true y responde success con la vista", async () => {
+    const resultado = await setCompanyAddonAction(
+      IDLE,
+      formData({ companyId: COMPANY_ID, addon: 'proveedores', enabled: 'true' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'success', data: { companyId: COMPANY_ID } });
+    expect(anadidos.casos.setCompanyAddon).toHaveBeenCalledWith(ACTOR_DE_SESION, {
+      companyId: COMPANY_ID,
+      addon: 'proveedores',
+      enabled: true,
+    });
+    expect(anadidos.apply).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: COMPANY_ID, enable: ['proveedores'], actorId: MAESTRO.id }),
+    );
+  });
+
+  it("R28: enabled 'false' apaga", async () => {
+    const resultado = await setCompanyAddonAction(
+      IDLE,
+      formData({ companyId: COMPANY_ID, addon: 'dashboard', enabled: 'false' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'success' });
+    expect(anadidos.apply).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: COMPANY_ID, disable: ['dashboard'], actorId: MAESTRO.id }),
+    );
+  });
+
+  for (const enabled of ['1', '0', 'TRUE', 'on', 'si', ' true', '']) {
+    it(`R28: enabled ${JSON.stringify(enabled)} responde invalid_input sin tocar el puerto`, async () => {
+      const resultado = await setCompanyAddonAction(
+        IDLE,
+        formData({ companyId: COMPANY_ID, addon: 'dashboard', enabled }),
+      );
+
+      expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+      ningunPuertoDeAnadidosTocado();
+    });
+  }
+
+  it('R28: sin enabled responde invalid_input sin tocar el puerto', async () => {
+    const resultado = await setCompanyAddonAction(IDLE, formData({ companyId: COMPANY_ID, addon: 'dashboard' }));
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+    ningunPuertoDeAnadidosTocado();
+  });
+
+  for (const addon of ['pedidos', 'inventario', 'x']) {
+    it(`R32: la clave ${addon} responde invalid_input sin tocar el puerto`, async () => {
+      const resultado = await setCompanyAddonAction(
+        IDLE,
+        formData({ companyId: COMPANY_ID, addon, enabled: 'false' }),
+      );
+
+      expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+      ningunPuertoDeAnadidosTocado();
+    });
+  }
+
+  it('R28: solo con empresas.consultar responde unauthorized', async () => {
+    getSessionUserMock.mockResolvedValue({ ...MAESTRO, permissions: ['empresas.consultar'] });
+
+    const resultado = await setCompanyAddonAction(
+      IDLE,
+      formData({ companyId: COMPANY_ID, addon: 'dashboard', enabled: 'true' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+    ningunPuertoDeAnadidosTocado();
+  });
+
+  it('R31: una empresa de baja o inexistente vuelve como company_not_found', async () => {
+    anadidos.apply.mockResolvedValue('not_found');
+
+    const resultado = await setCompanyAddonAction(
+      IDLE,
+      formData({ companyId: COMPANY_ID, addon: 'dashboard', enabled: 'true' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'company_not_found' });
+  });
+});
+
+describe('setAllCompanyAddonsAction', () => {
+  beforeEach(() => {
+    anadidos = cablearAnadidos();
+  });
+
+  it("R29: enabled 'true' prende los cinco en una sola llamada al puerto", async () => {
+    anadidos.apply.mockResolvedValue({ stored: [...ADDONS], changed: [] });
+
+    const resultado = await setAllCompanyAddonsAction(
+      IDLE,
+      formData({ companyId: COMPANY_ID, enabled: 'true' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'success', data: { companyId: COMPANY_ID } });
+    expect(anadidos.casos.setAllCompanyAddons).toHaveBeenCalledWith(ACTOR_DE_SESION, {
+      companyId: COMPANY_ID,
+      enabled: true,
+    });
+    expect(anadidos.apply).toHaveBeenCalledTimes(1);
+    expect(anadidos.apply).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: COMPANY_ID, enable: [...ADDONS], actorId: MAESTRO.id }),
+    );
+  });
+
+  it("R29: enabled 'false' apaga los cinco en una sola llamada al puerto", async () => {
+    anadidos.apply.mockResolvedValue({ stored: [], changed: [] });
+
+    const resultado = await setAllCompanyAddonsAction(
+      IDLE,
+      formData({ companyId: COMPANY_ID, enabled: 'false' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'success' });
+    expect(anadidos.apply).toHaveBeenCalledTimes(1);
+    expect(anadidos.apply).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: COMPANY_ID, disable: [...ADDONS], actorId: MAESTRO.id }),
+    );
+  });
+
+  for (const enabled of ['1', 'yes', 'False', '']) {
+    it(`R29: enabled ${JSON.stringify(enabled)} responde invalid_input sin tocar el puerto`, async () => {
+      const resultado = await setAllCompanyAddonsAction(
+        IDLE,
+        formData({ companyId: COMPANY_ID, enabled }),
+      );
+
+      expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+      ningunPuertoDeAnadidosTocado();
+    });
+  }
+
+  it('R31: una empresa de baja o inexistente vuelve como company_not_found', async () => {
+    anadidos.apply.mockResolvedValue('not_found');
+
+    const resultado = await setAllCompanyAddonsAction(
+      IDLE,
+      formData({ companyId: COMPANY_ID, enabled: 'false' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'company_not_found' });
   });
 });
