@@ -98,3 +98,76 @@ toque el archivo. Solo lo anoto.
 - [x] Perfil 9 (comentarios): los comentarios nuevos de `private-nav.ts` no citan `QC-<n>`, `R<n>` ni `design.md`. La limpieza de comentarios va mezclada con el cambio de código en f08edc0e, que es menor según la regla; no lo cuento aparte.
 - [x] Perfil 10 (duplicados): no hay componente nuevo.
 - [~] Perfil 11 (diseño): no hay componente nuevo. Quitar el desplegable de Producción es un cambio visual pequeño sin referencia de diseño, y el canvas queda desfasado: va en m2.
+
+## Vuelta 2 (acotada a 8db6a616..739f6a04)
+
+Revisé solo ese rango frente a B1, m1, m2 y m3 y sus posibles regresiones. HEAD es d6dbc2af: después de
+739f6a04 solo cambia `progress/features/QC-285.md`.
+
+### Veredicto vuelta 2: OK
+0 bloqueantes y 1 menor nuevo (n1). B1 y m1 están arreglados, m2 queda cerrado por la decisión humana
+y m3 queda bien resuelto.
+
+### Verificación ejecutada por el reviewer
+- `pnpm run typecheck` (el tsconfig incluye `e2e/`): sin errores, así que los imports de `ASSIGNED_ORDERS_ROUTE` e `INVENTORY_ROUTE` de las specs resuelven.
+- `pnpm run lint`: 0 errores, 7 warnings ajenos.
+- `vitest run tests/guards tests/unit/navegacion tests/unit/shell tests/unit/app-sidebar.test.tsx`: 1164 passed / 17 skipped, sin rojos.
+- E2E: no lo corrí. Valoro la salida local que trae la bitácora (abajo).
+
+### B1: cerrado
+- `e2e/permisos.spec.ts:214-215` ahora espera `INVENTORY_ROUTE` + `inventario-title`. El testId existe en
+  `app/(private)/inventario/page.tsx:95`. También se corrigieron el título del test (`:201`) y la cabecera (`:29-30`).
+- Los 11 sitios de la vuelta 1 y los 3 extra (`envases-del-pedido:616`,
+  `pedido-en-varias-presentaciones:317`, `operario-rediseno:887`) llevan ahora
+  `await page.goto(ASSIGNED_ORDERS_ROUTE)` tras el login del Operador. Lo comprobé en el diff, son 14.
+- Busqué el patrón otra vez en todo `e2e/`: cada `loginAndLand`/`switchUser`/`login` seguido en ≤4 líneas
+  de `asignacion-title` sin `goto`/`waitForURL` en medio. Solo quedan
+  `acondicionamiento:407`, `acondicionar-con-equipo:415` (rol Acondicionamiento) y
+  `pedidos-terminados:504` (Empacador), y esos dos roles siguen aterrizando en `/asignacion`. Son correctos.
+  Repasé también cada `loginAndLand(page, operatorUser|actorUser)` del resto de `e2e/`: todos navegan
+  después con `goto` explícito, con `openScreen` o afirman un 404/ausencia. Ninguno depende del aterrizaje.
+- CHECKPOINTS l.27: la salida E2E local ya está en `progress/impl_QC-285.md > Vuelta 2 > Verificación`.
+  La base es una copia de la plantilla del CI, con Chromium y WebKit: 10/10 y 85/86.
+- **El flaky de WebKit (`ejecucion-receta:775`) es aceptable y no hace falta evidencia contra dev.** Ese
+  caso no está en el diff: el cambio de ese archivo es el de `:692`, otro test. Además entra directo por
+  `assignedOrderRoute(orderId)`, no por la lista, y el timeout es el `waitForURL` posterior a finalizar
+  (`:878`), que es una redirección de la app que este PR no toca. Pasó al repetirlo. Si vuelve a salir
+  en el CI de producción, se trata como deuda ajena y no de QC-285.
+
+### m1: cerrado
+`'factory'` desaparece de `NavIconName` (`private-nav.ts`) y de `NAV_ICONS`, junto con el import de
+`Factory` (`nav-icons.ts`). La fixture de `tests/unit/navegacion/nav-filtrado.test.ts:52` pasa a `puzzle`,
+que es un icono existente, y no se relaja nada.
+
+### m2: cerrado
+Decisión humana registrada en `progress/features/QC-285.md > Decisiones`: Producción queda como enlace
+directo. El canvas se actualizó en este PR.
+
+### m3: resuelto, y es lo correcto
+`git ls-files --eol`: `i/crlf w/crlf` para `e2e/permisos.spec.ts`, el mismo blob CRLF que tiene dev.
+El diff contra `origin/dev` baja de 539 a 19 líneas.
+Dejarlo en CRLF es la opción buena, no pasarlo a LF:
+- `.gitattributes` dice expresamente que la normalización a LF se hace con un `git add --renormalize .`
+  deliberado y con el árbol quieto, nunca dentro de una feature, porque destroza los merges ajenos.
+- Con `text=auto`, git no renormaliza un archivo que ya está en el índice con CRLF, así que el estado
+  es estable ante un `git add` posterior.
+- Las guardias normalizan `\r` por su cuenta.
+
+Pasarlo a LF aquí reabriría el ruido de diff y el riesgo de conflicto sin ganar nada.
+
+### Canvas `docs/diseno/canvas/Sidebar.dc.html`: fiel al menú
+`def` (l.54-58) reproduce exactamente el orden de `PRIVATE_NAV_ITEMS`:
+- Seguimiento: Dashboard
+- Operación: Inventario, Pedidos, Asignación
+- Producción: Fórmulas, como item directo con icono de matraz
+- Directorio: Proveedores, Clientes
+- Configuración: Usuarios, Presentaciones, Unidades, grupo Integraciones con sus 3 hijos
+
+No queda «Cadena» ni el grupo `produccion`. `open` ya no lo nombra, `hint-placeholder-count` sube a 16
+(5 encabezados + 11 entradas) y las opciones de `active` (l.36) no incluyen `produccion`.
+
+### Hallazgos nuevos
+- **n1 (menor):** el contenido del canvas mide unos 774 px de alto y su vista previa declara
+  `"$preview":{"width":272,"height":760}` (`Sidebar.dc.html:36`). Con todo desplegado, los últimos
+  ~14 px (el final del grupo Integraciones) quedan cortados o con scroll en la miniatura. Es cosmético
+  y no afecta a la app. Basta con subir `height` a 780 o más, ahora o en la próxima ficha que toque el canvas.
