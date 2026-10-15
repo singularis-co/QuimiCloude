@@ -20,10 +20,15 @@ import type { ExecutionTraceDetail as ExecutionTraceDetailData } from '@/lib/mod
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import {
   CONDITIONING_DURATION_MS,
+  CORRECTION_SAVE_LINES,
   FINISHED_CONDITIONING_TRACE,
+  FIRST_SAVE_LINES,
   IN_PROGRESS_CONDITIONING_TRACE,
+  MIXED_TEAM,
   PREVIOUS_CONDITIONING_TRACE,
+  TRACE_PEOPLE,
   UNCLOSED_CONDITIONING_TRACE,
+  WORK_GROUP_NAME,
 } from '../../fixtures/execution-trace-conditioning';
 
 const { requirePagePermissionMock, getExecutionTraceActionMock, notFoundMock } = vi.hoisted(() => ({
@@ -391,5 +396,191 @@ describe('R25 - R28 - duraciones por fase y marca «En curso» con acondicionami
     );
     expect(screen.getByTestId('execution-trace-deleted')).toHaveTextContent(DELETED_ORDER_MARK);
     expect(screen.queryByTestId('execution-trace-active')).toBeNull();
+  });
+});
+
+describe('R12 - R18 - las tres anotaciones de acondicionamiento en la linea de tiempo', () => {
+  function paso(action: string, n = 0): HTMLElement {
+    const elegido = pasos().filter((li) => li.getAttribute('data-action') === action)[n];
+    if (elegido === undefined) throw new Error(`no hay paso ${action} #${n}`);
+    return elegido;
+  }
+
+  function filasDeTabla(cuerpo: HTMLElement): string[][] {
+    return within(within(cuerpo).getByTestId('execution-trace-batch-table'))
+      .getAllByTestId('execution-trace-batch-line')
+      .map((fila) => Array.from(fila.querySelectorAll('td')).map((td) => td.textContent ?? ''));
+  }
+
+  it('R12 - nombre, tono e icono de las tres anotaciones, en orden cronologico tras empaque', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(pasos().map((li) => li.getAttribute('data-action')).slice(-5)).toEqual([
+      'pack_finish',
+      'conditioning_start',
+      'conditioning_batch_save',
+      'conditioning_batch_save',
+      'conditioning_finish',
+    ]);
+    const esperado = [
+      ['conditioning_start', 'Comenzar acondicionamiento', 'progress', 'lucide-clipboard-list'],
+      ['conditioning_batch_save', 'Guardado de datos de lote', 'neutral', 'lucide-download'],
+      ['conditioning_finish', 'Terminar acondicionamiento', 'success', 'lucide-clipboard-check'],
+    ] as const;
+    for (const [action, nombre, tono, icono] of esperado) {
+      const li = paso(action);
+      expect(within(li).getByTestId('execution-trace-step-action')).toHaveTextContent(nombre);
+      expect(li).toHaveAttribute('data-tone', tono);
+      expect(within(li).getByTestId('execution-trace-step-dot').querySelector('svg')).toHaveClass(icono);
+      expect(within(li).getByTestId('execution-trace-step-instant').tagName).toBe('TIME');
+      expect(within(li).queryByTestId('execution-trace-step-position')).toBeNull();
+    }
+    const comenzar = paso('conditioning_start');
+    expect(within(comenzar).getByTestId('execution-trace-step-instant')).toHaveTextContent('2026-10-02 13:02:00');
+    expect(within(comenzar).getByTestId('execution-trace-step-gap')).toHaveTextContent('38 min 00 s');
+  });
+
+  it('R13 - supervisor y equipo en orden, con grupo', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const comenzar = paso('conditioning_start');
+    const supervisor = within(comenzar).getByTestId('execution-trace-supervisor');
+    expect(supervisor).toHaveTextContent('Supervisor');
+    expect(within(supervisor).getByTestId('execution-trace-step-person')).toHaveTextContent(
+      TRACE_PEOPLE.santiago.displayName,
+    );
+    expect(within(comenzar).getByTestId('execution-trace-team-count')).toHaveTextContent('Equipo de trabajo · 3');
+
+    const equipo = within(comenzar).getByRole('list', { name: 'Equipo de trabajo · 3' });
+    expect(equipo.tagName).toBe('UL');
+    const miembros = within(equipo).getAllByTestId('execution-trace-team-member');
+    expect(miembros.map((m) => m.textContent)).toEqual([
+      `LG${TRACE_PEOPLE.laura.displayName}Grupo de trabajo: ${WORK_GROUP_NAME}`,
+      `MS${TRACE_PEOPLE.mateo.displayName}Grupo de trabajo: ${WORK_GROUP_NAME}`,
+      `VH${TRACE_PEOPLE.valentina.displayName}`,
+    ]);
+    for (const miembro of miembros) expect(miembro).toHaveClass('min-h-10');
+    const grupo = within(miembros[0]).getByTestId('execution-trace-team-group');
+    expect(within(grupo).getByText('Grupo de trabajo:')).toHaveClass('sr-only');
+    expect(grupo.querySelector('svg')).toHaveClass('lucide-users');
+    expect(grupo.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(miembros[2]).queryByTestId('execution-trace-team-group')).toBeNull();
+    expect(within(comenzar).queryByTestId('execution-trace-no-team')).toBeNull();
+  });
+
+  it('R13 - un miembro que el directorio no devuelve se pinta «—» con «Sin dato»', () => {
+    const steps = FINISHED_CONDITIONING_TRACE.steps.map((step) =>
+      step.action === 'conditioning_start' ? { ...step, team: [{ ...MIXED_TEAM[2], displayName: null }] } : step,
+    );
+    render(<ExecutionTraceDetail trace={{ ...FINISHED_CONDITIONING_TRACE, steps }} backHref={DASHBOARD_ROUTE} />);
+    const miembro = within(paso('conditioning_start')).getByTestId('execution-trace-team-member');
+    expect(within(miembro).getByLabelText('Sin dato')).toHaveTextContent('—');
+  });
+
+  it('R14 - sin equipo', () => {
+    render(<ExecutionTraceDetail trace={IN_PROGRESS_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const comenzar = paso('conditioning_start');
+    expect(within(comenzar).getByTestId('execution-trace-team-count')).toHaveTextContent('Equipo de trabajo · 0');
+    expect(within(comenzar).getByTestId('execution-trace-no-team')).toHaveTextContent(
+      'Se comenzó sin equipo de trabajo.',
+    );
+    expect(within(comenzar).queryByRole('list')).toBeNull();
+    expect(within(comenzar).queryByTestId('execution-trace-team-member')).toBeNull();
+  });
+
+  it('R15 - quien guardo, n presentaciones, lineas con fechas dd/mm/aaaa y aviso', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const cuerpo = within(paso('conditioning_batch_save', 0)).getByTestId('execution-trace-batch-save');
+    expect(cuerpo.firstElementChild).toHaveTextContent(`GuardóSV${TRACE_PEOPLE.santiago.displayName}2 presentaciones`);
+    expect(within(cuerpo).getByTestId('execution-trace-step-person')).toHaveTextContent(
+      TRACE_PEOPLE.santiago.displayName,
+    );
+    expect(within(cuerpo).getByTestId('execution-trace-batch-count')).toHaveTextContent('2 presentaciones');
+
+    const tabla = within(cuerpo).getByRole('table');
+    expect(within(tabla).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+      'Lote',
+      'Presentación',
+      'Vencimiento',
+      'Día de producción',
+    ]);
+    expect(filasDeTabla(cuerpo)).toEqual([
+      ['L-0000', 'Galón 3,78 L', '02/10/2028', '02/10/2026'],
+      ['L-0001', 'Litro 1 L', '02/10/2028', '02/10/2026'],
+    ]);
+    const [lote, , vence, producido] = Array.from(within(tabla).getAllByRole('row')[1].querySelectorAll('td'));
+    expect(lote).toHaveClass('font-mono');
+    expect(vence).toHaveClass('font-mono', 'text-right');
+    expect(producido).toHaveClass('font-mono', 'text-right');
+
+    const aviso = within(cuerpo).getByTestId('execution-trace-batch-notice');
+    expect(aviso).toHaveTextContent('Datos tal como se guardaron en ese momento');
+    expect(aviso.querySelector('svg')).toHaveClass('lucide-camera');
+  });
+
+  it('R15 - un guardado de una linea dice «1 presentación»', () => {
+    render(<ExecutionTraceDetail trace={IN_PROGRESS_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(within(paso('conditioning_batch_save')).getByTestId('execution-trace-batch-count')).toHaveTextContent(
+      /^1 presentación$/,
+    );
+  });
+
+  it('R15 - la correccion es otro guardado con su propia foto; la primera no cambia', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(filasDeTabla(paso('conditioning_batch_save', 0)).map((fila) => fila[0])).toEqual(
+      FIRST_SAVE_LINES.map((l) => l.lot),
+    );
+    expect(filasDeTabla(paso('conditioning_batch_save', 1)).map((fila) => fila[0])).toEqual(
+      CORRECTION_SAVE_LINES.map((l) => l.lot),
+    );
+  });
+
+  it('R16 - presentacion sin nombre', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const correccion = paso('conditioning_batch_save', 1);
+    expect(filasDeTabla(correccion)[1]).toEqual(['L-0001', '—', '02/10/2028', '02/10/2026']);
+    const tabla = within(correccion).getByTestId('execution-trace-batch-table');
+    expect(within(tabla).getByLabelText('Sin dato')).toHaveTextContent('—');
+    const tarjeta = within(correccion).getAllByTestId('execution-trace-batch-card')[1];
+    expect(within(tarjeta).getByLabelText('Sin dato')).toHaveTextContent('—');
+    expect(within(paso('conditioning_batch_save', 0)).queryByLabelText('Sin dato')).toBeNull();
+  });
+
+  it('R17 - Terminar solo con quien', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const terminar = paso('conditioning_finish');
+    expect(within(terminar).getByTestId('execution-trace-step-person')).toHaveTextContent(
+      TRACE_PEOPLE.santiago.displayName,
+    );
+    for (const testId of [
+      'execution-trace-supervisor',
+      'execution-trace-team-count',
+      'execution-trace-batch-save',
+      'execution-trace-step-reason',
+      'execution-trace-step-gap',
+    ]) {
+      expect(within(terminar).queryByTestId(testId)).toBeNull();
+    }
+    expect(terminar.textContent).toBe(
+      `Terminar acondicionamiento2026-10-02 15:10:00SV${TRACE_PEOPLE.santiago.displayName}`,
+    );
+  });
+
+  it('R18 - tarjetas de linea con los mismos datos', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const primero = paso('conditioning_batch_save', 0);
+    const contenedor = within(primero).getByTestId('execution-trace-batch-cards');
+    expect(contenedor).toHaveClass('hidden', '@max-[760px]:flex');
+    expect(within(primero).getByTestId('execution-trace-batch-table')).toHaveClass('@max-[760px]:hidden');
+    expect(primero.closest('[data-slot="page-shell"]')).toHaveClass('@container');
+
+    const tarjetas = within(contenedor).getAllByTestId('execution-trace-batch-card');
+    expect(tarjetas).toHaveLength(FIRST_SAVE_LINES.length);
+    const [arriba, abajo] = Array.from(tarjetas[0].children);
+    expect(arriba).toHaveTextContent('L-0000Galón 3,78 L');
+    expect(abajo).toHaveTextContent('Vence 02/10/2028Producido 02/10/2026');
+
+    const filas = filasDeTabla(primero);
+    tarjetas.forEach((tarjeta, i) => {
+      for (const dato of filas[i]) expect(tarjeta).toHaveTextContent(dato);
+    });
   });
 });

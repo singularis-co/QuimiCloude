@@ -1,11 +1,18 @@
 import { cleanup, render } from '@testing-library/react';
 
 import DashboardPage from '@/app/(private)/dashboard/page';
+import { ExecutionTraceDetail } from '@/app/(private)/dashboard/recorrido/[id]/components';
 import type { ExecutionTraceList, ExecutionTraceRow } from '@/lib/modules/asignaciones';
+import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import type { ExecutionTraceListResult } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 import { errorMessage, type ErrorState } from '@/lib/modules/errores';
 import { PERMISSIONS } from '@/lib/modules/identity';
 
+import {
+  FINISHED_CONDITIONING_TRACE,
+  IN_PROGRESS_CONDITIONING_TRACE,
+  PREVIOUS_CONDITIONING_TRACE,
+} from '../../fixtures/execution-trace-conditioning';
 import { errorInesperado } from '../../helpers/identificador-de-request';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { arbolAccesible, nuncaResuelve, resolverServerComponents } from './arbol-accesible';
@@ -152,6 +159,19 @@ describe('paridad de recorridos (dashboard)', () => {
   it('R1 R17 — error inesperado, con su identificador', async () => {
     listExecutionTracesActionMock.mockResolvedValue(errorInesperado());
     await renderPantalla();
+    expect(arbolAccesible()).toMatchSnapshot();
+  });
+});
+
+// Añadido el 2026-10-14 (QC-283): congela el detalle con las tres anotaciones de acondicionamiento,
+// una por variante del tablero `RecorridoAcondicionamiento` (terminado, en curso y anterior).
+describe('paridad del detalle del recorrido con acondicionamiento', () => {
+  it.each([
+    ['terminado', FINISHED_CONDITIONING_TRACE],
+    ['en curso', IN_PROGRESS_CONDITIONING_TRACE],
+    ['anterior', PREVIOUS_CONDITIONING_TRACE],
+  ])('R12 R13 R14 R15 R16 R17 R18 R25 — %s', (_variante, trace) => {
+    render(<ExecutionTraceDetail trace={trace} backHref={DASHBOARD_ROUTE} />);
     expect(arbolAccesible()).toMatchSnapshot();
   });
 });

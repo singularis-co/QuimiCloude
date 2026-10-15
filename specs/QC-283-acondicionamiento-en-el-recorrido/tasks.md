@@ -190,7 +190,7 @@ verde.
 
 ## Tanda 1B — Frontend: las tres anotaciones en la línea de tiempo (en paralelo con 1A)
 
-### T8 — Cuerpos de Comenzar, guardado y Terminar · frontend_dev · R12–R18 · Dep: tanda 0
+### [x] T8 — Cuerpos de Comenzar, guardado y Terminar · frontend_dev · R12–R18 · Dep: tanda 0
 
 **Hacer:**
 

@@ -25,9 +25,10 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { getInitials } from '@/lib/shared/ui/initials';
 import type { StatusTone } from '@/lib/shared/ui/status-tone';
 
+import { ConditioningBatchSaveBody, ConditioningStartBody, MISSING_DATA_LABEL } from './conditioning-step-details';
+
 const HEADING_TEXT = 'Anotaciones';
 const HEADING_ID = 'execution-trace-annotations';
-const MISSING_PERSON_LABEL = 'Sin dato';
 const STEP_STAGGER_MS = 40;
 
 type TimelineTone = Extract<StatusTone, 'neutral' | 'progress' | 'waiting' | 'success' | 'danger'>;
@@ -64,11 +65,12 @@ const BODY_BASE_CLASS = 'flex min-w-0 flex-col gap-1.5 rounded-xl border px-3.5 
 const BODY_HOVER_CLASS = 'hover:border-primary/40 hover:shadow-md';
 const BODY_DEFAULT_CLASS = 'border-border bg-card';
 const BODY_GO_BACK_CLASS = 'border-warning-border bg-warning-subtle/55';
+const STEP_META_CLASS = 'flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground';
 
 function StepPerson({ step }: { readonly step: ExecutionTraceDetailStep }) {
   if (step.userDisplayName === null) {
     return (
-      <span aria-label={MISSING_PERSON_LABEL} data-testid="execution-trace-step-person">
+      <span aria-label={MISSING_DATA_LABEL} data-testid="execution-trace-step-person">
         {EMPTY_MARK}
       </span>
     );
@@ -81,6 +83,37 @@ function StepPerson({ step }: { readonly step: ExecutionTraceDetailStep }) {
       {step.userDisplayName}
     </span>
   );
+}
+
+function StepBody({ step }: { readonly step: ExecutionTraceDetailStep }) {
+  switch (step.action) {
+    case 'conditioning_start':
+      return <ConditioningStartBody supervisor={<StepPerson step={step} />} team={step.team} />;
+    case 'conditioning_batch_save':
+      return <ConditioningBatchSaveBody savedBy={<StepPerson step={step} />} lines={step.lines} />;
+    case 'conditioning_finish':
+      return (
+        <div className={STEP_META_CLASS}>
+          <StepPerson step={step} />
+        </div>
+      );
+    default:
+      return (
+        <>
+          <div className={STEP_META_CLASS}>
+            {step.stepPosition === null ? null : (
+              <span data-testid="execution-trace-step-position">Paso {step.stepPosition}</span>
+            )}
+            <StepPerson step={step} />
+          </div>
+          {step.action === 'cancel' && step.reason !== null ? (
+            <p className="m-0 text-xs text-foreground" data-testid="execution-trace-step-reason">
+              <span className="font-semibold">Motivo</span> · {step.reason}
+            </p>
+          ) : null}
+        </>
+      );
+  }
 }
 
 function TimelineStep({ step, index }: { readonly step: ExecutionTraceDetailStep; readonly index: number }) {
@@ -116,17 +149,7 @@ function TimelineStep({ step, index }: { readonly step: ExecutionTraceDetailStep
             {formatTraceInstant(step.occurredAt)}
           </time>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {step.stepPosition === null ? null : (
-            <span data-testid="execution-trace-step-position">Paso {step.stepPosition}</span>
-          )}
-          <StepPerson step={step} />
-        </div>
-        {step.action === 'cancel' && step.reason !== null ? (
-          <p className="m-0 text-xs text-foreground" data-testid="execution-trace-step-reason">
-            <span className="font-semibold">Motivo</span> · {step.reason}
-          </p>
-        ) : null}
+        <StepBody step={step} />
         {step.gapToNextMs === null ? null : (
           <p className="m-0 text-xs text-muted-foreground" data-testid="execution-trace-step-gap">
             Hasta la siguiente: {formatElapsed(step.gapToNextMs)}

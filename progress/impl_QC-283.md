@@ -289,3 +289,55 @@ Modificados (tests):
 - Grafo de codigo (MCP) no usado: exploracion con Grep/Read.
 
 Veredicto: T7 hecha y tanda 1A (T4–T7) cerrada en backend: typecheck, lint, guardias, related y las integraciones de la tanda en verde.
+
+## Tanda 1B · T8 — Cuerpos de Comenzar, guardado y Terminar (frontend_dev, 2026-10-14)
+
+### Archivos
+
+Creados:
+- `app/(private)/dashboard/recorrido/[id]/components/conditioning-step-details.tsx` (`ConditioningStartBody`, `ConditioningBatchSaveBody`, `ConditioningBatchLinesTable`; solo `Avatar`, `Table` y partes, `avatarTone`, `getInitials`, `EMPTY_MARK`, iconos `Users` y `Camera` de `lucide-react`)
+
+Modificados (producción):
+- `app/(private)/dashboard/recorrido/[id]/components/execution-timeline.tsx` (`StepBody` estrecha por `step.action`: Comenzar → `ConditioningStartBody`, guardado → `ConditioningBatchSaveBody`, Terminar → solo `StepPerson`, el resto como antes; «Hasta la siguiente» se mantiene en todas; `MISSING_PERSON_LABEL` pasa a `MISSING_DATA_LABEL` de la pieza nueva)
+- `app/(private)/dashboard/recorrido/[id]/components/index.ts` (reexporta las tres piezas y sus props)
+
+Modificados (tests):
+- `tests/ui/dashboard/execution-trace-detail.test.tsx` (describe nuevo «R12 - R18 …», 10 casos con los fixtures de T3; los casos existentes no cambian)
+- `tests/unit/paridad/recorridos-paridad.test.tsx` (describe nuevo con nota fechada: snapshot del detalle en las tres variantes del tablero, `terminado`, `en curso` y `anterior`)
+- `tests/unit/paridad/__snapshots__/recorridos-paridad.test.tsx.snap` (3 snapshots nuevos; los 6 de la lista no cambian)
+
+### Decisiones de implementación
+- Las piezas reciben a quien firma ya pintado (`supervisor` / `savedBy: ReactNode`) en vez del paso entero: así `StepPerson` sigue viviendo en la línea de tiempo y no hay import circular entre los dos archivos.
+- El snapshot de paridad de la lista no cubría el detalle (solo congela el `fallback` del `Suspense`), así que «regenerar» no cambiaba nada. Se añaden tres casos del detalle, uno por variante del tablero, para que la revisión a mano tenga algo que comparar.
+- El corte tabla ⇄ tarjetas es `@max-[760px]`, el mismo de `DataTable`, contra el `@container` de `PageShell` (el contenedor del recorrido). Tabla y tarjetas están las dos en el DOM y el CSS oculta una, como en `DataTable`.
+- La lista del equipo se nombra con `aria-labelledby` apuntando a «Equipo de trabajo · N» (`useId`, que se admite en Server Components).
+- Un miembro sin `displayName` se pinta «—» con «Sin dato», igual que `StepPerson`.
+
+### Revisión visual contra los tableros
+- `RecorridoAcondicionamiento.dc.html` (terminado): coinciden la fila «Supervisor» con avatar, la etiqueta «Equipo de trabajo · 3» en mayúsculas pequeñas, la lista en caja con filas de 40 px y el grupo a la derecha con el icono `Users` y «Grupo de trabajo:» oculto, «Guardó» + persona + «N presentaciones», la tabla Lote · Presentación · Vencimiento · Día de producción (lote y fechas en monoespaciada, fechas a la derecha, cabecera de 36 px y filas de 44 px), el aviso con `Camera` y Terminar solo con la persona.
+- Tablet (en curso, 820 px): el contenedor queda por encima de 760 px, así que la tabla conserva sus columnas; Comenzar sin equipo muestra «Equipo de trabajo · 0» y «Se comenzó sin equipo de trabajo.».
+- Teléfono (390 px): la tabla se oculta y cada línea pasa a tarjeta (lote + presentación arriba, «Vence» y «Producido» abajo); la fila del equipo lleva `flex-wrap`, así que el grupo baja debajo del nombre si no cabe.
+- Diferencia con el tablero: el tablero no dibuja «Hasta la siguiente» en las anotaciones nuevas, pero `design.md > UI > Línea de tiempo` lo mantiene, y gana el design.
+
+### R → test
+| R | Test |
+|---|---|
+| R12 | `execution-trace-detail.test.tsx` › «R12 - nombre, tono e icono de las tres anotaciones, en orden cronologico tras empaque» |
+| R13 | `execution-trace-detail.test.tsx` › «R13 - supervisor y equipo en orden, con grupo», «R13 - un miembro que el directorio no devuelve se pinta «—» con «Sin dato»» |
+| R14 | `execution-trace-detail.test.tsx` › «R14 - sin equipo» |
+| R15 | `execution-trace-detail.test.tsx` › «R15 - quien guardo, n presentaciones, lineas con fechas dd/mm/aaaa y aviso», «R15 - un guardado de una linea dice «1 presentación»», «R15 - la correccion es otro guardado con su propia foto; la primera no cambia» |
+| R16 | `execution-trace-detail.test.tsx` › «R16 - presentacion sin nombre» (en la tabla y en la tarjeta) |
+| R17 | `execution-trace-detail.test.tsx` › «R17 - Terminar solo con quien» |
+| R18 | `execution-trace-detail.test.tsx` › «R18 - tarjetas de linea con los mismos datos» (acotado al cuerpo de tarjetas del primer guardado) |
+| R12–R18, R25 (paridad) | `recorridos-paridad.test.tsx` › «R12 R13 R14 R15 R16 R17 R18 R25 — terminado / en curso / anterior» |
+
+### Verificación (salida real)
+- `pnpm exec vitest run tests/ui/dashboard/execution-trace-detail.test.tsx tests/ui/dashboard/recorrido-rediseno.test.tsx` → `Test Files 2 passed (2)`, `Tests 58 passed (58)`.
+- `pnpm exec vitest run tests/unit/paridad/recorridos-paridad.test.tsx` → `Snapshots 3 written`, `Test Files 1 passed (1)`, `Tests 9 passed (9)`.
+- `pnpm exec vitest related --run <conditioning-step-details.tsx, execution-timeline.tsx, index.ts, los 2 tests>` → `Test Files 5 passed (5)`, `Tests 126 passed (126)`.
+- `pnpm run typecheck` → `tsc --noEmit`, 0 errores (con los cambios del backend en curso en el árbol).
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos 7 de T2/T3 en archivos que no se tocaron.
+- `pnpm exec vitest run guard` → `Test Files 76 passed (76)`, `Tests 1066 passed | 20 skipped (1086)`.
+- Grafo de código (MCP) no usado: exploración con Grep/Read.
+
+Veredicto: T8 hecha; las tres anotaciones se pintan según el tablero, R12–R18 tienen test y todo está en verde.
