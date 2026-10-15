@@ -294,3 +294,47 @@ Salida (`pnpm exec playwright test e2e/datos-de-lote-en-acondicionamiento.spec.t
 Tras el arreglo: `pnpm run typecheck` 0 errores (exit 0); `pnpm run lint` 0 errores, 7 warnings en archivos no tocados (exit 0); `eslint` sobre el spec: «No issues found».
 
 Veredicto: T12 y T13 hechas; el E2E de R26/R30 pasa en Chromium y WebKit contra la base aislada `qc284_e2e`.
+
+## Cierre — T14 (implementer, 2026-10-14)
+
+### R31 y R32 (los que no tienen test propio)
+- **R31** (R1–R29 probados; guardias verdes; sin dependencias nuevas): el mapa de las tandas 1–4
+  cubre R1–R30. `git diff --stat 0ac707ea HEAD -- package.json pnpm-lock.yaml` sale vacío (sin
+  cambios desde que se tomó la feature). Guardias: 76 archivos verdes (abajo).
+- **R32** (no crear lotes para líneas sin producción, no leer el vencimiento para reservar o
+  consumir, no tocar lotes de insumos): `tests/integration/inventario/finished-batch-labels.int.test.ts`
+  casos R23 (pedido sin lotes / otra empresa / inexistente -> `no_batches` sin escribir ni crear
+  nada) y R18 (no cambian existencia, coste, compra, presentación, producto, contenido, asientos
+  ni el lote de otro pedido). Además el diff de producción no toca reserva, consumo ni ejecución:
+  solo `asignaciones` (datos de lote del acondicionamiento), `inventario` (lotes, importación,
+  etiquetas de terminado), `errores` (texto), la pantalla del detalle y el seed.
+
+### Verificación final (sobre HEAD tras F2.3)
+- F2.3: `git fetch origin dev && git merge origin/dev` -> «Already up to date» (dev no trae nada
+  nuevo; sin migraciones que aplicar).
+- `pnpm run typecheck` -> exit 0.
+- `pnpm run lint` -> exit 0, `✖ 7 problems (0 errors, 7 warnings)`, todos en archivos no tocados.
+- Los 25 archivos de test tocados por la feature + guardias, en una corrida
+  (`pnpm exec vitest run <25 archivos> guard`, con `.env` cargado):
+  ```
+   Test Files  100 passed (100)
+        Tests  1578 passed | 21 skipped (1599)
+  ```
+- E2E: ver tanda 4 (2 passed, Chromium y WebKit, base aislada `qc284_e2e`).
+- `./init.sh` (rápido): **aborta en el validador de features** antes de los tests —
+  `zona fullstack: QC-203, QC-271, QC-275, QC-281, QC-283 (5 in_progress, max 3)`—, el rojo de
+  cupo conocido y aceptado por el humano. Por eso los pasos que vienen detrás (typecheck, lint,
+  tests, guardias) se corrieron a mano, arriba. `test:rapido` no se corrió: con `schema.prisma` en
+  el diff arrastra casi toda la suite (899 archivos en la tanda 1); queda para el gate del leader / CI.
+
+### Abierto
+- `tests/integration/proveedores/catalog-line.int.test.ts > R32` sale rojo aislado en este
+  worktree (`TypeError: .toMatch() expects to receive a string, but got object`, FK de
+  `supplier_catalog_lines`). No está en `tests/baseline-rojos.json` y no se ha confirmado contra
+  la base sin el cambio; ningún archivo de la feature toca proveedores. Lo decide el leader.
+- Seed de demo (T11): cuando un pedido tiene datos divergentes, `saveDemoBatchData` toma el lote
+  provisional de la primera línea que lo tenga y, si no, el lote escrito de la primera línea. Esa
+  regla de respaldo la eligió el backend_dev; el spec no la fija.
+- La base de desarrollo compartida `QuimiCloude` NO tiene aplicada la migración de T1 (la
+  comparten otros worktrees, con 3 migraciones de otras ramas). No se migró. Las bases
+  `qc284_e2e` (E2E) quedan en el Postgres local y se pueden borrar con `pnpm run db:test clean`.

@@ -94,7 +94,7 @@
   línea 1 con código conocido. **Hecho:** `pnpm exec playwright test
   e2e/datos-de-lote-en-acondicionamiento.spec.ts` verde en Chromium y WebKit.
 
-- [ ] **T14. Cierre** (R31, R32). Mapa `R<n> -> test` en `progress/impl_QC-284.md`;
+- [x] **T14. Cierre** (R31, R32). Mapa `R<n> -> test` en `progress/impl_QC-284.md`;
   `package.json` y `pnpm-lock.yaml` sin cambios; `pnpm exec vitest run guard` verde; `./init.sh`
   verde.
 
