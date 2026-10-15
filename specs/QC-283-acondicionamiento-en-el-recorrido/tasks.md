@@ -49,7 +49,7 @@
 - typecheck, lint y guardias están en verde;
 - los tests de arriba están en verde.
 
-### T2 — Lectura del recorrido · backend_dev · R10, R11, R13, R19–R24, R26, R27, R29, R31, R32 · Dep: T1
+### [x] T2 — Lectura del recorrido · backend_dev · R10, R11, R13, R19–R24, R26, R27, R29, R31, R32 · Dep: T1
 
 **Hacer:**
 

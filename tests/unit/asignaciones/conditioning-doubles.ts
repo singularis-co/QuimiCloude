@@ -130,7 +130,7 @@ export function montar(options?: Opciones) {
     people: { findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
     units: { findRefs: findRefsUnits } as unknown as UnitCatalog,
-    team: { insertAll: vi.fn(), listByOrderInCompany: listTeamByOrderInCompany },
+    team: { insertAll: vi.fn(), listByOrderInCompany: listTeamByOrderInCompany, listByOrdersInCompany: vi.fn() },
     batches: { listOfOrder },
     now: () => AHORA,
   } as unknown as ComposeOrderRowsDeps & {

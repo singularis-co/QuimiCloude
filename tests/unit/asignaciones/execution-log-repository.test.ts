@@ -207,7 +207,11 @@ describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () 
       },
       log: new RegistroDoble(),
       conditioning: { startConditioningAliveById: () => Promise.resolve('ok') },
-      team: { insertAll: () => Promise.resolve(0), listByOrderInCompany: () => Promise.resolve([]) },
+      team: {
+        insertAll: () => Promise.resolve(0),
+        listByOrderInCompany: () => Promise.resolve([]),
+        listByOrdersInCompany: () => Promise.resolve([]),
+      },
     }
     const transaccion: ExecutionTransaction = { run: (work) => work(writers) }
 

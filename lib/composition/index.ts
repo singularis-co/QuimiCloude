@@ -2074,11 +2074,13 @@ export const asignaciones = {
     log: executionLogRepository,
     orders: orderCatalog,
     people: peopleDirectory,
+    team: createConditioningTeamRepository(),
   }),
   getExecutionTrace: createGetExecutionTrace({
     log: executionLogRepository,
     orders: orderCatalog,
     people: peopleDirectory,
+    team: createConditioningTeamRepository(),
   }),
   startConditioning: createStartConditioningOrder({
     orders: orderCatalog,
