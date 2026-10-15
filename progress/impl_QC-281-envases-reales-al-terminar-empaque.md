@@ -183,3 +183,37 @@ Comandos:
 
 Veredicto: T11 verde sin tocar specs; T12 escrito y verde en chromium y webkit con el arreglo de
 un import de T10, que queda pendiente (rojo hasta entonces).
+
+## Fix T10 — import de cliente (frontend_dev, 2026-10-15)
+
+Causa: `finished-product-distribution-table.tsx` (`'use client'`) importaba `movementReasonLabel`
+del barrel `@/app/(private)/inventario/components`, que reexporta secciones de servidor
+(`next/headers` via `lib/composition`). Rompia `next build` y la ruta en dev.
+
+Arreglo: la tabla recibe `reasonLabels` por prop, el mismo mapa `REASON_LABELS` que
+`finished-product-list-section.tsx` (servidor) ya pasaba a la tabla de movimientos.
+
+Archivos:
+- `app/(private)/inventario/producto-terminado/[id]/components/finished-product-distribution-table.tsx`
+- `app/(private)/inventario/producto-terminado/[id]/components/finished-product-list-section.tsx`
+- `tests/unit/inventario-ui/finished-product-tables.test.tsx` (pasa `reasonLabels`; el motivo
+  se comprueba contra la etiqueta recibida)
+- `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts`: nueva
+  guardia «ningun modulo de cliente de la ruta importa valores del barrel de /inventario» + su
+  prueba de mordida; `listFinishedProductDistributionAction` añadida a `LECTURAS_PERMITIDAS`
+  (la guardia R7/R36 estaba roja desde T10 por no listarla).
+
+Por que no lo cazo nada: la guardia R16 del contrato saltaba los modulos de cliente a proposito
+(solo miraba llamadas de servidor), y la R14 de `guard-arquitectura-modulos` solo mira imports
+DIRECTOS de `lib/composition` / adaptadores driven desde `'use client'`, no transitivos via un
+barrel de `app/`. Una guardia generica transitiva seria una mejora al arnes (`/afinar-regla`).
+
+Resultados:
+- `pnpm run typecheck`: verde.
+- `pnpm run lint`: 0 errores, 7 avisos ajenos a estos archivos (eslint de los tocados: limpio).
+- `pnpm exec vitest run guard`: 76/76 archivos, 1069 pasan, 20 omitidos.
+- `pnpm exec vitest related --run <tocados>`: 5/5 archivos, 57/57 tests.
+- E2E chromium `envases-reales-empaque.spec.ts` + `detalle-de-producto-terminado.spec.ts`:
+  5 passed (55.9s).
+
+Veredicto: el import de cliente de T10 queda resuelto y protegido por guardia; E2E verdes.

@@ -3,10 +3,14 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, useTransition } from 'react';
 
-import { movementReasonLabel } from '@/app/(private)/inventario/components';
 import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
 import { StatusBadge } from '@/components/shared/status-badge';
-import type { FinishedDistributionLine, FinishedProductDetail, Page } from '@/lib/modules/inventario';
+import type {
+  FinishedDistributionLine,
+  FinishedProductDetail,
+  MovementReason,
+  Page,
+} from '@/lib/modules/inventario';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 import {
@@ -25,6 +29,7 @@ const MINUS_SIGN = '−';
 const NOTE_SEPARATOR = ' · ';
 
 type Presentation = FinishedProductDetail['presentation'];
+type ReasonLabels = Readonly<Record<MovementReason, string>>;
 
 function presentationText(presentation: Presentation): string {
   if (presentation === null) return EMPTY_MARK;
@@ -47,9 +52,9 @@ export function differenceText(difference: number): string {
   return difference > 0 ? `+${difference}` : `${MINUS_SIGN}${-difference}`;
 }
 
-function reasonText(line: FinishedDistributionLine): string {
+function reasonText(line: FinishedDistributionLine, reasonLabels: ReasonLabels): string {
   if (line.reason === null) return EMPTY_MARK;
-  return line.reason === 'otro' ? OTHER_REASON_LABEL : movementReasonLabel(line.reason);
+  return line.reason === 'otro' ? OTHER_REASON_LABEL : reasonLabels[line.reason];
 }
 
 function reasonNote(line: FinishedDistributionLine): string | null {
@@ -79,11 +84,17 @@ function DifferenceCell({ line }: { readonly line: FinishedDistributionLine }) {
   );
 }
 
-function ReasonCell({ line }: { readonly line: FinishedDistributionLine }) {
+function ReasonCell({
+  line,
+  reasonLabels,
+}: {
+  readonly line: FinishedDistributionLine;
+  readonly reasonLabels: ReasonLabels;
+}) {
   const note = reasonNote(line);
   return (
     <span data-testid="finished-product-distribution-reason" className="inline-flex flex-col gap-1">
-      <span className={line.reason === null ? 'text-muted-foreground' : undefined}>{reasonText(line)}</span>
+      <span className={line.reason === null ? 'text-muted-foreground' : undefined}>{reasonText(line, reasonLabels)}</span>
       {note === null ? null : (
         <span
           className="whitespace-normal text-xs text-muted-foreground"
@@ -98,6 +109,7 @@ function ReasonCell({ line }: { readonly line: FinishedDistributionLine }) {
 
 function distributionColumns(
   presentation: Presentation,
+  reasonLabels: ReasonLabels,
 ): readonly DataTableColumn<FinishedDistributionLine>[] {
   const presentationLabel = presentationText(presentation);
   return [
@@ -148,7 +160,7 @@ function distributionColumns(
       label: 'Motivo',
       align: 'start',
       hideText: false,
-      cell: (row) => <ReasonCell line={row} />,
+      cell: (row) => <ReasonCell line={row} reasonLabels={reasonLabels} />,
     },
   ];
 }
@@ -157,16 +169,22 @@ export type FinishedProductDistributionTableProps = {
   readonly productId: string;
   readonly page: Page<FinishedDistributionLine>;
   readonly presentation: Presentation;
+  /** Etiquetas de motivo armadas en el servidor: este modulo de cliente no importa el barrel de /inventario. */
+  readonly reasonLabels: ReasonLabels;
 };
 
 export function FinishedProductDistributionTable({
   productId,
   page,
   presentation,
+  reasonLabels,
 }: FinishedProductDistributionTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const columns = useMemo(() => distributionColumns(presentation), [presentation]);
+  const columns = useMemo(
+    () => distributionColumns(presentation, reasonLabels),
+    [presentation, reasonLabels],
+  );
 
   return (
     <div data-testid="finished-product-reparto" aria-busy={isPending}>

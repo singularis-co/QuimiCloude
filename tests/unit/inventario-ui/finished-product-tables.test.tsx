@@ -385,6 +385,7 @@ describe('Reparto', () => {
         productId={FINISHED_PRODUCT_ID}
         page={finishedProductPage(rows)}
         presentation={PRESENTATION}
+        reasonLabels={REASON_LABELS}
       />,
     );
   }
@@ -423,11 +424,11 @@ describe('Reparto', () => {
     const menos = rowOf('menos');
     expect(cell(menos, 'finished-product-distribution-packed')).toHaveTextContent('15');
     expect(cell(menos, 'finished-product-distribution-difference')).toHaveTextContent(`${MINUS}1`);
-    expect(cell(menos, 'finished-product-distribution-reason')).toHaveTextContent('Rotura');
+    expect(cell(menos, 'finished-product-distribution-reason')).toHaveTextContent(REASON_LABELS.rotura);
 
     const mas = rowOf('mas');
     expect(cell(mas, 'finished-product-distribution-difference')).toHaveTextContent('+1');
-    expect(cell(mas, 'finished-product-distribution-reason')).toHaveTextContent('Conteo físico');
+    expect(cell(mas, 'finished-product-distribution-reason')).toHaveTextContent(REASON_LABELS.conteo_fisico);
   });
 
   it('R27 — «Otro» lleva el texto escrito entre comillas bajo el motivo', () => {
@@ -450,7 +451,7 @@ describe('Reparto', () => {
     const cero = rowOf('cero');
     expect(cell(cero, 'finished-product-distribution-packed')).toHaveTextContent('0');
     expect(cell(cero, 'finished-product-distribution-difference')).toHaveTextContent(`${MINUS}6`);
-    expect(cell(cero, 'finished-product-distribution-reason')).toHaveTextContent('Merma');
+    expect(cell(cero, 'finished-product-distribution-reason')).toHaveTextContent(REASON_LABELS.merma);
     expect(cell(cero, 'finished-product-distribution-reason-note')).toHaveTextContent(WITHOUT_BATCH_LABEL);
 
     expect(cell(rowOf('cero-otro'), 'finished-product-distribution-reason-note')).toHaveTextContent(
@@ -477,6 +478,7 @@ describe('Reparto', () => {
         productId={FINISHED_PRODUCT_ID}
         page={finishedProductPage([finishedDistributionLine()], { total: 30, pageSize: 25, totalPages: 2 })}
         presentation={PRESENTATION}
+        reasonLabels={REASON_LABELS}
       />,
     );
 

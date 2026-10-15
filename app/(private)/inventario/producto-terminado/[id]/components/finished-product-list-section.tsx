@@ -169,7 +169,12 @@ export async function FinishedProductListSection(props: FinishedProductListSecti
       ));
     case 'reparto':
       return dispatch(props, await listFinishedProductDistributionAction(productId, input), (page) => (
-        <FinishedProductDistributionTable productId={productId} page={page} presentation={presentation} />
+        <FinishedProductDistributionTable
+          productId={productId}
+          page={page}
+          presentation={presentation}
+          reasonLabels={REASON_LABELS}
+        />
       ));
   }
 }
