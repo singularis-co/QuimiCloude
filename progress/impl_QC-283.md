@@ -482,3 +482,53 @@ Verificacion (salida real):
 - Cambio: nota fechada 2026-10-14, entrada ordenada antes de `recorrido-ejecucion`, recuento «cuarenta y seis» -> «cuarenta y siete» en título y mensaje.
 - Otras listas cerradas: `tests/guards/guard-identificador-de-request.test.ts` ya incluía el spec (commit 5e45b37e). No hay más.
 - Verificación: `vitest run tests/unit/shared/data-table-alcance.test.ts` 18 passed | 2 skipped; `vitest run guard` 76 files, 1066 passed | 20 skipped; typecheck limpio; lint 0 errores, 7 warnings.
+
+## Merge de origin/dev (QC-284 #241, QC-285) en la rama (2026-10-15)
+
+`git merge origin/dev` (sin rebase). QC-284 cambió el modelo: un solo juego de datos de lote por
+pedido (`{ orderId, lot, expiryDate, productionDate }`), `writeForOrder({ label })` en vez de
+`labels[]`, y `batch_not_found` pasa a ser `no_batches` (pedido sin lotes). Manda dev.
+
+Conflictos de texto:
+- `inventario/domain/finished-batch-labels.ts`: JSDoc de `writeForOrder` unido («el mismo dato en
+  todos los lotes… en la transacción que recibe o en la suya»).
+- `inventario/.../finished-batch-labels-prisma.ts`: se conserva el `db?` de C2.5 con la entrada
+  `label` de QC-284.
+- `asignaciones/domain/save-conditioning-batch-data.ts`: entrada y reglas de QC-284 + foto y
+  transacción de C2.7. `composeSnapshot` ya no valida `batchId` enviados (la entrada no los trae):
+  toma los lotes de `listOfOrder`, en su orden; si no hay ninguno lanza `batch_not_found` antes de
+  abrir la transacción (QC-284 R23). `no_batches` en carrera también se traduce a `batch_not_found`.
+- `tests/guards/guard-identificador-de-request.test.ts`: las tres migraciones, en orden.
+- `tests/unit/asignaciones/save-conditioning-batch-data.test.ts`: base de dev + dobles de QC-283
+  (`listOfOrder`, `findRefs`, transacción) + bloque QC-283 adaptado.
+
+Ajuste semántico (sin cambio de contrato: forma de `batch_lines`, columna, CHECK, migraciones y UI
+intactas): la foto tiene **una línea por lote del pedido que el guardado escribe**, en el orden de
+`listOfOrder` (alta), todas con los mismos lote/vencimiento/día. Antes era «una por línea enviada,
+en el orden enviado» (redacción de R3 y C1.3, que el spec debería actualizar). Desaparece el caso
+«batchId ajeno al pedido» de R4: no hay batchId en la entrada.
+
+Tests adaptados a la entrada nueva: `conditioning-execution-log.int` (R3–R6; el duplicado ahora es
+el código de otra producción de la misma presentación, y el «sin lotes» un pedido comenzado sin
+lotes), `finished-batch-labels.int` (bloque `db`), `e2e/recorrido-acondicionamiento.spec.ts`
+(un formulario: un lote original y uno corregido para las dos líneas).
+
+Fix aparte (`fix(QC-283)`): la limpieza de `e2e/datos-de-lote-en-acondicionamiento.spec.ts` y de
+`e2e/acondicionar-con-equipo.spec.ts` borra `orderExecutionEntry` antes que los pedidos (Comenzar /
+guardar / Terminar ahora anotan; sin eso el `afterAll` choca con la FK).
+
+Verificación (salida real):
+- `pnpm run db:test template` → `qct_tpl_7b329a253f72 (94 migraciones)`; base desechable
+  `qc283_merge_desechable` desde ella: `_prisma_migrations` en orden `20261014200000_product_batches_lot_per_presentation`
+  → `20261015120000_…conditioning_actions` → `20261015120100_…batch_lines`. Borrada al final (0 restantes).
+- `pnpm run typecheck`: sin errores. `pnpm run lint`: 0 errors, 7 warnings (preexistentes).
+- `pnpm exec vitest run guard`: 76 files passed; 1066 passed, 20 skipped.
+- `vitest related --run <63 archivos del merge>`: 918 passed, 1 failed (14731 tests passed). El rojo
+  es `tests/integration/proveedores/catalog-line.int.test.ts` › R32 (`toMatch() expects to receive a
+  string, but got object`); ni la rama ni el merge tocan proveedores; no está en el baseline. Se
+  reproduce solo. Ajeno: se reporta al leader.
+- Unit + int tocados (save-conditioning-batch-data, conditioning-execution-log, finished-batch-labels,
+  finish-conditioning-batch-data, order-execution-entries-constraints, execution-log-read): 6 files, 127 passed.
+- E2E chromium sobre la base desechable: `recorrido-acondicionamiento` ✓ (33.2s),
+  `datos-de-lote-en-acondicionamiento` (QC-284) ✓ (30.6s), `acondicionar-con-equipo` ✓ (26.9s) → 3 passed.
+  Primera corrida del de QC-284: rojo en `afterAll` por la FK de `order_execution_entries` (el fix de arriba).

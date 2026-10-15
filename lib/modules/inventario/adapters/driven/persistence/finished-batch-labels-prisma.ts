@@ -67,7 +67,7 @@ export function createFinishedBatchLabels(db?: Prisma.TransactionClient): Finish
       const write = (tx: Prisma.TransactionClient) =>
         writeFinishedBatchLabels(
           tx,
-          { orderId: input.orderId, labels: input.labels, actorId: input.actorId, now: input.now },
+          { orderId: input.orderId, label: input.label, actorId: input.actorId, now: input.now },
           scope,
         );
       try {

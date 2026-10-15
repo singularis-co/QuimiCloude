@@ -125,7 +125,7 @@ export const CSV_FILE = { fileName: 'inventario.csv', bytes: new TextEncoder().e
 export type CatalogState = {
   products?: ImportProductRef[];
   finishedProducts?: ImportProductRef[];
-  batches?: { lot: string; productId: string }[];
+  batches?: { lot: string; productId: string; presentationId: string | null }[];
 };
 
 /** Puertos de lectura con espias; el estado se puede cambiar entre llamadas. */

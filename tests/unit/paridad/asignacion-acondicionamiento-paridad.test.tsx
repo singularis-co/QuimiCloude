@@ -18,6 +18,7 @@ import {
 import { PackingOrderScreen } from '@/app/(private)/asignacion/empaque/[id]/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type {
+  ConditioningBatchForm,
   ConditioningBatchLineView,
   ConditioningOrderDetail,
   ConditioningOrderRow,
@@ -214,6 +215,13 @@ const LINEA_DE_LOTE_COMPLETA: ConditioningBatchLineView = {
   productionDate: '2026-09-30',
 };
 
+const FORMULARIO_COMPARTIDO: ConditioningBatchForm = {
+  kind: 'shared',
+  lot: 'L-2026-07',
+  expiryDate: '2027-09-30',
+  productionDate: '2026-09-30',
+};
+
 function detalle(overrides: Partial<ConditioningOrderDetail> = {}): ConditioningOrderDetail {
   return { ...POR_ACONDICIONAR, team: [], batchData: null, ...overrides };
 }
@@ -368,12 +376,22 @@ describe('paridad del acondicionador — el detalle', () => {
     expect(arbolAccesible()).toMatchSnapshot();
   });
 
-  it('R11 R13 R24 — mio, con datos de lote incompletos y «Terminar» bloqueado', () => {
+  it('R11 R13 R15 R24 — mio, con datos de lote incompletos y «Terminar» bloqueado', () => {
     render(
       <ConditioningOrderScreen
         order={detalle({
           ...MIO,
-          batchData: { lines: [LINEA_DE_LOTE, LINEA_DE_LOTE_COMPLETA], missingCount: 1 },
+          batchData: {
+            lines: [LINEA_DE_LOTE, LINEA_DE_LOTE_COMPLETA],
+            missingCount: 1,
+            form: {
+              kind: 'divergent',
+              lines: [
+                { presentationId: 'pres-1', lot: '0000042' },
+                { presentationId: 'pres-2', lot: 'L-2026-07' },
+              ],
+            },
+          },
         })}
         canFinish
         finishBlocked
@@ -385,8 +403,29 @@ describe('paridad del acondicionador — el detalle', () => {
   it('R11 R24 — mio, con los datos de lote completos y «Terminar» disponible', () => {
     render(
       <ConditioningOrderScreen
-        order={detalle({ ...MIO, batchData: { lines: [LINEA_DE_LOTE_COMPLETA], missingCount: 0 } })}
+        order={detalle({
+          ...MIO,
+          batchData: { lines: [LINEA_DE_LOTE_COMPLETA], missingCount: 0, form: FORMULARIO_COMPARTIDO },
+        })}
         canFinish
+      />,
+    );
+    expect(arbolAccesible()).toMatchSnapshot();
+  });
+
+  it('R17 R24 — mio, sin ninguna línea con lote: el formulario va deshabilitado', () => {
+    render(
+      <ConditioningOrderScreen
+        order={detalle({
+          ...MIO,
+          batchData: {
+            lines: [{ ...LINEA_DE_LOTE, batchId: null, provisionalLot: null }],
+            missingCount: 1,
+            form: { kind: 'no_batches' },
+          },
+        })}
+        canFinish
+        finishBlocked
       />,
     );
     expect(arbolAccesible()).toMatchSnapshot();
@@ -395,7 +434,11 @@ describe('paridad del acondicionador — el detalle', () => {
   it.each(['TERMINADO', 'ENTREGADO'] as const)('R11 R24 — %s, con su vuelta a la lista', (status) => {
     render(
       <ConditioningOrderScreen
-        order={detalle({ ...MIO, status, batchData: { lines: [LINEA_DE_LOTE_COMPLETA], missingCount: 0 } })}
+        order={detalle({
+          ...MIO,
+          status,
+          batchData: { lines: [LINEA_DE_LOTE_COMPLETA], missingCount: 0, form: FORMULARIO_COMPARTIDO },
+        })}
       />,
     );
     expect(arbolAccesible()).toMatchSnapshot();

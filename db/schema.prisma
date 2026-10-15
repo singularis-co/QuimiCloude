@@ -335,10 +335,11 @@ model Product {
 
 /// `createdBy`, `updatedBy` y `companyId` no llevan `@relation` porque apuntan a otros modulos; sus
 /// FK estan escritas a mano y son drift. NULL en la autoria = no lo creo una persona.
-/// `companyId` es columna propia del lote, y no se deriva del producto, porque la unicidad
-/// `(company_id, lot)` no puede indexar otra tabla; `product_batches_check_company` exige que
-/// coincida con la del producto y la de la presentacion. Los CHECK de `stock`, `unitCost` y `lot`
-/// estan escritos a mano. No hay coste total: se calcula al leer.
+/// `companyId` es columna propia del lote para el aislamiento por empresa;
+/// `product_batches_check_company` exige que coincida con la del producto y la de la presentacion.
+/// La unicidad del lote son dos indices unicos parciales, con presentacion y sin ella, que Prisma
+/// no modela: son drift. Los CHECK de `stock`, `unitCost` y `lot` estan escritos a mano. No hay
+/// coste total: se calcula al leer.
 /// @module inventario
 model ProductBatch {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -348,7 +349,7 @@ model ProductBatch {
   presentationId String?   @map("presentation_id") @db.Uuid
   stock          Decimal   @db.Decimal(14, 4)
   unitCost       Decimal?  @map("unit_cost") @db.Decimal(14, 4)
-  /// Texto exacto, sin normalizar: la unicidad por empresa distingue mayusculas.
+  /// Texto exacto, sin normalizar: la unicidad del lote distingue mayusculas.
   lot            String    @map("lot")
   /// Sin `@default`: el «hoy» lo pone el caso de uso con su reloj, y que no sea futura solo lo
   /// comprueba la aplicacion.
@@ -370,7 +371,6 @@ model ProductBatch {
   presentation Presentation?       @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   movements    InventoryMovement[]
 
-  @@unique([companyId, lot], map: "product_batches_company_lot_unique")
   @@unique([id, companyId], map: "product_batches_id_company_id_key")
   @@index([companyId], map: "product_batches_company_id_idx")
   @@index([productId], map: "product_batches_product_id_idx")

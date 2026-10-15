@@ -231,7 +231,11 @@ type Lote = { readonly batchId: string; readonly presentationId: string };
 
 /** Una linea del reparto con su entrada por Terminar el empaque: el lote que se etiqueta. */
 async function crearLote(fixture: Fixture, orderId: string, nombre: string): Promise<Lote> {
-  const presentationId = await crearPresentacion(fixture, nombre);
+  return crearLoteEn(fixture, orderId, await crearPresentacion(fixture, nombre));
+}
+
+/** Como `crearLote`, sobre una presentacion que ya existe (otra produccion de la misma). */
+async function crearLoteEn(fixture: Fixture, orderId: string, presentationId: string): Promise<Lote> {
   const line = await prisma.orderPresentationLine.create({
     data: { orderId, companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
     select: { id: true },
@@ -271,8 +275,9 @@ async function pedidoComenzadoConLotes(fixture: Fixture): Promise<{ pedido: stri
   return { pedido, frasco, garrafa };
 }
 
-function datos(batchId: string, lot: string) {
-  return { batchId, lot, expiryDate: diaUtc(365), productionDate: diaUtc(0) };
+/** La entrada de guardar (QC-284): un solo juego de datos para todas las lineas con lote. */
+function datos(orderId: string, lot: string) {
+  return { orderId, lot, expiryDate: diaUtc(365), productionDate: diaUtc(0) };
 }
 
 async function loteDe(batchId: string): Promise<string> {
@@ -362,22 +367,22 @@ describe('Comenzar anota en el registro de ejecucion', () => {
 });
 
 describe('Guardar datos de lote anota una foto en el registro de ejecucion', () => {
-  it('R3: guardado y anotacion en la misma transaccion: la foto lleva las lineas en el orden enviado, con su presentacion', async () => {
+  it('R3: guardado y anotacion en la misma transaccion: la foto lleva una linea por lote del pedido, con su presentacion', async () => {
     const fixture = await crearFixture();
     try {
       const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
-      const lineas = [datos(garrafa.batchId, `G-${token()}`), datos(frasco.batchId, `F-${token()}`)];
+      const entrada = datos(pedido, `F-${token()}`);
 
-      await asignaciones.saveConditioningBatchData(actor(fixture), { orderId: pedido, lines: lineas });
+      await asignaciones.saveConditioningBatchData(actor(fixture), entrada);
 
-      expect(await loteDe(garrafa.batchId)).toBe(lineas[0]!.lot);
-      expect(await loteDe(frasco.batchId)).toBe(lineas[1]!.lot);
+      expect(await loteDe(frasco.batchId)).toBe(entrada.lot);
+      expect(await loteDe(garrafa.batchId)).toBe(entrada.lot);
       const [guardado, ...resto] = await guardados(pedido);
       expect(resto).toEqual([]);
       expect(guardado).toMatchObject({ userId: fixture.acondicionador, stepPosition: null, reason: null });
       expect(guardado!.batchLines).toEqual([
-        { batchId: garrafa.batchId, presentationId: garrafa.presentationId, presentationName: 'Garrafa 5 L', ...sinId(lineas[0]!) },
-        { batchId: frasco.batchId, presentationId: frasco.presentationId, presentationName: 'Frasco 1 L', ...sinId(lineas[1]!) },
+        { batchId: frasco.batchId, presentationId: frasco.presentationId, presentationName: 'Frasco 1 L', ...sinPedido(entrada) },
+        { batchId: garrafa.batchId, presentationId: garrafa.presentationId, presentationName: 'Garrafa 5 L', ...sinPedido(entrada) },
       ]);
       const escrito = await prisma.productBatch.findUniqueOrThrow({ where: { id: frasco.batchId }, select: { updatedAt: true } });
       expect(guardado!.occurredAt).toEqual(escrito.updatedAt);
@@ -386,29 +391,29 @@ describe('Guardar datos de lote anota una foto en el registro de ejecucion', () 
     }
   });
 
-  it('R4: un lote duplicado o ajeno al pedido no guarda ni anota', async () => {
+  it('R4: un lote duplicado o un pedido sin lotes no guarda ni anota', async () => {
     const fixture = await crearFixture();
     try {
       const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
+      const otraProduccion = await pedidoPorAcondicionar(fixture);
+      const previa = await crearLoteEn(fixture, otraProduccion, frasco.presentationId);
       const loteFrasco = await loteDe(frasco.batchId);
       const loteGarrafa = await loteDe(garrafa.batchId);
 
       await expect(
-        asignaciones.saveConditioningBatchData(actor(fixture), {
-          orderId: pedido,
-          lines: [datos(frasco.batchId, loteGarrafa)],
-        }),
+        asignaciones.saveConditioningBatchData(actor(fixture), datos(pedido, await loteDe(previa.batchId))),
       ).rejects.toMatchObject({ code: 'batch_duplicate_lot' });
+
+      const sinLotes = await pedidoPorAcondicionar(fixture);
+      await asignaciones.startConditioning(actor(fixture), { orderId: sinLotes, userIds: [fixture.operario], workGroupIds: [] });
       await expect(
-        asignaciones.saveConditioningBatchData(actor(fixture), {
-          orderId: pedido,
-          lines: [datos(frasco.batchId, `F-${token()}`), datos(randomUUID(), `X-${token()}`)],
-        }),
+        asignaciones.saveConditioningBatchData(actor(fixture), datos(sinLotes, `X-${token()}`)),
       ).rejects.toMatchObject({ code: 'batch_not_found' });
 
       expect(await loteDe(frasco.batchId)).toBe(loteFrasco);
       expect(await loteDe(garrafa.batchId)).toBe(loteGarrafa);
       expect(await guardados(pedido)).toEqual([]);
+      expect(await guardados(sinLotes)).toEqual([]);
     } finally {
       await borrarFixture(fixture);
     }
@@ -421,12 +426,9 @@ describe('Guardar datos de lote anota una foto en el registro de ejecucion', () 
       const antes = await loteDe(frasco.batchId);
 
       await conFallo(() =>
-        expect(
-          asignaciones.saveConditioningBatchData(actor(fixture), {
-            orderId: pedido,
-            lines: [datos(frasco.batchId, `F-${token()}`)],
-          }),
-        ).rejects.toThrow(CHECK_SIN_PASO),
+        expect(asignaciones.saveConditioningBatchData(actor(fixture), datos(pedido, `F-${token()}`))).rejects.toThrow(
+          CHECK_SIN_PASO,
+        ),
       );
 
       expect(await loteDe(frasco.batchId)).toBe(antes);
@@ -440,23 +442,22 @@ describe('Guardar datos de lote anota una foto en el registro de ejecucion', () 
     const fixture = await crearFixture();
     try {
       const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
-      const original = [datos(frasco.batchId, `F-${token()}`), datos(garrafa.batchId, `G-${token()}`)];
-      await asignaciones.saveConditioningBatchData(actor(fixture), { orderId: pedido, lines: original });
+      const original = datos(pedido, `F-${token()}`);
+      await asignaciones.saveConditioningBatchData(actor(fixture), original);
       const [primera] = await guardados(pedido);
 
-      const corregido = `F-CORR-${token()}`;
-      await asignaciones.saveConditioningBatchData(actor(fixture), {
-        orderId: pedido,
-        lines: [datos(frasco.batchId, corregido)],
-      });
+      const corregido = datos(pedido, `F-CORR-${token()}`);
+      await asignaciones.saveConditioningBatchData(actor(fixture), corregido);
 
-      expect(await loteDe(frasco.batchId)).toBe(corregido);
+      expect(await loteDe(frasco.batchId)).toBe(corregido.lot);
+      expect(await loteDe(garrafa.batchId)).toBe(corregido.lot);
       const fotos = await guardados(pedido);
       expect(fotos).toHaveLength(2);
       expect(fotos[0]).toEqual(primera);
-      expect((fotos[0]!.batchLines as { lot: string }[]).map((linea) => linea.lot)).toEqual(original.map((l) => l.lot));
+      expect((fotos[0]!.batchLines as { lot: string }[]).map((linea) => linea.lot)).toEqual([original.lot, original.lot]);
       expect(fotos[1]!.batchLines).toEqual([
-        { batchId: frasco.batchId, presentationId: frasco.presentationId, presentationName: 'Frasco 1 L', ...sinId(datos(frasco.batchId, corregido)) },
+        { batchId: frasco.batchId, presentationId: frasco.presentationId, presentationName: 'Frasco 1 L', ...sinPedido(corregido) },
+        { batchId: garrafa.batchId, presentationId: garrafa.presentationId, presentationName: 'Garrafa 5 L', ...sinPedido(corregido) },
       ]);
     } finally {
       await borrarFixture(fixture);
@@ -464,19 +465,16 @@ describe('Guardar datos de lote anota una foto en el registro de ejecucion', () 
   });
 });
 
-function sinId(linea: ReturnType<typeof datos>) {
-  return { lot: linea.lot, expiryDate: linea.expiryDate, productionDate: linea.productionDate };
+function sinPedido(entrada: ReturnType<typeof datos>) {
+  return { lot: entrada.lot, expiryDate: entrada.expiryDate, productionDate: entrada.productionDate };
 }
 
 describe('Terminar anota en el registro de ejecucion', () => {
   it('R6: la transicion a TERMINADO y la anotacion conditioning_finish quedan juntas, a nombre de quien termina', async () => {
     const fixture = await crearFixture();
     try {
-      const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
-      await asignaciones.saveConditioningBatchData(actor(fixture), {
-        orderId: pedido,
-        lines: [datos(frasco.batchId, `F-${token()}`), datos(garrafa.batchId, `G-${token()}`)],
-      });
+      const { pedido } = await pedidoComenzadoConLotes(fixture);
+      await asignaciones.saveConditioningBatchData(actor(fixture), datos(pedido, `F-${token()}`));
 
       await asignaciones.finishConditioning(actor(fixture), { orderId: pedido });
 
@@ -499,11 +497,8 @@ describe('Terminar anota en el registro de ejecucion', () => {
   it('R6: si append falla el pedido no cambia', async () => {
     const fixture = await crearFixture();
     try {
-      const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
-      await asignaciones.saveConditioningBatchData(actor(fixture), {
-        orderId: pedido,
-        lines: [datos(frasco.batchId, `F-${token()}`), datos(garrafa.batchId, `G-${token()}`)],
-      });
+      const { pedido } = await pedidoComenzadoConLotes(fixture);
+      await asignaciones.saveConditioningBatchData(actor(fixture), datos(pedido, `F-${token()}`));
       const antes = await leerPedido(pedido);
       const anotacionesAntes = await leerAnotaciones(pedido);
 
@@ -522,11 +517,18 @@ describe('Terminar anota en el registro de ejecucion', () => {
   it('R6: un rechazo de Terminar (datos de lote incompletos) no anota', async () => {
     const fixture = await crearFixture();
     try {
-      const { pedido, frasco } = await pedidoComenzadoConLotes(fixture);
-      await asignaciones.saveConditioningBatchData(actor(fixture), {
-        orderId: pedido,
-        lines: [datos(frasco.batchId, `F-${token()}`)],
+      const { pedido } = await pedidoComenzadoConLotes(fixture);
+      // Una linea sin lote (sin asiento de produccion): guardar no la cubre y Terminar la exige.
+      await prisma.orderPresentationLine.create({
+        data: {
+          orderId: pedido,
+          companyId: fixture.companyId,
+          presentationId: await crearPresentacion(fixture, 'Bidon 20 L'),
+          packages: 1,
+          presentationContent: null,
+        },
       });
+      await asignaciones.saveConditioningBatchData(actor(fixture), datos(pedido, `F-${token()}`));
       const anotacionesAntes = await leerAnotaciones(pedido);
 
       await expect(asignaciones.finishConditioning(actor(fixture), { orderId: pedido })).rejects.toMatchObject({

@@ -300,7 +300,7 @@ export {
   type SaveConditioningBatchDataDeps,
   type SaveConditioningBatchDataInput,
 } from './domain/save-conditioning-batch-data';
-export { missingBatchDataLines } from './domain/conditioning-batch-data';
+export { missingBatchDataLines, type ConditioningBatchForm } from './domain/conditioning-batch-data';
 
 // ---------------------------------------------------------------------------------------
 // El equipo de acondicionamiento: la entrada de Comenzar y los candidatos del modal.

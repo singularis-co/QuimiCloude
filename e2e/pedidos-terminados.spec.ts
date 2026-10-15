@@ -460,10 +460,11 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos', () => {
-  test('el Operador aterriza en «Mis asignados» y no ve ninguna pestaña ni las otras vistas (R28)', async ({
+  test('el Operador abre /asignacion en «Mis asignados» y no ve ninguna pestaña ni las otras vistas (R28)', async ({
     page,
   }) => {
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     // Sin pestañas: es la UNICA vista que este rol tiene.

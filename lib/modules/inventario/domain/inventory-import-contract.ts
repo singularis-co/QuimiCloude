@@ -63,7 +63,6 @@ export const IMPORT_ROW_ISSUE_CODES = [
   'qty_alert_invalid',
   'number_format_invalid',
   'lot_invalid',
-  'lot_used_by_other_product',
   'purchase_date_invalid',
   'purchase_date_future',
   'expiry_date_invalid',

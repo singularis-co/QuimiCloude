@@ -13,7 +13,7 @@ import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSION
 import { NAV_ICONS } from '@/lib/shared/navigation/nav-icons';
 import {
   CUSTOMERS_LABEL,
-  NAV_SECTION_CHAIN,
+  NAV_SECTION_DIRECTORY,
   PRIVATE_NAV_ITEMS,
   filterNavItemsByPermissions,
   firstVisibleNavHref,
@@ -73,27 +73,28 @@ describe('la navegacion privada lleva a clientes (R4)', () => {
     // ENMIENDA QC-257: el icono de Clientes pasa de 'contact' a 'square-user' (decision humana
     // D11/P3; autorizada por el leader el 2026-10-10).
     expect(ITEMS_DE_CLIENTES[0]?.icon).toBe('square-user');
-    expect(ITEMS_DE_CLIENTES[0]?.section).toBe(NAV_SECTION_CHAIN);
+    expect(ITEMS_DE_CLIENTES[0]?.section).toBe(NAV_SECTION_DIRECTORY);
   });
 
-  it('el item es el ULTIMO de la seccion «Cadena», tras proveedores', () => {
-    const cadena = groupNavItemsBySection(PRIVATE_NAV_ITEMS).find(
-      (seccion) => seccion.label === NAV_SECTION_CHAIN,
+  it('el item es el ULTIMO de la seccion «Directorio», tras proveedores', () => {
+    const directorio = groupNavItemsBySection(PRIVATE_NAV_ITEMS).find(
+      (seccion) => seccion.label === NAV_SECTION_DIRECTORY,
     )?.items ?? [];
 
-    const ultimo = cadena[cadena.length - 1];
+    const ultimo = directorio[directorio.length - 1];
     expect(ultimo?.kind === 'link' ? ultimo.href : undefined).toBe(CUSTOMERS_ROUTE);
 
     const proveedores = NAV_APLANADO.find((item) => item.href === SUPPLIERS_ROUTE);
-    expect(proveedores?.section).toBe(NAV_SECTION_CHAIN);
+    expect(proveedores?.section).toBe(NAV_SECTION_DIRECTORY);
   });
 
-  it('el item es el PENULTIMO de todo el array, y el ultimo es el grupo nav-integraciones', () => {
-    expect(PRIVATE_NAV_ITEMS[PRIVATE_NAV_ITEMS.length - 2]).toBe(ITEMS_DE_CLIENTES[0]);
+  it('el item va justo detras de proveedores en el array', () => {
+    const indiceProveedores = PRIVATE_NAV_ITEMS.findIndex(
+      (item) => item.kind === 'link' && item.href === SUPPLIERS_ROUTE,
+    );
 
-    const ultimo = PRIVATE_NAV_ITEMS[PRIVATE_NAV_ITEMS.length - 1];
-    expect(ultimo?.kind).toBe('group');
-    expect(ultimo?.testId).toBe('nav-integraciones');
+    expect(indiceProveedores).toBeGreaterThanOrEqual(0);
+    expect(PRIVATE_NAV_ITEMS[indiceProveedores + 1]).toBe(ITEMS_DE_CLIENTES[0]);
   });
 
   it('su icono tiene fila en NAV_ICONS', () => {
@@ -131,10 +132,10 @@ describe('el item se oculta a quien no tiene el permiso (R4, R6)', () => {
     expect(PERMISOS_EMPACADOR.length).toBeGreaterThan(0);
   });
 
-  it('con los permisos del Administrador se ve el item, dentro de «Cadena»', () => {
+  it('con los permisos del Administrador se ve el item, dentro de «Directorio»', () => {
     const visible = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_ADMINISTRADOR);
     expect(visible.map((item) => item.testId)).toContain('nav-clientes');
-    expect(seccionesDe(visible)).toContain(NAV_SECTION_CHAIN);
+    expect(seccionesDe(visible)).toContain(NAV_SECTION_DIRECTORY);
   });
 
   it('con los del Operador no aparece el item', () => {

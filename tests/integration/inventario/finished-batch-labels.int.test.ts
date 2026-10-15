@@ -1,6 +1,7 @@
 /**
- * QC-219 — `createFinishedBatchLabels` contra Postgres real: lee los lotes de produccion de un
- * pedido y escribe su lote, vencimiento y dia de produccion sin tocar existencias ni asientos.
+ * QC-219, QC-284 — `createFinishedBatchLabels` contra Postgres real: lee los lotes de produccion de
+ * un pedido y escribe el mismo lote, vencimiento y dia de produccion en todos, sin tocar
+ * existencias ni asientos.
  *
  * AISLAMIENTO: `listOfOrder` lee con el cliente Prisma GLOBAL y `writeForOrder` abre su propia
  * transaccion, asi que lo sembrado tiene que quedar CONFIRMADO. Cada caso crea su empresa efimera,
@@ -234,22 +235,28 @@ async function sembrarLoteSinProduccion(fixture: Fixture, productId: string, pre
   return id;
 }
 
-function label(batchId: string, lot: string): FinishedBatchLabel {
-  return { batchId, lot, expiryDate: '2027-04-30', productionDate: '2026-10-01' };
+function label(lot: string): FinishedBatchLabel {
+  return { lot, expiryDate: '2027-04-30', productionDate: '2026-10-01' };
 }
 
 const adapter = createFinishedBatchLabels();
 
-describe('QC-219 — writeForOrder escribe los datos de lote', () => {
-  it('R6, R19: escribe las tres columnas del lote enviado; no toca existencia, coste, fecha de compra, asientos ni el lote no enviado', async () => {
+describe('QC-284 — writeForOrder escribe el mismo dato en todos los lotes del pedido', () => {
+  it('R18: la misma terna en los dos lotes del pedido; no toca existencia, coste, compra, presentacion, producto, contenido, asientos ni otro pedido', async () => {
     const fixture = await sembrarFixture();
     try {
       const pedido = await sembrarPedido(fixture);
-      const chica = await recibir(fixture, pedido, await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25'), 6);
+      const otroPedido = await sembrarPedido(fixture);
+      const botella = await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25');
+      const chica = await recibir(fixture, pedido, botella, 6);
       const grande = await recibir(fixture, pedido, await sembrarPresentacion(fixture, 'Garrafa 1 L', '1'), 2);
-      const antesChica = await loteSinEtiqueta(chica.batchId);
-      const antesGrande = await loteSinEtiqueta(grande.batchId);
-      const etiquetaGrande = await etiqueta(grande.batchId);
+      const ajeno = await recibir(fixture, otroPedido, botella, 3);
+      const antes = {
+        chica: await loteSinEtiqueta(chica.batchId),
+        grande: await loteSinEtiqueta(grande.batchId),
+        ajeno: await loteSinEtiqueta(ajeno.batchId),
+      };
+      const etiquetaAjena = await etiqueta(ajeno.batchId);
       const asientosAntes = await asientos(fixture.empresa.companyId);
       const lot = `REAL-${token()}`;
       const ahora = new Date('2026-10-09T15:00:00.000Z');
@@ -257,171 +264,232 @@ describe('QC-219 — writeForOrder escribe los datos de lote', () => {
       const outcome = await adapter.writeForOrder({
         companyId: fixture.empresa.companyId,
         orderId: pedido,
-        labels: [label(chica.batchId, lot)],
+        label: label(lot),
         actorId: fixture.empresa.userId,
         now: ahora,
       });
 
       expect(outcome).toEqual({ kind: 'written' });
-      expect(await etiqueta(chica.batchId)).toEqual({ lot, expiryDate: '2027-04-30', productionDate: '2026-10-01' });
-      expect(await loteSinEtiqueta(chica.batchId)).toEqual(antesChica);
-      const autoria = await prisma.productBatch.findUniqueOrThrow({
-        where: { id: chica.batchId },
-        select: { updatedBy: true, updatedAt: true },
-      });
-      expect(autoria).toEqual({ updatedBy: fixture.empresa.userId, updatedAt: ahora });
-      // La linea no enviada no cambia.
-      expect(await loteSinEtiqueta(grande.batchId)).toEqual(antesGrande);
-      expect(await etiqueta(grande.batchId)).toEqual(etiquetaGrande);
-      // R19: el mismo registro; sus asientos le siguen apuntando y no hay asiento nuevo.
+      for (const batchId of [chica.batchId, grande.batchId]) {
+        expect(await etiqueta(batchId)).toEqual({ lot, expiryDate: '2027-04-30', productionDate: '2026-10-01' });
+        const autoria = await prisma.productBatch.findUniqueOrThrow({
+          where: { id: batchId },
+          select: { updatedBy: true, updatedAt: true },
+        });
+        expect(autoria).toEqual({ updatedBy: fixture.empresa.userId, updatedAt: ahora });
+      }
+      expect(await loteSinEtiqueta(chica.batchId)).toEqual(antes.chica);
+      expect(await loteSinEtiqueta(grande.batchId)).toEqual(antes.grande);
+      expect(await loteSinEtiqueta(ajeno.batchId)).toEqual(antes.ajeno);
+      expect(await etiqueta(ajeno.batchId), 'el lote de otro pedido no cambia').toEqual(etiquetaAjena);
+      // El mismo registro: sus asientos le siguen apuntando y no hay asiento nuevo.
       expect(await asientos(fixture.empresa.companyId)).toEqual(asientosAntes);
-      const movement = await prisma.inventoryMovement.findFirstOrThrow({
-        where: { orderPresentationLineId: chica.lineId, kind: 'production' },
-        select: { batchId: true },
-      });
-      expect(movement.batchId).toBe(chica.batchId);
+      for (const recibido of [chica, grande]) {
+        const movement = await prisma.inventoryMovement.findFirstOrThrow({
+          where: { orderPresentationLineId: recibido.lineId, kind: 'production' },
+          select: { batchId: true },
+        });
+        expect(movement.batchId).toBe(recibido.batchId);
+      }
     } finally {
       await limpiar(fixture);
     }
   });
 
-  it('R12: batch_not_found para un lote de otro pedido, de otra empresa, sin asiento production o inexistente, sin escribir nada', async () => {
+  it('R23: no_batches para un pedido sin lotes de produccion, de otra empresa o inexistente, sin escribir nada', async () => {
     const fixture = await sembrarFixture();
     const ajena = await sembrarFixture();
     try {
       const botella = await sembrarPresentacion(fixture, 'Botella 500 ml', '0.5');
-      const pedido = await sembrarPedido(fixture);
-      const otroPedido = await sembrarPedido(fixture);
-      const propio = await recibir(fixture, pedido, botella, 4);
-      const deOtroPedido = await recibir(fixture, otroPedido, botella, 2);
+      const conLote = await sembrarPedido(fixture);
+      const propio = await recibir(fixture, conLote, botella, 4);
       const sinProduccion = await sembrarLoteSinProduccion(fixture, propio.productId, botella);
+      const sinLotes = await sembrarPedido(fixture);
       const pedidoAjeno = await sembrarPedido(ajena);
       const deOtraEmpresa = await recibir(ajena, pedidoAjeno, await sembrarPresentacion(ajena, 'Botella 500 ml', '0.5'), 2);
-      const etiquetaPropia = await etiqueta(propio.batchId);
+      const antes = {
+        propio: await etiqueta(propio.batchId),
+        sinProduccion: await etiqueta(sinProduccion),
+        ajeno: await etiqueta(deOtraEmpresa.batchId),
+      };
 
-      for (const fueraDelPedido of [deOtroPedido.batchId, sinProduccion, deOtraEmpresa.batchId, randomUUID()]) {
+      for (const orderId of [sinLotes, pedidoAjeno, randomUUID()]) {
         const outcome = await adapter.writeForOrder({
           companyId: fixture.empresa.companyId,
-          orderId: pedido,
-          labels: [label(propio.batchId, `OK-${token()}`), label(fueraDelPedido, `X-${token()}`)],
+          orderId,
+          label: label(`X-${token()}`),
           actorId: fixture.empresa.userId,
           now: new Date(),
         });
-        expect(outcome).toEqual({ kind: 'batch_not_found', batchId: fueraDelPedido });
-        expect(await etiqueta(propio.batchId), 'ninguna linea se escribe').toEqual(etiquetaPropia);
+        expect(outcome).toEqual({ kind: 'no_batches' });
       }
 
-      // El pedido de otra empresa, pedido con el ambito propio, tampoco encuentra su lote.
-      const cruzado = await adapter.writeForOrder({
-        companyId: fixture.empresa.companyId,
-        orderId: pedidoAjeno,
-        labels: [label(deOtraEmpresa.batchId, `X-${token()}`)],
-        actorId: fixture.empresa.userId,
-        now: new Date(),
-      });
-      expect(cruzado).toEqual({ kind: 'batch_not_found', batchId: deOtraEmpresa.batchId });
+      expect(await etiqueta(propio.batchId)).toEqual(antes.propio);
+      expect(await etiqueta(sinProduccion)).toEqual(antes.sinProduccion);
+      expect(await etiqueta(deOtraEmpresa.batchId)).toEqual(antes.ajeno);
     } finally {
       await limpiar(fixture);
       await limpiar(ajena);
     }
   });
 
-  it('R10: duplicate_lot si el lote ya es de otro lote de la empresa o de otra linea del pedido; no si es el suyo o uno de otra empresa', async () => {
+  it('R21: duplicate_lot con el codigo de otra produccion de la misma presentacion, sin escribir ninguna linea', async () => {
+    const fixture = await sembrarFixture();
+    try {
+      const botella = await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25');
+      const pedido = await sembrarPedido(fixture);
+      const otraProduccion = await sembrarPedido(fixture);
+      const chica = await recibir(fixture, pedido, botella, 6);
+      const grande = await recibir(fixture, pedido, await sembrarPresentacion(fixture, 'Garrafa 1 L', '1'), 2);
+      const previa = await recibir(fixture, otraProduccion, botella, 1);
+      expect(previa.productId, 'otra produccion de la misma presentacion es el mismo producto').toBe(chica.productId);
+      const loteDeOtraProduccion = (await etiqueta(previa.batchId)).lot;
+      const antes = { chica: await etiqueta(chica.batchId), grande: await etiqueta(grande.batchId) };
+
+      const outcome = await adapter.writeForOrder({
+        companyId: fixture.empresa.companyId,
+        orderId: pedido,
+        label: label(loteDeOtraProduccion),
+        actorId: fixture.empresa.userId,
+        now: new Date(),
+      });
+
+      expect(outcome).toEqual({ kind: 'duplicate_lot', batchId: chica.batchId });
+      expect(await etiqueta(chica.batchId), 'ninguna linea se escribe').toEqual(antes.chica);
+      expect(await etiqueta(grande.batchId), 'ninguna linea se escribe').toEqual(antes.grande);
+    } finally {
+      await limpiar(fixture);
+    }
+  });
+
+  it('R21: no choca el codigo de otro producto, de otra presentacion, de otra linea del pedido, el suyo ni el de otra empresa', async () => {
     const fixture = await sembrarFixture();
     const ajena = await sembrarFixture();
     try {
+      const botella = await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25');
       const pedido = await sembrarPedido(fixture);
       const otroPedido = await sembrarPedido(fixture);
-      const chica = await recibir(fixture, pedido, await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25'), 6);
+      const chica = await recibir(fixture, pedido, botella, 6);
       const grande = await recibir(fixture, pedido, await sembrarPresentacion(fixture, 'Garrafa 1 L', '1'), 2);
-      const deOtroPedido = await recibir(fixture, otroPedido, await sembrarPresentacion(fixture, 'Bidon 5 L', '5'), 1);
+      const otraPresentacion = await recibir(fixture, otroPedido, await sembrarPresentacion(fixture, 'Bidon 5 L', '5'), 1);
+      const marca = token();
+      const insumo = await prisma.product.create({
+        data: {
+          name: `Insumo ${marca}`,
+          nameNormalized: `insumo${marca}`,
+          type: 'PRODUCT',
+          unitId: fixture.unitId,
+          companyId: fixture.empresa.companyId,
+        },
+        select: { id: true },
+      });
+      const loteInsumo = `INS-${token()}`;
+      await prisma.productBatch.create({
+        data: {
+          productId: insumo.id,
+          presentationId: null,
+          stock: new Prisma.Decimal('1'),
+          unitCost: new Prisma.Decimal('1'),
+          lot: loteInsumo,
+          purchaseDate: new Date('2026-10-01T00:00:00.000Z'),
+          companyId: fixture.empresa.companyId,
+        },
+      });
+      const base = { companyId: fixture.empresa.companyId, orderId: pedido, actorId: fixture.empresa.userId, now: new Date() };
+
+      // Otro producto (un insumo) y otra presentacion de la misma formula.
+      expect(await adapter.writeForOrder({ ...base, label: label(loteInsumo) })).toEqual({ kind: 'written' });
+      const loteOtraPresentacion = (await etiqueta(otraPresentacion.batchId)).lot;
+      expect(await adapter.writeForOrder({ ...base, label: label(loteOtraPresentacion) })).toEqual({ kind: 'written' });
+      expect((await etiqueta(chica.batchId)).lot).toBe(loteOtraPresentacion);
+
+      // El codigo que hoy tiene otra linea del pedido.
+      const loteGrande = `GRANDE-${token()}`;
+      await prisma.productBatch.update({ where: { id: grande.batchId }, data: { lot: loteGrande } });
+      expect(await adapter.writeForOrder({ ...base, label: label(loteGrande) })).toEqual({ kind: 'written' });
+      expect((await etiqueta(chica.batchId)).lot).toBe(loteGrande);
+      expect((await etiqueta(grande.batchId)).lot).toBe(loteGrande);
+
+      // El codigo que ya tiene.
+      expect(await adapter.writeForOrder({ ...base, label: label(loteGrande) })).toEqual({ kind: 'written' });
+
+      // La misma clave analoga en otra empresa.
       const pedidoAjeno = await sembrarPedido(ajena);
-      const ajeno = await recibir(ajena, pedidoAjeno, await sembrarPresentacion(ajena, 'Botella 500 ml', '0.5'), 2);
-      // Las dos series automaticas empiezan en 1: el lote ajeno se fija para no chocar dentro de
-      // la empresa propia por casualidad.
+      const ajeno = await recibir(ajena, pedidoAjeno, await sembrarPresentacion(ajena, 'Botella 250 ml', '0.25'), 2);
       const loteAjeno = `AJENO-${token()}`;
       expect(
         await adapter.writeForOrder({
           companyId: ajena.empresa.companyId,
           orderId: pedidoAjeno,
-          labels: [label(ajeno.batchId, loteAjeno)],
+          label: label(loteAjeno),
           actorId: ajena.empresa.userId,
           now: new Date(),
         }),
       ).toEqual({ kind: 'written' });
-      const loteDeOtroPedido = (await etiqueta(deOtroPedido.batchId)).lot;
-      const loteGrande = (await etiqueta(grande.batchId)).lot;
-      const loteChica = (await etiqueta(chica.batchId)).lot;
-      const base = { companyId: fixture.empresa.companyId, orderId: pedido, actorId: fixture.empresa.userId, now: new Date() };
-
-      expect(await adapter.writeForOrder({ ...base, labels: [label(chica.batchId, loteDeOtroPedido)] })).toEqual({
-        kind: 'duplicate_lot',
-        batchId: chica.batchId,
-      });
-      expect(await adapter.writeForOrder({ ...base, labels: [label(chica.batchId, loteGrande)] })).toEqual({
-        kind: 'duplicate_lot',
-        batchId: chica.batchId,
-      });
-      // Intercambio en un solo guardado: tambien choca.
-      expect(
-        await adapter.writeForOrder({ ...base, labels: [label(chica.batchId, loteGrande), label(grande.batchId, loteChica)] }),
-      ).toEqual({ kind: 'duplicate_lot', batchId: chica.batchId });
-      expect(await etiqueta(chica.batchId), 'ningun rechazo escribio').toMatchObject({ lot: loteChica, productionDate: null });
-
-      // Su propio valor no es choque, ni el de otra empresa.
-      expect(await adapter.writeForOrder({ ...base, labels: [label(chica.batchId, loteChica)] })).toEqual({ kind: 'written' });
-      expect(await adapter.writeForOrder({ ...base, labels: [label(grande.batchId, loteAjeno)] })).toEqual({ kind: 'written' });
-      expect((await etiqueta(grande.batchId)).lot).toBe(loteAjeno);
-
-      // Sensible a mayusculas, como el indice: el mismo texto en otra caja no es choque.
-      const enMayusculas = `CASO-${token()}`;
-      expect(
-        await adapter.writeForOrder({ ...base, orderId: otroPedido, labels: [label(deOtroPedido.batchId, enMayusculas)] }),
-      ).toEqual({ kind: 'written' });
-      expect(
-        await adapter.writeForOrder({ ...base, labels: [label(chica.batchId, enMayusculas.toLowerCase())] }),
-      ).toEqual({ kind: 'written' });
-      expect(
-        await adapter.writeForOrder({ ...base, labels: [label(chica.batchId, enMayusculas)] }),
-      ).toEqual({ kind: 'duplicate_lot', batchId: chica.batchId });
+      expect(await adapter.writeForOrder({ ...base, label: label(loteAjeno) })).toEqual({ kind: 'written' });
+      expect((await etiqueta(ajeno.batchId)).lot).toBe(loteAjeno);
+      expect((await etiqueta(chica.batchId)).lot).toBe(loteAjeno);
     } finally {
       await limpiar(fixture);
       await limpiar(ajena);
     }
   });
 
-  it('R11: dos escrituras simultaneas del mismo lote en dos lotes: una gana y la otra no escribe ninguna de sus lineas', async () => {
+  it('R21: sensible a mayusculas, como los indices: el mismo texto en otra caja no choca', async () => {
     const fixture = await sembrarFixture();
     try {
+      const botella = await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25');
+      const pedido = await sembrarPedido(fixture);
+      const otraProduccion = await sembrarPedido(fixture);
+      const chica = await recibir(fixture, pedido, botella, 6);
+      await recibir(fixture, otraProduccion, botella, 1);
+      const enMayusculas = `CASO-${token()}`;
+      const base = { companyId: fixture.empresa.companyId, actorId: fixture.empresa.userId, now: new Date() };
+
+      expect(await adapter.writeForOrder({ ...base, orderId: otraProduccion, label: label(enMayusculas) })).toEqual({
+        kind: 'written',
+      });
+      expect(await adapter.writeForOrder({ ...base, orderId: pedido, label: label(enMayusculas.toLowerCase()) })).toEqual({
+        kind: 'written',
+      });
+      expect(await adapter.writeForOrder({ ...base, orderId: pedido, label: label(enMayusculas) })).toEqual({
+        kind: 'duplicate_lot',
+        batchId: chica.batchId,
+      });
+    } finally {
+      await limpiar(fixture);
+    }
+  });
+
+  it('R22: dos guardados simultaneos de pedidos distintos con la misma clave: uno gana y el otro no escribe ninguna de sus lineas', async () => {
+    const fixture = await sembrarFixture();
+    try {
+      const botella = await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25');
       const pedidoA = await sembrarPedido(fixture);
       const pedidoB = await sembrarPedido(fixture);
-      const a = await recibir(fixture, pedidoA, await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25'), 4);
-      const b1 = await recibir(fixture, pedidoB, await sembrarPresentacion(fixture, 'Garrafa 1 L', '1'), 2);
-      const b2 = await recibir(fixture, pedidoB, await sembrarPresentacion(fixture, 'Bidon 5 L', '5'), 1);
+      const a = await recibir(fixture, pedidoA, botella, 4);
+      const b1 = await recibir(fixture, pedidoB, botella, 2);
+      const b2 = await recibir(fixture, pedidoB, await sembrarPresentacion(fixture, 'Garrafa 1 L', '1'), 1);
       const etiquetasAntes = { a: await etiqueta(a.batchId), b1: await etiqueta(b1.batchId), b2: await etiqueta(b2.batchId) };
       const disputado = `CARRERA-${token()}`;
       const base = { companyId: fixture.empresa.companyId, actorId: fixture.empresa.userId, now: new Date() };
 
       const [deA, deB] = await Promise.all([
-        adapter.writeForOrder({ ...base, orderId: pedidoA, labels: [label(a.batchId, disputado)] }),
-        adapter.writeForOrder({
-          ...base,
-          orderId: pedidoB,
-          labels: [label(b2.batchId, `SOLO-B-${token()}`), label(b1.batchId, disputado)],
-        }),
+        adapter.writeForOrder({ ...base, orderId: pedidoA, label: label(disputado) }),
+        adapter.writeForOrder({ ...base, orderId: pedidoB, label: label(disputado) }),
       ]);
 
-      const kinds = [deA.kind, deB.kind].sort();
-      expect(kinds).toEqual(['duplicate_lot', 'written']);
+      expect([deA.kind, deB.kind].sort()).toEqual(['duplicate_lot', 'written']);
       const conElLote = await prisma.productBatch.findMany({
         where: { companyId: fixture.empresa.companyId, lot: disputado },
         select: { id: true },
       });
-      expect(conElLote).toHaveLength(1);
       if (deA.kind === 'written') {
+        expect(conElLote).toEqual([{ id: a.batchId }]);
         expect(await etiqueta(b1.batchId)).toEqual(etiquetasAntes.b1);
         expect(await etiqueta(b2.batchId), 'el perdedor no escribe ninguna linea').toEqual(etiquetasAntes.b2);
       } else {
+        expect(conElLote.map((row) => row.id).sort()).toEqual([b1.batchId, b2.batchId].sort());
         expect(await etiqueta(a.batchId)).toEqual(etiquetasAntes.a);
       }
     } finally {
@@ -438,15 +506,16 @@ function connectionString(): string {
   return url;
 }
 
-describe('QC-219 — la carrera la decide el indice unico', () => {
-  it('R11: con el lote escrito por otra sesion sin confirmar, la escritura espera, recibe duplicate_lot y no escribe ninguna linea', async () => {
+describe('QC-284 — la carrera la deciden los indices unicos', () => {
+  it('R22: con la misma clave escrita por otra sesion sin confirmar, la escritura espera, recibe duplicate_lot y no escribe ninguna linea', async () => {
     const fixture = await sembrarFixture();
     const holder = new Client({ connectionString: connectionString() });
     try {
+      const botella = await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25');
       const pedidoA = await sembrarPedido(fixture);
       const pedidoB = await sembrarPedido(fixture);
-      const a = await recibir(fixture, pedidoA, await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25'), 4);
-      const b1 = await recibir(fixture, pedidoB, await sembrarPresentacion(fixture, 'Garrafa 1 L', '1'), 2);
+      const a = await recibir(fixture, pedidoA, botella, 4);
+      const b1 = await recibir(fixture, pedidoB, botella, 2);
       const b2 = await recibir(fixture, pedidoB, await sembrarPresentacion(fixture, 'Bidon 5 L', '5'), 1);
       const antesB1 = await etiqueta(b1.batchId);
       const antesB2 = await etiqueta(b2.batchId);
@@ -461,7 +530,7 @@ describe('QC-219 — la carrera la decide el indice unico', () => {
       const contendiente = adapter.writeForOrder({
         companyId: fixture.empresa.companyId,
         orderId: pedidoB,
-        labels: [label(b2.batchId, `SOLO-B-${token()}`), label(b1.batchId, disputado)],
+        label: label(disputado),
         actorId: fixture.empresa.userId,
         now: new Date(),
       });
@@ -500,12 +569,11 @@ describe('QC-219 — listOfOrder lee los lotes de produccion del pedido', () => 
       const chica = await recibir(fixture, pedido, botella, 6);
       const grande = await recibir(fixture, pedido, garrafa, 2);
       await sembrarLoteSinProduccion(fixture, chica.productId, botella);
-      const loteGrande = (await etiqueta(grande.batchId)).lot;
       const lot = `REAL-${token()}`;
       await adapter.writeForOrder({
         companyId: fixture.empresa.companyId,
         orderId: pedido,
-        labels: [label(chica.batchId, lot)],
+        label: label(lot),
         actorId: fixture.empresa.userId,
         now: new Date(),
       });
@@ -527,9 +595,9 @@ describe('QC-219 — listOfOrder lee los lotes de produccion del pedido', () => 
             batchId: grande.batchId,
             orderPresentationLineId: grande.lineId,
             presentationId: garrafa,
-            lot: loteGrande,
-            expiryDate: null,
-            productionDate: null,
+            lot,
+            expiryDate: '2027-04-30',
+            productionDate: '2026-10-01',
           },
         ].sort(porLote),
       );
@@ -560,7 +628,7 @@ describe('QC-283 — con un cliente de transaccion, escribe y lee en ella', () =
           const outcome = await enTx.writeForOrder({
             companyId: fixture.empresa.companyId,
             orderId: pedido,
-            labels: [label(chica.batchId, lot)],
+            label: label(lot),
             actorId: fixture.empresa.userId,
             now: new Date(),
           });
@@ -577,20 +645,22 @@ describe('QC-283 — con un cliente de transaccion, escribe y lee en ella', () =
     }
   });
 
-  it('R4: con db, un lote que ya tiene otra linea devuelve duplicate_lot sin escribir', async () => {
+  it('R4: con db, el codigo de otra produccion de la misma presentacion devuelve duplicate_lot sin escribir', async () => {
     const fixture = await sembrarFixture();
     try {
+      const botella = await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25');
       const pedido = await sembrarPedido(fixture);
-      const chica = await recibir(fixture, pedido, await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25'), 6);
-      const grande = await recibir(fixture, pedido, await sembrarPresentacion(fixture, 'Garrafa 1 L', '1'), 2);
+      const otraProduccion = await sembrarPedido(fixture);
+      const chica = await recibir(fixture, pedido, botella, 6);
+      const previa = await recibir(fixture, otraProduccion, botella, 1);
       const antes = await etiqueta(chica.batchId);
-      const loteGrande = (await etiqueta(grande.batchId)).lot;
+      const loteDeOtraProduccion = (await etiqueta(previa.batchId)).lot;
 
       const outcome = await prisma.$transaction((tx) =>
         createFinishedBatchLabels(tx).writeForOrder({
           companyId: fixture.empresa.companyId,
           orderId: pedido,
-          labels: [label(chica.batchId, loteGrande)],
+          label: label(loteDeOtraProduccion),
           actorId: fixture.empresa.userId,
           now: new Date(),
         }),

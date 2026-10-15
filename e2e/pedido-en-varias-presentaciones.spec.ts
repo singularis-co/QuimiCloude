@@ -314,6 +314,7 @@ async function expectAvailability(scope: Locator, exceeds: boolean): Promise<voi
 /** El Operador entra al pedido asignado y lo finaliza; queda `POR_EMPACAR`. */
 async function finishProduction(page: Page, orderId: string, numberText: string): Promise<void> {
   await switchUser(page, operatorUser);
+  await page.goto(ASSIGNED_ORDERS_ROUTE);
   await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
   await page.goto(assignedOrderRoute(orderId));

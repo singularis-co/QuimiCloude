@@ -657,6 +657,7 @@ test.describe('producto terminado', () => {
     await page.goto('about:blank');
     await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const assignedRow = rowByNumber(page, orderNumber);

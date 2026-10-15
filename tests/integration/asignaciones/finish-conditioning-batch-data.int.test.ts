@@ -1,7 +1,8 @@
 /**
- * QC-219 T8 — Terminar exige los datos de lote, contra Postgres real y con la composicion real
- * (`asignaciones` de `@/lib/composition`): `finishConditioning`, `saveConditioningBatchData` y
- * `getConditioningOrder` con sus adaptadores de produccion.
+ * QC-219 T8 y QC-284 T8 — Terminar exige los datos de lote, y guardar escribe un solo juego de datos
+ * en todas las lineas con lote, contra Postgres real y con la composicion real (`asignaciones` de
+ * `@/lib/composition`): `finishConditioning`, `saveConditioningBatchData` y `getConditioningOrder`
+ * con sus adaptadores de produccion.
  *
  * AISLAMIENTO: `commit`. Guardar abre su propia `prisma.$transaction` sobre el cliente global y
  * Terminar escribe con el cliente global; lo sembrado tiene que quedar confirmado. Cada caso fabrica
@@ -242,16 +243,36 @@ async function leerEquipo(orderId: string) {
   });
 }
 
-function datos(batchId: string, lot: string) {
-  return { batchId, lot, expiryDate: diaUtc(365), productionDate: diaUtc(0) };
+function datos(lot: string, dias = 365) {
+  return { lot, expiryDate: diaUtc(dias), productionDate: diaUtc(0) };
+}
+
+function dia(fecha: string): Date {
+  return new Date(`${fecha}T00:00:00.000Z`);
+}
+
+async function leerLotes(ids: readonly string[]) {
+  const filas = await prisma.productBatch.findMany({
+    where: { id: { in: [...ids] } },
+    select: { id: true, lot: true, expiryDate: true, productionDate: true, updatedAt: true },
+  });
+  return ids.map((id) => filas.find((fila) => fila.id === id));
+}
+
+async function esperarTerna(ids: readonly string[], terna: ReturnType<typeof datos>): Promise<void> {
+  for (const fila of await leerLotes(ids)) {
+    expect(fila?.lot).toBe(terna.lot);
+    expect(fila?.expiryDate?.toISOString().slice(0, 10)).toBe(terna.expiryDate);
+    expect(fila?.productionDate?.toISOString().slice(0, 10)).toBe(terna.productionDate);
+  }
 }
 
 afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('QC-219 — Terminar exige los datos de lote', () => {
-  it('R15, R16, R25: sin datos rechaza con conditioning_batch_data_missing; el pedido sigue EN_ACONDICIONAMIENTO, sin finishedAt y con su equipo', async () => {
+describe('QC-219 / QC-284 — Terminar exige los datos de lote', () => {
+  it('QC-219 R15, R16, R25; QC-284 R18, R26: sin datos rechaza; un solo guardado cubre las dos lineas y Terminar pasa conservando el equipo', async () => {
     const fixture = await crearFixture();
     try {
       const pedido = await pedidoEnAcondicionamiento(fixture);
@@ -271,22 +292,24 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
       });
       expect(await leerEquipo(pedido)).toEqual(equipoAntes);
 
-      // R16: el otro acondicionador recibe order_conditioning_taken aunque falten datos.
+      // QC-219 R16: el otro acondicionador recibe order_conditioning_taken aunque falten datos.
       await expect(
         asignaciones.finishConditioning(actor(fixture, fixture.acondicionador2), { orderId: pedido }),
       ).rejects.toMatchObject({ code: 'order_conditioning_taken' });
 
-      // R4, R15: con una sola linea guardada siguen faltando datos; el detalle cuenta lo mismo.
-      await asignaciones.saveConditioningBatchData(uno, { orderId: pedido, lines: [datos(lote1, `L1-${token()}`)] });
-      expect((await asignaciones.getConditioningOrder(uno, { orderId: pedido })).batchData?.missingCount).toBe(1);
-      await expect(asignaciones.finishConditioning(uno, { orderId: pedido })).rejects.toMatchObject({
-        code: 'conditioning_batch_data_missing',
-      });
-      expect((await leerPedido(pedido)).status).toBe('EN_ACONDICIONAMIENTO');
+      // QC-284 R14: sin datos, el formulario abre vacio.
+      const antes = await asignaciones.getConditioningOrder(uno, { orderId: pedido });
+      expect(antes.batchData?.missingCount).toBe(2);
+      expect(antes.batchData?.form).toEqual({ kind: 'empty' });
 
-      // Con las dos lineas, termina y conserva el equipo.
-      await asignaciones.saveConditioningBatchData(uno, { orderId: pedido, lines: [datos(lote2, `L2-${token()}`)] });
-      expect((await asignaciones.getConditioningOrder(uno, { orderId: pedido })).batchData?.missingCount).toBe(0);
+      // QC-284 R18, R26: un solo guardado deja la misma terna en las dos lineas y habilita Terminar.
+      const terna = datos(`L-${token()}`);
+      await asignaciones.saveConditioningBatchData(uno, { orderId: pedido, ...terna });
+      await esperarTerna([lote1, lote2], terna);
+      const despues = await asignaciones.getConditioningOrder(uno, { orderId: pedido });
+      expect(despues.batchData?.missingCount).toBe(0);
+      expect(despues.batchData?.form).toEqual({ kind: 'shared', ...terna });
+
       const { numberText } = await asignaciones.finishConditioning(uno, { orderId: pedido });
       expect(numberText.length).toBeGreaterThan(0);
       const terminado = await leerPedido(pedido);
@@ -298,7 +321,7 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
     }
   });
 
-  it('R17: una linea sin lote de produccion cuenta como sin datos y bloquea Terminar', async () => {
+  it('QC-219 R17; QC-284 R26: una linea sin lote sigue sin datos tras guardar y bloquea Terminar', async () => {
     const fixture = await crearFixture();
     try {
       const pedido = await pedidoEnAcondicionamiento(fixture);
@@ -307,10 +330,12 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
       await comenzar(fixture, pedido);
       const uno = actor(fixture, fixture.acondicionador1);
 
-      await asignaciones.saveConditioningBatchData(uno, { orderId: pedido, lines: [datos(lote, `L-${token()}`)] });
+      const terna = datos(`L-${token()}`);
+      await asignaciones.saveConditioningBatchData(uno, { orderId: pedido, ...terna });
       const detalle = await asignaciones.getConditioningOrder(uno, { orderId: pedido });
       expect(detalle.batchData?.missingCount).toBe(1);
       expect(detalle.batchData?.lines.map((line) => line.batchId)).toEqual([lote, null]);
+      expect(detalle.batchData?.form).toEqual({ kind: 'shared', ...terna });
 
       await expect(asignaciones.finishConditioning(uno, { orderId: pedido })).rejects.toMatchObject({
         code: 'conditioning_batch_data_missing',
@@ -325,7 +350,26 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
     }
   });
 
-  it('R18: corregir un TERMINADO cambia el lote y no toca estado, finishedAt ni equipo', async () => {
+  it('QC-284 R17, R23: un pedido sin ninguna linea con lote abre deshabilitado y guardar rechaza con batch_not_found', async () => {
+    const fixture = await crearFixture();
+    try {
+      const pedido = await pedidoEnAcondicionamiento(fixture);
+      await crearLinea(fixture, pedido, 'Botella 1 L', false);
+      await comenzar(fixture, pedido);
+      const uno = actor(fixture, fixture.acondicionador1);
+
+      expect((await asignaciones.getConditioningOrder(uno, { orderId: pedido })).batchData?.form).toEqual({
+        kind: 'no_batches',
+      });
+      await expect(
+        asignaciones.saveConditioningBatchData(uno, { orderId: pedido, ...datos(`L-${token()}`) }),
+      ).rejects.toMatchObject({ code: 'batch_not_found' });
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('QC-219 R18: corregir un TERMINADO cambia el lote y no toca estado, finishedAt ni equipo', async () => {
     const fixture = await crearFixture();
     try {
       const pedido = await pedidoEnAcondicionamiento(fixture);
@@ -333,13 +377,13 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
       await comenzar(fixture, pedido);
       const uno = actor(fixture, fixture.acondicionador1);
 
-      await asignaciones.saveConditioningBatchData(uno, { orderId: pedido, lines: [datos(lote, `L-${token()}`)] });
+      await asignaciones.saveConditioningBatchData(uno, { orderId: pedido, ...datos(`L-${token()}`) });
       await asignaciones.finishConditioning(uno, { orderId: pedido });
       const antes = await leerPedido(pedido);
       const equipoAntes = await leerEquipo(pedido);
 
       const corregido = `CORR-${token()}`;
-      await asignaciones.saveConditioningBatchData(uno, { orderId: pedido, lines: [datos(lote, corregido)] });
+      await asignaciones.saveConditioningBatchData(uno, { orderId: pedido, ...datos(corregido) });
 
       expect(await leerPedido(pedido)).toEqual(antes);
       expect(await leerEquipo(pedido)).toEqual(equipoAntes);
@@ -349,4 +393,60 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
       await borrarFixture(fixture);
     }
   });
+
+  it.each(['TERMINADO', 'ENTREGADO'] as const)(
+    'QC-284 R15, R16, R27: un %s con lotes distintos abre con aviso sin escribir nada; al guardar la terna pasa a todas las lineas y no cambian estado, finishedAt ni equipo',
+    async (estado) => {
+      const fixture = await crearFixture();
+      try {
+        const pedido = await pedidoEnAcondicionamiento(fixture);
+        const lote1 = (await crearLinea(fixture, pedido, 'Botella 1 L', true))!;
+        const lote2 = (await crearLinea(fixture, pedido, 'Garrafa 5 L', true))!;
+        await comenzar(fixture, pedido);
+        const uno = actor(fixture, fixture.acondicionador1);
+
+        // Lo que dejaba QC-219: cada linea con su propio lote, escrito directo en la base.
+        const viejo1 = `V1-${token()}`;
+        const viejo2 = `V2-${token()}`;
+        await prisma.productBatch.update({
+          where: { id: lote1 },
+          data: { lot: viejo1, expiryDate: dia(diaUtc(300)), productionDate: dia(diaUtc(-2)) },
+        });
+        await prisma.productBatch.update({
+          where: { id: lote2 },
+          data: { lot: viejo2, expiryDate: dia(diaUtc(200)), productionDate: dia(diaUtc(-1)) },
+        });
+        await asignaciones.finishConditioning(uno, { orderId: pedido });
+        if (estado === 'ENTREGADO') await prisma.order.update({ where: { id: pedido }, data: { status: 'ENTREGADO' } });
+        const pedidoAntes = await leerPedido(pedido);
+        const equipoAntes = await leerEquipo(pedido);
+        const lotesAntes = await leerLotes([lote1, lote2]);
+
+        // R15, R16: el detalle avisa con el codigo de cada linea, en orden de alta, y no escribe.
+        const detalle = await asignaciones.getConditioningOrder(uno, { orderId: pedido });
+        expect(detalle.status).toBe(estado);
+        expect(detalle.batchData?.form).toEqual({
+          kind: 'divergent',
+          lines: [
+            { presentationId: fixture.presentationIds[0], lot: viejo1 },
+            { presentationId: fixture.presentationIds[1], lot: viejo2 },
+          ],
+        });
+        expect(await leerLotes([lote1, lote2])).toEqual(lotesAntes);
+
+        // R27: guardar deja la misma terna en las dos lineas; el pedido no cambia.
+        const terna = datos(`N-${token()}`, 400);
+        await asignaciones.saveConditioningBatchData(uno, { orderId: pedido, ...terna });
+        await esperarTerna([lote1, lote2], terna);
+        expect(await leerPedido(pedido)).toEqual(pedidoAntes);
+        expect(await leerEquipo(pedido)).toEqual(equipoAntes);
+        expect((await asignaciones.getConditioningOrder(uno, { orderId: pedido })).batchData?.form).toEqual({
+          kind: 'shared',
+          ...terna,
+        });
+      } finally {
+        await borrarFixture(fixture);
+      }
+    },
+  );
 });

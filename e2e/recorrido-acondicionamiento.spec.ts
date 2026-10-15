@@ -5,7 +5,8 @@
  *
  * 1. el Administrador de acondicionamiento lo comienza con un equipo de dos personas: una marcada
  *    suelta y otra que entra por un grupo de trabajo;
- * 2. guarda los datos de lote de las dos líneas y después los corrige;
+ * 2. guarda los datos de lote del pedido (un solo juego para las dos líneas, QC-284) y después
+ *    los corrige;
  * 3. lo termina.
  *
  * Después el Administrador, en su propio contexto, abre el dashboard y comprueba:
@@ -33,7 +34,6 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 
 import {
-  CONDITIONING_BATCH_DATA_LINE_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_BATCH_DATA_SUBMIT_TESTID,
   CONDITIONING_BATCH_DATA_TEXTS,
@@ -118,11 +118,9 @@ const LINE_2_PACKAGES = 3;
 const ORDER_QUANTITY = String(LINE_1_PACKAGES + LINE_2_PACKAGES);
 const FINISHED_UNIT_COST = '1.0000';
 
-/** Los lotes del primer guardado y los de la corrección. */
-const ORIGINAL_LOT_1 = `A1-${RUN_ID.slice(0, 12)}`;
-const ORIGINAL_LOT_2 = `A2-${RUN_ID.slice(0, 12)}`;
-const CORRECTED_LOT_1 = `B1-${RUN_ID.slice(0, 12)}`;
-const CORRECTED_LOT_2 = `B2-${RUN_ID.slice(0, 12)}`;
+/** El lote del primer guardado y el de la corrección: uno por pedido, el mismo en las dos líneas (QC-284). */
+const ORIGINAL_LOT = `A1-${RUN_ID.slice(0, 12)}`;
+const CORRECTED_LOT = `B1-${RUN_ID.slice(0, 12)}`;
 
 /**
  * Las anotaciones sembradas de producción y empaque: diez minutos cada fase, sin pausas, para que
@@ -298,12 +296,8 @@ async function waitForHydration(target: Locator): Promise<void> {
 
 type LineInput = { readonly lot: string; readonly expiryDate: string; readonly productionDate: string };
 
-function lineBlock(section: Locator, batchId: string): Locator {
-  return section.locator(`[data-testid="${CONDITIONING_BATCH_DATA_LINE_TESTID}"][data-batch-id="${batchId}"]`);
-}
-
-/** Los tres campos se localizan por su etiqueta visible. */
-async function fillLine(block: Locator, input: LineInput): Promise<void> {
+/** Un solo juego de campos por pedido (QC-284); se localizan por su etiqueta visible. */
+async function fillBatchData(block: Locator, input: LineInput): Promise<void> {
   const lot = block.getByLabel(CONDITIONING_BATCH_DATA_TEXTS.lot, { exact: true });
   const expiryDate = block.getByLabel(CONDITIONING_BATCH_DATA_TEXTS.expiryDate, { exact: true });
   const productionDate = block.getByLabel(CONDITIONING_BATCH_DATA_TEXTS.productionDate, { exact: true });
@@ -819,17 +813,13 @@ test.describe('acondicionamiento en el recorrido (R36)', () => {
     const today = utcDay(0);
     const nextYear = utcDay(365);
     const yesterday = utcDay(-1);
-    const original1: LineInput = { lot: ORIGINAL_LOT_1, expiryDate: nextYear, productionDate: today };
-    const original2: LineInput = { lot: ORIGINAL_LOT_2, expiryDate: nextYear, productionDate: today };
-    const corrected1: LineInput = { lot: CORRECTED_LOT_1, expiryDate: utcDay(400), productionDate: yesterday };
-    const corrected2: LineInput = { lot: CORRECTED_LOT_2, expiryDate: utcDay(400), productionDate: yesterday };
+    const original: LineInput = { lot: ORIGINAL_LOT, expiryDate: nextYear, productionDate: today };
+    const corrected: LineInput = { lot: CORRECTED_LOT, expiryDate: utcDay(400), productionDate: yesterday };
 
-    await fillLine(lineBlock(section, line1.batchId), original1);
-    await fillLine(lineBlock(section, line2.batchId), original2);
+    await fillBatchData(section, original);
     await saveBatchData(section, orderId, 1);
 
-    await fillLine(lineBlock(section, line1.batchId), corrected1);
-    await fillLine(lineBlock(section, line2.batchId), corrected2);
+    await fillBatchData(section, corrected);
     await saveBatchData(section, orderId, 2);
 
     // --- 3. Termina.
@@ -864,12 +854,12 @@ test.describe('acondicionamiento en el recorrido (R36)', () => {
     await expectAdminSeesTrace(browser, {
       conditioningMs,
       original: [
-        { line: line1, input: original1 },
-        { line: line2, input: original2 },
+        { line: line1, input: original },
+        { line: line2, input: original },
       ],
       corrected: [
-        { line: line1, input: corrected1 },
-        { line: line2, input: corrected2 },
+        { line: line1, input: corrected },
+        { line: line2, input: corrected },
       ],
     });
   });

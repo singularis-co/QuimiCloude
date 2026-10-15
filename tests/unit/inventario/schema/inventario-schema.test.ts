@@ -931,9 +931,9 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     expect(productBatch.body).toMatch(
       /@@index\(\[companyId\],\s*map:\s*"product_batches_company_id_idx"\)/,
     )
-    // Por empresa y no global: dos empresas pueden repetir lote, una misma empresa no.
-    expect(productBatch.body, 'la unicidad (empresa, lote) la declara QC-81 (R11)').toMatch(
-      /@@unique\(\[companyId,\s*lot\],\s*map:\s*"product_batches_company_lot_unique"\)/,
+    // QC-284: la unicidad del lote son dos indices parciales de la migracion, que Prisma no modela.
+    expect(productBatch.body, 'ningun @@unique de lote en el esquema (QC-284)').not.toMatch(
+      /@@unique\(\[[^\]]*\blot\b[^\]]*\]/,
     )
     expect(productBatch.body, 'ninguna unicidad GLOBAL de lote (R12)').not.toMatch(
       /@@unique\(\[lot\]/,
@@ -1085,5 +1085,16 @@ describe('QC-219 R23/R24 — el dia de produccion vive en el lote del inventario
     expect(productionDate.attributes).toContain('@map("production_date")')
     expect(productionDate.attributes).toContain('@db.Date')
     expect(productionDate.attributes).not.toMatch(/@default\(/)
+  })
+})
+
+describe('QC-284 R1/R2 — la unicidad del lote vive en dos indices parciales, no en el esquema', () => {
+  it('R1, R2: ProductBatch no declara ningun @@unique que incluya lot, y el modelo dice donde vive la unicidad', () => {
+    expect(productBatch.body).not.toMatch(/@@unique\(\[[^\]]*\blot\b[^\]]*\]/)
+    expect(productBatch.body).not.toContain('product_batches_company_lot_unique')
+    expect(productBatch.body).not.toMatch(/\blot\b[^\n]*@unique/)
+    expect(rawSchema, 'el comentario del modelo nombra los indices parciales').toMatch(
+      /La unicidad del lote son dos indices unicos parciales/,
+    )
   })
 })
