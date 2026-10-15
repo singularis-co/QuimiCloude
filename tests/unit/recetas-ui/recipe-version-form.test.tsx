@@ -211,9 +211,13 @@ describe('RecipeVersionForm — guardar habilitado solo con 100,00 % y todo con 
     renderCreate();
     await user.type(screen.getByTestId('recipe-version-field-name'), 'Nueva');
 
-    await user.click(screen.getByTestId('recipe-line-add-1'));
+    // Al 100 % el «+» está apagado: se libera el 40 %, se añade la línea y se le da ese 40 %
+    // sin elegir producto.
+    await user.click(screen.getByTestId('recipe-line-remove-1'));
+    await user.click(screen.getByTestId('recipe-line-add-0'));
+    await user.type(screen.getByTestId('recipe-line-percentage-1'), '40');
 
-    expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(3);
+    expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(2);
     expect(screen.getByTestId('recipe-lines-sum')).toHaveAttribute('data-complete', 'true');
     expect(screen.getByTestId('recipe-version-form-submit')).toBeDisabled();
     screen.getByTestId('recipe-version-field-name').focus();
