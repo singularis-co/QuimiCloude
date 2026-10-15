@@ -89,7 +89,7 @@ export function createFinishPacking(
     try {
       await deps.transaction.run(async ({ packing, log }) => {
         // El exito de Terminar es un objeto con los lotes dados de alta, no el literal `'ok'`.
-        const result = await packing.finishPackingAliveById(orderId, actor.companyId, actor.id, now);
+        const result = await packing.finishPackingAliveById(orderId, actor.companyId, actor.id, now, []);
         if (!isExecutionSuccess(result)) throw new ExecutionAbortedError(result);
         await log.append({
           companyId: actor.companyId,

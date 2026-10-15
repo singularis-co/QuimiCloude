@@ -45,7 +45,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   caracteres escritos a mano.
 - **Hecho:** tests verdes. (R16, R29)
 
-## T5 — Terminar con conteo real en `pedidos` (depende de T2, T3, T4)
+## [x] T5 — Terminar con conteo real en `pedidos` (depende de T2, T3, T4)
 - `order-packing.ts`: flujo de `design.md § 3`; `OrderCatalog['finishPackingAliveById']` con
   `counts` y los tres resultados nuevos (`order-catalog.ts`); `errors.ts` si hace falta.
 - Actualizar dobles: `tests/helpers/order-unit-of-work-double.ts`.
