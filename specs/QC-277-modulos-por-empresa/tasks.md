@@ -279,7 +279,7 @@
     que también escribe `company_addon_overrides` y que caen por `ON DELETE CASCADE` al borrar la
     empresa. Si T25–T27 crean un `.int.test.ts` nuevo, se declara aquí.
   - **Hecho:** `pnpm exec vitest run guard-aislamiento-integracion` verde.
-- [ ] **T31 — E2E de la ficha y gate del bloque.** Depende de: T22–T30
+- [x] **T31 — E2E de la ficha y gate del bloque.** Depende de: T22–T30
   - `pnpm exec playwright test e2e/modulos-por-empresa.spec.ts` en Chromium y WebKit.
   - `pnpm run typecheck`, `pnpm run lint`, `pnpm exec vitest run guard` y
     `pnpm exec vitest related --run` sobre los archivos del bloque.

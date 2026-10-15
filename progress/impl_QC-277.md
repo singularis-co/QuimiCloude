@@ -626,3 +626,102 @@ y corren en el gate; los títulos citan su R.
   - `pnpm run typecheck` → 0 `error TS` en el momento de correrlo.
   - `git grep -n "companies.addons" -- ':!specs' ':!progress'` → vacío.
 - Veredicto: T23, T24 y T29 hechos; guardias verdes y ninguna cita a `companies.addons` fuera de specs/progress.
+
+## Bloque H — T25, T26, T27, T30 (backend_dev, 2026-10-15)
+
+- Archivos de producción:
+  - `lib/modules/identity/adapters/driven/persistence/company-addons-prisma.ts` (T25, § 6.3): `findByCompany`
+    lee `addonOverrides` con `enabled: true` y devuelve `stored` en el orden de `ADDONS`; `apply` bloquea
+    `companies ... FOR UPDATE`, lee las excepciones prendidas, sin cambios no escribe, y con cambios hace un
+    `upsert` por cambio (`createdBy` = actor, `createdAt` = now; apagar escribe `false`, sin borrar),
+    toca `updated_at` y escribe un evento por cambio, todo en el mismo `atomically`. Puerto, casos de
+    uso e `is-company-addon-active.ts` sin cambios.
+  - `session-user-prisma.ts` (T26, § 3.1): `company.addonOverrides` (`enabled: true`) en el mismo
+    `findFirst`; párrafo de cabecera con el coste (una sentencia SQL más, cero invocaciones nuevas).
+  - `initial-access-repository-prisma.ts` (T27, § 2.5): `create` anidado con las cinco excepciones
+    prendidas y sin autor.
+- Tests:
+  - `tests/integration/identity/company-addons.int.test.ts`: siembra excepciones (prendidas/apagadas);
+    casos nuevos: apagar deja `false` con autor el actor; volver a prender; sin cambios y apagar sin
+    fila no escriben; apagar todos → cinco filas `false` + cinco eventos; fallo del 5.º evento
+    (proxy sobre `companyEvent.create`) deshace las cinco y `updated_at`; `findByCompany` solo
+    prendidas en orden de catálogo; tabla `addons` = `ADDONS`; clave `'futuro'` → FK `23503`.
+  - `company-directory-addons.int.test.ts`: siembra excepciones; empresa con todas apagadas sale en la lista.
+  - `session-user.int.test.ts`: fixture con excepciones (`fijarAnadidos`); `companyAddons` con
+    `arrayContaining` + `toHaveLength(5)` (mismo patrón que `permissions`: el adaptador no ordena);
+    R8 espía también `companyAddonOverride.find*`; caso nuevo con todas apagadas → `[]`.
+  - `tests/unit/identity/seed/seed-initial-access.test.ts` y `identity-seed.int.test.ts`: cinco filas
+    `enabled = true`, `source = 'manual'`, `created_by` null; la segunda corrida no las toca;
+    `platform-only` → `company_addon_overrides` vacía.
+  - `tests/integration/aislamiento.json` (T30): motivo de `session-user.int.test.ts` nombra
+    `company_addon_overrides` y el `ON DELETE CASCADE`. Ningún `.int.test.ts` nuevo.
+- Mapa R → test:
+  - R2 (D13) → `company-addons.int.test.ts` «la tabla addons… = ADDONS» y «…FK con 23503».
+  - R5 → `company-addons.int.test.ts` «R5: … nace sin ningun añadido» (cero excepciones).
+  - R7 → `seed-initial-access.test.ts` (R7 ×2) + `identity-seed.int.test.ts` «QC-277 R7» y caso platform-only.
+  - R8 → `session-user.int.test.ts` «QC-277 R8, R9: … misma llamada al lector» y «QC-277 R8: … núcleo».
+  - R9 → `session-user.int.test.ts` «QC-277 R9: … todas apagadas» + `company-addons.int.test.ts` «R9: apagar con apply y releer».
+  - R24 → `company-addons.int.test.ts` «R24: apagar los cinco no toca…».
+  - R25 → `company-directory-addons.int.test.ts`.
+  - R29, R33 → `company-addons.int.test.ts` «apagar todos…», «si falla un evento a mitad…», «si el autor no existe…», casos R33.
+  - R31 → `company-addons.int.test.ts` «R31: empresa de baja o inexistente».
+  - R34 → `company-addons.int.test.ts` «R34: listEvents…».
+- Salida real:
+  - `pnpm run typecheck` → 0 `error TS`.
+  - `pnpm exec eslint <8 archivos tocados>` → `ESLint: No issues found`.
+  - `vitest run` de los 4 `.int` → plantilla reconstruida `qct_tpl_c291773e75d6` (seed con el adaptador nuevo);
+    `Test Files 4 passed (4)  Tests 71 passed (71)`.
+  - `vitest run guard-aislamiento-integracion seed-initial-access.test.ts` → `Test Files 2 passed (2)  Tests 46 passed (46)`.
+  - `vitest related --run <3 adaptadores + test unit del seed>` → `Test Files 371 passed (371)  Tests 6066 passed | 2 skipped`.
+- Veredicto: T25, T26, T27 y T30 hechos; todo verde, sin dependencias nuevas ni cambios en puerto/dominio.
+
+## Bloque H — T31, re-T20 y re-T21 (implementer, 2026-10-15)
+
+### Bases recreadas (riesgo 5)
+- `qct_tpl_48246af3423e` (plantilla de integración con la migración vieja): borrada. La plantilla nueva
+  (`qct_tpl_c291773e75d6`) se construyó sola por huella de migraciones.
+- `quimicloude_e2e_qc277`: DROP + `db:migrate` + `db:seed` dos veces (antes de T31 y antes de la suite). El seed deja
+  5 excepciones `enabled = true` y `created_by` NULL.
+- `QuimiCloude`, `quimicloude_e2e_qc277_dev`, `quimicloude_e2e_qc285` y el resto de `qct_tpl_*` no tenían la
+  migración: no se tocaron.
+
+### T31
+- `playwright test e2e/modulos-por-empresa.spec.ts` (chromium + webkit): `10 passed (33.9s)`.
+- `pnpm run typecheck`: 0 errores. `pnpm run lint`: 0 errores y 7 avisos (los previos).
+- `vitest run guard`: `Test Files 79 passed (79)`, `Tests 1090 passed | 20 skipped`.
+- `vitest related --run <archivos del bloque>`: `Test Files 379 passed (379)`, `Tests 6167 passed | 2 skipped`.
+- T25–T27 y T30, revisados contra su «Hecho»: los 4 `.int`, el seed unitario y `guard-aislamiento` dan 117/117.
+  Nota: en `session-user.int.test.ts` la forma de `companyAddons` pasó a `arrayContaining` + `toHaveLength(5)`. Es un
+  assert propio de QC-277: el adaptador no ordena, y es el mismo patrón que ya se usa para `permissions`.
+
+### Re-T20 (suite E2E completa, base limpia, HEAD 66b493fa)
+- `4 failed | 488 passed (28.3m)`:
+  - `acceso-rediseno.spec.ts:319` R20 (chromium y webkit): heredado de dev;
+  - `integraciones-proveedor-ia.spec.ts:211` (webkit): heredado de dev;
+  - `marca-componentes.spec.ts:868` R39 (webkit, `locator.click` timeout): reintentado una vez → `2 passed`. Inestable.
+- `acceso-rediseno.spec.ts:413` R8 (chromium), rojo en dev, esta vez pasó.
+- Resultado: no hay rojos nuevos frente a dev. Las 13 llamadas a `enableAllAddons` valen con el cuerpo nuevo del helper.
+
+### Re-T21 (`./init.sh` rápido): ROJO, desvío de clase nueva, parado
+- related 888 archivos: `4 failed | 884 passed`; `Tests 5 failed | 14258 passed`. Rojos nuevos, fuera del baseline. Los
+  cinco son listas cerradas de Prisma.dmmf en tests de OTRAS fichas, rotas por la relación inversa
+  `User.addonOverridesCreated` (y el modelo `CompanyAddonOverride`) de design §2.2:
+  - `tests/unit/identity/credential-policy-contract.test.ts` (QC-19 R21): los campos de `User` ganan `addonOverridesCreated`;
+  - `tests/unit/proveedores/module-contract.test.ts` R22 (2 casos): `CompanyAddonOverride` entre los modelos relacionados
+    con `User`;
+  - `tests/unit/identity/schema/account-status-schema.test.ts`: «User NO gana ninguna relación nueva»;
+  - `tests/unit/identity/schema/identity-schema.test.ts` R12: lista de modelos.
+- No están en design §10.3. Precedente: QC-162 (c3e02f15) amplió esas mismas listas con `companyEvents`/`CompanyEvent`.
+- No se ha tocado nada. Falta decidir entre:
+  - A) ampliar las 5 listas con `addonOverridesCreated` / `CompanyAddonOverride`, como QC-162, y añadirlo a §10.3 y a
+    Archivos esperados;
+  - B) quitar la relación `author` de Prisma y dejar `createdBy` como escalar con la FK solo en SQL, como
+    `accountStatusChangedBy` (drift declarado). Se aparta de design §2.2.
+- El mapa R1–R38 queda pendiente de cerrar T21. Filas que cambian con el Bloque H:
+  - R2: + `tests/guards/guard-catalogo-de-anadidos.test.ts` + `company-addons.int.test.ts` (tabla = ADDONS, FK 23503);
+  - R5, R24, R29, R31, R33, R34: `company-addons.int.test.ts` sobre excepciones;
+  - R6, R38: `company-addons-migration.test.ts` reescrito;
+  - R7: seed unitario + `identity-seed.int.test.ts` (5 filas, sin autor; `platform-only` sin filas);
+  - R8, R9: `session-user.int.test.ts` (prendidas, misma llamada al lector, apagadas no salen);
+  - R20: `landing.test.ts`;
+  - R37: `architecture-doc.test.ts` + `guard-empresa-en-esquema.test.ts` (D13, D15).
