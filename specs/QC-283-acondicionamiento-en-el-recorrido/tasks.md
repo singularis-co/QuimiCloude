@@ -135,7 +135,7 @@ T4 → T5 → T6 son secuenciales porque comparten `lib/composition/index.ts`, e
 
 **Hecho cuando:** los tests están en verde y `start-conditioning-team.int.test.ts` sigue en verde.
 
-### T5 — Guardar datos de lote anota con foto · backend_dev · R3, R4, R5 · Dep: T4
+### [x] T5 — Guardar datos de lote anota con foto · backend_dev · R3, R4, R5 · Dep: T4
 
 **Hacer:**
 

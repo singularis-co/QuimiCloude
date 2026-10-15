@@ -187,3 +187,39 @@ Modificados (tests):
 - `pnpm exec eslint <10 archivos de T4>` → sin salida (0 problemas).
 
 Veredicto: T4 hecha; Comenzar anota en su transaccion y los tests de T4 estan en verde.
+
+## Tanda 1A · T5 — Guardar datos de lote anota con foto (backend_dev, 2026-10-14)
+
+### Archivos
+
+Modificados (produccion):
+- `lib/modules/asignaciones/domain/save-conditioning-batch-data.ts` (C2.7: deps `batches.listOfOrder`, `presentations.findRefs`, `transaction`; foto fuera de la transaccion; `writers.batches.writeForOrder` + `log.append(conditioning_batch_save)` dentro; traduccion de `ExecutionAbortedError`)
+- `lib/composition/index.ts` (`saveConditioningBatchData`: `presentations: presentationCatalog`, `transaction: executionTransaction`)
+- (C2.5 ya entro en T4: `createFinishedBatchLabels(db?)` y su JSDoc)
+
+Modificados (tests):
+- `tests/unit/asignaciones/conditioning-doubles.ts` (`transaccionDeAcondicionamiento`: doble de la transaccion con `batches`, `conditioning.finishConditioningAliveById` y `log`, y `pasos`)
+- `tests/unit/asignaciones/save-conditioning-batch-data.test.ts` (deps nuevas, nota fechada; R3, R4)
+- `tests/integration/asignaciones/conditioning-execution-log.int.test.ts` (R3, R4, R5)
+- `tests/integration/inventario/finished-batch-labels.int.test.ts` (con `db`: no abre transaccion propia; `duplicate_lot` con `db`)
+- `tests/integration/asignaciones/finish-conditioning-batch-data.int.test.ts` (la limpieza borra antes las anotaciones; nota fechada)
+
+### Decisiones de implementacion
+- `listOfOrder` antes de la transaccion: un `batchId` que no aparece lanza `ConditioningBatchNotFoundError(batchId)` sin abrir la transaccion ni leer el catalogo. Va despues de todas las comprobaciones actuales (fechas, lote repetido), que no cambian de orden.
+- `findRefs` recibe los `presentationId` sin repetir, en el orden de la primera linea que los usa.
+- `batchLabelsError` traduce `ExecutionAbortedError.outcome` con un `as` al desenlace no-`written` de `FinishedBatchLabelsOutcome`: el `outcome` de `ExecutionAbortedError` es generico (`ExecutionWriteOutcome`) y solo este caso de uso lo lanza con ese tipo.
+
+### R → test
+| R | Test |
+|---|---|
+| R3 | `save-conditioning-batch-data.test.ts` › «R3: compone la foto en el orden enviado, con nombre o null, y la anota en la transaccion tras escribir», «R3: la foto lleva solo las lineas enviadas…»; `conditioning-execution-log.int.test.ts` › «R3: guardado y anotacion en la misma transaccion…»; `finished-batch-labels.int.test.ts` › «R3: con db no abre transaccion propia…» |
+| R4 | `save-conditioning-batch-data.test.ts` › «R4, R12: un lote que no es de una linea del pedido…», «R4: un rechazo del guardado (%s) no anota y mantiene el error» (3), «R4: un rechazo de las reglas… no abre la transaccion ni anota», «R4: si anotar falla, el error sale de la transaccion…»; `conditioning-execution-log.int.test.ts` › «R4: un lote duplicado o ajeno al pedido no guarda ni anota», «R4: un append que falla no guarda datos»; `finished-batch-labels.int.test.ts` › «R4: con db, un lote que ya tiene otra linea devuelve duplicate_lot sin escribir» |
+| R5 | `conditioning-execution-log.int.test.ts` › «R5: corregir anade otra foto y la primera no cambia» |
+
+### Verificacion (salida real)
+- `pnpm exec vitest run tests/unit/asignaciones/save-conditioning-batch-data.test.ts` → `Tests 61 passed (61)`.
+- `pnpm exec vitest run` de los 6 unit que usan `conditioning-doubles.ts` → `Test Files 6 passed (6)`, `Tests 161 passed (161)`.
+- `pnpm exec vitest run --project integration tests/integration/asignaciones/conditioning-execution-log.int.test.ts tests/integration/inventario/finished-batch-labels.int.test.ts tests/integration/asignaciones/finish-conditioning-batch-data.int.test.ts` → plantilla `qct_tpl_f928446831e4` reutilizada, base efimera creada y borrada; `Test Files 3 passed (3)`, `Tests 18 passed (18)`.
+- `pnpm exec tsc --noEmit` → sin errores. `pnpm exec eslint <7 archivos de T5>` → sin salida (0 problemas).
+
+Veredicto: T5 hecha; cada guardado anota su foto en la misma transaccion y `finish-conditioning-batch-data.int.test.ts` sigue en verde.

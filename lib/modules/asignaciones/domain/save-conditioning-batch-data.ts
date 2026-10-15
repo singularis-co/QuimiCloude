@@ -2,7 +2,8 @@
 /**
  * Guardar lote, vencimiento y dia de produccion de las lineas de un pedido. Solo lo hace quien
  * acondiciona, y solo desde que comenzo: en `EN_ACONDICIONAMIENTO`, `TERMINADO` o `ENTREGADO`.
- * Ningun dato se borra: cada linea enviada trae los tres.
+ * Ningun dato se borra: cada linea enviada trae los tres. Cada guardado anota en el registro de
+ * ejecucion una foto de lo que escribio, en la misma transaccion.
  *
  * Las fechas se comparan como cadenas `AAAA-MM-DD` contra el dia civil UTC del servidor: con ancho
  * fijo el orden lexicografico es el del calendario y no hay corrimiento de zona.
@@ -19,9 +20,19 @@ import {
   OrderNotConditionableError,
   OrderNotFoundError,
   ValidationError,
+  type AsignacionesError,
 } from './errors';
+import { ExecutionAbortedError, type ExecutionWriteOutcome } from './execution-entry';
 
-import { civilDateSchema, typedLotSchema, type FinishedBatchLabels } from '@/lib/modules/inventario';
+import type { ConditioningBatchSnapshotLine } from './conditioning-trace';
+import type { ExecutionTransaction } from '../ports/execution-transaction';
+import {
+  civilDateSchema,
+  typedLotSchema,
+  type FinishedBatchLabels,
+  type FinishedBatchLabelsOutcome,
+  type PresentationCatalog,
+} from '@/lib/modules/inventario';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 
 const lineSchema = z.strictObject({
@@ -43,7 +54,9 @@ export type SaveConditioningBatchDataInput = z.infer<typeof saveConditioningBatc
 
 export type SaveConditioningBatchDataDeps = {
   readonly orders: OrderCatalog;
-  readonly batches: Pick<FinishedBatchLabels, 'writeForOrder'>;
+  readonly batches: Pick<FinishedBatchLabels, 'listOfOrder'>;
+  readonly presentations: Pick<PresentationCatalog, 'findRefs'>;
+  readonly transaction: ExecutionTransaction;
   readonly now?: () => Date;
 };
 
@@ -63,6 +76,41 @@ function firstDuplicateLot(lines: SaveConditioningBatchDataInput['lines']): stri
     seen.add(line.lot);
   }
   return undefined;
+}
+
+async function composeSnapshot(
+  deps: SaveConditioningBatchDataDeps,
+  companyId: string,
+  orderId: string,
+  lines: SaveConditioningBatchDataInput['lines'],
+): Promise<readonly ConditioningBatchSnapshotLine[]> {
+  const ofOrder = await deps.batches.listOfOrder(companyId, orderId);
+  const presentationOf = new Map(ofOrder.map((batch) => [batch.batchId, batch.presentationId]));
+  const missing = lines.find((line) => !presentationOf.has(line.batchId));
+  if (missing !== undefined) throw new ConditioningBatchNotFoundError(missing.batchId);
+
+  const presentationIds = [...new Set(lines.map((line) => presentationOf.get(line.batchId)!))];
+  const refs = await deps.presentations.findRefs(presentationIds, companyId);
+  const nameOf = new Map(refs.map((ref) => [ref.id, ref.name]));
+
+  return lines.map((line) => {
+    const presentationId = presentationOf.get(line.batchId)!;
+    return {
+      batchId: line.batchId,
+      presentationId,
+      presentationName: nameOf.get(presentationId) ?? null,
+      lot: line.lot,
+      expiryDate: line.expiryDate,
+      productionDate: line.productionDate,
+    };
+  });
+}
+
+/** Solo llegan aqui los desenlaces de `writeForOrder` que no son `written`. */
+function batchLabelsError(outcome: ExecutionWriteOutcome): AsignacionesError {
+  const rejected = outcome as Exclude<FinishedBatchLabelsOutcome, { kind: 'written' }>;
+  if (rejected.kind === 'batch_not_found') return new ConditioningBatchNotFoundError(rejected.batchId);
+  return new ConditioningBatchDuplicateLotError(rejected.batchId ?? undefined);
 }
 
 export function createSaveConditioningBatchData(
@@ -98,14 +146,27 @@ export function createSaveConditioningBatchData(
     const duplicated = firstDuplicateLot(lines);
     if (duplicated !== undefined) throw new ConditioningBatchDuplicateLotError(duplicated);
 
-    const outcome = await deps.batches.writeForOrder({
-      companyId: actor.companyId,
-      orderId,
-      labels: lines,
-      actorId: actor.id,
-      now,
-    });
-    if (outcome.kind === 'batch_not_found') throw new ConditioningBatchNotFoundError(outcome.batchId);
-    if (outcome.kind === 'duplicate_lot') throw new ConditioningBatchDuplicateLotError(outcome.batchId ?? undefined);
+    const companyId = actor.companyId;
+    const batchLines = await composeSnapshot(deps, companyId, orderId, lines);
+
+    try {
+      await deps.transaction.run(async ({ batches, log }) => {
+        const outcome = await batches.writeForOrder({ companyId, orderId, labels: lines, actorId: actor.id, now });
+        // Tras un `duplicate_lot` la transaccion queda abortada en Postgres: hay que lanzar, no seguir.
+        if (outcome.kind !== 'written') throw new ExecutionAbortedError(outcome);
+        await log.append({
+          action: 'conditioning_batch_save',
+          companyId,
+          orderId,
+          userId: actor.id,
+          stepPosition: null,
+          batchLines,
+          occurredAt: now,
+        });
+      });
+    } catch (error) {
+      if (error instanceof ExecutionAbortedError) throw batchLabelsError(error.outcome);
+      throw error;
+    }
   };
 }

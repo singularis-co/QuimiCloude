@@ -40,6 +40,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-pr
 
 import { asignaciones } from '@/lib/composition';
 import { normalizeCompanyName } from '@/lib/modules/identity';
+import { receiveFinishedGoods } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 const CHECK_SIN_PASO = /order_execution_entries_conditioning_has_no_step/u;
@@ -204,6 +205,84 @@ async function leerAnotaciones(orderId: string) {
   });
 }
 
+/** El dia civil UTC desplazado `dias`, como lo compara el caso de uso. */
+function diaUtc(dias: number): string {
+  const instante = new Date();
+  instante.setUTCDate(instante.getUTCDate() + dias);
+  return instante.toISOString().slice(0, 10);
+}
+
+async function crearPresentacion(fixture: Fixture, nombre: string): Promise<string> {
+  const { id } = await prisma.presentation.create({
+    data: {
+      name: nombre,
+      nameNormalized: `${nombre}${token()}`.toLowerCase().replace(/[^a-z0-9]/gu, ''),
+      unitId: fixture.unitId,
+      companyId: fixture.companyId,
+      content: '1',
+    },
+    select: { id: true },
+  });
+  fixture.presentationIds.push(id);
+  return id;
+}
+
+type Lote = { readonly batchId: string; readonly presentationId: string };
+
+/** Una linea del reparto con su entrada por Terminar el empaque: el lote que se etiqueta. */
+async function crearLote(fixture: Fixture, orderId: string, nombre: string): Promise<Lote> {
+  const presentationId = await crearPresentacion(fixture, nombre);
+  const line = await prisma.orderPresentationLine.create({
+    data: { orderId, companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
+    select: { id: true },
+  });
+  const outcome = await prisma.$transaction((tx) =>
+    receiveFinishedGoods(
+      tx,
+      {
+        orderId,
+        recipeId: fixture.recipeId,
+        recipeName: 'Limpiador',
+        presentationId,
+        orderPresentationLineId: line.id,
+        packages: 2,
+        orderContent: null,
+        unitCost: '1.0000',
+        actorId: fixture.packerId,
+        now: new Date(),
+      },
+      { companyId: fixture.companyId },
+    ),
+  );
+  if (outcome.kind !== 'received') throw new Error(`esperaba received, llego ${outcome.kind}`);
+  const movement = await prisma.inventoryMovement.findFirstOrThrow({
+    where: { orderPresentationLineId: line.id, kind: 'production' },
+    select: { batchId: true },
+  });
+  return { batchId: movement.batchId, presentationId };
+}
+
+/** Un pedido `EN_ACONDICIONAMIENTO` comenzado de verdad, con dos lotes de produccion. */
+async function pedidoComenzadoConLotes(fixture: Fixture): Promise<{ pedido: string; frasco: Lote; garrafa: Lote }> {
+  const pedido = await pedidoPorAcondicionar(fixture);
+  const frasco = await crearLote(fixture, pedido, 'Frasco 1 L');
+  const garrafa = await crearLote(fixture, pedido, 'Garrafa 5 L');
+  await asignaciones.startConditioning(actor(fixture), { orderId: pedido, userIds: [fixture.operario], workGroupIds: [] });
+  return { pedido, frasco, garrafa };
+}
+
+function datos(batchId: string, lot: string) {
+  return { batchId, lot, expiryDate: diaUtc(365), productionDate: diaUtc(0) };
+}
+
+async function loteDe(batchId: string): Promise<string> {
+  return (await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { lot: true } })).lot;
+}
+
+async function guardados(orderId: string) {
+  return (await leerAnotaciones(orderId)).filter((anotacion) => anotacion.action === 'CONDITIONING_BATCH_SAVE');
+}
+
 async function conFallo<T>(work: () => Promise<T>): Promise<T> {
   falloDeAnotacion.activo = true;
   try {
@@ -281,3 +360,110 @@ describe('Comenzar anota en el registro de ejecucion', () => {
     }
   });
 });
+
+describe('Guardar datos de lote anota una foto en el registro de ejecucion', () => {
+  it('R3: guardado y anotacion en la misma transaccion: la foto lleva las lineas en el orden enviado, con su presentacion', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
+      const lineas = [datos(garrafa.batchId, `G-${token()}`), datos(frasco.batchId, `F-${token()}`)];
+
+      await asignaciones.saveConditioningBatchData(actor(fixture), { orderId: pedido, lines: lineas });
+
+      expect(await loteDe(garrafa.batchId)).toBe(lineas[0]!.lot);
+      expect(await loteDe(frasco.batchId)).toBe(lineas[1]!.lot);
+      const [guardado, ...resto] = await guardados(pedido);
+      expect(resto).toEqual([]);
+      expect(guardado).toMatchObject({ userId: fixture.acondicionador, stepPosition: null, reason: null });
+      expect(guardado!.batchLines).toEqual([
+        { batchId: garrafa.batchId, presentationId: garrafa.presentationId, presentationName: 'Garrafa 5 L', ...sinId(lineas[0]!) },
+        { batchId: frasco.batchId, presentationId: frasco.presentationId, presentationName: 'Frasco 1 L', ...sinId(lineas[1]!) },
+      ]);
+      const escrito = await prisma.productBatch.findUniqueOrThrow({ where: { id: frasco.batchId }, select: { updatedAt: true } });
+      expect(guardado!.occurredAt).toEqual(escrito.updatedAt);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R4: un lote duplicado o ajeno al pedido no guarda ni anota', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
+      const loteFrasco = await loteDe(frasco.batchId);
+      const loteGarrafa = await loteDe(garrafa.batchId);
+
+      await expect(
+        asignaciones.saveConditioningBatchData(actor(fixture), {
+          orderId: pedido,
+          lines: [datos(frasco.batchId, loteGarrafa)],
+        }),
+      ).rejects.toMatchObject({ code: 'batch_duplicate_lot' });
+      await expect(
+        asignaciones.saveConditioningBatchData(actor(fixture), {
+          orderId: pedido,
+          lines: [datos(frasco.batchId, `F-${token()}`), datos(randomUUID(), `X-${token()}`)],
+        }),
+      ).rejects.toMatchObject({ code: 'batch_not_found' });
+
+      expect(await loteDe(frasco.batchId)).toBe(loteFrasco);
+      expect(await loteDe(garrafa.batchId)).toBe(loteGarrafa);
+      expect(await guardados(pedido)).toEqual([]);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R4: un append que falla no guarda datos', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco } = await pedidoComenzadoConLotes(fixture);
+      const antes = await loteDe(frasco.batchId);
+
+      await conFallo(() =>
+        expect(
+          asignaciones.saveConditioningBatchData(actor(fixture), {
+            orderId: pedido,
+            lines: [datos(frasco.batchId, `F-${token()}`)],
+          }),
+        ).rejects.toThrow(CHECK_SIN_PASO),
+      );
+
+      expect(await loteDe(frasco.batchId)).toBe(antes);
+      expect(await guardados(pedido)).toEqual([]);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R5: corregir anade otra foto y la primera no cambia', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
+      const original = [datos(frasco.batchId, `F-${token()}`), datos(garrafa.batchId, `G-${token()}`)];
+      await asignaciones.saveConditioningBatchData(actor(fixture), { orderId: pedido, lines: original });
+      const [primera] = await guardados(pedido);
+
+      const corregido = `F-CORR-${token()}`;
+      await asignaciones.saveConditioningBatchData(actor(fixture), {
+        orderId: pedido,
+        lines: [datos(frasco.batchId, corregido)],
+      });
+
+      expect(await loteDe(frasco.batchId)).toBe(corregido);
+      const fotos = await guardados(pedido);
+      expect(fotos).toHaveLength(2);
+      expect(fotos[0]).toEqual(primera);
+      expect((fotos[0]!.batchLines as { lot: string }[]).map((linea) => linea.lot)).toEqual(original.map((l) => l.lot));
+      expect(fotos[1]!.batchLines).toEqual([
+        { batchId: frasco.batchId, presentationId: frasco.presentationId, presentationName: 'Frasco 1 L', ...sinId(datos(frasco.batchId, corregido)) },
+      ]);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+});
+
+function sinId(linea: ReturnType<typeof datos>) {
+  return { lot: linea.lot, expiryDate: linea.expiryDate, productionDate: linea.productionDate };
+}

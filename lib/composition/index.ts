@@ -2142,6 +2142,8 @@ export const asignaciones = {
   saveConditioningBatchData: createSaveConditioningBatchData({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
+    presentations: presentationCatalog,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   requestEvidenceUpload: createRequestEvidenceUpload({

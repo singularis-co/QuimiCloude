@@ -1,4 +1,6 @@
 // QC-219 T7 — Guardar los datos de lote: el orden de las reglas, con puertos simulados.
+// Nota 2026-10-14 (QC-283): la escritura pasa a la transaccion de ejecucion (`writers.batches`) y
+// anota una foto del guardado; `listOfOrder` y `findRefs` se leen antes, fuera de ella.
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -19,16 +21,38 @@ import {
 import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
-import type { FinishedBatchLabels, FinishedBatchLabelsOutcome } from '@/lib/modules/inventario';
+import type { NewExecutionEntry } from '@/lib/modules/asignaciones/domain/execution-entry';
+import type {
+  FinishedBatchLabels,
+  FinishedBatchLabelsOutcome,
+  FinishedBatchOfOrderLine,
+  PresentationCatalog,
+  PresentationRef,
+} from '@/lib/modules/inventario';
 import type { OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
 
-import { ACONDICIONADOR, AHORA, ANA, BETO, EMPRESA, PEDIDO_1, actoresSinElPermiso, uuid } from './conditioning-doubles';
+import {
+  ACONDICIONADOR,
+  AHORA,
+  ANA,
+  BETO,
+  EMPRESA,
+  PEDIDO_1,
+  actoresSinElPermiso,
+  loteDeLinea,
+  transaccionDeAcondicionamiento,
+  uuid,
+} from './conditioning-doubles';
 
 // AHORA = 2026-10-08T10:00Z: «hoy» es 2026-10-08.
 const HOY = '2026-10-08';
 const MANANA = '2026-10-09';
 const LOTE_A = uuid('7');
 const LOTE_B = uuid('8');
+const LOTE_C = uuid('9');
+const FRASCO = uuid('c');
+const GARRAFA = uuid('d');
+const SIN_NOMBRE = uuid('e');
 
 function linea(batchId: string, overrides?: Partial<{ lot: string; expiryDate: string; productionDate: string }>) {
   return { batchId, lot: `L-${batchId.slice(0, 4)}`, expiryDate: '2027-04-30', productionDate: HOY, ...overrides };
@@ -38,10 +62,16 @@ function entrada(lines: readonly unknown[] = [linea(LOTE_A)]) {
   return { orderId: PEDIDO_1, lines };
 }
 
+function presentacion(id: string, name: string): PresentationRef {
+  return { id, name, content: '1', unitId: uuid('b') };
+}
+
 function montar(options?: {
   readonly status?: OrderStatus | null;
   readonly conditionedBy?: string | null;
   readonly outcome?: FinishedBatchLabelsOutcome;
+  readonly append?: (entry: NewExecutionEntry) => Promise<void>;
+  readonly ofOrder?: readonly FinishedBatchOfOrderLine[];
 }) {
   const status = options?.status === undefined ? 'EN_ACONDICIONAMIENTO' : options.status;
   const conditionedBy = options?.conditionedBy === undefined ? ANA : options.conditionedBy;
@@ -53,15 +83,37 @@ function montar(options?: {
     pageSize: 1,
     totalPages: 1,
   }));
-  const writeForOrder = vi.fn<FinishedBatchLabels['writeForOrder']>(
-    async () => options?.outcome ?? { kind: 'written' },
+  const listOfOrder = vi.fn<FinishedBatchLabels['listOfOrder']>(
+    async () =>
+      options?.ofOrder ?? [loteDeLinea(FRASCO, LOTE_A), loteDeLinea(GARRAFA, LOTE_B), loteDeLinea(SIN_NOMBRE, LOTE_C)],
   );
+  const findRefs = vi.fn<PresentationCatalog['findRefs']>(async () => [
+    presentacion(FRASCO, 'Frasco 1 L'),
+    presentacion(GARRAFA, 'Garrafa 5 L'),
+  ]);
+  const { transaction, run, writeForOrder, append, pasos } = transaccionDeAcondicionamiento({
+    outcome: options?.outcome,
+    append: options?.append,
+  });
   const deps = {
     orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
-    batches: { writeForOrder },
+    batches: { listOfOrder },
+    presentations: { findRefs },
+    transaction,
     now: () => AHORA,
   } satisfies SaveConditioningBatchDataDeps;
-  return { deps, findAliveById, listAliveSummariesByIds, writeForOrder, todos: [findAliveById, listAliveSummariesByIds, writeForOrder] };
+  return {
+    deps,
+    findAliveById,
+    listAliveSummariesByIds,
+    listOfOrder,
+    findRefs,
+    run,
+    writeForOrder,
+    append,
+    pasos,
+    todos: [findAliveById, listAliveSummariesByIds, listOfOrder, findRefs, run, writeForOrder, append],
+  };
 }
 
 // Sin valor por defecto en `actor`: un `undefined` explicito tiene que llegar tal cual.
@@ -310,4 +362,116 @@ describe('R6, R18 — guarda en los estados corregibles', () => {
       });
     },
   );
+});
+
+describe('QC-283 — cada guardado anota una foto en el registro de ejecucion', () => {
+  it('R3: compone la foto en el orden enviado, con nombre o null, y la anota en la transaccion tras escribir', async () => {
+    const { deps, pasos, listOfOrder, findRefs, append, writeForOrder } = montar();
+    const lineas = [
+      linea(LOTE_C, { lot: '  CR-C  ', productionDate: '2026-09-01' }),
+      linea(LOTE_A, { lot: 'CR-A' }),
+      linea(LOTE_B, { lot: 'CR-B', expiryDate: '2028-01-31' }),
+    ];
+
+    await createSaveConditioningBatchData(deps)(ACONDICIONADOR, entrada(lineas));
+
+    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(findRefs).toHaveBeenCalledWith([SIN_NOMBRE, FRASCO, GARRAFA], EMPRESA);
+    expect(pasos).toEqual(['transaccion', 'escribe-lotes', 'anota']);
+    expect(writeForOrder.mock.calls[0]?.[0].labels.map((label) => label.lot)).toEqual(['CR-C', 'CR-A', 'CR-B']);
+    expect(append).toHaveBeenCalledTimes(1);
+    expect(append).toHaveBeenCalledWith({
+      action: 'conditioning_batch_save',
+      companyId: EMPRESA,
+      orderId: PEDIDO_1,
+      userId: ANA,
+      stepPosition: null,
+      occurredAt: AHORA,
+      batchLines: [
+        {
+          batchId: LOTE_C,
+          presentationId: SIN_NOMBRE,
+          presentationName: null,
+          lot: 'CR-C',
+          expiryDate: '2027-04-30',
+          productionDate: '2026-09-01',
+        },
+        {
+          batchId: LOTE_A,
+          presentationId: FRASCO,
+          presentationName: 'Frasco 1 L',
+          lot: 'CR-A',
+          expiryDate: '2027-04-30',
+          productionDate: HOY,
+        },
+        {
+          batchId: LOTE_B,
+          presentationId: GARRAFA,
+          presentationName: 'Garrafa 5 L',
+          lot: 'CR-B',
+          expiryDate: '2028-01-31',
+          productionDate: HOY,
+        },
+      ],
+    });
+  });
+
+  it('R3: la foto lleva solo las lineas enviadas, no todos los lotes del pedido', async () => {
+    const { deps, append, findRefs } = montar();
+
+    await createSaveConditioningBatchData(deps)(ACONDICIONADOR, entrada([linea(LOTE_B)]));
+
+    expect(findRefs).toHaveBeenCalledWith([GARRAFA], EMPRESA);
+    expect((append.mock.calls[0]?.[0] as { batchLines: readonly unknown[] }).batchLines).toHaveLength(1);
+  });
+
+  it('R4, R12: un lote que no es de una linea del pedido -> `batch_not_found` sin abrir la transaccion', async () => {
+    const { deps, run, findRefs } = montar({ ofOrder: [loteDeLinea(FRASCO, LOTE_A)] });
+
+    const error = await fallo(deps, entrada([linea(LOTE_A), linea(LOTE_B)]));
+
+    expect(error).toBeInstanceOf(ConditioningBatchNotFoundError);
+    expect((error as ConditioningBatchNotFoundError).batchId).toBe(LOTE_B);
+    expect(findRefs).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['duplicate_lot con linea', { kind: 'duplicate_lot', batchId: LOTE_A }, ConditioningBatchDuplicateLotError, LOTE_A],
+    ['duplicate_lot en carrera', { kind: 'duplicate_lot', batchId: null }, ConditioningBatchDuplicateLotError, undefined],
+    ['batch_not_found en carrera', { kind: 'batch_not_found', batchId: LOTE_B }, ConditioningBatchNotFoundError, LOTE_B],
+  ] as const)('R4: un rechazo del guardado (%s) no anota y mantiene el error', async (_n, outcome, clase, batchId) => {
+    const { deps, append, run } = montar({ outcome });
+
+    const error = await fallo(deps, entrada([linea(LOTE_A), linea(LOTE_B, { lot: 'OTRO' })]));
+
+    expect(error).toBeInstanceOf(clase);
+    expect((error as { batchId?: string }).batchId).toBe(batchId);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it('R4: un rechazo de las reglas (fechas, lote repetido) no abre la transaccion ni anota', async () => {
+    const { deps, run, append, listOfOrder } = montar();
+
+    expect(await fallo(deps, entrada([linea(LOTE_A, { expiryDate: HOY })]))).toBeInstanceOf(BatchExpiryNotFutureError);
+    expect(
+      await fallo(deps, entrada([linea(LOTE_A, { lot: 'X' }), linea(LOTE_B, { lot: 'X' })])),
+    ).toBeInstanceOf(ConditioningBatchDuplicateLotError);
+    expect(listOfOrder).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it('R4: si anotar falla, el error sale de la transaccion para que deshaga el guardado', async () => {
+    const roto = new Error('fallo al anotar');
+    const { deps, writeForOrder } = montar({
+      append: async () => {
+        throw roto;
+      },
+    });
+
+    expect(await fallo(deps, entrada())).toBe(roto);
+    expect(writeForOrder).toHaveBeenCalledTimes(1);
+  });
 });
