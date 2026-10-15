@@ -42,6 +42,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { prisma } from '@/lib/shared/db/prisma';
 import { CUSTOMERS_ROUTE, FORMULAS_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -402,6 +403,7 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
+  await enableAllAddons(companyId);
 
   const role = await prisma.role.findUnique({
     where: { name: ROLE_ADMINISTRADOR },

@@ -32,6 +32,7 @@ import { probeFailureMessage } from '@/lib/modules/integraciones/domain/ai-provi
 import { prisma } from '@/lib/shared/db/prisma';
 import { AI_PROVIDER_INTEGRATION_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -167,6 +168,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   companyId = company.id;
+  await enableAllAddons(companyId);
 
   const uploaderRole = await prisma.role.create({
     data: {

@@ -42,6 +42,7 @@ import {
   WHATSAPP_INTEGRATION_ROUTE,
 } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -173,6 +174,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   companyId = company.id;
+  await enableAllAddons(companyId);
 });
 
 test.afterAll(async () => {

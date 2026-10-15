@@ -179,7 +179,7 @@
   - `e2e/modulos-por-empresa.spec.ts`, con los cinco casos de `design.md > 10.2`.
   - **Hecho:** `pnpm exec playwright test e2e/modulos-por-empresa.spec.ts` verde en Chromium y
     WebKit.
-- [ ] **T20 — Censo de la suite E2E** (riesgo 1 de `design.md > 14`). Depende de: T19
+- [x] **T20 — Censo de la suite E2E** (riesgo 1 de `design.md > 14`). Depende de: T19 (hecho sobre `companies.addons`, antes del Bloque H; se repite tras T31)
   - Correr la suite E2E completa sobre base limpia.
   - En cada spec que falle **solo** porque su empresa propia nace sin añadidos, llamar a
     `enableAllAddons` tras crearla.
@@ -447,6 +447,7 @@ E2E (el spec de la ficha, los helpers y los candidatos del censo de T20):
 - `e2e/piezas-compartidas.spec.ts`
 - `e2e/permisos.spec.ts`
 - `e2e/login.spec.ts`
+- `e2e/movimiento.spec.ts`
 
 Bloque H, enmienda D13–D16. Solo las rutas nuevas; el resto de archivos del bloque (esquema,
 migración, los tres adaptadores de persistencia, docs de arquitectura, los tests de integración de

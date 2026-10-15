@@ -393,3 +393,74 @@ Fixture: empresa propia `qc277_e2e_<runId>_c` (nace sin añadidos; se comprueba)
 Chromium 5/5, WebKit 5/5 (dos corridas seguidas, ambas verdes). `pnpm run typecheck`: sin salida de errores. `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, todos previos (`confirm-catalog-import.test.ts`, `order-service.test.ts`); el spec nuevo, `ESLint: No issues found`.
 
 **Veredicto:** T19 hecha: los cinco casos de design §10.2 están verdes en Chromium y WebKit sin tocar código de producción.
+
+## Tanda 5 — T20 censo E2E (frontend_dev, 2026-10-15)
+
+Punto de partida: suite completa en la rama contra `quimicloude_e2e_qc277`, 63 failed / 429 passed.
+Todos los specs tocados reciben `await enableAllAddons(<id>)` (de `e2e/helpers/addons.ts`) justo tras
+crear su empresa propia. No se cambió ningún assert. Cada spec crea su empresa inline: no hay fixture
+compartido en `e2e/` que tocar.
+
+| Spec | Causa en el log (empresa propia sin añadidos) | ¿En «Archivos esperados»? |
+|---|---|---|
+| `e2e/aislamiento-proveedores.spec.ts` | `proveedores-title` no aparece (proveedores apagado). Se llama dentro de `seedCompanySuppliers`, así que cubre las empresas A y B | sí |
+| `e2e/catalogo-desde-pdf.spec.ts` | `supplier-detail-name` no aparece (proveedores) | sí |
+| `e2e/dashboard-rediseno.spec.ts` | `dashboard-title` no aparece (dashboard) | sí |
+| `e2e/documentos.spec.ts` | `supplier-detail-name` y `document-upload-open` ausentes (proveedores, lectura_pdf) | sí |
+| `e2e/formula-desde-pdf.spec.ts` | `document-upload-open` ausente (lectura_pdf) | sí |
+| `e2e/integraciones-proveedor-ia.spec.ts` | `document-upload-open` ausente en Fórmulas (lectura_pdf) | sí |
+| `e2e/integraciones-whatsapp.spec.ts` | 404 en la pantalla y `whatsapp-connection-form` ausente (integraciones) | sí |
+| `e2e/integraciones.spec.ts` | `nav-integraciones` ausente en el menú (integraciones) | sí |
+| `e2e/inventario-importar.spec.ts` | `inventory-import-review` ausente (importacion_excel) | sí |
+| `e2e/marca-componentes.spec.ts` | espera `nav-integraciones` (FIRST_GROUP) y no está; otros dos casos acabaron en `/login?sesion=fin`, que tras el cambio también pasan | sí |
+| `e2e/movimiento.spec.ts` | «no hay indicador en la lista de nav-proveedores» y `document-upload-open` ausente (proveedores, lectura_pdf) | **NO: falta en `tasks.md > Archivos esperados`** |
+| `e2e/proveedores.spec.ts` | `proveedores-title` no aparece (proveedores) | sí |
+| `e2e/recorrido-ejecucion.spec.ts` | `dashboard-title` no aparece (dashboard). Solo la empresa principal: el usuario de la otra empresa no inicia sesión | sí |
+
+No tocados:
+
+- `e2e/acceso-rediseno.spec.ts`: en la rama solo falla R20 (chromium y webkit), que es HEREDADO de dev.
+  Su empresa no entra en ningún añadido.
+- `e2e/pedidos-rediseno.spec.ts`: 1 caso en webkit (`data-pinned` de la cabecera, l. 547), sin relación
+  con añadidos. Se reintentó una vez y pasó: inestable.
+- `shell-rediseno`, `piezas-compartidas`, `permisos`, `login` (listados en Archivos esperados): no
+  fallaron en la suite de la rama, así que no se tocan.
+
+Salida final (solo los 13 specs tocados + `pedidos-rediseno`, chromium + webkit):
+
+```
+bash e2e-qc277.sh quimicloude_e2e_qc277 pnpm exec playwright test --reporter=line <13 specs> e2e/pedidos-rediseno.spec.ts
+  1 failed
+    [webkit] › e2e\integraciones-proveedor-ia.spec.ts:211:7 › el proveedor IA de la empresa › R37, R30, ... desconectar
+  151 passed (10.7m)
+```
+
+El único rojo es el HEREDADO de dev (antes l. 209, ahora l. 211 por las dos líneas añadidas; solo webkit). Ya
+pasa la aserción del añadido (`document-upload-open` deshabilitado, l. 229) y cae más adelante, en
+`ai-provider-required-tooltip` tras el hover (l. 231), el síntoma de webkit que trae dev.
+
+`pnpm run typecheck`: sin errores. `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, los mismos de antes
+(`confirm-catalog-import.test.ts`, `order-service.test.ts`). `eslint e2e/*.spec.ts`: `No issues found`.
+
+**Veredicto:** T20 hecha. Los 13 specs tocados quedan verdes en chromium y webkit, salvo el heredado. Hay
+que añadir `e2e/movimiento.spec.ts` a `tasks.md > Archivos esperados`.
+
+## Tanda 5 — T20 cierre: suite completa y comparación con dev (implementer, 2026-10-15)
+- Base limpia propia: `quimicloude_e2e_qc277` (pg17 :5433, `db:migrate` + `db:seed` desde cero). La compartida
+  `QuimiCloude` no tiene la migración de la ficha. Línea base de dev: `quimicloude_e2e_qc277_dev`, migrada y sembrada
+  desde el worktree principal (`dev` @ `ccde16f7`).
+- Suite completa en la rama (commit `89819c2c`, antes del censo): **63 failed | 429 passed (35.2 min)**. Han fallado 15 specs.
+- Esos 15 specs en dev: **4 failed | 190 passed (11.3 min)**:
+  - `acceso-rediseno.spec.ts:319` R20 (chromium y webkit);
+  - `acceso-rediseno.spec.ts:413` R8 (chromium);
+  - `integraciones-proveedor-ia.spec.ts:209` (webkit). Cae en el mismo assert que en la rama:
+    `getByTestId('ai-provider-required-tooltip')` no aparece, l. 229 en dev y l. 231 en la rama.
+  Son **heredados**: no se tocan.
+- Tras el censo (13 specs + `pedidos-rediseno`, chromium y webkit): **1 failed | 151 passed**. El rojo es el
+  heredado de webkit en `integraciones-proveedor-ia`. `pedidos-rediseno` (webkit, `data-pinned`) pasó al reintentarlo: inestable, sin
+  relación con añadidos.
+- Resultado: la suite queda con los mismos rojos que dev. No hay nada nuevo y no apareció ninguna clase nueva de desvío.
+- `e2e/movimiento.spec.ts` añadido a `tasks.md > Archivos esperados`.
+- **Aviso:** el Bloque H (T22–T31) cambia `companies.addons` por tablas y su T31 dice que T20 y T21 corren después. Este
+  censo es sobre el modelo anterior. Las llamadas a `enableAllAddons` siguen valiendo, pero el cuerpo del helper cambiará, así
+  que hay que repetir el censo tras T31.

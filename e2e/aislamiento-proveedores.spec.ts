@@ -35,6 +35,7 @@ import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -135,6 +136,7 @@ async function seedCompanySuppliers(input: {
     },
     select: { id: true },
   });
+  await enableAllAddons(company.id);
 
   const unit = await prisma.unit.create({
     data: {
