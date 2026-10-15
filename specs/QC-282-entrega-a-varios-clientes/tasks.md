@@ -155,7 +155,7 @@ tablet y teléfono (comprobado en el navegador local); hay commit.
 
 ---
 
-## [ ] F2 [P] — Lista de entregas y diálogo de anular (depende de T0 y F3)
+## [x] F2 [P] — Lista de entregas y diálogo de anular (depende de T0 y F3)
 
 - `app/(private)/pedidos/components/order-delivery-list.tsx` (`design.md > 7.2`).
 - `app/(private)/pedidos/components/delivery-void-dialog.tsx` (`design.md > 7.3`).

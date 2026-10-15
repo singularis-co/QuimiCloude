@@ -16,6 +16,7 @@ import {
   ORDER_DELIVERIES_SHEET_TESTID,
   ORDER_DELIVERIES_SKELETON_TESTID,
   ORDER_DELIVERY_ENTRY_TESTID,
+  ORDER_DELIVERY_ENTRY_VOIDED_TESTID,
   ORDER_DELIVERY_VOID_TESTID,
   OrderDeliveriesSheet,
 } from '@/app/(private)/pedidos/components';
@@ -26,9 +27,12 @@ import type {
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 
 import {
+  FIRST_CUSTOMER_ID,
   NEWER_DELIVERY_ID,
   OLDER_DELIVERY_ID,
   OPEN_LINE_ID,
+  SECOND_CUSTOMER_ID,
+  VOIDED_LINE_ID,
   VOID_ERROR_STATES,
   VOID_KEY,
   VOID_ORDER_ID,
@@ -127,6 +131,16 @@ async function anularLaMasReciente(user: ReturnType<typeof setupUser>) {
   await screen.findAllByTestId(ORDER_DELIVERY_ENTRY_TESTID);
   await user.click(within(entrada(NEWER_DELIVERY_ID)).getByTestId(ORDER_DELIVERY_VOID_TESTID));
   await screen.findByTestId(DELIVERY_VOID_DIALOG_TESTID);
+  // 2026-10-15: el dialogo abre sin nada marcado; se marca la botella de Ana.
+  const botellaDeAna = screen
+    .getAllByTestId(DELIVERY_VOID_PRESENTATION_TESTID)
+    .find(
+      (c) =>
+        c.getAttribute('data-customer-id') === FIRST_CUSTOMER_ID &&
+        c.getAttribute('data-presentation-line-id') === OPEN_LINE_ID,
+    );
+  if (botellaDeAna === undefined) throw new Error('no se pinta la botella de Ana');
+  await user.click(botellaDeAna);
   await user.type(screen.getByTestId(DELIVERY_VOID_REASON_TESTID), VOID_REASON);
   await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
 }
@@ -201,7 +215,8 @@ describe('lectura', () => {
 });
 
 describe('anular desde el sheet', () => {
-  it('«Anular» abre el dialogo con las presentaciones sin anular de esa entrega', async () => {
+  // 2026-10-15: los pares van por cliente y abren sin marcar.
+  it('R36: «Anular» abre el dialogo con los pares sin anular de esa entrega, sin marcar', async () => {
     const user = setupUser();
     montar();
 
@@ -209,9 +224,11 @@ describe('anular desde el sheet', () => {
     await user.click(within(entrada(NEWER_DELIVERY_ID)).getByTestId(ORDER_DELIVERY_VOID_TESTID));
 
     await screen.findByTestId(DELIVERY_VOID_DIALOG_TESTID);
+    const casillas = screen.getAllByTestId(DELIVERY_VOID_PRESENTATION_TESTID);
     expect(
-      screen.getAllByTestId(DELIVERY_VOID_PRESENTATION_TESTID).map((c) => c.getAttribute('data-presentation-line-id')),
-    ).toEqual([OPEN_LINE_ID]);
+      casillas.map((c) => `${c.getAttribute('data-customer-id')}:${c.getAttribute('data-presentation-line-id')}`),
+    ).toEqual([`${FIRST_CUSTOMER_ID}:${OPEN_LINE_ID}`, `${SECOND_CUSTOMER_ID}:${VOIDED_LINE_ID}`]);
+    for (const c of casillas) expect(c).toHaveAttribute('aria-checked', 'false');
   });
 
   it('R15: tras anular cierra el dialogo, relee la lista con el estado nuevo y refresca', async () => {
@@ -227,10 +244,16 @@ describe('anular desde el sheet', () => {
     await waitFor(() => expect(screen.queryByTestId(DELIVERY_VOID_DIALOG_TESTID)).toBeNull());
     expect(exito).toHaveBeenCalledWith('Entrega anulada');
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
-    // Con el pedido TERMINADO y la entrega mas reciente ya anulada entera, solo la otra ofrece «Anular».
-    await waitFor(() =>
-      expect(within(entrada(NEWER_DELIVERY_ID)).queryByTestId(ORDER_DELIVERY_VOID_TESTID)).toBeNull(),
-    );
+    // 2026-10-15: lo de Ana queda anulado entero, pero a Bruno le queda el galon: las dos entregas
+    // siguen ofreciendo «Anular».
+    await waitFor(() => {
+      const botellaDeAna = entrada(NEWER_DELIVERY_ID).querySelector<HTMLElement>(
+        `[data-customer-id="${FIRST_CUSTOMER_ID}"] [data-presentation-line-id="${OPEN_LINE_ID}"]`,
+      );
+      expect(botellaDeAna).not.toBeNull();
+      expect(within(botellaDeAna!).getByTestId(ORDER_DELIVERY_ENTRY_VOIDED_TESTID)).toBeInTheDocument();
+    });
+    expect(within(entrada(NEWER_DELIVERY_ID)).getByTestId(ORDER_DELIVERY_VOID_TESTID)).toBeInTheDocument();
     expect(within(entrada(OLDER_DELIVERY_ID)).getByTestId(ORDER_DELIVERY_VOID_TESTID)).toBeInTheDocument();
     expect(cerrar).not.toHaveBeenCalled();
   });

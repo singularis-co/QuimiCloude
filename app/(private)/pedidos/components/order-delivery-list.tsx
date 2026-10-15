@@ -7,9 +7,12 @@ import { Button } from '@/components/ui/button';
 import type { OrderDeliveryHistoryView, OrderStatus } from '@/lib/modules/pedidos';
 
 export type OrderDeliveryHistoryEntry = OrderDeliveryHistoryView['deliveries'][number];
+type OrderDeliveryHistoryCustomer = OrderDeliveryHistoryEntry['customers'][number];
+type OrderDeliveryHistoryPresentation = OrderDeliveryHistoryCustomer['presentations'][number];
 
 export const ORDER_DELIVERIES_EMPTY_TESTID = 'order-deliveries-empty';
 export const ORDER_DELIVERY_ENTRY_TESTID = 'order-delivery-entry';
+export const ORDER_DELIVERY_ENTRY_CUSTOMER_TESTID = 'order-delivery-entry-customer';
 export const ORDER_DELIVERY_ENTRY_PRESENTATION_TESTID = 'order-delivery-entry-presentation';
 export const ORDER_DELIVERY_ENTRY_BATCH_TESTID = 'order-delivery-entry-batch';
 export const ORDER_DELIVERY_ENTRY_VOIDED_TESTID = 'order-delivery-entry-voided';
@@ -18,7 +21,7 @@ export const ORDER_DELIVERY_VOID_TESTID = 'order-delivery-void';
 const EMPTY_TEXT = 'Este pedido todavía no tiene entregas.';
 const LIST_LABEL = 'Entregas del pedido';
 const DATE_LABEL = 'Fecha';
-const CUSTOMER_LABEL = 'Cliente';
+const CUSTOMERS_LABEL = 'Clientes';
 const AUTHOR_LABEL = 'Entregó';
 const PACKAGES_LABEL = 'Envases';
 const LOT_LABEL = 'Lote';
@@ -49,6 +52,12 @@ function formatDeliveryDate(iso: string): string {
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
 }
 
+function hasOpenPair(delivery: OrderDeliveryHistoryEntry): boolean {
+  return delivery.customers.some((customer) =>
+    customer.presentations.some((presentation) => presentation.void === null),
+  );
+}
+
 export type OrderDeliveryListProps = {
   /** En el orden en que se pintan: la más reciente primero. */
   readonly deliveries: OrderDeliveryHistoryView['deliveries'];
@@ -72,31 +81,25 @@ export function OrderDeliveryList({ deliveries, canVoid, orderStatus, onVoid }: 
   return (
     <ul className="flex flex-col gap-4" aria-label={LIST_LABEL}>
       {deliveries.map((delivery) => {
-        const presentations = delivery.customers.flatMap((customer) =>
-          customer.presentations.map((presentation) => ({
-            ...presentation,
-            key: `${customer.customerId}:${presentation.presentationLineId}`,
-          })),
-        );
-        const showVoid = statusAcceptsVoid && presentations.some((presentation) => presentation.void === null);
+        const showVoid = statusAcceptsVoid && hasOpenPair(delivery);
         const dateText = formatDeliveryDate(delivery.createdAt);
         return (
           <li
             key={delivery.id}
-            className="flex flex-col gap-3 rounded-lg border p-3"
+            className="flex flex-col gap-3 rounded-lg border p-4"
             data-testid={ORDER_DELIVERY_ENTRY_TESTID}
             data-delivery-id={delivery.id}
           >
-            <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
                 <dt className="text-muted-foreground">{DATE_LABEL}</dt>
                 <dd data-testid="order-delivery-entry-date">
                   <time dateTime={delivery.createdAt}>{dateText}</time>
                 </dd>
-                <dt className="text-muted-foreground">{CUSTOMER_LABEL}</dt>
-                <dd data-testid="order-delivery-entry-customer">
-                  {delivery.customers.map((customer) => customer.customerName).join(', ')}
-                </dd>
+                <dt className="text-muted-foreground">{CUSTOMERS_LABEL}</dt>
+                <dd data-testid="order-delivery-entry-customers">{delivery.customers.length}</dd>
+                <dt className="text-muted-foreground">{PACKAGES_LABEL}</dt>
+                <dd data-testid="order-delivery-entry-packages">{delivery.packages}</dd>
                 <dt className="text-muted-foreground">{AUTHOR_LABEL}</dt>
                 <dd data-testid="order-delivery-entry-author">{delivery.authorName}</dd>
               </dl>
@@ -114,69 +117,89 @@ export function OrderDeliveryList({ deliveries, canVoid, orderStatus, onVoid }: 
                 </Button>
               ) : null}
             </div>
-            <ul className="flex flex-col gap-2">
-              {presentations.map((presentation) => (
-                <li
-                  key={presentation.key}
-                  className="flex flex-col gap-1 border-t pt-2 text-sm"
-                  data-testid={ORDER_DELIVERY_ENTRY_PRESENTATION_TESTID}
-                  data-presentation-line-id={presentation.presentationLineId}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium" data-testid="order-delivery-entry-presentation-name">
-                      {presentation.presentationName}
-                    </span>
-                    <span data-testid="order-delivery-entry-presentation-packages">
-                      <span className="text-muted-foreground">{PACKAGES_LABEL} </span>
-                      {presentation.packages}
-                    </span>
-                  </div>
-                  <ul className="flex flex-col gap-0.5">
-                    {presentation.batches.map((batch) => (
-                      <li
-                        key={batch.batchId}
-                        className="flex justify-between gap-2 text-muted-foreground"
-                        data-testid={ORDER_DELIVERY_ENTRY_BATCH_TESTID}
-                        data-batch-id={batch.batchId}
-                      >
-                        <span>
-                          {LOT_LABEL} <span data-testid="order-delivery-entry-batch-lot">{batch.lot}</span>
-                        </span>
-                        <span>
-                          {PACKAGES_LABEL}{' '}
-                          <span data-testid="order-delivery-entry-batch-packages">{batch.packages}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  {presentation.void === null ? null : (
-                    <div
-                      className="flex flex-col gap-1 rounded-md bg-muted p-2"
-                      data-testid={ORDER_DELIVERY_ENTRY_VOIDED_TESTID}
-                    >
-                      <StatusBadge tone="danger" label={VOIDED_LABEL} />
-                      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-                        <dt className="text-muted-foreground">{VOID_REASON_LABEL}</dt>
-                        <dd className="break-words" data-testid="order-delivery-entry-void-reason">
-                          {presentation.void.reason}
-                        </dd>
-                        <dt className="text-muted-foreground">{VOID_AUTHOR_LABEL}</dt>
-                        <dd data-testid="order-delivery-entry-void-author">{presentation.void.authorName}</dd>
-                        <dt className="text-muted-foreground">{VOID_DATE_LABEL}</dt>
-                        <dd data-testid="order-delivery-entry-void-date">
-                          <time dateTime={presentation.void.createdAt}>
-                            {formatDeliveryDate(presentation.void.createdAt)}
-                          </time>
-                        </dd>
-                      </dl>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
+            {delivery.customers.map((customer) => (
+              <DeliveryCustomer key={customer.customerId} customer={customer} />
+            ))}
           </li>
         );
       })}
     </ul>
+  );
+}
+
+function DeliveryCustomer({ customer }: { readonly customer: OrderDeliveryHistoryCustomer }) {
+  return (
+    <section
+      aria-label={customer.customerName}
+      className="flex flex-col gap-2 border-t pt-2.5"
+      data-testid={ORDER_DELIVERY_ENTRY_CUSTOMER_TESTID}
+      data-customer-id={customer.customerId}
+    >
+      <h3 className="text-sm font-semibold" data-testid="order-delivery-entry-customer-name">
+        {customer.customerName}
+      </h3>
+      <ul className="flex flex-col gap-2">
+        {customer.presentations.map((presentation) => (
+          <DeliveryPresentation key={presentation.presentationLineId} presentation={presentation} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function DeliveryPresentation({ presentation }: { readonly presentation: OrderDeliveryHistoryPresentation }) {
+  return (
+    <li
+      className="flex flex-col gap-1 pl-3 text-sm"
+      data-testid={ORDER_DELIVERY_ENTRY_PRESENTATION_TESTID}
+      data-presentation-line-id={presentation.presentationLineId}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-medium" data-testid="order-delivery-entry-presentation-name">
+          {presentation.presentationName}
+        </span>
+        <span data-testid="order-delivery-entry-presentation-packages">
+          <span className="text-muted-foreground">{PACKAGES_LABEL} </span>
+          {presentation.packages}
+        </span>
+      </div>
+      <ul className="flex flex-col gap-0.5">
+        {presentation.batches.map((batch) => (
+          <li
+            key={batch.batchId}
+            className="flex justify-between gap-2 text-muted-foreground"
+            data-testid={ORDER_DELIVERY_ENTRY_BATCH_TESTID}
+            data-batch-id={batch.batchId}
+          >
+            <span>
+              {LOT_LABEL} <span data-testid="order-delivery-entry-batch-lot">{batch.lot}</span>
+            </span>
+            <span>
+              {PACKAGES_LABEL} <span data-testid="order-delivery-entry-batch-packages">{batch.packages}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {presentation.void === null ? null : (
+        <div
+          className="mt-1 flex flex-col gap-1.5 rounded-lg bg-muted p-2"
+          data-testid={ORDER_DELIVERY_ENTRY_VOIDED_TESTID}
+        >
+          <StatusBadge tone="danger" label={VOIDED_LABEL} />
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+            <dt className="text-muted-foreground">{VOID_REASON_LABEL}</dt>
+            <dd className="break-words" data-testid="order-delivery-entry-void-reason">
+              {presentation.void.reason}
+            </dd>
+            <dt className="text-muted-foreground">{VOID_AUTHOR_LABEL}</dt>
+            <dd data-testid="order-delivery-entry-void-author">{presentation.void.authorName}</dd>
+            <dt className="text-muted-foreground">{VOID_DATE_LABEL}</dt>
+            <dd data-testid="order-delivery-entry-void-date">
+              <time dateTime={presentation.void.createdAt}>{formatDeliveryDate(presentation.void.createdAt)}</time>
+            </dd>
+          </dl>
+        </div>
+      )}
+    </li>
   );
 }

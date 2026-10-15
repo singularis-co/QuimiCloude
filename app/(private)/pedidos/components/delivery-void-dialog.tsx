@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import { newRequestId } from '@/lib/modules/observabilidad';
@@ -21,6 +20,8 @@ import {
 import type { OrderDeliveryHistoryEntry } from './order-delivery-list';
 
 export const DELIVERY_VOID_DIALOG_TESTID = 'delivery-void-dialog';
+export const DELIVERY_VOID_GROUP_TESTID = 'delivery-void-group';
+export const DELIVERY_VOID_GROUP_TOGGLE_TESTID = 'delivery-void-group-toggle';
 export const DELIVERY_VOID_PRESENTATION_TESTID = 'delivery-void-presentation';
 export const DELIVERY_VOID_REASON_TESTID = 'delivery-void-reason';
 export const DELIVERY_VOID_EMPTY_ERROR_TESTID = 'delivery-void-empty-error';
@@ -41,9 +42,11 @@ const NOTICE_CLASS = 'rounded-lg border border-destructive/40 p-3 text-sm text-d
 const LABELS = {
   title: 'Anular la entrega',
   description:
-    'Marca las presentaciones que se anulan. Sus envases vuelven a los lotes de los que salieron.',
-  presentations: 'Presentaciones que se anulan',
+    'Marca, por cliente, las presentaciones que se anulan. Sus envases vuelven a los lotes de los que salieron.',
   packages: (packages: number) => `${packages} envases`,
+  groupToggle: (customerName: string) => `Anular todo lo de ${customerName}`,
+  pair: (presentationName: string, customerName: string, packages: number) =>
+    `${presentationName} de ${customerName} · ${packages} envases`,
   reason: 'Motivo de la anulación',
   empty: 'No hay nada que anular: marca al menos una presentación.',
   reasonRequired: 'Escribe el motivo de la anulación.',
@@ -63,6 +66,38 @@ function unexpectedFromRejection(): ErrorState {
     message: errorMessage(UNEXPECTED_ERROR_CODE),
     reference: newRequestId(),
   };
+}
+
+type OpenPair = {
+  readonly key: string;
+  readonly customerId: string;
+  readonly presentationLineId: string;
+  readonly presentationName: string;
+  readonly packages: number;
+};
+
+type OpenGroup = {
+  readonly customerId: string;
+  readonly customerName: string;
+  readonly pairs: readonly OpenPair[];
+};
+
+function openGroups(delivery: OrderDeliveryHistoryEntry): OpenGroup[] {
+  return delivery.customers
+    .map((customer) => ({
+      customerId: customer.customerId,
+      customerName: customer.customerName,
+      pairs: customer.presentations
+        .filter((presentation) => presentation.void === null)
+        .map((presentation) => ({
+          key: `${customer.customerId}:${presentation.presentationLineId}`,
+          customerId: customer.customerId,
+          presentationLineId: presentation.presentationLineId,
+          presentationName: presentation.presentationName,
+          packages: presentation.packages,
+        })),
+    }))
+    .filter((group) => group.pairs.length > 0);
 }
 
 export type DeliveryVoidDialogProps = {
@@ -100,18 +135,9 @@ function DeliveryVoidDialogBody({ delivery, onOpenChange, reload, fieldId }: Del
   const reasonId = `${fieldId}-reason`;
   const reasonErrorId = `${fieldId}-reason-error`;
   const [voidKey] = useState(() => crypto.randomUUID());
-  const openLines = delivery.customers.flatMap((customer) =>
-    customer.presentations
-      .filter((presentation) => presentation.void === null)
-      .map((presentation) => ({
-        ...presentation,
-        customerId: customer.customerId,
-        key: `${customer.customerId}:${presentation.presentationLineId}`,
-      })),
-  );
-  const [checked, setChecked] = useState<ReadonlySet<string>>(
-    () => new Set(openLines.map((presentation) => presentation.key)),
-  );
+  const groups = openGroups(delivery);
+  const openLines = groups.flatMap((group) => group.pairs);
+  const [checked, setChecked] = useState<ReadonlySet<string>>(() => new Set());
   const [reason, setReason] = useState('');
   const [attempted, setAttempted] = useState(false);
   const [rejected, setRejected] = useState<ErrorState | null>(null);
@@ -131,6 +157,18 @@ function DeliveryVoidDialogBody({ delivery, onOpenChange, reload, fieldId }: Del
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleGroup(group: OpenGroup) {
+    setChecked((current) => {
+      const next = new Set(current);
+      const allChecked = group.pairs.every((pair) => current.has(pair.key));
+      for (const pair of group.pairs) {
+        if (allChecked) next.delete(pair.key);
+        else next.add(pair.key);
+      }
       return next;
     });
   }
@@ -206,38 +244,64 @@ function DeliveryVoidDialogBody({ delivery, onOpenChange, reload, fieldId }: Del
       }
     >
       <div className="flex flex-col gap-4">
-        <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium">{LABELS.presentations}</legend>
-          <ul className="flex flex-col gap-1">
-            {openLines.map((presentation) => {
-              const checkboxId = `${fieldId}-line-${presentation.key}`;
-              const label = `${presentation.presentationName} · ${LABELS.packages(presentation.packages)}`;
-              return (
-                <li key={presentation.key} className="flex items-center gap-2">
-                  {/* Etiqueta hermana: dentro del `<label>` un clic llegaría dos veces al primitivo. */}
+        <div className="flex flex-col gap-2">
+          {groups.map((group) => {
+            const checkedCount = group.pairs.filter((pair) => checked.has(pair.key)).length;
+            const allChecked = checkedCount === group.pairs.length;
+            return (
+              <fieldset
+                key={group.customerId}
+                className="flex flex-col gap-0.5 border-t pt-2"
+                data-testid={DELIVERY_VOID_GROUP_TESTID}
+                data-customer-id={group.customerId}
+              >
+                <legend className="sr-only">{group.customerName}</legend>
+                <div className="flex min-h-11 items-center gap-3">
                   <Checkbox
-                    id={checkboxId}
-                    aria-label={label}
+                    aria-label={LABELS.groupToggle(group.customerName)}
                     className={touchTarget}
-                    checked={checked.has(presentation.key)}
-                    onCheckedChange={() => toggle(presentation.key)}
+                    checked={allChecked}
+                    indeterminate={checkedCount > 0 && !allChecked}
+                    onCheckedChange={() => toggleGroup(group)}
                     disabled={isPending}
-                    data-testid={DELIVERY_VOID_PRESENTATION_TESTID}
-                    data-presentation-line-id={presentation.presentationLineId}
+                    data-testid={DELIVERY_VOID_GROUP_TOGGLE_TESTID}
+                    data-customer-id={group.customerId}
                   />
-                  <Label htmlFor={checkboxId} className="text-sm">
-                    {label}
-                  </Label>
-                </li>
-              );
-            })}
-          </ul>
+                  <span className="text-sm font-semibold" aria-hidden="true">
+                    {group.customerName}
+                  </span>
+                </div>
+                <ul className="flex flex-col gap-0.5 pl-8">
+                  {group.pairs.map((pair) => {
+                    return (
+                      <li key={pair.key} className="flex min-h-11 items-center gap-3">
+                        <Checkbox
+                          aria-label={LABELS.pair(pair.presentationName, group.customerName, pair.packages)}
+                          className={touchTarget}
+                          checked={checked.has(pair.key)}
+                          onCheckedChange={() => toggle(pair.key)}
+                          disabled={isPending}
+                          data-testid={DELIVERY_VOID_PRESENTATION_TESTID}
+                          data-customer-id={group.customerId}
+                          data-presentation-line-id={pair.presentationLineId}
+                        />
+                        <span className="text-sm" aria-hidden="true">
+                          {pair.presentationName}{' '}
+                          <span className="text-muted-foreground">· {LABELS.packages(pair.packages)}</span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </fieldset>
+            );
+          })}
           {showEmpty ? (
             <p className="text-sm text-destructive" data-testid={DELIVERY_VOID_EMPTY_ERROR_TESTID}>
               {LABELS.empty}
             </p>
           ) : null}
-        </fieldset>
+        </div>
 
         <div className="flex flex-col gap-2">
           <label htmlFor={reasonId} className="text-sm font-medium">
