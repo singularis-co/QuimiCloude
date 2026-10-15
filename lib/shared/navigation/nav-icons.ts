@@ -4,7 +4,6 @@ import {
   ClipboardCheck,
   ClipboardList,
   Contact,
-  Factory,
   FlaskConical,
   LayoutDashboard,
   Package,
@@ -45,7 +44,6 @@ export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   'clipboard-list': ClipboardList,
   'clipboard-check': ClipboardCheck,
   truck: Truck,
-  factory: Factory,
   'flask-conical': FlaskConical,
   boxes: Boxes,
   // QC-67 R2 — la fila del unico icono que esa ficha anade. El `Record<NavIconName, LucideIcon>`

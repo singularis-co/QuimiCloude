@@ -539,6 +539,7 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     // --- 3. El Operario ejecuta el pedido: ve su paso y ninguno de envasado.
     await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const assignedRow = rowByNumber(page, orderNumber);
