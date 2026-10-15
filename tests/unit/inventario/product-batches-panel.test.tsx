@@ -103,6 +103,65 @@ describe('ProductBatchesPanel', () => {
     ).toHaveTextContent('2027-01-31');
   });
 
+  it('pinta cada lote en tres lineas: lote, cantidades y fechas con el vencimiento al final', () => {
+    const batches: ProductBatchView[] = [
+      lote({
+        id: 'b1',
+        purchaseDate: '2026-03-05',
+        expiryDate: '2027-03-05',
+        reserved: '2',
+        available: '8',
+      }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    const b1 = screen.getByTestId('product-batch-b1');
+    const lineas = [
+      within(b1).getByTestId('product-batch-line-lot'),
+      within(b1).getByTestId('product-batch-line-amounts'),
+      within(b1).getByTestId('product-batch-line-dates'),
+    ];
+    for (const [i, linea] of lineas.entries()) {
+      expect(linea.tagName).toBe('DL');
+      if (i > 0) {
+        expect(
+          lineas[i - 1].compareDocumentPosition(linea) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+      }
+    }
+
+    const [lineaLote, lineaCantidades, lineaFechas] = lineas;
+    expect(within(lineaLote).getAllByRole('term').map((dt) => dt.textContent)).toEqual(['Lote']);
+    expect(within(lineaLote).getByTestId('product-batch-lot')).toHaveTextContent('L-001');
+
+    expect(within(lineaCantidades).getAllByRole('term').map((dt) => dt.textContent)).toEqual([
+      'Cantidad',
+      'Apartado',
+      'Disponible',
+    ]);
+
+    expect(within(lineaFechas).getAllByRole('term').map((dt) => dt.textContent)).toEqual([
+      'Fecha de compra',
+      'Vencimiento',
+    ]);
+    const compra = within(lineaFechas).getByTestId('product-batch-purchase-date');
+    const vencimiento = within(lineaFechas).getByTestId('product-batch-expiry-date');
+    expect(compra.compareDocumentPosition(vencimiento) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('sin vencimiento, la linea de fechas lleva solo la compra', () => {
+    render(<ProductBatchesPanel batches={[lote({ id: 'b1', expiryDate: null })]} />);
+
+    const lineaFechas = within(screen.getByTestId('product-batch-b1')).getByTestId(
+      'product-batch-line-dates',
+    );
+    expect(within(lineaFechas).getAllByRole('term').map((dt) => dt.textContent)).toEqual([
+      'Fecha de compra',
+    ]);
+    expect(within(lineaFechas).queryByTestId('product-batch-expiry-date')).toBeNull();
+  });
+
   it('no convierte: la cantidad pintada es exactamente `batch.stock`, sin catalogo de unidades', () => {
     const batches: ProductBatchView[] = [lote({ id: 'b1', stock: '7' })];
 
