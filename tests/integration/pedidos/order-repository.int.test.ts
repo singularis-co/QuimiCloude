@@ -732,7 +732,7 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
 
       const resumenConReparto = pagina.items.find((item) => item.id === conReparto.id)
       const resumenSinReparto = pagina.items.find((item) => item.id === filaSinReparto.id)
-      expect(resumenConReparto?.presentationLines).toEqual([{ id: expect.any(String), presentationId, packages: 3, packedPackages: null, packagingName: null }])
+      expect(resumenConReparto?.presentationLines).toEqual([{ id: expect.any(String), presentationId, packages: 3, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }])
       expect(resumenConReparto?.unitId).toBe(unitId)
       expect(resumenSinReparto?.presentationLines).toEqual([])
       expect(resumenSinReparto?.unitId).toBeNull()
@@ -757,10 +757,10 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
       const pagina = await listAliveOrderSummariesByIds(companyId, [conEnvase.id, antiguo.id], ['PENDIENTE'], 1)
 
       expect(pagina.items.find((item) => item.id === conEnvase.id)?.presentationLines).toEqual([
-        { id: expect.any(String), presentationId, packages: 2, packedPackages: null, packagingName: nombreEnvase },
+        { id: expect.any(String), presentationId, packages: 2, packedPackages: null, presentationContent: null, packagingProductId: envaseId, packagingName: nombreEnvase },
       ])
       expect(pagina.items.find((item) => item.id === antiguo.id)?.presentationLines).toEqual([
-        { id: expect.any(String), presentationId, packages: 5, packedPackages: null, packagingName: null },
+        { id: expect.any(String), presentationId, packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
       ])
     } finally {
       await limpiar(creados)
