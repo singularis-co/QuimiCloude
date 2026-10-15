@@ -84,15 +84,14 @@ const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 const LAST_NAMES = 'Permisos';
 
 /**
- * Los `data-testid` de los items de menu que el `Operador` NO puede ver (R2, R3). `nav-produccion`
- * es el GRUPO: su unico hijo hoy es «Recetas», y sin `recetas.consultar` el grupo entero desaparece
- * —etiqueta y disparador incluidos—, que es justo la decision cerrada nº 4.
+ * Los `data-testid` de los items de menu que el `Operador` NO puede ver (R2, R3). «Fórmulas»
+ * (`nav-produccion-recetas`) es un enlace directo de la seccion «Producción»: sin
+ * `recetas.consultar` desaparece, y con el la seccion entera, encabezado incluido.
  */
 const HIDDEN_NAV_TEST_IDS = [
   'nav-dashboard',
   'nav-pedidos',
   'nav-proveedores',
-  'nav-produccion',
   'nav-produccion-recetas',
 ] as const;
 
