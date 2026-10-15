@@ -217,3 +217,68 @@ Resultados:
   5 passed (55.9s).
 
 Veredicto: el import de cliente de T10 queda resuelto y protegido por guardia; E2E verdes.
+
+## Cierre (T13) — consolidado del implementer (2026-10-15)
+
+Commits de la tanda 4: 3af625b2 (pedido sin unidad), ded3d3d8 («Conteo físico»), 9e2ffedf (pliegue
+animado), a2f17589 (T11), 2b65ee48 (T12), 6f478b49 (fix de T10: la tabla de Reparto importaba el
+barrel de servidor de inventario desde un archivo `'use client'`; rompía `next build` y la página
+`/inventario/producto-terminado/[id]`).
+
+Fuera de «Archivos esperados» en esta tanda: `app/(private)/inventario/components/movement-reason-label.ts`,
+`tests/unit/inventario/batch-history.test.tsx`, `tests/unit/inventario/adjust-batch-dialog.test.tsx`,
+`e2e/ajuste-de-inventario.spec.ts`, `tests/unit/asignaciones-ui/packing-order-page.test.tsx`,
+`tests/unit/paridad/asignacion-acondicionamiento-paridad.test.tsx`,
+`tests/guards/guard-identificador-de-request.test.ts` (alta del spec E2E nuevo en `E2E_ESPERADOS`),
+`tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts` (regresión del
+import de cliente + `listFinishedProductDistributionAction` en `LECTURAS_PERMITIDAS`). Sumando tandas
+anteriores, `git diff --name-only cfa2511e..HEAD` da 62 archivos fuera de la lista (fixtures y
+contratos ya anotados en cada tanda).
+
+### Mapa R<n> → test (consolidado)
+- R1: `packing-finish-dialog.test.tsx` «R1: una fila por línea…prellenado con el plan»; `packing-order-screen.test.tsx` «R1: «Terminar» del pie abre…»; `get-packing-order.test.ts` «QC-281 … R1…»; pedido sin unidad: `packing-order-screen.test.tsx` (tanda 4)
+- R2: `packing-count.test.ts`; `packing-finish-dialog.test.tsx` «R2: vacío →…», «R2: solo entra un entero…»
+- R3: `packing-count.test.ts`; `packing-finish-dialog.test.tsx` «R3: todo igual al plan…», «R3: volver al plan…» (pliegue, tanda 4)
+- R4: `packing-finish-dialog.test.tsx` «R4: al pasar de menos a más…se vacía»
+- R5: `packing-count.test.ts`; `packing-finish-dialog.test.tsx` «R5, R13: «Otro» abre…»
+- R6: `packing-count.test.ts`; `packing-finish-dialog.test.tsx` «R6: Terminar…sin motivo…»
+- R7: `packing-count.test.ts`; `packing-finish-dialog.test.tsx` «R7: el pie «Envasado…» se ve siempre»
+- R8: `packing-count.test.ts`; `packing-finish-dialog.test.tsx` «R8: Galón 16 supera 72 L…»
+- R9: `packing-finish-dialog.test.tsx` «R9: Botella 19 pide 4 vacías…»; `get-packing-order.test.ts` «R9: freePackages…»; E2E `envases-reales-empaque.spec.ts` (rechazo por stock)
+- R10: `packing-finish-dialog.test.tsx` «R3, R10…», «R10: …plural»
+- R11: `packing-finish-dialog.test.tsx` «R11: «Cancelar» cierra sin enviar»; `packing-order-screen.test.tsx` «R11…»
+- R12: `get-packing-order.test.ts`, `list-packing-orders.test.ts` «QC-281 R12…»; `packing-orders-columns.test.tsx` «R12…»; `packing-order-screen.test.tsx` «R12…»
+- R13: `packing-count.test.ts`; migración `order-presentation-lines-packed-count-migration.test.ts`; `order-packing.test.ts` «R13, R22…»; `finish-packing.test.ts`; `order-packing-actions.test.ts`
+- R14: `finish-packing.test.ts` «R14: sin `empaque.modificar` rechaza antes de validar…», «R14: …`OrderPackingTakenError`»; `get-packing-order.test.ts` «R1, R14…»
+- R15: `packing-count.test.ts`; `order-packing.test.ts` y `finish-with-finished-goods.int.test.ts` «R15, R22: …packed_exceeds_quantity…»
+- R16: `order-packed-counts.int.test.ts`; migración; `finish-with-finished-goods.int.test.ts`; `packing-finish-dialog.test.tsx` «R1, R16…»
+- R17: `settle-packaging.int.test.ts`; E2E `envases-reales-empaque.spec.ts`
+- R18: `settle-packaging.int.test.ts`; `order-packing.test.ts` y `finish-with-finished-goods.int.test.ts` «R18, R22…»; E2E
+- R19: `settle-packaging.int.test.ts`; `packing-count.test.ts`; `finish-with-finished-goods.int.test.ts`; E2E
+- R20: `finish-with-finished-goods.int.test.ts`; E2E (lotes con real × contenido)
+- R21: `finish-with-finished-goods.int.test.ts`; `order-packing.test.ts`; E2E (coste unitario = coste / total real)
+- R22: `order-packing.test.ts` y `finish-with-finished-goods.int.test.ts` «R13/R15/R18, R22: …no cambia nada»
+- R23: `conditioning-batch-data.test.ts`, `finish-conditioning.test.ts`, `get-conditioning-order.test.ts`, `order-distribution-view.test.ts` «QC-281 R23…»; E2E (línea en 0, acondicionamiento no bloqueado)
+- R24: `deliver-order.test.ts`, `get-order-delivery.test.ts` (envases reales en la entrega)
+- R25: `packing-count.test.ts`; `conditioning-batch-data.test.ts`; `packed-lines-directory.int.test.ts` «una linea empacada antes de contar…»; `get-packing-order.test.ts` «R25…»
+- R26: `list-finished-product-distribution.test.ts`; `packed-lines-directory.int.test.ts`; `finished-product-tabs.test.tsx`, `finished-product-params.test.ts`; E2E
+- R27: `finished-product-tables.test.tsx`; `list-finished-product-distribution.test.ts`; `packed-lines-directory.int.test.ts`; E2E (−1/+1, motivo, «Sin lote»)
+- R28: `finished-product-tables.test.tsx` «R28 — Reparto: …» (vacío, error con «Reintentar», paginación)
+- R29: `settle-packaging.int.test.ts`, `order-packed-counts.int.test.ts`, `packed-lines-directory.int.test.ts`, `list-finished-product-distribution.test.ts`, `get-packing-order.test.ts` «R29…»
+- R30: `order-packing.test.ts` y `finish-with-finished-goods.int.test.ts` «R30: …not_packable…»
+- R31: guardia de dependencias del gate (sin dependencias nuevas; `package.json` sin cambios en la feature)
+- R32: `packing-finish-dialog.test.tsx` «R32…»; `finish-with-finished-goods.int.test.ts`; `order-packing.test.ts`
+- R33: `packing-finish-dialog.test.tsx` «R33…» (2); `packing-order-evidence.test.tsx` «R23, R33…»
+
+### Verificación de la tanda 4 (salida real reportada por los subagentes)
+- `pnpm run typecheck`: sin errores (tras cada commit).
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes en archivos no tocados.
+- `pnpm exec vitest run guard`: 76/76 archivos, 1069 passed, 20 skipped.
+- `vitest related`: 214/214 (sin unidad), 434/434 (tilde), 218/218 (pliegue), 57/57 (fix T10).
+- E2E chromium: ajuste-de-inventario 4/4, empaque 1/1, envases-del-pedido 2/2, operario-rediseno 20/20,
+  pasos-de-envasado 1/1, pedido-en-varias-presentaciones 2/2, envases-reales-empaque 3/3,
+  detalle-de-producto-terminado 2/2. envases-reales-empaque también 3/3 en webkit (con el fix de T10).
+- `./init.sh`: no corrido por instrucción del leader; lo cubre `gate-completo` en el PR.
+
+Pendiente: T9 sin marcar (revisión visual humana 1440/1024/390, incluido el pliegue animado y la
+nota de pedido sin unidad).

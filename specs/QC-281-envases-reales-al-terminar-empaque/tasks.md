@@ -117,12 +117,12 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   paginación 10/25; añadir el directorio a `tests/integration/aislamiento.json` si aplica.
 - **Hecho:** tests verdes. (R26–R29)
 
-## T11 — Limpieza de comentarios y E2E existentes (depende de T9)
+## [x] T11 — Limpieza de comentarios y E2E existentes (depende de T9)
 - Ajustar los E2E que pulsan Terminar o miran «Envases:»/columna (`design.md § 10`).
 - Limpiar comentarios de las líneas tocadas (`docs/conventions.md > Comentarios`).
 - **Hecho:** `pnpm exec playwright test` de los specs tocados en verde.
 
-## T12 — E2E nuevo: inventario y coste (depende de T9, T10) (D11)
+## [x] T12 — E2E nuevo: inventario y coste (depende de T9, T10) (D11)
 - `e2e/envases-reales-empaque.spec.ts`: pedido con dos líneas; Terminar con una línea −1 (Rotura) y
   otra +1 (Conteo físico) → existencias del envase (una libera, otra consume del libre), lotes con
   `real × contenido`, coste unitario = coste / total real; segundo caso con una línea en 0 → sin
@@ -132,7 +132,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
 - **Hecho:** `pnpm exec playwright test e2e/envases-reales-empaque.spec.ts` verde. (R9, R17–R21,
   R23, R26, R27)
 
-## T13 — Cierre
+## [x] T13 — Cierre
 - Mapa `R<n> → test` en `progress/impl_QC-281-envases-reales-al-terminar-empaque.md`.
 - `./init.sh` verde (o `gate-completo` en el PR).
 - **Hecho:** cada R1–R33 con su test; R31 lo cubre la guardia de dependencias del gate.
