@@ -219,7 +219,7 @@ verde.
 
 ## Tanda 2 — Flujo completo (Dep: tandas 1A y 1B)
 
-### T9 — E2E · frontend_dev o backend_dev · R36 · Dep: T4–T8
+### [x] T9 — E2E · frontend_dev o backend_dev · R36 · Dep: T4–T8
 
 **Hacer:** `e2e/recorrido-acondicionamiento.spec.ts` (NUEVO), con los helpers de
 `e2e/acondicionar-con-equipo.spec.ts`, `e2e/datos-de-lote-en-acondicionamiento.spec.ts` y
@@ -239,7 +239,7 @@ verde.
 
 **Hecho cuando:** el spec está en verde en local.
 
-### T10 — Cierre de trazabilidad · implementer · R1–R36 · Dep: T9
+### [x] T10 — Cierre de trazabilidad · implementer · R1–R36 · Dep: T9
 
 **Hacer:**
 

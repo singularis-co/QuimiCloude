@@ -424,21 +424,30 @@ su titulo en el archivo (grep) y los archivos se corrieron (salida abajo).
 | R33 | `execution-log-prisma.test.ts` › «R33: append valida la foto con zod y no escribe una corrupta ni una vacia», «R33: listEntriesForOrders selecciona batchLines y devuelve la foto validada» |
 | R34 | `order-execution-conditioning-migration.test.ts` › «R34: las dos migraciones tienen su down.sql», «R34: el down de las acciones abre con una guarda RAISE EXCEPTION …» |
 | R35 | `tests/guards/guard-dependencias-aprobadas.test.ts` (sin cambios). `package.json` y `pnpm-lock.yaml` sin diff frente a `dev` (merge-base `2ebf7634`) |
-| R36 | `e2e/recorrido-acondicionamiento.spec.ts` › «R36 - el supervisor comienza con un equipo de dos (uno por grupo), guarda y corrige…» — **escrito, sin correr en verde** (ver T9) |
+| R36 | `e2e/recorrido-acondicionamiento.spec.ts` › «R36 - el supervisor comienza con un equipo de dos (uno por grupo), guarda y corrige…» (verde en chromium y webkit, ver abajo) |
 
 ### Verificacion (salida real)
 - `pnpm exec vitest run <11 archivos unit/ui del mapa>` → `Test Files 11 passed (11)`, `Tests 426 passed (426)`.
 - `pnpm exec vitest run --project integration <conditioning-execution-log, order-execution-entries-constraints, execution-log-read, conditioning-team-repository>` → `Test Files 4 passed (4)`, `Tests 54 passed (54)`; base efimera borrada.
 - `pnpm exec vitest run tests/guards/guard-dependencias-aprobadas.test.ts` → `Test Files 1 passed (1)`, `Tests 2 passed (2)`.
-- Typecheck y lint: ver T9 (0 errores; 7 warnings previos en archivos no tocados).
+- Typecheck y lint: `tsc --noEmit` sin errores; `✖ 7 problems (0 errors, 7 warnings)`, los previos; `eslint e2e/recorrido-acondicionamiento.spec.ts` limpio.
 - `./init.sh` **no se corrio** por instruccion del leader: el gate completo lo corre CI.
 
-### Pendiente / bloqueo
-- **R36 sin verde.** El E2E no corre en local: la base local compartida `QuimiCloude` no tiene las dos
-  migraciones de QC-283 y trae migraciones de otras ramas (incluida otra `20261015120000_…`). No se
-  migro por ser compartida. Debe correr en CI (PR a produccion) o en una base con las migraciones de
-  QC-283. Por eso T9 y T10 quedan sin `[x]` en `tasks.md`: su «Hecho cuando» no se cumple aun.
-- Interpretacion del fixture: «equipo de dos, una por grupo» se implemento como 1 persona suelta +
-  1 por grupo de trabajo. Si se queria dos grupos de una persona, es un cambio menor en el fixture.
+### E2E de R36 en base desechable (2026-10-14)
+- Primer intento (T9) contra la base compartida `QuimiCloude`: falla en `beforeAll`, la base no tiene
+  las migraciones de QC-283. No se toco esa base.
+- Base desechable como en CI (`gate.yml` › «Base del E2E»): `pnpm run db:test template` →
+  `plantilla reutilizada: qct_tpl_f928446831e4 (93 migraciones)`; `CREATE DATABASE qc283_e2e_desechable
+  TEMPLATE qct_tpl_f928446831e4`; `DATABASE_URL`/`DIRECT_URL` solo en el entorno del comando (sin
+  editar `.env`); puerto del E2E 3117 (playwright.config), libre.
+- 1.ª corrida: falla una asercion del test (no de produccion): `execution-trace-step-person` incluye
+  las iniciales del avatar (`"QSQc28… Supervisa"`). frontend_dev la ajusta: el avatar debe mostrar
+  `getInitials(nombre)` y el span entero `${iniciales}${nombre}`.
+- Tras el ajuste: chromium `✓ 1 [chromium] › e2e\recorrido-acondicionamiento.spec.ts:768:7 › … 1 passed (47.9s)`
+  y webkit `✓ 1 [webkit] › … 1 passed (48.3s)` (frontend_dev); repetido por el implementer en chromium:
+  `1 passed (40.8s)`.
+- Limpieza: `DROP DATABASE qc283_e2e_desechable` → 0 restantes; `test-results` borrado.
+- Interpretacion del fixture: «equipo de dos, una por grupo» = 1 persona suelta + 1 por grupo de
+  trabajo. Si se queria dos grupos de una persona, es un cambio menor en el fixture.
 
-Veredicto: R1–R35 con test existente y en verde; R36 escrito pero pendiente de ejecucion en CI.
+Veredicto: R1–R36 con test existente y en verde. T9 y T10 cerradas.

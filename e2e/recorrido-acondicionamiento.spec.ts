@@ -80,6 +80,7 @@ import { normalizePresentationName, normalizeProductName, PRODUCT_TYPES } from '
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
+import { getInitials } from '@/lib/shared/ui/initials';
 import {
   ASSIGNED_ORDERS_ROUTE,
   CONDITIONED_ORDER_PARAM,
@@ -723,9 +724,14 @@ async function expectAdminSeesTrace(
       await expect(finishStep.getByTestId('execution-trace-step-action')).toHaveText(
         exactText(EXECUTION_ACTION_LABELS.conditioning_finish),
       );
-      await expect(finishStep.getByTestId('execution-trace-step-person')).toHaveText(
-        exactText(displayNameOf(conditionerUser)),
+      // El span de la persona lleva dentro el avatar (`aria-hidden`), cuyas iniciales forman parte
+      // de su texto: se comprueban por separado y el span entero es «iniciales + nombre».
+      const finisher = displayNameOf(conditionerUser);
+      const finisherPerson = finishStep.getByTestId('execution-trace-step-person');
+      await expect(finisherPerson.getByTestId('execution-trace-step-avatar')).toHaveText(
+        exactText(getInitials(finisher)),
       );
+      await expect(finisherPerson).toHaveText(exactText(`${getInitials(finisher)}${finisher}`));
       await expect(finishStep.getByTestId('execution-trace-team')).toHaveCount(0);
       await expect(finishStep.getByTestId('execution-trace-batch-save')).toHaveCount(0);
     });
