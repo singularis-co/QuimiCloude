@@ -118,12 +118,12 @@ async function dropFixture(fixture: Fixture): Promise<void> {
 }
 
 /** Un producto nuevo con un lote de `stock`; devuelve el lote. */
-async function loteCon(fixture: Fixture, stock: string): Promise<string> {
+async function loteCon(fixture: Fixture, stock: string, lot: string | null = null): Promise<string> {
   const batch: NewProductBatch = {
     presentationId: fixture.presentationId,
     stock,
     unitCost: '2.5000',
-    lot: null,
+    lot,
     purchaseDate: '2026-09-01',
     expiryDate: null,
     createdBy: fixture.actorId,
@@ -336,6 +336,31 @@ describe('R25 — los CHECK de la existencia de antes y el total contado', () =>
           countedStock: '12',
         }),
       ).resolves.toBe(1);
+    } finally {
+      await dropFixture(fixture);
+    }
+  });
+
+  it('QC-284 R12: con dos lotes de la empresa que comparten codigo, el ajuste solo escribe en el lote pedido', async () => {
+    const fixture = await createFixture();
+    try {
+      const codigo = `COMP-${token().slice(0, 10)}`;
+      const ajustado = await loteCon(fixture, '10', codigo);
+      const otro = await loteCon(fixture, '7', codigo);
+
+      await expect(ajustar(fixture, ajustado, '10', '4', 'conteo_fisico')).resolves.toMatchObject({
+        kind: 'adjusted',
+        stock: '4.0000',
+      });
+
+      expect(await existenciaDe(ajustado)).toBe('4.0000');
+      expect(await existenciaDe(otro)).toBe('7.0000');
+      expect(await ajustesDe(otro)).toEqual([]);
+      expect(await ajustesDe(ajustado)).toEqual([
+        { quantity: '-6.0000', reason: 'conteo_fisico', stockBefore: '10.0000', countedStock: '4.0000' },
+      ]);
+      const lotes = await prisma.productBatch.findMany({ where: { id: { in: [ajustado, otro] } }, select: { lot: true } });
+      expect(lotes.map((lote) => lote.lot)).toEqual([codigo, codigo]);
     } finally {
       await dropFixture(fixture);
     }

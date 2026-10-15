@@ -62,7 +62,7 @@ export function createFinishedBatchLabels(): FinishedBatchLabels {
         return await prisma.$transaction((tx) =>
           writeFinishedBatchLabels(
             tx,
-            { orderId: input.orderId, labels: input.labels, actorId: input.actorId, now: input.now },
+            { orderId: input.orderId, label: input.label, actorId: input.actorId, now: input.now },
             scope,
           ),
         );

@@ -382,4 +382,74 @@ describe('batchLotDirectoryPrisma.findLots y el historial del lote, sobre filas 
       for (const t of tenants) await dropTenant(t)
     }
   })
+
+  it('QC-284 R12: con dos lotes que comparten codigo, la devolucion vuelve solo al lote de origen y findLots da el codigo de cada uno', async () => {
+    const tenants: Tenant[] = []
+    try {
+      const a = await createTenant(prisma, 'A')
+      tenants.push(a)
+      const marca = token()
+      const otraPresentacion = await prisma.presentation.create({
+        data: { name: `Otra ${marca}`, nameNormalized: `otra${marca}`, unitId: a.unitId, companyId: a.companyId },
+        select: { id: true },
+      })
+      const recipe = await prisma.product.findUniqueOrThrow({ where: { id: a.productId }, select: { recipeId: true } })
+      const otroProducto = await prisma.product.create({
+        data: {
+          name: `Terminado otro ${marca}`,
+          nameNormalized: `terminadootro${marca}`,
+          type: 'FINISHED_PRODUCT',
+          unitId: a.unitId,
+          recipeId: recipe.recipeId,
+          presentationId: otraPresentacion.id,
+          companyId: a.companyId,
+        },
+        select: { id: true },
+      })
+      const codigo = `CR-${marca.slice(0, 10)}`
+      const nuevoLote = (productId: string, presentationId: string, stock: string) =>
+        prisma.productBatch.create({
+          data: {
+            productId,
+            presentationId,
+            stock: new Prisma.Decimal(stock),
+            unitCost: new Prisma.Decimal('1.0000'),
+            packageContent: new Prisma.Decimal('5.0000'),
+            lot: codigo,
+            purchaseDate: new Date('2026-09-01T00:00:00Z'),
+            companyId: a.companyId,
+          },
+          select: { id: true },
+        })
+      const origen = await nuevoLote(a.productId, a.presentationId, '1.0000')
+      const otro = await nuevoLote(otroProducto.id, otraPresentacion.id, '6.0000')
+      const voidId = await createVoid(prisma, a)
+
+      const outcome = await prisma.$transaction((tx) =>
+        createFinishedGoodsReturn(tx).returnForDeliveryVoid(
+          returnInput(a, voidId, [{ batchId: origen.id, quantity: '3.0000' }]),
+        ),
+      )
+
+      expect(outcome).toEqual({ kind: 'returned' })
+      expect(await stockOf(prisma, origen.id)).toBe('4.0000')
+      expect(await stockOf(prisma, otro.id)).toBe('6.0000')
+      // Sembrado sin recalcular: si la devolucion tocara el otro producto, su existencia dejaria de ser 0.
+      expect(await productStockOf(prisma, otroProducto.id)).toBe('0.0000')
+      expect(await prisma.inventoryMovement.count({ where: { batchId: otro.id } })).toBe(0)
+      expect(
+        await prisma.inventoryMovement.findMany({ where: { orderDeliveryVoidId: voidId }, select: { batchId: true } }),
+      ).toEqual([{ batchId: origen.id }])
+
+      const lots = await batchLotDirectoryPrisma.findLots([origen.id, otro.id], a.companyId)
+      expect(new Map(lots)).toEqual(
+        new Map([
+          [origen.id, codigo],
+          [otro.id, codigo],
+        ]),
+      )
+    } finally {
+      for (const t of tenants) await dropTenant(t)
+    }
+  })
 })

@@ -1,7 +1,7 @@
 // QC-219 T6 — `missingBatchDataLines`: cuantas lineas del reparto no tienen sus datos de lote.
 import { describe, expect, it } from 'vitest';
 
-import { missingBatchDataLines } from '@/lib/modules/asignaciones/domain/conditioning-batch-data';
+import { batchDataForm, missingBatchDataLines } from '@/lib/modules/asignaciones/domain/conditioning-batch-data';
 
 import { loteDeLinea, uuid } from './conditioning-doubles';
 
@@ -33,5 +33,100 @@ describe('QC-219 — missingBatchDataLines', () => {
 
   it('R17: un lote de otra presentacion no cubre la linea', () => {
     expect(missingBatchDataLines([{ presentationId: 'p1' }], [loteDeLinea('p9', uuid('7'), DATOS)])).toBe(1);
+  });
+});
+
+describe('QC-284 — batchDataForm: como abre el formulario unico del pedido', () => {
+  const LINEAS = [{ presentationId: 'p1' }, { presentationId: 'p2' }];
+
+  it('R14: un pedido con datos uniformes abre relleno con esos datos', () => {
+    expect(batchDataForm(LINEAS, [loteDeLinea('p1', uuid('7'), DATOS), loteDeLinea('p2', uuid('8'), DATOS)])).toEqual({
+      kind: 'shared',
+      ...DATOS,
+    });
+  });
+
+  it('R14: un pedido sin datos abre vacio y sin aviso', () => {
+    expect(batchDataForm(LINEAS, [loteDeLinea('p1', uuid('7')), loteDeLinea('p2', uuid('8'))])).toEqual({
+      kind: 'empty',
+    });
+  });
+
+  it('R14: una linea sin lote no impide abrir relleno ni vacio: no cuenta para decidir', () => {
+    expect(batchDataForm(LINEAS, [loteDeLinea('p1', uuid('7'), DATOS)])).toEqual({ kind: 'shared', ...DATOS });
+    expect(batchDataForm(LINEAS, [loteDeLinea('p2', uuid('8'))])).toEqual({ kind: 'empty' });
+  });
+
+  it('R15: datos a medias (una linea con datos y otra sin ellos) -> aviso con el codigo actual de cada una', () => {
+    expect(batchDataForm(LINEAS, [loteDeLinea('p1', uuid('7'), DATOS), loteDeLinea('p2', uuid('8'))])).toEqual({
+      kind: 'divergent',
+      lines: [
+        { presentationId: 'p1', lot: 'CR-2610-A' },
+        { presentationId: 'p2', lot: 'AUTO-p2' },
+      ],
+    });
+  });
+
+  it('R15: dos lotes distintos -> aviso', () => {
+    const form = batchDataForm(LINEAS, [
+      loteDeLinea('p1', uuid('7'), DATOS),
+      loteDeLinea('p2', uuid('8'), { ...DATOS, lot: 'CR-2610-B' }),
+    ]);
+    expect(form).toEqual({
+      kind: 'divergent',
+      lines: [
+        { presentationId: 'p1', lot: 'CR-2610-A' },
+        { presentationId: 'p2', lot: 'CR-2610-B' },
+      ],
+    });
+  });
+
+  it.each([
+    ['vencimiento', { expiryDate: '2027-05-01' }],
+    ['dia de produccion', { productionDate: '2026-09-30' }],
+  ])('R15: el mismo lote con distinto %s -> aviso', (_n, cambio) => {
+    expect(
+      batchDataForm(LINEAS, [loteDeLinea('p1', uuid('7'), DATOS), loteDeLinea('p2', uuid('8'), { ...DATOS, ...cambio })])
+        .kind,
+    ).toBe('divergent');
+  });
+
+  it('R15: la comparacion del codigo distingue mayusculas', () => {
+    expect(
+      batchDataForm(LINEAS, [loteDeLinea('p1', uuid('7'), DATOS), loteDeLinea('p2', uuid('8'), { ...DATOS, lot: 'cr-2610-a' })])
+        .kind,
+    ).toBe('divergent');
+  });
+
+  it('R15: el aviso lista todas las lineas en su orden de alta, y una sin lote como `null`', () => {
+    const lineas = [{ presentationId: 'p3' }, { presentationId: 'p1' }, { presentationId: 'p2' }];
+    const form = batchDataForm(lineas, [
+      loteDeLinea('p1', uuid('7'), DATOS),
+      loteDeLinea('p3', uuid('9'), { ...DATOS, lot: 'OTRO' }),
+    ]);
+    expect(form).toEqual({
+      kind: 'divergent',
+      lines: [
+        { presentationId: 'p3', lot: 'OTRO' },
+        { presentationId: 'p1', lot: 'CR-2610-A' },
+        { presentationId: 'p2', lot: null },
+      ],
+    });
+  });
+
+  it('R17: un pedido sin ninguna linea con lote -> `no_batches`', () => {
+    expect(batchDataForm(LINEAS, [])).toEqual({ kind: 'no_batches' });
+    expect(batchDataForm([], [])).toEqual({ kind: 'no_batches' });
+  });
+
+  it('R17: un lote de otra presentacion no cuenta como linea con lote', () => {
+    expect(batchDataForm(LINEAS, [loteDeLinea('p9', uuid('7'), DATOS)])).toEqual({ kind: 'no_batches' });
+  });
+
+  it('R16: es pura: no cambia lo que recibe', () => {
+    const lotes = Object.freeze([Object.freeze(loteDeLinea('p1', uuid('7'), DATOS)), Object.freeze(loteDeLinea('p2', uuid('8')))]);
+    const lineas = Object.freeze(LINEAS.map((linea) => Object.freeze({ ...linea })));
+    expect(() => batchDataForm(lineas, lotes)).not.toThrow();
+    expect(lotes[1]?.lot).toBe('AUTO-p2');
   });
 });

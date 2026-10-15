@@ -650,6 +650,16 @@
       "archivo": "pedidos/order-delivery-directory.int.test.ts",
       "motivo": "QC-225 B2: el directorio de entregas para la ficha de producto terminado (order-delivery-directory-prisma.ts) lee con el cliente Prisma GLOBAL, que no ve lo que una transaccion abierta no confirmo. 'beforeAll' fabrica dos empresas efimeras con randomUUID (tipo de documento, rol, usuario, cliente, unidad, receta, presentaciones, pedidos, lineas, productos, lotes, entregas, lineas de entrega, anulaciones y sus lineas) y 'afterAll' las borra por 'company_id' en orden de FK (lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> recetas -> presentaciones -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-13"
+    },
+    {
+      "archivo": "inventario/product-batch-lot-per-presentation-migration.int.test.ts",
+      "motivo": "QC-284 T1: aplica el migration.sql y el down.sql reales de 'product_batches_lot_per_presentation' por 'pg' (solo su protocolo simple ejecuta un .sql con un bloque DO $$ y su error trae 'constraint'). No toca 'public.product_batches': cada caso copia la tabla con LIKE a un esquema de usar y tirar, trabaja ahi con search_path solo en ese esquema -asi el DROP INDEX del UP y del DOWN no bloquea la tabla real que usan los demas archivos- y lo borra con DROP SCHEMA CASCADE en un 'finally'. Mismo patron que los casos de migracion de 'product-batch-lot.int.test.ts'. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-14"
+    },
+    {
+      "archivo": "inventario/product-batch-lot-per-presentation.int.test.ts",
+      "motivo": "QC-284 T2/T3: ejercita 'createWithFirstBatch' y 'addBatchToAlive' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren SU PROPIA 'prisma.$transaction' por intento, asi que envolverlos en una transaccion del test seria un aislamiento de mentira. Las carreras de R6 necesitan que cada escritura CONFIRME, y la del lote generado sostiene ademas una transaccion abierta en otra conexion 'pg' hasta ver al adaptador esperando en el indice. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (asientos -> lotes -> productos -> receta -> presentaciones -> usuario -> rol y tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-14"
     }
   ]
 }

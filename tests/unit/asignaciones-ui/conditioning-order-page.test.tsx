@@ -269,7 +269,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
   it('R4: con líneas sin datos, «Terminar» se pinta deshabilitado con el aviso', async () => {
     getConditioningOrderMock.mockResolvedValue({
       ...MINE,
-      batchData: { lines: [LINE, { ...LINE, batchId: 'otro' }], missingCount: 2 },
+      batchData: { lines: [LINE, { ...LINE, batchId: 'otro' }], missingCount: 2, form: { kind: 'empty' } },
     });
 
     render(await invocar());
@@ -287,6 +287,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
       batchData: {
         lines: [{ ...LINE, provisionalLot: null, lot: 'L-1', expiryDate: '2027-01-01', productionDate: '2026-10-01' }],
         missingCount: 0,
+        form: { kind: 'shared', lot: 'L-1', expiryDate: '2027-01-01', productionDate: '2026-10-01' },
       },
     });
 
@@ -300,7 +301,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
     getConditioningOrderMock.mockResolvedValue({
       ...MINE,
       status: 'TERMINADO',
-      batchData: { lines: [LINE], missingCount: 1 },
+      batchData: { lines: [LINE], missingCount: 1, form: { kind: 'empty' } },
     });
 
     render(await invocar());
@@ -314,7 +315,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
     getConditioningOrderMock.mockResolvedValue({
       ...MINE,
       status: 'ENTREGADO',
-      batchData: { lines: [LINE], missingCount: 1 },
+      batchData: { lines: [LINE], missingCount: 1, form: { kind: 'empty' } },
     });
 
     render(await invocar());

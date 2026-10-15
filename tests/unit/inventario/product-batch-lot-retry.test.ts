@@ -80,8 +80,11 @@ function choqueDeUnicidad(target: unknown): Prisma.PrismaClientKnownRequestError
   });
 }
 
+const COLUMNAS_CON_PRESENTACION = ['company_id', 'product_id', 'presentation_id', 'lot'];
+const COLUMNAS_SIN_PRESENTACION = ['company_id', 'product_id', 'lot'];
+
 const choqueDeLote = (): Prisma.PrismaClientKnownRequestError =>
-  choqueDeUnicidad(['company_id', 'lot']);
+  choqueDeUnicidad(COLUMNAS_CON_PRESENTACION);
 
 function loteEscrito(llamada: number): unknown {
   const args = doble.batchCreate.mock.calls[llamada]?.[0] as { data: { lot: unknown } } | undefined;
@@ -106,38 +109,45 @@ beforeEach(() => {
   doble.queryRaw.mockResolvedValue([{ top: '41' }]);
 });
 
-describe('isDuplicateBatchLot — P2002 Y la pareja de columnas (R13, R15)', () => {
-  it('es verdadero con P2002 y meta.target con las columnas company_id y lot', () => {
-    expect(isDuplicateBatchLot(choqueDeUnicidad(['company_id', 'lot']))).toBe(true);
+describe('isDuplicateBatchLot — P2002 Y el conjunto exacto de uno de los dos indices del lote', () => {
+  it('R1, R6: es verdadero con P2002 y las columnas del indice con presentacion', () => {
+    expect(isDuplicateBatchLot(choqueDeUnicidad(COLUMNAS_CON_PRESENTACION))).toBe(true);
   });
 
-  it('es verdadero con la misma pareja en el otro orden: se compara el conjunto', () => {
-    expect(isDuplicateBatchLot(choqueDeUnicidad(['lot', 'company_id']))).toBe(true);
+  it('R2, R6: es verdadero con P2002 y las columnas del indice sin presentacion', () => {
+    expect(isDuplicateBatchLot(choqueDeUnicidad(COLUMNAS_SIN_PRESENTACION))).toBe(true);
   });
 
-  it('es falso con P2002 sobre otras columnas', () => {
+  it('R1, R2: es verdadero con las mismas columnas en otro orden: se compara el conjunto', () => {
+    expect(isDuplicateBatchLot(choqueDeUnicidad(['lot', 'presentation_id', 'product_id', 'company_id']))).toBe(true);
+    expect(isDuplicateBatchLot(choqueDeUnicidad(['lot', 'product_id', 'company_id']))).toBe(true);
+  });
+
+  it('R3: es falso con la pareja (company_id, lot) del indice retirado y con otras columnas', () => {
+    expect(isDuplicateBatchLot(choqueDeUnicidad(['company_id', 'lot']))).toBe(false);
     expect(isDuplicateBatchLot(choqueDeUnicidad(['company_id', 'name_normalized']))).toBe(false);
     expect(isDuplicateBatchLot(choqueDeUnicidad(['lot']))).toBe(false);
-    expect(isDuplicateBatchLot(choqueDeUnicidad(['company_id', 'lot', 'presentation_id']))).toBe(false);
+    expect(isDuplicateBatchLot(choqueDeUnicidad(['company_id', 'presentation_id', 'lot']))).toBe(false);
+    expect(isDuplicateBatchLot(choqueDeUnicidad([...COLUMNAS_CON_PRESENTACION, 'id']))).toBe(false);
   });
 
-  it('es falso con P2002 sin meta.target inspeccionable o con target como cadena suelta', () => {
+  it('R6: es falso con P2002 sin meta.target inspeccionable o con target como cadena suelta', () => {
     expect(isDuplicateBatchLot(choqueDeUnicidad(undefined))).toBe(false);
-    // Una cadena cuenta como UNA columna: nunca forma la pareja.
-    expect(isDuplicateBatchLot(choqueDeUnicidad('product_batches_company_lot_unique'))).toBe(false);
+    // Una cadena cuenta como UNA columna: nunca forma un conjunto del lote.
+    expect(isDuplicateBatchLot(choqueDeUnicidad('product_batches_product_presentation_lot_unique'))).toBe(false);
   });
 
-  it('es falso con otro codigo aunque meta.target traiga company_id y lot', () => {
+  it('R6: es falso con otro codigo aunque meta.target traiga las columnas del lote', () => {
     const otroCodigo = new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', {
       code: 'P2003',
       clientVersion: '6.19.3',
-      meta: { target: ['company_id', 'lot'] },
+      meta: { target: COLUMNAS_CON_PRESENTACION },
     });
     expect(isDuplicateBatchLot(otroCodigo)).toBe(false);
   });
 
-  it('es falso con un Error suelto que dice P2002', () => {
-    expect(isDuplicateBatchLot(new Error('P2002 company_id lot'))).toBe(false);
+  it('R6: es falso con un Error suelto que dice P2002', () => {
+    expect(isDuplicateBatchLot(new Error('P2002 company_id product_id lot'))).toBe(false);
     expect(isDuplicateBatchLot(undefined)).toBe(false);
   });
 });
@@ -408,8 +418,8 @@ describe('addBatchToAlive — el mismo reintento en el otro camino que escribe l
     expect(loteEscrito(1)).toBe('9');
   });
 
-  it('con lote escrito a mano no reintenta y sale BatchDuplicateLotError', async () => {
-    doble.batchCreate.mockRejectedValue(choqueDeLote());
+  it('R7: con lote escrito a mano no reintenta y sale BatchDuplicateLotError, tambien con el indice sin presentacion', async () => {
+    doble.batchCreate.mockRejectedValue(choqueDeUnicidad(COLUMNAS_SIN_PRESENTACION));
 
     await expect(addBatchToAlive(PRODUCTO_ID, LOTE_A_MANO, AHORA, AMBITO)).rejects.toBeInstanceOf(
       BatchDuplicateLotError,
