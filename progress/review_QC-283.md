@@ -175,3 +175,43 @@ Un solo bloqueante. Es mecánico y se arregla en un commit: la guardia
   - El punto 9 del perfil solo bloquea en producción, así que esto es menor.
 - **M2.** El grafo de código no se usó en ninguna tanda (consta en la bitácora). Solo es
   informativo.
+
+## Vuelta 2 (acotada a 3d8a2eac..951562bb, fix en 5e45b37e)
+
+### Veredicto final: OK
+
+No quedan bloqueantes.
+
+### Verificación (salida real)
+- `pnpm exec vitest run guard`: `Test Files 76 passed (76)`, `Tests 1066 passed | 20 skipped`.
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `eslint` sobre los tres archivos tocados: «No issues found».
+- Unit y UI del área: `Test Files 70 passed (70)`, `Tests 1799 passed`.
+- Los `.int` tocados (`conditioning-execution-log`, `execution-log-read`,
+  `finish-conditioning-batch-data` y `start-conditioning-team`): `Test Files 4 passed`,
+  `Tests 33 passed`.
+
+### Hallazgos de la vuelta 1
+- **B1: resuelto.** `recorrido-acondicionamiento.spec.ts` está dado de alta en la lista de E2E
+  de `guard-identificador-de-request`, y la guardia sale verde.
+- **Menor 7: resuelto.**
+  - Ya no hay `as`. La subclase `BatchLabelsAbortedError` lleva `outcome` tipado como
+    `Exclude<FinishedBatchLabelsOutcome, {kind:'written'}>`.
+  - El `catch` la reconoce con `instanceof`.
+  - El resto de los `ExecutionAbortedError` se relanza sin traducir, que es correcto.
+  - No es una regresión: R4 sigue verde.
+- **M1: resuelto.** Las líneas que añade el diff en `tests/` y `e2e/` ya no tienen comentarios que
+  citen `QC-<n>`.
+- **Puntos 3 y 10: siguen abiertos como menores.** No bloquean.
+
+### Pregunta del leader: ¿incumplen las convenciones los `describe` «QC-283 — …» y el `motivo` de `aislamiento.json`?
+- **No.** `docs/conventions.md > Comentarios` regula los **comentarios**. Además dice que la
+  historia de fichas «vive en `specs/`, en los nombres de los tests y en git».
+- Los tres `describe` («QC-283 — …») están en
+  `tests/integration/inventario/finished-batch-labels.int.test.ts:546`,
+  `tests/unit/asignaciones/finish-conditioning.test.ts:342` y
+  `tests/unit/asignaciones/save-conditioning-batch-data.test.ts:366`. Son nombres de test, no
+  comentarios.
+- El `motivo` de `tests/integration/aislamiento.json` es un dato del censo, no un comentario. Su
+  `_nota` exige motivo y desde, y el resto de entradas citan fichas igual.
+- Sin hallazgo.
