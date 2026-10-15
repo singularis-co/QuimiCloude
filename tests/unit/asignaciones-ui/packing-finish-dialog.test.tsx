@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -10,8 +10,10 @@ import {
   PACKING_FINISH_LINE_ERROR_TESTID,
   PACKING_FINISH_LINE_TESTID,
   PACKING_FINISH_OTHER_ERROR_TESTID,
+  PACKING_FINISH_OTHER_FOLD_TESTID,
   PACKING_FINISH_OTHER_TESTID,
   PACKING_FINISH_REASON_ERROR_TESTID,
+  PACKING_FINISH_REASON_FOLD_TESTID,
   PACKING_FINISH_REASON_OPTION_TESTID,
   PACKING_FINISH_REASON_TESTID,
   PACKING_FINISH_TOTAL_TESTID,
@@ -254,6 +256,8 @@ describe('diálogo — diferencia y motivo', () => {
 
     await contar(user, galon(), '14');
     expect(within(galon()).queryByTestId(PACKING_FINISH_BADGE_TESTID)).toBeNull();
+    expect(within(galon()).queryByRole('combobox')).toBeNull();
+    fireEvent.transitionEnd(within(galon()).getByTestId(PACKING_FINISH_REASON_FOLD_TESTID));
     expect(within(galon()).queryByTestId(PACKING_FINISH_REASON_TESTID)).toBeNull();
   });
 
@@ -544,5 +548,89 @@ describe('diálogo — textos del tablero', () => {
       error_de_carga: 'Error de carga',
       otro: 'Otro',
     });
+  });
+});
+
+describe('diálogo — el bloque de motivo se despliega y se pliega', () => {
+  const plegable = (fila: HTMLElement) => within(fila).getByTestId(PACKING_FINISH_REASON_FOLD_TESTID);
+
+  it('R3: al diferir del plan el bloque se despliega abierto, accesible y con la transición del tablero', async () => {
+    const { user } = pintar();
+
+    expect(within(galon()).queryByTestId(PACKING_FINISH_REASON_FOLD_TESTID)).toBeNull();
+    await contar(user, galon(), '13');
+
+    const bloque = plegable(galon());
+    expect(bloque).toHaveAttribute('data-state', 'open');
+    expect(bloque).not.toHaveAttribute('inert');
+    expect(bloque).not.toHaveAttribute('aria-hidden');
+    const clases = bloque.className.split(/\s+/);
+    expect(clases).toEqual(
+      expect.arrayContaining([
+        'grid',
+        'grid-rows-[1fr]',
+        'starting:grid-rows-[0fr]',
+        'starting:translate-y-[10px]',
+        'duration-(--dur-base)',
+      ]),
+    );
+    expect(within(galon()).getByRole('combobox')).toBeInTheDocument();
+  });
+
+  it('R3: al volver al plan el bloque se pliega (0fr y 10 px) inerte y oculto, con su contenido, y se desmonta al acabar', async () => {
+    const { user } = pintar();
+
+    await user.click(within(galon()).getByRole('button', { name: T.decrease('Galón 3,78 L') }));
+    await user.click(within(galon()).getByRole('button', { name: T.increase('Galón 3,78 L') }));
+
+    const bloque = plegable(galon());
+    expect(bloque).toHaveAttribute('data-state', 'closed');
+    expect(bloque).toHaveAttribute('inert');
+    expect(bloque).toHaveAttribute('aria-hidden', 'true');
+    expect(bloque.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(['grid-rows-[0fr]', 'translate-y-[10px]', 'opacity-0', 'duration-(--dur-base)']),
+    );
+    // Se pliega con lo que mostraba, no vacío: la ayuda de liberar sigue dentro mientras se mueve.
+    expect(within(bloque).getByTestId(PACKING_FINISH_HELP_TESTID)).toHaveTextContent('Se libera 1 envase apartado.');
+    expect(within(galon()).queryByRole('combobox')).toBeNull();
+
+    // Una transición que burbujea desde dentro no lo desmonta.
+    fireEvent.transitionEnd(within(bloque).getByTestId(PACKING_FINISH_REASON_TESTID));
+    expect(plegable(galon())).toBe(bloque);
+
+    fireEvent.transitionEnd(bloque);
+    expect(within(galon()).queryByTestId(PACKING_FINISH_REASON_FOLD_TESTID)).toBeNull();
+  });
+
+  it('R3: si vuelve a diferir mientras se pliega, el mismo bloque se abre de nuevo', async () => {
+    const { user } = pintar();
+
+    await contar(user, galon(), '13');
+    await contar(user, galon(), '14');
+    const bloque = plegable(galon());
+    await contar(user, galon(), '12');
+
+    expect(plegable(galon())).toBe(bloque);
+    expect(bloque).toHaveAttribute('data-state', 'open');
+    expect(bloque).not.toHaveAttribute('inert');
+  });
+
+  it('R5: el texto de «Otro» se pliega igual al cambiar a otro motivo', async () => {
+    const { user } = pintar();
+
+    await contar(user, botella(), '14');
+    await elegirMotivo(user, botella(), 'Otro');
+    const otro = within(botella()).getByTestId(PACKING_FINISH_OTHER_FOLD_TESTID);
+    expect(otro).toHaveAttribute('data-state', 'open');
+    expect(within(botella()).getByRole('textbox', { name: /Describe el motivo/ })).toBeInTheDocument();
+
+    await elegirMotivo(user, botella(), 'Rotura');
+    expect(otro).toHaveAttribute('data-state', 'closed');
+    expect(otro).toHaveAttribute('inert');
+    expect(otro).toHaveAttribute('aria-hidden', 'true');
+    expect(within(botella()).queryByRole('textbox', { name: /Describe el motivo/ })).toBeNull();
+
+    fireEvent.transitionEnd(otro);
+    expect(within(botella()).queryByTestId(PACKING_FINISH_OTHER_FOLD_TESTID)).toBeNull();
   });
 });

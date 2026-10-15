@@ -1,7 +1,7 @@
 'use client';
 
 import { CircleCheckIcon, MinusIcon, PackageIcon, PlusIcon, XIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode, type TransitionEvent } from 'react';
 
 import { FieldError } from '@/components/shared/field-error';
 import { SharedSelectControl } from '@/components/shared/shared-select';
@@ -89,6 +89,8 @@ export const PACKING_FINISH_INCREASE_TESTID = 'packing-finish-increase';
 export const PACKING_FINISH_BADGE_TESTID = 'packing-finish-badge';
 export const PACKING_FINISH_LINE_ERROR_TESTID = 'packing-finish-line-error';
 export const PACKING_FINISH_REASON_TESTID = 'packing-finish-reason';
+export const PACKING_FINISH_REASON_FOLD_TESTID = 'packing-finish-reason-fold';
+export const PACKING_FINISH_OTHER_FOLD_TESTID = 'packing-finish-other-fold';
 export const PACKING_FINISH_REASON_OPTION_TESTID = 'packing-finish-reason-option';
 export const PACKING_FINISH_REASON_ERROR_TESTID = 'packing-finish-reason-error';
 export const PACKING_FINISH_OTHER_TESTID = 'packing-finish-other';
@@ -99,8 +101,11 @@ export const PACKING_FINISH_GATE_TESTID = 'packing-finish-gate';
 
 const TEXTS = PACKING_FINISH_DIALOG_TEXTS;
 
-const REVEAL_CLASS =
-  'animate-in fade-in-0 slide-in-from-bottom-[10px] duration-(--dur-base) ease-(--ease-enter)';
+const FOLD_CLASS =
+  'grid transition-[grid-template-rows,opacity,translate] duration-(--dur-base)';
+const FOLD_OPEN_CLASS =
+  'grid-rows-[1fr] translate-y-0 opacity-100 ease-(--ease-enter) starting:grid-rows-[0fr] starting:translate-y-[10px] starting:opacity-0';
+const FOLD_CLOSED_CLASS = 'grid-rows-[0fr] translate-y-[10px] opacity-0 ease-(--ease-exit)';
 const ERROR_REVEAL_CLASS =
   'animate-in fade-in-0 slide-in-from-top-1 duration-(--dur-fast) ease-(--ease-enter)';
 
@@ -436,6 +441,61 @@ function PackingFinishBody({
   );
 }
 
+/**
+ * Despliega y pliega su contenido animando la fila de la rejilla entre 0 y su alto. Al plegarse
+ * sigue montado con lo último que mostró abierto, `inert` y oculto a la tecnología de asistencia,
+ * y se desmonta al acabar la transición. Con movimiento reducido la regla global acorta la
+ * transición a casi nada, así que el desmontaje llega en el acto.
+ */
+function Fold({
+  open,
+  className,
+  testId,
+  children,
+}: {
+  readonly open: boolean;
+  readonly className?: string;
+  readonly testId: string;
+  readonly children: ReactNode;
+}) {
+  const [mounted, setMounted] = useState(open);
+  const [lastOpen, setLastOpen] = useState<ReactNode>(open ? children : null);
+  // Recorta solo mientras se mueve: abierto y quieto, el anillo de foco no se corta.
+  const [settled, setSettled] = useState(false);
+
+  if (open && (!mounted || lastOpen !== children)) {
+    setMounted(true);
+    setLastOpen(children);
+  }
+  if (!open && settled) setSettled(false);
+  if (!mounted) return null;
+
+  function handleTransitionEnd(event: TransitionEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) return;
+    if (open) {
+      setSettled(true);
+    } else {
+      setMounted(false);
+      setLastOpen(null);
+    }
+  }
+
+  return (
+    <div
+      data-testid={testId}
+      data-state={open ? 'open' : 'closed'}
+      inert={!open}
+      aria-hidden={open ? undefined : true}
+      onTransitionEnd={handleTransitionEnd}
+      className={cn(FOLD_CLASS, open ? FOLD_OPEN_CLASS : FOLD_CLOSED_CLASS, className)}
+    >
+      <div className={cn('min-h-0', !(open && settled) && 'overflow-hidden')}>
+        {open ? children : lastOpen}
+      </div>
+    </div>
+  );
+}
+
 function PackingFinishLineRow({
   view,
   onChange,
@@ -534,8 +594,8 @@ function PackingFinishLineRow({
         </div>
       )}
 
-      {differs ? (
-        <div className={cn('col-span-full flex flex-col gap-2.5 md:col-start-2', REVEAL_CLASS)}>
+      <Fold open={differs} className="col-span-full md:col-start-2" testId={PACKING_FINISH_REASON_FOLD_TESTID}>
+        <div className="flex flex-col gap-2.5">
           <div className="flex flex-col gap-2">
             <span id={reasonLabelId} className="text-sm font-medium">
               {TEXTS.reasonLabel} <span aria-hidden="true" className="text-destructive">*</span>
@@ -565,8 +625,8 @@ function PackingFinishLineRow({
             {difference > 0 ? <p className="text-xs text-muted-foreground">{TEXTS.increaseHint}</p> : null}
           </div>
 
-          {reason === 'otro' ? (
-            <div className={cn('flex flex-col gap-2', REVEAL_CLASS)}>
+          <Fold open={reason === 'otro'} testId={PACKING_FINISH_OTHER_FOLD_TESTID}>
+            <div className="flex flex-col gap-2">
               <Label htmlFor={otherId}>
                 {TEXTS.otherLabel} <span aria-hidden="true" className="text-destructive">*</span>
               </Label>
@@ -588,7 +648,7 @@ function PackingFinishLineRow({
                 </div>
               )}
             </div>
-          ) : null}
+          </Fold>
 
           {help === null ? null : (
             <p className="text-xs text-muted-foreground" data-testid={PACKING_FINISH_HELP_TESTID}>
@@ -596,7 +656,7 @@ function PackingFinishLineRow({
             </p>
           )}
         </div>
-      ) : null}
+      </Fold>
     </div>
   );
 }

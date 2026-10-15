@@ -93,3 +93,54 @@ Comandos:
 Revisión visual 1440/1024/390: NO hecha (sin navegador en este agente).
 
 Veredicto: T9 hecha en código y tests; queda la revisión visual y dos puntos abiertos (pedido con `finish: null`, formato de cifras).
+
+## Tanda 4 — decisiones del humano (frontend_dev, 2026-10-15)
+
+Commits: `3af625b2` (pedido sin unidad), `ded3d3d8` (tilde «Conteo físico»), y el del pliegue animado (este).
+
+Archivos:
+- 1. Pedido sin unidad: `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx`
+  (`lacksUnit = EN_EMPAQUE propio && finish === null`; Terminar del pie deshabilitado sin form ni
+  testid y `aria-describedby` a la nota; en paso a paso el último paso se bloquea con la nota como
+  motivo visible vía `stepBlockReason`; `Notice` warning `packing-order-missing-unit`; texto en
+  `PACKING_ORDER_TEXTS.missingUnit`), `.../components/index.ts`,
+  `tests/unit/asignaciones-ui/packing-order-screen.test.tsx`, `packing-order-evidence.test.tsx`,
+  `packing-order-page.test.tsx`, `tests/unit/paridad/asignacion-acondicionamiento-paridad.test.tsx`
+  (fixtures de empaque propio pasan a llevar `finish`; el snapshot no cambia).
+- 2. Tilde: `app/(private)/inventario/components/movement-reason-label.ts`,
+  `tests/unit/inventario/batch-history.test.tsx`, `tests/unit/inventario/adjust-batch-dialog.test.tsx`,
+  `tests/unit/inventario-ui/finished-product-tables.test.tsx`, `e2e/ajuste-de-inventario.spec.ts`
+  (solo el texto, no corrido). Ningún snapshot contenía «Conteo fisico». El diálogo de Terminar
+  mantiene su copia `PACKING_FINISH_DIALOG_TEXTS.reasons`: reusar la etiqueta exigiría importar desde
+  `inventario/components` en otra ruta (o subirla a shared) y añadir «Otro»; no es trivial.
+- 3. Pliegue: `packing-finish-dialog.tsx` (subcomponente interno `Fold`: `grid-rows-[1fr]`↔`[0fr]`,
+  `translate-y-[10px]`, opacidad, `duration-(--dur-base)`; despliegue con `starting:`; al plegarse
+  queda `inert` + `aria-hidden` con lo último que mostró y se desmonta en `transitionend`; movimiento
+  reducido por la regla global de `globals.css`, que acorta a 0.01 ms), `index.ts`,
+  `tests/unit/asignaciones-ui/packing-finish-dialog.test.tsx`.
+
+R → test (añadidos):
+- R1, R8 (pedido sin unidad): screen «R1, R8: sin pasos, «Terminar» del pie queda deshabilitado…»,
+  «R1, R8: con pasos, el último paso no deja terminar…», «R1: la nota no sale en `POR_EMPACAR`…»,
+  «R1: la nota es corta y lleva tilde».
+- R3 (tilde/etiquetas): batch-history «deriva la etiqueta…» y finished-product-tables actualizados.
+- R3, R5 (pliegue): dialog «R3: al diferir del plan el bloque se despliega…», «R3: al volver al plan
+  el bloque se pliega…», «R3: si vuelve a diferir mientras se pliega…», «R5: el texto de «Otro» se
+  pliega igual…»; «R3: volver al plan quita insignia y motivo» ajustado al desmontaje en `transitionend`.
+
+Comandos (tras cada cambio):
+- `pnpm run typecheck`: limpio las tres veces.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes (tests/unit/documentos, tests/unit/pedidos).
+- `pnpm exec vitest run guard`: 76 archivos, 1069 pasan, 20 omitidos, las tres veces.
+- `vitest related`: cambio 1 → 8 archivos, 214/214 (antes de ajustar `packing-order-page.test.tsx`,
+  3 rojos ahí por `finish: null` en empaque propio); cambio 2 → 27 archivos, 434/434; cambio 3 → 8
+  archivos, 218/218.
+
+Fuera de «Archivos esperados»: `app/(private)/inventario/components/movement-reason-label.ts`,
+`tests/unit/inventario/batch-history.test.tsx`, `tests/unit/inventario/adjust-batch-dialog.test.tsx`,
+`e2e/ajuste-de-inventario.spec.ts`, `tests/unit/asignaciones-ui/packing-order-page.test.tsx`,
+`tests/unit/paridad/asignacion-acondicionamiento-paridad.test.tsx`.
+
+Revisión visual del pliegue: NO hecha (sin navegador).
+
+Veredicto: las tres decisiones hechas con tests; typecheck, lint y guardias verdes.
