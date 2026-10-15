@@ -11,6 +11,7 @@ import {
   ORDER_CANCEL_TEXTS,
   ORDER_CANCEL_TRIGGER_TESTID,
   ORDER_EXECUTION_ACTIONS_TESTID,
+  ORDER_EXECUTION_BACK_LINK_TESTID,
   ORDER_EXECUTION_LINES_TESTID,
   ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID,
   ORDER_EXECUTION_MATERIALS_TESTID,
@@ -20,13 +21,20 @@ import {
   ORDER_EXECUTION_ORDER_ID_FIELD,
   ORDER_EXECUTION_ORDER_QUANTITY_TESTID,
   ORDER_EXECUTION_PRESENTATION_TESTID,
+  ORDER_EXECUTION_NOT_STARTED_TESTID,
   ORDER_EXECUTION_SCREEN_TESTID,
+  ORDER_EXECUTION_START_BUTTON_TESTID,
+  ORDER_EXECUTION_START_CONFIRM_TESTID,
+  ORDER_EXECUTION_START_DIALOG_TESTID,
+  ORDER_EXECUTION_START_ERROR_TESTID,
   ORDER_EXECUTION_STEP_POSITION_FIELD,
   ORDER_EXECUTION_TEXTS,
   ORDER_EXECUTION_TITLE_TESTID,
   ORDER_EXECUTION_TOOLS_TESTID,
   OrderExecutionScreen,
+  assignedOrderStartConfirmTexts,
 } from '@/app/(private)/asignacion/[id]/components';
+import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { STEP_READER_SIDE_COLUMN_RESERVE } from '@/app/(private)/asignacion/components/operator-screen-frame';
 import type { StartedOrderExecution } from '@/lib/modules/asignaciones';
 
@@ -37,14 +45,16 @@ import { esperarInteractiva, setupUser } from '../../helpers/user-event';
  * lista de pedidos asignados, no en esta pantalla: ver `assigned-orders-states.test.tsx`.
  */
 
-const { finishAssignedOrderActionMock } = vi.hoisted(() => ({
+const { finishAssignedOrderActionMock, startAssignedOrderActionMock } = vi.hoisted(() => ({
   finishAssignedOrderActionMock: vi.fn(),
+  startAssignedOrderActionMock: vi.fn(),
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-execution-actions', () => ({
   finishAssignedOrderAction: finishAssignedOrderActionMock,
   recordStepMoveAction: vi.fn(() => Promise.resolve({ status: 'success' })),
   cancelAssignedOrderAction: vi.fn(),
+  startAssignedOrderAction: startAssignedOrderActionMock,
 }));
 
 afterEach(() => {
@@ -745,5 +755,97 @@ describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
     expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
       'Presentación: 5 × Caja x 12',
     );
+  });
+});
+
+describe('pantalla de ejecucion — entrar es libre: «Comenzar» dentro de la pantalla', () => {
+  const PENDIENTE: StartedOrderExecution = { ...EXECUTION, status: 'PENDIENTE' };
+
+  it('PENDIENTE: pinta «Comenzar» en el pie, sin paso a paso ni Finalizar', () => {
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toHaveTextContent(
+      ORDER_EXECUTION_TEXTS.start,
+    );
+    expect(screen.getByTestId(ORDER_EXECUTION_NOT_STARTED_TESTID)).toBeVisible();
+    expect(screen.queryByText('Verifica el equipo antes de cargar')).toBeNull();
+    expect(screen.queryByTestId('step-reader-finish')).toBeNull();
+  });
+
+  it('PENDIENTE: la vuelta es un enlace habilitado a la lista de pedidos asignados', () => {
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    const back = screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID);
+    expect(back.tagName).toBe('A');
+    expect(back).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
+    expect(back).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('pulsar «Comenzar» abre la confirmacion con sus textos y no comienza todavia', () => {
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    expect(screen.queryByTestId(ORDER_EXECUTION_START_DIALOG_TESTID)).toBeNull();
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
+
+    const texts = assignedOrderStartConfirmTexts();
+    const dialog = screen.getByTestId(ORDER_EXECUTION_START_DIALOG_TESTID);
+    expect(dialog).toHaveTextContent(texts.title);
+    expect(dialog).toHaveTextContent(texts.description);
+    expect(screen.getByTestId(ORDER_EXECUTION_START_CONFIRM_TESTID)).toHaveTextContent(texts.confirm);
+    expect(startAssignedOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('cancelar la confirmacion no comienza el pedido', () => {
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
+    fireEvent.click(screen.getByRole('button', { name: assignedOrderStartConfirmTexts().cancel }));
+
+    expect(startAssignedOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('confirmar comienza el pedido y pinta la ejecucion: paso a paso y la vuelta deshabilitada', async () => {
+    startAssignedOrderActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ...PENDIENTE, status: 'EN_CURSO', resumeStepPosition: 1 },
+    });
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_CONFIRM_TESTID));
+
+    expect(await screen.findByText('Verifica el equipo antes de cargar')).toBeVisible();
+    expect(startAssignedOrderActionMock).toHaveBeenCalledTimes(1);
+    expect(startAssignedOrderActionMock).toHaveBeenCalledWith(PENDIENTE.orderId);
+    expect(screen.queryByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toBeNull();
+    expect(screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID)).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('si comenzar falla, sigue sin comenzar y pinta el error', async () => {
+    startAssignedOrderActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'order_blocked',
+      message: 'Falta material.',
+    });
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_CONFIRM_TESTID));
+
+    expect(await screen.findByTestId(ORDER_EXECUTION_START_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID).tagName).toBe('A');
+  });
+
+  it('EN_CURSO: la vuelta se ve pero esta deshabilitada, sin href ni foco', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    const back = screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID);
+    expect(back.tagName).not.toBe('A');
+    expect(back).not.toHaveAttribute('href');
+    expect(back).not.toHaveAttribute('tabindex');
+    expect(back).toHaveAttribute('aria-disabled', 'true');
+    expect(back).toHaveTextContent(ORDER_EXECUTION_TEXTS.back);
+    expect(screen.queryByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toBeNull();
   });
 });

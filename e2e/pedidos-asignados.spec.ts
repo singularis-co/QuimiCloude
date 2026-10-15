@@ -38,8 +38,7 @@ import { ASSIGNED_ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
-  clickAndConfirm,
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
 } from './helpers/confirm-dialog';
 
 // El primer `goto` hace que `next dev` compile la ruta bajo demanda, y bcrypt tarda a proposito.
@@ -759,7 +758,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
 
     const row = rowByNumber(page, executable.numberText);
     await expect(row).toHaveCount(1, { timeout: 60_000 });
-    await clickAndConfirm(page, row.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, row.getByTestId(ENTER_TESTID));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(executable!.id), {
       timeout: 60_000,
     });

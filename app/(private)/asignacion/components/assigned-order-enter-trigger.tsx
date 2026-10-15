@@ -5,8 +5,6 @@ import type { AssignedOrderView } from '@/lib/modules/asignaciones';
 import { assignedOrderRoute } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
-import { AssignedOrderStartTrigger } from './assigned-order-start-trigger';
-
 export const ASSIGNED_ORDER_ENTER_TESTID = 'assigned-order-enter';
 export const ASSIGNED_ORDER_ENTER_REASON_TESTID = 'assigned-order-enter-reason';
 
@@ -78,12 +76,15 @@ export function AssignedOrderEnterTrigger({
     );
   }
 
+  // Entrar es libre: el pedido se comienza dentro de la pantalla, con «Comenzar».
   return (
-    <AssignedOrderStartTrigger
+    <Link
       href={assignedOrderRoute(order.id)}
-      testId={ASSIGNED_ORDER_ENTER_TESTID}
+      data-slot="button"
+      data-testid={ASSIGNED_ORDER_ENTER_TESTID}
+      className={cn(buttonVariants({ variant: 'outline', touch: true }))}
     >
       Entrar
-    </AssignedOrderStartTrigger>
+    </Link>
   );
 }

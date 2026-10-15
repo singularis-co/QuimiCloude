@@ -333,6 +333,15 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).startAssignedOrderAction('no-es-un-uuid'),
   },
   {
+    // Abrir la pantalla sin comenzar el pedido: mismo archivo de `driving/`, mismo `currentActor`.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-execution-actions.ts',
+    nombre: 'openAssignedOrderAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-execution-actions')
+      ).openAssignedOrderAction('no-es-un-uuid'),
+  },
+  {
     // Anadida por QC-168, que estrena la pantalla de empaque: su archivo de `driving/` resuelve
     // las dos caras de la sesion, asi que el censo tiene que cubrirlo. La accion captura los
     // errores y devuelve un estado, asi que un `orderId` que no exista no rompe la invocacion.

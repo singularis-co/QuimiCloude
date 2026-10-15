@@ -71,7 +71,7 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
@@ -662,7 +662,7 @@ test.describe('producto terminado', () => {
 
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
-    await clickAndConfirm(page, assignedRow.getByTestId('assigned-order-enter'), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, assignedRow.getByTestId('assigned-order-enter'));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(order.id), {
       timeout: 60_000,
     });
