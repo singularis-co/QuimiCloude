@@ -276,3 +276,71 @@ integración de dev (m1) están resueltos. Sigue abierto m6 (ajeno, CI) y se añ
 Lo que falta para OK: RB1 (derivar las claves del mapa de motivos) y RB2 (alta de
 `createListFinishedProductDistribution` en la lista de `inventario-schema.test.ts`). Después, correr esos
 dos archivos de test y el del diálogo.
+
+## Re-review (vuelta 3, acotada a 8419cca1..2512c5fa)
+
+HEAD `2512c5fa` (PR borrador #246). Por instrucción del humano, la suite completa la corre `gate-completo`
+en el PR. Esta vuelta revisa leyendo el diff y corre solo los 3 archivos de test afectados directamente.
+
+### Verificación
+
+- `movement-reason.test.ts`, `inventario-schema.test.ts` y `data-table-alcance.test.ts`: 3/3 archivos,
+  53 tests pasan y 2 se omiten.
+- Antes de cambiar de método, en `55a69d35` llegó a terminar `vitest run tests/unit tests/guards`:
+  1103/1103 archivos y 17674 tests en verde. También typecheck (verde) y lint (0 errores, 7 warnings
+  preexistentes). No lo repetí en `2512c5fa`, porque la segunda mezcla solo trae código de dev ajeno a
+  la feature (ver abajo).
+
+### Hallazgos de la vuelta 2
+
+- **RB2: resuelto.** 037fd0ba da de alta `createListFinishedProductDistribution` en la lista cerrada de
+  `inventario-schema.test.ts`.
+- **RB1: resuelto en lo funcional.** 899bec1c construye `PACKING_REASON_LABELS` a partir de
+  `PACKING_DIFFERENCE_REASONS`. Las etiquetas de inventario salen de `movementReasonLabel` y «Otro» va
+  aparte, tras comprobar el tipo con `isMovementReason`. No queda ningún literal de motivo y la guardia
+  pasa. Pero el comentario que añade cita un requisito (ver RB3).
+- **m8:** sigue como deuda menor.
+
+### be7ac58d (`data-table-alcance`)
+
+Correcto. `e2e/envases-reales-empaque.spec.ts` sí referencia `data-table`: localiza las filas de «Reparto»
+por `data-table-row-<id>`. Entra en la lista cerrada en su orden alfabético, el centinela pasa de 47 a 48,
+la nota sigue el formato de las anteriores y la lista sigue cerrada. Es un archivo de test, así que la
+regla 9 no se le aplica.
+
+### Las dos mezclas con dev (55a69d35 y 2512c5fa)
+
+- Lo que traen de dev desde be7ac58d: vencimiento próximo y lotes vivos en inventario
+  (`product-prisma.ts`, `product-batch-view.ts`, `product-view.ts`, `batch-actions.ts`, componentes de
+  `inventario/components`), `session-user-prisma.ts` de identity, el snapshot de `inventario-paridad`
+  (#244) y sus tests.
+- Ninguno toca `asignaciones`, `pedidos`, `reservation-prisma.ts`, `consumeBatchStock` ni
+  `recalculateProductStock`. En `product-prisma.ts` solo se añade `findNextExpiryDateByProduct` y
+  `toNextExpiryByProduct`.
+- R23 y R25 no se ven afectados: `conditioning-batch-data.ts`, `finish-conditioning.ts` y
+  `conditioning-order-view.ts` son iguales que en la vuelta 2.
+- Orden de migraciones: dev no trae migraciones nuevas. La última sigue siendo
+  `20261015120200_order_presentation_lines_packed_count`, después de `20261015120100`.
+- `inventario-paridad` queda resuelto en dev con #244.
+- Ahora mismo `origin/dev` va 1 commit por delante (6cc59959, QC-209, la guía de importación). Toca solo
+  `inventario/importar` y no se cruza con la feature.
+
+### Hallazgos nuevos
+
+#### BLOQUEANTE
+
+- **RB3: un comentario de producción cita un requisito (regla 9 del reviewer).**
+  - **Dónde:** `app/(private)/asignacion/empaque/[id]/components/packing-finish-dialog.tsx:47`, añadido
+    en 899bec1c: `// Derivado del conjunto cerrado (R9): un motivo nuevo de inventario gana etiqueta sin tocar aqui.`
+  - **Por qué bloquea:** la regla dice que una línea añadida en producción con un comentario que cite
+    `R<n>` es BLOQUEANTE.
+  - **Arreglo:** quitar «(R9)». El resto del comentario explica el motivo y se puede quedar. No hace falta
+    tocar ningún test.
+
+### Veredicto de la vuelta 3
+
+**RECHAZADO**: 1 bloqueante (RB3, un comentario de una línea) y 0 menores nuevos. RB1, RB2 y be7ac58d
+están bien, y las mezclas no rompen R23, R25 ni el orden de migraciones.
+
+Siguen abiertos m6 (ajeno, se ve en CI) y m8 (deuda). En cuanto se quite «(R9)» y `gate-completo` de #246
+salga verde, la feature queda en OK.
