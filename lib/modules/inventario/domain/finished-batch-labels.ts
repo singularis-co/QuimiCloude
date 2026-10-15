@@ -29,7 +29,7 @@ export interface FinishedBatchLabels {
   /** Un elemento por linea que tiene asiento `production` de ese pedido; una linea sin lote no
    *  aparece. Fuera de transaccion. */
   listOfOrder(companyId: string, orderId: string): Promise<readonly FinishedBatchOfOrderLine[]>;
-  /** Todo o nada, en su propia transaccion. */
+  /** Todo o nada, en la transaccion que recibe o en la suya. */
   writeForOrder(input: {
     readonly companyId: string;
     readonly orderId: string;

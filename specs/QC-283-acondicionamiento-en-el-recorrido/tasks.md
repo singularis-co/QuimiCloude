@@ -117,7 +117,7 @@
 T4 → T5 → T6 son secuenciales porque comparten `lib/composition/index.ts`, el puerto
 `execution-transaction.ts` y el helper de test. T7 `[P]` no comparte archivos con ellas.
 
-### T4 — Writers ampliados y Comenzar anota · backend_dev · R1, R2 · Dep: tanda 0
+### [x] T4 — Writers ampliados y Comenzar anota · backend_dev · R1, R2 · Dep: tanda 0
 
 **Hacer:**
 

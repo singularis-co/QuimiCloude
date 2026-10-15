@@ -1,3 +1,4 @@
+import type { FinishedBatchLabels } from '@/lib/modules/inventario';
 import type { OrderCancellation, OrderCatalog } from '@/lib/modules/pedidos';
 
 import type { ConditioningTeamRepository } from './conditioning-team-repository';
@@ -8,8 +9,9 @@ export type ExecutionWriters = {
   readonly orders: Pick<OrderCatalog, 'transitionAliveById'> & OrderCancellation;
   readonly packing: Pick<OrderCatalog, 'startPackingAliveById' | 'finishPackingAliveById'>;
   readonly log: ExecutionLogRepository;
-  readonly conditioning: Pick<OrderCatalog, 'startConditioningAliveById'>;
+  readonly conditioning: Pick<OrderCatalog, 'startConditioningAliveById' | 'finishConditioningAliveById'>;
   readonly team: ConditioningTeamRepository;
+  readonly batches: Pick<FinishedBatchLabels, 'writeForOrder'>;
 };
 
 /** Lo escrito por `writers` se confirma entero o nada, y se deshace entero si `work` lanza. */

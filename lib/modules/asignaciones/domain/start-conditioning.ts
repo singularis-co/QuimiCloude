@@ -1,9 +1,9 @@
 // lib/modules/asignaciones/domain/start-conditioning.ts
 /**
  * Comenzar el acondicionamiento: `POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO` con el actor como quien
- * acondiciona y, en la misma transaccion, el equipo que lo acompana. Sin comprobacion de
- * asignacion: cualquier actor con `acondicionamiento.modificar` puede tomar cualquier pedido vivo
- * de su empresa que este `POR_ACONDICIONAR`. No toca inventario.
+ * acondiciona y, en la misma transaccion, el equipo que lo acompana y la anotacion en el registro.
+ * Sin comprobacion de asignacion: cualquier actor con `acondicionamiento.modificar` puede tomar
+ * cualquier pedido vivo de su empresa que este `POR_ACONDICIONAR`. No toca inventario.
  *
  * Los errores del pedido se deciden antes que los del equipo, y el equipo solo se resuelve si el
  * pedido esta `POR_ACONDICIONAR`: repetir Comenzar sobre el propio pedido no lee ni escribe equipo.
@@ -93,11 +93,19 @@ export function createStartConditioning(
         : [];
 
     try {
-      await deps.transaction.run(async ({ conditioning, team: teamWriter }) => {
+      await deps.transaction.run(async ({ conditioning, team: teamWriter, log }) => {
         const result = await conditioning.startConditioningAliveById(orderId, companyId, actor.id, now);
         if (result === 'already_mine') return;
         if (!isExecutionSuccess(result)) throw new ExecutionAbortedError(result);
         await teamWriter.insertAll(team);
+        await log.append({
+          action: 'conditioning_start',
+          companyId,
+          orderId,
+          userId: actor.id,
+          stepPosition: null,
+          occurredAt: now,
+        });
       });
     } catch (error) {
       if (error instanceof ExecutionAbortedError) throw startConditioningError(error.outcome);

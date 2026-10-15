@@ -195,7 +195,9 @@ describe('ExecutionLogRepository: solo anexar (R31)', () => {
 })
 
 describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () => {
-  it('R24: `run` entrega exactamente `orders`, `packing`, `log`, `conditioning` y `team`, y devuelve lo que devuelve `work`', async () => {
+  // Nota 2026-10-14 (QC-283): los escritores ganan `batches` y `conditioning.finishConditioningAliveById`,
+  // para que guardar datos de lote y Terminar anoten en la misma transaccion.
+  it('R24: `run` entrega exactamente `orders`, `packing`, `log`, `conditioning`, `team` y `batches`, y devuelve lo que devuelve `work`', async () => {
     const writers: ExecutionWriters = {
       orders: {
         transitionAliveById: () => Promise.resolve('ok'),
@@ -206,17 +208,21 @@ describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () 
         finishPackingAliveById: () => Promise.resolve({ kind: 'ok', finishedGoods: [] }),
       },
       log: new RegistroDoble(),
-      conditioning: { startConditioningAliveById: () => Promise.resolve('ok') },
+      conditioning: {
+        startConditioningAliveById: () => Promise.resolve('ok'),
+        finishConditioningAliveById: () => Promise.resolve('ok'),
+      },
       team: {
         insertAll: () => Promise.resolve(0),
         listByOrderInCompany: () => Promise.resolve([]),
         listByOrdersInCompany: () => Promise.resolve([]),
       },
+      batches: { writeForOrder: () => Promise.resolve({ kind: 'written' }) },
     }
     const transaccion: ExecutionTransaction = { run: (work) => work(writers) }
 
     const claves = await transaccion.run((w) => Promise.resolve(Object.keys(w).sort()))
-    expect(claves).toEqual(['conditioning', 'log', 'orders', 'packing', 'team'])
+    expect(claves).toEqual(['batches', 'conditioning', 'log', 'orders', 'packing', 'team'])
   })
 })
 

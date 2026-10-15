@@ -1885,8 +1885,10 @@ const executionTransaction: ExecutionTransaction = {
         log: createExecutionLogRepository(tx),
         conditioning: {
           startConditioningAliveById: createStartConditioning({ conditioning: createOrderConditioningRepository(tx) }),
+          finishConditioningAliveById: createFinishConditioning({ conditioning: createOrderConditioningRepository(tx) }),
         },
         team: createConditioningTeamRepository(tx),
+        batches: createFinishedBatchLabels(tx),
       }),
     ),
 };

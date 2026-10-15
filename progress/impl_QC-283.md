@@ -148,3 +148,42 @@ Modificados (tests, nota fechada 2026-10-14): `tests/unit/dashboard/execution-tr
 - Grafo de código (MCP) no usado: exploración con Grep/Read.
 
 Veredicto: T3 hecha; el repo compila, lista y detalle consumen `active`/`totalDuration`/`durations`, tests y guardias en verde.
+
+## Tanda 1A · T4 — Writers ampliados y Comenzar anota (backend_dev, 2026-10-14)
+
+### Archivos
+
+Creados:
+- `tests/integration/asignaciones/conditioning-execution-log.int.test.ts` (R1, R2; censado `commit` en `tests/integration/aislamiento.json`)
+
+Modificados (produccion):
+- `lib/modules/asignaciones/ports/execution-transaction.ts` (C2.4: `conditioning.finishConditioningAliveById` y `batches`)
+- `lib/modules/asignaciones/domain/start-conditioning.ts` (C2.6: `log.append(conditioning_start)` tras `insertAll`, dentro de la transaccion)
+- `lib/composition/index.ts` (`executionTransaction`: los dos escritores nuevos sobre `tx`)
+- `lib/modules/inventario/adapters/driven/persistence/finished-batch-labels-prisma.ts` (C2.5 adelantado: `createFinishedBatchLabels(db?)`)
+- `lib/modules/inventario/domain/finished-batch-labels.ts` (JSDoc de `writeForOrder`, C2.5)
+
+Modificados (tests):
+- `tests/helpers/execution-transaction-on-client.ts` (los dos escritores, con «lanza si este archivo no lo usa»; `batches` entra por un 4.º parametro opcional)
+- `tests/unit/asignaciones/start-conditioning.test.ts` (doble `log.append`; R1, R2; el orden de R12/R13 gana `anota`, nota fechada)
+- `tests/unit/asignaciones/execution-log-repository.test.ts` (R24 de QC-82: las claves ganan `batches`, nota fechada)
+- `tests/integration/asignaciones/start-conditioning-team.int.test.ts` (la limpieza borra antes las anotaciones: su FK `RESTRICT` al pedido haria fallar el `finally`; nota fechada)
+
+### Decisiones de implementacion
+- **C2.5 entra en T4 y no en T5.** El cableado de C2.4 (`batches: createFinishedBatchLabels(tx)`) no compila sin la firma nueva. T5 añade su test de integracion. Sin `db` el adaptador hace lo de siempre; con `db`, `listOfOrder` lee y `writeForOrder` escribe por el, sin abrir otra transaccion.
+- El fallo de `append` en integracion se fuerza con `stepPosition: 1`, que rechaza el CHECK `order_execution_entries_conditioning_has_no_step` dentro de la misma transaccion (el error es de Postgres, no de un doble), siguiendo `execution-atomicity.int.test.ts`.
+
+### R → test
+| R | Test |
+|---|---|
+| R1 | `start-conditioning.test.ts` › «R1: anota conditioning_start en la transaccion, tras la transicion y el equipo», «R1: si anotar falla, el error sale de la transaccion…», «R1: si insertar el equipo falla, no anota», «R1: una escritura %s no anota» (3); `conditioning-execution-log.int.test.ts` › «R1: la transicion, el equipo y la anotacion conditioning_start quedan juntos…», «R1: si append falla no quedan ni transicion ni equipo» |
+| R2 | `start-conditioning.test.ts` › «R2: already_mine (repetir Comenzar) no anota»; `conditioning-execution-log.int.test.ts` › «R2: repetir Comenzar (already_mine) no anota otra vez» |
+
+### Verificacion (salida real)
+- `pnpm exec vitest run tests/unit/asignaciones/start-conditioning.test.ts tests/unit/asignaciones/execution-log-repository.test.ts` → `Test Files 2 passed (2)`, `Tests 99 passed (99)`.
+- `pnpm exec vitest run --project integration tests/integration/asignaciones/conditioning-execution-log.int.test.ts tests/integration/asignaciones/start-conditioning-team.int.test.ts` → plantilla `qct_tpl_f928446831e4` reutilizada, base efimera creada y borrada; `Test Files 2 passed (2)`, `Tests 8 passed (8)`.
+- `pnpm exec vitest run --project integration tests/integration/asignaciones/finished-orders.int.test.ts tests/integration/inventario/finished-batch-labels.int.test.ts` (consumidores del helper y del adaptador) → `Test Files 2 passed (2)`, `Tests 13 passed (13)`.
+- `pnpm run typecheck` → `tsc --noEmit` sin errores.
+- `pnpm exec eslint <10 archivos de T4>` → sin salida (0 problemas).
+
+Veredicto: T4 hecha; Comenzar anota en su transaccion y los tests de T4 estan en verde.
