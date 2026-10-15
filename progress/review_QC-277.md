@@ -182,3 +182,57 @@ Ningún BLOQUEANTE.
 
 **OK (APROBADO).** 0 bloqueantes, 5 menores. Los menores no hace falta corregirlos para pasar a
 F2.3. m5 hay que tenerlo en cuenta al sincronizar con `dev`.
+
+## Vuelta 2 (acotada a cae5a7ad..fcd85793)
+
+Solo lo que QC-277 cambia respecto a `origin/dev` (`git diff origin/dev...fcd85793`). El conjunto
+de archivos de QC-277 es el mismo que en la vuelta 1, más `progress/deudas.md`. Lo comprobé
+comparando los nombres de archivo con el re-fechado aplicado.
+
+### Checklist
+
+- [x] **Conflicto en `session-user-prisma.ts`.** El diff contra dev son +10 líneas: el campo
+  `company_addons` en `FilaSesion`, un docblock de 3 líneas (m2) y
+  `ARRAY(SELECT o.addon_key FROM company_addon_overrides o WHERE o.company_id = u.company_id AND o.enabled)`
+  dentro del mismo `$queryRaw` etiquetado.
+  - Aislamiento: el subselect se ata a `u.company_id` del propio usuario. Las tablas tienen RLS
+    forzada y sin policies, igual que el resto del proyecto (`docs/architecture.md`: la frontera
+    es el `WHERE`, no la RLS).
+  - Sin empresa: `NULL = …` no casa ninguna fila y el resultado es `{}`, o sea `[]`.
+  - Solo cuenta `enabled = true` (D14).
+  - El SQL no interpola nada nuevo.
+  - R8 se cumple: es la misma sentencia.
+- [x] **Test R8/R9 reescrito.** No relaja nada. Antes espiaba los `findFirst`/`findMany` de
+  Prisma, que tras el `$queryRaw` de dev ya no se llaman. Ahora `medir()` captura **todas** las
+  sentencias SQL del lector y exige que sea exactamente una, con `FROM users u` y
+  `company_addon_overrides`. Es más estricto: cualquier consulta aparte, sea por Prisma o por SQL
+  crudo, la rompe.
+- [x] **m2:** el docblock queda en 3 líneas.
+- [x] **m3:** caso nuevo «con dos empresas». Prueba A con uno y B con cinco, y luego al revés,
+  con B en `[]` por tener todo apagado. Comprueba que el `companyId` de cada uno es el suyo y
+  deshace los datos en `finally`.
+- [x] **m5:** la carpeta `db/migrations/20261015190000_company_addons` queda después de
+  `20261015130000_…`, la última de dev. Las referencias en `guard-identificador-de-request`,
+  `recipe-route-contract`, `design.md` y `tasks.md` están actualizadas. `git grep 20261014190000`
+  solo da historia en `progress/` (impl, ficha y review).
+- [x] **D59 (m1) y D60 (m4)** están en `progress/deudas.md`, con origen y qué falta.
+- [x] **`guard-identificador-de-request.test.ts`:** contra dev son solo +14 líneas y 0 borradas.
+  Entran el alta de `modulos-por-empresa.spec.ts` en `E2E_ESPERADOS` y
+  `20261015190000_company_addons` al final de `MIGRACIONES_ESPERADAS`. Se conservan todas las
+  entradas de dev (QC-281/282).
+
+### Verificación ejecutada
+
+- `vitest run session-user.int + guard-identificador-de-request + recipe-route-contract`:
+  `Test Files 3 passed (3)`, `Tests 71 passed (71)`.
+- `playwright test e2e/modulos-por-empresa.spec.ts` (base `quimicloude_e2e_qc277`, pg17 :5433,
+  chromium + webkit): `10 passed (29.2s)`.
+
+### Hallazgos
+
+Ninguno nuevo. Los menores de la vuelta 1 están resueltos (m2, m3, m5) o pasados a deuda (m1 en
+D59, m4 en D60).
+
+### Veredicto vuelta 2
+
+**OK.** 0 bloqueantes, 0 menores nuevos.
