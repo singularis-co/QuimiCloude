@@ -348,3 +348,14 @@ T11 parte frontend hecha; verde.
 
 ### Veredicto
 T15 hecha; sin desvíos de `## Archivos esperados` ni tests ajenos rotos.
+
+## Tanda 4 — cierre (implementer, 2026-10-15)
+- Tasks cerradas: T15 y T18 (commit `c5f828df`). Quedan T19–T21.
+- Sin desvíos: ningún archivo fuera de `## Archivos esperados`, ningún assert ajeno tocado, ninguna dependencia nueva.
+- La parte de integración que T15 no pudo correr (Docker apagado) se cubrió aquí: se levantó Docker (pg17 :5433) y `./init.sh` incluye los `.int` relacionados.
+- Gate (./init.sh rápido):
+  - 1.ª pasada: 1 rojo, `tests/unit/documentos/module-contract.test.ts` R27/R33, timeout de 20 s en `await import('@/lib/modules/documentos')`
+    con la máquina cargada (Docker recién arrancado). Ese archivo no está en el diff; solo pasa 23/23. Es otro archivo que el
+    inestable conocido (`adjust-batch-dialog`), pero de la misma clase: inestabilidad por carga.
+  - 2.ª pasada: related 886/886 archivos (14230 pasados, 59 saltados); test:rapido 117/117 (1641 pasados, 37 saltados);
+    `== init OK ==`.
