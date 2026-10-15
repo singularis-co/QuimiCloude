@@ -17,6 +17,8 @@ export type OrderDistributionLineView = {
   readonly packedPackages: number | null;
   /** `null` = linea antigua o envase que no volvio: la pantalla cae al nombre de la presentacion. */
   readonly packagingName: string | null;
+  /** `null` = sin envase, envase que no volvio o envase sin imagen: la pantalla pinta el marcador. */
+  readonly packagingImageUrl?: string | null;
 };
 
 /** Los ids unicos de las presentaciones de todas las lineas, para resolverlos en una sola llamada. */
@@ -40,6 +42,7 @@ export function toDistributionLines(
     packages: line.packages,
     packedPackages: line.packedPackages,
     packagingName: line.packagingName,
+    packagingImageUrl: line.packagingImageUrl,
   }));
 }
 

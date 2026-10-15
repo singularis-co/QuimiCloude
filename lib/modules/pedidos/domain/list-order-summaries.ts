@@ -1,4 +1,4 @@
-import { findPackagingNames } from './get-order';
+import { findPackagingInfo } from './get-order';
 import type { AssignedOrderSummary, OrderCatalog } from './order-catalog';
 import { orderNumberContains } from './order-number';
 import type { Page } from './page';
@@ -26,20 +26,24 @@ async function withPackagingNames(
       ),
     ),
   ];
-  const names = await findPackagingNames(packaging, packagingIds, companyId);
+  const info = await findPackagingInfo(packaging, packagingIds, companyId);
   return {
     ...page,
     items: page.items.map((item) => ({
       ...item,
-      presentationLines: item.presentationLines.map((line) => ({
-        id: line.id,
-        presentationId: line.presentationId,
-        packages: line.packages,
-        packedPackages: line.packedPackages,
-        presentationContent: line.presentationContent,
-        packagingProductId: line.packagingProductId,
-        packagingName: line.packagingProductId === null ? null : (names.get(line.packagingProductId) ?? null),
-      })),
+      presentationLines: item.presentationLines.map((line) => {
+        const packagingInfo = line.packagingProductId === null ? undefined : info.get(line.packagingProductId);
+        return {
+          id: line.id,
+          presentationId: line.presentationId,
+          packages: line.packages,
+          packedPackages: line.packedPackages,
+          presentationContent: line.presentationContent,
+          packagingProductId: line.packagingProductId,
+          packagingName: packagingInfo?.name ?? null,
+          packagingImageUrl: packagingInfo?.imageUrl ?? null,
+        };
+      }),
     })),
   };
 }

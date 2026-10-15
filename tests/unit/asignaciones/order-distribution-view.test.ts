@@ -72,6 +72,18 @@ describe('QC-170 — order-distribution-view: el reparto en solo lectura', () =>
     ]);
   });
 
+  it('imagen del envase: copia `packagingImageUrl` de cada linea, `null` incluido', () => {
+    const lineas = toDistributionLines(
+      [
+        { id: 'linea-6', presentationId: 'p-1', packages: 1, packedPackages: null, presentationContent: null, packagingProductId: 'env-1', packagingName: 'Envase PET 1L', packagingImageUrl: 'https://cdn.test/productos/env-1.png' },
+        { id: 'linea-7', presentationId: 'p-1', packages: 1, packedPackages: null, presentationContent: null, packagingProductId: 'env-2', packagingName: 'Galon', packagingImageUrl: null },
+      ],
+      new Map([['p-1', 'Botella 1L']]),
+    );
+
+    expect(lineas.map((linea) => linea.packagingImageUrl)).toEqual(['https://cdn.test/productos/env-1.png', null]);
+  });
+
   it('QC-281 R23: lleva el id de la linea y los envases contados junto al plan', () => {
     expect(
       toDistributionLines(

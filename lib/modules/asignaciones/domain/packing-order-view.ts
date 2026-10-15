@@ -52,7 +52,13 @@ export type PackingFinishLineView = {
   readonly unit: UnitConversion;
   /** `null` = linea guardada antes de que el reparto nombrara envases. `freePackages` es lo que
    *  queda sin apartar por ningun pedido; si dos lineas comparten envase, lo comparten. */
-  readonly packaging: { readonly productId: string; readonly name: string; readonly freePackages: number } | null;
+  readonly packaging: {
+    readonly productId: string;
+    readonly name: string;
+    readonly freePackages: number;
+    /** `null` = envase sin imagen o que ya no vuelve del catalogo: el dialogo pinta el marcador. */
+    readonly imageUrl?: string | null;
+  } | null;
 };
 
 /** Lo que el dialogo de Terminar necesita para validar el conteo igual que el servidor. */
@@ -169,6 +175,7 @@ export async function composePackingFinishView(
               productId: packagingId,
               name: packagingRef?.name ?? line.packagingName ?? presentation.name,
               freePackages: packagingRef === undefined ? 0 : wholePackages(packagingRef.available),
+              imageUrl: packagingRef?.imageUrl ?? line.packagingImageUrl ?? null,
             },
     });
   }
