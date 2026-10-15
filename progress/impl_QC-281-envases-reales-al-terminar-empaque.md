@@ -413,3 +413,10 @@ Salidas:
   Los 2 eran `order-repository`; tras la correccion da 13/13.
 
 Veredicto: merge resuelto con R23/R25 intactos. Queda un rojo heredado de dev (`inventario-paridad`).
+
+### E2E tras el merge de origin/dev (implementer, 2026-10-15)
+- `pnpm exec playwright test e2e/envases-reales-empaque.spec.ts --project=chromium` en 4aa1d41e,
+  servidor propio del worktree (puerto 3117): **3 passed (2.8m)**.
+- Rojo ajeno conocido: `tests/unit/paridad/inventario-paridad.test.tsx` «R1 R16-R18 — con filas»
+  (1 snapshot). Sus tres archivos son idénticos a origin/dev (QC-284 añadió la columna «Tipo» sin
+  regenerar el snapshot); no es de QC-281.
