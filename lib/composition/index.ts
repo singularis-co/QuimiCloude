@@ -73,6 +73,7 @@ import {
   createListFinishedProductBatches,
   createListFinishedProductCosts,
   createListFinishedProductDeliveries,
+  createListFinishedProductDistribution,
   createListFinishedProductMovements,
   createListFinishedStock,
   createListOrderBatches,
@@ -169,6 +170,7 @@ import type { FinishedProductDetailRepository } from '@/lib/modules/inventario/p
 import type {
   FinishedBatchCatalog,
   FinishedDeliveryDirectory,
+  FinishedDistributionDirectory,
   OrderNumberDirectory,
   PackagingCatalog,
   PresentationCatalog,
@@ -329,6 +331,7 @@ import {
   findDeliveryDetailsByIds,
   summarizeDeliveredByBatchIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
+import { listPackedLinesByCombination } from '@/lib/modules/pedidos/adapters/driven/persistence/packed-lines-directory-prisma';
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma';
 import {
   withOrderTransaction,
@@ -1023,6 +1026,10 @@ const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
   summarizeDelivered: summarizeDeliveredByBatchIds,
 };
 
+const finishedDistributionDirectory: FinishedDistributionDirectory = {
+  listPackedLines: listPackedLinesByCombination,
+};
+
 const finishedProductDetailRepository: FinishedProductDetailRepository = {
   findAliveFinished: findAliveFinishedProduct,
   listBatches: listFinishedProductBatches,
@@ -1193,6 +1200,10 @@ export const inventario = {
     customers: {
       findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
     },
+  }),
+  listFinishedProductDistribution: createListFinishedProductDistribution({
+    products: finishedProductDetailRepository,
+    distribution: finishedDistributionDirectory,
   }),
   listFinishedProductCosts: createListFinishedProductCosts({
     products: finishedProductDetailRepository,
@@ -2016,11 +2027,7 @@ export const asignaciones = {
     people: peopleDirectory,
     now: () => new Date(),
   }),
-  // `listPackingOrders` y `getPackingOrder` comparten los MISMOS `orderCatalog`,
-  // `orderAssignmentRepository`, `recipeCatalog`, `presentationCatalog` y `peopleDirectory` del
-  // resto del modulo, mas `productCatalog` -el mismo que usa `recetas` y la ejecucion, arriba-
-  // para los envases. `startPacking` y `finishPacking` solo necesitan `orderCatalog`: ningun
-  // adaptador nuevo.
+  // `getPackingOrder` suma `packagingCatalog` para el libre de cada envase del conteo de Terminar.
   listPackingOrders: createListPackingOrders({
     orders: orderCatalog,
     assignments: orderAssignmentRepository,
@@ -2028,7 +2035,6 @@ export const asignaciones = {
     people: peopleDirectory,
     presentations: presentationCatalog,
     units: unitCatalog,
-    products: productCatalog,
     now: () => new Date(),
   }),
   getPackingOrder: createGetPackingOrder({
@@ -2038,7 +2044,7 @@ export const asignaciones = {
     people: peopleDirectory,
     presentations: presentationCatalog,
     units: unitCatalog,
-    products: productCatalog,
+    packaging: packagingCatalog,
     packingSteps: { findPackingStepsById: findRecipePackingStepsById },
     now: () => new Date(),
     evidence: stepEvidenceRepository,

@@ -86,7 +86,7 @@ const EXECUTION: StartedOrderExecution = {
     },
   ],
   tools: [],
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
   unitId: null,
   unitLabel: null,
   evidence: [],
@@ -428,8 +428,8 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
         execution={{
           ...EXECUTION,
           presentationLines: [
-            { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+            { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+            { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
           ],
         }}
       />,
@@ -724,8 +724,8 @@ describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
         execution={{
           ...EXECUTION,
           presentationLines: [
-            { presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: 'Caja cartón 12 u', packages: 5 },
-            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+            { lineId: 'linea-4', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: 'Caja cartón 12 u', packages: 5 },
+            { lineId: 'linea-5', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
           ],
         }}
       />,

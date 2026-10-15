@@ -32,8 +32,12 @@ async function withPackagingNames(
     items: page.items.map((item) => ({
       ...item,
       presentationLines: item.presentationLines.map((line) => ({
+        id: line.id,
         presentationId: line.presentationId,
         packages: line.packages,
+        packedPackages: line.packedPackages,
+        presentationContent: line.presentationContent,
+        packagingProductId: line.packagingProductId,
         packagingName: line.packagingProductId === null ? null : (names.get(line.packagingProductId) ?? null),
       })),
     })),

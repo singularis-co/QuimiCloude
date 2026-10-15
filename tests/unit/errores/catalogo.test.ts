@@ -75,7 +75,9 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-275 2026-10-13: 95 y no 93: entran `ai_provider_missing` y `ai_provider_error`.
       // QC-162 2026-10-14: 99 y no 95: entran `company_duplicate_name`, `company_duplicate_tax_id`,
       // `company_name_mismatch` y `company_not_deleted`.
-      expect(ERROR_CODES).toHaveLength(99)
+      // QC-281 2026-10-14: 101 y no 99: entran `packed_exceeds_quantity` y
+      // `packaging_stock_insufficient`.
+      expect(ERROR_CODES).toHaveLength(101)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

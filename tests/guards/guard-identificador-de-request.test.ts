@@ -327,6 +327,10 @@ export const E2E_ESPERADOS = [
   // que la receta no ofrece un envase como ingrediente. No lee ni afirma nada sobre el
   // identificador de peticion.
   'envases-del-pedido.spec.ts',
+  // Alta por el mismo motivo que las demas. Termina el empaque con envases reales distintos del
+  // plan y mira envases, lotes, coste y la tab «Reparto». No lee ni afirma nada sobre el
+  // identificador de peticion.
+  'envases-reales-empaque.spec.ts',
   // Alta por el mismo motivo que las demas. Recorre el alta de un insumo eligiendo su unidad y lo
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.
@@ -654,6 +658,9 @@ export const MIGRACIONES_ESPERADAS = [
   // tocan el identificador.
   '20261015120000_order_execution_conditioning_actions',
   '20261015120100_order_execution_batch_lines',
+  // QC-281 2026-10-15: el conteo real de envases en `order_presentation_lines`; no toca el
+  // identificador.
+  '20261015120200_order_presentation_lines_packed_count',
 ] as const
 
 export function hallazgosDeMigraciones(

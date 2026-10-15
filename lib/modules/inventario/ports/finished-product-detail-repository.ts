@@ -14,6 +14,7 @@ export type FinishedProductRecord = {
   readonly imagePath: string | null;
   readonly qtyAlert: string | null;
   readonly unitId: string | null;
+  readonly recipeId: string | null;
   readonly presentation: {
     readonly id: string;
     readonly name: string;

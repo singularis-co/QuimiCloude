@@ -54,8 +54,8 @@ const ROW: ConditioningOrderDetail = {
   unitId: 'unit-kg',
   unitLabel: 'kg',
   presentationLines: [
-    { presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12 },
-    { presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: '1 kg', packages: 4 },
+    { lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12 },
+    { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: '1 kg', packages: 4 },
   ],
   status: 'EN_ACONDICIONAMIENTO',
   conditionedByName: 'Berta Ruiz',

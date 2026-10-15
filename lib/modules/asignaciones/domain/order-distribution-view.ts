@@ -7,10 +7,14 @@ import type { AssignedOrderPresentationLine } from '@/lib/modules/pedidos';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 export type OrderDistributionLineView = {
+  readonly lineId: string;
   readonly presentationId: string;
   /** `null` = la presentacion no volvio del catalogo: la pantalla pinta el marcador de ausencia. */
   readonly presentationName: string | null;
   readonly packages: number;
+  /** Envases contados al terminar el empaque; `null` = sin contar todavia, o empacado antes de que
+   *  se contaran. */
+  readonly packedPackages: number | null;
   /** `null` = linea antigua o envase que no volvio: la pantalla cae al nombre de la presentacion. */
   readonly packagingName: string | null;
 };
@@ -30,9 +34,11 @@ export function toDistributionLines(
   presentationNames: ReadonlyMap<string, string>,
 ): readonly OrderDistributionLineView[] {
   return lines.map((line) => ({
+    lineId: line.id,
     presentationId: line.presentationId,
     presentationName: presentationNames.get(line.presentationId) ?? null,
     packages: line.packages,
+    packedPackages: line.packedPackages,
     packagingName: line.packagingName,
   }));
 }

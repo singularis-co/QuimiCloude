@@ -35,20 +35,20 @@ describe('QC-170 — order-distribution-view: el reparto en solo lectura', () =>
     expect(
       toDistributionLines(
         [
-          { presentationId: 'p-2', packages: 5, packagingName: null },
-          { presentationId: 'p-1', packages: 1, packagingName: null },
+          { id: 'linea-1', presentationId: 'p-2', packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
+          { id: 'linea-2', presentationId: 'p-1', packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
         ],
         names,
       ),
     ).toEqual([
-      { presentationId: 'p-2', presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
-      { presentationId: 'p-1', presentationName: 'Botella 1L', packages: 1, packagingName: null },
+      { lineId: 'linea-1', presentationId: 'p-2', presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: null },
+      { lineId: 'linea-2', presentationId: 'p-1', presentationName: 'Botella 1L', packages: 1, packedPackages: null, packagingName: null },
     ]);
   });
 
   it('R26: una presentacion que no vuelve del catalogo deja `presentationName: null` y no se descarta', () => {
-    expect(toDistributionLines([{ presentationId: 'p-x', packages: 2, packagingName: null }], new Map())).toEqual([
-      { presentationId: 'p-x', presentationName: null, packages: 2, packagingName: null },
+    expect(toDistributionLines([{ id: 'linea-3', presentationId: 'p-x', packages: 2, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }], new Map())).toEqual([
+      { lineId: 'linea-3', presentationId: 'p-x', presentationName: null, packages: 2, packedPackages: null, packagingName: null },
     ]);
   });
 
@@ -61,15 +61,24 @@ describe('QC-170 — order-distribution-view: el reparto en solo lectura', () =>
     expect(
       toDistributionLines(
         [
-          { presentationId: 'p-1', packages: 4, packagingName: 'Envase PET 1L' },
-          { presentationId: 'p-2', packages: 2, packagingName: null },
+          { id: 'linea-4', presentationId: 'p-1', packages: 4, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: 'Envase PET 1L' },
+          { id: 'linea-5', presentationId: 'p-2', packages: 2, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
         ],
         names,
       ),
     ).toEqual([
-      { presentationId: 'p-1', presentationName: 'Botella 1L', packages: 4, packagingName: 'Envase PET 1L' },
-      { presentationId: 'p-2', presentationName: 'Bidon 20L', packages: 2, packagingName: null },
+      { lineId: 'linea-4', presentationId: 'p-1', presentationName: 'Botella 1L', packages: 4, packedPackages: null, packagingName: 'Envase PET 1L' },
+      { lineId: 'linea-5', presentationId: 'p-2', presentationName: 'Bidon 20L', packages: 2, packedPackages: null, packagingName: null },
     ]);
+  });
+
+  it('QC-281 R23: lleva el id de la linea y los envases contados junto al plan', () => {
+    expect(
+      toDistributionLines(
+        [{ id: 'linea-9', presentationId: 'p-1', packages: 5, packedPackages: 3, presentationContent: null, packagingProductId: null, packagingName: null }],
+        new Map([['p-1', 'Botella 1L']]),
+      ),
+    ).toEqual([{ lineId: 'linea-9', presentationId: 'p-1', presentationName: 'Botella 1L', packages: 5, packedPackages: 3, packagingName: null }]);
   });
 
   it('R27: sin lineas, el reparto es `[]`', () => {
@@ -79,9 +88,9 @@ describe('QC-170 — order-distribution-view: el reparto en solo lectura', () =>
   it('R26: los ids de presentacion de toda la pagina salen unicos, para una sola llamada al catalogo', () => {
     expect(
       distributionPresentationIds([
-        { presentationLines: [{ presentationId: 'p-1', packages: 1, packagingName: null }, { presentationId: 'p-2', packages: 2, packagingName: null }] },
+        { presentationLines: [{ id: 'linea-6', presentationId: 'p-1', packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }, { id: 'linea-7', presentationId: 'p-2', packages: 2, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] },
         { presentationLines: [] },
-        { presentationLines: [{ presentationId: 'p-1', packages: 3, packagingName: null }] },
+        { presentationLines: [{ id: 'linea-8', presentationId: 'p-1', packages: 3, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] },
       ]),
     ).toEqual(['p-1', 'p-2']);
   });

@@ -30,6 +30,7 @@ const REGISTRO: FinishedProductRecord = {
   imagePath: null,
   qtyAlert: null,
   unitId: null,
+  recipeId: null,
   presentation: null,
   batches: [],
 };

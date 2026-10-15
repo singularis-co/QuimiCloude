@@ -412,9 +412,11 @@ async function applyOrderStep(
     case 'startPacking':
       await asignaciones.startPacking(await actor(actors.packer), { orderId })
       return
-    case 'finishPacking':
-      await asignaciones.finishPacking(await actor(actors.packer), { orderId })
+    case 'finishPacking': {
+      const packer = await actor(actors.packer)
+      await asignaciones.finishPacking(packer, { orderId, lines: await packedAsPlanned(packer, orderId) })
       return
+    }
     case 'startConditioning':
       // El equipo es la propia persona que acondiciona, para que la siembra sea determinista.
       await asignaciones.startConditioning(await actor(actors.conditioner), {
@@ -432,6 +434,13 @@ async function applyOrderStep(
       await pedidos.cancelOrder(orderId, { reason: cancellationReason }, await actor(actors.admin))
       return
   }
+}
+
+/** La demo envasa siempre lo planeado: cada linea con sus envases del reparto y sin motivo. */
+async function packedAsPlanned(packer: Actor, orderId: string) {
+  const { finish } = await asignaciones.getPackingOrder(packer, { orderId })
+  if (finish === null) throw new Error(`el pedido ${orderId} no tiene conteo de empaque para ${packer.id}`)
+  return finish.lines.map((line) => ({ lineId: line.lineId, packedPackages: line.plan, reason: null, reasonOther: null }))
 }
 
 /**

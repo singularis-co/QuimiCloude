@@ -7,6 +7,7 @@
  * lote que entro por ella.
  */
 import type { FinishedBatchOfOrderLine } from '@/lib/modules/inventario';
+import { effectivePackages } from '@/lib/modules/pedidos';
 
 /** El lote de cada presentacion del pedido; una presentacion sin lote de produccion no aparece. */
 export function batchesByPresentation(
@@ -20,13 +21,20 @@ export function hasBatchData(batch: FinishedBatchOfOrderLine | undefined): boole
   return batch !== undefined && batch.productionDate !== null;
 }
 
-/** Cuantas lineas no tienen datos de lote. Una linea sin lote cuenta como sin datos. */
+/** Cuantas lineas no tienen datos de lote. Una linea sin lote cuenta como sin datos, salvo la que
+ *  se empaco con 0 envases: esa no da de alta lote y nunca podria tenerlos. */
 export function missingBatchDataLines(
-  lines: readonly { readonly presentationId: string }[],
+  lines: readonly {
+    readonly presentationId: string;
+    readonly packages: number;
+    readonly packedPackages: number | null;
+  }[],
   batches: readonly FinishedBatchOfOrderLine[],
 ): number {
   const byPresentation = batchesByPresentation(batches);
-  return lines.filter((line) => !hasBatchData(byPresentation.get(line.presentationId))).length;
+  return lines.filter(
+    (line) => effectivePackages(line) > 0 && !hasBatchData(byPresentation.get(line.presentationId)),
+  ).length;
 }
 
 /** Como abre el formulario unico del pedido. En `divergent`, una entrada por linea en orden de alta

@@ -104,6 +104,8 @@ export const ERROR_MESSAGE_KEY = {
   company_duplicate_tax_id: 'errors.company_duplicate_tax_id',
   company_name_mismatch: 'errors.company_name_mismatch',
   company_not_deleted: 'errors.company_not_deleted',
+  packed_exceeds_quantity: 'errors.packed_exceeds_quantity',
+  packaging_stock_insufficient: 'errors.packaging_stock_insufficient',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -262,4 +264,6 @@ export const ERROR_MESSAGES_ES = {
     'Ya existe una empresa activa con esa identificación fiscal.',
   'errors.company_name_mismatch': 'El nombre escrito no coincide con el de la empresa.',
   'errors.company_not_deleted': 'La empresa ya está activa.',
+  'errors.packed_exceeds_quantity': 'Lo envasado supera la cantidad del pedido.',
+  'errors.packaging_stock_insufficient': 'No alcanza el stock del envase.',
 } as const satisfies Record<ErrorMessageKey, string>;

@@ -190,7 +190,7 @@ describe('BatchHistory', () => {
   });
 
   it('deriva la etiqueta de un motivo del propio valor, sin enumerarlos a mano', () => {
-    expect(movementReasonLabel('conteo_fisico')).toBe('Conteo fisico');
+    expect(movementReasonLabel('conteo_fisico')).toBe('Conteo físico');
     expect(movementReasonLabel('error_de_carga')).toBe('Error de carga');
   });
 

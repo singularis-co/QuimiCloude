@@ -171,12 +171,12 @@ const views = [
   rows: done.map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2], 'num mono'), T(d[3]), T(d[6], 'num mono'), A(d[7])], menu: [mRoute], st: null, meta: [[d[2], 'mono'], [d[3], ''], [d[6], 'mono']], people: d[7] })) },
 { label: 'Todos', heads: H(['Nº de pedido', 'Receta', 'Cantidad', 'Presentación', 'Prioridad', 'Estado', 'Responsables', 'Fecha de terminado']),
   rows: mine.map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2], 'num mono'), T(d[3]), PR(d[4], d[5]), B(d[6], d[7]), A(d[8]), T('—', 'num dim')], menu: [mRoute], st: [d[6], d[7]], meta: [[d[2], 'mono'], [d[3], '']], people: d[8] })).concat(done.map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2], 'num mono'), T(d[3]), PR(d[4], d[5]), B('Terminado', 'success'), A(d[7]), T(d[6], 'num mono')], menu: [mRoute], st: ['Terminado', 'success'], meta: [[d[2], 'mono'], [d[3], ''], [d[6], 'mono']], people: d[7] }))) },
-{ label: 'Por empacar', heads: H(['Nº de pedido', 'Receta', 'Presentación', 'Envases', 'Estado', 'Quién empaca']),
+{ label: 'Por empacar', heads: H(['Nº de pedido', 'Receta', 'Presentación', 'Estado', 'Quién empaca']),
   empty: 'No hay pedidos por empacar en tu empresa.',
   rows: vacio ? [] : [
-  ['2026-0000004', 'Limpiador multiusos limón', 'Galón 3,78 L', '22', 'Por empacar', 'waiting', null],
-  ['2026-0000005', 'Blanqueador hipoclorito 5 %', 'Tambor 200 L', '1', 'En empaque', 'progress', 'SV']
-  ].map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2]), T(d[3], 'num mono'), B(d[4], d[5]), W(d[6])], menu: [mPack, mRoute], st: [d[4], d[5]], meta: [[d[2], ''], [d[3] + ' envases', 'mono']], people: d[6] ? [d[6]] : [] })) },
+  ['2026-0000004', 'Limpiador multiusos limón', 'Galón 3,78 L', 'Por empacar', 'waiting', null],
+  ['2026-0000005', 'Blanqueador hipoclorito 5 %', 'Tambor 200 L', 'En empaque', 'progress', 'SV']
+  ].map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2]), B(d[3], d[4]), W(d[5])], menu: [mPack, mRoute], st: [d[3], d[4]], meta: [[d[2], '']], people: d[5] ? [d[5]] : [] })) },
 { label: 'Por acondicionar', heads: H(['Nº de pedido', 'Receta', 'Envases', 'Estado', 'Quién acondiciona']),
   rows: [
   ['2026-0000006', 'Limpiador multiusos limón', '12', 'Por acondicionar', 'waiting', null],

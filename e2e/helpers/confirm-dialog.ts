@@ -1,4 +1,5 @@
-// Pulsar un control que pide confirmacion (`components/shared/confirm-action-dialog.tsx`) y confirmar.
+// Pulsar un control que pide confirmacion y confirmar. Terminar el empaque confirma sin tocar el
+// conteo, que viene con el plan.
 import { expect, type Locator, type Page } from '@playwright/test';
 
 export const ASSIGNED_ORDER_START_CONFIRM_TESTID = 'assigned-order-start-confirm';

@@ -18,6 +18,7 @@ import type { OrderPriority, OrderStatus } from './order-classification';
 import type { FinishConditioningAliveById, StartConditioningAliveById } from './order-conditioning';
 import type { OrderNumber } from './order-number';
 import type { Page } from './page';
+import type { PackedLineCount } from './packing-count';
 
 /** Lo que otro modulo puede saber de un pedido: su identidad y su ESTADO, y nada mas. Ni el
  *  numero, ni la receta, ni las cantidades (mismo criterio que `MemberCandidate` de QC-84):
@@ -185,12 +186,20 @@ export interface OrderCatalog {
    *
    * Consume los envases del reparto en la misma transaccion; `'insufficient_material'` es que el
    * disponible no alcanza para consumirlos todos, y tambien deshace todo.
+   *
+   * `counts` son los envases contados de verdad, uno por linea del reparto: mandan sobre el plan
+   * para guardar el conteo en la linea, consumir y liberar envases, dar de alta lotes (una linea
+   * en 0 no da lote) y repartir el coste. `'invalid_packing_count'` son conteos que no casan con
+   * las lineas o con sus motivos; `'packed_exceeds_quantity'`, lo envasado por encima de la
+   * cantidad del pedido; `'packaging_stock_insufficient'`, un envase sin existencia libre para el
+   * exceso sobre lo apartado. Los tres deshacen todo.
    */
   finishPackingAliveById(
     id: string,
     companyId: string,
     packerId: string,
     now: Date,
+    counts: readonly PackedLineCount[],
   ): Promise<
     | { readonly kind: 'ok'; readonly finishedGoods: readonly FinishedGoodsReceipt[] }
     | 'not_packer'
@@ -201,6 +210,9 @@ export interface OrderCatalog {
     | 'incompatible_units'
     | 'order_without_unit'
     | 'insufficient_material'
+    | 'invalid_packing_count'
+    | 'packed_exceeds_quantity'
+    | 'packaging_stock_insufficient'
   >;
 
   /**
@@ -238,8 +250,16 @@ export interface OrderCatalog {
  * copiado ni nada mas que quien reparte no necesite para pintarlo.
  */
 export type AssignedOrderPresentationLine = {
+  readonly id: string;
   readonly presentationId: string;
   readonly packages: number;
+  /** Envases contados al terminar el empaque; `null` = sin terminar, o terminado antes de que se
+   *  contaran (se lee como `packages`). */
+  readonly packedPackages: number | null;
+  /** Contenido copiado al guardar la linea; `null` = sin copia, vale el vigente de la presentacion. */
+  readonly presentationContent: string | null;
+  /** `null` = linea guardada antes de que el reparto nombrara envases. */
+  readonly packagingProductId: string | null;
   /** `null` = linea guardada antes de que el reparto nombrara envases, o envase que ya no vuelve
    *  del catalogo. */
   readonly packagingName: string | null;
