@@ -206,7 +206,7 @@ Cubre: R43, R44 (pantalla).
 
 ---
 
-## [ ] TI — E2E (depende de TC)
+## [x] TI — E2E (depende de TC) — 2026-10-15: specs escritos; la corrida va en gate-completo (CI) por decisión del humano, no en local
 
 - `e2e/entrega-a-varios-clientes.spec.ts` (nuevo, R47).
 - `e2e/entregar-producto-terminado.spec.ts`, `e2e/anular-entrega.spec.ts` y
@@ -219,7 +219,7 @@ Cubre: R43, R44 (pantalla).
 
 ---
 
-## [ ] TZ — Cierre
+## [x] TZ — Cierre
 
 - `./init.sh` en verde.
 - `progress/impl_QC-282-entrega-a-varios-clientes.md` con el mapa `R<n> → test` (`design.md > 12`).

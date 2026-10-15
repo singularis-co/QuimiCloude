@@ -16,9 +16,9 @@
 | F2 lista y diálogo | hecha | f5c74f57 |
 | F3 Checkbox indeterminado | hecha (+ arreglo de regresión de clases por defecto 76610e49) | 3b387ce6 |
 | F4 tab Entregas | hecha | 9697f8cf |
-| TC censos | **abierta**: 2 rojos en `tests/unit/clientes/scope.test.ts` (R38/R40) pendientes de decisión; test de R20 «del barrel» sin escribir | 7e095e04, fff684f9 |
-| TI E2E | **abierta**: specs escritos y con typecheck; la corrida local no llegó a probar nada (disco C: lleno → Postgres en recuperación) | 1081a9d0 |
-| TZ cierre | pendiente | — |
+| TC censos | hecha (detectores R38/R40 afinados por decisión del humano; test de R20) | 7e095e04, fff684f9, a42c832e, 2c4bc4fd |
+| TI E2E | specs escritos y con typecheck; por decisión del humano (2026-10-15) la corrida va en gate-completo (CI), no en local | 1081a9d0 |
+| TZ cierre | hecha: typecheck 0, lint 0 errores, guardias 76/76 (1066 passed), test:rapido 615/615 archivos (10313 passed, 0 failed); init.sh se corta por el cupo (excepción aceptada) | este commit |
 
 ## T0 (backend_dev)
 - Producción: `pedidos/domain/order-delivery.ts` (`DeliveryCustomerBlock`, `DeliveryBlockIssue`,
@@ -63,7 +63,7 @@
 | R42 | `order-delivery-void.int.test.ts`, `finished-goods-return-prisma.test.ts`, `finished-goods-return.int.test.ts`, `ledger-cuadre.int.test.ts` |
 | R43, R44 | `tests/unit/inventario/list-finished-product-deliveries.test.ts`, `order-delivery-directory.int.test.ts`, `finished-product-detail.int.test.ts`, `tests/unit/inventario-ui/finished-product-tables.test.tsx` |
 | R45, R46 | `tests/unit/pedidos-ui/order-delivery-draft.test.ts`, `order-delivery-sheet.test.tsx` |
-| R47 | `e2e/entrega-a-varios-clientes.spec.ts` (escrito; **sin corrida en verde**) |
+| R47 | `e2e/entrega-a-varios-clientes.spec.ts` (escrito; corre en gate-completo, CI) |
 | R48 | sin cambios en dependencias; `guard-dependencias-aprobadas` verde (TC) |
 
 ## Preguntas abiertas para el leader / humano
