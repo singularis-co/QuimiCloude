@@ -7,6 +7,7 @@ import {
   TAB_PARAM,
   finishedProductPageHref,
   finishedProductTabHref,
+  isFinishedProductListTab,
   parseFinishedProductParams,
 } from '@/app/(private)/inventario/producto-terminado/[id]/components';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
@@ -14,7 +15,7 @@ import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { FINISHED_PRODUCT_ID } from '../../fixtures/finished-product-detail';
 
 describe('parametros de la ficha de producto terminado', () => {
-  it('R9 — cada uno de los siete tabs se lee tal cual de la direccion', () => {
+  it('R9, R26 — cada uno de los ocho tabs se lee tal cual de la direccion', () => {
     for (const tab of FINISHED_PRODUCT_TABS) {
       expect(parseFinishedProductParams({ [TAB_PARAM]: tab }).tab).toBe(tab);
     }
@@ -46,6 +47,22 @@ describe('parametros de la ficha de producto terminado', () => {
         [PAGE_SIZE_PARAM]: String(MAX_PAGE_SIZE),
       }),
     ).toEqual({ tab: 'lotes', page: 3, pageSize: MAX_PAGE_SIZE });
+  });
+
+  it('R26 — «reparto» es un tab de listado con paginacion 10 o 25', () => {
+    expect(FINISHED_PRODUCT_TABS.at(-1)).toBe('reparto');
+    expect(isFinishedProductListTab('reparto')).toBe(true);
+    for (const pageSize of [DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE]) {
+      const url = new URL(
+        finishedProductPageHref(FINISHED_PRODUCT_ID, 'reparto', { page: 2, pageSize }),
+        'http://local',
+      );
+      expect(parseFinishedProductParams(Object.fromEntries(url.searchParams))).toEqual({
+        tab: 'reparto',
+        page: 2,
+        pageSize,
+      });
+    }
   });
 
   it('R9 — el enlace de tab lleva el tab y no lleva pagina', () => {

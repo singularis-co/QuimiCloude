@@ -17,6 +17,7 @@ export const FINISHED_PRODUCT_TAB_LABELS: Readonly<Record<FinishedProductTab, st
   salidas: 'Salidas',
   entregas: 'Entregas',
   costo: 'Costo de producción',
+  reparto: 'Reparto',
 };
 
 export function finishedProductTabTestId(tab: FinishedProductTab): string {
