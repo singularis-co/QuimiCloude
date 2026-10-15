@@ -21,7 +21,7 @@ import {
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import type { ImportCells, ImportResultRow } from '@/lib/modules/inventario';
 
-const ADMIN: Actor = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar'] };
+const ADMIN: Actor = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar'], addons: ['importacion_excel'] };
 const KEY = '9b2f6a52-5d0e-4c7e-9a36-0f1d7c1b2a10';
 const FILE = { ...CSV_FILE, importKey: KEY };
 

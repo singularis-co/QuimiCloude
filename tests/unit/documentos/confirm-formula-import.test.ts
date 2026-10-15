@@ -28,7 +28,7 @@ const ARCHIVO_LISTO: FileForReview = { status: 'done', strategy: 'formula', extr
 const PASO: RecipeStepDocument = { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] };
 
 function actorConPermiso(): Actor {
-  return { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION, 'inventario.modificar'] };
+  return { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION, 'inventario.modificar'], addons: ['lectura_pdf'] };
 }
 
 function filaExistente(productId: string, percentage: string | null = '100.00') {
@@ -720,7 +720,7 @@ describe('QC-211 — confirmar con pasos de envasado', () => {
     const bitacora: Bitacora = [];
     const deps = crearDeps(bitacora);
     const confirm = createConfirmFormulaImport(deps);
-    const sinPermiso: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.modificar'] };
+    const sinPermiso: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.modificar'], addons: ['lectura_pdf'] };
 
     await expect(confirm(sinPermiso, entradaBase({ packingSteps: [ENVASAR] }))).rejects.toBeInstanceOf(
       UnauthorizedError,

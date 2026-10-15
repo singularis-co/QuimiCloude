@@ -1,4 +1,4 @@
-import { requirePermission, type Actor } from './actor';
+import { requireAddon, requirePermission, type Actor } from './actor';
 import { ActionNotAllowedError, BatchDuplicateLotError } from './errors';
 import { createImportFinishedGoods } from './import-finished-goods';
 import { importRowIssue, type ImportRowWrite } from './plan-inventory-import';
@@ -154,6 +154,7 @@ export function createConfirmInventoryImport(deps: ConfirmInventoryImportDeps): 
 
   return async function confirmInventoryImport(input, actor) {
     requirePermission(actor, 'inventario.modificar');
+    requireAddon(actor, 'importacion_excel');
     const scope = { companyId: actor.companyId };
     const instant = now();
 

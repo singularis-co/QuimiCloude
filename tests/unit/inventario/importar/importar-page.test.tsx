@@ -67,13 +67,14 @@ vi.mock('@/lib/modules/inventario/adapters/driving/inventory-import-actions', ()
 
 const TODOS_LOS_PERMISOS = PERMISSIONS.map((permiso) => permiso.code);
 
-function sesionCon(permissions: readonly string[]) {
+function sesionCon(permissions: readonly string[], addons: readonly string[] = ['importacion_excel']) {
   return {
     id: '99999999-9999-4999-8999-999999999999',
     username: 'admin.prueba',
     displayName: 'Admin De Prueba',
     roleName: 'Administrador',
     permissions,
+    addons,
   };
 }
 
@@ -119,6 +120,16 @@ describe('pantalla /inventario/importar', () => {
     expect(notFoundMock).not.toHaveBeenCalled();
   });
 
+  it('R13 R14 sin el añadido importacion_excel responde 404 y no pide nada', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(TODOS_LOS_PERMISOS, []));
+
+    await expect(InventoryImportPage()).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(notFoundMock).toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(listUnitsActionMock).not.toHaveBeenCalled();
+  });
+
   it('R2 con inventario.modificar pinta la pantalla y pide las unidades una vez', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(['inventario.modificar']));
 
@@ -154,6 +165,12 @@ describe('enlace «Importar» en /inventario', () => {
 
   it('R2 no aparece sin inventario.modificar', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(['inventario.consultar']));
+
+    expect(contieneEnlaceA(await arbolDeInventario(), INVENTORY_IMPORT_ROUTE)).toBe(false);
+  });
+
+  it('R16 no aparece sin el añadido importacion_excel, aunque tenga inventario.modificar', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(TODOS_LOS_PERMISOS, []));
 
     expect(contieneEnlaceA(await arbolDeInventario(), INVENTORY_IMPORT_ROUTE)).toBe(false);
   });

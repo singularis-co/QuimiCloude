@@ -89,7 +89,12 @@ import {
   DOCUMENT_UPLOAD_SUBMIT_TESTID,
   DOCUMENT_UPLOAD_TESTID,
 } from '@/components/shared/document-upload';
-import { PERMISSIONS } from '@/lib/modules/identity';
+import {
+  PERMISSIONS,
+  ROLE_ADMINISTRADOR,
+  SEED_ROLE_PERMISSIONS,
+  effectivePermissions,
+} from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { AI_PROVIDER_INTEGRATION_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
 
@@ -227,6 +232,23 @@ describe('el boton de subida en el listado de formulas', () => {
     expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
     expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).toBeNull();
     expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R15 R23 con los permisos del Administrador recortados por la empresa sin añadidos no hay boton ni subida', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: 'u-test-44',
+      username: 'carla.duarte',
+      displayName: 'Carla Duarte Salas',
+      roleName: ROLE_ADMINISTRADOR,
+      permissions: effectivePermissions(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [], []),
+      addons: [],
+    });
+
+    await renderPantalla();
+
+    expect(screen.getAllByTestId('recipe-create-open').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).toBeNull();
   });
 
   it('el boton comparte contenedor padre con «Nueva formula» (R22)', async () => {

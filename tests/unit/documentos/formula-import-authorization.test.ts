@@ -136,9 +136,9 @@ function entradaConfirmar(overrides: Record<string, unknown> = {}) {
 const ACTORES_DENEGADOS: readonly (readonly [string, Actor | null | undefined])[] = [
   ['actor nulo', null],
   ['actor ausente', undefined],
-  ['sin el permiso exigido', { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.consultar'] }],
-  ['con el conjunto vacio', { id: PERSONA, companyId: EMPRESA, permissions: [] }],
-  ['solo con `documentos.modificar`', { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'] }],
+  ['sin el permiso exigido', { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.consultar'], addons: ['lectura_pdf'] }],
+  ['con el conjunto vacio', { id: PERSONA, companyId: EMPRESA, permissions: [], addons: ['lectura_pdf'] }],
+  ['solo con `documentos.modificar`', { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'], addons: ['lectura_pdf'] }],
 ];
 
 describe('formula-import — autorizacion (R30)', () => {
@@ -160,7 +160,7 @@ describe('formula-import — autorizacion (R30)', () => {
       const bitacora: Bitacora = [];
       const deps = crearDeps(bitacora);
       const preview = createPreviewFormulaImport(deps);
-      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION] };
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION], addons: ['lectura_pdf'] };
 
       await preview(actor, { documentFileId: ARCHIVO });
 
@@ -188,7 +188,7 @@ describe('formula-import — autorizacion (R30)', () => {
       const bitacora: Bitacora = [];
       const deps = crearDeps(bitacora);
       const confirm = createConfirmFormulaImport(deps);
-      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION, 'inventario.modificar'] };
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION, 'inventario.modificar'], addons: ['lectura_pdf'] };
 
       await confirm(actor, entradaConfirmar());
 
@@ -204,7 +204,7 @@ describe('formula-import — autorizacion de la materia prima nueva (R31)', () =
       productNames: dobleDeNombresDeProducto(bitacora, []) as unknown as FormulaImportDeps['productNames'],
     });
     const confirm = createConfirmFormulaImport(deps);
-    const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION] };
+    const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION], addons: ['lectura_pdf'] };
 
     await expect(
       confirm(
@@ -227,7 +227,7 @@ describe('formula-import — autorizacion de la materia prima nueva (R31)', () =
     const bitacora: Bitacora = [];
     const deps = crearDeps(bitacora);
     const confirm = createConfirmFormulaImport(deps);
-    const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION] };
+    const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION], addons: ['lectura_pdf'] };
 
     const resumen = await confirm(actorSinInventario, entradaConfirmar());
 

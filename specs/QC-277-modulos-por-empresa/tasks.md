@@ -46,7 +46,7 @@
 
 ## Bloque C — Cortes de pantalla, caso de uso y menú
 
-- [ ] **T6 [P] — `requirePageAddon`** (R13). Depende de: T5
+- [x] **T6 [P] — `requirePageAddon`** (R13). Depende de: T5
   - `identity/adapters/driving/require-page-addon.ts`.
   - Llamada en las tres pantallas de `design.md > 5.2`, después de `requirePagePermission`.
   - Tests:
@@ -54,7 +54,7 @@
     - `formula-import-page.test.tsx`, `catalog-import-page.test.tsx` e `importar-page.test.tsx`
       ampliados.
   - **Hecho:** 404 sin el añadido y redirección con marca sin sesión.
-- [ ] **T7 [P] — Importación desde Excel** (R14, R16). Depende de: T1, T5
+- [x] **T7 [P] — Importación desde Excel** (R14, R16). Depende de: T1, T5
   - `inventario/domain/actor.ts`: `addons?` y `requireAddon`.
   - `requireAddon(actor, 'importacion_excel')` en los cuatro casos de uso.
   - `currentActor()` de `inventory-import-actions.ts` copia `addons`.
@@ -63,7 +63,7 @@
   - **Hecho:**
     - con `inventario.modificar` y sin el añadido → `unauthorized`, sin tocar puertos;
     - sin botón «Importar».
-- [ ] **T8 [P] — Importaciones desde PDF** (R14, R15, R23). Depende de: T1, T5
+- [x] **T8 [P] — Importaciones desde PDF** (R14, R15, R23). Depende de: T1, T5
   - `documentos/domain/actor.ts`: `addons?` y `requireAddon`.
   - `requireAddon(actor, 'lectura_pdf')` en los cuatro casos de uso de importación.
   - `currentActor()` de `formula-import-actions.ts` y `catalog-import-actions.ts` copia `addons`.
@@ -73,7 +73,7 @@
       permisos recortados).
   - **Hecho:** con `recetas.modificar` o `proveedores.modificar` y sin el añadido →
     `unauthorized`.
-- [ ] **T9 [P] — Menú y recorrido recortados** (R12, R17). Depende de: T5
+- [x] **T9 [P] — Menú y recorrido recortados** (R12, R17). Depende de: T5
   - Sin código nuevo de producción: se prueba lo que ya filtra.
   - Tests:
     - `tests/unit/identity/addons/menu-recortado.test.ts`;
@@ -81,7 +81,7 @@
   - **Hecho:**
     - sin dashboard, proveedores ni grupo «Integraciones»;
     - sin «Ver recorrido» al quitar `dashboard`.
-- [ ] **T10 [P] — Guardia de pantallas de añadido** (R13, R23). Depende de: T6
+- [x] **T10 [P] — Guardia de pantallas de añadido** (R13, R23). Depende de: T6
   - `tests/guards/guard-pantallas-de-anadido.test.ts` (`design.md > 9.2`), con autocomprobación.
   - **Hecho:** verde con las tres pantallas; rojo con una pantalla `importar` sintética sin
     `requirePageAddon`.
@@ -297,6 +297,36 @@ Tests ampliados o enmendados:
 - `tests/unit/marca/sidebar-carril.test.ts`
 - `tests/unit/e2e-helpers/landing.test.ts`
 - `tests/guards/guard-e2e-landing.test.ts`
+
+Añadidos durante la implementación (fixtures sin `companyAddons`/`addons`, migración en la lista de
+`guard-identificador-de-request` y listas cerradas de permisos con la opción A aprobada):
+
+- `tests/guards/guard-identificador-de-request.test.ts`
+- `tests/integration/documentos/catalog-import-isolation.int.test.ts`
+- `tests/integration/documentos/formula-import-versions.int.test.ts`
+- `tests/integration/documentos/formula-import.int.test.ts`
+- `tests/integration/inventario/inventory-import-wiring.ts`
+- `tests/unit/asignaciones/module-contract.test.ts`
+- `tests/unit/clientes/scope.test.ts`
+- `tests/unit/composition/identity-facade.test.ts`
+- `tests/unit/documentos/catalog-import-authorization.test.ts`
+- `tests/unit/documentos/confirm-catalog-import.test.ts`
+- `tests/unit/documentos/confirm-formula-import.test.ts`
+- `tests/unit/documentos/formula-import-authorization.test.ts`
+- `tests/unit/documentos/preview-catalog-import.test.ts`
+- `tests/unit/documentos/preview-formula-import.test.ts`
+- `tests/unit/identity/end-other-sessions.test.ts`
+- `tests/unit/identity/end-session.test.ts`
+- `tests/unit/identity/resolve-session-user.test.ts`
+- `tests/unit/identity/roles/acondicionamiento-rol.test.ts`
+- `tests/unit/identity/roles/empacador-rol.test.ts`
+- `tests/unit/identity/session-once-per-request-actions.test.ts`
+- `tests/unit/identity/session-once-per-request-render.test.tsx`
+- `tests/unit/integraciones/module-shape.test.ts`
+- `tests/unit/inventario/confirm-inventory-import.test.ts`
+- `tests/unit/inventario/get-inventory-import-template.test.ts`
+- `tests/unit/inventario/preview-inventory-import.test.ts`
+- `tests/unit/paridad/inventario-paridad.test.tsx`
 
 E2E (el spec de la ficha, los helpers y los candidatos del censo de T20):
 

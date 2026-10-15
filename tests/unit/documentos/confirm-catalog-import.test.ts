@@ -21,7 +21,7 @@ const PRESENTACION_LITRO = '55555555-5555-4555-8555-555555555555';
 const UNIDAD_LITRO = '66666666-6666-4666-8666-666666666666';
 
 function actorConPermiso(): Actor {
-  return { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION, 'inventario.modificar'] };
+  return { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION, 'inventario.modificar'], addons: ['lectura_pdf'] };
 }
 
 const ARCHIVO_LISTO: FileForReview = { status: 'done', strategy: 'catalogo', extractedText: null };

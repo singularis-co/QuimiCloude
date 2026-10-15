@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { previewCatalogImportAction } from '@/lib/modules/documentos/adapters/driving/catalog-import-actions';
 import type { ErrorState } from '@/lib/modules/errores';
+import { requirePageAddon } from '@/lib/modules/identity/adapters/driving/require-page-addon';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { getSupplierAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
@@ -64,6 +65,7 @@ export default async function CatalogImportPage({
 }) {
   await requirePagePermission('proveedores.consultar');
   await requirePagePermission('proveedores.modificar');
+  await requirePageAddon('lectura_pdf');
 
   const { id, documentoId } = await params;
 

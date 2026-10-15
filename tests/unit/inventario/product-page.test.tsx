@@ -100,6 +100,7 @@ const USUARIO_DEL_TEST: SessionUser = {
   // `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`-, prueba lo que se ve cuando SI se
   // puede ver, y con el catalogo entero el menu filtrado tampoco pierde ningun item.
   permissions: PERMISSIONS.map((permiso) => permiso.code),
+  addons: ['importacion_excel'],
 };
 
 const {
@@ -1270,6 +1271,23 @@ describe('pantalla de productos — lista', () => {
       filters: {},
     });
     expect(listProductsActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('pantalla de productos — botón «Importar»', () => {
+  it('R14 R16 con inventario.modificar y el añadido importacion_excel se ofrece', async () => {
+    await renderPantalla();
+
+    expect(screen.getByTestId('inventory-import-link')).toBeInTheDocument();
+  });
+
+  it('R14 R16 sin el añadido importacion_excel no se ofrece, aunque tenga inventario.modificar', async () => {
+    getSessionUserMock.mockResolvedValue({ ...USUARIO_DEL_TEST, addons: [] });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(testId.tabla)).toBeInTheDocument();
+    expect(screen.queryByTestId('inventory-import-link')).not.toBeInTheDocument();
   });
 });
 
