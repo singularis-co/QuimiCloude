@@ -341,3 +341,14 @@ Modificados (tests):
 - Grafo de código (MCP) no usado: exploración con Grep/Read.
 
 Veredicto: T8 hecha; las tres anotaciones se pintan según el tablero, R12–R18 tienen test y todo está en verde.
+
+## Cierre de la tanda 1 (implementer, 2026-10-14)
+
+Commits: T4 `79d5668f`, T5 `cda5e09b`, T6 `8b79b1e4`, T7 `3b7a40f9`, T8 `a126d98b`.
+Sobre el arbol combinado (1A + 1B):
+- `pnpm run typecheck` → `tsc --noEmit` sin errores.
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos de la tanda 0, en archivos no tocados.
+- `pnpm exec vitest run guard` → `Test Files 76 passed (76)`, `Tests 1066 passed | 20 skipped (1086)`.
+- `pnpm exec vitest related --run <5 archivos de T8>` → `Test Files 5 passed (5)`, `Tests 126 passed (126)`.
+- related de T4–T7: ver el cierre de T7 (386 archivos, 6428 en verde).
+Sin push (lo pide el leader). T9/T10 pendientes.
