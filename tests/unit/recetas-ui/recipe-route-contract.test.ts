@@ -570,8 +570,8 @@ const MIGRACION_QC275 = [
 // demas: cualquier otro archivo de `db/` en el diff sigue en rojo.
 const MIGRACION_QC277 = [
   'db/schema.prisma',
-  'db/migrations/20261014190000_company_addons/migration.sql',
-  'db/migrations/20261014190000_company_addons/down.sql',
+  'db/migrations/20261015190000_company_addons/migration.sql',
+  'db/migrations/20261015190000_company_addons/down.sql',
 ];
 
 export const RECETAS_PERMITIDAS: readonly string[] = [

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createConfirmInventoryImport } from '@/lib/modules/inventario/domain/confirm-inventory-import';
+import { createPreviewInventoryImport } from '@/lib/modules/inventario/domain/preview-inventory-import';
 import { ActionNotAllowedError, BatchDuplicateLotError, UnauthorizedError } from '@/lib/modules/inventario/domain/errors';
 
 import {
@@ -64,7 +65,7 @@ describe('confirmInventoryImport — que se escribe', () => {
     const existing = productRef({ id: 'p-sal', nameNormalized: 'salfina', unitId: KG.id });
     const { confirm, createProduct } = build(
       [ROW_INSUMO, { ...ROW_INSUMO, lot: 'L-1' }, { ...ROW_INSUMO, stock: 'x' }, ROW_ENVASE, { ...ROW_INSUMO, unit: 'Galón' }],
-      { products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal' }] },
+      { products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal', presentationId: null }] },
     );
 
     const outcome = await confirm(FILE, ADMIN);
@@ -86,7 +87,7 @@ describe('confirmInventoryImport — que se escribe', () => {
     const existing = productRef({ id: 'p-sal', nameNormalized: 'salfina', unitId: KG.id });
     const { confirm, createProduct, imports, stockIncreases, digest } = build(
       [{ ...ROW_INSUMO, lot: 'L-1' }, { ...ROW_INSUMO, stock: 'x' }, { ...ROW_TERMINADO, formula: 'Jabon' }],
-      { products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal' }] },
+      { products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal', presentationId: null }] },
     );
 
     const outcome = await confirm(FILE, ADMIN);
@@ -111,7 +112,7 @@ describe('confirmInventoryImport — que se escribe', () => {
     const existing = productRef({ id: 'p-sal', nameNormalized: 'salfina', unitId: KG.id });
     const { confirm, createProduct, imports } = build([{ ...ROW_INSUMO, lot: 'L-1' }], {
       products: [existing],
-      batches: [{ lot: 'L-1', productId: 'p-sal' }],
+      batches: [{ lot: 'L-1', productId: 'p-sal', presentationId: null }],
     });
     imports.findImport.mockResolvedValueOnce({ importId: 'import-1', importedAt: new Date('2026-10-05T10:00:00.000Z') });
 
@@ -132,22 +133,23 @@ describe('confirmInventoryImport — que se escribe', () => {
     expect(imports.claimImport).toHaveBeenCalledTimes(1);
   });
 
-  it('R25 vuelve a validar contra la base del momento: lo que cambio desde la vista previa se refleja', async () => {
+  it('R25, QC-284 R9, R10: vuelve a validar contra la base del momento con la clave del lote', async () => {
     const state: Parameters<typeof fakeReadPorts>[0] = { products: [], batches: [] };
     const { confirm, createProduct } = build([{ ...ROW_INSUMO, lot: 'L-9' }, { ...ROW_INSTRUMENTO, lot: 'L-8' }], state);
     state.products = [productRef({ id: 'p-sal', nameNormalized: 'salfina', unitId: KG.id })];
     state.batches = [
-      { lot: 'L-9', productId: 'p-sal' },
-      { lot: 'L-8', productId: 'p-ajeno' },
+      { lot: 'L-9', productId: 'p-sal', presentationId: null },
+      { lot: 'L-8', productId: 'p-ajeno', presentationId: null },
     ];
 
     const outcome = await confirm(FILE, ADMIN);
 
-    // Las dos dejaron de ser validas desde la vista previa: no queda nada que importar.
-    expect(outcome.kind).toBe('nothing_imported');
-    if (outcome.kind !== 'nothing_imported') return;
-    expect(statuses(outcome.rows)).toEqual(['duplicate', 'error:lot_used_by_other_product']);
-    expect(createProduct).not.toHaveBeenCalled();
+    // L-9 ya existe con su clave; L-8 solo existe en otro producto, asi que el instrumento se crea.
+    expect(outcome.kind).toBe('imported');
+    if (outcome.kind !== 'imported') return;
+    expect(statuses(outcome.rows)).toEqual(['duplicate', 'created']);
+    expect(createProduct).toHaveBeenCalledTimes(1);
+    expect(createProduct).toHaveBeenCalledWith(expect.objectContaining({ type: 'MACHINE', lot: 'L-8' }), ADMIN);
   });
 
   it('R26 insumo, envase e instrumento pasan por el alta manual con la unidad y la presentacion ya resueltas', async () => {
@@ -210,7 +212,7 @@ describe('confirmInventoryImport — que se escribe', () => {
     expect(failed?.status === 'error' && failed.issues[0]).toMatchObject({ code: 'write_failed', column: null });
   });
 
-  it('R27 los rechazos del alta manual se traducen a su motivo', async () => {
+  it('R27, QC-284 R11: los rechazos del alta manual se traducen a su motivo; un choque de lote es duplicado', async () => {
     const { confirm, createProduct, imports } = build([
       { ...ROW_INSUMO, lot: 'L-1' },
       ROW_ENVASE,
@@ -219,26 +221,83 @@ describe('confirmInventoryImport — que se escribe', () => {
     createProduct.mockRejectedValueOnce(new BatchDuplicateLotError());
     createProduct.mockRejectedValueOnce(new ActionNotAllowedError());
     createProduct.mockRejectedValueOnce(new ActionNotAllowedError());
-    imports.findBatchesByLots.mockResolvedValueOnce([]).mockResolvedValue([{ lot: 'L-1', productId: 'p-ajeno' }]);
 
     const outcome = await confirm(FILE, ADMIN);
 
     expect(outcome.kind === 'imported' && statuses(outcome.rows)).toEqual([
-      'error:lot_used_by_other_product',
+      'duplicate',
       'error:presentation_mismatch',
       'error:finished_product_homonym',
     ]);
+    expect(outcome.kind === 'imported' && outcome.rows[0]).toMatchObject({ status: 'duplicate', lot: 'L-1' });
+    // La carrera no relee el lote: solo la lectura de la planificacion.
+    expect(imports.findBatchesByLots).toHaveBeenCalledTimes(1);
   });
 
-  it('R27 un lote que choca al escribir sobre el mismo producto es duplicado', async () => {
+  it('R27, QC-284 R11: un lote que choca al escribir sobre el mismo producto es duplicado', async () => {
     const existing = productRef({ id: 'p-sal', nameNormalized: 'salfina', unitId: KG.id });
-    const { confirm, createProduct, imports } = build([{ ...ROW_INSUMO, lot: 'L-5' }], { products: [existing] });
+    const { confirm, createProduct } = build([{ ...ROW_INSUMO, lot: 'L-5' }], { products: [existing] });
     createProduct.mockRejectedValueOnce(new BatchDuplicateLotError());
-    imports.findBatchesByLots.mockResolvedValueOnce([]).mockResolvedValueOnce([{ lot: 'L-5', productId: 'p-sal' }]);
 
     const outcome = await confirm(FILE, ADMIN);
 
     expect(outcome.kind === 'imported' && outcome.rows[0]).toMatchObject({ status: 'duplicate', lot: 'L-5' });
+  });
+
+  it('QC-284 R11: un terminado cuyo lote tecleado choca en carrera queda duplicado', async () => {
+    const { confirm, imports } = build([{ ...ROW_TERMINADO, lot: 'CR-2610' }, ROW_INSUMO]);
+    imports.receiveImportedFinishedGoods.mockResolvedValueOnce({ kind: 'duplicate_lot' });
+
+    const outcome = await confirm(FILE, ADMIN);
+
+    expect(outcome.kind === 'imported' && statuses(outcome.rows)).toEqual(['duplicate', 'created']);
+    expect(outcome.kind === 'imported' && outcome.rows[0]).toMatchObject({ status: 'duplicate', lot: 'CR-2610' });
+  });
+
+  it('QC-284 R9, R10: la vista previa y la confirmacion dicen lo mismo con codigos repetidos entre claves', async () => {
+    const existing = productRef({ id: 'p-sal', nameNormalized: 'salfina', unitId: KG.id });
+    const rows = [
+      { ...ROW_INSUMO, lot: 'L-1' },
+      { ...ROW_INSUMO, lot: 'L-2' },
+      { ...ROW_INSUMO, name: 'Otro', lot: 'L-2' },
+      { ...ROW_INSUMO, name: 'Otro', lot: 'L-2' },
+      { ...ROW_INSTRUMENTO, lot: 'L-1' },
+    ];
+    const state = {
+      products: [existing],
+      batches: [
+        { lot: 'L-1', productId: 'p-sal', presentationId: null },
+        { lot: 'L-2', productId: 'p-ajeno', presentationId: null },
+      ],
+    };
+    const { confirm } = build(rows, state);
+    const preview = createPreviewInventoryImport({ ...fakeReadPorts(state), reader: fakeReader(rows), now: () => NOW });
+
+    const previewed = await preview(CSV_FILE, ADMIN);
+    const confirmed = await confirm(FILE, ADMIN);
+
+    expect(previewed.kind === 'preview' && previewed.rows.map((row) => row.status)).toEqual([
+      'duplicate',
+      'add_batch',
+      'create',
+      'duplicate',
+      'create',
+    ]);
+    const asResult = { duplicate: 'duplicate', add_batch: 'batch_added', create: 'created' } as const;
+    expect(confirmed.kind === 'imported' && statuses(confirmed.rows)).toEqual(
+      previewed.kind === 'preview' ? previewed.rows.map((row) => (row.status === 'error' ? 'error' : asResult[row.status])) : [],
+    );
+  });
+
+  it('QC-284 R10: ningun resultado lleva lot_used_by_other_product, ni con el codigo en otro producto', async () => {
+    const { confirm } = build(
+      [{ ...ROW_INSUMO, lot: 'L-1' }, { ...ROW_ENVASE, lot: 'L-1' }, { ...ROW_TERMINADO, lot: 'L-1' }],
+      { batches: [{ lot: 'L-1', productId: 'p-ajeno', presentationId: null }] },
+    );
+
+    const outcome = await confirm(FILE, ADMIN);
+
+    expect(outcome.kind === 'imported' && statuses(outcome.rows)).toEqual(['created', 'created', 'created']);
   });
 });
 

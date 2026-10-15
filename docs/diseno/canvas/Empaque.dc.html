@@ -33,11 +33,12 @@
       </sc-if>
       <div class="cq-2" style="display: grid; grid-template-columns: 300px minmax(0, 720px); gap: 20px 24px; justify-content: center; align-items: start">
         <section class="card" style="padding: 18px; gap: 14px" aria-labelledby="em-rep">
-          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px"><span class="dim">Cantidad:</span><span class="mono strong" style="font-size: 18px">80,50 kg</span></div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px"><span class="dim">Cantidad:</span><span class="mono strong" style="font-size: 18px">72,00 L</span></div>
           <div class="sep" style="margin: 0"></div>
           <h2 id="em-rep" class="h3">Reparto</h2>
           <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 15px">
-            <li style="display: flex; align-items: center; gap: 12px"><span class="thumb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></span><span style="display: flex; flex-direction: column"><span class="strong">Galón 3,78 L</span><span class="cap"><span class="mono">22</span> envases</span></span></li>
+            <li style="display: flex; align-items: center; gap: 12px"><span class="thumb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></span><span style="display: flex; flex-direction: column"><span class="strong">Galón 3,78 L</span><span class="cap"><span class="mono">14</span> envases</span></span></li>
+            <li style="display: flex; align-items: center; gap: 12px"><span class="thumb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></span><span style="display: flex; flex-direction: column"><span class="strong">Botella 1 L</span><span class="cap"><span class="mono">15</span> envases</span></span></li>
           </ul>
         </section>
 
@@ -59,7 +60,8 @@
         <div></div>
         <div class="g2">
           <button class="{{ comCls }}" type="button" disabled="{{ comDis }}" onClick="{{ askStart }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg>Comenzar</button>
-          <button class="{{ terCls }}" type="button" disabled="{{ terDis }}" onClick="{{ askEnd }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Terminar</button>
+          <sc-if value="{{ canEnd }}" hint-placeholder-val="{{ false }}"><a class="b b-pri b-xl" href="EmpaqueTerminar.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Terminar</a></sc-if>
+          <sc-if value="{{ noEnd }}" hint-placeholder-val="{{ true }}"><button class="b b-out b-xl" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Terminar</button></sc-if>
         </div>
       </div>
     </div>
@@ -72,13 +74,6 @@
     <h2 id="em-s" class="h2">¿Comenzar el empaque?</h2>
     <p class="sub"><span class="mono">2026-0000004</span> · Limpiador multiusos limón · [DESCRIPCIÓN DEL DIÁLOGO]</p>
     <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri b-touch" type="button" onClick="{{ doStart }}">Comenzar</button></div>
-  </div>
-
-  <div class="{{ endCls }}" role="alertdialog" aria-modal="true" aria-labelledby="em-t">
-    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></div>
-    <h2 id="em-t" class="h2">¿Terminar el empaque?</h2>
-    <p class="sub"><span class="mono">2026-0000004</span> · Limpiador multiusos limón · [DESCRIPCIÓN DEL DIÁLOGO]</p>
-    <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri b-touch" type="button" onClick="{{ doEnd }}">Terminar</button></div>
   </div>
 
   <div class="toastwrap" aria-live="polite" style="bottom: 104px"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
@@ -103,7 +98,7 @@ busy: busy,
 st: ST[phase][0], stCls: 'sb t-' + ST[phase][1],
 pasos: ['[PASO DE ENVASADO DE LA RECETA]', '[PASO DE ENVASADO DE LA RECETA]', '[PASO DE ENVASADO DE LA RECETA]'].map((t, i) => ({ n: i + 1, t: t })),
 comCls: canStart ? 'b b-pri b-xl' : 'b b-out b-xl', comDis: !canStart,
-terCls: canEnd ? 'b b-pri b-xl' : 'b b-out b-xl', terDis: !canEnd,
+canEnd: canEnd, noEnd: !canEnd,
 askStart: () => { if (canStart) this.setState({ dlg: 'start' }); },
 askEnd: () => { if (canEnd) this.setState({ dlg: 'end' }); },
 doStart: () => this.setState({ dlg: null, phase: 'en' }),

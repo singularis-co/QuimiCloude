@@ -61,27 +61,16 @@ type RowContext = {
   readonly productByRow: Map<number, string>;
 };
 
-function targetProductId(row: ImportPreviewRow, context: RowContext): string | null {
-  if (row.status !== 'add_batch') return null;
-  if (row.target.kind === 'existing') return row.target.productId;
-  return context.productByRow.get(row.target.rowNumber) ?? null;
-}
-
 const errorRow = (row: ImportPreviewRow, issue: ImportRowIssue): ImportResultRow => ({
   ...baseOf(row),
   status: 'error',
   issues: [issue],
 });
 
-/** El lote ya estaba al escribir: es duplicado si es del mismo producto y error si es de otro. */
-async function lotClash(row: ImportPreviewRow, lot: string | null, context: RowContext): Promise<ImportResultRow> {
+/** El indice solo choca con la misma clave del lote, asi que lo escrito en carrera es un duplicado. */
+function lotClash(row: ImportPreviewRow, lot: string | null): ImportResultRow {
   if (lot === null) return errorRow(row, importRowIssue('write_failed', null));
-  const [owner] = await context.deps.imports.findBatchesByLots([lot], context.scope);
-  const target = targetProductId(row, context);
-  if (owner !== undefined && target !== null && owner.productId === target) {
-    return { ...baseOf(row), status: 'duplicate', lot };
-  }
-  return errorRow(row, importRowIssue('lot_used_by_other_product', 'lot'));
+  return { ...baseOf(row), status: 'duplicate', lot };
 }
 
 function written(row: ImportPreviewRow, productId: string, lot: string, context: RowContext): ImportResultRow {
@@ -122,10 +111,10 @@ async function writeRow(
     }
     const outcome = await importFinishedGoods(write.input, actor);
     if (outcome.kind === 'received') return written(row, outcome.productId, outcome.lot, context);
-    if (outcome.kind === 'duplicate_lot') return lotClash(row, lot, context);
+    if (outcome.kind === 'duplicate_lot') return lotClash(row, lot);
     return errorRow(row, importRowIssue('presentation_without_content', 'presentation'));
   } catch (error) {
-    if (error instanceof BatchDuplicateLotError) return lotClash(row, lot, context);
+    if (error instanceof BatchDuplicateLotError) return lotClash(row, lot);
     if (error instanceof ActionNotAllowedError) {
       return errorRow(
         row,

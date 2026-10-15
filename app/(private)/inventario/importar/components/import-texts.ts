@@ -1,3 +1,5 @@
+import type { ImportColumnKey } from '@/lib/modules/inventario';
+
 export const IMPORT_PAGE_TITLE = 'Importar inventario';
 export const IMPORT_PAGE_DESCRIPTION =
   'Sube un archivo .xlsx o .csv con las columnas de la plantilla. Antes de importar verás qué se crea, qué suma un lote y qué filas tienen error.';
@@ -307,14 +309,49 @@ export const GUIDE_RULES_TESTID = 'inventory-import-guide-rules';
 export const GUIDE_VALUES_TESTID = 'inventory-import-guide-values';
 export const GUIDE_EXAMPLES_TESTID = 'inventory-import-guide-examples';
 export const GUIDE_COLUMN_HEADER = 'Columna';
+export const GUIDE_DESCRIPTION_HEADER = 'Descripción';
+/**
+ * Texto de la descripción de cada columna. Las columnas de catálogo (unidad, presentación,
+ * fórmula) suman además un enlace a su módulo: lo compone `GUIDE_COLUMN_DESCRIPTIONS`
+ * (`import-guide-descriptions.tsx`), porque este archivo no lleva JSX.
+ */
+export const GUIDE_COLUMN_DESCRIPTION_TEXTS: Readonly<Record<ImportColumnKey, string>> = {
+  type: 'Qué es el producto: Insumo, Envase, Instrumento o Producto terminado. Decide qué otras columnas se piden.',
+  name: 'Nombre del producto. Si ya existe uno igual (mismo nombre y unidad; en envases, misma presentación), se agrega como lote nuevo del producto.',
+  unit: 'Unidad en que se mide el insumo, por su nombre o su símbolo. Debe existir en la empresa.',
+  presentation:
+    'Presentación del envase o del producto terminado. Debe existir en la empresa; en Producto terminado, con contenido declarado.',
+  formula: 'Fórmula original de la empresa con la que se fabrica el producto terminado.',
+  stock:
+    'Cantidad que entra con este lote. Envase y Producto terminado cuentan unidades (5 unidades(U) de X fórmula).',
+  unitCost: 'Costo de una unidad del lote.',
+  lot: 'Código del lote. Si va vacío, se genera automáticamente.',
+  purchaseDate: 'Fecha en que entró el lote. Si va vacía, se usa la fecha de hoy automáticamente; no puede ser futura.',
+  expiryDate: 'Fecha en que vence el lote.',
+  qtyAlert:
+    'Existencia mínima del producto: cuando la existencia queda por debajo de este valor, el inventario lo resalta y se notifica.',
+};
+/** Columnas de la guía cuya descripción enlaza al módulo donde se gestiona su catálogo. */
+export type GuideCatalogColumn = 'unit' | 'presentation' | 'formula';
+export const GUIDE_CATALOG_LINK_LABELS: Readonly<Record<GuideCatalogColumn, string>> = {
+  unit: 'Mira tus unidades disponibles',
+  presentation: 'Mira tus presentaciones disponibles',
+  formula: 'Mira tus fórmulas disponibles',
+};
+export const GUIDE_CATALOG_LINK_TESTIDS: Readonly<Record<GuideCatalogColumn, string>> = {
+  unit: 'guide-link-unit',
+  presentation: 'guide-link-presentation',
+  formula: 'guide-link-formula',
+};
 export const GUIDE_RULE_LABELS = {
   required: 'Obligatoria',
   optional: 'Opcional',
   forbidden: 'Se ignora',
 } as const;
+/** Celda «Opcional» de las columnas que la importación rellena sola si van vacías. */
+export const GUIDE_RULE_OPTIONAL_AUTO_LABEL = 'Opcional · automático si va vacío';
 export const GUIDE_RULES_NOTES: readonly string[] = [
   '«Se ignora»: si la columna trae un valor, no se importa y la fila sigue; la vista previa lo avisa.',
-  '«Costo unitario» es obligatorio para Insumo, Envase y Producto terminado; el Instrumento puede ir sin costo.',
   'Producto terminado no lleva «Nombre»: se arma como «Fórmula · Presentación». La presentación debe tener contenido declarado.',
   'Envase y Producto terminado cuentan la existencia en envases enteros; en Producto terminado, mayor que 0.',
   '«Unidad» se reconoce por su nombre o por su símbolo.',

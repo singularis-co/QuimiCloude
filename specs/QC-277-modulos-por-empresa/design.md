@@ -191,7 +191,7 @@ model CompanyAddonOverride {
 - **Relaciones declaradas, no escalares sueltos** (a diferencia de `ai_provider_connections`): la
   sesión necesita `company.addonOverrides` dentro del mismo `findFirst` (§ 3.1).
 
-### 2.3 Migración `db/migrations/20261014190000_company_addons/` — reescrita en sitio
+### 2.3 Migración `db/migrations/20261015190000_company_addons/` — reescrita en sitio
 
 **No está en `dev` ni aplicada en ninguna base compartida**, así que se reescribe en su carpeta
 con el mismo nombre; no nace una segunda migración. Quien la tenga aplicada en una base local
@@ -974,7 +974,7 @@ sus adaptadores de IA. El único archivo compartido con lógica es `run-document
 4. **Sin pantalla hasta QC-278.** El Maestro no puede prender ni apagar desde la app. Con el defecto
    de P2, nadie pierde nada al desplegar.
 5. **Migración reescrita en sitio (enmienda).** Cualquier base local o efímera que ya aplicó la
-   versión con la columna tiene `20261014190000_company_addons` en `_prisma_migrations` con otro
+   versión con la columna tiene `20261015190000_company_addons` en `_prisma_migrations` con otro
    checksum. Hay que revertirla con el `down.sql` viejo (`DROP COLUMN`) **antes** de traer el
    nuevo, o recrear la base. No hay base compartida afectada: la migración no está en `dev`
    (`progress/impl_QC-277.md` lo confirma para `QuimiCloude`).
@@ -1000,7 +1000,7 @@ Restrepo del mismo día (D13–D16 en `requirements.md`).
 | Pieza | Cambio | § |
 |---|---|---|
 | `db/schema.prisma` | Fuera `Company.addons`; nacen `Addon` y `CompanyAddonOverride`, con relaciones inversas en `Company` y `User` | 2.2 |
-| `db/migrations/20261014190000_company_addons/` | Reescrita en sitio: dos tablas, sembrado del catálogo, cinco excepciones prendidas por empresa existente, RLS; `down.sql` borra las dos tablas | 2.3 |
+| `db/migrations/20261015190000_company_addons/` | Reescrita en sitio: dos tablas, sembrado del catálogo, cinco excepciones prendidas por empresa existente, RLS; `down.sql` borra las dos tablas | 2.3 |
 | `session-user-prisma.ts` | La relación `company.addonOverrides` (`enabled: true`) en vez de la columna | 3.1 |
 | `company-addons-prisma.ts` | `findByCompany` lee excepciones; `apply` bloquea la empresa, hace `upsert` por cambio y escribe los eventos en la misma transacción | 6.3 |
 | `initial-access-repository-prisma.ts` | `create` anidado con las cinco excepciones | 2.5 |

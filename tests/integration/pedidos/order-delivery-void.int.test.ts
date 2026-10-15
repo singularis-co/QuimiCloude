@@ -125,11 +125,15 @@ async function entregarTodo(e: Escenario): Promise<string> {
     {
       orderId: e.orderId,
       deliveryKey,
-      customerId: e.customerId,
-      allocations: [
-        { presentationLineId: e.lineId, batchId: e.batchId, packages: 4 },
-        { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
-        { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 3 },
+      customers: [
+        {
+          customerId: e.customerId,
+          allocations: [
+            { presentationLineId: e.lineId, batchId: e.batchId, packages: 4 },
+            { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+            { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 3 },
+          ],
+        },
       ],
     },
     e.a.actor,
@@ -184,15 +188,28 @@ async function expectLibroCuadra(batchIds: readonly string[]): Promise<void> {
   }
 }
 
-function anular(e: Escenario, deliveryId: string, presentationLineIds: readonly string[], extra: { voidKey?: string; reason?: string } = {}) {
+type Par = { readonly customerId: string; readonly presentationLineId: string };
+
+// 2026-10-15: la anulacion se pide por pares cliente-presentacion. `anular` pide las presentaciones
+// del cliente del escenario; `anularPares`, pares sueltos.
+function anularPares(e: Escenario, deliveryId: string, items: readonly Par[], extra: { voidKey?: string; reason?: string } = {}) {
   return pedidos.voidDelivery(
     {
       deliveryId,
       voidKey: extra.voidKey ?? randomUUID(),
-      presentationLineIds,
+      items,
       reason: extra.reason ?? 'El cliente devolvio el producto',
     },
     e.admin,
+  );
+}
+
+function anular(e: Escenario, deliveryId: string, presentationLineIds: readonly string[], extra: { voidKey?: string; reason?: string } = {}) {
+  return anularPares(
+    e,
+    deliveryId,
+    presentationLineIds.map((presentationLineId) => ({ customerId: e.customerId, presentationLineId })),
+    extra,
   );
 }
 
@@ -212,8 +229,7 @@ describe('voidDelivery contra Postgres', () => {
         {
           orderId: orderB,
           deliveryKey: keyB,
-          customerId: customerB,
-          allocations: [{ presentationLineId: linesB[0], batchId: batchB, packages: 2 }],
+          customers: [{ customerId: customerB, allocations: [{ presentationLineId: linesB[0] as string, batchId: batchB, packages: 2 }] }],
         },
         e.b.actor,
       );
@@ -363,10 +379,14 @@ describe('voidDelivery contra Postgres', () => {
         {
           orderId: e.orderId,
           deliveryKey: randomUUID(),
-          customerId: e.customerId,
-          allocations: [
-            { presentationLineId: e.lineId, batchId: e.batchId, packages: 4 },
-            { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+          customers: [
+            {
+              customerId: e.customerId,
+              allocations: [
+                { presentationLineId: e.lineId, batchId: e.batchId, packages: 4 },
+                { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+              ],
+            },
           ],
         },
         e.a.actor,
@@ -402,10 +422,14 @@ describe('voidDelivery contra Postgres', () => {
         {
           orderId: e.orderId,
           deliveryKey: randomUUID(),
-          customerId: e.customerId,
-          allocations: [
-            { presentationLineId: e.lineId, batchId: e.batchId, packages: 4 },
-            { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+          customers: [
+            {
+              customerId: e.customerId,
+              allocations: [
+                { presentationLineId: e.lineId, batchId: e.batchId, packages: 4 },
+                { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+              ],
+            },
           ],
         },
         e.a.actor,
@@ -468,7 +492,15 @@ describe('voidDelivery contra Postgres', () => {
         const entregasAntes = await fotoDeEntregas(e.a.companyId);
 
         const fallo = voidDeliveryQueFalla(donde)(
-          { deliveryId, voidKey: randomUUID(), presentationLineIds: [e.lineId, e.smallLineId], reason: 'Devolucion' },
+          {
+            deliveryId,
+            voidKey: randomUUID(),
+            items: [
+              { customerId: e.customerId, presentationLineId: e.lineId },
+              { customerId: e.customerId, presentationLineId: e.smallLineId },
+            ],
+            reason: 'Devolucion',
+          },
           e.admin,
         );
 
@@ -488,6 +520,192 @@ describe('voidDelivery contra Postgres', () => {
   }
 });
 
+// 2026-10-15 (QC-282): una entrega con dos clientes. Garcia lleva 2 L de los dos lotes (2 + 1) y
+// 1 L (1); Lopez lleva 2 L del primer lote (2), el mismo que Garcia, y 1 L (2). Queda ENTREGADO.
+async function entregarADosClientes(e: Escenario): Promise<{ deliveryId: string; segundoCliente: string }> {
+  const segundoCliente = await crearCliente(e.a, 'Lopez');
+  const deliveryKey = randomUUID();
+  const resultado = await pedidos.deliverOrder(
+    {
+      orderId: e.orderId,
+      deliveryKey,
+      customers: [
+        {
+          customerId: e.customerId,
+          allocations: [
+            { presentationLineId: e.lineId, batchId: e.batchId, packages: 2 },
+            { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+            { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 1 },
+          ],
+        },
+        {
+          customerId: segundoCliente,
+          allocations: [
+            { presentationLineId: e.lineId, batchId: e.batchId, packages: 2 },
+            { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 2 },
+          ],
+        },
+      ],
+    },
+    e.a.actor,
+  );
+  expect(resultado).toEqual({ status: 'delivered', orderStatus: 'ENTREGADO' });
+  const { id } = await prisma.orderDelivery.findFirstOrThrow({ where: { deliveryKey }, select: { id: true } });
+  return { deliveryId: id, segundoCliente };
+}
+
+/** Las lineas de entrega anuladas, como (cliente, linea del reparto, lote), ordenadas. */
+async function lineasAnuladas(companyId: string): Promise<string[]> {
+  const filas = await prisma.orderDeliveryVoidLine.findMany({
+    where: { companyId },
+    select: { deliveryLine: { select: { customerId: true, orderPresentationLineId: true, batchId: true } } },
+  });
+  return filas
+    .map(({ deliveryLine: l }) => `${l.customerId}|${l.orderPresentationLineId}|${l.batchId}`)
+    .sort();
+}
+
+describe('voidDelivery con varios clientes contra Postgres', () => {
+  it('R39: un par repetido, un par cuya presentacion no lleva ese cliente o un cliente ajeno a la entrega son invalid_input, sin escribir', async () => {
+    const e = await crearEscenario();
+    try {
+      const { deliveryId, segundoCliente } = await entregarADosClientes(e);
+      const ajeno = await crearCliente(e.a, 'Ajeno');
+      const antes = await fotoDeEntregas(e.a.companyId);
+
+      const repetido = [
+        { customerId: segundoCliente, presentationLineId: e.lineId },
+        { customerId: segundoCliente, presentationLineId: e.lineId },
+      ];
+      expect(await codigoDe(anularPares(e, deliveryId, repetido))).toBe('invalid_input');
+      expect(await codigoDe(anularPares(e, deliveryId, []))).toBe('invalid_input');
+      expect(
+        await codigoDe(
+          anularPares(e, deliveryId, [
+            { customerId: segundoCliente, presentationLineId: e.lineId },
+            { customerId: segundoCliente, presentationLineId: randomUUID() },
+          ]),
+        ),
+      ).toBe('invalid_input');
+      expect(await codigoDe(anularPares(e, deliveryId, [{ customerId: ajeno, presentationLineId: e.lineId }]))).toBe(
+        'invalid_input',
+      );
+
+      expect(await escritoPorAnulaciones(e.a.companyId)).toEqual({ anulaciones: 0, lineas: 0, asientos: 0 });
+      expect(await stockDeLote(e.batchId)).toBe('0.0000');
+      expect((await pedido(e.orderId)).status).toBe('ENTREGADO');
+      expect(await fotoDeEntregas(e.a.companyId)).toEqual(antes);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('R41, R34: anula todas las lineas del par en todos sus lotes y ninguna del otro cliente en la misma presentacion', async () => {
+    const e = await crearEscenario();
+    try {
+      const { deliveryId, segundoCliente } = await entregarADosClientes(e);
+
+      expect(await anularPares(e, deliveryId, [{ customerId: e.customerId, presentationLineId: e.lineId }])).toEqual({
+        status: 'voided',
+        orderStatus: 'TERMINADO',
+      });
+
+      expect(await lineasAnuladas(e.a.companyId)).toEqual(
+        [`${e.customerId}|${e.lineId}|${e.batchId}`, `${e.customerId}|${e.lineId}|${e.secondBatchId}`].sort(),
+      );
+
+      const vista = await pedidos.listOrderDeliveries(e.orderId, e.admin);
+      const [entrega] = vista.deliveries;
+      expect(entrega?.packages).toBe(8);
+      expect(entrega?.customers.map((c) => [c.customerId, c.customerName])).toEqual([
+        [e.customerId, 'Cliente Garcia'],
+        [segundoCliente, 'Cliente Lopez'],
+      ]);
+      const anulada = (customerId: string) =>
+        entrega?.customers.find((c) => c.customerId === customerId)?.presentations.find((p) => p.presentationLineId === e.lineId)
+          ?.void ?? null;
+      expect(anulada(e.customerId)).toMatchObject({ reason: 'El cliente devolvio el producto', authorName: 'Ana Perez' });
+      expect(anulada(segundoCliente)).toBeNull();
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('R40: un par ya anulado es delivery_already_voided y no anula el otro par pedido', async () => {
+    const e = await crearEscenario();
+    try {
+      const { deliveryId, segundoCliente } = await entregarADosClientes(e);
+      await anularPares(e, deliveryId, [{ customerId: e.customerId, presentationLineId: e.lineId }]);
+      const despuesDeLaPrimera = await escritoPorAnulaciones(e.a.companyId);
+      const stockChico = await stockDeLote(e.smallBatchId);
+
+      expect(
+        await codigoDe(
+          anularPares(e, deliveryId, [
+            { customerId: segundoCliente, presentationLineId: e.smallLineId },
+            { customerId: e.customerId, presentationLineId: e.lineId },
+          ]),
+        ),
+      ).toBe('delivery_already_voided');
+
+      expect(await escritoPorAnulaciones(e.a.companyId)).toEqual(despuesDeLaPrimera);
+      expect(await stockDeLote(e.smallBatchId)).toBe(stockChico);
+
+      // El mismo par de presentacion, del otro cliente, sigue pudiendose anular.
+      expect(await anularPares(e, deliveryId, [{ customerId: segundoCliente, presentationLineId: e.lineId }])).toEqual({
+        status: 'voided',
+        orderStatus: 'TERMINADO',
+      });
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('R42: dos clientes del mismo lote en una anulacion dan un solo asiento por lote con la suma, y los entregados bajan en lo anulado', async () => {
+    const e = await crearEscenario();
+    try {
+      const { deliveryId, segundoCliente } = await entregarADosClientes(e);
+      expect(await stockDeLote(e.batchId)).toBe('0.0000');
+      expect(await stockDeLote(e.secondBatchId)).toBe('4.0000');
+      expect(await stockDeLote(e.smallBatchId)).toBe('3.0000');
+
+      const resultado = await anularPares(e, deliveryId, [
+        { customerId: segundoCliente, presentationLineId: e.lineId },
+        { customerId: e.customerId, presentationLineId: e.lineId },
+        { customerId: segundoCliente, presentationLineId: e.smallLineId },
+      ]);
+      expect(resultado).toEqual({ status: 'voided', orderStatus: 'TERMINADO' });
+
+      const anulacion = await prisma.orderDeliveryVoid.findFirstOrThrow({ where: { companyId: e.a.companyId } });
+      const asientos = await prisma.inventoryMovement.findMany({
+        where: { companyId: e.a.companyId, kind: 'delivery_void' },
+      });
+      const porLote = (x: readonly string[], y: readonly string[]) => ((x[0] ?? '') < (y[0] ?? '') ? -1 : 1);
+      expect(asientos.map((m) => [m.batchId, m.quantity.toFixed(4), m.orderDeliveryVoidId ?? '']).sort(porLote)).toEqual(
+        [
+          [e.batchId, '8.0000', anulacion.id],
+          [e.secondBatchId, '2.0000', anulacion.id],
+          [e.smallBatchId, '2.0000', anulacion.id],
+        ].sort(porLote),
+      );
+      expect(await escritoPorAnulaciones(e.a.companyId)).toEqual({ anulaciones: 1, lineas: 4, asientos: 3 });
+
+      expect(await stockDeLote(e.batchId)).toBe('8.0000');
+      expect(await stockDeLote(e.secondBatchId)).toBe('6.0000');
+      expect(await stockDeLote(e.smallBatchId)).toBe('5.0000');
+      await expectLibroCuadra([e.batchId, e.secondBatchId, e.smallBatchId]);
+
+      const vista = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+      const [grande, chica] = vista.lines;
+      expect(grande).toMatchObject({ presentationLineId: e.lineId, deliveredPackages: 0, remainingPackages: 5 });
+      expect(chica).toMatchObject({ presentationLineId: e.smallLineId, deliveredPackages: 1, remainingPackages: 2 });
+      expect((await pedido(e.orderId)).status).toBe('TERMINADO');
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+});
+
 describe('listOrderDeliveries contra Postgres', () => {
   it('R7, R9: lista las entregas de la mas reciente a la mas antigua, con cliente dado de baja, autor, presentaciones, lotes y la anulacion', async () => {
     const e = await crearEscenario();
@@ -497,8 +715,9 @@ describe('listOrderDeliveries contra Postgres', () => {
         {
           orderId: e.orderId,
           deliveryKey: primeraKey,
-          customerId: e.customerId,
-          allocations: [{ presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 2 }],
+          customers: [
+            { customerId: e.customerId, allocations: [{ presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 2 }] },
+          ],
         },
         e.a.actor,
       );
@@ -510,11 +729,15 @@ describe('listOrderDeliveries contra Postgres', () => {
         {
           orderId: e.orderId,
           deliveryKey: segundaKey,
-          customerId: e.customerId,
-          allocations: [
-            { presentationLineId: e.lineId, batchId: e.batchId, packages: 3 },
-            { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 1 },
-            { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+          customers: [
+            {
+              customerId: e.customerId,
+              allocations: [
+                { presentationLineId: e.lineId, batchId: e.batchId, packages: 3 },
+                { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 1 },
+                { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+              ],
+            },
           ],
         },
         e.a.actor,
@@ -548,7 +771,8 @@ describe('listOrderDeliveries contra Postgres', () => {
       expect(vista.orderStatus).toBe(status);
       expect(vista.numberText).toMatch(/^\d{4}-\d{7}$/u);
       expect(vista.deliveries.map((d) => d.id)).toEqual([segunda, primera]);
-      expect(vista.deliveries.map((d) => [d.customerName, d.authorName])).toEqual([
+      // 2026-10-15: las presentaciones van por cliente; estas entregas tienen uno solo.
+      expect(vista.deliveries.map((d) => [d.customers[0]?.customerName, d.authorName])).toEqual([
         ['Cliente Garcia', 'Ana Perez'],
         ['Cliente Garcia', 'Ana Perez'],
       ]);
@@ -556,7 +780,7 @@ describe('listOrderDeliveries contra Postgres', () => {
       // El lector ordena las lineas por id de linea del reparto y de lote: el orden esperado sale de ahi.
       const porId = <T>(clave: (x: T) => string) => (x: T, y: T) => (clave(x) < clave(y) ? -1 : 1);
       const [reciente, antigua] = vista.deliveries;
-      expect(reciente?.presentations).toEqual(
+      expect(reciente?.customers[0]?.presentations).toEqual(
         [
           {
             presentationLineId: e.lineId,
@@ -577,7 +801,7 @@ describe('listOrderDeliveries contra Postgres', () => {
           },
         ].sort(porId((p) => p.presentationLineId)),
       );
-      expect(antigua?.presentations).toEqual([
+      expect(antigua?.customers[0]?.presentations).toEqual([
         {
           presentationLineId: e.smallLineId,
           presentationName: nombres.get(e.smallPresentationId),

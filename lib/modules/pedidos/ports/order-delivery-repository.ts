@@ -3,7 +3,6 @@ import type { OrderScope } from '../domain/order-scope';
 export type NewOrderDelivery = {
   readonly deliveryKey: string;
   readonly orderId: string;
-  readonly customerId: string;
   readonly actorId: string;
   readonly now: Date;
 };
@@ -15,6 +14,7 @@ export type RegisteredOrderDelivery = {
 };
 
 export type NewOrderDeliveryLine = {
+  readonly customerId: string;
   readonly presentationLineId: string;
   readonly batchId: string;
   readonly packages: number;

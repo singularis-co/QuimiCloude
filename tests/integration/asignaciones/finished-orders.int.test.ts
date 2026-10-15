@@ -197,6 +197,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
             productionDate: '2026-03-01',
           })),
       },
+      transaction: execution.transaction,
       now: () => NOW,
     }),
   };
@@ -416,7 +417,11 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
 
       // Terminar el empaque: EN_EMPAQUE -> POR_ACONDICIONAR. Un POR_ACONDICIONAR NO aparece.
-      const { numberText } = await finishPacking(actorEmpacador, { orderId: pedido });
+      const lineas = await fixture.tx.orderPresentationLine.findMany({ where: { orderId: pedido }, select: { id: true, packages: true } });
+      const { numberText } = await finishPacking(actorEmpacador, {
+        orderId: pedido,
+        lines: lineas.map((linea) => ({ lineId: linea.id, packedPackages: linea.packages, reason: null, reasonOther: null })),
+      });
       expect(numberText.length).toBeGreaterThan(0);
       expect(await estadoDe()).toBe('POR_ACONDICIONAR');
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);

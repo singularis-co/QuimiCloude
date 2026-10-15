@@ -198,6 +198,61 @@ describe('importacion de inventario contra la base', () => {
     expect(segunda.kind === 'nothing_imported' && segunda.rows[0]?.status).toBe('duplicate');
   });
 
+  it('QC-284 R11: un lote con la misma clave escrito entre la vista previa y la escritura deja la fila duplicada', async () => {
+    const escenario = await escenarioMixto();
+    const { companyId } = escenario.empresa;
+    const actor = actorOf(escenario.empresa);
+    const codigo = `R-${token().slice(0, 8)}`;
+    const filas: Partial<ImportCells>[] = [
+      { type: 'Insumo', name: 'Sal existente', unit: escenario.unidad, stock: '9', unitCost: '1', qtyAlert: '1', lot: codigo },
+      { type: 'Instrumento', name: 'Termometro', stock: '1', lot: codigo },
+    ];
+    const base = wireImport();
+    const vista = await base.preview(csvFile(filas), actor);
+    expect(vista.kind === 'preview' && vista.rows.map((row) => row.status)).toEqual(['add_batch', 'create']);
+
+    let llamada = 0;
+    const { confirm } = wireImport({
+      createProduct: async (input, who) => {
+        llamada += 1;
+        // Otra sesion escribe la misma clave justo antes de la primera escritura.
+        if (llamada === 1) await sembrarLote(escenario.empresa, escenario.existente, codigo);
+        return base.manualCreate(input, who);
+      },
+    });
+
+    const outcome = await confirm({ ...csvFile(filas), importKey: crypto.randomUUID() }, actor);
+
+    expect(outcome.kind).toBe('imported');
+    const result = outcome as InventoryImportResult;
+    // El instrumento lleva el mismo codigo en otro producto: no choca.
+    expect(result.rows.map((row) => row.status)).toEqual(['duplicate', 'created']);
+    expect(result.rows[0]).toMatchObject({ status: 'duplicate', lot: codigo });
+    expect(await prisma.productBatch.count({ where: { companyId, lot: codigo } })).toBe(2);
+    expect(await prisma.productBatch.count({ where: { companyId, productId: escenario.existente, lot: codigo } })).toBe(1);
+  });
+
+  it('QC-284 R9, R10: el codigo de otro producto no impide crear ni sumar lote, y la misma clave sigue siendo duplicado', async () => {
+    const escenario = await escenarioMixto();
+    const { companyId } = escenario.empresa;
+    const actor = actorOf(escenario.empresa);
+    const filas: Partial<ImportCells>[] = [
+      { type: 'Insumo', name: 'Sal nueva', unit: escenario.unidad, stock: '2', unitCost: '1', qtyAlert: '1', lot: escenario.loteExistente },
+      { type: 'Envase', name: 'Bidon rojo', presentation: escenario.presentacion, stock: '3', unitCost: '2', qtyAlert: '1', lot: escenario.loteExistente },
+      { type: 'Insumo', name: 'Sal existente', unit: escenario.unidad, stock: '9', unitCost: '1', qtyAlert: '1', lot: escenario.loteExistente },
+    ];
+    const { preview, confirm } = wireImport();
+
+    const vista = await preview(csvFile(filas), actor);
+    const outcome = await confirm({ ...csvFile(filas), importKey: crypto.randomUUID() }, actor);
+
+    expect(vista.kind === 'preview' && vista.rows.map((row) => row.status)).toEqual(['create', 'create', 'duplicate']);
+    const result = outcome as InventoryImportResult;
+    expect(result.rows.map((row) => row.status)).toEqual(['created', 'created', 'duplicate']);
+    expect(JSON.stringify(result.rows)).not.toContain('lot_used_by_other_product');
+    expect(await prisma.productBatch.count({ where: { companyId, lot: escenario.loteExistente } })).toBe(3);
+  });
+
   it.skipIf(process.env.QC209_MEDIR_2000 !== '1')(
     'R7 medida: confirmar 2.000 filas en la misma peticion, con el alta y el aviso de pedidos reales',
     async () => {

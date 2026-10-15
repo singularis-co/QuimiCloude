@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
-import { compareQuantities, subtractQuantities } from '../../../domain/decimal-quantity';
+import { addQuantities, compareQuantities, subtractQuantities } from '../../../domain/decimal-quantity';
 import {
   ActionNotAllowedError,
   BatchDuplicateLotError,
@@ -341,6 +341,38 @@ const NO_FIXED_PRESENTATION: FixedPresentationFields = {
   presentationUnitId: null,
 };
 
+type NextExpiryRow = { readonly productId: string; readonly _min: { readonly expiryDate: Date | null } };
+
+/** De las filas del `groupBy` al mapa producto -> `YYYY-MM-DD`. Un producto sin fecha no entra:
+ *  el llamante lo resuelve a `null`. */
+export function toNextExpiryByProduct(rows: readonly NextExpiryRow[]): ReadonlyMap<string, string> {
+  return new Map(
+    rows.flatMap((row) => (row._min.expiryDate === null ? [] : [[row.productId, toCivilDate(row._min.expiryDate)] as const])),
+  );
+}
+
+/** UNA consulta agregada por pagina. Solo lotes con existencia > 0 (`productId` de la pagina y
+ *  `companyId`): un lote agotado ya no vence nada. NO coincide a proposito con
+ *  `findReservedAndAvailableByProduct`, que suma todos los lotes. El producto vivo ya lo garantiza
+ *  el `where` del listado. */
+async function findNextExpiryDateByProduct(
+  productIds: readonly string[],
+  scope: InventoryScope,
+): Promise<ReadonlyMap<string, string>> {
+  if (productIds.length === 0) return new Map();
+  const rows = await prisma.productBatch.groupBy({
+    by: ['productId'],
+    where: {
+      AND: [
+        batchCompanyScope(scope),
+        { productId: { in: [...productIds] }, stock: { gt: 0 }, expiryDate: { not: null } },
+      ],
+    },
+    _min: { expiryDate: true },
+  });
+  return toNextExpiryByProduct(rows);
+}
+
 export async function listAliveProducts(
   query: ListQuery,
   scope: InventoryScope,
@@ -364,11 +396,11 @@ export async function listAliveProducts(
 
   // UNA consulta agregada mas para la pagina entera, nunca una por fila: `reserved`/`available`
   // salen del libro de reservas, sumados por producto.
-  const reservedByProduct = await findReservedAndAvailableByProduct(
-    prisma,
-    scope.companyId,
-    rows.map((row) => row.id),
-  );
+  const productIds = rows.map((row) => row.id);
+  const [reservedByProduct, nextExpiryByProduct] = await Promise.all([
+    findReservedAndAvailableByProduct(prisma, scope.companyId, productIds),
+    findNextExpiryDateByProduct(productIds, scope),
+  ]);
   const presentations = await findFixedPresentations(
     [...new Set(rows.flatMap((row) => (row.presentationId === null ? [] : [row.presentationId])))],
     scope,
@@ -380,6 +412,7 @@ export async function listAliveProducts(
       ...toProductView(row),
       reserved: aggregate?.reserved ?? ZERO_QUANTITY,
       available: aggregate?.available ?? ZERO_QUANTITY,
+      nextExpiryDate: nextExpiryByProduct.get(row.id) ?? null,
       ...(fixed ?? NO_FIXED_PRESENTATION),
     };
   });
@@ -696,8 +729,12 @@ function translateBatchWriteError(error: unknown): never {
 }
 
 /** Por columnas y no por el nombre del indice: con esta version de Prisma, `meta.target` trae las
- *  columnas (igual que en `unit-write-prisma.ts`). */
-const BATCH_LOT_UNIQUE_COLUMNS: ReadonlySet<string> = new Set(['company_id', 'lot']);
+ *  columnas (igual que en `unit-write-prisma.ts`). Un conjunto por indice parcial: con presentacion
+ *  y sin ella. */
+const BATCH_LOT_UNIQUE_COLUMN_SETS: readonly ReadonlySet<string>[] = [
+  new Set(['company_id', 'product_id', 'presentation_id', 'lot']),
+  new Set(['company_id', 'product_id', 'lot']),
+];
 
 function uniqueTargetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string[] {
   const target: unknown = error.meta?.target;
@@ -711,8 +748,9 @@ function uniqueTargetsOf(error: Prisma.PrismaClientKnownRequestError): readonly 
 export function isDuplicateBatchLot(error: unknown): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
   const targets = new Set(uniqueTargetsOf(error));
-  if (targets.size !== BATCH_LOT_UNIQUE_COLUMNS.size) return false;
-  return [...BATCH_LOT_UNIQUE_COLUMNS].every((column) => targets.has(column));
+  return BATCH_LOT_UNIQUE_COLUMN_SETS.some(
+    (columns) => targets.size === columns.size && [...columns].every((column) => targets.has(column)),
+  );
 }
 
 /** Acotado: el lock ya evita el choque, y uno que se repite no es mala suerte. */
@@ -755,7 +793,7 @@ async function writeBatchWithLotRetry<T>(
   }
 
   throw new Error(
-    `no se pudo escribir un lote generado sin chocar con el indice unico (company_id, lot): empresa ${companyId}, ultimo lote intentado '${attemptLog.lastLot ?? '(sin resolver)'}', ${BATCH_LOT_MAX_ATTEMPTS} intentos`,
+    `no se pudo escribir un lote generado sin chocar con la unicidad del lote: empresa ${companyId}, ultimo lote intentado '${attemptLog.lastLot ?? '(sin resolver)'}', ${BATCH_LOT_MAX_ATTEMPTS} intentos`,
     { cause: lastCollision },
   );
 }
@@ -1299,9 +1337,9 @@ export async function receiveFinishedGoods(
  * La salida de producto terminado hacia un cliente, para UNA combinacion receta-presentacion, sobre
  * la MISMA transaccion de quien llama: bloquea el producto terminado vivo (`FOR NO KEY UPDATE`,
  * como la entrada), lee los lotes pedidos -de ese producto, de la empresa y con contenido de
- * envase-, y por cada asignacion hace el decremento CONDICIONAL (`stock >= cantidad` en el
- * `where`, como `consumeBatchStock`) y su asiento `delivery` en negativo. Recalcula
- * `products.stock` una sola vez, al final.
+ * envase-, y por cada lote hace el decremento CONDICIONAL (`stock >= cantidad` en el `where`, como
+ * `consumeBatchStock`) de la suma de sus asignaciones y un asiento `delivery` en negativo. Recalcula
+ * `products.stock` una sola vez, al final. Devuelve una linea por asignacion, en el orden de entrada.
  *
  * No lanza por un lote ausente o corto: lo devuelve, y quien llama deshace la transaccion entera.
  * Un lote de otra empresa, de otro producto o sin contenido sale igual que uno que no existe.
@@ -1336,12 +1374,17 @@ export async function dispatchFinishedGoods(
   const product = productRows[0];
   if (product === undefined) return { kind: 'batch_not_found', batchId: firstAllocation.batchId };
 
+  const packagesByBatch = new Map<string, number>();
+  for (const allocation of input.allocations) {
+    packagesByBatch.set(allocation.batchId, (packagesByBatch.get(allocation.batchId) ?? 0) + allocation.packages);
+  }
+
   const batchRows = await tx.productBatch.findMany({
     where: {
       AND: [
         batchCompanyScope(scope),
         {
-          id: { in: input.allocations.map((allocation) => allocation.batchId) },
+          id: { in: [...packagesByBatch.keys()] },
           productId: product.id,
           packageContent: { not: null },
         },
@@ -1356,40 +1399,34 @@ export async function dispatchFinishedGoods(
   const missing = input.allocations.find((allocation) => !contentByBatch.has(allocation.batchId));
   if (missing !== undefined) return { kind: 'batch_not_found', batchId: missing.batchId };
 
-  const lines: { batchId: string; packages: number; quantity: string }[] = [];
-  for (const allocation of input.allocations) {
-    const packageContent = contentByBatch.get(allocation.batchId);
-    if (packageContent === undefined) return { kind: 'batch_not_found', batchId: allocation.batchId };
-    const quantity = quantityForPackages(allocation.packages, packageContent);
+  // Un decremento y un asiento por lote aunque varias asignaciones lo repitan: el indice unico del
+  // libro por (entrega, lote) no admite dos asientos, y el asiento es el movimiento fisico del lote.
+  for (const [batchId, packages] of packagesByBatch) {
+    const packageContent = contentByBatch.get(batchId);
+    if (packageContent === undefined) return { kind: 'batch_not_found', batchId };
+    const quantity = quantityForPackages(packages, packageContent);
     const decimalQuantity = new Prisma.Decimal(quantity);
 
     const { count } = await tx.productBatch.updateMany({
       where: {
-        AND: [
-          batchCompanyScope(scope),
-          { id: allocation.batchId, productId: product.id, stock: { gte: decimalQuantity } },
-        ],
+        AND: [batchCompanyScope(scope), { id: batchId, productId: product.id, stock: { gte: decimalQuantity } }],
       },
       data: { stock: { decrement: decimalQuantity }, updatedBy: input.actorId, updatedAt: input.now },
     });
 
     if (count === 0) {
       const current = await tx.productBatch.findFirst({
-        where: { AND: [batchCompanyScope(scope), { id: allocation.batchId }] },
+        where: { AND: [batchCompanyScope(scope), { id: batchId }] },
         select: { stock: true },
       });
       const stock = current === null ? ZERO_QUANTITY : current.stock.toFixed(4);
-      return {
-        kind: 'insufficient',
-        batchId: allocation.batchId,
-        availablePackages: wholePackagesIn(stock, packageContent),
-      };
+      return { kind: 'insufficient', batchId, availablePackages: wholePackagesIn(stock, packageContent) };
     }
 
     await writeMovement(
       tx,
       {
-        batchId: allocation.batchId,
+        batchId,
         kind: 'delivery',
         quantity: negateQuantity(quantity),
         reason: null,
@@ -1401,11 +1438,16 @@ export async function dispatchFinishedGoods(
       input.now,
       scope,
     );
-
-    lines.push({ batchId: allocation.batchId, packages: allocation.packages, quantity });
   }
 
   await recalculateProductStock(tx, product.id, scope);
+
+  // Misma multiplicacion exacta que el asiento: la suma de las lineas de un lote es su asiento.
+  const lines = input.allocations.map((allocation) => ({
+    batchId: allocation.batchId,
+    packages: allocation.packages,
+    quantity: quantityForPackages(allocation.packages, contentByBatch.get(allocation.batchId) ?? ZERO_QUANTITY),
+  }));
 
   return { kind: 'dispatched', lines };
 }
@@ -1450,19 +1492,25 @@ export async function returnFinishedGoods(
        FOR NO KEY UPDATE
   `);
 
+  // Un incremento y un asiento por lote: el indice unico del libro por (anulacion, lote) no admite dos.
+  const quantityByBatch = new Map<string, string>();
   for (const line of input.lines) {
+    quantityByBatch.set(line.batchId, addQuantities(quantityByBatch.get(line.batchId) ?? ZERO_QUANTITY, line.quantity));
+  }
+
+  for (const [batchId, quantity] of quantityByBatch) {
     await tx.productBatch.update({
-      where: { id: line.batchId, companyId },
-      data: { stock: { increment: new Prisma.Decimal(line.quantity) }, updatedBy: input.actorId, updatedAt: input.now },
+      where: { id: batchId, companyId },
+      data: { stock: { increment: new Prisma.Decimal(quantity) }, updatedBy: input.actorId, updatedAt: input.now },
       select: { id: true },
     });
 
     await writeMovement(
       tx,
       {
-        batchId: line.batchId,
+        batchId,
         kind: 'delivery_void',
-        quantity: line.quantity,
+        quantity,
         reason: null,
         orderId: input.orderId,
         orderPresentationLineId: null,
@@ -1577,9 +1625,9 @@ export async function findFinishedGoodsReceipts(
 }
 
 /**
- * Lote, vencimiento y dia de produccion de los lotes que entraron por el asiento `production` del
- * pedido. Cambia la etiqueta del lote, no su existencia: por eso no asienta movimiento, y la
- * trazabilidad queda en `updated_by` y `updated_at`.
+ * El mismo lote, vencimiento y dia de produccion en todos los lotes de produccion del pedido: los
+ * de las lineas que devuelve `listOfOrder`. Cambia la etiqueta del lote, no su existencia: por eso
+ * no asienta movimiento, y la trazabilidad queda en `updated_by` y `updated_at`.
  *
  * Los lotes se bloquean antes de comprobar el choque, asi que dos guardados del mismo pedido se
  * serializan. Contra otro pedido en carrera solo protege el indice unico: su `P2002` sale como
@@ -1589,21 +1637,19 @@ export async function writeFinishedBatchLabels(
   tx: Prisma.TransactionClient,
   input: {
     readonly orderId: string;
-    readonly labels: readonly FinishedBatchLabel[];
+    readonly label: FinishedBatchLabel;
     readonly actorId: string;
     readonly now: Date;
   },
   scope: InventoryScope,
 ): Promise<FinishedBatchLabelsOutcome> {
   const { companyId } = companyScopeColumns(scope);
-  if (input.labels.length === 0) return { kind: 'written' };
-  const batchIds = input.labels.map((label) => label.batchId);
 
-  const ofOrder = await tx.$queryRaw<ReadonlyArray<{ readonly id: string }>>(Prisma.sql`
+  const locked = await tx.$queryRaw<ReadonlyArray<{ readonly id: string }>>(Prisma.sql`
     SELECT b."id"::text AS "id"
       FROM "product_batches" b
      WHERE b."company_id" = ${companyId}::uuid
-       AND b."id" = ANY(${batchIds}::uuid[])
+       AND b."presentation_id" IS NOT NULL
        AND EXISTS (
              SELECT 1
                FROM "inventory_movements" m
@@ -1611,31 +1657,43 @@ export async function writeFinishedBatchLabels(
                 AND m."company_id" = ${companyId}::uuid
                 AND m."kind" = 'production'
                 AND m."order_id" = ${input.orderId}::uuid
+                AND m."order_presentation_line_id" IS NOT NULL
            )
      ORDER BY b."id"
        FOR UPDATE
   `);
-  const lockedIds = new Set(ofOrder.map((row) => row.id));
-  const notFound = input.labels.find((label) => !lockedIds.has(label.batchId));
-  if (notFound !== undefined) return { kind: 'batch_not_found', batchId: notFound.batchId };
+  if (locked.length === 0) return { kind: 'no_batches' };
+  const batchIds = locked.map((row) => row.id);
 
-  // Exacta y sensible a mayusculas, como el indice unico. Un lote del mismo pedido tambien choca.
-  const holders = await tx.productBatch.findMany({
-    where: { AND: [batchCompanyScope(scope), { lot: { in: input.labels.map((label) => label.lot) } }] },
-    select: { id: true, lot: true },
-  });
-  const clash = input.labels.find((label) =>
-    holders.some((holder) => holder.lot === label.lot && holder.id !== label.batchId),
-  );
-  if (clash !== undefined) return { kind: 'duplicate_lot', batchId: clash.batchId };
+  // La misma regla que los dos indices unicos: `IS NOT DISTINCT FROM` iguala dos lotes sin
+  // presentacion. El codigo se compara exacto, sensible a mayusculas.
+  const clash = await tx.$queryRaw<ReadonlyArray<{ readonly id: string }>>(Prisma.sql`
+    SELECT b."id"::text AS "id"
+      FROM "product_batches" b
+     WHERE b."company_id" = ${companyId}::uuid
+       AND b."id" = ANY(${batchIds}::uuid[])
+       AND EXISTS (
+             SELECT 1
+               FROM "product_batches" o
+              WHERE o."company_id" = ${companyId}::uuid
+                AND o."product_id" = b."product_id"
+                AND o."presentation_id" IS NOT DISTINCT FROM b."presentation_id"
+                AND o."lot" = ${input.label.lot}
+                AND o."id" <> b."id"
+           )
+     ORDER BY b."id"
+     LIMIT 1
+  `);
+  const [first] = clash;
+  if (first !== undefined) return { kind: 'duplicate_lot', batchId: first.id };
 
-  for (const label of input.labels) {
+  for (const id of batchIds) {
     await tx.productBatch.update({
-      where: { id: label.batchId, companyId },
+      where: { id, companyId },
       data: {
-        lot: label.lot,
-        expiryDate: toBatchExpiryDate(label.expiryDate),
-        productionDate: toBatchExpiryDate(label.productionDate),
+        lot: input.label.lot,
+        expiryDate: toBatchExpiryDate(input.label.expiryDate),
+        productionDate: toBatchExpiryDate(input.label.productionDate),
         updatedBy: input.actorId,
         updatedAt: input.now,
       },

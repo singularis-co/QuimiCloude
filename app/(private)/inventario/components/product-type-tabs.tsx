@@ -5,18 +5,12 @@ import { useMemo } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { PRODUCT_TYPE_VALUES, type ProductType } from '@/lib/modules/inventario';
 import { productListHref, TYPE_COLUMN_ID } from './product-list-params';
+import { PRODUCT_TYPE_LABELS as TYPE_LABELS } from './product-type-label';
 import type { DataTableParams } from '@/components/shared/data-table';
 
 export type ProductTypeTabsProps = {
   readonly params: DataTableParams;
   readonly onNavigate: (href: string) => void;
-};
-
-const TYPE_LABELS: Record<ProductType, string> = {
-  PRODUCT: 'Producto',
-  MACHINE: 'Máquina',
-  PACKAGING: 'Envase',
-  FINISHED_PRODUCT: 'Producto terminado',
 };
 
 export function ProductTypeTabs({ params, onNavigate }: ProductTypeTabsProps) {

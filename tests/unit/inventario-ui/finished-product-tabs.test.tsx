@@ -16,7 +16,7 @@ import { FINISHED_PRODUCT_ID } from '../../fixtures/finished-product-detail';
 afterEach(cleanup);
 
 describe('tabs de la ficha de producto terminado', () => {
-  it('R8 — siete tabs en este orden: General, Stock, Lotes, Entradas, Salidas, Entregas y Costo de produccion', () => {
+  it('R8, R26 — ocho tabs en este orden: General, Stock, Lotes, Entradas, Salidas, Entregas, Costo de produccion y Reparto', () => {
     render(<FinishedProductTabs productId={FINISHED_PRODUCT_ID} current="general" />);
 
     const lista = screen.getByRole('tablist', { name: FINISHED_PRODUCT_TABS_LABEL });
@@ -30,6 +30,7 @@ describe('tabs de la ficha de producto terminado', () => {
       'Salidas',
       'Entregas',
       'Costo de producción',
+      'Reparto',
     ]);
     expect(pestanas.map((pestana) => pestana.getAttribute('data-testid'))).toEqual(
       FINISHED_PRODUCT_TABS.map(finishedProductTabTestId),

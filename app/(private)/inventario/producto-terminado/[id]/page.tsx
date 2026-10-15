@@ -106,6 +106,7 @@ export default async function FinishedProductDetailPage({
             tab={tab}
             paging={{ page: view.page, pageSize: view.pageSize }}
             unitLabel={unitLabel}
+            presentation={product.presentation}
           />
         </Suspense>
       ) : null}

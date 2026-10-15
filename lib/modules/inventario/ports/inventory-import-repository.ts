@@ -59,12 +59,12 @@ export interface InventoryImportRepository {
     scope: InventoryScope,
   ): Promise<readonly ImportProductRef[]>;
 
-  /** Lotes de la empresa con esos codigos, tambien los de productos dados de baja: el codigo de
-   *  lote es unico en la empresa sin mirar si su producto sigue vivo. */
+  /** Lotes de la empresa con esos codigos, tambien los de productos dados de baja: la unicidad
+   *  del lote no mira si su producto sigue vivo. */
   findBatchesByLots(
     lots: readonly string[],
     scope: InventoryScope,
-  ): Promise<readonly { lot: string; productId: string }[]>;
+  ): Promise<readonly { lot: string; productId: string; presentationId: string | null }[]>;
 
   /** La importacion ya confirmada con esa clave en la empresa, o `null`. Solo lee. */
   findImport(importKey: string, scope: InventoryScope): Promise<ExistingImport | null>;

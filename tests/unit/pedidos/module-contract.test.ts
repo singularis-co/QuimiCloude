@@ -492,6 +492,8 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // el cliente compartido, sin importar `@prisma/client`.
     // 2026-10-13: `order-delivery-directory-prisma.ts` (`FinishedDeliveryDirectory` de
     // `inventario`, solo lectura) abre el cliente compartido, sin importar `@prisma/client`.
+    // 2026-10-14: `packed-lines-directory-prisma.ts` (`FinishedDistributionDirectory` de
+    // `inventario`, solo lectura) igual, sin importar `@prisma/client`.
     // Las dos listas siguen CERRADAS.
     const DUENOS_DEL_CLIENTE = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
@@ -502,6 +504,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
       DUENO_DE_PRISMA,
       UNIDAD_DE_TRABAJO,
+      'lib/modules/pedidos/adapters/driven/persistence/packed-lines-directory-prisma.ts',
     ]
     expect(
       pedidosSources.filter((file) => /@prisma\/client/.test(read(file))).map(etiqueta),

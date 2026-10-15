@@ -190,6 +190,47 @@ describe('returnFinishedGoods — orden de pasos con un tx doblado', () => {
   });
 });
 
+// 2026-10-15: las lineas pueden repetir lote (una por cliente). Un lote repetido recibe la suma en un
+// incremento y un asiento.
+describe('returnFinishedGoods — lote repetido entre lineas', () => {
+  it('R42: un incremento y un asiento delivery_void por lote con la suma, en el orden de su primera linea', async () => {
+    const { tx, txDouble, order } = makeTx(THREE_BATCHES);
+
+    const outcome = await returnFinishedGoods(
+      tx,
+      baseInput({
+        lines: [
+          { batchId: 'batch-1', quantity: '15.0000' },
+          { batchId: 'batch-2', quantity: '1.5000' },
+          { batchId: 'batch-1', quantity: '20.0000' },
+        ],
+      }),
+      SCOPE,
+    );
+
+    expect(outcome).toEqual({ kind: 'returned' });
+    expect(order).toEqual([
+      'batches-read',
+      'product-lock',
+      'batch-increment:batch-1',
+      'movement-create:batch-1',
+      'batch-increment:batch-2',
+      'movement-create:batch-2',
+      'recalculate-stock',
+      'recalculate-stock',
+    ]);
+    const increments = txDouble.productBatch.update.mock.calls.map(
+      (call) => (call as unknown as [{ data: { stock: { increment: Prisma.Decimal } } }])[0].data.stock.increment.toFixed(4),
+    );
+    expect(increments).toEqual(['35.0000', '1.5000']);
+    const datos = txDouble.inventoryMovement.create.mock.calls.map((call) => call[0].data);
+    expect(datos.map((d) => [d.batchId, d.kind, d.quantity])).toEqual([
+      ['batch-1', 'delivery_void', '35.0000'],
+      ['batch-2', 'delivery_void', '1.5000'],
+    ]);
+  });
+});
+
 describe('returnFinishedGoods — lote ausente sin escribir', () => {
   it('R29: un lote que no vuelve (ausente o de otra empresa) da batch_not_found con ese lote y no escribe nada', async () => {
     const { tx, txDouble, order } = makeTx([THREE_BATCHES[0] as BatchRow, THREE_BATCHES[2] as BatchRow]);

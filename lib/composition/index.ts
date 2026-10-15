@@ -73,6 +73,7 @@ import {
   createListFinishedProductBatches,
   createListFinishedProductCosts,
   createListFinishedProductDeliveries,
+  createListFinishedProductDistribution,
   createListFinishedProductMovements,
   createListFinishedStock,
   createListOrderBatches,
@@ -138,7 +139,6 @@ import {
   findProducedFinishedProducts,
   listFinishedProductBatches,
   listFinishedProductCosts,
-  listFinishedProductDeliveryMovements,
   listFinishedProductMovements,
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-product-detail-prisma';
 import {
@@ -169,6 +169,7 @@ import type { FinishedProductDetailRepository } from '@/lib/modules/inventario/p
 import type {
   FinishedBatchCatalog,
   FinishedDeliveryDirectory,
+  FinishedDistributionDirectory,
   OrderNumberDirectory,
   PackagingCatalog,
   PresentationCatalog,
@@ -326,9 +327,10 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
-  findDeliveryDetailsByIds,
+  listDeliveryLinesByBatchIds,
   summarizeDeliveredByBatchIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
+import { listPackedLinesByCombination } from '@/lib/modules/pedidos/adapters/driven/persistence/packed-lines-directory-prisma';
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma';
 import {
   withOrderTransaction,
@@ -1032,15 +1034,18 @@ const presentationRepository: PresentationRepository = {
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
 const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
-  findDeliveryDetails: findDeliveryDetailsByIds,
+  listDeliveryLines: listDeliveryLinesByBatchIds,
   summarizeDelivered: summarizeDeliveredByBatchIds,
+};
+
+const finishedDistributionDirectory: FinishedDistributionDirectory = {
+  listPackedLines: listPackedLinesByCombination,
 };
 
 const finishedProductDetailRepository: FinishedProductDetailRepository = {
   findAliveFinished: findAliveFinishedProduct,
   listBatches: listFinishedProductBatches,
   listMovements: listFinishedProductMovements,
-  listDeliveryMovements: listFinishedProductDeliveryMovements,
   listProductionCosts: listFinishedProductCosts,
   findProducedProducts: findProducedFinishedProducts,
 };
@@ -1206,6 +1211,10 @@ export const inventario = {
     customers: {
       findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
     },
+  }),
+  listFinishedProductDistribution: createListFinishedProductDistribution({
+    products: finishedProductDetailRepository,
+    distribution: finishedDistributionDirectory,
   }),
   listFinishedProductCosts: createListFinishedProductCosts({
     products: finishedProductDetailRepository,
@@ -1898,8 +1907,10 @@ const executionTransaction: ExecutionTransaction = {
         log: createExecutionLogRepository(tx),
         conditioning: {
           startConditioningAliveById: createStartConditioning({ conditioning: createOrderConditioningRepository(tx) }),
+          finishConditioningAliveById: createFinishConditioning({ conditioning: createOrderConditioningRepository(tx) }),
         },
         team: createConditioningTeamRepository(tx),
+        batches: createFinishedBatchLabels(tx),
       }),
     ),
 };
@@ -2027,11 +2038,7 @@ export const asignaciones = {
     people: peopleDirectory,
     now: () => new Date(),
   }),
-  // `listPackingOrders` y `getPackingOrder` comparten los MISMOS `orderCatalog`,
-  // `orderAssignmentRepository`, `recipeCatalog`, `presentationCatalog` y `peopleDirectory` del
-  // resto del modulo, mas `productCatalog` -el mismo que usa `recetas` y la ejecucion, arriba-
-  // para los envases. `startPacking` y `finishPacking` solo necesitan `orderCatalog`: ningun
-  // adaptador nuevo.
+  // `getPackingOrder` suma `packagingCatalog` para el libre de cada envase del conteo de Terminar.
   listPackingOrders: createListPackingOrders({
     orders: orderCatalog,
     assignments: orderAssignmentRepository,
@@ -2039,7 +2046,6 @@ export const asignaciones = {
     people: peopleDirectory,
     presentations: presentationCatalog,
     units: unitCatalog,
-    products: productCatalog,
     now: () => new Date(),
   }),
   getPackingOrder: createGetPackingOrder({
@@ -2049,7 +2055,7 @@ export const asignaciones = {
     people: peopleDirectory,
     presentations: presentationCatalog,
     units: unitCatalog,
-    products: productCatalog,
+    packaging: packagingCatalog,
     packingSteps: { findPackingStepsById: findRecipePackingStepsById },
     now: () => new Date(),
     evidence: stepEvidenceRepository,
@@ -2087,11 +2093,13 @@ export const asignaciones = {
     log: executionLogRepository,
     orders: orderCatalog,
     people: peopleDirectory,
+    team: createConditioningTeamRepository(),
   }),
   getExecutionTrace: createGetExecutionTrace({
     log: executionLogRepository,
     orders: orderCatalog,
     people: peopleDirectory,
+    team: createConditioningTeamRepository(),
   }),
   startConditioning: createStartConditioningOrder({
     orders: orderCatalog,
@@ -2103,6 +2111,7 @@ export const asignaciones = {
   finishConditioning: createFinishConditioningOrder({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   listConditioningOrders: createListConditioningOrders({
@@ -2151,6 +2160,8 @@ export const asignaciones = {
   saveConditioningBatchData: createSaveConditioningBatchData({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
+    presentations: presentationCatalog,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   requestEvidenceUpload: createRequestEvidenceUpload({

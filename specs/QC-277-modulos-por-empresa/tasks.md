@@ -16,8 +16,8 @@
     - `assertAddon`/`hasAddon` fallan cerrado.
 - [x] **T2 — Columna y migración** (R5, R6, R38). Depende de: —
   - `Company.addons` en `db/schema.prisma`.
-  - `db/migrations/20261014190000_company_addons/` con `migration.sql` y `down.sql`
-    (`design.md > 2.3`). Re-fechada a `20261014190000`: `20261014180000` ya lo usa `admin_without_assigned_orders_view`.
+  - `db/migrations/20261015190000_company_addons/` con `migration.sql` y `down.sql`
+    (`design.md > 2.3`). Re-fechada a `20261015190000` en F2.3 (review m5): debe ir despues de la ultima migracion de dev (`20261015130000_order_delivery_lines_customer`).
   - Tests: `tests/unit/identity/schema/company-addons-migration.test.ts`.
   - **Hecho:**
     - el `UPDATE` lista exactamente `ADDONS`;
@@ -203,7 +203,7 @@
 - [x] **T22 — Esquema y migración reescrita** (R5, R6, R38; D13–D16). Depende de: —
   - `db/schema.prisma`: fuera `Company.addons`; `Addon`, `CompanyAddonOverride` y las relaciones
     inversas en `Company` y `User` (`design.md > 2.2`).
-  - `db/migrations/20261014190000_company_addons/migration.sql` y `down.sql` **reescritos en su
+  - `db/migrations/20261015190000_company_addons/migration.sql` y `down.sql` **reescritos en su
     carpeta**, sin migración nueva (`design.md > 2.3`). Antes, revertir la versión vieja en la base
     local y en la plantilla de tests (riesgo 5, `design.md > 14`).
   - `tests/unit/identity/schema/company-addons-migration.test.ts` reescrito (fila R6, R38 de
@@ -293,8 +293,8 @@
 Producción:
 
 - `db/schema.prisma`
-- `db/migrations/20261014190000_company_addons/migration.sql`
-- `db/migrations/20261014190000_company_addons/down.sql`
+- `db/migrations/20261015190000_company_addons/migration.sql`
+- `db/migrations/20261015190000_company_addons/down.sql`
 - `lib/modules/identity/index.ts`
 - `lib/modules/identity/domain/company-addons.ts`
 - `lib/modules/identity/domain/company-addon-input.ts`

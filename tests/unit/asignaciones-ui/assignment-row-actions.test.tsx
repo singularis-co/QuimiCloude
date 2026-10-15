@@ -86,7 +86,6 @@ const PACKING: PackingOrderRow = {
   presentationLines: [],
   unitId: null,
   unitLabel: null,
-  packages: '8',
   status: 'POR_EMPACAR',
   packedByName: null,
   packedById: null,

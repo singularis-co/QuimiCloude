@@ -12,7 +12,7 @@ import {
   ORDER_CANCEL_TRIGGER_TESTID,
   ORDER_EXECUTION_ACTIONS_TESTID,
   ORDER_EXECUTION_LINES_TESTID,
-  ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID,
+  ORDER_EXECUTION_MATERIALS_PANEL_TESTID,
   ORDER_EXECUTION_MATERIALS_TESTID,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   ORDER_EXECUTION_FINISH_CONFIRM_TEXTS,
@@ -86,7 +86,7 @@ const EXECUTION: StartedOrderExecution = {
     },
   ],
   tools: [],
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
   unitId: null,
   unitLabel: null,
   evidence: [],
@@ -428,8 +428,8 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
         execution={{
           ...EXECUTION,
           presentationLines: [
-            { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+            { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+            { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
           ],
         }}
       />,
@@ -597,25 +597,28 @@ describe('pantalla de ejecucion — materiales y herramientas en su propio conte
     expect(sideReserve).toBe(readerReserve);
   });
 
-  it('QC-265 R24: con herramientas, un divisor separa las herramientas de los materiales', () => {
+  it('con herramientas, herramientas y materiales van en Cards distintas, herramientas primero', () => {
     render(
       <OrderExecutionScreen
         execution={{ ...EXECUTION, tools: [{ productName: 'Espátula', quantity: 1 }] }}
       />,
     );
 
-    const divisor = screen.getByTestId(ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID);
-    const lineas = screen.getByTestId(ORDER_EXECUTION_LINES_TESTID);
+    const materiales = screen.getByTestId(ORDER_EXECUTION_MATERIALS_PANEL_TESTID);
     const herramientas = screen.getByTestId(ORDER_EXECUTION_TOOLS_TESTID);
-    expect(herramientas.compareDocumentPosition(divisor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(divisor.compareDocumentPosition(lineas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(materiales).toContainElement(screen.getByTestId(ORDER_EXECUTION_LINES_TESTID));
+    expect(materiales).not.toContainElement(herramientas);
+    expect(herramientas.compareDocumentPosition(materiales) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByTestId('order-execution-materials-divider')).toBeNull();
   });
 
-  it('sin herramientas no pinta el divisor', () => {
+  it('sin herramientas solo queda la Card de materiales', () => {
     render(<OrderExecutionScreen execution={{ ...EXECUTION, tools: [] }} />);
 
     expect(screen.queryByTestId(ORDER_EXECUTION_TOOLS_TESTID)).toBeNull();
-    expect(screen.queryByTestId(ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID)).toBeNull();
+    expect(screen.getByTestId(ORDER_EXECUTION_MATERIALS_PANEL_TESTID)).toContainElement(
+      screen.getByTestId(ORDER_EXECUTION_LINES_TESTID),
+    );
   });
 });
 
@@ -724,8 +727,8 @@ describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
         execution={{
           ...EXECUTION,
           presentationLines: [
-            { presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: 'Caja cartón 12 u', packages: 5 },
-            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+            { lineId: 'linea-4', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: 'Caja cartón 12 u', packages: 5 },
+            { lineId: 'linea-5', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
           ],
         }}
       />,

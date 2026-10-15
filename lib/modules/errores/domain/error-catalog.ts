@@ -104,6 +104,8 @@ export const ERROR_MESSAGE_KEY = {
   company_duplicate_tax_id: 'errors.company_duplicate_tax_id',
   company_name_mismatch: 'errors.company_name_mismatch',
   company_not_deleted: 'errors.company_not_deleted',
+  packed_exceeds_quantity: 'errors.packed_exceeds_quantity',
+  packaging_stock_insufficient: 'errors.packaging_stock_insufficient',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -179,8 +181,8 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_assignment_not_found': 'Esa persona no es responsable de este pedido.',
   // No dice cual estado inactivo es: el catalogo no interpola y todos llevan a la misma accion.
   'errors.user_not_assignable': 'No se puede asignar a una persona cuya cuenta no esta activa.',
-  // «En esta empresa» porque el lote es unico por empresa, no en toda la base.
-  'errors.batch_duplicate_lot': 'Ya existe un lote con ese valor en esta empresa.',
+  // El lote es unico por producto y presentacion: el mismo valor puede existir en otro producto.
+  'errors.batch_duplicate_lot': 'Ya existe un lote con ese valor para ese producto y presentacion.',
   // No distingue «no existe» de «es de otra empresa»: la respuesta es la misma para las dos.
   'errors.batch_not_found': 'El lote solicitado no existe.',
   'errors.batch_stock_negative': 'El ajuste dejaria la existencia del lote por debajo de cero.',
@@ -262,4 +264,6 @@ export const ERROR_MESSAGES_ES = {
     'Ya existe una empresa activa con esa identificación fiscal.',
   'errors.company_name_mismatch': 'El nombre escrito no coincide con el de la empresa.',
   'errors.company_not_deleted': 'La empresa ya está activa.',
+  'errors.packed_exceeds_quantity': 'Lo envasado supera la cantidad del pedido.',
+  'errors.packaging_stock_insufficient': 'No alcanza el stock del envase.',
 } as const satisfies Record<ErrorMessageKey, string>;

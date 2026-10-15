@@ -172,6 +172,7 @@ const LECTURAS_PERMITIDAS = new Set([
   'listFinishedProductMovementsAction',
   'listFinishedProductDeliveriesAction',
   'listFinishedProductCostsAction',
+  'listFinishedProductDistributionAction',
 ]);
 
 describe('contrato de la ficha de producto terminado', () => {
@@ -273,6 +274,27 @@ describe('contrato de la ficha de producto terminado', () => {
     const origenDeLaEtiqueta = origenEnElBarrel(barrel, 'movementReasonLabel');
     expect(origenDeLaEtiqueta).not.toBeNull();
     expect(esModuloDeCliente(leer(origenDeLaEtiqueta as string))).toBe(false);
+  });
+
+  /**
+   * El barrel de /inventario reexporta secciones de servidor (`next/headers` via la composicion):
+   * un modulo de cliente que importe un VALOR de el arrastra ese codigo al bundle y rompe el build.
+   * Las etiquetas le llegan por props desde el servidor.
+   */
+  it('R16 — ningun modulo de cliente de la ruta importa valores del barrel de /inventario', () => {
+    const clientes = FUENTES_DE_LA_RUTA.filter((ruta) => esModuloDeCliente(leer(ruta)));
+    const hallazgos = clientes.flatMap((ruta) =>
+      valoresImportadosDe(leer(ruta), ESPECIFICADOR_INVENTARIO).map((nombre) => `${ruta} -> ${nombre}`),
+    );
+
+    expect(clientes.length).toBeGreaterThan(0);
+    expect(hallazgos).toEqual([]);
+  });
+
+  it('R16 — la guardia de cliente contra el barrel muerde con una fuente fabricada', () => {
+    const fabricada = `'use client';\n\nimport { movementReasonLabel } from '${ESPECIFICADOR_INVENTARIO}';\n`;
+    expect(esModuloDeCliente(fabricada)).toBe(true);
+    expect(valoresImportadosDe(fabricada, ESPECIFICADOR_INVENTARIO)).toEqual(['movementReasonLabel']);
   });
 
   it('R16 — la guardia de modulo de cliente muerde con fuentes fabricadas', () => {

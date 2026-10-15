@@ -9,8 +9,8 @@ import { assignmentActionsColumn } from './assignment-row-actions';
 import { COMPANY_ORDER_STATUS_LABELS } from './company-orders-columns';
 
 /**
- * Las seis columnas de «Por empacar»: número, receta, presentación, envases enteros, estado y quién
- * empaca -vacío en `POR_EMPACAR`-; y el menú, que abre la pantalla del pedido. Sin `'use client'`:
+ * Las cinco columnas de «Por empacar»: número, receta, presentación, estado y quién empaca -vacío
+ * en `POR_EMPACAR`-; y el menú, que abre la pantalla del pedido. Sin `'use client'`:
  * `packing-orders-skeleton.tsx`, de servidor, lee de aquí el número de columnas.
  */
 
@@ -19,12 +19,11 @@ const MISSING_TEST_ID_PREFIX = 'packing-order';
 export const PACKING_ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 export const PACKING_ORDER_RECIPE_NAME_COLUMN_ID = 'recipeName';
 export const PACKING_ORDER_PRESENTATION_COLUMN_ID = 'presentationName';
-export const PACKING_ORDER_PACKAGES_COLUMN_ID = 'packages';
 export const PACKING_ORDER_STATUS_COLUMN_ID = 'status';
 export const PACKING_ORDER_PACKER_COLUMN_ID = 'packedByName';
 
 /** Las columnas de datos de `buildPackingOrdersColumns()`, sin el menú; un test ata las dos. */
-export const PACKING_ORDERS_COLUMN_COUNT = 6;
+export const PACKING_ORDERS_COLUMN_COUNT = 5;
 
 export const PACKING_ORDERS_CARD: DataTableCardLayout = {
   primary: PACKING_ORDER_NUMBER_COLUMN_ID,
@@ -32,7 +31,6 @@ export const PACKING_ORDERS_CARD: DataTableCardLayout = {
   title: PACKING_ORDER_RECIPE_NAME_COLUMN_ID,
   meta: [
     PACKING_ORDER_PRESENTATION_COLUMN_ID,
-    PACKING_ORDER_PACKAGES_COLUMN_ID,
     PACKING_ORDER_PACKER_COLUMN_ID,
   ],
 };
@@ -53,16 +51,6 @@ export function buildPackingOrdersColumns({
     },
     recipeColumn(PACKING_ORDER_RECIPE_NAME_COLUMN_ID, MISSING_TEST_ID_PREFIX),
     presentationColumn(PACKING_ORDER_PRESENTATION_COLUMN_ID),
-    {
-      id: PACKING_ORDER_PACKAGES_COLUMN_ID,
-      label: 'Envases',
-      tabular: true,
-      align: 'end',
-      cell: (order) =>
-        order.packages ?? (
-          <MissingValue testIdPrefix={MISSING_TEST_ID_PREFIX} field={PACKING_ORDER_PACKAGES_COLUMN_ID} />
-        ),
-    },
     {
       id: PACKING_ORDER_STATUS_COLUMN_ID,
       label: 'Estado',

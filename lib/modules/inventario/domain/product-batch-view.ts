@@ -1,3 +1,5 @@
+import { compareQuantities } from './decimal-quantity';
+
 export type ProductBatchView = {
   readonly id: string;
   readonly lot: string;
@@ -19,3 +21,11 @@ export type ProductBatchView = {
    *  tener lotes de varias presentaciones. */
   readonly presentationName?: string | null;
 };
+
+/**
+ * Los lotes vivos: los que conservan existencia (`stock > 0`). Puro, sin reloj ni base de datos;
+ * la lista de lotes la filtra el servidor para que la UI no repita el criterio.
+ */
+export function aliveBatches(batches: readonly ProductBatchView[]): readonly ProductBatchView[] {
+  return batches.filter((batch) => compareQuantities(batch.stock, '0') > 0);
+}

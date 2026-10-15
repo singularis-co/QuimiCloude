@@ -327,6 +327,10 @@ export const E2E_ESPERADOS = [
   // que la receta no ofrece un envase como ingrediente. No lee ni afirma nada sobre el
   // identificador de peticion.
   'envases-del-pedido.spec.ts',
+  // Alta por el mismo motivo que las demas. Termina el empaque con envases reales distintos del
+  // plan y mira envases, lotes, coste y la tab «Reparto». No lee ni afirma nada sobre el
+  // identificador de peticion.
+  'envases-reales-empaque.spec.ts',
   // Alta por el mismo motivo que las demas. Recorre el alta de un insumo eligiendo su unidad y lo
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.
@@ -435,6 +439,22 @@ export const E2E_ESPERADOS = [
   // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
   // identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'modulos-por-empresa.spec.ts',
+  // Lo que ejercita: el Administrador de acondicionamiento comienza un pedido sembrado «Por
+  // acondicionar» con un equipo -una persona suelta y otra por grupo-, guarda los datos de lote, los
+  // corrige y lo termina; el Administrador ve en el dashboard el total de la fila y el filtro por un
+  // miembro que no firma, y en el recorrido las tres anotaciones nuevas, la foto del primer guardado
+  // y las tres duraciones. No lee ni afirma nada sobre el identificador de peticion ni sobre
+  // `reference`.
+  'recorrido-acondicionamiento.spec.ts',
+  // Alta el 2026-10-15 (QC-282 R47) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: una entrega de un pedido `TERMINADO` a dos
+  // clientes que comparten un lote, con un asiento por lote y la existencia comprobados en Postgres;
+  // el cliente repetido que no envia nada; el dialogo de anular que abre sin nada marcado y la
+  // anulacion de una sola presentacion de un cliente; la lista con un subbloque por cliente y el tab
+  // Entregas con una fila por cliente y «Presentación». No lee ni afirma nada sobre el identificador
+  // de peticion ni sobre `reference`.
+  'entrega-a-varios-clientes.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -652,8 +672,20 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-10-14: migracion de datos que quita `asignaciones.consultar` al Administrador; no toca el
   // identificador.
   '20261014180000_admin_without_assigned_orders_view',
-  // QC-277 2026-10-14: las tablas de añadidos; no toca el identificador.
-  '20261014190000_company_addons',
+  // QC-284 2026-10-14: la unicidad del lote pasa a producto + presentacion + codigo; no toca el
+  // identificador.
+  '20261014200000_product_batches_lot_per_presentation',
+  // Las acciones del acondicionamiento en el registro de ejecucion y la columna `batch_lines`; no
+  // tocan el identificador.
+  '20261015120000_order_execution_conditioning_actions',
+  '20261015120100_order_execution_batch_lines',
+  // QC-281 2026-10-15: el conteo real de envases en `order_presentation_lines`; no toca el
+  // identificador.
+  '20261015120200_order_presentation_lines_packed_count',
+  // QC-282 2026-10-15: el cliente pasa de la entrega a sus lineas; no toca el identificador.
+  '20261015130000_order_delivery_lines_customer',
+  // QC-277 2026-10-15: las tablas de añadidos; no toca el identificador.
+  '20261015190000_company_addons',
 ] as const
 
 export function hallazgosDeMigraciones(

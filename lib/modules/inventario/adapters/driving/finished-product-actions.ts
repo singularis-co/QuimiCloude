@@ -5,6 +5,7 @@ import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/error
 import {
   InventarioError,
   type Actor,
+  type FinishedDistributionLine,
   type FinishedProductBatchRow,
   type FinishedProductCostRow,
   type FinishedProductDeliveriesPage,
@@ -109,6 +110,20 @@ export async function listFinishedProductCostsAction(
 
   try {
     const data = await inventario.listFinishedProductCosts(id, input, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export async function listFinishedProductDistributionAction(
+  id: string,
+  input: unknown,
+): Promise<PageResult<FinishedDistributionLine>> {
+  const actor = await currentActor();
+
+  try {
+    const data = await inventario.listFinishedProductDistribution(id, input, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

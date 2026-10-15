@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { IMPORT_ROW_ISSUE_CODES } from '@/lib/modules/inventario';
 import { planInventoryImport } from '@/lib/modules/inventario/domain/plan-inventory-import';
 
 import {
@@ -42,7 +43,7 @@ describe('planInventoryImport — un estado por fila', () => {
         { ...ROW_INSUMO, lot: 'L-1' },
         { ...ROW_INSUMO, stock: 'abc' },
       ),
-      snapshot({ products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal' }] }),
+      snapshot({ products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal', presentationId: null }] }),
     );
 
     expect(result.rows.map((r) => [r.rowNumber, r.status])).toEqual([
@@ -101,9 +102,20 @@ describe('planInventoryImport — reglas de campo del alta manual', () => {
     expect(previewRow?.status === 'error' && previewRow.issues[0]?.message).toMatch(/^Existencia: /u);
   });
 
-  it('R10 sin ningun costo pide uno, una sola vez', () => {
-    const result = plan(sheet({ ...ROW_INSUMO, unitCost: '' }));
-    expect(codes(result.rows[0])).toEqual([['cost_required', 'unitCost']]);
+  it('R10 insumo, envase y terminado sin costo: un unico motivo value_required en «Costo unitario»', () => {
+    const result = plan(
+      sheet({ ...ROW_INSUMO, unitCost: '' }, { ...ROW_ENVASE, unitCost: '' }, { ...ROW_TERMINADO, unitCost: '  ' }),
+    );
+    for (const previewRow of result.rows) {
+      expect(codes(previewRow)).toEqual([['value_required', 'unitCost']]);
+    }
+    const first = result.rows[0];
+    expect(first?.status === 'error' && first.issues[0]?.message).toBe('Costo unitario: este campo es obligatorio para este tipo.');
+  });
+
+  it('R10 el instrumento sin costo es valido', () => {
+    const result = plan(sheet({ ...ROW_INSTRUMENTO, unitCost: '' }));
+    expect(result.rows[0]?.status).toBe('create');
   });
 
   it('R10 el instrumento no exige costo ni alerta, como en el alta manual', () => {
@@ -341,7 +353,7 @@ describe('planInventoryImport — producto terminado', () => {
     );
     expect(codes(result.rows[0])).toEqual([['stock_not_whole', 'stock']]);
     expect(codes(result.rows[1])).toEqual([['stock_not_whole', 'stock']]);
-    expect(codes(result.rows[2])).toEqual([['cost_required', 'unitCost']]);
+    expect(codes(result.rows[2])).toEqual([['value_required', 'unitCost']]);
   });
 
   it('R17 un insumo con el nombre derivado de un terminado que crea el archivo queda en error', () => {
@@ -361,7 +373,7 @@ describe('planInventoryImport — lotes', () => {
         { ...ROW_INSUMO, name: 'Nuevo', lot: 'L-2' },
         { ...ROW_INSUMO, name: 'nuevo', lot: ' L-2 ' },
       ),
-      snapshot({ products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal' }] }),
+      snapshot({ products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal', presentationId: null }] }),
     );
     expect(result.rows[0]).toMatchObject({ status: 'duplicate', lot: 'L-1', target: { kind: 'existing', productId: 'p-sal' } });
     expect(result.rows[1]?.status).toBe('create');
@@ -370,18 +382,95 @@ describe('planInventoryImport — lotes', () => {
     expect(result.writes.has(4)).toBe(false);
   });
 
-  it('R19 el lote es de otro producto, en la base o en una fila anterior: error', () => {
+  it('QC-284 R10: el codigo es de otro producto, en la base o en una fila anterior: la fila se planifica como si no existiera', () => {
+    const existing = productRef({ id: 'p-sal', nameNormalized: 'salfina', unitId: KG.id });
     const result = plan(
       sheet(
         { ...ROW_INSUMO, lot: 'L-1' },
+        { ...ROW_INSUMO, name: 'Otro', lot: 'L-1' },
         { ...ROW_INSUMO, name: 'Otro', lot: 'L-2' },
         { ...ROW_INSUMO, name: 'Tercero', lot: 'L-2' },
+        { ...ROW_INSUMO, name: 'Otro', lot: 'L-2' },
       ),
-      snapshot({ batches: [{ lot: 'L-1', productId: 'p-ajeno' }] }),
+      snapshot({ products: [existing], batches: [{ lot: 'L-1', productId: 'p-ajeno', presentationId: null }] }),
     );
-    expect(codes(result.rows[0])).toEqual([['lot_used_by_other_product', 'lot']]);
-    expect(result.rows[1]?.status).toBe('create');
-    expect(codes(result.rows[2])).toEqual([['lot_used_by_other_product', 'lot']]);
+    expect(result.rows.map((r) => r.status)).toEqual(['add_batch', 'create', 'add_batch', 'create', 'duplicate']);
+    expect(result.rows[0]).toMatchObject({ target: { kind: 'existing', productId: 'p-sal' } });
+    expect(result.rows[4]).toMatchObject({ lot: 'L-2', target: { kind: 'file_row', rowNumber: 3 } });
+    expect([...result.writes.keys()]).toEqual([2, 3, 4, 5]);
+  });
+
+  it('QC-284 R9: un terminado con la misma clave (producto, presentacion, codigo) en la base es duplicado', () => {
+    const terminado = productRef({
+      id: 'p-term',
+      nameNormalized: 'desengrasantebotella1l',
+      type: 'FINISHED_PRODUCT',
+      recipeId: FORMULA.id,
+      presentationId: BOTELLA.id,
+    });
+    const result = plan(
+      sheet({ ...ROW_TERMINADO, lot: 'CR-2610' }),
+      snapshot({
+        finishedProducts: [terminado],
+        batches: [{ lot: 'CR-2610', productId: 'p-term', presentationId: BOTELLA.id }],
+      }),
+    );
+    expect(result.rows[0]).toMatchObject({ status: 'duplicate', lot: 'CR-2610', target: { kind: 'existing', productId: 'p-term' } });
+    expect(result.writes.size).toBe(0);
+  });
+
+  it('QC-284 R10: el mismo codigo en otra presentacion u otro producto terminado no es duplicado', () => {
+    const terminado = productRef({
+      id: 'p-term',
+      nameNormalized: 'desengrasantebotella1l',
+      type: 'FINISHED_PRODUCT',
+      recipeId: FORMULA.id,
+      presentationId: BOTELLA.id,
+    });
+    const result = plan(
+      sheet({ ...ROW_TERMINADO, lot: 'CR-2610' }, { ...ROW_TERMINADO, presentation: 'Bidón 20 L', lot: 'CR-2610' }),
+      snapshot({
+        finishedProducts: [terminado],
+        batches: [
+          // Mismo producto, lote sin presentacion: otra clave.
+          { lot: 'CR-2610', productId: 'p-term', presentationId: null },
+          { lot: 'CR-2610', productId: 'p-otro', presentationId: BOTELLA.id },
+        ],
+      }),
+    );
+    expect(result.rows.map((r) => r.status)).toEqual(['add_batch', 'create']);
+    expect([...result.writes.keys()]).toEqual([2, 3]);
+  });
+
+  it('QC-284 R9: un terminado repetido en el archivo con la misma presentacion es duplicado; con otra, no', () => {
+    const result = plan(
+      sheet(
+        { ...ROW_TERMINADO, lot: 'CR-2610' },
+        { ...ROW_TERMINADO, presentation: 'Bidón 20 L', lot: 'CR-2610' },
+        { ...ROW_TERMINADO, lot: 'CR-2610' },
+      ),
+    );
+    expect(result.rows.map((r) => r.status)).toEqual(['create', 'create', 'duplicate']);
+    expect(result.rows[2]).toMatchObject({ target: { kind: 'file_row', rowNumber: 2 } });
+  });
+
+  it('QC-284 R9, R10: un envase o un insumo se compara con la clave sin presentacion', () => {
+    const envase = productRef({ id: 'p-bidon', nameNormalized: 'bidon', type: 'PACKAGING', presentationId: BIDON.id });
+    const result = plan(
+      sheet({ ...ROW_ENVASE, lot: 'E-1' }, { ...ROW_ENVASE, lot: 'E-2' }),
+      snapshot({
+        products: [envase],
+        batches: [
+          { lot: 'E-1', productId: 'p-bidon', presentationId: null },
+          { lot: 'E-2', productId: 'p-bidon', presentationId: BIDON.id },
+        ],
+      }),
+    );
+    expect(result.rows.map((r) => r.status)).toEqual(['duplicate', 'add_batch']);
+  });
+
+  it('QC-284 R10: lot_used_by_other_product ya no existe en el catalogo de motivos', () => {
+    expect(IMPORT_ROW_ISSUE_CODES).not.toContain('lot_used_by_other_product');
   });
 });
 

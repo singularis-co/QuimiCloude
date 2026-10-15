@@ -1,135 +1,137 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
+import type { UserAccountStatus } from '../../../domain/account-status';
 import type { SessionUserRecord } from '../../../ports/session-user-reader';
 
+/** Fila cruda que devuelve Postgres: nombres de columna, no de modelo. */
+type FilaSesion = {
+  id: string;
+  username: string;
+  first_names: string;
+  last_names: string;
+  role_name: string;
+  company_id: string | null;
+  company_deleted_at: Date | null;
+  permissions: string[];
+  company_addons: string[];
+  account_status: string;
+  locked_until: Date | null;
+  sessions_valid_from: Date;
+  session_revoked_at: Date | null;
+};
+
 /**
- * Implementa `SessionUserReader.findActiveById` (`design.md > 4.2`). Busca por clave primaria,
- * asi que va con la API tipada de Prisma y no con `$queryRaw`: aqui no hay ningun indice
- * funcional que esquivar, a diferencia de `findActiveByUsername` en
- * `user-credentials-prisma.ts`, que si lo tiene.
+ * Implementa `SessionUserReader.findActiveById` (`design.md > 4.2`). Es la lectura de la ruta mas
+ * caliente de la aplicacion: corre en cada peticion autenticada.
  *
- * `deletedAt: null` va en el `where`, no en un `if` posterior (R11): un usuario dado de baja
- * no debe salir de la base para la sesion.
+ * **UNA SOLA SENTENCIA SQL por llamada.** Hasta aqui era un `prisma.user.findFirst` con
+ * relaciones anidadas (`role.permissions`, `company`, `revokedSessions`): UNA llamada a Prisma,
+ * pero medido con el log de consultas de Prisma eran **cinco sentencias en serie** (`users`,
+ * `roles`, `role_permissions`, `companies`, `revoked_sessions`), porque sin `relationJoins` el
+ * motor resuelve cada relacion con su propio `SELECT`. Los comentarios de QC-48, QC-74 y QC-23
+ * que decian «ni una consulta adicional» contaban llamadas a Prisma, no idas a la base.
  *
- * El `select` es explicito y minimo (R14): ni correo, ni telefono, ni documento, ni
- * `password_hash`, ni los contadores de bloqueo. `role.name` viaja en la misma consulta, por la
- * FK ya indexada `users_role_id_idx`, y no como una segunda consulta aparte: es lo que hace
- * barata la decision «el rol es siempre el actual» (R12).
+ * Ahora es un `$queryRaw` parametrizado (template tag, jamas `$queryRawUnsafe` ni interpolacion
+ * de cadenas) con `JOIN`s y subselects, que Postgres resuelve en una sola ida. NO se activa
+ * `previewFeatures = ["relationJoins"]`: cambiaria la carga de TODAS las consultas del repo, y
+ * medido empeora inventario y recetas. Solo esta funcion cambia de mecanismo.
  *
- * `id` es `@db.Uuid`: un `sub` sin forma de UUID haria que Prisma lanzara en vez de devolver
- * `null`. Por eso el esquema del dominio exige forma de UUID y corta antes de llegar aqui (R6).
+ * Contrato identico al de antes, campo a campo:
+ * - `JOIN roles`: `users.role_id` es NOT NULL con FK `onDelete: Restrict`; todo usuario vivo
+ *   tiene rol (R12: el rol es siempre el ACTUAL, leido en cada peticion).
+ * - `LEFT JOIN companies`: el Maestro no tiene empresa y se encuentra igual, con `company_id` y
+ *   `company_deleted_at` en `null` (QC-161 R31). La fila SI sale con la empresa dada de baja: el
+ *   corte de «empresa viva» es del dominio (`resolve-session.ts`, QC-48 R13), no del `WHERE`.
+ * - Permisos (QC-74 R7, R11): `ARRAY(SELECT ...)` sobre `role_permissions` por su clave primaria
+ *   compuesta `(role_id, permission_code)`. Un rol sin asignaciones da `{}`, o sea `[]`, sin
+ *   `GROUP BY` ni `COALESCE`. Sin ordenar y sin deduplicar: la comparacion de `assertPermission`
+ *   es por pertenencia exacta (R13) y la clave primaria ya impide repetidos.
+ * - Revocacion (QC-23 R11, R14): subselect escalar acotado al `sid` de la sesion en curso, por
+ *   `revoked_sessions_session_id_key`; 0 o 1 filas, `null` si no hay. Solo sale `revoked_at`: ni
+ *   el `sid`, ni el `id` de la fila (decision cerrada 12).
+ * - `u.deleted_at IS NULL` va en el `WHERE` (R11): un usuario dado de baja no sale de la base.
+ *   Un id inexistente da cero filas, o sea `null`, sin excepcion.
+ * - Sin filtro por `account_status`: el corte por estado es del dominio
+ *   (`effectiveAccountStatus`, QC-78 R7, R20), igual que el de la empresa.
  *
- * QC-48 (T6, R13, `design.md > 4.1`): el `select` gana `companyId` y `company.deletedAt`, en
- * ESTA MISMA llamada a `findFirst`. `companyId` es una columna de `users` y ya venia en la fila;
- * `company.deletedAt` vive en `companies` y Prisma lo resuelve por la relacion ya declarada y por
- * la clave primaria de `companies`, igual que ya hace con `role.name`. **Ni una segunda consulta
- * por peticion**, que era la condicion.
+ * El `SELECT` es explicito y minimo (R14 de QC-8): ni correo, ni telefono, ni documento, ni
+ * `password_hash`, ni los contadores de bloqueo. Lo que sale ademas de la identidad
+ * (`company_deleted_at`, `account_status`, `locked_until`, `sessions_valid_from`,
+ * `session_revoked_at`) **no es PII** y no se registra en ningun log; coste aceptado por escrito
+ * en QC-48, QC-78 y QC-23.
  *
- * El coste, aceptado por escrito en `design.md > 4.1` y anotado aqui para que nadie lo descubra
- * de sorpresa: (a) el plan de esta consulta gana un `JOIN` mas —una busqueda por CLAVE PRIMARIA,
- * en la ruta mas caliente de la aplicacion, que ya hacia otro `JOIN` por `users_role_id_idx`—;
- * (b) el `select` deja de ser tan estrecho: sale de la base una marca de tiempo mas, que **no es
- * PII** y no se registra en ningun log.
+ * `::uuid` en los dos parametros: Prisma los manda como texto. El esquema del dominio exige forma
+ * de UUID y corta antes de llegar aqui (R6); un valor sin esa forma haria lanzar a Postgres, igual
+ * que antes lanzaba Prisma. `account_status::text` porque por el raw el enum se lee como cadena y
+ * asi el tipo de la columna no depende del deserializador.
  *
- * QC-74 (T8, R7, R11, `design.md > 4`): el `select` gana `role.permissions`, otra vez en ESTA
- * MISMA llamada a `findFirst`. Prisma lo resuelve por la relacion `Role.permissions`, o sea por
- * la clave primaria compuesta `(role_id, permission_code)` de `role_permissions`, que hoy
- * devuelve como maximo diez filas. **Ni una consulta adicional por peticion** (R11), que era la
- * condicion; el test `trae los permisos del rol sin una segunda consulta` la vigila con un
- * contador de invocaciones.
+ * RLS: misma conexion y mismo cliente global que antes; las cinco tablas se leian ya con el y
+ * `findActiveByUsername` (`user-credentials-prisma.ts`) lee `users`, `roles` y `companies` por
+ * `$queryRaw` igual.
  *
- * El mapeo es un `map` a los codigos y nada mas: sin normalizar, sin ordenar y sin deduplicar.
- * La comparacion de `assertPermission` es por pertenencia exacta (R13), asi que cualquier
- * cocina aqui solo podria cambiar el resultado, nunca mejorarlo.
+ * Añadidos (QC-277): `ARRAY(SELECT ...)` sobre `company_addon_overrides` con `enabled`, por el
+ * prefijo de su clave primaria; en la MISMA sentencia. Sin empresa (Maestro) da `{}`, o sea `[]`.
+ * Claves cortas, sin PII y fuera de todo log.
  *
- * QC-78 (T10, R20, R21, `design.md > 4`): el `select` gana `accountStatus` y `lockedUntil`, otra
- * vez en ESTA MISMA llamada a `findFirst`. Las dos son columnas de `users`, o sea que ya venian
- * en la fila leida: **ni un `JOIN` mas, ni una consulta mas por peticion** (R21), que era la
- * condicion. No se anade nada al `where`: el corte por estado es del dominio
- * —`effectiveAccountStatus` en `resolve-session.ts`—, igual que el de la empresa.
- *
- * El coste, declarado: el `select` deja de ser tan estrecho como lo dejo QC-8 R14 —salen un enum
- * mas y una marca de tiempo mas—. **Ninguno de los dos es PII** y ninguno se registra en ningun
- * log, mismo argumento que ya se acepto para `companyDeletedAt`. Y sin `lockedUntil` habria que
- * duplicar aqui la traduccion del plazo, que es justo lo que R7 prohibe.
- *
- * QC-23 (T9, R11, R14, `design.md > 4`): el `select` gana `sessionsValidFrom` y la relacion
- * `revokedSessions` acotada al `sid` de la sesion en curso, otra vez en ESTA MISMA llamada a
- * `findFirst`. **Ni una invocacion nueva del puerto por peticion**, que era la condicion de R14,
- * y lo vigila el test con contador de invocaciones igual que ya vigila `role.permissions`.
- *
- * El coste, medido y declarado: `sessions_valid_from` es una columna de `users` y **no cuesta
- * nada** —ya venia en la fila—; `revokedSessions` si anade **una sentencia**, un
- * `SELECT revoked_at FROM revoked_sessions WHERE user_id = ? AND session_id = ? LIMIT 1` por
- * `revoked_sessions_session_id_key`, que devuelve 0 o 1 filas sobre una tabla que la purga de
- * R39 mantiene pequena —solo sesiones cerradas y aun no caducadas, cota natural de 8 h—. Es
- * exactamente la lectura que QC-28 viene a quitar de la ruta caliente.
- *
- * `take: 1` y `select: { revokedAt: true }`: no sale el `sid`, no sale el `id` de la fila y no
- * sale ningun dato de PII. El `select` de la sesion sigue sin ganar ni un campo sensible.
- *
- * Los añadidos de la empresa salen de la relacion `company.addonOverrides` con `enabled = true`,
- * en este mismo `findFirst`: el lector se sigue invocando una vez por peticion. El coste,
- * declarado: sin `relationJoins`, Prisma la resuelve con **una sentencia SQL mas**, un
- * `SELECT addon_key FROM company_addon_overrides WHERE company_id = ? AND enabled` por el prefijo
- * de la clave primaria, que devuelve como mucho una fila por añadido del catalogo. Sale un array
- * de claves cortas, sin PII y fuera de todo log.
- *
- * **Cero escrituras** (R40): aqui no se purga nada. La purga vive en las dos operaciones de
- * `session-revocation-prisma.ts`, nunca en el camino de lectura.
+ * **Cero escrituras** (R40 de QC-23): aqui no se purga nada. La purga vive en las dos operaciones
+ * de `session-revocation-prisma.ts`, nunca en el camino de lectura.
  */
 export async function findActiveSessionUserById(
   id: string,
   sessionId: string,
 ): Promise<SessionUserRecord | null> {
-  const usuario = await prisma.user.findFirst({
-    where: { id, deletedAt: null },
-    select: {
-      id: true,
-      username: true,
-      firstNames: true,
-      lastNames: true,
-      role: { select: { name: true, permissions: { select: { permissionCode: true } } } },
-      companyId: true,
-      company: {
-        select: {
-          deletedAt: true,
-          addonOverrides: { where: { enabled: true }, select: { addonKey: true } },
-        },
-      },
-      // QC-78 R20, R21: columnas de `users`, en el MISMO `findFirst`.
-      accountStatus: true,
-      lockedUntil: true,
-      // QC-23 R7, R8: columna de `users`, en el MISMO `findFirst`. Coste cero.
-      sessionsValidFrom: true,
-      // QC-23 R11, R14: la fila del registro para ESE `sid`, y solo su instante. Por el indice
-      // unico `revoked_sessions_session_id_key`: 0 o 1 filas, nunca una lista de dispositivos
-      // (decision cerrada 12).
-      revokedSessions: { where: { sessionId }, select: { revokedAt: true }, take: 1 },
-    },
-  });
+  const filas = await prisma.$queryRaw<FilaSesion[]>`
+    SELECT u.id, u.username, u.first_names, u.last_names,
+           r.name AS role_name,
+           u.company_id, c.deleted_at AS company_deleted_at,
+           ARRAY(
+             SELECT rp.permission_code FROM role_permissions rp WHERE rp.role_id = u.role_id
+           ) AS permissions,
+           ARRAY(
+             SELECT o.addon_key FROM company_addon_overrides o
+             WHERE o.company_id = u.company_id AND o.enabled
+           ) AS company_addons,
+           u.account_status::text AS account_status, u.locked_until, u.sessions_valid_from,
+           (
+             SELECT rs.revoked_at FROM revoked_sessions rs
+             WHERE rs.user_id = u.id AND rs.session_id = ${sessionId}::uuid
+             LIMIT 1
+           ) AS session_revoked_at
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    LEFT JOIN companies c ON c.id = u.company_id
+    WHERE u.id = ${id}::uuid AND u.deleted_at IS NULL
+    LIMIT 1
+  `;
 
-  if (usuario === null) return null;
+  const fila = filas[0];
+  if (fila === undefined) return null;
 
+  // El raw no pasa por el mapeo de Prisma: las conversiones son explicitas y no implicitas.
   return {
-    id: usuario.id,
-    username: usuario.username,
-    firstNames: usuario.firstNames,
-    lastNames: usuario.lastNames,
-    roleName: usuario.role.name,
-    companyId: usuario.companyId,
+    id: fila.id,
+    username: fila.username,
+    firstNames: fila.first_names,
+    lastNames: fila.last_names,
+    roleName: fila.role_name,
+    companyId: fila.company_id,
     // La marca cruda; sin empresa no hay marca. Quien decide si «esta viva» es el dominio.
-    companyDeletedAt: usuario.company?.deletedAt ?? null,
-    companyAddons: usuario.company?.addonOverrides.map((override) => override.addonKey) ?? [],
+    companyDeletedAt: fecha(fila.company_deleted_at),
+    companyAddons: fila.company_addons,
     // QC-74 R7: los permisos salen de la ASIGNACION rol-permiso, nunca del nombre del rol.
-    permissions: usuario.role.permissions.map((asignacion) => asignacion.permissionCode),
+    permissions: fila.permissions,
     // QC-78 R7, R20: los dos crudos. Quien traduce «lo que la columna dice» a «lo que significa
-    // AHORA» es `effectiveAccountStatus`, no este adaptador.
-    accountStatus: usuario.accountStatus,
-    lockedUntil: usuario.lockedUntil,
+    // AHORA» es `effectiveAccountStatus`, no este adaptador. El texto se afirma contra la union
+    // de literales del dominio, unica definicion del conjunto (QC-65 R3).
+    accountStatus: fila.account_status as UserAccountStatus,
+    lockedUntil: fecha(fila.locked_until),
     // QC-23 R8: el sello crudo. Quien compara `iat <= sello` es `isStampedOut`, no este
     // adaptador: esa desigualdad tiene UN solo cuerpo en el repositorio.
-    sessionRevokedAt: usuario.revokedSessions[0]?.revokedAt ?? null,
-    sessionsValidFrom: usuario.sessionsValidFrom,
+    sessionRevokedAt: fecha(fila.session_revoked_at),
+    sessionsValidFrom: new Date(fila.sessions_valid_from),
   };
+}
+
+function fecha(valor: Date | null): Date | null {
+  return valor === null ? null : new Date(valor);
 }
