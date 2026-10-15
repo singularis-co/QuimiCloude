@@ -850,6 +850,18 @@ limpia y añadir la llamada donde falle por esta causa, y solo por esta. Los can
    `tests/unit/recetas-ui/recipe-route-contract.test.ts` (l. 567) y
    `tests/guards/guard-identificador-de-request.test.ts` (l. 643) pasan a «las tablas de
    añadidos». El nombre de la migración no cambia, así que sus listas no cambian.
+9. **Enmienda D13–D16, opción A (decisión del humano, 2026-10-15).** La relación inversa
+   `User.addonOverridesCreated` y el modelo `CompanyAddonOverride` (§ 2.2) entran en las listas cerradas
+   de Prisma.dmmf de otras fichas, igual que entró `CompanyEvent` con QC-162. No se afloja nada más y se
+   mantiene la igualdad exacta:
+   - `tests/unit/identity/credential-policy-contract.test.ts` (QC-19 R21): los campos de `User` ganan
+     `addonOverridesCreated`;
+   - `tests/unit/proveedores/module-contract.test.ts` R22 (dos casos) y
+     `tests/unit/identity/schema/account-status-schema.test.ts`: `relationTargets('User')` gana
+     `CompanyAddonOverride`;
+   - `tests/unit/identity/schema/identity-schema.test.ts` R12: `CompanyAddonOverride` se excluye de la
+     búsqueda de tablas intermedias, como `CompanyEvent`, porque es una excepción de añadido y no da a
+     nadie una segunda empresa.
 
 ---
 

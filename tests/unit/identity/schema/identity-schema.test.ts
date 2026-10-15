@@ -612,6 +612,10 @@ describe('db/schema.prisma — la columna de empresa del usuario (QC-47)', () =>
       // (su autor), pero es un historial y no una tabla intermedia: no da a nadie una segunda
       // empresa. La pertenencia sigue siendo la unica relacion escalar de arriba.
       .filter((name) => name !== 'CompanyEvent')
+      // QC-277 2026-10-15 (D13–D16): `CompanyAddonOverride` apunta a `Company` (la empresa de la
+      // excepcion) y a `User` (su autor), pero es una excepcion de añadido y no una tabla
+      // intermedia: no da a nadie una segunda empresa.
+      .filter((name) => name !== 'CompanyAddonOverride')
     for (const name of modelNames) {
       const otro = parseModel(name)
       const apunta = (tipo: string): boolean =>

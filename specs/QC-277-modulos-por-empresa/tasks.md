@@ -456,3 +456,11 @@ archivos E2E) ya está listado arriba:
 
 - `tests/guards/guard-catalogo-de-anadidos.test.ts`
 - `tests/guards/guard-empresa-en-esquema.test.ts`
+
+Bloque H, listas cerradas de Prisma.dmmf de otras fichas (opción A, decidida por el humano el
+2026-10-15; `design.md > 10.3`, punto 9):
+
+- `tests/unit/identity/credential-policy-contract.test.ts`
+- `tests/unit/proveedores/module-contract.test.ts`
+- `tests/unit/identity/schema/account-status-schema.test.ts`
+- `tests/unit/identity/schema/identity-schema.test.ts`

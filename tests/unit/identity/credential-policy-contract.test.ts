@@ -298,6 +298,9 @@ describe('QC-19 — esta feature no toca la persistencia (R21)', () => {
         // RETENSADO 2026-10-14 (QC-162). `companyEvents` es VIRTUAL: el lado inverso que Prisma
         // EXIGE para el autor de `CompanyEvent`. No es columna de `users` ni guarda credencial.
         'companyEvents',
+        // RETENSADO 2026-10-15 (QC-277, D13–D16). `addonOverridesCreated` es VIRTUAL: el lado
+        // inverso del autor de `CompanyAddonOverride`. No es columna de `users` ni guarda credencial.
+        'addonOverridesCreated',
       ].sort(),
     );
   });

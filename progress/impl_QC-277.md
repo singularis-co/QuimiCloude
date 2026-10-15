@@ -725,3 +725,52 @@ y corren en el gate; los títulos citan su R.
   - R8, R9: `session-user.int.test.ts` (prendidas, misma llamada al lector, apagadas no salen);
   - R20: `landing.test.ts`;
   - R37: `architecture-doc.test.ts` + `guard-empresa-en-esquema.test.ts` (D13, D15).
+
+### Re-T21 cerrado: opción A (decisión del humano, 2026-10-15)
+- Las 5 listas cerradas de Prisma.dmmf ganan solo `addonOverridesCreated` / `CompanyAddonOverride`, con su comentario
+  RETENSADO y la igualdad exacta intacta. Enmienda en `design.md > 10.3`, punto 9; los 4 archivos están en
+  `tasks.md > Archivos esperados`.
+- Los 4 archivos: `Test Files 4 passed (4)`, `Tests 55 passed (55)`.
+- `./init.sh` rápido: related `Test Files 888 passed (888)`, `Tests 14263 passed | 59 skipped`; test:rapido
+  `118 passed (118)`, `Tests 1649 passed | 37 skipped`; `== init OK ==`. No salió ningún inestable conocido.
+
+### Mapa R1–R38 → test (consolidado tras el Bloque H, implementer, 2026-10-15)
+Reemplaza al mapa de antes del Bloque H.
+
+| R | Test |
+|---|---|
+| R1, R3 | `tests/unit/identity/addons/company-addons.test.ts` |
+| R2 | `company-addons.test.ts` + `tests/guards/guard-catalogo-de-anadidos.test.ts` (código = tabla) + `tests/integration/identity/company-addons.int.test.ts` (tabla `addons` = `ADDONS`; clave desconocida → FK 23503) |
+| R4 | `company-addons.test.ts` + `tests/unit/documentos/run-document-job-addon.test.ts` + `company-addons.int.test.ts` + E2E caso 5 |
+| R5 | `company-addons.int.test.ts` (alta con `createWithAdministrator` → cero excepciones) |
+| R6, R38 | `tests/unit/identity/schema/company-addons-migration.test.ts` (reescrito: dos tablas, siembra, RLS, `down.sql`) |
+| R7 | `tests/unit/identity/seed/seed-initial-access.test.ts` + `tests/integration/identity/identity-seed.int.test.ts` (5 filas `enabled = true`, sin autor; `platform-only` sin filas) |
+| R8 | `tests/unit/identity/resolve-session.test.ts` + `tests/integration/identity/session-user.int.test.ts` (prendidas en la misma llamada al lector; el contador no sube) |
+| R9 | `session-user.int.test.ts` (las apagadas no salen) + `company-addons.int.test.ts` + E2E casos 4 y 5 |
+| R10, R11 | `resolve-session.test.ts` + `session-user.int.test.ts` |
+| R12 | `tests/unit/identity/addons/menu-recortado.test.ts` + E2E caso 1 |
+| R13 | `tests/unit/identity/require-page-addon.test.ts` + `tests/guards/guard-pantallas-de-anadido.test.ts` + E2E caso 2 |
+| R14, R16 | `tests/unit/inventario/importar/inventory-import-addon.test.ts` + `importar-page.test.tsx` + `tests/unit/inventario/product-page.test.tsx` |
+| R14, R15, R23 | `tests/unit/documentos/import-addon.test.ts` + `formula-import-page.test.tsx` + `catalog-import-page.test.tsx` + `formulas-upload.test.tsx` + `supplier-detail-upload.test.tsx` + `guard-pantallas-de-anadido.test.ts` |
+| R17 | `menu-recortado.test.ts` + `tests/unit/asignaciones-ui/assigned-orders-route-contract.test.ts` |
+| R18 | `tests/unit/identity/home-route.test.ts` + `app-sidebar.test.tsx` + `sidebar-carril.test.ts` + `sidebar-desktop.test.tsx` + E2E casos 1 y 4 |
+| R19, R21 | `home-route.test.ts` + `route-guard-middleware.test.ts` + E2E caso 3 |
+| R20 | `tests/unit/identity/login-action.test.ts` + `tests/unit/e2e-helpers/landing.test.ts` (lee `company.addonOverrides`) + E2E caso 1 |
+| R22 | `run-document-job-addon.test.ts` + `documentos-facade.test.ts` + `company-addons.int.test.ts` |
+| R24 | `company-addons.int.test.ts` (apagar los cinco no toca datos) |
+| R25 | `tests/integration/identity/company-directory-addons.int.test.ts` |
+| R26 | `tests/guards/guard-rutas-fuera-de-sesion.test.ts` |
+| R27 | `get-company-addons.test.ts` + `company-actions.test.ts` |
+| R28 | `set-company-addon.test.ts` + `company-actions.test.ts` + `company-addons.int.test.ts` (apagar → `enabled = false`, autor = actor) |
+| R29 | `set-all-company-addons.test.ts` + `company-actions.test.ts` + `company-addons.int.test.ts` (cinco filas y cinco eventos; un fallo deshace todo) |
+| R30, R31, R32 | los tres unitarios de `companies/` + `company-actions.test.ts` + `company-addons.int.test.ts` (R31: empresa de baja) |
+| R33, R34 | `company-addons.int.test.ts` (upsert por cambio, autor e instante, sin cambios no escribe) + `company-event.test.ts` + `list-company-events.test.ts` + `company-actions.test.ts` |
+| R35 | suma de R8, R12–R16 y R22 + `sin-decision-en-cliente.test.ts` |
+| R36 | `e2e/modulos-por-empresa.spec.ts` (10/10 en chromium y webkit, sobre excepciones) |
+| R37 | `tests/unit/identity/addons/architecture-doc.test.ts` + `tests/guards/guard-empresa-en-esquema.test.ts` (`addons` exenta; `company_addon_overrides` tabla de empresa) |
+
+P2–P5 siguen con el defecto aplicado (ver «Preguntas abiertas con el defecto aplicado»). Para P2, el R6 ahora es el
+INSERT de excepciones de la migración. Para P6 y P7 también se aplica el defecto: P6 es la relación en el mismo
+`findFirst` (R8); P7 es `created_by` NULL en lo sembrado (R6, R7).
+
+**Veredicto:** Bloque H y re-T20/T21 cerrados.
