@@ -521,3 +521,49 @@ y corren en el gate; los títulos citan su R.
 - 3.ª pasada: related 886/886 archivos (14230 pasados, 59 saltados); test:rapido 117/117 (1641 pasados, 37 saltados);
   `== init OK ==`. Los inestables conocidos (`adjust-batch-dialog`, `documentos/module-contract`) no salieron.
 - Veredicto: T19–T21 hechos sobre el modelo `companies.addons`. El Bloque H (T22–T31) pide repetir T20 y T21 tras T31.
+
+## Bloque H — T22 (backend_dev, 2026-10-15)
+
+### Archivos
+- `db/schema.prisma`: fuera `Company.addons`; nacen `Addon` (`addons`) y `CompanyAddonOverride`
+  (`company_addon_overrides`) como `design.md > 2.2`; inversas `Company.addonOverrides` y
+  `User.addonOverridesCreated`.
+- `db/migrations/20261014190000_company_addons/migration.sql` y `down.sql`: reescritos en su carpeta
+  (`design.md > 2.3`). El SQL es el del diseño, letra a letra; en los comentarios se quitaron las
+  citas «P2»/«P7» (regla de comentarios de producción).
+- `tests/unit/identity/schema/company-addons-migration.test.ts`: reescrito (fila R6, R38 de § 10.1).
+- Cliente Prisma regenerado (`pnpm exec prisma generate`).
+
+### Mapa R → test
+| R | Test |
+|---|---|
+| R6 | `company-addons-migration.test.ts`: catálogo con PK + CHECK y `INSERT` = `ADDONS`; excepciones con PK compuesta, índices y FK (empresa CASCADE, añadido y autor RESTRICT); siembra `true` por empresa × añadido sin `WHERE` ni autor; RLS ENABLE + FORCE al final; mutaciones |
+| R38 | ídem: `down.sql` = `DROP TABLE "company_addon_overrides"; DROP TABLE "addons"`, hija antes que padre; mutaciones (orden invertido, sentencia de más) |
+
+### Migración sobre base desechable `qc277_t22_scratch` (pg17 :5433, ya borrada)
+- `pnpm run db:migrate` sobre base vacía: `All migrations have been successfully applied.`
+  `addons|t|t`, `company_addon_overrides|t|t` (RLS/FORCE); catálogo = los cinco; FK
+  `company_id`→`c`, `addon_key`→`r`, `created_by`→`r`; `companies.addons` no existe.
+- `prisma migrate diff --from-url <scratch> --to-schema-datamodel db/schema.prisma --script`: 314
+  líneas de drift preexistente (FK compuestas escritas a mano en otras tablas y
+  `users_account_status_changed_by_fkey`, declarado en el esquema); **ninguna** línea con `addon`,
+  `companies` ni `company_addon_overrides`.
+- `pnpm run db:rollback`: `20261014190000_company_addons revertida.`; 0 tablas, 0 filas en
+  `_prisma_migrations` para la migración.
+- Con dos empresas (una de baja) insertadas, `db:migrate` reaplica: 10 excepciones, todas
+  `enabled`, todas sin autor, 2 empresas. Segundo rollback con datos: 0 tablas. `DROP DATABASE`.
+- La base compartida `QuimiCloude` no se tocó.
+
+### Verificación
+- `pnpm exec vitest run tests/unit/identity/schema/company-addons-migration.test.ts guard-rls-force`:
+  2 archivos, 12 pasados.
+- `pnpm exec eslint <test>`: sin problemas. `prisma validate`: válido.
+- `pnpm exec vitest run guard`: 77/78 archivos; 1 fallo esperado,
+  `guard-empresa-en-esquema` («el modelo 'Addon' (tabla 'addons') no declara la columna company_id
+  y su tabla no esta en EXENTAS»): lo cierra T24.
+- `pnpm run typecheck`: 34 errores, todos de la clase esperada (uso de `Company.addons`), en
+  `e2e/helpers/addons.ts`, `e2e/helpers/landing.ts`, `e2e/modulos-por-empresa.spec.ts`,
+  `company-addons-prisma.ts`, `initial-access-repository-prisma.ts`, `session-user-prisma.ts`,
+  `tests/integration/identity/{company-addons,company-directory-addons,identity-seed,session-user}.int.test.ts`
+  → T25–T28. No se arreglaron.
+- Veredicto: T22 hecho; quedan rojos esperados de tipos (T25–T28) y la guardia de empresa (T24).

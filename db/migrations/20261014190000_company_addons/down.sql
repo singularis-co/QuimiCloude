@@ -1,1 +1,2 @@
-ALTER TABLE "companies" DROP COLUMN "addons";
+DROP TABLE "company_addon_overrides";
+DROP TABLE "addons";
