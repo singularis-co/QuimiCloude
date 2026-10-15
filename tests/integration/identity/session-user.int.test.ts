@@ -483,26 +483,21 @@ describe('findActiveSessionUserById contra Postgres real', () => {
 
   it('QC-277 R8, R9: trae solo las excepciones prendidas de la empresa, en la misma llamada al lector', async () => {
     await fijarAnadidos(['lectura_pdf', 'dashboard'], ['proveedores']);
-    const espiaUsuario = vi.spyOn(prisma.user, 'findFirst');
-    const espiasAparte = [
-      vi.spyOn(prisma.company, 'findFirst'),
-      vi.spyOn(prisma.company, 'findUnique'),
-      vi.spyOn(prisma.company, 'findMany'),
-      vi.spyOn(prisma.companyAddonOverride, 'findFirst'),
-      vi.spyOn(prisma.companyAddonOverride, 'findUnique'),
-      vi.spyOn(prisma.companyAddonOverride, 'findMany'),
-    ];
 
     try {
-      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
+      // Una sola invocacion del lector real, medida por el cliente con log.
+      const { resultado, sentencias } = await medir(usuarioId, SID_SIN_CERRAR);
 
       // La excepcion apagada no sale; el orden no lo fija el adaptador.
       expect([...(resultado?.companyAddons ?? [])].sort()).toEqual(['dashboard', 'lectura_pdf']);
-      expect(espiaUsuario).toHaveBeenCalledTimes(1);
-      for (const espia of espiasAparte) expect(espia).not.toHaveBeenCalled();
+      // Los añadidos salen de la MISMA sentencia que el usuario: ni una consulta aparte a
+      // `companies` ni a `company_addon_overrides`.
+      expect(sentencias).toHaveLength(1);
+      expect(sentencias[0]).toMatch(/\bFROM users u\b/);
+      expect(sentencias[0]).toMatch(/\bcompany_addon_overrides\b/);
+      // Mismo dato por el cliente global: la medida no cambia lo que se lee.
+      expect(resultado).toEqual(await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR));
     } finally {
-      espiaUsuario.mockRestore();
-      for (const espia of espiasAparte) espia.mockRestore();
       await fijarAnadidos([...ADDONS]);
     }
   });
@@ -515,6 +510,86 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       expect(resultado?.companyAddons).toEqual([]);
     } finally {
       await fijarAnadidos([...ADDONS]);
+    }
+  });
+
+  // Dos empresas en la misma base: los añadidos de cada usuario salen SOLO de las excepciones de su
+  // empresa. La segunda empresa y su usuario son propios del caso y se borran en `finally`, en
+  // orden `users -> companies`; sus excepciones caen con la empresa por `ON DELETE CASCADE`.
+  it('QC-277 R8: con dos empresas, cada usuario trae solo los añadidos prendidos de la suya', async () => {
+    const marca = randomUUID();
+    const nombreEmpresaB = `qc277-session-b-${marca}`;
+    const { id: empresaBId } = await prisma.company.create({
+      data: { name: nombreEmpresaB, nameNormalized: normalizeCompanyName(nombreEmpresaB) },
+      select: { id: true },
+    });
+    let usuarioBId = '';
+
+    async function fijarAnadidosDeB(on: readonly string[], off: readonly string[] = []) {
+      await prisma.$transaction([
+        prisma.companyAddonOverride.deleteMany({ where: { companyId: empresaBId } }),
+        prisma.companyAddonOverride.createMany({
+          data: [
+            ...on.map((addonKey) => ({ companyId: empresaBId, addonKey, enabled: true })),
+            ...off.map((addonKey) => ({ companyId: empresaBId, addonKey, enabled: false })),
+          ],
+        }),
+      ]);
+    }
+
+    async function anadidosDe(id: string): Promise<string[]> {
+      const resultado = await findActiveSessionUserById(id, SID_SIN_CERRAR);
+      return [...(resultado?.companyAddons ?? [])].sort();
+    }
+
+    try {
+      ({ id: usuarioBId } = await prisma.user.create({
+        data: {
+          firstNames: 'Empresa',
+          lastNames: 'Segunda',
+          birthDate: new Date('1990-01-01T00:00:00.000Z'),
+          email: `qc277.session.${marca}@example.test`,
+          phone: '+57 300 000 0000',
+          documentTypeCode: DOCUMENT_TYPE_CC,
+          documentNumber: `67${marca.replaceAll('-', '').slice(0, 18)}`,
+          username: `qc277_session_${marca}`,
+          passwordHash: 'no-se-usa-en-este-test',
+          roleId: rolId,
+          companyId: empresaBId,
+          accountStatus: 'active',
+        },
+        select: { id: true },
+      }));
+
+      // A con uno solo prendido y el resto apagado; B con los cinco prendidos.
+      await fijarAnadidos(
+        ['lectura_pdf'],
+        ADDONS.filter((addon) => addon !== 'lectura_pdf'),
+      );
+      await fijarAnadidosDeB([...ADDONS]);
+
+      expect(await anadidosDe(usuarioId)).toEqual(['lectura_pdf']);
+      expect(await anadidosDe(usuarioBId)).toEqual([...ADDONS].sort());
+
+      // Al reves: B sin ningun añadido (todas sus excepciones apagadas) y A con dos prendidos.
+      await fijarAnadidos(['dashboard', 'proveedores']);
+      await fijarAnadidosDeB([], [...ADDONS]);
+
+      expect(await anadidosDe(usuarioId)).toEqual(['dashboard', 'proveedores']);
+      expect(await anadidosDe(usuarioBId)).toEqual([]);
+
+      // Cada ficha sigue apuntando a su propia empresa.
+      expect((await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR))?.companyId).toBe(empresaId);
+      expect((await findActiveSessionUserById(usuarioBId, SID_SIN_CERRAR))?.companyId).toBe(
+        empresaBId,
+      );
+    } finally {
+      try {
+        if (usuarioBId) await prisma.user.deleteMany({ where: { id: usuarioBId } });
+      } finally {
+        await prisma.company.deleteMany({ where: { id: empresaBId } });
+        await fijarAnadidos([...ADDONS]);
+      }
     }
   });
 });
