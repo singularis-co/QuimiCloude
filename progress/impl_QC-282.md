@@ -502,3 +502,15 @@ Sin código de producción. Sin dependencias nuevas.
 Casos sintéticos nuevos: 6 etiquetas que no disparan y 10 usos reales que sí (ruta, permiso, import profundo, tabla, constante de ruta, etiqueta del sidebar importada, 2 entradas de menú, 2 enlaces). Se conservan todos los casos anteriores.
 Salida: `vitest run tests/unit/clientes/scope.test.ts` → `Tests 34 passed (34)`; `vitest run guard` → `76 passed (76)`, `1066 passed | 20 skipped`; `pnpm run lint` → `0 errors, 7 warnings` (las mismas, ajenas).
 **Veredicto P7:** R38 en verde, sin perder sensibilidad al nombre del módulo como enlace o entrada de menú.
+
+## backend_dev — m1 (2026-10-15)
+Cambio: el `refine` de cliente repetido de `lib/modules/pedidos/domain/deliver-order.ts` y `checkDeliveryBlocks` de `lib/modules/pedidos/domain/order-delivery.ts` (la función pura que comparten el sheet y el servidor) comparan `customerId.toLowerCase()`, así que el mismo uuid en otra capitalización cuenta como cliente repetido.
+Tests: `QC-282 R21: el mismo cliente dos veces en distinta capitalizacion es invalid_input…` (deliver-order.test.ts); `QC-282 R17 R21: el mismo uuid de cliente en distinta capitalizacion es duplicate_customer` (order-delivery.test.ts).
+Salida: `vitest run tests/unit/pedidos/deliver-order.test.ts tests/unit/pedidos/order-delivery.test.ts` → `Test Files 2 passed (2)`, `Tests 121 passed (121)`; `pnpm run lint` → `0 errors, 7 warnings` (las mismas de antes, de otros archivos).
+**Veredicto m1:** cerrado; el servidor responde `invalid_input` y el sheet marca el cliente repetido aunque la capitalización sea distinta.
+
+## frontend_dev — m2 (2026-10-15)
+Cambio en `app/(private)/pedidos/components/order-delivery-sheet.tsx`: sin sumas propias. `overBatchIds` = `new Set(batchesOverAvailable(batches, allocations))`; el resumen «Entregas» y el contador del bloque usan `packagesInLine`. Fuera `sumPackages`, `packagesOfLine` y el truco del +1. Mismo comportamiento.
+Test: el caso `QC-282 R20` (`REGLAS_R20`, order-delivery.test.ts) exige además que el sheet importe `batchesOverAvailable` y `packagesInLine` del barrel.
+Salida: `vitest run` de los 4 archivos (sheet, summary, draft, order-delivery) → `Test Files 4 passed (4)`, `Tests 115 passed (115)`; `tsc --noEmit` sin salida; `pnpm run lint` → `0 errors, 7 warnings` (ninguna en los archivos tocados).
+**Veredicto m2:** cerrado; el sheet usa solo las funciones puras del barrel para las sumas por lote y por presentación.

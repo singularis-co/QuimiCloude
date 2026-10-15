@@ -51,6 +51,23 @@ function sumBy(allocations: readonly DeliveryAllocation[], key: (a: DeliveryAllo
   return totals;
 }
 
+/** Los lotes cuya suma de asignaciones supera lo disponible, en el orden en que aparecen en
+ *  `allocations`. Un lote que no esta en `batches` cuenta con 0 disponibles. */
+export function batchesOverAvailable(
+  batches: readonly DeliveryBatchState[],
+  allocations: readonly DeliveryAllocation[],
+): readonly string[] {
+  const availableByBatch = new Map(batches.map((batch) => [batch.batchId, batch.availablePackages]));
+  return [...sumBy(allocations, (a) => a.batchId)]
+    .filter(([batchId, packages]) => packages > (availableByBatch.get(batchId) ?? 0))
+    .map(([batchId]) => batchId);
+}
+
+/** Los envases asignados a una presentacion; las asignaciones sin envases no cuentan. */
+export function packagesInLine(allocations: readonly DeliveryAllocation[], presentationLineId: string): number {
+  return sumBy(allocations, (a) => a.presentationLineId).get(presentationLineId) ?? 0;
+}
+
 /**
  * Comprueba una entrega en este orden: `empty`, `exceeds_remaining` y `exceeds_batch`. Con
  * `batches` en `null` no se comprueba el tope por lote: lo hace quien tiene el lote bloqueado.
@@ -72,10 +89,7 @@ export function checkDelivery(
   if (exceededLines.length > 0) return { kind: 'exceeds_remaining', presentationLineIds: exceededLines };
 
   if (batches !== null) {
-    const availableByBatch = new Map(batches.map((batch) => [batch.batchId, batch.availablePackages]));
-    const exceededBatches = [...sumBy(allocations, (a) => a.batchId)]
-      .filter(([batchId, packages]) => packages > (availableByBatch.get(batchId) ?? 0))
-      .map(([batchId]) => batchId);
+    const exceededBatches = batchesOverAvailable(batches, allocations);
     if (exceededBatches.length > 0) return { kind: 'exceeds_batch', batchIds: exceededBatches };
   }
 

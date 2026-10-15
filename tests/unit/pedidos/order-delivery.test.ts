@@ -8,9 +8,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DELIVERY_MAX_ALLOCATIONS,
+  batchesOverAvailable,
   checkDelivery,
   checkDeliveryBlocks,
   flattenBlocks,
+  packagesInLine,
   packagesLeftInBatch,
   remainingPackages,
   type DeliveryAllocation,
@@ -275,6 +277,63 @@ describe('packagesLeftInBatch', () => {
   })
 })
 
+// QC-282 2026-10-15 (m2 del reviewer): el sheet saca de aqui lo que antes sumaba a mano.
+describe('batchesOverAvailable', () => {
+  it('QC-282 R15: sin exceso no devuelve ningun lote', () => {
+    expect(batchesOverAvailable(BATCHES, [alloc(L1, B1, 3), alloc(L1, B2, 8)])).toEqual([])
+    expect(batchesOverAvailable(BATCHES, [])).toEqual([])
+  })
+
+  it('QC-282 R15: un lote repetido entre dos clientes topa por la suma de ambos', () => {
+    const bloques = [bloque(CA, alloc(L1, B1, 2)), bloque(CB, alloc(L1, B1, 2))]
+
+    expect(batchesOverAvailable(BATCHES, flattenBlocks(bloques))).toEqual([B1])
+    expect(batchesOverAvailable(BATCHES, flattenBlocks([bloque(CA, alloc(L1, B1, 2)), bloque(CB, alloc(L1, B1, 1))]))).toEqual([])
+  })
+
+  it('QC-282 R15: un lote ausente de los leidos cuenta con 0 disponibles', () => {
+    expect(batchesOverAvailable(BATCHES, [alloc(L2, 'batch-x', 1)])).toEqual(['batch-x'])
+    expect(batchesOverAvailable([], [alloc(L1, B1, 1)])).toEqual([B1])
+  })
+
+  it('QC-282 R15: las asignaciones con packages 0 se ignoran, tambien en un lote ausente', () => {
+    expect(batchesOverAvailable(BATCHES, [alloc(L1, B1, 3), alloc(L1, B1, 0)])).toEqual([])
+    expect(batchesOverAvailable(BATCHES, [alloc(L2, 'batch-x', 0)])).toEqual([])
+  })
+
+  it('QC-282 R15: devuelve todos los lotes que exceden, en el orden de las asignaciones', () => {
+    expect(batchesOverAvailable(BATCHES, [alloc(L2, B3, 6), alloc(L1, B2, 1), alloc(L1, B1, 4)])).toEqual([B3, B1])
+  })
+
+  it('QC-282 R15: coincide con la rama exceeds_batch de checkDelivery', () => {
+    const allocations = [alloc(L1, B1, 2), alloc(L1, B1, 2), alloc(L2, 'batch-x', 1)]
+
+    expect(checkDelivery(LINES, BATCHES, allocations)).toEqual({
+      kind: 'exceeds_batch',
+      batchIds: batchesOverAvailable(BATCHES, allocations),
+    })
+  })
+})
+
+describe('packagesInLine', () => {
+  it('QC-282 R11: suma los envases de la presentacion de todos los clientes y lotes', () => {
+    const bloques = [bloque(CA, alloc(L1, B1, 2), alloc(L2, B3, 1)), bloque(CB, alloc(L1, B2, 3))]
+
+    expect(packagesInLine(flattenBlocks(bloques), L1)).toBe(5)
+    expect(packagesInLine(flattenBlocks(bloques), L2)).toBe(1)
+  })
+
+  it('QC-282 R11: una presentacion sin asignaciones da 0', () => {
+    expect(packagesInLine([alloc(L1, B1, 2)], L2)).toBe(0)
+    expect(packagesInLine([], L1)).toBe(0)
+  })
+
+  it('QC-282 R11: las asignaciones con packages 0 no suman', () => {
+    expect(packagesInLine([alloc(L1, B1, 0), alloc(L1, B2, 4)], L1)).toBe(4)
+    expect(packagesInLine([alloc(L1, B1, 0)], L1)).toBe(0)
+  })
+})
+
 // QC-223 2026-10-08 (TC): el sheet y el servidor no calculan el tope por su cuenta.
 //
 // Rutas de import aceptadas (decision del humano, 2026-10-08):
@@ -339,14 +398,14 @@ describe('una sola funcion pura en el sheet y en el servidor (R16)', () => {
     return nombres
   }
 
-  // QC-282 2026-10-15 (decision del humano, design §12 fila R20): el sheet trae las tres reglas
-  // puras del barrel; `deliver-order.ts` trae de `./order-delivery` las dos que usa (el barrel
+  // QC-282 2026-10-15 (decision del humano, design §12 fila R20): el sheet trae las reglas
+  // puras del barrel (m2 sumo `batchesOverAvailable` y `packagesInLine`); `deliver-order.ts` trae de `./order-delivery` las dos que usa (el barrel
   // crearia un ciclo y el tope por lote lo aplica inventario con el lote bloqueado).
   const REGLAS_R20 = [
     {
       ruta: 'app/(private)/pedidos/components/order-delivery-sheet.tsx',
       desde: '@/lib/modules/pedidos',
-      nombres: ['checkDelivery', 'checkDeliveryBlocks', 'packagesLeftInBatch'],
+      nombres: ['checkDelivery', 'checkDeliveryBlocks', 'packagesLeftInBatch', 'batchesOverAvailable', 'packagesInLine'],
     },
     {
       ruta: 'lib/modules/pedidos/domain/deliver-order.ts',

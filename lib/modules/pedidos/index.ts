@@ -274,9 +274,11 @@ export type { GetOrderCustomerFilterOptionDeps } from './domain/get-order-custom
  *  casos de uso y sus errores propios. */
 export {
   DELIVERY_MAX_ALLOCATIONS,
+  batchesOverAvailable,
   checkDelivery,
   checkDeliveryBlocks,
   flattenBlocks,
+  packagesInLine,
   packagesLeftInBatch,
   remainingPackages,
 } from './domain/order-delivery';

@@ -12,9 +12,11 @@ import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modu
 import { newRequestId } from '@/lib/modules/observabilidad';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import {
+  batchesOverAvailable,
   checkDelivery,
   checkDeliveryBlocks,
   flattenBlocks,
+  packagesInLine,
   packagesLeftInBatch,
   type DeliveryAllocation,
   type DeliveryBatchState,
@@ -135,10 +137,6 @@ type Evaluation = {
   readonly overBatchIds: ReadonlySet<string>;
 };
 
-function sumPackages(allocations: readonly DeliveryAllocation[], match: (allocation: DeliveryAllocation) => boolean): number {
-  return allocations.reduce((total, allocation) => (match(allocation) ? total + allocation.packages : total), 0);
-}
-
 function evaluate(view: OrderDeliveryView, draft: OrderDeliveryDraft): Evaluation {
   const pendingLines = view.lines.filter((line) => line.remainingPackages > 0);
   const blocks: DeliveryCustomerBlock[] = draft.blocks.map((block) => ({
@@ -158,11 +156,7 @@ function evaluate(view: OrderDeliveryView, draft: OrderDeliveryDraft): Evaluatio
       availablePackages: batch.availablePackages,
     })),
   );
-  const overBatchIds = new Set(
-    batches
-      .filter((batch) => sumPackages(allocations, (a) => a.batchId === batch.batchId) > batch.availablePackages)
-      .map((batch) => batch.batchId),
-  );
+  const overBatchIds = new Set(batchesOverAvailable(batches, allocations));
   return {
     blocks,
     allocations,
@@ -177,7 +171,7 @@ function summaryLines(view: OrderDeliveryView, evaluation: Evaluation): OrderDel
   return view.lines.map((line) => ({
     presentationLineId: line.presentationLineId,
     presentationName: line.presentationName,
-    writtenPackages: sumPackages(evaluation.allocations, (a) => a.presentationLineId === line.presentationLineId),
+    writtenPackages: packagesInLine(evaluation.allocations, line.presentationLineId),
     remainingPackages: line.remainingPackages,
   }));
 }
@@ -194,7 +188,7 @@ function blockPresentations(
     .map((line) => ({
       presentationLineId: line.presentationLineId,
       presentationName: line.presentationName,
-      packages: sumPackages(own, (a) => a.presentationLineId === line.presentationLineId),
+      packages: packagesInLine(own, line.presentationLineId),
       batches: line.batches.map((batch) => ({
         batchId: batch.batchId,
         lot: batch.lot,
