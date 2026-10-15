@@ -58,12 +58,17 @@ columna; `pnpm run db:rollback` revierte; `migrate deploy` la reaplica. La base 
 ### Veredicto
 T1–T5 implementados y verdes en lo suyo; 4 barridos de otras fichas en rojo por un hueco del spec, pendiente de decisión humana.
 
-### Pendiente de decisión humana (implementer)
-- `vitest related` da 4 rojos ajenos al spec: `tests/unit/identity/roles/maestro-rol.test.ts`,
-  `empacador-rol.test.ts`, `acondicionamiento-rol.test.ts` y `tests/unit/integraciones/module-shape.test.ts`.
-  Solo dejan nombrar `empresas.*`, `terminados.consultar`, `acondicionamiento.modificar` e
-  `integraciones.modificar` en una lista cerrada de archivos; `company-addons.ts` los nombra
-  (CORE_PERMISSIONS/ADDON_PERMISSIONS escritos a mano, design §2.1). No están en `tests/baseline-rojos.json`.
-  Propuesta: añadir `lib/modules/identity/domain/company-addons.ts` a la lista permitida de los cuatro,
-  como `permissions.ts`. design §10.3 solo enmienda `maestro-rol` (para T15). T1 queda sin `[x]` hasta decidir.
-- Migración re-fechada a `20261014190000_company_addons` (`20261014180000` lo usa `admin_without_assigned_orders_view`).
+### Rojos de listas cerradas de permisos: resuelto (opción A, aprobada por el humano 2026-10-14)
+- Primera pasada de `vitest related`: 4 rojos ajenos al spec en `maestro-rol.test.ts`, `empacador-rol.test.ts`,
+  `acondicionamiento-rol.test.ts` y `integraciones/module-shape.test.ts`. Esos tests solo dejan nombrar
+  ciertos permisos en una lista cerrada de archivos, y `company-addons.ts` los nombra (catálogo escrito a mano, design §2.1).
+- Arreglo: `lib/modules/identity/domain/company-addons.ts` entra como archivo permitido, igual que `permissions.ts`.
+  Las comprobaciones anti-ceguera siguen: igualdad exacta en maestro; recuento 11 -> 12 en acondicionamiento;
+  `arrayContaining` + catálogo en empacador; `toContain(ADDONS_CATALOG)` y un vecino `company-addons-extra.ts` -> false en module-shape.
+- Salida tras el arreglo:
+  - los 4 archivos: 140 pasados, 0 fallidos, 1 saltado (`ctx.skip` condicional que ya existía);
+  - `pnpm run typecheck`: exit 0;
+  - `pnpm run lint`: 0 errores, 7 avisos ya existentes en archivos que no se tocaron;
+  - `pnpm exec vitest related --run` sobre los 8 archivos de producción de la tanda (schema incluido):
+    827/827 archivos, 13349 pasados, 0 fallidos, 14 saltados.
+- La migración se re-fechó a `20261014190000_company_addons` porque `20261014180000` lo usa `admin_without_assigned_orders_view`.

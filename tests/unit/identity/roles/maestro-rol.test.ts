@@ -205,6 +205,8 @@ describe('R4 — el rol Maestro es global: Role no lleva campo de empresa', () =
  */
 const RUTAS_ABIERTAS_EMPRESAS = new Set([
   CATALOGO_DE_PERMISOS,
+  // Catalogo de anadidos: clasifica cada permiso como nucleo o anadido.
+  'lib/modules/identity/domain/company-addons.ts',
   'lib/modules/identity/domain/set-company-country.ts',
   // Enmienda QC-162 (2026-10-14): los ocho casos de uso de gestion de empresas exigen
   // `empresas.*` en su primera linea. Se abren solo sus rutas exactas.

@@ -8,8 +8,7 @@
 
 ## Bloque A — Datos y catálogo
 
-- [ ] **T1 — Catálogo de añadidos** (R1–R4, R11). Depende de: —
-  - _Hecho en código y tests; pendiente: 4 tests de otras fichas en rojo (lista cerrada de archivos que nombran permisos), a la espera de decisión humana._
+- [x] **T1 — Catálogo de añadidos** (R1–R4, R11). Depende de: —
   - `identity/domain/company-addons.ts` según `design.md > 2.1`, reexportado en `identity/index.ts`.
   - Tests: `tests/unit/identity/addons/company-addons.test.ts`.
   - **Hecho:**
@@ -184,12 +183,12 @@
   - Correr la suite E2E completa sobre base limpia.
   - En cada spec que falle **solo** porque su empresa propia nace sin añadidos, llamar a
     `enableAllAddons` tras crearla.
-  - Los specs tocados se anotan en `progress/impl_QC-277-modulos-por-empresa.md`. Si alguno no está
+  - Los specs tocados se anotan en `progress/impl_QC-277.md`. Si alguno no está
     en `## Archivos esperados`, se añade aquí antes del commit.
   - **Hecho:** la suite queda con los mismos rojos que `dev` (nada nuevo), escrito en el PR.
 - [ ] **T21 — Gate local y trazabilidad.** Depende de: todas
   - `./init.sh` verde.
-  - El mapa `R<n> → test` en `progress/impl_QC-277-modulos-por-empresa.md`.
+  - El mapa `R<n> → test` en `progress/impl_QC-277.md`.
   - **Hecho:** los 38 requisitos tienen test, y P2–P5 constan con el defecto aplicado.
 
 > Orden: T13 va antes que T12 porque T12 usa `isCompanyAddonActive`. La numeración sigue al diseño,
