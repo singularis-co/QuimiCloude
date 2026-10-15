@@ -49,7 +49,7 @@ Cubre: R20 (funciones puras), base de R16–R18 y R13–R14.
 
 ---
 
-## [ ] B1 — Migración y esquema (depende de T0)
+## [x] B1 — Migración y esquema (depende de T0)
 
 - `db/migrations/<ts>_order_delivery_lines_customer/migration.sql` y `down.sql` (`design.md > 1.1`),
   con las dos comprobaciones previas que pide el diseño hechas contra la base de test.

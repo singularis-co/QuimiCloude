@@ -660,6 +660,11 @@
       "archivo": "inventario/product-batch-lot-per-presentation.int.test.ts",
       "motivo": "QC-284 T2/T3: ejercita 'createWithFirstBatch' y 'addBatchToAlive' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren SU PROPIA 'prisma.$transaction' por intento, asi que envolverlos en una transaccion del test seria un aislamiento de mentira. Las carreras de R6 necesitan que cada escritura CONFIRME, y la del lote generado sostiene ademas una transaccion abierta en otra conexion 'pg' hasta ver al adaptador esperando en el indice. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (asientos -> lotes -> productos -> receta -> presentaciones -> usuario -> rol y tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-14"
+    },
+    {
+      "archivo": "pedidos/order-delivery-lines-customer-migration.int.test.ts",
+      "motivo": "QC-282 B1 (2026-10-15): aplica el migration.sql y el down.sql reales de 'order_delivery_lines_customer' por 'pg' (solo su protocolo simple ejecuta un .sql con un bloque DO $$ y su error trae 'code'). No toca las tablas de 'public': cada caso copia con LIKE las siete tablas que la migracion lee, escribe o debe dejar intactas a un esquema de usar y tirar, repone sus FK entre ellas, trabaja ahi con search_path solo en ese esquema -asi el DDL del UP y del DOWN no bloquea las tablas reales que usan los demas archivos- y lo borra con DROP SCHEMA CASCADE en un 'finally'. Mismo patron que 'inventario/product-batch-lot-per-presentation-migration.int.test.ts'. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-15"
     }
   ]
 }

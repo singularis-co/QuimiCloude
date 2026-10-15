@@ -30,14 +30,37 @@ async function findOrderDeliveryByKey(
   });
 }
 
-// La tabla aun exige el cliente en la entrega y el contrato ya lo lleva en cada linea: no hay
-// valor correcto que escribir hasta que la columna pase a las lineas.
-async function createOrderDelivery(delivery: NewOrderDelivery): Promise<CreateOutcome> {
-  throw new Error(`createOrderDelivery: sin columna de cliente en las lineas (entrega ${delivery.deliveryKey})`);
+/** El `INSERT` no escribe `id`, asi que el unico indice unico con el que puede chocar es el de la
+ *  clave de entrega por empresa. El choque aborta la transaccion de quien llama. */
+function isDuplicateDeliveryKey(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
 
-/** La empresa de cada linea la fijan las claves foraneas compuestas: una entrega, una linea del
- *  reparto o un lote de otra empresa hacen fallar el `INSERT`. */
+async function createOrderDelivery(
+  delivery: NewOrderDelivery,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<CreateOutcome> {
+  try {
+    const { id } = await tx.orderDelivery.create({
+      data: {
+        ...companyScopeColumns(scope),
+        orderId: delivery.orderId,
+        deliveryKey: delivery.deliveryKey,
+        createdBy: delivery.actorId,
+        createdAt: delivery.now,
+      },
+      select: { id: true },
+    });
+    return { kind: 'created', id };
+  } catch (error) {
+    if (isDuplicateDeliveryKey(error)) return { kind: 'duplicate_key' };
+    throw error;
+  }
+}
+
+/** La empresa de cada linea la fijan las claves foraneas compuestas: una entrega, un cliente, una
+ *  linea del reparto o un lote de otra empresa hacen fallar el `INSERT`. */
 async function addOrderDeliveryLines(
   deliveryId: string,
   lines: readonly NewOrderDeliveryLine[],
@@ -50,6 +73,7 @@ async function addOrderDeliveryLines(
     data: lines.map((line) => ({
       companyId,
       deliveryId,
+      customerId: line.customerId,
       orderPresentationLineId: line.presentationLineId,
       batchId: line.batchId,
       packages: line.packages,
@@ -78,7 +102,7 @@ async function sumOrderDeliveredPackages(
 export function createOrderDeliveryRepository(tx: PrismaLike = prisma): OrderDeliveryRepository {
   return {
     findByKey: (deliveryKey, scope) => findOrderDeliveryByKey(deliveryKey, scope, tx),
-    create: (delivery) => createOrderDelivery(delivery),
+    create: (delivery, scope) => createOrderDelivery(delivery, scope, tx),
     addLines: (deliveryId, lines, scope) => addOrderDeliveryLines(deliveryId, lines, scope, tx),
     sumDeliveredPackages: (orderId, scope) => sumOrderDeliveredPackages(orderId, scope, tx),
   };

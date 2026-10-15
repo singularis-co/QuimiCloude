@@ -643,6 +643,8 @@ export const MIGRACIONES_ESPERADAS = [
   // QC-284 2026-10-14: la unicidad del lote pasa a producto + presentacion + codigo; no toca el
   // identificador.
   '20261014200000_product_batches_lot_per_presentation',
+  // QC-282 2026-10-15: el cliente pasa de la entrega a sus lineas; no toca el identificador.
+  '20261015130000_order_delivery_lines_customer',
 ] as const
 
 export function hallazgosDeMigraciones(
