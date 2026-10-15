@@ -606,8 +606,26 @@ const USOS_REALES_DE_CLIENTES = [
 // ---------------------------------------------------------------------------------------------
 
 describe('R38 (QC-154), R37 (QC-155) — solo bajo app/(private)/clientes/ nombra clientes', () => {
-  const MARCADORES_DE_CLIENTES = /\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
-  const nombraClientes = (fuente: string): boolean => usaTablaCustomers(fuente) || MARCADORES_DE_CLIENTES.test(fuente)
+  // QC-282 P7 2026-10-15 (decision del humano, opcion A): el marcador `['"]Clientes['"]` (QC-153,
+  // menor 5) buscaba el NOMBRE VISIBLE del modulo, el de la entrada del sidebar y el titulo de su
+  // pantalla (`CUSTOMERS_LABEL` de lib/shared/navigation/private-nav.ts): que ninguna pantalla
+  // fuera de (private)/clientes/ enlazara o se presentara como el modulo. Pero la palabra a secas
+  // tambien es una etiqueta de UI legitima (la columna «Clientes» de una entrega con varios). Ahora
+  // la etiqueta visible -constante local, texto JSX, prop de etiqueta- no cuenta; si cuenta lo que
+  // apunta al modulo: la constante de su ruta, la etiqueta del sidebar importada de la navegacion,
+  // una entrada de menu `{ label: 'Clientes', href }` y un enlace cuyo texto es «Clientes».
+  const MARCADORES_DE_CLIENTES = /\/clientes\b|clientes\.(consultar|modificar)|\bCUSTOMERS_ROUTE\b/
+  const ETIQUETA_DEL_SIDEBAR_IMPORTADA =
+    /import\s*(?:type\s*)?\{[^}]*\bCUSTOMERS_LABEL\b[^}]*\}\s*from\s*['"]@\/lib\/shared\/navigation\/private-nav['"]/
+  const ENTRADA_DE_MENU_A_CLIENTES =
+    /\{[^{}]*\b(?:href|route|path)\s*:[^{}]*['"`]Clientes['"`][^{}]*\}|\{[^{}]*['"`]Clientes['"`][^{}]*\b(?:href|route|path)\s*:[^{}]*\}/
+  const ENLACE_CON_TEXTO_CLIENTES = /<(Link|a)\b[^>]*>\s*(?:\{\s*)?['"`]?Clientes['"`]?(?:\s*\})?\s*<\/\1>/
+  const nombraClientes = (fuente: string): boolean =>
+    usaTablaCustomers(fuente) ||
+    MARCADORES_DE_CLIENTES.test(fuente) ||
+    ETIQUETA_DEL_SIDEBAR_IMPORTADA.test(fuente) ||
+    ENTRADA_DE_MENU_A_CLIENTES.test(fuente) ||
+    ENLACE_CON_TEXTO_CLIENTES.test(fuente)
   const CARPETA_PERMITIDA = '(private)/clientes/'
 
   function coincidenciasEnApp(appDir: string = join(repoRoot, 'app')): string[] {
@@ -676,6 +694,34 @@ describe('R38 (QC-154), R37 (QC-155) — solo bajo app/(private)/clientes/ nombr
       ...USOS_REALES_DE_CLIENTES,
       'export const href = "/clientes"\n',
       "import { x } from '@/lib/modules/clientes/domain/customer'\nexport { x }\n",
+    ]
+    expect(disparanEnApp(usos)).toEqual(usos.map((_, i) => i))
+  })
+
+  it('QC-282 P7 — «Clientes» como etiqueta visible no dispara (casos sinteticos)', () => {
+    const etiquetas = [
+      "const CUSTOMERS_LABEL = 'Clientes';\nexport const Th = () => <th>{CUSTOMERS_LABEL}</th>\n",
+      'const CUSTOMERS_LABEL = "Clientes"\nexport const L = CUSTOMERS_LABEL\n',
+      'export const Th = () => <th scope="col">Clientes</th>\n',
+      'export const D = () => <dt>Clientes</dt>\n',
+      'export const F = () => <Field label="Clientes" value={n} />\n',
+      "export const S = () => <section aria-label={'Clientes'}><h3>Clientes</h3></section>\n",
+    ]
+    expect(disparanEnApp(etiquetas)).toEqual([])
+  })
+
+  it('QC-282 P7 — ruta, permiso, import profundo, tabla, entrada de menu y enlace «Clientes» siguen disparando (casos sinteticos)', () => {
+    const usos = [
+      'export const href = "/clientes"\n',
+      "export const puede = can(user, 'clientes.consultar')\n",
+      "import { x } from '@/lib/modules/clientes/domain/customer'\nexport { x }\n",
+      "export const tabla = 'customers'\n",
+      "import { CUSTOMERS_ROUTE } from '@/lib/shared/routes'\nexport const h = CUSTOMERS_ROUTE\n",
+      "import { BRAND_LABEL, CUSTOMERS_LABEL } from '@/lib/shared/navigation/private-nav'\nexport const t = `${CUSTOMERS_LABEL} · ${BRAND_LABEL}`\n",
+      "export const items = [{ label: 'Clientes', href: ruta }]\n",
+      "export const items = [{ href: ruta, label: 'Clientes' }]\n",
+      'export const Menu = () => <Link href={ruta}>Clientes</Link>\n',
+      'export const Menu = () => <a href={ruta}>Clientes</a>\n',
     ]
     expect(disparanEnApp(usos)).toEqual(usos.map((_, i) => i))
   })

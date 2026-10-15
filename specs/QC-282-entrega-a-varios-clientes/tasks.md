@@ -195,7 +195,7 @@ Cubre: R43, R44 (pantalla).
 
 ---
 
-## [ ] TC — Barrido de censos y guardias (depende de B y F)
+## [x] TC — Barrido de censos y guardias (depende de B y F)
 
 - Recorre `design.md > 9`: cada fila verificada o enmendada con nota fechada.
 - Verifica que `tests/unit/pedidos/order-delivery-append-only.test.ts` no barre `db/migrations`.

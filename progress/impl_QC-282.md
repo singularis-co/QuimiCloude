@@ -91,7 +91,7 @@
 6. **`./init.sh` se corta en el paso 3** por el cupo fullstack (5 de 3), la excepción ya aceptada. El
    gate no tiene forma de saltarlo, así que los pasos siguientes se corrieron a mano (ver Tandas en
    la ficha).
-7. **(nueva, 2026-10-15) `scope.test.ts` R38 sigue rojo por `order-delivery-list.tsx`**, ya no por
+7. **[RESUELTA 2026-10-15: decisión humana opción A; ver P7 al final de «backend_dev — cierre TC»]** **(nueva, 2026-10-15) `scope.test.ts` R38 sigue rojo por `order-delivery-list.tsx`**, ya no por
    `customers` sino por el literal `'Clientes'` (`const CUSTOMERS_LABEL = 'Clientes'`, etiqueta de la
    tarjeta «Fecha · Clientes · Envases · Entregó» de design §7.2). El marcador `['"]Clientes['"]` de R38
    (pensado para la entrada de menú de QC-155) lo caza; antes quedaba tapado por `customers`. La
@@ -497,3 +497,8 @@ Sin código de producción. Sin dependencias nuevas.
 - `pnpm run typecheck`: `tsc --noEmit` sin errores.
 
 **Veredicto:** preguntas 1 y 2 cerradas; R20 trazado; R38 queda rojo por un marcador distinto (`'Clientes'`) que necesita decisión (pregunta 7).
+
+**P7 (2026-10-15, decisión humana opción A).** El marcador `['"]Clientes['"]` (QC-153, menor 5) protegía el nombre visible del módulo: la entrada del sidebar y el título de su pantalla (`CUSTOMERS_LABEL` de `private-nav.ts`). En R38 se sustituye por: `CUSTOMERS_ROUTE`, `CUSTOMERS_LABEL` importada de `private-nav`, una entrada de menú `{ label: 'Clientes', href }` y un enlace `<Link|a>Clientes</…>`. La etiqueta visible (constante local, texto JSX, prop de etiqueta) ya no cuenta. El detector de e2e (R28) no cambia.
+Casos sintéticos nuevos: 6 etiquetas que no disparan y 10 usos reales que sí (ruta, permiso, import profundo, tabla, constante de ruta, etiqueta del sidebar importada, 2 entradas de menú, 2 enlaces). Se conservan todos los casos anteriores.
+Salida: `vitest run tests/unit/clientes/scope.test.ts` → `Tests 34 passed (34)`; `vitest run guard` → `76 passed (76)`, `1066 passed | 20 skipped`; `pnpm run lint` → `0 errors, 7 warnings` (las mismas, ajenas).
+**Veredicto P7:** R38 en verde, sin perder sensibilidad al nombre del módulo como enlace o entrada de menú.
