@@ -139,7 +139,6 @@ import {
   findProducedFinishedProducts,
   listFinishedProductBatches,
   listFinishedProductCosts,
-  listFinishedProductDeliveryMovements,
   listFinishedProductMovements,
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-product-detail-prisma';
 import {
@@ -328,7 +327,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
-  findDeliveryDetailsByIds,
+  listDeliveryLinesByBatchIds,
   summarizeDeliveredByBatchIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
 import { listPackedLinesByCombination } from '@/lib/modules/pedidos/adapters/driven/persistence/packed-lines-directory-prisma';
@@ -1022,7 +1021,7 @@ const presentationRepository: PresentationRepository = {
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
 const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
-  findDeliveryDetails: findDeliveryDetailsByIds,
+  listDeliveryLines: listDeliveryLinesByBatchIds,
   summarizeDelivered: summarizeDeliveredByBatchIds,
 };
 
@@ -1034,7 +1033,6 @@ const finishedProductDetailRepository: FinishedProductDetailRepository = {
   findAliveFinished: findAliveFinishedProduct,
   listBatches: listFinishedProductBatches,
   listMovements: listFinishedProductMovements,
-  listDeliveryMovements: listFinishedProductDeliveryMovements,
   listProductionCosts: listFinishedProductCosts,
   findProducedProducts: findProducedFinishedProducts,
 };

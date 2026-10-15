@@ -262,13 +262,15 @@ describe('Entregas', () => {
 
   it('R19, R20 — Entregas con cliente, pedido, lote, envases y cantidad; dado de baja y ausente', () => {
     const deBaja = finishedProductDeliveryRow({
-      movementId: 'de-baja',
+      deliveryLineId: 'de-baja',
       customer: { id: 'c-baja', firstNames: 'Luis', lastNames: 'Gomez', isDeleted: true },
     });
-    const ausente = finishedProductDeliveryRow({ movementId: 'ausente', customer: null, packages: null });
+    // 2026-10-15: la fila es una linea de entrega y sus envases ya no pueden faltar; se quita el caso de
+    // envases ausentes.
+    const ausente = finishedProductDeliveryRow({ deliveryLineId: 'ausente', customer: null });
     renderDeliveries(finishedProductDeliveriesPage({ items: [FINISHED_DELIVERY_ROWS[0], deBaja, ausente], total: 3 }));
 
-    const activa = rowOf(FINISHED_DELIVERY_ROWS[0].movementId);
+    const activa = rowOf(FINISHED_DELIVERY_ROWS[0].deliveryLineId);
     expect(cell(activa, 'finished-product-delivery-row')).toHaveTextContent('2026-10-11 10:00');
     expect(cell(activa, 'finished-product-delivery-customer')).toHaveTextContent('Ana Perez');
     expect(within(activa).queryByTestId('finished-product-delivery-customer-deleted')).toBeNull();
@@ -283,13 +285,12 @@ describe('Entregas', () => {
 
     const filaAusente = rowOf('ausente');
     expect(cell(filaAusente, 'finished-product-delivery-customer')).toHaveTextContent(EMPTY_MARK);
-    expect(cell(filaAusente, 'finished-product-delivery-packages')).toHaveTextContent(EMPTY_MARK);
   });
 
   it('R33 — una fila anulada lleva «Anulada», su motivo y data-voided; la otra de la misma entrega no', () => {
     renderDeliveries();
 
-    const anulada = rowOf(VOIDED_DELIVERY_ROW.movementId);
+    const anulada = rowOf(VOIDED_DELIVERY_ROW.deliveryLineId);
     expect(cell(anulada, 'finished-product-delivery-row')).toHaveAttribute('data-voided', 'true');
     const marca = cell(anulada, 'finished-product-delivery-void');
     expect(marca).toHaveTextContent('Anulada');
@@ -299,7 +300,7 @@ describe('Entregas', () => {
     expect(cell(anulada, 'finished-product-delivery-lot')).toHaveTextContent('L-2026-0226');
     expect(cell(anulada, 'finished-product-delivery-packages')).toHaveTextContent('1');
 
-    const viva = rowOf(FINISHED_DELIVERY_ROWS[0].movementId);
+    const viva = rowOf(FINISHED_DELIVERY_ROWS[0].deliveryLineId);
     expect(viva).not.toBe(anulada);
     expect(FINISHED_DELIVERY_ROWS[0].orderDeliveryId).toBe(VOIDED_DELIVERY_ROW.orderDeliveryId);
     expect(cell(viva, 'finished-product-delivery-row')).toHaveAttribute('data-voided', 'false');
@@ -337,11 +338,110 @@ describe('Entregas', () => {
     );
   });
 
+  it('R43 — columnas en orden Fecha, Cliente, Pedido, Presentación, Lote, Envases, Cantidad, Anulación', () => {
+    renderDeliveries();
+
+    const encabezados = screen.getAllByRole('columnheader').map((th) => th.textContent?.trim());
+    expect(encabezados).toEqual([
+      'Fecha',
+      'Cliente',
+      'Pedido',
+      'Presentación',
+      'Lote',
+      'Envases',
+      'Cantidad',
+      'Anulación',
+    ]);
+  });
+
+  it('R43 — una fila por linea de entrega: misma entrega y cliente, otra presentacion, filas propias', () => {
+    const frasco = finishedProductDeliveryRow({
+      deliveryLineId: 'linea-frasco',
+      presentationName: 'Frasco 200 ml',
+      lot: 'L-2026-0227',
+      packages: 10,
+      quantity: '2.0000',
+    });
+    const sinPresentacion = finishedProductDeliveryRow({
+      deliveryLineId: 'linea-sin-presentacion',
+      presentationName: null,
+    });
+    renderDeliveries(
+      finishedProductDeliveriesPage({
+        items: [FINISHED_DELIVERY_ROWS[0], frasco, sinPresentacion],
+        total: 3,
+      }),
+    );
+
+    expect(screen.getAllByTestId('finished-product-delivery-row')).toHaveLength(3);
+    expect(frasco.orderDeliveryId).toBe(FINISHED_DELIVERY_ROWS[0].orderDeliveryId);
+
+    const botella = rowOf(FINISHED_DELIVERY_ROWS[0].deliveryLineId);
+    expect(cell(botella, 'finished-product-delivery-presentation')).toHaveTextContent('Botella 1 L');
+    expect(cell(botella, 'finished-product-delivery-customer')).toHaveTextContent('Ana Perez');
+
+    const filaFrasco = rowOf('linea-frasco');
+    expect(cell(filaFrasco, 'finished-product-delivery-presentation')).toHaveTextContent('Frasco 200 ml');
+    expect(cell(filaFrasco, 'finished-product-delivery-customer')).toHaveTextContent('Ana Perez');
+    expect(cell(filaFrasco, 'finished-product-delivery-order')).toHaveTextContent(FINISHED_ORDER_NUMBER);
+    expect(cell(filaFrasco, 'finished-product-delivery-lot')).toHaveTextContent('L-2026-0227');
+    expect(cell(filaFrasco, 'finished-product-delivery-packages')).toHaveTextContent('10');
+    expect(cell(filaFrasco, 'finished-product-delivery-quantity')).toHaveTextContent('2 L');
+
+    expect(
+      cell(rowOf('linea-sin-presentacion'), 'finished-product-delivery-presentation'),
+    ).toHaveTextContent(EMPTY_MARK);
+  });
+
+  it('R44 — solo la fila de la presentacion anulada lleva «Anulada» y su motivo; las demas de la entrega no', () => {
+    const anuladaFrasco = finishedProductDeliveryRow({
+      deliveryLineId: 'linea-frasco-anulada',
+      presentationName: 'Frasco 200 ml',
+      void: { reason: FINISHED_VOID_REASON },
+    });
+    const vivaBotella = finishedProductDeliveryRow({
+      deliveryLineId: 'linea-botella-viva',
+      presentationName: 'Botella 1 L',
+    });
+    renderDeliveries(finishedProductDeliveriesPage({ items: [anuladaFrasco, vivaBotella], total: 2 }));
+
+    const anulada = rowOf('linea-frasco-anulada');
+    expect(cell(anulada, 'finished-product-delivery-row')).toHaveAttribute('data-voided', 'true');
+    expect(cell(anulada, 'finished-product-delivery-void')).toHaveTextContent('Anulada');
+    expect(cell(anulada, 'finished-product-delivery-void-reason')).toHaveTextContent(FINISHED_VOID_REASON);
+
+    const viva = rowOf('linea-botella-viva');
+    expect(cell(viva, 'finished-product-delivery-row')).toHaveAttribute('data-voided', 'false');
+    expect(within(viva).queryByTestId('finished-product-delivery-void')).toBeNull();
+  });
+
+  it('R44 — el total viene de delivered y la paginacion de la pagina de lineas, no de contar filas', async () => {
+    const user = setupUser();
+    renderDeliveries(
+      finishedProductDeliveriesPage({
+        delivered: { quantity: '8.0000', packages: 5 },
+        total: 45,
+        totalPages: 3,
+      }),
+    );
+
+    expect(screen.getAllByTestId('finished-product-delivery-row')).toHaveLength(FINISHED_DELIVERY_ROWS.length);
+    expect(screen.getByTestId('finished-product-deliveries-total-quantity')).toHaveTextContent('8 L');
+    expect(screen.getByTestId('finished-product-deliveries-total-packages')).toHaveTextContent('5 envases');
+    expect(screen.getByTestId('data-table-page-indicator')).toHaveTextContent('3');
+
+    await user.click(screen.getByTestId('data-table-next'));
+
+    const url = new URL(routerMock.push.mock.calls[0][0], 'http://local');
+    expect(url.searchParams.get(TAB_PARAM)).toBe('entregas');
+    expect(url.searchParams.get(PAGE_PARAM)).toBe('2');
+  });
+
   it('R36 — ninguna fila de Entregas lleva un boton o enlace, tampoco para anular', () => {
     renderDeliveries();
 
     for (const row of FINISHED_DELIVERY_ROWS) {
-      const fila = rowOf(row.movementId);
+      const fila = rowOf(row.deliveryLineId);
       expect(within(fila).queryAllByRole('button')).toEqual([]);
       expect(within(fila).queryAllByRole('link')).toEqual([]);
     }

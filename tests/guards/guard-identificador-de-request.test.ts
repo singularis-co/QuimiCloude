@@ -434,6 +434,15 @@ export const E2E_ESPERADOS = [
   // y las tres duraciones. No lee ni afirma nada sobre el identificador de peticion ni sobre
   // `reference`.
   'recorrido-acondicionamiento.spec.ts',
+  // Alta el 2026-10-15 (QC-282 R47) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: una entrega de un pedido `TERMINADO` a dos
+  // clientes que comparten un lote, con un asiento por lote y la existencia comprobados en Postgres;
+  // el cliente repetido que no envia nada; el dialogo de anular que abre sin nada marcado y la
+  // anulacion de una sola presentacion de un cliente; la lista con un subbloque por cliente y el tab
+  // Entregas con una fila por cliente y «Presentación». No lee ni afirma nada sobre el identificador
+  // de peticion ni sobre `reference`.
+  'entrega-a-varios-clientes.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -661,6 +670,8 @@ export const MIGRACIONES_ESPERADAS = [
   // QC-281 2026-10-15: el conteo real de envases en `order_presentation_lines`; no toca el
   // identificador.
   '20261015120200_order_presentation_lines_packed_count',
+  // QC-282 2026-10-15: el cliente pasa de la entrega a sus lineas; no toca el identificador.
+  '20261015130000_order_delivery_lines_customer',
 ] as const
 
 export function hallazgosDeMigraciones(

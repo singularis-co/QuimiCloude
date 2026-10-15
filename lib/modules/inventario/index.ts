@@ -158,6 +158,7 @@ export {
   type FinishedProductCostRow,
   type ProducedProductLink,
   type FinishedDeliveryDirectory,
+  type FinishedDeliveryLineRecord,
   type PackingReasonView,
   type FinishedDistributionLine,
   type FinishedDistributionDirectory,

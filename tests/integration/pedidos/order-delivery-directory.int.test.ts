@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import {
-  findDeliveryDetailsByIds,
+  listDeliveryLinesByBatchIds,
   summarizeDeliveredByBatchIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
@@ -161,14 +161,32 @@ async function createBatch(t: Tenant, productId: string, presentationId: string)
   return id
 }
 
-async function createDelivery(t: Tenant, orderId: string): Promise<string> {
+// 2026-10-15 (QC-282): la entrega ya no guarda cliente; lo lleva cada linea. Cada entrega se siembra
+// con su instante para fijar el orden del listado.
+async function createDelivery(t: Tenant, orderId: string, createdAt: Date): Promise<string> {
   const { id } = await prisma.orderDelivery.create({
     data: {
       companyId: t.companyId,
       orderId,
-      customerId: t.customerId,
       deliveryKey: randomUUID(),
       createdBy: t.userId,
+      createdAt,
+    },
+    select: { id: true },
+  })
+  return id
+}
+
+async function createCustomer(t: Tenant, firstNames: string): Promise<string> {
+  const { id } = await prisma.customer.create({
+    data: {
+      firstNames,
+      firstNamesNormalized: firstNames.toLowerCase(),
+      lastNames: 'Rojas',
+      lastNamesNormalized: 'rojas',
+      city: 'Cali',
+      cityNormalized: 'cali',
+      companyId: t.companyId,
     },
     select: { id: true },
   })
@@ -177,6 +195,7 @@ async function createDelivery(t: Tenant, orderId: string): Promise<string> {
 
 type LineSeed = {
   readonly deliveryId: string
+  readonly customerId?: string
   readonly presentationLineId: string
   readonly batchId: string
   readonly packages: number
@@ -188,6 +207,7 @@ async function createDeliveryLine(t: Tenant, seed: LineSeed): Promise<string> {
     data: {
       companyId: t.companyId,
       deliveryId: seed.deliveryId,
+      customerId: seed.customerId ?? t.customerId,
       orderPresentationLineId: seed.presentationLineId,
       batchId: seed.batchId,
       packages: seed.packages,
@@ -234,22 +254,45 @@ async function dropTenant(t: Tenant): Promise<void> {
 }
 
 const VOID_REASON = 'Cliente devolvio la caja'
+const SHARED_VOID_REASON = 'Caja golpeada'
+
+const T1 = new Date('2026-10-01T10:00:00.000Z')
+const T2 = new Date('2026-10-02T10:00:00.000Z')
+const T3 = new Date('2026-10-03T10:00:00.000Z')
+const T4 = new Date('2026-10-04T10:00:00.000Z')
 
 type Seed = {
   readonly a: Tenant
   readonly b: Tenant
-  /** Dos lotes, ninguno anulado. */
+  readonly order: string
+  readonly orderB: string
+  readonly otherCustomer: string
+  /** Dos lotes, ninguno anulado. En T1. */
   readonly twoBatchDelivery: string
-  /** Dos presentaciones; la linea de `batchOne` anulada y la de `batchOther` no. */
+  /** Dos presentaciones; la linea de `batchOne` anulada y la de `batchOther` no. En T2. */
   readonly partiallyVoidedDelivery: string
-  /** Su unica linea, la de `batchAllVoided`, anulada. */
+  /** Su unica linea, la de `batchAllVoided`, anulada. En T3. */
   readonly fullyVoidedDelivery: string
+  /** Dos clientes del mismo lote `batchShared`; solo la linea del segundo anulada. En T4. */
+  readonly twoCustomerDelivery: string
   readonly batchOne: string
   readonly batchTwo: string
   readonly batchOther: string
   readonly batchAllVoided: string
+  readonly batchShared: string
   readonly deliveryB: string
   readonly batchB: string
+  /** Las lineas de A, por nombre. */
+  readonly lines: {
+    readonly twoBatchOne: string
+    readonly twoBatchTwo: string
+    readonly partialVoided: string
+    readonly partialOther: string
+    readonly fullyVoided: string
+    readonly sharedFirst: string
+    readonly sharedSecond: string
+  }
+  readonly lineB: string
 }
 
 const tenants: Tenant[] = []
@@ -268,21 +311,23 @@ async function seedAll(): Promise<Seed> {
   const order = await createOrder(a)
   const line = await createLine(a, order, presentation)
   const otherLine = await createLine(a, order, otherPresentation)
+  const otherCustomer = await createCustomer(a, 'Marta')
 
   const batchOne = await createBatch(a, product, presentation)
   const batchTwo = await createBatch(a, product, presentation)
   const batchAllVoided = await createBatch(a, product, presentation)
   const batchOther = await createBatch(a, otherProduct, otherPresentation)
+  const batchShared = await createBatch(a, product, presentation)
 
-  const twoBatchDelivery = await createDelivery(a, order)
-  await createDeliveryLine(a, {
+  const twoBatchDelivery = await createDelivery(a, order, T1)
+  const twoBatchOne = await createDeliveryLine(a, {
     deliveryId: twoBatchDelivery,
     presentationLineId: line,
     batchId: batchOne,
     packages: 2,
     quantity: '10.1000',
   })
-  await createDeliveryLine(a, {
+  const twoBatchTwo = await createDeliveryLine(a, {
     deliveryId: twoBatchDelivery,
     presentationLineId: line,
     batchId: batchTwo,
@@ -290,42 +335,60 @@ async function seedAll(): Promise<Seed> {
     quantity: '5.0001',
   })
 
-  const partiallyVoidedDelivery = await createDelivery(a, order)
-  const voidedLine = await createDeliveryLine(a, {
+  const partiallyVoidedDelivery = await createDelivery(a, order, T2)
+  const partialVoided = await createDeliveryLine(a, {
     deliveryId: partiallyVoidedDelivery,
     presentationLineId: line,
     batchId: batchOne,
     packages: 3,
     quantity: '15.0000',
   })
-  await createDeliveryLine(a, {
+  const partialOther = await createDeliveryLine(a, {
     deliveryId: partiallyVoidedDelivery,
     presentationLineId: otherLine,
     batchId: batchOther,
     packages: 4,
     quantity: '8.2500',
   })
-  await voidLines(a, partiallyVoidedDelivery, [voidedLine], VOID_REASON)
+  await voidLines(a, partiallyVoidedDelivery, [partialVoided], VOID_REASON)
 
-  const fullyVoidedDelivery = await createDelivery(a, order)
-  const onlyLine = await createDeliveryLine(a, {
+  const fullyVoidedDelivery = await createDelivery(a, order, T3)
+  const fullyVoided = await createDeliveryLine(a, {
     deliveryId: fullyVoidedDelivery,
     presentationLineId: line,
     batchId: batchAllVoided,
     packages: 6,
     quantity: '30.0000',
   })
-  await voidLines(a, fullyVoidedDelivery, [onlyLine], 'Entrega duplicada')
+  await voidLines(a, fullyVoidedDelivery, [fullyVoided], 'Entrega duplicada')
+
+  const twoCustomerDelivery = await createDelivery(a, order, T4)
+  const sharedFirst = await createDeliveryLine(a, {
+    deliveryId: twoCustomerDelivery,
+    presentationLineId: line,
+    batchId: batchShared,
+    packages: 2,
+    quantity: '10.0000',
+  })
+  const sharedSecond = await createDeliveryLine(a, {
+    deliveryId: twoCustomerDelivery,
+    customerId: otherCustomer,
+    presentationLineId: line,
+    batchId: batchShared,
+    packages: 1,
+    quantity: '5.0000',
+  })
+  await voidLines(a, twoCustomerDelivery, [sharedSecond], SHARED_VOID_REASON)
 
   const presentationB = await createPresentation(b)
   const productB = await createFinished(b, presentationB)
   const orderB = await createOrder(b)
-  const lineB = await createLine(b, orderB, presentationB)
+  const presentationLineB = await createLine(b, orderB, presentationB)
   const batchB = await createBatch(b, productB, presentationB)
-  const deliveryB = await createDelivery(b, orderB)
-  await createDeliveryLine(b, {
+  const deliveryB = await createDelivery(b, orderB, T1)
+  const lineB = await createDeliveryLine(b, {
     deliveryId: deliveryB,
-    presentationLineId: lineB,
+    presentationLineId: presentationLineB,
     batchId: batchB,
     packages: 5,
     quantity: '9.0000',
@@ -334,15 +397,22 @@ async function seedAll(): Promise<Seed> {
   return {
     a,
     b,
+    order,
+    orderB,
+    otherCustomer,
     twoBatchDelivery,
     partiallyVoidedDelivery,
     fullyVoidedDelivery,
+    twoCustomerDelivery,
     batchOne,
     batchTwo,
     batchOther,
     batchAllVoided,
+    batchShared,
     deliveryB,
     batchB,
+    lines: { twoBatchOne, twoBatchTwo, partialVoided, partialOther, fullyVoided, sharedFirst, sharedSecond },
+    lineB,
   }
 }
 
@@ -355,49 +425,108 @@ afterAll(async () => {
   await prisma.$disconnect()
 }, 120_000)
 
-describe('findDeliveryDetailsByIds', () => {
-  it('R19: trae el cliente de la entrega y los envases de cada uno de sus dos lotes', async () => {
-    const details = await findDeliveryDetailsByIds(seed.a.companyId, [seed.twoBatchDelivery])
+/** Los ids de una pareja de lineas de la misma entrega, en el orden del listado: id descendente. */
+function idDesc(...ids: string[]): string[] {
+  return [...ids].sort().reverse()
+}
 
-    expect([...details.keys()]).toEqual([seed.twoBatchDelivery])
-    const detail = details.get(seed.twoBatchDelivery)
-    expect(detail?.customerId).toBe(seed.a.customerId)
-    expect(detail?.linesByBatch.size).toBe(2)
-    expect(detail?.linesByBatch.get(seed.batchOne)).toEqual({ packages: 2, void: null })
-    expect(detail?.linesByBatch.get(seed.batchTwo)).toEqual({ packages: 1, void: null })
-  })
+function allBatchesOfA(): string[] {
+  return [seed.batchOne, seed.batchTwo, seed.batchOther, seed.batchAllVoided, seed.batchShared]
+}
 
-  it('R33: en una entrega con dos presentaciones y una anulada, solo la linea anulada trae su motivo', async () => {
-    const details = await findDeliveryDetailsByIds(seed.a.companyId, [seed.partiallyVoidedDelivery])
+/** Todas las lineas de A, en el orden del listado: entrega mas reciente primero e id descendente. */
+function expectedOrderOfA(): string[] {
+  return [
+    ...idDesc(seed.lines.sharedFirst, seed.lines.sharedSecond),
+    seed.lines.fullyVoided,
+    ...idDesc(seed.lines.partialVoided, seed.lines.partialOther),
+    ...idDesc(seed.lines.twoBatchOne, seed.lines.twoBatchTwo),
+  ]
+}
 
-    const lines = details.get(seed.partiallyVoidedDelivery)?.linesByBatch
-    expect(lines?.size).toBe(2)
-    expect(lines?.get(seed.batchOne)).toEqual({ packages: 3, void: { reason: VOID_REASON } })
-    expect(lines?.get(seed.batchOther)).toEqual({ packages: 4, void: null })
-  })
+// 2026-10-15 (QC-282): `findDeliveryDetailsByIds` (entrega -> cliente y lineas por lote) desaparece; el
+// tab Entregas pagina las lineas directamente. Lo que comprobaban sus casos (cliente, envases por
+// lote, motivo solo en la linea anulada, varias entregas a la vez) se comprueba ahora sobre las filas.
+describe('listDeliveryLinesByBatchIds', () => {
+  it('R19, R43: una fila por linea de entrega, con su entrega, pedido, instante, cliente, lote, envases y cantidad', async () => {
+    const page = await listDeliveryLinesByBatchIds(seed.a.companyId, [seed.batchOne, seed.batchTwo], { page: 1 })
 
-  it('R19, R33: resuelve varias entregas en una llamada y omite el id que no existe', async () => {
-    const details = await findDeliveryDetailsByIds(seed.a.companyId, [
-      seed.twoBatchDelivery,
-      seed.fullyVoidedDelivery,
-      randomUUID(),
-    ])
-
-    expect(new Set(details.keys())).toEqual(new Set([seed.twoBatchDelivery, seed.fullyVoidedDelivery]))
-    expect(details.get(seed.fullyVoidedDelivery)?.linesByBatch.get(seed.batchAllVoided)).toEqual({
-      packages: 6,
-      void: { reason: 'Entrega duplicada' },
+    expect(page.total).toBe(3)
+    const porId = new Map(page.items.map((item) => [item.id, item]))
+    expect(porId.get(seed.lines.twoBatchOne)).toEqual({
+      id: seed.lines.twoBatchOne,
+      orderDeliveryId: seed.twoBatchDelivery,
+      orderId: seed.order,
+      createdAt: T1.toISOString(),
+      customerId: seed.a.customerId,
+      batchId: seed.batchOne,
+      packages: 2,
+      quantity: '10.1000',
+      void: null,
     })
+    expect(porId.get(seed.lines.twoBatchTwo)).toMatchObject({ batchId: seed.batchTwo, packages: 1, quantity: '5.0001', void: null })
   })
 
-  it('con ids vacios devuelve un mapa vacio sin consultar', async () => {
-    const spy = vi.spyOn(prisma.orderDelivery, 'findMany')
+  it('R33, R44: en una entrega con dos presentaciones y una anulada, solo la linea anulada trae su motivo', async () => {
+    const page = await listDeliveryLinesByBatchIds(seed.a.companyId, [seed.batchOne, seed.batchOther], { page: 1 })
+
+    const deLaParcial = page.items.filter((item) => item.orderDeliveryId === seed.partiallyVoidedDelivery)
+    expect(deLaParcial.map((item) => [item.batchId, item.packages, item.void])).toEqual(
+      expect.arrayContaining([
+        [seed.batchOne, 3, { reason: VOID_REASON }],
+        [seed.batchOther, 4, null],
+      ]),
+    )
+    expect(deLaParcial).toHaveLength(2)
+  })
+
+  it('R43, R44: dos clientes del mismo lote en una entrega son dos filas, y solo la del par anulado sale anulada', async () => {
+    const page = await listDeliveryLinesByBatchIds(seed.a.companyId, [seed.batchShared], { page: 1 })
+
+    expect(page.total).toBe(2)
+    expect(page.items.map((item) => [item.id, item.customerId, item.packages, item.quantity, item.void])).toEqual(
+      expect.arrayContaining([
+        [seed.lines.sharedFirst, seed.a.customerId, 2, '10.0000', null],
+        [seed.lines.sharedSecond, seed.otherCustomer, 1, '5.0000', { reason: SHARED_VOID_REASON }],
+      ]),
+    )
+    expect(new Set(page.items.map((item) => item.orderDeliveryId))).toEqual(new Set([seed.twoCustomerDelivery]))
+  })
+
+  it('R44: las anuladas tambien salen, en orden createdAt desc de la entrega e id desc de la linea', async () => {
+    const page = await listDeliveryLinesByBatchIds(seed.a.companyId, allBatchesOfA(), { page: 1 })
+
+    expect(page).toMatchObject({ total: 7, page: 1, pageSize: 10, totalPages: 1 })
+    expect(page.items.map((item) => item.id)).toEqual(expectedOrderOfA())
+  })
+
+  it('R44: pagina sobre las filas: el tamano pedido, la pagina y el total cuentan lineas', async () => {
+    const segunda = await listDeliveryLinesByBatchIds(seed.a.companyId, allBatchesOfA(), { page: 2, pageSize: 3 })
+
+    expect(segunda).toMatchObject({ total: 7, page: 2, pageSize: 3, totalPages: 3 })
+    expect(segunda.items.map((item) => item.id)).toEqual(expectedOrderOfA().slice(3, 6))
+
+    const ultima = await listDeliveryLinesByBatchIds(seed.a.companyId, allBatchesOfA(), { page: 3, pageSize: 3 })
+    expect(ultima.items.map((item) => item.id)).toEqual(expectedOrderOfA().slice(6))
+  })
+
+  it('R44: un tamano mayor que el tope se acota a 25', async () => {
+    const page = await listDeliveryLinesByBatchIds(seed.a.companyId, allBatchesOfA(), { page: 1, pageSize: 500 })
+
+    expect(page).toMatchObject({ total: 7, pageSize: 25, totalPages: 1 })
+  })
+
+  it('con lotes vacios devuelve una pagina vacia sin consultar', async () => {
+    const findMany = vi.spyOn(prisma.orderDeliveryLine, 'findMany')
+    const count = vi.spyOn(prisma.orderDeliveryLine, 'count')
     try {
-      const details = await findDeliveryDetailsByIds(seed.a.companyId, [])
-      expect(details.size).toBe(0)
-      expect(spy).not.toHaveBeenCalled()
+      const page = await listDeliveryLinesByBatchIds(seed.a.companyId, [], { page: 1 })
+      expect(page).toEqual({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 })
+      expect(findMany).not.toHaveBeenCalled()
+      expect(count).not.toHaveBeenCalled()
     } finally {
-      spy.mockRestore()
+      findMany.mockRestore()
+      count.mockRestore()
     }
   })
 })
@@ -412,6 +541,12 @@ describe('summarizeDeliveredByBatchIds', () => {
     ])
 
     expect(total).toEqual({ quantity: '23.3501', packages: 7 })
+  })
+
+  it('R34, R44: con dos clientes en un lote solo suma la linea del par sin anular', async () => {
+    const total = await summarizeDeliveredByBatchIds(seed.a.companyId, [seed.batchShared])
+
+    expect(total).toEqual({ quantity: '10.0000', packages: 2 })
   })
 
   it('R34: con todas las lineas de esos lotes anuladas el total es cero', async () => {
@@ -433,10 +568,11 @@ describe('summarizeDeliveredByBatchIds', () => {
 })
 
 describe('ambito de empresa', () => {
-  it('R25: una entrega de B no vuelve con la empresa A aunque se pida su id', async () => {
-    const details = await findDeliveryDetailsByIds(seed.a.companyId, [seed.deliveryB, seed.twoBatchDelivery])
+  it('R25: las lineas de B no vuelven con la empresa A aunque se pida su lote', async () => {
+    const page = await listDeliveryLinesByBatchIds(seed.a.companyId, [seed.batchB, seed.batchTwo], { page: 1 })
 
-    expect([...details.keys()]).toEqual([seed.twoBatchDelivery])
+    expect(page.total).toBe(1)
+    expect(page.items.map((item) => item.id)).toEqual([seed.lines.twoBatchTwo])
   })
 
   it('R25: las lineas de B no suman en el total de A aunque se pase su lote', async () => {
@@ -446,9 +582,21 @@ describe('ambito de empresa', () => {
   })
 
   it('R25: con el ambito de B, B ve lo suyo y nada de A', async () => {
-    const details = await findDeliveryDetailsByIds(seed.b.companyId, [seed.deliveryB, seed.twoBatchDelivery])
-    expect([...details.keys()]).toEqual([seed.deliveryB])
-    expect(details.get(seed.deliveryB)?.linesByBatch.get(seed.batchB)).toEqual({ packages: 5, void: null })
+    const page = await listDeliveryLinesByBatchIds(seed.b.companyId, [seed.batchB, seed.batchOne], { page: 1 })
+    expect(page.total).toBe(1)
+    expect(page.items).toEqual([
+      {
+        id: seed.lineB,
+        orderDeliveryId: seed.deliveryB,
+        orderId: seed.orderB,
+        createdAt: T1.toISOString(),
+        customerId: seed.b.customerId,
+        batchId: seed.batchB,
+        packages: 5,
+        quantity: '9.0000',
+        void: null,
+      },
+    ])
 
     const total = await summarizeDeliveredByBatchIds(seed.b.companyId, [seed.batchB, seed.batchOne])
     expect(total).toEqual({ quantity: '9.0000', packages: 5 })

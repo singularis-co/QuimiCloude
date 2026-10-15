@@ -822,17 +822,16 @@ model OrderPresentationLine {
   @@map("order_presentation_lines")
 }
 
-/// Una entrega al cliente del producto terminado de un pedido. Solo de insercion: sin `updatedAt`
-/// ni `deletedAt`. `deliveryKey` la hace idempotente por empresa. `customerId`, `createdBy` y
-/// `companyId` no llevan `@relation`: `Customer`, `User` y `Company` son de otros modulos; sus FK
-/// estan escritas a mano y son drift, y las del cliente y del autor son compuestas con `companyId`. La FK de
-/// `order` tambien es compuesta en la base (`(order_id, company_id)`).
+/// Una entrega del producto terminado de un pedido, a uno o varios clientes: el cliente va en cada
+/// linea, no aqui. Solo de insercion: sin `updatedAt` ni `deletedAt`. `deliveryKey` la hace
+/// idempotente por empresa. `createdBy` y `companyId` no llevan `@relation`: `User` y `Company` son
+/// de otros modulos; sus FK estan escritas a mano y son drift, y la del autor es compuesta con
+/// `companyId`. La FK de `order` tambien es compuesta en la base (`(order_id, company_id)`).
 /// @module pedidos
 model OrderDelivery {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId   String   @map("company_id") @db.Uuid
   orderId     String   @map("order_id") @db.Uuid
-  customerId  String   @map("customer_id") @db.Uuid
   deliveryKey String   @map("delivery_key") @db.Uuid
   createdBy   String   @map("created_by") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -844,20 +843,21 @@ model OrderDelivery {
   @@unique([id, companyId], map: "order_deliveries_id_company_id_key")
   @@unique([companyId, deliveryKey], map: "order_deliveries_company_key_unique")
   @@index([orderId], map: "order_deliveries_order_id_idx")
-  @@index([companyId, customerId], map: "order_deliveries_customer_id_idx")
   @@index([createdBy], map: "order_deliveries_created_by_idx")
   @@map("order_deliveries")
 }
 
-/// Un lote dentro de una entrega: cuantos envases salen de el para una linea del reparto y su
-/// cantidad. Solo de insercion. `batchId` no lleva `@relation`: `ProductBatch` es de `inventario`;
-/// FK compuesta con `companyId` escrita a mano, drift. Las FK de `delivery` y `presentationLine`
-/// tambien son compuestas en la base. Los CHECK de positivos son drift.
+/// Un lote dentro de una entrega para un cliente: cuantos envases salen de el para una linea del
+/// reparto y su cantidad. Solo de insercion. `customerId` y `batchId` no llevan `@relation`:
+/// `Customer` es de `clientes` y `ProductBatch` de `inventario`; sus FK son compuestas con
+/// `companyId`, escritas a mano y drift. Las FK de `delivery` y `presentationLine` tambien son
+/// compuestas en la base. Los CHECK de positivos son drift.
 /// @module pedidos
 model OrderDeliveryLine {
   id                      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId               String  @map("company_id") @db.Uuid
   deliveryId              String  @map("delivery_id") @db.Uuid
+  customerId              String  @map("customer_id") @db.Uuid
   orderPresentationLineId String  @map("order_presentation_line_id") @db.Uuid
   batchId                 String  @map("batch_id") @db.Uuid
   packages                Int
@@ -867,9 +867,10 @@ model OrderDeliveryLine {
   presentationLine OrderPresentationLine @relation(fields: [orderPresentationLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   voidLine         OrderDeliveryVoidLine?
 
-  @@unique([deliveryId, batchId], map: "order_delivery_lines_delivery_batch_unique")
+  @@unique([deliveryId, customerId, batchId], map: "order_delivery_lines_delivery_customer_batch_unique")
   @@unique([id, deliveryId], map: "order_delivery_lines_id_delivery_id_key")
   @@index([companyId], map: "order_delivery_lines_company_id_idx")
+  @@index([companyId, customerId], map: "order_delivery_lines_customer_id_idx")
   @@index([orderPresentationLineId], map: "order_delivery_lines_presentation_line_id_idx")
   @@index([batchId], map: "order_delivery_lines_batch_id_idx")
   @@map("order_delivery_lines")

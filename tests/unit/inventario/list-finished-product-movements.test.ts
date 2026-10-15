@@ -60,7 +60,7 @@ function montar(
     findAliveFinished: vi.fn<FinishedProductDetailRepository['findAliveFinished']>(async () => record),
     listBatches: vi.fn<FinishedProductDetailRepository['listBatches']>(),
     listMovements: vi.fn<FinishedProductDetailRepository['listMovements']>(async () => finishedProductPage(items)),
-    listDeliveryMovements: vi.fn<FinishedProductDetailRepository['listDeliveryMovements']>(),
+    // 2026-10-15 (QC-282): el puerto pierde `listDeliveryMovements`; el tab Entregas lee las lineas de `pedidos`.
     listProductionCosts: vi.fn<FinishedProductDetailRepository['listProductionCosts']>(),
     findProducedProducts: vi.fn<FinishedProductDetailRepository['findProducedProducts']>(),
   };
