@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   PACKING_FINISH_BADGE_TESTID,
@@ -257,8 +257,7 @@ describe('diálogo — diferencia y motivo', () => {
     await contar(user, galon(), '14');
     expect(within(galon()).queryByTestId(PACKING_FINISH_BADGE_TESTID)).toBeNull();
     expect(within(galon()).queryByRole('combobox')).toBeNull();
-    fireEvent.transitionEnd(within(galon()).getByTestId(PACKING_FINISH_REASON_FOLD_TESTID));
-    expect(within(galon()).queryByTestId(PACKING_FINISH_REASON_TESTID)).toBeNull();
+    await waitFor(() => expect(within(galon()).queryByTestId(PACKING_FINISH_REASON_TESTID)).toBeNull());
   });
 
   it('R4: al pasar de menos a más, un motivo que no vale para más se vacía', async () => {
@@ -552,6 +551,54 @@ describe('diálogo — textos del tablero', () => {
 });
 
 describe('diálogo — el bloque de motivo se despliega y se pliega', () => {
+  // jsdom no pinta: Base UI solo anima el panel si lee una transición en su estilo calculado y un
+  // alto medido, y lo desmonta cuando terminan sus `getAnimations()`. Aquí la transición se declara
+  // con una hoja de estilo, el alto se finge y la salida «dura» hasta soltarla, como en el
+  // navegador al acabar la animación.
+  const PANEL = '[data-slot="collapsible-content"]';
+  let hoja: HTMLStyleElement | null = null;
+  let soltarSalida: (() => void) | null = null;
+
+  beforeEach(() => {
+    hoja = document.createElement('style');
+    hoja.textContent = `${PANEL} { transition-duration: 200ms; }`;
+    document.head.append(hoja);
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.matches(PANEL) ? 120 : 0;
+      },
+    });
+  });
+
+  afterEach(() => {
+    hoja?.remove();
+    soltarSalida?.();
+    soltarSalida = null;
+    Reflect.deleteProperty(Element.prototype, 'getAnimations');
+    Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight');
+  });
+
+  function salidaPendiente(): void {
+    const finished = new Promise<void>((resolve) => {
+      soltarSalida = resolve;
+    });
+    const animacion = { finished, pending: false, playState: 'running' };
+    Object.defineProperty(Element.prototype, 'getAnimations', {
+      configurable: true,
+      writable: true,
+      value(this: Element) {
+        return this.matches(PANEL) ? [animacion] : [];
+      },
+    });
+  }
+
+  async function terminarSalida(): Promise<void> {
+    await act(async () => {
+      soltarSalida?.();
+    });
+  }
+
   const plegable = (fila: HTMLElement) => within(fila).getByTestId(PACKING_FINISH_REASON_FOLD_TESTID);
 
   it('R3: al diferir del plan el bloque se despliega abierto, accesible y con la transición del tablero', async () => {
@@ -561,17 +608,18 @@ describe('diálogo — el bloque de motivo se despliega y se pliega', () => {
     await contar(user, galon(), '13');
 
     const bloque = plegable(galon());
-    expect(bloque).toHaveAttribute('data-state', 'open');
+    expect(bloque).toHaveAttribute('data-open');
     expect(bloque).not.toHaveAttribute('inert');
     expect(bloque).not.toHaveAttribute('aria-hidden');
-    const clases = bloque.className.split(/\s+/);
-    expect(clases).toEqual(
+    expect(bloque.className.split(/\s+/)).toEqual(
       expect.arrayContaining([
         'grid',
         'grid-rows-[1fr]',
-        'starting:grid-rows-[0fr]',
-        'starting:translate-y-[10px]',
+        'data-starting-style:grid-rows-[0fr]',
+        'data-starting-style:translate-y-[10px]',
+        'data-starting-style:opacity-0',
         'duration-(--dur-base)',
+        'ease-(--ease-enter)',
       ]),
     );
     expect(within(galon()).getByRole('combobox')).toBeInTheDocument();
@@ -581,37 +629,45 @@ describe('diálogo — el bloque de motivo se despliega y se pliega', () => {
     const { user } = pintar();
 
     await user.click(within(galon()).getByRole('button', { name: T.decrease('Galón 3,78 L') }));
+    salidaPendiente();
     await user.click(within(galon()).getByRole('button', { name: T.increase('Galón 3,78 L') }));
 
     const bloque = plegable(galon());
-    expect(bloque).toHaveAttribute('data-state', 'closed');
+    await waitFor(() => expect(bloque).toHaveAttribute('data-ending-style'));
+    expect(bloque.isConnected).toBe(true);
+    expect(bloque).toHaveAttribute('data-closed');
     expect(bloque).toHaveAttribute('inert');
     expect(bloque).toHaveAttribute('aria-hidden', 'true');
     expect(bloque.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(['grid-rows-[0fr]', 'translate-y-[10px]', 'opacity-0', 'duration-(--dur-base)']),
+      expect.arrayContaining([
+        'data-ending-style:grid-rows-[0fr]',
+        'data-ending-style:translate-y-[10px]',
+        'data-ending-style:opacity-0',
+        'data-closed:ease-(--ease-exit)',
+        'duration-(--dur-base)',
+      ]),
     );
     // Se pliega con lo que mostraba, no vacío: la ayuda de liberar sigue dentro mientras se mueve.
     expect(within(bloque).getByTestId(PACKING_FINISH_HELP_TESTID)).toHaveTextContent('Se libera 1 envase apartado.');
     expect(within(galon()).queryByRole('combobox')).toBeNull();
 
-    // Una transición que burbujea desde dentro no lo desmonta.
-    fireEvent.transitionEnd(within(bloque).getByTestId(PACKING_FINISH_REASON_TESTID));
-    expect(plegable(galon())).toBe(bloque);
-
-    fireEvent.transitionEnd(bloque);
-    expect(within(galon()).queryByTestId(PACKING_FINISH_REASON_FOLD_TESTID)).toBeNull();
+    await terminarSalida();
+    await waitFor(() => expect(within(galon()).queryByTestId(PACKING_FINISH_REASON_FOLD_TESTID)).toBeNull());
   });
 
   it('R3: si vuelve a diferir mientras se pliega, el mismo bloque se abre de nuevo', async () => {
     const { user } = pintar();
 
     await contar(user, galon(), '13');
+    salidaPendiente();
     await contar(user, galon(), '14');
     const bloque = plegable(galon());
+    await waitFor(() => expect(bloque).toHaveAttribute('data-closed'));
+    expect(bloque.isConnected).toBe(true);
     await contar(user, galon(), '12');
 
     expect(plegable(galon())).toBe(bloque);
-    expect(bloque).toHaveAttribute('data-state', 'open');
+    expect(bloque).toHaveAttribute('data-open');
     expect(bloque).not.toHaveAttribute('inert');
   });
 
@@ -621,16 +677,31 @@ describe('diálogo — el bloque de motivo se despliega y se pliega', () => {
     await contar(user, botella(), '14');
     await elegirMotivo(user, botella(), 'Otro');
     const otro = within(botella()).getByTestId(PACKING_FINISH_OTHER_FOLD_TESTID);
-    expect(otro).toHaveAttribute('data-state', 'open');
+    expect(otro).toHaveAttribute('data-open');
     expect(within(botella()).getByRole('textbox', { name: /Describe el motivo/ })).toBeInTheDocument();
 
+    salidaPendiente();
     await elegirMotivo(user, botella(), 'Rotura');
-    expect(otro).toHaveAttribute('data-state', 'closed');
+    await waitFor(() => expect(otro).toHaveAttribute('data-ending-style'));
+    expect(otro.isConnected).toBe(true);
+    expect(otro).toHaveAttribute('data-closed');
     expect(otro).toHaveAttribute('inert');
     expect(otro).toHaveAttribute('aria-hidden', 'true');
     expect(within(botella()).queryByRole('textbox', { name: /Describe el motivo/ })).toBeNull();
 
-    fireEvent.transitionEnd(otro);
-    expect(within(botella()).queryByTestId(PACKING_FINISH_OTHER_FOLD_TESTID)).toBeNull();
+    await terminarSalida();
+    await waitFor(() => expect(within(botella()).queryByTestId(PACKING_FINISH_OTHER_FOLD_TESTID)).toBeNull());
+  });
+
+  it('R3: abierto y quieto deja de recortar, para que el anillo de foco no se corte', async () => {
+    const { user } = pintar();
+
+    await contar(user, galon(), '13');
+    const bloque = plegable(galon());
+    const interior = bloque.firstElementChild as HTMLElement;
+    expect(interior).toHaveClass('overflow-hidden');
+
+    fireEvent.transitionEnd(bloque);
+    expect(interior).not.toHaveClass('overflow-hidden');
   });
 });

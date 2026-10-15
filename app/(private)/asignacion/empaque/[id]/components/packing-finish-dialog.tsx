@@ -8,6 +8,7 @@ import { SharedSelectControl } from '@/components/shared/shared-select';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { STEP_EVIDENCE_TEXTS } from '@/components/shared/step-evidence';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import {
   Dialog,
   DialogClose,
@@ -101,11 +102,12 @@ export const PACKING_FINISH_GATE_TESTID = 'packing-finish-gate';
 
 const TEXTS = PACKING_FINISH_DIALOG_TEXTS;
 
-const FOLD_CLASS =
-  'grid transition-[grid-template-rows,opacity,translate] duration-(--dur-base)';
-const FOLD_OPEN_CLASS =
-  'grid-rows-[1fr] translate-y-0 opacity-100 ease-(--ease-enter) starting:grid-rows-[0fr] starting:translate-y-[10px] starting:opacity-0';
-const FOLD_CLOSED_CLASS = 'grid-rows-[0fr] translate-y-[10px] opacity-0 ease-(--ease-exit)';
+const FOLD_CLASS = [
+  'grid grid-rows-[1fr] translate-y-0 opacity-100',
+  'transition-[grid-template-rows,opacity,translate] duration-(--dur-base) ease-(--ease-enter) data-closed:ease-(--ease-exit)',
+  'data-starting-style:grid-rows-[0fr] data-starting-style:translate-y-[10px] data-starting-style:opacity-0',
+  'data-ending-style:grid-rows-[0fr] data-ending-style:translate-y-[10px] data-ending-style:opacity-0',
+].join(' ');
 const ERROR_REVEAL_CLASS =
   'animate-in fade-in-0 slide-in-from-top-1 duration-(--dur-fast) ease-(--ease-enter)';
 
@@ -442,12 +444,10 @@ function PackingFinishBody({
 }
 
 /**
- * Despliega y pliega su contenido animando la fila de la rejilla entre 0 y su alto. Al plegarse
- * sigue montado con lo último que mostró abierto, `inert` y oculto a la tecnología de asistencia,
- * y se desmonta al acabar la transición. Con movimiento reducido la regla global acorta la
- * transición a casi nada, así que el desmontaje llega en el acto.
+ * Panel de `Collapsible` que se pliega con lo último que mostró abierto: al volver al plan la
+ * ayuda y el aviso cambian, y sin congelarlos el bloque saltaría mientras se cierra.
  */
-function Fold({
+function FoldPanel({
   open,
   className,
   testId,
@@ -458,41 +458,31 @@ function Fold({
   readonly testId: string;
   readonly children: ReactNode;
 }) {
-  const [mounted, setMounted] = useState(open);
   const [lastOpen, setLastOpen] = useState<ReactNode>(open ? children : null);
   // Recorta solo mientras se mueve: abierto y quieto, el anillo de foco no se corta.
   const [settled, setSettled] = useState(false);
 
-  if (open && (!mounted || lastOpen !== children)) {
-    setMounted(true);
-    setLastOpen(children);
-  }
+  if (open && lastOpen !== children) setLastOpen(children);
   if (!open && settled) setSettled(false);
-  if (!mounted) return null;
 
   function handleTransitionEnd(event: TransitionEvent<HTMLDivElement>) {
-    if (event.target !== event.currentTarget) return;
-    if (open) {
-      setSettled(true);
-    } else {
-      setMounted(false);
-      setLastOpen(null);
-    }
+    if (open && event.target === event.currentTarget) setSettled(true);
   }
 
   return (
-    <div
-      data-testid={testId}
-      data-state={open ? 'open' : 'closed'}
-      inert={!open}
-      aria-hidden={open ? undefined : true}
-      onTransitionEnd={handleTransitionEnd}
-      className={cn(FOLD_CLASS, open ? FOLD_OPEN_CLASS : FOLD_CLOSED_CLASS, className)}
-    >
-      <div className={cn('min-h-0', !(open && settled) && 'overflow-hidden')}>
-        {open ? children : lastOpen}
-      </div>
-    </div>
+    <Collapsible open={open} className="contents">
+      <CollapsibleContent
+        data-testid={testId}
+        inert={!open}
+        aria-hidden={open ? undefined : true}
+        onTransitionEnd={handleTransitionEnd}
+        className={cn(FOLD_CLASS, className)}
+      >
+        <div className={cn('min-h-0', !(open && settled) && 'overflow-hidden')}>
+          {open ? children : lastOpen}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -594,7 +584,7 @@ function PackingFinishLineRow({
         </div>
       )}
 
-      <Fold open={differs} className="col-span-full md:col-start-2" testId={PACKING_FINISH_REASON_FOLD_TESTID}>
+      <FoldPanel open={differs} className="col-span-full md:col-start-2" testId={PACKING_FINISH_REASON_FOLD_TESTID}>
         <div className="flex flex-col gap-2.5">
           <div className="flex flex-col gap-2">
             <span id={reasonLabelId} className="text-sm font-medium">
@@ -625,7 +615,7 @@ function PackingFinishLineRow({
             {difference > 0 ? <p className="text-xs text-muted-foreground">{TEXTS.increaseHint}</p> : null}
           </div>
 
-          <Fold open={reason === 'otro'} testId={PACKING_FINISH_OTHER_FOLD_TESTID}>
+          <FoldPanel open={reason === 'otro'} testId={PACKING_FINISH_OTHER_FOLD_TESTID}>
             <div className="flex flex-col gap-2">
               <Label htmlFor={otherId}>
                 {TEXTS.otherLabel} <span aria-hidden="true" className="text-destructive">*</span>
@@ -648,7 +638,7 @@ function PackingFinishLineRow({
                 </div>
               )}
             </div>
-          </Fold>
+          </FoldPanel>
 
           {help === null ? null : (
             <p className="text-xs text-muted-foreground" data-testid={PACKING_FINISH_HELP_TESTID}>
@@ -656,7 +646,7 @@ function PackingFinishLineRow({
             </p>
           )}
         </div>
-      </Fold>
+      </FoldPanel>
     </div>
   );
 }

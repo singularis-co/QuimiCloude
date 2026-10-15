@@ -1362,6 +1362,7 @@ div role=generic
           button role=button name="Añadir un envase de Botella 200 ml" aria-label="Añadir un envase de Botella 200 ml" data-testid="packing-finish-increase" type="button" class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:scale-[0.98] aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-background bg-clip-padding border border-border btn-veil cursor-pointer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:border-input disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring focus-visible:outline-solid font-medium group/button inline-flex items-center justify-center min-h-11 min-w-11 outline-none rounded-lg select-none shrink-0 size-9 text-sm transition-all whitespace-nowrap"
             svg aria-hidden="true" height="24" width="24" class="lucide lucide-plus"
           span role=generic class="flex justify-end min-w-12"
+        div role=generic class="contents"
     div role=generic class="border-border border-t flex flex-col gap-3 items-stretch md:flex-row md:flex-wrap md:gap-4 md:items-center md:justify-between md:pb-5 md:pt-3.5 md:px-6 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3 px-4"
       div role=generic aria-live="polite" class="flex flex-col gap-0.5 text-sm"
         span role=generic data-testid="packing-finish-total"
