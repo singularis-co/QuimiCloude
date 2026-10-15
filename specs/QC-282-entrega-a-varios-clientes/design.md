@@ -614,7 +614,7 @@ Rutas abreviadas:
 | R13, R14, R15 | u `order-delivery.test.ts` (`packagesLeftInBatch`) + ui `order-delivery-sheet.test.tsx` |
 | R16, R17, R18 | u `order-delivery.test.ts` (`checkDeliveryBlocks`) + ui `order-delivery-sheet.test.tsx` |
 | R19 | ui `order-delivery-sheet.test.tsx` (payload exacto de la action) |
-| R20 | u `order-delivery.test.ts`: caso que lee las fuentes del sheet y de `deliver-order.ts` y exige que importen `checkDelivery`, `checkDeliveryBlocks` y `packagesLeftInBatch` del barrel |
+| R20 | u `order-delivery.test.ts`: caso que lee las fuentes del sheet y de `deliver-order.ts` y exige que importen `checkDelivery`, `checkDeliveryBlocks` y `packagesLeftInBatch` del barrel. **Decisión 2026-10-15 (humano):** el sheet importa las tres del barrel `@/lib/modules/pedidos`; `deliver-order.ts` importa de `./order-delivery` las dos que usa (`checkDelivery`, `checkDeliveryBlocks`), porque el barrel crearía un ciclo y el tope por lote lo aplica inventario. Caso «QC-282 R20» junto al R16 de QC-223 |
 | R21 | u `deliver-order.test.ts` (tabla de formas); int `order-delivery.int.test.ts` |
 | R22 | u `deliver-order.test.ts`; int `order-delivery.int.test.ts` (segundo cliente de B o dado de baja) |
 | R23 | u `deliver-order.test.ts`; int `order-delivery.int.test.ts` (suma de dos clientes) |

@@ -319,6 +319,58 @@ describe('una sola funcion pura en el sheet y en el servidor (R16)', () => {
     expect(aritmeticaPropia(codigo), `${ruta} calcula el tope por su cuenta`).toEqual([])
   })
 
+  /** Nombres (sin `type`, sin alias) que un import con llaves trae desde `origen`. */
+  function nombresImportadosDe(codigo: string, origen: string): string[] {
+    const nombres: string[] = []
+    for (const m of codigo.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*'([^']+)'/g)) {
+      if (m[2] !== origen) continue
+      for (const n of (m[1] ?? '').split(',')) {
+        const limpio = n.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0] ?? ''
+        if (limpio) nombres.push(limpio)
+      }
+    }
+    return nombres
+  }
+
+  // QC-282 2026-10-15 (decision del humano, design §12 fila R20): el sheet trae las tres reglas
+  // puras del barrel; `deliver-order.ts` trae de `./order-delivery` las dos que usa (el barrel
+  // crearia un ciclo y el tope por lote lo aplica inventario con el lote bloqueado).
+  const REGLAS_R20 = [
+    {
+      ruta: 'app/(private)/pedidos/components/order-delivery-sheet.tsx',
+      desde: '@/lib/modules/pedidos',
+      nombres: ['checkDelivery', 'checkDeliveryBlocks', 'packagesLeftInBatch'],
+    },
+    {
+      ruta: 'lib/modules/pedidos/domain/deliver-order.ts',
+      desde: './order-delivery',
+      nombres: ['checkDelivery', 'checkDeliveryBlocks'],
+    },
+  ] as const
+
+  it.each(REGLAS_R20)('QC-282 R20: $ruta importa $nombres de $desde', ({ ruta, desde, nombres }) => {
+    const codigo = soloCodigo(readFileSync(join(RAIZ, ruta), 'utf8'))
+    const importados = nombresImportadosDe(codigo, desde)
+    for (const nombre of nombres) {
+      expect(importados, `${ruta} tiene que importar ${nombre} de ${desde}`).toContain(nombre)
+    }
+  })
+
+  it('QC-282 R20: el detector no cuenta un nombre traido de otra ruta (caso sintetico)', () => {
+    const sintetico = soloCodigo(
+      [
+        "import { checkDelivery, type DeliveryCheck } from '@/lib/modules/pedidos'",
+        "import { checkDeliveryBlocks as bloques } from '@/lib/modules/pedidos/domain/order-delivery'",
+        "// import { packagesLeftInBatch } from '@/lib/modules/pedidos'",
+      ].join('\n'),
+    )
+
+    expect(nombresImportadosDe(sintetico, '@/lib/modules/pedidos')).toEqual(['checkDelivery', 'DeliveryCheck'])
+    expect(nombresImportadosDe(sintetico, '@/lib/modules/pedidos/domain/order-delivery')).toEqual([
+      'checkDeliveryBlocks',
+    ])
+  })
+
   it('R16: el detector caza una resta propia y un import de otra ruta (caso sintetico)', () => {
     const sintetico = soloCodigo(
       [

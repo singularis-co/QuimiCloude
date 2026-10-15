@@ -564,18 +564,76 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
 })
 
 // ---------------------------------------------------------------------------------------------
+// Uso de la TABLA `customers` (compartido por R38 y R40)
+// ---------------------------------------------------------------------------------------------
+
+// QC-282 2026-10-15 (decision del humano): el contrato de entrega (design §2 de QC-282) tiene un
+// campo `customers`. Antes R38 y R40 cazaban la PALABRA `customers`, y un nombre de propiedad
+// (`.customers`, `customers:`, `customers?:`, `{ customers }` y la variable que esa
+// desestructuracion declara, y el acceso indexado `View['customers']`) no es la tabla. Ahora solo
+// cuenta lo que nombra la tabla: el literal entre comillas (`'customers'`, `"customers"` del SQL
+// con comillas) que no sea un acceso indexado, o el nombre tras una palabra clave de SQL
+// (`FROM customers`, `JOIN public.customers`, `REFERENCES "customers"`...). El modelo de Prisma,
+// la ruta y el import profundo siguen con su propio marcador.
+const TABLA_CUSTOMERS_ENTRE_COMILLAS = /(?<![\w$)\].]\[)['"`]customers['"`]/
+const TABLA_CUSTOMERS_EN_SQL = /\b(?:from|join|into|update|table|references)\s+(?:"?\w+"?\.)?"?customers\b/i
+
+function usaTablaCustomers(fuente: string): boolean {
+  return TABLA_CUSTOMERS_ENTRE_COMILLAS.test(fuente) || TABLA_CUSTOMERS_EN_SQL.test(fuente)
+}
+
+/** Nombres de propiedad `customers` que NO deben disparar (casos sinteticos de R38 y R40). */
+const CUSTOMERS_COMO_PROPIEDAD = [
+  'export const n = (delivery) => delivery.customers.length\n',
+  'export const m = (delivery) => delivery?.customers ?? []\n',
+  'export const body = { orderId, customers: blocks.map((b) => b.customerId) }\n',
+  'export type View = { readonly customers?: readonly string[] }\n',
+  'export const ok = ({ customers }) => customers.every((c) => c.allocations.length > 0)\n',
+  "export type Item = View['customers'][number]\n",
+  'const { customers, orderId } = input\nexport const total = customers.reduce((s, c) => s + c.n, 0)\n',
+] as const
+
+/** Usos reales de la tabla, el modelo, la ruta o el modulo de clientes, que SI deben disparar. */
+const USOS_REALES_DE_CLIENTES = [
+  "export const tabla = 'customers'\n",
+  'export const sql = `SELECT id FROM "customers" WHERE deleted_at IS NULL`\n',
+  'export const sql = `SELECT c.id FROM customers c JOIN orders o ON o.customer_id = c.id`\n',
+  'export const sql = `SELECT 1 FROM public.customers`\n',
+] as const
+
+// ---------------------------------------------------------------------------------------------
 // R38 — nada bajo app/ que nombre clientes
 // ---------------------------------------------------------------------------------------------
 
 describe('R38 (QC-154), R37 (QC-155) — solo bajo app/(private)/clientes/ nombra clientes', () => {
-  const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
+  const MARCADORES_DE_CLIENTES = /\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
+  const nombraClientes = (fuente: string): boolean => usaTablaCustomers(fuente) || MARCADORES_DE_CLIENTES.test(fuente)
   const CARPETA_PERMITIDA = '(private)/clientes/'
 
   function coincidenciasEnApp(appDir: string = join(repoRoot, 'app')): string[] {
     return filesIn(appDir)
       .map((ruta) => relative(appDir, ruta).split(sep).join('/'))
       .filter((relativa) => !relativa.startsWith(CARPETA_PERMITIDA))
-      .filter((relativa) => /cliente/i.test(relativa) || MARCADORES_DE_CLIENTES.test(leer(join(appDir, relativa))))
+      .filter((relativa) => /cliente/i.test(relativa) || nombraClientes(leer(join(appDir, relativa))))
+  }
+
+  /** Escribe cada fuente en una pantalla fabricada fuera de (private)/clientes/ y devuelve
+   *  cuales dispara el detector. */
+  function disparanEnApp(fuentes: readonly string[]): number[] {
+    const appDir = mkdtempSync(join(tmpdir(), 'qc282-scope-'))
+    try {
+      fuentes.forEach((fuente, i) => {
+        const ruta = join(appDir, '(private)', 'pedidos', 'components', `__sensibilidad_${i}__.tsx`)
+        mkdirSync(dirname(ruta), { recursive: true })
+        writeFileSync(ruta, fuente)
+      })
+      const coincidencias = coincidenciasEnApp(appDir)
+      return fuentes
+        .map((_, i) => i)
+        .filter((i) => coincidencias.includes(`(private)/pedidos/components/__sensibilidad_${i}__.tsx`))
+    } finally {
+      rmSync(appDir, { recursive: true, force: true })
+    }
   }
 
   it('ningun archivo de app/ fuera de app/(private)/clientes/ nombra ni el nombre, ni la tabla, ni el permiso ni la ruta de clientes', () => {
@@ -607,6 +665,19 @@ describe('R38 (QC-154), R37 (QC-155) — solo bajo app/(private)/clientes/ nombr
     } finally {
       rmSync(appDir, { recursive: true, force: true })
     }
+  })
+
+  it('QC-282 — `customers` como nombre de propiedad no dispara (casos sinteticos)', () => {
+    expect(disparanEnApp(CUSTOMERS_COMO_PROPIEDAD)).toEqual([])
+  })
+
+  it('QC-282 — la tabla, la ruta y el import profundo de clientes siguen disparando (casos sinteticos)', () => {
+    const usos = [
+      ...USOS_REALES_DE_CLIENTES,
+      'export const href = "/clientes"\n',
+      "import { x } from '@/lib/modules/clientes/domain/customer'\nexport { x }\n",
+    ]
+    expect(disparanEnApp(usos)).toEqual(usos.map((_, i) => i))
   })
 })
 
@@ -647,7 +718,13 @@ describe('R40 — clientes no nombra pedidos, y pedidos solo usa clientes por su
     }
     for (const archivo of filesIn(pedidosDir, /\.tsx?$/)) {
       const fuente = leer(archivo)
-      if (importaModuloEnProfundidad(fuente, 'clientes') || nombraModeloOTabla(fuente, 'customer', 'customers')) {
+      // QC-282 2026-10-15: del lado de pedidos la tabla se busca por su USO (`usaTablaCustomers`),
+      // no por la palabra: el contrato de entrega tiene una propiedad `customers`.
+      if (
+        importaModuloEnProfundidad(fuente, 'clientes') ||
+        new RegExp('\\bprisma\\.customer\\b').test(fuente) ||
+        usaTablaCustomers(fuente)
+      ) {
         hallazgos.push(archivo)
       }
     }
@@ -718,6 +795,36 @@ describe('R40 — clientes no nombra pedidos, y pedidos solo usa clientes por su
       rmSync(raizClientes, { recursive: true, force: true })
       rmSync(raizPedidos, { recursive: true, force: true })
     }
+  })
+
+  /** Escribe cada fuente en un `pedidos` fabricado y devuelve cuales dispara el detector. */
+  function disparanEnPedidos(fuentes: readonly string[]): number[] {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc282-scope-'))
+    try {
+      const rutas = fuentes.map((fuente, i) => {
+        const ruta = join(raiz, 'domain', `__sensibilidad_${i}__.ts`)
+        mkdirSync(dirname(ruta), { recursive: true })
+        writeFileSync(ruta, fuente)
+        return ruta
+      })
+      const hallazgos = hallazgosDeAcoplamiento(moduloDir, raiz)
+      return rutas.map((_, i) => i).filter((i) => hallazgos.includes(rutas[i] ?? ''))
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
+  }
+
+  it('QC-282 — `customers` como nombre de propiedad dentro de pedidos no dispara (casos sinteticos)', () => {
+    expect(disparanEnPedidos(CUSTOMERS_COMO_PROPIEDAD)).toEqual([])
+  })
+
+  it('QC-282 — la tabla, el modelo y el import profundo de clientes dentro de pedidos siguen disparando (casos sinteticos)', () => {
+    const usos = [
+      ...USOS_REALES_DE_CLIENTES,
+      'export const uno = (id) => prisma.customer.findUnique({ where: { id } })\n',
+      "import { x } from '@/lib/modules/clientes/domain/customer'\nexport { x }\n",
+    ]
+    expect(disparanEnPedidos(usos)).toEqual(usos.map((_, i) => i))
   })
 })
 

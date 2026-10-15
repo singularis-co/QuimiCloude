@@ -52,7 +52,7 @@
 | R11, R12 | `order-delivery-sheet.test.tsx`, `order-delivery-summary.test.tsx` |
 | R13–R18 | `tests/unit/pedidos/order-delivery.test.ts`, `order-delivery-sheet.test.tsx` |
 | R19 | `order-delivery-sheet.test.tsx` (envío igual a `deliverInput()`) |
-| R20 | `tests/unit/pedidos/order-delivery.test.ts` (funciones puras). **Falta** el caso de imports «del barrel» de design §12: ver Preguntas |
+| R20 | `tests/unit/pedidos/order-delivery.test.ts`: funciones puras + «QC-282 R20: $ruta importa $nombres de $desde» (sheet: las tres del barrel; `deliver-order.ts`: dos de `./order-delivery`, design §12 enmendado 2026-10-15) + caso sintético del detector |
 | R21–R29 | `tests/unit/pedidos/deliver-order.test.ts`, `tests/integration/pedidos/order-delivery.int.test.ts`, `order-delivery-concurrency.int.test.ts`; R24, R26 también en `tests/unit/inventario/finished-goods-dispatch-prisma.test.ts`, `tests/integration/inventario/finished-goods-dispatch.int.test.ts`, `ledger-cuadre.int.test.ts` |
 | R30 | `order-delivery-constraints.int.test.ts`, `order-delivery-repository.int.test.ts`, unit del SQL, `pedidos-schema.test.ts` |
 | R31, R32 | `tests/integration/pedidos/order-delivery-lines-customer-migration.int.test.ts`, `tests/unit/pedidos/schema/order-delivery-lines-customer-migration.test.ts` |
@@ -67,14 +67,14 @@
 | R48 | sin cambios en dependencias; `guard-dependencias-aprobadas` verde (TC) |
 
 ## Preguntas abiertas para el leader / humano
-1. **`tests/unit/clientes/scope.test.ts`, 2 rojos (detectores R38 de QC-154 y R40 de QC-156).** El
+1. **[RESUELTA 2026-10-15: se afinan los detectores; ver «backend_dev — cierre TC». Queda un rojo NUEVO por `'Clientes'`, pregunta 7]** **`tests/unit/clientes/scope.test.ts`, 2 rojos (detectores R38 de QC-154 y R40 de QC-156).** El
    campo `customers` del contrato de design §2 dispara el detector de la palabra `customers` en
    `app/(private)/pedidos/components/{delivery-void-dialog,order-delivery-list,order-delivery-sheet}.tsx`
    y en `lib/modules/pedidos/{domain/deliver-order,domain/list-order-deliveries,adapters/driving/order-actions}.ts`.
    design §9 no lo prevé. Salidas: (A) afinar los detectores para que no cuenten un nombre de
    propiedad (solo `scope.test.ts`, con casos sintéticos); (B) renombrar el campo del contrato
    (p. ej. `customerBlocks`), enmendando design §2.4/§2.5/§7.1 y ~6 archivos + tests + e2e.
-2. **Test de R20 de design §12** («deliver-order.ts y el sheet importan del barrel»): importar el
+2. **[RESUELTA 2026-10-15: caso «QC-282 R20» y design §12 enmendado]** **Test de R20 de design §12** («deliver-order.ts y el sheet importan del barrel»): importar el
    barrel desde `deliver-order.ts` crea un ciclo; el caso R16 de QC-223 (decisión del 2026-10-08)
    exige `./order-delivery`; y `deliver-order.ts` no usa `packagesLeftInBatch` (el tope por lote lo
    aplica inventario con el lote bloqueado). Propuesta: el sheet importa las tres del barrel y
@@ -91,6 +91,14 @@
 6. **`./init.sh` se corta en el paso 3** por el cupo fullstack (5 de 3), la excepción ya aceptada. El
    gate no tiene forma de saltarlo, así que los pasos siguientes se corrieron a mano (ver Tandas en
    la ficha).
+7. **(nueva, 2026-10-15) `scope.test.ts` R38 sigue rojo por `order-delivery-list.tsx`**, ya no por
+   `customers` sino por el literal `'Clientes'` (`const CUSTOMERS_LABEL = 'Clientes'`, etiqueta de la
+   tarjeta «Fecha · Clientes · Envases · Entregó» de design §7.2). El marcador `['"]Clientes['"]` de R38
+   (pensado para la entrada de menú de QC-155) lo caza; antes quedaba tapado por `customers`. La
+   decisión del humano solo cubría `customers`, así que no lo toqué. Salidas: (A) afinar también
+   ese marcador (p. ej. solo en `private-nav`/títulos, o excluir etiquetas de `pedidos`); (B) cambiar
+   la etiqueta en producción (p. ej. sacarla de un literal compartido); (C) excepción nombrada para
+   ese archivo en R38.
 
 ## frontend_dev — F3 y F4
 
@@ -456,3 +464,36 @@
   `DATABASE_URL=<url de la copia> DIRECT_URL=<url de la copia> pnpm exec playwright test e2e/entrega-a-varios-clientes.spec.ts e2e/entregar-producto-terminado.spec.ts e2e/anular-entrega.spec.ts e2e/detalle-de-producto-terminado.spec.ts`
 
 **Veredicto:** specs escritos y censo E2E de la guardia al día. Typecheck en 0 y guardias en verde. El E2E no se ha visto en verde: la corrida falló por disco lleno y Postgres en recuperación, sin evaluar ninguna aserción. Queda pendiente repetirla y dar de alta el spec en `E2E_PERMITIDOS` de `clientes/scope.test.ts`.
+
+## backend_dev — cierre TC (2026-10-15)
+
+Sin código de producción. Sin dependencias nuevas.
+
+**Archivos**
+- `tests/unit/clientes/scope.test.ts`: `usaTablaCustomers` (compartido por R38 y R40) sustituye a la
+  palabra `customers`. Cuenta el literal entre comillas `'customers'`/`"customers"`/`` `customers` ``
+  salvo acceso indexado (`View['customers']`, `x?.['customers']`) y el nombre tras `FROM|JOIN|INTO|UPDATE|TABLE|REFERENCES`
+  (con esquema y comillas opcionales). R38 conserva `/clientes`, el permiso y `'Clientes'`; R40 conserva
+  `prisma.customer`, el import profundo y, del lado de clientes, `prisma.order`/`orders` sin cambios.
+  Casos previos intactos. Nuevos (4): en R38 y en R40, 8 nombres de propiedad (`.customers`, `?.customers`,
+  `customers:`, `customers?:`, `{ customers }` + su variable, `View['customers']`, `?.['customers']`,
+  desestructuración `const { customers } =`) **no** disparan; y los usos reales (`'customers'`,
+  `['customers']`, `FROM "customers"`, `FROM customers c JOIN …`, `FROM public.customers`, más `/clientes`
+  e import profundo en R38, y `prisma.customer` e import profundo en R40) **sí** disparan, todos.
+- `tests/unit/pedidos/order-delivery.test.ts`: junto al R16 de QC-223, `it.each` «QC-282 R20: $ruta importa
+  $nombres de $desde» (sheet: `checkDelivery`, `checkDeliveryBlocks`, `packagesLeftInBatch` de
+  `@/lib/modules/pedidos`; `deliver-order.ts`: `checkDelivery`, `checkDeliveryBlocks` de `./order-delivery`)
+  y un caso sintético del detector (alias, `type`, comentario, otra ruta). Aserciones previas intactas.
+- `specs/QC-282-entrega-a-varios-clientes/design.md` §12, fila R20: línea de decisión fechada 2026-10-15.
+
+**Salida**
+- `pnpm exec vitest run tests/unit/clientes/scope.test.ts tests/unit/pedidos/order-delivery.test.ts`:
+  `Test Files 1 failed | 1 passed (2)`, `Tests 1 failed | 69 passed (70)`. El rojo: R38, «ningun archivo de
+  app/ … nombra …», `(private)/pedidos/components/order-delivery-list.tsx` por `'Clientes'` (pregunta 7).
+  R40 en verde; los 6 archivos de `customers` ya no disparan.
+- `pnpm exec vitest run guard`: `Test Files 76 passed (76)`, `Tests 1066 passed | 20 skipped (1086)`.
+- `pnpm run lint`: `0 errors, 7 warnings` (todas en `tests/unit/documentos/confirm-catalog-import.test.ts`
+  y `tests/unit/pedidos/order-service.test.ts`, ajenas a este cambio).
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+
+**Veredicto:** preguntas 1 y 2 cerradas; R20 trazado; R38 queda rojo por un marcador distinto (`'Clientes'`) que necesita decisión (pregunta 7).
