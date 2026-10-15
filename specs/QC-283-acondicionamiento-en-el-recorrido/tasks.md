@@ -158,7 +158,7 @@ T4 → T5 → T6 son secuenciales porque comparten `lib/composition/index.ts`, e
 **Hecho cuando:** los tests están en verde y `finish-conditioning-batch-data.int.test.ts` sigue en
 verde.
 
-### T6 — Terminar anota · backend_dev · R6 · Dep: T5
+### [x] T6 — Terminar anota · backend_dev · R6 · Dep: T5
 
 **Hacer:**
 

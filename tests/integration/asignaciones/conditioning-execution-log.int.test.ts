@@ -467,3 +467,76 @@ describe('Guardar datos de lote anota una foto en el registro de ejecucion', () 
 function sinId(linea: ReturnType<typeof datos>) {
   return { lot: linea.lot, expiryDate: linea.expiryDate, productionDate: linea.productionDate };
 }
+
+describe('Terminar anota en el registro de ejecucion', () => {
+  it('R6: la transicion a TERMINADO y la anotacion conditioning_finish quedan juntas, a nombre de quien termina', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
+      await asignaciones.saveConditioningBatchData(actor(fixture), {
+        orderId: pedido,
+        lines: [datos(frasco.batchId, `F-${token()}`), datos(garrafa.batchId, `G-${token()}`)],
+      });
+
+      await asignaciones.finishConditioning(actor(fixture), { orderId: pedido });
+
+      const terminado = await leerPedido(pedido);
+      expect(terminado.status).toBe('TERMINADO');
+      const anotaciones = await leerAnotaciones(pedido);
+      expect(anotaciones.map((a) => a.action)).toEqual(['CONDITIONING_START', 'CONDITIONING_BATCH_SAVE', 'CONDITIONING_FINISH']);
+      expect(anotaciones[2]).toMatchObject({
+        userId: fixture.acondicionador,
+        stepPosition: null,
+        reason: null,
+        batchLines: null,
+        occurredAt: terminado.finishedAt,
+      });
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R6: si append falla el pedido no cambia', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
+      await asignaciones.saveConditioningBatchData(actor(fixture), {
+        orderId: pedido,
+        lines: [datos(frasco.batchId, `F-${token()}`), datos(garrafa.batchId, `G-${token()}`)],
+      });
+      const antes = await leerPedido(pedido);
+      const anotacionesAntes = await leerAnotaciones(pedido);
+
+      await conFallo(() =>
+        expect(asignaciones.finishConditioning(actor(fixture), { orderId: pedido })).rejects.toThrow(CHECK_SIN_PASO),
+      );
+
+      expect(antes).toEqual({ status: 'EN_ACONDICIONAMIENTO', conditionedBy: fixture.acondicionador, finishedAt: null });
+      expect(await leerPedido(pedido)).toEqual(antes);
+      expect(await leerAnotaciones(pedido)).toEqual(anotacionesAntes);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R6: un rechazo de Terminar (datos de lote incompletos) no anota', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco } = await pedidoComenzadoConLotes(fixture);
+      await asignaciones.saveConditioningBatchData(actor(fixture), {
+        orderId: pedido,
+        lines: [datos(frasco.batchId, `F-${token()}`)],
+      });
+      const anotacionesAntes = await leerAnotaciones(pedido);
+
+      await expect(asignaciones.finishConditioning(actor(fixture), { orderId: pedido })).rejects.toMatchObject({
+        code: 'conditioning_batch_data_missing',
+      });
+
+      expect((await leerPedido(pedido)).status).toBe('EN_ACONDICIONAMIENTO');
+      expect(await leerAnotaciones(pedido)).toEqual(anotacionesAntes);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+});

@@ -2094,6 +2094,7 @@ export const asignaciones = {
   finishConditioning: createFinishConditioningOrder({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   listConditioningOrders: createListConditioningOrders({

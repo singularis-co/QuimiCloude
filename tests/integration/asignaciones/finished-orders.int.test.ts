@@ -197,6 +197,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
             productionDate: '2026-03-01',
           })),
       },
+      transaction: execution.transaction,
       now: () => NOW,
     }),
   };

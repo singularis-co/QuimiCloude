@@ -223,3 +223,31 @@ Modificados (tests):
 - `pnpm exec tsc --noEmit` → sin errores. `pnpm exec eslint <7 archivos de T5>` → sin salida (0 problemas).
 
 Veredicto: T5 hecha; cada guardado anota su foto en la misma transaccion y `finish-conditioning-batch-data.int.test.ts` sigue en verde.
+
+## Tanda 1A · T6 — Terminar anota (backend_dev, 2026-10-14)
+
+### Archivos
+
+Modificados (produccion):
+- `lib/modules/asignaciones/domain/finish-conditioning.ts` (C2.8: dep `transaction`; `writers.conditioning.finishConditioningAliveById` + `log.append(conditioning_finish)` dentro; traduccion de `ExecutionAbortedError` con la misma tabla de antes)
+- `lib/composition/index.ts` (`finishConditioning`: `transaction: executionTransaction`)
+
+Modificados (tests):
+- `tests/unit/asignaciones/finish-conditioning.test.ts` (dobles de la transaccion de `conditioning-doubles.ts`; `depsIntocables` con transaccion intocable; nota fechada; R6)
+- `tests/integration/asignaciones/conditioning-execution-log.int.test.ts` (R6)
+- `tests/integration/asignaciones/finished-orders.int.test.ts` (`finishConditioning` recibe `execution.transaction`; el helper ya usa el `finishConditioningAliveById` real del fixture)
+
+### Decisiones de implementacion
+- Las comprobaciones previas (pedido, numero, estado, quien acondiciona, datos de lote) siguen fuera de la transaccion y en el mismo orden; solo la transicion y la anotacion entran. `orders.finishConditioningAliveById` deja de usarse en este caso de uso.
+
+### R → test
+| R | Test |
+|---|---|
+| R6 | `finish-conditioning.test.ts` › «R6: anota conditioning_finish en la transaccion, despues de la transicion», «R6: un rechazo de la transicion (%s) no anota y mantiene el error» (3), «R6: los rechazos previos… no abren la transaccion», «R6: si anotar falla, el error sale de la transaccion…»; `conditioning-execution-log.int.test.ts` › «R6: la transicion a TERMINADO y la anotacion conditioning_finish quedan juntas…», «R6: si append falla el pedido no cambia», «R6: un rechazo de Terminar (datos de lote incompletos) no anota» |
+
+### Verificacion (salida real)
+- `pnpm exec vitest run tests/unit/asignaciones/finish-conditioning.test.ts tests/unit/asignaciones/acondicionamiento-authorization.test.ts tests/unit/asignaciones/order-conditioning-actions.test.ts` → `Test Files 3 passed (3)`, `Tests 85 passed (85)`.
+- `pnpm exec vitest run --project integration tests/integration/asignaciones/conditioning-execution-log.int.test.ts tests/integration/asignaciones/finish-conditioning-batch-data.int.test.ts tests/integration/asignaciones/finished-orders.int.test.ts tests/integration/asignaciones/start-conditioning-team.int.test.ts` → plantilla `qct_tpl_f928446831e4` reutilizada, base efimera creada y borrada; `Test Files 4 passed (4)`, `Tests 25 passed (25)`.
+- `pnpm exec tsc --noEmit` → sin errores. `pnpm exec eslint <5 archivos de T6>` → sin salida (0 problemas).
+
+Veredicto: T6 hecha; Terminar anota en la misma transaccion que la transicion.
