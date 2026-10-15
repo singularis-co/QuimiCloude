@@ -1,9 +1,10 @@
 'use client';
 
-import { CircleCheckIcon, MinusIcon, PackageIcon, PlusIcon, XIcon } from 'lucide-react';
+import { CircleCheckIcon, MinusIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useId, useState, type ReactNode, type TransitionEvent } from 'react';
 
 import { movementReasonLabel } from '@/app/(private)/inventario/components/movement-reason-label';
+import { EntityImage } from '@/components/shared/entity-image';
 import { FieldError } from '@/components/shared/field-error';
 import { SharedSelectControl } from '@/components/shared/shared-select';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -525,14 +526,9 @@ function PackingFinishLineRow({
       aria-labelledby={nameId}
       data-testid={PACKING_FINISH_LINE_TESTID}
       data-line-id={line.lineId}
-      className="grid grid-cols-[40px_minmax(0,1fr)] items-center gap-x-3.5 gap-y-2.5 border-b border-border py-4 md:grid-cols-[40px_minmax(0,1fr)_auto]"
+      className="grid grid-cols-[80px_minmax(0,1fr)] items-center gap-x-3.5 gap-y-2.5 border-b border-border py-4 md:grid-cols-[80px_minmax(0,1fr)_auto]"
     >
-      <span
-        aria-hidden="true"
-        className="flex size-10 flex-none items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground"
-      >
-        <PackageIcon className="size-5" />
-      </span>
+      <EntityImage path={line.packaging?.imageUrl ?? null} name={line.packaging?.name ?? name} />
       <span className="flex min-w-0 flex-col">
         <span id={nameId} className="text-[15px] font-semibold">
           {name}

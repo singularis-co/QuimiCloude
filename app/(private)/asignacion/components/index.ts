@@ -230,6 +230,7 @@ export {
   type OrderOutcomeNoticeProps,
 } from './order-outcome-notice';
 export {
+  ORDER_DISTRIBUTION_FULL_LINE_TESTID,
   ORDER_DISTRIBUTION_FULL_SEPARATOR,
   ORDER_DISTRIBUTION_FULL_TESTID,
   OrderDistributionFull,

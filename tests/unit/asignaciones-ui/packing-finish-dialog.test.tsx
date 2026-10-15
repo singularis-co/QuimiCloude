@@ -20,6 +20,11 @@ import {
   PackingFinishDialog,
   type PackingFinishDialogProps,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
+import {
+  ENTITY_IMAGE_ZOOM_TESTID,
+  ENTITY_IMAGE_ZOOM_TRIGGER_TESTID,
+  MISSING_IMAGE_SRC,
+} from '@/components/shared/entity-image';
 import { STEP_EVIDENCE_TEXTS } from '@/components/shared/step-evidence';
 import type { PackingOrderDetail } from '@/lib/modules/asignaciones';
 
@@ -703,5 +708,54 @@ describe('diálogo — el bloque de motivo se despliega y se pliega', () => {
 
     fireEvent.transitionEnd(bloque);
     expect(interior).not.toHaveClass('overflow-hidden');
+  });
+});
+
+describe('diálogo «¿Terminar el empaque?» — imagen del envase', () => {
+  const GALON_URL = 'https://cdn.example/galon.png';
+  const conImagen: Finish = {
+    ...FINISH,
+    lines: [
+      { ...FINISH.lines[0]!, packaging: { ...FINISH.lines[0]!.packaging!, imageUrl: GALON_URL } },
+      { ...FINISH.lines[1]!, packaging: { ...FINISH.lines[1]!.packaging!, imageUrl: null } },
+      { lineId: 'linea-antigua', label: 'Garrafa 5 L', plan: 1, content: '5', unit: LITRO, packaging: null },
+    ],
+  };
+
+  it('cada fila lleva la miniatura de su envase y ya no el icono genérico', () => {
+    pintar({ finish: conImagen });
+
+    const imagen = within(galon()).getByRole('img');
+    expect(imagen).toHaveAttribute('src', GALON_URL);
+    expect(imagen).toHaveAttribute('alt', 'Galón 3,78 L');
+    expect(imagen).not.toHaveAttribute('data-missing');
+    expect(galon().querySelector('[class*="lucide-package"]')).toBeNull();
+    expect(galon().className).toContain('grid-cols-[80px_minmax(0,1fr)]');
+  });
+
+  it('sin imagen, o en una línea antigua sin envase, muestra el marcador', () => {
+    pintar({ finish: conImagen });
+
+    const sinImagen = within(botella()).getByRole('img');
+    expect(sinImagen).toHaveAttribute('data-missing', 'true');
+    expect(sinImagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(sinImagen).toHaveAttribute('alt', 'Botella 1 L');
+
+    const antigua = within(linea('linea-antigua')).getByRole('img');
+    expect(antigua).toHaveAttribute('data-missing', 'true');
+    expect(antigua).toHaveAttribute('alt', 'Garrafa 5 L');
+    expect(within(linea('linea-antigua')).getByTestId(ENTITY_IMAGE_ZOOM_TRIGGER_TESTID)).toBeDisabled();
+  });
+
+  it('la miniatura se amplía dentro del diálogo y al cerrarla el diálogo sigue abierto', async () => {
+    const { user, onOpenChange } = pintar({ finish: conImagen });
+
+    await user.click(within(galon()).getByTestId(ENTITY_IMAGE_ZOOM_TRIGGER_TESTID));
+    expect(await screen.findByTestId(ENTITY_IMAGE_ZOOM_TESTID)).toHaveAttribute('src', GALON_URL);
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId(ENTITY_IMAGE_ZOOM_TESTID)).toBeNull());
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: T.title })).toBeInTheDocument();
   });
 });

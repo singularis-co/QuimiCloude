@@ -32,6 +32,10 @@ import {
   PackingOrderScreen,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
 import { STEP_READER_SIDE_COLUMN_RESERVE } from '@/app/(private)/asignacion/components/operator-screen-frame';
+import {
+  ENTITY_IMAGE_ZOOM_TRIGGER_TESTID,
+  MISSING_IMAGE_SRC,
+} from '@/components/shared/entity-image';
 import type { PackingOrderDetail } from '@/lib/modules/asignaciones';
 import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 
@@ -119,6 +123,45 @@ describe('pantalla del Empacador — el reparto completo en solo lectura', () =>
     ]);
   });
 
+  it('cada linea del reparto lleva la miniatura de su envase, con el nombre del envase como alt', () => {
+    pintar(
+      fila({
+        presentationLines: [
+          {
+            lineId: 'linea-1',
+            packedPackages: null,
+            presentationId: 'p-1',
+            presentationName: 'Botella 200 ml',
+            packagingName: 'Galón 4 L',
+            packagingImageUrl: 'https://cdn.example/galon.png',
+            packages: 3,
+          },
+          { lineId: 'linea-2', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: 'Botella 1 L', packagingImageUrl: null, packages: 12 },
+        ],
+      }),
+    );
+
+    const lineas = screen.getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID);
+    expect(lineas.map((linea) => linea.querySelectorAll('img').length)).toEqual([1, 1]);
+    const [conImagen, sinImagen] = lineas.map((linea) => within(linea).getByRole('img'));
+    expect(conImagen).toHaveAttribute('alt', 'Galón 4 L');
+    expect(conImagen).toHaveAttribute('src', 'https://cdn.example/galon.png');
+    expect(conImagen).not.toHaveAttribute('data-missing');
+    expect(sinImagen).toHaveAttribute('alt', 'Botella 1 L');
+    expect(sinImagen).toHaveAttribute('data-missing', 'true');
+    expect(sinImagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(lineas.map((linea) => linea.textContent)).toEqual(['3 × Galón 4 L', '12 × Botella 1 L']);
+  });
+
+  it('una linea antigua sin envase muestra el marcador con el nombre de la presentacion', () => {
+    pintar(fila());
+
+    const [primera] = screen.getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID);
+    const imagen = within(primera).getByRole('img');
+    expect(imagen).toHaveAttribute('alt', 'Botella 200 ml');
+    expect(imagen).toHaveAttribute('data-missing', 'true');
+  });
+
   it('R26: la cantidad del pedido va con su unidad', () => {
     pintar(fila({ quantity: '12.5', unitLabel: 'kg' }));
 
@@ -144,7 +187,11 @@ describe('pantalla del Empacador — el reparto completo en solo lectura', () =>
       expect(within(pantalla).queryAllByRole('textbox')).toHaveLength(0);
       expect(pantalla.querySelectorAll('input:not([type="hidden"]), textarea')).toHaveLength(0);
       expect(within(pantalla).queryByRole('button', { name: /añadir|agregar|quitar|eliminar/i })).toBeNull();
-      expect(within(screen.getByTestId(PACKING_ORDER_PRESENTATION_TESTID)).queryAllByRole('button')).toHaveLength(0);
+      // Los unicos botones del reparto son las miniaturas que amplian la imagen del envase.
+      const botones = within(screen.getByTestId(PACKING_ORDER_PRESENTATION_TESTID)).queryAllByRole('button');
+      expect(botones.map((boton) => boton.dataset.testid)).toEqual(
+        botones.map(() => ENTITY_IMAGE_ZOOM_TRIGGER_TESTID),
+      );
 
       cleanup();
     }
