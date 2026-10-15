@@ -652,7 +652,12 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // estrena tabla: recorre la lista del recorrido de ejecucion del dashboard, ya en esta lista
   // (QC-167), y localiza la fila del pedido y la del senuelo por `data-table-row-<id>`. El centinela
   // pasa de CUARENTA Y SEIS a CUARENTA Y SIETE; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y siete', () => {
+  //
+  // 2026-10-15: entra `e2e/envases-reales-empaque.spec.ts` (QC-281), y no afloja la lista. No
+  // estrena tabla: tras terminar el empaque lee el reparto del producto terminado, ya en esta lista
+  // (ficha de producto terminado), y localiza sus filas por `data-table-row-<id>`. El centinela
+  // pasa de CUARENTA Y SIETE a CUARENTA Y OCHO; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y ocho', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -662,7 +667,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cuarenta y siete E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cuarenta y ocho E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -705,6 +710,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-10-08, QC-223). Entre `empaque` y `grupos-de-trabajo` porque la
       // lista esta ORDENADA: 'm' precede a 'n', y 'e' precede a 'g'.
       'e2e/entregar-producto-terminado.spec.ts',
+      // Ver la nota de arriba (2026-10-15, QC-281). Tras `entregar-producto-terminado` porque la
+      // lista esta ORDENADA: 'ent' precede a 'env'.
+      'e2e/envases-reales-empaque.spec.ts',
       // La OCTAVA la trae QC-85 el 2026-09-12 (R42): ver la nota de arriba.
       'e2e/grupos-de-trabajo.spec.ts',
       // Ver la nota de arriba (2026-10-13, QC-262). Tras `grupos-de-trabajo` porque la lista esta
