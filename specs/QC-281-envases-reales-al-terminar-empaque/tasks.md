@@ -140,8 +140,8 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
 ## Archivos esperados
 
 - `db/schema.prisma`
-- `db/migrations/20261015120000_order_presentation_lines_packed_count/migration.sql`
-- `db/migrations/20261015120000_order_presentation_lines_packed_count/down.sql`
+- `db/migrations/20261015120200_order_presentation_lines_packed_count/migration.sql`
+- `db/migrations/20261015120200_order_presentation_lines_packed_count/down.sql`
 - `lib/modules/pedidos/domain/packing-count.ts`
 - `lib/modules/pedidos/domain/order-distribution.ts`
 - `lib/modules/pedidos/domain/order-packing.ts`

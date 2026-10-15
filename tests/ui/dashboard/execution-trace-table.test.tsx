@@ -16,11 +16,18 @@ import {
   TRACE_LINK_TEXT,
   createDefaultExecutionTraceListParams,
   executionTraceListHref,
-  formatTraceDuration,
+  formatTraceTotal,
   type ExecutionTraceListParams,
 } from '@/app/(private)/dashboard/components';
 import { SEARCH_DEBOUNCE_MS } from '@/components/shared/data-table';
 import type { ExecutionTracePerson, ExecutionTraceRow } from '@/lib/modules/asignaciones';
+import {
+  ACTIVE_CLOSED_TOTAL_ROW,
+  CLOSED_TOTAL_ROW,
+  CONDITIONING_TRACE_ROWS,
+  OPEN_TOTAL_ROW,
+  UNCLOSED_TOTAL_ROW,
+} from '../../fixtures/execution-trace-conditioning';
 import { executionTraceRoute } from '@/lib/shared/routes';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
@@ -58,7 +65,8 @@ const ACTIVO: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:30:00.000Z'),
-  duration: { kind: 'open', ms: 45 * 60 * 1000 },
+  active: true,
+  totalDuration: { kind: 'open', ms: 45 * 60 * 1000 },
   goBackCount: 2,
 };
 
@@ -70,7 +78,8 @@ const DE_BAJA: ExecutionTraceRow = {
   people: [ANA, LUIS],
   firstAt: new Date('2026-10-06T08:00:00.000Z'),
   lastAt: new Date('2026-10-06T09:00:00.000Z'),
-  duration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
   goBackCount: 0,
 };
 
@@ -82,7 +91,8 @@ const CERRADO: ExecutionTraceRow = {
   people: [LUIS],
   firstAt: new Date('2026-10-05T08:00:00.000Z'),
   lastAt: new Date('2026-10-05T09:05:00.000Z'),
-  duration: { kind: 'closed', ms: 65 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'closed', ms: 65 * 60 * 1000 },
   goBackCount: 1,
 };
 
@@ -96,7 +106,8 @@ const ACTIVO_POR_EMPACAR: ExecutionTraceRow = {
   people: [LUIS],
   firstAt: new Date('2026-10-07T07:00:00.000Z'),
   lastAt: new Date('2026-10-07T07:40:00.000Z'),
-  duration: { kind: 'open', ms: 50 * 60 * 1000 },
+  active: true,
+  totalDuration: { kind: 'open', ms: 50 * 60 * 1000 },
   goBackCount: 0,
 };
 
@@ -171,12 +182,13 @@ describe('R2 - columnas de la fila', () => {
   });
 });
 
+// El total de la lista se trunca a minutos, sin segundos.
 describe('R3 - R15 - en curso y duracion', () => {
   it('R3 - la fila activa se marca «En curso» y su duracion es abierta', () => {
     montar();
     const activa = fila(ACTIVO.orderId);
     expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('En curso');
-    expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('45 min 00 s (en curso)');
+    expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('45 min (en curso)');
   });
 
   it('R3 - una fila activa en POR_EMPACAR lleva la marca «En curso» aparte del estado y su duracion abierta', () => {
@@ -191,7 +203,7 @@ describe('R3 - R15 - en curso y duracion', () => {
     const activa = fila(ACTIVO_POR_EMPACAR.orderId);
     expect(within(activa).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
     expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('Por empacar');
-    expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('50 min 00 s (en curso)');
+    expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('50 min (en curso)');
     expect(within(fila(ACTIVO.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
   });
 
@@ -211,11 +223,72 @@ describe('R3 - R15 - en curso y duracion', () => {
   it('R15 - una sola cifra por fila, la del formateador, con su marca de cierre', () => {
     montar();
     expect(within(fila(CERRADO.orderId)).getByTestId('execution-trace-duration')).toHaveTextContent(
-      formatTraceDuration(CERRADO.duration),
+      formatTraceTotal(CERRADO.totalDuration),
     );
     expect(within(fila(DE_BAJA.orderId)).getByTestId('execution-trace-duration')).toHaveTextContent(
       '1 h 00 min (sin cierre anotado)',
     );
+  });
+});
+
+describe('R26 - R28 - total por fila y marca «En curso» con acondicionamiento', () => {
+  function montarAcondicionamiento() {
+    render(
+      <ExecutionTraceTable rows={CONDITIONING_TRACE_ROWS} personOptions={[]} params={params()} totalPages={1} />,
+    );
+  }
+
+  it('R26 - celda de duracion con total y sufijo', () => {
+    montarAcondicionamiento();
+    const abierta = within(fila(OPEN_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration');
+    expect(abierta).toHaveTextContent('4 h 33 min (en curso)');
+    expect(abierta).toHaveAttribute('data-kind', 'open');
+    const cerrada = within(fila(CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration');
+    expect(cerrada.textContent).toBe('5 h 29 min');
+    expect(cerrada).toHaveAttribute('data-kind', 'closed');
+    const sinCierre = within(fila(UNCLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration');
+    expect(sinCierre.textContent).toBe(formatTraceTotal(UNCLOSED_TOTAL_ROW.totalDuration));
+    expect(sinCierre.textContent).toBe('3 h 46 min (sin cierre anotado)');
+  });
+
+  it('R26 - la cifra es la de la columna monoespaciada y el sufijo va pequeno y atenuado', () => {
+    montarAcondicionamiento();
+    const abierta = within(fila(OPEN_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration');
+    expect(abierta.closest('td')).toHaveClass('font-mono');
+    const sufijo = within(abierta).getByText('(en curso)');
+    expect(sufijo).toHaveClass('text-xs', 'text-muted-foreground');
+    const cerrada = within(fila(CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration');
+    expect(cerrada.children).toHaveLength(0);
+  });
+
+  it('R28 - En curso segun active; nunca en dado de baja', () => {
+    montarAcondicionamiento();
+    expect(within(fila(OPEN_TOTAL_ROW.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(
+      ACTIVE_ORDER_MARK,
+    );
+    expect(within(fila(ACTIVE_CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(
+      ACTIVE_ORDER_MARK,
+    );
+    expect(within(fila(ACTIVE_CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration')).toHaveAttribute(
+      'data-kind',
+      'closed',
+    );
+    expect(within(fila(CLOSED_TOTAL_ROW.orderId)).queryByTestId('execution-trace-active')).toBeNull();
+    const baja = fila(UNCLOSED_TOTAL_ROW.orderId);
+    expect(within(baja).queryByTestId('execution-trace-active')).toBeNull();
+    expect(within(baja).getByTestId('execution-trace-deleted')).toBeInTheDocument();
+  });
+
+  it('R28 - una fila dada de baja con active a true tampoco lleva la marca', () => {
+    render(
+      <ExecutionTraceTable
+        rows={[{ ...UNCLOSED_TOTAL_ROW, active: true }]}
+        personOptions={[]}
+        params={params()}
+        totalPages={1}
+      />,
+    );
+    expect(within(fila(UNCLOSED_TOTAL_ROW.orderId)).queryByTestId('execution-trace-active')).toBeNull();
   });
 });
 

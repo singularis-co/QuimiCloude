@@ -8,19 +8,18 @@ export type FinishedBatchOfOrderLine = {
   readonly productionDate: string | null;
 };
 
-/** Los tres datos van juntos: un dato guardado no se borra, solo se sustituye. */
+/** Los tres datos van juntos: un dato guardado no se borra, solo se sustituye. Fechas `AAAA-MM-DD`. */
 export type FinishedBatchLabel = {
-  readonly batchId: string;
   readonly lot: string;
   readonly expiryDate: string;
   readonly productionDate: string;
 };
 
-/** `batchId` `null` en `duplicate_lot`: el choque lo detecto el indice unico en carrera y no se sabe
- *  que linea lo causo. */
+/** `no_batches`: el pedido no tiene ningun lote de produccion. `batchId` `null` en `duplicate_lot`:
+ *  el choque lo detecto el indice unico en carrera y no se sabe que lote lo causo. */
 export type FinishedBatchLabelsOutcome =
   | { readonly kind: 'written' }
-  | { readonly kind: 'batch_not_found'; readonly batchId: string }
+  | { readonly kind: 'no_batches' }
   | { readonly kind: 'duplicate_lot'; readonly batchId: string | null };
 
 /** Escribe lote, vencimiento y dia de produccion solo en lotes que entraron por produccion del
@@ -29,11 +28,12 @@ export interface FinishedBatchLabels {
   /** Un elemento por linea que tiene asiento `production` de ese pedido; una linea sin lote no
    *  aparece. Fuera de transaccion. */
   listOfOrder(companyId: string, orderId: string): Promise<readonly FinishedBatchOfOrderLine[]>;
-  /** Todo o nada, en su propia transaccion. */
+  /** El mismo dato en todos los lotes que devuelve `listOfOrder`: los elige el servidor, no quien
+   *  llama. Todo o nada, en la transaccion que recibe o en la suya. */
   writeForOrder(input: {
     readonly companyId: string;
     readonly orderId: string;
-    readonly labels: readonly FinishedBatchLabel[];
+    readonly label: FinishedBatchLabel;
     readonly actorId: string;
     readonly now: Date;
   }): Promise<FinishedBatchLabelsOutcome>;

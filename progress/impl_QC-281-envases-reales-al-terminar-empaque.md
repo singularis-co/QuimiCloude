@@ -6,7 +6,7 @@ Las secciones T1–T6 se reconstruyen de los commits y de `progress/features/QC-
 ## T1–T2 — migración y dominio del conteo (backend_dev, 2026-10-14) · 68a7ff54
 
 Archivos:
-- nuevos `db/migrations/20261015120000_order_presentation_lines_packed_count/{migration.sql,down.sql}`
+- nuevos `db/migrations/20261015120200_order_presentation_lines_packed_count/{migration.sql,down.sql}`
   (3 columnas en `order_presentation_lines` y 4 `CHECK`, sin backfill); `db/schema.prisma`
 - nuevo `lib/modules/pedidos/domain/packing-count.ts` (`PACKING_DIFFERENCE_REASONS`,
   `PACKING_INCREASE_REASONS`, `PACKING_REASON_OTHER_MAX`, `checkPackingCounts`, `effectivePackages`,
@@ -375,3 +375,41 @@ Comandos:
 - E2E `envases-reales-empaque` en chromium: 3/3, con `.env` + `.env.local` del repo principal exportados.
 
 Veredicto: B1 y m3 resueltos sin dependencias nuevas.
+
+## Merge de origin/dev (QC-283, QC-284) y m2 (backend_dev, 2026-10-15)
+
+Archivos:
+- Conflictos resueltos como union: `tests/guards/guard-identificador-de-request.test.ts`,
+  `tests/integration/aislamiento.json` y `tests/unit/asignaciones/finish-conditioning.test.ts`.
+  En este ultimo quedan el bloque QC-283 R6 y el bloque QC-281 R23/R25; el `montar` de dev ya
+  acepta `packedPackages`.
+- m2: `git mv` de la migracion a `20261015120200_order_presentation_lines_packed_count`.
+  Va despues de las dos de QC-283 (`...120000`, `...120100`), que tocan `order_execution_entries`
+  y su enum; la nuestra solo toca `order_presentation_lines`.
+  Referencias actualizadas: MIGRACIONES_ESPERADAS, `tasks.md > Archivos esperados` y esta bitacora.
+  El test de esquema localiza la migracion por sufijo y gana un caso: su instante no lo comparte
+  ninguna otra migracion.
+- `tests/integration/pedidos/order-repository.int.test.ts`: la expectativa del resumen no tenia
+  `presentationContent` ni `packagingProductId`, que T7 (`4e5cd569`) anadio a la linea.
+  Era un rojo propio, anterior al merge.
+- Base local: `_prisma_migrations.migration_name` pasa del nombre viejo al nuevo, con el mismo
+  checksum. Despues, `db:migrate` responde «No pending migrations».
+
+R23 y R25 tras el merge:
+- `conditioning-batch-data.ts:35-37`: `effectivePackages(line) > 0`.
+- `conditioning-order-view.ts:164-170`: `packages` real en la fila.
+- QC-283 no anade lecturas de `packages`: la foto del guardado sale de los lotes del pedido, asi
+  que una linea en 0 no aparece.
+
+Salidas:
+- typecheck: 0 errores.
+- lint: 0 errores y 7 avisos, ninguno en archivos tocados.
+- guard: 76/76 archivos (1069 passed, 20 skipped).
+- related (node y ui): 354 de 356 archivos verdes. Los dos rojos no son de QC-281:
+  - `inventario-paridad`: tambien rojo en dev, porque la columna «Tipo» de QC-284 no esta en
+    el snapshot.
+  - `session-once-per-request-render`: timeout por carga; aislado da 12/12.
+- integracion: 41 archivos (pedidos, inventario y asignaciones tocados), 378 passed y 2 failed.
+  Los 2 eran `order-repository`; tras la correccion da 13/13.
+
+Veredicto: merge resuelto con R23/R25 intactos. Queda un rojo heredado de dev (`inventario-paridad`).

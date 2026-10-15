@@ -200,12 +200,12 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   })
 
   describe('QC-81 R13 — el lote duplicado en la empresa tiene codigo y texto propios', () => {
-    it('batch_duplicate_lot esta en el catalogo con su clave y su texto exacto', () => {
+    it('QC-284 R8: batch_duplicate_lot conserva su codigo y su clave, con el texto por producto y presentacion', () => {
       const codigos: readonly string[] = ERROR_CODES
       expect(codigos).toContain('batch_duplicate_lot')
       expect(ERROR_MESSAGE_KEY.batch_duplicate_lot).toBe('errors.batch_duplicate_lot')
       expect(errorMessage('batch_duplicate_lot')).toBe(
-        'Ya existe un lote con ese valor en esta empresa.',
+        'Ya existe un lote con ese valor para ese producto y presentacion.',
       )
     })
 

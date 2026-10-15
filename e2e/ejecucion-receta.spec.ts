@@ -687,9 +687,9 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
       'el pedido del fixture debe nacer PENDIENTE para que este caso demuestre la transicion',
     ).toBe('PENDIENTE');
 
-    // Nunca una ruta escrita a mano: `loginAndLand` deriva el destino de los permisos reales del
-    // actor.
+    // El Operador no aterriza en la lista: tras el login se abre por su ruta.
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const pendingRow = rowByNumber(page, orderPendingNumber);

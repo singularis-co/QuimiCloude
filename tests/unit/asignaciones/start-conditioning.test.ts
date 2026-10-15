@@ -32,6 +32,7 @@ import {
 } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
+import type { NewExecutionEntry } from '@/lib/modules/asignaciones/domain/execution-entry';
 import type { NewConditioningTeamMember } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
 import type { ExecutionTransaction, ExecutionWriters } from '@/lib/modules/asignaciones/ports/execution-transaction';
 import type { OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
@@ -64,6 +65,7 @@ type Opciones = {
   readonly groups?: Readonly<Record<string, WorkGroupSnapshot | null>>;
   readonly escritura?: Escritura;
   readonly insertAll?: (rows: readonly NewConditioningTeamMember[]) => Promise<number>;
+  readonly append?: (entry: NewExecutionEntry) => Promise<void>;
 };
 
 function montar(opciones: Opciones = {}) {
@@ -91,11 +93,16 @@ function montar(opciones: Opciones = {}) {
     pasos.push('escribe-equipo');
     return opciones.insertAll ? opciones.insertAll(rows) : rows.length;
   });
+  const append = vi.fn(async (entry: NewExecutionEntry) => {
+    pasos.push('anota');
+    if (opciones.append) await opciones.append(entry);
+  });
   const run = vi.fn(async <T>(work: (writers: ExecutionWriters) => Promise<T>) => {
     pasos.push('transaccion');
     return work({
       conditioning: { startConditioningAliveById },
       team: { insertAll, listByOrderInCompany: vi.fn() },
+      log: { append },
     } as unknown as ExecutionWriters);
   });
 
@@ -114,6 +121,7 @@ function montar(opciones: Opciones = {}) {
     findSnapshotAliveInCompany,
     startConditioningAliveById,
     insertAll,
+    append,
     run,
     startConditioning: createStartConditioning(deps),
   };
@@ -220,7 +228,7 @@ describe('startConditioning — el orden auth -> zod -> pedido -> equipo -> tran
 
     expect(pasos[0]).toBe('pedido');
     expect(pasos.slice(1, 3).sort()).toEqual(['grupo', 'personas']);
-    expect(pasos.slice(3)).toEqual(['personas', 'transaccion', 'escribe-pedido', 'escribe-equipo']);
+    expect(pasos.slice(3)).toEqual(['personas', 'transaccion', 'escribe-pedido', 'escribe-equipo', 'anota']);
     expect(startConditioningAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
     expect(insertAll).toHaveBeenCalledWith([
       { orderId: PEDIDO, userId: BETO, companyId: EMPRESA, workGroupId: null, workGroupName: null, position: 0 },
@@ -266,6 +274,63 @@ describe('startConditioning — el orden auth -> zod -> pedido -> equipo -> tran
 
     await expect(startConditioning(ACTOR, ENTRADA)).rejects.toBe(fallo);
     expect(startConditioningAliveById).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('startConditioning — anota Comenzar en el registro de ejecucion', () => {
+  it('R1: anota conditioning_start en la transaccion, tras la transicion y el equipo', async () => {
+    const { startConditioning, pasos, append } = montar();
+
+    await startConditioning(ACTOR, ENTRADA);
+
+    expect(pasos.slice(-4)).toEqual(['transaccion', 'escribe-pedido', 'escribe-equipo', 'anota']);
+    expect(append).toHaveBeenCalledTimes(1);
+    expect(append).toHaveBeenCalledWith({
+      action: 'conditioning_start',
+      companyId: EMPRESA,
+      orderId: PEDIDO,
+      userId: ANA,
+      stepPosition: null,
+      occurredAt: AHORA,
+    });
+  });
+
+  it('R1: si anotar falla, el error sale de la transaccion para que deshaga transicion y equipo', async () => {
+    const fallo = new Error('fallo al anotar');
+    const { startConditioning, startConditioningAliveById, insertAll } = montar({
+      append: async () => {
+        throw fallo;
+      },
+    });
+
+    await expect(startConditioning(ACTOR, ENTRADA)).rejects.toBe(fallo);
+    expect(startConditioningAliveById).toHaveBeenCalledTimes(1);
+    expect(insertAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('R1: si insertar el equipo falla, no anota', async () => {
+    const { startConditioning, append } = montar({
+      insertAll: async () => {
+        throw new Error('fallo al insertar el equipo');
+      },
+    });
+
+    await expect(startConditioning(ACTOR, ENTRADA)).rejects.toThrow('fallo al insertar el equipo');
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it('R2: already_mine (repetir Comenzar) no anota', async () => {
+    const { startConditioning, append } = montar({ status: 'EN_ACONDICIONAMIENTO', escritura: 'already_mine' });
+
+    await expect(startConditioning(ACTOR, ENTRADA)).resolves.toBeUndefined();
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it.each(['taken', 'not_conditionable', 'not_found'] as const)('R1: una escritura %s no anota', async (escritura) => {
+    const { startConditioning, append } = montar({ escritura });
+
+    await expect(startConditioning(ACTOR, ENTRADA)).rejects.toBeDefined();
+    expect(append).not.toHaveBeenCalled();
   });
 });
 

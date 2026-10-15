@@ -49,7 +49,7 @@ function menuFixture(): readonly NavItem[] {
       kind: 'group',
       label: 'Grupo',
       testId: 'fx-grupo',
-      icon: 'factory',
+      icon: 'puzzle',
       section: SECCION_B,
       items: [
         {

@@ -85,7 +85,22 @@ function addsColumn(sql: string, column: string, type: string): boolean {
   return new RegExp(`ADD COLUMN "${column}" ${type}(,|;| )`).test(sql.replace(/ADD COLUMN\s+/g, 'ADD COLUMN '));
 }
 
+/** Dos migraciones con el mismo instante dejan el orden de aplicacion al azar del nombre. */
+function sharesTimestamp(name: string, others: readonly string[]): boolean {
+  const stamp = name.slice(0, 14);
+  return others.some((other) => other !== name && other.slice(0, 14) === stamp);
+}
+
 describe('migracion order_presentation_lines_packed_count', () => {
+  it('R16: su instante no lo comparte ninguna otra migracion', () => {
+    const names = readdirSync(migrationsDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+    const own = migrationDir().split(/[\\/]/).pop() ?? '';
+    expect(sharesTimestamp(own, names)).toBe(false);
+    expect(sharesTimestamp(own, [...names, `${own.slice(0, 14)}_otra`])).toBe(true);
+  });
+
   it('R16: anade las tres columnas anulables del conteo real', () => {
     expect(addsColumn(up, 'packed_packages', 'INTEGER')).toBe(true);
     expect(addsColumn(up, 'packed_reason', 'TEXT')).toBe(true);

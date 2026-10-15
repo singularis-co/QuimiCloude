@@ -8,10 +8,17 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import {
   ActiveOrderMark,
   DeletedOrderMark,
+  PHASE_DURATION_LABELS,
+  PHASE_OPEN_MARK,
+  PHASE_UNCLOSED_MARK,
   TRACE_ORDER_STATUS_LABELS,
-  formatTraceDuration,
+  formatElapsed,
 } from '@/app/(private)/dashboard/components';
-import type { ExecutionTraceDetail as ExecutionTraceDetailData } from '@/lib/modules/asignaciones';
+import type {
+  ExecutionPhase,
+  ExecutionTraceDetail as ExecutionTraceDetailData,
+  TraceDuration,
+} from '@/lib/modules/asignaciones';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 
@@ -25,9 +32,9 @@ const ERROR_TITLE = 'Recorrido';
 const ERROR_MESSAGE = 'No se pudo cargar el recorrido.';
 const STAT_LABELS = {
   status: 'Estado',
-  duration: 'Duración',
   goBacks: 'Vueltas atrás',
 } as const;
+const PHASE_ORDER: readonly ExecutionPhase[] = ['production', 'packing', 'conditioning'];
 
 function BackToList({ href }: { readonly href: string }) {
   return (
@@ -37,15 +44,39 @@ function BackToList({ href }: { readonly href: string }) {
   );
 }
 
-function Stat({ label, children }: { readonly label: string; readonly children: ReactNode }) {
+type StatProps = {
+  readonly label: string;
+  readonly children: ReactNode;
+  readonly testId?: string;
+  readonly phase?: ExecutionPhase;
+  readonly kind?: TraceDuration['kind'];
+};
+
+function Stat({ label, children, testId = 'execution-trace-stat', phase, kind }: StatProps) {
   return (
     <div
-      data-testid="execution-trace-stat"
+      data-testid={testId}
+      data-phase={phase}
+      data-kind={kind}
       className="flex min-w-0 flex-col gap-1.5 rounded-xl border bg-card px-[18px] py-4"
     >
       <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
       <dd className="m-0 flex min-w-0 flex-wrap items-center gap-2 text-[22px] font-semibold">{children}</dd>
     </div>
+  );
+}
+
+function PhaseDuration({ phase, duration }: { readonly phase: ExecutionPhase; readonly duration: TraceDuration }) {
+  return (
+    <Stat label={PHASE_DURATION_LABELS[phase]} testId="execution-trace-duration" phase={phase} kind={duration.kind}>
+      <span className="font-mono">{formatElapsed(duration.ms)}</span>
+      {duration.kind === 'open' ? (
+        <StatusBadge tone="progress" label={PHASE_OPEN_MARK} data-testid="execution-trace-phase-open" />
+      ) : null}
+      {duration.kind === 'unclosed' ? (
+        <StatusBadge tone="muted" label={PHASE_UNCLOSED_MARK} data-testid="execution-trace-phase-unclosed" />
+      ) : null}
+    </Stat>
   );
 }
 
@@ -78,7 +109,7 @@ export function ExecutionTraceDetail({ trace, backHref }: ExecutionTraceDetailPr
           }
           titleTestId="execution-trace-title"
         />
-        <dl className="m-0 grid grid-cols-3 gap-3 @max-[760px]:grid-cols-1">
+        <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(170px,calc(50%_-_6px)),1fr))] gap-3">
           <Stat label={STAT_LABELS.status}>
             <StatusBadge
               tone={ORDER_STATUS_TONES[trace.status]}
@@ -87,13 +118,12 @@ export function ExecutionTraceDetail({ trace, backHref }: ExecutionTraceDetailPr
               data-status={trace.status}
             />
             {trace.deleted ? <DeletedOrderMark /> : null}
-            {!trace.deleted && trace.duration.kind === 'open' ? <ActiveOrderMark /> : null}
+            {!trace.deleted && trace.active ? <ActiveOrderMark /> : null}
           </Stat>
-          <Stat label={STAT_LABELS.duration}>
-            <span className="font-mono" data-testid="execution-trace-duration" data-kind={trace.duration.kind}>
-              {formatTraceDuration(trace.duration)}
-            </span>
-          </Stat>
+          {PHASE_ORDER.map((phase) => {
+            const duration = trace.durations[phase];
+            return duration === null ? null : <PhaseDuration key={phase} phase={phase} duration={duration} />;
+          })}
           <Stat label={STAT_LABELS.goBacks}>
             <GoBackCount count={trace.goBackCount} />
           </Stat>

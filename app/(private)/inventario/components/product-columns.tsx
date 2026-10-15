@@ -4,12 +4,14 @@ import type { ReactNode } from 'react';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { compareQuantities, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 import { productNameWithoutPresentation } from './product-base-name';
+import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
 
 /**
  * Declaracion de las columnas de la tabla de productos (R6, R7, R8, `design.md > 7`).
@@ -194,9 +196,39 @@ export type ProductColumnsDeps = {
    * pagina), la celda sigue pintando la cantidad, sin etiqueta.
    */
   readonly units?: readonly UnitRef[];
+  /**
+   * Anade la columna «Tipo» con su chip. Solo tiene sentido en la pestana «Todos»: con un tipo
+   * filtrado, todas las filas dirian lo mismo. Defecto `false`, que es el recuento del esqueleto.
+   */
+  readonly showType?: boolean;
 };
 
-export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): readonly ProductColumn[] {
+/** Encabezado de la columna de tipo. Constante para que ningun test dependa del literal. */
+export const TYPE_COLUMN_LABEL = 'Tipo';
+
+/**
+ * Columna «Tipo»: un chip con la etiqueta y el tono propios del tipo. Sin `sortable` ni `filter`
+ * en la cabecera: `type` no ordena en `PRODUCT_QUERYABLE` y el filtro ya lo dan las pestanas.
+ */
+const typeColumn: ProductColumn = {
+  id: 'type',
+  label: TYPE_COLUMN_LABEL,
+  align: 'start',
+  cell: (product) => (
+    <StatusBadge
+      tone={PRODUCT_TYPE_TONES[product.type]}
+      label={PRODUCT_TYPE_LABELS[product.type]}
+      data-testid="product-type"
+      data-type={product.type}
+    />
+  ),
+};
+
+export function buildProductColumns({
+  rowActions,
+  units,
+  showType = false,
+}: ProductColumnsDeps): readonly ProductColumn[] {
   return [
     {
       id: IMAGE_COLUMN_ID,
@@ -227,6 +259,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       // Sin `sortable` ni `filter`: `PRODUCT_QUERYABLE` no los admite para esta columna.
       cell: (product) => product.presentationName ?? EMPTY_MARK,
     },
+    ...(showType ? [typeColumn] : []),
     {
       id: 'stock',
       label: 'Existencia',

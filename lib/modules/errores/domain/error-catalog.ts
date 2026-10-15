@@ -181,8 +181,8 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_assignment_not_found': 'Esa persona no es responsable de este pedido.',
   // No dice cual estado inactivo es: el catalogo no interpola y todos llevan a la misma accion.
   'errors.user_not_assignable': 'No se puede asignar a una persona cuya cuenta no esta activa.',
-  // «En esta empresa» porque el lote es unico por empresa, no en toda la base.
-  'errors.batch_duplicate_lot': 'Ya existe un lote con ese valor en esta empresa.',
+  // El lote es unico por producto y presentacion: el mismo valor puede existir en otro producto.
+  'errors.batch_duplicate_lot': 'Ya existe un lote con ese valor para ese producto y presentacion.',
   // No distingue «no existe» de «es de otra empresa»: la respuesta es la misma para las dos.
   'errors.batch_not_found': 'El lote solicitado no existe.',
   'errors.batch_stock_negative': 'El ajuste dejaria la existencia del lote por debajo de cero.',

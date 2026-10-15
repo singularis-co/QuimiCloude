@@ -3,7 +3,13 @@
  * La fila comun de «Por acondicionar» y del detalle del acondicionador: una sola composicion para
  * las dos, para que la lista y el detalle nunca muestren datos distintos de un mismo pedido.
  */
-import { batchesByPresentation, hasBatchData, missingBatchDataLines } from './conditioning-batch-data';
+import {
+  batchDataForm,
+  batchesByPresentation,
+  hasBatchData,
+  missingBatchDataLines,
+  type ConditioningBatchForm,
+} from './conditioning-batch-data';
 import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
 import type { OrderDistributionLineView } from './order-distribution-view';
 import type { ConditioningTeamMemberRow } from '../ports/conditioning-team-repository';
@@ -61,6 +67,7 @@ export type ConditioningBatchLineView = {
 export type ConditioningBatchData = {
   readonly lines: readonly ConditioningBatchLineView[];
   readonly missingCount: number;
+  readonly form: ConditioningBatchForm;
 };
 
 /** La fila del detalle con su equipo; vacio en `POR_ACONDICIONAR`, que todavia no lo tiene.
@@ -131,6 +138,7 @@ function composeBatchData(
       };
     }),
     missingCount: missingBatchDataLines(lines, batches),
+    form: batchDataForm(lines, batches),
   };
 }
 
