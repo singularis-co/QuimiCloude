@@ -3,8 +3,7 @@
 > **Orden:** T0 (contrato, secuencial) → B1 (migración) → bloques B (backend) y F (frontend), en
 > paralelo entre sí donde se marca `[P]` → TC (barrido de censos) → TI (E2E) → TZ (cierre).
 >
-> **Antes de F1:** P1 y P2 de `requirements.md` resueltas por el humano (afectan a la lista de lotes y
-> al resumen del sheet). El resto no depende de ellas.
+> P1 y P2 cerradas el 2026-10-15 con la aprobación del spec (ver `requirements.md > Decisiones cerradas`).
 >
 > **Reglas de toda la feature:**
 > - Ningún archivo de un bloque B aparece en un bloque F, y al revés. Las excepciones son T0 y TI.
@@ -137,7 +136,7 @@ Cubre: R3, R33, R34, R39–R44 (servidor).
 
 ---
 
-## [ ] F1 [P] — Sheet «Entregar» con bloques y borrador v2 (depende de T0; P1 y P2 resueltas)
+## [ ] F1 [P] — Sheet «Entregar» con bloques y borrador v2 (depende de T0)
 
 - `app/(private)/pedidos/components/order-delivery-sheet.tsx` (`design.md > 7.1`).
 - `app/(private)/pedidos/components/order-delivery-customer-block.tsx` (nuevo).

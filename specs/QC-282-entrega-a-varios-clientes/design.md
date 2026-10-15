@@ -1,7 +1,7 @@
 # QC-282 — entrega-a-varios-clientes · design.md
 
 > Zona fullstack · Complejidad high · Requisitos en `requirements.md` (R1–R48, decisiones D1–D18,
-> preguntas P1 y P2). Sin dependencias nuevas (R48): todo sale de `zod`, Prisma, la aritmética
+> sin preguntas abiertas). Sin dependencias nuevas (R48): todo sale de `zod`, Prisma, la aritmética
 > `BigInt` que ya usa `inventario` y los primitivos de UI que ya usa `/pedidos`.
 
 ## Lo que ya existe
@@ -456,8 +456,8 @@ por los mismos tests, ampliados con un caso de dos clientes.
 - **Composición (tablero):** cabecera; aviso de borrador ajustado (si aplica); `OrderDeliverySummary`;
   un `OrderDeliveryCustomerBlock` por bloque; botón `outline-dashed` «Añadir cliente»; aviso de stock;
   pie con «Cancelar» y «Entregar» (`disabled` si `stockOver`).
-- **Lista de lotes**: columnas «Lote · Disponibles · Entrada (campo)». Se quita «Vence» (R7). La fecha
-  de entrada del lote queda a la espera de P1.
+- **Lista de lotes**: columnas «Lote · Disponibles · Entrada (campo)». Se quita «Vence» (R7). Tampoco se
+  muestra la fecha de entrada del lote (R7).
 - **Envío:** `deliverOrderAction({ orderId, deliveryKey, customers })` con un elemento por bloque y,
   dentro, solo las asignaciones mayores que cero.
 - **Respuesta:** como QC-223 §6.2 (R33 y R34 de QC-223 siguen vigentes). `customer_not_found` se
@@ -555,8 +555,8 @@ Las aprueba el humano con este spec.
 
 | Spec | Requisito | Queda así |
 |---|---|---|
-| QC-223 | R6 | sustituido por el resumen de R11 (pendiente de P2) |
-| QC-223 | R7 | sin vencimiento (R7); fecha de entrada pendiente de P1 |
+| QC-223 | R6 | sustituido por el resumen de R11 |
+| QC-223 | R7 | sin vencimiento ni fecha de entrada (R7) |
 | QC-223 | R9, R10, R14 | por bloque (R4, R5, R10, R16) |
 | QC-223 | R11, R12 | R12 y R15 (el exceso por lote ya no avisa: limita y deshabilita) |
 | QC-223 | R13, R15 | el campo solo admite dígitos (R14); «nada que entregar» pasa a «este cliente no lleva envases» (R18) |

@@ -62,7 +62,8 @@ La lista de enmiendas está en `design.md > 10`.
   (R13) y un campo de envases. MIENTRAS a una presentación no le falten envases, ningún bloque DEBE
   mostrarle campos de envases.
 - **R7** [D13] La lista de lotes del sheet «Entregar» NO DEBE mostrar la fecha de vencimiento del
-  lote, ni en la tabla ni en las tarjetas de teléfono. *(La fecha de entrada del lote: ver P1.)*
+  lote, ni en la tabla ni en las tarjetas de teléfono. Tampoco DEBE mostrar la fecha de entrada del lote: el
+  sheet sigue el tablero aprobado (Lote · Disponibles · campo de envases).
 - **R8** [D1] CUANDO el usuario pulsa «Añadir cliente», el sheet DEBE añadir al final un bloque con
   el cliente vacío y sin envases, titulado «Cliente N» según su posición.
 - **R9** [D1] MIENTRAS haya más de un bloque, cada bloque DEBE ofrecer «Quitar». SI solo hay un
@@ -76,7 +77,7 @@ La lista de enmiendas está en `design.md > 10`.
 - **R11** [D6] El sheet DEBE mostrar un resumen «Por entregar» con, por cada presentación del pedido,
   la suma de los envases escritos en todos los bloques y los envases que le faltan, y una marca:
   «Completa» si la suma es igual a lo que falta, «Faltan N» si es menor y «Sobran N» si es mayor.
-  *(Ver P2.)*
+  El resumen sustituye a la línea «Pedidos · Entregados · Faltan» de QC-223 R6, que deja de mostrarse.
 - **R12** [D6] MIENTRAS la suma de los envases escritos en todos los bloques para una presentación
   supere los que le faltan, el sheet NO DEBE enviar la entrega.
 - **R13** [D16] En cada bloque, los disponibles de un lote DEBEN ser sus envases disponibles menos
@@ -255,17 +256,7 @@ La lista de enmiendas está en `design.md > 10`.
 
 ## Preguntas abiertas
 
-- **P1 — Fecha de entrada en la lista de lotes del sheet.** QC-223 R7 muestra, por lote, la fecha de
-  entrada y la de vencimiento. D13 quita solo «Vence». En el tablero aprobado
-  (`EntregaVariosClientes.dc.html`) las columnas son «Lote · Disponibles · Entrada», y «Entrada» es
-  el **campo de envases**, no la fecha: el tablero no muestra ninguna fecha. ¿La fecha de entrada del
-  lote se mantiene en el sheet (con otra etiqueta, porque «Entrada» pasa a ser el campo) o se quita
-  también? R7 solo fija lo decidido (sin vencimiento).
-- **P2 — Progreso por presentación.** QC-223 R6 muestra, por presentación, «Pedidos N · Entregados M ·
-  Faltan K». El tablero lo sustituye por el resumen «Por entregar» («Entregas X de Y» + marca), y en
-  sus datos de ejemplo Y coincide con lo pedido porque no hay entregas previas. R11 toma Y = los
-  envases que **faltan** (es el tope de D6; con lo pedido, «Completa» saldría mal en un pedido con
-  entregas parciales). ¿Se confirma, y se deja de mostrar «Pedidos · Entregados · Faltan»?
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -289,3 +280,5 @@ La lista de enmiendas está en `design.md > 10`.
 | 2026-10-15 | ¿Stock por lote con varios clientes? | Se suma lo de todos los clientes. «Disponibles» muestra lo que queda tras todos los bloques; la Entrada no deja pasar de ahí; si la suma ya supera el stock (p. ej. bajó), el lote marca «Solo hay N» y «Entregar» queda deshabilitado. El servidor lo valida igual. |
 | 2026-10-15 | ¿Aviso de borrador? | El de QC-223 D8, sin cambios: solo cuando un lote del borrador ya no está disponible. |
 | 2026-10-15 | ¿Pase `/design`? | Aprobado por el humano. Tableros en `docs/diseno/canvas/`: `EntregaVariosClientes.dc.html`, `EntregaVariosClientesTablet.dc.html` y `EntregaVariosClientesMovil.dc.html` (página «Pedidos» del canvas; origen https://claude.ai/artifact/WUkjAyEcpu73NyNRmA6iMk). |
+| 2026-10-15 | ¿Fecha de entrada del lote en el sheet? (P1 del spec) | Se quita también: el sheet sigue el tablero aprobado, sin fechas. Aprobado con el spec. |
+| 2026-10-15 | ¿Progreso por presentación? (P2 del spec) | Resumen «Por entregar» con Y = envases que faltan; deja de mostrarse «Pedidos · Entregados · Faltan» de QC-223 R6. Aprobado con el spec. |
