@@ -181,3 +181,98 @@
 Lo que falta para OK: resolver B1. Basta la opción (b), que es solo documentación en `design.md`. El resto
 de la feature está sólido: servidor, migración, rollback, autorización, aislamiento y trazabilidad R1–R33.
 Antes del PR, además, hay que integrar `origin/dev` y volver a verificar R23 y R25 (m1, m2).
+
+## Re-review (vuelta 2, acotada a 1a4f8008..8419cca1)
+
+HEAD `8419cca1`, 0 commits por detrás de `origin/dev`. La mezcla con dev es `fd431be5`.
+
+### Verificación ejecutada
+
+| Comando | Resultado |
+|---|---|
+| `pnpm run typecheck` | verde |
+| `pnpm run lint` | 0 errores, 7 warnings (preexistentes) |
+| `pnpm exec vitest run guard` | 76/76 archivos, 1069 pasan, 20 omitidos |
+| Unit dirigidos: `tests/unit/pedidos`, `tests/unit/inventario`, `tests/unit/inventario-ui`, `asignaciones/schema`, dialog, screen, get-packing-order, finish-conditioning, conditioning-batch-data, get-conditioning-order, finish-packing y paridad de asignación/confirmaciones | **2 rojos**, 5253 pasan, en 275 archivos (ver RB1 y RB2) |
+| Integración: finish-with-finished-goods, settle-packaging, order-packed-counts, packed-lines-directory, execution-atomicity, order-repository, finish-conditioning-batch-data | 7/7 archivos, 85/85 |
+| `tests/unit/paridad/inventario-paridad.test.tsx` | rojo, ajeno a la feature (ver más abajo) |
+
+### Hallazgos de la vuelta 1
+
+- **B1: resuelto.** Desde 4c3e64d7, `FoldPanel` compone `Collapsible`/`CollapsibleContent` del catálogo. La
+  animación usa `data-starting-style`/`data-ending-style` de Base UI, y ya no hay montaje ni desmontaje
+  a mano. Los tests del pliegue y el snapshot de confirmaciones están al día, y pasan.
+- **m2: resuelto.** La migración pasa a `20261015120200_order_presentation_lines_packed_count`, detrás de
+  `20261015120100` de dev, y está dada de alta en `MIGRACIONES_ESPERADAS` (guardia verde). El test de
+  esquema busca por sufijo y no le afecta el cambio de nombre. En local la base ya tenía las columnas
+  con el nombre antiguo; CI parte de una base limpia.
+- **m3: resuelto, pero introduce el rojo RB1.** Desde a7f703d9 las etiquetas salen de
+  `movementReasonLabel`.
+- **m4: resuelto.** 040e2432 añade una nota en QC-195 R25.
+- **m5: resuelto.** c09d8952 añade un test en `get-packing-order.test.ts`: un `EN_EMPAQUE` heredado sin
+  reparto da `finish` con cero líneas y el zod lo rechaza. Es una justificación aceptable.
+- **m7: resuelto.** 49c11de1 añade a la bitácora las secciones de T1–T6.
+- **m1 (integrar dev): hecho.**
+  - Los tres conflictos están bien resueltos. `finish-conditioning.test.ts` conserva el montaje de QC-283 y
+    añade el bloque de QC-281: R23 ×2 y R25. `guard-identificador-de-request` tiene las altas del E2E y de
+    la migración. `aislamiento.json` es JSON válido y conserva las entradas de las dos ramas.
+  - R23 y R25 siguen bien sobre el código de QC-283: `missingBatchDataLines` filtra con
+    `effectivePackages(line) > 0`, y lo usan `finish-conditioning.ts:86` y `conditioning-order-view.ts:140`.
+    `batchDataForm` (nuevo de QC-283) ignora las líneas sin lote, así que una línea en 0 no altera el
+    formulario. Los tests unitarios y `finish-conditioning-batch-data.int` están verdes.
+- **4aa1d41e: correcto.** `order-repository.int` espera además `presentationContent` y
+  `packagingProductId`, los campos que T7 añadió al contrato `AssignedOrderPresentationLine`. Pasa.
+
+### `tests/unit/paridad/inventario-paridad.test.tsx`: confirmado ajeno a QC-281
+
+- El test y su snapshot son idénticos a `origin/dev`: `git diff origin/dev HEAD` no da ninguna diferencia.
+- La diferencia del snapshot es solo la columna «Tipo» con su chip en la lista de productos, que viene del
+  commit de dev 6f08e379 («columna Tipo con chip de color en la pestana Todos»). Ese commit cambió la
+  UI sin regenerar el snapshot.
+- Nada de QC-281 aparece en esa diferencia.
+- No está en `tests/baseline-rojos.json`, así que `gate-completo` lo marcará rojo igual en dev que aquí.
+  Hay que arreglarlo en dev o añadirlo al baseline. Lo decide el humano y no bloquea esta feature.
+
+No lo corrí en un checkout de dev: la conclusión sale de comparar los archivos y de leer la diferencia.
+
+### Hallazgos nuevos
+
+#### BLOQUEANTE
+
+Dos tests unitarios en rojo los causa esta feature, no están en el baseline y harán fallar `gate-completo`.
+El implementer solo reportó el rojo de paridad.
+
+- **RB1: `tests/unit/inventario/movement-reason.test.ts` «R9 — ninguna fuente bajo app/ ni lib/ enumera
+  los motivos a mano» está en rojo.**
+  - **Qué lo dispara:** en `packing-finish-dialog.tsx:59-62` aparecen los literales `'merma'`, `'rotura'`,
+    `'conteo_fisico'` y `'error_de_carga'`, como argumentos de `movementReasonLabel(...)`.
+  - **De dónde viene:** lo introdujo el arreglo de m3 (a7f703d9). En 1a4f8008 las claves no iban entre
+    comillas y la guardia pasaba.
+  - **Cómo arreglarlo:** derivar el mapa de la constante sin escribir los literales, por ejemplo
+    `Object.fromEntries(PACKING_DIFFERENCE_REASONS.map((r) => [r, r === 'otro' ? 'Otro' : movementReasonLabel(r)]))`,
+    con el tipo `Record<PackingDifferenceReason, string>`.
+- **RB2: `tests/unit/inventario/schema/inventario-schema.test.ts` «la feature no anade ninguna ruta HTTP de
+  productos ni presentaciones bajo app/api» está en rojo.**
+  - **Qué falla:** la guardia compara las factorías `create*` del barrel de `inventario` con una lista
+    cerrada (alrededor de la línea 767). `createListFinishedProductDistribution` (T10, 080c56dc) no está
+    en la lista.
+  - **Cómo arreglarlo:** darla de alta en esa lista.
+  - **Nota:** ya estaba rojo en la vuelta 1. No lo vi porque ese archivo no entró en mi selección de tests.
+
+#### menor
+
+- **m8: el diálogo importa de otra ruta.** `packing-finish-dialog.tsx` importa
+  `@/app/(private)/inventario/components/movement-reason-label` desde la ruta de asignación. Lo hace por la
+  ruta profunda del archivo y no por el barrel, así que no arrastra servidor; es lo que pidió m3. Si
+  `movementReasonLabel` lo usa una segunda ruta, lo natural sería subirlo a `lib/shared/ui` o a
+  `components/shared`. Puede quedar como deuda.
+
+### Veredicto de la vuelta 2
+
+**RECHAZADO**: 2 bloqueantes nuevos (RB1 y RB2) y 1 menor nuevo (m8). B1, m2, m3, m4, m5, m7 y la
+integración de dev (m1) están resueltos. Sigue abierto m6 (ajeno, CI) y se añade como ajeno el rojo de
+`inventario-paridad`, que viene de dev.
+
+Lo que falta para OK: RB1 (derivar las claves del mapa de motivos) y RB2 (alta de
+`createListFinishedProductDistribution` en la lista de `inventario-schema.test.ts`). Después, correr esos
+dos archivos de test y el del diálogo.
