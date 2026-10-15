@@ -832,6 +832,7 @@ test.describe('R21 — tarjetas a 390 × 844', () => {
     const { execPending } = seeded();
     await page.setViewportSize(PHONE);
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(TESTIDS.asignacionTitle)).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByTestId(TESTIDS.cards)).toBeVisible({ timeout: 60_000 });
@@ -883,6 +884,7 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
     const { execPending, execRunning } = seeded();
     await page.setViewportSize(PHONE);
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
 
     const card = page.getByTestId(`data-table-card-${execPending.id}`);
     await expect(card).toBeVisible({ timeout: 60_000 });
@@ -1115,6 +1117,7 @@ test.describe('QC-269 R1, R2, R3 — «Entrar» en «Mis asignados»', () => {
 
     await page.setViewportSize(DESKTOP);
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(TESTIDS.asignacionTitle)).toBeVisible({ timeout: 60_000 });
 
     // R1, R2: en la tabla, los tres botones y sus avisos comparten el borde derecho.

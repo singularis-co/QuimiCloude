@@ -26,8 +26,8 @@
  *
  * POR QUE EL 404 ES EN `/pedidos` Y NO EN `/inventario` NI EN `/asignacion`: `SEED_ROLE_PERMISSIONS`
  * da al `Operador` exactamente `inventario.consultar` y `asignaciones.consultar`, asi que `/pedidos`
- * es el unico modulo que no puede consultar. Y aterriza en `/asignacion` porque «Asignación» es el
- * primer item de su menu ya filtrado, entre Dashboard e Inventario.
+ * es el unico modulo que no puede consultar. Y aterriza en `/inventario` porque «Inventario» es el
+ * primer item de su menu ya filtrado, antes de «Asignación».
  *
  * DATOS: este spec SI depende del seed para el rol `Operador` y sus permisos. Lo efimero es el
  * USUARIO —creado con hash real y borrado al final— y su EMPRESA. El rol nunca se crea ni se borra
@@ -53,7 +53,7 @@ import { expect, test } from '@playwright/test';
 import { normalizeCompanyName, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
-import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
+import { INVENTORY_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
@@ -84,15 +84,14 @@ const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 const LAST_NAMES = 'Permisos';
 
 /**
- * Los `data-testid` de los items de menu que el `Operador` NO puede ver (R2, R3). `nav-produccion`
- * es el GRUPO: su unico hijo hoy es «Recetas», y sin `recetas.consultar` el grupo entero desaparece
- * —etiqueta y disparador incluidos—, que es justo la decision cerrada nº 4.
+ * Los `data-testid` de los items de menu que el `Operador` NO puede ver (R2, R3). «Fórmulas»
+ * (`nav-produccion-recetas`) es un enlace directo de la seccion «Producción»: sin
+ * `recetas.consultar` desaparece, y con el la seccion entera, encabezado incluido.
  */
 const HIDDEN_NAV_TEST_IDS = [
   'nav-dashboard',
   'nav-pedidos',
   'nav-proveedores',
-  'nav-produccion',
   'nav-produccion-recetas',
 ] as const;
 
@@ -199,7 +198,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('la zona privada segun los permisos de quien entra', () => {
-  test('el Operador entra, aterriza en asignacion, ve un menu corto con dos modulos y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente', async ({
+  test('el Operador entra, aterriza en inventario, ve un menu corto con dos modulos y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente', async ({
     page,
   }) => {
     const { username, password } = await createOperatorUser();
@@ -212,8 +211,8 @@ test.describe('la zona privada segun los permisos de quien entra', () => {
 
     // --- 2. Aterriza en el PRIMER item de su menu ya filtrado, no en el dashboard: ahi este rol
     // veria un 404.
-    await page.waitForURL((url) => url.pathname === ASSIGNED_ORDERS_ROUTE, { timeout: 60_000 });
-    await expect(page.getByTestId('asignacion-title')).toBeVisible({ timeout: 60_000 });
+    await page.waitForURL((url) => url.pathname === INVENTORY_ROUTE, { timeout: 60_000 });
+    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
 
     // --- 3. El menu es corto: solo estan los modulos que puede consultar.
     await expect(page.getByTestId('nav-asignacion')).toBeVisible();

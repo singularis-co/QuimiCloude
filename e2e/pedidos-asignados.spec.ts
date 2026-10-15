@@ -324,7 +324,7 @@ test.describe('la lista de pedidos asignados del Operador (R38)', () => {
     if (primerFallo !== undefined) throw primerFallo;
   });
 
-  test('el Operador aterriza en asignacion, ve solo sus pedidos ejecutables, no ve los finales ni los de otra persona, y el en curso entra con aviso (R27)', async ({
+  test('el Operador abre asignacion, ve solo sus pedidos ejecutables, no ve los finales ni los de otra persona, y el en curso entra con aviso (R27)', async ({
     page,
   }) => {
     expect(orderPendingNumber, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
@@ -343,9 +343,9 @@ test.describe('la lista de pedidos asignados del Operador (R38)', () => {
       return;
     }
 
-    // Nunca una ruta escrita a mano: `loginAndLand` deriva el destino de los permisos reales del
-    // actor, que es justo lo que se esta midiendo.
+    // El Operador no aterriza en la lista: tras el login se abre por su ruta.
     await loginAndLand(page, actorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const pendingRow = rowByNumber(page, orderPendingNumber);

@@ -701,6 +701,7 @@ test.describe('reserva de material del pedido', () => {
     // vacia el frasco de cookies antes de entrar como Operador.
     await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const assignedRowB = rowByNumber(page, orderBNumber);

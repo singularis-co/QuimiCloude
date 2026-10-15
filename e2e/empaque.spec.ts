@@ -588,6 +588,7 @@ test.describe('el recorrido de empaque (R48)', () => {
 
     // --- 1. El Operario finaliza y el pedido queda «Por empacar», no «Entregado» (R5, R9).
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const assignedRow = rowByNumber(page, orderNumber);
