@@ -286,3 +286,8 @@ T11 parte frontend hecha; verde.
   - Los cuatro archivos se han añadido a `tasks.md > Archivos esperados`.
 - Pendiente fuera de esta tanda (T18): `e2e/helpers/landing.ts` y `tests/unit/e2e-helpers/landing.test.ts` aún componen
   `firstVisibleNavHref(...) ?? DASHBOARD_ROUTE` a mano.
+- Gate (commit `c004e2e4`, ./init.sh rápido):
+  - 1.ª pasada: 1 rojo, `tests/unit/inventario/adjust-batch-dialog.test.tsx` R9 (`toastExito` llamado 0 veces). Ese archivo
+    no está en el diff y solo pasa 30/30: inestabilidad por carga.
+  - 2.ª pasada: related 883/883 archivos (14098 pasados, 59 saltados); test:rapido 117/117 (1641 pasados, 37 saltados);
+    `== init OK ==`.
