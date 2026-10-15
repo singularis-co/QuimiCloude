@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { PackingOrderDetail } from '@/lib/modules/asignaciones';
+import { MOVEMENT_REASONS, type MovementReason } from '@/lib/modules/inventario';
 import {
   PACKING_DIFFERENCE_REASONS,
   PACKING_INCREASE_REASONS,
@@ -36,6 +37,21 @@ import { cn } from '@/lib/utils';
 
 type PackingFinishView = NonNullable<PackingOrderDetail['finish']>;
 type PackingFinishLine = PackingFinishView['lines'][number];
+
+const STOCK_MOVEMENT_REASONS: readonly string[] = MOVEMENT_REASONS;
+
+function isMovementReason(reason: PackingDifferenceReason): reason is MovementReason {
+  return STOCK_MOVEMENT_REASONS.includes(reason);
+}
+
+// Derivado del conjunto cerrado (R9): un motivo nuevo de inventario gana etiqueta sin tocar aqui.
+// El unico motivo propio del empaque, el texto libre, se rotula aparte.
+const PACKING_REASON_LABELS = Object.fromEntries(
+  PACKING_DIFFERENCE_REASONS.map((reason) => [
+    reason,
+    isMovementReason(reason) ? movementReasonLabel(reason) : 'Otro',
+  ]),
+) as Readonly<Record<PackingDifferenceReason, string>>;
 
 export const PACKING_FINISH_DIALOG_TEXTS = {
   title: '¿Terminar el empaque?',
@@ -55,13 +71,7 @@ export const PACKING_FINISH_DIALOG_TEXTS = {
   reasonPlaceholder: 'Elegir',
   increaseHint: 'Para envases de más solo valen Conteo físico, Error de carga u Otro.',
   otherLabel: 'Describe el motivo',
-  reasons: {
-    merma: movementReasonLabel('merma'),
-    rotura: movementReasonLabel('rotura'),
-    conteo_fisico: movementReasonLabel('conteo_fisico'),
-    error_de_carga: movementReasonLabel('error_de_carga'),
-    otro: 'Otro',
-  } satisfies Record<PackingDifferenceReason, string>,
+  reasons: PACKING_REASON_LABELS,
   invalidCount: 'Escribe un número entero: 0 o más.',
   missingReason: 'Elige un motivo.',
   missingOther: 'Escribe el motivo.',
