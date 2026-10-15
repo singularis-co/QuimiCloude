@@ -64,6 +64,11 @@ la forma exacta de su entrada y su salida está en `design.md > 1. Contrato de s
   del mismo tipo (nombre, existencia, costo unitario o total, lote, fechas, alerta de cantidad, y
   existencia entera en envase). SI una fila incumple alguna, ENTONCES su estado DEBE ser `error` con
   un motivo por cada regla incumplida, y cada motivo DEBE nombrar la columna afectada.
+  *Nota 2026-10-14 (cambio implementado y aprobado por el humano):* en insumo, envase y producto
+  terminado el costo unitario es obligatorio; en instrumento sigue opcional. Una fila de esos tres
+  tipos sin costo da un único motivo en la columna «Costo unitario» (`value_required`, igual que
+  cualquier columna obligatoria vacía), no un motivo de costo aparte. Un costo con valor no válido
+  sigue dando su propio motivo (`cost_invalid`). Ver `design.md > 1.1`.
 - **R11** (D4, D8) SI una fila trae valor en una columna que no aplica a su tipo según
   `design.md > 1.1`, ENTONCES su estado DEBE ser `error` nombrando esa columna.
 - **R12** El sistema DEBE leer los importes y cantidades de un .csv con coma o con punto como
