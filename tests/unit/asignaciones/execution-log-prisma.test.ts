@@ -153,6 +153,12 @@ describe('execution-log-prisma: solo anexar (R31)', () => {
     const operaciones = [...fuente.matchAll(/orderExecutionEntry\s*\.\s*(\w+)/g)].map((m) => m[1])
     expect([...new Set(operaciones)].sort()).toEqual(['create', 'findFirst', 'findMany', 'groupBy'])
   })
+
+  it('R8: la lectura del equipo para el filtro no actualiza ni borra: solo findMany sobre el equipo', () => {
+    const fuente = readFileSync(REGISTRO_ABS, 'utf8')
+    const operaciones = [...fuente.matchAll(/orderConditioningTeamMember\s*\.\s*(\w+)/g)].map((m) => m[1])
+    expect([...new Set(operaciones)]).toEqual(['findMany'])
+  })
 })
 
 describe('execution-log-prisma: el mapa inverso del enum (QC-167 T4a)', () => {
@@ -177,11 +183,16 @@ describe('execution-log-prisma: el mapa inverso del enum (QC-167 T4a)', () => {
   })
 })
 
+// Nota 2026-10-14 (QC-283): con persona, el filtro tambien lee el equipo de acondicionamiento.
 function clienteDeLectura() {
   const findMany = vi.fn()
   const groupBy = vi.fn()
-  const db = { orderExecutionEntry: { findMany, groupBy } } as unknown as PrismaClient
-  return { db, findMany, groupBy }
+  const findTeam = vi.fn().mockResolvedValue([])
+  const db = {
+    orderExecutionEntry: { findMany, groupBy },
+    orderConditioningTeamMember: { findMany: findTeam },
+  } as unknown as PrismaClient
+  return { db, findMany, groupBy, findTeam }
 }
 
 describe('execution-log-prisma: las tres lecturas', () => {
@@ -207,6 +218,44 @@ describe('execution-log-prisma: las tres lecturas', () => {
       by: ['orderId'],
       where: { companyId: COMPANY, userId: USER, occurredAt: { gte: FROM, lt: BEFORE } },
     })
+  })
+
+  it('R30, R10: con persona, suma los pedidos de su equipo con Comenzar anotado en el rango, sin repetir', async () => {
+    const { db, groupBy, findTeam } = clienteDeLectura()
+    const OTRO = '66666666-6666-4666-8666-666666666666'
+    const SIN_COMENZAR = '77777777-7777-4777-8777-777777777777'
+    findTeam.mockResolvedValue([{ orderId: ORDER }, { orderId: OTRO }, { orderId: SIN_COMENZAR }])
+    groupBy.mockResolvedValueOnce([{ orderId: ORDER }]).mockResolvedValueOnce([{ orderId: ORDER }, { orderId: OTRO }])
+
+    const ids = await createExecutionLogRepository(db).listExecutedOrderIds(COMPANY, {
+      userId: USER,
+      occurredFrom: FROM,
+      occurredBefore: BEFORE,
+    })
+
+    expect([...ids].sort()).toEqual([ORDER, OTRO].sort())
+    expect(findTeam).toHaveBeenCalledWith({ where: { companyId: COMPANY, userId: USER }, select: { orderId: true } })
+    expect(groupBy).toHaveBeenNthCalledWith(2, {
+      by: ['orderId'],
+      where: {
+        companyId: COMPANY,
+        action: 'CONDITIONING_START',
+        orderId: { in: [ORDER, OTRO, SIN_COMENZAR] },
+        occurredAt: { gte: FROM, lt: BEFORE },
+      },
+    })
+  })
+
+  it('R32: sin filas de equipo no consulta Comenzar; sin persona no lee el equipo', async () => {
+    const { db, groupBy, findTeam } = clienteDeLectura()
+    groupBy.mockResolvedValue([])
+
+    await createExecutionLogRepository(db).listExecutedOrderIds(COMPANY, { userId: USER })
+    expect(groupBy).toHaveBeenCalledTimes(1)
+
+    findTeam.mockClear()
+    await createExecutionLogRepository(db).listExecutedOrderIds(COMPANY, { occurredFrom: FROM })
+    expect(findTeam).not.toHaveBeenCalled()
   })
 
   it('R8: un extremo ausente no aparece en el where', async () => {

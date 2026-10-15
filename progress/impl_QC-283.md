@@ -251,3 +251,41 @@ Modificados (tests):
 - `pnpm exec tsc --noEmit` → sin errores. `pnpm exec eslint <5 archivos de T6>` → sin salida (0 problemas).
 
 Veredicto: T6 hecha; Terminar anota en la misma transaccion que la transicion.
+
+## Tanda 1A · T7 — Filtro por persona incluye al equipo (backend_dev, 2026-10-14)
+
+### Archivos
+
+Modificados (produccion):
+- `lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma.ts` (C2.3 `listExecutedOrderIds`: con `userId`, union sin repetir de los pedidos firmados y de `listStartedOrderIdsOfTeamMember`: `orderConditioningTeamMember.findMany({ companyId, userId })` + `orderExecutionEntry.groupBy` con `CONDITIONING_START`, `orderId in` y el mismo rango; sin SQL crudo)
+- `lib/modules/asignaciones/ports/execution-log-repository.ts` (solo el JSDoc de `listExecutedOrderIds`: la semantica nueva; firma sin cambios)
+
+Modificados (tests):
+- `tests/unit/asignaciones/execution-log-prisma.test.ts` (doble de lectura con `orderConditioningTeamMember.findMany`, nota fechada; R8 estatico, R30/R10, R32)
+- `tests/integration/asignaciones/execution-log-read.int.test.ts` (R30, R32, R10)
+
+### Decisiones de implementacion
+- Las dos consultas del filtro (firmados y equipo) van en `Promise.all`; la del equipo no se hace sin `userId`, y la de `CONDITIONING_START` no se hace si la persona no esta en ningun equipo.
+- En integracion los pedidos de la escena del equipo se crean `EN_CURSO`: `createOrder` no fija `conditioned_by` y el CHECK `orders_conditioned_by_matches_status` rechaza `EN_ACONDICIONAMIENTO` sin el; el estado del pedido no interviene en el filtro.
+
+### R → test
+| R | Test |
+|---|---|
+| R8 | `execution-log-prisma.test.ts` › «R8: la lectura del equipo para el filtro no actualiza ni borra: solo findMany sobre el equipo»; «R31: el archivo del registro no contiene update, upsert ni delete…» y «R31 / R22: las unicas operaciones sobre orderExecutionEntry…» (QC-82, verdes sin tocar) |
+| R10 | `execution-log-read.int.test.ts` › «R10: el filtro por equipo no cruza empresas»; `execution-log-prisma.test.ts` › «R30, R10: con persona, suma los pedidos de su equipo…» (las dos consultas llevan `companyId`) |
+| R30 | `execution-log-read.int.test.ts` › «R30: encuentra el pedido por el miembro del equipo que no firma ninguna anotacion», «R30: con rango, cuenta el instante del Comenzar», «R30: quien firma y ademas es del equipo no repite el pedido…»; `execution-log-prisma.test.ts` › «R30, R10: …» |
+| R32 | `execution-log-read.int.test.ts` › «R32: un equipo sin Comenzar anotado no filtra»; `execution-log-prisma.test.ts` › «R32: sin filas de equipo no consulta Comenzar; sin persona no lee el equipo» |
+
+### Verificacion (salida real)
+- `pnpm exec vitest run tests/unit/asignaciones/execution-log-prisma.test.ts` → `Tests 70 passed (70)`.
+- `pnpm exec vitest run --project integration tests/integration/asignaciones/execution-log-read.int.test.ts` → plantilla `qct_tpl_f928446831e4` reutilizada, base efimera creada y borrada; primera corrida 5 rojos propios (pedido `EN_ACONDICIONAMIENTO` sin `conditioned_by`, ver decisiones); corregido: `Tests 15 passed (15)`.
+
+### Cierre de la tanda 1A (T4–T7)
+- `pnpm run typecheck` → `tsc --noEmit` sin errores (incluye lo que frontend_dev tiene en curso de T8 en el worktree; no dio ningun rojo).
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos 7 de tanda 0, en archivos no tocados (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest run guard` → `Test Files 76 passed (76)`, `Tests 1066 passed | 20 skipped (1086)`.
+- `pnpm exec vitest related --run <11 archivos de produccion y helpers de T4–T7>` → `Test Files 386 passed (386)`, `Tests 6428 passed | 2 skipped (6430)`.
+- Integracion de la tanda, por task (arriba): `conditioning-execution-log`, `start-conditioning-team`, `finish-conditioning-batch-data`, `finished-orders`, `finished-batch-labels`, `execution-log-read`, todas en verde en base efimera.
+- Grafo de codigo (MCP) no usado: exploracion con Grep/Read.
+
+Veredicto: T7 hecha y tanda 1A (T4–T7) cerrada en backend: typecheck, lint, guardias, related y las integraciones de la tanda en verde.

@@ -173,7 +173,7 @@ verde.
 
 **Hecho cuando:** los tests están en verde.
 
-### T7 [P] — Filtro por persona incluye al equipo · backend_dev · R10, R30, R32 · Dep: tanda 0
+### [x] T7 [P] — Filtro por persona incluye al equipo · backend_dev · R10, R30, R32 · Dep: tanda 0
 
 **Hacer:** C2.3 `listExecutedOrderIds`, con las dos consultas Prisma unidas y sin SQL crudo.
 

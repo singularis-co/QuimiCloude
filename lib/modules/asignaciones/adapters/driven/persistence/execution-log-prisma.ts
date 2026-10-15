@@ -43,6 +43,31 @@ function parseBatchLines(entryId: string, value: Prisma.JsonValue): readonly Con
   return parsed.data;
 }
 
+/** Pedidos en cuyo equipo esta la persona y cuyo Comenzar anotado cae en el rango: sin esa anotacion
+ *  no se sabe cuando trabajo, y no se reconstruye. */
+async function listStartedOrderIdsOfTeamMember(
+  db: PrismaLike,
+  companyId: string,
+  userId: string,
+  inRange: Prisma.OrderExecutionEntryWhereInput,
+): Promise<readonly string[]> {
+  const memberships = await db.orderConditioningTeamMember.findMany({
+    where: { companyId, userId },
+    select: { orderId: true },
+  });
+  if (memberships.length === 0) return [];
+  const rows = await db.orderExecutionEntry.groupBy({
+    by: ['orderId'],
+    where: {
+      companyId,
+      action: EXECUTION_ACTION_TO_PRISMA.conditioning_start,
+      orderId: { in: memberships.map((member) => member.orderId) },
+      ...inRange,
+    },
+  });
+  return rows.map((row) => row.orderId);
+}
+
 /** Fabrica y no objeto ya construido: dentro de una transaccion tiene que escribir por su `tx`. */
 export function createExecutionLogRepository(db: PrismaLike = prisma): ExecutionLogRepository {
   return {
@@ -81,12 +106,19 @@ export function createExecutionLogRepository(db: PrismaLike = prisma): Execution
       const occurredAt: Prisma.DateTimeFilter = {};
       if (filter.occurredFrom !== undefined) occurredAt.gte = filter.occurredFrom;
       if (filter.occurredBefore !== undefined) occurredAt.lt = filter.occurredBefore;
-      const where: Prisma.OrderExecutionEntryWhereInput = { companyId };
-      if (filter.userId !== undefined) where.userId = filter.userId;
-      if (Object.keys(occurredAt).length > 0) where.occurredAt = occurredAt;
+      const inRange: Prisma.OrderExecutionEntryWhereInput =
+        Object.keys(occurredAt).length > 0 ? { occurredAt } : {};
+      const where: Prisma.OrderExecutionEntryWhereInput = {
+        companyId,
+        ...(filter.userId === undefined ? {} : { userId: filter.userId }),
+        ...inRange,
+      };
 
-      const rows = await db.orderExecutionEntry.groupBy({ by: ['orderId'], where });
-      return rows.map((row) => row.orderId);
+      const [signed, asTeamMember] = await Promise.all([
+        db.orderExecutionEntry.groupBy({ by: ['orderId'], where }),
+        filter.userId === undefined ? [] : listStartedOrderIdsOfTeamMember(db, companyId, filter.userId, inRange),
+      ]);
+      return [...new Set([...signed.map((row) => row.orderId), ...asTeamMember])];
     },
 
     async listEntriesForOrders(

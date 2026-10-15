@@ -217,3 +217,92 @@ describe('listUserIdsWithEntries', () => {
     });
   });
 });
+
+// QC-283: con persona, el filtro tambien encuentra los pedidos en cuyo equipo de acondicionamiento
+// esta, si su Comenzar esta anotado; el rango se mide sobre el instante de ese Comenzar.
+describe('listExecutedOrderIds: el equipo de acondicionamiento', () => {
+  type EscenaEquipo = Escena & {
+    readonly marta: string;
+    readonly miembroB: string;
+    readonly pedidoC: string;
+    readonly pedidoSinComenzar: string;
+    readonly pedidoB2: string;
+  };
+
+  /**
+   * Empresa A: Ana comienza el acondicionamiento del pedido C el dia 2 a la 01:00 con Marta en el
+   * equipo; Marta no firma nada. El pedido sin Comenzar tiene a Marta en el equipo y ninguna
+   * anotacion de acondicionamiento. Empresa B: su persona comienza el pedido B2 con su propio miembro.
+   */
+  async function montarEquipo(fixture: Fixture): Promise<EscenaEquipo> {
+    const e = await montarEscena(fixture);
+    const a = fixture.companyA;
+    const b = fixture.companyB;
+    const marta = await createPerson(fixture, a, { lastNames: 'Mora' });
+    const miembroB = await createPerson(fixture, b, { lastNames: 'Bueno' });
+    const pedidoC = await createOrder(fixture, { status: 'EN_CURSO' });
+    const pedidoSinComenzar = await createOrder(fixture, { status: 'EN_CURSO' });
+    const pedidoB2 = await createOrder(fixture, { companyId: b, status: 'EN_CURSO' });
+
+    const comenzar = new Date(D2.getTime() + 60 * 60_000);
+    await e.log.append({ companyId: a, orderId: pedidoC, userId: e.ana, action: 'conditioning_start', stepPosition: null, occurredAt: comenzar });
+    await e.log.append({ companyId: b, orderId: pedidoB2, userId: e.ajena, action: 'conditioning_start', stepPosition: null, occurredAt: comenzar });
+    for (const [orderId, userId, companyId] of [
+      [pedidoC, marta, a],
+      [pedidoSinComenzar, marta, a],
+      [pedidoB2, miembroB, b],
+    ] as const) {
+      await fixture.tx.orderConditioningTeamMember.create({ data: { orderId, userId, companyId, position: 0 } });
+    }
+    return { ...e, marta, miembroB, pedidoC, pedidoSinComenzar, pedidoB2 };
+  }
+
+  it('R30: encuentra el pedido por el miembro del equipo que no firma ninguna anotacion', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const e = await montarEquipo(fixture);
+      expect(await e.log.listExecutedOrderIds(fixture.companyA, { userId: e.marta })).toEqual([e.pedidoC]);
+    });
+  });
+
+  it('R30: con rango, cuenta el instante del Comenzar', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const e = await montarEquipo(fixture);
+      expect(
+        await e.log.listExecutedOrderIds(fixture.companyA, { userId: e.marta, occurredFrom: D2, occurredBefore: D3 }),
+      ).toEqual([e.pedidoC]);
+      expect(
+        await e.log.listExecutedOrderIds(fixture.companyA, { userId: e.marta, occurredFrom: D1, occurredBefore: D2 }),
+      ).toEqual([]);
+      expect(await e.log.listExecutedOrderIds(fixture.companyA, { userId: e.marta, occurredFrom: D3 })).toEqual([]);
+    });
+  });
+
+  it('R30: quien firma y ademas es del equipo no repite el pedido; los firmados siguen saliendo', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const e = await montarEquipo(fixture);
+      await fixture.tx.orderConditioningTeamMember.create({
+        data: { orderId: e.pedidoC, userId: e.ana, companyId: fixture.companyA, position: 1 },
+      });
+      expect(ordenados(await e.log.listExecutedOrderIds(fixture.companyA, { userId: e.ana }))).toEqual(
+        ordenados([e.pedidoA1, e.pedidoC]),
+      );
+    });
+  });
+
+  it('R32: un equipo sin Comenzar anotado no filtra', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const e = await montarEquipo(fixture);
+      const ids = await e.log.listExecutedOrderIds(fixture.companyA, { userId: e.marta });
+      expect(ids).not.toContain(e.pedidoSinComenzar);
+    });
+  });
+
+  it('R10: el filtro por equipo no cruza empresas', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const e = await montarEquipo(fixture);
+      expect(await e.log.listExecutedOrderIds(fixture.companyB, { userId: e.marta })).toEqual([]);
+      expect(await e.log.listExecutedOrderIds(fixture.companyA, { userId: e.miembroB })).toEqual([]);
+      expect(await e.log.listExecutedOrderIds(fixture.companyB, { userId: e.miembroB })).toEqual([e.pedidoB2]);
+    });
+  });
+});
