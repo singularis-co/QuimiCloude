@@ -111,3 +111,40 @@ Modificados (tests):
 - Grafo de codigo (MCP) no usado: exploracion con Grep/Read.
 
 Veredicto: T2 hecha; `lib/` compila, tests de T2, related y guardias en verde; el typecheck del front queda rojo a proposito hasta T3.
+
+## Tanda 0 · T3 — Puente del front: fixtures, formato, lista y tarjetas de duración (frontend_dev, 2026-10-14)
+
+### Archivos
+
+Creados:
+- `tests/fixtures/execution-trace-conditioning.ts` (C4: detalle `terminado` con equipo mixto 2 por grupo + 1 directo, dos guardados con corrección y `presentationName: null`; `en_curso` sin equipo y `conditioning` `open`; `anterior` con `conditioning: null`; uno `unclosed` dado de baja; filas con `totalDuration` en los tres `kind`, una con 5 personas y una viva con todo cerrado)
+
+Modificados (producción):
+- `app/(private)/dashboard/components/execution-trace-format.ts` (`formatElapsedMinutes`, `formatTraceTotal`, `formatSnapshotDate`, `PHASE_DURATION_LABELS`, `PHASE_OPEN_MARK`, `PHASE_UNCLOSED_MARK`, `CONDITIONING_TEXTS`; `formatTraceDuration` borrada: sin consumidores)
+- `app/(private)/dashboard/components/index.ts` (exporta lo nuevo; quita `formatTraceDuration`)
+- `app/(private)/dashboard/components/execution-trace-columns.tsx` (celda Duración = cifra en minutos + sufijo `text-xs text-muted-foreground`, mismo texto que `formatTraceTotal`; «En curso» con `row.active`)
+- `app/(private)/dashboard/recorrido/[id]/components/execution-trace-detail.tsx` (tarjeta por fase no `null` en orden producción → empaque → acondicionamiento, `formatElapsed` sin sufijo, insignias `progress`/`muted` con `data-testid` de design; rejilla `repeat(auto-fit,minmax(min(170px,50%-6px),1fr))` del tablero: 5 en fila / 3+2 / 2; «En curso» con `trace.active`)
+
+Modificados (tests, nota fechada 2026-10-14): `tests/unit/dashboard/execution-trace-format.test.ts`, `tests/ui/dashboard/execution-trace-table.test.tsx`, `tests/ui/dashboard/execution-trace-detail.test.tsx`, `tests/ui/dashboard/recorrido-rediseno.test.tsx`, `tests/ui/dashboard/textos-dashboard.test.tsx`, `tests/ui/dashboard/dashboard-rediseno.test.tsx`, `tests/unit/paridad/recorridos-paridad.test.tsx` (el snapshot no cambió: el árbol accesible no incluye la cifra).
+
+### Decisiones de implementación
+- La rejilla usa el `auto-fit` del tablero con mínimo `min(170px, 50% - gap/2)` en vez de cortes por contenedor: en tablet (~700 px de contenedor, por debajo del corte de 760) un `@max-[760px]:grid-cols-2` daría 2 columnas en lugar de 3+2; el `min()` garantiza 2 columnas en teléfonos estrechos.
+- `formatTraceDuration` tenía su test de formato (QC-167 R15): los casos de cifra pasan a `formatElapsed` y los de marca a `formatTraceTotal`.
+
+### R → test
+| R | Test |
+|---|---|
+| R15 (formato) | `execution-trace-format.test.ts` › «R15 - formatSnapshotDate reordena AAAA-MM-DD a dd/mm/aaaa», «R15 - el primer y el ultimo dia del ano no se corren por huso horario» |
+| R25 | `execution-trace-detail.test.tsx` › «R25 - tarjetas por fase con insignias; fase null no se pinta», «R25 - una fase sin cierre lleva la insignia «Sin cierre anotado»», «R25 - estado, tres fases y vueltas atras: cinco datos en orden», «R25 - un pedido anterior a la feature no pinta la tarjeta de acondicionamiento», «R25 - la rejilla reparte 5 en una fila, 3 + 2 o 2 columnas segun el ancho»; `execution-trace-format.test.ts` › «R25 - una etiqueta por fase y las dos insignias»; `textos-dashboard.test.tsx` › «R21 - R25 - …» |
+| R26 | `execution-trace-format.test.ts` › «R26 - formatElapsedMinutes trunca …» (5), «R26 - formatTraceTotal trunca a minutos y lleva los tres sufijos», «R26 - una duracion negativa se muestra como 0 min»; `execution-trace-table.test.tsx` › «R26 - celda de duracion con total y sufijo», «R26 - la cifra es la de la columna monoespaciada y el sufijo va pequeno y atenuado» |
+| R28 | `execution-trace-table.test.tsx` › «R28 - En curso segun active; nunca en dado de baja», «R28 - una fila dada de baja con active a true tampoco lleva la marca»; `execution-trace-detail.test.tsx` › «R28 - En curso segun active; nunca en dado de baja» |
+
+### Verificación (salida real)
+- `pnpm run typecheck` → `tsc --noEmit`, exit 0, 0 errores (los 30 que dejó T2 cerrados).
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos 7 de T2 en archivos no tocados.
+- `pnpm exec vitest run` de los 7 tests listados → `Test Files 7 passed (7)`, `Tests 133 passed (133)`.
+- `pnpm exec vitest related --run <4 archivos de app + fixture>` → `Test Files 11 passed (11)`, `Tests 212 passed (212)`.
+- `pnpm exec vitest run guard` → `Test Files 76 passed (76)`, `Tests 1066 passed | 20 skipped (1086)`.
+- Grafo de código (MCP) no usado: exploración con Grep/Read.
+
+Veredicto: T3 hecha; el repo compila, lista y detalle consumen `active`/`totalDuration`/`durations`, tests y guardias en verde.

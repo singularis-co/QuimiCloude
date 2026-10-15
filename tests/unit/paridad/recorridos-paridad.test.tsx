@@ -47,6 +47,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', (
 
 const PERSONA = { userId: 'user-1', displayName: 'Ana López García' };
 
+// Ajustado el 2026-10-14 (QC-283): la fila trae `active` y `totalDuration` en vez de `duration`.
 const FILAS: readonly ExecutionTraceRow[] = [
   {
     orderId: 'order-1',
@@ -56,7 +57,8 @@ const FILAS: readonly ExecutionTraceRow[] = [
     people: [PERSONA],
     firstAt: new Date('2026-09-20T08:00:00.000Z'),
     lastAt: new Date('2026-09-20T09:30:15.000Z'),
-    duration: { kind: 'closed', ms: 5_415_000 },
+    active: false,
+    totalDuration: { kind: 'closed', ms: 5_415_000 },
     goBackCount: 1,
   },
   {
@@ -67,7 +69,8 @@ const FILAS: readonly ExecutionTraceRow[] = [
     people: [],
     firstAt: new Date('2026-09-21T10:00:00.000Z'),
     lastAt: new Date('2026-09-21T10:05:00.000Z'),
-    duration: { kind: 'open', ms: 300_000 },
+    active: false,
+    totalDuration: { kind: 'unclosed', ms: 300_000 },
     goBackCount: 0,
   },
 ];

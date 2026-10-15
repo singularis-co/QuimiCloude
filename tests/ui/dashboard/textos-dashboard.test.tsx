@@ -23,6 +23,7 @@ import {
 } from '@/app/(private)/dashboard/recorrido/[id]/components';
 import PrivateNotFound from '@/app/(private)/not-found';
 import type {
+  ConditioningAction,
   ExecutionAction,
   ExecutionTraceDetail as ExecutionTraceDetailData,
   ExecutionTraceDetailStep,
@@ -99,7 +100,17 @@ const TEXTOS = {
   recorrido: {
     volver: 'Volver a la lista',
     titulo: (numero: string) => `Recorrido del pedido ${numero}`,
-    datos: ['Estado', 'Duración', 'Vueltas atrás'],
+    // Ajustado el 2026-10-14 (QC-283): «Duración» pasa a una tarjeta por fase, con insignia si la
+    // fase sigue abierta o quedó sin cierre.
+    datos: [
+      'Estado',
+      'Duración de producción',
+      'Duración de empaque',
+      'Duración de acondicionamiento',
+      'Vueltas atrás',
+    ],
+    faseEnCurso: 'En curso',
+    faseSinCierre: 'Sin cierre anotado',
     anotaciones: 'Anotaciones',
     paso: (n: number) => `Paso ${n}`,
     motivo: 'Motivo',
@@ -133,6 +144,7 @@ const TEXTOS = {
 
 const ANA: ExecutionTracePerson = { userId: '3f2b8c1e-5d4a-4b7e-9c2f-1a2b3c4d5e6f', displayName: 'Ana Ruiz' };
 
+// Ajustado el 2026-10-14 (QC-283): la fila trae `active` y `totalDuration` en vez de `duration`.
 const ACTIVO: ExecutionTraceRow = {
   orderId: 'o-activo',
   numberText: '2026-0000042',
@@ -141,7 +153,8 @@ const ACTIVO: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:30:00.000Z'),
-  duration: { kind: 'open', ms: 45 * 60 * 1000 },
+  active: true,
+  totalDuration: { kind: 'open', ms: 45 * 60 * 1000 },
   goBackCount: 2,
 };
 
@@ -153,7 +166,8 @@ const DE_BAJA: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-06T08:00:00.000Z'),
   lastAt: new Date('2026-10-06T09:00:00.000Z'),
-  duration: { kind: 'open', ms: 60 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
   goBackCount: 0,
 };
 
@@ -203,16 +217,17 @@ async function resolverPagina(nodo: ReactNode): Promise<ReactNode> {
 const ORDER_ID = '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718';
 const MIN = 60 * 1000;
 
-function step(
-  overrides: Partial<ExecutionTraceDetailStep> & Pick<ExecutionTraceDetailStep, 'id' | 'action'>,
-): ExecutionTraceDetailStep {
+// Ajustado el 2026-10-14 (QC-283): el paso es una union por `action`; los pasos de produccion y
+// empaque ya no llevan `batchLines`.
+type ProductionStep = Exclude<ExecutionTraceDetailStep, { readonly action: ConditioningAction }>;
+
+function step(overrides: Partial<ProductionStep> & Pick<ProductionStep, 'id' | 'action'>): ProductionStep {
   return {
     orderId: ORDER_ID,
     userId: 'u1',
     userDisplayName: 'Ana Ruiz',
     stepPosition: 1,
     reason: null,
-    batchLines: null,
     occurredAt: new Date('2026-10-07T08:00:00.000Z'),
     gapToNextMs: 5 * MIN,
     isGoBack: false,
@@ -239,7 +254,12 @@ const TRACE: ExecutionTraceDetailData = {
   deleted: false,
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:20:00.000Z'),
-  duration: { kind: 'open', ms: 20 * MIN },
+  active: true,
+  durations: {
+    production: { kind: 'closed', ms: 20 * MIN },
+    packing: { kind: 'unclosed', ms: 5 * MIN },
+    conditioning: { kind: 'open', ms: 10 * MIN },
+  },
   goBackCount: 1,
   steps: STEPS,
 };
@@ -352,7 +372,7 @@ describe('R21 - textos del Dashboard', () => {
 // ---------------------------------------------------------------------------------------------
 
 describe('R21 - textos del recorrido', () => {
-  it('R21 - «Volver a la lista», «Recorrido del pedido {n}», «Estado», «Duración», «Vueltas atrás» y «Anotaciones»', () => {
+  it('R21 - R25 - «Volver a la lista», «Recorrido del pedido {n}», «Estado», una «Duración de …» por fase, «Vueltas atrás» y «Anotaciones»', () => {
     const { container } = render(<ExecutionTraceDetail trace={TRACE} backHref={BACK_HREF} />);
 
     expect(screen.getByRole('link', { name: TEXTOS.recorrido.volver })).toBeInTheDocument();
@@ -362,6 +382,8 @@ describe('R21 - textos del recorrido', () => {
     expect(Array.from(container.querySelectorAll('dt')).map((dt) => dt.textContent)).toEqual(
       TEXTOS.recorrido.datos,
     );
+    expect(screen.getByTestId('execution-trace-phase-open').textContent).toBe(TEXTOS.recorrido.faseEnCurso);
+    expect(screen.getByTestId('execution-trace-phase-unclosed').textContent).toBe(TEXTOS.recorrido.faseSinCierre);
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(TEXTOS.recorrido.anotaciones);
     expect(screen.getByRole('list', { name: TEXTOS.recorrido.anotaciones })).toBeInTheDocument();
   });

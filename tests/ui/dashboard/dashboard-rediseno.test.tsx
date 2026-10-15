@@ -61,6 +61,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/require-page-permission', () =>
 
 const ANA: ExecutionTracePerson = { userId: '3f2b8c1e-5d4a-4b7e-9c2f-1a2b3c4d5e6f', displayName: 'Ana Ruiz' };
 
+// Ajustado el 2026-10-14 (QC-283): la fila trae `active` y `totalDuration` en vez de `duration`.
 const ACTIVO: ExecutionTraceRow = {
   orderId: 'o-activo',
   numberText: '2026-0000042',
@@ -69,7 +70,8 @@ const ACTIVO: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:30:00.000Z'),
-  duration: { kind: 'open', ms: 45 * 60 * 1000 },
+  active: true,
+  totalDuration: { kind: 'open', ms: 45 * 60 * 1000 },
   goBackCount: 2,
 };
 
@@ -81,7 +83,8 @@ const DE_BAJA: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-06T08:00:00.000Z'),
   lastAt: new Date('2026-10-06T09:00:00.000Z'),
-  duration: { kind: 'open', ms: 60 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
   goBackCount: 0,
 };
 
@@ -93,7 +96,8 @@ const ENTREGADO: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-05T08:00:00.000Z'),
   lastAt: new Date('2026-10-05T09:05:00.000Z'),
-  duration: { kind: 'closed', ms: 65 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'closed', ms: 65 * 60 * 1000 },
   goBackCount: 0,
 };
 

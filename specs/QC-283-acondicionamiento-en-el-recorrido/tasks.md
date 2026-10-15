@@ -81,7 +81,7 @@
 - `lib/` compila. El repo entero todavía no compila, porque el front sigue leyendo `duration`: lo
   cierra T3 en esta misma tanda, y la tanda no se da por cerrada antes.
 
-### T3 — Puente del front: fixtures, formato, lista y tarjetas de duración · frontend_dev · R25, R26, R28 · Dep: T2
+### [x] T3 — Puente del front: fixtures, formato, lista y tarjetas de duración · frontend_dev · R25, R26, R28 · Dep: T2
 
 **Hacer:**
 
