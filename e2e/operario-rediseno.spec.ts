@@ -141,7 +141,7 @@ const TESTIDS = {
   executionScreen: 'order-execution-screen',
   executionActions: 'order-execution-actions',
   executionMaterials: 'order-execution-materials',
-  executionToolsTrigger: 'order-execution-tools-panel-trigger',
+  executionMaterialsTrigger: 'order-execution-materials-panel-trigger',
   stepReaderActions: 'step-reader-actions',
   stepChecklistItem: 'step-reader-item-0-0',
   stepFinish: 'step-reader-finish',
@@ -660,7 +660,7 @@ const FRAMES: readonly FrameCase[] = [
   {
     ...SCREENS[0]!,
     footer: (page) => page.getByTestId(TESTIDS.stepReaderActions),
-    controls: [TESTIDS.themeToggle, TESTIDS.executionActions, TESTIDS.executionToolsTrigger],
+    controls: [TESTIDS.themeToggle, TESTIDS.executionActions, TESTIDS.executionMaterialsTrigger],
   },
   {
     ...SCREENS[1]!,
