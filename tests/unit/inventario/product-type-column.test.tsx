@@ -69,12 +69,13 @@ describe('columna «Tipo» de la tabla de inventario', () => {
     expect(PRODUCT_SKELETON_COLUMN_COUNT).toBe(columnas.length);
   });
 
-  it('con `showType` va justo despues de la presentacion, sin orden ni filtro de cabecera', () => {
+  it('con `showType` va justo despues del nombre, sin orden ni filtro de cabecera', () => {
     const columnas = buildProductColumns({ rowActions: () => null, showType: true });
     const ids = columnas.map((columna) => columna.id);
     const tipo = columnas.find((columna) => columna.id === 'type');
 
-    expect(ids.indexOf('type')).toBe(ids.indexOf('presentationName') + 1);
+    expect(ids.indexOf('type')).toBe(ids.indexOf('name') + 1);
+    expect(ids.indexOf('type')).toBeLessThan(ids.indexOf('presentationName'));
     expect(tipo?.sortable).toBeFalsy();
     expect(tipo?.filter).toBeUndefined();
   });

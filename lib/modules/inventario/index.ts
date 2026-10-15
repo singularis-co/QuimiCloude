@@ -65,7 +65,7 @@ export { type ProductStockByUnit, sumStockByUnit, singleUnitStock } from './doma
 export { type CostingBatch } from './domain/costing-batch';
 export { productDisplayName } from './domain/product-display-name';
 export { type PresentationView } from './domain/presentation-view';
-export { type ProductBatchView } from './domain/product-batch-view';
+export { aliveBatches, type ProductBatchView } from './domain/product-batch-view';
 export { type InventoryMovementView, type NewInventoryMovement } from './domain/inventory-movement';
 export { MOVEMENT_REASONS, STOCK_INCREASE_REASONS, type MovementReason } from './domain/movement-reason';
 

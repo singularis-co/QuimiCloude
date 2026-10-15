@@ -67,6 +67,11 @@ export type ProductView = {
   readonly reserved?: string;
   /** Suma de lo disponible en los lotes vivos del producto. Misma condicion que `reserved`. */
   readonly available?: string;
+  /** Vencimiento mas proximo: el minimo `expiry_date` de los lotes con existencia > 0 del producto
+   *  vivo, como fecha de calendario `YYYY-MM-DD`. NO coincide a proposito con `reserved`/`available`,
+   *  que suman todos los lotes. `null` si ningun lote con existencia tiene fecha. Solo lo rellena
+   *  `listAliveProducts`. */
+  readonly nextExpiryDate?: string | null;
   /** Presentacion fija del producto; `null` si no la tiene (un envase anterior a tenerla). */
   readonly presentationId?: string | null;
   readonly presentationName?: string | null;
