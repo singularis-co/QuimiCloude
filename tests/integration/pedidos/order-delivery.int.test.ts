@@ -655,6 +655,59 @@ describe('QC-282 deliverOrder con varios clientes contra Postgres', () => {
       await borrarEscenario(e);
     }
   });
+
+  // Cruce QC-281 x QC-282 (2026-10-15): el tope por envases reales limita la suma de los clientes.
+  // La presentacion de 2 L tiene plan 5 y se le fijan 4 envases reales (con motivo, por el CHECK).
+  async function conRealesEnLaLinea(e: Escenario): Promise<void> {
+    await prisma.orderPresentationLine.update({
+      where: { id: e.lineId },
+      data: { packedPackages: 4, packedReason: 'merma', packedReasonOther: null },
+    });
+  }
+
+  it('QC-282 R23 + QC-281: A=2 y B=3 con packedPackages: 4 sobre un plan de 5 es delivery_exceeds_remaining sin escribir nada', async () => {
+    const e = await crearEscenario();
+    try {
+      await conRealesEnLaLinea(e);
+      const antes = await pedido(e.orderId);
+      const codigo = await codigoDe(
+        pedidos.deliverOrder(
+          entrada(e, [
+            cliente(e.customerId, [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 2 }]),
+            cliente(e.otherCustomerId, [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 3 }]),
+          ]),
+          e.a.actor,
+        ),
+      );
+
+      expect(codigo).toBe('delivery_exceeds_remaining');
+      await nadaEscrito(e, antes);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('QC-282 R23 + QC-281: A=1 y B=3 con packedPackages: 4 se acepta y el pedido sigue TERMINADO', async () => {
+    const e = await crearEscenario();
+    try {
+      await conRealesEnLaLinea(e);
+      const resultado = await pedidos.deliverOrder(
+        entrada(e, [
+          cliente(e.customerId, [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 1 }]),
+          cliente(e.otherCustomerId, [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 3 }]),
+        ]),
+        e.a.actor,
+      );
+
+      // A la presentacion de 1 L le siguen faltando 3.
+      expect(resultado).toEqual({ status: 'delivered', orderStatus: 'TERMINADO' });
+      expect(await escritoPorEntregas(e.a.companyId)).toEqual({ entregas: 1, lineas: 2, asientos: 2 });
+      expect(await stockDeLote(e.batchId)).toBe('6.0000');
+      expect(await stockDeLote(e.secondBatchId)).toBe('0.0000');
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
 });
 
 describe('getOrderDelivery contra Postgres', () => {

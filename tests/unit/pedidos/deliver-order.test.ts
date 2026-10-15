@@ -1111,3 +1111,37 @@ describe('QC-281 — deliverOrder con los envases reales del empaque', () => {
     expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
   })
 })
+
+// Cruce QC-281 x QC-282 (2026-10-15): el tope por envases reales limita la suma de todos los
+// clientes, no a cada uno por separado.
+describe('QC-282 R23 + QC-281 — tope por envases reales sobre la suma de los clientes', () => {
+  /** La linea pendiente: plan 10, reales 7, nada entregado aun; el galon sigue en el plan. */
+  const VARIOS_CON_REALES: readonly FinishPackingLine[] = LINEAS_VARIOS.map((linea) =>
+    linea.id === PENDING_LINE_ID ? { ...linea, packedPackages: 7 } : linea,
+  )
+  const SIN_ENTREGAS_PENDIENTES = new Map([[COMPLETE_LINE_ID, 4]])
+
+  it('QC-282 R23 + QC-281: A=4 y B=4 con packedPackages: 7 → delivery_exceeds_remaining', async () => {
+    const m = montar({ lineas: VARIOS_CON_REALES, entregados: SIN_ENTREGAS_PENDIENTES })
+    catalogoConDos(m)
+    // El plan (10) admitiria 8; los reales (7) no.
+    const entrada = deliverInput({
+      customers: [clienteA([{ ...UNA, packages: 4 }]), clienteB([{ ...UNA, batchId: NEWER_BATCH_ID, packages: 4 }])],
+    })
+
+    expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entrada, ENTREGADOR))).toBe('delivery_exceeds_remaining')
+    nadaEscrito(m)
+  })
+
+  it('QC-282 R23 + QC-281: A=3 y B=4 con packedPackages: 7 → la entrega se acepta', async () => {
+    const m = montar({ lineas: VARIOS_CON_REALES, entregados: SIN_ENTREGAS_PENDIENTES })
+    catalogoConDos(m)
+    const entrada = deliverInput({
+      customers: [clienteA([{ ...UNA, packages: 3 }]), clienteB([{ ...UNA, batchId: NEWER_BATCH_ID, packages: 4 }])],
+    })
+
+    // Al galon le siguen faltando 5: el pedido sigue TERMINADO.
+    await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).resolves.toEqual({ status: 'delivered', orderStatus: 'TERMINADO' })
+    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+  })
+})
