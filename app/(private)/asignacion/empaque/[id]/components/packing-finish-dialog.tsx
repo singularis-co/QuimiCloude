@@ -44,7 +44,7 @@ function isMovementReason(reason: PackingDifferenceReason): reason is MovementRe
   return STOCK_MOVEMENT_REASONS.includes(reason);
 }
 
-// Derivado del conjunto cerrado (R9): un motivo nuevo de inventario gana etiqueta sin tocar aqui.
+// Derivado del conjunto cerrado: un motivo nuevo de inventario gana etiqueta sin tocar aqui.
 // El unico motivo propio del empaque, el texto libre, se rotula aparte.
 const PACKING_REASON_LABELS = Object.fromEntries(
   PACKING_DIFFERENCE_REASONS.map((reason) => [
