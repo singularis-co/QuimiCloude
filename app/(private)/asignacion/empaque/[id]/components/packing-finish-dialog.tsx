@@ -3,6 +3,7 @@
 import { CircleCheckIcon, MinusIcon, PackageIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useId, useState, type ReactNode, type TransitionEvent } from 'react';
 
+import { movementReasonLabel } from '@/app/(private)/inventario/components/movement-reason-label';
 import { FieldError } from '@/components/shared/field-error';
 import { SharedSelectControl } from '@/components/shared/shared-select';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -55,10 +56,10 @@ export const PACKING_FINISH_DIALOG_TEXTS = {
   increaseHint: 'Para envases de más solo valen Conteo físico, Error de carga u Otro.',
   otherLabel: 'Describe el motivo',
   reasons: {
-    merma: 'Merma',
-    rotura: 'Rotura',
-    conteo_fisico: 'Conteo físico',
-    error_de_carga: 'Error de carga',
+    merma: movementReasonLabel('merma'),
+    rotura: movementReasonLabel('rotura'),
+    conteo_fisico: movementReasonLabel('conteo_fisico'),
+    error_de_carga: movementReasonLabel('error_de_carga'),
     otro: 'Otro',
   } satisfies Record<PackingDifferenceReason, string>,
   invalidCount: 'Escribe un número entero: 0 o más.',

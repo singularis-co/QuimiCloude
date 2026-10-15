@@ -348,3 +348,30 @@ contratos ya anotados en cada tanda).
 
 Pendiente: T9 sin marcar (revisión visual humana 1440/1024/390, incluido el pliegue animado y la
 nota de pedido sin unidad).
+
+## Fixes de review B1 y m3 (frontend_dev, 2026-10-15)
+
+- **B1:** `Fold` se reescribe como `FoldPanel`, que compone `Collapsible`/`CollapsibleContent` (Base UI).
+  - El raíz lleva `contents` y el panel es el elemento de la rejilla.
+  - La animación es la misma: filas de 0fr a 1fr, 10 px y opacidad, en `--dur-base`, entrando con `--ease-enter` y saliendo con `--ease-exit`. Va por `data-starting-style`/`data-ending-style`.
+  - Base UI se encarga de montar y desmontar.
+  - Se quedan dos cosas propias: `inert`/`aria-hidden` al plegarse (Base UI no las pone durante la salida) y el contenido congelado mientras se pliega.
+  - El recorte solo se aplica mientras se mueve. Reduced-motion lo sigue resolviendo la regla global.
+  - Tests:
+    - `packing-finish-dialog.test.tsx`: se reescribe el bloque de pliegue. Afirmaba `data-state`, las clases `starting:` y el desmontaje en `transitionend` de `Fold`. Ahora afirma `data-open`/`data-closed`/`data-ending-style`, `isConnected` y el desmontaje cuando acaba `getAnimations`. jsdom finge la transición y el alto.
+    - Caso nuevo de R3: el anillo de foco no se recorta.
+    - R3 «volver al plan» pasa a usar `waitFor`.
+    - `confirmaciones-paridad` snapshot: +1 div `contents`.
+- **m3:** `reasons` se deriva de `movementReasonLabel`, importado directamente del archivo `app/(private)/inventario/components/movement-reason-label`.
+  - No se usa el barrel porque arrastra código de servidor.
+  - `otro` sigue literal porque `MovementReason` no lo incluye.
+
+R → test: R3 → los 4 casos de «el bloque de motivo se despliega y se pliega»; R5 → «R5: el texto de «Otro» se pliega igual…».
+Comandos:
+- typecheck: verde.
+- lint: 0 errores y 7 warnings preexistentes.
+- guard: 76/76 archivos (1069 passed, 20 skipped).
+- vitest related: 8 archivos, 219/219.
+- E2E `envases-reales-empaque` en chromium: 3/3, con `.env` + `.env.local` del repo principal exportados.
+
+Veredicto: B1 y m3 resueltos sin dependencias nuevas.
