@@ -1,7 +1,7 @@
 'use client';
 
 import { CheckIcon, PlayIcon } from 'lucide-react';
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useId, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { ErrorAlert } from '@/components/shared/error-alert';
@@ -40,6 +40,8 @@ import { PackingFinishDialog, type PackingFinishSubmission } from './packing-fin
  *   2. `EN_EMPAQUE` a nombre del propio actor -> **Terminar**; si hay pasos de envasado, el pie es
  *      el del paso a paso y su ultimo boton abre la misma confirmacion.
  *   3. `EN_EMPAQUE` a nombre de otro -> los dos deshabilitados y un aviso con quien empaca.
+ *   4. `EN_EMPAQUE` propio sin `finish` (el pedido no tiene unidad) -> Terminar deshabilitado, en el
+ *      pie o en el ultimo paso, y un aviso que lo explica: sin unidad no hay con que validar el conteo.
  *
  * El boton que no aplica se pinta deshabilitado y SIN `data-testid`: el testid sigue marcando
  * solo el boton que abre su confirmacion, dentro de su `<form>`, como antes.
@@ -65,6 +67,7 @@ export const PACKING_ORDER_START_ERROR_TESTID = 'packing-order-start-error';
 export const PACKING_ORDER_FINISH_ERROR_TESTID = 'packing-order-finish-error';
 export const PACKING_ORDER_BACK_LINK_TESTID = 'packing-order-back-link';
 export const PACKING_ORDER_STEPS_TESTID = 'packing-order-steps';
+export const PACKING_ORDER_MISSING_UNIT_TESTID = 'packing-order-missing-unit';
 export const PACKING_ORDER_ID_FIELD = 'orderId';
 export const PACKING_ORDER_LINES_FIELD = 'lines';
 export const PACKING_ORDER_START_DIALOG_TESTID = 'packing-order-start-dialog';
@@ -94,6 +97,7 @@ export const PACKING_ORDER_TEXTS = {
   packingSteps: 'Pasos de envasado',
   packerUnknown: 'Lo está empacando otra persona.',
   packer: (name: string) => `Lo está empacando ${name}.`,
+  missingUnit: 'Falta la unidad del pedido: sin ella no se puede comprobar el conteo real.',
 } as const;
 
 const START_DIALOG_TEXTS = {
@@ -151,6 +155,8 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
   const showsOtherPacker = order.status === 'EN_EMPAQUE' && order.packedById !== actorId;
   const lacksDistribution = order.status === 'POR_EMPACAR' && order.presentationLines.length === 0;
   const showsPackingSteps = canFinish && order.packingSteps.length > 0;
+  const lacksUnit = canFinish && order.finish === null;
+  const missingUnitId = useId();
 
   const evidence = useStepEvidence({
     orderId: order.id,
@@ -158,6 +164,12 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
     steps: order.packingSteps,
     initial: order.packingEvidence,
   });
+
+  function stepBlockReason(position: number): string | null {
+    const reason = evidence.stepBlockReason(position);
+    if (reason !== null || !lacksUnit || position !== order.packingSteps.length) return reason;
+    return PACKING_ORDER_TEXTS.missingUnit;
+  }
 
   function handleStepsFinish() {
     const missing = evidence.missingPositions();
@@ -243,7 +255,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
   );
 
   const finishCell =
-    canFinish && !showsPackingSteps ? (
+    canFinish && !showsPackingSteps && !lacksUnit ? (
       <form
         ref={finishFormRef}
         action={finishFormAction}
@@ -268,7 +280,15 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
         {finishDialog}
       </form>
     ) : (
-      <Button type="button" size="xl" touch variant="outline" className={FOOTER_BUTTON_CLASS} disabled>
+      <Button
+        type="button"
+        size="xl"
+        touch
+        variant="outline"
+        className={FOOTER_BUTTON_CLASS}
+        disabled
+        aria-describedby={lacksUnit ? missingUnitId : undefined}
+      >
         {finishIcon}
         {PACKING_ORDER_TEXTS.finish}
       </Button>
@@ -305,6 +325,12 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
       {showsOtherPacker ? (
         <Notice tone="info" testId={PACKING_ORDER_PACKER_TESTID}>
           {packerLabel(order)}
+        </Notice>
+      ) : null}
+
+      {lacksUnit ? (
+        <Notice tone="warning" id={missingUnitId} testId={PACKING_ORDER_MISSING_UNIT_TESTID}>
+          {PACKING_ORDER_TEXTS.missingUnit}
         </Notice>
       ) : null}
 
@@ -383,7 +409,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
                 }
                 finishBusy={finishPending}
                 renderStepAddon={evidence.renderStepAddon}
-                stepBlockReason={evidence.stepBlockReason}
+                stepBlockReason={stepBlockReason}
                 stepRequest={stepRequest}
               />
             </div>

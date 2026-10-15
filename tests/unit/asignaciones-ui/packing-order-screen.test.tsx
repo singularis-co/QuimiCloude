@@ -13,6 +13,7 @@ import {
   PACKING_FINISH_LINE_TESTID,
   PACKING_FINISH_REASON_TESTID,
   PACKING_ORDER_MISSING_DISTRIBUTION_TESTID,
+  PACKING_ORDER_MISSING_UNIT_TESTID,
   PACKING_ORDER_PRESENTATION_LINE_TESTID,
   PACKING_ORDER_PRESENTATION_TESTID,
   PACKING_ORDER_QUANTITY_TESTID,
@@ -671,7 +672,7 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
   });
 
   it('R29: `EN_EMPAQUE` propio sin pasos habilita solo «Terminar», dentro de su formulario', () => {
-    pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo' }));
+    pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH }));
 
     const comenzar = within(pie()).getByRole('button', { name: 'Comenzar' });
     const terminar = within(pie()).getByRole('button', { name: 'Terminar' });
@@ -802,5 +803,81 @@ describe('el diálogo del conteo real desde el pie', () => {
       expect(screen.queryByText(/Envases:/)).toBeNull();
       cleanup();
     }
+  });
+});
+
+describe('pedido sin unidad: Terminar deshabilitado con su nota', () => {
+  const sinUnidad = (packingSteps: PackingOrderDetail['packingSteps'] = []) =>
+    fila({
+      status: 'EN_EMPAQUE',
+      packedById: ACTOR_ID,
+      packedByName: 'Yo',
+      unitId: null,
+      unitLabel: null,
+      packingSteps,
+      finish: null,
+    });
+
+  it('R1, R8: sin pasos, «Terminar» del pie queda deshabilitado, sin formulario, y la nota lo explica', () => {
+    pintar(sinUnidad());
+
+    const nota = screen.getByTestId(PACKING_ORDER_MISSING_UNIT_TESTID);
+    expect(nota).toHaveAttribute('data-tone', 'warning');
+    expect(nota).toHaveAttribute('role', 'status');
+    expect(nota).toHaveTextContent(PACKING_ORDER_TEXTS.missingUnit);
+
+    const terminar = screen.getByRole('button', { name: 'Terminar' });
+    expect(terminar).toBeDisabled();
+    expect(terminar).toHaveAttribute('aria-describedby', nota.id);
+    expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Comenzar' })).toBeDisabled();
+  });
+
+  it('R1, R8: con pasos, el último paso no deja terminar y su motivo visible es la nota', async () => {
+    vi.useFakeTimers();
+    try {
+      pintar(
+        sinUnidad([
+          { blocks: [{ kind: 'paragraph', spans: [{ text: 'Llenar' }] }] },
+          { blocks: [{ kind: 'paragraph', spans: [{ text: 'Etiquetar' }] }] },
+        ]),
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(screen.getByTestId('step-reader-next')).toBeEnabled();
+      fireEvent.click(screen.getByTestId('step-reader-next'));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const terminar = screen.getByTestId('step-reader-finish');
+    expect(terminar).toBeDisabled();
+    expect(screen.getByTestId('step-reader-blocked-reason')).toHaveTextContent(PACKING_ORDER_TEXTS.missingUnit);
+    expect(screen.getByTestId(PACKING_ORDER_MISSING_UNIT_TESTID)).toBeInTheDocument();
+    fireEvent.click(terminar);
+    expect(screen.queryByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID)).toBeNull();
+  });
+
+  it('R1: la nota no sale en `POR_EMPACAR`, ni si empaca otro, ni con unidad', () => {
+    for (const order of [
+      fila({ unitId: null, unitLabel: null }),
+      fila({ status: 'EN_EMPAQUE', packedById: 'otro', packedByName: 'Otra', unitId: null, unitLabel: null }),
+      fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH }),
+    ]) {
+      pintar(order);
+      expect(screen.queryByTestId(PACKING_ORDER_MISSING_UNIT_TESTID)).toBeNull();
+      cleanup();
+    }
+  });
+
+  it('R1: la nota es corta y lleva tilde', () => {
+    expect(PACKING_ORDER_TEXTS.missingUnit).toBe(
+      'Falta la unidad del pedido: sin ella no se puede comprobar el conteo real.',
+    );
   });
 });

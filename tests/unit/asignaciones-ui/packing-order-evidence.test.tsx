@@ -66,14 +66,19 @@ function pedido(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail
     recipeName: 'Desengrasante alcalino',
     quantity: '12.5',
     presentationLines: [],
-    unitId: null,
-    unitLabel: null,
+    unitId: 'unit-1',
+    unitLabel: 'l',
     status: 'EN_EMPAQUE',
     packedByName: 'Empacador de Prueba',
     packedById: ACTOR_ID,
     packingSteps: [paso('Etiqueta los envases', true), paso('Sella las cajas')],
     packingEvidence: [],
-    finish: null,
+    finish: {
+      orderQuantity: '12.5',
+      orderUnit: { id: 'unit-1', baseUnitId: null, factor: null },
+      orderUnitLabel: 'l',
+      lines: [],
+    },
     ...overrides,
   };
 }

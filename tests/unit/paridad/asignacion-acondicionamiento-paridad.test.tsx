@@ -521,6 +521,12 @@ describe('paridad del empaque — la pantalla del pedido', () => {
         status: 'EN_EMPAQUE',
         packedById: ACTOR_ID,
         packedByName: 'Empacador De Prueba',
+        finish: {
+          orderQuantity: '12.5',
+          orderUnit: { id: 'unit-1', baseUnitId: null, factor: null },
+          orderUnitLabel: 'kg',
+          lines: [],
+        },
       }),
     );
     expect(arbolAccesible()).toMatchSnapshot();
