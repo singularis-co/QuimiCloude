@@ -15,7 +15,7 @@ import type { UnitRef } from '@/lib/modules/unidades';
 
 import { buildProductColumns } from './product-columns';
 import { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
-import { productListHref } from './product-list-params';
+import { productListHref, TYPE_COLUMN_ID } from './product-list-params';
 import { ProductRowActions } from './product-row-actions';
 import { ProductTypeTabs } from './product-type-tabs';
 
@@ -187,6 +187,9 @@ export function ProductTable({
   // Las acciones de fila se enchufan aqui, no en la declaracion de columnas: asi esa declaracion
   // no importa el panel ni el dialogo. `useMemo` para que la identidad del array no cambie en
   // cada render y la tabla compartida no se reconstruya entera.
+  // La columna «Tipo» solo sale en la pestana «Todos» (sin filtro de tipo): con un tipo
+  // filtrado, todas las filas dirian lo mismo.
+  const showType = params.filters[TYPE_COLUMN_ID] === undefined;
   const columns = useMemo(
     () =>
       buildProductColumns({
@@ -194,8 +197,9 @@ export function ProductTable({
           <ProductRowActions product={product} units={units} canAdjust={canAdjust} />
         ),
         units,
+        showType,
       }),
-    [units, canAdjust],
+    [units, canAdjust, showType],
   );
 
   /*

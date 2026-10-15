@@ -98,6 +98,7 @@ export {
   type ProductListSearchParams,
   type ProductPageSize,
 } from './product-list-params';
+export { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
 export { ProductTypeTabs, type ProductTypeTabsProps } from './product-type-tabs';
 export { ProductListSection } from './product-list-section';
 export { ProductSheet } from './product-sheet';
