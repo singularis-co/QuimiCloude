@@ -144,3 +144,42 @@ Fuera de «Archivos esperados»: `app/(private)/inventario/components/movement-r
 Revisión visual del pliegue: NO hecha (sin navegador).
 
 Veredicto: las tres decisiones hechas con tests; typecheck, lint y guardias verdes.
+
+## T11–T12 — E2E (frontend_dev, 2026-10-15)
+
+Archivos:
+- T11 (a2f17589): `e2e/helpers/confirm-dialog.ts` (solo la cabecera: ya no atribuye el diálogo a
+  `ConfirmActionDialog`). Ningún otro E2E necesitó cambio: el diálogo conserva los testids y viene
+  prellenado con el plan; ninguno miraba «Envases:» ni la columna de «Por empacar».
+- T12: `e2e/envases-reales-empaque.spec.ts` (nuevo);
+  `tests/guards/guard-identificador-de-request.test.ts` (alta del spec nuevo en la lista cerrada
+  `E2E_ESPERADOS`; sin ella la guardia queda roja). Fuera de «Archivos esperados»: la guardia.
+
+R → test (`e2e/envases-reales-empaque.spec.ts`):
+- R17, R18, R20, R21, R26, R27 → «R17, R18, R20, R21, R26, R27 - una línea con 1 envase menos
+  (Rotura)… y «Reparto» muestra −1 y +1 con su motivo».
+- R19, R20, R21, R23, R26, R27 → «R19, R20, R21, R23, R26, R27 - una línea en 0 no da de alta lote…
+  y «Reparto» la marca «Sin lote»».
+- R9 → «R9 - un envase de más sin stock libre del envase muestra «No alcanza el stock del envase…»
+  y deja Terminar deshabilitado».
+
+Playwright (chromium; base local del repo principal, `.env` + `.env.local` exportados):
+- T11, sin cambios de código: ajuste-de-inventario 4/4, empaque 1/1, envases-del-pedido 2/2,
+  operario-rediseno 20/20, pasos-de-envasado 1/1, pedido-en-varias-presentaciones 2/2 → 30 passed.
+- T12, estado del commit: 1 passed, 2 failed. Los dos rojos son el mismo bug de T10, no del spec:
+  `finished-product-distribution-table.tsx` (`'use client'`) importa `movementReasonLabel` del
+  barrel `@/app/(private)/inventario/components`, que arrastra `product-list-section.tsx` →
+  `lib/composition` → `next/headers` al cliente. La ruta `/inventario/producto-terminado/[id]` no
+  compila (`next build` falla con 10 errores; en `next dev`, ENOENT de `build-manifest.json` y
+  overlay «Build Error» en las demás páginas). También deja rojo `e2e/detalle-de-producto-terminado.spec.ts`.
+- Comprobado con el import cambiado a `@/app/(private)/inventario/components/movement-reason-label`
+  (aplicado solo para la prueba y revertido): chromium 3/3 y webkit 3/3.
+
+Comandos:
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes.
+- `pnpm exec vitest run guard`: 76/76 archivos, 1069 pasan, 20 omitidos (antes del alta en
+  `E2E_ESPERADOS`: 1 rojo en `guard-identificador-de-request`).
+
+Veredicto: T11 verde sin tocar specs; T12 escrito y verde en chromium y webkit con el arreglo de
+un import de T10, que queda pendiente (rojo hasta entonces).
