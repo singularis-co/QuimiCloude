@@ -1,3 +1,69 @@
+# Bitácora de implementación — QC-281 Envases reales al terminar el empaque
+
+Las secciones T1–T6 se reconstruyen de los commits y de `progress/features/QC-281.md > Tandas`
+(añadidas tras la revisión, hallazgo m7). Las demás son las que escribieron los subagentes en su día.
+
+## T1–T2 — migración y dominio del conteo (backend_dev, 2026-10-14) · 68a7ff54
+
+Archivos:
+- nuevos `db/migrations/20261015120000_order_presentation_lines_packed_count/{migration.sql,down.sql}`
+  (3 columnas en `order_presentation_lines` y 4 `CHECK`, sin backfill); `db/schema.prisma`
+- nuevo `lib/modules/pedidos/domain/packing-count.ts` (`PACKING_DIFFERENCE_REASONS`,
+  `PACKING_INCREASE_REASONS`, `PACKING_REASON_OTHER_MAX`, `checkPackingCounts`, `effectivePackages`,
+  `packedTotalInOrderUnit`, `maxPackagesForLine`); `lib/modules/pedidos/index.ts`,
+  `lib/modules/pedidos/domain/order-distribution.ts`, `lib/modules/inventario/index.ts`
+  (`STOCK_INCREASE_REASONS`)
+- tests: nuevo `tests/unit/pedidos/packing-count.test.ts`, nuevo test de esquema de la migración
+  (`order-presentation-lines-packed-count-migration.test.ts`), `tests/guards/guard-identificador-de-request.test.ts`
+
+Mapa R → test: R2–R8, R13, R15, R25 → `packing-count.test.ts`; R13, R16, R25 → test de esquema de la
+migración (CHECK iguales a las constantes del dominio, `down.sql` en orden inverso).
+
+## T3–T4 — liquidar envases y guardar conteos por línea (backend_dev, 2026-10-14) · 12557f25
+
+Archivos:
+- `lib/modules/inventario/domain/reservation.ts` (`settlePackagingForOrder`) y
+  `adapters/driven/persistence/reservation-prisma.ts`
+- `lib/modules/pedidos/ports/order-write-repository.ts` (`recordPackedCounts`,
+  `FinishPackingLine.packedPackages`), `adapters/driven/persistence/order-prisma.ts`,
+  `order-catalog-prisma.ts`, `domain/order-catalog.ts` (`AssignedOrderPresentationLine.id/packedPackages`),
+  `domain/list-order-summaries.ts`, `ports/order-summary-reader.ts`
+- tests: nuevos `tests/integration/inventario/settle-packaging.int.test.ts` y
+  `tests/integration/pedidos/order-packed-counts.int.test.ts`; `tests/integration/aislamiento.json`;
+  `tests/helpers/order-unit-of-work-double.ts`; fixtures de asignaciones/pedidos con los campos nuevos
+
+Mapa R → test: R17, R18, R19, R29 → `settle-packaging.int.test.ts`; R16, R29 → `order-packed-counts.int.test.ts`.
+
+Verificación tanda 1 (T1–T4): typecheck verde, lint 0 errores, tests propios y 76 guardias verdes.
+Migración aplicada a la base local del repo principal (el worktree no tiene `.env`).
+
+## T5 — Terminar con conteo real en `pedidos` (backend_dev, 2026-10-14) · 5101473c
+
+Archivos: `lib/modules/pedidos/domain/order-packing.ts` (flujo de design § 3),
+`domain/order-catalog.ts` (`finishPackingAliveById` con `counts` y los tres resultados nuevos),
+`lib/modules/asignaciones/domain/finish-packing.ts` (adaptación del tipo); tests: nuevo
+`tests/helpers/packed-counts.ts`, `tests/unit/pedidos/order-packing.test.ts`,
+`tests/integration/pedidos/finish-with-finished-goods.int.test.ts`, `tests/integration/pedidos/order-packing.int.test.ts`.
+
+Mapa R → test: R15, R16, R18–R22, R30, R32 → `order-packing.test.ts` y `finish-with-finished-goods.int.test.ts`.
+Cambia la expectativa de QC-195 R25 en `finish-with-finished-goods.int` a `packaging_stock_insufficient`
+(design §§ 2.2 y 3).
+
+## T6 — caso de uso y acción en `asignaciones` (backend_dev, 2026-10-14) · 5f4abc1d
+
+Archivos: `lib/modules/asignaciones/domain/finish-packing.ts` (zod con `lines`, paso de `counts`,
+mapeo de resultados), `domain/errors.ts` (`PackedExceedsQuantityError`,
+`PackagingStockInsufficientError`), `index.ts`, `adapters/driving/order-packing-actions.ts`
+(`finishPackingInputFromFormData`), `lib/modules/errores/domain/{error-codes,error-catalog}.ts`,
+`scripts/seed-demo/gateway.ts`; tests: `finish-packing.test.ts`, `order-packing-actions.test.ts`,
+`authorization.test.ts`, `tests/unit/errores/catalogo.test.ts`,
+`tests/integration/asignaciones/{execution-atomicity,finished-orders}.int.test.ts`.
+
+Mapa R → test: R13, R14 → `finish-packing.test.ts` y `order-packing-actions.test.ts`.
+`execution-atomicity` «R18, R24» pasa a `packaging_stock_insufficient`.
+
+Verificación tanda 2 (T5–T6): typecheck verde, lint 0 errores, tests propios y 76 guardias verdes.
+Rojo ajeno visto: `tests/integration/proveedores/catalog-line.int.test.ts` R32 (el diff no toca proveedores).
 
 ## T10 backend — tab «Reparto» (backend_dev, 2026-10-14)
 
