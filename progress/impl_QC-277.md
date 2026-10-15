@@ -774,3 +774,33 @@ INSERT de excepciones de la migración. Para P6 y P7 también se aplica el defec
 `findFirst` (R8); P7 es `created_by` NULL en lo sembrado (R6, R7).
 
 **Veredicto:** Bloque H y re-T20/T21 cerrados.
+
+## F2.3 — sincronización con dev tras review APROBADO (implementer, 2026-10-15)
+
+- **Qué trajo dev** (`git merge origin/dev`, 132 commits): QC-281, QC-282, QC-283, QC-284, QC-209, QC-262/195 y
+  `perf(identity): sesion en una sola sentencia SQL`. Migraciones nuevas hasta `20261015130000_order_delivery_lines_customer`.
+  QC-203, QC-271 y QC-275 (choques aceptados) **no** están aún en dev.
+- **Conflictos (2, triviales):**
+  - `session-user-prisma.ts`: dev pasó la lectura a un único `$queryRaw`. `companyAddons` entra como
+    `ARRAY(SELECT o.addon_key FROM company_addon_overrides o WHERE o.company_id = u.company_id AND o.enabled)` en esa misma
+    sentencia (sin empresa da `[]`). El párrafo de QC-277 del docblock queda en 3 líneas (m2).
+  - `guard-identificador-de-request.test.ts`: altas de ambos lados conservadas; la migración de QC-277 al final de
+    `MIGRACIONES_ESPERADAS` con el nombre nuevo.
+- **Cortes de añadido:** dev no añade pantallas, rutas ni Server Actions nuevas en zonas de añadido. Solo cambia
+  componentes dentro de pantallas ya cortadas (`dashboard/recorrido`, guía de `inventario/importar` de QC-209, cuyos
+  enlaces van a catálogos del núcleo). No hay nada nuevo que cortar.
+- **m5:** `db/migrations/20261014190000_company_addons` → `20261015190000_company_addons` (`git mv`). Actualizados:
+  `guard-identificador-de-request`, `recipe-route-contract` (`MIGRACION_QC277`), `design.md`, `tasks.md`. El test de la
+  migración la busca por patrón (`^\d{14}_company_addons$`), así que no cambia.
+  Bases recreadas: `qct_tpl_c291773e75d6` borrada (se reconstruye por huella); `quimicloude_e2e_qc277` DROP +
+  `db:migrate` + `db:seed` (última migración `20261015190000_company_addons`, 5 excepciones). `QuimiCloude` no la tenía.
+- **m2** hecho en la resolución. **m3:** caso nuevo en `session-user.int.test.ts`, «QC-277 R8: con dos empresas, cada usuario
+  trae solo los añadidos prendidos de la suya». El caso «QC-277 R8, R9: … en la misma llamada al lector» espiaba
+  `prisma.user.findFirst`, que ya no se llama tras el `$queryRaw`. Ahora mide **1 sentencia SQL** con `medir()` y comprueba que
+  esa sentencia lee `company_addon_overrides`. Es más estricto que antes, no se relaja nada. Resultado: `Test Files 1 passed (1) Tests 20 passed (20)`;
+  añadidos/seed `.int`: `3 passed, 53 passed`; `guard-aislamiento-integracion`: `6 passed`.
+- **m1, m4:** como deuda D59 y D60 en `progress/deudas.md`.
+- **Gate** `./init.sh` (rápido) → `== init OK ==`. related: `Test Files 902 passed (902)  Tests 14827 passed | 59 skipped`.
+  Guardias: `Test Files 118 passed (118)  Tests 1660 passed | 37 skipped`. Lint: 0 errores, 7 avisos previos. Sin inestables.
+- **E2E** `pnpm exec playwright test e2e/modulos-por-empresa.spec.ts` (base `quimicloude_e2e_qc277`, chromium + webkit):
+  `10 passed (34.1s)`.
