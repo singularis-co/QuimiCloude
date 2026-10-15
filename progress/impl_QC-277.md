@@ -359,3 +359,37 @@ T15 hecha; sin desvíos de `## Archivos esperados` ni tests ajenos rotos.
     inestable conocido (`adjust-batch-dialog`), pero de la misma clase: inestabilidad por carga.
   - 2.ª pasada: related 886/886 archivos (14230 pasados, 59 saltados); test:rapido 117/117 (1641 pasados, 37 saltados);
     `== init OK ==`.
+
+## Tanda 5 — T19 E2E de la ficha (frontend_dev, 2026-10-15)
+
+**Archivos:** creado `e2e/modulos-por-empresa.spec.ts`. Sin cambios en código de producción ni dependencias nuevas.
+
+Fixture: empresa propia `qc277_e2e_<runId>_c` (nace sin añadidos; se comprueba) y un Administrador; limpieza de huérfanos por prefijo con más de 1 h y borrado por token en `afterAll`. Token generado en `beforeAll`. Los casos comparten empresa (`describe.configure({ mode: 'default' })`) y cada uno fija sus añadidos por Prisma al empezar.
+
+| R | Test (`e2e/modulos-por-empresa.spec.ts`) |
+|---|---|
+| R36, R12, R18, R20 | caso 1 «sin añadidos: aterriza en Inventario…»: `loginAndLand` → `/inventario`; `nav-inventario` visible y `nav-dashboard`/`nav-proveedores`/`nav-integraciones` con 0; sin `inventory-import-link`; desde Fórmulas, `private-brand-link` tiene `href=/inicio` y el clic acaba en `/inventario` |
+| R36, R13 | caso 2 «cada pantalla de un añadido pedida por URL da el 404 privado…»: `/dashboard`, `/proveedores`, `/inventario/importar`, `/integraciones/proveedor-ia` → status 404, `private-not-found`, `private-nav` y `private-logout` visibles |
+| R36, R19 | caso 3 «entrar al login con sesión pasa por /inicio…»: cadena de redirecciones exacta `/login → /inicio → /inventario` |
+| R36, R9, R18 | caso 4 «al prender los cinco añadidos con la sesión abierta…»: `enableAllAddons` + `reload` sin re-login → los tres enlaces y `inventory-import-link` visibles; `/dashboard` 200 sin 404; logo → `/dashboard` |
+| R4, R9 | caso 5 «con la lectura de PDF prendida e integraciones apagado…»: `['lectura_pdf']` → sin `document-upload-open` en Fórmulas; positivo con `['lectura_pdf','integraciones']` + `reload` → 1 |
+
+**Salida real** (base `quimicloude_e2e_qc277`, `pnpm exec playwright test e2e/modulos-por-empresa.spec.ts`, títulos recortados):
+
+```
+  ok  2 [chromium] › e2e\modulos-por-empresa.spec.ts:165:7 › sin añadidos: aterriza en Inventario… (R36, R12, R18, R20) (33.8s)
+  ok  1 [webkit] › e2e\modulos-por-empresa.spec.ts:165:7 › sin añadidos: aterriza en Inventario… (R36, R12, R18, R20) (34.6s)
+  ok  3 [chromium] › e2e\modulos-por-empresa.spec.ts:185:7 › sin añadidos: cada pantalla de un añadido… (R36, R13) (17.5s)
+  ok  4 [webkit] › e2e\modulos-por-empresa.spec.ts:185:7 › sin añadidos: cada pantalla de un añadido… (R36, R13) (17.2s)
+  ok  5 [chromium] › e2e\modulos-por-empresa.spec.ts:200:7 › sin añadidos: entrar al login con sesión… (R36, R19) (3.6s)
+  ok  6 [webkit] › e2e\modulos-por-empresa.spec.ts:200:7 › sin añadidos: entrar al login con sesión… (R36, R19) (7.6s)
+  ok  7 [chromium] › e2e\modulos-por-empresa.spec.ts:211:7 › al prender los cinco añadidos… (R36, R9, R18) (6.3s)
+  ok  9 [chromium] › e2e\modulos-por-empresa.spec.ts:239:7 › con la lectura de PDF prendida… (R4, R9) (4.7s)
+  ok  8 [webkit] › e2e\modulos-por-empresa.spec.ts:211:7 › al prender los cinco añadidos… (R36, R9, R18) (10.6s)
+  ok 10 [webkit] › e2e\modulos-por-empresa.spec.ts:239:7 › con la lectura de PDF prendida… (R4, R9) (5.3s)
+  10 passed (1.4m)
+```
+
+Chromium 5/5, WebKit 5/5 (dos corridas seguidas, ambas verdes). `pnpm run typecheck`: sin salida de errores. `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, todos previos (`confirm-catalog-import.test.ts`, `order-service.test.ts`); el spec nuevo, `ESLint: No issues found`.
+
+**Veredicto:** T19 hecha: los cinco casos de design §10.2 están verdes en Chromium y WebKit sin tocar código de producción.

@@ -175,7 +175,7 @@
   - Tests: `tests/unit/e2e-helpers/landing.test.ts` ampliado; `guard-e2e-landing.test.ts` ajustado
     si hace falta.
   - **Hecho:** el aterrizaje esperado de un Administrador sin añadidos es `/inventario`.
-- [ ] **T19 — E2E de la ficha** (R36, R9, R12, R13, R18–R20). Depende de: T6–T12, T18
+- [x] **T19 — E2E de la ficha** (R36, R9, R12, R13, R18–R20). Depende de: T6–T12, T18
   - `e2e/modulos-por-empresa.spec.ts`, con los cinco casos de `design.md > 10.2`.
   - **Hecho:** `pnpm exec playwright test e2e/modulos-por-empresa.spec.ts` verde en Chromium y
     WebKit.
