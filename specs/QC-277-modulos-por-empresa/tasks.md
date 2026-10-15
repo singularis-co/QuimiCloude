@@ -327,6 +327,7 @@ Añadidos durante la implementación (fixtures sin `companyAddons`/`addons`, mig
 - `tests/unit/inventario/get-inventory-import-template.test.ts`
 - `tests/unit/inventario/preview-inventory-import.test.ts`
 - `tests/unit/paridad/inventario-paridad.test.tsx`
+- `tests/unit/recetas-ui/recipe-route-contract.test.ts`
 
 E2E (el spec de la ficha, los helpers y los candidatos del censo de T20):
 

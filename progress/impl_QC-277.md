@@ -169,3 +169,16 @@ Frontend de T6–T9 hecho y verde; la guardia de pantallas de añadido pasa a ve
 - Tanda 2 (T6–T10) cerrada. Archivos fuera de `## Archivos esperados` añadidos a `tasks.md`.
 - `./init.sh` (rápido) tras la tanda 2: related 837/837 archivos (13522 pasados, 14 saltados); test:rapido 116/116
   (1633 pasados, 37 saltados); `== init OK ==`, exit 0.
+
+### Desvío tras la tanda 2: contrato de rutas de recetas (implementer, 2026-10-15)
+- Rojo que encontró el `./init.sh` independiente del leader:
+  `tests/unit/recetas-ui/recipe-route-contract.test.ts` > «la feature no toca lib/modules/recetas ni db/».
+  Ese test compara `origin/dev...HEAD`, y se activa porque la tanda 2 tocó
+  `app/(private)/produccion/formulas/importar/[documentoId]/page.tsx` (`requirePageAddon`), que está en la carpeta de rutas
+  de recetas. Mi gate de la tanda 2 no lo vio porque corrió antes de commitear (el diff contra `HEAD` aún no traía la página).
+- Arreglo (misma clase que la opción A): lista `MIGRACION_QC277` (`db/schema.prisma` y los dos `.sql` de
+  `20261014190000_company_addons`) añadida a `DB_PERMITIDAS`, como `MIGRACION_QC275`. No se tocó ningún assert.
+- Barrido de los tests que comparan contra dev (`origin/dev|merge-base|PERMITIDAS|diff --name-only`): 57 archivos,
+  57/57 en verde (1002 pasados, 140 saltados a propósito porque son guardias de alcance de otras fichas). No hizo falta
+  arreglar ningún otro.
+- `recipe-route-contract.test.ts` solo: 28/28. typecheck verde; lint con 0 errores y los mismos 7 avisos.

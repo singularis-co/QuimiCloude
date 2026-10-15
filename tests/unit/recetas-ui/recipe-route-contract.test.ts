@@ -564,6 +564,16 @@ const MIGRACION_QC275 = [
   'db/migrations/20261013150000_ai_providers/down.sql',
 ];
 
+// QC-277 2026-10-15: la columna `companies.addons` (añadidos prendidos por empresa) y
+// `db/schema.prisma` con esa columna. No toca ninguna tabla de recetas; la rama entra aqui
+// porque la pantalla de importar formulas llama a `requirePageAddon`. Lista nombrada como las
+// demas: cualquier otro archivo de `db/` en el diff sigue en rojo.
+const MIGRACION_QC277 = [
+  'db/schema.prisma',
+  'db/migrations/20261014190000_company_addons/migration.sql',
+  'db/migrations/20261014190000_company_addons/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
@@ -595,6 +605,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC211,
   ...MIGRACION_QC214,
   ...MIGRACION_QC275,
+  ...MIGRACION_QC277,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
