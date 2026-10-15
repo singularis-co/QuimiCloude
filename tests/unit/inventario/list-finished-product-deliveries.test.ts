@@ -43,6 +43,7 @@ const REGISTRO: FinishedProductRecord = {
   imagePath: null,
   qtyAlert: null,
   unitId: null,
+  recipeId: null,
   presentation: null,
   batches: [
     { id: LITER_BATCH_ID, stock: '10.5000', packageContent: '1.0000' },

@@ -34,6 +34,7 @@ function registro(overrides: Partial<FinishedProductRecord> = {}): FinishedProdu
     imagePath: null,
     qtyAlert: '5.0000',
     unitId: FINISHED_UNIT_ID,
+    recipeId: null,
     presentation: { id: FINISHED_PRESENTATION_ID, name: 'Botella 1 L', content: '1.0000', unitId: FINISHED_UNIT_ID },
     batches: [
       { id: LITER_BATCH_ID, stock: '10.5000', packageContent: '1.0000' },

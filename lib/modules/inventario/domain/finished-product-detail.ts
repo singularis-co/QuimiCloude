@@ -144,6 +144,31 @@ export interface FinishedDeliveryDirectory {
   summarizeDelivered(companyId: string, batchIds: readonly string[]): Promise<DeliveredTotal>;
 }
 
+export type PackingReasonView = MovementReason | 'otro';
+
+/** Una linea del reparto de un pedido ya empacado. */
+export type FinishedDistributionLine = {
+  readonly lineId: string;
+  readonly orderNumberText: string;
+  /** Envases del plan. */
+  readonly plan: number;
+  /** `null`: empacado antes de que se contaran; se lee como igual al plan. */
+  readonly packedPackages: number | null;
+  readonly reason: PackingReasonView | null;
+  /** Solo con el motivo `otro`. */
+  readonly reasonOther: string | null;
+};
+
+/** Hueco para `pedidos`: las lineas del reparto son suyas. Sin permisos: autoriza quien llama. */
+export interface FinishedDistributionDirectory {
+  /** Pedidos vivos ya empacados, por numero de pedido descendente. */
+  listPackedLines(
+    companyId: string,
+    combination: { readonly recipeId: string; readonly presentationId: string },
+    paging: { readonly page: number; readonly pageSize?: number },
+  ): Promise<Page<FinishedDistributionLine>>;
+}
+
 const ZERO_QUANTITY = '0.0000';
 const SCALE = 4;
 const ZERO = BigInt(0);

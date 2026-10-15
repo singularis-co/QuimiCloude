@@ -158,6 +158,9 @@ export {
   type FinishedProductCostRow,
   type ProducedProductLink,
   type FinishedDeliveryDirectory,
+  type PackingReasonView,
+  type FinishedDistributionLine,
+  type FinishedDistributionDirectory,
 } from './domain/finished-product-detail';
 export {
   createGetFinishedProduct,
@@ -175,6 +178,10 @@ export {
   createListFinishedProductDeliveries,
   type ListFinishedProductDeliveriesDeps,
 } from './domain/list-finished-product-deliveries';
+export {
+  createListFinishedProductDistribution,
+  type ListFinishedProductDistributionDeps,
+} from './domain/list-finished-product-distribution';
 export {
   createListFinishedProductCosts,
   type ListFinishedProductCostsDeps,
