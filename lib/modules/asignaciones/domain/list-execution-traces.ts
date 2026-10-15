@@ -4,7 +4,9 @@ import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { buildExecutionTrace, type TraceDuration } from './execution-trace';
 
+import type { ExecutionTraceTeamMember } from './conditioning-trace';
 import type { ExecutionEntryRecord } from './execution-entry';
+import type { ConditioningTeamMemberRow, ConditioningTeamRepository } from '../ports/conditioning-team-repository';
 import type { ExecutedOrdersFilter, ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { PeopleDirectory, PersonRef } from '@/lib/modules/identity';
 import {
@@ -52,10 +54,12 @@ export type ExecutionTraceRow = {
   readonly numberText: string;
   readonly status: OrderStatus;
   readonly deleted: boolean;
+  readonly active: boolean;
+  /** Quien firma anotaciones y despues el equipo del Comenzar anotado, sin repetir. */
   readonly people: readonly ExecutionTracePerson[];
   readonly firstAt: Date;
   readonly lastAt: Date;
-  readonly duration: TraceDuration;
+  readonly totalDuration: TraceDuration;
   readonly goBackCount: number;
 };
 
@@ -68,6 +72,7 @@ export type ListExecutionTracesDeps = {
   readonly log: ExecutionLogRepository;
   readonly orders: OrderCatalog;
   readonly people: PeopleDirectory;
+  readonly team: Pick<ConditioningTeamRepository, 'listByOrdersInCompany'>;
 };
 
 function startOfDayUtc(day: string): Date {
@@ -115,6 +120,39 @@ export async function findPeopleByIds(
   if (userIds.length === 0) return new Map();
   const refs = await people.findRefsIncludingDeletedInCompany(companyId, userIds, now);
   return new Map(refs.map((ref) => [ref.id, ref]));
+}
+
+/** Solo los pedidos con `conditioning_start` anotado: un equipo sin Comenzar no se muestra. */
+export async function listConditioningTeams(
+  team: ListExecutionTracesDeps['team'],
+  companyId: string,
+  entriesByOrder: ReadonlyMap<string, readonly ExecutionEntryRecord[]>,
+): Promise<Map<string, ConditioningTeamMemberRow[]>> {
+  const orderIds = [...entriesByOrder]
+    .filter(([, entries]) => entries.some((entry) => entry.action === 'conditioning_start'))
+    .map(([orderId]) => orderId);
+  const byOrder = new Map<string, ConditioningTeamMemberRow[]>();
+  if (orderIds.length === 0) return byOrder;
+  for (const { orderId, ...member } of await team.listByOrdersInCompany(companyId, orderIds)) {
+    const members = byOrder.get(orderId);
+    if (members === undefined) byOrder.set(orderId, [member]);
+    else members.push(member);
+  }
+  return byOrder;
+}
+
+export function toTraceTeamMember(
+  member: ConditioningTeamMemberRow,
+  refs: ReadonlyMap<string, PersonRef>,
+): ExecutionTraceTeamMember {
+  return {
+    userId: member.userId,
+    displayName: refs.get(member.userId)?.displayName ?? null,
+    origin:
+      member.workGroupId === null || member.workGroupName === null
+        ? { kind: 'direct' }
+        : { kind: 'workGroup', workGroupId: member.workGroupId, workGroupName: member.workGroupName },
+  };
 }
 
 async function listPersonOptions(
@@ -171,7 +209,14 @@ export function createListExecutionTraces(
         return [{ order, trace: buildExecutionTrace(orderEntries, order, now) }];
       });
 
-      const userIds = [...new Set(traces.flatMap(({ trace }) => trace.userIds))];
+      const teams = await listConditioningTeams(deps.team, companyId, byOrder);
+      const peopleOf = new Map(
+        traces.map(({ order, trace }) => [
+          order.id,
+          [...new Set([...trace.userIds, ...(teams.get(order.id) ?? []).map((member) => member.userId)])],
+        ]),
+      );
+      const userIds = [...new Set([...peopleOf.values()].flat())];
       const refs = await findPeopleByIds(deps.people, companyId, userIds, now);
 
       const items: ExecutionTraceRow[] = traces.map(({ order, trace }) => ({
@@ -179,13 +224,14 @@ export function createListExecutionTraces(
         numberText: formatOrderNumber(order.number),
         status: order.status,
         deleted: order.deleted,
-        people: trace.userIds.flatMap((userId) => {
+        active: trace.active,
+        people: (peopleOf.get(order.id) ?? []).flatMap((userId) => {
           const ref = refs.get(userId);
           return ref === undefined ? [] : [{ userId, displayName: ref.displayName }];
         }),
         firstAt: trace.firstAt,
         lastAt: trace.lastAt,
-        duration: trace.duration,
+        totalDuration: trace.totalDuration,
         goBackCount: trace.goBackCount,
       }));
 

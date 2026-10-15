@@ -16,6 +16,7 @@ import { ORDER_STATUS_VALUES, type OrderCatalog, type OrderHistorySummary, type 
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { ExecutionAction, ExecutionEntryRecord } from '@/lib/modules/asignaciones/domain/execution-entry';
+import type { ConditioningTeamMemberRow } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
 import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
 import type { PeopleDirectory } from '@/lib/modules/identity';
 
@@ -50,8 +51,9 @@ function anotacion(
     orderId,
     userId,
     action,
-    stepPosition: action === 'pack_start' || action === 'pack_finish' ? null : 1,
+    stepPosition: action === 'pack_start' || action === 'pack_finish' || action.startsWith('conditioning_') ? null : 1,
     reason: action === 'cancel' ? 'sin material' : null,
+    batchLines: null,
     occurredAt: new Date(T0 + offsetMin * MIN),
   };
 }
@@ -64,6 +66,12 @@ function persona(id: string, displayName: string): PersonRef {
   return { id, displayName, isActive: true, permissions: [], roleName: 'Operador' };
 }
 
+type TeamRow = ConditioningTeamMemberRow & { readonly orderId: string };
+
+function miembro(orderId: string, userId: string, group?: { id: string; name: string }): TeamRow {
+  return { orderId, userId, workGroupId: group?.id ?? null, workGroupName: group?.name ?? null };
+}
+
 function pagina(items: readonly OrderHistorySummary[], page = 1, pageSize = 10): Page<OrderHistorySummary> {
   return { items, total: items.length, page, pageSize, totalPages: 1 };
 }
@@ -74,6 +82,7 @@ function montar(options?: {
   readonly entries?: readonly ExecutionEntryRecord[];
   readonly usersWithEntries?: readonly string[];
   readonly people?: readonly PersonRef[];
+  readonly team?: readonly TeamRow[];
 }) {
   const listExecutedOrderIds = vi.fn(async () => options?.executedIds ?? [PEDIDO_A]);
   const listEntriesForOrders = vi.fn(async (_companyId: string, ids: readonly string[]) =>
@@ -101,8 +110,14 @@ function montar(options?: {
   );
   const people = { findRefsIncludingDeletedInCompany } as unknown as PeopleDirectory;
 
-  const deps: ListExecutionTracesDeps = { log, orders, people };
+  const listByOrdersInCompany = vi.fn(async (_companyId: string, ids: readonly string[]) =>
+    (options?.team ?? []).filter((row) => ids.includes(row.orderId)),
+  );
+  const team = { listByOrdersInCompany };
+
+  const deps: ListExecutionTracesDeps = { log, orders, people, team };
   const todos = [
+    listByOrdersInCompany,
     listExecutedOrderIds,
     listEntriesForOrders,
     listUserIdsWithEntries,
@@ -118,6 +133,7 @@ function montar(options?: {
     listUserIdsWithEntries,
     listSummariesByIdsIncludingDeleted,
     findRefsIncludingDeletedInCompany,
+    listByOrdersInCompany,
     ningunPuertoLlamado: () => todos.every((fn) => fn.mock.calls.length === 0),
   };
 }
@@ -323,7 +339,7 @@ describe('listExecutionTraces — la fila', () => {
     anotacion(PEDIDO_A, 'pack_finish', 150, BEA),
   ];
 
-  it('R2 R15: la fila lleva una sola duracion, la misma que da buildExecutionTrace', async () => {
+  it('R2 R15 R27: la fila lleva active y un solo total, el mismo que da buildExecutionTrace', async () => {
     const orden = resumen(PEDIDO_A, { status: 'ENTREGADO' });
     const m = montar({ orders: [orden], entries: entregado });
     const { page } = await m.listar(ACTOR, {}, NOW);
@@ -334,35 +350,39 @@ describe('listExecutionTraces — la fila', () => {
       numberText: '2026-0000042',
       status: 'ENTREGADO',
       deleted: false,
+      active: false,
       people: [
         { userId: ANA, displayName: 'Ana Perez' },
         { userId: BEA, displayName: 'Bea Gomez' },
       ],
       firstAt: esperado.firstAt,
       lastAt: esperado.lastAt,
-      duration: esperado.duration,
+      totalDuration: esperado.totalDuration,
       goBackCount: 1,
     });
-    expect(fila!.duration).toEqual({ kind: 'closed', ms: 150 * MIN });
+    // Produccion 60 + empaque 30: la espera entre finish y pack_start no cuenta.
+    expect(fila!.totalDuration).toEqual({ kind: 'closed', ms: 90 * MIN });
   });
 
-  it('R3: un pedido activo sale con la duracion abierta hasta el instante de la consulta', async () => {
+  it('R3 R20: un pedido activo sale con el total abierto hasta el instante de la consulta', async () => {
     const m = montar({
       orders: [resumen(PEDIDO_A, { status: 'EN_CURSO' })],
       entries: [anotacion(PEDIDO_A, 'start', 0), anotacion(PEDIDO_A, 'advance', 5)],
     });
     const { page } = await m.listar(ACTOR, {}, NOW);
-    expect(page.items[0]!.duration).toEqual({ kind: 'open', ms: NOW.getTime() - T0 });
+    expect(page.items[0]!.active).toBe(true);
+    expect(page.items[0]!.totalDuration).toEqual({ kind: 'open', ms: NOW.getTime() - T0 });
   });
 
-  it('R1 R2 R3: un pedido dado de baja sale marcado y su duracion no es abierta', async () => {
+  it('R1 R2 R3 R21: un pedido dado de baja sale marcado, sin active, y su total no es abierto', async () => {
     const m = montar({
       orders: [resumen(PEDIDO_A, { status: 'EN_CURSO', deleted: true })],
       entries: [anotacion(PEDIDO_A, 'start', 0), anotacion(PEDIDO_A, 'advance', 5)],
     });
     const { page } = await m.listar(ACTOR, {}, NOW);
     expect(page.items[0]!.deleted).toBe(true);
-    expect(page.items[0]!.duration).toEqual({ kind: 'unclosed', ms: 5 * MIN });
+    expect(page.items[0]!.active).toBe(false);
+    expect(page.items[0]!.totalDuration).toEqual({ kind: 'unclosed', ms: 5 * MIN });
   });
 
   it('R1: el total y la paginacion son los de pedidos', async () => {
@@ -381,14 +401,19 @@ describe('listExecutionTraces — la fila', () => {
 
 describe('listExecutionTraces — empresa y numero de consultas', () => {
   it('R23: todas las llamadas llevan la empresa del actor', async () => {
-    const m = montar({ orders: [resumen(PEDIDO_A)], entries: [anotacion(PEDIDO_A, 'start', 0)] });
+    const m = montar({
+      orders: [resumen(PEDIDO_A)],
+      entries: [anotacion(PEDIDO_A, 'start', 0), anotacion(PEDIDO_A, 'conditioning_start', 5)],
+    });
     await m.listar(ACTOR, {}, NOW);
+    expect(m.listByOrdersInCompany).toHaveBeenCalled();
     const llamadas = [
       ...m.listUserIdsWithEntries.mock.calls,
       ...m.listExecutedOrderIds.mock.calls,
       ...m.listSummariesByIdsIncludingDeleted.mock.calls,
       ...m.listEntriesForOrders.mock.calls,
       ...m.findRefsIncludingDeletedInCompany.mock.calls,
+      ...m.listByOrdersInCompany.mock.calls,
     ] as unknown as readonly (readonly unknown[])[];
     expect(llamadas.length).toBeGreaterThan(0);
     for (const llamada of llamadas) expect(llamada[0]).toBe(EMPRESA);
@@ -405,8 +430,9 @@ describe('listExecutionTraces — empresa y numero de consultas', () => {
     const m = montar({
       executedIds: ids,
       orders: ids.map((id) => resumen(id)),
-      entries: ids.flatMap((id) => [anotacion(id, 'start', 0, ANA), anotacion(id, 'cancel', 3, BEA)]),
+      entries: ids.flatMap((id) => [anotacion(id, 'conditioning_start', 0, ANA), anotacion(id, 'cancel', 3, BEA)]),
       usersWithEntries: [ANA, BEA],
+      team: ids.map((id) => miembro(id, BEA)),
     });
     const { page } = await m.listar(ACTOR, { orderNumber: '42' }, NOW);
     expect(page.items).toHaveLength(10);
@@ -414,7 +440,136 @@ describe('listExecutionTraces — empresa y numero de consultas', () => {
     expect(m.listExecutedOrderIds).toHaveBeenCalledTimes(1);
     expect(m.listSummariesByIdsIncludingDeleted).toHaveBeenCalledTimes(1);
     expect(m.listEntriesForOrders).toHaveBeenCalledTimes(1);
+    expect(m.listByOrdersInCompany).toHaveBeenCalledTimes(1);
     // Una para las opciones de persona y otra para toda la pagina.
     expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('listExecutionTraces — el equipo del acondicionamiento', () => {
+  const CARLA = uuid('5');
+  const DIEGO = uuid('6');
+  const ELENA = uuid('7');
+  const GRUPO = { id: uuid('8'), name: 'Turno manana' };
+  const directorio = [
+    persona(ANA, 'Ana Perez'),
+    persona(BEA, 'Bea Gomez'),
+    persona(CARLA, 'Carla Diaz'),
+    persona(DIEGO, 'Diego Sanz'),
+    persona(ELENA, 'Elena Mora'),
+  ];
+
+  it('R11: sin dashboard.consultar no lee registro ni equipo', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A)],
+      entries: [anotacion(PEDIDO_A, 'conditioning_start', 0)],
+      team: [miembro(PEDIDO_A, CARLA)],
+    });
+    const sinConsultar = PERMISSIONS.map((p) => p.code).filter((code) => code !== 'dashboard.consultar');
+    await expect(
+      m.listar({ id: ANA, companyId: EMPRESA, permissions: sinConsultar }, {}, NOW),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(m.listEntriesForOrders).not.toHaveBeenCalled();
+    expect(m.listExecutedOrderIds).not.toHaveBeenCalled();
+    expect(m.listByOrdersInCompany).not.toHaveBeenCalled();
+  });
+
+  it('R29: firmantes y despues equipo, sin repetir', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'EN_ACONDICIONAMIENTO' })],
+      entries: [anotacion(PEDIDO_A, 'start', 0, BEA), anotacion(PEDIDO_A, 'conditioning_start', 10, ANA)],
+      people: directorio,
+      // BEA firma y ademas esta en el equipo: sale una sola vez, en su sitio de firmante.
+      team: [miembro(PEDIDO_A, DIEGO, GRUPO), miembro(PEDIDO_A, BEA), miembro(PEDIDO_A, CARLA, GRUPO)],
+    });
+    const { page } = await m.listar(ACTOR, {}, NOW);
+    expect(page.items[0]!.people).toEqual([
+      { userId: BEA, displayName: 'Bea Gomez' },
+      { userId: ANA, displayName: 'Ana Perez' },
+      { userId: DIEGO, displayName: 'Diego Sanz' },
+      { userId: CARLA, displayName: 'Carla Diaz' },
+    ]);
+  });
+
+  it('R29: nombres actuales del directorio, con una sola lectura de equipo y de personas por pagina', async () => {
+    const m = montar({
+      executedIds: [PEDIDO_A, PEDIDO_B],
+      orders: [resumen(PEDIDO_A), resumen(PEDIDO_B)],
+      entries: [anotacion(PEDIDO_A, 'conditioning_start', 0, ANA), anotacion(PEDIDO_B, 'conditioning_start', 0, ANA)],
+      people: [persona(ANA, 'Ana Perez'), persona(ELENA, 'Elena Mora Nueva')],
+      team: [miembro(PEDIDO_A, ELENA, GRUPO), miembro(PEDIDO_B, ELENA)],
+    });
+    const { page } = await m.listar(ACTOR, {}, NOW);
+    expect(page.items.map((row) => row.people.map((p) => p.displayName))).toEqual([
+      ['Ana Perez', 'Elena Mora Nueva'],
+      ['Ana Perez', 'Elena Mora Nueva'],
+    ]);
+    expect(m.listByOrdersInCompany).toHaveBeenCalledTimes(1);
+    expect(m.listByOrdersInCompany).toHaveBeenCalledWith(EMPRESA, [PEDIDO_A, PEDIDO_B]);
+    expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledWith(EMPRESA, [ANA, ELENA], NOW);
+  });
+
+  it('R32: equipo sin Comenzar no sale', async () => {
+    const m = montar({
+      executedIds: [PEDIDO_A, PEDIDO_B],
+      orders: [resumen(PEDIDO_A), resumen(PEDIDO_B)],
+      entries: [
+        anotacion(PEDIDO_A, 'start', 0, ANA),
+        anotacion(PEDIDO_A, 'finish', 10, ANA),
+        anotacion(PEDIDO_B, 'conditioning_start', 0, ANA),
+      ],
+      people: directorio,
+      team: [miembro(PEDIDO_A, CARLA), miembro(PEDIDO_B, DIEGO)],
+    });
+    const { page } = await m.listar(ACTOR, {}, NOW);
+    expect(m.listByOrdersInCompany).toHaveBeenCalledWith(EMPRESA, [PEDIDO_B]);
+    expect(page.items.map((row) => row.people.map((p) => p.userId))).toEqual([[ANA], [ANA, DIEGO]]);
+  });
+
+  it('R32: sin ningun Comenzar en la pagina no consulta el equipo', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A)],
+      entries: [anotacion(PEDIDO_A, 'start', 0, ANA)],
+      team: [miembro(PEDIDO_A, CARLA)],
+    });
+    await m.listar(ACTOR, {}, NOW);
+    expect(m.listByOrdersInCompany).not.toHaveBeenCalled();
+  });
+
+  it('R31: opciones solo de firmantes', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A)],
+      entries: [
+        anotacion(PEDIDO_A, 'conditioning_start', 0, ANA),
+        anotacion(PEDIDO_A, 'conditioning_batch_save', 5, BEA),
+      ],
+      usersWithEntries: [ANA, BEA],
+      people: directorio,
+      team: [miembro(PEDIDO_A, CARLA), miembro(PEDIDO_A, DIEGO)],
+    });
+    const { personOptions, page } = await m.listar(ACTOR, {}, NOW);
+    expect(personOptions).toEqual([
+      { userId: ANA, displayName: 'Ana Perez' },
+      { userId: BEA, displayName: 'Bea Gomez' },
+    ]);
+    // El equipo si sale en la fila, pero no en las opciones.
+    expect(page.items[0]!.people.map((p) => p.userId)).toEqual([ANA, BEA, CARLA, DIEGO]);
+  });
+
+  it('R27: la fila trae totalDuration y no el desglose', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'TERMINADO' })],
+      entries: [
+        anotacion(PEDIDO_A, 'start', 0),
+        anotacion(PEDIDO_A, 'finish', 30),
+        anotacion(PEDIDO_A, 'conditioning_start', 100),
+        anotacion(PEDIDO_A, 'conditioning_finish', 145),
+      ],
+    });
+    const { page } = await m.listar(ACTOR, {}, NOW);
+    const fila = page.items[0]!;
+    expect(Object.keys(fila)).not.toContain('durations');
+    expect(Object.keys(fila)).not.toContain('duration');
+    expect(fila.totalDuration).toEqual({ kind: 'closed', ms: 75 * MIN });
   });
 });

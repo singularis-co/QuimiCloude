@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Recorrido con acondicionamiento</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="dashboard" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div><a class="b b-out b-back" href="DashboardAcondicionamiento.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a la lista</a></div>
+
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Recorrido del pedido <span class="mono">{{ no }}</span></h1></div>
+        </div>
+
+        <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 16px" aria-busy="true">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px"><div class="stat"><span class="sk" style="width: 40%"></span><span class="sk" style="width: 70%; height: 22px"></span></div><div class="stat"><span class="sk" style="width: 60%"></span><span class="sk" style="width: 60%; height: 22px"></span></div><div class="stat"><span class="sk" style="width: 60%"></span><span class="sk" style="width: 50%; height: 22px"></span></div><div class="stat"><span class="sk" style="width: 60%"></span><span class="sk" style="width: 60%; height: 22px"></span></div><div class="stat"><span class="sk" style="width: 40%"></span><span class="sk" style="width: 30%; height: 22px"></span></div></div>
+            <div class="card"><span class="sk" style="width: 140px; height: 16px"></span><span class="sk" style="height: 56px"></span><span class="sk" style="height: 56px"></span><span class="sk" style="height: 120px"></span></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ ready }}" hint-placeholder-val="{{ true }}">
+          <dl class="fade" style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+            <div class="stat"><dt>Estado</dt><dd style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span class="{{ stCls }}"><i></i>{{ st }}</span><sc-if value="{{ active }}" hint-placeholder-val="{{ false }}"><span class="sb t-progress"><i></i>En curso</span></sc-if></dd></div>
+            <sc-for list="{{ durations }}" as="d" hint-placeholder-count="3">
+              <div class="stat"><dt>{{ d.label }}</dt><dd style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span class="mono">{{ d.value }}</span><sc-if value="{{ d.isOpen }}" hint-placeholder-val="{{ false }}"><span class="sb t-progress"><i></i>En curso</span></sc-if><sc-if value="{{ d.isUnclosed }}" hint-placeholder-val="{{ false }}"><span class="sb t-muted"><i></i>Sin cierre anotado</span></sc-if></dd></div>
+            </sc-for>
+            <div class="stat"><dt>Vueltas atrás</dt><dd><span class="{{ backCls }}" style="{{ backStyle }}">{{ back }}</span></dd></div>
+          </dl>
+
+          <section class="card fade" aria-labelledby="rca-an">
+            <div class="card-hd"><h2 id="rca-an" class="h2">Anotaciones</h2><span class="count">{{ count }}</span></div>
+            <ol class="tl">
+              <sc-for list="{{ events }}" as="e" hint-placeholder-count="12">
+                <li class="{{ e.cls }}" style="animation-delay: {{ e.delay }}ms">
+                  <span class="ev-dot"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ e.icon }}"></path></svg></span>
+                  <div class="ev-body">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap"><span class="strong">{{ e.act }}</span><time class="mono cap">{{ e.time }}</time></div>
+
+                    <sc-if value="{{ e.isBase }}" hint-placeholder-val="{{ true }}">
+                      <div class="rm-meta" style="align-items: center"><sc-if value="{{ e.hasPos }}" hint-placeholder-val="{{ true }}"><span>{{ e.pos }}</span></sc-if><span style="display: inline-flex; align-items: center; gap: 6px; color: var(--fg)"><span class="{{ e.avCls }}">{{ e.ini }}</span>{{ e.name }}</span></div>
+                    </sc-if>
+
+                    <sc-if value="{{ e.isStart }}" hint-placeholder-val="{{ false }}">
+                      <div class="rm-meta" style="align-items: center"><span>Supervisor</span><span style="display: inline-flex; align-items: center; gap: 6px; color: var(--fg)"><span class="{{ e.avCls }}">{{ e.ini }}</span>{{ e.name }}</span></div>
+                      <div style="display: flex; flex-direction: column; gap: 6px">
+                        <span class="lab">Equipo de trabajo · {{ e.teamCount }}</span>
+                        <sc-if value="{{ e.hasTeam }}" hint-placeholder-val="{{ true }}">
+                          <ul class="lbox" style="margin: 0; list-style: none; padding: 2px 12px">
+                            <sc-for list="{{ e.team }}" as="m" hint-placeholder-count="3">
+                              <li class="lrow" style="min-height: 40px; padding: 4px 0; flex-wrap: wrap"><span class="person" style="min-height: 32px; font-size: 13px"><span class="{{ m.avCls }}">{{ m.ini }}</span>{{ m.name }}</span><sc-if value="{{ m.hasGroup }}" hint-placeholder-val="{{ true }}"><span class="cap" style="display: inline-flex; align-items: center; gap: 6px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg><span class="sr">Grupo de trabajo:</span>{{ m.origin }}</span></sc-if></li>
+                            </sc-for>
+                          </ul>
+                        </sc-if>
+                        <sc-if value="{{ e.noTeam }}" hint-placeholder-val="{{ false }}">
+                          <p class="cap" style="margin: 0">Se comenzó sin equipo de trabajo.</p>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ e.isSave }}" hint-placeholder-val="{{ false }}">
+                      <div class="rm-meta" style="align-items: center"><span>Guardó</span><span style="display: inline-flex; align-items: center; gap: 6px; color: var(--fg)"><span class="{{ e.avCls }}">{{ e.ini }}</span>{{ e.name }}</span><span>{{ e.linesLabel }}</span></div>
+                      <div class="tw">
+                        <div class="scroll">
+                          <table class="collapse">
+                            <thead><tr><th scope="col" style="height: 36px">Lote</th><th scope="col" style="height: 36px">Presentación</th><th scope="col" class="num" style="height: 36px">Vencimiento</th><th scope="col" class="num" style="height: 36px">Día de producción</th></tr></thead>
+                            <tbody>
+                              <sc-for list="{{ e.lines }}" as="l" hint-placeholder-count="2">
+                                <tr><td class="mono strong" style="height: 44px">{{ l.lot }}</td><td style="height: 44px"><span class="{{ l.presCls }}" aria-label="{{ l.presAria }}">{{ l.pres }}</span></td><td class="num mono" style="height: 44px">{{ l.exp }}</td><td class="num mono" style="height: 44px">{{ l.prod }}</td></tr>
+                              </sc-for>
+                            </tbody>
+                          </table>
+                          <div class="rows-m">
+                            <sc-for list="{{ e.lines }}" as="l" hint-placeholder-count="2">
+                              <div class="rm" style="padding: 10px 12px; gap: 4px">
+                                <div class="rm-top"><span class="mono strong">{{ l.lot }}</span><span class="{{ l.presCls }}" aria-label="{{ l.presAria }}">{{ l.pres }}</span></div>
+                                <div class="rm-meta"><span>Vence <span class="mono" style="color: var(--fg)">{{ l.exp }}</span></span><span>Producido <span class="mono" style="color: var(--fg)">{{ l.prod }}</span></span></div>
+                              </div>
+                            </sc-for>
+                          </div>
+                        </div>
+                      </div>
+                      <p class="cap" style="margin: 0; display: inline-flex; align-items: center; gap: 6px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Datos tal como se guardaron en ese momento</p>
+                    </sc-if>
+
+                    <sc-if value="{{ e.isEnd }}" hint-placeholder-val="{{ false }}">
+                      <div class="rm-meta" style="align-items: center"><span style="display: inline-flex; align-items: center; gap: 6px; color: var(--fg)"><span class="{{ e.avCls }}">{{ e.ini }}</span>{{ e.name }}</span></div>
+                    </sc-if>
+
+                    <sc-if value="{{ e.hasMot }}" hint-placeholder-val="{{ false }}"><p class="cap" style="margin: 0; color: var(--fg)"><span class="strong">Motivo</span> · [MOTIVO…]</p></sc-if>
+                  </div>
+                </li>
+              </sc-for>
+            </ol>
+          </section>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="dashboard" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"variante":{"editor":"enum","options":["terminado","en_curso","anterior"],"default":"terminado"},"$preview":{"width":1440,"height":2000}}'>
+class Component extends DCLogic {
+componentDidMount() { this.t = setTimeout(() => this.setState({ loaded: true }), 700); }
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const v = this.props.variante || 'terminado';
+const I = {
+start: 'M7 4v16l13-8z',
+fwd: 'M5 12h14M13 6l6 6-6 6',
+back: 'M3 12a9 9 0 1 0 3-6.7M3 4v5h5',
+end: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6',
+box: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
+cstart: 'M9 2h6v4H9zM16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M12 11h4M12 16h4M8 11h.01M8 16h.01',
+csave: 'M12 4v11M7 10l5 5 5-5M4 20h16',
+cend: 'M9 2h6v4H9zM16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 14l2 2 4-4'
+};
+const P = { LG: ['LG','av sm','Laura Gómez'], MS: ['MS','av sm c2','Mateo Sánchez'], VH: ['VH','av sm c3','Valentina Herrera'], SV: ['SV','av sm c4','Santiago Vargas'] };
+const prod = [
+['k-start','start','Arrancar','Paso 1 de 6','02/10/2026 08:12','LG',false],
+['','fwd','Avanzar','Paso 2 de 6','02/10/2026 08:40','LG',false],
+['','fwd','Avanzar','Paso 3 de 6','02/10/2026 09:15','MS',false],
+['k-back','back','Retroceder','Paso 2 de 6','02/10/2026 09:31','MS',true],
+['k-start','start','Retomar','Paso 2 de 6','02/10/2026 10:02','LG',false],
+['','fwd','Avanzar','Paso 6 de 6','02/10/2026 10:48','LG',false],
+['k-end','end','Finalizar','Paso 6 de 6','02/10/2026 11:05','LG',false],
+['k-start','box','Comenzar empaque','Paso 1 de 2','02/10/2026 11:12','MS',false],
+['k-end','box','Terminar empaque','Paso 2 de 2','02/10/2026 11:40','MS',false]
+];
+const base = (e) => ({ kind: 'base', cls: e[0] ? 'ev ' + e[0] : 'ev', icon: I[e[1]], act: e[2], pos: e[3], hasPos: !!e[3], time: e[4], who: e[5], hasMot: e[6] });
+const team = [['LG','Turno mañana'],['MS','Turno mañana'],['VH','']];
+const L = (lot, pres, exp, prd) => ({ lot: lot, pres: pres === null ? '—' : pres, presCls: pres === null ? 'dim' : '', presAria: pres === null ? 'Sin dato' : pres, exp: exp, prod: prd });
+const cStart = (time, tm) => ({ kind: 'start', cls: 'ev k-start', icon: I.cstart, act: 'Comenzar acondicionamiento', time: time, who: 'SV', team: tm });
+const cSave = (time, lines) => ({ kind: 'save', cls: 'ev', icon: I.csave, act: 'Guardado de datos de lote', time: time, who: 'SV', lines: lines });
+const cEnd = (time) => ({ kind: 'end', cls: 'ev k-end', icon: I.cend, act: 'Terminar acondicionamiento', time: time, who: 'SV' });
+let ev, no, st, stCls, active, durs;
+if (v === 'en_curso') {
+ev = prod.map(base).concat([
+cStart('02/10/2026 13:20', []),
+cSave('02/10/2026 13:45', [L('L-0000','Galón 3,78 L','02/10/2028','02/10/2026')])
+]);
+no = '2026-0000003'; st = 'En acondicionamiento'; stCls = 'sb t-progress'; active = true;
+durs = [['Duración de producción','2 h 53 min','closed'],['Duración de empaque','28 min 12 s','closed'],['Duración de acondicionamiento','1 h 12 min','open']];
+} else if (v === 'anterior') {
+ev = prod.map(base);
+no = '2026-0000002'; st = 'Terminado'; stCls = 'sb t-success'; active = false;
+durs = [['Duración de producción','2 h 53 min','closed'],['Duración de empaque','28 min 12 s','closed']];
+} else {
+ev = prod.map(base).concat([
+cStart('02/10/2026 13:02', team),
+cSave('02/10/2026 13:40', [L('L-0000','Galón 3,78 L','02/10/2028','02/10/2026'), L('L-0001','Litro 1 L','02/10/2028','02/10/2026')]),
+cSave('02/10/2026 14:26', [L('L-0002','Galón 3,78 L','02/10/2028','02/10/2026'), L('L-0001',null,'02/10/2028','02/10/2026')]),
+cEnd('02/10/2026 15:10')
+]);
+no = '2026-0000006'; st = 'Terminado'; stCls = 'sb t-success'; active = false;
+durs = [['Duración de producción','2 h 53 min','closed'],['Duración de empaque','28 min 12 s','closed'],['Duración de acondicionamiento','2 h 08 min','closed']];
+}
+const back = ev.filter((e) => e.cls.indexOf('k-back') !== -1).length;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+ovCls: s.menu ? 'ov open' : 'ov',
+closeAll: () => this.setState({ menu: false }),
+loading: !s.loaded, ready: !!s.loaded,
+no: no, st: st, stCls: stCls, active: active,
+durations: durs.map((d) => ({ label: d[0], value: d[1], isOpen: d[2] === 'open', isUnclosed: d[2] === 'unclosed' })),
+back: String(back),
+backCls: back > 0 ? 'sb t-waiting mono' : 'mono',
+backStyle: back > 0 ? 'height: 28px; padding: 0 12px; font-size: 16px' : '',
+count: String(ev.length),
+events: ev.map((e, i) => ({
+cls: e.cls, icon: e.icon, act: e.act, time: e.time, pos: e.pos || '', hasPos: !!e.hasPos, hasMot: !!e.hasMot,
+ini: P[e.who][0], avCls: P[e.who][1], name: P[e.who][2],
+isBase: e.kind === 'base', isStart: e.kind === 'start', isSave: e.kind === 'save', isEnd: e.kind === 'end',
+team: (e.team || []).map((m) => ({ ini: P[m[0]][0], avCls: P[m[0]][1], name: P[m[0]][2], origin: m[1], hasGroup: !!m[1] })),
+teamCount: String((e.team || []).length), hasTeam: !!(e.team && e.team.length), noTeam: e.kind === 'start' && !(e.team && e.team.length),
+lines: e.lines || [], linesLabel: e.lines ? (e.lines.length === 1 ? '1 presentación' : e.lines.length + ' presentaciones') : '',
+delay: String(i * 40)
+}))
+};
+}
+}
+</script>
+</body>
+</html>

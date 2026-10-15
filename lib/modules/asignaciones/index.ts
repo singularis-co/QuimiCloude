@@ -250,6 +250,13 @@ export {
   type GetExecutionTraceDeps,
 } from './domain/get-execution-trace';
 export type { ExecutionTrace, TraceDuration, TraceStep } from './domain/execution-trace';
+export type {
+  ConditioningAction,
+  ConditioningBatchSnapshotLine,
+  ExecutionPhase,
+  TraceDurations,
+  ExecutionTraceTeamMember,
+} from './domain/conditioning-trace';
 
 // ---------------------------------------------------------------------------------------
 // El acondicionamiento: Comenzar y Terminar. Bloque NUEVO al final.

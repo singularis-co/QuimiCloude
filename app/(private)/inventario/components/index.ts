@@ -30,12 +30,24 @@ export { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/pres
 export {
   ACTIONS_COLUMN_ID,
   IMAGE_COLUMN_ID,
+  PRODUCT_BATCH_ROW_TEXTS,
   buildProductColumns,
   productUnitLabel,
+  type ProductBatchesStatus,
   type ProductColumn,
   type ProductColumnId,
   type ProductColumnsDeps,
+  type ProductTableRow,
 } from './product-columns';
+export {
+  daysUntil,
+  EXPIRY_RELATIVE_TEXTS,
+  EXPIRY_WARNING_DAYS,
+  expiryRelativeLabel,
+  isExpired,
+  isExpiringSoon,
+} from './expiry-warning';
+export { ExpiryDate, type ExpiryDateProps, useLocalToday } from './expiry-date';
 export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 export { productNameWithoutPresentation } from './product-base-name';
 export {
@@ -98,6 +110,7 @@ export {
   type ProductListSearchParams,
   type ProductPageSize,
 } from './product-list-params';
+export { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
 export { ProductTypeTabs, type ProductTypeTabsProps } from './product-type-tabs';
 export { ProductListSection } from './product-list-section';
 export { ProductSheet } from './product-sheet';

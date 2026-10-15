@@ -390,6 +390,15 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).listProductBatchesAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
   },
   {
+    // Anadida el 2026-10-15: variante de la lectura de lotes que filtra en servidor los vivos.
+    archivo: 'lib/modules/inventario/adapters/driving/batch-actions.ts',
+    nombre: 'listAliveProductBatchesAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/inventario/adapters/driving/batch-actions')
+      ).listAliveProductBatchesAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
+  },
+  {
     // Anadida el 2026-10-13: la ficha de producto terminado resuelve las dos caras de la sesion.
     archivo: 'lib/modules/inventario/adapters/driving/finished-product-actions.ts',
     nombre: 'getFinishedProductAction',

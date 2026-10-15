@@ -233,6 +233,8 @@ async function createUser(user: Credentials, roleId: string, lastNames: string):
 async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown> {
   const ids = [...companyIds];
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    // Comenzar, guardar datos de lote y Terminar anotan en el registro de ejecucion.
+    () => prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.orderConditioningTeamMember.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.inventoryMovement.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.productBatch.deleteMany({ where: { companyId: { in: ids } } }),

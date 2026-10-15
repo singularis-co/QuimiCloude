@@ -167,6 +167,8 @@ async function crearFixture(): Promise<Fixture> {
 
 async function borrarFixture(fixture: Fixture): Promise<void> {
   const companyId = fixture.companyId;
+  // Comenzar anota en el registro, y sus filas apuntan al pedido: se borran antes.
+  await prisma.orderExecutionEntry.deleteMany({ where: { companyId } });
   await prisma.orderConditioningTeamMember.deleteMany({ where: { companyId } });
   await prisma.orderAssignment.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });

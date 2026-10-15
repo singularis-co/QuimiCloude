@@ -24,14 +24,20 @@ export {
 } from './execution-trace-columns';
 export {
   ACTIVE_ORDER_MARK,
+  CONDITIONING_TEXTS,
   DELETED_ORDER_MARK,
   EXECUTION_ACTION_LABELS,
   GO_BACK_MARK,
+  PHASE_DURATION_LABELS,
+  PHASE_OPEN_MARK,
+  PHASE_UNCLOSED_MARK,
   TRACE_DURATION_SUFFIXES,
   TRACE_ORDER_STATUS_LABELS,
   formatElapsed,
-  formatTraceDuration,
+  formatElapsedMinutes,
+  formatSnapshotDate,
   formatTraceInstant,
+  formatTraceTotal,
 } from './execution-trace-format';
 export {
   CANCELLED_ON_VALUE,

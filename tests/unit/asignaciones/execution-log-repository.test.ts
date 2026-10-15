@@ -116,11 +116,11 @@ describe('NewExecutionEntry: el empaque va sin posicion (R5bis)', () => {
   })
 })
 
-describe('ExecutionAction: total sobre las ocho del enum (R1)', () => {
-  it('R1: el dominio declara exactamente ocho acciones, y el enum de Prisma tambien', () => {
-    expect(EXECUTION_ACTIONS).toHaveLength(8)
-    expect(new Set(EXECUTION_ACTIONS).size).toBe(8)
-    expect(Object.values(OrderExecutionAction)).toHaveLength(8)
+describe('ExecutionAction: total sobre las once del enum (R1)', () => {
+  it('R1: el dominio declara exactamente once acciones, y el enum de Prisma tambien', () => {
+    expect(EXECUTION_ACTIONS).toHaveLength(11)
+    expect(new Set(EXECUTION_ACTIONS).size).toBe(11)
+    expect(Object.values(OrderExecutionAction)).toHaveLength(11)
   })
 
   it.each(EXECUTION_ACTIONS)('R1: la accion %s tiene su valor en el enum de Prisma', (action) => {
@@ -132,7 +132,7 @@ describe('ExecutionAction: total sobre las ocho del enum (R1)', () => {
     expect([...Object.values(OrderExecutionAction)].sort()).toEqual(delDominio)
   })
 
-  it('R1: `ExecutionAction` es la union de las ocho, ni una mas', () => {
+  it('R1: `ExecutionAction` es la union de las once, ni una mas', () => {
     const exhaustivo = (a: ExecutionAction): number => {
       switch (a) {
         case 'start':
@@ -143,6 +143,9 @@ describe('ExecutionAction: total sobre las ocho del enum (R1)', () => {
         case 'finish':
         case 'pack_start':
         case 'pack_finish':
+        case 'conditioning_start':
+        case 'conditioning_batch_save':
+        case 'conditioning_finish':
           return 1
         default: {
           const nunca: never = a
@@ -150,7 +153,7 @@ describe('ExecutionAction: total sobre las ocho del enum (R1)', () => {
         }
       }
     }
-    expect(EXECUTION_ACTIONS.map(exhaustivo)).toHaveLength(8)
+    expect(EXECUTION_ACTIONS.map(exhaustivo)).toHaveLength(11)
   })
 })
 
@@ -190,7 +193,7 @@ describe('ExecutionLogRepository: solo anexar (R31)', () => {
 })
 
 describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () => {
-  it('R24: `run` entrega exactamente `orders`, `packing`, `log`, `conditioning` y `team`, y devuelve lo que devuelve `work`', async () => {
+  it('R24: `run` entrega exactamente `orders`, `packing`, `log`, `conditioning`, `team` y `batches`, y devuelve lo que devuelve `work`', async () => {
     const writers: ExecutionWriters = {
       orders: {
         transitionAliveById: () => Promise.resolve('ok'),
@@ -201,13 +204,21 @@ describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () 
         finishPackingAliveById: () => Promise.resolve({ kind: 'ok', finishedGoods: [] }),
       },
       log: new RegistroDoble(),
-      conditioning: { startConditioningAliveById: () => Promise.resolve('ok') },
-      team: { insertAll: () => Promise.resolve(0), listByOrderInCompany: () => Promise.resolve([]) },
+      conditioning: {
+        startConditioningAliveById: () => Promise.resolve('ok'),
+        finishConditioningAliveById: () => Promise.resolve('ok'),
+      },
+      team: {
+        insertAll: () => Promise.resolve(0),
+        listByOrderInCompany: () => Promise.resolve([]),
+        listByOrdersInCompany: () => Promise.resolve([]),
+      },
+      batches: { writeForOrder: () => Promise.resolve({ kind: 'written' }) },
     }
     const transaccion: ExecutionTransaction = { run: (work) => work(writers) }
 
     const claves = await transaccion.run((w) => Promise.resolve(Object.keys(w).sort()))
-    expect(claves).toEqual(['conditioning', 'log', 'orders', 'packing', 'team'])
+    expect(claves).toEqual(['batches', 'conditioning', 'log', 'orders', 'packing', 'team'])
   })
 })
 

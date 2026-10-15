@@ -341,6 +341,38 @@ const NO_FIXED_PRESENTATION: FixedPresentationFields = {
   presentationUnitId: null,
 };
 
+type NextExpiryRow = { readonly productId: string; readonly _min: { readonly expiryDate: Date | null } };
+
+/** De las filas del `groupBy` al mapa producto -> `YYYY-MM-DD`. Un producto sin fecha no entra:
+ *  el llamante lo resuelve a `null`. */
+export function toNextExpiryByProduct(rows: readonly NextExpiryRow[]): ReadonlyMap<string, string> {
+  return new Map(
+    rows.flatMap((row) => (row._min.expiryDate === null ? [] : [[row.productId, toCivilDate(row._min.expiryDate)] as const])),
+  );
+}
+
+/** UNA consulta agregada por pagina. Solo lotes con existencia > 0 (`productId` de la pagina y
+ *  `companyId`): un lote agotado ya no vence nada. NO coincide a proposito con
+ *  `findReservedAndAvailableByProduct`, que suma todos los lotes. El producto vivo ya lo garantiza
+ *  el `where` del listado. */
+async function findNextExpiryDateByProduct(
+  productIds: readonly string[],
+  scope: InventoryScope,
+): Promise<ReadonlyMap<string, string>> {
+  if (productIds.length === 0) return new Map();
+  const rows = await prisma.productBatch.groupBy({
+    by: ['productId'],
+    where: {
+      AND: [
+        batchCompanyScope(scope),
+        { productId: { in: [...productIds] }, stock: { gt: 0 }, expiryDate: { not: null } },
+      ],
+    },
+    _min: { expiryDate: true },
+  });
+  return toNextExpiryByProduct(rows);
+}
+
 export async function listAliveProducts(
   query: ListQuery,
   scope: InventoryScope,
@@ -364,11 +396,11 @@ export async function listAliveProducts(
 
   // UNA consulta agregada mas para la pagina entera, nunca una por fila: `reserved`/`available`
   // salen del libro de reservas, sumados por producto.
-  const reservedByProduct = await findReservedAndAvailableByProduct(
-    prisma,
-    scope.companyId,
-    rows.map((row) => row.id),
-  );
+  const productIds = rows.map((row) => row.id);
+  const [reservedByProduct, nextExpiryByProduct] = await Promise.all([
+    findReservedAndAvailableByProduct(prisma, scope.companyId, productIds),
+    findNextExpiryDateByProduct(productIds, scope),
+  ]);
   const presentations = await findFixedPresentations(
     [...new Set(rows.flatMap((row) => (row.presentationId === null ? [] : [row.presentationId])))],
     scope,
@@ -380,6 +412,7 @@ export async function listAliveProducts(
       ...toProductView(row),
       reserved: aggregate?.reserved ?? ZERO_QUANTITY,
       available: aggregate?.available ?? ZERO_QUANTITY,
+      nextExpiryDate: nextExpiryByProduct.get(row.id) ?? null,
       ...(fixed ?? NO_FIXED_PRESENTATION),
     };
   });

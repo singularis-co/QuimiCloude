@@ -610,3 +610,66 @@ describe('QC-219 — listOfOrder lee los lotes de produccion del pedido', () => 
     }
   });
 });
+
+describe('QC-283 — con un cliente de transaccion, escribe y lee en ella', () => {
+  it('R3: con db no abre transaccion propia: lo escrito se ve dentro y desaparece con el ROLLBACK de quien la abrio', async () => {
+    const fixture = await sembrarFixture();
+    try {
+      const pedido = await sembrarPedido(fixture);
+      const chica = await recibir(fixture, pedido, await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25'), 6);
+      const antes = await etiqueta(chica.batchId);
+      const lot = `TX-${token()}`;
+      const deshacer = new Error('rollback del test');
+
+      let dentro: { outcome: unknown; lote: string | undefined } | undefined;
+      await expect(
+        prisma.$transaction(async (tx) => {
+          const enTx = createFinishedBatchLabels(tx);
+          const outcome = await enTx.writeForOrder({
+            companyId: fixture.empresa.companyId,
+            orderId: pedido,
+            label: label(lot),
+            actorId: fixture.empresa.userId,
+            now: new Date(),
+          });
+          const lineas = await enTx.listOfOrder(fixture.empresa.companyId, pedido);
+          dentro = { outcome, lote: lineas.find((linea) => linea.batchId === chica.batchId)?.lot };
+          throw deshacer;
+        }),
+      ).rejects.toBe(deshacer);
+
+      expect(dentro).toEqual({ outcome: { kind: 'written' }, lote: lot });
+      expect(await etiqueta(chica.batchId), 'el ROLLBACK de fuera deshizo la escritura').toEqual(antes);
+    } finally {
+      await limpiar(fixture);
+    }
+  });
+
+  it('R4: con db, el codigo de otra produccion de la misma presentacion devuelve duplicate_lot sin escribir', async () => {
+    const fixture = await sembrarFixture();
+    try {
+      const botella = await sembrarPresentacion(fixture, 'Botella 250 ml', '0.25');
+      const pedido = await sembrarPedido(fixture);
+      const otraProduccion = await sembrarPedido(fixture);
+      const chica = await recibir(fixture, pedido, botella, 6);
+      const previa = await recibir(fixture, otraProduccion, botella, 1);
+      const antes = await etiqueta(chica.batchId);
+      const loteDeOtraProduccion = (await etiqueta(previa.batchId)).lot;
+
+      const outcome = await prisma.$transaction((tx) =>
+        createFinishedBatchLabels(tx).writeForOrder({
+          companyId: fixture.empresa.companyId,
+          orderId: pedido,
+          label: label(loteDeOtraProduccion),
+          actorId: fixture.empresa.userId,
+          now: new Date(),
+        }),
+      );
+
+      expect(outcome).toEqual({ kind: 'duplicate_lot', batchId: chica.batchId });
+      expect(await etiqueta(chica.batchId)).toEqual(antes);
+    } finally {
+      await limpiar(fixture);
+    }
+  });
+});

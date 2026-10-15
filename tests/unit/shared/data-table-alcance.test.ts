@@ -647,7 +647,12 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // localiza la fila por `data-table-row-<id>` y la celda `data-table-cell-presentationName` de
   // inventario, ya en esta lista. El centinela pasa de CUARENTA Y CINCO a CUARENTA Y SEIS; la lista
   // sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y seis', () => {
+  //
+  // 2026-10-14: entra `e2e/recorrido-acondicionamiento.spec.ts` (QC-283), y no afloja la lista. No
+  // estrena tabla: recorre la lista del recorrido de ejecucion del dashboard, ya en esta lista
+  // (QC-167), y localiza la fila del pedido y la del senuelo por `data-table-row-<id>`. El centinela
+  // pasa de CUARENTA Y SEIS a CUARENTA Y SIETE; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y siete', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -657,7 +662,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cuarenta y seis E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cuarenta y siete E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -770,6 +775,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // '-' precede a '.', igual que en pedidos.
       'e2e/recetas-pasos.spec.ts',
       'e2e/recetas.spec.ts',
+      // Ver la nota de arriba (2026-10-14, QC-283). Antes que `recorrido-ejecucion` porque la lista
+      // esta ORDENADA: 'a' precede a 'e'.
+      'e2e/recorrido-acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-08, QC-167). Entre `recetas` y `registro-ejecucion` porque
       // la lista esta ORDENADA: 'e' precede a 'o', y 'c' precede a 'g'.
       'e2e/recorrido-ejecucion.spec.ts',
