@@ -31,8 +31,8 @@ consecuencias de arquitectura que no son opinables:
      autoriza por si solo**.
    - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la
      columna `company_id` exista, obligatoria u opcional. Las exentas son una lista corta
-     y cerrada de diez tablas: los catalogos compartidos por todas las empresas
-     (`document_types`, `roles`, `permissions`, `role_permissions`, `ai_providers`), la propia empresa
+     y cerrada de once tablas: los catalogos compartidos por todas las empresas
+     (`document_types`, `roles`, `permissions`, `role_permissions`, `ai_providers`, `addons`), la propia empresa
      (`companies`), las que cuelgan de un usuario que ya tiene empresa
      (`credential_setup_tokens`, `revoked_sessions`) y las que heredan la empresa de su
      receta (`recipe_lines`, `recipe_tools`). La tabla de usuarios no es exenta: lleva su empresa. La
@@ -42,7 +42,7 @@ consecuencias de arquitectura que no son opinables:
      rechaza— todo lo que no esta pedido: jerarquias de empresas, empresas anidadas, un
      usuario en varias empresas, permisos por empresa **que amplíen** su rol, o un selector de
      empresa antes de que exista su ficha. Lo único por empresa son sus **añadidos activos**
-     (`companies.addons`), que solo **recortan**: el permiso efectivo es rol ∩ añadidos activos
+     (`company_addon_overrides`), que solo **recortan**: el permiso efectivo es rol ∩ añadidos activos
      (QC-277).
    - **Coste que esto impone y se acepta**: cada feature de datos pasa a llevar columna de
      empresa, filtro en cada consulta, rechazo probado del acceso cruzado y su test. No es

@@ -652,7 +652,7 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-10-14: migracion de datos que quita `asignaciones.consultar` al Administrador; no toca el
   // identificador.
   '20261014180000_admin_without_assigned_orders_view',
-  // QC-277 2026-10-14: la columna `companies.addons`; no toca el identificador.
+  // QC-277 2026-10-14: las tablas de añadidos; no toca el identificador.
   '20261014190000_company_addons',
 ] as const
 

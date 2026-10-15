@@ -564,8 +564,8 @@ const MIGRACION_QC275 = [
   'db/migrations/20261013150000_ai_providers/down.sql',
 ];
 
-// QC-277 2026-10-15: la columna `companies.addons` (añadidos prendidos por empresa) y
-// `db/schema.prisma` con esa columna. No toca ninguna tabla de recetas; la rama entra aqui
+// QC-277 2026-10-15: las tablas de añadidos (catalogo y excepciones por empresa) y
+// `db/schema.prisma` con esas tablas. No toca ninguna tabla de recetas; la rama entra aqui
 // porque la pantalla de importar formulas llama a `requirePageAddon`. Lista nombrada como las
 // demas: cualquier otro archivo de `db/` en el diff sigue en rojo.
 const MIGRACION_QC277 = [

@@ -30,7 +30,7 @@ describe('docs/architecture.md y el permiso efectivo', () => {
     const vineta = vinetaDe('**Nada de infraestructura «por si acaso».**');
     expect(vineta).not.toContain('mas alla de su rol');
     expect(vineta).toContain('**que amplíen** su rol');
-    expect(vineta).toContain('`companies.addons`');
+    expect(vineta).toContain('`company_addon_overrides`');
     expect(vineta).toContain('rol ∩ añadidos activos');
     expect(vineta).toContain('usuario en varias empresas');
   });
