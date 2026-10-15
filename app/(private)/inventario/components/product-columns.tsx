@@ -1,14 +1,17 @@
 'use client';
 
+import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { StatusBadge } from '@/components/shared/status-badge';
-import { compareQuantities, type ProductView } from '@/lib/modules/inventario';
+import { Button } from '@/components/ui/button';
+import { compareQuantities, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { cn } from '@/lib/utils';
 
 import { productNameWithoutPresentation } from './product-base-name';
 import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
@@ -69,8 +72,49 @@ export type ProductColumnId =
   | typeof IMAGE_COLUMN_ID
   | typeof ACTIONS_COLUMN_ID;
 
+/** Estado de la carga de los lotes de un producto desplegado. */
+export type ProductBatchesStatus =
+  | { readonly status: 'loading' }
+  | { readonly status: 'empty' }
+  | { readonly status: 'error'; readonly message: string };
+
+/**
+ * Fila que pinta la tabla: la del producto y, desplegada, una por lote vivo o una de estado
+ * (cargando, vacio, error).
+ */
+export type ProductTableRow =
+  | {
+      readonly kind: 'product';
+      readonly product: ProductView;
+      readonly expanded: boolean;
+      readonly expiring: boolean;
+    }
+  | {
+      readonly kind: 'batch';
+      readonly product: ProductView;
+      readonly batch: ProductBatchView;
+      readonly expiring: boolean;
+    }
+  | {
+      readonly kind: 'batchesStatus';
+      readonly product: ProductView;
+      readonly state: ProductBatchesStatus;
+    };
+
 /** Columna de esta tabla: la de la tabla compartida, con el id acotado por R7. */
-export type ProductColumn = DataTableColumn<ProductView> & { readonly id: ProductColumnId };
+export type ProductColumn = DataTableColumn<ProductTableRow> & { readonly id: ProductColumnId };
+
+/** Textos de las sub-filas de lotes. */
+export const PRODUCT_BATCH_ROW_TEXTS = {
+  toggle: (name: string) => `Mostrar lotes de ${name}`,
+  lot: 'Lote',
+  purchaseDate: 'Fecha de compra',
+  expiryDate: 'Vencimiento',
+  loading: 'Cargando lotes…',
+  empty: 'Sin lotes con existencia.',
+  error: 'No se pudieron cargar los lotes.',
+  retry: 'Reintentar',
+} as const;
 
 /** Encabezado de la columna de imagen. Constante para que ningun test dependa del literal. */
 export const IMAGE_COLUMN_LABEL = 'Imagen';
@@ -118,15 +162,21 @@ export function productUnitLabel(
  *
  * Se pinta a dos decimales: la celda no es donde se vuelve a guardar. El `aria-label` lleva la
  * cifra exacta. `data-alert` acompana a la clase para que la alarma sea afirmable sin depender
- * del nombre de una utilidad de Tailwind.
+ * del nombre de una utilidad de Tailwind. `testId` distingue la sub-fila de lote de la fila de
+ * producto.
  */
-export function stockAmountCell(stock: string, label: string | null, alerted: boolean): ReactNode {
+export function stockAmountCell(
+  stock: string,
+  label: string | null,
+  alerted: boolean,
+  testId = 'product-stock',
+): ReactNode {
   const amount = formatDecimalDisplay(stock);
   const exact = trimDecimal(stock);
 
   return (
     <span
-      data-testid="product-stock"
+      data-testid={testId}
       data-alert={alerted ? 'true' : undefined}
       className={alerted ? 'font-semibold text-destructive' : undefined}
       title={exactDecimalTitle(stock)}
@@ -148,7 +198,10 @@ function productQuantityCell(
   product: ProductView,
   units: readonly UnitRef[] | undefined,
 ): ReactNode {
-  const label = productUnitLabel(product, units);
+  return quantityCell(value, testId, productUnitLabel(product, units));
+}
+
+function quantityCell(value: string, testId: string, label: string | null): ReactNode {
   const amount = formatDecimalDisplay(value);
   const exact = trimDecimal(value);
 
@@ -170,7 +223,7 @@ export function qtyAlertCell(product: ProductView, units: readonly UnitRef[] | u
 }
 
 /**
- * Celda de una cantidad agregada (reservado, disponible), junto a la unidad del producto.
+ * Celda de una cantidad agregada (reservado, disponible), junto a su unidad.
  *
  * `undefined` pinta el marcador de vacio sin `title` ni `aria-label`: es lo que devuelve toda
  * lectura que no sea el listado paginado, que es la unica que agrega estas dos columnas.
@@ -178,11 +231,10 @@ export function qtyAlertCell(product: ProductView, units: readonly UnitRef[] | u
 function aggregateQuantityCell(
   value: string | undefined,
   testId: string,
-  product: ProductView,
-  units: readonly UnitRef[] | undefined,
+  label: string | null,
 ): ReactNode {
   if (value === undefined) return EMPTY_MARK;
-  return productQuantityCell(value, testId, product, units);
+  return quantityCell(value, testId, label);
 }
 
 export type ProductColumnsDeps = {
@@ -201,6 +253,10 @@ export type ProductColumnsDeps = {
    * filtrado, todas las filas dirian lo mismo. Defecto `false`, que es el recuento del esqueleto.
    */
   readonly showType?: boolean;
+  /** Despliega o pliega los lotes de un producto. Sin el, la fila no pinta el chevron. */
+  readonly onToggle?: (productId: string) => void;
+  /** Vuelve a pedir los lotes de un producto tras un error. */
+  readonly onRetry?: (productId: string) => void;
 };
 
 /** Encabezado de la columna de tipo. Constante para que ningun test dependa del literal. */
@@ -214,20 +270,146 @@ const typeColumn: ProductColumn = {
   id: 'type',
   label: TYPE_COLUMN_LABEL,
   align: 'start',
-  cell: (product) => (
-    <StatusBadge
-      tone={PRODUCT_TYPE_TONES[product.type]}
-      label={PRODUCT_TYPE_LABELS[product.type]}
-      data-testid="product-type"
-      data-type={product.type}
-    />
-  ),
+  cell: (row) =>
+    row.kind === 'product' ? (
+      <StatusBadge
+        tone={PRODUCT_TYPE_TONES[row.product.type]}
+        label={PRODUCT_TYPE_LABELS[row.product.type]}
+        data-testid="product-type"
+        data-type={row.product.type}
+      />
+    ) : null,
 };
+
+const EXPIRING_CLASS = 'font-semibold text-destructive';
+
+function productNameCell(
+  row: Extract<ProductTableRow, { kind: 'product' }>,
+  onToggle: ProductColumnsDeps['onToggle'],
+): ReactNode {
+  const name = productNameWithoutPresentation(row.product);
+  const label = (
+    <span
+      data-testid="product-name"
+      data-expiring={row.expiring ? 'true' : undefined}
+      className={row.expiring ? EXPIRING_CLASS : undefined}
+    >
+      {name}
+    </span>
+  );
+  if (onToggle === undefined) return label;
+
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        touch
+        className="shrink-0"
+        aria-expanded={row.expanded}
+        aria-label={PRODUCT_BATCH_ROW_TEXTS.toggle(name)}
+        data-testid="product-batches-toggle"
+        onClick={() => onToggle(row.product.id)}
+      >
+        <ChevronRight
+          aria-hidden="true"
+          className={cn('transition-transform', row.expanded && 'rotate-90')}
+        />
+      </Button>
+      {label}
+    </div>
+  );
+}
+
+function batchDetailCell(row: Extract<ProductTableRow, { kind: 'batch' }>): ReactNode {
+  const { batch } = row;
+  return (
+    <dl data-testid="product-batch-row" className="flex flex-wrap gap-x-4 gap-y-1 pl-12 text-sm">
+      <div className="flex gap-1">
+        <dt className="text-muted-foreground">{PRODUCT_BATCH_ROW_TEXTS.lot}</dt>
+        <dd data-testid="product-batch-row-lot" className="font-mono tabular-nums">
+          {batch.lot}
+        </dd>
+      </div>
+      <div className="flex gap-1">
+        <dt className="text-muted-foreground">{PRODUCT_BATCH_ROW_TEXTS.purchaseDate}</dt>
+        <dd data-testid="product-batch-row-purchase-date" className="font-mono tabular-nums">
+          {batch.purchaseDate}
+        </dd>
+      </div>
+      <div className="flex gap-1">
+        <dt className="text-muted-foreground">{PRODUCT_BATCH_ROW_TEXTS.expiryDate}</dt>
+        <dd
+          data-testid="product-batch-row-expiry-date"
+          data-expiring={row.expiring ? 'true' : undefined}
+          className={cn('font-mono tabular-nums', row.expiring && EXPIRING_CLASS)}
+        >
+          {batch.expiryDate ?? EMPTY_MARK}
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
+function batchesStatusCell(
+  row: Extract<ProductTableRow, { kind: 'batchesStatus' }>,
+  onRetry: ProductColumnsDeps['onRetry'],
+): ReactNode {
+  const { state } = row;
+  if (state.status === 'loading') {
+    return (
+      <p data-testid="product-batches-row-loading" className="pl-12 text-sm text-muted-foreground">
+        {PRODUCT_BATCH_ROW_TEXTS.loading}
+      </p>
+    );
+  }
+  if (state.status === 'empty') {
+    return (
+      <p data-testid="product-batches-row-empty" className="pl-12 text-sm text-muted-foreground">
+        {PRODUCT_BATCH_ROW_TEXTS.empty}
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 pl-12" data-testid="product-batches-row-error">
+      <p data-testid="product-batches-row-error-message" className="text-sm text-destructive">
+        {state.message}
+      </p>
+      {onRetry === undefined ? null : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          touch
+          data-testid="product-batches-row-retry"
+          onClick={() => onRetry(row.product.id)}
+        >
+          {PRODUCT_BATCH_ROW_TEXTS.retry}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function reservedOrAvailableCell(
+  row: ProductTableRow,
+  field: 'reserved' | 'available',
+  units: readonly UnitRef[] | undefined,
+): ReactNode {
+  if (row.kind === 'batchesStatus') return null;
+  const label = productUnitLabel(row.product, units);
+  return row.kind === 'product'
+    ? aggregateQuantityCell(row.product[field], `product-${field}`, label)
+    : aggregateQuantityCell(row.batch[field], `product-batch-row-${field}`, label);
+}
 
 export function buildProductColumns({
   rowActions,
   units,
   showType = false,
+  onToggle,
+  onRetry,
 }: ProductColumnsDeps): readonly ProductColumn[] {
   return [
     {
@@ -239,9 +421,14 @@ export function buildProductColumns({
       defaultPinned: 'left',
       // `imageUrl` y no `imagePath`: la ruta del bucket no es una URL servible. Sin imagen sale
       // el marcador.
-      cell: (product) => (
-        <EntityImage path={product.imageUrl ?? null} name={product.name} testId="product-image" />
-      ),
+      cell: (row) =>
+        row.kind === 'product' ? (
+          <EntityImage
+            path={row.product.imageUrl ?? null}
+            name={row.product.name}
+            testId="product-image"
+          />
+        ) : null,
     },
     {
       id: 'name',
@@ -250,14 +437,19 @@ export function buildProductColumns({
       sortable: true,
       width: 500,
       hideText: false,
-      cell: (product) => productNameWithoutPresentation(product),
+      cell: (row) => {
+        if (row.kind === 'product') return productNameCell(row, onToggle);
+        if (row.kind === 'batch') return batchDetailCell(row);
+        return batchesStatusCell(row, onRetry);
+      },
     },
     {
       id: 'presentationName',
       label: 'Presentación',
       align: 'start',
       // Sin `sortable` ni `filter`: `PRODUCT_QUERYABLE` no los admite para esta columna.
-      cell: (product) => product.presentationName ?? EMPTY_MARK,
+      cell: (row) =>
+        row.kind === 'product' ? (row.product.presentationName ?? EMPTY_MARK) : null,
     },
     ...(showType ? [typeColumn] : []),
     {
@@ -267,7 +459,18 @@ export function buildProductColumns({
       align: 'center',
       sortable: true,
       filter: { kind: 'numberRange' },
-      cell: (product) => stockCell(product, units),
+      cell: (row) => {
+        if (row.kind === 'product') return stockCell(row.product, units);
+        if (row.kind === 'batch') {
+          return stockAmountCell(
+            row.batch.stock,
+            productUnitLabel(row.product, units),
+            false,
+            'batch-stock',
+          );
+        }
+        return null;
+      },
     },
     {
       id: 'qtyAlert',
@@ -276,7 +479,7 @@ export function buildProductColumns({
       align: 'center',
       sortable: true,
       filter: { kind: 'numberRange' },
-      cell: (product) => qtyAlertCell(product, units),
+      cell: (row) => (row.kind === 'product' ? qtyAlertCell(row.product, units) : null),
     },
     {
       id: 'reserved',
@@ -284,21 +487,21 @@ export function buildProductColumns({
       tabular: true,
       align: 'center',
       // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
-      cell: (product) => aggregateQuantityCell(product.reserved, 'product-reserved', product, units),
+      cell: (row) => reservedOrAvailableCell(row, 'reserved', units),
     },
     {
       id: 'available',
       label: 'Disponible',
       tabular: true,
       align: 'center',
-      cell: (product) => aggregateQuantityCell(product.available, 'product-available', product, units),
+      cell: (row) => reservedOrAvailableCell(row, 'available', units),
     },
     {
-      ...actionsColumn<ProductView>({
+      ...actionsColumn<ProductTableRow>({
         id: ACTIONS_COLUMN_ID,
         label: ACTIONS_COLUMN_LABEL,
         defaultPinned: 'right',
-        cell: (product) => rowActions(product),
+        cell: (row) => (row.kind === 'product' ? rowActions(row.product) : null),
       }),
       id: ACTIONS_COLUMN_ID,
     },

@@ -30,12 +30,16 @@ export { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/pres
 export {
   ACTIONS_COLUMN_ID,
   IMAGE_COLUMN_ID,
+  PRODUCT_BATCH_ROW_TEXTS,
   buildProductColumns,
   productUnitLabel,
+  type ProductBatchesStatus,
   type ProductColumn,
   type ProductColumnId,
   type ProductColumnsDeps,
+  type ProductTableRow,
 } from './product-columns';
+export { EXPIRY_WARNING_DAYS, isExpiringSoon } from './expiry-warning';
 export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 export { productNameWithoutPresentation } from './product-base-name';
 export {

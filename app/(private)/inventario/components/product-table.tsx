@@ -1,7 +1,13 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useTransition, type ReactNode } from 'react';
+import {
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+  type ReactNode,
+} from 'react';
 
 import {
   DataTable,
@@ -10,10 +16,17 @@ import {
   type DataTableTexts,
 } from '@/components/shared/data-table';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
-import type { ProductView } from '@/lib/modules/inventario';
+import type { ProductBatchView, ProductView } from '@/lib/modules/inventario';
+import { listAliveProductBatchesAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
 
-import { buildProductColumns } from './product-columns';
+import { isExpiringSoon } from './expiry-warning';
+import {
+  buildProductColumns,
+  PRODUCT_BATCH_ROW_TEXTS,
+  type ProductTableRow,
+} from './product-columns';
 import { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 import { productListHref, TYPE_COLUMN_ID } from './product-list-params';
 import { ProductRowActions } from './product-row-actions';
@@ -171,6 +184,45 @@ export function productTableStates({
   };
 }
 
+type BatchesLoad =
+  // `request` identifica la peticion en vuelo: solo su respuesta puede sustituir esta entrada.
+  | { readonly status: 'loading'; readonly request: object }
+  | { readonly status: 'success'; readonly data: readonly ProductBatchView[] }
+  | { readonly status: 'error'; readonly message: string };
+
+const subscribeToNothing = () => () => {};
+const localToday = () => formatDateLocalISO(new Date());
+// En el servidor no hay «hoy» del usuario: sin el, nada se marca y se pinta tras hidratar.
+const noTodayOnServer = () => null;
+
+function productRowId(row: ProductTableRow): string {
+  if (row.kind === 'product') return row.product.id;
+  if (row.kind === 'batch') return `${row.product.id}--batch-${row.batch.id}`;
+  return `${row.product.id}--batches`;
+}
+
+function expandedRows(
+  product: ProductView,
+  load: BatchesLoad | undefined,
+  today: string | null,
+): ProductTableRow[] {
+  if (load === undefined || load.status === 'loading') {
+    return [{ kind: 'batchesStatus', product, state: { status: 'loading' } }];
+  }
+  if (load.status === 'error') {
+    return [{ kind: 'batchesStatus', product, state: load }];
+  }
+  if (load.data.length === 0) {
+    return [{ kind: 'batchesStatus', product, state: { status: 'empty' } }];
+  }
+  return load.data.map((batch) => ({
+    kind: 'batch',
+    product,
+    batch,
+    expiring: today !== null && isExpiringSoon(batch.expiryDate, today),
+  }));
+}
+
 export function ProductTable({
   products,
   params,
@@ -183,6 +235,17 @@ export function ProductTable({
 }: ProductTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const today = useSyncExternalStore(subscribeToNothing, localToday, noTodayOnServer);
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const [batches, setBatches] = useState<ReadonlyMap<string, BatchesLoad>>(() => new Map());
+  const [shownProducts, setShownProducts] = useState(products);
+
+  // Una lista nueva (otra pagina, o el refresco tras un ajuste) invalida los lotes ya leidos.
+  if (shownProducts !== products) {
+    setShownProducts(products);
+    setExpanded(new Set());
+    setBatches(new Map());
+  }
 
   // Las acciones de fila se enchufan aqui, no en la declaracion de columnas: asi esa declaracion
   // no importa el panel ni el dialogo. `useMemo` para que la identidad del array no cambie en
@@ -190,16 +253,64 @@ export function ProductTable({
   // La columna «Tipo» solo sale en la pestana «Todos» (sin filtro de tipo): con un tipo
   // filtrado, todas las filas dirian lo mismo.
   const showType = params.filters[TYPE_COLUMN_ID] === undefined;
-  const columns = useMemo(
+  const columns = useMemo(() => {
+    const loadBatches = (productId: string) => {
+      // Cada peticion lleva su propia identidad. Si la lista se invalido mientras tanto (y quiza
+      // el producto se reabrio con otra peticion), la respuesta ya no le pertenece y se descarta.
+      const request = {};
+      setBatches((current) => new Map(current).set(productId, { status: 'loading', request }));
+      const settle = (next: BatchesLoad) =>
+        setBatches((current) => {
+          const entry = current.get(productId);
+          return entry?.status === 'loading' && entry.request === request
+            ? new Map(current).set(productId, next)
+            : current;
+        });
+      void listAliveProductBatchesAction(productId).then(
+        (result) =>
+          settle(
+            result.status === 'success'
+              ? { status: 'success', data: result.data }
+              : { status: 'error', message: result.message },
+          ),
+        () => settle({ status: 'error', message: PRODUCT_BATCH_ROW_TEXTS.error }),
+      );
+    };
+
+    return buildProductColumns({
+      rowActions: (product) => (
+        <ProductRowActions product={product} units={units} canAdjust={canAdjust} />
+      ),
+      units,
+      showType,
+      onToggle: (productId) => {
+        setExpanded((current) => {
+          const next = new Set(current);
+          if (next.has(productId)) next.delete(productId);
+          else next.add(productId);
+          return next;
+        });
+        // Solo un producto nunca abierto carece de entrada: el resto se sirve de lo ya leido.
+        if (!batches.has(productId)) loadBatches(productId);
+      },
+      onRetry: loadBatches,
+    });
+  }, [units, canAdjust, showType, batches]);
+
+  const tableRows = useMemo(
     () =>
-      buildProductColumns({
-        rowActions: (product) => (
-          <ProductRowActions product={product} units={units} canAdjust={canAdjust} />
-        ),
-        units,
-        showType,
+      products.flatMap((product): ProductTableRow[] => {
+        const isOpen = expanded.has(product.id);
+        const row: ProductTableRow = {
+          kind: 'product',
+          product,
+          expanded: isOpen,
+          expiring: today !== null && isExpiringSoon(product.nextExpiryDate, today),
+        };
+        if (!isOpen) return [row];
+        return [row, ...expandedRows(product, batches.get(product.id), today)];
       }),
-    [units, canAdjust, showType],
+    [products, expanded, batches, today],
   );
 
   /*
@@ -224,8 +335,8 @@ export function ProductTable({
     <DataTable
       tableId={PRODUCT_TABLE_ID}
       columns={columns}
-      rows={products}
-      getRowId={(product) => product.id}
+      rows={tableRows}
+      getRowId={productRowId}
       params={params}
       totalPages={totalPages}
       onParamsChange={(next) => navigate(productListHref(next))}
