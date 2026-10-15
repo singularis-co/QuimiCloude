@@ -427,7 +427,7 @@ describe('Reparto', () => {
 
     const mas = rowOf('mas');
     expect(cell(mas, 'finished-product-distribution-difference')).toHaveTextContent('+1');
-    expect(cell(mas, 'finished-product-distribution-reason')).toHaveTextContent('Conteo fisico');
+    expect(cell(mas, 'finished-product-distribution-reason')).toHaveTextContent('Conteo físico');
   });
 
   it('R27 — «Otro» lleva el texto escrito entre comillas bajo el motivo', () => {
