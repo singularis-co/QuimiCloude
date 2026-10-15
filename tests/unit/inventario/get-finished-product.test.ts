@@ -34,6 +34,7 @@ function registro(overrides: Partial<FinishedProductRecord> = {}): FinishedProdu
     imagePath: null,
     qtyAlert: '5.0000',
     unitId: FINISHED_UNIT_ID,
+    recipeId: null,
     presentation: { id: FINISHED_PRESENTATION_ID, name: 'Botella 1 L', content: '1.0000', unitId: FINISHED_UNIT_ID },
     // 2026-10-15 (QC-282): los lotes del registro traen su codigo.
     batches: [

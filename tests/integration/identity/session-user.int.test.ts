@@ -2,9 +2,9 @@
  * T6 — Integracion de `findActiveSessionUserById` contra Postgres real (`design.md > 4.2`,
  * `design.md > 7` nivel 3).
  *
- * QUE SE EJERCITA AQUI Y NO EN LOS UNITARIOS: el adaptador Prisma de verdad, con la API tipada
- * por clave primaria, el `where` con `deletedAt: null` y el `select` minimo con el join a
- * `role.name`. Mismo patron que `login.int.test.ts`: fixture propio con prefijo y `uuid`,
+ * QUE SE EJERCITA AQUI Y NO EN LOS UNITARIOS: el adaptador Prisma de verdad —hoy un unico
+ * `$queryRaw` por clave primaria, con `u.deleted_at IS NULL` en el `WHERE` y el `SELECT` minimo
+ * con el `JOIN` a `roles`—. Mismo patron que `login.int.test.ts`: fixture propio con prefijo y `uuid`,
  * limpieza en `afterAll` dentro de `try`/`finally`, sin seed (R21 de QC-7).
  *
  * QC-47 (T17, T19) — `users.company_id` es obligatoria, asi que este fixture crea tambien su
@@ -29,12 +29,24 @@
  * verdad y que siguen saliendo en UNA SOLA llamada a `findFirst`: la condicion de R14 era «ni una
  * invocacion nueva del puerto por peticion». El `sid` del caso corriente es uno que nadie cerro.
  *
+ * UNA SOLA SENTENCIA SQL — el adaptador paso de un `findFirst` con relaciones anidadas (que,
+ * medido con el log de Prisma, eran CINCO sentencias en serie: `users`, `roles`,
+ * `role_permissions`, `companies`, `revoked_sessions`) a un unico `$queryRaw` con `JOIN`s. Los
+ * contadores de invocaciones de `findFirst` de las fichas anteriores contaban LLAMADAS a Prisma,
+ * no idas a la base, y por eso no veian las cinco. Ahora se cuenta lo que importa: las sentencias
+ * que el motor emite, con un cliente propio con `log: query` (`clienteConLog`) al que se ata una
+ * copia del adaptador de produccion (`vi.doMock` + import dinamico, mismo patron que
+ * `credential-setup.int.test.ts`). No se copia ni una linea de SQL: el codigo que corre es el de
+ * produccion. Los datos los escribe el cliente global y se confirman, asi que la segunda conexion
+ * los ve.
+ *
  * EL ROL NO SE MUEVE (R13, R14): sigue saliendo de `users.role_id`, en el mismo `select` y sin
  * ninguna consulta adicional. El caso «el rol cambiado entre dos lecturas devuelve el nuevo»
  * ya lo demuestra, y esta ficha lo deja intacto a proposito.
  */
 import { randomUUID } from 'node:crypto';
 
+import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
@@ -68,7 +80,58 @@ const SID_SIN_CERRAR = randomUUID();
 const CODIGO_CONSULTAR = `${moduloDePrueba}.consultar`;
 const CODIGO_MODIFICAR = `${moduloDePrueba}.modificar`;
 
+const ADAPTER_PATH = '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
+
+type LecturaDeSesion = typeof findActiveSessionUserById;
+
+/**
+ * Cliente propio que emite un evento por cada sentencia SQL que manda el motor. Es el contador de
+ * «una sola ida a la base»: cuenta sentencias, no llamadas a Prisma.
+ */
+const clienteConLog = new PrismaClient({ log: [{ emit: 'event', level: 'query' }] });
+let sentenciasEmitidas: string[] = [];
+clienteConLog.$on('query', (evento) => {
+  sentenciasEmitidas.push(evento.query);
+});
+let adaptadorConLog: LecturaDeSesion = async () => {
+  throw new Error('el adaptador atado a `clienteConLog` no se cargo en el beforeAll');
+};
+
+/** El adaptador de produccion atado a `clienteConLog`, no al cliente global. */
+async function atarAdaptadorAlClienteConLog(): Promise<LecturaDeSesion> {
+  vi.resetModules();
+  vi.doMock('@/lib/shared/db/prisma', () => ({ prisma: clienteConLog }));
+  try {
+    const atado = await import('@/lib/shared/db/prisma');
+    if (atado.prisma !== clienteConLog) {
+      throw new Error('el doble de `@/lib/shared/db/prisma` no quedo en vigor');
+    }
+    const modulo = (await import(ADAPTER_PATH)) as { findActiveSessionUserById: LecturaDeSesion };
+    return modulo.findActiveSessionUserById;
+  } finally {
+    vi.doUnmock('@/lib/shared/db/prisma');
+  }
+}
+
+/**
+ * Corre el adaptador real y devuelve su resultado junto con las sentencias SQL que emitio. El
+ * `SELECT 1` previo deja la conexion abierta, para que nada de su arranque entre en la cuenta.
+ */
+async function medir(
+  id: string,
+  sid: string,
+): Promise<{ resultado: Awaited<ReturnType<LecturaDeSesion>>; sentencias: string[] }> {
+  await clienteConLog.$queryRaw`SELECT 1`;
+  sentenciasEmitidas = [];
+  const resultado = await adaptadorConLog(id, sid);
+  const sentencias = [...sentenciasEmitidas];
+  sentenciasEmitidas = [];
+  return { resultado, sentencias };
+}
+
 beforeAll(async () => {
+  adaptadorConLog = await atarAdaptadorAlClienteConLog();
+
   const rol = await prisma.role.create({
     data: { name: `qc8-session-${sufijo}`, description: 'Rol de prueba de QC-8' },
     select: { id: true },
@@ -151,6 +214,7 @@ afterAll(async () => {
     // QC-47: el orden es `users -> companies`; la FK hacia la empresa es `ON DELETE RESTRICT`.
     await prisma.role.deleteMany({ where: { id: { in: [rolId, rolAlternativoId] } } });
     await prisma.company.deleteMany({ where: { id: empresaId } });
+    await clienteConLog.$disconnect();
     await prisma.$disconnect();
   }
 });
@@ -199,24 +263,14 @@ describe('findActiveSessionUserById contra Postgres real', () => {
     }
   });
 
-  // QC-74 R11 — la condicion dura de `design.md > 4`: los permisos salen del MISMO `findFirst`.
-  // Se cuenta la unica via tipada que podria haber servido para una segunda ida a la base
-  // (`prisma.rolePermission.findMany`) ademas del contador de `findFirst`: si alguien resolviera
-  // los permisos aparte, uno de los dos contadores lo delata.
+  // QC-74 R11 — la condicion dura de `design.md > 4`: los permisos salen de la MISMA ida a la
+  // base. Se cuentan sentencias SQL emitidas, no llamadas a Prisma: si alguien resolviera los
+  // permisos aparte —por la API tipada o por otro raw— la cuenta pasaria de 1.
   it('trae los permisos del rol sin una segunda consulta', async () => {
-    const espiaUsuario = vi.spyOn(prisma.user, 'findFirst');
-    const espiaAsignaciones = vi.spyOn(prisma.rolePermission, 'findMany');
+    const { resultado, sentencias } = await medir(usuarioId, SID_SIN_CERRAR);
 
-    try {
-      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
-
-      expect(resultado?.permissions).toHaveLength(2);
-      expect(espiaUsuario).toHaveBeenCalledTimes(1);
-      expect(espiaAsignaciones).not.toHaveBeenCalled();
-    } finally {
-      espiaUsuario.mockRestore();
-      espiaAsignaciones.mockRestore();
-    }
+    expect(resultado?.permissions).toHaveLength(2);
+    expect(sentencias).toHaveLength(1);
   });
 
   it('un usuario con deleted_at con valor devuelve null', async () => {
@@ -277,16 +331,14 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       where: { id: usuarioId },
       data: { accountStatus: 'blocked', lockedUntil: plazo },
     });
-    const espia = vi.spyOn(prisma.user, 'findFirst');
 
     try {
-      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
+      const { resultado, sentencias } = await medir(usuarioId, SID_SIN_CERRAR);
 
       expect(resultado?.accountStatus).toBe('blocked');
       expect(resultado?.lockedUntil).toEqual(plazo);
-      expect(espia).toHaveBeenCalledTimes(1);
+      expect(sentencias).toHaveLength(1);
     } finally {
-      espia.mockRestore();
       await prisma.user.update({
         where: { id: usuarioId },
         data: { accountStatus: 'active', lockedUntil: null },
@@ -310,35 +362,96 @@ describe('findActiveSessionUserById contra Postgres real', () => {
         revokedAt: cerradaEn,
       },
     });
-    const espia = vi.spyOn(prisma.user, 'findFirst');
 
     try {
-      const cerrada = await findActiveSessionUserById(usuarioId, sidCerrado);
-      const otra = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
+      const cerrada = await medir(usuarioId, sidCerrado);
+      const otra = await medir(usuarioId, SID_SIN_CERRAR);
 
-      expect(cerrada?.sessionRevokedAt).toEqual(cerradaEn);
+      expect(cerrada.resultado?.sessionRevokedAt).toEqual(cerradaEn);
       // R20: cerrar UNA sesion no toca las demas de la misma persona.
-      expect(otra?.sessionRevokedAt).toBeNull();
-      expect(espia).toHaveBeenCalledTimes(2);
+      expect(otra.resultado?.sessionRevokedAt).toBeNull();
+      expect(cerrada.sentencias).toHaveLength(1);
+      expect(otra.sentencias).toHaveLength(1);
     } finally {
-      espia.mockRestore();
       await prisma.revokedSession.deleteMany({ where: { sessionId: sidCerrado } });
     }
   });
 
-  // QC-48 R13 — la condicion dura de `design.md > 4.1`: empresa y estado salen del MISMO
-  // `findFirst`. Si alguien anadiera una segunda ida a la base, este contador lo delata.
+  // QC-48 R13 — la condicion dura de `design.md > 4.1`: empresa y estado salen de la MISMA ida
+  // a la base. Si alguien anadiera una segunda sentencia, este contador lo delata.
   it('trae empresa y estado sin una segunda consulta', async () => {
-    const espia = vi.spyOn(prisma.user, 'findFirst');
+    const { resultado, sentencias } = await medir(usuarioId, SID_SIN_CERRAR);
+
+    expect(resultado?.companyId).toBe(empresaId);
+    expect(resultado?.companyDeletedAt).toBeNull();
+    expect(sentencias).toHaveLength(1);
+  });
+
+  // UNA SOLA SENTENCIA en cada forma de la fila, y el MISMO dato que lee el cliente global:
+  // empresa viva, sesion abierta, sesion cerrada, empresa de baja, rol sin permisos, usuario de
+  // baja e id inexistente. El caso sin empresa vive en el bloque del Maestro, mas abajo.
+  it('emite exactamente una sentencia SQL en cada forma de la fila y devuelve el mismo dato', async () => {
+    const sidCerrado = randomUUID();
+    const cerradaEn = new Date('2026-09-02T08:00:00.000Z');
+    const bajada = new Date('2026-09-03T08:00:00.000Z');
+
+    async function comprobar(caso: string, id: string, sid: string) {
+      const { resultado, sentencias } = await medir(id, sid);
+      expect(sentencias, caso).toHaveLength(1);
+      expect(sentencias[0], caso).toMatch(/\bFROM users u\b/);
+      // Mismo dato por las dos conexiones: la medida no cambia lo que se lee.
+      expect(resultado, caso).toEqual(await findActiveSessionUserById(id, sid));
+      return resultado;
+    }
+
+    await prisma.revokedSession.create({
+      data: {
+        sessionId: sidCerrado,
+        userId: usuarioId,
+        expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+        revokedAt: cerradaEn,
+      },
+    });
 
     try {
-      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
+      expect(await comprobar('empresa viva, sesion abierta', usuarioId, SID_SIN_CERRAR)).toMatchObject({
+        companyId: empresaId,
+        companyDeletedAt: null,
+        sessionRevokedAt: null,
+      });
 
-      expect(resultado?.companyId).toBe(empresaId);
-      expect(resultado?.companyDeletedAt).toBeNull();
-      expect(espia).toHaveBeenCalledTimes(1);
+      expect((await comprobar('sesion cerrada', usuarioId, sidCerrado))?.sessionRevokedAt).toEqual(
+        cerradaEn,
+      );
+
+      await prisma.company.update({ where: { id: empresaId }, data: { deletedAt: bajada } });
+      try {
+        expect(
+          (await comprobar('empresa de baja', usuarioId, SID_SIN_CERRAR))?.companyDeletedAt,
+        ).toEqual(bajada);
+      } finally {
+        await prisma.company.update({ where: { id: empresaId }, data: { deletedAt: null } });
+      }
+
+      await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolAlternativoId } });
+      try {
+        expect((await comprobar('rol sin permisos', usuarioId, SID_SIN_CERRAR))?.permissions).toEqual(
+          [],
+        );
+      } finally {
+        await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolId } });
+      }
+
+      await prisma.user.update({ where: { id: usuarioId }, data: { deletedAt: new Date() } });
+      try {
+        expect(await comprobar('usuario de baja', usuarioId, SID_SIN_CERRAR)).toBeNull();
+      } finally {
+        await prisma.user.update({ where: { id: usuarioId }, data: { deletedAt: null } });
+      }
+
+      expect(await comprobar('id inexistente', randomUUID(), SID_SIN_CERRAR)).toBeNull();
     } finally {
-      espia.mockRestore();
+      await prisma.revokedSession.deleteMany({ where: { sessionId: sidCerrado } });
     }
   });
 });
@@ -376,10 +489,9 @@ describe('findActiveSessionUserById sin empresa (QC-161)', () => {
 
   it('QC-161 R31: resuelve la ficha del Maestro sin empresa, con sus permisos, en una sola consulta', async () => {
     const maestro = await crearMaestro();
-    const espia = vi.spyOn(prisma.user, 'findFirst');
 
     try {
-      const resultado = await findActiveSessionUserById(maestro.id, SID_SIN_CERRAR);
+      const { resultado, sentencias } = await medir(maestro.id, SID_SIN_CERRAR);
 
       expect(resultado).toEqual({
         id: maestro.id,
@@ -398,9 +510,9 @@ describe('findActiveSessionUserById sin empresa (QC-161)', () => {
       expect(resultado?.permissions).toHaveLength(
         (SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? []).length,
       );
-      expect(espia).toHaveBeenCalledTimes(1);
+      // Sin empresa tambien es UNA sentencia: el `LEFT JOIN companies` no encuentra fila.
+      expect(sentencias).toHaveLength(1);
     } finally {
-      espia.mockRestore();
       await prisma.user.deleteMany({ where: { id: maestro.id } });
     }
   });

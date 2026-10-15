@@ -1,5 +1,6 @@
 import { errorMessage, type ErrorState } from '@/lib/modules/errores';
 import type {
+  FinishedDistributionLine,
   FinishedProductBatchRow,
   FinishedProductCostRow,
   FinishedProductDeliveriesPage,
@@ -199,6 +200,21 @@ export function finishedProductCostRow(overrides: Partial<FinishedProductCostRow
     unitCost: '2.5000',
     totalCost: '30.0000',
     createdAt: '2026-10-10T12:00:00.000Z',
+    ...overrides,
+  };
+}
+
+/** Linea del reparto empacada igual al plan. */
+export function finishedDistributionLine(
+  overrides: Partial<FinishedDistributionLine> = {},
+): FinishedDistributionLine {
+  return {
+    lineId: 'd0000000-0000-4000-8000-000000000281',
+    orderNumberText: FINISHED_ORDER_NUMBER,
+    plan: 12,
+    packedPackages: 12,
+    reason: null,
+    reasonOther: null,
     ...overrides,
   };
 }

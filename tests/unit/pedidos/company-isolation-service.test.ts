@@ -194,7 +194,8 @@ function almacen() {
   const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }))
   const releaseForOrder = vi.fn(async () => undefined)
   const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }))
-  const reservations = { syncForOrder, releaseForOrder, consumeForOrder }
+  const settlePackagingForOrder = vi.fn(async () => ({ kind: 'consumed' as const }))
+  const reservations = { syncForOrder, releaseForOrder, consumeForOrder, settlePackagingForOrder }
 
   const recipes = {
     findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) =>

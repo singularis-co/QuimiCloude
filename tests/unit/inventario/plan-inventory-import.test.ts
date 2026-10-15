@@ -102,9 +102,20 @@ describe('planInventoryImport — reglas de campo del alta manual', () => {
     expect(previewRow?.status === 'error' && previewRow.issues[0]?.message).toMatch(/^Existencia: /u);
   });
 
-  it('R10 sin ningun costo pide uno, una sola vez', () => {
-    const result = plan(sheet({ ...ROW_INSUMO, unitCost: '' }));
-    expect(codes(result.rows[0])).toEqual([['cost_required', 'unitCost']]);
+  it('R10 insumo, envase y terminado sin costo: un unico motivo value_required en «Costo unitario»', () => {
+    const result = plan(
+      sheet({ ...ROW_INSUMO, unitCost: '' }, { ...ROW_ENVASE, unitCost: '' }, { ...ROW_TERMINADO, unitCost: '  ' }),
+    );
+    for (const previewRow of result.rows) {
+      expect(codes(previewRow)).toEqual([['value_required', 'unitCost']]);
+    }
+    const first = result.rows[0];
+    expect(first?.status === 'error' && first.issues[0]?.message).toBe('Costo unitario: este campo es obligatorio para este tipo.');
+  });
+
+  it('R10 el instrumento sin costo es valido', () => {
+    const result = plan(sheet({ ...ROW_INSTRUMENTO, unitCost: '' }));
+    expect(result.rows[0]?.status).toBe('create');
   });
 
   it('R10 el instrumento no exige costo ni alerta, como en el alta manual', () => {
@@ -342,7 +353,7 @@ describe('planInventoryImport — producto terminado', () => {
     );
     expect(codes(result.rows[0])).toEqual([['stock_not_whole', 'stock']]);
     expect(codes(result.rows[1])).toEqual([['stock_not_whole', 'stock']]);
-    expect(codes(result.rows[2])).toEqual([['cost_required', 'unitCost']]);
+    expect(codes(result.rows[2])).toEqual([['value_required', 'unitCost']]);
   });
 
   it('R17 un insumo con el nombre derivado de un terminado que crea el archivo queda en error', () => {

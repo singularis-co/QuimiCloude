@@ -404,3 +404,57 @@ describe('QC-283 — Terminar anota en el registro de ejecucion', () => {
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('QC-281 — Terminar el acondicionamiento con envases reales', () => {
+  const CON_DATOS: FinishedBatchOfOrderLine = {
+    batchId: LOTE,
+    orderPresentationLineId: 'linea-1',
+    presentationId: 'pres-1',
+    lot: 'CR-2610-A',
+    expiryDate: '2027-04-30',
+    productionDate: '2026-10-01',
+  };
+
+  function resumenCon(lineas: readonly unknown[]) {
+    return [{ id: PEDIDO, number: { year: 2026, sequence: 7 }, conditionedBy: ANA, presentationLines: lineas }];
+  }
+
+  it('R23: una linea empacada con 0 envases no tiene lote y no bloquea Terminar', async () => {
+    const { deps, finishConditioningAliveById } = montar('ok', {
+      summaryItems: resumenCon([
+        { id: 'linea-1', presentationId: 'pres-1', packages: 2, packedPackages: 2, packagingName: null },
+        { id: 'linea-2', presentationId: 'pres-2', packages: 3, packedPackages: 0, packagingName: null },
+      ]),
+      batches: [CON_DATOS],
+    });
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+      numberText: '2026-0000007',
+    });
+    expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R23: un pedido con todas sus lineas en 0 termina sin pedir datos de lote', async () => {
+    const { deps, finishConditioningAliveById } = montar('ok', {
+      summaryItems: resumenCon([{ id: 'linea-1', presentationId: 'pres-1', packages: 2, packedPackages: 0, packagingName: null }]),
+      batches: [],
+    });
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+      numberText: '2026-0000007',
+    });
+    expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R25: una linea sin conteo guardado se lee con su plan y sin lote sigue bloqueando como hoy', async () => {
+    const { deps, finishConditioningAliveById } = montar('ok', {
+      summaryItems: resumenCon([{ id: 'linea-1', presentationId: 'pres-1', packages: 2, packedPackages: null, packagingName: null }]),
+      batches: [],
+    });
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      ConditioningBatchDataMissingError,
+    );
+    expect(finishConditioningAliveById).not.toHaveBeenCalled();
+  });
+});

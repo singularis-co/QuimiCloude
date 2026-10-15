@@ -48,6 +48,7 @@ const REGISTRO: FinishedProductRecord = {
   imagePath: null,
   qtyAlert: null,
   unitId: null,
+  recipeId: null,
   presentation: { id: FINISHED_PRESENTATION_ID, name: 'Botella 1 L', content: '1.0000', unitId: null },
   batches: [
     { id: LITER_BATCH_ID, lot: 'L-2026-0225', stock: '10.5000', packageContent: '1.0000' },

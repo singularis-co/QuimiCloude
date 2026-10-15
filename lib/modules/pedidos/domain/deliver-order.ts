@@ -18,6 +18,7 @@ import {
   type DeliveryAllocation,
 } from './order-delivery';
 import type { OrderScope } from './order-scope';
+import { effectivePackages } from './packing-count';
 import { assertTransition } from './order-transitions';
 
 import type { NewOrderDeliveryLine, OrderDeliveryRepository } from '../ports/order-delivery-repository';
@@ -134,7 +135,7 @@ async function deliverInTransaction(
   const check = checkDelivery(
     lines.map((line) => ({
       presentationLineId: line.id,
-      orderedPackages: line.packages,
+      orderedPackages: effectivePackages(line),
       deliveredPackages: delivered.get(line.id) ?? 0,
     })),
     null,

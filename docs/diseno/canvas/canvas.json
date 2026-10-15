@@ -574,7 +574,7 @@
   },
   "Acondicionamiento.dc.html": {
    "x": 0,
-   "y": 4740,
+   "y": 6320,
    "w": 1440,
    "h": 1000,
    "title": "Acondicionamiento",
@@ -584,7 +584,7 @@
   },
   "AcondicionamientoTablet.dc.html": {
    "x": 1520,
-   "y": 4740,
+   "y": 6320,
    "w": 904,
    "h": 1300,
    "title": "AcondicionamientoTablet",
@@ -593,7 +593,7 @@
   },
   "AcondicionamientoMovil.dc.html": {
    "x": 2504,
-   "y": 4740,
+   "y": 6320,
    "w": 960,
    "h": 1300,
    "title": "AcondicionamientoMovil",
@@ -602,16 +602,16 @@
   },
   "ModalesOperario.dc.html": {
    "x": 0,
-   "y": 6620,
+   "y": 8200,
    "w": 1440,
-   "h": 1900,
+   "h": 2300,
    "title": "ModalesOperario",
    "page": "operario",
    "is_interactive": true
   },
   "EvidenciaPaso.dc.html": {
    "x": 0,
-   "y": 8840,
+   "y": 10820,
    "w": 1440,
    "h": 1000,
    "title": "Evidencia por paso (QC-214)",
@@ -621,7 +621,7 @@
   },
   "EvidenciaPasoTablet.dc.html": {
    "x": 1520,
-   "y": 8840,
+   "y": 10820,
    "w": 904,
    "h": 1300,
    "title": "EvidenciaPasoTablet",
@@ -630,7 +630,7 @@
   },
   "EvidenciaPasoMovil.dc.html": {
    "x": 2504,
-   "y": 8840,
+   "y": 10820,
    "w": 960,
    "h": 1300,
    "title": "EvidenciaPasoMovil",
@@ -916,32 +916,6 @@
    "page": "fundamentos",
    "is_interactive": true
   },
-  "ProveedorIA.dc.html": {
-   "x": 0,
-   "y": 11740,
-   "w": 1440,
-   "h": 1100,
-   "title": "Proveedor IA (QC-275)",
-   "page": "configuracion",
-   "is_interactive": true,
-   "expand": "fill"
-  },
-  "ProveedorIATablet.dc.html": {
-   "x": 1520,
-   "y": 11740,
-   "w": 904,
-   "h": 1300,
-   "title": "ProveedorIATablet",
-   "page": "configuracion"
-  },
-  "ProveedorIAMovil.dc.html": {
-   "x": 2504,
-   "y": 11740,
-   "w": 960,
-   "h": 1300,
-   "title": "ProveedorIAMovil",
-   "page": "configuracion"
-  },
   "ProductoTerminado.dc.html": {
    "x": 0,
    "y": 8180,
@@ -1022,6 +996,96 @@
    "h": 1300,
    "title": "EntregaVariosClientesMovil",
    "page": "pedidos"
+  },
+  "ProveedorIA.dc.html": {
+   "x": 0,
+   "y": 11740,
+   "w": 1440,
+   "h": 1100,
+   "title": "Proveedor IA (QC-275)",
+   "page": "configuracion",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "ProveedorIATablet.dc.html": {
+   "x": 1520,
+   "y": 11740,
+   "w": 904,
+   "h": 1300,
+   "title": "ProveedorIATablet",
+   "page": "configuracion"
+  },
+  "ProveedorIAMovil.dc.html": {
+   "x": 2504,
+   "y": 11740,
+   "w": 960,
+   "h": 1300,
+   "title": "ProveedorIAMovil",
+   "page": "configuracion"
+  },
+  "EmpaqueTerminar.dc.html": {
+   "x": 0,
+   "y": 4740,
+   "w": 1440,
+   "h": 1000,
+   "title": "Terminar el empaque (QC-281)",
+   "page": "operario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "EmpaqueTerminarTablet.dc.html": {
+   "x": 1520,
+   "y": 4740,
+   "w": 904,
+   "h": 1300,
+   "title": "EmpaqueTerminarTablet",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "EmpaqueTerminarMovil.dc.html": {
+   "x": 2504,
+   "y": 4740,
+   "w": 960,
+   "h": 1300,
+   "title": "EmpaqueTerminarMovil",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "EmpaqueTerminarEstados.dc.html": {
+   "x": 3544,
+   "y": 3160,
+   "w": 2500,
+   "h": 3000,
+   "title": "Estados de Terminar el empaque (QC-281)",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "ProductoTerminadoReparto.dc.html": {
+   "x": 0,
+   "y": 11390,
+   "w": 1440,
+   "h": 1000,
+   "title": "Tab Reparto de producto terminado (QC-281)",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "ProductoTerminadoRepartoTablet.dc.html": {
+   "x": 1520,
+   "y": 11390,
+   "w": 904,
+   "h": 1300,
+   "title": "ProductoTerminadoRepartoTablet",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "ProductoTerminadoRepartoMovil.dc.html": {
+   "x": 2504,
+   "y": 11390,
+   "w": 960,
+   "h": 1300,
+   "title": "ProductoTerminadoRepartoMovil",
+   "page": "inventario",
+   "is_interactive": true
   }
  },
  "order": [
@@ -1082,6 +1146,10 @@
   "Empaque.dc.html",
   "EmpaqueTablet.dc.html",
   "EmpaqueMovil.dc.html",
+  "EmpaqueTerminar.dc.html",
+  "EmpaqueTerminarTablet.dc.html",
+  "EmpaqueTerminarMovil.dc.html",
+  "EmpaqueTerminarEstados.dc.html",
   "Acondicionamiento.dc.html",
   "AcondicionamientoTablet.dc.html",
   "AcondicionamientoMovil.dc.html",
@@ -1112,22 +1180,25 @@
   "IntegracionesTablet.dc.html",
   "IntegracionesMovil.dc.html",
   "ModalesConfiguracion.dc.html",
-  "CountrySelect.dc.html",
-  "ProveedorIA.dc.html",
-  "ProveedorIATablet.dc.html",
-  "ProveedorIAMovil.dc.html",
-  "ProductoTerminado.dc.html",
-  "ProductoTerminadoTablet.dc.html",
-  "ProductoTerminadoMovil.dc.html",
-  "PedidosPresentaciones.dc.html",
-  "PedidosPresentacionesTablet.dc.html",
-  "PedidosPresentacionesMovil.dc.html",
   "EvidenciaPaso.dc.html",
   "EvidenciaPasoTablet.dc.html",
   "EvidenciaPasoMovil.dc.html",
   "FormulaEvidencia.dc.html",
   "FormulaEvidenciaTablet.dc.html",
   "FormulaEvidenciaMovil.dc.html",
+  "CountrySelect.dc.html",
+  "ProductoTerminado.dc.html",
+  "ProductoTerminadoTablet.dc.html",
+  "ProductoTerminadoMovil.dc.html",
+  "PedidosPresentaciones.dc.html",
+  "PedidosPresentacionesTablet.dc.html",
+  "PedidosPresentacionesMovil.dc.html",
+  "ProveedorIA.dc.html",
+  "ProveedorIATablet.dc.html",
+  "ProveedorIAMovil.dc.html",
+  "ProductoTerminadoReparto.dc.html",
+  "ProductoTerminadoRepartoTablet.dc.html",
+  "ProductoTerminadoRepartoMovil.dc.html",
   "EntregaVariosClientes.dc.html",
   "EntregaVariosClientesTablet.dc.html",
   "EntregaVariosClientesMovil.dc.html"
@@ -1277,6 +1348,28 @@
    "maxW": 1440,
    "page": "inventario"
   },
+  "c_ProductoTerminado": {
+   "x": 0,
+   "y": 8070,
+   "text": "Ficha de producto terminado (QC-225)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "inventario"
+  },
+  "c_PedidosPresentaciones": {
+   "x": 0,
+   "y": 5990,
+   "text": "Presentaciones enlazadas a la ficha (QC-225)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "pedidos"
+  },
   "t_formulas": {
    "x": 0,
    "y": -300,
@@ -1380,7 +1473,7 @@
   },
   "c_Acondicionamiento": {
    "x": 0,
-   "y": 4630,
+   "y": 6210,
    "text": "Acondicionamiento  ·  escritorio · tablet · teléfono",
    "size": "l",
    "bold": true,
@@ -1391,7 +1484,7 @@
   },
   "tm_operario": {
    "x": 0,
-   "y": 6320,
+   "y": 7900,
    "text": "Modales del módulo",
    "kind": "title1",
    "maxW": 1440,
@@ -1399,7 +1492,7 @@
   },
   "c_EvidenciaPaso": {
    "x": 0,
-   "y": 8730,
+   "y": 10710,
    "text": "Evidencia por paso en Ejecución y Empaque (QC-214)  ·  escritorio · tablet · teléfono",
    "size": "l",
    "bold": true,
@@ -1550,27 +1643,38 @@
    "fill": "gray",
    "page": "configuracion"
   },
-  "c_ProductoTerminado": {
+  "c_EmpaqueTerminar": {
    "x": 0,
-   "y": 8070,
-   "text": "Ficha de producto terminado (QC-225)  ·  escritorio · tablet · teléfono",
+   "y": 4630,
+   "text": "Terminar el empaque con envases reales (QC-281)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "operario"
+  },
+  "c_EmpaqueTerminarEstados": {
+   "x": 3544,
+   "y": 3050,
+   "text": "¿Terminar el empaque? · todos los estados (QC-281)",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "operario"
+  },
+  "c_ProductoTerminadoReparto": {
+   "x": 0,
+   "y": 11280,
+   "text": "Producto terminado: tab «Reparto» con envases reales (QC-281)  ·  escritorio · tablet · teléfono",
    "size": "l",
    "bold": true,
    "w": 1400,
    "maxH": 70,
    "fill": "gray",
    "page": "inventario"
-  },
-  "c_PedidosPresentaciones": {
-   "x": 0,
-   "y": 5990,
-   "text": "Presentaciones enlazadas a la ficha (QC-225)  ·  escritorio · tablet · teléfono",
-   "size": "l",
-   "bold": true,
-   "w": 1400,
-   "maxH": 70,
-   "fill": "gray",
-   "page": "pedidos"
   }
  },
  "designSystems": [],

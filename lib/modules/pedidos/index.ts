@@ -180,6 +180,23 @@ export type { TransitionOrderDeps } from './domain/transition-order';
  *  `inventario`. `lib/composition` las cablea sobre el adaptador driven de `pedidos`. */
 export { createStartPacking, createFinishPacking } from './domain/order-packing';
 export type { StartPackingDeps, FinishPackingDeps } from './domain/order-packing';
+export {
+  PACKING_DIFFERENCE_REASONS,
+  PACKING_INCREASE_REASONS,
+  PACKING_REASON_OTHER_MAX,
+  checkPackingCounts,
+  effectivePackages,
+  maxPackagesForLine,
+  packedTotalInOrderUnit,
+} from './domain/packing-count';
+export type {
+  PackedDistributionLine,
+  PackedLineCount,
+  PackingCountCheck,
+  PackingDifferenceReason,
+  PackingLineError,
+  PackingPlanLine,
+} from './domain/packing-count';
 
 /** Implementan `OrderCatalog['startConditioningAliveById']` y `['finishConditioningAliveById']`:
  *  cada uno un `UPDATE` condicional, fuera de la unidad de trabajo de `inventario`. */

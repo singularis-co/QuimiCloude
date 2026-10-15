@@ -105,7 +105,7 @@ describe('R11 — solo TERMINADO, solo los que acondiciono el actor, filtrado en
           conditionedBy: ANA,
           finishedAt: terminado,
           unitId: null,
-          presentationLines: [{ presentationId: 'pres-1', packages: 3, packagingName: 'Garrafa' }],
+          presentationLines: [{ id: 'linea-1', presentationId: 'pres-1', packages: 3, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: 'Garrafa' }],
         }),
       ],
       refs: [receta()],
@@ -122,7 +122,7 @@ describe('R11 — solo TERMINADO, solo los que acondiciono el actor, filtrado en
       recipeName: 'Jabon liquido',
       quantity: '10.0000',
       presentationLines: [
-        { presentationId: 'pres-1', presentationName: 'Garrafa 5 L', packages: 3, packagingName: 'Garrafa' },
+        { lineId: 'linea-1', presentationId: 'pres-1', presentationName: 'Garrafa 5 L', packages: 3, packedPackages: null, packagingName: 'Garrafa' },
       ],
       unitId: null,
       unitLabel: null,

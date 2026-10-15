@@ -6,20 +6,25 @@ import {
   IMPORT_EXAMPLE_ROWS,
   IMPORT_TYPE_LABELS,
   INVENTORY_IMPORT_COLUMNS,
+  type ImportColumnKey,
+  type ImportColumnRule,
   type ImportRowType,
   type ImportTemplateValues,
 } from '@/lib/modules/inventario';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { cn } from '@/lib/utils';
 
+import { GUIDE_COLUMN_DESCRIPTIONS } from './import-guide-descriptions';
 import {
   GUIDE_COLUMN_HEADER,
   GUIDE_DESCRIPTION,
+  GUIDE_DESCRIPTION_HEADER,
   GUIDE_EXAMPLES_NOTE,
   GUIDE_EXAMPLES_TESTID,
   GUIDE_RULES_NOTES,
   GUIDE_RULES_TESTID,
   GUIDE_RULE_LABELS,
+  GUIDE_RULE_OPTIONAL_AUTO_LABEL,
   GUIDE_TABS,
   GUIDE_TESTID,
   GUIDE_TITLE,
@@ -37,6 +42,24 @@ const RULE_CLASS = {
   forbidden: 'text-muted-foreground/70 italic',
 } as const;
 
+/**
+ * Columnas que, vacias, rellena la propia importacion: el lote se genera al escribir y la fecha de
+ * compra toma la de hoy (`create-product.ts`, `import-finished-goods.ts`).
+ */
+const AUTO_FILLED_COLUMNS: ReadonlySet<ImportColumnKey> = new Set<ImportColumnKey>(['lot', 'purchaseDate']);
+
+function RuleLabel({ column, rule }: { readonly column: ImportColumnKey; readonly rule: ImportColumnRule }) {
+  if (rule !== 'optional' || !AUTO_FILLED_COLUMNS.has(column)) return <>{GUIDE_RULE_LABELS[rule]}</>;
+  return (
+    <span
+      className="inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-medium whitespace-normal text-primary"
+      data-auto-fill
+    >
+      {GUIDE_RULE_OPTIONAL_AUTO_LABEL}
+    </span>
+  );
+}
+
 /** Sale de la misma tabla de reglas que aplica la importacion: no hay una segunda copia que se desfase. */
 function RulesPanel() {
   return (
@@ -45,6 +68,7 @@ function RulesPanel() {
         <TableHeader>
           <TableRow>
             <TableHead>{GUIDE_COLUMN_HEADER}</TableHead>
+            <TableHead className="min-w-64">{GUIDE_DESCRIPTION_HEADER}</TableHead>
             {TYPES.map((type) => (
               <TableHead key={type}>{IMPORT_TYPE_LABELS[type]}</TableHead>
             ))}
@@ -54,11 +78,14 @@ function RulesPanel() {
           {INVENTORY_IMPORT_COLUMNS.map((column) => (
             <TableRow key={column.key}>
               <TableCell className="font-medium">{column.header}</TableCell>
+              <TableCell className="min-w-64 max-w-md whitespace-normal text-muted-foreground" data-description>
+                {GUIDE_COLUMN_DESCRIPTIONS[column.key]}
+              </TableCell>
               {TYPES.map((type) => {
                 const rule = column.rules[type];
                 return (
                   <TableCell key={type} className={RULE_CLASS[rule]} data-rule={rule}>
-                    {GUIDE_RULE_LABELS[rule]}
+                    <RuleLabel column={column.key} rule={rule} />
                   </TableCell>
                 );
               })}
@@ -78,7 +105,9 @@ function RulesPanel() {
 function ValueList({ title, items }: { readonly title: string; readonly items: readonly string[] }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-lg border p-3">
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <h3 className="-mx-3 -mt-3 mb-1 rounded-t-lg border-b bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+        {title}
+      </h3>
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground">{GUIDE_VALUES_EMPTY}</p>
       ) : (

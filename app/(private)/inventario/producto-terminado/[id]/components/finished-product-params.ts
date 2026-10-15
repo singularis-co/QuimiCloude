@@ -10,6 +10,7 @@ export const FINISHED_PRODUCT_TABS = [
   'salidas',
   'entregas',
   'costo',
+  'reparto',
 ] as const;
 
 export type FinishedProductTab = (typeof FINISHED_PRODUCT_TABS)[number];

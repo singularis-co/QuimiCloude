@@ -71,8 +71,8 @@ function entradaDeUnCliente(): DeliverOrderInput {
 }
 
 const LINEAS: readonly FinishPackingLine[] = [
-  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null },
-  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null },
+  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null },
+  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null },
 ]
 
 /** Pedidos 4 + 10; entregados 4 + 3: a la segunda linea le faltan 7. */
@@ -703,7 +703,7 @@ const GALLON_PRESENTATION = 'f0000000-0000-4000-8000-000000000003'
 /** Las de QC-223 mas el galon: pedidos 5, ninguno entregado. */
 const LINEAS_VARIOS: readonly FinishPackingLine[] = [
   ...LINEAS,
-  { id: SECOND_PENDING_LINE_ID, presentationId: GALLON_PRESENTATION, packages: 5, presentationContent: '4.0000', packagingProductId: null },
+  { id: SECOND_PENDING_LINE_ID, presentationId: GALLON_PRESENTATION, packages: 5, presentationContent: '4.0000', packagingProductId: null, packedPackages: null },
 ]
 
 type Bloque = DeliverOrderInput['customers'][number]
@@ -1032,5 +1032,82 @@ describe('QC-282 deliverOrder — clave ya registrada con varios clientes', () =
     await expect(createDeliverOrder(m.deps)(deliverInput(), ENTREGADOR)).resolves.toEqual({ status: 'already_registered', orderStatus: 'TERMINADO' })
     expect(m.lanzoDentro(), 'la senal tiene que deshacer la transaccion').not.toBeNull()
     nadaEscrito(m)
+  })
+})
+
+// 2026-10-15 (merge con QC-281): las entradas de estos casos pasan a la forma de QC-282, un
+// solo cliente en `customers`; lo que prueban (el tope sale de los envases reales) no cambia.
+describe('QC-281 — deliverOrder con los envases reales del empaque', () => {
+  /** Plan 4 + 10; reales: la primera sin conteo (linea antigua, cuenta el plan) y la segunda 7. */
+  const CON_REALES: readonly FinishPackingLine[] = [
+    { ...LINEAS[0]!, packedPackages: null },
+    { ...LINEAS[1]!, packedPackages: 7 },
+  ]
+
+  it('R24: lo que falta de una linea con menos reales sale del real y entregarlo completa el pedido', async () => {
+    const m = montar({ lineas: CON_REALES })
+    const entrada = deliverInput({
+      customers: [clienteA([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 4 }])],
+    })
+
+    await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).resolves.toEqual({
+      status: 'delivered',
+      orderStatus: 'ENTREGADO',
+    })
+    expect(m.tx.orders.setStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
+  })
+
+  it('R24: entregar mas de lo que falta segun el real es delivery_exceeds_remaining aunque el plan lo admitiria', async () => {
+    const m = montar({ lineas: CON_REALES })
+    const entrada = deliverInput({
+      customers: [clienteA([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 5 }])],
+    })
+
+    const error = await createDeliverOrder(m.deps)(entrada, ENTREGADOR).then(
+      () => null,
+      (e: unknown) => e,
+    )
+    expect((error as PedidosError).code).toBe('delivery_exceeds_remaining')
+    nadaEscrito(m)
+  })
+
+  it('R24: una linea con 0 envases reales no pide nada: el pedido se completa sin ella y no admite envases', async () => {
+    const lineas: readonly FinishPackingLine[] = [
+      { ...LINEAS[0]!, packedPackages: 0 },
+      { ...LINEAS[1]!, packedPackages: 7 },
+    ]
+    const sinEntregas = new Map([[PENDING_LINE_ID, 3]])
+
+    const completa = montar({ lineas, entregados: sinEntregas })
+    await expect(
+      createDeliverOrder(completa.deps)(
+        deliverInput({ customers: [clienteA([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 4 }])] }),
+        ENTREGADOR,
+      ),
+    ).resolves.toEqual({ status: 'delivered', orderStatus: 'ENTREGADO' })
+
+    const aCero = montar({ lineas, entregados: sinEntregas })
+    const error = await createDeliverOrder(aCero.deps)(
+      deliverInput({ customers: [clienteA([{ presentationLineId: COMPLETE_LINE_ID, batchId: OLDER_BATCH_ID, packages: 1 }])] }),
+      ENTREGADOR,
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    )
+    expect((error as PedidosError).code).toBe('delivery_exceeds_remaining')
+    nadaEscrito(aCero)
+  })
+
+  it('R25: una linea sin conteo real guardado usa el plan: entregar lo que el real habria cerrado deja el pedido TERMINADO', async () => {
+    const m = montar({ lineas: LINEAS })
+    const entrada = deliverInput({
+      customers: [clienteA([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 4 }])],
+    })
+
+    await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).resolves.toEqual({
+      status: 'delivered',
+      orderStatus: 'TERMINADO',
+    })
+    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
   })
 })

@@ -206,7 +206,7 @@ describe('el motivo depende del sentido de la diferencia', () => {
     await abrirDialogo(user);
     await escribirTotal(user, '12');
 
-    expect(await opcionesDeMotivo(user)).toEqual(['Conteo fisico', 'Error de carga']);
+    expect(await opcionesDeMotivo(user)).toEqual(['Conteo físico', 'Error de carga']);
   });
 
   it('R4 — en una disminucion se ofrecen los cuatro motivos', async () => {
@@ -219,7 +219,7 @@ describe('el motivo depende del sentido de la diferencia', () => {
     expect(await opcionesDeMotivo(user)).toEqual([
       'Merma',
       'Rotura',
-      'Conteo fisico',
+      'Conteo físico',
       'Error de carga',
     ]);
   });
@@ -261,10 +261,10 @@ describe('el motivo depende del sentido de la diferencia', () => {
 
     await abrirDialogo(user);
     await escribirTotal(user, '8');
-    await elegirMotivo(user, 'Conteo fisico');
+    await elegirMotivo(user, 'Conteo físico');
     await escribirTotal(user, '12');
 
-    expect(screen.getByTestId('adjust-batch-reason')).toHaveTextContent('Conteo fisico');
+    expect(screen.getByTestId('adjust-batch-reason')).toHaveTextContent('Conteo físico');
   });
 
   it('sin motivo, muestra el mensaje y NO invoca la action', async () => {
@@ -373,7 +373,7 @@ describe('el envio y la respuesta del servidor', () => {
 
     await abrirDialogo(user);
     await escribirTotal(user, '12');
-    await elegirMotivo(user, 'Conteo fisico');
+    await elegirMotivo(user, 'Conteo físico');
     await user.click(screen.getByTestId('adjust-batch-confirm'));
 
     const aviso = await screen.findByTestId('adjust-batch-error');
@@ -429,7 +429,7 @@ describe('rechazo por existencia cambiada', () => {
     expect(diferencia).toHaveAttribute('data-direction', 'increase');
     // Merma no vale para un aumento: queda sin elegir y las opciones son las del aumento.
     expect(screen.getByTestId('adjust-batch-reason')).not.toHaveTextContent('Merma');
-    expect(await opcionesDeMotivo(user)).toEqual(['Conteo fisico', 'Error de carga']);
+    expect(await opcionesDeMotivo(user)).toEqual(['Conteo físico', 'Error de carga']);
 
     expect(adjustBatchStockActionMock).toHaveBeenCalledTimes(1);
     expect(toastExito).not.toHaveBeenCalled();
@@ -456,7 +456,7 @@ describe('rechazo por existencia cambiada', () => {
     render(<AdjustBatchDialog batch={lote()} canAdjust />);
 
     await confirmarConExistenciaCambiada(user);
-    await elegirMotivo(user, 'Conteo fisico');
+    await elegirMotivo(user, 'Conteo físico');
     await user.click(screen.getByTestId('adjust-batch-confirm'));
 
     await waitFor(() => expect(adjustBatchStockActionMock).toHaveBeenCalledTimes(2));

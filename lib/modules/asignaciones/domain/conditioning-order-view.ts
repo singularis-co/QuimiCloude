@@ -15,7 +15,12 @@ import type { OrderDistributionLineView } from './order-distribution-view';
 import type { ConditioningTeamMemberRow } from '../ports/conditioning-team-repository';
 
 import type { FinishedBatchOfOrderLine } from '@/lib/modules/inventario';
-import { formatOrderNumber, type AssignedOrderSummary, type OrderStatus } from '@/lib/modules/pedidos';
+import {
+  effectivePackages,
+  formatOrderNumber,
+  type AssignedOrderSummary,
+  type OrderStatus,
+} from '@/lib/modules/pedidos';
 
 export type ConditioningOrderRow = {
   readonly id: string;
@@ -27,7 +32,8 @@ export type ConditioningOrderRow = {
   /** La unidad de `quantity`; los dos `null` = pedido sin unidad, la cifra va sola. */
   readonly unitId: string | null;
   readonly unitLabel: string | null;
-  /** El reparto completo en orden de alta; vacio = sin reparto. */
+  /** El reparto completo en orden de alta; vacio = sin reparto. `packages` son los envases
+   *  reales: los contados al terminar el empaque o, sin conteo, los del plan. */
   readonly presentationLines: readonly OrderDistributionLineView[];
   readonly status: OrderStatus;
   /** Los dos `null` en `POR_ACONDICIONAR`: todavia nadie lo acondiciona. */
@@ -166,7 +172,10 @@ async function composeConditioningOrderRowsWithNames(
       quantity: order.quantity,
       unitId: order.unitId,
       unitLabel: rowComposed?.unitLabel ?? null,
-      presentationLines: rowComposed?.presentationLines ?? [],
+      presentationLines: (rowComposed?.presentationLines ?? []).map((line) => ({
+        ...line,
+        packages: effectivePackages(line),
+      })),
       status: order.status,
       conditionedByName: order.conditionedBy === null ? null : (names.get(order.conditionedBy) ?? order.conditionedBy),
       conditionedById: order.conditionedBy,

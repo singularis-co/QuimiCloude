@@ -68,6 +68,7 @@ export async function findAliveFinishedProduct(
       imagePath: true,
       qtyAlert: true,
       unitId: true,
+      recipeId: true,
       presentationId: true,
       batches: {
         where: batchCompanyScope(scope),
@@ -92,6 +93,7 @@ export async function findAliveFinishedProduct(
     imagePath: product.imagePath,
     qtyAlert: decimalOrNull(product.qtyAlert),
     unitId: product.unitId,
+    recipeId: product.recipeId,
     presentation:
       presentation === null
         ? null

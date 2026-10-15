@@ -82,7 +82,7 @@ const DATE_RULE = 'no es una fecha valida (AAAA-MM-DD o DD/MM/AAAA).';
 
 const ISSUE_TEXT: Readonly<Record<ImportRowIssueCode, string>> = {
   type_invalid: 'debe ser Insumo, Envase, Instrumento o Producto terminado.',
-  value_required: 'es obligatoria para este tipo.',
+  value_required: 'este campo es obligatorio para este tipo.',
   name_too_long: `admite hasta ${PRODUCT_NAME_MAX_LENGTH} caracteres.`,
   unit_not_found: 'la unidad no existe en la empresa.',
   unit_ambiguous: 'coincide con mas de una unidad; escribe su nombre completo.',
@@ -93,7 +93,6 @@ const ISSUE_TEXT: Readonly<Record<ImportRowIssueCode, string>> = {
   finished_product_homonym: 'ya existe un producto terminado con ese nombre.',
   stock_invalid: `debe ser un numero mayor o igual que 0, ${NUMBER_RULE}.`,
   stock_not_whole: 'debe ser un numero entero de envases.',
-  cost_required: 'indica el costo unitario o el costo total.',
   cost_invalid: `debe ser un importe mayor que 0, ${NUMBER_RULE}.`,
   total_cost_too_low: 'es demasiado bajo para esa existencia: el costo unitario quedaria en 0.',
   qty_alert_invalid: `debe ser un numero mayor o igual que 0, ${NUMBER_RULE}.`,
@@ -271,11 +270,12 @@ function addSchemaIssue(field: string, type: ImportRowType, values: RowValues, i
       else issues.add('stock_invalid', 'stock', STOCK_ZERO_FOR_TOTAL);
       return;
     }
-    // Sin «Costo total» en el archivo, todo rechazo de costo cae en «Costo unitario».
+    // Sin «Costo total» en el archivo, todo rechazo de costo cae en «Costo unitario». La celda
+    // vacia ya la nombro `checkRequired` con `value_required` (el contrato la exige al tipo): el
+    // esquema, que tambien la rechaza, no suma un segundo motivo para la misma columna.
     case 'unitCost':
     case 'totalCost':
-      if (values.unitCost === null) issues.add('cost_required', 'unitCost');
-      else issues.add('cost_invalid', 'unitCost');
+      issues.add(values.unitCost === null ? 'value_required' : 'cost_invalid', 'unitCost');
       return;
     case 'qtyAlert':
       issues.add(values.qtyAlert.trim() === '' ? 'value_required' : 'qty_alert_invalid', 'qtyAlert');

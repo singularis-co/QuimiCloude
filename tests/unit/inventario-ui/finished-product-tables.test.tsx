@@ -6,17 +6,25 @@ import {
   FinishedProductBatchesTable,
   FinishedProductCostsTable,
   FinishedProductDeliveriesTable,
+  FinishedProductDistributionTable,
   FinishedProductListSection,
   FinishedProductMovementsTable,
+  OTHER_REASON_LABEL,
+  PACKED_BEFORE_COUNT_LABEL,
   PAGE_PARAM,
   PAGE_SIZE_PARAM,
   TAB_PARAM,
+  WITHOUT_BATCH_LABEL,
   WITHOUT_ORDER_LABEL,
   finishedProductListEmptyTestId,
   finishedProductListErrorTestId,
   type FinishedProductListTab,
 } from '@/app/(private)/inventario/producto-terminado/[id]/components';
-import { MOVEMENT_REASONS, type MovementReason } from '@/lib/modules/inventario';
+import {
+  MOVEMENT_REASONS,
+  type FinishedDistributionLine,
+  type MovementReason,
+} from '@/lib/modules/inventario';
 import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import {
@@ -30,9 +38,11 @@ import {
   UNPACKAGED_BATCH_ROW,
   VOIDED_DELIVERY_ROW,
   finishedProductBatchRow,
+  finishedDistributionLine,
   finishedProductCostRow,
   finishedProductDeliveriesPage,
   finishedProductDeliveryRow,
+  finishedProductDetail,
   finishedProductPage,
 } from '../../fixtures/finished-product-detail';
 import { setupUser } from '../../helpers/user-event';
@@ -43,6 +53,7 @@ const {
   listMovementsMock,
   listDeliveriesMock,
   listCostsMock,
+  listDistributionMock,
 } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
@@ -56,6 +67,7 @@ const {
   listMovementsMock: vi.fn(),
   listDeliveriesMock: vi.fn(),
   listCostsMock: vi.fn(),
+  listDistributionMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -69,6 +81,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', ()
   listFinishedProductMovementsAction: listMovementsMock,
   listFinishedProductDeliveriesAction: listDeliveriesMock,
   listFinishedProductCostsAction: listCostsMock,
+  listFinishedProductDistributionAction: listDistributionMock,
   listProducedProductsAction: vi.fn(),
 }));
 
@@ -461,6 +474,123 @@ describe('Costo de produccion', () => {
   });
 });
 
+describe('Reparto', () => {
+  const PRESENTATION = finishedProductDetail().presentation;
+  const MINUS = '−';
+
+  function renderDistribution(lines: readonly Partial<FinishedDistributionLine>[]) {
+    const rows = lines.map((overrides) => finishedDistributionLine(overrides));
+    render(
+      <FinishedProductDistributionTable
+        productId={FINISHED_PRODUCT_ID}
+        page={finishedProductPage(rows)}
+        presentation={PRESENTATION}
+        reasonLabels={REASON_LABELS}
+      />,
+    );
+  }
+
+  it('R26 — columnas Pedido, Presentación, Plan, Envases reales, Diferencia y Motivo, sin acciones', () => {
+    renderDistribution([{}]);
+
+    const headers = screen.getAllByRole('columnheader').map((th) => th.textContent);
+    for (const label of ['Pedido', 'Presentación', 'Plan', 'Envases reales', 'Diferencia', 'Motivo']) {
+      expect(headers.some((text) => text?.includes(label)), label).toBe(true);
+    }
+    const fila = rowOf(finishedDistributionLine().lineId);
+    expect(cell(fila, 'finished-product-distribution-row')).toHaveTextContent(FINISHED_ORDER_NUMBER);
+    expect(cell(fila, 'finished-product-distribution-presentation')).toHaveTextContent('Botella 1 L 1 L');
+    expect(within(fila).queryByRole('button')).toBeNull();
+    expect(within(fila).queryByRole('link')).toBeNull();
+  });
+
+  it('R27 — igual al plan: «—» en Diferencia y Motivo, sin nota', () => {
+    renderDistribution([{}]);
+    const fila = rowOf(finishedDistributionLine().lineId);
+
+    expect(cell(fila, 'finished-product-distribution-plan')).toHaveTextContent('12');
+    expect(cell(fila, 'finished-product-distribution-packed')).toHaveTextContent('12');
+    expect(cell(fila, 'finished-product-distribution-difference')).toHaveTextContent(EMPTY_MARK);
+    expect(cell(fila, 'finished-product-distribution-reason')).toHaveTextContent(EMPTY_MARK);
+    expect(within(fila).queryByTestId('finished-product-distribution-reason-note')).toBeNull();
+  });
+
+  it('R27 — menos envases: «−N» y el motivo; más envases: «+N» y el motivo', () => {
+    renderDistribution([
+      { lineId: 'menos', plan: 16, packedPackages: 15, reason: 'rotura' },
+      { lineId: 'mas', plan: 12, packedPackages: 13, reason: 'conteo_fisico' },
+    ]);
+
+    const menos = rowOf('menos');
+    expect(cell(menos, 'finished-product-distribution-packed')).toHaveTextContent('15');
+    expect(cell(menos, 'finished-product-distribution-difference')).toHaveTextContent(`${MINUS}1`);
+    expect(cell(menos, 'finished-product-distribution-reason')).toHaveTextContent(REASON_LABELS.rotura);
+
+    const mas = rowOf('mas');
+    expect(cell(mas, 'finished-product-distribution-difference')).toHaveTextContent('+1');
+    expect(cell(mas, 'finished-product-distribution-reason')).toHaveTextContent(REASON_LABELS.conteo_fisico);
+  });
+
+  it('R27 — «Otro» lleva el texto escrito entre comillas bajo el motivo', () => {
+    const texto = 'Se cayó la caja al pasarla a la estiba.';
+    renderDistribution([{ lineId: 'otro', plan: 6, packedPackages: 5, reason: 'otro', reasonOther: texto }]);
+
+    const motivo = cell(rowOf('otro'), 'finished-product-distribution-reason');
+    expect(motivo).toHaveTextContent(OTHER_REASON_LABEL);
+    expect(within(motivo).getByTestId('finished-product-distribution-reason-note')).toHaveTextContent(
+      `«${texto}»`,
+    );
+  });
+
+  it('R27 — 0 envases reales: «−N» y «Sin lote», también junto al texto de «Otro»', () => {
+    renderDistribution([
+      { lineId: 'cero', plan: 6, packedPackages: 0, reason: 'merma' },
+      { lineId: 'cero-otro', plan: 6, packedPackages: 0, reason: 'otro', reasonOther: 'Se cayó' },
+    ]);
+
+    const cero = rowOf('cero');
+    expect(cell(cero, 'finished-product-distribution-packed')).toHaveTextContent('0');
+    expect(cell(cero, 'finished-product-distribution-difference')).toHaveTextContent(`${MINUS}6`);
+    expect(cell(cero, 'finished-product-distribution-reason')).toHaveTextContent(REASON_LABELS.merma);
+    expect(cell(cero, 'finished-product-distribution-reason-note')).toHaveTextContent(WITHOUT_BATCH_LABEL);
+
+    expect(cell(rowOf('cero-otro'), 'finished-product-distribution-reason-note')).toHaveTextContent(
+      `«Se cayó» · ${WITHOUT_BATCH_LABEL}`,
+    );
+  });
+
+  it('R27 — sin conteo guardado: envases reales = plan, «—» y «Empacado antes de QC-281»', () => {
+    renderDistribution([{ lineId: 'antiguo', plan: 10, packedPackages: null }]);
+    const fila = rowOf('antiguo');
+
+    expect(cell(fila, 'finished-product-distribution-packed')).toHaveTextContent('10');
+    expect(cell(fila, 'finished-product-distribution-difference')).toHaveTextContent(EMPTY_MARK);
+    expect(cell(fila, 'finished-product-distribution-reason')).toHaveTextContent(EMPTY_MARK);
+    expect(cell(fila, 'finished-product-distribution-reason-note')).toHaveTextContent(
+      PACKED_BEFORE_COUNT_LABEL,
+    );
+  });
+
+  it('R26 — la paginación de Reparto navega con su tab y su tamaño 10 o 25', async () => {
+    const user = setupUser();
+    render(
+      <FinishedProductDistributionTable
+        productId={FINISHED_PRODUCT_ID}
+        page={finishedProductPage([finishedDistributionLine()], { total: 30, pageSize: 25, totalPages: 2 })}
+        presentation={PRESENTATION}
+        reasonLabels={REASON_LABELS}
+      />,
+    );
+
+    await user.click(screen.getByTestId('data-table-next'));
+
+    const url = new URL(routerMock.push.mock.calls[0][0], 'http://local');
+    expect(url.searchParams.get(TAB_PARAM)).toBe('reparto');
+    expect(url.searchParams.get(PAGE_PARAM)).toBe('2');
+    expect(url.searchParams.get(PAGE_SIZE_PARAM)).toBe('25');
+  });
+});
+
 describe('Listados', () => {
   it('R23 — la paginacion navega cambiando page, con su tab y su tamaño', async () => {
     const user = setupUser();
@@ -482,10 +612,23 @@ describe('Listados', () => {
     expect(url.searchParams.get(PAGE_SIZE_PARAM)).toBe('10');
   });
 
-  const TABS: readonly FinishedProductListTab[] = ['lotes', 'entradas', 'salidas', 'entregas', 'costo'];
+  const TABS: readonly FinishedProductListTab[] = [
+    'lotes',
+    'entradas',
+    'salidas',
+    'entregas',
+    'costo',
+    'reparto',
+  ];
 
   function mockAll(value: unknown) {
-    for (const mock of [listBatchesMock, listMovementsMock, listDeliveriesMock, listCostsMock]) {
+    for (const mock of [
+      listBatchesMock,
+      listMovementsMock,
+      listDeliveriesMock,
+      listCostsMock,
+      listDistributionMock,
+    ]) {
       mock.mockResolvedValue(value);
     }
   }
@@ -496,11 +639,12 @@ describe('Listados', () => {
       tab,
       paging: { page, pageSize: 10 },
       unitLabel: UNIT,
+      presentation: finishedProductDetail().presentation,
     });
     return render(<>{tree}</>);
   }
 
-  it('R24 — cada tab sin filas muestra su estado vacio propio, distinto del error', async () => {
+  it('R24, R28 — cada tab sin filas muestra su estado vacio propio, distinto del error', async () => {
     const vacios = new Set<string>();
 
     for (const tab of TABS) {
@@ -521,7 +665,7 @@ describe('Listados', () => {
     expect(vacios.size).toBe(TABS.length);
   });
 
-  it('R24 — cada tab en error muestra su estado de error, no el vacio', async () => {
+  it('R24, R28 — cada tab en error muestra su estado de error, no el vacio', async () => {
     for (const tab of TABS) {
       mockAll(FINISHED_PRODUCT_ERROR_STATES.invalidInput);
       await renderSection(tab);
@@ -567,5 +711,45 @@ describe('Listados', () => {
     expect(cell(rowOf(FINISHED_OUT_MOVEMENTS[0].id), 'finished-product-movement-reason')).toHaveTextContent(
       'Merma',
     );
+  });
+
+  it('R28 — Reparto: vacío con su texto, error «No se pudo cargar el reparto.» con «Reintentar»', async () => {
+    mockAll({ status: 'success', data: finishedProductPage([], { total: 0, totalPages: 0 }) });
+    await renderSection('reparto');
+    expect(screen.getByTestId(finishedProductListEmptyTestId('reparto'))).toHaveTextContent(
+      'Ningún pedido empacado tiene este producto.',
+    );
+    cleanup();
+
+    mockAll(FINISHED_PRODUCT_ERROR_STATES.unauthorized);
+    await renderSection('reparto');
+    expect(screen.getByTestId(finishedProductListErrorTestId('reparto'))).toHaveTextContent(
+      'No se pudo cargar el reparto.',
+    );
+    expect(screen.getByTestId(`${finishedProductListErrorTestId('reparto')}-retry`)).toHaveTextContent(
+      'Reintentar',
+    );
+  });
+
+  it('R28 — Reparto: una página pasada del final ofrece volver a la primera', async () => {
+    mockAll({ status: 'success', data: finishedProductPage([], { total: 3, page: 4, totalPages: 1 }) });
+    await renderSection('reparto', 4);
+
+    expect(screen.getByTestId(finishedProductListEmptyTestId('reparto'))).toHaveTextContent(
+      'Esta página ya no tiene filas.',
+    );
+    const enlace = screen.getByTestId(`${finishedProductListEmptyTestId('reparto')}-first-page`);
+    const url = new URL(enlace.getAttribute('href') as string, 'http://local');
+    expect(url.searchParams.get(TAB_PARAM)).toBe('reparto');
+    expect(url.searchParams.get(PAGE_PARAM)).toBe('1');
+  });
+
+  it('R26 — la sección de Reparto pide solo su listado, con la página', async () => {
+    mockAll({ status: 'success', data: finishedProductPage([finishedDistributionLine()]) });
+    await renderSection('reparto', 2);
+
+    expect(listDistributionMock).toHaveBeenCalledWith(FINISHED_PRODUCT_ID, { page: 2, pageSize: 10 });
+    expect(listCostsMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('finished-product-reparto')).toBeInTheDocument();
   });
 });

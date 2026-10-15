@@ -145,6 +145,7 @@ misma transacción que da de alta el producto terminado, los envases que el pedi
 SI el disponible no alcanza para consumirlos todos, ENTONCES DEBE rechazar Terminar con
 `insufficient_material` sin mover el estado ni dar de alta producto terminado `[D2]` `[D4]` `[P3]`.
 *(Acotado por la Enmienda 1: no se aplica a lo que R43 deja sin consumir.)*
+*(Desde QC-281 R18, el error es `packaging_stock_insufficient`.)*
 
 **R26.** CUANDO un pedido pase a `POR_EMPACAR`, el sistema DEBE consumir sus materias primas como
 hoy y NO DEBE consumir sus envases `[P3]`. *(Enmienda 1: un envase que fuera también ingrediente
