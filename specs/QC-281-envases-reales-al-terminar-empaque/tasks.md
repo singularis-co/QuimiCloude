@@ -88,7 +88,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   real; línea en 0 no pide nada; línea antigua usa el plan.
 - **Hecho:** tests verdes. (R24, R25)
 
-## T9 [P] — Diálogo y pantalla del empacador (depende de T6, T7)
+## [x] T9 [P] — Diálogo y pantalla del empacador (depende de T6, T7)
 - `packing-finish-dialog.tsx` nuevo (`design.md § 6`, tablero `EmpaqueTerminar*.dc.html`): textos
   del tablero en `PACKING_FINISH_DIALOG_TEXTS`, estados `igual`, `diferencia`, `otro`, `tope`,
   `stock`, `cero`, `sinMotivo`, responsive y animaciones de la ficha.
