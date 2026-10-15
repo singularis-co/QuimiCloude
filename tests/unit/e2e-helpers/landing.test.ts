@@ -1,17 +1,28 @@
 // QC-93 T4 — el helper de aterrizaje de los E2E (R2, R3, R4, R5).
 // QC-277 T18 — el helper usa el permiso efectivo (rol recortado por los añadidos) y `homeHrefFor`
 // (R20); nace `enableAllAddons`.
+// QC-277 T28 — los interruptores son excepciones en `company_addon_overrides` (D14, P7).
 //
 // La base se mockea: aqui se prueba la regla y la forma de la consulta. Que la consulta devuelva
 // lo sembrado de verdad lo cierra la corrida E2E real.
-const { findFirstMock, companyUpdateMock } = vi.hoisted(() => ({
+const { findFirstMock, overrideUpsertMock, transactionMock } = vi.hoisted(() => ({
   findFirstMock: vi.fn(),
-  companyUpdateMock: vi.fn(),
+  overrideUpsertMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock('@/lib/shared/db/prisma', () => ({
-  prisma: { user: { findFirst: findFirstMock }, company: { update: companyUpdateMock } },
+  prisma: {
+    user: { findFirst: findFirstMock },
+    companyAddonOverride: { upsert: overrideUpsertMock },
+    $transaction: transactionMock,
+  },
 }));
+
+/** La empresa como la devuelve el `select`: solo las excepciones prendidas, por su clave. */
+function companyWith(addons: readonly string[]): { addonOverrides: { addonKey: string }[] } {
+  return { addonOverrides: addons.map((addonKey) => ({ addonKey })) };
+}
 
 import { enableAllAddons } from '@/e2e/helpers/addons';
 import {
@@ -75,7 +86,7 @@ describe('QC-93 — permissionsForUsername lee los permisos del usuario vivo en 
           { permissionCode: 'asignaciones.consultar' },
         ],
       },
-      company: { addons: [] },
+      company: companyWith([]),
     });
 
     await expect(permissionsForUsername('qc93_operador')).resolves.toEqual([
@@ -98,7 +109,7 @@ describe('QC-93 — permissionsForUsername lee los permisos del usuario vivo en 
   it('deriva el destino esperado de los permisos que devuelve la base (R4)', async () => {
     findFirstMock.mockResolvedValue({
       role: { permissions: [{ permissionCode: 'inventario.consultar' }] },
-      company: { addons: [] },
+      company: companyWith([]),
     });
 
     await expect(expectedLandingRoute('qc93_operador')).resolves.toBe(INVENTORY_ROUTE);
@@ -114,20 +125,24 @@ describe('QC-277 — el aterrizaje E2E usa el permiso efectivo: rol recortado po
     findFirstMock.mockReset();
   });
 
-  it('pide en la misma consulta los interruptores de la empresa del usuario (R20)', async () => {
-    findFirstMock.mockResolvedValue({ role: { permissions: [] }, company: { addons: [] } });
+  it('pide en la misma consulta solo las excepciones prendidas de la empresa del usuario (R20)', async () => {
+    findFirstMock.mockResolvedValue({ role: { permissions: [] }, company: companyWith([]) });
 
     await permissionsForUsername('qc277_admin');
 
     expect(findFirstMock.mock.calls[0]?.[0]).toMatchObject({
-      select: { company: { select: { addons: true } } },
+      select: {
+        company: {
+          select: { addonOverrides: { where: { enabled: true }, select: { addonKey: true } } },
+        },
+      },
     });
   });
 
   it('aterriza en /inventario a un Administrador cuya empresa no tiene añadidos (R20, hecho de T18)', async () => {
     findFirstMock.mockResolvedValue({
       role: { permissions: seedRoleRows(ROLE_ADMINISTRADOR) },
-      company: { addons: [] },
+      company: companyWith([]),
     });
 
     const permissions = await permissionsForUsername('qc277_admin');
@@ -141,7 +156,7 @@ describe('QC-277 — el aterrizaje E2E usa el permiso efectivo: rol recortado po
   it('aterriza en el dashboard a un Administrador cuya empresa tiene todos los añadidos (R20)', async () => {
     findFirstMock.mockResolvedValue({
       role: { permissions: seedRoleRows(ROLE_ADMINISTRADOR) },
-      company: { addons: [...ADDONS] },
+      company: companyWith(ADDONS),
     });
 
     await expect(permissionsForUsername('qc277_admin')).resolves.toEqual(
@@ -158,7 +173,7 @@ describe('QC-277 — el aterrizaje E2E usa el permiso efectivo: rol recortado po
           { permissionCode: 'inventario.consultar' },
         ],
       },
-      company: { addons: ['lectura_pdf'] },
+      company: companyWith(['lectura_pdf']),
     });
 
     await expect(permissionsForUsername('qc277_admin')).resolves.toEqual(['inventario.consultar']);
@@ -182,19 +197,27 @@ describe('QC-277 — el aterrizaje E2E usa el permiso efectivo: rol recortado po
   });
 });
 
-describe('QC-277 — enableAllAddons prende los cinco añadidos a la empresa de fixture (R20)', () => {
+describe('QC-277 — enableAllAddons prende los cinco añadidos a la empresa de fixture (R20, P7)', () => {
   beforeEach(() => {
-    companyUpdateMock.mockReset();
-    companyUpdateMock.mockResolvedValue({});
+    overrideUpsertMock.mockReset();
+    overrideUpsertMock.mockImplementation((args: unknown) => args);
+    transactionMock.mockReset();
+    transactionMock.mockResolvedValue([]);
   });
 
-  it('guarda todos los interruptores en la empresa indicada y en ninguna otra', async () => {
-    await enableAllAddons('00000000-0000-0000-0000-000000000277');
+  it('hace upsert de una excepcion prendida por añadido, sin autor, en la empresa indicada y en una transaccion', async () => {
+    const companyId = '00000000-0000-0000-0000-000000000277';
+    await enableAllAddons(companyId);
 
-    expect(companyUpdateMock).toHaveBeenCalledTimes(1);
-    expect(companyUpdateMock).toHaveBeenCalledWith({
-      where: { id: '00000000-0000-0000-0000-000000000277' },
-      data: { addons: [...ADDONS] },
-    });
+    expect(overrideUpsertMock).toHaveBeenCalledTimes(ADDONS.length);
+    for (const addonKey of ADDONS) {
+      expect(overrideUpsertMock).toHaveBeenCalledWith({
+        where: { companyId_addonKey: { companyId, addonKey } },
+        create: { companyId, addonKey, enabled: true },
+        update: { enabled: true },
+      });
+    }
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(transactionMock.mock.calls[0]?.[0]).toHaveLength(ADDONS.length);
   });
 });

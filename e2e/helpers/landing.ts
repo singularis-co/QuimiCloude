@@ -30,7 +30,8 @@ export function landingRouteForPermissions(permissions: readonly string[]): stri
 
 /**
  * Los permisos EFECTIVOS del usuario VIVO con ese username, leidos de la base: usuario -> rol ->
- * `role_permissions` (R4), recortados por los añadidos activos de su empresa (QC-277 R20). De la
+ * `role_permissions` (R4), recortados por los añadidos activos de su empresa (QC-277 R20): sus
+ * excepciones con `enabled = true` en `company_addon_overrides`. De la
  * base y no del catalogo del seed, porque hay fixtures con roles efimeros que el seed no conoce.
  *
  * El recorte es el mismo que hace la sesion (`resolve-session.ts`): sin empresa (el Maestro) los
@@ -44,7 +45,9 @@ export async function permissionsForUsername(username: string): Promise<readonly
     where: { username, deletedAt: null },
     select: {
       role: { select: { permissions: { select: { permissionCode: true } } } },
-      company: { select: { addons: true } },
+      company: {
+        select: { addonOverrides: { where: { enabled: true }, select: { addonKey: true } } },
+      },
     },
   });
 
@@ -56,7 +59,8 @@ export async function permissionsForUsername(username: string): Promise<readonly
 
   const rolePermissions = user.role.permissions.map((permission) => permission.permissionCode);
   if (user.company === null) return rolePermissions;
-  return effectivePermissions(rolePermissions, effectiveAddons(user.company.addons));
+  const stored = user.company.addonOverrides.map((override) => override.addonKey);
+  return effectivePermissions(rolePermissions, effectiveAddons(stored));
 }
 
 /** El destino esperado para ese usuario: sus permisos efectivos pasados por la regla del login. */

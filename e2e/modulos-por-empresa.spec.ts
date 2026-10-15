@@ -11,7 +11,12 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test, type Page, type Response } from '@playwright/test';
 
-import { type Addon, normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
+import {
+  ADDONS,
+  type Addon,
+  normalizeCompanyName,
+  ROLE_ADMINISTRADOR,
+} from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
 import {
@@ -56,9 +61,23 @@ let companyId: string | null = null;
 let adminUsername = '';
 let adminPassword = '';
 
+/**
+ * Deja prendidos exactamente `addons`: una excepción por cada uno de los cinco, `enabled = true` si
+ * está en la lista y `false` si no (apagar no borra la fila). Sin autor, como el fixture (P7).
+ */
 async function setAddons(addons: readonly Addon[]): Promise<void> {
   if (!companyId) throw new Error('el fixture no existe: fallo el beforeAll');
-  await prisma.company.update({ where: { id: companyId }, data: { addons: [...addons] } });
+  const id = companyId;
+  await prisma.$transaction(
+    ADDONS.map((addonKey) => {
+      const enabled = addons.includes(addonKey);
+      return prisma.companyAddonOverride.upsert({
+        where: { companyId_addonKey: { companyId: id, addonKey } },
+        create: { companyId: id, addonKey, enabled },
+        update: { enabled },
+      });
+    }),
+  );
 }
 
 /** El logo apunta a `/inicio`, y lo que cuenta es dónde acaba quien lo pulsa. */
@@ -108,9 +127,9 @@ test.beforeAll(async () => {
   const companyName = `${token}_c`;
   const company = await prisma.company.create({
     data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
-    select: { id: true, addons: true },
+    select: { id: true, _count: { select: { addonOverrides: true } } },
   });
-  if (company.addons.length !== 0) {
+  if (company._count.addonOverrides !== 0) {
     throw new Error('una empresa nueva debe nacer sin añadidos');
   }
   companyId = company.id;
