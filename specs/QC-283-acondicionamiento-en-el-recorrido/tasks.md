@@ -14,7 +14,7 @@
 
 ## Tanda 0 — Contratos (secuencial: T1 → T2 → T3; desbloquea las tandas 1A y 1B)
 
-### T1 — Esquema, migraciones y tipos de escritura · backend_dev · R7, R8, R9, R33, R34
+### [x] T1 — Esquema, migraciones y tipos de escritura · backend_dev · R7, R8, R9, R33, R34
 
 **Hacer:**
 

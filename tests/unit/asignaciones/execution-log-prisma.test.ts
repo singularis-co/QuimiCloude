@@ -18,6 +18,7 @@ import {
   createExecutionLogRepository,
 } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma'
 import { withExecutionTransaction } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-transaction-prisma'
+import type { ConditioningBatchSnapshotLine } from '@/lib/modules/asignaciones/domain/conditioning-trace'
 import { EXECUTION_ACTIONS, type NewExecutionEntry } from '@/lib/modules/asignaciones/domain/execution-entry'
 
 const COMPANY = '11111111-1111-4111-8111-111111111111'
@@ -39,20 +40,44 @@ function clienteDoble() {
   return { db, create, findFirst }
 }
 
+const BATCH = '44444444-4444-4444-8444-444444444444'
+const PRESENTATION = '55555555-5555-4555-8555-555555555555'
+
+const FOTO: readonly ConditioningBatchSnapshotLine[] = [
+  {
+    batchId: BATCH,
+    presentationId: PRESENTATION,
+    presentationName: 'Frasco 1 L',
+    lot: 'L-2026-001',
+    expiryDate: '2027-10-14',
+    productionDate: '2026-10-14',
+  },
+]
+
 function entradaDe(action: (typeof EXECUTION_ACTIONS)[number]): NewExecutionEntry {
   if (action === 'cancel') return { ...base, action, stepPosition: 2, reason: 'sin material' }
-  if (action === 'pack_start' || action === 'pack_finish') return { ...base, action, stepPosition: null }
+  if (action === 'conditioning_batch_save') return { ...base, action, stepPosition: null, batchLines: FOTO }
+  if (
+    action === 'pack_start' ||
+    action === 'pack_finish' ||
+    action === 'conditioning_start' ||
+    action === 'conditioning_finish'
+  ) {
+    return { ...base, action, stepPosition: null }
+  }
   return { ...base, action, stepPosition: 3 }
 }
 
+// Enmendado el 2026-10-14 (QC-283): el enum gana las tres acciones del acondicionamiento; el mapa
+// pasa de ocho a once pares y sigue cubriendo exactamente el dominio y el enum.
 describe('execution-log-prisma: el mapa al enum (R1)', () => {
-  it('R1: el mapa tiene exactamente ocho pares, uno por accion del dominio', () => {
-    expect(Object.keys(EXECUTION_ACTION_TO_PRISMA)).toHaveLength(8)
+  it('R1: el mapa tiene exactamente once pares, uno por accion del dominio', () => {
+    expect(Object.keys(EXECUTION_ACTION_TO_PRISMA)).toHaveLength(11)
     expect(Object.keys(EXECUTION_ACTION_TO_PRISMA).sort()).toEqual([...EXECUTION_ACTIONS].sort())
   })
 
-  it('R1: los ocho valores del mapa son los ocho del enum de Prisma, sin repetir', () => {
-    expect(new Set(Object.values(EXECUTION_ACTION_TO_PRISMA)).size).toBe(8)
+  it('R1: los once valores del mapa son los once del enum de Prisma, sin repetir', () => {
+    expect(new Set(Object.values(EXECUTION_ACTION_TO_PRISMA)).size).toBe(11)
     expect(Object.values(EXECUTION_ACTION_TO_PRISMA).sort()).toEqual(
       [...Object.values(OrderExecutionAction)].sort(),
     )
@@ -141,9 +166,9 @@ describe('execution-log-prisma: el mapa inverso del enum (QC-167 T4a)', () => {
     expect(EXECUTION_ACTION_TO_PRISMA[action]).toBe(value)
   })
 
-  it('R14: el mapa inverso tiene exactamente ocho pares', () => {
+  it('R14: el mapa inverso tiene exactamente once pares', () => {
     expect(Object.keys(EXECUTION_ACTION_FROM_PRISMA).sort()).toEqual([...Object.values(OrderExecutionAction)].sort())
-    expect(new Set(Object.values(EXECUTION_ACTION_FROM_PRISMA)).size).toBe(8)
+    expect(new Set(Object.values(EXECUTION_ACTION_FROM_PRISMA)).size).toBe(11)
   })
 
   it('R14: el inverso se deriva del mapa de ida, no se escribe a mano', () => {
@@ -194,11 +219,29 @@ describe('execution-log-prisma: las tres lecturas', () => {
   it('R23: listEntriesForOrders filtra por empresa, ordena por pedido, instante e id y traduce la accion', async () => {
     const { db, findMany } = clienteDeLectura()
     findMany.mockResolvedValue([
-      { id: 'e1', orderId: ORDER, userId: USER, action: 'GO_BACK', stepPosition: 2, reason: null, occurredAt: NOW },
+      {
+        id: 'e1',
+        orderId: ORDER,
+        userId: USER,
+        action: 'GO_BACK',
+        stepPosition: 2,
+        reason: null,
+        batchLines: null,
+        occurredAt: NOW,
+      },
     ])
     const entries = await createExecutionLogRepository(db).listEntriesForOrders(COMPANY, [ORDER])
     expect(entries).toEqual([
-      { id: 'e1', orderId: ORDER, userId: USER, action: 'go_back', stepPosition: 2, reason: null, occurredAt: NOW },
+      {
+        id: 'e1',
+        orderId: ORDER,
+        userId: USER,
+        action: 'go_back',
+        stepPosition: 2,
+        reason: null,
+        batchLines: null,
+        occurredAt: NOW,
+      },
     ])
     expect(findMany.mock.calls[0][0]).toMatchObject({
       where: { companyId: COMPANY, orderId: { in: [ORDER] } },
@@ -211,6 +254,82 @@ describe('execution-log-prisma: las tres lecturas', () => {
     groupBy.mockResolvedValue([{ userId: USER }])
     await expect(createExecutionLogRepository(db).listUserIdsWithEntries(COMPANY)).resolves.toEqual([USER])
     expect(groupBy).toHaveBeenCalledWith({ by: ['userId'], where: { companyId: COMPANY } })
+  })
+})
+
+describe('execution-log-prisma: la foto del guardado de lote', () => {
+  const fila = (batchLines: unknown) => ({
+    id: 'e9',
+    orderId: ORDER,
+    userId: USER,
+    action: 'CONDITIONING_BATCH_SAVE',
+    stepPosition: null,
+    reason: null,
+    batchLines,
+    occurredAt: NOW,
+  })
+
+  it('R7: conditioning_batch_save escribe su foto en batchLines, sin posicion ni motivo', async () => {
+    const { db, create } = clienteDoble()
+    await createExecutionLogRepository(db).append(entradaDe('conditioning_batch_save'))
+    expect(create.mock.calls[0][0].data).toMatchObject({
+      action: 'CONDITIONING_BATCH_SAVE',
+      stepPosition: null,
+      reason: null,
+      batchLines: FOTO,
+    })
+  })
+
+  it.each(['conditioning_start', 'conditioning_finish', 'pack_start', 'advance', 'cancel'] as const)(
+    'R7: %s no manda batchLines, asi que la columna queda en NULL',
+    async (action) => {
+      const { db, create } = clienteDoble()
+      await createExecutionLogRepository(db).append(entradaDe(action))
+      expect(create.mock.calls[0][0].data).not.toHaveProperty('batchLines')
+    },
+  )
+
+  it('R33: append valida la foto con zod y no escribe una corrupta ni una vacia', async () => {
+    const { db, create } = clienteDoble()
+    const repo = createExecutionLogRepository(db)
+    const corrupta = [{ ...FOTO[0], expiryDate: '14/10/2027' }] as unknown as readonly ConditioningBatchSnapshotLine[]
+    await expect(
+      repo.append({ ...base, action: 'conditioning_batch_save', stepPosition: null, batchLines: corrupta }),
+    ).rejects.toThrow()
+    await expect(
+      repo.append({ ...base, action: 'conditioning_batch_save', stepPosition: null, batchLines: [] }),
+    ).rejects.toThrow()
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('R33: listEntriesForOrders selecciona batchLines y devuelve la foto validada', async () => {
+    const { db, findMany } = clienteDeLectura()
+    findMany.mockResolvedValue([fila(FOTO)])
+    const entries = await createExecutionLogRepository(db).listEntriesForOrders(COMPANY, [ORDER])
+    expect(findMany.mock.calls[0][0].select).toMatchObject({ batchLines: true })
+    expect(entries[0]).toMatchObject({ action: 'conditioning_batch_save', batchLines: FOTO })
+  })
+
+  it.each([
+    ['un objeto en vez de un array', { ...FOTO[0] }],
+    ['un array vacio', []],
+    ['un campo de mas', [{ ...FOTO[0], quantity: 3 }]],
+    ['un campo de menos', [{ ...FOTO[0], productionDate: undefined }]],
+    ['una fecha que no es AAAA-MM-DD', [{ ...FOTO[0], expiryDate: '14/10/2027' }]],
+    ['un batchId que no es uuid', [{ ...FOTO[0], batchId: 'lote-1' }]],
+    ['un lote vacio', [{ ...FOTO[0], lot: '' }]],
+  ])('R33: foto corrupta lanza al leer (%s)', async (_caso, batchLines) => {
+    const { db, findMany } = clienteDeLectura()
+    findMany.mockResolvedValue([fila(batchLines)])
+    await expect(createExecutionLogRepository(db).listEntriesForOrders(COMPANY, [ORDER])).rejects.toThrow(/e9/)
+  })
+
+  it('R33: una foto con presentationName null es valida', async () => {
+    const { db, findMany } = clienteDeLectura()
+    const sinNombre = [{ ...FOTO[0], presentationName: null }]
+    findMany.mockResolvedValue([fila(sinNombre)])
+    const entries = await createExecutionLogRepository(db).listEntriesForOrders(COMPANY, [ORDER])
+    expect(entries[0]?.batchLines).toEqual(sinNombre)
   })
 })
 

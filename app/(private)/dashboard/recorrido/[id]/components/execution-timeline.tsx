@@ -1,5 +1,15 @@
 import type { LucideIcon } from 'lucide-react';
-import { ArrowRight, Ban, CircleCheck, Package, Play, RotateCcw } from 'lucide-react';
+import {
+  ArrowRight,
+  Ban,
+  CircleCheck,
+  ClipboardCheck,
+  ClipboardList,
+  Download,
+  Package,
+  Play,
+  RotateCcw,
+} from 'lucide-react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
@@ -34,6 +44,9 @@ export const EXECUTION_TIMELINE_ACTIONS: Record<
   finish: { tone: 'success', icon: CircleCheck },
   pack_finish: { tone: 'success', icon: Package },
   cancel: { tone: 'danger', icon: Ban },
+  conditioning_start: { tone: 'progress', icon: ClipboardList },
+  conditioning_batch_save: { tone: 'neutral', icon: Download },
+  conditioning_finish: { tone: 'success', icon: ClipboardCheck },
 };
 
 const DOT_TONE_CLASS: Record<TimelineTone, string> = {

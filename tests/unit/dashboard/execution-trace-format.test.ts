@@ -65,7 +65,8 @@ describe('R13 - instantes, acciones y estados', () => {
     expect(formatTraceInstant(new Date('2026-10-07T23:05:09.123Z'))).toBe('2026-10-07 23:05:09');
   });
 
-  it('R13 - las ocho acciones tienen su etiqueta en espanol', () => {
+  // Enmendado el 2026-10-14 (QC-283): las tres acciones del acondicionamiento ganan su etiqueta.
+  it('R13 - las once acciones tienen su etiqueta en espanol', () => {
     expect(EXECUTION_ACTION_LABELS).toEqual({
       start: 'Arrancar',
       resume: 'Retomar',
@@ -75,6 +76,9 @@ describe('R13 - instantes, acciones y estados', () => {
       finish: 'Finalizar',
       pack_start: 'Comenzar empaque',
       pack_finish: 'Terminar empaque',
+      conditioning_start: 'Comenzar acondicionamiento',
+      conditioning_batch_save: 'Guardado de datos de lote',
+      conditioning_finish: 'Terminar acondicionamiento',
     });
   });
 

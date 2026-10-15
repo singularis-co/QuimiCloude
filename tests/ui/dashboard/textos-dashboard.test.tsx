@@ -116,6 +116,9 @@ const TEXTOS = {
     finish: 'Finalizar',
     pack_start: 'Comenzar empaque',
     pack_finish: 'Terminar empaque',
+    conditioning_start: 'Comenzar acondicionamiento',
+    conditioning_batch_save: 'Guardado de datos de lote',
+    conditioning_finish: 'Terminar acondicionamiento',
   } satisfies Record<ExecutionAction, string>,
   noEncontrada: {
     etiqueta: '404',
@@ -209,6 +212,7 @@ function step(
     userDisplayName: 'Ana Ruiz',
     stepPosition: 1,
     reason: null,
+    batchLines: null,
     occurredAt: new Date('2026-10-07T08:00:00.000Z'),
     gapToNextMs: 5 * MIN,
     isGoBack: false,
@@ -384,13 +388,18 @@ describe('R21 - textos del recorrido', () => {
     );
   });
 
+  // Enmendado el 2026-10-14 (QC-283): `TEXTOS.acciones` gana las tres del acondicionamiento, que
+  // este recorrido no anota; se comparan las ocho que si pinta.
   it('R21 - las ocho acciones dicen «Arrancar», «Retomar», «Avanzar», «Retroceder», «Cancelar», «Finalizar», «Comenzar empaque», «Terminar empaque»', () => {
     render(<ExecutionTraceDetail trace={TRACE} backHref={BACK_HREF} />);
     const vistas = screen
       .getAllByTestId('execution-trace-step-action')
       .map((nodo) => nodo.textContent)
       .sort();
-    expect(vistas).toEqual(Object.values(TEXTOS.acciones).sort());
+    const ocho = (['start', 'resume', 'advance', 'go_back', 'cancel', 'finish', 'pack_start', 'pack_finish'] as const).map(
+      (accion) => TEXTOS.acciones[accion],
+    );
+    expect(vistas).toEqual(ocho.sort());
   });
 
   it('R21 - las marcas del recorrido dicen «En curso», «Dado de baja» y «Vuelta atrás»', () => {

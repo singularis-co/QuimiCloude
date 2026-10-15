@@ -116,11 +116,13 @@ describe('NewExecutionEntry: el empaque va sin posicion (R5bis)', () => {
   })
 })
 
-describe('ExecutionAction: total sobre las ocho del enum (R1)', () => {
-  it('R1: el dominio declara exactamente ocho acciones, y el enum de Prisma tambien', () => {
-    expect(EXECUTION_ACTIONS).toHaveLength(8)
-    expect(new Set(EXECUTION_ACTIONS).size).toBe(8)
-    expect(Object.values(OrderExecutionAction)).toHaveLength(8)
+// Enmendado el 2026-10-14 (QC-283): el enum gana las tres acciones del acondicionamiento; de ocho
+// pasan a once. El dominio y el enum de Prisma siguen teniendo exactamente las mismas.
+describe('ExecutionAction: total sobre las once del enum (R1)', () => {
+  it('R1: el dominio declara exactamente once acciones, y el enum de Prisma tambien', () => {
+    expect(EXECUTION_ACTIONS).toHaveLength(11)
+    expect(new Set(EXECUTION_ACTIONS).size).toBe(11)
+    expect(Object.values(OrderExecutionAction)).toHaveLength(11)
   })
 
   it.each(EXECUTION_ACTIONS)('R1: la accion %s tiene su valor en el enum de Prisma', (action) => {
@@ -132,7 +134,7 @@ describe('ExecutionAction: total sobre las ocho del enum (R1)', () => {
     expect([...Object.values(OrderExecutionAction)].sort()).toEqual(delDominio)
   })
 
-  it('R1: `ExecutionAction` es la union de las ocho, ni una mas', () => {
+  it('R1: `ExecutionAction` es la union de las once, ni una mas', () => {
     const exhaustivo = (a: ExecutionAction): number => {
       switch (a) {
         case 'start':
@@ -143,6 +145,9 @@ describe('ExecutionAction: total sobre las ocho del enum (R1)', () => {
         case 'finish':
         case 'pack_start':
         case 'pack_finish':
+        case 'conditioning_start':
+        case 'conditioning_batch_save':
+        case 'conditioning_finish':
           return 1
         default: {
           const nunca: never = a
@@ -150,7 +155,7 @@ describe('ExecutionAction: total sobre las ocho del enum (R1)', () => {
         }
       }
     }
-    expect(EXECUTION_ACTIONS.map(exhaustivo)).toHaveLength(8)
+    expect(EXECUTION_ACTIONS.map(exhaustivo)).toHaveLength(11)
   })
 })
 

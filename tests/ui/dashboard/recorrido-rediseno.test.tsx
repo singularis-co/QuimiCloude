@@ -40,6 +40,7 @@ function step(overrides: Partial<ExecutionTraceDetailStep> & Pick<ExecutionTrace
     userDisplayName: 'Ana Ruiz',
     stepPosition: 1,
     reason: null,
+    batchLines: null,
     occurredAt: new Date('2026-10-07T08:00:00.000Z'),
     gapToNextMs: 5 * MIN,
     isGoBack: false,

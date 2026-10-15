@@ -2,6 +2,7 @@ import type { OrderExecutionAction, Prisma, PrismaClient } from '@prisma/client'
 
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { conditioningBatchSnapshotSchema, type ConditioningBatchSnapshotLine } from '../../../domain/conditioning-trace';
 import type { ExecutionAction, ExecutionEntryRecord, NewExecutionEntry } from '../../../domain/execution-entry';
 import type { ExecutedOrdersFilter, ExecutionLogRepository } from '../../../ports/execution-log-repository';
 
@@ -16,6 +17,9 @@ export const EXECUTION_ACTION_TO_PRISMA = {
   finish: 'FINISH',
   pack_start: 'PACK_START',
   pack_finish: 'PACK_FINISH',
+  conditioning_start: 'CONDITIONING_START',
+  conditioning_batch_save: 'CONDITIONING_BATCH_SAVE',
+  conditioning_finish: 'CONDITIONING_FINISH',
 } as const satisfies Record<ExecutionAction, OrderExecutionAction>;
 
 function invertActionMap(): Readonly<Record<OrderExecutionAction, ExecutionAction>> {
@@ -31,10 +35,23 @@ function invertActionMap(): Readonly<Record<OrderExecutionAction, ExecutionActio
 
 export const EXECUTION_ACTION_FROM_PRISMA = invertActionMap();
 
+function parseBatchLines(entryId: string, value: Prisma.JsonValue): readonly ConditioningBatchSnapshotLine[] {
+  const parsed = conditioningBatchSnapshotSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error(`la foto de lote de la anotacion ${entryId} no tiene la forma esperada: ${parsed.error.message}`);
+  }
+  return parsed.data;
+}
+
 /** Fabrica y no objeto ya construido: dentro de una transaccion tiene que escribir por su `tx`. */
 export function createExecutionLogRepository(db: PrismaLike = prisma): ExecutionLogRepository {
   return {
     async append(entry: NewExecutionEntry): Promise<void> {
+      // Las demas acciones no mandan la columna: queda en NULL, como exige su CHECK.
+      const snapshot =
+        entry.action === 'conditioning_batch_save'
+          ? { batchLines: conditioningBatchSnapshotSchema.parse(entry.batchLines) }
+          : {};
       await db.orderExecutionEntry.create({
         data: {
           companyId: entry.companyId,
@@ -43,6 +60,7 @@ export function createExecutionLogRepository(db: PrismaLike = prisma): Execution
           action: EXECUTION_ACTION_TO_PRISMA[entry.action],
           stepPosition: entry.stepPosition,
           reason: entry.action === 'cancel' ? entry.reason : null,
+          ...snapshot,
           // Explicito: la anotacion lleva el mismo instante que el resto de la operacion.
           occurredAt: entry.occurredAt,
         },
@@ -85,10 +103,15 @@ export function createExecutionLogRepository(db: PrismaLike = prisma): Execution
           action: true,
           stepPosition: true,
           reason: true,
+          batchLines: true,
           occurredAt: true,
         },
       });
-      return rows.map((row) => ({ ...row, action: EXECUTION_ACTION_FROM_PRISMA[row.action] }));
+      return rows.map((row) => ({
+        ...row,
+        action: EXECUTION_ACTION_FROM_PRISMA[row.action],
+        batchLines: row.batchLines === null ? null : parseBatchLines(row.id, row.batchLines),
+      }));
     },
 
     async listUserIdsWithEntries(companyId: string): Promise<readonly string[]> {

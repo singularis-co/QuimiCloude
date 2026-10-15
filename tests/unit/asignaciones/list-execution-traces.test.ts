@@ -52,6 +52,7 @@ function anotacion(
     action,
     stepPosition: action === 'pack_start' || action === 'pack_finish' ? null : 1,
     reason: action === 'cancel' ? 'sin material' : null,
+    batchLines: null,
     occurredAt: new Date(T0 + offsetMin * MIN),
   };
 }
