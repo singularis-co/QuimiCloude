@@ -288,3 +288,55 @@ describe('ProductBatchesPanel', () => {
     expect(document.querySelector('[class*="hover:"][class*="hidden"]')).toBeNull();
   });
 });
+
+describe('resaltado de vencimiento en el panel de lotes (hoy = 2026-10-15)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function vencimiento(id: string) {
+    return within(screen.getByTestId(`product-batch-${id}`)).getByTestId('product-batch-expiry-date');
+  }
+
+  it('rojo bajo 30 dias, dias relativos siempre y chip «Vencido» solo en el vencido, incluso sin existencia', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 15, 12, 0, 0));
+    render(
+      <ProductBatchesPanel
+        batches={[
+          lote({ id: 'vencido', stock: '0', expiryDate: '2026-10-12' }),
+          lote({ id: 'ayer', expiryDate: '2026-10-14' }),
+          lote({ id: 'hoy', expiryDate: '2026-10-15' }),
+          lote({ id: 'manana', expiryDate: '2026-10-16' }),
+          lote({ id: 'cerca', expiryDate: '2026-11-04' }),
+          lote({ id: 'lejos', expiryDate: '2027-01-13' }),
+        ]}
+      />,
+    );
+
+    expect(vencimiento('vencido')).toHaveTextContent('2026-10-12 (venció hace 3 días)');
+    expect(vencimiento('vencido')).toHaveAttribute('data-expiring', 'true');
+    expect(vencimiento('vencido')).toHaveAttribute('data-expired', 'true');
+    expect(vencimiento('vencido')).toHaveClass('text-destructive');
+    const chip = within(vencimiento('vencido')).getByTestId('product-batch-expired');
+    expect(chip).toHaveTextContent('Vencido');
+    expect(chip).toHaveAttribute('data-tone', 'danger');
+
+    const relativo = (id: string) =>
+      within(vencimiento(id)).getByTestId('product-batch-expiry-relative');
+    expect(relativo('ayer')).toHaveTextContent('(venció hace 1 día)');
+    expect(relativo('hoy')).toHaveTextContent('(vence hoy)');
+    expect(relativo('manana')).toHaveTextContent('(vence en 1 día)');
+    expect(relativo('cerca')).toHaveTextContent('(vence en 20 días)');
+    expect(relativo('lejos')).toHaveTextContent('(vence en 90 días)');
+
+    expect(vencimiento('cerca')).toHaveAttribute('data-expiring', 'true');
+    expect(vencimiento('cerca')).toHaveClass('text-destructive');
+    expect(vencimiento('lejos')).not.toHaveAttribute('data-expiring');
+    expect(vencimiento('lejos')).not.toHaveClass('text-destructive');
+    for (const id of ['hoy', 'manana', 'cerca', 'lejos']) {
+      expect(vencimiento(id)).not.toHaveAttribute('data-expired');
+      expect(within(vencimiento(id)).queryByTestId('product-batch-expired')).toBeNull();
+    }
+  });
+});

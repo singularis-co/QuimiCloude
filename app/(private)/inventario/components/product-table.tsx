@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import {
   useMemo,
   useState,
-  useSyncExternalStore,
   useTransition,
   type ReactNode,
 } from 'react';
@@ -19,9 +18,9 @@ import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import type { ProductBatchView, ProductView } from '@/lib/modules/inventario';
 import { listAliveProductBatchesAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
-import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
 
-import { isExpiringSoon } from './expiry-warning';
+import { useLocalToday } from './expiry-date';
+import { daysUntil, isExpiringSoon } from './expiry-warning';
 import {
   buildProductColumns,
   PRODUCT_BATCH_ROW_TEXTS,
@@ -190,10 +189,6 @@ type BatchesLoad =
   | { readonly status: 'success'; readonly data: readonly ProductBatchView[] }
   | { readonly status: 'error'; readonly message: string };
 
-const subscribeToNothing = () => () => {};
-const localToday = () => formatDateLocalISO(new Date());
-// En el servidor no hay «hoy» del usuario: sin el, nada se marca y se pinta tras hidratar.
-const noTodayOnServer = () => null;
 
 function productRowId(row: ProductTableRow): string {
   if (row.kind === 'product') return row.product.id;
@@ -220,6 +215,7 @@ function expandedRows(
     product,
     batch,
     expiring: today !== null && isExpiringSoon(batch.expiryDate, today),
+    daysToExpiry: today === null ? null : daysUntil(batch.expiryDate, today),
   }));
 }
 
@@ -235,7 +231,8 @@ export function ProductTable({
 }: ProductTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const today = useSyncExternalStore(subscribeToNothing, localToday, noTodayOnServer);
+  // En el servidor no hay «hoy» del usuario: sin el, nada se marca y se pinta tras hidratar.
+  const today = useLocalToday();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const [batches, setBatches] = useState<ReadonlyMap<string, BatchesLoad>>(() => new Map());
   const [shownProducts, setShownProducts] = useState(products);

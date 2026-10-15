@@ -39,7 +39,15 @@ export {
   type ProductColumnsDeps,
   type ProductTableRow,
 } from './product-columns';
-export { EXPIRY_WARNING_DAYS, isExpiringSoon } from './expiry-warning';
+export {
+  daysUntil,
+  EXPIRY_RELATIVE_TEXTS,
+  EXPIRY_WARNING_DAYS,
+  expiryRelativeLabel,
+  isExpired,
+  isExpiringSoon,
+} from './expiry-warning';
+export { ExpiryDate, type ExpiryDateProps, useLocalToday } from './expiry-date';
 export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 export { productNameWithoutPresentation } from './product-base-name';
 export {

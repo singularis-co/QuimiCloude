@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  daysUntil,
   EXPIRY_WARNING_DAYS,
+  expiryRelativeLabel,
+  isExpired,
   isExpiringSoon,
 } from '@/app/(private)/inventario/components/expiry-warning';
 
@@ -35,5 +38,48 @@ describe('isExpiringSoon: vencimiento a menos de 30 dias de calendario', () => {
 
   it('una fecha mal formada no avisa', () => {
     expect(isExpiringSoon('15/10/2026', TODAY)).toBe(false);
+  });
+});
+
+describe('daysUntil: dias de calendario hasta el vencimiento', () => {
+  it.each([
+    ['hoy', '2026-10-15', 0],
+    ['manana', '2026-10-16', 1],
+    ['ayer', '2026-10-14', -1],
+    ['hace 3 dias', '2026-10-12', -3],
+    ['en 20 dias', '2026-11-04', 20],
+  ])('%s → %i', (_caso, date, expected) => {
+    expect(daysUntil(date, TODAY)).toBe(expected);
+  });
+
+  it('sin fecha o con fecha mal formada devuelve null', () => {
+    expect(daysUntil(null, TODAY)).toBeNull();
+    expect(daysUntil(undefined, TODAY)).toBeNull();
+    expect(daysUntil('15/10/2026', TODAY)).toBeNull();
+  });
+});
+
+describe('expiryRelativeLabel: texto relativo del vencimiento', () => {
+  it.each([
+    [0, 'vence hoy'],
+    [1, 'vence en 1 día'],
+    [20, 'vence en 20 días'],
+    [-1, 'venció hace 1 día'],
+    [-3, 'venció hace 3 días'],
+  ])('%i → «%s»', (days, expected) => {
+    expect(expiryRelativeLabel(days)).toBe(expected);
+  });
+});
+
+describe('isExpired: el lote ya vencio', () => {
+  it.each([
+    [-3, true],
+    [-1, true],
+    [0, false],
+    [1, false],
+    [20, false],
+    [null, false],
+  ])('%s → %s', (days, expected) => {
+    expect(isExpired(days)).toBe(expected);
   });
 });

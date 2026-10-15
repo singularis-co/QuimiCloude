@@ -22,3 +22,34 @@ export function isExpiringSoon(date: string | null | undefined, today: string): 
   if (target === null || now === null) return false;
   return target - now < EXPIRY_WARNING_DAYS;
 }
+
+/**
+ * Dias de calendario de `today` a `date`: positivo si vence despues, 0 si vence hoy y negativo
+ * si ya vencio. `null` sin fecha o con una fecha que no es `YYYY-MM-DD`.
+ */
+export function daysUntil(date: string | null | undefined, today: string): number | null {
+  if (date === null || date === undefined) return null;
+  const target = civilDayNumber(date);
+  const now = civilDayNumber(today);
+  if (target === null || now === null) return null;
+  return target - now;
+}
+
+/** Textos del vencimiento relativo. Constantes: ningun test depende del literal. */
+export const EXPIRY_RELATIVE_TEXTS = {
+  today: 'vence hoy',
+  future: (days: number) => `vence en ${days} ${days === 1 ? 'día' : 'días'}`,
+  past: (days: number) => `venció hace ${days} ${days === 1 ? 'día' : 'días'}`,
+} as const;
+
+/** Texto relativo de un vencimiento a `days` dias (ver `daysUntil`). */
+export function expiryRelativeLabel(days: number): string {
+  if (days === 0) return EXPIRY_RELATIVE_TEXTS.today;
+  if (days > 0) return EXPIRY_RELATIVE_TEXTS.future(days);
+  return EXPIRY_RELATIVE_TEXTS.past(-days);
+}
+
+/** El lote ya vencio: su vencimiento quedo antes de hoy (ver `daysUntil`). Vencer hoy no cuenta. */
+export function isExpired(days: number | null): boolean {
+  return days !== null && days < 0;
+}

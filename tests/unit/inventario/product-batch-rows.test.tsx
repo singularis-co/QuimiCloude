@@ -112,6 +112,7 @@ describe('desplegar los lotes de un producto', () => {
     expect(within(fila).getByTestId('product-batch-row-lot')).toHaveTextContent('L-001');
     expect(within(fila).getByTestId('product-batch-row-purchase-date')).toHaveTextContent('2026-03-05');
     expect(within(fila).getByTestId('product-batch-row-expiry-date')).toHaveTextContent(EMPTY_MARK);
+    expect(within(fila).queryByTestId('product-batch-row-expiry-relative')).toBeNull();
     expect(listAliveProductBatchesActionMock).toHaveBeenCalledWith('product-1');
 
     const filaLote = screen.getByTestId('data-table-row-product-1--batch-batch-1');
@@ -268,6 +269,95 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     }
     expect(vencimiento('lejos')).not.toHaveAttribute('data-expiring');
     expect(vencimiento('lejos')).not.toHaveClass('text-destructive');
+  });
+
+  it('junto a la fecha pinta los dias relativos, tambien para los lejanos', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [
+        lote({ id: 'vencido', expiryDate: '2026-10-12' }),
+        lote({ id: 'ayer', expiryDate: '2026-10-14' }),
+        lote({ id: 'hoy', expiryDate: '2026-10-15' }),
+        lote({ id: 'manana', expiryDate: '2026-10-16' }),
+        lote({ id: 'cerca', expiryDate: '2026-11-04' }),
+        lote({ id: 'lejos', expiryDate: '2027-01-13' }),
+      ],
+    });
+    const user = setupUser();
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    await user.click(toggle());
+    await screen.findAllByTestId('product-batch-row');
+
+    const vencimiento = (batchId: string) =>
+      within(screen.getByTestId(`data-table-row-product-1--batch-${batchId}`)).getByTestId(
+        'product-batch-row-expiry-date',
+      );
+    const relativo = (batchId: string) =>
+      within(vencimiento(batchId)).getByTestId('product-batch-row-expiry-relative');
+
+    expect(vencimiento('vencido')).toHaveTextContent('2026-10-12 (venció hace 3 días)');
+    expect(relativo('ayer')).toHaveTextContent('(venció hace 1 día)');
+    expect(relativo('hoy')).toHaveTextContent('(vence hoy)');
+    expect(relativo('manana')).toHaveTextContent('(vence en 1 día)');
+    expect(vencimiento('cerca')).toHaveTextContent('2026-11-04 (vence en 20 días)');
+    expect(relativo('lejos')).toHaveTextContent('(vence en 90 días)');
+    // El rojo sigue solo bajo 30 dias: el relativo hereda el color de la fecha.
+    expect(vencimiento('cerca')).toHaveClass('text-destructive');
+    expect(vencimiento('lejos')).not.toHaveClass('text-destructive');
+  });
+
+  it('el vencido lleva el chip «Vencido» y data-expired; el proximo y el lejano no', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [
+        lote({ id: 'vencido', expiryDate: '2026-10-12' }),
+        lote({ id: 'hoy', expiryDate: '2026-10-15' }),
+        lote({ id: 'cerca', expiryDate: '2026-11-04' }),
+        lote({ id: 'lejos', expiryDate: '2027-01-13' }),
+        lote({ id: 'sin-fecha', expiryDate: null }),
+      ],
+    });
+    const user = setupUser();
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    await user.click(toggle());
+    await screen.findAllByTestId('product-batch-row');
+
+    const vencimiento = (batchId: string) =>
+      within(screen.getByTestId(`data-table-row-product-1--batch-${batchId}`)).getByTestId(
+        'product-batch-row-expiry-date',
+      );
+    expect(vencimiento('vencido')).toHaveAttribute('data-expired', 'true');
+    expect(vencimiento('vencido')).toHaveClass('text-destructive');
+    const chip = within(vencimiento('vencido')).getByTestId('product-batch-row-expired');
+    expect(chip).toHaveTextContent('Vencido');
+    expect(chip).toHaveAttribute('data-tone', 'danger');
+
+    for (const id of ['hoy', 'cerca', 'lejos', 'sin-fecha']) {
+      expect(vencimiento(id)).not.toHaveAttribute('data-expired');
+      expect(within(vencimiento(id)).queryByTestId('product-batch-row-expired')).toBeNull();
+    }
+    expect(vencimiento('cerca')).toHaveClass('text-destructive');
+  });
+
+  it('cada clave va en negrita y seguida de «:», en su propio bloque', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote()] });
+    const user = setupUser();
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    await user.click(toggle());
+    const fila = await screen.findByTestId('product-batch-row');
+    const claves = within(fila).getAllByRole('term');
+    expect(claves.map((dt) => dt.textContent)).toEqual([
+      'Lote:',
+      'Fecha de compra:',
+      'Vencimiento:',
+    ]);
+    for (const dt of claves) {
+      expect(dt).toHaveClass('font-bold');
+      expect(dt.parentElement).toHaveClass('block');
+    }
   });
 
   it('resalta el nombre del producto segun nextExpiryDate, sin desplegar', () => {

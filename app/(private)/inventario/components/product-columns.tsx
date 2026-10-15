@@ -13,6 +13,7 @@ import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shar
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { cn } from '@/lib/utils';
 
+import { EXPIRING_CLASS, ExpiryDate } from './expiry-date';
 import { productNameWithoutPresentation } from './product-base-name';
 import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
 
@@ -94,6 +95,8 @@ export type ProductTableRow =
       readonly product: ProductView;
       readonly batch: ProductBatchView;
       readonly expiring: boolean;
+      /** Dias hasta el vencimiento (negativo si vencio); null sin fecha o sin «hoy» (servidor). */
+      readonly daysToExpiry: number | null;
     }
   | {
       readonly kind: 'batchesStatus';
@@ -107,9 +110,10 @@ export type ProductColumn = DataTableColumn<ProductTableRow> & { readonly id: Pr
 /** Textos de las sub-filas de lotes. */
 export const PRODUCT_BATCH_ROW_TEXTS = {
   toggle: (name: string) => `Mostrar lotes de ${name}`,
-  lot: 'Lote',
-  purchaseDate: 'Fecha de compra',
-  expiryDate: 'Vencimiento',
+  lot: 'Lote:',
+  purchaseDate: 'Fecha de compra:',
+  expiryDate: 'Vencimiento:',
+  expired: 'Vencido',
   loading: 'Cargando lotes…',
   empty: 'Sin lotes con existencia.',
   error: 'No se pudieron cargar los lotes.',
@@ -281,7 +285,13 @@ const typeColumn: ProductColumn = {
     ) : null,
 };
 
-const EXPIRING_CLASS = 'font-semibold text-destructive';
+const BATCH_ROW_EXPIRY_TEST_IDS = {
+  date: 'product-batch-row-expiry-date',
+  relative: 'product-batch-row-expiry-relative',
+  expired: 'product-batch-row-expired',
+} as const;
+/** Clave de la sub-fila de lote: en negrita y en linea con su valor. */
+const BATCH_KEY_CLASS = 'inline font-bold';
 
 function productNameCell(
   row: Extract<ProductTableRow, { kind: 'product' }>,
@@ -325,28 +335,29 @@ function productNameCell(
 function batchDetailCell(row: Extract<ProductTableRow, { kind: 'batch' }>): ReactNode {
   const { batch } = row;
   return (
-    <dl data-testid="product-batch-row" className="flex flex-wrap gap-x-4 gap-y-1 pl-12 text-sm">
-      <div className="flex gap-1">
-        <dt className="text-muted-foreground">{PRODUCT_BATCH_ROW_TEXTS.lot}</dt>
-        <dd data-testid="product-batch-row-lot" className="font-mono tabular-nums">
+    <dl data-testid="product-batch-row" className="space-y-1 pl-12 text-sm">
+      <div className="block">
+        <dt className={BATCH_KEY_CLASS}>{PRODUCT_BATCH_ROW_TEXTS.lot}</dt>{' '}
+        <dd data-testid="product-batch-row-lot" className="inline font-mono tabular-nums">
           {batch.lot}
         </dd>
       </div>
-      <div className="flex gap-1">
-        <dt className="text-muted-foreground">{PRODUCT_BATCH_ROW_TEXTS.purchaseDate}</dt>
-        <dd data-testid="product-batch-row-purchase-date" className="font-mono tabular-nums">
+      <div className="block">
+        <dt className={BATCH_KEY_CLASS}>{PRODUCT_BATCH_ROW_TEXTS.purchaseDate}</dt>{' '}
+        <dd data-testid="product-batch-row-purchase-date" className="inline font-mono tabular-nums">
           {batch.purchaseDate}
         </dd>
       </div>
-      <div className="flex gap-1">
-        <dt className="text-muted-foreground">{PRODUCT_BATCH_ROW_TEXTS.expiryDate}</dt>
-        <dd
-          data-testid="product-batch-row-expiry-date"
-          data-expiring={row.expiring ? 'true' : undefined}
-          className={cn('font-mono tabular-nums', row.expiring && EXPIRING_CLASS)}
-        >
-          {batch.expiryDate ?? EMPTY_MARK}
-        </dd>
+      <div className="block">
+        <dt className={BATCH_KEY_CLASS}>{PRODUCT_BATCH_ROW_TEXTS.expiryDate}</dt>{' '}
+        <ExpiryDate
+          date={batch.expiryDate}
+          expiring={row.expiring}
+          daysToExpiry={row.daysToExpiry}
+          expiredLabel={PRODUCT_BATCH_ROW_TEXTS.expired}
+          testIds={BATCH_ROW_EXPIRY_TEST_IDS}
+          className="inline"
+        />
       </div>
     </dl>
   );
@@ -443,6 +454,7 @@ export function buildProductColumns({
         return batchesStatusCell(row, onRetry);
       },
     },
+    ...(showType ? [typeColumn] : []),
     {
       id: 'presentationName',
       label: 'Presentación',
@@ -451,7 +463,6 @@ export function buildProductColumns({
       cell: (row) =>
         row.kind === 'product' ? (row.product.presentationName ?? EMPTY_MARK) : null,
     },
-    ...(showType ? [typeColumn] : []),
     {
       id: 'stock',
       label: 'Existencia',

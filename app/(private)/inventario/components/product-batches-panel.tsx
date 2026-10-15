@@ -12,10 +12,19 @@ import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
+import { ExpiryDate, useLocalToday } from './expiry-date';
+import { daysUntil, isExpiringSoon } from './expiry-warning';
+
 const LOT_LABEL = 'Lote';
 const QUANTITY_LABEL = 'Cantidad';
 const PURCHASE_DATE_LABEL = 'Fecha de compra';
 const EXPIRY_DATE_LABEL = 'Vencimiento';
+const EXPIRED_LABEL = 'Vencido';
+const EXPIRY_TEST_IDS = {
+  date: 'product-batch-expiry-date',
+  relative: 'product-batch-expiry-relative',
+  expired: 'product-batch-expired',
+} as const;
 const RESERVED_LABEL = 'Apartado';
 const AVAILABLE_LABEL = 'Disponible';
 const OVER_RESERVED_LABEL = 'Sobre-reservado';
@@ -149,6 +158,8 @@ export function ProductBatchesPanel({
   product,
 }: ProductBatchesPanelProps) {
   const packaging = packagingInfo(product);
+  // Sin «hoy» (servidor) no se marca ningun vencimiento: se pinta tras hidratar.
+  const today = useLocalToday();
   const header =
     packaging === null ? null : packaging.kind === 'legacy' ? (
       <p
@@ -221,7 +232,13 @@ export function ProductBatchesPanel({
                 {batch.expiryDate === null ? null : (
                   <div className="flex flex-col">
                     <dt className="text-xs text-muted-foreground">{EXPIRY_DATE_LABEL}</dt>
-                    <dd data-testid="product-batch-expiry-date" className="font-mono tabular-nums">{batch.expiryDate}</dd>
+                    <ExpiryDate
+                      date={batch.expiryDate}
+                      expiring={today !== null && isExpiringSoon(batch.expiryDate, today)}
+                      daysToExpiry={today === null ? null : daysUntil(batch.expiryDate, today)}
+                      expiredLabel={EXPIRED_LABEL}
+                      testIds={EXPIRY_TEST_IDS}
+                    />
                   </div>
                 )}
                 {batch.reserved === undefined ? null : (
