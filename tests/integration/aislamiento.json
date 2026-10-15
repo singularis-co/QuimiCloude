@@ -160,7 +160,7 @@
     },
     {
       "archivo": "identity/session-user.int.test.ts",
-      "motivo": "Nacido antes de QC-77: ejercita el adaptador 'findActiveSessionUserById' contra el cliente Prisma global con fixture propio (empresa efimera + usuario) y barrido en afterAll en orden users -> companies, por el ON DELETE RESTRICT de 'users_company_id_fkey'. Committea; se apoya en que la base de la corrida es suya.",
+      "motivo": "Nacido antes de QC-77: ejercita el adaptador 'findActiveSessionUserById' contra el cliente Prisma global con fixture propio (empresa efimera + usuario) y barrido en afterAll en orden users -> companies, por el ON DELETE RESTRICT de 'users_company_id_fkey'. Tambien escribe 'company_addon_overrides' de su empresa (QC-277); esas filas caen por el ON DELETE CASCADE de 'company_addon_overrides_company_id_fkey' al borrar la empresa, asi que el barrido no las nombra. Committea; se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-12"
     },
     {

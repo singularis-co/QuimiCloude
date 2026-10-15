@@ -567,3 +567,62 @@ y corren en el gate; los títulos citan su R.
   `tests/integration/identity/{company-addons,company-directory-addons,identity-seed,session-user}.int.test.ts`
   → T25–T28. No se arreglaron.
 - Veredicto: T22 hecho; quedan rojos esperados de tipos (T25–T28) y la guardia de empresa (T24).
+
+## Bloque H — T28 (frontend_dev, 2026-10-15)
+
+- Archivos modificados:
+  - `e2e/helpers/addons.ts`: `enableAllAddons(companyId)` hace `upsert` de las cinco excepciones
+    (`ADDONS`) a `enabled = true`, sin autor (P7), en un `$transaction`. Misma firma.
+  - `e2e/helpers/landing.ts`: `permissionsForUsername` selecciona
+    `company.addonOverrides { where: { enabled: true }, select: { addonKey } }` y pasa las claves a
+    `effectiveAddons`. Misma firma.
+  - `e2e/modulos-por-empresa.spec.ts`: `setAddons` hace `upsert` de las cinco con
+    `enabled = addons.includes(key)` (apagar escribe `false`, no borra); «nace sin añadidos» cuenta
+    `_count.addonOverrides` (debe ser 0). Asserts de comportamiento sin tocar.
+  - `tests/unit/e2e-helpers/landing.test.ts`: dobles de `findFirst` con `companyWith(...)`, forma
+    del `select` nueva, mock de `companyAddonOverride.upsert` + `$transaction`.
+- Mapa:
+  - R20 → `tests/unit/e2e-helpers/landing.test.ts` (describe «el aterrizaje E2E usa el permiso
+    efectivo» y «enableAllAddons prende los cinco añadidos ... (R20, P7)»).
+  - R36 → `e2e/modulos-por-empresa.spec.ts` (no corrido: playwright lo corre el implementer tras
+    recrear la base E2E).
+- Salida real:
+  - `pnpm exec vitest run tests/unit/e2e-helpers/landing.test.ts tests/guards/guard-e2e-landing.test.ts`
+    → `Test Files 2 passed (2) · Tests 30 passed (30)`.
+  - `pnpm exec tsc --noEmit -p .` → 0 errores en los cuatro archivos de T28; 18 restantes, todos en
+    `lib/modules/identity/adapters/driven/persistence/{initial-access-repository,session-user}-prisma.ts`
+    y `tests/integration/identity/*` (T25–T27, otros agentes).
+  - `pnpm exec eslint <los cuatro archivos>` → `No issues found`.
+- Veredicto: T28 hecho; helpers y spec E2E escriben y leen excepciones, firmas intactas.
+
+## Bloque H — T23, T24, T29 (backend_dev, 2026-10-15)
+
+- Archivos:
+  - creado `tests/guards/guard-catalogo-de-anadidos.test.ts` (T23, design § 9.4): lee
+    `db/migrations/*/migration.sql` en orden de carpeta, suma `INSERT INTO "addons"`, resta
+    `DELETE`, vacía con `TRUNCATE`/`DROP TABLE`; `UPDATE "addons" SET "key"` e `INSERT` no legible
+    son hallazgo. Compara con `ADDONS` importado de `@/lib/modules/identity`.
+  - `tests/guards/guard-empresa-en-esquema.test.ts` (T24): `EXENTAS` gana `addons` con su motivo;
+    R7 «las once», `toHaveLength(11)`; R10 comprueba que `company_addon_overrides` tiene
+    `company_id` y no está exenta; las dos fixtures sintéticas de R14 nombran `addons` (si no, el
+    hallazgo esperado sumaba «addons» por la tabla nueva; el assert no se relaja).
+  - `docs/architecture.md > Dominio`: bullet de exentas «once tablas» + `addons`; viñeta «Nada de
+    infraestructura» nombra `company_addon_overrides` (design § 11, punto 1).
+  - `tests/unit/identity/addons/architecture-doc.test.ts`: espera `company_addon_overrides`.
+  - Comentarios: `tests/unit/recetas-ui/recipe-route-contract.test.ts` (l. 567) y
+    `tests/guards/guard-identificador-de-request.test.ts` (l. 655) → «las tablas de añadidos».
+- Mapa R → test:
+  - R2 (D13) → `tests/guards/guard-catalogo-de-anadidos.test.ts` (real verde; rojo con añadido
+    sintético sin INSERT, con INSERT de `'futuro'`, con `UPDATE "addons" SET "key"`, con INSERT…SELECT;
+    simétrico verde; anclas).
+  - D13/D15 (`addons` exenta, overrides como tabla de empresa) → `guard-empresa-en-esquema` R7, R10, R14.
+  - R37 → `tests/unit/identity/addons/architecture-doc.test.ts`.
+- Salida real:
+  - `vitest run guard-catalogo-de-anadidos guard-empresa-en-esquema architecture-doc recipe-route-contract`
+    → `Test Files 4 passed (4)  Tests 55 passed (55)`.
+  - `pnpm exec vitest run guard` → `Test Files 79 passed (79)  Tests 1090 passed | 20 skipped (1110)`.
+  - `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)` (preexistentes: confirm-catalog-import,
+    order-service).
+  - `pnpm run typecheck` → 0 `error TS` en el momento de correrlo.
+  - `git grep -n "companies.addons" -- ':!specs' ':!progress'` → vacío.
+- Veredicto: T23, T24 y T29 hechos; guardias verdes y ninguna cita a `companies.addons` fuera de specs/progress.

@@ -87,10 +87,11 @@ beforeAll(async () => {
   const empresa = await prisma.company.create({
     // Con todos los añadidos, como toda empresa que ya existía al llegar los interruptores: así
     // los permisos de la sesión siguen siendo los del rol, que es lo que miden los casos de abajo.
+    // Las excepciones caen con la empresa por `ON DELETE CASCADE`: el `afterAll` no las conoce.
     data: {
       name: nombreDeEmpresa,
       nameNormalized: normalizeCompanyName(nombreDeEmpresa),
-      addons: [...ADDONS],
+      addonOverrides: { create: ADDONS.map((addonKey) => ({ addonKey, enabled: true })) },
     },
     select: { id: true },
   });
@@ -163,6 +164,19 @@ afterAll(async () => {
   }
 });
 
+// Reescribe las excepciones de la empresa del fixture: `on` prendidas y `off` apagadas.
+async function fijarAnadidos(on: readonly string[], off: readonly string[] = []): Promise<void> {
+  await prisma.$transaction([
+    prisma.companyAddonOverride.deleteMany({ where: { companyId: empresaId } }),
+    prisma.companyAddonOverride.createMany({
+      data: [
+        ...on.map((addonKey) => ({ companyId: empresaId, addonKey, enabled: true })),
+        ...off.map((addonKey) => ({ companyId: empresaId, addonKey, enabled: false })),
+      ],
+    }),
+  ]);
+}
+
 describe('findActiveSessionUserById contra Postgres real', () => {
   it('un usuario activo devuelve nombres, username y el rol actual', async () => {
     // R10 — consulta por sub (id de la fila real).
@@ -177,7 +191,9 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       // QC-48 R13: la empresa de la ficha y su estado, en la misma fila.
       companyId: empresaId,
       companyDeletedAt: null,
-      companyAddons: [...ADDONS],
+      // Sin `orderBy`, como los permisos: el orden lo decide Postgres y el `toHaveLength` de abajo
+      // cierra la puerta a que sobre alguno.
+      companyAddons: expect.arrayContaining([...ADDONS]),
       // QC-74 R7: los permisos del rol, en la misma fila. `arrayContaining` porque la consulta
       // no lleva `orderBy` —el adaptador no ordena a proposito— y el orden de `role_permissions`
       // lo decide Postgres; el `toHaveLength` de abajo cierra la puerta a que sobre alguno.
@@ -191,6 +207,7 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       sessionRevokedAt: null,
     });
     expect(resultado?.permissions).toHaveLength(2);
+    expect(resultado?.companyAddons).toHaveLength(ADDONS.length);
   });
 
   // QC-74 R7 — los permisos salen de la ASIGNACION, no del nombre del rol: el rol alternativo
@@ -351,27 +368,40 @@ describe('findActiveSessionUserById contra Postgres real', () => {
     }
   });
 
-  it('QC-277 R8: trae los interruptores de añadidos de la empresa, crudos, sin una segunda consulta', async () => {
-    // Crudos: con una clave desconocida y una repetida, que solo el dominio sabe ignorar.
-    const guardados = ['lectura_pdf', 'dashboard', 'x', 'dashboard'];
-    await prisma.company.update({ where: { id: empresaId }, data: { addons: guardados } });
+  it('QC-277 R8, R9: trae solo las excepciones prendidas de la empresa, en la misma llamada al lector', async () => {
+    await fijarAnadidos(['lectura_pdf', 'dashboard'], ['proveedores']);
     const espiaUsuario = vi.spyOn(prisma.user, 'findFirst');
-    const espiasEmpresa = [
+    const espiasAparte = [
       vi.spyOn(prisma.company, 'findFirst'),
       vi.spyOn(prisma.company, 'findUnique'),
       vi.spyOn(prisma.company, 'findMany'),
+      vi.spyOn(prisma.companyAddonOverride, 'findFirst'),
+      vi.spyOn(prisma.companyAddonOverride, 'findUnique'),
+      vi.spyOn(prisma.companyAddonOverride, 'findMany'),
     ];
 
     try {
       const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
 
-      expect(resultado?.companyAddons).toEqual(guardados);
+      // La excepcion apagada no sale; el orden no lo fija el adaptador.
+      expect([...(resultado?.companyAddons ?? [])].sort()).toEqual(['dashboard', 'lectura_pdf']);
       expect(espiaUsuario).toHaveBeenCalledTimes(1);
-      for (const espia of espiasEmpresa) expect(espia).not.toHaveBeenCalled();
+      for (const espia of espiasAparte) expect(espia).not.toHaveBeenCalled();
     } finally {
       espiaUsuario.mockRestore();
-      for (const espia of espiasEmpresa) espia.mockRestore();
-      await prisma.company.update({ where: { id: empresaId }, data: { addons: [...ADDONS] } });
+      for (const espia of espiasAparte) espia.mockRestore();
+      await fijarAnadidos([...ADDONS]);
+    }
+  });
+
+  it('QC-277 R9: con todas las excepciones apagadas la empresa no trae ningun añadido', async () => {
+    await fijarAnadidos([], [...ADDONS]);
+    try {
+      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
+
+      expect(resultado?.companyAddons).toEqual([]);
+    } finally {
+      await fijarAnadidos([...ADDONS]);
     }
   });
 });
@@ -600,7 +630,7 @@ describe('findActiveSessionUserById y el permiso integraciones.modificar', () =>
   });
 
   it('QC-277 R8: con la empresa sin añadidos, la sesión real del Administrador queda en su parte del núcleo', async () => {
-    await prisma.company.update({ where: { id: empresaId }, data: { addons: [] } });
+    await fijarAnadidos([]);
     try {
       const permisos = await permisosDeLaSesionDe(ROLE_ADMINISTRADOR);
 
@@ -612,7 +642,7 @@ describe('findActiveSessionUserById y el permiso integraciones.modificar', () =>
           .sort(),
       );
     } finally {
-      await prisma.company.update({ where: { id: empresaId }, data: { addons: [...ADDONS] } });
+      await fijarAnadidos([...ADDONS]);
     }
   });
 

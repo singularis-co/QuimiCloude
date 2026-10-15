@@ -2,7 +2,7 @@ import { type Prisma, type PrismaClient } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { ADDONS, isAddon, type Addon } from '../../../domain/company-addons';
+import { ADDONS, type Addon } from '../../../domain/company-addons';
 
 import { atomically } from './company-prisma';
 
@@ -11,24 +11,24 @@ import type { AddonChange, CompanyAddonRepository } from '../../../ports/company
 
 type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
-// La base guarda texto sin lista cerrada: una clave que el catálogo no conoce no concede nada, y
-// esta escritura no la borra.
-function nextAddons(
-  stored: readonly string[],
-  enable: readonly Addon[],
-  disable: readonly Addon[],
-): string[] {
-  const on = new Set<string>(stored.filter(isAddon));
-  for (const addon of disable) on.delete(addon);
-  for (const addon of enable) on.add(addon);
-  const unknown = stored.filter((key) => !isAddon(key));
-  return [...ADDONS.filter((addon) => on.has(addon)), ...unknown];
+// Sin planes, un añadido está prendido solo si su excepción dice `enabled = true`: no tener fila o
+// tenerla en `false` es estar apagado.
+function inCatalogOrder(on: ReadonlySet<string>): Addon[] {
+  return ADDONS.filter((addon) => on.has(addon));
 }
 
-function changesBetween(before: readonly string[], after: readonly string[]): AddonChange[] {
-  return ADDONS.filter((addon) => before.includes(addon) !== after.includes(addon)).map(
-    (addon) => ({ addon, enabled: after.includes(addon) }),
-  );
+function changesFor(
+  on: ReadonlySet<string>,
+  enable: readonly Addon[],
+  disable: readonly Addon[],
+): AddonChange[] {
+  const next = new Set(on);
+  for (const addon of disable) next.delete(addon);
+  for (const addon of enable) next.add(addon);
+  return ADDONS.filter((addon) => on.has(addon) !== next.has(addon)).map((addon) => ({
+    addon,
+    enabled: next.has(addon),
+  }));
 }
 
 export function createCompanyAddonRepository(db: PrismaLike = prisma): CompanyAddonRepository {
@@ -36,27 +36,47 @@ export function createCompanyAddonRepository(db: PrismaLike = prisma): CompanyAd
     async findByCompany(companyId) {
       const row = await db.company.findUnique({
         where: { id: companyId },
-        select: { addons: true, deletedAt: true },
+        select: {
+          deletedAt: true,
+          addonOverrides: { where: { enabled: true }, select: { addonKey: true } },
+        },
       });
       if (row === null) return null;
-      return { stored: row.addons, alive: row.deletedAt === null };
+      const on = new Set(row.addonOverrides.map((o) => o.addonKey));
+      return { stored: inCatalogOrder(on), alive: row.deletedAt === null };
     },
 
     async apply({ companyId, enable = [], disable = [], actorId, now }) {
       return atomically(db, async (tx) => {
-        const rows = await tx.$queryRaw<Array<{ addons: string[] }>>`
-          SELECT addons FROM companies
+        // Se bloquea la empresa y no las excepciones, que pueden no existir todavía: así dos
+        // escrituras a la vez sobre la misma empresa se serializan.
+        const rows = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM companies
           WHERE id = ${companyId}::uuid AND deleted_at IS NULL FOR UPDATE`;
-        const current = rows[0];
-        if (current === undefined) return 'not_found' as const;
+        if (rows[0] === undefined) return 'not_found' as const;
 
-        const stored = nextAddons(current.addons, enable, disable);
-        const changed = changesBetween(current.addons, stored);
-        if (changed.length === 0) return { stored: current.addons, changed };
+        const overrides = await tx.companyAddonOverride.findMany({
+          where: { companyId, enabled: true },
+          select: { addonKey: true },
+        });
+        const on = new Set(overrides.map((o) => o.addonKey));
+        const changed = changesFor(on, enable, disable);
+        if (changed.length === 0) return { stored: inCatalogOrder(on), changed };
 
+        for (const { addon, enabled } of changed) {
+          // Apagar escribe `false` y no borra: la fila guarda quién fijó el valor vigente y cuándo.
+          await tx.companyAddonOverride.upsert({
+            where: { companyId_addonKey: { companyId, addonKey: addon } },
+            create: { companyId, addonKey: addon, enabled, createdBy: actorId, createdAt: now },
+            update: { enabled, createdBy: actorId, createdAt: now },
+            select: { addonKey: true },
+          });
+          if (enabled) on.add(addon);
+          else on.delete(addon);
+        }
         await tx.company.update({
           where: { id: companyId },
-          data: { addons: stored, updatedAt: now },
+          data: { updatedAt: now },
           select: { id: true },
         });
         for (const change of changed) {
@@ -66,7 +86,7 @@ export function createCompanyAddonRepository(db: PrismaLike = prisma): CompanyAd
             select: { id: true },
           });
         }
-        return { stored, changed };
+        return { stored: inCatalogOrder(on), changed };
       });
     },
   };

@@ -109,19 +109,26 @@ function createMaestro(tx: Tx): Promise<string> {
   return createUser(tx, ROLE_MAESTRO, null)
 }
 
+// `addons` siembra excepciones prendidas y `off` excepciones apagadas, las dos sin autor, como las
+// deja la migracion.
 async function seedCompany(
   tx: Tx,
-  fields: { addons?: string[]; deleted?: boolean } = {},
+  fields: { addons?: readonly string[]; off?: readonly string[]; deleted?: boolean } = {},
 ): Promise<string> {
   const name = `Anadidos ${tag()}`
   const company = await tx.company.create({
     data: {
       name,
       nameNormalized: normalizeCompanyName(name),
-      addons: fields.addons ?? [],
       createdAt: NOW,
       updatedAt: NOW,
       deletedAt: fields.deleted === true ? NOW : null,
+      addonOverrides: {
+        create: [
+          ...(fields.addons ?? []).map((addonKey) => ({ addonKey, enabled: true, createdAt: NOW })),
+          ...(fields.off ?? []).map((addonKey) => ({ addonKey, enabled: false, createdAt: NOW })),
+        ],
+      },
     },
     select: { id: true },
   })
@@ -131,7 +138,72 @@ async function seedCompany(
 function readCompany(tx: Tx, id: string) {
   return tx.company.findUniqueOrThrow({
     where: { id },
-    select: { id: true, name: true, addons: true, createdAt: true, updatedAt: true, deletedAt: true },
+    select: { id: true, name: true, createdAt: true, updatedAt: true, deletedAt: true },
+  })
+}
+
+function overridesOf(tx: Tx, companyId: string) {
+  return tx.companyAddonOverride.findMany({
+    where: { companyId },
+    select: { addonKey: true, enabled: true, source: true, createdBy: true, createdAt: true },
+    orderBy: { addonKey: 'asc' },
+  })
+}
+
+async function enabledOf(tx: Tx, companyId: string): Promise<string[]> {
+  const rows = await overridesOf(tx, companyId)
+  const on = new Set(rows.filter((row) => row.enabled).map((row) => row.addonKey))
+  return ADDONS.filter((addon) => on.has(addon))
+}
+
+function sqlStateOf(error: unknown): string {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const meta: unknown = error.meta
+    if (typeof meta === 'object' && meta !== null && 'code' in meta) {
+      const code: unknown = (meta as { code: unknown }).code
+      if (typeof code === 'string') return code
+    }
+    return error.code
+  }
+  return error instanceof Error ? error.message : String(error)
+}
+
+// Una sentencia rechazada aborta la transaccion del test: el SAVEPOINT la deja usable despues.
+async function rejectedByDatabase(tx: Tx, run: () => Promise<unknown>): Promise<string> {
+  await tx.$executeRawUnsafe('SAVEPOINT sp_addons_test')
+  try {
+    await run()
+  } catch (error) {
+    await tx.$executeRawUnsafe('ROLLBACK TO SAVEPOINT sp_addons_test')
+    return sqlStateOf(error)
+  }
+  await tx.$executeRawUnsafe('RELEASE SAVEPOINT sp_addons_test')
+  throw new Error('se esperaba que la base rechazara la escritura, pero la acepto')
+}
+
+// El cliente del repositorio con `companyEvent.create` fallando en la llamada numero `failAt`: un
+// fallo del evento a mitad, despues de que las excepciones ya se escribieron.
+function failingEventsOn(tx: Tx, failAt: number): Tx {
+  let calls = 0
+  const companyEvent = new Proxy(tx.companyEvent, {
+    get(target, prop) {
+      if (prop === 'create') {
+        return async (args: Prisma.CompanyEventCreateArgs) => {
+          calls += 1
+          if (calls === failAt) throw new Error('fallo simulado del evento')
+          return target.create(args)
+        }
+      }
+      const value: unknown = Reflect.get(target, prop)
+      return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value
+    },
+  })
+  return new Proxy(tx, {
+    get(target, prop) {
+      if (prop === 'companyEvent') return companyEvent
+      const value: unknown = Reflect.get(target, prop)
+      return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value
+    },
   })
 }
 
@@ -167,8 +239,13 @@ describe('apply', () => {
         ],
       })
       const fila = await readCompany(tx, companyId)
-      expect(fila.addons).toEqual(['dashboard', 'proveedores', 'integraciones'])
       expect(fila.updatedAt).toEqual(at(5))
+      // La excepcion que ya estaba prendida no se reescribe: conserva su autor vacio.
+      expect(await overridesOf(tx, companyId)).toEqual([
+        { addonKey: 'dashboard', enabled: true, source: 'manual', createdBy: null, createdAt: NOW },
+        { addonKey: 'integraciones', enabled: true, source: 'manual', createdBy: actorId, createdAt: at(5) },
+        { addonKey: 'proveedores', enabled: true, source: 'manual', createdBy: actorId, createdAt: at(5) },
+      ])
       // Mismo instante: el orden entre los dos eventos no esta definido.
       const eventos = await eventsOf(tx, companyId)
       expect(eventos).toHaveLength(2)
@@ -181,44 +258,105 @@ describe('apply', () => {
     })
   })
 
-  it('R33: apagar escribe addon.disabled; las claves desconocidas se conservan al final', async () => {
+  it('R33: apagar escribe enabled = false sin borrar la fila, con el actor como autor, y addon.disabled', async () => {
     await inRolledBackTransaction(async (tx) => {
       const repo = createCompanyAddonRepository(tx)
       const actorId = await createMaestro(tx)
-      const companyId = await seedCompany(tx, { addons: ['futuro', 'lectura_pdf', 'dashboard'] })
+      const companyId = await seedCompany(tx, { addons: ['lectura_pdf', 'dashboard'] })
 
       const result = await repo.apply({ companyId, disable: ['lectura_pdf'], actorId, now: at(1) })
 
-      expect(result).toEqual({ stored: ['dashboard', 'futuro'], changed: [{ addon: 'lectura_pdf', enabled: false }] })
-      expect((await readCompany(tx, companyId)).addons).toEqual(['dashboard', 'futuro'])
+      expect(result).toEqual({ stored: ['dashboard'], changed: [{ addon: 'lectura_pdf', enabled: false }] })
+      expect(await overridesOf(tx, companyId)).toEqual([
+        { addonKey: 'dashboard', enabled: true, source: 'manual', createdBy: null, createdAt: NOW },
+        { addonKey: 'lectura_pdf', enabled: false, source: 'manual', createdBy: actorId, createdAt: at(1) },
+      ])
       expect(await eventsOf(tx, companyId)).toEqual([
         { kind: 'addon.disabled', actorId, occurredAt: at(1), details: { addon: 'lectura_pdf' } },
       ])
     })
   })
 
-  it('R33: sin cambios no escribe: ni updated_at ni evento', async () => {
+  it('R33: volver a prender una excepcion apagada la reescribe a true con el nuevo autor e instante', async () => {
     await inRolledBackTransaction(async (tx) => {
       const repo = createCompanyAddonRepository(tx)
       const actorId = await createMaestro(tx)
-      const companyId = await seedCompany(tx, { addons: ['dashboard'] })
+      const companyId = await seedCompany(tx, { off: ['proveedores'] })
+
+      const result = await repo.apply({ companyId, enable: ['proveedores'], actorId, now: at(2) })
+
+      expect(result).toEqual({ stored: ['proveedores'], changed: [{ addon: 'proveedores', enabled: true }] })
+      expect(await overridesOf(tx, companyId)).toEqual([
+        { addonKey: 'proveedores', enabled: true, source: 'manual', createdBy: actorId, createdAt: at(2) },
+      ])
+    })
+  })
+
+  it('R33: sin cambios no escribe: ni excepcion ni updated_at ni evento; apagar sin fila no crea fila', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createCompanyAddonRepository(tx)
+      const actorId = await createMaestro(tx)
+      const companyId = await seedCompany(tx, { addons: ['dashboard'], off: ['lectura_pdf'] })
       const antes = await readCompany(tx, companyId)
+      const excepcionesAntes = await overridesOf(tx, companyId)
 
       const result = await repo.apply({
         companyId,
         enable: ['dashboard'],
-        disable: ['proveedores'],
+        disable: ['proveedores', 'lectura_pdf'],
         actorId,
         now: at(9),
       })
 
       expect(result).toEqual({ stored: ['dashboard'], changed: [] })
       expect(await readCompany(tx, companyId)).toEqual(antes)
+      expect(await overridesOf(tx, companyId)).toEqual(excepcionesAntes)
       expect(await eventsOf(tx, companyId)).toEqual([])
     })
   })
 
-  it('R29, R33: si un evento no se puede escribir (autor inexistente), la fila tampoco cambia', async () => {
+  it('R29, R33: apagar todos con los cinco prendidos escribe cinco filas false y cinco eventos', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createCompanyAddonRepository(tx)
+      const actorId = await createMaestro(tx)
+      const companyId = await seedCompany(tx, { addons: [...ADDONS] })
+
+      const result = await repo.apply({ companyId, disable: [...ADDONS], actorId, now: at(3) })
+
+      expect(result).toEqual({ stored: [], changed: ADDONS.map((addon) => ({ addon, enabled: false })) })
+      const filas = await overridesOf(tx, companyId)
+      expect(filas).toHaveLength(5)
+      for (const fila of filas) {
+        expect(fila, fila.addonKey).toMatchObject({ enabled: false, createdBy: actorId, createdAt: at(3) })
+      }
+      const eventos = await eventsOf(tx, companyId)
+      expect(eventos).toHaveLength(5)
+      expect(eventos.map((e) => (e.details as { addon: string }).addon).sort()).toEqual([...ADDONS].sort())
+      for (const evento of eventos) expect(evento).toMatchObject({ kind: 'addon.disabled', actorId, occurredAt: at(3) })
+      expect((await readCompany(tx, companyId)).updatedAt).toEqual(at(3))
+    })
+  })
+
+  it('R29, R33: si falla un evento a mitad de apagar todos, las cinco excepciones y updated_at quedan como estaban', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const actorId = await createMaestro(tx)
+      const companyId = await seedCompany(tx, { addons: [...ADDONS] })
+      const antes = await readCompany(tx, companyId)
+      const excepcionesAntes = await overridesOf(tx, companyId)
+      const repo = createCompanyAddonRepository(failingEventsOn(tx, 5))
+
+      await expect(repo.apply({ companyId, disable: [...ADDONS], actorId, now: at(1) })).rejects.toThrow(
+        'fallo simulado del evento',
+      )
+
+      expect(await overridesOf(tx, companyId)).toEqual(excepcionesAntes)
+      expect(await enabledOf(tx, companyId)).toEqual([...ADDONS])
+      expect(await readCompany(tx, companyId)).toEqual(antes)
+      expect(await eventsOf(tx, companyId)).toEqual([])
+    })
+  })
+
+  it('R29, R33: si el autor no existe, la base rechaza la escritura y no queda nada', async () => {
     await inRolledBackTransaction(async (tx) => {
       const repo = createCompanyAddonRepository(tx)
       const companyId = await seedCompany(tx)
@@ -229,6 +367,7 @@ describe('apply', () => {
       ).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError)
 
       expect(await readCompany(tx, companyId)).toEqual(antes)
+      expect(await overridesOf(tx, companyId)).toEqual([])
       expect(await eventsOf(tx, companyId)).toEqual([])
     })
   })
@@ -249,6 +388,21 @@ describe('apply', () => {
       expect(await eventsOf(tx, deBaja)).toEqual([])
       expect(await repo.findByCompany(deBaja)).toEqual({ stored: ['dashboard'], alive: false })
       expect(await repo.findByCompany(randomUUID())).toBeNull()
+    })
+  })
+
+  it('R33: findByCompany devuelve solo las excepciones prendidas, en el orden del catalogo', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createCompanyAddonRepository(tx)
+      const companyId = await seedCompany(tx, {
+        addons: ['integraciones', 'dashboard', 'importacion_excel'],
+        off: ['proveedores'],
+      })
+
+      expect(await repo.findByCompany(companyId)).toEqual({
+        stored: ['dashboard', 'importacion_excel', 'integraciones'],
+        alive: true,
+      })
     })
   })
 
@@ -341,7 +495,7 @@ describe('lo que no cambia al apagar', () => {
       const result = await repo.apply({ companyId, disable: [...ADDONS], actorId, now: at(1) })
 
       expect(result).not.toBe('not_found')
-      expect((await readCompany(tx, companyId)).addons).toEqual([])
+      expect(await enabledOf(tx, companyId)).toEqual([])
       expect(await foto()).toEqual(antes)
     })
   })
@@ -377,7 +531,7 @@ describe('alta y lectura de sistema', () => {
       })
       if (typeof created === 'string') throw new Error(`el alta no debia fallar: ${created}`)
 
-      expect((await readCompany(tx, created.companyId)).addons).toEqual([])
+      expect(await overridesOf(tx, created.companyId)).toEqual([])
       expect(await createCompanyAddonRepository(tx).findByCompany(created.companyId)).toEqual({
         stored: [],
         alive: true,
@@ -396,6 +550,31 @@ describe('alta y lectura de sistema', () => {
       expect(await isActive(conTodo, 'lectura_pdf')).toBe(true)
       expect(await isActive(deBaja, 'lectura_pdf')).toBe(false)
       expect(await isActive(randomUUID(), 'lectura_pdf')).toBe(false)
+    })
+  })
+})
+
+describe('el catalogo en la base', () => {
+  it('R2: la tabla addons de la base tiene exactamente las claves de ADDONS', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const filas = await tx.addon.findMany({ select: { key: true } })
+      expect(filas.map((fila) => fila.key).sort()).toEqual([...ADDONS].sort())
+    })
+  })
+
+  it('R2: una excepcion con una clave que el catalogo no conoce la rechaza la FK con 23503', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const companyId = await seedCompany(tx)
+
+      const sqlState = await rejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`
+          INSERT INTO company_addon_overrides (company_id, addon_key, enabled)
+          VALUES (${companyId}::uuid, 'futuro', true)`,
+      )
+
+      expect(sqlState).toBe('23503')
+      expect(await overridesOf(tx, companyId)).toEqual([])
     })
   })
 })

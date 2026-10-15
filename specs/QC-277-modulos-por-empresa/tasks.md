@@ -200,7 +200,7 @@
 > `/inicio`, webhook y cron no se tocan. T22 va primero; después T23, T24 y T29 en paralelo, y
 > T25–T28 en cuanto T22 esté. T31 cierra el bloque y desbloquea T20 y T21.
 
-- [ ] **T22 — Esquema y migración reescrita** (R5, R6, R38; D13–D16). Depende de: —
+- [x] **T22 — Esquema y migración reescrita** (R5, R6, R38; D13–D16). Depende de: —
   - `db/schema.prisma`: fuera `Company.addons`; `Addon`, `CompanyAddonOverride` y las relaciones
     inversas en `Company` y `User` (`design.md > 2.2`).
   - `db/migrations/20261014190000_company_addons/migration.sql` y `down.sql` **reescritos en su
@@ -213,16 +213,16 @@
       salvo el drift declarado;
     - `pnpm run db:rollback` deja la base sin las dos tablas y vuelve a aplicar;
     - `guard-rls-force` verde con las dos tablas.
-- [ ] **T23 [P] — Guardia catálogo = tabla** (R2; D13). Depende de: T22
+- [x] **T23 [P] — Guardia catálogo = tabla** (R2; D13). Depende de: T22
   - `tests/guards/guard-catalogo-de-anadidos.test.ts` (`design.md > 9.4`).
   - **Hecho:** verde con el SQL real; rojo con un añadido sintético en el código sin `INSERT`, con
     un `INSERT` de una clave que el código no conoce y con un `UPDATE "addons" SET "key"`.
-- [ ] **T24 [P] — `addons` exenta de columna de empresa** (D13, D15). Depende de: T22
+- [x] **T24 [P] — `addons` exenta de columna de empresa** (D13, D15). Depende de: T22
   - `tests/guards/guard-empresa-en-esquema.test.ts`: `EXENTAS` gana `addons` y R7 pasa a once.
   - Bullet de exentas de `docs/architecture.md > Dominio`: nombra `addons` y dice «once tablas».
   - **Hecho:** `pnpm exec vitest run guard-empresa-en-esquema` verde, con
     `company_addon_overrides` juzgada como tabla de empresa (sin exención).
-- [ ] **T25 — Repositorio de añadidos sobre excepciones** (R24, R28, R29, R31, R33; D14, D15). Depende
+- [x] **T25 — Repositorio de añadidos sobre excepciones** (R24, R28, R29, R31, R33; D14, D15). Depende
   de: T22
   - `lib/modules/identity/adapters/driven/persistence/company-addons-prisma.ts`
     (`design.md > 6.3`): `findByCompany` lee excepciones prendidas; `apply` bloquea la empresa,
@@ -239,7 +239,7 @@
       fallo del evento deshace las cinco;
     - apagar un añadido sin fila no escribe nada;
     - alta nueva → cero excepciones (R5).
-- [ ] **T26 — Lectura de la sesión** (R8, R9; P6). Depende de: T22
+- [x] **T26 — Lectura de la sesión** (R8, R9; P6). Depende de: T22
   - `lib/modules/identity/adapters/driven/persistence/session-user-prisma.ts`: la relación
     `company.addonOverrides` con `enabled: true`, en el mismo `findFirst` (`design.md > 3.1`).
     Actualizar el comentario de cabecera con el coste declarado (una sentencia SQL más, cero
@@ -249,14 +249,14 @@
     `company.update({ addons })` (l. 93, 374, 603, 615).
   - **Hecho:** `companyAddons` sale de las excepciones prendidas; el contador de invocaciones del
     lector no sube; con una excepción `enabled = false` el añadido no sale.
-- [ ] **T27 [P] — Seed con excepciones** (R7; P7). Depende de: T22
+- [x] **T27 [P] — Seed con excepciones** (R7; P7). Depende de: T22
   - `lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma.ts`:
     `create` anidado con las cinco excepciones prendidas, sin autor (`design.md > 2.5`).
   - Tests: `tests/unit/identity/seed/seed-initial-access.test.ts` (l. 1591) y
     `tests/integration/identity/identity-seed.int.test.ts`.
   - **Hecho:** la empresa inicial queda con cinco filas `enabled = true` y `created_by` vacío; con
     `platform-only` no se crea ninguna.
-- [ ] **T28 — Helpers y spec E2E sobre excepciones** (R20, R36). Depende de: T22
+- [x] **T28 — Helpers y spec E2E sobre excepciones** (R20, R36). Depende de: T22
   - `e2e/helpers/addons.ts`: `enableAllAddons` hace `upsert` de las cinco a `enabled = true`.
   - `e2e/helpers/landing.ts`: lee `company.addonOverrides` (`enabled: true`).
   - `e2e/modulos-por-empresa.spec.ts`: la función que fija los interruptores (l. 61) y la
@@ -265,7 +265,7 @@
     `select`).
   - **Hecho:** `vitest run tests/unit/e2e-helpers/landing.test.ts tests/guards/guard-e2e-landing.test.ts`
     verde; misma firma pública de los dos helpers.
-- [ ] **T29 [P] — Docs y comentarios** (R37). Depende de: —
+- [x] **T29 [P] — Docs y comentarios** (R37). Depende de: —
   - `docs/architecture.md`, viñeta de `## Dominio` punto 1: `company_addon_overrides` en vez de
     `companies.addons` (`design.md > 11`).
   - `tests/unit/identity/addons/architecture-doc.test.ts`: espera `company_addon_overrides`.
@@ -274,7 +274,7 @@
     punto 8).
   - **Hecho:** ningún archivo fuera de `specs/` y `progress/` cita `companies.addons`
     (`git grep -n "companies.addons" -- ':!specs' ':!progress'` vacío).
-- [ ] **T30 — Censo de aislamiento** (D15). Depende de: T25, T26, T27
+- [x] **T30 — Censo de aislamiento** (D15). Depende de: T25, T26, T27
   - `tests/integration/aislamiento.json`: el `motivo` de `identity/session-user.int.test.ts` dice
     que también escribe `company_addon_overrides` y que caen por `ON DELETE CASCADE` al borrar la
     empresa. Si T25–T27 crean un `.int.test.ts` nuevo, se declara aquí.

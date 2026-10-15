@@ -68,6 +68,13 @@ import type { SessionUserRecord } from '../../../ports/session-user-reader';
  * `take: 1` y `select: { revokedAt: true }`: no sale el `sid`, no sale el `id` de la fila y no
  * sale ningun dato de PII. El `select` de la sesion sigue sin ganar ni un campo sensible.
  *
+ * Los añadidos de la empresa salen de la relacion `company.addonOverrides` con `enabled = true`,
+ * en este mismo `findFirst`: el lector se sigue invocando una vez por peticion. El coste,
+ * declarado: sin `relationJoins`, Prisma la resuelve con **una sentencia SQL mas**, un
+ * `SELECT addon_key FROM company_addon_overrides WHERE company_id = ? AND enabled` por el prefijo
+ * de la clave primaria, que devuelve como mucho una fila por añadido del catalogo. Sale un array
+ * de claves cortas, sin PII y fuera de todo log.
+ *
  * **Cero escrituras** (R40): aqui no se purga nada. La purga vive en las dos operaciones de
  * `session-revocation-prisma.ts`, nunca en el camino de lectura.
  */
@@ -84,7 +91,12 @@ export async function findActiveSessionUserById(
       lastNames: true,
       role: { select: { name: true, permissions: { select: { permissionCode: true } } } },
       companyId: true,
-      company: { select: { deletedAt: true, addons: true } },
+      company: {
+        select: {
+          deletedAt: true,
+          addonOverrides: { where: { enabled: true }, select: { addonKey: true } },
+        },
+      },
       // QC-78 R20, R21: columnas de `users`, en el MISMO `findFirst`.
       accountStatus: true,
       lockedUntil: true,
@@ -108,7 +120,7 @@ export async function findActiveSessionUserById(
     companyId: usuario.companyId,
     // La marca cruda; sin empresa no hay marca. Quien decide si «esta viva» es el dominio.
     companyDeletedAt: usuario.company?.deletedAt ?? null,
-    companyAddons: usuario.company?.addons ?? [],
+    companyAddons: usuario.company?.addonOverrides.map((override) => override.addonKey) ?? [],
     // QC-74 R7: los permisos salen de la ASIGNACION rol-permiso, nunca del nombre del rol.
     permissions: usuario.role.permissions.map((asignacion) => asignacion.permissionCode),
     // QC-78 R7, R20: los dos crudos. Quien traduce «lo que la columna dice» a «lo que significa

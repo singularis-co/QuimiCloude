@@ -845,7 +845,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
     });
   });
 
-  it('QC-277 R7: con alcance full la empresa inicial nace con los cinco añadidos prendidos, y la segunda corrida no los toca', async () => {
+  it('QC-277 R7: con alcance full la empresa inicial nace con cinco excepciones prendidas y sin autor, y la segunda corrida no las toca', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
       const deps = {
@@ -860,10 +860,22 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const first = await seedInitialAccess(deps);
       expect(first.createdCompany).toBe(INITIAL_COMPANY_NAME);
       const empresa = await tx.company.findFirstOrThrow({ where: { deletedAt: null } });
-      expect(empresa.addons).toEqual([...ADDONS]);
+      const excepcionesDe = () =>
+        tx.companyAddonOverride.findMany({
+          where: { companyId: empresa.id },
+          select: { addonKey: true, enabled: true, source: true, createdBy: true, createdAt: true },
+          orderBy: { addonKey: 'asc' },
+        });
+      const excepciones = await excepcionesDe();
+      expect(excepciones.map((fila) => fila.addonKey)).toEqual([...ADDONS].sort());
+      for (const fila of excepciones) {
+        expect(fila, fila.addonKey).toMatchObject({ enabled: true, source: 'manual', createdBy: null });
+      }
+      expect(await tx.companyAddonOverride.count()).toBe(ADDONS.length);
 
       await seedInitialAccess(deps);
-      expect((await tx.company.findUniqueOrThrow({ where: { id: empresa.id } })).addons).toEqual([...ADDONS]);
+      expect(await excepcionesDe()).toEqual(excepciones);
+      expect(await tx.companyAddonOverride.count()).toBe(ADDONS.length);
     });
   });
 
@@ -1936,6 +1948,8 @@ describe('seedInitialAccess contra base real — alcance platform-only (QC-162)'
         );
       }
       expect(await tx.company.count()).toBe(0);
+      // QC-277 R7: sin empresa inicial no se siembra ninguna excepcion de añadidos.
+      expect(await tx.companyAddonOverride.count()).toBe(0);
       expect(await findLiveAdmin(tx)).toBeNull();
       const maestros = await findLiveMaestros(tx);
       expect(maestros).toHaveLength(1);

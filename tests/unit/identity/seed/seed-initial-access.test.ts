@@ -1570,7 +1570,7 @@ describe('seedInitialAccess', () => {
     expect(obtenido.createdMaestro).toBe(true);
   });
 
-  it('R7: full crea la empresa inicial una vez por el puerto, y el adaptador la crea con los cinco añadidos', async () => {
+  it('R7: full crea la empresa inicial una vez por el puerto, y el adaptador la crea con las cinco excepciones prendidas y sin autor', async () => {
     const repository = crearRepositorioFalso();
     await seedInitialAccess({ ...depsDelSeed(repository), scope: 'full' });
     expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createCompany')).toHaveLength(1);
@@ -1588,7 +1588,8 @@ describe('seedInitialAccess', () => {
       data: {
         name: INITIAL_COMPANY_NAME,
         nameNormalized: NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL,
-        addons: [...ADDONS],
+        // Las cinco excepciones prendidas en el mismo `create`, sin autor: las siembra el sistema.
+        addonOverrides: { create: ADDONS.map((addonKey) => ({ addonKey, enabled: true })) },
       },
     });
   });

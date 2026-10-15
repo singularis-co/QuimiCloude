@@ -58,14 +58,23 @@ async function inRolledBackTransaction(body: (tx: Tx) => Promise<void>): Promise
   }
 }
 
-async function seedCompany(tx: Tx, fields: { addons: string[]; deleted?: boolean }): Promise<string> {
+// `addons` siembra excepciones prendidas y `off` excepciones apagadas.
+async function seedCompany(
+  tx: Tx,
+  fields: { addons: readonly string[]; off?: readonly string[]; deleted?: boolean },
+): Promise<string> {
   const name = `Directorio ${randomUUID().replaceAll('-', '')}`
   const company = await tx.company.create({
     data: {
       name,
       nameNormalized: normalizeCompanyName(name),
-      addons: fields.addons,
       deletedAt: fields.deleted === true ? new Date() : null,
+      addonOverrides: {
+        create: [
+          ...fields.addons.map((addonKey) => ({ addonKey, enabled: true })),
+          ...(fields.off ?? []).map((addonKey) => ({ addonKey, enabled: false })),
+        ],
+      },
     },
     select: { id: true },
   })
@@ -73,15 +82,17 @@ async function seedCompany(tx: Tx, fields: { addons: string[]; deleted?: boolean
 }
 
 describe('listActiveCompanyIds y los añadidos', () => {
-  it('R25: una empresa viva sin añadidos sale en la lista, igual que una con todos; la de baja no', async () => {
+  it('R25: una empresa viva sin añadidos o con todos apagados sale en la lista, igual que una con todos; la de baja no', async () => {
     await inRolledBackTransaction(async (tx) => {
       const sinAnadidos = await seedCompany(tx, { addons: [] })
+      const todosApagados = await seedCompany(tx, { addons: [], off: [...ADDONS] })
       const conTodos = await seedCompany(tx, { addons: [...ADDONS] })
       const deBaja = await seedCompany(tx, { addons: [...ADDONS], deleted: true })
 
       const ids = await listActiveCompanyIds()
 
       expect(ids).toContain(sinAnadidos)
+      expect(ids).toContain(todosApagados)
       expect(ids).toContain(conTodos)
       expect(ids).not.toContain(deBaja)
     })
