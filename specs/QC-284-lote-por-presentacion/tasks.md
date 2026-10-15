@@ -80,7 +80,7 @@
 
 ## Bloque D — Pantalla (frontend_dev), depende de T9 y T10
 
-- [ ] **T12. Formulario único** (R13, R14, R15, R17, R25). `design.md > 5.1, 5.2`.
+- [x] **T12. Formulario único** (R13, R14, R15, R17, R25). `design.md > 5.1, 5.2`.
   **Hecho:** test de componente: un solo juego de tres campos y un botón; valores iniciales con
   `shared`; vacíos sin aviso con `empty`; vacíos con `Notice` `warning`, la lista por línea y
   «sin lote» con `divergent`; deshabilitado con `no_batches`; tras un rechazo, `role="alert"`,

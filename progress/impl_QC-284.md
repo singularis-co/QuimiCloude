@@ -230,3 +230,48 @@ completas, con pedidos que pasan por Terminar).
 - `vitest related` sobre los 7 archivos de `lib/` y `scripts/`: 429 archivos, 7293 pass, 2 skipped, 0 fail (el barrel `asignaciones/index.ts` arrastra casi toda la suite; los tests de UI pasan en ejecucion aunque no tipan, ver typecheck).
 
 Veredicto: T8-T11 hechas y verdes en backend; el typecheck queda rojo solo por los 11 errores de frontend que cierra T12.
+
+## Tanda 4 — T12, T13 (frontend_dev, 2026-10-14)
+
+### Archivos
+
+- `app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-batch-data-form.tsx` (reescrito: un solo juego de campos; props `{ orderId, form, divergentLabels }`; `Notice` warning para `divergent`; campo culpable por `code`; se retiran `batchId`, testids de linea y provisional; nace `CONDITIONING_BATCH_DATA_DIVERGENT_TESTID`)
+- `app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-order-screen.tsx` (pasa `batchData.form` y las etiquetas por `presentationId`)
+- `app/(private)/asignacion/acondicionamiento/[id]/components/index.ts` (barrel)
+- `tests/unit/asignaciones-ui/conditioning-batch-data-form.test.tsx` (reescrito)
+- `tests/unit/asignaciones-ui/conditioning-order-screen.test.tsx`
+- `tests/unit/asignaciones-ui/conditioning-order-page.test.tsx` (fixtures con `form`)
+- `tests/unit/paridad/asignacion-acondicionamiento-paridad.test.tsx` + `__snapshots__/…snap` (3 actualizados, 1 nuevo `no_batches`, 1 obsoleto retirado)
+- `e2e/datos-de-lote-en-acondicionamiento.spec.ts` (reescrito al recorrido de R30)
+
+Sin componentes nuevos (solo compone `Input`, `Label`, `Button`, `ErrorAlert`, `Notice`), sin cambios en `lib/`, sin dependencias.
+
+### Mapa R<n> -> test
+
+| R | Archivo | Caso |
+|---|---|---|
+| R13 | `tests/unit/asignaciones-ui/conditioning-batch-data-form.test.tsx` | `R13: un solo juego de «Lote», «Vencimiento» y «Día de producción» y un único botón, sin bloques por línea`; `R13: cada campo tiene su etiqueta, 16 px, 44 px de alto, es obligatorio y las fechas usan el selector nativo`; `R13: envía orderId y un solo valor por campo, y confirma con un solo toast` |
+| R13, R14 | `tests/unit/asignaciones-ui/conditioning-order-screen.test.tsx` | `R13 R14 R33: en %s, con batchData, pinta la tarjeta con un solo juego de campos y un botón` (3 estados) |
+| R14 | `conditioning-batch-data-form.test.tsx` | `R14: con datos uniformes los tres campos vienen rellenos y no hay aviso`; `R14: sin datos los tres campos vienen vacíos y no hay aviso` |
+| R15 | `conditioning-batch-data-form.test.tsx` | `R15: con lotes distintos los campos vienen vacíos y un aviso warning lista cada línea con su lote o «sin lote»` |
+| R15 | `conditioning-order-screen.test.tsx` | `R15: en %s, con lotes distintos, el aviso lista cada línea como en el reparto con su lote` (3 estados) |
+| R15 | `tests/unit/paridad/asignacion-acondicionamiento-paridad.test.tsx` | `R11 R13 R15 R24 — mio, con datos de lote incompletos y «Terminar» bloqueado` (snapshot) |
+| R17 | `conditioning-batch-data-form.test.tsx` | `R17: sin ninguna línea con lote los tres campos y el botón van deshabilitados` |
+| R17 | `asignacion-acondicionamiento-paridad.test.tsx` | `R17 R24 — mio, sin ninguna línea con lote: el formulario va deshabilitado` (snapshot) |
+| R25 | `conditioning-batch-data-form.test.tsx` | `R25: con %s muestra el mensaje en role="alert", marca aria-invalid solo su campo y conserva lo escrito` (3 códigos); `R25: con cualquier otro código va a role="alert" sin marcar ningún campo` |
+| R26, R30 | `e2e/datos-de-lote-en-acondicionamiento.spec.ts` | `R30 R26 - un solo formulario vacío, …` (pasos: vencimiento de hoy, producción de mañana, lote de otra producción de la misma presentación choca, lote de envase se acepta y las dos líneas quedan iguales, Terminar, Administrador en /inventario) |
+
+### Verificacion (salida real)
+
+- `pnpm run typecheck`: **0 errores** (`tsc --noEmit` sin salida).
+- `pnpm run lint`: 0 errores, 7 warnings en archivos no tocados (`tests/unit/documentos/confirm-catalog-import.test.ts`, `tests/unit/pedidos/order-service.test.ts`, …). `eslint` sobre mis archivos: «No issues found».
+- Tests por ruta: `conditioning-batch-data-form`, `conditioning-order-screen`, `conditioning-order-page`: 3 archivos, 67/67. Paridad: 37/37 (`-u`: 3 updated, 1 removed; el caso `no_batches` se escribió nuevo).
+- `pnpm exec vitest related --run` sobre los 3 componentes y los 4 tests: 7 archivos, 136/136.
+- `pnpm exec vitest run guard`: 76 archivos, 1066 pass, 20 skipped.
+- **E2E** `pnpm exec playwright test e2e/datos-de-lote-en-acondicionamiento.spec.ts`: **2 failed (chromium, webkit)**, misma causa en los dos y de entorno:
+  - Pasan en los dos navegadores: formulario único vacío sin aviso, «Terminar» deshabilitado, rechazo `batch_expiry_not_future`, rechazo `batch_production_date_future` y rechazo `batch_duplicate_lot` con el lote de otra producción de la misma presentación, sin cambiar ningún lote.
+  - Falla el paso «el lote de un envase se acepta»: la acción devuelve `unexpected`. Log del servidor: `Invalid tx.productBatch.update() … Unique constraint failed on the fields: (company_id, lot)` en `writeFinishedBatchLabels`.
+  - Causa: la base local de los E2E (`localhost:5432/QuimiCloude`, la de `.env`) **no tiene aplicada** `20261014200000_product_batches_lot_per_presentation`. `prisma migrate status`: «The migration have not yet been applied: 20261014200000_product_batches_lot_per_presentation»; además la base tiene 3 migraciones de otras ramas que no están en este worktree (`20260922160000_…`, `20260922160100_…`, `20261015120000_…`). Es una base compartida con otros worktrees: no la he migrado.
+  - Para cerrarlo: aplicar la migración en una base donde corra el E2E (o la compartida, si el humano lo acepta) y volver a correr el spec.
+
+Veredicto: T12 hecha y verde (typecheck a cero); T13 escrita, pero el E2E queda rojo por entorno: a la base de los E2E le falta la migración de T1.

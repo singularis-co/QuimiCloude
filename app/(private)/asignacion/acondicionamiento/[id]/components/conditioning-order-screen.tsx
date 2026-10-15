@@ -163,7 +163,10 @@ export function ConditioningOrderScreen({
               <CardContent>
                 <ConditioningBatchDataForm
                   orderId={order.id}
-                  lines={batchData.lines.map((line) => ({ ...line, label: orderDistributionFullText([line]) }))}
+                  form={batchData.form}
+                  divergentLabels={Object.fromEntries(
+                    batchData.lines.map((line) => [line.presentationId, orderDistributionFullText([line])]),
+                  )}
                 />
               </CardContent>
             </Card>
