@@ -61,10 +61,6 @@ async function setAddons(addons: readonly Addon[]): Promise<void> {
   await prisma.company.update({ where: { id: companyId }, data: { addons: [...addons] } });
 }
 
-function login(page: Page): Promise<string> {
-  return loginAndLand(page, { username: adminUsername, password: adminPassword });
-}
-
 /** El logo apunta a `/inicio`, y lo que cuenta es dónde acaba quien lo pulsa. */
 async function expectBrandLeadsTo(page: Page, destination: string): Promise<void> {
   const brand = page.getByTestId(BRAND_LINK);
@@ -167,7 +163,7 @@ test.describe('módulos por empresa', () => {
   }) => {
     await setAddons([]);
 
-    const destination = await login(page);
+    const destination = await loginAndLand(page, { username: adminUsername, password: adminPassword });
     expect(destination).toBe(INVENTORY_ROUTE);
 
     // Positivo sobre el mismo menú: sin él, un menú vacío daría el mismo verde.
@@ -186,7 +182,7 @@ test.describe('módulos por empresa', () => {
     page,
   }) => {
     await setAddons([]);
-    await login(page);
+    await loginAndLand(page, { username: adminUsername, password: adminPassword });
 
     for (const route of ADDON_ROUTES) {
       const response = await page.goto(route);
@@ -201,7 +197,7 @@ test.describe('módulos por empresa', () => {
     page,
   }) => {
     await setAddons([]);
-    await login(page);
+    await loginAndLand(page, { username: adminUsername, password: adminPassword });
 
     const response = await page.goto(LOGIN_ROUTE);
     await page.waitForURL((url) => url.pathname === INVENTORY_ROUTE, { timeout: 60_000 });
@@ -212,7 +208,7 @@ test.describe('módulos por empresa', () => {
     page,
   }) => {
     await setAddons([]);
-    await login(page);
+    await loginAndLand(page, { username: adminUsername, password: adminPassword });
     await expect(page.getByTestId('nav-dashboard')).toHaveCount(0);
 
     if (!companyId) throw new Error('el fixture no existe: fallo el beforeAll');
@@ -240,7 +236,7 @@ test.describe('módulos por empresa', () => {
     page,
   }) => {
     await setAddons(['lectura_pdf']);
-    await login(page);
+    await loginAndLand(page, { username: adminUsername, password: adminPassword });
 
     await page.goto(FORMULAS_ROUTE);
     await expect(page.getByTestId(RECIPES_TITLE)).toBeVisible({ timeout: 60_000 });

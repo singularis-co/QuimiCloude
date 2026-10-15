@@ -464,3 +464,52 @@ que añadir `e2e/movimiento.spec.ts` a `tasks.md > Archivos esperados`.
 - **Aviso:** el Bloque H (T22–T31) cambia `companies.addons` por tablas y su T31 dice que T20 y T21 corren después. Este
   censo es sobre el modelo anterior. Las llamadas a `enableAllAddons` siguen valiendo, pero el cuerpo del helper cambiará, así
   que hay que repetir el censo tras T31.
+
+## Tanda 5 — T21
+
+- 2026-10-15 (backend_dev): alta de `'modulos-por-empresa.spec.ts'` en `E2E_ESPERADOS` de `tests/guards/guard-identificador-de-request.test.ts` con su comentario (5 casos de añadidos; no lee el identificador de petición ni `reference`, QC-71 R21 intacto). `pnpm exec vitest run tests/guards/guard-identificador-de-request.test.ts` → 23/23 passed; `pnpm run lint` → exit 0 (solo warnings previos de otros archivos).
+- 2026-10-15 (frontend_dev): guardia QC-93 — borrada la función local `login` de `e2e/modulos-por-empresa.spec.ts`; sus 5 usos llaman directamente a `loginAndLand(page, { username: adminUsername, password: adminPassword })` (el valor devuelto se conserva en el primer caso); sin cambios en asserts ni en la guardia. `pnpm exec vitest run tests/guards/guard-e2e-landing.test.ts` → 16/16 passed; `pnpm run lint` → exit 0 (solo warnings previos de otros archivos); `pnpm run typecheck` → exit 0; `playwright test e2e/modulos-por-empresa.spec.ts` (base quimicloude_e2e_qc277) → 10 passed (chromium + webkit).
+
+### Mapa R1–R38 → test (consolidado, implementer, 2026-10-15)
+Antes del Bloque H. El T31 de ese bloque actualiza las filas R2, R5, R6/R38, R7 y R33/R34. Todos los archivos existen
+y corren en el gate; los títulos citan su R.
+
+| R | Test |
+|---|---|
+| R1, R2, R3 | `tests/unit/identity/addons/company-addons.test.ts` |
+| R4 | `company-addons.test.ts` + `tests/unit/documentos/run-document-job-addon.test.ts` + `tests/integration/identity/company-addons.int.test.ts` + E2E caso 5 |
+| R5 | `tests/integration/identity/company-addons.int.test.ts` |
+| R6, R38 | `tests/unit/identity/schema/company-addons-migration.test.ts` |
+| R7 | `tests/unit/identity/seed/seed-initial-access.test.ts` + `tests/integration/identity/identity-seed.int.test.ts` |
+| R8, R10, R11 | `tests/unit/identity/resolve-session.test.ts` + `tests/integration/identity/session-user.int.test.ts` |
+| R9 | `company-addons.int.test.ts` + E2E casos 4 y 5 |
+| R12 | `tests/unit/identity/addons/menu-recortado.test.ts` + E2E caso 1 |
+| R13 | `tests/unit/identity/require-page-addon.test.ts` + `tests/guards/guard-pantallas-de-anadido.test.ts` + E2E caso 2 |
+| R14, R16 | `tests/unit/inventario/importar/inventory-import-addon.test.ts` + `importar-page.test.tsx` + `tests/unit/inventario/product-page.test.tsx` |
+| R14, R15, R23 | `tests/unit/documentos/import-addon.test.ts` + `tests/unit/recetas-ui/formula-import-page.test.tsx` + `tests/unit/proveedores-ui/catalog-import-page.test.tsx` + `tests/unit/documentos-ui/formulas-upload.test.tsx` + `supplier-detail-upload.test.tsx` + `guard-pantallas-de-anadido.test.ts` |
+| R17 | `menu-recortado.test.ts` + `tests/unit/asignaciones-ui/assigned-orders-route-contract.test.ts` |
+| R18 | `tests/unit/identity/home-route.test.ts` + `tests/unit/app-sidebar.test.tsx` + `tests/unit/marca/sidebar-carril.test.ts` + `tests/unit/sidebar-desktop.test.tsx` + E2E casos 1 y 4 |
+| R19, R21 | `home-route.test.ts` + `tests/unit/identity/route-guard-middleware.test.ts` + E2E caso 3 |
+| R20 | `tests/unit/identity/login-action.test.ts` + `tests/unit/e2e-helpers/landing.test.ts` + E2E caso 1 |
+| R22 | `run-document-job-addon.test.ts` + `tests/unit/composition/documentos-facade.test.ts` + `company-addons.int.test.ts` |
+| R24 | `company-addons.int.test.ts` |
+| R25 | `tests/integration/identity/company-directory-addons.int.test.ts` |
+| R26 | `tests/guards/guard-rutas-fuera-de-sesion.test.ts` |
+| R27 | `tests/unit/identity/companies/get-company-addons.test.ts` + `tests/unit/identity/company-actions.test.ts` |
+| R28 | `tests/unit/identity/companies/set-company-addon.test.ts` + `company-actions.test.ts` |
+| R29 | `tests/unit/identity/companies/set-all-company-addons.test.ts` + `company-actions.test.ts` + `company-addons.int.test.ts` (atomicidad) |
+| R30, R31, R32 | los tres unitarios de `companies/` + `company-actions.test.ts` + `company-addons.int.test.ts` (R31, empresa de baja) |
+| R33, R34 | `company-addons.int.test.ts` + `tests/unit/identity/companies/company-event.test.ts` + `list-company-events.test.ts` + `company-actions.test.ts` |
+| R35 | suma de R8, R12–R16 y R22 + `tests/unit/identity/addons/sin-decision-en-cliente.test.ts` |
+| R36 | `e2e/modulos-por-empresa.spec.ts` (5/5 en chromium y en webkit) |
+| R37 | `tests/unit/identity/addons/architecture-doc.test.ts` |
+
+### Preguntas abiertas con el defecto aplicado
+- **P2:** la migración prende los cinco añadidos en las empresas existentes (R6, `company-addons-migration.test.ts`) y el seed
+  crea QuimiCloud con los cinco (R7, `seed-initial-access.test.ts` + `identity-seed.int.test.ts`).
+- **P3:** el interruptor de `lectura_pdf` se guarda pero no surte efecto sin `integraciones` (R4: `company-addons.test.ts`,
+  `run-document-job-addon.test.ts`, E2E caso 5).
+- **P4:** apagar no borra ni marca nada en `documentos`. Los trabajos que llegan con la lectura apagada terminan en `unauthorized`
+  definitivo y no vuelven a la cola (R22, `run-document-job-addon.test.ts`); R24 confirma que no se toca ningún dato.
+- **P5:** la evidencia por paso queda fuera: el catálogo tiene exactamente cinco claves (R2, `company-addons.test.ts`) y sus
+  permisos siguen en el núcleo.

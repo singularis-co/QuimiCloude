@@ -423,6 +423,18 @@ export const E2E_ESPERADOS = [
   // con el pie visible. No confirma nada. No lee ni afirma nada sobre el identificador de peticion
   // ni sobre `reference`.
   'pedidos-rediseno.spec.ts',
+  // Alta el 2026-10-15 (QC-277) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita, en una empresa sin añadidos: aterriza en
+  // Inventario, el menu no trae dashboard, proveedores ni integraciones, no hay boton de importar y
+  // el logo lleva a Inventario; cada pantalla de un añadido pedida por URL da el 404 privado con menu
+  // y cerrar sesion; entrar al login con sesion pasa por `/inicio` y acaba en Inventario. Al prender
+  // los cinco añadidos con la sesion abierta, la siguiente peticion ya trae enlaces, importar,
+  // dashboard y logo al dashboard sin volver a entrar; y con la lectura de PDF prendida pero
+  // integraciones apagado, Formulas no ofrece «Subir PDF» (con los dos, si). NO ejercita el cruce
+  // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'modulos-por-empresa.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
