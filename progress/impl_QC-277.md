@@ -72,3 +72,14 @@ T1–T5 implementados y verdes en lo suyo; 4 barridos de otras fichas en rojo po
   - `pnpm exec vitest related --run` sobre los 8 archivos de producción de la tanda (schema incluido):
     827/827 archivos, 13349 pasados, 0 fallidos, 14 saltados.
 - La migración se re-fechó a `20261014190000_company_addons` porque `20261014180000` lo usa `admin_without_assigned_orders_view`.
+
+### Segunda pasada de la opción A: barrido completo (2026-10-14)
+- Barrido: 68 tests que nombran códigos de `company-addons.ts` y recorren el árbol (o usan listas cerradas). Fallaban 2: `tests/unit/clientes/scope.test.ts` (R26, 1 test) y `tests/unit/asignaciones/module-contract.test.ts` (R29 y sus mutaciones, 20 tests).
+- Arreglo: `company-addons.ts` entra por ruta exacta, igual que `permissions.ts`. En asignaciones, además: el catálogo de añadidos tiene que leerse y nombrar los 3 códigos, y un vecino `company-addons-extra.ts` sigue vigilado.
+- Salida: typecheck exit 0; lint 0 errores y 7 avisos que ya estaban; barrido 68/68 archivos, 1252 pasados y 41 saltados; `vitest run guard` 76/76 archivos, 1066 pasados y 20 saltados.
+
+### Gate local tras la segunda pasada (implementer, 2026-10-14)
+- Tests ampliados por la opción A, en total: `tests/unit/identity/roles/maestro-rol.test.ts`,
+  `empacador-rol.test.ts`, `acondicionamiento-rol.test.ts`, `tests/unit/integraciones/module-shape.test.ts`,
+  `tests/unit/clientes/scope.test.ts` y `tests/unit/asignaciones/module-contract.test.ts`.
+- `./init.sh` (rápido): `test:rapido` 115/115 archivos, 1623 pasados, 37 saltados; `== init OK ==`, exit 0.

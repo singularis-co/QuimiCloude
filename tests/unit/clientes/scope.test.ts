@@ -194,6 +194,8 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
   }
 
   const PERMISO_YA_CUBIERTO = 'lib/modules/identity/domain/permissions.ts'
+  // Catalogo de anadidos: clasifica cada permiso como nucleo o anadido, y por eso lo nombra.
+  const CATALOGO_DE_ANADIDOS = 'lib/modules/identity/domain/company-addons.ts'
 
   /** Rutas de produccion donde el literal de permiso SI puede aparecer: el corte de la propia
    *  pantalla y el item del menu que la enlaza, cada uno acotado a su archivo exacto -nunca a la
@@ -204,6 +206,7 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
   function permisoPermitidoEn(relativo: string): boolean {
     return (
       relativo === PERMISO_YA_CUBIERTO ||
+      relativo === CATALOGO_DE_ANADIDOS ||
       relativo.startsWith('lib/modules/clientes/domain/') ||
       relativo === PANTALLA_PERMITIDA ||
       relativo === NAV_PERMITIDA
@@ -223,11 +226,11 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
     return hallazgos
   }
 
-  it('R26 (QC-153), R35 (QC-154), R37 (QC-155) — el literal de los dos permisos solo aparece en permissions.ts, en lib/modules/clientes/domain, en app/(private)/clientes/page.tsx o en private-nav.ts', () => {
+  it('R26 (QC-153), R35 (QC-154), R37 (QC-155) — el literal de los dos permisos solo aparece en permissions.ts, en company-addons.ts, en lib/modules/clientes/domain, en app/(private)/clientes/page.tsx o en private-nav.ts', () => {
     const hallazgos = detectarLiteralesDePermiso()
     expect(
       hallazgos,
-      'ningun archivo distinto de permissions.ts o de lib/modules/clientes/domain/** puede ' +
+      'ningun archivo distinto de permissions.ts, company-addons.ts o de lib/modules/clientes/domain/** puede ' +
         'nombrar clientes.consultar/modificar: ' + hallazgos.join(', '),
     ).toEqual([])
   })
