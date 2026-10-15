@@ -186,7 +186,7 @@
   - Los specs tocados se anotan en `progress/impl_QC-277.md`. Si alguno no está
     en `## Archivos esperados`, se añade aquí antes del commit.
   - **Hecho:** la suite queda con los mismos rojos que `dev` (nada nuevo), escrito en el PR.
-- [ ] **T21 — Gate local y trazabilidad.** Depende de: todas
+- [x] **T21 — Gate local y trazabilidad.** Depende de: todas (hecho antes del Bloque H; se repite tras T31)
   - `./init.sh` verde.
   - El mapa `R<n> → test` en `progress/impl_QC-277.md`.
   - **Hecho:** los 38 requisitos tienen test, y P2–P5 constan con el defecto aplicado.

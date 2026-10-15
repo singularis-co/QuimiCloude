@@ -513,3 +513,11 @@ y corren en el gate; los títulos citan su R.
   definitivo y no vuelven a la cola (R22, `run-document-job-addon.test.ts`); R24 confirma que no se toca ningún dato.
 - **P5:** la evidencia por paso queda fuera: el catálogo tiene exactamente cinco claves (R2, `company-addons.test.ts`) y sus
   permisos siguen en el núcleo.
+
+### Gate local T21 (implementer, 2026-10-15; `./init.sh` rápido sobre `9e65f3fd`)
+- 1.ª pasada: `guard-identificador-de-request` R21, porque la lista cerrada `E2E_ESPERADOS` no tenía el spec nuevo → alta.
+- 2.ª pasada: `guard-e2e-landing` (QC-93), porque el spec tenía una función local `login` → se entra directamente por `loginAndLand`. Esta guardia no la dispara `playwright` y
+  solo salió en el gate.
+- 3.ª pasada: related 886/886 archivos (14230 pasados, 59 saltados); test:rapido 117/117 (1641 pasados, 37 saltados);
+  `== init OK ==`. Los inestables conocidos (`adjust-batch-dialog`, `documentos/module-contract`) no salieron.
+- Veredicto: T19–T21 hechos sobre el modelo `companies.addons`. El Bloque H (T22–T31) pide repetir T20 y T21 tras T31.
