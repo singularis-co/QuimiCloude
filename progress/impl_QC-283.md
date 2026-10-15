@@ -352,3 +352,32 @@ Sobre el arbol combinado (1A + 1B):
 - `pnpm exec vitest related --run <5 archivos de T8>` → `Test Files 5 passed (5)`, `Tests 126 passed (126)`.
 - related de T4–T7: ver el cierre de T7 (386 archivos, 6428 en verde).
 Sin push (lo pide el leader). T9/T10 pendientes.
+
+## T9 — E2E (frontend_dev, 2026-10-14)
+
+### Archivos
+- `e2e/recorrido-acondicionamiento.spec.ts` (NUEVO). Sin cambios en código de producción.
+
+### Mapa R → test
+| R | Test |
+|---|---|
+| R36 | `e2e/recorrido-acondicionamiento.spec.ts` › «R36 - el supervisor comienza con un equipo de dos (uno por grupo), guarda y corrige…» (pasos internos R26, R30 R31, R12 R13, R5 R15, R17, R25) |
+
+Fixture: pedido «Por acondicionar» con reparto de 2 líneas, lotes y asientos `production`, y
+anotaciones de producción y empaque sembradas (10 min cada fase) firmadas por un tercero; equipo =
+1 persona suelta + 1 por grupo, ninguno firma; pedido señuelo firmado solo por el Administrador.
+El miembro por grupo no es opción del filtro (R31) y se filtra por URL `?persona=<id>` (R30).
+
+### Verificación (salida real)
+- `pnpm run typecheck` → `tsc --noEmit`, 0 errores.
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos 7 previos; el spec nuevo, limpio.
+- `pnpm exec playwright test e2e/recorrido-acondicionamiento.spec.ts --project=chromium` → **1 failed
+  en el `beforeAll`**: `Invalid prisma.orderExecutionEntry.create() … The column 'existe' does not
+  exist in the current database` (es `batch_lines`). La base local compartida (`QuimiCloude`) no
+  tiene las migraciones de esta feature: `prisma migrate status` → «have not yet been applied:
+  20261015120000_order_execution_conditioning_actions, 20261015120100_order_execution_batch_lines»,
+  y además trae migraciones de otras ramas que este worktree no tiene. No se migró (fuera de
+  alcance de frontend_dev). Limpieza comprobada: 0 empresas `qc283_e2e_` restantes.
+- Grafo de código (MCP) no usado: exploración con Grep/Read.
+
+Veredicto: spec escrito y tipado; no se pudo poner en verde en local porque la base no tiene las migraciones de QC-283 — pendiente de correr en CI o en una base migrada.
