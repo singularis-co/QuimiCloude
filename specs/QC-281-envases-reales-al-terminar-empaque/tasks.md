@@ -71,7 +71,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
 - **Hecho:** tests verdes; `guard-catalogo-de-errores`, `guard-autorizacion-por-permiso` y
   `guard-arquitectura-modulos` verdes. (R13, R14)
 
-## T7 [P] — Vista de empaque y acondicionamiento en `asignaciones` (depende de T4, T6)
+## [x] T7 [P] — Vista de empaque y acondicionamiento en `asignaciones` (depende de T4, T6)
 - `packing-order-view.ts` / `get-packing-order.ts` / `list-packing-orders.ts`: fuera `packages`;
   dentro `finish` (`design.md § 2.4`) con `PackagingCatalog.findRefs` y unidades.
 - `order-distribution-view.ts`: `lineId` y `packedPackages`; `conditioning-order-view.ts` pinta
@@ -82,7 +82,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   (`packedPackages` nulo) sigue como hoy.
 - **Hecho:** tests verdes. (R1, R9, R23, R25)
 
-## T8 [P] — Entregas con envases reales en `pedidos` (depende de T4)
+## [x] T8 [P] — Entregas con envases reales en `pedidos` (depende de T4)
 - `deliver-order.ts` y `get-order-delivery.ts`: `orderedPackages = effectivePackages(line)`.
 - Tests: línea con menos reales → lo pendiente es el real y la entrega completa el pedido con el
   real; línea en 0 no pide nada; línea antigua usa el plan.
@@ -104,7 +104,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   `packing-order-evidence.test.tsx` y el snapshot de `confirmaciones-paridad`.
 - **Hecho:** tests verdes; revisión visual contra los tableros en 1440/1024/390. (R1–R13, R32, R33)
 
-## T10 [P] — Tab «Reparto» (depende de T4)
+## [x] T10 [P] — Tab «Reparto» (depende de T4)
 - `FinishedDistributionDirectory` en `lib/modules/inventario/domain/finished-product-detail.ts`;
   `list-finished-product-distribution.ts`; export en `inventario/index.ts`; acción en
   `finished-product-actions.ts`.

@@ -256,6 +256,10 @@ export type AssignedOrderPresentationLine = {
   /** Envases contados al terminar el empaque; `null` = sin terminar, o terminado antes de que se
    *  contaran (se lee como `packages`). */
   readonly packedPackages: number | null;
+  /** Contenido copiado al guardar la linea; `null` = sin copia, vale el vigente de la presentacion. */
+  readonly presentationContent: string | null;
+  /** `null` = linea guardada antes de que el reparto nombrara envases. */
+  readonly packagingProductId: string | null;
   /** `null` = linea guardada antes de que el reparto nombrara envases, o envase que ya no vuelve
    *  del catalogo. */
   readonly packagingName: string | null;

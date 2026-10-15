@@ -69,6 +69,7 @@ type AssignedOrderPresentationLineRow = {
   readonly presentationId: string;
   readonly packages: number;
   readonly packedPackages: number | null;
+  readonly presentationContent: { toFixed(digits: number): string } | null;
   readonly packagingProductId: string | null;
 };
 
@@ -104,7 +105,14 @@ const SUMMARY_SELECT = {
   status: true,
   unitId: true,
   presentationLines: {
-    select: { id: true, presentationId: true, packages: true, packedPackages: true, packagingProductId: true },
+    select: {
+      id: true,
+      presentationId: true,
+      packages: true,
+      packedPackages: true,
+      presentationContent: true,
+      packagingProductId: true,
+    },
     orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
   },
   finishedAt: true,
@@ -149,6 +157,7 @@ export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummary
         presentationId: line.presentationId,
         packages: line.packages,
         packedPackages: line.packedPackages,
+        presentationContent: line.presentationContent === null ? null : line.presentationContent.toFixed(4),
         packagingProductId: line.packagingProductId,
       }),
     ),

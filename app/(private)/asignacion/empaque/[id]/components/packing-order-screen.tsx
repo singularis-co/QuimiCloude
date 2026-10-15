@@ -20,7 +20,6 @@ import {
   type StartPackingResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-packing-actions';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
-import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 import { cn } from '@/lib/utils';
 
@@ -55,7 +54,6 @@ export const PACKING_ORDER_QUANTITY_TESTID = 'packing-order-quantity';
 export const PACKING_ORDER_PRESENTATION_TESTID = 'packing-order-presentation';
 export const PACKING_ORDER_PRESENTATION_LINE_TESTID = 'packing-order-presentation-line';
 export const PACKING_ORDER_MISSING_DISTRIBUTION_TESTID = 'packing-order-missing-distribution';
-export const PACKING_ORDER_PACKAGES_TESTID = 'packing-order-packages';
 export const PACKING_ORDER_STATUS_TESTID = 'packing-order-status';
 export const PACKING_ORDER_PACKER_TESTID = 'packing-order-packer';
 export const PACKING_ORDER_START_FORM_TESTID = 'packing-order-start-form';
@@ -94,7 +92,6 @@ export const PACKING_ORDER_TEXTS = {
   distribution: 'Reparto',
   emptyDistribution: 'Sin presentación',
   missingDistribution: 'Falta el reparto: lo define quien edita pedidos',
-  packages: 'Envases:',
   start: 'Comenzar',
   startPending: 'Comenzando…',
   finish: 'Terminar',
@@ -355,10 +352,6 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
               </Notice>
             ) : null}
           </section>
-
-          <p className="text-base" data-testid={PACKING_ORDER_PACKAGES_TESTID}>
-            {PACKING_ORDER_TEXTS.packages} {order.packages ?? EMPTY_MARK}
-          </p>
         </Card>
 
         <div className="flex min-w-0 flex-col gap-4">

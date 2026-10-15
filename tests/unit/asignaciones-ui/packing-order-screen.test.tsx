@@ -22,7 +22,6 @@ import {
   PACKING_ORDER_STEPS_TESTID,
   PACKING_ORDER_BACK_LINK_TESTID,
   PACKING_ORDER_PACKER_TESTID,
-  PACKING_ORDER_PACKAGES_TESTID,
   PACKING_ORDER_RECIPE_TESTID,
   PACKING_ORDER_START_FORM_TESTID,
   PACKING_ORDER_TEXTS,
@@ -52,18 +51,18 @@ function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
-      { presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-      { presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2 },
-      { presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1 },
+      { lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+      { lineId: 'linea-2', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2 },
+      { lineId: 'linea-3', packedPackages: null, presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1 },
     ],
     unitId: 'unit-1',
     unitLabel: 'kg',
-    packages: '8',
     status: 'POR_EMPACAR',
     packedByName: null,
     packedById: null,
     packingSteps: [],
     packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }
@@ -169,7 +168,7 @@ describe('pantalla del Empacador — el nombre del envase de cada linea', () => 
     pintar(
       fila({
         presentationLines: [
-          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: 'Botella PET ámbar 200 ml', packages: 5 },
+          { lineId: 'linea-4', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: 'Botella PET ámbar 200 ml', packages: 5 },
         ],
       }),
     );
@@ -182,8 +181,8 @@ describe('pantalla del Empacador — el nombre del envase de cada linea', () => 
     pintar(
       fila({
         presentationLines: [
-          { presentationId: 'p-1', presentationName: 'Botella PET', packagingName: 'Botella PET ámbar 200 ml', packages: 5 },
-          { presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2 },
+          { lineId: 'linea-5', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella PET', packagingName: 'Botella PET ámbar 200 ml', packages: 5 },
+          { lineId: 'linea-6', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2 },
         ],
       }),
     );
@@ -614,7 +613,7 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
     const reparto = screen.getByTestId(PACKING_ORDER_PRESENTATION_TESTID);
     expect(within(reparto).getByRole('heading', { level: 2, name: 'Reparto' })).toBeInTheDocument();
     expect(within(reparto).getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID)).toHaveLength(3);
-    expect(screen.getByTestId(PACKING_ORDER_PACKAGES_TESTID)).toHaveTextContent('Envases: 8');
+    expect(screen.queryByText(/Envases:/)).toBeNull();
   });
 
   it('R28: sin líneas dice «Sin presentación» y la falta de reparto es un `Notice` `warning`', () => {

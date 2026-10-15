@@ -20,15 +20,15 @@ function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
     numberText: '2026-0000030',
     recipeName: 'Jarabe simple',
     quantity: '12.5',
-    presentationLines: [{ presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 }],
+    presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 }],
     unitId: 'unit-1',
     unitLabel: 'l',
-    packages: '5',
     status: 'POR_EMPACAR',
     packedByName: null,
     packedById: null,
     packingSteps: [],
     packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }

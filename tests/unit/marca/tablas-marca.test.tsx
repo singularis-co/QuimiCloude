@@ -300,7 +300,7 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
           typeof import('@/app/(private)/asignacion/components/packing-orders-columns')
         >('@/app/(private)/asignacion/components/packing-orders-columns')
       ).buildPackingOrdersColumns(),
-    esperadas: ['Envases'],
+    esperadas: [],
   },
   {
     archivo: 'execution-trace-columns.tsx',

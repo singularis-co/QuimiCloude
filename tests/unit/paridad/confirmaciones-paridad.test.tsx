@@ -323,16 +323,16 @@ function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOr
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
-      { presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+      { lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
     ],
     unitId: 'unit-1',
     unitLabel: 'kg',
-    packages: '8',
     status: 'POR_EMPACAR',
     packedByName: null,
     packedById: null,
     packingSteps: [],
     packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }

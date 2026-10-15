@@ -120,8 +120,8 @@ const POR_ACONDICIONAR: ConditioningOrderRow = {
   unitId: 'unit-kg',
   unitLabel: 'kg',
   presentationLines: [
-    { presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12 },
-    { presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: null, packages: 4 },
+    { lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12 },
+    { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: null, packages: 4 },
   ],
   status: 'POR_ACONDICIONAR',
   conditionedByName: null,
@@ -147,7 +147,7 @@ const ACONDICIONADO: FinishedOrderView = {
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [
-    { presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 5 },
+    { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 5 },
   ],
   unitId: null,
   unitLabel: null,
@@ -240,18 +240,18 @@ function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOr
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
-      { presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-      { presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: 'Garrafa azul', packages: 2 },
-      { presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1 },
+      { lineId: 'linea-4', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+      { lineId: 'linea-5', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: 'Garrafa azul', packages: 2 },
+      { lineId: 'linea-6', packedPackages: null, presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1 },
     ],
     unitId: 'unit-1',
     unitLabel: 'kg',
-    packages: '8',
     status: 'POR_EMPACAR',
     packedByName: null,
     packedById: null,
     packingSteps: [],
     packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }
@@ -535,7 +535,6 @@ describe('paridad del empaque — la pantalla del pedido', () => {
         recipeName: null,
         unitId: null,
         unitLabel: null,
-        packages: null,
       }),
     );
     expect(arbolAccesible()).toMatchSnapshot();

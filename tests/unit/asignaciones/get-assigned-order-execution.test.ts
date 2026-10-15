@@ -398,7 +398,7 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
 describe('getAssignedOrderExecution — la presentacion del pedido asignado', () => {
   it('R25: la vista lleva el nombre de la presentacion cuando el pedido tiene una', async () => {
     const { deps, findRefsPresentations } = montar({
-      summary: resumen({ presentationLines: [{ id: 'linea-1', presentationId: PRESENTACION, packages: 1, packedPackages: null, packagingName: null }] }),
+      summary: resumen({ presentationLines: [{ id: 'linea-1', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] }),
       presentations: [presentacion()],
     });
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
@@ -427,8 +427,8 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     const { deps, findRefsPresentations } = montar({
       summary: resumen({
         presentationLines: [
-          { id: 'linea-2', presentationId: SEGUNDA_PRESENTACION, packages: 5, packedPackages: null, packagingName: null },
-          { id: 'linea-3', presentationId: PRESENTACION, packages: 1, packedPackages: null, packagingName: null },
+          { id: 'linea-2', presentationId: SEGUNDA_PRESENTACION, packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
+          { id: 'linea-3', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
         ],
       }),
       presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
@@ -440,8 +440,8 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     expect(findRefsPresentations).toHaveBeenCalledTimes(1);
     expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
     expect(view.presentationLines).toEqual([
-      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
-      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
+      { lineId: 'linea-2', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: null },
+      { lineId: 'linea-3', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null },
     ]);
   });
 
@@ -449,8 +449,8 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     const { deps } = montar({
       summary: resumen({
         presentationLines: [
-          { id: 'linea-4', presentationId: SEGUNDA_PRESENTACION, packages: 5, packedPackages: null, packagingName: 'Envase PET 200 ml' },
-          { id: 'linea-5', presentationId: PRESENTACION, packages: 1, packedPackages: null, packagingName: null },
+          { id: 'linea-4', presentationId: SEGUNDA_PRESENTACION, packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: 'Envase PET 200 ml' },
+          { id: 'linea-5', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
         ],
       }),
       presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
@@ -460,8 +460,8 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(view.presentationLines).toEqual([
-      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: 'Envase PET 200 ml' },
-      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
+      { lineId: 'linea-4', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: 'Envase PET 200 ml' },
+      { lineId: 'linea-5', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null },
     ]);
   });
 

@@ -223,16 +223,16 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       status: 'PENDIENTE',
       unitId: 'u-1',
       presentationLines: [
-        { id: 'lp-1', presentationId: 'p-1', packages: 5, packedPackages: null, packagingProductId: null },
-        { id: 'lp-2', presentationId: 'p-2', packages: 1, packedPackages: null, packagingProductId: null },
+        { id: 'lp-1', presentationId: 'p-1', packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null },
+        { id: 'lp-2', presentationId: 'p-2', packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null },
       ],
       finishedAt: null,
       packedBy: null,
       conditionedBy: null,
     })
     expect(conReparto.presentationLines).toEqual([
-      { id: 'lp-1', presentationId: 'p-1', packages: 5, packedPackages: null, packagingProductId: null },
-      { id: 'lp-2', presentationId: 'p-2', packages: 1, packedPackages: null, packagingProductId: null },
+      { id: 'lp-1', presentationId: 'p-1', packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null },
+      { id: 'lp-2', presentationId: 'p-2', packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null },
     ])
 
     const sinReparto = toOrderSummaryRecord({
@@ -644,7 +644,14 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     const seleccion = findMany.mock.calls[0]?.[0]?.select
     expect(seleccion.unitId).toBe(true)
     expect(seleccion.presentationLines).toEqual({
-      select: { id: true, presentationId: true, packages: true, packedPackages: true, packagingProductId: true },
+      select: {
+        id: true,
+        presentationId: true,
+        packages: true,
+        packedPackages: true,
+        presentationContent: true,
+        packagingProductId: true,
+      },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     })
     // Y ya no pide la columna que retiro T10: el reparto vive en `order_presentation_lines`.
@@ -670,9 +677,9 @@ describe('listAliveSummariesByIds — el nombre del envase de cada linea', () =>
         status: 'POR_EMPACAR',
         unitId: null,
         presentationLines: [
-          { presentationId: 'p-1', packages: 4, packagingProductId: 'env-1' },
-          { presentationId: 'p-2', packages: 2, packagingProductId: null },
-          { presentationId: 'p-3', packages: 1, packagingProductId: 'env-de-baja' },
+          { presentationId: 'p-1', packages: 4, presentationContent: { toFixed: () => '1.0000' }, packagingProductId: 'env-1' },
+          { presentationId: 'p-2', packages: 2, presentationContent: null, packagingProductId: null },
+          { presentationId: 'p-3', packages: 1, presentationContent: null, packagingProductId: 'env-de-baja' },
         ],
         finishedAt: null,
         packedBy: null,
@@ -684,9 +691,9 @@ describe('listAliveSummariesByIds — el nombre del envase de cada linea', () =>
     expect(findPackagingRefs).toHaveBeenCalledTimes(1)
     expect(findPackagingRefs).toHaveBeenCalledWith(['env-1', 'env-de-baja'], EMPRESA)
     expect(pagina.items[0]?.presentationLines).toEqual([
-      { presentationId: 'p-1', packages: 4, packagingName: 'Envase PET 1L' },
-      { presentationId: 'p-2', packages: 2, packagingName: null },
-      { presentationId: 'p-3', packages: 1, packagingName: null },
+      { presentationId: 'p-1', packages: 4, presentationContent: '1.0000', packagingProductId: 'env-1', packagingName: 'Envase PET 1L' },
+      { presentationId: 'p-2', packages: 2, presentationContent: null, packagingProductId: null, packagingName: null },
+      { presentationId: 'p-3', packages: 1, presentationContent: null, packagingProductId: 'env-de-baja', packagingName: null },
     ])
   })
 

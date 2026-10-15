@@ -36,6 +36,8 @@ async function withPackagingNames(
         presentationId: line.presentationId,
         packages: line.packages,
         packedPackages: line.packedPackages,
+        presentationContent: line.presentationContent,
+        packagingProductId: line.packagingProductId,
         packagingName: line.packagingProductId === null ? null : (names.get(line.packagingProductId) ?? null),
       })),
     })),

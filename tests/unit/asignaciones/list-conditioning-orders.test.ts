@@ -99,9 +99,9 @@ describe('R6 — la consulta: toda la empresa, los dos estados, el orden de trab
 describe('R7 — cada fila trae numero, receta, reparto completo, estado y quien acondiciona', () => {
   it('R7: el reparto sale entero y en el orden de alta, con el nombre del envase y de la presentacion', async () => {
     const lineas = [
-      { id: 'linea-1', presentationId: 'pres-500', packages: 12, packedPackages: null, packagingName: '500 g' },
-      { id: 'linea-2', presentationId: 'pres-1k', packages: 4, packedPackages: null, packagingName: '1 kg' },
-      { id: 'linea-3', presentationId: 'pres-2k', packages: 1, packedPackages: null, packagingName: null },
+      { id: 'linea-1', presentationId: 'pres-500', packages: 12, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: '500 g' },
+      { id: 'linea-2', presentationId: 'pres-1k', packages: 4, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: '1 kg' },
+      { id: 'linea-3', presentationId: 'pres-2k', packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
     ];
     const { deps } = montar({
       items: [resumen(PEDIDO_1, { presentationLines: lineas })],
@@ -115,9 +115,9 @@ describe('R7 — cada fila trae numero, receta, reparto completo, estado y quien
     const [fila] = (await createListConditioningOrders(deps)(ACONDICIONADOR, { page: 1 })).items;
 
     expect(fila?.presentationLines).toEqual([
-      { presentationId: 'pres-500', presentationName: 'Bolsa 500 g', packages: 12, packagingName: '500 g' },
-      { presentationId: 'pres-1k', presentationName: 'Bolsa 1 kg', packages: 4, packagingName: '1 kg' },
-      { presentationId: 'pres-2k', presentationName: null, packages: 1, packagingName: null },
+      { lineId: 'linea-1', presentationId: 'pres-500', presentationName: 'Bolsa 500 g', packages: 12, packedPackages: null, packagingName: '500 g' },
+      { lineId: 'linea-2', presentationId: 'pres-1k', presentationName: 'Bolsa 1 kg', packages: 4, packedPackages: null, packagingName: '1 kg' },
+      { lineId: 'linea-3', presentationId: 'pres-2k', presentationName: null, packages: 1, packedPackages: null, packagingName: null },
     ]);
   });
 

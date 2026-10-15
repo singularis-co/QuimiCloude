@@ -84,12 +84,12 @@ function filaCon(overrides: Partial<Record<string, unknown>> = {}) {
     presentationLines: [{ presentationId: 'presentation-1', presentationName: 'Caja x 12', packages: 4 }],
     unitId: 'unit-1',
     unitLabel: 'kg',
-    packages: '4',
     status: 'POR_EMPACAR',
     packedByName: null,
     packedById: null,
     packingSteps: [],
     packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }

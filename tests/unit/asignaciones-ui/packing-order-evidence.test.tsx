@@ -68,12 +68,12 @@ function pedido(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail
     presentationLines: [],
     unitId: null,
     unitLabel: null,
-    packages: '8',
     status: 'EN_EMPAQUE',
     packedByName: 'Empacador de Prueba',
     packedById: ACTOR_ID,
     packingSteps: [paso('Etiqueta los envases', true), paso('Sella las cajas')],
     packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }

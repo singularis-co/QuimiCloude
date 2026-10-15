@@ -15,6 +15,7 @@ export type OrderSummaryLineRecord = {
   readonly presentationId: string;
   readonly packages: number;
   readonly packedPackages: number | null;
+  readonly presentationContent: string | null;
   readonly packagingProductId: string | null;
 };
 
