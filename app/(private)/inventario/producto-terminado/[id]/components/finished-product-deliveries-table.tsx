@@ -96,6 +96,16 @@ function deliveryColumns(unitLabel: string | null): readonly DataTableColumn<Fin
       ),
     },
     {
+      id: 'presentation',
+      label: 'Presentación',
+      align: 'start',
+      cell: (row) => (
+        <span data-testid="finished-product-delivery-presentation">
+          {row.presentationName ?? EMPTY_MARK}
+        </span>
+      ),
+    },
+    {
       id: 'lot',
       label: 'Lote',
       align: 'start',

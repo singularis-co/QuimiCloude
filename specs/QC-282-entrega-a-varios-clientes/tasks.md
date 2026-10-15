@@ -170,7 +170,7 @@ Cubre: R33–R38 (pantalla).
 
 ---
 
-## [ ] F3 — `Checkbox` con estado indeterminado (depende de T0)
+## [x] F3 — `Checkbox` con estado indeterminado (depende de T0)
 
 - `components/ui/checkbox.tsx` (`design.md > 7.4`).
 - `components/shared/CATALOGO.md`: punto de extensión en la fila de `Checkbox`.
@@ -183,7 +183,7 @@ Cubre: base de R37.
 
 ---
 
-## [ ] F4 [P] — Tab Entregas con «Presentación» (depende de T0)
+## [x] F4 [P] — Tab Entregas con «Presentación» (depende de T0)
 
 - `app/(private)/inventario/producto-terminado/[id]/components/finished-product-deliveries-table.tsx`
   (`design.md > 7.5`).
