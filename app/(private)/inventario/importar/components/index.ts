@@ -11,6 +11,7 @@ export {
 } from './import-create-unit-dialog';
 export { ImportFileRejection, describeRejection } from './import-file-rejection';
 export { ImportGuide, type ImportGuideProps } from './import-guide';
+export { GUIDE_CATALOG_LINK_ROUTES, GUIDE_COLUMN_DESCRIPTIONS } from './import-guide-descriptions';
 export { ImportMissingCatalog, type ImportMissingCatalogProps } from './import-missing-catalog';
 export {
   ErrorFileButton,
