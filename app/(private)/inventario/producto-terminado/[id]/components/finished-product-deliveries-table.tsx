@@ -177,7 +177,7 @@ export function FinishedProductDeliveriesTable({
         tableId={FINISHED_PRODUCT_DELIVERIES_TABLE_ID}
         columns={columns}
         rows={page.items}
-        getRowId={(row) => row.movementId}
+        getRowId={(row) => row.deliveryLineId}
         params={finishedProductTableParams(page)}
         totalPages={page.totalPages}
         onParamsChange={(next) =>

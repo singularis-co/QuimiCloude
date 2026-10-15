@@ -12,6 +12,7 @@ import { DELIVERY_MAX_ALLOCATIONS } from '@/lib/modules/pedidos/domain/order-del
 import { createVoidDelivery, type VoidDeliveryDeps } from '@/lib/modules/pedidos/domain/void-delivery'
 import {
   FIRST_BATCH_ID,
+  FIRST_CUSTOMER_ID,
   NEWER_DELIVERY_ID,
   OPEN_LINE_ID,
   SECOND_BATCH_ID,
@@ -25,6 +26,7 @@ import {
 import { fakeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { FinishedGoodsReturnOutcome } from '@/lib/modules/inventario'
+import type { VoidDeliveryInput } from '@/lib/modules/pedidos/adapters/driving/order-actions'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { PedidosError } from '@/lib/modules/pedidos/domain/errors'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
@@ -47,16 +49,22 @@ const OTHER_LINE_ID = 'd0000000-0000-4000-8000-000000000026'
 const OTHER_BATCH_ID = 'e0000000-0000-4000-8000-000000000027'
 const AJENA = 'd0000000-0000-4000-8000-000000000099'
 
+// 2026-10-15: la anulacion se pide por pares cliente-presentacion. Las lineas de este archivo son
+// todas del primer cliente, y las peticiones piden sus presentaciones.
+function delPrimerCliente(presentationLineIds: readonly string[]): Pick<VoidDeliveryInput, 'items'> {
+  return { items: presentationLineIds.map((presentationLineId) => ({ customerId: FIRST_CUSTOMER_ID, presentationLineId })) }
+}
+
 const ANULADOR: Actor = { id: 'u-anula', companyId: EMPRESA, permissions: ['entregas.anular'] }
 
 const ENTREGA: DeliveryForVoid = { id: NEWER_DELIVERY_ID, orderId: VOID_ORDER_ID }
 
 /** La presentacion abierta sale en dos lotes; la anulada, en uno; la otra, en uno. */
 const LINEAS: readonly DeliveryLineForVoid[] = [
-  { id: 'l-1', presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
-  { id: 'l-2', presentationLineId: OPEN_LINE_ID, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
-  { id: 'l-3', presentationLineId: VOIDED_LINE_ID, batchId: THIRD_BATCH_ID, packages: 3, quantity: '12.0000', voided: true },
-  { id: 'l-4', presentationLineId: OTHER_LINE_ID, batchId: OTHER_BATCH_ID, packages: 5, quantity: '2.5000', voided: false },
+  { id: 'l-1', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
+  { id: 'l-2', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
+  { id: 'l-3', customerId: FIRST_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, batchId: THIRD_BATCH_ID, packages: 3, quantity: '12.0000', voided: true },
+  { id: 'l-4', customerId: FIRST_CUSTOMER_ID, presentationLineId: OTHER_LINE_ID, batchId: OTHER_BATCH_ID, packages: 5, quantity: '2.5000', voided: false },
 ]
 
 function pedido(status: OrderStatus = 'ENTREGADO'): LockedOrderRow {
@@ -232,17 +240,15 @@ describe('voidDelivery — forma de la entrada (R17)', () => {
   const invalidas: ReadonlyArray<readonly [string, unknown]> = [
     ['deliveryId sin forma de uuid', voidInput({ deliveryId: 'entrega-1' })],
     ['voidKey sin forma de uuid', voidInput({ voidKey: 'clave' })],
-    ['ninguna presentacion', voidInput({ presentationLineIds: [] })],
-    ['una presentacion repetida', voidInput({ presentationLineIds: [OPEN_LINE_ID, OPEN_LINE_ID] })],
-    ['una presentacion sin forma de uuid', voidInput({ presentationLineIds: ['linea'] })],
+    ['ninguna presentacion', voidInput(delPrimerCliente([]))],
+    ['una presentacion repetida', voidInput(delPrimerCliente([OPEN_LINE_ID, OPEN_LINE_ID]))],
+    ['una presentacion sin forma de uuid', voidInput(delPrimerCliente(['linea']))],
     [
       'mas presentaciones que el tope',
-      voidInput({
-        presentationLineIds: Array.from(
+      voidInput(delPrimerCliente(Array.from(
           { length: DELIVERY_MAX_ALLOCATIONS + 1 },
           (_, i) => `d0000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
-        ),
-      }),
+        ))),
     ],
     ['motivo vacio', voidInput({ reason: '' })],
     ['motivo solo con espacios', voidInput({ reason: '   \t\n ' })],
@@ -316,7 +322,7 @@ describe('voidDelivery — entrega y pedido (R18, R19)', () => {
 describe('voidDelivery — presentaciones pedidas (R20, R21)', () => {
   it('R20: una presentacion que no es de esa entrega responde invalid_input sin escribir', async () => {
     const m = montar()
-    const entrada = voidInput({ presentationLineIds: [OPEN_LINE_ID, AJENA] })
+    const entrada = voidInput(delPrimerCliente([OPEN_LINE_ID, AJENA]))
     expect(await codigoDelFallo(() => createVoidDelivery(m.deps)(entrada, ANULADOR))).toBe('invalid_input')
     expect(m.tx.voids.findDeliveryLines).toHaveBeenCalledWith(NEWER_DELIVERY_ID, SCOPE)
     nadaEscrito(m)
@@ -324,7 +330,7 @@ describe('voidDelivery — presentaciones pedidas (R20, R21)', () => {
 
   it('R21: una presentacion ya anulada responde delivery_already_voided y no anula las otras pedidas', async () => {
     const m = montar()
-    const entrada = voidInput({ presentationLineIds: [OPEN_LINE_ID, VOIDED_LINE_ID] })
+    const entrada = voidInput(delPrimerCliente([OPEN_LINE_ID, VOIDED_LINE_ID]))
     expect(await codigoDelFallo(() => createVoidDelivery(m.deps)(entrada, ANULADOR))).toBe('delivery_already_voided')
     nadaEscrito(m)
   })
@@ -357,14 +363,14 @@ describe('voidDelivery — registro (R22, R23, R24)', () => {
 
   it('R22: addLines recibe todas las lineas de las presentaciones pedidas, en todos sus lotes, y ninguna otra', async () => {
     const m = montar()
-    await createVoidDelivery(m.deps)(voidInput({ presentationLineIds: [OPEN_LINE_ID] }), ANULADOR)
+    await createVoidDelivery(m.deps)(voidInput(delPrimerCliente([OPEN_LINE_ID])), ANULADOR)
     expect(m.tx.voids.addLines).toHaveBeenCalledTimes(1)
     expect(m.tx.voids.addLines).toHaveBeenCalledWith(VOID_ID, NEWER_DELIVERY_ID, ['l-1', 'l-2'], SCOPE)
   })
 
   it('R22: con dos presentaciones pedidas anula las lineas de las dos y deja la no pedida', async () => {
     const m = montar()
-    await createVoidDelivery(m.deps)(voidInput({ presentationLineIds: [OTHER_LINE_ID, OPEN_LINE_ID] }), ANULADOR)
+    await createVoidDelivery(m.deps)(voidInput(delPrimerCliente([OTHER_LINE_ID, OPEN_LINE_ID])), ANULADOR)
     const [, , ids] = m.tx.voids.addLines.mock.calls[0] as [string, string, string[]]
     expect([...ids].sort()).toEqual(['l-1', 'l-2', 'l-4'])
   })

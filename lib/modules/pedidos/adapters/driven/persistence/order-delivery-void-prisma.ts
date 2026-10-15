@@ -64,11 +64,13 @@ async function findDeliveryLinesForVoid(
       packages: true,
       quantity: true,
       voidLine: { select: { id: true } },
+      delivery: { select: { customerId: true } },
     },
     orderBy: [{ orderPresentationLineId: 'asc' }, { batchId: 'asc' }],
   });
   return rows.map((row) => ({
     id: row.id,
+    customerId: row.delivery.customerId,
     presentationLineId: row.orderPresentationLineId,
     batchId: row.batchId,
     packages: row.packages,
@@ -147,10 +149,10 @@ async function listOrderDeliveryHistory(
   });
   return rows.map((row) => ({
     id: row.id,
-    customerId: row.customerId,
     createdBy: row.createdBy,
     createdAt: row.createdAt,
     lines: row.lines.map((line) => ({
+      customerId: row.customerId,
       presentationLineId: line.orderPresentationLineId,
       batchId: line.batchId,
       packages: line.packages,

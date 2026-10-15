@@ -208,12 +208,13 @@ type SeededDelivery = {
   readonly lineIds: readonly [string, string, string]
 }
 
+// 2026-10-15: el cliente pasa de la entrega a cada linea.
 /** Una entrega de A con tres lineas: la presentacion 0 en sus dos lotes y la 1 en el primero. */
 async function seedDelivery(tx: Prisma.TransactionClient, t: Tenant, now: Date = ENTREGA_1): Promise<SeededDelivery> {
   const deliveries = createOrderDeliveryRepository(tx)
   const scope = { companyId: t.companyId }
   const outcome = await deliveries.create(
-    { deliveryKey: randomUUID(), orderId: t.orderId, customerId: t.customerId, actorId: t.userId, now },
+    { deliveryKey: randomUUID(), orderId: t.orderId, actorId: t.userId, now },
     scope,
   )
   if (outcome.kind !== 'created') throw new Error('se esperaba una entrega creada')
@@ -221,8 +222,8 @@ async function seedDelivery(tx: Prisma.TransactionClient, t: Tenant, now: Date =
   await deliveries.addLines(
     deliveryId,
     [
-      { presentationLineId: t.lineIds[0], batchId: t.batchIds[0], packages: 2, quantity: '2.5000' },
-      { presentationLineId: t.lineIds[0], batchId: t.batchIds[1], packages: 1, quantity: '1.2500' },
+      { customerId: t.customerId, presentationLineId: t.lineIds[0], batchId: t.batchIds[0], packages: 2, quantity: '2.5000' },
+      { customerId: t.customerId, presentationLineId: t.lineIds[0], batchId: t.batchIds[1], packages: 1, quantity: '1.2500' },
     ],
     scope,
   )
@@ -245,7 +246,7 @@ async function seedDelivery(tx: Prisma.TransactionClient, t: Tenant, now: Date =
   })
   await deliveries.addLines(
     deliveryId,
-    [{ presentationLineId: t.lineIds[1], batchId: loteB, packages: 3, quantity: '3.0000' }],
+    [{ customerId: t.customerId, presentationLineId: t.lineIds[1], batchId: loteB, packages: 3, quantity: '3.0000' }],
     scope,
   )
   const lineas = await tx.orderDeliveryLine.findMany({

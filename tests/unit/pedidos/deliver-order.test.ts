@@ -24,6 +24,7 @@ import { fakeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { FinishedGoodsDispatchInput, FinishedGoodsDispatchOutcome } from '@/lib/modules/inventario'
+import type { DeliverOrderInput } from '@/lib/modules/pedidos/adapters/driving/order-actions'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { PedidosError } from '@/lib/modules/pedidos/domain/errors'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
@@ -44,6 +45,22 @@ const PENDING_PRESENTATION = 'f0000000-0000-4000-8000-000000000002'
 const ENTREGADOR: Actor = { id: 'u-entrega', companyId: EMPRESA, permissions: ['entregas.modificar'] }
 
 const CLIENTE: CustomerRef = { id: DELIVERY_CUSTOMER_ID, firstNames: 'Ana', lastNames: 'Perez', isDeleted: false }
+
+// 2026-10-15: la entrada lleva `customers`. Estos dos ayudantes conservan los casos de un solo
+// cliente con las asignaciones que tenian.
+function asignacionesDeUnCliente(): DeliverOrderInput['customers'][number]['allocations'] {
+  return [
+    { presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 4 },
+    { presentationLineId: PENDING_LINE_ID, batchId: NEWER_BATCH_ID, packages: 2 },
+  ]
+}
+
+function unCliente(
+  allocations: DeliverOrderInput['customers'][number]['allocations'],
+  customerId: string = DELIVERY_CUSTOMER_ID,
+): Pick<DeliverOrderInput, 'customers'> {
+  return { customers: [{ customerId, allocations }] }
+}
 
 const LINEAS: readonly FinishPackingLine[] = [
   { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null },
@@ -242,46 +259,42 @@ describe('deliverOrder — forma de la entrada (R22)', () => {
   const invalidas: ReadonlyArray<readonly [string, unknown]> = [
     ['orderId sin forma de uuid', deliverInput({ orderId: 'pedido-1' })],
     ['deliveryKey sin forma de uuid', deliverInput({ deliveryKey: 'clave' })],
-    ['batchId sin forma de uuid', deliverInput({ allocations: [{ presentationLineId: PENDING_LINE_ID, batchId: 'lote', packages: 1 }] })],
+    ['batchId sin forma de uuid', deliverInput({ ...unCliente([{ presentationLineId: PENDING_LINE_ID, batchId: 'lote', packages: 1 }]) })],
     [
       'presentationLineId sin forma de uuid',
-      deliverInput({ allocations: [{ presentationLineId: 'linea', batchId: OLDER_BATCH_ID, packages: 1 }] }),
+      deliverInput({ ...unCliente([{ presentationLineId: 'linea', batchId: OLDER_BATCH_ID, packages: 1 }]) }),
     ],
-    ['envases cero', deliverInput({ allocations: [{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 0 }] })],
-    ['envases negativos', deliverInput({ allocations: [{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: -1 }] })],
-    ['envases no enteros', deliverInput({ allocations: [{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 1.5 }] })],
+    ['envases cero', deliverInput({ ...unCliente([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 0 }]) })],
+    ['envases negativos', deliverInput({ ...unCliente([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: -1 }]) })],
+    ['envases no enteros', deliverInput({ ...unCliente([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 1.5 }]) })],
     [
       'envases como texto',
       { ...deliverInput(), allocations: [{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: '1' }] },
     ],
     [
       'la misma linea y lote repetidos',
-      deliverInput({
-        allocations: [
+      deliverInput({ ...unCliente([
           { presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 1 },
           { presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 2 },
-        ],
-      }),
+        ]) }),
     ],
-    ['ninguna linea', deliverInput({ allocations: [] })],
+    ['ninguna linea', deliverInput({ ...unCliente([]) })],
     [
       `mas de ${String(DELIVERY_MAX_ALLOCATIONS)} asignaciones`,
-      deliverInput({
-        allocations: Array.from({ length: DELIVERY_MAX_ALLOCATIONS + 1 }, (_, i) => ({
+      deliverInput({ ...unCliente(Array.from({ length: DELIVERY_MAX_ALLOCATIONS + 1 }, (_, i) => ({
           presentationLineId: PENDING_LINE_ID,
           batchId: `e0000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
           packages: 1,
-        })),
-      }),
+        }))) }),
     ],
     ['un campo de mas', { ...deliverInput(), companyId: EMPRESA }],
     [
       'un campo de mas en una asignacion',
       { ...deliverInput(), allocations: [{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 1, quantity: '1' }] },
     ],
-    ['sin customerId', { orderId: DELIVERY_ORDER_ID, deliveryKey: DELIVERY_KEY, allocations: deliverInput().allocations }],
+    ['sin customerId', { orderId: DELIVERY_ORDER_ID, deliveryKey: DELIVERY_KEY, allocations: asignacionesDeUnCliente() }],
     ['sin allocations', { orderId: DELIVERY_ORDER_ID, deliveryKey: DELIVERY_KEY, customerId: DELIVERY_CUSTOMER_ID }],
-    ['sin deliveryKey', { orderId: DELIVERY_ORDER_ID, customerId: DELIVERY_CUSTOMER_ID, allocations: deliverInput().allocations }],
+    ['sin deliveryKey', { orderId: DELIVERY_ORDER_ID, customerId: DELIVERY_CUSTOMER_ID, allocations: asignacionesDeUnCliente() }],
     ['null', null],
   ]
 
@@ -297,7 +310,7 @@ describe('deliverOrder — forma de la entrada (R22)', () => {
   it('R22: una linea del reparto que no es del pedido es invalid_input, sin crear la entrega', async () => {
     const m = montar()
     const ajena = 'd0000000-0000-4000-8000-0000000000ff'
-    const entrada = deliverInput({ allocations: [{ presentationLineId: ajena, batchId: OLDER_BATCH_ID, packages: 1 }] })
+    const entrada = deliverInput({ ...unCliente([{ presentationLineId: ajena, batchId: OLDER_BATCH_ID, packages: 1 }]) })
 
     expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entrada, ENTREGADOR))).toBe('invalid_input')
     expect(m.tx.deliveries.create).not.toHaveBeenCalled()
@@ -323,7 +336,7 @@ describe('deliverOrder — cliente (R21)', () => {
 
   it('R21: un cliente sin forma de uuid es customer_not_found sin consultar el catalogo', async () => {
     const m = montar()
-    expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(deliverInput({ customerId: 'cliente' }), ENTREGADOR))).toBe(
+    expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(deliverInput(unCliente(asignacionesDeUnCliente(), 'cliente')), ENTREGADOR))).toBe(
       'customer_not_found',
     )
     expect(m.findAliveRefById).not.toHaveBeenCalled()
@@ -353,12 +366,10 @@ describe('deliverOrder — el pedido bloqueado (R17)', () => {
 describe('deliverOrder — tope por linea (R18)', () => {
   it('R18: mas envases que los que faltan en una linea es delivery_exceeds_remaining, sin despachar ni escribir lineas', async () => {
     const m = montar()
-    const entrada = deliverInput({
-      allocations: [
+    const entrada = deliverInput({ ...unCliente([
         { presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 4 },
         { presentationLineId: PENDING_LINE_ID, batchId: NEWER_BATCH_ID, packages: 4 },
-      ],
-    })
+      ]) })
 
     expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entrada, ENTREGADOR))).toBe('delivery_exceeds_remaining')
     expect(m.tx.deliveries.sumDeliveredPackages).toHaveBeenCalledWith(DELIVERY_ORDER_ID, SCOPE)
@@ -368,7 +379,7 @@ describe('deliverOrder — tope por linea (R18)', () => {
 
   it('R18: cualquier envase a una linea que ya esta completa es delivery_exceeds_remaining', async () => {
     const m = montar()
-    const entrada = deliverInput({ allocations: [{ presentationLineId: COMPLETE_LINE_ID, batchId: OLDER_BATCH_ID, packages: 1 }] })
+    const entrada = deliverInput({ ...unCliente([{ presentationLineId: COMPLETE_LINE_ID, batchId: OLDER_BATCH_ID, packages: 1 }]) })
 
     expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entrada, ENTREGADOR))).toBe('delivery_exceeds_remaining')
     nadaEscrito(m)
@@ -410,12 +421,10 @@ describe('deliverOrder — salida fisica de inventario (R19, R20, R24)', () => {
 
   it('R24: con dos lineas pendientes despacha cada una con su presentacion', async () => {
     const m = montar({ entregados: new Map([[PENDING_LINE_ID, 3]]) })
-    const entrada = deliverInput({
-      allocations: [
+    const entrada = deliverInput({ ...unCliente([
         { presentationLineId: COMPLETE_LINE_ID, batchId: NEWER_BATCH_ID, packages: 1 },
         { presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 2 },
-      ],
-    })
+      ]) })
     await createDeliverOrder(m.deps)(entrada, ENTREGADOR)
 
     const presentaciones = m.tx.finishedGoods.dispatchForDelivery.mock.calls.map(
@@ -455,12 +464,10 @@ describe('deliverOrder — estado del pedido tras la entrega (R26, R27)', () => 
 
   it('R27: si no le falta nada a ninguna linea pasa a ENTREGADO en la misma transaccion', async () => {
     const m = montar()
-    const entrada = deliverInput({
-      allocations: [
+    const entrada = deliverInput({ ...unCliente([
         { presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 4 },
         { presentationLineId: PENDING_LINE_ID, batchId: NEWER_BATCH_ID, packages: 3 },
-      ],
-    })
+      ]) })
 
     await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).resolves.toEqual({
       status: 'delivered',
@@ -473,9 +480,7 @@ describe('deliverOrder — estado del pedido tras la entrega (R26, R27)', () => 
 
   it('R27: si setStatus no mueve el pedido la entrega entera falla', async () => {
     const m = montar({ setStatus: 'stale' })
-    const entrada = deliverInput({
-      allocations: [{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 7 }],
-    })
+    const entrada = deliverInput({ ...unCliente([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 7 }]) })
 
     await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).rejects.toThrow(/setStatus/)
     expect(m.lanzoDentro()).not.toBeNull()
@@ -598,10 +603,7 @@ describe('deliverOrder — clave de entrega ya registrada (R29)', () => {
     await expect(entregar(deliverInput(), ENTREGADOR)).resolves.toEqual({ status: 'delivered', orderStatus: 'TERMINADO' })
     await expect(
       entregar(
-        deliverInput({
-          deliveryKey: SEGUNDA_CLAVE,
-          allocations: [{ presentationLineId: PENDING_LINE_ID, batchId: NEWER_BATCH_ID, packages: 1 }],
-        }),
+        deliverInput({ deliveryKey: SEGUNDA_CLAVE, ...unCliente([{ presentationLineId: PENDING_LINE_ID, batchId: NEWER_BATCH_ID, packages: 1 }]) }),
         ENTREGADOR,
       ),
     ).resolves.toEqual({ status: 'delivered', orderStatus: 'ENTREGADO' })

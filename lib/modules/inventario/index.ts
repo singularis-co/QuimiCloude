@@ -158,6 +158,7 @@ export {
   type FinishedProductCostRow,
   type ProducedProductLink,
   type FinishedDeliveryDirectory,
+  type FinishedDeliveryLineRecord,
 } from './domain/finished-product-detail';
 export {
   createGetFinishedProduct,

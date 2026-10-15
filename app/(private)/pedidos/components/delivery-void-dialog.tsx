@@ -100,9 +100,17 @@ function DeliveryVoidDialogBody({ delivery, onOpenChange, reload, fieldId }: Del
   const reasonId = `${fieldId}-reason`;
   const reasonErrorId = `${fieldId}-reason-error`;
   const [voidKey] = useState(() => crypto.randomUUID());
-  const openLines = delivery.presentations.filter((presentation) => presentation.void === null);
+  const openLines = delivery.customers.flatMap((customer) =>
+    customer.presentations
+      .filter((presentation) => presentation.void === null)
+      .map((presentation) => ({
+        ...presentation,
+        customerId: customer.customerId,
+        key: `${customer.customerId}:${presentation.presentationLineId}`,
+      })),
+  );
   const [checked, setChecked] = useState<ReadonlySet<string>>(
-    () => new Set(openLines.map((presentation) => presentation.presentationLineId)),
+    () => new Set(openLines.map((presentation) => presentation.key)),
   );
   const [reason, setReason] = useState('');
   const [attempted, setAttempted] = useState(false);
@@ -111,9 +119,7 @@ function DeliveryVoidDialogBody({ delivery, onOpenChange, reload, fieldId }: Del
   const [isPending, startTransition] = useTransition();
 
   // Tras una relectura una línea marcada puede haber quedado anulada: ya no se envía.
-  const selected = openLines
-    .map((presentation) => presentation.presentationLineId)
-    .filter((id) => checked.has(id));
+  const selected = openLines.filter((presentation) => checked.has(presentation.key));
   const trimmedReason = reason.trim();
   const showEmpty = attempted && selected.length === 0;
   const showReasonRequired = attempted && trimmedReason === '';
@@ -143,7 +149,7 @@ function DeliveryVoidDialogBody({ delivery, onOpenChange, reload, fieldId }: Del
     const input: VoidDeliveryInput = {
       deliveryId: delivery.id,
       voidKey,
-      presentationLineIds: selected,
+      items: selected.map(({ customerId, presentationLineId }) => ({ customerId, presentationLineId })),
       reason,
     };
     startTransition(async () => {
@@ -204,17 +210,17 @@ function DeliveryVoidDialogBody({ delivery, onOpenChange, reload, fieldId }: Del
           <legend className="text-sm font-medium">{LABELS.presentations}</legend>
           <ul className="flex flex-col gap-1">
             {openLines.map((presentation) => {
-              const checkboxId = `${fieldId}-line-${presentation.presentationLineId}`;
+              const checkboxId = `${fieldId}-line-${presentation.key}`;
               const label = `${presentation.presentationName} · ${LABELS.packages(presentation.packages)}`;
               return (
-                <li key={presentation.presentationLineId} className="flex items-center gap-2">
+                <li key={presentation.key} className="flex items-center gap-2">
                   {/* Etiqueta hermana: dentro del `<label>` un clic llegaría dos veces al primitivo. */}
                   <Checkbox
                     id={checkboxId}
                     aria-label={label}
                     className={touchTarget}
-                    checked={checked.has(presentation.presentationLineId)}
-                    onCheckedChange={() => toggle(presentation.presentationLineId)}
+                    checked={checked.has(presentation.key)}
+                    onCheckedChange={() => toggle(presentation.key)}
                     disabled={isPending}
                     data-testid={DELIVERY_VOID_PRESENTATION_TESTID}
                     data-presentation-line-id={presentation.presentationLineId}

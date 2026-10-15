@@ -8,6 +8,8 @@ import type { InventoryMovementView } from './inventory-movement';
 import type { MovementReason } from './movement-reason';
 import type { Page } from './page';
 
+import type { PageRequest } from '../ports/finished-product-detail-repository';
+
 // Solo el tipo: el contrato de este modulo lo carga un componente de cliente.
 import type { CustomerRef } from '@/lib/modules/clientes';
 
@@ -82,18 +84,17 @@ export type FinishedProductMovementRow = {
 };
 
 export type FinishedProductDeliveryRow = {
-  readonly movementId: string;
+  readonly deliveryLineId: string;
   readonly orderDeliveryId: string;
   readonly createdAt: string;
   readonly customer: CustomerRef | null;
   readonly orderNumberText: string | null;
+  readonly presentationName: string | null;
   readonly batchId: string;
   readonly lot: string;
-  /** `null` si la linea de entrega no vuelve del directorio. */
-  readonly packages: number | null;
-  /** Valor absoluto. */
+  readonly packages: number;
+  /** Positiva. */
   readonly quantity: string;
-  /** `null`: no anulada, o la linea no volvio del directorio. */
   readonly void: { readonly reason: string } | null;
 };
 
@@ -127,19 +128,29 @@ export type ProducedProductLink = {
   readonly productId: string;
 };
 
+export type FinishedDeliveryLineRecord = {
+  readonly id: string;
+  readonly orderDeliveryId: string;
+  readonly orderId: string;
+  /** ISO, el de la entrega. */
+  readonly createdAt: string;
+  readonly customerId: string;
+  readonly batchId: string;
+  readonly packages: number;
+  /** Positiva. */
+  readonly quantity: string;
+  readonly void: { readonly reason: string } | null;
+};
+
 /** Hueco para `pedidos`: las tablas de entregas son suyas. Sin permisos: autoriza quien llama. */
 export interface FinishedDeliveryDirectory {
-  findDeliveryDetails(
+  /** Lineas de entrega de esos lotes, anuladas o no, por `createdAt` desc de la entrega e `id` desc
+   *  de la linea. El defecto y el tope del tamano los aplica el adaptador. */
+  listDeliveryLines(
     companyId: string,
-    deliveryIds: readonly string[],
-  ): Promise<ReadonlyMap<string, {
-    readonly customerId: string;
-    /** Clave: batchId. `(delivery_id, batch_id)` es unico en `order_delivery_lines`. */
-    readonly linesByBatch: ReadonlyMap<string, {
-      readonly packages: number;
-      readonly void: { readonly reason: string } | null;
-    }>;
-  }>>;
+    batchIds: readonly string[],
+    page: PageRequest,
+  ): Promise<Page<FinishedDeliveryLineRecord>>;
   /** Cantidad y envases de las lineas de entrega de esos lotes sin linea de anulacion. */
   summarizeDelivered(companyId: string, batchIds: readonly string[]): Promise<DeliveredTotal>;
 }

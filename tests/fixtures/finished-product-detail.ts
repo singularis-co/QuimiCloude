@@ -154,15 +154,17 @@ export const FINISHED_OUT_MOVEMENTS: readonly FinishedProductMovementRow[] = [
   }),
 ];
 
+// 2026-10-15: la fila es una linea de entrega (`deliveryLineId`) y lleva su presentacion.
 export function finishedProductDeliveryRow(
   overrides: Partial<FinishedProductDeliveryRow> = {},
 ): FinishedProductDeliveryRow {
   return {
-    movementId: '20000000-0000-4000-8000-000000000230',
+    deliveryLineId: '30000000-0000-4000-8000-000000000230',
     orderDeliveryId: FINISHED_DELIVERY_ID,
     createdAt: '2026-10-11T10:00:00.000Z',
     customer: { id: FINISHED_CUSTOMER_ID, firstNames: 'Ana', lastNames: 'Perez', isDeleted: false },
     orderNumberText: FINISHED_ORDER_NUMBER,
+    presentationName: 'Botella 1 L',
     batchId: LITER_BATCH_ID,
     lot: 'L-2026-0225',
     packages: 4,
@@ -174,7 +176,7 @@ export function finishedProductDeliveryRow(
 
 /** Misma entrega que la fila sin anular, otro lote y su linea anulada. */
 export const VOIDED_DELIVERY_ROW = finishedProductDeliveryRow({
-  movementId: '20000000-0000-4000-8000-000000000232',
+  deliveryLineId: '30000000-0000-4000-8000-000000000232',
   batchId: GALLON_BATCH_ID,
   lot: 'L-2026-0226',
   packages: 1,

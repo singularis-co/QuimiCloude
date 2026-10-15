@@ -548,7 +548,8 @@ describe('listOrderDeliveries contra Postgres', () => {
       expect(vista.orderStatus).toBe(status);
       expect(vista.numberText).toMatch(/^\d{4}-\d{7}$/u);
       expect(vista.deliveries.map((d) => d.id)).toEqual([segunda, primera]);
-      expect(vista.deliveries.map((d) => [d.customerName, d.authorName])).toEqual([
+      // 2026-10-15: las presentaciones van por cliente; estas entregas tienen uno solo.
+      expect(vista.deliveries.map((d) => [d.customers[0]?.customerName, d.authorName])).toEqual([
         ['Cliente Garcia', 'Ana Perez'],
         ['Cliente Garcia', 'Ana Perez'],
       ]);
@@ -556,7 +557,7 @@ describe('listOrderDeliveries contra Postgres', () => {
       // El lector ordena las lineas por id de linea del reparto y de lote: el orden esperado sale de ahi.
       const porId = <T>(clave: (x: T) => string) => (x: T, y: T) => (clave(x) < clave(y) ? -1 : 1);
       const [reciente, antigua] = vista.deliveries;
-      expect(reciente?.presentations).toEqual(
+      expect(reciente?.customers[0]?.presentations).toEqual(
         [
           {
             presentationLineId: e.lineId,
@@ -577,7 +578,7 @@ describe('listOrderDeliveries contra Postgres', () => {
           },
         ].sort(porId((p) => p.presentationLineId)),
       );
-      expect(antigua?.presentations).toEqual([
+      expect(antigua?.customers[0]?.presentations).toEqual([
         {
           presentationLineId: e.smallLineId,
           presentationName: nombres.get(e.smallPresentationId),

@@ -5,7 +5,8 @@ import type { VoidDeliveryInput } from '@/lib/modules/pedidos/adapters/driving/o
 export const VOID_ORDER_ID = 'a0000000-0000-4000-8000-000000000024';
 export const VOID_KEY = 'b0000000-0000-4000-8000-0000000000c1';
 
-/** La entrega mas reciente: dos presentaciones, una ya anulada. */
+/** La entrega mas reciente: dos clientes. El primero lleva dos presentaciones, una ya anulada; el
+ *  segundo lleva esa misma presentacion, sin anular. */
 export const NEWER_DELIVERY_ID = '10000000-0000-4000-8000-000000000002';
 /** La entrega mas antigua: una presentacion sin anular. */
 export const OLDER_DELIVERY_ID = '10000000-0000-4000-8000-000000000001';
@@ -19,8 +20,12 @@ export const FIRST_BATCH_ID = 'e0000000-0000-4000-8000-000000000024';
 export const SECOND_BATCH_ID = 'e0000000-0000-4000-8000-000000000025';
 export const THIRD_BATCH_ID = 'e0000000-0000-4000-8000-000000000026';
 
+export const FIRST_CUSTOMER_ID = 'c0000000-0000-4000-8000-000000000024';
+export const SECOND_CUSTOMER_ID = 'c0000000-0000-4000-8000-000000000025';
+
 export const VOID_REASON = 'El cliente devolvio el producto por error de etiqueta';
 
+// 2026-10-15: cada entrega agrupa sus presentaciones por cliente y lleva su total de envases.
 export function deliveryHistoryView(overrides: Partial<OrderDeliveryHistoryView> = {}): OrderDeliveryHistoryView {
   return {
     orderId: VOID_ORDER_ID,
@@ -30,40 +35,65 @@ export function deliveryHistoryView(overrides: Partial<OrderDeliveryHistoryView>
       {
         id: NEWER_DELIVERY_ID,
         createdAt: '2026-10-08T15:30:00.000Z',
-        customerName: 'Ana Perez',
         authorName: 'Laura Gomez',
-        presentations: [
+        packages: 11,
+        customers: [
           {
-            presentationLineId: OPEN_LINE_ID,
-            presentationName: 'Botella 1 L',
-            packages: 6,
-            batches: [
-              { batchId: FIRST_BATCH_ID, lot: 'L-2026-0101', packages: 4 },
-              { batchId: SECOND_BATCH_ID, lot: 'L-2026-0102', packages: 2 },
+            customerId: FIRST_CUSTOMER_ID,
+            customerName: 'Ana Perez',
+            presentations: [
+              {
+                presentationLineId: OPEN_LINE_ID,
+                presentationName: 'Botella 1 L',
+                packages: 6,
+                batches: [
+                  { batchId: FIRST_BATCH_ID, lot: 'L-2026-0101', packages: 4 },
+                  { batchId: SECOND_BATCH_ID, lot: 'L-2026-0102', packages: 2 },
+                ],
+                void: null,
+              },
+              {
+                presentationLineId: VOIDED_LINE_ID,
+                presentationName: 'Galon 4 L',
+                packages: 3,
+                batches: [{ batchId: THIRD_BATCH_ID, lot: 'L-2026-0103', packages: 3 }],
+                void: { reason: VOID_REASON, authorName: 'Laura Gomez', createdAt: '2026-10-09T09:00:00.000Z' },
+              },
             ],
-            void: null,
           },
           {
-            presentationLineId: VOIDED_LINE_ID,
-            presentationName: 'Galon 4 L',
-            packages: 3,
-            batches: [{ batchId: THIRD_BATCH_ID, lot: 'L-2026-0103', packages: 3 }],
-            void: { reason: VOID_REASON, authorName: 'Laura Gomez', createdAt: '2026-10-09T09:00:00.000Z' },
+            customerId: SECOND_CUSTOMER_ID,
+            customerName: 'Bruno Diaz',
+            presentations: [
+              {
+                presentationLineId: VOIDED_LINE_ID,
+                presentationName: 'Galon 4 L',
+                packages: 2,
+                batches: [{ batchId: THIRD_BATCH_ID, lot: 'L-2026-0103', packages: 2 }],
+                void: null,
+              },
+            ],
           },
         ],
       },
       {
         id: OLDER_DELIVERY_ID,
         createdAt: '2026-10-07T11:00:00.000Z',
-        customerName: 'Ana Perez',
         authorName: 'Carlos Ruiz',
-        presentations: [
+        packages: 4,
+        customers: [
           {
-            presentationLineId: OPEN_LINE_ID,
-            presentationName: 'Botella 1 L',
-            packages: 4,
-            batches: [{ batchId: FIRST_BATCH_ID, lot: 'L-2026-0101', packages: 4 }],
-            void: null,
+            customerId: FIRST_CUSTOMER_ID,
+            customerName: 'Ana Perez',
+            presentations: [
+              {
+                presentationLineId: OPEN_LINE_ID,
+                presentationName: 'Botella 1 L',
+                packages: 4,
+                batches: [{ batchId: FIRST_BATCH_ID, lot: 'L-2026-0101', packages: 4 }],
+                void: null,
+              },
+            ],
           },
         ],
       },
@@ -90,11 +120,12 @@ export const VOID_ERROR_STATES = {
   unauthorized: errorState('unauthorized'),
 } as const satisfies Record<string, ErrorState>;
 
+// 2026-10-15: la anulacion se pide por pares cliente-presentacion.
 export function voidInput(overrides: Partial<VoidDeliveryInput> = {}): VoidDeliveryInput {
   return {
     deliveryId: NEWER_DELIVERY_ID,
     voidKey: VOID_KEY,
-    presentationLineIds: [OPEN_LINE_ID],
+    items: [{ customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID }],
     reason: VOID_REASON,
     ...overrides,
   };

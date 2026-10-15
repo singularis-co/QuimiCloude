@@ -16,12 +16,6 @@ type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 type CreateOutcome = { readonly kind: 'created'; readonly id: string } | { readonly kind: 'duplicate_key' };
 
-/** El `INSERT` no escribe `id`, asi que el unico indice unico con el que puede chocar es el de la
- *  clave de entrega por empresa. El choque aborta la transaccion de quien llama. */
-function isDuplicateDeliveryKey(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
-}
-
 /** Lee por el indice unico `(company_id, delivery_key)`: la empresa va en el `where`, asi que la
  *  clave de otra empresa no aparece. */
 async function findOrderDeliveryByKey(
@@ -36,28 +30,10 @@ async function findOrderDeliveryByKey(
   });
 }
 
-async function createOrderDelivery(
-  delivery: NewOrderDelivery,
-  scope: OrderScope,
-  tx: PrismaLike,
-): Promise<CreateOutcome> {
-  try {
-    const { id } = await tx.orderDelivery.create({
-      data: {
-        ...companyScopeColumns(scope),
-        orderId: delivery.orderId,
-        customerId: delivery.customerId,
-        deliveryKey: delivery.deliveryKey,
-        createdBy: delivery.actorId,
-        createdAt: delivery.now,
-      },
-      select: { id: true },
-    });
-    return { kind: 'created', id };
-  } catch (error) {
-    if (isDuplicateDeliveryKey(error)) return { kind: 'duplicate_key' };
-    throw error;
-  }
+// La tabla aun exige el cliente en la entrega y el contrato ya lo lleva en cada linea: no hay
+// valor correcto que escribir hasta que la columna pase a las lineas.
+async function createOrderDelivery(delivery: NewOrderDelivery): Promise<CreateOutcome> {
+  throw new Error(`createOrderDelivery: sin columna de cliente en las lineas (entrega ${delivery.deliveryKey})`);
 }
 
 /** La empresa de cada linea la fijan las claves foraneas compuestas: una entrega, una linea del
@@ -102,7 +78,7 @@ async function sumOrderDeliveredPackages(
 export function createOrderDeliveryRepository(tx: PrismaLike = prisma): OrderDeliveryRepository {
   return {
     findByKey: (deliveryKey, scope) => findOrderDeliveryByKey(deliveryKey, scope, tx),
-    create: (delivery, scope) => createOrderDelivery(delivery, scope, tx),
+    create: (delivery) => createOrderDelivery(delivery),
     addLines: (deliveryId, lines, scope) => addOrderDeliveryLines(deliveryId, lines, scope, tx),
     sumDeliveredPackages: (orderId, scope) => sumOrderDeliveredPackages(orderId, scope, tx),
   };

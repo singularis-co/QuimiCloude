@@ -79,6 +79,7 @@ function ok(view: OrderDeliveryHistoryView = deliveryHistoryView()): OrderDelive
   return { status: 'success', data: view };
 }
 
+// 2026-10-15: las presentaciones van por cliente; se anula la del primero.
 /** La vista tras anular la presentacion abierta de la entrega mas reciente. */
 function trasAnular(): OrderDeliveryHistoryView {
   const view = deliveryHistoryView();
@@ -90,10 +91,17 @@ function trasAnular(): OrderDeliveryHistoryView {
     deliveries: [
       {
         ...newer,
-        presentations: newer.presentations.map((p) =>
-          p.presentationLineId === OPEN_LINE_ID
-            ? { ...p, void: { reason: VOID_REASON, authorName: 'Laura Gomez', createdAt: '2026-10-09T10:00:00.000Z' } }
-            : p,
+        customers: newer.customers.map((customer, index) =>
+          index !== 0
+            ? customer
+            : {
+                ...customer,
+                presentations: customer.presentations.map((p) =>
+                  p.presentationLineId === OPEN_LINE_ID
+                    ? { ...p, void: { reason: VOID_REASON, authorName: 'Laura Gomez', createdAt: '2026-10-09T10:00:00.000Z' } }
+                    : p,
+                ),
+              },
         ),
       },
       ...rest,

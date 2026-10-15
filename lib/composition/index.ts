@@ -326,7 +326,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
-  findDeliveryDetailsByIds,
+  listDeliveryLinesByBatchIds,
   summarizeDeliveredByBatchIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma';
@@ -1019,7 +1019,7 @@ const presentationRepository: PresentationRepository = {
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
 const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
-  findDeliveryDetails: findDeliveryDetailsByIds,
+  listDeliveryLines: listDeliveryLinesByBatchIds,
   summarizeDelivered: summarizeDeliveredByBatchIds,
 };
 

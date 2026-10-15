@@ -249,13 +249,15 @@ describe('Entregas', () => {
 
   it('R19, R20 — Entregas con cliente, pedido, lote, envases y cantidad; dado de baja y ausente', () => {
     const deBaja = finishedProductDeliveryRow({
-      movementId: 'de-baja',
+      deliveryLineId: 'de-baja',
       customer: { id: 'c-baja', firstNames: 'Luis', lastNames: 'Gomez', isDeleted: true },
     });
-    const ausente = finishedProductDeliveryRow({ movementId: 'ausente', customer: null, packages: null });
+    // 2026-10-15: la fila es una linea de entrega y sus envases ya no pueden faltar; se quita el caso de
+    // envases ausentes.
+    const ausente = finishedProductDeliveryRow({ deliveryLineId: 'ausente', customer: null });
     renderDeliveries(finishedProductDeliveriesPage({ items: [FINISHED_DELIVERY_ROWS[0], deBaja, ausente], total: 3 }));
 
-    const activa = rowOf(FINISHED_DELIVERY_ROWS[0].movementId);
+    const activa = rowOf(FINISHED_DELIVERY_ROWS[0].deliveryLineId);
     expect(cell(activa, 'finished-product-delivery-row')).toHaveTextContent('2026-10-11 10:00');
     expect(cell(activa, 'finished-product-delivery-customer')).toHaveTextContent('Ana Perez');
     expect(within(activa).queryByTestId('finished-product-delivery-customer-deleted')).toBeNull();
@@ -270,13 +272,12 @@ describe('Entregas', () => {
 
     const filaAusente = rowOf('ausente');
     expect(cell(filaAusente, 'finished-product-delivery-customer')).toHaveTextContent(EMPTY_MARK);
-    expect(cell(filaAusente, 'finished-product-delivery-packages')).toHaveTextContent(EMPTY_MARK);
   });
 
   it('R33 — una fila anulada lleva «Anulada», su motivo y data-voided; la otra de la misma entrega no', () => {
     renderDeliveries();
 
-    const anulada = rowOf(VOIDED_DELIVERY_ROW.movementId);
+    const anulada = rowOf(VOIDED_DELIVERY_ROW.deliveryLineId);
     expect(cell(anulada, 'finished-product-delivery-row')).toHaveAttribute('data-voided', 'true');
     const marca = cell(anulada, 'finished-product-delivery-void');
     expect(marca).toHaveTextContent('Anulada');
@@ -286,7 +287,7 @@ describe('Entregas', () => {
     expect(cell(anulada, 'finished-product-delivery-lot')).toHaveTextContent('L-2026-0226');
     expect(cell(anulada, 'finished-product-delivery-packages')).toHaveTextContent('1');
 
-    const viva = rowOf(FINISHED_DELIVERY_ROWS[0].movementId);
+    const viva = rowOf(FINISHED_DELIVERY_ROWS[0].deliveryLineId);
     expect(viva).not.toBe(anulada);
     expect(FINISHED_DELIVERY_ROWS[0].orderDeliveryId).toBe(VOIDED_DELIVERY_ROW.orderDeliveryId);
     expect(cell(viva, 'finished-product-delivery-row')).toHaveAttribute('data-voided', 'false');
@@ -328,7 +329,7 @@ describe('Entregas', () => {
     renderDeliveries();
 
     for (const row of FINISHED_DELIVERY_ROWS) {
-      const fila = rowOf(row.movementId);
+      const fila = rowOf(row.deliveryLineId);
       expect(within(fila).queryAllByRole('button')).toEqual([]);
       expect(within(fila).queryAllByRole('link')).toEqual([]);
     }

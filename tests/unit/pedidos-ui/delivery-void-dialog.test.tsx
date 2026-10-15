@@ -75,18 +75,26 @@ const SECOND_OPEN_LINE_ID = 'd0000000-0000-4000-8000-000000000026';
 const NEWER: OrderDeliveryHistoryEntry = deliveryHistoryView().deliveries[0] as OrderDeliveryHistoryEntry;
 
 /** Dos presentaciones sin anular y una anulada, para poder desmarcar. */
+// 2026-10-15: las presentaciones van por cliente; la nueva se anade al primero.
 const TWO_OPEN: OrderDeliveryHistoryEntry = {
   ...NEWER,
-  presentations: [
-    ...NEWER.presentations,
-    {
-      presentationLineId: SECOND_OPEN_LINE_ID,
-      presentationName: 'Caneca 20 L',
-      packages: 2,
-      batches: [],
-      void: null,
-    },
-  ],
+  customers: NEWER.customers.map((customer, index) =>
+    index !== 0
+      ? customer
+      : {
+          ...customer,
+          presentations: [
+            ...customer.presentations,
+            {
+              presentationLineId: SECOND_OPEN_LINE_ID,
+              presentationName: 'Caneca 20 L',
+              packages: 2,
+              batches: [],
+              void: null,
+            },
+          ],
+        },
+  ),
 };
 
 const reload = vi.fn<() => Promise<void>>();

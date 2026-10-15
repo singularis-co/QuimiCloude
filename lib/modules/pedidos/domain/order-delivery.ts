@@ -26,6 +26,15 @@ export type DeliveryCheck =
   | { readonly kind: 'exceeds_remaining'; readonly presentationLineIds: readonly string[] }
   | { readonly kind: 'exceeds_batch'; readonly batchIds: readonly string[] };
 
+export type DeliveryCustomerBlock = {
+  /** `null` solo en el sheet: el bloque aun no tiene cliente. */
+  readonly customerId: string | null;
+  readonly allocations: readonly DeliveryAllocation[];
+};
+
+export type DeliveryBlockIssue = 'missing_customer' | 'duplicate_customer' | 'no_packages';
+
+/** Cuenta las asignaciones de todos los clientes juntos. */
 export const DELIVERY_MAX_ALLOCATIONS = 200;
 
 export function remainingPackages(line: DeliveryLineState): number {
@@ -72,4 +81,38 @@ export function checkDelivery(
 
   const completesOrder = lines.every((line) => (byLine.get(line.presentationLineId) ?? 0) >= remainingPackages(line));
   return { kind: 'ok', completesOrder };
+}
+
+/** Por indice de bloque, el primer problema en el orden `missing_customer`, `duplicate_customer`
+ *  (frente a un bloque anterior) y `no_packages`. Los bloques sin problema no aparecen. */
+export function checkDeliveryBlocks(blocks: readonly DeliveryCustomerBlock[]): ReadonlyMap<number, DeliveryBlockIssue> {
+  const issues = new Map<number, DeliveryBlockIssue>();
+  const seen = new Set<string>();
+  blocks.forEach((block, index) => {
+    if (block.customerId === null) {
+      issues.set(index, 'missing_customer');
+      return;
+    }
+    if (seen.has(block.customerId)) {
+      issues.set(index, 'duplicate_customer');
+      return;
+    }
+    seen.add(block.customerId);
+    if (!block.allocations.some((allocation) => allocation.packages > 0)) issues.set(index, 'no_packages');
+  });
+  return issues;
+}
+
+export function flattenBlocks(blocks: readonly DeliveryCustomerBlock[]): readonly DeliveryAllocation[] {
+  return blocks.flatMap((block) => block.allocations);
+}
+
+/** Lo que le queda al lote tras `allocations`, sin bajar de cero. */
+export function packagesLeftInBatch(
+  availablePackages: number,
+  allocations: readonly DeliveryAllocation[],
+  batchId: string,
+): number {
+  const used = sumBy(allocations, (a) => a.batchId).get(batchId) ?? 0;
+  return Math.max(0, availablePackages - used);
 }

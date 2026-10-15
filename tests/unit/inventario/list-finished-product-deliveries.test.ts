@@ -68,9 +68,17 @@ function asiento(overrides: Partial<FinishedProductDeliveryMovementRecord> = {})
   };
 }
 
-const ASIENTO_ANULADO = asiento({ id: VOIDED_DELIVERY_ROW.movementId, batchId: GALLON_BATCH_ID, lot: 'L-2026-0226' });
+const ASIENTO_ANULADO = asiento({ id: VOIDED_DELIVERY_ROW.deliveryLineId, batchId: GALLON_BATCH_ID, lot: 'L-2026-0226' });
 
-type Detalles = Awaited<ReturnType<FinishedDeliveryDirectory['findDeliveryDetails']>>;
+// 2026-10-15: el directorio cambia `findDeliveryDetails` por `listDeliveryLines`. Hasta reescribir
+// estos casos, el doble conserva la forma anterior junto al metodo nuevo.
+type Detalles = ReadonlyMap<
+  string,
+  {
+    readonly customerId: string;
+    readonly linesByBatch: ReadonlyMap<string, { readonly packages: number; readonly void: { readonly reason: string } | null }>;
+  }
+>;
 
 function detallesDe(customerId = FINISHED_CUSTOMER_ID): Detalles {
   return new Map([
@@ -115,8 +123,9 @@ function montar({
   const orders: OrderNumberDirectory = {
     findNumberTexts: vi.fn<OrderNumberDirectory['findNumberTexts']>(async () => new Map([[FINISHED_ORDER_ID, FINISHED_ORDER_NUMBER]])),
   };
-  const deliveries: FinishedDeliveryDirectory = {
-    findDeliveryDetails: vi.fn<FinishedDeliveryDirectory['findDeliveryDetails']>(async () => detalles),
+  const deliveries = {
+    listDeliveryLines: vi.fn<FinishedDeliveryDirectory['listDeliveryLines']>(),
+    findDeliveryDetails: vi.fn<(companyId: string, deliveryIds: readonly string[]) => Promise<Detalles>>(async () => detalles),
     summarizeDelivered: vi.fn<FinishedDeliveryDirectory['summarizeDelivered']>(async () => ENTREGADO),
   };
   const customers: Pick<CustomerCatalog, 'findRefsIncludingDeleted'> = {
@@ -239,7 +248,7 @@ describe('listFinishedProductDeliveries', () => {
     const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
 
     expect(pagina.items).toEqual([
-      finishedProductDeliveryRow({ orderDeliveryId: OTRA_ENTREGA, customer: null, packages: null, void: null }),
+      finishedProductDeliveryRow({ orderDeliveryId: OTRA_ENTREGA, customer: null, void: null }),
     ]);
   });
 

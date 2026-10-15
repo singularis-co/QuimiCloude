@@ -72,8 +72,13 @@ export function OrderDeliveryList({ deliveries, canVoid, orderStatus, onVoid }: 
   return (
     <ul className="flex flex-col gap-4" aria-label={LIST_LABEL}>
       {deliveries.map((delivery) => {
-        const showVoid =
-          statusAcceptsVoid && delivery.presentations.some((presentation) => presentation.void === null);
+        const presentations = delivery.customers.flatMap((customer) =>
+          customer.presentations.map((presentation) => ({
+            ...presentation,
+            key: `${customer.customerId}:${presentation.presentationLineId}`,
+          })),
+        );
+        const showVoid = statusAcceptsVoid && presentations.some((presentation) => presentation.void === null);
         const dateText = formatDeliveryDate(delivery.createdAt);
         return (
           <li
@@ -89,7 +94,9 @@ export function OrderDeliveryList({ deliveries, canVoid, orderStatus, onVoid }: 
                   <time dateTime={delivery.createdAt}>{dateText}</time>
                 </dd>
                 <dt className="text-muted-foreground">{CUSTOMER_LABEL}</dt>
-                <dd data-testid="order-delivery-entry-customer">{delivery.customerName}</dd>
+                <dd data-testid="order-delivery-entry-customer">
+                  {delivery.customers.map((customer) => customer.customerName).join(', ')}
+                </dd>
                 <dt className="text-muted-foreground">{AUTHOR_LABEL}</dt>
                 <dd data-testid="order-delivery-entry-author">{delivery.authorName}</dd>
               </dl>
@@ -108,9 +115,9 @@ export function OrderDeliveryList({ deliveries, canVoid, orderStatus, onVoid }: 
               ) : null}
             </div>
             <ul className="flex flex-col gap-2">
-              {delivery.presentations.map((presentation) => (
+              {presentations.map((presentation) => (
                 <li
-                  key={presentation.presentationLineId}
+                  key={presentation.key}
                   className="flex flex-col gap-1 border-t pt-2 text-sm"
                   data-testid={ORDER_DELIVERY_ENTRY_PRESENTATION_TESTID}
                   data-presentation-line-id={presentation.presentationLineId}

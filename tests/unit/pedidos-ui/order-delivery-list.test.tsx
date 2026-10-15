@@ -160,11 +160,15 @@ describe('OrderDeliveryList', () => {
 
   it('R10: una entrega con todas sus presentaciones anuladas no ofrece «Anular»', () => {
     const [reciente, antigua] = VISTA.deliveries;
+    // 2026-10-15: las presentaciones van por cliente.
     const todaAnulada = {
       ...antigua!,
-      presentations: antigua!.presentations.map((item) => ({
-        ...item,
-        void: { reason: VOID_REASON, authorName: 'Laura Gomez', createdAt: '2026-10-09T10:00:00.000Z' },
+      customers: antigua!.customers.map((customer) => ({
+        ...customer,
+        presentations: customer.presentations.map((item) => ({
+          ...item,
+          void: { reason: VOID_REASON, authorName: 'Laura Gomez', createdAt: '2026-10-09T10:00:00.000Z' },
+        })),
       })),
     };
     pintar({ deliveries: [reciente!, todaAnulada] });

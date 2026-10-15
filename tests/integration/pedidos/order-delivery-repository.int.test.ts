@@ -200,6 +200,8 @@ async function newBatch(tx: Prisma.TransactionClient, t: Tenant): Promise<string
   return id
 }
 
+// 2026-10-15: el contrato de la entrega ya no lleva `customerId` (va en cada linea); aqui sobra y se
+// conserva para las aserciones de este archivo hasta que la columna pase a las lineas.
 function newDelivery(t: Tenant, deliveryKey: string = randomUUID()) {
   return { deliveryKey, orderId: t.orderId, customerId: t.customerId, actorId: t.userId, now: AHORA }
 }
@@ -296,7 +298,7 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       const repo = createOrderDeliveryRepository(tx)
 
       const error = await errorOf(tx, () =>
-        repo.create({ ...newDelivery(a), customerId: b.customerId, actorId: b.userId }, { companyId: b.companyId }),
+        repo.create({ ...newDelivery(a), actorId: b.userId }, { companyId: b.companyId }),
       )
       expect(prismaCode(error)).toBe('P2003')
     })
@@ -312,8 +314,8 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       await repo.addLines(
         deliveryId,
         [
-          { presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.5000' },
-          { presentationLineId: a.lineIds[0], batchId: otroLote, packages: 1, quantity: '1.2500' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.5000' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: otroLote, packages: 1, quantity: '1.2500' },
         ],
         { companyId: a.companyId },
       )
@@ -339,8 +341,8 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
         repo.addLines(
           deliveryId,
           [
-            { presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 1, quantity: '1.0000' },
-            { presentationLineId: a.lineIds[1], batchId: b.batchId, packages: 1, quantity: '1.0000' },
+            { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 1, quantity: '1.0000' },
+            { customerId: a.customerId, presentationLineId: a.lineIds[1], batchId: b.batchId, packages: 1, quantity: '1.0000' },
           ],
           { companyId: a.companyId },
         ),
@@ -361,7 +363,7 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       const error = await errorOf(tx, () =>
         repo.addLines(
           deliveryId,
-          [{ presentationLineId: b.lineIds[0], batchId: b.batchId, packages: 1, quantity: '1.0000' }],
+          [{ customerId: b.customerId, presentationLineId: b.lineIds[0], batchId: b.batchId, packages: 1, quantity: '1.0000' }],
           { companyId: b.companyId },
         ),
       )
@@ -380,15 +382,15 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       await repo.addLines(
         primera,
         [
-          { presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.0000' },
-          { presentationLineId: a.lineIds[0], batchId: otroLote, packages: 3, quantity: '3.0000' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.0000' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: otroLote, packages: 3, quantity: '3.0000' },
         ],
         scope,
       )
       const segunda = await createdId(repo, a)
       await repo.addLines(
         segunda,
-        [{ presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 1, quantity: '1.0000' }],
+        [{ customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 1, quantity: '1.0000' }],
         scope,
       )
 
@@ -407,13 +409,13 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       const deA = await createdId(repo, a)
       await repo.addLines(
         deA,
-        [{ presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 4, quantity: '4.0000' }],
+        [{ customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 4, quantity: '4.0000' }],
         { companyId: a.companyId },
       )
       const deB = await createdId(repo, b)
       await repo.addLines(
         deB,
-        [{ presentationLineId: b.lineIds[0], batchId: b.batchId, packages: 7, quantity: '7.0000' }],
+        [{ customerId: b.customerId, presentationLineId: b.lineIds[0], batchId: b.batchId, packages: 7, quantity: '7.0000' }],
         { companyId: b.companyId },
       )
 
@@ -435,15 +437,15 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       await repo.addLines(
         deliveryId,
         [
-          { presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.0000' },
-          { presentationLineId: a.lineIds[1], batchId: otroLote, packages: 3, quantity: '3.0000' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.0000' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[1], batchId: otroLote, packages: 3, quantity: '3.0000' },
         ],
         scope,
       )
       const segunda = await createdId(repo, a)
       await repo.addLines(
         segunda,
-        [{ presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 4, quantity: '4.0000' }],
+        [{ customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 4, quantity: '4.0000' }],
         scope,
       )
       expect(new Map(await repo.sumDeliveredPackages(a.orderId, scope))).toEqual(

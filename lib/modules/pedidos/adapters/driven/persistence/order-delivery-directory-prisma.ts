@@ -1,4 +1,4 @@
-import type { DeliveredTotal } from '@/lib/modules/inventario';
+import type { DeliveredTotal, FinishedDeliveryDirectory } from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { companyScopeColumns } from './company-scope';
@@ -56,6 +56,12 @@ export async function findDeliveryDetailsByIds(
   }
   return result;
 }
+
+// El cliente aun vive en la entrega y la fila del tab ya es la linea con su cliente: hasta que la
+// columna pase a las lineas no hay lectura correcta que devolver.
+export const listDeliveryLinesByBatchIds: FinishedDeliveryDirectory['listDeliveryLines'] = async (companyId) => {
+  throw new Error(`listDeliveryLinesByBatchIds: sin columna de cliente en las lineas (empresa ${companyId})`);
+};
 
 export async function summarizeDeliveredByBatchIds(
   companyId: string,

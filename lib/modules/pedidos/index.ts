@@ -275,12 +275,17 @@ export type { GetOrderCustomerFilterOptionDeps } from './domain/get-order-custom
 export {
   DELIVERY_MAX_ALLOCATIONS,
   checkDelivery,
+  checkDeliveryBlocks,
+  flattenBlocks,
+  packagesLeftInBatch,
   remainingPackages,
 } from './domain/order-delivery';
 export type {
   DeliveryAllocation,
   DeliveryBatchState,
+  DeliveryBlockIssue,
   DeliveryCheck,
+  DeliveryCustomerBlock,
   DeliveryLineState,
 } from './domain/order-delivery';
 export { createGetOrderDelivery } from './domain/get-order-delivery';

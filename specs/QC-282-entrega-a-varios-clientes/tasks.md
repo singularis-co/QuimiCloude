@@ -18,7 +18,7 @@
 
 ---
 
-## [ ] T0 — Publicar el contrato (bloquea todo lo demás)
+## [x] T0 — Publicar el contrato (bloquea todo lo demás)
 
 Implementa `design.md > 2` (tipos y firmas), sin la lógica nueva.
 
