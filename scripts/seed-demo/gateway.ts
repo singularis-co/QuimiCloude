@@ -435,33 +435,27 @@ async function applyOrderStep(
 }
 
 /**
- * Terminar exige los datos de lote de cada linea. Se escriben solo en las lineas que tienen lote y
- * aun no los tienen, asi que repetir la siembra no los cambia. El lote se deriva del provisional,
- * que ya es unico en la empresa; las fechas salen del dia UTC de la corrida: produccion hoy y
- * vencimiento dentro de dos anos.
+ * Terminar exige los datos de lote de cada linea, y se guardan una vez para todo el pedido. Si el
+ * pedido ya los tiene iguales en todas sus lineas, repetir la siembra no los cambia. El lote se
+ * deriva del provisional de la primera linea que lo tenga, que ya es unico en la empresa; si
+ * ninguna lo tiene, se reutiliza el lote ya escrito de la primera. Las fechas salen del dia UTC de
+ * la corrida: produccion hoy y vencimiento dentro de dos anos.
  */
 async function saveDemoBatchData(conditioner: Actor, orderId: string): Promise<void> {
   const detail = await asignaciones.getConditioningOrder(conditioner, { orderId })
-  const pending = (detail.batchData?.lines ?? []).flatMap((line) =>
-    line.batchId === null || line.provisionalLot === null
-      ? []
-      : [{ batchId: line.batchId, provisionalLot: line.provisionalLot }],
-  )
-  if (pending.length === 0) return
+  const batchData = detail.batchData
+  if (batchData === null || batchData.form.kind === 'shared' || batchData.form.kind === 'no_batches') return
+
+  const withBatch = batchData.lines.filter((line) => line.batchId !== null)
+  const provisional = withBatch.find((line) => line.provisionalLot !== null)?.provisionalLot
+  const lot = provisional === undefined || provisional === null ? withBatch[0]?.lot : `${DEMO_PREFIX}-PT-${provisional}`
+  if (lot === undefined || lot === null) return
 
   const today = new Date()
   const productionDate = today.toISOString().slice(0, 10)
   const expiry = new Date(Date.UTC(today.getUTCFullYear() + 2, today.getUTCMonth(), today.getUTCDate()))
   const expiryDate = expiry.toISOString().slice(0, 10)
-  await asignaciones.saveConditioningBatchData(conditioner, {
-    orderId,
-    lines: pending.map((line) => ({
-      batchId: line.batchId,
-      lot: `${DEMO_PREFIX}-PT-${line.provisionalLot}`,
-      expiryDate,
-      productionDate,
-    })),
-  })
+  await asignaciones.saveConditioningBatchData(conditioner, { orderId, lot, expiryDate, productionDate })
 }
 
 function productInput(

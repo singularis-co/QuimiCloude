@@ -60,22 +60,22 @@
 
 ## Bloque C — `asignaciones` (backend_dev), depende de T7
 
-- [ ] **T8. Caso de uso de guardar** (R19, R20, R21, R23, R24, R27). `design.md > 4.1`.
+- [x] **T8. Caso de uso de guardar** (R19, R20, R21, R23, R24, R27). `design.md > 4.1`.
   **Hecho:** unit con puertos simulados: forma de la entrada (y `lines`/`batchId` → `invalid_input`
   sin puertos); orden permiso → entrada → pedido → fechas → escritura; traducción de
   `no_batches` y `duplicate_lot`; en `TERMINADO`/`ENTREGADO` no se cambia estado, `finishedAt` ni
   equipo (integración, R27).
 
-- [ ] **T9. [P] El formulario del detalle** (R14, R15, R16, R17). `batchDataForm` en
+- [x] **T9. [P] El formulario del detalle** (R14, R15, R16, R17). `batchDataForm` en
   `conditioning-batch-data.ts` y `ConditioningBatchData.form` en `conditioning-order-view.ts`.
   **Hecho:** unit puro: `empty`, `shared`, `divergent` (datos a medias, lotes distintos, fechas
   distintas con el mismo lote, línea sin lote como `null`) y `no_batches`; el detalle no invoca
   ninguna escritura (R16).
 
-- [ ] **T10. Server Action** (R19, R25). `design.md > 4.2`. **Hecho:** unit: lee un valor por
+- [x] **T10. Server Action** (R19, R25). `design.md > 4.2`. **Hecho:** unit: lee un valor por
   campo, ya no devuelve `batchId`, entrega los códigos del catálogo.
 
-- [ ] **T11. [P] Seed de demo.** `scripts/seed-demo/gateway.ts > saveDemoBatchData` llama con la
+- [x] **T11. [P] Seed de demo.** `scripts/seed-demo/gateway.ts > saveDemoBatchData` llama con la
   entrada nueva. **Hecho:** typecheck verde; el seed guarda un único lote por pedido.
 
 ## Bloque D — Pantalla (frontend_dev), depende de T9 y T10

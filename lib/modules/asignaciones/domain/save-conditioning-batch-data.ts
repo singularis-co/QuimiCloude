@@ -1,8 +1,8 @@
 // lib/modules/asignaciones/domain/save-conditioning-batch-data.ts
 /**
- * Guardar lote, vencimiento y dia de produccion de las lineas de un pedido. Solo lo hace quien
- * acondiciona, y solo desde que comenzo: en `EN_ACONDICIONAMIENTO`, `TERMINADO` o `ENTREGADO`.
- * Ningun dato se borra: cada linea enviada trae los tres.
+ * Guardar lote, vencimiento y dia de produccion de un pedido. Solo lo hace quien acondiciona, y
+ * solo desde que comenzo: en `EN_ACONDICIONAMIENTO`, `TERMINADO` o `ENTREGADO`. Los tres datos
+ * pasan a todas las lineas con lote: que lotes son lo decide el servidor, no la entrada.
  *
  * Las fechas se comparan como cadenas `AAAA-MM-DD` contra el dia civil UTC del servidor: con ancho
  * fijo el orden lexicografico es el del calendario y no hay corrimiento de zona.
@@ -24,19 +24,11 @@ import {
 import { civilDateSchema, typedLotSchema, type FinishedBatchLabels } from '@/lib/modules/inventario';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 
-const lineSchema = z.strictObject({
-  batchId: z.string().uuid(),
+export const saveConditioningBatchDataSchema = z.strictObject({
+  orderId: z.string().uuid(),
   lot: typedLotSchema,
   expiryDate: civilDateSchema,
   productionDate: civilDateSchema,
-});
-
-export const saveConditioningBatchDataSchema = z.strictObject({
-  orderId: z.string().uuid(),
-  lines: z
-    .array(lineSchema)
-    .min(1)
-    .refine((lines) => new Set(lines.map((line) => line.batchId)).size === lines.length),
 });
 
 export type SaveConditioningBatchDataInput = z.infer<typeof saveConditioningBatchDataSchema>;
@@ -56,15 +48,6 @@ function civilDayUtc(instant: Date): string {
   return instant.toISOString().slice(0, 10);
 }
 
-function firstDuplicateLot(lines: SaveConditioningBatchDataInput['lines']): string | undefined {
-  const seen = new Set<string>();
-  for (const line of lines) {
-    if (seen.has(line.lot)) return line.batchId;
-    seen.add(line.lot);
-  }
-  return undefined;
-}
-
 export function createSaveConditioningBatchData(
   deps: SaveConditioningBatchDataDeps,
 ): (actor: Actor | null | undefined, input: unknown) => Promise<void> {
@@ -74,7 +57,7 @@ export function createSaveConditioningBatchData(
 
     const parsed = saveConditioningBatchDataSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, lines } = parsed.data;
+    const { orderId, lot, expiryDate, productionDate } = parsed.data;
 
     const target = await deps.orders.findAliveById(orderId, actor.companyId);
     if (target === null) throw new OrderNotFoundError();
@@ -90,22 +73,17 @@ export function createSaveConditioningBatchData(
 
     const now = deps.now?.() ?? new Date();
     const today = civilDayUtc(now);
-    const expiryNotFuture = lines.find((line) => line.expiryDate <= today);
-    if (expiryNotFuture !== undefined) throw new BatchExpiryNotFutureError(expiryNotFuture.batchId);
-    const productionFuture = lines.find((line) => line.productionDate > today);
-    if (productionFuture !== undefined) throw new BatchProductionDateFutureError(productionFuture.batchId);
-
-    const duplicated = firstDuplicateLot(lines);
-    if (duplicated !== undefined) throw new ConditioningBatchDuplicateLotError(duplicated);
+    if (expiryDate <= today) throw new BatchExpiryNotFutureError();
+    if (productionDate > today) throw new BatchProductionDateFutureError();
 
     const outcome = await deps.batches.writeForOrder({
       companyId: actor.companyId,
       orderId,
-      labels: lines,
+      label: { lot, expiryDate, productionDate },
       actorId: actor.id,
       now,
     });
-    if (outcome.kind === 'batch_not_found') throw new ConditioningBatchNotFoundError(outcome.batchId);
+    if (outcome.kind === 'no_batches') throw new ConditioningBatchNotFoundError();
     if (outcome.kind === 'duplicate_lot') throw new ConditioningBatchDuplicateLotError(outcome.batchId ?? undefined);
   };
 }

@@ -13,14 +13,7 @@ import { redirect } from 'next/navigation';
 
 import { asignaciones, identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
-import {
-  AsignacionesError,
-  BatchExpiryNotFutureError,
-  BatchProductionDateFutureError,
-  ConditioningBatchDuplicateLotError,
-  ConditioningBatchNotFoundError,
-  type Actor,
-} from '@/lib/modules/asignaciones';
+import { AsignacionesError, type Actor } from '@/lib/modules/asignaciones';
 import { ASSIGNED_ORDERS_ROUTE, CONDITIONED_ORDER_PARAM, conditioningOrderRoute } from '@/lib/shared/routes';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
@@ -86,43 +79,10 @@ export async function finishConditioningAction(
   redirect(`${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`);
 }
 
-export type SaveConditioningBatchDataResult = { status: 'idle' } | { status: 'success' } | (ErrorState & { batchId?: string });
+export type SaveConditioningBatchDataResult = { status: 'idle' } | { status: 'success' } | ErrorState;
 
-function textValues(formData: FormData, key: string): string[] {
-  return formData.getAll(key).map((value) => (typeof value === 'string' ? value : ''));
-}
-
-/** Las cuatro listas del formulario, emparejadas por posicion. Una linea con los tres datos vacios
- *  no se envia; una a medias viaja tal cual y la rechaza el caso de uso. */
-function batchDataLines(formData: FormData) {
-  const batchIds = textValues(formData, 'batchId');
-  const lots = textValues(formData, 'lot');
-  const expiryDates = textValues(formData, 'expiryDate');
-  const productionDates = textValues(formData, 'productionDate');
-  return batchIds
-    .map((batchId, index) => ({
-      batchId,
-      lot: lots[index] ?? '',
-      expiryDate: expiryDates[index] ?? '',
-      productionDate: productionDates[index] ?? '',
-    }))
-    .filter((line) => line.lot.trim() !== '' || line.expiryDate !== '' || line.productionDate !== '');
-}
-
-function culpritBatchId(error: unknown): string | undefined {
-  if (
-    error instanceof BatchExpiryNotFutureError ||
-    error instanceof BatchProductionDateFutureError ||
-    error instanceof ConditioningBatchDuplicateLotError ||
-    error instanceof ConditioningBatchNotFoundError
-  ) {
-    return error.batchId;
-  }
-  return undefined;
-}
-
-/** Guarda los datos de lote y se queda en el detalle. El error lleva la linea culpable cuando se
- *  sabe, para que el formulario la marque. */
+/** Guarda los datos de lote del pedido y se queda en el detalle. El campo culpable lo deduce el
+ *  formulario por el `code`. */
 export async function saveConditioningBatchDataAction(
   _prevState: SaveConditioningBatchDataResult,
   formData: FormData,
@@ -131,11 +91,14 @@ export async function saveConditioningBatchDataAction(
   const orderId = formData.get('orderId');
 
   try {
-    await asignaciones.saveConditioningBatchData(actor, { orderId, lines: batchDataLines(formData) });
+    await asignaciones.saveConditioningBatchData(actor, {
+      orderId,
+      lot: formData.get('lot'),
+      expiryDate: formData.get('expiryDate'),
+      productionDate: formData.get('productionDate'),
+    });
   } catch (error) {
-    const state = await toErrorState(error);
-    const batchId = culpritBatchId(error);
-    return batchId === undefined ? state : { ...state, batchId };
+    return toErrorState(error);
   }
 
   if (typeof orderId === 'string') revalidatePath(conditioningOrderRoute(orderId));
