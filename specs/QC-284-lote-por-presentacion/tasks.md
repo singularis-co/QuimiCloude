@@ -89,7 +89,7 @@
 
 ## Bloque E — Verificación (implementer), depende de todo lo anterior
 
-- [ ] **T13. E2E** (R26, R30). Reescribir `e2e/datos-de-lote-en-acondicionamiento.spec.ts` al
+- [x] **T13. E2E** (R26, R30). Reescribir `e2e/datos-de-lote-en-acondicionamiento.spec.ts` al
   recorrido de R30, con la siembra actual más un lote de otra producción de la presentación de la
   línea 1 con código conocido. **Hecho:** `pnpm exec playwright test
   e2e/datos-de-lote-en-acondicionamiento.spec.ts` verde en Chromium y WebKit.

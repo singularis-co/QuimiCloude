@@ -163,6 +163,7 @@ const FINISHED_PRODUCT_TAB_NAME = 'Producto terminado';
 const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
 const NAME_CELL_TESTID = 'data-table-cell-name';
 const ORDER_GROUP_NAME_TESTID = 'finished-stock-name';
+const ORDER_GROUP_NUMBER_TESTID = 'finished-stock-order-number';
 const ORDER_GROUP_TOGGLE_TESTID = 'finished-stock-toggle';
 const BATCHES_OPEN_TESTID = 'product-batches-open';
 const PRODUCT_ROW_ACTIONS_TESTID = 'product-row-actions';
@@ -379,10 +380,11 @@ async function gotoSettled(page: Page, url: string): Promise<void> {
 
 /**
  * El Administrador, en su propio contexto, abre en `/inventario` el panel de lotes de cada
- * producto terminado del pedido y ve el lote escrito y su vencimiento.
+ * producto terminado del pedido `numberText` y ve el lote escrito y su vencimiento.
  */
 async function expectAdminSeesBatchData(
   browser: Browser,
+  numberText: string,
   expected: ReadonlyArray<{ readonly line: SeededLine; readonly input: BatchInput }>,
 ): Promise<void> {
   const context = await browser.newContext();
@@ -401,23 +403,34 @@ async function expectAdminSeesBatchData(
         { timeout: 60_000 },
       );
 
-      // La pestaña lista pedidos: los productos aparecen al desplegar el de la receta.
-      const orderName = page.getByTestId(ORDER_GROUP_NAME_TESTID).filter({ hasText: exactText(RECIPE_NAME) });
-      await expect(orderName).toHaveCount(1, { timeout: 60_000 });
-      const toggle = page
+      // La pestaña lista pedidos: los productos aparecen al desplegar el del pedido. El grupo se
+      // identifica por su número de pedido, no por el nombre: el lote de la otra producción (sin
+      // asiento de pedido) pinta su propio grupo «Sin pedido» con el mismo nombre de receta.
+      const orderNumber = page
+        .getByTestId(ORDER_GROUP_NUMBER_TESTID)
+        .filter({ hasText: exactText(numberText) });
+      const groupRow = page
         .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
-        .filter({ has: orderName })
-        .getByTestId(ORDER_GROUP_TOGGLE_TESTID);
+        .filter({ has: orderNumber });
+      await expect(groupRow).toHaveCount(1, { timeout: 60_000 });
+      await expect(groupRow.getByTestId(ORDER_GROUP_NAME_TESTID)).toHaveText(exactText(RECIPE_NAME));
+      const toggle = groupRow.getByTestId(ORDER_GROUP_TOGGLE_TESTID);
       await toggle.click();
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
-      // La celda de nombre pinta la receta sin la presentacion: la fila la distingue su columna.
+      // La fila del producto de la línea cuelga del grupo del pedido: su testid es el del grupo
+      // seguido del producto. La celda de nombre pinta la receta sin la presentacion: la fila la
+      // distingue su columna.
+      const groupRowTestId = await groupRow.getAttribute('data-testid');
+      if (groupRowTestId === null) throw new Error('la fila del pedido no tiene data-testid');
       const nameCell = page
         .getByTestId(NAME_CELL_TESTID)
         .filter({ hasText: exactProductNameCellText(RECIPE_NAME) });
       // «Lotes» vive en el menu de acciones de la fila desde QC-232 (c2d4d46f), igual que en los
       // otros specs que abren el panel de lotes.
-      const productRow = productRowByNameAndPresentation(page, nameCell, line.presentationName);
+      const productRow = productRowByNameAndPresentation(page, nameCell, line.presentationName).and(
+        page.getByTestId(`${groupRowTestId}--${line.productId}`),
+      );
       await expect(productRow).toHaveCount(1, { timeout: 60_000 });
       await (
         await openRowActionsMenuItem(
@@ -803,7 +816,7 @@ test.describe('datos de lote en el acondicionamiento: un formulario por pedido',
 
     // --- 8. El Administrador ve en `/inventario` el mismo lote y vencimiento en los dos productos.
     await test.step('R30 - el Administrador ve el mismo lote y vencimiento en los dos productos', async () => {
-      await expectAdminSeesBatchData(browser, [
+      await expectAdminSeesBatchData(browser, numberText, [
         { line: line1, input: valid },
         { line: line2, input: valid },
       ]);

@@ -274,4 +274,23 @@ Sin componentes nuevos (solo compone `Input`, `Label`, `Button`, `ErrorAlert`, `
   - Causa: la base local de los E2E (`localhost:5432/QuimiCloude`, la de `.env`) **no tiene aplicada** `20261014200000_product_batches_lot_per_presentation`. `prisma migrate status`: «The migration have not yet been applied: 20261014200000_product_batches_lot_per_presentation»; además la base tiene 3 migraciones de otras ramas que no están en este worktree (`20260922160000_…`, `20260922160100_…`, `20261015120000_…`). Es una base compartida con otros worktrees: no la he migrado.
   - Para cerrarlo: aplicar la migración en una base donde corra el E2E (o la compartida, si el humano lo acepta) y volver a correr el spec.
 
-Veredicto: T12 hecha y verde (typecheck a cero); T13 escrita, pero el E2E queda rojo por entorno: a la base de los E2E le falta la migración de T1.
+### E2E contra la base aislada `qc284_e2e` (2026-10-14)
+
+Corrido contra la base aislada `qc284_e2e`, recreada con `CREATE DATABASE "qc284_e2e" TEMPLATE "qct_tpl_4a9ce03acc6c"` (la plantilla de la rama, con la migración de T1 aplicada), con `DATABASE_URL`/`DIRECT_URL` apuntando a ella. La base compartida `QuimiCloude` no se tocó.
+
+- Primera corrida: todos los pasos verdes salvo el último («el Administrador ve el mismo lote y vencimiento en los dos productos»), en los dos navegadores: `getByTestId('finished-stock-name').filter({ hasText: /^\s*qc219_e2e_<run>_receta\s*$/ })` esperaba 1 y encontró 2.
+- Causa (del spec, no de producción): el lote sembrado de la otra producción (`…_previo`) no tiene asiento de pedido, y la pestaña «Producto terminado» lo pinta en su propio grupo «Sin pedido», cuya columna «Nombre» es también el nombre de la receta (`finishedStockRowName`). Comportamiento esperado de `/inventario`.
+- Arreglo en `e2e/datos-de-lote-en-acondicionamiento.spec.ts > expectAdminSeesBatchData`: el grupo se identifica por su número de pedido (`finished-stock-order-number` con igualdad exacta a `numberText`), se comprueba que su nombre es la receta, y la fila del producto de cada línea se acota a las que cuelgan de ESE grupo (`data-table-row-<grupo>--<productId>`) además de nombre y presentación. Lo que R30 exige no se relaja: para cada uno de los dos productos del pedido se abre «Lotes» y se exige el lote `product-batch-<batchId>` con el código y el vencimiento escritos.
+
+Salida (`pnpm exec playwright test e2e/datos-de-lote-en-acondicionamiento.spec.ts --reporter=list`):
+
+```
+  ✓  1 [chromium] › e2e\datos-de-lote-en-acondicionamiento.spec.ts:681:7 › datos de lote en el acondicionamiento: un formulario por pedido › R30 R26 - un solo formulario vacío, los rechazos no escriben nada, el lote de otra producción de la misma presentación choca, el de un envase no, las dos líneas quedan iguales, termina, y el Administrador lo ve en /inventario (57.3s)
+  ✓  2 [webkit] › e2e\datos-de-lote-en-acondicionamiento.spec.ts:681:7 › datos de lote en el acondicionamiento: un formulario por pedido › R30 R26 - un solo formulario vacío, los rechazos no escriben nada, el lote de otra producción de la misma presentación choca, el de un envase no, las dos líneas quedan iguales, termina, y el Administrador lo ve en /inventario (1.2m)
+
+  2 passed (2.1m)
+```
+
+Tras el arreglo: `pnpm run typecheck` 0 errores (exit 0); `pnpm run lint` 0 errores, 7 warnings en archivos no tocados (exit 0); `eslint` sobre el spec: «No issues found».
+
+Veredicto: T12 y T13 hechas; el E2E de R26/R30 pasa en Chromium y WebKit contra la base aislada `qc284_e2e`.
