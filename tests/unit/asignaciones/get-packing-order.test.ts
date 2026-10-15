@@ -585,6 +585,25 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
     expect(order.finish).toBeNull();
   });
 
+  // Hallazgo m5 de la revision. Un `EN_EMPAQUE` sin reparto no se puede producir hoy: Comenzar
+  // devuelve `without_distribution` sin lineas (QC-170), el reparto deja de ser editable al
+  // Comenzar (`REPARTO_EDITABLE_STATUSES`) y el backfill 20260927120200 aborto si quedaba alguno.
+  // Si apareciera a mano en la base, la vista NO lo frena: `finish` sale con cero lineas, el
+  // dialogo envia `[]` y `finishPacking` lo rechaza con `validation_error` (finish-packing.test).
+  it('m5: un `EN_EMPAQUE` legado sin reparto (imposible por Comenzar y el backfill) sale con `finish` de cero lineas, no null', async () => {
+    const d = montarConteo([{ ...EN_EMPAQUE_DE_ANA, presentationLines: [] }]);
+
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(order.finish).toEqual({
+      orderQuantity: '80.0000',
+      orderUnit: { id: 'unidad-1', baseUnitId: null, factor: null },
+      orderUnitLabel: 'L',
+      lines: [],
+    });
+    expect(d.findPackagingRefs).not.toHaveBeenCalled();
+  });
+
   it('R29: todas las lecturas del conteo van con la empresa del actor', async () => {
     const d = montarConteo([EN_EMPAQUE_DE_ANA]);
 
