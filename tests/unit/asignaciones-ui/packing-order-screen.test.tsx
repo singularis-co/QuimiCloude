@@ -1,14 +1,17 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   PACKING_ORDER_FINISH_BUTTON_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
-  PACKING_ORDER_FINISH_CONFIRM_TEXTS,
   PACKING_ORDER_FINISH_DIALOG_TESTID,
   PACKING_ORDER_FINISH_ERROR_TESTID,
   PACKING_ORDER_FINISH_FORM_TESTID,
   PACKING_ORDER_ID_FIELD,
+  PACKING_ORDER_LINES_FIELD,
+  PACKING_FINISH_DIALOG_TEXTS,
+  PACKING_FINISH_LINE_TESTID,
+  PACKING_FINISH_REASON_TESTID,
   PACKING_ORDER_MISSING_DISTRIBUTION_TESTID,
   PACKING_ORDER_PRESENTATION_LINE_TESTID,
   PACKING_ORDER_PRESENTATION_TESTID,
@@ -31,6 +34,8 @@ import { STEP_READER_SIDE_COLUMN_RESERVE } from '@/app/(private)/asignacion/comp
 import type { PackingOrderDetail } from '@/lib/modules/asignaciones';
 import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
+
 const { startPackingActionMock, finishPackingActionMock } = vi.hoisted(() => ({
   startPackingActionMock: vi.fn(),
   finishPackingActionMock: vi.fn(),
@@ -42,6 +47,29 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-packing-actions', () 
 }));
 
 const ACTOR_ID = '11111111-1111-4111-8111-111111111111';
+const LITRO = { id: 'unit-1', baseUnitId: null, factor: null } as const;
+
+const FINISH: NonNullable<PackingOrderDetail['finish']> = {
+  orderQuantity: '12.5',
+  orderUnit: LITRO,
+  orderUnitLabel: 'kg',
+  lines: [
+    { lineId: 'linea-1', label: 'Botella 200 ml', plan: 5, content: '0.2', unit: LITRO, packaging: null },
+    { lineId: 'linea-2', label: 'Garrafa 5 l', plan: 2, content: '5', unit: LITRO, packaging: null },
+  ],
+};
+
+const FINISH_CONFIRM_TEXTS = {
+  title: PACKING_FINISH_DIALOG_TEXTS.title,
+  description: PACKING_FINISH_DIALOG_TEXTS.descriptionEnd,
+  cancel: PACKING_FINISH_DIALOG_TEXTS.cancel,
+  confirm: PACKING_FINISH_DIALOG_TEXTS.confirm,
+} as const;
+
+const PLAN_SIN_CAMBIOS = [
+  { lineId: 'linea-1', packedPackages: 5, reason: null, reasonOther: null },
+  { lineId: 'linea-2', packedPackages: 2, reason: null, reasonOther: null },
+];
 const MISSING_DISTRIBUTION_TEXT = 'Falta el reparto: lo define quien edita pedidos';
 
 function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
@@ -209,11 +237,11 @@ describe('pantalla del Empacador — Comenzar y Terminar piden confirmacion', ()
     },
     {
       nombre: 'Terminar',
-      order: () => fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo' }),
+      order: () => fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH }),
       button: PACKING_ORDER_FINISH_BUTTON_TESTID,
       dialog: PACKING_ORDER_FINISH_DIALOG_TESTID,
       confirm: PACKING_ORDER_FINISH_CONFIRM_TESTID,
-      texts: PACKING_ORDER_FINISH_CONFIRM_TEXTS,
+      texts: FINISH_CONFIRM_TEXTS,
       action: finishPackingActionMock,
       other: startPackingActionMock,
     },
@@ -280,7 +308,7 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
   ];
 
   const enEmpaquePropio = (packingSteps: PackingOrderDetail['packingSteps'] = PASOS_DE_ENVASADO) =>
-    fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', packingSteps });
+    fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', packingSteps, finish: FINISH });
 
   function marcarTodo(): void {
     for (const casilla of screen.queryAllByRole('checkbox')) {
@@ -368,7 +396,7 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     expect(screen.getByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toHaveClass('hidden');
   });
 
-  it('R21: el ultimo boton dice «Terminar» y pasa por la misma confirmacion que el boton de hoy', async () => {
+  it('R1, R21: el ultimo boton dice «Terminar» y abre el diálogo del conteo, que envía las líneas', async () => {
     finishPackingActionMock.mockResolvedValue({ status: 'success' });
     await recorrerHastaElUltimo();
 
@@ -377,9 +405,9 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     expect(terminar).toHaveTextContent('Terminar');
 
     fireEvent.click(terminar);
-    expect(screen.getByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID)).toHaveTextContent(
-      PACKING_ORDER_FINISH_CONFIRM_TEXTS.title,
-    );
+    const dialogo = screen.getByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID);
+    expect(dialogo).toHaveTextContent(PACKING_FINISH_DIALOG_TEXTS.title);
+    expect(within(dialogo).getAllByTestId(PACKING_FINISH_LINE_TESTID)).toHaveLength(2);
     expect(finishPackingActionMock).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -390,6 +418,7 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     expect(startPackingActionMock).not.toHaveBeenCalled();
     const [, formData] = finishPackingActionMock.mock.calls[0] as [unknown, FormData];
     expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
+    expect(JSON.parse(String(formData.get(PACKING_ORDER_LINES_FIELD)))).toEqual(PLAN_SIN_CAMBIOS);
   });
 
   it('R21: mientras termina, el ultimo boton dice «Terminando…» como el boton de hoy', async () => {
@@ -703,5 +732,75 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
   it('R39: los textos de quien empaca llevan tilde', () => {
     expect(PACKING_ORDER_TEXTS.packerUnknown).toBe('Lo está empacando otra persona.');
     expect(PACKING_ORDER_TEXTS.packer('Ana')).toBe('Lo está empacando Ana.');
+  });
+});
+
+describe('el diálogo del conteo real desde el pie', () => {
+  const enEmpaque = (overrides: Partial<PackingOrderDetail> = {}) =>
+    fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH, ...overrides });
+
+  it('R1: «Terminar» del pie abre «¿Terminar el empaque?» con una fila por línea prellenada con el plan', () => {
+    pintar(enEmpaque());
+
+    fireEvent.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+
+    const dialogo = screen.getByRole('dialog', { name: PACKING_FINISH_DIALOG_TEXTS.title });
+    expect(within(dialogo).getByRole('textbox', { name: 'Envases reales de Botella 200 ml' })).toHaveValue('5');
+    expect(within(dialogo).getByRole('textbox', { name: 'Envases reales de Garrafa 5 l' })).toHaveValue('2');
+    expect(dialogo).toHaveTextContent('2026-0000030 · Jarabe simple · Cantidad 12.5 kg');
+  });
+
+  it('R1, R16: con una línea distinta y su motivo, el formulario lleva el conteo real en `lines`', async () => {
+    finishPackingActionMock.mockResolvedValue({ status: 'success' });
+    pintar(enEmpaque());
+    const user = setupUser();
+
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+    await user.click(screen.getByRole('button', { name: 'Quitar un envase de Garrafa 5 l' }));
+    await user.click(screen.getByTestId(PACKING_FINISH_REASON_TESTID));
+    await user.click(await esperarInteractiva(await screen.findByRole('option', { name: 'Rotura' })));
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_CONFIRM_TESTID));
+
+    await waitFor(() => expect(finishPackingActionMock).toHaveBeenCalledTimes(1));
+    const [, formData] = finishPackingActionMock.mock.calls[0] as [unknown, FormData];
+    expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
+    expect(JSON.parse(String(formData.get(PACKING_ORDER_LINES_FIELD)))).toEqual([
+      { lineId: 'linea-1', packedPackages: 5, reason: null, reasonOther: null },
+      { lineId: 'linea-2', packedPackages: 1, reason: 'rotura', reasonOther: null },
+    ]);
+  });
+
+  it('R6: con una línea distinta sin motivo, Terminar no envía nada', async () => {
+    pintar(enEmpaque());
+    const user = setupUser();
+
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+    await user.click(screen.getByRole('button', { name: 'Quitar un envase de Garrafa 5 l' }));
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_CONFIRM_TESTID));
+
+    expect(screen.getByText('Elige un motivo.')).toBeInTheDocument();
+    expect(finishPackingActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R11: cerrar el diálogo tras cambiar el conteo no envía, y al reabrir vuelve al plan', async () => {
+    pintar(enEmpaque());
+    const user = setupUser();
+
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+    await user.click(screen.getByRole('button', { name: 'Quitar un envase de Garrafa 5 l' }));
+    await user.click(screen.getByRole('button', { name: PACKING_FINISH_DIALOG_TEXTS.cancel }));
+    await waitFor(() => expect(screen.queryByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID)).toBeNull());
+
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+    expect(screen.getByRole('textbox', { name: 'Envases reales de Garrafa 5 l' })).toHaveValue('2');
+    expect(finishPackingActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R12: la pantalla no pinta «Envases:» en ningún estado', () => {
+    for (const order of [fila(), enEmpaque(), fila({ status: 'EN_EMPAQUE', packedById: 'otro', packedByName: 'Otra' })]) {
+      pintar(order);
+      expect(screen.queryByText(/Envases:/)).toBeNull();
+      cleanup();
+    }
   });
 });

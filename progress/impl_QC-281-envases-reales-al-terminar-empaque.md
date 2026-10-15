@@ -58,3 +58,38 @@ Verificacion:
 - integracion: `scripts/seed-demo.int.test.ts` 1/1; asignaciones assigned-orders, finish-conditioning-batch-data, finished-orders, company-orders 21/21
 
 Veredicto: T7 backend listo; la UI del dialogo (T9) puede consumir `PackingOrderDetail.finish`.
+
+## T9 — diálogo y pantalla del empacador (frontend_dev, 2026-10-14)
+
+Archivos:
+- nuevo `app/(private)/asignacion/empaque/[id]/components/packing-finish-dialog.tsx` (`PackingFinishDialog`, `PACKING_FINISH_DIALOG_TEXTS`, testids `PACKING_FINISH_*`): compone `ui/dialog`, `ui/button` (`touch`), `ui/input` (`inputMode="numeric"`), `SharedSelectControl` (controlado), `ui/textarea` + `ui/label` (el `TextField` no tiene varias líneas), `FieldError`, `StatusBadge`; reglas con `checkPackingCounts`, `packedTotalInOrderUnit`, `maxPackagesForLine` de `pedidos`.
+- `packing-order-screen.tsx`: Terminar (pie y último paso) abre el diálogo; campo oculto `lines` (`PACKING_ORDER_LINES_FIELD`) en los dos `<form>`; fuera `PACKING_ORDER_FINISH_CONFIRM_TEXTS`.
+- `index.ts` del barrel de la ruta.
+- tests: nuevo `tests/unit/asignaciones-ui/packing-finish-dialog.test.tsx` (31); `packing-order-screen.test.tsx`, `packing-order-evidence.test.tsx`, `packing-orders-columns.test.tsx`, `tests/unit/paridad/confirmaciones-paridad.test.tsx` + snapshot, snapshot de `asignacion-acondicionamiento-paridad` (el `<form>` de Terminar gana el `input` oculto `lines`).
+- «Envases:» y la columna ya habían salido en T7: verificado, con test.
+
+Mapa R → test (UI):
+- R1: dialog «R1: una fila por línea…prellenado con el plan», «R1: la cabecera…», «R1, R16: Terminar sin cambios envía el plan…»; screen «R1: «Terminar» del pie abre…», «R1, R21: el ultimo boton…abre el diálogo del conteo…», «R1, R16: …`lines`»
+- R2: dialog «R2: vacío →…», «R2: solo entra un entero…», «R2: «−» no baja de 0», «R2, R10: 0 se acepta…»
+- R3: dialog «R3: todo igual al plan…», «R3, R10: con menos envases…», «R3, R10: con más envases…», «R3: volver al plan…», «R3, R16: con diferencia y motivo…»
+- R4: dialog «R4: al pasar de menos a más…se vacía», «R4: un motivo que vale en los dos sentidos se conserva…»
+- R5: dialog «R5, R13: «Otro» abre «Describe el motivo»…»
+- R6: dialog «R6: Terminar con una línea distinta y sin motivo…», «R6: «Otro» con solo espacios…»; screen «R6: …no envía nada»
+- R7: dialog «R7: el pie «Envasado…» se ve siempre…», y el total en «R8: Galón 16…» y «R32…»
+- R8: dialog «R8: Galón 16 supera 72 L…», «R8: igual o por debajo…»
+- R9: dialog «R9: Botella 19 pide 4 vacías…», «R9: dos líneas con el mismo envase suman su exceso…»
+- R10: dialog «R3, R10…» (2), «R10: …plural» (2), «R2, R10: 0 se acepta…»
+- R11: dialog «R11: «Cancelar» cierra sin enviar», «R11: la X «Cerrar»…»; screen «R11: cerrar el diálogo…al reabrir vuelve al plan», «Terminar: cancelar no invoca la accion»
+- R12: screen «R12: la pantalla no pinta «Envases:»…», «R28: …»; columns «R12: ninguna columna…«Envases»»
+- R13: dialog «R5, R13…», «R13: el campo no admite más de 200 caracteres»
+- R32: dialog «R32: con todas las líneas en 0…se puede Terminar»
+- R33: dialog «R33: sin pasos con foto…», «R33: con pasos con foto…»; evidence «R23, R33…» (2)
+
+Comandos:
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes en archivos no tocados.
+- `pnpm exec vitest related --run <archivos de T9>`: 9 archivos, 216/216 tras actualizar el snapshot de `asignacion-acondicionamiento-paridad` (1 fallo previo: solo el `input` oculto nuevo).
+
+Revisión visual 1440/1024/390: NO hecha (sin navegador en este agente).
+
+Veredicto: T9 hecha en código y tests; queda la revisión visual y dos puntos abiertos (pedido con `finish: null`, formato de cifras).

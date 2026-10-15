@@ -61,6 +61,20 @@ describe('R14 - las cinco columnas de «Por empacar», y el menú', () => {
   });
 });
 
+describe('R12 - sin columna «Envases»', () => {
+  it('R12: ninguna columna de «Por empacar» se llama ni pinta «Envases»', () => {
+    const columns = buildPackingOrdersColumns({ canViewTrace: true });
+
+    expect(columns.map((column) => column.label)).not.toContain('Envases');
+    expect(columns.map((column) => column.id)).not.toContain('packages');
+    for (const column of columns.filter((entry) => entry.menu === undefined)) {
+      const { container } = render(<>{column.cell(POR_EMPACAR_ORDER)}</>);
+      expect(container.textContent ?? '').not.toMatch(/Envases/);
+      cleanup();
+    }
+  });
+});
+
 describe('QC-265 R19 - el número deja de ser enlace', () => {
   it('R19: el número es texto; a la pantalla de empaque se entra por el menú', () => {
     const { container } = renderCell(PACKING_ORDER_NUMBER_COLUMN_ID, POR_EMPACAR_ORDER);

@@ -758,13 +758,28 @@ describe('paridad de confirmaciones — empaque (ConfirmActionDialog)', () => {
     expect(arbolDePortales(container)).toMatchSnapshot();
   });
 
-  it('R1 R12 — terminar, abierto: solo el dialogo, en su portal', async () => {
+  it('R1 R12 — terminar, abierto: el diálogo del conteo real, en su portal', async () => {
     const { container } = render(
       <PackingOrderScreen
         order={pedidoDeEmpaque({
           status: 'EN_EMPAQUE',
           packedById: EMPACADOR_ID,
           packedByName: 'Empacador de Prueba',
+          finish: {
+            orderQuantity: '12.5',
+            orderUnit: { id: 'unit-1', baseUnitId: null, factor: null },
+            orderUnitLabel: 'kg',
+            lines: [
+              {
+                lineId: 'linea-1',
+                label: 'Botella 200 ml',
+                plan: 5,
+                content: '0.2',
+                unit: { id: 'unit-1', baseUnitId: null, factor: null },
+                packaging: null,
+              },
+            ],
+          },
         })}
         actorId={EMPACADOR_ID}
         backHref="/asignacion?vista=por_empacar"

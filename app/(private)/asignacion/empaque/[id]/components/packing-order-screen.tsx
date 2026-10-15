@@ -8,7 +8,7 @@ import { ErrorAlert } from '@/components/shared/error-alert';
 import { Notice } from '@/components/shared/notice';
 import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
 import { StatusBadge } from '@/components/shared/status-badge';
-import { EvidenceMissingDialog, STEP_EVIDENCE_TEXTS } from '@/components/shared/step-evidence';
+import { EvidenceMissingDialog } from '@/components/shared/step-evidence';
 import { StepReader } from '@/components/shared/step-reader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -28,6 +28,7 @@ import {
   STEP_READER_SIDE_COLUMN_RESERVE,
 } from '../../../components/operator-screen-frame';
 import { useStepEvidence } from '../../../components/use-step-evidence';
+import { PackingFinishDialog, type PackingFinishSubmission } from './packing-finish-dialog';
 
 /**
  * La pantalla de un pedido de empaque, sobre el marco del operario. Sin control de edicion: los
@@ -65,6 +66,7 @@ export const PACKING_ORDER_FINISH_ERROR_TESTID = 'packing-order-finish-error';
 export const PACKING_ORDER_BACK_LINK_TESTID = 'packing-order-back-link';
 export const PACKING_ORDER_STEPS_TESTID = 'packing-order-steps';
 export const PACKING_ORDER_ID_FIELD = 'orderId';
+export const PACKING_ORDER_LINES_FIELD = 'lines';
 export const PACKING_ORDER_START_DIALOG_TESTID = 'packing-order-start-dialog';
 export const PACKING_ORDER_START_CONFIRM_TESTID = 'packing-order-start-confirm';
 export const PACKING_ORDER_FINISH_DIALOG_TESTID = 'packing-order-finish-dialog';
@@ -76,13 +78,6 @@ export const PACKING_ORDER_START_CONFIRM_TEXTS = {
     'Una vez comenzado, el empaque no se puede devolver: tendrás que continuarlo hasta terminarlo.',
   cancel: 'Cancelar',
   confirm: 'Comenzar',
-} as const;
-
-export const PACKING_ORDER_FINISH_CONFIRM_TEXTS = {
-  title: '¿Terminar el empaque?',
-  description: 'Terminar el empaque no se puede deshacer.',
-  cancel: 'Cancelar',
-  confirm: 'Terminar',
 } as const;
 
 export const PACKING_ORDER_TEXTS = {
@@ -101,16 +96,12 @@ export const PACKING_ORDER_TEXTS = {
   packer: (name: string) => `Lo está empacando ${name}.`,
 } as const;
 
-function confirmTexts(
-  texts: typeof PACKING_ORDER_START_CONFIRM_TEXTS | typeof PACKING_ORDER_FINISH_CONFIRM_TEXTS,
-) {
-  return {
-    title: texts.title,
-    description: texts.description,
-    dismiss: texts.cancel,
-    confirm: texts.confirm,
-  };
-}
+const START_DIALOG_TEXTS = {
+  title: PACKING_ORDER_START_CONFIRM_TEXTS.title,
+  description: PACKING_ORDER_START_CONFIRM_TEXTS.description,
+  dismiss: PACKING_ORDER_START_CONFIRM_TEXTS.cancel,
+  confirm: PACKING_ORDER_START_CONFIRM_TEXTS.confirm,
+};
 
 const PACKING_MIN_STEP_SECONDS = 5;
 
@@ -135,6 +126,7 @@ export type PackingOrderScreenProps = {
 export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScreenProps) {
   const startFormRef = useRef<HTMLFormElement>(null);
   const finishFormRef = useRef<HTMLFormElement>(null);
+  const finishLinesRef = useRef<HTMLInputElement>(null);
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
   const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
   const [missingOpen, setMissingOpen] = useState(false);
@@ -177,19 +169,20 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
     setFinishConfirmOpen(true);
   }
 
-  const finishTexts = {
-    ...confirmTexts(PACKING_ORDER_FINISH_CONFIRM_TEXTS),
-    ...(evidence.hasEvidenceSteps
-      ? { description: STEP_EVIDENCE_TEXTS.finishWarning }
-      : {}),
-  };
+  // El diálogo vive en un portal, fuera del `<form>`: el conteo entra por el campo oculto.
+  function submitFinish(lines: PackingFinishSubmission) {
+    if (finishLinesRef.current !== null) finishLinesRef.current.value = JSON.stringify(lines);
+    finishFormRef.current?.requestSubmit();
+  }
+
+  const quantityText = `${formatDecimalDisplay(order.quantity)}${order.unitLabel === null ? '' : ` ${order.unitLabel}`}`;
 
   const startDialog = (
     <ConfirmDialog
       open={startConfirmOpen}
       onOpenChange={setStartConfirmOpen}
       onConfirm={() => startFormRef.current?.requestSubmit()}
-      texts={confirmTexts(PACKING_ORDER_START_CONFIRM_TEXTS)}
+      texts={START_DIALOG_TEXTS}
       testIds={{
         dialog: PACKING_ORDER_START_DIALOG_TESTID,
         dismiss: `${PACKING_ORDER_START_DIALOG_TESTID}-cancel`,
@@ -199,11 +192,15 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
   );
 
   const finishDialog = (
-    <ConfirmDialog
+    <PackingFinishDialog
       open={finishConfirmOpen}
       onOpenChange={setFinishConfirmOpen}
-      onConfirm={() => finishFormRef.current?.requestSubmit()}
-      texts={finishTexts}
+      finish={order.finish}
+      numberText={order.numberText}
+      recipeName={order.recipeName ?? PACKING_ORDER_TEXTS.recipeMissing}
+      quantityText={quantityText}
+      hasEvidenceSteps={evidence.hasEvidenceSteps}
+      onConfirm={submitFinish}
       testIds={{
         dialog: PACKING_ORDER_FINISH_DIALOG_TESTID,
         dismiss: `${PACKING_ORDER_FINISH_DIALOG_TESTID}-cancel`,
@@ -254,6 +251,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
         className="flex"
       >
         <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
+        <input ref={finishLinesRef} type="hidden" name={PACKING_ORDER_LINES_FIELD} defaultValue="" />
         <Button
           type="button"
           size="xl"
@@ -394,7 +392,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
       </div>
 
       {showsPackingSteps ? (
-        // El ultimo boton del paso a paso abre la confirmacion; el `<form>` de hoy envia.
+        // El último botón del paso a paso abre el diálogo; este `<form>` envía.
         <form
           ref={finishFormRef}
           action={finishFormAction}
@@ -402,6 +400,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
           className="hidden"
         >
           <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
+          <input ref={finishLinesRef} type="hidden" name={PACKING_ORDER_LINES_FIELD} defaultValue="" />
           {finishDialog}
         </form>
       ) : null}

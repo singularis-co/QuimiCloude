@@ -2,7 +2,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  PACKING_ORDER_FINISH_CONFIRM_TEXTS,
+  PACKING_FINISH_DIALOG_TEXTS,
   PACKING_ORDER_FINISH_DIALOG_TESTID,
   PackingOrderScreen,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
@@ -244,7 +244,7 @@ describe('empaque — terminar con evidencia', () => {
 });
 
 describe('empaque — confirmacion', () => {
-  it('R23: con evidencia en la lista y todas cubiertas, la confirmacion avisa de que las fotos quedan fijas', async () => {
+  it('R23, R33: con evidencia en la lista y todas cubiertas, la descripción del conteo acaba en el aviso de que las fotos quedan fijas', async () => {
     pintar(
       pedido({
         packingSteps: [paso('Unico', true)],
@@ -257,11 +257,14 @@ describe('empaque — confirmacion', () => {
     await user.click(screen.getByTestId('step-reader-finish'));
 
     const dialogo = await screen.findByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID);
-    expect(within(dialogo).getByText(STEP_EVIDENCE_TEXTS.finishWarning)).toBeVisible();
+    expect(dialogo).toHaveAccessibleDescription(
+      `${PACKING_FINISH_DIALOG_TEXTS.descriptionLead} ${STEP_EVIDENCE_TEXTS.finishWarning}`,
+    );
+    expect(dialogo.textContent).not.toContain(PACKING_FINISH_DIALOG_TEXTS.descriptionEnd);
     expect(screen.queryByRole('alertdialog', { name: EVIDENCE_MISSING_TEXTS.title })).toBeNull();
   });
 
-  it('R23: sin pasos con evidencia, la confirmacion conserva su texto de siempre', async () => {
+  it('R23, R33: sin pasos con evidencia, la descripción del conteo es la del tablero tal cual', async () => {
     pintar(pedido({ packingSteps: [paso('Unico')] }));
     const user = setupUser();
     await esperarPaso();
@@ -269,6 +272,8 @@ describe('empaque — confirmacion', () => {
     await user.click(screen.getByTestId('step-reader-finish'));
 
     const dialogo = await screen.findByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID);
-    expect(within(dialogo).getByText(PACKING_ORDER_FINISH_CONFIRM_TEXTS.description)).toBeVisible();
+    expect(dialogo).toHaveAccessibleDescription(
+      `${PACKING_FINISH_DIALOG_TEXTS.descriptionLead} ${PACKING_FINISH_DIALOG_TEXTS.descriptionEnd}`,
+    );
   });
 });
