@@ -1,12 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, useTransition, type FormEvent } from 'react';
 import { toast } from 'sonner';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
@@ -14,8 +13,14 @@ import { newRequestId } from '@/lib/modules/observabilidad';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import {
   checkDelivery,
+  checkDeliveryBlocks,
+  flattenBlocks,
+  packagesLeftInBatch,
   type DeliveryAllocation,
+  type DeliveryBatchState,
+  type DeliveryBlockIssue,
   type DeliveryCheck,
+  type DeliveryCustomerBlock,
   type OrderDeliveryView,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
@@ -23,16 +28,19 @@ import {
   deliverOrderAction,
   getOrderDeliveryAction,
   type DeliverOrderActionResult,
+  type DeliverOrderInput,
   type OrderDeliveryResult,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 
 import {
-  adjustOrderDeliveryDraft,
-  packagesKey,
-  type OrderDeliveryDraft,
-} from './order-delivery-draft';
+  OrderDeliveryAddCustomer,
+  OrderDeliveryCustomerBlock,
+  type OrderDeliveryBlockPresentation,
+  type OrderDeliveryCustomerBlockLabels,
+} from './order-delivery-customer-block';
+import { packagesKey, type OrderDeliveryDraft } from './order-delivery-draft';
+import { OrderDeliverySummary, type OrderDeliverySummaryLabels, type OrderDeliverySummaryLine } from './order-delivery-summary';
 import { type OrderCustomerChoice } from './order-customer-label';
-import { OrderCustomerPicker } from './order-customer-picker';
 import { useOrderDeliveryDraft } from './use-order-delivery-draft';
 
 export const ORDER_DELIVERY_SHEET_TESTID = 'order-delivery-sheet';
@@ -40,44 +48,51 @@ export const ORDER_DELIVERY_SKELETON_TESTID = 'order-delivery-skeleton';
 export const ORDER_DELIVERY_ERROR_TESTID = 'order-delivery-error';
 export const ORDER_DELIVERY_REJECTED_TESTID = 'order-delivery-rejected';
 export const ORDER_DELIVERY_DRAFT_ADJUSTED_TESTID = 'order-delivery-draft-adjusted';
-export const ORDER_DELIVERY_LINE_TESTID = 'order-delivery-line';
-export const ORDER_DELIVERY_LINE_COMPLETE_TESTID = 'order-delivery-line-complete';
-export const ORDER_DELIVERY_LINE_EXCEEDS_TESTID = 'order-delivery-line-exceeds';
-export const ORDER_DELIVERY_BATCH_TESTID = 'order-delivery-batch';
-export const ORDER_DELIVERY_BATCH_PACKAGES_TESTID = 'order-delivery-batch-packages';
-export const ORDER_DELIVERY_BATCH_EXCEEDS_TESTID = 'order-delivery-batch-exceeds';
-export const ORDER_DELIVERY_WHOLE_ERROR_TESTID = 'order-delivery-whole-error';
-export const ORDER_DELIVERY_CUSTOMER_ERROR_TESTID = 'order-delivery-customer-error';
-export const ORDER_DELIVERY_EMPTY_ERROR_TESTID = 'order-delivery-empty-error';
+export const ORDER_DELIVERY_STOCK_OVER_TESTID = 'order-delivery-stock-over';
 export const ORDER_DELIVERY_SUBMIT_TESTID = 'order-delivery-submit';
 export const ORDER_DELIVERY_CANCEL_TESTID = 'order-delivery-cancel';
 
 const LABELS = {
   title: (numberText: string) => `Entregar pedido ${numberText}`,
   description: 'Elige el cliente y, por presentación, de qué lotes salen los envases.',
-  customer: 'Cliente',
-  customerPlaceholder: 'Busca un cliente por su nombre',
-  customerEmpty: 'Ningún cliente coincide con la búsqueda.',
-  progress: (ordered: number, delivered: number, remaining: number) =>
-    `Pedidos ${ordered} · Entregados ${delivered} · Faltan ${remaining}`,
-  complete: 'Completa',
-  noBatches: 'No hay lotes con envases disponibles para esta presentación.',
-  lot: 'Lote',
-  available: 'Disponibles',
-  entry: 'Entrada',
-  expiry: 'Vence',
-  packages: (lot: string) => `Envases del lote ${lot}`,
-  lineExceeds: 'Los envases escritos superan los que faltan por entregar.',
-  batchExceeds: 'Los envases escritos superan los disponibles en el lote.',
-  whole: 'Escribe un número entero de envases.',
-  customerRequired: 'Elige el cliente de la entrega.',
-  empty: 'No hay nada que entregar: escribe los envases de al menos un lote.',
   adjusted: 'Algunos lotes del borrador ya no están disponibles y se quitaron sus envases.',
+  stockOver: 'Entre todos los clientes se pasa de lo disponible en un lote. Baja los envases para poder entregar.',
+  addCustomer: 'Añadir cliente',
   submit: 'Entregar',
   submitting: 'Entregando…',
   cancel: 'Cancelar',
   delivered: 'Entrega registrada',
   completed: 'Pedido entregado',
+  summary: {
+    title: 'Por entregar',
+    written: 'Entregas',
+    of: 'de',
+    complete: 'Completa',
+    missing: (packages: number) => `Faltan ${packages}`,
+    exceeds: (packages: number) => `Sobran ${packages}`,
+    footnote: 'Suma de todos los clientes. El pedido es el tope por presentación.',
+  } satisfies OrderDeliverySummaryLabels,
+  block: {
+    title: (position: number) => `Cliente ${position}`,
+    remove: 'Quitar',
+    removeAria: (position: number) => `Quitar el cliente ${position}`,
+    customer: 'Cliente',
+    customerPlaceholder: 'Busca un cliente por su nombre',
+    customerEmpty: 'Ningún cliente coincide con la búsqueda.',
+    packagesCount: (packages: number) => `${packages} envases`,
+    noBatches: 'No hay lotes con envases disponibles para esta presentación.',
+    lot: 'Lote',
+    available: 'Disponibles',
+    entry: 'Entrada',
+    packagesAria: (lot: string, presentationName: string, position: number) =>
+      `Envases del lote ${lot} de ${presentationName} para el cliente ${position}`,
+    onlyAvailable: (packages: number) => `Solo hay ${packages}`,
+  } satisfies OrderDeliveryCustomerBlockLabels,
+  blockIssues: {
+    missing_customer: 'Elige el cliente.',
+    duplicate_customer: 'Este cliente ya está en la entrega.',
+    no_packages: 'Este cliente no lleva envases: indica al menos uno en alguna presentación.',
+  } satisfies Record<DeliveryBlockIssue, string>,
 } as const;
 
 const REREAD_CODES: ReadonlySet<ErrorState['code']> = new Set([
@@ -86,14 +101,12 @@ const REREAD_CODES: ReadonlySet<ErrorState['code']> = new Set([
 ]);
 
 const WHOLE_NUMBER = /^\d+$/;
+const NON_DIGITS = /\D/g;
 
-type FieldValue = { readonly kind: 'empty' } | { readonly kind: 'invalid' } | { readonly kind: 'number'; readonly value: number };
-
-function parsePackages(text: string): FieldValue {
-  const trimmed = text.trim();
-  if (trimmed === '') return { kind: 'empty' };
-  if (!WHOLE_NUMBER.test(trimmed)) return { kind: 'invalid' };
-  return { kind: 'number', value: Number(trimmed) };
+/** Lo que no es un entero (p. ej. un borrador viejo con «2.5») no cuenta como envases. */
+function writtenPackages(text: string | undefined): number {
+  const trimmed = (text ?? '').trim();
+  return WHOLE_NUMBER.test(trimmed) ? Number(trimmed) : 0;
 }
 
 function unexpectedFromRejection(): ErrorState {
@@ -105,41 +118,102 @@ function unexpectedFromRejection(): ErrorState {
   };
 }
 
+async function readDeliveryView(orderId: string): Promise<OrderDeliveryResult> {
+  try {
+    return await getOrderDeliveryAction(orderId);
+  } catch {
+    return unexpectedFromRejection();
+  }
+}
+
 type Evaluation = {
-  readonly invalidKeys: ReadonlySet<string>;
-  readonly check: DeliveryCheck;
+  readonly blocks: readonly DeliveryCustomerBlock[];
   readonly allocations: readonly DeliveryAllocation[];
+  readonly batches: readonly DeliveryBatchState[];
+  readonly check: DeliveryCheck;
+  readonly issues: ReadonlyMap<number, DeliveryBlockIssue>;
+  readonly overBatchIds: ReadonlySet<string>;
 };
 
+function sumPackages(allocations: readonly DeliveryAllocation[], match: (allocation: DeliveryAllocation) => boolean): number {
+  return allocations.reduce((total, allocation) => (match(allocation) ? total + allocation.packages : total), 0);
+}
+
 function evaluate(view: OrderDeliveryView, draft: OrderDeliveryDraft): Evaluation {
-  const invalidKeys = new Set<string>();
-  const allocations: DeliveryAllocation[] = [];
-  for (const line of view.lines) {
-    for (const batch of line.batches) {
-      const key = packagesKey(line.presentationLineId, batch.batchId);
-      const parsed = parsePackages(draft.packages[key] ?? '');
-      if (parsed.kind === 'invalid') invalidKeys.add(key);
-      if (parsed.kind === 'number' && parsed.value > 0) {
-        allocations.push({
-          presentationLineId: line.presentationLineId,
-          batchId: batch.batchId,
-          packages: parsed.value,
-        });
-      }
-    }
-  }
-  const check = checkDelivery(
-    view.lines,
-    view.lines.flatMap((line) =>
-      line.batches.map((batch) => ({
-        batchId: batch.batchId,
-        presentationLineId: line.presentationLineId,
-        availablePackages: batch.availablePackages,
-      })),
+  const pendingLines = view.lines.filter((line) => line.remainingPackages > 0);
+  const blocks: DeliveryCustomerBlock[] = draft.blocks.map((block) => ({
+    customerId: block.customer?.id ?? null,
+    allocations: pendingLines.flatMap((line) =>
+      line.batches.flatMap((batch) => {
+        const packages = writtenPackages(block.packages[packagesKey(line.presentationLineId, batch.batchId)]);
+        return packages > 0 ? [{ presentationLineId: line.presentationLineId, batchId: batch.batchId, packages }] : [];
+      }),
     ),
-    allocations,
+  }));
+  const allocations = flattenBlocks(blocks);
+  const batches = view.lines.flatMap((line) =>
+    line.batches.map((batch) => ({
+      batchId: batch.batchId,
+      presentationLineId: line.presentationLineId,
+      availablePackages: batch.availablePackages,
+    })),
   );
-  return { invalidKeys, check, allocations };
+  const overBatchIds = new Set(
+    batches
+      .filter((batch) => sumPackages(allocations, (a) => a.batchId === batch.batchId) > batch.availablePackages)
+      .map((batch) => batch.batchId),
+  );
+  return {
+    blocks,
+    allocations,
+    batches,
+    check: checkDelivery(view.lines, batches, allocations),
+    issues: checkDeliveryBlocks(blocks),
+    overBatchIds,
+  };
+}
+
+function summaryLines(view: OrderDeliveryView, evaluation: Evaluation): OrderDeliverySummaryLine[] {
+  return view.lines.map((line) => ({
+    presentationLineId: line.presentationLineId,
+    presentationName: line.presentationName,
+    writtenPackages: sumPackages(evaluation.allocations, (a) => a.presentationLineId === line.presentationLineId),
+    remainingPackages: line.remainingPackages,
+  }));
+}
+
+function blockPresentations(
+  view: OrderDeliveryView,
+  evaluation: Evaluation,
+  draftBlock: OrderDeliveryDraft['blocks'][number],
+  blockIndex: number,
+): OrderDeliveryBlockPresentation[] {
+  const own = evaluation.blocks[blockIndex]?.allocations ?? [];
+  return view.lines
+    .filter((line) => line.remainingPackages > 0)
+    .map((line) => ({
+      presentationLineId: line.presentationLineId,
+      presentationName: line.presentationName,
+      packages: sumPackages(own, (a) => a.presentationLineId === line.presentationLineId),
+      batches: line.batches.map((batch) => ({
+        batchId: batch.batchId,
+        lot: batch.lot,
+        leftPackages: packagesLeftInBatch(batch.availablePackages, evaluation.allocations, batch.batchId),
+        availablePackages: batch.availablePackages,
+        over: evaluation.overBatchIds.has(batch.batchId),
+        value: draftBlock.packages[packagesKey(line.presentationLineId, batch.batchId)] ?? '',
+      })),
+    }));
+}
+
+function toDeliverInput(orderId: string, deliveryKey: string, blocks: readonly DeliveryCustomerBlock[]): DeliverOrderInput {
+  return {
+    orderId,
+    deliveryKey,
+    customers: blocks.flatMap((block) =>
+      block.customerId === null ? [] : [{ customerId: block.customerId, allocations: block.allocations }],
+    ),
+  };
 }
 
 function ErrorNotice({ error, testId }: { readonly error: ErrorState; readonly testId: string }) {
@@ -150,14 +224,6 @@ function ErrorNotice({ error, testId }: { readonly error: ErrorState; readonly t
       testId={testId}
       withDataCode
     />
-  );
-}
-
-function FieldWarning({ id, testId, children }: { readonly id?: string; readonly testId: string; readonly children: string }) {
-  return (
-    <p id={id} className="text-sm text-destructive" data-testid={testId}>
-      {children}
-    </p>
   );
 }
 
@@ -173,67 +239,60 @@ type LoadState =
   | { readonly kind: 'ready'; readonly view: OrderDeliveryView };
 
 /**
- * Registra una entrega parcial o total de un pedido terminado. El borrador vive en el navegador
- * hasta que la entrega se aplica o se cancela; cerrar el panel de cualquier otra forma lo conserva.
+ * Registra una entrega parcial o total de un pedido terminado, repartida entre uno o mas clientes.
+ * El borrador vive en el navegador hasta que la entrega se aplica o se cancela; cerrar el panel de
+ * cualquier otra forma lo conserva.
  */
 export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliverySheetProps) {
   const router = useRouter();
-  const customerFieldId = useId();
-  const customerErrorId = useId();
   const store = useOrderDeliveryDraft(order.id);
+  const { sync, hasDraft } = store;
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
-  const [draft, setDraft] = useState<OrderDeliveryDraft | null>(null);
-  const [adjusted, setAdjusted] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [rejected, setRejected] = useState<ErrorState | null>(null);
   const [submitError, setSubmitError] = useState<ErrorState | null>(null);
   const [isPending, startTransition] = useTransition();
-  const draftRef = useRef<OrderDeliveryDraft | null>(null);
 
-  const applyDraft = useCallback(
-    (next: OrderDeliveryDraft) => {
-      draftRef.current = next;
-      setDraft(next);
-      store.save(next);
+  const applyView = useCallback(
+    (result: OrderDeliveryResult) => {
+      if (result.status === 'error') {
+        if (hasDraft()) setSubmitError(result);
+        else setLoad({ kind: 'error', error: result });
+        return;
+      }
+      sync(result.data);
+      setLoad({ kind: 'ready', view: result.data });
     },
-    [store],
+    [hasDraft, sync],
   );
 
-  const readView = useCallback(async () => {
-    let result: OrderDeliveryResult;
-    try {
-      result = await getOrderDeliveryAction(order.id);
-    } catch {
-      result = unexpectedFromRejection();
-    }
-    if (result.status === 'error') {
-      if (draftRef.current === null) setLoad({ kind: 'error', error: result });
-      else setSubmitError(result);
-      return;
-    }
-    const view = result.data;
-    const loaded =
-      draftRef.current === null ? store.load(view) : adjustOrderDeliveryDraft(draftRef.current, view);
-    applyDraft(loaded.draft);
-    setAdjusted(loaded.adjusted);
-    setLoad({ kind: 'ready', view });
-  }, [applyDraft, order.id, store]);
+  const readView = useCallback(() => readDeliveryView(order.id).then(applyView), [applyView, order.id]);
 
   useEffect(() => {
     void readView();
   }, [readView]);
 
   const view = load.kind === 'ready' ? load.view : null;
+  const draft = store.draft;
   const evaluation = view !== null && draft !== null ? evaluate(view, draft) : null;
+  const stockOver = evaluation !== null && evaluation.overBatchIds.size > 0;
 
-  function changePackages(key: string, text: string) {
-    if (draft === null) return;
-    applyDraft({ ...draft, packages: { ...draft.packages, [key]: text } });
+  function changePackages(blockKey: string, presentationLineId: string, batchId: string, text: string) {
+    if (view === null || draft === null || evaluation === null) return;
+    const key = packagesKey(presentationLineId, batchId);
+    const digits = text.replace(NON_DIGITS, '');
+    if (digits === '') {
+      store.setPackages(blockKey, key, '');
+      return;
+    }
+    const batch = evaluation.batches.find((candidate) => candidate.batchId === batchId);
+    const others = flattenBlocks(evaluation.blocks.filter((_, index) => draft.blocks[index]?.key !== blockKey));
+    const cap = packagesLeftInBatch(batch?.availablePackages ?? 0, others, batchId);
+    store.setPackages(blockKey, key, String(Math.min(Number(digits), cap)));
   }
 
-  function changeCustomer(choice: OrderCustomerChoice | null) {
-    if (draft === null) return;
-    applyDraft({ ...draft, customer: choice?.kind === 'customer' ? choice.customer : null });
+  function changeCustomer(blockKey: string, choice: OrderCustomerChoice | null) {
+    store.setCustomer(blockKey, choice?.kind === 'customer' ? choice.customer : null);
   }
 
   function cancel() {
@@ -243,16 +302,11 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (draft === null || evaluation === null || isPending) return;
+    if (draft === null || evaluation === null || isPending || stockOver) return;
     setAttempted(true);
-    if (draft.customer === null || evaluation.invalidKeys.size > 0 || evaluation.check.kind !== 'ok') return;
+    if (evaluation.issues.size > 0 || evaluation.check.kind !== 'ok') return;
 
-    const input = {
-      orderId: order.id,
-      deliveryKey: draft.deliveryKey,
-      customerId: draft.customer.id,
-      allocations: evaluation.allocations,
-    };
+    const input = toDeliverInput(order.id, draft.deliveryKey, evaluation.blocks);
     startTransition(async () => {
       let result: DeliverOrderActionResult;
       try {
@@ -280,17 +334,11 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
     });
   }
 
-  const customerChoice: OrderCustomerChoice | null =
-    draft === null || draft.customer === null ? null : { kind: 'customer', customer: draft.customer };
-  const showCustomerError = attempted && draft !== null && draft.customer === null;
-  const showEmptyError =
-    attempted && evaluation !== null && evaluation.invalidKeys.size === 0 && evaluation.check.kind === 'empty';
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange} disableEscapeDismissal={false} disablePointerDismissal={false}>
       <SheetContent
         side="right"
-        className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-lg"
+        className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full data-[side=right]:sm:max-w-[600px]"
         data-testid={ORDER_DELIVERY_SHEET_TESTID}
         isForm={view !== null}
         formProps={{ onSubmit: submit, noValidate: true }}
@@ -309,7 +357,7 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
               <Button
                 type="submit"
                 className={touchTarget}
-                disabled={isPending}
+                disabled={isPending || stockOver}
                 data-testid={ORDER_DELIVERY_SUBMIT_TESTID}
               >
                 {isPending ? LABELS.submitting : LABELS.submit}
@@ -326,9 +374,8 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
           {load.kind === 'loading' ? (
             <div className="flex flex-col gap-3" data-testid={ORDER_DELIVERY_SKELETON_TESTID} aria-hidden="true">
-              <Skeleton className="h-11 w-full" />
               <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-40 w-full" />
             </div>
           ) : null}
 
@@ -337,149 +384,48 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
           {view !== null && draft !== null && evaluation !== null ? (
             <>
               {rejected === null ? null : <ErrorNotice error={rejected} testId={ORDER_DELIVERY_REJECTED_TESTID} />}
-              {submitError === null ? null : (
-                <ErrorNotice error={submitError} testId={ORDER_DELIVERY_ERROR_TESTID} />
-              )}
-              {adjusted ? (
+              {submitError === null ? null : <ErrorNotice error={submitError} testId={ORDER_DELIVERY_ERROR_TESTID} />}
+              {store.adjusted ? (
                 <p
                   role="status"
-                  className="rounded-lg border border-amber-500/40 p-3 text-sm"
+                  className="rounded-lg border bg-muted p-3 text-sm"
                   data-testid={ORDER_DELIVERY_DRAFT_ADJUSTED_TESTID}
                 >
                   {LABELS.adjusted}
                 </p>
               ) : null}
 
-              <div className="flex flex-col gap-2">
-                <label htmlFor={customerFieldId} className="text-sm font-medium">
-                  {LABELS.customer}
-                </label>
-                <OrderCustomerPicker
-                  purpose="deliver"
-                  id={customerFieldId}
-                  value={customerChoice}
-                  onChange={changeCustomer}
-                  disabled={isPending}
-                  placeholder={LABELS.customerPlaceholder}
-                  emptyMessage={LABELS.customerEmpty}
-                  aria-invalid={showCustomerError}
-                  aria-describedby={showCustomerError ? customerErrorId : undefined}
-                />
-                {showCustomerError ? (
-                  <FieldWarning id={customerErrorId} testId={ORDER_DELIVERY_CUSTOMER_ERROR_TESTID}>
-                    {LABELS.customerRequired}
-                  </FieldWarning>
-                ) : null}
-              </div>
+              <OrderDeliverySummary lines={summaryLines(view, evaluation)} labels={LABELS.summary} />
 
-              {view.lines.map((line) => {
-                const lineExceeds =
-                  evaluation.check.kind === 'exceeds_remaining' &&
-                  evaluation.check.presentationLineIds.includes(line.presentationLineId);
+              {draft.blocks.map((block, index) => {
+                const issue = attempted ? evaluation.issues.get(index) : undefined;
                 return (
-                  <section
-                    key={line.presentationLineId}
-                    className="flex flex-col gap-3 rounded-lg border p-3"
-                    data-testid={ORDER_DELIVERY_LINE_TESTID}
-                    data-presentation-line-id={line.presentationLineId}
-                    aria-label={line.presentationName}
-                  >
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <h3 className="text-base font-medium">{line.presentationName}</h3>
-                      {line.remainingPackages === 0 ? (
-                        <span
-                          className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
-                          data-testid={ORDER_DELIVERY_LINE_COMPLETE_TESTID}
-                        >
-                          {LABELS.complete}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {LABELS.progress(line.orderedPackages, line.deliveredPackages, line.remainingPackages)}
-                    </p>
-                    {line.remainingPackages > 0 && line.batches.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">{LABELS.noBatches}</p>
-                    ) : null}
-                    {line.remainingPackages > 0
-                      ? line.batches.map((batch) => {
-                          const key = packagesKey(line.presentationLineId, batch.batchId);
-                          const invalid = evaluation.invalidKeys.has(key);
-                          const batchExceeds =
-                            evaluation.check.kind === 'exceeds_batch' &&
-                            evaluation.check.batchIds.includes(batch.batchId);
-                          const wholeId = `${customerFieldId}-${key}-whole`;
-                          const exceedsId = `${customerFieldId}-${key}-exceeds`;
-                          const describedBy = [invalid ? wholeId : null, batchExceeds ? exceedsId : null]
-                            .filter((id) => id !== null)
-                            .join(' ');
-                          return (
-                            <div
-                              key={batch.batchId}
-                              className="flex flex-col gap-2 border-t pt-3"
-                              data-testid={ORDER_DELIVERY_BATCH_TESTID}
-                              data-batch-id={batch.batchId}
-                            >
-                              <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm sm:grid-cols-4">
-                                <div>
-                                  <dt className="text-xs text-muted-foreground">{LABELS.lot}</dt>
-                                  <dd>{batch.lot}</dd>
-                                </div>
-                                <div>
-                                  <dt className="text-xs text-muted-foreground">{LABELS.available}</dt>
-                                  <dd>{batch.availablePackages}</dd>
-                                </div>
-                                <div>
-                                  <dt className="text-xs text-muted-foreground">{LABELS.entry}</dt>
-                                  <dd>{batch.purchaseDate}</dd>
-                                </div>
-                                {batch.expiryDate === null ? null : (
-                                  <div>
-                                    <dt className="text-xs text-muted-foreground">{LABELS.expiry}</dt>
-                                    <dd>{batch.expiryDate}</dd>
-                                  </div>
-                                )}
-                              </dl>
-                              <Input
-                                type="text"
-                                inputMode="numeric"
-                                autoComplete="off"
-                                aria-label={LABELS.packages(batch.lot)}
-                                aria-invalid={invalid || batchExceeds || lineExceeds}
-                                aria-describedby={describedBy === '' ? undefined : describedBy}
-                                className="min-h-11 text-base md:text-base"
-                                value={draft.packages[key] ?? ''}
-                                onChange={(event) => changePackages(key, event.target.value)}
-                                disabled={isPending}
-                                data-testid={ORDER_DELIVERY_BATCH_PACKAGES_TESTID}
-                              />
-                              {invalid ? (
-                                <FieldWarning id={wholeId} testId={ORDER_DELIVERY_WHOLE_ERROR_TESTID}>
-                                  {LABELS.whole}
-                                </FieldWarning>
-                              ) : null}
-                              {batchExceeds ? (
-                                <FieldWarning id={exceedsId} testId={ORDER_DELIVERY_BATCH_EXCEEDS_TESTID}>
-                                  {LABELS.batchExceeds}
-                                </FieldWarning>
-                              ) : null}
-                            </div>
-                          );
-                        })
-                      : null}
-                    {lineExceeds ? (
-                      <FieldWarning testId={ORDER_DELIVERY_LINE_EXCEEDS_TESTID}>{LABELS.lineExceeds}</FieldWarning>
-                    ) : null}
-                  </section>
+                  <OrderDeliveryCustomerBlock
+                    key={block.key}
+                    index={index}
+                    canRemove={draft.blocks.length > 1}
+                    onRemove={() => store.removeBlock(block.key)}
+                    customer={block.customer === null ? null : { kind: 'customer', customer: block.customer }}
+                    onCustomerChange={(choice) => changeCustomer(block.key, choice)}
+                    error={issue === undefined ? null : LABELS.blockIssues[issue]}
+                    presentations={blockPresentations(view, evaluation, block, index)}
+                    onPackagesChange={(lineId, batchId, text) => changePackages(block.key, lineId, batchId, text)}
+                    disabled={isPending}
+                    labels={LABELS.block}
+                  />
                 );
               })}
 
-              {showEmptyError ? (
-                <FieldWarning testId={ORDER_DELIVERY_EMPTY_ERROR_TESTID}>{LABELS.empty}</FieldWarning>
-              ) : null}
+              <OrderDeliveryAddCustomer onAdd={store.addBlock} disabled={isPending} label={LABELS.addCustomer} />
             </>
           ) : null}
         </div>
+
+        {stockOver ? (
+          <p role="alert" className="px-4 text-sm text-destructive" data-testid={ORDER_DELIVERY_STOCK_OVER_TESTID}>
+            {LABELS.stockOver}
+          </p>
+        ) : null}
       </SheetContent>
     </Sheet>
   );

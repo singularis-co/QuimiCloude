@@ -136,7 +136,7 @@ Cubre: R3, R33, R34, R39–R44 (servidor).
 
 ---
 
-## [ ] F1 [P] — Sheet «Entregar» con bloques y borrador v2 (depende de T0)
+## [x] F1 [P] — Sheet «Entregar» con bloques y borrador v2 (depende de T0)
 
 - `app/(private)/pedidos/components/order-delivery-sheet.tsx` (`design.md > 7.1`).
 - `app/(private)/pedidos/components/order-delivery-customer-block.tsx` (nuevo).
