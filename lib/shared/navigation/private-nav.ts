@@ -162,7 +162,6 @@ export type NavIconName =
   | 'clipboard-list'
   | 'clipboard-check'
   | 'truck'
-  | 'factory'
   | 'flask-conical'
   | 'boxes'
   // QC-67 R2: el item de usuarios. Es el UNICO nombre que esta ficha anade, y se anade porque

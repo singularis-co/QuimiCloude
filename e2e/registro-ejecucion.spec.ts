@@ -119,6 +119,7 @@ async function countEntries(orderId: string, action: 'RESUME' | 'ADVANCE'): Prom
 /** Entra desde la lista con Entrar + Comenzar, como lo haria el Operador. */
 async function openFromList(page: Page, order: { id: string; numberText: string }): Promise<void> {
   await loginAndLand(page, operatorUser);
+  await page.goto(ASSIGNED_ORDERS_ROUTE);
   await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
   const row = rowByNumber(page, order.numberText);
