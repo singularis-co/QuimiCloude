@@ -29,7 +29,7 @@ export interface FinishedBatchLabels {
    *  aparece. Fuera de transaccion. */
   listOfOrder(companyId: string, orderId: string): Promise<readonly FinishedBatchOfOrderLine[]>;
   /** El mismo dato en todos los lotes que devuelve `listOfOrder`: los elige el servidor, no quien
-   *  llama. Todo o nada, en su propia transaccion. */
+   *  llama. Todo o nada, en la transaccion que recibe o en la suya. */
   writeForOrder(input: {
     readonly companyId: string;
     readonly orderId: string;

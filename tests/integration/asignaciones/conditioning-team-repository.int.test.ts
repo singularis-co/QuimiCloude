@@ -280,3 +280,51 @@ describe('el equipo guardado no cambia cuando cambian los grupos o las personas 
     });
   });
 });
+
+describe('createConditioningTeamRepository — listByOrdersInCompany', () => {
+  it('R10: listByOrdersInCompany filtra por empresa y ordena por pedido y position', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await seedScenario(tx);
+      const b = await seedScenario(tx);
+      const otroPedidoA = await createOrder(tx, a.companyId);
+      const repo = createConditioningTeamRepository(tx);
+      const equipoA = teamOf(a);
+      const equipoOtro = teamOf({ ...a, orderId: otroPedidoA }).slice(0, 2);
+      // Se insertan desordenadas y mezcladas entre pedidos.
+      await repo.insertAll([equipoA[2]!, equipoOtro[1]!, equipoA[0]!]);
+      await repo.insertAll([equipoOtro[0]!, equipoA[1]!]);
+      await repo.insertAll(teamOf(b));
+
+      const filas = await repo.listByOrdersInCompany(a.companyId, [a.orderId, otroPedidoA, b.orderId]);
+
+      const fila = (orderId: string, member: NewConditioningTeamMember) => ({
+        orderId,
+        userId: member.userId,
+        workGroupId: member.workGroupId,
+        workGroupName: member.workGroupName,
+      });
+      const porPedido = [
+        [a.orderId, equipoA.map((m) => fila(a.orderId, m))],
+        [otroPedidoA, equipoOtro.map((m) => fila(otroPedidoA, m))],
+      ] as const;
+      const esperado = [...porPedido].sort(([x], [y]) => (x < y ? -1 : 1)).flatMap(([, rows]) => rows);
+      expect(filas).toEqual(esperado);
+      // Ninguna fila de la otra empresa, aunque se pidiera su pedido.
+      expect(filas.some((row) => row.orderId === b.orderId)).toBe(false);
+      expect(await repo.listByOrdersInCompany(b.companyId, [a.orderId, otroPedidoA])).toEqual([]);
+    });
+  });
+
+  it('R10: con orderIds vacio devuelve la lista vacia sin consultar', async () => {
+    const sinConsulta = {
+      orderConditioningTeamMember: {
+        findMany: () => {
+          throw new Error('no deberia consultar');
+        },
+      },
+    } as unknown as Prisma.TransactionClient;
+    await expect(createConditioningTeamRepository(sinConsulta).listByOrdersInCompany(randomUUID(), [])).resolves.toEqual(
+      [],
+    );
+  });
+});

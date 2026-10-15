@@ -1,3 +1,5 @@
+import type { ConditioningAction, ConditioningBatchSnapshotLine } from './conditioning-trace';
+
 export const EXECUTION_ACTIONS = [
   'start',
   'resume',
@@ -7,13 +9,16 @@ export const EXECUTION_ACTIONS = [
   'finish',
   'pack_start',
   'pack_finish',
+  'conditioning_start',
+  'conditioning_batch_save',
+  'conditioning_finish',
 ] as const;
 
 export type ExecutionAction = (typeof EXECUTION_ACTIONS)[number];
 
 type PackingAction = 'pack_start' | 'pack_finish';
 
-type StepAction = Exclude<ExecutionAction, 'cancel' | PackingAction>;
+type StepAction = Exclude<ExecutionAction, 'cancel' | PackingAction | ConditioningAction>;
 
 type Base = {
   readonly companyId: string;
@@ -22,11 +27,17 @@ type Base = {
   readonly occurredAt: Date;
 };
 
-/** El empaque no recorre los pasos de la receta: su anotacion va siempre sin posicion. */
+/** El empaque y el acondicionamiento no recorren los pasos de la receta: van siempre sin posicion. */
 export type NewExecutionEntry =
   | (Base & { readonly action: StepAction; readonly stepPosition: number | null })
   | (Base & { readonly action: 'cancel'; readonly stepPosition: number | null; readonly reason: string })
-  | (Base & { readonly action: PackingAction; readonly stepPosition: null });
+  | (Base & { readonly action: PackingAction; readonly stepPosition: null })
+  | (Base & { readonly action: 'conditioning_start' | 'conditioning_finish'; readonly stepPosition: null })
+  | (Base & {
+      readonly action: 'conditioning_batch_save';
+      readonly stepPosition: null;
+      readonly batchLines: readonly ConditioningBatchSnapshotLine[];
+    });
 
 /** Una anotacion leida del registro. `id` desempata dos anotaciones con el mismo instante. */
 export type ExecutionEntryRecord = {
@@ -36,6 +47,8 @@ export type ExecutionEntryRecord = {
   readonly action: ExecutionAction;
   readonly stepPosition: number | null;
   readonly reason: string | null;
+  /** No nulo solo en `conditioning_batch_save`. */
+  readonly batchLines: readonly ConditioningBatchSnapshotLine[] | null;
   readonly occurredAt: Date;
 };
 

@@ -22,8 +22,12 @@ import {
 } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
+import type { NewExecutionEntry } from '@/lib/modules/asignaciones/domain/execution-entry';
+import type { ExecutionTransaction } from '@/lib/modules/asignaciones/ports/execution-transaction';
 import type { FinishedBatchLabels, FinishedBatchOfOrderLine } from '@/lib/modules/inventario';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
+
+import { transaccionDeAcondicionamiento } from './conditioning-doubles';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -46,6 +50,7 @@ function montar(
     readonly target?: { readonly id: string; readonly status: string } | null;
     readonly summaryItems?: readonly unknown[];
     readonly batches?: readonly FinishedBatchOfOrderLine[];
+    readonly append?: (entry: NewExecutionEntry) => Promise<void>;
   },
 ): {
   readonly deps: FinishConditioningDeps;
@@ -53,6 +58,9 @@ function montar(
   readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
   readonly finishConditioningAliveById: ReturnType<typeof vi.fn>;
   readonly listOfOrder: ReturnType<typeof vi.fn>;
+  readonly run: ReturnType<typeof vi.fn>;
+  readonly append: ReturnType<typeof vi.fn>;
+  readonly pasos: readonly string[];
 } {
   const findAliveById = vi.fn(async () =>
     options?.target === undefined ? { id: PEDIDO, status: 'EN_ACONDICIONAMIENTO' } : options.target,
@@ -65,14 +73,18 @@ function montar(
     page: 1,
     pageSize: 1,
   }));
-  const finishConditioningAliveById = vi.fn(async () => resultado);
+  const { transaction, run, finishConditioningAliveById, append, pasos } = transaccionDeAcondicionamiento({
+    finish: resultado,
+    append: options?.append,
+  });
   const listOfOrder = vi.fn<FinishedBatchLabels['listOfOrder']>(async () => options?.batches ?? []);
   const deps = {
-    orders: { findAliveById, listAliveSummariesByIds, finishConditioningAliveById } as unknown as OrderCatalog,
+    orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
     batches: { listOfOrder },
+    transaction,
     now: () => AHORA,
   } satisfies FinishConditioningDeps;
-  return { deps, findAliveById, listAliveSummariesByIds, finishConditioningAliveById, listOfOrder };
+  return { deps, findAliveById, listAliveSummariesByIds, finishConditioningAliveById, listOfOrder, run, append, pasos };
 }
 
 /** Un catalogo que falla en cuanto se lee cualquiera de sus miembros. */
@@ -92,6 +104,11 @@ function depsIntocables(): FinishConditioningDeps {
         throw new Error('se toco el puerto: listOfOrder');
       },
     },
+    transaction: new Proxy({} as ExecutionTransaction, {
+      get(_target, prop) {
+        throw new Error(`se toco la transaccion: ${String(prop)}`);
+      },
+    }),
     now: () => {
       throw new Error('se pidio la hora');
     },
@@ -319,5 +336,71 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
     const finishConditioning = createFinishConditioning(depsIntocables());
     await expect(finishConditioning(null, { orderId: PEDIDO })).rejects.toBeInstanceOf(UnauthorizedError);
     await expect(finishConditioning(ACTOR, { orderId: 'x' })).rejects.toBeInstanceOf(ValidationError);
+  });
+});
+
+describe('QC-283 — Terminar anota en el registro de ejecucion', () => {
+  it('R6: anota conditioning_finish en la transaccion, despues de la transicion', async () => {
+    const { deps, pasos, append, finishConditioningAliveById } = montar('ok');
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+      numberText: '2026-0000007',
+    });
+
+    expect(pasos).toEqual(['transaccion', 'escribe-pedido', 'anota']);
+    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
+    expect(append).toHaveBeenCalledTimes(1);
+    expect(append).toHaveBeenCalledWith({
+      action: 'conditioning_finish',
+      companyId: EMPRESA,
+      orderId: PEDIDO,
+      userId: ANA,
+      stepPosition: null,
+      occurredAt: AHORA,
+    });
+  });
+
+  it.each([
+    ['not_conditioner', OrderConditioningTakenError],
+    ['not_conditionable', OrderNotConditionableError],
+    ['not_found', OrderNotFoundError],
+  ] as const)('R6: un rechazo de la transicion (%s) no anota y mantiene el error', async (resultado, clase) => {
+    const { deps, append, run } = montar(resultado);
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(clase);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it('R6: los rechazos previos (datos de lote, otro acondicionador) no abren la transaccion', async () => {
+    const linea = { presentationId: 'pres-1', packages: 2, packagingName: 'Botella 1 L' };
+    const sinDatos = montar('ok', {
+      summaryItems: [{ id: PEDIDO, number: { year: 2026, sequence: 7 }, conditionedBy: ANA, presentationLines: [linea] }],
+      batches: [],
+    });
+    const ajeno = montar('ok', {
+      summaryItems: [{ id: PEDIDO, number: { year: 2026, sequence: 7 }, conditionedBy: BETO, presentationLines: [] }],
+    });
+
+    await expect(createFinishConditioning(sinDatos.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      ConditioningBatchDataMissingError,
+    );
+    await expect(createFinishConditioning(ajeno.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderConditioningTakenError,
+    );
+    expect(sinDatos.run).not.toHaveBeenCalled();
+    expect(ajeno.run).not.toHaveBeenCalled();
+  });
+
+  it('R6: si anotar falla, el error sale de la transaccion para que deshaga la transicion', async () => {
+    const roto = new Error('fallo al anotar');
+    const { deps, finishConditioningAliveById } = montar('ok', {
+      append: async () => {
+        throw roto;
+      },
+    });
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBe(roto);
+    expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
   });
 });

@@ -69,7 +69,8 @@ const ACTIVO: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:30:00.000Z'),
-  duration: { kind: 'open', ms: 45 * 60 * 1000 },
+  active: true,
+  totalDuration: { kind: 'open', ms: 45 * 60 * 1000 },
   goBackCount: 2,
 };
 
@@ -81,7 +82,8 @@ const DE_BAJA: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-06T08:00:00.000Z'),
   lastAt: new Date('2026-10-06T09:00:00.000Z'),
-  duration: { kind: 'open', ms: 60 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
   goBackCount: 0,
 };
 
@@ -93,7 +95,8 @@ const ENTREGADO: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-05T08:00:00.000Z'),
   lastAt: new Date('2026-10-05T09:05:00.000Z'),
-  duration: { kind: 'closed', ms: 65 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'closed', ms: 65 * 60 * 1000 },
   goBackCount: 0,
 };
 

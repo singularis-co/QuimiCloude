@@ -5,14 +5,15 @@ import { RouteIcon } from 'lucide-react';
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import { StatusBadge } from '@/components/shared/status-badge';
-import type { ExecutionTracePerson, ExecutionTraceRow } from '@/lib/modules/asignaciones';
+import type { ExecutionTracePerson, ExecutionTraceRow, TraceDuration } from '@/lib/modules/asignaciones';
 import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 
 import {
   ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
+  TRACE_DURATION_SUFFIXES,
   TRACE_ORDER_STATUS_LABELS,
-  formatTraceDuration,
+  formatElapsedMinutes,
   formatTraceInstant,
 } from './execution-trace-format';
 import {
@@ -36,9 +37,18 @@ export function DeletedOrderMark() {
   return <StatusBadge tone="muted" label={DELETED_ORDER_MARK} data-testid="execution-trace-deleted" />;
 }
 
-/** Solo la lleva un pedido cuya duración sigue abierta, nunca uno dado de baja. */
 export function ActiveOrderMark() {
   return <StatusBadge tone="progress" label={ACTIVE_ORDER_MARK} data-testid="execution-trace-active" />;
+}
+
+function TraceTotal({ duration }: { readonly duration: TraceDuration }) {
+  const suffix = TRACE_DURATION_SUFFIXES[duration.kind];
+  return (
+    <span data-testid="execution-trace-duration" data-kind={duration.kind}>
+      {formatElapsedMinutes(duration.ms)}
+      {suffix === '' ? null : <span className="text-xs text-muted-foreground">{suffix}</span>}
+    </span>
+  );
 }
 
 export type ExecutionTraceColumnsDeps = {
@@ -60,7 +70,7 @@ export function buildExecutionTraceColumns({
         <span className="flex flex-wrap items-center gap-2">
           <span data-testid="execution-trace-number">{row.numberText}</span>
           {row.deleted ? <DeletedOrderMark /> : null}
-          {!row.deleted && row.duration.kind === 'open' ? <ActiveOrderMark /> : null}
+          {!row.deleted && row.active ? <ActiveOrderMark /> : null}
         </span>
       ),
     },
@@ -107,11 +117,7 @@ export function buildExecutionTraceColumns({
       label: 'Duración',
       tabular: true,
       align: 'end',
-      cell: (row) => (
-        <span data-testid="execution-trace-duration" data-kind={row.duration.kind}>
-          {formatTraceDuration(row.duration)}
-        </span>
-      ),
+      cell: (row) => <TraceTotal duration={row.totalDuration} />,
     },
     {
       id: TRACE_GO_BACK_COLUMN_ID,

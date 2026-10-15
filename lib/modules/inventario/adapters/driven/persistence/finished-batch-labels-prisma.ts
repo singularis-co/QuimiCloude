@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { batchCompanyScope, movementCompanyScope } from './company-scope';
@@ -17,10 +19,11 @@ function toCivilDate(date: Date | null): string | null {
 
 /** El ambito va en el asiento y en el lote, como en `findBatchesOfOrder`. */
 async function findFinishedBatchesOfOrder(
+  db: Prisma.TransactionClient,
   orderId: string,
   scope: InventoryScope,
 ): Promise<readonly FinishedBatchOfOrderLine[]> {
-  const rows = await prisma.inventoryMovement.findMany({
+  const rows = await db.inventoryMovement.findMany({
     where: {
       AND: [movementCompanyScope(scope), { orderId, kind: 'production', batch: batchCompanyScope(scope) }],
     },
@@ -49,23 +52,26 @@ async function findFinishedBatchesOfOrder(
   );
 }
 
-/** `FinishedBatchLabels` sobre el cliente global: cada escritura abre su propia transaccion. */
-export function createFinishedBatchLabels(): FinishedBatchLabels {
+/**
+ * Sin `db`, cada escritura abre su propia transaccion. Con `db`, escribe en la que recibe; tras un
+ * `duplicate_lot` esa transaccion queda abortada en Postgres, asi que quien la abrio tiene que lanzar.
+ */
+export function createFinishedBatchLabels(db?: Prisma.TransactionClient): FinishedBatchLabels {
   return {
     listOfOrder(companyId, orderId): Promise<readonly FinishedBatchOfOrderLine[]> {
-      return findFinishedBatchesOfOrder(orderId, { companyId });
+      return findFinishedBatchesOfOrder(db ?? prisma, orderId, { companyId });
     },
 
     async writeForOrder(input): Promise<FinishedBatchLabelsOutcome> {
       const scope: InventoryScope = { companyId: input.companyId };
-      try {
-        return await prisma.$transaction((tx) =>
-          writeFinishedBatchLabels(
-            tx,
-            { orderId: input.orderId, label: input.label, actorId: input.actorId, now: input.now },
-            scope,
-          ),
+      const write = (tx: Prisma.TransactionClient) =>
+        writeFinishedBatchLabels(
+          tx,
+          { orderId: input.orderId, label: input.label, actorId: input.actorId, now: input.now },
+          scope,
         );
+      try {
+        return await (db === undefined ? prisma.$transaction(write) : write(db));
       } catch (error) {
         if (isDuplicateBatchLot(error)) return { kind: 'duplicate_lot', batchId: null };
         throw error;

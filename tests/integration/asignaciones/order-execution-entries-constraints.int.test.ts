@@ -388,6 +388,143 @@ describe('order_execution_entries — el pedido y la persona', () => {
   })
 })
 
+// 2026-10-14: el registro gana las tres acciones del acondicionamiento y la columna `batch_lines`.
+// Los casos de arriba no cambian: siguen insertando sin la columna, que queda en NULL.
+
+const CONDITIONING_ACTIONS = ['CONDITIONING_START', 'CONDITIONING_BATCH_SAVE', 'CONDITIONING_FINISH'] as const
+
+const FOTO = [
+  {
+    batchId: '44444444-4444-4444-8444-444444444444',
+    presentationId: '55555555-5555-4555-8555-555555555555',
+    presentationName: 'Frasco 1 L',
+    lot: 'L-2026-001',
+    expiryDate: '2027-10-14',
+    productionDate: '2026-10-14',
+  },
+]
+
+function rawInsertWithBatchLines(
+  tx: Prisma.TransactionClient,
+  v: EntryValues,
+  batchLines: unknown,
+): Promise<number> {
+  const json = batchLines === null ? null : JSON.stringify(batchLines)
+  return tx.$executeRaw`
+    INSERT INTO "order_execution_entries"
+      ("company_id", "order_id", "user_id", "action", "step_position", "reason", "batch_lines", "occurred_at")
+    VALUES (
+      CAST(${v.companyId} AS uuid),
+      CAST(${v.orderId} AS uuid),
+      CAST(${v.userId} AS uuid),
+      CAST(${v.action} AS "OrderExecutionAction"),
+      CAST(${v.stepPosition} AS integer),
+      CAST(${v.reason} AS text),
+      CAST(${json} AS jsonb),
+      CURRENT_TIMESTAMP
+    )`
+}
+
+function fotoDe(action: string): unknown {
+  return action === 'CONDITIONING_BATCH_SAVE' ? FOTO : null
+}
+
+describe('order_execution_entries — las anotaciones del acondicionamiento (R7)', () => {
+  it('R7: acepta las tres acciones nuevas sin posicion ni motivo, y la foto solo en el guardado', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      for (const action of CONDITIONING_ACTIONS) {
+        expect(await rawInsertWithBatchLines(tx, entryOf(f, action), fotoDe(action)), action).toBe(1)
+      }
+      expect(await countEntries(tx, f.a.orderId)).toBe(CONDITIONING_ACTIONS.length)
+    })
+  })
+
+  it('R7: rechaza una anotacion de acondicionamiento con posicion de paso, con SQLSTATE 23514', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      for (const action of CONDITIONING_ACTIONS) {
+        const estado = await expectRejectedByDatabase(
+          tx,
+          () => rawInsertWithBatchLines(tx, entryOf(f, action, { stepPosition: 1 }), fotoDe(action)),
+          `${action} con posicion`,
+        )
+        expect(estado, action).toBe(CHECK_VIOLATION)
+      }
+      expect(await countEntries(tx, f.a.orderId)).toBe(0)
+    })
+  })
+
+  it('R7: rechaza una anotacion de acondicionamiento con motivo, con SQLSTATE 23514', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      for (const action of CONDITIONING_ACTIONS) {
+        const estado = await expectRejectedByDatabase(
+          tx,
+          () => rawInsertWithBatchLines(tx, entryOf(f, action, { reason: 'no toca' }), fotoDe(action)),
+          `${action} con motivo`,
+        )
+        expect(estado, action).toBe(CHECK_VIOLATION)
+      }
+      expect(await countEntries(tx, f.a.orderId)).toBe(0)
+    })
+  })
+
+  it('R7: rechaza un guardado de datos de lote sin foto, con SQLSTATE 23514', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const estado = await expectRejectedByDatabase(
+        tx,
+        () => rawInsertWithBatchLines(tx, entryOf(f, 'CONDITIONING_BATCH_SAVE'), null),
+        'CONDITIONING_BATCH_SAVE sin foto',
+      )
+      expect(estado).toBe(CHECK_VIOLATION)
+      expect(await countEntries(tx, f.a.orderId)).toBe(0)
+    })
+  })
+
+  it('R7: rechaza un guardado de datos de lote con una foto sin lineas, con SQLSTATE 23514', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const estado = await expectRejectedByDatabase(
+        tx,
+        () => rawInsertWithBatchLines(tx, entryOf(f, 'CONDITIONING_BATCH_SAVE'), []),
+        'CONDITIONING_BATCH_SAVE con foto vacia',
+      )
+      expect(estado).toBe(CHECK_VIOLATION)
+      expect(await countEntries(tx, f.a.orderId)).toBe(0)
+    })
+  })
+
+  it('R7: rechaza una foto que no es un array, con SQLSTATE 23514', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const estado = await expectRejectedByDatabase(
+        tx,
+        () => rawInsertWithBatchLines(tx, entryOf(f, 'CONDITIONING_BATCH_SAVE'), FOTO[0]),
+        'CONDITIONING_BATCH_SAVE con un objeto como foto',
+      )
+      expect(estado).toBe(CHECK_VIOLATION)
+      expect(await countEntries(tx, f.a.orderId)).toBe(0)
+    })
+  })
+
+  it('R7: rechaza una foto en cualquier anotacion que no sea un guardado de datos de lote, con SQLSTATE 23514', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      for (const action of ['CONDITIONING_START', 'CONDITIONING_FINISH', 'START', 'PACK_FINISH', 'CANCEL'] as const) {
+        const estado = await expectRejectedByDatabase(
+          tx,
+          () => rawInsertWithBatchLines(tx, entryOf(f, action), FOTO),
+          `${action} con foto`,
+        )
+        expect(estado, action).toBe(CHECK_VIOLATION)
+      }
+      expect(await countEntries(tx, f.a.orderId)).toBe(0)
+    })
+  })
+})
+
 describe('order_execution_entries — RLS', () => {
   it('R32: la RLS esta activada y forzada, sin policies', async () => {
     await inRolledBackTransaction(async (tx) => {

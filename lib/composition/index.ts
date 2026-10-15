@@ -1885,8 +1885,10 @@ const executionTransaction: ExecutionTransaction = {
         log: createExecutionLogRepository(tx),
         conditioning: {
           startConditioningAliveById: createStartConditioning({ conditioning: createOrderConditioningRepository(tx) }),
+          finishConditioningAliveById: createFinishConditioning({ conditioning: createOrderConditioningRepository(tx) }),
         },
         team: createConditioningTeamRepository(tx),
+        batches: createFinishedBatchLabels(tx),
       }),
     ),
 };
@@ -2074,11 +2076,13 @@ export const asignaciones = {
     log: executionLogRepository,
     orders: orderCatalog,
     people: peopleDirectory,
+    team: createConditioningTeamRepository(),
   }),
   getExecutionTrace: createGetExecutionTrace({
     log: executionLogRepository,
     orders: orderCatalog,
     people: peopleDirectory,
+    team: createConditioningTeamRepository(),
   }),
   startConditioning: createStartConditioningOrder({
     orders: orderCatalog,
@@ -2090,6 +2094,7 @@ export const asignaciones = {
   finishConditioning: createFinishConditioningOrder({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   listConditioningOrders: createListConditioningOrders({
@@ -2138,6 +2143,8 @@ export const asignaciones = {
   saveConditioningBatchData: createSaveConditioningBatchData({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
+    presentations: presentationCatalog,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   requestEvidenceUpload: createRequestEvidenceUpload({

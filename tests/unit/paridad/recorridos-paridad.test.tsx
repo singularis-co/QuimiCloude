@@ -1,11 +1,18 @@
 import { cleanup, render } from '@testing-library/react';
 
 import DashboardPage from '@/app/(private)/dashboard/page';
+import { ExecutionTraceDetail } from '@/app/(private)/dashboard/recorrido/[id]/components';
 import type { ExecutionTraceList, ExecutionTraceRow } from '@/lib/modules/asignaciones';
+import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import type { ExecutionTraceListResult } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 import { errorMessage, type ErrorState } from '@/lib/modules/errores';
 import { PERMISSIONS } from '@/lib/modules/identity';
 
+import {
+  FINISHED_CONDITIONING_TRACE,
+  IN_PROGRESS_CONDITIONING_TRACE,
+  PREVIOUS_CONDITIONING_TRACE,
+} from '../../fixtures/execution-trace-conditioning';
 import { errorInesperado } from '../../helpers/identificador-de-request';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { arbolAccesible, nuncaResuelve, resolverServerComponents } from './arbol-accesible';
@@ -56,7 +63,8 @@ const FILAS: readonly ExecutionTraceRow[] = [
     people: [PERSONA],
     firstAt: new Date('2026-09-20T08:00:00.000Z'),
     lastAt: new Date('2026-09-20T09:30:15.000Z'),
-    duration: { kind: 'closed', ms: 5_415_000 },
+    active: false,
+    totalDuration: { kind: 'closed', ms: 5_415_000 },
     goBackCount: 1,
   },
   {
@@ -67,7 +75,8 @@ const FILAS: readonly ExecutionTraceRow[] = [
     people: [],
     firstAt: new Date('2026-09-21T10:00:00.000Z'),
     lastAt: new Date('2026-09-21T10:05:00.000Z'),
-    duration: { kind: 'open', ms: 300_000 },
+    active: false,
+    totalDuration: { kind: 'unclosed', ms: 300_000 },
     goBackCount: 0,
   },
 ];
@@ -149,6 +158,18 @@ describe('paridad de recorridos (dashboard)', () => {
   it('R1 R17 — error inesperado, con su identificador', async () => {
     listExecutionTracesActionMock.mockResolvedValue(errorInesperado());
     await renderPantalla();
+    expect(arbolAccesible()).toMatchSnapshot();
+  });
+});
+
+// Una variante por cada una del tablero `RecorridoAcondicionamiento`: terminado, en curso y anterior.
+describe('paridad del detalle del recorrido con acondicionamiento', () => {
+  it.each([
+    ['terminado', FINISHED_CONDITIONING_TRACE],
+    ['en curso', IN_PROGRESS_CONDITIONING_TRACE],
+    ['anterior', PREVIOUS_CONDITIONING_TRACE],
+  ])('R12 R13 R14 R15 R16 R17 R18 R25 — %s', (_variante, trace) => {
+    render(<ExecutionTraceDetail trace={trace} backHref={DASHBOARD_ROUTE} />);
     expect(arbolAccesible()).toMatchSnapshot();
   });
 });
