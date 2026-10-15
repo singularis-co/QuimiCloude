@@ -381,3 +381,64 @@ El miembro por grupo no es opción del filtro (R31) y se filtra por URL `?person
 - Grafo de código (MCP) no usado: exploración con Grep/Read.
 
 Veredicto: spec escrito y tipado; no se pudo poner en verde en local porque la base no tiene las migraciones de QC-283 — pendiente de correr en CI o en una base migrada.
+
+## T10 — Cierre de trazabilidad (implementer, 2026-10-14)
+
+Mapa consolidado `R<n> -> test`, partiendo de `design.md > Plan de tests`. Cada caso se comprobo por
+su titulo en el archivo (grep) y los archivos se corrieron (salida abajo).
+
+| R | Test (archivo › caso) |
+|---|---|
+| R1 | `tests/unit/asignaciones/start-conditioning.test.ts` › «R1: anota conditioning_start en la transaccion, tras la transicion y el equipo»; `tests/integration/asignaciones/conditioning-execution-log.int.test.ts` › «R1: si append falla no quedan ni transicion ni equipo» |
+| R2 | `start-conditioning.test.ts` › «R2: already_mine (repetir Comenzar) no anota» |
+| R3 | `tests/unit/asignaciones/save-conditioning-batch-data.test.ts` › «R3: compone la foto en el orden enviado, con nombre o null, …»; `conditioning-execution-log.int.test.ts` › «R3: guardado y anotacion en la misma transaccion: …» |
+| R4 | `save-conditioning-batch-data.test.ts` › «R4: un rechazo de las reglas (fechas, lote repetido) no abre la transaccion ni anota»; `conditioning-execution-log.int.test.ts` › «R4: un lote duplicado o ajeno al pedido no guarda ni anota», «R4: un append que falla no guarda datos» |
+| R5 | `conditioning-execution-log.int.test.ts` › «R5: corregir anade otra foto y la primera no cambia» |
+| R6 | `tests/unit/asignaciones/finish-conditioning.test.ts` › «R6: anota conditioning_finish en la transaccion, despues de la transicion»; `conditioning-execution-log.int.test.ts` › «R6: si append falla el pedido no cambia» |
+| R7 | `tests/integration/asignaciones/order-execution-entries-constraints.int.test.ts` › «R7: acepta las tres acciones nuevas sin posicion ni motivo, y la foto solo en el guardado» (+ rechazos); `tests/unit/asignaciones/schema/order-execution-conditioning-migration.test.ts` › «R7: los tres CHECK, con su texto literal, y ninguno mas» |
+| R8 | `tests/unit/asignaciones/execution-log-prisma.test.ts` › «R8: la lectura del equipo para el filtro no actualiza ni borra: solo findMany sobre el equipo» |
+| R9 | `order-execution-conditioning-migration.test.ts` › «R9: ninguna migracion inserta ni actualiza filas» |
+| R10 | `tests/integration/asignaciones/execution-log-read.int.test.ts` › «R10: el filtro por equipo no cruza empresas»; `tests/integration/asignaciones/conditioning-team-repository.int.test.ts` › «R10: listByOrdersInCompany filtra por empresa y ordena por pedido y position» |
+| R11 | `tests/unit/asignaciones/get-execution-trace.test.ts` y `list-execution-traces.test.ts` › «R11: sin dashboard.consultar no lee registro ni equipo» |
+| R12 | `tests/ui/dashboard/execution-trace-detail.test.tsx` › describe «R12 - R18 - las tres anotaciones de acondicionamiento en la linea de tiempo» › «R12 - nombre, tono e icono de las tres anotaciones, …» |
+| R13 | `execution-trace-detail.test.tsx` › «R13 - supervisor y equipo en orden, con grupo»; `get-execution-trace.test.ts` › «R13: equipo con nombres actuales y grupo foto» |
+| R14 | `execution-trace-detail.test.tsx` › «R14 - sin equipo» |
+| R15 | `execution-trace-detail.test.tsx` › «R15 - quien guardo, n presentaciones, lineas con fechas dd/mm/aaaa y aviso»; `tests/unit/dashboard/execution-trace-format.test.ts` › formatSnapshotDate (ver T3) |
+| R16 | `execution-trace-detail.test.tsx` › «R16 - presentacion sin nombre» |
+| R17 | `execution-trace-detail.test.tsx` › «R17 - Terminar solo con quien» |
+| R18 | `execution-trace-detail.test.tsx` › «R18 - tarjetas de linea con los mismos datos» |
+| R19 | `tests/unit/asignaciones/execution-trace.test.ts` › «R19: tres fases cerradas» |
+| R20 | `execution-trace.test.ts` › «R20: fase abierta hasta now en su estado» |
+| R21 | `execution-trace.test.ts` › «R21: sin cierre fuera de su estado o dado de baja» |
+| R22 | `execution-trace.test.ts` › «R22: fase sin apertura es null; guardados sin Comenzar» |
+| R23 | `execution-trace.test.ts` › «R23: descuenta pausas antes de cada resume; resume doble; BLOQUEADO no» |
+| R24 | `execution-trace.test.ts` › «R24: cancel cierra solo la fase en curso» |
+| R25 | `execution-trace-detail.test.tsx` › «R25 - tarjetas por fase con insignias; fase null no se pinta» |
+| R26 | `execution-trace.test.ts` › «R26: total = suma, null = 0, precedencia del kind»; `execution-trace-format.test.ts` › «R26 - formatTraceTotal trunca a minutos y lleva los tres sufijos»; `tests/ui/dashboard/execution-trace-table.test.tsx` › «R26 - celda de duracion con total y sufijo» |
+| R27 | `list-execution-traces.test.ts` › «R27: la fila trae totalDuration y no el desglose» |
+| R28 | `execution-trace-table.test.tsx` y `execution-trace-detail.test.tsx` › «R28 - En curso segun active; nunca en dado de baja» |
+| R29 | `list-execution-traces.test.ts` › «R29: firmantes y despues equipo, sin repetir» |
+| R30 | `execution-log-read.int.test.ts` › «R30: encuentra el pedido por el miembro del equipo que no firma ninguna anotacion», «R30: con rango, cuenta el instante del Comenzar» |
+| R31 | `list-execution-traces.test.ts` › «R31: opciones solo de firmantes» |
+| R32 | `list-execution-traces.test.ts` › «R32: equipo sin Comenzar no sale»; `execution-log-read.int.test.ts` › «R32: un equipo sin Comenzar anotado no filtra» |
+| R33 | `execution-log-prisma.test.ts` › «R33: append valida la foto con zod y no escribe una corrupta ni una vacia», «R33: listEntriesForOrders selecciona batchLines y devuelve la foto validada» |
+| R34 | `order-execution-conditioning-migration.test.ts` › «R34: las dos migraciones tienen su down.sql», «R34: el down de las acciones abre con una guarda RAISE EXCEPTION …» |
+| R35 | `tests/guards/guard-dependencias-aprobadas.test.ts` (sin cambios). `package.json` y `pnpm-lock.yaml` sin diff frente a `dev` (merge-base `2ebf7634`) |
+| R36 | `e2e/recorrido-acondicionamiento.spec.ts` › «R36 - el supervisor comienza con un equipo de dos (uno por grupo), guarda y corrige…» — **escrito, sin correr en verde** (ver T9) |
+
+### Verificacion (salida real)
+- `pnpm exec vitest run <11 archivos unit/ui del mapa>` → `Test Files 11 passed (11)`, `Tests 426 passed (426)`.
+- `pnpm exec vitest run --project integration <conditioning-execution-log, order-execution-entries-constraints, execution-log-read, conditioning-team-repository>` → `Test Files 4 passed (4)`, `Tests 54 passed (54)`; base efimera borrada.
+- `pnpm exec vitest run tests/guards/guard-dependencias-aprobadas.test.ts` → `Test Files 1 passed (1)`, `Tests 2 passed (2)`.
+- Typecheck y lint: ver T9 (0 errores; 7 warnings previos en archivos no tocados).
+- `./init.sh` **no se corrio** por instruccion del leader: el gate completo lo corre CI.
+
+### Pendiente / bloqueo
+- **R36 sin verde.** El E2E no corre en local: la base local compartida `QuimiCloude` no tiene las dos
+  migraciones de QC-283 y trae migraciones de otras ramas (incluida otra `20261015120000_…`). No se
+  migro por ser compartida. Debe correr en CI (PR a produccion) o en una base con las migraciones de
+  QC-283. Por eso T9 y T10 quedan sin `[x]` en `tasks.md`: su «Hecho cuando» no se cumple aun.
+- Interpretacion del fixture: «equipo de dos, una por grupo» se implemento como 1 persona suelta +
+  1 por grupo de trabajo. Si se queria dos grupos de una persona, es un cambio menor en el fixture.
+
+Veredicto: R1–R35 con test existente y en verde; R36 escrito pero pendiente de ejecucion en CI.
