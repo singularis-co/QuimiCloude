@@ -50,7 +50,11 @@ export type ImportCatalogSnapshot = {
   /** Vivos, de cualquier tipo, ordenados por antiguedad. */
   readonly products: readonly ImportProductRef[];
   readonly finishedProducts: readonly ImportProductRef[];
-  readonly batches: readonly { readonly lot: string; readonly productId: string }[];
+  readonly batches: readonly {
+    readonly lot: string;
+    readonly productId: string;
+    readonly presentationId: string | null;
+  }[];
 };
 
 /** Lo que la confirmacion escribe por una fila valida. */
@@ -95,7 +99,6 @@ const ISSUE_TEXT: Readonly<Record<ImportRowIssueCode, string>> = {
   qty_alert_invalid: `debe ser un numero mayor o igual que 0, ${NUMBER_RULE}.`,
   number_format_invalid: 'usa un solo separador decimal (coma o punto), sin separador de miles y hasta 4 decimales.',
   lot_invalid: 'debe tener entre 1 y 60 caracteres; un lote de solo numeros, hasta 59.',
-  lot_used_by_other_product: 'ese lote ya es de otro producto de la empresa.',
   purchase_date_invalid: DATE_RULE,
   purchase_date_future: 'no puede ser posterior a hoy.',
   expiry_date_invalid: DATE_RULE,
@@ -370,14 +373,14 @@ class MissingCatalog {
 }
 
 type FileProduct = { readonly rowNumber: number; readonly presentationId: string | null; readonly finished: boolean };
-type FileLot = { readonly identity: string; readonly target: ImportBatchTarget };
 
 type PlanState = {
   readonly snapshot: ImportCatalogSnapshot;
   readonly presentationsByName: ReadonlyMap<string, ImportPresentationRef>;
-  readonly batchesByLot: ReadonlyMap<string, string>;
+  readonly batchKeys: ReadonlySet<string>;
   readonly fileProducts: Map<string, FileProduct>;
-  readonly fileLots: Map<string, FileLot>;
+  /** Por `fileLotKey`: el producto al que una fila anterior ya sumo ese lote. */
+  readonly fileLots: Map<string, ImportBatchTarget>;
   readonly missingUnits: MissingCatalog;
   readonly missingPresentations: MissingCatalog;
 };
@@ -495,24 +498,29 @@ function resolveIdentity(
   return { key, target: inFile === undefined ? null : fileTarget(inFile) };
 }
 
-/** El codigo de lote es unico en la empresa: solo se repite sobre el mismo producto. */
-function checkLot(
-  lot: string,
-  identity: Identity,
-  state: PlanState,
-  issues: RowIssues,
-): ImportBatchTarget | null {
-  const owner = state.batchesByLot.get(lot);
-  if (owner !== undefined) {
-    if (identity.target?.kind === 'existing' && identity.target.productId === owner) return identity.target;
-    issues.add('lot_used_by_other_product', 'lot');
-    return null;
+/** JSON y no un separador: un `null` no se confunde con un texto y el codigo puede llevar cualquier caracter. */
+function batchKeyOf(productId: string, presentationId: string | null, lot: string): string {
+  return JSON.stringify([productId, presentationId, lot]);
+}
+
+/** La identidad ya fija producto y presentacion del lote que escribiria la fila. */
+function fileLotKey(identityKey: string, lot: string): string {
+  return JSON.stringify([identityKey, lot]);
+}
+
+/** Solo los terminados guardan la presentacion en el lote; insumos, envases e instrumentos, no. */
+function lotPresentationId(type: ImportRowType, refs: Resolved): string | null {
+  return type === PRODUCT_TYPES.FINISHED_PRODUCT ? (refs.presentation?.id ?? null) : null;
+}
+
+/** Duplicado solo con la misma clave; el mismo codigo en otro producto o presentacion no cuenta. */
+function checkLot(lot: string, lotPresentation: string | null, identity: Identity, state: PlanState): ImportBatchTarget | null {
+  const target = identity.target;
+  if (target?.kind === 'existing' && state.batchKeys.has(batchKeyOf(target.productId, lotPresentation, lot))) {
+    return target;
   }
-  const inFile = state.fileLots.get(lot);
-  if (inFile === undefined) return null;
-  if (inFile.identity === identity.key) return identity.target ?? inFile.target;
-  issues.add('lot_used_by_other_product', 'lot');
-  return null;
+  const inFile = state.fileLots.get(fileLotKey(identity.key, lot));
+  return inFile === undefined ? null : (target ?? inFile);
 }
 
 function finishedWrite(values: RowValues, refs: Resolved): ImportFinishedGoodsInput | null {
@@ -567,7 +575,10 @@ function planRow(parsed: ParsedImportRow, state: PlanState, today: string): Plan
 
   const identity = resolveIdentity(type, values.name, refs, state, issues);
   const lot = values.lot?.trim() ?? null;
-  const duplicateOf = identity !== null && lot !== null && !issues.has('lot') ? checkLot(lot, identity, state, issues) : null;
+  const duplicateOf =
+    identity !== null && lot !== null && !issues.has('lot')
+      ? checkLot(lot, lotPresentationId(type, refs), identity, state)
+      : null;
 
   const withName = { ...base, type, productName };
   const [first, ...rest] = issues.list();
@@ -590,10 +601,10 @@ function planRow(parsed: ParsedImportRow, state: PlanState, today: string): Plan
     if (identity.alsoOccupies !== undefined) state.fileProducts.set(identity.alsoOccupies, created);
   }
   if (lot !== null) {
-    state.fileLots.set(lot, {
-      identity: identity.key,
-      target: identity.target ?? { kind: 'file_row', rowNumber: row.rowNumber },
-    });
+    state.fileLots.set(
+      fileLotKey(identity.key, lot),
+      identity.target ?? { kind: 'file_row', rowNumber: row.rowNumber },
+    );
   }
 
   const write: ImportRowWrite | null =
@@ -629,7 +640,7 @@ export function planInventoryImport(
   const state: PlanState = {
     snapshot: catalog,
     presentationsByName: new Map(catalog.presentations.map((presentation) => [presentation.nameNormalized, presentation])),
-    batchesByLot: new Map(catalog.batches.map((batch) => [batch.lot, batch.productId])),
+    batchKeys: new Set(catalog.batches.map((batch) => batchKeyOf(batch.productId, batch.presentationId, batch.lot))),
     fileProducts: new Map(),
     fileLots: new Map(),
     missingUnits: new MissingCatalog(),

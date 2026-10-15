@@ -91,3 +91,69 @@ Base `qc284_scratch` (copia de la plantilla `qct_tpl_4a9ce03acc6c`, ya borrada):
 - `e2e/datos-de-lote-en-acondicionamiento.spec.ts` tiene un caso «el lote de otro producto choca» (T13).
 
 Veredicto: T1–T4 hechas y verdes; el P2002 de los indices parciales esta medido y lo reconoce `isDuplicateBatchLot`.
+
+## Tanda 2 — T5, T6, T7 (2026-10-14)
+
+### Archivos
+
+Modificados (codigo):
+- `lib/modules/inventario/domain/inventory-import-contract.ts` (fuera `lot_used_by_other_product`)
+- `lib/modules/inventario/domain/plan-inventory-import.ts` (`ImportCatalogSnapshot.batches` con `presentationId`; `batchKeys` por clave; `checkLot` por clave; `fileLots` por identidad + codigo; fuera el texto del motivo retirado)
+- `lib/modules/inventario/domain/confirm-inventory-import.ts` (`lotClash` -> `duplicate` sin releer; fuera `targetProductId`)
+- `lib/modules/inventario/ports/inventory-import-repository.ts` (`findBatchesByLots` devuelve `presentationId`)
+- `lib/modules/inventario/adapters/driven/persistence/inventory-import-prisma.ts` (`findBatchesByLots` con `presentationId`; mensaje del reintento agotado ya no dice «indice unico (company_id, lot)»)
+- `lib/modules/inventario/domain/finished-batch-labels.ts` (`label` unico, `no_batches`, fuera `batch_not_found`)
+- `lib/modules/inventario/adapters/driven/persistence/finished-batch-labels-prisma.ts` (pasa `label`)
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts` (`writeFinishedBatchLabels`: bloquea los lotes de produccion del pedido, choque por clave con `IS NOT DISTINCT FROM`, escribe la misma terna en todos)
+
+Modificados (tests): `tests/unit/inventario/{plan,confirm,preview}-inventory-import.test.ts`,
+`tests/unit/inventario/inventory-import-kit.ts`, `tests/integration/inventario/{inventory-import-confirm,inventory-import-repository,adjust-by-count,finished-goods-return,finished-batch-labels}.int.test.ts`.
+Ningun archivo nuevo de integracion: `aislamiento.json` sin cambios.
+
+`app/(private)/inventario/importar/components/import-texts.ts` NO se toca: no contiene el texto de
+`lot_used_by_other_product`; el texto vivia en `plan-inventory-import.ts > ISSUE_TEXT` y se retiro alli.
+
+### Precision sobre design.md > 2.3
+
+El conjunto que bloquea y escribe `writeFinishedBatchLabels` es el mismo que devuelve `listOfOrder`
+(asiento `production` del pedido **con** `order_presentation_line_id` y lote **con** presentacion), para
+que R18 («todas las lineas con lote») escriba exactamente las lineas que el formulario muestra.
+
+### Mapa R<n> -> test
+
+| R | Archivo | Caso |
+|---|---|---|
+| R9 | `tests/unit/inventario/plan-inventory-import.test.ts` | `QC-284 R9: un terminado con la misma clave ... en la base es duplicado`; `QC-284 R9: un terminado repetido en el archivo con la misma presentacion es duplicado; con otra, no`; `QC-284 R9, R10: un envase o un insumo se compara con la clave sin presentacion` |
+| R9, R10 | `tests/unit/inventario/confirm-inventory-import.test.ts` | `R25, QC-284 R9, R10: vuelve a validar contra la base del momento con la clave del lote`; `QC-284 R9, R10: la vista previa y la confirmacion dicen lo mismo con codigos repetidos entre claves` |
+| R9, R10 | `tests/integration/inventario/inventory-import-confirm.int.test.ts` | `QC-284 R9, R10: el codigo de otro producto no impide crear ni sumar lote, y la misma clave sigue siendo duplicado` |
+| R9, R10 | `tests/integration/inventario/inventory-import-repository.int.test.ts` | `QC-284 R9, R10: devuelve la presentacion de cada lote y todos los lotes que comparten codigo` |
+| R10 | `tests/unit/inventario/plan-inventory-import.test.ts` | `QC-284 R10: el codigo es de otro producto, en la base o en una fila anterior: ...`; `QC-284 R10: el mismo codigo en otra presentacion u otro producto terminado no es duplicado`; `QC-284 R10: lot_used_by_other_product ya no existe en el catalogo de motivos` |
+| R10 | `tests/unit/inventario/confirm-inventory-import.test.ts` | `QC-284 R10: ningun resultado lleva lot_used_by_other_product, ni con el codigo en otro producto` |
+| R11 | `tests/unit/inventario/confirm-inventory-import.test.ts` | `R27, QC-284 R11: ... un choque de lote es duplicado`; `R27, QC-284 R11: un lote que choca al escribir sobre el mismo producto es duplicado`; `QC-284 R11: un terminado cuyo lote tecleado choca en carrera queda duplicado` |
+| R11 | `tests/integration/inventario/inventory-import-confirm.int.test.ts` | `QC-284 R11: un lote con la misma clave escrito entre la vista previa y la escritura deja la fila duplicada` |
+| R12 | `tests/integration/inventario/adjust-by-count.int.test.ts` | `QC-284 R12: con dos lotes de la empresa que comparten codigo, el ajuste solo escribe en el lote pedido` |
+| R12 | `tests/integration/inventario/finished-goods-return.int.test.ts` | `QC-284 R12: con dos lotes que comparten codigo, la devolucion vuelve solo al lote de origen y findLots da el codigo de cada uno` |
+| R18 | `tests/integration/inventario/finished-batch-labels.int.test.ts` | `R18: la misma terna en los dos lotes del pedido; no toca existencia, coste, compra, presentacion, producto, contenido, asientos ni otro pedido` |
+| R21 | idem | `R21: duplicate_lot con el codigo de otra produccion de la misma presentacion, sin escribir ninguna linea`; `R21: no choca el codigo de otro producto, de otra presentacion, de otra linea del pedido, el suyo ni el de otra empresa`; `R21: sensible a mayusculas, ...` |
+| R22 | idem | `R22: dos guardados simultaneos de pedidos distintos con la misma clave: ...`; `R22: con la misma clave escrita por otra sesion sin confirmar, la escritura espera, recibe duplicate_lot ...` (sustituye el caso «R11 (QC-219)») |
+| R23 | idem | `R23: no_batches para un pedido sin lotes de produccion, de otra empresa o inexistente, sin escribir nada` |
+
+T6: sin cambio de codigo; ajuste y devolucion ya identificaban el lote por `id`.
+
+### Verificacion (salida real)
+
+- `pnpm run typecheck`: **rojo, 6 errores, todos de T8** (contrato nuevo de `writeForOrder`):
+  - `lib/modules/asignaciones/domain/save-conditioning-batch-data.ts(104,7)` TS2561 `labels` -> `label`
+  - `lib/modules/asignaciones/domain/save-conditioning-batch-data.ts(108,9)` TS2367 `batch_not_found` ya no existe
+  - `lib/modules/asignaciones/domain/save-conditioning-batch-data.ts(108,94)` TS2339 `batchId` en `never`
+  - `tests/unit/asignaciones/save-conditioning-batch-data.test.ts(132,45)` TS2551 y `(132,57)` TS7006 (`labels`)
+  - `tests/unit/asignaciones/save-conditioning-batch-data.test.ts(283,42)` TS2322 `batch_not_found`
+  - `scripts/seed-demo/gateway.ts` compila: llama al caso de uso, no al puerto (lo cambia T11).
+- `pnpm run lint`: 0 errores, 7 warnings en archivos no tocados.
+- `pnpm exec vitest run guard`: 76 archivos, 1066 pass, 20 skipped.
+- Unit: `plan-inventory-import` + `confirm-inventory-import` + `preview-inventory-import` 67/67; con `product-batch-lot-retry` y `product-batch-lot-per-presentation.int` 103/103.
+- Integracion: `inventory-import*` (5 archivos) 38 pass, 1 skipped (medida 2000); `adjust-by-count` + `finished-goods-return` 17/17; `finished-batch-labels` 8/8.
+- Rojo esperado hasta T8: `tests/integration/asignaciones/finish-conditioning-batch-data.int.test.ts`, 3 casos
+  (R15/R16/R25, R17, R18 de QC-219): el caso de uso aun pasa `labels` al adaptador nuevo.
+
+Veredicto: T5, T6 y T7 hechas y verdes en su alcance; typecheck rojo solo en `asignaciones`, pendiente de T8.

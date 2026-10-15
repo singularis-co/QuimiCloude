@@ -35,7 +35,7 @@
   `tests/unit/errores/catalogo.test.ts`. **Hecho:** el catálogo devuelve el texto exacto de
   `design.md > 5.3`; el código no cambia.
 
-- [ ] **T5. Importación por la clave** (R9, R10, R11). `design.md > 3`: `findBatchesByLots` con
+- [x] **T5. Importación por la clave** (R9, R10, R11). `design.md > 3`: `findBatchesByLots` con
   `presentationId`, `ImportCatalogSnapshot`, `checkLot` por clave, retirar
   `lot_used_by_other_product` (contrato, textos, `confirm-inventory-import.ts`), `lotClash` →
   `duplicate`. **Hecho:** unit del plan: misma clave en base o en fila anterior → `duplicate`;
@@ -43,12 +43,12 @@
   confirmación coinciden; ningún resultado lleva `lot_used_by_other_product`. Integración de la
   confirmación con una carrera de la misma clave → `duplicate`.
 
-- [ ] **T6. [P] Ajuste y devolución con código compartido** (R12). Sin cambio de código esperado.
+- [x] **T6. [P] Ajuste y devolución con código compartido** (R12). Sin cambio de código esperado.
   **Hecho:** integración: dos lotes de la empresa con el mismo código (productos distintos); el
   ajuste por conteo de uno no cambia el otro; la devolución por anulación vuelve al lote de origen
   y el listado de entregas muestra el código de cada lote.
 
-- [ ] **T7. Contrato y adaptador de datos de lote** (R18, R21, R22, R23). `design.md > 2.2, 2.3`:
+- [x] **T7. Contrato y adaptador de datos de lote** (R18, R21, R22, R23). `design.md > 2.2, 2.3`:
   `FinishedBatchLabels.writeForOrder` con `label` único y `no_batches`; `writeFinishedBatchLabels`
   escribe en todos los lotes del pedido con el choque por clave. **Hecho:** integración: escribe la
   misma terna en los dos lotes del pedido sin tocar `stock`, coste, compra, presentación, producto,
