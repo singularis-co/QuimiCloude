@@ -4,11 +4,7 @@ import { redirect } from 'next/navigation';
 
 import { identity } from '@/lib/composition';
 import { RETURN_PARAM, loginInputSchema, resolveReturnPath } from '@/lib/modules/identity';
-import {
-  PRIVATE_NAV_ITEMS,
-  filterNavItemsByPermissions,
-  firstVisibleNavHref,
-} from '@/lib/shared/navigation/private-nav';
+import { homeHrefFor } from '@/lib/shared/navigation/private-nav';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
@@ -110,20 +106,9 @@ export async function loginAction(
   // resultado del login abre la puerta a que un camino de fallo se lleve un campo de mas.
   const user = await identity.getSessionUser();
 
-  // **`DASHBOARD_ROUTE` como ultimo respaldo cubre R12 sin inventar ninguna ruta.** Si el menu
-  // filtrado queda vacio, esa persona tampoco tiene `dashboard.consultar` —el dashboard es un
-  // item mas del menu—, asi que `/dashboard` respondera exactamente el 404 dentro del layout
-  // privado que pide la decision cerrada nº 3, con su cabecera y su control de cerrar sesion.
-  // **No es un caso feliz disfrazado**: es el mismo 404 de R7, alcanzado sin codigo nuevo. Y,
-  // explicitamente (R12): NO se devuelve al login, NO se muestra error de credenciales y NO hay
-  // pantalla de «sin acceso» — las credenciales eran correctas y decir lo contrario seria mentir.
-  // El `user === null` es defensivo (sesion ilegible justo despues de emitirse) y cae al mismo
-  // respaldo.
-  const fallback =
-    (user === null
-      ? null
-      : firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, user.permissions))) ??
-    DASHBOARD_ROUTE;
+  // Las credenciales eran correctas: aunque la sesión no se pueda leer justo después de emitirse,
+  // no se vuelve al login ni se muestra error; se cae al mismo respaldo que un menú vacío.
+  const fallback = user === null ? DASHBOARD_ROUTE : homeHrefFor(user.permissions);
 
   const destino = resolveReturnPath(readField(formData, RETURN_PARAM), fallback);
 

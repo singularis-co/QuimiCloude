@@ -182,3 +182,107 @@ Frontend de T6–T9 hecho y verde; la guardia de pantallas de añadido pasa a ve
   57/57 en verde (1002 pasados, 140 saltados a propósito porque son guardias de alcance de otras fichas). No hizo falta
   arreglar ningún otro.
 - `recipe-route-contract.test.ts` solo: 28/28. typecheck verde; lint con 0 errores y los mismos 7 avisos.
+
+## Tanda 3 — T11 backend (backend_dev, 2026-10-15)
+
+### Archivos
+- Nuevos: `lib/modules/identity/adapters/driving/home-route.ts` (GET → 307 a `homeHrefFor(user.permissions)`; sin sesión → `LOGIN_ROUTE_SESSION_ENDED`), `app/inicio/route.ts` (reexporta `GET`, `runtime = 'nodejs'`), `tests/unit/identity/home-route.test.ts`.
+- Modificados: `lib/shared/navigation/private-nav.ts` (`homeHrefFor`), `lib/shared/routes.ts` (`HOME_ROUTE = '/inicio'`), `lib/modules/identity/adapters/driving/login-action.ts` (usa `homeHrefFor`; mismo comportamiento, `user === null` → `DASHBOARD_ROUTE`), `lib/modules/identity/adapters/driving/route-guard-middleware.ts` (`landing: HOME_ROUTE`; cabecera sin la frase falsa de `ASSIGNED_ORDERS_ROUTE`).
+- Tests enmendados: `tests/unit/identity/route-guard-middleware.test.ts` (tres destinos → `HOME_ROUTE`, design §10.3.2; caso nuevo: el borde deja pasar `/inicio` con y sin cookie), `tests/unit/identity/login-action.test.ts` (bloque nuevo con espía sobre `homeHrefFor` real), `tests/unit/recetas-ui/recipe-route-contract.test.ts` (lista cerrada de exportaciones de `routes.ts` gana `HOME_ROUTE`; sin tocar asserts).
+- No toqué `components/**` (logo → frontend_dev) ni `app-sidebar.test.tsx` / `sidebar-carril.test.ts` (§10.3.3).
+
+### R -> test
+- R18, R19 → `home-route.test.ts` (destino = `homeHrefFor(permisos efectivos)`, 307; menú vacío → dashboard) + `route-guard-middleware.test.ts` («redirige a la ruta de inicio … (R10, R19)», «deja pasar la ruta de inicio con y sin sesion (R19, R21)»). El logo (R18) lo completa frontend_dev.
+- R20 → `login-action.test.ts > aterrizaje con el permiso efectivo (QC-277)` (tres casos R20).
+- R21 → `home-route.test.ts` («R21: sin sesion valida va al login con la marca…») + middleware deja pasar `/inicio` sin cookie (sin bucle).
+
+### Salida
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- Tests nuevos/ampliados: 3 archivos, 61 passed; `recipe-route-contract.test.ts` 28 passed tras el alta.
+- `pnpm exec vitest related --run` (6 archivos de producción): 432 archivos, 6 failed | 6778 passed. Antes del alta, 1 rojo mío (`recipe-route-contract`, lista cerrada) → arreglado. Los otros 5 son de la zona de T12/T13 en curso en paralelo: `tests/unit/composition/ai-provider-wiring.test.ts` (4) y `tests/unit/documentos/document-job-route.test.ts` (1, R10).
+- `pnpm exec vitest run guard`: 78 archivos passed, 1082 passed | 20 skipped (incluye `guard-middleware-edge`).
+
+### Pendiente fuera de T11 backend
+- `e2e/helpers/landing.ts` y `tests/unit/e2e-helpers/landing.test.ts` siguen componiendo `firstVisibleNavHref(...) ?? DASHBOARD_ROUTE` a mano (design §10.1 R20 y §10.3.4); no estaban en este encargo.
+
+### Veredicto
+T11 parte backend hecha; verde salvo rojos ajenos de la zona T12/T13.
+
+## Tanda 3 — T13/T12/T14/T17/T16 (backend_dev, 2026-10-15)
+
+### Archivos
+- **T13** nuevos: `lib/modules/identity/ports/company-addon-repository.ts`, `lib/modules/identity/adapters/driven/persistence/company-addons-prisma.ts` (transacción con `FOR UPDATE` vía `atomically`; sin cambios → sin escritura; un `company_events` por cambio con `details.addon`; claves desconocidas conservadas al final), `lib/modules/identity/domain/is-company-addon-active.ts` (`false` si no existe o está de baja; usa `effectiveAddons`, así cubre la dependencia de un nivel), `tests/integration/identity/company-addons.int.test.ts`.
+  Modificados: `company-event.ts` (`addon.enabled`, `addon.disabled`), `company-view.ts` (`addon: string | null`), `company-prisma.ts` (`addonOf` en `listEvents`), `identity/index.ts` (barril: `createIsCompanyAddonActive`), `lib/composition/index.ts` (`companyAddonRepository`; `identity.isCompanyAddonActive` al final), `tests/integration/aislamiento.json` (los dos `.int` nuevos en `transaccion`), `tests/unit/identity/companies/company-event.test.ts`, `list-company-events.test.ts`, `tests/unit/identity/company-actions.test.ts` (solo `addon: null` en el fixture: lo exige el tipo).
+- **T12** nuevos: `lib/modules/documentos/ports/pdf-reading-switch.ts`, `tests/unit/documentos/run-document-job-addon.test.ts`. Modificados: `run-document-job.ts` (dep `pdfReading` y bloque tras `claim`, §8.1), `lib/composition/index.ts` (`pdfReading` → `identity.isCompanyAddonActive(…, 'lectura_pdf')`), `run-document-job-doubles.ts` (`LECTURA_PDF_PRENDIDA` por defecto en `trabajoConProveedor`), `run-document-job-ai-provider.test.ts` (pasa `LECTURA_PDF_PRENDIDA`), `tests/unit/composition/documentos-facade.test.ts` (caso del interruptor), `tests/unit/composition/ai-provider-wiring.test.ts` (**fuera de «Archivos esperados»**: dobla `company-addons-prisma` con la lectura prendida; sin eso, sus 4 casos caían con `prisma.company` indefinido). `run-document-job.test.ts` no necesitó cambio: usa `trabajoConProveedor`, que ya trae el interruptor prendido.
+- **T14** nuevos: `tests/integration/identity/company-directory-addons.int.test.ts`, `tests/guards/guard-rutas-fuera-de-sesion.test.ts`.
+- **T17** nuevo: `tests/unit/identity/addons/sin-decision-en-cliente.test.ts`.
+- **T16**: `docs/architecture.md` (las cuatro enmiendas de §11: viñeta «Nada de infraestructura», viñeta de permisos por petición + viñeta nueva de añadidos, párrafo «Permisos en cada petición» del `### Por qué`, crons núcleo), nuevo `tests/unit/identity/addons/architecture-doc.test.ts`.
+- Los dos `.int` releen con el código de producción que usa el cliente global (`findActiveSessionUserById`, `listActiveCompanyIds`): el test sustituye `@/lib/shared/db/prisma` por un proxy que delega en la `tx` del caso mientras corre. Así siguen en `transaccion` y la lectura es la real.
+
+### R -> test
+- R4 → `run-document-job-addon.test.ts` («R4 — interruptor de PDF prendido con integraciones apagado…», con el interruptor tal como lo ata la composición) + `company-addons.int.test.ts` («R4, R22: isCompanyAddonActive sobre el adaptador real…»).
+- R5 → `company-addons.int.test.ts` («R5: … createWithAdministrator nace sin ningun añadido»).
+- R9 → `company-addons.int.test.ts` («R9: apagar con apply y releer con la lectura de sesion → permisos recortados…»).
+- R22 → `run-document-job-addon.test.ts` (apagada → `unauthorized` definitivo; sin `readBatch`, `readerFor`, descarga, `remove` ni `pipelineFor`; nunca `requeue`; no consulta si no reclama) + `documentos-facade.test.ts` («R22 — se ata a identity.isCompanyAddonActive con la clave lectura_pdf…»).
+- R24 → `company-addons.int.test.ts` («R24: apagar los cinco no toca recetas, proveedores, lineas de catalogo, lotes ni la conexion de IA»).
+- R25 → `company-directory-addons.int.test.ts`.
+- R26 → `guard-rutas-fuera-de-sesion.test.ts` (ruta sin entrada, entrada sin ruta, prueba inexistente, añadido fuera del catálogo; autocomprobación con `app/api/whatsapp/webhook/route.ts` sintética).
+- R31 → `company-addons.int.test.ts` («R31: empresa de baja o inexistente → not_found…; la lectura ve la de baja»).
+- R33 → `company-addons.int.test.ts` (atómico con un evento por cambio y `details.addon`; un fallo del evento deshace la fila; sin cambios → ni `updated_at` ni evento) + `company-event.test.ts` («R33: los tipos de añadido…»).
+- R34 → `company-addons.int.test.ts` («R34: listEvents devuelve la clave del añadido…») + `list-company-events.test.ts` («R34: los eventos de añadido llegan con su tipo y la clave…»).
+- R35 → `sin-decision-en-cliente.test.ts` (autocomprobación con un `'use client'` sintético que importa `hasAddon`).
+- R37 → `architecture-doc.test.ts`.
+
+### Salida
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- Integración (base efímera sobre `quimicloude-pg17`:5433): `company-addons.int.test.ts` 10/10; `company-directory-addons.int.test.ts` 1/1.
+- Unitarios nuevos/ampliados: `run-document-job-addon`, `run-document-job`, `run-document-job-ai-provider`, `documentos-facade` 39/39; `company-event` + `list-company-events` 26/26; `architecture-doc` 4/4; `sin-decision-en-cliente` + guardia de rutas 12/12; `ai-provider-wiring` + `document-job-route` 18/18.
+- `pnpm exec vitest run guard`: 78 archivos, 1082 passed | 20 skipped.
+- `documentos/module-contract.test.ts` cayó una vez por plazo en una corrida conjunta; solo: 23/23.
+- `pnpm exec vitest related --run` (10 archivos de producción tocados): 839 archivos, 1 failed | 13437 passed | 14 skipped. El rojo era mío: `tests/integration/identity/company.int.test.ts > listEvents > R34, R37` compara la vista entera con `toEqual` y no tenía `addon`. Arreglado (solo `addon: null` en los tres objetos esperados; **fuera de «Archivos esperados»**) → 38/38.
+- Sin rojos fuera de mi zona en estas corridas. El de `recipe-route-contract` que anotó T11 ya estaba resuelto.
+
+### Fuera de «Archivos esperados» (para añadir a `tasks.md`)
+- `tests/unit/composition/ai-provider-wiring.test.ts` (doble de `company-addons-prisma` con la lectura prendida).
+- `tests/integration/identity/company.int.test.ts` (`addon: null` en lo esperado de `listEvents`).
+
+### Veredicto
+T13, T12, T14, T17 y T16 hechas; typecheck, lint, guardias y `related` en verde.
+
+## Tanda 3 — T11 frontend (frontend_dev, 2026-10-15)
+
+### Archivos
+- `components/private/app-sidebar.tsx`: el logo usa `href={HOME_ROUTE}` (antes `ASSIGNED_ORDERS_ROUTE`; import sustituido). Sin props nuevas ni cambio visual.
+- Tests enmendados (§10.3.3): `tests/unit/app-sidebar.test.tsx` (R4/R13: el `href` de la marca y el conjunto de destinos esperados pasan a `HOME_ROUTE`), `tests/unit/marca/sidebar-carril.test.ts` (no tenía assert de `href`; caso nuevo «QC-277 R18 el enlace de marca del carril colapsado apunta a HOME_ROUTE»), `tests/unit/sidebar-desktop.test.tsx` (fuera de §10.3.3 pero fijaba el logo a `/asignacion` en 3 asserts → `HOME_ROUTE`, con nota de enmienda QC-277). Ningún otro assert relajado.
+- `e2e/marca-componentes.spec.ts` sin tocar (otra tanda).
+
+### R -> test
+- R18 (logo) → `app-sidebar.test.tsx > la marca es un enlace a HOME_ROUTE con nombre accesible`, `sidebar-carril.test.ts > QC-277 R18 …`, `sidebar-desktop.test.tsx > activar el control alterna a modo icono …`.
+
+### Salida
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes; eslint de los 4 archivos tocados: sin incidencias.
+- Los dos tests enmendados: 2 archivos, 28 passed.
+- `pnpm exec vitest related --run components/private/app-sidebar.tsx`: 21 archivos, 2 failed | 19 passed. `sidebar-desktop.test.tsx` (logo a `/asignacion`) → enmendado, 20/20 al reejecutar. `session-once-per-request-render.test.tsx` falló en el barrido y pasa solo (falla por carga, no por el cambio).
+- `pnpm exec vitest run guard`: 78 archivos passed, 1082 passed | 20 skipped.
+
+### Veredicto
+T11 parte frontend hecha; verde.
+
+## Tanda 3 — cierre (implementer, 2026-10-15)
+- Tasks cerradas: T11, T12, T13, T14, T16 y T17. T15 y G (T18–T21) quedan para la siguiente tanda.
+- Desvíos consolidados:
+  - `tests/unit/recetas-ui/recipe-route-contract.test.ts`: `HOME_ROUTE` añadida a la lista cerrada de exportaciones de
+    `routes.ts` (misma clase que la opción A, sin tocar asserts).
+  - `tests/unit/sidebar-desktop.test.tsx`: tres asserts del `href` del logo pasan a `HOME_ROUTE`. Es la enmienda §10.3.3
+    aplicada a un archivo que el design no nombraba.
+  - `tests/unit/composition/ai-provider-wiring.test.ts`: doble de `company-addons-prisma` con la lectura de PDF prendida.
+    El trabajo compuesto lee ahora el interruptor.
+  - `tests/integration/identity/company.int.test.ts`: `addon: null` en la vista de eventos.
+  - Los dos `.int` nuevos cambian `@/lib/shared/db/prisma` por un proxy sobre la `tx` del caso, para seguir siendo
+    `transaccion` y ejercitar la lectura de producción.
+  - Los cuatro archivos se han añadido a `tasks.md > Archivos esperados`.
+- Pendiente fuera de esta tanda (T18): `e2e/helpers/landing.ts` y `tests/unit/e2e-helpers/landing.test.ts` aún componen
+  `firstVisibleNavHref(...) ?? DASHBOARD_ROUTE` a mano.

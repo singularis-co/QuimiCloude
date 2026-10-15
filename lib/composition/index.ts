@@ -512,6 +512,8 @@ import {
   createUpdateCompany,
 } from '@/lib/modules/identity';
 import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
+import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma';
+import { createIsCompanyAddonActive } from '@/lib/modules/identity';
 import { readSeedScopeFromEnv } from '@/lib/modules/identity/adapters/driven/config/seed-scope-env';
 import type { CompanyOpenOrdersCounter } from '@/lib/modules/identity/ports/company-open-orders-counter';
 import { countOpenOrdersInCompany } from '@/lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma';
@@ -820,6 +822,7 @@ const workGroupMemberPagination: PaginationPolicy = { toOffsetLimit, buildPage }
 const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAliveInCompany };
 
 const companyRepository = createCompanyRepository();
+const companyAddonRepository = createCompanyAddonRepository();
 
 // `orders` es de `pedidos`: `identity` solo ve el puerto.
 const companyOpenOrdersCounter: CompanyOpenOrdersCounter = {
@@ -968,6 +971,8 @@ export const identity = {
     openOrders: companyOpenOrdersCounter,
   }),
   listCompanyEvents: createListCompanyEvents({ companies: companyRepository }),
+  // Sin actor: la usan los trabajos que corren sin sesión.
+  isCompanyAddonActive: createIsCompanyAddonActive({ addons: companyAddonRepository }),
 } as const;
 
 /**
@@ -2340,6 +2345,8 @@ const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
   aiProvider: aiProviderGateway,
+  // La clave del añadido vive aquí: `documentos` no conoce el catálogo de añadidos.
+  pdfReading: { isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'lectura_pdf') },
   pipelineFor: documentPipelineFor,
   log: documentJobLog,
 });

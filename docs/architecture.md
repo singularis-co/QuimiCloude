@@ -40,8 +40,10 @@ consecuencias de arquitectura que no son opinables:
      con el motivo de cada entrada. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
    - **Nada de infraestructura «por si acaso».** Es sobre-ingenieria —y el reviewer la
      rechaza— todo lo que no esta pedido: jerarquias de empresas, empresas anidadas, un
-     usuario en varias empresas, permisos por empresa mas alla de su rol, o un selector de
-     empresa antes de que exista su ficha.
+     usuario en varias empresas, permisos por empresa **que amplíen** su rol, o un selector de
+     empresa antes de que exista su ficha. Lo único por empresa son sus **añadidos activos**
+     (`companies.addons`), que solo **recortan**: el permiso efectivo es rol ∩ añadidos activos
+     (QC-277).
    - **Coste que esto impone y se acepta**: cada feature de datos pasa a llevar columna de
      empresa, filtro en cada consulta, rechazo probado del acceso cruzado y su test. No es
      gratis y no es opcional.
@@ -555,9 +557,13 @@ error mas comun al montar Prisma sobre Supabase.
   pinta `nav-user`). **Un permiso implementado solo como corte de ruta no cuenta como implementado**,
   igual que no cuenta uno implementado solo como policy de RLS: el 404 de la pagina decide si se
   **enseña** una pantalla, y el service decide si se puede **hacer**.
-- **Los permisos de la sesion son una foto del instante del login** y envejecen hasta 8 h: una
-  pantalla puede pintarse para alguien a quien el service ya deniega. La invalidacion inmediata es
-  QC-23.
+- **Los permisos se resuelven en cada petición, en la misma lectura de sesión**: los del rol actual
+  menos los de los añadidos no activos de la empresa. Un cambio de rol o de añadidos vale desde la
+  siguiente petición; lo ya pintado en pantalla no se repinta solo.
+- **Añadidos por empresa.** El catálogo de añadidos vive en `identity/domain/company-addons.ts`. Las
+  operaciones de un añadido que no tienen permiso propio se cortan con `requireAddon` en el caso de
+  uso y con `requirePageAddon` en la pantalla. Lo que corre sin sesión comprueba el añadido en la
+  empresa del trabajo, y lo vigila `tests/guards/guard-rutas-fuera-de-sesion.test.ts`.
 
 ### Por qué
 
@@ -575,8 +581,10 @@ y que el test se ponga rojo si aparece una accion con las dos caras de la sesion
 lista o sin ambito, es lo que detecta la que llegue en el proximo merge, aunque venga en un
 **modulo nuevo** o en una **subcarpeta**.
 
-**Permisos que envejecen:** un cambio de permisos no llega a la pantalla hasta que la sesion
-caduca.
+**Permisos en cada petición:** la sesión ya relee el rol y la empresa en cada petición con una sola
+consulta, y los añadidos salen en esa misma lectura: el recorte no añade consultas ni obliga a volver
+a iniciar sesión. Lo que no hace es repintar una pantalla ya abierta; el cambio se ve en la siguiente
+petición.
 
 ## Server Actions vs Route Handlers
 | Caso | Usar |
@@ -595,6 +603,8 @@ caduca.
 - El proceso no actua en nombre de ninguna empresa, pero **tampoco lee varias a la vez**: recorre
   las empresas y busca los candidatos de cada una por separado, de modo que la regla de ambito de
   empresa de las consultas se cumple sin excepciones.
+- Los crons son **núcleo** y no miran añadidos; el webhook de un añadido sí, en la empresa del
+  trabajo, antes de actuar.
 
 ### Por qué
 

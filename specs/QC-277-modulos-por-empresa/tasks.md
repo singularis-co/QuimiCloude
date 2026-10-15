@@ -88,7 +88,7 @@
 
 ## Bloque D — Logo y aterrizaje
 
-- [ ] **T11 — `homeHrefFor` y `/inicio`** (R18–R21). Depende de: T5
+- [x] **T11 — `homeHrefFor` y `/inicio`** (R18–R21). Depende de: T5
   - `homeHrefFor` en `private-nav.ts`; `login-action.ts` la usa.
   - `HOME_ROUTE` en `routes.ts`.
   - `identity/adapters/driving/home-route.ts` y `app/inicio/route.ts`.
@@ -106,7 +106,7 @@
 
 ## Bloque E — Fuera de sesión
 
-- [ ] **T12 — Interruptor del webhook de documentos** (R4, R22). Depende de: T1, T13
+- [x] **T12 — Interruptor del webhook de documentos** (R4, R22). Depende de: T1, T13
   - Puerto `documentos/ports/pdf-reading-switch.ts`.
   - `run-document-job.ts`: dependencia `pdfReading` y bloque tras `claim` (`design.md > 8.1`).
   - En la composición, `pdfReading` se ata a `identity.isCompanyAddonActive(…, 'lectura_pdf')`.
@@ -119,7 +119,7 @@
     - apagado → `unauthorized` definitivo;
     - sin `readBatch`, sin `readerFor`, sin descarga ni pipeline;
     - nunca `requeue`.
-- [ ] **T14 [P] — Cron núcleo y guardia de rutas sin sesión** (R25, R26). Depende de: T2
+- [x] **T14 [P] — Cron núcleo y guardia de rutas sin sesión** (R25, R26). Depende de: T2
   - Tests:
     - `tests/integration/identity/company-directory-addons.int.test.ts`;
     - `tests/guards/guard-rutas-fuera-de-sesion.test.ts` (`design.md > 9.3`);
@@ -130,7 +130,7 @@
 
 ## Bloque F — Operación del Maestro
 
-- [ ] **T13 — Puerto, adaptador y lectura de sistema** (R31, R33, R24). Depende de: T1, T2
+- [x] **T13 — Puerto, adaptador y lectura de sistema** (R31, R33, R24). Depende de: T1, T2
   - `ports/company-addon-repository.ts` y `adapters/driven/persistence/company-addons-prisma.ts`
     (`design.md > 6.2`, `6.3`).
   - `domain/is-company-addon-active.ts`.
@@ -159,14 +159,14 @@
 
 ## Bloque G — Docs, E2E y cierre
 
-- [ ] **T16 [P] — `docs/architecture.md`** (R37). Depende de: T5
+- [x] **T16 [P] — `docs/architecture.md`** (R37). Depende de: T5
   - Las cuatro enmiendas de `design.md > 11`.
   - Tests: `tests/unit/identity/addons/architecture-doc.test.ts`.
   - **Hecho:**
     - ya no dice «foto del instante del login»;
     - dice «rol ∩ añadidos activos»;
     - la viñeta de la l. 41-44 está enmendada.
-- [ ] **T17 [P] — Ninguna decisión en el cliente** (R35). Depende de: T1
+- [x] **T17 [P] — Ninguna decisión en el cliente** (R35). Depende de: T1
   - Tests: `tests/unit/identity/addons/sin-decision-en-cliente.test.ts`.
   - **Hecho:** rojo con un `'use client'` sintético que importe `hasAddon`.
 - [ ] **T18 — Helpers E2E** (R20). Depende de: T1, T2
@@ -328,6 +328,9 @@ Añadidos durante la implementación (fixtures sin `companyAddons`/`addons`, mig
 - `tests/unit/inventario/preview-inventory-import.test.ts`
 - `tests/unit/paridad/inventario-paridad.test.tsx`
 - `tests/unit/recetas-ui/recipe-route-contract.test.ts`
+- `tests/integration/identity/company.int.test.ts`
+- `tests/unit/composition/ai-provider-wiring.test.ts`
+- `tests/unit/sidebar-desktop.test.tsx`
 
 E2E (el spec de la ficha, los helpers y los candidatos del censo de T20):
 

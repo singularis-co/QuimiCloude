@@ -278,6 +278,7 @@ const PAGINA_DE_EVENTOS: Page<CompanyEventView> = {
       occurredAt: new Date('2026-10-12T00:00:00.000Z'),
       actor: { id: MAESTRO.id, firstNames: 'Plataforma', lastNames: 'Inicial' },
       fields: ['name'],
+      addon: null,
     },
   ],
   total: 1,

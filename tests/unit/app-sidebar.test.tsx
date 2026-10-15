@@ -14,7 +14,7 @@ import {
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
 import * as privateNav from '@/lib/shared/navigation/private-nav';
-import { ASSIGNED_ORDERS_ROUTE, DASHBOARD_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { DASHBOARD_ROUTE, FORMULAS_ROUTE, HOME_ROUTE } from '@/lib/shared/routes';
 import type { SessionUser } from '@/lib/modules/identity';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
@@ -198,15 +198,15 @@ describe('barra lateral privada', () => {
     expect(screen.getAllByRole('navigation')).toHaveLength(1);
   });
 
-  it('la marca es un enlace a ASSIGNED_ORDERS_ROUTE con nombre accesible', () => {
-    // R4
+  it('la marca es un enlace a HOME_ROUTE con nombre accesible', () => {
+    // R4; QC-277 R18: el logo pasa por HOME_ROUTE (design.md § 7.2)
     renderSidebar();
 
     const enlace = screen.getByTestId(testId.brandLink);
 
     expect(screen.getByTestId(testId.brand)).toContainElement(enlace);
     expect(enlace).toHaveRole('link');
-    expect(enlace).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
+    expect(enlace).toHaveAttribute('href', HOME_ROUTE);
     expect(enlace).toHaveAccessibleName(BRAND_LABEL);
   });
 
@@ -432,7 +432,7 @@ describe('barra lateral privada', () => {
       }
     }
 
-    const esperados = new Set<string>([ASSIGNED_ORDERS_ROUTE]);
+    const esperados = new Set<string>([HOME_ROUTE]);
     for (const item of PRIVATE_NAV_ITEMS) {
       if (item.kind === 'link') {
         expect(screen.getByTestId(item.testId)).toHaveAttribute('href', item.href);
@@ -445,7 +445,7 @@ describe('barra lateral privada', () => {
       }
     }
 
-    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
+    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', HOME_ROUTE);
 
     // Y ningun destino del arbol queda fuera del conjunto de constantes.
     const enDom = Array.from(document.querySelectorAll('a[href]')).map((enlace) =>

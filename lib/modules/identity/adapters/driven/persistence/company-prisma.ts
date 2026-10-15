@@ -168,6 +168,11 @@ function isCompanyField(value: unknown): value is CompanyField {
   return COMPANY_FIELDS.some((field) => field === value);
 }
 
+function addonOf(details: Prisma.JsonValue | null): string | null {
+  if (typeof details !== 'object' || details === null || Array.isArray(details)) return null;
+  return typeof details.addon === 'string' ? details.addon : null;
+}
+
 export function createCompanyRepository(db: PrismaLike = prisma): CompanyRepository {
   return {
     async createWithAdministrator({ company, administrator, actorId, now }) {
@@ -392,6 +397,7 @@ export function createCompanyRepository(db: PrismaLike = prisma): CompanyReposit
           occurredAt: row.occurredAt,
           actor: row.actor,
           fields: fieldsOf(row.details),
+          addon: addonOf(row.details),
         }),
       );
       return buildPage(items, total, page, limit);

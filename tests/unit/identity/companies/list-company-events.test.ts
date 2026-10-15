@@ -26,6 +26,7 @@ const PAGINA: Page<CompanyEventView> = {
       occurredAt: new Date('2026-10-14T12:00:00.000Z'),
       actor: { id: MAESTRO.id, firstNames: 'Maestro', lastNames: 'Plataforma' },
       fields: [],
+      addon: null,
     },
     {
       id: 'e0',
@@ -33,6 +34,7 @@ const PAGINA: Page<CompanyEventView> = {
       occurredAt: new Date('2026-10-13T12:00:00.000Z'),
       actor: { id: MAESTRO.id, firstNames: 'Maestro', lastNames: 'Plataforma' },
       fields: ['name', 'taxId'],
+      addon: null,
     },
   ],
   total: 2,
@@ -125,6 +127,37 @@ describe('listCompanyEvents', () => {
     const pagina = await listCompanyEvents(MAESTRO, { companyId: COMPANY_ID });
     expect(pagina.items.map((evento) => evento.kind)).toEqual(['module.enabled', 'company.updated']);
     expect(pagina.items[1]?.fields).toEqual(['name', 'taxId']);
+  });
+
+  it('R34: los eventos de añadido llegan con su tipo y la clave del añadido, sin campos', async () => {
+    const conAnadidos: Page<CompanyEventView> = {
+      ...PAGINA,
+      items: [
+        {
+          id: 'e3',
+          kind: 'addon.disabled',
+          occurredAt: new Date('2026-10-15T12:00:00.000Z'),
+          actor: { id: MAESTRO.id, firstNames: 'Maestro', lastNames: 'Plataforma' },
+          fields: [],
+          addon: 'lectura_pdf',
+        },
+        {
+          id: 'e2',
+          kind: 'addon.enabled',
+          occurredAt: new Date('2026-10-15T11:00:00.000Z'),
+          actor: { id: MAESTRO.id, firstNames: 'Maestro', lastNames: 'Plataforma' },
+          fields: [],
+          addon: 'dashboard',
+        },
+      ],
+    };
+    const { listCompanyEvents } = setup(conAnadidos);
+
+    const pagina = await listCompanyEvents(MAESTRO, { companyId: COMPANY_ID });
+    expect(pagina.items.map((evento) => [evento.kind, evento.addon, evento.fields])).toEqual([
+      ['addon.disabled', 'lectura_pdf', []],
+      ['addon.enabled', 'dashboard', []],
+    ]);
   });
 
   it('R37: inexistente → company_not_found', async () => {

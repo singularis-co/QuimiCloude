@@ -38,13 +38,27 @@ const ANTES = {
 
 describe('company-event', () => {
   it('R34: los cuatro tipos de esta ficha cumplen la forma `<ambito>.<accion>`', () => {
-    expect(COMPANY_EVENT_KINDS).toEqual([
+    expect(COMPANY_EVENT_KINDS.slice(0, 4)).toEqual([
       'company.created',
       'company.updated',
       'company.deleted',
       'company.reactivated',
     ]);
     for (const kind of COMPANY_EVENT_KINDS) expect(EVENT_KIND_FORMAT.test(kind), kind).toBe(true);
+  });
+
+  it('R33: los tipos de añadido, encendido y apagado, completan la lista y cumplen la forma del CHECK', () => {
+    expect(COMPANY_EVENT_KINDS).toEqual([
+      'company.created',
+      'company.updated',
+      'company.deleted',
+      'company.reactivated',
+      'addon.enabled',
+      'addon.disabled',
+    ]);
+    const check = new RegExp(patronDelCheck(migracionDelHistorial()) ?? '^$');
+    expect(check.test('addon.enabled')).toBe(true);
+    expect(check.test('addon.disabled')).toBe(true);
   });
 
   it('R39: la forma admite tipos nuevos y rechaza lo que no la tiene', () => {

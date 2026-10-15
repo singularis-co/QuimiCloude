@@ -413,3 +413,7 @@ export {
   type Addon,
   type AddonBearer,
 } from './domain/company-addons';
+export {
+  createIsCompanyAddonActive,
+  type IsCompanyAddonActiveDeps,
+} from './domain/is-company-addon-active';

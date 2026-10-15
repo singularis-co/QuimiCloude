@@ -1028,11 +1028,11 @@ describe('listEvents', () => {
       if (primera === 'not_found' || ultima === 'not_found') throw new Error('la empresa existe')
       expect(primera).toMatchObject({ total: 5, page: 1, pageSize: 2, totalPages: 3 })
       expect(primera.items).toEqual([
-        { id: expect.any(String), kind: 'module.enabled', occurredAt: at(4), actor, fields: [] },
-        { id: expect.any(String), kind: 'company.reactivated', occurredAt: at(3), actor, fields: [] },
+        { id: expect.any(String), kind: 'module.enabled', occurredAt: at(4), actor, fields: [], addon: null },
+        { id: expect.any(String), kind: 'company.reactivated', occurredAt: at(3), actor, fields: [], addon: null },
       ])
       expect(ultima.items).toEqual([
-        { id: expect.any(String), kind: 'company.created', occurredAt: NOW, actor, fields: [] },
+        { id: expect.any(String), kind: 'company.created', occurredAt: NOW, actor, fields: [], addon: null },
       ])
       const segunda = await repo.listEvents(companyId, { page: 2, pageSize: 2 })
       if (segunda === 'not_found') throw new Error('la empresa existe')
