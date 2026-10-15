@@ -69,7 +69,7 @@ type Tenant = {
   readonly productId: string
 }
 
-/** Empresa con usuario, cliente, receta, presentacion, pedido, producto terminado y una entrega. */
+/** Empresa con usuario, receta, presentacion, pedido, producto terminado y una entrega. */
 async function createTenant(db: Db, label: string): Promise<Tenant> {
   const marca = token()
   const name = `Empresa ${label} ${marca}`
@@ -97,18 +97,6 @@ async function createTenant(db: Db, label: string): Promise<Tenant> {
       username: `ana.${marca}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
       roleId,
-      companyId,
-    },
-    select: { id: true },
-  })
-  const { id: customerId } = await db.customer.create({
-    data: {
-      firstNames: 'Luis',
-      firstNamesNormalized: 'luis',
-      lastNames: 'Rojas',
-      lastNamesNormalized: 'rojas',
-      city: 'Cali',
-      cityNormalized: 'cali',
       companyId,
     },
     select: { id: true },
@@ -145,7 +133,8 @@ async function createTenant(db: Db, label: string): Promise<Tenant> {
     select: { id: true },
   })
   const { id: deliveryId } = await db.orderDelivery.create({
-    data: { companyId, orderId, customerId, deliveryKey: randomUUID(), createdBy: userId },
+    // 2026-10-15: la entrega ya no lleva cliente (va en sus lineas), y esta devolucion no lee lineas.
+    data: { companyId, orderId, deliveryKey: randomUUID(), createdBy: userId },
     select: { id: true },
   })
   return { companyId, userId, roleId, documentTypeCode, unitId, orderId, deliveryId, presentationId, productId }
@@ -303,6 +292,38 @@ describe('returnFinishedGoods contra Postgres real', () => {
           companyId: a.companyId,
         })),
       )
+    })
+  })
+
+  // 2026-10-15: las lineas pueden repetir lote (una por cliente); el lote recibe la suma una vez.
+  it('R42: un lote repetido entre lineas de dos clientes recibe la suma en un incremento y un solo asiento', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const lote1 = await createBatch(tx, a, '5.0000')
+      const lote2 = await createBatch(tx, a, '0.0000')
+      const voidId = await createVoid(tx, a)
+
+      const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid(
+        returnInput(a, voidId, [
+          { batchId: lote1.id, quantity: '15.0000' },
+          { batchId: lote2.id, quantity: '2.5000' },
+          { batchId: lote1.id, quantity: '20.0000' },
+        ]),
+      )
+
+      expect(outcome).toEqual({ kind: 'returned' })
+      expect(await stockOf(tx, lote1.id)).toBe('40.0000')
+      expect(await stockOf(tx, lote2.id)).toBe('2.5000')
+      expect(await productStockOf(tx, a.productId)).toBe('42.5000')
+      const asientos = await tx.inventoryMovement.findMany({
+        where: { orderDeliveryVoidId: voidId },
+        orderBy: { quantity: 'desc' },
+        select: { batchId: true, kind: true, quantity: true },
+      })
+      expect(asientos.map((m) => [m.batchId, m.kind, m.quantity.toFixed(4)])).toEqual([
+        [lote1.id, 'delivery_void', '35.0000'],
+        [lote2.id, 'delivery_void', '2.5000'],
+      ])
     })
   })
 

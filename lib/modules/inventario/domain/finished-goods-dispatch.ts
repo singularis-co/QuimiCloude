@@ -65,6 +65,8 @@ export type FinishedGoodsDispatchInput = {
   readonly orderDeliveryId: string;
   readonly recipeId: string;
   readonly presentationId: string;
+  /** Puede repetir `batchId`: cada lote se descuenta una vez, por la suma de sus envases, con un solo
+   *  asiento. */
   readonly allocations: readonly { readonly batchId: string; readonly packages: number }[];
   readonly actorId: string;
   readonly now: Date;
@@ -73,6 +75,7 @@ export type FinishedGoodsDispatchInput = {
 export type FinishedGoodsDispatchOutcome =
   | {
       readonly kind: 'dispatched';
+      /** Una por asignacion de entrada, en el mismo orden; las de un lote suman su asiento. */
       readonly lines: readonly {
         readonly batchId: string;
         readonly packages: number;

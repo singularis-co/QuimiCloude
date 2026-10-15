@@ -76,7 +76,7 @@ en verde; hay commit `feat(QC-282): mueve el cliente de la entrega a sus lineas`
 
 ---
 
-## [ ] B2 [P] — `inventario`: salida y devolución agregadas por lote (depende de B1)
+## [x] B2 [P] — `inventario`: salida y devolución agregadas por lote (depende de B1)
 
 - `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`: `dispatchFinishedGoods` y
   `returnFinishedGoods` según `design.md > 2.3`.

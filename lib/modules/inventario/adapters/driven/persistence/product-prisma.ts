@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
-import { compareQuantities, subtractQuantities } from '../../../domain/decimal-quantity';
+import { addQuantities, compareQuantities, subtractQuantities } from '../../../domain/decimal-quantity';
 import {
   ActionNotAllowedError,
   BatchDuplicateLotError,
@@ -1304,9 +1304,9 @@ export async function receiveFinishedGoods(
  * La salida de producto terminado hacia un cliente, para UNA combinacion receta-presentacion, sobre
  * la MISMA transaccion de quien llama: bloquea el producto terminado vivo (`FOR NO KEY UPDATE`,
  * como la entrada), lee los lotes pedidos -de ese producto, de la empresa y con contenido de
- * envase-, y por cada asignacion hace el decremento CONDICIONAL (`stock >= cantidad` en el
- * `where`, como `consumeBatchStock`) y su asiento `delivery` en negativo. Recalcula
- * `products.stock` una sola vez, al final.
+ * envase-, y por cada lote hace el decremento CONDICIONAL (`stock >= cantidad` en el `where`, como
+ * `consumeBatchStock`) de la suma de sus asignaciones y un asiento `delivery` en negativo. Recalcula
+ * `products.stock` una sola vez, al final. Devuelve una linea por asignacion, en el orden de entrada.
  *
  * No lanza por un lote ausente o corto: lo devuelve, y quien llama deshace la transaccion entera.
  * Un lote de otra empresa, de otro producto o sin contenido sale igual que uno que no existe.
@@ -1341,12 +1341,17 @@ export async function dispatchFinishedGoods(
   const product = productRows[0];
   if (product === undefined) return { kind: 'batch_not_found', batchId: firstAllocation.batchId };
 
+  const packagesByBatch = new Map<string, number>();
+  for (const allocation of input.allocations) {
+    packagesByBatch.set(allocation.batchId, (packagesByBatch.get(allocation.batchId) ?? 0) + allocation.packages);
+  }
+
   const batchRows = await tx.productBatch.findMany({
     where: {
       AND: [
         batchCompanyScope(scope),
         {
-          id: { in: input.allocations.map((allocation) => allocation.batchId) },
+          id: { in: [...packagesByBatch.keys()] },
           productId: product.id,
           packageContent: { not: null },
         },
@@ -1361,40 +1366,34 @@ export async function dispatchFinishedGoods(
   const missing = input.allocations.find((allocation) => !contentByBatch.has(allocation.batchId));
   if (missing !== undefined) return { kind: 'batch_not_found', batchId: missing.batchId };
 
-  const lines: { batchId: string; packages: number; quantity: string }[] = [];
-  for (const allocation of input.allocations) {
-    const packageContent = contentByBatch.get(allocation.batchId);
-    if (packageContent === undefined) return { kind: 'batch_not_found', batchId: allocation.batchId };
-    const quantity = quantityForPackages(allocation.packages, packageContent);
+  // Un decremento y un asiento por lote aunque varias asignaciones lo repitan: el indice unico del
+  // libro por (entrega, lote) no admite dos asientos, y el asiento es el movimiento fisico del lote.
+  for (const [batchId, packages] of packagesByBatch) {
+    const packageContent = contentByBatch.get(batchId);
+    if (packageContent === undefined) return { kind: 'batch_not_found', batchId };
+    const quantity = quantityForPackages(packages, packageContent);
     const decimalQuantity = new Prisma.Decimal(quantity);
 
     const { count } = await tx.productBatch.updateMany({
       where: {
-        AND: [
-          batchCompanyScope(scope),
-          { id: allocation.batchId, productId: product.id, stock: { gte: decimalQuantity } },
-        ],
+        AND: [batchCompanyScope(scope), { id: batchId, productId: product.id, stock: { gte: decimalQuantity } }],
       },
       data: { stock: { decrement: decimalQuantity }, updatedBy: input.actorId, updatedAt: input.now },
     });
 
     if (count === 0) {
       const current = await tx.productBatch.findFirst({
-        where: { AND: [batchCompanyScope(scope), { id: allocation.batchId }] },
+        where: { AND: [batchCompanyScope(scope), { id: batchId }] },
         select: { stock: true },
       });
       const stock = current === null ? ZERO_QUANTITY : current.stock.toFixed(4);
-      return {
-        kind: 'insufficient',
-        batchId: allocation.batchId,
-        availablePackages: wholePackagesIn(stock, packageContent),
-      };
+      return { kind: 'insufficient', batchId, availablePackages: wholePackagesIn(stock, packageContent) };
     }
 
     await writeMovement(
       tx,
       {
-        batchId: allocation.batchId,
+        batchId,
         kind: 'delivery',
         quantity: negateQuantity(quantity),
         reason: null,
@@ -1406,11 +1405,16 @@ export async function dispatchFinishedGoods(
       input.now,
       scope,
     );
-
-    lines.push({ batchId: allocation.batchId, packages: allocation.packages, quantity });
   }
 
   await recalculateProductStock(tx, product.id, scope);
+
+  // Misma multiplicacion exacta que el asiento: la suma de las lineas de un lote es su asiento.
+  const lines = input.allocations.map((allocation) => ({
+    batchId: allocation.batchId,
+    packages: allocation.packages,
+    quantity: quantityForPackages(allocation.packages, contentByBatch.get(allocation.batchId) ?? ZERO_QUANTITY),
+  }));
 
   return { kind: 'dispatched', lines };
 }
@@ -1455,19 +1459,25 @@ export async function returnFinishedGoods(
        FOR NO KEY UPDATE
   `);
 
+  // Un incremento y un asiento por lote: el indice unico del libro por (anulacion, lote) no admite dos.
+  const quantityByBatch = new Map<string, string>();
   for (const line of input.lines) {
+    quantityByBatch.set(line.batchId, addQuantities(quantityByBatch.get(line.batchId) ?? ZERO_QUANTITY, line.quantity));
+  }
+
+  for (const [batchId, quantity] of quantityByBatch) {
     await tx.productBatch.update({
-      where: { id: line.batchId, companyId },
-      data: { stock: { increment: new Prisma.Decimal(line.quantity) }, updatedBy: input.actorId, updatedAt: input.now },
+      where: { id: batchId, companyId },
+      data: { stock: { increment: new Prisma.Decimal(quantity) }, updatedBy: input.actorId, updatedAt: input.now },
       select: { id: true },
     });
 
     await writeMovement(
       tx,
       {
-        batchId: line.batchId,
+        batchId,
         kind: 'delivery_void',
-        quantity: line.quantity,
+        quantity,
         reason: null,
         orderId: input.orderId,
         orderPresentationLineId: null,
