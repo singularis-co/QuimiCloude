@@ -474,3 +474,11 @@ Verificacion (salida real):
 - `pnpm run lint`: 0 errors, 7 warnings (archivos no tocados).
 - `vitest related --run` (dominio + tests ui/unit tocados): Test Files 384 passed; Tests 6536 passed, 2 skipped.
 - `--project integration` (3 `.int` tocados + `conditioning-execution-log`): Test Files 4 passed; Tests 33 passed.
+
+## Corrección: gate-completo rojo en PR #243 (2026-10-14)
+
+- Causa: `tests/unit/shared/data-table-alcance.test.ts` (lista CERRADA de E2E que referencian `data-table`, R36 de QC-55) recibía 47 specs; el nuevo `e2e/recorrido-acondicionamiento.spec.ts` no estaba dado de alta.
+- Decisión (a): la referencia es legítima. El E2E localiza la fila del pedido y la del señuelo en la lista del recorrido de ejecución del dashboard por `data-table-row-<id>`, igual que `recorrido-ejecucion.spec.ts` (QC-167). No estrena tabla.
+- Cambio: nota fechada 2026-10-14, entrada ordenada antes de `recorrido-ejecucion`, recuento «cuarenta y seis» -> «cuarenta y siete» en título y mensaje.
+- Otras listas cerradas: `tests/guards/guard-identificador-de-request.test.ts` ya incluía el spec (commit 5e45b37e). No hay más.
+- Verificación: `vitest run tests/unit/shared/data-table-alcance.test.ts` 18 passed | 2 skipped; `vitest run guard` 76 files, 1066 passed | 20 skipped; typecheck limpio; lint 0 errores, 7 warnings.
