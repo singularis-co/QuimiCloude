@@ -1,17 +1,15 @@
-import type { DeliveredTotal, FinishedDeliveryDirectory } from '@/lib/modules/inventario';
+import type {
+  DeliveredTotal,
+  FinishedDeliveryDirectory,
+  FinishedDeliveryLineRecord,
+  Page,
+} from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
+import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { companyScopeColumns } from './company-scope';
 
-type DeliveryLineDetail = {
-  readonly packages: number;
-  readonly void: { readonly reason: string } | null;
-};
-
-type DeliveryDetail = {
-  readonly customerId: string;
-  readonly linesByBatch: ReadonlyMap<string, DeliveryLineDetail>;
-};
+type PageRequest = Parameters<FinishedDeliveryDirectory['listDeliveryLines']>[2];
 
 const NOTHING_DELIVERED: DeliveredTotal = { quantity: '0.0000', packages: 0 };
 
@@ -20,48 +18,49 @@ const NOTHING_DELIVERED: DeliveredTotal = { quantity: '0.0000', packages: 0 };
  * un ciclo. Los lotes llegan como ids sueltos: no se cruza con `product_batches`, que es de
  * `inventario`.
  */
-export async function findDeliveryDetailsByIds(
+export async function listDeliveryLinesByBatchIds(
   companyId: string,
-  deliveryIds: readonly string[],
-): Promise<ReadonlyMap<string, DeliveryDetail>> {
-  const result = new Map<string, DeliveryDetail>();
-  if (deliveryIds.length === 0) return result;
+  batchIds: readonly string[],
+  page: PageRequest,
+): Promise<Page<FinishedDeliveryLineRecord>> {
+  const { offset, limit } = toOffsetLimit(page.page, page.pageSize);
+  if (batchIds.length === 0) return buildPage([], 0, page.page, limit);
 
   const columns = companyScopeColumns({ companyId });
-  const rows = await prisma.orderDelivery.findMany({
-    where: { AND: [columns, { id: { in: [...deliveryIds] } }] },
-    select: {
-      id: true,
-      customerId: true,
-      lines: {
-        where: columns,
-        select: {
-          batchId: true,
-          packages: true,
-          voidLine: { select: { void: { select: { reason: true } } } },
-        },
+  const where = { AND: [columns, { batchId: { in: [...batchIds] } }, { delivery: columns }] };
+  const [rows, total] = await Promise.all([
+    prisma.orderDeliveryLine.findMany({
+      where,
+      orderBy: [{ delivery: { createdAt: 'desc' } }, { id: 'desc' }],
+      skip: offset,
+      take: limit,
+      select: {
+        id: true,
+        deliveryId: true,
+        customerId: true,
+        batchId: true,
+        packages: true,
+        quantity: true,
+        delivery: { select: { orderId: true, createdAt: true } },
+        voidLine: { select: { void: { select: { reason: true } } } },
       },
-    },
-  });
+    }),
+    prisma.orderDeliveryLine.count({ where }),
+  ]);
 
-  for (const row of rows) {
-    const linesByBatch = new Map<string, DeliveryLineDetail>();
-    for (const line of row.lines) {
-      linesByBatch.set(line.batchId, {
-        packages: line.packages,
-        void: line.voidLine === null ? null : { reason: line.voidLine.void.reason },
-      });
-    }
-    result.set(row.id, { customerId: row.customerId, linesByBatch });
-  }
-  return result;
+  const items = rows.map((row) => ({
+    id: row.id,
+    orderDeliveryId: row.deliveryId,
+    orderId: row.delivery.orderId,
+    createdAt: row.delivery.createdAt.toISOString(),
+    customerId: row.customerId,
+    batchId: row.batchId,
+    packages: row.packages,
+    quantity: row.quantity.toFixed(4),
+    void: row.voidLine === null ? null : { reason: row.voidLine.void.reason },
+  }));
+  return buildPage(items, total, page.page, limit);
 }
-
-// El cliente aun vive en la entrega y la fila del tab ya es la linea con su cliente: hasta que la
-// columna pase a las lineas no hay lectura correcta que devolver.
-export const listDeliveryLinesByBatchIds: FinishedDeliveryDirectory['listDeliveryLines'] = async (companyId) => {
-  throw new Error(`listDeliveryLinesByBatchIds: sin columna de cliente en las lineas (empresa ${companyId})`);
-};
 
 export async function summarizeDeliveredByBatchIds(
   companyId: string,

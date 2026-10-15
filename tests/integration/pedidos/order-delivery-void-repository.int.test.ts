@@ -264,6 +264,30 @@ async function seedDelivery(tx: Prisma.TransactionClient, t: Tenant, now: Date =
   }
 }
 
+// 2026-10-15 (QC-282): un segundo cliente en la misma entrega, con la presentacion 0 en el lote 0,
+// el mismo lote que ya lleva el primer cliente.
+async function addSecondCustomer(tx: Prisma.TransactionClient, t: Tenant, deliveryId: string): Promise<{ customerId: string; lineId: string }> {
+  const { id: customerId } = await tx.customer.create({
+    data: {
+      firstNames: 'Marta',
+      firstNamesNormalized: 'marta',
+      lastNames: 'Lopez',
+      lastNamesNormalized: 'lopez',
+      city: 'Cali',
+      cityNormalized: 'cali',
+      companyId: t.companyId,
+    },
+    select: { id: true },
+  })
+  await createOrderDeliveryRepository(tx).addLines(
+    deliveryId,
+    [{ customerId, presentationLineId: t.lineIds[0], batchId: t.batchIds[0], packages: 4, quantity: '5.0000' }],
+    { companyId: t.companyId },
+  )
+  const { id: lineId } = await tx.orderDeliveryLine.findFirstOrThrow({ where: { deliveryId, customerId }, select: { id: true } })
+  return { customerId, lineId }
+}
+
 function newVoid(t: Tenant, deliveryId: string, voidKey: string = randomUUID()) {
   return { voidKey, deliveryId, reason: 'Cliente devolvio la mercancia', actorId: t.userId, now: ANULACION }
 }
@@ -399,8 +423,10 @@ describe('OrderDeliveryVoidRepository contra Postgres real', () => {
 
       const despues = await repo.findDeliveryLines(seeded.deliveryId, scope)
       const porId = new Map(despues.map((l) => [l.id, l]))
+      // 2026-10-15: cada linea trae su cliente.
       expect(porId.get(seeded.lineIds[0])).toEqual({
         id: seeded.lineIds[0],
+        customerId: a.customerId,
         presentationLineId: a.lineIds[0],
         batchId: a.batchIds[0],
         packages: 2,
@@ -459,6 +485,45 @@ describe('OrderDeliveryVoidRepository contra Postgres real', () => {
     })
   })
 
+  it('R39, R41: findDeliveryLines trae el cliente de cada linea; dos clientes en el mismo lote son dos lineas', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const seeded = await seedDelivery(tx, a)
+      const segundo = await addSecondCustomer(tx, a, seeded.deliveryId)
+      const repo = createOrderDeliveryVoidRepository(tx)
+      const scope = { companyId: a.companyId }
+      const voidId = await createdVoidId(repo, a, seeded.deliveryId)
+      await repo.addLines(voidId, seeded.deliveryId, [segundo.lineId], scope)
+
+      const lineas = await repo.findDeliveryLines(seeded.deliveryId, scope)
+
+      expect(lineas).toHaveLength(4)
+      expect(lineas.filter((l) => l.batchId === a.batchIds[0] && l.presentationLineId === a.lineIds[0])).toEqual(
+        expect.arrayContaining([
+          {
+            id: seeded.lineIds[0],
+            customerId: a.customerId,
+            presentationLineId: a.lineIds[0],
+            batchId: a.batchIds[0],
+            packages: 2,
+            quantity: '2.5000',
+            voided: false,
+          },
+          {
+            id: segundo.lineId,
+            customerId: segundo.customerId,
+            presentationLineId: a.lineIds[0],
+            batchId: a.batchIds[0],
+            packages: 4,
+            quantity: '5.0000',
+            voided: true,
+          },
+        ]),
+      )
+      expect(lineas.filter((l) => l.customerId === a.customerId).every((l) => !l.voided)).toBe(true)
+    })
+  })
+
   it('R18: addLines con el ambito de B no puede colgar lineas de la anulacion de A', async () => {
     await inRolledBackTransaction(async (tx) => {
       const a = await createTenant(tx, 'A')
@@ -491,18 +556,44 @@ describe('OrderDeliveryHistoryReader contra Postgres real', () => {
       const filas = await createOrderDeliveryHistoryReader(tx).listByOrder(a.orderId, scope)
 
       expect(filas.map((f) => f.id)).toEqual([nueva.deliveryId, vieja.deliveryId])
-      expect(filas[1]).toMatchObject({ customerId: a.customerId, createdBy: a.userId, createdAt: ENTREGA_1 })
+      // 2026-10-15: el cliente ya no es de la entrega sino de cada linea.
+      expect(filas[1]).toMatchObject({ createdBy: a.userId, createdAt: ENTREGA_1 })
+      expect(filas[1]).not.toHaveProperty('customerId')
       const lineasVieja = filas[1]?.lines ?? []
       expect(lineasVieja).toHaveLength(3)
       const anulacion = { reason: 'Cliente devolvio la mercancia', createdBy: a.userId, createdAt: ANULACION }
       expect(lineasVieja.filter((l) => l.presentationLineId === a.lineIds[0])).toEqual(
         expect.arrayContaining([
-          { presentationLineId: a.lineIds[0], batchId: a.batchIds[0], packages: 2, void: anulacion },
-          { presentationLineId: a.lineIds[0], batchId: a.batchIds[1], packages: 1, void: anulacion },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchIds[0], packages: 2, void: anulacion },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchIds[1], packages: 1, void: anulacion },
         ]),
       )
       expect(lineasVieja.find((l) => l.presentationLineId === a.lineIds[1])?.void).toBeNull()
       expect(filas[0]?.lines.every((l) => l.void === null)).toBe(true)
+    })
+  })
+
+  it('R33, R34: listByOrder trae el cliente de cada linea y la anulacion solo en las lineas del par anulado', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const seeded = await seedDelivery(tx, a)
+      const segundo = await addSecondCustomer(tx, a, seeded.deliveryId)
+      const repo = createOrderDeliveryVoidRepository(tx)
+      const scope = { companyId: a.companyId }
+      const voidId = await createdVoidId(repo, a, seeded.deliveryId)
+      await repo.addLines(voidId, seeded.deliveryId, [seeded.lineIds[0], seeded.lineIds[1]], scope)
+
+      const [fila] = await createOrderDeliveryHistoryReader(tx).listByOrder(a.orderId, scope)
+
+      expect(fila?.lines).toHaveLength(4)
+      const anulacion = { reason: 'Cliente devolvio la mercancia', createdBy: a.userId, createdAt: ANULACION }
+      expect(fila?.lines.filter((l) => l.presentationLineId === a.lineIds[0])).toEqual(
+        expect.arrayContaining([
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchIds[0], packages: 2, void: anulacion },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchIds[1], packages: 1, void: anulacion },
+          { customerId: segundo.customerId, presentationLineId: a.lineIds[0], batchId: a.batchIds[0], packages: 4, void: null },
+        ]),
+      )
     })
   })
 

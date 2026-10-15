@@ -59,18 +59,18 @@ async function findDeliveryLinesForVoid(
     where: { ...columns, deliveryId, delivery: columns },
     select: {
       id: true,
+      customerId: true,
       orderPresentationLineId: true,
       batchId: true,
       packages: true,
       quantity: true,
       voidLine: { select: { id: true } },
-      delivery: { select: { customerId: true } },
     },
-    orderBy: [{ orderPresentationLineId: 'asc' }, { batchId: 'asc' }],
+    orderBy: [{ orderPresentationLineId: 'asc' }, { customerId: 'asc' }, { batchId: 'asc' }],
   });
   return rows.map((row) => ({
     id: row.id,
-    customerId: row.delivery.customerId,
+    customerId: row.customerId,
     presentationLineId: row.orderPresentationLineId,
     batchId: row.batchId,
     packages: row.packages,
@@ -131,18 +131,18 @@ async function listOrderDeliveryHistory(
     where: { ...columns, orderId },
     select: {
       id: true,
-      customerId: true,
       createdBy: true,
       createdAt: true,
       lines: {
         where: columns,
         select: {
+          customerId: true,
           orderPresentationLineId: true,
           batchId: true,
           packages: true,
           voidLine: { select: { void: { select: { reason: true, createdBy: true, createdAt: true } } } },
         },
-        orderBy: [{ orderPresentationLineId: 'asc' }, { batchId: 'asc' }],
+        orderBy: [{ orderPresentationLineId: 'asc' }, { customerId: 'asc' }, { batchId: 'asc' }],
       },
     },
     orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
@@ -152,7 +152,7 @@ async function listOrderDeliveryHistory(
     createdBy: row.createdBy,
     createdAt: row.createdAt,
     lines: row.lines.map((line) => ({
-      customerId: row.customerId,
+      customerId: line.customerId,
       presentationLineId: line.orderPresentationLineId,
       batchId: line.batchId,
       packages: line.packages,

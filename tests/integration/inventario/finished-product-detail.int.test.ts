@@ -17,9 +17,9 @@ import {
   findProducedFinishedProducts,
   listFinishedProductBatches,
   listFinishedProductCosts,
-  listFinishedProductDeliveryMovements,
   listFinishedProductMovements,
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-product-detail-prisma'
+import { inventario } from '@/lib/composition'
 import { prisma } from '@/lib/shared/db/prisma'
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope'
@@ -244,6 +244,7 @@ type Seed = {
   readonly orderOfDeletedProduct: string
   readonly orderB: string
   readonly deliveryId: string
+  readonly deliveryLineId: string
   readonly voidId: string
   readonly batchProduced: { readonly id: string; readonly lot: string }
   readonly batchEmpty: { readonly id: string; readonly lot: string }
@@ -379,11 +380,11 @@ async function seedAll(): Promise<Seed> {
     createdAt: at(6),
   })
 
+  // 2026-10-15 (QC-282): el cliente va en la linea de entrega, no en la entrega.
   const { id: deliveryId } = await prisma.orderDelivery.create({
     data: {
       companyId: a.companyId,
       orderId: orderLive,
-      customerId: a.customerId,
       deliveryKey: randomUUID(),
       createdBy: a.userId,
       createdAt: at(7),
@@ -394,6 +395,7 @@ async function seedAll(): Promise<Seed> {
     data: {
       companyId: a.companyId,
       deliveryId,
+      customerId: a.customerId,
       orderPresentationLineId: lineLive,
       batchId: batchProduced.id,
       packages: 1,
@@ -471,7 +473,7 @@ async function seedAll(): Promise<Seed> {
     createdAt: at(1),
   })
   const { id: deliveryB } = await prisma.orderDelivery.create({
-    data: { companyId: b.companyId, orderId: orderB, customerId: b.customerId, deliveryKey: randomUUID(), createdBy: b.userId },
+    data: { companyId: b.companyId, orderId: orderB, deliveryKey: randomUUID(), createdBy: b.userId },
     select: { id: true },
   })
   await movement(b, {
@@ -497,6 +499,7 @@ async function seedAll(): Promise<Seed> {
     orderOfDeletedProduct,
     orderB,
     deliveryId,
+    deliveryLineId,
     voidId,
     batchProduced,
     batchEmpty,
@@ -544,10 +547,11 @@ describe('findAliveFinishedProduct', () => {
       content: '5.0000',
       unitId: seed.a.unitId,
     })
+    // 2026-10-15 (QC-282): cada lote trae tambien su codigo, del que sale el lote de la fila de Entregas.
     expect(record?.batches).toEqual([
-      { id: seed.batchOpening.id, stock: '7.0000', packageContent: null },
-      { id: seed.batchEmpty.id, stock: '0.0000', packageContent: '5.0000' },
-      { id: seed.batchProduced.id, stock: '22.0000', packageContent: '5.0000' },
+      { id: seed.batchOpening.id, lot: seed.batchOpening.lot, stock: '7.0000', packageContent: null },
+      { id: seed.batchEmpty.id, lot: seed.batchEmpty.lot, stock: '0.0000', packageContent: '5.0000' },
+      { id: seed.batchProduced.id, lot: seed.batchProduced.lot, stock: '22.0000', packageContent: '5.0000' },
     ])
   })
 })
@@ -657,22 +661,32 @@ describe('listFinishedProductMovements', () => {
   })
 })
 
-describe('listFinishedProductDeliveryMovements', () => {
-  it('R19: los asientos delivery traen su orderDeliveryId, su pedido y su lote, aunque la entrega este anulada', async () => {
-    const page = await listFinishedProductDeliveryMovements(seed.productId, { page: 1 }, seed.a.scope)
+// 2026-10-15 (QC-282): `listFinishedProductDeliveryMovements` desaparece: la fila del tab Entregas es
+// la linea de entrega, que lee `pedidos`. El caso pasa a la fachada con su cableado real; la entrega
+// sigue anulada y su fila sigue saliendo, ahora con su cliente, su presentacion y su anulacion.
+describe('inventario.listFinishedProductDeliveries con su cableado real', () => {
+  const lector = () => ({ id: seed.a.userId, companyId: seed.a.companyId, permissions: ['inventario.consultar'] })
 
-    expect(page.total).toBe(1)
+  it('R19, R43, R44: una fila por linea de entrega, con cliente, pedido, presentacion, lote, envases, cantidad y anulacion', async () => {
+    const page = await inventario.listFinishedProductDeliveries(seed.productId, { page: 1 }, lector())
+
+    expect(page).toMatchObject({ total: 1, page: 1, pageSize: 10, totalPages: 1 })
     expect(page.items).toEqual([
       {
-        id: seed.movements.delivery,
+        deliveryLineId: seed.deliveryLineId,
         orderDeliveryId: seed.deliveryId,
-        orderId: seed.orderLive,
+        createdAt: at(7).toISOString(),
+        customer: { id: seed.a.customerId, firstNames: 'Luis', lastNames: 'Rojas', isDeleted: false },
+        orderNumberText: expect.stringMatching(/^\d{4}-\d{7}$/u),
+        presentationName: expect.stringContaining('Presentacion'),
         batchId: seed.batchProduced.id,
         lot: seed.batchProduced.lot,
-        quantity: '-5.0000',
-        createdAt: at(7).toISOString(),
+        packages: 1,
+        quantity: '5.0000',
+        void: { reason: 'Cliente devolvio el pedido' },
       },
     ])
+    expect(page.delivered).toEqual({ quantity: '0.0000', packages: 0 })
   })
 })
 
@@ -730,7 +744,6 @@ describe('ambito de empresa', () => {
     expect((await listFinishedProductBatches(seed.productB, page, scope)).total).toBe(0)
     expect((await listFinishedProductMovements(seed.productB, 'in', page, scope)).total).toBe(0)
     expect((await listFinishedProductMovements(seed.productB, 'out', page, scope)).total).toBe(0)
-    expect((await listFinishedProductDeliveryMovements(seed.productB, page, scope)).total).toBe(0)
     expect((await listFinishedProductCosts(seed.productB, page, scope)).total).toBe(0)
     expect(await findProducedFinishedProducts([seed.orderB], scope)).toEqual([])
   })
@@ -742,12 +755,12 @@ describe('ambito de empresa', () => {
     expect(await findAliveFinishedProduct(seed.productId, scope)).toBeNull()
     expect((await listFinishedProductBatches(seed.productId, page, scope)).total).toBe(0)
     expect((await listFinishedProductMovements(seed.productId, 'in', page, scope)).total).toBe(0)
-    expect((await listFinishedProductDeliveryMovements(seed.productId, page, scope)).total).toBe(0)
     expect((await listFinishedProductCosts(seed.productId, page, scope)).total).toBe(0)
     expect(await findProducedFinishedProducts([seed.orderLive], scope)).toEqual([])
 
     expect((await listFinishedProductBatches(seed.productB, page, scope)).total).toBe(1)
-    expect((await listFinishedProductDeliveryMovements(seed.productB, page, scope)).total).toBe(1)
+    // 2026-10-15 (QC-282): el tab Entregas ya no lee asientos de este adaptador; su ambito se comprueba
+    // en `order-delivery-directory.int.test.ts`.
     expect(await findProducedFinishedProducts([seed.orderB], scope)).toHaveLength(1)
   })
 })

@@ -138,7 +138,6 @@ import {
   findProducedFinishedProducts,
   listFinishedProductBatches,
   listFinishedProductCosts,
-  listFinishedProductDeliveryMovements,
   listFinishedProductMovements,
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-product-detail-prisma';
 import {
@@ -1027,7 +1026,6 @@ const finishedProductDetailRepository: FinishedProductDetailRepository = {
   findAliveFinished: findAliveFinishedProduct,
   listBatches: listFinishedProductBatches,
   listMovements: listFinishedProductMovements,
-  listDeliveryMovements: listFinishedProductDeliveryMovements,
   listProductionCosts: listFinishedProductCosts,
   findProducedProducts: findProducedFinishedProducts,
 };

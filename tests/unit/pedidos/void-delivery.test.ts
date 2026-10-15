@@ -16,6 +16,7 @@ import {
   NEWER_DELIVERY_ID,
   OPEN_LINE_ID,
   SECOND_BATCH_ID,
+  SECOND_CUSTOMER_ID,
   THIRD_BATCH_ID,
   VOID_KEY,
   VOID_ORDER_ID,
@@ -492,5 +493,134 @@ describe('voidDelivery — idempotencia (R28)', () => {
   it('R28: si el pedido de la anulacion registrada ya no se lee, responde order_not_found', async () => {
     const m = montar({ registrada: { id: VOID_ID, orderId: VOID_ORDER_ID }, leido: null })
     expect(await codigoDelFallo(() => createVoidDelivery(m.deps)(voidInput(), ANULADOR))).toBe('order_not_found')
+  })
+})
+
+// 2026-10-15 (QC-282): la anulacion se pide por pares cliente-presentacion. Estas lineas tienen dos
+// clientes que comparten presentacion y lote: el primero lleva la presentacion abierta en dos lotes
+// y comparte con el segundo el primer lote; el segundo tiene ademas la presentacion ya anulada.
+const DOS_CLIENTES: readonly DeliveryLineForVoid[] = [
+  { id: 'a-1', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
+  { id: 'a-2', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
+  { id: 'b-1', customerId: SECOND_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 3, quantity: '3.0000', voided: false },
+  { id: 'b-2', customerId: SECOND_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, batchId: THIRD_BATCH_ID, packages: 1, quantity: '4.0000', voided: true },
+]
+
+const par = (customerId: string, presentationLineId: string) => ({ customerId, presentationLineId })
+
+describe('voidDelivery — pares cliente-presentacion (R3, R39, R40, R41)', () => {
+  it('R3: sin entregas.anular, la forma nueva y la vieja responden unauthorized sin leer nada', async () => {
+    const m = montar({ lineas: DOS_CLIENTES })
+    const anular = createVoidDelivery(m.deps)
+    const formaVieja = { deliveryId: NEWER_DELIVERY_ID, voidKey: VOID_KEY, presentationLineIds: [OPEN_LINE_ID], reason: VOID_REASON }
+    const sinPermiso: Actor = { ...ANULADOR, permissions: ['entregas.modificar', 'pedidos.consultar'] }
+
+    for (const entrada of [voidInput({ items: [par(SECOND_CUSTOMER_ID, OPEN_LINE_ID)] }), formaVieja, { items: 'basura' }]) {
+      expect(await codigoDelFallo(() => anular(entrada, sinPermiso))).toBe('unauthorized')
+    }
+    ningunPuerto(m)
+  })
+
+  const invalidas: ReadonlyArray<readonly [string, unknown]> = [
+    ['ningun par', voidInput({ items: [] })],
+    ['un par repetido', voidInput({ items: [par(FIRST_CUSTOMER_ID, OPEN_LINE_ID), par(FIRST_CUSTOMER_ID, OPEN_LINE_ID)] })],
+    ['un par sin cliente', { ...voidInput(), items: [{ presentationLineId: OPEN_LINE_ID }] }],
+    ['un cliente sin forma de uuid', voidInput({ items: [par('cliente-1', OPEN_LINE_ID)] })],
+    ['un par con un campo de mas', { ...voidInput(), items: [{ ...par(FIRST_CUSTOMER_ID, OPEN_LINE_ID), batchId: FIRST_BATCH_ID }] }],
+    ['la forma vieja (solo presentaciones)', { deliveryId: NEWER_DELIVERY_ID, voidKey: VOID_KEY, presentationLineIds: [OPEN_LINE_ID], reason: VOID_REASON }],
+    [
+      'mas pares que el tope',
+      voidInput({
+        items: Array.from({ length: DELIVERY_MAX_ALLOCATIONS + 1 }, (_, i) =>
+          par(FIRST_CUSTOMER_ID, `d0000000-0000-4000-8000-${String(i).padStart(12, '0')}`),
+        ),
+      }),
+    ],
+  ]
+
+  for (const [caso, entrada] of invalidas) {
+    it(`R39: ${caso} responde invalid_input sin leer ni escribir nada`, async () => {
+      const m = montar({ lineas: DOS_CLIENTES })
+      expect(await codigoDelFallo(() => createVoidDelivery(m.deps)(entrada, ANULADOR))).toBe('invalid_input')
+      ningunPuerto(m)
+    })
+  }
+
+  it('R39: el mismo cliente con dos presentaciones, o dos clientes con la misma, no son pares repetidos', async () => {
+    const m = montar({ lineas: DOS_CLIENTES })
+    await expect(
+      createVoidDelivery(m.deps)(
+        voidInput({ items: [par(FIRST_CUSTOMER_ID, OPEN_LINE_ID), par(SECOND_CUSTOMER_ID, OPEN_LINE_ID)] }),
+        ANULADOR,
+      ),
+    ).resolves.toEqual({ status: 'voided', orderStatus: 'TERMINADO' })
+  })
+
+  it('R39: un par cuya presentacion es de la entrega pero no de ese cliente responde invalid_input sin escribir', async () => {
+    const m = montar({ lineas: DOS_CLIENTES })
+    const entrada = voidInput({ items: [par(SECOND_CUSTOMER_ID, OPEN_LINE_ID), par(FIRST_CUSTOMER_ID, VOIDED_LINE_ID)] })
+    expect(await codigoDelFallo(() => createVoidDelivery(m.deps)(entrada, ANULADOR))).toBe('invalid_input')
+    expect(m.tx.voids.findDeliveryLines).toHaveBeenCalledWith(NEWER_DELIVERY_ID, SCOPE)
+    expect(m.lanzoDentro()).not.toBeNull()
+    nadaEscrito(m)
+  })
+
+  it('R39: un cliente que no esta en la entrega responde invalid_input sin escribir', async () => {
+    const m = montar({ lineas: DOS_CLIENTES })
+    const entrada = voidInput({ items: [par('c0000000-0000-4000-8000-000000000099', OPEN_LINE_ID)] })
+    expect(await codigoDelFallo(() => createVoidDelivery(m.deps)(entrada, ANULADOR))).toBe('invalid_input')
+    nadaEscrito(m)
+  })
+
+  it('R40: un par ya anulado responde delivery_already_voided y no anula los otros pares pedidos', async () => {
+    const m = montar({ lineas: DOS_CLIENTES })
+    const entrada = voidInput({ items: [par(FIRST_CUSTOMER_ID, OPEN_LINE_ID), par(SECOND_CUSTOMER_ID, VOIDED_LINE_ID)] })
+    expect(await codigoDelFallo(() => createVoidDelivery(m.deps)(entrada, ANULADOR))).toBe('delivery_already_voided')
+    expect(m.lanzoDentro()).not.toBeNull()
+    nadaEscrito(m)
+  })
+
+  it('R40: la presentacion anulada de un cliente no impide anular la misma presentacion de otro', async () => {
+    const lineas = DOS_CLIENTES.map((l) => (l.id === 'a-1' || l.id === 'a-2' ? { ...l, voided: true } : l))
+    const m = montar({ lineas })
+    await createVoidDelivery(m.deps)(voidInput({ items: [par(SECOND_CUSTOMER_ID, OPEN_LINE_ID)] }), ANULADOR)
+    expect(m.tx.voids.addLines).toHaveBeenCalledWith(VOID_ID, NEWER_DELIVERY_ID, ['b-1'], SCOPE)
+  })
+
+  it('R41: anula todas las lineas del par, en todos sus lotes, y ninguna del otro cliente en la misma presentacion', async () => {
+    const m = montar({ lineas: DOS_CLIENTES })
+    await createVoidDelivery(m.deps)(voidInput({ items: [par(FIRST_CUSTOMER_ID, OPEN_LINE_ID)] }), ANULADOR)
+    expect(m.tx.voids.addLines).toHaveBeenCalledTimes(1)
+    expect(m.tx.voids.addLines).toHaveBeenCalledWith(VOID_ID, NEWER_DELIVERY_ID, ['a-1', 'a-2'], SCOPE)
+    expect(m.tx.finishedGoods.returnForDeliveryVoid).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lines: [
+          { batchId: FIRST_BATCH_ID, quantity: '4.0000' },
+          { batchId: SECOND_BATCH_ID, quantity: '2.0000' },
+        ],
+      }),
+    )
+  })
+
+  it('R41: con dos clientes en el mismo lote, la devolucion lleva una entrada por linea y el lote se repite', async () => {
+    const m = montar({ lineas: DOS_CLIENTES })
+    await createVoidDelivery(m.deps)(
+      voidInput({ items: [par(SECOND_CUSTOMER_ID, OPEN_LINE_ID), par(FIRST_CUSTOMER_ID, OPEN_LINE_ID)] }),
+      ANULADOR,
+    )
+    expect(m.tx.voids.addLines).toHaveBeenCalledWith(VOID_ID, NEWER_DELIVERY_ID, ['a-1', 'a-2', 'b-1'], SCOPE)
+    expect(m.tx.finishedGoods.returnForDeliveryVoid).toHaveBeenCalledWith({
+      companyId: EMPRESA,
+      orderId: VOID_ORDER_ID,
+      orderDeliveryVoidId: VOID_ID,
+      lines: [
+        { batchId: FIRST_BATCH_ID, quantity: '4.0000' },
+        { batchId: SECOND_BATCH_ID, quantity: '2.0000' },
+        { batchId: FIRST_BATCH_ID, quantity: '3.0000' },
+      ],
+      actorId: ANULADOR.id,
+      now: AHORA,
+    })
+    expect(m.tx.voids.create).toHaveBeenCalledTimes(1)
   })
 })

@@ -109,7 +109,7 @@ Cubre: R2, R21–R29.
 
 ---
 
-## [ ] B4 [P] — Anulación y lecturas (depende de B1 y B2)
+## [x] B4 [P] — Anulación y lecturas (depende de B1 y B2)
 
 - `lib/modules/pedidos/domain/void-delivery.ts` (`design.md > 5`).
 - `lib/modules/pedidos/domain/list-order-deliveries.ts` (`design.md > 2.4`, `> 6`).
