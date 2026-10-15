@@ -765,6 +765,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       'createListFinishedProductBatches',
       'createListFinishedProductCosts',
       'createListFinishedProductDeliveries',
+      'createListFinishedProductDistribution',
       'createListFinishedProductMovements',
       'createListFinishedStock',
       'createListOrderBatches',
