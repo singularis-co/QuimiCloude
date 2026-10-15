@@ -412,9 +412,11 @@ async function applyOrderStep(
     case 'startPacking':
       await asignaciones.startPacking(await actor(actors.packer), { orderId })
       return
-    case 'finishPacking':
-      await asignaciones.finishPacking(await actor(actors.packer), { orderId })
+    case 'finishPacking': {
+      const packer = await actor(actors.packer)
+      await asignaciones.finishPacking(packer, { orderId, lines: await packedAsPlanned(packer.companyId, orderId) })
       return
+    }
     case 'startConditioning':
       // El equipo es la propia persona que acondiciona, para que la siembra sea determinista.
       await asignaciones.startConditioning(await actor(actors.conditioner), {
@@ -432,6 +434,16 @@ async function applyOrderStep(
       await pedidos.cancelOrder(orderId, { reason: cancellationReason }, await actor(actors.admin))
       return
   }
+}
+
+/** La demo envasa siempre lo planeado: cada linea con sus envases del reparto y sin motivo. */
+async function packedAsPlanned(companyId: string, orderId: string) {
+  const lines = await prisma.orderPresentationLine.findMany({
+    where: { orderId, companyId },
+    select: { id: true, packages: true },
+    orderBy: { createdAt: 'asc' },
+  })
+  return lines.map((line) => ({ lineId: line.id, packedPackages: line.packages, reason: null, reasonOther: null }))
 }
 
 /**

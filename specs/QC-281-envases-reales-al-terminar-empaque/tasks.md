@@ -58,7 +58,7 @@ nombre de cada test lleva su `R<n>` (`docs/conventions.md > Tests`).
   envío → `not_packable`; envase que también es ingrediente conserva lo de hoy.
 - **Hecho:** tests verdes. (R15, R16, R18–R22, R30, R32)
 
-## T6 — Caso de uso y acción en `asignaciones` (depende de T5)
+## [x] T6 — Caso de uso y acción en `asignaciones` (depende de T5)
 - `finish-packing.ts`: zod con `lines`, paso de `counts`, mapeo de resultados nuevos;
   `errors.ts` con `PackedExceedsQuantityError` y `PackagingStockInsufficientError`;
   `ports/execution-transaction.ts`; `lib/modules/errores/domain/error-codes.ts` y

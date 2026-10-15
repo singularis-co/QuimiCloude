@@ -58,6 +58,8 @@ export {
   NoWholePackageError,
   OrderPackingTakenError,
   OrderNotPackableError,
+  PackedExceedsQuantityError,
+  PackagingStockInsufficientError,
   OrderProducedFrozenError,
   OrderConditioningTakenError,
   OrderNotConditionableError,
