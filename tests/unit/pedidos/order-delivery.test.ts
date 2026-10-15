@@ -178,6 +178,13 @@ describe('checkDeliveryBlocks', () => {
     ).toEqual(new Map([[2, 'duplicate_customer']]))
   })
 
+  it('QC-282 R17 R21: el mismo uuid de cliente en distinta capitalizacion es duplicate_customer', () => {
+    const uuid = 'c0000000-0000-4000-8000-00000000000a'
+    expect(checkDeliveryBlocks([bloque(uuid, alloc(L1, B1, 1)), bloque(uuid.toUpperCase(), alloc(L1, B2, 1))])).toEqual(
+      new Map([[1, 'duplicate_customer']]),
+    )
+  })
+
   it('R17: un tercer bloque con el mismo cliente tambien se marca', () => {
     expect(
       checkDeliveryBlocks([bloque(CA, alloc(L1, B1, 1)), bloque(CA, alloc(L1, B2, 1)), bloque(CA, alloc(L2, B3, 1))]),

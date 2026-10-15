@@ -63,7 +63,7 @@ const deliverOrderSchema = z
       .min(1),
   })
   .refine(({ customers }) => customers.reduce((sum, c) => sum + c.allocations.length, 0) <= DELIVERY_MAX_ALLOCATIONS)
-  .refine(({ customers }) => new Set(customers.map((c) => c.customerId)).size === customers.length)
+  .refine(({ customers }) => new Set(customers.map((c) => c.customerId.toLowerCase())).size === customers.length)
   .refine(({ customers }) =>
     customers.every(
       ({ allocations }) =>

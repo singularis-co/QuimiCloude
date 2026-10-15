@@ -93,11 +93,13 @@ export function checkDeliveryBlocks(blocks: readonly DeliveryCustomerBlock[]): R
       issues.set(index, 'missing_customer');
       return;
     }
-    if (seen.has(block.customerId)) {
+    // Postgres iguala un uuid en mayusculas y en minusculas: son el mismo cliente.
+    const customerKey = block.customerId.toLowerCase();
+    if (seen.has(customerKey)) {
       issues.set(index, 'duplicate_customer');
       return;
     }
-    seen.add(block.customerId);
+    seen.add(customerKey);
     if (!block.allocations.some((allocation) => allocation.packages > 0)) issues.set(index, 'no_packages');
   });
   return issues;

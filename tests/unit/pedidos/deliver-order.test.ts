@@ -755,6 +755,12 @@ describe('QC-282 deliverOrder — forma de la entrada con varios clientes', () =
     ['un cliente sin envases', deliverInput({ customers: [clienteA([UNA]), clienteB([])] })],
     ['el mismo cliente dos veces', deliverInput({ customers: [clienteA([UNA]), clienteA([{ ...UNA, batchId: NEWER_BATCH_ID }])] })],
     [
+      'el mismo cliente dos veces en distinta capitalizacion',
+      deliverInput({
+        customers: [clienteA([UNA]), { ...clienteA([{ ...UNA, batchId: NEWER_BATCH_ID }]), customerId: DELIVERY_CUSTOMER_ID.toUpperCase() }],
+      }),
+    ],
+    [
       'la misma presentacion y lote repetidos dentro de un cliente',
       deliverInput({ customers: [clienteA([UNA]), clienteB([UNA, { ...UNA, packages: 2 }])] }),
     ],
