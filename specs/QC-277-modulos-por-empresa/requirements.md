@@ -40,6 +40,11 @@ Fuente de hechos del código (con citas): `progress/modulos-por-empresa.md`.
 Decisiones del humano tomadas el 2026-10-13 y escritas en la descripción del issue QC-277 y en
 `progress/modulos-por-empresa.md`. Este spec no las abre.
 
+**Enmienda del 2026-10-15 (D13–D16).** Cambia solo el modelo de datos de los interruptores: de una
+lista guardada en la fila de la empresa a una tabla de excepciones por empresa con su catálogo.
+Los requisitos de comportamiento y D1–D12 no cambian. Detalle técnico en `design.md > 2` y
+`> 15`.
+
 | # | Decisión | Quién y cuándo | Enmienda a | Cubierta por |
 | --- | --- | --- | --- | --- |
 | D1 | Módulos **enteros**, no permisos sueltos. «Integraciones» es un solo interruptor: Proveedor IA, Inventarios y WhatsApp; arrastra la lectura de PDF, Contactos y las notificaciones | humano, 2026-10-13 (QC-277) | — | R1, R2, R4 |
@@ -54,6 +59,10 @@ Decisiones del humano tomadas el 2026-10-13 y escritas en la descripción del is
 | D10 | Todos los huecos se cierran: puntos cruzados con permiso de otro módulo, logo y aterrizaje fijos, webhook y crons fuera de sesión | humano, 2026-10-13 (QC-277) | — | R15, R16, R17, R18, R19, R20, R21, R22, R25, R26 |
 | D11 | **Validación en el servidor y en el menú.** Lleva E2E | humano, 2026-10-13 (QC-277) | — | R12, R13, R14, R35, R36 |
 | D12 | El cron de caducidad de pedidos es **núcleo**: corre para toda empresa activa, sin depender de añadidos | humano, 2026-10-14 (cierra P1) | — | R25, R26 |
+| D13 | **El catálogo de añadidos tiene su tabla en la base**, espejo del catálogo del código, sembrada por migración. El código sigue mandando y una guardia comprueba que código y tabla coinciden. Las excepciones por empresa apuntan a esa tabla con FK. Se descarta la variante sin FK | Christian Quevedo, comentarios 10575 y 10576 en QC-277 (2026-10-15); Carlos Restrepo, 2026-10-15 («dale como mejor lo veas») | Modelo de datos aprobado (columna de interruptores en la empresa) | R2, R32 |
+| D14 | **Apagar guarda una excepción «apagado»; no borra.** Así, cuando haya planes, se podrá apagar lo que trae el plan. «Apagar todos» deja los cinco apagados en una transacción (R29), con su evento en el historial en esa misma transacción (R33) | Christian Quevedo (10575, 10576) y Carlos Restrepo, 2026-10-15 | ídem | R28, R29, R33 |
+| D15 | **El autor de cada excepción apunta al usuario, sin empresa en la referencia:** el Maestro no tiene empresa. La tabla de excepciones es tabla de empresa: lleva su columna de empresa y el control de acceso a filas activado y forzado, como el resto | Christian Quevedo (10575, 10576) y Carlos Restrepo, 2026-10-15 | ídem | R28, R33 |
+| D16 | **Solo se construye la tabla de excepciones.** Los planes y su lista de añadidos, y el plan de cada empresa, son de QC-182. Sin planes, los añadidos de una empresa son solo sus excepciones prendidas | Christian Quevedo (10575, 10576) y Carlos Restrepo, 2026-10-15 | ídem | R5, R6, R8 |
 
 ## Requisitos (EARS)
 
@@ -203,14 +212,16 @@ Vocabulario de este documento:
 ## Preguntas abiertas
 
 P1 (cron de caducidad de pedidos) se cerró el 2026-10-14 como D12. Las que siguen no bloquean el
-spec: cada una lleva el defecto con el que se diseñó, y cambiarlo toca solo lo que se cita.
+spec: cada una lleva el defecto con el que se diseñó, y cambiarlo toca solo lo que se cita. P6 y
+P7 nacen con la enmienda del 2026-10-15.
 
 - **P2 — Empresas que ya existen y empresa del seed.** D7 fija la empresa **nueva**, pero no dice
   qué pasa con las que ya existen (en producción, QuimiCloud: QC-162 P5). Si la migración las deja
   solo con el núcleo, en producción pierden dashboard, proveedores, PDF, Excel e integraciones al
   desplegar, y el Maestro no tiene pantalla para prenderlos hasta QC-278. **Defecto:** la migración
   prende los cinco añadidos en las que ya existen (R6), y el seed de desarrollo, preview y E2E crea
-  QuimiCloud con los cinco (R7). Cambiarlo toca R6, R7, el `UPDATE` de la migración y el seed.
+  QuimiCloud con los cinco (R7). Cambiarlo toca R6, R7, el sembrado de excepciones de la migración
+  y el seed.
 - **P3 — Prender la lectura de PDF con integraciones apagada.** D1 dice que integraciones
   «arrastra» la lectura de PDF, pero no dice si el Maestro puede prender la lectura con
   integraciones apagado. **Defecto:** se guarda el interruptor pero no surte efecto hasta que
@@ -227,3 +238,18 @@ spec: cada una lleva el defecto con el que se diseñó, y cambiarlo toca solo lo
   `empaque.modificar`, `recetas.modificar`). **Defecto:** queda fuera de esta ficha y sigue siendo
   núcleo de hecho hasta que una ficha propia la convierta en el sexto añadido. El catálogo de R2
   está hecho para que eso sea una entrada más y sus guardas.
+- **P6 — Cómo lee la sesión los añadidos con la tabla de excepciones (D13–D16).** Christian
+  Quevedo (2026-10-15) dice que «la lectura de la sesión la estamos resolviendo aparte», sin ficha
+  citada. Esa ficha es desconocida para este spec. R8 pide calcular el permiso efectivo «en la
+  misma lectura de sesión que ya existe, sin ninguna consulta adicional». **Defecto:** el lector de
+  sesión trae las excepciones prendidas de la empresa como relación de la misma consulta del
+  usuario, por la clave primaria de la tabla de excepciones. El lector se sigue invocando una vez
+  por petición. Prisma resuelve esa relación con una sentencia SQL más, como ya pasó con las
+  sesiones revocadas (QC-23). «Consulta adicional» se mide como entonces: invocaciones del lector,
+  no sentencias SQL (`design.md > 3.1`). Si la ficha de Christian cambia la lectura, toca solo
+  `session-user-prisma.ts` y su test de integración. Los recortes del dominio no cambian.
+- **P7 — Autor de las excepciones sembradas por la migración y por el seed (D15).** R6 y R7 crean
+  excepciones sin que nadie las pida, así que no hay autor. **Defecto:** el autor queda vacío en
+  esas filas, y vacío significa «lo sembró el sistema». Toda escritura del Maestro lleva su autor
+  (R33). La alternativa es buscar un usuario Maestro al migrar, pero puede no existir en una base
+  recién creada.
