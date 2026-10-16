@@ -13,10 +13,11 @@ import type { ErrorState } from '@/lib/modules/errores';
 import type { CompanyRow } from '@/lib/modules/identity';
 import { maestroCompanyRoute } from '@/lib/shared/routes';
 
-import { openRowActionsMenu } from '../../helpers/row-actions-menu';
+import { getRowActionItem, openRowActionsMenu } from '../../helpers/row-actions-menu';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
+import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
-const { routerMock } = vi.hoisted(() => ({
+const { routerMock, getCompanyActionMock, impactMock } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -25,11 +26,25 @@ const { routerMock } = vi.hoisted(() => ({
     forward: vi.fn<() => void>(),
     prefetch: vi.fn<(href: string) => void>(),
   },
+  getCompanyActionMock: vi.fn<(id: string) => Promise<unknown>>(),
+  impactMock: vi.fn<(id: string) => Promise<unknown>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => routerMock,
+}));
+
+vi.mock('@/lib/modules/identity/adapters/driving/company-actions', () => ({
+  getCompanyAction: getCompanyActionMock,
+  getCompanyDeletionImpactAction: impactMock,
+  updateCompanyAction: vi.fn(),
+  setCompanyCountryAction: vi.fn(),
+  deleteCompanyAction: vi.fn(),
+  reactivateCompanyAction: vi.fn(),
+  createCompanyAction: vi.fn(),
+  listCompaniesAction: vi.fn(),
+  listCompanyEventsAction: vi.fn(),
 }));
 
 const QUIMICLOUD: CompanyRow = {
@@ -129,10 +144,12 @@ async function etiquetasDelMenu(trigger: HTMLElement): Promise<string[]> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setViewportWidth(WIDE_VIEWPORT);
 });
 
 afterEach(() => {
   cleanup();
+  resetViewport();
 });
 
 describe('columnas y celdas', () => {
@@ -291,6 +308,38 @@ describe('menu de acciones', () => {
       'Abrir',
     ]);
     expect(screen.queryByText('Nueva empresa')).toBeNull();
+  });
+});
+
+describe('lo que abre cada accion del menu', () => {
+  it('R20: «Editar» abre el panel de edicion de esa empresa, activa o de baja', async () => {
+    getCompanyActionMock.mockReturnValue(new Promise(() => {}));
+    const user = setupUser();
+    montar();
+    const trigger = within(fila(LA_CEJA.id)).getByTestId('company-actions');
+    await user.click(await getRowActionItem(user, trigger, 'company-action-edit'));
+    expect(await screen.findByTestId('company-edit-sheet')).toBeInTheDocument();
+    expect(getCompanyActionMock).toHaveBeenCalledWith(LA_CEJA.id);
+  });
+
+  it('R23: «Dar de baja» abre el dialogo de baja de esa empresa', async () => {
+    impactMock.mockReturnValue(new Promise(() => {}));
+    const user = setupUser();
+    montar();
+    const trigger = within(fila(VALLE.id)).getByTestId('company-actions');
+    await user.click(await getRowActionItem(user, trigger, 'company-action-delete'));
+    const dialogo = await screen.findByTestId('company-delete-dialog');
+    expect(within(dialogo).getByRole('heading', { name: `Dar de baja a ${VALLE.name}` })).toBeInTheDocument();
+    expect(impactMock).toHaveBeenCalledWith(VALLE.id);
+  });
+
+  it('R26: «Reactivar» abre el dialogo de reactivacion de esa empresa', async () => {
+    const user = setupUser();
+    montar();
+    const trigger = within(fila(LA_CEJA.id)).getByTestId('company-actions');
+    await user.click(await getRowActionItem(user, trigger, 'company-action-reactivate'));
+    const dialogo = await screen.findByTestId('company-reactivate-dialog');
+    expect(within(dialogo).getByRole('heading', { name: `¿Reactivar ${LA_CEJA.name}?` })).toBeInTheDocument();
   });
 });
 

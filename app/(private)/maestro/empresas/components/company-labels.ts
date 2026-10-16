@@ -75,6 +75,35 @@ export const COMPANY_CREATE_TEXTS = {
   mailFailed: 'Empresa creada, pero no pudimos enviar el correo al Administrador.',
 } as const;
 
+export const COMPANY_EDIT_TEXTS = {
+  title: 'Editar empresa',
+  description: (name: string) => `Cambia los datos de ${name}.`,
+  loading: 'Cargando los datos de la empresa…',
+  success: 'Empresa actualizada.',
+} as const;
+
+export const COMPANY_DELETE_TEXTS = {
+  title: (name: string) => `Dar de baja a ${name}`,
+  warning:
+    'Sus usuarios no podrán entrar y se cerrarán las sesiones que tengan abiertas. Podrás reactivarla después.',
+  loadingImpact: 'Calculando el impacto…',
+  liveUsers: 'Usuarios activos',
+  openOrders: 'Pedidos abiertos',
+  confirmationPrefix: 'Escribe ',
+  confirmationSuffix: ' para confirmar',
+  dismiss: 'Volver',
+  confirm: 'Dar de baja',
+  success: 'Empresa dada de baja.',
+} as const;
+
+export const COMPANY_REACTIVATE_TEXTS = {
+  title: (name: string) => `¿Reactivar ${name}?`,
+  description: 'La empresa vuelve a estar activa con los datos y módulos que tenía.',
+  dismiss: 'Volver',
+  confirm: 'Reactivar',
+  success: 'Empresa reactivada.',
+} as const;
+
 export function companyTableTexts(total: number): DataTableTexts {
   return {
     empty: COMPANY_EMPTY_TEXTS.empty,

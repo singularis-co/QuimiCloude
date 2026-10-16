@@ -3,7 +3,7 @@
 import { Building2Icon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 
 import {
   DataTable,
@@ -25,6 +25,8 @@ import {
   buildCompanyColumns,
   type CompanyRowAction,
 } from './company-columns';
+import { CompanyDeleteDialog } from './company-delete-dialog';
+import { CompanyEditSheet } from './company-edit-sheet';
 import { COMPANY_EMPTY_TEXTS, COMPANY_ERROR_TITLE, companyTableTexts } from './company-labels';
 import {
   CREATED_AT_COLUMN_ID,
@@ -37,6 +39,7 @@ import {
   withoutSearch,
   withoutStatusFilter,
 } from './company-list-params';
+import { CompanyReactivateDialog } from './company-reactivate-dialog';
 
 export const COMPANY_TABLE_ID = 'maestro-empresas';
 export const COMPANY_TABLE_TESTID = 'company-table';
@@ -156,7 +159,10 @@ export function CompanyTable({
 }: CompanyTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [, setTarget] = useState<CompanyActionTarget | null>(null);
+  const [target, setTarget] = useState<CompanyActionTarget | null>(null);
+  const closeTarget = useCallback((next: boolean) => {
+    if (!next) setTarget(null);
+  }, []);
 
   const columns = useMemo(
     () =>
@@ -193,6 +199,16 @@ export function CompanyTable({
         states={buildStates(params, error)}
         card={COMPANY_CARD}
       />
+      {/* Montados solo mientras están abiertos: cada apertura empieza limpia. */}
+      {target?.action === 'edit' ? (
+        <CompanyEditSheet companyId={target.company.id} open onOpenChange={closeTarget} />
+      ) : null}
+      {target?.action === 'delete' ? (
+        <CompanyDeleteDialog company={target.company} open onOpenChange={closeTarget} />
+      ) : null}
+      {target?.action === 'reactivate' ? (
+        <CompanyReactivateDialog company={target.company} open onOpenChange={closeTarget} />
+      ) : null}
     </div>
   );
 }
