@@ -264,7 +264,7 @@ describe('R21 — con 760 px o menos, cada fila es una tarjeta', () => {
     const tarjeta = screen.getByTestId('data-table-card-order-a');
     const campo = (id: string) => within(tarjeta).getByTestId(`data-table-card-field-${id}`);
     expect(campo('orderNumber')).toHaveTextContent('2026-0000010');
-    expect(within(campo('status')).getByTestId('assigned-order-status')).toHaveTextContent('En curso');
+    expect(within(campo('status')).getByTestId('assigned-order-status')).toHaveTextContent('En fabricación');
     expect(campo('recipeName')).toHaveTextContent('Jarabe simple');
     expect(campo('quantity')).toHaveTextContent('12.500');
     expect(within(campo('priority')).getByTestId('assigned-order-priority')).toHaveTextContent('Alta');
