@@ -433,11 +433,11 @@ const TIE_BREAKER = {
   id: 'asc',
 } as const satisfies Prisma.SupplierCatalogLineOrderByWithRelationInput;
 
-/** Orden POR DEFECTO: exactamente el de hoy, `created_at ASC, id ASC` (R11). NO se cambia a
- *  `name ASC` aunque la linea tenga nombre propio y sea ordenable: sin `sort`, la lista no se
- *  mueve. Se construye en CADA llamada porque Prisma exige un array mutable en `orderBy`. */
+/** Orden POR DEFECTO: mas nuevas primero, `created_at DESC, id ASC` (QC-289; antes era
+ *  `created_at ASC`). NO es `name ASC` aunque la linea tenga nombre propio y sea ordenable.
+ *  Se construye en CADA llamada porque Prisma exige un array mutable en `orderBy`. */
 function defaultOrderBy(): Prisma.SupplierCatalogLineOrderByWithRelationInput[] {
-  return [{ createdAt: 'asc' }, TIE_BREAKER];
+  return [{ createdAt: 'desc' }, TIE_BREAKER];
 }
 
 /**

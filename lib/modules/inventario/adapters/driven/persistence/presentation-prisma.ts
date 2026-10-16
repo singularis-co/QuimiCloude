@@ -314,12 +314,13 @@ export async function deletePresentationById(
  */
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.PresentationOrderByWithRelationInput;
 
-/** Orden POR DEFECTO: exactamente el de hoy, `name ASC, id ASC` (R11). */
-/** Se construye en CADA llamada, no como constante compartida: Prisma exige un array
+/** Orden POR DEFECTO: mas nuevas primero, `created_at DESC, id ASC` (QC-289). El desempate por
+ *  `id` desambigua dos altas del mismo instante.
+ *  Se construye en CADA llamada, no como constante compartida: Prisma exige un array
  *  mutable en `orderBy`, y devolver siempre la misma instancia dejaria que un llamante la
  *  mutara para todos. */
 function defaultOrderBy(): Prisma.PresentationOrderByWithRelationInput[] {
-  return [{ name: 'asc' }, TIE_BREAKER];
+  return [{ createdAt: 'desc' }, TIE_BREAKER];
 }
 
 /**

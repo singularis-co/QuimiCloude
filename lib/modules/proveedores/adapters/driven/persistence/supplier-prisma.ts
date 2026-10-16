@@ -239,12 +239,12 @@ export async function softDeleteAliveSupplier(
  */
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.SupplierOrderByWithRelationInput;
 
-/** Orden POR DEFECTO: exactamente el de hoy, `name ASC, id ASC` (R11). Sin `sort`, la lista no
- *  se mueve. Se construye en CADA llamada, no como constante compartida: Prisma exige un array
- *  mutable en `orderBy`, y devolver siempre la misma instancia dejaria que un llamante la
- *  mutara para todos. */
+/** Orden POR DEFECTO: mas nuevos primero, `created_at DESC, id ASC` (QC-289); el `id` desempata
+ *  dos altas del mismo instante. Se construye en CADA llamada, no como constante compartida:
+ *  Prisma exige un array mutable en `orderBy`, y devolver siempre la misma instancia dejaria
+ *  que un llamante la mutara para todos. */
 function defaultOrderBy(): Prisma.SupplierOrderByWithRelationInput[] {
-  return [{ name: 'asc' }, TIE_BREAKER];
+  return [{ createdAt: 'desc' }, TIE_BREAKER];
 }
 
 /**

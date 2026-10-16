@@ -225,6 +225,11 @@
       "desde": "2026-10-06"
     },
     {
+      "archivo": "inventario/product-last-batch-at.int.test.ts",
+      "motivo": "QC-289: llama a 'createWithFirstBatch', 'addBatchToAlive' y 'adjustBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren SU PROPIA 'prisma.$transaction'; una transaccion del test no las envolveria. Cada caso fabrica su propia empresa efimera con randomUUID y la limpia en un 'finally' en el orden que exigen las FK (asientos -> lotes -> productos -> presentacion -> usuario -> rol -> tipo de documento -> empresa). El caso de la migracion aplica el 'down.sql' y el 'migration.sql' reales dentro de una transaccion que termina en ROLLBACK y no deja nada. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
+    },
+    {
       "archivo": "inventario/create-raw-material.int.test.ts",
       "motivo": "QC-159 T3: ejercita `createCreateRawMaterial` con el adaptador `createProduct` REAL de `product-prisma.ts`, que usa el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no lo envolveria. Empresa efimera propia del archivo (randomUUID), sin usuario ni rol -el alta de materia prima no escribe autoria-; se limpia en `afterAll` por su id exacto (productos -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-25"

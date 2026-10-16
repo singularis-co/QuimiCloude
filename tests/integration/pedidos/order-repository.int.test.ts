@@ -471,7 +471,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
 })
 
 describe('R41 — el orden del listado, con las filas sembradas EN DESORDEN', () => {
-  it('prioridad DESC, antiguedad ASC dentro de cada prioridad, y el correlativo desempata', async () => {
+  it('prioridad DESC, mas nuevos primero dentro de cada prioridad (QC-289), y el correlativo DESC desempata', async () => {
     const creados: string[] = []
     try {
       // Tres instantes del ano de prueba. `t1 < t2 < t3`, y `t1` se repite AL MILISEGUNDO en
@@ -492,20 +492,20 @@ describe('R41 — el orden del listado, con las filas sembradas EN DESORDEN', ()
       const altaT1 = await altaReal(creados, YEAR_ORDEN, t1, { priority: 'ALTA' })
 
       // Los dos CRITICA de `t1` comparten instante al milisegundo: lo unico que los separa es
-      // el correlativo, y el que lo tiene menor va primero.
+      // el correlativo, y desde QC-289 el que lo tiene MAYOR -el ultimo creado- va primero.
       expect(criticaT1a.createdAt.getTime()).toBe(criticaT1b.createdAt.getTime())
       expect(criticaT1a.number.sequence).toBeLessThan(criticaT1b.number.sequence)
 
       const mios = (await recorrerTodo()).filter((row) => creados.includes(row.id))
 
       expect(mios.map((row) => row.id)).toEqual([
-        criticaT1a.id,
-        criticaT1b.id,
         criticaT3.id,
-        altaT1.id,
+        criticaT1b.id,
+        criticaT1a.id,
         altaT2.id,
-        mediaT1.id,
+        altaT1.id,
         mediaT2.id,
+        mediaT1.id,
         bajaT1.id,
       ])
       // Y la prioridad baja de mayor a menor: `priority DESC` sobre el enum da el orden de
