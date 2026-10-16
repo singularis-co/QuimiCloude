@@ -539,7 +539,7 @@ describe('R29/R30 (parte)/R32: paginacion', () => {
     expect(rows.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
   });
 
-  it('ordena por nombre ascendente y recorre las paginas sin repetir ni omitir ninguna receta', async () => {
+  it('ordena por defecto las mas nuevas primero (QC-289) y recorre las paginas sin repetir ni omitir ninguna receta', async () => {
     const marker = token();
     // Nombres con el marcador AL FRENTE y un sufijo ordenado, para que el orden esperado
     // entre ELLAS sea previsible sin importar que otras recetas vivas haya en la base.
@@ -547,11 +547,13 @@ describe('R29/R30 (parte)/R32: paginacion', () => {
     const createdIds: string[] = [];
 
     try {
-      for (const suffix of suffixes) {
+      // `created_at` EXPLICITO y creciente con el sufijo: el orden por defecto es
+      // `created_at DESC`, y no puede depender de que dos altas seguidas no empaten en el reloj.
+      for (const [i, suffix] of suffixes.entries()) {
         const created = await createRecipe(
           baseRecipeInput({ name: `zzzorden-${marker}-${suffix}` }),
           sharedActorId,
-          new Date(),
+          new Date(Date.UTC(2031, 0, 1, 0, 0, i)),
           sharedScope,
         );
         expect(created).not.toBe('duplicate');
@@ -563,9 +565,9 @@ describe('R29/R30 (parte)/R32: paginacion', () => {
       const own = all.filter((item) => item.name.startsWith(`zzzorden-${marker}-`));
 
       expect(own).toHaveLength(suffixes.length);
-      // Cada una aparece EXACTAMENTE una vez y en el orden alfabetico esperado.
+      // Cada una aparece EXACTAMENTE una vez y en el orden esperado: la mas nueva primero.
       expect(own.map((item) => item.name)).toEqual(
-        suffixes.map((suffix) => `zzzorden-${marker}-${suffix}`),
+        suffixes.map((suffix) => `zzzorden-${marker}-${suffix}`).reverse(),
       );
 
       // Y el recorrido completo no repite ningun id, tampoco de recetas ajenas a este caso.

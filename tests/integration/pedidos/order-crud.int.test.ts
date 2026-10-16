@@ -49,7 +49,7 @@ import { normalizePresentationName } from '@/lib/modules/inventario'
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma'
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
 import { createCreateOrder, createUpdateOrder } from '@/lib/modules/pedidos'
-import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { createOrderWriteRepository, orderOrderBy } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { createRecipeExecutionReader } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
@@ -380,14 +380,10 @@ function sameInstantThisYear(): Date {
   return new Date(Date.UTC(currentUtcYear(), 5, 15, 12, 0, 0, 0))
 }
 
-/** El `ORDER BY` de R41, exactamente como lo escribe
- *  `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts > listAliveOrders`. */
-const LIST_ORDER_BY = [
-  { priority: 'desc' },
-  { createdAt: 'asc' },
-  { orderYear: 'asc' },
-  { orderSequence: 'asc' },
-] satisfies Prisma.OrderOrderByWithRelationInput[]
+/** El `ORDER BY` por defecto del listado (R41; QC-289 lo paso a mas nuevos primero), el MISMO
+ *  que usa `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts > listAliveOrders`:
+ *  se pide al adaptador en vez de copiarlo, para que no puedan divergir. */
+const LIST_ORDER_BY = orderOrderBy(null)
 
 // ---------------------------------------------------------------------------
 
@@ -779,11 +775,12 @@ describe('el orden del listado, tal como lo escribe el adaptador (R41)', () => {
     })
   })
 
-  it('desempata por (order_year, order_sequence): dos pedidos del mismo instante salen siempre en el mismo orden', async () => {
+  it('desempata por (order_year, order_sequence) DESC: dos pedidos del mismo instante salen siempre en el mismo orden', async () => {
     // R41. `created_at` no es desempate suficiente: dos altas del mismo milisegundo lo empatan,
     // y sin un tercer criterio Postgres puede devolverlas en cualquier orden — que es como un
     // pedido acaba saliendo en dos paginas o en ninguna. La pareja (ano, posicion) es UNICA
-    // (indice de QC-33 R21), asi que hace el orden TOTAL.
+    // (indice de QC-33 R21), asi que hace el orden TOTAL. Desde QC-289 va DESC: el correlativo
+    // mas alto -el ultimo creado- primero.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const instante = sameInstantThisYear()
@@ -812,9 +809,9 @@ describe('el orden del listado, tal como lo escribe el adaptador (R41)', () => {
         return filas.map((fila) => fila.id)
       }
 
-      expect(await orden()).toEqual([primero, segundo])
+      expect(await orden()).toEqual([segundo, primero])
       // Estable: la misma consulta sobre el mismo conjunto devuelve el mismo orden.
-      expect(await orden()).toEqual([primero, segundo])
+      expect(await orden()).toEqual([segundo, primero])
     })
   })
 })

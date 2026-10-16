@@ -304,7 +304,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       .sort()
     // `nameNormalized` (forma canonica de `name`), `unitId` (referencia a otro modulo) y
     // `companyId` (dueno de la fila) no son datos de negocio: van aparte para que el censo siga
-    // siendo una igualdad exacta.
+    // siendo una igualdad exacta. `lastBatchAt` tampoco: es una marca que deja la carga de lotes.
     expect(scalarNames).toEqual(
       [
         'id',
@@ -318,6 +318,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         'deletedAt',
         'recipeId',
         'presentationId',
+        'lastBatchAt',
       ].sort(),
     )
     expect(product.body).toContain('@@map("products")')
@@ -575,6 +576,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(deletedAt.attributes).toContain('@map("deleted_at")')
     expect(deletedAt.attributes).toContain('@db.Timestamptz(6)')
     expect(deletedAt.attributes).not.toMatch(/@default\(/)
+  })
+
+  it('Product declara lastBatchAt opcional, sin default: NULL significa producto sin lotes', () => {
+    const lastBatchAt = field(product, 'lastBatchAt')
+    expect(lastBatchAt.type).toBe('DateTime')
+    expect(lastBatchAt.isOptional).toBe(true)
+    expect(lastBatchAt.attributes).toContain('@map("last_batch_at")')
+    expect(lastBatchAt.attributes).toContain('@db.Timestamptz(6)')
+    expect(lastBatchAt.attributes).not.toMatch(/@default\(/)
   })
 
   it('Product y Presentation declaran createdAt y updatedAt', () => {

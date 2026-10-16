@@ -559,7 +559,7 @@ describe('listOrders — el campo no declarado se omite, no rompe y se anota (QC
     // (a) la consulta NO falla
     expect(salida.items).toEqual([])
     // (b) el orden aplicado es el de por defecto: `sort: null` -quien lo traduce a
-    //     `priority DESC, created_at ASC, order_year ASC, order_sequence ASC` es el adaptador-
+    //     `priority DESC, created_at DESC, order_year DESC, order_sequence DESC` es el adaptador-
     expect(d.listAlive).toHaveBeenCalledTimes(1)
     expect(consultaRecibida(d.listAlive.mock.calls).sort).toBeNull()
     // (c) el log recibio el campo, con el nombre del listado

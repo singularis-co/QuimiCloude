@@ -42,10 +42,10 @@ export interface OrderRepository {
    * `limit`, el caso de uso tendria que calcular el `offset` a mano, que es justo la
    * reimplementacion que R37 prohibe.
    *
-   * Sin `sort`, el orden es el de HOY (R11): `priority DESC, created_at ASC, order_year ASC,
-   * order_sequence ASC`, total y por tanto estable. El orden, los filtros y la paginacion se
-   * aplican sobre el conjunto completo y ANTES de paginar (R13), y el `total` describe ese
-   * conjunto ya filtrado (R14), no el catalogo entero.
+   * Sin `sort`, la prioridad manda y dentro de ella los mas nuevos primero: `priority DESC,
+   * created_at DESC, order_year DESC, order_sequence DESC, id ASC`, total y por tanto estable. El
+   * orden, los filtros y la paginacion se aplican sobre el conjunto completo y ANTES de paginar
+   * (R13), y el `total` describe ese conjunto ya filtrado (R14), no el catalogo entero.
    *
    * `recipeIds` es la busqueda ya resuelta a identificadores por otro modulo: `orders` no tiene
    * columna de nombre, asi que no puede traducir un termino de texto por si sola. `null` = sin

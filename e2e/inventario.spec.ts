@@ -255,8 +255,8 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 /**
  * Recorre las paginas de la lista hasta encontrar la celda de nombre pedida.
  *
- * Hace falta porque la pantalla NO ofrece busqueda (R13, decision cerrada) y el orden es fijo
- * por nombre ascendente: un producto recien creado puede caer en cualquier pagina. Se avanza con
+ * Hace falta porque la pantalla NO ofrece busqueda (R13, decision cerrada) y el orden no depende
+ * del nombre: un producto recien creado puede caer en cualquier pagina. Se avanza con
  * el control real de paginacion -que de paso ejercita R11 en un navegador- y se para cuando
  * «siguiente» queda deshabilitado. El assert NUNCA mira «la primera fila» ni el total: solo si
  * existe una celda con ESTE nombre.

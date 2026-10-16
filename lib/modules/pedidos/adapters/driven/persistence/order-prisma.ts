@@ -211,8 +211,10 @@ export async function findAliveOrderById(
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.OrderOrderByWithRelationInput;
 
 /**
- * Orden POR DEFECTO: exactamente el de hoy (R11, R41), `priority DESC, created_at ASC,
- * order_year ASC, order_sequence ASC`. Sin `sort`, la lista no se mueve.
+ * Orden POR DEFECTO: `priority DESC, created_at DESC, order_year DESC,
+ * order_sequence DESC, id ASC`. La prioridad manda y, dentro de cada prioridad, los
+ * mas nuevos primero; el correlativo desempata dos altas del mismo instante (el mas alto es el
+ * ultimo creado) y el `id` deja el orden total.
  *
  * `priority DESC` da `CRITICA -> ALTA -> MEDIA -> BAJA` porque Postgres ordena un enum por su
  * ORDEN DE DECLARACION, que QC-33 R16 fijo de menor a mayor -por eso reordenar esas cuatro
@@ -226,9 +228,10 @@ const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.OrderOrderByWithRela
 function defaultOrderBy(): Prisma.OrderOrderByWithRelationInput[] {
   return [
     { priority: 'desc' },
-    { createdAt: 'asc' },
-    { orderYear: 'asc' },
-    { orderSequence: 'asc' },
+    { createdAt: 'desc' },
+    { orderYear: 'desc' },
+    { orderSequence: 'desc' },
+    TIE_BREAKER,
   ];
 }
 

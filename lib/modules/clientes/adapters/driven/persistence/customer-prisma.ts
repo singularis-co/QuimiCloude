@@ -155,15 +155,16 @@ export async function softDeleteAliveCustomer(
  *  podrian intercambiar posicion entre paginas. */
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.CustomerOrderByWithRelationInput;
 
-/** Orden POR DEFECTO: `lastNames ASC, firstNames ASC, id ASC`. Se construye en CADA llamada,
- *  no como constante compartida: Prisma exige un array mutable en `orderBy`. */
+/** Orden POR DEFECTO: mas nuevos primero, `createdAt DESC, id ASC`. Se construye en
+ *  CADA llamada, no como constante compartida: Prisma exige un array mutable en `orderBy`. */
 function defaultOrderBy(): Prisma.CustomerOrderByWithRelationInput[] {
-  return [{ lastNames: 'asc' }, { firstNames: 'asc' }, TIE_BREAKER];
+  return [{ createdAt: 'desc' }, TIE_BREAKER];
 }
 
 /** `sort` del contrato -> `orderBy` de Prisma. Ninguna de las columnas ordenables de
- *  `CUSTOMER_QUERYABLE` es anulable, asi que no hace falta `nulls: 'last'`. */
-function customerOrderBy(sort: ListSort | null): Prisma.CustomerOrderByWithRelationInput[] {
+ *  `CUSTOMER_QUERYABLE` es anulable, asi que no hace falta `nulls: 'last'`. Exportada para que
+ *  el unitario fije el orden por defecto sin base de datos. */
+export function customerOrderBy(sort: ListSort | null): Prisma.CustomerOrderByWithRelationInput[] {
   if (sort === null) return defaultOrderBy();
   const dir = sort.direction;
 

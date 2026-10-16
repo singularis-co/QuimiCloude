@@ -178,13 +178,15 @@ export async function softDeleteAliveProduct(
   return count === 1;
 }
 
-/** El nombre no es unico: sin este desempate, dos homonimos pueden cambiar de pagina entre consultas. */
+/** Ninguna columna ordenable es unica: sin este desempate, dos filas empatadas pueden cambiar de
+ *  pagina entre consultas. */
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.ProductOrderByWithRelationInput;
 
-/** Un array nuevo por llamada: `orderBy` lo exige mutable, y una instancia compartida la podria
- *  mutar cualquier llamante. */
+/** Primero el ultimo lote cargado; los productos sin lote, al final, por alta mas reciente. Un
+ *  array nuevo por llamada: `orderBy` lo exige mutable, y una instancia compartida la podria mutar
+ *  cualquier llamante. */
 function defaultOrderBy(): Prisma.ProductOrderByWithRelationInput[] {
-  return [{ name: 'asc' }, TIE_BREAKER];
+  return [{ lastBatchAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }, TIE_BREAKER];
 }
 
 /**
@@ -538,6 +540,26 @@ export async function recalculateProductStock(
   `);
 }
 
+/**
+ * Solo para la carga de un lote -alta, importacion o el lote de una produccion-, con el mismo `now`
+ * que su `created_at`. SQL crudo por lo mismo que `recalculateProductStock`: no mueve `updated_at`.
+ */
+async function markBatchLoaded(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  now: Date,
+  scope: InventoryScope,
+): Promise<void> {
+  const { companyId } = companyScopeColumns(scope);
+
+  await tx.$executeRaw(Prisma.sql`
+    UPDATE "products"
+       SET "last_batch_at" = ${now}
+     WHERE "id" = ${productId}::uuid
+       AND "company_id" = ${companyId}::uuid
+  `);
+}
+
 /** Del texto directo a `Prisma.Decimal`: pasar por un numero del lenguaje meteria el error de la
  *  coma flotante antes de una columna `DECIMAL(14,4)`. `null` solo llega de MACHINE sin costo. */
 function toBatchUnitCost(unitCost: string | null): Prisma.Decimal | null {
@@ -843,6 +865,7 @@ export async function createWithFirstBatch(
         ...companyScopeColumns(scope),
         createdAt: now,
         updatedAt: now,
+        lastBatchAt: now,
       },
       select: { id: true },
     });
@@ -937,6 +960,7 @@ export async function addBatchToAlive(
     );
 
     await recalculateProductStock(tx, alive.id, scope);
+    await markBatchLoaded(tx, alive.id, now, scope);
 
     return { batchId: createdBatch.id, lot };
   });
@@ -1227,7 +1251,8 @@ type PresentationForShareRow = { readonly name: string; readonly unitId: string;
  * La entrada de un lote de produccion al Terminar el empaque, por UNA linea del reparto:
  * presentacion `FOR SHARE`, producto terminado (nace si falta, `ON CONFLICT ...
  * DO NOTHING` sobre el indice parcial de la combinacion), lote, asiento `production` -con
- * `order_id` Y `order_presentation_line_id`- y recalculo, todo sobre la MISMA transaccion que
+ * `order_id` Y `order_presentation_line_id`-, recalculo y `last_batch_at` con el mismo `now` que el
+ * lote (cuenta como lote cargado, como un alta), todo sobre la MISMA transaccion que
  * el resto de Terminar -no abre la suya, a diferencia de `createWithFirstBatch`-. `unitCost` ya
  * llega resuelto: el mismo para todas las lineas de un pedido, no se recalcula aqui.
  */
@@ -1329,6 +1354,7 @@ export async function receiveFinishedGoods(
   );
 
   await recalculateProductStock(tx, product.id, scope);
+  await markBatchLoaded(tx, product.id, input.now, scope);
 
   return { kind: 'received', productId: product.id, productName: product.name, packages: input.packages.toString() };
 }
@@ -1565,6 +1591,7 @@ export async function addImportedFinishedGoodsBatch(
   );
 
   await recalculateProductStock(tx, productId, scope);
+  await markBatchLoaded(tx, productId, now, scope);
 
   return { batchId: createdBatch.id, lot };
 }

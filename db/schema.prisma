@@ -356,6 +356,11 @@ model Product {
   /// Producto terminado: en que presentacion se fabrica. Envase: su presentacion fija; NULL en
   /// los envases dados de alta cuando el envase no la llevaba.
   presentationId String?     @map("presentation_id") @db.Uuid
+  /// Solo la escribe la carga de un lote (alta, importacion o el lote de una produccion), con el
+  /// `createdAt` de ese lote.
+  /// Su indice `products_company_id_last_batch_at_idx` es parcial y con `NULLS LAST`: vive en la
+  /// migracion, no aqui.
+  lastBatchAt    DateTime?   @map("last_batch_at") @db.Timestamptz(6)
 
   batches ProductBatch[]
 

@@ -212,8 +212,8 @@ afterAll(async () => {
 
 describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de paginar (R11, R13, R14)', () => {
   const MARCA = `orden${token().slice(0, 8)}`;
-  /** Doce lineas: mas que una pagina de cinco. Se siembran en orden de `created_at` creciente,
-   *  que es el orden POR DEFECTO de este listado (R11) y el que no puede cambiar. */
+  /** Doce lineas: mas que una pagina de cinco. Se siembran en orden de `created_at` creciente;
+   *  el orden POR DEFECTO de este listado es el inverso, `created_at DESC` (QC-289). */
   const NOMBRES = Array.from(
     { length: 12 },
     (_, i) => `Linea ${MARCA} ${String(i + 1).padStart(2, '0')}`,
@@ -229,35 +229,36 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
     );
   });
 
-  it('sin orden explicito, el orden es el de HOY: created_at ASC y NO name ASC (R11)', async () => {
+  it('sin orden explicito, el orden es created_at DESC -mas nuevas primero- (R11, QC-289)', async () => {
     const pagina = await listar(consulta({ pageSize: 25, search: MARCA }));
 
-    // Las sembramos con `created_at` creciente y nombre creciente a la vez, asi que para
-    // distinguir un orden del otro se comprueba contra el `created_at`, que es el criterio real.
+    // Las sembramos con `created_at` creciente y nombre creciente a la vez: el orden por defecto
+    // es el inverso del de siembra, y se comprueba contra el `created_at`, el criterio real.
     const fechas = pagina.items.map((l) => l.createdAt.getTime());
-    expect([...fechas].sort((a, b) => a - b)).toEqual(fechas);
+    expect([...fechas].sort((a, b) => b - a)).toEqual(fechas);
+    expect(pagina.items[0]?.name).toBe(NOMBRES[NOMBRES.length - 1]);
     expect(pagina.total).toBe(NOMBRES.length);
   });
 
-  it('la fila que en el orden de hoy esta en la pagina 3 aparece en la 1 al ordenar al reves', async () => {
+  it('la fila que en el orden por defecto esta en la pagina 3 aparece en la 1 al ordenar al reves', async () => {
     // R13 — el aserto que distingue filtrar en la BASE de filtrar la pagina ya traida.
-    const ultima = NOMBRES[NOMBRES.length - 1];
+    const primera = NOMBRES[0];
 
     const porDefectoPagina3 = await listar(consulta({ page: 3, pageSize: 5, search: MARCA }));
-    expect(porDefectoPagina3.items.map((l) => l.name)).toContain(ultima);
+    expect(porDefectoPagina3.items.map((l) => l.name)).toContain(primera);
     const porDefectoPagina1 = await listar(consulta({ page: 1, pageSize: 5, search: MARCA }));
-    expect(porDefectoPagina1.items.map((l) => l.name)).not.toContain(ultima);
+    expect(porDefectoPagina1.items.map((l) => l.name)).not.toContain(primera);
 
     // Pidiendo el orden inverso, la MISMA fila tiene que salir en la pagina 1.
-    const desc = await listar(
+    const asc = await listar(
       consulta({
         page: 1,
         pageSize: 5,
         search: MARCA,
-        sort: { columnId: 'createdAt', direction: 'desc' },
+        sort: { columnId: 'createdAt', direction: 'asc' },
       }),
     );
-    expect(desc.items[0]?.name).toBe(ultima);
+    expect(asc.items[0]?.name).toBe(primera);
   });
 
   it('un filtro que deja fuera casi todo trae la fila en la pagina 1 y el total describe lo filtrado (R14)', async () => {
