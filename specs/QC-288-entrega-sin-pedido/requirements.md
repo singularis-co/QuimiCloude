@@ -2,7 +2,8 @@
 
 > **Zona:** fullstack · **Complejidad:** high · **depends_on:** — · **Rama:** `feature/QC-288-entrega-sin-pedido`
 >
-> **Alcance.** Desde la ficha de un producto terminado (QC-225), el Administrador entrega envases de
+> **Alcance.** Desde la ficha de un producto terminado (QC-225) o el menú de acciones de su fila en el
+> listado, el Administrador entrega envases de
 > sus lotes a uno o varios clientes sin pedido de por medio. El tope es el excedente: lo disponible
 > menos lo que esperan los pedidos TERMINADO de esa receta y presentación. La salida queda en el
 > libro de movimientos como entrega, no como ajuste. Se ve en la tab Entregas de la ficha y desde
@@ -41,3 +42,6 @@ Ninguna.
 | 2026-10-16 | ¿Borrador e idempotencia? | Borrador en `localStorage` (QC-223 D8); clave de entrega generada en el cliente (`deliveryKey`, QC-223). |
 | 2026-10-16 | ¿Se modifica o borra una entrega? | No: solo de inserción; la anulación es un registro nuevo (hereda QC-223 R32, QC-224 D8). Identificadores en inglés, borrado lógico (hereda la 4). |
 | 2026-10-16 | ¿E2E? | Obligatorio: mueve inventario (hereda QC-213 D10). Sin dependencias nuevas. |
+| 2026-10-16 | ¿Más puntos de entrada? (enmienda la fila 1, revisión del pase `/design`) | Dos entradas al mismo sheet: «Entregar» en la cabecera de la ficha de producto terminado (visible en cualquier tab) y «Entregar» en el menú de acciones de la fila del listado de producto terminado. |
+| 2026-10-16 | ¿Y sin excedente? (revisión del pase `/design`) | Si el excedente es 0, ni el botón de la ficha ni la acción del menú existen en el DOM: no se muestran deshabilitados. |
+| 2026-10-16 | ¿Pase `/design`? | Aprobado por el humano. Tableros en `docs/diseno/canvas/`: `EntregaSinPedido.dc.html`, `EntregaSinPedidoTablet.dc.html` y `EntregaSinPedidoMovil.dc.html` (página «Inventario» del canvas; origen https://claude.ai/artifact/CGeq7psd1fvkViqFPVfDW1). Del tablero: tarjeta «Excedente» (en stock − esperan pedidos = se puede entregar, con los pedidos desplegables), contador «Entregas N de M»; la nota va bajo «Sin pedido» en la columna Pedido del tab Entregas; la anulación se marca por cliente (una sola presentación); los envases abren vacíos. |

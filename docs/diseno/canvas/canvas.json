@@ -1142,6 +1142,33 @@
    "title": "ProductoTerminadoRepartoMovil",
    "page": "inventario",
    "is_interactive": true
+  },
+  "EntregaSinPedido.dc.html": {
+   "x": 0,
+   "y": 12810,
+   "w": 1440,
+   "h": 3600,
+   "title": "Entregar sin pedido (QC-288)",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "EntregaSinPedidoTablet.dc.html": {
+   "x": 1520,
+   "y": 12810,
+   "w": 834,
+   "h": 4200,
+   "title": "EntregaSinPedidoTablet",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "EntregaSinPedidoMovil.dc.html": {
+   "x": 2434,
+   "y": 12810,
+   "w": 390,
+   "h": 6400,
+   "title": "EntregaSinPedidoMovil",
+   "page": "inventario",
+   "is_interactive": true
   }
  },
  "order": [
@@ -1263,7 +1290,10 @@
   "RecorridoEvidenciaMovil.dc.html",
   "ProductoTerminadoEvidencia.dc.html",
   "ProductoTerminadoEvidenciaTablet.dc.html",
-  "ProductoTerminadoEvidenciaMovil.dc.html"
+  "ProductoTerminadoEvidenciaMovil.dc.html",
+  "EntregaSinPedido.dc.html",
+  "EntregaSinPedidoTablet.dc.html",
+  "EntregaSinPedidoMovil.dc.html"
  ],
  "notes": {
   "t1": {
