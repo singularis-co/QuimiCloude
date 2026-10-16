@@ -66,6 +66,7 @@
                           <button class="mi danger" type="button" role="menuitem" onClick="{{ r.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Dar de baja</button>
                         </sc-if>
                         <sc-if value="{{ r.gone }}" hint-placeholder-val="{{ false }}">
+                          <button class="mi" type="button" role="menuitem" onClick="{{ r.edit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
                           <div class="sep"></div>
                           <button class="mi" type="button" role="menuitem" onClick="{{ r.react }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reactivar</button>
                         </sc-if>
@@ -159,7 +160,7 @@
         <div class="stat"><dt>Pedidos abiertos</dt><dd class="mono">{{ tOrders }}</dd></div>
       </dl>
     </sc-if>
-    <p class="sub">[QUÉ PASA CON SUS USUARIOS Y PEDIDOS AL DARLA DE BAJA]. Podrás reactivarla después.</p>
+    <p class="sub">Sus usuarios no podrán entrar y se cerrarán las sesiones que tengan abiertas. Podrás reactivarla después.</p>
     <div class="f"><label for="em-cf">Escribe <span class="strong">{{ tName }}</span> para confirmar</label><input id="em-cf" class="in" type="text" autocomplete="off"></div>
     <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmDel }}">Dar de baja</button></div>
   </div>
@@ -181,6 +182,7 @@
       <button class="mi danger" type="button" role="menuitem" onClick="{{ aDel }}">Dar de baja</button>
     </sc-if>
     <sc-if value="{{ tGone }}" hint-placeholder-val="{{ false }}">
+      <button class="mi" type="button" role="menuitem" onClick="{{ aEdit }}">Editar</button>
       <div class="sep"></div>
       <button class="mi" type="button" role="menuitem" onClick="{{ aReact }}">Reactivar</button>
     </sc-if>

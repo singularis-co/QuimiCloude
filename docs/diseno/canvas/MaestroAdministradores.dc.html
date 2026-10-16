@@ -108,8 +108,8 @@
     <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
     <h2 id="ad-de" class="h2">Dar de baja a {{ tName }}</h2>
     <p class="sub">{{ tName }} deja de poder entrar a <span class="strong">{{ tCo }}</span>.</p>
-    <sc-if value="{{ tLast }}" hint-placeholder-val="{{ false }}"><div class="nt n-w"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span><b>Es el último Administrador de {{ tCo }}</b>[QUÉ PASA AL QUITAR EL ÚLTIMO ADMINISTRADOR: abierto en QC-165]</span></div></sc-if>
-    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmDel }}">Dar de baja</button></div>
+    <sc-if value="{{ tLast }}" hint-placeholder-val="{{ false }}"><div class="nt n-w"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span><b>Es el último Administrador de {{ tCo }}</b>Crea otro Administrador para esta empresa antes de darlo de baja.</span></div></sc-if>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" aria-disabled="{{ tLastStr }}" onClick="{{ confirmDel }}">Dar de baja</button></div>
   </div>
 
   <div class="{{ actsCls }}" role="menu" aria-label="{{ actsLabel }}">
@@ -179,9 +179,9 @@ fCo: isEdit && t ? t.co : '[Elige una empresa]', coCls: isEdit ? '' : 'dim',
 fFirst: isEdit && t ? t.first : '', fLast: isEdit && t ? t.last : '', fMail: isEdit && t ? t.mail : '', fUser: isEdit && t ? t.user : 'jperez',
 saveLabel: isEdit ? 'Guardar' : 'Crear administrador',
 save: () => flash(isEdit ? 'Administrador actualizado.' : 'Administrador creado. Enviamos el enlace.', closed),
-tName: t ? nameOf(t) : '', tCo: t ? t.co : '', tLast: t ? (countBy[t.co] || 0) <= 1 : false,
+tName: t ? nameOf(t) : '', tCo: t ? t.co : '', tLast: t ? (countBy[t.co] || 0) <= 1 : false, tLastStr: t && (countBy[t.co] || 0) <= 1 ? 'true' : 'false',
 delCls: s.dlg === 'del' ? 'dlg open' : 'dlg',
-confirmDel: () => { const nx = Object.assign({}, gone); nx[s.target] = true; flash('Administrador dado de baja.', Object.assign({}, closed, { gone: nx, k: k + 1 })); },
+confirmDel: () => { if (t && (countBy[t.co] || 0) <= 1) return; const nx = Object.assign({}, gone); nx[s.target] = true; flash('Administrador dado de baja.', Object.assign({}, closed, { gone: nx, k: k + 1 })); },
 actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsLabel: 'Acciones de ' + (t ? nameOf(t) : ''),
 aEdit: () => this.setState(Object.assign({}, closed, { sheet: 'edit', target: s.target })),
 aDel: () => this.setState(Object.assign({}, closed, { dlg: 'del', target: s.target })),
