@@ -253,6 +253,38 @@ describe('menu de acciones', () => {
     expect(await etiquetasDelMenu(trigger)).toEqual(['Editar', 'Dar de baja']);
   });
 
+  it('R36: el menu de un Administrador «Pendiente» ofrece Reenviar enlace entre Editar y Dar de baja', async () => {
+    montar();
+    const trigger = within(fila(JULIAN.id)).getByTestId('administrator-actions');
+    expect(await etiquetasDelMenu(trigger)).toEqual(['Editar', 'Reenviar enlace', 'Dar de baja']);
+  });
+
+  it('R36: en cualquier otro estado el menu no ofrece Reenviar enlace', async () => {
+    montar();
+    expect(
+      await etiquetasDelMenu(within(fila(NATALIA.id)).getByTestId('administrator-actions')),
+    ).toEqual(['Editar', 'Dar de baja']);
+  });
+
+  it('R36: el menu centrado de la tarjeta de un «Pendiente» tambien ofrece Reenviar enlace', async () => {
+    const user = setupUser();
+    montar();
+    await user.click(within(tarjeta(JULIAN.id)).getByTestId('administrator-actions'));
+    const dialogo = await screen.findByRole('dialog');
+    expect(within(dialogo).getByTestId('administrator-action-resend')).toHaveTextContent(
+      'Reenviar enlace',
+    );
+  });
+
+  it('R36: el menu centrado de la tarjeta de un activo no ofrece Reenviar enlace', async () => {
+    const user = setupUser();
+    montar();
+    await user.click(within(tarjeta(DIANA.id)).getByTestId('administrator-actions'));
+    const dialogo = await screen.findByRole('dialog');
+    expect(within(dialogo).getByTestId('administrator-action-edit')).toBeInTheDocument();
+    expect(within(dialogo).queryByTestId('administrator-action-resend')).toBeNull();
+  });
+
   it('R6: sin empresas.modificar no hay menu de acciones en ninguna fila', () => {
     montar({ canModify: false });
     expect(screen.queryAllByTestId('administrator-actions')).toHaveLength(0);
@@ -269,6 +301,17 @@ describe('lo que abre cada accion del menu', () => {
     await user.click(await getRowActionItem(user, trigger, 'administrator-action-edit'));
     expect(await screen.findByTestId('administrator-sheet')).toBeInTheDocument();
     expect(getAdministratorActionMock).toHaveBeenCalledWith(JULIAN.id);
+  });
+
+  it('R46: «Reenviar enlace» abre el dialogo de reenvio de ese Administrador', async () => {
+    const user = setupUser();
+    montar();
+    const trigger = within(fila(JULIAN.id)).getByTestId('administrator-actions');
+    await user.click(await getRowActionItem(user, trigger, 'administrator-action-resend'));
+    const dialogo = await screen.findByTestId('administrator-resend-dialog');
+    expect(
+      within(dialogo).getByRole('heading', { name: '¿Reenviar el enlace a Julián Castro?' }),
+    ).toBeInTheDocument();
   });
 
   it('R39: «Dar de baja» abre el dialogo de baja de ese Administrador', async () => {

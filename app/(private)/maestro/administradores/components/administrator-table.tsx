@@ -39,6 +39,7 @@ import {
   withFilterResetsPage,
   withoutCompanyFilter,
 } from './administrator-list-params';
+import { AdministratorResendLinkDialog } from './administrator-resend-link-dialog';
 import { AdministratorSheet } from './administrator-sheet';
 import type { ActiveCompany } from './load-active-companies';
 
@@ -196,6 +197,13 @@ export function AdministratorTable({
         <AdministratorSheet
           mode="edit"
           administratorId={target.administrator.id}
+          open
+          onOpenChange={closeTarget}
+        />
+      ) : null}
+      {target?.action === 'resend' ? (
+        <AdministratorResendLinkDialog
+          administrator={target.administrator}
           open
           onOpenChange={closeTarget}
         />

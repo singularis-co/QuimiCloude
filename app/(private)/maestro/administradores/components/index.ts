@@ -4,6 +4,7 @@ export * from './administrator-delete-dialog';
 export * from './administrator-labels';
 export * from './administrator-list-params';
 export * from './administrator-list-section';
+export * from './administrator-resend-link-dialog';
 export * from './administrator-sheet';
 export * from './administrator-table';
 export * from './load-active-companies';

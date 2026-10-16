@@ -23,7 +23,19 @@ export const ADMINISTRATOR_COLUMN_LABELS = {
 
 export const ADMINISTRATOR_MENU_LABELS = {
   edit: 'Editar',
+  resend: 'Reenviar enlace',
   delete: 'Dar de baja',
+} as const;
+
+export const ADMINISTRATOR_RESEND_TEXTS = {
+  title: (name: string) => `¿Reenviar el enlace a ${name}?`,
+  descriptionBefore: 'Le llegará a ',
+  descriptionAfter: ' un correo nuevo para fijar su contraseña. El enlace anterior deja de servir.',
+  dismiss: 'Volver',
+  confirm: 'Reenviar enlace',
+  pending: 'Reenviando…',
+  sent: (name: string) => `Enviamos el enlace a ${name}.`,
+  mailFailed: (name: string) => `No pudimos enviar el correo a ${name}.`,
 } as const;
 
 export function administratorDisplayName(person: {

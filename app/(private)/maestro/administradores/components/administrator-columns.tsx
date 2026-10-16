@@ -1,6 +1,6 @@
 'use client';
 
-import { PencilIcon, Trash2Icon } from 'lucide-react';
+import { MailIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import Link from 'next/link';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
@@ -30,7 +30,7 @@ import type { ActiveCompany } from './load-active-companies';
 
 export const ADMINISTRATOR_COLUMN_COUNT = 6;
 
-export type AdministratorRowAction = 'edit' | 'delete';
+export type AdministratorRowAction = 'edit' | 'resend' | 'delete';
 
 export type AdministratorColumnsDeps = {
   readonly canModify: boolean;
@@ -42,7 +42,7 @@ function administratorMenuItems(
   administrator: AdministratorRow,
   onAction: AdministratorColumnsDeps['onAction'],
 ): RowActionMenuItem[] {
-  return [
+  const items: RowActionMenuItem[] = [
     {
       key: 'edit',
       label: ADMINISTRATOR_MENU_LABELS.edit,
@@ -50,16 +50,30 @@ function administratorMenuItems(
       onSelect: () => onAction('edit', administrator),
       testId: 'administrator-action-edit',
     },
-    {
-      key: 'delete',
-      label: ADMINISTRATOR_MENU_LABELS.delete,
-      icon: Trash2Icon,
-      destructive: true,
-      separatorBefore: true,
-      onSelect: () => onAction('delete', administrator),
-      testId: 'administrator-action-delete',
-    },
   ];
+
+  // El servidor solo reenvía a una cuenta que aún no fijó su contraseña.
+  if (administrator.accountStatus === 'pending') {
+    items.push({
+      key: 'resend',
+      label: ADMINISTRATOR_MENU_LABELS.resend,
+      icon: MailIcon,
+      onSelect: () => onAction('resend', administrator),
+      testId: 'administrator-action-resend',
+    });
+  }
+
+  items.push({
+    key: 'delete',
+    label: ADMINISTRATOR_MENU_LABELS.delete,
+    icon: Trash2Icon,
+    destructive: true,
+    separatorBefore: true,
+    onSelect: () => onAction('delete', administrator),
+    testId: 'administrator-action-delete',
+  });
+
+  return items;
 }
 
 export function buildAdministratorColumns({
