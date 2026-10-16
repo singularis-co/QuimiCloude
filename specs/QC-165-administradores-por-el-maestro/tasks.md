@@ -53,25 +53,25 @@
   ningún `delete`/`deleteMany` sobre `users`; `pnpm exec vitest run guard` verde (arquitectura de
   módulos, modelos con dueño).
 
-- [ ] **T7 — Composición.** Depende de T5, T6.
+- [x] **T7 — Composición.** Depende de T5, T6.
   Las seis claves en `identity` de `lib/composition/index.ts` (`design.md > 7`). **Hecho:**
   typecheck verde y guardia de arquitectura verde.
 
-- [ ] **T8 — Acciones de servidor.** Depende de T7.
+- [x] **T8 — Acciones de servidor.** Depende de T7.
   Extraer `currentPlatformActor` a `adapters/driving/platform-session.ts` y usarlo desde
   `company-actions.ts`; crear `adapters/driving/administrator-actions.ts` (`design.md > 6`).
   **Hecho:** `tests/unit/identity/administradores/administrator-actions.test.ts` verde con R3, R19
   (la edición no lee `companyId`) y R29 (el reenvío solo lee `id`); `tests/unit/identity/company-actions.test.ts` y los dos
   `session-once-per-request-*.test.ts` siguen verdes.
 
-- [ ] **T9 — Integración.** Depende de T6.
+- [x] **T9 — Integración.** Depende de T6.
   `tests/integration/identity/administrator.int.test.ts` (modo `transaccion`, con el repositorio
   sobre `tx`) y sus entradas en `tests/integration/aislamiento.json`. **Hecho:** verde contra la base
   de test con R4–R11, R13 (alta con un `roleId` de Operador: `invalid_input`, ninguna fila), R14–R16,
   R18, R20–R23, R25, R26 (enlace nuevo vivo, anterior sustituido, plazo desde el reenvío) y R28
   (ningún enlace nuevo en los rechazos).
 
-- [ ] **T10 — Concurrencia de la baja.** Depende de T6.
+- [x] **T10 — Concurrencia de la baja.** Depende de T6.
   `tests/integration/identity/administrator-concurrency.int.test.ts` (modo `commit`, dos
   conexiones, varias corridas, limpieza propia), con su entrada en `aislamiento.json`. **Hecho:** R24
   verde: como máximo una baja pasa y la empresa conserva ≥ 1 Administrador vivo, leído de la base.

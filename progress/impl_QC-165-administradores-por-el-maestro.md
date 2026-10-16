@@ -132,3 +132,77 @@ Interpretación anotada: para la ficha y la baja, `design.md > 3.6` y `> 8` solo
 MCP del grafo: no se usó; el worktree no está indexado. Se trabajó con Grep/Read.
 
 Veredicto: T5 hecha, todo verde, sin bloqueos.
+
+## Tanda 3 — T9/T10 (2026-10-16): integración
+
+### Archivos
+- Nuevo: `tests/integration/identity/administrator.int.test.ts` (T9, modo `transaccion`). Cada `it` en `prisma.$transaction` que termina en `RollbackSignal`; `createAdministratorRepository(tx)` y los seis casos de uso reales cableados sobre él (actor sin empresa con `empresas.*`, reloj inyectado, secreto real `credentialSetupSecretCrypto`, correo doble que registra `to`/`secret`). El adaptador del enlace (`credential-setup-link-prisma.ts`) usa el cliente global y abre su propio `$transaction`: se importa una copia con `@/lib/shared/db/prisma` doblado a un puente cuyo `$transaction` es `atomically(<tx del test>, fn)` (SAVEPOINT). El código de producción del enlace corre tal cual y un caso comprueba que su escritura se ve en la `tx` y no desde el cliente global (lo que confirma el modo `transaccion`).
+- Nuevo: `tests/integration/identity/administrator-concurrency.int.test.ts` (T10, modo `commit`). Dos `PrismaClient` (dos pools), `createAdministratorRepository(clientA|clientB)`; pids distintos con transacciones solapadas; empresa y Administradores propios por caso, borrados en `finally`; `afterAll` exige cero empresas propias.
+- `tests/integration/aislamiento.json`: `identity/administrator.int.test.ts` en `transaccion`; `identity/administrator-concurrency.int.test.ts` en `commit` con `motivo` y `desde`.
+- Producción: sin cambios. Ningún test destapó un bug.
+
+### Mapa R<n> → test (integración)
+
+| R | Caso |
+|---|---|
+| R4 | `administrator.int.test.ts` › «R4: … 10 por defecto, acota a 25 y el total es el del conjunto filtrado» (27 en 2 empresas) y «R4: una consulta sin la forma del contrato responde invalid_input» |
+| R5 | › «R5: cada fila lleva exactamente sus claves … y marca al ultimo» (uno solo, dos, uno vivo + uno de baja) |
+| R6 | › «R6: el filtro por empresa con una o varias…; no uuid descartado; sin ninguno se omite» |
+| R7 | › «R7: la busqueda … nombres, apellidos, correo y usuario, sin mayusculas» |
+| R8 | › «R8: ordena por %s en las dos direcciones» (6 columnas), «…nombre de la empresa…», «sin orden pedido…mas recientes», «…desempata por identificador … ninguna fila en dos paginas», «…no declarado se omite … se registra por su nombre» |
+| R9 | › «R9: no salen Operadores, Empacadores, el Maestro, … de baja ni de empresas de baja» |
+| R10 | › «R10: devuelve exactamente sus claves …» |
+| R11 | › «R11: inexistente, no uuid, de baja, de otro rol, el Maestro o de empresa de baja … user_not_found» |
+| R13 | › «R13: un alta con el roleId de Operador responde invalid_input, no escribe ninguna fila…» y «R13: contrasena, estado, faltante, tope, empresa no uuid…» |
+| R14 | › «R14: el creado es Administrador, nace en pending, …» |
+| R15 | › «R15: empresa inexistente o de baja responde company_not_found…» |
+| R16 | › «R16: correo o documento repetidos … usuario repetido en cualquier empresa…» y «R16: el mismo correo y documento en otra empresa se admiten» |
+| R18 | › «R18: reemplaza los ocho datos y no cambia empresa, rol, estado, credencial ni contadores» |
+| R20 | › «R20: un objetivo que no es un Administrador gestionable … sin escribir» |
+| R21 | › «R21: correo o documento … o usuario de cualquier otro…» y «R21: … de otra empresa se admiten» |
+| R22 | › «R22: marca la baja conservando la fila, sube el sello de sesiones y libera correo, usuario y documento» |
+| R23 | › «R23: el unico Administrador vivo se rechaza con company_last_administrator…» y «R23: con otro … en pending, la baja se admite» |
+| R24 | `administrator-concurrency.int.test.ts` › «R24: las dos conexiones son reales y distintas», «R24: corrida %i …» (5 corridas por el caso de uso), «R24: corrida %i en el adaptador …» (3), «R24 (simetrico): con tres…», «R24: dos bajas simultaneas del mismo Administrador…» |
+| R25 | `administrator.int.test.ts` › «R25: un objetivo que no es un Administrador gestionable … sin escribir» |
+| R26 | › «R26: el adaptador del enlace escribe dentro de la transaccion del test…», «R26: emite un enlace nuevo vivo con plazo desde el reenvio, sustituye el anterior y lo envia al correo guardado», «R26: sin enlace anterior emite uno vivo» |
+| R28 | › «R28: a un objetivo no gestionable responde user_not_found sin emitir…», «R28: … que ya no esta en pending responde user_not_pending…», «R28: el rechazo no toca el enlace vivo que ya tenia» |
+
+### Verificación
+- `pnpm exec vitest run --project integration <los dos archivos>`: 2 archivos, 49 pasan / 0 fallan (T9 38, T10 11). Base efímera `qct_qc165_…` copia de `qct_tpl_b2687cf7fda6`, borrada al terminar.
+- T10 repetido 6 veces seguidas: 11/11 verde las 6.
+- Prueba de mordida de T10: quitando temporalmente el `FOR UPDATE` de `softDelete`, 8 de los 8 casos de carrera fallan (los 3 restantes no dependen del bloqueo); restaurado byte a byte (`git diff` vacío en el adaptador).
+- `pnpm exec vitest run tests/guards/guard-aislamiento-integracion.test.ts`: 6/6 verde.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores; 10 avisos en 4 archivos ajenos (los mismos de antes); `eslint` de los dos archivos nuevos: sin avisos.
+
+MCP del grafo: no se usó (worktree sin indexar); Grep/Read.
+
+Veredicto: T9 y T10 hechas, en verde, sin cambios de producción ni bloqueos.
+
+## Tanda 3 — T7/T8 (2026-10-16): composición y acciones de servidor
+
+### Archivos
+- `lib/composition/index.ts` (T7): `administratorRepository = createAdministratorRepository()` y las seis claves al final de `identity` (`listAdministrators`, `getAdministrator`, `createAdministrator`, `updateAdministrator`, `deleteAdministrator`, `resendAdministratorLink`), con `identityListQueryLog`, `credentialSetupSecrets`, `credentialSetupLinkRepository` y `credentialSetupMailer` como pide `design.md > 7`. Las fábricas salen del contrato `@/lib/modules/identity`; el adaptador, por su ruta.
+- Nuevo `lib/modules/identity/adapters/driving/platform-session.ts` (T8): `currentPlatformActor()` extraído tal cual de `company-actions.ts`, sin `'use server'` (función normal, no acción).
+- `lib/modules/identity/adapters/driving/company-actions.ts` (T8): importa `currentPlatformActor` de `./platform-session`; se quitan la función privada y los imports de `PlatformActor` y `runInRequestScope`. Sin cambio de comportamiento.
+- Nuevo `lib/modules/identity/adapters/driving/administrator-actions.ts` (T8): `'use server'`, las seis acciones y sus cinco tipos de estado (`design.md > 6`), sin `revalidatePath`. Alta: `companyId` + los ocho datos crudos; edición: `id` + los ocho (no lee `companyId`); baja y reenvío: solo `id`.
+- Nuevo `tests/unit/identity/administradores/administrator-actions.test.ts`: composición doblada con los casos de uso reales sobre puertos espía (patrón de `company-actions.test.ts`), reutiliza `administrator-doubles.ts`.
+
+Guardias de lista cerrada revisadas, **ninguna tocada**: `session-once-per-request-actions` solo censa archivos con las dos caras (`getSessionUser` + `getSessionContext`) y `platform-session.ts` usa una; `maestro-rol` (`RUTAS_ABIERTAS_EMPRESAS`) mira quien nombra `empresas.*` y las acciones no lo nombran; `account-status-scope` y `credencial/scope` no se ven afectadas (las acciones no nombran el estado ni el envío). `company-actions.test.ts` y los dos `session-once-per-request-*.test.ts` siguen verdes sin tocarlos.
+
+### Mapa R<n> → test (esta tanda, `administrator-actions.test.ts`)
+| R | Test |
+|---|---|
+| R3 | por cada una de las seis acciones: «R3: el actor sale de la sesion, una sola lectura, sin contexto de empresa ni revalidar», «R3: lo colado en la entrada no llega al caso de uso», «R3: sin sesion el actor es null y responde unauthorized sin tocar ningun puerto», «R3: unos permisos de la entrada no autorizan…»; más éxito y error por `code` en cada acción (`invalid_input`, `user_not_found`, `duplicate_email`, `company_last_administrator`, `user_not_pending`, correo `failed`) |
+| R19 | «R19: la accion no lee companyId; el caso de uso recibe solo el id y los ocho datos» (con `companyId` de otra empresa en el formulario: success, entrada sin `companyId`, el puerto no la ve) |
+| R29 | «R29: la accion solo lee id; correo y empresa de la entrada no llegan al caso de uso» (`email`, `companyId`, `to` en el formulario: emisión con la empresa de la ficha, nada de lo colado en emisión ni correo, sin secreto) |
+
+### Verificación
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores; 10 avisos en 4 archivos ajenos (los de siempre). `eslint` de los cinco archivos de la tanda: sin avisos.
+- `pnpm exec vitest run tests/unit/identity tests/unit/composition`: 149 archivos pasaron (149); 2810 tests pasaron, 31 se saltaron (2841). `administrator-actions.test.ts`: 39/39.
+- `pnpm exec vitest run guard`: 80 archivos pasaron (80); 1096 pasan / 20 se saltan. (Una corrida intermedia dio rojo en `guard-aislamiento-integracion` por `administrator.int.test.ts` aún sin censar, trabajo en curso del otro agente; en la corrida final, verde.)
+
+MCP del grafo: no se usó (worktree sin indexar); Grep/Read.
+
+Veredicto: T7 y T8 hechas, en verde, sin bloqueos.
