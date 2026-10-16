@@ -14,11 +14,11 @@ import type { ErrorState } from '@/lib/modules/errores';
 import type { AdministratorRow } from '@/lib/modules/identity';
 import { maestroCompanyRoute } from '@/lib/shared/routes';
 
-import { openRowActionsMenu } from '../../helpers/row-actions-menu';
+import { getRowActionItem, openRowActionsMenu } from '../../helpers/row-actions-menu';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
-const { routerMock } = vi.hoisted(() => ({
+const { routerMock, getAdministratorActionMock } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -27,6 +27,7 @@ const { routerMock } = vi.hoisted(() => ({
     forward: vi.fn<() => void>(),
     prefetch: vi.fn<(href: string) => void>(),
   },
+  getAdministratorActionMock: vi.fn<(id: string) => Promise<unknown>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -36,7 +37,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 vi.mock('@/lib/modules/identity/adapters/driving/administrator-actions', () => ({
   listAdministratorsAction: vi.fn(),
-  getAdministratorAction: vi.fn(),
+  getAdministratorAction: getAdministratorActionMock,
   createAdministratorAction: vi.fn(),
   updateAdministratorAction: vi.fn(),
   deleteAdministratorAction: vi.fn(),
@@ -256,6 +257,36 @@ describe('menu de acciones', () => {
     montar({ canModify: false });
     expect(screen.queryAllByTestId('administrator-actions')).toHaveLength(0);
     expect(screen.queryByText('Nuevo administrador')).toBeNull();
+  });
+});
+
+describe('lo que abre cada accion del menu', () => {
+  it('R38: «Editar» abre el panel de edicion de ese Administrador', async () => {
+    getAdministratorActionMock.mockReturnValue(new Promise(() => {}));
+    const user = setupUser();
+    montar();
+    const trigger = within(fila(JULIAN.id)).getByTestId('administrator-actions');
+    await user.click(await getRowActionItem(user, trigger, 'administrator-action-edit'));
+    expect(await screen.findByTestId('administrator-sheet')).toBeInTheDocument();
+    expect(getAdministratorActionMock).toHaveBeenCalledWith(JULIAN.id);
+  });
+
+  it('R39: «Dar de baja» abre el dialogo de baja de ese Administrador', async () => {
+    const user = setupUser();
+    montar();
+    const trigger = within(fila(DIANA.id)).getByTestId('administrator-actions');
+    await user.click(await getRowActionItem(user, trigger, 'administrator-action-delete'));
+    const dialogo = await screen.findByTestId('administrator-delete-dialog');
+    expect(within(dialogo).getByRole('heading', { name: 'Dar de baja a Diana Mejía' })).toBeInTheDocument();
+  });
+
+  it('R40: «Dar de baja» sobre el ultimo de su empresa abre el dialogo sin poder confirmar', async () => {
+    const user = setupUser();
+    montar();
+    const trigger = within(fila(NATALIA.id)).getByTestId('administrator-actions');
+    await user.click(await getRowActionItem(user, trigger, 'administrator-action-delete'));
+    await screen.findByTestId('administrator-delete-dialog');
+    expect(screen.getByTestId('administrator-delete-confirm')).toBeDisabled();
   });
 });
 

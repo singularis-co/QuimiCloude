@@ -21,6 +21,7 @@ import {
   buildAdministratorColumns,
   type AdministratorRowAction,
 } from './administrator-columns';
+import { AdministratorDeleteDialog } from './administrator-delete-dialog';
 import {
   ADMINISTRATOR_EMPTY_TEXTS,
   ADMINISTRATOR_ERROR_TITLE,
@@ -38,6 +39,7 @@ import {
   withFilterResetsPage,
   withoutCompanyFilter,
 } from './administrator-list-params';
+import { AdministratorSheet } from './administrator-sheet';
 import type { ActiveCompany } from './load-active-companies';
 
 export const ADMINISTRATOR_TABLE_ID = 'maestro-administradores';
@@ -148,7 +150,10 @@ export function AdministratorTable({
 }: AdministratorTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [, setTarget] = useState<AdministratorActionTarget | null>(null);
+  const [target, setTarget] = useState<AdministratorActionTarget | null>(null);
+  const closeTarget = useCallback((next: boolean) => {
+    if (!next) setTarget(null);
+  }, []);
 
   const onAction = useCallback((action: AdministratorRowAction, administrator: AdministratorRow) => {
     setTarget({ action, administrator });
@@ -186,6 +191,22 @@ export function AdministratorTable({
         states={buildStates(params, error)}
         card={ADMINISTRATOR_CARD}
       />
+      {/* Montados solo mientras están abiertos: cada apertura empieza limpia. */}
+      {target?.action === 'edit' ? (
+        <AdministratorSheet
+          mode="edit"
+          administratorId={target.administrator.id}
+          open
+          onOpenChange={closeTarget}
+        />
+      ) : null}
+      {target?.action === 'delete' ? (
+        <AdministratorDeleteDialog
+          administrator={target.administrator}
+          open
+          onOpenChange={closeTarget}
+        />
+      ) : null}
     </div>
   );
 }

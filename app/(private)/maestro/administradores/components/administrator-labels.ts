@@ -46,6 +46,39 @@ export const ADMINISTRATOR_EMPTY_TEXTS = {
 
 export const ADMINISTRATOR_ERROR_TITLE = 'No se pudo cargar la lista de Administradores.';
 
+export const ADMINISTRATOR_COMPANY_FIELD_LABEL = 'Empresa';
+export const ADMINISTRATOR_COMPANY_PLACEHOLDER = 'Elige una empresa';
+export const ADMINISTRATOR_COMPANY_HINT = 'Solo empresas activas.';
+export const ADMINISTRATOR_ROLE_LABEL = 'Rol';
+export const ADMINISTRATOR_MAIL_NOTICE = 'Le llegará un correo con un enlace para fijar su contraseña.';
+
+export const ADMINISTRATOR_CREATE_TEXTS = {
+  open: 'Nuevo administrador',
+  title: 'Nuevo administrador',
+  description: 'Elige la empresa y describe a la persona que la va a administrar.',
+  submit: 'Crear administrador',
+  success: 'Administrador creado. Enviamos el enlace.',
+  mailFailed: 'Administrador creado, pero no pudimos enviar el correo.',
+} as const;
+
+export const ADMINISTRATOR_EDIT_TEXTS = {
+  title: 'Editar administrador',
+  description: 'Cambia los datos de la persona.',
+  loading: 'Cargando los datos del Administrador…',
+  submit: 'Guardar',
+  success: 'Administrador actualizado.',
+} as const;
+
+export const ADMINISTRATOR_DELETE_TEXTS = {
+  title: (name: string) => `Dar de baja a ${name}`,
+  description: (name: string, company: string) => `${name} deja de poder entrar a ${company}.`,
+  lastTitle: (company: string) => `Es el último Administrador de ${company}`,
+  lastMessage: 'Crea otro Administrador para esta empresa antes de darlo de baja.',
+  dismiss: 'Volver',
+  confirm: 'Dar de baja',
+  success: 'Administrador dado de baja.',
+} as const;
+
 export function administratorTableTexts(total: number): DataTableTexts {
   return {
     empty: ADMINISTRATOR_EMPTY_TEXTS.empty,

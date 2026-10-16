@@ -13,6 +13,7 @@ import {
 } from '@/lib/shared/navigation/private-nav';
 
 import {
+  AdministratorCreateAction,
   AdministratorListSection,
   AdministratorTable,
   loadActiveCompanies,
@@ -52,6 +53,11 @@ export default async function MaestroAdministradoresPage({
 
   const header = (
     <PageHeader
+      actions={
+        canModify && companies.status === 'success' ? (
+          <AdministratorCreateAction canModify companies={companies.companies} />
+        ) : undefined
+      }
       title={ADMINISTRATORS_LABEL}
       titleTestId="maestro-administradores-title"
       breadcrumb={{

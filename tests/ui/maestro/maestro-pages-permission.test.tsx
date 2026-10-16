@@ -377,5 +377,7 @@ describe('/maestro/administradores', () => {
     getSessionUserMock.mockResolvedValue(MAESTRO);
     const arbol = await invocarAdministradores();
     expect(buscar(arbol, AdministratorListSection).props.canModify).toBe(true);
+    render(buscar(arbol, PageHeader));
+    expect(screen.getByTestId('administrator-create-open')).toHaveTextContent('Nuevo administrador');
   });
 });
