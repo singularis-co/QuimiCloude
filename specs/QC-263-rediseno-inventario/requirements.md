@@ -62,8 +62,8 @@ La ficha llegó sin `/afinar-feature`. Estas filas son decisiones del humano ya 
 | D14 | Lo demás del canvas queda aprobado; cada pantalla en escritorio, tablet y teléfono | humano, 2026-10-10 (D14) | — | R1, R5, R6, R15, R19, R29, R35, R39, R42, R43, R47, R52, R53 |
 | QC-256 | `UrlTabs`, `PageShell`, `PageHeader`, `ArrowLink`, `StatusBadge`, `RowActionsMenu` centrado y `DataTable` con `card` son las piezas del rediseño | humano, 2026-10-10 (aprobación de QC-256) | — | R1, R3, R13, R30 |
 | QC-270 | La cabecera de `DataTable` sigue la alineación de su columna (ya en `dev`) | humano, 2026-10-13 | — | R6 |
-| P17 | Se mantienen las sub-filas de lote desplegables; en teléfono, cada una es tarjeta propia bajo la del producto, sin imagen ni «Acciones». **Requiere pase `/design`** (tableros `Inventario`, `InventarioTablet`, `InventarioMovil`), pendiente de aprobación | humano, 2026-10-16 (P17) | f978ef29 | R12, R13, R47 |
-| P18 | Se mantienen «Costo» (a la derecha, como las demás cifras), «Tipo» y «Presentación»; en la tarjeta, «Tipo» como chip de estado (solo en «Todos») y «Presentación» y «Costo» en las cifras. **Requiere pase `/design`** (mismos tableros), pendiente de aprobación | humano, 2026-10-16 (P18) | b0eaa866, 6f08e379, c2ac0e65 | R6, R13, R53 |
+| P17 | Se mantienen las sub-filas de lote desplegables; en teléfono, cada una es tarjeta propia bajo la del producto, sin imagen ni «Acciones». **Requiere pase `/design`** (tableros `Inventario`, `InventarioTablet`, `InventarioMovil`); tablero `InventarioColumnasLotes*.dc.html` aprobado 2026-10-16 | humano, 2026-10-16 (P17) | f978ef29 | R12, R13, R47 |
+| P18 | Se mantienen «Costo» (a la derecha, como las demás cifras), «Tipo» y «Presentación»; en la tarjeta, «Tipo» como chip de estado (solo en «Todos») y «Presentación» y «Costo» en las cifras. **Requiere pase `/design`** (mismos tableros); tablero `InventarioColumnasLotes*.dc.html` aprobado 2026-10-16 | humano, 2026-10-16 (P18) | b0eaa866, 6f08e379, c2ac0e65 | R6, R13, R53 |
 | P19 | «Por vencer» y el nombre del producto en ámbar; «Vencido» como chip en tono de error. D3 se mantiene | humano, 2026-10-16 (P19) | 08b69744 | R48 |
 | P20 | Panel «Lotes» como la tabla del tablero (tarjetas en teléfono), conservando el vencimiento relativo y el chip «Vencido» | humano, 2026-10-16 (P20) | ccde16f7 | R15, R19 |
 | P21 | Guía de importación y avisos de la vista previa con su aspecto de hoy, sin pase `/design` | humano, 2026-10-16 (P21) | c4f824fe, 6cc59959 | R49, R50 |
@@ -98,7 +98,7 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   «Existencia» y «Alerta de cantidad» en «Producto terminado») DEBEN alinearse a la derecha en la
   celda y en la cabecera, en cifras tabulares, también en las sub-filas de lote (R47); «Tipo» y
   «Presentación» DEBEN alinearse a la izquierda; la cifra de «Disponible» de la fila de producto
-  DEBE pintarse en negrita. *(enmienda 2026-10-16; decisión P18; tablero pendiente de aprobación)*
+  DEBE pintarse en negrita. *(enmienda 2026-10-16; decisión P18; tablero `docs/diseno/canvas/InventarioColumnasLotes*.dc.html`, aprobado 2026-10-16)*
 - **R7.** SI la alerta de cantidad de un producto supera su existencia (la regla de hoy: supera, no
   iguala), ENTONCES la celda de existencia DEBE pintarse en el tono de advertencia (ámbar), con un
   icono de advertencia oculto a lectores de pantalla y el texto «Por debajo de la alerta de cantidad»
@@ -133,7 +133,7 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   «Costo» (salvo en «Producto terminado»), «Alerta de cantidad», «Disponible» (salvo en «Producto
   terminado») y el aviso del R7, y un botón «Acciones» de 44 px que abre el menú centrado con el
   nombre del producto como título e ítems de al menos 48 px. *(supuesto P12; decisión P18;
-  enmienda 2026-10-16; tablero pendiente de aprobación)*
+  enmienda 2026-10-16; tablero `docs/diseno/canvas/InventarioColumnasLotes*.dc.html`, aprobado 2026-10-16)*
 - **R14.** DONDE un ítem de `RowActionsMenu` declara un separador delante, el menú DEBE pintar una
   línea divisoria (`role="separator"`) antes de ese ítem, en el desplegable y en el diálogo
   centrado, nunca antes del primer ítem que se pinta; sin la declaración, el árbol DEBE ser el de
@@ -285,7 +285,7 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   existencia, costo, reservado y disponible) o una sub-fila de estado (cargando, «Sin lotes con
   existencia.», error con «Reintentar»), con sus textos, su lectura y sus `data-testid` de hoy; MIENTRAS
   el contenedor de la tabla mide 760 px o menos, cada sub-fila DEBE pintarse como tarjeta propia
-  justo debajo de la del producto, sin imagen ni «Acciones». *(decisión P17; tablero pendiente de aprobación)*
+  justo debajo de la del producto, sin imagen ni «Acciones». *(decisión P17; tablero `docs/diseno/canvas/InventarioColumnasLotes*.dc.html`, aprobado 2026-10-16)*
 - **R48.** SI un lote vence a menos de 30 días o ya venció (la regla de hoy, `expiry-warning.ts`),
   ENTONCES su fecha de vencimiento (en la sub-fila y en el panel «Lotes») y el nombre del producto en
   la tabla DEBEN pintarse en el tono de advertencia (ámbar), conservar `data-expiring="true"` y el

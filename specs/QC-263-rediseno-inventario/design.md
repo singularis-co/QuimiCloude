@@ -570,9 +570,14 @@ lo mergeado choca con una (D3 en E4) queda una pregunta abierta con opción por 
 (`requirements.md > Decisiones cerradas`). P17 y P18 **sí** requieren pase `/design`: el leader lo
 hace en el canvas sobre `Inventario`, `InventarioTablet` e `InventarioMovil` (sub-filas de lote en
 tabla y en tarjeta; columnas «Tipo», «Presentación» y «Costo» en la tabla y en la tarjeta).
-**Tablero: pendiente de aprobación.** Cuando el humano lo apruebe y se copie a
-`docs/diseno/canvas/`, esta línea se sustituye por su ruta. Hasta entonces no se implementan T2c ni
-la tanda 3 (`tasks.md`). La guía y los avisos no cambian de aspecto ni llevan pase (P21).
+**Tablero aprobado por el humano el 2026-10-16:** `docs/diseno/canvas/InventarioColumnasLotes.dc.html`
+(+ `InventarioColumnasLotesTablet`, `InventarioColumnasLotesMovil`, con su ficha). El pase se hizo
+en un tablero propio, no sobre `Inventario`, y sigue lo que ya hace dev:
+- «Costo» es el costo unitario (b0eaa866);
+- todos los productos llevan el chevrón «Mostrar lotes de X», con sus estados de carga, error y
+  «Sin lotes con existencia.» (f978ef29).
+
+T2c y la tanda 3 quedan libres (`tasks.md`). La guía y los avisos no cambian de aspecto ni llevan pase (P21).
 
 **Cambios, cada uno con su commit de origen:**
 
