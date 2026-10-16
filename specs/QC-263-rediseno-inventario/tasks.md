@@ -10,7 +10,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 0 — Censo y comprobaciones (antes de tocar producción)
 
-- [ ] **T0a. Censo con grep.** Repetir el barrido de `design.md > 7` en `tests/unit`, `tests/guards`,
+- [x] **T0a. Censo con grep.** Repetir el barrido de `design.md > 7` en `tests/unit`, `tests/guards`,
   `tests/integration` y `e2e` para cada símbolo, texto o testid que la ficha cambia o mueve:
   `ProductTypeTabs`, `onNavigate`, `Mostrando todos los tipos`, `Filtrando por`, `routerMock.push`
   en tests de inventario, `product-row-actions`, `product-stock`, `data-table-cell-name`,
@@ -23,7 +23,7 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
   `separatorBefore` (decide T1a). *Hecho:* `progress/impl_QC-263.md` tiene la tabla «archivo → qué
   nombra → qué le pasa» y la decisión de T1a; todo archivo que salga y no esté en
   `## Archivos esperados` se añade a esa sección en el mismo commit.
-- [ ] **T0b. Medidas con el servidor de desarrollo.** A 1440, 820 y 390 px: ancho del contenedor de la
+- [x] **T0b. Medidas con el servidor de desarrollo.** A 1440, 820 y 390 px: ancho del contenedor de la
   tabla de `/inventario` (¿tarjetas a 820?), del `DataTable` dentro del panel «Lotes» a 900 px y del
   diálogo de historial a 1000 px; selector real del ancho de `SheetContent` en
   `components/ui/sheet.tsx` (no se edita); si el esqueleto de la tabla casa con las tarjetas (D53).
@@ -32,14 +32,14 @@ P1–P16 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 1 — Pieza compartida (depende de T0a)
 
-- [ ] **T1a. Separador en `RowActionsMenu`** (D12, R14) — **solo si T0a dice que QC-262 no lo ha
+- [x] **T1a. Separador en `RowActionsMenu`** — no aplica (a6a224e5, QC-262). (D12, R14) — **solo si T0a dice que QC-262 no lo ha
   mergeado**. `separatorBefore?` en `RowActionMenuItem`, separador en el desplegable y en el diálogo
   centrado, nunca delante del primer ítem pintado. Test
   `tests/unit/shared-ui/row-actions-menu-separator.test.tsx`: con la prop hay un `role="separator"`
   justo antes del ítem en los dos modos; en el primer ítem no; sin la prop, el árbol de
   `row-actions-menu-centrado.test.tsx` no cambia. El leader avisa antes al dueño de QC-262.
   *Hecho:* tests en verde; si QC-262 ya lo tiene, la tarea se marca «no aplica» con el commit de `dev`.
-- [ ] **T1b. Catálogo** (R44; depende de T1a, si aplica). Fila de `RowActionsMenu` con
+- [x] **T1b. Catálogo** — no aplica: la fila ya lista `separatorBefore` (a6a224e5); guardias en verde (R44; depende de T1a, si aplica). Fila de `RowActionsMenu` con
   `separatorBefore` en «Puntos de extensión». *Hecho:*
   `pnpm exec vitest run guard-catalogo-de-componentes catalogo-qc256` en verde.
 
@@ -201,6 +201,7 @@ Producción:
 - `app/(private)/inventario/components/adjust-batch-dialog.tsx`
 - `app/(private)/inventario/components/delete-product-dialog.tsx`
 - `app/(private)/inventario/components/product-sheet.tsx`
+- `app/(private)/inventario/components/movement-reason-label.ts` (D9: `movementReasonLabel` vive aquí desde ded3d3d8, QC-281; censo T0a)
 - `app/(private)/inventario/importar/page.tsx`
 - `app/(private)/inventario/importar/components/index.ts`
 - `app/(private)/inventario/importar/components/inventory-import-screen.tsx`
@@ -229,6 +230,9 @@ Tests y guardias:
 - `tests/unit/inventario/product-row-dialogs.test.tsx`
 - `tests/unit/inventario/product-cards.test.tsx`
 - `tests/unit/inventario/finished-stock-table.test.tsx`
+- `tests/unit/inventario/product-batch-rows.test.tsx` (sub-filas de lote de dev; censo T0a)
+- `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts` (origen de `movementReasonLabel` en el barrel; censo T0a)
+- `tests/unit/shared-ui/confirm-dialog-montado.test.tsx` (monta `ProductTable` y abre el borrado; censo T0a)
 - `tests/unit/inventario/product-batches-panel.test.tsx`
 - `tests/unit/inventario/product-batches-sheet.test.tsx`
 - `tests/unit/inventario/batch-history.test.tsx`
@@ -272,6 +276,7 @@ E2E:
 - `e2e/insumo-por-unidad.spec.ts`
 - `e2e/datos-de-lote-en-acondicionamiento.spec.ts`
 - `e2e/aislamiento-inventario.spec.ts`
+- `e2e/pedido-bloqueado.spec.ts` (nombra `product-stock` en filas de `/inventario`; censo T0a)
 - `e2e/helpers/row-actions-menu.ts`
 
 Estado:
