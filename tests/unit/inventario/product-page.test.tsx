@@ -608,7 +608,7 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    // El usuario del test es Administrador: ve tambien la columna «Costo».
+    // El usuario del test es Administrador: ve tambien la columna «Costo unitario».
     const columnas = buildProductColumns({ rowActions: () => null, showCost: true });
     for (const columna of columnas) {
       expect(
@@ -679,6 +679,24 @@ describe('pantalla de productos — lista', () => {
     expect(screen.getByTestId('product-list')).toBeInTheDocument();
     expect(screen.queryByTestId('data-table-head-averageUnitCost')).toBeNull();
     expect(screen.queryByTestId('product-cost')).toBeNull();
+  });
+
+  it('el Administrador lee el «Costo unitario» por la unidad del producto: «$1,234.56 / kg»', async () => {
+    const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ averageUnitCost: '1234.5600', unitId: UNIDAD_KG.id })]),
+    );
+    getSessionUserMock.mockResolvedValue({
+      ...USUARIO_DEL_TEST,
+      roleName: ROLE_ADMINISTRADOR,
+      permissions: SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR],
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveTextContent('Costo unitario');
+    expect(screen.getByTestId('product-cost')).toHaveTextContent(/^\$1,234\.56 \/ kg$/);
   });
 
   it('la unidad no es su propia columna: se lee junto a la existencia', async () => {

@@ -1214,6 +1214,24 @@ describe('R34 — el equivalente por teclado reordena y el asa anuncia su posici
 });
 
 describe('R37 — vista previa de la imagen y bloqueo de un segundo envío', () => {
+  it('la vista previa llena la zona sin recortarse y no pinta el nombre ni el tamaño del archivo', async () => {
+    const user = setupUser();
+    renderCreateForm();
+
+    await user.upload(screen.getByTestId('recipe-image-input'), validPngFile('mi-receta.png'));
+
+    const preview = await screen.findByTestId('recipe-image-preview');
+    expect(preview).toHaveClass('h-full', 'w-full', 'object-contain');
+    expect(screen.getByTestId('recipe-image-change-hint')).toHaveTextContent(
+      'Haz clic o arrastra otro para cambiarla',
+    );
+    const dropzone = screen.getByTestId('recipe-image-dropzone');
+    expect(dropzone).not.toHaveTextContent('mi-receta.png');
+    expect(dropzone).not.toHaveTextContent(/\d+(\.\d+)?\s?(B|KB|MB)\b/);
+    expect(screen.queryByTestId('recipe-image-file-name')).toBeNull();
+    expect(screen.queryByTestId('recipe-image-file-meta')).toBeNull();
+  });
+
   it('elegir un archivo válido muestra su vista previa, y el envío en curso impide un segundo envío', async () => {
     const user = setupUser();
     let resolveCreate!: (value: CreateRecipeFormState) => void;

@@ -233,7 +233,7 @@ export function StepEvidence({
                     key={photo.url}
                     src={photo.url}
                     alt=""
-                    className={cn('absolute inset-0 size-full object-cover', pending && 'opacity-0')}
+                    className={cn('absolute inset-0 size-full object-contain', pending && 'opacity-0')}
                     // La imagen puede terminar antes de que la hidratación enganche onLoad/onError
                     // y ese evento se pierde: al montar, se lee su estado. `withUrl` devuelve el
                     // mismo Set si la URL ya está, así que repetirlo no vuelve a renderizar.

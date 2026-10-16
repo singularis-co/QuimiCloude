@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 
 import { AsyncAutocomplete } from '@/components/shared/async-autocomplete';
 import type { AsyncPageRequest } from '@/hooks/use-async-paginated-options';
@@ -40,6 +40,7 @@ export type ProductNameOption = {
   readonly presentationName?: string;
   /** Unidad del insumo elegido: el alta la deja preseleccionada. */
   readonly unitId?: string | null;
+  readonly imageUrl?: string | null;
 };
 
 const FIELD_TEXT = 'text-base md:text-base';
@@ -59,6 +60,8 @@ type ProductNamePickerProps = {
   readonly error?: string;
   /** Avisa del producto existente elegido, para que el formulario autocomplete presentacion y alerta. */
   readonly onSelect?: (option: ProductNameOption) => void;
+  /** Avisa de que lo escrito ya no es el producto elegido: pasa a ser un nombre libre. */
+  readonly onDeselect?: () => void;
   /** Tipo elegido en el formulario: solo se ofrecen productos de ese tipo. */
   readonly productType: ProductType;
 };
@@ -67,6 +70,7 @@ export function ProductNamePicker({
   defaultValue = '',
   error,
   onSelect,
+  onDeselect,
   productType,
 }: ProductNamePickerProps) {
   const labelId = useId();
@@ -77,6 +81,9 @@ export function ProductNamePicker({
   const [name, setName] = useState(defaultValue);
   /** Lo que el usuario esta escribiendo. `null` = no esta escribiendo: se muestra lo elegido. */
   const [draft, setDraft] = useState<string | null>(null);
+  // Ref y no estado: el primitivo notifica el texto de la opcion justo despues de `onSelect`, en el
+  // mismo evento, y tiene que compararse ya con la opcion recien elegida.
+  const selectedNameRef = useRef<string | null>(null);
 
   const pedirPagina = useCallback(async ({ query, page }: AsyncPageRequest) => {
     const search = query.trim();
@@ -97,6 +104,7 @@ export function ProductNamePicker({
         qtyAlert: item.qtyAlert,
         type: item.type,
         unitId: item.unitId,
+        imageUrl: item.imageUrl ?? null,
       })),
       page: result.data.page,
       totalPages: result.data.totalPages,
@@ -106,12 +114,17 @@ export function ProductNamePicker({
   function handleValueChange(next: string) {
     setDraft(next);
     setName(next);
+    if (selectedNameRef.current !== null && next !== selectedNameRef.current) {
+      selectedNameRef.current = null;
+      onDeselect?.();
+    }
   }
 
   function choose(option: ProductNameOption | null) {
     if (option === null) {
       return;
     }
+    selectedNameRef.current = option.name;
     setName(option.name);
     setDraft(null);
     onSelect?.(option);
