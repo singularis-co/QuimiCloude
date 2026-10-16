@@ -49,6 +49,8 @@ Lo que NO entra:
 | D11 | (P8) Sin presentación en fabricación. Se quita «Presentación: …» (`order-execution-presentation`) de la pantalla y su comprobación de `e2e/envases-del-pedido.spec.ts` («R44: la ejecución nombra los envases»). Enmienda QC-195 R44. | 2026-10-16, humano | R2 |
 | D12 | (P9) Si el actor no puede actuar (pedido a nombre de otra persona, `TERMINADO`/`ENTREGADO`, o `POR_ACONDICIONAR` sin candidatos), el pie no lleva botones: solo una línea con el motivo. Se ajustan `acondicionar-con-equipo.spec.ts:283-286` y `acondicionamiento.spec.ts:463-465`. Enmienda QC-265 R34. | 2026-10-16, humano | R8, R33 |
 | D13 | (P10) La cuenta atrás de la espera se queda en el botón, como en QC-265 R37. Sin cambios ahí. | 2026-10-16, humano | R15 |
+| 2026-10-16 | P11: ¿textos de la línea de motivo de R33? (F1.4) | Se aprueban los propuestos: los textos existentes de «Lo acondiciona <nombre>.» y del empacador; «Este pedido ya está acondicionado.»; «Este pedido ya está entregado.»; «No se pudo cargar el equipo para comenzar.». |
+| 2026-10-16 | ¿Spec aprobado? | Sí, por el humano en F1.4, incluidas las enmiendas a QC-195 R44 y QC-265 (`design.md > 1.1`). |
 
 ## Requisitos (EARS)
 
@@ -212,16 +214,4 @@ la pantalla está comenzada por el actor y pinta `StepReader` con al menos un pa
 
 ## Preguntas abiertas
 
-P1 a P10 quedaron cerradas por el humano el 2026-10-16 (D4 a D13).
-
-- **P11. Texto de la línea de motivo de R33.** Ningún tablero lo pinta. `design.md > 3.7` propone
-  estos textos:
-  - a nombre de otra persona: los de hoy, «Lo acondiciona <nombre>.» y el de
-    `PACKING_ORDER_TEXTS.packer`;
-  - `TERMINADO`: «Este pedido ya está acondicionado.»;
-  - `ENTREGADO`: «Este pedido ya está entregado.»;
-  - `POR_ACONDICIONAR` sin candidatos: «No se pudo cargar el equipo para comenzar.». Hoy los
-    candidatos solo faltan si su carga falla (`page.tsx:72-81`), y el error ya se pinta en
-    `conditioning-order-candidates-error`.
-
-  Si el spec se aprueba sin cambiarlos, valen los propuestos. No bloquea ninguna task.
+Ninguna. P11 cerrada por el humano en F1.4 (ver «Decisiones cerradas»).
