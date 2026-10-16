@@ -100,14 +100,17 @@ export function ConditioningOrderScreen({
       titleTestId={CONDITIONING_ORDER_RECIPE_TESTID}
       subtitle={
         <>
-          <span data-testid={CONDITIONING_ORDER_QUANTITY_TESTID} title={exactDecimalTitle(order.quantity)}>
+          <span
+            className="block"
+            data-testid={CONDITIONING_ORDER_QUANTITY_TESTID}
+            title={exactDecimalTitle(order.quantity)}
+          >
             {CONDITIONING_ORDER_SCREEN_TEXTS.quantityLabel} {formatDecimalDisplay(order.quantity)}
             {order.unitLabel === null ? null : ` ${order.unitLabel}`}
           </span>
-          <span aria-hidden="true">{' · '}</span>
-          <span data-testid={CONDITIONING_ORDER_DISTRIBUTION_TESTID}>
-            <OrderDistributionFull lines={order.presentationLines} />
-          </span>
+          <div className="mt-2" data-testid={CONDITIONING_ORDER_DISTRIBUTION_TESTID}>
+            <OrderDistributionFull lines={order.presentationLines} withImages />
+          </div>
           {order.conditionedByName === null ? null : (
             <span className="block" data-testid={CONDITIONING_ORDER_CONDITIONER_TESTID}>
               {CONDITIONING_ORDER_SCREEN_TEXTS.conditionedBy(order.conditionedByName)}

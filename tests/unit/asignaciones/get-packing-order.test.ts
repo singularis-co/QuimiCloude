@@ -489,7 +489,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
           plan: 14,
           content: '3.7800',
           unit: { id: 'unidad-1', baseUnitId: null, factor: null },
-          packaging: { productId: GALON, name: 'Envase galon', freePackages: 6 },
+          packaging: { productId: GALON, name: 'Envase galon', freePackages: 6, imageUrl: null },
         },
         {
           lineId: LINEA_BOTELLA,
@@ -497,7 +497,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
           plan: 15,
           content: '1000.0000',
           unit: { id: 'unidad-ml', baseUnitId: 'unidad-1', factor: '0.001' },
-          packaging: { productId: BOTELLA, name: 'Envase botella', freePackages: 2 },
+          packaging: { productId: BOTELLA, name: 'Envase botella', freePackages: 2, imageUrl: null },
         },
       ],
     });
@@ -529,8 +529,44 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
     const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
 
     expect(order.finish?.lines.map((line) => line.packaging)).toEqual([
-      { productId: GALON, name: 'Envase galon', freePackages: 0 },
-      { productId: BOTELLA, name: 'Envase botella', freePackages: 0 },
+      { productId: GALON, name: 'Envase galon', freePackages: 0, imageUrl: null },
+      { productId: BOTELLA, name: 'Envase botella', freePackages: 0, imageUrl: null },
+    ]);
+  });
+
+  it('imagen del envase: cada linea lleva la URL que devuelve el catalogo, y `null` si el envase no tiene imagen', async () => {
+    const d = montarConteo(
+      [EN_EMPAQUE_DE_ANA],
+      [{ ...ENVASE_GALON, imageUrl: 'https://cdn.test/productos/galon.png' }, { ...ENVASE_BOTELLA, imageUrl: null }],
+    );
+
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(order.finish?.lines.map((line) => line.packaging?.imageUrl)).toEqual([
+      'https://cdn.test/productos/galon.png',
+      null,
+    ]);
+  });
+
+  it('imagen del envase: si el envase no vuelve del catalogo cae a la de la linea y, sin ella, a `null`', async () => {
+    const d = montarConteo(
+      [
+        {
+          ...EN_EMPAQUE_DE_ANA,
+          presentationLines: [
+            { ...LINEA_GALON_PLAN, packagingImageUrl: 'https://cdn.test/productos/galon-linea.png' },
+            LINEA_BOTELLA_PLAN,
+          ],
+        },
+      ],
+      [],
+    );
+
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(order.finish?.lines.map((line) => line.packaging?.imageUrl)).toEqual([
+      'https://cdn.test/productos/galon-linea.png',
+      null,
     ]);
   });
 

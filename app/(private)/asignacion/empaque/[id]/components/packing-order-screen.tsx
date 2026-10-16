@@ -4,6 +4,7 @@ import { CheckIcon, PlayIcon } from 'lucide-react';
 import { useActionState, useId, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { EntityImage } from '@/components/shared/entity-image';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Notice } from '@/components/shared/notice';
 import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
@@ -365,14 +366,18 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
                 {PACKING_ORDER_TEXTS.emptyDistribution}
               </p>
             ) : (
-              <ul className="flex flex-col gap-1">
+              <ul className="flex flex-col gap-2">
                 {order.presentationLines.map((line) => (
                   <li
                     key={line.presentationId}
-                    className="text-base"
+                    className="flex items-center gap-3 text-base"
                     data-testid={PACKING_ORDER_PRESENTATION_LINE_TESTID}
                   >
-                    {orderDistributionLineText(line)}
+                    <EntityImage
+                      path={line.packagingImageUrl ?? null}
+                      name={line.packagingName ?? line.presentationName ?? ''}
+                    />
+                    <span className="min-w-0">{orderDistributionLineText(line)}</span>
                   </li>
                 ))}
               </ul>

@@ -263,6 +263,9 @@ export type AssignedOrderPresentationLine = {
   /** `null` = linea guardada antes de que el reparto nombrara envases, o envase que ya no vuelve
    *  del catalogo. */
   readonly packagingName: string | null;
+  /** URL publica de la imagen del envase; `null` en los mismos casos que `packagingName` o si el
+   *  envase no tiene imagen. */
+  readonly packagingImageUrl?: string | null;
 };
 
 /**

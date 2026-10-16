@@ -25,7 +25,12 @@ import {
   CONDITIONING_TEAM_LIST_TESTID,
   ConditioningOrderScreen,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
-import { buildConditioningOrdersColumns } from '@/app/(private)/asignacion/components';
+import {
+  ORDER_DISTRIBUTION_FULL_LINE_TESTID,
+  ORDER_DISTRIBUTION_FULL_SEPARATOR,
+  buildConditioningOrdersColumns,
+} from '@/app/(private)/asignacion/components';
+import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import { RESPONSIBLE_AVATAR_TESTID, RESPONSIBLE_OVERFLOW_TESTID } from '@/components/shared/responsible-avatars';
 import type {
   ConditioningBatchLineView,
@@ -69,7 +74,40 @@ const CANDIDATES: ConditioningTeamCandidates = {
   workGroups: [],
 };
 
+/** El reparto del subtitulo, una linea por envase, sin el texto alternativo de su miniatura. */
+function lineasDelReparto(): string[] {
+  return within(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID))
+    .getAllByTestId(ORDER_DISTRIBUTION_FULL_LINE_TESTID)
+    .map((linea) => linea.textContent ?? '');
+}
+
 describe('el detalle muestra los datos del pedido', () => {
+  it('el reparto va en su propio bloque, bajo la cantidad, con la miniatura de cada envase', () => {
+    const URL_FRASCO = 'https://cdn.example/frasco.png';
+    render(
+      <ConditioningOrderScreen
+        order={{
+          ...ROW,
+          presentationLines: [
+            { ...ROW.presentationLines[0]!, packagingImageUrl: URL_FRASCO },
+            { ...ROW.presentationLines[1]!, packagingImageUrl: null },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId(CONDITIONING_ORDER_QUANTITY_TESTID)).not.toHaveTextContent('·');
+    const imagenes = within(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID)).getAllByRole('img');
+    expect(imagenes).toHaveLength(2);
+    const [conImagen, sinImagen] = imagenes;
+    expect(conImagen).toHaveAttribute('src', URL_FRASCO);
+    expect(conImagen).toHaveAttribute('alt', '500 g');
+    expect(conImagen).not.toHaveAttribute('data-missing');
+    expect(sinImagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(sinImagen).toHaveAttribute('alt', '1 kg');
+    expect(sinImagen).toHaveAttribute('data-missing', 'true');
+  });
+
   it('R15 R32: número, receta (único h1), cantidad con unidad, reparto entero, estado y quién acondiciona', () => {
     render(<ConditioningOrderScreen order={ROW} />);
 
@@ -89,9 +127,7 @@ describe('el detalle muestra los datos del pedido', () => {
       expect(cabecera?.contains(screen.getByTestId(testId))).toBe(true);
     }
     expect(screen.getByTestId(CONDITIONING_ORDER_QUANTITY_TESTID)).toHaveTextContent('20.5 kg');
-    expect(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID)).toHaveTextContent(
-      '12 × 500 g / 4 × 1 kg',
-    );
+    expect(lineasDelReparto()).toEqual(['12 × 500 g', '4 × 1 kg']);
     const estado = screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID);
     expect(estado).toHaveTextContent('En acondicionamiento');
     expect(estado).toHaveAttribute('data-status', 'EN_ACONDICIONAMIENTO');
@@ -113,7 +149,7 @@ describe('el detalle muestra los datos del pedido', () => {
 
     expect(screen.getByTestId(CONDITIONING_ORDER_NUMBER_TESTID).textContent).toBe(numero);
     expect(screen.getByTestId(CONDITIONING_ORDER_RECIPE_TESTID).textContent).toBe(receta);
-    expect(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID)).toHaveTextContent(envases ?? '');
+    expect(lineasDelReparto().join(ORDER_DISTRIBUTION_FULL_SEPARATOR)).toBe(envases);
     expect(screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID).textContent).toBe(estado);
     expect(screen.getByTestId(CONDITIONING_ORDER_CONDITIONER_TESTID)).toHaveTextContent(quien ?? '');
   });

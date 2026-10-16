@@ -66,15 +66,27 @@ export async function findOrderCustomers(
   return new Map(refs.map((ref) => [ref.id, toOrderCustomer(ref)]));
 }
 
+export type PackagingInfo = { readonly name: string; readonly imageUrl: string | null };
+
+/** Nombre e imagen de los envases; uno dado de baja o sin presentacion fija no vuelve. */
+export async function findPackagingInfo(
+  packaging: PackagingCatalog,
+  ids: readonly string[],
+  companyId: string,
+): Promise<ReadonlyMap<string, PackagingInfo>> {
+  if (ids.length === 0) return new Map();
+  const refs = await packaging.findRefs(ids, companyId);
+  return new Map(refs.map((ref) => [ref.id, { name: ref.name, imageUrl: ref.imageUrl ?? null }]));
+}
+
 /** Los nombres de los envases; uno dado de baja o sin presentacion fija no vuelve. */
 export async function findPackagingNames(
   packaging: PackagingCatalog,
   ids: readonly string[],
   companyId: string,
 ): Promise<ReadonlyMap<string, string>> {
-  if (ids.length === 0) return new Map();
-  const refs = await packaging.findRefs(ids, companyId);
-  return new Map(refs.map((ref) => [ref.id, ref.name]));
+  const info = await findPackagingInfo(packaging, ids, companyId);
+  return new Map([...info].map(([id, { name }]) => [id, name]));
 }
 
 /**

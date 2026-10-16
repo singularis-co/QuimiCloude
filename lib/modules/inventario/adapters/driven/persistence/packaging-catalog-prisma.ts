@@ -9,10 +9,16 @@ import { findReservedAndAvailableByBatch } from './reservation-prisma';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { PackagingCostingBatch, PackagingRef } from '../../../domain/packaging-catalog';
 import type { ProductId } from '../../../domain/product-catalog';
+import type { ProductImageStorage } from '../../../ports/product-image-storage';
 
 const ZERO = '0.0000';
 
-type PackagingRow = { readonly id: string; readonly name: string; readonly presentationId: string };
+type PackagingRow = {
+  readonly id: string;
+  readonly name: string;
+  readonly presentationId: string;
+  readonly imagePath: string | null;
+};
 
 async function findAlivePackaging(ids: readonly ProductId[], scope: InventoryScope): Promise<readonly PackagingRow[]> {
   const rows = await prisma.product.findMany({
@@ -22,7 +28,7 @@ async function findAlivePackaging(ids: readonly ProductId[], scope: InventorySco
         { id: { in: [...ids] }, type: PRODUCT_TYPES.PACKAGING, presentationId: { not: null }, deletedAt: null },
       ],
     },
-    select: { id: true, name: true, presentationId: true },
+    select: { id: true, name: true, presentationId: true, imagePath: true },
   });
   return rows.flatMap((row) => (row.presentationId === null ? [] : [{ ...row, presentationId: row.presentationId }]));
 }
@@ -53,10 +59,31 @@ async function findBatchesOf(
   return rows.map((row) => ({ id: row.id, productId: row.productId, unitCost: row.unitCost?.toFixed(4) ?? null }));
 }
 
+type PackagingImages = Pick<ProductImageStorage, 'publicUrl'>;
+
+/** Sin almacenamiento cableado no se inventa ninguna URL: `imageUrl` sale `null`. */
 export async function findPackagingRefs(
   ids: readonly ProductId[],
   companyId: string,
   options?: { readonly excludeOrderId?: string },
+): Promise<readonly PackagingRef[]> {
+  return findRefsWithImages(ids, companyId, options, undefined);
+}
+
+/** La ruta del bucket no sale de `inventario`: el envase viaja con la URL ya compuesta. */
+export function createFindPackagingRefs(images: PackagingImages) {
+  return (
+    ids: readonly ProductId[],
+    companyId: string,
+    options?: { readonly excludeOrderId?: string },
+  ): Promise<readonly PackagingRef[]> => findRefsWithImages(ids, companyId, options, images);
+}
+
+async function findRefsWithImages(
+  ids: readonly ProductId[],
+  companyId: string,
+  options: { readonly excludeOrderId?: string } | undefined,
+  images: PackagingImages | undefined,
 ): Promise<readonly PackagingRef[]> {
   if (ids.length === 0) return [];
   const scope: InventoryScope = { companyId };
@@ -92,6 +119,7 @@ export async function findPackagingRefs(
         content: presentation.content === null ? null : presentation.content.toFixed(4),
         unitId: presentation.unitId,
         available: availableByProduct.get(product.id) ?? ZERO,
+        imageUrl: images === undefined || product.imagePath === null ? null : images.publicUrl(product.imagePath),
       },
     ];
   });

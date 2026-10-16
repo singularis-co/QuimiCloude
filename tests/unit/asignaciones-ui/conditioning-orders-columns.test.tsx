@@ -89,6 +89,21 @@ describe('«Por acondicionar»: cinco columnas y el menú', () => {
     expect(screen.getByTestId('order-distribution-full')).toHaveTextContent('12 × 500 g / 4 × 1 kg');
   });
 
+  it('«Envases» sigue siendo solo texto aunque las líneas traigan imagen del envase', () => {
+    renderCell(CONDITIONING_ORDER_PACKAGES_COLUMN_ID, {
+      ...ROW,
+      presentationLines: ROW.presentationLines.map((line) => ({
+        ...line,
+        packagingImageUrl: 'https://cdn.example/envase.png',
+      })),
+    });
+
+    const cell = screen.getByTestId('order-distribution-full');
+    expect(cell.tagName).toBe('SPAN');
+    expect(cell.textContent).toBe('12 × 500 g / 4 × 1 kg');
+    expect(cell.querySelectorAll('img')).toHaveLength(0);
+  });
+
   it('R8: un pedido sin reparto dice «Sin presentación»', () => {
     renderCell(CONDITIONING_ORDER_PACKAGES_COLUMN_ID, { ...ROW, presentationLines: [] });
 

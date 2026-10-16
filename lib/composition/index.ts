@@ -95,8 +95,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
+  createFindPackagingRefs,
   findPackagingCostingBatches,
-  findPackagingRefs,
 } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import {
   addBatchToAlive,
@@ -1224,7 +1224,7 @@ export const inventario = {
 
 /** Solo para el servidor de `pedidos`: validar el envase de cada linea del reparto y costearlo. */
 const packagingCatalog: PackagingCatalog = {
-  findRefs: findPackagingRefs,
+  findRefs: createFindPackagingRefs(productImageStorage),
   findCostingBatches: findPackagingCostingBatches,
 };
 
