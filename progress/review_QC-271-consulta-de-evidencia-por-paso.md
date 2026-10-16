@@ -10,9 +10,12 @@ Grafo de código: no usé el MCP. Exploré con Grep/Read y `git diff`.
 - `pnpm run typecheck`: sin errores.
 - `pnpm run lint`: 0 errores y 7 warnings. Los 7 están en archivos que no toca el diff.
 - `vitest run` de los 26 tests unit/ui que toca el diff: 26 files, 464 passed, 2 skipped.
-- `vitest run tests/guards`, junto con `vitest related` de `read-order-evidence.ts`, `step-evidence.tsx`,
-  `list-finished-product-batches.ts` y `lib/composition/index.ts`: 68 files, 963 passed, 14 skipped.
-  Ninguno en rojo.
+- `vitest run tests/guards`: 68 files, 963 passed, 14 skipped, ninguno en rojo.
+  - El `vitest related` de `read-order-evidence.ts`, `step-evidence.tsx`,
+    `list-finished-product-batches.ts` y `lib/composition/index.ts` iba en la misma orden, después de
+    las guardias. Claude Code lo paró por falta de memoria en la máquina y no llegó a dar resultado.
+  - No lo relancé. Los 26 tests del diff de arriba sí terminaron en verde. La bitácora del
+    implementer da `vitest related` en verde (62 files, 959 passed).
 - `vitest run tests/integration/asignaciones/step-evidence-repository.int.test.ts`: 20 passed. Ahí
   están `countByOrders` y el conteo entre empresas (R6 y R29).
 - No corrí `./init.sh` ni el E2E (memoria; los corre CI). La bitácora del implementer da el E2E
