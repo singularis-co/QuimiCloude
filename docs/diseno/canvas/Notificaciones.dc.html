@@ -17,13 +17,11 @@
 .nf-bell.ring .ic{animation:nf-ring 700ms var(--e-std) both;transform-origin:50% 10%}
 @keyframes nf-bump{0%{scale:1}40%{scale:1.3}100%{scale:1}}
 @keyframes nf-ring{0%,100%{rotate:0}20%{rotate:14deg}40%{rotate:-12deg}60%{rotate:8deg}80%{rotate:-4deg}}
-.nf-pop{top:48px;width:380px;padding:0;display:flex;flex-direction:column;overflow:hidden}
+.nf-pop{top:48px;width:400px;padding:0;display:flex;flex-direction:column;overflow:hidden}
 .nf-pop-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px 10px;border-bottom:1px solid var(--border)}
-.nf-pop-bd{max-height:420px;overflow:auto;display:flex;flex-direction:column}
-.nf-pop-ft{display:flex;justify-content:center;padding:6px;border-top:1px solid var(--border)}
+.nf-pop-bd{height:520px;overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column}
 .nf-list{display:flex;flex-direction:column}
-.nf-row{position:relative;display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:start;padding:14px 16px;min-height:44px;color:var(--fg);text-decoration:none;border-bottom:1px solid var(--border);transition:background-color var(--d-i) var(--e-std)}
-.nf-row:last-child{border-bottom:0}
+.nf-row{display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:start;padding:14px 16px;min-height:44px;color:var(--fg);text-decoration:none;border-bottom:1px solid var(--border);transition:background-color var(--d-i) var(--e-std)}
 .nf-row:hover{background:color-mix(in oklch,var(--fg) 4%,transparent)}
 .nf-row:focus-visible{outline:2px solid var(--ring);outline-offset:-2px}
 .nf-row.unread{background:color-mix(in oklch,var(--primary) 7%,var(--card))}
@@ -39,22 +37,24 @@
 .nf-when{display:flex;flex-direction:column;align-items:flex-end;gap:8px;font:400 12px 'IBM Plex Mono',monospace;color:var(--muted-fg);white-space:nowrap}
 .nf-dot{width:9px;height:9px;border-radius:50%;background:var(--primary)}
 .nf-row.fresh{animation:nf-in var(--d-s) var(--e-in) both}
+.nf-row.more{animation:nf-fade var(--d-s) var(--e-in) both}
 @keyframes nf-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@keyframes nf-fade{from{opacity:0}to{opacity:1}}
 .nf-sk{display:grid;grid-template-columns:36px 1fr;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border)}
-.nf-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.nf-tail{display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;font-size:13px;color:var(--muted-fg);text-align:center}
+.nf-tail .b{height:36px}
 @container (max-width: 760px){
 .nf-pop{position:absolute;top:60px;left:8px;right:8px;width:auto}
-.nf-pop-bd{max-height:60vh}
+.nf-pop-bd{height:auto;max-height:70vh}
 .nf-row{grid-template-columns:32px 1fr;padding:14px 12px}
 .nf-when{grid-column:2;flex-direction:row;align-items:center;justify-content:space-between}
-.nf-head .b{width:100%;height:44px}
 }
-@media (prefers-reduced-motion: reduce){.nf-bdg.bump,.nf-bell.ring .ic,.nf-row.fresh{animation:none}}
+@media (prefers-reduced-motion: reduce){.nf-bdg.bump,.nf-bell.ring .ic,.nf-row.fresh,.nf-row.more{animation:none}}
 </style>
 </helmet>
 <div class="{{ rootCls }}">
   <div class="shell">
-    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="notificaciones" unread="{{ unread }}" hint-size="272px,100%"></dc-import></div>
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="dashboard" hint-size="272px,100%"></dc-import></div>
     <div class="main">
       <header class="topbar">
         <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
@@ -63,68 +63,42 @@
           <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
           <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
 
-          <div class="{{ panelCls }}" role="dialog" aria-label="Últimas notificaciones">
+          <div class="{{ panelCls }}" role="dialog" aria-label="Notificaciones">
             <div class="nf-pop-hd"><span class="h3">Notificaciones</span><sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}"><button class="b b-lnk b-sm" type="button" onClick="{{ readAll }}">Marcar todas como leídas</button></sc-if></div>
-            <div class="nf-pop-bd">
+            <div class="nf-pop-bd" onScroll="{{ onScroll }}">
               <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
-                <div role="status" aria-label="Cargando notificaciones"><sc-for list="{{ skel3 }}" as="k" hint-placeholder-count="3"><div class="nf-sk"><span class="sk" style="width: 36px; height: 36px; border-radius: 10px"></span><span style="display: flex; flex-direction: column; gap: 8px; padding-top: 4px"><span class="sk" style="width: 70%"></span><span class="sk" style="width: 90%"></span></span></div></sc-for></div>
+                <div role="status" aria-label="Cargando notificaciones"><sc-for list="{{ skel }}" as="k" hint-placeholder-count="5"><div class="nf-sk"><span class="sk" style="width: 36px; height: 36px; border-radius: 10px"></span><span style="display: flex; flex-direction: column; gap: 8px; padding-top: 4px"><span class="sk" style="width: 70%"></span><span class="sk" style="width: 90%"></span></span></div></sc-for></div>
               </sc-if>
               <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
-                <div class="box error" role="alert" style="border: 0; border-radius: 0"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg></span><p class="sub" style="color: var(--fg)">No se pudieron cargar las notificaciones.</p><button class="b b-out b-sm" type="button" onClick="{{ retry }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reintentar</button></div>
+                <div class="box error" role="alert" style="border: 0; border-radius: 0; flex: 1"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg></span><p class="sub" style="color: var(--fg)">No se pudieron cargar las notificaciones.</p><button class="b b-out b-sm" type="button" onClick="{{ retry }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reintentar</button></div>
               </sc-if>
               <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
-                <div class="box" style="border: 0; border-radius: 0; min-height: 200px"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg></span><p class="sub">No tienes notificaciones.</p></div>
+                <div class="box" style="border: 0; border-radius: 0; flex: 1"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg></span><p class="sub">No tienes notificaciones.</p></div>
               </sc-if>
               <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
                 <div class="nf-list">
-                  <sc-for list="{{ recent }}" as="n" hint-placeholder-count="5">
-                    <a class="{{ n.cls }}" href="#" onClick="{{ n.open }}" aria-label="{{ n.aria }}"><span class="{{ n.icCls }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ n.icon }}"></path></svg></span><span><span class="nf-t" style="display: block">{{ n.t }}</span><span class="nf-x" style="display: block">{{ n.x }}</span></span><span class="nf-when">{{ n.when }}<sc-if value="{{ n.unread }}" hint-placeholder-val="{{ true }}"><span class="nf-dot"></span></sc-if></span></a>
+                  <sc-for list="{{ rows }}" as="n" hint-placeholder-count="8">
+                    <a class="{{ n.cls }}" href="#" onClick="{{ n.open }}" aria-label="{{ n.aria }}"><span class="{{ n.icCls }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ n.icon }}"></path></svg></span><span><span class="nf-t" style="display: block">{{ n.t }}</span><span class="nf-x" style="display: block">{{ n.x }}</span><span class="nf-go">{{ n.go }}<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg></span></span><span class="nf-when">{{ n.when }}<sc-if value="{{ n.unread }}" hint-placeholder-val="{{ true }}"><span class="nf-dot"><span class="sr">Sin leer</span></span></sc-if></span></a>
                   </sc-for>
                 </div>
+                <sc-if value="{{ moreLoading }}" hint-placeholder-val="{{ false }}">
+                  <div class="nf-tail" role="status"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg>Cargando más avisos…</div>
+                </sc-if>
+                <sc-if value="{{ moreError }}" hint-placeholder-val="{{ false }}">
+                  <div class="nf-tail" role="alert">No se pudieron cargar más avisos.<button class="b b-out b-sm" type="button" onClick="{{ retryMore }}">Reintentar</button></div>
+                </sc-if>
+                <sc-if value="{{ atEnd }}" hint-placeholder-val="{{ false }}">
+                  <div class="nf-tail">No hay más avisos. Se conservan 90 días.</div>
+                </sc-if>
               </sc-if>
             </div>
-            <div class="nf-pop-ft"><a class="b b-gho b-sm" href="#" style="width: 100%; height: 40px; justify-content: center" onClick="{{ closePanel }}">Ver todas las notificaciones</a></div>
           </div>
         </div>
       </header>
 
       <div class="main-bd page enter">
-        <div class="ph">
-          <div class="ph-t"><h1 class="h1">Notificaciones</h1><p class="sub">Los avisos de tu empresa para ti y para tu rol. Se conservan 90 días.</p></div>
-        </div>
-
-        <section aria-label="Historial de notificaciones" style="display: flex; flex-direction: column; gap: 14px">
-          <div class="nf-head">
-            <div class="tabs" role="tablist" aria-label="Filtrar notificaciones">
-              <button class="tab" type="button" role="tab" aria-selected="{{ allSel }}" onClick="{{ showAll }}">Todas</button>
-              <button class="tab" type="button" role="tab" aria-selected="{{ unreadSel }}" onClick="{{ showUnread }}">No leídas<sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}"><span class="count">{{ cnt }}</span></sc-if></button>
-            </div>
-            <sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}"><button class="b b-out b-sm" type="button" onClick="{{ readAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2 12 5 5L18 6M12 17l1 1L22 9"></path></svg>Marcar todas como leídas</button></sc-if>
-          </div>
-
-          <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
-            <div class="box error" role="alert"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg></span><p class="sub" style="color: var(--fg)">No se pudieron cargar las notificaciones.</p><button class="b b-out" type="button" onClick="{{ retry }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reintentar</button></div>
-          </sc-if>
-
-          <sc-if value="{{ notError }}" hint-placeholder-val="{{ true }}">
-            <div class="tw">
-              <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
-                <div role="status" aria-label="Cargando notificaciones"><sc-for list="{{ skel6 }}" as="k" hint-placeholder-count="6"><div class="nf-sk"><span class="sk" style="width: 36px; height: 36px; border-radius: 10px"></span><span style="display: flex; flex-direction: column; gap: 8px; padding-top: 4px"><span class="sk" style="width: 40%"></span><span class="sk" style="width: 75%"></span></span></div></sc-for></div>
-              </sc-if>
-              <sc-if value="{{ pageEmpty }}" hint-placeholder-val="{{ false }}">
-                <div class="box fade" style="border: 0; border-radius: 0; min-height: 260px"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg></span><p class="sub">{{ emptyText }}</p></div>
-              </sc-if>
-              <sc-if value="{{ pageList }}" hint-placeholder-val="{{ true }}">
-                <div class="{{ listCls }}">
-                  <sc-for list="{{ rows }}" as="n" hint-placeholder-count="6">
-                    <a class="{{ n.cls }}" href="#" onClick="{{ n.open }}" aria-label="{{ n.aria }}"><span class="{{ n.icCls }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ n.icon }}"></path></svg></span><span><span class="nf-t" style="display: block">{{ n.t }}</span><span class="nf-x" style="display: block">{{ n.x }}</span><span class="nf-go">{{ n.go }}<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg></span></span><span class="nf-when">{{ n.when }}<sc-if value="{{ n.unread }}" hint-placeholder-val="{{ true }}"><span class="nf-dot"><span class="sr">Sin leer</span></span></sc-if></span></a>
-                  </sc-for>
-                </div>
-                <div class="pg"><span>{{ countLabel }}</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
-              </sc-if>
-            </div>
-          </sc-if>
-        </section>
+        <div class="ph"><div class="ph-t"><h1 class="h1">Dashboard</h1></div></div>
+        <div class="box" style="min-height: 260px"><p class="sub">[Pantalla actual: la campana vive en la cabecera de todas las pantallas privadas]</p></div>
       </div>
     </div>
   </div>
@@ -139,53 +113,61 @@
 
   <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
   <aside class="{{ menuSheetCls }}" aria-label="Menú">
-    <dc-import name="Sidebar" active="notificaciones" unread="{{ unread }}" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+    <dc-import name="Sidebar" active="dashboard" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
   </aside>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["lista","vacio","cargando","error"],"default":"lista"},"panel":{"editor":"boolean","default":false},"sinaudio":{"editor":"boolean","default":false},"nuevo":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["lista","vacio","cargando","error"],"default":"lista"},"panel":{"editor":"boolean","default":true},"cola":{"editor":"enum","options":["normal","cargandomas","errormas","fin"],"default":"normal"},"sinaudio":{"editor":"boolean","default":false},"nuevo":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
 class Component extends DCLogic {
 renderVals() {
 const s = this.state || {};
 const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
 const estado = s.estado || this.props.estado || 'lista';
-const panel = s.panel !== undefined ? s.panel : !!this.props.panel;
+const panel = s.panel !== undefined ? s.panel : (this.props.panel !== undefined ? !!this.props.panel : true);
 const toast = s.toast !== undefined ? s.toast : !!this.props.sinaudio;
 const fresh = !!this.props.nuevo;
+const cola = s.cola || this.props.cola || 'normal';
 const IC = {
 ok: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M9 15l2 2 4-4',
 warn: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M12 12v3M12 18h.01',
 bad: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M10 13l4 4M14 13l-4 4'
 };
 const base = [
-['n0','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 14:52.','Ver la tanda','hace 1 min',true],
-['n1','ok','Tanda de PDFs procesada','Se leyeron los 4 archivos de la tanda que subiste a las 14:20.','Ver la tanda','hace 3 min',true],
-['n2','bad','Falló la lectura de un archivo','No se pudo leer «cotizacion-proveedor.pdf». Revisa el archivo y vuelve a subirlo.','Ver el archivo','hace 12 min',true],
-['n3','warn','Tanda procesada con errores','Se leyeron 2 de 3 archivos. Uno no se pudo leer.','Ver la tanda','hace 48 min',true],
-['n4','ok','Tanda de PDFs procesada','Se leyeron los 6 archivos de la tanda que subiste ayer a las 16:58.','Ver la tanda','ayer 17:05',false],
-['n5','bad','Falló la lectura de un archivo','«ficha-tecnica-glicerina.pdf» no tiene texto legible.','Ver el archivo','14/10/2026 09:12',false],
-['n6','ok','Tanda de PDFs procesada','Se leyeron los 2 archivos de la tanda que subiste a las 16:31.','Ver la tanda','13/10/2026 16:40',false]
+['n0','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 14:52.','Ver fórmulas','hace 1 min',true],
+['n1','ok','Tanda de PDFs procesada','Se leyeron los 4 archivos de la tanda que subiste a las 14:20.','Ver fórmulas','hace 3 min',true],
+['n2','bad','Falló la lectura de la tanda','No se pudo leer ningún archivo de la tanda que subiste a las 14:02.','Ver proveedor','hace 12 min',true],
+['n3','warn','Tanda procesada con errores','Se leyeron 2 de 3 archivos. Uno no se pudo leer.','Ver fórmulas','hace 48 min',true],
+['n4','ok','Tanda de PDFs procesada','Se leyeron los 6 archivos de la tanda que subiste a las 16:58.','Ver proveedor','ayer 17:05',false],
+['n5','warn','Tanda procesada con errores','Se leyeron 4 de 5 archivos. Uno no se pudo leer.','Ver fórmulas','14/10/2026 09:12',false],
+['n6','ok','Tanda de PDFs procesada','Se leyeron los 2 archivos de la tanda que subiste a las 16:31.','Ver fórmulas','13/10/2026 16:40',false],
+['n7','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 10:05.','Ver proveedor','12/10/2026 10:11',false],
+['n8','bad','Falló la lectura de la tanda','No se pudo leer ningún archivo de la tanda que subiste a las 08:40.','Ver fórmulas','10/10/2026 08:44',false],
+['n9','ok','Tanda de PDFs procesada','Se leyeron los 5 archivos de la tanda que subiste a las 15:22.','Ver fórmulas','09/10/2026 15:30',false],
+['n10','ok','Tanda de PDFs procesada','Se leyeron los 2 archivos de la tanda que subiste a las 11:47.','Ver proveedor','07/10/2026 11:52',false],
+['n11','warn','Tanda procesada con errores','Se leyeron 1 de 2 archivos. Uno no se pudo leer.','Ver fórmulas','05/10/2026 09:03',false],
+['n12','ok','Tanda de PDFs procesada','Se leyeron los 4 archivos de la tanda que subiste a las 14:10.','Ver fórmulas','02/10/2026 14:18',false],
+['n13','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 09:30.','Ver proveedor','29/09/2026 09:36',false]
 ];
 const data = fresh ? base : base.slice(1);
 const read = s.read || {};
 const isUnread = (d) => d[6] && !read[d[0]];
 const unread = estado === 'lista' ? data.filter(isUnread).length : 0;
-const filter = s.filter || 'todas';
-const k = s.k || 0;
+const PAGE = 10;
+const shown = Math.min(data.length, s.shown || (cola === 'fin' ? data.length : PAGE));
 const markRead = (id) => (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ read: Object.assign({}, read, { [id]: true }), panel: false }); };
-const toRow = (d, i) => {
+const rows = data.slice(0, shown).map((d, i) => {
 const u = isUnread(d);
 return {
 t: d[2], x: d[3], go: d[4], when: d[5], unread: u,
-cls: 'nf-row' + (u ? ' unread' : '') + (fresh && i === 0 ? ' fresh' : ''),
+cls: 'nf-row' + (u ? ' unread' : '') + (fresh && i === 0 ? ' fresh' : '') + (i >= PAGE ? ' more' : ''),
 icCls: 'nf-ic ' + d[1], icon: IC[d[1]],
 aria: d[2] + '. ' + d[3] + ' ' + d[5] + (u ? '. Sin leer' : ''),
 open: markRead(d[0])
 };
-};
-const rows = (filter === 'no' ? data.filter(isUnread) : data).map(toRow);
+});
 const isList = estado === 'lista' && data.length > 0;
-const isEmpty = estado === 'vacio';
+const hasMore = shown < data.length;
+const loadMore = () => { if (hasMore && cola === 'normal') this.setState({ shown: Math.min(data.length, shown + 5) }); };
 return {
 rootCls: dark ? 'qc app dk' : 'qc app',
 toggleDark: () => this.setState({ dark: !dark }),
@@ -194,29 +176,24 @@ openMenu: () => this.setState({ menu: true, panel: false }),
 menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
 ovCls: s.menu ? 'ov open' : 'ov',
 closeAll: () => this.setState({ menu: false }),
-unread: unread, hasUnread: unread > 0, cnt: unread > 99 ? '99+' : String(unread),
+hasUnread: unread > 0, cnt: unread > 99 ? '99+' : String(unread),
 bellCls: 'tb-btn nf-bell' + (fresh ? ' ring' : ''),
 bdgCls: 'nf-bdg' + (fresh ? ' bump' : ''),
 bellLabel: unread > 0 ? 'Notificaciones, ' + unread + ' sin leer' : 'Notificaciones, ninguna sin leer',
 panelStr: panel ? 'true' : 'false',
 panelCls: 'pop right nf-pop' + (panel ? ' open' : ''),
 togglePanel: () => this.setState({ panel: !panel }),
-closePanel: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ panel: false }); },
-readAll: () => { const r = Object.assign({}, read); data.forEach((d) => { r[d[0]] = true; }); this.setState({ read: r, k: k + 1 }); },
-isLoading: estado === 'cargando', isError: estado === 'error', notError: estado !== 'error',
-isEmpty: isEmpty, isList: isList,
+readAll: () => { const r = Object.assign({}, read); data.forEach((d) => { r[d[0]] = true; }); this.setState({ read: r }); },
+isLoading: estado === 'cargando', isError: estado === 'error',
+isEmpty: estado === 'vacio', isList: isList,
 retry: () => this.setState({ estado: 'lista' }),
-skel3: [1, 2, 3], skel6: [1, 2, 3, 4, 5, 6],
-recent: data.slice(0, 5).map(toRow),
-allSel: filter === 'todas' ? 'true' : 'false', unreadSel: filter === 'no' ? 'true' : 'false',
-showAll: () => this.setState({ filter: 'todas', k: k + 1 }),
-showUnread: () => this.setState({ filter: 'no', k: k + 1 }),
-pageEmpty: isEmpty || (isList && rows.length === 0),
-pageList: isList && rows.length > 0,
-emptyText: isEmpty ? 'Todavía no tienes notificaciones.' : 'No tienes notificaciones sin leer.',
-listCls: 'nf-list' + (k % 2 ? ' fade' : ''),
+skel: [1, 2, 3, 4, 5],
 rows: rows,
-countLabel: rows.length + ' de ' + data.length + ' notificaciones',
+onScroll: (e) => { const t = e && e.target; if (t && t.scrollTop + t.clientHeight >= t.scrollHeight - 80) loadMore(); },
+moreLoading: cola === 'cargandomas' || (cola === 'normal' && hasMore),
+moreError: cola === 'errormas',
+retryMore: () => this.setState({ cola: 'normal' }),
+atEnd: cola === 'fin' || (cola === 'normal' && !hasMore),
 toastCls: toast ? 'toast show' : 'toast',
 closeToast: () => this.setState({ toast: false })
 };

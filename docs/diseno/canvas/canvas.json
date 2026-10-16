@@ -1220,7 +1220,7 @@
       "h": 1000,
       "is_interactive": true,
       "page": "notificaciones",
-      "title": "Notificaciones (QC-137)",
+      "title": "Campana de notificaciones (QC-137)",
       "w": 1440,
       "x": 0,
       "y": 0
@@ -1244,7 +1244,7 @@
       "y": 0
     },
     "NotificacionesEstados.dc.html": {
-      "h": 2960,
+      "h": 3820,
       "is_interactive": true,
       "page": "notificaciones",
       "title": "Estados de notificaciones (QC-137)",
@@ -1820,7 +1820,7 @@
       "maxH": 70,
       "page": "notificaciones",
       "size": 40,
-      "text": "Notificaciones: campana, menú y página (QC-137)  ·  escritorio · tablet · teléfono",
+      "text": "Notificaciones: campana con panel (QC-137)  ·  escritorio · tablet · teléfono",
       "w": 1400,
       "x": 0,
       "y": -110
