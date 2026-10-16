@@ -5,7 +5,6 @@ import { OrderDistributionLabel } from '@/components/shared/order-distribution-l
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import {
   formatOrderNumber,
-  type OrderPresentationLineView,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
@@ -25,9 +24,9 @@ import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
+import { distributionLabelLine } from './order-responsibles-sheet';
 import { orderRowActionsSpec, type OrderRowAction } from './order-row-actions';
 import { OrderRowResponsibles } from './order-sheet';
-import type { RecipePickerPage } from './recipe-picker';
 import {
   ORDER_PRIORITY_FILTER_OPTIONS,
   ORDER_STATUS_FILTER_OPTIONS,
@@ -127,12 +126,8 @@ function formatRequestDate(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-/**
- * Los dos catalogos que el panel lateral de edicion necesita, bajados por props desde el Server
- * Component de la seccion (R43): la primera pagina de recetas y las unidades existentes.
- */
+/** Lo que las columnas necesitan, bajado por props desde el Server Component de la seccion. */
 export type OrderColumnsDeps = {
-  readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
   readonly bridge: MassVolumeBridge | null;
   /**
@@ -167,11 +162,6 @@ export type OrderColumnsDeps = {
   readonly onAction?: (action: OrderRowAction, order: OrderSummary) => void;
 };
 
-/** Una linea con envase se nombra por el envase; una antigua, o sin nombre de envase, por su presentacion. */
-function distributionLabelLine(line: OrderPresentationLineView) {
-  return { presentationName: line.packagingName ?? line.presentationName, packages: line.packages };
-}
-
 const PRODUCED_ORDER_STATUSES: ReadonlySet<OrderSummary['status']> = new Set([
   'TERMINADO',
   'ENTREGADO',
@@ -191,9 +181,6 @@ function producedProductsOf(
 function ignoreAction(): void {}
 
 export function buildOrderColumns({
-  recipes,
-  units,
-  bridge,
   responsiblesByOrder = {},
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverageByOrder = {},
@@ -330,14 +317,9 @@ export function buildOrderColumns({
       cell: (order) => (
         <OrderRowResponsibles
           order={order}
-          recipes={recipes}
-          units={units}
-          bridge={bridge}
           // R20: si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia.
           responsibles={responsiblesByOrder[order.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
-          // El panel es el mismo, se abra por donde se abra.
-          coverage={coverageByOrder[order.id]}
         />
       ),
     },

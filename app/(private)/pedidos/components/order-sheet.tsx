@@ -19,11 +19,12 @@ import { OrderCustomerDialog } from './order-customer-dialog';
 import { OrderDeliveriesSheet } from './order-deliveries-sheet';
 import { OrderDeliverySheet } from './order-delivery-sheet';
 import { OrderDistributionDialog, type OrderDistributionDraft } from './order-distribution-dialog';
-import { OrderForm, type OrderSheetSection } from './order-form';
+import { OrderForm } from './order-form';
 import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
+import { OrderResponsiblesSheet } from './order-responsibles-sheet';
 import type { OrderRowAction } from './order-row-actions';
 import type { RecipePickerPage } from './recipe-picker';
 
@@ -82,21 +83,12 @@ export type OrderSheetProps = {
   /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador de alta. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
-  /** Los responsables que la fila ya trajo. Abrir el panel NO consulta nada. */
-  readonly responsibles?: readonly OrderResponsible[];
-  /** Catalogos y `canWrite`, por props desde el servidor. */
-  readonly responsiblesCatalog?: OrderResponsiblesCatalog;
   /**
    * La cobertura que la fila ya trajo. `undefined` cuando el lote fallo o el pedido es de alta
    * (no tiene id todavia): la hoja se degrada al marcador de ausencia, mismo criterio que
    * `responsibles`.
    */
   readonly coverage?: OrderCoverage;
-  /**
-   * EN QUE SECCION abre. **Es el mismo panel**: esta prop no crea otro, solo
-   * decide a donde va el foco. Por defecto, el formulario de siempre.
-   */
-  readonly section?: OrderSheetSection;
 };
 
 export function OrderSheet({
@@ -106,10 +98,7 @@ export function OrderSheet({
   bridge,
   open,
   onOpenChange,
-  responsibles = [],
-  responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
-  section = 'form',
 }: OrderSheetProps) {
   /** Instancia del formulario: cambia en cada apertura para que arranque SIEMPRE vacio (2026-09-09). */
   const [openKey, setOpenKey] = useState(0);
@@ -154,10 +143,7 @@ export function OrderSheet({
         units={units}
         bridge={bridge}
         onSaved={handleSaved}
-        responsibles={responsibles}
-        responsiblesCatalog={responsiblesCatalog}
         coverage={coverage}
-        section={section}
       />
     </Sheet>
   );
@@ -186,7 +172,8 @@ export type OrderRowSheetActionsProps = {
  * Monta el panel o el diálogo de la acción elegida en el menú de una fila. Uno por tabla: así
  * nunca hay dos abiertos y la tarjeta y la fila abren lo mismo.
  *
- * «Editar» y «Responsables» abren el mismo `OrderSheet`, en el formulario o en su sección.
+ * «Editar» abre el formulario y «Responsables», su propia hoja de solo lectura con la gestión de
+ * responsables.
  * Cerrado, lo montado sigue en el árbol para animar la salida; cada apertura lo remonta para que
  * arranque sin el estado de la anterior.
  */
@@ -219,7 +206,6 @@ export function OrderRowSheetActions({
 
   switch (action) {
     case 'edit':
-    case 'responsibles':
       return (
         <OrderSheet
           key={opening}
@@ -229,10 +215,18 @@ export function OrderRowSheetActions({
           bridge={bridge}
           open={open}
           onOpenChange={onOpenChange}
+          coverage={coverage}
+        />
+      );
+    case 'responsibles':
+      return (
+        <OrderResponsiblesSheet
+          key={opening}
+          order={order}
+          open={open}
+          onOpenChange={onOpenChange}
           responsibles={responsibles}
           responsiblesCatalog={responsiblesCatalog}
-          coverage={coverage}
-          section={action === 'responsibles' ? 'responsibles' : 'form'}
         />
       );
     case 'cancel':
@@ -254,7 +248,14 @@ export function OrderRowSheetActions({
     case 'customer':
       return <OrderCustomerDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
     case 'deliver':
-      return <OrderDeliverySheet key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
+      return (
+        <OrderDeliverySheet
+          key={opening}
+          order={order}
+          open={open}
+          onOpenChange={onOpenChange}
+        />
+      );
     case 'deliveries':
       return (
         <OrderDeliveriesSheet
@@ -270,41 +271,22 @@ export function OrderRowSheetActions({
 
 export type OrderRowResponsiblesProps = {
   readonly order: OrderSummary;
-  readonly recipes: RecipePickerPage;
-  readonly units: readonly UnitView[];
-  readonly bridge: MassVolumeBridge | null;
   /** Los responsables de ESTA fila, del lote que la seccion pidio una sola vez. */
   readonly responsibles: readonly OrderResponsible[];
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
-  /** La cobertura de ESTA fila: el panel es el mismo, se abra por donde se abra. */
-  readonly coverage?: OrderCoverage;
 };
 
 /**
- * La CELDA de la columna de responsables.
+ * La celda de la columna de responsables: los avatares y, al pulsar el `+N`, la misma hoja que la
+ * entrada «Responsables» del menu, que no depende de `:hover` ni del tooltip en tactil.
  *
- * Pinta los avatares y, al pulsar el `+N`, abre **el panel que ya existe** en su seccion de
- * responsables: la segunda puerta al dato, la que no depende de `:hover` ni de que el
- * tooltip llegue a abrir en tactil.
- *
- * **Vive en ESTE archivo, junto a `OrderRowSheetActions`, y no en `ResponsibleAvatars`** por
- * una razon concreta: `components/shared/responsible-avatars.tsx` es la pieza de presentacion
- * pura —no conoce
- * paneles y no debe conocerlos—, y quien sabe abrir el panel de un pedido es este modulo. Asi la
- * columna de avatares y la de acciones abren **el mismo** `OrderSheet`, no dos.
- *
- * **El panel se monta SOLO mientras esta abierto** (`{open ? ... : null}`): con la celda cerrada
- * no hay ningun panel en el arbol de la fila, que es lo que el test del panel unico comprueba contando
- * instancias.
+ * Vive aqui y no en `ResponsibleAvatars`, que es presentacion pura y no conoce paneles. La hoja se
+ * monta solo mientras esta abierta: con la celda cerrada no hay ninguna en el arbol de la fila.
  */
 export function OrderRowResponsibles({
   order,
-  recipes,
-  units,
-  bridge,
   responsibles,
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
-  coverage,
 }: OrderRowResponsiblesProps) {
   const [open, setOpen] = useState(false);
 
@@ -312,17 +294,12 @@ export function OrderRowResponsibles({
     <>
       <ResponsibleAvatars responsibles={responsibles} onShowAll={() => setOpen(true)} />
       {open ? (
-        <OrderSheet
+        <OrderResponsiblesSheet
           order={order}
-          recipes={recipes}
-          units={units}
-          bridge={bridge}
           open
           onOpenChange={setOpen}
           responsibles={responsibles}
           responsiblesCatalog={responsiblesCatalog}
-          coverage={coverage}
-          section="responsibles"
         />
       ) : null}
     </>

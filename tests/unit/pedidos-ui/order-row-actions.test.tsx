@@ -90,6 +90,7 @@ function pedido(status: OrderStatus, overrides: Partial<OrderSummary> = {}): Ord
     unitId: null,
     unitLabel: null,
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }

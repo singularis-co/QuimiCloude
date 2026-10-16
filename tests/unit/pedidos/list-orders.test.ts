@@ -323,6 +323,36 @@ describe('listOrders — lo que devuelve cada fila (R43, R44, R46, R29)', () => 
     expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
   })
 
+  it('cada fila lleva la imagen de su receta, la de la original para una version, con una sola llamada', async () => {
+    const VERSION = '55555555-5555-4555-8555-555555555555'
+    const URL_A = 'https://cdn.test/recetas/acido.jpg'
+    const d = dobles({
+      pagina: pagina([
+        fila({ id: 'o-1', recipeId: VERSION }),
+        fila({ id: 'o-2', recipeId: RECETA_A }),
+        fila({ id: 'o-3', recipeId: RECETA_B }),
+      ]),
+      recetas: [
+        ...REFS_RECETA.map((ref) => (ref.id === RECETA_A ? { ...ref, imageUrl: URL_A } : ref)),
+        {
+          id: VERSION,
+          name: 'Acido citrico 50% · Sin perfume',
+          ownName: 'Sin perfume',
+          isUnderReview: false,
+          original: { id: RECETA_A, name: 'Acido citrico 50%' },
+          isDeleted: false,
+          // El catalogo ya resuelve la de la original para una version.
+          imageUrl: URL_A,
+        },
+      ],
+    })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(salida.items.map((item) => item.recipeImageUrl)).toEqual([URL_A, URL_A, null])
+    expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
+  })
+
   it('los autores salen como IDENTIFICADORES y el cancelado trae su motivo (R46, R29, R40)', async () => {
     const d = dobles({
       pagina: pagina([
@@ -748,11 +778,11 @@ describe('listOrders — el reparto del pedido (R21, R22, R26, R27)', () => {
       fila({
         id: 'o-1',
         presentationLines: [
-          { presentationId: PRESENTACION_A, packages: 5, packagingProductId: null },
-          { presentationId: PRESENTACION_B, packages: 1, packagingProductId: null },
+          { presentationId: PRESENTACION_A, packages: 5, packagingProductId: null, presentationContent: null },
+          { presentationId: PRESENTACION_B, packages: 1, packagingProductId: null, presentationContent: null },
         ],
       }),
-      fila({ id: 'o-2', presentationLines: [{ presentationId: PRESENTACION_A, packages: 3, packagingProductId: null }] }),
+      fila({ id: 'o-2', presentationLines: [{ presentationId: PRESENTACION_A, packages: 3, packagingProductId: null, presentationContent: null }] }),
       fila({ id: 'o-3', presentationLines: [] }),
     ]
     const d = dobles({
@@ -768,11 +798,11 @@ describe('listOrders — el reparto del pedido (R21, R22, R26, R27)', () => {
     expect(d.findRefs).toHaveBeenCalledTimes(1)
     expect(d.findRefs.mock.calls[0]?.[0]).toEqual([PRESENTACION_A, PRESENTACION_B])
     expect(salida.items[0]?.presentationLines).toEqual([
-      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null },
-      { presentationId: PRESENTACION_B, presentationName: 'Botella 1L', packages: 1, packagingProductId: null, packagingName: null },
+      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
+      { presentationId: PRESENTACION_B, presentationName: 'Botella 1L', packages: 1, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ])
     expect(salida.items[1]?.presentationLines).toEqual([
-      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 3, packagingProductId: null, packagingName: null },
+      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 3, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ])
     // R27: sin reparto, lista vacia; no es un error de carga.
     expect(salida.items[2]?.presentationLines).toEqual([])

@@ -84,7 +84,7 @@ const ORDER_SELECT = {
   unitId: true,
   customerId: true,
   presentationLines: {
-    select: { presentationId: true, packages: true, packagingProductId: true },
+    select: { presentationId: true, packages: true, presentationContent: true, packagingProductId: true },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   },
 } satisfies Prisma.OrderSelect;
@@ -135,6 +135,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     presentationLines: row.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
+      presentationContent: line.presentationContent === null ? null : fromDecimal(line.presentationContent),
       packagingProductId: line.packagingProductId,
     })),
   };
@@ -768,6 +769,7 @@ async function insertAliveOrder(
     presentationLines: data.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
+      presentationContent: line.content === null ? null : fromDecimal(toDecimalInput(line.content)),
       packagingProductId: line.packagingProductId,
     })),
   };

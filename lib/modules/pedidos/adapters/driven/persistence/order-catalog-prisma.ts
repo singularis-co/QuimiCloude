@@ -141,6 +141,21 @@ const FINISHED_RECENT_FIRST_ORDER_BY = [
   { id: 'asc' },
 ] as const;
 
+/** Como el «orden de terminados», pero con los nulos PRIMERO: los que aun no tienen fecha de
+ *  terminado (siguen en acondicionamiento) arriba, luego la fecha descendente. Mismo desempate. */
+const UNFINISHED_THEN_RECENT_ORDER_BY = [
+  { finishedAt: { sort: 'desc', nulls: 'first' } },
+  { orderYear: 'desc' },
+  { orderSequence: 'desc' },
+  { id: 'asc' },
+] as const;
+
+const ORDER_BY_BY_ORDERING = {
+  work_queue: WORK_QUEUE_ORDER_BY,
+  finished_recent_first: FINISHED_RECENT_FIRST_ORDER_BY,
+  unfinished_then_recent: UNFINISHED_THEN_RECENT_ORDER_BY,
+} as const satisfies Record<OrderSummaryOrdering, readonly unknown[]>;
+
 /** `quantity` llega como `Prisma.Decimal` -tipado aqui por su forma minima para no importar
  *  `@prisma/client`- y se fija a 4 decimales, la escala de la columna `Decimal(14,4)`. */
 export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummaryRecord {
@@ -348,10 +363,7 @@ export async function listAliveOrderSummariesInCompany(
       },
     ],
   };
-  const orderBy =
-    ordering === 'finished_recent_first'
-      ? [...FINISHED_RECENT_FIRST_ORDER_BY]
-      : [...WORK_QUEUE_ORDER_BY];
+  const orderBy = [...ORDER_BY_BY_ORDERING[ordering]];
 
   const [rows, total] = await Promise.all([
     prisma.order.findMany({

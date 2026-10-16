@@ -688,7 +688,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     if (primerFallo !== undefined) throw primerFallo;
   });
 
-  test('R18, R19a, R10 - el Empacador responsable de pedidos PENDIENTE y EN_CURSO no los ve en ninguna vista, no tiene «Mis asignados» y ?vista=asignados aterriza en «Terminados» sin enlaces a ejecucion', async ({
+  test('R18, R19a, R10 - el Empacador responsable de pedidos PENDIENTE y EN_CURSO no los ve en ninguna vista, no tiene «Mis asignados» y ?vista=asignados aterriza en «Por empacar» sin enlaces a ejecucion', async ({
     page,
   }) => {
     expect(hiddenPending, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
@@ -706,21 +706,21 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.asignados)).toHaveCount(0);
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.todos)).toHaveCount(0);
 
-    // Pedir «Mis asignados» pinta «Terminados» y nada de la vista pedida.
-    await expect(page.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
+    // Pedir «Mis asignados» pinta «Por empacar» (lo pendiente va primero) y nada de la vista pedida.
+    await expect(page.getByTestId(PACKING_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ASSIGNED_ORDERS_TABLE_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(ASSIGNED_ORDERS_EMPTY_TESTID)).toHaveCount(0);
 
     for (const order of hiddenOrders) {
+      await expect(packingRowByNumber(page, order.numberText)).toHaveCount(0);
       await expect(rowByNumber(page, order.numberText)).toHaveCount(0);
       await expect(executionLinks(page, order.id)).toHaveCount(0);
     }
     await expect(page.getByTestId(ENTER_TESTID)).toHaveCount(0);
 
-    await page.goto(assignmentViewUrl('por_empacar'));
-    await expect(page.getByTestId(PACKING_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
+    await page.goto(assignmentViewUrl('terminados'));
+    await expect(page.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
     for (const order of hiddenOrders) {
-      await expect(packingRowByNumber(page, order.numberText)).toHaveCount(0);
       await expect(rowByNumber(page, order.numberText)).toHaveCount(0);
       await expect(executionLinks(page, order.id)).toHaveCount(0);
     }

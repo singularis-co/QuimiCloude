@@ -108,6 +108,7 @@ function pedido(status: OrderStatus = 'ENTREGADO', overrides: Partial<OrderSumma
     unitId: null,
     unitLabel: null,
     customer: ACTUAL,
+    recipeImageUrl: null,
     ...overrides,
   };
 }

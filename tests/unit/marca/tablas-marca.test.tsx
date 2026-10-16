@@ -239,7 +239,7 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   {
     archivo: 'order-columns.tsx',
     construir: async () =>
-      buildOrderColumns({ recipes: { items: [], totalPages: 1 }, units: [], bridge: null }),
+      buildOrderColumns({ units: [], bridge: null }),
     esperadas: ['Cantidad', 'Fecha de solicitud'],
   },
   {

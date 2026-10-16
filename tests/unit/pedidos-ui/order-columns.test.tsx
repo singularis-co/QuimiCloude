@@ -69,7 +69,6 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
  * las declaraba como array del modulo: **ningun assert de este archivo se relaja**.
  */
 const ORDER_COLUMNS = buildOrderColumns({
-  recipes: { items: [], totalPages: 1 },
   units: [],
   bridge: null,
 });
@@ -99,6 +98,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     unitId: null,
     unitLabel: null,
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -261,7 +261,6 @@ describe('el fijado por defecto y la columna de acciones (R19, `design.md > 6.1`
   it('R10: el menu lleva los permisos del servidor y emite `onAction` con el pedido de la fila', () => {
     const onAction = vi.fn();
     const columnas = buildOrderColumns({
-      recipes: { items: [], totalPages: 1 },
       units: [],
       bridge: null,
       canEditCustomer: true,
@@ -400,7 +399,7 @@ describe('R20: la columna Presentación pinta el reparto o Sin presentación', (
     const { container } = pintarCelda(
       PRESENTATION_NAME_COLUMN_ID,
       pedido({
-        presentationLines: [{ presentationId: 'p-1', presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null }],
+        presentationLines: [{ presentationId: 'p-1', presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
       }),
     );
 
@@ -412,8 +411,8 @@ describe('R20: la columna Presentación pinta el reparto o Sin presentación', (
       PRESENTATION_NAME_COLUMN_ID,
       pedido({
         presentationLines: [
-          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packages: 5, packagingProductId: null, packagingName: null },
-          { presentationId: 'p-2', presentationName: 'Bidón 20L', packages: 1, packagingProductId: null, packagingName: null },
+          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
+          { presentationId: 'p-2', presentationName: 'Bidón 20L', packages: 1, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
@@ -443,6 +442,8 @@ describe('el reparto del listado con lineas de envase y antiguas', () => {
             packages: 2,
             packagingProductId: 'e-1',
             packagingName: 'Bidón PET 20 L',
+            presentationContent: null,
+            presentationUnitLabel: null,
           },
         ],
       }),
@@ -462,6 +463,8 @@ describe('el reparto del listado con lineas de envase y antiguas', () => {
             packages: 2,
             packagingProductId: null,
             packagingName: null,
+            presentationContent: null,
+            presentationUnitLabel: null,
           },
         ],
       }),
@@ -481,12 +484,35 @@ describe('el reparto del listado con lineas de envase y antiguas', () => {
             packages: 3,
             packagingProductId: 'e-1',
             packagingName: null,
+            presentationContent: null,
+            presentationUnitLabel: null,
           },
         ],
       }),
     );
 
     expect(container.textContent).toBe('3 × 20 L');
+  });
+
+  it('una linea con envase y volumen conocido pinta «envases × envase · volumen»', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({
+        presentationLines: [
+          {
+            presentationId: 'p-1',
+            presentationName: '300 ml',
+            packages: 9,
+            packagingProductId: 'e-1',
+            packagingName: 'Embase pequeño 2',
+            presentationContent: '300.0000',
+            presentationUnitLabel: 'ml',
+          },
+        ],
+      }),
+    );
+
+    expect(container.textContent).toBe('9 × Embase pequeño 2 · 300 ml');
   });
 });
 
@@ -642,7 +668,6 @@ describe('QC-102 — la columna propia de responsables (R16)', () => {
     };
     const order = pedido();
     const columnas = buildOrderColumns({
-      recipes: { items: [], totalPages: 1 },
       units: [],
       bridge: null,
       responsiblesByOrder: { [order.id]: [RESPONSABLE] },
@@ -684,7 +709,6 @@ describe('QC-141 T14 — la columna propia de cobertura del material (R35)', () 
     (coverage) => {
       const order = pedido();
       const columnas = buildOrderColumns({
-        recipes: { items: [], totalPages: 1 },
         units: [],
         bridge: null,
         coverageByOrder: { [order.id]: coverage },
@@ -771,12 +795,11 @@ describe('la columna «Presentación» enlaza al producto terminado del pedido p
   const PRESENTACION_ID = 'p-1';
   const PRODUCTO_ID = '33333333-3333-4333-8333-333333333333';
   const LINEAS = [
-    { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null },
+    { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
   ];
 
   function pintarPresentacionConMapa(order: OrderSummary) {
     const columnas = buildOrderColumns({
-      recipes: { items: [], totalPages: 1 },
       units: [],
       bridge: null,
       producedProductsByOrder: { [PEDIDO_ID]: { [PRESENTACION_ID]: PRODUCTO_ID } },

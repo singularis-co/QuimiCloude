@@ -63,7 +63,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   getOrderAction: vi.fn(prohibida('getOrderAction')),
   quoteOrderCostAction: vi.fn(() => Promise.resolve({ status: 'success', data: { ingredientsCost: null } })),
   quoteOrderPresentationAvailabilityAction: vi.fn(() =>
-    Promise.resolve({ status: 'success', data: { kind: 'ok', available: '10' } }),
+    Promise.resolve({ status: 'success', data: { kind: 'ok', available: '0' } }),
   ),
 }));
 
@@ -136,6 +136,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -149,7 +150,7 @@ function renderFormulario(order?: OrderSummary) {
 }
 
 function campoCliente(): HTMLElement {
-  return screen.getByRole('combobox', { name: 'Cliente' });
+  return screen.getByRole('combobox', { name: 'Cliente (opcional)' });
 }
 
 async function rellenarAlta(user: ReturnType<typeof setupUser>) {

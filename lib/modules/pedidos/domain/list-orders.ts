@@ -24,8 +24,10 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 import {
   findOrderCustomers,
   findPackagingNames,
+  orderAndPresentationUnitIds,
   orderPackagingIds,
   orderPresentationIds,
+  toPresentationDisplays,
   unitLabelOf,
 } from './get-order';
 
@@ -199,14 +201,13 @@ export function createListOrders(
     const presentationIds = orderPresentationIds(page.items);
     const presentations =
       presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
-    const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
 
-    // Una sola llamada al catalogo de unidades por pagina, con los ids UNICOS.
-    const unitIds = [
-      ...new Set(page.items.map((row) => row.unitId).filter((id): id is string => id !== null)),
-    ];
+    // Una sola llamada al catalogo de unidades por pagina, con los ids UNICOS: los de los pedidos
+    // y los de sus presentaciones (la etiqueta del contenido de cada linea).
+    const unitIds = orderAndPresentationUnitIds(page.items, presentations);
     const units = unitIds.length === 0 ? [] : await deps.units.findRefs(unitIds, actor.companyId);
     const unitLabels = new Map(units.map((unit) => [unit.id, unitLabelOf(unit)]));
+    const presentationDisplays = toPresentationDisplays(presentations, unitLabels);
 
     // Los envases de la pagina, deduplicados: una sola llamada.
     const packagingNames = await findPackagingNames(deps.packaging, orderPackagingIds(page.items), actor.companyId);
@@ -215,7 +216,7 @@ export function createListOrders(
 
     return {
       items: page.items.map((row) =>
-        toOrderView(row, recipesById, presentationNames, unitLabels, packagingNames, orderCustomers),
+        toOrderView(row, recipesById, presentationDisplays, unitLabels, packagingNames, orderCustomers),
       ),
       total: page.total,
       page: page.page,

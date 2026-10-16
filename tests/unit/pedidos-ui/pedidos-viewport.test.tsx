@@ -72,7 +72,6 @@ import {
   RECIPE_NAME_COLUMN_ID,
   RECIPE_PICKER_TESTID,
   buildOrderColumns,
-  type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
@@ -293,7 +292,6 @@ const UNIDAD: UnitView = {
   factor: null,
   isSystem: true,
 };
-const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 /**
  * El pedido del caso: **PENDIENTE**, para que las tres acciones de fila esten habilitadas (R24),
@@ -327,12 +325,15 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
         packages: 1,
         packagingProductId: null,
         packagingName: null,
+        presentationContent: null,
+        presentationUnitLabel: null,
       },
 
     ],
     unitId: null,
     unitLabel: null,
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -717,7 +718,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // Primera mitad: la CONFIGURACION. Solo `recipeName` declara el `width` del contrato
     // (decision humana: es el texto largo de la fila); ninguna declara las claves de
     // dimensionado de la libreria, asi que por esa via no impone nada.
-    const columnas = buildOrderColumns({ recipes: RECETAS, units: [], bridge: null });
+    const columnas = buildOrderColumns({ units: [], bridge: null });
     expect(columnas).toHaveLength(12);
 
     for (const columna of columnas) {

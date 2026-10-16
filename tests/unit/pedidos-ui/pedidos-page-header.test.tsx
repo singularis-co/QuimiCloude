@@ -136,6 +136,7 @@ function pedido(): OrderSummary {
     unitId: null,
     unitLabel: null,
     customer: null,
+    recipeImageUrl: null,
   };
 }
 

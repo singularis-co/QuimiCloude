@@ -1,7 +1,8 @@
 // tests/unit/asignaciones/list-finished-orders.test.ts
 //
-// «Terminados»: los `TERMINADO` de toda la empresa, sin filtro por usuario asignado, ordenados por
-// fecha de terminado. A diferencia de «Mis asignados», los responsables incluyen al propio actor.
+// «Terminados»: con `asignaciones.ejecutar`, los `TERMINADO` de toda la empresa, sin filtro por
+// usuario asignado, ordenados por fecha de terminado. Sin el (empacador), lo que empaco el mismo y
+// ya salio de empaque. A diferencia de «Mis asignados», los responsables incluyen al propio actor.
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -316,7 +317,7 @@ describe('listFinishedOrders — quien no ejecuta solo ve lo que empaco', () => 
     permissions: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
   };
 
-  it('R20: sin `asignaciones.ejecutar` filtra en la consulta por `packedBy` = el actor', async () => {
+  it('R20: sin `asignaciones.ejecutar` filtra en la consulta por `packedBy` = el actor, con todo lo que ya salio de empaque', async () => {
     const { deps, listAliveSummariesInCompany } = montar();
 
     await createListFinishedOrders(deps)(EMPACADOR, { page: 3, pageSize: 5 });
@@ -324,11 +325,56 @@ describe('listFinishedOrders — quien no ejecuta solo ve lo que empaco', () => 
     expect(listAliveSummariesInCompany).toHaveBeenCalledTimes(1);
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['TERMINADO'],
-      'finished_recent_first',
+      ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'],
+      'unfinished_then_recent',
       3,
       5,
       { packedBy: ANA },
+    );
+  });
+
+  it('el empacador no pide estados previos al fin del empaque ni ENTREGADO', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+
+    await createListFinishedOrders(deps)(EMPACADOR, { page: 1 });
+
+    const estados = listAliveSummariesInCompany.mock.calls[0]?.[1] as readonly string[];
+    for (const fuera of ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO']) {
+      expect(estados).not.toContain(fuera);
+    }
+  });
+
+  it('el empacador recibe sus POR_ACONDICIONAR y EN_ACONDICIONAMIENTO (sin fecha) y sus TERMINADO', async () => {
+    const items = [
+      resumen(pedidoId(1), { status: 'POR_ACONDICIONAR', finishedAt: null, packedBy: ANA }),
+      resumen(pedidoId(2), { status: 'EN_ACONDICIONAMIENTO', finishedAt: null, packedBy: ANA, conditionedBy: BEA }),
+      resumen(pedidoId(3), { status: 'TERMINADO', packedBy: ANA, conditionedBy: BEA }),
+    ];
+    const { deps } = montar({ page: { items, total: 3 }, refs: [receta()] });
+
+    const pagina = await createListFinishedOrders(deps)(EMPACADOR, { page: 1 });
+
+    expect(pagina.items.map((item) => item.id)).toEqual([pedidoId(1), pedidoId(2), pedidoId(3)]);
+    expect(pagina.items.map((item) => item.finishedAt)).toEqual([
+      null,
+      null,
+      new Date('2026-09-20T10:00:00.000Z'),
+    ]);
+    expect(pagina.total).toBe(3);
+  });
+
+  it('el filtro es siempre el propio empacador: otro empacador consulta con SU id', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+
+    await createListFinishedOrders(deps)({ ...EMPACADOR, id: BEA }, { page: 1 });
+
+    expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
+      EMPRESA,
+      ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'],
+      'unfinished_then_recent',
+      1,
+      undefined,
+      { packedBy: BEA },
     );
   });
 

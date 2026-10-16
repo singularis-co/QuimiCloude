@@ -172,11 +172,14 @@ function pedido(id: string, sequence: number, status: OrderSummary['status']): O
         packages: 2,
         packagingProductId: null,
         packagingName: null,
+        presentationContent: null,
+        presentationUnitLabel: null,
       },
     ],
     unitId: null,
     unitLabel: null,
     customer: null,
+    recipeImageUrl: null,
   };
 }
 

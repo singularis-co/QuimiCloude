@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { StatusBadge, type StatusTone } from '@/components/shared/status-badge';
 
 export const ORDER_DELIVERY_SUMMARY_TESTID = 'order-delivery-summary';
@@ -29,6 +31,8 @@ export type OrderDeliverySummaryLabels = {
 export type OrderDeliverySummaryProps = {
   readonly lines: readonly OrderDeliverySummaryLine[];
   readonly labels: OrderDeliverySummaryLabels;
+  /** Imagen del producto, al lado del título. */
+  readonly image?: ReactNode;
 };
 
 type Mark = { readonly tone: StatusTone; readonly label: string; readonly testId: string };
@@ -45,14 +49,21 @@ function markFor(line: OrderDeliverySummaryLine, labels: OrderDeliverySummaryLab
 }
 
 /** «Por entregar»: lo escrito entre todos los clientes frente a lo que falta, por presentacion. */
-export function OrderDeliverySummary({ lines, labels }: OrderDeliverySummaryProps) {
+export function OrderDeliverySummary({ lines, labels, image }: OrderDeliverySummaryProps) {
   return (
     <section
       className="flex flex-col gap-2.5 rounded-lg border p-4"
       aria-label={labels.title}
       data-testid={ORDER_DELIVERY_SUMMARY_TESTID}
     >
-      <h3 className="text-base font-semibold">{labels.title}</h3>
+      {image === undefined ? (
+        <h3 className="text-base font-semibold">{labels.title}</h3>
+      ) : (
+        <div className="flex items-center gap-3">
+          <div className="size-12 shrink-0">{image}</div>
+          <h3 className="text-base font-semibold">{labels.title}</h3>
+        </div>
+      )}
       <ul className="flex flex-col gap-2.5">
         {lines.map((line) => {
           const mark = markFor(line, labels);

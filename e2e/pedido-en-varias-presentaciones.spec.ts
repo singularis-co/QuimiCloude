@@ -58,7 +58,7 @@ import {
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
-import { addPackagingLine, openOrderRowMenu } from './helpers/order-distribution';
+import { addPackagingLine, openOrderRowMenu, submitOrderWithLeftover } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc170_e2e_';
@@ -622,7 +622,8 @@ test.describe('pedido en varias presentaciones', () => {
     await expectAvailability(createForm, false);
     await expect(createForm.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
 
-    await createForm.getByTestId(ORDER_FORM_SUBMIT_TESTID).click();
+    // 4 x 1 + 6 x 0.5 = 7 de 10: queda sobrante y Guardar pregunta antes.
+    await submitOrderWithLeftover(page, createForm);
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
     const created = await prisma.order.findFirstOrThrow({

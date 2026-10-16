@@ -62,4 +62,25 @@ describe('OrderDistributionLabel', () => {
     expect(label.textContent).toBe('5 × Botella PET ámbar 200 ml, 2 × Bidón 20L');
     expect(label).toHaveAttribute('title', '5 × Botella PET ámbar 200 ml, 2 × Bidón 20L');
   });
+
+  it('una linea con envase y volumen pinta «envase · volumen»; sin volumen, solo el envase', () => {
+    render(
+      <OrderDistributionLabel
+        lines={[
+          {
+            presentationName: 'Botella chica',
+            packagingName: 'Embase pequeño 2',
+            presentationContent: '300.0000',
+            presentationUnitLabel: 'ml',
+            packages: 9,
+          },
+          { presentationName: 'Bidón 20L', packagingName: 'Bidón azul', packages: 2 },
+        ]}
+      />,
+    );
+
+    const label = screen.getByTestId('order-distribution');
+    expect(label.textContent).toBe('9 × Embase pequeño 2 · 300 ml, 2 × Bidón azul');
+    expect(label).toHaveAttribute('title', '9 × Embase pequeño 2 · 300 ml, 2 × Bidón azul');
+  });
 });
