@@ -6,7 +6,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { setupUser } from '../../helpers/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { StepReader } from '@/components/shared/step-reader';
+import { StepProgress, StepReader, type StepReaderProps } from '@/components/shared/step-reader';
 import { clampStepPosition } from '@/components/shared/step-reader/step-reader';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
 import {
@@ -1367,3 +1367,341 @@ describe.each(['lectura', 'ejecucion'] as const)(
     });
   },
 );
+
+describe('StepReader — pantalla del operario: slots y stepNote', () => {
+  type Destinos = { readonly progress: HTMLElement; readonly actions: HTMLElement };
+
+  /** Dos nodos fuera de la sección, como la cabecera y el pie del marco de la pantalla. */
+  function crearDestinos(): Destinos {
+    const progress = document.createElement('div');
+    const actions = document.createElement('div');
+    document.body.append(progress, actions);
+    return { progress, actions };
+  }
+
+  let destinos: Destinos | null = null;
+
+  function limpiar(): void {
+    cleanup();
+    destinos?.progress.remove();
+    destinos?.actions.remove();
+    destinos = null;
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+    limpiar();
+  });
+
+  function renderConSlots(props: Partial<StepReaderProps> = {}) {
+    const d = crearDestinos();
+    destinos = d;
+    const utils = render(
+      <StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode="ejecucion" slots={d} {...props} />,
+    );
+    return { ...utils, destinos: d };
+  }
+
+  it('R6: con slots, la barra, «Paso N de M» sin nombre de paso y el porcentaje van al nodo de progreso', async () => {
+    const user = setupUser();
+    const { destinos: d } = renderConSlots();
+
+    const seccion = screen.getByTestId('step-reader');
+    const posicion = within(d.progress).getByTestId('step-reader-position');
+    expect(posicion.textContent).toBe('Paso 1 de 3');
+    expect(posicion).toHaveAttribute('aria-live', 'polite');
+    expect(within(d.progress).getByTestId('step-reader-percent').textContent).toBe('33 %');
+    expect(within(d.progress).getByTestId('step-reader-progress')).toBeInTheDocument();
+    expect(within(d.progress).getByTestId('step-reader-progress-segment-0')).toHaveAttribute(
+      'data-state',
+      'current',
+    );
+    expect(within(seccion).queryByTestId('step-reader-progress')).toBeNull();
+    expect(within(seccion).queryByTestId('step-reader-position')).toBeNull();
+
+    await marcarTodo(user);
+    await user.click(screen.getByTestId('step-reader-next'));
+
+    expect(within(d.progress).getByTestId('step-reader-position').textContent).toBe('Paso 2 de 3');
+    expect(within(d.progress).getByTestId('step-reader-percent').textContent).toBe('67 %');
+    expect(within(d.progress).getByTestId('step-reader-progress-segment-0')).toHaveAttribute(
+      'data-state',
+      'done',
+    );
+  });
+
+  it('R6: StepProgress sale por el barrel y pinta un tramo por paso con su estado', () => {
+    render(<StepProgress total={3} current={1} />);
+
+    expect(screen.getByTestId('step-reader-progress-segment-0')).toHaveAttribute('data-state', 'done');
+    expect(screen.getByTestId('step-reader-progress-segment-1')).toHaveAttribute(
+      'data-state',
+      'current',
+    );
+    expect(screen.getByTestId('step-reader-progress-segment-2')).toHaveAttribute(
+      'data-state',
+      'pending',
+    );
+  });
+
+  it('R9: con slots, el motivo y los botones van por portal al pie, del mismo ancho y sin pie fijo propio', () => {
+    const { destinos: d } = renderConSlots();
+
+    const seccion = screen.getByTestId('step-reader');
+    const acciones = within(d.actions).getByTestId('step-reader-actions');
+    expect(within(seccion).queryByTestId('step-reader-actions')).toBeNull();
+    expect(acciones.className).not.toContain('fixed');
+    expect(document.querySelector('.fixed')).toBeNull();
+    expect(seccion.className).not.toContain('safe-area-inset-bottom');
+
+    const anterior = within(acciones).getByTestId('step-reader-previous');
+    const siguiente = within(acciones).getByTestId('step-reader-next');
+    expect(anterior).toHaveTextContent('Anterior');
+    expect(siguiente).toHaveTextContent('Siguiente');
+    const fila = anterior.parentElement as HTMLElement;
+    expect(fila).toBe(siguiente.parentElement);
+    expect(fila).toHaveClass('grid', 'grid-cols-2');
+    for (const boton of [anterior, siguiente]) {
+      expect(boton).toHaveClass('w-full', 'h-13');
+    }
+
+    const motivo = within(acciones).getByTestId('step-reader-blocked-reason');
+    expect(motivo).toHaveTextContent('Marca los 2 elementos pendientes para continuar.');
+    expect(motivo.compareDocumentPosition(anterior) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(siguiente.getAttribute('aria-describedby')?.split(' ')).toContain(motivo.id);
+  });
+
+  it('R9: en el último paso el pie lleva el texto de terminar de la pantalla en lugar de Siguiente', async () => {
+    const user = setupUser();
+    const onFinish = vi.fn();
+    const { destinos: d } = renderConSlots({
+      initialStepPosition: 3,
+      finishLabel: 'Terminar la fabricación',
+      onFinish,
+    });
+
+    expect(within(d.actions).queryByTestId('step-reader-next')).toBeNull();
+    const terminar = within(d.actions).getByTestId('step-reader-finish');
+    expect(terminar).toHaveTextContent('Terminar la fabricación');
+    expect(terminar).toBeDisabled();
+
+    await marcarTodo(user);
+    await user.click(terminar);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it('R9: mientras un nodo es null no se pinta esa parte, y aparece al tener el nodo', () => {
+    const { rerender } = render(
+      <StepReader
+        steps={TRES_PASOS}
+        onFinish={vi.fn()}
+        mode="ejecucion"
+        slots={{ progress: null, actions: null }}
+      />,
+    );
+
+    expect(screen.queryByTestId('step-reader-actions')).toBeNull();
+    expect(screen.queryByTestId('step-reader-position')).toBeNull();
+    expect(screen.getByTestId('step-reader-heading')).toBeInTheDocument();
+
+    const d = crearDestinos();
+    destinos = d;
+    rerender(<StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode="ejecucion" slots={d} />);
+
+    expect(within(d.actions).getByTestId('step-reader-next')).toBeInTheDocument();
+    expect(within(d.progress).getByTestId('step-reader-position')).toBeInTheDocument();
+  });
+
+  it('R12: el paso abre con la insignia «N de M», sin título de paso ni «En este paso usas»', async () => {
+    const user = setupUser();
+    renderConSlots();
+
+    const encabezado = screen.getByTestId('step-reader-heading');
+    const insignia = within(encabezado).getByTestId('step-reader-badge');
+    expect(insignia.querySelector('b')?.textContent).toBe('1');
+    expect(insignia).toHaveTextContent(/de 3$/);
+    expect(screen.queryByTestId('step-reader-title')).toBeNull();
+    expect(screen.queryByRole('heading')).toBeNull();
+    expect(screen.queryByText(/En este paso usas/i)).toBeNull();
+
+    await marcarTodo(user);
+    await user.click(screen.getByTestId('step-reader-next'));
+
+    expect(document.activeElement).toBe(screen.getByTestId('step-reader-heading'));
+    expect(screen.getByTestId('step-reader-badge').querySelector('b')?.textContent).toBe('2');
+  });
+
+  it('R12: el title del lector sigue siendo el h2 de la sección, no un nombre de paso', () => {
+    renderConSlots({ title: 'Pasos de envasado' });
+
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Pasos de envasado');
+    expect(screen.getByTestId('step-reader-heading')).not.toHaveTextContent('Pasos de envasado');
+  });
+
+  it('R13: cada comprobación es una tarjeta de 60 px que se marca y desmarca tocando en cualquier punto', async () => {
+    const user = setupUser();
+    renderConSlots();
+
+    const tarjeta = screen.getByTestId('step-reader-item-label-1-0');
+    expect(tarjeta.tagName).toBe('LABEL');
+    expect(tarjeta).toHaveClass('min-h-15', 'rounded-[14px]', 'border', 'motion-reduce:transition-none');
+    const casilla = within(tarjeta).getByRole('checkbox', { name: ITEM_1 });
+    expect(casilla).toHaveAttribute('aria-checked', 'false');
+
+    await user.click(within(tarjeta).getByText(ITEM_1));
+
+    expect(casilla).toHaveAttribute('aria-checked', 'true');
+    expect(tarjeta).toHaveClass('bg-primary/7', 'border-primary/45');
+    expect(within(tarjeta).getByText(ITEM_1)).toHaveClass('line-through', 'text-muted-foreground');
+
+    await user.click(tarjeta);
+
+    expect(casilla).toHaveAttribute('aria-checked', 'false');
+    expect(tarjeta).not.toHaveClass('bg-primary/7');
+    expect(within(tarjeta).getByText(ITEM_1)).not.toHaveClass('line-through');
+  });
+
+  it('R14: «Comprueba» y el contador «X de Y» del paso actual, que sube y baja al marcar y desmarcar', async () => {
+    const user = setupUser();
+    renderConSlots();
+
+    const cabecera = screen.getByTestId('step-reader-checklist-header');
+    expect(cabecera).toHaveTextContent('Comprueba');
+    expect(screen.getByTestId('step-reader-checklist-count').textContent).toBe('0 de 2');
+    expect(
+      cabecera.compareDocumentPosition(screen.getByTestId('step-reader-checklist-1')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole('checkbox', { name: ITEM_1 }));
+    expect(screen.getByTestId('step-reader-checklist-count').textContent).toBe('1 de 2');
+
+    await user.click(screen.getByRole('checkbox', { name: ITEM_2 }));
+    expect(screen.getByTestId('step-reader-checklist-count').textContent).toBe('2 de 2');
+
+    await user.click(screen.getByRole('checkbox', { name: ITEM_1 }));
+    expect(screen.getByTestId('step-reader-checklist-count').textContent).toBe('1 de 2');
+  });
+
+  it('R14: un paso sin elementos no pinta «Comprueba» ni contador', () => {
+    renderConSlots({ initialStepPosition: 2 });
+
+    expect(screen.queryByTestId('step-reader-checklist-header')).toBeNull();
+    expect(screen.queryByText('Comprueba')).toBeNull();
+  });
+
+  it('R14: con varias listas en el paso, el contador sale una vez y cuenta todos sus elementos', () => {
+    const pasoConDosListas: RecipeStepDocument = {
+      blocks: [
+        { kind: 'checklist', items: [{ spans: [{ text: ITEM_1 }] }] },
+        { kind: 'paragraph', spans: [{ text: PASO_1_TEXTO }] },
+        {
+          kind: 'checklist',
+          items: [{ spans: [{ text: ITEM_2 }] }, { spans: [{ text: ITEM_3 }] }],
+        },
+      ],
+    };
+    renderConSlots({ steps: [pasoConDosListas] });
+
+    expect(screen.getAllByTestId('step-reader-checklist-header')).toHaveLength(1);
+    expect(screen.getByTestId('step-reader-checklist-count').textContent).toBe('0 de 3');
+  });
+
+  it('R15: con slots, el anillo y la cuenta van dentro de Siguiente en el pie y el contenido no tiene bloque de espera', () => {
+    vi.useFakeTimers();
+    const { destinos: d } = renderConSlots({ steps: TRES_PASOS_SIN_ITEMS, minStepSeconds: 5 });
+
+    const siguiente = within(d.actions).getByTestId('step-reader-next');
+    expect(siguiente).toBeDisabled();
+    expect(within(siguiente).getByTestId('step-reader-wait-ring')).toBeInTheDocument();
+    expect(within(siguiente).getByTestId('countdown-timer')).toHaveTextContent('00:05');
+    expect(screen.getAllByTestId('step-reader-wait-ring')).toHaveLength(1);
+
+    const seccion = screen.getByTestId('step-reader');
+    expect(within(seccion).queryByTestId('countdown-timer')).toBeNull();
+    expect(within(seccion).queryByTestId('step-reader-wait-ring')).toBeNull();
+    expect(within(seccion).queryByTestId('step-reader-wait-reason')).toBeNull();
+
+    const motivo = within(d.actions).getByTestId('step-reader-wait-reason');
+    expect(siguiente.getAttribute('aria-describedby')?.split(' ')).toContain(motivo.id);
+
+    avanzarReloj(5000);
+    expect(siguiente).toBeEnabled();
+    expect(within(siguiente).queryByTestId('step-reader-wait-ring')).toBeNull();
+  });
+
+  it('R15: con slots, en el último paso la cuenta va dentro del botón de terminar', () => {
+    vi.useFakeTimers();
+    const { destinos: d } = renderConSlots({
+      steps: [PASO_SIN_ITEMS_A],
+      minStepSeconds: 5,
+      finishLabel: 'Terminar el empaque',
+    });
+
+    const terminar = within(d.actions).getByTestId('step-reader-finish');
+    expect(terminar).toBeDisabled();
+    expect(within(terminar).getByTestId('step-reader-wait-ring')).toBeInTheDocument();
+    expect(within(terminar).getByTestId('countdown-timer')).toHaveTextContent('00:05');
+  });
+
+  it('R16: con slots, los párrafos van en letra de entrada: 17 px y 16 px en contenedor de 560 px o menos', () => {
+    renderConSlots();
+
+    const parrafo = screen.getByTestId('step-reader-paragraph-0');
+    expect(parrafo).toHaveClass('text-[17px]', 'leading-[1.55]', '@max-[560px]:text-base');
+    expect(parrafo).not.toHaveClass('text-base');
+  });
+
+  it('R18: en "ejecucion" sin slots, el paso no lleva insignia, contador, tarjetas ni párrafos grandes', () => {
+    render(<StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode="ejecucion" />);
+
+    expect(screen.queryByTestId('step-reader-badge')).toBeNull();
+    expect(screen.queryByTestId('step-reader-checklist-header')).toBeNull();
+    expect(screen.queryByTestId('step-reader-percent')).toBeNull();
+    expect(screen.getByTestId('step-reader-item-label-1-0')).not.toHaveClass('min-h-15');
+    expect(screen.getByTestId('step-reader-paragraph-0')).toHaveClass('text-base');
+    expect(screen.getByTestId('step-reader-actions').className).toContain('fixed');
+  });
+
+  it('R34: con stepNote, la nota del paso va debajo de las comprobaciones con role="note" e icono de aviso', () => {
+    const stepNote = vi.fn((position: number) =>
+      position === 1 ? 'Usa gafas: el pigmento irrita los ojos.' : null,
+    );
+    renderConSlots({ stepNote });
+
+    const nota = screen.getByTestId('step-reader-note');
+    expect(nota).toHaveAttribute('role', 'note');
+    expect(nota).toHaveTextContent('Usa gafas: el pigmento irrita los ojos.');
+    expect(nota.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(stepNote).toHaveBeenCalledWith(1);
+    expect(
+      screen.getByTestId('step-reader-checklist-1').compareDocumentPosition(nota) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('R34: sin stepNote, con null o con cadena vacía no se pinta ningún bloque de nota', () => {
+    const casos: readonly StepReaderProps['stepNote'][] = [
+      undefined,
+      () => null,
+      () => '',
+      () => '   ',
+    ];
+    for (const stepNote of casos) {
+      renderConSlots({ stepNote });
+      expect(screen.queryByTestId('step-reader-note')).toBeNull();
+      expect(screen.queryByRole('note')).toBeNull();
+      limpiar();
+    }
+  });
+
+  it('R34: la nota sigue al paso actual: al pasar a un paso sin nota desaparece', async () => {
+    const user = setupUser();
+    renderConSlots({ stepNote: (position) => (position === 1 ? 'Nota del paso 1' : null) });
+
+    expect(screen.getByTestId('step-reader-note')).toBeInTheDocument();
+    await marcarTodo(user);
+    await user.click(screen.getByTestId('step-reader-next'));
+    expect(screen.queryByTestId('step-reader-note')).toBeNull();
+  });
+});

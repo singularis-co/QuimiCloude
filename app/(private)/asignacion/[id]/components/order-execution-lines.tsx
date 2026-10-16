@@ -22,9 +22,10 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
  * archivo no repite esa aritmetica, y no captura `IncompatibleUnitsError`: si algun dia una
  * unidad ofrecida no compartiera base efectiva, el fallo tiene que verse, no un guion.
  *
- * El cambio de unidad es estado en memoria de cada fila: no viaja a ningun sitio y remontar la
- * lista lo devuelve a la unidad original. Con `unit === null` no hay unidad resoluble: la fila
- * no ofrece selector ni simbolo.
+ * El cambio de unidad es estado en memoria: no viaja a ningun sitio. Sin `selectedUnitIds`, cada
+ * fila lo guarda y remontar la lista lo devuelve a la unidad original. Con `selectedUnitIds`, lo
+ * guarda quien pinta la lista, para que dos copias de la misma lista muestren la misma unidad.
+ * Con `unit === null` no hay unidad resoluble: la fila no ofrece selector ni simbolo.
  */
 
 export const ORDER_EXECUTION_LINES_TESTID = 'order-execution-lines';
@@ -47,10 +48,20 @@ function unitLabel(unit: UnitRef): string {
 type OrderExecutionLineRowProps = {
   readonly line: ExecutionLineView;
   readonly index: number;
+  readonly controlledUnitId?: string | undefined;
+  readonly onSelectUnit?: ((index: number, unitId: string) => void) | undefined;
+  readonly controlled: boolean;
 };
 
-function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
-  const [selectedUnitId, setSelectedUnitId] = useState(line.unit?.id ?? null);
+function OrderExecutionLineRow({
+  line,
+  index,
+  controlledUnitId,
+  onSelectUnit,
+  controlled,
+}: OrderExecutionLineRowProps) {
+  const [ownUnitId, setOwnUnitId] = useState(line.unit?.id ?? null);
+  const selectedUnitId = controlled ? (controlledUnitId ?? line.unit?.id ?? null) : ownUnitId;
 
   const availableUnits = line.unit === null ? [] : [line.unit, ...line.alternativeUnits];
   const selectedUnit = availableUnits.find((unit) => unit.id === selectedUnitId) ?? line.unit;
@@ -105,7 +116,9 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
           <Select
             value={selectedUnitId ?? line.unit.id}
             onValueChange={(next) => {
-              if (next !== null) setSelectedUnitId(next);
+              if (next === null) return;
+              if (!controlled) setOwnUnitId(next);
+              onSelectUnit?.(index, next);
             }}
             items={availableUnits.map((unit) => ({ label: unitLabel(unit), value: unit.id }))}
           >
@@ -144,9 +157,12 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
 
 export type OrderExecutionLinesProps = {
   readonly lines: readonly ExecutionLineView[];
+  /** Unidad elegida por indice de linea; si se pasa, la lista es controlada. */
+  readonly selectedUnitIds?: ReadonlyMap<number, string>;
+  readonly onSelectUnit?: (index: number, unitId: string) => void;
 };
 
-export function OrderExecutionLines({ lines }: OrderExecutionLinesProps) {
+export function OrderExecutionLines({ lines, selectedUnitIds, onSelectUnit }: OrderExecutionLinesProps) {
   return (
     <ul data-testid={ORDER_EXECUTION_LINES_TESTID} className="flex flex-col divide-y">
       {lines.map((line, index) => (
@@ -154,6 +170,9 @@ export function OrderExecutionLines({ lines }: OrderExecutionLinesProps) {
           key={`${line.unit?.id ?? 'sin-unidad'}-${index}`}
           line={line}
           index={index}
+          controlled={selectedUnitIds !== undefined}
+          controlledUnitId={selectedUnitIds?.get(index)}
+          onSelectUnit={onSelectUnit}
         />
       ))}
     </ul>

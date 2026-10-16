@@ -4,6 +4,7 @@ import { Fragment, type ReactNode } from 'react';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import type { RecipeStepDocument, RecipeStepSpan } from '@/lib/modules/recetas';
+import { cn } from '@/lib/utils';
 
 /**
  * Render de UN documento de paso del contrato de `recetas` (QC-62), en modo LECTURA
@@ -26,7 +27,14 @@ export type StepDocumentViewProps = {
   readonly onToggleItem: (blockIndex: number, itemIndex: number, checked: boolean) => void;
   /** Prefijo estable para los `id` de las etiquetas de cada item (`aria-labelledby`). */
   readonly idPrefix: string;
+  /** `'ejecucion'`: comprobaciones como tarjetas y párrafos grandes. */
+  readonly variant?: 'lectura' | 'ejecucion';
+  /** Se pinta una vez, justo antes de la primera lista de comprobaciones. */
+  readonly checklistHeader?: ReactNode;
 };
+
+const EJECUCION_ITEM =
+  'flex min-h-15 cursor-pointer items-center gap-3.5 rounded-[14px] border px-4 py-3 text-base transition-colors duration-(--dur-base) motion-reduce:transition-none';
 
 /**
  * Un fragmento con sus marcas. Negrilla y cursiva son **combinables** sobre el mismo fragmento
@@ -52,54 +60,95 @@ export function StepDocumentView({
   isItemChecked,
   onToggleItem,
   idPrefix,
+  variant = 'lectura',
+  checklistHeader,
 }: StepDocumentViewProps) {
+  const isEjecucion = variant === 'ejecucion';
+  const firstChecklistIndex = document.blocks.findIndex((block) => block.kind === 'checklist');
+
   return (
-    <div data-testid="step-reader-document" className="flex flex-col gap-3 text-base">
+    <div
+      data-testid="step-reader-document"
+      className={isEjecucion ? 'flex flex-col gap-5 text-base' : 'flex flex-col gap-3 text-base'}
+    >
       {document.blocks.map((block, blockIndex) => {
         if (block.kind === 'paragraph') {
           return (
             <p
               key={blockIndex}
               data-testid={`step-reader-paragraph-${blockIndex}`}
-              // `min-h-6`: el parrafo SIN fragmentos es la linea en blanco de QC-62 R2, y una
-              // linea en blanco sin altura no se ve.
-              className="min-h-6 text-base whitespace-pre-wrap"
+              // `min-h-6`: un parrafo sin fragmentos es una linea en blanco, y sin altura no se ve.
+              className={
+                isEjecucion
+                  ? 'min-h-6 text-[17px] leading-[1.55] whitespace-pre-wrap @max-[560px]:text-base'
+                  : 'min-h-6 text-base whitespace-pre-wrap'
+              }
             >
               {renderSpans(block.spans)}
             </p>
           );
         }
 
-        return (
+        const list = (
           <ul
             key={blockIndex}
             data-testid={`step-reader-checklist-${blockIndex}`}
-            className="flex flex-col gap-1"
+            className={isEjecucion ? 'flex flex-col gap-2' : 'flex flex-col gap-1'}
           >
             {block.items.map((item, itemIndex) => {
               const labelId = `${idPrefix}-item-${blockIndex}-${itemIndex}`;
+              const checked = isItemChecked(blockIndex, itemIndex);
               return (
                 <li key={itemIndex}>
                   <label
                     data-testid={`step-reader-item-label-${blockIndex}-${itemIndex}`}
-                    className={`flex ${TOUCH_TARGET} cursor-pointer items-center gap-3 text-base`}
+                    data-checked={isEjecucion && checked ? '' : undefined}
+                    className={
+                      isEjecucion
+                        ? cn(
+                            EJECUCION_ITEM,
+                            checked ? 'border-primary/45 bg-primary/7' : 'border-border bg-card',
+                          )
+                        : `flex ${TOUCH_TARGET} cursor-pointer items-center gap-3 text-base`
+                    }
                   >
                     <Checkbox
                       data-testid={`step-reader-item-${blockIndex}-${itemIndex}`}
-                      className={`${TOUCH_TARGET} shrink-0`}
+                      className={
+                        isEjecucion
+                          ? 'size-7 shrink-0 rounded-[8px] border-2'
+                          : `${TOUCH_TARGET} shrink-0`
+                      }
                       aria-labelledby={labelId}
-                      checked={isItemChecked(blockIndex, itemIndex)}
-                      onCheckedChange={(checked: boolean) => {
-                        onToggleItem(blockIndex, itemIndex, checked);
+                      checked={checked}
+                      onCheckedChange={(next: boolean) => {
+                        onToggleItem(blockIndex, itemIndex, next);
                       }}
                     />
-                    <span id={labelId}>{renderSpans(item.spans)}</span>
+                    <span
+                      id={labelId}
+                      className={
+                        isEjecucion && checked ? 'text-muted-foreground line-through' : undefined
+                      }
+                    >
+                      {renderSpans(item.spans)}
+                    </span>
                   </label>
                 </li>
               );
             })}
           </ul>
         );
+
+        if (checklistHeader !== undefined && blockIndex === firstChecklistIndex) {
+          return (
+            <div key={blockIndex} className="flex flex-col gap-2">
+              {checklistHeader}
+              {list}
+            </div>
+          );
+        }
+        return list;
       })}
     </div>
   );

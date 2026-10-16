@@ -35,7 +35,6 @@ import {
   assignedOrderStartConfirmTexts,
 } from '@/app/(private)/asignacion/[id]/components';
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
-import { STEP_READER_SIDE_COLUMN_RESERVE } from '@/app/(private)/asignacion/components/operator-screen-frame';
 import type { StartedOrderExecution } from '@/lib/modules/asignaciones';
 
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
@@ -599,31 +598,6 @@ describe('pantalla de ejecucion — materiales y herramientas en su propio conte
     expect(contenedor.contains(screen.getByTestId(ORDER_EXECUTION_TITLE_TESTID))).toBe(false);
   });
 
-  it('QC-269 R4, R7: la Card de materiales reserva el pie fijo del lector, sin envoltorio nuevo', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
-
-    const contenedor = screen.getByTestId(ORDER_EXECUTION_MATERIALS_TESTID);
-    expect(contenedor.className.split(/\s+/)).toContain(STEP_READER_SIDE_COLUMN_RESERVE);
-    // La Card sigue siendo hija directa de la rejilla, hermana del lector.
-    expect(contenedor.parentElement?.contains(screen.getByTestId('step-reader'))).toBe(true);
-  });
-
-  it('QC-269 R4, R7, R8: la reserva de la Card usa el mismo calc que el pie fijo del lector', () => {
-    // Vive aqui porque este test es el que el guardia de recipe-route-contract deja nombrar el
-    // lector de pasos; evita la deriva entre los dos sitios (design.md § 4.2).
-    render(<OrderExecutionScreen execution={EXECUTION} />);
-
-    const readerReserve = /(?:^|\s)pb-\[(calc\([^\]]+\))\](?:\s|$)/.exec(
-      screen.getByTestId('step-reader').className,
-    )?.[1];
-    const sideReserve = /^@min-\[1101px\]:mb-\[(calc\([^\]]+\))\]$/.exec(
-      STEP_READER_SIDE_COLUMN_RESERVE,
-    )?.[1];
-
-    expect(readerReserve).toBeDefined();
-    expect(sideReserve).toBe(readerReserve);
-  });
-
   it('con herramientas, herramientas y materiales van en Cards distintas, herramientas primero', () => {
     render(
       <OrderExecutionScreen
@@ -673,10 +647,10 @@ describe('pantalla de ejecucion — R26: objetivos tactiles de 44x44 en todo con
     }
   });
 
-  it('no usa `100vh` en su contenedor: usa `min-h-dvh`', () => {
+  it('R1: no usa `100vh` en su contenedor: usa `h-dvh`', () => {
     render(<OrderExecutionScreen execution={EXECUTION} />);
 
-    expect(screen.getByTestId(ORDER_EXECUTION_SCREEN_TESTID).className).toContain('min-h-dvh');
+    expect(screen.getByTestId(ORDER_EXECUTION_SCREEN_TESTID).className).toContain('h-dvh');
   });
 });
 

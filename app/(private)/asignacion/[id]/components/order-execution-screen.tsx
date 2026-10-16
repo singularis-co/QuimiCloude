@@ -24,10 +24,7 @@ import {
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
-import {
-  OperatorScreenFrame,
-  STEP_READER_SIDE_COLUMN_RESERVE,
-} from '../../components/operator-screen-frame';
+import { OperatorScreenFrame } from '../../components/operator-screen-frame';
 import { useStepEvidence } from '../../components/use-step-evidence';
 
 import { ORDER_CANCEL_TEXTS, ORDER_CANCEL_TRIGGER_TESTID, OrderCancelDialog } from './order-cancel-dialog';
@@ -267,7 +264,6 @@ export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreen
     >
       <div className="grid grid-cols-1 items-start gap-5 @min-[1101px]:grid-cols-[300px_minmax(0,720px)] @min-[1101px]:justify-center @min-[1101px]:gap-x-6">
         <OrderExecutionToolsPanel
-          className={STEP_READER_SIDE_COLUMN_RESERVE}
           tools={execution.tools}
           lines={execution.lines}
         />

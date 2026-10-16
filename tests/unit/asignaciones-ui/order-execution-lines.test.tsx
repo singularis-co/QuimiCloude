@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -372,6 +373,78 @@ describe('linea de ejecucion — el nombre no se solapa con las cifras (QC-269 R
     const visibles = Array.from(grupo.children).filter((el) => el.tagName !== 'INPUT');
     expect(visibles.at(-1)).toBe(selector);
     expect(selector).toHaveClass('ml-auto');
+  });
+});
+
+describe('linea de ejecucion — selector de unidad controlado', () => {
+  function DosListas({ lines }: { readonly lines: readonly ExecutionLineView[] }) {
+    const [unidades, setUnidades] = useState<ReadonlyMap<number, string>>(new Map());
+    const elegir = (index: number, unitId: string) => {
+      setUnidades((actual) => new Map(actual).set(index, unitId));
+    };
+    return (
+      <>
+        <div data-testid="columna">
+          <OrderExecutionLines lines={lines} selectedUnitIds={unidades} onSelectUnit={elegir} />
+        </div>
+        <div data-testid="panel">
+          <OrderExecutionLines lines={lines} selectedUnitIds={unidades} onSelectUnit={elegir} />
+        </div>
+      </>
+    );
+  }
+
+  it('R22: dos listas con el mismo mapa muestran la misma unidad tras elegir en una', async () => {
+    const user = setupUser();
+    render(<DosListas lines={[linea(), linea({ productName: 'Agua' })]} />);
+    const columna = screen.getByTestId('columna');
+    const panel = screen.getByTestId('panel');
+
+    await user.click(within(columna).getByTestId(`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-1`));
+    const [, mililitro] = await screen.findAllByTestId(ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID);
+    await user.click(await esperarInteractiva(mililitro));
+
+    for (const lista of [columna, panel]) {
+      expect(within(lista).getByTestId(`${ORDER_EXECUTION_LINE_UNIT_TESTID}-1`)).toHaveTextContent('ml');
+      expect(within(lista).getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-1`)).toHaveTextContent(
+        '20000',
+      );
+      expect(within(lista).getByTestId(`${ORDER_EXECUTION_LINE_UNIT_TESTID}-0`)).toHaveTextContent('L');
+    }
+  });
+
+  it('R22: la unidad elegida sobrevive a desmontar y volver a montar una de las listas', async () => {
+    const user = setupUser();
+    const lineas = [linea()];
+    function ConPanel({ abierto }: { readonly abierto: boolean }) {
+      const [unidades, setUnidades] = useState<ReadonlyMap<number, string>>(new Map());
+      return (
+        <>
+          <div data-testid="columna">
+            <OrderExecutionLines
+              lines={lineas}
+              selectedUnitIds={unidades}
+              onSelectUnit={(index, unitId) => setUnidades((actual) => new Map(actual).set(index, unitId))}
+            />
+          </div>
+          {abierto ? (
+            <div data-testid="panel">
+              <OrderExecutionLines lines={lineas} selectedUnitIds={unidades} />
+            </div>
+          ) : null}
+        </>
+      );
+    }
+    const { rerender } = render(<ConPanel abierto={false} />);
+
+    await user.click(screen.getByTestId(`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-0`));
+    const [, mililitro] = await screen.findAllByTestId(ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID);
+    await user.click(await esperarInteractiva(mililitro));
+    rerender(<ConPanel abierto />);
+
+    expect(
+      within(screen.getByTestId('panel')).getByTestId(`${ORDER_EXECUTION_LINE_UNIT_TESTID}-0`),
+    ).toHaveTextContent('ml');
   });
 });
 

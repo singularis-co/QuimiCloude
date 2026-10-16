@@ -7,7 +7,8 @@ import { FlaskConicalIcon, WrenchIcon } from 'lucide-react';
 import type { ExecutionLineView, ExecutionToolView } from '@/lib/modules/asignaciones';
 import { cn } from '@/lib/utils';
 
-import { OrderExecutionCollapsibleCard } from './order-execution-collapsible-card';
+import { OrderExecutionCollapsibleCard } from '../../components/order-execution-collapsible-card';
+
 import { OrderExecutionLines } from './order-execution-lines';
 import { OrderExecutionTools } from './order-execution-tools';
 

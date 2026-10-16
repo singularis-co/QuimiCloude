@@ -1,6 +1,8 @@
 'use client';
 
+import { TriangleAlertIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useEffectEvent, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { CountdownRing } from '@/components/shared/countdown-ring';
 import { CountdownTimer } from '@/components/shared/countdown-timer';
@@ -53,6 +55,10 @@ const TEXTS = {
   waitPrefix: 'Espera',
   waitSuffix: 'para continuar.',
   waitReasonEjecucion: 'Espera a que termine la cuenta regresiva para continuar.',
+  percent: (value: number) => `${value} %`,
+  badgeOf: (total: number) => `de ${total}`,
+  checklistTitle: 'Comprueba',
+  checklistCount: (done: number, total: number) => `${done} de ${total}`,
 } as const;
 
 export type StepReaderProps = {
@@ -83,6 +89,17 @@ export type StepReaderProps = {
   /** Cada `id` nuevo lleva al paso `position` (desde 1), aunque el actual esté bloqueado, y avisa
    *  a `onStepChange` si el paso cambia. El `id` con el que se monta no navega. */
   readonly stepRequest?: { readonly position: number; readonly id: number };
+  /** Solo en `'ejecucion'`. Nodos de la pantalla donde se pintan el progreso y los botones, en
+   *  lugar del pie fijo propio. Con `slots` el paso usa la presentación de planta: insignia,
+   *  porcentaje, contador de comprobaciones, tarjetas y párrafos grandes. Mientras un nodo sea
+   *  `null`, esa parte no se pinta. */
+  readonly slots?: {
+    readonly progress: HTMLElement | null;
+    readonly actions: HTMLElement | null;
+  };
+  /** Solo en `'ejecucion'`. Nota de seguridad del paso actual (posición desde 1); `null` o vacía
+   *  no pinta nada. */
+  readonly stepNote?: (position: number) => string | null;
 };
 
 /**
@@ -127,8 +144,15 @@ function countPendingItems(
   }, 0);
 }
 
+function countItems(document: RecipeStepDocument): number {
+  return document.blocks.reduce(
+    (total, block) => (block.kind === 'paragraph' ? total : total + block.items.length),
+    0,
+  );
+}
+
 /** Progreso segmentado (solo `'ejecucion'`): un tramo por paso, con su estado. */
-function StepProgress({ total, current }: { readonly total: number; readonly current: number }) {
+export function StepProgress({ total, current }: { readonly total: number; readonly current: number }) {
   return (
     <div data-testid="step-reader-progress" role="list" className="flex gap-1">
       {Array.from({ length: total }, (_, stepIndex) => {
@@ -164,8 +188,11 @@ export function StepReader({
   renderStepAddon,
   stepBlockReason,
   stepRequest,
+  slots,
+  stepNote,
 }: StepReaderProps) {
   const isEjecucion = mode === 'ejecucion';
+  const isPlanta = isEjecucion && slots !== undefined;
   const baseId = useId();
   const [index, setIndex] = useState(() => initialIndexFor(initialStepPosition, steps.length));
   const [checkedItems, setCheckedItems] = useState<ReadonlySet<string>>(() => new Set<string>());
@@ -291,6 +318,35 @@ export function StepReader({
     onFinish();
   }
 
+  const totalItems = countItems(current);
+  const checklistHeader =
+    isPlanta && totalItems > 0 ? (
+    <div
+      data-testid="step-reader-checklist-header"
+      className="flex items-baseline justify-between gap-3"
+    >
+      <span className="text-sm font-semibold">{TEXTS.checklistTitle}</span>
+      <span
+        data-testid="step-reader-checklist-count"
+        className="font-mono text-sm text-muted-foreground"
+      >
+        {TEXTS.checklistCount(totalItems - pending, totalItems)}
+      </span>
+    </div>
+    ) : undefined;
+
+  const noteText = isEjecucion ? (stepNote?.(currentIndex + 1) ?? null) : null;
+  const stepNoteBlock = noteText !== null && noteText.trim() !== '' && (
+    <div
+      role="note"
+      data-testid="step-reader-note"
+      className="flex items-start gap-3 rounded-[14px] bg-muted px-4 py-3.5 text-[15px]"
+    >
+      <TriangleAlertIcon className="mt-0.5 size-5 shrink-0" aria-hidden />
+      <span>{noteText}</span>
+    </div>
+  );
+
   const documentView = (
     <StepDocumentView
       key={currentIndex}
@@ -300,6 +356,8 @@ export function StepReader({
         checkedItems.has(itemKey(currentIndex, blockIndex, itemIndex))
       }
       onToggleItem={toggleItem}
+      variant={isPlanta ? 'ejecucion' : undefined}
+      checklistHeader={checklistHeader}
     />
   );
 
@@ -394,6 +452,94 @@ export function StepReader({
     </Button>
   );
 
+  const actionsContent = (
+    <>
+      {/* Reserva su alto aunque no haya motivo: marcar el ultimo item no debe mover el boton. */}
+      <div data-testid="step-reader-reason-slot" className="min-h-6">
+        <p
+          id={reasonId}
+          data-testid="step-reader-blocked-reason"
+          className={cn('text-center text-base', reasonText === null && 'invisible')}
+        >
+          {reasonText ?? TEXTS.blocked(pending)}
+        </p>
+        {waitReason}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {previousButton}
+        {primaryButton}
+      </div>
+    </>
+  );
+
+  if (isPlanta) {
+    const total = steps.length;
+    const percent = Math.round(((currentIndex + 1) / total) * 100);
+    return (
+      <section data-testid="step-reader" className="flex flex-col gap-5">
+        {title !== undefined && (
+          <h2 id={headingId} data-testid="step-reader-title" className="text-xl font-bold sm:text-2xl">
+            {title}
+          </h2>
+        )}
+
+        <div
+          ref={headingRef}
+          tabIndex={-1}
+          data-testid="step-reader-heading"
+          className="flex outline-none"
+        >
+          <span
+            data-testid="step-reader-badge"
+            className="inline-flex items-center gap-2.5 text-sm text-muted-foreground"
+          >
+            <b className="inline-flex size-8 items-center justify-center rounded-[10px] bg-primary font-mono text-[15px] font-semibold text-primary-foreground">
+              {currentIndex + 1}
+            </b>
+            <span className="font-mono">{TEXTS.badgeOf(total)}</span>
+          </span>
+        </div>
+
+        {documentView}
+
+        {stepNoteBlock}
+
+        {stepAddon}
+
+        {slots.progress !== null &&
+          createPortal(
+            <div data-testid="step-reader-progress-slot" className="flex flex-col gap-2.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <p
+                  aria-live="polite"
+                  data-testid="step-reader-position"
+                  className="text-[15px] font-semibold"
+                >
+                  {TEXTS.position(currentIndex + 1, total)}
+                </p>
+                <span
+                  data-testid="step-reader-percent"
+                  className="font-mono text-sm text-muted-foreground"
+                >
+                  {TEXTS.percent(percent)}
+                </span>
+              </div>
+              <StepProgress total={total} current={currentIndex} />
+            </div>,
+            slots.progress,
+          )}
+
+        {slots.actions !== null &&
+          createPortal(
+            <div data-testid="step-reader-actions" className="flex w-full flex-col gap-2">
+              {actionsContent}
+            </div>,
+            slots.actions,
+          )}
+      </section>
+    );
+  }
+
   if (isEjecucion) {
     return (
       // El relleno inferior reserva el alto del pie fijo para que el paso no quede debajo.
@@ -427,6 +573,8 @@ export function StepReader({
 
         {documentView}
 
+        {stepNoteBlock}
+
         {stepAddon}
 
         <div
@@ -434,21 +582,7 @@ export function StepReader({
           className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-4 pt-3 pb-[calc(14px+env(safe-area-inset-bottom,0px))]"
         >
           <div className="mx-auto flex w-full max-w-[720px] flex-col gap-2">
-            {/* Reserva su alto aunque no haya motivo: marcar el ultimo item no debe mover el boton. */}
-            <div data-testid="step-reader-reason-slot" className="min-h-6">
-              <p
-                id={reasonId}
-                data-testid="step-reader-blocked-reason"
-                className={cn('text-center text-base', reasonText === null && 'invisible')}
-              >
-                {reasonText ?? TEXTS.blocked(pending)}
-              </p>
-              {waitReason}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {previousButton}
-              {primaryButton}
-            </div>
+            {actionsContent}
           </div>
         </div>
       </section>

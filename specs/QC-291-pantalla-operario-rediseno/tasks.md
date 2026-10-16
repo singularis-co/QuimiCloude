@@ -8,7 +8,7 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
 
 ## Tasks
 
-- [ ] **T1 — Marco con scroll interno y cabecera nueva.** Depende de: —.
+- [x] **T1 — Marco con scroll interno y cabecera nueva.** Depende de: —.
   - Archivos: `operator-screen-frame.tsx` y su test.
   - Raíz `h-dvh flex flex-col overflow-hidden`, zona `operator-scroll` y pie en flujo.
   - Props `phaseLabel`, `running`, `quantity`, `progressSlotRef`, `footerSlotRef` y `overlay`.
@@ -19,7 +19,7 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
     ejemplo, con `running` no hay enlace de vuelta, sí hay `role="status"` y su texto es exactamente
     el que se pasa, sin hora (R4).
 
-- [ ] **T2 [P] — `StepReader` con `slots` y `stepNote`; `StepDocumentView` con `variant`.**
+- [x] **T2 [P] — `StepReader` con `slots` y `stepNote`; `StepDocumentView` con `variant`.**
   Depende de: —.
   - Insignia sin título de paso, porcentaje, contador «Comprueba · X de Y», tarjetas de 60 px,
     párrafos de entrada y el hueco de la nota de seguridad (§3.2).
@@ -43,14 +43,14 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
     - que los tokens existen en `:root` y en `.dark`;
     - que el contraste del texto sobre cada fondo es al menos 4.5:1.
 
-- [ ] **T4 [P] — Tarjeta plegable con `tone`, trasladada a `/asignacion`.** Depende de: T3.
+- [x] **T4 [P] — Tarjeta plegable con `tone`, trasladada a `/asignacion`.** Depende de: T3.
   - Se mueve `order-execution-collapsible-card.tsx` a `app/(private)/asignacion/components/`, con
     la prop `tone` (§3.4).
   - Se ajustan los imports y el barrel de `[id]/components/index.ts`.
   - **Hecho:** test R20 (con `tone`, la cabecera lleva la clase del tono; sin `tone`, la de hoy) en
     `tests/unit/asignaciones-ui/order-execution-collapsible-card.test.tsx`.
 
-- [ ] **T5 [P] — Selector de unidad controlable.** Depende de: —.
+- [x] **T5 [P] — Selector de unidad controlable.** Depende de: —.
   - `selectedUnitIds` y `onSelectUnit` opcionales en `order-execution-lines.tsx` (§3.5).
   - **Hecho:**
     - test R22 en `tests/unit/asignaciones-ui/order-execution-lines.test.tsx`: dos listas con el
@@ -68,7 +68,7 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
     - `aria-expanded`;
     - «Cerrar», Escape y el foco que vuelve al botón.
 
-- [ ] **T7 [P] — `ConditioningTeamList` con avatar, «Personas» y «Tú».** Depende de: —.
+- [x] **T7 [P] — `ConditioningTeamList` con avatar, «Personas» y «Tú».** Depende de: —.
   - Archivo: `conditioning-team-list.tsx` (§3.6).
   - **Hecho:**
     - tests R23 y R24 en `tests/unit/asignaciones-ui/conditioning-team-list.test.tsx`: iniciales,

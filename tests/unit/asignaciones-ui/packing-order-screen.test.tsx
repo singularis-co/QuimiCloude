@@ -31,7 +31,6 @@ import {
   PACKING_ORDER_TEXTS,
   PackingOrderScreen,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
-import { STEP_READER_SIDE_COLUMN_RESERVE } from '@/app/(private)/asignacion/components/operator-screen-frame';
 import {
   ENTITY_IMAGE_ZOOM_TRIGGER_TESTID,
   MISSING_IMAGE_SRC,
@@ -413,26 +412,6 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
 
     expect(screen.queryByTestId(PACKING_ORDER_STEPS_TESTID)).toBeNull();
     expect(screen.queryByText(LLENAR)).toBeNull();
-  });
-
-  function tarjetaResumen(): HTMLElement {
-    const tarjeta = screen.getByTestId(PACKING_ORDER_QUANTITY_TESTID).closest('[data-slot="card"]');
-    expect(tarjeta).not.toBeNull();
-    return tarjeta as HTMLElement;
-  }
-
-  it('QC-269 R4, R7: con paso a paso, la Card de la izquierda reserva el pie fijo del lector', () => {
-    pintar(enEmpaquePropio());
-
-    expect(screen.getByTestId('step-reader')).toBeInTheDocument();
-    expect(tarjetaResumen().className.split(/\s+/)).toContain(STEP_READER_SIDE_COLUMN_RESERVE);
-  });
-
-  it('QC-269 R8: sin paso a paso, la Card no reserva nada (el marco ya reserva su pie)', () => {
-    pintar(enEmpaquePropio([]));
-
-    expect(screen.queryByTestId('step-reader')).toBeNull();
-    expect(tarjetaResumen().className.split(/\s+/)).not.toContain(STEP_READER_SIDE_COLUMN_RESERVE);
   });
 
   it('R20: `EN_EMPAQUE` propio pinta el paso a paso, un paso por pantalla y sin el boton Terminar suelto', () => {

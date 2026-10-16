@@ -6,6 +6,9 @@ import { ChevronDownIcon, type LucideIcon } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
+
+export type OperatorSectionTone = 'materials' | 'tools' | 'team';
 
 export type OrderExecutionCollapsibleCardProps = {
   readonly icon: LucideIcon;
@@ -13,6 +16,7 @@ export type OrderExecutionCollapsibleCardProps = {
   /** Id del título: el contenido lo usa como `aria-labelledby`. */
   readonly titleId: string;
   readonly count: number;
+  readonly tone?: OperatorSectionTone;
   readonly testIds: {
     readonly card: string;
     readonly trigger: string;
@@ -20,6 +24,13 @@ export type OrderExecutionCollapsibleCardProps = {
     readonly content: string;
   };
   readonly children: ReactNode;
+};
+
+// Literales completos: Tailwind solo genera las clases que encuentra escritas en el código.
+export const OPERATOR_SECTION_TONE_CLASSES: Record<OperatorSectionTone, string> = {
+  materials: 'bg-(--section-materials)',
+  tools: 'bg-(--section-tools)',
+  team: 'bg-(--section-team)',
 };
 
 /**
@@ -31,23 +42,38 @@ export function OrderExecutionCollapsibleCard({
   title,
   titleId,
   count,
+  tone,
   testIds,
   children,
 }: OrderExecutionCollapsibleCardProps) {
+  const toned = tone !== undefined;
+
   return (
     <Card className="gap-0 py-0" data-testid={testIds.card}>
       <Collapsible defaultOpen>
         <CollapsibleTrigger
-          className="group flex min-h-13 w-full cursor-pointer items-center justify-between gap-3 rounded-xl px-4 text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={cn(
+            'group flex min-h-13 w-full cursor-pointer items-center justify-between gap-3 px-4 text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            toned
+              ? cn('rounded-none text-(--section-foreground)', OPERATOR_SECTION_TONE_CLASSES[tone])
+              : 'rounded-xl',
+          )}
           data-testid={testIds.trigger}
+          data-tone={tone}
         >
           <span className="flex items-center gap-2.5">
-            <Icon aria-hidden="true" className="size-5 text-muted-foreground" />
+            <Icon
+              aria-hidden="true"
+              className={cn('size-5', toned ? 'text-current' : 'text-muted-foreground')}
+            />
             <span id={titleId} className="text-base font-semibold">
               {title}
             </span>
             <span
-              className="rounded-full bg-muted px-2 py-0.5 font-mono text-sm tabular-nums"
+              className={cn(
+                'rounded-full px-2 py-0.5 font-mono text-sm tabular-nums',
+                toned ? 'bg-(--section-foreground)/22 text-(--section-foreground)' : 'bg-muted',
+              )}
               data-testid={testIds.count}
             >
               {count}
@@ -59,7 +85,7 @@ export function OrderExecutionCollapsibleCard({
           />
         </CollapsibleTrigger>
         <CollapsibleContent keepMounted data-testid={testIds.content}>
-          <div className="px-4 pb-4">{children}</div>
+          <div className={cn('px-4 pb-4', toned && 'pt-4')}>{children}</div>
         </CollapsibleContent>
       </Collapsible>
     </Card>
