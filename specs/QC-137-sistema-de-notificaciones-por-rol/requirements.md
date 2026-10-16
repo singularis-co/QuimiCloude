@@ -66,6 +66,24 @@ _Pendiente: los escribe spec_author (F1.2)._
 3. **Para las fichas de canal, no para esta:** qué es «teléfono» (SMS, llamada o los dos), de
    dónde salen el correo, el teléfono o el chat de Telegram de cada usuario, y si cada usuario
    elige por qué canal recibe cada evento.
+4. **BLOQUEANTE del spec (spec_author, 2026-10-16): falta el pase `/design`.** La ficha trae UI
+   visible nueva y `docs/perfil-agentes.md > Pase de diseño para componentes nuevos` exige que
+   el tablero aprobado esté en `docs/diseno/canvas/` antes de escribir el spec. Hoy no hay
+   ninguno (buscado `notificaci`, `campana`, `bell` en `docs/diseno/`: nada; la cabecera de
+   `app/(private)/layout.tsx` solo tiene `ThemeToggle` y `LogoutButton`). Faltan tableros
+   para:
+   - la **campana** de la cabecera: botón con conteo, panel con los últimos avisos, leído y no
+     leído, vacío, carga y error, conteo grande (p. ej. «99+»);
+   - la **página `/notificaciones`**: historial, vacío, carga, error y paginación si la hay;
+   - el **aviso de «sonido no disponible»** (puede bastar un `Notice` o un toast ya
+     catalogado; que el tablero lo diga);
+   - el **conteo del ítem «Notificaciones»** del menú (hoy `Badge` con número fijo).
+
+   Cada uno en escritorio, tablet y teléfono (`docs/diseno/README.md > Flujo /design`).
+   Cuando estén aprobados y copiados en esta rama, se relanza `spec_author`. Búsqueda de
+   duplicados hecha: board (QC-247/QC-248 son WhatsApp al cliente final, ya en «Lo que NO
+   entra» y pregunta 2), `specs/` (solo menciones de relleno retirado en QC-13 y del encargo de
+   QC-107) y código (`private-nav.ts` `badge` fijo, sin fuente de avisos): nada que choque.
 
 ## Decisiones cerradas (no reabrir)
 
