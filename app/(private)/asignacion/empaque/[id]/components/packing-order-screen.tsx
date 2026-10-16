@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckIcon, PlayIcon } from 'lucide-react';
+import { CheckIcon, PackageIcon, PlayIcon } from 'lucide-react';
 import { useActionState, useId, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -24,24 +24,21 @@ import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 
 import { OperatorScreenFrame } from '../../../components/operator-screen-frame';
+import { useOperatorSidePanels } from '../../../components/operator-side-panels';
 import { useStepEvidence } from '../../../components/use-step-evidence';
 import { PackingFinishDialog, type PackingFinishSubmission } from './packing-finish-dialog';
 
 /**
- * La pantalla de un pedido de empaque, sobre el marco del operario. Sin control de edicion: los
- * datos del pedido se leen tal cual llegaron por props. Se compara SIEMPRE `packedById` con el
- * actor, nunca por nombre, porque dos usuarios pueden llamarse igual. El pie pinta siempre
- * «Comenzar» y «Terminar», y solo uno queda habilitado:
+ * La pantalla de un pedido de empaque, sobre el marco del operario. Se compara SIEMPRE
+ * `packedById` con el actor, nunca por nombre, porque dos usuarios pueden llamarse igual. El pie
+ * pinta solo lo que aplica:
  *
- *   1. `POR_EMPACAR` -> **Comenzar**.
- *   2. `EN_EMPAQUE` a nombre del propio actor -> **Terminar**; si hay pasos de envasado, el pie es
- *      el del paso a paso y su ultimo boton abre la misma confirmacion.
- *   3. `EN_EMPAQUE` a nombre de otro -> los dos deshabilitados y un aviso con quien empaca.
- *   4. `EN_EMPAQUE` propio sin `finish` (el pedido no tiene unidad) -> Terminar deshabilitado, en el
- *      pie o en el ultimo paso, y un aviso que lo explica: sin unidad no hay con que validar el conteo.
- *
- * El boton que no aplica se pinta deshabilitado y SIN `data-testid`: el testid sigue marcando
- * solo el boton que abre su confirmacion, dentro de su `<form>`, como antes.
+ *   1. `POR_EMPACAR` -> «Comenzar el empaque».
+ *   2. `EN_EMPAQUE` propio -> «Terminar el empaque»; con pasos de envasado, el pie es el del paso a
+ *      paso y su ultimo boton abre la misma confirmacion.
+ *   3. `EN_EMPAQUE` a nombre de otro -> ningun boton, solo quien empaca.
+ *   4. `EN_EMPAQUE` propio sin `finish` (el pedido no tiene unidad) -> terminar deshabilitado y un
+ *      aviso que lo explica: sin unidad no hay con que validar el conteo.
  *
  * `startPackingAction` vuelve a la MISMA pantalla (revalida su ruta); `finishPackingAction`
  * termina, en el servidor, con una redireccion a «Por empacar» -su camino feliz nunca resuelve
@@ -65,6 +62,16 @@ export const PACKING_ORDER_FINISH_ERROR_TESTID = 'packing-order-finish-error';
 export const PACKING_ORDER_BACK_LINK_TESTID = 'packing-order-back-link';
 export const PACKING_ORDER_STEPS_TESTID = 'packing-order-steps';
 export const PACKING_ORDER_MISSING_UNIT_TESTID = 'packing-order-missing-unit';
+export const PACKING_ORDER_FOOTER_REASON_TESTID = 'packing-order-footer-reason';
+export const PACKING_ORDER_NOT_STARTED_TESTID = 'packing-order-not-started';
+export const PACKING_ORDER_SECTIONS_TESTID = 'packing-order-sections';
+export const PACKING_ORDER_PACKAGES_TESTIDS = {
+  card: 'packing-order-packages-card',
+  trigger: 'packing-order-packages-trigger',
+  count: 'packing-order-packages-count',
+  content: 'packing-order-packages-content',
+  fab: 'packing-order-packages-fab',
+} as const;
 export const PACKING_ORDER_ID_FIELD = 'orderId';
 export const PACKING_ORDER_LINES_FIELD = 'lines';
 export const PACKING_ORDER_START_DIALOG_TESTID = 'packing-order-start-dialog';
@@ -82,14 +89,18 @@ export const PACKING_ORDER_START_CONFIRM_TEXTS = {
 
 export const PACKING_ORDER_TEXTS = {
   back: 'Volver a «Por empacar»',
+  phase: 'Empaque',
+  running: 'Empacando',
   recipeMissing: 'Esta receta está dada de baja.',
-  quantity: 'Cantidad:',
-  distribution: 'Reparto',
+  quantity: 'Cantidad',
+  packages: 'Envases',
   emptyDistribution: 'Sin presentación',
   missingDistribution: 'Falta el reparto: lo define quien edita pedidos',
-  start: 'Comenzar',
+  startTitle: 'Revisa antes de comenzar',
+  startBody: 'Al comenzar, el empaque queda a tu nombre. Al terminar indicas los envases reales.',
+  start: 'Comenzar el empaque',
   startPending: 'Comenzando…',
-  finish: 'Terminar',
+  finish: 'Terminar el empaque',
   finishPending: 'Terminando…',
   packingSteps: 'Pasos de envasado',
   packerUnknown: 'Lo está empacando otra persona.',
@@ -115,6 +126,7 @@ function packerLabel(order: PackingOrderRow): string {
 const START_INITIAL_STATE: StartPackingResult = { status: 'success' };
 const FINISH_INITIAL_STATE: FinishPackingResult = { status: 'success' };
 
+const FOOTER_ONE_BUTTON_CLASS = 'mx-auto flex w-full max-w-[360px]';
 const FOOTER_BUTTON_CLASS = 'w-full';
 
 export type PackingOrderScreenProps = {
@@ -154,6 +166,9 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
   const showsPackingSteps = canFinish && order.packingSteps.length > 0;
   const lacksUnit = canFinish && order.finish === null;
   const missingUnitId = useId();
+  // En estado y no en ref: `StepReader` necesita re-renderizar cuando el marco ya pintó los nodos.
+  const [progressNode, setProgressNode] = useState<HTMLDivElement | null>(null);
+  const [footerNode, setFooterNode] = useState<HTMLDivElement | null>(null);
 
   const evidence = useStepEvidence({
     orderId: order.id,
@@ -226,7 +241,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
       ref={startFormRef}
       action={startFormAction}
       data-testid={PACKING_ORDER_START_FORM_TESTID}
-      className="flex"
+      className={FOOTER_ONE_BUTTON_CLASS}
     >
       <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
       <Button
@@ -244,78 +259,125 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
       </Button>
       {startDialog}
     </form>
-  ) : (
-    <Button type="button" size="xl" touch variant="outline" className={FOOTER_BUTTON_CLASS} disabled>
-      {startIcon}
-      {PACKING_ORDER_TEXTS.start}
-    </Button>
-  );
+  ) : null;
 
-  const finishCell =
-    canFinish && !showsPackingSteps && !lacksUnit ? (
-      <form
-        ref={finishFormRef}
-        action={finishFormAction}
-        data-testid={PACKING_ORDER_FINISH_FORM_TESTID}
-        className="flex"
-      >
-        <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
-        <input ref={finishLinesRef} type="hidden" name={PACKING_ORDER_LINES_FIELD} defaultValue="" />
-        <Button
-          type="button"
-          size="xl"
-          touch
-          className={FOOTER_BUTTON_CLASS}
-          onClick={() => setFinishConfirmOpen(true)}
-          disabled={finishPending}
-          aria-busy={finishPending}
-          data-testid={PACKING_ORDER_FINISH_BUTTON_TESTID}
-        >
-          {finishIcon}
-          {finishPending ? PACKING_ORDER_TEXTS.finishPending : PACKING_ORDER_TEXTS.finish}
-        </Button>
-        {finishDialog}
-      </form>
-    ) : (
+  const finishCell = !canFinish || showsPackingSteps ? null : lacksUnit ? (
+    <div className={FOOTER_ONE_BUTTON_CLASS}>
       <Button
         type="button"
         size="xl"
         touch
-        variant="outline"
         className={FOOTER_BUTTON_CLASS}
         disabled
-        aria-describedby={lacksUnit ? missingUnitId : undefined}
+        aria-describedby={missingUnitId}
       >
         {finishIcon}
         {PACKING_ORDER_TEXTS.finish}
       </Button>
-    );
+    </div>
+  ) : (
+    <form
+      ref={finishFormRef}
+      action={finishFormAction}
+      data-testid={PACKING_ORDER_FINISH_FORM_TESTID}
+      className={FOOTER_ONE_BUTTON_CLASS}
+    >
+      <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
+      <input ref={finishLinesRef} type="hidden" name={PACKING_ORDER_LINES_FIELD} defaultValue="" />
+      <Button
+        type="button"
+        size="xl"
+        touch
+        className={FOOTER_BUTTON_CLASS}
+        onClick={() => setFinishConfirmOpen(true)}
+        disabled={finishPending}
+        aria-busy={finishPending}
+        data-testid={PACKING_ORDER_FINISH_BUTTON_TESTID}
+      >
+        {finishIcon}
+        {finishPending ? PACKING_ORDER_TEXTS.finishPending : PACKING_ORDER_TEXTS.finish}
+      </Button>
+      {finishDialog}
+    </form>
+  );
 
-  // Con paso a paso el pie es el de `StepReader`: el marco no pinta el suyo.
-  const footer = showsPackingSteps ? undefined : (
-    <div className="grid grid-cols-1 gap-x-6 @min-[1101px]:grid-cols-[300px_minmax(0,720px)] @min-[1101px]:justify-center">
-      <div aria-hidden="true" className="hidden @min-[1101px]:block" />
-      <div className="grid grid-cols-2 gap-3">
-        {startCell}
-        {finishCell}
-      </div>
+  // Con paso a paso, el pie lo pinta `StepReader` por portal en `footerNode`.
+  const footer = showsOtherPacker ? (
+    <p
+      role="status"
+      className="py-3 text-center text-base text-muted-foreground"
+      data-testid={PACKING_ORDER_FOOTER_REASON_TESTID}
+    >
+      {packerLabel(order)}
+    </p>
+  ) : (startCell ?? finishCell ?? undefined);
+
+  const packagesContent = (
+    <div className="flex flex-col gap-2" data-testid={PACKING_ORDER_PRESENTATION_TESTID}>
+      {order.presentationLines.length === 0 ? (
+        <p className="text-base text-muted-foreground">{PACKING_ORDER_TEXTS.emptyDistribution}</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {order.presentationLines.map((line) => (
+            <li
+              key={line.presentationId}
+              className="flex items-center gap-3 text-base"
+              data-testid={PACKING_ORDER_PRESENTATION_LINE_TESTID}
+            >
+              <EntityImage
+                path={line.packagingImageUrl ?? null}
+                name={line.packagingName ?? line.presentationName ?? ''}
+              />
+              <span className="min-w-0">{orderDistributionLineText(line)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {lacksDistribution ? (
+        <Notice tone="warning" testId={PACKING_ORDER_MISSING_DISTRIBUTION_TESTID}>
+          {PACKING_ORDER_TEXTS.missingDistribution}
+        </Notice>
+      ) : null}
     </div>
   );
+
+  const sidePanels = useOperatorSidePanels({
+    columnTestId: PACKING_ORDER_SECTIONS_TESTID,
+    sections: [
+      {
+        key: 'materials',
+        title: PACKING_ORDER_TEXTS.packages,
+        icon: PackageIcon,
+        count: order.presentationLines.length,
+        content: packagesContent,
+        testIds: PACKING_ORDER_PACKAGES_TESTIDS,
+      },
+    ],
+  });
 
   return (
     <OperatorScreenFrame
       testId={PACKING_ORDER_SCREEN_TESTID}
-      // Comenzado por el propio actor, la vuelta queda deshabilitada hasta terminar; a nombre de
-      // otro sigue habilitada: quien mira no lo comenzo.
       back={{
         href: backHref,
         label: PACKING_ORDER_TEXTS.back,
         testId: PACKING_ORDER_BACK_LINK_TESTID,
-        disabled: canFinish,
       }}
+      running={canFinish ? PACKING_ORDER_TEXTS.running : undefined}
+      phaseLabel={PACKING_ORDER_TEXTS.phase}
       eyebrow={order.numberText}
       title={order.recipeName ?? PACKING_ORDER_TEXTS.recipeMissing}
       titleTestId={PACKING_ORDER_RECIPE_TESTID}
+      quantity={
+        <span
+          className="inline-flex min-h-9 items-center gap-2 rounded-full bg-muted px-3 text-sm"
+          data-testid={PACKING_ORDER_QUANTITY_TESTID}
+          title={exactDecimalTitle(order.quantity)}
+        >
+          <span className="text-muted-foreground">{PACKING_ORDER_TEXTS.quantity}</span>{' '}
+          <span className="font-mono font-semibold tabular-nums">{quantityText}</span>
+        </span>
+      }
       status={
         <StatusBadge
           tone={ORDER_STATUS_TONES[order.status]}
@@ -324,7 +386,10 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
           data-status={order.status}
         />
       }
+      progressSlotRef={showsPackingSteps ? setProgressNode : undefined}
       footer={footer}
+      footerSlotRef={showsPackingSteps ? setFooterNode : undefined}
+      overlay={sidePanels.overlay}
     >
       {showsOtherPacker ? (
         <Notice tone="info" testId={PACKING_ORDER_PACKER_TESTID}>
@@ -338,56 +403,10 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
         </Notice>
       ) : null}
 
-      <div className="grid grid-cols-1 items-start gap-5 @min-[1101px]:grid-cols-[300px_minmax(0,720px)] @min-[1101px]:justify-center @min-[1101px]:gap-x-6">
-        <Card className="gap-4 p-4">
-          <p
-            className="text-base font-medium"
-            data-testid={PACKING_ORDER_QUANTITY_TESTID}
-            title={exactDecimalTitle(order.quantity)}
-          >
-            {PACKING_ORDER_TEXTS.quantity} {formatDecimalDisplay(order.quantity)}
-            {order.unitLabel === null ? null : ` ${order.unitLabel}`}
-          </p>
-
-          <section
-            aria-labelledby="packing-order-distribution-heading"
-            className="flex flex-col gap-2"
-            data-testid={PACKING_ORDER_PRESENTATION_TESTID}
-          >
-            <h2 id="packing-order-distribution-heading" className="text-base font-semibold">
-              {PACKING_ORDER_TEXTS.distribution}
-            </h2>
-            {order.presentationLines.length === 0 ? (
-              <p className="text-base text-muted-foreground">
-                {PACKING_ORDER_TEXTS.emptyDistribution}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {order.presentationLines.map((line) => (
-                  <li
-                    key={line.presentationId}
-                    className="flex items-center gap-3 text-base"
-                    data-testid={PACKING_ORDER_PRESENTATION_LINE_TESTID}
-                  >
-                    <EntityImage
-                      path={line.packagingImageUrl ?? null}
-                      name={line.packagingName ?? line.presentationName ?? ''}
-                    />
-                    <span className="min-w-0">{orderDistributionLineText(line)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {lacksDistribution ? (
-              <Notice tone="warning" testId={PACKING_ORDER_MISSING_DISTRIBUTION_TESTID}>
-                {PACKING_ORDER_TEXTS.missingDistribution}
-              </Notice>
-            ) : null}
-          </section>
-        </Card>
+      <div className="grid grid-cols-1 items-start gap-5 @min-[1001px]:grid-cols-[320px_minmax(0,1fr)] @min-[1001px]:gap-x-6">
+        {sidePanels.column}
 
         <div className="flex min-w-0 flex-col gap-4">
-          {/* Encima del contenido y no al final: el pie fijo taparía lo último. */}
           {startError !== undefined ? (
             <ErrorAlert
               error={startError}
@@ -404,6 +423,16 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
             />
           ) : null}
 
+          {canFinish ? null : (
+            <Card
+              className="items-start gap-3 rounded-2xl border border-dashed border-input p-6 ring-0"
+              data-testid={PACKING_ORDER_NOT_STARTED_TESTID}
+            >
+              <h3 className="text-lg font-semibold">{PACKING_ORDER_TEXTS.startTitle}</h3>
+              <p className="text-base text-muted-foreground">{PACKING_ORDER_TEXTS.startBody}</p>
+            </Card>
+          )}
+
           {showsPackingSteps ? (
             <div data-testid={PACKING_ORDER_STEPS_TESTID}>
               <StepReader
@@ -419,6 +448,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
                 renderStepAddon={evidence.renderStepAddon}
                 stepBlockReason={stepBlockReason}
                 stepRequest={stepRequest}
+                slots={{ progress: progressNode, actions: footerNode }}
               />
             </div>
           ) : null}

@@ -7,6 +7,10 @@ import {
   PACKING_ORDER_FINISH_DIALOG_TESTID,
   PACKING_ORDER_FINISH_ERROR_TESTID,
   PACKING_ORDER_FINISH_FORM_TESTID,
+  PACKING_ORDER_FOOTER_REASON_TESTID,
+  PACKING_ORDER_NOT_STARTED_TESTID,
+  PACKING_ORDER_PACKAGES_TESTIDS,
+  PACKING_ORDER_SECTIONS_TESTID,
   PACKING_ORDER_ID_FIELD,
   PACKING_ORDER_LINES_FIELD,
   PACKING_FINISH_DIALOG_TEXTS,
@@ -31,6 +35,10 @@ import {
   PACKING_ORDER_TEXTS,
   PackingOrderScreen,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
+import {
+  OPERATOR_SIDE_PANELS_FABS_TESTID,
+  operatorSidePanelTestId,
+} from '@/app/(private)/asignacion/components';
 import {
   ENTITY_IMAGE_ZOOM_TRIGGER_TESTID,
   MISSING_IMAGE_SRC,
@@ -166,14 +174,14 @@ describe('pantalla del Empacador — el reparto completo en solo lectura', () =>
   it('R26: la cantidad del pedido va con su unidad', () => {
     pintar(fila({ quantity: '12.5', unitLabel: 'kg' }));
 
-    expect(screen.getByTestId(PACKING_ORDER_QUANTITY_TESTID)).toHaveTextContent('Cantidad: 12.5 kg');
+    expect(screen.getByTestId(PACKING_ORDER_QUANTITY_TESTID)).toHaveTextContent('Cantidad 12.5 kg');
   });
 
   it('R26: sin unidad, la cantidad va sola', () => {
     pintar(fila({ quantity: '12.5', unitId: null, unitLabel: null }));
 
     const cantidad = screen.getByTestId(PACKING_ORDER_QUANTITY_TESTID);
-    expect(cantidad.textContent?.trim()).toBe('Cantidad: 12.5');
+    expect(cantidad.textContent?.trim()).toBe('Cantidad 12.5');
   });
 
   it('R47: no hay selector de presentacion ni de unidad, ni botones de añadir/quitar, ni campo de envases', () => {
@@ -419,18 +427,20 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
 
     const pasos = screen.getByTestId(PACKING_ORDER_STEPS_TESTID);
     expect(within(pasos).getByTestId('step-reader-title')).toHaveTextContent('Pasos de envasado');
-    expect(within(pasos).getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 2');
+    expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 2');
     expect(within(pasos).getByText(LLENAR)).toBeInTheDocument();
     expect(screen.queryByText(ETIQUETAR)).toBeNull();
     expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
   });
 
-  it('QC-265 R30: con pasos, el pie es el del paso a paso y no se pintan «Comenzar» ni «Terminar» de R29', () => {
+  it('QC-291 R9: con pasos, el pie es el del paso a paso y no se pintan «Comenzar» ni «Terminar» sueltos', () => {
     pintar(enEmpaquePropio());
 
     const raiz = screen.getByTestId(PACKING_ORDER_SCREEN_TESTID);
-    expect(raiz.querySelector('[data-slot="operator-footer"]')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Comenzar' })).toBeNull();
+    const pie = raiz.querySelector<HTMLElement>('[data-slot="operator-footer"]');
+    expect(pie).not.toBeNull();
+    expect(within(pie!).getByTestId('step-reader-actions')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: PACKING_ORDER_TEXTS.start })).toBeNull();
     expect(screen.queryByTestId(PACKING_ORDER_START_BUTTON_TESTID)).toBeNull();
     expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
     expect(screen.getByTestId('step-reader-previous')).toBeInTheDocument();
@@ -555,7 +565,7 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     cleanup();
 
     pintar(fila({ status: 'EN_EMPAQUE', packedById: 'otro', packedByName: 'Otra' }));
-    expect(screen.getByText('Lo está empacando Otra.')).toBeInTheDocument();
+    expect(screen.getByTestId(PACKING_ORDER_PACKER_TESTID)).toHaveTextContent('Lo está empacando Otra.');
     expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
     expect(screen.queryByTestId(PACKING_ORDER_STEPS_TESTID)).toBeNull();
   });
@@ -675,16 +685,6 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
     expect(volver).not.toHaveAttribute('aria-disabled');
   });
 
-  it('EN_EMPAQUE a nombre propio: la vuelta se ve deshabilitada, sin href', () => {
-    pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH }));
-
-    const volver = screen.getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
-    expect(volver.tagName).not.toBe('A');
-    expect(volver).not.toHaveAttribute('href');
-    expect(volver).toHaveAttribute('aria-disabled', 'true');
-    expect(volver.textContent).toBe(PACKING_ORDER_TEXTS.back);
-  });
-
   it('EN_EMPAQUE a nombre de otro: la vuelta sigue habilitada, quien mira no lo comenzo', () => {
     pintar(
       fila({
@@ -709,12 +709,11 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
     expect(estado.textContent).toBe('En empaque');
   });
 
-  it('R28: el resumen pinta cantidad, reparto con sus líneas y envases, con sus testids', () => {
+  it('R28: el resumen pinta cantidad y el reparto con sus líneas y envases, con sus testids', () => {
     pintar(fila());
 
-    expect(screen.getByTestId(PACKING_ORDER_QUANTITY_TESTID)).toHaveTextContent('Cantidad: 12.5 kg');
+    expect(screen.getByTestId(PACKING_ORDER_QUANTITY_TESTID)).toHaveTextContent('Cantidad 12.5 kg');
     const reparto = screen.getByTestId(PACKING_ORDER_PRESENTATION_TESTID);
-    expect(within(reparto).getByRole('heading', { level: 2, name: 'Reparto' })).toBeInTheDocument();
     expect(within(reparto).getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID)).toHaveLength(3);
     expect(screen.queryByText(/Envases:/)).toBeNull();
   });
@@ -730,65 +729,26 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
     expect(aviso).toHaveTextContent(MISSING_DISTRIBUTION_TEXT);
   });
 
-  it('R29: `POR_EMPACAR` pinta en el pie «Comenzar» y «Terminar», y solo «Comenzar» habilitado', () => {
-    pintar(fila());
-
-    const comenzar = within(pie()).getByRole('button', { name: 'Comenzar' });
-    const terminar = within(pie()).getByRole('button', { name: 'Terminar' });
-    expect(comenzar).toBeEnabled();
-    expect(comenzar).toHaveAttribute('data-testid', PACKING_ORDER_START_BUTTON_TESTID);
-    expect(esPrincipal(comenzar)).toBe(true);
-    expect(within(pie()).getByTestId(PACKING_ORDER_START_FORM_TESTID)).toContainElement(comenzar);
-    expect(terminar).toBeDisabled();
-    expect(esPrincipal(terminar)).toBe(false);
-    expect(screen.queryByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toBeNull();
-  });
-
-  it('R29: `EN_EMPAQUE` propio sin pasos habilita solo «Terminar», dentro de su formulario', () => {
-    pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH }));
-
-    const comenzar = within(pie()).getByRole('button', { name: 'Comenzar' });
-    const terminar = within(pie()).getByRole('button', { name: 'Terminar' });
-    expect(comenzar).toBeDisabled();
-    expect(esPrincipal(comenzar)).toBe(false);
-    expect(terminar).toBeEnabled();
-    expect(terminar).toHaveAttribute('data-testid', PACKING_ORDER_FINISH_BUTTON_TESTID);
-    expect(esPrincipal(terminar)).toBe(true);
-    expect(within(pie()).getByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toContainElement(terminar);
-    expect(screen.queryByTestId(PACKING_ORDER_START_FORM_TESTID)).toBeNull();
-  });
-
-  it('R3: los botones del pie miden 52 px de alto y cumplen el mínimo táctil', () => {
+  it('R3: el botón del pie mide 52 px de alto y cumple el mínimo táctil', () => {
     pintar(fila());
 
     const botones = within(pie()).getAllByRole('button');
-    expect(botones).toHaveLength(2);
-    for (const boton of botones) {
-      const clases = boton.className.split(/\s+/);
-      expect(clases).toContain('h-13');
-      expect(clases).toContain('min-h-11');
-      expect(clases).toContain('min-w-11');
-    }
+    expect(botones).toHaveLength(1);
+    const clases = botones[0].className.split(/\s+/);
+    expect(clases).toContain('h-13');
+    expect(clases).toContain('min-h-11');
+    expect(clases).toContain('min-w-11');
+    expect(esPrincipal(botones[0])).toBe(true);
     const volver = screen.getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
     expect(volver.className).toContain('min-h-11');
     expect(volver.className).toContain('min-w-11');
-  });
-
-  it('R4: el cuerpo pasa a dos columnas (300 px y hasta 720 px) por encima de 1100 px', () => {
-    pintar(fila());
-
-    const resumen = screen.getByTestId(PACKING_ORDER_QUANTITY_TESTID).closest('[data-slot="card"]');
-    expect(resumen).not.toBeNull();
-    const rejilla = resumen!.parentElement!;
-    expect(rejilla.className).toContain('grid-cols-1');
-    expect(rejilla.className).toContain('@min-[1101px]:grid-cols-[300px_minmax(0,720px)]');
   });
 
   it.each([
     ['Otra Persona', 'Lo está empacando Otra Persona.'],
     [null, 'Lo está empacando otra persona.'],
   ] as const)(
-    'R31: otra persona empaca (%s) → `Notice` `info` «%s» y los dos botones deshabilitados',
+    'R31: otra persona empaca (%s) → `Notice` `info` «%s» en el contenido y sin formularios',
     (packedByName, texto) => {
       pintar(fila({ status: 'EN_EMPAQUE', packedById: OTRO_ID, packedByName }));
 
@@ -796,8 +756,6 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
       expect(aviso).toHaveAttribute('data-tone', 'info');
       expect(aviso).toHaveAttribute('role', 'status');
       expect(aviso.textContent).toBe(texto);
-      expect(within(pie()).getByRole('button', { name: 'Comenzar' })).toBeDisabled();
-      expect(within(pie()).getByRole('button', { name: 'Terminar' })).toBeDisabled();
       expect(screen.queryByTestId(PACKING_ORDER_START_FORM_TESTID)).toBeNull();
       expect(screen.queryByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toBeNull();
     },
@@ -899,12 +857,12 @@ describe('pedido sin unidad: Terminar deshabilitado con su nota', () => {
     expect(nota).toHaveAttribute('role', 'status');
     expect(nota).toHaveTextContent(PACKING_ORDER_TEXTS.missingUnit);
 
-    const terminar = screen.getByRole('button', { name: 'Terminar' });
+    const terminar = screen.getByRole('button', { name: PACKING_ORDER_TEXTS.finish });
     expect(terminar).toBeDisabled();
     expect(terminar).toHaveAttribute('aria-describedby', nota.id);
     expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
     expect(screen.queryByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Comenzar' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: PACKING_ORDER_TEXTS.start })).toBeNull();
   });
 
   it('R1, R8: con pasos, el último paso no deja terminar y su motivo visible es la nota', async () => {
@@ -952,5 +910,341 @@ describe('pedido sin unidad: Terminar deshabilitado con su nota', () => {
     expect(PACKING_ORDER_TEXTS.missingUnit).toBe(
       'Falta la unidad del pedido: sin ella no se puede comprobar el conteo real.',
     );
+  });
+});
+
+describe('QC-291 — el empaque con la cabecera, el pie y la columna nuevos', () => {
+  const OTRO_ID = '22222222-2222-4222-8222-222222222222';
+  const UN_PASO: PackingOrderDetail['packingSteps'] = [
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Etiquetar el lote' }] }] },
+  ];
+  const DOS_PASOS: PackingOrderDetail['packingSteps'] = [
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Llenar' }] }] },
+    ...UN_PASO,
+  ];
+  const SIN_PASOS: PackingOrderDetail['packingSteps'] = [];
+
+  const propio = (overrides: Partial<PackingOrderDetail> = {}) =>
+    fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH, ...overrides });
+  const deOtro = (overrides: Partial<PackingOrderDetail> = {}) =>
+    fila({ status: 'EN_EMPAQUE', packedById: OTRO_ID, packedByName: 'Otra', ...overrides });
+
+  function zona(slot: string): HTMLElement {
+    const nodo = screen
+      .getByTestId(PACKING_ORDER_SCREEN_TESTID)
+      .querySelector<HTMLElement>(`[data-slot="${slot}"]`);
+    expect(nodo).not.toBeNull();
+    return nodo!;
+  }
+
+  const cabecera = () => zona('operator-header');
+  const pie = () => zona('operator-footer');
+  const columna = () => screen.getByTestId(PACKING_ORDER_SECTIONS_TESTID);
+
+  it('R2: la cabecera pinta «Empaque · número», el número en su elemento, un único h1 y la insignia', () => {
+    pintar(fila());
+
+    expect(zona('operator-phase').textContent).toBe('Empaque · 2026-0000030');
+    expect(zona('operator-eyebrow').textContent).toBe('2026-0000030');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    const estado = within(cabecera()).getByTestId(PACKING_ORDER_STATUS_TESTID);
+    expect(estado.textContent).toBe(ORDER_STATUS_LABELS.POR_EMPACAR);
+  });
+
+  it('R2: un único chip «Cantidad <cifra> <unidad>» en la cabecera, y ningún otro chip ni «Lo acondiciona»', () => {
+    pintar(fila());
+
+    const meta = zona('operator-meta');
+    expect(meta.children).toHaveLength(1);
+    const chip = within(meta).getByTestId(PACKING_ORDER_QUANTITY_TESTID);
+    expect(chip.textContent).toBe('Cantidad 12.5 kg');
+    expect(screen.getAllByTestId(PACKING_ORDER_QUANTITY_TESTID)).toHaveLength(1);
+    expect(within(cabecera()).queryByText(/Lote|Entrega|Presentación|Envase/)).toBeNull();
+    expect(screen.queryByText(/Lo acondiciona/)).toBeNull();
+  });
+
+  it('R2: sin unidad, el chip lleva solo la cifra', () => {
+    pintar(fila({ unitId: null, unitLabel: null }));
+
+    expect(within(cabecera()).getByTestId(PACKING_ORDER_QUANTITY_TESTID).textContent).toBe('Cantidad 12.5');
+  });
+
+  it('R3: sin comenzar, la cabecera lleva «Volver a «Por empacar»» habilitado y sin línea de estado', () => {
+    pintar(fila());
+
+    const volver = within(cabecera()).getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
+    expect(volver.tagName).toBe('A');
+    expect(volver).toHaveAttribute('href', '/asignacion?vista=por_empacar');
+    expect(volver).not.toHaveAttribute('aria-disabled');
+    expect(volver.textContent).toBe(PACKING_ORDER_TEXTS.back);
+    expect(cabecera().querySelector('[data-slot="operator-running"]')).toBeNull();
+  });
+
+  it.each([
+    ['sin pasos', SIN_PASOS],
+    ['con pasos', DOS_PASOS],
+  ] as const)('R4: comenzado por el actor (%s), no hay vuelta y la línea de estado dice «Empacando»', (_, packingSteps) => {
+    pintar(propio({ packingSteps }));
+
+    expect(screen.queryByTestId(PACKING_ORDER_BACK_LINK_TESTID)).toBeNull();
+    expect(within(cabecera()).queryByRole('link')).toBeNull();
+    const linea = zona('operator-running');
+    expect(linea).toHaveAttribute('role', 'status');
+    expect(linea.textContent).toBe('Empacando');
+  });
+
+  it('R5: a nombre de otra persona, la vuelta sigue habilitada y no hay «Empacando»', () => {
+    pintar(deOtro());
+
+    const volver = within(cabecera()).getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
+    expect(volver.tagName).toBe('A');
+    expect(volver).toHaveAttribute('href', '/asignacion?vista=por_empacar');
+    expect(cabecera().querySelector('[data-slot="operator-running"]')).toBeNull();
+    expect(screen.queryByText('Empacando')).toBeNull();
+  });
+
+  it('R8: sin comenzar, el pie tiene un único botón «Comenzar el empaque», centrado, que abre la confirmación', () => {
+    pintar(fila());
+
+    const botones = within(pie()).getAllByRole('button');
+    expect(botones).toHaveLength(1);
+    const [comenzar] = botones;
+    expect(comenzar).toHaveAccessibleName('Comenzar el empaque');
+    expect(comenzar).toHaveAttribute('data-testid', PACKING_ORDER_START_BUTTON_TESTID);
+    expect(comenzar).toBeEnabled();
+    const formulario = within(pie()).getByTestId(PACKING_ORDER_START_FORM_TESTID);
+    expect(formulario).toContainElement(comenzar);
+    expect(formulario.className.split(/\s+/)).toEqual(expect.arrayContaining(['mx-auto', 'max-w-[360px]']));
+
+    fireEvent.click(comenzar);
+    expect(screen.getByTestId(PACKING_ORDER_START_DIALOG_TESTID)).toHaveTextContent(
+      PACKING_ORDER_START_CONFIRM_TEXTS.title,
+    );
+  });
+
+  it('R8: mientras comienza, el botón queda deshabilitado y ocupado, como hoy', async () => {
+    let resolver: (value: { status: 'success' }) => void = () => {};
+    startPackingActionMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolver = resolve;
+      }),
+    );
+    pintar(fila());
+
+    try {
+      fireEvent.click(screen.getByTestId(PACKING_ORDER_START_BUTTON_TESTID));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(PACKING_ORDER_START_CONFIRM_TESTID));
+      });
+
+      const boton = screen.getByTestId(PACKING_ORDER_START_BUTTON_TESTID);
+      expect(boton).toBeDisabled();
+      expect(boton).toHaveAttribute('aria-busy', 'true');
+      expect(boton).toHaveTextContent(PACKING_ORDER_TEXTS.startPending);
+    } finally {
+      await act(async () => {
+        resolver({ status: 'success' });
+      });
+    }
+  });
+
+  it('R9: con pasos, el pie lleva «Anterior» y «Siguiente» y la cabecera el progreso «Paso 1 de 2»', () => {
+    pintar(propio({ packingSteps: DOS_PASOS }));
+
+    expect(within(pie()).getByTestId('step-reader-previous')).toBeInTheDocument();
+    expect(within(pie()).getByTestId('step-reader-next')).toBeInTheDocument();
+    expect(within(pie()).queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
+    const progreso = within(cabecera()).getByTestId('step-reader-progress-slot');
+    expect(within(progreso).getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 2');
+  });
+
+  it('R9: en el último paso, el pie dice «Terminar el empaque» y abre el diálogo del conteo', async () => {
+    vi.useFakeTimers();
+    try {
+      pintar(propio({ packingSteps: UN_PASO }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const terminar = within(pie()).getByTestId('step-reader-finish');
+    expect(terminar).toHaveTextContent('Terminar el empaque');
+    expect(within(pie()).queryByTestId('step-reader-next')).toBeNull();
+    fireEvent.click(terminar);
+    expect(screen.getByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID)).toBeInTheDocument();
+  });
+
+  it('R10: comenzado sin pasos, el pie tiene un único botón «Terminar el empaque», centrado', () => {
+    pintar(propio());
+
+    const botones = within(pie()).getAllByRole('button');
+    expect(botones).toHaveLength(1);
+    expect(botones[0]).toHaveAccessibleName('Terminar el empaque');
+    expect(botones[0]).toHaveAttribute('data-testid', PACKING_ORDER_FINISH_BUTTON_TESTID);
+    expect(botones[0]).toBeEnabled();
+    const formulario = within(pie()).getByTestId(PACKING_ORDER_FINISH_FORM_TESTID);
+    expect(formulario).toContainElement(botones[0]);
+    expect(formulario.className.split(/\s+/)).toEqual(expect.arrayContaining(['mx-auto', 'max-w-[360px]']));
+  });
+
+  it('R10: sin unidad, el único botón queda deshabilitado con el motivo visible y asociado', () => {
+    pintar(propio({ unitId: null, unitLabel: null, finish: null }));
+
+    const botones = within(pie()).getAllByRole('button');
+    expect(botones).toHaveLength(1);
+    expect(botones[0]).toHaveAccessibleName('Terminar el empaque');
+    expect(botones[0]).toBeDisabled();
+    const motivo = screen.getByTestId(PACKING_ORDER_MISSING_UNIT_TESTID);
+    expect(motivo).toBeVisible();
+    expect(botones[0]).toHaveAttribute('aria-describedby', motivo.id);
+  });
+
+  it('R17: sin comenzar, el contenido muestra «Revisa antes de comenzar» con su texto y sin número de pasos', () => {
+    pintar(fila({ packingSteps: DOS_PASOS }));
+
+    const tarjeta = screen.getByTestId(PACKING_ORDER_NOT_STARTED_TESTID);
+    expect(zona('operator-body')).toContainElement(tarjeta);
+    expect(within(tarjeta).getByRole('heading', { level: 3 })).toHaveTextContent('Revisa antes de comenzar');
+    expect(tarjeta).toHaveTextContent(
+      'Al comenzar, el empaque queda a tu nombre. Al terminar indicas los envases reales.',
+    );
+    expect(tarjeta.textContent).not.toMatch(/pasos/);
+    expect(within(tarjeta).queryByRole('list')).toBeNull();
+  });
+
+  it('R17: comenzado por el actor, la tarjeta no aparece', () => {
+    pintar(propio());
+
+    expect(screen.queryByTestId(PACKING_ORDER_NOT_STARTED_TESTID)).toBeNull();
+  });
+
+  it.each([
+    ['sin comenzar', () => fila()],
+    ['comenzado', () => propio()],
+    ['de otra persona', () => deOtro()],
+  ] as const)('R20: %s, la columna tiene solo Envases, en ámbar, sin Equipo ni Herramientas', (_, orden) => {
+    pintar(orden());
+
+    expect(columna().tagName).toBe('ASIDE');
+    expect(columna()).toHaveAccessibleName('Envases');
+    expect(columna().className).toContain('@max-[1000px]:hidden');
+    expect(columna().querySelectorAll('[data-slot="card"]')).toHaveLength(1);
+    const disparador = within(columna()).getByTestId(PACKING_ORDER_PACKAGES_TESTIDS.trigger);
+    expect(disparador).toHaveTextContent('Envases');
+    expect(disparador).toHaveAttribute('data-tone', 'materials');
+    expect(disparador).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId(PACKING_ORDER_PACKAGES_TESTIDS.count).textContent).toBe('3');
+    expect(screen.queryByText(/Equipo|Herramientas/)).toBeNull();
+
+    const flotantes = within(screen.getByTestId(OPERATOR_SIDE_PANELS_FABS_TESTID)).getAllByRole('button');
+    expect(flotantes).toHaveLength(1);
+    expect(flotantes[0]).toHaveAccessibleName('Ver envases');
+    expect(flotantes[0]).toHaveAttribute('data-testid', PACKING_ORDER_PACKAGES_TESTIDS.fab);
+  });
+
+  it('R20: la rejilla pasa a dos columnas, 320 px y el contenido, por encima de 1000 px', () => {
+    pintar(fila());
+
+    const rejilla = columna().parentElement!;
+    expect(rejilla.className).toContain('grid-cols-1');
+    expect(rejilla.className).toContain('@min-[1001px]:grid-cols-[320px_minmax(0,1fr)]');
+  });
+
+  it('R25: Envases lleva las líneas con imagen dentro de la tarjeta', () => {
+    pintar(fila());
+
+    const contenido = screen.getByTestId(PACKING_ORDER_PACKAGES_TESTIDS.content);
+    const lineas = within(contenido).getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID);
+    expect(lineas.map((linea) => linea.textContent)).toEqual([
+      '5 × Botella 200 ml',
+      '2 × Garrafa 5 l',
+      '1 × —',
+    ]);
+    for (const linea of lineas) expect(linea.querySelectorAll('img')).toHaveLength(1);
+  });
+
+  it('R25: sin reparto, Envases dice «Sin presentación» y lleva el aviso de reparto pendiente', () => {
+    pintar(fila({ presentationLines: [] }));
+
+    const contenido = screen.getByTestId(PACKING_ORDER_PACKAGES_TESTIDS.content);
+    expect(within(contenido).getByText('Sin presentación')).toBeInTheDocument();
+    expect(within(contenido).getByTestId(PACKING_ORDER_MISSING_DISTRIBUTION_TESTID)).toHaveTextContent(
+      MISSING_DISTRIBUTION_TEXT,
+    );
+    expect(screen.getByTestId(PACKING_ORDER_PACKAGES_TESTIDS.count).textContent).toBe('0');
+  });
+
+  it('R25: el panel de Envases muestra el mismo reparto', async () => {
+    pintar(fila());
+
+    fireEvent.click(screen.getByTestId(PACKING_ORDER_PACKAGES_TESTIDS.fab));
+    const panel = await screen.findByTestId(operatorSidePanelTestId('materials'));
+    expect(within(panel).getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID)).toHaveLength(3);
+    expect(within(panel).getByRole('heading', { name: /Envases/ })).toBeInTheDocument();
+  });
+
+  it('R32: Comenzar llama a startPackingAction con el estado inicial y solo el id del pedido', async () => {
+    startPackingActionMock.mockResolvedValue({ status: 'success' });
+    pintar(fila());
+
+    fireEvent.click(screen.getByTestId(PACKING_ORDER_START_BUTTON_TESTID));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(PACKING_ORDER_START_CONFIRM_TESTID));
+    });
+
+    expect(startPackingActionMock).toHaveBeenCalledTimes(1);
+    const [estado, formData] = startPackingActionMock.mock.calls[0] as [unknown, FormData];
+    expect(estado).toEqual({ status: 'success' });
+    expect([...formData.keys()]).toEqual([PACKING_ORDER_ID_FIELD]);
+    expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
+    expect(finishPackingActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R32: Terminar llama a finishPackingAction con el estado inicial, el id y las líneas del conteo', async () => {
+    finishPackingActionMock.mockResolvedValue({ status: 'success' });
+    pintar(propio());
+
+    fireEvent.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(PACKING_ORDER_FINISH_CONFIRM_TESTID));
+    });
+
+    expect(finishPackingActionMock).toHaveBeenCalledTimes(1);
+    const [estado, formData] = finishPackingActionMock.mock.calls[0] as [unknown, FormData];
+    expect(estado).toEqual({ status: 'success' });
+    expect([...formData.keys()]).toEqual([PACKING_ORDER_ID_FIELD, PACKING_ORDER_LINES_FIELD]);
+    expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
+    expect(JSON.parse(String(formData.get(PACKING_ORDER_LINES_FIELD)))).toEqual(PLAN_SIN_CAMBIOS);
+    expect(startPackingActionMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Otra', SIN_PASOS, 'Lo está empacando Otra.'],
+    [null, SIN_PASOS, 'Lo está empacando otra persona.'],
+    ['Otra', DOS_PASOS, 'Lo está empacando Otra.'],
+  ] as const)(
+    'R33: a nombre de otra persona (%s), el pie no tiene botones y solo dice quién empaca',
+    (packedByName, packingSteps, texto) => {
+      pintar(deOtro({ packedByName, packingSteps }));
+
+      expect(within(pie()).queryAllByRole('button')).toHaveLength(0);
+      const motivo = within(pie()).getByTestId(PACKING_ORDER_FOOTER_REASON_TESTID);
+      expect(motivo).toHaveAttribute('role', 'status');
+      expect(motivo.textContent).toBe(texto);
+      expect(pie().textContent).toBe(texto);
+      expect(screen.queryByTestId(PACKING_ORDER_START_BUTTON_TESTID)).toBeNull();
+      expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
+      expect(screen.queryByTestId('step-reader-actions')).toBeNull();
+    },
+  );
+
+  it('R33: el motivo del pie no sale si el actor puede actuar', () => {
+    for (const orden of [fila(), propio(), propio({ packingSteps: DOS_PASOS })]) {
+      pintar(orden);
+      expect(screen.queryByTestId(PACKING_ORDER_FOOTER_REASON_TESTID)).toBeNull();
+      cleanup();
+    }
   });
 });

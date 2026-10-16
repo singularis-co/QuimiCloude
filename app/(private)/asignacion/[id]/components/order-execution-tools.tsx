@@ -1,3 +1,7 @@
+'use client';
+
+import { useId } from 'react';
+
 import type { ExecutionToolView } from '@/lib/modules/asignaciones';
 
 export const ORDER_EXECUTION_TOOLS_TESTID = 'order-execution-tools';
@@ -11,24 +15,31 @@ export type OrderExecutionToolsProps = {
   readonly tools: readonly ExecutionToolView[];
   /** Id del elemento que ya titula el bloque; con él no se pinta el título propio. */
   readonly labelledBy?: string;
+  /** Nombre del bloque cuando lo titula un contenedor cuyo id no se conoce; tampoco pinta el
+   *  título propio. */
+  readonly label?: string;
 };
 
 /**
  * Herramientas de la receta, solo lectura. La cantidad es la de la receta: no se escala con la
  * del pedido. Sin herramientas no se monta nada, ni siquiera el título.
  */
-export function OrderExecutionTools({ tools, labelledBy }: OrderExecutionToolsProps) {
+export function OrderExecutionTools({ tools, labelledBy, label }: OrderExecutionToolsProps) {
+  // Único por instancia: la misma lista puede estar en la columna y en el panel a la vez.
+  const headingId = useId();
+
   if (tools.length === 0) return null;
 
-  const headingId = `${ORDER_EXECUTION_TOOLS_TESTID}-heading`;
+  const ownHeading = labelledBy === undefined && label === undefined;
 
   return (
     <section
-      aria-labelledby={labelledBy ?? headingId}
+      aria-labelledby={ownHeading ? headingId : labelledBy}
+      aria-label={label}
       data-testid={ORDER_EXECUTION_TOOLS_TESTID}
       className="flex flex-col gap-2"
     >
-      {labelledBy === undefined ? (
+      {ownHeading ? (
         <h2 id={headingId} className="text-lg font-medium">
           {TOOLS_HEADING}
         </h2>

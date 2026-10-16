@@ -199,11 +199,12 @@ describe('pagina de ejecucion — entrar es libre: abrir no comienza el pedido',
     expect(screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID).tagName).toBe('A');
   });
 
-  it('EN_CURSO: retoma sin «Comenzar» y con la vuelta deshabilitada', async () => {
+  it('R4: EN_CURSO retoma sin «Comenzar», sin la vuelta y con «Fabricando»', async () => {
     render(await arbolDeLaPagina());
 
     expect(startAssignedOrderActionMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toBeNull();
-    expect(screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID)).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByTestId(ORDER_EXECUTION_BACK_LINK_TESTID)).toBeNull();
+    expect(screen.getByText('Fabricando')).toHaveAttribute('role', 'status');
   });
 });

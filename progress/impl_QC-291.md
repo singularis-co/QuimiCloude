@@ -196,3 +196,159 @@ cada task están en verde. La salida de `vitest related` de cada subagente está
 - `pnpm exec vitest related --run <los 3 archivos>`: `Test Files 3 failed | 36 passed (39) · Tests 17 failed | 533 passed (550)`. Los rojos son de archivos que no usan la pieza: entran solo por el barrel. `paridad/asignacion-acondicionamiento-paridad` (13 snapshots, la pantalla de tanda 1), `conditioning-order-screen` (3, Equipo de T7) y `marca/tablas-marca` (1, `product-columns.tsx`, fuera de la feature).
 
 **Veredicto:** T6 hecha y verde en su test; los rojos de `related` vienen de antes y no los toca T6.
+
+## Tanda 3 — T9 Pantalla de empaque (frontend_dev)
+
+**Archivos**
+
+- `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx`:
+  - cabecera con `phaseLabel` «Empaque», `running` «Empacando» si `canFinish`, `back` sin `disabled` y chip `packing-order-quantity` («Cantidad <cifra> <unidad>») en `quantity`;
+  - una sola sección, Envases (`key: 'materials'`, `PackageIcon`, contador = líneas del reparto), con `useOperatorSidePanels`. Lleva el contenido de hoy: líneas con `EntityImage`, «Sin presentación» y el aviso de reparto pendiente. Se quita el `h2` «Reparto», porque el título lo pone la tarjeta. Rejilla `@min-[1001px]:grid-cols-[320px_minmax(0,1fr)]`;
+  - pie de un botón centrado (`mx-auto max-w-[360px]`): «Comenzar el empaque» o «Terminar el empaque», que sin unidad queda deshabilitado con `aria-describedby` a la nota. Con pasos, `StepReader` con `slots` (`progressSlotRef`/`footerSlotRef` en estado) y `finishLabel` «Terminar el empaque». A nombre de otra persona, el pie lleva solo `<p role="status" data-testid="packing-order-footer-reason">` con `packerLabel`, y se conserva el `Notice` `packing-order-packer`;
+  - «Revisa antes de comenzar» (`packing-order-not-started`): `Card` discontinua con `h3` y el texto del tablero, sin número de pasos;
+  - sin `stepNote`, como dice §3.2. Mismas acciones y diálogos.
+- `app/(private)/asignacion/empaque/[id]/components/index.ts`: exporta `PACKING_ORDER_FOOTER_REASON_TESTID`, `PACKING_ORDER_NOT_STARTED_TESTID`, `PACKING_ORDER_SECTIONS_TESTID` y `PACKING_ORDER_PACKAGES_TESTIDS`.
+- `tests/unit/asignaciones-ui/packing-order-screen.test.tsx`:
+  - se ajustan los casos que fijaban el diseño anterior: los dos botones del pie (R29/R31 de QC-265), la vuelta deshabilitada, la rejilla de 300/1101, el `h2` «Reparto», «Cantidad:» y la posición dentro de `packing-order-steps`;
+  - se añade el describe «QC-291 — el empaque con la cabecera, el pie y la columna nuevos».
+- `PACKING_ORDER_TEXTS`:
+  - cambian `start`/`finish` a «Comenzar el empaque»/«Terminar el empaque» y `quantity` a «Cantidad»;
+  - se añaden `phase`, `running`, `packages`, `startTitle` y `startBody`;
+  - se quita `distribution`, que ya no se usa.
+
+**Interpretación a revisar:** R17 dice «MIENTRAS la pantalla no esté comenzada por el actor». La tarjeta sale también con `EN_EMPAQUE` a nombre de otra persona, junto al aviso de quien empaca.
+
+**Mapa R → test** (`tests/unit/asignaciones-ui/packing-order-screen.test.tsx`, describe «QC-291 — …» salvo que se indique)
+
+- R2: «R2: la cabecera pinta «Empaque · número»…», «R2: un único chip «Cantidad <cifra> <unidad>»…», «R2: sin unidad, el chip lleva solo la cifra»
+- R3: «R3: sin comenzar, la cabecera lleva «Volver a «Por empacar»» habilitado…»
+- R4: «R4: comenzado por el actor (sin pasos|con pasos), no hay vuelta y la línea de estado dice «Empacando»»
+- R5: «R5: a nombre de otra persona, la vuelta sigue habilitada y no hay «Empacando»»
+- R8: «R8: sin comenzar, el pie tiene un único botón «Comenzar el empaque»…», «R8: mientras comienza, el botón queda deshabilitado y ocupado…»
+- R9: «R9: con pasos, el pie lleva «Anterior» y «Siguiente»…», «R9: en el último paso, el pie dice «Terminar el empaque»…»; también «QC-291 R9: con pasos, el pie es el del paso a paso…» (describe de pasos)
+- R10: «R10: comenzado sin pasos, el pie tiene un único botón «Terminar el empaque»…», «R10: sin unidad, el único botón queda deshabilitado con el motivo visible y asociado»
+- R17: «R17: sin comenzar, el contenido muestra «Revisa antes de comenzar»…», «R17: comenzado por el actor, la tarjeta no aparece»
+- R20: «R20: (sin comenzar|comenzado|de otra persona), la columna tiene solo Envases, en ámbar, sin Equipo ni Herramientas», «R20: la rejilla pasa a dos columnas, 320 px…»
+- R25: «R25: Envases lleva las líneas con imagen…», «R25: sin reparto, Envases dice «Sin presentación»…», «R25: el panel de Envases muestra el mismo reparto»
+- R32: «R32: Comenzar llama a startPackingAction con el estado inicial y solo el id del pedido», «R32: Terminar llama a finishPackingAction con el estado inicial, el id y las líneas del conteo»
+- R33: «R33: a nombre de otra persona (%s), el pie no tiene botones y solo dice quién empaca» (×3, con y sin pasos), «R33: el motivo del pie no sale si el actor puede actuar»
+
+**Verificación**
+
+- `pnpm run typecheck`: sin errores. En una primera pasada salió un TS2322 en `conditioning-order-screen.test.tsx:265`, archivo de T10 en paralelo; en la segunda ya no estaba.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`; ninguno en archivos de T9.
+- `pnpm exec vitest run tests/unit/asignaciones-ui/packing-order-screen.test.tsx`: `Test Files 1 passed (1) · Tests 84 passed (84)`.
+- `pnpm exec vitest related --run <los 3 archivos de T9>`: `Test Files 1 failed | 7 passed (8) · Tests 13 failed | 237 passed (250) · Snapshots 13 failed`. Los 13 rojos están todos en `tests/unit/paridad/asignacion-acondicionamiento-paridad.test.tsx`: 4 son de «paridad del empaque», por este cambio, y 9 de acondicionamiento (T1/T7/T10). No se regeneraron: lo hace el implementer.
+
+**Veredicto:** T9 hecha; sus tests están en verde y solo quedan las snapshots de paridad, que el implementer regenera.
+
+## Tanda 3 — T10 Pantalla de acondicionamiento (frontend_dev)
+
+**Archivos**
+
+- `app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-order-screen.tsx`: pasa a `'use client'` (usa `useOperatorSidePanels`). Importa por archivo, no por el barrel de `/asignacion`. Cabecera con `phaseLabel` «Acondicionamiento», `running` «Acondicionando» si `canFinish` y `back` sin `disabled`, chip «Cantidad <cifra> <unidad>» (`quantity`) y la insignia de hoy. Columna y capa con Envases (`materials`, `OrderDistributionFull withImages`, contador = líneas del reparto) y Equipo (`team`, solo si hay equipo, con `actorId`). En el contenido: el error de candidatos, `Notice` «Lo acondiciona …», la tarjeta «Revisa antes de comenzar» (`conditioning-order-not-started`) y «Datos de lote». `conditioningBlockedReason` calcula el motivo de R33.
+- `.../conditioning-actions.tsx`: un solo botón según el estado («Comenzar el acondicionamiento» / «Terminar el acondicionamiento»), o ninguno con `blockedReason`, que pinta `<p role="status" data-testid="conditioning-actions-reason">`. Textos de P11 en `CONDITIONING_ACTIONS_TEXTS`.
+- `.../components/index.ts`: exporta los testids nuevos y `conditioningBlockedReason`.
+- `.../page.tsx`: pasa `actorId={actor.id}`. El actor ya estaba en la página: nada de `lib/modules/`.
+- Tests: `conditioning-order-screen.test.tsx` reescrito; `conditioning-order-page.test.tsx` ajustado al pie nuevo, más un caso de `actorId`.
+
+**Interpretaciones y abiertos**
+
+- R17: la tarjeta «Revisa antes de comenzar» se pinta solo en `POR_ACONDICIONAR`. Leído al pie de la letra («no comenzada por el actor»), saldría también en `TERMINADO`, `ENTREGADO` y a nombre de otro, con un texto que habla de comenzar. Que lo confirme el leader.
+- R33, abierto: un `EN_ACONDICIONAMIENTO` de otra persona con `conditionedByName === null` deja el pie vacío, sin botón y sin motivo. P11 no aprueba un texto para «quien acondiciona desconocido», y no lo inventé.
+- El aviso «Faltan los datos de lote…» del pie sale solo con `canFinish`. En `TERMINADO`/`ENTREGADO` el pie lleva solo el motivo (R33).
+
+**Mapa R → test** (`tests/unit/asignaciones-ui/conditioning-order-screen.test.tsx`)
+
+- R2: «R2: fase y número, receta como único h1, chip «Cantidad» y estado; sin reparto ni «Lo acondiciona» en la cabecera»; «R2: sin unidad el chip dice solo «Cantidad <cifra>»».
+- R3: «R3: en %s la cabecera lleva el enlace de vuelta habilitado «%s»» (×3).
+- R4: «R4: comenzado por el actor, no hay vuelta (ni deshabilitada) y la línea de estado dice exactamente «Acondicionando»».
+- R5: «R5: en curso a nombre de otra persona, la vuelta está habilitada y no hay línea «Acondicionando»».
+- R8: «R8: sin comenzar y con candidatos, un único botón «Comenzar el acondicionamiento», centrado, que abre el diálogo de hoy».
+- R10: «R10: comenzado por el actor, un único botón «Terminar el acondicionamiento»…»; «R10: con datos de lote pendientes, «Terminar» va deshabilitado con el motivo visible y asociado por aria-describedby»; «R10: «Datos de lote» va en el contenido principal, no en la columna».
+- R11 (extra): «R11: el botón del pie usa el tamaño xl de hoy (52 px)».
+- R17: «R17: sin comenzar, el contenido muestra «Revisa antes de comenzar»…»; «R17: comenzado por el actor no hay tarjeta…».
+- R20: «R20: la columna pinta solo Envases y Equipo, en ese orden, con el color de su sección; sin Herramientas ni Materiales»; «R20: los contadores son las líneas del reparto y las personas del equipo».
+- R23: «R23: en %s Equipo agrupa a las personas sueltas bajo «Personas»…» (×2); «R23: pinta el nombre que trae el equipo…»; «R23: sin equipo no hay tarjeta Equipo ni botón flotante «Ver equipo»; Envases sigue».
+- R24: «R24: con actorId, «Tú» va solo en la fila del actor»; «R24: sin actorId, o si el actor no está en el equipo, no hay ninguna marca «Tú»». En `conditioning-order-page.test.tsx`: «QC-291 R24: pasa el actor de la sesión a la pantalla…».
+- R25: «R25: Envases muestra el reparto de hoy…»; «R25: sin reparto, Envases dice «Sin presentación»»; «R25: el panel de envases lleva el mismo reparto».
+- R26: «R26: «Lo acondiciona <nombre>.» va en el contenido principal, fuera de la cabecera»; «R26: sin quien lo acondicione no se pinta la frase».
+- R32: «R32: ni la página ni la pantalla son Server Actions…» (ahora incluye `conditioning-actions.tsx`); «R32: el modal de comenzar recibe los mismos candidatos y el pedido de hoy».
+- R33: «R33: %s el pie no lleva ningún botón y solo la línea del motivo» (×4: a nombre de otro, `TERMINADO`, `ENTREGADO`, sin candidatos); «R33: sin candidatos el error del catálogo se sigue pintando en role="alert"».
+
+**Verificación**
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`; ninguno en archivos de T10.
+- `pnpm exec vitest run tests/unit/asignaciones-ui/conditioning-order-screen.test.tsx`: `Test Files 1 passed (1) · Tests 52 passed (52)`.
+- `pnpm exec vitest run tests/unit/asignaciones-ui/conditioning-order-page.test.tsx`: `Test Files 1 passed (1) · Tests 20 passed (20)`.
+- `pnpm exec vitest related --run <los 4 archivos de T10 y sus 2 tests>`: `Test Files 1 failed | 7 passed (8) · Tests 13 failed | 147 passed (160) · Snapshots 13 failed`. Los 13 rojos son todos snapshots de `tests/unit/paridad/asignacion-acondicionamiento-paridad.test.tsx` (9 de acondicionamiento y 4 de empaque). No se regeneraron.
+- E2E sin tocar (T12): `acondicionamiento.spec.ts:463-465`, `acondicionar-con-equipo.spec.ts:283-286` y `:477`, y `operario-rediseno.spec.ts` siguen buscando «Acondicionar»/«Terminar».
+
+**Veredicto:** T10 hecha; sus tests están en verde y solo quedan las snapshots de paridad, que regenera el implementer.
+
+## Tanda 3 — T8 Pantalla de fabricación (frontend_dev)
+
+**Archivos**
+
+- `app/(private)/asignacion/[id]/components/order-execution-screen.tsx`: `phaseLabel` «Fabricación»; `running` «Fabricando» con el pedido en curso, que sustituye a `back` (la vuelta solo sin comenzar); `StatusBadge` `order-execution-status` con `ORDER_STATUS_*`; chip «Cantidad <cifra> <unidad>» en `quantity` (testid `order-execution-order-quantity` y su `title` exacto). Fuera `order-execution-presentation`, `ORDER_EXECUTION_PRESENTATION_TESTID` y `ORDER_EXECUTION_TEXTS.presentation` (D11). Secciones con `useOperatorSidePanels`: Materiales y luego Herramientas, esta solo si hay; `columnTestId` `order-execution-materials`; rejilla `@min-[1001px]:grid-cols-[320px_minmax(0,1fr)]`. Testids de tarjeta conservados (`order-execution-materials-panel*`, `order-execution-tools-panel*`), y botones flotantes nuevos `order-execution-materials-fab` y `order-execution-tools-fab` (`ORDER_EXECUTION_*_SECTION_TESTIDS`). Unidad elegida en un `Map` del estado de la pantalla, que se pasa a `OrderExecutionLines` (`selectedUnitIds`/`onSelectUnit`). Sin comenzar: `Card` «Revisa antes de comenzar» con borde discontinuo, `h3`, el `startBody` del tablero y «N pasos» (testid `order-execution-not-started`). `StepReader` con `slots` (nodos en estado por callback ref), sin `stepNote`, con `finishLabel` «Terminar la fabricación». Pie «Comenzar la fabricación», centrado y `max-w-[360px]`; el diálogo, la acción y el `disabled` son los mismos.
+- `app/(private)/asignacion/[id]/components/order-execution-tools.tsx`: el id del título sale de `useId` (antes era el fijo `order-execution-tools-heading`, que se repetía con el panel abierto). Nueva prop opcional `label` (`aria-label`, sin título propio) porque la pantalla no conoce el id del título de la tarjeta. Pasa a `'use client'` por el hook. Sin `label` ni `labelledBy`, se ve igual que antes.
+- `app/(private)/asignacion/[id]/components/index.ts`: fuera los exports de `order-execution-tools-panel` y de `ORDER_EXECUTION_PRESENTATION_TESTID`; entran `ORDER_EXECUTION_MATERIALS_TESTID`, `ORDER_EXECUTION_MATERIALS_SECTION_TESTIDS`, `ORDER_EXECUTION_TOOLS_SECTION_TESTIDS` y `ORDER_EXECUTION_STATUS_TESTID`.
+- Borrados: `app/(private)/asignacion/[id]/components/order-execution-tools-panel.tsx` y `tests/unit/asignaciones-ui/order-execution-tools-panel.test.tsx` (con `git rm`: el borrado está en el índice y no hay commit).
+- `tests/unit/asignaciones-ui/order-execution-screen.test.tsx`: «Pedido» pasa a «Cantidad». Se borran los casos de la presentación (QC-170 R26/R27, R26 «sin control», R44 envase), porque D11 la quita. El pie se comprueba dentro del pie del marco y no `fixed`. Los objetivos táctiles admiten `size-14` (botones flotantes) y la tarjeta `min-h-15` de la casilla. El caso de la lista cerrada de QC-125 R18 queda igual. Casos nuevos: R2, R3, R4, R8, R9, R17, R20, R21, R22, R32 y R34.
+- `tests/unit/asignaciones-ui/order-execution-page.test.tsx`: el caso EN_CURSO esperaba la vuelta deshabilitada; ahora comprueba R4.
+- `tests/unit/asignaciones-ui/order-execution-tools.test.tsx`: casos de `label` y de dos copias sin ids repetidos.
+
+**Mapa R → test** (`tests/unit/asignaciones-ui/order-execution-screen.test.tsx`, salvo que se indique otro)
+
+- R2: «R2: la cabecera pinta «Fabricación · <número>» con el número en su elemento, un único chip «Cantidad» y la insignia de estado»; «R2: sin comenzar, la insignia dice «Pendiente»»; «R2: no hay `order-execution-presentation` ni «Presentación:» en ningún punto, sin comenzar ni comenzada».
+- R3: «R3: PENDIENTE: la vuelta es un enlace habilitado a la lista de pedidos asignados, sin línea «Fabricando»».
+- R4: «R4: EN_CURSO: la cabecera no lleva la vuelta, ni deshabilitada, sino «Fabricando» con role="status"»; «R4: confirmar comienza el pedido y pinta la ejecucion…»; `order-execution-page.test.tsx` «R4: EN_CURSO retoma sin «Comenzar», sin la vuelta y con «Fabricando»».
+- R8: «R8: PENDIENTE pinta en el pie un único botón «Comenzar la fabricación», centrado…».
+- R9: «R9: «Anterior» y «Siguiente» van en el pie del marco…»; «R9: en el último paso el pie ofrece «Terminar la fabricación»…»; «R9: el progreso del paso va en la cabecera».
+- R17: «R17: PENDIENTE pinta «Revisa antes de comenzar» con su texto y el número de pasos, sin listarlos»; «R17: con un solo paso dice «1 paso»».
+- R20: «R20: la columna lleva solo Materiales y Herramientas, en ese orden…»; «R20: los botones flotantes son los de Materiales y Herramientas, en ese orden, sin Equipo»; «R20: la lista de herramientas toma el nombre de su tarjeta…»; «R20: con el panel de herramientas abierto, cada copia de la lista tiene su nombre y no hay ids repetidos».
+- R21: «R21: sin herramientas no hay tarjeta Herramientas ni su botón flotante».
+- R22: «R22: la unidad elegida en la columna sale en el panel, y la del panel sigue al cerrarlo y reabrirlo»; «R22: plegar y desplegar la tarjeta de materiales conserva la unidad».
+- R32: «R32: comenzar llama a startAssignedOrderAction con el id del pedido, tras el mismo diálogo»; «R32: cambiar de paso registra el movimiento y terminar envía orderId y la posición del paso»; «R32: el menú de la cabecera sigue ofreciendo «Cancelar pedido»». Siguen además los casos de espera, bloqueo, errores y confirmación de antes.
+- R34 (fabricación): «R34: la fabricación no pasa nota de seguridad: no hay bloque de nota».
+
+**Pendiente para T12 (E2E, no se tocó)**
+
+- `e2e/recetas-porcentaje.spec.ts:574` espera `Pedido 200`; ahora el chip dice `Cantidad 200`.
+- `e2e/envases-del-pedido.spec.ts:151` (`order-execution-presentation`): es la comprobación que borra D11.
+- `e2e/operario-rediseno.spec.ts` usa `order-execution-materials` y `order-execution-materials-panel-trigger`, que se conservan.
+
+**Verificación**
+
+- `pnpm run typecheck`: el único error es `tests/unit/asignaciones-ui/conditioning-order-screen.test.tsx(265,35)` (TS2322, `candidatesError`), archivo de T10; ninguno en archivos de T8.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, los mismos de antes; ninguno en archivos de T8.
+- `pnpm exec vitest related --run <screen, tools, index.ts y sus 3 tests>`: `Test Files 9 passed (9) · Tests 202 passed (202)`.
+- `pnpm exec vitest run guard`: `Test Files 80 passed (80) · Tests 1096 passed | 20 skipped (1116)`.
+- No se corrió `vitest -u` en `tests/unit/paridad/`.
+
+**Veredicto:** T8 hecha; sus tests están en verde, y los E2E de la pantalla quedan para T12.
+
+## Tanda 3 — cierre del implementer (T8, T9, T10)
+
+- Snapshots de paridad regenerados por el implementer después de T8-T10:
+  `pnpm exec vitest run tests/unit/paridad/asignacion-acondicionamiento-paridad.test.tsx -u`.
+  Salida: `Snapshots 13 updated · Test Files 1 passed (1) · Tests 37 passed (37)`.
+- `pnpm run typecheck` limpio. `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno
+  en archivos de la feature.
+- **Abierto A1 (para el reviewer o el humano): R17 se lee distinto en empaque y en
+  acondicionamiento.** El texto de R17 dice «MIENTRAS la pantalla no esté comenzada por el actor».
+  - Empaque (T9) lo aplica al pie de la letra: también sale con el empaque en curso a nombre de otra
+    persona.
+  - Acondicionamiento (T10) solo lo pinta en `POR_ACONDICIONAR`. No sale en `TERMINADO`, en
+    `ENTREGADO` ni en curso a nombre de otra persona, porque su texto habla de comenzar.
+
+  No se unificó: decide el humano.
+- **Abierto A2: R33 sin nombre.** Acondicionamiento en `EN_ACONDICIONAMIENTO`, a nombre de otra
+  persona y con `conditionedByName === null`: el pie queda vacío, sin botón y sin motivo. P11 no
+  trae un texto para «persona desconocida» y no se inventó.
+- **Props extra, sin cambio visible para los usos de hoy:**
+  - `columnTestId?` en `useOperatorSidePanels` (T6).
+  - `label?` en `OrderExecutionTools` (T8), para que la tarjeta no repita «Herramientas».
+- `order-execution-page.test.tsx` y `conditioning-order-page.test.tsx` se ajustaron a R4 y a R33.
+  Fallaban con el cambio aunque no estaban en la lista de las tasks.

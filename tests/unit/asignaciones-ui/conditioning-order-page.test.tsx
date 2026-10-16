@@ -3,12 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ConditioningOrderPage from '@/app/(private)/asignacion/acondicionamiento/[id]/page';
 import {
+  CONDITIONING_ACTIONS_REASON_TESTID,
   CONDITIONING_ACTIONS_TEXTS,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_ORDER_BACK_LINK_TESTID,
   CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID,
   CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID,
   CONDITIONING_ORDER_SCREEN_TESTID,
+  CONDITIONING_TEAM_LIST_ME_TESTID,
+  CONDITIONING_TEAM_LIST_MEMBER_TESTID,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
 import { OrderNotFoundError, UnauthorizedError, ValidationError } from '@/lib/modules/asignaciones';
 import {
@@ -164,7 +167,7 @@ describe('sin el permiso, 404 antes de leer ningún pedido', () => {
 });
 
 describe('qué acción se ofrece y qué se lee para ella', () => {
-  it('R1: en POR_ACONDICIONAR pide los candidatos con el actor y ofrece «Acondicionar»', async () => {
+  it('R1: en POR_ACONDICIONAR pide los candidatos con el actor y ofrece solo «Comenzar el acondicionamiento»', async () => {
     getConditioningOrderMock.mockResolvedValue(ROW);
 
     render(await invocar());
@@ -175,7 +178,7 @@ describe('qué acción se ofrece y qué se lee para ella', () => {
       {},
     );
     expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeEnabled();
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
   });
 
   it('R2: en EN_ACONDICIONAMIENTO del propio actor ofrece «Terminar» sin pedir candidatos', async () => {
@@ -190,7 +193,7 @@ describe('qué acción se ofrece y qué se lee para ella', () => {
 
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeEnabled();
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
   });
 
   it('R3: en EN_ACONDICIONAMIENTO de otra persona no ofrece nada ni pide candidatos', async () => {
@@ -204,10 +207,9 @@ describe('qué acción se ofrece y qué se lee para ella', () => {
     render(await invocar());
 
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
-    // El pie pinta los dos botones del acondicionamiento; aquí ninguno está habilitado.
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
-    expect(screen.getByText('Lo acondiciona Berta Ruiz.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+    expect(screen.getByTestId(CONDITIONING_ACTIONS_REASON_TESTID)).toHaveTextContent('Lo acondiciona Berta Ruiz.');
   });
 
   it('R3: en TERMINADO no ofrece nada ni pide candidatos, aunque lo terminara el propio actor', async () => {
@@ -221,22 +223,44 @@ describe('qué acción se ofrece y qué se lee para ella', () => {
     render(await invocar());
 
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
-    // El pie pinta los dos botones del acondicionamiento; aquí ninguno está habilitado.
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+    expect(screen.getByTestId(CONDITIONING_ACTIONS_REASON_TESTID)).toHaveTextContent(CONDITIONING_ACTIONS_TEXTS.finished);
   });
 
-  it('R1: si los candidatos fallan con un error del módulo, pinta el detalle sin «Acondicionar» y con el aviso', async () => {
+  it('R1: si los candidatos fallan con un error del módulo, pinta el detalle sin «Comenzar» y con el aviso', async () => {
     getConditioningOrderMock.mockResolvedValue(ROW);
     listConditioningTeamCandidatesMock.mockRejectedValue(new UnauthorizedError());
 
     render(await invocar());
 
     expect(screen.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+    expect(screen.getByTestId(CONDITIONING_ACTIONS_REASON_TESTID)).toHaveTextContent(CONDITIONING_ACTIONS_TEXTS.noCandidates);
     const aviso = screen.getByTestId(CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID);
     expect(aviso).toHaveAttribute('role', 'alert');
     expect(aviso).toHaveAttribute('data-code', 'unauthorized');
+  });
+
+  it('QC-291 R24: pasa el actor de la sesión a la pantalla: su fila del equipo lleva «Tú»', async () => {
+    getConditioningOrderMock.mockResolvedValue({
+      ...ROW,
+      status: 'EN_ACONDICIONAMIENTO',
+      conditionedById: ACTOR_ID,
+      conditionedByName: 'Acondicionador de Prueba',
+      team: [
+        { userId: ACTOR_ID, displayName: 'Acondicionador de Prueba', origin: { kind: 'direct' } },
+        { userId: '22222222-2222-4222-8222-222222222222', displayName: 'Berta Ruiz', origin: { kind: 'direct' } },
+      ],
+    });
+
+    render(await invocar());
+
+    const marcas = screen.getAllByTestId(CONDITIONING_TEAM_LIST_ME_TESTID);
+    expect(marcas).toHaveLength(1);
+    expect(
+      marcas[0]?.parentElement?.querySelector(`[data-testid="${CONDITIONING_TEAM_LIST_MEMBER_TESTID}"]`),
+    ).toHaveAttribute('data-user-id', ACTOR_ID);
   });
 
   it('un error inesperado de los candidatos no se disfraza de aviso', async () => {
@@ -307,7 +331,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
     render(await invocar());
 
     expect(screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
   });
 
@@ -322,8 +346,9 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
 
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
     expect(screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+    expect(screen.getByTestId(CONDITIONING_ACTIONS_REASON_TESTID)).toHaveTextContent(CONDITIONING_ACTIONS_TEXTS.delivered);
     expect(screen.getByRole('button', { name: 'Guardar datos de lote' })).toBeEnabled();
     const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
     expect(back).toHaveTextContent('Volver a «Entregados»');

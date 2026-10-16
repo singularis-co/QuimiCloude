@@ -95,6 +95,30 @@ describe('bloque de herramientas del operador', () => {
     expect(block).toHaveAccessibleName('Herramientas del panel');
   });
 
+  it('con label no pinta su titulo y toma ese nombre', () => {
+    render(<OrderExecutionTools tools={TOOLS} label="Herramientas" />);
+
+    const block = screen.getByTestId(ORDER_EXECUTION_TOOLS_TESTID);
+    expect(within(block).queryByRole('heading')).toBeNull();
+    expect(block).toHaveAccessibleName('Herramientas');
+  });
+
+  it('dos copias a la vez no repiten el id de su titulo', () => {
+    render(
+      <>
+        <OrderExecutionTools tools={TOOLS} />
+        <OrderExecutionTools tools={TOOLS} />
+      </>,
+    );
+
+    const titulos = screen.getAllByRole('heading', { name: 'Herramientas' });
+    expect(titulos).toHaveLength(2);
+    expect(titulos[0]!.id).not.toBe(titulos[1]!.id);
+    for (const block of screen.getAllByTestId(ORDER_EXECUTION_TOOLS_TESTID)) {
+      expect(block).toHaveAccessibleName('Herramientas');
+    }
+  });
+
   it('R33 — el texto del bloque va a 16 px', () => {
     render(<OrderExecutionTools tools={TOOLS} />);
 

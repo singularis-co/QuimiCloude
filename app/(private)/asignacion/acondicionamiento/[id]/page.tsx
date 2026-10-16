@@ -88,6 +88,7 @@ export default async function ConditioningOrderPage({
       finishBlocked={finishBlocked}
       candidates={candidates}
       candidatesError={candidatesError}
+      actorId={actor.id}
     />
   );
 }

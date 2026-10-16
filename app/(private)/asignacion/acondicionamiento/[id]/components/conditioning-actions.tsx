@@ -12,29 +12,32 @@ import { StartConditioningDialog } from './start-conditioning-dialog';
 
 export const CONDITIONING_START_BUTTON_TESTID = 'conditioning-start-button';
 export const CONDITIONING_FINISH_BUTTON_TESTID = 'conditioning-finish-button';
+export const CONDITIONING_ACTIONS_REASON_TESTID = 'conditioning-actions-reason';
 
 export const CONDITIONING_ACTIONS_TEXTS = {
-  start: 'Acondicionar',
-  finish: 'Terminar',
+  start: 'Comenzar el acondicionamiento',
+  finish: 'Terminar el acondicionamiento',
+  finished: 'Este pedido ya está acondicionado.',
+  delivered: 'Este pedido ya está entregado.',
+  noCandidates: 'No se pudo cargar el equipo para comenzar.',
 } as const;
 
 export type ConditioningActionsProps = {
   readonly orderId: string;
   readonly orderNumber: string;
-  /** Con candidatos se habilita «Acondicionar»; sin ellos se pinta deshabilitado. */
+  /** Con candidatos se ofrece «Comenzar». */
   readonly startCandidates?: ConditioningTeamCandidates | null;
-  /** Se habilita «Terminar» (salvo `finishBlocked`). */
+  /** Se ofrece «Terminar»; tiene prioridad sobre «Comenzar». */
   readonly canFinish?: boolean;
   /** Deshabilita «Terminar» sin abrir el modal; el servidor sigue siendo quien rechaza. */
   readonly finishBlocked?: boolean;
   /** El aviso que explica por qué «Terminar» está deshabilitado. */
   readonly finishDescribedBy?: string;
+  /** Si viene, el actor no puede actuar: no hay botones ni modales, solo esta línea. */
+  readonly blockedReason?: string | null;
 };
 
-/**
- * Los dos botones del pie del acondicionamiento. Siempre se pintan los dos; se habilita, como
- * mucho, el que toca por el estado del pedido, y solo ese monta su modal.
- */
+/** El botón del pie del acondicionamiento que toca por el estado, con su modal, o el motivo de no tenerlo. */
 export function ConditioningActions({
   orderId,
   orderNumber,
@@ -42,68 +45,76 @@ export function ConditioningActions({
   canFinish = false,
   finishBlocked = false,
   finishDescribedBy,
+  blockedReason = null,
 }: ConditioningActionsProps) {
-  const [openDialog, setOpenDialog] = useState<'start' | 'finish' | null>(null);
+  const [open, setOpen] = useState(false);
   // Cada apertura monta el modal de cero: la espera vuelve a empezar y no queda nada de la anterior.
   const [opening, setOpening] = useState(0);
 
-  function open(kind: 'start' | 'finish'): void {
+  function openDialog(): void {
     setOpening((current) => current + 1);
-    setOpenDialog(kind);
+    setOpen(true);
   }
 
   function handleOpenChange(next: boolean): void {
-    if (!next) setOpenDialog(null);
+    if (!next) setOpen(false);
   }
 
-  const startEnabled = startCandidates !== null;
-  const finishEnabled = canFinish && !finishBlocked;
-
-  return (
-    <div className="grid w-full max-w-[520px] grid-cols-2 gap-3">
-      <Button
-        type="button"
-        size="xl"
-        variant={startEnabled ? 'default' : 'outline'}
-        onClick={startEnabled ? () => open('start') : undefined}
-        disabled={!startEnabled}
-        data-testid={CONDITIONING_START_BUTTON_TESTID}
+  if (blockedReason !== null && blockedReason !== '') {
+    return (
+      <p
+        role="status"
+        className="text-center text-base text-muted-foreground"
+        data-testid={CONDITIONING_ACTIONS_REASON_TESTID}
       >
-        <PlayIcon aria-hidden="true" />
-        {CONDITIONING_ACTIONS_TEXTS.start}
-      </Button>
-      <Button
-        type="button"
-        size="xl"
-        variant={canFinish ? 'default' : 'outline'}
-        onClick={finishEnabled ? () => open('finish') : undefined}
-        disabled={!finishEnabled}
-        aria-describedby={canFinish ? finishDescribedBy : undefined}
-        data-testid={CONDITIONING_FINISH_BUTTON_TESTID}
-      >
-        <CheckIcon aria-hidden="true" />
-        {CONDITIONING_ACTIONS_TEXTS.finish}
-      </Button>
+        {blockedReason}
+      </p>
+    );
+  }
 
-      {startCandidates === null ? null : (
+  if (canFinish) {
+    return (
+      <div className="mx-auto flex w-full max-w-[360px] flex-col">
+        <Button
+          type="button"
+          size="xl"
+          onClick={finishBlocked ? undefined : openDialog}
+          disabled={finishBlocked}
+          aria-describedby={finishDescribedBy}
+          data-testid={CONDITIONING_FINISH_BUTTON_TESTID}
+        >
+          <CheckIcon aria-hidden="true" />
+          {CONDITIONING_ACTIONS_TEXTS.finish}
+        </Button>
+        <FinishConditioningDialog
+          key={`finish-${opening}`}
+          open={open}
+          onOpenChange={handleOpenChange}
+          orderId={orderId}
+          orderNumber={orderNumber}
+        />
+      </div>
+    );
+  }
+
+  if (startCandidates !== null) {
+    return (
+      <div className="mx-auto flex w-full max-w-[360px] flex-col">
+        <Button type="button" size="xl" onClick={openDialog} data-testid={CONDITIONING_START_BUTTON_TESTID}>
+          <PlayIcon aria-hidden="true" />
+          {CONDITIONING_ACTIONS_TEXTS.start}
+        </Button>
         <StartConditioningDialog
           key={`start-${opening}`}
-          open={openDialog === 'start'}
+          open={open}
           onOpenChange={handleOpenChange}
           orderId={orderId}
           orderNumber={orderNumber}
           candidates={startCandidates}
         />
-      )}
-      {canFinish ? (
-        <FinishConditioningDialog
-          key={`finish-${opening}`}
-          open={openDialog === 'finish'}
-          onOpenChange={handleOpenChange}
-          orderId={orderId}
-          orderNumber={orderNumber}
-        />
-      ) : null}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  return null;
 }

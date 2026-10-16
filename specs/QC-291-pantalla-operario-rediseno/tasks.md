@@ -77,7 +77,7 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
     - el test de paridad `tests/unit/paridad/asignacion-acondicionamiento-paridad.test.tsx` se
       ajusta a la nueva etiqueta.
 
-- [ ] **T8 — Pantalla de fabricación.** Depende de: T1, T2, T5 y T6.
+- [x] **T8 — Pantalla de fabricación.** Depende de: T1, T2, T5 y T6.
   - `order-execution-screen.tsx`:
     - `phaseLabel`, `running` («Fabricando»), insignia de estado y chip «Cantidad»;
     - se borra la presentación: el elemento `order-execution-presentation` y su constante en la
@@ -93,7 +93,7 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
     `tests/unit/asignaciones-ui/order-execution-screen.test.tsx`. R32: las mismas acciones se
     llaman con los mismos argumentos que hoy.
 
-- [ ] **T9 — Pantalla de empaque.** Depende de: T1, T2 y T6.
+- [x] **T9 — Pantalla de empaque.** Depende de: T1, T2 y T6.
   - `packing-order-screen.tsx`:
     - cabecera, como en T8, con «Empacando»;
     - solo la sección Envases, con el contenido de hoy;
@@ -103,7 +103,7 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
   - **Hecho:** tests R2-R5, R8-R10, R17, R20 (solo Envases, sin Equipo ni Herramientas), R25, R32
     y R33 en `tests/unit/asignaciones-ui/packing-order-screen.test.tsx`.
 
-- [ ] **T10 — Pantalla de acondicionamiento.** Depende de: T1, T6 y T7.
+- [x] **T10 — Pantalla de acondicionamiento.** Depende de: T1, T6 y T7.
   - `conditioning-order-screen.tsx`:
     - cabecera, como en T8, con «Acondicionando»;
     - Envases y Equipo en la columna, sin Herramientas;
