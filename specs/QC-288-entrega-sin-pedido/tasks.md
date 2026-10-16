@@ -246,7 +246,7 @@ Cubre: R5, R6, R7, R8 (pantalla).
 
 ---
 
-## [ ] F4 [P] — Tab Entregas y diálogo de anular (depende de F1 y T0)
+## [x] F4 [P] — Tab Entregas y diálogo de anular (depende de F1 y T0)
 
 - `app/(private)/inventario/producto-terminado/[id]/components/direct-delivery-void-dialog.tsx` (nuevo).
 - `finished-product-deliveries-table.tsx`: «Sin pedido», nota y `canVoidDirect`.

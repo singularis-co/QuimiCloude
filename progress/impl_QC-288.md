@@ -8,8 +8,8 @@
   - **F3 parcial:** la página `producto-terminado/[id]/page.tsx` choca con
     `finished-product-route-contract.test.ts`: la action del excedente no está permitida, y la R16
     prohíbe un valor `'use client'` desde el barrel.
-  - **F4:** escrita en el árbol de trabajo, **sin commit**. El botón «Anular» de la fila choca con
-    `guard-formularios-y-acciones` R28. Faltan las tarjetas de teléfono.
+  - **F4:** hecha (2026-10-16), tras la decisión (a): «Anular» en el menú de acciones de la fila y,
+    en teléfono, la tabla con scroll horizontal. Ver la sección F4.
 - **Pendientes porque dependen de lo anterior:** TC, TI (E2E) y TZ. TC ya tiene identificados sus
   rojos de censo: `order-delivery-append-only` R32/R33 y `module-contract`/`scope` R57.
 - **Mapa R<n> → test:** parcial, en las secciones de cada tanda. El mapa completo (R1–R57) llega en TZ.
@@ -228,6 +228,59 @@ se pintan como JSX) o cambiar el diseño. Hasta entonces R5 solo tiene cubierta 
   (`guard-asignacion-componentizada`, `guard-archivos-en-vuelo-sin-ruido`: con `--testTimeout=120000`,
   `2 passed`, `31 passed`). El rojo real sigue siendo `guard-formularios-y-acciones` R28 sobre
   `finished-product-deliveries-table.tsx:103`, de F4.
+
+## F4 — Tab Entregas y diálogo de anular (frontend_dev, 2026-10-16)
+
+Decisión del humano (`requirements.md > Decisiones cerradas`, commit `68be26f5`): la fila usa el menú de
+acciones con un único ítem «Anular»; `guard-formularios-y-acciones` no cambia. En teléfono no hay
+tarjetas: la tab queda como hoy, con la tabla y su scroll horizontal. Grafo: sin proyecto para este
+worktree; Grep/Read.
+
+### Archivos
+- Nuevo: `app/(private)/inventario/producto-terminado/[id]/components/direct-delivery-void-dialog.tsx`.
+- `finished-product-deliveries-table.tsx`: celda Pedido con «Sin pedido» (`StatusBadge` `info`) y la
+  nota debajo; con `canVoidDirect`, `actionsColumn({ menu })` cuyo menú
+  (`finished-product-delivery-actions`, `aria-label` «Acciones de la entrega sin pedido del <fecha>»)
+  tiene un único ítem «Anular» (`finished-product-delivery-direct-void`, `XCircleIcon`, destructivo)
+  solo en filas `withoutOrder && void === null`; en las demás el menú no tiene ítems y no se pinta.
+- `finished-product-list-section.tsx`: `canVoidDirect` con `entregas.anular` (`assertPermission`), solo
+  si la página se leyó.
+- `components/index.ts` de la ficha: exporta el diálogo, sus test ids y los de la tabla.
+- `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts`: enmienda de QC-225
+  R7 con nota fechada (admite `deliverDirectAction`, `voidDirectDeliveryAction`,
+  `getDirectDeliveryForVoidAction`; sigue prohibiendo `voidDeliveryAction` y las demás).
+- Tests: `tests/unit/inventario-ui/finished-product-tables.test.tsx`,
+  `tests/unit/inventario-ui/direct-delivery-void-dialog.test.tsx` (nuevo).
+- **Sin cambio en `components/shared`:** la extensión `srOnlyLabel` de `data-table` (y su fila de
+  `CATALOGO.md`) se retiró. Con la columna de menú la cabecera «Acciones» es visible, como en el resto de
+  tablas con `actionsColumn` (p. ej. `customer-columns.tsx`); ya no hace falta ocultarla.
+
+### R → test
+- R43 → `finished-product-tables` («R43 — con el permiso, el menú de acciones solo en las filas sin
+  pedido no anuladas…», «R43 — el menú de la fila sin pedido tiene un único ítem «Anular»», «R43 — sin
+  el permiso, ni el menú ni «Anular» existen en el DOM…», «R43, R44 — elegir «Anular» en el menú abre el
+  diálogo…», «R43, R53 — la sección pasa canVoidDirect según entregas.anular…»); contrato
+  `finished-product-route-contract` («QC-225 R7 (enmienda QC-288), R43 …» ×2).
+- R44 → `direct-delivery-void-dialog` (3 casos «R44 — …»).
+- R45 → `direct-delivery-void-dialog` («R45 — sin ningún cliente marcado…», «R45 (QC-224 R13) …»,
+  «R45 (QC-224 R14) …» ×2).
+- R46 → `direct-delivery-void-dialog` (4 casos «R46 — …»).
+- R52 → `finished-product-tables` («R52 — la fila sin pedido marca «Sin pedido» con su nota…», «R52 —
+  mismas columnas que QC-282…»).
+- R55 → `finished-product-tables` («R55 — Salidas muestra «Entrega sin pedido»…», de F5).
+
+### Gate (salida real)
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 9 problems (0 errors, 9 warnings)`, los 9 previos y ajenos.
+- `finished-product-tables.test.tsx` + `direct-delivery-void-dialog.test.tsx`: `Test Files 2 passed (2)`,
+  `Tests 57 passed (57)`.
+- `pnpm exec vitest related --run` sobre los cuatro archivos de producción de F4:
+  `Test Files 8 passed (8)`, `Tests 97 passed (97)`.
+- `pnpm exec vitest run guard`: `Test Files 80 passed (80)`, `Tests 1099 passed | 20 skipped (1119)`.
+- `finished-product-route-contract.test.ts` + `product-route-contract.test.ts`: `Test Files 2 passed (2)`,
+  `Tests 40 passed (40)`.
+
+Veredicto: F4 hecha; R43–R46 y R52 de pantalla en verde, la guardia R28 en verde sin cambiarla.
 
 ## B1 — Migraciones y esquema (2026-10-16)
 

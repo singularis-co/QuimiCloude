@@ -2,6 +2,10 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  DIRECT_DELIVERY_ACTIONS_TESTID,
+  DIRECT_DELIVERY_LABEL,
+  DIRECT_DELIVERY_VOID_DIALOG_TESTID,
+  DIRECT_DELIVERY_VOID_TESTID,
   FINISHED_PRODUCT_MOVEMENT_KIND_LABELS,
   FinishedProductBatchesTable,
   FinishedProductCostsTable,
@@ -25,6 +29,8 @@ import {
   type FinishedDistributionLine,
   type MovementReason,
 } from '@/lib/modules/inventario';
+import { identity } from '@/lib/composition';
+import type { SessionUser } from '@/lib/modules/identity';
 import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import {
@@ -45,7 +51,8 @@ import {
   finishedProductDetail,
   finishedProductPage,
 } from '../../fixtures/finished-product-detail';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
+import { DIRECT_DELIVERY_ID, directDeliveryVoidView } from '../../fixtures/direct-delivery';
 
 const {
   routerMock,
@@ -54,6 +61,7 @@ const {
   listDeliveriesMock,
   listCostsMock,
   listDistributionMock,
+  getForVoidMock,
 } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
@@ -68,6 +76,7 @@ const {
   listDeliveriesMock: vi.fn(),
   listCostsMock: vi.fn(),
   listDistributionMock: vi.fn(),
+  getForVoidMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -84,6 +93,11 @@ vi.mock('@/lib/composition', () => ({
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-evidence-actions', () => ({
   getOrderEvidenceAction: vi.fn(),
   countOrderEvidenceAction: vi.fn(),
+}));
+
+vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
+  getDirectDeliveryForVoidAction: getForVoidMock,
+  voidDirectDeliveryAction: vi.fn(),
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', () => ({
@@ -477,6 +491,130 @@ describe('Entregas', () => {
     expect(url.searchParams.get(PAGE_PARAM)).toBe('2');
   });
 
+  // 2026-10-16 (QC-288): las entregas sin pedido conviven con las de pedido en el tab.
+  const DIRECTA = finishedProductDeliveryRow({
+    deliveryLineId: 'linea-directa',
+    orderDeliveryId: DIRECT_DELIVERY_ID,
+    createdAt: '2026-10-16T10:05:00.000Z',
+    orderNumberText: null,
+    withoutOrder: true,
+    note: 'Venta mostrador, factura 0012',
+  });
+  const DIRECTA_SIN_NOTA = finishedProductDeliveryRow({
+    deliveryLineId: 'linea-directa-sin-nota',
+    orderDeliveryId: DIRECT_DELIVERY_ID,
+    orderNumberText: null,
+    withoutOrder: true,
+    note: null,
+  });
+  const DIRECTA_ANULADA = finishedProductDeliveryRow({
+    deliveryLineId: 'linea-directa-anulada',
+    orderNumberText: null,
+    withoutOrder: true,
+    void: { reason: FINISHED_VOID_REASON },
+  });
+  const MEZCLADA = finishedProductDeliveriesPage({
+    items: [DIRECTA, FINISHED_DELIVERY_ROWS[0], DIRECTA_SIN_NOTA, DIRECTA_ANULADA],
+    total: 4,
+  });
+
+  function renderMixed(canVoidDirect?: boolean) {
+    return render(
+      <FinishedProductDeliveriesTable
+        productId={FINISHED_PRODUCT_ID}
+        page={MEZCLADA}
+        unitLabel={UNIT}
+        canVoidDirect={canVoidDirect}
+      />,
+    );
+  }
+
+  it('R52 — la fila sin pedido marca «Sin pedido» con su nota debajo; la de pedido muestra su número', () => {
+    renderMixed();
+
+    expect(screen.getAllByTestId('finished-product-delivery-row')).toHaveLength(4);
+    const directa = cell(rowOf('linea-directa'), 'finished-product-delivery-order');
+    const marca = within(directa).getByTestId('finished-product-delivery-direct');
+    const nota = within(directa).getByTestId('finished-product-delivery-note');
+    expect(marca).toHaveTextContent(DIRECT_DELIVERY_LABEL);
+    expect(marca).toHaveAttribute('data-tone', 'info');
+    expect(nota).toHaveTextContent('Venta mostrador, factura 0012');
+    expect(marca.compareDocumentPosition(nota) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const sinNota = cell(rowOf('linea-directa-sin-nota'), 'finished-product-delivery-order');
+    expect(within(sinNota).getByTestId('finished-product-delivery-direct')).toBeInTheDocument();
+    expect(within(sinNota).queryByTestId('finished-product-delivery-note')).toBeNull();
+
+    const dePedido = cell(rowOf(FINISHED_DELIVERY_ROWS[0].deliveryLineId), 'finished-product-delivery-order');
+    expect(dePedido).toHaveTextContent(FINISHED_ORDER_NUMBER);
+    expect(within(dePedido).queryByTestId('finished-product-delivery-direct')).toBeNull();
+  });
+
+  it('R52 — mismas columnas que QC-282 y en el orden que llega de la página', () => {
+    renderMixed();
+
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent?.trim())).toEqual([
+      'Fecha',
+      'Cliente',
+      'Pedido',
+      'Presentación',
+      'Lote',
+      'Envases',
+      'Cantidad',
+      'Anulación',
+    ]);
+    const filas = within(screen.getByRole('table')).getAllByTestId('finished-product-delivery-row');
+    expect(filas.map((fila) => fila.closest('tr')?.getAttribute('data-testid'))).toEqual(
+      MEZCLADA.items.map((row) => `data-table-row-${row.deliveryLineId}`),
+    );
+  });
+
+  it('R43 — con el permiso, el menú de acciones solo en las filas sin pedido no anuladas, con su aria-label', () => {
+    renderMixed(true);
+
+    const menu = within(rowOf('linea-directa')).getByTestId(DIRECT_DELIVERY_ACTIONS_TESTID);
+    expect(menu).toHaveAccessibleName('Acciones de la entrega sin pedido del 2026-10-16 10:05');
+    expect(within(rowOf('linea-directa-sin-nota')).getByTestId(DIRECT_DELIVERY_ACTIONS_TESTID)).toBeInTheDocument();
+
+    expect(within(rowOf('linea-directa-anulada')).queryAllByRole('button')).toEqual([]);
+    expect(within(rowOf(FINISHED_DELIVERY_ROWS[0].deliveryLineId)).queryAllByRole('button')).toEqual([]);
+    expect(screen.getAllByTestId(DIRECT_DELIVERY_ACTIONS_TESTID)).toHaveLength(2);
+    expect(screen.getByTestId('data-table-head-actions')).toHaveTextContent('Acciones');
+  });
+
+  it('R43 — el menú de la fila sin pedido tiene un único ítem «Anular»', async () => {
+    const user = setupUser();
+    renderMixed(true);
+
+    await user.click(within(rowOf('linea-directa')).getByTestId(DIRECT_DELIVERY_ACTIONS_TESTID));
+
+    const items = await screen.findAllByRole('menuitem');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent('Anular');
+    expect(items[0]).toHaveAttribute('data-testid', DIRECT_DELIVERY_VOID_TESTID);
+  });
+
+  it('R43 — sin el permiso, ni el menú ni «Anular» existen en el DOM, ni la columna de acciones', () => {
+    renderMixed(false);
+
+    expect(screen.queryByTestId(DIRECT_DELIVERY_ACTIONS_TESTID)).toBeNull();
+    expect(screen.queryByTestId(DIRECT_DELIVERY_VOID_TESTID)).toBeNull();
+    expect(screen.queryByRole('button', { name: /anular|acciones/i })).toBeNull();
+    expect(screen.queryByTestId('data-table-head-actions')).toBeNull();
+  });
+
+  it('R43, R44 — elegir «Anular» en el menú abre el diálogo de esa entrega', async () => {
+    const user = setupUser();
+    getForVoidMock.mockResolvedValue({ status: 'success', data: directDeliveryVoidView() });
+    renderMixed(true);
+
+    await user.click(within(rowOf('linea-directa')).getByTestId(DIRECT_DELIVERY_ACTIONS_TESTID));
+    await user.click(await esperarInteractiva(await screen.findByTestId(DIRECT_DELIVERY_VOID_TESTID)));
+
+    expect(await screen.findByTestId(DIRECT_DELIVERY_VOID_DIALOG_TESTID)).toBeInTheDocument();
+    expect(getForVoidMock).toHaveBeenCalledWith(DIRECT_DELIVERY_ID);
+  });
+
   it('R36 — ninguna fila de Entregas lleva un boton o enlace, tampoco para anular', () => {
     renderDeliveries();
 
@@ -782,6 +920,36 @@ describe('Listados', () => {
     const url = new URL(enlace.getAttribute('href') as string, 'http://local');
     expect(url.searchParams.get(TAB_PARAM)).toBe('reparto');
     expect(url.searchParams.get(PAGE_PARAM)).toBe('1');
+  });
+
+  // 2026-10-16 (QC-288): el permiso de anular baja de la sección; leer el tab no lo exige.
+  function sessionUser(permissions: readonly string[]): SessionUser {
+    return { id: 'u-1', username: 'admin', displayName: 'Admin', roleName: null, permissions };
+  }
+
+  it('R43, R53 — la sección pasa canVoidDirect según entregas.anular, sin pedirlo para leer', async () => {
+    const directa = finishedProductDeliveryRow({
+      deliveryLineId: 'seccion-directa',
+      orderNumberText: null,
+      withoutOrder: true,
+    });
+    listDeliveriesMock.mockResolvedValue({
+      status: 'success',
+      data: finishedProductDeliveriesPage({ items: [directa], total: 1 }),
+    });
+
+    vi.mocked(identity.getSessionUser).mockResolvedValueOnce(
+      sessionUser(['inventario.consultar', 'entregas.anular']),
+    );
+    await renderSection('entregas');
+    expect(within(rowOf('seccion-directa')).getByTestId(DIRECT_DELIVERY_ACTIONS_TESTID)).toBeInTheDocument();
+    cleanup();
+
+    vi.mocked(identity.getSessionUser).mockResolvedValueOnce(sessionUser(['inventario.consultar']));
+    await renderSection('entregas');
+    expect(within(rowOf('seccion-directa')).getByTestId('finished-product-delivery-direct')).toBeInTheDocument();
+    expect(screen.queryByTestId(DIRECT_DELIVERY_ACTIONS_TESTID)).toBeNull();
+    expect(screen.queryByTestId(DIRECT_DELIVERY_VOID_TESTID)).toBeNull();
   });
 
   it('R26 — la sección de Reparto pide solo su listado, con la página', async () => {
