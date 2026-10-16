@@ -80,7 +80,6 @@ const TEXTOS = {
     'Foto',
     'Fórmula',
     'Presentaciones',
-    'Por entregar',
     'Estado',
     'Personas',
     'Primera anotación',
@@ -160,7 +159,6 @@ const ACTIVO: ExecutionTraceRow = {
   formulaName: null,
   formulaImageUrl: null,
   presentations: [],
-  pendingDelivery: [],
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -177,7 +175,6 @@ const DE_BAJA: ExecutionTraceRow = {
   formulaName: null,
   formulaImageUrl: null,
   presentations: [],
-  pendingDelivery: [],
 };
 
 const ROWS = [ACTIVO, DE_BAJA];
@@ -306,7 +303,7 @@ describe('R21 - textos del Dashboard', () => {
     expect(screen.getByText(TEXTOS.dashboard.soloCancelados)).toBeVisible();
   });
 
-  it('R21 - las columnas se llaman «Nº de pedido», «Foto», «Fórmula», «Presentaciones», «Por entregar», «Estado», «Personas», «Primera anotación», «Última anotación», «Duración», «Vueltas atrás»', () => {
+  it('R21 - las columnas se llaman «Nº de pedido», «Foto», «Fórmula», «Presentaciones», «Estado», «Personas», «Primera anotación», «Última anotación», «Duración», «Vueltas atrás»', () => {
     montarTabla();
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
     TEXTOS.columnas.forEach((etiqueta, indice) => {

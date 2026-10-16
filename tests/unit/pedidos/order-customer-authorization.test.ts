@@ -59,6 +59,9 @@ function dobles() {
     packaging: { findRefs: explota('packaging.findRefs'), findCostingBatches: explota('packaging.findCostingBatches') } as unknown as PackagingCatalog,
     unitOfWork: { run: explota('unitOfWork.run') } as unknown as OrderUnitOfWork,
     log: { ignoredFields: explota('log.ignoredFields') } as unknown as ListQueryLog,
+    deliveryProgress: {
+      listDeliveryProgressByIdsIncludingDeleted: explota('deliveryProgress.listDeliveryProgressByIdsIncludingDeleted'),
+    },
     customerCatalog: {
       findRefsIncludingDeleted: explota('customerCatalog.findRefsIncludingDeleted'),
       findAliveRefById: explota('customerCatalog.findAliveRefById'),

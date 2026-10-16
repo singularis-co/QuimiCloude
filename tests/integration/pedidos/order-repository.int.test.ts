@@ -778,10 +778,10 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
       })
       const sinReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 11))
 
-      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4, packagingProductId: null }])
+      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4, presentationContent: null, packagingProductId: null }])
 
       const ficha = await findAliveOrderById(conReparto.id, scope())
-      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4, packagingProductId: null }])
+      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4, presentationContent: null, packagingProductId: null }])
       // Lo que devuelve el alta y la relectura no pueden divergir tampoco en el reparto.
       expect(ficha).toEqual(conReparto)
 
@@ -790,9 +790,26 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
 
       const todos = await recorrerTodo()
       expect(todos.find((fila) => fila.id === conReparto.id)?.presentationLines).toEqual([
-        { presentationId, packages: 4, packagingProductId: null },
+        { presentationId, packages: 4, presentationContent: null, packagingProductId: null },
       ])
       expect(todos.find((fila) => fila.id === sinReparto.id)?.presentationLines).toEqual([])
+    } finally {
+      await limpiar(creados)
+    }
+  })
+
+  it('la linea devuelve el contenido copiado al guardarla, igual en el alta y en la relectura', async () => {
+    const creados: string[] = []
+    try {
+      const conCopia = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 12), {
+        presentationLines: [{ presentationId, packages: 9, content: '300', packagingProductId: null }],
+      })
+
+      expect(conCopia.presentationLines).toEqual([
+        { presentationId, packages: 9, presentationContent: '300.0000', packagingProductId: null },
+      ])
+      const ficha = await findAliveOrderById(conCopia.id, scope())
+      expect(ficha?.presentationLines).toEqual(conCopia.presentationLines)
     } finally {
       await limpiar(creados)
     }

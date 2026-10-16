@@ -1644,6 +1644,7 @@ export const pedidos = {
   }),
   listOrders: createListOrders({
     orders: orderRepository,
+    deliveryProgress: { listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted },
     recipes: recipeCatalog,
     presentations: presentationCatalog,
     packaging: packagingCatalog,

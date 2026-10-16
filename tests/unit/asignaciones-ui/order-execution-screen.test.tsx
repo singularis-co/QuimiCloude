@@ -96,7 +96,7 @@ const EXECUTION: StartedOrderExecution = {
     },
   ],
   tools: [],
-  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],
   unitId: null,
   unitLabel: null,
   evidence: [],
@@ -438,8 +438,8 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
         execution={{
           ...EXECUTION,
           presentationLines: [
-            { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-            { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+            { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
+            { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1, presentationContent: null, presentationUnitLabel: null },
           ],
         }}
       />,
@@ -447,6 +447,23 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
 
     expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
       'Presentación: 5 × Botella 200 ml, 1 × Bidón 20L',
+    );
+  });
+
+  it('una linea con envase y volumen conocido pinta el envase y el volumen', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{
+          ...EXECUTION,
+          presentationLines: [
+            { lineId: 'linea-4', packedPackages: null, presentationId: 'pres-3', presentationName: '300 ml', packagingName: 'Embase pequeño 2', packages: 9, presentationContent: '300.0000', presentationUnitLabel: 'ml' },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
+      'Presentación: 9 × Embase pequeño 2 · 300 ml',
     );
   });
 
@@ -737,8 +754,8 @@ describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
         execution={{
           ...EXECUTION,
           presentationLines: [
-            { lineId: 'linea-4', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: 'Caja cartón 12 u', packages: 5 },
-            { lineId: 'linea-5', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+            { lineId: 'linea-4', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: 'Caja cartón 12 u', packages: 5, presentationContent: null, presentationUnitLabel: null },
+            { lineId: 'linea-5', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1, presentationContent: null, presentationUnitLabel: null },
           ],
         }}
       />,

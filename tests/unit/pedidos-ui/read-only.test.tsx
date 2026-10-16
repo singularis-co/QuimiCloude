@@ -198,7 +198,9 @@ const PEDIDO: OrderSummary = {
   presentationLines: [],
   unitId: null,
   unitLabel: null,
+  pendingDelivery: { kind: 'not_packed' },
   customer: null,
+  recipeImageUrl: null,
 };
 
 beforeEach(() => {

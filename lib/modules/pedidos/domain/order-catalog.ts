@@ -32,8 +32,10 @@ export type OrderAssignmentTarget = {
 };
 
 /** El orden de un resumen paginado. `work_queue` es el de la lista de trabajo (prioridad,
- *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
-export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
+ *  antiguedad, numero); `finished_recent_first` es el de «Terminados»; `unfinished_then_recent`
+ *  es el de «Terminados» del empacador, que mezcla pedidos aun sin fecha de terminado (en
+ *  acondicionamiento) con los ya terminados: primero los sin fecha. */
+export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first' | 'unfinished_then_recent';
 
 /** Filtro opcional por persona de un resumen paginado. Va en la consulta, no despues, para que
  *  `total` y la paginacion describan solo lo filtrado. */
@@ -89,7 +91,9 @@ export interface OrderCatalog {
    * usa para «Terminados» y «Todos», que no acotan por quien esta asignado. El `ordering`
    * decide el `ORDER BY`: `work_queue` es el mismo que `listAliveSummariesByIds`, extraido a
    * una constante compartida para que no diverjan; `finished_recent_first` ordena por fecha de
-   * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente.
+   * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente;
+   * `unfinished_then_recent` pone los nulos PRIMERO y luego la fecha descendente, con el mismo
+   * desempate (numero descendente, `id`).
    *
    * `filter.packedBy` deja solo los pedidos de ese empacador; un `packedBy` nulo no entra.
    * `filter.conditionedBy` hace lo mismo con quien acondiciona.

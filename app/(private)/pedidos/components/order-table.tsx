@@ -244,7 +244,6 @@ export function OrderTable({
   const columns = useMemo(
     () =>
       buildOrderColumns({
-        recipes,
         units,
         bridge,
         responsiblesByOrder,
@@ -257,7 +256,6 @@ export function OrderTable({
         onAction: handleAction,
       }),
     [
-      recipes,
       units,
       bridge,
       responsiblesByOrder,

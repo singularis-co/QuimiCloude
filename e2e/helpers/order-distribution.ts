@@ -2,6 +2,7 @@
 // envases» y abrir una accion del menu de 3 puntos de una fila.
 import { expect, type Locator, type Page } from '@playwright/test';
 
+import { clickAndConfirm } from './confirm-dialog';
 import { openRowActionsMenuItem } from './row-actions-menu';
 
 export const DISTRIBUTION_FIELD_TESTID = 'order-distribution-field';
@@ -14,6 +15,9 @@ export const PACKAGING_SELECT_TESTID = 'packaging-select';
 export const PACKAGING_OPTION_TESTID = 'packaging-option';
 export const PACKAGING_OPTION_AVAILABLE_TESTID = 'packaging-option-available';
 export const ORDER_ROW_ACTIONS_TESTID = 'order-row-actions';
+export const ORDER_FORM_SUBMIT_TESTID = 'order-form-submit';
+export const ORDER_LEFTOVER_DIALOG_TESTID = 'order-leftover-dialog';
+export const ORDER_LEFTOVER_CONFIRM_TESTID = 'order-leftover-confirm';
 
 export type PackagingChoice = { readonly productId: string; readonly name: string };
 
@@ -82,4 +86,17 @@ export function orderMenuTrigger(page: Page, orderId: string): Locator {
   return page
     .getByTestId(`data-table-row-${orderId}`)
     .locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${orderId}"]`);
+}
+
+/**
+ * Guarda un pedido cuyo reparto deja cantidad sin envasar: espera el disponible cotizado -antes,
+ * Guardar no pregunta-, pulsa Guardar y confirma «Guardar con sobrante».
+ */
+export async function submitOrderWithLeftover(page: Page, form: Locator): Promise<void> {
+  await expect(form.getByTestId(DISTRIBUTION_AVAILABLE_TESTID)).toHaveAttribute(
+    'data-state',
+    'ready',
+    { timeout: 60_000 },
+  );
+  await clickAndConfirm(page, form.getByTestId(ORDER_FORM_SUBMIT_TESTID), ORDER_LEFTOVER_CONFIRM_TESTID);
 }

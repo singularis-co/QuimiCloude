@@ -42,7 +42,7 @@ function linea(
   presentationName: string,
   packages: number,
 ): OrderPresentationLineView {
-  return { presentationId, presentationName, packages, packagingProductId: null, packagingName: null };
+  return { presentationId, presentationName, packages, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null };
 }
 
 const LINEAS = [
@@ -128,5 +128,22 @@ describe('el reparto producido de un pedido', () => {
     expect(screen.getByTestId(ORDER_PRODUCED_PRESENTATIONS_TESTID)).toHaveTextContent('1 × Bidón 20L');
     expect(screen.queryByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toBeNull();
     expect(screen.queryByTestId(ORDER_PRODUCED_MORE_TESTID)).toBeNull();
+  });
+
+  it('una línea con envase y volumen conocido pinta el envase y el volumen', () => {
+    const conVolumen: OrderPresentationLineView = {
+      presentationId: PRESENTACION_A,
+      presentationName: '300 ml',
+      packages: 9,
+      packagingProductId: 'e-1',
+      packagingName: 'Embase pequeño 2',
+      presentationContent: '300.0000',
+      presentationUnitLabel: 'ml',
+    };
+    render(<OrderProducedPresentations lines={[conVolumen]} productByPresentation={{}} />);
+
+    expect(screen.getByTestId(ORDER_PRODUCED_PRESENTATIONS_TESTID)).toHaveTextContent(
+      '9 × Embase pequeño 2 · 300 ml',
+    );
   });
 });

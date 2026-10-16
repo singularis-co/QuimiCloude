@@ -5,11 +5,12 @@ import { OrderDistributionLabel } from '@/components/shared/order-distribution-l
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import {
   formatOrderNumber,
-  type OrderPresentationLineView,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
+import { formatPresentationQuantities } from '@/lib/shared/ui/presentation-quantities';
 
 import { orderCustomerLabel } from './order-customer-label';
 import {
@@ -25,9 +26,9 @@ import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
+import { distributionLabelLine } from './order-responsibles-sheet';
 import { orderRowActionsSpec, type OrderRowAction } from './order-row-actions';
 import { OrderRowResponsibles } from './order-sheet';
-import type { RecipePickerPage } from './recipe-picker';
 import {
   ORDER_PRIORITY_FILTER_OPTIONS,
   ORDER_STATUS_FILTER_OPTIONS,
@@ -93,6 +94,7 @@ export const RECIPE_NAME_COLUMN_ID = 'recipeName';
 export const ORDER_CUSTOMER_NAME_COLUMN_ID = 'customer';
 export const QUANTITY_COLUMN_ID = 'quantity';
 export const PRESENTATION_NAME_COLUMN_ID = 'presentationName';
+export const PENDING_DELIVERY_COLUMN_ID = 'pendingDelivery';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
 export const COVERAGE_COLUMN_ID = 'coverage';
 /** QC-102 R16 — la columna propia de responsables. */
@@ -101,6 +103,10 @@ export const ACTIONS_COLUMN_ID = 'actions';
 
 /** Glifo del marcador de ausencia. Constante para que ningun test dependa del caracter. */
 export const MISSING_VALUE_MARK = '—';
+
+/** Todo lo empacado ya se entrego: se lee como el estado `ENTREGADO`. */
+export const NOTHING_PENDING_MARK = ORDER_STATUS_LABELS.ENTREGADO;
+export const PENDING_DELIVERY_TESTID = 'order-pending-delivery';
 
 /**
  * Marcador identificable de «este dato no viene informado» (R9, R11).
@@ -118,6 +124,38 @@ function MissingValue({ field }: { readonly field: string }) {
 }
 
 /**
+ * Celda «Por entregar». `delivered` se lee «Entregado»; `not_packed` -y un `pending` sin
+ * presentaciones con nombre- lleva el marcador de ausencia, porque no hay nada que entregar
+ * que se pueda nombrar. Con varias presentaciones el texto salta de linea.
+ */
+function PendingDelivery({ order }: { readonly order: OrderSummary }) {
+  const state = order.pendingDelivery;
+  const text = state.kind === 'pending' ? formatPresentationQuantities(state.items) : '';
+  if (text === '') {
+    return (
+      <span
+        data-testid={PENDING_DELIVERY_TESTID}
+        data-state={state.kind}
+        data-empty="true"
+        className="text-muted-foreground"
+      >
+        {state.kind === 'delivered' ? NOTHING_PENDING_MARK : MISSING_VALUE_MARK}
+      </span>
+    );
+  }
+  return (
+    <span
+      data-testid={PENDING_DELIVERY_TESTID}
+      data-state={state.kind}
+      title={text}
+      className="inline-block max-w-xs align-middle break-words whitespace-normal"
+    >
+      {text}
+    </span>
+  );
+}
+
+/**
  * Fecha en `YYYY-MM-DD` y en UTC, **no con `toLocaleDateString`**: el Server Component y el
  * navegador tienen husos y locales distintos, y una fecha formateada con el local del entorno
  * produce una discrepancia de hidratacion que nadie relaciona con la tabla. Mismo criterio que
@@ -127,12 +165,8 @@ function formatRequestDate(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-/**
- * Los dos catalogos que el panel lateral de edicion necesita, bajados por props desde el Server
- * Component de la seccion (R43): la primera pagina de recetas y las unidades existentes.
- */
+/** Lo que las columnas necesitan, bajado por props desde el Server Component de la seccion. */
 export type OrderColumnsDeps = {
-  readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
   readonly bridge: MassVolumeBridge | null;
   /**
@@ -167,11 +201,6 @@ export type OrderColumnsDeps = {
   readonly onAction?: (action: OrderRowAction, order: OrderSummary) => void;
 };
 
-/** Una linea con envase se nombra por el envase; una antigua, o sin nombre de envase, por su presentacion. */
-function distributionLabelLine(line: OrderPresentationLineView) {
-  return { presentationName: line.packagingName ?? line.presentationName, packages: line.packages };
-}
-
 const PRODUCED_ORDER_STATUSES: ReadonlySet<OrderSummary['status']> = new Set([
   'TERMINADO',
   'ENTREGADO',
@@ -191,9 +220,6 @@ function producedProductsOf(
 function ignoreAction(): void {}
 
 export function buildOrderColumns({
-  recipes,
-  units,
-  bridge,
   responsiblesByOrder = {},
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverageByOrder = {},
@@ -285,6 +311,12 @@ export function buildOrderColumns({
       },
     },
     {
+      id: PENDING_DELIVERY_COLUMN_ID,
+      label: 'Por entregar',
+      align: 'start',
+      cell: (order) => <PendingDelivery order={order} />,
+    },
+    {
       id: CREATED_AT_COLUMN_ID,
       label: 'Fecha de solicitud',
       tabular: true,
@@ -330,14 +362,9 @@ export function buildOrderColumns({
       cell: (order) => (
         <OrderRowResponsibles
           order={order}
-          recipes={recipes}
-          units={units}
-          bridge={bridge}
           // R20: si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia.
           responsibles={responsiblesByOrder[order.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
-          // El panel es el mismo, se abra por donde se abra.
-          coverage={coverageByOrder[order.id]}
         />
       ),
     },

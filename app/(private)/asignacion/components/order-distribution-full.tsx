@@ -2,8 +2,8 @@
  * El reparto entero de un pedido, todas sus lineas en orden de alta. Sin `'use client'` y sin
  * hooks: lo usan tanto la columna de una tabla de cliente como una pantalla de servidor.
  *
- * El nombre de cada linea sigue el criterio de `OrderDistributionLabel`: el envase y, si una linea
- * antigua no lo tiene, la presentacion.
+ * El nombre de cada linea sigue el criterio de `OrderDistributionLabel`: el envase con el volumen de su
+ * presentacion («Envase 2 · 300 ml») y, si una linea antigua no tiene envase, la presentacion.
  */
 
 import { EntityImage } from '@/components/shared/entity-image';
@@ -15,6 +15,8 @@ export type OrderDistributionFullLine = {
   readonly packagingName?: string | null;
   readonly packagingImageUrl?: string | null;
   readonly packages: number;
+  readonly presentationContent?: string | null;
+  readonly presentationUnitLabel?: string | null;
 };
 
 export type OrderDistributionFullProps = {

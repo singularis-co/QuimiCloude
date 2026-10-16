@@ -440,8 +440,8 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     expect(findRefsPresentations).toHaveBeenCalledTimes(1);
     expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
     expect(view.presentationLines).toEqual([
-      { lineId: 'linea-2', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: null },
-      { lineId: 'linea-3', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null },
+      { lineId: 'linea-2', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: 'L' },
+      { lineId: 'linea-3', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: 'L' },
     ]);
   });
 
@@ -460,8 +460,33 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(view.presentationLines).toEqual([
-      { lineId: 'linea-4', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: 'Envase PET 200 ml' },
-      { lineId: 'linea-5', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null },
+      { lineId: 'linea-4', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: 'Envase PET 200 ml', presentationContent: null, presentationUnitLabel: 'L' },
+      { lineId: 'linea-5', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: 'L' },
+    ]);
+  });
+
+  it('cada linea lleva el contenido (copiado o vigente) y la etiqueta de la unidad de su presentacion', async () => {
+    const { deps, findRefs } = montar({
+      summary: resumen({
+        presentationLines: [
+          { id: 'linea-6', presentationId: SEGUNDA_PRESENTACION, packages: 9, packedPackages: null, presentationContent: '300.0000', packagingProductId: null, packagingName: 'Embase pequeño 2' },
+          { id: 'linea-7', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
+        ],
+      }),
+      presentations: [
+        presentacion({ content: '20.0000' }),
+        presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 300', content: '250.0000', unitId: MILILITRO }),
+      ],
+      ownUnits: [unidad(), unidad({ id: MILILITRO, name: 'Mililitro', symbol: 'ml' })],
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(findRefs).toHaveBeenCalledWith(expect.arrayContaining([LITRO, MILILITRO]), EMPRESA);
+    expect(view.presentationLines.map(({ presentationContent, presentationUnitLabel }) => ({ presentationContent, presentationUnitLabel }))).toEqual([
+      { presentationContent: '300.0000', presentationUnitLabel: 'ml' },
+      { presentationContent: '20.0000', presentationUnitLabel: 'L' },
     ]);
   });
 

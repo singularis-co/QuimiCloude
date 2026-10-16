@@ -248,7 +248,6 @@ function row(overrides: Partial<ExecutionTraceRow> & Pick<ExecutionTraceRow, 'or
     formulaName: null,
     formulaImageUrl: null,
     presentations: [],
-    pendingDelivery: [],
     ...overrides,
   };
 }

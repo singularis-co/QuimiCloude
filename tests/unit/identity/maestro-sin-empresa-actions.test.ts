@@ -108,6 +108,7 @@ beforeEach(() => {
     packaging: fakePackagingCatalog(),
     units: trampa('units', llamadas),
     log: LOG_MUDO,
+    deliveryProgress: trampa('deliveryProgress', llamadas),
   }) as (input: unknown, actor: unknown) => Promise<unknown>;
   cableado.listUnits = createListUnits({
     units: trampa('units', llamadas),

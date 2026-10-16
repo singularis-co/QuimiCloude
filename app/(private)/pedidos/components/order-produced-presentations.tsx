@@ -46,6 +46,8 @@ function lineText(line: OrderPresentationLineView): string {
     presentationName: line.presentationName,
     packagingName: line.packagingName,
     packages: line.packages,
+    presentationContent: line.presentationContent,
+    presentationUnitLabel: line.presentationUnitLabel,
   });
 }
 

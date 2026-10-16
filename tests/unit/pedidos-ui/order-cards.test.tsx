@@ -97,7 +97,9 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }

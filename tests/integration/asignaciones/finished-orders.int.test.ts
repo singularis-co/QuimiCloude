@@ -419,7 +419,8 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       await startPacking(actorEmpacador, { orderId: pedido });
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
 
-      // Terminar el empaque: EN_EMPAQUE -> POR_ACONDICIONAR. Un POR_ACONDICIONAR NO aparece.
+      // Terminar el empaque: EN_EMPAQUE -> POR_ACONDICIONAR. Ya salio de empaque: el Empacador lo
+      // ve, todavia sin fecha de terminado; quien ejecuta pedidos todavia no.
       const lineas = await fixture.tx.orderPresentationLine.findMany({ where: { orderId: pedido }, select: { id: true, packages: true } });
       const { numberText } = await finishPacking(actorEmpacador, {
         orderId: pedido,
@@ -427,12 +428,18 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       });
       expect(numberText.length).toBeGreaterThan(0);
       expect(await estadoDe()).toBe('POR_ACONDICIONAR');
-      expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
+      expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([
+        expect.objectContaining({ id: pedido, finishedAt: null }),
+      ]);
+      expect((await listFinishedOrders({ ...actorOperario, permissions: PERMISOS_CON_EJECUCION }, { page: 1 })).items).toEqual([]);
 
-      // Comenzar el acondicionamiento: POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO. Tampoco aparece.
+      // Comenzar el acondicionamiento: POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO. Sigue igual.
       await startConditioning(actorAcondicionador, { orderId: pedido, userIds: [operario], workGroupIds: [] });
       expect(await estadoDe()).toBe('EN_ACONDICIONAMIENTO');
-      expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
+      expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([
+        expect.objectContaining({ id: pedido, finishedAt: null }),
+      ]);
+      expect((await listFinishedOrders({ ...actorOperario, permissions: PERMISOS_CON_EJECUCION }, { page: 1 })).items).toEqual([]);
 
       // Terminar el acondicionamiento: EN_ACONDICIONAMIENTO -> TERMINADO con `finished_at`, en el
       // instante que el fixture cablea como reloj (`NOW`), con el mismo numero visible.
@@ -527,6 +534,73 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const todos = await listFinishedOrders({ ...actorA, permissions: PERMISOS_CON_EJECUCION }, { page: 1 });
       expect(todos.items.map((item) => item.id)).toEqual([deC, deB, deA3, deA2, deA1]);
       expect(todos.total).toBe(5);
+    });
+  });
+
+  it('el empacador ve sus POR_ACONDICIONAR, EN_ACONDICIONAMIENTO y TERMINADO, los sin fecha primero; no los de otro empacador; el operador solo los TERMINADO', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const { listFinishedOrders } = wireListFinishedOrders(fixture.tx);
+
+      const empacadorA = await createPerson(fixture, fixture.companyA);
+      const empacadorB = await createPerson(fixture, fixture.companyA);
+      const acondicionador = await createPerson(fixture, fixture.companyA);
+
+      async function enEstado(
+        status: 'POR_ACONDICIONAR' | 'EN_ACONDICIONAMIENTO' | 'POR_EMPACAR' | 'EN_EMPAQUE',
+        packedBy: string | null,
+      ): Promise<string> {
+        const id = await createOrder(fixture, { status: 'PENDIENTE' });
+        await fixture.tx.order.update({
+          where: { id },
+          data: {
+            status,
+            packedBy,
+            ...(status === 'EN_ACONDICIONAMIENTO' ? { conditionedBy: acondicionador } : {}),
+          },
+        });
+        return id;
+      }
+
+      const terminadoViejo = await terminado(fixture, {
+        packedBy: empacadorA,
+        conditionedBy: acondicionador,
+        finishedAt: new Date('2026-03-01T00:00:00.000Z'),
+      });
+      const porAcondicionar = await enEstado('POR_ACONDICIONAR', empacadorA);
+      const terminadoNuevo = await terminado(fixture, {
+        packedBy: empacadorA,
+        conditionedBy: acondicionador,
+        finishedAt: new Date('2026-03-05T00:00:00.000Z'),
+      });
+      const enAcondicionamiento = await enEstado('EN_ACONDICIONAMIENTO', empacadorA);
+      // Lo que A aun empaca no ha salido de empaque: no entra.
+      await enEstado('EN_EMPAQUE', empacadorA);
+      // Lo de otro empacador no entra, en ningun estado.
+      const deB = await enEstado('POR_ACONDICIONAR', empacadorB);
+      const terminadoDeB = await terminado(fixture, {
+        packedBy: empacadorB,
+        conditionedBy: acondicionador,
+        finishedAt: new Date('2026-03-10T00:00:00.000Z'),
+      });
+
+      const actorA: Actor = { id: empacadorA, companyId: fixture.companyA, permissions: PERMISOS_DEL_EMPACADOR };
+      const primera = await listFinishedOrders(actorA, { page: 1, pageSize: 2 });
+      const segunda = await listFinishedOrders(actorA, { page: 2, pageSize: 2 });
+
+      // Sin fecha primero (numero descendente: el creado despues va antes), luego por fecha DESC.
+      expect(primera.items.map((item) => item.id)).toEqual([enAcondicionamiento, porAcondicionar]);
+      expect(primera.items.map((item) => item.finishedAt)).toEqual([null, null]);
+      expect(segunda.items.map((item) => item.id)).toEqual([terminadoNuevo, terminadoViejo]);
+      expect(primera.total).toBe(4);
+      expect(primera.totalPages).toBe(2);
+
+      // El operador (con `asignaciones.ejecutar`) sigue viendo solo los TERMINADO de la empresa.
+      const operador = await listFinishedOrders(
+        { ...actorA, permissions: PERMISOS_CON_EJECUCION },
+        { page: 1 },
+      );
+      expect(operador.items.map((item) => item.id)).toEqual([terminadoDeB, terminadoNuevo, terminadoViejo]);
+      void deB;
     });
   });
 });

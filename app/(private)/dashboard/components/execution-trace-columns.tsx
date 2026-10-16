@@ -9,22 +9,23 @@ import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import { StatusBadge } from '@/components/shared/status-badge';
 import type {
   ExecutionTracePerson,
-  ExecutionTracePresentation,
   ExecutionTraceRow,
   TraceDuration,
 } from '@/lib/modules/asignaciones';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
+import {
+  formatPresentationQuantities,
+  type PresentationQuantity,
+} from '@/lib/shared/ui/presentation-quantities';
 
 import {
   ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
   TRACE_DURATION_SUFFIXES,
-  TRACE_NOTHING_PENDING_MARK,
   TRACE_ORDER_STATUS_LABELS,
   formatElapsedMinutes,
   formatTraceInstant,
-  formatTracePresentations,
 } from './execution-trace-format';
 import {
   LAST_AT_COLUMN_ID,
@@ -37,7 +38,6 @@ export const TRACE_NUMBER_COLUMN_ID = 'orderNumber';
 export const TRACE_IMAGE_COLUMN_ID = 'formulaImage';
 export const TRACE_FORMULA_COLUMN_ID = 'formulaName';
 export const TRACE_PRESENTATIONS_COLUMN_ID = 'presentations';
-export const TRACE_PENDING_COLUMN_ID = 'pendingDelivery';
 export const TRACE_STATUS_COLUMN_ID = 'status';
 
 export const TRACE_IMAGE_EMPTY_ALT = 'Pedido sin fórmula';
@@ -81,9 +81,9 @@ function PresentationsText({
   items,
 }: {
   readonly testId: string;
-  readonly items: readonly ExecutionTracePresentation[];
+  readonly items: readonly PresentationQuantity[];
 }) {
-  const text = formatTracePresentations(items);
+  const text = formatPresentationQuantities(items);
   return (
     <span
       data-testid={testId}
@@ -152,17 +152,6 @@ export function buildExecutionTraceColumns({
           <MutedText testId="execution-trace-presentations">{EMPTY_MARK}</MutedText>
         ) : (
           <PresentationsText testId="execution-trace-presentations" items={row.presentations} />
-        ),
-    },
-    {
-      id: TRACE_PENDING_COLUMN_ID,
-      label: 'Por entregar',
-      align: 'start',
-      cell: (row) =>
-        row.pendingDelivery.length === 0 ? (
-          <MutedText testId="execution-trace-pending">{TRACE_NOTHING_PENDING_MARK}</MutedText>
-        ) : (
-          <PresentationsText testId="execution-trace-pending" items={row.pendingDelivery} />
         ),
     },
     {

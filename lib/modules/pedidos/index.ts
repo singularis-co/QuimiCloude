@@ -307,6 +307,7 @@ export type {
   DeliveryCustomerBlock,
   DeliveryLineState,
 } from './domain/order-delivery';
+export type { OrderDeliveryState, OrderPendingDelivery } from './domain/order-pending-delivery';
 export { createGetOrderDelivery } from './domain/get-order-delivery';
 export type {
   GetOrderDeliveryDeps,
