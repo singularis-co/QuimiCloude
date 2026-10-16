@@ -61,6 +61,8 @@ export type RecipeStepEditorProps = {
   readonly errorId?: string;
   /** Sin ella no se pinta el interruptor «Requiere evidencia». */
   readonly evidence?: RecipeStepEvidenceControl;
+  /** Botones de la fila (añadir, quitar), en el mismo grupo que el interruptor. */
+  readonly actions?: ReactNode;
 };
 
 export type RecipeStepEvidenceControl = {
@@ -87,6 +89,7 @@ export function RecipeStepEditor({
   error,
   errorId,
   evidence,
+  actions,
 }: RecipeStepEditorProps) {
   const warningId = useId();
   const evidenceHelpId = useId();
@@ -191,19 +194,25 @@ export function RecipeStepEditor({
             <span aria-hidden="true">&#9745;</span>
           </ToolbarButton>
         </div>
-        {evidence === undefined ? null : (
+        {evidence === undefined && actions === undefined ? null : (
           // En teléfono el interruptor baja a su propia línea; desde md se alinea a la derecha.
-          <div className="flex w-full md:ml-auto md:w-auto">
-            <Switch
-              checked={evidenceOn}
-              onCheckedChange={(checked) => evidence.onCheckedChange(checked)}
-              aria-label={evidence.label}
-              aria-describedby={evidenceOn ? evidenceHelpId : undefined}
-              data-testid={`${editableTestId}-evidence`}
-            >
-              <CameraIcon aria-hidden="true" className="size-4" />
-              {TEXTS.requiresEvidence}
-            </Switch>
+          <div
+            className="flex w-full items-center gap-1 md:ml-auto md:w-auto"
+            data-testid={`${editableTestId}-row-tools`}
+          >
+            {evidence === undefined ? null : (
+              <Switch
+                checked={evidenceOn}
+                onCheckedChange={(checked) => evidence.onCheckedChange(checked)}
+                aria-label={evidence.label}
+                aria-describedby={evidenceOn ? evidenceHelpId : undefined}
+                data-testid={`${editableTestId}-evidence`}
+              >
+                <CameraIcon aria-hidden="true" className="size-4" />
+                {TEXTS.requiresEvidence}
+              </Switch>
+            )}
+            {actions === undefined ? null : <div className="ml-auto flex gap-1">{actions}</div>}
           </div>
         )}
       </div>

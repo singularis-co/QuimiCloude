@@ -58,13 +58,16 @@ export {
   toLineFormValues,
   toToolFormValues,
   type ImageFieldState,
+  type RecipeFieldErrorMessages,
   type RecipeFormMode,
   type RecipeFormState,
+  type RecipeLineErrorMessages,
   type RecipeLineErrors,
   type RecipeLineFieldName,
   type RecipeLineFormValue,
   type RecipeLinePayload,
   type RecipePayload,
+  type RecipeStepErrorMessages,
   type RecipeStepErrors,
   type RecipeStepFormValue,
   type RecipeToolErrorMessages,
@@ -77,7 +80,10 @@ export {
 } from './recipe-form-state';
 export { ProductPicker, type ProductPickerOption, type ProductPickerProps } from './product-picker';
 export {
+  RECIPE_LINE_ERROR_MESSAGES,
+  RECIPE_LINES_GENERAL_ERROR_MESSAGE,
   RECIPE_TOOL_ERROR_MESSAGES,
+  RECIPE_TOOLS_GENERAL_ERROR_MESSAGE,
   RecipeLinesField,
   clampPercentageToRemaining,
   referenceAmountForPercentage,
@@ -85,7 +91,12 @@ export {
   sanitizeToolQuantityInput,
   type RecipeLinesFieldProps,
 } from './recipe-lines-field';
-export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
+export {
+  PACKING_STEPS_FIELD_TEXTS,
+  RECIPE_STEP_ERROR_MESSAGES,
+  RecipeStepsField,
+  type RecipeStepsFieldProps,
+} from './recipe-steps-field';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
 export {
   PropagateVersionsDialog,

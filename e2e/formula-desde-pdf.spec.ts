@@ -365,7 +365,7 @@ test.describe('formula-desde-pdf', () => {
     await expect(page.getByTestId('recipe-step-row')).toHaveCount(3);
     await page.getByTestId('recipe-step-remove-2').click();
     await expect(page.getByTestId('recipe-step-row')).toHaveCount(2);
-    await page.getByTestId('recipe-step-add').click();
+    await page.getByTestId('recipe-step-add-1').click();
     await page.getByTestId('recipe-step-text-2').fill(addedStepText);
 
     // --- 7. El choque de nombre: la receta sembrada tiene el mismo nombre leido (R17).

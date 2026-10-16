@@ -46,6 +46,7 @@ import type { NewProductBatch } from '../../../domain/product-batch';
 import type { ProductBatchView } from '../../../domain/product-batch-view';
 import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../../../domain/stock-adjustment';
 import type { NewProduct, PackagingIdentity, ProductView, ProductType } from '../../../domain/product-view';
+import type { ListAliveOptions } from '../../../ports/product-repository';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
 import { PRODUCT_PRESENTATION_UNIT_FILTER, PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
 
@@ -422,7 +423,9 @@ async function findAverageUnitCostByProduct(
 export async function listAliveProducts(
   query: ListQuery,
   scope: InventoryScope,
+  options: ListAliveOptions = {},
 ): Promise<Page<ProductView>> {
+  const withUnitCosts = options.withUnitCosts === true;
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
   const unitFilter = query.filters[PRODUCT_PRESENTATION_UNIT_FILTER];
   const presentationIdsByUnit =
@@ -446,7 +449,8 @@ export async function listAliveProducts(
   const [reservedByProduct, nextExpiryByProduct, averageUnitCostByProduct] = await Promise.all([
     findReservedAndAvailableByProduct(prisma, scope.companyId, productIds),
     findNextExpiryDateByProduct(productIds, scope),
-    findAverageUnitCostByProduct(productIds, scope),
+    // Sin costos pedidos, la consulta de costos ni se lanza.
+    withUnitCosts ? findAverageUnitCostByProduct(productIds, scope) : null,
   ]);
   const presentations = await findFixedPresentations(
     [...new Set(rows.flatMap((row) => (row.presentationId === null ? [] : [row.presentationId])))],
@@ -460,7 +464,9 @@ export async function listAliveProducts(
       reserved: aggregate?.reserved ?? ZERO_QUANTITY,
       available: aggregate?.available ?? ZERO_QUANTITY,
       nextExpiryDate: nextExpiryByProduct.get(row.id) ?? null,
-      averageUnitCost: averageUnitCostByProduct.get(row.id) ?? null,
+      ...(averageUnitCostByProduct === null
+        ? {}
+        : { averageUnitCost: averageUnitCostByProduct.get(row.id) ?? null }),
       ...(fixed ?? NO_FIXED_PRESENTATION),
     };
   });

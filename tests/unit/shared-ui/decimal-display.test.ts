@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DISPLAY_FRACTION_DIGITS,
+  exactDecimalTitle,
   formatDecimalDisplay,
+  formatMoneyDisplay,
   trimDecimal,
 } from '@/lib/shared/ui/decimal-display';
 
@@ -95,6 +97,63 @@ describe('formatDecimalDisplay: redondea a dos decimales y luego recorta', () =>
   it('lo que no es un decimal en notacion plana vuelve TAL CUAL', () => {
     for (const crudo of ['', '.', '12.', '-', 'abc']) {
       expect(formatDecimalDisplay(crudo), `«${crudo}» deberia volver intacto`).toBe(crudo);
+    }
+  });
+});
+
+describe('formatMoneyDisplay: «$», separador de miles y SIEMPRE dos decimales', () => {
+  it('los ceros de la derecha se escriben hasta dos decimales', () => {
+    expect(formatMoneyDisplay('12.5000')).toBe('$12.50');
+    expect(formatMoneyDisplay('12')).toBe('$12.00');
+    expect(formatMoneyDisplay('9.0000')).toBe('$9.00');
+    expect(formatMoneyDisplay('0')).toBe('$0.00');
+    expect(formatMoneyDisplay('0.0000')).toBe('$0.00');
+  });
+
+  it('redondea al mas cercano con el empate lejos del cero, como formatDecimalDisplay', () => {
+    expect(formatMoneyDisplay('0.125')).toBe('$0.13');
+    expect(formatMoneyDisplay('0.1249')).toBe('$0.12');
+    expect(formatMoneyDisplay('3.1250')).toBe('$3.13');
+    expect(formatMoneyDisplay('1.005')).toBe('$1.01');
+    expect(formatMoneyDisplay('8.165')).toBe('$8.17');
+    expect(formatMoneyDisplay('9.995')).toBe('$10.00');
+  });
+
+  it('un costo que redondea a cero se lee «$0.00», y el exacto queda para el `title`', () => {
+    expect(formatMoneyDisplay('0.0020')).toBe('$0.00');
+    expect(formatMoneyDisplay('0.0049')).toBe('$0.00');
+    expect(exactDecimalTitle('0.0020')).toBe('0.002');
+    // Sin perdida al redondear, no hay `title`.
+    expect(exactDecimalTitle('12.5000')).toBeUndefined();
+  });
+
+  it('agrupa la parte entera de tres en tres con «,», tambien por encima del millon', () => {
+    expect(formatMoneyDisplay('999.99')).toBe('$999.99');
+    expect(formatMoneyDisplay('1000')).toBe('$1,000.00');
+    expect(formatMoneyDisplay('1234.56')).toBe('$1,234.56');
+    expect(formatMoneyDisplay('999999.995')).toBe('$1,000,000.00');
+    expect(formatMoneyDisplay('1234567.8900')).toBe('$1,234,567.89');
+    expect(formatMoneyDisplay('12345678901.2345')).toBe('$12,345,678,901.23');
+  });
+
+  it('es exacto: un entero mas largo de lo que `Number` representa no pierde cifras', () => {
+    expect(formatMoneyDisplay('9007199254740993.4')).toBe('$9,007,199,254,740,993.40');
+  });
+
+  it('el signo va delante del simbolo, y un negativo que redondea a cero sale sin signo', () => {
+    expect(formatMoneyDisplay('-1234.5')).toBe('-$1,234.50');
+    expect(formatMoneyDisplay('-0.125')).toBe('-$0.13');
+    expect(formatMoneyDisplay('-0.001')).toBe('$0.00');
+  });
+
+  it('otras escalas: el numero de decimales es una prop', () => {
+    expect(formatMoneyDisplay('1234.5', 0)).toBe('$1,235');
+    expect(formatMoneyDisplay('0.1255', 3)).toBe('$0.126');
+  });
+
+  it('lo que no es un decimal en notacion plana vuelve TAL CUAL, como sus hermanas', () => {
+    for (const crudo of ['', '.', '12.', '-', 'abc', '1e3', '1,5']) {
+      expect(formatMoneyDisplay(crudo), `«${crudo}» deberia volver intacto`).toBe(crudo);
     }
   });
 });

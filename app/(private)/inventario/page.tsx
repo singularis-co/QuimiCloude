@@ -6,7 +6,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { identity } from '@/lib/composition';
 import { hasAddon } from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
-import { canAdjustBatchStock, type ProductFormUnits } from '@/lib/modules/inventario';
+import { canAdjustBatchStock, canViewUnitCosts, type ProductFormUnits } from '@/lib/modules/inventario';
 import { listProductFormUnitsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
@@ -86,6 +86,7 @@ export default async function InventarioPage({
     identity.getSessionUser(),
   ]);
   const canImport = canAdjustBatchStock(sessionUser) && hasAddon(sessionUser, 'importacion_excel');
+  const canSeeCost = canViewUnitCosts(sessionUser);
   const units = unitsResult.status === 'success' ? unitsResult.data : undefined;
   const formUnits: ProductFormUnits =
     formUnitsResult.status === 'success' ? formUnitsResult.data : [];
@@ -120,7 +121,15 @@ export default async function InventarioPage({
         primera carga.
       */}
       <Suspense
-        fallback={<ProductTable status="loading" products={[]} params={params} totalPages={0} />}
+        fallback={
+          <ProductTable
+            status="loading"
+            products={[]}
+            params={params}
+            totalPages={0}
+            canSeeCost={canSeeCost}
+          />
+        }
       >
         <ProductListSection params={params} units={units} formUnits={formUnits} />
       </Suspense>

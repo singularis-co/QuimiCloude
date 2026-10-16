@@ -9,6 +9,12 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /** 16 px en todos los anchos: el primitivo baja a 14 px en `md`. */
 const FIELD_TEXT = 'text-base md:text-base';
+/**
+ * El fondo es el del `Input` deshabilitado y el texto, el del tipo fijo de este mismo formulario.
+ * El anillo de foco se queda: el campo sigue siendo enfocable con teclado.
+ */
+const PRODUCT_FIELD_READ_ONLY_CLASS =
+  'cursor-default bg-input/50 text-muted-foreground dark:bg-input/80';
 
 type ProductFieldProps = {
   /** Nombre del campo en el `FormData`. De el salen tambien los `data-testid`. */
@@ -73,7 +79,7 @@ export function ProductField({
       value={value}
       onChange={onChange}
       remountOnDefault
-      inputClassName={`${touchTarget} ${FIELD_TEXT}`}
+      inputClassName={`${touchTarget} ${FIELD_TEXT}${readOnly ? ` ${PRODUCT_FIELD_READ_ONLY_CLASS}` : ''}`}
       labelRowClassName="flex items-center gap-1.5"
       labelAdornment={
         helper === undefined ? undefined : (

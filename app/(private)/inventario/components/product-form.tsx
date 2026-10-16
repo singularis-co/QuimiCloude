@@ -349,6 +349,10 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
   // Fuera del `FormData`: los bytes viajan como argumento aparte de la action. Es estado de React,
   // asi que un rechazo no lo pierde.
   const [image, setImage] = useState<ImageFieldState>({ kind: 'untouched' });
+  /** En el alta, la imagen del producto existente elegido: se ve pero no se reenvia. */
+  const [preloadedImageUrl, setPreloadedImageUrl] = useState<string | null>(null);
+  // Remonta el campo al elegir producto: guarda su propia vista previa local del archivo subido.
+  const [imageFieldKey, setImageFieldKey] = useState(0);
 
   /** Tipo de producto seleccionado. Parte del tipo del producto que se edita (o PRODUCT en alta). */
   const [productType, setProductType] = useState<ProductType>(product?.type ?? PRODUCT_TYPES.PRODUCT);
@@ -374,6 +378,9 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
       type: option.type ?? PRODUCT_TYPES.PRODUCT,
     });
     setQtyAlertValue(trimDecimal(option.qtyAlert ?? ''));
+    setPreloadedImageUrl(option.imageUrl ?? null);
+    setImage({ kind: 'untouched' });
+    setImageFieldKey((key) => key + 1);
   }
 
   async function save(_previous: ProductFormState, formData: FormData): Promise<ProductFormState> {
@@ -592,6 +599,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
     // Con solo texto libre escrito no hay nada autocompletado que deshacer: se conserva.
     if (template === null) return;
     setTemplate(null);
+    setPreloadedImageUrl(null);
     setStockValue('');
     setQtyAlertValue('');
     setValoresDescartados(state.status === 'error' ? state.values : undefined);
@@ -635,38 +643,15 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
       )}
 
       <ImageField
+        key={imageFieldKey}
         mode={isEdit ? 'edit' : 'create'}
-        initialImageUrl={product?.imageUrl ?? null}
+        initialImageUrl={product?.imageUrl ?? preloadedImageUrl}
         value={image}
         onChange={setImage}
         maxBytes={MAX_PRODUCT_IMAGE_BYTES}
         validate={validateProductImage}
         testIdPrefix="product-form-image"
       />
-
-      {/*
-        En el ALTA el nombre es un autocomplete que busca productos existentes; al elegir uno se
-        autocompletan unidad y alerta. En la EDICION el
-        nombre sigue siendo un campo de texto plano: no hay otro producto del que copiar nada.
-      */}
-      {isEdit ? (
-        <ProductField
-          name="name"
-          label={FIELD_LABELS.name}
-          type="text"
-          required
-          defaultValue={initialValue('name', product?.name ?? '')}
-          error={fieldErrors.name}
-        />
-      ) : (
-        <ProductNamePicker
-          key={`name-${resetCount}`}
-          defaultValue={initialValue('name', '')}
-          error={fieldErrors.name}
-          onSelect={applyTemplate}
-          productType={productType}
-        />
-      )}
 
       {/*
         Tipo de producto. Un producto terminado no se elige a mano: el select solo ofrece
@@ -703,6 +688,31 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           error={fieldErrors.type}
           options={TYPE_OPTIONS}
           onChange={(value) => handleTypeChange(value as ProductType)}
+        />
+      )}
+
+      {/*
+        En el ALTA el nombre es un autocomplete que busca productos existentes; al elegir uno se
+        autocompletan unidad y alerta. En la EDICION el
+        nombre sigue siendo un campo de texto plano: no hay otro producto del que copiar nada.
+      */}
+      {isEdit ? (
+        <ProductField
+          name="name"
+          label={FIELD_LABELS.name}
+          type="text"
+          required
+          defaultValue={initialValue('name', product?.name ?? '')}
+          error={fieldErrors.name}
+        />
+      ) : (
+        <ProductNamePicker
+          key={`name-${resetCount}`}
+          defaultValue={initialValue('name', '')}
+          error={fieldErrors.name}
+          onSelect={applyTemplate}
+          onDeselect={() => setPreloadedImageUrl(null)}
+          productType={productType}
         />
       )}
 

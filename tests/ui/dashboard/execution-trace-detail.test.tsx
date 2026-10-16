@@ -9,7 +9,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ExecutionTracePage from '@/app/(private)/dashboard/recorrido/[id]/page';
 import { BACK_TO_LIST_TEXT, ExecutionTraceDetail } from '@/app/(private)/dashboard/recorrido/[id]/components';
 import {
-  ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
   GO_BACK_MARK,
   createDefaultExecutionTraceListParams,
@@ -218,14 +217,14 @@ describe('R12 - R18 - R20 - la pagina del recorrido', () => {
   });
 });
 
-describe('R3 - la marca de actividad del resumen', () => {
-  it('R3 - un pedido activo en EN_EMPAQUE lleva la marca «En curso» aparte del estado', async () => {
+describe('R3 - el resumen no lleva marca de actividad', () => {
+  it('R3 - un pedido activo en EN_EMPAQUE no lleva chip «En curso»: el estado ya dice el paso', async () => {
     getExecutionTraceActionMock.mockResolvedValue({
       status: 'success',
       data: { ...TRACE, status: 'EN_EMPAQUE', active: true },
     });
     render(await abrir());
-    expect(screen.getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+    expect(screen.queryByTestId('execution-trace-active')).toBeNull();
     expect(screen.getByTestId('execution-trace-status')).toHaveTextContent('En empaque');
   });
 
@@ -400,9 +399,9 @@ describe('R25 - R28 - duraciones por fase y marca «En curso» con acondicionami
     expect(rejilla).toHaveClass('grid', 'grid-cols-[repeat(auto-fit,minmax(min(170px,calc(50%_-_6px)),1fr))]');
   });
 
-  it('R28 - En curso segun active; nunca en dado de baja', () => {
+  it('R28 - sin chip «En curso» ni activo ni dado de baja', () => {
     render(<ExecutionTraceDetail trace={IN_PROGRESS_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
-    expect(screen.getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+    expect(screen.queryByTestId('execution-trace-active')).toBeNull();
     cleanup();
 
     render(
@@ -411,7 +410,7 @@ describe('R25 - R28 - duraciones por fase y marca «En curso» con acondicionami
         backHref={DASHBOARD_ROUTE}
       />,
     );
-    expect(screen.getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+    expect(screen.queryByTestId('execution-trace-active')).toBeNull();
     expect(screen.queryByTestId('execution-trace-phase-open')).toBeNull();
     cleanup();
 

@@ -32,7 +32,13 @@ import {
   buildProductColumns,
   parseProductListParams,
 } from '@/app/(private)/inventario/components';
-import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
+import {
+  PERMISSIONS,
+  ROLE_ADMINISTRADOR,
+  ROLE_OPERADOR,
+  SEED_ROLE_PERMISSIONS,
+  type SessionUser,
+} from '@/lib/modules/identity';
 import { PRODUCT_TYPES, type FinishedStockRow, type ProductView } from '@/lib/modules/inventario';
 import type {
   CreateProductFormState,
@@ -602,7 +608,8 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    const columnas = buildProductColumns({ rowActions: () => null });
+    // El usuario del test es Administrador: ve tambien la columna «Costo unitario».
+    const columnas = buildProductColumns({ rowActions: () => null, showCost: true });
     for (const columna of columnas) {
       expect(
         screen.getByTestId(`data-table-head-${columna.id}`),
@@ -614,8 +621,11 @@ describe('pantalla de productos — lista', () => {
       ).toBeInTheDocument();
     }
 
-    // El esqueleto pinta tantas celdas como columnas hay: su constante no puede quedarse atras.
-    expect(PRODUCT_SKELETON_COLUMN_COUNT).toBe(columnas.length);
+    // El esqueleto por defecto cuenta las columnas por defecto (sin «Costo»): su constante no
+    // puede quedarse atras.
+    expect(PRODUCT_SKELETON_COLUMN_COUNT).toBe(
+      buildProductColumns({ rowActions: () => null }).length,
+    );
 
     // Las columnas de la tabla, por su clave: si alguna desaparece de la declaracion, esto se
     // pone rojo aunque la tabla siga pintando.
@@ -635,12 +645,58 @@ describe('pantalla de productos — lista', () => {
       'name',
       'presentationName',
       'stock',
-      'averageUnitCost',
-      'qtyAlert',
-      'reserved',
       'available',
+      'reserved',
+      'qtyAlert',
+      'averageUnitCost',
       'actions',
     ]);
+  });
+
+  it('la columna «Costo» la ve el Administrador y no el Operador, aunque el costo venga', async () => {
+    // El costo VIENE en los datos de la lista a proposito: lo que decide la columna es el permiso
+    // de la sesion, no la ausencia del campo.
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ averageUnitCost: '1234.5600' })]),
+    );
+
+    getSessionUserMock.mockResolvedValue({
+      ...USUARIO_DEL_TEST,
+      roleName: ROLE_ADMINISTRADOR,
+      permissions: SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR],
+    });
+    await renderPantalla();
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toBeInTheDocument();
+    expect(screen.getByTestId('product-cost')).toHaveTextContent(/^\$1,234\.56$/);
+    cleanup();
+
+    getSessionUserMock.mockResolvedValue({
+      ...USUARIO_DEL_TEST,
+      roleName: ROLE_OPERADOR,
+      permissions: SEED_ROLE_PERMISSIONS[ROLE_OPERADOR],
+    });
+    await renderPantalla();
+    expect(screen.getByTestId('product-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('data-table-head-averageUnitCost')).toBeNull();
+    expect(screen.queryByTestId('product-cost')).toBeNull();
+  });
+
+  it('el Administrador lee el «Costo unitario» por la unidad del producto: «$1,234.56 / kg»', async () => {
+    const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ averageUnitCost: '1234.5600', unitId: UNIDAD_KG.id })]),
+    );
+    getSessionUserMock.mockResolvedValue({
+      ...USUARIO_DEL_TEST,
+      roleName: ROLE_ADMINISTRADOR,
+      permissions: SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR],
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveTextContent('Costo unitario');
+    expect(screen.getByTestId('product-cost')).toHaveTextContent(/^\$1,234\.56 \/ kg$/);
   });
 
   it('la unidad no es su propia columna: se lee junto a la existencia', async () => {
