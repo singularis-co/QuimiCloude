@@ -40,6 +40,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { executionTraceRoute, finishedProductDetailRoute } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -302,6 +303,8 @@ test.beforeAll(async () => {
     })
   ).id;
   companyId = company;
+  // QC-277: una empresa nace sin añadidos; sin `dashboard` el recorrido responde 404.
+  await enableAllAddons(company);
 
   const admin = await createUser(adminUser, adminRole.id, company);
   adminUserId = admin;
