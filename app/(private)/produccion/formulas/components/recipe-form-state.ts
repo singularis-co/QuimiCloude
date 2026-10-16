@@ -173,8 +173,8 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
   const base = {
     name: state.name,
     description: state.description.trim() === '' ? null : state.description,
-    steps: state.steps.map((step): RecipeStepPayload => step.document),
-    packingSteps: state.packingSteps.map((step): RecipeStepPayload => step.document),
+    steps: toStepPayloads(state.steps),
+    packingSteps: toStepPayloads(state.packingSteps),
     lines: toLinePayloads(state.lines),
     tools: toToolPayloads(state.tools),
   };
@@ -188,6 +188,28 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
     case 'cleared':
       return { ...base, image: null };
   }
+}
+
+/**
+ * `true` si el documento no aporta ningún carácter visible: recorre TODOS los bloques -párrafos
+ * e ítems de cada lista de verificación- y mira si algún fragmento tiene texto tras `trim`.
+ */
+export function isStepDocumentEmpty(document: RecipeStepDocument): boolean {
+  const hasText = (spans: readonly { readonly text: string }[]) =>
+    spans.some((span) => span.text.trim() !== '');
+  return !document.blocks.some((block) =>
+    block.kind === 'paragraph' ? hasText(block.spans) : block.items.some((item) => hasText(item.spans)),
+  );
+}
+
+/**
+ * Una sección cuyo único paso está en blanco se envía vacía: es la fila de arranque, que el
+ * usuario tocó y dejó sin texto. Con dos o más pasos, el vacío sí llega al esquema y se señala.
+ */
+export function toStepPayloads(steps: readonly RecipeStepFormValue[]): RecipeStepPayload[] {
+  const [only] = steps;
+  if (steps.length === 1 && only !== undefined && isStepDocumentEmpty(only.document)) return [];
+  return steps.map((step): RecipeStepPayload => step.document);
 }
 
 function toLinePayloads(lines: readonly RecipeLineFormValue[]): RecipeLinePayload[] {

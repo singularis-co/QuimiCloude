@@ -85,7 +85,11 @@ export {
   sanitizeToolQuantityInput,
   type RecipeLinesFieldProps,
 } from './recipe-lines-field';
-export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
+export {
+  PACKING_STEPS_FIELD_TEXTS,
+  RecipeStepsField,
+  type RecipeStepsFieldProps,
+} from './recipe-steps-field';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
 export {
   PropagateVersionsDialog,

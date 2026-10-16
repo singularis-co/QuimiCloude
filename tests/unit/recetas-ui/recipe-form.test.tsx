@@ -1104,11 +1104,10 @@ describe('R32 — los pasos se añaden, editan y quitan, y se envían en el orde
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con pasos');
     await addValidLine(user, 0);
 
-    await user.click(screen.getByTestId('recipe-step-add'));
     await escribirEnPaso(0, 'Mezclar');
-    await user.click(screen.getByTestId('recipe-step-add'));
+    await user.click(screen.getByTestId('recipe-step-add-0'));
     await escribirEnPaso(1, 'Calentar de mas');
-    await user.click(screen.getByTestId('recipe-step-add'));
+    await user.click(screen.getByTestId('recipe-step-add-1'));
     await escribirEnPaso(2, 'Enfriar');
 
     // Editar el paso 2: corrige "Calentar de mas" -> "Calentar".
@@ -1134,11 +1133,10 @@ describe('R33 — reordenar por arrastre (ratón) cambia el orden enviado', () =
       await user.type(screen.getByTestId('recipe-field-name'), 'Receta con arrastre por ratón');
       await addValidLine(user, 0);
 
-      await user.click(screen.getByTestId('recipe-step-add'));
       await escribirEnPaso(0, 'Mezclar');
-      await user.click(screen.getByTestId('recipe-step-add'));
+      await user.click(screen.getByTestId('recipe-step-add-0'));
       await escribirEnPaso(1, 'Calentar');
-      await user.click(screen.getByTestId('recipe-step-add'));
+      await user.click(screen.getByTestId('recipe-step-add-1'));
       await escribirEnPaso(2, 'Enfriar');
 
       const handle = screen.getByTestId('recipe-step-handle-0');
@@ -1178,11 +1176,10 @@ describe('R34 — el equivalente por teclado reordena y el asa anuncia su posici
       await user.type(screen.getByTestId('recipe-field-name'), 'Receta con arrastre por teclado');
       await addValidLine(user, 0);
 
-      await user.click(screen.getByTestId('recipe-step-add'));
       await escribirEnPaso(0, 'Mezclar');
-      await user.click(screen.getByTestId('recipe-step-add'));
+      await user.click(screen.getByTestId('recipe-step-add-0'));
       await escribirEnPaso(1, 'Calentar');
-      await user.click(screen.getByTestId('recipe-step-add'));
+      await user.click(screen.getByTestId('recipe-step-add-1'));
       await escribirEnPaso(2, 'Enfriar');
 
       const primeraAsa = screen.getByTestId('recipe-step-handle-0');
@@ -1356,12 +1353,13 @@ describe('QC-64 R1 y R10 — el campo del paso es el editor, y no hay selector d
     expect(campo.tagName).not.toBe('INPUT');
     expect(campo.tagName).not.toBe('TEXTAREA');
     // La barra de formato del editor está montada, con sus tres controles y ninguno más.
-    expect(screen.getByRole('button', { name: 'Negrilla' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cursiva' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Lista de verificacion' })).toBeInTheDocument();
+    const operador = screen.getByTestId('recipe-steps-field');
+    expect(within(operador).getByRole('button', { name: 'Negrilla' })).toBeInTheDocument();
+    expect(within(operador).getByRole('button', { name: 'Cursiva' })).toBeInTheDocument();
+    expect(within(operador).getByRole('button', { name: 'Lista de verificacion' })).toBeInTheDocument();
 
     // Un paso nuevo tampoco trae un campo de texto plano.
-    await user.click(screen.getByTestId('recipe-step-add'));
+    await user.click(screen.getByTestId('recipe-step-add-0'));
     const nuevo = await screen.findByTestId('recipe-step-text-1');
     expect(nuevo).toHaveAttribute('contenteditable', 'true');
 
@@ -1380,7 +1378,7 @@ describe('QC-64 R1 y R10 — el campo del paso es el editor, y no hay selector d
     await screen.findByTestId('recipe-step-text-0');
     esperarSinSelectorDeTipo();
 
-    await user.click(screen.getByTestId('recipe-step-add'));
+    await user.click(screen.getByTestId('recipe-step-add-0'));
     expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(2);
     esperarSinSelectorDeTipo();
 
@@ -1388,7 +1386,6 @@ describe('QC-64 R1 y R10 — el campo del paso es el editor, y no hay selector d
 
     // --- Modo ALTA ---
     renderCreateForm();
-    await user.click(screen.getByTestId('recipe-step-add'));
     await screen.findByTestId('recipe-step-text-0');
     esperarSinSelectorDeTipo();
   });
@@ -1403,11 +1400,10 @@ describe('QC-64 R24 — el arrastre por teclado sigue funcionando con el editor 
       await user.type(screen.getByTestId('recipe-field-name'), 'Receta con editor y arrastre');
       await addValidLine(user, 0);
 
-      await user.click(screen.getByTestId('recipe-step-add'));
       await escribirEnPaso(0, 'Mezclar');
-      await user.click(screen.getByTestId('recipe-step-add'));
+      await user.click(screen.getByTestId('recipe-step-add-0'));
       await escribirEnPaso(1, 'Calentar');
-      await user.click(screen.getByTestId('recipe-step-add'));
+      await user.click(screen.getByTestId('recipe-step-add-1'));
       await escribirEnPaso(2, 'Enfriar');
 
       // El editor ESTÁ montado dentro de cada fila -es lo que este caso añade sobre el R34
@@ -1468,7 +1464,6 @@ describe('QC-64 R11, R13 y R22 — la vista previa lee lo que hay escrito y no g
     // Una línea al 100 % para que Guardar no quede deshabilitado en los casos de este bloque
     // que sí llegan a enviar.
     await addValidLine(user, 0);
-    await user.click(screen.getByTestId('recipe-step-add'));
     await escribirEnPaso(0, textoDelPaso);
   }
 

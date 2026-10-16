@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
@@ -45,7 +46,7 @@ import { cn } from '@/lib/utils';
 import type { ProductPickerOption } from './product-picker';
 import { PropagateVersionsDialog } from './propagate-versions-dialog';
 import { RECIPE_TOOL_ERROR_MESSAGES, RecipeLinesField } from './recipe-lines-field';
-import { RecipeStepsField } from './recipe-steps-field';
+import { PACKING_STEPS_FIELD_TEXTS, RecipeStepsField } from './recipe-steps-field';
 import {
   buildRecipePayload,
   createLocalKey,
@@ -102,8 +103,6 @@ import {
 
 const FIELD_TEXT = 'text-base';
 
-const PACKING_STEPS_TITLE = 'Pasos de envasado';
-const PACKING_STEPS_ADD_LABEL = 'Añadir paso de envasado';
 const PACKING_STEPS_TESTID_PREFIX = 'recipe-packing-step';
 
 const PREVIEW_OPEN_LABEL = 'Vista previa';
@@ -472,12 +471,17 @@ export function RecipeForm(props: RecipeFormProps) {
         locked={stepsLocked}
       />
 
+      <Separator data-testid="recipe-form-steps-separator" />
+
       <RecipeStepsField
         steps={state.packingSteps}
         onChange={(packingSteps) => setState((previous) => ({ ...previous, packingSteps }))}
         errors={fieldErrors.packingSteps}
-        title={PACKING_STEPS_TITLE}
-        addLabel={PACKING_STEPS_ADD_LABEL}
+        title={PACKING_STEPS_FIELD_TEXTS.title}
+        optionalHelp={{
+          text: PACKING_STEPS_FIELD_TEXTS.optionalHelp,
+          label: PACKING_STEPS_FIELD_TEXTS.optionalHelpLabel,
+        }}
         testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
         showEvidenceSwitch
         locked={stepsLocked}
