@@ -738,7 +738,8 @@ describe('R39 — no hay ninguna forma de pedir un enlace desde fuera', () => {
   //   1. quien llama a `issueForPendingUser` (este array);
   //   2. quien usa las dos funciones de `credential-setup-mail.ts` (`USUARIOS_DEL_ENVIO`, abajo).
   // Juntos dicen lo mismo que antes: los unicos sitios que emiten son el alta de usuario (R7), el
-  // reenvio (R14) y el alta de empresa (QC-162), cada uno detras de su permiso.
+  // reenvio (R14), el alta de empresa (QC-162) y el alta y el reenvio de Administradores por el
+  // Maestro (QC-165), cada uno detras de su permiso.
   const EMISORES_LEGITIMOS = [
     // R7: el alta sin contrasena, que emite UNO y lo manda a la direccion del usuario recien creado.
     'lib/modules/identity/domain/create-user.ts',
@@ -755,9 +756,12 @@ describe('R39 — no hay ninguna forma de pedir un enlace desde fuera', () => {
     // QC-162: el alta de empresa, que exige `empresas.modificar` y emite UNO para el Administrador
     // que acaba de crear.
     'lib/modules/identity/domain/create-company.ts',
-    // PENDIENTE (QC-165, tanda siguiente): el reenvio del Maestro,
-    // `lib/modules/identity/domain/resend-administrator-link.ts`, entrara aqui cuando exista. Exige
-    // `empresas.modificar` como primera linea (`design.md > 3.6`).
+    // QC-165 R26: el reenvio del Maestro, que exige `empresas.modificar` como primera linea y
+    // emite para la empresa del Administrador, nunca para una que llegue en la entrada.
+    'lib/modules/identity/domain/resend-administrator-link.ts',
+    // QC-165 R17: el alta de un Administrador por el Maestro, que exige `empresas.modificar` y
+    // emite UNO para el Administrador que acaba de crear.
+    'lib/modules/identity/domain/create-administrator.ts',
   ] as const;
 
   /**
@@ -796,14 +800,15 @@ describe('R39 — no hay ninguna forma de pedir un enlace desde fuera', () => {
     ).toEqual([...EMISORES_LEGITIMOS].sort());
   });
 
-  it('los UNICOS que usan el envio compartido son el reenvio y el alta de empresa', () => {
+  it('los UNICOS que usan el envio compartido son los dos reenvios y las dos altas de plataforma', () => {
     const usuarios = quienUsaElEnvio(fuentesDeProduccion());
     expect(
       usuarios,
       'QC-79 R39 (con la extraccion de QC-165): `credential-setup-mail.ts` emite un enlace sin ' +
         'comprobar ningun permiso, porque lo comprueba quien la llama. Por eso solo puede usarla ' +
-        'quien exige el suyo como primera linea: el reenvio (R14, `usuarios.modificar`) y el alta ' +
-        'de empresa (QC-162, `empresas.modificar`). Un usuario mas es un tercer emisor, igual que ' +
+        'quien exige el suyo como primera linea: el reenvio (R14, `usuarios.modificar`), el alta ' +
+        'de empresa (QC-162, `empresas.modificar`) y el alta y el reenvio de Administradores por el ' +
+        'Maestro (QC-165, `empresas.modificar`). Un usuario mas es un emisor no previsto, igual que ' +
         'una llamada directa a `issueForPendingUser`: la recuperacion de contrasena de **QC-96** ' +
         `o el restablecimiento de **QC-89** no entran por aqui. Quien la usa hoy:\n${usuarios.join('\n')}`,
     ).toEqual([...USUARIOS_DEL_ENVIO].sort());

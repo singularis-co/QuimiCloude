@@ -32,7 +32,7 @@
   `ports/administrator-repository.ts` (`design.md > 4`). **Hecho:** typecheck verde; ningún método
   recibe un rol.
 
-- [ ] **T5 — Casos de uso.** Depende de T1, T2, T3, T4.
+- [x] **T5 — Casos de uso.** Depende de T1, T2, T3, T4.
   `list-administrators.ts`, `get-administrator.ts`, `create-administrator.ts`,
   `update-administrator.ts`, `delete-administrator.ts`, `resend-administrator-link.ts`
   (`design.md > 3.6`), y sus reexportaciones en `identity/index.ts`. **Hecho:** verdes, en
@@ -47,7 +47,7 @@
   - `resend-administrator-link.test.ts`: R26 (emisión con la empresa del Administrador, actor sin
     empresa), R27, R28, R29.
 
-- [ ] **T6 — Adaptador Prisma.** Depende de T4.
+- [x] **T6 — Adaptador Prisma.** Depende de T4.
   `adapters/driven/persistence/administrator-prisma.ts` con `createAdministratorRepository(db)`
   (`design.md > 5`). **Hecho:** typecheck verde; todo `findMany`/`findFirst` con `select` enumerado;
   ningún `delete`/`deleteMany` sobre `users`; `pnpm exec vitest run guard` verde (arquitectura de

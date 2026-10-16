@@ -387,6 +387,10 @@ const SITIOS_PERMITIDOS = [
   // QC-165 R8 — la lista blanca del listado de Administradores declara `accountStatus` como campo
   // ORDENABLE (`design.md > 3.3`). Solo ordena: no es filtrable ni decide nada sobre el valor.
   'lib/modules/identity/domain/administrator-queryable.ts',
+  // QC-165 R5, R8, R10, R14 — el adaptador de los Administradores del Maestro enumera la columna
+  // en el `select` de la fila y la ficha, ordena por ella y escribe `pending` SOLO al nacer
+  // (`design.md > 5`). No la filtra ni la mueve despues del alta.
+  'lib/modules/identity/adapters/driven/persistence/administrator-prisma.ts',
 ] as const;
 
 /**
