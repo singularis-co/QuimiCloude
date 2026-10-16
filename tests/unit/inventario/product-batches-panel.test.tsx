@@ -357,7 +357,7 @@ describe('resaltado de vencimiento en el panel de lotes (hoy = 2026-10-15)', () 
     return within(screen.getByTestId(`product-batch-${id}`)).getByTestId('product-batch-expiry-date');
   }
 
-  it('rojo bajo 30 dias, dias relativos siempre y chip «Vencido» solo en el vencido, incluso sin existencia', () => {
+  it('R48 — ámbar bajo 30 dias, dias relativos siempre y chip «Vencido» en danger solo en el vencido, incluso sin existencia', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 9, 15, 12, 0, 0));
     render(
@@ -368,6 +368,7 @@ describe('resaltado de vencimiento en el panel de lotes (hoy = 2026-10-15)', () 
           lote({ id: 'hoy', expiryDate: '2026-10-15' }),
           lote({ id: 'manana', expiryDate: '2026-10-16' }),
           lote({ id: 'cerca', expiryDate: '2026-11-04' }),
+          lote({ id: 'treinta', expiryDate: '2026-11-14' }),
           lote({ id: 'lejos', expiryDate: '2027-01-13' }),
         ]}
       />,
@@ -376,7 +377,8 @@ describe('resaltado de vencimiento en el panel de lotes (hoy = 2026-10-15)', () 
     expect(vencimiento('vencido')).toHaveTextContent('2026-10-12 (venció hace 3 días)');
     expect(vencimiento('vencido')).toHaveAttribute('data-expiring', 'true');
     expect(vencimiento('vencido')).toHaveAttribute('data-expired', 'true');
-    expect(vencimiento('vencido')).toHaveClass('text-destructive');
+    expect(vencimiento('vencido')).toHaveClass('text-warning-text', 'font-semibold');
+    expect(vencimiento('vencido')).not.toHaveClass('text-destructive');
     const chip = within(vencimiento('vencido')).getByTestId('product-batch-expired');
     expect(chip).toHaveTextContent('Vencido');
     expect(chip).toHaveAttribute('data-tone', 'danger');
@@ -390,10 +392,14 @@ describe('resaltado de vencimiento en el panel de lotes (hoy = 2026-10-15)', () 
     expect(relativo('lejos')).toHaveTextContent('(vence en 90 días)');
 
     expect(vencimiento('cerca')).toHaveAttribute('data-expiring', 'true');
-    expect(vencimiento('cerca')).toHaveClass('text-destructive');
-    expect(vencimiento('lejos')).not.toHaveAttribute('data-expiring');
-    expect(vencimiento('lejos')).not.toHaveClass('text-destructive');
-    for (const id of ['hoy', 'manana', 'cerca', 'lejos']) {
+    expect(vencimiento('cerca')).toHaveClass('text-warning-text', 'font-semibold');
+    expect(vencimiento('cerca')).not.toHaveClass('text-destructive');
+    for (const id of ['treinta', 'lejos']) {
+      expect(vencimiento(id)).not.toHaveAttribute('data-expiring');
+      expect(vencimiento(id)).not.toHaveClass('text-warning-text');
+      expect(vencimiento(id)).not.toHaveClass('text-destructive');
+    }
+    for (const id of ['hoy', 'manana', 'cerca', 'treinta', 'lejos']) {
       expect(vencimiento(id)).not.toHaveAttribute('data-expired');
       expect(within(vencimiento(id)).queryByTestId('product-batch-expired')).toBeNull();
     }

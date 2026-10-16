@@ -47,7 +47,7 @@ import type {
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
-import { INVENTORY_ROUTE } from '@/lib/shared/routes';
+import { INVENTORY_IMPORT_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 import {
   REFERENCIA_DEL_CASO,
@@ -1235,21 +1235,18 @@ describe('pantalla de productos — lista', () => {
   });
 
   it('R5 — ofrece una pestaña «Producto terminado» que filtra el listado por ese tipo', async () => {
-    const user = setupUser();
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()], { total: 40 }));
 
-    await renderPantalla();
+    await renderPantalla({ [PAGE_PARAM]: '2' });
 
+    // La pestaña es un enlace: filtrar no pasa por el router de cliente.
     const pestana = screen.getByRole('tab', { name: 'Producto terminado' });
-    await user.click(pestana);
-
-    await waitFor(() => expect(routerMock.push).toHaveBeenCalled());
-    const destino = new URLSearchParams(
-      String(routerMock.push.mock.calls.at(-1)?.[0]).split('?')[1],
-    );
+    expect(pestana.tagName).toBe('A');
+    const destino = new URLSearchParams(String(pestana.getAttribute('href')).split('?')[1]);
     expect(destino.get('type')).toBe(PRODUCT_TYPES.FINISHED_PRODUCT);
     // Filtrar vuelve a la primera pagina, igual que la busqueda y el orden.
     expect(destino.get(PAGE_PARAM)).toBe('1');
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 
   it('R5 — con el filtro de tipo en la URL, la pestaña llega marcada y la consulta lo lleva', async () => {
@@ -1260,7 +1257,7 @@ describe('pantalla de productos — lista', () => {
     await renderPantalla({ type: PRODUCT_TYPES.FINISHED_PRODUCT });
 
     expect(screen.getByRole('tab', { name: 'Producto terminado', selected: true })).toBeInTheDocument();
-    expect(screen.getByText('Producto terminado', { selector: 'strong' })).toBeInTheDocument();
+    expect(screen.queryByText(/Filtrando por/)).toBeNull();
 
     // La pantalla no filtra en el cliente: la pestana pide al backend su propia lista, la
     // agrupada por pedido, que no ordena ni filtra.
@@ -1272,6 +1269,66 @@ describe('pantalla de productos — lista', () => {
       filters: {},
     });
     expect(listProductsActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('pantalla de productos — cabecera', () => {
+  it('R1 — «Inventario» es el único h1, con PageHeader dentro de PageShell', async () => {
+    await renderPantalla();
+
+    const titulos = screen.getAllByRole('heading', { level: 1 });
+    expect(titulos).toHaveLength(1);
+    expect(titulos[0]).toHaveTextContent('Inventario');
+    expect(titulos[0]).toHaveAttribute('data-testid', testId.titulo);
+    const cabecera = titulos[0].closest('[data-slot="page-header"]');
+    expect(cabecera).not.toBeNull();
+    expect(cabecera?.closest('[data-slot="page-shell"]')).not.toBeNull();
+  });
+
+  it('R1 — con permiso de importar, «Importar» (contorno, con icono, a /inventario/importar) va antes de «Nuevo producto»', async () => {
+    await renderPantalla();
+
+    const acciones = screen
+      .getByTestId(testId.titulo)
+      .closest('[data-slot="page-header"]')
+      ?.querySelector('[data-slot="page-header-actions"]');
+    expect(acciones).not.toBeNull();
+    const importar = within(acciones as HTMLElement).getByTestId('inventory-import-link');
+    const alta = within(acciones as HTMLElement).getByTestId(testId.abrirAlta);
+    expect(importar).toHaveAttribute('href', INVENTORY_IMPORT_ROUTE);
+    expect(importar).toHaveTextContent('Importar');
+    expect(importar.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(importar.className).toContain('border');
+    expect(alta).toHaveTextContent('Nuevo producto');
+    expect(importar.compareDocumentPosition(alta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('R1 — sin permiso de importar, la cabecera solo ofrece «Nuevo producto»', async () => {
+    getSessionUserMock.mockResolvedValue({
+      ...USUARIO_DEL_TEST,
+      permissions: USUARIO_DEL_TEST.permissions.filter((codigo) => codigo !== 'inventario.modificar'),
+    });
+
+    await renderPantalla();
+
+    const acciones = screen
+      .getByTestId(testId.titulo)
+      .closest('[data-slot="page-header"]')
+      ?.querySelector('[data-slot="page-header-actions"]') as HTMLElement;
+    expect(within(acciones).queryByTestId('inventory-import-link')).toBeNull();
+    expect(within(acciones).getByTestId(testId.abrirAlta)).toBeInTheDocument();
+  });
+
+  it('R2 — con 760 px o menos las acciones se reparten el ancho y miden al menos 44 px', async () => {
+    await renderPantalla();
+
+    const acciones = screen
+      .getByTestId(testId.titulo)
+      .closest('[data-slot="page-header"]')
+      ?.querySelector('[data-slot="page-header-actions"]') as HTMLElement;
+    expect(acciones).toHaveClass('@max-[760px]:w-full', '@max-[760px]:*:flex-1');
+    expect(screen.getByTestId('inventory-import-link')).toHaveClass('min-h-11');
+    expect(screen.getByTestId(testId.abrirAlta)).toHaveClass('min-h-11');
   });
 });
 

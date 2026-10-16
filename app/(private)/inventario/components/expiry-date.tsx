@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { expiryRelativeLabel, isExpired } from './expiry-warning';
 
 /** Clase del aviso de vencimiento cercano: la comparten el nombre del producto y la fecha. */
-export const EXPIRING_CLASS = 'font-semibold text-destructive';
+export const EXPIRING_CLASS = 'font-semibold text-warning-text';
 
 const subscribeToNothing = () => () => {};
 const localToday = () => formatDateLocalISO(new Date());
@@ -25,7 +25,7 @@ export function useLocalToday(): string | null {
 export type ExpiryDateProps = {
   /** Vencimiento `YYYY-MM-DD`; sin el se pinta `EMPTY_MARK` y nada mas. */
   readonly date: string | null;
-  /** Vence a menos de `EXPIRY_WARNING_DAYS` (o ya vencio): la fecha va en rojo. */
+  /** Vence a menos de `EXPIRY_WARNING_DAYS` (o ya vencio): la fecha va en ámbar. */
   readonly expiring: boolean;
   /** Dias hasta el vencimiento (`daysUntil`); `null` sin «hoy» (servidor): sin relativo ni chip. */
   readonly daysToExpiry: number | null;

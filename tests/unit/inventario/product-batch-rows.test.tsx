@@ -244,7 +244,7 @@ describe('desplegar los lotes de un producto', () => {
 });
 
 describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
-  it('pinta en rojo el vencimiento de un lote a menos de 30 dias, y no el lejano', async () => {
+  it('R48 — pinta en ámbar el vencimiento de un lote a menos de 30 dias o vencido, y no el de 30 o más', async () => {
     listAliveProductBatchesActionMock.mockResolvedValue({
       status: 'success',
       data: [
@@ -265,9 +265,11 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
       );
     for (const id of ['cerca', 'vencido']) {
       expect(vencimiento(id)).toHaveAttribute('data-expiring', 'true');
-      expect(vencimiento(id)).toHaveClass('text-destructive');
+      expect(vencimiento(id)).toHaveClass('text-warning-text', 'font-semibold');
+      expect(vencimiento(id)).not.toHaveClass('text-destructive');
     }
     expect(vencimiento('lejos')).not.toHaveAttribute('data-expiring');
+    expect(vencimiento('lejos')).not.toHaveClass('text-warning-text');
     expect(vencimiento('lejos')).not.toHaveClass('text-destructive');
   });
 
@@ -302,12 +304,12 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     expect(relativo('manana')).toHaveTextContent('(vence en 1 día)');
     expect(vencimiento('cerca')).toHaveTextContent('2026-11-04 (vence en 20 días)');
     expect(relativo('lejos')).toHaveTextContent('(vence en 90 días)');
-    // El rojo sigue solo bajo 30 dias: el relativo hereda el color de la fecha.
-    expect(vencimiento('cerca')).toHaveClass('text-destructive');
-    expect(vencimiento('lejos')).not.toHaveClass('text-destructive');
+    // El ámbar sigue solo bajo 30 dias: el relativo hereda el color de la fecha.
+    expect(vencimiento('cerca')).toHaveClass('text-warning-text');
+    expect(vencimiento('lejos')).not.toHaveClass('text-warning-text');
   });
 
-  it('el vencido lleva el chip «Vencido» y data-expired; el proximo y el lejano no', async () => {
+  it('R48 — el vencido lleva el chip «Vencido» en danger y data-expired, con la fecha en ámbar; el proximo y el lejano no', async () => {
     listAliveProductBatchesActionMock.mockResolvedValue({
       status: 'success',
       data: [
@@ -329,7 +331,8 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
         'product-batch-row-expiry-date',
       );
     expect(vencimiento('vencido')).toHaveAttribute('data-expired', 'true');
-    expect(vencimiento('vencido')).toHaveClass('text-destructive');
+    expect(vencimiento('vencido')).toHaveClass('text-warning-text');
+    expect(vencimiento('vencido')).not.toHaveClass('text-destructive');
     const chip = within(vencimiento('vencido')).getByTestId('product-batch-row-expired');
     expect(chip).toHaveTextContent('Vencido');
     expect(chip).toHaveAttribute('data-tone', 'danger');
@@ -338,7 +341,8 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
       expect(vencimiento(id)).not.toHaveAttribute('data-expired');
       expect(within(vencimiento(id)).queryByTestId('product-batch-row-expired')).toBeNull();
     }
-    expect(vencimiento('cerca')).toHaveClass('text-destructive');
+    expect(vencimiento('cerca')).toHaveClass('text-warning-text');
+    expect(vencimiento('cerca')).not.toHaveClass('text-destructive');
   });
 
   it('cada clave va en negrita y seguida de «:», en su propio bloque', async () => {
@@ -360,11 +364,13 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     }
   });
 
-  it('resalta el nombre del producto segun nextExpiryDate, sin desplegar', () => {
+  it('R48 — resalta en ámbar el nombre del producto segun nextExpiryDate, sin desplegar', () => {
     render(
       <ProductTable
         products={[
           producto({ id: 'cerca', name: 'Cerca', nextExpiryDate: '2026-10-20' }),
+          producto({ id: 'vencido', name: 'Vencido', nextExpiryDate: '2026-10-01' }),
+          producto({ id: 'treinta', name: 'Treinta', nextExpiryDate: '2026-11-14' }),
           producto({ id: 'lejos', name: 'Lejos', nextExpiryDate: '2027-01-01' }),
           producto({ id: 'sin-fecha', name: 'Sin fecha', nextExpiryDate: null }),
           producto({ id: 'sin-dato', name: 'Sin dato' }),
@@ -376,10 +382,14 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
 
     const nombre = (id: string) =>
       within(screen.getByTestId(`data-table-row-${id}`)).getByTestId('product-name');
-    expect(nombre('cerca')).toHaveAttribute('data-expiring', 'true');
-    expect(nombre('cerca')).toHaveClass('text-destructive', 'font-semibold');
-    for (const id of ['lejos', 'sin-fecha', 'sin-dato']) {
+    for (const id of ['cerca', 'vencido']) {
+      expect(nombre(id)).toHaveAttribute('data-expiring', 'true');
+      expect(nombre(id)).toHaveClass('text-warning-text', 'font-semibold');
+      expect(nombre(id)).not.toHaveClass('text-destructive');
+    }
+    for (const id of ['treinta', 'lejos', 'sin-fecha', 'sin-dato']) {
       expect(nombre(id)).not.toHaveAttribute('data-expiring');
+      expect(nombre(id)).not.toHaveClass('text-warning-text');
       expect(nombre(id)).not.toHaveClass('text-destructive');
     }
     expect(listAliveProductBatchesActionMock).not.toHaveBeenCalled();

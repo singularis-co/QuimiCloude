@@ -122,12 +122,16 @@ export function FinishedStockTable({
     <div
       data-testid="product-table"
       aria-busy={isPending}
-      className={isPending ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+      className={
+        isPending
+          ? 'flex flex-col gap-4 opacity-60 transition-opacity'
+          : 'flex flex-col gap-4 transition-opacity'
+      }
     >
       {isPending ? (
         <p className="text-xs text-muted-foreground">{FINISHED_STOCK_TABLE_TEXTS.loading}</p>
       ) : null}
-      <ProductTypeTabs params={params} onNavigate={navigate} />
+      <ProductTypeTabs params={params} />
       {table}
     </div>
   );

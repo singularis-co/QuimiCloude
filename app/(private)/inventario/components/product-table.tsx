@@ -352,7 +352,11 @@ export function ProductTable({
     <div
       data-testid="product-table"
       aria-busy={isPending}
-      className={isPending ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+      className={
+        isPending
+          ? 'flex flex-col gap-4 opacity-60 transition-opacity'
+          : 'flex flex-col gap-4 transition-opacity'
+      }
     >
       {/*
         La senal de «en vuelo»: un rotulo visible con el texto de `PRODUCT_TABLE_TEXTS.loading`
@@ -364,7 +368,7 @@ export function ProductTable({
       {isPending ? (
         <p className="text-xs text-muted-foreground">{PRODUCT_TABLE_TEXTS.loading}</p>
       ) : null}
-      <ProductTypeTabs params={params} onNavigate={navigate} />
+      <ProductTypeTabs params={params} />
       {table}
     </div>
   );
