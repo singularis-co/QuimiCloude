@@ -805,6 +805,9 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
     'deleted_at',
     'id',
     'image_path',
+    // El `created_at` del ultimo lote cargado: ordena el listado por defecto. Anulable, sin
+    // default: NULL es un producto sin lotes.
+    'last_batch_at',
     'name',
     // QC-57 (R19, R23): la columna normalizada de la BUSQUEDA del listado. La anade
     // `20260904160000_list_query_indexes`, es NOT NULL y NO tiene indice unico -el nombre
@@ -859,6 +862,26 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
     expect(row?.data_type).toBe('text')
     expect(row?.is_nullable).toBe('YES')
     expect(row?.column_default).toBeNull()
+  })
+
+  it('last_batch_at es TIMESTAMPTZ anulable sin default, con su indice parcial por empresa', async () => {
+    const [columna] = await prisma.$queryRaw<
+      { data_type: string; is_nullable: string; column_default: string | null }[]
+    >`
+      SELECT data_type, is_nullable, column_default FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'last_batch_at'`
+    expect(columna?.data_type).toBe('timestamp with time zone')
+    expect(columna?.is_nullable).toBe('YES')
+    expect(columna?.column_default).toBeNull()
+
+    // Prisma no modela ni el `WHERE` ni el `NULLS LAST`: solo el catalogo dice si siguen ahi.
+    const [indice] = await prisma.$queryRaw<{ indexdef: string }[]>`
+      SELECT indexdef FROM pg_indexes
+      WHERE schemaname = 'public' AND tablename = 'products'
+        AND indexname = 'products_company_id_last_batch_at_idx'`
+    expect(indice, 'falta products_company_id_last_batch_at_idx').toBeDefined()
+    expect(indice?.indexdef).toMatch(/\(company_id, last_batch_at DESC NULLS LAST\)/)
+    expect(indice?.indexdef).toMatch(/WHERE \(deleted_at IS NULL\)/)
   })
 
   it('sus claves foraneas son la de la empresa y la de la unidad, y ninguna mas', async () => {
