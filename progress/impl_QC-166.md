@@ -113,3 +113,53 @@ T5:
 - Archivo fuera de `tasks.md > Archivos esperados`: `app/(private)/maestro/empresas/components/company-data-fields.tsx`.
 
 Veredicto: T3, T4 y T5 hechas, todo en verde.
+
+## Tanda T6 + T7 (2026-10-16)
+
+Commits: `a4f2b6c9` (T6), `8d032205` (T7). Sin dependencias nuevas, sin tocar servidor.
+
+### Archivos
+
+T6:
+- `app/(private)/maestro/empresas/[id]/page.tsx`: corte `requirePagePermission('empresas.consultar')`; id no UUID → `notFound()` sin pedir nada; `company_not_found` → `notFound()`; otro error → `ErrorState` con «Reintentar»; `canModify` por `assertPermission`; `UrlTabs`; un `role="tabpanel"` con el panel vigente; Módulos vacío.
+- `app/(private)/maestro/empresas/[id]/components/`: `index.ts`, `company-detail-tabs.ts`, `company-detail-header.tsx`, `company-data-panel.tsx`. La cabecera importa `CompanyEditSheet`, `CompanyDeleteDialog` y `CompanyReactivateDialog` del barrel del padre.
+- Tests: `tests/ui/maestro/company-detail-page.test.tsx`, `company-detail-header.test.tsx`, `company-data-panel.test.tsx`; ampliado `maestro-pages-permission.test.tsx` (bloque `/maestro/empresas/[id]`).
+- Guardia: `tests/guards/guard-pantallas-exigen-permiso.test.ts` pasa de 28 a 29 pantallas con `/maestro/empresas/[id]` (`design.md > 3.3`). `data-table-alcance` no cambia: el detalle no usa `DataTable`.
+
+T7:
+- `company-event-text.ts` (`companyEventText`, `formatCompanyEventInstant`), `company-history-panel.tsx` (`CompanyHistoryPanel` servidor, `CompanyHistoryTimeline`, `CompanyHistorySkeleton`); `company-detail-tabs.ts` gana `page` del historial y `companyHistoryPageHref`; `page.tsx` monta el historial en `<Suspense key={historyPage}>`.
+- Tests: `tests/unit/maestro/company-event-text.test.ts`, `tests/ui/maestro/company-history-panel.test.tsx`; ampliado `company-detail-page.test.tsx`.
+
+### Mapa R<n> → test (de esta tanda)
+
+| R | Test |
+|---|---|
+| R1 (detalle) | `maestro-pages-permission.test.tsx` (sin sesión → login; sin `empresas.consultar` → 404 sin pedir la empresa; el corte es la primera línea) |
+| R6 (detalle) | `company-detail-header.test.tsx` («R6: sin empresas.modificar…», activa y de baja); `company-detail-page.test.tsx` («R6: con solo empresas.consultar…») |
+| R27 | `company-detail-page.test.tsx` (miga, título, estado, tres pestañas con sus `href`, defecto «Datos» sin tab y con tab desconocido, Historial seleccionada, empresa de baja, 404 por id no UUID y por `company_not_found`); `company-detail-header.test.tsx` («R27: miga…») |
+| R28 | `company-detail-header.test.tsx` (activa: Editar y Dar de baja; de baja: Editar y Reactivar; 44 px; Editar abre el panel con la ficha sin volver a pedirla; Dar de baja abre el diálogo y pide el impacto; Reactivar refresca con éxito); `company-detail-page.test.tsx` |
+| R29 | `company-data-panel.test.tsx` (orden de los siete, valores, país con prefijo, fecha UTC, marca de vacío, fecha de baja, solo lectura) |
+| R30 | `company-detail-page.test.tsx` (panel «Módulos» vacío y `getCompanyAddonsAction` sin llamar; ningún archivo del detalle importa añadidos ni tiene `components/modulos/`) |
+| R31 | `company-history-panel.test.tsx` (pide con la página de la dirección, orden del servidor, autor e instante con `<time>`, «Página N de M · T en total», anterior/siguiente con su `href` y deshabilitados en los bordes, 44 px, fuera de rango, `page` en la dirección); `company-detail-page.test.tsx` («R31, R34: con tab=historial y page=2…», «fuera de la pestaña Historial no se pide»); `company-event-text.test.ts` (instante) |
+| R32 | `company-event-text.test.ts` (alta, baja, reactivación, uno, dos y cinco campos con «y», cada añadido con `ADDON_NAMES`); `company-history-panel.test.tsx` (ningún valor en el DOM) |
+| R33 | `company-event-text.test.ts` (tipos desconocidos sin lanzar, campo desconocido, edición sin campos, añadido desconocido y sin añadido); `company-history-panel.test.tsx` (evento desconocido pintado) |
+| R34 | `company-detail-page.test.tsx` (error del detalle con referencia y «Reintentar» → `router.refresh`; esqueleto del historial como `fallback`); `company-history-panel.test.tsx` (esqueleto `status`, error con referencia y «Reintentar») |
+
+### Salida de la verificación
+
+- `pnpm run typecheck`: sin errores (tras T6 y tras T7).
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, los mismos preexistentes; ninguno en `maestro`. En T7 salió una vez `react-hooks/static-components` (icono elegido en el render); corregido con elementos estáticos.
+- `pnpm exec vitest related --run` (T6): 5 archivos, 48/48 pass.
+- `pnpm exec vitest related --run` (T7): 6 archivos, 80/80 pass.
+- `pnpm exec vitest run guard`: 80 archivos, 1096 pass / 20 skip / 0 fail (tras T6 y tras T7).
+
+### Notas y desvíos
+
+- **Esqueleto del detalle (R34):** la ficha se lee en la página antes de pintar, sin `loading.tsx` ni `Suspense` alrededor: con un límite de carga la respuesta ya sale con 200 y el `notFound()` de R27 dejaría de ser un 404 (los E2E del repo comprueban el 404 por estado). El esqueleto cubre el Historial; el detalle muestra error con «Reintentar».
+- **Miga:** «Empresas» (enlace) › nombre de la empresa; `PageHeader` siempre marca el último paso como actual, así que el nombre se repite en la miga (el tablero solo pinta «Empresas ›»). El `StatusBadge` va dentro del `h1`, junto al nombre, como en el tablero.
+- **Pregunta 4, campo o añadido desconocido:** «Registró un cambio (<nombres>)», con la etiqueta de los campos conocidos y el nombre técnico de los desconocidos (p. ej. «Registró un cambio (Nombre y billingCode)»). Es una lectura de «y el nombre técnico…»; si se quiere otra forma, es un texto.
+- Textos que no trae el tablero: «No se pudo cargar la empresa.», «No se pudo cargar el historial.», «Todavía no hay eventos en el historial.», «No hay eventos en esta página.», «Páginas del historial», «Página anterior», «Página siguiente», «Cargando el historial…».
+- Iconos del Historial (lucide, del tablero): alta `Building2`, edición `Pencil`, prender `Plus`, apagar `Power`; baja `Trash2` y reactivación `RotateCcw` (los de los botones de cabecera del tablero); desconocido `History`. Todos en tono neutro: el tablero no fija qué tono va con cada tipo.
+- `canModifyCompanies` se repite en `[id]/page.tsx`: no puede vivir en el barrel del padre porque la cabecera (cliente) lo importa y arrastraría `@/lib/composition` al cliente.
+
+Veredicto: T6 y T7 hechas, todo en verde.

@@ -64,7 +64,7 @@ mergeado; `design.md > 5` ya está alineado con su `design.md`, reenvío incluid
     `updateCompanyAction`; R22 refresca y deja el error en País; la baja no se puede confirmar sin
     impacto ni texto.
 
-- [ ] **T6 · Detalle: cabecera, pestañas, Datos y hueco de Módulos** (R27–R30, R34). Depende de T5.
+- [x] **T6 · Detalle: cabecera, pestañas, Datos y hueco de Módulos** (R27–R30, R34). Depende de T5.
   - `app/(private)/maestro/empresas/[id]/page.tsx` y `[id]/components/` con barrel:
     `company-detail-header.tsx`, `company-detail-tabs.ts`, `company-data-panel.tsx`; panel vacío de
     Módulos según `design.md > 6.4` (sin `components/modulos/`).
@@ -73,7 +73,7 @@ mergeado; `design.md > 5` ya está alineado con su `design.md`, reenvío incluid
   - **Hecho:** 404 para id inexistente o no UUID; pestaña por defecto de la pregunta 3; con
     `tab=modulos` no se llama a `getCompanyAddonsAction`.
 
-- [ ] **T7 · Historial** (R31–R34). Depende de T6. [P] con T9 si QC-165 ya está.
+- [x] **T7 · Historial** (R31–R34). Depende de T6. [P] con T9 si QC-165 ya está.
   - `company-history-panel.tsx`, `company-event-text.ts`.
   - Tests: `tests/unit/maestro/company-event-text.test.ts` (cada tipo, campos en orden con «y»,
     añadidos con `ADDON_NAMES`, desconocidos sin lanzar), `tests/ui/maestro/company-history-panel.test.tsx`.
