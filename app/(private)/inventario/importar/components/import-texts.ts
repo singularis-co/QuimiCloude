@@ -279,6 +279,24 @@ export function resultDescription(fileName: string, importedAt: string): string 
 
 export const NOTHING_IMPORTED_TITLE = 'No se importó nada';
 
+function countLabel(value: number, singular: string, plural: string): string {
+  return `${formatCount(value)} ${value === 1 ? singular : plural}`;
+}
+
+/** Aviso flotante al terminar una importación: lo creado, lo sumado y lo que se quedó fuera. */
+export function importedToastMessage(totals: {
+  readonly created: number;
+  readonly batchAdded: number;
+  readonly duplicate: number;
+  readonly error: number;
+}): string {
+  const done = `Inventario importado: ${countLabel(totals.created, 'producto creado', 'productos creados')} y ${countLabel(totals.batchAdded, 'lote sumado', 'lotes sumados')}.`;
+  const skipped = totals.duplicate + totals.error;
+  return skipped === 0
+    ? done
+    : `${done} ${countLabel(skipped, 'fila no se importó', 'filas no se importaron')}.`;
+}
+
 export function nothingImportedMessage(fileName: string): string {
   return `Al confirmar, «${fileName}» no tenía ninguna fila válida, así que no se ha importado nada. Revisa el motivo de cada fila, corrígelas y vuelve a subir el archivo.`;
 }
@@ -329,7 +347,7 @@ export const GUIDE_COLUMN_DESCRIPTION_TEXTS: Readonly<Record<ImportColumnKey, st
   purchaseDate: 'Fecha en que entró el lote. Si va vacía, se usa la fecha de hoy automáticamente; no puede ser futura.',
   expiryDate: 'Fecha en que vence el lote.',
   qtyAlert:
-    'Existencia mínima del producto: cuando la existencia queda por debajo de este valor, el inventario lo resalta y se notifica.',
+    'Cantidad mínima del producto: cuando la cantidad en inventario queda por debajo de este valor, el inventario lo resalta y se notifica.',
 };
 /** Columnas de la guía cuya descripción enlaza al módulo donde se gestiona su catálogo. */
 export type GuideCatalogColumn = 'unit' | 'presentation' | 'formula';
@@ -353,7 +371,7 @@ export const GUIDE_RULE_OPTIONAL_AUTO_LABEL = 'Opcional · automático si va vac
 export const GUIDE_RULES_NOTES: readonly string[] = [
   '«Se ignora»: si la columna trae un valor, no se importa y la fila sigue; la vista previa lo avisa.',
   'Producto terminado no lleva «Nombre»: se arma como «Fórmula · Presentación». La presentación debe tener contenido declarado.',
-  'Envase y Producto terminado cuentan la existencia en envases enteros; en Producto terminado, mayor que 0.',
+  'En Envase y Producto terminado, «Cantidad» cuenta envases enteros; en Producto terminado, mayor que 0.',
   '«Unidad» se reconoce por su nombre o por su símbolo.',
   'Si el producto ya existe (mismo nombre y unidad; en envases, misma presentación), la fila le suma un lote.',
   '«Lote» vacío: se genera solo. «Fecha de compra» vacía: hoy; no puede ser futura.',

@@ -77,7 +77,7 @@ describe('limites del archivo', () => {
 
   it('conserva el texto original de cada celda y su origen', () => {
     const row = HEADER.map((header) =>
-      header === 'Existencia'
+      header === 'Cantidad'
         ? { text: '2.5', origin: 'number' as const }
         : header === 'Fecha de compra'
           ? { text: '2026-01-15', origin: 'date' as const }
@@ -107,7 +107,7 @@ describe('fila de ejemplo de la plantilla', () => {
   });
 
   it('R8 una fila que difiere en una sola celda no es la de ejemplo y se lee', () => {
-    const changed = EXAMPLE.map((value, index) => (HEADER[index] === 'Existencia' ? '26' : value));
+    const changed = EXAMPLE.map((value, index) => (HEADER[index] === 'Cantidad' ? '26' : value));
     const outcome = parseImportSheet(sheet([HEADER, changed]));
     expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(false);
     expect(outcome.ok && outcome.sheet.rows).toHaveLength(1);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Spinner } from '@/components/shared/spinner';
@@ -22,7 +23,7 @@ import {
 import type { UnitView } from '@/lib/modules/unidades';
 
 import { downloadFile } from './download-file';
-import { ImportFileRejection } from './import-file-rejection';
+import { ImportFileRejection, describeRejection } from './import-file-rejection';
 import { ImportMissingCatalog } from './import-missing-catalog';
 import { ImportPreviewSummary } from './import-preview-summary';
 import { ImportPreviewTable } from './import-preview-table';
@@ -34,13 +35,17 @@ import {
 import { ImportTemplateButton } from './import-template-button';
 import {
   IMPORT_SCREEN_TESTID,
+  NOTHING_IMPORTED_TITLE,
   PREVIEW_DESCRIPTION,
   PREVIEW_TITLE,
+  REJECTION_TITLE,
   REVIEWING_NOTICE,
   REVIEWING_TESTID,
   REVIEW_BUTTON_LABEL,
   REVIEW_BUTTON_TESTID,
   SCREEN_ERROR_TESTID,
+  alreadyImportedMessage,
+  importedToastMessage,
 } from './import-texts';
 import { ImportUploadField, exceedsImportMaxBytes } from './import-upload-field';
 
@@ -78,6 +83,30 @@ function isFinished(outcome: Outcome | null): boolean {
 }
 
 type Busy = 'preview' | 'confirm' | null;
+
+/** Aviso flotante del desenlace; el detalle sigue en pantalla. La vista previa no avisa. */
+function notifyOutcome(outcome: Outcome) {
+  switch (outcome.kind) {
+    case 'imported':
+      toast.success(importedToastMessage(outcome.result.totals));
+      return;
+    case 'nothing_imported':
+      toast.error(NOTHING_IMPORTED_TITLE);
+      return;
+    case 'already_imported':
+      toast.info(alreadyImportedMessage(outcome.done.importedAt));
+      return;
+    case 'rejected':
+      toast.error(REJECTION_TITLE, { description: describeRejection(outcome.rejection).message });
+      return;
+    case 'preview':
+      return;
+  }
+}
+
+function notifyError(error: ErrorState) {
+  toast.error(error.message);
+}
 
 function ScreenError({ error }: { readonly error: ErrorState }) {
   return (
@@ -128,14 +157,16 @@ export function InventoryImportScreen({ units }: InventoryImportScreenProps) {
       const response = await previewInventoryImportAction(formData);
       if (response.status === 'error') {
         setError(response);
+        notifyError(response);
         return;
       }
       const data = response.data;
-      setOutcome(
+      const next: Outcome =
         data.kind === 'file_rejected'
           ? { kind: 'rejected', rejection: data.rejection }
-          : { kind: 'preview', preview: data, importKey: crypto.randomUUID() },
-      );
+          : { kind: 'preview', preview: data, importKey: crypto.randomUUID() };
+      setOutcome(next);
+      notifyOutcome(next);
     } finally {
       setBusy(null);
     }
@@ -154,9 +185,12 @@ export function InventoryImportScreen({ units }: InventoryImportScreenProps) {
       if (response.status === 'error') {
         // La vista previa y su clave se conservan: reintentar no puede importar dos veces.
         setError(response);
+        notifyError(response);
         return;
       }
-      setOutcome(confirmOutcome(response.data));
+      const next = confirmOutcome(response.data);
+      setOutcome(next);
+      notifyOutcome(next);
     } finally {
       setBusy(null);
     }
