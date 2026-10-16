@@ -9,13 +9,18 @@ import type { ExecutionEntryRecord } from './execution-entry';
 import type { ConditioningTeamMemberRow, ConditioningTeamRepository } from '../ports/conditioning-team-repository';
 import type { ExecutedOrdersFilter, ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { PeopleDirectory, PersonRef } from '@/lib/modules/identity';
+import type { PresentationCatalog } from '@/lib/modules/inventario';
 import {
+  effectivePackages,
   formatOrderNumber,
   ORDER_STATUS_VALUES,
+  remainingPackages,
   type OrderCatalog,
+  type OrderDeliveryProgress,
   type OrderStatus,
   type Page,
 } from '@/lib/modules/pedidos';
+import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
 
 const MAX_ORDER_NUMBER_LENGTH = 20;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -49,6 +54,12 @@ export type ExecutionTraceListInput = z.input<typeof listExecutionTracesSchema>;
 
 export type ExecutionTracePerson = { readonly userId: string; readonly displayName: string };
 
+/** Envases de una presentacion del reparto: `label` es el nombre de la presentacion. */
+export type ExecutionTracePresentation = {
+  readonly label: string;
+  readonly quantity: number;
+};
+
 export type ExecutionTraceRow = {
   readonly orderId: string;
   readonly numberText: string;
@@ -61,6 +72,15 @@ export type ExecutionTraceRow = {
   readonly lastAt: Date;
   readonly totalDuration: TraceDuration;
   readonly goBackCount: number;
+  /** Nombre de la receta del pedido, tambien dada de baja; `null` si no vuelve del catalogo. */
+  readonly formulaName: string | null;
+  /** URL publica de la imagen de la receta (la de la original en una version); `null` = sin imagen. */
+  readonly formulaImageUrl: string | null;
+  /** Lo que pide el pedido: los envases planeados de cada linea, en el orden de alta. */
+  readonly presentations: readonly ExecutionTracePresentation[];
+  /** Lo que falta por entregar, mismo criterio que el sheet de entrega (contados al empacar menos
+   *  lo entregado sin anular); solo lineas con algo pendiente. Vacio en un pedido ENTREGADO. */
+  readonly pendingDelivery: readonly ExecutionTracePresentation[];
 };
 
 export type ExecutionTraceList = {
@@ -73,7 +93,61 @@ export type ListExecutionTracesDeps = {
   readonly orders: OrderCatalog;
   readonly people: PeopleDirectory;
   readonly team: Pick<ConditioningTeamRepository, 'listByOrdersInCompany'>;
+  readonly recipes: Pick<RecipeCatalog, 'findRefsIncludingDeleted'>;
+  readonly presentations: Pick<PresentationCatalog, 'findRefs'>;
 };
+
+/** Receta y reparto de la pagina, cada catalogo una sola vez sin importar cuantas filas haya. */
+type OrderContents = {
+  readonly progress: ReadonlyMap<string, OrderDeliveryProgress>;
+  readonly recipes: ReadonlyMap<string, RecipeRef>;
+  readonly presentationNames: ReadonlyMap<string, string>;
+};
+
+async function listOrderContents(
+  deps: ListExecutionTracesDeps,
+  companyId: string,
+  orderIds: readonly string[],
+): Promise<OrderContents> {
+  const progress = await deps.orders.listDeliveryProgressByIdsIncludingDeleted(companyId, orderIds);
+  const recipeIds = [...new Set(progress.map((order) => order.recipeId))];
+  const presentationIds = [
+    ...new Set(progress.flatMap((order) => order.lines.map((line) => line.presentationId))),
+  ];
+  const [recipes, presentations] = await Promise.all([
+    recipeIds.length === 0 ? [] : deps.recipes.findRefsIncludingDeleted(recipeIds, companyId),
+    presentationIds.length === 0 ? [] : deps.presentations.findRefs(presentationIds, companyId),
+  ]);
+  return {
+    progress: new Map(progress.map((order) => [order.id, order])),
+    recipes: new Map(recipes.map((recipe) => [recipe.id, recipe])),
+    presentationNames: new Map(presentations.map((presentation) => [presentation.id, presentation.name])),
+  };
+}
+
+/** Una linea cuya presentacion no vuelve del catalogo se omite: se devuelve lo que hay. */
+export function toTracePresentations(
+  progress: OrderDeliveryProgress | undefined,
+  status: OrderStatus,
+  presentationNames: ReadonlyMap<string, string>,
+): Pick<ExecutionTraceRow, 'presentations' | 'pendingDelivery'> {
+  const presentations: ExecutionTracePresentation[] = [];
+  const pendingDelivery: ExecutionTracePresentation[] = [];
+  for (const line of progress?.lines ?? []) {
+    const label = presentationNames.get(line.presentationId);
+    if (label === undefined) continue;
+    presentations.push({ label, quantity: line.packages });
+    // Un ENTREGADO anterior a las entregas por linea no tiene nada anotado y ya no debe nada.
+    if (status === 'ENTREGADO') continue;
+    const pending = remainingPackages({
+      presentationLineId: line.presentationId,
+      orderedPackages: effectivePackages(line),
+      deliveredPackages: line.deliveredPackages,
+    });
+    if (pending > 0) pendingDelivery.push({ label, quantity: pending });
+  }
+  return { presentations, pendingDelivery };
+}
 
 function startOfDayUtc(day: string): Date {
   return new Date(`${day}T00:00:00.000Z`);
@@ -155,6 +229,15 @@ export function toTraceTeamMember(
   };
 }
 
+function toTraceFormula(
+  contents: OrderContents,
+  orderId: string,
+): Pick<ExecutionTraceRow, 'formulaName' | 'formulaImageUrl'> {
+  const recipeId = contents.progress.get(orderId)?.recipeId;
+  const recipe = recipeId === undefined ? undefined : contents.recipes.get(recipeId);
+  return { formulaName: recipe?.name ?? null, formulaImageUrl: recipe?.imageUrl ?? null };
+}
+
 async function listPersonOptions(
   deps: ListExecutionTracesDeps,
   companyId: string,
@@ -209,7 +292,14 @@ export function createListExecutionTraces(
         return [{ order, trace: buildExecutionTrace(orderEntries, order, now) }];
       });
 
-      const teams = await listConditioningTeams(deps.team, companyId, byOrder);
+      const [teams, contents] = await Promise.all([
+        listConditioningTeams(deps.team, companyId, byOrder),
+        listOrderContents(
+          deps,
+          companyId,
+          traces.map(({ order }) => order.id),
+        ),
+      ]);
       const peopleOf = new Map(
         traces.map(({ order, trace }) => [
           order.id,
@@ -233,6 +323,8 @@ export function createListExecutionTraces(
         lastAt: trace.lastAt,
         totalDuration: trace.totalDuration,
         goBackCount: trace.goBackCount,
+        ...toTraceFormula(contents, order.id),
+        ...toTracePresentations(contents.progress.get(order.id), order.status, contents.presentationNames),
       }));
 
       return {

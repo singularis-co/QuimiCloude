@@ -80,6 +80,9 @@ const orders: OrderCatalog = {
   listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
   listAliveSummariesInCompany: summaryReaders.listAliveSummariesInCompany,
   listSummariesByIdsIncludingDeleted: summaryReaders.listSummariesByIdsIncludingDeleted,
+  listDeliveryProgressByIdsIncludingDeleted: async () => {
+    throw new Error('los casos de uso de asignacion no leen el progreso de entrega');
+  },
   transitionAliveById: async () => {
     throw new Error('QC-87: los casos de uso de asignacion no escriben el estado del pedido');
   },

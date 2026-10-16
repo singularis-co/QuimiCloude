@@ -245,6 +245,10 @@ function row(overrides: Partial<ExecutionTraceRow> & Pick<ExecutionTraceRow, 'or
     lastAt: at('15:10'),
     totalDuration: { kind: 'closed', ms: 0 },
     goBackCount: 0,
+    formulaName: null,
+    formulaImageUrl: null,
+    presentations: [],
+    pendingDelivery: [],
     ...overrides,
   };
 }

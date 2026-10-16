@@ -59,7 +59,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
 }
 
 function receta(overrides?: Partial<RecipeRef>): RecipeRef {
-  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, ...overrides };
+  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, imageUrl: null, ...overrides };
 }
 
 function persona(id: string): PersonRef {

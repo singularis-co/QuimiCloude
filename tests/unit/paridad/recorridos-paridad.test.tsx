@@ -67,6 +67,10 @@ const FILAS: readonly ExecutionTraceRow[] = [
     active: false,
     totalDuration: { kind: 'closed', ms: 5_415_000 },
     goBackCount: 1,
+    formulaName: null,
+    formulaImageUrl: null,
+    presentations: [],
+    pendingDelivery: [],
   },
   {
     orderId: 'order-2',
@@ -79,6 +83,10 @@ const FILAS: readonly ExecutionTraceRow[] = [
     active: false,
     totalDuration: { kind: 'unclosed', ms: 300_000 },
     goBackCount: 0,
+    formulaName: null,
+    formulaImageUrl: null,
+    presentations: [],
+    pendingDelivery: [],
   },
 ];
 

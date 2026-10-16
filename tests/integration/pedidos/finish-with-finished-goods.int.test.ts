@@ -167,6 +167,9 @@ const orderCatalog: OrderCatalog = {
   listSummariesByIdsIncludingDeleted: async () => {
     throw new Error('este archivo no ejercita listSummariesByIdsIncludingDeleted');
   },
+  listDeliveryProgressByIdsIncludingDeleted: async () => {
+    throw new Error('este archivo no ejercita listDeliveryProgressByIdsIncludingDeleted');
+  },
   // R15, R16: Finalizar ya no da de alta ningun lote -eso se traslada a Terminar (T14)-.
   transitionAliveById: createTransitionOrder({ unitOfWork }),
   // T14: Comenzar y Terminar, cableados exactamente como `lib/composition`.

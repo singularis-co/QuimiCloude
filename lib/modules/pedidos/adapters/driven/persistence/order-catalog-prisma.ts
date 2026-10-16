@@ -8,6 +8,7 @@ import type { OrderStatus } from '../../../domain/order-classification';
 import type {
   AssignedOrderSummary,
   OrderAssignmentTarget,
+  OrderDeliveryProgress,
   OrderHistorySummary,
   OrderSummaryFilter,
   OrderSummaryOrdering,
@@ -265,6 +266,61 @@ export async function listOrderHistoryByIdsIncludingDeleted(
   ]);
 
   return buildPage(rows.map(toOrderHistorySummary), total, page, limit);
+}
+
+type OrderDeliveryProgressRow = {
+  readonly id: string;
+  readonly recipeId: string;
+  readonly presentationLines: readonly {
+    readonly presentationId: string;
+    readonly packages: number;
+    readonly packedPackages: number | null;
+    readonly deliveryLines: readonly { readonly packages: number }[];
+  }[];
+};
+
+/** Suma lo entregado de cada linea; la consulta ya deja fuera las lineas de entrega anuladas. */
+export function toOrderDeliveryProgress(row: OrderDeliveryProgressRow): OrderDeliveryProgress {
+  return {
+    id: row.id,
+    recipeId: row.recipeId,
+    lines: row.presentationLines.map((line) => ({
+      presentationId: line.presentationId,
+      packages: line.packages,
+      packedPackages: line.packedPackages,
+      deliveredPackages: line.deliveryLines.reduce((total, delivery) => total + delivery.packages, 0),
+    })),
+  };
+}
+
+/**
+ * Implementa `OrderCatalog['listDeliveryProgressByIdsIncludingDeleted']`: una sola consulta para
+ * toda la pagina. Incluye los dados de baja, como el historial; el ambito de empresa va en el
+ * `where` del pedido y las lineas cuelgan de el. Lo anulado no cuenta como entregado, mismo
+ * criterio que `sumOrderDeliveredPackages`.
+ */
+export async function listOrderDeliveryProgressByIdsIncludingDeleted(
+  companyId: string,
+  ids: readonly string[],
+): Promise<readonly OrderDeliveryProgress[]> {
+  if (ids.length === 0) return [];
+  const rows = await prisma.order.findMany({
+    where: { AND: [orderCompanyScope({ companyId }), { id: { in: [...ids] } }] },
+    select: {
+      id: true,
+      recipeId: true,
+      presentationLines: {
+        select: {
+          presentationId: true,
+          packages: true,
+          packedPackages: true,
+          deliveryLines: { where: { voidLine: { is: null } }, select: { packages: true } },
+        },
+        orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
+      },
+    },
+  });
+  return rows.map(toOrderDeliveryProgress);
 }
 
 /**

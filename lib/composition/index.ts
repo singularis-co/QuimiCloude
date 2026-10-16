@@ -360,7 +360,7 @@ import {
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipePackingStepsById,
-  findRecipeRefsIncludingDeleted,
+  findRecipeRefsWithImageIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import { readRequestIdHeader } from '@/lib/modules/observabilidad/adapters/driven/request-id-headers';
@@ -499,6 +499,7 @@ import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
   listAliveOrderSummariesInCompany,
+  listOrderDeliveryProgressByIdsIncludingDeleted,
   listOrderHistoryByIdsIncludingDeleted,
   listOrderNumbersByIdsIncludingDeleted,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
@@ -1495,9 +1496,12 @@ export const unidades = {
  *
  *  `findRefsIncludingDeleted`, y no una consulta de solo vivas, porque un pedido conserva su
  *  receta aunque la den de baja y la fila tiene que seguir diciendo que se pidio (R44).
- *  `findExecutionContentById` la estrena `asignaciones`, mas abajo. */
+ *  `findExecutionContentById` la estrena `asignaciones`, mas abajo.
+ *
+ *  `findRefsIncludingDeleted` va cableado a la variante CON foto (dashboard): el adaptador
+ *  deja la imagen opcional, y la guardia de ambito exige una funcion con nombre, sin lambda. */
 const recipeCatalog: RecipeCatalog = {
-  findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
+  findRefsIncludingDeleted: findRecipeRefsWithImageIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
   findAliveByNormalizedName: findAliveRecipeByNormalizedName,
@@ -1799,6 +1803,7 @@ const orderCatalog: OrderCatalog = {
     packaging: packagingCatalog,
   }),
   listSummariesByIdsIncludingDeleted: createListSummariesByIdsIncludingDeleted({ summaries: orderSummaryReader }),
+  listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted,
   // Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
   // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
   // cableados mas abajo para quien todavia los usa-.
@@ -2115,6 +2120,8 @@ export const asignaciones = {
     orders: orderCatalog,
     people: peopleDirectory,
     team: createConditioningTeamRepository(),
+    recipes: recipeCatalog,
+    presentations: presentationCatalog,
   }),
   getExecutionTrace: createGetExecutionTrace({
     log: executionLogRepository,

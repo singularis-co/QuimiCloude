@@ -55,7 +55,7 @@ const CLIENTES: readonly { readonly companyId: string; readonly ref: CustomerRef
 ]
 
 const REFS_RECETA: readonly RecipeRef[] = [
-  { id: RECETA, name: 'Crema', ownName: 'Crema', isDeleted: false, isUnderReview: false, original: null },
+  { id: RECETA, name: 'Crema', ownName: 'Crema', isDeleted: false, isUnderReview: false, original: null, imageUrl: null },
   {
     id: VERSION,
     name: 'Crema · Suave',
@@ -63,6 +63,7 @@ const REFS_RECETA: readonly RecipeRef[] = [
     isDeleted: false,
     isUnderReview: false,
     original: { id: RECETA, name: 'Crema' },
+    imageUrl: null,
   },
 ]
 

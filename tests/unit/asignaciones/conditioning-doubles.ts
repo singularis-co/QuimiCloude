@@ -67,6 +67,7 @@ export function receta(overrides?: Partial<RecipeRef>): RecipeRef {
     isUnderReview: false,
     original: null,
     isDeleted: false,
+    imageUrl: null,
     ...overrides,
   };
 }

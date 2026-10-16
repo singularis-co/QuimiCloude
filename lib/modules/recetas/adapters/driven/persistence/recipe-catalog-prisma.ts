@@ -7,6 +7,9 @@ import { isVersionUnderReview, recipeDisplayName } from '../../../domain/recipe-
 import type { RecipeCatalog, RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
 import type { RecipeScope } from '../../../domain/recipe-scope';
 import type { RecipeStepView } from '../../../domain/recipe-view';
+import type { RecipeImageStorage } from '../../../ports/recipe-image-storage';
+
+import { recipeImagePublicUrl } from '../storage/recipe-image-supabase';
 
 import { recipeCompanyScope, type PrismaLike } from './company-scope';
 import { normalizedSearchCondition } from './list-query-sql';
@@ -41,13 +44,29 @@ type RecipeCatalogRow = {
   readonly id: string;
   readonly name: string;
   readonly deletedAt: Date | null;
-  readonly parent: { readonly id: string; readonly name: string } | null;
+  readonly imagePath: string | null;
+  readonly parent: { readonly id: string; readonly name: string; readonly imagePath: string | null } | null;
   readonly lines: ReadonlyArray<{ readonly percentage: DecimalLike }>;
 };
 
-/** Fila de Prisma -> `RecipeRef` del contrato publico. Funcion pura, testeable sin base. */
-export function toRecipeRef(row: RecipeCatalogRow): RecipeRef {
+/**
+ * Solo la composicion de la URL: el catalogo no sube ni borra imagenes. Opcional, mismo patron
+ * que `inventario/.../packaging-catalog-prisma.ts`: solo `lib/composition` lo cablea
+ * (`findRecipeRefsWithImageIncludingDeleted`), para quien muestra la foto. Sin `images` no se toca la configuracion del bucket (R43): quien solo lee
+ * referencias -crear un pedido, importar formulas- no depende del almacenamiento.
+ */
+export type RecipeImageUrls = Pick<RecipeImageStorage, 'publicUrl'>;
+
+/**
+ * Fila de Prisma -> `RecipeRef` del contrato publico. Funcion pura, testeable sin base.
+ *
+ * La RUTA se compone a URL aqui, al leer, nunca se persiste la URL. Sin `images` la URL sale
+ * `null` aunque la receta tenga imagen.
+ */
+export function toRecipeRef(row: RecipeCatalogRow, images?: RecipeImageUrls): RecipeRef {
   const original = row.parent === null ? null : { id: row.parent.id, name: row.parent.name };
+  // Una version no guarda imagen: muestra la de su original, igual que la ficha de receta.
+  const imagePath = row.parent === null ? row.imagePath : row.parent.imagePath;
   return {
     id: row.id,
     name: recipeDisplayName(row.name, original?.name ?? null),
@@ -58,12 +77,14 @@ export function toRecipeRef(row: RecipeCatalogRow): RecipeRef {
       row.lines.map((line) => line.percentage.toFixed(2)),
     ),
     original,
+    imageUrl: imagePath === null || images === undefined ? null : images.publicUrl(imagePath),
   };
 }
 
 export async function findRecipeRefsIncludingDeleted(
   ids: readonly RecipeId[],
   companyId: string,
+  images?: RecipeImageUrls,
 ): Promise<readonly RecipeRef[]> {
   if (ids.length === 0) return [];
 
@@ -74,12 +95,26 @@ export async function findRecipeRefsIncludingDeleted(
       id: true,
       name: true,
       deletedAt: true,
-      parent: { select: { id: true, name: true } },
+      imagePath: true,
+      parent: { select: { id: true, name: true, imagePath: true } },
       lines: { select: { percentage: true } },
     },
   });
 
-  return rows.map(toRecipeRef);
+  return rows.map((row) => toRecipeRef(row, images));
+}
+
+/**
+ * La variante CON foto, para `lib/composition`: el mismo almacenamiento que la ficha de receta
+ * (driven del MISMO modulo, permitido). Funcion con nombre y no lambda en la composicion porque
+ * la guardia de ambito (`guard-ambito-empresa-recetas`) sigue el cableado por nombre. Quien
+ * llama a `findRecipeRefsIncludingDeleted` sin `images` no toca el bucket (R43).
+ */
+export async function findRecipeRefsWithImageIncludingDeleted(
+  ids: readonly RecipeId[],
+  companyId: string,
+): Promise<readonly RecipeRef[]> {
+  return findRecipeRefsIncludingDeleted(ids, companyId, { publicUrl: recipeImagePublicUrl });
 }
 
 /**

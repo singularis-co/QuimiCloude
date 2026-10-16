@@ -29,6 +29,7 @@ const REF_ORIGINAL: RecipeRef = {
   isDeleted: false,
   isUnderReview: false,
   original: null,
+  imageUrl: null,
 }
 const REF_VERSION: RecipeRef = {
   id: VERSION,
@@ -37,6 +38,7 @@ const REF_VERSION: RecipeRef = {
   isDeleted: false,
   isUnderReview: false,
   original: { id: ORIGINAL, name: 'Crema base' },
+  imageUrl: null,
 }
 
 function fila(recipeId: string): OrderRow {

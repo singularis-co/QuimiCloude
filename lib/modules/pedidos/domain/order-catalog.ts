@@ -118,6 +118,16 @@ export interface OrderCatalog {
   ): Promise<Page<OrderHistorySummary>>;
 
   /**
+   * La receta y el reparto de cada pedido pedido, con lo ya entregado por linea, INCLUIDOS LOS
+   * DADOS DE BAJA. Un id que no existe o de otra empresa no vuelve. Sin orden garantizado entre
+   * pedidos; las lineas, en el orden de alta. Con `ids` vacio no consulta.
+   */
+  listDeliveryProgressByIdsIncludingDeleted(
+    companyId: string,
+    ids: readonly string[],
+  ): Promise<readonly OrderDeliveryProgress[]>;
+
+  /**
    * Mueve el estado de un pedido vivo de esa empresa, SOLO si `assertTransition(from, to)` lo
    * permite: la comprobacion la hace `pedidos` con su propia matriz, dentro del metodo.
    *
@@ -296,4 +306,20 @@ export type AssignedOrderSummary = {
   /** Quien acondiciona: obligatorio en `EN_ACONDICIONAMIENTO` y `TERMINADO`, opcional en
    *  `ENTREGADO` y `null` en el resto. Viaja en crudo, como `packedBy`. */
   readonly conditionedBy: string | null;
+};
+
+/** Una linea del reparto con lo entregado de ella: `deliveredPackages` no cuenta lo anulado. */
+export type OrderDeliveryProgressLine = {
+  readonly presentationId: string;
+  readonly packages: number;
+  /** `null` = sin contar al terminar el empaque: vale `packages` (`effectivePackages`). */
+  readonly packedPackages: number | null;
+  readonly deliveredPackages: number;
+};
+
+/** Lo que un listado ajeno necesita para pintar que pide un pedido y que le falta por entregar. */
+export type OrderDeliveryProgress = {
+  readonly id: string;
+  readonly recipeId: string;
+  readonly lines: readonly OrderDeliveryProgressLine[];
 };

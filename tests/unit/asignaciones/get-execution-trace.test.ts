@@ -90,7 +90,11 @@ function montar(options?: {
       return { items, total: items.length, page, pageSize: pageSize ?? 10, totalPages: 1 };
     },
   );
-  const orders = { listSummariesByIdsIncludingDeleted } as unknown as OrderCatalog;
+  // Solo la lista lee el reparto; sin reparto, recetas y presentaciones no se consultan.
+  const listDeliveryProgressByIdsIncludingDeleted = vi.fn(async () => []);
+  const orders = { listSummariesByIdsIncludingDeleted, listDeliveryProgressByIdsIncludingDeleted } as unknown as OrderCatalog;
+  const recipes = { findRefsIncludingDeleted: vi.fn(async () => []) };
+  const presentations = { findRefs: vi.fn(async () => []) };
 
   const directorio = options?.people ?? [
     { id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [], roleName: 'Operador' },
@@ -118,7 +122,7 @@ function montar(options?: {
   ];
   return {
     abrir: createGetExecutionTrace({ log, orders, people, team }),
-    listar: createListExecutionTraces({ log, orders, people, team }),
+    listar: createListExecutionTraces({ log, orders, people, team, recipes, presentations }),
     listEntriesForOrders,
     listByOrdersInCompany,
     listSummariesByIdsIncludingDeleted,

@@ -51,10 +51,10 @@ const OTRA_RECETA = '44444444-4444-4444-8444-444444444444'
  *  MISMO reloj (R10), y con un reloj real el test no podria afirmarlo. */
 const AHORA = new Date('2026-09-04T12:00:00.000Z')
 
-const RECETA_VIVA: RecipeRef = { id: RECIPE_ID, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false }
-const RECETA_DE_BAJA: RecipeRef = { id: RECIPE_ID, name: 'Formula retirada', ownName: 'Formula retirada', isUnderReview: false, original: null, isDeleted: true }
-const OTRA_VIVA: RecipeRef = { id: OTRA_RECETA, name: 'Detergente neutro', ownName: 'Detergente neutro', isUnderReview: false, original: null, isDeleted: false }
-const OTRA_DE_BAJA: RecipeRef = { id: OTRA_RECETA, name: 'Formula vieja', ownName: 'Formula vieja', isUnderReview: false, original: null, isDeleted: true }
+const RECETA_VIVA: RecipeRef = { id: RECIPE_ID, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false, imageUrl: null }
+const RECETA_DE_BAJA: RecipeRef = { id: RECIPE_ID, name: 'Formula retirada', ownName: 'Formula retirada', isUnderReview: false, original: null, isDeleted: true, imageUrl: null }
+const OTRA_VIVA: RecipeRef = { id: OTRA_RECETA, name: 'Detergente neutro', ownName: 'Detergente neutro', isUnderReview: false, original: null, isDeleted: false, imageUrl: null }
+const OTRA_DE_BAJA: RecipeRef = { id: OTRA_RECETA, name: 'Formula vieja', ownName: 'Formula vieja', isUnderReview: false, original: null, isDeleted: true, imageUrl: null }
 const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
 /** QC-170 [Q4]: la unidad del pedido. `dobles()` la deja SIEMPRE resoluble. */
 const UNIT_ID = '77777777-7777-4777-8777-777777777777'

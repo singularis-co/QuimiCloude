@@ -246,6 +246,7 @@ export {
   type ExecutionTraceList,
   type ExecutionTraceListInput,
   type ExecutionTracePerson,
+  type ExecutionTracePresentation,
   type ExecutionTraceRow,
   type ListExecutionTracesDeps,
 } from './domain/list-execution-traces';
