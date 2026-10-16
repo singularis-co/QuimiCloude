@@ -23,11 +23,17 @@ const findMany = vi.fn()
 const findFirst = vi.fn()
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { recipe: { findMany, findFirst } } }))
 
+/** Doble del almacenamiento real de imagenes: sin el, componer una URL leeria la
+ *  configuracion del bucket. Cuenta invocaciones para afirmar que sin `images` no se toca. */
+const recipeImagePublicUrl = vi.fn((path: string) => `https://bucket.test/${path}`)
+vi.mock('@/lib/modules/recetas/adapters/driven/storage/recipe-image-supabase', () => ({ recipeImagePublicUrl }))
+
 const {
   findAliveRecipeByNormalizedName,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
+  findRecipeRefsWithImageIncludingDeleted,
   toRecipeExecutionContent,
   toRecipeRef,
 } = await import('@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma')
@@ -72,6 +78,7 @@ const adaptadorFuente = read(
 beforeEach(() => {
   findMany.mockReset()
   findFirst.mockReset()
+  recipeImagePublicUrl.mockClear()
 })
 
 describe('contrato RecipeCatalog', () => {
@@ -252,6 +259,28 @@ describe('la imagen de la receta en su referencia', () => {
 
     expect(findMany).toHaveBeenCalledTimes(1)
     expect(refs[0]?.imageUrl).toBe('https://cdn.test/recetas/cloro.jpg')
+  })
+
+  it('R43: findRecipeRefsIncludingDeleted sin `images` no toca el almacenamiento, aunque la receta tenga imagen', async () => {
+    // Quien solo lee referencias -crear un pedido, importar formulas- no depende del bucket: con
+    // la configuracion del storage vacia (CI) componer la URL lanzaria.
+    findMany.mockResolvedValue([{ id: 'r-1', name: 'Cloro', deletedAt: null, imagePath: 'recetas/cloro.jpg', parent: null, lines: [] }])
+
+    const refs = await findRecipeRefsIncludingDeleted(['r-1'], EMPRESA)
+
+    expect(refs[0]?.imageUrl).toBeNull()
+    expect(recipeImagePublicUrl).not.toHaveBeenCalled()
+  })
+
+  it('findRecipeRefsWithImageIncludingDeleted -lo que cablea `lib/composition`- compone con el almacenamiento real', async () => {
+    findMany.mockResolvedValue([{ id: 'r-1', name: 'Cloro', deletedAt: null, imagePath: 'recetas/cloro.jpg', parent: null, lines: [] }])
+
+    const refs = await findRecipeRefsWithImageIncludingDeleted(['r-1'], EMPRESA)
+
+    expect(findMany).toHaveBeenCalledTimes(1)
+    expect(findMany.mock.calls[0]?.[0].where).toEqual({ AND: [{ companyId: EMPRESA }, { id: { in: ['r-1'] } }] })
+    expect(recipeImagePublicUrl).toHaveBeenCalledWith('recetas/cloro.jpg')
+    expect(refs[0]?.imageUrl).toBe('https://bucket.test/recetas/cloro.jpg')
   })
 })
 

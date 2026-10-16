@@ -360,7 +360,7 @@ import {
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipePackingStepsById,
-  findRecipeRefsIncludingDeleted,
+  findRecipeRefsWithImageIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import { readRequestIdHeader } from '@/lib/modules/observabilidad/adapters/driven/request-id-headers';
@@ -1493,9 +1493,12 @@ export const unidades = {
  *
  *  `findRefsIncludingDeleted`, y no una consulta de solo vivas, porque un pedido conserva su
  *  receta aunque la den de baja y la fila tiene que seguir diciendo que se pidio (R44).
- *  `findExecutionContentById` la estrena `asignaciones`, mas abajo. */
+ *  `findExecutionContentById` la estrena `asignaciones`, mas abajo.
+ *
+ *  `findRefsIncludingDeleted` va cableado a la variante CON foto (dashboard): el adaptador
+ *  deja la imagen opcional, y la guardia de ambito exige una funcion con nombre, sin lambda. */
 const recipeCatalog: RecipeCatalog = {
-  findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
+  findRefsIncludingDeleted: findRecipeRefsWithImageIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
   findAliveByNormalizedName: findAliveRecipeByNormalizedName,
