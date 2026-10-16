@@ -37,11 +37,13 @@ export type ExpiryDateProps = {
     readonly expired: string;
   };
   readonly className?: string;
+  /** `dd` dentro de un `dl`; `span` en una celda de tabla, donde un `dd` no es valido. */
+  readonly as?: 'dd' | 'span';
 };
 
 /**
- * Valor `<dd>` de un vencimiento: la fecha, sus dias relativos con el mismo color y, si ya
- * vencio, el chip «Vencido». Lo comparten la sub-fila de lote de la tabla y el panel de lotes.
+ * Un vencimiento: la fecha, sus dias relativos con el mismo color y, si ya vencio, el chip
+ * «Vencido». Lo comparten la sub-fila de lote de la tabla y el panel de lotes.
  */
 export function ExpiryDate({
   date,
@@ -50,11 +52,12 @@ export function ExpiryDate({
   expiredLabel,
   testIds,
   className,
+  as: Tag = 'dd',
 }: ExpiryDateProps) {
   const known = date !== null && daysToExpiry !== null;
   const expired = known && isExpired(daysToExpiry);
   return (
-    <dd
+    <Tag
       data-testid={testIds.date}
       data-expiring={expiring ? 'true' : undefined}
       data-expired={expired ? 'true' : undefined}
@@ -74,6 +77,6 @@ export function ExpiryDate({
           className="ml-2 align-middle font-sans"
         />
       ) : null}
-    </dd>
+    </Tag>
   );
 }

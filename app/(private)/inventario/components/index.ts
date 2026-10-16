@@ -90,11 +90,23 @@ export {
   type ProductBatchDateFieldName,
 } from './product-batch-date-field';
 export {
+  PRODUCT_BATCHES_CARD,
+  PRODUCT_BATCHES_TABLE_ID,
+  PRODUCT_BATCHES_TABLE_TEXTS,
+  PRODUCT_BATCH_COLUMN_LABELS,
+  buildProductBatchColumns,
+  type ProductBatchColumnsDeps,
+  type ProductBatchColumnsProduct,
+} from './product-batch-columns';
+export {
   ProductBatchesPanel,
   type ProductBatchesPanelProps,
 } from './product-batches-panel';
 export {
+  BATCH_ADJUST_ITEM_TESTID,
+  BATCH_HISTORY_ITEM_TESTID,
   ProductBatchesSheet,
+  batchActionsLabel,
   type ProductBatchesSheetProps,
 } from './product-batches-sheet';
 export {

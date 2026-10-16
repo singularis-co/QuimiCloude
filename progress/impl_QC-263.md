@@ -795,3 +795,236 @@ $ pnpm exec vitest run guard
 
 T3a, T3b y T3c hechas y en verde (typecheck, lint sin errores, 37 archivos relacionados y guardias);
 los diffs de `acciones-por-fila` e `inventario-paridad` casan con su fila de `design.md > 6`.
+
+## Tanda 4 (T4b, T4c) — 2026-10-16 · frontend_dev
+
+Tablero: `docs/diseno/canvas/ModalesInventario.dc.html` («Dialog · Historial del lote», «Dialog ·
+Ajustar existencia» en disminución y en aumento sin motivo). En paralelo con T4a (otro frontend_dev,
+mismo worktree): no se han tocado sus archivos ni `index.ts`.
+
+### Archivos creados / modificados
+
+Producción (`app/(private)/inventario/components/`):
+- `movement-reason-label.ts` (T4b, D9/E6): `Record<MovementReason, string>` exhaustivo (Merma,
+  Rotura, Conteo físico, Error de carga) en vez de derivar + `ACCENTED_LABELS`. El barrel no cambia.
+- `batch-history.tsx` (T4b, D8/E7): de `Collapsible` a `Dialog` controlado con las props de D8
+  (`batchLot`, `open` y `onOpenChange` obligatorias: los dos consumidores, el anfitrión y el panel
+  de T4a, ya lo abren controlado). Título «Historial del lote <lote>» con el lote en
+  `font-mono tabular-nums`; `DialogContent` con `sm:max-w-[min(1000px,calc(100%-2rem))]` (más
+  `max-h-[calc(100dvh-2rem)] overflow-y-auto` para que un historial largo quede entero, R42). Asientos en
+  un `DataTable` local con las ocho columnas, paginado en cliente como `ImportRowsTable`, `card` =
+  `{ primary: 'kind', status: 'quantity', meta: resto }`; testids de hoy dentro de cada celda y
+  `batch-history-list` envolviendo la tabla; nulo → `EMPTY_MARK` sin testid. Sin disparador ni
+  `TOUCH_TARGET`. Pide la primera vez que `open` pasa a `true` y nunca más.
+- `adjust-batch-dialog.tsx` (T4c, D10): `productName?`; descripción «<producto> · Lote <lote>» (sin
+  nombre, «Lote <lote>»; lote en mono); «Existencia registrada» como `Input disabled` sin `name`
+  (`adjust-batch-recorded-stock` sobre el campo) junto a «Total contado» en rejilla de dos columnas
+  desde `sm`; diferencia en panel con `ArrowDownToLine`/`ArrowUpFromLine`; «Elige un motivo.» en
+  `FieldError` bajo el selector con icono, `aria-invalid` y `aria-describedby` en el disparador;
+  ayuda «Para aumentar solo valen Conteo físico y Error de carga.» solo con aumento (también en el
+  `aria-describedby`). Envío, resto de avisos y sobre-reserva sin cambio.
+- `product-row-dialogs.tsx` (anfitrión): pasa `productName={productNameWithoutPresentation(product)}`
+  al ajuste y monta el historial siempre (ya no `open ? … : null`; el diálogo se cierra solo). Se
+  quita el comentario «desplegable en línea», que dejó de ser cierto.
+
+Tests:
+- `tests/unit/inventario/batch-history.test.tsx`: reescrito para el diálogo (24 casos).
+- `tests/unit/inventario/adjust-batch-dialog.test.tsx`: existencia registrada por `toHaveValue`; R25
+  ampliado; describe nuevo «aspecto del rediseño» (7 casos); los dos casos R21 de QC-92 ya no montan
+  `ProductBatchesPanel` (T4a le quita `renderBatchActions`) y prueban `AdjustBatchDialog` solo, también
+  abierto desde fuera.
+- `tests/unit/inventario/product-row-dialogs.test.tsx`: el historial con un lote se busca como diálogo
+  «Historial del lote L-001» sin disparador; el ajuste afirma «Acido citrico · Lote L-777».
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R21 | `batch-history.test.tsx`: «R21 — se titula…», «R21 — la tabla tiene las ocho columnas…», «R21 — los asientos salen en el orden…», «R21 — un dato ausente pinta «—»…», «R21 — sin autor…» («Sistema»), «R21 — la cantidad…», «R21 — un ajuste con existencia anterior…», «R21 — las fixtures…», «R21 — un asiento de entrega…», «R21 — cada tipo…», «R21 — un mismo id en los dos libros…», «R21 — controlado, no pinta disparador»; `product-row-dialogs.test.tsx` > «R11 — «Historial» con un lote…» |
+| R22 | `batch-history.test.tsx`: «R22 — mientras llegan…», «R22 — sin ningun asiento…», «R22 — el error de carga…», «R22 — cerrado no pide nada; pide la primera vez…» (una sola llamada) |
+| R23 | `batch-history.test.tsx`: «R23 — cerrar el historial con Escape no cierra el panel», «R23 — cada asiento tiene también su tarjeta…». El umbral de 760 px es del E2E (T7) |
+| R52 | `batch-history.test.tsx` > «R52 — el diálogo llega a 1000 px…» (clase); la medida es del E2E |
+| R24 | `adjust-batch-dialog.test.tsx`: «R24 — debajo del título…», «R24 — sin el nombre…», «R24 — «Existencia registrada» es un campo deshabilitado…», «R24 — la diferencia lleva una flecha…», «R24 — los motivos se leen con tilde…», «R24 — en modo controlado no pinta disparador…», R4 (motivos por sentido, con tilde) y R8–R11 de hoy (envío y avisos); `batch-history.test.tsx` > «R24, R46 — «%s» se lee «%s»» ×4 |
+| R25 | `adjust-batch-dialog.test.tsx` > «R25 — sin motivo, «Elige un motivo.» sale bajo el campo…» |
+| R26 | `adjust-batch-dialog.test.tsx` > «R26 — la ayuda de aumento sale solo mientras…» |
+| R46 | `batch-history.test.tsx` > «R24, R46 …» ×4 y «R46 — hay un caso por cada motivo del dominio»; el mapa es `Record<MovementReason, string>` (no compila sin un texto); `grep "Elegi un motivo\|Conteo fisico" app/(private)/inventario` vacío; `batch-history.tsx` sin `TOUCH_TARGET` |
+
+### Salida real
+
+```
+$ pnpm exec vitest run tests/unit/inventario/batch-history.test.tsx
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+
+$ pnpm exec vitest run tests/unit/inventario/adjust-batch-dialog.test.tsx tests/unit/inventario/product-row-dialogs.test.tsx
+ Test Files  2 passed (2)
+      Tests  52 passed (52)
+
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores; una pasada intermedia falló solo en product-batches-panel.test.tsx de T4a, en curso)
+
+$ pnpm run lint
+✖ 10 problems (0 errors, 10 warnings)
+  (no-unused-vars en confirm-catalog-import.test.ts, list-execution-traces.test.ts,
+   order-service.test.ts y step-evidence.tsx: ninguno de esta tanda. Una pasada intermedia dio
+   react-hooks/set-state-in-effect en batch-history.tsx: corregido, el estado «queued» ya pinta
+   la carga y no hace falta pasar a «loading» dentro del efecto)
+
+$ pnpm exec vitest related --run <batch-history.tsx, movement-reason-label.ts, adjust-batch-dialog.tsx, product-row-dialogs.tsx y sus 3 tests>
+ Test Files  44 passed (44)
+      Tests  823 passed (823)
+
+$ pnpm exec vitest run guard
+ Test Files  80 passed (80)
+      Tests  1096 passed | 20 skipped (1116)
+```
+
+### Para el leader
+
+1. **Fila del historial: `data-table-row-<kind>-<id>`** (y `data-table-card-<kind>-<id>`). El dominio
+   dice que solo `kind` + `id` es único en la unión de los dos libros (`reservation.ts`), así que
+   `getRowId` usa el par, como la `key` de hoy. El contenedor por asiento `batch-history-entry-<id>`
+   desaparece (las celdas conservan `batch-history-entry-kind|quantity|…` y la tabla va dentro de
+   `batch-history-list`). Para T7b: `ajuste-de-inventario.spec.ts` (líneas 394, 403, 518) pasa a
+   `data-table-row-adjustment-<id>` / `data-table-row-opening-<id>`, y `reserva-de-material.spec.ts`
+   (764–771) filtra `li` dentro de `batch-history-list`: ahora son las tarjetas (ocultas por encima
+   de 760 px); debe filtrar `tr` o `data-table-row-`. Con un nulo, la celda ya no omite el campo:
+   pinta «—» sin el testid, así que los `toHaveCount(0)` de 405–406 siguen valiendo.
+2. **La tarjeta del historial sale sin rótulos** («Existencia anterior 0,00» del tablero de teléfono):
+   la tarjeta de `DataTable` solo pinta el contenido de la celda (E1, sin extensión), y los nulos salen
+   como «—» sueltos en `meta`. Es lo que D8 pide; el tablero muestra rótulos y omite los nulos.
+3. **`productName` del ajuste** = nombre sin la presentación (lo que pinta la celda y el `title` del
+   menú), sin unidad, como en el tablero. El panel «Lotes» de T4a aún no lo pasa a su
+   `AdjustBatchDialog`: falta `productName={productNameWithoutPresentation(product)}` allí.
+4. **`guard-piezas-base`: la exclusión de `batch-history.tsx` (`ARCHIVOS_D11`) ya se puede quitar.**
+   El archivo no declara el par táctil ni una constante «—» (usa `EMPTY_MARK`), no compara el código
+   inesperado ni usa locales borrados. No se ha quitado (es T6b) ni probado sin ella.
+5. El tablero pinta la cantidad con signo (`+120,00`) y fechas `dd/mm/aaaa`; R21 manda los de hoy
+   (`20`, `2026-09-15 10:00`), y así sale.
+
+### Veredicto
+
+T4b y T4c hechas y en verde (typecheck, lint sin errores, 44 archivos relacionados y guardias); sin
+tocar archivos de T4a.
+
+- **Arreglo T4c (contrato «sin busqueda ni orden»):** `adjust-batch-dialog.tsx` componía `aria-describedby` con `.filter((id) => id !== '')`, texto que `product-route-contract.test.ts` prohíbe en la ruta; ahora se arma con spreads condicionales (`[...(reasonError ? [reasonErrorId] : []), ...(isIncrease ? [increaseHintId] : [])].join(' ')`), mismo resultado, test sin tocar. Ningún otro archivo cambiado de la ruta rompe el contrato (`importar/` está fuera de su alcance). Salida: `vitest run product-route-contract.test.ts adjust-batch-dialog.test.tsx` → `Test Files 2 passed (2) · Tests 61 passed (61)`; `pnpm run typecheck` → `tsc --noEmit` sin salida (exit 0); `pnpm run lint` → `✖ 10 problems (0 errors, 10 warnings)` (exit 0, avisos ajenos).
+
+## Tanda 4 (T4a) — 2026-10-16 · frontend_dev
+
+Tablero: `docs/diseno/canvas/ModalesInventario.dc.html` («Sheet · Lotes»: etiqueta, tabla a 900 px y
+tarjetas). En paralelo con T4b/T4c (otro frontend_dev): no se han tocado `batch-history.tsx`,
+`movement-reason-label.ts`, `adjust-batch-dialog.tsx` ni sus tests; el panel usa `BatchHistory` y
+`AdjustBatchDialog` por su API controlada.
+
+### Archivos creados / modificados
+
+Producción (`app/(private)/inventario/components/`):
+- `product-batch-columns.tsx` (nuevo, D7): `buildProductBatchColumns({ units, product, menu })` con
+  `lot` (con «Sobre-reservado» como `StatusBadge` `danger`), `quantity` (envases debajo),
+  `purchaseDate`, `expiryDate` (`ExpiryDate as="span"`, con relativo y chip; sin fecha, «—» sin
+  testid), `reserved`, `available` (en negrita, como el tablero) y `actionsColumn({ menu })` si hay
+  menú. Todas `tabular`; las cifras `align: 'end'`. Sin apartado/disponible, «—» sin testid. Las
+  funciones de cantidad (`formattedQuantity`, `exactQuantity`, `packageCountLabel`, unidad del
+  envase) se mudan aquí sin cambiar. También `PRODUCT_BATCHES_CARD`, `PRODUCT_BATCHES_TABLE_ID`
+  (`inventario-lotes`) y `PRODUCT_BATCHES_TABLE_TEXTS`.
+- `product-batches-panel.tsx` (D7): `DataTable` local (patrón `ImportRowsTable`: `createDefaultParams`,
+  `searchable={false}`, paginación en cliente), `getRowId = batch.id`, `card` de D7. Ranura
+  `batchMenu`; salen `renderBatchDetail` y `renderBatchActions`. Conserva `product-batches-panel`, la
+  línea de presentación y el vacío.
+- `product-batches-sheet.tsx` (D7): «Lotes» encima del `SheetTitle` (`product-batches-label`, estilo
+  `.lab` del tablero), `SheetContent` con `data-[side=right]:w-full data-[side=right]:sm:max-w-[900px]`,
+  cuerpo con `px-4 pb-4` y scroll vertical. Menú de cada lote: «Historial» (`batch-history-trigger`) y,
+  con `canAdjust`, «Ajustar existencia» (`adjust-batch-open`); disparador «Acciones del lote <lote>»,
+  `title` = lote. Abre `BatchHistory` o `AdjustBatchDialog` de ese lote en modo controlado (remontados
+  en cada elección), con `productName` = nombre sin presentación (nota 3 de T4b/T4c). Tras un ajuste se
+  vuelven a pedir los lotes: `fetchBatches` pasa a `useCallback`, porque el ajuste ya no vive dentro
+  del panel (que se desmonta al recargar) y su efecto de éxito depende de `onAdjusted`; con una función
+  nueva por render pedía los lotes en bucle.
+- `expiry-date.tsx` (E5): `as?: 'dd' | 'span'`, por defecto `'dd'` (la sub-fila no cambia).
+- `index.ts`: exporta lo nuevo de `product-batch-columns.tsx` y `BATCH_HISTORY_ITEM_TESTID`,
+  `BATCH_ADJUST_ITEM_TESTID`, `batchActionsLabel`.
+
+Tests:
+- `tests/unit/inventario/product-batches-panel.test.tsx`: reescrito (25 casos). Las tres líneas
+  (`product-batch-line-*`) se sustituyen por columnas, testids en su celda, sin `dd`/`dl`; las de
+  vencimiento relativo y «Vencido» se conservan dentro de la celda (y en la tarjeta).
+- `tests/unit/inventario/product-batches-sheet.test.tsx`: acotado a `data-table-row-<id>`; casos
+  nuevos de etiqueta, ancho, estados, menú con y sin permiso, historial y ajuste con recarga única.
+- `tests/unit/inventario-ui/envase-en-inventario.test.tsx`: lee la fila de la tabla (duplicado de la
+  tarjeta).
+- `tests/unit/marca/tablas-marca.test.tsx` (R12 de QC-227, enmienda § 10): el valor no es `DD` y su
+  celda lleva `font-mono tabular-nums`; seis cabeceras sin mono; ningún `dl/dt/dd`.
+- `tests/unit/marca/badges-estado.test.tsx` (R7 de QC-227, enmienda § 10): `data-tone="danger"`, con
+  las clases del tono error de hoy.
+- `tests/unit/inventario/decimal-quantity-convenciones.test.ts`: vigila también
+  `product-batch-columns.tsx`, adonde se mudan las cuentas de cantidad (siete → ocho archivos).
+
+Snapshots: ninguno cambia (`tests/unit/paridad`, 22 archivos, en verde sin `-u`).
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R15 | `product-batches-panel.test.tsx`: «R15 — columnas…», «R15 — lote, cifras y fechas en cifras tabulares…», «R15 — cada lote es una fila…», «R15 — la disposicion en tres lineas desaparece…», «R15 — sin vencimiento…», «R15, R48 — ámbar bajo 30 dias…», «R15 — la tarjeta conserva el relativo…»; `product-batches-sheet.test.tsx` > «R15 — pinta «Lotes» encima del titulo…»; `tablas-marca.test.tsx` > «R12: lote, cantidades y fechas del panel van en celdas Mono…» |
+| R16 | `product-batches-panel.test.tsx`: «R16 — division exacta…», «R16 — un solo envase…», «R16 — division no entera…», «R16 — la linea de presentacion…», «R16 — lista vacia…»; `product-batches-sheet.test.tsx`: «R16 — mientras se piden…», «R16 — sin lotes…», «el estado de error se distingue…»; `envase-en-inventario.test.tsx` > «R6: un lote de envase…», «R6: el lote de un envase legado…» |
+| R17 | `product-batches-panel.test.tsx` > «R17 — un lote sobre-reservado…», «R17 — sin sobre-reserva…»; `badges-estado.test.tsx` > «R7: «Sobre-reservado» del panel de lotes es un StatusBadge…» |
+| R18 | `product-batches-panel.test.tsx` > «R18 — `batchMenu` se pide por lote…», «R18 — sin `batchMenu`…»; `product-batches-sheet.test.tsx` > «R18 — con permiso…», «R18 — sin permiso…», «R18 — «Historial» abre…», «R18 — «Ajustar existencia» abre… se vuelven a pedir los lotes», «con canAdjust el control de ajuste SI existe, en el menu del lote» |
+| R19 | `product-batches-panel.test.tsx` > «R19 — la tarjeta lleva lote, «Cantidad»…», «R19 — la tarjeta tiene el boton «Acciones» de 44 px…», «R19 — sin `batchMenu`…». El umbral de 760 px es del E2E (T7) |
+| R20 | `product-batches-sheet.test.tsx` > «R20 — mide hasta 900 px…» (clase); la medida es del E2E (T7) |
+| R48 | `product-batches-panel.test.tsx` > «R15, R48 — ámbar bajo 30 dias…» |
+
+### Salida real
+
+```
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm run lint
+ESLint: 0 errors, 10 warnings in 4 files
+  (no-unused-vars en confirm-catalog-import.test.ts, list-execution-traces.test.ts,
+   order-service.test.ts y step-evidence.tsx: ninguno de esta tanda)
+
+$ pnpm exec vitest run tests/unit/inventario/product-batches-sheet.test.tsx   (primera pasada)
+      Tests  1 failed | 14 passed (15)
+   → «R18 — Ajustar existencia…»: los lotes se pedían en bucle (ver `useCallback` arriba). Después:
+      Tests  15 passed (15)
+
+$ pnpm exec vitest run tests/unit/paridad
+ Test Files  22 passed (22)
+      Tests  415 passed (415)
+
+$ pnpm exec vitest related --run <product-batch-columns.tsx, product-batches-panel.tsx, product-batches-sheet.tsx, expiry-date.tsx, index.ts y los 6 tests tocados>
+ Test Files  38 passed (38)
+      Tests  662 passed (662)
+
+$ pnpm exec vitest run guard
+ Test Files  80 passed (80)
+      Tests  1096 passed | 20 skipped (1116)
+
+$ pnpm exec vitest run tests/unit/inventario/product-route-contract.test.ts
+     × la pantalla no ofrece busqueda ni control de orden
+   AssertionError: app/(private)/inventario/components/adjust-batch-dialog.tsx no debe contener «filter(»
+   (archivo de T4c, no de esta tanda; los cuatro de T4a no contienen ninguno de los patrones)
+```
+
+### Para el leader
+
+1. **Rojo de T4c en `product-route-contract.test.ts`** (no es guardia ni lo saca `vitest related`, que
+   no sigue lecturas de `fs`): `adjust-batch-dialog.tsx` contiene `filter(`. No se ha tocado.
+2. **La tarjeta del lote sale sin rótulos**: el tablero de teléfono pinta «Cantidad 120,00»,
+   «Apartado …» y R19 nombra esos campos; la tarjeta de `DataTable` solo pinta el contenido de la
+   celda (igual que en T3 y en el historial de T4b). Sale el orden de D7 sin rótulos.
+3. **Fechas a la izquierda**: el tablero alinea a la derecha también «Fecha de compra» y
+   «Vencimiento» (clase `num`); R15 y D7 dicen «las cifras a la derecha» y el repo alinea las fechas a
+   la izquierda (`finished-product-batches-table.tsx`). Se sigue el spec: solo las cantidades a la
+   derecha.
+4. Los textos de las tres líneas desaparecen con ellas; para T7b, `e2e/insumo-por-unidad.spec.ts`
+   (264, 305) lee `product-batch-quantity` dentro del panel, que ahora sale dos veces (fila y
+   tarjeta): hay que acotarlo a `data-table-row-<id>`, como dice `design.md > 7`.
+
+### Veredicto
+
+T4a hecha y en verde (typecheck, lint sin errores, 38 archivos relacionados, paridad sin cambios y
+guardias); el único rojo visto es de T4c.

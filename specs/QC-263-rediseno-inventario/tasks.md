@@ -130,7 +130,7 @@ solo su parte y el commit cita la fila de `design.md > 6`.
 
 ## Tanda 4 — Lotes, historial y ajuste (depende de T3b)
 
-- [ ] **T4a. Panel «Lotes» como tabla** (D7, R15–R20). `product-batch-columns.tsx`,
+- [x] **T4a. Panel «Lotes» como tabla** (D7, R15–R20). `product-batch-columns.tsx`,
   `ProductBatchesPanel` sobre `DataTable` local con `batchMenu`, `ProductBatchesSheet` con la etiqueta
   «Lotes», el ancho y el menú de lote. Tests: `product-batches-panel.test.tsx` (columnas y testids de
   celda, envases, línea de presentación, vacío, «Sobre-reservado» con `StatusBadge` `danger`, tarjeta
@@ -141,7 +141,7 @@ solo su parte y el commit cita la fila de `design.md > 6`.
   vencimiento pasa `'span'`; en `product-batches-panel.test.tsx` las aserciones de las tres líneas
   (`product-batch-line-*`, ccde16f7) se sustituyen por las de columnas, y las de vencimiento
   relativo y «Vencido» (08b69744) se conservan dentro de la celda; ningún `<dd>` fuera de un `<dl>`.
-- [ ] **T4b [P]. Historial en diálogo** (D8, D9, R21–R23, R24). `BatchHistory` controlado, tabla y
+- [x] **T4b [P]. Historial en diálogo** (D8, D9, R21–R23, R24). `BatchHistory` controlado, tabla y
   tarjetas, mapa de motivos con tilde, sin `TOUCH_TARGET`. Test `batch-history.test.tsx`: título con
   el lote, ocho columnas, «—» en lo nulo, «Sistema», pide una sola vez, estados de hoy,
   `movementReasonLabel('conteo_fisico') === 'Conteo físico'`; cerrar no cierra el panel de lotes.
@@ -149,7 +149,7 @@ solo su parte y el commit cita la fila de `design.md > 6`.
   `ACCENTED_LABELS`), con un caso por cada `MovementReason`; el barrel sigue exportándola desde ahí
   (`finished-product-route-contract.test.ts` en verde sin cambio); `DialogContent` con
   `sm:max-w-[min(1000px,calc(100%-2rem))]`, afirmado por clase en el test.
-- [ ] **T4c [P]. Ajuste** (D10, R24–R26). Test `adjust-batch-dialog.test.tsx`: descripción
+- [x] **T4c [P]. Ajuste** (D10, R24–R26). Test `adjust-batch-dialog.test.tsx`: descripción
   «<producto> · Lote <lote>», existencia registrada como campo deshabilitado, flecha de la
   diferencia, «Elige un motivo.» bajo el campo con `aria-invalid` y `aria-describedby`, ayuda de
   aumento solo al aumentar, motivos con tilde, modo controlado sin disparador; el envío y el resto de

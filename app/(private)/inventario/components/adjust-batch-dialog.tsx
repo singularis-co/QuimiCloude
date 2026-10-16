@@ -1,10 +1,12 @@
 'use client';
 
+import { ArrowDownToLine, ArrowUpFromLine, CircleAlertIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useEffectEvent, useId, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { FieldError } from '@/components/shared/field-error';
 import {
   Dialog,
   DialogContent,
@@ -64,7 +66,10 @@ const INCREASE_PREFIX = 'Aumento de';
 const DECREASE_PREFIX = 'Disminución de';
 const ZERO_DIFFERENCE_MESSAGE = 'El total contado es igual a la existencia registrada.';
 const INVALID_COUNT_MESSAGE = 'Escribe el total contado.';
-const MISSING_REASON_MESSAGE = 'Elegi un motivo.';
+const MISSING_REASON_MESSAGE = 'Elige un motivo.';
+const REASON_LABEL = 'Motivo';
+const INCREASE_REASONS_HINT = 'Para aumentar solo valen Conteo físico y Error de carga.';
+const LOT_PREFIX = 'Lote';
 const OVER_RESERVED_MESSAGE =
   'El lote queda sobre-reservado: hay pedidos sin cobertura completa.';
 const FINISHED_PRODUCT_NOTICE = 'Solo se admiten ajustes que restan.';
@@ -107,6 +112,8 @@ export type AdjustBatchDialogProps = {
   /** Lote de un envase con presentacion fija: se ajusta en envases enteros. */
   readonly wholePackages?: boolean;
   readonly onAdjusted?: () => void;
+  /** Nombre del producto para la descripción; sin él, solo el lote. */
+  readonly productName?: string;
   /** Apertura controlada desde fuera. Ausente = el dialogo trae su propio disparador. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
@@ -127,6 +134,7 @@ export function AdjustBatchDialog({
   productType,
   wholePackages = false,
   onAdjusted,
+  productName,
   open,
   onOpenChange,
 }: AdjustBatchDialogProps) {
@@ -138,6 +146,7 @@ export function AdjustBatchDialog({
       productType={productType}
       wholePackages={wholePackages}
       onAdjusted={onAdjusted}
+      productName={productName}
       controlledOpen={open}
       onOpenChange={onOpenChange}
     />
@@ -149,6 +158,7 @@ function AdjustBatchDialogContent({
   productType,
   wholePackages,
   onAdjusted,
+  productName,
   controlledOpen,
   onOpenChange,
 }: {
@@ -156,10 +166,12 @@ function AdjustBatchDialogContent({
   readonly productType?: ProductType;
   readonly wholePackages: boolean;
   readonly onAdjusted?: () => void;
+  readonly productName?: string;
   readonly controlledOpen?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
 }) {
   const fieldId = useId();
+  const recordedId = `${fieldId}-recorded`;
   const countedId = `${fieldId}-counted`;
   const differenceId = `${fieldId}-difference`;
   const reasonLabelId = `${fieldId}-reason`;
@@ -167,6 +179,7 @@ function AdjustBatchDialogContent({
   const zeroErrorId = `${fieldId}-zero-error`;
   const countedErrorId = `${fieldId}-counted-error`;
   const reasonErrorId = `${fieldId}-reason-error`;
+  const increaseHintId = `${fieldId}-increase-hint`;
   const wholeErrorId = `${fieldId}-whole-error`;
 
   const router = useRouter();
@@ -281,6 +294,12 @@ function AdjustBatchDialogContent({
     .trim()
     .replace(/\s+/g, ' ');
 
+  const isIncrease = adjustment?.direction === 'increase';
+  const reasonDescribedBy = [
+    ...(reasonError ? [reasonErrorId] : []),
+    ...(isIncrease ? [increaseHintId] : []),
+  ].join(' ');
+
   return (
     <Dialog open={open} onOpenChange={requestOpen}>
       {isControlled ? null : (
@@ -299,7 +318,15 @@ function AdjustBatchDialogContent({
       <DialogContent data-testid="adjust-batch-dialog">
         <DialogHeader>
           <DialogTitle>{DIALOG_TITLE}</DialogTitle>
-          <DialogDescription>Lote {batch.lot}.</DialogDescription>
+          <DialogDescription data-testid="adjust-batch-description">
+            {productName === undefined ? null : (
+              <>
+                <span className="font-medium text-foreground">{productName}</span>
+                {' · '}
+              </>
+            )}
+            {LOT_PREFIX} <span className="font-mono tabular-nums">{batch.lot}</span>
+          </DialogDescription>
         </DialogHeader>
 
         {productType !== PRODUCT_TYPES.FINISHED_PRODUCT ? null : (
@@ -338,17 +365,6 @@ function AdjustBatchDialogContent({
             data-testid="adjust-batch-whole-error"
           >
             {WHOLE_PACKAGES_MESSAGE}
-          </p>
-        ) : null}
-
-        {reasonError ? (
-          <p
-            role="alert"
-            id={reasonErrorId}
-            className="text-sm text-destructive"
-            data-testid="adjust-batch-reason-error"
-          >
-            {MISSING_REASON_MESSAGE}
           </p>
         ) : null}
 
@@ -401,53 +417,76 @@ function AdjustBatchDialogContent({
             data-testid="adjust-batch-seen-stock"
           />
 
-          <dl className="flex flex-col gap-1">
-            <dt className="text-sm font-medium">{RECORDED_STOCK_LABEL}</dt>
-            <dd
-              title={exactDecimalTitle(seenStock)}
-              className="text-base"
-              data-testid="adjust-batch-recorded-stock"
-            >
-              {formatDecimalDisplay(seenStock)}
-            </dd>
-          </dl>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <label htmlFor={recordedId} className="text-sm font-medium">
+                {RECORDED_STOCK_LABEL}
+              </label>
+              <Input
+                id={recordedId}
+                type="text"
+                disabled
+                readOnly
+                value={formatDecimalDisplay(seenStock)}
+                title={exactDecimalTitle(seenStock)}
+                className={`${touchTarget} ${FIELD_TEXT} font-mono tabular-nums`}
+                data-testid="adjust-batch-recorded-stock"
+              />
+            </div>
 
-          <div className="flex flex-col gap-2">
-            <label htmlFor={countedId} className="text-sm font-medium">
-              {COUNTED_STOCK_LABEL}
-            </label>
-            <Input
-              id={countedId}
-              name={COUNTED_STOCK_FIELD}
-              type="text"
-              required
-              // Sin `pattern`: la validacion nativa taparia los avisos propios del dialogo.
-              inputMode={wholePackages ? 'numeric' : 'decimal'}
-              autoComplete="off"
-              value={counted}
-              onChange={(event) => handleCountedChange(event.currentTarget.value)}
-              className={`${touchTarget} ${FIELD_TEXT}`}
-              aria-invalid={zeroError || countedError || wholeError || undefined}
-              aria-describedby={countedDescribedBy === '' ? undefined : countedDescribedBy}
-              data-testid="adjust-batch-counted"
-            />
-            {adjustment === null ? null : (
-              <p
-                id={differenceId}
-                aria-live="polite"
-                className="text-sm"
-                data-testid="adjust-batch-difference"
-                data-direction={adjustment.direction}
-              >
-                {adjustment.direction === 'increase' ? INCREASE_PREFIX : DECREASE_PREFIX}{' '}
-                {trimDecimal(adjustment.amount)}
-              </p>
-            )}
+            <div className="flex flex-col gap-2">
+              <label htmlFor={countedId} className="text-sm font-medium">
+                {COUNTED_STOCK_LABEL}
+              </label>
+              <Input
+                id={countedId}
+                name={COUNTED_STOCK_FIELD}
+                type="text"
+                required
+                // Sin `pattern`: la validacion nativa taparia los avisos propios del dialogo.
+                inputMode={wholePackages ? 'numeric' : 'decimal'}
+                autoComplete="off"
+                value={counted}
+                onChange={(event) => handleCountedChange(event.currentTarget.value)}
+                className={`${touchTarget} ${FIELD_TEXT} font-mono tabular-nums`}
+                aria-invalid={zeroError || countedError || wholeError || undefined}
+                aria-describedby={countedDescribedBy === '' ? undefined : countedDescribedBy}
+                data-testid="adjust-batch-counted"
+              />
+            </div>
           </div>
+
+          {adjustment === null ? null : (
+            <div
+              id={differenceId}
+              aria-live="polite"
+              className="flex items-center gap-2.5 rounded-lg bg-muted px-3.5 py-3 text-sm"
+              data-testid="adjust-batch-difference"
+              data-direction={adjustment.direction}
+            >
+              {isIncrease ? (
+                <ArrowUpFromLine
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground"
+                  data-testid="adjust-batch-difference-increase-icon"
+                />
+              ) : (
+                <ArrowDownToLine
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground"
+                  data-testid="adjust-batch-difference-decrease-icon"
+                />
+              )}
+              <span>
+                {isIncrease ? INCREASE_PREFIX : DECREASE_PREFIX}{' '}
+                <span className="font-mono font-semibold tabular-nums">{trimDecimal(adjustment.amount)}</span>
+              </span>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2">
             <span id={reasonLabelId} className="text-sm font-medium">
-              Motivo
+              {REASON_LABEL}
             </span>
             <Select
               name={REASON_FIELD}
@@ -463,7 +502,8 @@ function AdjustBatchDialogContent({
             >
               <SelectTrigger
                 aria-labelledby={reasonLabelId}
-                aria-describedby={reasonError ? reasonErrorId : undefined}
+                aria-describedby={reasonDescribedBy === '' ? undefined : reasonDescribedBy}
+                aria-invalid={reasonError || undefined}
                 className={`w-full ${touchTarget} ${FIELD_TEXT}`}
                 data-testid="adjust-batch-reason"
               >
@@ -481,6 +521,23 @@ function AdjustBatchDialogContent({
                 ))}
               </SelectContent>
             </Select>
+            <FieldError
+              id={reasonErrorId}
+              testId="adjust-batch-reason-error"
+              message={
+                reasonError ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <CircleAlertIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                    {MISSING_REASON_MESSAGE}
+                  </span>
+                ) : undefined
+              }
+            />
+            {isIncrease ? (
+              <p id={increaseHintId} className="text-sm text-muted-foreground" data-testid="adjust-batch-increase-hint">
+                {INCREASE_REASONS_HINT}
+              </p>
+            ) : null}
           </div>
 
           <DialogFooter>

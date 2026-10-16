@@ -12,6 +12,7 @@ import type { UnitRef } from '@/lib/modules/unidades';
 import { AdjustBatchDialog } from './adjust-batch-dialog';
 import { BatchHistory } from './batch-history';
 import { DeleteProductDialog } from './delete-product-dialog';
+import { productNameWithoutPresentation } from './product-base-name';
 import { ProductBatchesSheet } from './product-batches-sheet';
 import type { ProductRowAction } from './product-row-actions';
 import { ProductSheet } from './product-sheet';
@@ -110,8 +111,7 @@ export function ProductRowDialogs({ active, open, onOpenChange, units, canAdjust
   if (target?.kind !== 'single') return null;
 
   if (action === 'history') {
-    // El historial es un desplegable en línea: cerrado no deja nada a la vista.
-    return open ? (
+    return (
       <BatchHistory
         key={key}
         batchId={target.batch.id}
@@ -119,7 +119,7 @@ export function ProductRowDialogs({ active, open, onOpenChange, units, canAdjust
         open={open}
         onOpenChange={onOpenChange}
       />
-    ) : null;
+    );
   }
 
   return (
@@ -129,6 +129,7 @@ export function ProductRowDialogs({ active, open, onOpenChange, units, canAdjust
       canAdjust={canAdjust}
       productType={product.type}
       wholePackages={product.type === PRODUCT_TYPES.PACKAGING && product.presentationId != null}
+      productName={productNameWithoutPresentation(product)}
       open={open}
       onOpenChange={onOpenChange}
     />

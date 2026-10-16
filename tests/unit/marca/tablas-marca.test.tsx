@@ -387,7 +387,7 @@ describe('alineación de las cifras de inventario', () => {
 });
 
 describe('panel de lotes con la nueva marca', () => {
-  it('R12: lote, cantidades y fechas del panel van en Mono con cifras tabulares, y sus etiquetas no', () => {
+  it('R12: lote, cantidades y fechas del panel van en celdas Mono con cifras tabulares, y sus cabeceras no', () => {
     const lote: ProductBatchView = {
       id: 'b1',
       lot: 'L-001',
@@ -409,14 +409,16 @@ describe('panel de lotes con la nueva marca', () => {
       'product-batch-reserved',
       'product-batch-available',
     ]) {
-      const dd = screen.getByTestId(testId);
-      expect(dd.tagName, testId).toBe('DD');
-      expect(dd, testId).toHaveClass('font-mono', 'tabular-nums');
+      const valor = within(screen.getByTestId('data-table-row-b1')).getByTestId(testId);
+      expect(valor.tagName, testId).not.toBe('DD');
+      expect(valor.closest('td'), testId).toHaveClass('font-mono', 'tabular-nums');
     }
-    const etiquetas = screen.getByTestId('product-batches-panel').querySelectorAll('dt');
-    expect(etiquetas).toHaveLength(6);
-    for (const dt of etiquetas) {
-      expect(dt).not.toHaveClass('font-mono');
+    const panel = screen.getByTestId('product-batches-panel');
+    expect(panel.querySelector('dl, dt, dd')).toBeNull();
+    const cabeceras = within(panel).getAllByRole('columnheader');
+    expect(cabeceras).toHaveLength(6);
+    for (const th of cabeceras) {
+      expect(th).not.toHaveClass('font-mono');
     }
   });
 });

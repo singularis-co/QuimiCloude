@@ -157,7 +157,8 @@ describe('«Historial» y «Ajustar existencia» deciden por los lotes del produ
     await elegir(ACIDO.id, 'product-history-open');
 
     expect(await screen.findByTestId('batch-history-before-ledger')).toBeInTheDocument();
-    expect(screen.getByTestId('batch-history-trigger')).toHaveAccessibleName('Historial del lote L-001');
+    expect(screen.getByRole('dialog', { name: 'Historial del lote L-001' })).toBeInTheDocument();
+    expect(screen.queryByTestId('batch-history-trigger')).toBeNull();
     expect(listProductBatchesActionMock).toHaveBeenCalledWith(ACIDO.id);
     expect(listBatchMovementsActionMock).toHaveBeenCalledWith('batch-1');
     expect(screen.queryByTestId('product-batches-sheet')).toBeNull();
@@ -168,8 +169,8 @@ describe('«Historial» y «Ajustar existencia» deciden por los lotes del produ
     montar();
     await elegir(ACIDO.id, 'product-adjust-open');
 
-    const dialogo = await screen.findByTestId('adjust-batch-dialog');
-    expect(dialogo).toHaveTextContent('Lote L-777.');
+    await screen.findByTestId('adjust-batch-dialog');
+    expect(screen.getByTestId('adjust-batch-description')).toHaveTextContent('Acido citrico · Lote L-777');
     expect(screen.queryByTestId('adjust-batch-open')).toBeNull();
     expect(screen.queryByTestId('product-batches-sheet')).toBeNull();
   });
