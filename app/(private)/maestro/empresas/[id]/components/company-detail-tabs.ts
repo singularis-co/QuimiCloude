@@ -4,6 +4,8 @@ import type { UrlTabItem } from '@/components/shared/url-tabs';
 import { maestroCompanyRoute } from '@/lib/shared/routes';
 
 export const TAB_PARAM = 'tab';
+export const HISTORY_PAGE_PARAM = 'page';
+export const FIRST_HISTORY_PAGE = 1;
 
 export const COMPANY_DETAIL_TABS = ['datos', 'modulos', 'historial'] as const;
 export type CompanyDetailTab = (typeof COMPANY_DETAIL_TABS)[number];
@@ -33,6 +35,7 @@ export type CompanyDetailSearchParams = Readonly<
 
 export type CompanyDetailParams = {
   readonly tab: CompanyDetailTab;
+  readonly historyPage: number;
 };
 
 function firstValue(raw: string | readonly string[] | undefined): string | undefined {
@@ -40,13 +43,28 @@ function firstValue(raw: string | readonly string[] | undefined): string | undef
   return typeof raw === 'string' ? raw : raw[0];
 }
 
+// Se comprueba el texto y no el número: `Number` acepta `'1.5'`, `'1e3'` y `' 2 '`.
+function parsePage(raw: string | undefined): number {
+  if (raw === undefined || !/^\d+$/.test(raw)) return FIRST_HISTORY_PAGE;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value >= FIRST_HISTORY_PAGE ? value : FIRST_HISTORY_PAGE;
+}
+
 function isCompanyDetailTab(value: string | undefined): value is CompanyDetailTab {
   return COMPANY_DETAIL_TABS.some((tab) => tab === value);
 }
 
 export function parseCompanyDetailParams(raw: CompanyDetailSearchParams): CompanyDetailParams {
-  const tab = firstValue(raw[TAB_PARAM]);
-  return { tab: isCompanyDetailTab(tab) ? tab : DEFAULT_COMPANY_DETAIL_TAB };
+  const rawTab = firstValue(raw[TAB_PARAM]);
+  const tab = isCompanyDetailTab(rawTab) ? rawTab : DEFAULT_COMPANY_DETAIL_TAB;
+  const historyPage =
+    tab === 'historial' ? parsePage(firstValue(raw[HISTORY_PAGE_PARAM])) : FIRST_HISTORY_PAGE;
+  return { tab, historyPage };
+}
+
+export function companyHistoryPageHref(companyId: string, page: number): string {
+  const base = maestroCompanyRoute(companyId, 'historial');
+  return page === FIRST_HISTORY_PAGE ? base : `${base}&${HISTORY_PAGE_PARAM}=${page}`;
 }
 
 const companyIdSchema = z.string().uuid();

@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { cleanup, render, screen, within } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { Suspense, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CompanyDetail, SessionUser } from '@/lib/modules/identity';
@@ -63,6 +63,10 @@ vi.mock('@/lib/modules/identity/adapters/driving/company-actions', () => ({
   setAllCompanyAddonsAction: vi.fn(),
 }));
 
+import {
+  CompanyHistoryPanel,
+  CompanyHistorySkeleton,
+} from '@/app/(private)/maestro/empresas/[id]/components';
 import MaestroEmpresaPage from '@/app/(private)/maestro/empresas/[id]/page';
 
 const RAIZ = join(__dirname, '..', '..', '..');
@@ -109,6 +113,19 @@ async function pintar(query: Record<string, string> = {}) {
   render(<>{await invocar(ID, query)}</>);
 }
 
+function hijosDe(nodo: ReactNode): ReactNode[] {
+  if (Array.isArray(nodo)) return nodo.flatMap(hijosDe);
+  if (!isValidElement(nodo)) return [];
+  const props = nodo.props as { children?: ReactNode };
+  return [nodo, ...hijosDe(props.children)];
+}
+
+function buscar(arbol: ReactNode, tipo: unknown): ReactElement<Record<string, unknown>> {
+  const encontrado = hijosDe(arbol).find((nodo) => isValidElement(nodo) && nodo.type === tipo);
+  if (!isValidElement(encontrado)) throw new Error('no esta en el arbol');
+  return encontrado as ReactElement<Record<string, unknown>>;
+}
+
 function archivosDe(dir: string): string[] {
   return readdirSync(dir).flatMap((nombre) => {
     const ruta = join(dir, nombre);
@@ -126,6 +143,10 @@ beforeEach(() => {
   });
   getSessionUserMock.mockResolvedValue(MAESTRO);
   getCompanyActionMock.mockResolvedValue({ status: 'success', data: ACTIVA });
+  listCompanyEventsActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 },
+  });
 });
 
 afterEach(() => {
@@ -244,5 +265,19 @@ describe('/maestro/empresas/[id]', () => {
     await pintar();
     expect(screen.getByTestId('company-detail-edit')).toHaveTextContent('Editar');
     expect(screen.getByTestId('company-detail-delete')).toHaveTextContent('Dar de baja');
+  });
+
+  it('R31, R34: con tab=historial y page=2 monta el historial de esa pagina con su esqueleto mientras carga', async () => {
+    const arbol = await invocar(ID, { tab: 'historial', page: '2' });
+    const limite = buscar(arbol, Suspense);
+    expect(isValidElement(limite.props.fallback) && limite.props.fallback.type).toBe(
+      CompanyHistorySkeleton,
+    );
+    expect(buscar(arbol, CompanyHistoryPanel).props).toEqual({ companyId: ID, page: 2 });
+  });
+
+  it('R31: fuera de la pestaña Historial no se pide el historial', async () => {
+    await pintar({ tab: 'datos', page: '2' });
+    expect(listCompanyEventsActionMock).not.toHaveBeenCalled();
   });
 });

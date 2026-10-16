@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { ErrorState } from '@/components/shared/error-state';
 import { PageHeader } from '@/components/shared/page-header';
@@ -20,6 +21,8 @@ import {
   COMPANY_DETAIL_TAB_LABELS,
   CompanyDataPanel,
   CompanyDetailHeader,
+  CompanyHistoryPanel,
+  CompanyHistorySkeleton,
   companyDetailPanelTestId,
   companyDetailTabItems,
   isCompanyId,
@@ -91,7 +94,7 @@ export default async function MaestroEmpresaPage({
 
   const company = result.data;
   const canModify = await canModifyCompanies();
-  const { tab } = parseCompanyDetailParams(query);
+  const { tab, historyPage } = parseCompanyDetailParams(query);
 
   return (
     <PageShell>
@@ -109,6 +112,11 @@ export default async function MaestroEmpresaPage({
         className="min-w-0"
       >
         {tab === 'datos' ? <CompanyDataPanel company={company} /> : null}
+        {tab === 'historial' ? (
+          <Suspense key={historyPage} fallback={<CompanyHistorySkeleton />}>
+            <CompanyHistoryPanel companyId={company.id} page={historyPage} />
+          </Suspense>
+        ) : null}
         {/* Módulos se deja vacía: su contenido se monta aquí y es quien pedirá los añadidos. */}
       </div>
     </PageShell>
