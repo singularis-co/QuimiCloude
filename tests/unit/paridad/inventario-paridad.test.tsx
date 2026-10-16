@@ -100,6 +100,15 @@ vi.mock('@/lib/modules/inventario/adapters/driving/batch-actions', () => ({
   adjustBatchStockAction: vi.fn(),
 }));
 
+// 2026-10-16: el barrel de la ruta exporta el sheet de entrega sin pedido, que importa las actions
+// de pedidos; sin este doble se cargaria la composicion real.
+vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
+  getDirectDeliveryAction: vi.fn(),
+  deliverDirectAction: vi.fn(),
+  listDirectDeliverySurplusAction: vi.fn(),
+  searchOrderCustomersAction: vi.fn(),
+}));
+
 const UNIDAD = {
   id: '11111111-1111-4111-8111-111111111111',
   name: 'Litro',

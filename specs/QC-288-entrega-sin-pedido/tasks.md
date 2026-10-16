@@ -206,7 +206,7 @@ de `pedidos-ui` incluidos, y hay commit `refactor(QC-288): sube los bloques de e
 
 ---
 
-## [ ] F2 — Sheet «Entregar sin pedido» y borrador (depende de F1 y T0)
+## [x] F2 — Sheet «Entregar sin pedido» y borrador (depende de F1 y T0)
 
 - `app/(private)/inventario/components/direct-delivery-sheet.tsx`, `direct-delivery-surplus-card.tsx`,
   `direct-delivery-draft.ts` y `use-direct-delivery-draft.ts` (§7.2, §7.3), contra las actions

@@ -1,6 +1,8 @@
 // La regla pura de la entrega sin pedido: lo que esperan los pedidos, el excedente, la nota y el
-// tope. La comparten el sheet y el servidor; el caso que lo comprueba en sus fuentes llega con el
-// sheet.
+// tope. La comparten el sheet y el servidor, y el ultimo bloque lo comprueba en sus fuentes.
+
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -204,6 +206,50 @@ describe('checkDirectDelivery: el tope (R23)', () => {
     const allocations = directAllocations(PRODUCT, [{ batchId: 'batch-x', packages: 1 }])
     expect(checkDirectDelivery(12, BATCHES, allocations)).toEqual({ kind: 'exceeds_batch', batchIds: ['batch-x'] })
   })
+})
+
+const SHEET_PATH = 'app/(private)/inventario/components/direct-delivery-sheet.tsx'
+
+/** Las reglas que el sheet y el servidor deben tomar del barrel de `pedidos`, no reescribir. */
+const SHARED_RULES = [
+  'checkDirectDelivery',
+  'checkDeliveryBlocks',
+  'flattenBlocks',
+  'packagesLeftInBatch',
+  'batchesOverAvailable',
+  'normalizeDeliveryNote',
+] as const
+
+function sourceWithoutComments(path: string): string {
+  return readFileSync(join(process.cwd(), path), 'utf8')
+    .split('\n')
+    .filter((text) => {
+      const trimmed = text.trim()
+      return !(trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*'))
+    })
+    .join('\n')
+}
+
+function importedFromPedidos(source: string): string {
+  const match = /import\s*\{([^}]*)\}\s*from\s*'@\/lib\/modules\/pedidos'/.exec(source)
+  return match?.[1] ?? ''
+}
+
+describe('las mismas funciones puras en el sheet y en el servidor (R23)', () => {
+  it('R23: el sheet importa del barrel de pedidos cada regla, la llama y no la redefine', () => {
+    const source = sourceWithoutComments(SHEET_PATH)
+    const imported = importedFromPedidos(source)
+
+    for (const rule of SHARED_RULES) {
+      expect(imported, `el sheet debe importar ${rule} de @/lib/modules/pedidos`).toMatch(new RegExp(`\\b${rule}\\b`))
+      expect(source, `el sheet debe llamar a ${rule}`).toMatch(new RegExp(`\\b${rule}\\(`))
+      expect(source, `el sheet no debe redefinir ${rule}`).not.toMatch(
+        new RegExp(`(function\\s+${rule}\\b|const\\s+${rule}\\s*=)`),
+      )
+    }
+  })
+
+  it.todo('R23: deliver-direct.ts usa checkDirectDelivery y checkDeliveryBlocks del dominio (llega con B4, hoy es el stub de T0)')
 })
 
 describe('el tope de productos por peticion del listado', () => {

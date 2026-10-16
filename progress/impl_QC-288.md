@@ -120,3 +120,38 @@ Veredicto: F1 hecha; las tres piezas viven en `shared` con la misma API y el gat
   solitario pasa (`22 passed`): intermitente por carga.
 
 Veredicto: F5 hecha; historial y movimientos muestran la entrega sin pedido y su anulación.
+
+## F2 — Sheet «Entregar sin pedido» y borrador (frontend_dev, 2026-10-16)
+
+### Archivos
+- Nuevos: `app/(private)/inventario/components/direct-delivery-sheet.tsx`,
+  `direct-delivery-surplus-card.tsx`, `direct-delivery-draft.ts`, `use-direct-delivery-draft.ts`.
+- `app/(private)/inventario/components/index.ts`: los cuatro, con sus test ids.
+- Tests nuevos: `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx`,
+  `direct-delivery-surplus-card.test.tsx`, `direct-delivery-draft.test.ts`.
+- `tests/unit/pedidos/direct-delivery.test.ts`: bloque de fuentes de R23.
+- `tests/unit/inventario/product-page.test.tsx` y `tests/unit/paridad/inventario-paridad.test.tsx`: doble
+  de `order-actions` con nota fechada (el barrel ahora exporta el sheet, que importa esas actions; sin el
+  doble se cargaba la composición real y el archivo no arrancaba). Sin cambio de aserciones.
+- Sin `filter(`/`toFixed(`/`orderBy` en los archivos nuevos (`product-route-contract.test.ts` en verde).
+
+### R → test
+- R10, R11 → `direct-delivery-surplus-card.test.tsx` (desglose, desplegable, 4 casos de la marca) y
+  `direct-delivery-sheet.test.tsx` (`R10`, `R11: el contador suma…`).
+- R12–R22 → `direct-delivery-sheet.test.tsx` (un caso o más por requisito, con su `R<n>` en el nombre);
+  payload exacto en `R22: envia una sola entrega…` contra `deliverDirectInput()` y `R22: … nota en null`.
+- R23 → `tests/unit/pedidos/direct-delivery.test.ts` (`R23: el sheet importa del barrel de pedidos cada
+  regla, la llama y no la redefine`). **Mitad del servidor pendiente:** `deliver-direct.ts` sigue siendo el
+  stub de T0, así que el caso queda como `it.todo` hasta B4.
+- R24–R26 → `direct-delivery-sheet.test.tsx` (`describe('despues de enviar')`).
+- R27, R28 → `direct-delivery-draft.test.ts` y `direct-delivery-sheet.test.tsx` (`describe('borrador')`).
+
+### Gate (salida real)
+- `pnpm run typecheck`: verde (un rojo intermedio era de `finished-product-route-contract.test.ts`, de F4,
+  y se resolvió solo).
+- `pnpm run lint`: 0 errores, 9 avisos, ninguno en archivos de F2.
+- `pnpm exec vitest related --run <archivos de F2 + product-route-contract + los dos tests ajustados>`:
+  `Test Files 37 passed (37)`, `Tests 631 passed | 1 todo (632)`.
+- `pnpm exec vitest run guard`: `79 passed | 1 failed`. El rojo es
+  `guard-formularios-y-acciones` R28 sobre
+  `producto-terminado/[id]/components/finished-product-deliveries-table.tsx:103`, archivo de F4 en curso.
