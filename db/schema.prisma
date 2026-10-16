@@ -428,6 +428,8 @@ enum InventoryMovementKind {
   production
   delivery
   delivery_void
+  direct_delivery
+  direct_delivery_void
 }
 
 /// Un asiento no se corrige: se corrige con otro. Sin `updatedAt` ni `deletedAt`, a proposito.
@@ -860,21 +862,25 @@ model OrderPresentationLine {
   @@map("order_presentation_lines")
 }
 
-/// Una entrega del producto terminado de un pedido, a uno o varios clientes: el cliente va en cada
-/// linea, no aqui. Solo de insercion: sin `updatedAt` ni `deletedAt`. `deliveryKey` la hace
-/// idempotente por empresa. `createdBy` y `companyId` no llevan `@relation`: `User` y `Company` son
-/// de otros modulos; sus FK estan escritas a mano y son drift, y la del autor es compuesta con
-/// `companyId`. La FK de `order` tambien es compuesta en la base (`(order_id, company_id)`).
+/// Una entrega de producto terminado, a uno o varios clientes: el cliente va en cada linea, no
+/// aqui. Es de un pedido (`orderId`) o de un producto sin pedido (`productId`), nunca de los dos;
+/// solo la que no tiene pedido lleva `note`. Solo de insercion: sin `updatedAt` ni `deletedAt`.
+/// `deliveryKey` la hace idempotente por empresa. `createdBy`, `companyId` y `productId` no llevan
+/// `@relation`: `User`, `Company` y `Product` son de otros modulos; sus FK estan escritas a mano y
+/// son drift, y las del autor y del producto son compuestas con `companyId`. La FK de `order`
+/// tambien es compuesta en la base (`(order_id, company_id)`). Los CHECK son drift.
 /// @module pedidos
 model OrderDelivery {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId   String   @map("company_id") @db.Uuid
-  orderId     String   @map("order_id") @db.Uuid
+  orderId     String?  @map("order_id") @db.Uuid
+  productId   String?  @map("product_id") @db.Uuid
+  note        String?
   deliveryKey String   @map("delivery_key") @db.Uuid
   createdBy   String   @map("created_by") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  order Order               @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  order Order?              @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   lines OrderDeliveryLine[]
   voids OrderDeliveryVoid[]
 
@@ -882,27 +888,29 @@ model OrderDelivery {
   @@unique([companyId, deliveryKey], map: "order_deliveries_company_key_unique")
   @@index([orderId], map: "order_deliveries_order_id_idx")
   @@index([createdBy], map: "order_deliveries_created_by_idx")
+  @@index([companyId, productId], map: "order_deliveries_product_id_idx")
   @@map("order_deliveries")
 }
 
-/// Un lote dentro de una entrega para un cliente: cuantos envases salen de el para una linea del
-/// reparto y su cantidad. Solo de insercion. `customerId` y `batchId` no llevan `@relation`:
-/// `Customer` es de `clientes` y `ProductBatch` de `inventario`; sus FK son compuestas con
-/// `companyId`, escritas a mano y drift. Las FK de `delivery` y `presentationLine` tambien son
-/// compuestas en la base. Los CHECK de positivos son drift.
+/// Un lote dentro de una entrega para un cliente: cuantos envases salen de el y su cantidad. La de
+/// una entrega de pedido lleva su linea del reparto; la de una entrega sin pedido no, y su lote es
+/// del producto de la entrega (disparador, drift). Solo de insercion. `customerId` y `batchId` no
+/// llevan `@relation`: `Customer` es de `clientes` y `ProductBatch` de `inventario`; sus FK son
+/// compuestas con `companyId`, escritas a mano y drift. Las FK de `delivery` y `presentationLine`
+/// tambien son compuestas en la base. Los CHECK de positivos son drift.
 /// @module pedidos
 model OrderDeliveryLine {
   id                      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId               String  @map("company_id") @db.Uuid
   deliveryId              String  @map("delivery_id") @db.Uuid
   customerId              String  @map("customer_id") @db.Uuid
-  orderPresentationLineId String  @map("order_presentation_line_id") @db.Uuid
+  orderPresentationLineId String? @map("order_presentation_line_id") @db.Uuid
   batchId                 String  @map("batch_id") @db.Uuid
   packages                Int
   quantity                Decimal @db.Decimal(14, 4)
 
   delivery         OrderDelivery         @relation(fields: [deliveryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  presentationLine OrderPresentationLine @relation(fields: [orderPresentationLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  presentationLine OrderPresentationLine? @relation(fields: [orderPresentationLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   voidLine         OrderDeliveryVoidLine?
 
   @@unique([deliveryId, customerId, batchId], map: "order_delivery_lines_delivery_customer_batch_unique")

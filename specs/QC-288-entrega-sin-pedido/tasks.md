@@ -65,7 +65,7 @@ commit `feat(QC-288): publica el contrato de la entrega sin pedido`.
 
 ---
 
-## [ ] B1 — Migraciones y esquema (depende de T0)
+## [x] B1 — Migraciones y esquema (depende de T0)
 
 - `db/migrations/<ts>_inventory_movement_kind_direct_delivery/` y `<ts>_direct_deliveries/`, con
   `migration.sql` y `down.sql` (`design.md > 1.1`, `1.2`).

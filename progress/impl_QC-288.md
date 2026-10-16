@@ -155,3 +155,106 @@ Veredicto: F5 hecha; historial y movimientos muestran la entrega sin pedido y su
 - `pnpm exec vitest run guard`: `79 passed | 1 failed`. El rojo es
   `guard-formularios-y-acciones` R28 sobre
   `producto-terminado/[id]/components/finished-product-deliveries-table.tsx:103`, archivo de F4 en curso.
+
+## B1 — Migraciones y esquema (2026-10-16)
+
+Grafo: sin proyecto para este worktree; Grep/Read.
+
+### Comprobaciones previas (§1.2), contra una copia de la plantilla de test (`qct_tpl_b2687cf7fda6`, PG 16.1)
+- Los cinco CHECK que se reescriben tienen hoy exactamente el texto de referencia (QC-224 §3.2):
+  `order_delivery_id_matches_kind` = `kind::text = 'delivery'`, `delivery_quantity_negative`,
+  `order_delivery_void_id_matches_kind`, `delivery_void_quantity_positive` y
+  `reason_matches_kind` (con `delivery_void`). Ninguna migración posterior los reescribió.
+- `products_company_id_id_key` = `UNIQUE (company_id, id)`.
+- Los índices parciales `inventory_movements_one_delivery_per_batch` y `..._one_delivery_void_per_batch`
+  tienen predicado `IS NOT NULL` sobre la columna: cubren los tipos nuevos sin cambio.
+- El único dependiente del tipo `InventoryMovementKind` es `inventory_movements.kind`; los CHECK y el
+  índice que usan el literal tipado son los mismos que suelta el molde de `delivery_void/down.sql`.
+- `[POR VERIFICAR]` de §1.1 cerrado: dos `ADD VALUE` en el mismo archivo los aplica `prisma migrate
+  deploy` sin error (una sola migración).
+- Ninguna diferencia cambia el diseño. Dos añadidos menores al SQL de referencia:
+  1. el disparador de líneas devuelve `NEW` si no encuentra la entrega de esa empresa (`IF NOT FOUND`),
+     para que la FK siga rechazando con 23503 la línea de otra empresa (lo esperan las suites de QC-223);
+     el de asientos filtra también por `company_id` y solo compara si encontró la fila;
+  2. el `down.sql` de `direct_deliveries` aborta también si hay asientos de los tipos nuevos (R42 lo
+     nombra), y abre/cierra el paréntesis de RLS como `order_delivery_lines_customer/down.sql`.
+
+### Archivos
+Nuevos:
+- `db/migrations/20261016130000_inventory_movement_kind_direct_delivery/{migration,down}.sql`
+- `db/migrations/20261016130100_direct_deliveries/{migration,down}.sql`
+- `tests/unit/pedidos/schema/direct-deliveries-migration.test.ts`
+- `tests/integration/pedidos/direct-deliveries-migration.int.test.ts` (esquema de usar y tirar con copia
+  propia del enum, `commit`)
+- `tests/integration/pedidos/direct-delivery-constraints.int.test.ts` (`transaccion`)
+
+Modificados:
+- `db/schema.prisma` (§1.3; sin `prisma format`, que reflowaba modelos ajenos) + `prisma generate`.
+- `lib/modules/inventario/domain/inventory-movement.ts`: `NewInventoryMovement['kind']` =
+  `InventoryMovementView['kind']` (gana los dos tipos).
+- `lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma.ts` (`sumOrderDeliveredPackages`)
+  y `order-delivery-void-prisma.ts` (`listOrderDeliveryHistory`): saltan la línea sin línea del reparto,
+  que en una entrega de pedido no puede existir; lo exige el tipo anulable.
+- Censos, con nota fechada 2026-10-16 y aserciones previas intactas:
+  `tests/guards/guard-identificador-de-request.test.ts` (`MIGRACIONES_ESPERADAS` + 2),
+  `tests/unit/inventario/schema/inventario-schema.test.ts` (caso nuevo del enum),
+  `tests/unit/inventario/schema/finished-product-enum-values-migration.test.ts` (el censo exacto del enum
+  vive aquí: + 2 valores al final), `tests/unit/pedidos/schema/pedidos-schema.test.ts` (caso nuevo:
+  `orderId?`, `productId?` sin `@relation`, `note?`, línea del reparto anulable),
+  `tests/integration/aislamiento.json` (+ las dos suites nuevas).
+- Sin cambio, verificado: `tests/unit/clientes/scope.test.ts` (la migración no toca `customers`); no hay
+  censo de migraciones que tocan `products` en `tests/unit/inventario/*`; `customers-migration.int.test.ts`
+  no arrastra la migración nueva (no referencia `customers` ni tablas de sus dependientes).
+- `specs/QC-288-entrega-sin-pedido/tasks.md`: B1 `[x]`.
+
+### R → test
+- R40 → `tests/integration/pedidos/direct-delivery-constraints.int.test.ts` (9 casos `R40`/`R41`: XOR,
+  nota, producto de otra empresa, líneas, `direct_delivery`, `direct_delivery_void`, empresa B) +
+  `order-delivery-constraints.int.test.ts` y `order-delivery-void-constraints.int.test.ts` sin cambio, en
+  verde; estático en `tests/unit/pedidos/schema/direct-deliveries-migration.test.ts` (`R40: …`).
+- R41 → `direct-deliveries-migration.test.ts` (`R41: no crea tablas ni updated_at/deleted_at`,
+  `R41: … nombre en ingles`, `R41: el UP solo anade los dos valores`), `pedidos-schema.test.ts`
+  (`QC-288 R40, R41`), `inventario-schema.test.ts` (`R41: InventoryMovementKind …`),
+  `direct-delivery-constraints.int.test.ts` (`R41: … RLS … sin updated_at ni deleted_at`).
+- R42 → `tests/integration/pedidos/direct-deliveries-migration.int.test.ts` (UP intacto sobre entregas
+  con anulaciones; DOWN sin entregas sin pedido deja el esquema previo y el UP lo repone; DOWN abortado
+  con una entrega sin pedido; DOWN de las dos abortado con asientos `direct_delivery(_void)`) + los casos
+  `R42` del estático.
+
+### Reversión con `pnpm run db:rollback` (base de test, nunca la de desarrollo)
+Copia `qc288_b1_scratch` de la plantilla, `prisma migrate deploy` (2 migraciones), dos
+`db:rollback` (el segundo desde un cwd con `db/migrations` sin la carpeta ya revertida, porque el script
+revierte la última carpeta del disco). Huella del esquema (restricciones, índices, columnas,
+disparadores, funciones y enum de `public`): plantilla `93162223…` (958 objetos) → migrada `87ae9dfd…`
+(968) → tras los dos rollbacks `93162223…` (958), y 0 filas de las dos en `_prisma_migrations`. Base
+borrada al terminar.
+
+### Gate (salida real)
+Entorno: sin `.env` en el worktree; `DATABASE_URL`, `DIRECT_URL` y `SEED_*` exportadas solo en el
+comando desde el `.env` del repo principal (el sembrado de la plantilla nueva pide `SEED_*`).
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 9 problems (0 errors, 9 warnings)`, los 9 previos y ajenos.
+- `pnpm exec vitest run guard`: `Test Files 80 passed (80)`, `Tests 1096 passed | 20 skipped (1116)`.
+- `pnpm exec vitest run tests/unit/pedidos/schema/ tests/unit/inventario/schema/ tests/unit/clientes/scope.test.ts`:
+  `Test Files 38 passed (38)`, `Tests 522 passed (522)`.
+- Integración (base efímera `qct_qc288_…`, plantilla `qct_tpl_8f650250810d`): las tres suites nuevas +
+  `order-delivery-constraints` + `order-delivery-void-constraints` + `customers-migration` +
+  `order-delivery-lines-customer-migration`: `Test Files 6 passed (6)`, `Tests 50 passed (50)`.
+- `pnpm exec vitest related --run <2 adaptadores + 9 tests tocados>`: `Test Files 2 failed | 392 passed (395)`,
+  `Tests 2 failed | 6556 passed | 2 skipped`, 1 worker caído (presión de disco/memoria, ver abajo). Los dos
+  rojos NO son de B1 y no están en `tests/baseline-rojos.json`: vienen de T0 (`c5277de2`), que añadió campos
+  al contrato sin tocar estas expectativas de integración:
+  - `tests/integration/inventario/finished-product-detail.int.test.ts` (R19, R43, R44): la fila trae
+    `note: null` y `withoutOrder: false` (`inventario/domain/list-finished-product-deliveries.ts:98`).
+  - `tests/integration/pedidos/order-delivery-void-repository.int.test.ts` (R18): `findDelivery` trae
+    `createdAt` y `productId: null` (`order-delivery-void-prisma.ts`, `findDeliveryForVoid`).
+  Los tocan B2 y B3 (sus adaptadores), no se corrigen aquí.
+- `related` sobre `inventory-movement.ts` no se completó: el tipo está detrás del barrel de `inventario` y
+  su conjunto es casi la suite entera (cortado a los 15 min). Su cambio es solo de tipo; lo cubre
+  `typecheck`.
+- Incidencia de entorno: con el disco C: al 100 % (3 GB libres) el Postgres local se interrumpió a las
+  15:04 y tardó ~20 min en recuperar (fsync de ~98 bases). Nada de B1 lo causó; la corrida de `related`
+  se repitió entera tras la recuperación.
+
+Veredicto: B1 hecha; las dos migraciones aplican y revierten limpias, R40–R42 tienen test en verde y el
+gate de la tanda está verde salvo dos rojos heredados de T0.

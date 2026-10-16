@@ -152,13 +152,20 @@ async function listOrderDeliveryHistory(
     id: row.id,
     createdBy: row.createdBy,
     createdAt: row.createdAt,
-    lines: row.lines.map((line) => ({
-      customerId: line.customerId,
-      presentationLineId: line.orderPresentationLineId,
-      batchId: line.batchId,
-      packages: line.packages,
-      void: line.voidLine === null ? null : line.voidLine.void,
-    })),
+    // Las lineas de una entrega de pedido siempre tienen linea del reparto: el disparador lo exige.
+    lines: row.lines.flatMap((line) =>
+      line.orderPresentationLineId === null
+        ? []
+        : [
+            {
+              customerId: line.customerId,
+              presentationLineId: line.orderPresentationLineId,
+              batchId: line.batchId,
+              packages: line.packages,
+              void: line.voidLine === null ? null : line.voidLine.void,
+            },
+          ],
+    ),
   }));
 }
 
