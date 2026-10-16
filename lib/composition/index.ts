@@ -334,6 +334,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
+  findCustomerIdsForMovements,
   listDeliveryLinesByBatchIds,
   summarizeDeliveredByBatchIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
@@ -1067,10 +1068,7 @@ const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
   summarizeDelivered: summarizeDeliveredByBatchIds,
 };
 
-// Doble hasta que exista el adaptador de `pedidos`.
-const deliveryCustomerDirectory: DeliveryCustomerDirectory = {
-  findCustomerIds: async () => new Map<string, readonly string[]>(),
-};
+const deliveryCustomerDirectory: DeliveryCustomerDirectory = { findCustomerIds: findCustomerIdsForMovements };
 
 const finishedDistributionDirectory: FinishedDistributionDirectory = {
   listPackedLines: listPackedLinesByCombination,

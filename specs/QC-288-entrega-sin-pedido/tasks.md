@@ -168,7 +168,7 @@ Cubre: R2, R3, R4, R8, R29–R39, R47–R51.
 
 ---
 
-## [ ] B5 — Actions, composición y lecturas de `inventario` (depende de B4)
+## [x] B5 — Actions, composición y lecturas de `inventario` (depende de B4)
 
 - `lib/modules/pedidos/adapters/driving/order-actions.ts`: el cuerpo real de las cinco actions.
 - `lib/composition/index.ts`: atado real (§6).

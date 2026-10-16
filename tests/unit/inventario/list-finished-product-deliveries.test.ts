@@ -347,4 +347,69 @@ describe('listFinishedProductDeliveries', () => {
     expect(pagina.items.map((item) => item.void)).toEqual([null, { reason: FINISHED_VOID_REASON }]);
     expect(pagina.delivered).toEqual(ENTREGADO);
   });
+
+  // 2026-10-16 (QC-288): las entregas sin pedido entran en el mismo tab.
+  describe('entregas sin pedido', () => {
+    const SIN_PEDIDO = linea({
+      id: '30000000-0000-4000-8000-000000000288',
+      orderDeliveryId: '20000000-0000-4000-8000-000000000288',
+      orderId: null,
+      note: 'Muestra para feria',
+      customerId: OTRO_CLIENTE,
+      batchId: GALLON_BATCH_ID,
+      packages: 2,
+      quantity: '8.0000',
+    });
+
+    it('R52: la fila sin pedido sale con withoutOrder, su nota y sin numero, mezclada en su sitio con las de pedido', async () => {
+      const m = montar({ items: [linea(), SIN_PEDIDO, LINEA_ANULADA], clientes: [ANA, BRUNO] });
+
+      const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+      expect(pagina.items.map((item) => item.deliveryLineId)).toEqual([
+        linea().id,
+        SIN_PEDIDO.id,
+        LINEA_ANULADA.id,
+      ]);
+      expect(pagina.items[1]).toMatchObject({
+        withoutOrder: true,
+        note: 'Muestra para feria',
+        orderNumberText: null,
+        customer: BRUNO,
+        lot: 'L-2026-0226',
+        packages: 2,
+        quantity: '8.0000',
+      });
+      expect(pagina.items[0]).toMatchObject({ withoutOrder: false, note: null, orderNumberText: FINISHED_ORDER_NUMBER });
+    });
+
+    it('R52: solo se piden numeros para los orderId no nulos', async () => {
+      const m = montar({ items: [linea(), SIN_PEDIDO], clientes: [ANA, BRUNO] });
+
+      await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+      expect(m.orders.findNumberTexts).toHaveBeenCalledTimes(1);
+      expect(m.orders.findNumberTexts).toHaveBeenCalledWith(EMPRESA, [FINISHED_ORDER_ID]);
+    });
+
+    it('R52: una pagina solo de entregas sin pedido no llama al directorio de pedidos', async () => {
+      const m = montar({ items: [SIN_PEDIDO], clientes: [BRUNO] });
+
+      const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+      expect(m.orders.findNumberTexts).not.toHaveBeenCalled();
+      expect(pagina.items).toHaveLength(1);
+      expect(pagina.items[0]).toMatchObject({ withoutOrder: true, orderNumberText: null });
+    });
+
+    it('R53: el total entregado es el del directorio sobre todos los lotes, con solo inventario.consultar', async () => {
+      const m = montar({ items: [SIN_PEDIDO], clientes: [BRUNO] });
+
+      const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+      expect(LECTOR.permissions).toEqual(['inventario.consultar']);
+      expect(m.deliveries.summarizeDelivered).toHaveBeenCalledWith(EMPRESA, TODOS_LOS_LOTES);
+      expect(pagina.delivered).toBe(ENTREGADO);
+    });
+  });
 });

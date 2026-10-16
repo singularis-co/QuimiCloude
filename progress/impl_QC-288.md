@@ -547,3 +547,46 @@ Entorno: `DATABASE_URL`, `DIRECT_URL` y `SEED_*` exportadas solo en el comando d
 - `vitest related` no se corrió: los archivos cuelgan de `lib/composition` (conjunto casi entero) y el disco C: está al 98 %.
 
 Veredicto: B4 hecha; los cinco casos de uso, con el paso 0 y sus transacciones, tienen R2–R4, R8, R29–R39 y R47–R51 en verde.
+
+## B5 — Actions, composición y lecturas de `inventario` (2026-10-16)
+
+Grafo: sin proyecto para este worktree; Grep/Read.
+
+### Archivos
+Producción:
+- `lib/modules/pedidos/adapters/driving/order-actions.ts`: **sin cambio**. Las cinco actions ya tenían su cuerpo
+  real desde T0 (actor con `currentActor()` una vez, `pedidos.<caso>`, `toErrorState`); B5 solo lo verifica con el censo.
+- `lib/composition/index.ts`: `deliveryCustomerDirectory` deja de ser un doble y se ata a
+  `findCustomerIdsForMovements` (B3). Dos líneas; el resto del atado de §6 ya lo hizo B4. No quedan dobles de QC-288.
+- `lib/modules/inventario/domain/list-batch-movements.ts`: refs solo de `direct_delivery` (entrega) y
+  `direct_delivery_void` (solo la anulación), una llamada a `deliveryCustomers` en el mismo `Promise.all` que autores y
+  pedidos (ninguna si no hay refs) y luego una a `customers.findRefsIncludingDeleted` (ninguna sin ids). Nombres
+  `nombres apellidos`, orden `localeCompare('es')`; el id que no vuelve sale tal cual. Salida campo a campo: las
+  referencias `orderDeliveryId`/`orderDeliveryVoidId` ya no se filtran por el spread (nota de B2).
+- `lib/modules/inventario/domain/list-finished-product-deliveries.ts`: **sin cambio**; `withoutOrder`, `note` y los números
+  solo para `orderId` no nulo ya estaban (T0/B3). B5 añade sus pruebas.
+
+Tests:
+- Nuevo u `tests/unit/inventario/list-batch-movements.test.ts` (6 casos R54).
+- u `list-finished-product-deliveries.test.ts`: + bloque «entregas sin pedido» (3 R52, 1 R53), nota fechada.
+- u `tests/unit/identity/session-once-per-request-actions.test.ts`: `ACCIONES` + las cinco actions, nota fechada.
+
+### R → test
+- R52 → u `list-finished-product-deliveries` («R52: la fila sin pedido sale con withoutOrder, su nota…», «R52: solo se
+  piden numeros para los orderId no nulos», «R52: una pagina solo de entregas sin pedido no llama al directorio…»).
+- R53 → u `list-finished-product-deliveries` («R53: el total entregado es el del directorio sobre todos los lotes…»).
+- R54 (dominio) → u `list-batch-movements` (6 casos «R54: …»); adaptador ya en int `order-delivery-directory` (B3).
+
+### Gate (salida real)
+Entorno: `DATABASE_URL`, `DIRECT_URL` y `SEED_*` exportadas solo en el comando desde el `.env` del repo principal.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 9 problems (0 errors, 9 warnings)`, los 9 previos y ajenos; los archivos de B5, limpios.
+- Unitarios: `list-batch-movements`, `list-finished-product-deliveries`, `session-once-per-request-actions`,
+  `pedidos/order-actions`, `adjust-batch-stock`, `inventario/authorization`: `Test Files 6 passed (6)`, `Tests 233 passed (233)`.
+- Integración: `direct-delivery`, `direct-delivery-concurrency`, `direct-delivery-void`, `direct-delivery-void-concurrency`,
+  `order-delivery-directory`: `Test Files 5 passed (5)`, `Tests 51 passed (51)`.
+- `pnpm exec vitest run guard`: `Test Files 1 failed | 79 passed (80)`, `Tests 1 failed | 1098 passed | 20 skipped`; el
+  rojo es el conocido `guard-formularios-y-acciones` R28 de F4 sin commit.
+- `vitest related` no se corrió sobre `lib/composition/index.ts` (conjunto = suite entera; disco C: casi lleno).
+
+Veredicto: B5 hecha; composición sin dobles y R52–R54 de dominio en verde; los censos de TC siguen igual.

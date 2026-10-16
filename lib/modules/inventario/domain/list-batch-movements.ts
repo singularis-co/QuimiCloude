@@ -90,16 +90,49 @@ export function createListBatchMovements(
       ),
     ];
 
-    const [refs, orderNumbers] = await Promise.all([
+    type DeliveryRef = Parameters<DeliveryCustomerDirectory['findCustomerIds']>[1][number];
+    const deliveryRefs = movements.flatMap((movement): DeliveryRef[] => {
+      if (movement.kind === 'direct_delivery') {
+        return [{ movementId: movement.id, batchId, deliveryId: movement.orderDeliveryId ?? null, voidId: null }];
+      }
+      if (movement.kind === 'direct_delivery_void') {
+        return [{ movementId: movement.id, batchId, deliveryId: null, voidId: movement.orderDeliveryVoidId ?? null }];
+      }
+      return [];
+    });
+
+    const [refs, orderNumbers, customerIdsByMovement] = await Promise.all([
       deps.people.findRefsIncludingDeletedInCompany(actor.companyId, authorIds, now),
       orderIds.length === 0
         ? Promise.resolve(new Map<string, string>())
         : deps.orders.findNumberTexts(actor.companyId, orderIds),
+      deliveryRefs.length === 0
+        ? Promise.resolve(new Map<string, readonly string[]>())
+        : deps.deliveryCustomers.findCustomerIds(actor.companyId, deliveryRefs),
     ]);
     const displayNames = new Map(refs.map((ref) => [ref.id, ref.displayName] as const));
 
+    const customerIds = [...new Set([...customerIdsByMovement.values()].flat())];
+    const customers =
+      customerIds.length === 0 ? [] : await deps.customers.findRefsIncludingDeleted(customerIds, actor.companyId);
+    const customerNames = new Map(
+      customers.map((customer) => [customer.id, `${customer.firstNames} ${customer.lastNames}`] as const),
+    );
+
+    const namesOf = (movementId: string): readonly string[] =>
+      (customerIdsByMovement.get(movementId) ?? [])
+        .map((id) => customerNames.get(id) ?? id)
+        .sort((a, b) => a.localeCompare(b, 'es'));
+
+    // Campo a campo: las referencias a la entrega son de la persistencia y no salen del caso de uso.
     return movements.map((movement) => ({
-      ...movement,
+      id: movement.id,
+      kind: movement.kind,
+      quantity: movement.quantity,
+      reason: movement.reason,
+      createdAt: movement.createdAt,
+      previousStock: movement.previousStock,
+      countedStock: movement.countedStock,
       authorName:
         movement.authorName === null
           ? null
@@ -108,6 +141,8 @@ export function createListBatchMovements(
         movement.orderNumberText === null
           ? null
           : (orderNumbers.get(movement.orderNumberText) ?? movement.orderNumberText),
+      customerNames:
+        movement.kind === 'direct_delivery' || movement.kind === 'direct_delivery_void' ? namesOf(movement.id) : null,
     }));
   };
 }
