@@ -57,3 +57,33 @@ Modificados (tests, nota fechada 2026-10-16): `tests/unit/errores/catalogo.test.
 - `pnpm exec vitest run guard`: `Test Files 80 passed (80)`, `Tests 1096 passed | 20 skipped (1116)`.
 
 Veredicto: contrato de T0 publicado y gate de la tanda en verde; paso 0 confirmado para B4.
+
+## F1 — Subir los bloques de entrega a `components/shared` (frontend_dev, 2026-10-16)
+
+### Archivos
+- Movidos con `git mv`, misma API (§7.1): `components/shared/order-customer-label.ts`,
+  `components/shared/order-customer-picker.tsx`, `components/shared/order-delivery-customer-block.tsx`
+  (dentro, sus imports relativos pasan a `@/components/shared/…`).
+- `app/(private)/pedidos/components/index.ts`: reexporta las tres desde `@/components/shared/…`.
+- Imports `./…` → `@/components/shared/…` en `order-columns.tsx`, `order-customer-dialog.tsx`,
+  `order-customer-filter.tsx`, `order-delivery-sheet.tsx`, `order-form.tsx`, `order-list-section.tsx`,
+  `order-table.tsx` (sin cambio visual).
+- `components/shared/CATALOGO.md`: tres filas (`order-customer-label.ts`, `order-customer-picker.tsx`
+  con `EntregaSinPedido.dc.html`; `order-delivery-customer-block.tsx` con `EntregaVariosClientes.dc.html`
+  y `EntregaSinPedido.dc.html`). Ninguna tenía fila de origen con otro tablero.
+- Rutas en guardias, con nota fechada 2026-10-16 y sin tocar aserciones:
+  `tests/guards/guard-identificador-de-request.test.ts` (`SUPERFICIES_QUE_APLANAN`) y
+  `tests/guards/guard-piezas-base.test.ts` (`CONSTANTES_QUE_NO_SON_EL_PAR`).
+- Los tests de las tres piezas y del sheet de QC-282 importan por el barrel de `/pedidos`: no
+  necesitaron cambio. `guard-buscadores.test.ts` cita la ruta vieja solo en listas históricas de
+  QC-233 (R21/R4) y sigue verde: no se toca.
+
+### Gate (salida real)
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 9 problems (0 errors, 9 warnings)`, los 9 previos y ajenos.
+- `pnpm exec vitest run guard`: `Test Files 80 passed (80)`, `Tests 1096 passed | 20 skipped (1116)`
+  (incluye `guard-catalogo-de-componentes`).
+- `pnpm exec vitest run tests/unit/pedidos-ui`: `Test Files 54 passed (54)`, `Tests 1075 passed | 3 skipped`.
+- `pnpm exec vitest related --run <11 archivos tocados>`: `Test Files 67 passed (67)`, `Tests 1442 passed`.
+
+Veredicto: F1 hecha; las tres piezas viven en `shared` con la misma API y el gate de la tanda está en verde.

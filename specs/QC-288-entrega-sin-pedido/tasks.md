@@ -187,7 +187,7 @@ Cubre: R52, R53, R54 (dominio).
 
 ---
 
-## [ ] F1 — Subir los bloques de entrega a `components/shared` (depende de T0)
+## [x] F1 — Subir los bloques de entrega a `components/shared` (depende de T0)
 
 - Mueve a `components/shared/`, con la misma API (§7.1):
   - `app/(private)/pedidos/components/order-customer-label.ts`;

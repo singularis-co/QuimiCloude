@@ -889,7 +889,8 @@ export const SUPERFICIES_QUE_APLANAN: readonly SuperficieAplanada[] = [
       'no aplanar haria falta que ese contrato aceptara un ErrorState (Opcion A, descartada).',
   },
   {
-    archivo: 'app/(private)/pedidos/components/order-customer-picker.tsx',
+    // 2026-10-16 (QC-288 F1): solo cambia la ruta; el buscador subio a components/shared con la misma API.
+    archivo: 'components/shared/order-customer-picker.tsx',
     idioma: 'throw-new-error',
     ocurrencias: 1,
     motivo: 'mismo canal `error: string` de AsyncAutocomplete que product-name-picker.',

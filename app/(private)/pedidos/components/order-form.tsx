@@ -41,8 +41,8 @@ import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { BlockedOrderDialog } from './blocked-order-dialog';
 import { compatibleUnitIds } from './compatible-unit-ids';
 import { OrderCostQuote } from './order-cost-quote';
-import type { OrderCustomerChoice } from './order-customer-label';
-import { OrderCustomerPicker } from './order-customer-picker';
+import type { OrderCustomerChoice } from '@/components/shared/order-customer-label';
+import { OrderCustomerPicker } from '@/components/shared/order-customer-picker';
 import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
   ORDER_DISTRIBUTION_PACKAGING_FIELD,

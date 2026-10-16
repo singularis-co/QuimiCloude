@@ -11,7 +11,7 @@ import {
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
-import { orderCustomerLabel } from './order-customer-label';
+import { orderCustomerLabel } from '@/components/shared/order-customer-label';
 import {
   OrderProducedPresentations,
   type ProducedProductsByOrder,

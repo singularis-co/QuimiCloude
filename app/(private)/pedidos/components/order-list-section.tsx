@@ -20,7 +20,7 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
-import type { OrderCustomerChoice } from './order-customer-label';
+import type { OrderCustomerChoice } from '@/components/shared/order-customer-label';
 import { OrderListEmpty } from './order-list-empty';
 import {
   EMPTY_RESPONSIBLES_CATALOG,

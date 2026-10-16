@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { withFilter, type DataTableParams } from '@/components/shared/data-table';
 import { ORDER_CUSTOMER_PRESENCE_NONE } from '@/lib/modules/pedidos';
 
-import type { OrderCustomerChoice } from './order-customer-label';
-import { OrderCustomerPicker } from './order-customer-picker';
+import type { OrderCustomerChoice } from '@/components/shared/order-customer-label';
+import { OrderCustomerPicker } from '@/components/shared/order-customer-picker';
 import {
   CUSTOMER_COLUMN_ID,
   CUSTOMER_PRESENCE_COLUMN_ID,

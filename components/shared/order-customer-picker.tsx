@@ -12,7 +12,7 @@ import {
   orderCustomerChoiceId,
   orderCustomerChoiceLabel,
   type OrderCustomerChoice,
-} from './order-customer-label';
+} from '@/components/shared/order-customer-label';
 
 export const ORDER_CUSTOMER_PICKER_TESTID = 'order-customer-picker';
 
