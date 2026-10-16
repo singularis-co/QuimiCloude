@@ -247,20 +247,27 @@ function aggregateQuantityCell(
 }
 
 /** Encabezado de la columna de costo. Constante para que ningun test dependa del literal. */
-export const COST_COLUMN_LABEL = 'Costo';
+export const COST_COLUMN_LABEL = 'Costo unitario';
 
 /**
  * Celda de un costo unitario: el del producto (promedio ponderado de sus lotes con existencia y
  * costo) o el del lote. Se pinta como DINERO con `formatMoneyDisplay`: «$», separador de miles y
  * siempre dos decimales redondeados («$1,234.56», «$12.50»), sin pasar por coma flotante. Un costo
  * que a dos decimales se leeria «$0.00» (0.0020) no se pierde: el valor exacto queda en el `title`
- * (`exactDecimalTitle`), a un hover, como en las cantidades. Sin costo, el marcador de vacio.
+ * (`exactDecimalTitle`), a un hover, como en las cantidades. Con unidad conocida se lee «por
+ * unidad» («$2,500.00 / L»); sin ella -tampoco con una unidad que no esta en el catalogo, que
+ * `unitLabel` marca con el vacio-, el importe solo. Sin costo, el marcador de vacio.
  */
-function unitCostCell(value: string | null | undefined, testId: string): ReactNode {
+function unitCostCell(
+  value: string | null | undefined,
+  testId: string,
+  label: string | null,
+): ReactNode {
   if (value === undefined || value === null) return EMPTY_MARK;
+  const amount = formatMoneyDisplay(value);
   return (
     <span data-testid={testId} title={exactDecimalTitle(value)}>
-      {formatMoneyDisplay(value)}
+      {label === null || label === EMPTY_MARK ? amount : `${amount} / ${label}`}
     </span>
   );
 }
@@ -282,7 +289,7 @@ export type ProductColumnsDeps = {
    */
   readonly showType?: boolean;
   /**
-   * Anade la columna «Costo». Solo la ve el Administrador: la decide el Server Component con el
+   * Anade la columna «Costo unitario». Solo la ve el Administrador: la decide el Server Component con el
    * permiso de la sesion (`canViewUnitCosts`) y baja por props. Defecto `false`: falla cerrado,
    * como `canAdjust`. Presentacion, no autorizacion: quien deja de enviar el costo a quien no
    * debe verlo es el servidor.
@@ -330,20 +337,25 @@ const presentationColumn: ProductColumn = {
 };
 
 /**
- * Columna «Costo»: el promedio en la fila del producto y el propio en la del lote. No ordena ni
- * filtra: es un agregado de los lotes, no una columna de `products`.
+ * Columna «Costo unitario»: el promedio en la fila del producto y el propio en la del lote, los dos
+ * en la unidad del producto. No ordena ni filtra: es un agregado de los lotes, no una columna de
+ * `products`.
  */
-const costColumn: ProductColumn = {
-  id: 'averageUnitCost',
-  label: COST_COLUMN_LABEL,
-  tabular: true,
-  align: 'center',
-  cell: (row) => {
-    if (row.kind === 'product') return unitCostCell(row.product.averageUnitCost, 'product-cost');
-    if (row.kind === 'batch') return unitCostCell(row.batch.unitCost, 'product-batch-row-cost');
-    return null;
-  },
-};
+function costColumn(units: readonly UnitRef[] | undefined): ProductColumn {
+  return {
+    id: 'averageUnitCost',
+    label: COST_COLUMN_LABEL,
+    tabular: true,
+    align: 'center',
+    cell: (row) => {
+      if (row.kind === 'batchesStatus') return null;
+      const label = productUnitLabel(row.product, units);
+      return row.kind === 'product'
+        ? unitCostCell(row.product.averageUnitCost, 'product-cost', label)
+        : unitCostCell(row.batch.unitCost, 'product-batch-row-cost', label);
+    },
+  };
+}
 
 const BATCH_ROW_EXPIRY_TEST_IDS = {
   date: 'product-batch-row-expiry-date',
@@ -538,7 +550,7 @@ export function buildProductColumns({
         return null;
       },
     },
-    ...(showCost ? [costColumn] : []),
+    ...(showCost ? [costColumn(units)] : []),
     {
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
