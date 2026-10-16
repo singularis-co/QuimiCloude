@@ -85,7 +85,7 @@ mergeado; `design.md > 5` ya está alineado con su `design.md`, reenvío incluid
   - Correr solo esos dos: `pnpm exec playwright test e2e/maestro-acceso.spec.ts e2e/maestro-empresas.spec.ts`.
   - **Hecho:** los dos en verde en local; salida anotada en `progress/impl_QC-166.md`.
 
-- [ ] **T9 · Alineación con QC-165 y lista de Administradores** (R1, R6, R35, R36, R42). Depende de
+- [x] **T9 · Alineación con QC-165 y lista de Administradores** (R1, R6, R35, R36, R42). Depende de
   T2 y de QC-165 en `dev`.
   - Comprobar que lo mergeado de QC-165 coincide con `design.md > 5.1` (acciones, campos,
     `isLastAdministrator`, `company_last_administrator`); si difiere, realinear y pasar por el
@@ -99,13 +99,13 @@ mergeado; `design.md > 5` ya está alineado con su `design.md`, reenvío incluid
     `maestro-pages-permission.test.tsx`.
   - **Hecho:** lista, filtro «Empresa», tarjetas y estados en verde.
 
-- [ ] **T10 · Alta, edición y baja de Administradores** (R37–R41). Depende de T9.
+- [x] **T10 · Alta, edición y baja de Administradores** (R37–R41). Depende de T9.
   - `administrator-sheet.tsx`, `administrator-create-action.tsx`, `administrator-delete-dialog.tsx`.
   - Tests: `tests/ui/maestro/administrator-sheet.test.tsx`, `administrator-delete-dialog.test.tsx`.
   - **Hecho:** la empresa no se puede cambiar al editar; el último no se puede confirmar
     (`isLastAdministrator`) y `company_last_administrator` se pinta sin cerrar.
 
-- [ ] **T10b · Reenviar enlace** (R36, R46–R49). Depende de T10 y de QC-165 en `dev`
+- [x] **T10b · Reenviar enlace** (R36, R46–R49). Depende de T10 y de QC-165 en `dev`
   (`resendAdministratorLinkAction`).
   - `administrator-resend-link-dialog.tsx` (`design.md > 5.4`); el ítem «Reenviar enlace» en el
     menú de la fila, solo si `accountStatus === 'pending'`.

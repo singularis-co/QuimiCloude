@@ -221,3 +221,93 @@ Commits: `a2563b66` fix(QC-166) tipo de documento del alta · `365353be` test(QC
   `private-content`). Los localizadores se acotan a `private-content`. En WebKit, el `router.refresh()`
   de la reactivación chocaba con el `goto` siguiente, así que se espera a que la fila salga de «De baja».
 - El toast del alta acepta las dos variantes (enviado o fallido), según design.md > 10.
+
+## T9, T10, T10b · Administradores (2026-10-16)
+
+Commits: `acd1c04d` (T9), `14a7aeb1` (T10), `9eab5853` (T10b). Sin dependencias nuevas. El grafo no
+tiene proyecto para este worktree: exploración con Grep/Read.
+
+### Alineación con QC-165 (mergeado en `dev`, PR #264)
+
+Comparado `lib/modules/identity/adapters/driving/administrator-actions.ts`, `domain/administrator-view.ts`,
+`administrator-queryable.ts`, `administrator-input.ts`, `delete-administrator.ts`,
+`resend-administrator-link.ts`, `credential-setup-mail.ts` y el catálogo de errores contra design.md > 5.1–5.5.
+**Coincide en todo: no hubo que realinear nada y ningún requisito cambia.**
+- Seis acciones con los nombres y firmas de 5.1. `createAdministratorAction` → `{ administratorId, mail }`.
+  `updateAdministratorAction` lee `id` + ocho datos, sin `companyId` (`strictObject` lo rechazaría).
+  `deleteAdministratorAction` y `resendAdministratorLinkAction` leen solo `id`.
+  `ResendAdministratorLinkFormState` = `{ status: 'success', mail: 'sent' | 'failed' }` o `ErrorState`.
+- `AdministratorRow` y `AdministratorDetail` traen `company: { id, name }`, `accountStatus`
+  (`UserAccountStatus`: active, pending, inactive, blocked) e `isLastAdministrator`.
+- Lista: filtro `companyId` (`select`), orden en las siete columnas de 5.1, `searchable: true`.
+- `company_last_administrator` («Es el único Administrador de la empresa: crea otro antes de darlo de
+  baja.») y `user_not_pending` están en el catálogo. `UserNotPendingError` sale de `credential-setup-mail.ts`.
+- **Teléfono y número de documento:** QC-165 lo confirma. `companyAdministratorSchema` es `createUserSchema`
+  sin rol ni credencial, y `phone` / `documentNumber` son `trim().min(1)` (obligatorios). `AdministratorFields`
+  sigue sin marcarlos: no lo he cambiado, está pendiente de decisión del leader.
+
+### Archivos
+T9:
+- `app/(private)/maestro/administradores/page.tsx`: lista, `canModify` y empresas activas. Si las empresas
+  no cargan, la tabla queda en su error.
+- `app/(private)/maestro/administradores/components/`: `index.ts`, `load-active-companies.ts`,
+  `administrator-list-params.ts`, `administrator-list-section.tsx`, `administrator-table.tsx`,
+  `administrator-columns.tsx`, `administrator-labels.ts`
+- `tests/ui/maestro/administrator-table.test.tsx` (nuevo), `tests/ui/maestro/maestro-pages-permission.test.tsx`
+  (parte de Administradores), `tests/unit/shared/data-table-alcance.test.ts`: `MAESTRO_ADMINISTRATORS_ROUTE`
+  entra en la lista cerrada como la DUODÉCIMA, citando design.md > 7.4, y el ancla pasa de 11 a 12.
+
+T10:
+- `administrator-sheet.tsx`, `administrator-create-action.tsx`, `administrator-delete-dialog.tsx`.
+  Ampliados: `administrator-table.tsx`, `administrator-labels.ts`, `index.ts`, `page.tsx`.
+- `tests/ui/maestro/administrator-sheet.test.tsx` y `administrator-delete-dialog.test.tsx` (nuevos).
+  Ampliados: `administrator-table.test.tsx`, `maestro-pages-permission.test.tsx`.
+
+T10b:
+- `administrator-resend-link-dialog.tsx`. Ampliados: `administrator-columns.tsx`, `administrator-table.tsx`,
+  `administrator-labels.ts`, `index.ts`.
+- `tests/ui/maestro/administrator-resend-link-dialog.test.tsx` (nuevo). Ampliado: `administrator-table.test.tsx`.
+
+### Mapa R<n> → test
+| R | Test |
+|---|---|
+| R1 | `maestro-pages-permission.test.tsx` › /maestro/administradores: «R1: sin sesion…», «R1: una sesion sin empresas.consultar…», «R1: el corte… es la primera linea» |
+| R6 | `administrator-table.test.tsx` «R6: sin empresas.modificar no hay menu…»; `administrator-sheet.test.tsx` «R6: sin empresas.modificar no hay disparador ni panel»; `maestro-pages-permission.test.tsx` «R6: …canModify falso / verdadero» |
+| R7 | `administrator-sheet.test.tsx` «R7: unauthorized…»; `administrator-delete-dialog.test.tsx` «R7: unauthorized…» |
+| R35 | `administrator-table.test.tsx`: columnas, lista única, enlace a la empresa, estados, sin búsqueda ni orden, filtro «Empresa» llevado a la dirección, lectura de `empresa`, paginación. `maestro-pages-permission.test.tsx`: miga y título, consulta con filtro y página, empresas activas página a página |
+| R36 | `administrator-table.test.tsx` «R36: … activo ofrece Editar y Dar de baja», «… Pendiente ofrece Reenviar enlace entre…», «… en cualquier otro estado no…», tarjeta pendiente y tarjeta activa |
+| R37 | `administrator-sheet.test.tsx` «R37: empieza por Empresa…», «solo las empresas activas», «FormData… sin prefijo», «con exito y el correo enviado…», «con exito pero sin correo…» (pregunta 6) |
+| R38 | `administrator-sheet.test.tsx` «R38: carga la ficha… empresa fija», «FormData… nunca la empresa», «al guardar con exito…», «si la ficha no carga…»; `administrator-table.test.tsx` «R38: Editar abre el panel…» |
+| R39 | `administrator-delete-dialog.test.tsx` «R39: se titula…», «R39: confirmar manda solo el id…»; `administrator-table.test.tsx` «R39: Dar de baja abre…» |
+| R40 | `administrator-delete-dialog.test.tsx` «R40: el ultimo… no deja confirmar», «R40: si el servidor rechaza… sin cerrar»; `administrator-table.test.tsx` «R40: … sin poder confirmar» |
+| R41 | `administrator-sheet.test.tsx` «R41: duplicate_* junto a su campo…» (×3), «company_not_found… region», «error inesperado… referencia», «un duplicado en la edicion…» |
+| R42 | `administrator-table.test.tsx`: esqueleto, error con «Reintentar», vacío, vacío con filtro, tarjeta, «Acciones» de al menos 44 px. `maestro-pages-permission.test.tsx` «R42: si las empresas no cargan…», «R42: si la lista falla…» |
+| R46 | `administrator-resend-link-dialog.test.tsx` «R46: pregunta…», «R46: … solo el id»; `administrator-table.test.tsx` «R46: Reenviar enlace abre…» |
+| R47 | `administrator-resend-link-dialog.test.tsx` «R47: si el correo salio…», «R47: si el correo no salio…» (pregunta 8) |
+| R48 | `administrator-resend-link-dialog.test.tsx` «R48: user_not_pending / user_not_found / unauthorized…», «R48: un error inesperado…» |
+| R49 | `administrator-resend-link-dialog.test.tsx` «R49: … Reenviando…, deshabilitado y no envia dos veces» |
+
+### Salida de la verificación
+- `pnpm run typecheck`: sin errores tras T9, T10 y T10b.
+- `pnpm run lint`: 0 errores y 10 warnings, todos previos y en archivos ajenos.
+- `pnpm exec vitest related --run <archivos de T9>`: 3 archivos, 54 passed / 2 skipped.
+- `pnpm exec vitest related --run <archivos de T10>`: 4 archivos, 61 passed.
+- `pnpm exec vitest related --run <archivos de T10b>`: 5 archivos, 75 passed.
+- `pnpm exec vitest run guard`: 80 archivos, 1096 passed / 20 skipped tras cada task. En T10, la guardia
+  `guard-rol-administrador-unico` cazó el literal «Administrador» en `administrator-labels.ts`. Lo arreglé
+  antes del commit: ahora se usa `ROLE_ADMINISTRADOR` del barrel de `identity`.
+
+### Notas y desvíos
+- La lista no tiene caja de búsqueda ni orden: R35 y el tablero solo piden el filtro «Empresa» y la
+  paginación. QC-165 sí los admite; si se quieren, basta con añadirlos a las columnas y a
+  `administrator-list-params.ts`.
+- `empresa` admite varias empresas separadas por coma, porque el filtro `select` es múltiple. Lo que no es
+  uuid se ignora.
+- Si `loadActiveCompanies` falla, la página pinta la tabla en error con «Reintentar» y sin
+  «Nuevo administrador».
+- El reenvío usa `ConfirmDialog` con `submit: { kind: 'action' }` + `useActionState`, el patrón de los
+  diálogos de empresa, en vez de `onConfirm` dentro de `startTransition` (design.md > 5.4). Lo que se ve no
+  cambia: `FormData` con solo `id`, botón en pendiente y sin doble envío.
+- El tablero pinta un icono de correo en el diálogo de reenvío. `ConfirmDialog` no tiene hueco para icono y
+  no lo he extendido. «Rol» se muestra fijo en el alta y en la edición; el aviso del correo, solo en el alta.
+- Están aplicados los textos por defecto de las preguntas abiertas 6 y 8.
