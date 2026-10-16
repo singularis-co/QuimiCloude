@@ -138,3 +138,61 @@ cada task están en verde. La salida de `vitest related` de cada subagente está
 - **Abierto, contradicción entre código y spec:** `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` › «R18 — el asistente heredado solo puede cambiar step-reader.tsx (lista cerrada)» tiene `PERMITIDOS = ['components/shared/step-reader/step-reader.tsx']` (QC-125, ratificado por el humano). El design de QC-291 §3.2 pide cambiar también `step-document-view.tsx` (`variant`) e `index.ts` (`StepProgress`), así que el caso queda en rojo. No lo toqué: el archivo es de T8 y otro agente lo está editando. Ampliar la lista necesita una decisión del humano o del leader.
 
 **Veredicto:** T2 hecha y verde en su propio test; queda en rojo la lista cerrada heredada de `order-execution-screen.test.tsx`, que necesita una decisión.
+
+## Tanda 2 — T3 (tokens de sección) y B2 (lista cerrada de QC-125)
+
+**Archivos**
+
+- `app/globals.css`: `--section-materials`, `--section-tools`, `--section-team` y `--section-foreground` al final de `:root` y de `.dark` (valores de design.md §3.3, con B1), y sus `--color-section-*` en `@theme inline`.
+- `tests/unit/asignaciones-ui/section-tones.test.ts` (nuevo): reutiliza `tests/unit/theme/contraste.ts`.
+- `tests/unit/asignaciones-ui/order-execution-screen.test.tsx`: solo `PERMITIDOS` del caso «R18 — el asistente heredado solo puede cambiar step-reader.tsx (lista cerrada)», con `step-document-view.tsx` e `index.ts` (B2, aprobado por el humano).
+- La tarjeta de T4 usa `bg-(--section-<tone>)` y `text-(--section-foreground)`: nombran las variables, que ahora existen. Sin cambios.
+
+**Mapa R → test** (`tests/unit/asignaciones-ui/section-tones.test.ts`)
+
+- R20: «R20: los cuatro tokens existen en :root y en .dark con los valores de design.md §3.3»; «R20: cada token tiene su utilidad en @theme inline»; «R20: el texto de sección contrasta al menos 4.5:1 sobre cada fondo, en claro y en oscuro»; «R20: la tarjeta con tono solo nombra tokens de sección que existen».
+- R18 (QC-125, B2): «R18 — el asistente heredado…» con la lista ampliada.
+
+**Verificación**
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`; ninguno en archivos de esta tanda.
+- `pnpm exec vitest run tests/unit/asignaciones-ui/section-tones.test.ts tests/unit/theme`: `Test Files 12 passed (12) · Tests 72 passed (72)`.
+- `pnpm exec vitest related --run app/globals.css tests/unit/asignaciones-ui/section-tones.test.ts tests/unit/asignaciones-ui/order-execution-screen.test.tsx`: `Test Files 5 passed (5) · Tests 89 passed (89)`.
+
+**Veredicto:** T3 y B2 hechas y verdes.
+
+## Tanda 2 — T6 `OperatorSidePanels` (frontend_dev)
+
+**Archivos**
+
+- `app/(private)/asignacion/components/operator-side-panels.tsx` (nuevo, `'use client'`): `useOperatorSidePanels({ sections, columnTestId? })` → `{ column, overlay }` (design.md §3.3). Paso 3 de la regla: compone `OrderExecutionCollapsibleCard` (con `tone`), `Button` y `Dialog`; vive en la ruta, sin fila en el catálogo; tablero `OperarioPantalla*.dc.html`.
+- `app/(private)/asignacion/components/index.ts`: reexporta la pieza, sus tipos y sus testids.
+- `tests/unit/asignaciones-ui/operator-side-panels.test.tsx` (nuevo): incluye los casos vigentes de `order-execution-tools-panel.test.tsx` (contador mono, tarjetas en orden y abiertas, plegar sin desmontar, unidad tras plegar, 52 px). El archivo viejo y su test siguen: los borra T8.
+
+**Notas para T8–T10**
+
+- `columnTestId` es opcional y extra al contrato del design: la fabricación lo pasa como `order-execution-materials` (lo usan el E2E y el test de pantalla).
+- El panel va en el portal de Base UI, fuera del `@container` del marco: su corte de 560 px es de ventana (`max-[560px]:`). El marco ocupa toda la ventana (la barra lateral se oculta), así que coincide. La pila sí usa `@max-[560px]:hidden`.
+- Base UI no devuelve el foco tras un toque fuera donde `focus()` no admite `preventScroll` (jsdom, Chrome Android); la pieza lo devuelve en `onOpenChangeComplete`.
+- `OrderExecutionTools` pinta un id fijo (`order-execution-tools-heading`): con el panel abierto hay dos copias en el DOM. Lo resuelve quien arma la sección (T8).
+
+**Mapa R → test** (`tests/unit/asignaciones-ui/operator-side-panels.test.tsx`)
+
+- R19: «R19 y R27: la columna se oculta en contenedores de 1000 px o menos y la capa en los de más».
+- R20: «R20: pinta solo las secciones recibidas, en su orden…»; «R20: el nombre de la columna sale de los títulos de sus secciones»; «R20: cada contador va en su disparador, en mono»; «R20: plegar una tarjeta oculta su contenido sin desmontarlo…».
+- R21: «R21: no se pintan ni la tarjeta Herramientas ni su botón flotante».
+- R22: «R22: plegar y desplegar los materiales conserva la unidad elegida».
+- R27: «R27: un botón redondo de 56 px por sección…»; «R27: en acondicionamiento, Envases y Equipo…».
+- R28: «R28: pulsar un botón abre el panel de su sección…» (incluye `aria-expanded` y `aria-controls`); «R28: el panel de materiales lleva el contenido de materiales…».
+- R29: «R29: «Cerrar» cierra…»; «R29: Escape cierra…»; «R29: tocar fuera del panel lo cierra…».
+- R30: «R30: con un panel abierto la pila se oculta en contenedores de 560 px o menos…».
+
+**Verificación**
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`; ninguno en archivos de T6.
+- `pnpm exec vitest run tests/unit/asignaciones-ui/operator-side-panels.test.tsx`: `Test Files 1 passed (1) · Tests 15 passed (15)`.
+- `pnpm exec vitest related --run <los 3 archivos>`: `Test Files 3 failed | 36 passed (39) · Tests 17 failed | 533 passed (550)`. Los rojos son de archivos que no usan la pieza: entran solo por el barrel. `paridad/asignacion-acondicionamiento-paridad` (13 snapshots, la pantalla de tanda 1), `conditioning-order-screen` (3, Equipo de T7) y `marca/tablas-marca` (1, `product-columns.tsx`, fuera de la feature).
+
+**Veredicto:** T6 hecha y verde en su test; los rojos de `related` vienen de antes y no los toca T6.

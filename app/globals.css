@@ -80,6 +80,10 @@
   --color-avatar-6: var(--avatar-6);
   --color-avatar-6-text: var(--avatar-6-text);
   --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+  --color-section-materials: var(--section-materials);
+  --color-section-tools: var(--section-tools);
+  --color-section-team: var(--section-team);
+  --color-section-foreground: var(--section-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -164,6 +168,11 @@
   --avatar-6: oklch(0.92 0.05 0);
   --avatar-6-text: oklch(0.42 0.11 0);
   --sidebar-muted-foreground: oklch(0.78 0.03 195);
+  /* Secciones de la pantalla del operario (QC-291 R20, R27). */
+  --section-materials: oklch(0.57 0.15 55);
+  --section-tools: oklch(0.55 0.15 255);
+  --section-team: oklch(0.54 0.13 160);
+  --section-foreground: oklch(0.99 0 0);
 }
 
 .dark {
@@ -236,6 +245,11 @@
   --avatar-6: oklch(0.34 0.05 0);
   --avatar-6-text: oklch(0.92 0.05 0);
   --sidebar-muted-foreground: oklch(0.72 0.025 195);
+  /* Secciones de la pantalla del operario (QC-291 R20, R27). */
+  --section-materials: oklch(0.68 0.14 60);
+  --section-tools: oklch(0.64 0.14 255);
+  --section-team: oklch(0.64 0.12 160);
+  --section-foreground: oklch(0.18 0 0);
 }
 
 :root {

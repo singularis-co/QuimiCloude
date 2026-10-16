@@ -35,7 +35,7 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
       `tests/unit/recetas-ui/step-reader.test.tsx`;
     - los tests actuales de lectura y de ejecución sin `slots` siguen verdes sin tocarlos (R18).
 
-- [ ] **T3 [P] — Tokens de color de sección.** Depende de: —.
+- [x] **T3 [P] — Tokens de color de sección.** Depende de: —.
   - Cuatro tokens, en claro y en oscuro, en `app/globals.css`, más sus utilidades `@theme`
     (§3.3).
   - **Hecho:** un test en `tests/unit/asignaciones-ui/section-tones.test.ts` (R20) lee
@@ -57,7 +57,7 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
       mismo mapa muestran la misma unidad tras elegir en una;
     - los casos actuales, no controlados, siguen verdes.
 
-- [ ] **T6 — `OperatorSidePanels`.** Depende de: T4.
+- [x] **T6 — `OperatorSidePanels`.** Depende de: T4.
   - Columna, botones flotantes y panel `Dialog` (§3.3). El `aria-label` de la columna sale de los
     títulos de sus secciones. Se exporta en el barrel de
     `app/(private)/asignacion/components/index.ts`.

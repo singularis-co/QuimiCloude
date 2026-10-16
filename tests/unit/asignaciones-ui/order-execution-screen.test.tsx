@@ -684,7 +684,11 @@ describe('R18 — el asistente heredado solo puede cambiar step-reader.tsx (list
   const HERE = dirname(fileURLToPath(import.meta.url));
   const REPO_ROOT = join(HERE, '..', '..', '..');
 
-  const PERMITIDOS = ['components/shared/step-reader/step-reader.tsx'];
+  const PERMITIDOS = [
+    'components/shared/step-reader/step-reader.tsx',
+    'components/shared/step-reader/step-document-view.tsx',
+    'components/shared/step-reader/index.ts',
+  ];
 
   function git(args: readonly string[]): string {
     return execFileSync('git', [...args], { cwd: REPO_ROOT, encoding: 'utf8' });

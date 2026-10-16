@@ -224,6 +224,18 @@ export {
   type OrderOutcomeNoticeProps,
 } from './order-outcome-notice';
 export {
+  OPERATOR_SIDE_PANEL_BODY_TESTID,
+  OPERATOR_SIDE_PANEL_CLOSE_TESTID,
+  OPERATOR_SIDE_PANELS_FABS_TESTID,
+  OPERATOR_SIDE_PANELS_TEXTS,
+  operatorSectionsLabel,
+  operatorSidePanelTestId,
+  useOperatorSidePanels,
+  type OperatorSection,
+  type OperatorSidePanels,
+  type OperatorSidePanelsProps,
+} from './operator-side-panels';
+export {
   ORDER_DISTRIBUTION_FULL_LINE_TESTID,
   ORDER_DISTRIBUTION_FULL_SEPARATOR,
   ORDER_DISTRIBUTION_FULL_TESTID,
