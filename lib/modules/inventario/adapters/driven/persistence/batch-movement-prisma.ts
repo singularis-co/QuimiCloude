@@ -12,7 +12,7 @@ import {
 import type { NewInventoryMovement } from '../../../domain/inventory-movement';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { MovementReason } from '../../../domain/movement-reason';
-import type { BatchHistoryEntry } from '../../../domain/reservation';
+import type { BatchHistoryEntry, BatchMovementRecord } from '../../../domain/reservation';
 
 /**
  * Escribe el asiento del libro. Recibe la `tx` desde fuera y nunca abre una propia: el asiento
@@ -33,7 +33,8 @@ export async function writeMovement(
       reason: movement.reason,
       orderId: movement.orderId,
       orderPresentationLineId: movement.orderPresentationLineId,
-      // Solo una entrega lo lleva; los demas asientos lo dejan NULL por omision.
+      // Solo una entrega (con o sin pedido) o su anulacion los llevan; los demas asientos los dejan
+      // NULL por omision.
       ...(movement.orderDeliveryId != null ? { orderDeliveryId: movement.orderDeliveryId } : {}),
       ...(movement.orderDeliveryVoidId != null ? { orderDeliveryVoidId: movement.orderDeliveryVoidId } : {}),
       // Sin ellos la columna queda NULL por omision: solo un ajuste los escribe.
@@ -57,6 +58,8 @@ const MOVEMENT_SELECT = {
   createdAt: true,
   stockBefore: true,
   countedStock: true,
+  orderDeliveryId: true,
+  orderDeliveryVoidId: true,
 } satisfies Prisma.InventoryMovementSelect;
 
 type MovementRow = Prisma.InventoryMovementGetPayload<{ select: typeof MOVEMENT_SELECT }>;
@@ -79,7 +82,7 @@ type ReservationMovementRow = Prisma.ReservationMovementGetPayload<{
  * el asiento-: resolverlos a texto mostrable es del caso de uso, que es quien conoce los
  * directorios de `pedidos` e `identity`.
  */
-function toInventoryHistoryEntry(row: MovementRow): BatchHistoryEntry {
+function toInventoryHistoryEntry(row: MovementRow): BatchMovementRecord {
   return {
     id: row.id,
     kind: row.kind as BatchHistoryEntry['kind'],
@@ -91,6 +94,8 @@ function toInventoryHistoryEntry(row: MovementRow): BatchHistoryEntry {
     previousStock: row.stockBefore === null ? null : row.stockBefore.toFixed(4),
     countedStock: row.countedStock === null ? null : row.countedStock.toFixed(4),
     customerNames: null,
+    orderDeliveryId: row.orderDeliveryId,
+    orderDeliveryVoidId: row.orderDeliveryVoidId,
   };
 }
 
@@ -118,7 +123,7 @@ function toReservationHistoryEntry(row: ReservationMovementRow): BatchHistoryEnt
 export async function findBatchMovements(
   batchId: string,
   scope: InventoryScope,
-): Promise<readonly BatchHistoryEntry[] | null> {
+): Promise<readonly BatchMovementRecord[] | null> {
   const batch = await prisma.productBatch.findFirst({
     where: { AND: [batchCompanyScope(scope), { id: batchId }] },
     select: { id: true },

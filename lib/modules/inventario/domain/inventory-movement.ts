@@ -29,7 +29,8 @@ export type NewInventoryMovement = {
   readonly createdBy: string;
   readonly orderId: string | null;
   readonly orderPresentationLineId: string | null;
-  /** Solo lo lleva `delivery`, y siempre: opcional para que los demas escritores no lo nombren. */
+  /** Solo lo llevan `delivery` y `direct_delivery`, y siempre: opcional para que los demas escritores
+   *  no lo nombren. `orderDeliveryVoidId`, igual, con `delivery_void` y `direct_delivery_void`. */
   readonly orderDeliveryId?: string | null;
   readonly orderDeliveryVoidId?: string | null;
   /** Solo los lleva un ajuste, y los dos juntos: el `CHECK` de la tabla rechaza uno sin el otro. */

@@ -4,7 +4,7 @@ import type { Page } from '../domain/page';
 import type { NewProductBatch } from '../domain/product-batch';
 import type { ProductBatchView } from '../domain/product-batch-view';
 import type { NewProduct, PackagingIdentity, ProductType, ProductView } from '../domain/product-view';
-import type { BatchHistoryEntry } from '../domain/reservation';
+import type { BatchMovementRecord } from '../domain/reservation';
 import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../domain/stock-adjustment';
 
 /**
@@ -238,5 +238,5 @@ export interface ProductRepository {
   findBatchMovements(
     batchId: string,
     scope: InventoryScope,
-  ): Promise<readonly BatchHistoryEntry[] | null>;
+  ): Promise<readonly BatchMovementRecord[] | null>;
 }

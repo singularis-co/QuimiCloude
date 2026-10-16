@@ -379,3 +379,79 @@ principal.
 
 Veredicto: B3 hecha; adaptadores de la entrega sin pedido con R9, R38 (base) y R52–R54 en verde; quedan tres
 rojos ajenos (F2, T0 y F4) señalados arriba.
+
+## B2 — `inventario`: salida, devolución y lecturas (2026-10-16)
+
+Grafo: sin proyecto para este worktree; Grep/Read.
+
+### Archivos
+Producción (`lib/modules/inventario/`):
+- `adapters/driven/persistence/product-prisma.ts`: `dispatchFinishedGoods` recibe el origen discriminado
+  (`FinishedGoodsDispatchOrigin`: `order` con pedido/receta/presentación, `direct` con `productId`); el bloqueo
+  `FOR NO KEY UPDATE` pasa a un ayudante privado `lockAliveFinishedProduct` (por receta+presentación o por id) que
+  comparten la salida y `lockFinishedProductForDelivery` (nueva, lectura con bloqueo, sin escritura: receta,
+  presentación y lotes con contenido). Con `direct` el asiento es `direct_delivery`, `orderId: null`.
+  `returnFinishedGoods`: `orderId: string | null`; nulo → `direct_delivery_void`; sigue sin mirar `deleted_at`.
+- `finished-goods-dispatch-prisma.ts`: `createFinishedGoodsDirectDispatch(tx)` (`lockForDirectDelivery` suma
+  `wholePackagesIn` de los lotes leídos con el producto bloqueado; `dispatchDirect`). `createFinishedGoodsDispatch`
+  pasa `origin: 'order'`.
+- `finished-goods-return-prisma.ts`: quitado el stub de T0 que lanzaba con `orderId` nulo.
+- `deliverable-batches-prisma.ts`: `findForDelivery` y `findSurplusBases` (§5), con las envolturas de
+  `company-scope.ts` en `products`, `product_batches` y `presentations`.
+- `batch-movement-prisma.ts`: selecciona `orderDeliveryId` y `orderDeliveryVoidId` y los devuelve en el asiento del
+  libro físico. Para tiparlo: `domain/reservation.ts` gana `BatchMovementRecord` (= `BatchHistoryEntry` + las dos
+  referencias opcionales) y `ports/product-repository.ts > findBatchMovements` devuelve ese tipo. Desvío menor:
+  `product-repository.ts` no estaba en `tasks.md > Archivos esperados`; es el puerto que B5 necesita leer.
+  `list-batch-movements.ts` (B5) no se toca: hoy propaga las dos referencias en el spread hasta que B5 resuelva los
+  clientes.
+- `domain/inventory-movement.ts` y `writeMovement`: solo comentarios (el tipo ya lo ensanchó B1).
+- `finished-product-detail-prisma.ts` **no cambia**: desde QC-282 el tab Entregas lo lee `pedidos`
+  (`order-delivery-directory-prisma.ts`, B3); `note`/`withoutOrder` no son lecturas de `inventario`.
+
+Censos sin cambio: `guard-libro-de-inventario`, `qc121-alcance` y `qc91-alcance` siguen contando los mismos nueve
+caminos (la escritura de lotes sigue en `dispatchFinishedGoods`/`returnFinishedGoods`; el bloqueo nuevo solo lee).
+
+Tests (nota fechada 2026-10-16, aserciones previas intactas):
+- u `tests/unit/inventario/finished-goods-dispatch-prisma.test.ts`: `baseInput` lleva `origin: 'order'`; + 4 casos
+  `origen direct` y 3 de `createFinishedGoodsDirectDispatch`.
+- u `finished-goods-return-prisma.test.ts` (+1), `batch-movement-prisma.test.ts` (+1).
+- int `finished-goods-dispatch.int.test.ts` (+6), `finished-goods-return.int.test.ts` (+3),
+  `deliverable-batches.int.test.ts` (+2), `ledger-cuadre.int.test.ts` (+1).
+- int `finished-product-detail.int.test.ts`: el rojo heredado de T0 que vio B1; la fila esperada gana
+  `withoutOrder: false` y `note: null`.
+
+### R → test
+- R9 (parte de `inventario`) → `deliverable-batches.int.test.ts` (`R9: un lote sin contenido de envase no suma…`,
+  `R9: ni el producto de otra empresa, ni el dado de baja…`), `finished-goods-dispatch.int.test.ts`
+  (`R9: lockForDirectDelivery…`), u `finished-goods-dispatch-prisma.test.ts` (`R9: lockForDirectDelivery…`).
+- R32 → `finished-goods-dispatch.int.test.ts` (`R32: el producto de la empresa B…`, `R32: un lote de la empresa B…`,
+  `R32: un lote de otro producto… o sin contenido`) + 3 casos `R32` del unitario.
+- R34 → `finished-goods-dispatch.int.test.ts` (`R34: si la suma de los clientes para un lote supera…`) + unitario.
+- R37 → `finished-goods-dispatch.int.test.ts` (`R37: con un lote repetido entre clientes…`),
+  `ledger-cuadre.int.test.ts` (`QC-288 R37, R50: …`), unitarios `R37` (dispatch y `batch-movement-prisma`).
+- R50 (parte de `inventario`) → `finished-goods-return.int.test.ts` (3 casos `R50`, dado de baja y empresa B),
+  `ledger-cuadre.int.test.ts` (`QC-288 R37, R50`), u `finished-goods-return-prisma.test.ts` (`R50: …`).
+
+### Gate (salida real)
+Entorno: `DATABASE_URL`, `DIRECT_URL` y `SEED_*` exportadas solo en el comando desde el `.env` del repo principal.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 9 problems (0 errors, 9 warnings)`, los 9 previos y ajenos.
+- `pnpm exec vitest run guard`: `Test Files 1 failed | 79 passed (80)`, `Tests 1 failed | 1097 passed | 20 skipped`.
+  El rojo es el conocido de F4 sin confirmar (`guard-formularios-y-acciones` R28,
+  `finished-product-deliveries-table.tsx`), ajeno.
+- Suites de B2 (integración, base efímera): `finished-goods-dispatch`, `finished-goods-return`,
+  `deliverable-batches`, `ledger-cuadre`, `finished-product-detail`: `Test Files 5 passed (5)`, `Tests 48 passed (48)`.
+- Llamadores de la salida y la devolución + historial (integración): las 5 anteriores + `order-delivery-void`,
+  `order-delivery-concurrency`, `order-delivery-void-concurrency`, `reservation`, `adjust-by-count`,
+  `company-scope-queries`: `Tests 2 failed | 147 passed (149)`; los 2 rojos son de `adjust-by-count` en la corrida
+  conjunta (no toca nada de B2) y sola da `Tests 11 passed (11)`: intermitencia de entorno.
+- Unitarios `tests/unit/inventario tests/unit/pedidos tests/unit/asignaciones` (proyecto node):
+  `Test Files 3 failed | 277 passed (280)`, `Tests 4 failed | 5569 passed | 8 skipped | 1 todo`. Los 4 rojos son
+  censos ajenos a B2, de código ya confirmado de T0/F2/F4: `pedidos/order-delivery-append-only.test.ts` R32/R33
+  (`voidDirectDeliveryAction`, `createVoidDirectDelivery`), `pedidos/module-contract.test.ts` y
+  `pedidos/scope.test.ts` R57 (UI de `inventario` y `components/shared` importan `pedidos`). Son de TC.
+- `vitest related` no se corrió: `product-prisma.ts` y las fábricas cuelgan de `lib/composition` (conjunto casi
+  entero) y el disco C: está casi lleno. Se corrieron las suites nombradas.
+
+Veredicto: B2 hecha; salida y devolución sin pedido y lecturas de `inventario` con R9, R32, R34, R37 y R50 en verde;
+los rojos que quedan son ajenos y están señalados.

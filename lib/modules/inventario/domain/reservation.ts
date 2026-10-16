@@ -124,3 +124,11 @@ export type BatchHistoryEntry = {
    *  resto. */
   readonly customerNames: readonly string[] | null;
 };
+
+/** Lo que devuelve la persistencia por asiento: la fila del historial con la entrega o la anulacion
+ *  que cita, para que el caso de uso resuelva sus clientes. Opcionales: los asientos del libro de la
+ *  reserva no los tienen. */
+export type BatchMovementRecord = BatchHistoryEntry & {
+  readonly orderDeliveryId?: string | null;
+  readonly orderDeliveryVoidId?: string | null;
+};

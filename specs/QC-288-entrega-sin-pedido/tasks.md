@@ -96,7 +96,7 @@ de la tanda y las tres suites nuevas están en verde. Commit
 
 ---
 
-## [ ] B2 [P] — `inventario`: salida, devolución y lecturas (depende de B1)
+## [x] B2 [P] — `inventario`: salida, devolución y lecturas (depende de B1)
 
 - `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`:
   - `dispatchFinishedGoods` con origen discriminado;
