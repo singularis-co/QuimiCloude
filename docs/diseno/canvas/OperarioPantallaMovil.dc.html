@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Pantalla del operario · teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}" style="width: 390px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px; font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--fg)">
+  <dc-import name="OperarioPantalla" pantalla="{{ pantalla }}" estado="{{ estado }}" oscuro="{{ oscuro }}" alto="{{ 844 }}" hint-size="390px,844px"></dc-import>
+  <div style="padding: 0 16px 40px">
+    <div class="card" style="gap: 12px">
+      <span class="lab">Ficha por plataforma · pantalla del operario</span>
+      <dl style="margin: 0; display: grid; gap: 10px; font-size: 14px">
+        <div><dt class="strong">Reutiliza</dt><dd class="sub" style="margin: 4px 0 0">`OperatorScreenFrame` (cabecera y pie), `StepReader` en modo ejecución, `ConditioningTeamList`, `ResponsibleAvatars`, la insignia de estado y los botones `b-xl`.</dd></div>
+        <div><dt class="strong">Librerías</dt><dd class="sub" style="margin: 4px 0 0">Ninguna nueva.</dd></div>
+        <div><dt class="strong">Escritorio</dt><dd class="sub" style="margin: 4px 0 0">Cabecera con aire: fila de control (volver o «en curso desde»), título de 30 px, chip de cantidad y barra de pasos con el nombre del paso. Dos columnas: materiales, herramientas y responsables a la izquierda, en ese orden (cada tarjeta se despliega y contrae; cada material conserva su selector de unidad); paso a la derecha.</dd></div>
+        <div><dt class="strong">Tablet</dt><dd class="sub" style="margin: 4px 0 0">Una columna con solo el paso. Materiales, herramientas y responsables pasan a botones flotantes a la derecha, sobre el pie, con su contador; cada uno abre un panel con X para cerrar (o tocando fuera).</dd></div>
+        <div><dt class="strong">Teléfono</dt><dd class="sub" style="margin: 4px 0 0">Título de 24 px, los mismos botones flotantes (el panel ocupa el ancho y los botones se ocultan mientras está abierto), comprobaciones de 60 px de alto. Cabecera fija arriba (progreso y paso actual siempre a la vista) y pie fijo abajo con «Anterior» y «Siguiente» del mismo ancho; solo el contenido hace scroll.</dd></div>
+        <div><dt class="strong">Animación</dt><dd class="sub" style="margin: 4px 0 0">La de cambio de paso que ya existe en `StepReader`; marcar una comprobación cambia fondo y tachado con la transición de `qc.css`.</dd></div>
+              </dl>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"pantalla":{"editor":"enum","options":["Ejecución","Acondicionamiento","Empaque"],"default":"Empaque"},"estado":{"editor":"enum","options":["Sin comenzar","En curso"],"default":"En curso"},"$preview":{"width":390,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { pantalla: this.props.pantalla ?? 'Empaque', estado: this.props.estado ?? 'En curso', oscuro: !!this.props.oscuro, rootCls: this.props.oscuro ? 'qc dk' : 'qc' };
+  }
+}
+</script>
+</body>
+</html>

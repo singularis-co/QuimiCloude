@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Pantalla del operario</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.opx{container-type:inline-size;font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;overflow:hidden}
+.opx-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.opx-hd{flex:none;position:sticky;top:0;z-index:5;box-shadow:0 1px 0 var(--border),0 6px 16px -12px color-mix(in oklch,var(--fg) 30%,transparent);background:var(--card);border-bottom:1px solid var(--border)}
+.opx-in{max-width:1120px;margin:0 auto;padding:20px 24px 22px;display:flex;flex-direction:column;gap:18px}
+.opx-top{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px}
+.opx-back{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px 0 10px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--fg);font:500 15px 'IBM Plex Sans',sans-serif;text-decoration:none}
+.opx-back:hover{background:var(--muted)}
+.opx-run{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--muted-fg)}
+.opx-run i{width:8px;height:8px;border-radius:999px;background:var(--primary);box-shadow:0 0 0 4px color-mix(in oklch,var(--primary) 18%,transparent)}
+.opx-title{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.opx-h1{margin:4px 0 0;font-size:30px;line-height:1.15;font-weight:700;letter-spacing:-.01em}
+.opx-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.opx-chip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;border-radius:999px;background:var(--muted);font-size:14px}
+.opx-chip .k{color:var(--muted-fg)}
+.opx-prog{display:flex;flex-direction:column;gap:10px}
+.opx-bar{display:grid;gap:6px}
+.opx-bar i{height:8px;border-radius:999px;background:var(--muted)}
+.opx-bar i.on{background:var(--primary)}
+.opx-bar i.cur{background:color-mix(in oklch,var(--primary) 55%,var(--muted))}
+.opx-body{max-width:1120px;margin:0 auto;padding:24px 24px 32px;display:grid;grid-template-columns:320px minmax(0,1fr);gap:24px;align-items:start}
+.opx-side{display:flex;flex-direction:column;gap:16px}
+.opx{position:relative}
+.opx{--k-mat:oklch(0.6 0.15 55);--k-tool:oklch(0.55 0.15 255);--k-team:oklch(0.55 0.13 160);--k-fg:oklch(0.99 0 0)}
+.dk .opx{--k-mat:oklch(0.68 0.14 60);--k-tool:oklch(0.64 0.14 255);--k-team:oklch(0.64 0.12 160);--k-fg:oklch(0.18 0 0)}
+section[aria-labelledby="opx-mat"],.k-mat{--k:var(--k-mat)}
+section[aria-labelledby="opx-tool"],.k-tool{--k:var(--k-tool)}
+section[aria-labelledby="opx-team"],.k-team{--k:var(--k-team)}
+.opx-card{overflow:hidden}
+.opx-card > .opx-tg{margin:-18px -18px 0;width:calc(100% + 36px);min-height:52px;padding:0 14px 0 18px;border-radius:0;background:var(--k);color:var(--k-fg)}
+.opx-card.closed{padding-bottom:0}
+.opx-tg .opx-count,.opx-sheet-h .opx-count{background:color-mix(in oklch,var(--k-fg) 22%,transparent);color:var(--k-fg)}
+.opx-fabs,.opx-scrim,.opx-sheet{display:none}
+.opx-fab{position:relative;width:56px;height:56px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--fg);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 18px -6px color-mix(in oklch,var(--fg) 40%,transparent)}
+.opx-fab .ic{width:22px;height:22px}
+.opx-fab{background:var(--k);color:var(--k-fg);border-color:transparent}
+.opx-fab.on{outline:3px solid color-mix(in oklch,var(--k) 40%,transparent);outline-offset:2px}
+.opx-fab:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.opx-fab-n{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--fg);color:var(--bg);font-size:11px;display:inline-flex;align-items:center;justify-content:center}
+.opx-scrim{position:absolute;inset:0;z-index:7;background:color-mix(in oklch,var(--fg) 25%,transparent)}
+.opx-sheet{position:absolute;z-index:8;right:16px;bottom:132px;width:min(380px,calc(100% - 104px));max-height:calc(100% - 300px);flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 18px 40px -12px color-mix(in oklch,var(--fg) 45%,transparent);overflow:hidden}
+.opx-sheet-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 8px 8px 18px;background:var(--k);color:var(--k-fg)}
+.opx-sheet-h .b{color:var(--k-fg)}
+.opx-sheet-h h2{margin:0;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.opx-sheet-c{padding:14px 18px 18px;overflow-y:auto}
+.opx-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.opx-sec{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.opx-sec h2{margin:0;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.opx-count{min-width:24px;height:24px;padding:0 8px;border-radius:999px;background:var(--muted);font:500 12px 'IBM Plex Mono',monospace;display:inline-flex;align-items:center;justify-content:center}
+.opx-grp{display:flex;flex-direction:column;gap:8px}
+.opx-grp + .opx-grp{border-top:1px solid var(--border);padding-top:12px}
+.opx-grp-h{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.04em}
+.opx-mem{display:flex;align-items:center;gap:12px;min-height:44px}
+.opx-av{flex:none;width:36px;height:36px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font:600 13px 'IBM Plex Sans',sans-serif;color:var(--primary-foreground);background:var(--primary)}
+.opx-av.a2{background:color-mix(in oklch,var(--primary) 65%,var(--fg))}
+.opx-av.a3{background:color-mix(in oklch,var(--primary) 45%,var(--muted-fg))}
+.opx-mem-t{display:flex;flex-direction:column;min-width:0;font-size:15px}
+.opx-mem-t .r{font-size:13px;color:var(--muted-fg)}
+.opx-me{margin-left:auto;font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted-fg)}
+.opx-card.closed{gap:0}
+.opx-tg{all:unset;box-sizing:border-box;width:100%;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;border-radius:10px}
+.opx-tg:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.opx-tg .chev{transition:transform .2s}
+.opx-tg[aria-expanded="false"] .chev{transform:rotate(-90deg)}
+.opx-rows{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.opx-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;font-size:15px}
+.opx-row .q{display:inline-flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+.opx-unit{min-height:36px;padding:0 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);font:500 14px 'IBM Plex Mono',monospace}
+.opx-mat{margin:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 12px;font-size:15px}
+.opx-mat dd{margin:0;font-family:'IBM Plex Mono',monospace;text-align:right}
+.opx-step{display:flex;flex-direction:column;gap:20px}
+.opx-sn{display:inline-flex;align-items:center;gap:10px;font-size:14px;color:var(--muted-fg)}
+.opx-sn b{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font:600 15px 'IBM Plex Mono',monospace}
+.opx-h2{margin:0;font-size:26px;line-height:1.25;font-weight:700}
+.opx-lead{margin:0;font-size:17px;line-height:1.55}
+.opx-uses{display:flex;flex-wrap:wrap;gap:8px}
+.opx-use{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--border);background:var(--card);font-size:15px}
+.opx-use .q{font-family:'IBM Plex Mono',monospace;font-weight:500}
+.opx-list{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+.opx-item{width:100%;display:flex;align-items:center;gap:14px;min-height:60px;padding:12px 16px;border-radius:14px;border:1px solid var(--border);background:var(--card);color:var(--fg);font:400 16px/1.4 'IBM Plex Sans',sans-serif;text-align:left;cursor:pointer}
+.opx-item:hover{border-color:var(--primary)}
+.opx-item .bx{flex:none;width:28px;height:28px;border-radius:8px;border:2px solid var(--input);display:inline-flex;align-items:center;justify-content:center;color:transparent}
+.opx-item[aria-checked=true]{background:color-mix(in oklch,var(--primary) 7%,var(--card));border-color:color-mix(in oklch,var(--primary) 45%,var(--border))}
+.opx-item[aria-checked=true] .bx{background:var(--primary);border-color:var(--primary);color:var(--primary-foreground)}
+.opx-item[aria-checked=true] .tx{color:var(--muted-fg);text-decoration:line-through;text-decoration-color:color-mix(in oklch,var(--muted-fg) 50%,transparent)}
+.opx-note{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:14px;background:var(--muted);font-size:15px}
+.opx-wait{display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:1px solid color-mix(in oklch,var(--primary) 35%,var(--border));background:color-mix(in oklch,var(--primary) 6%,var(--card));font-size:16px}
+.opx-start{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:24px;border-radius:16px;border:1px dashed var(--input);background:var(--card)}
+.opx-ft{flex:none;position:sticky;bottom:0;z-index:5;box-shadow:0 -6px 16px -12px color-mix(in oklch,var(--fg) 30%,transparent);background:var(--card);border-top:1px solid var(--border)}
+.opx-ft-in{max-width:720px;margin:0 auto;padding:12px 24px 16px}
+.opx-ft-b{display:flex;flex-direction:column;gap:8px}
+.opx-ft-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.opx-ft-row.one{grid-template-columns:minmax(0,1fr);max-width:360px;margin:0 auto;width:100%}
+.opx-btn{min-height:56px;font-size:17px}
+@container (max-width: 1000px){
+  .opx-body{grid-template-columns:minmax(0,1fr)}
+  .opx-side{display:none}
+  .opx-fabs{display:flex;flex-direction:column;gap:12px;position:absolute;z-index:9;right:16px;bottom:132px}
+  .opx-scrim,.opx-sheet{display:flex}
+  .opx-sheet{right:88px}
+}
+@container (max-width: 560px){
+  .opx-sheet{left:16px;right:16px;width:auto;bottom:132px;max-height:calc(100% - 330px)}
+  .opx-fabs{bottom:132px}
+  .opx:has(.opx-sheet) .opx-fabs{display:none}
+  .opx-in{padding:14px 16px 16px;gap:14px}
+  .opx-h1{font-size:24px}
+  .opx-body{padding:16px 16px 24px;gap:16px}
+  .opx-ft-in{padding:10px 16px 14px}
+  .opx-h2{font-size:22px}
+  .opx-lead{font-size:16px}
+}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+<div class="opx" style="{{ hStyle }}">
+  <header class="opx-hd">
+    <div class="opx-in">
+      <div class="opx-top">
+        <sc-if value="{{ notStarted }}" hint-placeholder-val="{{ true }}">
+          <a class="opx-back" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>{{ backLabel }}</a>
+        </sc-if>
+        <sc-if value="{{ started }}" hint-placeholder-val="{{ false }}">
+          <span class="opx-run" role="status"><i aria-hidden="true"></i>{{ runLabel }} · desde <span class="mono">{{ since }}</span></span>
+        </sc-if>
+        <div style="display: flex; gap: 8px; flex: none">
+          <button class="b b-out b-ico b-touch" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span></button>
+          <button class="b b-out b-ico b-touch" type="button" aria-label="Acciones del pedido 2026-0000003"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+        </div>
+      </div>
+
+      <div class="opx-title">
+        <div style="min-width: 0">
+          <span class="lab">{{ eyebrow }} · <span class="mono">2026-0000003</span></span>
+          <h1 class="opx-h1">Desengrasante alcalino</h1>
+          <div class="opx-meta">
+            <span class="opx-chip"><span class="k">Cantidad</span><span class="mono strong">120,00 kg</span></span>
+          </div>
+        </div>
+        <span class="{{ statusCls }}"><i></i>{{ statusLabel }}</span>
+      </div>
+
+      <sc-if value="{{ showProg }}" hint-placeholder-val="{{ true }}">
+        <div class="opx-prog">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+            <span style="font-size: 15px"><span class="strong">Paso <span class="mono">{{ n }}</span> de <span class="mono">{{ total }}</span></span><span class="dim"> · {{ title }}</span></span>
+            <span class="mono dim" style="font-size: 14px">{{ pct }} %</span>
+          </div>
+          <div class="opx-bar" role="progressbar" aria-label="{{ stepLabel }}" aria-valuemin="1" aria-valuemax="{{ total }}" aria-valuenow="{{ n }}" style="{{ barCols }}"><sc-for list="{{ segs }}" as="g" hint-placeholder-count="4"><i class="{{ g.cls }}"></i></sc-for></div>
+        </div>
+      </sc-if>
+    </div>
+  </header>
+
+  <div class="opx-scroll">
+
+  <main class="opx-body">
+    <aside class="opx-side" aria-label="Materiales, herramientas y equipo">
+      <section class="{{ matCls }}" aria-labelledby="opx-mat">
+        <button class="opx-tg" type="button" aria-expanded="{{ matOpen }}" aria-controls="opx-mat-c" onClick="{{ tog_mat }}"><span class="opx-sec" style="flex: 1"><h2 id="opx-mat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg>{{ matTitle }}</h2><span class="opx-count">{{ matCount }}</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <sc-if value="{{ matShow }}" hint-placeholder-val="{{ true }}"><ul id="opx-mat-c" class="opx-rows">
+          <sc-for list="{{ mats }}" as="x" hint-placeholder-count="4">
+            <li class="opx-row"><span>{{ x.name }}</span><span class="q">{{ x.q }}<sc-if value="{{ x.alt }}" hint-placeholder-val="{{ true }}"><select class="opx-unit" aria-label="{{ x.aria }}" value="{{ x.u }}" onChange="{{ x.set }}"><sc-for list="{{ x.units }}" as="o" hint-placeholder-count="2"><option value="{{ o }}">{{ o }}</option></sc-for></select></sc-if><sc-if value="{{ x.fixed }}" hint-placeholder-val="{{ false }}"><span>{{ x.u }}</span></sc-if></span></li>
+          </sc-for>
+        </ul></sc-if>
+      </section>
+
+      <sc-if value="{{ hasTools }}" hint-placeholder-val="{{ true }}">
+      <section class="{{ toolCls }}" aria-labelledby="opx-tool">
+        <button class="opx-tg" type="button" aria-expanded="{{ toolOpen }}" aria-controls="opx-tool-c" onClick="{{ tog_tool }}"><span class="opx-sec" style="flex: 1"><h2 id="opx-tool"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Herramientas</h2><span class="opx-count">{{ toolCount }}</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <sc-if value="{{ toolShow }}" hint-placeholder-val="{{ true }}"><ul id="opx-tool-c" class="opx-rows">
+          <sc-for list="{{ tools }}" as="t" hint-placeholder-count="3"><li class="opx-row"><span>{{ t }}</span></li></sc-for>
+        </ul></sc-if>
+      </section>
+      </sc-if>
+
+      <section class="{{ teamCls }}" aria-labelledby="opx-team">
+        <button class="opx-tg" type="button" aria-expanded="{{ teamOpen }}" aria-controls="opx-team-c" onClick="{{ tog_team }}"><span class="opx-sec" style="flex: 1"><h2 id="opx-team"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg>{{ teamTitle }}</h2><span class="opx-count">{{ teamCount }}</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <sc-if value="{{ teamShow }}" hint-placeholder-val="{{ true }}"><div id="opx-team-c" style="display: flex; flex-direction: column; gap: 12px">
+        <sc-for list="{{ groups }}" as="gr" hint-placeholder-count="2">
+          <div class="opx-grp">
+            <div class="opx-grp-h"><span>{{ gr.name }}</span><span class="mono">{{ gr.count }}</span></div>
+            <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px">
+              <sc-for list="{{ gr.members }}" as="m" hint-placeholder-count="2">
+                <li class="opx-mem"><span class="{{ m.avCls }}" aria-hidden="true">{{ m.ini }}</span><span class="opx-mem-t"><span>{{ m.name }}</span><span class="r">{{ m.role }}</span></span><sc-if value="{{ m.me }}" hint-placeholder-val="{{ false }}"><span class="opx-me">Tú</span></sc-if></li>
+              </sc-for>
+            </ul>
+          </div>
+        </sc-for>
+        </div></sc-if>
+      </section>
+    </aside>
+
+    <section aria-labelledby="opx-step" style="min-width: 0">
+      <sc-if value="{{ notStarted }}" hint-placeholder-val="{{ true }}">
+        <div class="opx-start">
+          <span class="h3">{{ startTitle }}</span>
+          <p class="sub" style="margin: 0; font-size: 16px">{{ startBody }}</p>
+          <ul style="margin: 0; padding-left: 20px; font-size: 15px; display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{ preview }}" as="p" hint-placeholder-count="4"><li>{{ p }}</li></sc-for>
+          </ul>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ started }}" hint-placeholder-val="{{ false }}">
+        <div class="opx-step">
+          <span class="opx-sn"><b>{{ n }}</b>de <span class="mono">{{ total }}</span></span>
+          <h2 id="opx-step" class="opx-h2">{{ title }}</h2>
+          <p class="opx-lead">{{ body }}</p>
+
+          <sc-if value="{{ hasUses }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <span class="lab">En este paso usas</span>
+              <div class="opx-uses"><sc-for list="{{ uses }}" as="u" hint-placeholder-count="2"><span class="opx-use">{{ u.name }}<span class="q">{{ u.q }}</span></span></sc-for></div>
+            </div>
+          </sc-if>
+
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline"><span class="lab">Comprueba</span><span class="cap"><span class="mono">{{ doneN }}</span> de <span class="mono">{{ itemsN }}</span></span></div>
+            <ul class="opx-list" role="group" aria-label="{{ title }}">
+              <sc-for list="{{ items }}" as="it" hint-placeholder-count="3">
+                <li><button class="opx-item" type="button" role="checkbox" aria-checked="{{ it.on }}" onClick="{{ it.toggle }}"><span class="bx"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="m5 12 5 5 9-10"></path></svg></span><span class="tx">{{ it.text }}</span></button></li>
+              </sc-for>
+            </ul>
+          </div>
+
+          <sc-if value="{{ hasNote }}" hint-placeholder-val="{{ false }}">
+            <div class="opx-note" role="note"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg><span>{{ note }}</span></div>
+          </sc-if>
+
+          <sc-if value="{{ waiting }}" hint-placeholder-val="{{ false }}">
+            <div class="opx-wait" role="status" aria-live="polite">
+              <svg class="ring" viewBox="0 0 44 44" aria-hidden="true" style="width: 44px; height: 44px"><circle class="bgc" cx="22" cy="22" r="17"></circle><circle class="fgc" cx="22" cy="22" r="17" stroke-dasharray="106.8" stroke-dashoffset="{{ dash }}" transform="rotate(-90 22 22)"></circle></svg>
+              <span>Deja reposar. Puedes seguir en <span class="mono strong">{{ timer }}</span>.</span>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </section>
+  </main>
+
+  </div>
+
+  <footer class="opx-ft">
+    <div class="opx-ft-in">
+      <div class="opx-ft-b">
+        <sc-if value="{{ notStarted }}" hint-placeholder-val="{{ true }}">
+          <div class="opx-ft-row one"><button class="b b-pri b-xl opx-btn" type="button" onClick="{{ start }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8z"></path></svg>{{ startCta }}</button></div>
+        </sc-if>
+        <sc-if value="{{ started }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <p class="cap" aria-live="polite" style="margin: 0; text-align: center; min-height: 18px">{{ gateMsg }}</p>
+            <div class="opx-ft-row">
+              <button class="b b-out b-xl opx-btn" type="button" disabled="{{ isFirst }}" onClick="{{ prev }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Anterior</button>
+              <sc-if value="{{ notLast }}" hint-placeholder-val="{{ true }}"><button class="b b-pri b-xl opx-btn" type="button" disabled="{{ nextDis }}" onClick="{{ next }}">Siguiente<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
+              <sc-if value="{{ isLast }}" hint-placeholder-val="{{ false }}"><button class="b b-pri b-xl opx-btn" type="button" disabled="{{ nextDis }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>{{ endCta }}</button></sc-if>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </footer>
+
+  <div class="opx-fabs" aria-label="Paneles">
+    <button class="{{ fabCls_mat }}" type="button" aria-label="{{ fabAria_mat }}" aria-expanded="{{ fabOn_mat }}" aria-controls="opx-sheet" onClick="{{ open_mat }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg><span class="opx-fab-n mono">{{ matCount }}</span></button>
+    <sc-if value="{{ hasTools }}" hint-placeholder-val="{{ true }}"><button class="{{ fabCls_tool }}" type="button" aria-label="{{ fabAria_tool }}" aria-expanded="{{ fabOn_tool }}" aria-controls="opx-sheet" onClick="{{ open_tool }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg><span class="opx-fab-n mono">{{ toolCount }}</span></button></sc-if>
+    <button class="{{ fabCls_team }}" type="button" aria-label="{{ fabAria_team }}" aria-expanded="{{ fabOn_team }}" aria-controls="opx-sheet" onClick="{{ open_team }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg><span class="opx-fab-n mono">{{ teamCount }}</span></button>
+  </div>
+
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="opx-scrim" onClick="{{ closeSheet }}" aria-hidden="true"></div>
+    <section id="opx-sheet" class="opx-sheet" role="dialog" aria-modal="false" aria-labelledby="opx-sheet-t">
+      <sc-if value="{{ sheet_mat }}" hint-placeholder-val="{{ false }}">
+        <div class="opx-sheet-h k-mat"><h2 id="opx-sheet-t"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg>{{ matTitle }}<span class="opx-count">{{ matCount }}</span></h2><button class="b b-ghost b-ico b-touch" type="button" aria-label="Cerrar" onClick="{{ closeSheet }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="opx-sheet-c"><ul id="opx-mat-c-s" class="opx-rows">
+          <sc-for list="{{ mats }}" as="x" hint-placeholder-count="4">
+            <li class="opx-row"><span>{{ x.name }}</span><span class="q">{{ x.q }}<sc-if value="{{ x.alt }}" hint-placeholder-val="{{ true }}"><select class="opx-unit" aria-label="{{ x.aria }}" value="{{ x.u }}" onChange="{{ x.set }}"><sc-for list="{{ x.units }}" as="o" hint-placeholder-count="2"><option value="{{ o }}">{{ o }}</option></sc-for></select></sc-if><sc-if value="{{ x.fixed }}" hint-placeholder-val="{{ false }}"><span>{{ x.u }}</span></sc-if></span></li>
+          </sc-for>
+        </ul></div>
+      </sc-if>
+      <sc-if value="{{ sheet_tool }}" hint-placeholder-val="{{ false }}">
+        <div class="opx-sheet-h k-tool"><h2 id="opx-sheet-t"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Herramientas<span class="opx-count">{{ toolCount }}</span></h2><button class="b b-ghost b-ico b-touch" type="button" aria-label="Cerrar" onClick="{{ closeSheet }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="opx-sheet-c"><ul id="opx-tool-c-s" class="opx-rows">
+          <sc-for list="{{ tools }}" as="t" hint-placeholder-count="3"><li class="opx-row"><span>{{ t }}</span></li></sc-for>
+        </ul></div>
+      </sc-if>
+      <sc-if value="{{ sheet_team }}" hint-placeholder-val="{{ false }}">
+        <div class="opx-sheet-h k-team"><h2 id="opx-sheet-t"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg>{{ teamTitle }}<span class="opx-count">{{ teamCount }}</span></h2><button class="b b-ghost b-ico b-touch" type="button" aria-label="Cerrar" onClick="{{ closeSheet }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="opx-sheet-c"><div id="opx-team-c-s" style="display: flex; flex-direction: column; gap: 12px">
+        <sc-for list="{{ groups }}" as="gr" hint-placeholder-count="2">
+          <div class="opx-grp">
+            <div class="opx-grp-h"><span>{{ gr.name }}</span><span class="mono">{{ gr.count }}</span></div>
+            <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px">
+              <sc-for list="{{ gr.members }}" as="m" hint-placeholder-count="2">
+                <li class="opx-mem"><span class="{{ m.avCls }}" aria-hidden="true">{{ m.ini }}</span><span class="opx-mem-t"><span>{{ m.name }}</span><span class="r">{{ m.role }}</span></span><sc-if value="{{ m.me }}" hint-placeholder-val="{{ false }}"><span class="opx-me">Tú</span></sc-if></li>
+              </sc-for>
+            </ul>
+          </div>
+        </sc-for>
+        </div></div>
+      </sc-if>
+    </section>
+  </sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"pantalla":{"editor":"enum","options":["Ejecución","Acondicionamiento","Empaque"],"default":"Ejecución"},"estado":{"editor":"enum","options":["Sin comenzar","En curso"],"default":"En curso"},"alto":{"editor":"number","default":900},"$preview":{"width":1440,"height":900}}'>
+var SCREENS = {
+  'Ejecución': {
+    eyebrow: 'Fabricación', back: 'Volver a mis pedidos', run: 'Fabricando', envase: 'Garrafa 20 L', lot: false,
+    startTitle: 'Revisa antes de comenzar', startBody: 'Al pulsar «Comenzar» el pedido queda en fabricación a tu nombre y no podrás salir de esta pantalla hasta terminarlo.',
+    startCta: 'Comenzar la fabricación', endCta: 'Terminar la fabricación', matTitle: 'Materiales', teamTitle: 'Responsables', tools: ['Mezcladora 200 L', 'Balanza de plataforma', 'pH-metro'],
+    mats: [['Agua desmineralizada', 96.00, 'kg'], ['Hidróxido de sodio', 6.00, 'kg'], ['Tensoactivo no iónico', 14.40, 'kg'], ['Metasilicato de sodio', 3.60, 'kg']],
+    steps: [
+      ['Prepara la mezcladora', 'Deja el equipo listo y protégete antes de cargar nada.', [], ['Revisa que la mezcladora de 200 L esté limpia y seca.', 'Ponte guantes de nitrilo y gafas.', 'Pesa los materiales de la lista.'], 0, 'El hidróxido de sodio es corrosivo: no lo manipules sin guantes.'],
+      ['Agrega el agua', 'Carga el agua y deja que la mezcladora gire antes de seguir.', [['Agua desmineralizada', '57,60 kg']], ['Agrega el 60 % del agua desmineralizada.', 'Enciende la agitación a velocidad baja.'], 8, ''],
+      ['Disuelve el tensoactivo', 'Agrégalo poco a poco para que no forme espuma.', [['Tensoactivo no iónico', '14,40 kg']], ['Agrega el tensoactivo no iónico.', 'Agita hasta que no queden grumos.'], 0, ''],
+      ['Completa y ajusta', 'Termina la mezcla y comprueba el pH.', [['Agua desmineralizada', '38,40 kg']], ['Agrega el resto del agua.', 'Mide el pH y anótalo en la etiqueta.'], 0, '']
+    ]
+  },
+  'Acondicionamiento': {
+    eyebrow: 'Acondicionamiento', back: 'Volver a acondicionamiento', run: 'Acondicionando', envase: 'Garrafa 20 L', lot: true,
+    startTitle: 'Revisa antes de comenzar', startBody: 'Al comenzar, el equipo queda registrado y el pedido pasa a «En acondicionamiento».',
+    startCta: 'Comenzar el acondicionamiento', endCta: 'Terminar el acondicionamiento', matTitle: 'Insumos', teamTitle: 'Equipo', tools: ['Balanza analítica', 'Densímetro', 'Cucharón de muestreo'],
+    mats: [['Colorante amarillo', 0.12, 'kg'], ['Fragancia limón', 0.60, 'kg']],
+    steps: [
+      ['Toma la muestra', 'Saca una muestra de 250 ml del tanque para el control.', [], ['Homogeniza el tanque 5 minutos.', 'Toma la muestra con el cucharón limpio.'], 0, ''],
+      ['Ajusta color y aroma', 'Agrega los insumos de acondicionamiento.', [['Colorante amarillo', '0,12 kg'], ['Fragancia limón', '0,60 kg']], ['Agrega el colorante disuelto.', 'Agrega la fragancia.', 'Agita a velocidad baja.'], 6, ''],
+      ['Controla y libera', 'Compara con el patrón y anota el resultado.', [], ['Compara color con el patrón.', 'Mide densidad y anótala.'], 0, 'Si no coincide con el patrón, avisa al responsable antes de seguir.']
+    ]
+  },
+  'Empaque': {
+    eyebrow: 'Empaque', back: 'Volver a por empacar', run: 'Empacando', envase: 'Garrafa 20 L · 6 envases', lot: true,
+    startTitle: 'Revisa antes de comenzar', startBody: 'Al comenzar, el empaque queda a tu nombre. Al terminar indicas los envases reales.',
+    startCta: 'Comenzar el empaque', endCta: 'Terminar el empaque', matTitle: 'Envases y etiquetas', teamTitle: 'Equipo', tools: ['Llenadora', 'Balanza de plataforma', 'Torquímetro'],
+    mats: [['Garrafa 20 L', 6, 'u'], ['Tapa 38 mm', 6, 'u'], ['Etiqueta frontal', 6, 'u']],
+    steps: [
+      ['Prepara la línea', 'Limpia la boquilla y deja los envases a mano.', [['Garrafa 20 L', '6 u']], ['Revisa que las garrafas estén limpias.', 'Calibra la balanza con una garrafa vacía.'], 0, ''],
+      ['Llena y tapa', 'Llena cada garrafa hasta la marca y tápala.', [['Tapa 38 mm', '6 u']], ['Llena hasta 20 kg netos.', 'Ajusta la tapa con el torquímetro.'], 0, ''],
+      ['Etiqueta', 'Pega la etiqueta con el lote y el vencimiento.', [['Etiqueta frontal', '6 u']], ['Imprime las etiquetas del lote L-2610-02.', 'Pégalas centradas y sin burbujas.'], 0, '']
+    ]
+  }
+};
+
+var TEAM = {
+  'Ejecución': [ { name: 'Turno mañana', members: [['Carlos Pérez', 'Operador', true], ['Ana Rojas', 'Operador', false]] }, { name: 'Personas', members: [['Luis Ortega', 'Operador', false]] } ],
+  'Acondicionamiento': [ { name: 'Calidad', members: [['María Díaz', 'Administrador de acondicionamiento', false], ['Carlos Pérez', 'Operador', true]] } ],
+  'Empaque': [ { name: 'Empaque A', members: [['Jorge Vélez', 'Empacador', true], ['Rosa León', 'Empacador', false], ['Pablo Cano', 'Empacador', false]] } ]
+};
+
+class Component extends DCLogic {
+  componentWillUnmount() { clearInterval(this.iv); }
+  componentDidUpdate(prev) {
+    if (prev.pantalla !== this.props.pantalla || prev.estado !== this.props.estado) { clearInterval(this.iv); this.setState({ i: 0, done: {}, waited: {}, wi: -1, left: 0, startedLocal: undefined }); }
+  }
+  startWait(idx, secs) {
+    clearInterval(this.iv);
+    this.end = Date.now() + secs * 1000;
+    this.setState({ left: secs, wi: idx, secs: secs });
+    this.iv = setInterval(() => {
+      const left = Math.max(0, Math.ceil((this.end - Date.now()) / 1000));
+      const st = this.state || {};
+      if (!left) { clearInterval(this.iv); this.setState({ left: 0, waited: Object.assign({}, st.waited || {}, { [idx]: true }) }); }
+      else this.setState({ left: left });
+    }, 250);
+  }
+  renderVals() {
+    const s = this.state || {};
+    const key = this.props.pantalla ?? 'Ejecución';
+    const sc = SCREENS[key];
+    const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+    const started = s.startedLocal !== undefined ? s.startedLocal : (this.props.estado ?? 'En curso') === 'En curso';
+    const steps = sc.steps;
+    const i = Math.min(s.i || 0, steps.length - 1);
+    const st = steps[i];
+    const done = s.done || {};
+    const waited = s.waited || {};
+    const go = (d) => { const ni = i + d; this.setState({ i: ni }); if (steps[ni][4] && !waited[ni]) this.startWait(ni, steps[ni][4]); };
+    const pendingN = st[3].filter((t, j) => !done[i + '-' + j]).length;
+    const secs = st[4];
+    const waiting = started && !!secs && !waited[i] && s.wi === i && (s.left || 0) > 0;
+    const left = waiting ? s.left : 0;
+    const blocked = pendingN > 0 || waiting;
+    let ai = 0;
+    const groups = TEAM[key].map((g) => ({
+      name: g.name, count: String(g.members.length),
+      members: g.members.map((m) => { ai++; return { name: m[0], role: m[1], me: m[2], ini: m[0].split(' ').map((p) => p[0]).join('').slice(0, 2), avCls: 'opx-av' + (ai % 3 === 2 ? ' a2' : ai % 3 === 0 ? ' a3' : '') }; })
+    }));
+    const openS = s.open || {};
+    const isOpen = (k) => openS[k] !== false;
+    const tog = (k) => () => this.setState({ open: Object.assign({}, openS, { [k]: !isOpen(k) }) });
+    const unitsS = s.units || {};
+    const fmt = (v) => v.toLocaleString('es-CO', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 });
+    const tools = sc.tools || [];
+    const mats = sc.mats.map((m, j) => {
+      const uk = key + j; const alts = m[2] === 'kg' ? ['kg', 'g'] : [m[2]]; const u = unitsS[uk] || m[2];
+      const v = u === 'g' ? m[1] * 1000 : m[1];
+      return { name: m[0], q: fmt(v), u: u, units: alts, alt: alts.length > 1, fixed: alts.length === 1, aria: 'Unidad de ' + m[0],
+        set: (e) => this.setState({ units: Object.assign({}, unitsS, { [uk]: e.target.value }) }) };
+    });
+    const sheet = s.sheet || null;
+    const fabV = {};
+    ['mat', 'tool', 'team'].forEach((k) => {
+      fabV['fabCls_' + k] = 'opx-fab k-' + k + (sheet === k ? ' on' : '');
+      fabV['fabOn_' + k] = String(sheet === k);
+      fabV['open_' + k] = () => this.setState({ sheet: sheet === k ? null : k });
+      fabV['sheet_' + k] = sheet === k;
+      fabV['tog_' + k] = tog(k);
+    });
+    const teamCount = TEAM[key].reduce((a, g) => a + g.members.length, 0);
+    return {
+      hStyle: 'height: ' + (this.props.alto || 900) + 'px',
+      rootCls: dark ? 'qc dk' : 'qc',
+      toggleDark: () => this.setState({ dark: !dark }),
+      eyebrow: sc.eyebrow, backLabel: sc.back, runLabel: sc.run, since: '09:42', 
+      notStarted: !started, started: started, showProg: started,
+      statusLabel: started ? sc.run : 'Sin comenzar',
+      statusCls: started ? 'sb t-progress' : 'sb t-waiting',
+      startTitle: sc.startTitle, startBody: sc.startBody, startCta: sc.startCta, endCta: sc.endCta,
+      preview: steps.map((x, j) => (j + 1) + '. ' + x[0]),
+      start: () => { this.setState({ startedLocal: true, i: 0 }); },
+      teamTitle: sc.teamTitle, teamCount: String(teamCount), groups: groups,
+      matTitle: sc.matTitle, matCount: String(sc.mats.length), mats: mats,
+      hasTools: tools.length > 0, tools: tools, toolCount: String(tools.length),
+      ...fabV, sheetOpen: !!sheet, closeSheet: () => this.setState({ sheet: null }),
+      fabAria_mat: 'Ver ' + sc.matTitle.toLowerCase(), fabAria_tool: 'Ver herramientas', fabAria_team: 'Ver ' + sc.teamTitle.toLowerCase(),
+      teamOpen: String(isOpen('team')), teamShow: isOpen('team'), teamCls: 'opx-card' + (isOpen('team') ? '' : ' closed'),
+      toolOpen: String(isOpen('tool')), toolShow: isOpen('tool'), toolCls: 'opx-card' + (isOpen('tool') ? '' : ' closed'),
+      matOpen: String(isOpen('mat')), matShow: isOpen('mat'), matCls: 'opx-card' + (isOpen('mat') ? '' : ' closed'),
+      segs: steps.map((x, j) => ({ cls: j < i ? 'on' : (j === i ? 'cur' : '') })),
+      barCols: 'grid-template-columns: repeat(' + steps.length + ', minmax(0, 1fr))',
+      stepLabel: 'Paso ' + (i + 1) + ' de ' + steps.length,
+      n: i + 1, total: steps.length, pct: Math.round(((i + 1) / steps.length) * 100),
+      title: st[0], body: st[1],
+      hasUses: st[2].length > 0, uses: st[2].map((u) => ({ name: u[0], q: u[1] })),
+      itemsN: String(st[3].length), doneN: String(st[3].length - pendingN),
+      items: st[3].map((t, j) => { const k = i + '-' + j; const on = !!done[k]; return { text: t, on: on ? 'true' : 'false', toggle: () => this.setState({ done: Object.assign({}, done, { [k]: !on }) }) }; }),
+      hasNote: !!st[5], note: st[5],
+      waiting: waiting, timer: '00:' + String(left).padStart(2, '0'), dash: (106.8 * (1 - left / (secs || 1))).toFixed(1),
+      gateMsg: pendingN > 0 ? 'Marca los ' + pendingN + ' puntos pendientes para continuar.' : (waiting ? 'Espera a que termine el reposo.' : ''),
+      isFirst: i === 0, notLast: i < steps.length - 1, isLast: i === steps.length - 1,
+      nextDis: blocked,
+      prev: () => go(-1), next: () => { if (!blocked) go(1); }
+    };
+  }
+}
+</script>
+</body>
+</html>
