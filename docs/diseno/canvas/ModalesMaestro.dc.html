@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Modales del área del Maestro</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}" style="width: 1440px; min-height: 3400px; padding: 40px; display: flex; flex-direction: column; gap: 24px">
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <span class="lab">Área del Maestro · Empresas, módulos y administradores</span>
+    <h1 class="h1">Modales del área</h1>
+    <p class="sub">Todos abiertos a la vez, sin animar. Los mensajes de error son los del catálogo; lo que no existe va entre corchetes.</p>
+  </div>
+
+  <div class="modal-grid">
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Nueva empresa · error de nombre repetido</span>
+      <aside class="sheet wide static" role="dialog" aria-labelledby="mm-ne">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mm-ne" class="h2">Nueva empresa</h2><p class="sub">Da de alta la empresa y a su primer Administrador.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <span class="lab">Empresa</span>
+          <div class="f"><label for="mm-n">Nombre<span class="req" aria-hidden="true">*</span></label><input id="mm-n" class="in" type="text" value="Aseo Caribe" aria-invalid="true" aria-describedby="mm-n-e"><span id="mm-n-e" class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 8v5M12 16h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"></path></svg>Ya existe una empresa activa con ese nombre.</span></div>
+          <div class="f"><label for="mm-t">Identificación fiscal</label><input id="mm-t" class="in mono" type="text"><span class="help">Opcional. Por ejemplo, el NIT.</span></div>
+          <div class="g2"><div class="f"><label>Correo de contacto</label><input class="in" type="email"></div><div class="f"><label>Teléfono de contacto</label><input class="in mono" type="tel"></div></div>
+          <span class="lab" style="padding-top: 8px; border-top: 1px solid var(--border)">Administrador inicial</span>
+          <div class="g2"><div class="f"><label>Nombres<span class="req" aria-hidden="true">*</span></label><input class="in" type="text" value="Paula"></div><div class="f"><label>Apellidos<span class="req" aria-hidden="true">*</span></label><input class="in" type="text" value="Gil"></div></div>
+          <div class="g2"><div class="f"><label>Correo<span class="req" aria-hidden="true">*</span></label><input class="in" type="email" value="gerencia@aseocaribe.co"></div><div class="f"><label>Nombre de usuario<span class="req" aria-hidden="true">*</span></label><input class="in mono" type="text" value="pgil"></div></div>
+          <div class="nt n-i"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6"></path></svg><span>Le llegará un correo con un enlace para fijar su contraseña.</span></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Crear empresa</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Editar empresa (con País)</span>
+      <aside class="sheet static" role="dialog" aria-labelledby="mm-ee">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mm-ee" class="h2">Editar empresa</h2><p class="sub">Cambia los datos de Químicos del Valle S.A.S.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label>Nombre<span class="req" aria-hidden="true">*</span></label><input class="in" type="text" value="Químicos del Valle S.A.S."></div>
+          <div class="f"><label>Identificación fiscal</label><input class="in mono" type="text" value="900.481.227-3"></div>
+          <div class="f"><label>Correo de contacto</label><input class="in" type="email" value="contacto@quimicosvalle.co"></div>
+          <div class="f"><label>Teléfono de contacto</label><input class="in mono" type="tel" value="602 488 1200"></div>
+          <div class="f anchor"><label>País</label><button class="in trig" type="button" aria-expanded="true" aria-haspopup="listbox"><span>Colombia (+57)</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <div class="lbox" role="listbox" style="margin-top: 6px">
+              <label class="wrap-ic" style="padding: 6px 0"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar país" aria-label="Buscar país"></label>
+              <div class="lrow" role="option" aria-selected="false"><span class="dim">Sin país</span></div>
+              <div class="lrow" role="option" aria-selected="true"><span>Colombia</span><span class="mono dim">+57</span></div>
+              <div class="lrow" role="option" aria-selected="false"><span>Ecuador</span><span class="mono dim">+593</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Dar de baja la empresa · nombre que no coincide</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mm-de">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+        <h2 id="mm-de" class="h2">Dar de baja a Químicos del Valle S.A.S.</h2>
+        <dl style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0"><div class="stat"><dt>Usuarios activos</dt><dd class="mono">14</dd></div><div class="stat"><dt>Pedidos abiertos</dt><dd class="mono">6</dd></div></dl>
+        <p class="sub">[QUÉ PASA CON SUS USUARIOS Y PEDIDOS AL DARLA DE BAJA]. Podrás reactivarla después.</p>
+        <div class="f"><label for="mm-cf">Escribe <span class="strong">Químicos del Valle S.A.S.</span> para confirmar</label><input id="mm-cf" class="in" type="text" value="Quimicos del valle" aria-invalid="true" aria-describedby="mm-cf-e"><span id="mm-cf-e" class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 8v5M12 16h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"></path></svg>El nombre escrito no coincide con el de la empresa.</span></div>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Dar de baja</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Reactivar · identificación fiscal ocupada</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mm-re">
+        <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg></div>
+        <h2 id="mm-re" class="h2">¿Reactivar Detergentes La Ceja?</h2>
+        <p class="sub">La empresa vuelve a estar activa con los datos y módulos que tenía.</p>
+        <div class="nt n-d" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5M12 16h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"></path></svg><span>Ya existe una empresa activa con esa identificación fiscal.</span></div>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-pri" type="button">Reactivar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Apagar un módulo (Lectura de PDF con IA)</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mm-off">
+        <div class="dlg-ic warn"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"></path></svg></div>
+        <h2 id="mm-off" class="h2">¿Apagar Lectura de PDF con IA?</h2>
+        <p class="sub">Desaparece del menú y de las pantallas de todos los usuarios de <span class="strong">Químicos del Valle S.A.S.</span> desde su siguiente acción. Lo ya confirmado no se borra.</p>
+        <ul class="sub" style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px"><li>Las lecturas de PDF en cola terminan como fallidas.</li><li>Las revisiones sin confirmar quedan ocultas hasta que lo vuelvas a prender.</li></ul>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Apagar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Apagar todos</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mm-all">
+        <div class="dlg-ic warn"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"></path></svg></div>
+        <h2 id="mm-all" class="h2">¿Apagar los 3 módulos prendidos?</h2>
+        <p class="sub">Dashboard y recorrido, Proveedores y Lectura de PDF con IA desaparecen para todos los usuarios de <span class="strong">Químicos del Valle S.A.S.</span> desde su siguiente acción. Lo ya confirmado no se borra.</p>
+        <ul class="sub" style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px"><li>Las lecturas de PDF en cola terminan como fallidas.</li><li>Las revisiones sin confirmar quedan ocultas hasta que lo vuelvas a prender.</li></ul>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Apagar todos</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Fila de módulo · error al guardar el interruptor</span>
+      <div class="card" style="width: min(560px, 100%)">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center"><span style="display: flex; flex-direction: column; gap: 2px"><span class="strong">Proveedores</span><span class="cap">[DESCRIPCIÓN: directorio de proveedores y su catálogo]</span></span><span class="sb t-success"><i></i>Prendido</span></div>
+        <div class="nt n-d" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5M12 16h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"></path></svg><span><b>No se guardó el cambio</b>Ocurrio un error inesperado. Intentalo de nuevo. · Referencia <span class="mono">[REF]</span></span></div>
+        <p class="cap" style="margin: 0">El interruptor vuelve a su posición anterior.</p>
+      </div>
+    </div>
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Nuevo administrador</span>
+      <aside class="sheet wide static" role="dialog" aria-labelledby="mm-na">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mm-na" class="h2">Nuevo administrador</h2><p class="sub">Elige la empresa y describe a la persona que la va a administrar.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f anchor"><label>Empresa<span class="req" aria-hidden="true">*</span></label><button class="in trig" type="button" aria-expanded="true" aria-haspopup="listbox"><span class="dim">[Elige una empresa]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <div class="lbox" role="listbox" style="margin-top: 6px"><div class="lrow" role="option" aria-selected="false">Aseo Caribe</div><div class="lrow" role="option" aria-selected="false">Laboratorios Andinos</div><div class="lrow" role="option" aria-selected="false">Pinturas del Sur</div><div class="lrow" role="option" aria-selected="false">Químicos del Valle S.A.S.</div></div>
+            <span class="help">Solo empresas activas.</span></div>
+          <div class="g2"><div class="f"><label>Nombres<span class="req" aria-hidden="true">*</span></label><input class="in" type="text"></div><div class="f"><label>Apellidos<span class="req" aria-hidden="true">*</span></label><input class="in" type="text"></div></div>
+          <div class="g2"><div class="f"><label>Correo<span class="req" aria-hidden="true">*</span></label><input class="in" type="email"></div><div class="f"><label>Nombre de usuario<span class="req" aria-hidden="true">*</span></label><input class="in mono" type="text"></div></div>
+          <div class="f"><span class="fl">Rol</span><span class="sb t-neutral" style="align-self: flex-start"><i></i>Administrador</span></div>
+          <div class="nt n-i"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6"></path></svg><span>Le llegará un correo con un enlace para fijar su contraseña.</span></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Crear administrador</button></div>
+      </aside>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Dar de baja al último Administrador</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mm-la">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+        <h2 id="mm-la" class="h2">Dar de baja a Natalia Ríos</h2>
+        <p class="sub">Natalia Ríos deja de poder entrar a <span class="strong">Laboratorios Andinos</span>.</p>
+        <div class="nt n-w"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span><b>Es el último Administrador de Laboratorios Andinos</b>[QUÉ PASA AL QUITAR EL ÚLTIMO ADMINISTRADOR: abierto en QC-165]</span></div>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Dar de baja</button></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":3400}}'>
+class Component extends DCLogic {
+renderVals() { return { rootCls: this.props.oscuro ? 'qc dk' : 'qc' }; }
+}
+</script>
+</body>
+</html>
