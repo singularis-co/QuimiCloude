@@ -550,15 +550,12 @@ export function buildProductColumns({
         return null;
       },
     },
-    ...(showCost ? [costColumn(units)] : []),
     {
-      id: 'qtyAlert',
-      label: 'Alerta de cantidad',
+      id: 'available',
+      label: 'Disponible',
       tabular: true,
       align: 'center',
-      sortable: true,
-      filter: { kind: 'numberRange' },
-      cell: (row) => (row.kind === 'product' ? qtyAlertCell(row.product, units) : null),
+      cell: (row) => reservedOrAvailableCell(row, 'available', units),
     },
     {
       id: 'reserved',
@@ -569,12 +566,15 @@ export function buildProductColumns({
       cell: (row) => reservedOrAvailableCell(row, 'reserved', units),
     },
     {
-      id: 'available',
-      label: 'Disponible',
+      id: 'qtyAlert',
+      label: 'Alerta de cantidad',
       tabular: true,
       align: 'center',
-      cell: (row) => reservedOrAvailableCell(row, 'available', units),
+      sortable: true,
+      filter: { kind: 'numberRange' },
+      cell: (row) => (row.kind === 'product' ? qtyAlertCell(row.product, units) : null),
     },
+    ...(showCost ? [costColumn(units)] : []),
     {
       ...actionsColumn<ProductTableRow>({
         id: ACTIONS_COLUMN_ID,
