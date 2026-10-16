@@ -16,6 +16,7 @@ const {
   redirectMock,
   listCompaniesActionMock,
   getCompanyActionMock,
+  listAdministratorsActionMock,
   routerMock,
 } = vi.hoisted(() => ({
     getSessionUserMock: vi.fn<() => Promise<unknown>>(),
@@ -23,6 +24,7 @@ const {
     redirectMock: vi.fn<(ruta: string) => never>(),
     listCompaniesActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
     getCompanyActionMock: vi.fn<(id: string) => Promise<unknown>>(),
+    listAdministratorsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
     routerMock: {
       push: vi.fn<(href: string) => void>(),
       replace: vi.fn<(href: string) => void>(),
@@ -57,6 +59,20 @@ vi.mock('@/lib/modules/identity/adapters/driving/company-actions', () => ({
   reactivateCompanyAction: vi.fn(),
 }));
 
+vi.mock('@/lib/modules/identity/adapters/driving/administrator-actions', () => ({
+  listAdministratorsAction: listAdministratorsActionMock,
+  getAdministratorAction: vi.fn(),
+  createAdministratorAction: vi.fn(),
+  updateAdministratorAction: vi.fn(),
+  deleteAdministratorAction: vi.fn(),
+  resendAdministratorLinkAction: vi.fn(),
+}));
+
+import {
+  AdministratorListSection,
+  AdministratorTable,
+} from '@/app/(private)/maestro/administradores/components';
+import MaestroAdministradoresPage from '@/app/(private)/maestro/administradores/page';
 import { CompanyListSection } from '@/app/(private)/maestro/empresas/components';
 import MaestroEmpresaPage from '@/app/(private)/maestro/empresas/[id]/page';
 import MaestroEmpresasPage from '@/app/(private)/maestro/empresas/page';
@@ -105,6 +121,10 @@ beforeEach(() => {
     throw new Error('NEXT_REDIRECT');
   });
   listCompaniesActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 },
+  });
+  listAdministratorsActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 },
   });
@@ -210,5 +230,152 @@ describe('/maestro/empresas/[id]', () => {
     const cuerpo = fuente.slice(fuente.indexOf('export default async function'));
     const primera = cuerpo.slice(cuerpo.indexOf('{', cuerpo.indexOf(')')) + 1).trim().split('\n')[0];
     expect(primera).toBe("await requirePagePermission('empresas.consultar');");
+  });
+});
+
+const VALLE = { id: '1c7d8e9f-2031-4b4c-9d5e-6f7a8b9c0d1e', name: 'Químicos del Valle S.A.S.' };
+const ANDINOS = { id: '3e9f0a1b-4253-4d6e-9f70-8b9c0d1e2f30', name: 'Laboratorios Andinos' };
+
+function filaEmpresa(company: { id: string; name: string }) {
+  return {
+    ...company,
+    taxId: null,
+    country: null,
+    liveUserCount: 1,
+    createdAt: new Date('2026-09-02T12:00:00.000Z'),
+    status: 'active',
+  };
+}
+
+const CONSULTA_DE_EMPRESAS = {
+  pageSize: 25,
+  sort: { columnId: 'name', direction: 'asc' },
+  filters: {},
+  search: '',
+};
+
+async function invocarAdministradores(raw: Record<string, string> = {}): Promise<ReactNode> {
+  return MaestroAdministradoresPage({ searchParams: Promise.resolve(raw) });
+}
+
+describe('/maestro/administradores', () => {
+  it('R1: sin sesion lleva al login y no pide ni la lista ni las empresas', async () => {
+    getSessionUserMock.mockResolvedValue(null);
+    await expect(invocarAdministradores()).rejects.toThrow('NEXT_REDIRECT');
+    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE_SESSION_ENDED);
+    expect(listAdministratorsActionMock).not.toHaveBeenCalled();
+    expect(listCompaniesActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R1: una sesion sin empresas.consultar recibe el 404 sin ningun dato de Administradores', async () => {
+    getSessionUserMock.mockResolvedValue(DE_EMPRESA);
+    await expect(invocarAdministradores()).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
+    expect(listAdministratorsActionMock).not.toHaveBeenCalled();
+    expect(listCompaniesActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R1: el corte por empresas.consultar es la primera linea del cuerpo de la pagina', () => {
+    const fuente = readFileSync(
+      join(RAIZ, 'app', '(private)', 'maestro', 'administradores', 'page.tsx'),
+      'utf8',
+    );
+    const cuerpo = fuente.slice(fuente.indexOf('export default async function'));
+    const primera = cuerpo.slice(cuerpo.indexOf('{', cuerpo.indexOf(')')) + 1).trim().split('\n')[0];
+    expect(primera).toBe("await requirePagePermission('empresas.consultar');");
+  });
+
+  it('R35: con el permiso pinta la miga «Plataforma» y el titulo «Administradores»', async () => {
+    getSessionUserMock.mockResolvedValue(MAESTRO);
+    const arbol = await invocarAdministradores();
+    render(buscar(arbol, PageHeader));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Administradores');
+    expect(screen.getByRole('navigation', { name: 'Plataforma' })).toHaveTextContent('Plataforma');
+  });
+
+  it('R35: la seccion pide la lista con el filtro «Empresa» y la pagina de la direccion', async () => {
+    getSessionUserMock.mockResolvedValue(MAESTRO);
+    const arbol = await invocarAdministradores({ empresa: VALLE.id, page: '2', pageSize: '25' });
+    const seccion = buscar(arbol, AdministratorListSection);
+    render(
+      await AdministratorListSection(
+        seccion.props as Parameters<typeof AdministratorListSection>[0],
+      ),
+    );
+    expect(listAdministratorsActionMock).toHaveBeenCalledWith({
+      page: 2,
+      pageSize: 25,
+      sort: null,
+      filters: { companyId: { kind: 'select', values: [VALLE.id] } },
+      search: '',
+    });
+  });
+
+  it('R35: las opciones del filtro son todas las empresas activas, pagina a pagina', async () => {
+    getSessionUserMock.mockResolvedValue(MAESTRO);
+    listCompaniesActionMock
+      .mockResolvedValueOnce({
+        status: 'success',
+        data: { items: [filaEmpresa(VALLE)], total: 2, page: 1, pageSize: 25, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        status: 'success',
+        data: { items: [filaEmpresa(ANDINOS)], total: 2, page: 2, pageSize: 25, totalPages: 2 },
+      });
+    const arbol = await invocarAdministradores();
+    expect(listCompaniesActionMock.mock.calls.map(([query]) => query)).toEqual([
+      { page: 1, ...CONSULTA_DE_EMPRESAS },
+      { page: 2, ...CONSULTA_DE_EMPRESAS },
+    ]);
+    expect(buscar(arbol, AdministratorListSection).props.companies).toEqual([VALLE, ANDINOS]);
+  });
+
+  it('R42: si las empresas no cargan, la lista queda en su error con «Reintentar»', async () => {
+    getSessionUserMock.mockResolvedValue(MAESTRO);
+    listCompaniesActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+      reference: 'req-77',
+    });
+    const arbol = await invocarAdministradores();
+    const tabla = buscar(arbol, AdministratorTable);
+    expect(tabla.props.status).toBe('error');
+    render(tabla);
+    expect(screen.getByTestId('administrator-list-error')).toHaveTextContent('req-77');
+    expect(screen.getByTestId('administrator-list-retry')).toBeInTheDocument();
+    expect(listAdministratorsActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R42: si la lista falla, la seccion pinta el error con su referencia', async () => {
+    getSessionUserMock.mockResolvedValue(MAESTRO);
+    listAdministratorsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+      reference: 'req-88',
+    });
+    const arbol = await invocarAdministradores();
+    const seccion = buscar(arbol, AdministratorListSection);
+    render(
+      await AdministratorListSection(
+        seccion.props as Parameters<typeof AdministratorListSection>[0],
+      ),
+    );
+    expect(screen.getByTestId('administrator-list-error')).toHaveTextContent('req-88');
+  });
+
+  it('R6: con empresas.consultar y sin empresas.modificar la seccion recibe canModify falso', async () => {
+    getSessionUserMock.mockResolvedValue(SOLO_CONSULTA);
+    const arbol = await invocarAdministradores();
+    expect(buscar(arbol, AdministratorListSection).props.canModify).toBe(false);
+    render(buscar(arbol, PageHeader));
+    expect(screen.queryByText('Nuevo administrador')).toBeNull();
+  });
+
+  it('R6: con empresas.modificar la seccion recibe canModify verdadero', async () => {
+    getSessionUserMock.mockResolvedValue(MAESTRO);
+    const arbol = await invocarAdministradores();
+    expect(buscar(arbol, AdministratorListSection).props.canModify).toBe(true);
   });
 });
