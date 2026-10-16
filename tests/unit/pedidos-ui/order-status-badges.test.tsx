@@ -17,7 +17,7 @@ afterEach(() => {
 // Tablas escritas a mano a proposito: si el mapa compartido cambia, este test lo nota.
 const ESTADOS: Readonly<Record<OrderStatus, { tone: StatusTone; label: string }>> = {
   PENDIENTE: { tone: 'neutral', label: 'Pendiente' },
-  EN_CURSO: { tone: 'progress', label: 'En curso' },
+  EN_CURSO: { tone: 'progress', label: 'En fabricación' },
   POR_EMPACAR: { tone: 'waiting', label: 'Por empacar' },
   EN_EMPAQUE: { tone: 'progress', label: 'En empaque' },
   ENTREGADO: { tone: 'success', label: 'Entregado' },

@@ -248,7 +248,7 @@ describe('R3 - R15 - en curso y duracion', () => {
   it('R3 - la fila activa se marca «En curso» y su duracion es abierta', () => {
     montar();
     const activa = fila(ACTIVO.orderId);
-    expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('En curso');
+    expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('En fabricación');
     expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('45 min (en curso)');
   });
 
@@ -268,11 +268,11 @@ describe('R3 - R15 - en curso y duracion', () => {
     expect(within(fila(ACTIVO.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
   });
 
-  it('R3 - la fila dada de baja en EN_CURSO no lleva la marca de actividad aunque su estado diga «En curso»', () => {
+  it('R3 - la fila dada de baja en EN_CURSO no lleva la marca de actividad aunque su estado diga «En fabricación»', () => {
     montar();
     const baja = fila(DE_BAJA.orderId);
     expect(within(baja).queryByTestId('execution-trace-active')).toBeNull();
-    expect(within(baja).getByTestId('execution-trace-status')).toHaveTextContent('En curso');
+    expect(within(baja).getByTestId('execution-trace-status')).toHaveTextContent('En fabricación');
     expect(within(baja).getByTestId('execution-trace-deleted')).toBeInTheDocument();
   });
 

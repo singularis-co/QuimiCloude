@@ -236,7 +236,7 @@ describe('R3 - la marca de actividad del resumen', () => {
     });
     render(await abrir());
     expect(screen.queryByTestId('execution-trace-active')).toBeNull();
-    expect(screen.getByTestId('execution-trace-status')).toHaveTextContent('En curso');
+    expect(screen.getByTestId('execution-trace-status')).toHaveTextContent('En fabricación');
     cleanup();
     getExecutionTraceActionMock.mockResolvedValue({ status: 'success', data: TRACE });
     render(await abrir());

@@ -85,8 +85,8 @@ describe('R13 - instantes, acciones y estados', () => {
     });
   });
 
-  it('R3 - EN_CURSO se lee «En curso»', () => {
-    expect(TRACE_ORDER_STATUS_LABELS.EN_CURSO).toBe('En curso');
+  it('R3 - EN_CURSO se lee «En fabricación»', () => {
+    expect(TRACE_ORDER_STATUS_LABELS.EN_CURSO).toBe('En fabricación');
   });
 
   it('R13 - la marca de dado de baja', () => {
