@@ -361,8 +361,8 @@ export async function findAliveInCompany(
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.UserOrderByWithRelationInput;
 
 /**
- * Orden POR DEFECTO: mas nuevos primero, `created_at DESC, id ASC` (QC-289; antes era
- * `last_names ASC, first_names ASC, id ASC`, R30). Se construye en CADA llamada y no como
+ * Orden POR DEFECTO: mas nuevos primero, `created_at DESC, id ASC`, para
+ * que lo recien dado de alta se vea sin buscarlo. Se construye en CADA llamada y no como
  * constante compartida: Prisma exige un array mutable en `orderBy`, y devolver siempre la misma
  * instancia dejaria que un llamante la mutara para todos.
  */

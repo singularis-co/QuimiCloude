@@ -253,7 +253,7 @@ export async function softDeleteAliveInCompany(
  *  trivial, y sin desempate un grupo podria salir en dos paginas o en ninguna. */
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.WorkGroupOrderByWithRelationInput;
 
-/** Orden POR DEFECTO: mas nuevos primero, `created_at DESC, id ASC` (QC-289). Se construye en
+/** Orden POR DEFECTO: mas nuevos primero, `created_at DESC, id ASC`. Se construye en
  *  CADA llamada porque Prisma exige un array mutable en `orderBy`. */
 function defaultOrderBy(): Prisma.WorkGroupOrderByWithRelationInput[] {
   return [{ createdAt: 'desc' }, TIE_BREAKER];

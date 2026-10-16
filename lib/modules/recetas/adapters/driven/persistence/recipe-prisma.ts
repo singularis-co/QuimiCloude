@@ -273,7 +273,7 @@ export async function findAliveRecipeById(id: string, scope: RecipeScope): Promi
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.RecipeOrderByWithRelationInput;
 
 /**
- * Orden POR DEFECTO: mas nuevas primero, `created_at DESC, id ASC` (QC-289). Dos altas del mismo
+ * Orden POR DEFECTO: mas nuevas primero, `created_at DESC, id ASC`. Dos altas del mismo
  * instante empatan en `created_at`, y el desempate por `id` las deja en un orden estable.
  *
  * Se construye en CADA llamada, no como constante compartida: Prisma exige un array mutable en

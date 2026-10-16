@@ -77,7 +77,7 @@ function toUnitView(row: UnitRow): UnitView {
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.UnitOrderByWithRelationInput;
 
 /**
- * Orden POR DEFECTO: mas nuevas primero, `created_at DESC, id ASC` (QC-289); el `id` desempata
+ * Orden POR DEFECTO: mas nuevas primero, `created_at DESC, id ASC`; el `id` desempata
  * dos altas del mismo instante. Se construye en CADA llamada, no como constante compartida:
  * Prisma exige un array mutable en `orderBy`, y devolver siempre la misma instancia dejaria que
  * un llamante la mutara para todos.
@@ -164,7 +164,7 @@ export function buildUnitWhere(query: ListQuery, scope: UnitScope): Prisma.UnitW
  * este modo no devuelve `total` porque no hay ventana, y contar seria una consulta de mas.
  *
  * Sin `sort`, este modo sigue ALFABETICO (`name ASC, id ASC`) y no toma el «mas nuevas primero»
- * del listado paginado (QC-289): lo consumen los selectores de unidad de recetas, proveedores y
+ * del listado paginado: lo consumen los selectores de unidad de recetas, proveedores y
  * pedidos, y los combos se quedan por nombre.
  */
 export async function listUnits(

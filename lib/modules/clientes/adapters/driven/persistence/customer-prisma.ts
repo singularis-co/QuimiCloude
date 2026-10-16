@@ -155,7 +155,7 @@ export async function softDeleteAliveCustomer(
  *  podrian intercambiar posicion entre paginas. */
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.CustomerOrderByWithRelationInput;
 
-/** Orden POR DEFECTO: mas nuevos primero, `createdAt DESC, id ASC` (QC-289). Se construye en
+/** Orden POR DEFECTO: mas nuevos primero, `createdAt DESC, id ASC`. Se construye en
  *  CADA llamada, no como constante compartida: Prisma exige un array mutable en `orderBy`. */
 function defaultOrderBy(): Prisma.CustomerOrderByWithRelationInput[] {
   return [{ createdAt: 'desc' }, TIE_BREAKER];
