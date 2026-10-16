@@ -1,5 +1,19 @@
 # QC-288 — entrega-sin-pedido · bitácora de implementación
 
+## Estado (implementer, 2026-10-16)
+
+- **Hechas y subidas:** T0, B1–B5, F1, F2, F5. Commits `c5277de2` … `89a4d9bf`.
+- **Bloqueadas por decisión de diseño/contrato** (detalle y opciones en
+  `progress/features/QC-288.md > Preguntas abiertas`):
+  - **F3 parcial:** la página `producto-terminado/[id]/page.tsx` choca con
+    `finished-product-route-contract.test.ts`: la action del excedente no está permitida, y la R16
+    prohíbe un valor `'use client'` desde el barrel.
+  - **F4:** escrita en el árbol de trabajo, **sin commit**. El botón «Anular» de la fila choca con
+    `guard-formularios-y-acciones` R28. Faltan las tarjetas de teléfono.
+- **Pendientes porque dependen de lo anterior:** TC, TI (E2E) y TZ. TC ya tiene identificados sus
+  rojos de censo: `order-delivery-append-only` R32/R33 y `module-contract`/`scope` R57.
+- **Mapa R<n> → test:** parcial, en las secciones de cada tanda. El mapa completo (R1–R57) llega en TZ.
+
 ## T0 — Verificaciones previas y contrato (2026-10-16)
 
 Verificaciones: `progress/features/QC-288.md > Decisiones` (2026-10-16 · T0). Paso 0 de
