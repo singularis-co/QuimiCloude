@@ -9,6 +9,7 @@ import {
   type RecipeLineFormValue,
   type RecipeToolFormValue,
 } from '@/app/(private)/produccion/formulas/components';
+import { isLineIncomplete } from '@/app/(private)/produccion/formulas/components/recipe-lines-field';
 
 /**
  * Tabs de líneas de la receta: ingredientes (PRODUCT, con % y cantidad) y herramientas
@@ -69,25 +70,19 @@ describe('tabs de líneas: ingredientes y máquinas', () => {
     expect(screen.getByTestId('recipe-line-product-0')).toBeInTheDocument();
   });
 
-  it('al 100 % se puede pedir otra línea sin porcentaje: los `+` siguen habilitados', async () => {
-    const user = setupUser();
+  it('al 100 % no se puede pedir otra línea: todos los `+` se deshabilitan', () => {
     render(<Harness initialLines={[lineValue('a', '60'), lineValue('b', '40')]} />);
 
     expect(screen.getByTestId('recipe-lines-sum')).toHaveAttribute('data-complete', 'true');
-    expect(screen.getByTestId('recipe-line-add-0')).toBeEnabled();
-
-    await user.click(screen.getByTestId('recipe-line-add-0'));
-
-    // La fila nueva nace vacía y no suma: el 100 % se conserva hasta que se reparta.
-    expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(3);
-    expect(screen.getByTestId('recipe-lines-sum')).toHaveAttribute('data-complete', 'true');
+    expect(screen.getByTestId('recipe-line-add-0')).toBeDisabled();
+    expect(screen.getByTestId('recipe-line-add-1')).toBeDisabled();
   });
 
-  it('al quitar una línea del 100 %, el `+` restante sigue habilitado', async () => {
+  it('al quitar una línea del 100 %, el `+` restante vuelve a habilitarse', async () => {
     const user = setupUser();
     render(<Harness initialLines={[lineValue('a', '60'), lineValue('b', '40')]} />);
 
-    expect(screen.getByTestId('recipe-line-add-0')).toBeEnabled();
+    expect(screen.getByTestId('recipe-line-add-0')).toBeDisabled();
 
     await user.click(screen.getByTestId('recipe-line-remove-1'));
 
@@ -185,5 +180,51 @@ describe('el select filtra por tipo en el servidor', () => {
         }),
       ),
     );
+  });
+});
+
+describe('«+» de ingredientes: solo con todas las líneas completas y la suma por debajo de 100 %', () => {
+  it('caso válido: líneas completas que suman menos de 100 % dejan todos los `+` activos', () => {
+    render(<Harness initialLines={[lineValue('a', '30'), lineValue('b', '20,5')]} />);
+    expect(screen.getByTestId('recipe-line-add-0')).toBeEnabled();
+    expect(screen.getByTestId('recipe-line-add-1')).toBeEnabled();
+  });
+
+  it('una línea sin porcentaje deshabilita todos los `+`', () => {
+    render(<Harness initialLines={[lineValue('a', '30'), lineValue('b', '')]} />);
+    expect(screen.getByTestId('recipe-line-add-0')).toBeDisabled();
+    expect(screen.getByTestId('recipe-line-add-1')).toBeDisabled();
+  });
+
+  it('una línea con porcentaje cero o que no parsea deshabilita todos los `+`', () => {
+    render(<Harness initialLines={[lineValue('a', '30'), lineValue('b', '0')]} />);
+    expect(screen.getByTestId('recipe-line-add-0')).toBeDisabled();
+    cleanup();
+    render(<Harness initialLines={[lineValue('a', '30'), lineValue('b', '5,')]} />);
+    expect(screen.getByTestId('recipe-line-add-0')).toBeDisabled();
+  });
+
+  it('una línea sin producto deshabilita todos los `+`', () => {
+    render(
+      <Harness
+        initialLines={[lineValue('a', '30'), { ...lineValue('b', '20'), productId: '', productName: '' }]}
+      />,
+    );
+    expect(screen.getByTestId('recipe-line-add-0')).toBeDisabled();
+    expect(screen.getByTestId('recipe-line-add-1')).toBeDisabled();
+  });
+
+  it('la fila fantasma, vacía, no deja añadir', () => {
+    render(<Harness />);
+    expect(screen.getByTestId('recipe-line-add-0')).toBeDisabled();
+  });
+
+  it('isLineIncomplete marca producto vacío, de baja y porcentajes vacíos o cero', () => {
+    expect(isLineIncomplete(lineValue('a', '10'))).toBe(false);
+    expect(isLineIncomplete(lineValue('a', '10,25'))).toBe(false);
+    expect(isLineIncomplete(lineValue('a', ''))).toBe(true);
+    expect(isLineIncomplete(lineValue('a', '0,00'))).toBe(true);
+    expect(isLineIncomplete({ ...lineValue('a', '10'), productId: '' })).toBe(true);
+    expect(isLineIncomplete({ ...lineValue('a', '10'), productName: null })).toBe(true);
   });
 });

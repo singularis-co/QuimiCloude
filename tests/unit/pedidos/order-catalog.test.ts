@@ -223,16 +223,16 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       status: 'PENDIENTE',
       unitId: 'u-1',
       presentationLines: [
-        { presentationId: 'p-1', packages: 5, packagingProductId: null },
-        { presentationId: 'p-2', packages: 1, packagingProductId: null },
+        { id: 'lp-1', presentationId: 'p-1', packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null },
+        { id: 'lp-2', presentationId: 'p-2', packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null },
       ],
       finishedAt: null,
       packedBy: null,
       conditionedBy: null,
     })
     expect(conReparto.presentationLines).toEqual([
-      { presentationId: 'p-1', packages: 5, packagingProductId: null },
-      { presentationId: 'p-2', packages: 1, packagingProductId: null },
+      { id: 'lp-1', presentationId: 'p-1', packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null },
+      { id: 'lp-2', presentationId: 'p-2', packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null },
     ])
 
     const sinReparto = toOrderSummaryRecord({
@@ -644,7 +644,14 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     const seleccion = findMany.mock.calls[0]?.[0]?.select
     expect(seleccion.unitId).toBe(true)
     expect(seleccion.presentationLines).toEqual({
-      select: { presentationId: true, packages: true, packagingProductId: true },
+      select: {
+        id: true,
+        presentationId: true,
+        packages: true,
+        packedPackages: true,
+        presentationContent: true,
+        packagingProductId: true,
+      },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     })
     // Y ya no pide la columna que retiro T10: el reparto vive en `order_presentation_lines`.
@@ -670,9 +677,9 @@ describe('listAliveSummariesByIds — el nombre del envase de cada linea', () =>
         status: 'POR_EMPACAR',
         unitId: null,
         presentationLines: [
-          { presentationId: 'p-1', packages: 4, packagingProductId: 'env-1' },
-          { presentationId: 'p-2', packages: 2, packagingProductId: null },
-          { presentationId: 'p-3', packages: 1, packagingProductId: 'env-de-baja' },
+          { presentationId: 'p-1', packages: 4, presentationContent: { toFixed: () => '1.0000' }, packagingProductId: 'env-1' },
+          { presentationId: 'p-2', packages: 2, presentationContent: null, packagingProductId: null },
+          { presentationId: 'p-3', packages: 1, presentationContent: null, packagingProductId: 'env-de-baja' },
         ],
         finishedAt: null,
         packedBy: null,
@@ -684,9 +691,9 @@ describe('listAliveSummariesByIds — el nombre del envase de cada linea', () =>
     expect(findPackagingRefs).toHaveBeenCalledTimes(1)
     expect(findPackagingRefs).toHaveBeenCalledWith(['env-1', 'env-de-baja'], EMPRESA)
     expect(pagina.items[0]?.presentationLines).toEqual([
-      { presentationId: 'p-1', packages: 4, packagingName: 'Envase PET 1L' },
-      { presentationId: 'p-2', packages: 2, packagingName: null },
-      { presentationId: 'p-3', packages: 1, packagingName: null },
+      { presentationId: 'p-1', packages: 4, presentationContent: '1.0000', packagingProductId: 'env-1', packagingName: 'Envase PET 1L', packagingImageUrl: null },
+      { presentationId: 'p-2', packages: 2, presentationContent: null, packagingProductId: null, packagingName: null, packagingImageUrl: null },
+      { presentationId: 'p-3', packages: 1, presentationContent: null, packagingProductId: 'env-de-baja', packagingName: null, packagingImageUrl: null },
     ])
   })
 
@@ -697,5 +704,46 @@ describe('listAliveSummariesByIds — el nombre del envase de cada linea', () =>
     await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
 
     expect(findPackagingRefs).not.toHaveBeenCalled()
+  })
+
+  it('imagen del envase: la linea lleva la URL que devuelve el catalogo, con una sola llamada por pagina', async () => {
+    const findRefsConImagen = vi.fn(async (ids: readonly string[]) =>
+      ids
+        .filter((id) => id === 'env-1' || id === 'env-2')
+        .map((id) =>
+          id === 'env-1'
+            ? { id, name: 'Envase PET 1L', imageUrl: 'https://cdn.test/productos/env-1.png' }
+            : { id, name: 'Galon', imageUrl: null },
+        ),
+    )
+    const listarConImagen = createListAliveSummariesInCompany({
+      ...summaryDeps,
+      packaging: { findRefs: findRefsConImagen, findCostingBatches: async () => [] },
+    } as unknown as Parameters<typeof createListAliveSummariesInCompany>[0])
+    const pedido = (id: string, packagingProductId: string) => ({
+      id,
+      orderYear: 2026,
+      orderSequence: 1,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'POR_EMPACAR',
+      unitId: null,
+      presentationLines: [{ presentationId: 'p-1', packages: 1, presentationContent: null, packagingProductId }],
+      finishedAt: null,
+      packedBy: null,
+    })
+    findMany.mockResolvedValue([pedido('o-1', 'env-1'), pedido('o-2', 'env-2'), pedido('o-3', 'env-1')])
+    count.mockResolvedValue(3)
+
+    const pagina = await listarConImagen(EMPRESA, ['POR_EMPACAR'], 'work_queue', 1)
+
+    expect(findRefsConImagen).toHaveBeenCalledTimes(1)
+    expect(findRefsConImagen).toHaveBeenCalledWith(['env-1', 'env-2'], EMPRESA)
+    expect(pagina.items.map((item) => item.presentationLines[0]?.packagingImageUrl)).toEqual([
+      'https://cdn.test/productos/env-1.png',
+      null,
+      'https://cdn.test/productos/env-1.png',
+    ])
   })
 })

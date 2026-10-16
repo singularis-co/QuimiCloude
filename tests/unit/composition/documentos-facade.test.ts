@@ -11,17 +11,29 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createAnthropicReaderMock, descargaRealMock, descargaDobleMock } = vi.hoisted(() => {
+const { createAnthropicReaderMock, descargaRealMock, descargaDobleMock, trabajoCableado } = vi.hoisted(() => {
   delete process.env.CATALOG_PROMPT;
   delete process.env.FORMULA_PROMPT;
   return {
     createAnthropicReaderMock: vi.fn(),
     descargaRealMock: vi.fn(async () => new Uint8Array([1])),
     descargaDobleMock: vi.fn(async () => new Uint8Array([2])),
+    trabajoCableado: { deps: null as null | { pdfReading: { isOn(companyId: string): Promise<boolean> } } },
   };
 });
 
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
+// Se observan las dependencias con las que la composicion construye el trabajo de la cola.
+vi.mock('@/lib/modules/documentos', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/modules/documentos')>();
+  return {
+    ...real,
+    createRunDocumentJob: (deps: Parameters<typeof real.createRunDocumentJob>[0]) => {
+      trabajoCableado.deps = deps;
+      return real.createRunDocumentJob(deps);
+    },
+  };
+});
 vi.mock('@/lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic', () => ({
   createAnthropicReader: createAnthropicReaderMock,
   probeAnthropic: vi.fn(),
@@ -43,7 +55,7 @@ vi.mock('@/lib/modules/documentos/adapters/driven/storage/document-storage-memor
   },
 }));
 
-import { documentos } from '@/lib/composition';
+import { documentos, identity } from '@/lib/composition';
 
 describe('documentos — el censo de la fachada cableada', () => {
   it('R21 — expone exactamente las doce claves del censo, y cada una con la forma que promete', () => {
@@ -97,6 +109,26 @@ describe('documentos — el censo de la fachada cableada', () => {
 
   it('R26 — el cableado no invoca el adaptador de IA al construirse', () => {
     expect(createAnthropicReaderMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('documentos — el interruptor de la lectura de PDF del trabajo de la cola', () => {
+  it('R22 — se ata a identity.isCompanyAddonActive con la clave lectura_pdf y devuelve su respuesta', async () => {
+    const deps = trabajoCableado.deps;
+    expect(deps).not.toBeNull();
+    const consulta = vi.spyOn(identity, 'isCompanyAddonActive');
+    try {
+      consulta.mockResolvedValueOnce(false);
+      expect(await deps!.pdfReading.isOn('empresa-a')).toBe(false);
+      consulta.mockResolvedValueOnce(true);
+      expect(await deps!.pdfReading.isOn('empresa-b')).toBe(true);
+      expect(consulta.mock.calls).toEqual([
+        ['empresa-a', 'lectura_pdf'],
+        ['empresa-b', 'lectura_pdf'],
+      ]);
+    } finally {
+      consulta.mockRestore();
+    }
   });
 });
 

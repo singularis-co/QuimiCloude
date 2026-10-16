@@ -95,7 +95,7 @@ const INITIAL_STOCK = '12';
 const REASON_OPTION_LABELS: Readonly<Record<MovementReason, string>> = {
   merma: 'Merma',
   rotura: 'Rotura',
-  conteo_fisico: 'Conteo fisico',
+  conteo_fisico: 'Conteo físico',
   error_de_carga: 'Error de carga',
 };
 

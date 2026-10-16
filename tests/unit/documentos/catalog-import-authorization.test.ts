@@ -133,8 +133,8 @@ describe('createConfirmCatalogImport — autorizacion', () => {
     const actoresDenegados: readonly (readonly [string, Actor | null | undefined])[] = [
       ['actor nulo', null],
       ['actor ausente', undefined],
-      ['sin el permiso exigido', { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.consultar'] }],
-      ['con el conjunto vacio', { id: PERSONA, companyId: EMPRESA, permissions: [] }],
+      ['sin el permiso exigido', { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.consultar'], addons: ['lectura_pdf'] }],
+      ['con el conjunto vacio', { id: PERSONA, companyId: EMPRESA, permissions: [], addons: ['lectura_pdf'] }],
     ];
 
     for (const [nombre, actor] of actoresDenegados) {
@@ -159,7 +159,7 @@ describe('createConfirmCatalogImport — autorizacion', () => {
         ]),
       });
       const confirm = createConfirmCatalogImport(deps);
-      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION, 'inventario.modificar'] };
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION, 'inventario.modificar'], addons: ['lectura_pdf'] };
 
       await confirm(actor, entradaBase([filaRevisada()]));
 
@@ -170,7 +170,7 @@ describe('createConfirmCatalogImport — autorizacion', () => {
       const bitacora: Bitacora = [];
       const deps = crearDeps(bitacora);
       const confirm = createConfirmCatalogImport(deps);
-      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'] };
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'], addons: ['lectura_pdf'] };
 
       await expect(confirm(actor, entradaBase([filaRevisada()]))).rejects.toBeInstanceOf(UnauthorizedError);
 
@@ -185,7 +185,7 @@ describe('createConfirmCatalogImport — autorizacion', () => {
         ]),
       });
       const confirm = createConfirmCatalogImport(deps);
-      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION] };
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION], addons: ['lectura_pdf'] };
 
       const resumen = await confirm(actor, entradaBase([filaRevisada()]));
 
@@ -201,7 +201,7 @@ describe('createConfirmCatalogImport — autorizacion', () => {
         units: dobleDeUnidades(bitacora, [{ id: UNIDAD_LITRO, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }]),
       });
       const confirm = createConfirmCatalogImport(deps);
-      const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION] };
+      const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION], addons: ['lectura_pdf'] };
 
       await expect(
         confirm(
@@ -222,7 +222,7 @@ describe('createConfirmCatalogImport — autorizacion', () => {
         ]),
       });
       const confirm = createConfirmCatalogImport(deps);
-      const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION] };
+      const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION], addons: ['lectura_pdf'] };
 
       const resumen = await confirm(actorSinInventario, entradaBase([filaRevisada()]));
 

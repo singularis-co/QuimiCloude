@@ -180,6 +180,23 @@ export type { TransitionOrderDeps } from './domain/transition-order';
  *  `inventario`. `lib/composition` las cablea sobre el adaptador driven de `pedidos`. */
 export { createStartPacking, createFinishPacking } from './domain/order-packing';
 export type { StartPackingDeps, FinishPackingDeps } from './domain/order-packing';
+export {
+  PACKING_DIFFERENCE_REASONS,
+  PACKING_INCREASE_REASONS,
+  PACKING_REASON_OTHER_MAX,
+  checkPackingCounts,
+  effectivePackages,
+  maxPackagesForLine,
+  packedTotalInOrderUnit,
+} from './domain/packing-count';
+export type {
+  PackedDistributionLine,
+  PackedLineCount,
+  PackingCountCheck,
+  PackingDifferenceReason,
+  PackingLineError,
+  PackingPlanLine,
+} from './domain/packing-count';
 
 /** Implementan `OrderCatalog['startConditioningAliveById']` y `['finishConditioningAliveById']`:
  *  cada uno un `UPDATE` condicional, fuera de la unidad de trabajo de `inventario`. */
@@ -274,13 +291,20 @@ export type { GetOrderCustomerFilterOptionDeps } from './domain/get-order-custom
  *  casos de uso y sus errores propios. */
 export {
   DELIVERY_MAX_ALLOCATIONS,
+  batchesOverAvailable,
   checkDelivery,
+  checkDeliveryBlocks,
+  flattenBlocks,
+  packagesInLine,
+  packagesLeftInBatch,
   remainingPackages,
 } from './domain/order-delivery';
 export type {
   DeliveryAllocation,
   DeliveryBatchState,
+  DeliveryBlockIssue,
   DeliveryCheck,
+  DeliveryCustomerBlock,
   DeliveryLineState,
 } from './domain/order-delivery';
 export { createGetOrderDelivery } from './domain/get-order-delivery';

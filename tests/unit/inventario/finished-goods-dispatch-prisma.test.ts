@@ -183,6 +183,79 @@ describe('dispatchFinishedGoods — orden de pasos con un tx doblado', () => {
   });
 });
 
+// 2026-10-15: las asignaciones pueden repetir lote (una por cliente). Un lote repetido se descuenta
+// una vez por la suma, con un asiento, y las lineas siguen siendo una por asignacion.
+describe('dispatchFinishedGoods — lote repetido entre asignaciones', () => {
+  const REPEATED = [
+    { batchId: 'batch-1', packages: 3 },
+    { batchId: 'batch-2', packages: 2 },
+    { batchId: 'batch-1', packages: 4 },
+  ];
+
+  it('R26: un decremento y un asiento por lote con la suma, y una linea por asignacion en el mismo orden', async () => {
+    const { tx, txDouble, order } = makeTx({ productRows: [{ id: 'product-1' }], batchRows: TWO_BATCHES });
+
+    const outcome = await dispatchFinishedGoods(tx, baseInput({ allocations: REPEATED }), SCOPE);
+
+    expect(outcome).toEqual({
+      kind: 'dispatched',
+      lines: [
+        { batchId: 'batch-1', packages: 3, quantity: '15.0000' },
+        { batchId: 'batch-2', packages: 2, quantity: '1.5000' },
+        { batchId: 'batch-1', packages: 4, quantity: '20.0000' },
+      ],
+    });
+    expect(order).toEqual([
+      'product-lock',
+      'batches-read',
+      'batch-decrement',
+      'movement-create',
+      'batch-decrement',
+      'movement-create',
+      'recalculate-stock',
+    ]);
+    expect(txDouble.productBatch.findMany.mock.calls[0]).toEqual([
+      {
+        where: {
+          AND: [
+            { companyId: COMPANY },
+            { id: { in: ['batch-1', 'batch-2'] }, productId: 'product-1', packageContent: { not: null } },
+          ],
+        },
+        select: { id: true, packageContent: true },
+      },
+    ]);
+    const decrements = txDouble.productBatch.updateMany.mock.calls as unknown as [
+      { where: { AND: Record<string, unknown>[] }; data: { stock: { decrement: Prisma.Decimal } } },
+    ][];
+    expect(decrements.map(([args]) => [args.where.AND[1], args.data.stock.decrement.toFixed(4)])).toEqual([
+      [{ id: 'batch-1', productId: 'product-1', stock: { gte: new Prisma.Decimal('35') } }, '35.0000'],
+      [{ id: 'batch-2', productId: 'product-1', stock: { gte: new Prisma.Decimal('1.5') } }, '1.5000'],
+    ]);
+    const datos = txDouble.inventoryMovement.create.mock.calls.map((call) => call[0].data);
+    expect(datos.map((d) => [d.batchId, d.quantity])).toEqual([
+      ['batch-1', '-35.0000'],
+      ['batch-2', '-1.5000'],
+    ]);
+  });
+
+  it('R24: si la suma de un lote repetido no cabe, insufficient con los envases enteros del lote y sin asiento', async () => {
+    const { tx, txDouble } = makeTx({
+      productRows: [{ id: 'product-1' }],
+      batchRows: TWO_BATCHES,
+      updateCounts: [0],
+      currentStock: '34.9999',
+    });
+
+    const outcome = await dispatchFinishedGoods(tx, baseInput({ allocations: REPEATED }), SCOPE);
+
+    expect(outcome).toEqual({ kind: 'insufficient', batchId: 'batch-1', availablePackages: 6 });
+    expect(txDouble.productBatch.updateMany).toHaveBeenCalledTimes(1);
+    expect(txDouble.inventoryMovement.create).not.toHaveBeenCalled();
+    expect(txDouble.$executeRaw).not.toHaveBeenCalled();
+  });
+});
+
 describe('dispatchFinishedGoods — rechazos sin escribir', () => {
   function expectNothingWritten(txDouble: ReturnType<typeof makeTx>['txDouble']): void {
     expect(txDouble.productBatch.updateMany).not.toHaveBeenCalled();

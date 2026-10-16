@@ -4,7 +4,7 @@
  * EL RECORRIDO del Administrador va en un solo `test()`: cada paso es la precondicion del
  * siguiente y partirlo obligaria a resembrar lo que dejo el anterior.
  *   1. abre «Entregas» desde el menu de la fila del pedido `ENTREGADO`;
- *   2. pulsa «Anular», desmarca una presentacion y confirma sin motivo: aparece el aviso y en
+ *   2. pulsa «Anular», marca solo la presentacion 2 y confirma sin motivo: aparece el aviso y en
  *      Postgres no cambia nada;
  *   3. escribe el motivo y confirma; en Postgres el lote de la presentacion anulada recupera su
  *      existencia, hay un asiento `delivery_void`, la fila de `order_delivery_voids` lleva el motivo,
@@ -13,6 +13,17 @@
  *   5. «Entregar» vuelve a ofrecer esa presentacion como pendiente.
  * Un segundo `test()` entra con un usuario que consulta pedidos pero no puede anular entregas:
  * abre «Entregas» y no ve «Anular».
+ *
+ * ENMIENDA 2026-10-15 (QC-282):
+ *  - el cliente de una entrega vive en cada linea (`order_delivery_lines.customer_id`) y no en
+ *    `order_deliveries`: la siembra lo pone en las lineas y las lecturas de «la entrega queda
+ *    intacta» lo leen de ellas;
+ *  - el dialogo de anular abre SIN NADA MARCADO (QC-282 R36): el paso 2 ya no desmarca la
+ *    presentacion 1, marca la 2;
+ *  - la marca «Completa» de una presentacion vive en el resumen «Por entregar» del sheet y no en la
+ *    lista de lotes, y una presentacion completa ya no pinta campos de envases (QC-282 R6, R11): el
+ *    paso 5 lee la marca del resumen.
+ * Las aserciones previas se conservan.
  *
  * QUE APORTA SOBRE UNIT E INTEGRACION: la lista, el dialogo y la Server Action de verdad, contra un
  * navegador real y Postgres. Chromium y WebKit: WebKit es el motor de iOS y la regla
@@ -138,6 +149,7 @@ const VOID_REJECTED_TESTID = 'delivery-void-rejected';
 const DELIVERY_SHEET_TESTID = 'order-delivery-sheet';
 const DELIVERY_SUBMIT_TESTID = 'order-delivery-submit';
 const DELIVERY_LINE_TESTID = 'order-delivery-line';
+const DELIVERY_SUMMARY_LINE_TESTID = 'order-delivery-summary-line';
 const DELIVERY_LINE_COMPLETE_TESTID = 'order-delivery-line-complete';
 const DELIVERY_BATCH_TESTID = 'order-delivery-batch';
 const DELIVERY_BATCH_PACKAGES_TESTID = 'order-delivery-batch-packages';
@@ -183,6 +195,13 @@ function voidCheckbox(dialog: Locator, presentationLineId: string): Locator {
 function deliveryLine(sheet: Locator, presentationLineId: string): Locator {
   return sheet.locator(
     `[data-testid="${DELIVERY_LINE_TESTID}"][data-presentation-line-id="${presentationLineId}"]`,
+  );
+}
+
+/** La fila de esa presentacion en el resumen «Por entregar» del sheet (2026-10-15, QC-282). */
+function summaryLine(sheet: Locator, presentationLineId: string): Locator {
+  return sheet.locator(
+    `[data-testid="${DELIVERY_SUMMARY_LINE_TESTID}"][data-presentation-line-id="${presentationLineId}"]`,
   );
 }
 
@@ -510,7 +529,6 @@ test.beforeAll(async () => {
       data: {
         companyId,
         orderId,
-        customerId,
         deliveryKey: randomUUID(),
         createdBy: adminUserId,
         createdAt: DELIVERED_AT,
@@ -524,6 +542,7 @@ test.beforeAll(async () => {
       {
         companyId,
         deliveryId,
+        customerId,
         orderPresentationLineId: lineOneId,
         batchId: batchOneId,
         packages: LINE_ONE_PACKAGES,
@@ -532,6 +551,7 @@ test.beforeAll(async () => {
       {
         companyId,
         deliveryId,
+        customerId,
         orderPresentationLineId: lineTwoId,
         batchId: batchTwoId,
         packages: LINE_TWO_PACKAGES,
@@ -603,11 +623,10 @@ test.describe('anular una entrega de un pedido', () => {
     const deliveryBefore = await prisma.orderDelivery.findUniqueOrThrow({
       where: { id: entryId },
       select: {
-        customerId: true,
         createdBy: true,
         createdAt: true,
         lines: {
-          select: { id: true, batchId: true, packages: true, quantity: true },
+          select: { id: true, customerId: true, batchId: true, packages: true, quantity: true },
           orderBy: { id: 'asc' },
         },
       },
@@ -627,12 +646,14 @@ test.describe('anular una entrega de un pedido', () => {
     await expect(entryPresentation(sheet, one).getByTestId(DELIVERY_ENTRY_VOIDED_TESTID)).toHaveCount(0);
     await expect(entryPresentation(sheet, two).getByTestId(DELIVERY_ENTRY_VOIDED_TESTID)).toHaveCount(0);
 
-    // 2. «Anular», desmarcar la presentacion 1 y confirmar sin motivo.
+    // 2. «Anular» abre sin nada marcado (2026-10-15, QC-282 R36); marcar la presentacion 2 y
+    //    confirmar sin motivo.
     const before = await voidFootprint(id, entryId);
     const dialog = await openVoidDialog(page, sheet);
-    await expect(voidCheckbox(dialog, one)).toBeChecked();
+    await expect(voidCheckbox(dialog, one)).not.toBeChecked();
+    await expect(voidCheckbox(dialog, two)).not.toBeChecked();
+    await voidCheckbox(dialog, two).click();
     await expect(voidCheckbox(dialog, two)).toBeChecked();
-    await voidCheckbox(dialog, one).click();
     await expect(voidCheckbox(dialog, one)).not.toBeChecked();
 
     await dialog.getByTestId(VOID_CONFIRM_TESTID).click();
@@ -702,11 +723,10 @@ test.describe('anular una entrega de un pedido', () => {
     const deliveryAfter = await prisma.orderDelivery.findUniqueOrThrow({
       where: { id: entryId },
       select: {
-        customerId: true,
         createdBy: true,
         createdAt: true,
         lines: {
-          select: { id: true, batchId: true, packages: true, quantity: true },
+          select: { id: true, customerId: true, batchId: true, packages: true, quantity: true },
           orderBy: { id: 'asc' },
         },
       },
@@ -741,8 +761,11 @@ test.describe('anular una entrega de un pedido', () => {
     sheet = page.getByTestId(DELIVERY_SHEET_TESTID);
     await expect(sheet).toBeVisible({ timeout: 60_000 });
     await expect(sheet.getByTestId(DELIVERY_SUBMIT_TESTID)).toBeVisible({ timeout: 60_000 });
-    await expect(deliveryLine(sheet, one).getByTestId(DELIVERY_LINE_COMPLETE_TESTID)).toBeVisible();
-    await expect(deliveryLine(sheet, two).getByTestId(DELIVERY_LINE_COMPLETE_TESTID)).toHaveCount(0);
+    // 2026-10-15 (QC-282): la marca «Completa» vive en el resumen; la presentacion completa no pinta
+    // campos de envases en ningun bloque.
+    await expect(summaryLine(sheet, one).getByTestId(DELIVERY_LINE_COMPLETE_TESTID)).toBeVisible();
+    await expect(summaryLine(sheet, two).getByTestId(DELIVERY_LINE_COMPLETE_TESTID)).toHaveCount(0);
+    await expect(deliveryLine(sheet, one)).toHaveCount(0);
     await expect(
       deliveryLine(sheet, two)
         .locator(`[data-testid="${DELIVERY_BATCH_TESTID}"][data-batch-id="${batchTwo}"]`)

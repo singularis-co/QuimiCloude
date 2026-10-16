@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Entregar a varios clientes</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}" style="width: 100%; box-sizing: border-box; padding: 40px; display: flex; flex-direction: column; gap: 24px; container-type: inline-size; font-family: 'IBM Plex Sans', sans-serif">
+  <div class="ph"><div class="ph-t"><span class="lab">QC-282 · tablero de diseño</span><h1 class="h1">Entregar a varios clientes</h1><p class="sub">Una sola entrega del pedido repartida entre varios clientes, cada uno con varias presentaciones: un bloque por cliente en el sheet «Entregar», anulación por cliente y presentación, la entrega en la lista del pedido y en el tab Entregas del producto terminado.</p></div></div>
+
+  <div class="modal-grid cq-1">
+
+    <!-- 1. Sheet Entregar pedido: bloques por cliente (interactivo) -->
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Entregar pedido · {{ estado }}</span>
+      <aside class="sheet wide static" role="dialog" aria-modal="true" aria-labelledby="ev-t">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="ev-t" class="h2">Entregar pedido <span class="mono">2026-0000006</span></h2><p class="sub">Elige el cliente y, por presentación, de qué lotes salen los envases.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+
+          <sc-if value="{{ adjusted }}" hint-placeholder-val="{{ false }}">
+            <div class="card" role="status" style="padding: 12px 16px; gap: 6px; flex-direction: row; align-items: flex-start; background: var(--muted)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg><span style="font-size: 14px">Algunos lotes del borrador ya no están disponibles y se quitaron sus envases.</span></div>
+          </sc-if>
+
+          <div class="card" style="padding: 16px; gap: 10px">
+            <span class="h3">Por entregar</span>
+            <sc-for list="{{ summary }}" as="s" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px">
+                <span class="strong">{{ s.name }}</span>
+                <span style="display: flex; align-items: center; gap: 10px"><span><span class="dim">Entregas </span><span class="mono strong">{{ s.total }}</span><span class="dim"> de </span><span class="mono">{{ s.pide }}</span></span><span class="{{ s.tagCls }}"><i></i>{{ s.tag }}</span></span>
+              </div>
+            </sc-for>
+            <span class="sub" style="font-size: 12px">Suma de todos los clientes. El pedido es el tope por presentación.</span>
+          </div>
+
+          <sc-for list="{{ blocks }}" as="b" hint-placeholder-count="2">
+            <div class="card fade" style="padding: 16px; gap: 14px">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+                <span class="h3">{{ b.title }}</span>
+                <sc-if value="{{ b.canRemove }}" hint-placeholder-val="{{ true }}">
+                  <button class="b b-gho b-sm" type="button" aria-label="{{ b.removeLabel }}" onClick="{{ b.remove }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path></svg>Quitar</button>
+                </sc-if>
+              </div>
+              <div class="f">
+                <label for="{{ b.inId }}">Cliente <span class="req">*</span></label>
+                <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="{{ b.inId }}" class="in" type="text" placeholder="Busca un cliente por su nombre" value="{{ b.client }}" onChange="{{ b.onClient }}" aria-invalid="{{ b.invalid }}"></label>
+                <sc-if value="{{ b.hasErr }}" hint-placeholder-val="{{ false }}">
+                  <span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>{{ b.errText }}</span>
+                </sc-if>
+              </div>
+              <sc-for list="{{ b.pres }}" as="p" hint-placeholder-count="3">
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <div class="rm-top"><span class="h3" style="font-size: 14px">{{ p.name }}</span><span class="cap"><span class="mono">{{ p.sum }}</span> envases</span></div>
+                  <div class="tw"><div class="scroll"><table class="collapse">
+                    <thead><tr><th scope="col">Lote</th><th scope="col" class="num">Disponibles</th><th scope="col">Entrada</th></tr></thead>
+                    <tbody>
+                      <sc-for list="{{ p.lots }}" as="l" hint-placeholder-count="1">
+                        <tr><td class="mono">{{ l.lot }}</td><td class="num mono"><span class="{{ l.dispCls }}">{{ l.disp }}</span></td><td><span style="display: flex; flex-direction: column; gap: 4px"><input class="in mono num" type="text" inputmode="numeric" value="{{ l.val }}" onChange="{{ l.onVal }}" aria-label="{{ l.label }}" aria-invalid="{{ l.invalid }}" style="width: 88px; height: 36px"><sc-if value="{{ l.over }}" hint-placeholder-val="{{ false }}"><span class="err">Solo hay {{ l.stock }}</span></sc-if></span></td></tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                  <div class="rows-m">
+                    <sc-for list="{{ p.lots }}" as="l" hint-placeholder-count="1">
+                      <div class="rm"><div class="rm-top"><span class="mono strong">{{ l.lot }}</span><span>Disponibles <span class="mono {{ l.dispCls }}">{{ l.disp }}</span></span></div><div class="f"><label for="{{ l.mId }}">Entrada</label><input id="{{ l.mId }}" class="in mono num" type="text" inputmode="numeric" value="{{ l.val }}" onChange="{{ l.onVal }}" aria-invalid="{{ l.invalid }}"><sc-if value="{{ l.over }}" hint-placeholder-val="{{ false }}"><span class="err">Solo hay {{ l.stock }}</span></sc-if></div></div>
+                    </sc-for>
+                  </div></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+
+          <button class="b b-dash" type="button" onClick="{{ addBlock }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir cliente</button>
+        </div>
+        <sc-if value="{{ stockOver }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 10px 24px 0"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Entre todos los clientes se pasa de lo disponible en un lote. Baja los envases para poder entregar.</span></div>
+        </sc-if>
+        <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ reset }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ submit }}" disabled="{{ stockOver }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path></svg>Entregar</button></div>
+        <sc-if value="{{ done }}" hint-placeholder-val="{{ false }}">
+          <div class="toastwrap" style="position: absolute; left: 16px; right: 16px; bottom: 84px"><div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Pedido entregado</span></div></div>
+        </sc-if>
+      </aside>
+    </div>
+
+    <!-- 2. AlertDialog Anular la entrega: por cliente y presentación (interactivo) -->
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Anular la entrega</span>
+      <div class="dlg static" role="alertdialog" aria-modal="true" aria-labelledby="ev-an" style="width: min(500px, calc(100% - 24px))">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+        <h2 id="ev-an" class="h2">Anular la entrega</h2>
+        <p class="sub">Marca, por cliente, las presentaciones que se anulan. Sus envases vuelven a los lotes de los que salieron.</p>
+        <sc-for list="{{ voidGroups }}" as="g" hint-placeholder-count="2">
+          <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--border); padding-top: 8px">
+            <legend class="sr">{{ g.client }}</legend>
+            <div style="display: flex; align-items: center; gap: 12px; min-height: 44px">
+              <button class="cb" type="button" role="checkbox" aria-checked="{{ g.state }}" aria-label="{{ g.allLabel }}" onClick="{{ g.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ g.icon }}"></path></svg></button>
+              <span class="strong" style="font-size: 14px">{{ g.client }}</span>
+            </div>
+            <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding-left: 32px">
+                <button class="cb" type="button" role="checkbox" aria-checked="{{ it.on }}" aria-label="{{ it.label }}" onClick="{{ it.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button>
+                <span style="font-size: 14px">{{ it.name }} <span class="dim">· <span class="mono">{{ it.packages }}</span> envases</span></span>
+              </div>
+            </sc-for>
+          </fieldset>
+        </sc-for>
+        <sc-if value="{{ voidEmpty }}" hint-placeholder-val="{{ false }}">
+          <span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>No hay nada que anular: marca al menos una presentación.</span>
+        </sc-if>
+        <div class="f"><label for="ev-m">Motivo de la anulación</label><textarea id="ev-m" class="in" rows="2">El cliente devolvió las botellas de 1 L.</textarea></div>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button" onClick="{{ tryVoid }}">Anular</button></div>
+      </div>
+    </div>
+
+    <!-- 3. Lista de entregas del pedido: tarjeta por entrega con subbloque por cliente -->
+    <div class="card" style="gap: 14px">
+      <span class="lab">Lista de entregas del pedido · tarjeta por entrega + subbloque por cliente</span>
+      <sc-for list="{{ history }}" as="d" hint-placeholder-count="2">
+        <div class="card" style="padding: 16px; gap: 12px">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+            <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px">
+              <dt class="dim">Fecha</dt><dd style="margin: 0"><span class="mono">{{ d.date }}</span></dd>
+              <dt class="dim">Clientes</dt><dd style="margin: 0"><span class="mono">{{ d.nClients }}</span></dd>
+              <dt class="dim">Envases</dt><dd style="margin: 0"><span class="mono">{{ d.nPackages }}</span></dd>
+              <dt class="dim">Entregó</dt><dd style="margin: 0">[Persona que entregó]</dd>
+            </dl>
+            <button class="b b-out b-touch" type="button" aria-label="{{ d.voidLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Anular</button>
+          </div>
+          <sc-for list="{{ d.clients }}" as="c" hint-placeholder-count="2">
+            <section aria-label="{{ c.client }}" style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px">
+              <span class="h3" style="font-size: 14px">{{ c.client }}</span>
+              <sc-for list="{{ c.pres }}" as="p" hint-placeholder-count="3">
+                <div style="display: flex; flex-direction: column; gap: 4px; padding-left: 12px; font-size: 14px">
+                  <div style="display: flex; justify-content: space-between; gap: 8px"><span class="strong">{{ p.name }}</span><span><span class="dim">Envases </span><span class="mono">{{ p.packages }}</span></span></div>
+                  <sc-for list="{{ p.lots }}" as="l" hint-placeholder-count="1">
+                    <div class="dim" style="display: flex; justify-content: space-between; gap: 8px"><span>Lote <span class="mono">{{ l.lot }}</span></span><span>Envases <span class="mono">{{ l.packages }}</span></span></div>
+                  </sc-for>
+                  <sc-if value="{{ p.voided }}" hint-placeholder-val="{{ false }}">
+                    <div style="display: flex; flex-direction: column; gap: 6px; border-radius: 8px; background: var(--muted); padding: 8px; margin-top: 4px">
+                      <span class="sb t-danger"><i></i>Anulada</span>
+                      <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px">
+                        <dt class="dim">Motivo</dt><dd style="margin: 0">{{ p.reason }}</dd>
+                        <dt class="dim">Anuló</dt><dd style="margin: 0">[Persona que anuló]</dd>
+                        <dt class="dim">Fecha de anulación</dt><dd style="margin: 0"><span class="mono">{{ p.voidDate }}</span></dd>
+                      </dl>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </section>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- 4. Tab Entregas de Producto terminado (QC-225) -->
+    <div class="card" style="gap: 14px">
+      <span class="lab">Producto terminado · tab Entregas (QC-225)</span>
+      <p class="sub" style="margin: 0">Una fila por cliente, presentación y lote. Columna nueva: Presentación.</p>
+      <p style="margin: 0; font-size: 14px"><span class="dim">Total entregado: </span><span class="mono strong">{{ ptTotalQty }}</span><span class="dim"> · </span><span class="mono strong">{{ ptTotalPk }} envases</span></p>
+      <div class="tw"><div class="scroll"><table style="min-width: 900px">
+        <thead><tr><th scope="col">Fecha</th><th scope="col">Cliente</th><th scope="col">Pedido</th><th scope="col">Presentación</th><th scope="col">Lote</th><th scope="col" class="num">Envases</th><th scope="col" class="num">Cantidad</th><th scope="col">Anulación</th></tr></thead>
+        <tbody>
+          <sc-for list="{{ ptRows }}" as="r" hint-placeholder-count="8">
+            <tr><td class="mono">{{ r.date }}</td><td>{{ r.client }}</td><td class="mono">{{ r.order }}</td><td>{{ r.pres }}</td><td class="mono">{{ r.lot }}</td><td class="num mono">{{ r.packages }}</td><td class="num mono">{{ r.qty }}</td><td><sc-if value="{{ r.voided }}" hint-placeholder-val="{{ false }}"><span style="display: flex; flex-direction: column; gap: 2px"><span class="sb t-danger"><i></i>Anulada</span><span class="dim" style="font-size: 12px">{{ r.reason }}</span></span></sc-if><sc-if value="{{ r.notVoided }}" hint-placeholder-val="{{ true }}"><span class="dim">—</span></sc-if></td></tr>
+          </sc-for>
+        </tbody>
+      </table></div></div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["Dos clientes","Con errores","Pedido sin cliente","Borrador ajustado"],"default":"Dos clientes"},"$preview":{"width":1440,"height":3400}}'>
+var PRES = [
+  { key: 'p200', name: 'Frasco 200 ml', liters: 0.2, pide: 50, lots: [
+    { key: 'l1', lot: 'L-2610-01', disp: 40 },
+    { key: 'l3', lot: 'L-2610-03', disp: 20 }
+  ] },
+  { key: 'p1l', name: 'Botella 1 L', liters: 1, pide: 5, lots: [
+    { key: 'l2', lot: 'L-2610-02', disp: 8 }
+  ] },
+  { key: 'p5l', name: 'Garrafa 5 L', liters: 5, pide: 4, lots: [
+    { key: 'l4', lot: 'L-2610-04', disp: 3 },
+    { key: 'l5', lot: 'L-2610-05', disp: 2 }
+  ] }
+];
+
+function seed(estado) {
+  if (estado === 'Con errores') {
+    return { tried: true, blocks: [
+      { id: 1, client: 'Laura Gómez', q: { l1: 25, l3: 5, l2: 3, l4: 2 } },
+      { id: 2, client: 'Laura Gómez', q: { l1: 15, l3: 10, l2: 2, l4: 2, l5: 2 } },
+      { id: 3, client: '', q: {} }
+    ] };
+  }
+  if (estado === 'Pedido sin cliente') {
+    return { tried: false, blocks: [ { id: 1, client: '', q: {} } ] };
+  }
+  if (estado === 'Borrador ajustado') {
+    return { tried: false, adjusted: true, blocks: [
+      { id: 1, client: 'Laura Gómez', q: { l1: 25, l2: 3 } },
+      { id: 2, client: 'Distribuidora Andina', q: { l1: 15, l2: 2 } }
+    ] };
+  }
+  return { tried: false, blocks: [
+    { id: 1, client: 'Laura Gómez', q: { l1: 25, l3: 5, l2: 3, l4: 2 } },
+    { id: 2, client: 'Distribuidora Andina', q: { l1: 15, l3: 5, l2: 2, l4: 1, l5: 1 } }
+  ] };
+}
+
+// Entregas ya hechas del pedido, la más reciente primero.
+var HISTORY = [
+  { date: '2026-10-15 15:42', clients: [
+    { client: 'Laura Gómez', pres: [
+      { name: 'Frasco 200 ml', liters: 0.2, lots: [ { lot: 'L-2610-01', packages: 25 }, { lot: 'L-2610-03', packages: 5 } ] },
+      { name: 'Botella 1 L', liters: 1, lots: [ { lot: 'L-2610-02', packages: 3 } ] },
+      { name: 'Garrafa 5 L', liters: 5, lots: [ { lot: 'L-2610-04', packages: 2 } ] }
+    ] },
+    { client: 'Distribuidora Andina', pres: [
+      { name: 'Frasco 200 ml', liters: 0.2, lots: [ { lot: 'L-2610-01', packages: 15 }, { lot: 'L-2610-03', packages: 5 } ] },
+      { name: 'Botella 1 L', liters: 1, lots: [ { lot: 'L-2610-02', packages: 2 } ] },
+      { name: 'Garrafa 5 L', liters: 5, lots: [ { lot: 'L-2610-04', packages: 1 }, { lot: 'L-2610-05', packages: 1 } ] }
+    ] }
+  ] },
+  { date: '2026-10-12 09:10', clients: [
+    { client: 'Ferretería El Sol', pres: [
+      { name: 'Frasco 200 ml', liters: 0.2, lots: [ { lot: 'L-2610-01', packages: 10 } ] },
+      { name: 'Botella 1 L', liters: 1, lots: [ { lot: 'L-2610-02', packages: 4 } ], voided: { reason: 'El cliente devolvió las botellas de 1 L.', date: '2026-10-13 11:20' } }
+    ] },
+    { client: 'Mario Ruiz', pres: [
+      { name: 'Garrafa 5 L', liters: 5, lots: [ { lot: 'L-2610-04', packages: 2 } ] }
+    ] }
+  ] }
+];
+
+var fmtL = function (n) { return (Math.round(n * 10) / 10).toString().replace('.', ',') + ' L'; };
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var s = seed(props.estado ?? 'Dos clientes');
+    this.state = { blocks: s.blocks, tried: s.tried, adjusted: !!s.adjusted, done: false, nextId: 10, voidSel: {}, voidTried: false };
+  }
+
+  componentDidUpdate(prev) {
+    if (prev.estado !== this.props.estado) this.reset();
+  }
+
+  reset() {
+    var s = seed(this.props.estado ?? 'Dos clientes');
+    this.setState({ blocks: s.blocks, tried: s.tried, adjusted: !!s.adjusted, done: false });
+  }
+
+  updateBlock(id, fn) {
+    this.setState({ done: false, blocks: this.state.blocks.map(function (b) { return b.id === id ? fn(b) : b; }) });
+  }
+
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var blocks = st.blocks;
+    var norm = function (s) { return (s || '').trim().toLowerCase(); };
+
+    var totals = {};
+    PRES.forEach(function (p) {
+      totals[p.key] = blocks.reduce(function (acc, b) {
+        return acc + p.lots.reduce(function (a, l) { return a + (Number(b.q[l.key]) || 0); }, 0);
+      }, 0);
+    });
+
+    var summary = PRES.map(function (p) {
+      var t = totals[p.key];
+      var tag = t === p.pide ? 'Completa' : (t > p.pide ? 'Sobran ' + (t - p.pide) : 'Faltan ' + (p.pide - t));
+      var tagCls = t === p.pide ? 'sb t-success' : (t > p.pide ? 'sb t-danger' : 'sb t-waiting');
+      return { name: p.name, total: String(t), pide: String(p.pide), tag: tag, tagCls: tagCls };
+    });
+
+    // Envases de un lote sumando todos los clientes, y si alguno se pasa del stock del lote.
+    var lotUsed = {};
+    PRES.forEach(function (p) { p.lots.forEach(function (l) {
+      lotUsed[l.key] = blocks.reduce(function (a, b) { return a + (Number(b.q[l.key]) || 0); }, 0);
+    }); });
+    var stockOver = PRES.some(function (p) { return p.lots.some(function (l) { return lotUsed[l.key] > l.disp; }); });
+    var blockPackages = function (b) { return Object.keys(b.q).reduce(function (a, k) { return a + (Number(b.q[k]) || 0); }, 0); };
+
+    var errFor = function (b, i) {
+      if (!st.tried) return '';
+      if (norm(b.client) === '') return 'Elige el cliente.';
+      var dup = blocks.some(function (o, j) { return j < i && norm(o.client) === norm(b.client); });
+      if (dup) return 'Este cliente ya está en la entrega.';
+      return blockPackages(b) === 0 ? 'Este cliente no lleva envases: indica al menos uno en alguna presentación.' : '';
+    };
+
+    var vb = blocks.map(function (b, i) {
+      var err = errFor(b, i);
+      return {
+        title: 'Cliente ' + (i + 1),
+        inId: 'ev-c-' + b.id,
+        client: b.client,
+        onClient: function (e) { var v = e.target.value; self.updateBlock(b.id, function (x) { return Object.assign({}, x, { client: v }); }); },
+        canRemove: blocks.length > 1,
+        removeLabel: 'Quitar el cliente ' + (i + 1),
+        remove: function () { self.setState({ done: false, blocks: self.state.blocks.filter(function (x) { return x.id !== b.id; }) }); },
+        hasErr: err !== '',
+        errText: err,
+        invalid: err !== '' ? 'true' : 'false',
+        pres: PRES.map(function (p) {
+          var sum = p.lots.reduce(function (a, l) { return a + (Number(b.q[l.key]) || 0); }, 0);
+          return {
+            name: p.name,
+            sum: String(sum),
+            lots: p.lots.map(function (l) {
+              return {
+                lot: l.lot,
+                // Lo que queda del lote después de lo que llevan todos los clientes.
+                disp: String(Math.max(l.disp - lotUsed[l.key], 0)),
+                dispCls: l.disp - lotUsed[l.key] <= 0 ? 'dim' : '',
+                stock: String(l.disp),
+                over: lotUsed[l.key] > l.disp,
+                invalid: lotUsed[l.key] > l.disp ? 'true' : 'false',
+                val: b.q[l.key] ? String(b.q[l.key]) : '',
+                mId: 'ev-m-' + b.id + '-' + l.key,
+                label: 'Envases del lote ' + l.lot + ' de ' + p.name + ' para el cliente ' + (i + 1),
+                onVal: function (e) {
+                  var v = e.target.value.replace(/[^0-9]/g, '');
+                  // Tope: lo que el lote aún tiene sin contar lo de este cliente. No deja pasar de ahí.
+                  var others = lotUsed[l.key] - (Number(b.q[l.key]) || 0);
+                  var n = v === '' ? 0 : Math.min(Number(v), Math.max(l.disp - others, 0));
+                  self.updateBlock(b.id, function (x) { var q = Object.assign({}, x.q); q[l.key] = n; return Object.assign({}, x, { q: q }); });
+                }
+              };
+            })
+          };
+        })
+      };
+    });
+
+    // Anular: la entrega más reciente, con sus dos clientes y tres presentaciones cada uno.
+    var GROUPS = [
+      { client: 'Laura Gómez', items: [ { key: 'a200', name: 'Frasco 200 ml', packages: 30 }, { key: 'a1l', name: 'Botella 1 L', packages: 3 }, { key: 'a5l', name: 'Garrafa 5 L', packages: 2 } ] },
+      { client: 'Distribuidora Andina', items: [ { key: 'b200', name: 'Frasco 200 ml', packages: 20 }, { key: 'b1l', name: 'Botella 1 L', packages: 2 }, { key: 'b5l', name: 'Garrafa 5 L', packages: 2 } ] }
+    ];
+    var sel = st.voidSel;
+    var anySel = Object.keys(sel).some(function (k) { return sel[k]; });
+    var voidGroups = GROUPS.map(function (g) {
+      var on = g.items.filter(function (it) { return sel[it.key]; }).length;
+      var all = on === g.items.length;
+      var state = all ? 'true' : (on === 0 ? 'false' : 'mixed');
+      return {
+        client: g.client,
+        state: state,
+        icon: state === 'mixed' ? 'M6 12h12' : 'm5 12 5 5 9-10',
+        allLabel: 'Anular todo lo de ' + g.client,
+        toggle: function () {
+          var next = Object.assign({}, self.state.voidSel);
+          g.items.forEach(function (it) { next[it.key] = !all; });
+          self.setState({ voidSel: next, voidTried: false });
+        },
+        items: g.items.map(function (it) {
+          return {
+            name: it.name,
+            packages: String(it.packages),
+            on: sel[it.key] ? 'true' : 'false',
+            label: it.name + ' de ' + g.client + ' · ' + it.packages + ' envases',
+            toggle: function () {
+              var next = Object.assign({}, self.state.voidSel);
+              next[it.key] = !next[it.key];
+              self.setState({ voidSel: next, voidTried: false });
+            }
+          };
+        })
+      };
+    });
+
+    var history = HISTORY.map(function (d) {
+      var nPk = 0;
+      var clients = d.clients.map(function (c) {
+        return {
+          client: c.client,
+          pres: c.pres.map(function (p) {
+            var pk = p.lots.reduce(function (a, l) { return a + l.packages; }, 0);
+            nPk += pk;
+            return {
+              name: p.name, packages: String(pk),
+              lots: p.lots.map(function (l) { return { lot: l.lot, packages: String(l.packages) }; }),
+              voided: !!p.voided,
+              reason: p.voided ? p.voided.reason : '',
+              voidDate: p.voided ? p.voided.date : ''
+            };
+          })
+        };
+      });
+      return { date: d.date, nClients: String(d.clients.length), nPackages: String(nPk), voidLabel: 'Anular la entrega del ' + d.date, clients: clients };
+    });
+
+    var ptRows = [];
+    var ptQty = 0, ptPk = 0;
+    HISTORY.forEach(function (d) {
+      d.clients.forEach(function (c) {
+        c.pres.forEach(function (p) {
+          p.lots.forEach(function (l) {
+            if (!p.voided) { ptQty += l.packages * p.liters; ptPk += l.packages; }
+            ptRows.push({ date: d.date, client: c.client, order: '2026-0000006', pres: p.name, lot: l.lot, packages: String(l.packages), qty: fmtL(l.packages * p.liters), voided: !!p.voided, notVoided: !p.voided, reason: p.voided ? p.voided.reason : '' });
+          });
+        });
+      });
+    });
+
+    return {
+      rootCls: this.props.oscuro ? 'qc dk' : 'qc',
+      estado: this.props.estado ?? 'Dos clientes',
+      summary: summary,
+      blocks: vb,
+      done: st.done,
+      addBlock: function () {
+        var id = self.state.nextId;
+        self.setState({ nextId: id + 1, done: false, blocks: self.state.blocks.concat([{ id: id, client: '', q: {} }]) });
+      },
+      reset: function () { self.reset(); },
+      submit: function () {
+        var bad = self.state.blocks.some(function (b, i) {
+          if (norm(b.client) === '') return true;
+          if (blockPackages(b) === 0) return true;
+          return self.state.blocks.some(function (o, j) { return j < i && norm(o.client) === norm(b.client); });
+        });
+        var over = PRES.some(function (p) { return totals[p.key] > p.pide; });
+        self.setState({ tried: true, done: !bad && !over });
+      },
+      stockOver: stockOver,
+      adjusted: st.adjusted,
+      voidGroups: voidGroups,
+      voidEmpty: st.voidTried && !anySel,
+      tryVoid: function () { self.setState({ voidTried: true }); },
+      history: history,
+      ptRows: ptRows,
+      ptTotalQty: fmtL(ptQty),
+      ptTotalPk: String(ptPk)
+    };
+  }
+}
+</script>
+</body>
+</html>

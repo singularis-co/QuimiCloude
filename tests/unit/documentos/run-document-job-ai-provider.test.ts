@@ -7,7 +7,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { dobleDeProveedor } from './run-document-job-doubles';
+import { dobleDeProveedor, LECTURA_PDF_PRENDIDA } from './run-document-job-doubles';
 
 import { AiProviderError, DocumentosError, ValidationError } from '@/lib/modules/documentos/domain/errors';
 import { createRunDocumentJob } from '@/lib/modules/documentos/domain/run-document-job';
@@ -154,6 +154,7 @@ function montar(strategy: Strategy, lookup: AiReaderLookup) {
     repository: repo.repository,
     storage: almacen.storage,
     aiProvider: proveedor.aiProvider,
+    pdfReading: LECTURA_PDF_PRENDIDA,
     pipelineFor: cadena.pipelineFor,
     log: espia.log,
   });

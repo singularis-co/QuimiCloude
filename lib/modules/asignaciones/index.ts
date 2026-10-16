@@ -58,6 +58,8 @@ export {
   NoWholePackageError,
   OrderPackingTakenError,
   OrderNotPackableError,
+  PackedExceedsQuantityError,
+  PackagingStockInsufficientError,
   OrderProducedFrozenError,
   OrderConditioningTakenError,
   OrderNotConditionableError,
@@ -159,6 +161,10 @@ export {
   type StartAssignedOrderDeps,
 } from './domain/start-assigned-order';
 export {
+  createOpenAssignedOrder,
+  type OpenAssignedOrderDeps,
+} from './domain/open-assigned-order';
+export {
   createFinishAssignedOrder,
   type FinishAssignedOrderDeps,
 } from './domain/finish-assigned-order';
@@ -250,6 +256,13 @@ export {
   type GetExecutionTraceDeps,
 } from './domain/get-execution-trace';
 export type { ExecutionTrace, TraceDuration, TraceStep } from './domain/execution-trace';
+export type {
+  ConditioningAction,
+  ConditioningBatchSnapshotLine,
+  ExecutionPhase,
+  TraceDurations,
+  ExecutionTraceTeamMember,
+} from './domain/conditioning-trace';
 
 // ---------------------------------------------------------------------------------------
 // El acondicionamiento: Comenzar y Terminar. Bloque NUEVO al final.
@@ -293,7 +306,7 @@ export {
   type SaveConditioningBatchDataDeps,
   type SaveConditioningBatchDataInput,
 } from './domain/save-conditioning-batch-data';
-export { missingBatchDataLines } from './domain/conditioning-batch-data';
+export { missingBatchDataLines, type ConditioningBatchForm } from './domain/conditioning-batch-data';
 
 // ---------------------------------------------------------------------------------------
 // El equipo de acondicionamiento: la entrada de Comenzar y los candidatos del modal.

@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 
 import { buttonVariants } from '@/components/ui/button';
 import { identity } from '@/lib/composition';
+import { hasAddon } from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { canAdjustBatchStock, type ProductFormUnits } from '@/lib/modules/inventario';
 import { listProductFormUnitsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
@@ -84,7 +85,7 @@ export default async function InventarioPage({
     listProductFormUnitsAction(),
     identity.getSessionUser(),
   ]);
-  const canImport = canAdjustBatchStock(sessionUser);
+  const canImport = canAdjustBatchStock(sessionUser) && hasAddon(sessionUser, 'importacion_excel');
   const units = unitsResult.status === 'success' ? unitsResult.data : undefined;
   const formUnits: ProductFormUnits =
     formUnitsResult.status === 'success' ? formUnitsResult.data : [];

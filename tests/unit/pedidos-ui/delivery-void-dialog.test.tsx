@@ -1,6 +1,9 @@
 // El dialogo de anulacion con la Server Action doblada: casillas, avisos previos, clave, respuestas.
 // Los controles se localizan por `data-testid`; el copy solo se afirma donde el diseño lo fija
 // (el toast «Entrega anulada»).
+//
+// 2026-10-15: las casillas van agrupadas por cliente, con su casilla de grupo, y el dialogo abre sin
+// nada marcado. Los casos de QC-224 R11 pasan a R36 y R37; los que envian marcan antes el par.
 
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
@@ -13,6 +16,8 @@ import {
   DELIVERY_VOID_DISMISS_TESTID,
   DELIVERY_VOID_EMPTY_ERROR_TESTID,
   DELIVERY_VOID_ERROR_TESTID,
+  DELIVERY_VOID_GROUP_TESTID,
+  DELIVERY_VOID_GROUP_TOGGLE_TESTID,
   DELIVERY_VOID_PRESENTATION_TESTID,
   DELIVERY_VOID_REASON_ERROR_TESTID,
   DELIVERY_VOID_REASON_TESTID,
@@ -24,7 +29,9 @@ import {
 import type { VoidDeliveryActionResult } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 
 import {
+  FIRST_CUSTOMER_ID,
   OPEN_LINE_ID,
+  SECOND_CUSTOMER_ID,
   VOIDED_LINE_ID,
   VOID_ERROR_STATES,
   VOID_KEY,
@@ -71,22 +78,31 @@ const KEY: Uuid = VOID_KEY as Uuid;
 const OTHER_KEY: Uuid = 'b0000000-0000-4000-8000-0000000000c2';
 const SECOND_OPEN_LINE_ID = 'd0000000-0000-4000-8000-000000000026';
 
-/** La entrega mas reciente del fixture: una presentacion sin anular y otra ya anulada. */
+/** La entrega mas reciente del fixture: Ana con la botella sin anular y el galon anulado; Bruno con el
+ *  galon sin anular. */
 const NEWER: OrderDeliveryHistoryEntry = deliveryHistoryView().deliveries[0] as OrderDeliveryHistoryEntry;
 
 /** Dos presentaciones sin anular y una anulada, para poder desmarcar. */
+// 2026-10-15: las presentaciones van por cliente; la nueva se anade al primero.
 const TWO_OPEN: OrderDeliveryHistoryEntry = {
   ...NEWER,
-  presentations: [
-    ...NEWER.presentations,
-    {
-      presentationLineId: SECOND_OPEN_LINE_ID,
-      presentationName: 'Caneca 20 L',
-      packages: 2,
-      batches: [],
-      void: null,
-    },
-  ],
+  customers: NEWER.customers.map((customer, index) =>
+    index !== 0
+      ? customer
+      : {
+          ...customer,
+          presentations: [
+            ...customer.presentations,
+            {
+              presentationLineId: SECOND_OPEN_LINE_ID,
+              presentationName: 'Caneca 20 L',
+              packages: 2,
+              batches: [],
+              void: null,
+            },
+          ],
+        },
+  ),
 };
 
 const reload = vi.fn<() => Promise<void>>();
@@ -114,6 +130,27 @@ function casillas(): HTMLElement[] {
   return screen.queryAllByTestId(DELIVERY_VOID_PRESENTATION_TESTID);
 }
 
+function casilla(customerId: string, lineId: string): HTMLElement {
+  const encontrada = casillas().find(
+    (c) => c.getAttribute('data-customer-id') === customerId && c.getAttribute('data-presentation-line-id') === lineId,
+  );
+  if (encontrada === undefined) throw new Error(`no se pinta el par ${customerId}:${lineId}`);
+  return encontrada;
+}
+
+function grupo(customerId: string): HTMLElement {
+  const encontrado = screen
+    .queryAllByTestId(DELIVERY_VOID_GROUP_TOGGLE_TESTID)
+    .find((c) => c.getAttribute('data-customer-id') === customerId);
+  if (encontrado === undefined) throw new Error(`no se pinta el grupo ${customerId}`);
+  return encontrado;
+}
+
+/** Marca el par que pide `voidInput()`: la botella de Ana. */
+async function marcarBotellaDeAna(user: ReturnType<typeof setupUser>) {
+  await user.click(casilla(FIRST_CUSTOMER_ID, OPEN_LINE_ID));
+}
+
 async function escribirMotivo(user: ReturnType<typeof setupUser>, texto = VOID_REASON) {
   const campo = screen.getByTestId(DELIVERY_VOID_REASON_TESTID);
   await user.clear(campo);
@@ -134,32 +171,124 @@ afterEach(() => {
 });
 
 describe('casillas', () => {
-  it('R11: lista solo las presentaciones sin anular, todas marcadas y sin campos de cantidad', () => {
+  it('R36: lista por cliente solo los pares sin anular, todos sin marcar y sin campos de cantidad', () => {
     montar(TWO_OPEN);
 
     const dialogo = screen.getByTestId(DELIVERY_VOID_DIALOG_TESTID);
-    expect(casillas().map((c) => c.getAttribute('data-presentation-line-id'))).toEqual([
-      OPEN_LINE_ID,
-      SECOND_OPEN_LINE_ID,
-    ]);
-    expect(dialogo.querySelector(`[data-presentation-line-id="${VOIDED_LINE_ID}"]`)).toBeNull();
-    for (const casilla of casillas()) expect(casilla).toHaveAttribute('aria-checked', 'true');
-    expect(within(dialogo).getByText(/Botella 1 L/)).toHaveTextContent('6');
+    const grupos = screen.getAllByTestId(DELIVERY_VOID_GROUP_TESTID);
+    expect(grupos.map((g) => g.getAttribute('data-customer-id'))).toEqual([FIRST_CUSTOMER_ID, SECOND_CUSTOMER_ID]);
+    expect(grupos[0]).toHaveAccessibleName('Ana Perez');
+    expect(grupos[1]).toHaveAccessibleName('Bruno Diaz');
+
+    const pares = (g: HTMLElement) =>
+      within(g)
+        .getAllByTestId(DELIVERY_VOID_PRESENTATION_TESTID)
+        .map((c) => `${c.getAttribute('data-customer-id')}:${c.getAttribute('data-presentation-line-id')}`);
+    expect(pares(grupos[0]!)).toEqual([`${FIRST_CUSTOMER_ID}:${OPEN_LINE_ID}`, `${FIRST_CUSTOMER_ID}:${SECOND_OPEN_LINE_ID}`]);
+    // El galon de Ana ya esta anulado; el de Bruno, no.
+    expect(pares(grupos[1]!)).toEqual([`${SECOND_CUSTOMER_ID}:${VOIDED_LINE_ID}`]);
+
+    for (const c of casillas()) expect(c).toHaveAttribute('aria-checked', 'false');
+    expect(casilla(FIRST_CUSTOMER_ID, OPEN_LINE_ID)).toHaveAccessibleName(/Botella 1 L de Ana Perez · 6 envases/);
+    expect(casilla(SECOND_CUSTOMER_ID, VOIDED_LINE_ID)).toHaveAccessibleName(/Galon 4 L de Bruno Diaz · 2 envases/);
     expect(within(dialogo).queryByRole('spinbutton')).toBeNull();
     expect(dialogo.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])')).toHaveLength(0);
   });
 
-  it('R11: deja desmarcar una y envia solo las que siguen marcadas', async () => {
+  it('R36: no lista a un cliente al que no le queda ningun par sin anular', () => {
+    const sinBruno: OrderDeliveryHistoryEntry = {
+      ...NEWER,
+      customers: NEWER.customers.map((customer) =>
+        customer.customerId !== SECOND_CUSTOMER_ID
+          ? customer
+          : {
+              ...customer,
+              presentations: customer.presentations.map((p) => ({
+                ...p,
+                void: { reason: VOID_REASON, authorName: 'Laura Gomez', createdAt: '2026-10-09T10:00:00.000Z' },
+              })),
+            },
+      ),
+    };
+    montar(sinBruno);
+
+    expect(screen.getAllByTestId(DELIVERY_VOID_GROUP_TESTID).map((g) => g.getAttribute('data-customer-id'))).toEqual([
+      FIRST_CUSTOMER_ID,
+    ]);
+    expect(screen.queryByText('Bruno Diaz')).toBeNull();
+    expect(casillas()).toHaveLength(1);
+  });
+
+  it('R37: la casilla de grupo sale sin marcar, a medias con algunos pares y marcada con todos', async () => {
     const user = setupUser();
     montar(TWO_OPEN);
 
-    await user.click(casillas()[1] as HTMLElement);
-    expect(casillas()[1]).toHaveAttribute('aria-checked', 'false');
+    expect(grupo(FIRST_CUSTOMER_ID)).toHaveAttribute('aria-checked', 'false');
+    expect(grupo(SECOND_CUSTOMER_ID)).toHaveAttribute('aria-checked', 'false');
+    expect(grupo(FIRST_CUSTOMER_ID)).toHaveAccessibleName('Anular todo lo de Ana Perez');
+
+    await user.click(casilla(FIRST_CUSTOMER_ID, OPEN_LINE_ID));
+    expect(grupo(FIRST_CUSTOMER_ID)).toHaveAttribute('aria-checked', 'mixed');
+    expect(grupo(SECOND_CUSTOMER_ID)).toHaveAttribute('aria-checked', 'false');
+
+    await user.click(casilla(FIRST_CUSTOMER_ID, SECOND_OPEN_LINE_ID));
+    expect(grupo(FIRST_CUSTOMER_ID)).toHaveAttribute('aria-checked', 'true');
+
+    await user.click(casilla(SECOND_CUSTOMER_ID, VOIDED_LINE_ID));
+    expect(grupo(SECOND_CUSTOMER_ID)).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('R37: pulsar la casilla de grupo a medias o sin marcar marca todos sus pares, y con todos marcados los desmarca', async () => {
+    const user = setupUser();
+    montar(TWO_OPEN);
+    const deAna = () => [casilla(FIRST_CUSTOMER_ID, OPEN_LINE_ID), casilla(FIRST_CUSTOMER_ID, SECOND_OPEN_LINE_ID)];
+
+    await user.click(grupo(FIRST_CUSTOMER_ID));
+    expect(deAna().map((c) => c.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(casilla(SECOND_CUSTOMER_ID, VOIDED_LINE_ID)).toHaveAttribute('aria-checked', 'false');
+
+    await user.click(grupo(FIRST_CUSTOMER_ID));
+    expect(deAna().map((c) => c.getAttribute('aria-checked'))).toEqual(['false', 'false']);
+
+    await user.click(casilla(FIRST_CUSTOMER_ID, SECOND_OPEN_LINE_ID));
+    expect(grupo(FIRST_CUSTOMER_ID)).toHaveAttribute('aria-checked', 'mixed');
+    await user.click(grupo(FIRST_CUSTOMER_ID));
+    expect(deAna().map((c) => c.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(grupo(FIRST_CUSTOMER_ID)).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('R38: envia la entrega, la clave, el motivo y solo los pares marcados, con su cliente y su presentacion', async () => {
+    const user = setupUser();
+    montar(TWO_OPEN);
+
+    await user.click(casilla(SECOND_CUSTOMER_ID, VOIDED_LINE_ID));
+    await marcarBotellaDeAna(user);
     await escribirMotivo(user);
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
 
     await waitFor(() => expect(voidMock).toHaveBeenCalledTimes(1));
-    expect(voidMock).toHaveBeenCalledWith(voidInput());
+    expect(voidMock).toHaveBeenCalledWith(
+      voidInput({
+        items: [
+          { customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID },
+          { customerId: SECOND_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID },
+        ],
+      }),
+    );
+  });
+
+  it('R38: con un solo par marcado envia solo ese, aunque otro cliente lleve la misma presentacion', async () => {
+    const user = setupUser();
+    montar();
+
+    await user.click(casilla(SECOND_CUSTOMER_ID, VOIDED_LINE_ID));
+    await escribirMotivo(user);
+    await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
+
+    await waitFor(() => expect(voidMock).toHaveBeenCalledTimes(1));
+    expect(voidMock).toHaveBeenCalledWith(
+      voidInput({ items: [{ customerId: SECOND_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID }] }),
+    );
   });
 });
 
@@ -168,7 +297,7 @@ describe('avisos previos', () => {
     const user = setupUser();
     montar();
 
-    await user.click(casillas()[0] as HTMLElement);
+    // 2026-10-15: abre sin nada marcado; ya no hace falta desmarcar.
     await escribirMotivo(user);
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
 
@@ -183,6 +312,7 @@ describe('avisos previos', () => {
     const user = setupUser();
     montar();
 
+    await marcarBotellaDeAna(user);
     await escribirMotivo(user, texto);
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
 
@@ -195,6 +325,7 @@ describe('avisos previos', () => {
     const user = setupUser();
     montar();
 
+    await marcarBotellaDeAna(user);
     const campo = screen.getByTestId(DELIVERY_VOID_REASON_TESTID);
     await user.click(campo);
     await user.paste('a'.repeat(501));
@@ -209,6 +340,7 @@ describe('avisos previos', () => {
     const user = setupUser();
     montar();
 
+    await marcarBotellaDeAna(user);
     await user.click(screen.getByTestId(DELIVERY_VOID_REASON_TESTID));
     await user.paste('a'.repeat(500));
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
@@ -224,6 +356,7 @@ describe('clave de anulacion', () => {
     voidMock.mockResolvedValueOnce(VOID_ERROR_STATES.actionNotAllowed);
     montar();
 
+    await marcarBotellaDeAna(user);
     await escribirMotivo(user);
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
     await screen.findByTestId(DELIVERY_VOID_ERROR_TESTID);
@@ -242,6 +375,7 @@ describe('clave de anulacion', () => {
     voidMock.mockResolvedValue(VOID_ERROR_STATES.actionNotAllowed);
     render(<Reabrible />);
 
+    await marcarBotellaDeAna(user);
     await escribirMotivo(user);
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
     await screen.findByTestId(DELIVERY_VOID_ERROR_TESTID);
@@ -249,6 +383,9 @@ describe('clave de anulacion', () => {
     await waitFor(() => expect(screen.queryByTestId(DELIVERY_VOID_DIALOG_TESTID)).toBeNull());
 
     await user.click(screen.getByRole('button', { name: 'reabrir', hidden: true }));
+    // 2026-10-15: al reabrir vuelve sin nada marcado.
+    for (const c of casillas()) expect(c).toHaveAttribute('aria-checked', 'false');
+    await marcarBotellaDeAna(user);
     await escribirMotivo(user);
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
 
@@ -268,6 +405,7 @@ describe('respuestas', () => {
     voidMock.mockResolvedValue({ status: 'success', data });
     const onOpenChange = montar();
 
+    await marcarBotellaDeAna(user);
     await escribirMotivo(user);
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
 
@@ -282,6 +420,7 @@ describe('respuestas', () => {
     voidMock.mockResolvedValue(VOID_ERROR_STATES.alreadyVoided);
     const onOpenChange = montar();
 
+    await marcarBotellaDeAna(user);
     await escribirMotivo(user);
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
 
@@ -303,7 +442,8 @@ describe('respuestas', () => {
     voidMock.mockResolvedValue(error);
     const onOpenChange = montar(TWO_OPEN);
 
-    await user.click(casillas()[1] as HTMLElement);
+    // 2026-10-15: abre sin nada marcado; se marca la primera en vez de desmarcar la segunda.
+    await marcarBotellaDeAna(user);
     await escribirMotivo(user);
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
 
@@ -312,7 +452,7 @@ describe('respuestas', () => {
     expect(region).toHaveTextContent(error.message);
     expect(screen.queryByTestId(DELIVERY_VOID_REJECTED_TESTID)).toBeNull();
     expect(screen.getByTestId(DELIVERY_VOID_DIALOG_TESTID)).toBeInTheDocument();
-    expect(casillas().map((c) => c.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+    expect(casillas().map((c) => c.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
     expect(screen.getByTestId(DELIVERY_VOID_REASON_TESTID)).toHaveValue(VOID_REASON);
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(reload).not.toHaveBeenCalled();
@@ -324,6 +464,7 @@ describe('respuestas', () => {
     voidMock.mockRejectedValue(new Error('red caida'));
     montar();
 
+    await marcarBotellaDeAna(user);
     await escribirMotivo(user);
     await user.click(screen.getByTestId(DELIVERY_VOID_CONFIRM_TESTID));
 

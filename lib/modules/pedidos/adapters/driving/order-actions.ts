@@ -563,8 +563,7 @@ export async function getOrderDeliveryAction(orderId: string): Promise<OrderDeli
 export type DeliverOrderInput = {
   readonly orderId: string;
   readonly deliveryKey: string;
-  readonly customerId: string;
-  readonly allocations: readonly DeliveryAllocation[];
+  readonly customers: readonly { readonly customerId: string; readonly allocations: readonly DeliveryAllocation[] }[];
 };
 
 export type DeliverOrderActionResult = { status: 'success'; data: DeliverOrderResult } | ErrorState;
@@ -602,13 +601,13 @@ export async function listOrderDeliveriesAction(orderId: string): Promise<OrderD
 export type VoidDeliveryInput = {
   readonly deliveryId: string;
   readonly voidKey: string;
-  readonly presentationLineIds: readonly string[];
+  readonly items: readonly { readonly customerId: string; readonly presentationLineId: string }[];
   readonly reason: string;
 };
 
 export type VoidDeliveryActionResult = { status: 'success'; data: VoidDeliveryResult } | ErrorState;
 
-/** Anula presentaciones de una entrega. `input` tiene la forma de `VoidDeliveryInput`; la valida el caso de uso. */
+/** Anula pares cliente-presentacion de una entrega. `input` tiene la forma de `VoidDeliveryInput`; la valida el caso de uso. */
 export async function voidDeliveryAction(input: unknown): Promise<VoidDeliveryActionResult> {
   const actor = await currentActor();
 

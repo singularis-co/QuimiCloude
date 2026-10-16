@@ -130,6 +130,8 @@ export function mentionsTerminadosConsultarLiteral(source: string): boolean {
  */
 const RUTAS_PERMITIDAS = new Set([
   'lib/modules/identity/domain/permissions.ts',
+  // Catalogo de anadidos: clasifica cada permiso como nucleo o anadido.
+  'lib/modules/identity/domain/company-addons.ts',
   'lib/modules/asignaciones/domain/assignment-views.ts',
   'lib/modules/asignaciones/domain/list-finished-orders.ts',
 ]);
@@ -226,7 +228,12 @@ describe('R16 — ningun archivo de produccion fuera de la lista permitida exige
             `${[...RUTAS_PERMITIDAS].join(', ')}. ` +
             `Se encontro tambien en: ${inesperados.join(', ')}.`,
     ).toEqual([]);
-    expect(conElCodigo).toEqual(expect.arrayContaining(['lib/modules/identity/domain/permissions.ts']));
+    expect(conElCodigo).toEqual(
+      expect.arrayContaining([
+        'lib/modules/identity/domain/permissions.ts',
+        'lib/modules/identity/domain/company-addons.ts',
+      ]),
+    );
   });
 
   it('dispara con un fuente sintetico que exige el codigo, con cualquiera de las tres comillas', () => {

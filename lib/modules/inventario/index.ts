@@ -16,6 +16,7 @@ export {
   BatchNotFoundError,
   BatchStockNegativeError,
   ActionNotAllowedError,
+  ExpiryDateNotFutureError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
 export {
@@ -64,9 +65,9 @@ export { type ProductStockByUnit, sumStockByUnit, singleUnitStock } from './doma
 export { type CostingBatch } from './domain/costing-batch';
 export { productDisplayName } from './domain/product-display-name';
 export { type PresentationView } from './domain/presentation-view';
-export { type ProductBatchView } from './domain/product-batch-view';
+export { aliveBatches, type ProductBatchView } from './domain/product-batch-view';
 export { type InventoryMovementView, type NewInventoryMovement } from './domain/inventory-movement';
-export { MOVEMENT_REASONS, type MovementReason } from './domain/movement-reason';
+export { MOVEMENT_REASONS, STOCK_INCREASE_REASONS, type MovementReason } from './domain/movement-reason';
 
 export { createCreateProduct, type CreateProductDeps } from './domain/create-product';
 export type { StockIncreaseListener } from './domain/stock-increase-listener';
@@ -74,7 +75,18 @@ export {
   createCreateRawMaterial,
   type CreateRawMaterialDeps,
 } from './domain/create-raw-material';
-export { createUpdateProduct, type UpdateProductDeps } from './domain/update-product';
+export {
+  createUpdateProduct,
+  type ProductImageWarning,
+  type UpdateProductDeps,
+  type UpdateProductResult,
+} from './domain/update-product';
+export {
+  MAX_PRODUCT_IMAGE_BYTES,
+  validateProductImage,
+  type ProductImageFormat,
+  type ProductImageValidation,
+} from './domain/product-image';
 export { createDeleteProduct, type DeleteProductDeps } from './domain/delete-product';
 export { createGetProduct, type GetProductDeps } from './domain/get-product';
 export { createListProducts, type ListProductsDeps } from './domain/list-products';
@@ -146,6 +158,10 @@ export {
   type FinishedProductCostRow,
   type ProducedProductLink,
   type FinishedDeliveryDirectory,
+  type FinishedDeliveryLineRecord,
+  type PackingReasonView,
+  type FinishedDistributionLine,
+  type FinishedDistributionDirectory,
 } from './domain/finished-product-detail';
 export {
   createGetFinishedProduct,
@@ -163,6 +179,10 @@ export {
   createListFinishedProductDeliveries,
   type ListFinishedProductDeliveriesDeps,
 } from './domain/list-finished-product-deliveries';
+export {
+  createListFinishedProductDistribution,
+  type ListFinishedProductDistributionDeps,
+} from './domain/list-finished-product-distribution';
 export {
   createListFinishedProductCosts,
   type ListFinishedProductCostsDeps,
@@ -266,11 +286,26 @@ export {
   type ConfirmInventoryImport,
 } from './domain/inventory-import-contract';
 export {
-  IMPORT_EXAMPLE_ROW,
-  buildInventoryImportTemplate,
+  IMPORT_EXAMPLE_ROWS,
+  IMPORT_TEMPLATE_FILE_NAME,
+  IMPORT_TEMPLATE_MIME_TYPE,
+  IMPORT_TEMPLATE_SHEET_NAME,
+  IMPORT_VALUES_SHEET_NAME,
+  buildInventoryImportTemplateSheets,
   buildInventoryImportErrorFile,
   type ImportDownload,
+  type ImportTemplateSheet,
+  type ImportTemplateValues,
 } from './domain/inventory-import-downloads';
+export {
+  createGetInventoryImportTemplate,
+  createGetInventoryImportValues,
+  type GetInventoryImportTemplate,
+  type GetInventoryImportTemplateDeps,
+  type GetInventoryImportValues,
+  type GetInventoryImportValuesDeps,
+  type InventoryImportTemplate,
+} from './domain/get-inventory-import-template';
 export {
   createPreviewInventoryImport,
   type PreviewInventoryImportDeps,

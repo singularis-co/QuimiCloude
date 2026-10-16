@@ -78,10 +78,10 @@ vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () =
 
 import FormulasPage from '@/app/(private)/produccion/formulas/page';
 import {
-  AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID,
-  AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID,
-  AI_PROVIDER_REQUIRED_NOTICE_TESTID,
-} from '@/components/shared/ai-provider-required-notice';
+  AI_PROVIDER_REQUIRED_TOOLTIP_LINK_TESTID,
+  AI_PROVIDER_REQUIRED_TOOLTIP_TESTID,
+  AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID,
+} from '@/components/shared/ai-provider-required-tooltip';
 import {
   DOCUMENT_UPLOAD_DIALOG_TESTID,
   DOCUMENT_UPLOAD_INPUT_TESTID,
@@ -89,7 +89,12 @@ import {
   DOCUMENT_UPLOAD_SUBMIT_TESTID,
   DOCUMENT_UPLOAD_TESTID,
 } from '@/components/shared/document-upload';
-import { PERMISSIONS } from '@/lib/modules/identity';
+import {
+  PERMISSIONS,
+  ROLE_ADMINISTRADOR,
+  SEED_ROLE_PERMISSIONS,
+  effectivePermissions,
+} from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { AI_PROVIDER_INTEGRATION_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
 
@@ -225,8 +230,25 @@ describe('el boton de subida en el listado de formulas', () => {
     await renderPantalla();
 
     expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
-    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID)).toBeNull();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).toBeNull();
     expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R15 R23 con los permisos del Administrador recortados por la empresa sin añadidos no hay boton ni subida', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: 'u-test-44',
+      username: 'carla.duarte',
+      displayName: 'Carla Duarte Salas',
+      roleName: ROLE_ADMINISTRADOR,
+      permissions: effectivePermissions(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [], []),
+      addons: [],
+    });
+
+    await renderPantalla();
+
+    expect(screen.getAllByTestId('recipe-create-open').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).toBeNull();
   });
 
   it('el boton comparte contenedor padre con «Nueva formula» (R22)', async () => {
@@ -271,7 +293,7 @@ describe('el boton de subida en el listado de formulas', () => {
   });
 });
 
-describe('el aviso de proveedor IA en el listado de formulas', () => {
+describe('el boton de subida sin proveedor IA en el listado de formulas', () => {
   const conSubida = {
     id: 'u-test-42',
     username: 'carla.duarte',
@@ -280,52 +302,56 @@ describe('el aviso de proveedor IA en el listado de formulas', () => {
     permissions: ['recetas.consultar', 'documentos.modificar'],
   };
 
-  it('R37: con la empresa conectada hay boton y no aviso', async () => {
+  it('con la empresa conectada el boton esta habilitado y sin globo de proveedor IA', async () => {
     getSessionUserMock.mockResolvedValue(conSubida);
     getAiProviderReadinessActionMock.mockResolvedValue({ configured: true, canConfigure: true });
 
     await renderPantalla();
 
-    expect(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeVisible();
-    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID)).toBeNull();
+    const abrir = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
+    expect(abrir).toBeVisible();
+    expect(abrir).toBeEnabled();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).toBeNull();
     expect(getAiProviderReadinessActionMock).toHaveBeenCalledTimes(1);
   });
 
-  it('R37: sin conexion y con integraciones.modificar, el aviso con enlace ocupa el sitio del boton', async () => {
-    getSessionUserMock.mockResolvedValue(conSubida);
-    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: true });
-
-    await renderPantalla();
-
-    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
-    expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).toBeNull();
-    const aviso = screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID);
-    expect(aviso).toHaveTextContent(
-      'Para leer PDF, conecta el proveedor IA de tu empresa. La lectura usa tu propia API key.',
-    );
-    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID)).toHaveAttribute(
-      'href',
-      AI_PROVIDER_INTEGRATION_ROUTE,
-    );
-    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID)).toBeNull();
-    // En el sitio del boton: la misma fila de acciones que «Nueva formula».
-    expect(
-      aviso.parentElement?.querySelector(':scope > [data-testid="recipe-create-open"]'),
-    ).not.toBeNull();
-  });
-
-  it('R37: sin conexion y sin integraciones.modificar, el aviso pide a un administrador y no enlaza', async () => {
+  it('sin conexion el boton sigue en su sitio pero deshabilitado, y no abre la ventana', async () => {
     getSessionUserMock.mockResolvedValue(conSubida);
     getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: false });
 
     await renderPantalla();
 
-    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
-    const aviso = screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_TESTID);
-    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_NOTICE_ASK_TESTID)).toHaveTextContent(
-      'Pídele a un administrador que lo configure',
+    const abrir = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
+    expect(abrir).toBeDisabled();
+    const envoltorio = screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID);
+    expect(envoltorio).toContainElement(abrir);
+    // En el sitio del boton: la misma fila de acciones que «Nueva formula».
+    expect(
+      envoltorio.parentElement?.querySelector(':scope > [data-testid="recipe-create-open"]'),
+    ).not.toBeNull();
+    expect(screen.queryByTestId('ai-provider-required-notice')).toBeNull();
+
+    const user = setupUser();
+    await user.click(abrir);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeVisible();
+  });
+
+  it('sin conexion, al pasar el puntero, el globo enlaza a Proveedor IA aunque falte integraciones.modificar', async () => {
+    getSessionUserMock.mockResolvedValue(conSubida);
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: false });
+
+    await renderPantalla();
+
+    const user = setupUser();
+    await user.hover(screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID));
+
+    expect(await screen.findByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TESTID)).toHaveTextContent(
+      'Para leer PDF, conecta el proveedor IA de tu empresa',
     );
-    expect(aviso.querySelector('a')).toBeNull();
-    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_NOTICE_LINK_TESTID)).toBeNull();
+    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_LINK_TESTID)).toHaveAttribute(
+      'href',
+      AI_PROVIDER_INTEGRATION_ROUTE,
+    );
   });
 });

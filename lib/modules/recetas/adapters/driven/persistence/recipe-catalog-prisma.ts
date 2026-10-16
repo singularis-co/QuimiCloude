@@ -137,6 +137,18 @@ export async function findAliveRecipeByNormalizedName(
   return row === null ? null : { id: row.id, name: row.name };
 }
 
+/** Los nombres de las formulas ORIGINALES VIVAS de la empresa, tal como estan guardados. */
+export async function listAliveOriginalRecipeNames(companyId: string): Promise<readonly string[]> {
+  const scope: RecipeScope = { companyId };
+  const rows = await prisma.recipe.findMany({
+    where: { AND: [recipeCompanyScope(scope), { deletedAt: null, parentRecipeId: null }] },
+    select: { name: true },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  });
+
+  return rows.map((row) => row.name);
+}
+
 /**
  * Valida cada elemento crudo del `Json` de `steps` contra el esquema del dominio y descarta el
  * que no pasa, conservando el orden -mismo criterio de tolerancia que `recipe-prisma.ts`, pero

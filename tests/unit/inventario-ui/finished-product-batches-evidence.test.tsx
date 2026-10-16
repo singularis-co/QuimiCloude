@@ -13,6 +13,7 @@ import {
   GALLON_BATCH_ID,
   UNPACKAGED_BATCH_ROW,
   finishedProductBatchRow,
+  finishedProductDetail,
   finishedProductPage,
 } from '../../fixtures/finished-product-detail';
 import {
@@ -93,6 +94,7 @@ async function renderLotes(rows = [WITH_ORDER, UNPACKAGED_BATCH_ROW]) {
     tab: 'lotes',
     paging: { page: 1, pageSize: 10 },
     unitLabel: UNIT,
+    presentation: finishedProductDetail().presentation,
   });
   return render(<>{tree}</>);
 }

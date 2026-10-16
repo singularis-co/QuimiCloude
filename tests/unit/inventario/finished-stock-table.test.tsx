@@ -239,6 +239,56 @@ describe('fila de pedido', () => {
   });
 });
 
+describe('nombre y presentacion', () => {
+  it('la sub-fila pinta el nombre sin la presentacion y la presentacion en su columna', async () => {
+    const user = setupUser();
+    const conPresentacion = producto({ presentationId: 'presentation-1', presentationName: 'Botella 250 ml' });
+    montar([pedido({ products: [{ product: conPresentacion, stock: '1.5', packagedStock: [entrada()] }] })]);
+
+    expect(within(filaDeGrupo('order-1')).getByTestId('data-table-cell-presentationName').textContent).toBe('');
+    await user.click(screen.getByTestId('finished-stock-toggle'));
+
+    const sub = screen.getByTestId('data-table-row-order-1--product-1');
+    expect(within(sub).getByTestId('finished-stock-line-name').textContent).toBe('Desengrasante');
+    expect(within(sub).getByTestId('data-table-cell-presentationName').textContent).toBe('Botella 250 ml');
+  });
+
+  it('sin presentacion conocida, el nombre queda entero y la columna pinta el marcador', async () => {
+    const user = setupUser();
+    montar([pedido()]);
+    await user.click(screen.getByTestId('finished-stock-toggle'));
+
+    const sub = screen.getByTestId('data-table-row-order-1--product-1');
+    expect(within(sub).getByTestId('finished-stock-line-name').textContent).toBe(
+      'Desengrasante · Botella 250 ml',
+    );
+    expect(within(sub).getByTestId('data-table-cell-presentationName')).toHaveTextContent(EMPTY_MARK);
+  });
+
+  it('la fila sin pedido pinta el nombre sin la presentacion y la presentacion en su columna', () => {
+    const product = producto({
+      id: 'product-2',
+      name: 'Jabon · Garrafa 5 L',
+      presentationId: 'presentation-2',
+      presentationName: 'Garrafa 5 L',
+    });
+    montar([
+      {
+        kind: 'withoutOrder',
+        key: 'without-product-2',
+        productId: 'product-2',
+        stock: '12.5000',
+        unitId: 'unit-l',
+        products: [{ product, stock: '12.5000', packagedStock: null }],
+      },
+    ]);
+
+    const grupo = filaDeGrupo('without-product-2');
+    expect(within(grupo).getByTestId('finished-stock-name').textContent).toBe('Jabon');
+    expect(within(grupo).getByTestId('data-table-cell-presentationName').textContent).toBe('Garrafa 5 L');
+  });
+});
+
 describe('desplegar', () => {
   it('muestra una sub-fila por producto con existencia, alerta y acciones; plegar las quita', async () => {
     const user = setupUser();

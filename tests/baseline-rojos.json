@@ -1,9 +1,4 @@
 {
   "_nota": "Mapa de archivos de test que YA estaban en rojo en dev por deuda ajena, para que el gate pueda responder '¿rompi algo YO?' sin exigir que la suite entera este verde. Cada entrada necesita motivo y desde; sin eso la lista se vuelve un vertedero. Todo lo que NO este aqui y salga rojo es bloqueante. Ver docs/gate.md > Rojos heredados.",
-  "archivos": {
-    "tests/unit/paridad/confirmaciones-paridad.test.tsx": {
-      "motivo": "Deuda ajena de dev, INTERMITENTE: el caso «estado de usuario > R1 R14 — con error, el dialogo sigue abierto» salio con snapshot mismatched en el gate-completo del PR #227 (run 38482106564), sin diff en el informe. Pasa en local 2 de 2 (rama antes y despues de fusionar origin/dev 2026-10-13) y en los gates de #228/#229. El snapshot fija el popup del Select de base-ui (top/left, --transform-origin, opacity) y aria-busy del boton, que se asientan de forma asincrona: carrera de tiempo bajo carga de CI. Ajeno a QC-274, que no toca app/, components/ ni el dialogo de estado de usuario. Salida limpia: estabilizar la espera del caso y borrar esta entrada; podar si el CI la reporta como ya verde.",
-      "desde": "2026-10-13"
-    }
-  }
+  "archivos": {}
 }

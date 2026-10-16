@@ -43,6 +43,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', ()
   listFinishedProductMovementsAction: listMock,
   listFinishedProductDeliveriesAction: listMock,
   listFinishedProductCostsAction: listMock,
+  listFinishedProductDistributionAction: listMock,
   listProducedProductsAction: listMock,
 }));
 
@@ -119,11 +120,11 @@ describe('pagina de la ficha de producto terminado', () => {
     expect(listMock).not.toHaveBeenCalled();
   });
 
-  it('R8 — el exito pinta el nombre del producto y las siete pestañas', async () => {
+  it('R8, R26 — el exito pinta el nombre del producto y las ocho pestañas', async () => {
     await renderPage();
 
     expect(screen.getByTestId('finished-product-name')).toHaveTextContent(finishedProductDetail().name);
-    expect(within(screen.getByRole('tablist')).getAllByRole('tab')).toHaveLength(7);
+    expect(within(screen.getByRole('tablist')).getAllByRole('tab')).toHaveLength(8);
   });
 
   it('R10 — General muestra nombre, imagen, presentacion con su contenido, unidad base y alerta', async () => {

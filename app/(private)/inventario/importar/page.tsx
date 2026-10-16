@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { buttonVariants } from '@/components/ui/button';
+import { requirePageAddon } from '@/lib/modules/identity/adapters/driving/require-page-addon';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import { getInventoryImportValuesAction } from '@/lib/modules/inventario/adapters/driving/inventory-import-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
@@ -15,6 +17,7 @@ import {
   IMPORT_PAGE_DESCRIPTION,
   IMPORT_PAGE_TITLE,
   IMPORT_TITLE_TESTID,
+  ImportGuide,
   InventoryImportScreen,
 } from './components';
 
@@ -27,11 +30,14 @@ export const maxDuration = 300;
 
 export default async function InventoryImportPage() {
   await requirePagePermission('inventario.modificar');
+  await requirePageAddon('importacion_excel');
 
   // Si el catálogo de unidades no se puede leer, la importación sigue disponible; solo los
   // diálogos de alta de faltantes se quedan sin unidades que ofrecer.
-  const unitsResult = await listUnitsAction();
+  // Igual con la guía: sin los valores de la empresa sigue mostrando reglas, tipos y ejemplos.
+  const [unitsResult, valuesResult] = await Promise.all([listUnitsAction(), getInventoryImportValuesAction()]);
   const units = unitsResult.status === 'success' ? unitsResult.data : [];
+  const values = valuesResult.status === 'success' ? valuesResult.data : null;
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -52,6 +58,7 @@ export default async function InventoryImportPage() {
         </Link>
       </div>
       <InventoryImportScreen units={units} />
+      <ImportGuide values={values} />
     </div>
   );
 }

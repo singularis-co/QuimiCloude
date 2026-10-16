@@ -35,6 +35,9 @@
  * **2026-10-13**: `company_not_found`.
  * **2026-10-13**: `evidence_required`, `evidence_limit`, `evidence_invalid_file`,
  * `evidence_not_found`, `recipe_steps_locked`.
+ * **2026-10-14**: `company_duplicate_name`, `company_duplicate_tax_id`, `company_name_mismatch`,
+ * `company_not_deleted`.
+ * **2026-10-14**: `packed_exceeds_quantity`, `packaging_stock_insufficient`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -210,6 +213,15 @@ export const ERROR_CODES = [
   'recipe_steps_locked',
   'ai_provider_missing',
   'ai_provider_error',
+  'company_duplicate_name',
+  'company_duplicate_tax_id',
+  'company_name_mismatch',
+  // Distinto de `company_not_found`: la empresa existe, pero no esta de baja.
+  'company_not_deleted',
+  // Distinto de `order_distribution_exceeds_quantity`: el plan cabe, lo que se pasa es lo envasado.
+  'packed_exceeds_quantity',
+  // Distinto de `insufficient_material`: lo que falta es stock libre del envase para el exceso.
+  'packaging_stock_insufficient',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { RecipeStepsField } from '@/app/(private)/produccion/formulas/components';
 import type { RecipeStepFormValue } from '@/app/(private)/produccion/formulas/components/recipe-form-state';
+import { isStepDocumentEmpty } from '@/app/(private)/produccion/formulas/components/recipe-steps-field';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
 
 import { setupUser } from '../../helpers/user-event';
@@ -271,5 +272,80 @@ describe('RecipeStepsField — «Requiere evidencia» (QC-214)', () => {
     expect(evidenceSwitch(1)).toHaveAttribute('aria-checked', 'true');
     await user.click(screen.getByTestId('recipe-step-add'));
     expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(3);
+  });
+});
+
+describe('RecipeStepsField — «Añadir paso» solo con todos los pasos rellenos', () => {
+  it('isStepDocumentEmpty recorre párrafos e ítems de checklist y solo cuenta texto tras trim', () => {
+    expect(isStepDocumentEmpty({ blocks: [] })).toBe(true);
+    expect(isStepDocumentEmpty({ blocks: [{ kind: 'paragraph', spans: [] }] })).toBe(true);
+    expect(isStepDocumentEmpty(doc('   '))).toBe(true);
+    expect(
+      isStepDocumentEmpty({
+        blocks: [
+          { kind: 'paragraph', spans: [] },
+          { kind: 'checklist', items: [{ spans: [{ text: ' ' }] }, { spans: [{ text: 'Pesar' }] }] },
+        ],
+      }),
+    ).toBe(false);
+    expect(isStepDocumentEmpty(doc('Mezclar'))).toBe(false);
+  });
+
+  it('sin pasos, añadir está activo', () => {
+    render(<SingleHarness initial={[]} />);
+    expect(screen.getByTestId('recipe-step-add')).toBeEnabled();
+  });
+
+  it('con un paso vacío, añadir se deshabilita; con todos con texto, vuelve a estar activo', async () => {
+    const user = setupUser();
+    render(<SingleHarness initial={[step('a', 'Pesar')]} />);
+    expect(screen.getByTestId('recipe-step-add')).toBeEnabled();
+
+    await user.click(screen.getByTestId('recipe-step-add'));
+    expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(2);
+    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+  });
+
+  it('cuando el paso vacío recibe texto, añadir vuelve a estar activo', () => {
+    const noop = () => undefined;
+    const { rerender } = render(
+      <RecipeStepsField
+        steps={[step('a', 'Pesar'), { key: 'b', document: { blocks: [{ kind: 'paragraph', spans: [] }] } }]}
+        onChange={noop}
+      />,
+    );
+    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+
+    rerender(<RecipeStepsField steps={[step('a', 'Pesar'), step('b', 'Mezclar')]} onChange={noop} />);
+    expect(screen.getByTestId('recipe-step-add')).toBeEnabled();
+  });
+
+  it('`locked` no cambia la regla: con un paso vacío añadir sigue deshabilitado', () => {
+    render(
+      <RecipeStepsField
+        steps={[{ key: 'a', document: { blocks: [{ kind: 'paragraph', spans: [] }] } }]}
+        onChange={() => undefined}
+        locked
+      />,
+    );
+    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+  });
+
+  it('un paso con solo espacios cuenta como vacío', () => {
+    render(<SingleHarness initial={[step('a', 'Pesar'), step('b', '   ')]} />);
+    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+  });
+
+  it('la regla aplica igual a los pasos de envasado', () => {
+    function PackingHarness() {
+      const [steps, setSteps] = useState<readonly RecipeStepFormValue[]>([
+        { key: 'pk', document: { blocks: [{ kind: 'paragraph', spans: [] }] } },
+      ]);
+      return (
+        <RecipeStepsField steps={steps} onChange={setSteps} testIdPrefix="recipe-packing-step" />
+      );
+    }
+    render(<PackingHarness />);
+    expect(screen.getByTestId('recipe-packing-step-add')).toBeDisabled();
   });
 });

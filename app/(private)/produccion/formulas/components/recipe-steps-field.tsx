@@ -67,6 +67,19 @@ function emptyStepDocument(): RecipeStepDocument {
   return { blocks: [{ kind: 'paragraph', spans: [] }] };
 }
 
+/**
+ * `true` si el documento no aporta ningún carácter visible: recorre TODOS los bloques -párrafos
+ * e ítems de cada lista de verificación- y mira si algún fragmento tiene texto tras `trim`. Con
+ * un paso así en la lista no se ofrece añadir otro.
+ */
+export function isStepDocumentEmpty(document: RecipeStepDocument): boolean {
+  const hasText = (spans: readonly { readonly text: string }[]) =>
+    spans.some((span) => span.text.trim() !== '');
+  return !document.blocks.some((block) =>
+    block.kind === 'paragraph' ? hasText(block.spans) : block.items.some((item) => hasText(item.spans)),
+  );
+}
+
 const EVIDENCE_TEXTS = {
   summary: (count: number) =>
     count === 0
@@ -103,7 +116,8 @@ export type RecipeStepsFieldProps = {
   readonly testIdPrefix?: string;
   /** Pinta el interruptor «Requiere evidencia» en cada paso y el resumen de la lista. */
   readonly showEvidenceSwitch?: boolean;
-  /** Deshabilita mover y quitar pasos; editar el texto, la marca y añadir siguen activos. */
+  /** Deshabilita mover y quitar pasos; editar el texto, la marca y añadir siguen activos
+   *  (añadir solo se apaga mientras haya un paso vacío, con o sin `locked`). */
   readonly locked?: boolean;
 };
 
@@ -147,6 +161,8 @@ export function RecipeStepsField({
 }: RecipeStepsFieldProps) {
   const headingId = useId();
   const evidenceCount = steps.filter((step) => step.document.requiresEvidence === true).length;
+  // Sin pasos se puede añadir; con alguno vacío, no: primero se rellena el que ya está.
+  const canAddStep = !steps.some((step) => isStepDocumentEmpty(step.document));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -199,7 +215,13 @@ export function RecipeStepsField({
             </p>
           ) : null}
         </div>
-        <Button type="button" touch data-testid={`${testIdPrefix}-add`} onClick={addStep}>
+        <Button
+          type="button"
+          touch
+          disabled={!canAddStep}
+          data-testid={`${testIdPrefix}-add`}
+          onClick={addStep}
+        >
           {addLabel}
         </Button>
       </div>

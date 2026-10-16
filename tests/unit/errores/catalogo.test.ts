@@ -73,7 +73,11 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-214 2026-10-13: 93 y no 88: entran `evidence_required`, `evidence_limit`,
       // `evidence_invalid_file`, `evidence_not_found` y `recipe_steps_locked`.
       // QC-275 2026-10-13: 95 y no 93: entran `ai_provider_missing` y `ai_provider_error`.
-      expect(ERROR_CODES).toHaveLength(95)
+      // QC-162 2026-10-14: 99 y no 95: entran `company_duplicate_name`, `company_duplicate_tax_id`,
+      // `company_name_mismatch` y `company_not_deleted`.
+      // QC-281 2026-10-14: 101 y no 99: entran `packed_exceeds_quantity` y
+      // `packaging_stock_insufficient`.
+      expect(ERROR_CODES).toHaveLength(101)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -196,12 +200,12 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   })
 
   describe('QC-81 R13 — el lote duplicado en la empresa tiene codigo y texto propios', () => {
-    it('batch_duplicate_lot esta en el catalogo con su clave y su texto exacto', () => {
+    it('QC-284 R8: batch_duplicate_lot conserva su codigo y su clave, con el texto por producto y presentacion', () => {
       const codigos: readonly string[] = ERROR_CODES
       expect(codigos).toContain('batch_duplicate_lot')
       expect(ERROR_MESSAGE_KEY.batch_duplicate_lot).toBe('errors.batch_duplicate_lot')
       expect(errorMessage('batch_duplicate_lot')).toBe(
-        'Ya existe un lote con ese valor en esta empresa.',
+        'Ya existe un lote con ese valor para ese producto y presentacion.',
       )
     })
 

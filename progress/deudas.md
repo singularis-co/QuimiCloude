@@ -36,7 +36,7 @@
 
 ### D6 — Flakes de saturación: la regla 5 no converge repitiendo
 - **Origen:** QC-103, QC-110 (PR #105 abierto sin gate verde por decisión humana, 2026-09-22), QC-141.
-- **Qué falta:** la suite completa tumba un archivo distinto por corrida bajo carga: `user-table.test.tsx` (27/27 aislado), `credential-setup.int.test.ts` (15/15 aislado), `product-page.test.tsx` (timeout 20 s; hoy además está en el baseline por otro caso). «Gate completo verde antes de cada PR» no se puede cumplir repitiendo. **No meter flakes en el baseline** (apaga sus casos sanos). Si un flake se repite: subir `testTimeout` del archivo o aligerar su setup.
+- **Qué falta:** la suite completa tumba un archivo distinto por corrida bajo carga: `user-table.test.tsx` (27/27 aislado), `credential-setup.int.test.ts` (15/15 aislado), `product-page.test.tsx` (timeout 20 s; hoy además está en el baseline por otro caso), `confirmaciones-paridad.test.tsx` («estado de usuario > con error», snapshot del popup del Select y `aria-busy`; rojo en el run 38482106564 del PR #227, verde en el siguiente; entró al baseline en QC-274 y se podó en su F2.6, 2026-10-14). «Gate completo verde antes de cada PR» no se puede cumplir repitiendo. **No meter flakes en el baseline** (apaga sus casos sanos). Si un flake se repite: subir `testTimeout` del archivo o aligerar su setup.
 - **Dueño:** fichas **QC-126** (`flake-tabla-de-usuarios-navegacion-jsdom`) y **QC-143** (`flake-credential-setup-bajo-carga`), pending.
 
 ### D7 — El baseline de rojos va por archivo, no por caso
@@ -440,4 +440,20 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   390. El texto de los campos de `components/shared/data-table/data-table-cards.tsx` no se parte
   (le faltan `break-words` / `min-w-0`). Es de la pieza compartida, así que afecta a todas las
   listas con tarjetas. Los nombres reales llevan espacios y no lo provocan.
+- **Dueño:** sin asignar.
+
+### D59 — Comentarios de test y helpers E2E de QC-277 que citan ficha o requisito
+- **Origen:** review de QC-277 (2026-10-15), menor m1 (`progress/review_QC-277.md`).
+- **Qué falta:** `docs/conventions.md > Comentarios` vale también en `tests/` y `e2e/`: el `R<n>`
+  va en el nombre del caso, no en el comentario. Lo incumplen, entre otros, `e2e/helpers/addons.ts`,
+  `e2e/helpers/landing.ts`, `tests/unit/identity/roles/maestro-rol.test.ts` y
+  `tests/unit/identity/schema/account-status-schema.test.ts` (lista completa en la review). Se
+  reescriben al estilo «RETENSADO …» de esos archivos. No es producción.
+- **Dueño:** sin asignar.
+
+### D60 — Sin E2E del webhook de documentos con el añadido apagado (QC-277 R22)
+- **Origen:** review de QC-277 (2026-10-15), menor m4 (`progress/review_QC-277.md`).
+- **Qué falta:** el corte del webhook con el añadido apagado (R22) tiene cobertura unitaria y de
+  composición, pero no E2E: los E2E de documentos recorren el webhook con todo prendido
+  (`enableAllAddons`). Falta el camino «descartado» de punta a punta.
 - **Dueño:** sin asignar.

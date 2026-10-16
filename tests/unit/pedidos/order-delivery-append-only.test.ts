@@ -11,6 +11,10 @@
 // rojo. Ademas, ningun camino modifica ni borra una anulacion ni sus lineas: `PRISMA_MUTANTE` y
 // `SQL_MUTANTE` cubren `orderDeliveryVoid`/`orderDeliveryVoidLine` y sus tablas
 // `order_delivery_voids`/`order_delivery_void_lines`. Las aserciones previas se conservan.
+//
+// QC-282 2026-10-15 (TC) — Verificado sin cambio: el `UPDATE "order_delivery_lines"` que copia el
+// cliente de la entrega a sus lineas vive en la migracion `order_delivery_lines_customer`, bajo
+// `db/migrations`, que este barrido no recorre (`CARPETAS` es `lib` y `app`).
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'

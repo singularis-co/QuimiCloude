@@ -75,7 +75,7 @@ describe('StepEvidence', () => {
   it('R17 — una casilla en error muestra su motivo, no cuenta y «Quitar» la descarta', async () => {
     const user = setupUser();
     const onRemove = vi.fn();
-    const message = 'No se pudo subir: pesa más de 5 MB. Elige otra foto.';
+    const message = 'No se pudo subir: pesa más de 4.4 MB. Elige otra foto.';
     render(
       <StepEvidence
         stepPosition={1}

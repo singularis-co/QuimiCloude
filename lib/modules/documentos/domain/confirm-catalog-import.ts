@@ -8,7 +8,7 @@ import { assertPermission } from '@/lib/modules/identity';
 import { normalizePresentationName, PresentationDuplicateNameError } from '@/lib/modules/inventario';
 import { normalizeSupplierName } from '@/lib/modules/proveedores';
 
-import { requirePermission, CATALOG_IMPORT_PERMISSION, type Actor } from './actor';
+import { requireAddon, requirePermission, CATALOG_IMPORT_PERMISSION, type Actor } from './actor';
 import {
   classifyCatalogImportRows,
   type AliveCatalogLine,
@@ -105,6 +105,7 @@ export function createConfirmCatalogImport(
     input: unknown,
   ): Promise<CatalogImportSummary> {
     requirePermission(actor, CATALOG_IMPORT_PERMISSION);
+    requireAddon(actor, 'lectura_pdf');
 
     const parsed = confirmCatalogImportInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

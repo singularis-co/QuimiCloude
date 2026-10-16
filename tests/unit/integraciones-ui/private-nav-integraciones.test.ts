@@ -15,9 +15,11 @@ import {
   AI_PROVIDER_INTEGRATION_LABEL,
   INTEGRATIONS_LABEL,
   INVENTORY_INTEGRATION_LABEL,
-  NAV_SECTION_CHAIN,
   NAV_SECTION_CONFIGURATION,
+  NAV_SECTION_DIRECTORY,
   NAV_SECTION_OPERATION,
+  NAV_SECTION_PRODUCTION,
+  NAV_SECTION_TRACKING,
   PRIVATE_NAV_ITEMS,
   WHATSAPP_INTEGRATION_LABEL,
   filterNavItemsByPermissions,
@@ -90,16 +92,16 @@ const ROLES_SIN_EL_PERMISO = ROLES_DE_SEMILLA.filter(
 const MENU_SIN_EL_GRUPO = PRIVATE_NAV_ITEMS.filter((item) => item !== GRUPO);
 
 const ITEMS_PREVIOS = [
-  { testId: 'nav-asignacion', section: NAV_SECTION_OPERATION },
-  { testId: 'nav-dashboard', section: NAV_SECTION_OPERATION },
+  { testId: 'nav-dashboard', section: NAV_SECTION_TRACKING },
   { testId: 'nav-inventario', section: NAV_SECTION_OPERATION },
   { testId: 'nav-pedidos', section: NAV_SECTION_OPERATION },
-  { testId: 'nav-produccion', section: NAV_SECTION_CHAIN },
-  { testId: 'nav-proveedores', section: NAV_SECTION_CHAIN },
+  { testId: 'nav-asignacion', section: NAV_SECTION_OPERATION },
+  { testId: 'nav-produccion-recetas', section: NAV_SECTION_PRODUCTION },
+  { testId: 'nav-proveedores', section: NAV_SECTION_DIRECTORY },
+  { testId: 'nav-clientes', section: NAV_SECTION_DIRECTORY },
+  { testId: 'nav-usuarios', section: NAV_SECTION_CONFIGURATION },
   { testId: 'nav-presentaciones', section: NAV_SECTION_CONFIGURATION },
   { testId: 'nav-unidades', section: NAV_SECTION_CONFIGURATION },
-  { testId: 'nav-usuarios', section: NAV_SECTION_OPERATION },
-  { testId: 'nav-clientes', section: NAV_SECTION_CHAIN },
 ] as const;
 
 describe('el grupo Integraciones y sus tres hijos', () => {

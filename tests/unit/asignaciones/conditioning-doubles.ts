@@ -4,14 +4,17 @@ import { vi } from 'vitest';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { ComposeOrderRowsDeps } from '@/lib/modules/asignaciones/domain/compose-order-rows';
+import type { NewExecutionEntry } from '@/lib/modules/asignaciones/domain/execution-entry';
 import type {
   ConditioningTeamMemberRow,
   ConditioningTeamRepository,
 } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
+import type { ExecutionTransaction, ExecutionWriters } from '@/lib/modules/asignaciones/ports/execution-transaction';
 import type { OrderAssignmentRowWithOrder } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { PersonRef } from '@/lib/modules/identity';
 import type {
   FinishedBatchLabels,
+  FinishedBatchLabelsOutcome,
   FinishedBatchOfOrderLine,
   PresentationCatalog,
   PresentationRef,
@@ -130,7 +133,7 @@ export function montar(options?: Opciones) {
     people: { findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
     units: { findRefs: findRefsUnits } as unknown as UnitCatalog,
-    team: { insertAll: vi.fn(), listByOrderInCompany: listTeamByOrderInCompany },
+    team: { insertAll: vi.fn(), listByOrderInCompany: listTeamByOrderInCompany, listByOrdersInCompany: vi.fn() },
     batches: { listOfOrder },
     now: () => AHORA,
   } as unknown as ComposeOrderRowsDeps & {
@@ -192,4 +195,40 @@ export function loteDeLinea(
     expiryDate: conDatos?.expiryDate ?? null,
     productionDate: conDatos?.productionDate ?? null,
   };
+}
+
+/**
+ * La transaccion de ejecucion de los casos de uso que escriben en el acondicionamiento, con
+ * los tres escritores que usan. `pasos` deja el orden: `transaccion`, `escribe-lotes`,
+ * `escribe-pedido` y `anota`.
+ */
+export function transaccionDeAcondicionamiento(options?: {
+  readonly outcome?: FinishedBatchLabelsOutcome;
+  readonly finish?: Awaited<ReturnType<OrderCatalog['finishConditioningAliveById']>>;
+  readonly append?: (entry: NewExecutionEntry) => Promise<void>;
+  readonly pasos?: string[];
+}) {
+  const pasos = options?.pasos ?? [];
+  const writeForOrder = vi.fn<FinishedBatchLabels['writeForOrder']>(async () => {
+    pasos.push('escribe-lotes');
+    return options?.outcome ?? { kind: 'written' };
+  });
+  const finishConditioningAliveById = vi.fn<OrderCatalog['finishConditioningAliveById']>(async () => {
+    pasos.push('escribe-pedido');
+    return options?.finish ?? 'ok';
+  });
+  const append = vi.fn(async (entry: NewExecutionEntry) => {
+    pasos.push('anota');
+    if (options?.append) await options.append(entry);
+  });
+  const run = vi.fn(async <T>(work: (writers: ExecutionWriters) => Promise<T>) => {
+    pasos.push('transaccion');
+    return work({
+      batches: { writeForOrder },
+      conditioning: { finishConditioningAliveById },
+      log: { append },
+    } as unknown as ExecutionWriters);
+  });
+  const transaction = { run } as ExecutionTransaction;
+  return { transaction, run, writeForOrder, finishConditioningAliveById, append, pasos };
 }

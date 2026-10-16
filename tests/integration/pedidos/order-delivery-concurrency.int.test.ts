@@ -83,6 +83,7 @@ function deliverOrderConLecturaPreviaSincronizada(participantes: number) {
   });
 }
 
+// 2026-10-15: las entregas de QC-223 van como un solo cliente en `customers`.
 function codigos(resultados: readonly PromiseSettledResult<unknown>[]): string[] {
   return resultados
     .map((r) => (r.status === 'fulfilled' ? 'aplicada' : ((r.reason as { code?: string }).code ?? String(r.reason))))
@@ -103,8 +104,7 @@ describe('R28, R29: entregas simultaneas', () => {
           {
             orderId,
             deliveryKey: randomUUID(),
-            customerId,
-            allocations: [{ presentationLineId: lineIds[0], batchId, packages: 3 }],
+            customers: [{ customerId, allocations: [{ presentationLineId: lineIds[0], batchId, packages: 3 }] }],
           },
           empresa.actor,
         );
@@ -135,7 +135,7 @@ describe('R28, R29: entregas simultaneas', () => {
       const entregar = deliverOrderConLecturaPreviaSincronizada(2);
       const envio = () =>
         entregar(
-          { orderId, deliveryKey, customerId, allocations: [{ presentationLineId: lineIds[0], batchId, packages: 5 }] },
+          { orderId, deliveryKey, customers: [{ customerId, allocations: [{ presentationLineId: lineIds[0], batchId, packages: 5 }] }] },
           empresa.actor,
         );
 
@@ -169,8 +169,7 @@ describe('R28, R29: entregas simultaneas', () => {
           {
             orderId,
             deliveryKey: randomUUID(),
-            customerId,
-            allocations: [{ presentationLineId, batchId, packages: 3 }],
+            customers: [{ customerId, allocations: [{ presentationLineId, batchId, packages: 3 }] }],
           },
           empresa.actor,
         );
@@ -184,6 +183,58 @@ describe('R28, R29: entregas simultaneas', () => {
       expect(await stockDeLote(batchId)).toBe('2.0000');
       expect(await stockDeProducto(productId)).toBe('2.0000');
       expect(await escritoPorEntregas(empresa.companyId)).toEqual({ entregas: 1, lineas: 1, asientos: 1 });
+      const negativos = await prisma.productBatch.count({
+        where: { companyId: empresa.companyId, stock: { lt: 0 } },
+      });
+      expect(negativos).toBe(0);
+      const estados = await prisma.order.findMany({
+        where: { id: { in: [uno.orderId, dos.orderId] } },
+        select: { status: true },
+      });
+      expect(estados.map((o) => o.status).sort()).toEqual(['ENTREGADO', 'TERMINADO']);
+    } finally {
+      await borrarEmpresaDeEntrega(empresa);
+    }
+  });
+
+  it('QC-282 R24: dos pedidos que reparten a la vez entre dos clientes el mismo lote y juntos superan lo que tiene: uno aplicado con un solo asiento por lote, el otro delivery_batch_insufficient sin nada escrito', async () => {
+    const empresa = await crearEmpresaDeEntrega('concurrencia-varios-clientes');
+    try {
+      const clienteA = await crearCliente(empresa, 'Garcia');
+      const clienteB = await crearCliente(empresa, 'Lopez');
+      const presentationId = await crearPresentacion(empresa, '2.0000');
+      const uno = await crearPedido(empresa, 'TERMINADO', clienteA, [{ presentationId, packages: 3 }]);
+      const dos = await crearPedido(empresa, 'TERMINADO', clienteA, [{ presentationId, packages: 3 }]);
+      const productId = await crearTerminado(empresa, presentationId);
+      // 4 envases: cada entrega lleva 2 + 1, asi que solo cabe una.
+      const batchId = await crearLote(empresa, productId, presentationId, '8.0000', '2.0000');
+      const entrega = (orderId: string, presentationLineId: string | undefined) =>
+        pedidos.deliverOrder(
+          {
+            orderId,
+            deliveryKey: randomUUID(),
+            customers: [
+              { customerId: clienteA, allocations: [{ presentationLineId, batchId, packages: 2 }] },
+              { customerId: clienteB, allocations: [{ presentationLineId, batchId, packages: 1 }] },
+            ],
+          },
+          empresa.actor,
+        );
+
+      const resultados = await Promise.allSettled([
+        entrega(uno.orderId, uno.lineIds[0]),
+        entrega(dos.orderId, dos.lineIds[0]),
+      ]);
+
+      expect(codigos(resultados)).toEqual(['aplicada', 'delivery_batch_insufficient']);
+      expect(await stockDeLote(batchId)).toBe('2.0000');
+      expect(await stockDeProducto(productId)).toBe('2.0000');
+      expect(await escritoPorEntregas(empresa.companyId)).toEqual({ entregas: 1, lineas: 2, asientos: 1 });
+      const asiento = await prisma.inventoryMovement.findFirstOrThrow({
+        where: { companyId: empresa.companyId, kind: 'delivery' },
+        select: { quantity: true },
+      });
+      expect(asiento.quantity.toFixed(4)).toBe('-6.0000');
       const negativos = await prisma.productBatch.count({
         where: { companyId: empresa.companyId, stock: { lt: 0 } },
       });

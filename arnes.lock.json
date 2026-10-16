@@ -18,12 +18,12 @@
     ".claude/commands/extraer-modulo.md": "f14a8baefd419d694f35e3afeab55e808eb29dc6fca0226b5e4458b3961def15",
     ".claude/commands/jira-connect.md": "80464f50c053d7f38f12bda16708bdfbf81f024b5fce2cb64c983e8456ad2072",
     ".claude/hooks/arranque.mjs": "527267733e840c68e237cf5a20071ccab9d3b4738fc5587258acd726309ad0b3",
-    ".claude/hooks/fin-de-turno.mjs": "8fbbb347fb2ab95c58a17c51b4f7f6514410c216fafbf7ee3a02e9907cb0d907",
-    ".claude/settings.json": "d4201f98b631aace30ca7f30d6e0070a4104d41f70fae9031bf68ac209612d72",
+    ".claude/hooks/fin-de-turno.mjs": "b97188777899e1250e20cfc35bc5be2e790aaf84c94b459e47415b7fff41c00b",
+    ".claude/settings.json": "8ad8c20870b16f0d83e02076b07576f110a5315a827fdde1e9ed20e1edba0d2a",
     "AGENTS.md": "c49cb95790801c04da0f9980921c678f32665a568ad23e6c69aabd2d2defc838",
     "CHECKPOINTS.md": "2182749c4481e05cbe32ee3778ec71b9ce4827e8644489edacd81d24254bfd1e",
     "CLAUDE.md": "e21a723aa87105784a5ee7c68654e5012d8571e7793bbd18c25e7111c8ea3d43",
-    "arnes.manifest": "54d31909cebe092cdd9365679509f02f3887a51a585be4b4003126d7ea46c16c",
+    "arnes.manifest": "40fcff81ee96dc3f17ee2fd4c880303835a89d4ae924ba4916371d6d8661dcad",
     "docs/equipo.md": "61867c06c495d4e76ed6c3dc2a5a685cb6b7b6328c567b7f3b5415e46362f63c",
     "docs/gate.md": "eaf9ff884e88d13142902b9f4a99f92a2d3b0f9afb1afc574ee45d5a5f54d48d",
     "docs/grafo-de-codigo.md": "9279062f42d0b6c80c9be190841ef432454faa7b465cb789ff198b529cfa83dc",
@@ -55,7 +55,8 @@
     "tests/guards/guard-validador-ve-ramas-remotas.test.ts": "d48c6890f97cf227b2d71f83ec165a44d3577e050a05f5b11cc3ecf25ecb6f90",
     "tests/guards/guard-test-rapido-rojos-heredados.test.ts": "9b7bc186db608192ac5d9d03eb8690f2b89dbe7f638759e68b1a576b2ba3fbb6",
     "scripts/tests-de-arbol.mjs": "5b05da30a39f2374a267ca12f2eacbddbae05a202fc94eaf1273608962911629",
-    "tests/guards/guard-tests-de-arbol-en-el-gate.test.ts": "ff947d5ac6ca9cf4642ed0cd0d375a1fcc7dd211e70b76f7648f0ef53cdf209e"
+    "tests/guards/guard-tests-de-arbol-en-el-gate.test.ts": "ff947d5ac6ca9cf4642ed0cd0d375a1fcc7dd211e70b76f7648f0ef53cdf209e",
+    "tests/guards/guard-hooks-anclados.test.ts": "42bcffeb24b022d3da47d30c16eb512d468d436db7a293bb2506cebc755f31f3"
   },
   "subidos": [
     {
@@ -161,6 +162,16 @@
         "tests/guards/guard-archivos-en-vuelo-sin-ruido.test.ts"
       ],
       "fecha": "2026-10-14"
+    },
+    {
+      "pr": "https://github.com/singularis-co/harness_config/pull/16",
+      "archivos": [
+        ".claude/hooks/fin-de-turno.mjs",
+        ".claude/settings.json",
+        "arnes.manifest",
+        "tests/guards/guard-hooks-anclados.test.ts"
+      ],
+      "fecha": "2026-10-15"
     }
   ]
 }

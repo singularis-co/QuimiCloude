@@ -26,6 +26,16 @@ export {
   DELIVERY_VOIDED_LABEL,
   type FinishedProductDeliveriesTableProps,
 } from './finished-product-deliveries-table';
+export {
+  FINISHED_PRODUCT_DISTRIBUTION_TABLE_ID,
+  FinishedProductDistributionTable,
+  OTHER_REASON_LABEL,
+  PACKED_BEFORE_COUNT_LABEL,
+  WITHOUT_BATCH_LABEL,
+  differenceText,
+  distributionDifference,
+  type FinishedProductDistributionTableProps,
+} from './finished-product-distribution-table';
 export { FinishedProductGeneral, type FinishedProductGeneralProps } from './finished-product-general';
 export { FinishedProductHeader, type FinishedProductHeaderProps } from './finished-product-header';
 export {

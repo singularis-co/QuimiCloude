@@ -23,6 +23,7 @@ import { join, resolve } from 'node:path';
 
 import type { SessionClaims } from '@/lib/modules/identity/domain/session-claims';
 import type { SessionUserRecord } from '@/lib/modules/identity/ports/session-user-reader';
+import { ADDONS } from '@/lib/modules/identity';
 
 const { readClaimsMock, findActiveByIdMock, headersMock, cookiesMock, revalidatePathMock } =
   vi.hoisted(() => ({
@@ -109,6 +110,7 @@ function fichaDe(id: string): SessionUserRecord {
     roleName: 'operador',
     companyId: COMPANY_ID,
     companyDeletedAt: null,
+    companyAddons: [...ADDONS],
     permissions: [],
     accountStatus: 'active',
     lockedUntil: null,
@@ -333,6 +335,15 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).startAssignedOrderAction('no-es-un-uuid'),
   },
   {
+    // Abrir la pantalla sin comenzar el pedido: mismo archivo de `driving/`, mismo `currentActor`.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-execution-actions.ts',
+    nombre: 'openAssignedOrderAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-execution-actions')
+      ).openAssignedOrderAction('no-es-un-uuid'),
+  },
+  {
     // Anadida por QC-168, que estrena la pantalla de empaque: su archivo de `driving/` resuelve
     // las dos caras de la sesion, asi que el censo tiene que cubrirlo. La accion captura los
     // errores y devuelve un estado, asi que un `orderId` que no exista no rompe la invocacion.
@@ -388,6 +399,15 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       (
         await import('@/lib/modules/inventario/adapters/driving/batch-actions')
       ).listProductBatchesAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
+  },
+  {
+    // Anadida el 2026-10-15: variante de la lectura de lotes que filtra en servidor los vivos.
+    archivo: 'lib/modules/inventario/adapters/driving/batch-actions.ts',
+    nombre: 'listAliveProductBatchesAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/inventario/adapters/driving/batch-actions')
+      ).listAliveProductBatchesAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
   },
   {
     // Anadida el 2026-10-13: la ficha de producto terminado resuelve las dos caras de la sesion.

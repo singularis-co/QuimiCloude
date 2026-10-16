@@ -1,6 +1,7 @@
 import type { OrderStatus } from '../domain/order-classification';
 import type { StoredOrderCost } from '../domain/order-cost';
 import type { OrderScope } from '../domain/order-scope';
+import type { PackedLineCount } from '../domain/packing-count';
 import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../domain/order-view';
 
 /** La fila que bloquea `lockAliveById`, con `reservedAt`: quien vuelve a comprobar el plazo bajo
@@ -39,6 +40,8 @@ export type FinishPackingLine = {
   readonly presentationContent: string | null;
   /** `null` en una linea antigua, sin envase. */
   readonly packagingProductId: string | null;
+  /** `null` = todavia sin contar. */
+  readonly packedPackages: number | null;
 };
 
 /**
@@ -154,4 +157,8 @@ export interface OrderWriteRepository {
    *  transaccion de `finishPackingAlive`, para que un fallo tras leerlas deshaga tambien el
    *  `UPDATE`. */
   findPresentationLinesForFinish(id: string, scope: OrderScope): Promise<readonly FinishPackingLine[]>;
+
+  /** Escribe el conteo de cada linea sin tocar `packages`. Una linea que no sea de ese pedido y
+   *  esa empresa no se escribe; quien llama ya comprobo los conteos contra las lineas leidas. */
+  recordPackedCounts(id: string, counts: readonly PackedLineCount[], scope: OrderScope): Promise<void>;
 }

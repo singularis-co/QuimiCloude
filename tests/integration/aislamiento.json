@@ -27,7 +27,10 @@
     "clientes/customers-migration.int.test.ts",
     "clientes/customers-search-migration.int.test.ts",
     "documentos/document-batches-and-files-constraints.int.test.ts",
+    "identity/company-addons.int.test.ts",
     "identity/company-country.int.test.ts",
+    "identity/company-directory-addons.int.test.ts",
+    "identity/company.int.test.ts",
     "identity/conditioning-role-migration.int.test.ts",
     "identity/delivery-permission-migration.int.test.ts",
     "identity/delivery-void-permission-migration.int.test.ts",
@@ -54,6 +57,7 @@
     "inventario/reservations-and-decimal-stock-migration.int.test.ts",
     "inventario/reserve-existing-orders-migration.int.test.ts",
     "pedidos/company-scope.int.test.ts",
+    "pedidos/order-company-stats.int.test.ts",
     "pedidos/order-conditioning-constraints.int.test.ts",
     "pedidos/order-conditioning-states-rollback.int.test.ts",
     "pedidos/order-crud.int.test.ts",
@@ -61,6 +65,7 @@
     "pedidos/order-delivery-repository.int.test.ts",
     "pedidos/order-delivery-void-constraints.int.test.ts",
     "pedidos/order-delivery-void-repository.int.test.ts",
+    "pedidos/order-packed-counts.int.test.ts",
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",
     "pedidos/order-status-blocked-rollback.int.test.ts",
@@ -156,7 +161,7 @@
     },
     {
       "archivo": "identity/session-user.int.test.ts",
-      "motivo": "Nacido antes de QC-77: ejercita el adaptador 'findActiveSessionUserById' contra el cliente Prisma global con fixture propio (empresa efimera + usuario) y barrido en afterAll en orden users -> companies, por el ON DELETE RESTRICT de 'users_company_id_fkey'. Committea; se apoya en que la base de la corrida es suya.",
+      "motivo": "Nacido antes de QC-77: ejercita el adaptador 'findActiveSessionUserById' contra el cliente Prisma global con fixture propio (empresa efimera + usuario) y barrido en afterAll en orden users -> companies, por el ON DELETE RESTRICT de 'users_company_id_fkey'. Tambien escribe 'company_addon_overrides' de su empresa (QC-277); esas filas caen por el ON DELETE CASCADE de 'company_addon_overrides_company_id_fkey' al borrar la empresa, asi que el barrido no las nombra. Committea; se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-12"
     },
     {
@@ -283,6 +288,11 @@
       "archivo": "inventario/reservation.int.test.ts",
       "motivo": "QC-141 T7: llama a 'createMaterialReservations' (reservation-prisma.ts) y a 'createWithFirstBatch'/'addBatchToAlive'/'adjustBatchStock'/'consumeBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL -las tres primeras abren cada una SU PROPIA 'prisma.$transaction'-, igual que 'product-stock.int.test.ts' y 'ledger-cuadre.int.test.ts': envolver la corrida en una transaccion del test seria aislamiento de mentira. Cada caso fabrica su propia empresa efimera con randomUUID (receta, presentacion, producto, lotes y pedidos), escribe solo en ella y la limpia en un 'finally' en orden de FK (los dos libros -> pedidos -> lotes -> productos -> receta -> presentacion -> usuario). El caso de R30/R15 que comprueba 'sin cambiar nada' ante 'insufficient' SI abre su propia 'prisma.$transaction' con una senal de rollback, sobre el mismo fixture ya committeado, para simular el contorno que abrira 'pedidos' (T10) y demostrar que no queda nada escrito. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-23"
+    },
+    {
+      "archivo": "inventario/settle-packaging.int.test.ts",
+      "motivo": "QC-281 T3: llama a 'settlePackagingForOrder' de 'reservation-prisma.ts' sobre productos y lotes dados de alta con 'createWithFirstBatch'/'addBatchToAlive', que abren cada uno SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, igual que 'reservation.int.test.ts': envolver la corrida en una transaccion del test seria aislamiento de mentira. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, presentacion, receta, productos, lotes y pedidos) y la limpia en un 'finally' por 'company_id' en orden de FK. Los casos de 'insufficient' abren su propia 'prisma.$transaction' con una senal de rollback para demostrar que no queda nada escrito. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-14"
     },
     {
       "archivo": "inventario/product-stock.int.test.ts",
@@ -600,6 +610,11 @@
       "desde": "2026-10-09"
     },
     {
+      "archivo": "asignaciones/conditioning-execution-log.int.test.ts",
+      "motivo": "QC-283 T4-T6 (R1, R3, R4, R5, R6): Comenzar, guardar datos de lote y Terminar con la composicion real ('asignaciones' de '@/lib/composition'): 'withExecutionTransaction' (execution-transaction-prisma.ts) abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y lo que se mide es que su ROLLBACK deshaga el cambio cuando la anotacion falla, asi que una transaccion del test con ROLLBACK no la envolveria. Siembra los lotes con 'receiveFinishedGoods' en una 'prisma.$transaction' que CONFIRMA. Cada caso fabrica su empresa efimera con randomUUID y la borra en su 'finally' en orden de FK (anotaciones -> equipo -> libros -> lotes -> productos -> lineas -> pedidos -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-14"
+    },
+    {
       "archivo": "pedidos/order-delivery.int.test.ts",
       "motivo": "La entrega de producto terminado por la fachada real de 'lib/composition': 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL (entrega, salida de inventario y estado del pedido), y la lectura del sheet usa ese mismo cliente, asi que una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica dos empresas efimeras con randomUUID (tres usuarios, roles, tipos de documento, unidad, receta, clientes, presentaciones, pedidos, lineas, productos terminados y lotes; tests/helpers/order-delivery-seed.ts) y las borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-08"
@@ -648,6 +663,26 @@
       "archivo": "pedidos/order-delivery-directory.int.test.ts",
       "motivo": "QC-225 B2: el directorio de entregas para la ficha de producto terminado (order-delivery-directory-prisma.ts) lee con el cliente Prisma GLOBAL, que no ve lo que una transaccion abierta no confirmo. 'beforeAll' fabrica dos empresas efimeras con randomUUID (tipo de documento, rol, usuario, cliente, unidad, receta, presentaciones, pedidos, lineas, productos, lotes, entregas, lineas de entrega, anulaciones y sus lineas) y 'afterAll' las borra por 'company_id' en orden de FK (lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> recetas -> presentaciones -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-13"
+    },
+    {
+      "archivo": "inventario/product-batch-lot-per-presentation-migration.int.test.ts",
+      "motivo": "QC-284 T1: aplica el migration.sql y el down.sql reales de 'product_batches_lot_per_presentation' por 'pg' (solo su protocolo simple ejecuta un .sql con un bloque DO $$ y su error trae 'constraint'). No toca 'public.product_batches': cada caso copia la tabla con LIKE a un esquema de usar y tirar, trabaja ahi con search_path solo en ese esquema -asi el DROP INDEX del UP y del DOWN no bloquea la tabla real que usan los demas archivos- y lo borra con DROP SCHEMA CASCADE en un 'finally'. Mismo patron que los casos de migracion de 'product-batch-lot.int.test.ts'. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-14"
+    },
+    {
+      "archivo": "inventario/product-batch-lot-per-presentation.int.test.ts",
+      "motivo": "QC-284 T2/T3: ejercita 'createWithFirstBatch' y 'addBatchToAlive' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren SU PROPIA 'prisma.$transaction' por intento, asi que envolverlos en una transaccion del test seria un aislamiento de mentira. Las carreras de R6 necesitan que cada escritura CONFIRME, y la del lote generado sostiene ademas una transaccion abierta en otra conexion 'pg' hasta ver al adaptador esperando en el indice. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (asientos -> lotes -> productos -> receta -> presentaciones -> usuario -> rol y tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-14"
+    },
+    {
+      "archivo": "pedidos/packed-lines-directory.int.test.ts",
+      "motivo": "QC-281 T10: el directorio de lineas empacadas para la tab Reparto de la ficha de producto terminado (packed-lines-directory-prisma.ts) lee con el cliente Prisma GLOBAL, que no ve lo que una transaccion abierta no confirmo. 'beforeAll' fabrica dos empresas efimeras con randomUUID (tipo de documento, rol, usuario, unidad, recetas, presentaciones, pedidos en varios estados y sus lineas) y 'afterAll' las borra por 'company_id' en orden de FK (lineas -> pedidos -> recetas -> presentaciones -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-14"
+    },
+    {
+      "archivo": "pedidos/order-delivery-lines-customer-migration.int.test.ts",
+      "motivo": "QC-282 B1 (2026-10-15): aplica el migration.sql y el down.sql reales de 'order_delivery_lines_customer' por 'pg' (solo su protocolo simple ejecuta un .sql con un bloque DO $$ y su error trae 'code'). No toca las tablas de 'public': cada caso copia con LIKE las siete tablas que la migracion lee, escribe o debe dejar intactas a un esquema de usar y tirar, repone sus FK entre ellas, trabaja ahi con search_path solo en ese esquema -asi el DDL del UP y del DOWN no bloquea las tablas reales que usan los demas archivos- y lo borra con DROP SCHEMA CASCADE en un 'finally'. Mismo patron que 'inventario/product-batch-lot-per-presentation-migration.int.test.ts'. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-15"
     }
   ]
 }

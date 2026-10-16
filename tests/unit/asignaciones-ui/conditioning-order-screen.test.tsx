@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CONDITIONING_ACTIONS_TEXTS,
-  CONDITIONING_BATCH_DATA_LINE_TESTID,
+  CONDITIONING_BATCH_DATA_DIVERGENT_TESTID,
   CONDITIONING_FINISH_BUTTON_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_ORDER_BACK_LINK_TESTID,
@@ -25,7 +25,12 @@ import {
   CONDITIONING_TEAM_LIST_TESTID,
   ConditioningOrderScreen,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
-import { buildConditioningOrdersColumns } from '@/app/(private)/asignacion/components';
+import {
+  ORDER_DISTRIBUTION_FULL_LINE_TESTID,
+  ORDER_DISTRIBUTION_FULL_SEPARATOR,
+  buildConditioningOrdersColumns,
+} from '@/app/(private)/asignacion/components';
+import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import { RESPONSIBLE_AVATAR_TESTID, RESPONSIBLE_OVERFLOW_TESTID } from '@/components/shared/responsible-avatars';
 import type {
   ConditioningBatchLineView,
@@ -54,8 +59,8 @@ const ROW: ConditioningOrderDetail = {
   unitId: 'unit-kg',
   unitLabel: 'kg',
   presentationLines: [
-    { presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12 },
-    { presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: '1 kg', packages: 4 },
+    { lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12 },
+    { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: '1 kg', packages: 4 },
   ],
   status: 'EN_ACONDICIONAMIENTO',
   conditionedByName: 'Berta Ruiz',
@@ -69,7 +74,40 @@ const CANDIDATES: ConditioningTeamCandidates = {
   workGroups: [],
 };
 
+/** El reparto del subtitulo, una linea por envase, sin el texto alternativo de su miniatura. */
+function lineasDelReparto(): string[] {
+  return within(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID))
+    .getAllByTestId(ORDER_DISTRIBUTION_FULL_LINE_TESTID)
+    .map((linea) => linea.textContent ?? '');
+}
+
 describe('el detalle muestra los datos del pedido', () => {
+  it('el reparto va en su propio bloque, bajo la cantidad, con la miniatura de cada envase', () => {
+    const URL_FRASCO = 'https://cdn.example/frasco.png';
+    render(
+      <ConditioningOrderScreen
+        order={{
+          ...ROW,
+          presentationLines: [
+            { ...ROW.presentationLines[0]!, packagingImageUrl: URL_FRASCO },
+            { ...ROW.presentationLines[1]!, packagingImageUrl: null },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId(CONDITIONING_ORDER_QUANTITY_TESTID)).not.toHaveTextContent('·');
+    const imagenes = within(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID)).getAllByRole('img');
+    expect(imagenes).toHaveLength(2);
+    const [conImagen, sinImagen] = imagenes;
+    expect(conImagen).toHaveAttribute('src', URL_FRASCO);
+    expect(conImagen).toHaveAttribute('alt', '500 g');
+    expect(conImagen).not.toHaveAttribute('data-missing');
+    expect(sinImagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(sinImagen).toHaveAttribute('alt', '1 kg');
+    expect(sinImagen).toHaveAttribute('data-missing', 'true');
+  });
+
   it('R15 R32: número, receta (único h1), cantidad con unidad, reparto entero, estado y quién acondiciona', () => {
     render(<ConditioningOrderScreen order={ROW} />);
 
@@ -89,9 +127,7 @@ describe('el detalle muestra los datos del pedido', () => {
       expect(cabecera?.contains(screen.getByTestId(testId))).toBe(true);
     }
     expect(screen.getByTestId(CONDITIONING_ORDER_QUANTITY_TESTID)).toHaveTextContent('20.5 kg');
-    expect(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID)).toHaveTextContent(
-      '12 × 500 g / 4 × 1 kg',
-    );
+    expect(lineasDelReparto()).toEqual(['12 × 500 g', '4 × 1 kg']);
     const estado = screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID);
     expect(estado).toHaveTextContent('En acondicionamiento');
     expect(estado).toHaveAttribute('data-status', 'EN_ACONDICIONAMIENTO');
@@ -113,7 +149,7 @@ describe('el detalle muestra los datos del pedido', () => {
 
     expect(screen.getByTestId(CONDITIONING_ORDER_NUMBER_TESTID).textContent).toBe(numero);
     expect(screen.getByTestId(CONDITIONING_ORDER_RECIPE_TESTID).textContent).toBe(receta);
-    expect(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID)).toHaveTextContent(envases ?? '');
+    expect(lineasDelReparto().join(ORDER_DISTRIBUTION_FULL_SEPARATOR)).toBe(envases);
     expect(screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID).textContent).toBe(estado);
     expect(screen.getByTestId(CONDITIONING_ORDER_CONDITIONER_TESTID)).toHaveTextContent(quien ?? '');
   });
@@ -316,6 +352,24 @@ describe('enlace de vuelta según el estado', () => {
     },
   );
 
+  it('comenzado por quien lo mira («Terminar» suyo), la vuelta se ve deshabilitada y sin href', () => {
+    render(<ConditioningOrderScreen order={{ ...ROW, status: 'EN_ACONDICIONAMIENTO' }} canFinish />);
+
+    const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
+    expect(back.tagName).not.toBe('A');
+    expect(back).not.toHaveAttribute('href');
+    expect(back).toHaveAttribute('aria-disabled', 'true');
+    expect(back).toHaveTextContent('Volver a «Por acondicionar»');
+  });
+
+  it('antes de comenzar la vuelta es un enlace habilitado', () => {
+    render(<ConditioningOrderScreen order={{ ...ROW, status: 'POR_ACONDICIONAR' }} canStart />);
+
+    const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
+    expect(back.tagName).toBe('A');
+    expect(back).not.toHaveAttribute('aria-disabled');
+  });
+
   it('R8 R32: en TERMINADO la vuelta es «Volver a «Acondicionados»», un botón con flecha en la cabecera', () => {
     render(<ConditioningOrderScreen order={{ ...ROW, status: 'TERMINADO' }} />);
 
@@ -364,21 +418,55 @@ describe('«Datos de lote» en el detalle', () => {
   const MINE = { ...ROW, conditionedById: 'user-1', conditionedByName: 'Ana Ruiz' };
 
   it.each(['EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'] as const)(
-    'R1 R18 R21 R33: en %s, con batchData, pinta la tarjeta con un bloque por línea en orden de alta',
+    'R13 R14 R33: en %s, con batchData, pinta la tarjeta con un solo juego de campos y un botón',
     (status) => {
       render(
-        <ConditioningOrderScreen order={{ ...MINE, status, batchData: { lines: [LINE, SECOND], missingCount: 2 } }} />,
+        <ConditioningOrderScreen
+          order={{ ...MINE, status, batchData: { lines: [LINE, SECOND], missingCount: 2, form: { kind: 'empty' } } }}
+        />,
       );
 
       const seccion = screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID);
       expect(seccion.closest('[data-slot="card"]')).not.toBeNull();
       expect(within(seccion).getByRole('heading', { name: 'Datos de lote' })).toBeInTheDocument();
-      expect(
-        within(seccion)
-          .getAllByTestId(CONDITIONING_BATCH_DATA_LINE_TESTID)
-          .map((bloque) => bloque.querySelector('legend')?.textContent),
-      ).toEqual(['12 × 500 g', '4 × 1 kg']);
+      expect(within(seccion).getAllByLabelText('Lote')).toHaveLength(1);
+      expect(within(seccion).getAllByLabelText('Vencimiento')).toHaveLength(1);
+      expect(within(seccion).getAllByLabelText('Día de producción')).toHaveLength(1);
+      expect(seccion.querySelectorAll('fieldset')).toHaveLength(0);
+      expect(within(seccion).getAllByRole('button')).toHaveLength(1);
       expect(within(seccion).getByRole('button', { name: 'Guardar datos de lote' })).toBeInTheDocument();
+      expect(within(seccion).queryByTestId(CONDITIONING_BATCH_DATA_DIVERGENT_TESTID)).toBeNull();
+    },
+  );
+
+  it.each(['EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'] as const)(
+    'R15: en %s, con lotes distintos, el aviso lista cada línea como en el reparto con su lote',
+    (status) => {
+      render(
+        <ConditioningOrderScreen
+          order={{
+            ...MINE,
+            status,
+            batchData: {
+              lines: [LINE, SECOND],
+              missingCount: 1,
+              form: {
+                kind: 'divergent',
+                lines: [
+                  { presentationId: 'pres-1', lot: 'CR-1' },
+                  { presentationId: 'pres-2', lot: null },
+                ],
+              },
+            },
+          }}
+        />,
+      );
+
+      const aviso = screen.getByTestId(CONDITIONING_BATCH_DATA_DIVERGENT_TESTID);
+      expect(within(aviso).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+        '12 × 500 g: CR-1',
+        '4 × 1 kg: sin lote',
+      ]);
     },
   );
 
@@ -404,7 +492,7 @@ describe('«Datos de lote» en el detalle', () => {
   it('R4 R34: con una línea sin datos dice «Faltan los datos de lote de 1 línea.» y «Terminar» va deshabilitado', () => {
     render(
       <ConditioningOrderScreen
-        order={{ ...MINE, batchData: { lines: [LINE], missingCount: 1 } }}
+        order={{ ...MINE, batchData: { lines: [LINE], missingCount: 1, form: { kind: 'empty' } } }}
         canFinish
         finishBlocked
       />,
@@ -420,7 +508,7 @@ describe('«Datos de lote» en el detalle', () => {
   it('R4: con k > 1 líneas sin datos dice «Faltan los datos de lote de k líneas.»', () => {
     render(
       <ConditioningOrderScreen
-        order={{ ...MINE, batchData: { lines: [LINE, SECOND], missingCount: 2 } }}
+        order={{ ...MINE, batchData: { lines: [LINE, SECOND], missingCount: 2, form: { kind: 'empty' } } }}
         canFinish
         finishBlocked
       />,
@@ -435,7 +523,17 @@ describe('«Datos de lote» en el detalle', () => {
   it('R4: con todas las líneas con datos no hay aviso y «Terminar» está habilitado', () => {
     const conDatos = { ...LINE, provisionalLot: null, lot: 'L-1', expiryDate: '2027-01-01', productionDate: '2026-10-01' };
     render(
-      <ConditioningOrderScreen order={{ ...MINE, batchData: { lines: [conDatos], missingCount: 0 } }} canFinish />,
+      <ConditioningOrderScreen
+        order={{
+          ...MINE,
+          batchData: {
+            lines: [conDatos],
+            missingCount: 0,
+            form: { kind: 'shared', lot: 'L-1', expiryDate: '2027-01-01', productionDate: '2026-10-01' },
+          },
+        }}
+        canFinish
+      />,
     );
 
     expect(screen.queryByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toBeNull();
@@ -447,7 +545,7 @@ describe('«Datos de lote» en el detalle', () => {
   it('R21: en ENTREGADO no habilita «Acondicionar» ni «Terminar» y la vuelta es «Volver a «Entregados»»', () => {
     render(
       <ConditioningOrderScreen
-        order={{ ...MINE, status: 'ENTREGADO', batchData: { lines: [LINE], missingCount: 1 } }}
+        order={{ ...MINE, status: 'ENTREGADO', batchData: { lines: [LINE], missingCount: 1, form: { kind: 'empty' } } }}
       />,
     );
 

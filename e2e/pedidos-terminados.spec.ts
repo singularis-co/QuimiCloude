@@ -7,10 +7,9 @@
  *   A. el Operador entra y ve SOLO «Mis asignados», sin pestañas;
  *   B. el Empacador ve solo «Terminados» + «Por empacar» -con el TERMINADO que empaco el, su
  *      fecha y sus responsables, y sin el ENTREGADO sin fecha que tambien empaco-;
- *   C. el Administrador ve SOLO «Todos», con todos los estados del fixture; al filtrar
- *      exactamente por Entregado queda solo ese y aparece la columna de fecha; sin ninguna entrada a
- *      ejecucion; y `/asignacion/<id>` de un pedido al que no esta asignado le responde
- *      "no encontrado";
+ *   C. el Administrador no ve «Asignación» en el menu y `/asignacion` le responde 404 -lo ve y lo
+ *      asigna todo desde «Pedidos»-; y `/asignacion/<id>` de un pedido al que no esta asignado le
+ *      responde "no encontrado";
  *   D. en `/pedidos`, el panel de edicion del Administrador no ofrece ningun control de estado
  *      y el selector de responsables no ofrece a otro Administrador -que tiene
  *      `pedidos.consultar`- aunque si sigue ofreciendo a quien no lo tiene.
@@ -143,7 +142,6 @@ const SEQUENCE_CANCELLED = BASE_SEQUENCE + 4;
 /** `finished_at` sembrado directamente: bastante antiguo para no rozar la medianoche UTC. */
 const FINISHED_AT = new Date(Date.now() - 6 * 60 * 60 * 1000);
 const FINISHED_AT_TEXT = FINISHED_AT.toISOString().slice(0, 10);
-const MISSING_DATE_TEXT = 'Sin fecha';
 
 /** `data-testid` de la pantalla `/asignacion` y sus partes. Constantes locales (ver cabecera). */
 const ASIGNACION_TITLE_TESTID = 'asignacion-title';
@@ -166,15 +164,12 @@ const RESPONSIBLES_CELL_TESTID = 'data-table-cell-responsibles';
 const RESPONSIBLE_AVATAR_TESTID = 'responsible-avatar';
 
 const FINISHED_ORDER_DATE_TESTID = 'finished-order-date';
-const COMPANY_ORDER_DATE_TESTID = 'company-order-date';
-const COMPANY_ORDER_STATUS_TESTID = 'company-order-status';
-const COMPANY_ORDER_STATUS_FILTER_TESTID = 'data-table-filter-status';
-const COMPANY_ORDER_STATUS_FILTER_OPTION_ENTREGADO_TESTID = 'data-table-filter-option-status-ENTREGADO';
 
-const ASSIGNED_ORDER_ENTER_TESTID = 'assigned-order-enter';
 const ORDER_ACTION_RESPONSIBLES_TESTID = 'order-action-responsibles';
 
 const ORDER_EXECUTION_ERROR_TESTID = 'order-execution-error';
+const PRIVATE_NOT_FOUND_TESTID = 'private-not-found';
+const NAV_ASIGNACION_TESTID = 'nav-asignacion';
 
 /** `/pedidos`: el formulario de edicion y su panel. */
 const ORDERS_TITLE_TESTID = 'pedidos-title';
@@ -207,7 +202,6 @@ let orderDeliveredWithDateId: string | null = null;
 let orderDeliveredNoDateId: string | null = null;
 
 let orderPendingNumber: string | null = null;
-let orderInProgressNumber: string | null = null;
 let orderDeliveredWithDateNumber: string | null = null;
 let orderDeliveredNoDateNumber: string | null = null;
 let orderCancelledNumber: string | null = null;
@@ -381,7 +375,8 @@ test.beforeAll(async () => {
     })
   ).id;
 
-  const [pending, inProgress, deliveredWithDate, deliveredNoDate, cancelled] = await Promise.all([
+  // El EN_CURSO no se lee: solo completa los estados del fixture.
+  const [pending, , deliveredWithDate, deliveredNoDate, cancelled] = await Promise.all([
     seedOrder({ sequence: SEQUENCE_PENDING, status: 'PENDIENTE' }),
     seedOrder({ sequence: SEQUENCE_IN_PROGRESS, status: 'EN_CURSO' }),
     // Empacados por el Empacador: sin `asignaciones.ejecutar` solo ve en «Terminados» lo suyo.
@@ -409,7 +404,6 @@ test.beforeAll(async () => {
 
   orderPendingId = pending.id;
   orderPendingNumber = pending.numberText;
-  orderInProgressNumber = inProgress.numberText;
   orderDeliveredWithDateId = deliveredWithDate.id;
   orderDeliveredWithDateNumber = deliveredWithDate.numberText;
   orderDeliveredNoDateId = deliveredNoDate.id;
@@ -466,10 +460,11 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos', () => {
-  test('el Operador aterriza en «Mis asignados» y no ve ninguna pestaña ni las otras vistas (R28)', async ({
+  test('el Operador abre /asignacion en «Mis asignados» y no ve ninguna pestaña ni las otras vistas (R28)', async ({
     page,
   }) => {
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     // Sin pestañas: es la UNICA vista que este rol tiene.
@@ -541,94 +536,28 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await expect(rowByNumber(page, cancelledNumber)).toHaveCount(0);
   });
 
-  test('el Administrador ve solo «Todos» con todos los estados del fixture; filtrar por Entregado trae solo el ENTREGADO con la columna de fecha; sin entrada a ejecucion; `/asignacion/<id>` de un pedido no asignado dice "no encontrado" (R28, R35)', async ({
+  test('el Administrador no ve «Asignación» en el menu, `/asignacion` le responde 404 y `/asignacion/<id>` de un pedido no asignado dice "no encontrado" (R35)', async ({
     page,
   }) => {
-    const pendingNumber = orderPendingNumber;
     const pendingId = orderPendingId;
-    const inProgressNumber = orderInProgressNumber;
-    const withDateNumber = orderDeliveredWithDateNumber;
-    const withDateId = orderDeliveredWithDateId;
-    const noDateNumber = orderDeliveredNoDateNumber;
-    const noDateId = orderDeliveredNoDateId;
-    const cancelledNumber = orderCancelledNumber;
-    expect(pendingNumber, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
-    if (
-      pendingNumber === null ||
-      pendingId === null ||
-      inProgressNumber === null ||
-      withDateNumber === null ||
-      withDateId === null ||
-      noDateNumber === null ||
-      noDateId === null ||
-      cancelledNumber === null
-    ) {
-      return;
-    }
+    expect(pendingId, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
+    if (pendingId === null) return;
 
-    // El aterrizaje lo deriva el menu; se navega explicito para no depender de su orden.
-    await loginAndLand(page, adminUser);
-    await page.goto(ASSIGNED_ORDERS_ROUTE);
-    await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
+    // Sin `asignaciones.consultar`: lo que esa pantalla le mostraba ya lo tiene en «Pedidos».
+    const landing = await loginAndLand(page, adminUser);
+    expect(landing).not.toBe(ASSIGNED_ORDERS_ROUTE);
+    await expect(page.getByTestId(NAV_ASIGNACION_TESTID)).toHaveCount(0);
 
-    // Solo «Todos»: sin pestañas, aunque tenga tambien `terminados.consultar`.
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)).toHaveCount(0);
-    await expect(page.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
-
-    // Los CUATRO estados, sin filtro.
-    for (const numberText of [pendingNumber, inProgressNumber, withDateNumber, noDateNumber, cancelledNumber]) {
-      await expect(rowByNumber(page, numberText), `deberia verse el pedido ${numberText}`).toHaveCount(
-        1,
-        { timeout: 60_000 },
-      );
-    }
-    const statusesShown = await page
-      .getByTestId(COMPANY_ORDER_STATUS_TESTID)
-      .evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-status')));
-    expect(new Set(statusesShown)).toEqual(
-      new Set(['PENDIENTE', 'EN_CURSO', 'TERMINADO', 'ENTREGADO', 'CANCELADO']),
-    );
-
-    // Sin filtro, sin columna de fecha.
-    await expect(page.getByTestId(COMPANY_ORDER_DATE_TESTID)).toHaveCount(0);
-
-    // Sin ninguna entrada a ejecucion ni a responsables, tampoco para lo asignado al propio actor:
-    // esta pantalla no tiene ningun pedido asignado al Administrador, y aun asi la
-    // ausencia de estos controles es estructural, no circunstancial.
-    await expect(page.getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toHaveCount(0);
-    await expect(page.getByTestId(ORDER_ACTION_RESPONSIBLES_TESTID)).toHaveCount(0);
-
-    // Filtrar EXACTAMENTE por Entregado.
-    await page.getByTestId(COMPANY_ORDER_STATUS_FILTER_TESTID).click();
-    await page.getByTestId(COMPANY_ORDER_STATUS_FILTER_OPTION_ENTREGADO_TESTID).click();
-    await page.waitForFunction(
-      () => new URL(window.location.href).searchParams.get('status') === 'ENTREGADO',
-      undefined,
-      { timeout: 60_000 },
-    );
-    // El menu del filtro tapa la tabla mientras esta abierto: cerrarlo con Escape.
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
-
-    // Solo el ENTREGADO queda -el TERMINADO no-, y la columna de fecha aparece como hasta ahora.
-    await expect(rowByNumber(page, noDateNumber)).toHaveCount(1, { timeout: 60_000 });
-    await expect(rowByNumber(page, withDateNumber)).toHaveCount(0);
-    await expect(rowByNumber(page, pendingNumber)).toHaveCount(0);
-    await expect(rowByNumber(page, inProgressNumber)).toHaveCount(0);
-    await expect(rowByNumber(page, cancelledNumber)).toHaveCount(0);
-
-    // La tabla monta también sus tarjetas (ocultas en escritorio), que repiten la fecha: se cuenta
-    // solo lo visible.
-    const dateCells = page.getByTestId(COMPANY_ORDER_DATE_TESTID).filter({ visible: true });
-    await expect(dateCells).toHaveCount(1);
-    await expect(rowByNumber(page, noDateNumber).getByTestId(COMPANY_ORDER_DATE_TESTID)).toHaveText(
-      MISSING_DATE_TEXT,
-    );
-    expect(await rowDomIndex(page, noDateId)).toBeGreaterThanOrEqual(0);
-    expect(await rowDomIndex(page, withDateId)).toBe(-1);
+    const response = await page.goto(ASSIGNED_ORDERS_ROUTE);
+    expect(
+      response?.status(),
+      'sin asignaciones.consultar `/asignacion` debe responder 404, indistinguible de una ruta que no existe',
+    ).toBe(404);
+    await expect(page.getByTestId(PRIVATE_NOT_FOUND_TESTID)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toHaveCount(0);
 
     // `/asignacion/<id>` de un pedido al que el Administrador NUNCA fue asignado: "no encontrado",
-    // sin que haya escrito nada -no hay boton para intentarlo desde aqui-.
+    // sin que haya escrito nada.
     await page.goto(assignedOrderRoute(pendingId));
     await expect(page.getByTestId(ORDER_EXECUTION_ERROR_TESTID)).toBeVisible({ timeout: 60_000 });
   });

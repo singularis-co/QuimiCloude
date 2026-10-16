@@ -96,6 +96,16 @@ function deliveryColumns(unitLabel: string | null): readonly DataTableColumn<Fin
       ),
     },
     {
+      id: 'presentation',
+      label: 'Presentación',
+      align: 'start',
+      cell: (row) => (
+        <span data-testid="finished-product-delivery-presentation">
+          {row.presentationName ?? EMPTY_MARK}
+        </span>
+      ),
+    },
+    {
       id: 'lot',
       label: 'Lote',
       align: 'start',
@@ -177,7 +187,7 @@ export function FinishedProductDeliveriesTable({
         tableId={FINISHED_PRODUCT_DELIVERIES_TABLE_ID}
         columns={columns}
         rows={page.items}
-        getRowId={(row) => row.movementId}
+        getRowId={(row) => row.deliveryLineId}
         params={finishedProductTableParams(page)}
         totalPages={page.totalPages}
         onParamsChange={(next) =>

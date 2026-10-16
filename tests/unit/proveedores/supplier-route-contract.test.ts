@@ -32,6 +32,7 @@ import {
 } from '@/lib/modules/identity/domain/route-access'
 import { PERMISSIONS } from '@/lib/modules/identity'
 import {
+  NAV_SECTION_DIRECTORY,
   PRIVATE_NAV_ITEMS,
   SUPPLIERS_LABEL,
   type NavLink,
@@ -175,16 +176,13 @@ describe('la navegacion privada lleva a proveedores (R4, R47)', () => {
     expect(deNivelSuperior[0]?.icon).toBe('truck')
   })
 
-  it('el item va en la seccion «Cadena», junto al grupo de produccion y NO dentro de el (R4)', () => {
+  it('el item va en la seccion «Directorio» y NO dentro de un grupo (R4)', () => {
     const proveedores = PRIVATE_NAV_ITEMS.find(
       (item): item is NavLink => item.kind === 'link' && item.href === SUPPLIERS_ROUTE,
     )
-    const produccion = PRIVATE_NAV_ITEMS.find(
-      (item) => item.kind === 'group' && item.testId === 'nav-produccion',
-    )
 
-    if (!proveedores || !produccion) throw new Error('falta el item de proveedores o el grupo')
-    expect(proveedores.section).toBe(produccion.section)
+    if (!proveedores) throw new Error('falta el item de proveedores')
+    expect(proveedores.section).toBe(NAV_SECTION_DIRECTORY)
 
     // Y no cuelga de ningun grupo: proveedores es modulo de dominio propio (epica QC-41).
     const comoHijoDeGrupo = PRIVATE_NAV_ITEMS.filter((item) => item.kind === 'group').flatMap(

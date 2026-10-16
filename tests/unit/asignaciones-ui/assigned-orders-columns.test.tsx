@@ -37,7 +37,7 @@ const BASE_ORDER: AssignedOrderView = {
   otherResponsibles: [
     { userId: 'user-2', displayName: 'Ana López García', origin: { kind: 'direct' } },
   ],
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
   unitId: null,
   unitLabel: null,
 };
@@ -120,16 +120,16 @@ describe('la cantidad se pinta TAL CUAL (cadena, no formateada)', () => {
 });
 
 describe('R24: columna Presentación', () => {
-  it('QC-170 R26: pinta la primera linea del reparto y «+N» con el resto', () => {
+  it('QC-170 R26: pinta todas las lineas del reparto separadas por coma', () => {
     renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, {
       ...BASE_ORDER,
       presentationLines: [
-        { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-        { presentationId: 'pres-2', presentationName: 'Caja x 12', packagingName: null, packages: 1 },
+        { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+        { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-2', presentationName: 'Caja x 12', packagingName: null, packages: 1 },
       ],
     });
 
-    expect(screen.getByTestId('order-distribution').textContent).toBe('5 × Botella 200 ml +1');
+    expect(screen.getByTestId('order-distribution').textContent).toBe('5 × Botella 200 ml, 1 × Caja x 12');
   });
 
   it('QC-170 R27: con el reparto vacio pinta «Sin presentación»', () => {

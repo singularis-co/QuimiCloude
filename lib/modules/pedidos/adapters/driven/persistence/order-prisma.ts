@@ -22,6 +22,7 @@ import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-
 import type { Page } from '../../../domain/page';
 import type { StoredOrderCost } from '../../../domain/order-cost';
 import type { OrderScope } from '../../../domain/order-scope';
+import type { PackedLineCount } from '../../../domain/packing-count';
 import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../../../domain/order-view';
 import type {
   FinishPackingLine,
@@ -941,6 +942,7 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
       updatePresentationLinesAliveOrder(id, unitId, lines, actorId, now, scope, tx),
     finishPackingAlive: (id, packerId, now, scope) => finishPackingAliveOrder(id, packerId, now, scope, tx),
     findPresentationLinesForFinish: (id, scope) => findPresentationLinesForFinishOrder(id, scope, tx),
+    recordPackedCounts: (id, counts, scope) => recordPackedCountsForOrder(id, counts, scope, tx),
   };
 }
 
@@ -1176,6 +1178,7 @@ type FinishPackingLineRow = {
   readonly packages: number;
   readonly presentation_content: string | null;
   readonly packaging_product_id: string | null;
+  readonly packed_packages: number | null;
 };
 
 async function findPresentationLinesForFinishOrder(
@@ -1186,7 +1189,7 @@ async function findPresentationLinesForFinishOrder(
   const { companyId } = companyScopeColumns(scope);
   const rows = await tx.$queryRaw<ReadonlyArray<FinishPackingLineRow>>(Prisma.sql`
     SELECT "id", "presentation_id", "packages", "presentation_content"::text AS "presentation_content",
-           "packaging_product_id"
+           "packaging_product_id", "packed_packages"
       FROM "order_presentation_lines"
      WHERE "order_id" = ${id}::uuid
        AND "company_id" = ${companyId}::uuid
@@ -1199,5 +1202,26 @@ async function findPresentationLinesForFinishOrder(
     packages: row.packages,
     presentationContent: row.presentation_content,
     packagingProductId: row.packaging_product_id,
+    packedPackages: row.packed_packages,
   }));
+}
+
+async function recordPackedCountsForOrder(
+  id: string,
+  counts: readonly PackedLineCount[],
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<void> {
+  const { companyId } = companyScopeColumns(scope);
+  for (const count of counts) {
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE "order_presentation_lines"
+         SET "packed_packages" = ${count.packedPackages}::integer,
+             "packed_reason" = ${count.reason}::text,
+             "packed_reason_other" = ${count.reasonOther === null ? null : count.reasonOther.trim()}::text
+       WHERE "id" = ${count.lineId}::uuid
+         AND "order_id" = ${id}::uuid
+         AND "company_id" = ${companyId}::uuid
+    `);
+  }
 }

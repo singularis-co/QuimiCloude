@@ -9,11 +9,11 @@ import {
   PRIVATE_NAV_ITEMS,
   filterNavItemsByPermissions,
   firstVisibleNavHref,
+  homeHrefFor,
 } from '@/lib/shared/navigation/private-nav';
 import {
-  ASSIGNED_ORDERS_ROUTE,
+  AI_PROVIDER_INTEGRATION_ROUTE,
   DASHBOARD_ROUTE,
-  FORMULAS_ROUTE,
   INVENTORY_ROUTE,
 } from '@/lib/shared/routes';
 import {
@@ -36,6 +36,13 @@ vi.mock('@/lib/composition', () => ({
 vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
 }));
+
+// Envoltura espía sobre la regla real: el destino sigue siendo el de verdad y se puede comprobar
+// con qué permisos se calculó.
+vi.mock('@/lib/shared/navigation/private-nav', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/shared/navigation/private-nav')>();
+  return { ...real, homeHrefFor: vi.fn(real.homeHrefFor) };
+});
 
 /** Los codigos del catalogo de QC-74, derivados y no escritos a mano. */
 const TODOS_LOS_PERMISOS: readonly string[] = PERMISSIONS.map((permiso) => permiso.code);
@@ -67,8 +74,8 @@ beforeEach(() => {
   // Doble explicito: la action se testea contra un doble, nunca contra el dominio real.
   // Por defecto rechaza; los tests que necesitan otro resultado lo sobreescriben.
   verifyCredentialsMock.mockResolvedValue({ ok: false });
-  // Por defecto quien entra lo puede consultar todo; con el dashboard oculto del menu, su
-  // respaldo es asignacion, el primer item visible.
+  // Por defecto quien entra lo puede consultar todo, asi que su respaldo es el dashboard, el
+  // primer item del menu.
   getSessionUserMock.mockResolvedValue(usuarioCon(TODOS_LOS_PERMISOS));
 });
 
@@ -162,7 +169,7 @@ describe('loginAction', () => {
     const resultado = await submit({ username: 'ana.perez', password: 'clave' });
 
     expect(redirect).toHaveBeenCalledTimes(1);
-    expect(redirect).toHaveBeenCalledWith(ASSIGNED_ORDERS_ROUTE);
+    expect(redirect).toHaveBeenCalledWith(DASHBOARD_ROUTE);
     // Sin estado de error, no hay nada de lo que el cliente pueda derivar un toast (R17).
     expect(resultado).toBeUndefined();
   });
@@ -239,7 +246,7 @@ describe('loginAction', () => {
 
       await submit({ username: 'ana.perez', password: 'clave', next: destinoFabricado });
 
-      expect(redirect).toHaveBeenCalledWith(ASSIGNED_ORDERS_ROUTE);
+      expect(redirect).toHaveBeenCalledWith(DASHBOARD_ROUTE);
     }
   });
 
@@ -250,8 +257,8 @@ describe('loginAction', () => {
     await submit({ username: 'ana.perez', password: 'clave' });
 
     expect(redirect).toHaveBeenCalledTimes(2);
-    expect(redirect).toHaveBeenNthCalledWith(1, ASSIGNED_ORDERS_ROUTE);
-    expect(redirect).toHaveBeenNthCalledWith(2, ASSIGNED_ORDERS_ROUTE);
+    expect(redirect).toHaveBeenNthCalledWith(1, DASHBOARD_ROUTE);
+    expect(redirect).toHaveBeenNthCalledWith(2, DASHBOARD_ROUTE);
   });
 
   // QC-75 T9 (R11, R12, R13) — el respaldo del login pasa a ser el primer enlace del menu YA
@@ -273,11 +280,11 @@ describe('loginAction', () => {
 
     it('entra en el grupo del menu cuando el unico permiso cuelga de uno de sus hijos (R11)', async () => {
       verifyCredentialsMock.mockResolvedValue({ ok: true });
-      getSessionUserMock.mockResolvedValue(usuarioCon(['recetas.consultar']));
+      getSessionUserMock.mockResolvedValue(usuarioCon(['integraciones.modificar']));
 
       await submit({ username: 'ana.perez', password: 'clave' });
 
-      expect(redirect).toHaveBeenCalledWith(FORMULAS_ROUTE);
+      expect(redirect).toHaveBeenCalledWith(AI_PROVIDER_INTEGRATION_ROUTE);
     });
 
     it('aterriza en el dashboard cuando el usuario no tiene ningun permiso (R12)', async () => {
@@ -307,8 +314,8 @@ describe('loginAction', () => {
       }
 
       expect(redirect).toHaveBeenCalledWith(primerItem.href);
-      // El dashboard esta oculto del menu, asi que ni con `dashboard.consultar` se aterriza alli.
-      expect(primerItem.href).not.toBe(DASHBOARD_ROUTE);
+      // El dashboard abre el menu, asi que quien lo puede consultar todo aterriza alli.
+      expect(primerItem.href).toBe(DASHBOARD_ROUTE);
     });
 
     it('el destino de vuelta interno gana al respaldo por permisos (R13, no regresion de QC-9 R8)', async () => {
@@ -405,5 +412,48 @@ describe('aterrizaje del Maestro (QC-161)', () => {
 
     expect(redirect).toHaveBeenCalledTimes(1);
     expect(redirect).toHaveBeenCalledWith('/inventario');
+  });
+});
+
+// La sesión ya trae el permiso efectivo (rol ∩ añadidos activos): el login aterriza con la misma
+// regla que el logo y `/login` con sesión.
+describe('aterrizaje con el permiso efectivo (QC-277)', () => {
+  // Todos los permisos salvo los que se pierden con dashboard y proveedores apagados.
+  const EFECTIVOS = TODOS_LOS_PERMISOS.filter(
+    (permiso) => !permiso.startsWith('dashboard.') && !permiso.startsWith('proveedores.'),
+  );
+
+  it('R20: sin destino de vuelta aterriza en homeHrefFor de los permisos de la sesion', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+    getSessionUserMock.mockResolvedValue(usuarioCon(EFECTIVOS));
+
+    await submit({ username: 'ana.perez', password: 'clave' });
+
+    expect(homeHrefFor).toHaveBeenCalledTimes(1);
+    expect(homeHrefFor).toHaveBeenCalledWith(EFECTIVOS);
+    expect(redirect).toHaveBeenCalledTimes(1);
+    expect(redirect).toHaveBeenCalledWith(homeHrefFor(EFECTIVOS));
+  });
+
+  it('R20: el destino recortado no es el dashboard ni un enlace que el permiso efectivo no ve', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+    getSessionUserMock.mockResolvedValue(usuarioCon(EFECTIVOS));
+
+    await submit({ username: 'ana.perez', password: 'clave' });
+
+    const esperado = firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, EFECTIVOS));
+    expect(esperado).not.toBeNull();
+    expect(esperado).not.toBe(DASHBOARD_ROUTE);
+    expect(redirect).toHaveBeenCalledWith(esperado);
+  });
+
+  it('R20: homeHrefFor compone exactamente el respaldo de siempre, dashboard incluido con el menu vacio', () => {
+    for (const permisos of [TODOS_LOS_PERMISOS, EFECTIVOS, ['inventario.consultar'], []]) {
+      expect(homeHrefFor(permisos)).toBe(
+        firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permisos)) ??
+          DASHBOARD_ROUTE,
+      );
+    }
+    expect(homeHrefFor([])).toBe(DASHBOARD_ROUTE);
   });
 });

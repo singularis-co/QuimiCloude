@@ -94,6 +94,7 @@ export const EXENTAS: readonly Exenta[] = [
   { tabla: 'recipe_lines', motivo: 'hereda la empresa de la receta a la que pertenece' },
   { tabla: 'recipe_tools', motivo: 'hereda la empresa de la receta a la que pertenece' },
   { tabla: 'ai_providers', motivo: 'catalogo de proveedores de IA, compartido por todas las empresas' },
+  { tabla: 'addons', motivo: 'catalogo de añadidos, compartido por todas las empresas' },
 ]
 
 function mensajeSinEmpresa(modelo: ModeloLeido): string {
@@ -260,7 +261,7 @@ describe('guardia — company_id en el esquema', () => {
     ])
   })
 
-  it('R7 EXENTAS son exactamente las diez y users no esta', () => {
+  it('R7 EXENTAS son exactamente las once y users no esta', () => {
     const tablas = EXENTAS.map((exenta) => exenta.tabla)
     expect(new Set(tablas)).toEqual(
       new Set([
@@ -274,9 +275,10 @@ describe('guardia — company_id en el esquema', () => {
         'recipe_lines',
         'recipe_tools',
         'ai_providers',
+        'addons',
       ]),
     )
-    expect(tablas).toHaveLength(10)
+    expect(tablas).toHaveLength(11)
     expect(tablas).not.toContain('users')
   })
 
@@ -300,6 +302,11 @@ describe('guardia — company_id en el esquema', () => {
     expect(users, "no se encontro la tabla 'users' en db/schema.prisma").toBeDefined()
     expect((users as ModeloLeido).columnas.has(COLUMNA_EMPRESA)).toBe(true)
     expect(EXENTAS.some((exenta) => exenta.tabla === 'users')).toBe(false)
+
+    const excepciones = modelosReales.find((modelo) => modelo.tabla === 'company_addon_overrides')
+    expect(excepciones, "no se encontro la tabla 'company_addon_overrides' en db/schema.prisma").toBeDefined()
+    expect((excepciones as ModeloLeido).columnas.has(COLUMNA_EMPRESA)).toBe(true)
+    expect(EXENTAS.some((exenta) => exenta.tabla === 'company_addon_overrides')).toBe(false)
   })
 
   it('R11 CRLF y LF dan los mismos hallazgos', () => {
@@ -339,7 +346,7 @@ describe('guardia — company_id en el esquema', () => {
       '   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la',
       '     columna `company_id` exista. Las exentas son `document_types`, `roles`,',
       '     `permissions`, `role_permissions`, `companies`, `credential_setup_tokens` y',
-      '     `revoked_sessions`, `recipe_tools` y `ai_providers`.',
+      '     `revoked_sessions`, `recipe_tools`, `ai_providers` y `addons`.',
       '   - **Lo que la regla vieja protegia sigue en pie.**',
     ].join('\n')
     expect(hallazgosDocExentas(bulletSinRecipeLines, EXENTAS)).toEqual([
@@ -350,7 +357,7 @@ describe('guardia — company_id en el esquema', () => {
       '   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la',
       '     columna `company_id` exista. Las exentas son `document_types`, `roles`,',
       '     `permissions`, `role_permissions`, `companies`, `credential_setup_tokens`,',
-      '     `revoked_sessions`, `recipe_lines`, `recipe_tools`, `ai_providers` y `users`.',
+      '     `revoked_sessions`, `recipe_lines`, `recipe_tools`, `ai_providers`, `addons` y `users`.',
       '   - **Lo que la regla vieja protegia sigue en pie.**',
     ].join('\n')
     expect(hallazgosDocExentas(bulletConUsersDeMas, EXENTAS)).toEqual([

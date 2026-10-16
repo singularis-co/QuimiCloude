@@ -134,6 +134,8 @@ model User {
   company               Company?               @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   credentialSetupTokens CredentialSetupToken[]
   revokedSessions       RevokedSession[]
+  companyEvents         CompanyEvent[]
+  addonOverridesCreated CompanyAddonOverride[]
 
   @@unique([id, companyId], map: "users_id_company_id_key")
   @@index([roleId], map: "users_role_id_idx")
@@ -156,11 +158,70 @@ model Company {
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
   country        String?   @db.VarChar(2)
+  taxId           String?   @map("tax_id")
+  /// Unica entre empresas vivas por `companies_tax_id_unique`, parcial y escrito a mano en la
+  /// migracion, por la misma razon que el nombre.
+  taxIdNormalized String?   @map("tax_id_normalized")
+  contactEmail    String?   @map("contact_email")
+  contactPhone    String?   @map("contact_phone")
 
-  users      User[]
-  workGroups WorkGroup[]
+  users          User[]
+  workGroups     WorkGroup[]
+  events         CompanyEvent[]
+  addonOverrides CompanyAddonOverride[]
 
   @@map("companies")
+}
+
+/// Espejo del catálogo `ADDONS` del código, que es el que manda. Lo siembra la migración; un
+/// añadido nuevo es otra migración con su INSERT. Lo vigila la guardia del catálogo de añadidos.
+/// @module identity
+model Addon {
+  key       String                 @id
+  overrides CompanyAddonOverride[]
+
+  @@map("addons")
+}
+
+/// Excepción de una empresa sobre un añadido. Sin planes, el añadido está prendido solo si hay
+/// fila con `enabled = true`. Apagar no borra: escribe `enabled = false`.
+/// @module identity
+model CompanyAddonOverride {
+  companyId String   @map("company_id") @db.Uuid
+  addonKey  String   @map("addon_key")
+  enabled   Boolean
+  source    String   @default("manual")
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  addon   Addon   @relation(fields: [addonKey], references: [key], onDelete: Restrict, onUpdate: Cascade)
+  author  User?   @relation(fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([companyId, addonKey], map: "company_addon_overrides_pkey")
+  @@index([addonKey], map: "company_addon_overrides_addon_key_idx")
+  @@index([createdBy], map: "company_addon_overrides_created_by_idx")
+  @@map("company_addon_overrides")
+}
+
+/// Sin `updatedAt` ni `deletedAt`: un evento no se corrige ni se borra. `kind` es texto con forma
+/// `<ambito>.<accion>` y no un enum, para admitir tipos nuevos sin migrar.
+/// @module identity
+model CompanyEvent {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  kind       String
+  actorId    String   @map("actor_id") @db.Uuid
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  actor   User    @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([companyId, occurredAt(sort: Desc), id(sort: Desc)], map: "company_events_company_id_occurred_at_idx")
+  @@index([actorId], map: "company_events_actor_id_idx")
+  @@map("company_events")
 }
 
 /// La unicidad del nombre no es `@@unique`: `work_groups_name_unique` es compuesto con
@@ -307,10 +368,11 @@ model Product {
 
 /// `createdBy`, `updatedBy` y `companyId` no llevan `@relation` porque apuntan a otros modulos; sus
 /// FK estan escritas a mano y son drift. NULL en la autoria = no lo creo una persona.
-/// `companyId` es columna propia del lote, y no se deriva del producto, porque la unicidad
-/// `(company_id, lot)` no puede indexar otra tabla; `product_batches_check_company` exige que
-/// coincida con la del producto y la de la presentacion. Los CHECK de `stock`, `unitCost` y `lot`
-/// estan escritos a mano. No hay coste total: se calcula al leer.
+/// `companyId` es columna propia del lote para el aislamiento por empresa;
+/// `product_batches_check_company` exige que coincida con la del producto y la de la presentacion.
+/// La unicidad del lote son dos indices unicos parciales, con presentacion y sin ella, que Prisma
+/// no modela: son drift. Los CHECK de `stock`, `unitCost` y `lot` estan escritos a mano. No hay
+/// coste total: se calcula al leer.
 /// @module inventario
 model ProductBatch {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -320,7 +382,7 @@ model ProductBatch {
   presentationId String?   @map("presentation_id") @db.Uuid
   stock          Decimal   @db.Decimal(14, 4)
   unitCost       Decimal?  @map("unit_cost") @db.Decimal(14, 4)
-  /// Texto exacto, sin normalizar: la unicidad por empresa distingue mayusculas.
+  /// Texto exacto, sin normalizar: la unicidad del lote distingue mayusculas.
   lot            String    @map("lot")
   /// Sin `@default`: el «hoy» lo pone el caso de uso con su reloj, y que no sea futura solo lo
   /// comprueba la aplicacion.
@@ -342,7 +404,6 @@ model ProductBatch {
   presentation Presentation?       @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   movements    InventoryMovement[]
 
-  @@unique([companyId, lot], map: "product_batches_company_lot_unique")
   @@unique([id, companyId], map: "product_batches_id_company_id_key")
   @@index([companyId], map: "product_batches_company_id_idx")
   @@index([productId], map: "product_batches_product_id_idx")
@@ -772,6 +833,14 @@ model OrderPresentationLine {
   /// nombrara envases. Sin `@relation`: `Product` es de `inventario`; FK compuesta
   /// `(company_id, packaging_product_id)` escrita a mano, drift.
   packagingProductId String? @map("packaging_product_id") @db.Uuid
+  /// Envases contados al terminar el empaque. NULL = sin terminar, o terminado antes de que se
+  /// contaran: se lee como igual a `packages`. Los CHECK de coherencia con el motivo van a mano.
+  packedPackages    Int?    @map("packed_packages")
+  /// `merma`, `rotura`, `conteo_fisico`, `error_de_carga` u `otro`; TEXT + CHECK y no enum para
+  /// no recrear el tipo al anadir valores.
+  packedReason      String? @map("packed_reason")
+  /// Texto del motivo `otro`, ya recortado.
+  packedReasonOther String? @map("packed_reason_other")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -786,17 +855,16 @@ model OrderPresentationLine {
   @@map("order_presentation_lines")
 }
 
-/// Una entrega al cliente del producto terminado de un pedido. Solo de insercion: sin `updatedAt`
-/// ni `deletedAt`. `deliveryKey` la hace idempotente por empresa. `customerId`, `createdBy` y
-/// `companyId` no llevan `@relation`: `Customer`, `User` y `Company` son de otros modulos; sus FK
-/// estan escritas a mano y son drift, y las del cliente y del autor son compuestas con `companyId`. La FK de
-/// `order` tambien es compuesta en la base (`(order_id, company_id)`).
+/// Una entrega del producto terminado de un pedido, a uno o varios clientes: el cliente va en cada
+/// linea, no aqui. Solo de insercion: sin `updatedAt` ni `deletedAt`. `deliveryKey` la hace
+/// idempotente por empresa. `createdBy` y `companyId` no llevan `@relation`: `User` y `Company` son
+/// de otros modulos; sus FK estan escritas a mano y son drift, y la del autor es compuesta con
+/// `companyId`. La FK de `order` tambien es compuesta en la base (`(order_id, company_id)`).
 /// @module pedidos
 model OrderDelivery {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId   String   @map("company_id") @db.Uuid
   orderId     String   @map("order_id") @db.Uuid
-  customerId  String   @map("customer_id") @db.Uuid
   deliveryKey String   @map("delivery_key") @db.Uuid
   createdBy   String   @map("created_by") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -808,20 +876,21 @@ model OrderDelivery {
   @@unique([id, companyId], map: "order_deliveries_id_company_id_key")
   @@unique([companyId, deliveryKey], map: "order_deliveries_company_key_unique")
   @@index([orderId], map: "order_deliveries_order_id_idx")
-  @@index([companyId, customerId], map: "order_deliveries_customer_id_idx")
   @@index([createdBy], map: "order_deliveries_created_by_idx")
   @@map("order_deliveries")
 }
 
-/// Un lote dentro de una entrega: cuantos envases salen de el para una linea del reparto y su
-/// cantidad. Solo de insercion. `batchId` no lleva `@relation`: `ProductBatch` es de `inventario`;
-/// FK compuesta con `companyId` escrita a mano, drift. Las FK de `delivery` y `presentationLine`
-/// tambien son compuestas en la base. Los CHECK de positivos son drift.
+/// Un lote dentro de una entrega para un cliente: cuantos envases salen de el para una linea del
+/// reparto y su cantidad. Solo de insercion. `customerId` y `batchId` no llevan `@relation`:
+/// `Customer` es de `clientes` y `ProductBatch` de `inventario`; sus FK son compuestas con
+/// `companyId`, escritas a mano y drift. Las FK de `delivery` y `presentationLine` tambien son
+/// compuestas en la base. Los CHECK de positivos son drift.
 /// @module pedidos
 model OrderDeliveryLine {
   id                      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId               String  @map("company_id") @db.Uuid
   deliveryId              String  @map("delivery_id") @db.Uuid
+  customerId              String  @map("customer_id") @db.Uuid
   orderPresentationLineId String  @map("order_presentation_line_id") @db.Uuid
   batchId                 String  @map("batch_id") @db.Uuid
   packages                Int
@@ -831,9 +900,10 @@ model OrderDeliveryLine {
   presentationLine OrderPresentationLine @relation(fields: [orderPresentationLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   voidLine         OrderDeliveryVoidLine?
 
-  @@unique([deliveryId, batchId], map: "order_delivery_lines_delivery_batch_unique")
+  @@unique([deliveryId, customerId, batchId], map: "order_delivery_lines_delivery_customer_batch_unique")
   @@unique([id, deliveryId], map: "order_delivery_lines_id_delivery_id_key")
   @@index([companyId], map: "order_delivery_lines_company_id_idx")
+  @@index([companyId, customerId], map: "order_delivery_lines_customer_id_idx")
   @@index([orderPresentationLineId], map: "order_delivery_lines_presentation_line_id_idx")
   @@index([batchId], map: "order_delivery_lines_batch_id_idx")
   @@map("order_delivery_lines")
@@ -1009,6 +1079,9 @@ enum OrderExecutionAction {
   FINISH
   PACK_START
   PACK_FINISH
+  CONDITIONING_START
+  CONDITIONING_BATCH_SAVE
+  CONDITIONING_FINISH
 }
 
 /// Una fila por movimiento sobre la ejecucion de un pedido. Solo se inserta: no se edita ni se
@@ -1027,6 +1100,7 @@ model OrderExecutionEntry {
   stepPosition Int?                 @map("step_position")
   reason       String?
   occurredAt   DateTime             @map("occurred_at") @db.Timestamptz(6)
+  batchLines   Json?                @map("batch_lines")
 
   @@index([orderId, occurredAt(sort: Desc)], map: "order_execution_entries_order_id_occurred_at_idx")
   @@index([userId], map: "order_execution_entries_user_id_idx")

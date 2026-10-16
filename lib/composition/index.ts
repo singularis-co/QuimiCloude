@@ -73,6 +73,7 @@ import {
   createListFinishedProductBatches,
   createListFinishedProductCosts,
   createListFinishedProductDeliveries,
+  createListFinishedProductDistribution,
   createListFinishedProductMovements,
   createListFinishedStock,
   createListOrderBatches,
@@ -81,6 +82,8 @@ import {
   createListProductBatches,
   createListProductFormUnits,
   createListProducts,
+  createGetInventoryImportTemplate,
+  createGetInventoryImportValues,
   createPreviewInventoryImport,
   createUpdatePresentation,
   createUpdateProduct,
@@ -92,8 +95,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
+  createFindPackagingRefs,
   findPackagingCostingBatches,
-  findPackagingRefs,
 } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import {
   addBatchToAlive,
@@ -120,6 +123,7 @@ import {
 import {
   findPresentationRefs,
   findPresentationsByNormalizedNames,
+  listPresentationNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   createMaterialReservations,
@@ -135,7 +139,6 @@ import {
   findProducedFinishedProducts,
   listFinishedProductBatches,
   listFinishedProductCosts,
-  listFinishedProductDeliveryMovements,
   listFinishedProductMovements,
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-product-detail-prisma';
 import {
@@ -150,7 +153,11 @@ import {
 import { readCsv } from '@/lib/modules/inventario/adapters/driven/spreadsheet/csv-reader';
 import { fileDigest } from '@/lib/modules/inventario/adapters/driven/spreadsheet/file-digest';
 import { readXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader';
+import { writeXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-writer';
+import { createProductImageStorageSupabase } from '@/lib/modules/inventario/adapters/driven/storage/product-image-supabase';
+import type { ProductImageStorage } from '@/lib/modules/inventario/ports/product-image-storage';
 import type { ImportFormulaLookup } from '@/lib/modules/inventario/ports/import-formula-lookup';
+import type { ImportTemplateValuesReader } from '@/lib/modules/inventario/ports/import-template-values';
 import type { InventoryImportRepository } from '@/lib/modules/inventario/ports/inventory-import-repository';
 import type { SpreadsheetReader } from '@/lib/modules/inventario/ports/spreadsheet-reader';
 import type { FinishedOrderRepository } from '@/lib/modules/inventario/ports/finished-order-repository';
@@ -162,6 +169,7 @@ import type { FinishedProductDetailRepository } from '@/lib/modules/inventario/p
 import type {
   FinishedBatchCatalog,
   FinishedDeliveryDirectory,
+  FinishedDistributionDirectory,
   OrderNumberDirectory,
   PackagingCatalog,
   PresentationCatalog,
@@ -229,6 +237,7 @@ import {
   removeRecipeImage,
   uploadRecipeImage,
 } from '@/lib/modules/recetas/adapters/driven/storage/recipe-image-supabase';
+import { readRecipeImageStorageConfigFromEnv } from '@/lib/modules/recetas/adapters/driven/config/storage-config-env';
 import type { ListQueryLog as RecetasListQueryLog } from '@/lib/modules/recetas/ports/list-query-log';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
@@ -318,9 +327,10 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
-  findDeliveryDetailsByIds,
+  listDeliveryLinesByBatchIds,
   summarizeDeliveredByBatchIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
+import { listPackedLinesByCombination } from '@/lib/modules/pedidos/adapters/driven/persistence/packed-lines-directory-prisma';
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma';
 import {
   withOrderTransaction,
@@ -346,6 +356,7 @@ import type { OrderDeliveryVoidUnitOfWork } from '@/lib/modules/pedidos/ports/or
 import {
   createRecipeExecutionReader,
   findAliveRecipeByNormalizedName,
+  listAliveOriginalRecipeNames,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipePackingStepsById,
@@ -446,6 +457,7 @@ import {
   createListPackingOrders,
   createListResponsibleCandidates,
   createListResponsiblesForOrders,
+  createOpenAssignedOrder,
   createRemoveWorkGroupFromOrder,
   createStartAssignedOrder,
   createStartPacking as createStartPackingOrder,
@@ -495,6 +507,27 @@ import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/drive
 import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import { createSetCompanyCountry } from '@/lib/modules/identity';
 import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
+import {
+  createCreateCompany,
+  createDeleteCompany,
+  createGetCompany,
+  createGetCompanyDeletionImpact,
+  createListCompanies,
+  createListCompanyEvents,
+  createReactivateCompany,
+  createUpdateCompany,
+} from '@/lib/modules/identity';
+import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
+import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma';
+import {
+  createGetCompanyAddons,
+  createIsCompanyAddonActive,
+  createSetAllCompanyAddons,
+  createSetCompanyAddon,
+} from '@/lib/modules/identity';
+import { readSeedScopeFromEnv } from '@/lib/modules/identity/adapters/driven/config/seed-scope-env';
+import type { CompanyOpenOrdersCounter } from '@/lib/modules/identity/ports/company-open-orders-counter';
+import { countOpenOrdersInCompany } from '@/lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
@@ -799,6 +832,14 @@ const workGroupMemberPagination: PaginationPolicy = { toOffsetLimit, buildPage }
 
 const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAliveInCompany };
 
+const companyRepository = createCompanyRepository();
+const companyAddonRepository = createCompanyAddonRepository();
+
+// `orders` es de `pedidos`: `identity` solo ve el puerto.
+const companyOpenOrdersCounter: CompanyOpenOrdersCounter = {
+  countOpenOrders: (companyId) => countOpenOrdersInCompany(companyId),
+};
+
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
 export const identity = {
   // La clave conserva nombre y firma: por eso `login-action.ts` no cambia (R16).
@@ -831,6 +872,8 @@ export const identity = {
         // R18: el seed evalua la politica antes de hashear; aqui se le entrega la misma
         // funcion que expone la fachada.
         checkCredentialPolicy,
+        // Se lee en la invocacion y no al importar, como el transporte del correo.
+        scope: readSeedScopeFromEnv(),
       }),
     ),
   // QC-66 T15 (`design.md > 11`) — los SEIS casos de uso de la administracion de usuarios, ya
@@ -922,6 +965,28 @@ export const identity = {
   }),
   // Operacion de plataforma: el actor no lleva empresa.
   setCompanyCountry: createSetCompanyCountry({ companies: createCompanyCountryRepository() }),
+  // Operaciones de plataforma sobre empresas: el actor no lleva empresa.
+  createCompany: createCreateCompany({
+    companies: companyRepository,
+    secrets: credentialSetupSecrets,
+    links: credentialSetupLinkRepository,
+    mailer: credentialSetupMailer,
+  }),
+  updateCompany: createUpdateCompany({ companies: companyRepository }),
+  deleteCompany: createDeleteCompany({ companies: companyRepository }),
+  reactivateCompany: createReactivateCompany({ companies: companyRepository }),
+  listCompanies: createListCompanies({ companies: companyRepository, log: identityListQueryLog }),
+  getCompany: createGetCompany({ companies: companyRepository }),
+  getCompanyDeletionImpact: createGetCompanyDeletionImpact({
+    companies: companyRepository,
+    openOrders: companyOpenOrdersCounter,
+  }),
+  listCompanyEvents: createListCompanyEvents({ companies: companyRepository }),
+  // Sin actor: la usan los trabajos que corren sin sesión.
+  isCompanyAddonActive: createIsCompanyAddonActive({ addons: companyAddonRepository }),
+  getCompanyAddons: createGetCompanyAddons({ addons: companyAddonRepository }),
+  setCompanyAddon: createSetCompanyAddon({ addons: companyAddonRepository }),
+  setAllCompanyAddons: createSetAllCompanyAddons({ addons: companyAddonRepository }),
 } as const;
 
 /**
@@ -973,15 +1038,18 @@ const presentationRepository: PresentationRepository = {
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
 const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
-  findDeliveryDetails: findDeliveryDetailsByIds,
+  listDeliveryLines: listDeliveryLinesByBatchIds,
   summarizeDelivered: summarizeDeliveredByBatchIds,
+};
+
+const finishedDistributionDirectory: FinishedDistributionDirectory = {
+  listPackedLines: listPackedLinesByCombination,
 };
 
 const finishedProductDetailRepository: FinishedProductDetailRepository = {
   findAliveFinished: findAliveFinishedProduct,
   listBatches: listFinishedProductBatches,
   listMovements: listFinishedProductMovements,
-  listDeliveryMovements: listFinishedProductDeliveryMovements,
   listProductionCosts: listFinishedProductCosts,
   findProducedProducts: findProducedFinishedProducts,
 };
@@ -1023,12 +1091,24 @@ const stockIncreaseListener: StockIncreaseListener = {
  * `{ id, roleName }` con lo que devuelve `SessionUser`. `lib/composition` no conoce
  * cookies ni sesion; solo ata puerto -> adaptador.
  */
-const createProductUseCase = createCreateProduct({
+/** Mismo bucket y credenciales que la imagen de receta; la carpeta es `productos/`. Construirlo
+ *  no lee el entorno: la configuracion se resuelve en cada llamada. */
+const productImageStorage: ProductImageStorage = createProductImageStorageSupabase(
+  readRecipeImageStorageConfigFromEnv,
+);
+
+const createProductDeps = {
   products: productRepository,
   stockIncreases: stockIncreaseListener,
   packageUnit: { findPackageUnitId },
   units: { findRefs: findUnitRefs },
-});
+  images: productImageStorage,
+};
+
+const createProductUseCase = createCreateProduct(createProductDeps);
+
+/** El importador carga inventario que ya existe: sus lotes pueden venir vencidos. */
+const createImportedProductUseCase = createCreateProduct({ ...createProductDeps, acceptsPastExpiry: true });
 
 const inventoryImportRepository: InventoryImportRepository = {
   findAliveProductsByNormalizedNames,
@@ -1042,6 +1122,12 @@ const inventoryImportRepository: InventoryImportRepository = {
 
 const spreadsheetReader: SpreadsheetReader = {
   read: async (bytes, format) => (format === 'csv' ? readCsv(bytes) : readXlsx(bytes)),
+};
+
+const importTemplateValuesReader: ImportTemplateValuesReader = {
+  listUnitNames: async (companyId) => (await listVisibleUnitRefs(companyId)).map((unit) => unit.name),
+  listPresentationNames,
+  listFormulaNames: listAliveOriginalRecipeNames,
 };
 
 const importFormulaLookup: ImportFormulaLookup = {
@@ -1060,10 +1146,14 @@ const inventoryImportReadDeps = {
 export const inventario = {
   createProduct: createProductUseCase,
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
-  updateProduct: createUpdateProduct({ products: productRepository }),
+  updateProduct: createUpdateProduct({ products: productRepository, images: productImageStorage }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
-  getProduct: createGetProduct({ products: productRepository }),
-  listProducts: createListProducts({ products: productRepository, log: inventarioListQueryLog }),
+  getProduct: createGetProduct({ products: productRepository, images: productImageStorage }),
+  listProducts: createListProducts({
+    products: productRepository,
+    log: inventarioListQueryLog,
+    images: productImageStorage,
+  }),
   createPresentation: createCreatePresentation({ presentations: presentationRepository }),
   updatePresentation: createUpdatePresentation({ presentations: presentationRepository }),
   deletePresentation: createDeletePresentation({ presentations: presentationRepository }),
@@ -1095,9 +1185,14 @@ export const inventario = {
   // El adaptador y no `unitCatalog`, que se declara mas abajo.
   listProductFormUnits: createListProductFormUnits({ units: { listVisibleRefs: listVisibleUnitRefs } }),
   previewInventoryImport: createPreviewInventoryImport(inventoryImportReadDeps),
+  getInventoryImportTemplate: createGetInventoryImportTemplate({
+    values: importTemplateValuesReader,
+    writer: { write: writeXlsx },
+  }),
+  getInventoryImportValues: createGetInventoryImportValues({ values: importTemplateValuesReader }),
   confirmInventoryImport: createConfirmInventoryImport({
     ...inventoryImportReadDeps,
-    createProduct: createProductUseCase,
+    createProduct: createImportedProductUseCase,
     stockIncreases: stockIncreaseListener,
     digest: fileDigest,
   }),
@@ -1121,6 +1216,10 @@ export const inventario = {
       findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
     },
   }),
+  listFinishedProductDistribution: createListFinishedProductDistribution({
+    products: finishedProductDetailRepository,
+    distribution: finishedDistributionDirectory,
+  }),
   listFinishedProductCosts: createListFinishedProductCosts({
     products: finishedProductDetailRepository,
     orders: orderNumberDirectory,
@@ -1141,7 +1240,7 @@ export const inventario = {
 
 /** Solo para el servidor de `pedidos`: validar el envase de cada linea del reparto y costearlo. */
 const packagingCatalog: PackagingCatalog = {
-  findRefs: findPackagingRefs,
+  findRefs: createFindPackagingRefs(productImageStorage),
   findCostingBatches: findPackagingCostingBatches,
 };
 
@@ -1814,8 +1913,10 @@ const executionTransaction: ExecutionTransaction = {
         log: createExecutionLogRepository(tx),
         conditioning: {
           startConditioningAliveById: createStartConditioning({ conditioning: createOrderConditioningRepository(tx) }),
+          finishConditioningAliveById: createFinishConditioning({ conditioning: createOrderConditioningRepository(tx) }),
         },
         team: createConditioningTeamRepository(tx),
+        batches: createFinishedBatchLabels(tx),
       }),
     ),
 };
@@ -1907,6 +2008,21 @@ export const asignaciones = {
     evidence: stepEvidenceRepository,
     storage: evidenceStorage,
   }),
+  // Abrir la pantalla: lee un `PENDIENTE` sin comenzarlo y retoma un `EN_CURSO`. MISMAS
+  // dependencias que `startAssignedOrder`, al que delega el retomar.
+  openAssignedOrder: createOpenAssignedOrder({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    recipes: recipeCatalog,
+    units: unitCatalog,
+    products: productCatalog,
+    presentations: presentationCatalog,
+    log: executionLogRepository,
+    transaction: executionTransaction,
+    now: () => new Date(),
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
   finishAssignedOrder: createFinishAssignedOrder({
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
@@ -1943,11 +2059,7 @@ export const asignaciones = {
     people: peopleDirectory,
     now: () => new Date(),
   }),
-  // `listPackingOrders` y `getPackingOrder` comparten los MISMOS `orderCatalog`,
-  // `orderAssignmentRepository`, `recipeCatalog`, `presentationCatalog` y `peopleDirectory` del
-  // resto del modulo, mas `productCatalog` -el mismo que usa `recetas` y la ejecucion, arriba-
-  // para los envases. `startPacking` y `finishPacking` solo necesitan `orderCatalog`: ningun
-  // adaptador nuevo.
+  // `getPackingOrder` suma `packagingCatalog` para el libre de cada envase del conteo de Terminar.
   listPackingOrders: createListPackingOrders({
     orders: orderCatalog,
     assignments: orderAssignmentRepository,
@@ -1955,7 +2067,6 @@ export const asignaciones = {
     people: peopleDirectory,
     presentations: presentationCatalog,
     units: unitCatalog,
-    products: productCatalog,
     now: () => new Date(),
   }),
   getPackingOrder: createGetPackingOrder({
@@ -1965,7 +2076,7 @@ export const asignaciones = {
     people: peopleDirectory,
     presentations: presentationCatalog,
     units: unitCatalog,
-    products: productCatalog,
+    packaging: packagingCatalog,
     packingSteps: { findPackingStepsById: findRecipePackingStepsById },
     now: () => new Date(),
     evidence: stepEvidenceRepository,
@@ -2003,11 +2114,13 @@ export const asignaciones = {
     log: executionLogRepository,
     orders: orderCatalog,
     people: peopleDirectory,
+    team: createConditioningTeamRepository(),
   }),
   getExecutionTrace: createGetExecutionTrace({
     log: executionLogRepository,
     orders: orderCatalog,
     people: peopleDirectory,
+    team: createConditioningTeamRepository(),
   }),
   startConditioning: createStartConditioningOrder({
     orders: orderCatalog,
@@ -2019,6 +2132,7 @@ export const asignaciones = {
   finishConditioning: createFinishConditioningOrder({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   listConditioningOrders: createListConditioningOrders({
@@ -2067,6 +2181,8 @@ export const asignaciones = {
   saveConditioningBatchData: createSaveConditioningBatchData({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
+    presentations: presentationCatalog,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   requestEvidenceUpload: createRequestEvidenceUpload({
@@ -2280,6 +2396,8 @@ const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
   aiProvider: aiProviderGateway,
+  // La clave del añadido vive aquí: `documentos` no conoce el catálogo de añadidos.
+  pdfReading: { isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'lectura_pdf') },
   pipelineFor: documentPipelineFor,
   log: documentJobLog,
 });

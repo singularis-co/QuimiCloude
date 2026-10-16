@@ -45,7 +45,7 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
     {
       id: IMAGE_COLUMN_ID,
       label: IMAGE_COLUMN_LABEL,
-      align: 'start',
+      align: 'center',
       // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
       defaultPinned: 'left',
       // La URL se usa tal cual; sin ella el componente pinta el marcador, nunca un `src` vacio.

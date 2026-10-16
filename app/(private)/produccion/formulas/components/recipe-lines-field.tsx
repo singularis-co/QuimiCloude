@@ -120,6 +120,16 @@ function remainingHundredths(lines: readonly RecipeLineFormValue[], exceptIndex:
 }
 
 /**
+ * `true` si a la línea le falta algo: sin producto, con producto no disponible, o con un
+ * porcentaje vacío, que no parsea o que es cero. Con una así no se ofrece añadir otra.
+ */
+export function isLineIncomplete(line: RecipeLineFormValue): boolean {
+  if (line.productId === '' || line.productName === null) return true;
+  const hundredths = percentageToHundredths(line.percentage.replace(',', '.'));
+  return hundredths === null || hundredths === BigInt(0);
+}
+
+/**
  * Recorta un porcentaje ya saneado al mínimo entre su valor, lo que queda por asignar y
  * 100. Los intermedios (`''`, `'5,'`) y lo que no parsea pasan intactos: el esquema del
  * contrato los valida al guardar. Ej.: otras líneas suman 50 y se escribe 80 → anota 50.
@@ -258,6 +268,11 @@ export function RecipeLinesField({
   /** `true` si lo que se está pintando es el fantasma y no una línea real de `lines`. */
   const isGhost = lines.length === 0;
   const rows: readonly RecipeLineFormValue[] = isGhost ? [GHOST_LINE] : lines;
+
+  // Un único booleano para todos los «+»: no se añade otra línea mientras la suma ya llegue a
+  // 100 % ni mientras quede alguna línea a medias. El fantasma cuenta como línea a medias.
+  const canAddLine =
+    !total.isComplete && !total.difference.startsWith('-') && !rows.some(isLineIncomplete);
 
   function addLineAfter(index: number) {
     // Con el fantasma en pantalla no hay nada que conservar todavía: se materializa y se le
@@ -518,7 +533,7 @@ export function RecipeLinesField({
                   touch
                   aria-label={`Añadir una línea después de la ${index + 1}`}
                   data-testid={`recipe-line-add-${index}`}
-                  disabled={line.productId === '' || line.productName === null}
+                  disabled={!canAddLine}
                   onClick={() => addLineAfter(index)}
                 >
                   <PlusIcon aria-hidden />

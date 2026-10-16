@@ -19,4 +19,9 @@ export interface ConditioningTeamRepository {
   insertAll(rows: readonly NewConditioningTeamMember[]): Promise<number>;
   /** Ordenadas por `position`, que es el orden de composicion. */
   listByOrderInCompany(companyId: string, orderId: string): Promise<readonly ConditioningTeamMemberRow[]>;
+  /** Ordenadas por pedido y luego por `position`. Con `orderIds` vacio no consulta. */
+  listByOrdersInCompany(
+    companyId: string,
+    orderIds: readonly string[],
+  ): Promise<readonly (ConditioningTeamMemberRow & { readonly orderId: string })[]>;
 }

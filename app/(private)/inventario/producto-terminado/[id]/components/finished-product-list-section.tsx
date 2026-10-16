@@ -10,6 +10,7 @@ import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import {
   MOVEMENT_REASONS,
   type FinishedProductBatchRow,
+  type FinishedProductDetail,
   type MovementReason,
   type Page,
 } from '@/lib/modules/inventario';
@@ -17,12 +18,14 @@ import {
   listFinishedProductBatchesAction,
   listFinishedProductCostsAction,
   listFinishedProductDeliveriesAction,
+  listFinishedProductDistributionAction,
   listFinishedProductMovementsAction,
 } from '@/lib/modules/inventario/adapters/driving/finished-product-actions';
 
 import { FinishedProductBatchesTable, type EvidenceCounts } from './finished-product-batches-table';
 import { FinishedProductCostsTable } from './finished-product-costs-table';
 import { FinishedProductDeliveriesTable } from './finished-product-deliveries-table';
+import { FinishedProductDistributionTable } from './finished-product-distribution-table';
 import { FinishedProductMovementsTable } from './finished-product-movements-table';
 import {
   finishedProductPageHref,
@@ -36,6 +39,7 @@ const EMPTY_MESSAGES: Readonly<Record<FinishedProductListTab, string>> = {
   salidas: 'Este producto todavía no tiene salidas.',
   entregas: 'Este producto todavía no se ha entregado.',
   costo: 'Ningún lote de este producto salió de un pedido.',
+  reparto: 'Ningún pedido empacado tiene este producto.',
 };
 
 const ERROR_TITLES: Readonly<Record<FinishedProductListTab, string>> = {
@@ -44,6 +48,7 @@ const ERROR_TITLES: Readonly<Record<FinishedProductListTab, string>> = {
   salidas: 'No se pudieron cargar las salidas.',
   entregas: 'No se pudieron cargar las entregas.',
   costo: 'No se pudo cargar el costo de producción.',
+  reparto: 'No se pudo cargar el reparto.',
 };
 
 const REASON_LABELS = Object.fromEntries(
@@ -63,6 +68,7 @@ export type FinishedProductListSectionProps = {
   readonly tab: FinishedProductListTab;
   readonly paging: FinishedProductPaging;
   readonly unitLabel: string | null;
+  readonly presentation: FinishedProductDetail['presentation'];
 };
 
 type Result<T> = { readonly status: 'success'; readonly data: T } | OperationError;
@@ -150,7 +156,7 @@ async function loadEvidenceCounts(
 
 /** Pide solo el listado del tab activo. */
 export async function FinishedProductListSection(props: FinishedProductListSectionProps) {
-  const { productId, tab, paging, unitLabel } = props;
+  const { productId, tab, paging, unitLabel, presentation } = props;
   const input = { page: paging.page, pageSize: paging.pageSize };
 
   switch (tab) {
@@ -192,6 +198,15 @@ export async function FinishedProductListSection(props: FinishedProductListSecti
     case 'costo':
       return dispatch(props, await listFinishedProductCostsAction(productId, input), (page) => (
         <FinishedProductCostsTable productId={productId} page={page} unitLabel={unitLabel} />
+      ));
+    case 'reparto':
+      return dispatch(props, await listFinishedProductDistributionAction(productId, input), (page) => (
+        <FinishedProductDistributionTable
+          productId={productId}
+          page={page}
+          presentation={presentation}
+          reasonLabels={REASON_LABELS}
+        />
       ));
   }
 }

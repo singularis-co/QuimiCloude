@@ -293,7 +293,6 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'pedidos.modificar',
     'usuarios.consultar',
     'usuarios.modificar',
-    'asignaciones.consultar',
     'asignaciones.modificar',
     'asignaciones.ejecutar',
     'terminados.consultar',
@@ -318,11 +317,16 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
  * contra "el catalogo entero" lo haga restando esta lista en vez de escribiendo un total a mano.
  *
  * El acondicionamiento es tarea del Administrador de acondicionamiento; el Administrador lo
- * supervisa desde «Todos».
+ * supervisa desde «Pedidos».
+ *
+ * `asignaciones.consultar` abre la pantalla «Asignación» (`/asignacion`), la cola de trabajo de
+ * los roles operativos. El Administrador ya ve y asigna todos los pedidos desde «Pedidos»
+ * (`pedidos.consultar` + `asignaciones.modificar`), asi que no la recibe: duplicaria esa vista.
  */
 export const ADMIN_EXCLUDED_PERMISSIONS: readonly PermissionCode[] = [
   'empaque.modificar',
   'empresas.consultar',
   'empresas.modificar',
   'acondicionamiento.modificar',
+  'asignaciones.consultar',
 ];

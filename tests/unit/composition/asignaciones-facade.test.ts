@@ -16,7 +16,7 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-215, QC-218, QC-219, QC-214 y QC-271) — la fachada de `asignaciones` lista sus TREINTA Y CUATRO operaciones', () => {
+describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-215, QC-218, QC-219, QC-214, la de abrir la pantalla y QC-271) — la fachada de `asignaciones` lista sus TREINTA Y CINCO operaciones', () => {
   // El censo CRECE, no se afloja: primero llegaron las tres de la pantalla de ejecucion, luego
   // las tres de las vistas nuevas -`listFinishedOrders`, `listCompanyOrders`,
   // `listResponsibleCandidates`- y ahora las CUATRO del empaque de QC-168. Siguen nombradas UNA A
@@ -32,10 +32,11 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-2
   // 2026-10-13 (QC-214): crece con TRES operaciones de la evidencia por paso, `registerEvidence`,
   // `removeEvidence` y `requestEvidenceUpload` (T13, `design.md` de QC-214). Ninguna previa se
   // quita; el censo pasa de veintiocho a TREINTA Y UNA.
+  // Crece con `openAssignedOrder`: abrir la pantalla sin comenzar un PENDIENTE. Pasa a TREINTA Y DOS.
   // 2026-10-14 (QC-271): crece con TRES lecturas de las fotos de un pedido ejecutado,
   // `getExecutionEvidence`, `getOrderEvidence` y `countOrderEvidence`. Ninguna previa se quita; el
-  // censo pasa de treinta y una a TREINTA Y CUATRO.
-  it('R31: expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167, las DOS de QC-215, las TRES del acondicionamiento, los candidatos del equipo, las DOS de QC-219, las TRES de QC-214 y las TRES de QC-271, y ninguna mas', () => {
+  // censo pasa de treinta y dos a TREINTA Y CINCO.
+  it('R31: expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167, las DOS de QC-215, las TRES del acondicionamiento, los candidatos del equipo, las DOS de QC-219, las TRES de QC-214, la de abrir la pantalla y las TRES de QC-271, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
       'cancelAssignedOrder',
@@ -61,6 +62,7 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-2
       'listPackingOrders',
       'listResponsibleCandidates',
       'listResponsiblesForOrders',
+      'openAssignedOrder',
       'recordStepMove',
       'registerEvidence',
       'removeEvidence',

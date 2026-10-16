@@ -86,7 +86,6 @@ const PACKING: PackingOrderRow = {
   presentationLines: [],
   unitId: null,
   unitLabel: null,
-  packages: '8',
   status: 'POR_EMPACAR',
   packedByName: null,
   packedById: null,
@@ -237,14 +236,15 @@ describe('R18 — en «Mis asignados» «Entrar» es la única acción visible',
     expect(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toHaveAttribute('href', '/asignacion/order-a');
   });
 
-  it('R18: pendiente, «Entrar» pide «¿Comenzar el pedido?» antes de entrar', async () => {
-    const user = setupUser();
+  it('R18: pendiente, «Entrar» es un enlace directo: se comienza dentro de la pantalla', () => {
     const entrar = buildAssignedOrdersColumns({ canExecute: true }).find((column) => column.id === 'enter');
     if (entrar === undefined) throw new Error('falta la columna «Entrar»');
     render(<>{entrar.cell(ASSIGNED)}</>);
 
-    await user.click(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID));
-    expect(await screen.findByRole('alertdialog')).toHaveTextContent('¿Comenzar el pedido?');
+    const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
+    expect(trigger.tagName).toBe('A');
+    expect(trigger).toHaveAttribute('href', '/asignacion/order-a');
+    expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 });
 

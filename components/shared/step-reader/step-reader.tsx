@@ -25,7 +25,9 @@ import { StepDocumentView } from './step-document-view';
  *
  * **El bloqueo (R17)** no es solo `disabled`: el motivo va en un parrafo de **texto visible**
  * junto al boton y asociado por `aria-describedby`. Un `title` no vale, porque en tactil no hay
- * `:hover` (R26) y una pantalla que no responde sin decir por que es una pantalla rota.
+ * `:hover` (R26) y una pantalla que no responde sin decir por que es una pantalla rota. En
+ * `mode="ejecucion"` la espera minima es la excepcion: su cuenta va visible dentro del boton
+ * primario y su motivo, solo para lectores de pantalla (decision humana, fuera de SDD).
  *
  * Los textos viven en UNA constante para que la i18n futura sea sustituirla.
  *
@@ -38,7 +40,7 @@ import { StepDocumentView } from './step-document-view';
  * ampare. Quien busque trazabilidad completa, que la pida — hoy no existe.
  */
 
-/** En `'ejecucion'` los botones van en talla `xl` y llenan su columna del pie. */
+/** En `'ejecucion'` los botones van en talla `xl` y llenan su columna del pie, a partes iguales. */
 const PRIMARY_TOUCH_TARGET_EJECUCION = 'w-full min-w-11';
 
 const TEXTS = {
@@ -50,6 +52,7 @@ const TEXTS = {
   blocked: (pending: number) => `Marca los ${pending} elementos pendientes para continuar.`,
   waitPrefix: 'Espera',
   waitSuffix: 'para continuar.',
+  waitReasonEjecucion: 'Espera a que termine la cuenta regresiva para continuar.',
 } as const;
 
 export type StepReaderProps = {
@@ -302,20 +305,45 @@ export function StepReader({
 
   const stepAddon = renderStepAddon?.(currentIndex + 1);
 
-  const waitReason = waiting && (
-    <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
-      {isEjecucion && (
-        <CountdownRing
-          key={`ring-${arrival}`}
-          seconds={minStepSeconds ?? 0}
-          testId="step-reader-wait-ring"
-        />
-      )}
-      {TEXTS.waitPrefix}{' '}
-      <CountdownTimer key={`timer-${arrival}`} seconds={minStepSeconds} onEnd={() => setWaitedArrival(arrival)} />
-      {' '}
-      {TEXTS.waitSuffix}
-    </p>
+  const waitTimer = (
+    <CountdownTimer
+      key={`timer-${arrival}`}
+      seconds={minStepSeconds}
+      onEnd={() => setWaitedArrival(arrival)}
+      className={isEjecucion ? 'text-current' : undefined}
+    />
+  );
+
+  // En 'lectura' el motivo de espera, con su cuenta, es texto visible en el cuerpo del paso.
+  // En 'ejecucion' la cuenta va dentro del boton primario y el motivo queda solo para lectores
+  // de pantalla, sin la cuenta: anunciar cada segundo seria ruido.
+  const waitReason =
+    waiting &&
+    (isEjecucion ? (
+      <p id={waitReasonId} data-testid="step-reader-wait-reason" className="sr-only">
+        {TEXTS.waitReasonEjecucion}
+      </p>
+    ) : (
+      <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
+        {TEXTS.waitPrefix} {waitTimer} {TEXTS.waitSuffix}
+      </p>
+    ));
+
+  // `aria-hidden`: el nombre accesible del boton se queda en su texto, no cambia con cada tick.
+  const buttonCountdown = isEjecucion && waiting && (
+    <span
+      aria-hidden="true"
+      data-testid="step-reader-button-countdown"
+      className="inline-flex items-center gap-1.5"
+    >
+      <CountdownRing
+        key={`ring-${arrival}`}
+        seconds={minStepSeconds ?? 0}
+        testId="step-reader-wait-ring"
+        className="size-5 [&_[data-slot=countdown-ring-progress]]:stroke-primary-foreground [&_[data-slot=countdown-ring-track]]:stroke-primary-foreground/30"
+      />
+      {waitTimer}
+    </span>
   );
 
   const buttonSize = isEjecucion ? 'xl' : 'default';
@@ -348,6 +376,7 @@ export function StepReader({
       onClick={finish}
     >
       {finishLabel}
+      {buttonCountdown}
     </Button>
   ) : (
     <Button
@@ -361,6 +390,7 @@ export function StepReader({
       onClick={goNext}
     >
       {TEXTS.next}
+      {buttonCountdown}
     </Button>
   );
 
@@ -399,8 +429,6 @@ export function StepReader({
 
         {stepAddon}
 
-        {waitReason}
-
         <div
           data-testid="step-reader-actions"
           className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-4 pt-3 pb-[calc(14px+env(safe-area-inset-bottom,0px))]"
@@ -415,8 +443,9 @@ export function StepReader({
               >
                 {reasonText ?? TEXTS.blocked(pending)}
               </p>
+              {waitReason}
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {previousButton}
               {primaryButton}
             </div>

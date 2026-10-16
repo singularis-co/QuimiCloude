@@ -9,7 +9,12 @@ import {
   PACKING_EVIDENCE_TEXTS,
 } from '@/app/(private)/dashboard/recorrido/[id]/components';
 import { STEP_EVIDENCE_TEXTS } from '@/components/shared/step-evidence';
-import type { ExecutionAction, ExecutionTraceDetail as ExecutionTraceDetailData } from '@/lib/modules/asignaciones';
+import type {
+  ConditioningAction,
+  ExecutionAction,
+  ExecutionTraceDetail as ExecutionTraceDetailData,
+  ExecutionTraceDetailStep,
+} from '@/lib/modules/asignaciones';
 import type { ExecutionEvidenceResult } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 import { errorMessage } from '@/lib/modules/errores';
 import {
@@ -41,7 +46,12 @@ const BACK_HREF = '/dashboard?page=1&pageSize=10';
 const MIN = 60 * 1000;
 const START = new Date('2026-10-07T08:00:00.000Z').getTime();
 
-function step(id: string, action: ExecutionAction, stepPosition: number | null, minute: number) {
+function step(
+  id: string,
+  action: Exclude<ExecutionAction, ConditioningAction>,
+  stepPosition: number | null,
+  minute: number,
+): ExecutionTraceDetailStep {
   return {
     id,
     orderId: ORDER_ID,
@@ -62,9 +72,14 @@ const TRACE: ExecutionTraceDetailData = {
   numberText: '2026-0000042',
   status: 'TERMINADO',
   deleted: false,
+  active: false,
   firstAt: new Date(START),
   lastAt: new Date(START + 35 * MIN),
-  duration: { kind: 'closed', ms: 35 * MIN },
+  durations: {
+    production: { kind: 'closed', ms: 25 * MIN },
+    packing: { kind: 'closed', ms: 5 * MIN },
+    conditioning: null,
+  },
   goBackCount: 1,
   steps: [
     step('e1', 'start', 1, 0),
