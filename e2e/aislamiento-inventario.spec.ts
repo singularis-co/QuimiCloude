@@ -337,7 +337,9 @@ test.describe('aislamiento por empresa del inventario', () => {
     await page.goto(listUrl(INVENTORY_ROUTE, SHARED_TOKEN));
     await expect(page.getByTestId(INVENTORY_TITLE)).toBeVisible({ timeout: 60_000 });
 
-    const menuDeFila = page.getByTestId(ROW_ACTIONS);
+    // Se cuentan los menus de las filas: la tarjeta de cada producto (oculta en una lista ancha)
+    // lleva el suyo.
+    const menuDeFila = page.locator('[data-testid^="data-table-row-"]').getByTestId(ROW_ACTIONS);
     await expect(menuDeFila, 'la lista de A debe ofrecer el borrado de su unico producto').toHaveCount(1, {
       timeout: 60_000,
     });

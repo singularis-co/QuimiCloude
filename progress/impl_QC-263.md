@@ -1124,3 +1124,80 @@ El rojo de `product-route-contract.test.ts` que anotó T4a ya no sale (170/170).
 
 T6a, T6b y T6c hechas y en verde: toasts de alta de unidad y presentación, guardia nueva con su
 negativo por regla, exclusión de `batch-history.tsx` retirada y fila de `RowActionsMenu` suficiente.
+
+## Tanda 7 (T7b) — 2026-10-16 · frontend_dev
+
+Sin cambios de producción: ningún E2E reveló un bug del rediseño. Solo se cambian selectores y flujo
+a la UI nueva; ningún assert de negocio se relaja.
+
+### Archivos creados / modificados
+
+- `e2e/helpers/row-actions-menu.ts`: `batchActionsTrigger(batchRow)` (disparador «Acciones del lote …»
+  de la fila del lote). Sin `data-table` dentro, para no entrar en la lista cerrada.
+- `e2e/ajuste-de-inventario.spec.ts`: menú de la fila acotado a `data-table-row-<productId>` (la
+  tarjeta oculta repite `product-row-actions`); lote por `data-table-row-<batchId>` dentro del panel;
+  «Historial» y «Ajustar existencia» desde el menú del lote; asientos por
+  `data-table-row-adjustment-<id>` / `data-table-row-opening-<id>` dentro de `batch-history-list`;
+  `adjust-batch-recorded-stock` es ahora un campo (`toHaveValue`); `product-stock` acotado a la fila.
+  R21 (operador): con el menú del lote abierto, «Historial» está y `adjust-batch-open` no existe.
+- `e2e/reserva-de-material.spec.ts`: lote por `data-table-row-<batchId>`, historial desde el menú del
+  lote, asientos filtrados por `[data-testid^="data-table-row-"]` en vez de `li` (ahora tarjetas ocultas).
+- `e2e/producto-terminado.spec.ts`: el grupo del pedido se cuenta por fila (`finished-stock-name`
+  salía 2 veces: fila y tarjeta); lote por `data-table-row-` del panel; ajuste desde el menú del lote.
+- `e2e/insumo-por-unidad.spec.ts`: `product-batch-quantity` acotado a las filas del panel.
+- `e2e/datos-de-lote-en-acondicionamiento.spec.ts`: lote por `data-table-row-<batchId>`; la fecha de
+  vencimiento se compara exacta admitiendo el relativo detrás («2027-10-16 (vence en 365 días)»).
+  **Ese rojo no es del rediseño:** el relativo vive dentro de `product-batch-expiry-date` desde
+  08b69744 (dev); `expiry-date.tsx` solo ganó `as` en esta rama.
+- `e2e/aislamiento-inventario.spec.ts`: los menús se cuentan dentro de las filas.
+- `tests/unit/shared/data-table-alcance.test.ts`: alta de `e2e/ajuste-de-inventario.spec.ts` (49 → 50),
+  como pedía `design.md > 7`. T7a sumará `inventario-rediseno.spec.ts` sobre este 50.
+
+Sin cambios y en verde: `inventario.spec.ts`, `inventario-importar.spec.ts`, `pedido-bloqueado.spec.ts`
+(E15) y los de solo `inventario-title` (`session`, `login`, `cierre-de-sesiones`).
+
+### Salida real (cada spec por separado, `pnpm exec playwright test <spec>`)
+
+```
+inventario.spec.ts                          16 passed (1.6m)   chromium 8/8  webkit 8/8
+inventario-importar.spec.ts                  2 passed (44.3s)  chromium 1/1  webkit 1/1
+pedido-bloqueado.spec.ts                     2 passed (1.2m)   chromium 1/1  webkit 1/1
+ajuste-de-inventario.spec.ts                 8 passed (42.9s)  chromium 4/4  webkit 4/4
+  (antes: 8 failed, strict mode: getByTestId('product-row-actions') resolved to 2 elements;
+   luego 6 failed por adjust-batch-recorded-stock toHaveText "" -> es un input)
+reserva-de-material.spec.ts                  2 passed (1.1m)   chromium 1/1  webkit 1/1
+producto-terminado.spec.ts                   2 passed (1.1m)   chromium 1/1  webkit 1/1
+  (antes: 2 failed, finished-stock-name toHaveCount 1, received 2)
+insumo-por-unidad.spec.ts                    2 passed (25.8s)  chromium 1/1  webkit 1/1
+datos-de-lote-en-acondicionamiento.spec.ts   2 passed (1.1m)   chromium 1/1  webkit 1/1
+  (antes: 2 failed, expiry-date "2027-10-16 (vence en 365 días)")
+aislamiento-inventario.spec.ts               2 passed (19.0s)  chromium 1/1  webkit 1/1
+session.spec.ts                              6 passed (16.4s)  chromium 3/3  webkit 3/3
+login.spec.ts                               10 passed (20.8s)  chromium 5/5  webkit 5/5
+cierre-de-sesiones.spec.ts                   2 passed (17.2s)  chromium 1/1  webkit 1/1
+
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm run lint
+✖ 10 problems (0 errors, 10 warnings)   (los mismos 4 archivos ajenos de tandas anteriores)
+
+$ pnpm exec vitest run tests/unit/shared/data-table-alcance.test.ts tests/guards/guard-identificador-de-request.test.ts
+ Test Files  2 passed (2)
+      Tests  41 passed | 2 skipped (43)
+
+$ pnpm exec vitest run guard
+ Test Files  81 passed (81)
+      Tests  1106 passed | 20 skipped (1126)
+```
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R45 | los seis E2E de la fila R45 de `tasks.md` (arriba, en verde) |
+
+### Veredicto
+
+T7b hecha: los nueve E2E de `design.md > 7` y los de solo `inventario-title` pasan en Chromium y WebKit, sin tocar producción.

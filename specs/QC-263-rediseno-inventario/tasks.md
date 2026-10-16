@@ -207,7 +207,7 @@ solo su parte y el commit cita la fila de `design.md > 6`.
   lista es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
   -el archivo se nombra, uno a uno-. Lo que ejercita: …». *Hecho:* pasa en Chromium y WebKit; las dos
   guardias en verde.
-- [ ] **T7b. E2E existentes** (R45 y los cambios de `design.md > 7`). Migrar los de la tabla a la fila
+- [x] **T7b. E2E existentes** (R45 y los cambios de `design.md > 7`). Migrar los de la tabla a la fila
   visible, al menú del lote y a «Conteo físico». *Hecho:* cada spec tocado pasa por separado
   (`pnpm exec playwright test <spec>`); los que solo esperan `inventario-title` pasan sin cambios.
   *Enmienda (E15):* `e2e/pedido-bloqueado.spec.ts` no es de ese grupo: se corre y debe pasar sin
