@@ -9,7 +9,12 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
 import { compareQuantities, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
-import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
+import {
+  exactDecimalTitle,
+  formatDecimalDisplay,
+  formatMoneyDisplay,
+  trimDecimal,
+} from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { cn } from '@/lib/utils';
 
@@ -246,13 +251,18 @@ export const COST_COLUMN_LABEL = 'Costo';
 
 /**
  * Celda de un costo unitario: el del producto (promedio ponderado de sus lotes con existencia y
- * costo) o el del lote. Se pinta igual que el costo unitario de producto terminado
- * (`finished-product-costs-table.tsx`): `trimDecimal`, sin redondear -un costo de 0.0020 a dos
- * decimales se leeria «0»- y sin pasar por coma flotante. Sin costo, el marcador de vacio.
+ * costo) o el del lote. Se pinta como DINERO con `formatMoneyDisplay`: «$», separador de miles y
+ * siempre dos decimales redondeados («$1,234.56», «$12.50»), sin pasar por coma flotante. Un costo
+ * que a dos decimales se leeria «$0.00» (0.0020) no se pierde: el valor exacto queda en el `title`
+ * (`exactDecimalTitle`), a un hover, como en las cantidades. Sin costo, el marcador de vacio.
  */
 function unitCostCell(value: string | null | undefined, testId: string): ReactNode {
   if (value === undefined || value === null) return EMPTY_MARK;
-  return <span data-testid={testId}>{trimDecimal(value)}</span>;
+  return (
+    <span data-testid={testId} title={exactDecimalTitle(value)}>
+      {formatMoneyDisplay(value)}
+    </span>
+  );
 }
 
 export type ProductColumnsDeps = {
@@ -271,6 +281,18 @@ export type ProductColumnsDeps = {
    * filtrado, todas las filas dirian lo mismo. Defecto `false`, que es el recuento del esqueleto.
    */
   readonly showType?: boolean;
+  /**
+   * Anade la columna «Costo». Solo la ve el Administrador: la decide el Server Component con el
+   * permiso de la sesion (`canViewUnitCosts`) y baja por props. Defecto `false`: falla cerrado,
+   * como `canAdjust`. Presentacion, no autorizacion: quien deja de enviar el costo a quien no
+   * debe verlo es el servidor.
+   */
+  readonly showCost?: boolean;
+  /**
+   * Pinta la columna «Presentación». Defecto `true`; la tabla la apaga en la pestana «Producto»,
+   * donde la presentacion no aporta.
+   */
+  readonly showPresentation?: boolean;
   /** Despliega o pliega los lotes de un producto. Sin el, la fila no pinta el chevron. */
   readonly onToggle?: (productId: string) => void;
   /** Vuelve a pedir los lotes de un producto tras un error. */
@@ -297,6 +319,30 @@ const typeColumn: ProductColumn = {
         data-type={row.product.type}
       />
     ) : null,
+};
+
+/** Columna «Presentación». Sin `sortable` ni `filter`: `PRODUCT_QUERYABLE` no los admite. */
+const presentationColumn: ProductColumn = {
+  id: 'presentationName',
+  label: 'Presentación',
+  align: 'start',
+  cell: (row) => (row.kind === 'product' ? (row.product.presentationName ?? EMPTY_MARK) : null),
+};
+
+/**
+ * Columna «Costo»: el promedio en la fila del producto y el propio en la del lote. No ordena ni
+ * filtra: es un agregado de los lotes, no una columna de `products`.
+ */
+const costColumn: ProductColumn = {
+  id: 'averageUnitCost',
+  label: COST_COLUMN_LABEL,
+  tabular: true,
+  align: 'center',
+  cell: (row) => {
+    if (row.kind === 'product') return unitCostCell(row.product.averageUnitCost, 'product-cost');
+    if (row.kind === 'batch') return unitCostCell(row.batch.unitCost, 'product-batch-row-cost');
+    return null;
+  },
 };
 
 const BATCH_ROW_EXPIRY_TEST_IDS = {
@@ -433,6 +479,8 @@ export function buildProductColumns({
   rowActions,
   units,
   showType = false,
+  showCost = false,
+  showPresentation = true,
   onToggle,
   onRetry,
 }: ProductColumnsDeps): readonly ProductColumn[] {
@@ -469,14 +517,7 @@ export function buildProductColumns({
       },
     },
     ...(showType ? [typeColumn] : []),
-    {
-      id: 'presentationName',
-      label: 'Presentación',
-      align: 'start',
-      // Sin `sortable` ni `filter`: `PRODUCT_QUERYABLE` no los admite para esta columna.
-      cell: (row) =>
-        row.kind === 'product' ? (row.product.presentationName ?? EMPTY_MARK) : null,
-    },
+    ...(showPresentation ? [presentationColumn] : []),
     {
       id: 'stock',
       label: 'Existencia',
@@ -497,18 +538,7 @@ export function buildProductColumns({
         return null;
       },
     },
-    {
-      id: 'averageUnitCost',
-      label: COST_COLUMN_LABEL,
-      tabular: true,
-      align: 'center',
-      // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
-      cell: (row) => {
-        if (row.kind === 'product') return unitCostCell(row.product.averageUnitCost, 'product-cost');
-        if (row.kind === 'batch') return unitCostCell(row.batch.unitCost, 'product-batch-row-cost');
-        return null;
-      },
-    },
+    ...(showCost ? [costColumn] : []),
     {
       id: 'qtyAlert',
       label: 'Alerta de cantidad',

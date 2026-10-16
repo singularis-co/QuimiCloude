@@ -12,7 +12,8 @@ export type ProductBatchView = {
   readonly packageContent: string | null;
   /** Costo unitario guardado en el lote (`product_batches.unit_cost`), en cadena decimal de
    *  cuatro decimales; `null` si el lote no tiene costo. Opcional: lo rellenan las lecturas que
-   *  usan `BATCH_VIEW_SELECT` (`findBatchesOfAliveProduct`, `findBatchesOfOrder`). */
+   *  usan `BATCH_VIEW_SELECT` (`findBatchesOfAliveProduct`, `findBatchesOfOrder`), y los casos de
+   *  uso la quitan (`withoutUnitCost`) a quien no cumple `canViewUnitCosts`. */
   readonly unitCost?: string | null;
   /** Lo apartado por pedidos vivos en este lote. Opcional: solo lo rellena
    *  `findBatchesOfAliveProduct`; las demas lecturas no la traen. */
@@ -25,6 +26,16 @@ export type ProductBatchView = {
    *  tener lotes de varias presentaciones. */
   readonly presentationName?: string | null;
 };
+
+/**
+ * El lote sin `unitCost`: el campo desaparece, no queda en `null`, para que un actor sin
+ * `canViewUnitCosts` no reciba ni la clave. Lo aplican los casos de uso de listado de lotes.
+ */
+export function withoutUnitCost(batch: ProductBatchView): ProductBatchView {
+  const copy: { -readonly [K in keyof ProductBatchView]: ProductBatchView[K] } = { ...batch };
+  delete copy.unitCost;
+  return copy;
+}
 
 /**
  * Los lotes vivos: los que conservan existencia (`stock > 0`). Puro, sin reloj ni base de datos;

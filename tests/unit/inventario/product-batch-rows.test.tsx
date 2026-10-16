@@ -415,7 +415,9 @@ describe('sin cambio de anchura de la tabla', () => {
 
 describe('columna «Costo» de la tabla de productos', () => {
   it('pinta la cabecera «Costo» justo despues de la existencia', () => {
-    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} />);
+    render(
+      <ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} canSeeCost />,
+    );
 
     expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveTextContent('Costo');
     const cabeceras = screen
@@ -426,23 +428,34 @@ describe('columna «Costo» de la tabla de productos', () => {
     );
   });
 
-  it('la fila del producto pinta su costo promedio sin ceros de relleno ni redondeo', () => {
+  it('la fila del producto pinta su costo promedio como dinero: «$», miles y dos decimales', () => {
     render(
       <ProductTable
         products={[
           producto({ averageUnitCost: '12.5000' }),
           producto({ id: 'product-2', name: 'Sal', averageUnitCost: '0.0025' }),
+          producto({ id: 'product-3', name: 'Glicerina', averageUnitCost: '1234.5650' }),
         ]}
         params={TODOS}
         totalPages={1}
         units={UNITS}
+        canSeeCost
       />,
     );
 
-    const fila1 = screen.getByTestId('data-table-row-product-1');
-    expect(within(fila1).getByTestId('product-cost')).toHaveTextContent(/^12\.5$/);
-    const fila2 = screen.getByTestId('data-table-row-product-2');
-    expect(within(fila2).getByTestId('product-cost')).toHaveTextContent(/^0\.0025$/);
+    const fila1 = within(screen.getByTestId('data-table-row-product-1')).getByTestId('product-cost');
+    expect(fila1).toHaveTextContent(/^\$12\.50$/);
+    // Sin perdida: lo pintado ya es exacto, asi que no hay `title` que repita lo que se ve.
+    expect(fila1).not.toHaveAttribute('title');
+
+    // Redondeado se lee «$0.00», pero el valor exacto queda a un hover.
+    const fila2 = within(screen.getByTestId('data-table-row-product-2')).getByTestId('product-cost');
+    expect(fila2).toHaveTextContent(/^\$0\.00$/);
+    expect(fila2).toHaveAttribute('title', '0.0025');
+
+    const fila3 = within(screen.getByTestId('data-table-row-product-3')).getByTestId('product-cost');
+    expect(fila3).toHaveTextContent(/^\$1,234\.57$/);
+    expect(fila3).toHaveAttribute('title', '1234.565');
   });
 
   it('sin costo (null o ausente), la fila del producto pinta el marcador de vacio', () => {
@@ -452,6 +465,7 @@ describe('columna «Costo» de la tabla de productos', () => {
         params={TODOS}
         totalPages={1}
         units={UNITS}
+        canSeeCost
       />,
     );
 
@@ -476,6 +490,7 @@ describe('columna «Costo» de la tabla de productos', () => {
         params={TODOS}
         totalPages={1}
         units={UNITS}
+        canSeeCost
       />,
     );
 
@@ -483,9 +498,11 @@ describe('columna «Costo» de la tabla de productos', () => {
     await screen.findByTestId('product-batch-row');
 
     const filaLote = screen.getByTestId('data-table-row-product-1--batch-batch-1');
-    expect(within(filaLote).getByTestId('product-batch-row-cost')).toHaveTextContent(/^3\.125$/);
+    const costoLote = within(filaLote).getByTestId('product-batch-row-cost');
+    expect(costoLote).toHaveTextContent(/^\$3\.13$/);
+    expect(costoLote).toHaveAttribute('title', '3.125');
     const filaProducto = screen.getByTestId('data-table-row-product-1');
-    expect(within(filaProducto).getByTestId('product-cost')).toHaveTextContent(/^9$/);
+    expect(within(filaProducto).getByTestId('product-cost')).toHaveTextContent(/^\$9\.00$/);
   });
 
   it('sin costo (null o ausente), la fila del lote pinta el marcador de vacio', async () => {
@@ -494,7 +511,9 @@ describe('columna «Costo» de la tabla de productos', () => {
       data: [lote({ unitCost: null }), lote({ id: 'batch-2', lot: 'L-002' })],
     });
     const user = setupUser();
-    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} />);
+    render(
+      <ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} canSeeCost />,
+    );
 
     await user.click(toggle());
     await screen.findAllByTestId('product-batch-row');
@@ -506,5 +525,31 @@ describe('columna «Costo» de la tabla de productos', () => {
       );
       expect(within(filaLote).queryByTestId('product-batch-row-cost')).toBeNull();
     }
+  });
+
+  it('sin `canSeeCost` (cualquier rol que no sea el Administrador) la columna no existe', async () => {
+    // El costo VIENE en los datos a proposito: lo que oculta la columna es el permiso
+    // explicito, no la ausencia del campo.
+    listAliveProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [lote({ unitCost: '3.1250' })],
+    });
+    const user = setupUser();
+    render(
+      <ProductTable
+        products={[producto({ averageUnitCost: '9.0000' })]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+      />,
+    );
+
+    await user.click(toggle());
+    await screen.findByTestId('product-batch-row');
+
+    expect(screen.queryByTestId('data-table-head-averageUnitCost')).toBeNull();
+    expect(screen.queryAllByTestId('data-table-cell-averageUnitCost')).toEqual([]);
+    expect(screen.queryByTestId('product-cost')).toBeNull();
+    expect(screen.queryByTestId('product-batch-row-cost')).toBeNull();
   });
 });
