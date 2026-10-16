@@ -99,11 +99,11 @@ solo su parte y el commit cita la fila de `design.md > 6`.
 
 ## Tanda 3 — Menú de fila, anfitrión y tarjetas (depende de T2 y del tablero aprobado de P17/P18 copiado en `docs/diseno/canvas/`; T1a no aplica)
 
-- [ ] **T3a. Menú como datos** (D4, R9, R10). `productRowActionsSpec` y `ProductRowActions` como
+- [x] **T3a. Menú como datos** (D4, R9, R10). `productRowActionsSpec` y `ProductRowActions` como
   envoltorio. Test `tests/unit/inventario/product-row-actions.test.tsx`: orden Lotes, Historial,
   Ajustar existencia, Editar, separador, Borrar destructivo; sin `canAdjust` no hay «Ajustar
   existencia»; testids y `triggerLabel` de hoy; `title` = nombre.
-- [ ] **T3b. Anfitrión por tabla** (D5, R11, R12). `product-row-dialogs.tsx` con `batchTarget`;
+- [x] **T3b. Anfitrión por tabla** (D5, R11, R12). `product-row-dialogs.tsx` con `batchTarget`;
   `ProductTable` y `FinishedStockTable` con `actionsColumn({ menu })` y un solo anfitrión. Test
   `tests/unit/inventario/product-row-dialogs.test.tsx`: «Lotes», «Editar» y «Borrar» abren el panel o
   diálogo de hoy con el producto de la fila; «Historial» y «Ajustar» con un lote abren ese lote, con
@@ -115,7 +115,7 @@ solo su parte y el commit cita la fila de `design.md > 6`.
   porque la lectura es `listProductBatchesAction`; `confirm-dialog-montado.test.tsx` acotado a la
   fila visible y con el borrado en el anfitrión. *Hecho:* snapshot de `acciones-por-fila` actualizado
   con la fila de `design.md > 6`.
-- [ ] **T3c. Tarjetas** (D6, R13). `card` en las dos tablas y `cardActions` / `closeMenu`. Test
+- [x] **T3c. Tarjetas** (D6, R13). `card` en las dos tablas y `cardActions` / `closeMenu`. Test
   `tests/unit/inventario/product-cards.test.tsx` (con el ayudante de ancho de contenedor que usan los
   tests de tarjetas): imagen, nombre, cifras y aviso en la tarjeta; «Acciones» de 44 px que abre el
   menú centrado con el nombre como título e ítems de 48 px; en producto terminado, número de pedido

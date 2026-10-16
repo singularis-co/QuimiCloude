@@ -81,8 +81,13 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+/** jsdom no evalua las consultas de contenedor: la tabla y sus tarjetas estan las dos en el arbol. */
+function enLaTabla() {
+  return within(screen.getByRole('table'));
+}
+
 function toggle(name = 'Acido citrico') {
-  return screen.getByRole('button', { name: `Mostrar lotes de ${name}` });
+  return enLaTabla().getByRole('button', { name: `Mostrar lotes de ${name}` });
 }
 
 beforeEach(() => {
@@ -104,11 +109,11 @@ describe('desplegar los lotes de un producto', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} />);
 
     expect(toggle()).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('product-batch-row')).toBeNull();
+    expect(enLaTabla().queryByTestId('product-batch-row')).toBeNull();
 
     await user.click(toggle());
     expect(toggle()).toHaveAttribute('aria-expanded', 'true');
-    const fila = await screen.findByTestId('product-batch-row');
+    const fila = await enLaTabla().findByTestId('product-batch-row');
     expect(within(fila).getByTestId('product-batch-row-lot')).toHaveTextContent('L-001');
     expect(within(fila).getByTestId('product-batch-row-purchase-date')).toHaveTextContent('2026-03-05');
     expect(within(fila).getByTestId('product-batch-row-expiry-date')).toHaveTextContent(EMPTY_MARK);
@@ -122,7 +127,7 @@ describe('desplegar los lotes de un producto', () => {
 
     await user.click(toggle());
     expect(toggle()).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('product-batch-row')).toBeNull();
+    expect(enLaTabla().queryByTestId('product-batch-row')).toBeNull();
   });
 
   it('pide los lotes una sola vez por producto aunque se pliegue y despliegue', async () => {
@@ -131,11 +136,11 @@ describe('desplegar los lotes de un producto', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    await screen.findByTestId('product-batch-row');
+    await enLaTabla().findByTestId('product-batch-row');
     await user.click(toggle());
     await user.click(toggle());
 
-    expect(screen.getByTestId('product-batch-row')).toBeInTheDocument();
+    expect(enLaTabla().getByTestId('product-batch-row')).toBeInTheDocument();
     expect(listAliveProductBatchesActionMock).toHaveBeenCalledTimes(1);
   });
 
@@ -146,11 +151,11 @@ describe('desplegar los lotes de un producto', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    expect(screen.getByTestId('product-batches-row-loading')).toHaveTextContent('Cargando lotes…');
+    expect(enLaTabla().getByTestId('product-batches-row-loading')).toHaveTextContent('Cargando lotes…');
 
     pendiente.resolve({ status: 'success', data: [lote()] });
-    await screen.findByTestId('product-batch-row');
-    expect(screen.queryByTestId('product-batches-row-loading')).toBeNull();
+    await enLaTabla().findByTestId('product-batch-row');
+    expect(enLaTabla().queryByTestId('product-batches-row-loading')).toBeNull();
   });
 
   it('con error pinta el mensaje y el reintento vuelve a pedir los lotes', async () => {
@@ -163,14 +168,14 @@ describe('desplegar los lotes de un producto', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    const error = await screen.findByTestId('product-batches-row-error');
+    const error = await enLaTabla().findByTestId('product-batches-row-error');
     expect(error).toHaveTextContent('No tienes permiso.');
 
     listAliveProductBatchesActionMock.mockResolvedValueOnce({ status: 'success', data: [lote()] });
     await user.click(within(error).getByRole('button', { name: 'Reintentar' }));
 
-    await screen.findByTestId('product-batch-row');
-    expect(screen.queryByTestId('product-batches-row-error')).toBeNull();
+    await enLaTabla().findByTestId('product-batch-row');
+    expect(enLaTabla().queryByTestId('product-batches-row-error')).toBeNull();
     expect(listAliveProductBatchesActionMock).toHaveBeenCalledTimes(2);
   });
 
@@ -192,13 +197,13 @@ describe('desplegar los lotes de un producto', () => {
     await act(async () => {
       vieja.resolve({ status: 'success', data: [lote({ id: 'viejo', lot: 'L-VIEJO' })] });
     });
-    expect(screen.getByTestId('product-batches-row-loading')).toBeInTheDocument();
-    expect(screen.queryByText('L-VIEJO')).toBeNull();
+    expect(enLaTabla().getByTestId('product-batches-row-loading')).toBeInTheDocument();
+    expect(enLaTabla().queryByText('L-VIEJO')).toBeNull();
 
     await act(async () => {
       nueva.resolve({ status: 'success', data: [lote({ id: 'nuevo', lot: 'L-NUEVO' })] });
     });
-    expect(screen.getAllByTestId('product-batch-row-lot').map((dd) => dd.textContent)).toEqual([
+    expect(enLaTabla().getAllByTestId('product-batch-row-lot').map((dd) => dd.textContent)).toEqual([
       'L-NUEVO',
     ]);
   });
@@ -209,7 +214,7 @@ describe('desplegar los lotes de un producto', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    expect(await screen.findByTestId('product-batches-row-error')).toBeInTheDocument();
+    expect(await enLaTabla().findByTestId('product-batches-row-error')).toBeInTheDocument();
   });
 
   it('pide solo los lotes vivos al servidor y pinta tal cual lo que devuelve; sin ninguno, el vacio', async () => {
@@ -230,16 +235,16 @@ describe('desplegar los lotes de un producto', () => {
     );
 
     await user.click(toggle());
-    await screen.findAllByTestId('product-batch-row');
+    await enLaTabla().findAllByTestId('product-batch-row');
     expect(listAliveProductBatchesActionMock).toHaveBeenCalledWith('product-1');
-    expect(screen.getAllByTestId('product-batch-row-lot').map((dd) => dd.textContent)).toEqual([
+    expect(enLaTabla().getAllByTestId('product-batch-row-lot').map((dd) => dd.textContent)).toEqual([
       'L-VIVO',
       'L-OTRO',
     ]);
 
     listAliveProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [] });
     await user.click(toggle('Glicerina'));
-    expect(await screen.findByTestId('product-batches-row-empty')).toBeInTheDocument();
+    expect(await enLaTabla().findByTestId('product-batches-row-empty')).toBeInTheDocument();
   });
 });
 
@@ -257,7 +262,7 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    await screen.findAllByTestId('product-batch-row');
+    await enLaTabla().findAllByTestId('product-batch-row');
 
     const vencimiento = (batchId: string) =>
       within(screen.getByTestId(`data-table-row-product-1--batch-${batchId}`)).getByTestId(
@@ -289,7 +294,7 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    await screen.findAllByTestId('product-batch-row');
+    await enLaTabla().findAllByTestId('product-batch-row');
 
     const vencimiento = (batchId: string) =>
       within(screen.getByTestId(`data-table-row-product-1--batch-${batchId}`)).getByTestId(
@@ -324,7 +329,7 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    await screen.findAllByTestId('product-batch-row');
+    await enLaTabla().findAllByTestId('product-batch-row');
 
     const vencimiento = (batchId: string) =>
       within(screen.getByTestId(`data-table-row-product-1--batch-${batchId}`)).getByTestId(
@@ -351,7 +356,7 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    const fila = await screen.findByTestId('product-batch-row');
+    const fila = await enLaTabla().findByTestId('product-batch-row');
     const claves = within(fila).getAllByRole('term');
     expect(claves.map((dt) => dt.textContent)).toEqual([
       'Lote:',
@@ -404,9 +409,9 @@ describe('la columna «Tipo» convive con las filas de lotes', () => {
 
     expect(screen.getByTestId('data-table-head-type')).toBeInTheDocument();
     await user.click(toggle());
-    await screen.findByTestId('product-batch-row');
+    await enLaTabla().findByTestId('product-batch-row');
 
-    expect(screen.getAllByTestId('product-type')).toHaveLength(1);
+    expect(enLaTabla().getAllByTestId('product-type')).toHaveLength(1);
     expect(
       within(screen.getByTestId('data-table-row-product-1--batch-batch-1')).queryByTestId(
         'product-type',
@@ -418,7 +423,7 @@ describe('la columna «Tipo» convive con las filas de lotes', () => {
 describe('sin cambio de anchura de la tabla', () => {
   it('el chevron vive en la celda del nombre: no hay columna nueva', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
-    const celdaNombre = screen.getByTestId('data-table-cell-name');
+    const celdaNombre = enLaTabla().getByTestId('data-table-cell-name');
     expect(within(celdaNombre).getByTestId('product-batches-toggle')).toBeInTheDocument();
   });
 });
@@ -467,7 +472,7 @@ describe('columna «Costo» de la tabla de productos', () => {
     );
 
     await user.click(toggle());
-    await screen.findByTestId('product-batch-row');
+    await enLaTabla().findByTestId('product-batch-row');
 
     const filaProducto = screen.getByTestId('data-table-row-product-1');
     const filaLote = screen.getByTestId('data-table-row-product-1--batch-batch-1');
@@ -513,7 +518,7 @@ describe('columna «Costo» de la tabla de productos', () => {
     );
 
     await user.click(toggle());
-    await screen.findByTestId('product-batch-row');
+    await enLaTabla().findByTestId('product-batch-row');
 
     const filaProducto = screen.getByTestId('data-table-row-product-1');
     expect(within(filaProducto).getByTestId('product-available')).toHaveClass('font-semibold');
@@ -578,7 +583,7 @@ describe('columna «Costo» de la tabla de productos', () => {
     );
 
     await user.click(toggle());
-    await screen.findByTestId('product-batch-row');
+    await enLaTabla().findByTestId('product-batch-row');
 
     const filaLote = screen.getByTestId('data-table-row-product-1--batch-batch-1');
     expect(within(filaLote).getByTestId('product-batch-row-cost')).toHaveTextContent(/^3\.125$/);
@@ -595,7 +600,7 @@ describe('columna «Costo» de la tabla de productos', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} />);
 
     await user.click(toggle());
-    await screen.findAllByTestId('product-batch-row');
+    await enLaTabla().findAllByTestId('product-batch-row');
 
     for (const id of ['batch-1', 'batch-2']) {
       const filaLote = screen.getByTestId(`data-table-row-product-1--batch-${id}`);

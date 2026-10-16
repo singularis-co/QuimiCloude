@@ -3,7 +3,7 @@
 import { ChevronRight, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn, type RowActionsSpec } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
@@ -32,9 +32,7 @@ import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
  * `ProductView` sino las dos columnas de MARCADO -miniatura y acciones-. El test en negativo
  * sigue haciendo falta y sigue ahi.
  *
- * **Es una FACTORIA y no un array del modulo** por lo mismo que en pedidos: la celda de acciones
- * monta el panel de edicion y el dialogo de baja, que son componentes de cliente. Mientras fue un
- * array de datos, esas acciones vivian incrustadas en la tabla.
+ * Es una factoría porque el menú de la fila y el despliegue de lotes llegan de quien monta la tabla.
  *
  * **Que columna ordena y que columna filtra sale de `PRODUCT_QUERYABLE`**, la lista blanca del
  * modulo, no de una decision de esta pantalla: declarar `sortable` en una cabecera que el backend
@@ -282,12 +280,12 @@ function unitCostCell(value: string | null | undefined, testId: string): ReactNo
   return <span data-testid={testId}>{trimDecimal(value)}</span>;
 }
 
+/** Las sub-filas de lote y de estado no tienen menú: sin ítems, no se pinta. */
+const NO_ROW_ACTIONS: RowActionsSpec = { items: [], triggerLabel: '' };
+
 export type ProductColumnsDeps = {
-  /**
-   * Acciones de la fila (el menu de la fila). Es un **slot**: la declaracion de columnas no
-   * importa el panel lateral ni el dialogo, los enchufa quien monta la tabla.
-   */
-  readonly rowActions: (product: ProductView) => ReactNode;
+  /** El menú de la fila de un producto, como datos: lo pintan la fila y la tarjeta. */
+  readonly menu: (product: ProductView) => RowActionsSpec;
   /**
    * Catalogo de unidades para resolver el simbolo de la existencia. Sin el (lectura fallida en la
    * pagina), la celda sigue pintando la cantidad, sin etiqueta.
@@ -458,7 +456,7 @@ function reservedOrAvailableCell(
 }
 
 export function buildProductColumns({
-  rowActions,
+  menu,
   units,
   showType = false,
   onToggle,
@@ -566,7 +564,7 @@ export function buildProductColumns({
         id: ACTIONS_COLUMN_ID,
         label: ACTIONS_COLUMN_LABEL,
         defaultPinned: 'right',
-        cell: (row) => (row.kind === 'product' ? rowActions(row.product) : null),
+        menu: (row) => (row.kind === 'product' ? menu(row.product) : NO_ROW_ACTIONS),
       }),
       id: ACTIONS_COLUMN_ID,
     },

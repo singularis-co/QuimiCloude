@@ -234,6 +234,7 @@ type ColumnasDeArchivo = {
 };
 
 const sinAcciones = () => null;
+const sinMenu = () => ({ items: [], triggerLabel: '' });
 
 const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   {
@@ -263,12 +264,12 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   },
   {
     archivo: 'product-columns.tsx',
-    construir: async () => buildProductColumns({ rowActions: sinAcciones }),
+    construir: async () => buildProductColumns({ menu: sinMenu }),
     esperadas: ['Existencia', 'Costo', 'Alerta de cantidad', 'Reservado', 'Disponible'],
   },
   {
     archivo: 'finished-stock-columns.tsx',
-    construir: async () => buildFinishedStockColumns({ onToggle: vi.fn(), lineActions: sinAcciones }),
+    construir: async () => buildFinishedStockColumns({ onToggle: vi.fn(), menu: sinMenu }),
     esperadas: ['Existencia', 'Alerta de cantidad'],
   },
   {
@@ -367,7 +368,7 @@ describe('alineación de las cifras de inventario', () => {
   }
 
   it('R6: en product-columns.tsx las cifras, «Costo» incluido, van a la derecha y «Tipo» y «Presentación» a la izquierda', () => {
-    const align = alineaciones(buildProductColumns({ rowActions: sinAcciones, showType: true }));
+    const align = alineaciones(buildProductColumns({ menu: sinMenu, showType: true }));
     for (const id of ['stock', 'averageUnitCost', 'qtyAlert', 'reserved', 'available']) {
       expect(align[id], id).toBe('end');
     }
@@ -377,7 +378,7 @@ describe('alineación de las cifras de inventario', () => {
 
   it('R6: en finished-stock-columns.tsx la existencia y la alerta van a la derecha y «Presentación» a la izquierda', () => {
     const align = alineaciones(
-      buildFinishedStockColumns({ onToggle: vi.fn(), lineActions: sinAcciones }),
+      buildFinishedStockColumns({ onToggle: vi.fn(), menu: sinMenu }),
     );
     expect(align.stock).toBe('end');
     expect(align.qtyAlert).toBe('end');

@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from 'react';
 
 import {
   DataTable,
+  type DataTableCardLayout,
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
@@ -14,13 +15,22 @@ import type { FinishedStockProductLine, FinishedStockRow } from '@/lib/modules/i
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { buildFinishedStockColumns, type FinishedStockTableRow } from './finished-stock-columns';
-import { productListHref } from './product-list-params';
-import { ProductRowActions } from './product-row-actions';
+import { IMAGE_COLUMN_ID } from './product-columns';
+import { productListHref, QTY_ALERT_COLUMN_ID, STOCK_COLUMN_ID } from './product-list-params';
+import { ProductRowDialogs, type ProductRowDialogsActive } from './product-row-dialogs';
+import { productRowActionsSpec } from './product-row-actions';
 import { PRODUCT_TABLE_TEXTS, productTableStates, type ProductTableStatus } from './product-table';
 import { ProductTypeTabs } from './product-type-tabs';
 
 /** Otra clave que la del catalogo: las columnas fijadas de una tabla no son las de la otra. */
 export const FINISHED_STOCK_TABLE_ID = 'inventario-producto-terminado';
+
+const FINISHED_STOCK_CARD: DataTableCardLayout = {
+  primary: IMAGE_COLUMN_ID,
+  status: 'orderNumber',
+  title: 'name',
+  meta: ['presentationName', STOCK_COLUMN_ID, QTY_ALERT_COLUMN_ID],
+};
 
 export const FINISHED_STOCK_TABLE_TEXTS: DataTableTexts = {
   ...PRODUCT_TABLE_TEXTS,
@@ -60,6 +70,8 @@ export function FinishedStockTable({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const [active, setActive] = useState<ProductRowDialogsActive | null>(null);
+  const [activeOpen, setActiveOpen] = useState(false);
 
   const columns = useMemo(
     () =>
@@ -71,14 +83,16 @@ export function FinishedStockTable({
             else next.add(key);
             return next;
           }),
-        lineActions: (parent, line) => (
-          <ProductRowActions
-            product={line.product}
-            units={units}
-            canAdjust={canAdjust}
-            loadBatches={loadLineBatches(parent, line)}
-          />
-        ),
+        menu: (parent, line) =>
+          productRowActionsSpec({
+            product: line.product,
+            units,
+            canAdjust,
+            onAction: (action, product) => {
+              setActive({ product, action, loadBatches: loadLineBatches(parent, line) });
+              setActiveOpen(true);
+            },
+          }),
         units,
       }),
     [units, canAdjust],
@@ -113,6 +127,7 @@ export function FinishedStockTable({
       status={status}
       texts={FINISHED_STOCK_TABLE_TEXTS}
       states={productTableStates({ pageSize: params.pageSize, error })}
+      card={FINISHED_STOCK_CARD}
     />
   );
 
@@ -133,6 +148,13 @@ export function FinishedStockTable({
       ) : null}
       <ProductTypeTabs params={params} />
       {table}
+      <ProductRowDialogs
+        active={active}
+        open={activeOpen}
+        onOpenChange={setActiveOpen}
+        units={units}
+        canAdjust={canAdjust}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -65,6 +65,8 @@ function DecimalValue({ value, testId }: { readonly value: string; readonly test
 
 type LoadState =
   | { readonly status: 'idle' }
+  /** Abierto desde fuera: la peticion sale en el efecto, justo despues de pintar. */
+  | { readonly status: 'queued' }
   | { readonly status: 'loading' }
   | { readonly status: 'success'; readonly data: readonly BatchHistoryEntry[] }
   | ErrorState;
@@ -72,6 +74,9 @@ type LoadState =
 type BatchHistoryProps = {
   readonly batchId: string;
   readonly batchLot?: string;
+  /** Apertura controlada desde fuera. Ausente = la abre su propio disparador. */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 };
 
 /**
@@ -79,18 +84,32 @@ type BatchHistoryProps = {
  * apertura, sin volver a pedirlos en las siguientes. El orden que llega de la action se pinta
  * tal cual, del mas reciente al mas antiguo.
  */
-export function BatchHistory({ batchId, batchLot }: BatchHistoryProps) {
-  const [open, setOpen] = useState(false);
+export function BatchHistory({ batchId, batchLot, open: controlledOpen, onOpenChange }: BatchHistoryProps) {
+  const [selfOpen, setSelfOpen] = useState(false);
   const [state, setState] = useState<LoadState>({ status: 'idle' });
+  const open = controlledOpen ?? selfOpen;
 
-  function handleOpenChange(nextOpen: boolean) {
-    setOpen(nextOpen);
-    if (!nextOpen || state.status !== 'idle') return;
-
-    setState({ status: 'loading' });
+  function requestMovements() {
     void listBatchMovementsAction(batchId).then((result) => {
       setState(result.status === 'success' ? { status: 'success', data: result.data } : result);
     });
+  }
+
+  if (controlledOpen === true && state.status === 'idle') setState({ status: 'queued' });
+
+  const sendQueuedRequest = useEffectEvent(requestMovements);
+
+  useEffect(() => {
+    if (state.status === 'queued') sendQueuedRequest();
+  }, [state.status]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (controlledOpen === undefined) setSelfOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+    if (!nextOpen || state.status !== 'idle') return;
+
+    setState({ status: 'loading' });
+    requestMovements();
   }
 
   const etiquetaDisparador =
@@ -111,7 +130,7 @@ export function BatchHistory({ batchId, batchLot }: BatchHistoryProps) {
         {etiquetaDisparador}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        {state.status === 'loading' ? (
+        {state.status === 'loading' || state.status === 'queued' ? (
           <p data-testid="batch-history-loading">Cargando historial…</p>
         ) : null}
 

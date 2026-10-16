@@ -63,14 +63,14 @@ const TODOS: DataTableParams = { page: 1, pageSize: 10, sort: null, filters: {},
 
 describe('columna «Tipo» de la tabla de inventario', () => {
   it('sin `showType` no existe y el esqueleto sigue contando las columnas por defecto', () => {
-    const columnas = buildProductColumns({ rowActions: () => null });
+    const columnas = buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }) });
 
     expect(columnas.some((columna) => columna.id === 'type')).toBe(false);
     expect(PRODUCT_SKELETON_COLUMN_COUNT).toBe(columnas.length);
   });
 
   it('con `showType` va justo despues del nombre, sin orden ni filtro de cabecera', () => {
-    const columnas = buildProductColumns({ rowActions: () => null, showType: true });
+    const columnas = buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }), showType: true });
     const ids = columnas.map((columna) => columna.id);
     const tipo = columnas.find((columna) => columna.id === 'type');
 
@@ -93,7 +93,7 @@ describe('columna «Tipo» de la tabla de inventario', () => {
     render(<ProductTable products={productos} params={TODOS} totalPages={1} />);
 
     expect(screen.getByTestId('data-table-head-type')).toBeInTheDocument();
-    const chips = screen.getAllByTestId('product-type');
+    const chips = within(screen.getByRole('table')).getAllByTestId('product-type');
     expect(chips).toHaveLength(PRODUCT_TYPE_VALUES.length);
 
     for (const type of PRODUCT_TYPE_VALUES) {

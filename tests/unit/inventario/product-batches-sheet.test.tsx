@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProductTable } from '@/app/(private)/inventario/components';
@@ -85,7 +85,7 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
 
 async function abrirPanel() {
   const user = setupUser();
-  await clickRowAction(user, screen.getByTestId('product-row-actions'), 'product-batches-open');
+  await clickRowAction(user, within(screen.getByRole('table')).getByTestId('product-row-actions'), 'product-batches-open');
   return user;
 }
 
@@ -204,7 +204,7 @@ describe('el panel se titula "nombre · unidad" (T15)', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'Acciones de Acido citrico · kg' }),
+      within(screen.getByRole('table')).getByRole('button', { name: 'Acciones de Acido citrico · kg' }),
     ).toBeInTheDocument();
 
     await abrirPanel();
@@ -221,7 +221,7 @@ describe('el panel se titula "nombre · unidad" (T15)', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Acciones de Acido citrico' })).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByRole('button', { name: 'Acciones de Acido citrico' })).toBeInTheDocument();
 
     await abrirPanel();
 
@@ -238,7 +238,7 @@ describe('el panel se titula "nombre · unidad" (T15)', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Acciones de Acido citrico' })).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByRole('button', { name: 'Acciones de Acido citrico' })).toBeInTheDocument();
 
     await abrirPanel();
 

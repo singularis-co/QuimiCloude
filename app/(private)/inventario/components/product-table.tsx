@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import {
+  useCallback,
   useMemo,
   useState,
   useTransition,
@@ -10,6 +11,7 @@ import {
 
 import {
   DataTable,
+  type DataTableCardLayout,
   type DataTableParams,
   type DataTableStates,
   type DataTableTexts,
@@ -23,12 +25,19 @@ import { useLocalToday } from './expiry-date';
 import { daysUntil, isExpiringSoon } from './expiry-warning';
 import {
   buildProductColumns,
+  IMAGE_COLUMN_ID,
   PRODUCT_BATCH_ROW_TEXTS,
   type ProductTableRow,
 } from './product-columns';
 import { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
-import { productListHref, TYPE_COLUMN_ID } from './product-list-params';
-import { ProductRowActions } from './product-row-actions';
+import {
+  productListHref,
+  QTY_ALERT_COLUMN_ID,
+  STOCK_COLUMN_ID,
+  TYPE_COLUMN_ID,
+} from './product-list-params';
+import { ProductRowDialogs, type ProductRowDialogsActive } from './product-row-dialogs';
+import { productRowActionsSpec, type ProductRowAction } from './product-row-actions';
 import { ProductTypeTabs } from './product-type-tabs';
 
 /**
@@ -42,7 +51,7 @@ import { ProductTypeTabs } from './product-type-tabs';
  * un solo sitio donde se arreglan los tres.
  *
  * **Ahora es `'use client'`**, y antes no: la tabla compartida es interactiva -emite
- * `onParamsChange`- y las celdas de accion montan el panel y el dialogo. El Server Component
+ * `onParamsChange`- y monta el panel o el dialogo que abre el menu de la fila. El Server Component
  * sigue siendo `ProductListSection`, que es quien pide los datos (R30); aqui solo llegan filas ya
  * resueltas y los parametros con los que se pidieron.
  *
@@ -96,7 +105,27 @@ export const PRODUCT_TABLE_TEXTS: DataTableTexts = {
   lastWeek: 'Última semana',
   lastMonth: 'Último mes',
   lastYear: 'Último año',
+  cardActions: 'Acciones',
+  closeMenu: 'Cerrar',
 };
+
+const PRODUCT_CARD_META = [
+  'presentationName',
+  STOCK_COLUMN_ID,
+  'averageUnitCost',
+  QTY_ALERT_COLUMN_ID,
+  'available',
+] as const;
+
+/** La tarjeta del producto; «Tipo» solo sale donde sale su columna, en «Todos». */
+export function productTableCard(showType: boolean): DataTableCardLayout {
+  return {
+    primary: IMAGE_COLUMN_ID,
+    status: showType ? TYPE_COLUMN_ID : undefined,
+    title: 'name',
+    meta: PRODUCT_CARD_META,
+  };
+}
 
 export type ProductTableProps = {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega. */
@@ -244,12 +273,17 @@ export function ProductTable({
     setBatches(new Map());
   }
 
-  // Las acciones de fila se enchufan aqui, no en la declaracion de columnas: asi esa declaracion
-  // no importa el panel ni el dialogo. `useMemo` para que la identidad del array no cambie en
-  // cada render y la tabla compartida no se reconstruya entera.
+  const [active, setActive] = useState<ProductRowDialogsActive | null>(null);
+  const [activeOpen, setActiveOpen] = useState(false);
+  const handleAction = useCallback((action: ProductRowAction, product: ProductView) => {
+    setActive({ product, action });
+    setActiveOpen(true);
+  }, []);
+
   // La columna «Tipo» solo sale en la pestana «Todos» (sin filtro de tipo): con un tipo
   // filtrado, todas las filas dirian lo mismo.
   const showType = params.filters[TYPE_COLUMN_ID] === undefined;
+  const card = useMemo(() => productTableCard(showType), [showType]);
   const columns = useMemo(() => {
     const loadBatches = (productId: string) => {
       // Cada peticion lleva su propia identidad. Si la lista se invalido mientras tanto (y quiza
@@ -275,9 +309,7 @@ export function ProductTable({
     };
 
     return buildProductColumns({
-      rowActions: (product) => (
-        <ProductRowActions product={product} units={units} canAdjust={canAdjust} />
-      ),
+      menu: (product) => productRowActionsSpec({ product, units, canAdjust, onAction: handleAction }),
       units,
       showType,
       onToggle: (productId) => {
@@ -292,7 +324,7 @@ export function ProductTable({
       },
       onRetry: loadBatches,
     });
-  }, [units, canAdjust, showType, batches]);
+  }, [units, canAdjust, showType, batches, handleAction]);
 
   const tableRows = useMemo(
     () =>
@@ -340,6 +372,7 @@ export function ProductTable({
       status={status}
       texts={PRODUCT_TABLE_TEXTS}
       states={productTableStates({ pageSize: params.pageSize, error, empty })}
+      card={card}
     />
   );
 
@@ -370,6 +403,13 @@ export function ProductTable({
       ) : null}
       <ProductTypeTabs params={params} />
       {table}
+      <ProductRowDialogs
+        active={active}
+        open={activeOpen}
+        onOpenChange={setActiveOpen}
+        units={units}
+        canAdjust={canAdjust}
+      />
     </div>
   );
 }

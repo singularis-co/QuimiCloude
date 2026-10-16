@@ -162,8 +162,8 @@ describe('aviso de existencia en la tabla de productos', () => {
     const user = setupUser();
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} />);
 
-    await user.click(screen.getByRole('button', { name: 'Mostrar lotes de Acido citrico' }));
-    await screen.findByTestId('product-batch-row');
+    await user.click(within(screen.getByRole('table')).getByRole('button', { name: 'Mostrar lotes de Acido citrico' }));
+    await screen.findByTestId('data-table-row-product-1--batch-batch-1');
 
     const lote = within(screen.getByTestId('data-table-row-product-1--batch-batch-1')).getByTestId(
       'batch-stock',

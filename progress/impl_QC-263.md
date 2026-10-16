@@ -633,3 +633,165 @@ $ pnpm exec vitest run guard
 
 T2c hecha y en verde. El diff del snapshot casa con la fila de `design.md > 6`. Quedan dos notas
 para el leader: el `title` del aviso va en la marca, y «Costo» sigue en el orden de `dev`.
+
+---
+
+## Tanda 3 (T3a-T3c) — 2026-10-16 · frontend_dev
+
+Tableros: `docs/diseno/canvas/InventarioColumnasLotes*.dc.html`, `Inventario*.dc.html` y
+`Tabla.dc.html`. Se sigue lo que ya hace `dev`: «Costo» es el costo unitario; todos los productos
+llevan el chevrón «Mostrar lotes de X» con sus estados de carga, error y «Sin lotes con
+existencia.». No se ha tocado `components/shared` (ni `data-table-types.ts`): `data-product-id`
+llega al disparador por propagación del spec, igual que `data-order-id` en pedidos
+(`ProductRowActionsSpec = RowActionsSpec & Pick<RowActionsMenuProps, 'triggerDataAttributes'>`).
+Tampoco el catálogo: `ProductRowDialogs` es subcomponente interno de la ruta (excepción declarada en
+`design.md > Lo que ya existe`).
+
+### Archivos creados / modificados
+
+Producción (`app/(private)/inventario/components/`):
+- `product-row-actions.tsx` (T3a): `ProductRowAction`, `productRowActionsSpec` (Lotes, Historial,
+  Ajustar existencia solo con `canAdjust`, Editar, separador y Borrar destructivo; iconos `Layers`,
+  `History`, `Scale`, `Pencil`, `Trash2`; testids de hoy más `product-history-open` y
+  `product-adjust-open`; `triggerLabel` de `productRowActionsLabel`; `title` = nombre sin la
+  presentación). `ProductRowActions` pasa a envoltorio de `RowActionsMenu` con `onAction`,
+  `presentation` y `texts`; ya no monta paneles.
+- `product-row-dialogs.tsx` (T3b, nuevo): `batchTarget` y `ProductRowDialogs`. Para `history` y
+  `adjust` pide `loadBatches ?? listProductBatchesAction` (E12); un lote → historial o ajuste de ese
+  lote; ninguno, varios o error → «Lotes» (que vuelve a pedir y pinta su error). Mientras se piden no
+  abre nada. Edición y borrado llevan `key` = producto (conservan su estado entre aperturas, como
+  cuando vivían en la fila: el caso «heredado» de `confirm-dialog-montado` sigue igual); lotes,
+  historial y ajuste se remontan en cada elección (en producto terminado dependen de la línea).
+- `product-columns.tsx` (T3b): `ProductColumnsDeps.rowActions` → `menu: (product) => RowActionsSpec`;
+  columna con `actionsColumn({ menu })` y spec sin ítems para `batch` y `batchesStatus` (E2).
+- `finished-stock-columns.tsx` (T3b): `lineActions` → `menu: (parent, line) => RowActionsSpec`; la
+  fila de grupo devuelve spec sin ítems.
+- `product-table.tsx` (T3b, T3c): un `ProductRowDialogs` con `active`/`open` (cerrar no suelta
+  `active`); `PRODUCT_TABLE_TEXTS` gana `cardActions` y `closeMenu`; `card` de E1 con
+  `productTableCard(showType)` en `useMemo` (`status: 'type'` solo en «Todos»; `meta`: presentación,
+  existencia, costo, alerta, disponible).
+- `finished-stock-table.tsx` (T3b, T3c): un `ProductRowDialogs`; cada línea pasa su
+  `loadLineBatches`; `card` = `{ primary: image, status: orderNumber, title: name, meta:
+  [presentationName, stock, qtyAlert] }` (E11: el título lleva el enlace a la ficha y, en el grupo,
+  el conmutador).
+- `batch-history.tsx` (para T3b; **prop mínima, sin cambio de aspecto**): `open?`/`onOpenChange?`
+  opcionales. Con `open` pide los asientos tras pintar (estado `queued`, el patrón de
+  `ProductBatchesSheet`). Sigue siendo el `Collapsible` de hoy con su disparador: T4b lo pasa a
+  diálogo.
+- `adjust-batch-dialog.tsx` (para T3b; **prop mínima, sin cambio de aspecto**): `open?`/`onOpenChange?`
+  opcionales. Con `open` no pinta disparador, reinicia el formulario al abrirse como al pulsarlo y
+  avisa `onOpenChange(false)` tras un ajuste sin sobre-reserva. Sin ellos, igual que hoy. Lo demás de
+  D10 (`productName`, campo deshabilitado, «Elige un motivo.») es de T4c.
+- `index.ts`: exporta `productRowActionsSpec`, `ProductRowAction`, `ProductRowActionsSpec`,
+  `ProductRowActionsSpecInput`, `PRODUCT_ACTION_HISTORY_TESTID`, `PRODUCT_ACTION_ADJUST_TESTID`,
+  `PRODUCT_ROW_ACTION_LABELS`, `ProductRowDialogs`, `batchTarget` y sus tipos
+  (`product-route-contract.test.ts` exige que el barrel reexporte todo componente de la ruta).
+
+Tests:
+- Nuevos: `tests/unit/inventario/product-row-actions.test.tsx` (9), `product-row-dialogs.test.tsx`
+  (15), `product-cards.test.tsx` (19).
+- `finished-stock-table.test.tsx`: el conmutador se busca en la tabla; el menú de la línea afirma
+  los cinco ítems en orden; casos nuevos R12 («Historial» de una línea pide los lotes de ese pedido y
+  producto y abre su historial) y R12 (la fila del pedido no pinta menú ni en fila ni en tarjeta).
+- Acotados al cuerpo visible (la tabla: `enLaTabla()` o el primer disparador) por los duplicados de
+  la tarjeta: `product-page.test.tsx`, `product-batch-rows.test.tsx`, `product-batches-sheet.test.tsx`,
+  `product-stock-alert.test.tsx`, `product-type-column.test.tsx` y `confirm-dialog-montado.test.tsx`
+  (`disparadorDeLaFila`; el borrado ya vive en el anfitrión). `product-page`, `product-type-column`
+  y `tablas-marca` pasan `menu` en vez de `rowActions`/`lineActions` a los constructores de columnas.
+- `tests/unit/paridad/acciones-por-fila.test.tsx`: al desplegar producto terminado solo pulsa los
+  conmutadores de las filas (el de la tarjeta lo volvía a plegar y la línea desaparecía del
+  inventario).
+- Snapshots regenerados: `acciones-por-fila` (4) e `inventario-paridad` (5).
+- `e2e/helpers/product-name-cell.ts`: revisado, **sin cambio**. Filtra filas `data-table-row-` que
+  tengan la celda de nombre pedida **y** la de presentación con ese texto exacto; la sub-fila de lote
+  tiene la celda de presentación vacía y su nombre es el `dl` del lote, así que no casa. Las tarjetas
+  (`data-table-card-…`) no casan con el prefijo.
+
+### Diff de los snapshots (fila de `design.md > 6`)
+
+- **`acciones-por-fila`** (4 snapshots, +36 −0): «productos» y «producto terminado» ganan
+  `product-history-open` (abre `product-batches-sheet`, porque el doble devuelve cero lotes) y, solo
+  con permiso, `product-adjust-open` (igual). Nada más cambia; la fila de grupo sigue `[]`. Casa con
+  «ganan «Historial» y, con permiso, «Ajustar existencia»» (R9, R10).
+- **`inventario-paridad`** (5 de 13): el contenedor `data-table` gana `@container` y la tabla
+  `@max-[760px]:hidden` (también en los estados vacío y sin resultados, que montan `card`); con filas
+  aparece `ul data-testid="data-table-cards"` con la tarjeta (imagen, «Tipo» en «Todos», nombre con
+  el conmutador, cifras y «Acciones» con `aria-haspopup="dialog"`). El disparador de la fila es el
+  mismo árbol. Casa con «`actionsColumn`, tarjetas» (R9, R13).
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R9 | `product-row-actions.test.tsx`: «R9 — ofrece Lotes, Historial…», «R9, R14 — solo «Borrar» lleva separador…», «R9 — el disparador se llama…», «R9 — cada item avisa…», «R9, R14 — el desplegable pinta los cinco items…», «R9 — elegir un item…»; `finished-stock-table.test.tsx` > «muestra una sub-fila…» (cinco ítems en orden); snapshot `acciones-por-fila` |
+| R10 | `product-row-actions.test.tsx` > «R10 — sin permiso de ajuste…»; snapshot `acciones-por-fila` (R22, solo consulta) |
+| R11 | `product-row-dialogs.test.tsx`: `batchTarget`, «R11 — «Historial» con un lote…», «R11 — «Ajustar existencia» con un lote…», «R11 — «Historial» sin lotes / con varios lotes…», «R11 — «Ajustar existencia» con varios…», «R11 — con un error…», «R11 — lee todos los lotes, no solo los vivos…», «R11 — mientras se piden…» |
+| R12 | `product-row-dialogs.test.tsx`: «R12 — «Lotes»…», «R12 — «Editar»…», «R12 — «Borrar»…», «R12 — un solo panel montado…», «R12, R47 — desplegado, ni las sub-filas…», «R12, R47 — la sub-fila de estado…»; `finished-stock-table.test.tsx`: «R12 — «Historial» de una linea…», «R12 — la fila del pedido no pinta menu…» y los de hoy (lotes, baja y edición desde la línea); `product-cards.test.tsx` > «R12, R13 — elegir «Lotes»…», «R12, R13 — la linea tiene su «Acciones»…» |
+| R13 | `product-cards.test.tsx`: «cada producto en su tarjeta» (×7), ««Acciones» abre el menu…» (×4), «producto terminado en tarjetas» (×4); `product-row-actions.test.tsx` > «R13 — el titulo…», «R13, R14 — centrado…»; snapshot `inventario-paridad`. La medida real (44/48 px, umbral de 760) es del E2E (T7a) |
+| R14 | `product-row-actions.test.tsx` > «R9, R14 …» (desplegable) y «R13, R14 — centrado…»; `product-cards.test.tsx` > «R13, R14 — el dialogo se titula…» |
+| R8 (tarjeta) | `product-cards.test.tsx` > «R8, R13 — por debajo de la alerta…» y «R8, R13 — la linea por debajo de la alerta…» |
+| R47 | `product-cards.test.tsx` > «las sub-filas de lote salen como tarjetas…» (lote, cargando, vacío y error con «Reintentar»); `product-row-dialogs.test.tsx` > «R12, R47 …» ×2 |
+| R53 | `product-cards.test.tsx` > «R13, R53 — en «Todos», «Tipo»…», «R13, R53 — con un tipo filtrado…», «R13, R53 — las cifras…», «R13, R53 — la linea es una tarjeta con el enlace a la ficha…» |
+
+### Salida real
+
+```
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm run lint
+ESLint: 0 errors, 10 warnings in 4 files
+  (no-unused-vars en confirm-catalog-import.test.ts, list-execution-traces.test.ts,
+   order-service.test.ts y step-evidence.tsx: ninguno de esta tanda)
+
+$ pnpm exec vitest run tests/unit/inventario/product-row-actions.test.tsx
+      Tests  9 passed (9)
+$ pnpm exec vitest run tests/unit/inventario/product-row-dialogs.test.tsx
+      Tests  15 passed (15)
+$ pnpm exec vitest run tests/unit/inventario/product-cards.test.tsx      (primera pasada)
+     × R8, R13 — la linea por debajo de la alerta lleva el aviso tambien en la tarjeta
+      Tests  1 failed | 18 passed (19)
+   → el fixture tenía la existencia del producto por encima de la alerta; con stock 1.5:
+      Tests  19 passed (19)
+
+$ pnpm exec vitest run tests/unit/paridad/inventario-paridad.test.tsx tests/unit/paridad/acciones-por-fila.test.tsx -u
+  Snapshots  9 updated      (el de producto terminado perdía la línea: arreglado el despliegue
+                             del test, snapshot restaurado con git y regenerado)
+$ pnpm exec vitest run tests/unit/paridad/acciones-por-fila.test.tsx -u
+  Snapshots  4 updated
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+
+$ pnpm exec vitest related --run <los 8 de producción + 11 de test modificados + 3 nuevos>
+ Test Files  37 passed (37)
+      Tests  631 passed (631)
+
+$ pnpm exec vitest run tests/unit/inventario/adjust-batch-dialog.test.tsx tests/unit/inventario/batch-history.test.tsx tests/unit/inventario/product-batches-panel.test.tsx tests/unit/inventario-ui/envase-en-inventario.test.tsx
+ Test Files  4 passed (4)
+      Tests  79 passed (79)
+
+$ pnpm exec vitest run guard
+ Test Files  80 passed (80)
+      Tests  1096 passed | 20 skipped (1116)
+```
+
+### Para el leader
+
+1. **Historial con un lote, interino hasta T4b.** `BatchHistory` sigue siendo el desplegable en
+   línea de hoy (con su disparador); el anfitrión lo pinta **debajo de la tabla** solo mientras está
+   abierto. Funciona y se cierra con su propio disparador, pero no es el diálogo del tablero: T4b lo
+   convierte en `Dialog` y el anfitrión no cambia de props.
+2. **Tablero contra spec, sin decidir nada:** la ficha del tablero dice que en tablet (820) la tabla
+   con sub-filas hace scroll; R13/P12 y T0b dicen que a 820 el contenedor queda bajo 760 y salen
+   tarjetas. Se ha seguido el spec (umbral de `DataTable`). El tablero de teléfono pinta las cifras
+   con rótulo («Existencia 12»), el chevrón como botón «Mostrar lotes» al pie y las tarjetas de lote
+   con fondo suave y animación de subida; E1 dice «tarjeta de `DataTable` sin extensión», así que
+   salen sin rótulos, con el chevrón en el título, con la sangría `pl-12` de hoy y sin fondo propio.
+3. **`title` del menú centrado** = nombre sin la presentación (lo que pinta la celda, R53); el
+   disparador conserva «Acciones de <nombre · unidad>» con el nombre guardado.
+
+### Veredicto
+
+T3a, T3b y T3c hechas y en verde (typecheck, lint sin errores, 37 archivos relacionados y guardias);
+los diffs de `acciones-por-fila` e `inventario-paridad` casan con su fila de `design.md > 6`.

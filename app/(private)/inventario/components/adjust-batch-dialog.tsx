@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useId, useState, type FormEvent } from 'react';
+import { useActionState, useEffect, useEffectEvent, useId, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
@@ -107,6 +107,9 @@ export type AdjustBatchDialogProps = {
   /** Lote de un envase con presentacion fija: se ajusta en envases enteros. */
   readonly wholePackages?: boolean;
   readonly onAdjusted?: () => void;
+  /** Apertura controlada desde fuera. Ausente = el dialogo trae su propio disparador. */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 };
 
 /**
@@ -124,6 +127,8 @@ export function AdjustBatchDialog({
   productType,
   wholePackages = false,
   onAdjusted,
+  open,
+  onOpenChange,
 }: AdjustBatchDialogProps) {
   if (!canAdjust) return null;
 
@@ -133,6 +138,8 @@ export function AdjustBatchDialog({
       productType={productType}
       wholePackages={wholePackages}
       onAdjusted={onAdjusted}
+      controlledOpen={open}
+      onOpenChange={onOpenChange}
     />
   );
 }
@@ -142,11 +149,15 @@ function AdjustBatchDialogContent({
   productType,
   wholePackages,
   onAdjusted,
+  controlledOpen,
+  onOpenChange,
 }: {
   readonly batch: ProductBatchView;
   readonly productType?: ProductType;
   readonly wholePackages: boolean;
   readonly onAdjusted?: () => void;
+  readonly controlledOpen?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }) {
   const fieldId = useId();
   const countedId = `${fieldId}-counted`;
@@ -159,7 +170,9 @@ function AdjustBatchDialogContent({
   const wholeErrorId = `${fieldId}-whole-error`;
 
   const router = useRouter();
-  const [requestedOpen, setRequestedOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const [selfOpen, setSelfOpen] = useState(false);
+  const requestedOpen = controlledOpen ?? selfOpen;
   const [zeroError, setZeroError] = useState(false);
   const [countedError, setCountedError] = useState(false);
   const [reasonError, setReasonError] = useState(false);
@@ -198,6 +211,36 @@ function AdjustBatchDialogContent({
     router.refresh();
     onAdjusted?.();
   }, [state, router, onAdjusted]);
+
+  const closeControlled = useEffectEvent(() => onOpenChange?.(false));
+
+  useEffect(() => {
+    if (state.status === 'success' && !state.overReserved) closeControlled();
+  }, [state]);
+
+  function resetForm() {
+    setDismissedState(state);
+    setZeroError(false);
+    setCountedError(false);
+    setReasonError(false);
+    setWholeError(false);
+    setCounted('');
+    setSeenStock(batch.stock);
+    setReason(null);
+  }
+
+  function requestOpen(next: boolean) {
+    if (next) resetForm();
+    if (!isControlled) setSelfOpen(next);
+    onOpenChange?.(next);
+  }
+
+  // Sin disparador, la apertura llega por la prop: se reinicia al verla, como al pulsarlo.
+  const [seenControlledOpen, setSeenControlledOpen] = useState(controlledOpen);
+  if (controlledOpen !== seenControlledOpen) {
+    setSeenControlledOpen(controlledOpen);
+    if (controlledOpen === true) resetForm();
+  }
 
   const error = visibleState.status === 'error' ? visibleState : undefined;
   const stockChanged = visibleState.status === 'stock_changed' ? visibleState : undefined;
@@ -239,33 +282,20 @@ function AdjustBatchDialogContent({
     .replace(/\s+/g, ' ');
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setRequestedOpen(next);
-        if (next) {
-          setDismissedState(state);
-          setZeroError(false);
-          setCountedError(false);
-          setReasonError(false);
-          setWholeError(false);
-          setCounted('');
-          setSeenStock(batch.stock);
-          setReason(null);
-        }
-      }}
-    >
-      <DialogTrigger
-        render={
-          <Button
-            variant="outline"
-            touch
-            data-testid="adjust-batch-open"
-          />
-        }
-      >
-        {DIALOG_TITLE}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={requestOpen}>
+      {isControlled ? null : (
+        <DialogTrigger
+          render={
+            <Button
+              variant="outline"
+              touch
+              data-testid="adjust-batch-open"
+            />
+          }
+        >
+          {DIALOG_TITLE}
+        </DialogTrigger>
+      )}
       <DialogContent data-testid="adjust-batch-dialog">
         <DialogHeader>
           <DialogTitle>{DIALOG_TITLE}</DialogTitle>
@@ -458,7 +488,7 @@ function AdjustBatchDialogContent({
               type="button"
               variant="ghost"
               touch
-              onClick={() => setRequestedOpen(false)}
+              onClick={() => requestOpen(false)}
               data-testid="adjust-batch-cancel"
             >
               {CANCEL_LABEL}

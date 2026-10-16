@@ -52,14 +52,28 @@ export { ExpiryDate, type ExpiryDateProps, useLocalToday } from './expiry-date';
 export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 export { productNameWithoutPresentation } from './product-base-name';
 export {
+  PRODUCT_ACTION_ADJUST_TESTID,
   PRODUCT_ACTION_BATCHES_TESTID,
   PRODUCT_ACTION_DELETE_TESTID,
   PRODUCT_ACTION_EDIT_TESTID,
+  PRODUCT_ACTION_HISTORY_TESTID,
+  PRODUCT_ROW_ACTION_LABELS,
   PRODUCT_ROW_ACTIONS_TESTID,
   ProductRowActions,
   productRowActionsLabel,
+  productRowActionsSpec,
+  type ProductRowAction,
   type ProductRowActionsProps,
+  type ProductRowActionsSpec,
+  type ProductRowActionsSpecInput,
 } from './product-row-actions';
+export {
+  ProductRowDialogs,
+  batchTarget,
+  type BatchTarget,
+  type ProductRowDialogsActive,
+  type ProductRowDialogsProps,
+} from './product-row-dialogs';
 export {
   COST_INPUT_SCALE,
   divideCost,

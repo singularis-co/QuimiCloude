@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn, type RowActionsSpec } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { Button } from '@/components/ui/button';
 import type {
@@ -125,16 +125,19 @@ function lineStockCell(
   return stockAmountCell(line.stock, productUnitLabel(line.product, units), alerted);
 }
 
+/** La fila del pedido no tiene menú: sin ítems, no se pinta. */
+const NO_GROUP_ACTIONS: RowActionsSpec = { items: [], triggerLabel: '' };
+
 export type FinishedStockColumnsDeps = {
   readonly onToggle: (key: string) => void;
-  /** Acciones de producto de una sub-fila: las enchufa quien monta la tabla. */
-  readonly lineActions: (parent: FinishedStockRow, line: FinishedStockProductLine) => ReactNode;
+  /** El menú de una línea de producto, como datos: lo pintan la fila y la tarjeta. */
+  readonly menu: (parent: FinishedStockRow, line: FinishedStockProductLine) => RowActionsSpec;
   readonly units?: readonly UnitRef[];
 };
 
 export function buildFinishedStockColumns({
   onToggle,
-  lineActions,
+  menu,
   units,
 }: FinishedStockColumnsDeps): readonly DataTableColumn<FinishedStockTableRow>[] {
   return [
@@ -240,7 +243,7 @@ export function buildFinishedStockColumns({
       id: ACTIONS_COLUMN_ID,
       label: ACTIONS_COLUMN_LABEL,
       defaultPinned: 'right',
-      cell: (item) => (item.kind === 'line' ? lineActions(item.parent, item.line) : null),
+      menu: (item) => (item.kind === 'line' ? menu(item.parent, item.line) : NO_GROUP_ACTIONS),
     }),
   ];
 }
