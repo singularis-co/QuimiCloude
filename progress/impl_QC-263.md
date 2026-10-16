@@ -1028,3 +1028,99 @@ $ pnpm exec vitest run tests/unit/inventario/product-route-contract.test.ts
 
 T4a hecha y en verde (typecheck, lint sin errores, 38 archivos relacionados, paridad sin cambios y
 guardias); el único rojo visto es de T4c.
+
+## Tanda 6 (T6a-T6c) — 2026-10-16 · frontend_dev
+
+### Archivos creados / modificados
+
+- `app/(private)/inventario/importar/components/import-texts.ts`: `UNIT_CREATED_TOAST` («Unidad
+  creada.») y `PRESENTATION_CREATED_TOAST` («Presentación creada.»); salen por el barrel (`export *`).
+- `app/(private)/inventario/importar/components/import-create-unit-dialog.tsx` y
+  `import-create-presentation-dialog.tsx`: `toast.success(<texto>)` antes de `onCreated()` cuando el
+  resultado es `success` (D11). Los toasts del desenlace de `inventory-import-screen.tsx` (da435d96)
+  no se tocan (E10).
+- `tests/unit/inventario/inventario-toasts.test.tsx` (nuevo): `sonner` simulado; los seis éxitos de
+  la ruta (alta y edición con `ProductForm` sustituido por un botón que llama a `onSaved`, porque el
+  aviso lo lanza `ProductSheet`; ajuste; borrado; alta de unidad y de presentación desde «Faltan en
+  el catálogo»), un caso con la revisión siguiente rechazada (éxito del alta + `toast.error` del
+  rechazo, R51) y un alta con error sin aviso de éxito.
+- `tests/guards/guard-inventario-rediseno.test.ts` (nuevo): siete reglas con el compilador de TS
+  (los comentarios no cuentan) y un caso en negativo por regla sobre fuentes inventados; barrido de
+  `app/(private)/inventario/**` (65 archivos, mínimo 50) con la lista de vigilados presente.
+  - `texto-retirado` (R4, R46): «Elegi un motivo», «Conteo fisico», «Mostrando todos los tipos»,
+    «Filtrando por».
+  - `existencia-en-rojo` (R7, E13): `text-destructive` en `stockAmountCell` / `packagedStockCell` y en
+    lo que nombran, de forma transitiva en el archivo o en un hermano importado por ruta relativa
+    (así `BELOW_ALERT_CLASS`, que `finished-stock-columns.tsx` importa de `product-columns.tsx`, entra);
+    el error de la sub-fila no se ve (caso propio que lo comprueba en el archivo real).
+  - `vencimiento-en-rojo` (R48, E4/E13): `EXPIRING_CLASS` sin `text-destructive`.
+  - `volver-como-enlace` (R30): «Volver a inventario» / `IMPORT_BACK_LABEL` dentro de `Link` o `a`;
+    `importar/page.tsx` sin `ArrowLink` con la etiqueta.
+  - `plantilla-fuera-de-cabecera` (R30): `<ImportTemplateButton>` fuera de `actions` de `PageHeader`;
+    «Descargar plantilla» / `TEMPLATE_BUTTON_LABEL` fuera de `import-texts.ts` e
+    `import-template-button.tsx`.
+  - `motivo-derivado` (R46, E6): `movementReasonLabel` sin llamadas en su cuerpo, mapa
+    `Record<MovementReason, string>` entero (no `Partial`) con las cuatro etiquetas con tilde.
+  - `tactil-propia` (R46, D41): `batch-history.tsx` sin el par `min-h-11 min-w-11`.
+- `tests/guards/guard-piezas-base.test.ts` (D41): `batch-history.tsx` pasa a `D11_SIN_HALLAZGOS`
+  (el mismo camino con el que QC-232/QC-265 retiraron las suyas): deja de estar en `EXCLUSIONES` y
+  sigue en `ARCHIVOS_D11` porque R33 de QC-231 vigila esa lista. El caso existente de
+  `D11_SIN_HALLAZGOS` comprueba que un par nuevo en él cuenta y que hoy no da hallazgos.
+- T6c: sin cambios. La fila de `RowActionsMenu` en `components/shared/CATALOGO.md` ya nombra
+  `triggerTestId`, `triggerDataAttributes`, `presentation` (`dropdown`/`centered`), `title`,
+  `texts.actions`, `texts.close` y por ítem `disabled`, `destructive`, `testId`, `separatorBefore`,
+  `href`/`onSelect`: cubre todo lo que usa `product-row-actions.tsx`. `components/shared` no se toca.
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R4 | `guard-inventario-rediseno.test.ts` > «R4, R46 — un texto retirado…» y el barrido |
+| R7 | `guard-inventario-rediseno.test.ts` > «R7 — `text-destructive` en el cuerpo…», «R7 — la celda empaquetada…», «R7 — el error de la sub-fila…» y el barrido |
+| R27 | `inventario-toasts.test.tsx` > «R27 — crear…», «R27 — editar…», «R27 — ajustar…», «R27 — borrar…» |
+| R28 | `inventario-toasts.test.tsx` > «R28, R51 — crear una unidad…», «R28, R51 — crear una presentación…», «R28 — un alta de unidad con error…» |
+| R30 | `guard-inventario-rediseno.test.ts` > «R30 — «Volver a inventario»…», «R30 — «Descargar plantilla»…» y el barrido |
+| R44 | `guard-catalogo-de-componentes` (en `vitest run guard`, verde; fila sin cambios) |
+| R46 | `guard-inventario-rediseno.test.ts` > «R4, R46 — …», «R46 — `movementReasonLabel`…», «R46 — `batch-history.tsx`…»; `guard-piezas-base.test.ts` (D41, `D11_SIN_HALLAZGOS`) |
+| R48 | `guard-inventario-rediseno.test.ts` > «R48 — `EXPIRING_CLASS`…» y el barrido |
+| R51 | `inventario-toasts.test.tsx` > «R28, R51 — si la revisión que sigue al alta se rechaza…» (y los dos de alta: la revisión que llega a vista previa no avisa) |
+
+### Salida real
+
+```
+$ pnpm exec vitest run tests/unit/inventario/inventario-toasts.test.tsx
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+
+$ pnpm exec vitest run tests/guards/guard-inventario-rediseno.test.ts tests/guards/guard-piezas-base.test.ts
+ Test Files  2 passed (2)
+      Tests  35 passed | 1 skipped (36)
+
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm run lint
+✖ 10 problems (0 errors, 10 warnings)
+  (no-unused-vars en confirm-catalog-import.test.ts, list-execution-traces.test.ts,
+   order-service.test.ts y step-evidence.tsx: ninguno de esta tanda)
+
+$ pnpm exec vitest related --run <import-texts.ts, import-create-unit-dialog.tsx, import-create-presentation-dialog.tsx, inventario-toasts.test.tsx, guard-inventario-rediseno.test.ts, guard-piezas-base.test.ts>
+ Test Files  11 passed (11)
+      Tests  214 passed | 1 skipped (215)
+
+$ pnpm exec vitest run guard
+ Test Files  81 passed (81)
+      Tests  1106 passed | 20 skipped (1126)
+
+$ pnpm exec vitest run tests/unit/inventario tests/unit/inventario-ui tests/unit/paridad tests/unit/marca
+ Test Files  170 passed (170)
+      Tests  2703 passed | 5 skipped (2708)
+```
+
+El rojo de `product-route-contract.test.ts` que anotó T4a ya no sale (170/170).
+
+### Veredicto
+
+T6a, T6b y T6c hechas y en verde: toasts de alta de unidad y presentación, guardia nueva con su
+negativo por regla, exclusión de `batch-history.tsx` retirada y fila de `RowActionsMenu` suficiente.

@@ -268,6 +268,7 @@ export const UNIT_FIELD_LABELS = {
   factor: 'Factor',
 } as const;
 export const NO_BASE_UNIT_LABEL = 'No deriva de ninguna';
+export const UNIT_CREATED_TOAST = 'Unidad creada.';
 
 export const PRESENTATION_DIALOG_TITLE = 'Nueva presentación';
 export const PRESENTATION_DIALOG_DESCRIPTION = 'Se crea igual que desde la pantalla de presentaciones.';
@@ -275,6 +276,7 @@ export const PRESENTATION_FIELD_LABELS = {
   name: 'Nombre',
   content: 'Contenido',
 } as const;
+export const PRESENTATION_CREATED_TOAST = 'Presentación creada.';
 
 export const UNIT_DIALOG_TESTID = 'inventory-import-unit-dialog';
 export const PRESENTATION_DIALOG_TESTID = 'inventory-import-presentation-dialog';

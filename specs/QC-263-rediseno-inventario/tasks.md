@@ -180,20 +180,20 @@ solo su parte y el commit cita la fila de `design.md > 6`.
 
 ## Tanda 6 — Toasts, guardia y limpieza (depende de 3, 4 y 5)
 
-- [ ] **T6a [P]. Toasts** (D11, R27, R28). `UNIT_CREATED_TOAST` y `PRESENTATION_CREATED_TOAST`. Test
+- [x] **T6a [P]. Toasts** (D11, R27, R28). `UNIT_CREATED_TOAST` y `PRESENTATION_CREATED_TOAST`. Test
   `tests/unit/inventario/inventario-toasts.test.tsx`: un único `toast.success` con su texto al crear,
   editar, ajustar, borrar, crear unidad y crear presentación; ninguno con error. *Enmienda (E10,
   R51):* en el alta de unidad y de presentación, el doble de la revisión que sigue devuelve una vista
   previa (no avisa), así que se cuenta un único `toast.success` del alta y cero `toast.error`; un
   caso aparte con la revisión rechazada afirma el `toast.error` del rechazo (R51) además del éxito del
   alta.
-- [ ] **T6b [P]. Guardia y D41** (D16, R4, R7, R30, R46). `tests/guards/guard-inventario-rediseno.test.ts`
+- [x] **T6b [P]. Guardia y D41** (D16, R4, R7, R30, R46). `tests/guards/guard-inventario-rediseno.test.ts`
   con sus reglas y un caso en negativo por regla; `guard-piezas-base.test.ts` sin la exclusión de
   `batch-history.tsx`. *Enmienda (E13):* la regla de `text-destructive` mira solo el cuerpo de
   `stockAmountCell` y `packagedStockCell` (el error de la sub-fila, `product-batches-row-error-message`,
   lo conserva y no debe ponerla roja); con P19 por defecto, otra regla sobre `EXPIRING_CLASS`.
   *Hecho:* `pnpm exec vitest run guard` en verde.
-- [ ] **T6c. Catálogo** (R44). Si T1a no aplicó, comprobar que la fila de `RowActionsMenu` que dejó
+- [x] **T6c. Catálogo** (R44). Si T1a no aplicó, comprobar que la fila de `RowActionsMenu` que dejó
   QC-262 cubre lo usado. *Hecho:* `guard-catalogo-de-componentes` en verde.
 
 ## Tanda 7 — E2E (depende de todas)
