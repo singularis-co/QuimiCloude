@@ -29,6 +29,7 @@ import {
   SORT_PARAM,
   SORT_SEPARATOR,
   PRODUCT_SKELETON_COLUMN_COUNT,
+  BELOW_ALERT_LABEL,
   buildProductColumns,
   parseProductListParams,
 } from '@/app/(private)/inventario/components';
@@ -730,7 +731,7 @@ describe('pantalla de productos — lista', () => {
     }
   });
 
-  it('R17 — la existencia se pinta en rojo cuando la alerta de cantidad supera la existencia guardada', async () => {
+  it('R17, R7 — la existencia se pinta en ámbar, no en rojo, cuando la alerta de cantidad supera la existencia guardada', async () => {
     const UNIDAD_A = crypto.randomUUID();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([
@@ -743,11 +744,16 @@ describe('pantalla de productos — lista', () => {
     await renderPantalla();
 
     const celdas = screen.getAllByTestId('product-stock');
-    // Por debajo de la alerta: en rojo.
+    // Por debajo de la alerta: en el tono de advertencia, con su aviso, nunca en el de error.
     expect(celdas[0]).toHaveAttribute('data-alert', 'true');
+    expect(celdas[0]).toHaveClass('text-warning-text');
+    expect(within(celdas[0]).getByTitle(BELOW_ALERT_LABEL)).toBeInTheDocument();
+    for (const celda of celdas) expect(celda.className).not.toContain('text-destructive');
     // Justo en la alerta y por encima: no. La alarma salta cuando la SUPERA, no al igualarla.
     expect(celdas[1]).not.toHaveAttribute('data-alert');
     expect(celdas[2]).not.toHaveAttribute('data-alert');
+    expect(celdas[1]).not.toHaveClass('text-warning-text');
+    expect(celdas[2]).not.toHaveClass('text-warning-text');
 
     // La alerta nunca se tine a si misma: la que esta en alarma es la existencia.
     for (const celda of screen.getAllByTestId('data-table-cell-qtyAlert')) {
@@ -901,6 +907,26 @@ describe('pantalla de productos — lista', () => {
     expect(celda3).toHaveTextContent('12345.68');
     expect(celda3).toHaveAttribute('title', '12345.6789');
     expect(celda3).toHaveAttribute('aria-label', '12345.6789');
+  });
+
+  it('R6 — las cifras, «Costo» incluido, van a la derecha en cabecera y celda; «Tipo» y «Presentación», a la izquierda', async () => {
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
+
+    await renderPantalla();
+
+    for (const columna of ['stock', 'averageUnitCost', 'qtyAlert', 'reserved', 'available']) {
+      expect(screen.getByTestId(`data-table-head-${columna}`), columna).toHaveClass('text-right');
+      expect(screen.getByTestId(`data-table-cell-${columna}`), columna).toHaveClass('text-right');
+    }
+    for (const columna of ['type', 'presentationName']) {
+      for (const celda of [
+        screen.getByTestId(`data-table-head-${columna}`),
+        screen.getByTestId(`data-table-cell-${columna}`),
+      ]) {
+        expect(celda, columna).not.toHaveClass('text-right');
+        expect(celda, columna).not.toHaveClass('text-center');
+      }
+    }
   });
 
   it('R6 — la alerta de cantidad se pinta a dos decimales, con la cifra exacta en el title y el aria-label', async () => {

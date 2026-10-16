@@ -29,6 +29,7 @@ export {
 export { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
 export {
   ACTIONS_COLUMN_ID,
+  BELOW_ALERT_LABEL,
   IMAGE_COLUMN_ID,
   PRODUCT_BATCH_ROW_TEXTS,
   buildProductColumns,

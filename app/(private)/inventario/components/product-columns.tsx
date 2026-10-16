@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
@@ -161,8 +161,27 @@ export function productUnitLabel(
   return product.unitId === null ? null : unitLabel(product.unitId, units);
 }
 
+/** Texto del aviso de existencia en alarma: `title` de la celda y texto para lectores de pantalla. */
+export const BELOW_ALERT_LABEL = 'Por debajo de la alerta de cantidad';
+
+/** Clase de la cifra en alarma, compartida con la existencia en envases de producto terminado. */
+export const BELOW_ALERT_CLASS = 'font-semibold text-warning-text';
+
 /**
- * Una existencia junto a su unidad, tenida de rojo cuando esta en alarma.
+ * Icono y texto oculto que acompanan a una cifra en alarma: el color solo no basta. El `title`
+ * va aqui y no en la celda, que lo reserva para la cifra exacta cuando se redondea.
+ */
+export function BelowAlertMark(): ReactNode {
+  return (
+    <span title={BELOW_ALERT_LABEL}>
+      <TriangleAlert aria-hidden="true" className="mr-1 inline size-3.5 align-[-0.125em]" />
+      <span className="sr-only">{BELOW_ALERT_LABEL}</span>
+    </span>
+  );
+}
+
+/**
+ * Una existencia junto a su unidad, en el tono de advertencia cuando esta en alarma.
  *
  * Se pinta a dos decimales: la celda no es donde se vuelve a guardar. El `aria-label` lleva la
  * cifra exacta. `data-alert` acompana a la clase para que la alarma sea afirmable sin depender
@@ -182,10 +201,11 @@ export function stockAmountCell(
     <span
       data-testid={testId}
       data-alert={alerted ? 'true' : undefined}
-      className={alerted ? 'font-semibold text-destructive' : undefined}
+      className={alerted ? BELOW_ALERT_CLASS : undefined}
       title={exactDecimalTitle(stock)}
       aria-label={label === null ? exact : `${exact} ${label}`}
     >
+      {alerted ? <BelowAlertMark /> : null}
       {label === null ? amount : `${amount} ${label}`}
     </span>
   );
@@ -205,13 +225,19 @@ function productQuantityCell(
   return quantityCell(value, testId, productUnitLabel(product, units));
 }
 
-function quantityCell(value: string, testId: string, label: string | null): ReactNode {
+function quantityCell(
+  value: string,
+  testId: string,
+  label: string | null,
+  className?: string,
+): ReactNode {
   const amount = formatDecimalDisplay(value);
   const exact = trimDecimal(value);
 
   return (
     <span
       data-testid={testId}
+      className={className}
       title={exactDecimalTitle(value)}
       aria-label={label === null ? exact : `${exact} ${label}`}
     >
@@ -236,9 +262,10 @@ function aggregateQuantityCell(
   value: string | undefined,
   testId: string,
   label: string | null,
+  className?: string,
 ): ReactNode {
   if (value === undefined) return EMPTY_MARK;
-  return quantityCell(value, testId, label);
+  return quantityCell(value, testId, label, className);
 }
 
 /** Encabezado de la columna de costo. Constante para que ningun test dependa del literal. */
@@ -424,8 +451,9 @@ function reservedOrAvailableCell(
 ): ReactNode {
   if (row.kind === 'batchesStatus') return null;
   const label = productUnitLabel(row.product, units);
+  const emphasis = row.kind === 'product' && field === 'available' ? 'font-semibold' : undefined;
   return row.kind === 'product'
-    ? aggregateQuantityCell(row.product[field], `product-${field}`, label)
+    ? aggregateQuantityCell(row.product[field], `product-${field}`, label, emphasis)
     : aggregateQuantityCell(row.batch[field], `product-batch-row-${field}`, label);
 }
 
@@ -481,7 +509,7 @@ export function buildProductColumns({
       id: 'stock',
       label: 'Existencia',
       tabular: true,
-      align: 'center',
+      align: 'end',
       sortable: true,
       filter: { kind: 'numberRange' },
       cell: (row) => {
@@ -501,7 +529,7 @@ export function buildProductColumns({
       id: 'averageUnitCost',
       label: COST_COLUMN_LABEL,
       tabular: true,
-      align: 'center',
+      align: 'end',
       // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
       cell: (row) => {
         if (row.kind === 'product') return unitCostCell(row.product.averageUnitCost, 'product-cost');
@@ -513,7 +541,7 @@ export function buildProductColumns({
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
       tabular: true,
-      align: 'center',
+      align: 'end',
       sortable: true,
       filter: { kind: 'numberRange' },
       cell: (row) => (row.kind === 'product' ? qtyAlertCell(row.product, units) : null),
@@ -522,7 +550,7 @@ export function buildProductColumns({
       id: 'reserved',
       label: 'Reservado',
       tabular: true,
-      align: 'center',
+      align: 'end',
       // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
       cell: (row) => reservedOrAvailableCell(row, 'reserved', units),
     },
@@ -530,7 +558,7 @@ export function buildProductColumns({
       id: 'available',
       label: 'Disponible',
       tabular: true,
-      align: 'center',
+      align: 'end',
       cell: (row) => reservedOrAvailableCell(row, 'available', units),
     },
     {

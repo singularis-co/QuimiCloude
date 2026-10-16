@@ -78,7 +78,7 @@ solo su parte y el commit cita la fila de `design.md > 6`.
   o quitado, búsqueda y orden intactos), la vigente `aria-selected`, lista «Filtrar por tipo de
   producto», sin «Mostrando…» ni «Filtrando por…». `product-list-params.test.ts` cubre
   `productTypeTabHref`. `product-page.test.tsx` (R5 de hoy) pasa a afirmar el `href`.
-- [ ] **T2c [P]. Columnas y aviso** (D3, R6–R8). **Espera al tablero aprobado de P17/P18**
+- [x] **T2c [P]. Columnas y aviso** (D3, R6–R8). **Espera al tablero aprobado de P17/P18**
   (copiado en `docs/diseno/canvas/`). `align: 'end'`, «Disponible» en negrita y
   `stockAmountCell` en ámbar. Test `tests/unit/inventario/product-stock-alert.test.tsx`: por debajo
   de la alerta, `data-alert="true"`, clase `text-warning-text`, sin `text-destructive`, icono

@@ -361,6 +361,30 @@ describe('lista cerrada de columnas en Plex Mono', () => {
   });
 });
 
+describe('alineación de las cifras de inventario', () => {
+  function alineaciones(columnas: readonly { id: string; align: string }[]) {
+    return Object.fromEntries(columnas.map((columna) => [columna.id, columna.align]));
+  }
+
+  it('R6: en product-columns.tsx las cifras, «Costo» incluido, van a la derecha y «Tipo» y «Presentación» a la izquierda', () => {
+    const align = alineaciones(buildProductColumns({ rowActions: sinAcciones, showType: true }));
+    for (const id of ['stock', 'averageUnitCost', 'qtyAlert', 'reserved', 'available']) {
+      expect(align[id], id).toBe('end');
+    }
+    expect(align.type).toBe('start');
+    expect(align.presentationName).toBe('start');
+  });
+
+  it('R6: en finished-stock-columns.tsx la existencia y la alerta van a la derecha y «Presentación» a la izquierda', () => {
+    const align = alineaciones(
+      buildFinishedStockColumns({ onToggle: vi.fn(), lineActions: sinAcciones }),
+    );
+    expect(align.stock).toBe('end');
+    expect(align.qtyAlert).toBe('end');
+    expect(align.presentationName).toBe('start');
+  });
+});
+
 describe('panel de lotes con la nueva marca', () => {
   it('R12: lote, cantidades y fechas del panel van en Mono con cifras tabulares, y sus etiquetas no', () => {
     const lote: ProductBatchView = {

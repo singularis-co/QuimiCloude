@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils';
 import {
   ACTIONS_COLUMN_ID,
   ACTIONS_COLUMN_LABEL,
+  BELOW_ALERT_CLASS,
+  BelowAlertMark,
   IMAGE_COLUMN_ID,
   IMAGE_COLUMN_LABEL,
   isBelowAlert,
@@ -98,10 +100,11 @@ function packagedStockCell(
     <span
       data-testid="finished-stock-packaged"
       data-alert={alerted ? 'true' : undefined}
-      className={alerted ? 'font-semibold text-destructive' : undefined}
+      className={alerted ? BELOW_ALERT_CLASS : undefined}
       title={label}
       aria-label={label}
     >
+      {alerted ? <BelowAlertMark /> : null}
       {label}
     </span>
   );
@@ -222,7 +225,7 @@ export function buildFinishedStockColumns({
       id: 'stock',
       label: 'Existencia',
       tabular: true,
-      align: 'center',
+      align: 'end',
       cell: (item) =>
         item.kind === 'group' ? groupStockCell(item.row, units) : lineStockCell(item.line, units),
     },
@@ -230,7 +233,7 @@ export function buildFinishedStockColumns({
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
       tabular: true,
-      align: 'center',
+      align: 'end',
       cell: (item) => (item.kind === 'line' ? qtyAlertCell(item.line.product, units) : null),
     },
     actionsColumn<FinishedStockTableRow>({

@@ -436,6 +436,94 @@ describe('columna «Costo» de la tabla de productos', () => {
     );
   });
 
+  it('R6 — «Costo» va a la derecha en la cabecera y en la celda, como las demás cifras', () => {
+    render(
+      <ProductTable
+        products={[producto({ averageUnitCost: '9' })]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+      />,
+    );
+
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveClass('text-right');
+    const fila = screen.getByTestId('data-table-row-product-1');
+    expect(within(fila).getByTestId('data-table-cell-averageUnitCost')).toHaveClass('text-right');
+  });
+
+  it('R6, R47, R53 — la sub-fila de lote alinea sus cifras como su columna y «Tipo», «Presentación» y «Costo» se conservan', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [lote({ unitCost: '3.1250' })],
+    });
+    const user = setupUser();
+    render(
+      <ProductTable
+        products={[producto({ averageUnitCost: '9', presentationName: 'Saco 25 kg' })]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+      />,
+    );
+
+    await user.click(toggle());
+    await screen.findByTestId('product-batch-row');
+
+    const filaProducto = screen.getByTestId('data-table-row-product-1');
+    const filaLote = screen.getByTestId('data-table-row-product-1--batch-batch-1');
+    for (const columna of ['stock', 'averageUnitCost', 'qtyAlert', 'reserved', 'available']) {
+      expect(screen.getByTestId(`data-table-head-${columna}`), columna).toHaveClass('text-right');
+      expect(within(filaProducto).getByTestId(`data-table-cell-${columna}`), columna).toHaveClass(
+        'text-right',
+      );
+      expect(within(filaLote).getByTestId(`data-table-cell-${columna}`), columna).toHaveClass(
+        'text-right',
+      );
+    }
+    // «start» es la alineación natural: la tabla no le añade clase.
+    for (const columna of ['type', 'presentationName']) {
+      for (const celda of [
+        screen.getByTestId(`data-table-head-${columna}`),
+        within(filaProducto).getByTestId(`data-table-cell-${columna}`),
+        within(filaLote).getByTestId(`data-table-cell-${columna}`),
+      ]) {
+        expect(celda, columna).not.toHaveClass('text-right');
+        expect(celda, columna).not.toHaveClass('text-center');
+      }
+    }
+
+    expect(within(filaProducto).getByTestId('product-type')).toBeInTheDocument();
+    expect(within(filaProducto).getByTestId('data-table-cell-presentationName')).toHaveTextContent(
+      'Saco 25 kg',
+    );
+    expect(within(filaProducto).getByTestId('product-cost')).toHaveTextContent(/^9$/);
+    expect(within(filaLote).getByTestId('product-batch-row-cost')).toHaveTextContent(/^3\.125$/);
+  });
+
+  it('R6 — «Disponible» va en negrita en la fila del producto y no en la del lote', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote()] });
+    const user = setupUser();
+    render(
+      <ProductTable
+        products={[producto({ reserved: '2', available: '10' })]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+      />,
+    );
+
+    await user.click(toggle());
+    await screen.findByTestId('product-batch-row');
+
+    const filaProducto = screen.getByTestId('data-table-row-product-1');
+    expect(within(filaProducto).getByTestId('product-available')).toHaveClass('font-semibold');
+    expect(within(filaProducto).getByTestId('product-reserved')).not.toHaveClass('font-semibold');
+    const filaLote = screen.getByTestId('data-table-row-product-1--batch-batch-1');
+    expect(within(filaLote).getByTestId('product-batch-row-available')).not.toHaveClass(
+      'font-semibold',
+    );
+  });
+
   it('la fila del producto pinta su costo promedio sin ceros de relleno ni redondeo', () => {
     render(
       <ProductTable

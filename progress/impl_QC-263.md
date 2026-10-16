@@ -497,3 +497,139 @@ $ pnpm exec vitest run guard
 
 T5a, T5b y T5c hechas. Typecheck, los tests relacionados y las guardias pasan; lint da 0 errores y
 solo los 10 avisos que ya había.
+
+---
+
+## Tanda 2c (T2c) — 2026-10-16 · frontend_dev
+
+Solo presentación. La lógica de datos sigue como en `dev`: «Costo» es el costo unitario (promedio
+ponderado en el producto, su costo en el lote) e `isBelowAlert` no cambia. No toca tarjetas (`card`)
+ni menú, que son de la tanda 3.
+
+### Archivos creados / modificados
+
+Producción:
+- `app/(private)/inventario/components/product-columns.tsx`:
+  - `align: 'end'` en `stock`, `averageUnitCost`, `qtyAlert`, `reserved` y `available`; `type` y
+    `presentationName` siguen en `start`. Las sub-filas de lote comparten columna, así que heredan
+    la alineación sin código propio.
+  - «Disponible» de la fila `product` en `font-semibold` (el lote no).
+  - Exporta `BELOW_ALERT_LABEL`, `BELOW_ALERT_CLASS` (`font-semibold text-warning-text`) y
+    `BelowAlertMark` (`TriangleAlert` `aria-hidden` + `sr-only`).
+  - En alarma, `stockAmountCell` pinta `BELOW_ALERT_CLASS` y `BelowAlertMark` delante de la cifra, y
+    conserva `data-testid`, `data-alert="true"` y el `aria-label` de la cifra exacta. Ya no lleva
+    `text-destructive`.
+- `app/(private)/inventario/components/finished-stock-columns.tsx`: `align: 'end'` en `stock` y
+  `qtyAlert`. `packagedStockCell` en alarma lleva la misma clase y la misma marca.
+- `app/(private)/inventario/components/index.ts`: exporta `BELOW_ALERT_LABEL`.
+
+Tests:
+- `tests/unit/inventario/product-stock-alert.test.tsx` (nuevo, 7 casos).
+- `tests/unit/inventario/product-batch-rows.test.tsx`: tres casos nuevos en «columna «Costo»»:
+  «Costo» a la derecha; sub-fila de lote alineada como su columna, con «Tipo», «Presentación» y
+  «Costo» conservados con sus testids; «Disponible» en negrita solo en el producto.
+- `tests/unit/inventario/product-page.test.tsx`: el R17 de hoy pasa de «en rojo» a «en ámbar».
+  Afirma `text-warning-text`, el `title` del aviso y que no hay `text-destructive`. Caso nuevo de R6
+  con cifras a la derecha y «Tipo» y «Presentación» a la izquierda, en cabecera y celda.
+- `tests/unit/marca/tablas-marca.test.tsx`: `describe` nuevo «alineación de las cifras de
+  inventario» para las dos declaraciones de columnas.
+- `tests/unit/paridad/__snapshots__/inventario-paridad.test.tsx.snap`: regenerado (2 snapshots).
+
+### Una decisión de colocación (sin cambio de spec)
+
+D3 pide el `title` «Por debajo de la alerta de cantidad» en la celda. Pero la celda ya usa su
+`title` para la cifra exacta cuando la redondea, y eso lo afirma el R6 de `product-page.test.tsx`
+(«con la cifra exacta en el title»). En `packagedStockCell` el `title` es el rótulo, que la celda
+trunca. Si se pisaba, ese caso fallaba. Por eso el `title` del aviso va en la marca
+(`<span title>` con el icono y el `sr-only`), dentro de la celda. La celda conserva su `title` de
+siempre. R7 se cumple igual: hay un `title` y un texto oculto con el aviso. Lo cubre el caso «R7 —
+con la cifra redondeada…».
+
+### Columna «Costo»: orden
+
+El tablero `InventarioColumnasLotes.dc.html` pinta «Costo» después de «Disponible». `dev` la pone
+justo después de «Existencia», y lo fija `product-batch-rows.test.tsx` («pinta la cabecera «Costo»
+justo despues de la existencia»). T2c no reordena columnas, así que se conserva el orden de `dev`. Si
+el humano quiere el orden del tablero, es un cambio aparte.
+
+### Diff del snapshot de `inventario-paridad` (fila de `design.md > 6`)
+
+Cambian 2 de 13 snapshots: «productos — con filas» y «producto terminado — con filas». Los otros
+estados no pintan cifras. Solo cambia la alineación, que es la parte «columnas a la derecha
+(también «Costo»)» de la fila:
+- `th` y `td` de `stock`, `averageUnitCost`, `qtyAlert`, `reserved` y `available` (productos) y de
+  `stock` y `qtyAlert` (producto terminado) pasan de `text-center` a `text-right`;
+- el `div` interior de esas 7 cabeceras pasa de `justify-center` a `justify-end`.
+
+Ningún fixture de paridad está en alarma, y «Disponible» sale como «—» (sin `span`). Por eso no
+aparecen ni el aviso ámbar ni la negrita: los cubren los tests unitarios.
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R6 | `product-batch-rows.test.tsx`: «R6 — «Costo» va a la derecha…», «R6, R47, R53 — la sub-fila de lote alinea sus cifras…», «R6 — «Disponible» va en negrita…»; `product-page.test.tsx`: «R6 — las cifras, «Costo» incluido, van a la derecha…»; `tablas-marca.test.tsx`: «R6: en product-columns.tsx…», «R6: en finished-stock-columns.tsx…»; snapshot de `inventario-paridad` |
+| R7 | `product-stock-alert.test.tsx`: «R7 — por debajo de la alerta…», «R7 — en la alerta exacta y por encima…», «R7 — con la cifra redondeada…», «R7 — la existencia de un lote nunca lleva el aviso…»; `product-page.test.tsx`: «R17, R7 — la existencia se pinta en ámbar…» |
+| R8 | `product-stock-alert.test.tsx`: «R8 — la línea de producto…en cifra suelta», «R8 — la línea en envases…», «R8 — en la alerta exacta y por encima…». La tarjeta (R13) es de T3c |
+| R47 | `product-batch-rows.test.tsx`: «R6, R47, R53 — la sub-fila de lote alinea sus cifras como su columna…» (solo la alineación; las tarjetas son de T3c) |
+| R53 | `product-batch-rows.test.tsx`: «R6, R47, R53 — …«Tipo», «Presentación» y «Costo» se conservan» (más los casos de costo que ya había) |
+
+La guardia D16 (`guard-inventario-rediseno.test.ts`, T6b) no existe todavía. Esta tanda deja
+`stockAmountCell` y `packagedStockCell` sin `text-destructive`, que es lo que esa guardia afirmará.
+
+### Salida real
+
+```
+$ pnpm exec vitest run tests/unit/inventario/product-stock-alert.test.tsx
+ Test Files  1 passed (1)
+      Tests  6 passed (6)          (antes de añadir el 7.º caso; luego, en el run de abajo)
+
+$ pnpm exec vitest run tests/unit/inventario/product-batch-rows.test.tsx
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+
+$ pnpm exec vitest run tests/unit/inventario/product-page.test.tsx   (primera pasada)
+ FAIL  … > R6 — la existencia se pinta a dos decimales, con la cifra exacta en el title y el aria-label
+   expect(element).toHaveAttribute("title", "0.0001")
+      Tests  1 failed | 92 passed (93)
+   → motivo de la decisión de colocación de arriba; tras moverla:
+
+$ pnpm exec vitest run tests/unit/inventario/product-page.test.tsx tests/unit/inventario/product-stock-alert.test.tsx tests/unit/inventario/finished-stock-table.test.tsx
+ Test Files  3 passed (3)
+      Tests  120 passed (120)
+
+$ pnpm exec vitest run tests/unit/marca/tablas-marca.test.tsx
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+
+$ pnpm exec vitest run tests/unit/paridad/inventario-paridad.test.tsx
+  Snapshots  2 failed
+      Tests  2 failed | 11 passed (13)      (diff: solo text-center→text-right y justify-center→justify-end)
+$ pnpm exec vitest run tests/unit/paridad/inventario-paridad.test.tsx -u
+  Snapshots  2 updated
+      Tests  13 passed (13)
+
+$ pnpm exec vitest run tests/unit/inventario/product-stock-alert.test.tsx tests/unit/inventario/product-batch-rows.test.tsx   (final)
+ Test Files  2 passed (2)
+      Tests  29 passed (29)          (7 + 22)
+
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm run lint
+✖ 10 problems (0 errors, 10 warnings)   (los 10 no-unused-vars de siempre, ninguno de esta tanda)
+
+$ pnpm exec vitest related --run <3 de producción + 5 de test de arriba>
+ Test Files  34 passed (34)
+      Tests  586 passed (586)
+
+$ pnpm exec vitest run guard
+ Test Files  80 passed (80)
+      Tests  1096 passed | 20 skipped (1116)
+```
+
+### Veredicto
+
+T2c hecha y en verde. El diff del snapshot casa con la fila de `design.md > 6`. Quedan dos notas
+para el leader: el `title` del aviso va en la marca, y «Costo» sigue en el orden de `dev`.
