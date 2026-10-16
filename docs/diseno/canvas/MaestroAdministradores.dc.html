@@ -51,6 +51,7 @@
                       <button class="b b-gho b-ico" type="button" aria-label="{{ u.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ u.open }}" onClick="{{ u.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
                       <div class="{{ u.menuCls }}" role="menu" style="min-width: 220px">
                         <button class="mi" type="button" role="menuitem" onClick="{{ u.edit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+                        <sc-if value="{{ u.pending }}" hint-placeholder-val="{{ false }}"><button class="mi" type="button" role="menuitem" onClick="{{ u.resend }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6"></path></svg>Reenviar enlace</button></sc-if>
                         <div class="sep"></div>
                         <button class="mi danger" type="button" role="menuitem" onClick="{{ u.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Dar de baja</button>
                       </div>
@@ -112,9 +113,17 @@
     <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" aria-disabled="{{ tLastStr }}" onClick="{{ confirmDel }}">Dar de baja</button></div>
   </div>
 
+  <div class="{{ resendCls }}" role="alertdialog" aria-modal="true" aria-labelledby="ad-rs">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6"></path></svg></div>
+    <h2 id="ad-rs" class="h2">¿Reenviar el enlace a {{ tName }}?</h2>
+    <p class="sub">Le llegará a <span class="strong">{{ tMail }}</span> un correo nuevo para fijar su contraseña. El enlace anterior deja de servir.</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-pri" type="button" onClick="{{ confirmResend }}">Reenviar enlace</button></div>
+  </div>
+
   <div class="{{ actsCls }}" role="menu" aria-label="{{ actsLabel }}">
     <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">{{ tName }}</span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
     <button class="mi" type="button" role="menuitem" onClick="{{ aEdit }}">Editar</button>
+    <sc-if value="{{ tPending }}" hint-placeholder-val="{{ false }}"><button class="mi" type="button" role="menuitem" onClick="{{ aResend }}">Reenviar enlace</button></sc-if>
     <div class="sep"></div>
     <button class="mi danger" type="button" role="menuitem" onClick="{{ aDel }}">Dar de baja</button>
   </div>
@@ -157,6 +166,7 @@ menuLabel: 'Acciones de ' + nm,
 toggle: () => this.setState({ open: open === p.id ? null : p.id }),
 edit: () => this.setState(Object.assign({}, closed, { sheet: 'edit', target: p.id })),
 del: () => this.setState(Object.assign({}, closed, { dlg: 'del', target: p.id })),
+resend: () => this.setState(Object.assign({}, closed, { dlg: 'resend', target: p.id })), pending: p.st === 'pending',
 mobileActs: () => this.setState(Object.assign({}, closed, { acts: true, target: p.id })) };
 });
 const t = s.target ? byId[s.target] : null;
@@ -185,6 +195,9 @@ confirmDel: () => { if (t && (countBy[t.co] || 0) <= 1) return; const nx = Objec
 actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsLabel: 'Acciones de ' + (t ? nameOf(t) : ''),
 aEdit: () => this.setState(Object.assign({}, closed, { sheet: 'edit', target: s.target })),
 aDel: () => this.setState(Object.assign({}, closed, { dlg: 'del', target: s.target })),
+aResend: () => this.setState(Object.assign({}, closed, { dlg: 'resend', target: s.target })),
+resendCls: s.dlg === 'resend' ? 'dlg open' : 'dlg', tMail: t ? t.mail : '', tPending: !!t && t.st === 'pending',
+confirmResend: () => flash('Enviamos el enlace a ' + (t ? nameOf(t) : '') + '.', closed),
 ovCls: ov ? 'ov open' : 'ov', closeAll: () => this.setState(closed),
 toastCls: s.toast ? 'toast show' : 'toast', toastMsg: s.toastMsg || ''
 };

@@ -20,11 +20,11 @@
       <dt>Ruta</dt><dd><span class="mono">[/maestro/administradores]</span>, abierta en QC-166 (se propone esta).</dd>
       <dt>Reutiliza</dt><dd><span class="mono">shared/data-table · row-actions-menu · form-sheet · save-button · select-field · text-field · date-picker · status-badge · notice · confirm-dialog · page-header · ui/sonner · private/app-sidebar</span> · el formulario de persona es el mismo de Usuarios (<span class="mono">user-form</span>) sin el campo Rol</dd>
       <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Menu, Dialog, AlertDialog, Sheet, Select) · <span class="mono">sonner · lucide-react</span></dd>
-      <dt>Escritorio</dt><dd>Una sola lista de los Administradores de todas las empresas · columnas Nombre, Usuario, Correo, Empresa (enlace a la empresa), Estado · filtro único «Empresa» · ⋯ con Editar y Dar de baja · «Nuevo administrador» abre un Sheet ancho que empieza por la Empresa (solo activas); el rol es siempre Administrador y no se elige</dd>
+      <dt>Escritorio</dt><dd>Una sola lista de los Administradores de todas las empresas · columnas Nombre, Usuario, Correo, Empresa (enlace a la empresa), Estado · filtro único «Empresa» · ⋯ con Editar, Reenviar enlace (solo en filas Pendiente; confirmación corta: el enlace anterior deja de servir) y Dar de baja; el último Administrador de una empresa no se puede dar de baja · «Nuevo administrador» abre un Sheet ancho que empieza por la Empresa (solo activas); el rol es siempre Administrador y no se elige</dd>
       <dt>Tablet</dt><dd>Barra lateral en modo icono · tabla con scroll horizontal dentro de su caja · Sheets anchos (600 px)</dd>
       <dt>Teléfono</dt><dd>Tabla a tarjetas (avatar, nombre, estado, usuario, correo y empresa) · «Acciones» abre el menú centrado con objetivos de 48 px · Sheet a pantalla completa; los pares de campos pasan a una columna</dd>
-      <dt>Animación</dt><dd>Entrada escalonada · cambio de filtro con fundido · Sheet 300/150 ms · toasts «Administrador creado. Enviamos el enlace.», «Administrador actualizado.», «Administrador dado de baja.»</dd>
-      <dt>Por confirmar</dt><dd>Depende de QC-165 (sin acciones de servidor todavía) · qué pasa al dar de baja al último Administrador de una empresa (aviso entre corchetes) · si se puede mover un Administrador a otra empresa (por ahora la Empresa no se edita) · si la lista agrupa por empresa o filtra (se propone filtrar)</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · cambio de filtro con fundido · Sheet 300/150 ms · toasts «Administrador creado. Enviamos el enlace.», «Administrador actualizado.», «Enviamos el enlace a X.», «Administrador dado de baja.»</dd>
+      <dt>Por confirmar</dt><dd>Depende de QC-165 (servidor en especificación) · texto si falla el correo al reenviar el enlace · si la lista agrupa por empresa o filtra (se propone filtrar)</dd>
     </dl>
   </div>
 </div>
