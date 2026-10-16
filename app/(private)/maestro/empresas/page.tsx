@@ -13,6 +13,7 @@ import {
 } from '@/lib/shared/navigation/private-nav';
 
 import {
+  CompanyCreateAction,
   CompanyListSection,
   CompanyTable,
   parseCompanyListParams,
@@ -57,6 +58,7 @@ export default async function MaestroEmpresasPage({
           label: NAV_SECTION_PLATFORM,
           items: [{ label: NAV_SECTION_PLATFORM }, { label: COMPANIES_LABEL }],
         }}
+        actions={canModify ? <CompanyCreateAction canModify /> : undefined}
       />
       {/* Sin `key`: remontar el límite en cada búsqueda se llevaría el foco de la caja. */}
       <Suspense

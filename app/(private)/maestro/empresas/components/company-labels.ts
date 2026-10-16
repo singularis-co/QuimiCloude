@@ -52,6 +52,29 @@ export const COMPANY_EMPTY_TEXTS = {
 
 export const COMPANY_ERROR_TITLE = 'No se pudo cargar la lista de empresas.';
 
+export const COMPANY_FIELD_LABELS = {
+  name: 'Nombre',
+  taxId: 'Identificación fiscal',
+  contactEmail: 'Correo de contacto',
+  contactPhone: 'Teléfono de contacto',
+  country: 'País',
+} as const;
+
+export const COMPANY_TAX_ID_HINT = 'Opcional. Por ejemplo, el NIT.';
+
+export const COMPANY_DATA_SECTION_LABEL = 'Empresa';
+export const COMPANY_ADMIN_SECTION_LABEL = 'Administrador inicial';
+export const COMPANY_MAIL_NOTICE = 'Le llegará un correo con un enlace para fijar su contraseña.';
+
+export const COMPANY_CREATE_TEXTS = {
+  open: 'Nueva empresa',
+  title: 'Nueva empresa',
+  description: 'Da de alta la empresa y a su primer Administrador.',
+  submit: 'Crear empresa',
+  success: 'Empresa creada. Enviamos el enlace al Administrador.',
+  mailFailed: 'Empresa creada, pero no pudimos enviar el correo al Administrador.',
+} as const;
+
 export function companyTableTexts(total: number): DataTableTexts {
   return {
     empty: COMPANY_EMPTY_TEXTS.empty,

@@ -165,5 +165,7 @@ describe('/maestro/empresas', () => {
     getSessionUserMock.mockResolvedValue(MAESTRO);
     const arbol = await invocarEmpresas();
     expect(buscar(arbol, CompanyListSection).props.canModify).toBe(true);
+    render(buscar(arbol, PageHeader));
+    expect(screen.getByTestId('company-create-open')).toHaveTextContent('Nueva empresa');
   });
 });
