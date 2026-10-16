@@ -140,7 +140,8 @@ const LONG_RECIPE_STEPS: readonly RecipeStepDocument[] = [
 const LAST_LONG_STEP_ITEM = `step-reader-item-0-${LONG_STEP_ITEMS - 1}`;
 
 const TABLET = { width: 820, height: 1180 } as const;
-const PANEL_TRACK = '300px';
+const PANEL_TRACK = '320px';
+const OPERATOR_SCROLL = '[data-slot="operator-scroll"]';
 const CENTER_TOLERANCE_PX = 2;
 const CONDITIONING_WAIT_MS = 5_000;
 
@@ -154,17 +155,22 @@ const TESTIDS = {
   executionScreen: 'order-execution-screen',
   executionActions: 'order-execution-actions',
   executionMaterials: 'order-execution-materials',
-  executionMaterialsTrigger: 'order-execution-materials-panel-trigger',
-  stepReaderActions: 'step-reader-actions',
+  executionMaterialsFab: 'order-execution-materials-fab',
+  materialsSidePanel: 'operator-side-panel-materials',
+  sidePanelBody: 'operator-side-panel-body',
   stepChecklistItem: 'step-reader-item-0-0',
   stepFinish: 'step-reader-finish',
   packingScreen: 'packing-order-screen',
   packingBack: 'packing-order-back-link',
-  packingQuantity: 'packing-order-quantity',
+  packingColumn: 'packing-order-sections',
+  packingPackagesFab: 'packing-order-packages-fab',
   packingStart: 'packing-order-start-button',
   packingFinish: 'packing-order-finish-button',
   conditioningScreen: 'conditioning-order-screen',
   conditioningBack: 'conditioning-order-back-link',
+  conditioningColumn: 'conditioning-order-sections',
+  conditioningPackagesFab: 'conditioning-order-packages-fab',
+  conditioningTeamFab: 'conditioning-order-team-fab',
   conditioningStart: 'conditioning-start-button',
   conditioningFinish: 'conditioning-finish-button',
   conditioningSection: 'conditioning-orders-list-section',
@@ -554,33 +560,33 @@ for (const screenCase of SCREENS) {
 }
 
 type FrameCase = ScreenCase & {
-  /** El pie fijo: el de `StepReader` en la ejecución, el del marco en las otras dos. */
-  readonly footer: (page: Page) => Locator;
   /** Los controles de la cabecera y del cuerpo que deben medir 44 × 44. */
   readonly controls: readonly string[];
+  /** Los que no deben estar: con el pedido comenzado por el actor, la cabecera no lleva la vuelta. */
+  readonly absent?: readonly string[];
 };
 
+// Los pedidos de `SCREENS`: la ejecución y el acondicionamiento, comenzados por el actor; el
+// empaque, sin comenzar.
 const FRAMES: readonly FrameCase[] = [
   {
     ...SCREENS[0]!,
-    footer: (page) => page.getByTestId(TESTIDS.stepReaderActions),
-    controls: [TESTIDS.themeToggle, TESTIDS.executionActions, TESTIDS.executionMaterialsTrigger],
+    controls: [TESTIDS.themeToggle, TESTIDS.executionActions, TESTIDS.executionMaterialsFab],
   },
   {
     ...SCREENS[1]!,
-    footer: (page) => page.locator(OPERATOR_FOOTER),
-    controls: [TESTIDS.themeToggle, TESTIDS.packingBack],
+    controls: [TESTIDS.themeToggle, TESTIDS.packingBack, TESTIDS.packingPackagesFab],
   },
   {
     ...SCREENS[2]!,
-    footer: (page) => page.locator(OPERATOR_FOOTER),
-    controls: [TESTIDS.themeToggle, TESTIDS.conditioningBack],
+    controls: [TESTIDS.themeToggle, TESTIDS.conditioningPackagesFab, TESTIDS.conditioningTeamFab],
+    absent: [TESTIDS.conditioningBack],
   },
 ];
 
 for (const frame of FRAMES) {
   test.describe(`R2, R3 — ${frame.name} a 390 × 844`, () => {
-    test(`R2, R3 — a 390 × 844 ${frame.name} tiene la cabecera pegada arriba con un único h1 y «Cambiar tema», el pie fijo abajo con botones de 52 px y controles de 44 × 44`, async ({
+    test(`R2, R3 — a 390 × 844 ${frame.name} tiene la cabecera pegada arriba con un único h1 y «Cambiar tema», el pie abajo, fuera de la zona con scroll, con botones de 52 px y controles de 44 × 44`, async ({
       page,
     }) => {
       const seededOrders = seeded();
@@ -596,11 +602,24 @@ for (const frame of FRAMES) {
       await expect(header.locator('h1')).toHaveCount(1);
       await expect(header.getByTestId(TESTIDS.themeToggle)).toBeVisible();
 
-      const footer = frame.footer(page);
+      const footer = screen.locator(OPERATOR_FOOTER);
       await expect(footer).toBeVisible();
-      expect(await footer.evaluate((el) => window.getComputedStyle(el).position)).toBe('fixed');
+      // El pie ya no es `fixed`: es la última fila del marco, fuera de la zona que se desplaza.
+      const zone = screen.locator(OPERATOR_SCROLL);
+      expect(await zone.evaluate((el) => window.getComputedStyle(el).overflowY)).toMatch(/^(auto|scroll)$/);
+      expect(
+        await footer.evaluate((el, selector) => el.closest(selector) === null, OPERATOR_SCROLL),
+        'el pie no está dentro de la zona con scroll',
+      ).toBe(true);
 
+      await zone.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      expect(
+        await page.evaluate(() => (document.scrollingElement as HTMLElement).scrollTop),
+        'el documento no se desplaza',
+      ).toBe(0);
       await expect
         .poll(async () => Math.abs((await box(header)).y))
         .toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
@@ -615,30 +634,30 @@ for (const frame of FRAMES) {
       for (const control of frame.controls) {
         await expectTarget(screen.getByTestId(control), `${control} en ${frame.name}`);
       }
+      for (const control of frame.absent ?? []) {
+        await expect(screen.getByTestId(control), `${control} no está en ${frame.name}`).toHaveCount(0);
+      }
     });
   });
 }
 
 type ColumnsCase = ScreenCase & {
+  /** La columna lateral de la pantalla: su rejilla es la que pasa de dos pistas a una. */
   readonly anchor: (screen: Locator) => Locator;
-  /** El ancho de la primera columna a 1440 px, si el tablero lo fija. */
-  readonly firstTrack?: string;
 };
 
 const COLUMNS: readonly ColumnsCase[] = [
   {
     ...SCREENS[0]!,
     anchor: (screen) => screen.getByTestId(TESTIDS.executionMaterials),
-    firstTrack: PANEL_TRACK,
   },
   {
     ...SCREENS[1]!,
-    anchor: (screen) => screen.getByTestId(TESTIDS.packingQuantity),
-    firstTrack: PANEL_TRACK,
+    anchor: (screen) => screen.getByTestId(TESTIDS.packingColumn),
   },
   {
     ...SCREENS[2]!,
-    anchor: (screen) => screen.locator('[data-slot="card"]').first(),
+    anchor: (screen) => screen.getByTestId(TESTIDS.conditioningColumn),
   },
 ];
 
@@ -653,16 +672,20 @@ for (const columns of COLUMNS) {
       await expect(anchor).toBeVisible();
 
       await expect.poll(async () => (await gridTracks(anchor)).length).toBe(2);
-      if (columns.firstTrack !== undefined) {
-        expect((await gridTracks(anchor))[0]).toBe(columns.firstTrack);
-      }
-      if (columns.firstTrack === undefined) {
-        const cards = screen.locator('[data-slot="card"]');
-        await expect(cards).toHaveCount(2);
-        const [left, right] = [await box(cards.nth(0)), await box(cards.nth(1))];
-        expect(Math.abs(left.y - right.y), 'las dos tarjetas lado a lado').toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
-        expect(right.x).toBeGreaterThan(left.x + left.width - EDGE_TOLERANCE_PX);
-      }
+      expect((await gridTracks(anchor))[0]).toBe(PANEL_TRACK);
+      // La columna lateral va a la izquierda y el contenido del pedido, a su derecha.
+      const contentBox = await anchor.evaluate((el) => {
+        const sibling = el.nextElementSibling;
+        if (sibling === null) return null;
+        const found = sibling.getBoundingClientRect();
+        return { x: found.x, y: found.y, width: found.width, height: found.height };
+      });
+      expect(contentBox, 'hay contenido junto a la columna').not.toBeNull();
+      const columnBox = await box(anchor);
+      expect(Math.abs(columnBox.y - contentBox!.y), 'columna y contenido lado a lado').toBeLessThanOrEqual(
+        EDGE_TOLERANCE_PX,
+      );
+      expect(contentBox!.x).toBeGreaterThan(columnBox.x + columnBox.width - EDGE_TOLERANCE_PX);
 
       await page.setViewportSize(TABLET);
       await expect.poll(async () => (await gridTracks(anchor)).length).toBe(1);
@@ -938,37 +961,45 @@ test.describe('R37 — el anillo del botón con espera', () => {
 const SETTLE_TIMEOUT_MS = 30_000;
 
 /**
- * Desplaza la página hasta el final y mide, en la misma ida al navegador, el pie fijo del lector
- * y los elementos pedidos por `data-testid`. Todo junto porque, hasta que termina de hidratar, la
- * pantalla puede devolver el desplazamiento arriba entre un paso y el siguiente.
+ * Desplaza la zona central del marco hasta el final y mide, en la misma ida al navegador, el pie
+ * del marco y los elementos pedidos por `data-testid`. Todo junto porque, hasta que termina de
+ * hidratar, la pantalla puede devolver el desplazamiento arriba entre un paso y el siguiente.
  */
 async function measureAtEnd(
   page: Page,
   testIds: readonly string[],
-): Promise<{ readonly gap: number; readonly footer: Rect | null; readonly targets: ReadonlyArray<Rect | null> }> {
+): Promise<{
+  readonly gap: number;
+  readonly documentScrollTop: number;
+  readonly footer: Rect | null;
+  readonly targets: ReadonlyArray<Rect | null>;
+}> {
   return page.evaluate(
-    ({ footerId, ids }) => {
+    ({ footer, scroll, ids }) => {
       const rect = (node: Element | null) => {
         if (node === null) return null;
         const found = node.getBoundingClientRect();
         return { x: found.x, y: found.y, width: found.width, height: found.height };
       };
-      const root = document.documentElement;
-      window.scrollTo(0, root.scrollHeight);
+      const zone = document.querySelector(scroll) as HTMLElement;
+      zone.scrollTop = zone.scrollHeight;
+      window.scrollTo(0, document.documentElement.scrollHeight);
       return {
-        gap: root.scrollHeight - (window.scrollY + window.innerHeight),
-        footer: rect(document.querySelector(`[data-testid="${footerId}"]`)),
+        gap: zone.scrollHeight - (zone.scrollTop + zone.clientHeight),
+        documentScrollTop: (document.scrollingElement as HTMLElement).scrollTop,
+        footer: rect(document.querySelector(footer)),
         targets: ids.map((id) => rect(document.querySelector(`[data-testid="${id}"]`))),
       };
     },
-    { footerId: TESTIDS.stepReaderActions, ids: [...testIds] },
+    { footer: OPERATOR_FOOTER, scroll: OPERATOR_SCROLL, ids: [...testIds] },
   );
 }
 
 /**
- * Con la página desplazada hasta el final, el pie fijo del lector queda pegado al borde inferior
- * de la ventana (R6) y cada elemento pedido termina por encima de él (R4, R5). Se reintenta
- * mientras corre la entrada de pantalla: con ella el pie se mide desplazado.
+ * Con la zona central desplazada hasta el final, el pie del marco queda pegado al borde inferior
+ * de la ventana (R6), el documento no se desplaza y cada elemento pedido termina por encima del
+ * pie (R4, R5). Se reintenta mientras corre la entrada de pantalla: con ella el pie se mide
+ * desplazado.
  */
 async function expectWholeAboveFooter(
   page: Page,
@@ -982,7 +1013,8 @@ async function expectWholeAboveFooter(
       page,
       targets.map((target) => target.testId),
     );
-    expect(measured.gap, `${label}: la página llega a su final`).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+    expect(measured.gap, `${label}: la zona central llega a su final`).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+    expect(measured.documentScrollTop, `R6 ${label}: el documento no se desplaza`).toBe(0);
     expect(measured.footer, `${label}: hay pie fijo`).not.toBeNull();
     const footer = measured.footer!;
     expect(
@@ -997,6 +1029,44 @@ async function expectWholeAboveFooter(
       );
     }
   }).toPass({ timeout: SETTLE_TIMEOUT_MS });
+}
+
+/**
+ * El panel flotante va en su portal, por encima del pie: desplazado su contenido hasta el final,
+ * el último material queda entero por encima del pie y ni él ni el borde inferior del panel quedan
+ * debajo de otra capa (R4). El documento no se desplaza (R6).
+ */
+async function expectSidePanelEndShown(
+  page: Page,
+  label: string,
+  sidePanel: Locator,
+  lastLine: Locator,
+): Promise<void> {
+  await lastLine.scrollIntoViewIfNeeded();
+  await expect(lastLine, `R4 ${label}: el último material a la vista`).toBeInViewport();
+  const [lineBox, footerBox] = await Promise.all([box(lastLine), box(page.locator(OPERATOR_FOOTER))]);
+  expect(lineBox.y + lineBox.height, `R4 ${label}: el último material por encima del pie`).toBeLessThanOrEqual(
+    footerBox.y + EDGE_TOLERANCE_PX,
+  );
+  const onTop = await sidePanel.evaluate(
+    (panel, line) => {
+      const inPanel = (x: number, y: number) => {
+        const hit = document.elementFromPoint(x, y);
+        return hit !== null && panel.contains(hit);
+      };
+      const panelRect = panel.getBoundingClientRect();
+      const lineRect = line!.getBoundingClientRect();
+      return {
+        line: inPanel(lineRect.x + lineRect.width / 2, lineRect.y + lineRect.height / 2),
+        edge: inPanel(panelRect.x + panelRect.width / 2, panelRect.bottom - 2),
+      };
+    },
+    await lastLine.elementHandle(),
+  );
+  expect(onTop.line, `R4 ${label}: el último material no queda tapado`).toBe(true);
+  expect(onTop.edge, `R4 ${label}: el borde inferior del panel no queda tapado`).toBe(true);
+  const documentScrollTop = await page.evaluate(() => (document.scrollingElement as HTMLElement).scrollTop);
+  expect(documentScrollTop, `R6 ${label}: el documento no se desplaza`).toBe(0);
 }
 
 const OPERATOR_WIDTHS = [
@@ -1088,23 +1158,41 @@ test.describe('QC-269 R4, R6, R9, R10 — ejecución con muchos materiales', () 
       const screen = await openScreen(page, assignedOrderRoute(execMany.id), TESTIDS.executionScreen);
       await waitForScreenEnterToSettle(page);
 
-      const panel = screen.getByTestId(TESTIDS.executionMaterials);
+      // Con dos columnas los materiales van en la columna; a 390 px, en el panel que abre su botón
+      // flotante.
+      const inColumn = width.size === DESKTOP;
+      const sidePanel = page.getByTestId(TESTIDS.materialsSidePanel);
+      if (!inColumn) {
+        await clickUntilVisible(page.getByTestId(TESTIDS.executionMaterialsFab), sidePanel);
+        await waitForAnimationsToSettle(sidePanel);
+      }
+      const panel = inColumn
+        ? screen.getByTestId(TESTIDS.executionMaterials)
+        : sidePanel.getByTestId(TESTIDS.sidePanelBody);
       await expect(panel.locator(`li[data-testid^="${TESTIDS.executionLine}-"]`)).toHaveCount(MANY_LINES);
       const lastLine = panel.getByTestId(`${TESTIDS.executionLine}-${MANY_LINES - 1}`);
       await expect(lastLine).toBeAttached();
 
-      // R6: el panel no tiene desplazamiento propio; crece con su contenido.
       const panelScroll = await panel.evaluate((el) => ({
         scrollHeight: el.scrollHeight,
         clientHeight: el.clientHeight,
         overflowY: window.getComputedStyle(el).overflowY,
       }));
-      expect(panelScroll.scrollHeight, `R6 ${width.name}: el panel no recorta su contenido`).toBe(
-        panelScroll.clientHeight,
-      );
-      expect(panelScroll.overflowY, `R6 ${width.name}: el panel no es un área desplazable`).not.toMatch(
-        /^(auto|scroll)$/,
-      );
+      if (inColumn) {
+        // R6: la columna no tiene desplazamiento propio; crece con su contenido.
+        expect(panelScroll.scrollHeight, `R6 ${width.name}: el panel no recorta su contenido`).toBe(
+          panelScroll.clientHeight,
+        );
+        expect(panelScroll.overflowY, `R6 ${width.name}: el panel no es un área desplazable`).not.toMatch(
+          /^(auto|scroll)$/,
+        );
+      } else {
+        // R6: lo que no cabe en el panel flotante se alcanza con su propio scroll, no con el del
+        // documento.
+        expect(panelScroll.overflowY, `R6 ${width.name}: el panel flotante hace scroll`).toMatch(
+          /^(auto|scroll)$/,
+        );
+      }
 
       // R9, R10: las medidas de todas las filas en una sola ida al navegador.
       const lines = await panel.evaluate(
@@ -1174,10 +1262,14 @@ test.describe('QC-269 R4, R6, R9, R10 — ejecución con muchos materiales', () 
       }
 
       // R4, R6: el último material y el borde inferior del panel quedan por encima del pie.
-      await expectWholeAboveFooter(page, width.name, [
-        { testId: `${TESTIDS.executionLine}-${MANY_LINES - 1}`, what: 'R4 el último material' },
-        { testId: TESTIDS.executionMaterials, what: 'R4 el borde inferior del panel' },
-      ]);
+      if (inColumn) {
+        await expectWholeAboveFooter(page, width.name, [
+          { testId: `${TESTIDS.executionLine}-${MANY_LINES - 1}`, what: 'R4 el último material' },
+          { testId: TESTIDS.executionMaterials, what: 'R4 el borde inferior del panel' },
+        ]);
+      } else {
+        await expectSidePanelEndShown(page, width.name, sidePanel, lastLine);
+      }
     }
     // Sin esto, la comprobación de las cifras debajo podría no ejercitarse nunca.
     expect(wrappedRows, 'R10: en algún ancho las cifras bajan bajo el nombre').toBeGreaterThan(0);

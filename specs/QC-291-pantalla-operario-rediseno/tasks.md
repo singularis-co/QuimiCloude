@@ -204,4 +204,5 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
 - `e2e/pasos-de-envasado.spec.ts`
 - `specs/QC-195-envases-del-pedido-como-productos/requirements.md`
 - `specs/QC-265-rediseno-operario/requirements.md`
+- `specs/QC-125-espera-minima-por-paso/requirements.md`
 - `progress/impl_QC-291.md`

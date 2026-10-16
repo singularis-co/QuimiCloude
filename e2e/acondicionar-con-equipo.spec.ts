@@ -3,12 +3,12 @@
  * que ve otro acondicionador mientras tanto (R33, R34).
  *
  * R33 recorre con el acondicionador 1: abre el detalle de un pedido «Por acondicionar» desde su
- * pestaña, pulsa «Acondicionar», comprueba que el selector no ofrece al Administrador y sí al
+ * pestaña, pulsa «Comenzar el acondicionamiento», comprueba que el selector no ofrece al Administrador y sí al
  * Operador, espera los 5 s REALES con una persona y un grupo marcados, comienza, ve el estado, el
  * equipo y «Terminar», espera otros 5 s REALES en el modal de Terminar, confirma, aterriza en «Por
  * acondicionar» con el aviso y encuentra el pedido en «Acondicionados».
  * R34, entre comenzar y terminar, abre el mismo detalle con el acondicionador 2 en otro contexto de
- * navegador: ve «Terminar» y «Acondicionar» deshabilitados y sí «Lo acondiciona <nombre del 1>.».
+ * navegador: el pie no le ofrece ningún botón y dice «Lo acondiciona <nombre del 1>.».
  *
  * EL PEDIDO SE SIEMBRA DIRECTAMENTE con `prisma`, ya «Por acondicionar» y con `packed_by`, cumpliendo
  * los CHECK de `orders`: el recorrido de empaque que lo deja ahí lo cubre `e2e/empaque.spec.ts`.
@@ -129,6 +129,10 @@ const SCREEN_STATUS_TESTID = 'conditioning-order-status';
 const SCREEN_CONDITIONER_TESTID = 'conditioning-order-conditioner';
 const START_BUTTON_TESTID = 'conditioning-start-button';
 const FINISH_BUTTON_TESTID = 'conditioning-finish-button';
+/** Sin acción posible, el pie lleva solo esta línea (`conditioning-actions.tsx`). */
+const ACTIONS_REASON_TESTID = 'conditioning-actions-reason';
+const CONDITIONING_START_TEXT = 'Comenzar el acondicionamiento';
+const CONDITIONING_FINISH_TEXT = 'Terminar el acondicionamiento';
 
 /** El equipo guardado, `conditioning-team-list.tsx`. */
 const TEAM_LIST_TESTID = 'conditioning-team-list';
@@ -279,11 +283,14 @@ async function expectConditioner2SeesItReadOnly(browser: Browser, orderId: strin
     await expect(screen.getByTestId(SCREEN_CONDITIONER_TESTID)).toHaveText(
       exactText(`Lo acondiciona ${displayNameOf(conditioner1User)}.`),
     );
-    // El pie pinta siempre los dos botones (R34 de QC-265): para él, los dos deshabilitados.
-    await expect(page.getByTestId(FINISH_BUTTON_TESTID)).toBeDisabled();
-    await expect(page.getByTestId(START_BUTTON_TESTID)).toBeDisabled();
-    await expect(screen.getByRole('button', { name: 'Terminar' })).toBeDisabled();
-    await expect(screen.getByRole('button', { name: 'Acondicionar' })).toBeDisabled();
+    // Sin acción posible, el pie no lleva botones: solo la línea con el motivo.
+    await expect(page.getByTestId(FINISH_BUTTON_TESTID)).toHaveCount(0);
+    await expect(page.getByTestId(START_BUTTON_TESTID)).toHaveCount(0);
+    await expect(screen.getByRole('button', { name: CONDITIONING_FINISH_TEXT })).toHaveCount(0);
+    await expect(screen.getByRole('button', { name: CONDITIONING_START_TEXT })).toHaveCount(0);
+    await expect(page.getByTestId(ACTIONS_REASON_TESTID)).toHaveText(
+      exactText(`Lo acondiciona ${displayNameOf(conditioner1User)}.`),
+    );
   } finally {
     await context.close();
   }
@@ -433,7 +440,7 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
       'POR_ACONDICIONAR',
     );
 
-    // --- 2. «Acondicionar» abre el modal: sin el Administrador y con el Operador.
+    // --- 2. «Comenzar el acondicionamiento» abre el modal: sin el Administrador y con el Operador.
     await screen.getByTestId(START_BUTTON_TESTID).click();
     const startDialog = page.getByTestId(START_DIALOG_TESTID);
     await expect(startDialog).toBeVisible({ timeout: 60_000 });
@@ -474,9 +481,9 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
       { timeout: 60_000 },
     );
     await expect(screen.getByTestId(SCREEN_STATUS_TESTID)).toHaveText(exactText('En acondicionamiento'));
-    await expect(screen.getByTestId(FINISH_BUTTON_TESTID)).toHaveText(exactText('Terminar'));
-    await expect(screen.getByTestId(FINISH_BUTTON_TESTID)).toBeEnabled();
-    await expect(screen.getByTestId(START_BUTTON_TESTID)).toBeDisabled();
+    await expect(page.getByTestId(FINISH_BUTTON_TESTID)).toHaveText(exactText(CONDITIONING_FINISH_TEXT));
+    await expect(page.getByTestId(FINISH_BUTTON_TESTID)).toBeEnabled();
+    await expect(page.getByTestId(START_BUTTON_TESTID)).toHaveCount(0);
 
     const team = screen.getByTestId(TEAM_LIST_TESTID);
     await expect(team).toBeVisible();
@@ -496,7 +503,7 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
     await expect(team).not.toContainText(displayNameOf(adminUser));
 
     // --- 5. R34: el acondicionador 2, aun estando en el equipo, solo mira.
-    await test.step('R34 - el acondicionador 2 ve «Terminar» y «Acondicionar» deshabilitados y ve quién acondiciona', async () => {
+    await test.step('R34 - el acondicionador 2 no ve botones en el pie, solo quién acondiciona', async () => {
       await expectConditioner2SeesItReadOnly(browser, orderId);
     });
 

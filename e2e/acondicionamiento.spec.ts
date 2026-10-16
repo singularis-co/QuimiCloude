@@ -2,8 +2,8 @@
  * E2E de las pestañas del acondicionador en `/asignacion` (R22) y de quién NO las ve (R23).
  *
  * R22 recorre con el Administrador de acondicionamiento «Por acondicionar» -un pedido con dos
- * líneas de reparto y otro que acondiciona otra persona-, el detalle con un único botón
- * habilitado, «Acondicionar», y «Acondicionados», que lista solo el TERMINADO que acondicionó él: ni el de otro ni un ENTREGADO suyo.
+ * líneas de reparto y otro que acondiciona otra persona-, el detalle con un único botón,
+ * «Comenzar el acondicionamiento», y «Acondicionados», que lista solo el TERMINADO que acondicionó él: ni el de otro ni un ENTREGADO suyo.
  * R23 comprueba, con un `test` por rol, que Administrador, Operador y Empacador no ven la pestaña,
  * tampoco pidiéndola por la dirección, y que el detalle les responde 404.
  *
@@ -125,10 +125,11 @@ const ROW_ENTER_TESTID = 'assignment-row-enter';
 const ORDER_DISTRIBUTION_FULL_TESTID = 'order-distribution-full';
 const ROW_STATUS_TESTID = 'conditioning-order-status';
 
-/** El detalle del pedido, `conditioning-order-screen.tsx`; de su pie solo se habilita «Acondicionar». */
+/** El detalle del pedido, `conditioning-order-screen.tsx`; su pie lleva un único botón, «Comenzar el acondicionamiento». */
 const SCREEN_TESTID = 'conditioning-order-screen';
 const START_BUTTON_TESTID = 'conditioning-start-button';
 const FINISH_BUTTON_TESTID = 'conditioning-finish-button';
+const ACTIONS_REASON_TESTID = 'conditioning-actions-reason';
 const SCREEN_NUMBER_TESTID = 'conditioning-order-number';
 const SCREEN_STATUS_TESTID = 'conditioning-order-status';
 
@@ -396,7 +397,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('las pestañas del acondicionador (R22)', () => {
-  test('R22 - el acondicionador aterriza en Por acondicionar con el reparto completo y quién acondiciona, abre el detalle con solo el botón Acondicionar habilitado, y en Acondicionados ve solo el TERMINADO suyo', async ({
+  test('R22 - el acondicionador aterriza en Por acondicionar con el reparto completo y quién acondiciona, abre el detalle con solo el botón «Comenzar el acondicionamiento», y en Acondicionados ve solo el TERMINADO suyo', async ({
     page,
   }) => {
     const { A, B, C, D, E } = seeded();
@@ -447,7 +448,7 @@ test.describe('las pestañas del acondicionador (R22)', () => {
       ),
     );
 
-    // --- 3. «Entrar» del menú ⋯ de A abre el detalle: número, estado y un único botón habilitado, «Acondicionar».
+    // --- 3. «Entrar» del menú ⋯ de A abre el detalle: número, estado y un único botón, «Comenzar el acondicionamiento».
     await enterFromRow(page, rowA);
     await page.waitForURL((url) => url.pathname === conditioningOrderRoute(A.id), {
       timeout: 60_000,
@@ -459,11 +460,14 @@ test.describe('las pestañas del acondicionador (R22)', () => {
       'data-status',
       'POR_ACONDICIONAR',
     );
-    // El pie pinta siempre «Acondicionar» y «Terminar» (R34): solo el primero está habilitado.
-    await expect(screenA.getByTestId(START_BUTTON_TESTID)).toHaveText(exactText('Acondicionar'));
+    // El pie lleva solo el botón que toca por el estado: «Comenzar el acondicionamiento», sin
+    // «Terminar» ni línea de motivo.
+    await expect(screenA.getByTestId(START_BUTTON_TESTID)).toHaveText(
+      exactText('Comenzar el acondicionamiento'),
+    );
     await expect(screenA.getByTestId(START_BUTTON_TESTID)).toBeEnabled();
-    await expect(screenA.getByTestId(FINISH_BUTTON_TESTID)).toHaveText(exactText('Terminar'));
-    await expect(screenA.getByTestId(FINISH_BUTTON_TESTID)).toBeDisabled();
+    await expect(screenA.getByTestId(FINISH_BUTTON_TESTID)).toHaveCount(0);
+    await expect(screenA.getByTestId(ACTIONS_REASON_TESTID)).toHaveCount(0);
 
     // --- 4. «Acondicionados»: C sí; D (de otro) y E (ENTREGADO suyo) no.
     await page.goto(ASSIGNED_ORDERS_ROUTE);

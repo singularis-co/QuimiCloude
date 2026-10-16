@@ -589,23 +589,27 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     await expect(steps).toBeVisible({ timeout: 60_000 });
     expect(await orderStatus(orderId)).toBe('EN_EMPAQUE');
 
+    // El progreso y los botones del paso se pintan en la cabecera y el pie de la pantalla, fuera
+    // del contenedor de los pasos.
+    const packingScreen = page.getByTestId(PACKING_ORDER_SCREEN_TESTID);
+
     // Con pasos de envasado, Terminar vive en el ultimo paso y no como boton suelto.
     await expect(page.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toHaveCount(0);
     await expect(steps.getByTestId(STEP_READER_TESTID)).toHaveCount(1);
-    await expect(steps.getByTestId(STEP_POSITION_TESTID)).toHaveText('Paso 1 de 2');
+    await expect(packingScreen.getByTestId(STEP_POSITION_TESTID)).toHaveText('Paso 1 de 2');
     await expect(steps.getByTestId(STEP_DOCUMENT_TESTID)).toContainText(PACKING_STEP_1_TEXT);
     await expect(steps.getByTestId(STEP_DOCUMENT_TESTID)).toContainText(PACKING_STEP_1_ITEM);
     await expect(page.getByText(PACKING_STEP_2_TEXT)).toHaveCount(0);
     await expectNoneOf(page, [OPERATOR_STEP_TEXT]);
 
-    const next = steps.getByTestId(STEP_NEXT_TESTID);
+    const next = packingScreen.getByTestId(STEP_NEXT_TESTID);
     await expect(next).toBeDisabled();
 
     // Pasada la espera, el check sin marcar sigue bloqueando y su motivo se ve.
-    await expect(steps.getByTestId(STEP_WAIT_REASON_TESTID)).toHaveCount(0, {
+    await expect(packingScreen.getByTestId(STEP_WAIT_REASON_TESTID)).toHaveCount(0, {
       timeout: PACKING_WAIT_MS + 30_000,
     });
-    await expect(steps.getByTestId(STEP_BLOCKED_REASON_TESTID)).toBeVisible();
+    await expect(packingScreen.getByTestId(STEP_BLOCKED_REASON_TESTID)).toBeVisible();
     await expect(next).toBeDisabled();
 
     const item = steps.getByTestId(STEP_CHECKLIST_ITEM_TESTID);
@@ -615,14 +619,15 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     await next.click();
 
     // --- 6. El ultimo paso: Terminar bloqueado mientras corre la espera.
-    await expect(steps.getByTestId(STEP_POSITION_TESTID)).toHaveText('Paso 2 de 2');
+    await expect(packingScreen.getByTestId(STEP_POSITION_TESTID)).toHaveText('Paso 2 de 2');
 
     // La espera dura 5 s desde que se muestra el paso: se comprueba antes que nada mas.
-    const finish = steps.getByTestId(STEP_FINISH_TESTID);
+    const finish = packingScreen.getByTestId(STEP_FINISH_TESTID);
     await expect(finish).toBeDisabled();
-    await expect(steps.getByTestId(STEP_WAIT_REASON_TESTID)).toBeVisible();
-    await expect(finish).toHaveText('Terminar');
-    await expect(steps.getByTestId(STEP_NEXT_TESTID)).toHaveCount(0);
+    await expect(packingScreen.getByTestId(STEP_WAIT_REASON_TESTID)).toBeVisible();
+    // La cuenta va dentro del boton, oculta a lectores de pantalla: se comprueba su nombre.
+    await expect(finish).toHaveAccessibleName('Terminar el empaque');
+    await expect(packingScreen.getByTestId(STEP_NEXT_TESTID)).toHaveCount(0);
 
     await expect(steps.getByTestId(STEP_DOCUMENT_TESTID)).toContainText(PACKING_STEP_2_TEXT);
     await expect(page.getByText(PACKING_STEP_1_TEXT)).toHaveCount(0);

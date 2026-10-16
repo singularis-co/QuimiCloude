@@ -261,6 +261,11 @@ envase y NO DEBE rechazar Terminar por él `[D4]` `[P3]` `[P4]`.
 **R44.** La pantalla de empaque y la de ejecución DEBEN mostrar en cada línea con envase el nombre
 del envase, y en cada línea antigua el nombre de su presentación `[D5]` `[D6]`.
 
+> **Enmienda (2026-10-16, QC-291 D11).** La pantalla de ejecución (fabricación) ya no muestra la
+> presentación: R44 queda solo para la pantalla de empaque. La comprobación «R44: la ejecución
+> nombra los envases» de `e2e/envases-del-pedido.spec.ts` se borra; la del empaque se queda.
+> Detalle en `specs/QC-291-pantalla-operario-rediseno/design.md > 1.1`.
+
 > **Mensaje.** `insufficient_material` al Terminar el empaque usa el texto del catálogo tal cual, sin
 > un mensaje propio (`design.md > 1.6`).
 

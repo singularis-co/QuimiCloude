@@ -139,6 +139,9 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   está dada de baja.»), «Pedido <cantidad> <unidad> · Presentación: <reparto>», «Cambiar tema» y un
   menú «Acciones del pedido <número>» con «Cancelar pedido», que abre el diálogo de cancelar de hoy
   con su motivo, textos, envío y errores.
+  > **Enmienda (2026-10-16, QC-291 D11).** La cabecera dice «Cantidad <cantidad> <unidad>», sin
+  > «Pedido» ni «· Presentación: <reparto>»: la ejecución ya no muestra la presentación (QC-291 R2).
+  > Detalle en `specs/QC-291-pantalla-operario-rediseno/design.md > 1.1`.
 - **R24.** La ejecución DEBE pintar herramientas y materiales en un panel plegable «Herramientas» con
   el número de herramientas, abierto al entrar; CUANDO se pliega o se despliega, el paso vigente y lo
   marcado NO DEBEN cambiar.
@@ -161,6 +164,11 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
 - **R29.** El pie del empaque DEBE pintar «Comenzar» y «Terminar»; MIENTRAS el pedido está
   `POR_EMPACAR`, solo «Comenzar» DEBE estar habilitado; MIENTRAS está `EN_EMPAQUE` a nombre del actor
   y sin pasos de envasado, solo «Terminar»; cada uno abre su confirmación de hoy y envía lo de hoy.
+  > **Enmienda (2026-10-16, QC-291 D12).** El pie ya no pinta los dos botones: pinta solo el que toca
+  > por el estado, «Comenzar el empaque» o «Terminar el empaque» (QC-291 R8, R10). Si el actor no
+  > puede actuar, no lleva ningún botón, solo una línea con el motivo (QC-291 R33). La confirmación y
+  > el envío siguen siendo los de hoy. Detalle en
+  > `specs/QC-291-pantalla-operario-rediseno/design.md > 1.1`.
 - **R30.** MIENTRAS el pedido está `EN_EMPAQUE` a nombre del actor y tiene pasos de envasado, el
   empaque DEBE pintar el paso a paso «Pasos de envasado» con su pie (Anterior / Siguiente / Terminar)
   en lugar de los botones del R29, con las reglas de QC-211 (checks, 5 s por paso, Terminar en el
@@ -169,6 +177,10 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   `Notice` en tono `info` «Lo está empacando <nombre>.» (o «Lo está empacando otra persona.» si no hay
   nombre), con `data-testid="packing-order-packer"`, y los dos botones del pie DEBEN estar
   deshabilitados.
+  > **Enmienda (2026-10-16, QC-291 D12).** A nombre de otra persona el pie no lleva botones,
+  > ni deshabilitados: solo una línea con quién empaca (`packing-order-footer-reason`, QC-291 R33).
+  > El `Notice` `packing-order-packer` se conserva. Detalle en
+  > `specs/QC-291-pantalla-operario-rediseno/design.md > 1.1`.
 
 ### Acondicionamiento (`/asignacion/acondicionamiento/<id>`)
 
@@ -184,6 +196,12 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   está `POR_ACONDICIONAR` y hay candidatos, solo «Acondicionar» DEBE estar habilitado; MIENTRAS está
   `EN_ACONDICIONAMIENTO` a nombre del actor, solo «Terminar», deshabilitado y descrito por el aviso
   de hoy si faltan datos de lote.
+  > **Enmienda (2026-10-16, QC-291 D12).** El pie pinta un solo botón según el estado, «Comenzar el
+  > acondicionamiento» o «Terminar el acondicionamiento» (QC-291 R8, R10); «Terminar» sigue
+  > deshabilitado y descrito por el aviso si faltan datos de lote. Sin acción posible (a nombre de
+  > otra persona, `TERMINADO`, `ENTREGADO` o `POR_ACONDICIONAR` sin candidatos) no lleva ningún
+  > botón, solo la línea con el motivo `conditioning-actions-reason` (QC-291 R33). Detalle en
+  > `specs/QC-291-pantalla-operario-rediseno/design.md > 1.1`.
 - **R35.** CUANDO se pulsa «Acondicionar», el sistema DEBE abrir el diálogo «Acondicionar el pedido
   <número>» con el selector de equipo de hoy y «Comenzar» bloqueado 5 s con el botón con espera.
   *(supuestos P2, P3)*

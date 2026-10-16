@@ -384,3 +384,49 @@ cada task están en verde. La salida de `vitest related` de cada subagente está
 - `pnpm exec playwright test e2e/pantalla-operario-rediseno.spec.ts --project=webkit`: `Running 16 tests using 6 workers` · `16 passed (1.3m)`. Scroll anidado verificado en WebKit de Playwright (design.md §6); no es un iOS real.
 
 **Veredicto:** T11 hecha; el spec nuevo está en verde en chromium y en webkit, sin cambios en la app.
+
+## Tanda 5 — T12 E2E existentes y enmiendas (frontend_dev)
+
+**Archivos**
+
+- `e2e/operario-rediseno.spec.ts`:
+  - QC-265 R2/R3 a 390 px: el pie es `[data-slot="operator-footer"]` en las tres pantallas, fuera de la zona `operator-scroll`. El `position: fixed` pasa a «el pie no está dentro de la zona con scroll» y «el documento no se desplaza». Se desplaza la zona, no `window`, y se mide el pie pegado abajo.
+  - Controles de 44 px: `order-execution-materials-panel-trigger` pasa a `order-execution-materials-fab`; empaque suma `packing-order-packages-fab`. En acondicionamiento, `conditioning-order-back-link` pasa a la lista `absent` (`toHaveCount(0)`, QC-291 R4: pedido comenzado por el actor) y entran los dos botones flotantes.
+  - QC-265 R4: `PANEL_TRACK` `320px` en las tres. El ancla es la columna (`order-execution-materials`, `packing-order-sections`, `conditioning-order-sections`). «Dos tarjetas lado a lado» del acondicionamiento pasa a «columna y contenido lado a lado».
+  - QC-269 R4/R6/R9/R10: a 1440 px se mide como antes, pero la zona central es `operator-scroll`. A 390 px los materiales se abren con el botón flotante y se miden en `operator-side-panel-body`. R6 pasa ahí a «el panel flotante hace scroll» (QC-291 R31), y R4 a `expectSidePanelEndShown`: último material por encima del pie, él y el borde inferior del panel sin tapar y el documento sin desplazar.
+  - QC-269 R5: `measureAtEnd` desplaza `operator-scroll` y mide `operator-footer`; `expectWholeAboveFooter` comprueba además que el documento no se desplace.
+  - R37 y R41, sin cambios: pasan.
+- `e2e/recetas-porcentaje.spec.ts`: «Pedido 200» pasa a «Cantidad 200» (`:563` título y `:574`).
+- `e2e/envases-del-pedido.spec.ts`: se borra la comprobación «R44: la ejecución nombra los envases» y, con ella, las constantes `EXECUTION_DISTRIBUTION_TESTID` y `ORDER_DISTRIBUTION_LABEL_TESTID` y la función `escapeRegExp`, que ya nadie usaba. La de empaque se queda.
+- `e2e/acondicionar-con-equipo.spec.ts`: `:283-286`, ningún botón (`toHaveCount(0)` por testid y por nombre) y `conditioning-actions-reason` con «Lo acondiciona <nombre>.». `:477-479`, «Terminar el acondicionamiento» exacto, y `conditioning-start-button` `toHaveCount(0)` en vez de deshabilitado. Se actualizan la cabecera y el nombre del `test.step`.
+- `e2e/acondicionamiento.spec.ts:463-466`: «Comenzar el acondicionamiento» habilitado, sin `conditioning-finish-button` y sin `conditioning-actions-reason`. Se actualizan el título y los comentarios.
+- `e2e/pasos-de-envasado.spec.ts`: posición, Siguiente, Terminar y los motivos se buscan en `packing-order-screen`, porque van por portal a la cabecera y al pie y no están en `packing-order-steps`. «Terminar» pasa a `toHaveAccessibleName('Terminar el empaque')`: la cuenta va dentro del botón con `aria-hidden` (D13), y con `toHaveText` salía «Terminar el empaque00:01».
+- Notas de enmienda fechadas: `specs/QC-195-envases-del-pedido-como-productos/requirements.md` (R44), `specs/QC-265-rediseno-operario/requirements.md` (R23, R29, R31, R34) y `specs/QC-125-espera-minima-por-paso/requirements.md` (R18, B2).
+- `specs/QC-291-pantalla-operario-rediseno/tasks.md`: se añade la spec de QC-125 a «Archivos esperados».
+- Sin cambios en la app.
+
+**Comprobaciones borradas (solo D11/D12)**
+
+- `e2e/envases-del-pedido.spec.ts:624-635` (original), las dos `toHaveAttribute('title', …)` sobre `order-execution-presentation` › `order-distribution`. Las ampara D11, que quita la presentación de la fabricación (enmienda de QC-195 R44).
+- Ninguna otra. Las de D12 (`acondicionar-con-equipo.spec.ts:283-286`, `acondicionamiento.spec.ts:465-466` y `acondicionar-con-equipo.spec.ts:479`) no se borraron: pasaron de «deshabilitado» a «no existe» y, donde toca, a la línea de motivo.
+
+**Fallos ajenos a QC-291 (sin corregir)**
+
+- `envases-del-pedido.spec.ts:492`, `:623`: `step-reader-item-0-0` no existe. Se entra por `goto` a un pedido `PENDIENTE` y no se pulsa «Comenzar». Viene de `d4ff52c6` (2026-10-15, «el operario comienza el pedido desde la pantalla»), que no actualizó este spec. Mismo fallo en `pedido-en-varias-presentaciones.spec.ts:575` (`finishProduction`, `:332`) y `:778`.
+- Líneas de reparto con « · 1 l » / « · 500 ml »: `acondicionamiento.spec.ts:430` (lista «Por acondicionar»), `envases-del-pedido.spec.ts:656`, y `pedido-en-varias-presentaciones.spec.ts:702` y `:892`. Viene de `9a330ab2` («volumen en el reparto», anterior a QC-291). QC-291 no toca `order-distribution-full.tsx`, `order-distribution-label.tsx` ni el texto de la línea de empaque (`orderDistributionLineText`, el mismo en `56876225`).
+- `empaque.spec.ts:701`: el pedido sale en «Terminados» para el Empacador. Es la lista de `/asignacion`, que QC-291 no toca.
+- `datos-de-lote-en-acondicionamiento.spec.ts:450`: inventario pinta «2027-10-16 (vence en 365 días)». Viene de `08b69744` (inventario, 2026-10-15).
+- `recorrido-acondicionamiento.spec.ts:631`: `GET /dashboard 404` para el Administrador. El dashboard no está en el diff de QC-291.
+- Para ver que detrás no había fallos de QC-291, se parchearon en local y de forma temporal (`TEMP-QC291`) el «Comenzar» y el `toContainText` del reparto. Con eso `envases-del-pedido.spec.ts:492` pasó (1 passed), `pedido-en-varias-presentaciones.spec.ts` pasó (2 passed) y `acondicionamiento.spec.ts:400` también. Los parches se revirtieron: `grep -c TEMP-QC291` da 0. En `empaque`, `datos-de-lote` y `recorrido-acondicionamiento` el fallo es el último paso del test.
+
+**Verificación**
+
+- `pnpm run typecheck`: sin errores.
+- `pnpm exec eslint <los 6 e2e>`: sin salida, exit 0.
+- `pnpm exec playwright test e2e/operario-rediseno.spec.ts e2e/recetas-porcentaje.spec.ts e2e/acondicionar-con-equipo.spec.ts e2e/pasos-de-envasado.spec.ts --project=chromium`: `Running 26 tests using 6 workers` · `26 passed (2.7m)`.
+- `pnpm exec playwright test e2e/envases-del-pedido.spec.ts e2e/acondicionamiento.spec.ts --project=chromium`: `2 failed · 3 passed (1.7m)`. Los dos fallos son los ajenos de arriba (`:430` y `:623`).
+- Lista «sin cambio previsto»:
+  - `ejecucion-receta`, `registro-ejecucion`, `envases-reales-empaque`, `producto-terminado` y `reserva-de-material`: en verde.
+  - `empaque`, `pedido-en-varias-presentaciones`, `datos-de-lote-en-acondicionamiento` y `recorrido-acondicionamiento`: solo los fallos ajenos de arriba.
+
+**Veredicto:** T12 hecha. Los E2E de la tabla están ajustados y la parte de QC-291 pasa en todos, y las tres specs llevan su enmienda. Quedan rojos ajenos a esta feature, documentados arriba.

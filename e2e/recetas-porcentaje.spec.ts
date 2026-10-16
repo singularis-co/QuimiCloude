@@ -560,7 +560,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     expect(await ingredientsCostText(created.id)).toBe('40.0000');
   });
 
-  test('escenario 4 (R18, R22, R25, R26) - el Operario ve "Pedido 200" en su propia linea y "10,00 % · 20" con el simbolo del litro en la del insumo', async ({
+  test('escenario 4 (R18, R22, R25, R26) - el Operario ve "Cantidad 200" en su propia linea y "10,00 % · 20" con el simbolo del litro en la del insumo', async ({
     page,
   }) => {
     await loginAndLand(page, operatorUser);
@@ -571,7 +571,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     // La cantidad del pedido va en SU PROPIA linea, fuera de la lista de la receta.
     const orderQuantity = page.getByTestId('order-execution-order-quantity');
     await expect(orderQuantity).toBeVisible();
-    await expect(orderQuantity).toContainText('Pedido 200');
+    await expect(orderQuantity).toContainText('Cantidad 200');
     await expect(
       page.locator('[data-testid="order-execution-lines"] [data-testid="order-execution-order-quantity"]'),
     ).toHaveCount(0);

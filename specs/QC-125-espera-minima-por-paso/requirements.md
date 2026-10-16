@@ -110,6 +110,13 @@ de esta ficha. El sistema NO DEBE guardar la espera en el navegador más allá d
 asistente, y CUANDO la pantalla se vuelve a montar, la cuenta DEBE empezar de nuevo en el primer
 paso.
 
+> **Enmienda (2026-10-16, QC-291 B2, aprobada por el humano).** La lista cerrada del caso «R18 — el
+> asistente heredado solo puede cambiar step-reader.tsx (lista cerrada)»
+> (`tests/unit/asignaciones-ui/order-execution-screen.test.tsx`, opción (b) de la pregunta abierta
+> 1) admite también `components/shared/step-reader/step-document-view.tsx` y
+> `components/shared/step-reader/index.ts`. Cualquier otro archivo de la carpeta sigue poniéndolo
+> rojo. Detalle en `specs/QC-291-pantalla-operario-rediseno/requirements.md > Decisiones cerradas`.
+
 ### Herencia que no se rompe
 
 **R19.** El asistente DEBE seguir recibiendo **todo por props** —incluida la activación de la

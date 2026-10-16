@@ -148,8 +148,6 @@ const EXECUTION_TITLE_TESTID = 'order-execution-title';
 /** La ejecución: el `h1` es solo la receta y el número va en el rótulo de la cabecera (R23 de QC-265). */
 const EXECUTION_SCREEN_TESTID = 'order-execution-screen';
 const EXECUTION_EYEBROW_SELECTOR = '[data-slot="operator-eyebrow"]';
-const EXECUTION_DISTRIBUTION_TESTID = 'order-execution-presentation';
-const ORDER_DISTRIBUTION_LABEL_TESTID = 'order-distribution';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
 const STEP_FINISH_TESTID = 'step-reader-finish';
 const PACKING_SCREEN_TESTID = 'packing-order-screen';
@@ -192,10 +190,6 @@ let literPresentationId: string | null = null;
 let bottle: SeededPackagingRef | null = null;
 let jug: SeededPackagingRef | null = null;
 let operatorUserId: string | null = null;
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 async function createUser(user: Credentials, roleId: string): Promise<string> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -620,19 +614,6 @@ test.describe('envases del pedido como productos', () => {
     await expect(
       page.getByTestId(EXECUTION_SCREEN_TESTID).locator(EXECUTION_EYEBROW_SELECTOR),
     ).toHaveText(firstNumber);
-
-    // R44: la ejecucion nombra los envases.
-    const executionLabel = page
-      .getByTestId(EXECUTION_DISTRIBUTION_TESTID)
-      .getByTestId(ORDER_DISTRIBUTION_LABEL_TESTID);
-    await expect(executionLabel).toHaveAttribute(
-      'title',
-      new RegExp(escapeRegExp(`${BOTTLES} × ${BOTTLE_NAME}`)),
-    );
-    await expect(executionLabel).toHaveAttribute(
-      'title',
-      new RegExp(escapeRegExp(`${JUGS} × ${JUG_NAME}`)),
-    );
 
     // Un clic antes de hidratar se pierde sin error: se repite hasta que la casilla quede marcada.
     const checklistItem = page.getByTestId(STEP_CHECKLIST_ITEM_TESTID);
