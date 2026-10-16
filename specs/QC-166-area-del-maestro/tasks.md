@@ -20,7 +20,7 @@ mergeado; `design.md > 5` ya está alineado con su `design.md`, reenvío incluid
 
 ## Tasks
 
-- [ ] **T1 · Rutas y menú** (R2, R3, R4, R5). Sin dependencias.
+- [x] **T1 · Rutas y menú** (R2, R3, R4, R5). Sin dependencias.
   - `lib/shared/routes.ts`: `MAESTRO_COMPANIES_ROUTE`, `maestroCompanyRoute`,
     `MAESTRO_ADMINISTRATORS_ROUTE`; los dos prefijos en `PRIVATE_ROUTE_PREFIXES` (`design.md > 3.1`).
   - `lib/shared/navigation/private-nav.ts`: sección «Plataforma», etiquetas y los dos `NavLink` al
@@ -32,7 +32,7 @@ mergeado; `design.md > 5` ya está alineado con su `design.md`, reenvío incluid
   - **Hecho:** el menú del Maestro es exactamente «Plataforma»; `homeHrefFor` del Maestro da
     `/maestro/empresas` y el de cada rol del seed no cambia; guardias en verde.
 
-- [ ] **T2 · Piezas compartidas** (R17, R32, R33). Depende de T1 (orden de commits).
+- [x] **T2 · Piezas compartidas** (R17, R32, R33). Depende de T1 (orden de commits).
   - `components/shared/administrator-fields.tsx` (`design.md > 7.2`) y su fila en el catálogo.
   - `lib/shared/ui/addon-names.ts` (`design.md > 6.5`) y su fila («sin UI»); test de tipos que
     iguala `AddonNameKey` a `Addon`.
