@@ -318,6 +318,10 @@ enmienda. La lista de enmiendas está en `design.md > 11`.
 | D13 dos entradas al mismo sheet | R5, R6, R7, R8 |
 | D14 sin excedente, nada en el DOM | R5, R6, R21 |
 | D15 pase `/design` aprobado | R10, R11, R12, R18, R21, R28, R44, R52, R54 (la UI sigue los tableros; `design.md > Lo que ya existe`) |
+| 2026-10-16 | Bloqueo F3 del implementer: `finished-product-route-contract` no admite `listDirectDeliverySurplusAction` y R16 prohíbe importar `DirectDeliveryButton` por el barrel de `/inventario` (F2.1) | Se enmienda el contrato: admite `listDirectDeliverySurplusAction` y `getDirectDeliveryForVoidAction`. El botón se importa por su ruta directa, no por el barrel. Enmienda el spec dueño del contrato, con nota fechada. |
+| 2026-10-16 | Bloqueo F4: `guard-formularios-y-acciones` R28 exige un único menú de acciones por fila (F2.1) | La fila de la tab Entregas usa el menú de acciones con un único elemento «Anular». Se aparta del tablero, que pintaba un botón suelto. La guardia no cambia. |
+| 2026-10-16 | Tab Entregas en teléfono: las tarjetas duplican `data-testid` (F2.1) | Sin tarjetas: en teléfono queda la tabla con scroll horizontal, como hoy. Las tarjetas quedan para otra ficha. |
+| 2026-10-16 | Elecciones menores del implementer (F2.1) | Aceptadas: «Entregar» va después de «Lotes» en el menú de la fila; «Ver los pedidos que esperan» se muestra siempre; B4 lee la receta y la presentación sin bloqueo antes del paso 0; la lectura de anular trae los clientes en una segunda llamada. |
 
 ## Preguntas abiertas
 
