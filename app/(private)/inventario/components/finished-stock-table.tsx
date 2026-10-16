@@ -33,9 +33,18 @@ export type FinishedStockTableProps = {
   readonly totalPages: number;
   readonly units?: readonly UnitRef[];
   readonly canAdjust?: boolean;
+  /** Envases de excedente por producto. Un producto ausente o en cero no ofrece «Entregar». */
+  readonly surplusByProduct?: Readonly<Record<string, number>>;
   readonly status?: ProductTableStatus;
   readonly error?: OperationError;
 };
+
+function directDeliveryOf(
+  surplusByProduct: Readonly<Record<string, number>> | undefined,
+  productId: string,
+): { readonly productId: string } | undefined {
+  return (surplusByProduct?.[productId] ?? 0) > 0 ? { productId } : undefined;
+}
 
 function loadLineBatches(parent: FinishedStockRow, line: FinishedStockProductLine) {
   return parent.kind === 'order'
@@ -54,6 +63,7 @@ export function FinishedStockTable({
   totalPages,
   units,
   canAdjust = false,
+  surplusByProduct,
   status = 'idle',
   error,
 }: FinishedStockTableProps) {
@@ -77,11 +87,12 @@ export function FinishedStockTable({
             units={units}
             canAdjust={canAdjust}
             loadBatches={loadLineBatches(parent, line)}
+            directDelivery={directDeliveryOf(surplusByProduct, line.product.id)}
           />
         ),
         units,
       }),
-    [units, canAdjust],
+    [units, canAdjust, surplusByProduct],
   );
 
   const tableRows = useMemo(

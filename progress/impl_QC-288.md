@@ -156,6 +156,65 @@ Veredicto: F5 hecha; historial y movimientos muestran la entrega sin pedido y su
   `guard-formularios-y-acciones` R28 sobre
   `producto-terminado/[id]/components/finished-product-deliveries-table.tsx:103`, archivo de F4 en curso.
 
+## F3 — Entradas: cabecera de la ficha y menú del listado (frontend_dev, 2026-10-16) — PARCIAL
+
+**Bloqueada la parte de `producto-terminado/[id]/page.tsx`.** Lo que pide `design.md > 7.4` para la
+ficha choca con `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts`, que
+`design.md > 9` no enmienda en ese punto. Probado cableando la página tal cual el diseño: 3 rojos, los 3
+de `page.tsx`, y la página se dejó como estaba en HEAD.
+1. `R7, R36` y `QC-225 R7 (enmienda QC-288), R43`: de `order-actions` la ruta solo admite
+   `deliverDirectAction`, `voidDirectDeliveryAction` y `getDirectDeliveryForVoidAction`; §7.4 manda a la
+   página llamar a `listDirectDeliverySurplusAction`.
+2. `R16 — la ruta solo llama desde el servidor a valores del barrel de /inventario que no vienen de un
+   modulo de cliente`: `DirectDeliveryButton` es `'use client'` (guarda el estado de apertura) y la
+   página lo importaría del barrel de `/inventario`.
+Falta decisión del leader/humano: enmendar ese contrato (lista de lecturas + R16 para componentes que
+se pintan como JSX) o cambiar el diseño. Hasta entonces R5 solo tiene cubierta la cabecera.
+
+### Archivos
+- Nuevo: `app/(private)/inventario/components/direct-delivery-button.tsx`.
+- `app/(private)/inventario/components/product-row-actions.tsx`: prop opcional `directDelivery`; con ella,
+  ítem «Entregar» (`product-action-direct-delivery`, `TruckIcon`) tras «Lotes», y el sheet montado solo
+  mientras está abierto. Sin la prop, ítems y orden iguales.
+- `finished-stock-table.tsx`: prop opcional `surplusByProduct`; da `directDelivery` solo con excedente > 0.
+- `finished-stock-list-section.tsx`: con `entregas.modificar` (mismo `assertPermission` que
+  `order-list-section.tsx`), una llamada a `listDirectDeliverySurplusAction` con los productos distintos
+  de la página (tandas de 200); error o rechazo dejan el mapa vacío.
+- `app/(private)/inventario/components/index.ts`: `DirectDeliveryButton`, `DIRECT_DELIVERY_OPEN_TESTID`,
+  `PRODUCT_ACTION_DIRECT_DELIVERY_TESTID`.
+- `producto-terminado/[id]/components/finished-product-header.tsx`: prop opcional `actions` al hueco de
+  `PageHeader`.
+- Tests nuevos: `tests/unit/inventario-ui/direct-delivery-button.test.tsx`,
+  `finished-product-header.test.tsx`, `finished-stock-list-section.test.tsx`.
+- `tests/unit/inventario/finished-stock-table.test.tsx`: doble de `order-actions` (nota fechada) y bloque
+  «Entregar» sin pedido. `product-page.test.tsx` y `inventario-paridad.test.tsx`: el doble de
+  `listDirectDeliverySurplusAction` resuelve `{ status: 'success', data: {} }`.
+
+### R → test
+- R5 → `finished-product-header.test.tsx` (`R5: con actions…`, `R5: sin actions…`). **Falta la página**
+  (ver bloqueo): `finished-product-page.test.tsx` sin caso nuevo.
+- R6 → `finished-stock-table.test.tsx` (`R6: solo la fila con excedente…`, `R6: sin mapa…`) y
+  `finished-stock-list-section.test.tsx` (`R6: …falla`, `R6: …rechaza`, `R6: sin entregas.modificar /
+  sin sesion`, `R6: el permiso decide, no el rol`).
+- R7 → `direct-delivery-button.test.tsx` (2 casos) y `finished-stock-table.test.tsx` (`R7: «Entregar» del
+  menu abre el sheet…`).
+- R8 → `finished-stock-list-section.test.tsx` (`R8: … una sola llamada`, `R8: con 1/25 filas…`,
+  `R8: … tandas de 200`).
+
+### Gate (salida real)
+- `pnpm run typecheck`: verde.
+- `pnpm run lint`: 0 errores, 9 avisos preexistentes, ninguno en archivos de F3.
+- Tests nuevos y `finished-stock-table.test.tsx`: `Test Files 4 passed (4)`, `Tests 37 passed (37)`.
+- `product-route-contract.test.ts` + `finished-product-route-contract.test.ts`: `2 passed`, `40 passed`.
+- `pnpm exec vitest related --run <archivos de F3 + contratos + tests tocados>`:
+  `Test Files 1 failed | 39 passed (40)`, `Tests 1 failed | 639 passed (640)`. El rojo fue un tiempo
+  agotado (21 s) en `product-page.test.tsx` («un guardado rechazado por un campo…»); solo y con
+  `--testTimeout=120000`: `Test Files 1 passed`, `Tests 88 passed (88)`.
+- `pnpm exec vitest run guard`: `74 passed | 3 failed`. Dos eran tiempos agotados por carga
+  (`guard-asignacion-componentizada`, `guard-archivos-en-vuelo-sin-ruido`: con `--testTimeout=120000`,
+  `2 passed`, `31 passed`). El rojo real sigue siendo `guard-formularios-y-acciones` R28 sobre
+  `finished-product-deliveries-table.tsx:103`, de F4.
+
 ## B1 — Migraciones y esquema (2026-10-16)
 
 Grafo: sin proyecto para este worktree; Grep/Read.

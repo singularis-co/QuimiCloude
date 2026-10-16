@@ -7,6 +7,11 @@ export { AdjustBatchDialog, type AdjustBatchDialogProps } from './adjust-batch-d
 export { BatchHistory, movementKindLabel } from './batch-history';
 export { DeleteProductDialog } from './delete-product-dialog';
 export {
+  DIRECT_DELIVERY_OPEN_TESTID,
+  DirectDeliveryButton,
+  type DirectDeliveryButtonProps,
+} from './direct-delivery-button';
+export {
   DIRECT_DELIVERY_CANCEL_TESTID,
   DIRECT_DELIVERY_DRAFT_ADJUSTED_TESTID,
   DIRECT_DELIVERY_ERROR_TESTID,
@@ -99,6 +104,7 @@ export { productNameWithoutPresentation } from './product-base-name';
 export {
   PRODUCT_ACTION_BATCHES_TESTID,
   PRODUCT_ACTION_DELETE_TESTID,
+  PRODUCT_ACTION_DIRECT_DELIVERY_TESTID,
   PRODUCT_ACTION_EDIT_TESTID,
   PRODUCT_ROW_ACTIONS_TESTID,
   ProductRowActions,

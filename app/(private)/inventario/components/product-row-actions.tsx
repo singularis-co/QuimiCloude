@@ -1,6 +1,6 @@
 'use client';
 
-import { LayersIcon, PencilIcon, Trash2Icon } from 'lucide-react';
+import { LayersIcon, PencilIcon, Trash2Icon, TruckIcon } from 'lucide-react';
 import { useState } from 'react';
 
 import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
@@ -9,6 +9,7 @@ import type { ProductBatchesResult } from '@/lib/modules/inventario/adapters/dri
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { DeleteProductDialog } from './delete-product-dialog';
+import { DirectDeliverySheet } from './direct-delivery-sheet';
 import { ProductBatchesSheet } from './product-batches-sheet';
 import { productUnitLabel } from './product-columns';
 import { ProductSheet } from './product-sheet';
@@ -28,8 +29,10 @@ export const PRODUCT_ROW_ACTIONS_TESTID = 'product-row-actions';
 export const PRODUCT_ACTION_BATCHES_TESTID = 'product-batches-open';
 export const PRODUCT_ACTION_EDIT_TESTID = 'product-edit-open';
 export const PRODUCT_ACTION_DELETE_TESTID = 'product-delete-open';
+export const PRODUCT_ACTION_DIRECT_DELIVERY_TESTID = 'product-action-direct-delivery';
 
 const BATCHES_ACTION_LABEL = 'Lotes';
+const DIRECT_DELIVERY_ACTION_LABEL = 'Entregar';
 const EDIT_ACTION_LABEL = 'Editar';
 const DELETE_ACTION_LABEL = 'Borrar';
 
@@ -45,12 +48,15 @@ export type ProductRowActionsProps = {
   readonly canAdjust: boolean;
   /** Que lotes pide el panel. Sin el, todos los del producto. */
   readonly loadBatches?: () => Promise<ProductBatchesResult>;
+  /** Solo con permiso y excedente: lo decide el servidor que monta la tabla. */
+  readonly directDelivery?: { readonly productId: string };
 };
 
-export function ProductRowActions({ product, units, canAdjust, loadBatches }: ProductRowActionsProps) {
+export function ProductRowActions({ product, units, canAdjust, loadBatches, directDelivery }: ProductRowActionsProps) {
   const [batchesOpen, setBatchesOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [directDeliveryOpen, setDirectDeliveryOpen] = useState(false);
 
   const items: RowActionMenuItem[] = [
     {
@@ -60,6 +66,17 @@ export function ProductRowActions({ product, units, canAdjust, loadBatches }: Pr
       onSelect: () => setBatchesOpen(true),
       testId: PRODUCT_ACTION_BATCHES_TESTID,
     },
+    ...(directDelivery === undefined
+      ? []
+      : [
+          {
+            key: 'direct-delivery',
+            label: DIRECT_DELIVERY_ACTION_LABEL,
+            icon: TruckIcon,
+            onSelect: () => setDirectDeliveryOpen(true),
+            testId: PRODUCT_ACTION_DIRECT_DELIVERY_TESTID,
+          },
+        ]),
     {
       key: 'edit',
       label: EDIT_ACTION_LABEL,
@@ -98,6 +115,9 @@ export function ProductRowActions({ product, units, canAdjust, loadBatches }: Pr
       />
       <ProductSheet product={product} units={units} open={editOpen} onOpenChange={setEditOpen} />
       <DeleteProductDialog product={product} open={deleteOpen} onOpenChange={setDeleteOpen} />
+      {directDelivery !== undefined && directDeliveryOpen ? (
+        <DirectDeliverySheet productId={directDelivery.productId} open onOpenChange={setDirectDeliveryOpen} />
+      ) : null}
     </>
   );
 }

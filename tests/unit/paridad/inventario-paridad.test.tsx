@@ -105,7 +105,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/batch-actions', () => ({
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   getDirectDeliveryAction: vi.fn(),
   deliverDirectAction: vi.fn(),
-  listDirectDeliverySurplusAction: vi.fn(),
+  listDirectDeliverySurplusAction: vi.fn(async () => ({ status: 'success', data: {} })),
   searchOrderCustomersAction: vi.fn(),
 }));
 
