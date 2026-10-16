@@ -175,6 +175,14 @@ const LECTURAS_PERMITIDAS = new Set([
   'listFinishedProductDistributionAction',
 ]);
 
+// 2026-10-14 (QC-271): la pestaña Lotes lee, solo lee, las fotos del pedido de origen de cada lote.
+// Es el segundo archivo de acciones que la ruta puede importar, y solo con estas dos lecturas.
+const ACCIONES_DE_EVIDENCIA = '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
+const LECTURAS_DE_EVIDENCIA = new Set(['getOrderEvidenceAction', 'countOrderEvidenceAction']);
+
+const ACCIONES_DE_ESCRITURA_DE_EVIDENCIA = '@/lib/modules/asignaciones/adapters/driving/step-evidence-actions';
+const PIEZA_DE_EVIDENCIA = '@/components/shared/step-evidence';
+
 describe('contrato de la ficha de producto terminado', () => {
   it('la pantalla existe donde la ubica finishedProductDetailRoute, con su barrel', () => {
     expect(existsSync(join(RAIZ, PAGE_PATH)), `deberia existir ${PAGE_PATH}`).toBe(true);
@@ -207,7 +215,11 @@ describe('contrato de la ficha de producto terminado', () => {
           hallazgos.push(`${ruta} -> ${especificador}`);
           continue;
         }
-        if (/\/adapters\/driving\//.test(especificador) && especificador !== ACCIONES_DE_LECTURA) {
+        if (
+          /\/adapters\/driving\//.test(especificador) &&
+          especificador !== ACCIONES_DE_LECTURA &&
+          especificador !== ACCIONES_DE_EVIDENCIA
+        ) {
           if (!especificador.endsWith('/require-page-permission')) {
             hallazgos.push(`${ruta} -> ${especificador}`);
           }
@@ -215,6 +227,11 @@ describe('contrato de la ficha de producto terminado', () => {
       }
       for (const nombre of nombresImportadosDe(codigo, ACCIONES_DE_LECTURA)) {
         if (!LECTURAS_PERMITIDAS.has(nombre) && !/Result$/.test(nombre)) {
+          hallazgos.push(`${ruta} -> ${nombre}`);
+        }
+      }
+      for (const nombre of nombresImportadosDe(codigo, ACCIONES_DE_EVIDENCIA)) {
+        if (!LECTURAS_DE_EVIDENCIA.has(nombre) && !/Result$/.test(nombre)) {
           hallazgos.push(`${ruta} -> ${nombre}`);
         }
       }
@@ -232,6 +249,52 @@ describe('contrato de la ficha de producto terminado', () => {
     expect(especificadores(fabricada)).toContain(ACCIONES_DE_ESCRITURA[3]);
     expect(nombresImportadosDe(fabricada, ACCIONES_DE_LECTURA)).toEqual(['listProducedProductsAction']);
     expect(LECTURAS_PERMITIDAS.has('listProducedProductsAction')).toBe(false);
+  });
+
+  it('R26 — ningun archivo de la ruta sube, cambia ni quita fotos de evidencia', () => {
+    const hallazgos: string[] = [];
+    let lecturas = 0;
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      const codigo = leer(ruta);
+      for (const especificador of especificadores(codigo)) {
+        if (/step-evidence-actions|upload-evidence/.test(especificador)) {
+          hallazgos.push(`${ruta} -> ${especificador}`);
+        }
+      }
+      for (const nombre of nombresImportadosDe(codigo, PIEZA_DE_EVIDENCIA)) {
+        if (/upload|EvidenceMissing/i.test(nombre)) hallazgos.push(`${ruta} -> ${nombre}`);
+      }
+      for (const nombre of nombresImportadosDe(codigo, ACCIONES_DE_EVIDENCIA)) {
+        if (LECTURAS_DE_EVIDENCIA.has(nombre)) lecturas += 1;
+        else if (!/Result$/.test(nombre)) hallazgos.push(`${ruta} -> ${nombre}`);
+      }
+      const limpio = sinComentarios(codigo);
+      for (const prohibido of [
+        'uploadEvidence',
+        'requestEvidenceUploadAction',
+        'registerEvidenceAction',
+        'removeEvidenceAction',
+      ]) {
+        if (limpio.includes(prohibido)) hallazgos.push(`${ruta} -> ${prohibido}`);
+      }
+    }
+
+    expect(lecturas, 'la ruta lee el conteo y las fotos').toBeGreaterThanOrEqual(2);
+    expect(hallazgos).toEqual([]);
+  });
+
+  it('R26 — la guardia de escritura de evidencia muerde con una fuente fabricada', () => {
+    const fabricada = [
+      `import { registerEvidenceAction } from '${ACCIONES_DE_ESCRITURA_DE_EVIDENCIA}';`,
+      `import { StepEvidence, uploadEvidence } from '${PIEZA_DE_EVIDENCIA}';`,
+      `import { getOrderEvidenceAction, removeEvidenceAction } from '${ACCIONES_DE_EVIDENCIA}';`,
+    ].join('\n');
+    expect(especificadores(fabricada)).toContain(ACCIONES_DE_ESCRITURA_DE_EVIDENCIA);
+    expect(nombresImportadosDe(fabricada, PIEZA_DE_EVIDENCIA)).toContain('uploadEvidence');
+    expect(
+      nombresImportadosDe(fabricada, ACCIONES_DE_EVIDENCIA).filter((nombre) => !LECTURAS_DE_EVIDENCIA.has(nombre)),
+    ).toEqual(['removeEvidenceAction']);
   });
 
   it('R30 — ningun archivo de la ruta incrusta la direccion de la ficha', () => {

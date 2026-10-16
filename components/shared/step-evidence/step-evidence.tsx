@@ -1,6 +1,6 @@
 'use client';
 
-import { type ChangeEvent, type DragEvent, useId, useRef, useState } from 'react';
+import { type ChangeEvent, type DragEvent, type ReactNode, useId, useRef, useState } from 'react';
 import { CameraIcon, RefreshCwIcon, Trash2Icon, TriangleAlertIcon, XIcon } from 'lucide-react';
 
 import { toAcceptAttribute } from '@/components/shared/file-types';
@@ -8,6 +8,7 @@ import { Spinner } from '@/components/shared/spinner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
@@ -35,23 +36,42 @@ export const STEP_EVIDENCE_TEXTS = {
   uploadingReason: 'Espera a que termine de subir la foto.',
   missingReason: 'Sube al menos 1 foto de evidencia para continuar.',
   finishWarning: 'Al terminar, las fotos de evidencia quedan fijas. No se puede deshacer.',
+  stepHeading: (step: number) => `Paso ${step}`,
+  groupLabel: (phase: string, step: number) => `Evidencia de ${phase}, paso ${step}`,
+  loading: 'Cargando fotos…',
+  expired: 'Vista vencida',
+  reload: 'Recargar',
+  reloadPhoto: (n: number, step: number) => `Recargar la foto ${n} del paso ${step}`,
+  readError: 'No se pudieron cargar las fotos.',
+  retry: 'Reintentar',
 } as const;
 
 export type StepEvidenceTile =
   | { readonly id: string; readonly status: 'ok'; readonly url: string }
   | { readonly id: string; readonly status: 'uploading'; readonly percent: number }
-  | { readonly id: string; readonly status: 'error'; readonly message: string };
+  | { readonly id: string; readonly status: 'error'; readonly message: string }
+  | { readonly id: string; readonly status: 'loading' };
 
 export type StepEvidenceProps = {
   /** Posición del paso desde 1: solo nombra las fotos para los lectores de pantalla. */
   readonly stepPosition: number;
-  /** Las casillas en el orden de la cuadrícula; solo las `ok` cuentan. */
+  /** Las casillas en el orden de la cuadrícula; solo las `ok` cuentan, salvo con `consult`. */
   readonly photos: readonly StepEvidenceTile[];
   readonly readOnly?: boolean;
+  /**
+   * Solo para ver fotos ya guardadas: implica `readOnly`, quita los textos de requisito y de ayuda
+   * y cuenta también las casillas que aún cargan.
+   */
+  readonly consult?: boolean;
+  /** Con `consult`, la fase que nombra el grupo para los lectores de pantalla. */
+  readonly phaseLabel?: string;
+  readonly heading?: string;
   readonly onAdd?: (file: File) => void;
   readonly onChange?: (id: string, file: File) => void;
   /** En una foto contada la retira; en una casilla en error la descarta. */
   readonly onRemove?: (id: string) => void;
+  /** Con `consult`, «Recargar» en una miniatura que no cargó; sin él no hay botón. */
+  readonly onReload?: () => void;
 };
 
 const TILE_ENTER =
@@ -65,22 +85,44 @@ function clampPercent(percent: number): number {
   return Math.min(100, Math.max(0, Math.round(percent)));
 }
 
+function withUrl(set: ReadonlySet<string>, url: string): ReadonlySet<string> {
+  return set.has(url) ? set : new Set(set).add(url);
+}
+
 export function StepEvidence({
   stepPosition,
   photos,
-  readOnly = false,
+  readOnly: readOnlyProp = false,
+  consult = false,
+  phaseLabel,
+  heading = STEP_EVIDENCE_TEXTS.heading,
   onAdd,
   onChange,
   onRemove,
+  onReload,
 }: StepEvidenceProps) {
   const baseId = useId();
   const headingId = `${baseId}-heading`;
   const inputRef = useRef<HTMLInputElement>(null);
   const changeTarget = useRef<string | null>(null);
   const [viewing, setViewing] = useState<{ url: string; label: string } | null>(null);
+  // Por URL y no por id: una lectura firmada nueva de la misma foto vuelve a esperar su carga.
+  const [loadedUrls, setLoadedUrls] = useState<ReadonlySet<string>>(() => new Set());
+  const [failedUrls, setFailedUrls] = useState<ReadonlySet<string>>(() => new Set());
 
-  const okCount = photos.filter((photo) => photo.status === 'ok').length;
+  const readOnly = readOnlyProp || consult;
+  const okCount = photos.filter((photo) =>
+    consult ? photo.status !== 'error' : photo.status === 'ok',
+  ).length;
   const canAdd = !readOnly && photos.length < MAX_STEP_EVIDENCE_PHOTOS;
+
+  function isPending(photo: StepEvidenceTile): boolean {
+    if (photo.status === 'loading') return true;
+    return (
+      consult && photo.status === 'ok' && !loadedUrls.has(photo.url) && !failedUrls.has(photo.url)
+    );
+  }
+  const anyPending = photos.some(isPending);
 
   function pickFile(targetId: string | null) {
     changeTarget.current = targetId;
@@ -112,51 +154,108 @@ export function StepEvidence({
     deliver(file);
   }
 
-  return (
-    <Card
-      role="region"
-      aria-labelledby={headingId}
-      data-testid="step-evidence"
-      data-read-only={readOnly || undefined}
-      className="gap-3 px-4"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-2.5">
-          <CameraIcon className="size-4" aria-hidden />
-          <h3 id={headingId} className="text-base font-semibold">
-            {STEP_EVIDENCE_TEXTS.heading}
-          </h3>
-          <span
-            data-testid="step-evidence-count"
-            aria-label={STEP_EVIDENCE_TEXTS.countLabel(okCount)}
-            className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs"
-          >
-            {STEP_EVIDENCE_TEXTS.count(okCount)}
+  const body = (
+    <>
+      {consult ? (
+        <EvidenceGroupHeader title={heading} count={okCount} titleId={headingId} />
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-2.5">
+            <CameraIcon className="size-4" aria-hidden />
+            <h3 id={headingId} className="text-base font-semibold">
+              {heading}
+            </h3>
+            <EvidenceCount count={okCount} />
           </span>
-        </span>
-        <span data-testid="step-evidence-requirement" className="text-xs text-muted-foreground">
-          {readOnly ? STEP_EVIDENCE_TEXTS.fixed : STEP_EVIDENCE_TEXTS.required}
-        </span>
-      </div>
+          <span data-testid="step-evidence-requirement" className="text-xs text-muted-foreground">
+            {readOnly ? STEP_EVIDENCE_TEXTS.fixed : STEP_EVIDENCE_TEXTS.required}
+          </span>
+        </div>
+      )}
 
-      <ul className="grid grid-cols-3 gap-2.5" data-testid="step-evidence-grid">
+      {consult && (
+        <span role="status" className="sr-only" data-testid="step-evidence-loading">
+          {anyPending ? STEP_EVIDENCE_TEXTS.loading : ''}
+        </span>
+      )}
+
+      <ul
+        className={cn('grid grid-cols-3', consult ? 'gap-2' : 'gap-2.5')}
+        data-testid="step-evidence-grid"
+        aria-busy={consult && anyPending ? true : undefined}
+      >
         {photos.map((photo, index) => {
           const n = index + 1;
+          const expired = consult && photo.status === 'ok' && failedUrls.has(photo.url);
+          const pending = isPending(photo);
           return (
             <li
               key={photo.id}
               data-testid={`step-evidence-tile-${n}`}
-              data-status={photo.status}
+              data-status={expired ? 'expired' : photo.status}
+              data-pending={pending || undefined}
               className={cn(
-                'relative aspect-square overflow-hidden rounded-xl border border-border',
+                'relative aspect-square overflow-hidden rounded-xl',
+                photo.status === 'loading' ? 'border-0' : 'border border-border',
                 TILE_ENTER,
               )}
             >
-              {photo.status === 'ok' && (
+              {pending && (
+                <Skeleton
+                  data-testid="step-evidence-skeleton"
+                  className="absolute inset-0 size-full rounded-xl"
+                />
+              )}
+
+              {expired && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-warning-subtle p-1.5 text-center text-xs leading-snug text-warning-text">
+                  <span className="font-semibold">{STEP_EVIDENCE_TEXTS.expired}</span>
+                  {onReload !== undefined && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      touch
+                      aria-label={STEP_EVIDENCE_TEXTS.reloadPhoto(n, stepPosition)}
+                      onClick={onReload}
+                    >
+                      {STEP_EVIDENCE_TEXTS.reload}
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {photo.status === 'ok' && !expired && (
                 <>
                   {/* URL firmada de vida corta del bucket: `next/image` exigiría declarar su dominio. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.url} alt="" className="absolute inset-0 size-full object-cover" />
+                  <img
+                    key={photo.url}
+                    src={photo.url}
+                    alt=""
+                    className={cn('absolute inset-0 size-full object-cover', pending && 'opacity-0')}
+                    // La imagen puede terminar antes de que la hidratación enganche onLoad/onError
+                    // y ese evento se pierde: al montar, se lee su estado. `withUrl` devuelve el
+                    // mismo Set si la URL ya está, así que repetirlo no vuelve a renderizar.
+                    ref={
+                      consult
+                        ? (img: HTMLImageElement | null) => {
+                            if (img === null || !img.getAttribute('src') || !img.complete) return;
+                            if (img.naturalWidth > 0) {
+                              setLoadedUrls((set) => withUrl(set, photo.url));
+                            } else {
+                              setFailedUrls((set) => withUrl(set, photo.url));
+                            }
+                          }
+                        : undefined
+                    }
+                    onLoad={
+                      consult ? () => setLoadedUrls((set) => withUrl(set, photo.url)) : undefined
+                    }
+                    onError={
+                      consult ? () => setFailedUrls((set) => withUrl(set, photo.url)) : undefined
+                    }
+                  />
                   <button
                     type="button"
                     aria-label={STEP_EVIDENCE_TEXTS.photo(n, stepPosition)}
@@ -241,12 +340,14 @@ export function StepEvidence({
                 </div>
               )}
 
-              <span
-                aria-hidden
-                className="absolute bottom-2 left-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-card/90 px-1.5 font-mono text-xs"
-              >
-                {n}
-              </span>
+              {photo.status !== 'loading' && !expired && (
+                <span
+                  aria-hidden
+                  className="absolute bottom-2 left-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-card/90 px-1.5 font-mono text-xs"
+                >
+                  {n}
+                </span>
+              )}
             </li>
           );
         })}
@@ -288,9 +389,11 @@ export function StepEvidence({
         />
       )}
 
-      <p data-testid="step-evidence-hint" className="m-0 text-xs text-muted-foreground">
-        {readOnly ? STEP_EVIDENCE_TEXTS.fixedHint : STEP_EVIDENCE_TEXTS.hint}
-      </p>
+      {!consult && (
+        <p data-testid="step-evidence-hint" className="m-0 text-xs text-muted-foreground">
+          {readOnly ? STEP_EVIDENCE_TEXTS.fixedHint : STEP_EVIDENCE_TEXTS.hint}
+        </p>
+      )}
 
       <Dialog open={viewing !== null} onOpenChange={(open) => {
           if (!open) setViewing(null);
@@ -320,6 +423,69 @@ export function StepEvidence({
           )}
         </DialogContent>
       </Dialog>
+    </>
+  );
+
+  if (consult) {
+    return (
+      <div
+        role="group"
+        aria-label={
+          phaseLabel === undefined ? undefined : STEP_EVIDENCE_TEXTS.groupLabel(phaseLabel, stepPosition)
+        }
+        aria-labelledby={phaseLabel === undefined ? headingId : undefined}
+        data-testid="step-evidence"
+        data-read-only
+        data-consult
+        className="flex flex-col gap-2"
+      >
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <Card
+      role="region"
+      aria-labelledby={headingId}
+      data-testid="step-evidence"
+      data-read-only={readOnly || undefined}
+      className="gap-3 px-4"
+    >
+      {body}
     </Card>
+  );
+}
+
+function EvidenceCount({ count }: { readonly count: number }) {
+  return (
+    <span
+      data-testid="step-evidence-count"
+      aria-label={STEP_EVIDENCE_TEXTS.countLabel(count)}
+      className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs"
+    >
+      {STEP_EVIDENCE_TEXTS.count(count)}
+    </span>
+  );
+}
+
+/** Cabecera de un grupo en modo consulta; la reutiliza el grupo que no se pudo leer. */
+export function EvidenceGroupHeader({
+  title,
+  count,
+  titleId,
+}: {
+  readonly title: ReactNode;
+  readonly count: number;
+  readonly titleId?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-[13px]">
+      <CameraIcon className="size-4" aria-hidden />
+      <span id={titleId} className="font-semibold">
+        {title}
+      </span>
+      <EvidenceCount count={count} />
+    </div>
   );
 }

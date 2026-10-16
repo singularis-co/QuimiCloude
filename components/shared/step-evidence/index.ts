@@ -4,12 +4,17 @@
  */
 
 export {
+  EvidenceGroupHeader,
   MAX_STEP_EVIDENCE_PHOTOS,
   STEP_EVIDENCE_TEXTS,
   StepEvidence,
   type StepEvidenceProps,
   type StepEvidenceTile,
 } from './step-evidence';
+
+export { EvidenceReadError, type EvidenceReadErrorProps } from './evidence-read-error';
+
+export { EvidenceStepList, type EvidenceStepListProps } from './evidence-step-list';
 
 export {
   EVIDENCE_MISSING_TEXTS,

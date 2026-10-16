@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { PERMISSIONS } from '@/lib/modules/identity';
@@ -68,7 +68,27 @@ const FUENTES_MULTIPLATAFORMA = [
   TABLE_PATH,
   DETAIL_PAGE_PATH,
   DETAIL_COMPONENT_PATH,
+  // 2026-10-14 (QC-271): las piezas de evidencia del detalle entran en la regla.
+  `${DETAIL_DIR}/components/execution-timeline.tsx`,
+  `${DETAIL_DIR}/components/trace-step-evidence.tsx`,
+  `${DETAIL_DIR}/components/trace-other-steps-evidence.tsx`,
+  `${DETAIL_DIR}/components/trace-packing-evidence.tsx`,
 ] as const;
+
+/** Todos los archivos de codigo bajo la carpeta del detalle, recorrida entera. */
+function fuentesDelDetalle(carpeta = DETAIL_DIR): string[] {
+  return readdirSync(join(RAIZ, carpeta), { withFileTypes: true }).flatMap((entrada) => {
+    const ruta = `${carpeta}/${entrada.name}`;
+    if (entrada.isDirectory()) return fuentesDelDetalle(ruta);
+    return /\.(ts|tsx)$/.test(entrada.name) ? [ruta] : [];
+  });
+}
+
+/** Lo que R26 (QC-271) prohibe al recorrido: cualquier via para subir, cambiar o quitar fotos. */
+const ESCRITURA_DE_EVIDENCIA = ['step-evidence-actions', 'uploadEvidence'] as const;
+
+/** Las actions que el detalle puede importar: solo las de lectura del recorrido. */
+const ACTIONS_DE_LECTURA = '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 
 /**
  * El **unico** import de `lib/modules/` que `page.tsx` tiene permitido (QC-75 R6, R10).
@@ -301,5 +321,30 @@ describe('contrato de la ruta del dashboard', () => {
         }
       }
     }
+  });
+
+  it('QC-271 R26: ningun archivo del detalle importa escritura de evidencia ni otra action que la de lectura', () => {
+    const fuentes = fuentesDelDetalle();
+    // Ancla anti-vacuidad: el censo ve la pagina y las piezas de evidencia.
+    expect(fuentes).toContain(DETAIL_PAGE_PATH);
+    expect(fuentes).toContain(`${DETAIL_DIR}/components/trace-packing-evidence.tsx`);
+
+    for (const ruta of fuentes) {
+      const codigo = fuenteSinComentarios(ruta);
+      for (const prohibido of ESCRITURA_DE_EVIDENCIA) {
+        expect(codigo, `${ruta} no debe usar «${prohibido}»`).not.toContain(prohibido);
+      }
+      const actions = [...codigo.matchAll(/from\s*['"]([^'"]*adapters\/driving\/[^'"]*)['"]/g)]
+        .map((m) => m[1])
+        .filter((modulo) => !modulo.endsWith('/require-page-permission'));
+      for (const modulo of actions) {
+        expect(modulo, `${ruta} solo puede importar actions de lectura del recorrido`).toBe(ACTIONS_DE_LECTURA);
+      }
+    }
+  });
+
+  it('QC-271 R26: el detalle lee las fotos con la action de lectura del recorrido', () => {
+    const codigo = fuenteSinComentarios(DETAIL_PAGE_PATH);
+    expect(codigo).toContain('getExecutionEvidenceAction(id)');
   });
 });

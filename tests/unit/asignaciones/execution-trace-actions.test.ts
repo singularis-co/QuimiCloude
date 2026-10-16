@@ -6,19 +6,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  getExecutionEvidenceAction,
   getExecutionTraceAction,
   listExecutionTracesAction,
 } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 import { OrderNotFoundError, UnauthorizedError, ValidationError } from '@/lib/modules/asignaciones';
+import { ORDER_EVIDENCE, ORDER_EVIDENCE_UNSIGNED } from '@/tests/fixtures/order-evidence';
 
-const { getSessionUserMock, getSessionContextMock, listExecutionTracesMock, getExecutionTraceMock } = vi.hoisted(
-  () => ({
-    getSessionUserMock: vi.fn(),
-    getSessionContextMock: vi.fn(),
-    listExecutionTracesMock: vi.fn(),
-    getExecutionTraceMock: vi.fn(),
-  }),
-);
+const {
+  getSessionUserMock,
+  getSessionContextMock,
+  listExecutionTracesMock,
+  getExecutionTraceMock,
+  getExecutionEvidenceMock,
+  logWarnMock,
+} = vi.hoisted(() => ({
+  getSessionUserMock: vi.fn(),
+  getSessionContextMock: vi.fn(),
+  listExecutionTracesMock: vi.fn(),
+  getExecutionTraceMock: vi.fn(),
+  getExecutionEvidenceMock: vi.fn(),
+  logWarnMock: vi.fn(),
+}));
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: vi.fn(async () => 'req-1') },
@@ -29,7 +38,12 @@ vi.mock('@/lib/composition', () => ({
   asignaciones: {
     listExecutionTraces: listExecutionTracesMock,
     getExecutionTrace: getExecutionTraceMock,
+    getExecutionEvidence: getExecutionEvidenceMock,
   },
+}));
+
+vi.mock('@/lib/shared/observability/logger', () => ({
+  forModule: () => ({ info: vi.fn(), warn: logWarnMock, error: vi.fn() }),
 }));
 
 const SESSION_USER = {
@@ -122,6 +136,55 @@ describe('getExecutionTraceAction', () => {
   it('un error inesperado no se filtra: sale como estado de error con referencia', async () => {
     getExecutionTraceMock.mockRejectedValue(new Error('boom'));
     const resultado = await getExecutionTraceAction(ORDER_ID);
+    expect(resultado).toMatchObject({ status: 'error', reference: expect.any(String) });
+  });
+});
+
+describe('getExecutionEvidenceAction', () => {
+  it('R1: entrega el actor de la sesion y el id al caso de uso y devuelve solo `evidence`', async () => {
+    getExecutionEvidenceMock.mockResolvedValue({ evidence: ORDER_EVIDENCE, signingFailure: null });
+
+    const resultado = await getExecutionEvidenceAction(ORDER_ID);
+
+    expect(resultado).toEqual({ status: 'success', data: ORDER_EVIDENCE });
+    expect(getExecutionEvidenceMock).toHaveBeenCalledWith(ACTOR, { orderId: ORDER_ID });
+    expect(logWarnMock).not.toHaveBeenCalled();
+  });
+
+  it('R11: con la firma caida devuelve los grupos sin fotos y escribe `signingFailure` en el log', async () => {
+    getExecutionEvidenceMock.mockResolvedValue({ evidence: ORDER_EVIDENCE_UNSIGNED, signingFailure: 'storage caido' });
+
+    const resultado = await getExecutionEvidenceAction(ORDER_ID);
+
+    expect(resultado).toEqual({ status: 'success', data: ORDER_EVIDENCE_UNSIGNED });
+    expect(JSON.stringify(resultado)).not.toContain('storage caido');
+    expect(logWarnMock).toHaveBeenCalledWith('evidence_read_signing_failed', {
+      orderId: ORDER_ID,
+      message: 'storage caido',
+    });
+  });
+
+  it('R1: el rechazo de autorizacion lo da el caso de uso y la accion lo traduce', async () => {
+    getSessionUserMock.mockResolvedValue({ ...SESSION_USER, permissions: [] });
+    getExecutionEvidenceMock.mockRejectedValue(new UnauthorizedError());
+
+    const resultado = await getExecutionEvidenceAction(ORDER_ID);
+
+    expect(getExecutionEvidenceMock.mock.calls[0]![0]).toEqual({ ...ACTOR, permissions: [] });
+    expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+  });
+
+  it('R5: `order_not_found` se traduce por su `code`', async () => {
+    getExecutionEvidenceMock.mockRejectedValue(new OrderNotFoundError());
+    await expect(getExecutionEvidenceAction('no-es-un-uuid')).resolves.toMatchObject({
+      status: 'error',
+      code: 'order_not_found',
+    });
+  });
+
+  it('un error inesperado no se filtra: sale como estado de error con referencia', async () => {
+    getExecutionEvidenceMock.mockRejectedValue(new Error('boom'));
+    const resultado = await getExecutionEvidenceAction(ORDER_ID);
     expect(resultado).toMatchObject({ status: 'error', reference: expect.any(String) });
   });
 });

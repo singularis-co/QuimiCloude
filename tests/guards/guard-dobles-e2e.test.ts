@@ -74,10 +74,13 @@ const VIGILADAS: readonly Vigilada[] = [
   {
     variable: 'EVIDENCE_E2E_DOUBLES',
     consulta: 'evidenceE2EDoublesEnabled(',
+    // QC-271: la composicion elige `evidenceStorageMemoryForE2E`, que firma la lectura de rutas
+    // sembradas desde otro proceso (decision del leader, 2026-10-14).
     dobles: ['lib/modules/asignaciones/adapters/driven/storage/evidence-storage-memory'],
-    design: 'specs/QC-214-evidencia-por-paso/design.md > 4.2',
-    requisito: 'R30',
-    ejemplo: 'evidenceStorageMemory',
+    design:
+      'specs/QC-214-evidencia-por-paso/design.md > 4.2; specs/QC-271-consulta-de-evidencia-por-paso/design.md > 4',
+    requisito: 'R30; QC-271 R27',
+    ejemplo: 'evidenceStorageMemoryForE2E',
   },
 ];
 

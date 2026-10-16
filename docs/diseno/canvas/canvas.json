@@ -972,6 +972,62 @@
    "page": "pedidos",
    "is_interactive": true
   },
+  "RecorridoEvidencia.dc.html": {
+   "x": 3600,
+   "y": 4740,
+   "w": 1440,
+   "h": 1240,
+   "title": "Recorrido del pedido con evidencia (QC-271) (QC-271)",
+   "page": "acceso",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "RecorridoEvidenciaTablet.dc.html": {
+   "x": 5120,
+   "y": 4740,
+   "w": 904,
+   "h": 1300,
+   "title": "RecorridoEvidenciaTablet (QC-271)",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "RecorridoEvidenciaMovil.dc.html": {
+   "x": 6104,
+   "y": 4740,
+   "w": 960,
+   "h": 1300,
+   "title": "RecorridoEvidenciaMovil (QC-271)",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "ProductoTerminadoEvidencia.dc.html": {
+   "x": 3600,
+   "y": 8180,
+   "w": 1440,
+   "h": 1000,
+   "title": "Ficha de producto terminado con evidencia (QC-271) (QC-271)",
+   "page": "inventario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "ProductoTerminadoEvidenciaTablet.dc.html": {
+   "x": 5120,
+   "y": 8180,
+   "w": 904,
+   "h": 1300,
+   "title": "ProductoTerminadoEvidenciaTablet (QC-271)",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "ProductoTerminadoEvidenciaMovil.dc.html": {
+   "x": 6104,
+   "y": 8180,
+   "w": 960,
+   "h": 1300,
+   "title": "ProductoTerminadoEvidenciaMovil (QC-271)",
+   "page": "inventario",
+   "is_interactive": true
+  },
   "EntregaVariosClientes.dc.html": {
    "x": 0,
    "y": 7600,
@@ -1201,7 +1257,13 @@
   "ProductoTerminadoRepartoMovil.dc.html",
   "EntregaVariosClientes.dc.html",
   "EntregaVariosClientesTablet.dc.html",
-  "EntregaVariosClientesMovil.dc.html"
+  "EntregaVariosClientesMovil.dc.html",
+  "RecorridoEvidencia.dc.html",
+  "RecorridoEvidenciaTablet.dc.html",
+  "RecorridoEvidenciaMovil.dc.html",
+  "ProductoTerminadoEvidencia.dc.html",
+  "ProductoTerminadoEvidenciaTablet.dc.html",
+  "ProductoTerminadoEvidenciaMovil.dc.html"
  ],
  "notes": {
   "t1": {

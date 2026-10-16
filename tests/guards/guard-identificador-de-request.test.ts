@@ -455,6 +455,14 @@ export const E2E_ESPERADOS = [
   // Entregas con una fila por cliente y «Presentación». No lee ni afirma nada sobre el identificador
   // de peticion ni sobre `reference`.
   'entrega-a-varios-clientes.spec.ts',
+  // Alta el 2026-10-14 (QC-271, TI) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. Lo que ejercita: el
+  // Administrador abre el recorrido de un pedido con fotos sembradas y ve las de fabricacion bajo la
+  // ultima anotacion de su paso y las de envasado en su tarjeta; en Lotes de la ficha del producto
+  // terminado ve el total y abre el dialogo con «Fabricacion» y «Envasado». El Operador, en la misma
+  // ficha, no ve la columna ni ninguna foto. No lee ni afirma nada sobre el identificador de
+  // peticion ni sobre `reference`.
+  'consulta-de-evidencia.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

@@ -17,11 +17,13 @@ export const evidenceRepositoryUnused: StepEvidenceRepository = {
   replace: noUsado('replace'),
   delete: noUsado('delete'),
   listOrderIdsWithEvidence: noUsado('listOrderIdsWithEvidence'),
+  countByOrders: noUsado('countByOrders'),
 };
 
 export const evidenceStorageUnused: EvidenceStorage = {
   createSignedUpload: noUsado('createSignedUpload'),
   createSignedReadUrl: noUsado('createSignedReadUrl'),
+  createSignedReadUrls: noUsado('createSignedReadUrls'),
   download: noUsado('download'),
   remove: noUsado('remove'),
 };

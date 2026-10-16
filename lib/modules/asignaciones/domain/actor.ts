@@ -136,6 +136,21 @@ export function canExecuteAssignedOrders(actor: PermissionBearer | null | undefi
   }
 }
 
+const PEDIDOS_CONSULTAR: PermissionCode = 'pedidos.consultar';
+
+/**
+ * ¿Este portador de permisos puede ver las fotos de un pedido? Mismo criterio que la autorizacion
+ * de esas lecturas, leido sin lanzar, para que la pantalla no escriba el codigo del permiso.
+ */
+export function canConsultOrderEvidence(actor: PermissionBearer | null | undefined): boolean {
+  try {
+    assertPermission(actor, PEDIDOS_CONSULTAR, () => DENEGADO);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Basta con UNO de los codigos. Mismo criterio y mismo error que `requirePermission`: cada codigo
  * se pregunta a `assertPermission` de `identity`, sin una segunda comparacion propia.

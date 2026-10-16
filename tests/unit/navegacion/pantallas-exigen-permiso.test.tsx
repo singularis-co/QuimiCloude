@@ -82,6 +82,8 @@ const { getSessionUserMock, notFoundMock, redirectMock, actions } = vi.hoisted((
     // 2026-10-08: las dos lecturas del recorrido de ejecucion.
     listExecutionTracesAction: vi.fn(),
     getExecutionTraceAction: vi.fn(),
+    // 2026-10-14: el detalle del recorrido lee tambien las fotos del pedido.
+    getExecutionEvidenceAction: vi.fn(),
   },
 }));
 
@@ -133,6 +135,7 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', () => ({
   listExecutionTracesAction: actions.listExecutionTracesAction,
   getExecutionTraceAction: actions.getExecutionTraceAction,
+  getExecutionEvidenceAction: actions.getExecutionEvidenceAction,
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({

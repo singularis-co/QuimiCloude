@@ -75,6 +75,17 @@ vi.mock('next/navigation', async (importOriginal) => ({
   useRouter: () => routerMock,
 }));
 
+// Sin sesion no hay columna «Evidencia» ni conteo: estos casos no cambian con ella.
+vi.mock('@/lib/composition', () => ({
+  identity: { getSessionUser: vi.fn(async () => null) },
+  observabilidad: { readRequestIdHeader: vi.fn(async () => 'req-1') },
+}));
+
+vi.mock('@/lib/modules/asignaciones/adapters/driving/order-evidence-actions', () => ({
+  getOrderEvidenceAction: vi.fn(),
+  countOrderEvidenceAction: vi.fn(),
+}));
+
 vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', () => ({
   getFinishedProductAction: vi.fn(),
   listFinishedProductBatchesAction: listBatchesMock,

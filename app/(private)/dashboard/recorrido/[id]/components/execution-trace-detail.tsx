@@ -19,10 +19,12 @@ import type {
   ExecutionTraceDetail as ExecutionTraceDetailData,
   TraceDuration,
 } from '@/lib/modules/asignaciones';
+import type { ExecutionEvidenceResult } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 
 import { ExecutionTimeline } from './execution-timeline';
+import { TracePackingEvidence } from './trace-packing-evidence';
 
 export const BACK_TO_LIST_TEXT = 'Volver a la lista';
 export { EMPTY_MARK as MISSING_PERSON_MARK } from '@/lib/shared/ui/empty-mark';
@@ -93,10 +95,11 @@ function GoBackCount({ count }: { readonly count: number }) {
 
 export type ExecutionTraceDetailProps = {
   readonly trace: ExecutionTraceDetailData;
+  readonly evidence?: ExecutionEvidenceResult;
   readonly backHref: string;
 };
 
-export function ExecutionTraceDetail({ trace, backHref }: ExecutionTraceDetailProps) {
+export function ExecutionTraceDetail({ trace, evidence, backHref }: ExecutionTraceDetailProps) {
   return (
     <PageShell>
       <div data-testid="execution-trace-detail" className="contents">
@@ -128,7 +131,10 @@ export function ExecutionTraceDetail({ trace, backHref }: ExecutionTraceDetailPr
             <GoBackCount count={trace.goBackCount} />
           </Stat>
         </dl>
-        <ExecutionTimeline steps={trace.steps} />
+        <ExecutionTimeline steps={trace.steps} evidence={evidence} />
+        {evidence?.status === 'success' && evidence.data.packing.length > 0 ? (
+          <TracePackingEvidence groups={evidence.data.packing} />
+        ) : null}
       </div>
     </PageShell>
   );

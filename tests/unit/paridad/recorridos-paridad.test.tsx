@@ -50,6 +50,7 @@ vi.mock('@/lib/composition', () => ({
 vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', () => ({
   listExecutionTracesAction: listExecutionTracesActionMock,
   getExecutionTraceAction: vi.fn(),
+  getExecutionEvidenceAction: vi.fn(),
 }));
 
 const PERSONA = { userId: 'user-1', displayName: 'Ana López García' };

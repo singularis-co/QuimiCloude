@@ -478,6 +478,9 @@ import {
   createRegisterEvidence,
   createRemoveEvidence,
   createCountEvidenceLockingOrders,
+  createGetExecutionEvidence,
+  createGetOrderEvidence,
+  createCountOrderEvidence,
 } from '@/lib/modules/asignaciones';
 import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -489,7 +492,7 @@ import type { ExecutionTransaction } from '@/lib/modules/asignaciones/ports/exec
 import { createStepEvidenceRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/step-evidence-prisma';
 import type { StepEvidenceRepository } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
 import { evidenceE2EDoublesEnabled } from '@/lib/modules/asignaciones/adapters/driven/config/evidence-e2e-doubles-env';
-import { evidenceStorageMemory } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-memory';
+import { evidenceStorageMemoryForE2E } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-memory';
 import { evidenceStorageSupabase } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-supabase';
 import type { EvidenceStorage } from '@/lib/modules/asignaciones/ports/evidence-storage';
 import {
@@ -1855,13 +1858,15 @@ const stepEvidenceRepository: StepEvidenceRepository = createStepEvidenceReposit
  * `playwright.config.ts`. Se consulta en cada llamada: importar este archivo no lee el entorno.
  */
 function selectedEvidenceStorage(): EvidenceStorage {
-  return evidenceE2EDoublesEnabled() ? evidenceStorageMemory : evidenceStorageSupabase;
+  return evidenceE2EDoublesEnabled() ? evidenceStorageMemoryForE2E : evidenceStorageSupabase;
 }
 
 const evidenceStorage: EvidenceStorage = {
   createSignedUpload: (path) => selectedEvidenceStorage().createSignedUpload(path),
   createSignedReadUrl: (path, expiresInSeconds) =>
     selectedEvidenceStorage().createSignedReadUrl(path, expiresInSeconds),
+  createSignedReadUrls: (paths, expiresInSeconds) =>
+    selectedEvidenceStorage().createSignedReadUrls(paths, expiresInSeconds),
   download: (path) => selectedEvidenceStorage().download(path),
   remove: (path) => selectedEvidenceStorage().remove(path),
 };
@@ -2195,6 +2200,17 @@ export const asignaciones = {
     evidence: stepEvidenceRepository,
     storage: evidenceStorage,
   }),
+  getExecutionEvidence: createGetExecutionEvidence({
+    orders: orderCatalog,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  getOrderEvidence: createGetOrderEvidence({
+    orders: orderCatalog,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  countOrderEvidence: createCountOrderEvidence({ evidence: stepEvidenceRepository }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
