@@ -24,7 +24,7 @@
 
 ---
 
-## [ ] T0 — Verificaciones previas y contrato (bloquea todo lo demás)
+## [x] T0 — Verificaciones previas y contrato (bloquea todo lo demás)
 
 **Verificaciones**, anotadas en `progress/features/QC-288.md > Decisiones` antes de escribir nada:
 1. Si `finishConditioningAlive` (`EN_ACONDICIONAMIENTO → TERMINADO`) bloquea el producto terminado.
