@@ -134,7 +134,7 @@ section[aria-labelledby="opx-team"],.k-team{--k:var(--k-team)}
           <a class="opx-back" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>{{ backLabel }}</a>
         </sc-if>
         <sc-if value="{{ started }}" hint-placeholder-val="{{ false }}">
-          <span class="opx-run" role="status"><i aria-hidden="true"></i>{{ runLabel }} · desde <span class="mono">{{ since }}</span></span>
+          <span class="opx-run" role="status"><i aria-hidden="true"></i>{{ runLabel }}</span>
         </sc-if>
         <div style="display: flex; gap: 8px; flex: none">
           <button class="b b-out b-ico b-touch" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span></button>
@@ -156,7 +156,7 @@ section[aria-labelledby="opx-team"],.k-team{--k:var(--k-team)}
       <sc-if value="{{ showProg }}" hint-placeholder-val="{{ true }}">
         <div class="opx-prog">
           <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
-            <span style="font-size: 15px"><span class="strong">Paso <span class="mono">{{ n }}</span> de <span class="mono">{{ total }}</span></span><span class="dim"> · {{ title }}</span></span>
+            <span style="font-size: 15px"><span class="strong">Paso <span class="mono">{{ n }}</span> de <span class="mono">{{ total }}</span></span></span>
             <span class="mono dim" style="font-size: 14px">{{ pct }} %</span>
           </div>
           <div class="opx-bar" role="progressbar" aria-label="{{ stepLabel }}" aria-valuemin="1" aria-valuemax="{{ total }}" aria-valuenow="{{ n }}" style="{{ barCols }}"><sc-for list="{{ segs }}" as="g" hint-placeholder-count="4"><i class="{{ g.cls }}"></i></sc-for></div>
@@ -187,6 +187,7 @@ section[aria-labelledby="opx-team"],.k-team{--k:var(--k-team)}
       </section>
       </sc-if>
 
+      <sc-if value="{{ hasTeam }}" hint-placeholder-val="{{ true }}">
       <section class="{{ teamCls }}" aria-labelledby="opx-team">
         <button class="opx-tg" type="button" aria-expanded="{{ teamOpen }}" aria-controls="opx-team-c" onClick="{{ tog_team }}"><span class="opx-sec" style="flex: 1"><h2 id="opx-team"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg>{{ teamTitle }}</h2><span class="opx-count">{{ teamCount }}</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
         <sc-if value="{{ teamShow }}" hint-placeholder-val="{{ true }}"><div id="opx-team-c" style="display: flex; flex-direction: column; gap: 12px">
@@ -195,13 +196,14 @@ section[aria-labelledby="opx-team"],.k-team{--k:var(--k-team)}
             <div class="opx-grp-h"><span>{{ gr.name }}</span><span class="mono">{{ gr.count }}</span></div>
             <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px">
               <sc-for list="{{ gr.members }}" as="m" hint-placeholder-count="2">
-                <li class="opx-mem"><span class="{{ m.avCls }}" aria-hidden="true">{{ m.ini }}</span><span class="opx-mem-t"><span>{{ m.name }}</span><span class="r">{{ m.role }}</span></span><sc-if value="{{ m.me }}" hint-placeholder-val="{{ false }}"><span class="opx-me">Tú</span></sc-if></li>
+                <li class="opx-mem"><span class="{{ m.avCls }}" aria-hidden="true">{{ m.ini }}</span><span class="opx-mem-t"><span>{{ m.name }}</span></span><sc-if value="{{ m.me }}" hint-placeholder-val="{{ false }}"><span class="opx-me">Tú</span></sc-if></li>
               </sc-for>
             </ul>
           </div>
         </sc-for>
         </div></sc-if>
       </section>
+      </sc-if>
     </aside>
 
     <section aria-labelledby="opx-step" style="min-width: 0">
@@ -209,28 +211,18 @@ section[aria-labelledby="opx-team"],.k-team{--k:var(--k-team)}
         <div class="opx-start">
           <span class="h3">{{ startTitle }}</span>
           <p class="sub" style="margin: 0; font-size: 16px">{{ startBody }}</p>
-          <ul style="margin: 0; padding-left: 20px; font-size: 15px; display: flex; flex-direction: column; gap: 6px">
-            <sc-for list="{{ preview }}" as="p" hint-placeholder-count="4"><li>{{ p }}</li></sc-for>
-          </ul>
+          <p class="strong" style="margin: 0; font-size: 15px">{{ total }} pasos</p>
         </div>
       </sc-if>
 
       <sc-if value="{{ started }}" hint-placeholder-val="{{ false }}">
         <div class="opx-step">
-          <span class="opx-sn"><b>{{ n }}</b>de <span class="mono">{{ total }}</span></span>
-          <h2 id="opx-step" class="opx-h2">{{ title }}</h2>
+          <span class="opx-sn" id="opx-step"><b>{{ n }}</b>de <span class="mono">{{ total }}</span></span>
           <p class="opx-lead">{{ body }}</p>
-
-          <sc-if value="{{ hasUses }}" hint-placeholder-val="{{ true }}">
-            <div style="display: flex; flex-direction: column; gap: 8px">
-              <span class="lab">En este paso usas</span>
-              <div class="opx-uses"><sc-for list="{{ uses }}" as="u" hint-placeholder-count="2"><span class="opx-use">{{ u.name }}<span class="q">{{ u.q }}</span></span></sc-for></div>
-            </div>
-          </sc-if>
 
           <div style="display: flex; flex-direction: column; gap: 8px">
             <div style="display: flex; justify-content: space-between; align-items: baseline"><span class="lab">Comprueba</span><span class="cap"><span class="mono">{{ doneN }}</span> de <span class="mono">{{ itemsN }}</span></span></div>
-            <ul class="opx-list" role="group" aria-label="{{ title }}">
+            <ul class="opx-list" role="group" aria-label="{{ stepLabel }}">
               <sc-for list="{{ items }}" as="it" hint-placeholder-count="3">
                 <li><button class="opx-item" type="button" role="checkbox" aria-checked="{{ it.on }}" onClick="{{ it.toggle }}"><span class="bx"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="m5 12 5 5 9-10"></path></svg></span><span class="tx">{{ it.text }}</span></button></li>
               </sc-for>
@@ -239,13 +231,6 @@ section[aria-labelledby="opx-team"],.k-team{--k:var(--k-team)}
 
           <sc-if value="{{ hasNote }}" hint-placeholder-val="{{ false }}">
             <div class="opx-note" role="note"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg><span>{{ note }}</span></div>
-          </sc-if>
-
-          <sc-if value="{{ waiting }}" hint-placeholder-val="{{ false }}">
-            <div class="opx-wait" role="status" aria-live="polite">
-              <svg class="ring" viewBox="0 0 44 44" aria-hidden="true" style="width: 44px; height: 44px"><circle class="bgc" cx="22" cy="22" r="17"></circle><circle class="fgc" cx="22" cy="22" r="17" stroke-dasharray="106.8" stroke-dashoffset="{{ dash }}" transform="rotate(-90 22 22)"></circle></svg>
-              <span>Deja reposar. Puedes seguir en <span class="mono strong">{{ timer }}</span>.</span>
-            </div>
           </sc-if>
         </div>
       </sc-if>
@@ -265,7 +250,7 @@ section[aria-labelledby="opx-team"],.k-team{--k:var(--k-team)}
             <p class="cap" aria-live="polite" style="margin: 0; text-align: center; min-height: 18px">{{ gateMsg }}</p>
             <div class="opx-ft-row">
               <button class="b b-out b-xl opx-btn" type="button" disabled="{{ isFirst }}" onClick="{{ prev }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Anterior</button>
-              <sc-if value="{{ notLast }}" hint-placeholder-val="{{ true }}"><button class="b b-pri b-xl opx-btn" type="button" disabled="{{ nextDis }}" onClick="{{ next }}">Siguiente<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
+              <sc-if value="{{ notLast }}" hint-placeholder-val="{{ true }}"><button class="b b-pri b-xl opx-btn" type="button" disabled="{{ nextDis }}" onClick="{{ next }}">{{ nextLabel }}<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
               <sc-if value="{{ isLast }}" hint-placeholder-val="{{ false }}"><button class="b b-pri b-xl opx-btn" type="button" disabled="{{ nextDis }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>{{ endCta }}</button></sc-if>
             </div>
           </div>
@@ -277,7 +262,7 @@ section[aria-labelledby="opx-team"],.k-team{--k:var(--k-team)}
   <div class="opx-fabs" aria-label="Paneles">
     <button class="{{ fabCls_mat }}" type="button" aria-label="{{ fabAria_mat }}" aria-expanded="{{ fabOn_mat }}" aria-controls="opx-sheet" onClick="{{ open_mat }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg><span class="opx-fab-n mono">{{ matCount }}</span></button>
     <sc-if value="{{ hasTools }}" hint-placeholder-val="{{ true }}"><button class="{{ fabCls_tool }}" type="button" aria-label="{{ fabAria_tool }}" aria-expanded="{{ fabOn_tool }}" aria-controls="opx-sheet" onClick="{{ open_tool }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg><span class="opx-fab-n mono">{{ toolCount }}</span></button></sc-if>
-    <button class="{{ fabCls_team }}" type="button" aria-label="{{ fabAria_team }}" aria-expanded="{{ fabOn_team }}" aria-controls="opx-sheet" onClick="{{ open_team }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg><span class="opx-fab-n mono">{{ teamCount }}</span></button>
+    <sc-if value="{{ hasTeam }}" hint-placeholder-val="{{ true }}"><button class="{{ fabCls_team }}" type="button" aria-label="{{ fabAria_team }}" aria-expanded="{{ fabOn_team }}" aria-controls="opx-sheet" onClick="{{ open_team }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg><span class="opx-fab-n mono">{{ teamCount }}</span></button></sc-if>
   </div>
 
   <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
@@ -305,7 +290,7 @@ section[aria-labelledby="opx-team"],.k-team{--k:var(--k-team)}
             <div class="opx-grp-h"><span>{{ gr.name }}</span><span class="mono">{{ gr.count }}</span></div>
             <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px">
               <sc-for list="{{ gr.members }}" as="m" hint-placeholder-count="2">
-                <li class="opx-mem"><span class="{{ m.avCls }}" aria-hidden="true">{{ m.ini }}</span><span class="opx-mem-t"><span>{{ m.name }}</span><span class="r">{{ m.role }}</span></span><sc-if value="{{ m.me }}" hint-placeholder-val="{{ false }}"><span class="opx-me">Tú</span></sc-if></li>
+                <li class="opx-mem"><span class="{{ m.avCls }}" aria-hidden="true">{{ m.ini }}</span><span class="opx-mem-t"><span>{{ m.name }}</span></span><sc-if value="{{ m.me }}" hint-placeholder-val="{{ false }}"><span class="opx-me">Tú</span></sc-if></li>
               </sc-for>
             </ul>
           </div>
@@ -325,7 +310,7 @@ var SCREENS = {
     startCta: 'Comenzar la fabricación', endCta: 'Terminar la fabricación', matTitle: 'Materiales', teamTitle: 'Responsables', tools: ['Mezcladora 200 L', 'Balanza de plataforma', 'pH-metro'],
     mats: [['Agua desmineralizada', 96.00, 'kg'], ['Hidróxido de sodio', 6.00, 'kg'], ['Tensoactivo no iónico', 14.40, 'kg'], ['Metasilicato de sodio', 3.60, 'kg']],
     steps: [
-      ['Prepara la mezcladora', 'Deja el equipo listo y protégete antes de cargar nada.', [], ['Revisa que la mezcladora de 200 L esté limpia y seca.', 'Ponte guantes de nitrilo y gafas.', 'Pesa los materiales de la lista.'], 0, 'El hidróxido de sodio es corrosivo: no lo manipules sin guantes.'],
+      ['Prepara la mezcladora', 'Deja el equipo listo y protégete antes de cargar nada.', [], ['Revisa que la mezcladora de 200 L esté limpia y seca.', 'Ponte guantes de nitrilo y gafas.', 'Pesa los materiales de la lista.'], 0, ''],
       ['Agrega el agua', 'Carga el agua y deja que la mezcladora gire antes de seguir.', [['Agua desmineralizada', '57,60 kg']], ['Agrega el 60 % del agua desmineralizada.', 'Enciende la agitación a velocidad baja.'], 8, ''],
       ['Disuelve el tensoactivo', 'Agrégalo poco a poco para que no forme espuma.', [['Tensoactivo no iónico', '14,40 kg']], ['Agrega el tensoactivo no iónico.', 'Agita hasta que no queden grumos.'], 0, ''],
       ['Completa y ajusta', 'Termina la mezcla y comprueba el pH.', [['Agua desmineralizada', '38,40 kg']], ['Agrega el resto del agua.', 'Mide el pH y anótalo en la etiqueta.'], 0, '']
@@ -334,19 +319,19 @@ var SCREENS = {
   'Acondicionamiento': {
     eyebrow: 'Acondicionamiento', back: 'Volver a acondicionamiento', run: 'Acondicionando', envase: 'Garrafa 20 L', lot: true,
     startTitle: 'Revisa antes de comenzar', startBody: 'Al comenzar, el equipo queda registrado y el pedido pasa a «En acondicionamiento».',
-    startCta: 'Comenzar el acondicionamiento', endCta: 'Terminar el acondicionamiento', matTitle: 'Insumos', teamTitle: 'Equipo', tools: ['Balanza analítica', 'Densímetro', 'Cucharón de muestreo'],
-    mats: [['Colorante amarillo', 0.12, 'kg'], ['Fragancia limón', 0.60, 'kg']],
+    startCta: 'Comenzar el acondicionamiento', endCta: 'Terminar el acondicionamiento', matTitle: 'Envases', teamTitle: 'Equipo',
+    mats: [['Garrafa 20 L', 4, 'u'], ['Bidón 5 L', 8, 'u']],
     steps: [
       ['Toma la muestra', 'Saca una muestra de 250 ml del tanque para el control.', [], ['Homogeniza el tanque 5 minutos.', 'Toma la muestra con el cucharón limpio.'], 0, ''],
       ['Ajusta color y aroma', 'Agrega los insumos de acondicionamiento.', [['Colorante amarillo', '0,12 kg'], ['Fragancia limón', '0,60 kg']], ['Agrega el colorante disuelto.', 'Agrega la fragancia.', 'Agita a velocidad baja.'], 6, ''],
-      ['Controla y libera', 'Compara con el patrón y anota el resultado.', [], ['Compara color con el patrón.', 'Mide densidad y anótala.'], 0, 'Si no coincide con el patrón, avisa al responsable antes de seguir.']
+      ['Controla y libera', 'Compara con el patrón y anota el resultado.', [], ['Compara color con el patrón.', 'Mide densidad y anótala.'], 0, '']
     ]
   },
   'Empaque': {
     eyebrow: 'Empaque', back: 'Volver a por empacar', run: 'Empacando', envase: 'Garrafa 20 L · 6 envases', lot: true,
     startTitle: 'Revisa antes de comenzar', startBody: 'Al comenzar, el empaque queda a tu nombre. Al terminar indicas los envases reales.',
-    startCta: 'Comenzar el empaque', endCta: 'Terminar el empaque', matTitle: 'Envases y etiquetas', teamTitle: 'Equipo', tools: ['Llenadora', 'Balanza de plataforma', 'Torquímetro'],
-    mats: [['Garrafa 20 L', 6, 'u'], ['Tapa 38 mm', 6, 'u'], ['Etiqueta frontal', 6, 'u']],
+    startCta: 'Comenzar el empaque', endCta: 'Terminar el empaque', matTitle: 'Envases', teamTitle: 'Equipo',
+    mats: [['Garrafa 20 L', 4, 'u'], ['Bidón 5 L', 8, 'u']],
     steps: [
       ['Prepara la línea', 'Limpia la boquilla y deja los envases a mano.', [['Garrafa 20 L', '6 u']], ['Revisa que las garrafas estén limpias.', 'Calibra la balanza con una garrafa vacía.'], 0, ''],
       ['Llena y tapa', 'Llena cada garrafa hasta la marca y tápala.', [['Tapa 38 mm', '6 u']], ['Llena hasta 20 kg netos.', 'Ajusta la tapa con el torquímetro.'], 0, ''],
@@ -356,9 +341,7 @@ var SCREENS = {
 };
 
 var TEAM = {
-  'Ejecución': [ { name: 'Turno mañana', members: [['Carlos Pérez', 'Operador', true], ['Ana Rojas', 'Operador', false]] }, { name: 'Personas', members: [['Luis Ortega', 'Operador', false]] } ],
-  'Acondicionamiento': [ { name: 'Calidad', members: [['María Díaz', 'Administrador de acondicionamiento', false], ['Carlos Pérez', 'Operador', true]] } ],
-  'Empaque': [ { name: 'Empaque A', members: [['Jorge Vélez', 'Empacador', true], ['Rosa León', 'Empacador', false], ['Pablo Cano', 'Empacador', false]] } ]
+  'Acondicionamiento': [ { name: 'Calidad', members: [['María Díaz', true], ['Carlos Pérez', false]] }, { name: 'Personas', members: [['Luis Ortega', false]] } ]
 };
 
 class Component extends DCLogic {
@@ -395,9 +378,10 @@ class Component extends DCLogic {
     const left = waiting ? s.left : 0;
     const blocked = pendingN > 0 || waiting;
     let ai = 0;
-    const groups = TEAM[key].map((g) => ({
+    const team = TEAM[key] || [];
+    const groups = team.map((g) => ({
       name: g.name, count: String(g.members.length),
-      members: g.members.map((m) => { ai++; return { name: m[0], role: m[1], me: m[2], ini: m[0].split(' ').map((p) => p[0]).join('').slice(0, 2), avCls: 'opx-av' + (ai % 3 === 2 ? ' a2' : ai % 3 === 0 ? ' a3' : '') }; })
+      members: g.members.map((m) => { ai++; return { name: m[0], me: m[1], ini: m[0].split(' ').map((p) => p[0]).join('').slice(0, 2), avCls: 'opx-av' + (ai % 3 === 2 ? ' a2' : ai % 3 === 0 ? ' a3' : '') }; })
     }));
     const openS = s.open || {};
     const isOpen = (k) => openS[k] !== false;
@@ -420,7 +404,7 @@ class Component extends DCLogic {
       fabV['sheet_' + k] = sheet === k;
       fabV['tog_' + k] = tog(k);
     });
-    const teamCount = TEAM[key].reduce((a, g) => a + g.members.length, 0);
+    const teamCount = team.reduce((a, g) => a + g.members.length, 0);
     return {
       hStyle: 'height: ' + (this.props.alto || 900) + 'px',
       rootCls: dark ? 'qc dk' : 'qc',
@@ -437,6 +421,8 @@ class Component extends DCLogic {
       hasTools: tools.length > 0, tools: tools, toolCount: String(tools.length),
       ...fabV, sheetOpen: !!sheet, closeSheet: () => this.setState({ sheet: null }),
       fabAria_mat: 'Ver ' + sc.matTitle.toLowerCase(), fabAria_tool: 'Ver herramientas', fabAria_team: 'Ver ' + sc.teamTitle.toLowerCase(),
+      hasTeam: team.length > 0,
+      nextLabel: waiting ? 'Siguiente · ' + '00:' + String(left).padStart(2, '0') : 'Siguiente',
       teamOpen: String(isOpen('team')), teamShow: isOpen('team'), teamCls: 'opx-card' + (isOpen('team') ? '' : ' closed'),
       toolOpen: String(isOpen('tool')), toolShow: isOpen('tool'), toolCls: 'opx-card' + (isOpen('tool') ? '' : ' closed'),
       matOpen: String(isOpen('mat')), matShow: isOpen('mat'), matCls: 'opx-card' + (isOpen('mat') ? '' : ' closed'),
