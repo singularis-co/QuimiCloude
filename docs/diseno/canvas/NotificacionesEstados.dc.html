@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Estados de notificaciones</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 2500px; height: 2960px; box-sizing: border-box; padding: 40px; display: flex; flex-direction: column; gap: 24px">
+  <div class="ph-t"><h1 class="h1">Notificaciones · estados (QC-137)</h1><p class="sub">Cada caja es la pantalla de notificaciones a 780 px. Los mismos estados valen para el panel de la campana y para la página.</p></div>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px 40px">
+    <sc-for list="{{ states }}" as="e" hint-placeholder-count="9">
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; flex-direction: column; gap: 2px"><span class="h3">{{ e.t }}</span><span class="cap">{{ e.d }}</span></div>
+        <div style="position: relative; width: 780px; height: 820px; border-radius: 14px; border: 1px solid var(--border); overflow: hidden"><div class="frame-in"><dc-import name="Notificaciones" estado="{{ e.k }}" panel="{{ e.p }}" sinaudio="{{ e.a }}" nuevo="{{ e.n }}" oscuro="{{ e.o }}" hint-size="100%,100%"></dc-import></div></div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2500,"height":2960}}'>
+class Component extends DCLogic {
+renderVals() {
+const st = (k, t, d, p, a, n, o) => ({ k: k, t: t, d: d, p: !!p, a: !!a, n: !!n, o: !!o });
+return { states: [
+st('lista', '1 · Página con avisos', '3 sin leer: fondo tintado, título en negrita y punto. Mismo número en campana, menú y pestaña «No leídas».'),
+st('lista', '2 · Panel de la campana abierto', 'Últimos 5 avisos, «Marcar todas como leídas» y «Ver todas las notificaciones».', true),
+st('lista', '3 · Llega un aviso nuevo', 'La campana se balancea, el conteo pulsa y la fila entra desde arriba. Suena el tono una vez por navegador.', false, false, true),
+st('lista', '4 · Navegador sin audio', 'Toast informativo una vez por sesión. Los avisos siguen llegando; no hay botón de silenciar.', false, true, true),
+st('vacio', '5 · Sin avisos', 'Conteo 0: la campana no lleva insignia y el menú no lleva número.'),
+st('vacio', '6 · Panel vacío', 'El panel abierto sin avisos.', true),
+st('cargando', '7 · Cargando', 'Esqueletos en la página y en el panel mientras llegan los avisos.', true),
+st('error', '8 · Error', 'No se pudieron cargar. «Reintentar» vuelve a pedirlos.'),
+st('lista', '9 · Modo oscuro', 'Página y panel en oscuro.', true, false, false, true)
+] };
+}
+}
+</script>
+</body>
+</html>

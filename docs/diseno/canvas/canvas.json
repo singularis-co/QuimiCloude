@@ -1214,6 +1214,43 @@
       "title": "ProductoTerminadoEvidenciaMovil (QC-271)",
       "page": "inventario",
       "is_interactive": true
+    },
+    "Notificaciones.dc.html": {
+      "expand": "fill",
+      "h": 1000,
+      "is_interactive": true,
+      "page": "notificaciones",
+      "title": "Notificaciones (QC-137)",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "NotificacionesTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "notificaciones",
+      "title": "NotificacionesTablet",
+      "w": 904,
+      "x": 1520,
+      "y": 0
+    },
+    "NotificacionesMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "notificaciones",
+      "title": "NotificacionesMovil",
+      "w": 960,
+      "x": 2504,
+      "y": 0
+    },
+    "NotificacionesEstados.dc.html": {
+      "h": 2960,
+      "is_interactive": true,
+      "page": "notificaciones",
+      "title": "Estados de notificaciones (QC-137)",
+      "w": 2500,
+      "x": 0,
+      "y": 1640
     }
   },
   "createdOnFiles": {
@@ -1776,6 +1813,28 @@
       "maxH": 70,
       "fill": "gray",
       "page": "inventario"
+    },
+    "c_Notificaciones": {
+      "bold": true,
+      "fill": "gray",
+      "maxH": 70,
+      "page": "notificaciones",
+      "size": 40,
+      "text": "Notificaciones: campana, menú y página (QC-137)  ·  escritorio · tablet · teléfono",
+      "w": 1400,
+      "x": 0,
+      "y": -110
+    },
+    "c_NotificacionesEstados": {
+      "bold": true,
+      "fill": "gray",
+      "maxH": 70,
+      "page": "notificaciones",
+      "size": 40,
+      "text": "Notificaciones: estados (QC-137)",
+      "w": 1400,
+      "x": 0,
+      "y": 1530
     }
   },
   "order": [
@@ -1909,7 +1968,11 @@
     "RecorridoEvidenciaMovil.dc.html",
     "ProductoTerminadoEvidencia.dc.html",
     "ProductoTerminadoEvidenciaTablet.dc.html",
-    "ProductoTerminadoEvidenciaMovil.dc.html"
+    "ProductoTerminadoEvidenciaMovil.dc.html",
+    "Notificaciones.dc.html",
+    "NotificacionesTablet.dc.html",
+    "NotificacionesMovil.dc.html",
+    "NotificacionesEstados.dc.html"
   ],
   "pages": [
     {
@@ -1943,6 +2006,10 @@
     {
       "id": "configuracion",
       "name": "8 · Configuración e integraciones"
+    },
+    {
+      "id": "notificaciones",
+      "name": "9 · Notificaciones"
     }
   ],
   "title": "QuimiCloude — Rediseño"

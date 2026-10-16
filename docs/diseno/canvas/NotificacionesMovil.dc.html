@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Notificaciones en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Notificaciones" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Notificaciones · ficha (QC-137)</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">topbar · tb-btn · pop · tabs · count · box (vacío y error) · sk (carga) · pg · toast</span> · <span class="mono">shared/empty-state · error-state · table-skeleton</span> · <span class="mono">components/ui/sonner</span> · ítem de <span class="mono">Sidebar</span> con su conteo</dd>
+      <dt>Nuevo</dt><dd>Campana de la cabecera con conteo y panel de los últimos 5 avisos · fila de aviso (icono por tono, título, texto, enlace al origen, hora, punto de no leído) · conteo del ítem «Notificaciones» del menú</dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Popover para el panel, Tabs para el filtro) · <span class="mono">lucide-react</span> (<span class="mono">Bell</span>, <span class="mono">FileCheck</span>, <span class="mono">FileWarning</span>, <span class="mono">FileX</span>, <span class="mono">VolumeX</span>) · <span class="mono">sonner</span> · el tono con la Web Audio API del navegador, sin archivo ni librería</dd>
+      <dt>Escritorio</dt><dd>Campana a la izquierda de «Cambiar tema» · el panel cae bajo la campana, 380 px, con «Marcar todas como leídas» y «Ver todas las notificaciones» · página con filtro Todas / No leídas, lista paginada y el texto «Se conservan 90 días» · clic en un aviso lo marca leído y abre su origen · el conteo de la campana, del menú y de la pestaña «No leídas» es el mismo número</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono: el conteo del menú pasa a un punto sobre el icono de la campana del menú · panel igual que en escritorio</dd>
+      <dt>Teléfono</dt><dd>La campana queda en la cabecera junto a «Alternar barra lateral» · el panel ocupa el ancho con 8 px de margen y alto máximo 60 % de la pantalla · cada aviso con objetivo de 44 px o más · la hora pasa bajo el texto · el menú lateral (hoja) muestra el conteo junto a «Notificaciones»</dd>
+      <dt>Animación</dt><dd>Llega un aviso: la campana se balancea 700 ms, su conteo da un pulso 360 ms y la fila nueva entra desde arriba con fundido · panel 200/150 ms (pop) · filtro con fundido 200 ms · con movimiento reducido no hay balanceo, pulso ni entrada · el tono suena una vez por navegador, no por pestaña</dd>
+      <dt>Sin audio</dt><dd>Si el navegador no permite reproducir sonido: toast informativo «Notificaciones sin sonido» una vez por sesión, con cerrar · no hay botón para silenciar</dd>
+      <dt>Estados</dt><dd>Lista · vacío («Todavía no tienes notificaciones.» / «No tienes notificaciones sin leer.») · cargando (esqueletos) · error con «Reintentar» · conteo 0 oculta la insignia · más de 99 se pinta «99+»</dd>
+      <dt>Por confirmar</dt><dd>«Marcar todas como leídas» (no está en la ficha) · cuántos avisos por página · texto exacto del enlace al origen de cada evento · hora relativa («hace 3 min») hasta qué antigüedad, luego fecha</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
