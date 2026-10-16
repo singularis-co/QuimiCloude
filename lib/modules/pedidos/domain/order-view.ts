@@ -2,6 +2,7 @@ import type { OrderPriority, OrderStatus } from './order-classification';
 import type { EditableOrderStatus } from './order-input';
 import type { OrderCustomer } from './order-customer';
 import type { OrderNumber } from './order-number';
+import type { OrderDeliveryState } from './order-pending-delivery';
 
 /**
  * Contratos de entrada y salida del pedido (`design.md > 7.3`). Viven en `domain/` -no en
@@ -188,9 +189,11 @@ export type OrderView = {
 };
 
 /**
- * Cada fila del listado lleva LO MISMO que la ficha (`design.md > 7.3`): un pedido es una sola
- * linea y no hay nada pesado que dejar fuera, a diferencia de las `lines` de una receta. Se
- * declara como alias y no como una copia recortada para que las dos salidas no puedan diverger.
+ * Cada fila del listado lleva lo mismo que la ficha mas lo que falta por entregar. Se declara
+ * sobre `OrderView` y no como una copia para que las dos salidas no puedan diverger.
  */
-export type OrderSummary = OrderView;
+export type OrderSummary = OrderView & {
+  /** Si hay algo empacado, si queda por entregar y que (`deliveryStateOf`). */
+  readonly pendingDelivery: OrderDeliveryState;
+};
 

@@ -135,6 +135,7 @@ function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSum
     ],
     unitId: UNIDAD_ID,
     unitLabel: 'L',
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
     recipeImageUrl: null,
     ...overrides,

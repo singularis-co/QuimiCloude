@@ -9,10 +9,12 @@ import {
   ORDER_CUSTOMER_PRESENCE_FILTER_FIELD,
   ORDER_CUSTOMER_PRESENCE_VALUES,
 } from './order-customer';
+import { deliveryStateOf } from './order-pending-delivery';
 import { ORDER_QUERYABLE } from './order-queryable';
 import type { OrderScope } from './order-scope';
 
 import type { ListFilterValue, ListQuery } from './list-query';
+import type { OrderCatalog } from './order-catalog';
 import type { OrderSummary } from './order-view';
 import type { Page } from './page';
 
@@ -38,6 +40,8 @@ import type { OrderRepository } from '../ports/order-repository';
  *  llamada por pagina con los ids UNICOS. */
 export type ListOrdersDeps = {
   readonly orders: OrderRepository;
+  /** Lo entregado por linea de los pedidos de la pagina, una llamada por pagina. */
+  readonly deliveryProgress: Pick<OrderCatalog, 'listDeliveryProgressByIdsIncludingDeleted'>;
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: resuelve los nombres de presentacion de la pagina. */
   readonly presentations: PresentationCatalog;
@@ -214,10 +218,20 @@ export function createListOrders(
 
     const orderCustomers = await findOrderCustomers(deps.customerCatalog, page.items, actor.companyId);
 
+    const progress =
+      page.items.length === 0
+        ? []
+        : await deps.deliveryProgress.listDeliveryProgressByIdsIncludingDeleted(
+            actor.companyId,
+            page.items.map((row) => row.id),
+          );
+    const progressById = new Map(progress.map((order) => [order.id, order]));
+
     return {
-      items: page.items.map((row) =>
-        toOrderView(row, recipesById, presentationDisplays, unitLabels, packagingNames, orderCustomers),
-      ),
+      items: page.items.map((row) => ({
+        ...toOrderView(row, recipesById, presentationDisplays, unitLabels, packagingNames, orderCustomers),
+        pendingDelivery: deliveryStateOf(progressById.get(row.id), row.status, presentationDisplays),
+      })),
       total: page.total,
       page: page.page,
       pageSize: page.pageSize,

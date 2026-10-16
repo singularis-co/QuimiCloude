@@ -75,7 +75,6 @@ const ACTIVO: ExecutionTraceRow = {
   formulaName: null,
   formulaImageUrl: null,
   presentations: [],
-  pendingDelivery: [],
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -92,7 +91,6 @@ const DE_BAJA: ExecutionTraceRow = {
   formulaName: null,
   formulaImageUrl: null,
   presentations: [],
-  pendingDelivery: [],
 };
 
 const ENTREGADO: ExecutionTraceRow = {
@@ -109,7 +107,6 @@ const ENTREGADO: ExecutionTraceRow = {
   formulaName: null,
   formulaImageUrl: null,
   presentations: [],
-  pendingDelivery: [],
 };
 
 const ROWS = [ACTIVO, DE_BAJA, ENTREGADO];
@@ -220,7 +217,6 @@ describe('R3 - columnas', () => {
       'Foto',
       'Fórmula',
       'Presentaciones',
-      'Por entregar',
       'Estado',
       'Personas',
       'Primera anotación',

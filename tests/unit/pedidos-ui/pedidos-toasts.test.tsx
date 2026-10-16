@@ -215,6 +215,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     ],
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
+    pendingDelivery: { kind: 'not_packed' },
     customer: { id: '6f1c2a3b-4d5e-4f60-8a71-b2c3d4e5f601', name: 'Ana Garcia', isDeleted: false },
     recipeImageUrl: null,
     ...overrides,
