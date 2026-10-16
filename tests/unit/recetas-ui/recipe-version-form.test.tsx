@@ -340,7 +340,13 @@ describe('RecipeVersionForm — errores del guardado', () => {
       const region = await screen.findByTestId('recipe-version-form-error');
       expect(region).toHaveAttribute('role', 'alert');
       expect(within(region).getByTestId('recipe-version-form-error-message')).toHaveTextContent(message);
-      expect(within(region).getByTestId('recipe-version-form-error-code')).toHaveTextContent(code);
+      if (code === 'invalid_input') {
+        // `invalid_input` no se pinta: el mensaje ya dice qué hacer.
+        expect(within(region).queryByTestId('recipe-version-form-error-code')).toBeNull();
+        expect(region).not.toHaveTextContent('invalid_input');
+      } else {
+        expect(within(region).getByTestId('recipe-version-form-error-code')).toHaveTextContent(code);
+      }
       expect(screen.queryByTestId('recipe-version-error-name')).toBeNull();
       expect(screen.getByTestId('recipe-version-field-name')).toHaveValue('Escrito a mano');
       expect(percentageValues()).toEqual(['70,00', '30,00']);

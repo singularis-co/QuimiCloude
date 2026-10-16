@@ -45,8 +45,18 @@ import { cn } from '@/lib/utils';
 
 import type { ProductPickerOption } from './product-picker';
 import { PropagateVersionsDialog } from './propagate-versions-dialog';
-import { RECIPE_TOOL_ERROR_MESSAGES, RecipeLinesField } from './recipe-lines-field';
-import { PACKING_STEPS_FIELD_TEXTS, RecipeStepsField } from './recipe-steps-field';
+import {
+  RECIPE_LINE_ERROR_MESSAGES,
+  RECIPE_LINES_GENERAL_ERROR_MESSAGE,
+  RECIPE_TOOL_ERROR_MESSAGES,
+  RECIPE_TOOLS_GENERAL_ERROR_MESSAGE,
+  RecipeLinesField,
+} from './recipe-lines-field';
+import {
+  PACKING_STEPS_FIELD_TEXTS,
+  RECIPE_STEP_ERROR_MESSAGES,
+  RecipeStepsField,
+} from './recipe-steps-field';
 import {
   buildRecipePayload,
   createLocalKey,
@@ -58,6 +68,7 @@ import {
   extractToolErrors,
   toLineFormValues,
   toToolFormValues,
+  type RecipeFieldErrorMessages,
   type RecipeFormState,
   type RecipeLineErrors,
   type RecipeStepErrors,
@@ -79,14 +90,18 @@ import {
  *
  * **Validación previa con los esquemas del CONTRATO** (`createRecipeSchema`/`updateRecipeSchema`
  * del barrel de `recetas`, R26): se ejecutan con `safeParse` ANTES de invocar la operación, sobre
- * el payload que arma `buildRecipePayload` -nunca sobre el estado crudo-, y sus mensajes -nunca
- * reescritos aquí- alimentan los errores por campo, por línea (R31) y por paso. El servidor
- * revalida igual: el cliente nunca es la frontera.
+ * el payload que arma `buildRecipePayload` -nunca sobre el estado crudo-, y sus issues alimentan
+ * los errores por campo, por línea (R31) y por paso. La REGLA es la del esquema; el TEXTO se
+ * traduce aquí: los `refine` del esquema ya traen su mensaje en español y pasan tal cual, y los
+ * issues de forma de zod (`too_small`, `too_big`, …), que traen el genérico en inglés, se
+ * sustituyen por el texto propio del formulario (`NAME_ERROR_MESSAGES`, `RECIPE_*_ERROR_MESSAGES`),
+ * igual que `product-form.tsx`. El servidor revalida igual: el cliente nunca es la frontera.
  *
  * **Errores de la operación (R23)**: `recipe_duplicate_name` va junto al campo nombre;
  * `recipe_not_found` se presenta con un enlace a la lista; cualquier otro código (`invalid_input`,
  * `unauthorized`, …) va en la región `role="alert"` del formulario. Ninguno navega fuera del
- * formulario ni pierde lo que el usuario había escrito.
+ * formulario ni pierde lo que el usuario había escrito. El código se pinta bajo el mensaje salvo
+ * `invalid_input`: su mensaje ya dice qué hacer y el código no le dice nada al usuario.
  *
  * QC-70 (R20, R21, R32): los dos códigos que se comparan son los ABIERTOS por caso -los genéricos
  * `duplicate_name` y `not_found` ya no existen en el catálogo-, el código está tipado con
@@ -126,6 +141,16 @@ const SAVE_SUCCESS_EDIT = 'Receta actualizada.';
  */
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const INVALID_INPUT_MESSAGE = 'Revisa los campos marcados.';
+
+/** Texto propio del nombre y la descripción para los issues de forma de zod (tope en el esquema). */
+const NAME_ERROR_MESSAGES: RecipeFieldErrorMessages = {
+  invalid: 'Escribe el nombre de la fórmula.',
+  tooLong: 'El nombre admite como máximo 120 caracteres.',
+};
+const DESCRIPTION_ERROR_MESSAGES: RecipeFieldErrorMessages = {
+  invalid: 'Revisa la descripción.',
+  tooLong: 'La descripción admite como máximo 500 caracteres.',
+};
 
 export type RecipeFormProductPage = {
   readonly items: readonly ProductPickerOption[];
@@ -257,14 +282,14 @@ export function RecipeForm(props: RecipeFormProps) {
     if (!parsed.success) {
       const issues = parsed.error.issues;
       setFieldErrors({
-        name: extractFieldError(issues, 'name'),
-        description: extractFieldError(issues, 'description'),
-        lines: extractLineErrors(issues),
-        linesGeneral: extractGeneralLinesError(issues),
+        name: extractFieldError(issues, 'name', NAME_ERROR_MESSAGES),
+        description: extractFieldError(issues, 'description', DESCRIPTION_ERROR_MESSAGES),
+        lines: extractLineErrors(issues, RECIPE_LINE_ERROR_MESSAGES),
+        linesGeneral: extractGeneralLinesError(issues, RECIPE_LINES_GENERAL_ERROR_MESSAGE),
         tools: extractToolErrors(issues, RECIPE_TOOL_ERROR_MESSAGES),
-        toolsGeneral: extractGeneralToolsError(issues),
-        steps: extractStepErrors(issues),
-        packingSteps: extractStepErrors(issues, 'packingSteps'),
+        toolsGeneral: extractGeneralToolsError(issues, RECIPE_TOOLS_GENERAL_ERROR_MESSAGE),
+        steps: extractStepErrors(issues, RECIPE_STEP_ERROR_MESSAGES),
+        packingSteps: extractStepErrors(issues, RECIPE_STEP_ERROR_MESSAGES, 'packingSteps'),
       });
       // R23: la validación previa rechazada tampoco invoca la operación, pero SÍ es un rechazo
       // que el usuario tiene que ver -no un silencio-, así que también alimenta la región de error
@@ -351,9 +376,11 @@ export function RecipeForm(props: RecipeFormProps) {
           renderCatalogued={(catalogued) => (
             <>
               <p data-testid="recipe-form-error-message">{catalogued.message}</p>
-              <p className="text-xs" data-testid="recipe-form-error-code">
-                {catalogued.code}
-              </p>
+              {catalogued.code === INVALID_INPUT_CODE ? null : (
+                <p className="text-xs" data-testid="recipe-form-error-code">
+                  {catalogued.code}
+                </p>
+              )}
             </>
           )}
         />

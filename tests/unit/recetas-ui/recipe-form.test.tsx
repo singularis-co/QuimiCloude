@@ -1746,7 +1746,9 @@ describe('QC-194 — herramientas en el formulario de receta', () => {
     expect(await screen.findByTestId('recipe-form-error-message')).toHaveTextContent(
       'La entrada recibida no es valida.',
     );
-    expect(screen.getByTestId('recipe-form-error-code')).toHaveTextContent('invalid_input');
+    // `invalid_input` no se pinta: el mensaje ya dice qué hacer.
+    expect(screen.queryByTestId('recipe-form-error-code')).toBeNull();
+    expect(screen.getByTestId('recipe-form-error')).not.toHaveTextContent('invalid_input');
     expect(routerMock.push).not.toHaveBeenCalled();
     expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue('1');
     expect(screen.getByTestId('recipe-field-name')).toHaveValue('Con herramientas');
