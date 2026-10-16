@@ -197,9 +197,15 @@ duraciones de las fases que tiene el pedido (R19–R24). Esa suma:
 **R27.** La lista DEBE entregar por pedido ese total como su única duración, sin el desglose por
 fase. El desglose solo está en el detalle. `[DC ¿Duración en la lista y en el detalle?]`
 
-**R28.** MIENTRAS un pedido esté vivo, la fila y el detalle DEBEN llevar la marca «En curso» junto al
-pedido, sea cual sea el estado de sus duraciones. Un pedido dado de baja NO DEBE llevarla.
-`[DC ¿Valores por defecto del tablero?]`
+**R28.** La fila y el detalle NO DEBEN llevar ninguna marca «En curso» de actividad junto al pedido,
+esté vivo o dado de baja, sea cual sea el estado de sus duraciones. La insignia «En curso» de una
+fase abierta en el detalle (R25) y el sufijo « (en curso)» del total de la lista (R26) NO cambian.
+`[DC ¿Valores por defecto del tablero?]` `[DC 2026-10-16 chip «En curso»]`
+
+> **Enmendado el 2026-10-16 (enmienda aprobada por el usuario, sin tarjeta; commit `0f135128`).**
+> Texto original: «MIENTRAS un pedido esté vivo, la fila y el detalle DEBEN llevar la marca «En
+> curso» junto al pedido, sea cual sea el estado de sus duraciones. Un pedido dado de baja NO DEBE
+> llevarla.» La marca de actividad se quita; la marca «Dado de baja» sigue como estaba.
 
 ### Personas y filtro por persona
 
@@ -274,6 +280,7 @@ Con eso DEBE comprobar en el dashboard:
 | ¿Duración en la lista y en el detalle? | R25, R26, R27 |
 | P10 — pausas en producción | R23 |
 | ¿Valores por defecto del tablero? | R12, R15, R17, R25, R28, R29 |
+| 2026-10-16 — chip «En curso» fuera (enmienda sin tarjeta) | R28 |
 
 ## Decisiones cerradas (no reabrir)
 
@@ -303,6 +310,7 @@ Con eso DEBE comprobar en el dashboard:
 | 2026-10-14 | ¿Duración en la lista y en el detalle? | **Lista: una sola duración total** = suma de las etapas (producción + empaque + acondicionamiento), sin las esperas entre etapas. Una etapa sin anotación que la abra suma 0. Redondeo a minutos. Con alguna etapa abierta lleva « (en curso)»; con alguna sin cierre, « (sin cierre anotado)». Ordenar por duración es ordenar por ese total. **Detalle:** las tres duraciones por etapa, con insignia «En curso» o «Sin cierre anotado»; una fase sin anotación que la abra no se pinta |
 | 2026-10-14 | ¿Qué tiempo se descuenta de producción? (P10) | **Opción 2: las pausas**, es decir, los tramos entre una pausa y su `resume` anotados en el registro. No `BLOQUEADO`. Enmienda P6a |
 | 2026-10-14 | ¿Valores por defecto del tablero («Por confirmar»)? | Se aceptan todos: fechas `dd/mm/aaaa` en pantalla (la foto guarda `AAAA-MM-DD`); etiquetas «Duración de producción / de empaque / de acondicionamiento»; insignia en el detalle y sufijo en la lista; Terminar solo muestra quién; iconos lucide `ClipboardList` / `Download` / `ClipboardCheck`; el tooltip de Personas no distingue al equipo de los firmantes |
+| 2026-10-16 | ¿Chip «En curso» del pedido en la fila y en el detalle? | **Enmienda aprobada por el usuario, sin tarjeta** (commit `0f135128`). Se quita: el estado ya dice en qué paso va el pedido. Se conservan «Dado de baja», la insignia de fase abierta del detalle y el sufijo « (en curso)» de la duración. Sustituye R28 en su redacción original. |
 
 ## Preguntas abiertas
 
@@ -326,4 +334,4 @@ Con eso DEBE comprobar en el dashboard:
     curso)»: el total es una sola `TraceDuration` con un solo `kind`.
   - **Marca «En curso» en la lista (R28).** El tablero la dibuja junto al estado. Se mantiene donde
     la dejó QC-261 P4 (junto al número). El tablero dice «Mismas columnas que hoy» y QC-283 no
-    reabre QC-261.
+    reabre QC-261. *(Superada el 2026-10-16: la marca se quitó, ver R28 enmendado.)*
