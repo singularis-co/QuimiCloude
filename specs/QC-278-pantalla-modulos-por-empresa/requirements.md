@@ -163,11 +163,9 @@ se diseñó, y cambiarlo toca solo lo que se cita.
 4. **Singular en el toast de «todos».** El tablero solo trae el plural («Se prendieron N
    módulos.»). Con un solo añadido por cambiar saldría «Se prendieron 1 módulos.». **Defecto:**
    «Se prendió 1 módulo.» / «Se apagó 1 módulo.». Cambiarlo toca R15 y `addon-labels.ts`.
-5. **Carpeta de la ruta del detalle.** QC-166 fija la URL (`/maestro/empresas/[id]`) pero su
-   `design.md` no existe todavía, así que el grupo de rutas (`(private)` u otro) es desconocido.
-   **Defecto:** `app/(private)/maestro/empresas/[id]/`, porque el `<Toaster />` que pide R15 lo
-   monta hoy el layout de `(private)`. Si QC-166 elige otra, solo se mueven las rutas de
-   `tasks.md > Archivos esperados`; el contrato de R1 no cambia (`design.md > 3`).
+5. ~~**Carpeta de la ruta del detalle.**~~ **Cerrada el 2026-10-16:** el spec de QC-166 pone el
+   detalle en `app/(private)/maestro/empresas/[id]/`, sin layout propio (el `<Toaster />` de R15
+   es el de `app/(private)/layout.tsx`), y adopta tal cual el contrato de R1 (`design.md > 3`).
 
 ## Decisiones cerradas (no reabrir)
 

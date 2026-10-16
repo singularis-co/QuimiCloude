@@ -7,15 +7,19 @@
 
 ## Tasks
 
-- [ ] **T1 [P] — Etiquetas y textos puros** (R5, R10, R12, R15, R19)
-  - `addon-labels.ts`: `ADDON_LABELS` como `Record<Addon, …>` (nombres del tablero, descripciones
-    de la pregunta abierta 1, iconos de `lucide-react`), `changedAddons(prev, next)` y
-    `successMessage(changed, enabled)` (singular y plural, pregunta abierta 4).
+- [ ] **T1 [P] — Etiquetas y textos puros** (R5, R10, R12, R15, R19) · depende de
+  `lib/shared/ui/addon-names.ts` de QC-166 en la rama (integrar `origin/dev` o la rama de QC-166;
+  no crear una copia)
+  - `addon-labels.ts`: `ADDON_LABELS` como `Record<Addon, …>` con `name` tomado de `ADDON_NAMES`
+    (sin repetir nombres), descripciones de la pregunta abierta 1 e iconos de `lucide-react`;
+    `changedAddons(prev, next)` y `successMessage(changed, enabled)` (singular y plural, pregunta
+    abierta 4).
   - `addon-off-consequences.ts`: `offConsequences(addons, view)` (design § 4.3, pregunta abierta 3).
   - `core-modules.ts`: `CORE_MODULE_NAMES`, los 11 del tablero.
   - Test: `tests/unit/maestro-ui/addon-labels.test.ts`.
   - **Hecho:** los casos R5, R10, R12 y R15 del mapa (design § 7.1) pasan; quitar una clave de
-    `ADDON_LABELS` rompe el typecheck.
+    `ADDON_LABELS` rompe el typecheck; `addon-labels.ts` no contiene ningún nombre de añadido
+    literal (el test R5 compara `ADDON_LABELS[a].name` con `ADDON_NAMES[a]`).
 
 - [ ] **T2 [P] — `CoreModuleChips`** (R19)
   - `core-module-chips.tsx` (Server): `h2` «Núcleo», subtítulo, una `Badge` `outline` con `Lock`
@@ -50,9 +54,7 @@
 
 - [ ] **T6 — Montaje en el detalle y E2E** (R25) · depende de T5 y de la ruta de QC-166 en `dev`
   - Integrar `origin/dev`. Si la página de QC-166 no monta ya `CompanyModulesTab`, añadir la línea
-    de montaje (design § 3) y `export * from './modulos';` en el barrel de la ruta. Si QC-166 eligió
-    otro grupo de rutas (pregunta abierta 5), mover `components/modulos/` y actualizar
-    `## Archivos esperados`.
+    de montaje (design § 3) y `export * from './modulos';` en el barrel de la ruta.
   - `e2e/maestro-modulos.spec.ts` (design § 7.2).
   - Correr `pnpm exec playwright test e2e/maestro-modulos.spec.ts` y pegar la salida en
     `progress/impl_QC-278-pantalla-modulos-por-empresa.md`.
@@ -89,3 +91,8 @@ Modificados (de QC-166; una línea cada uno, solo si QC-166 no la deja puesta):
 
 - `app/(private)/maestro/empresas/[id]/page.tsx`
 - `app/(private)/maestro/empresas/[id]/components/index.ts`
+
+Solo se importan (de QC-166; esta ficha no los edita, se listan para que el detector de
+choques vea la dependencia):
+
+- `lib/shared/ui/addon-names.ts`

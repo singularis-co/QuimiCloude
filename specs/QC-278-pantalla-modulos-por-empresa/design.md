@@ -14,7 +14,7 @@ Búsqueda hecha el 2026-10-16 (`docs/specs.md > Antes de especificar: lo que ya 
 |---|---|---|
 | Board (`feature_list.json`) | QC-277 (motor, `depends_on`), QC-166 (detalle de empresa que monta la pestaña, `depends_on`). Ninguna otra ficha con la pantalla de interruptores | Se consume QC-277 y se monta en QC-166; nada duplicado |
 | `specs/` | Solo `specs/QC-277-modulos-por-empresa/design.md` cita las acciones (§ 6.5) y deja la pantalla a QC-278 (§ 6.1 «para que QC-278 no tenga que releer», § 12) | Contrato de I/O tomado de ahí |
-| `.worktrees/QC-166-area-del-maestro/specs/QC-166-area-del-maestro/` | Solo `requirements.md` sembrado (Alcance: «pestañas Datos, Módulos (la llena QC-278) e Historial»). Sin `design.md` | El contrato de montaje lo fija este spec (§ 3) y QC-166 lo adopta |
+| `.worktrees/QC-166-area-del-maestro/specs/QC-166-area-del-maestro/` | Al empezar, solo `requirements.md` (Alcance: «pestañas Datos, Módulos (la llena QC-278) e Historial»). Después, su `design.md` adoptó el contrato de § 3 tal cual y declaró `lib/shared/ui/addon-names.ts` (`ADDON_NAMES`) para su Historial (QC-166 `design.md > 6.5`) | Se monta según § 3; los nombres de los añadidos se toman de `ADDON_NAMES` (§ 5) |
 | Código (grafo + Grep) | `getCompanyAddonsAction`, `setCompanyAddonAction`, `setAllCompanyAddonsAction` y sus tipos `CompanyAddonsResult`, `CompanyAddonsFormState` en `lib/modules/identity/adapters/driving/company-actions.ts:44-49, 222-266`; `CompanyAddonsView` en `lib/modules/identity/domain/company-addons-view.ts`; `ADDONS`, `ADDON_REQUIRES`, `type Addon` en `lib/modules/identity/domain/company-addons.ts`. Ninguna ruta `app/**/maestro/**`. Ningún nombre visible de añadido ni del núcleo en código | Se reutilizan tal cual; las etiquetas se crean (§ 5) |
 | `e2e/` | `e2e/modulos-por-empresa.spec.ts` (QC-277: interruptores por Prisma, menú del Administrador), `e2e/helpers/addons.ts`, `e2e/helpers/landing.ts`, `e2e/helpers/fixture-user.ts` | El E2E nuevo reutiliza los helpers y los `data-testid` del menú (`nav-proveedores`) |
 
@@ -115,13 +115,13 @@ Uso esperado en la página de QC-166 (Server Component):
 - **Barrel.** Los componentes de la pestaña viven en la subcarpeta `components/modulos/` con su
   propio `index.ts`; el `components/index.ts` de la ruta (de QC-166) solo gana la línea
   `export * from './modulos';`. Así las dos fichas no se pisan el barrel (§ 10).
-- **Carpeta.** `app/(private)/` es el defecto de la pregunta abierta 5: el `<Toaster />` que pide
-  R15 lo monta hoy `app/(private)/layout.tsx:152`. Si QC-166 elige otro grupo, se mueven las
-  rutas; el contrato no cambia. Si el layout del área del Maestro no monta un `<Toaster />`, los
-  toasts no se ven: QC-166 lo tiene que montar (se le anota en su ficha al integrar).
-- **Alineación con QC-166.** Su `design.md` no existe al escribir este spec. Cuando exista, si
-  nombra otra forma de props, gana la que se acuerde en la revisión de los dos specs; este
-  contrato es la propuesta.
+- **Carpeta.** `app/(private)/maestro/empresas/[id]/`, fijada por el spec de QC-166 (pregunta
+  abierta 5, cerrada). El área del Maestro no tiene layout propio: el `<Toaster />` que pide R15 es
+  el de `app/(private)/layout.tsx:152`.
+- **Alineación con QC-166.** Su `design.md` adopta este contrato tal cual (props y montaje).
+- **Nombres de los añadidos.** QC-166 crea `lib/shared/ui/addon-names.ts` con `ADDON_NAMES`
+  (solo nombres, los del tablero) para su Historial (QC-166 `design.md > 6.5`). Esta ficha los
+  toma de ahí y no los repite (§ 5).
 
 ## 4. Componentes y flujo
 
@@ -256,17 +256,24 @@ En la carpeta de la pestaña, **no en el dominio**:
 ```ts
 // addon-labels.ts
 import type { Addon } from '@/lib/modules/identity';   // solo el tipo: no arrastra servidor al cliente
-export const ADDON_LABELS: Readonly<Record<Addon, { name: string; description: string; icon: LucideIcon }>> = {
-  dashboard:         { name: 'Dashboard y recorrido',   description: '…', icon: LayoutDashboard },
-  proveedores:       { name: 'Proveedores',             description: '…', icon: Truck },
-  lectura_pdf:       { name: 'Lectura de PDF con IA',   description: '…', icon: FileText },
-  importacion_excel: { name: 'Importación desde Excel', description: '…', icon: Sheet },
-  integraciones:     { name: 'Integraciones',           description: 'Proveedor IA, Inventarios y WhatsApp.', icon: Puzzle },
+import { ADDON_NAMES } from '@/lib/shared/ui/addon-names';   // de QC-166: fuente única de los nombres
+
+const ADDON_DETAILS: Readonly<Record<Addon, { description: string; icon: LucideIcon }>> = {
+  dashboard:         { description: '…', icon: LayoutDashboard },
+  proveedores:       { description: '…', icon: Truck },
+  lectura_pdf:       { description: '…', icon: FileText },
+  importacion_excel: { description: '…', icon: Sheet },
+  integraciones:     { description: 'Proveedor IA, Inventarios y WhatsApp.', icon: Puzzle },
 };
+
+export const ADDON_LABELS: Readonly<Record<Addon, { name: string; description: string; icon: LucideIcon }>> =
+  /* por cada clave: { name: ADDON_NAMES[addon], ...ADDON_DETAILS[addon] } */;
 ```
 
 - **`Record<Addon, …>`**: un sexto añadido en `ADDONS` rompe el typecheck hasta tener etiqueta.
-- **Nombres**: los del tablero, que son los de QC-277 D3 con mayúscula inicial.
+- **Nombres**: **no se escriben aquí**. Salen de `ADDON_NAMES` (`lib/shared/ui/addon-names.ts`,
+  lo crea QC-166 para su Historial, QC-166 `design.md > 6.5`): los del tablero, que son los de
+  QC-277 D3 con mayúscula inicial. Esta ficha no edita ese archivo ni su fila del catálogo.
 - **Descripciones**: las de la pregunta abierta 1 (propuestas; el humano las confirma en la
   revisión). La de Integraciones ya está en el tablero.
 - **Iconos**: de `lucide-react`; el tablero dibuja trazos propios y no nombra el icono, así que el
@@ -391,11 +398,12 @@ seguidos sin esperar; para eso está «Prender todos».
 mantener una vista provisional y a deshacerla; con el interruptor controlado por la última vista
 del servidor, R16 («vuelve a su posición») sale gratis y R22 se cumple por construcción.
 
-**D. Etiquetas en el dominio (`identity/domain/company-addons.ts`) o en `lib/shared/ui/`.** Se
-descarta: el dominio no lleva textos de pantalla, y `lib/shared/ui` es para lo que usan varias
-rutas; hoy solo esta las usa. Si una segunda ruta las necesita (p. ej. el Historial de QC-166, que
-nombra «Prendió Proveedores»), suben a `lib/shared/ui/` en ese commit con su fila en el catálogo.
-Se anota a QC-166 en § 10.
+**D. Etiquetas en el dominio (`identity/domain/company-addons.ts`), o todas en `lib/shared/ui/`.**
+Se descarta: el dominio no lleva textos de pantalla. De `lib/shared/ui/` sube **solo lo que usan
+dos rutas**: los nombres, que también pinta el Historial de QC-166 («Prendió Proveedores»), y que
+por eso QC-166 crea en `lib/shared/ui/addon-names.ts`. Descripciones e iconos solo los usa esta
+pestaña y se quedan en su carpeta. **Repetir los nombres aquí** también se descarta: dos copias
+divergen.
 
 **E. Un `<form action>` por fila con `useActionState`.** Se descarta por B y porque apagar pasa
 por el diálogo, que ya llama por callback (`onConfirm`). El patrón de llamar a la acción con un
@@ -418,11 +426,8 @@ por el diálogo, que ya llama por callback (`onConfirm`). El patrón de llamar a
 |---|---|---|
 | `app/(private)/maestro/empresas/[id]/page.tsx` | QC-166 (dueño) | **No se toca.** QC-166 monta `CompanyModulesTab` con el contrato de § 3. Si QC-166 se mergea antes y deja el hueco, la línea de montaje la pone QC-166; si no, esta ficha la añade en F2.3 al integrar |
 | `app/(private)/maestro/empresas/[id]/components/index.ts` | QC-166 (dueño) | Una línea: `export * from './modulos';` |
+| `lib/shared/ui/addon-names.ts` | QC-166 (dueño, lo crea) | **Solo se importa** `ADDON_NAMES`; no se edita. T1 depende de que exista en la rama (merge de QC-166 o `origin/dev`) |
 | `e2e/helpers/*` | Toda ficha con E2E | Solo se leen; no se cambian |
-
-Para QC-166 quedan dos notas: montar el `<Toaster />` si su área tiene layout propio (§ 3) y, si
-su Historial pinta nombres de añadidos, reutilizar `ADDON_LABELS` subiéndolo a `lib/shared/ui/`
-(§ 8.D).
 
 ## 11. Dependencias de terceros
 
@@ -431,8 +436,8 @@ Ninguna nueva. Se usan `@base-ui/react` (vía `Switch` y `ConfirmDialog`), `sonn
 
 ## 12. Riesgos y desconocidos
 
-- **QC-166 sin diseño.** El contrato de § 3 es una propuesta. Si QC-166 lo cambia, cambia
-  `company-modules-tab.tsx` y su test, nada más.
-- **Grupo de rutas** (pregunta abierta 5): mover rutas, sin cambio de lógica.
+- **Orden de merge con QC-166.** T1 necesita `lib/shared/ui/addon-names.ts` y T6 la ruta. Si
+  esta ficha se implementa antes de que QC-166 esté en `dev`, T1 se integra desde la rama de
+  QC-166 o espera; **no** se crea aquí una copia de `ADDON_NAMES`.
 - **Maestro del seed en local.** `progress/deudas.md` D27 registra entornos sin `SEED_MAESTRO_*`
   en `.env`; ahí el E2E falla con su mensaje. En CI están.
