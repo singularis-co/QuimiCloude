@@ -283,9 +283,9 @@ export function useOperatorSidePanels(props: OperatorSidePanelsProps): {
 
 | Token | Claro | Oscuro (`.dark`) |
 |---|---|---|
-| `--section-materials` | `oklch(0.6 0.15 55)` | `oklch(0.68 0.14 60)` |
+| `--section-materials` | `oklch(0.57 0.15 55)` | `oklch(0.68 0.14 60)` |
 | `--section-tools` | `oklch(0.55 0.15 255)` | `oklch(0.64 0.14 255)` |
-| `--section-team` | `oklch(0.55 0.13 160)` | `oklch(0.64 0.12 160)` |
+| `--section-team` | `oklch(0.54 0.13 160)` | `oklch(0.64 0.12 160)` |
 | `--section-foreground` | `oklch(0.99 0 0)` | `oklch(0.18 0 0)` |
 
 Se exponen como utilidades de Tailwind en `@theme inline`, igual que los demás tokens del

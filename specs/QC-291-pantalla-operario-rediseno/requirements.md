@@ -51,6 +51,8 @@ Lo que NO entra:
 | D13 | (P10) La cuenta atrás de la espera se queda en el botón, como en QC-265 R37. Sin cambios ahí. | 2026-10-16, humano | R15 |
 | 2026-10-16 | P11: ¿textos de la línea de motivo de R33? (F1.4) | Se aprueban los propuestos: los textos existentes de «Lo acondiciona <nombre>.» y del empacador; «Este pedido ya está acondicionado.»; «Este pedido ya está entregado.»; «No se pudo cargar el equipo para comenzar.». |
 | 2026-10-16 | ¿Spec aprobado? | Sí, por el humano en F1.4, incluidas las enmiendas a QC-195 R44 y QC-265 (`design.md > 1.1`). |
+| 2026-10-16 | Bloqueo B1 del implementer: el ámbar y el verde claros no llegan a 4,5:1 (F2.1) | Se oscurecen manteniendo croma y tono: materiales `oklch(0.57 0.15 55)` (4,56) y equipo `oklch(0.54 0.13 160)` (4,57). El umbral de T3 sigue en 4,5:1. Tablero actualizado. |
+| 2026-10-16 | Bloqueo B2 del implementer: la lista cerrada de QC-125 R18 solo admite `step-reader.tsx` (F2.1) | Se amplía con `components/shared/step-reader/step-document-view.tsx` y `components/shared/step-reader/index.ts`. Enmienda QC-125; T12 anota la enmienda fechada en su spec. |
 
 ## Requisitos (EARS)
 
