@@ -12,7 +12,15 @@ import {
   type ListExecutionTracesDeps,
 } from '@/lib/modules/asignaciones/domain/list-execution-traces';
 import { PERMISSIONS, type PersonRef } from '@/lib/modules/identity';
-import { ORDER_STATUS_VALUES, type OrderCatalog, type OrderHistorySummary, type Page } from '@/lib/modules/pedidos';
+import {
+  ORDER_STATUS_VALUES,
+  type OrderCatalog,
+  type OrderDeliveryProgress,
+  type OrderHistorySummary,
+  type Page,
+} from '@/lib/modules/pedidos';
+import type { PresentationRef } from '@/lib/modules/inventario';
+import type { RecipeRef } from '@/lib/modules/recetas';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { ExecutionAction, ExecutionEntryRecord } from '@/lib/modules/asignaciones/domain/execution-entry';
@@ -62,6 +70,35 @@ function resumen(id: string, overrides?: Partial<OrderHistorySummary>): OrderHis
   return { id, number: { year: 2026, sequence: 42 }, status: 'ENTREGADO', deleted: false, ...overrides };
 }
 
+const RECETA = uuid('d');
+const GALON = uuid('e');
+const VASO = uuid('f');
+
+function progreso(id: string, recipeId: string, lines: OrderDeliveryProgress['lines']): OrderDeliveryProgress {
+  return { id, recipeId, lines };
+}
+
+function linea(
+  presentationId: string,
+  packages: number,
+  overrides?: { readonly packedPackages?: number | null; readonly deliveredPackages?: number },
+): OrderDeliveryProgress['lines'][number] {
+  return {
+    presentationId,
+    packages,
+    packedPackages: overrides?.packedPackages ?? null,
+    deliveredPackages: overrides?.deliveredPackages ?? 0,
+  };
+}
+
+function receta(id: string, name: string, imageUrl: string | null, isDeleted = false): RecipeRef {
+  return { id, name, ownName: name, isDeleted, isUnderReview: false, original: null, imageUrl };
+}
+
+function presentacion(id: string, name: string): PresentationRef {
+  return { id, name, content: '1', unitId: uuid('9') };
+}
+
 function persona(id: string, displayName: string): PersonRef {
   return { id, displayName, isActive: true, permissions: [], roleName: 'Operador' };
 }
@@ -83,6 +120,9 @@ function montar(options?: {
   readonly usersWithEntries?: readonly string[];
   readonly people?: readonly PersonRef[];
   readonly team?: readonly TeamRow[];
+  readonly progress?: readonly OrderDeliveryProgress[];
+  readonly recipes?: readonly RecipeRef[];
+  readonly presentations?: readonly PresentationRef[];
 }) {
   const listExecutedOrderIds = vi.fn(async () => options?.executedIds ?? [PEDIDO_A]);
   const listEntriesForOrders = vi.fn(async (_companyId: string, ids: readonly string[]) =>
@@ -102,7 +142,22 @@ function montar(options?: {
   const listSummariesByIdsIncludingDeleted = vi.fn<OrderCatalog['listSummariesByIdsIncludingDeleted']>(
     async (_companyId, _ids, _statuses, page, pageSize) => pagina(options?.orders ?? [], page, pageSize ?? 10),
   );
-  const orders = { listSummariesByIdsIncludingDeleted } as unknown as OrderCatalog;
+  const listDeliveryProgressByIdsIncludingDeleted = vi.fn<OrderCatalog['listDeliveryProgressByIdsIncludingDeleted']>(
+    async (_companyId, ids) => (options?.progress ?? []).filter((order) => ids.includes(order.id)),
+  );
+  const orders = {
+    listSummariesByIdsIncludingDeleted,
+    listDeliveryProgressByIdsIncludingDeleted,
+  } as unknown as OrderCatalog;
+
+  const findRecipeRefs = vi.fn(async (ids: readonly string[], _companyId: string) =>
+    (options?.recipes ?? []).filter((recipe) => ids.includes(recipe.id)),
+  );
+  const recipes = { findRefsIncludingDeleted: findRecipeRefs };
+  const findPresentationRefs = vi.fn(async (ids: readonly string[], _companyId: string) =>
+    (options?.presentations ?? []).filter((presentation) => ids.includes(presentation.id)),
+  );
+  const presentations = { findRefs: findPresentationRefs };
 
   const directorio = options?.people ?? [persona(ANA, 'Ana Perez'), persona(BEA, 'Bea Gomez')];
   const findRefsIncludingDeletedInCompany = vi.fn(
@@ -115,7 +170,7 @@ function montar(options?: {
   );
   const team = { listByOrdersInCompany };
 
-  const deps: ListExecutionTracesDeps = { log, orders, people, team };
+  const deps: ListExecutionTracesDeps = { log, orders, people, team, recipes, presentations };
   const todos = [
     listByOrdersInCompany,
     listExecutedOrderIds,
@@ -125,6 +180,9 @@ function montar(options?: {
     findLastStepPosition,
     listSummariesByIdsIncludingDeleted,
     findRefsIncludingDeletedInCompany,
+    listDeliveryProgressByIdsIncludingDeleted,
+    findRecipeRefs,
+    findPresentationRefs,
   ];
   return {
     listar: createListExecutionTraces(deps),
@@ -134,6 +192,9 @@ function montar(options?: {
     listSummariesByIdsIncludingDeleted,
     findRefsIncludingDeletedInCompany,
     listByOrdersInCompany,
+    listDeliveryProgressByIdsIncludingDeleted,
+    findRecipeRefs,
+    findPresentationRefs,
     ningunPuertoLlamado: () => todos.every((fn) => fn.mock.calls.length === 0),
   };
 }
@@ -359,6 +420,10 @@ describe('listExecutionTraces — la fila', () => {
       lastAt: esperado.lastAt,
       totalDuration: esperado.totalDuration,
       goBackCount: 1,
+      formulaName: null,
+      formulaImageUrl: null,
+      presentations: [],
+      pendingDelivery: [],
     });
     // Produccion 60 + empaque 30: la espera entre finish y pack_start no cuenta.
     expect(fila!.totalDuration).toEqual({ kind: 'closed', ms: 90 * MIN });
@@ -414,9 +479,22 @@ describe('listExecutionTraces — empresa y numero de consultas', () => {
       ...m.listEntriesForOrders.mock.calls,
       ...m.findRefsIncludingDeletedInCompany.mock.calls,
       ...m.listByOrdersInCompany.mock.calls,
+      ...m.listDeliveryProgressByIdsIncludingDeleted.mock.calls,
     ] as unknown as readonly (readonly unknown[])[];
     expect(llamadas.length).toBeGreaterThan(0);
     for (const llamada of llamadas) expect(llamada[0]).toBe(EMPRESA);
+  });
+
+  it('R23: los catalogos de receta y presentacion reciben la empresa del actor', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A)],
+      entries: [anotacion(PEDIDO_A, 'start', 0)],
+      progress: [progreso(PEDIDO_A, RECETA, [linea(GALON, 10)])],
+    });
+    await m.listar(ACTOR, {}, NOW);
+    expect(m.listDeliveryProgressByIdsIncludingDeleted).toHaveBeenCalledWith(EMPRESA, [PEDIDO_A]);
+    expect(m.findRecipeRefs).toHaveBeenCalledWith([RECETA], EMPRESA);
+    expect(m.findPresentationRefs).toHaveBeenCalledWith([GALON], EMPRESA);
   });
 
   it('R23: una entrada con companyId se rechaza y no toca ningun puerto', async () => {
@@ -430,6 +508,9 @@ describe('listExecutionTraces — empresa y numero de consultas', () => {
     const m = montar({
       executedIds: ids,
       orders: ids.map((id) => resumen(id)),
+      progress: ids.map((id) => progreso(id, RECETA, [linea(GALON, 2), linea(VASO, 3)])),
+      recipes: [receta(RECETA, 'Shampoo', null)],
+      presentations: [presentacion(GALON, 'Galón'), presentacion(VASO, 'Vaso')],
       entries: ids.flatMap((id) => [anotacion(id, 'conditioning_start', 0, ANA), anotacion(id, 'cancel', 3, BEA)]),
       usersWithEntries: [ANA, BEA],
       team: ids.map((id) => miembro(id, BEA)),
@@ -441,6 +522,10 @@ describe('listExecutionTraces — empresa y numero de consultas', () => {
     expect(m.listSummariesByIdsIncludingDeleted).toHaveBeenCalledTimes(1);
     expect(m.listEntriesForOrders).toHaveBeenCalledTimes(1);
     expect(m.listByOrdersInCompany).toHaveBeenCalledTimes(1);
+    expect(m.listDeliveryProgressByIdsIncludingDeleted).toHaveBeenCalledTimes(1);
+    expect(m.findRecipeRefs).toHaveBeenCalledTimes(1);
+    expect(m.findPresentationRefs).toHaveBeenCalledTimes(1);
+    expect(m.findPresentationRefs).toHaveBeenCalledWith([GALON, VASO], EMPRESA);
     // Una para las opciones de persona y otra para toda la pagina.
     expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledTimes(2);
   });
@@ -571,5 +656,114 @@ describe('listExecutionTraces — el equipo del acondicionamiento', () => {
     expect(Object.keys(fila)).not.toContain('durations');
     expect(Object.keys(fila)).not.toContain('duration');
     expect(fila.totalDuration).toEqual({ kind: 'closed', ms: 75 * MIN });
+  });
+});
+
+describe('listExecutionTraces — formula, presentaciones y por entregar', () => {
+  const IMAGEN = 'https://cdn.example/recetas/shampoo.png';
+  const catalogos = {
+    recipes: [receta(RECETA, 'Shampoo', IMAGEN)],
+    presentations: [presentacion(GALON, 'Galón'), presentacion(VASO, 'Vaso')],
+  };
+
+  it('formulaName y formulaImageUrl salen de la receta del pedido', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'TERMINADO' })],
+      entries: [anotacion(PEDIDO_A, 'start', 0)],
+      progress: [progreso(PEDIDO_A, RECETA, [])],
+      ...catalogos,
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    expect(fila.formulaName).toBe('Shampoo');
+    expect(fila.formulaImageUrl).toBe(IMAGEN);
+  });
+
+  it('una receta sin imagen da formulaImageUrl null; una que no vuelve, los dos null', async () => {
+    const m = montar({
+      executedIds: [PEDIDO_A, PEDIDO_B],
+      orders: [resumen(PEDIDO_A), resumen(PEDIDO_B)],
+      entries: [anotacion(PEDIDO_A, 'start', 0), anotacion(PEDIDO_B, 'start', 0)],
+      progress: [progreso(PEDIDO_A, RECETA, []), progreso(PEDIDO_B, uuid('7'), [])],
+      recipes: [receta(RECETA, 'Shampoo', null)],
+    });
+    const { page } = await m.listar(ACTOR, {}, NOW);
+    expect(page.items.map((row) => [row.formulaName, row.formulaImageUrl])).toEqual([
+      ['Shampoo', null],
+      [null, null],
+    ]);
+  });
+
+  it('presentations es lo que pide el pedido, en el orden del reparto, con el nombre de la presentacion', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'EN_CURSO' })],
+      entries: [anotacion(PEDIDO_A, 'start', 0)],
+      progress: [progreso(PEDIDO_A, RECETA, [linea(GALON, 10), linea(VASO, 5)])],
+      ...catalogos,
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    expect(fila.presentations).toEqual([
+      { label: 'Galón', quantity: 10 },
+      { label: 'Vaso', quantity: 5 },
+    ]);
+    // Nada entregado todavia: falta todo.
+    expect(fila.pendingDelivery).toEqual(fila.presentations);
+  });
+
+  it('pendingDelivery descuenta lo entregado de lo contado al empacar y omite lo que ya no falta', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'TERMINADO' })],
+      entries: [anotacion(PEDIDO_A, 'start', 0)],
+      progress: [
+        progreso(PEDIDO_A, RECETA, [
+          linea(GALON, 10, { packedPackages: 8, deliveredPackages: 3 }),
+          linea(VASO, 5, { deliveredPackages: 5 }),
+        ]),
+      ],
+      ...catalogos,
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    expect(fila.presentations).toEqual([
+      { label: 'Galón', quantity: 10 },
+      { label: 'Vaso', quantity: 5 },
+    ]);
+    expect(fila.pendingDelivery).toEqual([{ label: 'Galón', quantity: 5 }]);
+  });
+
+  it('un pedido ENTREGADO no debe nada aunque no tenga entregas anotadas', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'ENTREGADO' })],
+      entries: [anotacion(PEDIDO_A, 'start', 0)],
+      progress: [progreso(PEDIDO_A, RECETA, [linea(GALON, 10)])],
+      ...catalogos,
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    expect(fila.presentations).toEqual([{ label: 'Galón', quantity: 10 }]);
+    expect(fila.pendingDelivery).toEqual([]);
+  });
+
+  it('un pedido dado de baja devuelve lo que hay: receta de baja incluida, linea sin presentacion omitida', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'EN_CURSO', deleted: true })],
+      entries: [anotacion(PEDIDO_A, 'start', 0)],
+      progress: [progreso(PEDIDO_A, RECETA, [linea(uuid('0'), 4), linea(VASO, 2)])],
+      recipes: [receta(RECETA, 'Shampoo', IMAGEN, true)],
+      presentations: [presentacion(VASO, 'Vaso')],
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    expect(fila.deleted).toBe(true);
+    expect(fila.formulaName).toBe('Shampoo');
+    expect(fila.formulaImageUrl).toBe(IMAGEN);
+    expect(fila.presentations).toEqual([{ label: 'Vaso', quantity: 2 }]);
+    expect(fila.pendingDelivery).toEqual([{ label: 'Vaso', quantity: 2 }]);
+  });
+
+  it('un pedido sin progreso sale con listas vacias y sin consultar los catalogos', async () => {
+    const m = montar({ orders: [resumen(PEDIDO_A)], entries: [anotacion(PEDIDO_A, 'start', 0)] });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    expect([fila.formulaName, fila.formulaImageUrl]).toEqual([null, null]);
+    expect(fila.presentations).toEqual([]);
+    expect(fila.pendingDelivery).toEqual([]);
+    expect(m.findPresentationRefs).not.toHaveBeenCalled();
+    expect(m.findRecipeRefs).not.toHaveBeenCalled();
   });
 });

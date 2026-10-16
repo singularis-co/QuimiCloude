@@ -72,6 +72,10 @@ const ACTIVO: ExecutionTraceRow = {
   active: true,
   totalDuration: { kind: 'open', ms: 45 * 60 * 1000 },
   goBackCount: 2,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
+  pendingDelivery: [],
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -85,6 +89,10 @@ const DE_BAJA: ExecutionTraceRow = {
   active: false,
   totalDuration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
   goBackCount: 0,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
+  pendingDelivery: [],
 };
 
 const ENTREGADO: ExecutionTraceRow = {
@@ -98,6 +106,10 @@ const ENTREGADO: ExecutionTraceRow = {
   active: false,
   totalDuration: { kind: 'closed', ms: 65 * 60 * 1000 },
   goBackCount: 0,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
+  pendingDelivery: [],
 };
 
 const ROWS = [ACTIVO, DE_BAJA, ENTREGADO];
@@ -205,6 +217,10 @@ describe('R3 - columnas', () => {
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
     const esperadas = [
       'Nº de pedido',
+      'Foto',
+      'Fórmula',
+      'Presentaciones',
+      'Por entregar',
       'Estado',
       'Personas',
       'Primera anotación',

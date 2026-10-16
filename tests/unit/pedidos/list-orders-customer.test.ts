@@ -45,6 +45,7 @@ const REF_RECETA: RecipeRef = {
   isDeleted: false,
   isUnderReview: false,
   original: null,
+  imageUrl: null,
 }
 
 let secuencia = 0

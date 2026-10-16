@@ -74,7 +74,8 @@ export type ExecutionTraceDetail = {
   readonly goBackCount: number;
 };
 
-export type GetExecutionTraceDeps = ListExecutionTracesDeps;
+/** El detalle no pinta receta ni reparto: sin los catalogos que solo usa la lista. */
+export type GetExecutionTraceDeps = Omit<ListExecutionTracesDeps, 'recipes' | 'presentations'>;
 
 function toDetailStep(
   step: TraceStep,

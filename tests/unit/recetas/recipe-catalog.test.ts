@@ -116,8 +116,8 @@ describe('contrato RecipeCatalog', () => {
 })
 
 /** Campos de fila de una original: sin `parent`; las lineas no cuentan para la revision. */
-const ORIGINAL = { parent: null, lines: [] } as const
-const REF_ORIGINAL = (name: string) => ({ ownName: name, isUnderReview: false, original: null })
+const ORIGINAL = { imagePath: null, parent: null, lines: [] } as const
+const REF_ORIGINAL = (name: string) => ({ ownName: name, isUnderReview: false, original: null, imageUrl: null })
 const pct = (value: string) => ({ toFixed: () => value })
 
 describe('toRecipeRef', () => {
@@ -143,13 +143,14 @@ describe('toRecipeRef', () => {
 })
 
 describe('toRecipeRef de una version', () => {
-  const PADRE = { id: 'r-original', name: 'Crema base' }
+  const PADRE = { id: 'r-original', name: 'Crema base', imagePath: null }
 
   it('R11: el nombre mostrado es «Original · Version», con el propio y la original aparte', () => {
     const ref = toRecipeRef({
       id: 'r-version',
       name: 'Sin perfume',
       deletedAt: null,
+      imagePath: null,
       parent: PADRE,
       lines: [{ percentage: pct('60.00') }, { percentage: pct('40.00') }],
     })
@@ -161,6 +162,7 @@ describe('toRecipeRef de una version', () => {
       isDeleted: false,
       isUnderReview: false,
       original: { id: 'r-original', name: 'Crema base' },
+      imageUrl: null,
     })
   })
 
@@ -169,6 +171,7 @@ describe('toRecipeRef de una version', () => {
       id: 'r-version',
       name: 'Sin perfume',
       deletedAt: null,
+      imagePath: null,
       parent: PADRE,
       lines: [{ percentage: pct('60.00') }, { percentage: pct('39.99') }],
     })
@@ -177,17 +180,17 @@ describe('toRecipeRef de una version', () => {
   })
 
   it('R21: una version sin lineas esta por revisar', () => {
-    const ref = toRecipeRef({ id: 'r-version', name: 'Vacia', deletedAt: null, parent: PADRE, lines: [] })
+    const ref = toRecipeRef({ id: 'r-version', name: 'Vacia', deletedAt: null, imagePath: null, parent: PADRE, lines: [] })
 
     expect(ref.isUnderReview).toBe(true)
   })
 
   it('R21: una original sin lineas NO esta por revisar, ni una que no suma 100', () => {
-    expect(toRecipeRef({ id: 'r-1', name: 'Vieja', deletedAt: null, parent: null, lines: [] }).isUnderReview).toBe(
+    expect(toRecipeRef({ id: 'r-1', name: 'Vieja', deletedAt: null, imagePath: null, parent: null, lines: [] }).isUnderReview).toBe(
       false,
     )
     expect(
-      toRecipeRef({ id: 'r-1', name: 'Vieja', deletedAt: null, parent: null, lines: [{ percentage: pct('50.00') }] })
+      toRecipeRef({ id: 'r-1', name: 'Vieja', deletedAt: null, imagePath: null, parent: null, lines: [{ percentage: pct('50.00') }] })
         .isUnderReview,
     ).toBe(false)
   })
@@ -197,6 +200,7 @@ describe('toRecipeRef de una version', () => {
       id: 'r-version',
       name: 'Sin perfume',
       deletedAt: new Date('2026-03-03'),
+      imagePath: null,
       parent: PADRE,
       lines: [{ percentage: pct('100.00') }],
     })
@@ -207,6 +211,49 @@ describe('toRecipeRef de una version', () => {
 })
 
 const EMPRESA = 'empresa-1'
+
+describe('la imagen de la receta en su referencia', () => {
+  const images = { publicUrl: (path: string) => `https://cdn.test/${path}` }
+
+  it('una original con imagen la devuelve ya compuesta a URL publica', () => {
+    const ref = toRecipeRef({ id: 'r-1', name: 'Cloro', deletedAt: null, imagePath: 'recetas/cloro.jpg', parent: null, lines: [] }, images)
+
+    expect(ref.imageUrl).toBe('https://cdn.test/recetas/cloro.jpg')
+  })
+
+  it('una version lleva la imagen de su original, no la suya', () => {
+    const ref = toRecipeRef(
+      {
+        id: 'r-version',
+        name: 'Sin perfume',
+        deletedAt: null,
+        imagePath: null,
+        parent: { id: 'r-original', name: 'Crema base', imagePath: 'recetas/crema.png' },
+        lines: [{ percentage: pct('100.00') }],
+      },
+      images,
+    )
+
+    expect(ref.imageUrl).toBe('https://cdn.test/recetas/crema.png')
+  })
+
+  it('sin imagen, o sin quien componga la URL, `imageUrl` es null', () => {
+    const publicUrl = vi.fn((path: string) => path)
+
+    expect(toRecipeRef({ id: 'r-1', name: 'Cloro', deletedAt: null, ...ORIGINAL }, { publicUrl }).imageUrl).toBeNull()
+    expect(publicUrl).not.toHaveBeenCalled()
+    expect(toRecipeRef({ id: 'r-1', name: 'Cloro', deletedAt: null, imagePath: 'recetas/x.jpg', parent: null, lines: [] }).imageUrl).toBeNull()
+  })
+
+  it('findRecipeRefsIncludingDeleted compone la URL con el almacenamiento que recibe, en la misma consulta', async () => {
+    findMany.mockResolvedValue([{ id: 'r-1', name: 'Cloro', deletedAt: null, imagePath: 'recetas/cloro.jpg', parent: null, lines: [] }])
+
+    const refs = await findRecipeRefsIncludingDeleted(['r-1'], 'empresa-1', images)
+
+    expect(findMany).toHaveBeenCalledTimes(1)
+    expect(refs[0]?.imageUrl).toBe('https://cdn.test/recetas/cloro.jpg')
+  })
+})
 
 describe('findRecipeRefsIncludingDeleted', () => {
   it('devuelve la receta dada de baja con su nombre e isDeleted true, y la viva con false (R44)', async () => {
@@ -240,7 +287,8 @@ describe('findRecipeRefsIncludingDeleted', () => {
       id: true,
       name: true,
       deletedAt: true,
-      parent: { select: { id: true, name: true } },
+      imagePath: true,
+      parent: { select: { id: true, name: true, imagePath: true } },
       lines: { select: { percentage: true } },
     })
   })

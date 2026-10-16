@@ -172,7 +172,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       new Map([
         [
           RECETA,
-          { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false },
+          { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false, imageUrl: null },
         ],
       ]),
     )
@@ -196,7 +196,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
     })
     const recipes = {
       findRefsIncludingDeleted: vi.fn(async () => [
-        { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false },
+        { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false, imageUrl: null },
       ]),
       findExecutionContentById: vi.fn(async () => ({
         id: RECETA,

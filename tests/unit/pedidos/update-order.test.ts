@@ -78,8 +78,8 @@ function filaExistente(): OrderRow {
  *  no existe (contrato de `RecipeCatalog.findRefsIncludingDeleted`). */
 function catalogoDeRecetas(lineasPorReceta: ReadonlyMap<string, readonly RecipeExecutionLine[]> = new Map()) {
   const recetas = new Map<string, { companyId: string; ref: RecipeRef }>([
-    [RECETA_DE_A, { companyId: EMPRESA_A, ref: { id: RECETA_DE_A, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false } }],
-    [RECETA_DE_B, { companyId: EMPRESA_B, ref: { id: RECETA_DE_B, name: 'Formula de B', ownName: 'Formula de B', isUnderReview: false, original: null, isDeleted: false } }],
+    [RECETA_DE_A, { companyId: EMPRESA_A, ref: { id: RECETA_DE_A, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false, imageUrl: null } }],
+    [RECETA_DE_B, { companyId: EMPRESA_B, ref: { id: RECETA_DE_B, name: 'Formula de B', ownName: 'Formula de B', isUnderReview: false, original: null, isDeleted: false, imageUrl: null } }],
   ]);
   const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[], companyId: string) =>
     ids.flatMap((id) => {
@@ -1390,7 +1390,7 @@ describe('edicion con version de receta', () => {
   const PRODUCTO_Y = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 
   function ref(id: string, overrides: Partial<RecipeRef> = {}): RecipeRef {
-    return { id, name: id, ownName: id, isDeleted: false, isUnderReview: false, original: null, ...overrides };
+    return { id, name: id, ownName: id, isDeleted: false, isUnderReview: false, original: null, imageUrl: null, ...overrides };
   }
 
   /** Lo que no esta en `refs` no vuelve del catalogo, como una receta de otra empresa. */

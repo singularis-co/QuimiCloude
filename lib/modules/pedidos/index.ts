@@ -213,7 +213,7 @@ export { createListAliveSummariesByIds, createListAliveSummariesInCompany } from
 export type { ListOrderSummariesDeps } from './domain/list-order-summaries';
 export { createListSummariesByIdsIncludingDeleted } from './domain/list-order-summaries';
 export type { ListHistorySummariesDeps } from './domain/list-order-summaries';
-export type { OrderHistorySummary } from './domain/order-catalog';
+export type { OrderDeliveryProgress, OrderDeliveryProgressLine, OrderHistorySummary } from './domain/order-catalog';
 
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */

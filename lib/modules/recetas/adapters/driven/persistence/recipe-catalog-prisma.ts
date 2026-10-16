@@ -7,6 +7,9 @@ import { isVersionUnderReview, recipeDisplayName } from '../../../domain/recipe-
 import type { RecipeCatalog, RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
 import type { RecipeScope } from '../../../domain/recipe-scope';
 import type { RecipeStepView } from '../../../domain/recipe-view';
+import type { RecipeImageStorage } from '../../../ports/recipe-image-storage';
+
+import { recipeImagePublicUrl } from '../storage/recipe-image-supabase';
 
 import { recipeCompanyScope, type PrismaLike } from './company-scope';
 import { normalizedSearchCondition } from './list-query-sql';
@@ -41,13 +44,31 @@ type RecipeCatalogRow = {
   readonly id: string;
   readonly name: string;
   readonly deletedAt: Date | null;
-  readonly parent: { readonly id: string; readonly name: string } | null;
+  readonly imagePath: string | null;
+  readonly parent: { readonly id: string; readonly name: string; readonly imagePath: string | null } | null;
   readonly lines: ReadonlyArray<{ readonly percentage: DecimalLike }>;
 };
 
-/** Fila de Prisma -> `RecipeRef` del contrato publico. Funcion pura, testeable sin base. */
-export function toRecipeRef(row: RecipeCatalogRow): RecipeRef {
+/** Solo la composicion de la URL: el catalogo no sube ni borra imagenes. */
+export type RecipeImageUrls = Pick<RecipeImageStorage, 'publicUrl'>;
+
+/**
+ * El mismo almacenamiento que la ficha de receta (driven del MISMO modulo, permitido). Solo se
+ * invoca si la receta tiene imagen, asi que leer referencias sin imagenes no toca la
+ * configuracion del bucket (R43). `lib/composition` cablea el adaptador por nombre, sin lambda.
+ */
+const RECIPE_IMAGE_URLS: RecipeImageUrls = { publicUrl: recipeImagePublicUrl };
+
+/**
+ * Fila de Prisma -> `RecipeRef` del contrato publico. Funcion pura, testeable sin base.
+ *
+ * La RUTA se compone a URL aqui, al leer, nunca se persiste la URL. Sin `images` la URL sale
+ * `null`: solo lo omiten los tests que no miran la imagen.
+ */
+export function toRecipeRef(row: RecipeCatalogRow, images?: RecipeImageUrls): RecipeRef {
   const original = row.parent === null ? null : { id: row.parent.id, name: row.parent.name };
+  // Una version no guarda imagen: muestra la de su original, igual que la ficha de receta.
+  const imagePath = row.parent === null ? row.imagePath : row.parent.imagePath;
   return {
     id: row.id,
     name: recipeDisplayName(row.name, original?.name ?? null),
@@ -58,12 +79,14 @@ export function toRecipeRef(row: RecipeCatalogRow): RecipeRef {
       row.lines.map((line) => line.percentage.toFixed(2)),
     ),
     original,
+    imageUrl: imagePath === null || images === undefined ? null : images.publicUrl(imagePath),
   };
 }
 
 export async function findRecipeRefsIncludingDeleted(
   ids: readonly RecipeId[],
   companyId: string,
+  images: RecipeImageUrls = RECIPE_IMAGE_URLS,
 ): Promise<readonly RecipeRef[]> {
   if (ids.length === 0) return [];
 
@@ -74,12 +97,13 @@ export async function findRecipeRefsIncludingDeleted(
       id: true,
       name: true,
       deletedAt: true,
-      parent: { select: { id: true, name: true } },
+      imagePath: true,
+      parent: { select: { id: true, name: true, imagePath: true } },
       lines: { select: { percentage: true } },
     },
   });
 
-  return rows.map(toRecipeRef);
+  return rows.map((row) => toRecipeRef(row, images));
 }
 
 /**

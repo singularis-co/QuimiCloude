@@ -496,6 +496,7 @@ import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
   listAliveOrderSummariesInCompany,
+  listOrderDeliveryProgressByIdsIncludingDeleted,
   listOrderHistoryByIdsIncludingDeleted,
   listOrderNumbersByIdsIncludingDeleted,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
@@ -1796,6 +1797,7 @@ const orderCatalog: OrderCatalog = {
     packaging: packagingCatalog,
   }),
   listSummariesByIdsIncludingDeleted: createListSummariesByIdsIncludingDeleted({ summaries: orderSummaryReader }),
+  listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted,
   // Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
   // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
   // cableados mas abajo para quien todavia los usa-.
@@ -2110,6 +2112,8 @@ export const asignaciones = {
     orders: orderCatalog,
     people: peopleDirectory,
     team: createConditioningTeamRepository(),
+    recipes: recipeCatalog,
+    presentations: presentationCatalog,
   }),
   getExecutionTrace: createGetExecutionTrace({
     log: executionLogRepository,

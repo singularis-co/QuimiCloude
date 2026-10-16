@@ -68,6 +68,13 @@ const ACTIVO: ExecutionTraceRow = {
   active: true,
   totalDuration: { kind: 'open', ms: 45 * 60 * 1000 },
   goBackCount: 2,
+  formulaName: 'Gel antibacterial',
+  formulaImageUrl: 'https://cdn.example.test/gel.png',
+  presentations: [
+    { label: 'galones', quantity: 10 },
+    { label: 'vasos', quantity: 5 },
+  ],
+  pendingDelivery: [{ label: 'galones', quantity: 4 }],
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -81,6 +88,10 @@ const DE_BAJA: ExecutionTraceRow = {
   active: false,
   totalDuration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
   goBackCount: 0,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
+  pendingDelivery: [],
 };
 
 const CERRADO: ExecutionTraceRow = {
@@ -94,6 +105,10 @@ const CERRADO: ExecutionTraceRow = {
   active: false,
   totalDuration: { kind: 'closed', ms: 65 * 60 * 1000 },
   goBackCount: 1,
+  formulaName: 'Jabón líquido',
+  formulaImageUrl: null,
+  presentations: [{ label: 'galones', quantity: 3 }],
+  pendingDelivery: [],
 };
 
 const ROWS = [ACTIVO, DE_BAJA, CERRADO];
@@ -109,6 +124,10 @@ const ACTIVO_POR_EMPACAR: ExecutionTraceRow = {
   active: true,
   totalDuration: { kind: 'open', ms: 50 * 60 * 1000 },
   goBackCount: 0,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
+  pendingDelivery: [],
 };
 
 function params(overrides: Partial<ExecutionTraceListParams> = {}): ExecutionTraceListParams {
@@ -165,6 +184,48 @@ describe('R2 - columnas de la fila', () => {
     expect(within(activa).getByText('2026-10-07 08:00:00')).toBeInTheDocument();
     expect(within(activa).getByText('2026-10-07 08:30:00')).toBeInTheDocument();
     expect(within(activa).getByRole('img', { name: ANA.displayName })).toBeInTheDocument();
+  });
+
+  it('R2 - tras «Nº de pedido» van Foto, Fórmula, Presentaciones y Por entregar', () => {
+    montar();
+    const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+    const desde = cabeceras.findIndex((texto) => texto.includes('Nº de pedido'));
+    ['Foto', 'Fórmula', 'Presentaciones', 'Por entregar', 'Estado'].forEach((etiqueta, i) =>
+      expect(cabeceras[desde + 1 + i]).toContain(etiqueta),
+    );
+  });
+
+  it('R2 - la fila pinta la foto, la fórmula, las presentaciones y lo pendiente', () => {
+    montar();
+    const activa = fila(ACTIVO.orderId);
+    const foto = within(activa).getByTestId('execution-trace-image');
+    expect(foto).toHaveAttribute('src', 'https://cdn.example.test/gel.png');
+    expect(foto).toHaveAttribute('alt', 'Gel antibacterial');
+    expect(within(activa).getByTestId('execution-trace-formula')).toHaveTextContent('Gel antibacterial');
+    expect(within(activa).getByTestId('execution-trace-presentations')).toHaveTextContent(
+      '10 galones, 5 vasos',
+    );
+    expect(within(activa).getByTestId('execution-trace-pending')).toHaveTextContent('4 galones');
+  });
+
+  it('R2 - sin imagen sale el marcador; sin pendiente, «Entregado» atenuado', () => {
+    montar();
+    const cerrada = fila(CERRADO.orderId);
+    expect(within(cerrada).getByTestId('execution-trace-image')).toHaveAttribute('data-missing', 'true');
+    const pendiente = within(cerrada).getByTestId('execution-trace-pending');
+    expect(pendiente).toHaveTextContent('Entregado');
+    expect(pendiente).toHaveClass('text-muted-foreground');
+  });
+
+  it('R2 - sin fórmula ni presentaciones, la raya atenuada', () => {
+    montar();
+    const baja = fila(DE_BAJA.orderId);
+    expect(within(baja).getByTestId('execution-trace-image')).toHaveAttribute('alt', 'Pedido sin fórmula');
+    for (const testId of ['execution-trace-formula', 'execution-trace-presentations']) {
+      const celda = within(baja).getByTestId(testId);
+      expect(celda).toHaveTextContent('—');
+      expect(celda).toHaveClass('text-muted-foreground');
+    }
   });
 
   it('R2 - la fila dada de baja lleva el texto «Dado de baja» visible, sin depender de hover', () => {
