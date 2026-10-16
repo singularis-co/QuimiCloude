@@ -103,6 +103,8 @@ export type BatchHistoryEntry = {
     | 'consumption'
     | 'delivery'
     | 'delivery_void'
+    | 'direct_delivery'
+    | 'direct_delivery_void'
     | 'reserve'
     | 'release'
     | 'expire'
@@ -118,4 +120,7 @@ export type BatchHistoryEntry = {
   readonly previousStock: string | null;
   /** Mismo criterio que `previousStock`: o vienen los dos o ninguno. */
   readonly countedStock: string | null;
+  /** Solo en los asientos de entrega sin pedido y de su anulacion, por nombre ascendente; `null` en el
+   *  resto. */
+  readonly customerNames: readonly string[] | null;
 };

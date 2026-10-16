@@ -90,6 +90,7 @@ function toInventoryHistoryEntry(row: MovementRow): BatchHistoryEntry {
     createdAt: row.createdAt.toISOString(),
     previousStock: row.stockBefore === null ? null : row.stockBefore.toFixed(4),
     countedStock: row.countedStock === null ? null : row.countedStock.toFixed(4),
+    customerNames: null,
   };
 }
 
@@ -105,6 +106,7 @@ function toReservationHistoryEntry(row: ReservationMovementRow): BatchHistoryEnt
     createdAt: row.createdAt.toISOString(),
     previousStock: null,
     countedStock: null,
+    customerNames: null,
   };
 }
 

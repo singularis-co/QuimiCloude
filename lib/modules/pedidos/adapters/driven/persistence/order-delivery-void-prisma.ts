@@ -43,10 +43,11 @@ async function findDeliveryForVoid(
   scope: OrderScope,
   tx: PrismaLike,
 ): Promise<DeliveryForVoid | null> {
-  return tx.orderDelivery.findFirst({
+  const row = await tx.orderDelivery.findFirst({
     where: { ...companyScopeColumns(scope), id: deliveryId },
-    select: { id: true, orderId: true },
+    select: { id: true, orderId: true, createdAt: true },
   });
+  return row === null ? null : { ...row, productId: null };
 }
 
 async function findDeliveryLinesForVoid(

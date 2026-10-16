@@ -327,3 +327,31 @@ export type { ListOrderDeliveriesDeps, OrderDeliveryHistoryView } from './domain
 export { createVoidDelivery } from './domain/void-delivery';
 export type { VoidDeliveryDeps, VoidDeliveryResult } from './domain/void-delivery';
 export { DeliveryAlreadyVoidedError, DeliveryNotFoundError } from './domain/errors';
+/** La entrega sin pedido: la regla pura que comparten el sheet y el servidor, sus casos de uso y su
+ *  error propio. */
+export {
+  DIRECT_DELIVERY_NOTE_MAX_LENGTH,
+  DIRECT_DELIVERY_SURPLUS_MAX_PRODUCTS,
+  checkDirectDelivery,
+  directAllocations,
+  normalizeDeliveryNote,
+  surplusPackages,
+  waitingOrders,
+  waitingPackages,
+} from './domain/direct-delivery';
+export type { DirectDeliveryCheck, WaitingOrder, WaitingOrderLine } from './domain/direct-delivery';
+export { createGetDirectDelivery } from './domain/get-direct-delivery';
+export type { DirectDeliveryView, GetDirectDeliveryDeps } from './domain/get-direct-delivery';
+export { createListDirectDeliverySurplus } from './domain/list-direct-delivery-surplus';
+export type { ListDirectDeliverySurplusDeps } from './domain/list-direct-delivery-surplus';
+export { createDeliverDirect } from './domain/deliver-direct';
+export type { DeliverDirectDeps, DeliverDirectResult } from './domain/deliver-direct';
+export { createGetDirectDeliveryForVoid } from './domain/get-direct-delivery-for-void';
+export type {
+  DirectDeliveryVoidCustomer,
+  DirectDeliveryVoidView,
+  GetDirectDeliveryForVoidDeps,
+} from './domain/get-direct-delivery-for-void';
+export { createVoidDirectDelivery } from './domain/void-direct-delivery';
+export type { VoidDirectDeliveryDeps, VoidDirectDeliveryResult } from './domain/void-direct-delivery';
+export { DeliveryExceedsSurplusError } from './domain/errors';

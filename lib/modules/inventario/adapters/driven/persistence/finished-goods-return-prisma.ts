@@ -20,6 +20,9 @@ export function createFinishedGoodsReturn(tx: Prisma.TransactionClient): Finishe
   return {
     async returnForDeliveryVoid(input): Promise<FinishedGoodsReturnOutcome> {
       const scope: InventoryScope = { companyId: input.companyId };
+      if (input.orderId === null) {
+        throw new Error('returnForDeliveryVoid: la devolucion sin pedido aun no esta cableada');
+      }
 
       return returnFinishedGoods(
         tx,

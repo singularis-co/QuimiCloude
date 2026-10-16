@@ -2,7 +2,15 @@ import type { MovementReason } from './movement-reason';
 
 export type InventoryMovementView = {
   readonly id: string;
-  readonly kind: 'opening' | 'adjustment' | 'consumption' | 'production' | 'delivery' | 'delivery_void';
+  readonly kind:
+    | 'opening'
+    | 'adjustment'
+    | 'consumption'
+    | 'production'
+    | 'delivery'
+    | 'delivery_void'
+    | 'direct_delivery'
+    | 'direct_delivery_void';
   readonly quantity: string;
   readonly reason: MovementReason | null;
   readonly authorName: string | null;

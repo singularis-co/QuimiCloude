@@ -106,6 +106,7 @@ export const ERROR_MESSAGE_KEY = {
   company_not_deleted: 'errors.company_not_deleted',
   packed_exceeds_quantity: 'errors.packed_exceeds_quantity',
   packaging_stock_insufficient: 'errors.packaging_stock_insufficient',
+  delivery_exceeds_surplus: 'errors.delivery_exceeds_surplus',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -266,4 +267,6 @@ export const ERROR_MESSAGES_ES = {
   'errors.company_not_deleted': 'La empresa ya está activa.',
   'errors.packed_exceeds_quantity': 'Lo envasado supera la cantidad del pedido.',
   'errors.packaging_stock_insufficient': 'No alcanza el stock del envase.',
+  'errors.delivery_exceeds_surplus':
+    'La entrega supera el excedente: hay pedidos terminados esperando esos envases.',
 } as const satisfies Record<ErrorMessageKey, string>;

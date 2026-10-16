@@ -203,6 +203,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
     expect(doble.movementFindMany).not.toHaveBeenCalled();
   });
 
+  // 2026-10-16 (QC-288): el asiento lleva `customerNames`, nulo salvo en la entrega sin pedido.
   it('con el lote visible, devuelve el historial del mas reciente al mas antiguo', async () => {
     doble.productBatchFindFirst.mockResolvedValue({ id: LOTE_ID });
     doble.movementFindMany.mockResolvedValue([
@@ -241,6 +242,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         createdAt: '2026-09-17T14:00:00.000Z',
         previousStock: null,
         countedStock: null,
+        customerNames: null,
       },
       {
         id: 'movimiento-1',
@@ -252,6 +254,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         createdAt: AHORA.toISOString(),
         previousStock: null,
         countedStock: null,
+        customerNames: null,
       },
     ]);
 
@@ -304,6 +307,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         createdAt: '2026-09-17T12:00:00.000Z',
         previousStock: null,
         countedStock: null,
+        customerNames: null,
       },
       {
         id: 'movimiento-1',
@@ -315,6 +319,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         createdAt: '2026-09-17T10:00:00.000Z',
         previousStock: null,
         countedStock: null,
+        customerNames: null,
       },
     ]);
   });

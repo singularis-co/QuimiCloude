@@ -235,7 +235,8 @@ commit.
 - `finished-stock-list-section.tsx`: una llamada por página.
 - Tests (ui):
   - `finished-product-header.test.tsx` y `finished-product-page.test.tsx` (R5);
-  - `product-row-actions.test.tsx` y `finished-stock-table.test.tsx` (R6, R7);
+  - `tests/unit/inventario/finished-stock-table.test.tsx` (`ProductRowActions` se prueba ahí y en
+    `product-batches-sheet.test.tsx`; no hay `product-row-actions.test.tsx`) (R6, R7);
   - `finished-stock-list-section.test.tsx` (R8, una sola llamada);
   - `direct-delivery-button.test.tsx` (R7).
 
@@ -426,12 +427,12 @@ Tests:
 - `tests/unit/inventario-ui/direct-delivery-void-dialog.test.tsx`
 - `tests/unit/inventario-ui/finished-product-header.test.tsx`
 - `tests/unit/inventario-ui/finished-product-page.test.tsx`
-- `tests/unit/inventario-ui/product-row-actions.test.tsx`
-- `tests/unit/inventario-ui/finished-stock-table.test.tsx`
+- `tests/unit/inventario/product-batches-sheet.test.tsx`
+- `tests/unit/inventario/finished-stock-table.test.tsx`
 - `tests/unit/inventario-ui/finished-stock-list-section.test.tsx`
 - `tests/unit/inventario-ui/finished-product-tables.test.tsx`
 - `tests/unit/identity/session-once-per-request-actions.test.ts`
-- `tests/unit/errores/error-codes.test.ts`
+- `tests/unit/errores/catalogo.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
 - `tests/integration/aislamiento.json`
 - `tests/integration/pedidos/direct-deliveries-migration.int.test.ts`
@@ -449,6 +450,8 @@ Tests:
 - `tests/integration/inventario/ledger-cuadre.int.test.ts`
 - `e2e/entrega-sin-pedido.spec.ts`
 
-Las rutas exactas de los tests de UI que ya existen (`finished-product-tables.test.tsx`,
-`batch-history.test.tsx`, `product-row-actions.test.tsx`) se confirman en T0. Si viven en otra
-carpeta, T0 corrige esta lista en el mismo commit.
+Rutas de los tests de UI confirmadas en T0 (2026-10-16): `finished-product-tables.test.tsx` vive en
+`tests/unit/inventario-ui/` y `batch-history.test.tsx` en `tests/unit/inventario/`.
+`product-row-actions.test.tsx` no existe: `ProductRowActions` se prueba en
+`tests/unit/inventario/finished-stock-table.test.tsx` y `product-batches-sheet.test.tsx`, que
+sustituyen a esa fila. El censo de códigos de error es `tests/unit/errores/catalogo.test.ts`.

@@ -8,6 +8,22 @@ import type { ProductRepository } from '../ports/product-repository';
 // (`docs/architecture.md > La regla de dependencias`). Solo el tipo: el contrato de este modulo lo
 // carga un componente de cliente y no puede arrastrar servidor.
 import type { PeopleDirectory } from '@/lib/modules/identity';
+import type { CustomerCatalog } from '@/lib/modules/clientes';
+
+/** Hueco para `pedidos`: las lineas de entrega son suyas. Sin permisos: autoriza quien llama. */
+export interface DeliveryCustomerDirectory {
+  /** Por id de asiento, los clientes de las lineas de esa entrega, o de las anuladas por esa
+   *  anulacion, en ese lote. Una consulta por tipo de referencia, nunca una por asiento. */
+  findCustomerIds(
+    companyId: string,
+    refs: readonly {
+      readonly movementId: string;
+      readonly batchId: string;
+      readonly deliveryId: string | null;
+      readonly voidId: string | null;
+    }[],
+  ): Promise<ReadonlyMap<string, readonly string[]>>;
+}
 
 export type ListBatchMovementsDeps = {
   readonly products: ProductRepository;
@@ -15,6 +31,8 @@ export type ListBatchMovementsDeps = {
   readonly people: PeopleDirectory;
   /** El numero visible de cada pedido citado en el historial. */
   readonly orders: OrderNumberDirectory;
+  readonly deliveryCustomers: DeliveryCustomerDirectory;
+  readonly customers: Pick<CustomerCatalog, 'findRefsIncludingDeleted'>;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
 };

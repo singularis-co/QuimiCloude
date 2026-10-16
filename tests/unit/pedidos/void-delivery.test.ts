@@ -58,7 +58,13 @@ function delPrimerCliente(presentationLineIds: readonly string[]): Pick<VoidDeli
 
 const ANULADOR: Actor = { id: 'u-anula', companyId: EMPRESA, permissions: ['entregas.anular'] }
 
-const ENTREGA: DeliveryForVoid = { id: NEWER_DELIVERY_ID, orderId: VOID_ORDER_ID }
+// 2026-10-16 (QC-288): la entrega de un pedido no tiene producto; lleva su instante.
+const ENTREGA: DeliveryForVoid = {
+  id: NEWER_DELIVERY_ID,
+  orderId: VOID_ORDER_ID,
+  productId: null,
+  createdAt: new Date('2026-10-08T15:30:00.000Z'),
+}
 
 /** La presentacion abierta sale en dos lotes; la anulada, en uno; la otra, en uno. */
 const LINEAS: readonly DeliveryLineForVoid[] = [

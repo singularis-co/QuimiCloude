@@ -40,6 +40,8 @@ const KIND_LABELS: Record<BatchHistoryEntry['kind'], string> = {
   consume: 'Consumo',
   delivery: 'Entrega a cliente',
   delivery_void: 'Anulación de entrega',
+  direct_delivery: 'Entrega sin pedido',
+  direct_delivery_void: 'Anulación de entrega sin pedido',
 };
 
 /** Etiqueta del tipo de asiento. */

@@ -354,6 +354,22 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma';
 import type { OrderDeliveryVoidUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-void-unit-of-work';
 import {
+  createDeliverDirect,
+  createGetDirectDelivery,
+  createGetDirectDeliveryForVoid,
+  createListDirectDeliverySurplus,
+  createVoidDirectDelivery,
+} from '@/lib/modules/pedidos';
+import type {
+  DirectDeliveryUnitOfWork,
+  DirectDeliveryVoidUnitOfWork,
+} from '@/lib/modules/pedidos/ports/direct-delivery-unit-of-work';
+import type {
+  DirectDeliveryRepository,
+  WaitingOrdersReader,
+} from '@/lib/modules/pedidos/ports/direct-delivery-repository';
+import type { DeliveryCustomerDirectory, FinishedProductDeliveryCatalog } from '@/lib/modules/inventario';
+import {
   createRecipeExecutionReader,
   findAliveRecipeByNormalizedName,
   listAliveOriginalRecipeNames,
@@ -1043,6 +1059,11 @@ const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
   summarizeDelivered: summarizeDeliveredByBatchIds,
 };
 
+// Doble hasta que exista el adaptador de `pedidos`.
+const deliveryCustomerDirectory: DeliveryCustomerDirectory = {
+  findCustomerIds: async () => new Map<string, readonly string[]>(),
+};
+
 const finishedDistributionDirectory: FinishedDistributionDirectory = {
   listPackedLines: listPackedLinesByCombination,
 };
@@ -1176,6 +1197,10 @@ export const inventario = {
     products: productRepository,
     people: assignmentDirectoryPrisma,
     orders: orderNumberDirectory,
+    deliveryCustomers: deliveryCustomerDirectory,
+    customers: {
+      findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
+    },
   }),
   listOrderBatches: createListOrderBatches({ finishedOrders: finishedOrderRepository }),
   listFinishedStock: createListFinishedStock({
@@ -1623,6 +1648,36 @@ const orderDeliveryVoidUnitOfWork: OrderDeliveryVoidUnitOfWork = {
     ),
 };
 
+function directDeliveryAdapterPending(): never {
+  throw new Error('entrega sin pedido: adaptador sin cablear');
+}
+
+// Dobles hasta que existan los adaptadores driven de la entrega sin pedido.
+const finishedProductDeliveryCatalog: FinishedProductDeliveryCatalog = {
+  findForDelivery: async () => directDeliveryAdapterPending(),
+  findSurplusBases: async () => directDeliveryAdapterPending(),
+};
+const waitingOrdersReader: WaitingOrdersReader = {
+  listWaitingLines: async () => directDeliveryAdapterPending(),
+};
+const directDeliveryRepository: Pick<DirectDeliveryRepository, 'findByKey'> = {
+  findByKey: async () => directDeliveryAdapterPending(),
+};
+const directDeliveryUnitOfWork: DirectDeliveryUnitOfWork = {
+  run: async () => directDeliveryAdapterPending(),
+};
+
+/** La anulacion sin pedido y la devolucion a `inventario` confirman o se deshacen juntas. */
+const directDeliveryVoidUnitOfWork: DirectDeliveryVoidUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        voids: createOrderDeliveryVoidRepository(tx),
+        finishedGoods: createFinishedGoodsReturn(tx),
+      }),
+    ),
+};
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1729,6 +1784,28 @@ export const pedidos = {
     unitOfWork: orderDeliveryVoidUnitOfWork,
     voids: createOrderDeliveryVoidRepository(),
     orders: orderRepository,
+  }),
+  getDirectDelivery: createGetDirectDelivery({
+    catalog: finishedProductDeliveryCatalog,
+    waiting: waitingOrdersReader,
+  }),
+  listDirectDeliverySurplus: createListDirectDeliverySurplus({
+    catalog: finishedProductDeliveryCatalog,
+    waiting: waitingOrdersReader,
+  }),
+  deliverDirect: createDeliverDirect({
+    customerCatalog,
+    unitOfWork: directDeliveryUnitOfWork,
+    deliveries: directDeliveryRepository,
+  }),
+  getDirectDeliveryForVoid: createGetDirectDeliveryForVoid({
+    voids: createOrderDeliveryVoidRepository(),
+    catalog: finishedProductDeliveryCatalog,
+    customerCatalog,
+  }),
+  voidDirectDelivery: createVoidDirectDelivery({
+    unitOfWork: directDeliveryVoidUnitOfWork,
+    voids: createOrderDeliveryVoidRepository(),
   }),
 } as const;
 

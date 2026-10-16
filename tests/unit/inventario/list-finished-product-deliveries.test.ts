@@ -69,6 +69,8 @@ function linea(overrides: Partial<FinishedDeliveryLineRecord> = {}): FinishedDel
     id: '30000000-0000-4000-8000-000000000230',
     orderDeliveryId: FINISHED_DELIVERY_ID,
     orderId: FINISHED_ORDER_ID,
+    // 2026-10-16 (QC-288): solo una entrega sin pedido lleva nota.
+    note: null,
     createdAt: '2026-10-11T10:00:00.000Z',
     customerId: FINISHED_CUSTOMER_ID,
     batchId: LITER_BATCH_ID,

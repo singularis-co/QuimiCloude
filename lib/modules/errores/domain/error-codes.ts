@@ -38,6 +38,7 @@
  * **2026-10-14**: `company_duplicate_name`, `company_duplicate_tax_id`, `company_name_mismatch`,
  * `company_not_deleted`.
  * **2026-10-14**: `packed_exceeds_quantity`, `packaging_stock_insufficient`.
+ * **2026-10-16**: `delivery_exceeds_surplus`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -222,6 +223,9 @@ export const ERROR_CODES = [
   'packed_exceeds_quantity',
   // Distinto de `insufficient_material`: lo que falta es stock libre del envase para el exceso.
   'packaging_stock_insufficient',
+  // Distinto de `delivery_exceeds_remaining`: no hay pedido; lo que se pasa es lo que queda tras
+  // apartar lo que esperan los pedidos terminados.
+  'delivery_exceeds_surplus',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

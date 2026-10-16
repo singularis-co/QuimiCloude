@@ -52,6 +52,7 @@ export async function listDeliveryLinesByBatchIds(
     id: row.id,
     orderDeliveryId: row.deliveryId,
     orderId: row.delivery.orderId,
+    note: null,
     createdAt: row.delivery.createdAt.toISOString(),
     customerId: row.customerId,
     batchId: row.batchId,

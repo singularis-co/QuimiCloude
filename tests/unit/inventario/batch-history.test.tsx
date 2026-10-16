@@ -37,6 +37,8 @@ function asiento(overrides: Partial<BatchHistoryEntry> = {}): BatchHistoryEntry 
     createdAt: '2026-09-10T08:15:00.000Z',
     previousStock: null,
     countedStock: null,
+    // 2026-10-16 (QC-288): solo los asientos de entrega sin pedido llevan clientes.
+    customerNames: null,
     ...overrides,
   };
 }
