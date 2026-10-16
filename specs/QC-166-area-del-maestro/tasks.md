@@ -40,7 +40,7 @@ mergeado; `design.md > 5` ya está alineado con su `design.md`, reenvío incluid
     errores enlazados, 16 px / 44 px), `tests/unit/shared/addon-names.test.ts`.
   - **Hecho:** `guard-catalogo-de-componentes` en verde con las dos filas.
 
-- [ ] **T3 · Lista de empresas** (R1, R6, R8–R16). Depende de T2.
+- [x] **T3 · Lista de empresas** (R1, R6, R8–R16). Depende de T2.
   - `app/(private)/maestro/empresas/page.tsx` y `components/` con barrel: `company-list-params.ts`,
     `company-list-section.tsx`, `company-table.tsx`, `company-columns.tsx`, `company-labels.ts`
     (fechas según la pregunta abierta 2).
@@ -49,13 +49,13 @@ mergeado; `design.md > 5` ya está alineado con su `design.md`, reenvío incluid
   - **Hecho:** columnas, filtro, búsqueda, orden, paginación en la dirección, menú por estado,
     tarjetas y los tres estados en verde con `canModify` verdadero y falso.
 
-- [ ] **T4 · Alta de empresa** (R7, R17, R18, R19). Depende de T3.
+- [x] **T4 · Alta de empresa** (R7, R17, R18, R19). Depende de T3.
   - `company-create-sheet.tsx`, `company-create-action.tsx` (disparador de la cabecera).
   - Tests: `tests/ui/maestro/company-create-sheet.test.tsx` (los dos toasts, mapa de errores,
     `unauthorized`, inesperado con referencia, lo escrito se conserva).
   - **Hecho:** el `FormData` lleva exactamente los doce nombres de `company-actions.ts`.
 
-- [ ] **T5 · Edición, baja y reactivación** (R20–R26). Depende de T4.
+- [x] **T5 · Edición, baja y reactivación** (R20–R26). Depende de T4.
   - `company-edit-sheet.tsx`, `company-delete-dialog.tsx`, `company-reactivate-dialog.tsx` en
     `maestro/empresas/components/`.
   - Tests: `tests/ui/maestro/company-edit-sheet.test.tsx`, `company-delete-dialog.test.tsx`,
