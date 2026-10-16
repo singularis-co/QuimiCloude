@@ -41,6 +41,24 @@ import {
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import {
+  DESKTOP,
+  EDGE_TOLERANCE_PX,
+  MIN_FOOTER_BUTTON_PX,
+  OPERATOR_FOOTER,
+  OPERATOR_HEADER,
+  PHONE,
+  box,
+  clickUntilVisible,
+  deleteCompanyData,
+  expectTarget,
+  gridTracks,
+  openScreen,
+  rectsOverlap,
+  waitForAnimationsToSettle,
+  waitForScreenEnterToSettle,
+  type Rect,
+} from './helpers/operario';
 
 const FIXTURE_PREFIX = 'qc265_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -121,14 +139,9 @@ const LONG_RECIPE_STEPS: readonly RecipeStepDocument[] = [
 ];
 const LAST_LONG_STEP_ITEM = `step-reader-item-0-${LONG_STEP_ITEMS - 1}`;
 
-const PHONE = { width: 390, height: 844 } as const;
-const DESKTOP = { width: 1440, height: 900 } as const;
 const TABLET = { width: 820, height: 1180 } as const;
-const MIN_TARGET_PX = 44;
-const MIN_FOOTER_BUTTON_PX = 52;
 const PANEL_TRACK = '300px';
 const CENTER_TOLERANCE_PX = 2;
-const EDGE_TOLERANCE_PX = 1;
 const CONDITIONING_WAIT_MS = 5_000;
 
 /** Copias locales: los módulos que los exportan son de cliente y arrastrarían React al runner. */
@@ -179,8 +192,6 @@ const TAB_TESTIDS = {
 } as const;
 
 const SIDEBAR = '[data-slot="sidebar"]';
-const OPERATOR_HEADER = '[data-slot="operator-header"]';
-const OPERATOR_FOOTER = '[data-slot="operator-footer"]';
 const TAB_COUNT = '[data-slot="url-tabs-count"]';
 const RING_PROGRESS = '[data-slot="countdown-ring-progress"]';
 const TABLE_ROWS = '[data-testid^="data-table-row-"]';
@@ -236,35 +247,6 @@ async function createUser(user: Credentials, roleId: string): Promise<string> {
     select: { id: true },
   });
   return created.id;
-}
-
-/** En el orden que imponen las FK RESTRICT; cada paso corre aunque falle el anterior. */
-async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown> {
-  if (companyIds.length === 0) return undefined;
-  const ids = [...companyIds];
-  const pasos: ReadonlyArray<() => Promise<unknown>> = [
-    () => prisma.orderConditioningTeamMember.deleteMany({ where: { companyId: { in: ids } } }),
-    () => prisma.orderAssignment.deleteMany({ where: { companyId: { in: ids } } }),
-    () => prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: ids } } }),
-    () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: ids } } }),
-    () => prisma.order.deleteMany({ where: { companyId: { in: ids } } }),
-    // `recipe_lines.product_id` RESTRINGE el borrado del producto: las líneas caen antes (también
-    // caerían con la receta, por CASCADE), y los productos después de la receta.
-    () => prisma.recipeLine.deleteMany({ where: { recipe: { companyId: { in: ids } } } }),
-    () => prisma.recipe.deleteMany({ where: { companyId: { in: ids } } }),
-    () => prisma.product.deleteMany({ where: { companyId: { in: ids } } }),
-    () => prisma.user.deleteMany({ where: { companyId: { in: ids } } }),
-    () => prisma.company.deleteMany({ where: { id: { in: ids } } }),
-  ];
-  let primerFallo: unknown;
-  for (const paso of pasos) {
-    try {
-      await paso();
-    } catch (error) {
-      primerFallo ??= error;
-    }
-  }
-  return primerFallo;
 }
 
 test.beforeAll(async () => {
@@ -458,66 +440,6 @@ test.afterAll(async () => {
 // El primer `goto` compila la ruta en `next dev`, y bcrypt tarda a propósito.
 test.setTimeout(180_000);
 
-async function box(locator: Locator) {
-  const found = await locator.boundingBox();
-  expect(found, 'el elemento no tiene caja').not.toBeNull();
-  return found as NonNullable<typeof found>;
-}
-
-async function expectTarget(locator: Locator, label: string, minHeight = MIN_TARGET_PX): Promise<void> {
-  await expect(locator, label).toBeVisible();
-  const found = await box(locator);
-  expect(found.width, `${label}: ancho`).toBeGreaterThanOrEqual(MIN_TARGET_PX);
-  expect(found.height, `${label}: alto`).toBeGreaterThanOrEqual(minHeight);
-}
-
-/**
- * Espera a que terminen las animaciones de entrada: medido a media animación, el diálogo aún escala.
- * Solo `CSSAnimation`: el anillo del botón con espera es una transición de 5 s.
- */
-async function waitForAnimationsToSettle(locator: Locator): Promise<void> {
-  await expect
-    .poll(() =>
-      locator.evaluate(
-        (el) =>
-          el
-            .getAnimations({ subtree: true })
-            .filter((anim) => anim instanceof CSSAnimation && anim.playState === 'running').length,
-      ),
-    )
-    .toBe(0);
-}
-
-/**
- * Espera a que termine la entrada de pantalla (`screen-enter` en `app/globals.css`): mientras corre,
- * un ancestro del marco lleva `transform`, que pasa a ser el bloque contenedor del pie `fixed`, y el
- * pie se mide desplazado unos píxeles respecto al viewport. Se filtra por nombre porque otras
- * animaciones de la pantalla (el pulso del estado) son infinitas y nunca terminan.
- */
-async function waitForScreenEnterToSettle(page: Page): Promise<void> {
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          document
-            .getAnimations()
-            .filter(
-              (anim) =>
-                anim instanceof CSSAnimation && anim.animationName === 'screen-enter' && anim.playState !== 'finished',
-            ).length,
-      ),
-    )
-    .toBe(0);
-}
-
-/** En WebKit un clic antes de hidratar se pierde sin error: se repite hasta que aparece lo esperado. */
-async function clickUntilVisible(trigger: Locator, target: Locator): Promise<void> {
-  await expect(async () => {
-    if (!(await target.isVisible())) await trigger.click();
-    await expect(target).toBeVisible({ timeout: 5_000 });
-  }).toPass({ timeout: 60_000 });
-}
-
 /** El conjunto de pestañas va en `Suspense`: mientras llega el contador conviven dos copias. */
 function viewTab(page: Page, testId: string): Locator {
   return page.getByTestId(testId).filter({ visible: true });
@@ -525,24 +447,6 @@ function viewTab(page: Page, testId: string): Locator {
 
 function visibleSidebar(page: Page): Locator {
   return page.locator(SIDEBAR).filter({ visible: true });
-}
-
-async function openScreen(page: Page, url: string, screenTestId: string): Promise<Locator> {
-  const response = await page.goto(url);
-  expect(response?.status(), `${url} debe responder 200`).toBe(200);
-  const screen = page.getByTestId(screenTestId);
-  await expect(screen).toBeVisible({ timeout: 60_000 });
-  return screen;
-}
-
-/** Las columnas de la rejilla más cercana que contiene al ancla. */
-async function gridTracks(anchor: Locator): Promise<string[]> {
-  return anchor.evaluate((el) => {
-    let node: HTMLElement | null = el.parentElement;
-    while (node !== null && window.getComputedStyle(node).display !== 'grid') node = node.parentElement;
-    if (node === null) return [];
-    return window.getComputedStyle(node).gridTemplateColumns.split(' ').filter((track) => track !== '');
-  });
 }
 
 async function expectCenteredAndWhole(page: Page, dialog: Locator, label: string): Promise<void> {
@@ -1029,15 +933,6 @@ test.describe('R37 — el anillo del botón con espera', () => {
 // ---------------------------------------------------------------------------------------------
 // QC-269 — defectos de layout del operario tras QC-265.
 // ---------------------------------------------------------------------------------------------
-
-type Rect = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
-
-/** Dos cajas se cortan si se solapan más de la tolerancia en los dos ejes. */
-function rectsOverlap(a: Rect, b: Rect): boolean {
-  const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-  const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
-  return overlapX > EDGE_TOLERANCE_PX && overlapY > EDGE_TOLERANCE_PX;
-}
 
 /** Cuánto esperar a que la página deje de moverse (hidratación, entrada de pantalla). */
 const SETTLE_TIMEOUT_MS = 30_000;

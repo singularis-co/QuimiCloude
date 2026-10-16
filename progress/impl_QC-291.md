@@ -352,3 +352,35 @@ cada task están en verde. La salida de `vitest related` de cada subagente está
   - `label?` en `OrderExecutionTools` (T8), para que la tarjeta no repita «Herramientas».
 - `order-execution-page.test.tsx` y `conditioning-order-page.test.tsx` se ajustaron a R4 y a R33.
   Fallaban con el cambio aunque no estaban en la lista de las tasks.
+
+## Tanda 4 — T11 E2E nuevo del rediseño (frontend_dev)
+
+**Archivos**
+
+- `e2e/pantalla-operario-rediseno.spec.ts` (nuevo): empresa efímera propia (prefijo `qc291_e2e_`) con Operador, Empacador y acondicionador; pedidos PENDIENTE y EN_CURSO con un paso de 30 casillas y un material en litros, EN_CURSO con 24 materiales, POR_EMPACAR y EN_ACONDICIONAMIENTO con equipo. Anchos 1440 × 900, 834 × 1112 y 390 × 844. Ningún caso confirma un diálogo ni cambia de paso.
+- `e2e/helpers/operario.ts` (nuevo): sacados tal cual de `operario-rediseno.spec.ts` `deleteCompanyData`, `box`, `expectTarget`, `waitForAnimationsToSettle`, `waitForScreenEnterToSettle`, `clickUntilVisible`, `openScreen`, `gridTracks`, `Rect`, `rectsOverlap` y las constantes `PHONE`, `DESKTOP`, `MIN_TARGET_PX`, `MIN_FOOTER_BUTTON_PX` (el mínimo de R11, ahora en un solo sitio), `EDGE_TOLERANCE_PX`, `OPERATOR_HEADER` y `OPERATOR_FOOTER`.
+- `e2e/operario-rediseno.spec.ts`: solo se quitan esas definiciones y se importan del helper. Sus aserciones no cambian (las ajusta T12).
+- Sin cambios de código de la app.
+
+**Mapa R → test** (`e2e/pantalla-operario-rediseno.spec.ts`)
+
+- R1, R6: «R1, R6 — con el paso desplazado hasta el final, cabecera y pie no se mueven, el documento no se desplaza y la barra y «Paso N de M» siguen a la vista» (los tres anchos).
+- R11: «R11 — en %s, los botones del pie miden al menos 52 px y cabecera y pie reservan safe-area» (×3 pantallas, los tres anchos); «R11 — sin comenzar, «Comenzar la fabricación» mide al menos el mínimo del pie en los tres anchos».
+- R19: «R19 — en %s, a 1440 × 900 la rejilla tiene dos pistas y la primera mide 320px» (×3).
+- R27: «R27 — en %s, a 834 × 1112 la columna no se ve y cada botón flotante mide al menos 56 × 56 px» (×3).
+- R28, R29: «R28, R29 — a 834 × 1112 el panel de materiales abre con su botón y cierra con X, con un toque fuera y con Escape, devolviendo el foco al botón».
+- R30: «R30 — a 390 × 844 el panel abierto ocupa el ancho menos 16 px por lado y los botones flotantes no se ven».
+- R31: «R31 — a 834 × 1112 / a 390 × 844, con 24 materiales el panel hace scroll dentro y su último material queda a la vista y por encima del pie».
+- R22: «R22 — a 834 × 1112 la unidad elegida en el panel sigue al cerrarlo y reabrirlo, y en la columna al pasar a 1440 px».
+
+**Observación (no corregida, no contradice R31):** a 390 × 844 en fabricación el pie mide 134 px y el panel se ancla a `bottom-[132px]`, así que el borde inferior del panel pisa 2 px el pie. El panel va por encima (portal), su contenido no queda tapado y el último material queda sobre el pie; el caso de R31 lo comprueba con `elementFromPoint`.
+
+**Verificación**
+
+- Comandos con el `.env` cargado en el shell (`set -a; . ./.env; set +a`): el runner de Playwright no lo carga y sin él Prisma falla con «Environment variable not found: DATABASE_URL». Puerto 3117 libre antes de cada corrida.
+- `pnpm run typecheck`: limpio.
+- `pnpm exec eslint e2e/pantalla-operario-rediseno.spec.ts e2e/helpers/operario.ts e2e/operario-rediseno.spec.ts`: sin salida.
+- `pnpm exec playwright test e2e/pantalla-operario-rediseno.spec.ts --project=chromium`: `Running 16 tests using 6 workers` · `16 passed (1.6m)`.
+- `pnpm exec playwright test e2e/pantalla-operario-rediseno.spec.ts --project=webkit`: `Running 16 tests using 6 workers` · `16 passed (1.3m)`. Scroll anidado verificado en WebKit de Playwright (design.md §6); no es un iOS real.
+
+**Veredicto:** T11 hecha; el spec nuevo está en verde en chromium y en webkit, sin cambios en la app.

@@ -119,7 +119,7 @@ de motivo, no bloquea: si el spec se aprueba sin cambiarlo, T9 y T10 usan los te
     sin candidatos: ningún `button` en el pie y `conditioning-actions-reason` con su texto) en
     `tests/unit/asignaciones-ui/conditioning-order-screen.test.tsx`.
 
-- [ ] **T11 — E2E nuevo del rediseño.** Depende de: T8, T9 y T10.
+- [x] **T11 — E2E nuevo del rediseño.** Depende de: T8, T9 y T10.
   - `e2e/pantalla-operario-rediseno.spec.ts`, a 1440 × 900, 834 × 1112 y 390 × 844. Reutiliza la
     siembra y los helpers de `e2e/operario-rediseno.spec.ts`; si hace falta, se extraen a
     `e2e/helpers/operario.ts`.
