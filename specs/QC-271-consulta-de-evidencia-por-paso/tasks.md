@@ -231,7 +231,7 @@ teléfono contra `ProductoTerminadoEvidencia*.dc.html`.
 
 **Hecho cuando:** todo lo anterior está en verde y `./init.sh` termina en verde.
 
-## TI — E2E (depende de TC)
+## [x] TI — E2E (depende de TC)
 
 - `e2e/consulta-de-evidencia.spec.ts` (nuevo):
   - **Preparación.** Siembra un pedido con anotaciones y fotos guardadas, reutilizando los helpers
@@ -258,7 +258,7 @@ teléfono contra `ProductoTerminadoEvidencia*.dc.html`.
 **Hecho cuando:** `pnpm exec playwright test e2e/consulta-de-evidencia.spec.ts` está en verde en
 local y las guardias también.
 
-## TZ — Cierre (depende de TI)
+## [x] TZ — Cierre (depende de TI)
 
 - `progress/impl_QC-271-consulta-de-evidencia-por-paso.md`:
   - el mapa `R<n> → test` completo, de R1 a R30 (`design.md > 10`);
