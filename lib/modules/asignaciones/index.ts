@@ -161,6 +161,10 @@ export {
   type StartAssignedOrderDeps,
 } from './domain/start-assigned-order';
 export {
+  createOpenAssignedOrder,
+  type OpenAssignedOrderDeps,
+} from './domain/open-assigned-order';
+export {
   createFinishAssignedOrder,
   type FinishAssignedOrderDeps,
 } from './domain/finish-assigned-order';

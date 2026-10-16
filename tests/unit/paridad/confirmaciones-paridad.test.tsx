@@ -15,7 +15,6 @@ import { DeleteRecipeDialog } from '@/app/(private)/produccion/formulas/componen
 import { DeleteCatalogLineDialog, DeleteSupplierDialog } from '@/app/(private)/proveedores/[id]/components';
 import { OrderCancelDialog } from '@/app/(private)/asignacion/[id]/components/order-cancel-dialog';
 import { OrderExecutionScreen } from '@/app/(private)/asignacion/[id]/components/order-execution-screen';
-import { AssignedOrderStartTrigger } from '@/app/(private)/asignacion/components/assigned-order-start-trigger';
 import { PackingOrderScreen } from '@/app/(private)/asignacion/empaque/[id]/components/packing-order-screen';
 import type { PackingOrderDetail, StartedOrderExecution } from '@/lib/modules/asignaciones';
 import type { CustomerView } from '@/lib/modules/clientes';
@@ -171,6 +170,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-execution-actions', (
   finishAssignedOrderAction: acciones.fn('finishAssignedOrderAction'),
   recordStepMoveAction: acciones.fn('recordStepMoveAction'),
   cancelAssignedOrderAction: acciones.fn('cancelAssignedOrderAction'),
+  startAssignedOrderAction: acciones.fn('startAssignedOrderAction'),
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-packing-actions', () => ({
@@ -703,26 +703,15 @@ describe('paridad de confirmaciones — borrar receta (transicion)', () => {
   });
 });
 
+// El «Comenzar» del operario se mudo de «Entrar» en la lista al pie de la pantalla de ejecucion.
 describe('paridad de confirmaciones — comenzar un pedido asignado (ConfirmActionDialog)', () => {
-  it('R1 — el disparador, cerrado', () => {
-    render(
-      <AssignedOrderStartTrigger href="/asignacion/order-1" testId="assigned-order-enter-order-1">
-        Entrar
-      </AssignedOrderStartTrigger>,
+  it('R1 R12 — abierto: solo el dialogo, en su portal', async () => {
+    const { container } = render(
+      <OrderExecutionScreen execution={{ ...EJECUCION, status: 'PENDIENTE' }} />,
     );
-    expect(arbolAccesible()).toMatchSnapshot();
-  });
-
-  it('R1 R12 — abierto', async () => {
-    const user = setupUser();
-    render(
-      <AssignedOrderStartTrigger href="/asignacion/order-1" testId="assigned-order-enter-order-1">
-        Entrar
-      </AssignedOrderStartTrigger>,
-    );
-    await user.click(screen.getByTestId('assigned-order-enter-order-1'));
-    await screen.findByTestId('assigned-order-start-dialog');
-    expect(arbolAccesible()).toMatchSnapshot();
+    fireEvent.click(screen.getByTestId('order-execution-start-button'));
+    await screen.findByTestId('order-execution-start-dialog');
+    expect(arbolDePortales(container)).toMatchSnapshot();
   });
 });
 

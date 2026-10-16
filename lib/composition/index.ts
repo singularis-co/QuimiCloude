@@ -457,6 +457,7 @@ import {
   createListPackingOrders,
   createListResponsibleCandidates,
   createListResponsiblesForOrders,
+  createOpenAssignedOrder,
   createRemoveWorkGroupFromOrder,
   createStartAssignedOrder,
   createStartPacking as createStartPackingOrder,
@@ -1977,6 +1978,21 @@ export const asignaciones = {
     storage: evidenceStorage,
   }),
   startAssignedOrder: createStartAssignedOrder({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    recipes: recipeCatalog,
+    units: unitCatalog,
+    products: productCatalog,
+    presentations: presentationCatalog,
+    log: executionLogRepository,
+    transaction: executionTransaction,
+    now: () => new Date(),
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  // Abrir la pantalla: lee un `PENDIENTE` sin comenzarlo y retoma un `EN_CURSO`. MISMAS
+  // dependencias que `startAssignedOrder`, al que delega el retomar.
+  openAssignedOrder: createOpenAssignedOrder({
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
     recipes: recipeCatalog,

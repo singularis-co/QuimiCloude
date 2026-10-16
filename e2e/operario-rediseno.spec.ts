@@ -886,14 +886,17 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
     await loginAndLand(page, operatorUser);
     await page.goto(ASSIGNED_ORDERS_ROUTE);
 
-    const card = page.getByTestId(`data-table-card-${execPending.id}`);
-    await expect(card).toBeVisible({ timeout: 60_000 });
-    await clickUntilVisible(card.getByTestId(TESTIDS.assignedEnter), page.getByTestId('assigned-order-start-dialog'));
+    // «Entrar» ya no pide nada: «Comenzar» vive en el pie de la pantalla del pedido pendiente.
+    const pendingScreen = await openScreen(page, assignedOrderRoute(execPending.id), TESTIDS.executionScreen);
+    await clickUntilVisible(
+      pendingScreen.getByTestId('order-execution-start-button'),
+      page.getByTestId('order-execution-start-dialog'),
+    );
     await expectOperatorDialog(page, {
       label: '¿Comenzar el pedido?',
-      dialog: 'assigned-order-start-dialog',
-      dismiss: 'assigned-order-start-dialog-cancel',
-      confirm: 'assigned-order-start-confirm',
+      dialog: 'order-execution-start-dialog',
+      dismiss: 'order-execution-start-dialog-cancel',
+      confirm: 'order-execution-start-confirm',
     });
 
     const screen = await openScreen(page, assignedOrderRoute(execRunning.id), TESTIDS.executionScreen);

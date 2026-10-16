@@ -316,6 +316,24 @@ describe('enlace de vuelta según el estado', () => {
     },
   );
 
+  it('comenzado por quien lo mira («Terminar» suyo), la vuelta se ve deshabilitada y sin href', () => {
+    render(<ConditioningOrderScreen order={{ ...ROW, status: 'EN_ACONDICIONAMIENTO' }} canFinish />);
+
+    const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
+    expect(back.tagName).not.toBe('A');
+    expect(back).not.toHaveAttribute('href');
+    expect(back).toHaveAttribute('aria-disabled', 'true');
+    expect(back).toHaveTextContent('Volver a «Por acondicionar»');
+  });
+
+  it('antes de comenzar la vuelta es un enlace habilitado', () => {
+    render(<ConditioningOrderScreen order={{ ...ROW, status: 'POR_ACONDICIONAR' }} canStart />);
+
+    const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
+    expect(back.tagName).toBe('A');
+    expect(back).not.toHaveAttribute('aria-disabled');
+  });
+
   it('R8 R32: en TERMINADO la vuelta es «Volver a «Acondicionados»», un botón con flecha en la cabecera', () => {
     render(<ConditioningOrderScreen order={{ ...ROW, status: 'TERMINADO' }} />);
 

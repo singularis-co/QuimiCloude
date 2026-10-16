@@ -308,7 +308,14 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
   return (
     <OperatorScreenFrame
       testId={PACKING_ORDER_SCREEN_TESTID}
-      back={{ href: backHref, label: PACKING_ORDER_TEXTS.back, testId: PACKING_ORDER_BACK_LINK_TESTID }}
+      // Comenzado por el propio actor, la vuelta queda deshabilitada hasta terminar; a nombre de
+      // otro sigue habilitada: quien mira no lo comenzo.
+      back={{
+        href: backHref,
+        label: PACKING_ORDER_TEXTS.back,
+        testId: PACKING_ORDER_BACK_LINK_TESTID,
+        disabled: canFinish,
+      }}
       eyebrow={order.numberText}
       title={order.recipeName ?? PACKING_ORDER_TEXTS.recipeMissing}
       titleTestId={PACKING_ORDER_RECIPE_TESTID}

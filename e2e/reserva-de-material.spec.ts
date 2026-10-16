@@ -62,7 +62,7 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
 import { addPackagingLine, openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
@@ -706,7 +706,7 @@ test.describe('reserva de material del pedido', () => {
 
     const assignedRowB = rowByNumber(page, orderBNumber);
     await expect(assignedRowB).toHaveCount(1, { timeout: 60_000 });
-    await clickAndConfirm(page, assignedRowB.getByTestId(ASSIGNED_ORDER_ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, assignedRowB.getByTestId(ASSIGNED_ORDER_ENTER_TESTID));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderB.id), {
       timeout: 60_000,
     });

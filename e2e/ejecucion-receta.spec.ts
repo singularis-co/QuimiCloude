@@ -47,7 +47,7 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
 
@@ -695,7 +695,7 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
     const pendingRow = rowByNumber(page, orderPendingNumber);
     await expect(pendingRow).toHaveCount(1, { timeout: 60_000 });
 
-    await clickAndConfirm(page, pendingRow.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, pendingRow.getByTestId(ENTER_TESTID));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderPendingId!), {
       timeout: 60_000,
     });
