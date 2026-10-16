@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 
+import { StatusBadge, type StatusTone } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { listBatchMovementsAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { ErrorState } from '@/lib/modules/errores';
 import type { BatchHistoryEntry } from '@/lib/modules/inventario';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 import { movementReasonLabel } from './movement-reason-label';
 
@@ -19,6 +21,7 @@ const PREVIOUS_STOCK_LABEL = 'Existencia anterior';
 const COUNTED_STOCK_LABEL = 'Total contado';
 const REASON_LABEL = 'Motivo';
 const ORDER_LABEL = 'Pedido';
+const CUSTOMER_LABEL = 'Cliente';
 const AUTHOR_LABEL = 'Autor';
 const DATE_LABEL = 'Fecha';
 
@@ -42,6 +45,12 @@ const KIND_LABELS: Record<BatchHistoryEntry['kind'], string> = {
   delivery_void: 'Anulación de entrega',
   direct_delivery: 'Entrega sin pedido',
   direct_delivery_void: 'Anulación de entrega sin pedido',
+};
+
+/** Los asientos sin pedido nombran al cliente donde los demás nombran el pedido. */
+const DIRECT_KIND_TONES: Partial<Record<BatchHistoryEntry['kind'], StatusTone>> = {
+  direct_delivery: 'info',
+  direct_delivery_void: 'muted',
 };
 
 /** Etiqueta del tipo de asiento. */
@@ -132,6 +141,7 @@ export function BatchHistory({ batchId, batchLot }: BatchHistoryProps) {
         {state.status === 'success' && state.data.length > 0 ? (
           <ul data-testid="batch-history-list">
             {state.data.map((movimiento) => {
+              const tono = DIRECT_KIND_TONES[movimiento.kind];
               // `kind` distingue los dos libros; su `id` es unico dentro del suyo.
               return (
                 <li
@@ -140,7 +150,11 @@ export function BatchHistory({ batchId, batchLot }: BatchHistoryProps) {
                 >
                   <span className="text-xs text-muted-foreground">{KIND_LABEL}</span>
                   <span data-testid="batch-history-entry-kind">
-                    {movementKindLabel(movimiento.kind)}
+                    {tono === undefined ? (
+                      movementKindLabel(movimiento.kind)
+                    ) : (
+                      <StatusBadge tone={tono} label={movementKindLabel(movimiento.kind)} />
+                    )}
                   </span>
                   <span className="text-xs text-muted-foreground">{QUANTITY_LABEL}</span>
                   <span
@@ -169,6 +183,16 @@ export function BatchHistory({ batchId, batchLot }: BatchHistoryProps) {
                       <span className="text-xs text-muted-foreground">{REASON_LABEL}</span>
                       <span data-testid="batch-history-entry-reason">
                         {movementReasonLabel(movimiento.reason)}
+                      </span>
+                    </>
+                  )}
+                  {tono === undefined ? null : (
+                    <>
+                      <span className="text-xs text-muted-foreground">{CUSTOMER_LABEL}</span>
+                      <span data-testid="batch-history-entry-customers">
+                        {movimiento.customerNames === null || movimiento.customerNames.length === 0
+                          ? EMPTY_MARK
+                          : movimiento.customerNames.join(', ')}
                       </span>
                     </>
                   )}

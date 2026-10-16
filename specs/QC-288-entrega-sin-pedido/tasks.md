@@ -264,7 +264,7 @@ Cubre: R43–R46, R52, R55 (pantalla).
 
 ---
 
-## [ ] F5 [P] — Historial del lote y tabs de movimientos (depende de T0)
+## [x] F5 [P] — Historial del lote y tabs de movimientos (depende de T0)
 
 - `app/(private)/inventario/components/batch-history.tsx`: etiquetas y clientes (§7.6).
 - `app/(private)/inventario/producto-terminado/[id]/components/finished-product-movements-table.tsx`:

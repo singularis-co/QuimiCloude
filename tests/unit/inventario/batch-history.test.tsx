@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BatchHistory, movementKindLabel, movementReasonLabel } from '@/app/(private)/inventario/components';
 import type { BatchHistoryEntry } from '@/lib/modules/inventario';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import {
   ADJUSTMENT_WITH_COUNT,
   LEGACY_ADJUSTMENT,
@@ -363,5 +364,111 @@ describe('BatchHistory', () => {
     expect(within(fila).getByTestId('batch-history-entry-author')).toHaveTextContent('Laura Gomez');
     expect(within(fila).getByTestId('batch-history-entry-date')).toHaveTextContent('2026-10-09 09:00');
     expect(within(fila).queryByTestId('batch-history-entry-reason')).toBeNull();
+  });
+
+  // 2026-10-16 (QC-288): la entrega sin pedido y su anulación nombran al cliente, no un pedido.
+  it('R54 — un asiento de entrega sin pedido se pinta «Entrega sin pedido», en negativo y con los clientes en vez del pedido', async () => {
+    const entrega = asiento({
+      id: 'directa-1',
+      kind: 'direct_delivery',
+      quantity: '-6.0000',
+      reason: null,
+      orderNumberText: null,
+      authorName: 'Carla Duarte',
+      createdAt: '2026-10-16T10:05:00.000Z',
+      customerNames: ['Laura Gómez', 'Mario Ruiz'],
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [entrega] });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    const fila = await screen.findByTestId('batch-history-entry-directa-1');
+    const tipo = within(fila).getByTestId('batch-history-entry-kind');
+    expect(tipo).toHaveTextContent('Entrega sin pedido');
+    expect(tipo.querySelector('[data-tone]')).toHaveAttribute('data-tone', 'info');
+    expect(movementKindLabel('direct_delivery')).toBe('Entrega sin pedido');
+    const cantidad = within(fila).getByTestId('batch-history-entry-quantity');
+    expect(cantidad).toHaveAttribute('aria-label', '-6');
+    expect(cantidad.textContent).toMatch(/^-6/);
+    expect(within(fila).getByTestId('batch-history-entry-customers')).toHaveTextContent('Laura Gómez, Mario Ruiz');
+    expect(within(fila).getByText('Cliente')).toBeInTheDocument();
+    expect(within(fila).queryByTestId('batch-history-entry-order')).toBeNull();
+    expect(within(fila).queryByText('Pedido')).toBeNull();
+    expect(within(fila).getByTestId('batch-history-entry-author')).toHaveTextContent('Carla Duarte');
+    expect(within(fila).getByTestId('batch-history-entry-date')).toHaveTextContent('2026-10-16 10:05');
+  });
+
+  it('R54 — un asiento de anulación de entrega sin pedido se pinta con su tipo, en positivo y con el cliente', async () => {
+    const anulacion = asiento({
+      id: 'directa-anulada-1',
+      kind: 'direct_delivery_void',
+      quantity: '2.0000',
+      reason: null,
+      orderNumberText: null,
+      authorName: 'Laura Gomez',
+      createdAt: '2026-10-14T11:30:00.000Z',
+      customerNames: ['Mario Ruiz'],
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [anulacion] });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    const fila = await screen.findByTestId('batch-history-entry-directa-anulada-1');
+    const tipo = within(fila).getByTestId('batch-history-entry-kind');
+    expect(tipo).toHaveTextContent('Anulación de entrega sin pedido');
+    expect(tipo.querySelector('[data-tone]')).toHaveAttribute('data-tone', 'muted');
+    expect(movementKindLabel('direct_delivery_void')).not.toBe(movementKindLabel('delivery_void'));
+    const cantidad = within(fila).getByTestId('batch-history-entry-quantity');
+    expect(cantidad).toHaveAttribute('aria-label', '2');
+    expect(cantidad.textContent).not.toContain('-');
+    expect(within(fila).getByTestId('batch-history-entry-customers')).toHaveTextContent('Mario Ruiz');
+    expect(within(fila).queryByTestId('batch-history-entry-order')).toBeNull();
+    expect(within(fila).queryByTestId('batch-history-entry-reason')).toBeNull();
+  });
+
+  it('R54 — sin clientes resueltos el asiento sin pedido pinta la marca de vacío; los demás tipos no llevan cliente', async () => {
+    const sinClientes = asiento({
+      id: 'directa-sin-clientes',
+      kind: 'direct_delivery',
+      quantity: '-1.0000',
+      reason: null,
+      customerNames: [],
+    });
+    const dePedido = asiento({
+      id: 'de-pedido',
+      kind: 'delivery',
+      quantity: '-1.0000',
+      reason: null,
+      orderNumberText: '2026-0000007',
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [sinClientes, dePedido] });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    const fila = await screen.findByTestId('batch-history-entry-directa-sin-clientes');
+    expect(within(fila).getByTestId('batch-history-entry-customers')).toHaveTextContent(EMPTY_MARK);
+    const otra = screen.getByTestId('batch-history-entry-de-pedido');
+    expect(within(otra).queryByTestId('batch-history-entry-customers')).toBeNull();
+    expect(within(otra).getByTestId('batch-history-entry-kind').querySelector('[data-tone]')).toBeNull();
+  });
+
+  it('R54 — los dos tipos sin pedido tienen etiqueta propia, distinta de las demás', () => {
+    const kinds: readonly BatchHistoryEntry['kind'][] = [
+      'opening',
+      'adjustment',
+      'consumption',
+      'reserve',
+      'release',
+      'expire',
+      'consume',
+      'delivery',
+      'delivery_void',
+      'direct_delivery',
+      'direct_delivery_void',
+    ];
+    expect(new Set(kinds.map(movementKindLabel)).size).toBe(kinds.length);
   });
 });

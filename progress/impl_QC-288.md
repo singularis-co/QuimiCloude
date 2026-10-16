@@ -87,3 +87,36 @@ Veredicto: contrato de T0 publicado y gate de la tanda en verde; paso 0 confirma
 - `pnpm exec vitest related --run <11 archivos tocados>`: `Test Files 67 passed (67)`, `Tests 1442 passed`.
 
 Veredicto: F1 hecha; las tres piezas viven en `shared` con la misma API y el gate de la tanda está en verde.
+
+## F5 — Historial del lote y tabs de movimientos (frontend_dev, 2026-10-16)
+
+### Archivos
+- `app/(private)/inventario/components/batch-history.tsx`: los dos tipos sin pedido pintan su etiqueta
+  (ya puesta en T0) dentro de `StatusBadge` con los tonos del tablero (`info`, `muted`) y, en lugar del
+  pedido, «Cliente» con `customerNames.join(', ')` (`batch-history-entry-customers`), o `EMPTY_MARK` si
+  viene vacío. El resto de tipos se pinta igual que antes.
+- `finished-product-movements-table.tsx`: sin cambio. T0 ya dejó los dos orígenes en
+  `FINISHED_PRODUCT_MOVEMENT_KIND_LABELS`; el pedido sale `EMPTY_MARK` porque esos asientos no lo llevan.
+- `tests/unit/inventario/batch-history.test.tsx`: cuatro casos R54.
+- `tests/unit/inventario-ui/finished-product-tables.test.tsx`: un caso R55 (solo ese bloque en este
+  commit; los casos de F4 van en el suyo).
+
+### R → test
+- R54 → `batch-history.test.tsx`: «R54 — un asiento de entrega sin pedido se pinta…», «R54 — un asiento
+  de anulación de entrega sin pedido…», «R54 — sin clientes resueltos…», «R54 — los dos tipos sin pedido
+  tienen etiqueta propia…».
+- R55 (orígenes) → `finished-product-tables.test.tsx`: «R55 — Salidas muestra «Entrega sin pedido» y
+  Entradas «Anulación de entrega sin pedido», sin número de pedido».
+
+### Gate (salida real)
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `0 errors, 9 warnings` (todos en archivos ajenos).
+- `pnpm exec vitest run tests/unit/inventario/batch-history.test.tsx tests/unit/inventario-ui/finished-product-tables.test.tsx`:
+  `Test Files 2 passed (2)`, `Tests 57 passed (57)`; la versión del commit (sin F4): `Tests 32 passed`.
+- `pnpm exec vitest related --run batch-history.tsx batch-history.test.tsx`: `Test Files 35 passed (35)`,
+  `Tests 583 passed (583)`.
+- `pnpm exec vitest run guard`: `78 passed`, 2 rojos ajenos a F5: `guard-formularios-y-acciones` R28
+  (el botón «Anular» de F4, sin commitear: bloqueo abierto) y `guard-asignacion-componentizada`, que en
+  solitario pasa (`22 passed`): intermitente por carga.
+
+Veredicto: F5 hecha; historial y movimientos muestran la entrega sin pedido y su anulación.

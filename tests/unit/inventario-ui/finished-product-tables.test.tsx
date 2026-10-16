@@ -262,6 +262,35 @@ describe('Entradas y Salidas', () => {
     }
     expect(screen.getAllByRole('columnheader').some((th) => th.textContent?.includes('Tipo'))).toBe(true);
   });
+
+  // 2026-10-16 (QC-288): los asientos de la entrega sin pedido y de su anulación.
+  it('R55 — Salidas muestra «Entrega sin pedido» y Entradas «Anulación de entrega sin pedido», sin número de pedido', () => {
+    const salida = { ...FINISHED_OUT_MOVEMENTS[1], id: 'salida-directa', kind: 'direct_delivery' as const, orderNumberText: null };
+    const entrada = { ...FINISHED_IN_MOVEMENTS[0], id: 'entrada-directa', kind: 'direct_delivery_void' as const, orderNumberText: null };
+
+    renderMovements('salidas', [salida, FINISHED_OUT_MOVEMENTS[1]]);
+    const filaSalida = rowOf('salida-directa');
+    expect(cell(filaSalida, 'finished-product-movement-row')).toHaveAttribute('data-kind', 'direct_delivery');
+    expect(cell(filaSalida, 'finished-product-movement-origin')).toHaveTextContent('Entrega sin pedido');
+    expect(cell(filaSalida, 'finished-product-movement-order')).toHaveTextContent(EMPTY_MARK);
+    expect(cell(rowOf(FINISHED_OUT_MOVEMENTS[1].id), 'finished-product-movement-origin')).toHaveTextContent(
+      'Entrega a cliente',
+    );
+    cleanup();
+
+    renderMovements('entradas', [entrada]);
+    const filaEntrada = rowOf('entrada-directa');
+    expect(cell(filaEntrada, 'finished-product-movement-origin')).toHaveTextContent(
+      'Anulación de entrega sin pedido',
+    );
+    expect(cell(filaEntrada, 'finished-product-movement-order')).toHaveTextContent(EMPTY_MARK);
+
+    expect(FINISHED_PRODUCT_MOVEMENT_KIND_LABELS.direct_delivery).toBe('Entrega sin pedido');
+    expect(FINISHED_PRODUCT_MOVEMENT_KIND_LABELS.direct_delivery_void).toBe('Anulación de entrega sin pedido');
+    expect(new Set(Object.values(FINISHED_PRODUCT_MOVEMENT_KIND_LABELS)).size).toBe(
+      Object.keys(FINISHED_PRODUCT_MOVEMENT_KIND_LABELS).length,
+    );
+  });
 });
 
 describe('Entregas', () => {
