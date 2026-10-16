@@ -145,6 +145,7 @@ Lo que A3 temía perder —que falte una clave y no compile— se conserva en
 `tests/unit/shared-ui/order-status.test.ts` con `expectTypeOf<OrderStatusKey>().toEqualTypeOf<OrderStatus>()`
 en los dos sentidos (y lo mismo con prioridad y cobertura). `tsc` incluye `tests/`, así que una clave
 de más o de menos rompe el typecheck. Los textos son los de hoy, sin cambiar ni uno. Los tonos, los de R10.
+**Enmienda 2026-10-16 (D18, `440ff5b2`):** un texto sí cambia después: `EN_CURSO` pasa a «En fabricación».
 
 ### 3.3 Las copias de las rutas (R11)
 
@@ -532,7 +533,7 @@ intentara añadir un paquete, se para y se pregunta (R48).
 | --- | --- |
 | R1–R5 | `tests/unit/shared-ui/button-tallas.test.tsx` (+ `button-touch.test.tsx` existente, R3) |
 | R6–R9 | `tests/unit/shared-ui/status-badge.test.tsx` |
-| R10, R11 | `tests/unit/shared-ui/order-status.test.ts` |
+| R10, R11 | `tests/unit/shared-ui/order-status.test.ts` (desde el 2026-10-16, D18: «R10 — conserva los textos de hoy» afirma `EN_CURSO: 'En fabricación'`; también `tests/unit/pedidos-ui/order-status-badges.test.tsx`) |
 | R12–R14 | `tests/unit/shared-ui/priority-mark.test.tsx` |
 | R15–R18 | `tests/unit/shared-ui/notice.test.tsx` |
 | R19–R24, R26 | `tests/unit/shared-ui/password-field.test.tsx` |

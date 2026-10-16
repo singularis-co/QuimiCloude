@@ -22,6 +22,7 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { ProductPicker, type ProductPickerOption } from './product-picker';
 import {
   createLocalKey,
+  type RecipeLineErrorMessages,
   type RecipeLineErrors,
   type RecipeLineFormValue,
   type RecipeToolErrorMessages,
@@ -70,6 +71,18 @@ export const RECIPE_TOOL_ERROR_MESSAGES: RecipeToolErrorMessages = {
   productId: 'Elige una herramienta.',
   quantity: 'La cantidad debe ser un número entero mayor que 0.',
 };
+
+/**
+ * Textos propios para los issues de forma de zod sobre las líneas y las herramientas: el genérico
+ * de zod sale en inglés. Los mensajes que ya escribe el esquema (porcentaje, suma, repetidos)
+ * pasan tal cual (`recipe-form-state.ts`).
+ */
+export const RECIPE_LINE_ERROR_MESSAGES: RecipeLineErrorMessages = {
+  productId: 'Elige un ingrediente.',
+  percentage: 'Escribe un porcentaje mayor que 0 y hasta 100.',
+};
+export const RECIPE_LINES_GENERAL_ERROR_MESSAGE = 'Revisa los ingredientes de la fórmula.';
+export const RECIPE_TOOLS_GENERAL_ERROR_MESSAGE = 'Revisa las herramientas de la fórmula.';
 
 /** Más dígitos que el tope del contrato no aportan nada y desbordarían el entero. */
 const MAX_TOOL_QUANTITY_DIGITS = 10;
