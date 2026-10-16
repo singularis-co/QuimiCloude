@@ -121,8 +121,8 @@ const POR_ACONDICIONAR: ConditioningOrderRow = {
   unitId: 'unit-kg',
   unitLabel: 'kg',
   presentationLines: [
-    { lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12 },
-    { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: null, packages: 4 },
+    { lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12, presentationContent: null, presentationUnitLabel: null },
+    { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: null, packages: 4, presentationContent: null, presentationUnitLabel: null },
   ],
   status: 'POR_ACONDICIONAR',
   conditionedByName: null,
@@ -148,7 +148,7 @@ const ACONDICIONADO: FinishedOrderView = {
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [
-    { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 5 },
+    { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 5, presentationContent: null, presentationUnitLabel: null },
   ],
   unitId: null,
   unitLabel: null,
@@ -248,9 +248,9 @@ function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOr
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
-      { lineId: 'linea-4', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-      { lineId: 'linea-5', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: 'Garrafa azul', packages: 2 },
-      { lineId: 'linea-6', packedPackages: null, presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1 },
+      { lineId: 'linea-4', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-5', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: 'Garrafa azul', packages: 2, presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-6', packedPackages: null, presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1, presentationContent: null, presentationUnitLabel: null },
     ],
     unitId: 'unit-1',
     unitLabel: 'kg',

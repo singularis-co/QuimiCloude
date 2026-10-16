@@ -37,7 +37,7 @@ const BASE_ORDER: AssignedOrderView = {
   otherResponsibles: [
     { userId: 'user-2', displayName: 'Ana López García', origin: { kind: 'direct' } },
   ],
-  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],
   unitId: null,
   unitLabel: null,
 };
@@ -124,12 +124,23 @@ describe('R24: columna Presentación', () => {
     renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, {
       ...BASE_ORDER,
       presentationLines: [
-        { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-        { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-2', presentationName: 'Caja x 12', packagingName: null, packages: 1 },
+        { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
+        { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-2', presentationName: 'Caja x 12', packagingName: null, packages: 1, presentationContent: null, presentationUnitLabel: null },
       ],
     });
 
     expect(screen.getByTestId('order-distribution').textContent).toBe('5 × Botella 200 ml, 1 × Caja x 12');
+  });
+
+  it('una linea con envase y volumen conocido pinta «envases × envase · volumen»', () => {
+    renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, {
+      ...BASE_ORDER,
+      presentationLines: [
+        { lineId: 'linea-4', packedPackages: null, presentationId: 'pres-3', presentationName: '300 ml', packagingName: 'Embase pequeño 2', packages: 9, presentationContent: '300.0000', presentationUnitLabel: 'ml' },
+      ],
+    });
+
+    expect(screen.getByTestId('order-distribution').textContent).toBe('9 × Embase pequeño 2 · 300 ml');
   });
 
   it('QC-170 R27: con el reparto vacio pinta «Sin presentación»', () => {

@@ -350,7 +350,7 @@ describe('QC-195 — pasar a POR_EMPACAR consume solo la receta', () => {
     const lockAliveById = vi.fn(async () =>
       filaBloqueada({
         status: 'EN_CURSO',
-        presentationLines: [{ presentationId: 'pres-1', packages: 40, packagingProductId: 'envase-1' }],
+        presentationLines: [{ presentationId: 'pres-1', packages: 40, packagingProductId: 'envase-1', presentationContent: null }],
       }),
     );
     const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));

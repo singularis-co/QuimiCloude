@@ -76,7 +76,7 @@ import {
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
-import { addPackagingLine } from './helpers/order-distribution';
+import { addPackagingLine, submitOrderWithLeftover } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
@@ -292,7 +292,8 @@ async function createOrder(page: Page, quantity: string, packages: string): Prom
     { timeout: 60_000 },
   );
 
-  await page.getByTestId('order-form-submit').click();
+  // 50.5 en 50 envases de 1: queda sobrante y Guardar pregunta antes.
+  await submitOrderWithLeftover(page, page.getByTestId('order-form'));
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 }
 

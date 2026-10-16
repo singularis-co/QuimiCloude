@@ -199,6 +199,7 @@ const PEDIDO: OrderSummary = {
   unitId: null,
   unitLabel: null,
   customer: null,
+  recipeImageUrl: null,
 };
 
 beforeEach(() => {

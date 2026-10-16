@@ -296,6 +296,7 @@ const PEDIDO: OrderSummary = {
   unitId: UNIDAD.id,
   unitLabel: UNIDAD.symbol,
   customer: null,
+  recipeImageUrl: null,
 };
 
 const EJECUCION: StartedOrderExecution = {
@@ -323,7 +324,7 @@ function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOr
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
-      { lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+      { lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
     ],
     unitId: 'unit-1',
     unitLabel: 'kg',

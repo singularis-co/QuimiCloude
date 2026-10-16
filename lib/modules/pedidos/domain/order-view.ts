@@ -33,11 +33,13 @@ export type OrderPresentationLineWrite = {
   readonly packagingProductId: string | null;
 };
 
-/** Una linea del reparto tal como la lee el puerto: sin el contenido copiado, que solo
- *  necesita Terminar y lo lee por su propio camino. */
+/** Una linea del reparto tal como la lee el puerto, con el contenido copiado al guardarla: la
+ *  ficha y el listado lo pintan junto al envase («Envase 2 · 300 ml»). */
 export type OrderPresentationLineRow = {
   readonly presentationId: string;
   readonly packages: number;
+  /** Cadena decimal copiada al guardar la linea; `null` = sin copia, vale la de la presentacion. */
+  readonly presentationContent: string | null;
   /** `null` en una linea anterior a que el reparto nombrara su envase. */
   readonly packagingProductId: string | null;
 };
@@ -52,6 +54,12 @@ export type OrderPresentationLineView = {
   readonly packagingProductId: string | null;
   /** `null` en esa linea antigua, o si el envase no vuelve del catalogo. */
   readonly packagingName: string | null;
+  /** Cadena decimal: el contenido copiado en la linea o, sin copia, el vigente de la
+   *  presentacion. `null` = ninguno de los dos: la etiqueta no pinta el volumen. */
+  readonly presentationContent: string | null;
+  /** Simbolo (o nombre) de la unidad de la PRESENTACION, en la que se expresa el contenido;
+   *  `null` si la presentacion o su unidad no vuelven del catalogo. */
+  readonly presentationUnitLabel: string | null;
 };
 
 /**
@@ -152,6 +160,10 @@ export type OrderView = {
     readonly originalName: string;
     readonly versionName: string;
   } | null;
+  /** URL publica de la imagen de la receta; la de la original si `recipeId` es una version.
+   *  Llega con la misma lectura del catalogo que `recipeName`, sin consulta por fila. `null` =
+   *  sin imagen, o receta que no vuelve del catalogo. */
+  readonly recipeImageUrl: string | null;
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;

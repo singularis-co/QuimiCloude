@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type FormEvent,
 } from 'react';
 
 import {
@@ -33,7 +34,6 @@ import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeLineView } from '@/lib/modules/recetas';
-import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
@@ -50,6 +50,7 @@ import {
   OrderDistributionField,
 } from './order-distribution-field';
 import { OrderField } from './order-field';
+import { leftoverOf, OrderLeftoverDialog } from './order-leftover-dialog';
 import { ingredientNeedOf, OrderIngredientsTable } from './order-ingredients-table';
 import { OrderRecipeImage } from './order-recipe-image';
 import {
@@ -59,12 +60,6 @@ import {
   type RecipePickerPage,
 } from './recipe-picker';
 import { RECIPE_VERSION_FIELD, RecipeVersionSelect } from './recipe-version-select';
-import {
-  EMPTY_RESPONSIBLES_CATALOG,
-  OrderResponsibles,
-  type OrderResponsiblesCatalog,
-} from './order-responsibles';
-import { isFinalOrderStatus } from './order-row-actions';
 import { ORDER_PRIORITY_LABELS, OrderCoverageBadge } from './order-status-badge';
 import { useOrderCostQuote } from './use-order-cost-quote';
 import {
@@ -75,20 +70,6 @@ import {
   useOrderDistributionAvailability,
   type OrderDistributionLine,
 } from './use-order-distribution-availability';
-
-/**
- * QC-102 T14 — EN QUE SECCION abre el panel (R23, R24).
- *
- * Es una union de dos literales y no un booleano `openResponsibles` a proposito: el dia que el
- * panel tenga una tercera seccion, anadirla aqui rompe el `typecheck` de quien no la contemple.
- *
- * **No hay panel nuevo, ni ruta nueva, ni pantalla aparte**: el panel es EL MISMO
- * (`SheetContent`), y esto solo decide a donde va el foco al abrirlo.
- */
-export type OrderSheetSection = 'form' | 'responsibles';
-
-/** La seccion de responsables, dentro del panel que ya existe. Se localiza por este `data-testid`. */
-export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
 
 /** La etiqueta de cobertura de la hoja. */
 export const ORDER_SHEET_COVERAGE_TESTID = 'order-sheet-coverage';
@@ -220,7 +201,7 @@ const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
 const FIELD_LABELS = {
   quantity: 'Cantidad',
   priority: 'Prioridad',
-  customer: 'Cliente',
+  customer: 'Cliente (opcional)',
 } as const;
 
 /** Nombre del campo del `FormData` con el id del cliente; vacio = sin cliente. */
@@ -370,19 +351,10 @@ export type OrderFormProps = {
   /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R35). */
   readonly onSaved: () => void;
   /**
-   * QC-102 R26 — los responsables que **la fila del listado ya trajo**. Al abrir el panel NO se
-   * consulta nada: se pinta lo que ya esta en memoria.
-   */
-  readonly responsibles?: readonly OrderResponsible[];
-  /** QC-102 R27, R28 — catalogos y `canWrite`, por props desde el servidor. */
-  readonly responsiblesCatalog?: OrderResponsiblesCatalog;
-  /**
    * La cobertura que **la fila del listado ya trajo**. `undefined` con el lote caido: la hoja no
    * pinta la etiqueta, igual que `loadResponsiblesCatalog` se degrada sin decir nada.
    */
   readonly coverage?: OrderCoverage;
-  /** QC-102 R24 — en que seccion abre. Por defecto, el formulario de siempre. */
-  readonly section?: OrderSheetSection;
 };
 
 export function OrderForm({
@@ -391,10 +363,7 @@ export function OrderForm({
   units,
   bridge,
   onSaved,
-  responsibles = [],
-  responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
-  section = 'form',
 }: OrderFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
@@ -403,22 +372,6 @@ export function OrderForm({
   const [customer, setCustomer] = useState<OrderCustomerChoice | null>(
     order?.customer ? { kind: 'customer', customer: order.customer } : null,
   );
-
-  /**
-   * QC-102 T14 — La seccion de responsables, DENTRO de este mismo panel (R23). Cuando el panel se
-   * abre desde la entrada «Responsables» de la fila, el foco va aqui: sin scroll a ciegas y sin
-   * obligar a recorrer el formulario. `scrollIntoView` se llama solo si existe —jsdom no lo
-   * implementa— y el contenedor es `tabIndex={-1}` para poder recibir foco sin entrar en el orden
-   * de tabulacion.
-   */
-  const responsiblesRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (section !== 'responsibles') return;
-    const node = responsiblesRef.current;
-    if (node === null) return;
-    node.focus({ preventScroll: true });
-    if (typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'start' });
-  }, [section]);
 
   /*
     Eleccion VIGENTE de receta: con ella se pintan la CABECERA, la IMAGEN y la tabla de
@@ -634,6 +587,28 @@ export function OrderForm({
     startTransition(() => formAction(confirmed));
   }
 
+  // Con sobrante cotizado, Guardar no envia: guarda el envio y pregunta antes. Sin cotizacion
+  // todavia (o con error) se guarda como siempre.
+  const leftover = leftoverOf(availability);
+  // Se guarda la cantidad avisada con el envio: el aviso no cambia si la cotizacion se mueve.
+  const [leftoverSubmit, setLeftoverSubmit] = useState<{
+    formData: FormData;
+    leftover: string;
+  } | null>(null);
+
+  function askLeftover(event: FormEvent<HTMLFormElement>) {
+    if (leftover === null) return;
+    event.preventDefault();
+    setLeftoverSubmit({ formData: new FormData(event.currentTarget), leftover });
+  }
+
+  function saveWithLeftover() {
+    if (leftoverSubmit === null) return;
+    const { formData } = leftoverSubmit;
+    setLeftoverSubmit(null);
+    startTransition(() => formAction(formData));
+  }
+
   const fieldErrors = state.status === 'error' ? state.fieldErrors : {};
   const values =
     state.status === 'error' || state.status === 'wouldBlock' ? state.values : undefined;
@@ -655,6 +630,7 @@ export function OrderForm({
     <FormSheet
       minScreenWidth={70}
       formAction={formAction}
+      onSubmit={askLeftover}
       noValidate
       testIds={{
         sheet: 'order-sheet',
@@ -667,12 +643,21 @@ export function OrderForm({
       busy={isPending}
       saveTouch="class"
       beforeHeader={
-        <BlockedOrderDialog
-          open={blockedOpen}
-          message={state.status === 'wouldBlock' ? state.message : ''}
-          onConfirm={saveBlocked}
-          onDismiss={() => setClosedWarning(state)}
-        />
+        <>
+          <OrderLeftoverDialog
+            open={leftoverSubmit !== null}
+            leftover={leftoverSubmit?.leftover ?? '0'}
+            unitLabel={unitLabel}
+            onConfirm={saveWithLeftover}
+            onDismiss={() => setLeftoverSubmit(null)}
+          />
+          <BlockedOrderDialog
+            open={blockedOpen}
+            message={state.status === 'wouldBlock' ? state.message : ''}
+            onConfirm={saveBlocked}
+            onDismiss={() => setClosedWarning(state)}
+          />
+        </>
       }
       title={describeOrder(recipeName, quantity) ?? (isEdit ? EDIT_TITLE : CREATE_TITLE)}
       description={
@@ -861,34 +846,6 @@ export function OrderForm({
         />
       )}
 
-      {/*
-        LA SECCION DE RESPONSABLES, dentro del panel que ya existe. No hay panel
-        nuevo, ni ruta nueva, ni pantalla aparte: es una seccion mas del mismo `SheetContent`.
-
-        Solo en la EDICION: sin pedido creado no hay a quien asignar, y las tres operaciones de
-        responsables piden un `orderId` que en el alta todavia no existe.
-
-        Lo que pinta son los responsables que **la fila ya trajo**; no se consulta nada al
-        abrir. Con el pedido en estado final, `isFinal` apaga los controles de escritura
-        —y la seccion no dice por que—.
-      */}
-      {order === undefined ? null : (
-        <div
-          ref={responsiblesRef}
-          tabIndex={-1}
-          data-testid={ORDER_SHEET_RESPONSIBLES_TESTID}
-          data-section={section}
-        >
-          <OrderResponsibles
-            orderId={order.id}
-            responsibles={responsibles}
-            canWrite={responsiblesCatalog.canWrite}
-            isFinal={isFinalOrderStatus(order.status)}
-            people={responsiblesCatalog.people}
-            workGroups={responsiblesCatalog.workGroups}
-          />
-        </div>
-      )}
     </FormSheet>
   );
 }

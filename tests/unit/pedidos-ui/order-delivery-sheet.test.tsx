@@ -20,6 +20,7 @@ import {
   ORDER_DELIVERY_ERROR_TESTID,
   ORDER_DELIVERY_LINE_EXCEEDS_TESTID,
   ORDER_DELIVERY_LINE_TESTID,
+  ORDER_DELIVERY_NUMBER_TESTID,
   ORDER_DELIVERY_REJECTED_TESTID,
   ORDER_DELIVERY_SHEET_TESTID,
   ORDER_DELIVERY_SKELETON_TESTID,
@@ -27,6 +28,7 @@ import {
   ORDER_DELIVERY_SUBMIT_TESTID,
   ORDER_DELIVERY_SUMMARY_LINE_TESTID,
   ORDER_DELIVERY_SUMMARY_TESTID,
+  ORDER_RECIPE_IMAGE_TESTID,
   OrderDeliverySheet,
   OrderTable,
   orderDeliveryDraftKey,
@@ -806,6 +808,7 @@ describe('montaje desde la fila', () => {
       unitId: null,
       unitLabel: null,
       customer: null,
+      recipeImageUrl: null,
     };
   }
 
@@ -832,15 +835,76 @@ describe('montaje desde la fila', () => {
     expect(await screen.findByTestId(ORDER_DELIVERY_SHEET_TESTID)).toBeInTheDocument();
     expect(getDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID);
   });
+  it('desde la fila, el titulo es la receta del pedido y la imagen es la que trae el pedido', async () => {
+    const user = setupUser();
+    const pedido = { ...pedidoTerminado(), recipeImageUrl: 'https://img.example/esmalte.png' };
+    render(
+      <OrderTable
+        orders={[pedido]}
+        params={createDefaultParams()}
+        totalPages={1}
+        recipes={{ items: [], totalPages: 1 }}
+        units={[]}
+        bridge={null}
+        canDeliver
+      />,
+    );
+
+    await user.click(within(screen.getByTestId(`data-table-row-${DELIVERY_ORDER_ID}`)).getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID));
+
+    expect(await screen.findByRole('dialog', { name: 'Esmalte azul' })).toBeInTheDocument();
+    const resumen = await screen.findByTestId(ORDER_DELIVERY_SUMMARY_TESTID);
+    expect(within(resumen).getByTestId(ORDER_RECIPE_IMAGE_TESTID)).toHaveAttribute(
+      'src',
+      'https://img.example/esmalte.png',
+    );
+  });
 });
 
 describe('los textos del panel son los de hoy (QC-262 R20)', () => {
-  it('QC-262 R20: «Entregar pedido <numero>» con su descripcion, «Cancelar» y «Entregar»', async () => {
+  it('QC-262 R20: sin nombre de receta, el titulo es «Entregar pedido <numero>»; «Cancelar» y «Entregar»', async () => {
     montar();
 
     expect(await screen.findByRole('dialog', { name: `Entregar pedido ${ORDER.numberText}` })).toBeInTheDocument();
-    expect(screen.getByText('Elige el cliente y, por presentación, de qué lotes salen los envases.')).toBeInTheDocument();
+    expect(screen.queryByText('Elige el cliente y, por presentación, de qué lotes salen los envases.')).toBeNull();
     expect(screen.getByTestId(ORDER_DELIVERY_CANCEL_TESTID)).toHaveTextContent(/^Cancelar$/);
     expect(await screen.findByTestId(ORDER_DELIVERY_SUBMIT_TESTID)).toHaveTextContent(/^Entregar$/);
+  });
+});
+
+describe('cabecera con el producto', () => {
+  it('el titulo es el nombre de la receta y debajo va «Pedido <numero>» con el numero en mono', async () => {
+    render(<OrderDeliverySheet order={{ ...ORDER, recipeName: 'Esmalte azul' }} open onOpenChange={cerrar} />);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Esmalte azul' });
+    expect(within(dialog).getByRole('heading', { name: 'Esmalte azul' })).toBeInTheDocument();
+    const numero = screen.getByTestId(ORDER_DELIVERY_NUMBER_TESTID);
+    expect(numero).toHaveTextContent(`Pedido ${ORDER.numberText}`);
+    expect(within(numero).getByText(ORDER.numberText)).toHaveClass('font-mono');
+    expect(screen.queryByText('Elige el cliente y, por presentación, de qué lotes salen los envases.')).toBeNull();
+  });
+
+  it('la imagen del producto va junto a «Por entregar»; sin imagen, el marcador', async () => {
+    const { unmount } = render(
+      <OrderDeliverySheet
+        order={{ ...ORDER, recipeName: 'Esmalte azul', recipeImageUrl: 'https://img.example/esmalte.png' }}
+        open
+        onOpenChange={cerrar}
+      />,
+    );
+
+    const resumen = await screen.findByTestId(ORDER_DELIVERY_SUMMARY_TESTID);
+    const imagen = within(resumen).getByTestId(ORDER_RECIPE_IMAGE_TESTID);
+    expect(imagen).toHaveAttribute('src', 'https://img.example/esmalte.png');
+    expect(imagen).toHaveAttribute('alt', 'Esmalte azul');
+    expect(imagen).not.toHaveAttribute('data-missing');
+    unmount();
+
+    render(<OrderDeliverySheet order={{ ...ORDER, recipeName: 'Esmalte azul' }} open onOpenChange={cerrar} />);
+    const sinImagen = within(await screen.findByTestId(ORDER_DELIVERY_SUMMARY_TESTID)).getByTestId(
+      ORDER_RECIPE_IMAGE_TESTID,
+    );
+    expect(sinImagen).toHaveAttribute('data-missing', 'true');
   });
 });

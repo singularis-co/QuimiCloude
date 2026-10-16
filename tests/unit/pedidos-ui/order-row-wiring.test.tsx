@@ -20,6 +20,7 @@ import {
   DELETE_ORDER_ID_TESTID,
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_TESTID,
+  ORDER_RESPONSIBLES_SUMMARY_TESTID,
   ORDER_SHEET_RESPONSIBLES_TESTID,
   OrderTable,
   type RecipePickerPage,
@@ -170,6 +171,7 @@ function pedido(status: OrderStatus): OrderSummary {
     unitId: null,
     unitLabel: null,
     customer: null,
+    recipeImageUrl: null,
   };
 }
 
@@ -338,23 +340,19 @@ describe('R13: un solo anfitrion por tabla abre lo de cada item para su pedido',
 
     await screen.findByTestId(ORDER_FORM_TESTID);
     expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe('30');
-    expect(screen.getByTestId(ORDER_SHEET_RESPONSIBLES_TESTID)).toHaveAttribute('data-section', 'form');
+    expect(screen.queryByTestId(ORDER_SHEET_RESPONSIBLES_TESTID)).toBeNull();
   });
 
-  it('R13: «Responsables» abre el MISMO panel, en su seccion, y no un segundo', async () => {
+  it('R13: «Responsables» abre su propia hoja del pedido elegido, sin formulario de edicion', async () => {
     const user = setupUser();
     montarDos();
 
     await elegir(user, PEDIDO_A, 'order-action-responsibles');
 
-    await screen.findByTestId(ORDER_FORM_TESTID);
-    expect(screen.getAllByTestId(ORDER_FORM_TESTID)).toHaveLength(1);
+    const ficha = await screen.findByTestId(ORDER_RESPONSIBLES_SUMMARY_TESTID);
+    expect(ficha).toHaveTextContent(PEDIDO_A.numberText);
     expect(screen.getAllByTestId(ORDER_SHEET_RESPONSIBLES_TESTID)).toHaveLength(1);
-    expect(screen.getByTestId(ORDER_SHEET_RESPONSIBLES_TESTID)).toHaveAttribute(
-      'data-section',
-      'responsibles',
-    );
-    expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe('12.5');
+    expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
   });
 
   it('R13: «Cancelar» y «Eliminar» abren su dialogo con el id del pedido elegido', async () => {

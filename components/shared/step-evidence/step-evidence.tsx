@@ -22,7 +22,7 @@ export const STEP_EVIDENCE_TEXTS = {
   countLabel: (ok: number) => `${ok} de ${MAX_STEP_EVIDENCE_PHOTOS} fotos`,
   required: 'Obligatoria · de 1 a 3 fotos',
   fixed: 'Fijada al terminar',
-  hint: `JPG, PNG o WebP · hasta ${EVIDENCE_MAX_SIZE_LABEL} · se comprime antes de subir.`,
+  hint: `JPG, PNG o WebP`,
   fixedHint: 'El pedido ya terminó: las fotos no se pueden cambiar ni quitar.',
   add: 'Añadir foto',
   addAnother: 'Añadir otra foto',

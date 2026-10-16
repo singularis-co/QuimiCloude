@@ -62,6 +62,7 @@ import {
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { submitOrderWithLeftover } from './helpers/order-distribution';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc147_e2e_';
@@ -544,8 +545,9 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     await expect(page.getByTestId('order-ingredient-percentage')).toHaveText('10,00 %');
     await expect(page.getByTestId('order-ingredient-required')).toHaveText(`20 ${unitSymbol}`);
 
-    // Guardar: la Server Action REAL de `pedidos` contra Postgres.
-    await page.getByTestId('order-form-submit').click();
+    // Guardar: la Server Action REAL de `pedidos` contra Postgres. Sin reparto toda la cantidad
+    // queda sin envasar, asi que Guardar pregunta antes.
+    await submitOrderWithLeftover(page, page.getByTestId('order-form'));
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 
     // El pedido nuevo, distinguido del ya sembrado y asignado del escenario 4 (misma receta).

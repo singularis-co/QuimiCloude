@@ -159,7 +159,7 @@ describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
       numberText: expect.any(String),
       recipeName: 'Desengrasante',
       quantity: '10.0000',
-      presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null }],
+      presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
       unitId: 'unidad-1',
       unitLabel: 'L',
       status: 'POR_EMPACAR',
@@ -205,8 +205,8 @@ describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla de
     const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
 
     expect(row.presentationLines).toEqual([
-      { presentationId: 'presentacion-2', presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
-      { presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null },
+      { presentationId: 'presentacion-2', presentationName: 'Botella 200 ml', packages: 5, packagingName: null, presentationContent: null, presentationUnitLabel: null },
+      { presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ]);
     expect(row.quantity).toBe('10.0000');
     expect(row.unitLabel).toBe('L');
@@ -236,8 +236,8 @@ describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla de
     const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
 
     expect(row.presentationLines).toEqual([
-      { presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 3, packagingName: 'Envase PET 1L' },
-      { presentationId: 'presentacion-2', presentationName: 'Botella 200 ml', packages: 2, packagingName: null },
+      { presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 3, packagingName: 'Envase PET 1L', presentationContent: null, presentationUnitLabel: null },
+      { presentationId: 'presentacion-2', presentationName: 'Botella 200 ml', packages: 2, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ]);
   });
 

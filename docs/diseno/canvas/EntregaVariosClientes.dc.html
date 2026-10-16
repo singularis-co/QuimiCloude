@@ -21,7 +21,7 @@
     <div class="stage for-sheet">
       <span class="stage-cap">Sheet · Entregar pedido · {{ estado }}</span>
       <aside class="sheet wide static" role="dialog" aria-modal="true" aria-labelledby="ev-t">
-        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="ev-t" class="h2">Entregar pedido <span class="mono">2026-0000006</span></h2><p class="sub">Elige el cliente y, por presentación, de qué lotes salen los envases.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="ev-t" class="h2">Limpiador multiusos limón</h2><p class="sub">Pedido <span class="mono">2026-0000006</span></p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
         <div class="sheet-bd">
 
           <sc-if value="{{ adjusted }}" hint-placeholder-val="{{ false }}">
@@ -29,7 +29,7 @@
           </sc-if>
 
           <div class="card" style="padding: 16px; gap: 10px">
-            <span class="h3">Por entregar</span>
+            <div style="display: flex; align-items: center; gap: 12px"><span class="thumb photo" role="img" aria-label="Limpiador multiusos limón" style="width: 48px; height: 48px"></span><span class="h3">Por entregar</span></div>
             <sc-for list="{{ summary }}" as="s" hint-placeholder-count="3">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px">
                 <span class="strong">{{ s.name }}</span>

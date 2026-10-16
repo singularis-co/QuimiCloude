@@ -549,6 +549,7 @@ describe('pedidos: cancelar y borrar desde la fila (R33)', () => {
     unitId: null,
     unitLabel: null,
     customer: null,
+    recipeImageUrl: null,
   };
 
   function montar() {

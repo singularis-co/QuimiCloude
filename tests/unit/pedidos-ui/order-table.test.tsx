@@ -117,6 +117,7 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     unitId: null,
     unitLabel: null,
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }

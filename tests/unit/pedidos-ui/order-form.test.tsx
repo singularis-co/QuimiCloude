@@ -238,6 +238,8 @@ const LINEA_ENVASE = {
   packages: 1,
   packagingProductId: ENVASE.id,
   packagingName: ENVASE.name,
+  presentationContent: null,
+  presentationUnitLabel: null,
 };
 
 /** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta. */
@@ -299,6 +301,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -360,9 +363,10 @@ beforeEach(() => {
     status: 'success',
     data: { items: [ENVASE], page: 1, pageSize: 25, total: 1, totalPages: 1 },
   });
+  // Sin sobrante por defecto: con sobrante, Guardar pregunta antes de enviar.
   quoteAvailabilityMock.mockResolvedValue({
     status: 'success',
-    data: { kind: 'ok', available: '0.1005' },
+    data: { kind: 'ok', available: '0' },
   });
 });
 
@@ -578,7 +582,7 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
     renderFormulario(
       pedido({
         presentationLines: [
-          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2, packagingProductId: null, packagingName: null },
+          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
@@ -684,6 +688,10 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
   });
 
   it('R6: el disponible se pide con la cantidad, la unidad y el reparto vigentes', async () => {
+    quoteAvailabilityMock.mockResolvedValue({
+      status: 'success',
+      data: { kind: 'ok', available: '0.1005' },
+    });
     renderFormulario(pedido());
 
     await waitFor(() =>

@@ -79,7 +79,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationLines: [{ presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null }],
+    presentationLines: [{ presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null, presentationContent: null }],
     unitId: UNIT_ID,
     customerId: null,
     ...overrides,
@@ -325,6 +325,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       recipeId: RECIPE_ID,
       recipeName: 'Acido citrico 50%',
       recipeVersion: null,
+      recipeImageUrl: null,
       quantity: '10.0000',
       priority: 'BAJA',
       status: 'PENDIENTE',
@@ -336,7 +337,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       createdBy: 'admin-0',
       updatedBy: 'admin-0',
       // R26: el reparto, con el nombre de cada presentacion resuelto por el contrato.
-      presentationLines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null }],
+      presentationLines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
       // [Q4]: la unidad y su etiqueta, resueltas por el contrato de `unidades`.
       unitId: UNIT_ID,
       unitLabel: 'L',
@@ -358,8 +359,8 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
     const d = dobles({
       fila: fila({
         presentationLines: [
-          { presentationId: OTRA, packages: 2, packagingProductId: null },
-          { presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null },
+          { presentationId: OTRA, packages: 2, packagingProductId: null, presentationContent: null },
+          { presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null, presentationContent: null },
         ],
       }),
     })
@@ -370,8 +371,8 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
     expect(d.findPresentationRefs.mock.calls[0]?.[0]).toEqual([OTRA, PRESENTATION_ID])
     // `OTRA` no vuelve del doble del catalogo: la linea sigue saliendo, con el nombre a `null`.
     expect(vista.presentationLines).toEqual([
-      { presentationId: OTRA, presentationName: null, packages: 2, packagingProductId: null, packagingName: null },
-      { presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null },
+      { presentationId: OTRA, presentationName: null, packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
+      { presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ])
   })
 
