@@ -24,6 +24,7 @@
 import { errorMessage, ERROR_CODES, type ErrorCode } from '@/lib/modules/errores';
 import {
   ActionNotAllowedError,
+  CompanyLastAdministratorError,
   CredentialLinkInvalidError,
   DuplicateDocumentError,
   DuplicateEmailError,
@@ -199,5 +200,31 @@ describe('lib/modules/identity — errores de dominio', () => {
   // registrar (R28).
   it('sin diagnostico, el campo queda sin definir', () => {
     expect(new UserNotFoundError().diagnostic).toBeUndefined();
+  });
+});
+
+describe('lib/modules/identity — CompanyLastAdministratorError', () => {
+  it('R23: expone el code estable company_last_administrator y deriva de IdentityError', () => {
+    const error = new CompanyLastAdministratorError();
+
+    expect(error.code).toBe('company_last_administrator');
+    expect(error).toBeInstanceOf(IdentityError);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe('CompanyLastAdministratorError');
+  });
+
+  it('R23: es distinto de last_administrator y su mensaje sale del catalogo', () => {
+    const error = new CompanyLastAdministratorError();
+
+    expect(error.code).not.toBe(new LastAdministratorError().code);
+    expect(error.message).toBe(errorMessage('company_last_administrator'));
+    expect(error.message).not.toBe(new LastAdministratorError().message);
+  });
+
+  it('R23: el argumento es el diagnostico y no se muestra', () => {
+    const error = new CompanyLastAdministratorError('diagnostico interno');
+
+    expect(error.diagnostic).toBe('diagnostico interno');
+    expect(error.message).toBe(errorMessage('company_last_administrator'));
   });
 });

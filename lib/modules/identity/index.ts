@@ -432,3 +432,34 @@ export {
   createSetAllCompanyAddons,
   type SetAllCompanyAddonsDeps,
 } from './domain/set-all-company-addons';
+
+// Administradores de cualquier empresa, gestionados desde la plataforma.
+export { CompanyLastAdministratorError } from './domain/errors';
+export {
+  administratorIdSchema,
+  createAdministratorSchema,
+  updateAdministratorSchema,
+  type AdministratorIdInput,
+  type CreateAdministratorInput,
+  type UpdateAdministratorInput,
+} from './domain/administrator-input';
+export type {
+  AdministratorCompany,
+  AdministratorDetail,
+  AdministratorRow,
+} from './domain/administrator-view';
+export { ADMINISTRATOR_QUERYABLE } from './domain/administrator-queryable';
+export { createListAdministrators, type ListAdministratorsDeps } from './domain/list-administrators';
+export { createGetAdministrator, type GetAdministratorDeps } from './domain/get-administrator';
+export {
+  createCreateAdministrator,
+  type CreateAdministratorDeps,
+  type CreateAdministratorResult,
+} from './domain/create-administrator';
+export { createUpdateAdministrator, type UpdateAdministratorDeps } from './domain/update-administrator';
+export { createDeleteAdministrator, type DeleteAdministratorDeps } from './domain/delete-administrator';
+export {
+  createResendAdministratorLink,
+  type ResendAdministratorLinkDeps,
+  type ResendAdministratorLinkResult,
+} from './domain/resend-administrator-link';

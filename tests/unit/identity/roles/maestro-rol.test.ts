@@ -222,6 +222,14 @@ const RUTAS_ABIERTAS_EMPRESAS = new Set([
   'lib/modules/identity/domain/get-company-addons.ts',
   'lib/modules/identity/domain/set-company-addon.ts',
   'lib/modules/identity/domain/set-all-company-addons.ts',
+  // Enmienda QC-165 (design §3.6): los seis casos de uso de Administradores por el Maestro exigen
+  // `empresas.*` en su primera linea. Se abren solo sus rutas exactas.
+  'lib/modules/identity/domain/list-administrators.ts',
+  'lib/modules/identity/domain/get-administrator.ts',
+  'lib/modules/identity/domain/create-administrator.ts',
+  'lib/modules/identity/domain/update-administrator.ts',
+  'lib/modules/identity/domain/delete-administrator.ts',
+  'lib/modules/identity/domain/resend-administrator-link.ts',
 ]);
 
 describe('R17 — ningun archivo de produccion fuera del catalogo (y las rutas abiertas) nombra los permisos de empresas', () => {
