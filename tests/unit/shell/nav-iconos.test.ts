@@ -3,6 +3,7 @@
 
 import {
   Boxes,
+  Building2,
   ClipboardCheck,
   ClipboardList,
   FlaskConical,
@@ -10,6 +11,7 @@ import {
   Package,
   Puzzle,
   Ruler,
+  ShieldUser,
   SquareUser,
   Truck,
   Users,
@@ -42,6 +44,8 @@ const TABLA_DE_ICONOS: ReadonlyArray<readonly [string, NavIconName, LucideIcon]>
   ['nav-presentaciones', 'boxes', Boxes],
   ['nav-unidades', 'ruler', Ruler],
   ['nav-integraciones', 'puzzle', Puzzle],
+  ['nav-empresas', 'building-2', Building2],
+  ['nav-administradores', 'shield-user', ShieldUser],
 ];
 
 const SIN_ICONO = [
@@ -121,6 +125,8 @@ describe('iconos del menú lateral', () => {
       { kind: 'link', label: 'Proveedor IA', href: '/integraciones/proveedor-ia', testId: 'nav-integraciones-proveedor-ia', permission: 'integraciones.modificar', section: undefined },
       { kind: 'link', label: 'Inventarios', href: '/integraciones/inventarios', testId: 'nav-integraciones-inventarios', permission: 'integraciones.modificar', section: undefined },
       { kind: 'link', label: 'WhatsApp', href: '/integraciones/whatsapp', testId: 'nav-integraciones-whatsapp', permission: 'integraciones.modificar', section: undefined },
+      { kind: 'link', label: 'Empresas', href: '/maestro/empresas', testId: 'nav-empresas', permission: 'empresas.consultar', section: 'Plataforma' },
+      { kind: 'link', label: 'Administradores', href: '/maestro/administradores', testId: 'nav-administradores', permission: 'empresas.consultar', section: 'Plataforma' },
     ]);
   });
 });

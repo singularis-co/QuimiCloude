@@ -279,6 +279,8 @@ const RUTAS_ESPERADAS_HOY = [
   '/inventario',
   '/inventario/importar',
   '/inventario/producto-terminado/[id]',
+  '/maestro/administradores',
+  '/maestro/empresas',
   '/pedidos',
   '/produccion/formulas',
   '/produccion/formulas/[id]',
@@ -292,7 +294,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las veintiseis pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las veintiocho pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);

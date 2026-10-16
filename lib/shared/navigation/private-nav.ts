@@ -6,6 +6,8 @@ import {
   FORMULAS_ROUTE,
   INVENTORY_INTEGRATION_ROUTE,
   INVENTORY_ROUTE,
+  MAESTRO_ADMINISTRATORS_ROUTE,
+  MAESTRO_COMPANIES_ROUTE,
   ORDERS_ROUTE,
   PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
@@ -126,6 +128,9 @@ export const AI_PROVIDER_INTEGRATION_LABEL = 'Proveedor IA';
 export const INVENTORY_INTEGRATION_LABEL = 'Inventarios';
 export const WHATSAPP_INTEGRATION_LABEL = 'WhatsApp';
 
+export const COMPANIES_LABEL = 'Empresas';
+export const ADMINISTRATORS_LABEL = 'Administradores';
+
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
 
@@ -141,6 +146,7 @@ export const NAV_SECTION_OPERATION = 'Operación';
 export const NAV_SECTION_PRODUCTION = 'Producción';
 export const NAV_SECTION_DIRECTORY = 'Directorio';
 export const NAV_SECTION_CONFIGURATION = 'Configuración';
+export const NAV_SECTION_PLATFORM = 'Plataforma';
 
 /**
  * Nombre del icono de un item. **Es una cadena y no el componente a proposito.**
@@ -176,7 +182,9 @@ export type NavIconName =
   | 'contact'
   | 'puzzle'
   | 'ruler'
-  | 'square-user';
+  | 'square-user'
+  | 'building-2'
+  | 'shield-user';
 
 export type NavLink = {
   readonly kind: 'link';
@@ -390,6 +398,26 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
         permission: 'integraciones.modificar',
       },
     ],
+  },
+  // Al final a propósito: ningún rol de empresa tiene `empresas.*`, así que su aterrizaje no
+  // cambia, y para el Maestro el primer enlace visible es Empresas.
+  {
+    kind: 'link',
+    href: MAESTRO_COMPANIES_ROUTE,
+    label: COMPANIES_LABEL,
+    testId: 'nav-empresas',
+    permission: 'empresas.consultar',
+    icon: 'building-2',
+    section: NAV_SECTION_PLATFORM,
+  },
+  {
+    kind: 'link',
+    href: MAESTRO_ADMINISTRATORS_ROUTE,
+    label: ADMINISTRATORS_LABEL,
+    testId: 'nav-administradores',
+    permission: 'empresas.consultar',
+    icon: 'shield-user',
+    section: NAV_SECTION_PLATFORM,
   },
 ];
 

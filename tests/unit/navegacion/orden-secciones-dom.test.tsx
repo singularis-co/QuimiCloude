@@ -15,6 +15,7 @@ import {
   NAV_SECTION_CONFIGURATION,
   NAV_SECTION_DIRECTORY,
   NAV_SECTION_OPERATION,
+  NAV_SECTION_PLATFORM,
   NAV_SECTION_PRODUCTION,
   NAV_SECTION_TRACKING,
   PRIVATE_NAV_ITEMS,
@@ -75,7 +76,7 @@ afterEach(() => {
 });
 
 describe('encabezados de seccion del sidebar', () => {
-  it('con todos los permisos se dibujan las cinco secciones en orden', () => {
+  it('R2: con todos los permisos se dibujan las seis secciones en orden, «Plataforma» la ultima', () => {
     renderMenu(TODOS_LOS_PERMISOS);
 
     expect(encabezados()).toEqual([
@@ -84,6 +85,7 @@ describe('encabezados de seccion del sidebar', () => {
       NAV_SECTION_PRODUCTION,
       NAV_SECTION_DIRECTORY,
       NAV_SECTION_CONFIGURATION,
+      NAV_SECTION_PLATFORM,
     ]);
   });
 
