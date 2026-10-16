@@ -10,6 +10,10 @@ export type ProductBatchView = {
   readonly expiryDate: string | null;
   /** Contenido con el que se contaron los envases del lote; `null` si no es de produccion. */
   readonly packageContent: string | null;
+  /** Costo unitario guardado en el lote (`product_batches.unit_cost`), en cadena decimal de
+   *  cuatro decimales; `null` si el lote no tiene costo. Opcional: lo rellenan las lecturas que
+   *  usan `BATCH_VIEW_SELECT` (`findBatchesOfAliveProduct`, `findBatchesOfOrder`). */
+  readonly unitCost?: string | null;
   /** Lo apartado por pedidos vivos en este lote. Opcional: solo lo rellena
    *  `findBatchesOfAliveProduct`; las demas lecturas no la traen. */
   readonly reserved?: string;

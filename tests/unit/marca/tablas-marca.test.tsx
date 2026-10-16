@@ -264,7 +264,7 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   {
     archivo: 'product-columns.tsx',
     construir: async () => buildProductColumns({ rowActions: sinAcciones }),
-    esperadas: ['Existencia', 'Alerta de cantidad', 'Reservado', 'Disponible'],
+    esperadas: ['Existencia', 'Costo', 'Alerta de cantidad', 'Reservado', 'Disponible'],
   },
   {
     archivo: 'finished-stock-columns.tsx',

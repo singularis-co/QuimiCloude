@@ -635,6 +635,7 @@ describe('pantalla de productos — lista', () => {
       'name',
       'presentationName',
       'stock',
+      'averageUnitCost',
       'qtyAlert',
       'reserved',
       'available',

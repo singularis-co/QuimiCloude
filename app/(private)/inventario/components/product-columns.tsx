@@ -241,6 +241,20 @@ function aggregateQuantityCell(
   return quantityCell(value, testId, label);
 }
 
+/** Encabezado de la columna de costo. Constante para que ningun test dependa del literal. */
+export const COST_COLUMN_LABEL = 'Costo';
+
+/**
+ * Celda de un costo unitario: el del producto (promedio ponderado de sus lotes con existencia y
+ * costo) o el del lote. Se pinta igual que el costo unitario de producto terminado
+ * (`finished-product-costs-table.tsx`): `trimDecimal`, sin redondear -un costo de 0.0020 a dos
+ * decimales se leeria «0»- y sin pasar por coma flotante. Sin costo, el marcador de vacio.
+ */
+function unitCostCell(value: string | null | undefined, testId: string): ReactNode {
+  if (value === undefined || value === null) return EMPTY_MARK;
+  return <span data-testid={testId}>{trimDecimal(value)}</span>;
+}
+
 export type ProductColumnsDeps = {
   /**
    * Acciones de la fila (el menu de la fila). Es un **slot**: la declaracion de columnas no
@@ -480,6 +494,18 @@ export function buildProductColumns({
             'batch-stock',
           );
         }
+        return null;
+      },
+    },
+    {
+      id: 'averageUnitCost',
+      label: COST_COLUMN_LABEL,
+      tabular: true,
+      align: 'center',
+      // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
+      cell: (row) => {
+        if (row.kind === 'product') return unitCostCell(row.product.averageUnitCost, 'product-cost');
+        if (row.kind === 'batch') return unitCostCell(row.batch.unitCost, 'product-batch-row-cost');
         return null;
       },
     },

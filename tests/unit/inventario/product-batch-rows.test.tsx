@@ -412,3 +412,99 @@ describe('sin cambio de anchura de la tabla', () => {
     expect(within(celdaNombre).getByTestId('product-batches-toggle')).toBeInTheDocument();
   });
 });
+
+describe('columna «Costo» de la tabla de productos', () => {
+  it('pinta la cabecera «Costo» justo despues de la existencia', () => {
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} />);
+
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveTextContent('Costo');
+    const cabeceras = screen
+      .getAllByRole('columnheader')
+      .map((celda) => celda.getAttribute('data-testid'));
+    expect(cabeceras.indexOf('data-table-head-averageUnitCost')).toBe(
+      cabeceras.indexOf('data-table-head-stock') + 1,
+    );
+  });
+
+  it('la fila del producto pinta su costo promedio sin ceros de relleno ni redondeo', () => {
+    render(
+      <ProductTable
+        products={[
+          producto({ averageUnitCost: '12.5000' }),
+          producto({ id: 'product-2', name: 'Sal', averageUnitCost: '0.0025' }),
+        ]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+      />,
+    );
+
+    const fila1 = screen.getByTestId('data-table-row-product-1');
+    expect(within(fila1).getByTestId('product-cost')).toHaveTextContent(/^12\.5$/);
+    const fila2 = screen.getByTestId('data-table-row-product-2');
+    expect(within(fila2).getByTestId('product-cost')).toHaveTextContent(/^0\.0025$/);
+  });
+
+  it('sin costo (null o ausente), la fila del producto pinta el marcador de vacio', () => {
+    render(
+      <ProductTable
+        products={[producto({ averageUnitCost: null }), producto({ id: 'product-2', name: 'Sal' })]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+      />,
+    );
+
+    for (const id of ['product-1', 'product-2']) {
+      const fila = screen.getByTestId(`data-table-row-${id}`);
+      expect(within(fila).getByTestId('data-table-cell-averageUnitCost')).toHaveTextContent(
+        EMPTY_MARK,
+      );
+      expect(within(fila).queryByTestId('product-cost')).toBeNull();
+    }
+  });
+
+  it('la fila del lote pinta su propio costo unitario, no el promedio del producto', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [lote({ unitCost: '3.1250' })],
+    });
+    const user = setupUser();
+    render(
+      <ProductTable
+        products={[producto({ averageUnitCost: '9.0000' })]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+      />,
+    );
+
+    await user.click(toggle());
+    await screen.findByTestId('product-batch-row');
+
+    const filaLote = screen.getByTestId('data-table-row-product-1--batch-batch-1');
+    expect(within(filaLote).getByTestId('product-batch-row-cost')).toHaveTextContent(/^3\.125$/);
+    const filaProducto = screen.getByTestId('data-table-row-product-1');
+    expect(within(filaProducto).getByTestId('product-cost')).toHaveTextContent(/^9$/);
+  });
+
+  it('sin costo (null o ausente), la fila del lote pinta el marcador de vacio', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [lote({ unitCost: null }), lote({ id: 'batch-2', lot: 'L-002' })],
+    });
+    const user = setupUser();
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} />);
+
+    await user.click(toggle());
+    await screen.findAllByTestId('product-batch-row');
+
+    for (const id of ['batch-1', 'batch-2']) {
+      const filaLote = screen.getByTestId(`data-table-row-product-1--batch-${id}`);
+      expect(within(filaLote).getByTestId('data-table-cell-averageUnitCost')).toHaveTextContent(
+        EMPTY_MARK,
+      );
+      expect(within(filaLote).queryByTestId('product-batch-row-cost')).toBeNull();
+    }
+  });
+});
