@@ -16,10 +16,12 @@ Entra:
 - **Pie** pegado abajo. «Anterior» y «Siguiente» (o «Terminar …») centrados y del mismo ancho.
   Antes de comenzar, solo «Comenzar …». Solo hace scroll el contenido entre cabecera y pie.
 - **Contenido del paso:** insignia con el número, comprobaciones como tarjetas grandes con
-  contador «N de M», cuenta de espera y la tarjeta «Revisa antes de comenzar».
-- **Columna lateral en escritorio:** Materiales/Envases, Herramientas y Equipo, en ese orden.
-  Cada tarjeta es plegable y lleva el color de su sección en la cabecera. Cada material conserva
-  su selector de unidad. El equipo va agrupado, con avatar de iniciales y la marca «Tú».
+  contador «N de M», el hueco de la nota de seguridad y la tarjeta «Revisa antes de comenzar». La
+  cuenta de espera sigue dentro del botón, como hoy (D13).
+- **Columna lateral en escritorio:** las secciones de cada pantalla (D8), en este orden:
+  Materiales/Envases, Herramientas y Equipo. Cada tarjeta es plegable y lleva el color de su
+  sección en la cabecera. Cada material conserva su selector de unidad. El equipo va agrupado, con
+  avatar de iniciales y la marca «Tú».
 - **Tablet y teléfono:** botones flotantes redondos, uno por sección, que abren un panel con X.
   En teléfono el panel ocupa el ancho y los botones se ocultan mientras está abierto.
 
@@ -27,16 +29,26 @@ Lo que NO entra:
 
 - Datos nuevos, permisos o cambios en los flujos de comenzar, terminar, cancelar, evidencia o
   registro de pasos. Nada en `lib/modules/` ni en `db/`.
-- Lo que el tablero pinta y las vistas de hoy no traen (ver `## Preguntas abiertas` P1 a P6). No
-  se inventa: o se omite o espera a una ficha de datos.
+- Lo que el tablero pinta y las vistas de hoy no traen. El humano lo cerró el 2026-10-16 (D4 a
+  D10): se omite, sin ficha de datos.
 
 ## Decisiones cerradas (no reabrir)
 
 | # | Decisión | Fecha y fuente | Cubierta por |
 |---|---|---|---|
-| D1 | El diseño de los tableros `OperarioPantalla*` está aprobado y es la referencia visual. | 2026-10-16, humano (pase `/design`, `progress/features/QC-291.md`) | R1-R31 |
+| D1 | El diseño de los tableros `OperarioPantalla*` está aprobado y es la referencia visual. | 2026-10-16, humano (pase `/design`, `progress/features/QC-291.md`) | R1-R31, R33, R34 |
 | D2 | Es rediseño visual: sin datos, permisos ni cambios de flujo. | 2026-10-16, issue QC-291 | R32 |
 | D3 | Ninguna librería nueva. | 2026-10-16, ficha «Librerías: ninguna nueva» del tablero móvil | R32 |
+| D4 | (P1) Sin hora de inicio. La línea de estado dice solo «Fabricando», «Acondicionando» o «Empacando». | 2026-10-16, humano | R4 |
+| D5 | (P2) Los pasos no tienen nombre. Fuera el nombre del paso de la cabecera, el título grande del paso y la lista de pasos de «Revisa antes de comenzar». La cabecera dice «Paso N de M» y la tarjeta de inicio da el número de pasos. | 2026-10-16, humano | R6, R12, R17 |
+| D6 | (P3) Fuera el bloque «En este paso usas». | 2026-10-16, humano | R12 |
+| D7 | (P4) El hueco de la nota de seguridad se queda en el diseño, sin contenido ni texto de muestra. Solo se pinta si un paso trae nota. Hoy ningún dato lo alimenta, así que no se ve nada, y no entra trabajo de datos. | 2026-10-16, humano | R34 |
+| D8 | (P5) Cada pantalla pinta solo sus secciones y sus botones flotantes: fabricación, Materiales y Herramientas (Herramientas se oculta si no hay); acondicionamiento, Envases y Equipo; empaque, Envases. No hay Equipo en fabricación ni en empaque. | 2026-10-16, humano | R20, R21, R23, R27 |
+| D9 | (P6) Sin rol en el equipo. Cada persona lleva avatar de iniciales, nombre y la marca «Tú». | 2026-10-16, humano | R23, R24 |
+| D10 | (P7) Se queda como hoy: no existen los datos de «Insumos» ni de «Envases y etiquetas». La sección ámbar de acondicionamiento y empaque es «Envases», con el reparto de hoy. R25 se mantiene. | 2026-10-16, humano | R20, R25 |
+| D11 | (P8) Sin presentación en fabricación. Se quita «Presentación: …» (`order-execution-presentation`) de la pantalla y su comprobación de `e2e/envases-del-pedido.spec.ts` («R44: la ejecución nombra los envases»). Enmienda QC-195 R44. | 2026-10-16, humano | R2 |
+| D12 | (P9) Si el actor no puede actuar (pedido a nombre de otra persona, `TERMINADO`/`ENTREGADO`, o `POR_ACONDICIONAR` sin candidatos), el pie no lleva botones: solo una línea con el motivo. Se ajustan `acondicionar-con-equipo.spec.ts:283-286` y `acondicionamiento.spec.ts:463-465`. Enmienda QC-265 R34. | 2026-10-16, humano | R8, R33 |
+| D13 | (P10) La cuenta atrás de la espera se queda en el botón, como en QC-265 R37. Sin cambios ahí. | 2026-10-16, humano | R15 |
 
 ## Requisitos (EARS)
 
@@ -59,17 +71,19 @@ la pantalla está comenzada por el actor y pinta `StepReader` con al menos un pa
     `ORDER_STATUS_TONES`.
 
   No DEBE mostrar chips de envase, lote, entrega ni presentación, ni la línea «Lo acondiciona …».
+  En fabricación, la presentación del pedido («Presentación: …», `order-execution-presentation`)
+  NO DEBE aparecer en ningún punto de la pantalla.
 - **R3.** MIENTRAS la pantalla no esté comenzada por el actor, la cabecera DEBE mostrar el enlace de
   vuelta habilitado, con la etiqueta y el destino que tiene hoy en cada pantalla y estado.
 - **R4.** MIENTRAS la pantalla esté comenzada por el actor, la cabecera NO DEBE contener el enlace
   de vuelta, ni deshabilitado. En su lugar DEBE mostrar una línea con `role="status"` que diga
-  «Fabricando», «Acondicionando» o «Empacando», según la pantalla.
+  exactamente «Fabricando», «Acondicionando» o «Empacando», según la pantalla, sin hora de inicio.
 - **R5.** SI el pedido de acondicionamiento o de empaque está en curso a nombre de otra persona,
   ENTONCES la cabecera DEBE mostrar el enlace de vuelta habilitado y NO DEBE mostrar la línea de
   R4.
 - **R6.** MIENTRAS el paso a paso esté montado, la cabecera DEBE mostrar:
   - una barra con un tramo por paso, con su estado: hecho, actual o pendiente;
-  - el texto «Paso N de M», anunciado con `aria-live="polite"`;
+  - el texto «Paso N de M», sin nombre del paso, anunciado con `aria-live="polite"`;
   - el porcentaje `round(N / M × 100)` seguido de « %».
 
   Los tres DEBEN seguir visibles con el contenido desplazado hasta el final.
@@ -81,7 +95,7 @@ la pantalla está comenzada por el actor y pinta `StepReader` con al menos un pa
 - **R8.** MIENTRAS la pantalla no esté comenzada por el actor y el actor pueda comenzarla, el pie
   DEBE mostrar un único botón, centrado: «Comenzar la fabricación», «Comenzar el
   acondicionamiento» o «Comenzar el empaque». El botón abre el mismo diálogo de confirmación de
-  hoy y queda deshabilitado en los mismos casos que hoy.
+  hoy y queda deshabilitado en los mismos casos que hoy, salvo los de R33, que no pintan botón.
 - **R9.** MIENTRAS el paso a paso esté montado, el pie DEBE mostrar «Anterior» y «Siguiente»,
   centrados y del mismo ancho. En el último paso, en lugar de «Siguiente», DEBE mostrar «Terminar la
   fabricación» o «Terminar el empaque». Encima de los botones va la línea del motivo de bloqueo.
@@ -97,7 +111,8 @@ la pantalla está comenzada por el actor y pinta `StepReader` con al menos un pa
 ### Contenido del paso
 
 - **R12.** MIENTRAS el paso a paso esté montado, el paso actual DEBE abrir con una insignia con su
-  número y el texto «de M».
+  número y el texto «de M». El contenido del paso NO DEBE mostrar un título grande con el nombre
+  del paso ni el bloque «En este paso usas».
 - **R13.** MIENTRAS el paso a paso esté montado, cada elemento de una lista de verificación DEBE
   pintarse como una tarjeta de al menos 60 px de alto.
   - Tocar cualquier punto de la tarjeta marca o desmarca el elemento.
@@ -106,16 +121,15 @@ la pantalla está comenzada por el actor y pinta `StepReader` con al menos un pa
 - **R14.** DONDE el paso actual tenga elementos que marcar, el contenido DEBE mostrar «Comprueba» y
   el contador «X de Y»: X son los elementos marcados del paso actual e Y, todos los suyos. El
   contador se actualiza al marcar y al desmarcar.
-- **R15.** MIENTRAS dure la espera mínima del paso, el contenido DEBE mostrar un bloque con
-  `role="status"`, con un anillo que se vacía y la cuenta `MM:SS`. Ni el anillo ni la cuenta van
-  dentro del botón primario. El botón primario DEBE seguir deshabilitado, con el motivo asociado.
-  CUANDO la espera termina, el bloque DEBE desaparecer.
+- **R15.** MIENTRAS dure la espera mínima del paso, el botón primario del pie DEBE seguir
+  deshabilitado y llevar dentro el anillo y la cuenta, igual que hoy (QC-265 R37), con el motivo
+  asociado. El contenido del paso NO DEBE mostrar un bloque de espera aparte.
 - **R16.** MIENTRAS el paso a paso esté montado, los párrafos del documento del paso DEBEN pintarse
   como texto de entrada: al menos 17 px con contenedor de más de 560 px y al menos 16 px por debajo.
 - **R17.** MIENTRAS la pantalla no esté comenzada por el actor, el contenido principal DEBE mostrar
   la tarjeta «Revisa antes de comenzar» con el texto que explica qué pasa al comenzar en esa
   fase. DONDE la pantalla conozca los pasos antes de comenzar, que hoy es solo fabricación, la
-  tarjeta DEBE decir cuántos pasos tiene la receta.
+  tarjeta DEBE decir cuántos pasos tiene la receta. La tarjeta NO DEBE listar los pasos.
 - **R18.** `StepReader` en `mode="lectura"` y cualquier uso que no pase las props nuevas DEBEN
   comportarse exactamente igual que hoy. Sus tests actuales siguen verdes sin cambios.
 
@@ -123,26 +137,28 @@ la pantalla está comenzada por el actor y pinta `StepReader` con al menos un pa
 
 - **R19.** MIENTRAS el contenedor de la pantalla mida más de 1000 px, la pantalla DEBE pintar dos
   columnas: una lateral de 320 px con las secciones y otra con el paso o el contenido principal.
-- **R20.** Las secciones DEBEN ir en este orden, sin saltarse ninguna presente:
-  1. Materiales en fabricación, o Envases en acondicionamiento y empaque.
-  2. Herramientas.
-  3. Equipo.
+- **R20.** Cada pantalla DEBE pintar solo sus secciones, en este orden:
+  - fabricación: Materiales y Herramientas;
+  - acondicionamiento: Envases y Equipo;
+  - empaque: Envases.
 
-  Cada sección es una tarjeta plegable, abierta al entrar, con su icono, su título y su contador.
+  Ninguna otra sección DEBE aparecer: ni Herramientas en acondicionamiento o empaque, ni Equipo
+  en fabricación o empaque. Cada sección es una tarjeta plegable, abierta al entrar, con su icono, su título y su contador.
   La cabecera de la tarjeta va pintada con el color de su sección (ámbar, azul y verde), en claro
   y en oscuro, y su texto cumple contraste AA.
-- **R21.** SI la pantalla no tiene herramientas, ENTONCES NO DEBE pintarse ni la tarjeta
-  Herramientas ni su botón flotante.
+- **R21.** SI la pantalla de fabricación no tiene herramientas, ENTONCES NO DEBE pintarse ni la
+  tarjeta Herramientas ni su botón flotante.
 - **R22.** Cada material DEBE conservar el selector de unidad de hoy. La unidad elegida DEBE
   mantenerse al plegar la tarjeta, al cerrar y reabrir el panel, y al pasar de la columna al
   panel.
-- **R23.** DONDE la pantalla tenga equipo, que hoy es solo acondicionamiento con equipo no vacío,
-  la sección Equipo DEBE agrupar a las personas así:
+- **R23.** DONDE el pedido de acondicionamiento tenga equipo no vacío, la sección Equipo DEBE
+  agrupar a las personas así:
   - por grupo de trabajo, con su nombre y su número de personas;
   - las personas sueltas bajo «Personas», con su número.
 
   Cada persona lleva un avatar con sus iniciales (`getInitials`, tono de `avatarTone`) y su
-  nombre.
+  nombre. La fila NO DEBE mostrar rol. SI el equipo está vacío, ENTONCES NO DEBE pintarse ni la
+  tarjeta Equipo ni su botón flotante.
 - **R24.** SI una persona del equipo es el actor de la sesión, ENTONCES su fila DEBE llevar la marca
   «Tú». En la fila de cualquier otra persona, la marca NO DEBE aparecer.
 - **R25.** En acondicionamiento y en empaque, la sección Envases DEBE mostrar el reparto del pedido
@@ -156,7 +172,7 @@ la pantalla está comenzada por el actor y pinta `StepReader` con al menos un pa
 
 - **R27.** MIENTRAS el contenedor mida 1000 px o menos, la columna lateral NO DEBE verse. En su
   lugar DEBE aparecer, a la derecha y por encima del pie, una pila de botones redondos flotantes,
-  uno por cada sección presente y en el orden de R20. Cada botón:
+  uno por cada sección que pinta esa pantalla (R20, R21, R23) y en ese orden. Cada botón:
   - mide al menos 56 × 56 px;
   - lleva el color de su sección;
   - muestra el contador de la sección;
@@ -181,57 +197,31 @@ la pantalla está comenzada por el actor y pinta `StepReader` con al menos un pa
   condiciones de habilitación. El diff de la feature NO DEBE tocar `lib/modules/`, `db/` ni
   `package.json`.
 
+### Añadidos en la revisión del 2026-10-16
+
+- **R33.** SI el actor no puede actuar sobre el pedido, ENTONCES el pie NO DEBE mostrar ningún
+  botón, ni deshabilitado, y DEBE mostrar solo una línea con `role="status"` que diga el motivo.
+  Los casos son:
+  - acondicionamiento o empaque en curso a nombre de otra persona;
+  - acondicionamiento en `TERMINADO` o `ENTREGADO`;
+  - acondicionamiento en `POR_ACONDICIONAR` sin candidatos para el equipo.
+- **R34.** DONDE el paso actual traiga una nota de seguridad, el contenido del paso DEBE pintarla
+  debajo de las comprobaciones, con `role="note"` y el icono de aviso del tablero. SI el paso no
+  trae nota, ENTONCES el contenido NO DEBE pintar el bloque, ni vacío ni con texto de muestra.
+  Hoy ninguna pantalla pasa notas: en las tres, el bloque no aparece.
+
 ## Preguntas abiertas
 
-Cada una sale de un dato que el tablero pinta y que las vistas de hoy
-(`AssignedOrderExecutionView`, `ConditioningOrderDetail`, `PackingOrderDetail`,
-`RecipeStepDocument`) no traen. Mientras no se respondan, el spec **omite** ese dato: no lo
-inventa.
+P1 a P10 quedaron cerradas por el humano el 2026-10-16 (D4 a D13).
 
-- **P1. «desde HH:MM».** Ninguna de las tres vistas trae la hora de inicio: no hay `startedAt` en
-  `lib/modules/asignaciones`. R4 pinta la línea sin hora. ¿Se queda así o se abre una ficha de
-  datos que exponga la hora?
-- **P2. Nombre del paso, título grande y texto de entrada.** `RecipeStepDocument` solo trae
-  `blocks` y `requiresEvidence`: un paso no tiene nombre. R6 pinta «Paso N de M» sin «· nombre», y
-  R12 pinta la insignia sin título. Esto afecta también a la lista de pasos de «Revisa antes de
-  comenzar» (R17 solo da el número de pasos). ¿Se omite el nombre o se toma del primer párrafo del
-  documento? Lo segundo sería una regla nueva.
-- **P3. «En este paso usas».** No hay relación entre un paso y los materiales que usa. El spec no
-  pinta el bloque. ¿Va a una ficha de datos?
-- **P4. Nota de seguridad.** El documento del paso no tiene un tipo de bloque «nota». El spec no
-  pinta la nota. ¿Va a una ficha de datos?
-- **P5. Responsables en fabricación y Equipo en empaque.**
-  - `AssignedOrderExecutionView` no trae responsables.
-  - `PackingOrderDetail` solo trae a quien empaca (`packedById` / `packedByName`), no un equipo.
-  - R23 pinta Equipo solo en acondicionamiento.
+- **P11. Texto de la línea de motivo de R33.** Ningún tablero lo pinta. `design.md > 3.7` propone
+  estos textos:
+  - a nombre de otra persona: los de hoy, «Lo acondiciona <nombre>.» y el de
+    `PACKING_ORDER_TEXTS.packer`;
+  - `TERMINADO`: «Este pedido ya está acondicionado.»;
+  - `ENTREGADO`: «Este pedido ya está entregado.»;
+  - `POR_ACONDICIONAR` sin candidatos: «No se pudo cargar el equipo para comenzar.». Hoy los
+    candidatos solo faltan si su carga falla (`page.tsx:72-81`), y el error ya se pinta en
+    `conditioning-order-candidates-error`.
 
-  ¿Se omite en las otras dos pantallas? ¿O empaque muestra a quien empaca como única persona,
-  con la marca «Tú»?
-- **P6. Rol de cada persona.** `ConditioningTeamMemberView` trae `userId`, `displayName` y
-  `origin`, pero no el rol. R23 pinta solo el nombre. ¿Se omite el rol?
-- **P7. Título de la sección ámbar fuera de fabricación.** El tablero dice «Insumos» en
-  acondicionamiento y «Envases y etiquetas» en empaque, con datos que no existen: ni insumos de
-  acondicionamiento ni etiquetas. El spec usa «Envases» con el reparto (R25). ¿Se confirma?
-- **P8. Presentación en fabricación.** Hoy el subtítulo dice «Presentación: …», con el testid
-  `order-execution-presentation`. Lo cubre `e2e/envases-del-pedido.spec.ts` («R44: la ejecución
-  nombra los envases»). R2 lo quita de la cabecera. Hay dos opciones:
-  - quitarlo de la pantalla y borrar esa comprobación del E2E;
-  - moverlo a una sección Envases, como en las otras dos pantallas, entre Materiales y
-    Herramientas.
-
-  **Bloquea T8 y T12.**
-- **P9. Pie sin acción posible.** Hay tres casos en que el actor no puede hacer nada:
-  - acondicionamiento o empaque a nombre de otra persona;
-  - acondicionamiento `TERMINADO` o `ENTREGADO`;
-  - `POR_ACONDICIONAR` sin candidatos.
-
-  Hoy se pintan los dos botones deshabilitados (QC-265 R34; lo comprueban
-  `e2e/acondicionar-con-equipo.spec.ts:283-286` y `e2e/acondicionamiento.spec.ts:463-465`). El
-  tablero no cubre estos casos. Hay dos opciones:
-  - pintar solo «Comenzar …» deshabilitado;
-  - no pintar pie.
-
-  **Bloquea T9, T10 y T12.**
-- **P10. La cuenta atrás sale del botón.** QC-265 R37 la puso dentro del botón primario, con su
-  anillo. El tablero la pinta en el contenido, y R15 la saca del botón. ¿Se confirma que se
-  retira del botón?
+  Si el spec se aprueba sin cambiarlos, valen los propuestos. No bloquea ninguna task.

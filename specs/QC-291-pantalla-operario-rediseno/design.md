@@ -16,8 +16,8 @@ ejecución», «columna lateral», «botón flotante», «equipo de acondicionam
     `StepDocumentView` pasen por el barrel.
 
   Ninguna es esta ficha. QC-291 es la **segunda vuelta** de diseño sobre lo que dejaron QC-265 y
-  QC-269, con tableros nuevos aprobados el 2026-10-16. Lo que cambia de esas dos fichas se dice
-  abajo y en `requirements.md > P10`.
+  QC-269, con tableros nuevos aprobados el 2026-10-16. Lo que cambia de otras fichas está en
+  §1.1 (enmiendas).
 - **Specs:** `specs/QC-265-rediseno-operario/` y `specs/QC-269-layout-operario/`, ya
   implementados. No hay spec que cubra la columna con colores, los botones flotantes ni el scroll
   interno.
@@ -76,18 +76,34 @@ La «Ficha por plataforma» del tablero móvil dice:
 **Ninguno.** No hay tablas, columnas, RLS ni migraciones. Las vistas de dominio no cambian
 (R32).
 
-Lo que el tablero pinta y las vistas no traen se omite. El detalle está en
-`requirements.md > Preguntas abiertas` P1 a P6:
+Lo que el tablero pinta y las vistas no traen lo cerró el humano el 2026-10-16
+(`requirements.md > Decisiones cerradas`, D4 a D13). Los tableros ya están actualizados a esas
+decisiones:
 
 | Dato del tablero | Vista de hoy | Qué hace el spec |
 |---|---|---|
-| «desde HH:MM» | Ninguna vista trae la hora de inicio | Línea sin hora (P1) |
-| Nombre del paso, título y entrada | `RecipeStepDocument` = `blocks` + `requiresEvidence` | «Paso N de M» sin nombre (P2) |
-| «En este paso usas» | No hay relación paso–material | No se pinta (P3) |
-| Nota de seguridad | No hay bloque «nota» | No se pinta (P4) |
-| Responsables en fabricación, equipo en empaque | Ninguno | Equipo solo en acondicionamiento (P5) |
-| Rol de la persona | `ConditioningTeamMemberView` sin rol | Solo el nombre (P6) |
-| Insumos y herramientas de acondicionamiento | `ConditioningOrderDetail` no los trae | Solo Envases y Equipo (P7) |
+| Hora de inicio | Ninguna vista la trae | Fuera del diseño. La línea dice solo «Fabricando», «Acondicionando» o «Empacando» (D4, R4) |
+| Nombre del paso, título grande, lista de pasos al empezar | `RecipeStepDocument` = `blocks` + `requiresEvidence` | Fuera. «Paso N de M» y el número de pasos (D5, R6, R12, R17) |
+| «En este paso usas» | No hay relación paso–material | Fuera (D6, R12) |
+| Nota de seguridad | No hay bloque «nota» | Hueco opcional en `StepReader` que nadie alimenta: no se ve (D7, R34) |
+| Equipo en fabricación y empaque | Ninguno | Equipo solo en acondicionamiento (D8, R20, R23) |
+| Rol de la persona | `ConditioningTeamMemberView` sin rol | Solo avatar, nombre y «Tú» (D9, R23, R24) |
+| Insumos, «Envases y etiquetas», herramientas de acondicionamiento | `ConditioningOrderDetail` no los trae | Envases con el reparto de hoy, y Equipo (D10, R20, R25) |
+| Presentación en fabricación | `order-execution-presentation` en el subtítulo | Fuera de la pantalla (D11, R2) |
+| Cuenta atrás de la espera | Dentro del botón (QC-265 R37) | Se queda en el botón (D13, R15) |
+
+### 1.1 Enmiendas a otras specs
+
+Esta ficha cambia lo que fijaron otras. Al implementarla se añade una nota fechada bajo cada
+requisito, sin reescribirlo (T12):
+
+| Spec y requisito | Qué decía | Qué queda | Decisión |
+|---|---|---|---|
+| `specs/QC-195-envases-del-pedido-como-productos` R44 | La pantalla de empaque **y la de ejecución** nombran los envases de cada línea | Solo la de empaque. La de ejecución (fabricación) ya no muestra la presentación. Se borra la comprobación «R44: la ejecución nombra los envases» de `e2e/envases-del-pedido.spec.ts:624-635`; la de empaque (`:671`) se queda | D11 |
+| `specs/QC-265-rediseno-operario` R23 | Cabecera con «Pedido … · Presentación: <reparto>» | «Cantidad …», sin presentación (R2) | D11 |
+| `specs/QC-265-rediseno-operario` R29, R31 y R34 | El pie pinta siempre los dos botones; los que no aplican, deshabilitados | Un botón según el estado (R8, R10) y, sin acción posible, ningún botón y una línea con el motivo (R33) | D12 |
+
+QC-265 R37, la cuenta dentro del botón, **no** se enmienda (D13).
 
 **La marca «Tú» no es un dato nuevo.** La página de acondicionamiento ya resuelve `actor.id`
 (`app/(private)/asignacion/acondicionamiento/[id]/page.tsx:57`). Hoy solo la usa para calcular
@@ -160,8 +176,11 @@ readonly slots?: {
   /** Destino de la línea de motivo y los botones. */
   readonly actions: HTMLElement | null;
 };
-/** Bloque de espera en el contenido en vez de la cuenta dentro del botón. */
-readonly waitInContent?: boolean;
+/**
+ * Nota de seguridad del paso, por posición (1-based). Hueco del tablero (D7): ninguna pantalla lo
+ * pasa hoy, porque el documento del paso no tiene nota.
+ */
+readonly stepNote?: (position: number) => string | null;
 ```
 
 - **Con `slots`.** El progreso y los botones se pintan con `createPortal` en esos nodos, no en el
@@ -173,20 +192,23 @@ readonly waitInContent?: boolean;
     `step-reader-blocked-reason`. Así siguen valiendo los E2E de `ejecucion-receta`,
     `pasos-de-envasado` y `registro-ejecucion`.
 - **Insignia (R12).** El encabezado del paso, `step-reader-heading`, que conserva el foco y el
-  `scrollIntoView` del cambio de paso, pinta la insignia con el número y «de M». El título, si
-  viene, sigue siendo el `h2` (empaque: «Pasos de envasado»).
+  `scrollIntoView` del cambio de paso, pinta la insignia con el número y «de M». No hay título
+  del paso ni bloque «En este paso usas» (D5, D6). El `title` del lector, si viene, sigue siendo
+  el `h2` de la sección (empaque: «Pasos de envasado»); no es el nombre de un paso.
 - **Porcentaje (R6).** Se calcula en el componente: `Math.round(((index + 1) / total) * 100)`.
 - **Contador (R14).** «Comprueba · X de Y», con X = total − pendientes. Sale de `countPendingItems`,
   que ya existe, y del total de items del paso. Se pinta una vez, antes de la primera lista del
   documento. Para eso `StepDocumentView` recibe `checklistHeader?: ReactNode`.
-- **Espera (R15), con `waitInContent`.**
-  - El anillo y el `CountdownTimer` salen del botón.
-  - En el contenido, debajo del documento, se pinta un bloque con `role="status"` y
-    `data-testid="step-reader-wait"`: `CountdownRing` de 44 px y «Puedes seguir en
-    <CountdownTimer>.».
-  - El motivo `TEXTS.waitReasonEjecucion` pasa a ser visible en la línea de motivo del pie, y
-    sigue en `aria-describedby`.
-  - «Deja reposar» no se usa: la espera es un tiempo mínimo de lectura, no un reposo.
+- **Espera (R15): sin cambios** (D13). El anillo y el `CountdownTimer` siguen dentro del botón
+  primario, como fijó QC-265 R37, y el motivo sigue en `aria-describedby`. Con `slots`, el botón
+  se pinta por portal en el pie con su anillo dentro: cambia dónde está el botón, no lo que
+  lleva. No hay bloque de espera en el contenido.
+- **Nota de seguridad (R34).** Si `stepNote?.(position)` devuelve texto no vacío, debajo del
+  documento se pinta un bloque con `role="note"`, `data-testid="step-reader-note"`, el icono
+  `TriangleAlertIcon` (`aria-hidden`) y el texto, con el estilo `.opx-note` del tablero (fondo
+  `muted`, `rounded-[14px]`). Sin `stepNote`, o con `null` o cadena vacía, no se pinta nada: ni
+  contenedor vacío ni texto de muestra. Ninguna de las tres pantallas pasa `stepNote`; que llegue
+  un dato es trabajo de otra ficha (D7).
 - **`finishLabel`.** Lo pasan las pantallas: «Terminar la fabricación» o «Terminar el empaque».
 - **`StepProgress`.** Se exporta por `components/shared/step-reader/index.ts`. Se actualiza su
   fila en `CATALOGO.md`, con el punto de extensión de las props nuevas.
@@ -230,7 +252,8 @@ export function useOperatorSidePanels(props: OperatorSidePanelsProps): {
 };
 ```
 
-- **Columna** (R19, R20). `aside` con `aria-label` «Materiales, herramientas y equipo». Contiene
+- **Columna** (R19, R20). `aside` con `aria-label` hecho con los títulos de sus secciones
+  («Materiales y herramientas», «Envases y equipo», «Envases»). Contiene
   una `OrderExecutionCollapsibleCard` por sección, con `tone`. La rejilla de la pantalla es
   `@min-[1001px]:grid-cols-[320px_minmax(0,1fr)]`; hoy es `300px` con corte en 1101 px.
 - **Capa** (R27-R31).
@@ -299,7 +322,7 @@ Props opcionales `selectedUnitIds?: ReadonlyMap<number, string>` y
 - Cada miembro, `li` de al menos 44 px, lleva:
   - `Avatar` de 36 px con `tone={avatarTone(userId)}`, `aria-hidden` y `AvatarFallback`
     `getInitials(displayName)`;
-  - el nombre;
+  - el nombre, sin rol (D9);
   - si `userId === actorId`, la marca «Tú» con `data-testid="conditioning-team-list-me"` (R24).
 - **Orden de los grupos:** el de `groupResponsiblesByOrigin`, que pone las personas sueltas
   primero. El tablero las pone al final, pero son datos de muestra. Reordenar aquí sería el
@@ -317,15 +340,18 @@ Props opcionales `selectedUnitIds?: ReadonlyMap<number, string>` y
 | `back` (R3, R5) | sin comenzar | sin `canFinish` | sin `canFinish` |
 | Insignia de estado | **nueva** en fabricación, con `ORDER_STATUS_*` | la de hoy | la de hoy |
 | Chip Cantidad | `order-execution-order-quantity` | `conditioning-order-quantity` | `packing-order-quantity` |
-| Secciones (R20) | Materiales (`lines`), Herramientas (`tools`, si hay) | Envases (`OrderDistributionFull withImages`), Equipo (si `team` no vacío) | Envases (líneas con `EntityImage`, vacío y aviso) |
-| Contenido sin comenzar (R17) | «Revisa antes de comenzar» + «La receta tiene N pasos.» | «Revisa antes de comenzar» | «Revisa antes de comenzar» |
-| Contenido comenzado | `StepReader` con `slots` y `waitInContent` | Notice «Lo acondiciona …» (R26) + «Datos de lote» | `StepReader` si hay pasos; si no, nada más que avisos |
-| Pie | R8 → R9 | R8 → R10 | R8 → R9 o R10 |
+| Secciones y botones flotantes (R20, D8) | Materiales (`lines`) y Herramientas (`tools`, si hay: R21) | Envases (`OrderDistributionFull withImages`) y Equipo (si `team` no vacío: R23) | Solo Envases (líneas con `EntityImage`, vacío y aviso) |
+| Presentación | **No se pinta** (D11) | En Envases | En Envases |
+| Contenido sin comenzar (R17) | «Revisa antes de comenzar» + «N pasos» | «Revisa antes de comenzar» | «Revisa antes de comenzar» |
+| Contenido comenzado | `StepReader` con `slots`, sin `stepNote` | Notice «Lo acondiciona …» (R26) + «Datos de lote» | `StepReader` con `slots` si hay pasos; si no, solo los avisos |
+| Pie | R8 → R9 | R8 → R10, o R33 | R8 → R9 o R10, o R33 |
 
 Notas:
 
-- **«Revisa antes de comenzar»** es una `Card` con borde discontinuo, `h3` y texto. Los textos de
-  cada fase salen del tablero (`SCREENS[*].startBody`):
+- **«Revisa antes de comenzar»** es una `Card` con borde discontinuo, `h3` y texto, sin lista de
+  pasos (D5). En fabricación cierra con «N pasos», como el tablero. Empaque no conoce sus pasos
+  antes de comenzar (`get-packing-order.ts:65-67` los vacía), así que no da el número. Los textos
+  de cada fase salen del tablero (`SCREENS[*].startBody`):
   - fabricación conserva el sentido del Notice de hoy;
   - acondicionamiento: «Al comenzar, el equipo queda registrado y el pedido pasa a «En
     acondicionamiento».»;
@@ -333,12 +359,27 @@ Notas:
 
   Se conserva el testid `order-execution-not-started`.
 - **Acondicionamiento:** `ConditioningActions` pasa a pintar **un** botón según el estado (R8,
-  R10). Mientras P9 no se responda, los estados sin acción quedan como hoy (T10 espera a P9). Los
-  textos `CONDITIONING_ACTIONS_TEXTS` pasan a «Comenzar el acondicionamiento» y «Terminar el
-  acondicionamiento».
+  R10), o ninguno (R33). Recibe una prop nueva `blockedReason?: string | null`: si viene, no pinta
+  botones ni monta diálogos, y pinta solo
+  `<p role="status" data-testid="conditioning-actions-reason">`. La pantalla la calcula:
+  - en curso a nombre de otro: `CONDITIONING_ORDER_SCREEN_TEXTS.conditionedBy(nombre)`;
+  - `TERMINADO`: `CONDITIONING_ACTIONS_TEXTS.finished`;
+  - `ENTREGADO`: `CONDITIONING_ACTIONS_TEXTS.delivered`;
+  - `POR_ACONDICIONAR` sin candidatos: `CONDITIONING_ACTIONS_TEXTS.noCandidates`. Hoy los
+    candidatos solo faltan si su carga falla (`page.tsx:72-81`); el error se sigue pintando en
+    `conditioning-order-candidates-error`.
+
+  Los textos de `CONDITIONING_ACTIONS_TEXTS` pasan a «Comenzar el acondicionamiento» y «Terminar
+  el acondicionamiento», más los tres motivos propuestos en `requirements.md > P11`.
 - **Empaque:** `startCell` y `finishCell` dejan de ir juntos en una rejilla de dos. Se pinta el que
-  aplica, centrado y con `max-w-[360px]`. El caso «a nombre de otro» espera a P9.
-- **Fabricación:** la presentación sale de la cabecera. Dónde queda depende de P8 (T8).
+  aplica, centrado y con `max-w-[360px]`. A nombre de otro (R33), el pie pinta solo
+  `<p role="status" data-testid="packing-order-footer-reason">` con el texto de
+  `PACKING_ORDER_TEXTS.packer` / `packerUnknown`. El `Notice` `packing-order-packer` del
+  contenido se conserva.
+- **Fabricación:** la presentación sale de la pantalla (D11). Se borran el elemento
+  `order-execution-presentation` y su constante, y no se mueve a ninguna sección.
+- **Sin acción posible en fabricación:** el spec no cambia nada. D12 nombra solo casos de
+  acondicionamiento y empaque.
 
 ## 4. Integraciones
 
@@ -369,11 +410,12 @@ una dependencia.
 añaden casos `R<n>` para:
 
 - el marco: R1-R7, por estructura y atributos;
-- `StepReader` con y sin `slots`: R6, R9, R12-R16 y R18;
+- `StepReader` con y sin `slots`: R6, R9, R12-R16, R18 y R34 (con `stepNote` se pinta la nota;
+  sin él, o con `null`, no hay `step-reader-note`);
 - `OperatorSidePanels`: R20, R21, R27-R29;
 - `ConditioningTeamList`: R23, R24;
 - el estado de unidad: R22;
-- las tres pantallas: R2-R5, R8, R10, R17, R25, R26 y R32.
+- las tres pantallas: R2-R5, R8, R10, R17, R20, R23, R25, R26, R32 y R33.
 
 **E2E: sí hace falta.** jsdom no aplica container queries ni calcula scroll, posiciones ni
 `position`. Por eso R1, R6 (visible al final), R11, R19, R27, R30 y R31 solo se verifican en
@@ -384,11 +426,11 @@ y 390 × 844.
 
 | Spec | Qué cambia |
 |---|---|
-| `e2e/operario-rediseno.spec.ts` | R2/R3: el pie ya no es `fixed` y el scroll no es el de `window`. R4: la primera pista es `320px` con corte en 1001 px, y en acondicionamiento el ancla ya no son dos `card` lado a lado. R37: el anillo sale del botón (P10). QC-269 R4/R6/R5: a 390 px el panel de materiales es un botón flotante, y `expectWholeAboveFooter` mide sobre la zona con scroll. `executionMaterialsTrigger` como control de 44 px en teléfono pasa a ser el botón flotante. «Terminar» del R41 cambia de texto. |
+| `e2e/operario-rediseno.spec.ts` | R2/R3: el pie ya no es `fixed` y el scroll no es el de `window`. R4: la primera pista es `320px` con corte en 1001 px, y en acondicionamiento el ancla ya no son dos `card` lado a lado. R37 se queda: el anillo sigue en el botón (D13), solo cambia que el botón está en el pie por portal. QC-269 R4/R6/R5: a 390 px el panel de materiales es un botón flotante, y `expectWholeAboveFooter` mide sobre la zona con scroll. `executionMaterialsTrigger` como control de 44 px en teléfono pasa a ser el botón flotante. «Terminar» del R41 cambia de texto. |
 | `e2e/recetas-porcentaje.spec.ts:574` | «Pedido 200» pasa a «Cantidad 200». |
-| `e2e/envases-del-pedido.spec.ts:626` | `order-execution-presentation` según P8. |
-| `e2e/acondicionar-con-equipo.spec.ts` | `:283-286`: dos botones deshabilitados según P9, y nombres «Terminar»/«Acondicionar». `:477`: texto exacto del botón de terminar. |
-| `e2e/acondicionamiento.spec.ts:463-465` | Textos exactos «Acondicionar» y «Terminar», y P9. |
+| `e2e/envases-del-pedido.spec.ts:624-635` | Se borra la comprobación «R44: la ejecución nombra los envases» (D11, enmienda de QC-195 R44). La de empaque, `:671`, se queda. |
+| `e2e/acondicionar-con-equipo.spec.ts` | `:283-286`: en vez de dos botones deshabilitados, ningún botón y la línea `conditioning-actions-reason` (D12). `:477`: texto exacto «Terminar el acondicionamiento». |
+| `e2e/acondicionamiento.spec.ts:463-465` | Ningún botón y la línea de motivo (D12); donde haya botón, textos «Comenzar el acondicionamiento» y «Terminar el acondicionamiento». |
 | `e2e/pasos-de-envasado.spec.ts:624` | «Terminar» pasa a «Terminar el empaque». |
 
 Se revisan sin cambio previsto, porque usan testids que se conservan y el ancho por defecto pinta
