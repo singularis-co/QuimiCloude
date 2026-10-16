@@ -1,5 +1,6 @@
 import type {
   DeliveredTotal,
+  DeliveryCustomerDirectory,
   FinishedDeliveryDirectory,
   FinishedDeliveryLineRecord,
   Page,
@@ -41,7 +42,7 @@ export async function listDeliveryLinesByBatchIds(
         batchId: true,
         packages: true,
         quantity: true,
-        delivery: { select: { orderId: true, createdAt: true } },
+        delivery: { select: { orderId: true, note: true, createdAt: true } },
         voidLine: { select: { void: { select: { reason: true } } } },
       },
     }),
@@ -52,7 +53,7 @@ export async function listDeliveryLinesByBatchIds(
     id: row.id,
     orderDeliveryId: row.deliveryId,
     orderId: row.delivery.orderId,
-    note: null,
+    note: row.delivery.note,
     createdAt: row.delivery.createdAt.toISOString(),
     customerId: row.customerId,
     batchId: row.batchId,
@@ -79,4 +80,76 @@ export async function summarizeDeliveredByBatchIds(
     quantity: sum.quantity === null ? NOTHING_DELIVERED.quantity : sum.quantity.toFixed(4),
     packages: sum.packages ?? 0,
   };
+}
+
+type MovementRef = Parameters<DeliveryCustomerDirectory['findCustomerIds']>[1][number];
+
+function refKey(referenceId: string, batchId: string): string {
+  return `${referenceId}:${batchId}`;
+}
+
+/**
+ * Implementa `DeliveryCustomerDirectory` de `inventario`: los clientes de cada asiento de entrega o
+ * de anulacion, por la pareja (entrega o anulacion, lote). Una consulta por tipo de referencia.
+ */
+export async function findCustomerIdsForMovements(
+  companyId: string,
+  refs: readonly MovementRef[],
+): Promise<ReadonlyMap<string, readonly string[]>> {
+  const result = new Map<string, readonly string[]>();
+  const deliveryRefs = refs.flatMap((ref) =>
+    ref.deliveryId === null ? [] : [{ deliveryId: ref.deliveryId, batchId: ref.batchId }],
+  );
+  const voidRefs = refs.flatMap((ref) => (ref.voidId === null ? [] : [{ voidId: ref.voidId, batchId: ref.batchId }]));
+  if (deliveryRefs.length === 0 && voidRefs.length === 0) return result;
+
+  const columns = companyScopeColumns({ companyId });
+  const [deliveryLines, voidLines] = await Promise.all([
+    deliveryRefs.length === 0
+      ? []
+      : prisma.orderDeliveryLine.findMany({
+          where: {
+            AND: [
+              columns,
+              { OR: deliveryRefs.map((ref) => ({ deliveryId: ref.deliveryId, batchId: ref.batchId })) },
+            ],
+          },
+          select: { deliveryId: true, batchId: true, customerId: true },
+        }),
+    voidRefs.length === 0
+      ? []
+      : prisma.orderDeliveryVoidLine.findMany({
+          where: {
+            AND: [
+              columns,
+              {
+                OR: voidRefs.map((ref) => ({
+                  voidId: ref.voidId,
+                  deliveryLine: { AND: [columns, { batchId: ref.batchId }] },
+                })),
+              },
+            ],
+          },
+          select: { voidId: true, deliveryLine: { select: { batchId: true, customerId: true } } },
+        }),
+  ]);
+
+  const customersByRef = new Map<string, Set<string>>();
+  const collect = (key: string, customerId: string): void => {
+    const current = customersByRef.get(key);
+    if (current === undefined) customersByRef.set(key, new Set([customerId]));
+    else current.add(customerId);
+  };
+  for (const line of deliveryLines) collect(refKey(line.deliveryId, line.batchId), line.customerId);
+  for (const line of voidLines) {
+    collect(refKey(line.voidId, line.deliveryLine.batchId), line.deliveryLine.customerId);
+  }
+
+  for (const ref of refs) {
+    const referenceId = ref.deliveryId ?? ref.voidId;
+    if (referenceId === null) continue;
+    const customers = customersByRef.get(refKey(referenceId, ref.batchId));
+    if (customers !== undefined) result.set(ref.movementId, [...customers].sort());
+  }
+  return result;
 }

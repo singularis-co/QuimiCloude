@@ -120,7 +120,7 @@ Cubre: R9 (parte de `inventario`), R32, R34, R37, R50 (parte de `inventario`).
 
 ---
 
-## [ ] B3 [P] — `pedidos`: adaptadores driven (depende de B1)
+## [x] B3 [P] — `pedidos`: adaptadores driven (depende de B1)
 
 - `lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma.ts` (nuevo):
   `findByKey`, `create`, `addLines` y `listWaitingLines` (§5).

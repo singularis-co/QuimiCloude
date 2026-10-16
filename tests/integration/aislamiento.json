@@ -87,7 +87,8 @@
     "unidades/mass-volume-bridge.int.test.ts",
     "unidades/unidades-constraints.int.test.ts",
     "inventario/product-batch-production-date-migration.int.test.ts",
-    "pedidos/direct-delivery-constraints.int.test.ts"
+    "pedidos/direct-delivery-constraints.int.test.ts",
+    "pedidos/direct-delivery-repository.int.test.ts"
   ],
   "commit": [
     {

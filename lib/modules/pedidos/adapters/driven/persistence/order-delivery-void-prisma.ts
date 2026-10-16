@@ -45,9 +45,9 @@ async function findDeliveryForVoid(
 ): Promise<DeliveryForVoid | null> {
   const row = await tx.orderDelivery.findFirst({
     where: { ...companyScopeColumns(scope), id: deliveryId },
-    select: { id: true, orderId: true, createdAt: true },
+    select: { id: true, orderId: true, productId: true, createdAt: true },
   });
-  return row === null ? null : { ...row, productId: null };
+  return row;
 }
 
 async function findDeliveryLinesForVoid(

@@ -317,3 +317,65 @@ comando desde el `.env` del repo principal (el sembrado de la plantilla nueva pi
 
 Veredicto: B1 hecha; las dos migraciones aplican y revierten limpias, R40–R42 tienen test en verde y el
 gate de la tanda está verde salvo dos rojos heredados de T0.
+
+## B3 — `pedidos`: adaptadores driven (2026-10-16)
+
+Grafo: sin proyecto para este worktree; Grep/Read. Composición sin tocar (la ata B5).
+
+### Archivos
+Nuevos:
+- `lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma.ts`:
+  `createDirectDeliveryRepository` (`findByKey`, `create` con P2002 → `duplicate_key`, `addLines` con
+  `createMany` y línea del reparto nula) y `createWaitingOrdersReader` (`listWaitingLines`: un
+  `orderPresentationLine.findMany` con todos los pares en un `OR`, pedido `TERMINADO` sin borrar de la
+  empresa; lo entregado con un `groupBy` de líneas sin anular; `numberText` con `formatOrderNumber`,
+  envases con `effectivePackages`). Sin pares, no consulta.
+- `tests/integration/pedidos/direct-delivery-repository.int.test.ts` (`transaccion`, en `aislamiento.json`).
+
+Modificados:
+- `order-delivery-void-prisma.ts`: `findDelivery` selecciona `productId` (ya traía `createdAt`).
+  `findDeliveryLines` y `findByKey` ya admitían los nulos por el tipo de B1; lo prueban los casos nuevos.
+- `order-delivery-directory-prisma.ts`: `listDeliveryLines` trae `delivery.note`; nueva
+  `findCustomerIdsForMovements` (un `findMany` de líneas por `(entrega, lote)` y otro de líneas de
+  anulación por `(anulación, lote)`, ids ordenados y sin repetir; sin referencias, no consulta).
+- `order-delivery-prisma.ts`: sin cambio; `findByKey` ya devuelve `orderId` nulo (probado).
+- Tests con nota fechada 2026-10-16 y aserciones previas intactas:
+  `order-delivery-void-repository.int.test.ts` (el rojo heredado de T0: `findDelivery` con `productId`
+  y `createdAt`; + 4 casos sin pedido), `order-delivery-directory.int.test.ts` (`note: null` en los dos
+  `toEqual` previos, que también estaban rojos desde T0; + 2 entregas sin pedido en lotes propios y 8
+  casos), `tests/unit/pedidos/module-contract.test.ts` (censo cerrado de `@prisma/client` y del cliente
+  compartido: + `direct-delivery-prisma.ts`), `tests/integration/aislamiento.json` (+1).
+- `specs/QC-288-entrega-sin-pedido/tasks.md`: B3 `[x]`.
+
+### R → test
+- R9 (parte `pedidos`) → `direct-delivery-repository.int.test.ts` (`R9: solo cuentan los pedidos vivos …`
+  con otra receta, otra presentación, EN_ACONDICIONAMIENTO, ENTREGADO, borrado, empresa B y una línea
+  anulada; `R9: varios pares en una sola consulta`; `R9: con el ambito de B …`; `R9: sin pares …`).
+- R38 (base) → `direct-delivery-repository.int.test.ts` (5 casos `R38`: duplicada, clave de una entrega de
+  pedido, única por empresa, `findByKey` de los dos tipos, `findByKey` de pedido con `orderId` nulo).
+- R47, R48, R51 (adaptador) → `order-delivery-void-repository.int.test.ts` (bloque «con entregas sin pedido»).
+- R52 → `order-delivery-directory.int.test.ts` (`R52: … mezcladas …`, `R52: pagina sobre la mezcla`,
+  `R52, R53: con el ambito de B …`).
+- R53 → `order-delivery-directory.int.test.ts` (`R53: el total entregado suma …`).
+- R54 → `order-delivery-directory.int.test.ts` (`findCustomerIdsForMovements`: 4 casos `R54`, incluida una
+  consulta por tipo de referencia y empresa B).
+
+### Gate (salida real)
+Entorno: `DATABASE_URL`, `DIRECT_URL` y `SEED_*` exportadas solo en el comando desde el `.env` del repo
+principal.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 9 problems (0 errors, 9 warnings)`, los 9 previos y ajenos.
+- `pnpm exec vitest run guard`: `Test Files 1 failed | 79 passed (80)`, `Tests 1 failed | 1097 passed | 20 skipped`.
+  El rojo es `guard-formularios-y-acciones` R28, de los archivos de F4 sin commit (conocido, no de B3).
+- Integración: las 3 suites de B3 + `order-delivery-repository`, `order-delivery`, `order-delivery-void` y
+  `direct-delivery-constraints`: `Test Files 7 passed (7)`, `Tests 111 passed (111)`.
+- `tests/unit/pedidos/module-contract.test.ts` + `order-delivery-append-only.test.ts` (los dos barridos que
+  leen estos adaptadores): `module-contract` en verde salvo «las Server Actions viven en UN SOLO archivo
+  driving», que señala `app/(private)/inventario/components/direct-delivery-draft.ts` (F2); y
+  `order-delivery-append-only` R32/R33 rojos por `voidDirectDeliveryAction` y `createVoidDirectDelivery`
+  (nombres de T0). Ninguno nombra un archivo de B3 y ninguno está en `tests/baseline-rojos.json`.
+- `vitest related` no se corrió: los adaptadores cuelgan de `lib/composition`, cuyo conjunto es casi la
+  suite entera (B1 lo cortó a los 15 min) y el disco C: está al 98 %. Se corrieron las suites nombradas.
+
+Veredicto: B3 hecha; adaptadores de la entrega sin pedido con R9, R38 (base) y R52–R54 en verde; quedan tres
+rojos ajenos (F2, T0 y F4) señalados arriba.
