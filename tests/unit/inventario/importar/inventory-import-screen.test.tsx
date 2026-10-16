@@ -5,7 +5,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ALREADY_IMPORTED_TESTID,
+  CONFIRMING_LABEL,
   CONFIRM_BUTTON_TESTID,
+  EXAMPLE_ROW_NOTICE_TESTID,
+  IGNORED_COLUMNS_SUMMARY_TESTID,
+  IMPORT_FILE_NAME_TESTID,
+  IMPORT_STEPS_TESTID,
+  MISSING_SECTION_TESTID,
+  PREVIEW_ACTIONS_TESTID,
+  PREVIEW_CARD_TESTID,
+  RESULT_CARD_TESTID,
+  RESULT_TABLE_TESTID,
+  ROW_DETAIL_TESTID,
+  ROW_IGNORED_COLUMNS_TESTID,
+  TEMPLATE_BUTTON_TESTID,
+  importStepTestId,
   DIALOG_SUBMIT_TESTID,
   ERROR_FILE_BUTTON_TESTID,
   InventoryImportScreen,
@@ -40,6 +54,7 @@ import {
   buildInventoryImportErrorFile,
   type ImportDownload,
   type ImportNothingImported,
+  type InventoryImportPreview,
 } from '@/lib/modules/inventario';
 import type {
   ConfirmInventoryImportResult,
@@ -242,7 +257,7 @@ describe('confirmación', () => {
     const formData = enviado(confirmMock, 0);
     expect(formData.get('file')).toBe(ARCHIVO);
     expect(String(formData.get('importKey'))).toMatch(UUID);
-    const estados = within(resultadoPintado)
+    const estados = within(within(resultadoPintado).getByRole('table'))
       .getAllByTestId(ROW_STATUS_TESTID)
       .map((estado) => estado.getAttribute('data-status'));
     expect(estados).toEqual(FILAS_RESULTADO.map((fila) => fila.status));
@@ -323,13 +338,14 @@ describe('confirmación', () => {
       nothingImportedMessage('inventario.csv'),
     );
     expect(screen.queryByTestId(RESULT_TESTID)).toBeNull();
-    expect(screen.queryByText(RESULT_TITLE)).toBeNull();
+    expect(within(nada).queryByText(RESULT_TITLE)).toBeNull();
     expect(screen.queryByTestId(CONFIRM_BUTTON_TESTID)).toBeNull();
-    const estados = within(nada)
+    const tabla = within(nada).getByRole('table');
+    const estados = within(tabla)
       .getAllByTestId(ROW_STATUS_TESTID)
       .map((estado) => estado.getAttribute('data-status'));
     expect(estados).toEqual(['duplicate', 'error', 'error']);
-    const motivos = within(nada)
+    const motivos = within(tabla)
       .getAllByTestId(ROW_ISSUE_TESTID)
       .map((motivo) => motivo.textContent);
     expect(motivos).toEqual(
@@ -459,6 +475,214 @@ describe('avisos flotantes', () => {
 
     await screen.findByTestId(ALREADY_IMPORTED_TESTID);
     expect(toast.info).toHaveBeenCalledWith(alreadyImportedMessage(importedAt));
+  });
+});
+
+function pasoVigente(): string | null {
+  const vigentes = within(screen.getByTestId(IMPORT_STEPS_TESTID))
+    .getAllByRole('listitem')
+    .filter((paso) => paso.getAttribute('aria-current') === 'step');
+  expect(vigentes).toHaveLength(1);
+  return vigentes[0]?.getAttribute('data-testid') ?? null;
+}
+
+/** `true` si `antes` aparece en el documento antes que `despues`. */
+function vaAntes(antes: HTMLElement, despues: HTMLElement): boolean {
+  return (antes.compareDocumentPosition(despues) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
+function conIgnoradas(): InventoryImportPreview {
+  const base = vistaPrevia({ exampleRowIgnored: true });
+  const [primera, ...resto] = base.rows;
+  if (primera === undefined) throw new Error('fixture vacío');
+  return { ...base, rows: [{ ...primera, ignoredColumns: ['formula'] }, ...resto] };
+}
+
+describe('barra de pasos', () => {
+  it('R31 R32 el paso vigente va del 1 al 2 y al 3, e «Importar otro archivo» lo devuelve al 1', async () => {
+    const user = setupUser();
+    render(<InventoryImportScreen units={[]} />);
+    expect(pasoVigente()).toBe(importStepTestId(1));
+
+    await user.upload(screen.getByTestId(UPLOAD_INPUT_TESTID), ARCHIVO);
+    expect(pasoVigente()).toBe(importStepTestId(1));
+    await user.click(screen.getByTestId(REVIEW_BUTTON_TESTID));
+    await screen.findByTestId(PREVIEW_TABLE_TESTID);
+    expect(pasoVigente()).toBe(importStepTestId(2));
+
+    await user.click(screen.getByTestId(CONFIRM_BUTTON_TESTID));
+    await screen.findByTestId(RESULT_TESTID);
+    expect(pasoVigente()).toBe(importStepTestId(3));
+
+    await user.click(screen.getByTestId(RESTART_TESTID));
+    expect(pasoVigente()).toBe(importStepTestId(1));
+    expect(screen.getByTestId(UPLOAD_INPUT_TESTID)).toBeInTheDocument();
+  });
+
+  it('R32 con el archivo rechazado sigue en el paso 1', async () => {
+    previewMock.mockResolvedValue({
+      status: 'success',
+      data: { kind: 'file_rejected', rejection: { code: 'unreadable' } },
+    });
+
+    await subirYRevisar();
+
+    await screen.findByTestId(REJECTION_TESTID);
+    expect(pasoVigente()).toBe(importStepTestId(1));
+  });
+
+  it('R32 con un error del servidor al revisar sigue en el paso 1', async () => {
+    previewMock.mockResolvedValue({ status: 'error', code: 'unauthorized', message: 'Sin permiso.' });
+
+    await subirYRevisar();
+
+    await screen.findByTestId(SCREEN_ERROR_TESTID);
+    expect(pasoVigente()).toBe(importStepTestId(1));
+  });
+
+  it('R32 sin nada importado el vigente es el 3', async () => {
+    confirmMock.mockResolvedValue({ status: 'success', data: nadaImportado() });
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    await screen.findByTestId(NOTHING_IMPORTED_TESTID);
+    expect(pasoVigente()).toBe(importStepTestId(3));
+  });
+
+  it('R32 con la importación ya hecha el vigente es el 3', async () => {
+    confirmMock.mockResolvedValue({
+      status: 'success',
+      data: {
+        kind: 'already_imported',
+        importId: '44444444-4444-4444-8444-444444444444',
+        importedAt: '2026-10-06T12:00:00.000Z',
+      },
+    });
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    await screen.findByTestId(ALREADY_IMPORTED_TESTID);
+    expect(pasoVigente()).toBe(importStepTestId(3));
+  });
+});
+
+describe('composición de los pasos', () => {
+  it('R29 el paso 1 no ofrece la plantilla: vive en la cabecera de la página', () => {
+    render(<InventoryImportScreen units={[]} />);
+
+    expect(screen.queryByTestId(TEMPLATE_BUTTON_TESTID)).toBeNull();
+  });
+
+  it('R35 R40 R50 el paso 2 pinta cifras, avisos, faltantes, tabla y botones, en ese orden', async () => {
+    previewMock.mockResolvedValue({ status: 'success', data: conIgnoradas() });
+
+    await subirYRevisar();
+
+    const orden = [
+      await screen.findByTestId(PREVIEW_CARD_TESTID),
+      screen.getByTestId(EXAMPLE_ROW_NOTICE_TESTID),
+      screen.getByTestId(IGNORED_COLUMNS_SUMMARY_TESTID),
+      screen.getByTestId(MISSING_SECTION_TESTID),
+      screen.getByTestId(PREVIEW_TABLE_TESTID),
+      screen.getByTestId(PREVIEW_ACTIONS_TESTID),
+    ];
+    for (let indice = 1; indice < orden.length; indice += 1) {
+      expect(vaAntes(orden[indice - 1]!, orden[indice]!)).toBe(true);
+    }
+    const botones = within(screen.getByTestId(PREVIEW_ACTIONS_TESTID));
+    expect(botones.getByTestId(CONFIRM_BUTTON_TESTID)).toBeInTheDocument();
+    expect(botones.getByTestId(ERROR_FILE_BUTTON_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(UPLOAD_INPUT_TESTID)).toBeNull();
+  });
+
+  it('R50 el aviso de columnas ignoradas de una fila sigue en su detalle, en la tabla y en la tarjeta', async () => {
+    const preview = conIgnoradas();
+    previewMock.mockResolvedValue({ status: 'success', data: preview });
+    const numero = preview.rows[0]?.rowNumber;
+
+    await subirYRevisar();
+
+    await screen.findByTestId(PREVIEW_TABLE_TESTID);
+    const enFila = within(screen.getByTestId(`data-table-row-${numero}`)).getByTestId(ROW_IGNORED_COLUMNS_TESTID);
+    const enTarjeta = within(screen.getByTestId(`data-table-card-${numero}`)).getByTestId(ROW_IGNORED_COLUMNS_TESTID);
+    expect(enFila.closest(`[data-testid="${ROW_DETAIL_TESTID}"]`)).not.toBeNull();
+    expect(enTarjeta.closest(`[data-testid="${ROW_DETAIL_TESTID}"]`)).not.toBeNull();
+  });
+
+  it('R40 mientras importa, el botón pinta el icono de carga e «Importando…»', async () => {
+    let responder: (value: ConfirmInventoryImportResult) => void = () => undefined;
+    confirmMock.mockReturnValue(new Promise((resolve) => (responder = resolve)));
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    const boton = screen.getByTestId(CONFIRM_BUTTON_TESTID);
+    await waitFor(() => expect(boton).toHaveAttribute('aria-busy', 'true'));
+    expect(boton).toHaveTextContent(CONFIRMING_LABEL);
+    expect(boton.querySelector('svg')).not.toBeNull();
+    responder({ status: 'success', data: resultado() });
+    await screen.findByTestId(RESULT_TESTID);
+  });
+
+  it('R41 el paso 3 pinta la tarjeta del resultado con el archivo y debajo la tabla', async () => {
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    const resultadoPintado = await screen.findByTestId(RESULT_TESTID);
+    const tarjeta = within(resultadoPintado).getByTestId(RESULT_CARD_TESTID);
+    expect(within(tarjeta).getByRole('heading', { level: 2 })).toHaveTextContent(RESULT_TITLE);
+    expect(within(tarjeta).getByTestId(IMPORT_FILE_NAME_TESTID)).toHaveTextContent('inventario.csv');
+    expect(within(tarjeta).getByTestId(ERROR_FILE_BUTTON_TESTID)).toBeInTheDocument();
+    expect(within(tarjeta).getByTestId(RESTART_TESTID)).toBeInTheDocument();
+    expect(vaAntes(tarjeta, within(resultadoPintado).getByTestId(RESULT_TABLE_TESTID))).toBe(true);
+  });
+
+  it('R41 «Importar otro archivo» es la acción principal del paso 3', async () => {
+    const user = await subirYRevisar();
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    const reiniciar = await screen.findByTestId(RESTART_TESTID);
+    expect(reiniciar.className).toContain('bg-primary');
+  });
+
+  it('R50 el paso 3 conserva el aviso de fila de ejemplo ignorada', async () => {
+    confirmMock.mockResolvedValue({ status: 'success', data: resultado({ exampleRowIgnored: true }) });
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    const tarjeta = await screen.findByTestId(RESULT_CARD_TESTID);
+    expect(within(tarjeta).getByTestId(EXAMPLE_ROW_NOTICE_TESTID)).toBeInTheDocument();
+  });
+
+  it('R41 la importación ya hecha se pinta en el paso 3 con su texto y su reinicio', async () => {
+    const importedAt = '2026-10-06T12:00:00.000Z';
+    confirmMock.mockResolvedValue({
+      status: 'success',
+      data: { kind: 'already_imported', importId: '44444444-4444-4444-8444-444444444444', importedAt },
+    });
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    const hecha = await screen.findByTestId(ALREADY_IMPORTED_TESTID);
+    expect(within(hecha).getByRole('status')).toHaveTextContent(alreadyImportedMessage(importedAt));
+    expect(within(hecha).getByTestId(RESTART_TESTID)).toBeInTheDocument();
+  });
+
+  it('R51 al llegar al paso 3 se avisa una sola vez y el resumen queda en pantalla', async () => {
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    const tarjeta = await screen.findByTestId(RESULT_CARD_TESTID);
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(within(tarjeta).getByTestId(RESTART_TESTID)).toBeInTheDocument();
   });
 });
 

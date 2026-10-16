@@ -69,10 +69,10 @@ solo su parte y el commit cita la fila de `design.md > 6`.
 
 ## Tanda 2 — `/inventario`: cabecera, pestañas, columnas (depende de T0b) [P con la 5]
 
-- [ ] **T2a [P]. Cabecera** (D1, R1, R2). `page.tsx` con `PageShell` + `PageHeader`. Test en
+- [x] **T2a [P]. Cabecera** (D1, R1, R2). `page.tsx` con `PageShell` + `PageHeader`. Test en
   `product-page.test.tsx`: un único `h1` «Inventario» con `inventario-title`; «Importar» (con permiso)
   antes de «Nuevo producto»; sin permiso de importar, solo «Nuevo producto».
-- [ ] **T2b [P]. Pestañas** (D2, R3–R5). `productTypeTabHref` en `product-list-params.ts`;
+- [x] **T2b [P]. Pestañas** (D2, R3–R5). `productTypeTabHref` en `product-list-params.ts`;
   `ProductTypeTabs` sobre `UrlTabs`. Test `tests/unit/inventario/product-type-tabs.test.tsx`: cinco
   pestañas en orden, cada una enlace con el `href` que hoy daba `handleChange` (página 1, tipo puesto
   o quitado, búsqueda y orden intactos), la vigente `aria-selected`, lista «Filtrar por tipo de
@@ -90,7 +90,7 @@ solo su parte y el commit cita la fila de `design.md > 6`.
   lote alinea sus cifras como su columna y que «Tipo» (solo en «Todos»), «Presentación» y «Costo» se
   conservan con sus testids. *Hecho:* snapshot de `inventario-paridad` actualizado con la fila de
   `design.md > 6`, sobre el que dejó `dev`.
-- [ ] **T2d [P]. «Por vencer» en ámbar** *(enmienda; E4, R48; decisión P19: ámbar)*. `EXPIRING_CLASS` en
+- [x] **T2d [P]. «Por vencer» en ámbar** *(enmienda; E4, R48; decisión P19: ámbar)*. `EXPIRING_CLASS` en
   `expiry-date.tsx` con `text-warning-text`. Tests en `product-batch-rows.test.tsx` y
   `product-batches-panel.test.tsx`: lote a menos de 30 días y lote vencido con `data-expiring="true"`,
   clase `text-warning-text` y sin `text-destructive` en la fecha y en el nombre del producto; el
@@ -157,17 +157,17 @@ solo su parte y el commit cita la fila de `design.md > 6`.
 
 ## Tanda 5 — `/inventario/importar` (depende de T0b) [P con la 2]
 
-- [ ] **T5a [P]. Cabecera** (D13, R29, R30). `importar/page.tsx` con `ArrowLink`, `PageHeader` y la
+- [x] **T5a [P]. Cabecera** (D13, R29, R30). `importar/page.tsx` con `ArrowLink`, `PageHeader` y la
   plantilla en las acciones. Test `importar-page.test.tsx`: «Volver a inventario» con flecha y su
   testid lleva a `/inventario`; único `h1`; plantilla dentro de `page-header-actions`. *Enmienda
   (E8, R49):* `ImportGuide` sigue montada debajo de la pantalla con sus valores (y sin ellos si la
   lectura falla); `requirePageAddon` sigue en la segunda línea (`importar-route-contract.test.ts`);
   `import-guide.test.tsx` en verde sin cambio.
-- [ ] **T5b. Barra de pasos** (D14, R31–R33). `import-steps.tsx` e `importStepOf`. Test
+- [x] **T5b. Barra de pasos** (D14, R31–R33). `import-steps.tsx` e `importStepOf`. Test
   `tests/unit/inventario/importar/import-steps.test.tsx`: `ol` «Pasos» con tres pasos numerados en
   orden, `aria-current="step"` solo en el vigente, sin botones; `importStepOf` para los seis tipos de
   resultado y `null`. `inventory-import-screen.test.tsx`: 1 → 2 → 3 y «Importar otro archivo» → 1.
-- [ ] **T5c. Pasos 1 a 3** (D15, R34–R41). Tarjetas, zona de archivo, tonos de las cifras,
+- [x] **T5c. Pasos 1 a 3** (D15, R34–R41). Tarjetas, zona de archivo, tonos de las cifras,
   `StatusBadge` en las filas, contador sin paréntesis, tarjetas de filas, botones al final, paso 3
   centrado. Tests: `import-upload.test.tsx` (zona con y sin archivo, aviso de tamaño, `aria-busy` al
   revisar), `import-preview.test.tsx` (tonos, `dt`/`dd` y testids de las cifras, `StatusBadge` con

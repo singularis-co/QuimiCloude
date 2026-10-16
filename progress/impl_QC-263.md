@@ -253,3 +253,247 @@ pero la aserción del E2E a 820 no depende del estado de la barra.
 T0a y T0b hechas, T1a y T1b no aplican (a6a224e5). Antes de la tanda 2 hay que resolver los choques
 con dev (sub-filas de lote, Costo centrado, panel de tres líneas, `movementReasonLabel` mudado, guía
 de importación) y la clase de D8.
+
+---
+
+## Tanda 2 (T2a, T2b, T2d) — 2026-10-16 · frontend_dev
+
+T2c no se ha tocado: sigue bloqueada por el tablero de P17/P18. Las columnas «Tipo»,
+«Presentación» y «Costo» y las sub-filas de lote se quedan como las dejó `dev`. Ninguna de las tres
+tareas obligaba a cambiarlas.
+
+### Archivos creados / modificados
+
+Producción:
+- `app/(private)/inventario/page.tsx` (T2a): `PageShell` > `PageHeader` (`title`, `titleTestId`,
+  `actions`); «Importar» lleva el `UploadIcon` `aria-hidden` y sigue con contorno, `touchTarget` y
+  la misma condición `canImport`.
+- `app/(private)/inventario/components/product-list-params.ts` (T2b): nuevo `productTypeTabHref`.
+- `app/(private)/inventario/components/product-type-tabs.tsx` (T2b): compone `UrlTabs`. Ya no lleva
+  `onNavigate`, `TabsContent` ni los dos textos. Constantes `PRODUCT_TYPE_TABS_LABEL`,
+  `PRODUCT_TYPE_TABS_TESTID` (`product-type-tabs`) y `ALL_TYPES_TAB_LABEL`. Sin `'use client'`,
+  como `UrlTabs`.
+- `app/(private)/inventario/components/product-table.tsx`, `finished-stock-table.tsx` (T2b):
+  `<ProductTypeTabs params={params} />`. El contenedor `product-table` pasa a `flex flex-col gap-4`
+  para recuperar el aire que antes daba el `pt-4` del `TabsContent`.
+- `app/(private)/inventario/components/index.ts`: exporta `productTypeTabHref` y las tres
+  constantes de las pestañas.
+- `app/(private)/inventario/components/expiry-date.tsx` (T2d): `EXPIRING_CLASS = 'font-semibold
+  text-warning-text'`, y el comentario de la prop que decía «en rojo».
+
+Tests:
+- `tests/unit/inventario/product-type-tabs.test.tsx` (nuevo).
+- `tests/unit/inventario/product-list-params.test.ts`: tres casos de `productTypeTabHref`.
+- `tests/unit/inventario/product-page.test.tsx`: nuevo `describe` «cabecera» (R1 ×3, R2). El R5 de
+  QC-150 ahora afirma el `href` del enlace y que no se llama a `router.push`. El otro R5 cambia la
+  aserción del `strong` «Filtrando por» por su ausencia.
+- `tests/unit/inventario/product-batch-rows.test.tsx`, `product-batches-panel.test.tsx` (T2d):
+  ámbar en vez de rojo y sin `text-destructive`. Casos nuevos: el nombre del producto con lote
+  vencido y a 30 días exactos, y el panel a 30 días exactos.
+- `tests/unit/paridad/__snapshots__/inventario-paridad.test.tsx.snap`: regenerado (13 snapshots).
+
+### Diff del snapshot de `inventario-paridad` (fila de `design.md > 6`)
+
+Cambian los 13 snapshots y solo en tres zonas. Todas caben en la fila (R1, R3, R4):
+
+1. **Cabecera (R1), ×13:** el `div` `p-4 md:p-6` pasa a `PageShell` (`@container … md:px-7`). La
+   fila `h1` + `div` de acciones pasa a `PageHeader`: `h1` `text-[30px] @max-[760px]:text-2xl` y
+   acciones `@max-[760px]:w-full @max-[760px]:*:flex-1`. «Importar» gana `svg.lucide-upload`.
+2. **Pestañas (R3, R4), en los 5 estados con tabla** (los de error y carga no pintan pestañas,
+   igual que antes): los `button role=tab` pasan a `a role=tab href="/inventario?page=1&pageSize=10[&q=…][&type=…]"`,
+   con su `span` de etiqueta y el indicador `TabsIndicator`. La lista gana
+   `data-testid="product-type-tabs"`, y desaparecen el `tabpanel` y los textos «Mostrando todos los
+   tipos» / «Filtrando por: <strong>».
+3. **Contenedor `product-table`:** pasa de `transition-opacity` a `flex flex-col gap-4 transition-opacity`.
+
+No cambia ninguna celda ni ninguna columna (T2c). T2d no toca el snapshot, porque ningún fixture de
+paridad trae un vencimiento cercano (ya antes no había ningún `text-destructive`).
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R1 | `product-page.test.tsx` > «cabecera»: único `h1` con `inventario-title` en `PageHeader` dentro de `PageShell`; «Importar» (contorno, icono, `href`) antes de «Nuevo producto»; sin `inventario.modificar`, solo «Nuevo producto». También el snapshot de `inventario-paridad` |
+| R2 | `product-page.test.tsx` > «R2 — con 760 px o menos…» (clases `@max-[760px]:w-full` y `*:flex-1`, `min-h-11` en las dos). La medida real es del E2E (T7a) |
+| R3 | `product-type-tabs.test.tsx` (orden, lista «Filtrar por tipo de producto», `href` = el de antes, vigente `aria-selected`); `product-list-params.test.ts` > `productTypeTabHref` ×3; `product-page.test.tsx` > R5 (QC-150) ×2 |
+| R4 | `product-type-tabs.test.tsx` > «R4 — no pinta…»; `product-page.test.tsx` > R5 (QC-150) con filtro (sin «Filtrando por») |
+| R5 | `product-type-tabs.test.tsx` > «R5 — … sin saltar de línea» (clases `overflow-x-auto flex-nowrap max-w-full`). La medida real es del E2E (T7a) |
+| R48 | `product-batch-rows.test.tsx`: «R48 — pinta en ámbar…» (sub-fila), «R48 — el vencido lleva el chip «Vencido» en danger…», «R48 — resalta en ámbar el nombre del producto…»; `product-batches-panel.test.tsx`: «R48 — ámbar bajo 30 dias…» (panel). La guardia (T6b) y el E2E (T7a) quedan pendientes |
+
+### Salida real
+
+```
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm run lint
+ESLint: 0 errors, 10 warnings in 4 files
+  (no-unused-vars en confirm-catalog-import.test.ts, list-execution-traces.test.ts,
+   order-service.test.ts y step-evidence.tsx: ninguno de esta tanda)
+
+$ pnpm exec vitest run tests/unit/inventario/product-page.test.tsx tests/unit/inventario/product-type-tabs.test.tsx tests/unit/inventario/product-list-params.test.ts
+ Test Files  3 passed (3)
+      Tests  115 passed (115)
+
+$ pnpm exec vitest run tests/unit/inventario/product-batch-rows.test.tsx tests/unit/inventario/product-batches-panel.test.tsx
+ Test Files  2 passed (2)
+      Tests  39 passed (39)
+
+$ pnpm exec vitest run tests/unit/paridad/inventario-paridad.test.tsx -u
+  Snapshots  13 updated
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+
+$ pnpm exec vitest related --run <los 7 de producción y los 6 de test de arriba>
+ FAIL  tests/unit/inventario/importar/importar-page.test.tsx > enlace «Importar» en /inventario > R2 aparece con inventario.modificar…
+ Test Files  1 failed | 32 passed (33)
+      Tests  1 failed | 565 passed (566)
+$ pnpm exec vitest run tests/unit/inventario/importar/importar-page.test.tsx   (reintento)
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+
+$ pnpm exec vitest run guard
+ Test Files  80 passed (80)
+      Tests  1096 passed | 20 skipped (1116)
+```
+
+**El fallo de `importar-page.test.tsx` lo causa T2a.** Su ayudante `contieneEnlaceA` recorría solo
+`children`, y el enlace «Importar» vive ahora en la prop `actions` de `PageHeader`. El otro
+frontend_dev (T5a), que trabaja en paralelo en ese archivo, ya ha añadido el recorrido de
+`props.actions`, y con esa edición suya el archivo pasa (reintento de arriba). Yo no lo he tocado.
+**Hay que hacer el commit de las dos cosas juntas.** Si T2a entra sin ese cambio del ayudante, ese
+caso sale rojo.
+
+### Veredicto
+
+T2a, T2b y T2d hechas y en verde. El diff del snapshot casa con la fila de `design.md > 6`. T2c y la
+tanda 3 siguen bloqueadas por el tablero.
+
+---
+
+## Tanda 5 (T5a-T5c) — 2026-10-16 · frontend_dev
+
+Tablero: `docs/diseno/canvas/InventarioImportar.dc.html`. `ImportSteps` se crea en la ruta (paso 4
+de la regla de decisión, justificado en `design.md > Lo que ya existe`). No sube a
+`components/shared`, así que no lleva fila en el catálogo. No se ha tocado ningún snapshot de
+`tests/unit/paridad`: `campos-paridad` monta `import-dialog-parts.tsx`, que no cambia.
+
+### Archivos creados / modificados
+
+Producción (`app/(private)/inventario/importar/`):
+- `page.tsx` (T5a): `PageShell` > [`ArrowLink` back `touch` «Volver a inventario», `PageHeader`
+  con `actions={<ImportTemplateButton />}`, descripción] > `InventoryImportScreen` > `ImportGuide`.
+  `requirePagePermission` sigue en la primera línea y `requirePageAddon` en la segunda. Ya no
+  importa `next/link` ni `buttonVariants`.
+- `components/import-steps.tsx` (T5b, nuevo): `ImportStep`, `importStepOf` e `ImportSteps`
+  (`ol` «Pasos» con `aria-current="step"`, sin controles y con `overflow-x-auto flex-nowrap`).
+- `components/inventory-import-screen.tsx` (T5b, T5c): pinta la barra con `importStepOf(outcome)`.
+  Cada paso entra con `motion-safe:animate-in` (`key={step}`). El paso 1 es una `Card` con la zona y
+  «Revisar archivo» (con `ArrowRightIcon`, y `Spinner` + `aria-busy` mientras revisa); la plantilla
+  sale de aquí. En el paso 2, el error y «Revisando…» van entre la tabla y los botones. Se quita
+  `isFinished`.
+- `components/import-upload-field.tsx` (T5c): la zona discontinua. Sin archivo: icono, «.xlsx ·
+  .csv» y «Elegir archivo». Con archivo: nombre `font-mono tabular-nums`, tamaño y «Elegir otro
+  archivo». La ayuda, el aviso de tamaño y el input son los de hoy.
+- `components/import-preview-summary.tsx` (T5c): `ImportTotals` gana `tones?`, pinta un `dd`
+  `font-mono tabular-nums` con su tono y `data-tone` y usa la rejilla `auto-fit,minmax(130px,1fr)`.
+  `ImportPreviewSummary` pinta, en este orden: la `Card` «Vista previa» (h2, archivo, descripción
+  y cifras), los avisos de hoy sin cambio, `children` (faltantes, tabla, error) y los botones
+  apilados con 760 px o menos («Descargar filas con error» y luego «Importar N filas válidas», con
+  N en `span` tabular). Exporta `PREVIEW_TOTAL_TONES` y `STACKED_ACTIONS_CLASS`.
+- `components/import-preview-table.tsx` (T5c): `ImportStatusLabel` compone `StatusBadge` (pasan
+  `data-testid` y `data-status`). `ImportStatusPresentation` pasa a `{ label, tone }`. Nuevos
+  `PREVIEW_STATUS_TONES`, el filtro «Todas <n>» sin paréntesis (con `span` `font-mono
+  tabular-nums`, `rounded-full`), la columna «Fila» `tabular` y
+  `card={{ primary: 'row', status: 'status', title: 'product', meta: ['detail'] }}`.
+- `components/import-result-summary.tsx` (T5c): `RESULT_STATUS_TONES`. El paso 3 se pinta como
+  tarjeta centrada (`OutcomeCard`): icono de éxito, de error o de información, título, archivo,
+  descripción de hoy, cifras con tono, aviso de fila de ejemplo y botones. «Importar otro archivo»
+  pasa a `default` con `UploadIcon`. Debajo va la tabla. `ImportAlreadyDoneNotice` usa la misma
+  tarjeta, con su texto y su `data-testid`.
+- `components/import-missing-catalog.tsx` (T5c): `Card` con `border-warning-border`, icono
+  `TriangleAlert` y columnas `grid-cols-2 @max-[760px]:grid-cols-1`. Se conservan los testids y
+  las altas.
+- `components/import-texts.ts`: `IMPORT_STEPS_LABEL`, `IMPORT_STEP_LABELS`, `IMPORT_STEPS_TESTID`,
+  `importStepTestId`, `UPLOAD_FORMATS_LABEL`, `UPLOAD_FILE_SIZE_TESTID`, `UPLOAD_EMPTY_TESTID`,
+  `PREVIEW_CARD_TESTID`, `PREVIEW_ACTIONS_TESTID`, `IMPORT_FILE_NAME_TESTID`,
+  `RESULT_CARD_TESTID` y `confirmLabelParts` (`confirmLabel` da el mismo texto). Sale
+  `UPLOAD_NO_FILE`, que ya no se usa.
+- `components/index.ts`: exporta `ImportSteps`, `importStepOf`, `ImportStep`,
+  `PREVIEW_TOTAL_TONES`, `PREVIEW_STATUS_TONES` y `RESULT_STATUS_TONES`.
+
+Tests (`tests/unit/inventario/importar/`):
+- `import-steps.test.tsx` (nuevo).
+- `importar-page.test.tsx`: casos R29, R30 y R49. Las lecturas de la guía pasan a un mock
+  `hoisted`. `contieneEnlaceA` recorre también `props.actions`, que es el arreglo del fallo que
+  trajo T2a.
+- `importar-route-contract.test.ts`: los permisos van en la primera y la segunda línea (R29), y la
+  página usa `ArrowLink` y no `Link` (R30).
+- `inventory-import-screen.test.tsx`: `describe` «barra de pasos» y «composición de los pasos».
+  En dos casos de confirmación, el conteo de estados y motivos se acota a la `table`, porque la
+  tarjeta duplica las celdas. «sin decir que se importó» se acota a `nada`, porque la barra de
+  pasos dice «Importación terminada». Los casos de «avisos flotantes» (da435d96) no cambian.
+- `import-preview.test.tsx`: el R9 «icono» pasa a R38 `StatusBadge` con tono, y el contador «(2)»
+  pasa a R39 sin paréntesis. Casos nuevos para R35, R36, R38 (resultado), R39 (tarjetas y «Todas
+  48»), R40 y R50.
+- `import-upload.test.tsx`: `describe` «zona del archivo (paso 1)» con R34 ×5 (la pantalla con
+  `previewInventoryImportAction` doblado).
+- `import-missing-catalog.test.tsx`: R37 ×2.
+- `import-guide.test.tsx`: sin cambio, y en verde.
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R29 | `importar-page.test.tsx` > «R29 pinta «Volver a inventario» con flecha…», «R29 … único h1…», «R29 R30 «Descargar plantilla» va en las acciones…»; `importar-route-contract.test.ts` > «R29 … primera linea … segunda»; `inventory-import-screen.test.tsx` > «R29 el paso 1 no ofrece la plantilla» |
+| R30 | `importar-page.test.tsx` > «R30 … no es un enlace de texto», «R29 R30 …»; `importar-route-contract.test.ts` > «R30 … ArrowLink y no con un Link». La guardia de T6b queda pendiente |
+| R31 | `import-steps.test.tsx` > «R31 es una lista ordenada…», «R31 con el paso N vigente…» ×3, «R31 los pasos no son controles…»; `inventory-import-screen.test.tsx` > «R31 R32 … del 1 al 2 y al 3…» |
+| R32 | `import-steps.test.tsx` > `importStepOf` ×4 (null, rejected, preview, los tres finales); `inventory-import-screen.test.tsx` > «R31 R32 …», «R32 con el archivo rechazado…», «R32 con un error del servidor…», «R32 sin nada importado…», «R32 con la importación ya hecha…» |
+| R33 | `import-steps.test.tsx` > «R33 se desplaza en horizontal…» (clases). La medida es del E2E (T7a) |
+| R34 | `import-upload.test.tsx` > «R34 sin archivo…», «R34 con archivo…», «R34 la ayuda de límites…», «R34 «Revisar archivo» lleva flecha…», «R34 mientras se revisa… aria-busy» |
+| R35 | `import-preview.test.tsx` > «R35 pinta la tarjeta «Vista previa»…» (más los R9 de las cifras y sus testids); `inventory-import-screen.test.tsx` > «R35 R40 R50 … en ese orden» |
+| R36 | `import-preview.test.tsx` > «R36 cada cifra se pinta en el tono de su estado…» |
+| R37 | `import-missing-catalog.test.tsx` > «R37 … tarjeta con borde e icono…», «R37 … dos columnas…» |
+| R38 | `import-preview.test.tsx` > «R38 cada estado de la vista previa…», «R38 cada estado del resultado…» |
+| R39 | `import-preview.test.tsx` > «R39 con tarjetas…», «R39 … sin paréntesis», «R39 «Todas 48»…» |
+| R40 | `import-preview.test.tsx` > «R40 los botones van al final…»; `inventory-import-screen.test.tsx` > «R35 R40 R50 …», «R40 mientras importa…» (y el caso de hoy «mientras confirma…») |
+| R41 | `inventory-import-screen.test.tsx` > «R41 el paso 3 pinta la tarjeta…», «R41 «Importar otro archivo» es la acción principal…», «R41 la importación ya hecha…» |
+| R49 | `importar-page.test.tsx` > «R49 la guía va debajo…», «R49 … valores de la empresa en su pestaña», «R49 si los valores no se pueden leer…»; `import-guide.test.tsx` sin cambio |
+| R50 | `import-preview.test.tsx` > «R50 los avisos van entre las cifras…»; `inventory-import-screen.test.tsx` > «R35 R40 R50 …», «R50 el aviso de columnas ignoradas… en la tabla y en la tarjeta», «R50 el paso 3 conserva el aviso de fila de ejemplo» |
+| R51 | `inventory-import-screen.test.tsx` > «avisos flotantes» (los siete casos de da435d96, sin cambio) y «R51 al llegar al paso 3 se avisa una sola vez…» |
+
+### Salida real
+
+```
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm run lint
+ESLint: 0 errors, 10 warnings in 4 files
+  (no-unused-vars en confirm-catalog-import.test.ts, list-execution-traces.test.ts,
+   order-service.test.ts y step-evidence.tsx: ninguno de esta tanda)
+
+$ pnpm exec vitest related --run <los 10 de producción y los 7 de test de arriba>
+ Test Files  9 passed (9)
+      Tests  183 passed (183)
+
+$ pnpm exec vitest run guard
+ Test Files  80 passed (80)
+      Tests  1096 passed | 20 skipped (1116)
+```
+
+### Para el leader
+
+- **El paso 2 ya no ofrece elegir otro archivo.** Hoy la zona de subida seguía visible en la vista
+  previa. El tablero del paso 2 no la dibuja, y R31 no deja que los pasos sean controles. Para
+  cambiar de archivo desde la vista previa hay que recargar la página. No he añadido nada fuera
+  del tablero. Si se quiere conservar, hace falta decidir dónde va (por ejemplo, en la cabecera de
+  la tarjeta «Vista previa»).
+- El E2E `e2e/inventario-importar.spec.ts` no se ha tocado: es de T7b.
+
+### Veredicto
+
+T5a, T5b y T5c hechas. Typecheck, los tests relacionados y las guardias pasan; lint da 0 errores y
+solo los 10 avisos que ya había.
