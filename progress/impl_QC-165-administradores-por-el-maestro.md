@@ -206,3 +206,56 @@ Guardias de lista cerrada revisadas, **ninguna tocada**: `session-once-per-reque
 MCP del grafo: no se usó (worktree sin indexar); Grep/Read.
 
 Veredicto: T7 y T8 hechas, en verde, sin bloqueos.
+
+## T11: cierre y consolidación (implementer, 2026-10-16)
+
+### Commits
+- `88cb339a`: tanda 1 (T1–T4).
+- `8f6bbd2f`: tanda 2 (T5–T6).
+- `97c22c30`: tanda 3 (T7–T10).
+- Merge de `origin/dev` al empezar (`898d699d`), sin migraciones.
+
+### Mapa R<n> → test (los 29)
+U = `tests/unit/identity/administradores/`; I = `tests/integration/identity/administrator.int.test.ts`; C = `tests/integration/identity/administrator-concurrency.int.test.ts`.
+
+| R | Test |
+|---|---|
+| R1, R2 | U `authorization.test.ts` (seis operaciones, dobles que fallan si los llaman) |
+| R3 | U `administrator-actions.test.ts` |
+| R4 | U `list-administrators.test.ts` + I |
+| R5, R6, R7, R9 | I |
+| R8 | U `administrator-input.test.ts` (lista blanca) + U `list-administrators.test.ts` + I |
+| R10, R11 | U `get-administrator.test.ts` + I |
+| R12 | U `administrator-input.test.ts` |
+| R13 | U `administrator-input.test.ts` + U `create-administrator.test.ts` + I (roleId de Operador) |
+| R14 | U `create-administrator.test.ts` + I |
+| R15, R16 | U `create-administrator.test.ts` + I |
+| R17 | U `create-administrator.test.ts` |
+| R18, R20, R21 | U `update-administrator.test.ts` + I |
+| R19 | U `administrator-input.test.ts` + U `update-administrator.test.ts` + U `administrator-actions.test.ts` |
+| R22, R25 | U `delete-administrator.test.ts` + I |
+| R23 | U `delete-administrator.test.ts` + I + `tests/unit/errores/catalogo.test.ts` + `tests/unit/identity/usuarios/errors.test.ts` |
+| R24 | C (dos conexiones, `commit`, varias corridas; se puso rojo al quitar `FOR UPDATE`) |
+| R26, R28 | U `resend-administrator-link.test.ts` + I |
+| R27 | U `resend-administrator-link.test.ts` |
+| R29 | U `administrator-input.test.ts` + U `resend-administrator-link.test.ts` + U `administrator-actions.test.ts` |
+| Extracción § 3.5 | `tests/unit/identity/credencial/resend-link.test.ts` y `tests/unit/identity/companies/create-company.test.ts` verdes y sin tocar (sin cambios frente a `origin/dev`) |
+
+Comprobado con grep: todos los R1–R29 aparecen en los nombres de caso de U/I/C.
+
+### Guardias de lista cerrada ajustadas (fuera de «Archivos esperados»)
+- `tests/unit/identity/account-status-scope.test.ts` (`SITIOS_PERMITIDOS`: view, queryable, adaptador).
+- `tests/unit/identity/credencial/scope.test.ts` (`EMISORES_LEGITIMOS` → `credential-setup-mail.ts`; aserción nueva `USUARIOS_DEL_ENVIO`).
+- `tests/unit/identity/roles/maestro-rol.test.ts` (`RUTAS_ABIERTAS_EMPRESAS`: los seis casos de uso).
+
+### Para que lo mire el reviewer
+- La ficha y la baja responden `user_not_found` a cualquier entrada que no pase `administratorIdSchema`, incluida una clave de más (design § 3.6/§ 8 solo prevé ese código). El reenvío responde `invalid_input` (R29).
+- `administrator.int.test.ts` carga una copia del adaptador del enlace con `@/lib/shared/db/prisma` sustituido por un puente cuyo `$transaction` es `atomically(tx, fn)`. Así R26 y R28 corren en modo `transaccion`, y la producción no se toca.
+
+### `./init.sh` (rápido)
+- Tanda 1: rojo en 2 guardias de lista cerrada; después del ajuste, verde (119 archivos, 1673 tests).
+- Tanda 2: verde (related 963 archivos, 15878 tests; guardias 119/1673).
+- Tanda 3:
+  - 1.ª corrida roja por carga: timeout de 20 s en `pedidos/order-reservation-concurrency.int.test.ts` y cascada de filas confirmadas en 8 int de migraciones/constraints. Ninguno estaba en `tests/baseline-rojos.json`, y los 9 pasan aislados (158/158).
+  - 2.ª corrida verde: related 966 archivos, 15966 tests; guardias 119/1673.
+- T11, con todo commiteado: verde (related 966 archivos, 15966 tests, incluidos composición y acciones; guardias 119/1673).

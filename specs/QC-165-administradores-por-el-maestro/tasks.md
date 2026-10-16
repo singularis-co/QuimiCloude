@@ -76,7 +76,7 @@
   conexiones, varias corridas, limpieza propia), con su entrada en `aislamiento.json`. **Hecho:** R24
   verde: como máximo una baja pasa y la empresa conserva ≥ 1 Administrador vivo, leído de la base.
 
-- [ ] **T11 — Cierre.** Depende de todas.
+- [x] **T11 — Cierre.** Depende de todas.
   `./init.sh` verde en el worktree; mapa `R<n> -> test` completo en
   `progress/impl_QC-165-administradores-por-el-maestro.md` (29 requisitos, `design.md > 10`).
 
