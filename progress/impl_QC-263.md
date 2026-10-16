@@ -1231,6 +1231,16 @@ a 390 px R42 pide botones de 44. Los dos diálogos pasan `showCloseButton={false
   `E2E_ESPERADOS`, con el comentario literal de `tasks.md > T7a`.
 - `tests/unit/shared/data-table-alcance.test.ts`: alta en su sitio alfabético (entre
   `inventario-importar` e `inventario`), nota con el comentario literal; centinela 50 → 51.
+- Arreglo 2026-10-16: `tests/unit/inventario/scope.test.ts` («la pantalla del catalogo vive solo donde
+  la declara QC-22…») estaba en rojo por `spec E2E de catalogo inesperado: …inventario-rediseno.spec.ts`.
+  Alta de `inventario-rediseno.spec.ts` en su lista cerrada (orden alfabético, entre
+  `inventario-importar` e `inventario`) con el comentario literal de T7a; el test no se relaja. Grep
+  en `tests/` de listas que nombran `inventario-importar.spec.ts` / `ajuste-de-inventario.spec.ts`:
+  solo esa, `guard-identificador-de-request.test.ts` y `data-table-alcance.test.ts` (ya dadas de alta).
+  `pnpm exec vitest run tests/unit/inventario/scope.test.ts tests/unit/shared/data-table-alcance.test.ts
+  tests/guards/guard-identificador-de-request.test.ts` → `Test Files 3 passed (3) · Tests 45 passed | 2
+  skipped (47)`. `pnpm exec vitest run guard` → `Test Files 81 passed (81) · Tests 1106 passed | 20
+  skipped (1126)`.
 
 ### Mapa R → caso del E2E (`e2e/inventario-rediseno.spec.ts`)
 

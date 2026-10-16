@@ -456,6 +456,16 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // una segunda pantalla del catalogo: recorre la ficha de solo lectura de un producto terminado,
     // a la que llega desde Pedidos y desde la pestaña de terminados, y solo siembra por Prisma el
     // pedido terminado y su lote. La guardia no se afloja; se le añade un renglon.
+    // ACTUALIZADO 2026-10-16 (QC-263, T7a): entra `inventario-rediseno.spec.ts`. Alta el 2026-10-16
+    // (QC-263) por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA y darse de
+    // alta en ella es su punto de extension por diseno. El ancla NO se relaja -el archivo se nombra,
+    // uno a uno-. Lo que ejercita: el rediseño visual de la pantalla de Inventario que ya existe (la
+    // lista, el panel «Lotes», el historial del lote y la importacion) medido a 1440, 820 y 390 px con
+    // `boundingBox` y estilos computados. Casa con `screenPattern` por la palabra «inventario» del
+    // nombre y no es una segunda pantalla del catalogo: no estrena alta de producto -el alta la sigue
+    // cubriendo `inventario.spec.ts`-. Va entre `inventario-importar` y `inventario.spec.ts` porque la
+    // lista esta en el orden del matcher (alfabetico): 'i' precede a 'r', y '-' precede a '.'. La
+    // guardia no se afloja; se le añade un renglon.
     const E2E_DE_AISLAMIENTO = 'aislamiento-inventario.spec.ts'
     const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
     expect(e2eMatches, `spec E2E de catalogo inesperado: ${e2eMatches.join(', ')}`).toEqual([
@@ -466,6 +476,7 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
       'fixtures/inventario-importar-mixto.csv',
       'helpers/product-name-cell.ts',
       'inventario-importar.spec.ts',
+      'inventario-rediseno.spec.ts',
       'inventario.spec.ts',
       'producto-terminado.spec.ts',
     ])

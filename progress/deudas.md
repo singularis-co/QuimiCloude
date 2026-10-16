@@ -191,6 +191,9 @@
   `TOUCH_TARGET = 'min-h-11 min-w-11'`. `guard-piezas-base` lo excluye por D11 con motivo que cita
   QC-232. Pasar a `touchTarget` y retirar la exclusión.
 - **Dueño:** ficha **QC-223**.
+- **Resuelta (2026-10-16, QC-263, P15/R46):** `batch-history.tsx` es ahora un diálogo sin
+  `TOUCH_TARGET` y `guard-piezas-base` lo pasa a `D11_SIN_HALLAZGOS` (sigue en `ARCHIVOS_D11`
+  porque R33 de QC-231 vigila esa lista).
 
 ### D42 — Asignación: `OrderDistributionFull` sin mover a shared (QC-232 → QC-217)
 - **Origen:** QC-232 (2026-10-09), `design.md > 7` (último punto de la ficha).
@@ -406,6 +409,9 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   No rompe ningún requisito: R21 habla de la lista, no de la carga.
 - **Ampliada (2026-10-13, QC-262, P12):** `/pedidos` igual. `OrderListSkeleton` pinta filas de
   tabla también en teléfono, donde la lista ya sale en tarjetas.
+- **Ampliada (2026-10-16, QC-263, T0b, P22):** `/inventario` igual. El esqueleto de
+  `product-columns-skeleton.ts` pinta 9 columnas y sin tarjeta; la tabla real tiene 10 en «Todos»,
+  9 con un tipo filtrado y 7 en «Producto terminado», y bajo 760 px sale en tarjetas.
 - **Dueño:** sin asignar.
 
 ### D54 — `guard-dobles-e2e` lee `.env.example` con una regex que cruza líneas
@@ -425,6 +431,8 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   título de «Cancelar el pedido», «Eliminar el pedido» y «Material insuficiente» (`dlg-ic`).
   `ConfirmDialog` no lo admite y lo usan todos los módulos: es una ficha transversal sobre la pieza
   compartida, con la revisión visual de cada confirmación.
+- **Ampliada (2026-10-16, QC-263):** `/inventario` igual: el diálogo de borrado de producto
+  (`DeleteConfirmDialog`) sale sin el icono que dibuja `ModalesInventario.dc.html`.
 - **Dueño:** sin asignar.
 
 ### D57 — Selector de prioridad del pedido sin `PriorityMark` (QC-262, P10)
@@ -457,3 +465,19 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   composición, pero no E2E: los E2E de documentos recorren el webhook con todo prendido
   (`enableAllAddons`). Falta el camino «descartado» de punta a punta.
 - **Dueño:** sin asignar.
+
+### D61 — Inventario: cifras y fechas sin el formato del tablero (QC-263, P4)
+- **Origen:** QC-263 (2026-10-16), `requirements.md > P4` cerrada por defecto.
+- **Qué falta:** los tableros de inventario escriben `120,00` y `12/09/2026 10:14`; la app sigue con
+  `formatDecimalDisplay` y `YYYY-MM-DD HH:mm`. Cambiarlo es transversal (todas las tablas), no de
+  una ruta.
+- **Dueño:** sin asignar.
+
+### D62 — Importar inventario: sin arrastrar y soltar (QC-263, P10)
+- **Origen:** QC-263 (2026-10-16), `requirements.md > P10` cerrada por defecto.
+- **Qué falta:** el tablero pide la zona de `FileField` con arrastrar y soltar; `FileField` no
+  admite `.xlsx`, comprime imágenes y entrega bytes, no el `File` que necesita la action. Se quedó
+  `ImportUploadField` con el aspecto de la zona y sin arrastrar y soltar (R34). Extender `FileField`
+  o la zona propia con `drop`.
+- **Dueño:** sin asignar.
+
