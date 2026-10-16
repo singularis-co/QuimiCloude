@@ -414,7 +414,7 @@ describe('sin cambio de anchura de la tabla', () => {
 });
 
 describe('columna «Costo unitario» de la tabla de productos', () => {
-  it('pinta la cabecera «Costo unitario» justo despues de la existencia', () => {
+  it('pinta la cabecera «Costo unitario» la ultima de datos, justo antes de las acciones', () => {
     render(
       <ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} canSeeCost />,
     );
@@ -424,7 +424,10 @@ describe('columna «Costo unitario» de la tabla de productos', () => {
       .getAllByRole('columnheader')
       .map((celda) => celda.getAttribute('data-testid'));
     expect(cabeceras.indexOf('data-table-head-averageUnitCost')).toBe(
-      cabeceras.indexOf('data-table-head-stock') + 1,
+      cabeceras.indexOf('data-table-head-actions') - 1,
+    );
+    expect(cabeceras.indexOf('data-table-head-averageUnitCost')).toBe(
+      cabeceras.indexOf('data-table-head-qtyAlert') + 1,
     );
   });
 
