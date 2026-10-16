@@ -479,6 +479,13 @@ export const E2E_ESPERADOS = [
   // siguiente peticion. No lee ni afirma nada sobre el identificador de peticion ni sobre
   // `reference`.
   'maestro-empresas.spec.ts',
+  // Alta el 2026-10-16 (QC-166 R45, `specs/QC-166-area-del-maestro/design.md > 10`) por el MISMO
+  // motivo. Lo que ejercita: el Maestro da de alta un Administrador eligiendo la empresa en el
+  // panel, lo edita, le reenvia el enlace (solo en la fila pendiente) y ve el aviso de correo
+  // enviado o fallido, lo da de baja porque no es el ultimo, y ve deshabilitada la baja del ultimo
+  // Administrador de la empresa. No lee ni afirma nada sobre el identificador de peticion ni sobre
+  // `reference`.
+  'maestro-administradores.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
