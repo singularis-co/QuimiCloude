@@ -143,7 +143,7 @@ Cubre: R9 (parte de `pedidos`), base de R38, R52–R54.
 
 ---
 
-## [ ] B4 — `pedidos`: casos de uso (depende de T0; la integración, de B2 y B3)
+## [x] B4 — `pedidos`: casos de uso (depende de T0; la integración, de B2 y B3)
 
 - Implementa los cinco casos de uso de §2.6 y la transacción de §3 y §4. Incluye el paso 0 si T0 lo
   fijó.

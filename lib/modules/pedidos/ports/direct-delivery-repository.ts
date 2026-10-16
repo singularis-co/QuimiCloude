@@ -44,3 +44,11 @@ export interface WaitingOrdersReader {
     scope: OrderScope,
   ): Promise<readonly WaitingOrderLineOfPair[]>;
 }
+
+/** Sobre la transaccion de la entrega, antes de bloquear el producto. */
+export interface WaitingOrdersLock {
+  /** `FOR SHARE`, por id, de los pedidos vivos de la empresa con esa receta en `TERMINADO` o
+   *  `EN_ACONDICIONAMIENTO` que tienen linea de esa presentacion. Terminar el acondicionamiento no
+   *  bloquea el producto: asi espera, o se le espera, antes de que el pedido empiece a esperar envases. */
+  lockWaitingCandidates(pair: WaitingOrderPair, scope: OrderScope): Promise<void>;
+}

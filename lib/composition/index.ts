@@ -131,8 +131,15 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import { createFinishedBatchLabels } from '@/lib/modules/inventario/adapters/driven/persistence/finished-batch-labels-prisma';
-import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
-import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
+import {
+  createFinishedGoodsDirectDispatch,
+  createFinishedGoodsDispatch,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
+import {
+  findDeliverableBatches,
+  findForDelivery,
+  findSurplusBases,
+} from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
   findAliveFinishedProduct,
@@ -364,10 +371,11 @@ import type {
   DirectDeliveryUnitOfWork,
   DirectDeliveryVoidUnitOfWork,
 } from '@/lib/modules/pedidos/ports/direct-delivery-unit-of-work';
-import type {
-  DirectDeliveryRepository,
-  WaitingOrdersReader,
-} from '@/lib/modules/pedidos/ports/direct-delivery-repository';
+import {
+  createDirectDeliveryRepository,
+  createWaitingOrdersLock,
+  createWaitingOrdersReader,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma';
 import type { DeliveryCustomerDirectory, FinishedProductDeliveryCatalog } from '@/lib/modules/inventario';
 import {
   createRecipeExecutionReader,
@@ -1648,23 +1656,19 @@ const orderDeliveryVoidUnitOfWork: OrderDeliveryVoidUnitOfWork = {
     ),
 };
 
-function directDeliveryAdapterPending(): never {
-  throw new Error('entrega sin pedido: adaptador sin cablear');
-}
+const finishedProductDeliveryCatalog: FinishedProductDeliveryCatalog = { findForDelivery, findSurplusBases };
 
-// Dobles hasta que existan los adaptadores driven de la entrega sin pedido.
-const finishedProductDeliveryCatalog: FinishedProductDeliveryCatalog = {
-  findForDelivery: async () => directDeliveryAdapterPending(),
-  findSurplusBases: async () => directDeliveryAdapterPending(),
-};
-const waitingOrdersReader: WaitingOrdersReader = {
-  listWaitingLines: async () => directDeliveryAdapterPending(),
-};
-const directDeliveryRepository: Pick<DirectDeliveryRepository, 'findByKey'> = {
-  findByKey: async () => directDeliveryAdapterPending(),
-};
+/** La entrega sin pedido y la salida de `inventario` confirman o se deshacen juntas. */
 const directDeliveryUnitOfWork: DirectDeliveryUnitOfWork = {
-  run: async () => directDeliveryAdapterPending(),
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        deliveries: createDirectDeliveryRepository(tx),
+        waiting: createWaitingOrdersReader(tx),
+        waitingLock: createWaitingOrdersLock(tx),
+        finishedGoods: createFinishedGoodsDirectDispatch(tx),
+      }),
+    ),
 };
 
 /** La anulacion sin pedido y la devolucion a `inventario` confirman o se deshacen juntas. */
@@ -1787,16 +1791,17 @@ export const pedidos = {
   }),
   getDirectDelivery: createGetDirectDelivery({
     catalog: finishedProductDeliveryCatalog,
-    waiting: waitingOrdersReader,
+    waiting: createWaitingOrdersReader(),
   }),
   listDirectDeliverySurplus: createListDirectDeliverySurplus({
     catalog: finishedProductDeliveryCatalog,
-    waiting: waitingOrdersReader,
+    waiting: createWaitingOrdersReader(),
   }),
   deliverDirect: createDeliverDirect({
     customerCatalog,
+    catalog: finishedProductDeliveryCatalog,
     unitOfWork: directDeliveryUnitOfWork,
-    deliveries: directDeliveryRepository,
+    deliveries: createDirectDeliveryRepository(),
   }),
   getDirectDeliveryForVoid: createGetDirectDeliveryForVoid({
     voids: createOrderDeliveryVoidRepository(),

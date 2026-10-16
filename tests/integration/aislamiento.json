@@ -695,6 +695,26 @@
       "archivo": "pedidos/direct-deliveries-migration.int.test.ts",
       "motivo": "QC-288 B1 (2026-10-16): aplica el migration.sql y el down.sql reales de 'inventory_movement_kind_direct_delivery' y 'direct_deliveries' por 'pg' (solo su protocolo simple ejecuta un .sql con bloques $$ y su error trae 'code'). No toca las tablas ni el tipo de 'public': cada caso copia con LIKE las seis tablas que las migraciones leen, escriben o deben dejar intactas a un esquema de usar y tirar, con una tabla 'products' minima y una copia propia de 'InventoryMovementKind' para la columna 'kind', repone sus FK y los dos disparadores, trabaja ahi con search_path solo en ese esquema -asi el DDL del UP y del DOWN, incluido el que recrea el enum, no bloquea las tablas reales que usan los demas archivos- y lo borra con DROP SCHEMA CASCADE en un 'finally'. Mismo patron que 'pedidos/order-delivery-lines-customer-migration.int.test.ts'. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-16"
+    },
+    {
+      "archivo": "pedidos/direct-delivery.int.test.ts",
+      "motivo": "QC-288 B4: la entrega sin pedido por la fachada real de 'lib/composition' (y, en el fallo forzado, por 'createDeliverDirect' cableado con los mismos adaptadores reales): 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL (entrega, salida de inventario y lectura de lo que esperan los pedidos), y las lecturas del sheet y del listado usan ese mismo cliente, asi que una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica sus empresas efimeras con randomUUID (tests/helpers/direct-delivery-seed.ts sobre order-delivery-seed.ts) y las borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
+    },
+    {
+      "archivo": "pedidos/direct-delivery-concurrency.int.test.ts",
+      "motivo": "QC-288 B4: entregas sin pedido reales a la vez, a la vez que una entrega de pedido y a la vez que una transaccion que termina el acondicionamiento de un pedido, por la fachada de 'lib/composition': cada 'withOrderTransaction' tiene que CONFIRMAR para que la otra vea lo que escribio despues de esperar el bloqueo de los pedidos o del producto, y la transaccion del acondicionamiento la abre el propio test con 'prisma.$transaction' y la confirma, asi que una transaccion del test con ROLLBACK no puede envolverlas. Cada caso fabrica su empresa efimera con randomUUID (tests/helpers/direct-delivery-seed.ts) y la borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
+    },
+    {
+      "archivo": "pedidos/direct-delivery-void.int.test.ts",
+      "motivo": "QC-288 B4: la anulacion de una entrega sin pedido por la fachada real de 'lib/composition' (y, en el fallo forzado, por 'createVoidDirectDelivery' cableado con los mismos adaptadores reales): 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL (anulacion y devolucion a inventario), y la entrega previa, la lectura del dialogo y la lectura previa de la clave usan ese mismo cliente, asi que una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica sus empresas efimeras con randomUUID (tests/helpers/direct-delivery-seed.ts) y las borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
+    },
+    {
+      "archivo": "pedidos/direct-delivery-void-concurrency.int.test.ts",
+      "motivo": "QC-288 B4: anulaciones sin pedido reales a la vez por la fachada de 'lib/composition' (y, en el caso de la misma clave, por 'createVoidDirectDelivery' cableado con los mismos adaptadores reales y solo la lectura previa de la clave sincronizada): cada 'withOrderTransaction' tiene que CONFIRMAR para que la otra choque con el unico de 'delivery_line_id' o de la clave, asi que una transaccion del test con ROLLBACK no puede envolverlas. Cada caso fabrica su empresa efimera con randomUUID (tests/helpers/direct-delivery-seed.ts) y la borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
     }
   ]
 }

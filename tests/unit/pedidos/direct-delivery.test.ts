@@ -209,6 +209,7 @@ describe('checkDirectDelivery: el tope (R23)', () => {
 })
 
 const SHEET_PATH = 'app/(private)/inventario/components/direct-delivery-sheet.tsx'
+const SERVER_PATH = 'lib/modules/pedidos/domain/deliver-direct.ts'
 
 /** Las reglas que el sheet y el servidor deben tomar del barrel de `pedidos`, no reescribir. */
 const SHARED_RULES = [
@@ -249,7 +250,23 @@ describe('las mismas funciones puras en el sheet y en el servidor (R23)', () => 
     }
   })
 
-  it.todo('R23: deliver-direct.ts usa checkDirectDelivery y checkDeliveryBlocks del dominio (llega con B4, hoy es el stub de T0)')
+  // 2026-10-16: deliver-direct.ts ya es real; sustituye al it.todo de F2. Importa por ruta relativa
+  // porque es parte del modulo.
+  it('R23: deliver-direct.ts toma del dominio las reglas del tope y de los bloques, las llama y no las redefine', () => {
+    const source = sourceWithoutComments(SERVER_PATH)
+    const rules = ['checkDirectDelivery', 'directAllocations', 'normalizeDeliveryNote', 'surplusPackages', 'waitingOrders', 'checkDeliveryBlocks']
+    const imported = [...source.matchAll(/import\s*\{([^}]*)\}\s*from\s*'\.\/(?:direct-delivery|order-delivery)'/g)]
+      .map((m) => m[1] ?? '')
+      .join(',')
+
+    for (const rule of rules) {
+      expect(imported, `deliver-direct.ts debe importar ${rule} del dominio`).toMatch(new RegExp(`\\b${rule}\\b`))
+      expect(source, `deliver-direct.ts debe llamar a ${rule}`).toMatch(new RegExp(`\\b${rule}\\(`))
+      expect(source, `deliver-direct.ts no debe redefinir ${rule}`).not.toMatch(
+        new RegExp(`(function\\s+${rule}\\b|const\\s+${rule}\\s*=)`),
+      )
+    }
+  })
 })
 
 describe('el tope de productos por peticion del listado', () => {

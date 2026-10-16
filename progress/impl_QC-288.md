@@ -455,3 +455,95 @@ Entorno: `DATABASE_URL`, `DIRECT_URL` y `SEED_*` exportadas solo en el comando d
 
 Veredicto: B2 hecha; salida y devolución sin pedido y lecturas de `inventario` con R9, R32, R34, R37 y R50 en verde;
 los rojos que quedan son ajenos y están señalados.
+
+## B4 — `pedidos`: casos de uso (2026-10-16)
+
+Grafo: sin proyecto para este worktree; Grep/Read.
+
+### Paso 0 (T0: `finishConditioningAlive` no bloquea el producto)
+- Puerto nuevo `WaitingOrdersLock.lockWaitingCandidates(pair, scope)` en `ports/direct-delivery-repository.ts`, en el
+  ámbito de la transacción como `waitingLock`. Adaptador `createWaitingOrdersLock(tx)` en `direct-delivery-prisma.ts`:
+  `SELECT … FROM orders o … status IN (TERMINADO, EN_ACONDICIONAMIENTO) AND EXISTS (línea de esa presentación)
+  ORDER BY o.id FOR SHARE OF o`, con la empresa de `companyScopeColumns` (guardia de SQL crudo en verde).
+- La receta y la presentación hacen falta antes del bloqueo del producto: `deliverDirect` las lee **sin bloqueo**,
+  fuera de la transacción y tras los clientes, con `catalog.findSurplusBases([productId])` (dep nueva `catalog`;
+  vacío → `ProductNotFoundError`). Dentro: paso 0 → `lockForDirectDelivery` → si receta/presentación del bloqueo no
+  son las leídas, `Error` interno (ningún camino de la app cambia la identidad de un producto terminado) → clave →
+  `listWaitingLines` (solo `TERMINADO`) → tope. Orden pedidos → producto → lote.
+- Comprobado por mutación: sin la llamada del paso 0, el caso del acondicionamiento de
+  `direct-delivery-concurrency.int.test.ts` se pone rojo.
+
+### Archivos
+Producción:
+- `lib/modules/pedidos/domain/{get-direct-delivery,list-direct-delivery-surplus,deliver-direct,get-direct-delivery-for-void,void-direct-delivery}.ts`: cuerpos reales (§2.6, §3, §4).
+- `lib/modules/pedidos/ports/direct-delivery-repository.ts` (+ `WaitingOrdersLock`), `direct-delivery-unit-of-work.ts` (+ `waitingLock`).
+- `lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma.ts` (+ `createWaitingOrdersLock`).
+- `lib/composition/index.ts`: solo lo que piden las suites de integración: catálogo real (`findForDelivery`,
+  `findSurplusBases`), lector y repositorio reales y la unidad de trabajo de la entrega con `withOrderTransaction`.
+  `deliveryCustomerDirectory` y `listBatchMovements` quedan para B5.
+- `deliver-order.ts` y `void-delivery.ts`: sin cambio; las enmiendas de §2.6 ya venían de T0 y aquí se prueban.
+
+Tests:
+- Nuevos u: `tests/unit/pedidos/{deliver-direct,void-direct-delivery,get-direct-delivery,list-direct-delivery-surplus,get-direct-delivery-for-void}.test.ts`.
+- Nuevos int (`commit`, en `aislamiento.json`): `tests/integration/pedidos/{direct-delivery,direct-delivery-concurrency,direct-delivery-void,direct-delivery-void-concurrency}.int.test.ts`;
+  ayudante `tests/helpers/direct-delivery-seed.ts` (sobre `order-delivery-seed.ts`).
+- Modificados, con nota fechada y aserciones previas intactas: `deliver-order.test.ts` (+2), `void-delivery.test.ts` (+2),
+  `direct-delivery.test.ts` (el `it.todo` de R23 pasa a caso real sobre `deliver-direct.ts`).
+
+### Desvíos menores
+- `getDirectDeliveryForVoid`: §2.6 pide líneas, producto y clientes en un `Promise.all`, pero los ids de cliente salen de
+  las líneas. Van líneas + producto en paralelo y luego los clientes (una llamada; ninguna si todos están anulados). Un
+  cliente sin ref sale con su id corto, como en `list-order-deliveries`.
+- `deliverDirect` gana la dep `catalog` (lectura previa del paso 0), que el contrato de T0 no tenía.
+
+### R → test
+- R2 → u `deliver-direct`, `get-direct-delivery`, `list-direct-delivery-surplus` («R2: sin entregas.modificar…»).
+- R3 → u `void-direct-delivery`, `get-direct-delivery-for-void` («R3: sin entregas.anular…»).
+- R4 → los cinco u («R4: … otro rol es aceptado», «R4: un Administrador sin … es rechazado»).
+- R8 → u `list-direct-delivery-surplus` («R8: con 1/25/200 productos son una lectura del catalogo y una de los pedidos»,
+  forma, lista vacía, pares distintos, ids repetidos).
+- R29 → u `deliver-direct` (16 casos de forma, producto y cliente sin uuid, nota de 500) + `get-direct-delivery` (id sin uuid).
+- R30 → u `deliver-direct` (catálogo y bloqueo nulos); int `direct-delivery` («R30: producto inexistente, dado de baja, que
+  no es terminado o de otra empresa»).
+- R31 → u `deliver-direct` (2); int `direct-delivery` («R31: …»).
+- R32 → u `deliver-direct`; int `direct-delivery` («R32: un lote de otro producto o de otra empresa»).
+- R33 → u `deliver-direct` (12 pasan, 13 no, excedente bajo bloqueo); int `direct-delivery` («R33: 20 en stock y 8 que
+  esperan: 13 … y 12 pasan», «R33: una linea de entrega anulada vuelve a esperar…»).
+- R34 → u `deliver-direct`; int `direct-delivery` («R34: dos clientes que juntos piden a un lote mas…»).
+- R35 → u `deliver-direct` (orden pedidos → producto → lectura); int `direct-delivery-concurrency` (dos entregas 7 + 7;
+  una sin pedido a la vez que una de pedido; el acondicionamiento retenido que la entrega espera: paso 0).
+- R36, R37 → u `deliver-direct` (create, dispatch, addLines, nota); int `direct-delivery` («R36: …», «R37: …»).
+- R38 → u `deliver-direct` (6), `deliver-order` («QC-288 … R38» ×2); int `direct-delivery` («R38: la misma clave…»,
+  «R38: la clave de una entrega de pedido…», empresa B).
+- R39 → u `deliver-direct` (fallos dentro de `run`); int `direct-delivery` (fallo forzado tras la salida; lote ajeno en el
+  segundo cliente).
+- R44 (dominio) → u `get-direct-delivery-for-void`; int `direct-delivery-void` («R44: …»).
+- R47 → u `void-direct-delivery` (10 de forma + cliente sin líneas); int `direct-delivery-void` («R47: …»).
+- R48 → u `void-direct-delivery`, `get-direct-delivery-for-void`, `void-delivery` («QC-288 … R48» ×2); int
+  `direct-delivery-void` («R48: …», empresa B).
+- R49 → u `void-direct-delivery` (2); int `direct-delivery-void` («R49: …»).
+- R50 → u `void-direct-delivery` (3); int `direct-delivery-void` («R50: guarda la anulacion…», «R50: con el producto dado
+  de baja…»).
+- R51 → u `void-direct-delivery` (clave ×5, fallo de la devolución); int `direct-delivery-void` (clave, clave de pedido,
+  fallo forzado), `direct-delivery-void-concurrency` (dos anulaciones que comparten cliente; misma clave a la vez).
+- R23 (mitad del servidor) → u `direct-delivery.test.ts` («R23: deliver-direct.ts toma del dominio las reglas…»).
+
+### Gate (salida real)
+Entorno: `DATABASE_URL`, `DIRECT_URL` y `SEED_*` exportadas solo en el comando desde el `.env` del repo principal.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 9 problems (0 errors, 9 warnings)`, los 9 previos y ajenos.
+- Unitarios de B4 (`deliver-direct`, `void-direct-delivery`, `get-direct-delivery`, `list-direct-delivery-surplus`,
+  `get-direct-delivery-for-void`, `direct-delivery`, `deliver-order`, `void-delivery`): `Test Files 8 passed (8)`,
+  `Tests 283 passed (283)`.
+- Integración, las cuatro suites de B4: `Test Files 4 passed (4)`, `Tests 29 passed (29)`.
+- Integración vecina (`direct-delivery-repository`, `order-delivery`, `order-delivery-void`, `order-delivery-concurrency`,
+  `direct-delivery-constraints`): `Test Files 5 passed (5)`, `Tests 61 passed (61)`.
+- `pnpm exec vitest run --project node tests/unit/pedidos`: `Test Files 3 failed | 99 passed (102)`,
+  `Tests 4 failed | 2170 passed | 3 skipped`. Los 4 rojos son los censos de TC ya vistos en B2, sin empeorar:
+  `order-delivery-append-only` R32/R33 (`voidDirectDeliveryAction`, `createVoidDirectDelivery`, nombres de T0),
+  `module-contract` (`direct-delivery-draft.ts`, F2) y `scope` R57 (UI de `inventario` y `components/shared`).
+- `pnpm exec vitest run guard`: `Test Files 1 failed | 79 passed (80)`, `Tests 1 failed | 1098 passed | 20 skipped`; el
+  rojo es el conocido `guard-formularios-y-acciones` R28 de F4 sin commit.
+- `vitest related` no se corrió: los archivos cuelgan de `lib/composition` (conjunto casi entero) y el disco C: está al 98 %.
+
+Veredicto: B4 hecha; los cinco casos de uso, con el paso 0 y sus transacciones, tienen R2–R4, R8, R29–R39 y R47–R51 en verde.

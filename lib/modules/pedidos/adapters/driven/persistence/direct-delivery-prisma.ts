@@ -15,6 +15,7 @@ import type {
   RegisteredDelivery,
   WaitingOrderLineOfPair,
   WaitingOrderPair,
+  WaitingOrdersLock,
   WaitingOrdersReader,
 } from '../../../ports/direct-delivery-repository';
 
@@ -142,6 +143,32 @@ async function listWaitingOrderLines(
   }));
 }
 
+/** Solo bloquea: lo que esperan se vuelve a leer con el producto ya bloqueado. */
+async function lockWaitingCandidateOrders(
+  pair: WaitingOrderPair,
+  scope: OrderScope,
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  const { companyId } = companyScopeColumns(scope);
+  await tx.$queryRaw<ReadonlyArray<{ id: string }>>(Prisma.sql`
+    SELECT o."id"
+      FROM "orders" o
+     WHERE o."company_id" = ${companyId}::uuid
+       AND o."recipe_id" = ${pair.recipeId}::uuid
+       AND o."deleted_at" IS NULL
+       AND o."status" IN ('TERMINADO'::"OrderStatus", 'EN_ACONDICIONAMIENTO'::"OrderStatus")
+       AND EXISTS (
+             SELECT 1
+               FROM "order_presentation_lines" l
+              WHERE l."order_id" = o."id"
+                AND l."company_id" = ${companyId}::uuid
+                AND l."presentation_id" = ${pair.presentationId}::uuid
+           )
+     ORDER BY o."id"
+       FOR SHARE OF o
+  `);
+}
+
 /** Sobre el `tx` de la entrega. Sin `update`, `delete` ni `upsert`: una entrega no se modifica. */
 export function createDirectDeliveryRepository(tx: PrismaLike = prisma): DirectDeliveryRepository {
   return {
@@ -155,5 +182,12 @@ export function createDirectDeliveryRepository(tx: PrismaLike = prisma): DirectD
 export function createWaitingOrdersReader(tx: PrismaLike = prisma): WaitingOrdersReader {
   return {
     listWaitingLines: (pairs, scope) => listWaitingOrderLines(pairs, scope, tx),
+  };
+}
+
+/** Solo sobre el `tx` de la entrega: fuera de una transaccion el bloqueo no duraria nada. */
+export function createWaitingOrdersLock(tx: Prisma.TransactionClient): WaitingOrdersLock {
+  return {
+    lockWaitingCandidates: (pair, scope) => lockWaitingCandidateOrders(pair, scope, tx),
   };
 }
