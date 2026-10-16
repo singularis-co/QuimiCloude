@@ -73,6 +73,10 @@ const DOMINIO = [
   'lib/modules/identity/domain/issue-credential-setup-link.ts',
   'lib/modules/identity/domain/set-credential-with-link.ts',
   'lib/modules/identity/domain/create-user.ts',
+  // QC-165 (`design.md > 3.5`): la emision y el envio del enlace salen de
+  // `issue-credential-setup-link.ts` y de `create-company.ts` a este archivo, y con ellos el
+  // secreto en claro. Entra en la lista para que lo extraido siga bajo R5/R13/R31/R40.
+  'lib/modules/identity/domain/credential-setup-mail.ts',
 ] as const;
 
 /** Puertos: interfaces por las que el dominio pide. Tampoco registran nada. */
@@ -729,17 +733,54 @@ describe('R31 — el unico reintento del correo es el reenvio a mano de R14', ()
 // ---------------------------------------------------------------------------------------------
 
 describe('R39 — no hay ninguna forma de pedir un enlace desde fuera', () => {
+  // QC-165 (`design.md > 3.5`) extrae la emision a `credential-setup-mail.ts`, y desde entonces la
+  // lista cerrada se afirma EN DOS SALTOS, ambos por igualdad:
+  //   1. quien llama a `issueForPendingUser` (este array);
+  //   2. quien usa las dos funciones de `credential-setup-mail.ts` (`USUARIOS_DEL_ENVIO`, abajo).
+  // Juntos dicen lo mismo que antes: los unicos sitios que emiten son el alta de usuario (R7), el
+  // reenvio (R14) y el alta de empresa (QC-162), cada uno detras de su permiso.
   const EMISORES_LEGITIMOS = [
     // R7: el alta sin contrasena, que emite UNO y lo manda a la direccion del usuario recien creado.
     'lib/modules/identity/domain/create-user.ts',
+    // QC-165: la emision compartida. No tiene permiso propio ni la llama nadie desde fuera del
+    // dominio: quien puede usarla lo fija `USUARIOS_DEL_ENVIO`.
+    'lib/modules/identity/domain/credential-setup-mail.ts',
+  ] as const;
+
+  const ENVIO_COMPARTIDO = 'lib/modules/identity/domain/credential-setup-mail.ts';
+
+  const USUARIOS_DEL_ENVIO = [
     // R14: el reenvio, que exige `usuarios.modificar` como primera linea y falla cerrado.
     'lib/modules/identity/domain/issue-credential-setup-link.ts',
     // QC-162: el alta de empresa, que exige `empresas.modificar` y emite UNO para el Administrador
     // que acaba de crear.
     'lib/modules/identity/domain/create-company.ts',
+    // PENDIENTE (QC-165, tanda siguiente): el reenvio del Maestro,
+    // `lib/modules/identity/domain/resend-administrator-link.ts`, entrara aqui cuando exista. Exige
+    // `empresas.modificar` como primera linea (`design.md > 3.6`).
   ] as const;
 
-  it('los UNICOS que llaman a `issueForPendingUser` son el alta y el reenvio', () => {
+  /**
+   * Quien USA el envio compartido: importa `credential-setup-mail` o nombra una de sus dos
+   * funciones. `sendCredentialSetupLink` es tambien el nombre del metodo del puerto del correo y de
+   * los adaptadores de transporte, asi que el nombre suelto no basta: para ella cuenta el import;
+   * `resendCredentialSetupLinkTo` es unico y cuenta por la llamada.
+   */
+  function usaElEnvio(fuente: string): boolean {
+    const codigo = stripComments(fuente);
+    const importa = /from\s+['"][^'"]*\/credential-setup-mail['"]/;
+    const llamaAlReenvio = /\bresendCredentialSetupLinkTo\s*\(/;
+    return importa.test(codigo) || llamaAlReenvio.test(codigo);
+  }
+
+  function quienUsaElEnvio(fuentes: readonly string[]): string[] {
+    return fuentes
+      .filter((ruta) => ruta !== ENVIO_COMPARTIDO)
+      .filter((ruta) => usaElEnvio(leer(ruta)))
+      .sort();
+  }
+
+  it('los UNICOS que llaman a `issueForPendingUser` son el alta y el envio compartido', () => {
     const emisores = quienLlamaA('issueForPendingUser', fuentesDeProduccion());
     expect(
       emisores,
@@ -749,8 +790,42 @@ describe('R39 — no hay ninguna forma de pedir un enlace desde fuera', () => {
         'primera linea. Un tercer emisor es, por definicion, una emision sin permiso: seria la ' +
         'recuperacion de contrasena olvidada de **QC-96** —que se dispara SIN sesion y cuya ' +
         'respuesta no puede revelar que correos existen— o el restablecimiento de la de otro de ' +
-        `**QC-89**, y los dos quedaron fuera de esta ficha. Quien lo llama hoy:\n${emisores.join('\n')}`,
+        `**QC-89**, y los dos quedaron fuera de esta ficha. La emision vive en el alta (R7) y en ` +
+        'el envio compartido de QC-165, cuyos usuarios fija el caso siguiente. Quien lo llama ' +
+        `hoy:\n${emisores.join('\n')}`,
     ).toEqual([...EMISORES_LEGITIMOS].sort());
+  });
+
+  it('los UNICOS que usan el envio compartido son el reenvio y el alta de empresa', () => {
+    const usuarios = quienUsaElEnvio(fuentesDeProduccion());
+    expect(
+      usuarios,
+      'QC-79 R39 (con la extraccion de QC-165): `credential-setup-mail.ts` emite un enlace sin ' +
+        'comprobar ningun permiso, porque lo comprueba quien la llama. Por eso solo puede usarla ' +
+        'quien exige el suyo como primera linea: el reenvio (R14, `usuarios.modificar`) y el alta ' +
+        'de empresa (QC-162, `empresas.modificar`). Un usuario mas es un tercer emisor, igual que ' +
+        'una llamada directa a `issueForPendingUser`: la recuperacion de contrasena de **QC-96** ' +
+        `o el restablecimiento de **QC-89** no entran por aqui. Quien la usa hoy:\n${usuarios.join('\n')}`,
+    ).toEqual([...USUARIOS_DEL_ENVIO].sort());
+  });
+
+  it('el envio compartido sigue exportando sus dos funciones y el censo las reconoce', () => {
+    // Ancla: un renombrado dejaria el censo de arriba verde con la lista vacia.
+    const fuente = leer(ENVIO_COMPARTIDO);
+    expect(fuente).toMatch(/export async function sendCredentialSetupLink\s*\(/);
+    expect(fuente).toMatch(/export async function resendCredentialSetupLinkTo\s*\(/);
+
+    // Dispara con el import (relativo o por alias) y con la llamada al reenvio...
+    expect(usaElEnvio("import { sendCredentialSetupLink } from './credential-setup-mail';")).toBe(true);
+    expect(
+      usaElEnvio("import { x } from '@/lib/modules/identity/domain/credential-setup-mail';"),
+    ).toBe(true);
+    expect(usaElEnvio('await resendCredentialSetupLinkTo(deps, target);')).toBe(true);
+    // ...y no con el metodo homonimo del puerto del correo, ni con el contenido del correo, ni
+    // con un comentario.
+    expect(usaElEnvio('await deps.mailer.sendCredentialSetupLink({ to, secret });')).toBe(false);
+    expect(usaElEnvio("import { a } from './credential-setup-mail-content';")).toBe(false);
+    expect(usaElEnvio('// resendCredentialSetupLinkTo(deps, target)')).toBe(false);
   });
 
   it('el metodo censado sigue existiendo con ese nombre en su puerto y en su adaptador', () => {

@@ -8,27 +8,27 @@
 
 ## Tasks
 
-- [ ] **T1 [P] — Código de error `company_last_administrator`.**
+- [x] **T1 [P] — Código de error `company_last_administrator`.**
   `CompanyLastAdministratorError` en `identity/domain/errors.ts`; el código en
   `errores/domain/error-codes.ts` (con su línea «Distinto de `last_administrator`…» y la enmienda
   fechada en la cabecera) y su clave y texto en `errores/domain/error-catalog.ts` (`design.md > 3.4`).
   **Hecho:** typecheck verde; `tests/unit/errores/catalogo.test.ts` y el test de errores de identity
   cubren la clase nueva (código estable, texto del catálogo). R23.
 
-- [ ] **T2 [P] — Esquemas, vistas y lista blanca.**
+- [x] **T2 [P] — Esquemas, vistas y lista blanca.**
   `administrator-input.ts`, `administrator-view.ts`, `administrator-queryable.ts`
   (`design.md > 3.1–3.3`). **Hecho:** `tests/unit/identity/administradores/administrator-input.test.ts`
   verde con R12, R13 (rechaza `roleId`, `credential`, `accountStatus`, faltantes, topes, empresa no
   uuid) y R19 (la edición rechaza `companyId`, `roleId`, `credential`, `accountStatus`).
 
-- [ ] **T3 [P] — Extraer el envío del enlace.**
+- [x] **T3 [P] — Extraer el envío del enlace.**
   `sendCredentialSetupLink` de `create-company.ts` a `domain/credential-setup-mail.ts`, sin cambiar
   su comportamiento, y en el mismo archivo `resendCredentialSetupLinkTo`, extraída del cuerpo de
   `issue-credential-setup-link.ts`, que pasa a llamarla (`design.md > 3.5`). **Hecho:**
   `tests/unit/identity/companies/create-company.test.ts` y `tests/unit/identity/credencial/resend-link.test.ts`
   siguen verdes sin tocarlos.
 
-- [ ] **T4 — Puerto `AdministratorRepository`.** Depende de T2.
+- [x] **T4 — Puerto `AdministratorRepository`.** Depende de T2.
   `ports/administrator-repository.ts` (`design.md > 4`). **Hecho:** typecheck verde; ningún método
   recibe un rol.
 

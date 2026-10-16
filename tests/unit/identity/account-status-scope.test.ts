@@ -379,6 +379,14 @@ const SITIOS_PERMITIDOS = [
   // QC-162 R11 — el alta de empresa crea su primer Administrador en `pending`, en la misma
   // transaccion que la empresa, con los invariantes del alta de usuario. Solo lo escribe al nacer.
   'lib/modules/identity/adapters/driven/persistence/company-prisma.ts',
+
+  // QC-165 R5, R10 — la fila y la ficha del Administrador que ve el Maestro llevan el estado de
+  // cuenta ALMACENADO, como `UserRow` (`design.md > 3.2`). Importa `UserAccountStatus` de
+  // `account-status.ts`: no declara un segundo conjunto, no lo traduce y no lo escribe.
+  'lib/modules/identity/domain/administrator-view.ts',
+  // QC-165 R8 — la lista blanca del listado de Administradores declara `accountStatus` como campo
+  // ORDENABLE (`design.md > 3.3`). Solo ordena: no es filtrable ni decide nada sobre el valor.
+  'lib/modules/identity/domain/administrator-queryable.ts',
 ] as const;
 
 /**
