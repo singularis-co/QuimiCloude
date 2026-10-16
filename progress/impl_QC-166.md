@@ -163,3 +163,61 @@ T7:
 - `canModifyCompanies` se repite en `[id]/page.tsx`: no puede vivir en el barrel del padre porque la cabecera (cliente) lo importa y arrastraría `@/lib/composition` al cliente.
 
 Veredicto: T6 y T7 hechas, todo en verde.
+
+## T8 · E2E de acceso y de empresas (2026-10-16)
+
+Commits: `a2563b66` fix(QC-166) tipo de documento del alta · `365353be` test(QC-166) T8.
+
+### Archivos
+- `e2e/maestro-acceso.spec.ts` (nuevo, R43)
+- `e2e/maestro-empresas.spec.ts` (nuevo, R44)
+- `e2e/helpers/maestro.ts` (nuevo): `maestroCredentials()` (`SEED_MAESTRO_*`) y `deleteFixtureCompanies()`
+- `tests/guards/guard-identificador-de-request.test.ts`: alta de los dos specs en la lista cerrada `E2E_ESPERADOS` (design.md > 10)
+- Fix aparte: `app/(private)/maestro/empresas/components/company-create-sheet.tsx` + `tests/ui/maestro/company-create-sheet.test.tsx` (caso nuevo R17)
+
+### Mapa R → caso
+| R | Caso |
+|---|---|
+| R43 (login → `/maestro/empresas`, solo «Plataforma») | `maestro-acceso.spec.ts` › el login del Maestro aterriza en Empresas con solo «Plataforma» en el menú |
+| R43 (ERP → 404 privado) | `maestro-acceso.spec.ts` › una pantalla del ERP le responde al Maestro el 404 de la zona privada |
+| R43 (usuario de empresa → 404, sin «Plataforma») | `maestro-acceso.spec.ts` › un usuario de empresa recibe el 404 en Empresas y no ve «Plataforma» |
+| R43 (cierre de sesión) | `maestro-acceso.spec.ts` › el Maestro cierra sesión como cualquiera |
+| R44 (alta, edición de país en la columna País, baja con nombre erróneo y correcto, sin filtro / «De baja», reactivación, Historial alta + «País» + baja, sesión cortada) | `maestro-empresas.spec.ts` › el Maestro da de alta, edita el país, da de baja, reactiva y ve el Historial; la sesión de la empresa dada de baja se corta (R44) |
+
+### Salida de la verificación
+- `pnpm exec playwright test e2e/maestro-acceso.spec.ts e2e/maestro-empresas.spec.ts` (ejecución final):
+  ```
+  ok  2 [chromium] maestro-acceso › el login del Maestro aterriza en Empresas con solo «Plataforma» en el menú (32.0s)
+  ok  5 [chromium] maestro-acceso › una pantalla del ERP le responde al Maestro el 404 de la zona privada (36.1s)
+  ok  3 [chromium] maestro-acceso › un usuario de empresa recibe el 404 en Empresas y no ve «Plataforma» (37.4s)
+  ok  1 [chromium] maestro-acceso › el Maestro cierra sesión como cualquiera (37.6s)
+  ok  4 [webkit]   maestro-acceso › el login del Maestro aterriza en Empresas con solo «Plataforma» en el menú (39.3s)
+  ok  8 [webkit]   maestro-acceso › una pantalla del ERP le responde al Maestro el 404 de la zona privada (14.3s)
+  ok  7 [webkit]   maestro-acceso › un usuario de empresa recibe el 404 en Empresas y no ve «Plataforma» (17.5s)
+  ok  9 [webkit]   maestro-acceso › el Maestro cierra sesión como cualquiera (19.0s)
+  ok  6 [chromium] maestro-empresas › el Maestro da de alta, edita el país, ... la sesión ... se corta (R44) (1.2m)
+  ok 10 [webkit]   maestro-empresas › el Maestro da de alta, edita el país, ... la sesión ... se corta (R44) (45.8s)
+  10 passed (2.1m)
+  ```
+  Tras la ejecución, 0 empresas y 0 usuarios `qc166_%` en la base.
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errores, 10 warnings previos en archivos ajenos a T8.
+- `pnpm exec vitest run guard`: 80 archivos, 1096 passed, 20 skipped.
+- `pnpm exec vitest run tests/ui/maestro/company-create-sheet.test.tsx`: 15 passed (el caso nuevo falla sin el fix).
+- Tests que recorren `e2e/` (scope de módulos, data-table-alcance, etc.): 11 archivos, 155 passed.
+
+### Notas y desvíos
+- **Bug destapado (fix aparte, `a2563b66`):** `adminValues` del alta rellenaba con `''` los campos
+  vacíos, y ese `''` tapaba el `?? DOCUMENT_TYPE_CODES[0]` de `AdministratorFields`. El alta llegaba sin
+  `adminDocumentTypeCode` y el servidor respondía `invalid_input`. Ahora se omiten las claves vacías.
+- **Para el leader:** el servidor exige teléfono y número de documento del Administrador (reglas del
+  alta de usuario), pero `AdministratorFields` no les pone la marca de obligatorio. design.md > 2.2
+  solo declara el desvío de la fecha de nacimiento. No lo he cambiado (afecta a T2 y al tablero).
+  El E2E rellena los dos campos.
+- La búsqueda y el filtro «De baja» se ponen por la URL (`?q=`, `?estado=de-baja`), que es el estado
+  de la lista. Así el spec no nombra los testids de la tabla compartida y no entra en la lista cerrada
+  R36 de `data-table-alcance`.
+- Durante el streaming, la lista sale un instante dos veces (la copia oculta fuera de
+  `private-content`). Los localizadores se acotan a `private-content`. En WebKit, el `router.refresh()`
+  de la reactivación chocaba con el `goto` siguiente, así que se espera a que la fila salga de «De baja».
+- El toast del alta acepta las dos variantes (enviado o fallido), según design.md > 10.

@@ -79,7 +79,7 @@ mergeado; `design.md > 5` ya está alineado con su `design.md`, reenvío incluid
     añadidos con `ADDON_NAMES`, desconocidos sin lanzar), `tests/ui/maestro/company-history-panel.test.tsx`.
   - **Hecho:** ningún valor de campo en el DOM; paginación en la dirección.
 
-- [ ] **T8 · E2E de acceso y de empresas** (R43, R44). Depende de T7.
+- [x] **T8 · E2E de acceso y de empresas** (R43, R44). Depende de T7.
   - `e2e/maestro-acceso.spec.ts`, `e2e/maestro-empresas.spec.ts` (`design.md > 10`). Si hace falta
     un helper, en `e2e/helpers/maestro.ts`.
   - Correr solo esos dos: `pnpm exec playwright test e2e/maestro-acceso.spec.ts e2e/maestro-empresas.spec.ts`.
