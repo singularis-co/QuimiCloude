@@ -85,9 +85,14 @@ async function save(_previous: CreateState, formData: FormData): Promise<CreateS
   return INITIAL_STATE;
 }
 
+// Sin las claves vacías: un `''` taparía el valor de partida de `AdministratorFields` (el tipo de
+// documento arrancaría sin elegir y el alta llegaría sin él).
 function adminValues(values: Values): Partial<Record<AdministratorFieldName, string>> {
   return Object.fromEntries(
-    ADMINISTRATOR_FIELD_NAMES.map((field) => [field, values[administratorFieldName(field, ADMIN_PREFIX)] ?? '']),
+    ADMINISTRATOR_FIELD_NAMES.flatMap((field) => {
+      const value = values[administratorFieldName(field, ADMIN_PREFIX)] ?? '';
+      return value === '' ? [] : [[field, value]];
+    }),
   );
 }
 

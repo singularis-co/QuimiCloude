@@ -15,6 +15,7 @@ import {
   administratorFieldTestId,
 } from '@/components/shared/administrator-fields';
 import type { ErrorState } from '@/lib/modules/errores';
+import { DOCUMENT_TYPE_CODES } from '@/lib/modules/identity';
 
 import { setupUser } from '../../helpers/user-event';
 
@@ -154,6 +155,20 @@ describe('el panel «Nueva empresa»', () => {
     expect([...new Set(formData.keys())].sort()).toEqual([...DOCE_NOMBRES].sort());
     expect(formData.get('name')).toBe('Aseo Caribe');
     expect(formData.get('adminUsername')).toBe('pgil');
+  });
+
+  it('R17: sin tocar el tipo de documento, el FormData lleva el de partida', async () => {
+    createCompanyActionMock.mockResolvedValue({
+      status: 'success',
+      companyId: 'c',
+      administratorId: 'a',
+      mail: 'sent',
+    });
+    const user = await abrir();
+    escribir();
+    await enviar(user);
+    const formData = createCompanyActionMock.mock.calls[0]![1];
+    expect(formData.get('adminDocumentTypeCode')).toBe(DOCUMENT_TYPE_CODES[0]);
   });
 
   it('R6: sin empresas.modificar no hay disparador ni panel', () => {
