@@ -20,6 +20,7 @@ import {
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
+  MAESTRO_COMPANIES_ROUTE,
   ORDERS_ROUTE,
   PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
@@ -187,6 +188,12 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
   // la fila y se TENSA el resto del centinela -el ancla de consumidores minimos sube de siete a
   // ocho-, nunca se afloja: la lista sigue CERRADA y una DECIMA pantalla vuelve a poner esto en
   // rojo.
+  //
+  // AMPLIADO el 2026-10-16 (QC-166, area-del-maestro): entra la UNDECIMA pantalla declarada -la
+  // lista de empresas del maestro-, y la trae una decision de diseno aprobada, no un descuido:
+  // `specs/QC-166-area-del-maestro/design.md > Componentes nuevos` dice que `CompanyTable` compone
+  // `DataTable`. Se anade la fila y se TENSA el ancla de consumidores minimos de diez a once, nunca
+  // se afloja: la lista sigue CERRADA y una DUODECIMA pantalla vuelve a poner esto en rojo.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
   /**
@@ -216,6 +223,10 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     // 2026-10-08 (QC-167): la lista del recorrido de ejecucion del dashboard se monta sobre la
     // tabla compartida por decision de diseno (`design.md` de QC-167 > 4.3). Es la DECIMA.
     DASHBOARD_ROUTE,
+    // 2026-10-16 (QC-166): la lista de empresas del maestro se monta sobre la tabla compartida por
+    // decision de diseno (`design.md` de QC-166 > Componentes nuevos: `CompanyTable` compone
+    // `DataTable`). Es la UNDECIMA.
+    MAESTRO_COMPANIES_ROUTE,
   ].map(carpetaDeRuta)
 
   function carpetaDeRuta(ruta: string): string {
@@ -228,7 +239,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     )
   }
 
-  it('solo las diez pantallas autorizadas importan components/shared/data-table', () => {
+  it('solo las once pantallas autorizadas importan components/shared/data-table', () => {
     let consumidores = 0
     for (const relDir of consumerDirs) {
       const files = walkCodeFiles(join(repoRoot, ...relDir.split('/')))
@@ -236,7 +247,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
         if (!/components\/shared\/data-table/.test(readSource(file))) continue
         expect(
           autorizada(file),
-          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las diez pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion, clientes, dashboard): migrar una undecima es una decision, no un descuido (R29, R34)`,
+          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las once pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion, clientes, dashboard, empresas del maestro): migrar una duodecima es una decision, no un descuido (R29, R34)`,
         ).toBe(true)
         consumidores += 1
       }
@@ -244,8 +255,8 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor. El ancla se
     // TENSA con cada alta: hoy son NUEVE pantallas autorizadas, asi que se exige al menos un
     // consumidor por pantalla (2026-09-25; antes eran ocho). 2026-10-08 (QC-167): DIEZ, con el
-    // dashboard.
-    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(9)
+    // dashboard. 2026-10-16 (QC-166): ONCE, con la lista de empresas del maestro.
+    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(10)
   })
 
   it('la pantalla de recetas SI consume la tabla compartida (R29)', () => {
