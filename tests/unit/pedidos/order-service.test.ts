@@ -33,6 +33,7 @@ import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
+import { fakeDeliveryProgress } from '../../helpers/delivery-progress-double';
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -453,6 +454,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
       packaging: fakePackagingCatalog(),
       units: { findRefs: vi.fn(async () => []) } as unknown as UnitCatalog,
       log,
+      deliveryProgress: fakeDeliveryProgress(),
     })({ page: 1 }, ADMIN)
 
     expect(pagina.items[0]?.ingredientsCost).toBe('1234.5600')

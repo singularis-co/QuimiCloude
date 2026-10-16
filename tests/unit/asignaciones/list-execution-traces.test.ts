@@ -423,7 +423,6 @@ describe('listExecutionTraces — la fila', () => {
       formulaName: null,
       formulaImageUrl: null,
       presentations: [],
-      pendingDelivery: [],
     });
     // Produccion 60 + empaque 30: la espera entre finish y pack_start no cuenta.
     expect(fila!.totalDuration).toEqual({ kind: 'closed', ms: 90 * MIN });
@@ -659,7 +658,7 @@ describe('listExecutionTraces — el equipo del acondicionamiento', () => {
   });
 });
 
-describe('listExecutionTraces — formula, presentaciones y por entregar', () => {
+describe('listExecutionTraces — formula y presentaciones', () => {
   const IMAGEN = 'https://cdn.example/recetas/shampoo.png';
   const catalogos = {
     recipes: [receta(RECETA, 'Shampoo', IMAGEN)],
@@ -705,40 +704,6 @@ describe('listExecutionTraces — formula, presentaciones y por entregar', () =>
       { label: 'Galón', quantity: 10 },
       { label: 'Vaso', quantity: 5 },
     ]);
-    // Nada entregado todavia: falta todo.
-    expect(fila.pendingDelivery).toEqual(fila.presentations);
-  });
-
-  it('pendingDelivery descuenta lo entregado de lo contado al empacar y omite lo que ya no falta', async () => {
-    const m = montar({
-      orders: [resumen(PEDIDO_A, { status: 'TERMINADO' })],
-      entries: [anotacion(PEDIDO_A, 'start', 0)],
-      progress: [
-        progreso(PEDIDO_A, RECETA, [
-          linea(GALON, 10, { packedPackages: 8, deliveredPackages: 3 }),
-          linea(VASO, 5, { deliveredPackages: 5 }),
-        ]),
-      ],
-      ...catalogos,
-    });
-    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
-    expect(fila.presentations).toEqual([
-      { label: 'Galón', quantity: 10 },
-      { label: 'Vaso', quantity: 5 },
-    ]);
-    expect(fila.pendingDelivery).toEqual([{ label: 'Galón', quantity: 5 }]);
-  });
-
-  it('un pedido ENTREGADO no debe nada aunque no tenga entregas anotadas', async () => {
-    const m = montar({
-      orders: [resumen(PEDIDO_A, { status: 'ENTREGADO' })],
-      entries: [anotacion(PEDIDO_A, 'start', 0)],
-      progress: [progreso(PEDIDO_A, RECETA, [linea(GALON, 10)])],
-      ...catalogos,
-    });
-    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
-    expect(fila.presentations).toEqual([{ label: 'Galón', quantity: 10 }]);
-    expect(fila.pendingDelivery).toEqual([]);
   });
 
   it('un pedido dado de baja devuelve lo que hay: receta de baja incluida, linea sin presentacion omitida', async () => {
@@ -754,7 +719,6 @@ describe('listExecutionTraces — formula, presentaciones y por entregar', () =>
     expect(fila.formulaName).toBe('Shampoo');
     expect(fila.formulaImageUrl).toBe(IMAGEN);
     expect(fila.presentations).toEqual([{ label: 'Vaso', quantity: 2 }]);
-    expect(fila.pendingDelivery).toEqual([{ label: 'Vaso', quantity: 2 }]);
   });
 
   it('un pedido sin progreso sale con listas vacias y sin consultar los catalogos', async () => {
@@ -762,7 +726,6 @@ describe('listExecutionTraces — formula, presentaciones y por entregar', () =>
     const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
     expect([fila.formulaName, fila.formulaImageUrl]).toEqual([null, null]);
     expect(fila.presentations).toEqual([]);
-    expect(fila.pendingDelivery).toEqual([]);
     expect(m.findPresentationRefs).not.toHaveBeenCalled();
     expect(m.findRecipeRefs).not.toHaveBeenCalled();
   });

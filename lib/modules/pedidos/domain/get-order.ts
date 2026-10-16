@@ -131,8 +131,8 @@ export async function findPackagingNames(
  * Compone la salida de una fila con los nombres ya resueltos (R42, R43, R44, R46).
  *
  * Vive aqui y lo IMPORTA `list-orders.ts` para que la ficha y el listado no puedan diverger:
- * `OrderSummary` es un alias de `OrderView` (`design.md > 7.3`) y una segunda copia de este
- * mapeo seria el sitio exacto por donde empezarian a diferir.
+ * `OrderSummary` es `OrderView` mas lo pendiente de entregar, y una segunda copia de este mapeo
+ * seria el sitio exacto por donde empezarian a diferir.
  *
  * `recipeName` es `null` solo si el id NO vuelve del catalogo -una receta borrada FISICAMENTE
  * por consola, que las FK `RESTRICT` de QC-33 hacen casi imposible-: la fila SIGUE saliendo

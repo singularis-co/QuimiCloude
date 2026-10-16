@@ -548,6 +548,7 @@ describe('pedidos: cancelar y borrar desde la fila (R33)', () => {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
     recipeImageUrl: null,
   };

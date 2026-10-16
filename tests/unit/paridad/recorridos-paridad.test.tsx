@@ -70,7 +70,6 @@ const FILAS: readonly ExecutionTraceRow[] = [
     formulaName: null,
     formulaImageUrl: null,
     presentations: [],
-    pendingDelivery: [],
   },
   {
     orderId: 'order-2',
@@ -86,7 +85,6 @@ const FILAS: readonly ExecutionTraceRow[] = [
     formulaName: null,
     formulaImageUrl: null,
     presentations: [],
-    pendingDelivery: [],
   },
 ];
 

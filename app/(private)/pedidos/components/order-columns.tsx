@@ -9,6 +9,8 @@ import {
 } from '@/lib/modules/pedidos';
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
+import { formatPresentationQuantities } from '@/lib/shared/ui/presentation-quantities';
 
 import { orderCustomerLabel } from './order-customer-label';
 import {
@@ -92,6 +94,7 @@ export const RECIPE_NAME_COLUMN_ID = 'recipeName';
 export const ORDER_CUSTOMER_NAME_COLUMN_ID = 'customer';
 export const QUANTITY_COLUMN_ID = 'quantity';
 export const PRESENTATION_NAME_COLUMN_ID = 'presentationName';
+export const PENDING_DELIVERY_COLUMN_ID = 'pendingDelivery';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
 export const COVERAGE_COLUMN_ID = 'coverage';
 /** QC-102 R16 — la columna propia de responsables. */
@@ -100,6 +103,10 @@ export const ACTIONS_COLUMN_ID = 'actions';
 
 /** Glifo del marcador de ausencia. Constante para que ningun test dependa del caracter. */
 export const MISSING_VALUE_MARK = '—';
+
+/** Todo lo empacado ya se entrego: se lee como el estado `ENTREGADO`. */
+export const NOTHING_PENDING_MARK = ORDER_STATUS_LABELS.ENTREGADO;
+export const PENDING_DELIVERY_TESTID = 'order-pending-delivery';
 
 /**
  * Marcador identificable de «este dato no viene informado» (R9, R11).
@@ -112,6 +119,38 @@ function MissingValue({ field }: { readonly field: string }) {
   return (
     <span aria-label="Sin dato" data-testid={`order-missing-${field}`}>
       {MISSING_VALUE_MARK}
+    </span>
+  );
+}
+
+/**
+ * Celda «Por entregar». `delivered` se lee «Entregado»; `not_packed` -y un `pending` sin
+ * presentaciones con nombre- lleva el marcador de ausencia, porque no hay nada que entregar
+ * que se pueda nombrar. Con varias presentaciones el texto salta de linea.
+ */
+function PendingDelivery({ order }: { readonly order: OrderSummary }) {
+  const state = order.pendingDelivery;
+  const text = state.kind === 'pending' ? formatPresentationQuantities(state.items) : '';
+  if (text === '') {
+    return (
+      <span
+        data-testid={PENDING_DELIVERY_TESTID}
+        data-state={state.kind}
+        data-empty="true"
+        className="text-muted-foreground"
+      >
+        {state.kind === 'delivered' ? NOTHING_PENDING_MARK : MISSING_VALUE_MARK}
+      </span>
+    );
+  }
+  return (
+    <span
+      data-testid={PENDING_DELIVERY_TESTID}
+      data-state={state.kind}
+      title={text}
+      className="inline-block max-w-xs align-middle break-words whitespace-normal"
+    >
+      {text}
     </span>
   );
 }
@@ -270,6 +309,12 @@ export function buildOrderColumns({
           />
         );
       },
+    },
+    {
+      id: PENDING_DELIVERY_COLUMN_ID,
+      label: 'Por entregar',
+      align: 'start',
+      cell: (order) => <PendingDelivery order={order} />,
     },
     {
       id: CREATED_AT_COLUMN_ID,

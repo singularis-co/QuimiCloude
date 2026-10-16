@@ -178,6 +178,7 @@ function pedido(id: string, sequence: number, status: OrderSummary['status']): O
     ],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
     recipeImageUrl: null,
   };

@@ -107,6 +107,7 @@ function pedido(status: OrderStatus = 'ENTREGADO', overrides: Partial<OrderSumma
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: ACTUAL,
     recipeImageUrl: null,
     ...overrides,

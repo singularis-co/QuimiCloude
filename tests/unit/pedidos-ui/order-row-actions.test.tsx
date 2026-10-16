@@ -89,6 +89,7 @@ function pedido(status: OrderStatus, overrides: Partial<OrderSummary> = {}): Ord
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
     recipeImageUrl: null,
     ...overrides,
