@@ -1,4 +1,4 @@
-﻿Tipo;Nombre;Unidad;Presentación;Fórmula;Existencia;Costo unitario;Lote;Fecha de compra;Fecha de vencimiento;Alerta de cantidad
+﻿Tipo;Nombre;Unidad;Presentación;Fórmula;Cantidad;Costo unitario;Lote;Fecha de compra;Fecha de vencimiento;Alerta de cantidad
 Insumo;qc209_e2e_{{RUN}}_insumo_nuevo;kilogramo;;;25;3,50;qc209_{{RUN}}_L01;;;5
 Insumo;qc209_e2e_{{RUN}}_insumo_existente;kilogramo;;;5;2;qc209_{{RUN}}_L02;;;1
 Envase;qc209_e2e_{{RUN}}_envase;;qc209_e2e_{{RUN}}_botella;;40;0,25;qc209_{{RUN}}_L03;;;10

@@ -99,7 +99,7 @@ describe('planInventoryImport — reglas de campo del alta manual', () => {
   it('R10 el mensaje nombra la columna afectada', () => {
     const result = plan(sheet({ ...ROW_INSUMO, stock: 'abc' }));
     const previewRow = result.rows[0];
-    expect(previewRow?.status === 'error' && previewRow.issues[0]?.message).toMatch(/^Existencia: /u);
+    expect(previewRow?.status === 'error' && previewRow.issues[0]?.message).toMatch(/^Cantidad: /u);
   });
 
   it('R10 insumo, envase y terminado sin costo: un unico motivo value_required en «Costo unitario»', () => {

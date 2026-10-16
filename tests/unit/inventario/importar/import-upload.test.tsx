@@ -161,12 +161,12 @@ describe('rechazo del archivo entero', () => {
 
   for (const code of conColumnas) {
     it(`R4 «${code}» nombra cada columna`, () => {
-      render(<ImportFileRejection rejection={{ code, columns: ['Existencia', 'Costo unitarios'] }} />);
+      render(<ImportFileRejection rejection={{ code, columns: ['Cantidad', 'Costo unitarios'] }} />);
 
       const columnas = within(screen.getByTestId(REJECTION_TESTID))
         .getAllByTestId(REJECTION_COLUMN_TESTID)
         .map((item) => item.textContent);
-      expect(columnas).toEqual(['Existencia', 'Costo unitarios']);
+      expect(columnas).toEqual(['Cantidad', 'Costo unitarios']);
     });
   }
 });

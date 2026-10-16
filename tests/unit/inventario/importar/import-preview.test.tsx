@@ -164,7 +164,7 @@ describe('tabla de la vista previa', () => {
     expect(motivos.map((m) => m.getAttribute('data-column'))).toEqual(['unit', 'stock']);
     expect(motivos.map((m) => m.textContent)).toEqual([
       'Unidad: «Galón» no existe.',
-      'Existencia: «4,5,1» no es un número.',
+      'Cantidad: «4,5,1» no es un número.',
     ]);
   });
 

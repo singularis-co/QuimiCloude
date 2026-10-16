@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import Papa from 'papaparse';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -12,9 +13,12 @@ import {
   MISSING_UNIT_TESTID,
   NOTHING_IMPORTED_MESSAGE_TESTID,
   NOTHING_IMPORTED_TESTID,
+  NOTHING_IMPORTED_TITLE,
   PREVIEW_TABLE_TESTID,
   REJECTION_COLUMN_TESTID,
+  REJECTION_MESSAGES,
   REJECTION_TESTID,
+  REJECTION_TITLE,
   RESTART_TESTID,
   RESULT_TESTID,
   RESULT_TITLE,
@@ -27,6 +31,7 @@ import {
   UPLOAD_INPUT_TESTID,
   UPLOAD_TOO_LARGE_TESTID,
   alreadyImportedMessage,
+  importedToastMessage,
   nothingImportedMessage,
 } from '@/app/(private)/inventario/importar/components';
 import { UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID } from '@/components/shared/unexpected-error-notice';
@@ -69,6 +74,10 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 
 vi.mock('@/app/(private)/inventario/importar/components/download-file', () => ({
   downloadFile: downloadFileMock,
+}));
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
 const ARCHIVO = new File(['Tipo;Nombre'], 'inventario.csv', { type: 'text/csv' });
@@ -157,13 +166,13 @@ describe('vista previa', () => {
   it('R4 R5 un archivo rechazado entero muestra el motivo y no ofrece confirmar', async () => {
     previewMock.mockResolvedValue({
       status: 'success',
-      data: { kind: 'file_rejected', rejection: { code: 'missing_columns', columns: ['Existencia'] } },
+      data: { kind: 'file_rejected', rejection: { code: 'missing_columns', columns: ['Cantidad'] } },
     });
 
     await subirYRevisar();
 
     const rechazo = await screen.findByTestId(REJECTION_TESTID);
-    expect(within(rechazo).getByTestId(REJECTION_COLUMN_TESTID)).toHaveTextContent('Existencia');
+    expect(within(rechazo).getByTestId(REJECTION_COLUMN_TESTID)).toHaveTextContent('Cantidad');
     expect(screen.queryByTestId(CONFIRM_BUTTON_TESTID)).toBeNull();
   });
 
@@ -367,5 +376,102 @@ describe('confirmación', () => {
     responder({ status: 'success', data: resultado() });
     await screen.findByTestId(RESULT_TESTID);
     expect(confirmMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('avisos flotantes', () => {
+  it('al importar avisa con toast.success y el resumen de los totales, y deja el resumen en pantalla', async () => {
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    await screen.findByTestId(RESULT_TESTID);
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(toast.success).toHaveBeenCalledWith(importedToastMessage(resultado().totals));
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('la vista previa no avisa', async () => {
+    await subirYRevisar();
+
+    await screen.findByTestId(PREVIEW_TABLE_TESTID);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it('un archivo rechazado avisa con toast.error y el motivo que se pinta', async () => {
+    previewMock.mockResolvedValue({
+      status: 'success',
+      data: { kind: 'file_rejected', rejection: { code: 'missing_columns', columns: ['Cantidad'] } },
+    });
+
+    await subirYRevisar();
+
+    await screen.findByTestId(REJECTION_TESTID);
+    expect(toast.error).toHaveBeenCalledWith(REJECTION_TITLE, {
+      description: REJECTION_MESSAGES.missing_columns,
+    });
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('si la vista previa falla avisa con toast.error y el mismo mensaje que la pantalla', async () => {
+    previewMock.mockResolvedValue({ status: 'error', code: 'unauthorized', message: 'Sin permiso.' });
+
+    await subirYRevisar();
+
+    expect(await screen.findByTestId(SCREEN_ERROR_TESTID)).toHaveTextContent('Sin permiso.');
+    expect(toast.error).toHaveBeenCalledWith('Sin permiso.');
+  });
+
+  it('un error del servidor al confirmar avisa con toast.error y conserva la vista previa', async () => {
+    confirmMock.mockResolvedValue({ status: 'error', code: 'unexpected', message: 'Algo falló.', reference: 'REF-1' });
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    await screen.findByTestId(SCREEN_ERROR_TESTID);
+    expect(toast.error).toHaveBeenCalledWith('Algo falló.');
+    expect(screen.getByTestId(PREVIEW_TABLE_TESTID)).toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('si al confirmar no se importa nada avisa con toast.error', async () => {
+    confirmMock.mockResolvedValue({ status: 'success', data: nadaImportado() });
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    await screen.findByTestId(NOTHING_IMPORTED_TESTID);
+    expect(toast.error).toHaveBeenCalledWith(NOTHING_IMPORTED_TITLE);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('una importación ya hecha avisa con toast.info', async () => {
+    const importedAt = '2026-10-06T12:00:00.000Z';
+    confirmMock.mockResolvedValue({
+      status: 'success',
+      data: { kind: 'already_imported', importId: '44444444-4444-4444-8444-444444444444', importedAt },
+    });
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    await screen.findByTestId(ALREADY_IMPORTED_TESTID);
+    expect(toast.info).toHaveBeenCalledWith(alreadyImportedMessage(importedAt));
+  });
+});
+
+describe('importedToastMessage', () => {
+  it('resume creados y lotes sumados, en singular y plural', () => {
+    expect(importedToastMessage({ created: 1, batchAdded: 2, duplicate: 0, error: 0 })).toBe(
+      'Inventario importado: 1 producto creado y 2 lotes sumados.',
+    );
+  });
+
+  it('añade las filas que no se importaron', () => {
+    expect(importedToastMessage({ created: 3, batchAdded: 1, duplicate: 1, error: 1 })).toBe(
+      'Inventario importado: 3 productos creados y 1 lote sumado. 2 filas no se importaron.',
+    );
   });
 });
