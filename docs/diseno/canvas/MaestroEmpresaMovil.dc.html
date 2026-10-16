@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Empresa del Maestro en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="MaestroEmpresa" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Empresa (Maestro) · ficha</h2>
+    <dl class="spec">
+      <dt>Ruta</dt><dd><span class="mono">[/maestro/empresas/:id]</span> con pestañas que son enlaces (<span class="mono">?tab=datos|modulos|historial</span>). Ruta por confirmar al acotar QC-166.</dd>
+      <dt>Reutiliza</dt><dd><span class="mono">shared/url-tabs · page-header · status-badge · notice · confirm-dialog · error-state · ui/switch · ui/sonner</span> · nuevo en la ruta: <span class="mono">addon-switch-list</span> (lista de añadidos con su interruptor) y <span class="mono">core-module-chips</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Switch, Tabs, AlertDialog) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>Pestaña Módulos: los 5 añadidos en orden de catálogo, cada uno con estado (Prendido, Apagado, «Sin efecto» si le falta una dependencia) y su Switch · «Necesita Integraciones» en Lectura de PDF con IA; en ámbar si Integraciones está apagada · «Prender todos» y «Apagar todos» (deshabilitados cuando no hay nada que cambiar) · Núcleo como fichas con candado, sin interruptor · prender es inmediato; apagar pide confirmación · empresa de baja: aviso y todos los interruptores deshabilitados · pestaña Datos (solo lectura) y Historial (alta, edición con los campos cambiados, baja, reactivación, añadido prendido o apagado)</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · mismas filas a ancho completo</dd>
+      <dt>Teléfono</dt><dd>Pestañas con scroll horizontal · en cada fila el Switch sube a la derecha del nombre (objetivo de 44 px) y el estado baja bajo la descripción · «Prender todos» y «Apagar todos» a ancho completo · los botones de la cabecera ocupan todo el ancho</dd>
+      <dt>Animación</dt><dd>Switch 150 ms · spinner en el interruptor mientras guarda (el servidor devuelve la vista nueva, sin recargar) · el icono de la fila se tiñe al quedar activa · cambio de pestaña con fundido · «Cargando los módulos…» con esqueleto · toasts «Proveedores prendido.», «Proveedores apagado.», «Se prendieron N módulos.», «Se apagaron N módulos.», «Empresa reactivada.»</dd>
+      <dt>Por confirmar</dt><dd>Descripción de cada añadido (va entre corchetes) · si apagar pide confirmación (no lo exige QC-277; se propone por el descarte de lo pendiente) · nombres de los módulos del núcleo en las fichas · si el Historial nombra al Maestro o dice solo «Maestro» · texto de error al guardar un interruptor (se propone el ErrorAlert del catálogo, junto a la fila)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Administradores del Maestro en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="MaestroAdministradores" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Administradores (Maestro) · ficha</h2>
+    <dl class="spec">
+      <dt>Ruta</dt><dd><span class="mono">[/maestro/administradores]</span>, abierta en QC-166 (se propone esta).</dd>
+      <dt>Reutiliza</dt><dd><span class="mono">shared/data-table · row-actions-menu · form-sheet · save-button · select-field · text-field · date-picker · status-badge · notice · confirm-dialog · page-header · ui/sonner · private/app-sidebar</span> · el formulario de persona es el mismo de Usuarios (<span class="mono">user-form</span>) sin el campo Rol</dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Menu, Dialog, AlertDialog, Sheet, Select) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>Una sola lista de los Administradores de todas las empresas · columnas Nombre, Usuario, Correo, Empresa (enlace a la empresa), Estado · filtro único «Empresa» · ⋯ con Editar y Dar de baja · «Nuevo administrador» abre un Sheet ancho que empieza por la Empresa (solo activas); el rol es siempre Administrador y no se elige</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · tabla con scroll horizontal dentro de su caja · Sheets anchos (600 px)</dd>
+      <dt>Teléfono</dt><dd>Tabla a tarjetas (avatar, nombre, estado, usuario, correo y empresa) · «Acciones» abre el menú centrado con objetivos de 48 px · Sheet a pantalla completa; los pares de campos pasan a una columna</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · cambio de filtro con fundido · Sheet 300/150 ms · toasts «Administrador creado. Enviamos el enlace.», «Administrador actualizado.», «Administrador dado de baja.»</dd>
+      <dt>Por confirmar</dt><dd>Depende de QC-165 (sin acciones de servidor todavía) · qué pasa al dar de baja al último Administrador de una empresa (aviso entre corchetes) · si se puede mover un Administrador a otra empresa (por ahora la Empresa no se edita) · si la lista agrupa por empresa o filtra (se propone filtrar)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
