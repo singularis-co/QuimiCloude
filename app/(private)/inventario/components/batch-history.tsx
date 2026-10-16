@@ -2,6 +2,8 @@
 
 import { useEffect, useEffectEvent, useState } from 'react';
 
+import { XIcon } from 'lucide-react';
+
 import {
   DataTable,
   createDefaultParams,
@@ -10,7 +12,8 @@ import {
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { listBatchMovementsAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { ErrorState } from '@/lib/modules/errores';
 import type { BatchHistoryEntry } from '@/lib/modules/inventario';
@@ -20,6 +23,7 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { movementReasonLabel } from './movement-reason-label';
 
 const HISTORY_TITLE = 'Historial del lote';
+const CLOSE_LABEL = 'Close';
 const LOADING_MESSAGE = 'Cargando historial…';
 const BEFORE_LEDGER_MESSAGE = 'Este lote es anterior al libro de movimientos: no tiene historial registrado.';
 
@@ -238,8 +242,16 @@ export function BatchHistory({ batchId, batchLot, open, onOpenChange }: BatchHis
       <DialogContent
         data-testid="batch-history-dialog"
         className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[min(1000px,calc(100%-2rem))]"
+        showCloseButton={false}
       >
-        <DialogHeader>
+        {/* El cierre del primitivo mide 32 px: en el teléfono hace falta el objetivo de 44. */}
+        <DialogClose
+          render={<Button type="button" variant="ghost" size="icon" touch className="absolute top-2 right-2" />}
+        >
+          <XIcon aria-hidden="true" />
+          <span className="sr-only">{CLOSE_LABEL}</span>
+        </DialogClose>
+        <DialogHeader className="pr-10">
           <DialogTitle>
             {HISTORY_TITLE}{' '}
             <span className="font-mono tabular-nums" data-testid="batch-history-lot">

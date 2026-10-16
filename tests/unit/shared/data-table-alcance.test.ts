@@ -671,7 +671,18 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // tambien como tarjeta con los mismos `data-testid` dentro, y el historial del lote pasa a la
   // tabla compartida: el spec acota la fila del producto, la del lote y la del asiento por
   // `data-table-row-<id>`. El centinela pasa de CUARENTA Y NUEVE a CINCUENTA; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta', () => {
+  //
+  // Alta el 2026-10-16 (QC-263) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: entra `e2e/inventario-rediseno.spec.ts`, que no
+  // estrena tabla. Mide la lista de inventario, el panel «Lotes» y el historial del lote, ya en esta
+  // lista, a 1440, 820 y 390 px: localiza la fila por `data-table-row-<id>` (tambien las sub-filas
+  // `<id>--batch-<lote>` y los asientos `opening-<id>`), sus celdas por `data-table-cell-<id>` y sus
+  // cabeceras por `data-table-head-<id>`, y las tarjetas por `data-table-cards`,
+  // `data-table-card-<id>` y `data-table-card-field-<id>`; en la importacion, las filas de la vista
+  // previa y del resultado por `data-table-row-<fila>`. El centinela pasa de CINCUENTA a CINCUENTA Y
+  // UNO; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y uno', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -681,7 +692,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cincuenta E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cincuenta y uno E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -746,6 +757,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-10-06, QC-209). Va antes que `inventario.spec.ts` porque la
       // lista esta ORDENADA y '-' precede a '.'.
       'e2e/inventario-importar.spec.ts',
+      // Ver la nota de arriba (2026-10-16, QC-263). Entre `inventario-importar` e `inventario`
+      // porque la lista esta ORDENADA: 'i' precede a 'r', y '-' precede a '.'.
+      'e2e/inventario-rediseno.spec.ts',
       'e2e/inventario.spec.ts',
       // La DECIMA la trae QC-93 el 2026-09-15 (R18): ver la nota de arriba. Es la sonda del usuario
       // sin permisos de modulo: afirma que `data-table` NO esta, no consume la tabla.

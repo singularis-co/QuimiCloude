@@ -198,7 +198,7 @@ solo su parte y el commit cita la fila de `design.md > 6`.
 
 ## Tanda 7 — E2E (depende de todas)
 
-- [ ] **T7a. E2E nuevo** `e2e/inventario-rediseno.spec.ts` con los casos de `design.md > 7` (R1–R3,
+- [x] **T7a. E2E nuevo** `e2e/inventario-rediseno.spec.ts` con los casos de `design.md > 7` (R1–R3,
   R5–R7, R9, R11, R13–R15, R19–R21, R23, R25, R28, R31–R33, R38, R42, R43 y, por la enmienda, R47,
   R48, R49, R52), midiendo con
   `boundingBox` y estilos computados, y su alta en `E2E_ESPERADOS` de

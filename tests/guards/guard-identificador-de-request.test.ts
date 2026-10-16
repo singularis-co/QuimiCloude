@@ -463,6 +463,20 @@ export const E2E_ESPERADOS = [
   // ficha, no ve la columna ni ninguna foto. No lee ni afirma nada sobre el identificador de
   // peticion ni sobre `reference`.
   'consulta-de-evidencia.spec.ts',
+  // Alta el 2026-10-16 (QC-263) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en chromium y webkit, `/inventario` a 1440 px
+  // pinta «Importar» y «Nuevo producto», las pestanas como enlaces, las cifras a la derecha con la
+  // misma x final que su cabecera, la existencia en alarma y el vencimiento cercano en el tono de
+  // advertencia, el menu de la fila con su separador y «Borrar» destructivo, las sub-filas de lote
+  // sin menu, «Historial» que abre el lote unico o «Lotes», el panel de 900 px con tabla, el
+  // historial con tabla que al cerrarse deja el panel y el motivo exigido bajo su campo; a 820 px,
+  // tarjetas y el historial con 16 px a cada lado; a 390 px, tarjetas con «Acciones» de 44 px, el
+  // menu centrado con items de 48 px, lotes, sub-filas e historial en tarjetas y los dialogos
+  // enteros y centrados; y la importacion pasa por los pasos 1, 2, 3 y 1 con sus estados en tono,
+  // «Unidad creada.» una vez, la guia debajo y sin desbordar a los tres anchos. No lee ni afirma
+  // nada sobre el identificador de peticion ni sobre `reference`.
+  'inventario-rediseno.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

@@ -1201,3 +1201,98 @@ $ pnpm exec vitest run guard
 ### Veredicto
 
 T7b hecha: los nueve E2E de `design.md > 7` y los de solo `inventario-title` pasan en Chromium y WebKit, sin tocar producción.
+
+---
+
+## Tanda 7 (T7a) — 2026-10-16 · frontend_dev
+
+E2E nuevo con medidas reales (`boundingBox`, estilos calculados) a 1440 × 900, 820 × 1180 y
+390 × 844. El tono se compara color con color: un `span` sonda con `var(--warning-text)` /
+`var(--destructive)` junto al elemento, sin depender de cómo serializa cada navegador el `oklch`.
+
+**Bug de producción que destapó (R42), arreglado:** el historial del lote y «Ajustar existencia»
+usaban la X por defecto de `DialogContent` (`size="icon-sm"`, 32 px de alto medidos en Chromium):
+a 390 px R42 pide botones de 44. Los dos diálogos pasan `showCloseButton={false}` y pintan su propio
+`DialogClose` (`size="icon"` + `touch`, misma posición y mismo nombre accesible «Close»), como ya hace
+`batch-evidence-dialog.tsx`. No cambia `components/ui/dialog.tsx` ni el resto de diálogos del repo.
+
+### Archivos creados / modificados
+
+- `e2e/inventario-rediseno.spec.ts` (nuevo): 8 casos × 2 navegadores. Fixture Prisma propio
+  (`qc263_e2e_`, `RUN_ID` por worker, empresa con añadidos prendidos, «alerta» con un lote en
+  alarma y «varios» con dos lotes, uno que vence en 10 días). Selectores acotados a
+  `data-table-row-<id>` / `data-table-card-<id>`; menú del lote por `batchActionsTrigger`; menús
+  centrados por `getByRole('dialog', { name: <título> })`. La importación usa un .csv propio en
+  memoria (misma cabecera que `e2e/fixtures/inventario-importar-mixto.csv`) con una unidad y una
+  presentación que faltan.
+- `app/(private)/inventario/components/batch-history.tsx`: cierre táctil de 44 px (R42).
+- `app/(private)/inventario/components/adjust-batch-dialog.tsx`: cierre táctil de 44 px (R42).
+- `tests/guards/guard-identificador-de-request.test.ts`: alta de `inventario-rediseno.spec.ts` en
+  `E2E_ESPERADOS`, con el comentario literal de `tasks.md > T7a`.
+- `tests/unit/shared/data-table-alcance.test.ts`: alta en su sitio alfabético (entre
+  `inventario-importar` e `inventario`), nota con el comentario literal; centinela 50 → 51.
+
+### Mapa R → caso del E2E (`e2e/inventario-rediseno.spec.ts`)
+
+| R | Caso |
+| --- | --- |
+| R1, R3, R6, R7, R9, R14 | `/inventario a 1440 px › R1, R3, R6, R7, R9, R14 — cabecera, pestañas enlace, …` |
+| R47, R48, R6, R12 | `/inventario a 1440 px › R47, R48, R6, R12 — los lotes desplegados pintan sub-filas sin menú, …` |
+| R11, R15, R20, R21, R23, R25, R52 | `/inventario a 1440 px › R11, R15, R20, R21, R23, R25, R52 — «Historial» abre el lote único o «Lotes»; …` |
+| R13, R5, R52 | `/inventario a 820 px › R13, R5, R52 — la lista en tarjetas, …` |
+| R2, R13, R14, R42, R47, R5 | `/inventario a 390 px › R2, R13, R14, R42, R47, R5 — acciones de cabecera a todo el ancho, …` |
+| R19, R23, R42 (y R20 a 390) | `/inventario a 390 px › R19, R23, R42 — lotes e historial en tarjetas; historial, ajuste y borrado …` |
+| R43 | `R43 — /inventario sin desbordamiento horizontal › R43 — a 1440, 820 y 390 px «Todos» y «Producto terminado» …` |
+| R31, R32, R33, R38, R28, R42, R43, R49 | `importar inventario › R31, R32, R33, R38, R28, R42, R43, R49 — los pasos 1 → 2 → 3 → 1, …` |
+
+### Salida real
+
+```
+$ pnpm exec playwright test e2e/inventario-rediseno.spec.ts --project=chromium   (primera pasada)
+  2 failed
+    … R2, R13, R14, R42, R47, R5 …   toEqual: la tarjeta de estado «--batches» (cargando) iba delante
+                                     -> el caso espera a las tarjetas de lote antes de leer el orden,
+                                        y compara el conjunto (el orden es el de la lectura)
+    … R19, R23, R42 …                Error: historial: botón «Close» Expected: >= 44 Received: 32
+                                     -> bug R42 (arriba); tras arreglar el historial, el mismo rojo
+                                        en «ajuste: botón «Close»» -> mismo arreglo
+  6 passed (28.9s)
+
+$ pnpm exec playwright test e2e/inventario-rediseno.spec.ts
+  16 passed (2.0m)      chromium 8/8  webkit 8/8
+  (una pasada intermedia dio 1 failed en webkit por timeout de carga en loginAndLand -waitForURL
+   «load», primer compilado tras limpiar .next/dev/types-; repetido solo ese spec: 16 passed)
+
+$ pnpm exec playwright test e2e/ajuste-de-inventario.spec.ts e2e/insumo-por-unidad.spec.ts
+  10 passed (1.9m)      (los dos E2E que pasan por los diálogos tocados y por el «Close» del panel)
+
+$ pnpm exec vitest run guard-identificador-de-request data-table-alcance
+ Test Files  2 passed (2)
+      Tests  41 passed | 2 skipped (43)
+
+$ pnpm exec vitest run guard
+ Test Files  81 passed (81)
+      Tests  1106 passed | 20 skipped (1126)
+
+$ pnpm exec vitest related --run app/(private)/inventario/components/batch-history.tsx app/(private)/inventario/components/adjust-batch-dialog.tsx
+ Test Files  37 passed (37)
+      Tests  603 passed (603)
+
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores)
+  Nota de entorno: tras cada pasada de Playwright en Windows, `next dev` muere a medio escribir
+  `.next/dev/types/validator.ts` y `routes.d.ts` (TS1109/TS1128 solo en esos archivos generados).
+  Se borra `.next/dev/types` (artefacto, no versionado) y `tsc` sale limpio.
+
+$ pnpm run lint
+ESLint: 0 errors, 10 warnings in 4 files   (los mismos 4 archivos ajenos de tandas anteriores)
+```
+
+`guard-e2e-presupuesto` no cuenta specs (mira `actionTimeout` y la matriz del workflow): sin cambio.
+
+### Veredicto
+
+T7a hecha: `e2e/inventario-rediseno.spec.ts` pasa en Chromium y WebKit (16/16), dado de alta en
+las dos listas cerradas, y un bug de R42 (cierre de 32 px en historial y ajuste) arreglado en sus
+componentes.

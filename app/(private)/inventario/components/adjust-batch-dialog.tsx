@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDownToLine, ArrowUpFromLine, CircleAlertIcon } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, CircleAlertIcon, XIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useEffectEvent, useId, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { ErrorAlert } from '@/components/shared/error-alert';
 import { FieldError } from '@/components/shared/field-error';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -49,6 +50,7 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { movementReasonLabel } from './movement-reason-label';
 
 const FIELD_TEXT = 'text-base md:text-base';
+const CLOSE_LABEL = 'Close';
 
 const BATCH_ID_FIELD = 'batchId';
 const COUNTED_STOCK_FIELD = 'countedStock';
@@ -315,8 +317,15 @@ function AdjustBatchDialogContent({
           {DIALOG_TITLE}
         </DialogTrigger>
       )}
-      <DialogContent data-testid="adjust-batch-dialog">
-        <DialogHeader>
+      <DialogContent data-testid="adjust-batch-dialog" showCloseButton={false}>
+        {/* El cierre del primitivo mide 32 px: en el teléfono hace falta el objetivo de 44. */}
+        <DialogClose
+          render={<Button type="button" variant="ghost" size="icon" touch className="absolute top-2 right-2" />}
+        >
+          <XIcon aria-hidden="true" />
+          <span className="sr-only">{CLOSE_LABEL}</span>
+        </DialogClose>
+        <DialogHeader className="pr-10">
           <DialogTitle>{DIALOG_TITLE}</DialogTitle>
           <DialogDescription data-testid="adjust-batch-description">
             {productName === undefined ? null : (
