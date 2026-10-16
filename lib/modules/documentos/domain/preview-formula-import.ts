@@ -12,7 +12,7 @@
  * MISMO tipo de dependencias; esta funcion no toca `createRawMaterial`, `createRecipe` ni
  * `updateRecipe`.
  */
-import { requirePermission, FORMULA_IMPORT_PERMISSION, type Actor } from './actor';
+import { requireAddon, requirePermission, FORMULA_IMPORT_PERMISSION, type Actor } from './actor';
 import { extractFormulaFromText, type ExtractedIngredient } from './formula-extraction';
 import { previewFormulaImportInputSchema } from './formula-import-input';
 import { ValidationError } from './errors';
@@ -109,6 +109,7 @@ export function createPreviewFormulaImport(
     input: unknown,
   ): Promise<FormulaImportPreview> {
     requirePermission(actor, FORMULA_IMPORT_PERMISSION);
+    requireAddon(actor, 'lectura_pdf');
 
     const parsed = previewFormulaImportInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

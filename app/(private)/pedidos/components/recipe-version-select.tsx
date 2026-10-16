@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge, type StatusTone } from '@/components/shared/status-badge';
 import type { RecipeVersionSummary } from '@/lib/modules/recetas';
 import { listRecipeVersionsAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
@@ -52,7 +53,9 @@ export type RecipeVersionSelectProps = {
   readonly texts?: RecipeVersionSelectTexts;
 };
 
-type Option = { readonly value: string; readonly label: string };
+type VersionMark = { readonly text: string; readonly tone: StatusTone };
+
+type Option = { readonly value: string; readonly label: string; readonly mark?: VersionMark };
 
 type Loaded = { readonly recipeId: string; readonly versions: readonly RecipeVersionSummary[] };
 
@@ -106,7 +109,8 @@ export function RecipeVersionSelect({
   if (keepsInitial) {
     options.push({
       value: initialVersion.id,
-      label: withNote(initialVersion.name, initialNote(initialVersion, versions, texts)),
+      label: initialVersion.name,
+      mark: initialMark(initialVersion, versions, texts),
     });
   }
 
@@ -145,7 +149,12 @@ export function RecipeVersionSelect({
           className={`w-full ${touchTarget} ${FIELD_TEXT}`}
           data-testid={RECIPE_VERSION_SELECT_TESTID}
         >
-          <SelectValue />
+          <SelectValue>
+            {(selected: string) => {
+              const option = options.find((candidate) => candidate.value === selected);
+              return option === undefined ? null : <OptionContent option={option} />;
+            }}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
@@ -156,7 +165,7 @@ export function RecipeVersionSelect({
               data-testid={`${RECIPE_VERSION_SELECT_TESTID}-option`}
               data-value={option.value}
             >
-              {option.label}
+              <OptionContent option={option} />
             </SelectItem>
           ))}
         </SelectContent>
@@ -175,17 +184,31 @@ export function RecipeVersionSelect({
   );
 }
 
-function initialNote(
+function OptionContent({ option }: { readonly option: Option }) {
+  if (option.mark === undefined) return <>{option.label}</>;
+  return (
+    <span className="inline-flex min-w-0 items-center gap-2">
+      <span className="truncate">{option.label}</span>
+      <StatusBadge
+        tone={option.mark.tone}
+        label={option.mark.text}
+        data-testid={`${RECIPE_VERSION_SELECT_TESTID}-mark`}
+      />
+    </span>
+  );
+}
+
+// Mientras el listado no llega no se sabe si la version sigue viva: una nota dada por quien
+// llama sale en el tono neutro de «dada de baja» hasta entonces.
+function initialMark(
   initial: RecipeVersionChoice,
   versions: readonly RecipeVersionSummary[] | null,
   texts: RecipeVersionSelectTexts,
-): string | undefined {
-  if (initial.note !== undefined) return initial.note;
-  if (versions === null) return undefined;
-  const listed = versions.find((version) => version.id === initial.id);
-  return listed === undefined ? texts.deleted : texts.underReview;
-}
-
-function withNote(name: string, note: string | undefined): string {
-  return note === undefined ? name : `${name} (${note})`;
+): VersionMark | undefined {
+  if (versions === null) {
+    return initial.note === undefined ? undefined : { text: initial.note, tone: 'muted' };
+  }
+  const listed = versions.some((version) => version.id === initial.id);
+  const tone: StatusTone = listed ? 'waiting' : 'muted';
+  return { text: initial.note ?? (listed ? texts.underReview : texts.deleted), tone };
 }

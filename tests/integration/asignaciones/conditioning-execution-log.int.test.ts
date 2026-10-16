@@ -1,0 +1,544 @@
+/**
+ * El acondicionamiento anota en el registro de ejecucion, contra Postgres real y con la composicion
+ * real (`asignaciones` de `@/lib/composition`): Comenzar, guardar datos de lote y Terminar escriben
+ * su anotacion en la misma transaccion que su cambio, o no escriben nada.
+ *
+ * Como se fuerza el fallo: el registro atado a la transaccion de ejecucion se envuelve para que,
+ * con `falloDeAnotacion.activo`, escriba la fila con `step_position = 1`. La rechaza el CHECK
+ * `order_execution_entries_conditioning_has_no_step` dentro de la misma transaccion, asi que el
+ * error es de la base y no un doble. El registro global (el que lee el recorrido) no se toca.
+ *
+ * AISLAMIENTO: `commit`. `withExecutionTransaction` abre su propia transaccion sobre el cliente
+ * global y lo que se mide es su ROLLBACK. Cada caso fabrica su empresa efimera con randomUUID y la
+ * borra en su `finally`, en orden de FK.
+ */
+import { randomUUID } from 'node:crypto';
+
+import { Prisma } from '@prisma/client';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+
+import type { NewExecutionEntry } from '@/lib/modules/asignaciones';
+
+const falloDeAnotacion = vi.hoisted(() => ({ activo: false }));
+
+vi.mock('@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma', async (importOriginal) => {
+  const real =
+    await importOriginal<typeof import('@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma')>();
+  return {
+    ...real,
+    createExecutionLogRepository: (db?: Parameters<typeof real.createExecutionLogRepository>[0]) => {
+      const repo = real.createExecutionLogRepository(db);
+      if (db === undefined) return repo;
+      return {
+        ...repo,
+        append: (entry: NewExecutionEntry) =>
+          repo.append(falloDeAnotacion.activo ? ({ ...entry, stepPosition: 1 } as unknown as NewExecutionEntry) : entry),
+      };
+    },
+  };
+});
+
+import { asignaciones } from '@/lib/composition';
+import { normalizeCompanyName } from '@/lib/modules/identity';
+import { receiveFinishedGoods } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { prisma } from '@/lib/shared/db/prisma';
+
+const CHECK_SIN_PASO = /order_execution_entries_conditioning_has_no_step/u;
+
+type Actor = { readonly id: string; readonly companyId: string; readonly permissions: readonly string[] };
+
+const PERMISOS_ACONDICIONADOR = ['asignaciones.consultar', 'acondicionamiento.modificar'] as const;
+
+function token(): string {
+  return randomUUID().replace(/-/gu, '');
+}
+
+let nextSequence = 970_000;
+function freshSequence(): number {
+  nextSequence += 1;
+  return nextSequence;
+}
+
+type Fixture = {
+  readonly companyId: string;
+  readonly documentTypeCode: string;
+  readonly roleIds: readonly string[];
+  readonly recipeId: string;
+  readonly unitId: string;
+  readonly packerId: string;
+  readonly acondicionador: string;
+  readonly operario: string;
+  readonly presentationIds: string[];
+};
+
+async function crearRol(permisos: readonly string[]): Promise<string> {
+  const role = await prisma.role.create({
+    data: { name: `rol-${token()}`, description: 'Rol de prueba' },
+    select: { id: true },
+  });
+  for (const permissionCode of permisos) {
+    await prisma.rolePermission.create({ data: { roleId: role.id, permissionCode } });
+  }
+  return role.id;
+}
+
+async function crearPersona(companyId: string, roleId: string, documentTypeCode: string, nombre: string): Promise<string> {
+  const marca = token();
+  const user = await prisma.user.create({
+    data: {
+      firstNames: nombre,
+      lastNames: 'Prueba',
+      birthDate: new Date('1990-05-17T00:00:00.000Z'),
+      email: `${marca}@quimicloude.test`,
+      phone: '+57 300 111 2233',
+      documentTypeCode,
+      documentNumber: marca.slice(0, 12),
+      username: `u.${marca}`,
+      passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
+      roleId,
+      companyId,
+      accountStatus: 'active',
+    },
+    select: { id: true },
+  });
+  return user.id;
+}
+
+async function crearFixture(): Promise<Fixture> {
+  const marca = token();
+  const documentType = await prisma.documentType.create({
+    data: { code: `DOC${marca.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
+    select: { code: true },
+  });
+  const nombre = `Empresa registro acondicionamiento ${marca}`;
+  const company = await prisma.company.create({
+    data: { name: nombre, nameNormalized: normalizeCompanyName(nombre) },
+    select: { id: true },
+  });
+  const rolAcondicionador = await crearRol(PERMISOS_ACONDICIONADOR);
+  const rolOtro = await crearRol(['asignaciones.consultar', 'asignaciones.ejecutar']);
+  const persona = (roleId: string, n: string) => crearPersona(company.id, roleId, documentType.code, n);
+  const packerId = await persona(rolOtro, 'Empacador');
+  const operario = await persona(rolOtro, 'Olga');
+  const acondicionador = await persona(rolAcondicionador, 'Alba');
+
+  const unit = await prisma.unit.create({
+    data: { name: `unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `u${marca}` },
+    select: { id: true },
+  });
+  const recipe = await prisma.recipe.create({
+    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId: company.id },
+    select: { id: true },
+  });
+
+  return {
+    companyId: company.id,
+    documentTypeCode: documentType.code,
+    roleIds: [rolAcondicionador, rolOtro],
+    recipeId: recipe.id,
+    unitId: unit.id,
+    packerId,
+    acondicionador,
+    operario,
+    presentationIds: [],
+  };
+}
+
+async function borrarFixture(fixture: Fixture): Promise<void> {
+  const companyId = fixture.companyId;
+  const products = await prisma.product.findMany({ where: { companyId }, select: { id: true } });
+  const productIds = products.map((product) => product.id);
+  await prisma.orderExecutionEntry.deleteMany({ where: { companyId } });
+  await prisma.orderConditioningTeamMember.deleteMany({ where: { companyId } });
+  await prisma.reservationMovement.deleteMany({ where: { companyId } });
+  await prisma.inventoryMovement.deleteMany({ where: { batch: { productId: { in: productIds } } } });
+  await prisma.productBatch.deleteMany({ where: { productId: { in: productIds } } });
+  await prisma.product.deleteMany({ where: { id: { in: productIds } } });
+  await prisma.orderPresentationLine.deleteMany({ where: { companyId } });
+  await prisma.order.deleteMany({ where: { companyId } });
+  await prisma.recipe.deleteMany({ where: { companyId } });
+  await prisma.presentation.deleteMany({ where: { id: { in: fixture.presentationIds } } });
+  await prisma.unit.deleteMany({ where: { id: fixture.unitId } });
+  await prisma.user.deleteMany({ where: { companyId } });
+  await prisma.rolePermission.deleteMany({ where: { roleId: { in: [...fixture.roleIds] } } });
+  await prisma.role.deleteMany({ where: { id: { in: [...fixture.roleIds] } } });
+  await prisma.documentType.deleteMany({ where: { code: fixture.documentTypeCode } });
+  await prisma.company.deleteMany({ where: { id: companyId } });
+}
+
+async function pedidoPorAcondicionar(fixture: Fixture): Promise<string> {
+  const order = await prisma.order.create({
+    data: {
+      companyId: fixture.companyId,
+      orderYear: new Date().getUTCFullYear(),
+      orderSequence: freshSequence(),
+      recipeId: fixture.recipeId,
+      quantity: new Prisma.Decimal('10'),
+      status: 'POR_ACONDICIONAR',
+      packedBy: fixture.packerId,
+    },
+    select: { id: true },
+  });
+  return order.id;
+}
+
+function actor(fixture: Fixture): Actor {
+  return { id: fixture.acondicionador, companyId: fixture.companyId, permissions: PERMISOS_ACONDICIONADOR };
+}
+
+async function leerPedido(id: string) {
+  return prisma.order.findUniqueOrThrow({
+    where: { id },
+    select: { status: true, conditionedBy: true, finishedAt: true },
+  });
+}
+
+async function leerEquipo(orderId: string) {
+  return prisma.orderConditioningTeamMember.findMany({ where: { orderId }, select: { userId: true } });
+}
+
+async function leerAnotaciones(orderId: string) {
+  return prisma.orderExecutionEntry.findMany({
+    where: { orderId },
+    orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
+    select: { userId: true, action: true, stepPosition: true, reason: true, batchLines: true, occurredAt: true },
+  });
+}
+
+/** El dia civil UTC desplazado `dias`, como lo compara el caso de uso. */
+function diaUtc(dias: number): string {
+  const instante = new Date();
+  instante.setUTCDate(instante.getUTCDate() + dias);
+  return instante.toISOString().slice(0, 10);
+}
+
+async function crearPresentacion(fixture: Fixture, nombre: string): Promise<string> {
+  const { id } = await prisma.presentation.create({
+    data: {
+      name: nombre,
+      nameNormalized: `${nombre}${token()}`.toLowerCase().replace(/[^a-z0-9]/gu, ''),
+      unitId: fixture.unitId,
+      companyId: fixture.companyId,
+      content: '1',
+    },
+    select: { id: true },
+  });
+  fixture.presentationIds.push(id);
+  return id;
+}
+
+type Lote = { readonly batchId: string; readonly presentationId: string };
+
+/** Una linea del reparto con su entrada por Terminar el empaque: el lote que se etiqueta. */
+async function crearLote(fixture: Fixture, orderId: string, nombre: string): Promise<Lote> {
+  return crearLoteEn(fixture, orderId, await crearPresentacion(fixture, nombre));
+}
+
+/** Como `crearLote`, sobre una presentacion que ya existe (otra produccion de la misma). */
+async function crearLoteEn(fixture: Fixture, orderId: string, presentationId: string): Promise<Lote> {
+  const line = await prisma.orderPresentationLine.create({
+    data: { orderId, companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
+    select: { id: true },
+  });
+  const outcome = await prisma.$transaction((tx) =>
+    receiveFinishedGoods(
+      tx,
+      {
+        orderId,
+        recipeId: fixture.recipeId,
+        recipeName: 'Limpiador',
+        presentationId,
+        orderPresentationLineId: line.id,
+        packages: 2,
+        orderContent: null,
+        unitCost: '1.0000',
+        actorId: fixture.packerId,
+        now: new Date(),
+      },
+      { companyId: fixture.companyId },
+    ),
+  );
+  if (outcome.kind !== 'received') throw new Error(`esperaba received, llego ${outcome.kind}`);
+  const movement = await prisma.inventoryMovement.findFirstOrThrow({
+    where: { orderPresentationLineId: line.id, kind: 'production' },
+    select: { batchId: true },
+  });
+  return { batchId: movement.batchId, presentationId };
+}
+
+/** Un pedido `EN_ACONDICIONAMIENTO` comenzado de verdad, con dos lotes de produccion. */
+async function pedidoComenzadoConLotes(fixture: Fixture): Promise<{ pedido: string; frasco: Lote; garrafa: Lote }> {
+  const pedido = await pedidoPorAcondicionar(fixture);
+  const frasco = await crearLote(fixture, pedido, 'Frasco 1 L');
+  const garrafa = await crearLote(fixture, pedido, 'Garrafa 5 L');
+  await asignaciones.startConditioning(actor(fixture), { orderId: pedido, userIds: [fixture.operario], workGroupIds: [] });
+  return { pedido, frasco, garrafa };
+}
+
+/** La entrada de guardar (QC-284): un solo juego de datos para todas las lineas con lote. */
+function datos(orderId: string, lot: string) {
+  return { orderId, lot, expiryDate: diaUtc(365), productionDate: diaUtc(0) };
+}
+
+async function loteDe(batchId: string): Promise<string> {
+  return (await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { lot: true } })).lot;
+}
+
+async function guardados(orderId: string) {
+  return (await leerAnotaciones(orderId)).filter((anotacion) => anotacion.action === 'CONDITIONING_BATCH_SAVE');
+}
+
+async function conFallo<T>(work: () => Promise<T>): Promise<T> {
+  falloDeAnotacion.activo = true;
+  try {
+    return await work();
+  } finally {
+    falloDeAnotacion.activo = false;
+  }
+}
+
+afterAll(async () => {
+  await prisma.$disconnect();
+});
+
+describe('Comenzar anota en el registro de ejecucion', () => {
+  it('R1: la transicion, el equipo y la anotacion conditioning_start quedan juntos, a nombre de quien comienza', async () => {
+    const fixture = await crearFixture();
+    try {
+      const pedido = await pedidoPorAcondicionar(fixture);
+
+      await asignaciones.startConditioning(actor(fixture), {
+        orderId: pedido,
+        userIds: [fixture.operario],
+        workGroupIds: [],
+      });
+
+      expect((await leerPedido(pedido)).status).toBe('EN_ACONDICIONAMIENTO');
+      expect(await leerEquipo(pedido)).toEqual([{ userId: fixture.operario }]);
+      const anotaciones = await leerAnotaciones(pedido);
+      expect(anotaciones).toEqual([
+        {
+          userId: fixture.acondicionador,
+          action: 'CONDITIONING_START',
+          stepPosition: null,
+          reason: null,
+          batchLines: null,
+          occurredAt: expect.any(Date),
+        },
+      ]);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R1: si append falla no quedan ni transicion ni equipo', async () => {
+    const fixture = await crearFixture();
+    try {
+      const pedido = await pedidoPorAcondicionar(fixture);
+
+      await conFallo(() =>
+        expect(
+          asignaciones.startConditioning(actor(fixture), { orderId: pedido, userIds: [fixture.operario], workGroupIds: [] }),
+        ).rejects.toThrow(CHECK_SIN_PASO),
+      );
+
+      expect(await leerPedido(pedido)).toEqual({ status: 'POR_ACONDICIONAR', conditionedBy: null, finishedAt: null });
+      expect(await leerEquipo(pedido)).toEqual([]);
+      expect(await leerAnotaciones(pedido)).toEqual([]);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R2: repetir Comenzar (already_mine) no anota otra vez', async () => {
+    const fixture = await crearFixture();
+    try {
+      const pedido = await pedidoPorAcondicionar(fixture);
+      const entrada = { orderId: pedido, userIds: [fixture.operario], workGroupIds: [] };
+
+      await asignaciones.startConditioning(actor(fixture), entrada);
+      await asignaciones.startConditioning(actor(fixture), entrada);
+
+      expect((await leerAnotaciones(pedido)).map((a) => a.action)).toEqual(['CONDITIONING_START']);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+});
+
+describe('Guardar datos de lote anota una foto en el registro de ejecucion', () => {
+  it('R3: guardado y anotacion en la misma transaccion: la foto lleva una linea por lote del pedido, con su presentacion', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
+      const entrada = datos(pedido, `F-${token()}`);
+
+      await asignaciones.saveConditioningBatchData(actor(fixture), entrada);
+
+      expect(await loteDe(frasco.batchId)).toBe(entrada.lot);
+      expect(await loteDe(garrafa.batchId)).toBe(entrada.lot);
+      const [guardado, ...resto] = await guardados(pedido);
+      expect(resto).toEqual([]);
+      expect(guardado).toMatchObject({ userId: fixture.acondicionador, stepPosition: null, reason: null });
+      expect(guardado!.batchLines).toEqual([
+        { batchId: frasco.batchId, presentationId: frasco.presentationId, presentationName: 'Frasco 1 L', ...sinPedido(entrada) },
+        { batchId: garrafa.batchId, presentationId: garrafa.presentationId, presentationName: 'Garrafa 5 L', ...sinPedido(entrada) },
+      ]);
+      const escrito = await prisma.productBatch.findUniqueOrThrow({ where: { id: frasco.batchId }, select: { updatedAt: true } });
+      expect(guardado!.occurredAt).toEqual(escrito.updatedAt);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R4: un lote duplicado o un pedido sin lotes no guarda ni anota', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
+      const otraProduccion = await pedidoPorAcondicionar(fixture);
+      const previa = await crearLoteEn(fixture, otraProduccion, frasco.presentationId);
+      const loteFrasco = await loteDe(frasco.batchId);
+      const loteGarrafa = await loteDe(garrafa.batchId);
+
+      await expect(
+        asignaciones.saveConditioningBatchData(actor(fixture), datos(pedido, await loteDe(previa.batchId))),
+      ).rejects.toMatchObject({ code: 'batch_duplicate_lot' });
+
+      const sinLotes = await pedidoPorAcondicionar(fixture);
+      await asignaciones.startConditioning(actor(fixture), { orderId: sinLotes, userIds: [fixture.operario], workGroupIds: [] });
+      await expect(
+        asignaciones.saveConditioningBatchData(actor(fixture), datos(sinLotes, `X-${token()}`)),
+      ).rejects.toMatchObject({ code: 'batch_not_found' });
+
+      expect(await loteDe(frasco.batchId)).toBe(loteFrasco);
+      expect(await loteDe(garrafa.batchId)).toBe(loteGarrafa);
+      expect(await guardados(pedido)).toEqual([]);
+      expect(await guardados(sinLotes)).toEqual([]);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R4: un append que falla no guarda datos', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco } = await pedidoComenzadoConLotes(fixture);
+      const antes = await loteDe(frasco.batchId);
+
+      await conFallo(() =>
+        expect(asignaciones.saveConditioningBatchData(actor(fixture), datos(pedido, `F-${token()}`))).rejects.toThrow(
+          CHECK_SIN_PASO,
+        ),
+      );
+
+      expect(await loteDe(frasco.batchId)).toBe(antes);
+      expect(await guardados(pedido)).toEqual([]);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R5: corregir anade otra foto y la primera no cambia', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido, frasco, garrafa } = await pedidoComenzadoConLotes(fixture);
+      const original = datos(pedido, `F-${token()}`);
+      await asignaciones.saveConditioningBatchData(actor(fixture), original);
+      const [primera] = await guardados(pedido);
+
+      const corregido = datos(pedido, `F-CORR-${token()}`);
+      await asignaciones.saveConditioningBatchData(actor(fixture), corregido);
+
+      expect(await loteDe(frasco.batchId)).toBe(corregido.lot);
+      expect(await loteDe(garrafa.batchId)).toBe(corregido.lot);
+      const fotos = await guardados(pedido);
+      expect(fotos).toHaveLength(2);
+      expect(fotos[0]).toEqual(primera);
+      expect((fotos[0]!.batchLines as { lot: string }[]).map((linea) => linea.lot)).toEqual([original.lot, original.lot]);
+      expect(fotos[1]!.batchLines).toEqual([
+        { batchId: frasco.batchId, presentationId: frasco.presentationId, presentationName: 'Frasco 1 L', ...sinPedido(corregido) },
+        { batchId: garrafa.batchId, presentationId: garrafa.presentationId, presentationName: 'Garrafa 5 L', ...sinPedido(corregido) },
+      ]);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+});
+
+function sinPedido(entrada: ReturnType<typeof datos>) {
+  return { lot: entrada.lot, expiryDate: entrada.expiryDate, productionDate: entrada.productionDate };
+}
+
+describe('Terminar anota en el registro de ejecucion', () => {
+  it('R6: la transicion a TERMINADO y la anotacion conditioning_finish quedan juntas, a nombre de quien termina', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido } = await pedidoComenzadoConLotes(fixture);
+      await asignaciones.saveConditioningBatchData(actor(fixture), datos(pedido, `F-${token()}`));
+
+      await asignaciones.finishConditioning(actor(fixture), { orderId: pedido });
+
+      const terminado = await leerPedido(pedido);
+      expect(terminado.status).toBe('TERMINADO');
+      const anotaciones = await leerAnotaciones(pedido);
+      expect(anotaciones.map((a) => a.action)).toEqual(['CONDITIONING_START', 'CONDITIONING_BATCH_SAVE', 'CONDITIONING_FINISH']);
+      expect(anotaciones[2]).toMatchObject({
+        userId: fixture.acondicionador,
+        stepPosition: null,
+        reason: null,
+        batchLines: null,
+        occurredAt: terminado.finishedAt,
+      });
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R6: si append falla el pedido no cambia', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido } = await pedidoComenzadoConLotes(fixture);
+      await asignaciones.saveConditioningBatchData(actor(fixture), datos(pedido, `F-${token()}`));
+      const antes = await leerPedido(pedido);
+      const anotacionesAntes = await leerAnotaciones(pedido);
+
+      await conFallo(() =>
+        expect(asignaciones.finishConditioning(actor(fixture), { orderId: pedido })).rejects.toThrow(CHECK_SIN_PASO),
+      );
+
+      expect(antes).toEqual({ status: 'EN_ACONDICIONAMIENTO', conditionedBy: fixture.acondicionador, finishedAt: null });
+      expect(await leerPedido(pedido)).toEqual(antes);
+      expect(await leerAnotaciones(pedido)).toEqual(anotacionesAntes);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R6: un rechazo de Terminar (datos de lote incompletos) no anota', async () => {
+    const fixture = await crearFixture();
+    try {
+      const { pedido } = await pedidoComenzadoConLotes(fixture);
+      // Una linea sin lote (sin asiento de produccion): guardar no la cubre y Terminar la exige.
+      await prisma.orderPresentationLine.create({
+        data: {
+          orderId: pedido,
+          companyId: fixture.companyId,
+          presentationId: await crearPresentacion(fixture, 'Bidon 20 L'),
+          packages: 1,
+          presentationContent: null,
+        },
+      });
+      await asignaciones.saveConditioningBatchData(actor(fixture), datos(pedido, `F-${token()}`));
+      const anotacionesAntes = await leerAnotaciones(pedido);
+
+      await expect(asignaciones.finishConditioning(actor(fixture), { orderId: pedido })).rejects.toMatchObject({
+        code: 'conditioning_batch_data_missing',
+      });
+
+      expect((await leerPedido(pedido)).status).toBe('EN_ACONDICIONAMIENTO');
+      expect(await leerAnotaciones(pedido)).toEqual(anotacionesAntes);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+});

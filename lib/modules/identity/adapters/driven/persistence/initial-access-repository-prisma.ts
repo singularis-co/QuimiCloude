@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { ADDONS } from '../../../domain/company-addons';
 import { ROLE_ADMINISTRADOR } from '../../../domain/roles';
 
 import type { InitialAccessRepository } from '../../../ports/initial-access-repository';
@@ -49,7 +50,13 @@ export function createInitialAccessRepository(
     async createCompany(input) {
       try {
         const created = await db.company.create({
-          data: { name: input.name, nameNormalized: input.nameNormalized },
+          // La empresa inicial solo se crea fuera de producción: nace con todos los añadidos
+          // prendidos y sin autor, porque los siembra el sistema y no una persona.
+          data: {
+            name: input.name,
+            nameNormalized: input.nameNormalized,
+            addonOverrides: { create: ADDONS.map((addonKey) => ({ addonKey, enabled: true })) },
+          },
         });
         return created.id;
       } catch (error) {

@@ -53,11 +53,11 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
 }
 
 function receta(overrides?: Partial<RecipeRef>): RecipeRef {
-  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, ...overrides };
+  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, imageUrl: null, ...overrides };
 }
 
 function persona(id: string): PersonRef {
-  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive: true, permissions: [] };
+  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive: true, permissions: [], roleName: 'Operador' };
 }
 
 function filaSuelta(orderId: string, userId: string): OrderAssignmentRowWithOrder {

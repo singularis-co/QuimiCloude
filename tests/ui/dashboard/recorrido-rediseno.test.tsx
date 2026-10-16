@@ -15,12 +15,12 @@ import {
   EXECUTION_ACTION_LABELS,
   GO_BACK_MARK,
   TRACE_ORDER_STATUS_LABELS,
+  PHASE_DURATION_LABELS,
   formatElapsed,
-  formatTraceDuration,
   formatTraceInstant,
 } from '@/app/(private)/dashboard/components';
 import type {
-  ExecutionAction,
+  ConditioningAction,
   ExecutionTraceDetail as ExecutionTraceDetailData,
   ExecutionTraceDetailStep,
 } from '@/lib/modules/asignaciones';
@@ -33,7 +33,10 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 const ORDER_ID = '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718';
 const MIN = 60 * 1000;
 
-function step(overrides: Partial<ExecutionTraceDetailStep> & Pick<ExecutionTraceDetailStep, 'id' | 'action'>): ExecutionTraceDetailStep {
+// Estos casos solo usan pasos de produccion y empaque, que no llevan `batchLines`.
+type ProductionStep = Exclude<ExecutionTraceDetailStep, { readonly action: ConditioningAction }>;
+
+function step(overrides: Partial<ProductionStep> & Pick<ProductionStep, 'id' | 'action'>): ProductionStep {
   return {
     orderId: ORDER_ID,
     userId: 'u1',
@@ -70,7 +73,7 @@ const STEPS: readonly ExecutionTraceDetailStep[] = [
   }),
 ];
 
-const ALL_ACTIONS: readonly { readonly action: ExecutionAction; readonly tone: string; readonly icon: string }[] = [
+const ALL_ACTIONS: readonly { readonly action: ProductionStep['action']; readonly tone: string; readonly icon: string }[] = [
   { action: 'start', tone: 'progress', icon: 'lucide-play' },
   { action: 'resume', tone: 'progress', icon: 'lucide-play' },
   { action: 'pack_start', tone: 'progress', icon: 'lucide-package' },
@@ -249,7 +252,8 @@ const TRACE: ExecutionTraceDetailData = {
   deleted: false,
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:20:00.000Z'),
-  duration: { kind: 'closed', ms: 20 * MIN },
+  active: false,
+  durations: { production: { kind: 'closed', ms: 20 * MIN }, packing: null, conditioning: null },
   goBackCount: 1,
   steps: STEPS,
 };
@@ -320,15 +324,15 @@ describe('ExecutionTraceDetail', () => {
     expect(back).toHaveClass('min-h-11', 'min-w-11');
   });
 
-  it('R12: dl con «Estado», «Duración» y «Vueltas atrás» en tres columnas que se apilan a 760 px', () => {
+  it('R12: dl con «Estado», una duración por fase y «Vueltas atrás» en una rejilla que se reparte', () => {
     const { container } = renderDetail();
 
     const dl = container.querySelector('dl');
     expect(dl).not.toBeNull();
-    expect(dl).toHaveClass('grid-cols-3', '@max-[760px]:grid-cols-1');
+    expect(dl).toHaveClass('grid', 'grid-cols-[repeat(auto-fit,minmax(min(170px,calc(50%_-_6px)),1fr))]');
     expect(Array.from(dl!.querySelectorAll('dt')).map((dt) => dt.textContent)).toEqual([
       'Estado',
-      'Duración',
+      PHASE_DURATION_LABELS.production,
       'Vueltas atrás',
     ]);
 
@@ -339,10 +343,10 @@ describe('ExecutionTraceDetail', () => {
     expect(status).toHaveTextContent(TRACE_ORDER_STATUS_LABELS.CANCELADO);
 
     const duration = screen.getByTestId('execution-trace-duration');
-    expect(statValue('Duración').contains(duration)).toBe(true);
+    expect(duration.contains(statValue(PHASE_DURATION_LABELS.production))).toBe(true);
     expect(duration).toHaveAttribute('data-kind', 'closed');
-    expect(duration).toHaveClass('font-mono');
-    expect(duration).toHaveTextContent(formatTraceDuration(TRACE.duration));
+    expect(duration).toHaveAttribute('data-phase', 'production');
+    expect(within(duration).getByText(formatElapsed(20 * MIN))).toHaveClass('font-mono');
 
     const goBacks = screen.getByTestId('execution-trace-go-backs');
     expect(statValue('Vueltas atrás').contains(goBacks)).toBe(true);
@@ -360,7 +364,7 @@ describe('ExecutionTraceDetail', () => {
   });
 
   it('R12: «En curso» y «Dado de baja» van junto al estado, y un dado de baja nunca lleva «En curso»', () => {
-    renderDetail({ status: 'EN_EMPAQUE', duration: { kind: 'open', ms: 20 * MIN } });
+    renderDetail({ status: 'EN_EMPAQUE', active: true });
     const active = screen.getByTestId('execution-trace-active');
     expect(active).toHaveTextContent(ACTIVE_ORDER_MARK);
     expect(active).toHaveAttribute('data-tone', 'progress');
@@ -368,7 +372,7 @@ describe('ExecutionTraceDetail', () => {
     expect(screen.queryByTestId('execution-trace-deleted')).toBeNull();
     cleanup();
 
-    renderDetail({ deleted: true, status: 'EN_CURSO', duration: { kind: 'open', ms: 20 * MIN } });
+    renderDetail({ deleted: true, status: 'EN_CURSO', active: true });
     const deleted = screen.getByTestId('execution-trace-deleted');
     expect(deleted).toHaveTextContent(DELETED_ORDER_MARK);
     expect(deleted).toHaveAttribute('data-tone', 'muted');

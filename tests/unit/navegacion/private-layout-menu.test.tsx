@@ -95,21 +95,18 @@ const testId = {
   inventario: 'nav-inventario',
   pedidos: 'nav-pedidos',
   proveedores: 'nav-proveedores',
-  produccion: 'nav-produccion',
   recetas: 'nav-produccion-recetas',
   // QC-45 T2: el item de la seccion «Configuración». Declara `inventario.modificar`, que es el
   // permiso que el Operador del seed NO tiene teniendo `inventario.consultar`: por eso es el caso
   // interesante del primer test de este archivo.
   presentaciones: 'nav-presentaciones',
-  // QC-39 T4 (2026-09-08): el SEGUNDO item de la seccion «Configuración». Declara
-  // `unidades.consultar`, que ningun rol del seed tiene salvo el Administrador, asi que es el
+  // Declara `unidades.consultar`, que ningun rol del seed tiene salvo el Administrador, asi que es el
   // contraste limpio con el Operador (R9, R10).
   unidades: 'nav-unidades',
-  // QC-67 T2 (2026-09-11): nacio en la seccion «Configuración» y paso a «Operación» por decision
-  // humana del 2026-09-21. Declara `usuarios.consultar` —el MISMO codigo que exige su pantalla—,
+  // Declara `usuarios.consultar` —el MISMO codigo que exige su pantalla—,
   // que ningun rol del seed tiene salvo el Administrador, igual que unidades (R2, R3).
   usuarios: 'nav-usuarios',
-  // Item de la seccion «Cadena», junto a Proveedores. Declara `clientes.consultar`, que el seed
+  // Item de la seccion «Directorio», junto a Proveedores. Declara `clientes.consultar`, que el seed
   // da SOLO al Administrador -el Operador no lo tiene-, igual que unidades.
   clientes: 'nav-clientes',
   // Grupo de la seccion «Configuración», ULTIMO del array.
@@ -164,8 +161,6 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(screen.queryByTestId(testId.dashboard)).toBeNull();
     expect(screen.queryByTestId(testId.pedidos)).toBeNull();
     expect(screen.queryByTestId(testId.proveedores)).toBeNull();
-    // El grupo entero desaparece, no solo su hijo (R3).
-    expect(screen.queryByTestId(testId.produccion)).toBeNull();
     expect(screen.queryByTestId(testId.recetas)).toBeNull();
     // QC-45: `inventario.consultar` NO abre «Presentaciones», que exige `inventario.modificar`.
     // Es la unica pareja del menu que comparte modulo y difiere en la accion, asi que es donde un
@@ -204,7 +199,6 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       testId.inventario,
       testId.pedidos,
       testId.proveedores,
-      testId.produccion,
       testId.recetas,
       testId.presentaciones,
       testId.clientes,
@@ -222,7 +216,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(screen.getByTestId(testId.logoutForm)).toBeInTheDocument();
   });
 
-  it('con todos los permisos del catalogo estan los ocho items del menu', async () => {
+  it('con todos los permisos del catalogo estan los items del menu', async () => {
     // R4 — el filtrado quita items, nunca los inventa ni los pierde: con todo el catalogo, el
     // arbol es el de `PRIVATE_NAV_ITEMS` entero.
     // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): de seis items a siete, con «Unidades». El
@@ -238,10 +232,12 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       testId.inventario,
       testId.pedidos,
       testId.proveedores,
-      testId.produccion,
+      testId.recetas,
       testId.presentaciones,
       testId.unidades,
+      testId.usuarios,
       testId.clientes,
+      testId.integraciones,
     ]) {
       expect(screen.getByTestId(item)).toBeInTheDocument();
     }
@@ -331,36 +327,23 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(screen.queryByTestId(testId.unidades)).toBeNull();
   });
 
-  // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard; el ancla vuelve a
-  // diez, con `nav-dashboard` SEGUNDO, detras de «Asignación».
   it('ancla: el menu real tiene los once items que este test vigila', async () => {
     // Anti-vacuidad: si alguien renombra un `testId` de `PRIVATE_NAV_ITEMS`, los
-    // `queryByTestId(...) === null` de arriba pasarian por buenos sin comprobar nada.
-    // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): el ancla sube de seis a siete con
-    // `nav-unidades`, ULTIMO del array y segundo item de la seccion «Configuración» que QC-45 ya
-    // habia abierto -no se crea seccion ni se reordena el item de presentaciones-. Se tensa, no se
-    // afloja: sigue siendo la lista EXACTA y en orden, nunca un «al menos N».
+    // `queryByTestId(...) === null` de arriba pasarian por buenos sin comprobar nada. Lista EXACTA
+    // y en orden, nunca un «al menos N».
     const testIds = PRIVATE_NAV_ITEMS.map((item) => item.testId);
 
     expect(testIds).toEqual([
-      testId.asignacion,
       testId.dashboard,
       testId.inventario,
       testId.pedidos,
-      testId.produccion,
+      testId.asignacion,
+      testId.recetas,
       testId.proveedores,
+      testId.clientes,
+      testId.usuarios,
       testId.presentaciones,
       testId.unidades,
-      // TENSADO el 2026-09-11 (QC-67 T2, R2/R39): sube de siete a ocho con `nav-usuarios`, ULTIMO
-      // del array. Se tensa, no se afloja: sigue siendo la lista EXACTA y en orden, nunca un «al
-      // menos N». Su `section` paso de «Configuración» a «Operación» el 2026-09-21 sin moverlo de
-      // sitio en el array, asi que esta lista no cambia.
-      testId.usuarios,
-      // Sube de ocho a nueve con `nav-clientes`, ULTIMO del array y de la seccion «Cadena», tras
-      // Proveedores.
-      testId.clientes,
-      // Sube de diez a once con el grupo `nav-integraciones`, ULTIMO del array y de la seccion
-      // «Configuración». Sigue siendo la lista EXACTA y en orden.
       testId.integraciones,
     ]);
   });

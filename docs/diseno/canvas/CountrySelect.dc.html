@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>CountrySelect</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 1440px; height: 1240px; padding: 40px 48px; display: flex; flex-direction: column; gap: 20px; position: relative; overflow: hidden">
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; align-items: center; gap: 12px"><h1 class="h1">CountrySelect</h1><span class="sb t-info"><i></i>Nuevo · QC-235</span></div>
+    <p class="sub" style="max-width: 940px">Elige un país o lo deja vacío. Cada opción dice el nombre en español y su prefijo, <span class="mono">Colombia (+57)</span>. Se busca por nombre (sin tildes ni mayúsculas) o por prefijo (<span class="mono">57</span> o <span class="mono">+57</span>). No sabe nada de la empresa: lo reutiliza el teléfono del cliente (QC-236).</p>
+  </div>
+
+  <div class="g3" style="gap: 20px">
+    <section class="card" aria-labelledby="cs-v">
+      <span id="cs-v" class="lab">Vacío</span>
+      <div class="f"><span class="fl" id="cs-vl">País</span><button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="cs-vl"><span style="color: var(--muted-fg)">Sin país</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button><span class="help">Opcional. Vacío guarda <span class="mono">null</span>.</span></div>
+    </section>
+
+    <section class="card" aria-labelledby="cs-c">
+      <span id="cs-c" class="lab">Con país</span>
+      <div class="f"><span class="fl" id="cs-cl">País</span><button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="cs-cl"><span>Colombia <span class="mono" style="color: var(--muted-fg)">(+57)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button><span class="help">Al abrir, la lista arranca en el país elegido.</span></div>
+    </section>
+
+    <section class="card" aria-labelledby="cs-e">
+      <span id="cs-e" class="lab">Deshabilitado · FieldError</span>
+      <div class="f"><span class="fl" id="cs-dl">País</span><button class="in trig" type="button" disabled aria-labelledby="cs-dl"><span>México <span class="mono">(+52)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+      <div class="f"><span class="fl" id="cs-el">País</span><button class="in trig" type="button" aria-invalid="true" aria-describedby="cs-em" aria-labelledby="cs-el"><span style="color: var(--muted-fg)">Sin país</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button><span id="cs-em" class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Ese país no está en la lista. Elige uno de la lista.</span></div>
+    </section>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 390px; gap: 20px; align-items: start">
+    <section class="card" aria-labelledby="cs-i" style="min-height: 470px">
+      <div class="card-hd"><span id="cs-i" class="lab">Escritorio · abierto, pruébalo</span></div>
+      <div class="f">
+        <span class="fl" id="cs-il">País</span>
+        <div class="anchor">
+          <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ openStr }}" aria-labelledby="cs-il" onClick="{{ tog }}"><span style="color: {{ valColor }}">{{ valLabel }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true" style="rotate: {{ chevRot }}"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <div class="{{ popCls }}" style="padding: 6px">
+            <label class="wrap-ic" style="display: block; margin-bottom: 6px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" role="combobox" aria-autocomplete="list" aria-expanded="{{ openStr }}" aria-controls="cs-list" aria-label="Buscar país por nombre o prefijo" placeholder="Busca por nombre o prefijo" value="{{ q }}" onInput="{{ onQ }}" style="padding-left: 36px"></label>
+            <div id="cs-list" role="listbox" aria-labelledby="cs-il" style="max-height: 264px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px">
+              <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ true }}">
+                <button class="{{ emptyCls }}" type="button" role="option" aria-selected="{{ emptySel }}" onClick="{{ pickEmpty }}"><span style="flex: 1; color: var(--muted-fg)">Sin país</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="opacity: {{ emptyOp }}"><path d="m5 12 5 5 9-10"></path></svg></button>
+              </sc-if>
+              <sc-for list="{{ opts }}" as="o" hint-placeholder-count="8">
+                <button class="{{ o.cls }}" type="button" role="option" aria-selected="{{ o.sel }}" onClick="{{ o.pick }}"><span style="flex: 1">{{ o.name }}</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">{{ o.dial }}</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="opacity: {{ o.op }}"><path d="m5 12 5 5 9-10"></path></svg></button>
+              </sc-for>
+              <sc-if value="{{ noHits }}" hint-placeholder-val="{{ false }}"><span class="opt" style="cursor: default; color: var(--muted-fg)">Ningún país coincide con «{{ q }}».</span></sc-if>
+            </div>
+          </div>
+        </div>
+        <span class="help">Prueba <span class="mono">peru</span>, <span class="mono">+57</span> o <span class="mono">593</span>. Con las flechas se recorre la lista; Enter elige y Esc cierra sin cambiar nada.</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="cs-t" style="min-height: 470px">
+      <span id="cs-t" class="lab">Tablet · popup anclado, igual que escritorio</span>
+      <div class="f">
+        <span class="fl" id="cs-tl">País</span>
+        <div class="anchor">
+          <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="true" aria-labelledby="cs-tl"><span>Ecuador <span class="mono" style="color: var(--muted-fg)">(+593)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true" style="rotate: 180deg"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <div class="pop full open" style="padding: 6px">
+            <label class="wrap-ic" style="display: block; margin-bottom: 6px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" aria-label="Buscar país por nombre o prefijo" value="ec" style="padding-left: 36px"></label>
+            <div role="listbox" aria-label="Países" style="display: flex; flex-direction: column; gap: 2px">
+              <button class="opt hl" type="button" role="option" aria-selected="true"><span style="flex: 1">Ecuador</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+593</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button>
+              <button class="opt" type="button" role="option" aria-selected="false" style="min-height: 44px"><span style="flex: 1">República Checa</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+420</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <span class="cap" style="margin-top: 150px">Opciones de 44 px en táctil. Mismo componente y mismo popup que en escritorio.</span>
+    </section>
+
+    <section class="card" aria-labelledby="cs-p" style="min-height: 470px; padding: 0; overflow: hidden">
+      <div style="padding: 16px 16px 0"><span id="cs-p" class="lab">Teléfono · hoja inferior</span></div>
+      <div style="position: relative; flex: 1; min-height: 420px; background: color-mix(in oklch, var(--fg) 30%, transparent)">
+        <div role="dialog" aria-label="Elegir país" style="position: absolute; left: 0; right: 0; bottom: 0; background: var(--popover); border-radius: 16px 16px 0 0; padding: 8px 12px 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-pop)">
+          <span aria-hidden="true" style="align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--border)"></span>
+          <div style="display: flex; align-items: center; justify-content: space-between"><span class="h3">País</span><button class="b b-gho b-ico" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></div>
+          <label class="wrap-ic" style="display: block"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" aria-label="Buscar país por nombre o prefijo" placeholder="Busca por nombre o prefijo" style="padding-left: 36px; height: 48px"></label>
+          <div role="listbox" aria-label="Países" style="display: flex; flex-direction: column; gap: 2px">
+            <button class="opt" type="button" role="option" aria-selected="false" style="min-height: 48px"><span style="flex: 1; color: var(--muted-fg)">Sin país</span></button>
+            <button class="opt" type="button" role="option" aria-selected="false" style="min-height: 48px"><span style="flex: 1">Argentina</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+54</span></button>
+            <button class="opt" type="button" role="option" aria-selected="false" style="min-height: 48px"><span style="flex: 1">Chile</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+56</span></button>
+            <button class="opt hl" type="button" role="option" aria-selected="true" style="min-height: 48px"><span style="flex: 1">Colombia</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+57</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button>
+            <button class="opt" type="button" role="option" aria-selected="false" style="min-height: 48px"><span style="flex: 1">Costa Rica</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+506</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <dl class="spec" style="margin-top: auto">
+    <dt>Componente</dt><dd><span class="mono">components/shared/country-select.tsx</span> (nuevo). Props: <span class="mono">value: CountryCode | null</span>, <span class="mono">onChange</span>, <span class="mono">label</span>, <span class="mono">disabled</span>, <span class="mono">error</span>. Se compone con <span class="mono">components/ui/autocomplete</span> (popup y lista) y <span class="mono">field-error</span>; en teléfono, la lista va en la hoja inferior de <span class="mono">FormSheet</span>.</dd>
+    <dt>Datos</dt><dd>Países de <span class="mono">getCountries()</span> y prefijo de <span class="mono">getCountryCallingCode()</span> (<span class="mono">libphonenumber-js</span>); nombres de <span class="mono">Intl.DisplayNames('es', {type: 'region'})</span>, ordenados con <span class="mono">localeCompare('es')</span>. «Sin país» siempre primero. Los países que comparten prefijo (<span class="mono">+1</span>, <span class="mono">+7</span>) se listan por separado.</dd>
+    <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Combobox / Autocomplete, Field) · <span class="mono">libphonenumber-js</span> · <span class="mono">lucide-react</span> (Search, Check, ChevronDown)</dd>
+    <dt>Animación</dt><dd>La misma de los popups de Campos: opacidad + escala .96 → 1 en 200 ms al abrir, 150 ms al cerrar, desde su esquina · el chevron gira 180° · la opción resaltada cambia de fondo en 100 ms · la hoja de teléfono sube 100 % → 0 en 250 ms.</dd>
+    <dt>Escritorio · tablet · teléfono</dt><dd>Escritorio y tablet: popup anclado bajo el campo, con un buscador arriba y una lista de 264 px con scroll; en tablet las opciones miden 44 px. Teléfono (≤ 640 px): hoja inferior con un buscador de 48 px y opciones de 48 px; el foco va al buscador al abrir.</dd>
+    <dt>Por confirmar</dt><dd>Si el país de la empresa se ofrece primero en la lista del teléfono del cliente (QC-236): [POR CONFIRMAR, lo decide QC-236].</dd>
+  </dl>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const open = s.open === undefined ? true : s.open;
+    const value = s.value === undefined ? 'CO' : s.value;
+    const q = s.q || '';
+    const C = [
+      ['AR', 'Argentina', '54'], ['BO', 'Bolivia', '591'], ['BR', 'Brasil', '55'], ['CA', 'Canadá', '1'],
+      ['CL', 'Chile', '56'], ['CO', 'Colombia', '57'], ['CR', 'Costa Rica', '506'], ['EC', 'Ecuador', '593'],
+      ['ES', 'España', '34'], ['US', 'Estados Unidos', '1'], ['GT', 'Guatemala', '502'], ['MX', 'México', '52'],
+      ['PA', 'Panamá', '507'], ['PY', 'Paraguay', '595'], ['PE', 'Perú', '51'], ['DO', 'República Dominicana', '1'],
+      ['UY', 'Uruguay', '598'], ['VE', 'Venezuela', '58']
+    ];
+    const norm = (x) => x.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const qn = norm(q.trim());
+    const digits = qn.replace(/^\+/, '');
+    const isDial = qn !== '' && /^\+?[0-9]+$/.test(qn);
+    const hits = C.filter((c) => qn === '' || (isDial ? c[2].indexOf(digits) === 0 : norm(c[1]).indexOf(qn) >= 0));
+    const opts = hits.map((c) => ({
+      name: c[1], dial: '+' + c[2],
+      sel: c[0] === value ? 'true' : 'false', op: c[0] === value ? '1' : '0',
+      cls: c[0] === value ? 'opt hl' : 'opt',
+      pick: () => this.setState({ value: c[0], open: false, q: '' })
+    }));
+    const cur = C.find((c) => c[0] === value);
+    return {
+      openStr: open ? 'true' : 'false',
+      popCls: open ? 'pop full open' : 'pop full',
+      chevRot: open ? '180deg' : '0deg',
+      tog: () => this.setState({ open: !open }),
+      valLabel: cur ? cur[1] + ' (+' + cur[2] + ')' : 'Sin país',
+      valColor: cur ? 'inherit' : 'var(--muted-fg)',
+      q: q,
+      onQ: (e) => this.setState({ q: e && e.target ? e.target.value : '', open: true }),
+      opts: opts,
+      noHits: hits.length === 0,
+      showEmpty: qn === '',
+      emptyCls: value === null ? 'opt hl' : 'opt',
+      emptySel: value === null ? 'true' : 'false',
+      emptyOp: value === null ? '1' : '0',
+      pickEmpty: () => this.setState({ value: null, open: false, q: '' })
+    };
+  }
+}
+</script>
+</body>
+</html>

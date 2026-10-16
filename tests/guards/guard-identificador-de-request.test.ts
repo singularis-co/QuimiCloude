@@ -327,6 +327,10 @@ export const E2E_ESPERADOS = [
   // que la receta no ofrece un envase como ingrediente. No lee ni afirma nada sobre el
   // identificador de peticion.
   'envases-del-pedido.spec.ts',
+  // Alta por el mismo motivo que las demas. Termina el empaque con envases reales distintos del
+  // plan y mira envases, lotes, coste y la tab «Reparto». No lee ni afirma nada sobre el
+  // identificador de peticion.
+  'envases-reales-empaque.spec.ts',
   // Alta por el mismo motivo que las demas. Recorre el alta de un insumo eligiendo su unidad y lo
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.
@@ -401,6 +405,64 @@ export const E2E_ESPERADOS = [
   // reabre el pedido, la presentacion otra vez pendiente en «Entregar» y usuario sin permiso. No lee
   // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'anular-entrega.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el proveedor IA de una empresa: aviso de bloqueo
+  // en «Fórmulas» con y sin permiso de configurarlo, key rechazada que no guarda nada, prueba y alta
+  // con el doble, el HTML sin la key y desconectar. No lee ni afirma nada sobre el identificador de
+  // peticion ni sobre `reference`.
+  'integraciones-proveedor-ia.spec.ts',
+  // Alta el 2026-10-13 (ficha de producto terminado) por el mismo motivo que las demas. Recorre la ficha de un producto
+  // terminado: entrega parcial desde Pedidos, llegada por el enlace de /pedidos y por la pestana de
+  // terminados de /inventario, sus tabs Lotes, Entradas, Salidas y Entregas, y usuario sin permiso
+  // que recibe el 404. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'detalle-de-producto-terminado.spec.ts',
+  // Alta el 2026-10-13 (QC-262) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en chromium y webkit, la lista de `/pedidos` a
+  // 1440 px pinta una sola barra de filtros con buscador, cliente y chips en orden, el menu de la
+  // fila con su orden, su separador y «Cancelar» y «Eliminar» destructivos, y la tabla con doce
+  // columnas y el numero fijado sin desbordar el documento; a 820 y 390 px pinta tarjetas; a 390 px
+  // la barra no desborda, «Acciones» mide 44 px y abre el dialogo centrado «Pedido <n>» con items de
+  // 48 px, los dialogos de cancelar, eliminar, cliente, reparto y material insuficiente quedan enteros
+  // y centrados con botones de 44 px, y los paneles de alta, edicion y entrega ocupan la pantalla
+  // con el pie visible. No confirma nada. No lee ni afirma nada sobre el identificador de peticion
+  // ni sobre `reference`.
+  'pedidos-rediseno.spec.ts',
+  // Alta el 2026-10-15 (QC-277) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita, en una empresa sin añadidos: aterriza en
+  // Inventario, el menu no trae dashboard, proveedores ni integraciones, no hay boton de importar y
+  // el logo lleva a Inventario; cada pantalla de un añadido pedida por URL da el 404 privado con menu
+  // y cerrar sesion; entrar al login con sesion pasa por `/inicio` y acaba en Inventario. Al prender
+  // los cinco añadidos con la sesion abierta, la siguiente peticion ya trae enlaces, importar,
+  // dashboard y logo al dashboard sin volver a entrar; y con la lectura de PDF prendida pero
+  // integraciones apagado, Formulas no ofrece «Subir PDF» (con los dos, si). NO ejercita el cruce
+  // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'modulos-por-empresa.spec.ts',
+  // Lo que ejercita: el Administrador de acondicionamiento comienza un pedido sembrado «Por
+  // acondicionar» con un equipo -una persona suelta y otra por grupo-, guarda los datos de lote, los
+  // corrige y lo termina; el Administrador ve en el dashboard el total de la fila y el filtro por un
+  // miembro que no firma, y en el recorrido las tres anotaciones nuevas, la foto del primer guardado
+  // y las tres duraciones. No lee ni afirma nada sobre el identificador de peticion ni sobre
+  // `reference`.
+  'recorrido-acondicionamiento.spec.ts',
+  // Alta el 2026-10-15 (QC-282 R47) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: una entrega de un pedido `TERMINADO` a dos
+  // clientes que comparten un lote, con un asiento por lote y la existencia comprobados en Postgres;
+  // el cliente repetido que no envia nada; el dialogo de anular que abre sin nada marcado y la
+  // anulacion de una sola presentacion de un cliente; la lista con un subbloque por cliente y el tab
+  // Entregas con una fila por cliente y «Presentación». No lee ni afirma nada sobre el identificador
+  // de peticion ni sobre `reference`.
+  'entrega-a-varios-clientes.spec.ts',
+  // Alta el 2026-10-14 (QC-271, TI) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. Lo que ejercita: el
+  // Administrador abre el recorrido de un pedido con fotos sembradas y ve las de fabricacion bajo la
+  // ultima anotacion de su paso y las de envasado en su tarjeta; en Lotes de la ficha del producto
+  // terminado ve el total y abre el dialogo con «Fabricacion» y «Envasado». El Operador, en la misma
+  // ficha, no ve la columna ni ninguna foto. No lee ni afirma nada sobre el identificador de
+  // peticion ni sobre `reference`.
+  'consulta-de-evidencia.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -605,6 +667,35 @@ export const MIGRACIONES_ESPERADAS = [
   '20261009120200_delivery_void_permission',
   // 2026-10-09: la tabla de conexiones de WhatsApp; no toca el identificador.
   '20261009130000_whatsapp_connections',
+  // QC-235 2026-10-13: la columna `companies.country`; no toca el identificador.
+  '20261013120000_companies_country',
+  // 2026-10-13: las fotos de evidencia por paso; no toca el identificador.
+  '20261013120000_order_step_evidence',
+  // QC-275 2026-10-13: el catalogo de proveedores de IA y la conexion por empresa; no toca el
+  // identificador.
+  '20261013150000_ai_providers',
+  // QC-162 2026-10-14: indices de unicidad de empresas y la tabla `company_events`; no toca el
+  // identificador.
+  '20261014120000_companies_management',
+  // 2026-10-14: migracion de datos que quita `asignaciones.consultar` al Administrador; no toca el
+  // identificador.
+  '20261014180000_admin_without_assigned_orders_view',
+  // QC-284 2026-10-14: la unicidad del lote pasa a producto + presentacion + codigo; no toca el
+  // identificador.
+  '20261014200000_product_batches_lot_per_presentation',
+  // Las acciones del acondicionamiento en el registro de ejecucion y la columna `batch_lines`; no
+  // tocan el identificador.
+  '20261015120000_order_execution_conditioning_actions',
+  '20261015120100_order_execution_batch_lines',
+  // QC-281 2026-10-15: el conteo real de envases en `order_presentation_lines`; no toca el
+  // identificador.
+  '20261015120200_order_presentation_lines_packed_count',
+  // QC-282 2026-10-15: el cliente pasa de la entrega a sus lineas; no toca el identificador.
+  '20261015130000_order_delivery_lines_customer',
+  // QC-277 2026-10-15: las tablas de añadidos; no toca el identificador.
+  '20261015190000_company_addons',
+  // QC-289 2026-10-16: el ultimo lote cargado de cada producto; no toca el identificador.
+  '20261016120000_products_last_batch_at',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -669,13 +760,20 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // El 2026-10-07 entro `nodemailer` -transporte SMTP temporal del correo- y, como devDependency,
 // `@types/nodemailer`, pedidas por el humano y con su fila en `docs/dependencias.md`: de 41 a 42
 // y de 21 a 22.
+// El 2026-10-13 entro `libphonenumber-js` -pais y telefono, QC-235-, con los cuatro checks,
+// aprobacion humana y su fila en `docs/dependencias.md`: de 42 a 43.
+// El 2026-10-13 entro `openai` -SDK de OpenAI y OpenRouter, QC-275-, con los cuatro checks,
+// aprobacion humana y su fila en `docs/dependencias.md`: de 43 a 44.
+// El 2026-10-14 entro `write-excel-file` -escribir la plantilla .xlsx de la importacion de
+// inventario con su hoja de valores disponibles-, con los cuatro checks, aprobacion humana y su
+// fila en `docs/dependencias.md`: de 44 a 45.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 42
+export const DEPENDENCIAS_ESPERADAS = 45
 export const DEV_DEPENDENCIAS_ESPERADAS = 22
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */

@@ -2,12 +2,15 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
+import { EvidenceRequiredError, OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
 import { assertOrderAcceptsWrites } from './order-state';
+import { stepRequiresEvidence } from './step-evidence';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
+import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
+import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 const recordStepMoveSchema = z.strictObject({
   orderId: z.string().uuid(),
@@ -19,8 +22,33 @@ export type RecordStepMoveDeps = {
   readonly assignments: OrderAssignmentRepository;
   readonly orders: OrderCatalog;
   readonly log: ExecutionLogRepository;
+  readonly recipes: RecipeCatalog;
+  readonly evidence: StepEvidenceRepository;
   readonly now?: () => Date;
 };
+
+/**
+ * Avanzar deja atras el paso `position`: si pide evidencia en la formula ACTUAL y no tiene ninguna
+ * foto, no se avanza.
+ */
+async function assertLeavingStepHasEvidence(
+  deps: RecordStepMoveDeps,
+  companyId: string,
+  orderId: string,
+  position: number,
+): Promise<void> {
+  const page = await deps.orders.listAliveSummariesByIds(companyId, [orderId], ['EN_CURSO'], 1, 1);
+  const summary = page.items[0];
+  if (summary === undefined) throw new OrderNotFoundError();
+
+  const content = await deps.recipes.findExecutionContentById(summary.recipeId, companyId);
+  if (!stepRequiresEvidence(content?.steps ?? [], position)) return;
+
+  const rows = await deps.evidence.listByOrder(companyId, orderId, 'manufacturing');
+  if (!rows.some((row) => row.stepPosition === position)) {
+    throw new EvidenceRequiredError(`paso ${String(position)} sin evidencia`);
+  }
+}
 
 /**
  * Anota un paso adelante o atras, con la posicion del paso al que se llega. Solo sobre un
@@ -57,6 +85,11 @@ export function createRecordStepMove(
       if (order.status === 'BLOQUEADO') throw new OrderBlockedError();
       assertOrderAcceptsWrites(order);
       throw new OrderNotFoundError();
+    }
+
+    // Volver atras nunca se bloquea: corregir un paso anterior siempre se permite.
+    if (direction === 'advance' && stepPosition !== null && stepPosition >= 2) {
+      await assertLeavingStepHasEvidence(deps, actor.companyId, orderId, stepPosition - 1);
     }
 
     await deps.log.append({

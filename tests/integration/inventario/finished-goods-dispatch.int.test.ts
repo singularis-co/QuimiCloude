@@ -60,7 +60,7 @@ type Tenant = {
   readonly productId: string
 }
 
-/** Empresa con usuario, cliente, receta, presentacion, pedido, producto terminado y una entrega. */
+/** Empresa con usuario, receta, presentacion, pedido, producto terminado y una entrega. */
 async function createTenant(tx: Prisma.TransactionClient, label: string): Promise<Tenant> {
   const marca = token()
   const name = `Empresa ${label} ${marca}`
@@ -88,18 +88,6 @@ async function createTenant(tx: Prisma.TransactionClient, label: string): Promis
       username: `ana.${marca}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
       roleId: role.id,
-      companyId,
-    },
-    select: { id: true },
-  })
-  const { id: customerId } = await tx.customer.create({
-    data: {
-      firstNames: 'Luis',
-      firstNamesNormalized: 'luis',
-      lastNames: 'Rojas',
-      lastNamesNormalized: 'rojas',
-      city: 'Cali',
-      cityNormalized: 'cali',
       companyId,
     },
     select: { id: true },
@@ -136,7 +124,8 @@ async function createTenant(tx: Prisma.TransactionClient, label: string): Promis
     select: { id: true },
   })
   const { id: deliveryId } = await tx.orderDelivery.create({
-    data: { companyId, orderId, customerId, deliveryKey: randomUUID(), createdBy: userId },
+    // 2026-10-15: la entrega ya no lleva cliente (va en sus lineas), y esta salida no escribe lineas.
+    data: { companyId, orderId, deliveryKey: randomUUID(), createdBy: userId },
     select: { id: true },
   })
   return { companyId, userId, orderId, deliveryId, recipeId, presentationId, productId }
@@ -222,6 +211,65 @@ describe('dispatchFinishedGoods contra Postgres real', () => {
         [lote1, 'delivery', '-15.0000', a.orderId, null, a.companyId],
         [lote2, 'delivery', '-5.0000', a.orderId, null, a.companyId],
       ])
+    })
+  })
+
+  // 2026-10-15: un lote repetido entre asignaciones (una por cliente) baja una vez por la suma.
+  it('R26: un lote repetido entre dos asignaciones da un decremento, un asiento con la suma y una linea por asignacion', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const lote1 = await createBatch(tx, a, '50.0000', '5.0000')
+      const lote2 = await createBatch(tx, a, '7.5000', '2.5000')
+
+      const outcome = await createFinishedGoodsDispatch(tx).dispatchForDelivery(
+        dispatchInput(a, [
+          { batchId: lote1, packages: 3 },
+          { batchId: lote2, packages: 1 },
+          { batchId: lote1, packages: 4 },
+        ]),
+      )
+
+      expect(outcome).toEqual({
+        kind: 'dispatched',
+        lines: [
+          { batchId: lote1, packages: 3, quantity: '15.0000' },
+          { batchId: lote2, packages: 1, quantity: '2.5000' },
+          { batchId: lote1, packages: 4, quantity: '20.0000' },
+        ],
+      })
+      expect(await stockOf(tx, lote1)).toBe('15.0000')
+      expect(await stockOf(tx, lote2)).toBe('5.0000')
+      const product = await tx.product.findUniqueOrThrow({ where: { id: a.productId }, select: { stock: true } })
+      expect(product.stock.toFixed(4)).toBe('20.0000')
+
+      const asientos = await tx.inventoryMovement.findMany({
+        where: { orderDeliveryId: a.deliveryId },
+        orderBy: { quantity: 'asc' },
+        select: { batchId: true, kind: true, quantity: true },
+      })
+      expect(asientos.map((m) => [m.batchId, m.kind, m.quantity.toFixed(4)])).toEqual([
+        [lote1, 'delivery', '-35.0000'],
+        [lote2, 'delivery', '-2.5000'],
+      ])
+    })
+  })
+
+  it('R24: si la suma de un lote repetido supera su existencia, insufficient con sus envases enteros y nada escrito', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      // Cada asignacion cabe sola (3 y 4 envases de 6), pero la suma (7) no.
+      const lote = await createBatch(tx, a, '30.0000', '5.0000')
+
+      const outcome = await createFinishedGoodsDispatch(tx).dispatchForDelivery(
+        dispatchInput(a, [
+          { batchId: lote, packages: 3 },
+          { batchId: lote, packages: 4 },
+        ]),
+      )
+
+      expect(outcome).toEqual({ kind: 'insufficient', batchId: lote, availablePackages: 6 })
+      expect(await stockOf(tx, lote)).toBe('30.0000')
+      expect(await tx.inventoryMovement.count({ where: { batchId: lote } })).toBe(0)
     })
   })
 

@@ -24,7 +24,7 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, CANCELLED_ORDER_PARAM, assignedOrderRoute } from '@/lib/shared/routes';
 
-import { ASSIGNED_ORDER_START_CONFIRM_TESTID, clickAndConfirm } from './helpers/confirm-dialog';
+import { enterAndStartAssignedOrder } from './helpers/confirm-dialog';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -119,12 +119,13 @@ async function countEntries(orderId: string, action: 'RESUME' | 'ADVANCE'): Prom
 /** Entra desde la lista con Entrar + Comenzar, como lo haria el Operador. */
 async function openFromList(page: Page, order: { id: string; numberText: string }): Promise<void> {
   await loginAndLand(page, operatorUser);
+  await page.goto(ASSIGNED_ORDERS_ROUTE);
   await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
   const row = rowByNumber(page, order.numberText);
   await expect(row).toHaveCount(1, { timeout: 60_000 });
 
-  await clickAndConfirm(page, row.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+  await enterAndStartAssignedOrder(page, row.getByTestId(ENTER_TESTID));
   await page.waitForURL((url) => url.pathname === assignedOrderRoute(order.id), { timeout: 60_000 });
   await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 }

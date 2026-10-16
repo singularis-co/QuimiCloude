@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
@@ -12,7 +13,9 @@ import type {
   PackagedStockEntry,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import {
@@ -26,6 +29,7 @@ import {
   stockAmountCell,
   unitLabel,
 } from './product-columns';
+import { productNameWithoutPresentation } from './product-base-name';
 
 /** Fila que pinta la tabla: la del pedido (o sin pedido) y, desplegada, una por producto. */
 export type FinishedStockTableRow =
@@ -62,8 +66,15 @@ export function finishedStockRowTitle(row: FinishedStockRow): string {
 
 /** Lo que pinta la columna «Nombre» en la fila agrupadora: el producto, sin el pedido. */
 export function finishedStockRowName(row: FinishedStockRow): string {
-  if (row.kind === 'withoutOrder') return row.products[0].product.name;
+  if (row.kind === 'withoutOrder') return productNameWithoutPresentation(row.products[0].product);
   return row.recipeName ?? EMPTY_MARK;
+}
+
+/** La presentacion va en su columna; la fila de un pedido no tiene una sola. */
+function presentationCell(item: FinishedStockTableRow): ReactNode {
+  if (item.kind === 'line') return item.line.product.presentationName ?? EMPTY_MARK;
+  if (item.row.kind === 'order') return null;
+  return item.row.products[0].product.presentationName ?? EMPTY_MARK;
 }
 
 function orderNumberCell(row: FinishedStockRow): ReactNode {
@@ -127,7 +138,7 @@ export function buildFinishedStockColumns({
     {
       id: IMAGE_COLUMN_ID,
       label: IMAGE_COLUMN_LABEL,
-      align: 'start',
+      align: 'center',
       defaultPinned: 'left',
       cell: (item) =>
         item.kind === 'group' ? (
@@ -159,8 +170,19 @@ export function buildFinishedStockColumns({
       cell: (item) => {
         if (item.kind === 'line') {
           return (
-            <span className="block pl-12" data-testid="finished-stock-line-name">
-              {item.line.product.name}
+            <span className="block pl-12">
+              <Link
+                href={finishedProductDetailRoute(item.line.product.id)}
+                data-testid="finished-stock-line-link"
+                className={cn(
+                  'inline-flex max-w-full items-center rounded-lg font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none',
+                  touchTarget,
+                )}
+              >
+                <span className="min-w-0 break-words" data-testid="finished-stock-line-name">
+                  {productNameWithoutPresentation(item.line.product)}
+                </span>
+              </Link>
             </span>
           );
         }
@@ -189,6 +211,12 @@ export function buildFinishedStockColumns({
           </div>
         );
       },
+    },
+    {
+      id: 'presentationName',
+      label: 'Presentación',
+      align: 'start',
+      cell: presentationCell,
     },
     {
       id: 'stock',

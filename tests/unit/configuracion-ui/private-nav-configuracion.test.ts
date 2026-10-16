@@ -34,7 +34,7 @@ import {
   type NavItem,
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
-import { PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
+import { PRESENTATIONS_ROUTE, USERS_ROUTE } from '@/lib/shared/routes';
 
 const RAIZ = join(__dirname, '..', '..', '..');
 
@@ -58,23 +58,17 @@ function paginaDe(href: string): string {
 }
 
 describe('la seccion Configuración existe una sola vez y su item sigue en pie (R3)', () => {
-  it('hay exactamente UNA seccion Configuración y su primer item es el de presentaciones', () => {
+  it('hay exactamente UNA seccion Configuración y el item de presentaciones va tras usuarios', () => {
     const secciones = groupNavItemsBySection(PRIVATE_NAV_ITEMS).filter(
       (seccion) => seccion.label === NAV_SECTION_CONFIGURATION,
     );
 
     expect(secciones).toHaveLength(1);
-    // ANCLA TENSADA el 2026-09-08 (QC-39 T4), no relajada: la seccion nacio con UN item y ahora
-    // lleva DOS, porque «Unidades» llego con QC-39 —la decision cerrada de QC-45 lo anunciaba—.
-    // Lo que esta task promete y sigue vigente es que la seccion es UNA y que su item **no se
-    // sustituyo ni se reordeno**: sigue existiendo y sigue siendo el PRIMERO.
-    // TENSADA el 2026-09-11 (QC-67 T2, R2/R39) a TRES, porque «Usuarios» se dio de alta detras de
-    // «Unidades», y RELAJADA de vuelta a DOS el 2026-09-21: «Usuarios» paso a `NAV_SECTION_OPERATION`
-    // por decision humana (es operacion, no configuracion). Lo que esta task promete y sigue
-    // vigente es lo mismo: la seccion es UNA y su item **no se sustituyo ni se reordeno**; sigue
-    // siendo el PRIMERO.
-    expect(secciones[0]?.items).toHaveLength(3);
-    expect((secciones[0]?.items[0] as NavLink | undefined)?.href).toBe(PRESENTATIONS_ROUTE);
+    // Cuatro items desde que «Usuarios» abre la seccion: Usuarios, Presentaciones, Unidades e
+    // Integraciones. El item de presentaciones sigue existiendo, ahora en segunda posicion.
+    expect(secciones[0]?.items).toHaveLength(4);
+    expect((secciones[0]?.items[0] as NavLink | undefined)?.href).toBe(USERS_ROUTE);
+    expect((secciones[0]?.items[1] as NavLink | undefined)?.href).toBe(PRESENTATIONS_ROUTE);
   });
 
   it('ese item apunta a PRESENTATIONS_ROUTE y declara inventario.modificar (R3, R4)', () => {

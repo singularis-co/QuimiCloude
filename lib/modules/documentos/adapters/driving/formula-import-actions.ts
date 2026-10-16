@@ -49,6 +49,7 @@ async function currentActor(): Promise<Actor | null> {
     id: sessionUser.id,
     companyId: sessionContext.companyId,
     permissions: sessionUser.permissions,
+    addons: sessionUser.addons,
   };
 }
 

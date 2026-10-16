@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { RecipeStepsField } from '@/app/(private)/produccion/formulas/components';
 import type { RecipeStepFormValue } from '@/app/(private)/produccion/formulas/components/recipe-form-state';
+import { isStepDocumentEmpty } from '@/app/(private)/produccion/formulas/components/recipe-steps-field';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
 
 import { setupUser } from '../../helpers/user-event';
@@ -160,5 +161,191 @@ describe('RecipeStepsField reutilizable (QC-211)', () => {
     } finally {
       uninstall();
     }
+  });
+});
+
+function stepWithEvidence(key: string, text: string): RecipeStepFormValue {
+  return { key, document: { ...doc(text), requiresEvidence: true } };
+}
+
+let lastSteps: readonly RecipeStepFormValue[] = [];
+
+function EvidenceHarness({
+  initial,
+  locked = false,
+}: {
+  readonly initial: RecipeStepFormValue[];
+  readonly locked?: boolean;
+}) {
+  const [steps, setSteps] = useState<readonly RecipeStepFormValue[]>(initial);
+  return (
+    <RecipeStepsField
+      steps={steps}
+      onChange={(next) => {
+        lastSteps = next;
+        setSteps(next);
+      }}
+      showEvidenceSwitch
+      locked={locked}
+    />
+  );
+}
+
+function evidenceSwitch(position: number): HTMLElement {
+  return screen.getByRole('switch', { name: `Requiere evidencia en el paso ${position}` });
+}
+
+describe('RecipeStepsField — «Requiere evidencia» (QC-214)', () => {
+  it('R1: sin showEvidenceSwitch no hay interruptor ni resumen', () => {
+    render(<SingleHarness />);
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByTestId('recipe-step-evidence-summary')).toBeNull();
+  });
+
+  it('R2: un paso guardado sin el dato y un paso recién añadido salen apagados', async () => {
+    const user = setupUser();
+    render(<EvidenceHarness initial={[step('a', 'Pesar')]} />);
+
+    expect(evidenceSwitch(1)).toHaveAttribute('aria-checked', 'false');
+    await user.click(screen.getByTestId('recipe-step-add'));
+    expect(evidenceSwitch(2)).toHaveAttribute('aria-checked', 'false');
+    expect(lastSteps[1]?.document.requiresEvidence).toBeUndefined();
+  });
+
+  it('R1: encender un paso no toca los demás, y apagarlo quita la marca del documento', async () => {
+    const user = setupUser();
+    render(<EvidenceHarness initial={[step('a', 'Pesar'), step('b', 'Mezclar')]} />);
+
+    await user.click(evidenceSwitch(2));
+    expect(evidenceSwitch(2)).toHaveAttribute('aria-checked', 'true');
+    expect(evidenceSwitch(1)).toHaveAttribute('aria-checked', 'false');
+    expect(lastSteps.map((s) => s.document.requiresEvidence)).toEqual([undefined, true]);
+    expect(textOf('recipe-step-text-1')).toContain('Mezclar');
+
+    await user.click(evidenceSwitch(2));
+    expect('requiresEvidence' in (lastSteps[1]?.document ?? {})).toBe(false);
+  });
+
+  it('R5: el paso encendido se marca con su línea de ayuda y el resumen cuenta por lista', async () => {
+    const user = setupUser();
+    render(
+      <EvidenceHarness
+        initial={[step('a', 'Pesar'), step('b', 'Mezclar'), step('c', 'Envasar')]}
+      />,
+    );
+    const summary = screen.getByTestId('recipe-step-evidence-summary');
+    expect(summary).toHaveTextContent('Ningún paso pide evidencia');
+
+    await user.click(evidenceSwitch(1));
+    expect(summary).toHaveTextContent('1 paso pide evidencia');
+    expect(screen.getByTestId('recipe-step-text-0-evidence-help')).toHaveTextContent(
+      'Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.',
+    );
+    expect(screen.queryByTestId('recipe-step-text-1-evidence-help')).toBeNull();
+
+    await user.click(evidenceSwitch(3));
+    expect(summary).toHaveTextContent('2 pasos piden evidencia');
+  });
+
+  it('R2, R5: un paso guardado con la marca abre encendido y cuenta en el resumen', () => {
+    render(<EvidenceHarness initial={[stepWithEvidence('a', 'Pesar'), step('b', 'Mezclar')]} />);
+    expect(evidenceSwitch(1)).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('recipe-step-evidence-summary')).toHaveTextContent(
+      '1 paso pide evidencia',
+    );
+  });
+
+  it('R8: bloqueado, mover y quitar se deshabilitan con su motivo; el interruptor y añadir siguen activos', async () => {
+    const user = setupUser();
+    render(<EvidenceHarness initial={[step('a', 'Pesar'), step('b', 'Mezclar')]} locked />);
+
+    expect(screen.getByTestId('recipe-step-handle-0')).toBeDisabled();
+    expect(screen.getByTestId('recipe-step-handle-0')).toHaveAccessibleName(
+      'No se puede mover el paso 1: hay pedidos en curso con fotos',
+    );
+    expect(screen.getByTestId('recipe-step-remove-1')).toBeDisabled();
+    expect(screen.getByTestId('recipe-step-remove-1')).toHaveAccessibleName(
+      'No se puede quitar el paso 2: hay pedidos en curso con fotos',
+    );
+
+    await user.click(evidenceSwitch(1));
+    expect(evidenceSwitch(1)).toHaveAttribute('aria-checked', 'true');
+    await user.click(screen.getByTestId('recipe-step-add'));
+    expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(3);
+  });
+});
+
+describe('RecipeStepsField — «Añadir paso» solo con todos los pasos rellenos', () => {
+  it('isStepDocumentEmpty recorre párrafos e ítems de checklist y solo cuenta texto tras trim', () => {
+    expect(isStepDocumentEmpty({ blocks: [] })).toBe(true);
+    expect(isStepDocumentEmpty({ blocks: [{ kind: 'paragraph', spans: [] }] })).toBe(true);
+    expect(isStepDocumentEmpty(doc('   '))).toBe(true);
+    expect(
+      isStepDocumentEmpty({
+        blocks: [
+          { kind: 'paragraph', spans: [] },
+          { kind: 'checklist', items: [{ spans: [{ text: ' ' }] }, { spans: [{ text: 'Pesar' }] }] },
+        ],
+      }),
+    ).toBe(false);
+    expect(isStepDocumentEmpty(doc('Mezclar'))).toBe(false);
+  });
+
+  it('sin pasos, añadir está activo', () => {
+    render(<SingleHarness initial={[]} />);
+    expect(screen.getByTestId('recipe-step-add')).toBeEnabled();
+  });
+
+  it('con un paso vacío, añadir se deshabilita; con todos con texto, vuelve a estar activo', async () => {
+    const user = setupUser();
+    render(<SingleHarness initial={[step('a', 'Pesar')]} />);
+    expect(screen.getByTestId('recipe-step-add')).toBeEnabled();
+
+    await user.click(screen.getByTestId('recipe-step-add'));
+    expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(2);
+    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+  });
+
+  it('cuando el paso vacío recibe texto, añadir vuelve a estar activo', () => {
+    const noop = () => undefined;
+    const { rerender } = render(
+      <RecipeStepsField
+        steps={[step('a', 'Pesar'), { key: 'b', document: { blocks: [{ kind: 'paragraph', spans: [] }] } }]}
+        onChange={noop}
+      />,
+    );
+    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+
+    rerender(<RecipeStepsField steps={[step('a', 'Pesar'), step('b', 'Mezclar')]} onChange={noop} />);
+    expect(screen.getByTestId('recipe-step-add')).toBeEnabled();
+  });
+
+  it('`locked` no cambia la regla: con un paso vacío añadir sigue deshabilitado', () => {
+    render(
+      <RecipeStepsField
+        steps={[{ key: 'a', document: { blocks: [{ kind: 'paragraph', spans: [] }] } }]}
+        onChange={() => undefined}
+        locked
+      />,
+    );
+    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+  });
+
+  it('un paso con solo espacios cuenta como vacío', () => {
+    render(<SingleHarness initial={[step('a', 'Pesar'), step('b', '   ')]} />);
+    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+  });
+
+  it('la regla aplica igual a los pasos de envasado', () => {
+    function PackingHarness() {
+      const [steps, setSteps] = useState<readonly RecipeStepFormValue[]>([
+        { key: 'pk', document: { blocks: [{ kind: 'paragraph', spans: [] }] } },
+      ]);
+      return (
+        <RecipeStepsField steps={steps} onChange={setSteps} testIdPrefix="recipe-packing-step" />
+      );
+    }
+    render(<PackingHarness />);
+    expect(screen.getByTestId('recipe-packing-step-add')).toBeDisabled();
   });
 });

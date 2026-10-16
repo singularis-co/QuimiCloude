@@ -5,6 +5,8 @@ import {
   CONFIRM_BUTTON_TESTID,
   ERROR_FILE_BUTTON_TESTID,
   EXAMPLE_ROW_NOTICE_TESTID,
+  IGNORED_COLUMNS_SUMMARY_TESTID,
+  ROW_IGNORED_COLUMNS_TESTID,
   ImportPreviewSummary,
   ImportPreviewTable,
   NO_VALID_ROWS_TESTID,
@@ -70,6 +72,18 @@ describe('resumen de la vista previa', () => {
     expect(screen.queryByTestId(EXAMPLE_ROW_NOTICE_TESTID)).toBeNull();
   });
 
+  it('R11 resume cuántas filas traen columnas ignoradas, solo si hay alguna', () => {
+    const conIgnoradas = vistaPrevia();
+    const [primera, ...resto] = conIgnoradas.rows;
+    if (primera === undefined) throw new Error('fixture vacío');
+    renderResumen({ ...conIgnoradas, rows: [{ ...primera, ignoredColumns: ['name'] }, ...resto] });
+    expect(screen.getByTestId(IGNORED_COLUMNS_SUMMARY_TESTID)).toHaveTextContent(/^1 fila trae valores/);
+    cleanup();
+
+    renderResumen(vistaPrevia());
+    expect(screen.queryByTestId(IGNORED_COLUMNS_SUMMARY_TESTID)).toBeNull();
+  });
+
   it('R24 «Confirmar» sigue disponible con filas en error y faltantes sin crear', async () => {
     const user = setupUser();
     const { onConfirm } = renderResumen(vistaPrevia());
@@ -133,6 +147,16 @@ describe('tabla de la vista previa', () => {
     for (const texto of porEstado.values()) expect(texto.trim()).not.toBe('');
   });
 
+  it('R11 una fila con columnas que su tipo no usa sigue válida y avisa cuáles se ignoraron', () => {
+    const [primera, ...resto] = FILAS_VISTA_PREVIA;
+    if (primera === undefined) throw new Error('fixture vacío');
+    render(<ImportPreviewTable rows={[{ ...primera, ignoredColumns: ['presentation', 'formula'] }, ...resto]} />);
+
+    const aviso = within(fila(primera.rowNumber)).getByTestId(ROW_IGNORED_COLUMNS_TESTID);
+    expect(aviso).toHaveTextContent('Se ignoraron «Presentación», «Fórmula»: no aplican a este tipo.');
+    expect(within(fila(primera.rowNumber)).queryByTestId(ROW_ISSUE_TESTID)).toBeNull();
+  });
+
   it('R10 una fila en error lista cada motivo con la columna a la que apunta', () => {
     render(<ImportPreviewTable rows={FILAS_VISTA_PREVIA} />);
 
@@ -140,7 +164,7 @@ describe('tabla de la vista previa', () => {
     expect(motivos.map((m) => m.getAttribute('data-column'))).toEqual(['unit', 'stock']);
     expect(motivos.map((m) => m.textContent)).toEqual([
       'Unidad: «Galón» no existe.',
-      'Existencia: «4,5,1» no es un número.',
+      'Cantidad: «4,5,1» no es un número.',
     ]);
   });
 

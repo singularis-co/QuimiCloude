@@ -34,6 +34,7 @@ const USUARIO: SessionUser = {
   displayName: 'Carla Duarte Salas',
   roleName: 'Administrador',
   permissions: PERMISSIONS.map((permiso) => permiso.code),
+  addons: ['importacion_excel'],
 };
 
 const {

@@ -1,8 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs';
 
-import { describe, expect, it } from 'vitest';
+import type { ReactElement, ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 
-import { PERMISSIONS } from '@/lib/modules/identity';
+import {
+  ADDONS,
+  PERMISSIONS,
+  ROLE_ADMINISTRADOR,
+  SEED_ROLE_PERMISSIONS,
+  effectivePermissions,
+  type SessionUser,
+} from '@/lib/modules/identity';
 import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
 import {
   ASSIGNED_ORDERS_ROUTE,
@@ -11,6 +19,18 @@ import {
   PRIVATE_ROUTE_PREFIXES,
   assignedOrderRoute,
 } from '@/lib/shared/routes';
+
+const { getSessionUserMock } = vi.hoisted(() => ({
+  getSessionUserMock: vi.fn<() => Promise<SessionUser | null>>(),
+}));
+
+vi.mock('@/lib/composition', () => ({
+  identity: { getSessionUser: getSessionUserMock },
+  // Las secciones construyen su traductor de errores al cargar el módulo.
+  observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
+}));
+
+import AsignacionPage from '@/app/(private)/asignacion/page';
 
 /** Texto del archivo sin comentarios: un literal citado dentro de un comentario no es codigo. */
 function fuenteSinComentarios(ruta: string): string {
@@ -121,5 +141,55 @@ describe('la pantalla vive donde dice la constante (R33)', () => {
       "from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions'",
     );
     expect(codigo).not.toContain("from '@/lib/modules/asignaciones'");
+  });
+});
+
+describe('«Ver recorrido» con el permiso efectivo de la empresa', () => {
+  // Los permisos del Administrador más `asignaciones.consultar` para entrar a la pantalla; el
+  // recorte por añadidos es el de la sesión.
+  const PERMISOS_DEL_ROL = [...(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []), 'asignaciones.consultar'];
+
+  function sesionCon(permissions: readonly string[]): SessionUser {
+    return {
+      id: 'u-qc277',
+      username: 'admin.prueba',
+      displayName: 'Admin De Prueba',
+      roleName: ROLE_ADMINISTRADOR,
+      permissions,
+    };
+  }
+
+  /** Valores de `canViewTrace` de todos los elementos del árbol, sin montarlo. */
+  function valoresDeCanViewTrace(nodo: ReactNode, hallazgos: unknown[] = []): unknown[] {
+    if (nodo === null || nodo === undefined || typeof nodo === 'boolean') return hallazgos;
+    if (Array.isArray(nodo)) {
+      for (const hijo of nodo) valoresDeCanViewTrace(hijo, hallazgos);
+      return hallazgos;
+    }
+    if (typeof nodo !== 'object' || !('props' in nodo)) return hallazgos;
+    const props = (nodo as ReactElement<{ canViewTrace?: unknown; children?: ReactNode; fallback?: ReactNode }>)
+      .props;
+    if (props && 'canViewTrace' in props) hallazgos.push(props.canViewTrace);
+    valoresDeCanViewTrace(props?.children, hallazgos);
+    return hallazgos;
+  }
+
+  async function canViewTraceCon(addons: readonly (typeof ADDONS)[number][]): Promise<unknown[]> {
+    getSessionUserMock.mockResolvedValue(sesionCon(effectivePermissions(PERMISOS_DEL_ROL, addons)));
+    return valoresDeCanViewTrace(await AsignacionPage({ searchParams: Promise.resolve({}) }));
+  }
+
+  it('R17 sin el añadido `dashboard` la página no ofrece «Ver recorrido»', async () => {
+    const valores = await canViewTraceCon(ADDONS.filter((addon) => addon !== 'dashboard'));
+
+    expect(valores.length).toBeGreaterThan(0);
+    expect(valores.every((valor) => valor === false)).toBe(true);
+  });
+
+  it('R17 con el añadido `dashboard` la página ofrece «Ver recorrido»', async () => {
+    const valores = await canViewTraceCon(ADDONS);
+
+    expect(valores.length).toBeGreaterThan(0);
+    expect(valores.every((valor) => valor === true)).toBe(true);
   });
 });

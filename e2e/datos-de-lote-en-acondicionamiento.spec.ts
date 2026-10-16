@@ -1,27 +1,30 @@
 /**
- * E2E de los datos de lote en el acondicionamiento (QC-219 R28).
+ * E2E de los datos de lote en el acondicionamiento: un solo formulario por pedido.
  *
  * Recorre, con los roles REALES del seed, un pedido `EN_ACONDICIONAMIENTO` del acondicionador 1 con
- * dos líneas y sus dos lotes de producción:
+ * dos líneas de presentaciones distintas y sus dos lotes de producción:
  *
- * - el detalle muestra «Datos de lote» con dos bloques, «Terminar» deshabilitado y el aviso de las
- *   2 líneas que faltan;
+ * - el detalle muestra «Datos de lote» con un solo juego de campos, vacío y sin aviso de lotes
+ *   distintos, «Terminar» deshabilitado y el aviso de las 2 líneas que faltan;
  * - guardar con un vencimiento de hoy se rechaza con `batch_expiry_not_future`;
  * - guardar con un día de producción de mañana se rechaza con `batch_production_date_future`;
- * - guardar con un lote que ya existe en la empresa se rechaza con `batch_duplicate_lot`;
- * - tras cada rechazo, el error sale en `role="alert"`, la línea culpable lleva `aria-invalid`, lo
- *   escrito se conserva y el pedido sigue sin datos en la base;
- * - guarda datos válidos en las dos líneas, «Terminar» se habilita, confirma y aterriza en «Por
- *   acondicionar» con el aviso;
+ * - guardar el código del lote de otra producción de la presentación de la línea 1 se rechaza con
+ *   `batch_duplicate_lot`;
+ * - tras cada rechazo, el error sale en `role="alert"`, el campo culpable lleva `aria-invalid`, lo
+ *   escrito se conserva y ningún lote cambia en la base;
+ * - guardar el código de un envase de la empresa (otro producto) se acepta, y los dos lotes del
+ *   pedido quedan con el mismo código, vencimiento y día de producción;
+ * - «Terminar» se habilita, confirma y aterriza en «Por acondicionar» con el aviso;
  * - el Administrador sembrado abre en `/inventario` los lotes del producto terminado y ve el lote
  *   escrito y su vencimiento.
  *
  * EL PEDIDO SE SIEMBRA DIRECTAMENTE con `prisma`, ya `EN_ACONDICIONAMIENTO`, con su reparto, sus dos
  * productos terminados, sus dos lotes y sus asientos `production` (uno por línea): lo que deja
- * Terminar el empaque, cuyo recorrido cubre `e2e/producto-terminado.spec.ts`. El lote ajeno es el
- * de un envase de la misma empresa, para el choque de R10.
+ * Terminar el empaque, cuyo recorrido cubre `e2e/producto-terminado.spec.ts`. Además se siembran un
+ * lote de otra producción del producto de la línea 1 (misma presentación) y un envase de la misma
+ * empresa, los dos con un código conocido.
  *
- * «Hoy» y «mañana» son fechas civiles UTC (D16), como las compara el caso de uso.
+ * «Hoy» y «mañana» son fechas civiles UTC, como las compara el caso de uso.
  *
  * AISLAMIENTO: prefijo propio `qc219_e2e_` + `RUN_ID` por proceso de worker, empresa efímera
  * -`companies_name_unique` es GLOBAL- y limpieza de huérfanos por prefijo Y POR EDAD, porque
@@ -32,9 +35,8 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 
 import {
+  CONDITIONING_BATCH_DATA_DIVERGENT_TESTID,
   CONDITIONING_BATCH_DATA_ERROR_TESTID,
-  CONDITIONING_BATCH_DATA_LINE_TESTID,
-  CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_BATCH_DATA_SUBMIT_TESTID,
   CONDITIONING_BATCH_DATA_TEXTS,
@@ -81,7 +83,7 @@ import {
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
-import { exactProductNameCellText } from './helpers/product-name-cell';
+import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
@@ -111,13 +113,13 @@ const FINISHED_UNIT_COST = '1.0000';
 const PROVISIONAL_LOT_1 = '1001';
 const PROVISIONAL_LOT_2 = '1002';
 
-/** El lote ajeno de la empresa: un envase con un código conocido, para el choque (R10). */
-const PACKAGING_NAME = `${SHARED_TOKEN}_envase`;
-const FOREIGN_LOT = `${SHARED_TOKEN}_ajeno`;
+/** Un lote de otra producción del producto de la línea 1: misma presentación, choca. */
+const PREVIOUS_PRODUCTION_LOT = `${SHARED_TOKEN}_previo`;
+const PREVIOUS_PRODUCTION_STOCK = 1;
 
-/** Los lotes reales que teclea el acondicionador. */
-const REAL_LOT_1 = `L1-${RUN_ID.slice(0, 12)}`;
-const REAL_LOT_2 = `L2-${RUN_ID.slice(0, 12)}`;
+/** El lote de un envase de la empresa: otro producto, no choca. */
+const PACKAGING_NAME = `${SHARED_TOKEN}_envase`;
+const PACKAGING_LOT = `${SHARED_TOKEN}_envlote`;
 
 /** El día civil UTC desplazado `days`, como lo compara el caso de uso (D16). */
 function utcDay(days: number): string {
@@ -161,6 +163,7 @@ const FINISHED_PRODUCT_TAB_NAME = 'Producto terminado';
 const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
 const NAME_CELL_TESTID = 'data-table-cell-name';
 const ORDER_GROUP_NAME_TESTID = 'finished-stock-name';
+const ORDER_GROUP_NUMBER_TESTID = 'finished-stock-order-number';
 const ORDER_GROUP_TOGGLE_TESTID = 'finished-stock-toggle';
 const BATCHES_OPEN_TESTID = 'product-batches-open';
 const PRODUCT_ROW_ACTIONS_TESTID = 'product-row-actions';
@@ -172,7 +175,10 @@ let companyId: string | null = null;
 
 type SeededLine = {
   readonly batchId: string;
+  readonly productId: string;
   readonly productName: string;
+  readonly presentationId: string;
+  readonly presentationName: string;
   readonly label: string;
   readonly provisionalLot: string;
 };
@@ -181,6 +187,7 @@ type Seeded = {
   readonly orderId: string;
   readonly numberText: string;
   readonly lines: readonly [SeededLine, SeededLine];
+  readonly previousProductionBatchId: string;
 };
 let fixture: Seeded | null = null;
 
@@ -226,6 +233,8 @@ async function createUser(user: Credentials, roleId: string, lastNames: string):
 async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown> {
   const ids = [...companyIds];
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    // Comenzar, guardar datos de lote y Terminar anotan en el registro de ejecucion.
+    () => prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.orderConditioningTeamMember.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.inventoryMovement.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.productBatch.deleteMany({ where: { companyId: { in: ids } } }),
@@ -267,18 +276,18 @@ async function storedBatches(batchIds: readonly string[]) {
   });
 }
 
-type LineInput = { readonly lot: string; readonly expiryDate: string; readonly productionDate: string };
+type BatchInput = { readonly lot: string; readonly expiryDate: string; readonly productionDate: string };
 
-function lineBlock(section: Locator, batchId: string): Locator {
-  return section.locator(`[data-testid="${CONDITIONING_BATCH_DATA_LINE_TESTID}"][data-batch-id="${batchId}"]`);
-}
+type FieldName = keyof BatchInput;
 
-/** Los tres campos, por su etiqueta: si la etiqueta no está asociada, no se encuentran (R5). */
-function fields(block: Locator) {
+const FIELD_NAMES: readonly FieldName[] = ['lot', 'expiryDate', 'productionDate'];
+
+/** Los tres campos, por su etiqueta: si la etiqueta no está asociada, no se encuentran. */
+function fields(section: Locator): Record<FieldName, Locator> {
   return {
-    lot: block.getByLabel(CONDITIONING_BATCH_DATA_TEXTS.lot, { exact: true }),
-    expiryDate: block.getByLabel(CONDITIONING_BATCH_DATA_TEXTS.expiryDate, { exact: true }),
-    productionDate: block.getByLabel(CONDITIONING_BATCH_DATA_TEXTS.productionDate, { exact: true }),
+    lot: section.getByLabel(CONDITIONING_BATCH_DATA_TEXTS.lot, { exact: true }),
+    expiryDate: section.getByLabel(CONDITIONING_BATCH_DATA_TEXTS.expiryDate, { exact: true }),
+    productionDate: section.getByLabel(CONDITIONING_BATCH_DATA_TEXTS.productionDate, { exact: true }),
   };
 }
 
@@ -296,34 +305,35 @@ async function waitForFormHydration(section: Locator): Promise<void> {
     .toBe(true);
 }
 
-async function fillLine(block: Locator, input: LineInput): Promise<void> {
-  const { lot, expiryDate, productionDate } = fields(block);
-  await lot.fill(input.lot);
-  await expiryDate.fill(input.expiryDate);
-  await productionDate.fill(input.productionDate);
-  await expectLineValues(block, input);
+async function fillForm(section: Locator, input: BatchInput): Promise<void> {
+  const located = fields(section);
+  for (const name of FIELD_NAMES) await located[name].fill(input[name]);
+  await expectFormValues(section, input);
 }
 
-async function expectLineValues(block: Locator, input: LineInput): Promise<void> {
-  const { lot, expiryDate, productionDate } = fields(block);
-  await expect(lot).toHaveValue(input.lot);
-  await expect(expiryDate).toHaveValue(input.expiryDate);
-  await expect(productionDate).toHaveValue(input.productionDate);
+async function expectFormValues(section: Locator, input: BatchInput): Promise<void> {
+  const located = fields(section);
+  for (const name of FIELD_NAMES) await expect(located[name]).toHaveValue(input[name]);
+}
+
+/** Los dos lotes del pedido y el de la otra producción: ningún rechazo puede tocarlos. */
+function watchedBatchIds(): string[] {
+  const { lines, previousProductionBatchId } = seeded();
+  return [...lines.map((line) => line.batchId), previousProductionBatchId];
 }
 
 /**
- * Guarda y espera el rechazo `code`: el mensaje del catálogo en la región `role="alert"`, la línea
- * culpable con `aria-invalid` y la otra sin él, lo escrito intacto y la base sin cambios (R5, R28).
+ * Guarda y espera el rechazo `code`: el mensaje del catálogo en la región `role="alert"`, solo el
+ * campo culpable con `aria-invalid`, lo escrito intacto y ningún lote cambiado en la base.
  */
 async function saveAndExpectRejection(
   page: Page,
   section: Locator,
   code: ErrorCode,
-  culpritBatchId: string,
-  written: Readonly<Record<string, LineInput>>,
+  culprit: FieldName,
+  written: BatchInput,
 ): Promise<void> {
-  const { lines } = seeded();
-  const before = await storedBatches(lines.map((line) => line.batchId));
+  const before = await storedBatches(watchedBatchIds());
 
   await section.getByTestId(CONDITIONING_BATCH_DATA_SUBMIT_TESTID).click();
 
@@ -335,22 +345,22 @@ async function saveAndExpectRejection(
     page.locator(TOAST_SELECTOR).filter({ hasText: CONDITIONING_BATCH_DATA_TEXTS.saved }),
   ).toHaveCount(0);
 
-  for (const line of lines) {
-    const block = lineBlock(section, line.batchId);
-    if (line.batchId === culpritBatchId) {
-      await expect(block).toHaveAttribute('aria-invalid', 'true');
+  const located = fields(section);
+  for (const name of FIELD_NAMES) {
+    if (name === culprit) {
+      await expect(located[name]).toHaveAttribute('aria-invalid', 'true');
     } else {
-      await expect(block).not.toHaveAttribute('aria-invalid', 'true');
+      await expect(located[name]).not.toHaveAttribute('aria-invalid', 'true');
     }
-    await expectLineValues(block, written[line.batchId]!);
   }
+  await expectFormValues(section, written);
 
   // El pedido sigue sin datos: ni en la pantalla ni en la base.
   await expect(page.getByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toHaveText(
     exactText(CONDITIONING_ORDER_SCREEN_TEXTS.batchDataMissing(2)),
   );
   await expect(page.getByTestId(CONDITIONING_FINISH_BUTTON_TESTID)).toBeDisabled();
-  const after = await storedBatches(lines.map((line) => line.batchId));
+  const after = await storedBatches(watchedBatchIds());
   expect(after).toEqual(before);
   for (const batch of after) expect(batch.productionDate).toBeNull();
 }
@@ -372,11 +382,12 @@ async function gotoSettled(page: Page, url: string): Promise<void> {
 
 /**
  * El Administrador, en su propio contexto, abre en `/inventario` el panel de lotes de cada
- * producto terminado del pedido y ve el lote escrito y su vencimiento (R22, R28).
+ * producto terminado del pedido `numberText` y ve el lote escrito y su vencimiento.
  */
 async function expectAdminSeesBatchData(
   browser: Browser,
-  expected: ReadonlyArray<{ readonly line: SeededLine; readonly input: LineInput }>,
+  numberText: string,
+  expected: ReadonlyArray<{ readonly line: SeededLine; readonly input: BatchInput }>,
 ): Promise<void> {
   const context = await browser.newContext();
   try {
@@ -394,25 +405,35 @@ async function expectAdminSeesBatchData(
         { timeout: 60_000 },
       );
 
-      // La pestaña lista pedidos: los productos aparecen al desplegar el de la receta.
-      const orderName = page.getByTestId(ORDER_GROUP_NAME_TESTID).filter({ hasText: exactText(RECIPE_NAME) });
-      await expect(orderName).toHaveCount(1, { timeout: 60_000 });
-      const toggle = page
+      // La pestaña lista pedidos: los productos aparecen al desplegar el del pedido. El grupo se
+      // identifica por su número de pedido, no por el nombre: el lote de la otra producción (sin
+      // asiento de pedido) pinta su propio grupo «Sin pedido» con el mismo nombre de receta.
+      const orderNumber = page
+        .getByTestId(ORDER_GROUP_NUMBER_TESTID)
+        .filter({ hasText: exactText(numberText) });
+      const groupRow = page
         .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
-        .filter({ has: orderName })
-        .getByTestId(ORDER_GROUP_TOGGLE_TESTID);
+        .filter({ has: orderNumber });
+      await expect(groupRow).toHaveCount(1, { timeout: 60_000 });
+      await expect(groupRow.getByTestId(ORDER_GROUP_NAME_TESTID)).toHaveText(exactText(RECIPE_NAME));
+      const toggle = groupRow.getByTestId(ORDER_GROUP_TOGGLE_TESTID);
       await toggle.click();
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
+      // La fila del producto de la línea cuelga del grupo del pedido: su testid es el del grupo
+      // seguido del producto. La celda de nombre pinta la receta sin la presentacion: la fila la
+      // distingue su columna.
+      const groupRowTestId = await groupRow.getAttribute('data-testid');
+      if (groupRowTestId === null) throw new Error('la fila del pedido no tiene data-testid');
       const nameCell = page
         .getByTestId(NAME_CELL_TESTID)
-        .filter({ hasText: exactProductNameCellText(line.productName) });
-      await expect(nameCell).toHaveCount(1, { timeout: 60_000 });
+        .filter({ hasText: exactProductNameCellText(RECIPE_NAME) });
       // «Lotes» vive en el menu de acciones de la fila desde QC-232 (c2d4d46f), igual que en los
       // otros specs que abren el panel de lotes.
-      const productRow = page
-        .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
-        .filter({ has: nameCell });
+      const productRow = productRowByNameAndPresentation(page, nameCell, line.presentationName).and(
+        page.getByTestId(`${groupRowTestId}--${line.productId}`),
+      );
+      await expect(productRow).toHaveCount(1, { timeout: 60_000 });
       await (
         await openRowActionsMenuItem(
           page,
@@ -491,14 +512,14 @@ test.beforeAll(async () => {
   const presentation1Id = await createPresentation(PRESENTATION_1_NAME);
   const presentation2Id = await createPresentation(PRESENTATION_2_NAME);
 
-  // El lote ajeno: otro producto de la empresa, con un lote cuyo código se conoce.
+  // Otro producto de la empresa, con un lote cuyo código se conoce: no choca.
   await seedPackaging({
     companyId,
     name: PACKAGING_NAME,
     presentationId: presentation1Id,
     stock: '10',
     unitCost: '0.5000',
-    lot: FOREIGN_LOT,
+    lot: PACKAGING_LOT,
     createdBy: adminId,
   });
 
@@ -603,7 +624,10 @@ test.beforeAll(async () => {
 
     return {
       batchId: batch.id,
+      productId: product.id,
       productName,
+      presentationId,
+      presentationName,
       label: orderDistributionFullText([{ presentationId, presentationName, packagingName: null, packages }]),
       provisionalLot,
     };
@@ -612,10 +636,32 @@ test.beforeAll(async () => {
   const line1 = await seedLine(0, presentation1Id, PRESENTATION_1_NAME, LINE_1_PACKAGES, PROVISIONAL_LOT_1);
   const line2 = await seedLine(1, presentation2Id, PRESENTATION_2_NAME, LINE_2_PACKAGES, PROVISIONAL_LOT_2);
 
+  // Otra producción de la presentación de la línea 1: otro lote del mismo producto terminado, sin
+  // asiento de este pedido. La existencia del producto acompaña a la del lote.
+  const previousProduction = await prisma.productBatch.create({
+    data: {
+      productId: line1.productId,
+      presentationId: line1.presentationId,
+      companyId,
+      stock: String(PREVIOUS_PRODUCTION_STOCK),
+      unitCost: FINISHED_UNIT_COST,
+      lot: PREVIOUS_PRODUCTION_LOT,
+      purchaseDate: new Date('2026-01-01T00:00:00Z'),
+      packageContent: PRESENTATION_CONTENT,
+      createdBy: empacadorId,
+    },
+    select: { id: true },
+  });
+  await prisma.product.update({
+    where: { id: line1.productId },
+    data: { stock: { increment: PREVIOUS_PRODUCTION_STOCK } },
+  });
+
   fixture = {
     orderId: order.id,
     numberText: formatOrderNumber({ year, sequence: ORDER_SEQUENCE }),
     lines: [line1, line2],
+    previousProductionBatchId: previousProduction.id,
   };
 });
 
@@ -633,8 +679,8 @@ test.afterAll(async () => {
 // el modal de Terminar espera sus segundos reales.
 test.setTimeout(300_000);
 
-test.describe('datos de lote en el acondicionamiento (R28)', () => {
-  test('R28 - el acondicionador 1 ve Terminar bloqueado, los tres rechazos no escriben nada, guarda datos válidos, termina, y el Administrador ve lote y vencimiento en /inventario', async ({
+test.describe('datos de lote en el acondicionamiento: un formulario por pedido', () => {
+  test('R30 R26 - un solo formulario vacío, los rechazos no escriben nada, el lote de otra producción de la misma presentación choca, el de un envase no, las dos líneas quedan iguales, termina, y el Administrador lo ve en /inventario', async ({
     page,
     browser,
   }) => {
@@ -655,26 +701,24 @@ test.describe('datos de lote en el acondicionamiento (R28)', () => {
       'EN_ACONDICIONAMIENTO',
     );
 
-    // --- 2. «Datos de lote» con dos bloques en orden de alta, vacíos y con el lote provisional;
-    //        «Terminar» deshabilitado con el aviso de las 2 líneas (R1, R2, R4).
+    // --- 2. «Datos de lote» con un solo juego de campos, vacío y sin aviso de lotes distintos;
+    //        «Terminar» deshabilitado con el aviso de las 2 líneas.
     const section = screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID);
     await expect(section).toBeVisible();
     await expect(section.getByRole('heading', { name: CONDITIONING_BATCH_DATA_TEXTS.title })).toBeVisible();
-    const blocks = section.getByTestId(CONDITIONING_BATCH_DATA_LINE_TESTID);
-    await expect(blocks).toHaveCount(2);
-    await expect(blocks.nth(0)).toHaveAttribute('data-batch-id', line1.batchId);
-    await expect(blocks.nth(1)).toHaveAttribute('data-batch-id', line2.batchId);
-    for (const line of lines) {
-      const block = lineBlock(section, line.batchId);
-      await expect(block.locator('legend')).toHaveText(exactText(line.label));
-      await expectLineValues(block, { lot: '', expiryDate: '', productionDate: '' });
-      await expect(block.getByTestId(CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID)).toHaveText(
-        exactText(CONDITIONING_BATCH_DATA_TEXTS.provisional(line.provisionalLot)),
-      );
-      // Las dos fechas usan el selector nativo (R5).
-      await expect(fields(block).expiryDate).toHaveAttribute('type', 'date');
-      await expect(fields(block).productionDate).toHaveAttribute('type', 'date');
+    for (const label of [
+      CONDITIONING_BATCH_DATA_TEXTS.lot,
+      CONDITIONING_BATCH_DATA_TEXTS.expiryDate,
+      CONDITIONING_BATCH_DATA_TEXTS.productionDate,
+    ]) {
+      await expect(section.getByLabel(label, { exact: true })).toHaveCount(1);
     }
+    await expect(section.locator('fieldset')).toHaveCount(0);
+    await expect(section.getByTestId(CONDITIONING_BATCH_DATA_DIVERGENT_TESTID)).toHaveCount(0);
+    await expectFormValues(section, { lot: '', expiryDate: '', productionDate: '' });
+    await expect(fields(section).expiryDate).toHaveAttribute('type', 'date');
+    await expect(fields(section).productionDate).toHaveAttribute('type', 'date');
+    await expect(section.getByRole('button')).toHaveCount(1);
     await expect(section.getByTestId(CONDITIONING_BATCH_DATA_SUBMIT_TESTID)).toHaveText(
       exactText(CONDITIONING_BATCH_DATA_TEXTS.submit),
     );
@@ -688,63 +732,62 @@ test.describe('datos de lote en el acondicionamiento (R28)', () => {
 
     await waitForFormHydration(section);
 
-    const valid1: LineInput = { lot: REAL_LOT_1, expiryDate: nextYear, productionDate: today };
-    const valid2: LineInput = { lot: REAL_LOT_2, expiryDate: nextYear, productionDate: today };
+    const valid: BatchInput = { lot: PACKAGING_LOT, expiryDate: nextYear, productionDate: today };
 
-    // --- 3. Vencimiento de hoy en la línea 2: `batch_expiry_not_future` (R8).
-    await test.step('R8 - un vencimiento de hoy se rechaza y no escribe nada', async () => {
-      const expiryToday: LineInput = { ...valid2, expiryDate: today };
-      await fillLine(lineBlock(section, line1.batchId), valid1);
-      await fillLine(lineBlock(section, line2.batchId), expiryToday);
-      await saveAndExpectRejection(page, section, 'batch_expiry_not_future', line2.batchId, {
-        [line1.batchId]: valid1,
-        [line2.batchId]: expiryToday,
+    // --- 3. Vencimiento de hoy: `batch_expiry_not_future`.
+    await test.step('R30 - un vencimiento de hoy se rechaza y no escribe nada', async () => {
+      const expiryToday: BatchInput = { ...valid, expiryDate: today };
+      await fillForm(section, expiryToday);
+      await saveAndExpectRejection(page, section, 'batch_expiry_not_future', 'expiryDate', expiryToday);
+    });
+
+    // --- 4. Día de producción de mañana: `batch_production_date_future`.
+    await test.step('R30 - un día de producción de mañana se rechaza y no escribe nada', async () => {
+      const productionTomorrow: BatchInput = { ...valid, productionDate: tomorrow };
+      await fillForm(section, productionTomorrow);
+      await saveAndExpectRejection(
+        page,
+        section,
+        'batch_production_date_future',
+        'productionDate',
+        productionTomorrow,
+      );
+    });
+
+    // --- 5. El código de otra producción de la presentación de la línea 1: `batch_duplicate_lot`.
+    await test.step('R30 - el lote de otra producción de la misma presentación se rechaza y no escribe nada', async () => {
+      const clashing: BatchInput = { ...valid, lot: PREVIOUS_PRODUCTION_LOT };
+      await fillForm(section, clashing);
+      await saveAndExpectRejection(page, section, 'batch_duplicate_lot', 'lot', clashing);
+    });
+
+    // --- 6. El código de un envase de la empresa (otro producto) se acepta: los dos lotes del pedido
+    //        quedan iguales, desaparece el aviso y «Terminar» se habilita.
+    await test.step('R30 R26 - el lote de un envase se acepta y las dos líneas quedan con los mismos datos', async () => {
+      await fillForm(section, valid);
+      await section.getByTestId(CONDITIONING_BATCH_DATA_SUBMIT_TESTID).click();
+      // El éxito se avisa con un toast del `<Toaster />` del layout privado.
+      const savedToast = page.locator(TOAST_SELECTOR).filter({ hasText: CONDITIONING_BATCH_DATA_TEXTS.saved });
+      await expect(savedToast).toHaveCount(1, { timeout: 60_000 });
+      await expect(savedToast).toBeVisible();
+      await expect(section.getByTestId(CONDITIONING_BATCH_DATA_ERROR_TESTID)).toHaveCount(0);
+      await expect(screen.getByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toHaveCount(0, {
+        timeout: 60_000,
       });
-    });
+      await expect(finishButton).toBeEnabled({ timeout: 60_000 });
+      await expectFormValues(section, valid);
 
-    // --- 4. Día de producción de mañana en la línea 1: `batch_production_date_future` (R9).
-    await test.step('R9 - un día de producción de mañana se rechaza y no escribe nada', async () => {
-      const productionTomorrow: LineInput = { ...valid1, productionDate: tomorrow };
-      await fillLine(lineBlock(section, line1.batchId), productionTomorrow);
-      await fillLine(lineBlock(section, line2.batchId), valid2);
-      await saveAndExpectRejection(page, section, 'batch_production_date_future', line1.batchId, {
-        [line1.batchId]: productionTomorrow,
-        [line2.batchId]: valid2,
-      });
+      expect(await storedBatches(watchedBatchIds())).toEqual([
+        { lot: PACKAGING_LOT, expiryDate: nextYear, productionDate: today, stock: String(LINE_1_PACKAGES) },
+        { lot: PACKAGING_LOT, expiryDate: nextYear, productionDate: today, stock: String(LINE_2_PACKAGES) },
+        {
+          lot: PREVIOUS_PRODUCTION_LOT,
+          expiryDate: null,
+          productionDate: null,
+          stock: String(PREVIOUS_PRODUCTION_STOCK),
+        },
+      ]);
     });
-
-    // --- 5. El lote de otro producto de la empresa en la línea 2: `batch_duplicate_lot` (R10).
-    await test.step('R10 - un lote que ya existe en la empresa se rechaza y no escribe nada', async () => {
-      const clashing: LineInput = { ...valid2, lot: FOREIGN_LOT };
-      await fillLine(lineBlock(section, line1.batchId), valid1);
-      await fillLine(lineBlock(section, line2.batchId), clashing);
-      await saveAndExpectRejection(page, section, 'batch_duplicate_lot', line2.batchId, {
-        [line1.batchId]: valid1,
-        [line2.batchId]: clashing,
-      });
-    });
-
-    // --- 6. Datos válidos en las dos líneas: se guardan, desaparece el aviso y «Terminar» se
-    //        habilita (R4, R6).
-    await fillLine(lineBlock(section, line2.batchId), valid2);
-    await section.getByTestId(CONDITIONING_BATCH_DATA_SUBMIT_TESTID).click();
-    // El éxito se avisa con un toast del `<Toaster />` del layout privado (R40 de QC-265).
-    const savedToast = page
-      .locator(TOAST_SELECTOR)
-      .filter({ hasText: CONDITIONING_BATCH_DATA_TEXTS.saved });
-    await expect(savedToast).toHaveCount(1, { timeout: 60_000 });
-    await expect(savedToast).toBeVisible();
-    await expect(section.getByTestId(CONDITIONING_BATCH_DATA_ERROR_TESTID)).toHaveCount(0);
-    await expect(screen.getByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toHaveCount(0, {
-      timeout: 60_000,
-    });
-    await expect(finishButton).toBeEnabled({ timeout: 60_000 });
-
-    const before = await storedBatches([line1.batchId, line2.batchId]);
-    expect(before).toEqual([
-      { lot: REAL_LOT_1, expiryDate: nextYear, productionDate: today, stock: String(LINE_1_PACKAGES) },
-      { lot: REAL_LOT_2, expiryDate: nextYear, productionDate: today, stock: String(LINE_2_PACKAGES) },
-    ]);
 
     // --- 7. «Terminar» abre la confirmación con su espera, confirma y aterriza con el aviso.
     await finishButton.click();
@@ -773,11 +816,11 @@ test.describe('datos de lote en el acondicionamiento (R28)', () => {
     expect(stored.status).toBe('TERMINADO');
     expect(stored.finishedAt).not.toBeNull();
 
-    // --- 8. El Administrador ve en `/inventario` el lote escrito y su vencimiento (R22).
-    await test.step('R22 - el Administrador ve lote y vencimiento en el panel de lotes', async () => {
-      await expectAdminSeesBatchData(browser, [
-        { line: line1, input: valid1 },
-        { line: line2, input: valid2 },
+    // --- 8. El Administrador ve en `/inventario` el mismo lote y vencimiento en los dos productos.
+    await test.step('R30 - el Administrador ve el mismo lote y vencimiento en los dos productos', async () => {
+      await expectAdminSeesBatchData(browser, numberText, [
+        { line: line1, input: valid },
+        { line: line2, input: valid },
       ]);
     });
   });

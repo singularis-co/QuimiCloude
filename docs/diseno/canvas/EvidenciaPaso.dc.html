@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Evidencia por paso</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ev-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ev-tile{position:relative;aspect-ratio:1/1;border-radius:12px;overflow:hidden;border:1px solid var(--border);animation:qc-rise var(--d-s) var(--e-in) both}
+.ev-view{position:absolute;inset:0;width:100%;height:100%;border:0;padding:0;background:transparent;cursor:zoom-in}
+.ev-view:focus-visible{outline:2px solid var(--primary);outline-offset:-4px;border-radius:12px}
+.ev-up{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:14px;background:color-mix(in oklch,var(--card) 72%,transparent)}
+.ev-err{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px;text-align:center;font-size:13px;line-height:1.35;background:var(--d-bg);color:var(--d-fg)}
+.ev-acts{position:absolute;right:6px;top:6px;display:flex;gap:6px}
+.ev-btn{width:44px;height:44px;border-radius:10px;border:0;background:color-mix(in oklch,var(--card) 90%,transparent);color:var(--fg);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 3px rgb(0 0 0 / .2);transition:background-color var(--d-i)}
+.ev-btn:hover{background:var(--card)}
+.ev-n{position:absolute;left:8px;bottom:8px;min-width:24px;height:24px;padding:0 7px;border-radius:999px;background:color-mix(in oklch,var(--card) 90%,transparent);font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.ev-add{aspect-ratio:1/1;padding:12px;cursor:pointer;font:inherit;color:var(--fg)}
+.ev-big{width:min(640px,80vw);aspect-ratio:4/3;border-radius:12px}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="scroller" style="padding-bottom: 132px">
+    <header class="op-hd">
+      <div style="max-width: 800px; margin: 0 auto; padding: 14px 20px 14px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
+          <div class="ph-t" style="gap: 2px">
+            <span class="mono cap">2026-0000003</span>
+            <h1 class="op-t">{{ heading }}</h1>
+            <p class="sub">Pedido <span class="mono">120,00 kg</span> · Presentación: Garrafa 20 L</p>
+          </div>
+          <button class="b b-out b-ico b-touch" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span></button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px"><span class="strong" style="font-size: 14px">{{ listName }} · Paso <span class="mono">{{ n }}</span> de <span class="mono">{{ total }}</span></span><span class="cap mono">{{ pct }} %</span></div>
+          <div class="seg" role="progressbar" aria-label="{{ stepLabel }}" aria-valuemin="1" aria-valuemax="{{ total }}" aria-valuenow="{{ n }}"><sc-for list="{{ segs }}" as="g" hint-placeholder-count="3"><i class="{{ g.cls }}"></i></sc-for></div>
+        </div>
+      </div>
+    </header>
+
+    <div style="max-width: 800px; margin: 0 auto; padding: 20px">
+      <section aria-labelledby="ev-step" style="min-width: 0">
+        <div class="{{ anim }}" style="display: flex; flex-direction: column; gap: 16px">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <sc-if value="{{ hasEv }}" hint-placeholder-val="{{ true }}">
+              <span class="cap" style="display: inline-flex; align-items: center; gap: 6px; color: var(--primary)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Este paso pide evidencia</span>
+            </sc-if>
+            <h2 id="ev-step" class="h2" style="font-size: 24px; line-height: 1.25">{{ title }}</h2>
+          </div>
+          <p class="sub" style="font-size: 16px; color: var(--fg)">{{ body }}</p>
+          <div role="group" aria-label="{{ title }}" style="display: flex; flex-direction: column">
+            <sc-for list="{{ items }}" as="it" hint-placeholder-count="2">
+              <button class="chk" type="button" role="checkbox" aria-checked="{{ it.on }}" onClick="{{ it.toggle }}" style="min-height: 52px"><span class="cb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></span><span class="chk-t">{{ it.text }}</span></button>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ hasEv }}" hint-placeholder-val="{{ true }}">
+            <section class="card" aria-labelledby="ev-h" style="gap: 12px">
+              <div class="card-hd">
+                <span style="display: inline-flex; align-items: center; gap: 10px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg><h3 id="ev-h" class="h3">Evidencia</h3><span class="count mono" aria-label="{{ countLabel }}">{{ count }}</span></span>
+                <span class="cap" style="display: inline-flex; align-items: center; gap: 6px">{{ reqTxt }}</span>
+              </div>
+              <div class="ev-grid">
+                <sc-for list="{{ tiles }}" as="p" hint-placeholder-count="2">
+                  <div class="ev-tile" style="{{ p.style }}">
+                    <sc-if value="{{ p.isOk }}" hint-placeholder-val="{{ true }}"><button class="ev-view" type="button" aria-label="{{ p.viewLabel }}" onClick="{{ p.view }}"></button></sc-if>
+                    <sc-if value="{{ p.isUp }}" hint-placeholder-val="{{ false }}">
+                      <div class="ev-up" role="status" aria-live="polite">
+                        <svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.6"></path></svg>
+                        <span class="cap mono">Subiendo {{ p.pctTxt }}</span>
+                        <div class="progress" style="width: 100%"><i style="{{ p.bar }}"></i></div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ p.isErr }}" hint-placeholder-val="{{ false }}">
+                      <div class="ev-err" role="alert">
+                        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+                        <span>{{ p.msg }}</span>
+                        <button class="b b-out b-sm" type="button" onClick="{{ p.remove }}" style="min-height: 44px">Quitar</button>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ p.canEdit }}" hint-placeholder-val="{{ true }}">
+                      <div class="ev-acts">
+                        <button class="ev-btn" type="button" aria-label="{{ p.chLabel }}" onClick="{{ p.change }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.3L3 16M3 21v-5h5"></path></svg></button>
+                        <button class="ev-btn" type="button" aria-label="{{ p.rmLabel }}" onClick="{{ p.remove }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></button>
+                      </div>
+                    </sc-if>
+                    <span class="ev-n mono" aria-hidden="true">{{ p.n }}</span>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ addable }}" hint-placeholder-val="{{ true }}">
+                  <button class="drop ev-add" type="button" onClick="{{ add }}">
+                    <svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--primary)"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>
+                    <span class="strong" style="font-size: 14px">{{ addTxt }}</span>
+                    <span class="cap">Cámara o archivo</span>
+                  </button>
+                </sc-if>
+              </div>
+              <p class="help" style="margin: 0; display: flex; align-items: center; gap: 6px">{{ evHint }}</p>
+            </section>
+          </sc-if>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer class="op-ft">
+    <div style="max-width: 800px; margin: 0 auto; padding: 0 20px">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <p class="cap" aria-live="polite" style="margin: 0; text-align: center; min-height: 18px">{{ gateMsg }}</p>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px">
+          <button class="b b-out b-xl b-back" type="button" disabled="{{ isFirst }}" onClick="{{ prev }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Anterior</button>
+          <sc-if value="{{ notLast }}" hint-placeholder-val="{{ true }}"><button class="b b-pri b-xl b-go" type="button" disabled="{{ nextDis }}" onClick="{{ next }}">Siguiente<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
+          <sc-if value="{{ showEnd }}" hint-placeholder-val="{{ false }}"><button class="b b-pri b-xl" type="button" disabled="{{ nextDis }}" onClick="{{ askEnd }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>{{ endTxt }}</button></sc-if>
+          <sc-if value="{{ showDone }}" hint-placeholder-val="{{ false }}"><span class="nt n-s" style="align-items: center; justify-content: center">{{ doneTxt }}</span></sc-if>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <div class="{{ endCls }}" role="alertdialog" aria-modal="true" aria-labelledby="ev-end" aria-describedby="ev-end-d">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></div>
+    <h2 id="ev-end" class="h2">{{ endQ }}</h2>
+    <p id="ev-end-d" class="sub">Al terminar, las fotos de evidencia quedan fijas. No se puede deshacer.</p>
+    <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri b-touch" type="button" onClick="{{ closeAll }}">Terminar</button></div>
+  </div>
+
+  <div class="{{ missCls }}" role="alertdialog" aria-modal="true" aria-labelledby="ev-miss" aria-describedby="ev-miss-d">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg></div>
+    <h2 id="ev-miss" class="h2">Falta evidencia</h2>
+    <p id="ev-miss-d" class="sub">Estos pasos piden al menos 1 foto y no tienen ninguna. Súbela para poder terminar.</p>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <sc-for list="{{ missing }}" as="m" hint-placeholder-count="1">
+        <button class="b b-out b-touch" type="button" onClick="{{ m.go }}" style="justify-content: space-between">{{ m.label }}<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+      </sc-for>
+    </div>
+    <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cerrar</button></div>
+  </div>
+
+  <div class="{{ viewCls }}" role="dialog" aria-modal="true" aria-label="{{ viewLabel }}" style="width: auto; max-width: none">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px"><h2 class="h3">{{ viewLabel }}</h2><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}" style="width: 44px; height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="ev-big" style="{{ viewStyle }}"></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"empaque":{"editor":"boolean","default":false},"terminado":{"editor":"boolean","default":false},"errorDeArchivo":{"editor":"boolean","default":false},"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearInterval(this.iv); this.iv = null; }
+tick() {
+if (this.iv) return;
+this.iv = setInterval(() => {
+const s = this.state || {};
+const ph = Object.assign({}, s.ph || {});
+let busy = false;
+Object.keys(ph).forEach((key) => {
+ph[key] = ph[key].map((p) => {
+if (p.st !== 'up') return p;
+const pct = Math.min(100, p.pct + 20);
+if (pct < 100) busy = true;
+return Object.assign({}, p, { pct: pct, st: pct >= 100 ? 'ok' : 'up' });
+});
+});
+this.setState({ ph: ph });
+if (!busy) { clearInterval(this.iv); this.iv = null; }
+}, 220);
+}
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const emp = !!this.props.empaque;
+const fin = !!this.props.terminado;
+const errDemo = !!this.props.errorDeArchivo;
+const steps = emp ? [
+['Llena las garrafas', 'Llena cada garrafa hasta la marca de 20 L y ciérrala bien.', ['Llena las 6 garrafas.', 'Cierra cada tapa hasta el clic.'], true],
+['Etiqueta', 'Pega la etiqueta del lote en el frente de cada garrafa.', ['Pega las 6 etiquetas.'], false],
+['Revisa el lote', 'Revisa que no haya fugas antes de entregar.', ['Voltea cada garrafa y revisa la tapa.'], true]
+] : [
+['Prepara la mezcladora', 'Antes de empezar, deja el equipo listo y protégete.', ['Revisa que la mezcladora de 200 L esté limpia y seca.', 'Ponte guantes de nitrilo y gafas.'], true],
+['Agrega el agua', 'Carga el agua y deja que la mezcladora gire antes de seguir.', ['Agrega el 60 % del agua desmineralizada.', 'Enciende la agitación a velocidad baja.'], false],
+['Revisa color y pH', 'Comprueba que la mezcla quedó homogénea y mide el pH.', ['Mide el pH y anótalo en la etiqueta.'], true]
+];
+const hues = [200, 150, 60, 280, 20, 110];
+const seed = fin ? { 0: [{ id: 's1', h: 200, st: 'ok' }, { id: 's2', h: 150, st: 'ok' }], 2: [{ id: 's3', h: 60, st: 'ok' }] } : {};
+const ph = s.ph || seed;
+const i = s.i || 0;
+const st = steps[i];
+const done = s.done || {};
+const k = s.k || 0;
+const seq = s.seq || 0;
+const list = ph[i] || [];
+const okN = list.filter((p) => p.st === 'ok').length;
+const upN = list.filter((p) => p.st === 'up').length;
+const put = (arr, extra) => this.setState(Object.assign({ ph: Object.assign({}, ph, { [i]: arr }) }, extra || {}));
+const go = (d) => this.setState({ i: i + d, dir: d, k: k + 1 });
+const shade = (h) => 'background: linear-gradient(160deg, oklch(0.9 0.05 ' + h + '), oklch(0.7 0.09 ' + (h + 25) + '))';
+const add = () => {
+if (fin || list.length >= 3) return;
+const n = seq + 1;
+const bad = errDemo && !s.errShown;
+const p = bad ? { id: 'p' + n, h: 0, st: 'err', msg: 'No se pudo subir: pesa más de 5 MB. Elige otra foto.' } : { id: 'p' + n, h: hues[n % hues.length], st: 'up', pct: 0 };
+put(list.concat([p]), { seq: n, errShown: s.errShown || bad });
+if (!bad) this.tick();
+};
+const tiles = list.map((p, j) => ({
+isOk: p.st === 'ok', isUp: p.st === 'up', isErr: p.st === 'err', canEdit: !fin && p.st === 'ok',
+style: p.st === 'err' ? '' : shade(p.h),
+bar: 'width: ' + (p.pct || 0) + '%', pctTxt: (p.pct || 0) + ' %', msg: p.msg, n: j + 1,
+viewLabel: 'Foto ' + (j + 1) + ' del paso ' + (i + 1),
+chLabel: 'Cambiar la foto ' + (j + 1) + ' del paso ' + (i + 1),
+rmLabel: 'Quitar la foto ' + (j + 1) + ' del paso ' + (i + 1),
+remove: () => put(list.filter((x) => x.id !== p.id)),
+change: () => { put(list.map((x) => x.id === p.id ? Object.assign({}, x, { st: 'up', pct: 0, h: hues[(seq + 1) % hues.length] }) : x), { seq: seq + 1 }); this.tick(); },
+view: () => this.setState({ view: { h: p.h, label: 'Foto ' + (j + 1) + ' del paso ' + (i + 1) } })
+}));
+const pending = fin ? 0 : st[2].filter((t, j) => !done[i + '-' + j]).length;
+const needEv = !fin && st[3] && okN === 0;
+const blocked = !fin && (pending > 0 || needEv || upN > 0);
+const missing = steps.map((x, j) => ({ x: x, j: j })).filter((o) => o.x[3] && !(ph[o.j] || []).some((p) => p.st === 'ok'));
+const base = (s.dir || 1) > 0 ? 'slide-n' : 'slide-p';
+const last = i === steps.length - 1;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+heading: emp ? 'Empaque · Desengrasante alcalino' : 'Desengrasante alcalino',
+listName: emp ? 'Envasado' : 'Fabricación',
+segs: steps.map((x, j) => ({ cls: j <= i ? 'on' : '' })), stepLabel: 'Paso ' + (i + 1) + ' de ' + steps.length,
+n: i + 1, total: steps.length, pct: Math.round(((i + 1) / steps.length) * 100),
+title: st[0], body: st[1], hasEv: st[3],
+items: st[2].map((t, j) => { const key = i + '-' + j; const on = fin || !!done[key]; return { text: t, on: on ? 'true' : 'false', toggle: () => { if (!fin) this.setState({ done: Object.assign({}, done, { [key]: !on }) }); } }; }),
+count: okN + '/3', countLabel: okN + ' de 3 fotos',
+reqTxt: fin ? 'Fijada al terminar' : 'Obligatoria · de 1 a 3 fotos',
+tiles: tiles,
+addable: !fin && list.length < 3,
+addTxt: list.length ? 'Añadir otra foto' : 'Añadir foto',
+evHint: fin ? 'El pedido ya terminó: las fotos no se pueden cambiar ni quitar.' : 'JPG, PNG o WebP',
+add: add,
+gateMsg: fin ? '' : pending > 0 ? 'Marca los ' + pending + ' elementos pendientes para continuar.' : upN > 0 ? 'Espera a que termine de subir la foto.' : needEv ? 'Sube al menos 1 foto de evidencia para continuar.' : '',
+anim: k === 0 ? '' : (k % 2 ? base : base + '2'),
+isFirst: i === 0, notLast: !last, showEnd: last && !fin, showDone: last && fin,
+endTxt: emp ? 'Terminar empaque' : 'Finalizar',
+doneTxt: emp ? 'Empaque terminado' : 'Pedido terminado',
+endQ: emp ? '¿Terminar el empaque?' : '¿Terminar el pedido?',
+nextDis: blocked,
+prev: () => go(-1), next: () => { if (!blocked) go(1); },
+askEnd: () => { if (blocked) return; this.setState({ dlg: missing.length ? 'miss' : 'end' }); },
+missing: missing.map((o) => ({ label: 'Paso ' + (o.j + 1) + ' · ' + o.x[0], go: () => this.setState({ i: o.j, dir: -1, k: k + 1, dlg: null }) })),
+endCls: s.dlg === 'end' ? 'dlg open' : 'dlg',
+missCls: s.dlg === 'miss' ? 'dlg open' : 'dlg',
+viewCls: s.view ? 'dlg open' : 'dlg',
+viewLabel: s.view ? s.view.label : 'Foto',
+viewStyle: s.view ? shade(s.view.h) : '',
+ovCls: s.dlg || s.view ? 'ov open' : 'ov',
+closeAll: () => this.setState({ dlg: null, view: null })
+};
+}
+}
+</script>
+</body>
+</html>

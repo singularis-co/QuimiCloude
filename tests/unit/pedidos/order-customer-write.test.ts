@@ -55,7 +55,7 @@ const CLIENTES: readonly { readonly companyId: string; readonly ref: CustomerRef
 ]
 
 const REFS_RECETA: readonly RecipeRef[] = [
-  { id: RECETA, name: 'Crema', ownName: 'Crema', isDeleted: false, isUnderReview: false, original: null },
+  { id: RECETA, name: 'Crema', ownName: 'Crema', isDeleted: false, isUnderReview: false, original: null, imageUrl: null },
   {
     id: VERSION,
     name: 'Crema · Suave',
@@ -63,6 +63,7 @@ const REFS_RECETA: readonly RecipeRef[] = [
     isDeleted: false,
     isUnderReview: false,
     original: { id: RECETA, name: 'Crema' },
+    imageUrl: null,
   },
 ]
 
@@ -147,8 +148,8 @@ function filaGuardada(overrides: Partial<OrderRow> = {}): OrderRow {
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationLines: [
-      { presentationId: PRES_A, packages: 2, packagingProductId: ENVASE_A },
-      { presentationId: PRES_B, packages: 3, packagingProductId: ENVASE_B },
+      { presentationId: PRES_A, packages: 2, packagingProductId: ENVASE_A, presentationContent: null },
+      { presentationId: PRES_B, packages: 3, packagingProductId: ENVASE_B, presentationContent: null },
     ],
     unitId: UNIDAD,
     customerId: CLIENTE_A,

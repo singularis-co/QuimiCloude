@@ -13,7 +13,7 @@ import {
   type ImportColumnKey,
   type ImportFileRejection,
 } from './inventory-import-contract';
-import { IMPORT_EXAMPLE_ROW } from './inventory-import-downloads';
+import { IMPORT_EXAMPLE_ROWS } from './inventory-import-downloads';
 
 export type ParsedImportRow = {
   /** 1 = cabecera, como en la hoja. */
@@ -117,7 +117,7 @@ function toParsedRow(row: readonly SpreadsheetCell[], rowNumber: number, columns
   return { rowNumber, cells, origins };
 }
 
-const DECIMAL_COLUMNS = new Set<ImportColumnKey>(['stock', 'unitCost', 'totalCost', 'qtyAlert']);
+const DECIMAL_COLUMNS = new Set<ImportColumnKey>(['stock', 'unitCost', 'qtyAlert']);
 const DATE_COLUMNS = new Set<ImportColumnKey>(['purchaseDate', 'expiryDate']);
 const PLAIN_DECIMAL = /^(\d*)(?:\.(\d*))?$/;
 
@@ -146,18 +146,19 @@ function canonicalCell(key: ImportColumnKey, text: string, origin: ImportCellOri
   return collapseSpaces(text);
 }
 
-const CANONICAL_EXAMPLE = new Map<ImportColumnKey, string>(
-  INVENTORY_IMPORT_COLUMNS.map((column) => [
-    column.key,
-    canonicalCell(column.key, IMPORT_EXAMPLE_ROW[column.key], 'text'),
-  ]),
+const CANONICAL_EXAMPLES = IMPORT_EXAMPLE_ROWS.map(
+  (example) =>
+    new Map<ImportColumnKey, string>(
+      INVENTORY_IMPORT_COLUMNS.map((column) => [column.key, canonicalCell(column.key, example[column.key], 'text')]),
+    ),
 );
 
 function isExampleRow(row: ParsedImportRow): boolean {
-  return INVENTORY_IMPORT_COLUMNS.every(
-    (column) =>
-      canonicalCell(column.key, row.cells[column.key], row.origins[column.key]) ===
-      CANONICAL_EXAMPLE.get(column.key),
+  return CANONICAL_EXAMPLES.some((example) =>
+    INVENTORY_IMPORT_COLUMNS.every(
+      (column) =>
+        canonicalCell(column.key, row.cells[column.key], row.origins[column.key]) === example.get(column.key),
+    ),
   );
 }
 

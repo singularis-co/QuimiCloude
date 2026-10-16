@@ -41,7 +41,26 @@ export type StartAssignedOrderResult =
   | { status: 'success'; data: StartedOrderExecution }
   | ErrorState;
 
-/** Lee la ejecucion del pedido y lo abre —`PENDIENTE` a `EN_CURSO`— en una sola llamada. */
+/**
+ * Abre la pantalla: un `PENDIENTE` se lee sin comenzarlo y un `EN_CURSO` se retoma. Lo usa la
+ * pagina al renderizar; comenzar es `startAssignedOrderAction`.
+ */
+export async function openAssignedOrderAction(orderId: string): Promise<StartAssignedOrderResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await asignaciones.openAssignedOrder(actor, { orderId });
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/**
+ * «Comenzar» de la pantalla: lleva el pedido de `PENDIENTE` a `EN_CURSO` y devuelve la ejecucion
+ * ya comenzada, que la pantalla pinta sin volver a cargar la ruta. No revalida: recargar la ruta
+ * anotaria un retomar justo detras del arranque.
+ */
 export async function startAssignedOrderAction(orderId: string): Promise<StartAssignedOrderResult> {
   const actor = await currentActor();
 

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Barra de filtros en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="FiltrosBarra" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Barra de filtros · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">ui/popover · ui/button · ui/input · ui/checkbox · shared/date-picker (mode range, atajos en header) · estilo de chip de shared/data-table · lib/shared/ui/date-civil · lib/shared/ui/touch-target</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Popover, vía ui/popover) · <span class="mono">react-day-picker</span> (vía Calendar/DatePicker) · <span class="mono">lucide-react</span>. Ninguna nueva.</dd>
+      <dt>Escritorio</dt><dd>Una fila que envuelve: buscador <span class="mono">q</span> (lupa, flex-1, mín. 250 px, X propia, aviso «Escribe al menos 3 caracteres para buscar.» en región de estado) · «Filtros (n)» abre una lista multiselección para elegir qué controles se montan, en el orden declarado · un control por filtro montado: punteado sin valor, sólido con «Etiqueta | valor» y X para quitar · «Limpiar todo» solo con algo aplicado · cada control abre su popover anclado debajo · sí/no alterna en el propio control, sin panel</dd>
+      <dt>Tablet</dt><dd>Igual que escritorio; la fila envuelve a dos líneas cuando no caben todos los controles. Popovers anclados</dd>
+      <dt>Teléfono</dt><dd>Buscador a lo ancho en su propia línea · debajo «Filtros (n)», los controles y «Limpiar todo» envuelven en varias líneas, sin scroll horizontal · controles y X a 44 px · cada popover pasa a hoja inferior con título, X y «Listo» a lo ancho · opciones a 48 px, días a 44 px, campos a 16 px para que iOS no haga zoom</dd>
+      <dt>Animación</dt><dd>Popover 150 ms al cerrar / 200 ms al abrir con escala .96 → 1 · hoja inferior sube 300 ms y baja 150 ms sobre velo · control nuevo y X entran con fundido 200 ms · hover del control: velo de izquierda a derecha 200 ms · interruptor 200 ms · marca de casilla dibujada 200 ms</dd>
+      <dt>Por confirmar</dt><dd>Orden de la fila: aquí buscador primero como en DataTable; ordenex pone los controles antes del buscador · si «Limpiar todo» también desmonta los controles o solo vacía valores (aquí solo vacía) · filtro de texto «Proveedor»: ¿existe el dato en inventario? · semana empieza en lunes · atajos de vencimiento (Vencidos, 7 días, 30 días, Este mes) · sincronización con la URL y dependencias entre filtros quedan para después</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

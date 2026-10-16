@@ -23,6 +23,7 @@ import { join, resolve } from 'node:path';
 
 import type { SessionClaims } from '@/lib/modules/identity/domain/session-claims';
 import type { SessionUserRecord } from '@/lib/modules/identity/ports/session-user-reader';
+import { ADDONS } from '@/lib/modules/identity';
 
 const { readClaimsMock, findActiveByIdMock, headersMock, cookiesMock, revalidatePathMock } =
   vi.hoisted(() => ({
@@ -109,6 +110,7 @@ function fichaDe(id: string): SessionUserRecord {
     roleName: 'operador',
     companyId: COMPANY_ID,
     companyDeletedAt: null,
+    companyAddons: [...ADDONS],
     permissions: [],
     accountStatus: 'active',
     lockedUntil: null,
@@ -333,6 +335,15 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).startAssignedOrderAction('no-es-un-uuid'),
   },
   {
+    // Abrir la pantalla sin comenzar el pedido: mismo archivo de `driving/`, mismo `currentActor`.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-execution-actions.ts',
+    nombre: 'openAssignedOrderAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-execution-actions')
+      ).openAssignedOrderAction('no-es-un-uuid'),
+  },
+  {
     // Anadida por QC-168, que estrena la pantalla de empaque: su archivo de `driving/` resuelve
     // las dos caras de la sesion, asi que el censo tiene que cubrirlo. La accion captura los
     // errores y devuelve un estado, asi que un `orderId` que no exista no rompe la invocacion.
@@ -388,6 +399,24 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       (
         await import('@/lib/modules/inventario/adapters/driving/batch-actions')
       ).listProductBatchesAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
+  },
+  {
+    // Anadida el 2026-10-15: variante de la lectura de lotes que filtra en servidor los vivos.
+    archivo: 'lib/modules/inventario/adapters/driving/batch-actions.ts',
+    nombre: 'listAliveProductBatchesAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/inventario/adapters/driving/batch-actions')
+      ).listAliveProductBatchesAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
+  },
+  {
+    // Anadida el 2026-10-13: la ficha de producto terminado resuelve las dos caras de la sesion.
+    archivo: 'lib/modules/inventario/adapters/driving/finished-product-actions.ts',
+    nombre: 'getFinishedProductAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/inventario/adapters/driving/finished-product-actions')
+      ).getFinishedProductAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
   },
   {
     archivo: 'lib/modules/recetas/adapters/driving/recipe-actions.ts',
@@ -526,6 +555,38 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       (
         await import('@/lib/modules/integraciones/adapters/driving/whatsapp-connection-actions')
       ).getWhatsappConnectionAction(),
+  },
+  {
+    // Las fotos de evidencia por paso: la accion captura el error de un pedido inexistente y
+    // devuelve un estado, asi que la invocacion no rompe.
+    archivo: 'lib/modules/asignaciones/adapters/driving/step-evidence-actions.ts',
+    nombre: 'requestEvidenceUploadAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/step-evidence-actions')
+      ).requestEvidenceUploadAction({
+        orderId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        phase: 'manufacturing',
+        stepPosition: 1,
+      }),
+  },
+  {
+    // La accion captura el error y devuelve un estado, asi que un `orderId` invalido no rompe la
+    // invocacion.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-evidence-actions.ts',
+    nombre: 'getOrderEvidenceAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-evidence-actions')
+      ).getOrderEvidenceAction('no-es-un-uuid'),
+  },
+  {
+    archivo: 'lib/modules/integraciones/adapters/driving/ai-provider-actions.ts',
+    nombre: 'getAiProviderConnectionAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/ai-provider-actions')
+      ).getAiProviderConnectionAction(),
   },
 ];
 

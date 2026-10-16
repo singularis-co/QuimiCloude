@@ -67,14 +67,23 @@ import {
   createCreateRawMaterial,
   createDeletePresentation,
   createDeleteProduct,
+  createGetFinishedProduct,
   createGetProduct,
   createListBatchMovements,
+  createListFinishedProductBatches,
+  createListFinishedProductCosts,
+  createListFinishedProductDeliveries,
+  createListFinishedProductDistribution,
+  createListFinishedProductMovements,
   createListFinishedStock,
   createListOrderBatches,
   createListPresentations,
+  createListProducedProducts,
   createListProductBatches,
   createListProductFormUnits,
   createListProducts,
+  createGetInventoryImportTemplate,
+  createGetInventoryImportValues,
   createPreviewInventoryImport,
   createUpdatePresentation,
   createUpdateProduct,
@@ -86,8 +95,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
+  createFindPackagingRefs,
   findPackagingCostingBatches,
-  findPackagingRefs,
 } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import {
   addBatchToAlive,
@@ -114,6 +123,7 @@ import {
 import {
   findPresentationRefs,
   findPresentationsByNormalizedNames,
+  listPresentationNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   createMaterialReservations,
@@ -124,6 +134,13 @@ import { createFinishedBatchLabels } from '@/lib/modules/inventario/adapters/dri
 import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
 import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
+import {
+  findAliveFinishedProduct,
+  findProducedFinishedProducts,
+  listFinishedProductBatches,
+  listFinishedProductCosts,
+  listFinishedProductMovements,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-product-detail-prisma';
 import {
   claimImport,
   findAliveFinishedProducts,
@@ -136,7 +153,11 @@ import {
 import { readCsv } from '@/lib/modules/inventario/adapters/driven/spreadsheet/csv-reader';
 import { fileDigest } from '@/lib/modules/inventario/adapters/driven/spreadsheet/file-digest';
 import { readXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader';
+import { writeXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-writer';
+import { createProductImageStorageSupabase } from '@/lib/modules/inventario/adapters/driven/storage/product-image-supabase';
+import type { ProductImageStorage } from '@/lib/modules/inventario/ports/product-image-storage';
 import type { ImportFormulaLookup } from '@/lib/modules/inventario/ports/import-formula-lookup';
+import type { ImportTemplateValuesReader } from '@/lib/modules/inventario/ports/import-template-values';
 import type { InventoryImportRepository } from '@/lib/modules/inventario/ports/inventory-import-repository';
 import type { SpreadsheetReader } from '@/lib/modules/inventario/ports/spreadsheet-reader';
 import type { FinishedOrderRepository } from '@/lib/modules/inventario/ports/finished-order-repository';
@@ -144,8 +165,11 @@ import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log
 import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-number-formatter';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
+import type { FinishedProductDetailRepository } from '@/lib/modules/inventario/ports/finished-product-detail-repository';
 import type {
   FinishedBatchCatalog,
+  FinishedDeliveryDirectory,
+  FinishedDistributionDirectory,
   OrderNumberDirectory,
   PackagingCatalog,
   PresentationCatalog,
@@ -195,6 +219,7 @@ import {
   createListRecipes,
   createUpdateRecipe,
   createUpdateRecipeVersion,
+  createGetRecipeStepLock,
 } from '@/lib/modules/recetas';
 import {
   createRecipe,
@@ -205,15 +230,18 @@ import {
   replaceAliveRecipe,
   replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
+  listRecipeVersionIdsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import {
   recipeImagePublicUrl,
   removeRecipeImage,
   uploadRecipeImage,
 } from '@/lib/modules/recetas/adapters/driven/storage/recipe-image-supabase';
+import { readRecipeImageStorageConfigFromEnv } from '@/lib/modules/recetas/adapters/driven/config/storage-config-env';
 import type { ListQueryLog as RecetasListQueryLog } from '@/lib/modules/recetas/ports/list-query-log';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
+import type { RecipeStepLockReader } from '@/lib/modules/recetas/ports/recipe-step-lock-reader';
 import {
   createCreateCatalogLine,
   createCreateSupplier,
@@ -298,6 +326,11 @@ import {
   createOrderConditioningRepository,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
+import {
+  listDeliveryLinesByBatchIds,
+  summarizeDeliveredByBatchIds,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
+import { listPackedLinesByCombination } from '@/lib/modules/pedidos/adapters/driven/persistence/packed-lines-directory-prisma';
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma';
 import {
   withOrderTransaction,
@@ -323,10 +356,11 @@ import type { OrderDeliveryVoidUnitOfWork } from '@/lib/modules/pedidos/ports/or
 import {
   createRecipeExecutionReader,
   findAliveRecipeByNormalizedName,
+  listAliveOriginalRecipeNames,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipePackingStepsById,
-  findRecipeRefsIncludingDeleted,
+  findRecipeRefsWithImageIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import { readRequestIdHeader } from '@/lib/modules/observabilidad/adapters/driven/request-id-headers';
@@ -423,6 +457,7 @@ import {
   createListPackingOrders,
   createListResponsibleCandidates,
   createListResponsiblesForOrders,
+  createOpenAssignedOrder,
   createRemoveWorkGroupFromOrder,
   createStartAssignedOrder,
   createStartPacking as createStartPackingOrder,
@@ -439,6 +474,13 @@ import {
   createListConditioningTeamCandidates,
   createListDeliveredConditionedOrders,
   createSaveConditioningBatchData,
+  createRequestEvidenceUpload,
+  createRegisterEvidence,
+  createRemoveEvidence,
+  createCountEvidenceLockingOrders,
+  createGetExecutionEvidence,
+  createGetOrderEvidence,
+  createCountOrderEvidence,
 } from '@/lib/modules/asignaciones';
 import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -447,16 +489,46 @@ import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapter
 import { withExecutionTransaction } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-transaction-prisma';
 import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
 import type { ExecutionTransaction } from '@/lib/modules/asignaciones/ports/execution-transaction';
+import { createStepEvidenceRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/step-evidence-prisma';
+import type { StepEvidenceRepository } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
+import { evidenceE2EDoublesEnabled } from '@/lib/modules/asignaciones/adapters/driven/config/evidence-e2e-doubles-env';
+import { evidenceStorageMemoryForE2E } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-memory';
+import { evidenceStorageSupabase } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-supabase';
+import type { EvidenceStorage } from '@/lib/modules/asignaciones/ports/evidence-storage';
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
   listAliveOrderSummariesInCompany,
+  listOrderDeliveryProgressByIdsIncludingDeleted,
   listOrderHistoryByIdsIncludingDeleted,
   listOrderNumbersByIdsIncludingDeleted,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
+import { createSetCompanyCountry } from '@/lib/modules/identity';
+import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
+import {
+  createCreateCompany,
+  createDeleteCompany,
+  createGetCompany,
+  createGetCompanyDeletionImpact,
+  createListCompanies,
+  createListCompanyEvents,
+  createReactivateCompany,
+  createUpdateCompany,
+} from '@/lib/modules/identity';
+import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
+import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma';
+import {
+  createGetCompanyAddons,
+  createIsCompanyAddonActive,
+  createSetAllCompanyAddons,
+  createSetCompanyAddon,
+} from '@/lib/modules/identity';
+import { readSeedScopeFromEnv } from '@/lib/modules/identity/adapters/driven/config/seed-scope-env';
+import type { CompanyOpenOrdersCounter } from '@/lib/modules/identity/ports/company-open-orders-counter';
+import { countOpenOrdersInCompany } from '@/lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
@@ -476,11 +548,20 @@ import {
   createProcessPdfByStrategy,
   createReadPdfWithAi,
   createRunDocumentJob,
+  type AiProviderGateway,
   type CatalogImportDeps,
   type FormulaImportDeps,
 } from '@/lib/modules/documentos';
-import { readWithAnthropic } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic';
+import { createAnthropicReader, probeAnthropic } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic';
+import { createGenaiReader, probeGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
+import {
+  OPENROUTER_BASE_URL,
+  createOpenAiReader,
+  probeOpenAi,
+  probeOpenRouter,
+} from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-openai';
 import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
+import type { AiProviderCode } from '@/lib/modules/integraciones';
 import { documentsE2EDoublesEnabled } from '@/lib/modules/documentos/adapters/driven/config/e2e-doubles-env';
 import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
 import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
@@ -752,6 +833,14 @@ const workGroupMemberPagination: PaginationPolicy = { toOffsetLimit, buildPage }
 
 const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAliveInCompany };
 
+const companyRepository = createCompanyRepository();
+const companyAddonRepository = createCompanyAddonRepository();
+
+// `orders` es de `pedidos`: `identity` solo ve el puerto.
+const companyOpenOrdersCounter: CompanyOpenOrdersCounter = {
+  countOpenOrders: (companyId) => countOpenOrdersInCompany(companyId),
+};
+
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
 export const identity = {
   // La clave conserva nombre y firma: por eso `login-action.ts` no cambia (R16).
@@ -784,6 +873,8 @@ export const identity = {
         // R18: el seed evalua la politica antes de hashear; aqui se le entrega la misma
         // funcion que expone la fachada.
         checkCredentialPolicy,
+        // Se lee en la invocacion y no al importar, como el transporte del correo.
+        scope: readSeedScopeFromEnv(),
       }),
     ),
   // QC-66 T15 (`design.md > 11`) — los SEIS casos de uso de la administracion de usuarios, ya
@@ -873,6 +964,30 @@ export const identity = {
     sessions: sessionWriter,
     ids: sessionIds,
   }),
+  // Operacion de plataforma: el actor no lleva empresa.
+  setCompanyCountry: createSetCompanyCountry({ companies: createCompanyCountryRepository() }),
+  // Operaciones de plataforma sobre empresas: el actor no lleva empresa.
+  createCompany: createCreateCompany({
+    companies: companyRepository,
+    secrets: credentialSetupSecrets,
+    links: credentialSetupLinkRepository,
+    mailer: credentialSetupMailer,
+  }),
+  updateCompany: createUpdateCompany({ companies: companyRepository }),
+  deleteCompany: createDeleteCompany({ companies: companyRepository }),
+  reactivateCompany: createReactivateCompany({ companies: companyRepository }),
+  listCompanies: createListCompanies({ companies: companyRepository, log: identityListQueryLog }),
+  getCompany: createGetCompany({ companies: companyRepository }),
+  getCompanyDeletionImpact: createGetCompanyDeletionImpact({
+    companies: companyRepository,
+    openOrders: companyOpenOrdersCounter,
+  }),
+  listCompanyEvents: createListCompanyEvents({ companies: companyRepository }),
+  // Sin actor: la usan los trabajos que corren sin sesión.
+  isCompanyAddonActive: createIsCompanyAddonActive({ addons: companyAddonRepository }),
+  getCompanyAddons: createGetCompanyAddons({ addons: companyAddonRepository }),
+  setCompanyAddon: createSetCompanyAddon({ addons: companyAddonRepository }),
+  setAllCompanyAddons: createSetAllCompanyAddons({ addons: companyAddonRepository }),
 } as const;
 
 /**
@@ -923,6 +1038,23 @@ const presentationRepository: PresentationRepository = {
  *  cableado: un `const` no existe antes de su linea. */
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
+const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
+  listDeliveryLines: listDeliveryLinesByBatchIds,
+  summarizeDelivered: summarizeDeliveredByBatchIds,
+};
+
+const finishedDistributionDirectory: FinishedDistributionDirectory = {
+  listPackedLines: listPackedLinesByCombination,
+};
+
+const finishedProductDetailRepository: FinishedProductDetailRepository = {
+  findAliveFinished: findAliveFinishedProduct,
+  listBatches: listFinishedProductBatches,
+  listMovements: listFinishedProductMovements,
+  listProductionCosts: listFinishedProductCosts,
+  findProducedProducts: findProducedFinishedProducts,
+};
+
 /**
  * El aviso de existencia que sube, atado a la revision de los pedidos bloqueados de `pedidos`.
  * Va antes de la fachada de `inventario`, que lo necesita; `reviewBlockedOrders` se declara mas
@@ -960,12 +1092,24 @@ const stockIncreaseListener: StockIncreaseListener = {
  * `{ id, roleName }` con lo que devuelve `SessionUser`. `lib/composition` no conoce
  * cookies ni sesion; solo ata puerto -> adaptador.
  */
-const createProductUseCase = createCreateProduct({
+/** Mismo bucket y credenciales que la imagen de receta; la carpeta es `productos/`. Construirlo
+ *  no lee el entorno: la configuracion se resuelve en cada llamada. */
+const productImageStorage: ProductImageStorage = createProductImageStorageSupabase(
+  readRecipeImageStorageConfigFromEnv,
+);
+
+const createProductDeps = {
   products: productRepository,
   stockIncreases: stockIncreaseListener,
   packageUnit: { findPackageUnitId },
   units: { findRefs: findUnitRefs },
-});
+  images: productImageStorage,
+};
+
+const createProductUseCase = createCreateProduct(createProductDeps);
+
+/** El importador carga inventario que ya existe: sus lotes pueden venir vencidos. */
+const createImportedProductUseCase = createCreateProduct({ ...createProductDeps, acceptsPastExpiry: true });
 
 const inventoryImportRepository: InventoryImportRepository = {
   findAliveProductsByNormalizedNames,
@@ -979,6 +1123,12 @@ const inventoryImportRepository: InventoryImportRepository = {
 
 const spreadsheetReader: SpreadsheetReader = {
   read: async (bytes, format) => (format === 'csv' ? readCsv(bytes) : readXlsx(bytes)),
+};
+
+const importTemplateValuesReader: ImportTemplateValuesReader = {
+  listUnitNames: async (companyId) => (await listVisibleUnitRefs(companyId)).map((unit) => unit.name),
+  listPresentationNames,
+  listFormulaNames: listAliveOriginalRecipeNames,
 };
 
 const importFormulaLookup: ImportFormulaLookup = {
@@ -997,10 +1147,14 @@ const inventoryImportReadDeps = {
 export const inventario = {
   createProduct: createProductUseCase,
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
-  updateProduct: createUpdateProduct({ products: productRepository }),
+  updateProduct: createUpdateProduct({ products: productRepository, images: productImageStorage }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
-  getProduct: createGetProduct({ products: productRepository }),
-  listProducts: createListProducts({ products: productRepository, log: inventarioListQueryLog }),
+  getProduct: createGetProduct({ products: productRepository, images: productImageStorage }),
+  listProducts: createListProducts({
+    products: productRepository,
+    log: inventarioListQueryLog,
+    images: productImageStorage,
+  }),
   createPresentation: createCreatePresentation({ presentations: presentationRepository }),
   updatePresentation: createUpdatePresentation({ presentations: presentationRepository }),
   deletePresentation: createDeletePresentation({ presentations: presentationRepository }),
@@ -1032,12 +1186,46 @@ export const inventario = {
   // El adaptador y no `unitCatalog`, que se declara mas abajo.
   listProductFormUnits: createListProductFormUnits({ units: { listVisibleRefs: listVisibleUnitRefs } }),
   previewInventoryImport: createPreviewInventoryImport(inventoryImportReadDeps),
+  getInventoryImportTemplate: createGetInventoryImportTemplate({
+    values: importTemplateValuesReader,
+    writer: { write: writeXlsx },
+  }),
+  getInventoryImportValues: createGetInventoryImportValues({ values: importTemplateValuesReader }),
   confirmInventoryImport: createConfirmInventoryImport({
     ...inventoryImportReadDeps,
-    createProduct: createProductUseCase,
+    createProduct: createImportedProductUseCase,
     stockIncreases: stockIncreaseListener,
     digest: fileDigest,
   }),
+  getFinishedProduct: createGetFinishedProduct({
+    products: finishedProductDetailRepository,
+    units: { findRefs: findUnitRefs },
+  }),
+  listFinishedProductBatches: createListFinishedProductBatches({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+  }),
+  listFinishedProductMovements: createListFinishedProductMovements({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+  }),
+  listFinishedProductDeliveries: createListFinishedProductDeliveries({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+    deliveries: finishedDeliveryDirectory,
+    customers: {
+      findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
+    },
+  }),
+  listFinishedProductDistribution: createListFinishedProductDistribution({
+    products: finishedProductDetailRepository,
+    distribution: finishedDistributionDirectory,
+  }),
+  listFinishedProductCosts: createListFinishedProductCosts({
+    products: finishedProductDetailRepository,
+    orders: orderNumberDirectory,
+  }),
+  listProducedProducts: createListProducedProducts({ products: finishedProductDetailRepository }),
 } as const;
 
 // El modulo `unidades` (QC-32) siembra su catalogo con su propia migracion. `recetas`
@@ -1053,7 +1241,7 @@ export const inventario = {
 
 /** Solo para el servidor de `pedidos`: validar el envase de cada linea del reparto y costearlo. */
 const packagingCatalog: PackagingCatalog = {
-  findRefs: findPackagingRefs,
+  findRefs: createFindPackagingRefs(productImageStorage),
   findCostingBatches: findPackagingCostingBatches,
 };
 
@@ -1096,6 +1284,7 @@ const recipeRepository: RecipeRepository = {
   createVersion: createRecipeVersion,
   listAliveVersions: listAliveRecipeVersions,
   replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
+  listVersionIdsIncludingDeleted: listRecipeVersionIdsIncludingDeleted,
 };
 
 /** `RecipeImageStorage` cableado con el adaptador de Supabase Storage (T11). Ninguna de
@@ -1112,6 +1301,14 @@ const recipeImageStorage: RecipeImageStorage = {
 /** QC-57 (T7, R6): el MISMO `logIgnoredListQueryFields` que `inventario`, visto por el puerto
  *  que declara `recetas`. Cinco puertos con la misma forma, una sola implementacion. */
 const recetasListQueryLog: RecetasListQueryLog = { ignoredFields: logIgnoredListQueryFields };
+
+/**
+ * `recetas` pregunta por los pedidos en curso con fotos sin importar `asignaciones`, que ya importa
+ * `recetas`. El conteo se resuelve al llamar: se construye mas abajo, con el resto de la evidencia.
+ */
+const recipeStepLockReader: RecipeStepLockReader = {
+  countOrdersWithEvidenceInProgress: (recipeIds, companyId) => countEvidenceLockingOrders(companyId, recipeIds),
+};
 
 /**
  * Fachada del modulo `recetas` ya cableada (T12, `design.md > 3`, `> 11`). Es lo que
@@ -1143,11 +1340,13 @@ export const recetas = {
     recipes: recipeRepository,
     products: productCatalog,
     images: recipeImageStorage,
+    stepLocks: recipeStepLockReader,
   }),
   deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
   createRecipeVersion: createCreateRecipeVersion({ recipes: recipeRepository, products: productCatalog }),
   updateRecipeVersion: createUpdateRecipeVersion({ recipes: recipeRepository, products: productCatalog }),
   listRecipeVersions: createListRecipeVersions({ recipes: recipeRepository }),
+  getRecipeStepLock: createGetRecipeStepLock({ recipes: recipeRepository, stepLocks: recipeStepLockReader }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -1297,9 +1496,12 @@ export const unidades = {
  *
  *  `findRefsIncludingDeleted`, y no una consulta de solo vivas, porque un pedido conserva su
  *  receta aunque la den de baja y la fila tiene que seguir diciendo que se pidio (R44).
- *  `findExecutionContentById` la estrena `asignaciones`, mas abajo. */
+ *  `findExecutionContentById` la estrena `asignaciones`, mas abajo.
+ *
+ *  `findRefsIncludingDeleted` va cableado a la variante CON foto (dashboard): el adaptador
+ *  deja la imagen opcional, y la guardia de ambito exige una funcion con nombre, sin lambda. */
 const recipeCatalog: RecipeCatalog = {
-  findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
+  findRefsIncludingDeleted: findRecipeRefsWithImageIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
   findAliveByNormalizedName: findAliveRecipeByNormalizedName,
@@ -1442,6 +1644,7 @@ export const pedidos = {
   }),
   listOrders: createListOrders({
     orders: orderRepository,
+    deliveryProgress: { listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted },
     recipes: recipeCatalog,
     presentations: presentationCatalog,
     packaging: packagingCatalog,
@@ -1601,6 +1804,7 @@ const orderCatalog: OrderCatalog = {
     packaging: packagingCatalog,
   }),
   listSummariesByIdsIncludingDeleted: createListSummariesByIdsIncludingDeleted({ summaries: orderSummaryReader }),
+  listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted,
   // Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
   // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
   // cableados mas abajo para quien todavia los usa-.
@@ -1652,6 +1856,39 @@ const orderAssignmentRepository: OrderAssignmentRepository = createOrderAssignme
 /** El registro fuera de transaccion: anotar un paso o el retomar es una sola sentencia. */
 const executionLogRepository: ExecutionLogRepository = createExecutionLogRepository();
 
+/** Las fotos de evidencia por paso: la unica puerta a `order_step_evidence`. */
+const stepEvidenceRepository: StepEvidenceRepository = createStepEvidenceRepository();
+
+/**
+ * El bucket de las fotos: el real salvo con `EVIDENCE_E2E_DOUBLES` puesta, que solo pone
+ * `playwright.config.ts`. Se consulta en cada llamada: importar este archivo no lee el entorno.
+ */
+function selectedEvidenceStorage(): EvidenceStorage {
+  return evidenceE2EDoublesEnabled() ? evidenceStorageMemoryForE2E : evidenceStorageSupabase;
+}
+
+const evidenceStorage: EvidenceStorage = {
+  createSignedUpload: (path) => selectedEvidenceStorage().createSignedUpload(path),
+  createSignedReadUrl: (path, expiresInSeconds) =>
+    selectedEvidenceStorage().createSignedReadUrl(path, expiresInSeconds),
+  createSignedReadUrls: (paths, expiresInSeconds) =>
+    selectedEvidenceStorage().createSignedReadUrls(paths, expiresInSeconds),
+  download: (path) => selectedEvidenceStorage().download(path),
+  remove: (path) => selectedEvidenceStorage().remove(path),
+};
+
+const countEvidenceLockingOrders = createCountEvidenceLockingOrders({
+  orders: orderCatalog,
+  evidence: stepEvidenceRepository,
+});
+
+const evidenceTargetDeps = {
+  assignments: orderAssignmentRepository,
+  orders: orderCatalog,
+  recipes: recipeCatalog,
+  packingSteps: { findPackingStepsById: findRecipePackingStepsById },
+};
+
 /**
  * La transaccion de ejecucion la abre `asignaciones`, y `pedidos` se une a ella sin abrir otra:
  * la escritura del pedido, lo que `pedidos` escriba en `inventario` y la anotacion se confirman
@@ -1682,8 +1919,10 @@ const executionTransaction: ExecutionTransaction = {
         log: createExecutionLogRepository(tx),
         conditioning: {
           startConditioningAliveById: createStartConditioning({ conditioning: createOrderConditioningRepository(tx) }),
+          finishConditioningAliveById: createFinishConditioning({ conditioning: createOrderConditioningRepository(tx) }),
         },
         team: createConditioningTeamRepository(tx),
+        batches: createFinishedBatchLabels(tx),
       }),
     ),
 };
@@ -1759,6 +1998,8 @@ export const asignaciones = {
     units: unitCatalog,
     products: productCatalog,
     presentations: presentationCatalog,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
   startAssignedOrder: createStartAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1770,6 +2011,23 @@ export const asignaciones = {
     log: executionLogRepository,
     transaction: executionTransaction,
     now: () => new Date(),
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  // Abrir la pantalla: lee un `PENDIENTE` sin comenzarlo y retoma un `EN_CURSO`. MISMAS
+  // dependencias que `startAssignedOrder`, al que delega el retomar.
+  openAssignedOrder: createOpenAssignedOrder({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    recipes: recipeCatalog,
+    units: unitCatalog,
+    products: productCatalog,
+    presentations: presentationCatalog,
+    log: executionLogRepository,
+    transaction: executionTransaction,
+    now: () => new Date(),
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
   finishAssignedOrder: createFinishAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1779,6 +2037,8 @@ export const asignaciones = {
     log: executionLogRepository,
     transaction: executionTransaction,
     now: () => new Date(),
+    recipes: recipeCatalog,
+    evidence: stepEvidenceRepository,
   }),
   // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
   // `recipeCatalog`, `presentationCatalog`, `orderAssignmentRepository` y `peopleDirectory` que
@@ -1805,11 +2065,7 @@ export const asignaciones = {
     people: peopleDirectory,
     now: () => new Date(),
   }),
-  // `listPackingOrders` y `getPackingOrder` comparten los MISMOS `orderCatalog`,
-  // `orderAssignmentRepository`, `recipeCatalog`, `presentationCatalog` y `peopleDirectory` del
-  // resto del modulo, mas `productCatalog` -el mismo que usa `recetas` y la ejecucion, arriba-
-  // para los envases. `startPacking` y `finishPacking` solo necesitan `orderCatalog`: ningun
-  // adaptador nuevo.
+  // `getPackingOrder` suma `packagingCatalog` para el libre de cada envase del conteo de Terminar.
   listPackingOrders: createListPackingOrders({
     orders: orderCatalog,
     assignments: orderAssignmentRepository,
@@ -1817,7 +2073,6 @@ export const asignaciones = {
     people: peopleDirectory,
     presentations: presentationCatalog,
     units: unitCatalog,
-    products: productCatalog,
     now: () => new Date(),
   }),
   getPackingOrder: createGetPackingOrder({
@@ -1827,9 +2082,11 @@ export const asignaciones = {
     people: peopleDirectory,
     presentations: presentationCatalog,
     units: unitCatalog,
-    products: productCatalog,
+    packaging: packagingCatalog,
     packingSteps: { findPackingStepsById: findRecipePackingStepsById },
     now: () => new Date(),
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
   }),
   startPacking: createStartPackingOrder({
     orders: orderCatalog,
@@ -1842,6 +2099,8 @@ export const asignaciones = {
     log: executionLogRepository,
     transaction: executionTransaction,
     now: () => new Date(),
+    packingSteps: { findPackingStepsById: findRecipePackingStepsById },
+    evidence: stepEvidenceRepository,
   }),
   cancelAssignedOrder: createCancelAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1854,16 +2113,22 @@ export const asignaciones = {
     orders: orderCatalog,
     log: executionLogRepository,
     now: () => new Date(),
+    recipes: recipeCatalog,
+    evidence: stepEvidenceRepository,
   }),
   listExecutionTraces: createListExecutionTraces({
     log: executionLogRepository,
     orders: orderCatalog,
     people: peopleDirectory,
+    team: createConditioningTeamRepository(),
+    recipes: recipeCatalog,
+    presentations: presentationCatalog,
   }),
   getExecutionTrace: createGetExecutionTrace({
     log: executionLogRepository,
     orders: orderCatalog,
     people: peopleDirectory,
+    team: createConditioningTeamRepository(),
   }),
   startConditioning: createStartConditioningOrder({
     orders: orderCatalog,
@@ -1875,6 +2140,7 @@ export const asignaciones = {
   finishConditioning: createFinishConditioningOrder({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   listConditioningOrders: createListConditioningOrders({
@@ -1923,8 +2189,36 @@ export const asignaciones = {
   saveConditioningBatchData: createSaveConditioningBatchData({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
+    presentations: presentationCatalog,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
+  requestEvidenceUpload: createRequestEvidenceUpload({
+    ...evidenceTargetDeps,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  registerEvidence: createRegisterEvidence({
+    ...evidenceTargetDeps,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  removeEvidence: createRemoveEvidence({
+    ...evidenceTargetDeps,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  getExecutionEvidence: createGetExecutionEvidence({
+    orders: orderCatalog,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  getOrderEvidence: createGetOrderEvidence({
+    orders: orderCatalog,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  countOrderEvidence: createCountOrderEvidence({ evidence: stepEvidenceRepository }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -1986,24 +2280,45 @@ const pdfConverter: PdfConverter = {
   renderPages,
 };
 
-/**
- * `AiReader` cableado con el adaptador de Claude; el de Gemini se conserva sin cablear como
- * futuro respaldo. La clave del objeto es la del PUERTO
- * (`read`) y el valor, la funcion del adaptador (`readWithAnthropic`) —se llaman distinto a
- * proposito, igual que `documentStorage` y `pdfConverter` arriba—. Aqui no se invoca nada,
- * solo se referencia, asi que construir esta fachada no lee ninguna variable de entorno ni
- * toca la red: la suite entera arranca sin claves de IA.
- */
-const aiReader: AiReader = {
-  read: (request) =>
-    documentsE2EDoublesEnabled() ? readCannedText(request) : readWithAnthropic(request),
+type ReaderFactory = (config: { apiKey: string; model: string }) => AiReader;
+
+/** Un proveedor nuevo sin lector no compila. */
+const READER_BY_PROVIDER: Record<AiProviderCode, ReaderFactory> = {
+  ANTHROPIC: createAnthropicReader,
+  GOOGLE: createGenaiReader,
+  OPENAI: (config) => createOpenAiReader(config),
+  OPENROUTER: (config) => createOpenAiReader({ ...config, baseURL: OPENROUTER_BASE_URL }),
 };
 
 /**
- * La lectura con IA, construida UNA vez: la publica la fachada y la reutiliza el procesamiento por
- * estrategia. Dos construcciones serian dos cableados que pueden divergir.
+ * El lector sale de la conexion de cada empresa. `integraciones` se declara mas abajo y solo se
+ * usa dentro de estas funciones, ya con el modulo evaluado. Con el doble de lectura no se descifra
+ * nada, pero sigue haciendo falta una conexion.
  */
-const readPdfWithAi = createReadPdfWithAi({ ai: aiReader, converter: pdfConverter });
+const aiProviderGateway: AiProviderGateway = {
+  isConfigured: async (companyId) => (await integraciones.getAiProviderStatus(companyId)) !== null,
+  readerFor: async (companyId, use) => {
+    if (documentsE2EDoublesEnabled()) {
+      const status = await integraciones.getAiProviderStatus(companyId);
+      return status === null
+        ? { status: 'missing' }
+        : { status: 'ready', reader: { read: readCannedText }, connectionStatus: status.connectionStatus };
+    }
+    const resolution = await integraciones.resolveAiProviderForReading(companyId, use);
+    if (resolution.status !== 'ready') return { status: resolution.status };
+    return {
+      status: 'ready',
+      reader: READER_BY_PROVIDER[resolution.provider]({
+        apiKey: resolution.apiKey,
+        model: resolution.model,
+      }),
+      connectionStatus: resolution.connectionStatus,
+    };
+  },
+  reportAccountFailure: (companyId, failure) =>
+    integraciones.reportAiProviderOutcome(companyId, { kind: 'account_failure', failure }),
+  reportRecovered: (companyId) => integraciones.reportAiProviderOutcome(companyId, { kind: 'recovered' }),
+};
 
 /** `StrategyRunLog` cableado con la unica implementacion que hay: una linea en el registro. */
 const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
@@ -2013,17 +2328,6 @@ const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
  * se invoca: construir esta fachada no lee ninguna variable.
  */
 const strategyPrompt: StrategyPrompt = { promptFor: readStrategyPromptFromEnv };
-
-/**
- * El procesamiento por estrategia, construido UNA vez: lo usa la fachada de abajo y lo necesita
- * `runDocumentJob`. Dos construcciones serian dos cableados que pueden divergir.
- */
-const processPdfByStrategy = createProcessPdfByStrategy({
-  readPdfWithAi,
-  countPages: pdfConverter.countPages,
-  log: strategyRunLog,
-  prompt: strategyPrompt,
-});
 
 // ---------------------------------------------------------------------------------------
 // `documentos` — el procesamiento en cola. Bloque nuevo dentro del mismo modulo, no reordena nada
@@ -2066,14 +2370,28 @@ const cropCatalog: CropCatalog = {
 /** `CropRegionLog` cableado con la unica implementacion que hay: una linea en el registro. */
 const cropRegionLog: CropRegionLog = createCropRegionLogConsole();
 
-/** Reutiliza el MISMO `pdfConverter` y el MISMO `aiReader` que ya cablea el resto del modulo. */
-const cropCatalogImages = createCropCatalogImages({
-  converter: pdfConverter,
-  ai: aiReader,
-  cropper: imageCropper,
-  storage: cropStorage,
-  log: cropRegionLog,
-});
+/**
+ * La cadena de lectura de un trabajo, con el lector de su empresa y su uso. Se construye en cada
+ * trabajo porque el lector cambia con la empresa; las fabricas solo cierran funciones, sin E/S.
+ */
+function documentPipelineFor(reader: AiReader) {
+  const readPdfWithAi = createReadPdfWithAi({ ai: reader, converter: pdfConverter });
+  return {
+    processPdfByStrategy: createProcessPdfByStrategy({
+      readPdfWithAi,
+      countPages: pdfConverter.countPages,
+      log: strategyRunLog,
+      prompt: strategyPrompt,
+    }),
+    cropCatalogImages: createCropCatalogImages({
+      converter: pdfConverter,
+      ai: reader,
+      cropper: imageCropper,
+      storage: cropStorage,
+      log: cropRegionLog,
+    }),
+  };
+}
 
 /**
  * El trabajo de la cola, construido UNA vez: lo publica la fachada y lo necesita la cola en linea,
@@ -2085,8 +2403,10 @@ const documentJobLog: DocumentJobLog = forModule('documentos');
 const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
-  processPdfByStrategy,
-  cropCatalogImages,
+  aiProvider: aiProviderGateway,
+  // La clave del añadido vive aquí: `documentos` no conoce el catálogo de añadidos.
+  pdfReading: { isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'lectura_pdf') },
+  pipelineFor: documentPipelineFor,
   log: documentJobLog,
 });
 
@@ -2183,6 +2503,7 @@ const confirmFormulaImport = createConfirmFormulaImport(formulaImportDeps);
 export const documentos = {
   issueUploadLinks: createIssueUploadLinks({
     storage: documentStorage,
+    aiProvider: aiProviderGateway,
     now: () => new Date(),
   }),
   convertPdfs: createConvertPdfs({ converter: pdfConverter }),
@@ -2196,11 +2517,6 @@ export const documentos = {
   // una variable ni tocar la red.
   issueReadLink: createIssueReadLink({ storage: documentStorage }),
   downloadDocument: createDownloadDocument({ storage: documentStorage }),
-  readPdfWithAi,
-  // El procesamiento por estrategia recibe la LECTURA ya construida, no el puerto de IA: el plazo y
-  // el tope de paginas son de ella. `countPages` es solo para el resumen que se registra. Tampoco
-  // recibe actor, por el mismo motivo que `convertPdfs`.
-  processPdfByStrategy,
   // Las TRES capacidades nuevas del procesamiento en cola. `enqueueBatch` es la unica que recibe
   // actor -- lo construye el adaptador driving con las dos caras de la sesion --, y las otras dos
   // ninguna: `runDocumentJob` porque no hay usuario delante, y `queueSignature` porque verificar
@@ -2339,6 +2655,78 @@ function whatsappWebhookUrl(connectionId: string): WhatsappWebhookUrl {
   return base === null ? { url: path, complete: false } : { url: `${base}${path}`, complete: true };
 }
 
+// ---------------------------------------------------------------------------------------
+// `integraciones`: el proveedor IA de la empresa. Bloque nuevo al final, con sus imports.
+// ---------------------------------------------------------------------------------------
+
+import {
+  createDisconnectAiProvider,
+  createGetAiProviderConnection,
+  createGetAiProviderReadiness,
+  createGetAiProviderStatus,
+  createReportAiProviderOutcome,
+  createResolveAiProviderForReading,
+  createSaveAiProviderConnection,
+  createTestAiProviderKey,
+  createTestSavedAiProvider,
+  type AiProviderProbeResult,
+} from '@/lib/modules/integraciones';
+import { aiProviderProbeCanned } from '@/lib/modules/integraciones/adapters/driven/ai/ai-provider-probe-canned';
+import {
+  getAiProvider,
+  listAiProviders,
+} from '@/lib/modules/integraciones/adapters/driven/catalog/ai-provider-catalog-prisma';
+import {
+  deleteAiProviderConnection,
+  findAiProviderConnection,
+  insertAiProviderConnection,
+  updateAiProviderConnection,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/ai-provider-connection-prisma';
+import type { AiProviderCatalog } from '@/lib/modules/integraciones/ports/ai-provider-catalog';
+import type { AiProviderConnectionRepository } from '@/lib/modules/integraciones/ports/ai-provider-connection-repository';
+import type { AiProviderProbe } from '@/lib/modules/integraciones/ports/ai-provider-probe';
+
+type ProviderProbe = (input: {
+  apiKey: string;
+  models: readonly string[];
+}) => Promise<AiProviderProbeResult>;
+
+/** Un proveedor nuevo sin prueba no compila. */
+const PROBE_BY_PROVIDER: Record<AiProviderCode, ProviderProbe> = {
+  ANTHROPIC: probeAnthropic,
+  GOOGLE: probeGenai,
+  OPENAI: probeOpenAi,
+  OPENROUTER: probeOpenRouter,
+};
+
+/** El doble se elige en cada llamada: la variable puede cambiar dentro del mismo proceso. */
+const aiProviderProbe: AiProviderProbe = {
+  probe: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? aiProviderProbeCanned.probe(input)
+      : PROBE_BY_PROVIDER[input.provider]({ apiKey: input.apiKey, models: input.models }),
+};
+
+const aiProviderConnectionRepository: AiProviderConnectionRepository = {
+  find: findAiProviderConnection,
+  create: insertAiProviderConnection,
+  update: updateAiProviderConnection,
+  delete: deleteAiProviderConnection,
+};
+
+const aiProviderCatalog: AiProviderCatalog = {
+  list: listAiProviders,
+  get: getAiProvider,
+};
+
+const aiProviderDeps = {
+  connections: aiProviderConnectionRepository,
+  catalog: aiProviderCatalog,
+  probe: aiProviderProbe,
+  cipher: secretCipher,
+  random: randomSource,
+};
+
 /**
  * Fachada de `integraciones`. `secretCipher` y `secretDigest` siguen expuestos para quien reciba
  * los webhooks. El actor no se resuelve aqui: lo resuelve la Server Action.
@@ -2353,4 +2741,13 @@ export const integraciones = {
   setWhatsappConnectionEnabled: createSetWhatsappConnectionEnabled(whatsappDeps),
   regenerateWhatsappVerifyToken: createRegenerateWhatsappVerifyToken(whatsappDeps),
   whatsappWebhookUrl,
+  getAiProviderConnection: createGetAiProviderConnection(aiProviderDeps),
+  testAiProviderKey: createTestAiProviderKey(aiProviderDeps),
+  testSavedAiProvider: createTestSavedAiProvider(aiProviderDeps),
+  saveAiProviderConnection: createSaveAiProviderConnection(aiProviderDeps),
+  disconnectAiProvider: createDisconnectAiProvider(aiProviderDeps),
+  getAiProviderReadiness: createGetAiProviderReadiness(aiProviderDeps),
+  getAiProviderStatus: createGetAiProviderStatus(aiProviderDeps),
+  resolveAiProviderForReading: createResolveAiProviderForReading(aiProviderDeps),
+  reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
 } as const;

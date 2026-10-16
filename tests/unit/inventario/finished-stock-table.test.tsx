@@ -13,6 +13,7 @@ import {
   type ProductView,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { clickRowAction, openRowActionsMenu } from '../../helpers/row-actions-menu';
 import { setupUser } from '../../helpers/user-event';
@@ -238,6 +239,56 @@ describe('fila de pedido', () => {
   });
 });
 
+describe('nombre y presentacion', () => {
+  it('la sub-fila pinta el nombre sin la presentacion y la presentacion en su columna', async () => {
+    const user = setupUser();
+    const conPresentacion = producto({ presentationId: 'presentation-1', presentationName: 'Botella 250 ml' });
+    montar([pedido({ products: [{ product: conPresentacion, stock: '1.5', packagedStock: [entrada()] }] })]);
+
+    expect(within(filaDeGrupo('order-1')).getByTestId('data-table-cell-presentationName').textContent).toBe('');
+    await user.click(screen.getByTestId('finished-stock-toggle'));
+
+    const sub = screen.getByTestId('data-table-row-order-1--product-1');
+    expect(within(sub).getByTestId('finished-stock-line-name').textContent).toBe('Desengrasante');
+    expect(within(sub).getByTestId('data-table-cell-presentationName').textContent).toBe('Botella 250 ml');
+  });
+
+  it('sin presentacion conocida, el nombre queda entero y la columna pinta el marcador', async () => {
+    const user = setupUser();
+    montar([pedido()]);
+    await user.click(screen.getByTestId('finished-stock-toggle'));
+
+    const sub = screen.getByTestId('data-table-row-order-1--product-1');
+    expect(within(sub).getByTestId('finished-stock-line-name').textContent).toBe(
+      'Desengrasante · Botella 250 ml',
+    );
+    expect(within(sub).getByTestId('data-table-cell-presentationName')).toHaveTextContent(EMPTY_MARK);
+  });
+
+  it('la fila sin pedido pinta el nombre sin la presentacion y la presentacion en su columna', () => {
+    const product = producto({
+      id: 'product-2',
+      name: 'Jabon · Garrafa 5 L',
+      presentationId: 'presentation-2',
+      presentationName: 'Garrafa 5 L',
+    });
+    montar([
+      {
+        kind: 'withoutOrder',
+        key: 'without-product-2',
+        productId: 'product-2',
+        stock: '12.5000',
+        unitId: 'unit-l',
+        products: [{ product, stock: '12.5000', packagedStock: null }],
+      },
+    ]);
+
+    const grupo = filaDeGrupo('without-product-2');
+    expect(within(grupo).getByTestId('finished-stock-name').textContent).toBe('Jabon');
+    expect(within(grupo).getByTestId('data-table-cell-presentationName').textContent).toBe('Garrafa 5 L');
+  });
+});
+
 describe('desplegar', () => {
   it('muestra una sub-fila por producto con existencia, alerta y acciones; plegar las quita', async () => {
     const user = setupUser();
@@ -265,6 +316,37 @@ describe('desplegar', () => {
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('data-table-row-order-1--product-1')).toBeNull();
+  });
+
+  it('R26: el nombre de cada sub-fila enlaza a la ficha de su producto y la fila de grupo no lleva enlace', async () => {
+    const user = setupUser();
+    const otro = producto({ id: 'product-3', name: 'Desengrasante · Botella 1 L' });
+    montar([
+      pedido({
+        products: [
+          { product: producto(), stock: '1.5', packagedStock: [entrada()] },
+          { product: otro, stock: '2', packagedStock: null },
+        ],
+      }),
+    ]);
+
+    const fila = filaDeGrupo('order-1');
+    expect(within(fila).queryByRole('link')).toBeNull();
+    expect(within(fila).queryByTestId('finished-stock-line-link')).toBeNull();
+
+    await user.click(screen.getByTestId('finished-stock-toggle'));
+
+    const primera = within(screen.getByTestId('data-table-row-order-1--product-1')).getByTestId(
+      'finished-stock-line-link',
+    );
+    expect(primera).toHaveAttribute('href', finishedProductDetailRoute('product-1'));
+    expect(primera).toHaveAccessibleName('Desengrasante · Botella 250 ml');
+
+    const segunda = within(screen.getByTestId('data-table-row-order-1--product-3')).getByTestId(
+      'finished-stock-line-link',
+    );
+    expect(segunda).toHaveAttribute('href', finishedProductDetailRoute('product-3'));
+    expect(within(fila).queryByRole('link')).toBeNull();
   });
 
   it('una sub-fila sin envases pinta existencia y unidad', async () => {

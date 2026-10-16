@@ -375,6 +375,10 @@ const SITIOS_PERMITIDOS = [
   // segunda definicion del conjunto ni escribe el estado. Ocultar no es autorizar: la autorizacion
   // sigue en el service (`end-all-sessions.ts`), no en esta comparacion.
   'app/(private)/configuracion/usuarios/components/user-sheet.tsx',
+
+  // QC-162 R11 — el alta de empresa crea su primer Administrador en `pending`, en la misma
+  // transaccion que la empresa, con los invariantes del alta de usuario. Solo lo escribe al nacer.
+  'lib/modules/identity/adapters/driven/persistence/company-prisma.ts',
 ] as const;
 
 /**

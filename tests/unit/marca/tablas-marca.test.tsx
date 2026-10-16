@@ -239,7 +239,7 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   {
     archivo: 'order-columns.tsx',
     construir: async () =>
-      buildOrderColumns({ recipes: { items: [], totalPages: 1 }, units: [], bridge: null }),
+      buildOrderColumns({ units: [], bridge: null }),
     esperadas: ['Cantidad', 'Fecha de solicitud'],
   },
   {
@@ -264,7 +264,7 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   {
     archivo: 'product-columns.tsx',
     construir: async () => buildProductColumns({ rowActions: sinAcciones }),
-    esperadas: ['Existencia', 'Alerta de cantidad', 'Reservado', 'Disponible'],
+    esperadas: ['Existencia', 'Costo', 'Alerta de cantidad', 'Reservado', 'Disponible'],
   },
   {
     archivo: 'finished-stock-columns.tsx',
@@ -300,7 +300,7 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
           typeof import('@/app/(private)/asignacion/components/packing-orders-columns')
         >('@/app/(private)/asignacion/components/packing-orders-columns')
       ).buildPackingOrdersColumns(),
-    esperadas: ['Envases'],
+    esperadas: [],
   },
   {
     archivo: 'execution-trace-columns.tsx',

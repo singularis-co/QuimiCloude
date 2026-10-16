@@ -26,16 +26,22 @@ export type DocumentUploadDialogProps = {
   readonly strategy: PdfStrategy;
   /** Opcional: se pasa tal cual a `DocumentUpload`. */
   readonly reviewHrefFor?: (documentFileId: string) => string;
+  readonly disabled?: boolean;
 };
 
 /**
  * Ventana emergente que envuelve `DocumentUpload`. `keepMounted` mantiene la subida montada mientras
  * la ventana esta cerrada, para que una tanda en curso siga sondeandose y se vea igual al reabrir.
  */
-export function DocumentUploadDialog({ strategy, reviewHrefFor }: DocumentUploadDialogProps) {
+export function DocumentUploadDialog({
+  strategy,
+  reviewHrefFor,
+  disabled = false,
+}: DocumentUploadDialogProps) {
   return (
     <Dialog>
       <DialogTrigger
+        disabled={disabled}
         render={
           <Button
             variant="outline"

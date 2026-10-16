@@ -82,6 +82,8 @@ const { getSessionUserMock, notFoundMock, redirectMock, actions } = vi.hoisted((
     // 2026-10-08: las dos lecturas del recorrido de ejecucion.
     listExecutionTracesAction: vi.fn(),
     getExecutionTraceAction: vi.fn(),
+    // 2026-10-14: el detalle del recorrido lee tambien las fotos del pedido.
+    getExecutionEvidenceAction: vi.fn(),
   },
 }));
 
@@ -89,6 +91,11 @@ vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   notFound: notFoundMock,
   redirect: redirectMock,
+}));
+
+// La empresa tiene proveedor IA conectado: la pantalla pinta el boton de subida de siempre.
+vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () => ({
+  getAiProviderReadinessAction: vi.fn(async () => ({ configured: true, canConfigure: true })),
 }));
 
 vi.mock('@/lib/composition', () => ({
@@ -110,6 +117,7 @@ vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-actions', () => ({
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   getRecipeAction: actions.getRecipeAction,
+  getRecipeStepLockAction: vi.fn(async () => ({ status: 'success' as const, data: { lockingOrders: 0 } })),
   listRecipesAction: actions.listRecipesAction,
   createRecipeAction: vi.fn(),
   updateRecipeAction: vi.fn(),
@@ -127,6 +135,7 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', () => ({
   listExecutionTracesAction: actions.listExecutionTracesAction,
   getExecutionTraceAction: actions.getExecutionTraceAction,
+  getExecutionEvidenceAction: actions.getExecutionEvidenceAction,
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({

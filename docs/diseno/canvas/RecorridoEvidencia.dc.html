@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Recorrido con evidencia</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.demo{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 8px;border:1px dashed var(--border);border-radius:10px;font-size:12px;color:var(--muted-fg)}
+.demo-l{font-weight:600;margin-right:4px}
+.ev-ro{display:flex;flex-direction:column;gap:8px;margin-top:6px;max-width:372px}
+.ev-ro-hd{display:flex;align-items:center;gap:8px;font-size:13px}
+.ev-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ev-tile{position:relative;aspect-ratio:1/1;min-width:0;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--muted);animation:qc-rise var(--d-s) var(--e-in) both;transition:border-color var(--d-i)}
+.ev-tile:hover{border-color:var(--primary)}
+.ev-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;text-align:center;font-size:12px;line-height:1.3;color:var(--fg)}
+.ev-ph .ic{color:var(--muted-fg)}
+.ev-view{position:absolute;inset:0;width:100%;height:100%;border:0;padding:0;background:transparent;cursor:zoom-in}
+.ev-view:focus-visible{outline:2px solid var(--primary);outline-offset:-4px;border-radius:12px}
+.ev-exp{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;text-align:center;font-size:12px;line-height:1.3;background:var(--w-bg);color:var(--w-fg)}
+.ev-n{position:absolute;left:8px;bottom:8px;min-width:24px;height:24px;padding:0 7px;border-radius:999px;background:color-mix(in oklch,var(--card) 90%,transparent);font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.ev-big{width:min(640px,80vw);aspect-ratio:4/3;border-radius:12px;background:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--fg);font-size:15px}
+.ev-big .ic{width:40px;height:40px;color:var(--muted-fg)}
+.ev-row{display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid var(--border)}
+.ev-row:first-of-type{border-top:0;padding-top:0}
+.ev-more{display:flex;flex-direction:column;gap:4px;padding-top:16px;margin-top:4px;border-top:1px solid var(--border)}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="dashboard" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="demo" role="toolbar" aria-label="Controles de demostración del tablero">
+          <span class="demo-l">Demo · Fotos:</span>
+          <sc-for list="{{ modes }}" as="m" hint-placeholder-count="5"><button class="{{ m.cls }}" type="button" aria-pressed="{{ m.on }}" onClick="{{ m.pick }}" style="min-height: 32px">{{ m.label }}</button></sc-for>
+        </div>
+
+        <div><a class="b b-out b-back" href="Dashboard.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a la lista</a></div>
+
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Recorrido del pedido <span class="mono">{{ no }}</span></h1></div>
+        </div>
+
+        <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+          <div class="box error" role="alert"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg></span><p class="sub" style="color: var(--fg)">No se pudo cargar el recorrido.</p></div>
+        </sc-if>
+
+        <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 16px" aria-busy="true">
+            <div class="g3 cq-1"><div class="stat"><span class="sk" style="width: 40%"></span><span class="sk" style="width: 70%; height: 22px"></span></div><div class="stat"><span class="sk" style="width: 40%"></span><span class="sk" style="width: 60%; height: 22px"></span></div><div class="stat"><span class="sk" style="width: 40%"></span><span class="sk" style="width: 30%; height: 22px"></span></div></div>
+            <div class="card"><span class="sk" style="width: 140px; height: 16px"></span><span class="sk" style="height: 56px"></span><span class="sk" style="height: 56px"></span><span class="sk" style="height: 56px"></span></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ ready }}" hint-placeholder-val="{{ true }}">
+          <dl class="g3 cq-1 fade" style="margin: 0">
+            <div class="stat"><dt>Estado</dt><dd><span class="{{ stCls }}"><i></i>{{ st }}</span></dd></div>
+            <div class="stat"><dt>Duración</dt><dd class="mono">{{ dur }}</dd></div>
+            <div class="stat"><dt>Vueltas atrás</dt><dd><span class="{{ backCls }}" style="{{ backStyle }}">{{ back }}</span></dd></div>
+          </dl>
+
+          <section class="card fade" aria-labelledby="rc-an">
+            <div class="card-hd"><h2 id="rc-an" class="h2">Anotaciones</h2><span class="count">{{ count }}</span></div>
+            <ol class="tl">
+              <sc-for list="{{ events }}" as="e" hint-placeholder-count="9">
+                <li class="{{ e.cls }}" style="animation-delay: {{ e.delay }}ms">
+                  <span class="ev-dot"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ e.icon }}"></path></svg></span>
+                  <div class="ev-body">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap"><span class="strong">{{ e.act }}</span><time class="mono cap">{{ e.time }}</time></div>
+                    <div class="rm-meta" style="align-items: center"><span>{{ e.pos }}</span><span style="display: inline-flex; align-items: center; gap: 6px; color: var(--fg)"><span class="{{ e.avCls }}">{{ e.ini }}</span>{{ e.name }}</span></div>
+                    <sc-if value="{{ e.hasMot }}" hint-placeholder-val="{{ false }}"><p class="cap" style="margin: 0; color: var(--fg)"><span class="strong">Motivo</span> · [MOTIVO…]</p></sc-if>
+                    <sc-if value="{{ e.hasEv }}" hint-placeholder-val="{{ false }}">
+                      <div class="ev-ro" role="group" aria-label="{{ e.evAria }}">
+                        <div class="ev-ro-hd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg><span class="strong">{{ e.evTitle }}</span><span class="count mono" aria-label="{{ e.evCountLabel }}">{{ e.evCount }}</span></div>
+                        <sc-if value="{{ e.isLoad }}" hint-placeholder-val="{{ false }}">
+                          <div class="ev-grid" aria-busy="true"><span class="sr">Cargando fotos…</span><sc-for list="{{ e.sk }}" as="k" hint-placeholder-count="2"><div class="ev-tile" style="border: 0"><span class="sk" style="height: 100%; border-radius: 12px"></span></div></sc-for></div>
+                        </sc-if>
+                        <sc-if value="{{ e.isErr }}" hint-placeholder-val="{{ false }}">
+                          <div class="nt n-d" role="alert" style="align-items: center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span style="flex: 1">No se pudieron cargar las fotos.</span><button class="b b-out b-sm" type="button" onClick="{{ e.retry }}" style="min-height: 44px; width: auto">Reintentar</button></div>
+                        </sc-if>
+                        <sc-if value="{{ e.isShow }}" hint-placeholder-val="{{ true }}">
+                          <div class="ev-grid">
+                            <sc-for list="{{ e.tiles }}" as="p" hint-placeholder-count="2">
+                              <div class="ev-tile" style="{{ p.delay }}">
+                                <div class="ev-ph" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg><span>{{ p.label }}</span></div>
+                                <sc-if value="{{ p.isOk }}" hint-placeholder-val="{{ true }}"><button class="ev-view" type="button" aria-label="{{ p.viewLabel }}" onClick="{{ p.view }}"></button><span class="ev-n mono" aria-hidden="true">{{ p.n }}</span></sc-if>
+                                <sc-if value="{{ p.isExp }}" hint-placeholder-val="{{ false }}"><div class="ev-exp"><span class="strong">Vista vencida</span><button class="b b-out b-sm" type="button" aria-label="{{ p.reloadLabel }}" onClick="{{ p.reload }}" style="min-height: 44px; width: auto">Recargar</button></div></sc-if>
+                              </div>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </div>
+                </li>
+              </sc-for>
+            </ol>
+
+            <sc-if value="{{ showOtros }}" hint-placeholder-val="{{ true }}">
+              <div class="ev-more" aria-labelledby="rc-ot">
+                <h3 id="rc-ot" class="h3">Otros pasos con fotos</h3>
+                <p class="cap" style="margin: 0 0 8px">Pasos de fabricación con fotos que no tienen ninguna anotación en el recorrido.</p>
+                <sc-for list="{{ otros }}" as="o" hint-placeholder-count="1">
+                  <div class="ev-ro" role="group" aria-label="{{ o.evAria }}" style="margin-top: 0">
+                    <div class="ev-ro-hd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg><span class="strong">{{ o.evTitle }}</span><span class="count mono" aria-label="{{ o.evCountLabel }}">{{ o.evCount }}</span></div>
+                    <sc-if value="{{ o.isLoad }}" hint-placeholder-val="{{ false }}">
+                      <div class="ev-grid" aria-busy="true"><span class="sr">Cargando fotos…</span><sc-for list="{{ o.sk }}" as="k" hint-placeholder-count="1"><div class="ev-tile" style="border: 0"><span class="sk" style="height: 100%; border-radius: 12px"></span></div></sc-for></div>
+                    </sc-if>
+                    <sc-if value="{{ o.isErr }}" hint-placeholder-val="{{ false }}">
+                      <div class="nt n-d" role="alert" style="align-items: center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span style="flex: 1">No se pudieron cargar las fotos.</span><button class="b b-out b-sm" type="button" onClick="{{ o.retry }}" style="min-height: 44px; width: auto">Reintentar</button></div>
+                    </sc-if>
+                    <sc-if value="{{ o.isShow }}" hint-placeholder-val="{{ true }}">
+                      <div class="ev-grid">
+                        <sc-for list="{{ o.tiles }}" as="p" hint-placeholder-count="1">
+                          <div class="ev-tile" style="{{ p.delay }}">
+                            <div class="ev-ph" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg><span>{{ p.label }}</span></div>
+                            <sc-if value="{{ p.isOk }}" hint-placeholder-val="{{ true }}"><button class="ev-view" type="button" aria-label="{{ p.viewLabel }}" onClick="{{ p.view }}"></button><span class="ev-n mono" aria-hidden="true">{{ p.n }}</span></sc-if>
+                            <sc-if value="{{ p.isExp }}" hint-placeholder-val="{{ false }}"><div class="ev-exp"><span class="strong">Vista vencida</span><button class="b b-out b-sm" type="button" aria-label="{{ p.reloadLabel }}" onClick="{{ p.reload }}" style="min-height: 44px; width: auto">Recargar</button></div></sc-if>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </section>
+
+          <sc-if value="{{ showEnv }}" hint-placeholder-val="{{ true }}">
+            <section class="card fade" aria-labelledby="rc-env">
+              <div class="card-hd"><h2 id="rc-env" class="h2">Envasado</h2><span class="count" aria-label="{{ envCountLabel }}">{{ envCount }}</span></div>
+              <div style="display: flex; flex-direction: column">
+                <sc-for list="{{ envRows }}" as="o" hint-placeholder-count="2">
+                  <div class="ev-row">
+                    <div class="ev-ro" role="group" aria-label="{{ o.evAria }}" style="margin-top: 0">
+                      <div class="ev-ro-hd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg><span class="strong">{{ o.evTitle }}</span><span class="count mono" aria-label="{{ o.evCountLabel }}">{{ o.evCount }}</span></div>
+                      <sc-if value="{{ o.isLoad }}" hint-placeholder-val="{{ false }}">
+                        <div class="ev-grid" aria-busy="true"><span class="sr">Cargando fotos…</span><sc-for list="{{ o.sk }}" as="k" hint-placeholder-count="2"><div class="ev-tile" style="border: 0"><span class="sk" style="height: 100%; border-radius: 12px"></span></div></sc-for></div>
+                      </sc-if>
+                      <sc-if value="{{ o.isErr }}" hint-placeholder-val="{{ false }}">
+                        <div class="nt n-d" role="alert" style="align-items: center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span style="flex: 1">No se pudieron cargar las fotos.</span><button class="b b-out b-sm" type="button" onClick="{{ o.retry }}" style="min-height: 44px; width: auto">Reintentar</button></div>
+                      </sc-if>
+                      <sc-if value="{{ o.isShow }}" hint-placeholder-val="{{ true }}">
+                        <div class="ev-grid">
+                          <sc-for list="{{ o.tiles }}" as="p" hint-placeholder-count="2">
+                            <div class="ev-tile" style="{{ p.delay }}">
+                              <div class="ev-ph" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg><span>{{ p.label }}</span></div>
+                              <sc-if value="{{ p.isOk }}" hint-placeholder-val="{{ true }}"><button class="ev-view" type="button" aria-label="{{ p.viewLabel }}" onClick="{{ p.view }}"></button><span class="ev-n mono" aria-hidden="true">{{ p.n }}</span></sc-if>
+                              <sc-if value="{{ p.isExp }}" hint-placeholder-val="{{ false }}"><div class="ev-exp"><span class="strong">Vista vencida</span><button class="b b-out b-sm" type="button" aria-label="{{ p.reloadLabel }}" onClick="{{ p.reload }}" style="min-height: 44px; width: auto">Recargar</button></div></sc-if>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+          </sc-if>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="dashboard" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="{{ viewCls }}" role="dialog" aria-modal="true" aria-label="{{ viewLabel }}" style="width: auto; max-width: none">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px"><h2 class="h3">{{ viewLabel }}</h2><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}" style="width: 44px; height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="ev-big" role="img" aria-label="{{ viewAlt }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg><span>{{ viewPh }}</span></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"variante":{"editor":"enum","options":["terminado","cancelado"],"default":"terminado"},"error":{"editor":"boolean","default":false},"fotos":{"editor":"enum","options":["Normal","Cargando","Error","Enlace vencido","Sin fotos"],"default":"Normal"},"visor":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+componentDidMount() { this.t = setTimeout(() => this.setState({ loaded: true }), 700); }
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const isError = !!this.props.error;
+const cancel = this.props.variante === 'cancelado';
+const mode = s.mode || this.props.fotos || 'Normal';
+const I = {
+start: 'M7 4v16l13-8z',
+fwd: 'M5 12h14M13 6l6 6-6 6',
+back: 'M3 12a9 9 0 1 0 3-6.7M3 4v5h5',
+end: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6',
+box: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
+ban: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12'
+};
+const P = { LG: ['LG','av sm','Laura Gómez'], MS: ['MS','av sm c2','Mateo Sánchez'], VH: ['VH','av sm c3','Valentina Herrera'] };
+const done = [
+['k-start','start','Arrancar','Paso 1 de 6','02/10/2026 08:12','LG',false],
+['','fwd','Avanzar','Paso 2 de 6','02/10/2026 08:40','LG',false],
+['','fwd','Avanzar','Paso 3 de 6','02/10/2026 09:15','MS',false],
+['k-back','back','Retroceder','Paso 2 de 6','02/10/2026 09:31','MS',true],
+['k-start','start','Retomar','Paso 2 de 6','02/10/2026 10:02','LG',false],
+['','fwd','Avanzar','Paso 6 de 6','02/10/2026 10:48','LG',false],
+['k-end','end','Finalizar','Paso 6 de 6','02/10/2026 11:05','LG',false],
+['k-start','box','Comenzar empaque','Paso 1 de 2','02/10/2026 11:12','MS',false],
+['k-end','box','Terminar empaque','Paso 2 de 2','02/10/2026 11:40','MS',false]
+];
+const canc = [
+['k-start','start','Arrancar','Paso 1 de 5','08/10/2026 10:02','VH',false],
+['','fwd','Avanzar','Paso 2 de 5','08/10/2026 10:30','VH',false],
+['k-back','back','Retroceder','Paso 1 de 5','08/10/2026 10:47','MS',true],
+['k-start','start','Retomar','Paso 1 de 5','08/10/2026 11:05','MS',false],
+['k-cancel','ban','Cancelar','Paso 1 de 5','08/10/2026 11:21','MS',true]
+];
+const ev = cancel ? canc : done;
+const back = ev.filter((e) => e[0] === 'k-back').length;
+// Fotos guardadas por paso (número de paso -> cantidad). Fabricación y envasado van aparte.
+const fab = mode === 'Sin fotos' ? {} : (cancel ? { 1: 2, 2: 1 } : { 1: 2, 2: 3, 4: 1, 6: 1 });
+const env = mode === 'Sin fotos' || cancel ? {} : { 1: 2, 2: 1 };
+const envNames = { 1: 'Envasar en bidón 20 L', 2: 'Etiquetar y sellar' };
+const stepOf = (e) => parseInt(e[3].split(' ')[1], 10);
+const isFab = (e) => e[1] !== 'box';
+const last = {};
+ev.forEach((e, i) => { if (isFab(e)) last[stepOf(e)] = i; });
+const blk = (step, cnt, title, phase) => {
+const tiles = [];
+for (let j = 1; j <= cnt; j++) {
+tiles.push({
+n: String(j), label: 'Foto ' + j + ' · Paso ' + step, delay: 'animation-delay: ' + ((j - 1) * 40) + 'ms',
+viewLabel: 'Foto ' + j + ' del paso ' + step, reloadLabel: 'Recargar la foto ' + j + ' del paso ' + step,
+isOk: mode !== 'Enlace vencido', isExp: mode === 'Enlace vencido',
+view: () => this.setState({ view: { label: 'Foto ' + j + ' del paso ' + step + ' · ' + phase, ph: 'Foto ' + j + ' · Paso ' + step } }),
+reload: () => this.setState({ mode: 'Normal' })
+});
+}
+return {
+hasEv: cnt > 0, evTitle: title, evCount: cnt + '/3', evCountLabel: cnt + ' de 3 fotos',
+evAria: 'Evidencia de ' + phase.toLowerCase() + ', paso ' + step,
+isLoad: mode === 'Cargando', isErr: mode === 'Error', isShow: mode === 'Normal' || mode === 'Enlace vencido',
+tiles: tiles, sk: tiles.map(() => ({})), retry: () => this.setState({ mode: 'Normal' })
+};
+};
+const noEv = { hasEv: false, evTitle: '', evCount: '', evCountLabel: '', evAria: '', isLoad: false, isErr: false, isShow: false, tiles: [], sk: [], retry: () => {} };
+const anchored = Object.keys(last).map(Number);
+const otros = Object.keys(fab).map(Number).filter((n) => anchored.indexOf(n) < 0).map((n) => blk(n, fab[n], 'Paso ' + n, 'Fabricación'));
+const envRows = Object.keys(env).map(Number).map((n) => blk(n, env[n], 'Paso ' + n + (envNames[n] ? ' · ' + envNames[n] : ''), 'Envasado'));
+const envTotal = Object.keys(env).reduce((a, k) => a + env[k], 0);
+const modes = ['Normal', 'Cargando', 'Error', 'Enlace vencido', 'Sin fotos'];
+const view = s.view !== undefined ? s.view : (this.props.visor && mode !== 'Sin fotos' ? { label: 'Foto 1 del paso 2 · Fabricación', ph: 'Foto 1 · Paso 2' } : null);
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+ovCls: s.menu || view ? 'ov open' : 'ov',
+closeAll: () => this.setState({ menu: false, view: null }),
+modes: modes.map((m) => ({ label: m, on: m === mode ? 'true' : 'false', cls: m === mode ? 'b b-pri b-sm' : 'b b-out b-sm', pick: () => this.setState({ mode: m }) })),
+isError: isError, loading: !isError && !s.loaded, ready: !isError && !!s.loaded,
+no: cancel ? '2026-0000009' : '2026-0000003',
+st: cancel ? 'Cancelado' : 'Por acondicionar',
+stCls: cancel ? 'sb t-muted' : 'sb t-waiting',
+dur: cancel ? '1 h 19 min' : '3 h 28 min',
+back: String(back),
+backCls: back > 0 ? 'sb t-waiting mono' : 'mono',
+backStyle: back > 0 ? 'height: 28px; padding: 0 12px; font-size: 16px' : '',
+count: String(ev.length),
+events: ev.map((e, i) => {
+const n = stepOf(e);
+const ownsEv = isFab(e) && last[n] === i && fab[n];
+return Object.assign({
+cls: e[0] ? 'ev ' + e[0] : 'ev', icon: I[e[1]], act: e[2], pos: e[3], time: e[4],
+ini: P[e[5]][0], avCls: P[e[5]][1], name: P[e[5]][2], hasMot: e[6], delay: String(i * 40)
+}, ownsEv ? blk(n, fab[n], 'Evidencia', 'Fabricación') : noEv);
+}),
+showOtros: otros.length > 0, otros: otros,
+showEnv: envRows.length > 0, envRows: envRows,
+envCount: String(envTotal), envCountLabel: envTotal + ' fotos de envasado',
+viewCls: view ? 'dlg open' : 'dlg',
+viewLabel: view ? view.label : 'Foto',
+viewPh: view ? view.ph : '',
+viewAlt: view ? view.label : 'Foto'
+};
+}
+}
+</script>
+</body>
+</html>

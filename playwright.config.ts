@@ -92,6 +92,8 @@ export default defineConfig({
       // No es un secreto. Con el doble no se lee; esta para que el servidor del E2E tenga el mismo
       // entorno completo que un despliegue.
       WHATSAPP_GRAPH_API_VERSION: 'v21.0',
+      // El bucket de las fotos de evidencia en memoria: la subida la intercepta el recorrido.
+      EVIDENCE_E2E_DOUBLES: '1',
       ...E2E_PUBLIC_BASE_URL_ENV,
       ...E2E_ENCRYPTION_ENV,
     },

@@ -42,6 +42,8 @@ const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 
 const CATALOGO_DE_ROLES = 'lib/modules/identity/domain/roles.ts';
 const CATALOGO_DE_PERMISOS = 'lib/modules/identity/domain/permissions.ts';
+// Clasifica cada permiso como nucleo o anadido, y por eso lo nombra.
+const CATALOGO_DE_ANADIDOS = 'lib/modules/identity/domain/company-addons.ts';
 
 const CODIGO_DEL_PERMISO = 'acondicionamiento.modificar';
 
@@ -228,12 +230,13 @@ describe('R3 — el rol es global: una sola fila y Role sin campo de empresa', (
 describe('R17, R21 — solo el catalogo, los casos de uso del acondicionamiento y sus dos consumidores nombran acondicionamiento.modificar', () => {
   const permitidos: readonly string[] = [
     CATALOGO_DE_PERMISOS,
+    CATALOGO_DE_ANADIDOS,
     ...CASOS_DE_USO_QUE_LO_EXIGEN,
     ...CONSUMIDORES_QUE_NO_SON_CASO_DE_USO,
   ];
 
-  it('R21, R31, QC-219 R26: son once rutas exactas: el catalogo, ocho casos de uso (con los candidatos del equipo, guardar los datos de lote y «Entregados») y dos consumidores', () => {
-    expect(new Set(permitidos).size).toBe(11);
+  it('R21, R31, QC-219 R26: son doce rutas exactas: los dos catalogos (permisos y anadidos), ocho casos de uso (con los candidatos del equipo, guardar los datos de lote y «Entregados») y dos consumidores', () => {
+    expect(new Set(permitidos).size).toBe(12);
   });
 
   it('R17, R21: el codigo solo aparece en el catalogo de permisos y en las rutas exactas abiertas', () => {

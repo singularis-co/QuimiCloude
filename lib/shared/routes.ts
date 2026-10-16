@@ -3,6 +3,12 @@ export const DASHBOARD_ROUTE = '/dashboard';
 export const LOGIN_ROUTE = '/login';
 
 /**
+ * Redirige al primer enlace del menú efectivo. Existe porque el middleware y el logo no conocen
+ * los permisos; la ruta los resuelve en el servidor.
+ */
+export const HOME_ROUTE = '/inicio';
+
+/**
  * Nombre del parametro que marca «este login viene de un corte de sesion» (QC-78 R29, R30).
  *
  * Existe para romper un BUCLE, no para informar de nada. El servidor corta la sesion consultando
@@ -37,6 +43,11 @@ export const INVENTORY_ROUTE = '/inventario';
 
 /** Cuelga de `INVENTORY_ROUTE`, así que su prefijo privado ya la cubre. */
 export const INVENTORY_IMPORT_ROUTE = '/inventario/importar';
+
+/** Cuelga de `INVENTORY_ROUTE`; el segmento estatico no choca con `importar`. */
+export function finishedProductDetailRoute(id: string): string {
+  return `${INVENTORY_ROUTE}/producto-terminado/${id}`;
+}
 
 /**
  * Pantalla de recetas de produccion (QC-26, R3).

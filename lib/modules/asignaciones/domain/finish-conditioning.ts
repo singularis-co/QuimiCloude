@@ -2,7 +2,7 @@
 /**
  * Terminar el acondicionamiento: `EN_ACONDICIONAMIENTO -> TERMINADO`, con `finished_at`, solo si el
  * actor es quien acondiciona el pedido y todas las lineas del reparto tienen sus datos de lote. No
- * toca inventario.
+ * toca inventario. La transicion y su anotacion en el registro de ejecucion van en una transaccion.
  *
  * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `TERMINADO`, el
  * filtro de estado con el que se leyo ya no lo encontraria.
@@ -20,7 +20,11 @@ import {
   OrderNotConditionableError,
   OrderNotFoundError,
   ValidationError,
+  type AsignacionesError,
 } from './errors';
+import { ExecutionAbortedError, type ExecutionWriteOutcome } from './execution-entry';
+
+import type { ExecutionTransaction } from '../ports/execution-transaction';
 
 import type { FinishedBatchLabels } from '@/lib/modules/inventario';
 import { formatOrderNumber, type OrderAssignmentTarget, type OrderCatalog } from '@/lib/modules/pedidos';
@@ -32,8 +36,15 @@ const finishConditioningSchema = z.strictObject({
 export type FinishConditioningDeps = {
   readonly orders: OrderCatalog;
   readonly batches: Pick<FinishedBatchLabels, 'listOfOrder'>;
+  readonly transaction: ExecutionTransaction;
   readonly now?: () => Date;
 };
+
+function finishConditioningError(outcome: ExecutionWriteOutcome): AsignacionesError {
+  if (outcome === 'not_conditioner') return new OrderConditioningTakenError();
+  if (outcome === 'not_conditionable') return new OrderNotConditionableError();
+  return new OrderNotFoundError();
+}
 
 export type FinishConditioningResult = {
   readonly numberText: string;
@@ -75,10 +86,24 @@ export function createFinishConditioning(
     if (missingBatchDataLines(summary.presentationLines, batches) > 0) throw new ConditioningBatchDataMissingError();
 
     const now = deps.now?.() ?? new Date();
-    const result = await deps.orders.finishConditioningAliveById(orderId, actor.companyId, actor.id, now);
-    if (result === 'ok') return { numberText };
-    if (result === 'not_conditioner') throw new OrderConditioningTakenError();
-    if (result === 'not_conditionable') throw new OrderNotConditionableError();
-    throw new OrderNotFoundError();
+    const companyId = actor.companyId;
+    try {
+      await deps.transaction.run(async ({ conditioning, log }) => {
+        const result = await conditioning.finishConditioningAliveById(orderId, companyId, actor.id, now);
+        if (result !== 'ok') throw new ExecutionAbortedError(result);
+        await log.append({
+          action: 'conditioning_finish',
+          companyId,
+          orderId,
+          userId: actor.id,
+          stepPosition: null,
+          occurredAt: now,
+        });
+      });
+    } catch (error) {
+      if (error instanceof ExecutionAbortedError) throw finishConditioningError(error.outcome);
+      throw error;
+    }
+    return { numberText };
   };
 }

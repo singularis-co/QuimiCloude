@@ -298,18 +298,38 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
     )
       .split(sep)
       .join('/')
+    // QC-275 2026-10-13: la integracion del proveedor IA dejo de ser una pagina cascaron; ahora
+    // es una pantalla con su carpeta `components/` (tarjeta, formulario, selector, logo...).
+    // Todos esos archivos casan con `PATRON_PROVEEDORES` solo por vivir bajo «proveedor-ia».
+    // La exclusion se ensancha a la CARPETA de esa ruta (derivada de
+    // `AI_PROVIDER_INTEGRATION_ROUTE`), no a toda la carpeta de integraciones: lo que case bajo
+    // integraciones fuera de `proveedor-ia/` sigue en rojo, la pagina debe seguir existiendo, y
+    // ningun archivo de esa carpeta puede tocar el modulo, la ruta ni las piezas de proveedores
+    // (el texto de la UI dice «proveedor» por el proveedor IA, asi que la defensa se hace sobre
+    // los identificadores de proveedores, no sobre la palabra).
+    const CARPETA_DEL_PROVEEDOR_IA = PAGINA_DEL_PROVEEDOR_IA.slice(0, -'/page.tsx'.length)
     const dentroDeIntegraciones = enApp.filter((relativa) =>
       relativa.startsWith(`${CARPETA_DE_INTEGRACIONES}/`),
     )
+    const fueraDelProveedorIa = dentroDeIntegraciones.filter(
+      (relativa) => !relativa.startsWith(`${CARPETA_DEL_PROVEEDOR_IA}/`),
+    )
+    expect(
+      fueraDelProveedorIa,
+      `archivos inesperados bajo app/${CARPETA_DE_INTEGRACIONES}/: ${fueraDelProveedorIa.join(', ')}`,
+    ).toEqual([])
     expect(
       dentroDeIntegraciones,
-      `archivos inesperados bajo app/${CARPETA_DE_INTEGRACIONES}/: ${dentroDeIntegraciones.join(', ')}`,
-    ).toEqual([PAGINA_DEL_PROVEEDOR_IA])
-    const fuenteDelProveedorIa = readFileSync(join(repoRoot, 'app', PAGINA_DEL_PROVEEDOR_IA), 'utf8')
-    expect(
-      PATRON_PROVEEDORES.test(fuenteDelProveedorIa),
-      `pieza de proveedores escondida en app/${PAGINA_DEL_PROVEEDOR_IA}`,
-    ).toBe(false)
+      `la pagina del proveedor IA no aparece en app/${PAGINA_DEL_PROVEEDOR_IA}`,
+    ).toContain(PAGINA_DEL_PROVEEDOR_IA)
+    const PATRON_PIEZAS_DE_PROVEEDORES = /supplier|modules\/proveedores|SUPPLIERS_ROUTE/i
+    for (const relativa of dentroDeIntegraciones) {
+      const fuente = readFileSync(join(repoRoot, 'app', relativa), 'utf8')
+      expect(
+        PATRON_PIEZAS_DE_PROVEEDORES.test(fuente),
+        `pieza de proveedores escondida en app/${relativa}`,
+      ).toBe(false)
+    }
 
     // Esta mitad sigue en negativo, pero con una unica excepcion, tan estrecha como la carpeta
     // que la motiva: `components/` (compartido entre pantallas) no gana ninguna pieza de
@@ -341,6 +361,10 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       // un tercer spec de proveedores sin ficha la pone roja igual que antes, y si desaparece
       // cualquiera de estos dos, tambien.
       'aislamiento-proveedores.spec.ts',
+      // QC-275 2026-10-13: falso positivo por nombre. El E2E de la integracion del proveedor IA
+      // casa con `PATRON_PROVEEDORES` solo por «proveedor-ia»; no es un spec de proveedores.
+      // Se nombra uno a uno y la lista sigue CERRADA.
+      'integraciones-proveedor-ia.spec.ts',
       'proveedores.spec.ts',
     ])
   })

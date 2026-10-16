@@ -613,6 +613,7 @@ test.describe('envases del pedido como productos', () => {
       data: { orderId: first.id, userId: operatorUserId, companyId },
     });
     await switchUser(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     await page.goto(assignedOrderRoute(first.id));
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(RECIPE_NAME, { timeout: 60_000 });

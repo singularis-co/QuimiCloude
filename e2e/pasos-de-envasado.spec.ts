@@ -36,7 +36,7 @@ import {
 } from '@/lib/shared/routes';
 
 import {
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
@@ -539,12 +539,13 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     // --- 3. El Operario ejecuta el pedido: ve su paso y ninguno de envasado.
     await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
     expect(await orderStatus(orderId)).toBe('PENDIENTE');
-    await clickAndConfirm(page, assignedRow.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, assignedRow.getByTestId(ENTER_TESTID));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderId), {
       timeout: 60_000,
     });

@@ -239,6 +239,7 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
       id: empresa.userId,
       companyId: empresa.companyId,
       permissions: ['proveedores.modificar', 'inventario.modificar'],
+      addons: ['lectura_pdf'],
     };
 
     const marker = token();
@@ -315,6 +316,7 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
       id: empresa.userId,
       companyId: empresa.companyId,
       permissions: ['proveedores.modificar', 'inventario.modificar'],
+      addons: ['lectura_pdf'],
     };
 
     const marker = token();
@@ -348,7 +350,7 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
       const otra = await crearEmpresa();
       const supplierId = await crearProveedor(empresa.companyId);
       const documentFileDeOtra = await crearArchivoListo(otra.companyId);
-      const actor: Actor = { id: empresa.userId, companyId: empresa.companyId, permissions: ['proveedores.modificar'] };
+      const actor: Actor = { id: empresa.userId, companyId: empresa.companyId, permissions: ['proveedores.modificar'], addons: ['lectura_pdf'] };
       const deps = crearDeps();
       const confirm = createConfirmCatalogImport(deps);
 
@@ -370,7 +372,7 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
       const otra = await crearEmpresa();
       const supplierDeOtra = await crearProveedor(otra.companyId);
       const documentFileId = await crearArchivoListo(empresa.companyId);
-      const actor: Actor = { id: empresa.userId, companyId: empresa.companyId, permissions: ['proveedores.modificar'] };
+      const actor: Actor = { id: empresa.userId, companyId: empresa.companyId, permissions: ['proveedores.modificar'], addons: ['lectura_pdf'] };
       const deps = crearDeps();
       const confirm = createConfirmCatalogImport(deps);
 
@@ -397,6 +399,7 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
         id: empresa.userId,
         companyId: empresa.companyId,
         permissions: ['proveedores.modificar', 'inventario.modificar'],
+        addons: ['lectura_pdf'],
       };
       const deps = crearDeps();
       const confirm = createConfirmCatalogImport(deps);
@@ -427,7 +430,7 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
       const rutaDeOtroArchivo = `${empresa.companyId}/${otroArchivo}/1-1.png`;
       const deps = crearDeps({ crops: dobleDeRecortes([rutaDeOtroArchivo]) });
       const confirm = createConfirmCatalogImport(deps);
-      const actor: Actor = { id: empresa.userId, companyId: empresa.companyId, permissions: ['proveedores.modificar'] };
+      const actor: Actor = { id: empresa.userId, companyId: empresa.companyId, permissions: ['proveedores.modificar'], addons: ['lectura_pdf'] };
 
       await expect(
         confirm(actor, {

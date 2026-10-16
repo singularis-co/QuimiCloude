@@ -17,13 +17,13 @@
   <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
     <h2 class="h2">Empaque · ficha</h2>
     <dl class="spec">
-      <dt>Reutiliza</dt><dd><span class="mono">packing-order-screen · notice · status-badge · order-distribution-label · confirm-dialog · ui/card · ui/sonner</span></dd>
-      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (AlertDialog) · <span class="mono">sonner · lucide-react</span></dd>
-      <dt>Escritorio</dt><dd>«Volver a «Por empacar»» como botón con flecha · resumen «Cantidad:» + «Reparto» al lado de «Pasos de envasado» · Comenzar / Terminar en el pie, solo uno activo según el estado (Por empacar → En empaque → Por acondicionar)</dd>
+      <dt>Reutiliza</dt><dd><span class="mono">packing-order-screen · notice · status-badge · order-distribution-label · confirm-dialog · ui/card · ui/sonner · entity-image</span></dd>
+      <dt>Imagen del envase</dt><dd>Miniatura de 80 px con <span class="mono">shared/entity-image</span> (tamaño <span class="mono">thumbnail</span>, el de los listados) a la izquierda de cada línea · con imagen: se toca y abre la imagen ampliada · sin imagen, envase dado de baja o línea antigua: el marcador de <span class="mono">entity-image</span> (aquí el icono de imagen tachada; en la app <span class="mono">inv_not_found.png</span>), sin ampliar · la imagen sale del envase de cada línea, no de la presentación</dd><dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (AlertDialog) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>«Volver a «Por empacar»» como botón con flecha · resumen «Cantidad:» + «Reparto» (una línea por presentación con la imagen de su envase y su plan de envases) al lado de «Pasos de envasado» · sin la línea «Envases:» (QC-281) · Comenzar / Terminar en el pie, solo uno activo según el estado (Por empacar → En empaque → Por acondicionar) · «Terminar» abre el diálogo de envases reales (tablero EmpaqueTerminar)</dd>
       <dt>Tablet</dt><dd>Una columna: resumen arriba, pasos debajo · pie fijo</dd>
-      <dt>Teléfono</dt><dd>Botones de 52 px al alcance del pulgar · pie con <span class="mono">safe-area-inset-bottom</span> · «Lo está empacando otra persona.» como Notice info que deja los dos botones deshabilitados (prop «ocupado») · diálogos centrados</dd>
-      <dt>Animación</dt><dd>Entrada escalonada · la flecha de «Volver» retrocede 3 px · diálogo con zoom 300 ms · el estado cambia de color 200 ms · toast al terminar</dd>
-      <dt>Por confirmar</dt><dd>Descripción de «¿Comenzar el empaque?» y «¿Terminar el empaque?» · toast «[Empaque terminado.]» · los pasos de envasado vienen de la receta</dd>
+      <dt>Teléfono</dt><dd>Miniaturas de 80 px también aquí (la tarjeta va a todo el ancho) · botones de 52 px al alcance del pulgar · pie con <span class="mono">safe-area-inset-bottom</span> · «Lo está empacando otra persona.» como Notice info que deja los dos botones deshabilitados (prop «ocupado») · diálogos centrados</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · la flecha de «Volver» retrocede 3 px · diálogo con zoom 300 ms (también la imagen ampliada) · borde de foco en la miniatura al pasar · el estado cambia de color 200 ms · toast al terminar</dd>
+      <dt>Por confirmar</dt><dd>Descripción de «¿Comenzar el empaque?» · toast «[Empaque terminado.]» · los pasos de envasado vienen de la receta</dd>
     </dl>
   </div>
 </div>

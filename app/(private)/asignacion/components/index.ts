@@ -8,12 +8,6 @@ export {
   assignedOrderEnterNoticeText,
 } from './assigned-order-enter-trigger';
 export {
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
-  ASSIGNED_ORDER_START_DIALOG_TESTID,
-  AssignedOrderStartTrigger,
-  assignedOrderStartConfirmTexts,
-} from './assigned-order-start-trigger';
-export {
   ASSIGNED_ORDER_ENTER_COLUMN_ID,
   ASSIGNED_ORDER_NUMBER_COLUMN_ID,
   ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,
@@ -194,7 +188,6 @@ export {
 } from './finished-orders-table';
 export {
   PACKING_ORDER_NUMBER_COLUMN_ID,
-  PACKING_ORDER_PACKAGES_COLUMN_ID,
   PACKING_ORDER_PACKER_COLUMN_ID,
   PACKING_ORDER_PRESENTATION_COLUMN_ID,
   PACKING_ORDER_RECIPE_NAME_COLUMN_ID,
@@ -231,6 +224,7 @@ export {
   type OrderOutcomeNoticeProps,
 } from './order-outcome-notice';
 export {
+  ORDER_DISTRIBUTION_FULL_LINE_TESTID,
   ORDER_DISTRIBUTION_FULL_SEPARATOR,
   ORDER_DISTRIBUTION_FULL_TESTID,
   OrderDistributionFull,
@@ -238,3 +232,8 @@ export {
   type OrderDistributionFullLine,
   type OrderDistributionFullProps,
 } from './order-distribution-full';
+export {
+  useStepEvidence,
+  type StepEvidenceController,
+  type UseStepEvidenceOptions,
+} from './use-step-evidence';

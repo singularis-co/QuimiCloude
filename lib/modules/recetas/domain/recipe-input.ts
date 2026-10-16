@@ -179,6 +179,8 @@ function documentoTieneCaracterVisible(blocks: readonly RecipeStepBlock[]): bool
 export const recipeStepSchema = z
   .object({
     blocks: z.array(recipeStepBlockSchema),
+    // Ausente equivale a apagado: las formulas guardadas antes no lo traen y no se migran.
+    requiresEvidence: z.boolean().optional(),
   })
   .strict()
   .superRefine((document, ctx) => {

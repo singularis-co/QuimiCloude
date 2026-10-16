@@ -4,16 +4,21 @@ import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { buildExecutionTrace, type TraceDuration } from './execution-trace';
 
+import type { ExecutionTraceTeamMember } from './conditioning-trace';
 import type { ExecutionEntryRecord } from './execution-entry';
+import type { ConditioningTeamMemberRow, ConditioningTeamRepository } from '../ports/conditioning-team-repository';
 import type { ExecutedOrdersFilter, ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { PeopleDirectory, PersonRef } from '@/lib/modules/identity';
+import type { PresentationCatalog } from '@/lib/modules/inventario';
 import {
   formatOrderNumber,
   ORDER_STATUS_VALUES,
   type OrderCatalog,
+  type OrderDeliveryProgress,
   type OrderStatus,
   type Page,
 } from '@/lib/modules/pedidos';
+import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
 
 const MAX_ORDER_NUMBER_LENGTH = 20;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -47,16 +52,30 @@ export type ExecutionTraceListInput = z.input<typeof listExecutionTracesSchema>;
 
 export type ExecutionTracePerson = { readonly userId: string; readonly displayName: string };
 
+/** Envases de una presentacion del reparto: `label` es el nombre de la presentacion. */
+export type ExecutionTracePresentation = {
+  readonly label: string;
+  readonly quantity: number;
+};
+
 export type ExecutionTraceRow = {
   readonly orderId: string;
   readonly numberText: string;
   readonly status: OrderStatus;
   readonly deleted: boolean;
+  readonly active: boolean;
+  /** Quien firma anotaciones y despues el equipo del Comenzar anotado, sin repetir. */
   readonly people: readonly ExecutionTracePerson[];
   readonly firstAt: Date;
   readonly lastAt: Date;
-  readonly duration: TraceDuration;
+  readonly totalDuration: TraceDuration;
   readonly goBackCount: number;
+  /** Nombre de la receta del pedido, tambien dada de baja; `null` si no vuelve del catalogo. */
+  readonly formulaName: string | null;
+  /** URL publica de la imagen de la receta (la de la original en una version); `null` = sin imagen. */
+  readonly formulaImageUrl: string | null;
+  /** Lo que pide el pedido: los envases planeados de cada linea, en el orden de alta. */
+  readonly presentations: readonly ExecutionTracePresentation[];
 };
 
 export type ExecutionTraceList = {
@@ -68,7 +87,52 @@ export type ListExecutionTracesDeps = {
   readonly log: ExecutionLogRepository;
   readonly orders: OrderCatalog;
   readonly people: PeopleDirectory;
+  readonly team: Pick<ConditioningTeamRepository, 'listByOrdersInCompany'>;
+  readonly recipes: Pick<RecipeCatalog, 'findRefsIncludingDeleted'>;
+  readonly presentations: Pick<PresentationCatalog, 'findRefs'>;
 };
+
+/** Receta y reparto de la pagina, cada catalogo una sola vez sin importar cuantas filas haya. */
+type OrderContents = {
+  readonly progress: ReadonlyMap<string, OrderDeliveryProgress>;
+  readonly recipes: ReadonlyMap<string, RecipeRef>;
+  readonly presentationNames: ReadonlyMap<string, string>;
+};
+
+async function listOrderContents(
+  deps: ListExecutionTracesDeps,
+  companyId: string,
+  orderIds: readonly string[],
+): Promise<OrderContents> {
+  const progress = await deps.orders.listDeliveryProgressByIdsIncludingDeleted(companyId, orderIds);
+  const recipeIds = [...new Set(progress.map((order) => order.recipeId))];
+  const presentationIds = [
+    ...new Set(progress.flatMap((order) => order.lines.map((line) => line.presentationId))),
+  ];
+  const [recipes, presentations] = await Promise.all([
+    recipeIds.length === 0 ? [] : deps.recipes.findRefsIncludingDeleted(recipeIds, companyId),
+    presentationIds.length === 0 ? [] : deps.presentations.findRefs(presentationIds, companyId),
+  ]);
+  return {
+    progress: new Map(progress.map((order) => [order.id, order])),
+    recipes: new Map(recipes.map((recipe) => [recipe.id, recipe])),
+    presentationNames: new Map(presentations.map((presentation) => [presentation.id, presentation.name])),
+  };
+}
+
+/** Una linea cuya presentacion no vuelve del catalogo se omite: se devuelve lo que hay. */
+export function toTracePresentations(
+  progress: OrderDeliveryProgress | undefined,
+  presentationNames: ReadonlyMap<string, string>,
+): Pick<ExecutionTraceRow, 'presentations'> {
+  const presentations: ExecutionTracePresentation[] = [];
+  for (const line of progress?.lines ?? []) {
+    const label = presentationNames.get(line.presentationId);
+    if (label === undefined) continue;
+    presentations.push({ label, quantity: line.packages });
+  }
+  return { presentations };
+}
 
 function startOfDayUtc(day: string): Date {
   return new Date(`${day}T00:00:00.000Z`);
@@ -115,6 +179,48 @@ export async function findPeopleByIds(
   if (userIds.length === 0) return new Map();
   const refs = await people.findRefsIncludingDeletedInCompany(companyId, userIds, now);
   return new Map(refs.map((ref) => [ref.id, ref]));
+}
+
+/** Solo los pedidos con `conditioning_start` anotado: un equipo sin Comenzar no se muestra. */
+export async function listConditioningTeams(
+  team: ListExecutionTracesDeps['team'],
+  companyId: string,
+  entriesByOrder: ReadonlyMap<string, readonly ExecutionEntryRecord[]>,
+): Promise<Map<string, ConditioningTeamMemberRow[]>> {
+  const orderIds = [...entriesByOrder]
+    .filter(([, entries]) => entries.some((entry) => entry.action === 'conditioning_start'))
+    .map(([orderId]) => orderId);
+  const byOrder = new Map<string, ConditioningTeamMemberRow[]>();
+  if (orderIds.length === 0) return byOrder;
+  for (const { orderId, ...member } of await team.listByOrdersInCompany(companyId, orderIds)) {
+    const members = byOrder.get(orderId);
+    if (members === undefined) byOrder.set(orderId, [member]);
+    else members.push(member);
+  }
+  return byOrder;
+}
+
+export function toTraceTeamMember(
+  member: ConditioningTeamMemberRow,
+  refs: ReadonlyMap<string, PersonRef>,
+): ExecutionTraceTeamMember {
+  return {
+    userId: member.userId,
+    displayName: refs.get(member.userId)?.displayName ?? null,
+    origin:
+      member.workGroupId === null || member.workGroupName === null
+        ? { kind: 'direct' }
+        : { kind: 'workGroup', workGroupId: member.workGroupId, workGroupName: member.workGroupName },
+  };
+}
+
+function toTraceFormula(
+  contents: OrderContents,
+  orderId: string,
+): Pick<ExecutionTraceRow, 'formulaName' | 'formulaImageUrl'> {
+  const recipeId = contents.progress.get(orderId)?.recipeId;
+  const recipe = recipeId === undefined ? undefined : contents.recipes.get(recipeId);
+  return { formulaName: recipe?.name ?? null, formulaImageUrl: recipe?.imageUrl ?? null };
 }
 
 async function listPersonOptions(
@@ -171,7 +277,21 @@ export function createListExecutionTraces(
         return [{ order, trace: buildExecutionTrace(orderEntries, order, now) }];
       });
 
-      const userIds = [...new Set(traces.flatMap(({ trace }) => trace.userIds))];
+      const [teams, contents] = await Promise.all([
+        listConditioningTeams(deps.team, companyId, byOrder),
+        listOrderContents(
+          deps,
+          companyId,
+          traces.map(({ order }) => order.id),
+        ),
+      ]);
+      const peopleOf = new Map(
+        traces.map(({ order, trace }) => [
+          order.id,
+          [...new Set([...trace.userIds, ...(teams.get(order.id) ?? []).map((member) => member.userId)])],
+        ]),
+      );
+      const userIds = [...new Set([...peopleOf.values()].flat())];
       const refs = await findPeopleByIds(deps.people, companyId, userIds, now);
 
       const items: ExecutionTraceRow[] = traces.map(({ order, trace }) => ({
@@ -179,14 +299,17 @@ export function createListExecutionTraces(
         numberText: formatOrderNumber(order.number),
         status: order.status,
         deleted: order.deleted,
-        people: trace.userIds.flatMap((userId) => {
+        active: trace.active,
+        people: (peopleOf.get(order.id) ?? []).flatMap((userId) => {
           const ref = refs.get(userId);
           return ref === undefined ? [] : [{ userId, displayName: ref.displayName }];
         }),
         firstAt: trace.firstAt,
         lastAt: trace.lastAt,
-        duration: trace.duration,
+        totalDuration: trace.totalDuration,
         goBackCount: trace.goBackCount,
+        ...toTraceFormula(contents, order.id),
+        ...toTracePresentations(contents.progress.get(order.id), contents.presentationNames),
       }));
 
       return {

@@ -554,7 +554,7 @@ describe('StepReader — mode="ejecucion" (rediseno de planta, 2026-09-21, fuera
     expect(screen.getByTestId('step-reader').className).toContain('env(safe-area-inset-bottom');
   });
 
-  it('QC-265 R25: en "ejecucion" los botones van en talla xl, Anterior a 1/3 y la accion a 2/3', () => {
+  it('QC-265 R25 (enmendado): en "ejecucion" los botones van en talla xl y Anterior y la accion tienen el mismo ancho', () => {
     render(
       <StepReader steps={TRES_PASOS} onFinish={vi.fn()} title="Receta de prueba" mode="ejecucion" />,
     );
@@ -567,7 +567,8 @@ describe('StepReader — mode="ejecucion" (rediseno de planta, 2026-09-21, fuera
     }
     const fila = anterior.parentElement as HTMLElement;
     expect(fila).toBe(siguiente.parentElement);
-    expect(fila.className).toContain('grid-cols-[minmax(0,1fr)_minmax(0,2fr)]');
+    expect(fila).toHaveClass('grid', 'grid-cols-2');
+    expect(fila.className).not.toContain('2fr');
     expect(fila.firstElementChild).toBe(anterior);
   });
 
@@ -997,9 +998,83 @@ describe('StepReader — espera minima por paso', () => {
     }
     expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 4');
 
-    const motivo = screen.getByTestId('step-reader-wait-reason');
+    const siguiente = screen.getByTestId('step-reader-next');
     expect(screen.getAllByTestId('step-reader-wait-ring')).toHaveLength(1);
-    expect(within(motivo).getAllByTestId('countdown-timer')).toHaveLength(1);
+    expect(screen.getAllByTestId('countdown-timer')).toHaveLength(1);
+    expect(within(siguiente).getByTestId('countdown-timer')).toBeInTheDocument();
+  });
+
+  function renderEjecucionConEspera(steps: readonly RecipeStepDocument[] = TRES_PASOS_SIN_ITEMS) {
+    return render(
+      <StepReader
+        steps={steps}
+        onFinish={vi.fn()}
+        title="Receta de prueba"
+        mode="ejecucion"
+        minStepSeconds={5}
+      />,
+    );
+  }
+
+  it('en "ejecucion", la cuenta va dentro de Siguiente y no en el cuerpo del paso', () => {
+    vi.useFakeTimers();
+    renderEjecucionConEspera();
+
+    const siguiente = screen.getByTestId('step-reader-next');
+    const cuenta = within(siguiente).getByTestId('step-reader-button-countdown');
+    expect(within(cuenta).getByTestId('countdown-timer')).toHaveTextContent('00:05');
+    expect(within(cuenta).getByTestId('step-reader-wait-ring')).toBeInTheDocument();
+    expect(cuenta).toHaveAttribute('aria-hidden', 'true');
+    expect(within(cuenta).getByTestId('countdown-timer')).toHaveClass('tabular-nums');
+
+    const acciones = screen.getByTestId('step-reader-actions');
+    expect(acciones).toContainElement(screen.getByTestId('countdown-timer'));
+    expect(within(acciones).getByTestId('step-reader-wait-reason')).not.toContainElement(
+      screen.getByTestId('countdown-timer'),
+    );
+
+    avanzarReloj(2000);
+    expect(within(siguiente).getByTestId('countdown-timer')).toHaveTextContent('00:03');
+  });
+
+  it('en "ejecucion", el nombre accesible de Siguiente no cambia con la cuenta y el motivo va por aria-describedby', () => {
+    vi.useFakeTimers();
+    renderEjecucionConEspera();
+
+    const siguiente = screen.getByRole('button', { name: 'Siguiente' });
+    expect(siguiente).toBeDisabled();
+    const motivo = screen.getByTestId('step-reader-wait-reason');
+    expect(motivo).toHaveClass('sr-only');
+    expect(motivo).toHaveTextContent('para continuar.');
+    expect(motivo).not.toHaveTextContent(/\d/);
+    expect(siguiente.getAttribute('aria-describedby')?.split(' ')).toContain(motivo.id);
+  });
+
+  it('en "ejecucion", al cumplirse la espera la cuenta sale del boton y se habilita', () => {
+    vi.useFakeTimers();
+    renderEjecucionConEspera();
+
+    avanzarReloj(5000);
+
+    const siguiente = screen.getByTestId('step-reader-next');
+    expect(siguiente).toBeEnabled();
+    expect(siguiente).toHaveTextContent(/^Siguiente$/);
+    expect(screen.queryByTestId('step-reader-button-countdown')).toBeNull();
+    expect(screen.queryByTestId('step-reader-wait-reason')).toBeNull();
+    expect(siguiente).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('en "ejecucion", en el ultimo paso la cuenta va dentro de Finalizar', () => {
+    vi.useFakeTimers();
+    renderEjecucionConEspera([PASO_SIN_ITEMS_A]);
+
+    const finalizar = screen.getByTestId('step-reader-finish');
+    expect(finalizar).toBeDisabled();
+    expect(within(finalizar).getByTestId('countdown-timer')).toHaveTextContent('00:05');
+
+    avanzarReloj(5000);
+    expect(finalizar).toBeEnabled();
+    expect(within(finalizar).queryByTestId('countdown-timer')).toBeNull();
   });
 });
 
@@ -1149,3 +1224,146 @@ describe('StepReader — R37: la pantalla de empaque no recibe las props nuevas'
     expect(fuente).not.toMatch(/\b(onStepChange|initialStepPosition)\b/);
   });
 });
+
+describe.each(['lectura', 'ejecucion'] as const)(
+  'StepReader: puntos de extension de la evidencia por paso (QC-214), mode=%s',
+  (mode) => {
+    const SIN_FOTO = 'Sube al menos 1 foto de evidencia para continuar.';
+    const SUBIENDO = 'Espera a que termine de subir la foto.';
+    const SIN_BLOQUEO: readonly RecipeStepDocument[] = [PASO_SIN_ITEMS, PASO_SIN_ITEMS, PASO_SIN_ITEMS];
+
+    it('R15: el motivo extra deshabilita Siguiente, se muestra y el boton lo referencia', () => {
+      render(
+        <StepReader
+          steps={SIN_BLOQUEO}
+          onFinish={vi.fn()}
+          mode={mode}
+          stepBlockReason={(position) => (position === 1 ? SIN_FOTO : null)}
+        />,
+      );
+
+      const siguiente = screen.getByTestId('step-reader-next');
+      const motivo = screen.getByTestId('step-reader-blocked-reason');
+      expect(siguiente).toBeDisabled();
+      expect(motivo).toHaveTextContent(SIN_FOTO);
+      expect(motivo.className).not.toContain('invisible');
+      expect(siguiente.getAttribute('aria-describedby')).toContain(motivo.id);
+
+      fireEvent.click(siguiente);
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+    });
+
+    it('R15: en el ultimo paso el motivo extra deshabilita el boton de terminar y onFinish no se llama', () => {
+      const onFinish = vi.fn();
+      render(
+        <StepReader
+          steps={SIN_BLOQUEO}
+          onFinish={onFinish}
+          mode={mode}
+          initialStepPosition={3}
+          stepBlockReason={(position) => (position === 3 ? SIN_FOTO : null)}
+        />,
+      );
+
+      const terminar = screen.getByTestId('step-reader-finish');
+      expect(terminar).toBeDisabled();
+      expect(screen.getByTestId('step-reader-blocked-reason')).toHaveTextContent(SIN_FOTO);
+      fireEvent.click(terminar);
+      expect(onFinish).not.toHaveBeenCalled();
+    });
+
+    it('R16: el motivo de subida en curso bloquea igual y se ve el texto que devuelve la pantalla', () => {
+      render(
+        <StepReader steps={SIN_BLOQUEO} onFinish={vi.fn()} mode={mode} stepBlockReason={() => SUBIENDO} />,
+      );
+
+      expect(screen.getByTestId('step-reader-next')).toBeDisabled();
+      expect(screen.getByTestId('step-reader-blocked-reason')).toHaveTextContent(SUBIENDO);
+    });
+
+    it('R15, R16: los elementos pendientes tienen prioridad; al marcarlos aparece el motivo extra y sigue bloqueado', async () => {
+      const user = setupUser();
+      render(
+        <StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode={mode} stepBlockReason={() => SIN_FOTO} />,
+      );
+
+      const motivo = () => screen.getByTestId('step-reader-blocked-reason');
+      expect(motivo()).toHaveTextContent('Marca los 2 elementos pendientes para continuar.');
+      expect(motivo()).not.toHaveTextContent(SIN_FOTO);
+
+      await marcarTodo(user);
+
+      expect(motivo()).toHaveTextContent(SIN_FOTO);
+      expect(screen.getByTestId('step-reader-next')).toBeDisabled();
+    });
+
+    it('R15: sin motivo extra (null) el paso sin elementos se puede avanzar como hoy', () => {
+      render(
+        <StepReader steps={SIN_BLOQUEO} onFinish={vi.fn()} mode={mode} stepBlockReason={() => null} />,
+      );
+
+      const siguiente = screen.getByTestId('step-reader-next');
+      expect(siguiente).toBeEnabled();
+      expect(siguiente).not.toHaveAttribute('aria-describedby');
+    });
+
+    it('R15: renderStepAddon pinta el contenido del paso actual debajo del documento', () => {
+      render(
+        <StepReader
+          steps={SIN_BLOQUEO}
+          onFinish={vi.fn()}
+          mode={mode}
+          renderStepAddon={(position) => <div data-testid="addon">{`Evidencia del paso ${position}`}</div>}
+        />,
+      );
+
+      const addon = screen.getByTestId('addon');
+      expect(addon).toHaveTextContent('Evidencia del paso 1');
+      expect(
+        screen.getAllByText(PASO_2_TEXTO)[0].compareDocumentPosition(addon) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      fireEvent.click(screen.getByTestId('step-reader-next'));
+      expect(screen.getByTestId('addon')).toHaveTextContent('Evidencia del paso 2');
+    });
+
+    it('R22: un stepRequest nuevo lleva al paso pedido, aunque el actual este bloqueado, y avisa a onStepChange', () => {
+      const onStepChange = vi.fn();
+      const props = {
+        steps: SIN_BLOQUEO,
+        onFinish: vi.fn(),
+        mode,
+        onStepChange,
+        initialStepPosition: 3,
+        stepBlockReason: (position: number) => (position === 3 ? SIN_FOTO : null),
+      };
+      const { rerender } = render(<StepReader {...props} />);
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 3 de 3');
+
+      rerender(<StepReader {...props} stepRequest={{ position: 1, id: 1 }} />);
+
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+      expect(onStepChange).toHaveBeenCalledTimes(1);
+      expect(onStepChange).toHaveBeenLastCalledWith({ direction: 'go_back', position: 1 });
+
+      rerender(<StepReader {...props} stepRequest={{ position: 2, id: 2 }} />);
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 2 de 3');
+      expect(onStepChange).toHaveBeenLastCalledWith({ direction: 'advance', position: 2 });
+    });
+
+    it('R22: el id con el que se monta no navega, repetir el id no navega y pedir el paso actual no avisa', () => {
+      const onStepChange = vi.fn();
+      const props = { steps: SIN_BLOQUEO, onFinish: vi.fn(), mode, onStepChange };
+      const { rerender } = render(<StepReader {...props} stepRequest={{ position: 3, id: 7 }} />);
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+
+      rerender(<StepReader {...props} stepRequest={{ position: 3, id: 7 }} />);
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+
+      rerender(<StepReader {...props} stepRequest={{ position: 1, id: 8 }} />);
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+      expect(onStepChange).not.toHaveBeenCalled();
+    });
+  },
+);

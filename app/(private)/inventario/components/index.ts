@@ -4,7 +4,7 @@
 // Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente,
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
 export { AdjustBatchDialog, type AdjustBatchDialogProps } from './adjust-batch-dialog';
-export { BatchHistory, movementKindLabel, movementReasonLabel } from './batch-history';
+export { BatchHistory, movementKindLabel } from './batch-history';
 export { DeleteProductDialog } from './delete-product-dialog';
 export {
   buildFinishedStockColumns,
@@ -15,6 +15,7 @@ export {
   type FinishedStockTableRow,
 } from './finished-stock-columns';
 export { FinishedStockListSection } from './finished-stock-list-section';
+export { movementReasonLabel } from './movement-reason-label';
 export {
   FINISHED_STOCK_TABLE_ID,
   FINISHED_STOCK_TABLE_TEXTS,
@@ -29,13 +30,26 @@ export { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/pres
 export {
   ACTIONS_COLUMN_ID,
   IMAGE_COLUMN_ID,
+  PRODUCT_BATCH_ROW_TEXTS,
   buildProductColumns,
   productUnitLabel,
+  type ProductBatchesStatus,
   type ProductColumn,
   type ProductColumnId,
   type ProductColumnsDeps,
+  type ProductTableRow,
 } from './product-columns';
+export {
+  daysUntil,
+  EXPIRY_RELATIVE_TEXTS,
+  EXPIRY_WARNING_DAYS,
+  expiryRelativeLabel,
+  isExpired,
+  isExpiringSoon,
+} from './expiry-warning';
+export { ExpiryDate, type ExpiryDateProps, useLocalToday } from './expiry-date';
 export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
+export { productNameWithoutPresentation } from './product-base-name';
 export {
   PRODUCT_ACTION_BATCHES_TESTID,
   PRODUCT_ACTION_DELETE_TESTID,
@@ -51,12 +65,14 @@ export {
   multiplyCost,
   sanitizeCostInput,
 } from './product-cost-amount';
-export { COST_QUANTITY_FIELD, ProductCostFields } from './product-cost-fields';
-export { ProductField } from './product-field';
+export { ProductCostFields } from './product-cost-fields';
+export { ProductField, ProductFieldHelper } from './product-field';
 export { ProductForm } from './product-form';
 export {
+  EXPIRY_DATE_FIELD,
   PURCHASE_DATE_FIELD,
   ProductBatchDateField,
+  type ProductBatchDateFieldName,
 } from './product-batch-date-field';
 export {
   ProductBatchesPanel,
@@ -94,6 +110,7 @@ export {
   type ProductListSearchParams,
   type ProductPageSize,
 } from './product-list-params';
+export { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
 export { ProductTypeTabs, type ProductTypeTabsProps } from './product-type-tabs';
 export { ProductListSection } from './product-list-section';
 export { ProductSheet } from './product-sheet';

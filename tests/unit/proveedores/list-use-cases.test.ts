@@ -323,8 +323,8 @@ describe('list-suppliers: lo que llega al repositorio (R11, R13, R15, R16, R20, 
 
 describe('list-catalog-lines: mismo contrato, y las DOS condiciones de vida siguen en el puerto', () => {
   it('ordenar por un campo no declarado: no falla, orden por defecto y log (R5, R6, R11)', async () => {
-    // R11 — el orden por defecto del catalogo es `created_at ASC, id ASC` y NO cambia; el
-    // dominio lo expresa mandando `sort: null`.
+    // R11 — el orden por defecto del catalogo (`created_at DESC, id ASC` desde QC-289) lo
+    // decide el adaptador; el dominio lo expresa mandando `sort: null`.
     const { catalog, log, listCatalogLines } = montarCatalogo();
 
     const pagina = await listCatalogLines(

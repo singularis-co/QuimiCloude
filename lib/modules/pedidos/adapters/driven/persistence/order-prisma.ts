@@ -22,6 +22,7 @@ import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-
 import type { Page } from '../../../domain/page';
 import type { StoredOrderCost } from '../../../domain/order-cost';
 import type { OrderScope } from '../../../domain/order-scope';
+import type { PackedLineCount } from '../../../domain/packing-count';
 import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../../../domain/order-view';
 import type {
   FinishPackingLine,
@@ -83,7 +84,7 @@ const ORDER_SELECT = {
   unitId: true,
   customerId: true,
   presentationLines: {
-    select: { presentationId: true, packages: true, packagingProductId: true },
+    select: { presentationId: true, packages: true, presentationContent: true, packagingProductId: true },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   },
 } satisfies Prisma.OrderSelect;
@@ -134,6 +135,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     presentationLines: row.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
+      presentationContent: line.presentationContent === null ? null : fromDecimal(line.presentationContent),
       packagingProductId: line.packagingProductId,
     })),
   };
@@ -210,8 +212,10 @@ export async function findAliveOrderById(
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.OrderOrderByWithRelationInput;
 
 /**
- * Orden POR DEFECTO: exactamente el de hoy (R11, R41), `priority DESC, created_at ASC,
- * order_year ASC, order_sequence ASC`. Sin `sort`, la lista no se mueve.
+ * Orden POR DEFECTO: `priority DESC, created_at DESC, order_year DESC,
+ * order_sequence DESC, id ASC`. La prioridad manda y, dentro de cada prioridad, los
+ * mas nuevos primero; el correlativo desempata dos altas del mismo instante (el mas alto es el
+ * ultimo creado) y el `id` deja el orden total.
  *
  * `priority DESC` da `CRITICA -> ALTA -> MEDIA -> BAJA` porque Postgres ordena un enum por su
  * ORDEN DE DECLARACION, que QC-33 R16 fijo de menor a mayor -por eso reordenar esas cuatro
@@ -225,9 +229,10 @@ const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.OrderOrderByWithRela
 function defaultOrderBy(): Prisma.OrderOrderByWithRelationInput[] {
   return [
     { priority: 'desc' },
-    { createdAt: 'asc' },
-    { orderYear: 'asc' },
-    { orderSequence: 'asc' },
+    { createdAt: 'desc' },
+    { orderYear: 'desc' },
+    { orderSequence: 'desc' },
+    TIE_BREAKER,
   ];
 }
 
@@ -764,6 +769,7 @@ async function insertAliveOrder(
     presentationLines: data.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
+      presentationContent: line.content === null ? null : fromDecimal(toDecimalInput(line.content)),
       packagingProductId: line.packagingProductId,
     })),
   };
@@ -941,6 +947,7 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
       updatePresentationLinesAliveOrder(id, unitId, lines, actorId, now, scope, tx),
     finishPackingAlive: (id, packerId, now, scope) => finishPackingAliveOrder(id, packerId, now, scope, tx),
     findPresentationLinesForFinish: (id, scope) => findPresentationLinesForFinishOrder(id, scope, tx),
+    recordPackedCounts: (id, counts, scope) => recordPackedCountsForOrder(id, counts, scope, tx),
   };
 }
 
@@ -1176,6 +1183,7 @@ type FinishPackingLineRow = {
   readonly packages: number;
   readonly presentation_content: string | null;
   readonly packaging_product_id: string | null;
+  readonly packed_packages: number | null;
 };
 
 async function findPresentationLinesForFinishOrder(
@@ -1186,7 +1194,7 @@ async function findPresentationLinesForFinishOrder(
   const { companyId } = companyScopeColumns(scope);
   const rows = await tx.$queryRaw<ReadonlyArray<FinishPackingLineRow>>(Prisma.sql`
     SELECT "id", "presentation_id", "packages", "presentation_content"::text AS "presentation_content",
-           "packaging_product_id"
+           "packaging_product_id", "packed_packages"
       FROM "order_presentation_lines"
      WHERE "order_id" = ${id}::uuid
        AND "company_id" = ${companyId}::uuid
@@ -1199,5 +1207,26 @@ async function findPresentationLinesForFinishOrder(
     packages: row.packages,
     presentationContent: row.presentation_content,
     packagingProductId: row.packaging_product_id,
+    packedPackages: row.packed_packages,
   }));
+}
+
+async function recordPackedCountsForOrder(
+  id: string,
+  counts: readonly PackedLineCount[],
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<void> {
+  const { companyId } = companyScopeColumns(scope);
+  for (const count of counts) {
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE "order_presentation_lines"
+         SET "packed_packages" = ${count.packedPackages}::integer,
+             "packed_reason" = ${count.reason}::text,
+             "packed_reason_other" = ${count.reasonOther === null ? null : count.reasonOther.trim()}::text
+       WHERE "id" = ${count.lineId}::uuid
+         AND "order_id" = ${id}::uuid
+         AND "company_id" = ${companyId}::uuid
+    `);
+  }
 }

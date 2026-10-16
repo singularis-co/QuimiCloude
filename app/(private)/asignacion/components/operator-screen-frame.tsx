@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { ThemeToggle } from '../../components/theme-toggle';
 
 export type OperatorScreenFrameProps = {
-  readonly back?: { readonly href: string; readonly label: string; readonly testId: string };
+  readonly back?: OperatorScreenBack;
   readonly eyebrow: string;
   readonly eyebrowTestId?: string;
   readonly title: string;
@@ -17,6 +17,14 @@ export type OperatorScreenFrameProps = {
   readonly footer?: ReactNode;
   readonly testId: string;
   readonly children: ReactNode;
+};
+
+export type OperatorScreenBack = {
+  readonly href: string;
+  readonly label: string;
+  readonly testId: string;
+  /** Pedido ya comenzado por quien lo mira: la vuelta se ve, pero no navega hasta terminarlo. */
+  readonly disabled?: boolean;
 };
 
 const CONTENT_WIDTH = 'mx-auto w-full max-w-[1064px]';
@@ -85,7 +93,13 @@ export function OperatorScreenFrame({
           {back ? (
             <>
               <div className="flex items-center justify-between gap-3">
-                <ArrowLink href={back.href} direction="back" touch testId={back.testId}>
+                <ArrowLink
+                  href={back.href}
+                  direction="back"
+                  touch
+                  testId={back.testId}
+                  disabled={back.disabled}
+                >
                   {back.label}
                 </ArrowLink>
                 {controls}

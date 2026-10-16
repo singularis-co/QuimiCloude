@@ -1,3 +1,5 @@
+import type { ImportColumnKey } from '@/lib/modules/inventario';
+
 export const IMPORT_PAGE_TITLE = 'Importar inventario';
 export const IMPORT_PAGE_DESCRIPTION =
   'Sube un archivo .xlsx o .csv con las columnas de la plantilla. Antes de importar verás qué se crea, qué suma un lote y qué filas tienen error.';
@@ -129,7 +131,14 @@ export const RESULT_TOTAL_LABELS = {
 } as const;
 
 export const EXAMPLE_ROW_IGNORED_NOTICE =
-  'La fila de ejemplo de la plantilla venía en el archivo y se ignoró: no se importa.';
+  'Las filas de ejemplo de la plantilla venían en el archivo y se ignoraron: no se importan.';
+
+export const IGNORED_COLUMNS_SUMMARY_TESTID = 'inventory-import-ignored-columns-summary';
+export function ignoredColumnsSummary(rows: number): string {
+  return rows === 1
+    ? '1 fila trae valores en columnas que su tipo no usa: esos valores se ignoran y la fila se importa igual.'
+    : `${formatCount(rows)} filas traen valores en columnas que su tipo no usa: esos valores se ignoran y las filas se importan igual.`;
+}
 
 export function confirmLabel(validRows: number): string {
   return validRows === 1 ? 'Importar 1 fila válida' : `Importar ${formatCount(validRows)} filas válidas`;
@@ -150,6 +159,14 @@ export const ERROR_FILE_BUTTON_TESTID = 'inventory-import-error-file';
 export const STATUS_FILTER_TESTID = 'inventory-import-status-filter';
 export const ROW_STATUS_TESTID = 'inventory-import-row-status';
 export const ROW_DETAIL_TESTID = 'inventory-import-row-detail';
+export const ROW_IGNORED_COLUMNS_TESTID = 'inventory-import-row-ignored-columns';
+
+export function ignoredColumnsNotice(headers: readonly string[]): string {
+  const list = headers.map((header) => `«${header}»`).join(', ');
+  return headers.length === 1
+    ? `Se ignoró ${list}: no aplica a este tipo.`
+    : `Se ignoraron ${list}: no aplican a este tipo.`;
+}
 export const ROW_ISSUE_TESTID = 'inventory-import-row-issue';
 
 export function totalTestId(key: string): string {
@@ -262,6 +279,24 @@ export function resultDescription(fileName: string, importedAt: string): string 
 
 export const NOTHING_IMPORTED_TITLE = 'No se importó nada';
 
+function countLabel(value: number, singular: string, plural: string): string {
+  return `${formatCount(value)} ${value === 1 ? singular : plural}`;
+}
+
+/** Aviso flotante al terminar una importación: lo creado, lo sumado y lo que se quedó fuera. */
+export function importedToastMessage(totals: {
+  readonly created: number;
+  readonly batchAdded: number;
+  readonly duplicate: number;
+  readonly error: number;
+}): string {
+  const done = `Inventario importado: ${countLabel(totals.created, 'producto creado', 'productos creados')} y ${countLabel(totals.batchAdded, 'lote sumado', 'lotes sumados')}.`;
+  const skipped = totals.duplicate + totals.error;
+  return skipped === 0
+    ? done
+    : `${done} ${countLabel(skipped, 'fila no se importó', 'filas no se importaron')}.`;
+}
+
 export function nothingImportedMessage(fileName: string): string {
   return `Al confirmar, «${fileName}» no tenía ninguna fila válida, así que no se ha importado nada. Revisa el motivo de cada fila, corrígelas y vuelve a subir el archivo.`;
 }
@@ -278,3 +313,78 @@ export const ALREADY_IMPORTED_TESTID = 'inventory-import-already-imported';
 export const NOTHING_IMPORTED_TESTID = 'inventory-import-nothing-imported';
 export const NOTHING_IMPORTED_MESSAGE_TESTID = 'inventory-import-nothing-imported-message';
 export const RESTART_TESTID = 'inventory-import-restart';
+
+export const GUIDE_TESTID = 'inventory-import-guide';
+export const GUIDE_TITLE = 'Cómo llenar la plantilla';
+export const GUIDE_DESCRIPTION =
+  'Las mismas reglas y valores que trae la hoja «Valores disponibles» de la plantilla descargada.';
+export const GUIDE_TABS = {
+  rules: 'Campos por tipo',
+  values: 'Valores disponibles',
+  examples: 'Ejemplos',
+} as const;
+export const GUIDE_RULES_TESTID = 'inventory-import-guide-rules';
+export const GUIDE_VALUES_TESTID = 'inventory-import-guide-values';
+export const GUIDE_EXAMPLES_TESTID = 'inventory-import-guide-examples';
+export const GUIDE_COLUMN_HEADER = 'Columna';
+export const GUIDE_DESCRIPTION_HEADER = 'Descripción';
+/**
+ * Texto de la descripción de cada columna. Las columnas de catálogo (unidad, presentación,
+ * fórmula) suman además un enlace a su módulo: lo compone `GUIDE_COLUMN_DESCRIPTIONS`
+ * (`import-guide-descriptions.tsx`), porque este archivo no lleva JSX.
+ */
+export const GUIDE_COLUMN_DESCRIPTION_TEXTS: Readonly<Record<ImportColumnKey, string>> = {
+  type: 'Qué es el producto: Insumo, Envase, Instrumento o Producto terminado. Decide qué otras columnas se piden.',
+  name: 'Nombre del producto. Si ya existe uno igual (mismo nombre y unidad; en envases, misma presentación), se agrega como lote nuevo del producto.',
+  unit: 'Unidad en que se mide el insumo, por su nombre o su símbolo. Debe existir en la empresa.',
+  presentation:
+    'Presentación del envase o del producto terminado. Debe existir en la empresa; en Producto terminado, con contenido declarado.',
+  formula: 'Fórmula original de la empresa con la que se fabrica el producto terminado.',
+  stock:
+    'Cantidad que entra con este lote. Envase y Producto terminado cuentan unidades (5 unidades(U) de X fórmula).',
+  unitCost: 'Costo de una unidad del lote.',
+  lot: 'Código del lote. Si va vacío, se genera automáticamente.',
+  purchaseDate: 'Fecha en que entró el lote. Si va vacía, se usa la fecha de hoy automáticamente; no puede ser futura.',
+  expiryDate: 'Fecha en que vence el lote.',
+  qtyAlert:
+    'Cantidad mínima del producto: cuando la cantidad en inventario queda por debajo de este valor, el inventario lo resalta y se notifica.',
+};
+/** Columnas de la guía cuya descripción enlaza al módulo donde se gestiona su catálogo. */
+export type GuideCatalogColumn = 'unit' | 'presentation' | 'formula';
+export const GUIDE_CATALOG_LINK_LABELS: Readonly<Record<GuideCatalogColumn, string>> = {
+  unit: 'Mira tus unidades disponibles',
+  presentation: 'Mira tus presentaciones disponibles',
+  formula: 'Mira tus fórmulas disponibles',
+};
+export const GUIDE_CATALOG_LINK_TESTIDS: Readonly<Record<GuideCatalogColumn, string>> = {
+  unit: 'guide-link-unit',
+  presentation: 'guide-link-presentation',
+  formula: 'guide-link-formula',
+};
+export const GUIDE_RULE_LABELS = {
+  required: 'Obligatoria',
+  optional: 'Opcional',
+  forbidden: 'Se ignora',
+} as const;
+/** Celda «Opcional» de las columnas que la importación rellena sola si van vacías. */
+export const GUIDE_RULE_OPTIONAL_AUTO_LABEL = 'Opcional · automático si va vacío';
+export const GUIDE_RULES_NOTES: readonly string[] = [
+  '«Se ignora»: si la columna trae un valor, no se importa y la fila sigue; la vista previa lo avisa.',
+  'Producto terminado no lleva «Nombre»: se arma como «Fórmula · Presentación». La presentación debe tener contenido declarado.',
+  'En Envase y Producto terminado, «Cantidad» cuenta envases enteros; en Producto terminado, mayor que 0.',
+  '«Unidad» se reconoce por su nombre o por su símbolo.',
+  'Si el producto ya existe (mismo nombre y unidad; en envases, misma presentación), la fila le suma un lote.',
+  '«Lote» vacío: se genera solo. «Fecha de compra» vacía: hoy; no puede ser futura.',
+  'Números con coma o punto decimal, sin separador de miles y hasta 4 decimales. Fechas AAAA-MM-DD o DD/MM/AAAA.',
+];
+export const GUIDE_VALUES_HEADERS = {
+  types: 'Tipo',
+  units: 'Unidad',
+  presentations: 'Presentación',
+  formulas: 'Fórmula',
+} as const;
+export const GUIDE_VALUES_EMPTY = 'Ninguna registrada.';
+export const GUIDE_VALUES_UNAVAILABLE =
+  'No se pudieron cargar los valores de la empresa; la plantilla descargada sí los trae.';
+export const GUIDE_EXAMPLES_NOTE =
+  'Una fila por tipo. Si las dejas en el archivo, se reconocen y se ignoran al importar.';

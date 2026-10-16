@@ -23,6 +23,7 @@ import type { RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/re
 
 import { PERMISSIONS } from '@/lib/modules/identity';
 import type { ProductCatalog } from '@/lib/modules/inventario';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 /** Los dos codigos que este modulo puede exigir (R16). */
 const CONSULTAR = 'recetas.consultar';
@@ -76,6 +77,7 @@ function repositorioQueFalla(): RecipeRepository {
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(explota),
     createVersion: vi.fn<RecipeRepository['createVersion']>(explota),
     listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(explota),
+    listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(explota),
     replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(explota),
   };
 }
@@ -143,6 +145,7 @@ function montarPuertosPermisivos(): Puertos {
       softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
       createVersion: vi.fn<RecipeRepository['createVersion']>(async () => 'not_found'),
       listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+      listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(async () => []),
       replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => 'not_found'),
     },
     products: {
@@ -239,6 +242,7 @@ const CASOS_DE_USO: ReadonlyArray<{
         recipes: puertos.recipes,
         products: puertos.products,
         images: puertos.images,
+        stepLocks: noEvidenceLocks,
       })('receta-1', entrada ?? RECETA_VALIDA, actor),
   },
   {

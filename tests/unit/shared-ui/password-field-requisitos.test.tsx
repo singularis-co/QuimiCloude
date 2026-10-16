@@ -7,20 +7,18 @@ import { useState } from 'react';
 
 import { render, screen } from '@testing-library/react';
 
-import type { CredentialRuleState } from '@/components/shared/credential-requirements';
 import { PASSWORD_FIELD_SHOW_LABEL, PasswordField } from '@/components/shared/password-field';
 
 import { setupUser } from '../../helpers/user-event';
 
-/** Candidata que cumple las seis reglas comprobables en vivo (no la séptima, que es del servidor). */
+/** Candidata que cumple las seis reglas comprobables en vivo (la de filtradas es del servidor). */
 const CANDIDATA_QUE_CUMPLE_LAS_SEIS = 'Abcdefg1#';
 
 type TestFormProps = {
-  readonly breachedState?: CredentialRuleState;
   readonly onOwnRulesMetChange?: (met: boolean) => void;
 };
 
-function TestForm({ breachedState, onOwnRulesMetChange }: TestFormProps) {
+function TestForm({ onOwnRulesMetChange }: TestFormProps) {
   const [ownRulesMet, setOwnRulesMet] = useState(false);
 
   return (
@@ -30,7 +28,6 @@ function TestForm({ breachedState, onOwnRulesMetChange }: TestFormProps) {
         label="Contrasena nueva"
         autoComplete="new-password"
         requirements={{
-          breachedState,
           onOwnRulesMetChange: (met) => {
             setOwnRulesMet(met);
             onOwnRulesMetChange?.(met);
@@ -57,7 +54,7 @@ describe('PasswordField con requisitos — el bloqueo del envío es parcial', ()
     expect(boton).toBeDisabled();
   });
 
-  it('R25 — con las seis en verde el envío se habilita aunque la séptima siga neutra', async () => {
+  it('R25 — con las seis en verde el envío se habilita y la lista no pinta la de filtradas', async () => {
     const user = setupUser();
     render(<TestForm />);
 
@@ -67,11 +64,10 @@ describe('PasswordField con requisitos — el bloqueo del envío es parcial', ()
     await user.type(input, CANDIDATA_QUE_CUMPLE_LAS_SEIS);
 
     expect(boton).toBeEnabled();
-    const septima = document.querySelector('li[data-rule="breached"]');
-    expect(septima?.getAttribute('data-state')).toBe('unknown');
+    expect(document.querySelector('li[data-rule="breached"]')).toBeNull();
   });
 
-  it('R25 — tras el rechazo por filtrada las seis siguen en verde y el envío sigue habilitado', async () => {
+  it('R25 — al re-renderizar el consumidor tras un rechazo las seis siguen en verde y el envío sigue habilitado', async () => {
     const user = setupUser();
     const { rerender } = render(<TestForm />);
 
@@ -79,13 +75,11 @@ describe('PasswordField con requisitos — el bloqueo del envío es parcial', ()
     await user.type(input, CANDIDATA_QUE_CUMPLE_LAS_SEIS);
 
     // El servidor rechaza la candidata y el consumidor re-renderiza con el veredicto.
-    rerender(<TestForm breachedState="unmet" />);
+    rerender(<TestForm />);
 
     const boton = screen.getByRole('button', { name: 'Enviar' });
     expect(boton).toBeEnabled();
-
-    const septima = document.querySelector('li[data-rule="breached"]');
-    expect(septima?.getAttribute('data-state')).toBe('unmet');
+    expect(document.querySelector('li[data-rule="breached"]')).toBeNull();
 
     const reglasLive = ['min_length', 'max_length', 'no_uppercase', 'no_lowercase', 'no_digit', 'no_symbol'];
     for (const rule of reglasLive) {
@@ -96,13 +90,13 @@ describe('PasswordField con requisitos — el bloqueo del envío es parcial', ()
 });
 
 describe('PasswordField con requisitos — lista enlazada al campo', () => {
-  it('R25 — pinta los siete requisitos debajo, enlazados por aria-describedby', () => {
+  it('R25 — pinta los seis requisitos en vivo debajo, enlazados por aria-describedby', () => {
     render(<TestForm />);
 
     const input = screen.getByLabelText('Contrasena nueva');
     const lista = document.querySelector('ul');
     expect(lista).not.toBeNull();
-    expect(lista?.querySelectorAll('li')).toHaveLength(7);
+    expect(lista?.querySelectorAll('li')).toHaveLength(6);
     expect((input.getAttribute('aria-describedby') ?? '').split(' ')).toContain(lista?.id);
   });
 });
@@ -161,22 +155,6 @@ describe('PasswordField con requisitos — el campo nace oculto', () => {
 
     await user.click(screen.getByRole('button', { name: PASSWORD_FIELD_SHOW_LABEL }));
     expect(input).toHaveAttribute('type', 'text');
-  });
-});
-
-describe('PasswordField con requisitos — el veredicto del servidor solo entra por props', () => {
-  it('R25 — el veredicto del servidor solo entra por props', async () => {
-    const conVeredicto = render(<TestForm breachedState="unmet" />);
-    const septima = conVeredicto.container.querySelector('li[data-rule="breached"]');
-    expect(septima?.getAttribute('data-state')).toBe('unmet');
-    conVeredicto.unmount();
-
-    const user = setupUser();
-    const sinVeredicto = render(<TestForm />);
-    const input = sinVeredicto.getByLabelText('Contrasena nueva');
-    await user.type(input, CANDIDATA_QUE_CUMPLE_LAS_SEIS);
-    const septimaSinVeredicto = sinVeredicto.container.querySelector('li[data-rule="breached"]');
-    expect(septimaSinVeredicto?.getAttribute('data-state')).not.toBe('unmet');
   });
 });
 

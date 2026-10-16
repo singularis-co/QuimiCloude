@@ -28,7 +28,7 @@ import type { ListQueryable } from './list-query';
 
 export const USER_QUERYABLE: ListQueryable = {
   /**
-   * El orden por defecto -`lastNames ASC, firstNames ASC, id ASC` (R30)- lo pone el adaptador;
+   * El orden por defecto -`createdAt DESC, id ASC`, mas nuevos primero- lo pone el adaptador;
    * esta lista declara lo que el cliente PUEDE pedir. `accountStatus` es un enum de Postgres y
    * ordena por orden de declaracion del enum, no por el alfabetico.
    */

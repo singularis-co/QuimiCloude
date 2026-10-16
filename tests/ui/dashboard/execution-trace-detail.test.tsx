@@ -14,14 +14,28 @@ import {
   GO_BACK_MARK,
   createDefaultExecutionTraceListParams,
   executionTraceListHref,
-  formatTraceDuration,
+  formatElapsed,
 } from '@/app/(private)/dashboard/components';
 import type { ExecutionTraceDetail as ExecutionTraceDetailData } from '@/lib/modules/asignaciones';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { ORDER_EVIDENCE_EMPTY, ORDER_EVIDENCE_ERROR_STATES } from '@/tests/fixtures/order-evidence';
+import {
+  CONDITIONING_DURATION_MS,
+  CORRECTION_SAVE_LINES,
+  FINISHED_CONDITIONING_TRACE,
+  FIRST_SAVE_LINES,
+  IN_PROGRESS_CONDITIONING_TRACE,
+  MIXED_TEAM,
+  PREVIOUS_CONDITIONING_TRACE,
+  TRACE_PEOPLE,
+  UNCLOSED_CONDITIONING_TRACE,
+  WORK_GROUP_NAME,
+} from '../../fixtures/execution-trace-conditioning';
 
-const { requirePagePermissionMock, getExecutionTraceActionMock, notFoundMock } = vi.hoisted(() => ({
+const { requirePagePermissionMock, getExecutionTraceActionMock, getExecutionEvidenceActionMock, notFoundMock } = vi.hoisted(() => ({
   requirePagePermissionMock: vi.fn<(code: string) => Promise<void>>(),
   getExecutionTraceActionMock: vi.fn<(orderId: string) => Promise<unknown>>(),
+  getExecutionEvidenceActionMock: vi.fn<(orderId: string) => Promise<unknown>>(),
   notFoundMock: vi.fn<() => never>(() => {
     throw new Error('NEXT_NOT_FOUND');
   }),
@@ -30,6 +44,8 @@ const { requirePagePermissionMock, getExecutionTraceActionMock, notFoundMock } =
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   notFound: notFoundMock,
+  // 2026-10-14 (QC-271): el aviso de fotos del detalle reintenta con `router.refresh`.
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 
 vi.mock('@/lib/modules/identity/adapters/driving/require-page-permission', () => ({
@@ -38,6 +54,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/require-page-permission', () =>
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', () => ({
   getExecutionTraceAction: getExecutionTraceActionMock,
+  getExecutionEvidenceAction: getExecutionEvidenceActionMock,
   listExecutionTracesAction: vi.fn(),
 }));
 
@@ -51,7 +68,8 @@ const TRACE: ExecutionTraceDetailData = {
   deleted: false,
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:20:00.000Z'),
-  duration: { kind: 'closed', ms: 20 * MIN },
+  active: false,
+  durations: { production: { kind: 'closed', ms: 20 * MIN }, packing: null, conditioning: null },
   goBackCount: 1,
   steps: [
     {
@@ -120,6 +138,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   requirePagePermissionMock.mockResolvedValue(undefined);
   getExecutionTraceActionMock.mockResolvedValue({ status: 'success', data: TRACE });
+  getExecutionEvidenceActionMock.mockResolvedValue({ status: 'success', data: ORDER_EVIDENCE_EMPTY });
 });
 
 afterEach(() => {
@@ -166,6 +185,31 @@ describe('R12 - R18 - R20 - la pagina del recorrido', () => {
     expect(notFoundMock).toHaveBeenCalledTimes(1);
   });
 
+  it('QC-271 R15 - pide las fotos del mismo id a la vez que el recorrido, despues del permiso', async () => {
+    await abrir();
+    expect(getExecutionEvidenceActionMock).toHaveBeenCalledWith(ORDER_ID);
+    expect(requirePagePermissionMock.mock.invocationCallOrder[0]).toBeLessThan(
+      getExecutionEvidenceActionMock.mock.invocationCallOrder[0],
+    );
+    const source = readFileSync(resolve(process.cwd(), 'app/(private)/dashboard/recorrido/[id]/page.tsx'), 'utf8');
+    expect(source).toMatch(/Promise\.all\(\[getExecutionTraceAction\(id\), getExecutionEvidenceAction\(id\)\]\)/);
+  });
+
+  it('QC-271 R15 - sin permiso tampoco lee las fotos', async () => {
+    requirePagePermissionMock.mockRejectedValue(new Error('NEXT_NOT_FOUND'));
+    await expect(abrir()).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(getExecutionEvidenceActionMock).not.toHaveBeenCalled();
+  });
+
+  it('QC-271 R15 - el 404 sale solo del recorrido: las fotos en order_not_found no lo provocan', async () => {
+    getExecutionEvidenceActionMock.mockResolvedValue(ORDER_EVIDENCE_ERROR_STATES.orderNotFound);
+    render(await abrir());
+    expect(notFoundMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('execution-trace-detail')).toBeInTheDocument();
+    expect(screen.getAllByTestId('execution-trace-step')).toHaveLength(TRACE.steps.length);
+    expect(screen.getByTestId('trace-evidence-read-error')).toBeInTheDocument();
+  });
+
   it('R18 - un pedido dado de baja con anotaciones abre su recorrido marcado', async () => {
     getExecutionTraceActionMock.mockResolvedValue({ status: 'success', data: { ...TRACE, deleted: true } });
     render(await abrir());
@@ -178,7 +222,7 @@ describe('R3 - la marca de actividad del resumen', () => {
   it('R3 - un pedido activo en EN_EMPAQUE lleva la marca «En curso» aparte del estado', async () => {
     getExecutionTraceActionMock.mockResolvedValue({
       status: 'success',
-      data: { ...TRACE, status: 'EN_EMPAQUE', duration: { kind: 'open', ms: 20 * MIN } },
+      data: { ...TRACE, status: 'EN_EMPAQUE', active: true },
     });
     render(await abrir());
     expect(screen.getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
@@ -188,11 +232,11 @@ describe('R3 - la marca de actividad del resumen', () => {
   it('R3 - un pedido dado de baja en EN_CURSO o uno cerrado no lleva la marca de actividad', async () => {
     getExecutionTraceActionMock.mockResolvedValue({
       status: 'success',
-      data: { ...TRACE, status: 'EN_CURSO', deleted: true, duration: { kind: 'unclosed', ms: 20 * MIN } },
+      data: { ...TRACE, status: 'EN_CURSO', deleted: true, active: false },
     });
     render(await abrir());
     expect(screen.queryByTestId('execution-trace-active')).toBeNull();
-    expect(screen.getByTestId('execution-trace-status')).toHaveTextContent('En curso');
+    expect(screen.getByTestId('execution-trace-status')).toHaveTextContent('En fabricación');
     cleanup();
     getExecutionTraceActionMock.mockResolvedValue({ status: 'success', data: TRACE });
     render(await abrir());
@@ -237,11 +281,13 @@ describe('R13 - R14 - R15 - R16 - lo que muestra el detalle', () => {
     expect(tramos[3]).toBeNull();
   });
 
-  it('R15 - una sola duracion, la misma cifra que la fila', async () => {
+  // Aqui solo hay produccion.
+  it('R15 - solo la fase con duracion se pinta, con su cifra sin sufijo', async () => {
     render(await abrir());
     const duraciones = screen.getAllByTestId('execution-trace-duration');
     expect(duraciones).toHaveLength(1);
-    expect(duraciones[0]).toHaveTextContent(formatTraceDuration(TRACE.duration));
+    expect(duraciones[0]).toHaveAttribute('data-phase', 'production');
+    expect(duraciones[0]).toHaveTextContent(formatElapsed(20 * MIN));
   });
 
   // ENMIENDA QC-261 (2026-10-12): la marca visual de cada retroceder pasa a ser su tono, su icono y
@@ -289,5 +335,280 @@ describe('R17 - volver a la lista', () => {
     expect(volver).toHaveClass('min-h-11', 'min-w-11');
     volver.focus();
     expect(volver).toHaveFocus();
+  });
+});
+
+describe('R25 - R28 - duraciones por fase y marca «En curso» con acondicionamiento', () => {
+  function tarjetas(): HTMLElement[] {
+    return screen.getAllByTestId('execution-trace-duration');
+  }
+
+  function datos(): HTMLElement[] {
+    return Array.from(screen.getByTestId('execution-trace-detail').querySelectorAll<HTMLElement>('dl > div'));
+  }
+
+  it('R25 - tarjetas por fase con insignias; fase null no se pinta', () => {
+    render(<ExecutionTraceDetail trace={IN_PROGRESS_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(tarjetas().map((t) => t.getAttribute('data-phase'))).toEqual(['production', 'packing', 'conditioning']);
+    expect(tarjetas().map((t) => t.getAttribute('data-kind'))).toEqual(['closed', 'closed', 'open']);
+    const [produccion, empaque, acondicionamiento] = tarjetas();
+    expect(within(produccion).getByText('Duración de producción')).toBeInTheDocument();
+    expect(within(empaque).getByText('Duración de empaque')).toBeInTheDocument();
+    expect(within(acondicionamiento).getByText('Duración de acondicionamiento')).toBeInTheDocument();
+    expect(within(produccion).getByText(formatElapsed(CONDITIONING_DURATION_MS.production))).toHaveClass('font-mono');
+    expect(within(empaque).getByText('28 min 12 s')).toBeInTheDocument();
+    expect(within(acondicionamiento).getByText('1 h 12 min')).toBeInTheDocument();
+    expect(within(acondicionamiento).getByTestId('execution-trace-phase-open')).toHaveTextContent('En curso');
+    expect(within(produccion).queryByTestId('execution-trace-phase-open')).toBeNull();
+    expect(screen.queryByTestId('execution-trace-phase-unclosed')).toBeNull();
+    expect(screen.queryByText(/\(en curso\)|\(sin cierre anotado\)/)).toBeNull();
+  });
+
+  it('R25 - una fase sin cierre lleva la insignia «Sin cierre anotado»', () => {
+    render(<ExecutionTraceDetail trace={UNCLOSED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const acondicionamiento = tarjetas()[2];
+    expect(acondicionamiento).toHaveAttribute('data-kind', 'unclosed');
+    expect(within(acondicionamiento).getByTestId('execution-trace-phase-unclosed')).toHaveTextContent(
+      'Sin cierre anotado',
+    );
+    expect(within(acondicionamiento).queryByTestId('execution-trace-phase-open')).toBeNull();
+  });
+
+  it('R25 - estado, tres fases y vueltas atras: cinco datos en orden', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(datos().map((d) => d.querySelector('dt')?.textContent)).toEqual([
+      'Estado',
+      'Duración de producción',
+      'Duración de empaque',
+      'Duración de acondicionamiento',
+      'Vueltas atrás',
+    ]);
+    expect(screen.queryByTestId('execution-trace-phase-open')).toBeNull();
+    expect(screen.queryByTestId('execution-trace-phase-unclosed')).toBeNull();
+  });
+
+  it('R25 - un pedido anterior a la feature no pinta la tarjeta de acondicionamiento', () => {
+    render(<ExecutionTraceDetail trace={PREVIOUS_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(datos()).toHaveLength(4);
+    expect(tarjetas().map((t) => t.getAttribute('data-phase'))).toEqual(['production', 'packing']);
+    expect(screen.queryByText('Duración de acondicionamiento')).toBeNull();
+  });
+
+  it('R25 - la rejilla reparte 5 en una fila, 3 + 2 o 2 columnas segun el ancho', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const rejilla = screen.getByTestId('execution-trace-detail').querySelector('dl');
+    expect(rejilla).toHaveClass('grid', 'grid-cols-[repeat(auto-fit,minmax(min(170px,calc(50%_-_6px)),1fr))]');
+  });
+
+  it('R28 - En curso segun active; nunca en dado de baja', () => {
+    render(<ExecutionTraceDetail trace={IN_PROGRESS_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(screen.getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+    cleanup();
+
+    render(
+      <ExecutionTraceDetail
+        trace={{ ...FINISHED_CONDITIONING_TRACE, status: 'POR_EMPACAR', active: true }}
+        backHref={DASHBOARD_ROUTE}
+      />,
+    );
+    expect(screen.getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+    expect(screen.queryByTestId('execution-trace-phase-open')).toBeNull();
+    cleanup();
+
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(screen.queryByTestId('execution-trace-active')).toBeNull();
+    cleanup();
+
+    render(
+      <ExecutionTraceDetail trace={{ ...UNCLOSED_CONDITIONING_TRACE, active: true }} backHref={DASHBOARD_ROUTE} />,
+    );
+    expect(screen.getByTestId('execution-trace-deleted')).toHaveTextContent(DELETED_ORDER_MARK);
+    expect(screen.queryByTestId('execution-trace-active')).toBeNull();
+  });
+});
+
+describe('R12 - R18 - las tres anotaciones de acondicionamiento en la linea de tiempo', () => {
+  function paso(action: string, n = 0): HTMLElement {
+    const elegido = pasos().filter((li) => li.getAttribute('data-action') === action)[n];
+    if (elegido === undefined) throw new Error(`no hay paso ${action} #${n}`);
+    return elegido;
+  }
+
+  function filasDeTabla(cuerpo: HTMLElement): string[][] {
+    return within(within(cuerpo).getByTestId('execution-trace-batch-table'))
+      .getAllByTestId('execution-trace-batch-line')
+      .map((fila) => Array.from(fila.querySelectorAll('td')).map((td) => td.textContent ?? ''));
+  }
+
+  it('R12 - nombre, tono e icono de las tres anotaciones, en orden cronologico tras empaque', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(pasos().map((li) => li.getAttribute('data-action')).slice(-5)).toEqual([
+      'pack_finish',
+      'conditioning_start',
+      'conditioning_batch_save',
+      'conditioning_batch_save',
+      'conditioning_finish',
+    ]);
+    const esperado = [
+      ['conditioning_start', 'Comenzar acondicionamiento', 'progress', 'lucide-clipboard-list'],
+      ['conditioning_batch_save', 'Guardado de datos de lote', 'neutral', 'lucide-download'],
+      ['conditioning_finish', 'Terminar acondicionamiento', 'success', 'lucide-clipboard-check'],
+    ] as const;
+    for (const [action, nombre, tono, icono] of esperado) {
+      const li = paso(action);
+      expect(within(li).getByTestId('execution-trace-step-action')).toHaveTextContent(nombre);
+      expect(li).toHaveAttribute('data-tone', tono);
+      expect(within(li).getByTestId('execution-trace-step-dot').querySelector('svg')).toHaveClass(icono);
+      expect(within(li).getByTestId('execution-trace-step-instant').tagName).toBe('TIME');
+      expect(within(li).queryByTestId('execution-trace-step-position')).toBeNull();
+    }
+    const comenzar = paso('conditioning_start');
+    expect(within(comenzar).getByTestId('execution-trace-step-instant')).toHaveTextContent('2026-10-02 13:02:00');
+    expect(within(comenzar).getByTestId('execution-trace-step-gap')).toHaveTextContent('38 min 00 s');
+  });
+
+  it('R13 - supervisor y equipo en orden, con grupo', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const comenzar = paso('conditioning_start');
+    const supervisor = within(comenzar).getByTestId('execution-trace-supervisor');
+    expect(supervisor).toHaveTextContent('Supervisor');
+    expect(within(supervisor).getByTestId('execution-trace-step-person')).toHaveTextContent(
+      TRACE_PEOPLE.santiago.displayName,
+    );
+    expect(within(comenzar).getByTestId('execution-trace-team-count')).toHaveTextContent('Equipo de trabajo · 3');
+
+    const equipo = within(comenzar).getByRole('list', { name: 'Equipo de trabajo · 3' });
+    expect(equipo.tagName).toBe('UL');
+    const miembros = within(equipo).getAllByTestId('execution-trace-team-member');
+    expect(miembros.map((m) => m.textContent)).toEqual([
+      `LG${TRACE_PEOPLE.laura.displayName}Grupo de trabajo: ${WORK_GROUP_NAME}`,
+      `MS${TRACE_PEOPLE.mateo.displayName}Grupo de trabajo: ${WORK_GROUP_NAME}`,
+      `VH${TRACE_PEOPLE.valentina.displayName}`,
+    ]);
+    for (const miembro of miembros) expect(miembro).toHaveClass('min-h-10');
+    const grupo = within(miembros[0]).getByTestId('execution-trace-team-group');
+    expect(within(grupo).getByText('Grupo de trabajo:')).toHaveClass('sr-only');
+    expect(grupo.querySelector('svg')).toHaveClass('lucide-users');
+    expect(grupo.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(miembros[2]).queryByTestId('execution-trace-team-group')).toBeNull();
+    expect(within(comenzar).queryByTestId('execution-trace-no-team')).toBeNull();
+  });
+
+  it('R13 - un miembro que el directorio no devuelve se pinta «—» con «Sin dato»', () => {
+    const steps = FINISHED_CONDITIONING_TRACE.steps.map((step) =>
+      step.action === 'conditioning_start' ? { ...step, team: [{ ...MIXED_TEAM[2], displayName: null }] } : step,
+    );
+    render(<ExecutionTraceDetail trace={{ ...FINISHED_CONDITIONING_TRACE, steps }} backHref={DASHBOARD_ROUTE} />);
+    const miembro = within(paso('conditioning_start')).getByTestId('execution-trace-team-member');
+    expect(within(miembro).getByLabelText('Sin dato')).toHaveTextContent('—');
+  });
+
+  it('R14 - sin equipo', () => {
+    render(<ExecutionTraceDetail trace={IN_PROGRESS_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const comenzar = paso('conditioning_start');
+    expect(within(comenzar).getByTestId('execution-trace-team-count')).toHaveTextContent('Equipo de trabajo · 0');
+    expect(within(comenzar).getByTestId('execution-trace-no-team')).toHaveTextContent(
+      'Se comenzó sin equipo de trabajo.',
+    );
+    expect(within(comenzar).queryByRole('list')).toBeNull();
+    expect(within(comenzar).queryByTestId('execution-trace-team-member')).toBeNull();
+  });
+
+  it('R15 - quien guardo, n presentaciones, lineas con fechas dd/mm/aaaa y aviso', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const cuerpo = within(paso('conditioning_batch_save', 0)).getByTestId('execution-trace-batch-save');
+    expect(cuerpo.firstElementChild).toHaveTextContent(`GuardóSV${TRACE_PEOPLE.santiago.displayName}2 presentaciones`);
+    expect(within(cuerpo).getByTestId('execution-trace-step-person')).toHaveTextContent(
+      TRACE_PEOPLE.santiago.displayName,
+    );
+    expect(within(cuerpo).getByTestId('execution-trace-batch-count')).toHaveTextContent('2 presentaciones');
+
+    const tabla = within(cuerpo).getByRole('table');
+    expect(within(tabla).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+      'Lote',
+      'Presentación',
+      'Vencimiento',
+      'Día de producción',
+    ]);
+    expect(filasDeTabla(cuerpo)).toEqual([
+      ['L-0000', 'Galón 3,78 L', '02/10/2028', '02/10/2026'],
+      ['L-0001', 'Litro 1 L', '02/10/2028', '02/10/2026'],
+    ]);
+    const [lote, , vence, producido] = Array.from(within(tabla).getAllByRole('row')[1].querySelectorAll('td'));
+    expect(lote).toHaveClass('font-mono');
+    expect(vence).toHaveClass('font-mono', 'text-right');
+    expect(producido).toHaveClass('font-mono', 'text-right');
+
+    const aviso = within(cuerpo).getByTestId('execution-trace-batch-notice');
+    expect(aviso).toHaveTextContent('Datos tal como se guardaron en ese momento');
+    expect(aviso.querySelector('svg')).toHaveClass('lucide-camera');
+  });
+
+  it('R15 - un guardado de una linea dice «1 presentación»', () => {
+    render(<ExecutionTraceDetail trace={IN_PROGRESS_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(within(paso('conditioning_batch_save')).getByTestId('execution-trace-batch-count')).toHaveTextContent(
+      /^1 presentación$/,
+    );
+  });
+
+  it('R15 - la correccion es otro guardado con su propia foto; la primera no cambia', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    expect(filasDeTabla(paso('conditioning_batch_save', 0)).map((fila) => fila[0])).toEqual(
+      FIRST_SAVE_LINES.map((l) => l.lot),
+    );
+    expect(filasDeTabla(paso('conditioning_batch_save', 1)).map((fila) => fila[0])).toEqual(
+      CORRECTION_SAVE_LINES.map((l) => l.lot),
+    );
+  });
+
+  it('R16 - presentacion sin nombre', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const correccion = paso('conditioning_batch_save', 1);
+    expect(filasDeTabla(correccion)[1]).toEqual(['L-0001', '—', '02/10/2028', '02/10/2026']);
+    const tabla = within(correccion).getByTestId('execution-trace-batch-table');
+    expect(within(tabla).getByLabelText('Sin dato')).toHaveTextContent('—');
+    const tarjeta = within(correccion).getAllByTestId('execution-trace-batch-card')[1];
+    expect(within(tarjeta).getByLabelText('Sin dato')).toHaveTextContent('—');
+    expect(within(paso('conditioning_batch_save', 0)).queryByLabelText('Sin dato')).toBeNull();
+  });
+
+  it('R17 - Terminar solo con quien', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const terminar = paso('conditioning_finish');
+    expect(within(terminar).getByTestId('execution-trace-step-person')).toHaveTextContent(
+      TRACE_PEOPLE.santiago.displayName,
+    );
+    for (const testId of [
+      'execution-trace-supervisor',
+      'execution-trace-team-count',
+      'execution-trace-batch-save',
+      'execution-trace-step-reason',
+      'execution-trace-step-gap',
+    ]) {
+      expect(within(terminar).queryByTestId(testId)).toBeNull();
+    }
+    expect(terminar.textContent).toBe(
+      `Terminar acondicionamiento2026-10-02 15:10:00SV${TRACE_PEOPLE.santiago.displayName}`,
+    );
+  });
+
+  it('R18 - tarjetas de linea con los mismos datos', () => {
+    render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
+    const primero = paso('conditioning_batch_save', 0);
+    const contenedor = within(primero).getByTestId('execution-trace-batch-cards');
+    expect(contenedor).toHaveClass('hidden', '@max-[760px]:flex');
+    expect(within(primero).getByTestId('execution-trace-batch-table')).toHaveClass('@max-[760px]:hidden');
+    expect(primero.closest('[data-slot="page-shell"]')).toHaveClass('@container');
+
+    const tarjetas = within(contenedor).getAllByTestId('execution-trace-batch-card');
+    expect(tarjetas).toHaveLength(FIRST_SAVE_LINES.length);
+    const [arriba, abajo] = Array.from(tarjetas[0].children);
+    expect(arriba).toHaveTextContent('L-0000Galón 3,78 L');
+    expect(abajo).toHaveTextContent('Vence 02/10/2028Producido 02/10/2026');
+
+    const filas = filasDeTabla(primero);
+    tarjetas.forEach((tarjeta, i) => {
+      for (const dato of filas[i]) expect(tarjeta).toHaveTextContent(dato);
+    });
   });
 });

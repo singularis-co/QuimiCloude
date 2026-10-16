@@ -32,6 +32,12 @@
  * **2026-10-09**: `whatsapp_connection_not_found`, `whatsapp_connection_exists`,
  * `whatsapp_phone_number_taken`.
  * **2026-10-09**: `delivery_not_found`, `delivery_already_voided`.
+ * **2026-10-13**: `company_not_found`.
+ * **2026-10-13**: `evidence_required`, `evidence_limit`, `evidence_invalid_file`,
+ * `evidence_not_found`, `recipe_steps_locked`.
+ * **2026-10-14**: `company_duplicate_name`, `company_duplicate_tax_id`, `company_name_mismatch`,
+ * `company_not_deleted`.
+ * **2026-10-14**: `packed_exceeds_quantity`, `packaging_stock_insufficient`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -191,6 +197,31 @@ export const ERROR_CODES = [
   // Distinto de `action_not_allowed`: el pedido admite anular, pero alguna presentacion elegida ya
   // estaba anulada en esa entrega.
   'delivery_already_voided',
+  'company_not_found',
+  // Distinto de `invalid_transition`: el pedido admite la accion, lo que falta es al menos una foto
+  // en un paso que la exige.
+  'evidence_required',
+  // Distinto de `invalid_input`: la peticion es valida, pero el paso ya tiene sus 3 fotos.
+  'evidence_limit',
+  // Distinto de `invalid_input`: la peticion es valida; lo que no sirve es el archivo subido, leido
+  // por su contenido.
+  'evidence_invalid_file',
+  // Distinto de `order_not_found`: el pedido existe, lo que falta es la foto.
+  'evidence_not_found',
+  // Distinto de `invalid_input`: la formula es valida, pero mover o quitar pasos dejaria fotos de
+  // pedidos en curso atadas a otro paso.
+  'recipe_steps_locked',
+  'ai_provider_missing',
+  'ai_provider_error',
+  'company_duplicate_name',
+  'company_duplicate_tax_id',
+  'company_name_mismatch',
+  // Distinto de `company_not_found`: la empresa existe, pero no esta de baja.
+  'company_not_deleted',
+  // Distinto de `order_distribution_exceeds_quantity`: el plan cabe, lo que se pasa es lo envasado.
+  'packed_exceeds_quantity',
+  // Distinto de `insufficient_material`: lo que falta es stock libre del envase para el exceso.
+  'packaging_stock_insufficient',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

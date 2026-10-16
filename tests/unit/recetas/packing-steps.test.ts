@@ -13,6 +13,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 const EMPRESA = 'empresa-1';
 const ACTOR: Actor = { id: 'actor-1', companyId: EMPRESA, permissions: ['recetas.consultar', 'recetas.modificar'] };
@@ -81,6 +82,7 @@ function repositorio(fila: RecipeRow | null): RecipeRepository {
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     createVersion: vi.fn<RecipeRepository['createVersion']>(async () => ({ id: 'version-nueva' })),
     listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(async () => []),
     replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => ({
       kind: 'ok',
       propagated: [{ versionId: V_1, isUnderReview: false }],
@@ -112,7 +114,7 @@ function montar(fila: RecipeRow | null = ORIGINAL) {
     products,
     images,
     create: createCreateRecipe(deps),
-    update: createUpdateRecipe(deps),
+    update: createUpdateRecipe({ ...deps, stepLocks: noEvidenceLocks }),
     get: createGetRecipe(deps),
     createVersion: createCreateRecipeVersion(deps),
     updateVersion: createUpdateRecipeVersion(deps),

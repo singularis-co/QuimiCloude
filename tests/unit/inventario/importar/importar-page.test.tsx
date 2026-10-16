@@ -8,7 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import InventarioPage from '@/app/(private)/inventario/page';
 import InventoryImportPage, { maxDuration } from '@/app/(private)/inventario/importar/page';
-import { IMPORT_SCREEN_TESTID, IMPORT_TITLE_TESTID } from '@/app/(private)/inventario/importar/components';
+import {
+  GUIDE_TESTID,
+  IMPORT_SCREEN_TESTID,
+  IMPORT_TITLE_TESTID,
+} from '@/app/(private)/inventario/importar/components';
 import { PERMISSIONS } from '@/lib/modules/identity';
 import type { ProductFormUnitsResult } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
@@ -54,17 +58,23 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 vi.mock('@/lib/modules/inventario/adapters/driving/inventory-import-actions', () => ({
   previewInventoryImportAction: vi.fn(),
   confirmInventoryImportAction: vi.fn(),
+  getInventoryImportTemplateAction: vi.fn(),
+  getInventoryImportValuesAction: vi.fn(async () => ({
+    status: 'success',
+    data: { units: ['kilogramo'], presentations: ['Bidón 20 L'], formulas: ['Desengrasante'] },
+  })),
 }));
 
 const TODOS_LOS_PERMISOS = PERMISSIONS.map((permiso) => permiso.code);
 
-function sesionCon(permissions: readonly string[]) {
+function sesionCon(permissions: readonly string[], addons: readonly string[] = ['importacion_excel']) {
   return {
     id: '99999999-9999-4999-8999-999999999999',
     username: 'admin.prueba',
     displayName: 'Admin De Prueba',
     roleName: 'Administrador',
     permissions,
+    addons,
   };
 }
 
@@ -110,6 +120,16 @@ describe('pantalla /inventario/importar', () => {
     expect(notFoundMock).not.toHaveBeenCalled();
   });
 
+  it('R13 R14 sin el añadido importacion_excel responde 404 y no pide nada', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(TODOS_LOS_PERMISOS, []));
+
+    await expect(InventoryImportPage()).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(notFoundMock).toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(listUnitsActionMock).not.toHaveBeenCalled();
+  });
+
   it('R2 con inventario.modificar pinta la pantalla y pide las unidades una vez', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(['inventario.modificar']));
 
@@ -118,6 +138,7 @@ describe('pantalla /inventario/importar', () => {
     expect(screen.getByTestId(IMPORT_TITLE_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId(IMPORT_SCREEN_TESTID)).toBeInTheDocument();
     expect(listUnitsActionMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId(GUIDE_TESTID)).toBeInTheDocument();
   });
 
   it('si las unidades no se pueden leer, la pantalla se pinta igual', async () => {
@@ -144,6 +165,12 @@ describe('enlace «Importar» en /inventario', () => {
 
   it('R2 no aparece sin inventario.modificar', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(['inventario.consultar']));
+
+    expect(contieneEnlaceA(await arbolDeInventario(), INVENTORY_IMPORT_ROUTE)).toBe(false);
+  });
+
+  it('R16 no aparece sin el añadido importacion_excel, aunque tenga inventario.modificar', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(TODOS_LOS_PERMISOS, []));
 
     expect(contieneEnlaceA(await arbolDeInventario(), INVENTORY_IMPORT_ROUTE)).toBe(false);
   });

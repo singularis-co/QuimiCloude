@@ -1,7 +1,7 @@
 import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
-import { requirePermission, type Actor } from './actor';
+import { requireAddon, requirePermission, type Actor } from './actor';
 import { detectImportFileFormat } from './import-file-format';
 import { parseImportSheet, type ParsedImportSheet } from './import-sheet';
 import {
@@ -166,6 +166,7 @@ export function createPreviewInventoryImport(deps: PreviewInventoryImportDeps): 
 
   return async function previewInventoryImport(input, actor) {
     requirePermission(actor, 'inventario.modificar');
+    requireAddon(actor, 'importacion_excel');
     const scope = { companyId: actor.companyId };
 
     const outcome = await readInventoryImport(deps, input, scope, civilDateUtc(now()));

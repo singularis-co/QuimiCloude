@@ -27,6 +27,7 @@ import type {
   SessionUserReader,
   SessionUserRecord,
 } from '@/lib/modules/identity/ports/session-user-reader';
+import { ADDONS, CORE_PERMISSIONS, PERMISSIONS } from '@/lib/modules/identity';
 
 const SUB = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
@@ -64,6 +65,7 @@ const RECORD: SessionUserRecord = {
   roleName: 'operador',
   companyId: COMPANY_ID,
   companyDeletedAt: null,
+  companyAddons: [...ADDONS],
   // QC-74 T8 (R7, R11): el record trae ya los permisos del rol. Los cortes de esta cadena no
   // los miran —quien los mira es `assertPermission` en cada caso de uso—, asi que aqui basta
   // con una lista no vacia que se pueda seguir hasta la proyeccion.
@@ -183,6 +185,7 @@ describe('createResolveSession', () => {
         roleName: 'operador',
         // QC-74 T8 (R7): la proyeccion de usuario lleva los permisos del record, tal cual.
         permissions: ['inventario.consultar'],
+        addons: [...ADDONS],
       },
       context: {
         userId: SUB,
@@ -309,6 +312,7 @@ describe('createResolveSession — corte por estado de cuenta (QC-78)', () => {
         displayName: 'Ana Perez',
         roleName: 'operador',
         permissions: ['inventario.consultar'],
+        addons: [...ADDONS],
       },
       context: {
         userId: SUB,
@@ -712,6 +716,7 @@ describe('createResolveSession — sesion sin empresa (QC-161)', () => {
         displayName: 'Ana Perez',
         roleName: 'Maestro',
         permissions: ['empresas.consultar', 'empresas.modificar'],
+        addons: [],
       },
       context: null,
     });
@@ -763,5 +768,101 @@ describe('createResolveSession — sesion sin empresa (QC-161)', () => {
       ),
     ).resolves.toBeNull();
     expect(users.findActiveById).not.toHaveBeenCalled();
+  });
+});
+
+// ================================================================================================
+// El recorte por añadidos: rol ∩ añadidos activos de la empresa.
+// ================================================================================================
+
+describe('createResolveSession — recorte por añadidos de la empresa', () => {
+  const ROL_COMPLETO = PERMISSIONS.map((p) => p.code as string);
+
+  async function resolver(record: SessionUserRecord, claims: SessionClaims = CLAIMS_VIGENTES) {
+    const users = fakeUserReader(record);
+    const resultado = await createResolveSession({
+      session: fakeSessionReader(claims),
+      users,
+      ...REGISTRO_QC23,
+    })(AHORA);
+    return { resultado, users };
+  }
+
+  it('R8 — con empresa, los permisos son los del rol menos los de cada añadido no activo, y addons expone los activos', async () => {
+    const { resultado, users } = await resolver({
+      ...RECORD,
+      permissions: ROL_COMPLETO,
+      companyAddons: ['dashboard', 'lectura_pdf'],
+    });
+
+    expect(resultado).not.toBeNull();
+    // lectura_pdf sin integraciones no es activo.
+    expect(resultado!.user.addons).toEqual(['dashboard']);
+    expect(resultado!.user.permissions).toContain('dashboard.consultar');
+    expect(resultado!.user.permissions).toContain('inventario.consultar');
+    for (const recortado of [
+      'proveedores.consultar',
+      'proveedores.modificar',
+      'documentos.consultar',
+      'documentos.modificar',
+      'integraciones.modificar',
+    ]) {
+      expect(resultado!.user.permissions).not.toContain(recortado);
+    }
+    expect([...resultado!.user.permissions].sort()).toEqual(
+      [...CORE_PERMISSIONS, 'dashboard.consultar'].sort(),
+    );
+    // Sigue siendo una sola lectura por petición.
+    expect(users.findActiveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R8 — con empresa y sin ningún añadido quedan solo los permisos del núcleo', async () => {
+    const { resultado } = await resolver({ ...RECORD, permissions: ROL_COMPLETO, companyAddons: [] });
+
+    expect(resultado!.user.addons).toEqual([]);
+    expect([...resultado!.user.permissions].sort()).toEqual([...CORE_PERMISSIONS].sort());
+  });
+
+  it('R8 — interruptores desconocidos se ignoran: no exponen añadidos ni conceden nada', async () => {
+    const { resultado } = await resolver({
+      ...RECORD,
+      permissions: ['inventario.consultar', 'dashboard.consultar'],
+      companyAddons: ['pedidos', 'x'],
+    });
+
+    expect(resultado!.user.addons).toEqual([]);
+    expect(resultado!.user.permissions).toEqual(['inventario.consultar']);
+  });
+
+  it('R10 — sin empresa, los permisos del rol pasan enteros y no hay añadidos', async () => {
+    const { resultado } = await resolver(
+      { ...RECORD, roleName: 'Maestro', companyId: null, companyAddons: [], permissions: ROL_COMPLETO },
+      { ...CLAIMS_VIGENTES, companyId: null },
+    );
+
+    expect(resultado!.context).toBeNull();
+    expect(resultado!.user.permissions).toEqual(ROL_COMPLETO);
+    expect(resultado!.user.addons).toEqual([]);
+  });
+
+  it('R11 — un añadido activo nunca concede un permiso que el rol no tiene', async () => {
+    const { resultado } = await resolver({
+      ...RECORD,
+      permissions: ['inventario.consultar'],
+      companyAddons: [...ADDONS],
+    });
+
+    expect(resultado!.user.addons).toEqual([...ADDONS]);
+    expect(resultado!.user.permissions).toEqual(['inventario.consultar']);
+  });
+
+  it('R8 — el recorte no reabre ningún corte: una empresa de baja sigue sin sesión', async () => {
+    const { resultado } = await resolver({
+      ...RECORD,
+      companyDeletedAt: EMPRESA_DADA_DE_BAJA,
+      companyAddons: [...ADDONS],
+    });
+
+    expect(resultado).toBeNull();
   });
 });

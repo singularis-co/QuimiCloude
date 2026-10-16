@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { ApproximateMark, NotConvertibleNotice } from '@/components/shared/unit-conversion-marks';
+import { NotConvertibleNotice } from '@/components/shared/unit-conversion-marks';
 import {
   Select,
   SelectContent,
@@ -35,7 +35,6 @@ export const ORDER_EXECUTION_LINE_QUANTITY_TESTID = 'order-execution-line-quanti
 export const ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID = 'order-execution-line-unit-select';
 export const ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID = 'order-execution-line-unit-option';
 export const ORDER_EXECUTION_LINE_UNIT_TESTID = 'order-execution-line-unit';
-export const ORDER_EXECUTION_LINE_APPROXIMATE_TESTID = 'order-execution-line-approximate';
 export const ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID = 'order-execution-line-not-convertible';
 export const PRODUCT_NAME_FALLBACK = 'Producto no disponible';
 
@@ -73,7 +72,9 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
       >
         {productLabel}
       </span>
-      <span className="flex min-w-0 flex-wrap items-center gap-3">
+      {/* Crece para ocupar el resto de la fila (o la fila entera cuando baja de linea): la unidad,
+          con `ml-auto`, queda siempre en el extremo derecho, opuesta al nombre. */}
+      <span className="flex min-w-0 flex-[1_1_auto] flex-wrap items-center gap-3">
         <span aria-hidden="true" className="text-base text-muted-foreground">
           {' · '}
         </span>
@@ -110,7 +111,7 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
           >
             <SelectTrigger
               aria-label={`Unidad de ${productLabel}`}
-              className={`${touchTarget} ${FIELD_TEXT}`}
+              className={`ml-auto ${touchTarget} ${FIELD_TEXT}`}
               data-testid={`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-${index}`}
             >
               <SelectValue data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`} />
@@ -130,18 +131,12 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
         ) : (
           <span
             data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`}
-            className="text-base text-muted-foreground"
+            className="ml-auto text-base text-muted-foreground"
           >
             {' '}
             {unitLabel(line.unit)}
           </span>
         )}
-        {line.need === 'approximate' ? (
-          <ApproximateMark
-            testId={`${ORDER_EXECUTION_LINE_APPROXIMATE_TESTID}-${index}`}
-            className="text-base"
-          />
-        ) : null}
       </span>
     </li>
   );

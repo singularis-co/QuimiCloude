@@ -14,7 +14,7 @@ import {
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
 import * as privateNav from '@/lib/shared/navigation/private-nav';
-import { ASSIGNED_ORDERS_ROUTE, DASHBOARD_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { DASHBOARD_ROUTE, FORMULAS_ROUTE, HOME_ROUTE } from '@/lib/shared/routes';
 import type { SessionUser } from '@/lib/modules/identity';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
@@ -61,9 +61,8 @@ function primerGrupo(): NavGroup {
  * El orden REAL en el que `AppSidebar` dibuja los items de nivel superior: agrupados por
  * `section` con `groupNavItemsBySection`, no el orden crudo de `PRIVATE_NAV_ITEMS`.
  *
- * Antes de que «Usuarios» pasara a `NAV_SECTION_OPERATION` (2026-09-21), ambos ordenes
- * coincidian porque cada seccion era un bloque contiguo del array. Dejaron de coincidir en
- * cuanto un item cambio de seccion sin moverse de sitio en el array: el DOM sigue la seccion.
+ * Hoy ambos ordenes coinciden porque cada seccion es un bloque contiguo del array, pero si un
+ * item cambiara de seccion sin moverse de sitio en el array, el DOM seguiria la seccion.
  */
 function ordenDeNivelSuperiorEnDom(): readonly NavItem[] {
   return privateNav.groupNavItemsBySection(PRIVATE_NAV_ITEMS).flatMap((seccion) => seccion.items);
@@ -199,15 +198,15 @@ describe('barra lateral privada', () => {
     expect(screen.getAllByRole('navigation')).toHaveLength(1);
   });
 
-  it('la marca es un enlace a ASSIGNED_ORDERS_ROUTE con nombre accesible', () => {
-    // R4
+  it('la marca es un enlace a HOME_ROUTE con nombre accesible', () => {
+    // R4; QC-277 R18: el logo pasa por HOME_ROUTE (design.md § 7.2)
     renderSidebar();
 
     const enlace = screen.getByTestId(testId.brandLink);
 
     expect(screen.getByTestId(testId.brand)).toContainElement(enlace);
     expect(enlace).toHaveRole('link');
-    expect(enlace).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
+    expect(enlace).toHaveAttribute('href', HOME_ROUTE);
     expect(enlace).toHaveAccessibleName(BRAND_LABEL);
   });
 
@@ -256,24 +255,19 @@ describe('barra lateral privada', () => {
       entrada.querySelector('[data-testid]')?.getAttribute('data-testid'),
     );
     // La lista va A MANO y no sale de `groupNavItemsBySection`: si esa funcion ordenara mal, una
-    // expectativa derivada de ella se moveria junto con el DOM y R6 dejaria de cazar el fallo. El
-    // orden lo manda la SECCION (Operacion, Cadena, Configuracion), no la posicion en el array:
-    // «Usuarios» es el ultimo item declarado en `PRIVATE_NAV_ITEMS` pero se dibuja junto a los
-    // demas de «Operación».
-    // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard; se dibuja detras de
-    // «Asignación», dentro de «Operación».
+    // expectativa derivada de ella se moveria junto con el DOM y R6 dejaria de cazar el fallo.
+    // Secciones: Seguimiento, Operación, Producción, Directorio y Configuración.
     const esperado = [
-      'nav-asignacion',
       'nav-dashboard',
       'nav-inventario',
       'nav-pedidos',
-      'nav-usuarios',
-      'nav-produccion',
+      'nav-asignacion',
+      'nav-produccion-recetas',
       'nav-proveedores',
       'nav-clientes',
+      'nav-usuarios',
       'nav-presentaciones',
       'nav-unidades',
-      // «Integraciones» es el ultimo item de «Configuración»: se dibuja detras de Unidades.
       'nav-integraciones',
     ];
 
@@ -438,7 +432,7 @@ describe('barra lateral privada', () => {
       }
     }
 
-    const esperados = new Set<string>([ASSIGNED_ORDERS_ROUTE]);
+    const esperados = new Set<string>([HOME_ROUTE]);
     for (const item of PRIVATE_NAV_ITEMS) {
       if (item.kind === 'link') {
         expect(screen.getByTestId(item.testId)).toHaveAttribute('href', item.href);
@@ -451,7 +445,7 @@ describe('barra lateral privada', () => {
       }
     }
 
-    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
+    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', HOME_ROUTE);
 
     // Y ningun destino del arbol queda fuera del conjunto de constantes.
     const enDom = Array.from(document.querySelectorAll('a[href]')).map((enlace) =>
@@ -463,15 +457,13 @@ describe('barra lateral privada', () => {
     }
   });
 
-  it('el item de recetas apunta a la constante FORMULAS_ROUTE, es el unico, y el enlace muestra RECIPES_LABEL (R5)', async () => {
+  it('el item de recetas apunta a la constante FORMULAS_ROUTE, es el unico, y el enlace muestra RECIPES_LABEL (R5)', () => {
     // R5 — QC-26 T23. El item nace en el barrel `private-nav.ts` (T3) ya migrado; aqui se
     // afirma sobre el DOM real: un solo item apunta a `FORMULAS_ROUTE`, con el testId nuevo, y
     // el testId viejo (`nav-produccion-formulas`) ya no existe en ningun sitio del arbol.
     // Decision humana del 2026-09-21: el literal 'Fórmulas' deja de ser el nombre placeholder
     // que QC-13 desterro y pasa a ser el nombre definitivo de esta pantalla; la aserción del
     // enlace compara contra RECIPES_LABEL, la unica fuente de verdad, no contra un literal.
-    const user = setupUser();
-
     const itemsDeRecetas = PRIVATE_NAV_ITEMS.flatMap((item) =>
       item.kind === 'group' ? item.items : [item],
     ).filter((item) => item.href === FORMULAS_ROUTE);
@@ -482,20 +474,7 @@ describe('barra lateral privada', () => {
     expect(itemRecetas.testId).toBe('nav-produccion-recetas');
     expect(itemRecetas.label).toBe(RECIPES_LABEL);
 
-    const grupo = PRIVATE_NAV_ITEMS.find(
-      (item): item is NavGroup =>
-        item.kind === 'group' && item.items.some((hijo) => hijo.href === FORMULAS_ROUTE),
-    );
-    if (!grupo) {
-      throw new Error('ningun grupo de PRIVATE_NAV_ITEMS contiene el item de recetas');
-    }
-
     renderSidebar();
-
-    await user.click(screen.getByTestId(grupo.testId));
-    await waitFor(() =>
-      expect(screen.getByTestId(grupo.testId)).toHaveAttribute('aria-expanded', 'true'),
-    );
 
     const enlace = screen.getByTestId('nav-produccion-recetas');
     expect(enlace).toHaveAttribute('href', FORMULAS_ROUTE);
@@ -547,96 +526,38 @@ describe('el borrado de items de relleno (QC-13)', () => {
     }
   });
 
-  it('PRIVATE_NAV_ITEMS tiene exactamente nueve entradas de nivel superior en orden', () => {
-    // R5. AMPLIADO el 2026-09-04 (QC-44 T2, R4): la CUARTA entrada es la pantalla de proveedores,
-    // item de nivel superior de la seccion «Cadena» -hermano del grupo de produccion, no hijo
-    // suyo-. El centinela no se relaja: sigue exigiendo la lista exacta y su orden, asi que una
-    // quinta entrada sin ficha que la respalde lo vuelve a poner en rojo. El destino y la
-    // etiqueta del item nuevo los afirma
-    // `tests/unit/proveedores/supplier-route-contract.test.ts` sobre `SUPPLIERS_ROUTE` y
-    // `SUPPLIERS_LABEL`, nunca sobre el literal del copy.
-    // AMPLIADO otra vez el 2026-09-06 (QC-35 T2, R3): la entrada nueva es la pantalla de
-    // pedidos, item de nivel superior de la seccion «Operación» —hermano de Dashboard e
-    // Inventario— y por eso va detras de ellos y delante del grupo de produccion. El centinela
-    // no se relaja: sigue exigiendo la lista exacta y su orden, asi que una sexta entrada sin
-    // ficha que la respalde lo vuelve a poner en rojo. El destino y la etiqueta del item nuevo
-    // los afirma `tests/unit/pedidos-ui/private-nav-pedidos.test.ts` sobre `ORDERS_ROUTE` y
-    // `ORDERS_LABEL`, nunca sobre el literal del copy.
-    // AMPLIADO otra vez el 2026-09-08 (QC-45 T2, R3): la entrada nueva es la pantalla de
-    // presentaciones, unico item de la seccion «Configuración» y ULTIMO del array —seccion nueva
-    // que se abre detras de las que ya habia—. El centinela no se relaja: sigue exigiendo la
-    // lista exacta y su orden, asi que una septima entrada sin ficha que la respalde lo vuelve a
-    // poner en rojo. El destino, la etiqueta y el permiso del item nuevo los afirma
-    // `tests/unit/configuracion-ui/private-nav-configuracion.test.ts` sobre `PRESENTATIONS_ROUTE`
-    // y `PRESENTATIONS_LABEL`, nunca sobre el literal del copy.
-    // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): la entrada nueva es la pantalla de unidades,
-    // SEGUNDO item de la seccion «Configuración» que QC-45 ya habia abierto -no se crea seccion
-    // ninguna- y ULTIMO del array, detras de presentaciones, al que no se toca ni se reordena. El
-    // ancla se TENSA, nunca se afloja (R47): sube de seis a siete y sigue exigiendo la lista
-    // exacta y su orden, asi que una octava entrada sin ficha que la respalde lo vuelve a poner en
-    // rojo. El destino, la etiqueta y el permiso del item nuevo los afirma
-    // `tests/unit/configuracion-ui/private-nav-unidades.test.ts` sobre `UNITS_ROUTE` y
-    // `UNITS_LABEL`, nunca sobre el literal del copy.
-    // TENSADO el 2026-09-11 (QC-67 T2, R2/R39): la entrada nueva es la pantalla de usuarios,
-    // ULTIMO del array, detras de unidades. El ancla se TENSA, nunca se afloja: sube de siete a
-    // OCHO y sigue exigiendo la lista exacta y su orden, asi que una novena entrada sin ficha que
-    // la respalde lo vuelve a poner en rojo. El destino, la etiqueta y el permiso del item nuevo
-    // los afirma `tests/unit/configuracion-ui/private-nav-usuarios.test.ts` sobre `USERS_ROUTE` y
-    // `USERS_LABEL`, nunca sobre el literal del copy.
-    // POR DECISION HUMANA del 2026-09-21, `nav-usuarios` paso de la seccion «Configuración» a
-    // «Operación» -usuarios es operacion, no configuracion-: NO se movio de sitio en el array,
-    // solo cambio su `section`, asi que este centinela de POSICION sigue exigiendo la MISMA lista
-    // y el MISMO orden.
-    // «Asignación» va ENTRE Dashboard e Inventario, no al final: el aterrizaje de quien no tiene
-    // `dashboard.consultar` es el primer item visible de su menu, asi que ese orden lo decide.
-    //
-    // TENSADO: la entrada nueva es la pantalla de clientes, ULTIMO del array y de la seccion
-    // «Cadena», detras de proveedores. El ancla se TENSA, nunca se afloja: sube de nueve a DIEZ.
-    // El dashboard esta fuera temporalmente: vive en `HIDDEN_DASHBOARD_NAV_ITEM`.
-    // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard. Vuelve a DIEZ, con
-    // el dashboard SEGUNDO, detras de «Asignación», para no cambiar el aterrizaje de nadie.
+  it('PRIVATE_NAV_ITEMS tiene exactamente once entradas de nivel superior en orden', () => {
+    // R5. Centinela de POSICION: exige la lista exacta y su orden, asi que una entrada nueva sin
+    // ficha que la respalde lo pone en rojo. El orden del array decide tambien el aterrizaje tras
+    // el login (`firstVisibleNavHref`).
     expect(PRIVATE_NAV_ITEMS).toHaveLength(11);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
-      'nav-asignacion',
       'nav-dashboard',
       'nav-inventario',
       'nav-pedidos',
-      'nav-produccion',
+      'nav-asignacion',
+      'nav-produccion-recetas',
       'nav-proveedores',
+      'nav-clientes',
+      'nav-usuarios',
       'nav-presentaciones',
       'nav-unidades',
-      'nav-usuarios',
-      'nav-clientes',
       'nav-integraciones',
     ]);
   });
 
-  it('el grupo nav-produccion conserva un unico hijo: el item de recetas', () => {
-    // R6. La asercion original comparaba contra el literal 'nav-produccion-formulas'. QC-26
-    // (R5) le cambio el testId a 'nav-produccion-recetas', y volver a escribir aqui a mano el
-    // literal nuevo repetiria el mismo error que rompio este test hoy: dos copias sueltas de un
-    // mismo dato que solo una de las dos actualiza. En su lugar se deriva el testId esperado del
-    // propio `PRIVATE_NAV_ITEMS`, localizando el item por `FORMULAS_ROUTE` -la fuente que ya usa
-    // el test de R5 de este archivo-, asi que si alguien vuelve a renombrar el testId, ambos
-    // lados de la comparacion se mueven juntos. Lo que esta ficha (QC-13) garantiza sigue igual:
-    // el grupo tiene exactamente un hijo. Actualizado el 2026-09-03 al resolver el conflicto de
-    // F2.3 (merge con dev).
-    const grupoProduccion = PRIVATE_NAV_ITEMS.find(
-      (item): item is NavGroup => item.kind === 'group' && item.testId === 'nav-produccion',
+  it('el item de recetas es un enlace de nivel superior y ya no cuelga de un grupo nav-produccion', () => {
+    // R6. Derivado de `FORMULAS_ROUTE` y no del literal del testId.
+    const deNivelSuperior = PRIVATE_NAV_ITEMS.filter(
+      (item): item is NavLink => item.kind === 'link' && item.href === FORMULAS_ROUTE,
     );
-    if (!grupoProduccion) {
-      throw new Error('PRIVATE_NAV_ITEMS no contiene el grupo nav-produccion');
-    }
+    expect(deNivelSuperior).toHaveLength(1);
 
-    const itemRecetas = PRIVATE_NAV_ITEMS.flatMap((item) =>
-      item.kind === 'group' ? item.items : [item],
-    ).find((item) => item.href === FORMULAS_ROUTE);
-    if (!itemRecetas) {
-      throw new Error('PRIVATE_NAV_ITEMS no contiene el item de recetas (FORMULAS_ROUTE)');
-    }
-
-    expect(grupoProduccion.items).toHaveLength(1);
-    expect(grupoProduccion.items[0]?.testId).toBe(itemRecetas.testId);
+    const hijosDeGrupos = PRIVATE_NAV_ITEMS.flatMap((item) =>
+      item.kind === 'group' ? item.items : [],
+    );
+    expect(hijosDeGrupos.map((hijo) => hijo.href)).not.toContain(FORMULAS_ROUTE);
+    expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).not.toContain('nav-produccion');
   });
 
   // El test «FORMULAS_ROUTE y su item se conservan intactos: terreno de QC-26» vivia aqui y lo

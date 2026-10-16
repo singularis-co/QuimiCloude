@@ -12,10 +12,19 @@ import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
+import { ExpiryDate, useLocalToday } from './expiry-date';
+import { daysUntil, isExpiringSoon } from './expiry-warning';
+
 const LOT_LABEL = 'Lote';
 const QUANTITY_LABEL = 'Cantidad';
 const PURCHASE_DATE_LABEL = 'Fecha de compra';
 const EXPIRY_DATE_LABEL = 'Vencimiento';
+const EXPIRED_LABEL = 'Vencido';
+const EXPIRY_TEST_IDS = {
+  date: 'product-batch-expiry-date',
+  relative: 'product-batch-expiry-relative',
+  expired: 'product-batch-expired',
+} as const;
 const RESERVED_LABEL = 'Apartado';
 const AVAILABLE_LABEL = 'Disponible';
 const OVER_RESERVED_LABEL = 'Sobre-reservado';
@@ -149,6 +158,8 @@ export function ProductBatchesPanel({
   product,
 }: ProductBatchesPanelProps) {
   const packaging = packagingInfo(product);
+  // Sin «hoy» (servidor) no se marca ningun vencimiento: se pinta tras hidratar.
+  const today = useLocalToday();
   const header =
     packaging === null ? null : packaging.kind === 'legacy' ? (
       <p
@@ -193,64 +204,76 @@ export function ProductBatchesPanel({
             className="flex flex-col gap-2 rounded-lg border p-3"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <dl className="flex flex-wrap gap-4 text-sm">
-                <div className="flex flex-col">
-                  <dt className="text-xs text-muted-foreground">{LOT_LABEL}</dt>
-                  <dd data-testid="product-batch-lot" className="font-mono tabular-nums">{batch.lot}</dd>
-                </div>
-                <div className="flex flex-col">
-                  <dt className="text-xs text-muted-foreground">{QUANTITY_LABEL}</dt>
-                  <dd
-                    data-testid="product-batch-quantity"
-                    className="font-mono tabular-nums"
-                    title={exactDecimalTitle(batch.stock)}
-                    aria-label={quantityAriaLabel(batch, unitId, units)}
-                  >
-                    {quantityLabel(batch, unitId, units)}
-                  </dd>
-                  {packages === null ? null : (
-                    <span data-testid="product-batch-packages" className="text-xs text-muted-foreground">
-                      {packages}
-                    </span>
+              <div className="flex flex-col gap-2 text-sm">
+                <dl data-testid="product-batch-line-lot" className="flex flex-wrap gap-4">
+                  <div className="flex flex-col">
+                    <dt className="text-xs text-muted-foreground">{LOT_LABEL}</dt>
+                    <dd data-testid="product-batch-lot" className="font-mono tabular-nums">{batch.lot}</dd>
+                  </div>
+                </dl>
+                <dl data-testid="product-batch-line-amounts" className="flex flex-wrap gap-4">
+                  <div className="flex flex-col">
+                    <dt className="text-xs text-muted-foreground">{QUANTITY_LABEL}</dt>
+                    <dd
+                      data-testid="product-batch-quantity"
+                      className="font-mono tabular-nums"
+                      title={exactDecimalTitle(batch.stock)}
+                      aria-label={quantityAriaLabel(batch, unitId, units)}
+                    >
+                      {quantityLabel(batch, unitId, units)}
+                    </dd>
+                    {packages === null ? null : (
+                      <span data-testid="product-batch-packages" className="text-xs text-muted-foreground">
+                        {packages}
+                      </span>
+                    )}
+                  </div>
+                  {batch.reserved === undefined ? null : (
+                    <div className="flex flex-col">
+                      <dt className="text-xs text-muted-foreground">{RESERVED_LABEL}</dt>
+                      <dd
+                        data-testid="product-batch-reserved"
+                        className="font-mono tabular-nums"
+                        title={exactDecimalTitle(batch.reserved)}
+                        aria-label={exactQuantity(batch.reserved, unitId, units)}
+                      >
+                        {formattedQuantity(batch.reserved, unitId, units)}
+                      </dd>
+                    </div>
                   )}
-                </div>
-                <div className="flex flex-col">
-                  <dt className="text-xs text-muted-foreground">{PURCHASE_DATE_LABEL}</dt>
-                  <dd data-testid="product-batch-purchase-date" className="font-mono tabular-nums">{batch.purchaseDate}</dd>
-                </div>
-                {batch.expiryDate === null ? null : (
+                  {batch.available === undefined ? null : (
+                    <div className="flex flex-col">
+                      <dt className="text-xs text-muted-foreground">{AVAILABLE_LABEL}</dt>
+                      <dd
+                        data-testid="product-batch-available"
+                        className="font-mono tabular-nums"
+                        title={exactDecimalTitle(batch.available)}
+                        aria-label={exactQuantity(batch.available, unitId, units)}
+                      >
+                        {formattedQuantity(batch.available, unitId, units)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+                <dl data-testid="product-batch-line-dates" className="flex flex-wrap gap-4">
                   <div className="flex flex-col">
-                    <dt className="text-xs text-muted-foreground">{EXPIRY_DATE_LABEL}</dt>
-                    <dd data-testid="product-batch-expiry-date" className="font-mono tabular-nums">{batch.expiryDate}</dd>
+                    <dt className="text-xs text-muted-foreground">{PURCHASE_DATE_LABEL}</dt>
+                    <dd data-testid="product-batch-purchase-date" className="font-mono tabular-nums">{batch.purchaseDate}</dd>
                   </div>
-                )}
-                {batch.reserved === undefined ? null : (
-                  <div className="flex flex-col">
-                    <dt className="text-xs text-muted-foreground">{RESERVED_LABEL}</dt>
-                    <dd
-                      data-testid="product-batch-reserved"
-                      className="font-mono tabular-nums"
-                      title={exactDecimalTitle(batch.reserved)}
-                      aria-label={exactQuantity(batch.reserved, unitId, units)}
-                    >
-                      {formattedQuantity(batch.reserved, unitId, units)}
-                    </dd>
-                  </div>
-                )}
-                {batch.available === undefined ? null : (
-                  <div className="flex flex-col">
-                    <dt className="text-xs text-muted-foreground">{AVAILABLE_LABEL}</dt>
-                    <dd
-                      data-testid="product-batch-available"
-                      className="font-mono tabular-nums"
-                      title={exactDecimalTitle(batch.available)}
-                      aria-label={exactQuantity(batch.available, unitId, units)}
-                    >
-                      {formattedQuantity(batch.available, unitId, units)}
-                    </dd>
-                  </div>
-                )}
-              </dl>
+                  {batch.expiryDate === null ? null : (
+                    <div className="flex flex-col">
+                      <dt className="text-xs text-muted-foreground">{EXPIRY_DATE_LABEL}</dt>
+                      <ExpiryDate
+                        date={batch.expiryDate}
+                        expiring={today !== null && isExpiringSoon(batch.expiryDate, today)}
+                        daysToExpiry={today === null ? null : daysUntil(batch.expiryDate, today)}
+                        expiredLabel={EXPIRED_LABEL}
+                        testIds={EXPIRY_TEST_IDS}
+                      />
+                    </div>
+                  )}
+                </dl>
+              </div>
               {batch.overReserved !== true ? null : (
                 <Badge variant="destructive" data-testid="product-batch-over-reserved">
                   {OVER_RESERVED_LABEL}

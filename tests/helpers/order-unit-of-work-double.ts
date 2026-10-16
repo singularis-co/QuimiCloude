@@ -43,6 +43,7 @@ export function fakeOrderWriteRepository(
     setIngredientsCost: vi.fn(explota('setIngredientsCost')),
     finishPackingAlive: vi.fn(explota('finishPackingAlive')),
     findPresentationLinesForFinish: vi.fn(explota('findPresentationLinesForFinish')),
+    recordPackedCounts: vi.fn(explota('recordPackedCounts')),
     ...overrides,
   } as unknown as OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
 }
@@ -59,10 +60,14 @@ export function fakeMaterialReservations(
   const consumeForOrder = vi.fn(
     async (): Promise<ConsumptionOutcome> => ({ kind: 'consumed' }),
   );
+  const settlePackagingForOrder = vi.fn(
+    async (): Promise<ConsumptionOutcome> => ({ kind: 'consumed' }),
+  );
   return {
     syncForOrder,
     releaseForOrder,
     consumeForOrder,
+    settlePackagingForOrder,
     ...overrides,
   } as unknown as MaterialReservations & Record<keyof MaterialReservations, ReturnType<typeof vi.fn>>;
 }

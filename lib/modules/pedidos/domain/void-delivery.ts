@@ -36,16 +36,29 @@ export type VoidDeliveryDeps = {
   readonly now?: () => Date;
 };
 
+function pairKey(pair: { readonly customerId: string; readonly presentationLineId: string }): string {
+  return `${pair.customerId}:${pair.presentationLineId}`;
+}
+
 const voidDeliverySchema = z
   .strictObject({
     deliveryId: z.string().uuid(),
     voidKey: z.string().uuid(),
-    presentationLineIds: z.array(z.string().uuid()).min(1).max(DELIVERY_MAX_ALLOCATIONS),
+    items: z
+      .array(
+        z.strictObject({
+          customerId: z.string().uuid(),
+          presentationLineId: z.string().uuid(),
+        }),
+      )
+      .min(1)
+      .max(DELIVERY_MAX_ALLOCATIONS),
     reason: z.string().trim().min(1).max(500),
   })
-  .refine(({ presentationLineIds }) => new Set(presentationLineIds).size === presentationLineIds.length);
+  .refine(({ items }) => new Set(items.map(pairKey)).size === items.length);
 
 type VoidDeliveryInput = z.infer<typeof voidDeliverySchema>;
+type VoidItem = VoidDeliveryInput['items'][number];
 
 /** Deshace la transaccion cuando otra peticion registro la misma clave despues de la lectura previa
  *  (se ve ya con el pedido bloqueado o choca en el `INSERT`); fuera se vuelve a leer la anulacion ya
@@ -56,16 +69,16 @@ class VoidAlreadyRegisteredSignal extends Error {
   }
 }
 
-/** Todas las lineas de entrega de las presentaciones pedidas, en todos sus lotes. Una presentacion
- *  se anula entera o no se anula: basta una linea ya anulada para rechazar la peticion completa. */
+/** Todas las lineas de entrega de los pares cliente-presentacion pedidos, en todos sus lotes. Un par
+ *  se anula entero o no se anula: basta una linea ya anulada para rechazar la peticion completa. */
 function linesToVoid(
   deliveryLines: readonly DeliveryLineForVoid[],
-  presentationLineIds: readonly string[],
+  items: readonly VoidItem[],
 ): readonly DeliveryLineForVoid[] {
-  const requested = new Set(presentationLineIds);
-  const selected = deliveryLines.filter((line) => requested.has(line.presentationLineId));
-  const present = new Set(selected.map((line) => line.presentationLineId));
-  if (presentationLineIds.some((id) => !present.has(id))) throw new ValidationError();
+  const requested = new Set(items.map(pairKey));
+  const selected = deliveryLines.filter((line) => requested.has(pairKey(line)));
+  const present = new Set(selected.map(pairKey));
+  if (items.some((item) => !present.has(pairKey(item)))) throw new ValidationError();
   if (selected.some((line) => line.voided)) throw new DeliveryAlreadyVoidedError();
   return selected;
 }
@@ -85,7 +98,7 @@ async function voidInTransaction(
   if ((await tx.voids.findByKey(input.voidKey, scope)) !== null) throw new VoidAlreadyRegisteredSignal();
   if (order.status !== 'TERMINADO' && order.status !== 'ENTREGADO') throw new ActionNotAllowedError();
 
-  const lines = linesToVoid(await tx.voids.findDeliveryLines(delivery.id, scope), input.presentationLineIds);
+  const lines = linesToVoid(await tx.voids.findDeliveryLines(delivery.id, scope), input.items);
 
   const created = await tx.voids.create(
     { voidKey: input.voidKey, deliveryId: delivery.id, reason: input.reason, actorId, now },
@@ -133,7 +146,7 @@ async function alreadyRegistered(
   return { status: 'already_registered', orderStatus: order.status };
 }
 
-/** Anula presentaciones enteras de una entrega y devuelve sus envases a los lotes de origen. */
+/** Anula pares cliente-presentacion de una entrega y devuelve sus envases a los lotes de origen. */
 export function createVoidDelivery(
   deps: VoidDeliveryDeps,
 ): (input: unknown, actor: Actor | null | undefined) => Promise<VoidDeliveryResult> {

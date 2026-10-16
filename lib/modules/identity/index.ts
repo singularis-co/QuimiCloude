@@ -333,6 +333,8 @@ export {
 // ---------------------------------------------------------------------------------------
 export type { PersonRef, PeopleDirectory, PeopleRefFilters } from './domain/people-directory';
 export { ACTIVE_ACCOUNTS_ONLY } from './domain/people-directory';
+// Quien puede ser responsable de un pedido: filtro del directorio y su pregunta.
+export { ORDER_RESPONSIBLE_FILTERS, isOrderResponsible } from './domain/order-responsible';
 export type { WorkGroupSnapshot, WorkGroupDirectory } from './domain/work-group-directory';
 
 // ---------------------------------------------------------------------------------------
@@ -356,3 +358,77 @@ export {
   type CurrentSession,
   type EndOtherSessionsDeps,
 } from './domain/end-other-sessions';
+
+// El pais de la empresa: la primera operacion de plataforma, hecha por un actor sin empresa.
+// La Server Action no sale por aqui (la pantalla la importa por su ruta exacta), y el puerto
+// tampoco: el contrato solo reexporta `./domain`, y la composicion lo importa desde `ports/`.
+export type { PlatformActor } from './domain/platform-actor';
+export { CompanyNotFoundError } from './domain/errors';
+export { createSetCompanyCountry, type SetCompanyCountryDeps } from './domain/set-company-country';
+
+// Gestion de empresas por el Maestro: casos de uso de plataforma, sus vistas y el historial.
+export {
+  CompanyDuplicateNameError,
+  CompanyDuplicateTaxIdError,
+  CompanyNameMismatchError,
+  CompanyNotDeletedError,
+} from './domain/errors';
+export type {
+  CompanyDeletionImpact,
+  CompanyDetail,
+  CompanyEventView,
+  CompanyRow,
+  CompanyStatus,
+} from './domain/company-view';
+export {
+  COMPANY_EVENT_KINDS,
+  type CompanyEventKind,
+  type CompanyField,
+} from './domain/company-event';
+export {
+  createCreateCompany,
+  type CreateCompanyDeps,
+  type CreateCompanyResult,
+} from './domain/create-company';
+export { createUpdateCompany, type UpdateCompanyDeps } from './domain/update-company';
+export { createDeleteCompany, type DeleteCompanyDeps } from './domain/delete-company';
+export { createReactivateCompany, type ReactivateCompanyDeps } from './domain/reactivate-company';
+export { createListCompanies, type ListCompaniesDeps } from './domain/list-companies';
+export { createGetCompany, type GetCompanyDeps } from './domain/get-company';
+export {
+  createGetCompanyDeletionImpact,
+  type GetCompanyDeletionImpactDeps,
+} from './domain/get-company-deletion-impact';
+export { createListCompanyEvents, type ListCompanyEventsDeps } from './domain/list-company-events';
+export {
+  ADDONS,
+  ADDON_PERMISSIONS,
+  ADDON_REQUIRES,
+  CORE_PERMISSIONS,
+  assertAddon,
+  effectiveAddons,
+  effectivePermissions,
+  hasAddon,
+  isAddon,
+  type Addon,
+  type AddonBearer,
+} from './domain/company-addons';
+export {
+  createIsCompanyAddonActive,
+  type IsCompanyAddonActiveDeps,
+} from './domain/is-company-addon-active';
+export {
+  companyAddonsQuerySchema,
+  setAllCompanyAddonsSchema,
+  setCompanyAddonSchema,
+  type CompanyAddonsQueryInput,
+  type SetAllCompanyAddonsInput,
+  type SetCompanyAddonInput,
+} from './domain/company-addon-input';
+export type { CompanyAddonState, CompanyAddonsView } from './domain/company-addons-view';
+export { createGetCompanyAddons, type GetCompanyAddonsDeps } from './domain/get-company-addons';
+export { createSetCompanyAddon, type SetCompanyAddonDeps } from './domain/set-company-addon';
+export {
+  createSetAllCompanyAddons,
+  type SetAllCompanyAddonsDeps,
+} from './domain/set-all-company-addons';

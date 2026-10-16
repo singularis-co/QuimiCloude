@@ -238,6 +238,8 @@ const LINEA_ENVASE = {
   packages: 1,
   packagingProductId: ENVASE.id,
   packagingName: ENVASE.name,
+  presentationContent: null,
+  presentationUnitLabel: null,
 };
 
 /** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta. */
@@ -298,7 +300,9 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     presentationLines: [LINEA_ENVASE],
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -360,9 +364,10 @@ beforeEach(() => {
     status: 'success',
     data: { items: [ENVASE], page: 1, pageSize: 25, total: 1, totalPages: 1 },
   });
+  // Sin sobrante por defecto: con sobrante, Guardar pregunta antes de enviar.
   quoteAvailabilityMock.mockResolvedValue({
     status: 'success',
-    data: { kind: 'ok', available: '0.1005' },
+    data: { kind: 'ok', available: '0' },
   });
 });
 
@@ -578,7 +583,7 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
     renderFormulario(
       pedido({
         presentationLines: [
-          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2, packagingProductId: null, packagingName: null },
+          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
@@ -684,6 +689,10 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
   });
 
   it('R6: el disponible se pide con la cantidad, la unidad y el reparto vigentes', async () => {
+    quoteAvailabilityMock.mockResolvedValue({
+      status: 'success',
+      data: { kind: 'ok', available: '0.1005' },
+    });
     renderFormulario(pedido());
 
     await waitFor(() =>
@@ -1414,4 +1423,49 @@ describe('el selector de version en el formulario', () => {
       expect(enviado.get(RECIPE_VERSION_FIELD)).toBe(actual.id);
     },
   );
+});
+
+describe('el panel en telefono y sus textos (QC-262)', () => {
+  /** Clases que fijan ancho o tope de ancho SIN prefijo de punto de ruptura: las que mandan bajo 640 px. */
+  function clasesDeAnchoSinBreakpoint(panel: HTMLElement): string[] {
+    return [...panel.classList].filter((clase) =>
+      /^(data-\[side=right\]:)?(w-|max-w-|min-w-)/.test(clase),
+    );
+  }
+
+  it('R19: por debajo de 640 px el panel ocupa todo el ancho con su clase de hoy', () => {
+    renderFormulario();
+
+    const panel = screen.getByTestId('order-sheet');
+    expect(panel).toHaveAttribute('data-side', 'right');
+    expect(clasesDeAnchoSinBreakpoint(panel).sort()).toEqual(['data-[side=right]:w-full', 'w-full']);
+    // El tope de ancho solo entra desde `sm` (640 px).
+    expect(panel).toHaveClass('sm:max-w-md');
+    expect(panel).not.toHaveClass('data-[side=right]:w-3/4');
+    // El minimo del 70 % no recorta el ancho completo.
+    expect(panel.style.minWidth).toBe('70vw');
+    // El pie respeta el margen seguro inferior.
+    expect(panel).toHaveClass('pb-[env(safe-area-inset-bottom)]');
+  });
+
+  it('R20: el alta se titula «Nuevo pedido» con su descripcion de hoy', () => {
+    renderFormulario();
+
+    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID)).toHaveTextContent(/^Nuevo pedido$/);
+    expect(
+      screen.getByText('Completa los datos del pedido. La fecha y el número los pone el sistema.'),
+    ).toBeInTheDocument();
+  });
+
+  it('R20: la edicion se titula «<receta> × <cantidad>» con su descripcion de hoy', () => {
+    const elPedido = pedido();
+    renderFormulario(elPedido);
+
+    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID)).toHaveTextContent(
+      new RegExp(`^${elPedido.recipeName} × ${elPedido.quantity.replace('.', '\.')}$`),
+    );
+    expect(
+      screen.getByText('Cambia los datos del pedido. Se guardan todos los campos.'),
+    ).toBeInTheDocument();
+  });
 });

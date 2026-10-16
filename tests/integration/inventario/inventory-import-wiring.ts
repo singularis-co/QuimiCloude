@@ -99,6 +99,8 @@ export function wireImport(options: { readonly createProduct?: CreateProductUseC
     stockIncreases,
     packageUnit: { findPackageUnitId },
     units: { findRefs: findUnitRefs },
+    // Como en la composicion: el importador acepta lotes ya vencidos.
+    acceptsPastExpiry: true,
   });
   const createProductSpy = vi.fn(options.createProduct ?? manualCreate);
   return {
@@ -118,5 +120,5 @@ export function csvFile(rows: readonly Partial<ImportCells>[], fileName = 'inven
 }
 
 export function actorOf(empresa: { readonly companyId: string; readonly userId: string }): Actor {
-  return { id: empresa.userId, companyId: empresa.companyId, permissions: ['inventario.modificar'] };
+  return { id: empresa.userId, companyId: empresa.companyId, permissions: ['inventario.modificar'], addons: ['importacion_excel'] };
 }

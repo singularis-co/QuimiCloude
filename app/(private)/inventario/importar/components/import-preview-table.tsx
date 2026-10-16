@@ -19,7 +19,9 @@ import {
 import { Button } from '@/components/ui/button';
 import {
   IMPORT_TYPE_LABELS,
+  INVENTORY_IMPORT_COLUMNS,
   type ImportCells,
+  type ImportColumnKey,
   type ImportPreviewRow,
   type ImportPreviewStatus,
   type ImportRowIssue,
@@ -36,6 +38,7 @@ import {
   ROWS_COLUMN_LABELS,
   ROWS_TABLE_TEXTS,
   ROW_DETAIL_TESTID,
+  ROW_IGNORED_COLUMNS_TESTID,
   ROW_ISSUE_TESTID,
   ROW_STATUS_TESTID,
   STATUS_FILTER_ALL_LABEL,
@@ -43,6 +46,7 @@ import {
   STATUS_FILTER_TESTID,
   duplicateLotDetail,
   formatCount,
+  ignoredColumnsNotice,
   previewDetailAddFileRow,
   statusFilterTestId,
 } from './import-texts';
@@ -55,7 +59,21 @@ type ImportTableRow = {
   readonly type: ImportRowType | null;
   readonly productName: string | null;
   readonly cells: ImportCells;
+  readonly ignoredColumns?: readonly ImportColumnKey[];
 };
+
+const HEADER_BY_KEY = new Map<ImportColumnKey, string>(
+  INVENTORY_IMPORT_COLUMNS.map((column) => [column.key, column.header]),
+);
+
+/** Aviso, no error: la fila sigue su curso sin esas celdas. */
+function IgnoredColumnsNotice({ columns }: { readonly columns: readonly ImportColumnKey[] }) {
+  return (
+    <p className="text-xs text-muted-foreground" data-testid={ROW_IGNORED_COLUMNS_TESTID}>
+      {ignoredColumnsNotice(columns.map((key) => HEADER_BY_KEY.get(key) ?? key))}
+    </p>
+  );
+}
 
 export type ImportStatusPresentation = {
   readonly label: string;
@@ -157,8 +175,9 @@ export function ImportRowsTable<TRow extends ImportTableRow>({
         label: ROWS_COLUMN_LABELS.detail,
         align: 'start',
         cell: (row) => (
-          <div className="min-w-48 whitespace-normal" data-testid={ROW_DETAIL_TESTID}>
+          <div className="flex min-w-48 flex-col gap-1 whitespace-normal" data-testid={ROW_DETAIL_TESTID}>
             {renderDetail(row)}
+            {row.ignoredColumns === undefined ? null : <IgnoredColumnsNotice columns={row.ignoredColumns} />}
           </div>
         ),
       },

@@ -52,6 +52,9 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
     listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
     listAliveSummariesInCompany: summaryReaders.listAliveSummariesInCompany,
     listSummariesByIdsIncludingDeleted: summaryReaders.listSummariesByIdsIncludingDeleted,
+    listDeliveryProgressByIdsIncludingDeleted: async () => {
+      throw new Error('listCompanyOrders no lee el progreso de entrega');
+    },
     // Este archivo prueba `listCompanyOrders`, que nunca transiciona un pedido.
     transitionAliveById: async () => {
       throw new Error('listCompanyOrders no ejecuta ninguna transicion');
