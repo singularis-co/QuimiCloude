@@ -10,12 +10,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SessionUser } from '@/lib/modules/identity';
 
-const { getSessionUserMock, notFoundMock, redirectMock, listCompaniesActionMock, routerMock } =
-  vi.hoisted(() => ({
+const {
+  getSessionUserMock,
+  notFoundMock,
+  redirectMock,
+  listCompaniesActionMock,
+  getCompanyActionMock,
+  routerMock,
+} = vi.hoisted(() => ({
     getSessionUserMock: vi.fn<() => Promise<unknown>>(),
     notFoundMock: vi.fn<() => never>(),
     redirectMock: vi.fn<(ruta: string) => never>(),
     listCompaniesActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
+    getCompanyActionMock: vi.fn<(id: string) => Promise<unknown>>(),
     routerMock: {
       push: vi.fn<(href: string) => void>(),
       replace: vi.fn<(href: string) => void>(),
@@ -40,7 +47,7 @@ vi.mock('@/lib/composition', () => ({
 
 vi.mock('@/lib/modules/identity/adapters/driving/company-actions', () => ({
   listCompaniesAction: listCompaniesActionMock,
-  getCompanyAction: vi.fn(),
+  getCompanyAction: getCompanyActionMock,
   getCompanyDeletionImpactAction: vi.fn(),
   listCompanyEventsAction: vi.fn(),
   createCompanyAction: vi.fn(),
@@ -51,6 +58,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/company-actions', () => ({
 }));
 
 import { CompanyListSection } from '@/app/(private)/maestro/empresas/components';
+import MaestroEmpresaPage from '@/app/(private)/maestro/empresas/[id]/page';
 import MaestroEmpresasPage from '@/app/(private)/maestro/empresas/page';
 import { PageHeader } from '@/components/shared/page-header';
 import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
@@ -167,5 +175,40 @@ describe('/maestro/empresas', () => {
     expect(buscar(arbol, CompanyListSection).props.canModify).toBe(true);
     render(buscar(arbol, PageHeader));
     expect(screen.getByTestId('company-create-open')).toHaveTextContent('Nueva empresa');
+  });
+});
+
+const ID_EMPRESA = '2d8e9f0a-3142-4c5d-8e6f-7a8b9c0d1e2f';
+
+async function invocarDetalle(): Promise<ReactNode> {
+  return MaestroEmpresaPage({
+    params: Promise.resolve({ id: ID_EMPRESA }),
+    searchParams: Promise.resolve({}),
+  });
+}
+
+describe('/maestro/empresas/[id]', () => {
+  it('R1: sin sesion lleva al login y no pide la empresa', async () => {
+    getSessionUserMock.mockResolvedValue(null);
+    await expect(invocarDetalle()).rejects.toThrow('NEXT_REDIRECT');
+    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE_SESSION_ENDED);
+    expect(getCompanyActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R1: una sesion sin empresas.consultar recibe el 404 sin ningun dato de la empresa', async () => {
+    getSessionUserMock.mockResolvedValue(DE_EMPRESA);
+    await expect(invocarDetalle()).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
+    expect(getCompanyActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R1: el corte por empresas.consultar es la primera linea del cuerpo de la pagina', () => {
+    const fuente = readFileSync(
+      join(RAIZ, 'app', '(private)', 'maestro', 'empresas', '[id]', 'page.tsx'),
+      'utf8',
+    );
+    const cuerpo = fuente.slice(fuente.indexOf('export default async function'));
+    const primera = cuerpo.slice(cuerpo.indexOf('{', cuerpo.indexOf(')')) + 1).trim().split('\n')[0];
+    expect(primera).toBe("await requirePagePermission('empresas.consultar');");
   });
 });
