@@ -12,7 +12,8 @@ Buscado: `administrador`, `Maestro`, `createWithAdministrator`, `PlatformActor`,
 
 | Dónde | Qué apareció | Qué se hace con ello |
 |---|---|---|
-| Board | QC-162 (gestión de empresas, crea el primer Administrador), QC-166 (pantallas, depende de esta), QC-161 (rol Maestro, `done`), QC-54 (constante del rol). Ninguna otra ficha gestiona Administradores desde la plataforma. | Nada se duplica. QC-162 dejó aquí «más Administradores, reenvío, último Administrador» (alcance sembrado). El reenvío no está en el alcance de esta ficha: `requirements.md > P1`. |
+| Board | QC-162 (gestión de empresas, crea el primer Administrador), QC-166 (pantallas, depende de esta), QC-161 (rol Maestro, `done`), QC-54 (constante del rol). Ninguna otra ficha gestiona Administradores desde la plataforma. | Nada se duplica. QC-162 dejó aquí «más Administradores, reenvío, último Administrador» (alcance sembrado). El reenvío entra por la decisión del 2026-10-16 (R26–R29). |
+| `lib/modules/identity/domain/issue-credential-setup-link.ts` (QC-79) | Reenvío del enlace: exige `Actor` con empresa y `usuarios.modificar`; emite con `issueForPendingUser` (mata el enlace vivo anterior e inserta el nuevo en una transacción), traduce `not_found`, `user_not_pending`, `superseded`. | Su cuerpo, después del permiso y del `parse`, se **extrae** a `credential-setup-mail.ts` y lo usan el reenvío de QC-79 y el del Maestro (§ 3.5). Sin cambio de comportamiento. |
 | `specs/QC-162-gestion-de-empresas/` | Alta de empresa con primer Administrador, `PlatformActor`, `company_not_found`, eventos. | Se reutiliza el patrón entero: actor de plataforma, acciones sin `revalidatePath`, emisión del enlace tras el alta. |
 | `specs/QC-66-crud-de-usuarios/` | CRUD de usuarios de **una** empresa, guarda del «último administrador en `active`», unicidad por índices, baja lógica. | Se reutilizan los esquemas, la traducción de duplicados y el sello de sesiones. La guarda del último **no** se reutiliza (ver § 9.2). |
 | `lib/modules/identity/domain/platform-actor.ts` | `PlatformActor`, `requirePlatformPermission`. | Primera línea de los cinco casos de uso nuevos (R1, R2). |
@@ -31,7 +32,7 @@ No hay UI: no se consultó `components/shared/CATALOGO.md` y no se propone ning�
 
 ## 1. Resumen
 
-Cinco operaciones de plataforma en el módulo `identity`, todas con `PlatformActor`:
+Seis operaciones de plataforma en el módulo `identity`, todas con `PlatformActor`:
 
 | Operación | Permiso | Caso de uso | Acción de servidor |
 |---|---|---|---|
@@ -40,6 +41,7 @@ Cinco operaciones de plataforma en el módulo `identity`, todas con `PlatformAct
 | Alta | `empresas.modificar` | `create-administrator.ts` | `createAdministratorAction(prev, formData)` |
 | Edición | `empresas.modificar` | `update-administrator.ts` | `updateAdministratorAction(prev, formData)` |
 | Baja | `empresas.modificar` | `delete-administrator.ts` | `deleteAdministratorAction(prev, formData)` |
+| Reenvío del enlace | `empresas.modificar` | `resend-administrator-link.ts` | `resendAdministratorLinkAction(prev, formData)` |
 
 Un puerto nuevo, `AdministratorRepository`, con su adaptador Prisma. Ningún cambio de esquema.
 
@@ -149,6 +151,25 @@ Y en `lib/modules/errores/domain/`: `company_last_administrator` en `ERROR_CODES
 `mailer.sendCredentialSetupLink`; `'superseded'` → `'sent'`; cualquier otra → `'failed'`).
 `create-company.ts` pasa a importarla; sus tests no cambian.
 
+En el mismo archivo, la variante **estricta** del reenvío, extraída del cuerpo de
+`issue-credential-setup-link.ts` (todo lo que va después del permiso y del `parse`):
+
+```ts
+export async function resendCredentialSetupLinkTo(
+  deps: { secrets; links; mailer },
+  target: { readonly userId: string; readonly companyId: string; readonly now: Date },
+): Promise<'sent' | 'failed'>;
+// issueForPendingUser({ userId, companyId, digest, expiresAt: credentialSetupLinkExpiresAt(now), now })
+// objeto -> mailer (sent | failed); 'superseded' -> 'sent'; 'issued' sin correo -> 'failed';
+// 'not_found' -> UserNotFoundError; 'user_not_pending' -> UserNotPendingError
+```
+
+`issue-credential-setup-link.ts` la llama con `companyId: actor.companyId` y conserva su permiso
+(`usuarios.modificar`) y su esquema; sus tests no cambian. El reenvío del Maestro la llama con la
+empresa **del Administrador**. Así no hace falta un actor con empresa (R26) y la emisión es una
+sola: `issueForPendingUser` mata el enlace vivo anterior e inserta el nuevo en la misma transacción,
+y el correo de destino lo resuelve el repositorio, nunca la entrada.
+
 ### 3.6 Casos de uso
 
 Todos empiezan por `requirePlatformPermission(actor, <permiso>)`, **antes** del `parse` y de tocar
@@ -161,6 +182,7 @@ cualquier puerto (R1). El reloj es `deps.now ?? (() => new Date())`.
 | `create-administrator.ts` | `empresas.modificar` → `createAdministratorSchema` → `toBirthDate` → `administrators.create({ companyId, administrator, now })` → traduce → `sendCredentialSetupLink(deps, companyId, id, now)` → `{ administratorId, mail }` | `invalid_input`, `company_not_found`, duplicados |
 | `update-administrator.ts` | `empresas.modificar` → `updateAdministratorSchema` → `toBirthDate` → `administrators.update({ id, data, now })` → traduce | `invalid_input`, `user_not_found`, duplicados |
 | `delete-administrator.ts` | `empresas.modificar` → `administratorIdSchema` (no uuid → `user_not_found`) → `administrators.softDelete({ id, now })` → traduce | `user_not_found`, `company_last_administrator` |
+| `resend-administrator-link.ts` | `empresas.modificar` → `administratorIdSchema` (clave extra → `invalid_input`, R29; id no uuid → `user_not_found`) → `administrators.findManageable(id)`; `null` → error → `resendCredentialSetupLinkTo(deps, { userId: id, companyId: detail.company.id, now })` → `{ mail }` | `invalid_input`, `user_not_found`, `user_not_pending` |
 
 Traducción de resultados del puerto: `'company_not_found'` → `CompanyNotFoundError`;
 `'not_found'` → `UserNotFoundError`; `'last_administrator'` → `CompanyLastAdministratorError`;
@@ -306,6 +328,12 @@ export async function getAdministratorAction(id: string): Promise<AdministratorD
 export async function createAdministratorAction(prev, formData): Promise<CreateAdministratorFormState>;
 export async function updateAdministratorAction(prev, formData): Promise<AdministratorMutationFormState>;
 export async function deleteAdministratorAction(prev, formData): Promise<AdministratorMutationFormState>;
+
+export type ResendAdministratorLinkFormState =
+  | { status: 'idle' }
+  | { status: 'success'; mail: 'sent' | 'failed' }
+  | ErrorState;
+export async function resendAdministratorLinkAction(prev, formData): Promise<ResendAdministratorLinkFormState>;
 ```
 
 Campos del formulario, crudos (un ausente llega `null` y lo rechaza el esquema del dominio):
@@ -315,6 +343,7 @@ Campos del formulario, crudos (un ausente llega `null` y lo rechaza el esquema d
 - Edición: `id` + los ocho datos. **No lee `companyId`**: si el cliente lo manda, no llega al dominio
   (y si llegara, el esquema lo rechaza).
 - Baja: `id`.
+- Reenvío: `id`. Ningún campo de correo de destino ni de empresa.
 
 Contrato de la lista que QC-166 usa con el `DataTable`: el mismo `ListQuery` que
 `listCompaniesAction`; filtro `{ companyId: { kind: 'select', values: [<uuid>…] } }`; búsqueda en
@@ -336,9 +365,15 @@ createAdministrator: createCreateAdministrator({
 }),
 updateAdministrator: createUpdateAdministrator({ administrators: administratorRepository }),
 deleteAdministrator: createDeleteAdministrator({ administrators: administratorRepository }),
+resendAdministratorLink: createResendAdministratorLink({
+  administrators: administratorRepository,
+  secrets: credentialSetupSecrets,
+  links: credentialSetupLinkRepository,
+  mailer: credentialSetupMailer,
+}),
 ```
 
-`lib/modules/identity/index.ts` reexporta las cinco fábricas, los tres esquemas, los tipos de vista,
+`lib/modules/identity/index.ts` reexporta las seis fábricas, los tres esquemas, los tipos de vista,
 `ADMINISTRATOR_QUERYABLE` y `CompanyLastAdministratorError`.
 
 ## 8. Errores que ve QC-166
@@ -346,8 +381,9 @@ deleteAdministrator: createDeleteAdministrator({ administrators: administratorRe
 | Código | Cuándo |
 |---|---|
 | `unauthorized` | R1 |
-| `invalid_input` | R4, R13, R19 |
-| `user_not_found` | R11, R20, R25 |
+| `invalid_input` | R4, R13, R19, R29 |
+| `user_not_found` | R11, R20, R25, R28 |
+| `user_not_pending` (ya en el catálogo, QC-79) | R28 |
 | `company_not_found` | R15 |
 | `duplicate_email`, `duplicate_username`, `duplicate_document` | R16, R21 |
 | `company_last_administrator` | R23, R24 |
@@ -384,6 +420,13 @@ el de empresas.
 Su texto dice «sin ningún administrador **activo**» y la pantalla de usuarios de QC-67 ya lo pinta
 con ese sentido. La decisión pide un error propio.
 
+### 9.5 Llamar al reenvío de QC-79 con un actor fabricado — descartada
+
+Construir un `Actor` con la empresa del Administrador y los permisos del Maestro para pasárselo a
+`issueCredentialSetupLink` evitaría la extracción, pero esa función exige `usuarios.modificar`, que
+el Maestro no tiene: habría que inventarle un permiso que no tiene, o saltarse el control. Extraer el
+cuerpo común deja cada caso de uso con su propio permiso y una sola emisión.
+
 ## 10. Tests y trazabilidad
 
 E2E diferido a QC-166 (decisión cerrada). Unitarios con dobles del puerto (los de autorización
@@ -416,13 +459,21 @@ E2E diferido a QC-166 (decisión cerrada). Unitarios con dobles del puerto (los 
 | R23 | `delete-administrator.test.ts` (traducción) + `administrator.int.test.ts` (único vivo rechazado y sin escribir; con otro en `pending`, admitida) |
 | R24 | `tests/integration/identity/administrator-concurrency.int.test.ts` (dos conexiones, varias corridas, `commit`) |
 | R25 | `delete-administrator.test.ts` + `administrator.int.test.ts` |
+| R26 | `tests/unit/identity/administradores/resend-administrator-link.test.ts` (llama a la emisión con la empresa del Administrador; actor sin empresa) + `administrator.int.test.ts` (enlace nuevo vivo, el anterior con `superseded_at`, plazo desde el reenvío, destinatario el correo guardado) |
+| R27 | `resend-administrator-link.test.ts` (`sent`, `failed`, `superseded`→`sent` sin segundo correo; resultado sin secreto ni correo) |
+| R28 | `resend-administrator-link.test.ts` (traducción; ningún correo) + `administrator.int.test.ts` (Operador, de baja, empresa de baja → `user_not_found`; Administrador `active` → `user_not_pending`; ningún enlace nuevo) |
+| R29 | `resend-administrator-link.test.ts` (clave `email` o `companyId` → `invalid_input`, ningún puerto llamado) + `administrator-actions.test.ts` (la acción solo lee `id`) |
+| Extracción § 3.5 | `tests/unit/identity/credencial/resend-link.test.ts` y `create-company.test.ts` siguen verdes sin tocarlos |
+
+R1 y R2 cubren también el reenvío: `authorization.test.ts` recorre las seis operaciones.
 
 `tests/integration/aislamiento.json` gana las dos entradas (`transaccion` y `commit`).
 
 ## 11. Riesgos
 
-1. **P1 sin responder deja el hueco de QC-162**: el Administrador cuyo correo de alta falló no tiene
-   cómo entrar si es el único de su empresa. En preview el correo siempre devuelve `failed`.
+1. **El reenvío cierra el hueco de QC-162** (riesgo 1 de su `design.md`): el Administrador cuyo
+   correo de alta falló recibe otro enlace sin darlo de baja. En preview el correo sigue devolviendo
+   siempre `failed`, así que allí el reenvío tampoco llega.
 2. **Empresa sin Administrador activo** tras una baja permitida (§ 5.5): aceptado por la decisión.
 3. **`updateMany`/`findMany` con filtro de relación** (`company: { deletedAt: null }`): Prisma lo
    admite en `where`; si el `updateMany` no lo aceptara, la condición ya se comprobó en el paso 1 de

@@ -25,8 +25,8 @@ Vocabulario de este archivo:
 - «Último Administrador»: el único Administrador vivo de su empresa, sea cual sea su estado de
   cuenta y el de los demás. Un Administrador recién creado, todavía en `pending`, ya cuenta: es lo
   que hace cierto «primero hay que crear otro».
-- «Actor»: quien llama, tomado de la sesión. Alta, edición y baja exigen `empresas.modificar`; la
-  lista y la ficha, `empresas.consultar`.
+- «Actor»: quien llama, tomado de la sesión. Alta, edición, baja y reenvío del enlace exigen
+  `empresas.modificar`; la lista y la ficha, `empresas.consultar`.
 - «Los ocho datos»: nombres, apellidos, fecha de nacimiento, correo, teléfono, tipo de documento,
   número de documento y nombre de usuario, con las validaciones del alta de usuarios (QC-4/QC-66).
 
@@ -140,6 +140,26 @@ Vocabulario de este archivo:
 - **R25.** SI el objetivo de la baja no es un Administrador gestionable (los mismos casos de R11),
   ENTONCES el sistema DEBE responder `user_not_found` sin escribir nada.
 
+### Reenvío del enlace
+
+- **R26.** CUANDO el actor pide reenviar el enlace para fijar la contraseña a un Administrador
+  gestionable en `pending`, el sistema DEBE emitir un enlace nuevo con la emisión de QC-79, cuyo plazo
+  se cuenta desde el reenvío, DEBE dejar sin efecto el enlace vivo anterior de ese Administrador, si
+  lo hay, y DEBE enviarlo al correo guardado del Administrador, nunca a una dirección que llegue en la
+  entrada. El actor no necesita pertenecer a ninguna empresa (R2).
+- **R27.** CUANDO el reenvío termina, el sistema DEBE devolver el resultado del correo, `sent` o
+  `failed`. Un fallo del correo NO DEBE anular el enlace emitido ni hacer fallar la operación. SI
+  otra emisión simultánea para el mismo Administrador gana, ENTONCES la perdedora DEBE responder
+  `sent` sin enviar un segundo correo. Ni el resultado ni ningún error DEBEN llevar el secreto del
+  enlace ni el correo del destinatario.
+- **R28.** SI el objetivo del reenvío no es un Administrador gestionable (los mismos casos de R11),
+  ENTONCES el sistema DEBE responder `user_not_found`; SI es un Administrador gestionable que ya no
+  está en `pending`, ENTONCES DEBE responder `user_not_pending`. En los dos casos, sin emitir ningún
+  enlace y sin enviar ningún correo.
+- **R29.** SI la entrada del reenvío trae cualquier clave distinta del identificador del
+  Administrador (un correo de destino, una empresa), ENTONCES el sistema DEBE rechazarla con
+  `invalid_input` sin emitir ningún enlace y sin enviar ningún correo.
+
 ### Cobertura de las decisiones cerradas
 
 | Decisión | Requisitos |
@@ -154,6 +174,7 @@ Vocabulario de este archivo:
 | E2E en QC-166; unitarios e integración incluidos permiso y rol distinto | R1 y R13, con su test unitario y de integración (`tasks.md`) |
 | No se da de baja al último Administrador | R5, R10, R23, R24 |
 | La empresa de un Administrador no se cambia | R19 |
+| El Maestro reenvía el enlace de contraseña | R1, R2, R26, R27, R28, R29 |
 
 ## Preguntas abiertas
 
@@ -161,17 +182,12 @@ Las dos preguntas sembradas el 2026-09-24 quedan **resueltas** por las filas del
 tabla de decisiones: «¿El último Administrador de una empresa?» (R5, R10, R23, R24) y «¿Cambiar de
 empresa a un Administrador?» (R19). Se retiran de aquí.
 
-Quedan tres, ninguna bloquea el spec. Cada una lleva la posición que toma este spec si no hay
+La antigua **P1** (reenvío del enlace por el Maestro) queda **resuelta** por la fila del 2026-10-16
+«¿El Maestro reenvía el enlace de contraseña? → Sí» (R26–R29). Se retira de aquí.
+
+Quedan dos, ninguna bloquea el spec. Cada una lleva la posición que toma este spec si no hay
 respuesta:
 
-- **P1. Reenvío del enlace por el Maestro.** QC-162 dejó a esta ficha el reenvío del enlace al
-  Administrador cuyo correo de alta falló (`specs/QC-162-gestion-de-empresas/requirements.md`,
-  línea de cierre de Preguntas abiertas, y su `design.md > 11`, riesgo 1): el reenvío de QC-79 exige
-  un actor con empresa y el Maestro no la tiene. **No está en el Alcance ni en las Decisiones
-  cerradas de esta ficha.** **Por defecto:** no entra; la alternativa que queda es dar de baja al
-  Administrador y crearlo otra vez, lo que solo es posible si la empresa tiene otro (R23). Si el
-  humano lo quiere aquí, son un requisito y una task más (reutiliza `issueCredentialSetupLink` con
-  la empresa del Administrador).
 - **P2. Historial de la empresa.** QC-162 guarda quién y cuándo creó, editó, dio de baja o reactivó
   cada empresa. **Por defecto:** el alta, la edición y la baja de un Administrador **no** dejan
   evento en ese historial; el usuario ya guarda sus fechas de alta y de cambio.
@@ -193,3 +209,4 @@ respuesta:
 | 2026-09-24 | ¿E2E? | **Se difiere a QC-166**, que tiene las pantallas (precedente **QC-94 → QC-67**). Unitarios e integración **sí**, incluido el rechazo por permiso y el de crear un rol distinto de Administrador. |
 | 2026-10-16 | ¿El último Administrador de una empresa? | **No se puede dar de baja**: primero hay que crear otro. El servidor lo rechaza con un error propio y la lista/detalle indica cuál es el último (para el diálogo de **QC-166**). |
 | 2026-10-16 | ¿Cambiar de empresa a un Administrador? | **No.** La empresa queda fija desde el alta; para moverlo se da de baja en una y se crea en la otra. |
+| 2026-10-16 | ¿El Maestro reenvía el enlace de contraseña? | **Sí.** El Maestro puede reenviar el enlace para fijar la contraseña a un Administrador gestionable (cierra la P1 del spec). En QC-166 es la acción «Reenviar enlace» del menú de la fila. |
