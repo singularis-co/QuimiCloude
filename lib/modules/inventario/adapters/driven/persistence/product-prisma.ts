@@ -541,8 +541,8 @@ export async function recalculateProductStock(
 }
 
 /**
- * Solo para la carga de un lote, con el mismo `now` que su `created_at`: una produccion no cuenta
- * como carga. SQL crudo por lo mismo que `recalculateProductStock`: no mueve `updated_at`.
+ * Solo para la carga de un lote -alta, importacion o el lote de una produccion-, con el mismo `now`
+ * que su `created_at`. SQL crudo por lo mismo que `recalculateProductStock`: no mueve `updated_at`.
  */
 async function markBatchLoaded(
   tx: Prisma.TransactionClient,
@@ -1251,7 +1251,8 @@ type PresentationForShareRow = { readonly name: string; readonly unitId: string;
  * La entrada de un lote de produccion al Terminar el empaque, por UNA linea del reparto:
  * presentacion `FOR SHARE`, producto terminado (nace si falta, `ON CONFLICT ...
  * DO NOTHING` sobre el indice parcial de la combinacion), lote, asiento `production` -con
- * `order_id` Y `order_presentation_line_id`- y recalculo, todo sobre la MISMA transaccion que
+ * `order_id` Y `order_presentation_line_id`-, recalculo y `last_batch_at` con el mismo `now` que el
+ * lote (cuenta como lote cargado, como un alta), todo sobre la MISMA transaccion que
  * el resto de Terminar -no abre la suya, a diferencia de `createWithFirstBatch`-. `unitCost` ya
  * llega resuelto: el mismo para todas las lineas de un pedido, no se recalcula aqui.
  */
@@ -1353,6 +1354,7 @@ export async function receiveFinishedGoods(
   );
 
   await recalculateProductStock(tx, product.id, scope);
+  await markBatchLoaded(tx, product.id, input.now, scope);
 
   return { kind: 'received', productId: product.id, productName: product.name, packages: input.packages.toString() };
 }

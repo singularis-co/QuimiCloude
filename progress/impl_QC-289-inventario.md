@@ -24,10 +24,10 @@ Escriben `last_batch_at` (mismo `now` que el `created_at` del lote, misma transa
 - `createWithFirstBatch` (alta manual e importación de materia prima/envase): en el `product.create`.
 - `addBatchToAlive` (lote sobre producto existente, manual o importación): `markBatchLoaded`.
 - `addImportedFinishedGoodsBatch` (importación de producto terminado): `markBatchLoaded`.
+- `receiveFinishedGoods` (lote creado por una producción, Terminar el empaque): `markBatchLoaded`,
+  sobre la transacción de Terminar.
 
-No la escribe:
-- `receiveFinishedGoods`: lote creado por una producción (Terminar el empaque). Decisión humana.
-- Ninguna otra ruta crea lotes en `lib/` (censo de `guard-libro-de-inventario`).
+Ninguna otra ruta crea lotes en `lib/` (censo de `guard-libro-de-inventario`).
 
 ## Mapa decisión → test
 - Orden por defecto → unit `productOrderBy(null)`; int `list-query-products` «ordena por último
@@ -36,7 +36,10 @@ No la escribe:
 - Lote nuevo sobre existente la avanza, sin mover `updated_at` → int «un lote nuevo…».
 - Importación de terminado la escribe → unit «el lote importado de producto terminado…».
 - Ajuste no la toca → int «un ajuste de existencia no la toca».
-- Producción no la toca → unit «el lote de una produccion no la toca».
+- Producción la escribe = `created_at` del lote → unit «el lote de una produccion la escribe con
+  el mismo instante que el lote» (`[now, productId, companyId]`); int `finished-goods` «R11, R13,
+  R17, R41, R43: nace el producto…» (`lastBatchAt` = `created_at` del lote = `now`); orden de pasos
+  en unit `finished-goods-prisma` «camino feliz…» (`mark-batch-loaded` tras el recálculo).
 - Consumo no la toca → unit «el consumo de un pedido no la toca».
 - Relleno `MAX(created_at)` y NULL sin lotes; DOWN revierte → int «el UP rellena…».
 
@@ -47,8 +50,27 @@ No la escribe:
 - `vitest run` unit nuevo + `finished-goods-prisma.test.ts`: 2 files, 12 passed.
 - `vitest run --project integration` `product-last-batch-at` + `list-query-products`: 2 files,
   24 passed (plantilla nueva `qct_tpl_f8f47b8c9ae3` construida con la migración).
+- `vitest run --project integration product-crud.int.test.ts`: 1 file, 4 passed.
+- `vitest related --run --project node --project ui product-prisma.ts product-last-batch-at.test.ts`:
+  362 files, 6058 passed, 1 skipped.
 - `vitest run guard`: 1 rojo (`guard-identificador-de-request`, migración nueva sin listar) →
   corregido; el archivo pasa 23/23.
 
 ## Veredicto
 Hecho: inventario ordenado por último lote cargado, escrito solo en cargas, con tests en verde.
+
+## Tanda 2 (2026-10-16): la producción cuenta como lote cargado
+Decisión humana (`progress/features/QC-289.md > Decisiones`): `receiveFinishedGoods` llama
+`markBatchLoaded` con `input.now`. Se ajustaron el JSDoc de `markBatchLoaded` y de
+`receiveFinishedGoods` y la cabecera de `migration.sql` (solo comentario). Test unitario invertido;
+`finished-goods-prisma.test.ts` (orden de pasos) y `finished-goods.int.test.ts` (aserción nueva)
+ajustados.
+
+Verificación (salida real):
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `0 errors, 7 warnings` (los mismos preexistentes).
+- `vitest run` `product-last-batch-at.test.ts` + `finished-goods-prisma.test.ts`: 2 files, 12 passed
+  (antes del ajuste, 1 rojo esperado en el orden de pasos).
+- `vitest run --project integration` `finished-goods` + `product-last-batch-at`: 2 files, 15 passed.
+- `vitest related --run --project node --project ui product-prisma.ts`: 362 files, 6058 passed,
+  1 skipped.

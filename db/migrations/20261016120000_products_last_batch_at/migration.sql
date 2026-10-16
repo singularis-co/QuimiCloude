@@ -1,6 +1,6 @@
 -- Cuando se cargo el ultimo lote de cada producto, para ordenar el inventario por defecto. La
--- escribe la aplicacion al dar de alta un lote o importarlo; ajustes, consumos, producciones,
--- entregas y ediciones no la tocan.
+-- escribe la aplicacion al dar de alta un lote, importarlo o recibir el de una produccion; ajustes,
+-- consumos, entregas y ediciones no la tocan.
 --
 -- Escrita a mano: el indice ordena con `NULLS LAST` y es parcial, y Prisma no modela ninguna de
 -- las dos cosas. Se aplica con `pnpm run db:migrate`.

@@ -89,7 +89,7 @@ describe('quien escribe products.last_batch_at', () => {
     expect(writes[0]?.values).toEqual([NOW, 'product-1', 'company-1']);
   });
 
-  it('el lote de una produccion no la toca', async () => {
+  it('el lote de una produccion la escribe con el mismo instante que el lote', async () => {
     const { tx, txDouble } = makeTx([
       [{ name: 'Botella 1L', unitId: 'unit-1', content: '1.0000' }],
       [{ id: 'product-1', name: 'Desengrasante · Botella 1L' }],
@@ -115,7 +115,11 @@ describe('quien escribe products.last_batch_at', () => {
 
     expect(outcome.kind).toBe('received');
     expect(txDouble.productBatch.create).toHaveBeenCalledTimes(1);
-    expect(lastBatchAtWrites(txDouble)).toEqual([]);
+    const batchData = txDouble.productBatch.create.mock.calls[0]?.[0]?.data;
+    expect(batchData?.createdAt).toBe(NOW);
+    const writes = lastBatchAtWrites(txDouble);
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.values).toEqual([NOW, 'product-1', 'company-1']);
   });
 
   it('el consumo de un pedido no la toca', async () => {
