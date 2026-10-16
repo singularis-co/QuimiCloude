@@ -318,6 +318,65 @@ describe('StepEvidence en modo consulta', () => {
     expect(screen.getByTestId('step-evidence-grid')).not.toHaveAttribute('aria-busy');
   });
 
+  describe('miniatura ya resuelta antes de enganchar los handlers', () => {
+    const proto = HTMLImageElement.prototype;
+    const original = {
+      complete: Object.getOwnPropertyDescriptor(proto, 'complete'),
+      naturalWidth: Object.getOwnPropertyDescriptor(proto, 'naturalWidth'),
+    };
+
+    function fakeImageState(complete: boolean, naturalWidth: number) {
+      Object.defineProperty(proto, 'complete', { configurable: true, get: () => complete });
+      Object.defineProperty(proto, 'naturalWidth', { configurable: true, get: () => naturalWidth });
+    }
+
+    afterEach(() => {
+      for (const [key, descriptor] of Object.entries(original)) {
+        if (descriptor === undefined) {
+          Reflect.deleteProperty(proto, key);
+        } else {
+          Object.defineProperty(proto, key, descriptor);
+        }
+      }
+    });
+
+    it('R22 — una miniatura ya cargada antes de enganchar el handler sale de cargando', () => {
+      fakeImageState(true, 640);
+      render(<StepEvidence consult phaseLabel="fabricación" stepPosition={3} photos={[OK_1, OK_2]} />);
+
+      expect(screen.queryByTestId('step-evidence-skeleton')).toBeNull();
+      expect(screen.getByTestId('step-evidence-loading')).toHaveTextContent('');
+      expect(screen.getByTestId('step-evidence-grid')).not.toHaveAttribute('aria-busy');
+      expect(screen.getByRole('button', { name: 'Foto 1 del paso 3' })).toBeInTheDocument();
+    });
+
+    it('R22 — una miniatura ya fallida antes de enganchar el handler pasa a «Vista vencida»', () => {
+      fakeImageState(true, 0);
+      render(<StepEvidence consult phaseLabel="fabricación" stepPosition={3} photos={[OK_1]} />);
+
+      const tile = screen.getByTestId('step-evidence-tile-1');
+      expect(tile).toHaveAttribute('data-status', 'expired');
+      expect(within(tile).getByText('Vista vencida')).toBeInTheDocument();
+      expect(screen.getByTestId('step-evidence-grid')).not.toHaveAttribute('aria-busy');
+    });
+
+    it('R22 — una miniatura aún sin terminar sigue en cargando', () => {
+      fakeImageState(false, 0);
+      render(<StepEvidence consult phaseLabel="fabricación" stepPosition={3} photos={[OK_1]} />);
+
+      expect(screen.getByTestId('step-evidence-skeleton')).toBeInTheDocument();
+      expect(screen.getByTestId('step-evidence-grid')).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('R21 — sin `consult`, una miniatura ya fallida no pasa a «Vista vencida»', () => {
+      fakeImageState(true, 0);
+      render(<StepEvidence stepPosition={1} photos={[OK_1]} readOnly onReload={vi.fn()} />);
+
+      expect(screen.queryByText('Vista vencida')).toBeNull();
+      expect(screen.getByTestId('step-evidence-tile-1')).toHaveAttribute('data-status', 'ok');
+    });
+  });
+
   it('R22 — la casilla `loading` pinta un esqueleto sin foto ni botón', () => {
     render(
       <StepEvidence

@@ -234,6 +234,21 @@ export function StepEvidence({
                     src={photo.url}
                     alt=""
                     className={cn('absolute inset-0 size-full object-cover', pending && 'opacity-0')}
+                    // La imagen puede terminar antes de que la hidratación enganche onLoad/onError
+                    // y ese evento se pierde: al montar, se lee su estado. `withUrl` devuelve el
+                    // mismo Set si la URL ya está, así que repetirlo no vuelve a renderizar.
+                    ref={
+                      consult
+                        ? (img: HTMLImageElement | null) => {
+                            if (img === null || !img.getAttribute('src') || !img.complete) return;
+                            if (img.naturalWidth > 0) {
+                              setLoadedUrls((set) => withUrl(set, photo.url));
+                            } else {
+                              setFailedUrls((set) => withUrl(set, photo.url));
+                            }
+                          }
+                        : undefined
+                    }
                     onLoad={
                       consult ? () => setLoadedUrls((set) => withUrl(set, photo.url)) : undefined
                     }
