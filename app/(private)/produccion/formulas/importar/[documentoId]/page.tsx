@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 
 import { previewFormulaImportAction } from '@/lib/modules/documentos/adapters/driving/formula-import-actions';
 import type { ErrorState } from '@/lib/modules/errores';
+import { requirePageAddon } from '@/lib/modules/identity/adapters/driving/require-page-addon';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
@@ -79,6 +80,7 @@ export default async function FormulaImportPage({
 }) {
   await requirePagePermission('recetas.consultar');
   await requirePagePermission('recetas.modificar');
+  await requirePageAddon('lectura_pdf');
 
   const { documentoId } = await params;
 

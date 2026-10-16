@@ -37,4 +37,6 @@ export type CompanyEventView = {
   readonly occurredAt: Date;
   readonly actor: { readonly id: string; readonly firstNames: string; readonly lastNames: string };
   readonly fields: readonly CompanyField[];
+  /** La clave del añadido en los eventos de añadido; `null` en el resto. */
+  readonly addon: string | null;
 };

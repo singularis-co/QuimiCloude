@@ -117,10 +117,14 @@ const EXACT_HOLDERS_OUTSIDE_THE_CATALOG = [
   'lib/modules/integraciones/domain/actor.ts',
 ] as const
 
-/** Lo que el permiso tiene permitido: el catalogo, las migraciones y las rutas exactas de arriba. */
+/** Catalogo de anadidos: asigna el permiso al anadido `integraciones`, y por eso lo nombra. */
+const ADDONS_CATALOG = 'lib/modules/identity/domain/company-addons.ts'
+
+/** Lo que el permiso tiene permitido: los dos catalogos, las migraciones y las rutas exactas de arriba. */
 export function isAllowedHolderOfTheCode(relativePath: string): boolean {
   return (
     relativePath === 'lib/modules/identity/domain/permissions.ts' ||
+    relativePath === ADDONS_CATALOG ||
     relativePath.startsWith('db/migrations/') ||
     (EXACT_HOLDERS_OUTSIDE_THE_CATALOG as readonly string[]).includes(relativePath)
   )
@@ -653,12 +657,13 @@ describe('la autorizacion del modulo es por permiso', () => {
     expect(findForbiddenPatternsInSource(sintetico).length).toBeGreaterThan(0)
   })
 
-  it('R17: el codigo del permiso solo aparece en el catalogo, en db/migrations/, en las tres paginas de integraciones, en el menu privado y en el actor del modulo', () => {
+  it('R17: el codigo del permiso solo aparece en el catalogo de permisos, en el de anadidos, en db/migrations/, en las tres paginas de integraciones, en el menu privado y en el actor del modulo', () => {
     const conElCodigo = productionFilesContaining(CODIGO)
 
     expect(conElCodigo, 'el barrido deberia ver el catalogo de permisos').toContain(
       'lib/modules/identity/domain/permissions.ts',
     )
+    expect(conElCodigo, 'el barrido deberia ver el catalogo de anadidos').toContain(ADDONS_CATALOG)
     expect(
       conElCodigo.filter((file) => !isAllowedHolderOfTheCode(file)),
       `${CODIGO} aparece fuera de los archivos permitidos. Si lo exige una pagina, un enlace del ` +
@@ -674,8 +679,10 @@ describe('la autorizacion del modulo es por permiso', () => {
     }
   })
 
-  it('R17: la regla admite el catalogo, las migraciones y las cinco rutas exactas, y rechaza un archivo vecino', () => {
+  it('R17: la regla admite los dos catalogos, las migraciones y las cinco rutas exactas, y rechaza un archivo vecino', () => {
     expect(isAllowedHolderOfTheCode('lib/modules/identity/domain/permissions.ts')).toBe(true)
+    expect(isAllowedHolderOfTheCode(ADDONS_CATALOG)).toBe(true)
+    expect(isAllowedHolderOfTheCode('lib/modules/identity/domain/company-addons-extra.ts')).toBe(false)
     expect(isAllowedHolderOfTheCode('db/migrations/x_integrations_permission/migration.sql')).toBe(true)
     expect(isAllowedHolderOfTheCode('app/(private)/integraciones/proveedor-ia/page.tsx')).toBe(true)
     expect(isAllowedHolderOfTheCode('app/(private)/integraciones/inventarios/page.tsx')).toBe(true)

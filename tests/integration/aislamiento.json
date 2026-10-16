@@ -27,7 +27,9 @@
     "clientes/customers-migration.int.test.ts",
     "clientes/customers-search-migration.int.test.ts",
     "documentos/document-batches-and-files-constraints.int.test.ts",
+    "identity/company-addons.int.test.ts",
     "identity/company-country.int.test.ts",
+    "identity/company-directory-addons.int.test.ts",
     "identity/company.int.test.ts",
     "identity/conditioning-role-migration.int.test.ts",
     "identity/delivery-permission-migration.int.test.ts",
@@ -159,7 +161,7 @@
     },
     {
       "archivo": "identity/session-user.int.test.ts",
-      "motivo": "Nacido antes de QC-77: ejercita el adaptador 'findActiveSessionUserById' contra el cliente Prisma global con fixture propio (empresa efimera + usuario) y barrido en afterAll en orden users -> companies, por el ON DELETE RESTRICT de 'users_company_id_fkey'. Committea; se apoya en que la base de la corrida es suya.",
+      "motivo": "Nacido antes de QC-77: ejercita el adaptador 'findActiveSessionUserById' contra el cliente Prisma global con fixture propio (empresa efimera + usuario) y barrido en afterAll en orden users -> companies, por el ON DELETE RESTRICT de 'users_company_id_fkey'. Tambien escribe 'company_addon_overrides' de su empresa (QC-277); esas filas caen por el ON DELETE CASCADE de 'company_addon_overrides_company_id_fkey' al borrar la empresa, asi que el barrido no las nombra. Committea; se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-12"
     },
     {

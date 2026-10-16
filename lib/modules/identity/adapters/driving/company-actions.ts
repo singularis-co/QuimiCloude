@@ -4,6 +4,7 @@ import { identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import {
   IdentityError,
+  type CompanyAddonsView,
   type CompanyDeletionImpact,
   type CompanyDetail,
   type CompanyEventView,
@@ -38,6 +39,13 @@ export type CompanyDeletionImpactResult =
 
 export type CompanyEventListResult =
   | { status: 'success'; data: Page<CompanyEventView> }
+  | ErrorState;
+
+export type CompanyAddonsResult = { status: 'success'; data: CompanyAddonsView } | ErrorState;
+
+export type CompanyAddonsFormState =
+  | { status: 'idle' }
+  | { status: 'success'; data: CompanyAddonsView }
   | ErrorState;
 
 const toErrorState = createErrorStateTranslator(IdentityError, observabilidad.readRequestIdHeader);
@@ -196,6 +204,61 @@ export async function listCompanyEventsAction(input: unknown): Promise<CompanyEv
 
   try {
     const data = await identity.listCompanyEvents(actor, input);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// Del formulario llega texto: solo «true» y «false» se traducen; cualquier otro valor sigue crudo
+// y lo rechaza el esquema del dominio.
+function enabledFromFormData(formData: FormData): unknown {
+  const raw = formData.get('enabled');
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return raw;
+}
+
+export async function getCompanyAddonsAction(companyId: string): Promise<CompanyAddonsResult> {
+  const actor = await currentPlatformActor();
+
+  try {
+    const data = await identity.getCompanyAddons(actor, { companyId });
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export async function setCompanyAddonAction(
+  _prevState: CompanyAddonsFormState,
+  formData: FormData,
+): Promise<CompanyAddonsFormState> {
+  const actor = await currentPlatformActor();
+
+  try {
+    const data = await identity.setCompanyAddon(actor, {
+      companyId: formData.get('companyId'),
+      addon: formData.get('addon'),
+      enabled: enabledFromFormData(formData),
+    });
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export async function setAllCompanyAddonsAction(
+  _prevState: CompanyAddonsFormState,
+  formData: FormData,
+): Promise<CompanyAddonsFormState> {
+  const actor = await currentPlatformActor();
+
+  try {
+    const data = await identity.setAllCompanyAddons(actor, {
+      companyId: formData.get('companyId'),
+      enabled: enabledFromFormData(formData),
+    });
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

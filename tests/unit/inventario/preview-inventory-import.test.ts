@@ -19,7 +19,7 @@ import {
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import type { ImportCells } from '@/lib/modules/inventario';
 
-const ADMIN: Actor = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar', 'unidades.modificar'] };
+const ADMIN: Actor = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar', 'unidades.modificar'], addons: ['importacion_excel'] };
 
 function build(rows: readonly Partial<ImportCells>[], state: Parameters<typeof fakeReadPorts>[0] = {}) {
   const ports = fakeReadPorts(state);

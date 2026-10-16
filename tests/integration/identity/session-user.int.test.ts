@@ -51,6 +51,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
 import {
+  ADDONS,
+  CORE_PERMISSIONS,
   DOCUMENT_TYPE_CC,
   normalizeCompanyName,
   ROLE_ACONDICIONAMIENTO,
@@ -146,7 +148,14 @@ beforeAll(async () => {
 
   // QC-47: empresa PROPIA del fixture, nunca la de instalacion.
   const empresa = await prisma.company.create({
-    data: { name: nombreDeEmpresa, nameNormalized: normalizeCompanyName(nombreDeEmpresa) },
+    // Con todos los añadidos, como toda empresa que ya existía al llegar los interruptores: así
+    // los permisos de la sesión siguen siendo los del rol, que es lo que miden los casos de abajo.
+    // Las excepciones caen con la empresa por `ON DELETE CASCADE`: el `afterAll` no las conoce.
+    data: {
+      name: nombreDeEmpresa,
+      nameNormalized: normalizeCompanyName(nombreDeEmpresa),
+      addonOverrides: { create: ADDONS.map((addonKey) => ({ addonKey, enabled: true })) },
+    },
     select: { id: true },
   });
   empresaId = empresa.id;
@@ -219,6 +228,19 @@ afterAll(async () => {
   }
 });
 
+// Reescribe las excepciones de la empresa del fixture: `on` prendidas y `off` apagadas.
+async function fijarAnadidos(on: readonly string[], off: readonly string[] = []): Promise<void> {
+  await prisma.$transaction([
+    prisma.companyAddonOverride.deleteMany({ where: { companyId: empresaId } }),
+    prisma.companyAddonOverride.createMany({
+      data: [
+        ...on.map((addonKey) => ({ companyId: empresaId, addonKey, enabled: true })),
+        ...off.map((addonKey) => ({ companyId: empresaId, addonKey, enabled: false })),
+      ],
+    }),
+  ]);
+}
+
 describe('findActiveSessionUserById contra Postgres real', () => {
   it('un usuario activo devuelve nombres, username y el rol actual', async () => {
     // R10 — consulta por sub (id de la fila real).
@@ -233,6 +255,9 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       // QC-48 R13: la empresa de la ficha y su estado, en la misma fila.
       companyId: empresaId,
       companyDeletedAt: null,
+      // Sin `orderBy`, como los permisos: el orden lo decide Postgres y el `toHaveLength` de abajo
+      // cierra la puerta a que sobre alguno.
+      companyAddons: expect.arrayContaining([...ADDONS]),
       // QC-74 R7: los permisos del rol, en la misma fila. `arrayContaining` porque la consulta
       // no lleva `orderBy` —el adaptador no ordena a proposito— y el orden de `role_permissions`
       // lo decide Postgres; el `toHaveLength` de abajo cierra la puerta a que sobre alguno.
@@ -246,6 +271,7 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       sessionRevokedAt: null,
     });
     expect(resultado?.permissions).toHaveLength(2);
+    expect(resultado?.companyAddons).toHaveLength(ADDONS.length);
   });
 
   // QC-74 R7 — los permisos salen de la ASIGNACION, no del nombre del rol: el rol alternativo
@@ -454,6 +480,118 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       await prisma.revokedSession.deleteMany({ where: { sessionId: sidCerrado } });
     }
   });
+
+  it('QC-277 R8, R9: trae solo las excepciones prendidas de la empresa, en la misma llamada al lector', async () => {
+    await fijarAnadidos(['lectura_pdf', 'dashboard'], ['proveedores']);
+
+    try {
+      // Una sola invocacion del lector real, medida por el cliente con log.
+      const { resultado, sentencias } = await medir(usuarioId, SID_SIN_CERRAR);
+
+      // La excepcion apagada no sale; el orden no lo fija el adaptador.
+      expect([...(resultado?.companyAddons ?? [])].sort()).toEqual(['dashboard', 'lectura_pdf']);
+      // Los añadidos salen de la MISMA sentencia que el usuario: ni una consulta aparte a
+      // `companies` ni a `company_addon_overrides`.
+      expect(sentencias).toHaveLength(1);
+      expect(sentencias[0]).toMatch(/\bFROM users u\b/);
+      expect(sentencias[0]).toMatch(/\bcompany_addon_overrides\b/);
+      // Mismo dato por el cliente global: la medida no cambia lo que se lee.
+      expect(resultado).toEqual(await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR));
+    } finally {
+      await fijarAnadidos([...ADDONS]);
+    }
+  });
+
+  it('QC-277 R9: con todas las excepciones apagadas la empresa no trae ningun añadido', async () => {
+    await fijarAnadidos([], [...ADDONS]);
+    try {
+      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
+
+      expect(resultado?.companyAddons).toEqual([]);
+    } finally {
+      await fijarAnadidos([...ADDONS]);
+    }
+  });
+
+  // Dos empresas en la misma base: los añadidos de cada usuario salen SOLO de las excepciones de su
+  // empresa. La segunda empresa y su usuario son propios del caso y se borran en `finally`, en
+  // orden `users -> companies`; sus excepciones caen con la empresa por `ON DELETE CASCADE`.
+  it('QC-277 R8: con dos empresas, cada usuario trae solo los añadidos prendidos de la suya', async () => {
+    const marca = randomUUID();
+    const nombreEmpresaB = `qc277-session-b-${marca}`;
+    const { id: empresaBId } = await prisma.company.create({
+      data: { name: nombreEmpresaB, nameNormalized: normalizeCompanyName(nombreEmpresaB) },
+      select: { id: true },
+    });
+    let usuarioBId = '';
+
+    async function fijarAnadidosDeB(on: readonly string[], off: readonly string[] = []) {
+      await prisma.$transaction([
+        prisma.companyAddonOverride.deleteMany({ where: { companyId: empresaBId } }),
+        prisma.companyAddonOverride.createMany({
+          data: [
+            ...on.map((addonKey) => ({ companyId: empresaBId, addonKey, enabled: true })),
+            ...off.map((addonKey) => ({ companyId: empresaBId, addonKey, enabled: false })),
+          ],
+        }),
+      ]);
+    }
+
+    async function anadidosDe(id: string): Promise<string[]> {
+      const resultado = await findActiveSessionUserById(id, SID_SIN_CERRAR);
+      return [...(resultado?.companyAddons ?? [])].sort();
+    }
+
+    try {
+      ({ id: usuarioBId } = await prisma.user.create({
+        data: {
+          firstNames: 'Empresa',
+          lastNames: 'Segunda',
+          birthDate: new Date('1990-01-01T00:00:00.000Z'),
+          email: `qc277.session.${marca}@example.test`,
+          phone: '+57 300 000 0000',
+          documentTypeCode: DOCUMENT_TYPE_CC,
+          documentNumber: `67${marca.replaceAll('-', '').slice(0, 18)}`,
+          username: `qc277_session_${marca}`,
+          passwordHash: 'no-se-usa-en-este-test',
+          roleId: rolId,
+          companyId: empresaBId,
+          accountStatus: 'active',
+        },
+        select: { id: true },
+      }));
+
+      // A con uno solo prendido y el resto apagado; B con los cinco prendidos.
+      await fijarAnadidos(
+        ['lectura_pdf'],
+        ADDONS.filter((addon) => addon !== 'lectura_pdf'),
+      );
+      await fijarAnadidosDeB([...ADDONS]);
+
+      expect(await anadidosDe(usuarioId)).toEqual(['lectura_pdf']);
+      expect(await anadidosDe(usuarioBId)).toEqual([...ADDONS].sort());
+
+      // Al reves: B sin ningun añadido (todas sus excepciones apagadas) y A con dos prendidos.
+      await fijarAnadidos(['dashboard', 'proveedores']);
+      await fijarAnadidosDeB([], [...ADDONS]);
+
+      expect(await anadidosDe(usuarioId)).toEqual(['dashboard', 'proveedores']);
+      expect(await anadidosDe(usuarioBId)).toEqual([]);
+
+      // Cada ficha sigue apuntando a su propia empresa.
+      expect((await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR))?.companyId).toBe(empresaId);
+      expect((await findActiveSessionUserById(usuarioBId, SID_SIN_CERRAR))?.companyId).toBe(
+        empresaBId,
+      );
+    } finally {
+      try {
+        if (usuarioBId) await prisma.user.deleteMany({ where: { id: usuarioBId } });
+      } finally {
+        await prisma.company.deleteMany({ where: { id: empresaBId } });
+        await fijarAnadidos([...ADDONS]);
+      }
+    }
+  });
 });
 
 // La ficha de quien no tiene empresa (el Maestro). Fixture propio, creado y borrado en el
@@ -501,6 +639,7 @@ describe('findActiveSessionUserById sin empresa (QC-161)', () => {
         roleName: ROLE_MAESTRO,
         companyId: null,
         companyDeletedAt: null,
+        companyAddons: [],
         permissions: expect.arrayContaining([...(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? [])]),
         accountStatus: 'active',
         lockedUntil: null,
@@ -675,6 +814,23 @@ describe('findActiveSessionUserById y el permiso integraciones.modificar', () =>
 
     expect(permisos).toContain(CODIGO);
     expect(permisos).toEqual([...(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [])].sort());
+  });
+
+  it('QC-277 R8: con la empresa sin añadidos, la sesión real del Administrador queda en su parte del núcleo', async () => {
+    await fijarAnadidos([]);
+    try {
+      const permisos = await permisosDeLaSesionDe(ROLE_ADMINISTRADOR);
+
+      expect(permisos.length).toBeGreaterThan(0);
+      expect(permisos).not.toContain(CODIGO);
+      expect(permisos).toEqual(
+        [...(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [])]
+          .filter((codigo) => (CORE_PERMISSIONS as readonly string[]).includes(codigo))
+          .sort(),
+      );
+    } finally {
+      await fijarAnadidos([...ADDONS]);
+    }
   });
 
   it('R7: la sesion de un Operador, un Empacador o un Administrador de acondicionamiento no incluye integraciones.modificar', async () => {

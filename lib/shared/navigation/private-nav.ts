@@ -488,3 +488,15 @@ export function firstVisibleNavHref(items: readonly NavItem[]): string | null {
 
   return null;
 }
+
+/**
+ * Adónde aterriza una persona según sus permisos efectivos: el login, el logo y `/login` con
+ * sesión comparten esta regla para que no diverjan. Con el menú vacío cae al dashboard, que
+ * responde el 404 dentro de la zona privada, con su salida.
+ */
+export function homeHrefFor(permissions: readonly string[]): string {
+  return (
+    firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permissions)) ??
+    DASHBOARD_ROUTE
+  );
+}

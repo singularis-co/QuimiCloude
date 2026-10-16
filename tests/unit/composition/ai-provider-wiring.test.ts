@@ -42,6 +42,16 @@ vi.mock('@/lib/modules/integraciones/adapters/driven/catalog/ai-provider-catalog
 vi.mock('@/lib/modules/integraciones/adapters/driven/security/secret-cipher-aes-gcm', () => ({
   secretCipherAesGcm: { encrypt: vi.fn(), decrypt: m.decrypt },
 }));
+// El trabajo pregunta primero si la empresa tiene la lectura de PDF activa: aquí la tiene, para
+// que estos casos lleguen al lector como antes.
+vi.mock('@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma', () => ({
+  createCompanyAddonRepository: () => ({
+    findByCompany: async () => ({ stored: ['integraciones', 'lectura_pdf'], alive: true }),
+    apply: async () => {
+      throw new Error('el trabajo de la cola no escribe añadidos');
+    },
+  }),
+}));
 vi.mock('@/lib/modules/documentos/adapters/driven/persistence/document-batch-repository-prisma', () => ({
   documentBatchRepositoryPrisma: { claim: m.claim, readBatch: m.readBatch, finish: m.finish },
 }));

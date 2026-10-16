@@ -664,8 +664,11 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     // cerradas-. Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`.
     // RETENSADO 2026-10-14 (QC-162): entra `CompanyEvent`, el lado inverso del autor del
     // historial de empresas. Es de `identity`, no de `proveedores`: el caso b) lo sigue vigilando.
+    // RETENSADO 2026-10-15 (QC-277, D13–D16): entra `CompanyAddonOverride`, el lado inverso del
+    // autor de una excepcion de añadido. Tambien es de `identity`.
     expect(relationTargets('User')).toEqual([
       'Company',
+      'CompanyAddonOverride',
       'CompanyEvent',
       'CredentialSetupToken',
       'DocumentType',
@@ -713,8 +716,11 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     // igualdad EXACTA sobre el conjunto entero, no un `toContain`.
     // RETENSADO 2026-10-14 (QC-162): entra `CompanyEvent`, el lado inverso del autor del
     // historial de empresas; tampoco es de `proveedores`.
+    // RETENSADO 2026-10-15 (QC-277, D13–D16): entra `CompanyAddonOverride`, el lado inverso del
+    // autor de una excepcion de añadido; tampoco es de `proveedores`.
     expect(relationTargets('User')).toEqual([
       'Company',
+      'CompanyAddonOverride',
       'CompanyEvent',
       'CredentialSetupToken',
       'DocumentType',

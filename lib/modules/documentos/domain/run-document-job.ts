@@ -28,6 +28,7 @@ import type { AiReader } from '../ports/ai-reader';
 import type { DocumentBatchRepository, JobOutcome } from '../ports/document-batch-repository';
 import type { DocumentJobLog } from '../ports/document-job-log';
 import type { DocumentStorage } from '../ports/document-storage';
+import type { PdfReadingSwitch } from '../ports/pdf-reading-switch';
 
 // Lo publica el contrato desde aqui, su unico consumidor de dominio: la composicion lo implementa.
 export type { AiProviderGateway, AiReaderLookup } from '../ports/ai-provider-gateway';
@@ -54,6 +55,7 @@ export type RunDocumentJobDeps = {
   readonly repository: DocumentBatchRepository;
   readonly storage: DocumentStorage;
   readonly aiProvider: AiProviderGateway;
+  readonly pdfReading: PdfReadingSwitch;
   /** El lector depende de la empresa y del uso, así que la cadena se construye por trabajo. */
   readonly pipelineFor: (reader: AiReader) => DocumentPipeline;
   /** Opcional para que quien no observa el trabajo no tenga que pasar un doble mudo. */
@@ -149,6 +151,17 @@ export function createRunDocumentJob(
       return { kind: 'skipped' };
     }
     log.info('fila reclamada', { fileId: claimed.id, batchId: claimed.batchId });
+
+    // Lo que quedó en cola al apagar se descarta: definitivo, sin descargar ni llamar a la IA.
+    if (!(await deps.pdfReading.isOn(claimed.companyId))) {
+      const outcome = {
+        kind: outcomeKindOf(failureKind('unauthorized')),
+        code: 'unauthorized',
+        reason: 'run-document-job: la lectura de PDF no esta activa en la empresa',
+      } as const;
+      await terminar(claimed.id, outcome);
+      return { kind: outcome.kind };
+    }
 
     // Permisos vacios a proposito: es el ambito minimo que `downloadDocument` necesita para
     // comprobar la empresa, sin conceder nada mas.

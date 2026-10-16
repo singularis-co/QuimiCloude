@@ -135,6 +135,7 @@ model User {
   credentialSetupTokens CredentialSetupToken[]
   revokedSessions       RevokedSession[]
   companyEvents         CompanyEvent[]
+  addonOverridesCreated CompanyAddonOverride[]
 
   @@unique([id, companyId], map: "users_id_company_id_key")
   @@index([roleId], map: "users_role_id_idx")
@@ -164,11 +165,43 @@ model Company {
   contactEmail    String?   @map("contact_email")
   contactPhone    String?   @map("contact_phone")
 
-  users      User[]
-  workGroups WorkGroup[]
-  events     CompanyEvent[]
+  users          User[]
+  workGroups     WorkGroup[]
+  events         CompanyEvent[]
+  addonOverrides CompanyAddonOverride[]
 
   @@map("companies")
+}
+
+/// Espejo del catálogo `ADDONS` del código, que es el que manda. Lo siembra la migración; un
+/// añadido nuevo es otra migración con su INSERT. Lo vigila la guardia del catálogo de añadidos.
+/// @module identity
+model Addon {
+  key       String                 @id
+  overrides CompanyAddonOverride[]
+
+  @@map("addons")
+}
+
+/// Excepción de una empresa sobre un añadido. Sin planes, el añadido está prendido solo si hay
+/// fila con `enabled = true`. Apagar no borra: escribe `enabled = false`.
+/// @module identity
+model CompanyAddonOverride {
+  companyId String   @map("company_id") @db.Uuid
+  addonKey  String   @map("addon_key")
+  enabled   Boolean
+  source    String   @default("manual")
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  addon   Addon   @relation(fields: [addonKey], references: [key], onDelete: Restrict, onUpdate: Cascade)
+  author  User?   @relation(fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([companyId, addonKey], map: "company_addon_overrides_pkey")
+  @@index([addonKey], map: "company_addon_overrides_addon_key_idx")
+  @@index([createdBy], map: "company_addon_overrides_created_by_idx")
+  @@map("company_addon_overrides")
 }
 
 /// Sin `updatedAt` ni `deletedAt`: un evento no se corrige ni se borra. `kind` es texto con forma

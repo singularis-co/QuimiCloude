@@ -3,6 +3,8 @@ export const COMPANY_EVENT_KINDS = [
   'company.updated',
   'company.deleted',
   'company.reactivated',
+  'addon.enabled',
+  'addon.disabled',
 ] as const;
 export type CompanyEventKind = (typeof COMPANY_EVENT_KINDS)[number];
 

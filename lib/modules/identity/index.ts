@@ -400,3 +400,35 @@ export {
   type GetCompanyDeletionImpactDeps,
 } from './domain/get-company-deletion-impact';
 export { createListCompanyEvents, type ListCompanyEventsDeps } from './domain/list-company-events';
+export {
+  ADDONS,
+  ADDON_PERMISSIONS,
+  ADDON_REQUIRES,
+  CORE_PERMISSIONS,
+  assertAddon,
+  effectiveAddons,
+  effectivePermissions,
+  hasAddon,
+  isAddon,
+  type Addon,
+  type AddonBearer,
+} from './domain/company-addons';
+export {
+  createIsCompanyAddonActive,
+  type IsCompanyAddonActiveDeps,
+} from './domain/is-company-addon-active';
+export {
+  companyAddonsQuerySchema,
+  setAllCompanyAddonsSchema,
+  setCompanyAddonSchema,
+  type CompanyAddonsQueryInput,
+  type SetAllCompanyAddonsInput,
+  type SetCompanyAddonInput,
+} from './domain/company-addon-input';
+export type { CompanyAddonState, CompanyAddonsView } from './domain/company-addons-view';
+export { createGetCompanyAddons, type GetCompanyAddonsDeps } from './domain/get-company-addons';
+export { createSetCompanyAddon, type SetCompanyAddonDeps } from './domain/set-company-addon';
+export {
+  createSetAllCompanyAddons,
+  type SetAllCompanyAddonsDeps,
+} from './domain/set-all-company-addons';

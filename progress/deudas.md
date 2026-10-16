@@ -441,3 +441,19 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   (le faltan `break-words` / `min-w-0`). Es de la pieza compartida, así que afecta a todas las
   listas con tarjetas. Los nombres reales llevan espacios y no lo provocan.
 - **Dueño:** sin asignar.
+
+### D59 — Comentarios de test y helpers E2E de QC-277 que citan ficha o requisito
+- **Origen:** review de QC-277 (2026-10-15), menor m1 (`progress/review_QC-277.md`).
+- **Qué falta:** `docs/conventions.md > Comentarios` vale también en `tests/` y `e2e/`: el `R<n>`
+  va en el nombre del caso, no en el comentario. Lo incumplen, entre otros, `e2e/helpers/addons.ts`,
+  `e2e/helpers/landing.ts`, `tests/unit/identity/roles/maestro-rol.test.ts` y
+  `tests/unit/identity/schema/account-status-schema.test.ts` (lista completa en la review). Se
+  reescriben al estilo «RETENSADO …» de esos archivos. No es producción.
+- **Dueño:** sin asignar.
+
+### D60 — Sin E2E del webhook de documentos con el añadido apagado (QC-277 R22)
+- **Origen:** review de QC-277 (2026-10-15), menor m4 (`progress/review_QC-277.md`).
+- **Qué falta:** el corte del webhook con el añadido apagado (R22) tiene cobertura unitaria y de
+  composición, pero no E2E: los E2E de documentos recorren el webhook con todo prendido
+  (`enableAllAddons`). Falta el camino «descartado» de punta a punta.
+- **Dueño:** sin asignar.

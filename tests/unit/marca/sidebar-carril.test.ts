@@ -15,6 +15,7 @@ import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarMenuButton, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import type { SessionUser } from '@/lib/modules/identity';
 import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
+import { HOME_ROUTE } from '@/lib/shared/routes';
 
 const { usePathnameMock } = vi.hoisted(() => ({ usePathnameMock: vi.fn<() => string>() }));
 
@@ -125,6 +126,13 @@ describe('carril colapsado', () => {
     );
     expect(classes).toContain(`${ICON_PREFIX}p-1.5!`);
     expect(classes).not.toContain(`${ICON_PREFIX}p-3.5!`);
+  });
+
+  it('QC-277 R18 el enlace de marca del carril colapsado apunta a HOME_ROUTE', () => {
+    const html = render(false, createElement(AppSidebar, { user: USER, navItems: PRIVATE_NAV_ITEMS }));
+    const tag = html.match(/<a[^>]*data-testid="private-brand-link"[^>]*>/)?.[0];
+    expect(tag).toBeDefined();
+    expect(tag).toContain(`href="${HOME_ROUTE}"`);
   });
 
   it('R36 las clases del boton de menu sin prefijo de modo icono son las de partida', () => {

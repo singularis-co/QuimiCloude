@@ -9,6 +9,7 @@ import {
   PRIVATE_NAV_ITEMS,
   filterNavItemsByPermissions,
   firstVisibleNavHref,
+  homeHrefFor,
 } from '@/lib/shared/navigation/private-nav';
 import {
   AI_PROVIDER_INTEGRATION_ROUTE,
@@ -35,6 +36,13 @@ vi.mock('@/lib/composition', () => ({
 vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
 }));
+
+// Envoltura espía sobre la regla real: el destino sigue siendo el de verdad y se puede comprobar
+// con qué permisos se calculó.
+vi.mock('@/lib/shared/navigation/private-nav', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/shared/navigation/private-nav')>();
+  return { ...real, homeHrefFor: vi.fn(real.homeHrefFor) };
+});
 
 /** Los codigos del catalogo de QC-74, derivados y no escritos a mano. */
 const TODOS_LOS_PERMISOS: readonly string[] = PERMISSIONS.map((permiso) => permiso.code);
@@ -404,5 +412,48 @@ describe('aterrizaje del Maestro (QC-161)', () => {
 
     expect(redirect).toHaveBeenCalledTimes(1);
     expect(redirect).toHaveBeenCalledWith('/inventario');
+  });
+});
+
+// La sesión ya trae el permiso efectivo (rol ∩ añadidos activos): el login aterriza con la misma
+// regla que el logo y `/login` con sesión.
+describe('aterrizaje con el permiso efectivo (QC-277)', () => {
+  // Todos los permisos salvo los que se pierden con dashboard y proveedores apagados.
+  const EFECTIVOS = TODOS_LOS_PERMISOS.filter(
+    (permiso) => !permiso.startsWith('dashboard.') && !permiso.startsWith('proveedores.'),
+  );
+
+  it('R20: sin destino de vuelta aterriza en homeHrefFor de los permisos de la sesion', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+    getSessionUserMock.mockResolvedValue(usuarioCon(EFECTIVOS));
+
+    await submit({ username: 'ana.perez', password: 'clave' });
+
+    expect(homeHrefFor).toHaveBeenCalledTimes(1);
+    expect(homeHrefFor).toHaveBeenCalledWith(EFECTIVOS);
+    expect(redirect).toHaveBeenCalledTimes(1);
+    expect(redirect).toHaveBeenCalledWith(homeHrefFor(EFECTIVOS));
+  });
+
+  it('R20: el destino recortado no es el dashboard ni un enlace que el permiso efectivo no ve', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+    getSessionUserMock.mockResolvedValue(usuarioCon(EFECTIVOS));
+
+    await submit({ username: 'ana.perez', password: 'clave' });
+
+    const esperado = firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, EFECTIVOS));
+    expect(esperado).not.toBeNull();
+    expect(esperado).not.toBe(DASHBOARD_ROUTE);
+    expect(redirect).toHaveBeenCalledWith(esperado);
+  });
+
+  it('R20: homeHrefFor compone exactamente el respaldo de siempre, dashboard incluido con el menu vacio', () => {
+    for (const permisos of [TODOS_LOS_PERMISOS, EFECTIVOS, ['inventario.consultar'], []]) {
+      expect(homeHrefFor(permisos)).toBe(
+        firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permisos)) ??
+          DASHBOARD_ROUTE,
+      );
+    }
+    expect(homeHrefFor([])).toBe(DASHBOARD_ROUTE);
   });
 });

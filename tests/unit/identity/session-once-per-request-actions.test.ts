@@ -23,6 +23,7 @@ import { join, resolve } from 'node:path';
 
 import type { SessionClaims } from '@/lib/modules/identity/domain/session-claims';
 import type { SessionUserRecord } from '@/lib/modules/identity/ports/session-user-reader';
+import { ADDONS } from '@/lib/modules/identity';
 
 const { readClaimsMock, findActiveByIdMock, headersMock, cookiesMock, revalidatePathMock } =
   vi.hoisted(() => ({
@@ -109,6 +110,7 @@ function fichaDe(id: string): SessionUserRecord {
     roleName: 'operador',
     companyId: COMPANY_ID,
     companyDeletedAt: null,
+    companyAddons: [...ADDONS],
     permissions: [],
     accountStatus: 'active',
     lockedUntil: null,

@@ -205,6 +205,8 @@ describe('R4 — el rol Maestro es global: Role no lleva campo de empresa', () =
  */
 const RUTAS_ABIERTAS_EMPRESAS = new Set([
   CATALOGO_DE_PERMISOS,
+  // Catalogo de anadidos: clasifica cada permiso como nucleo o anadido.
+  'lib/modules/identity/domain/company-addons.ts',
   'lib/modules/identity/domain/set-company-country.ts',
   // Enmienda QC-162 (2026-10-14): los ocho casos de uso de gestion de empresas exigen
   // `empresas.*` en su primera linea. Se abren solo sus rutas exactas.
@@ -216,6 +218,10 @@ const RUTAS_ABIERTAS_EMPRESAS = new Set([
   'lib/modules/identity/domain/get-company.ts',
   'lib/modules/identity/domain/get-company-deletion-impact.ts',
   'lib/modules/identity/domain/list-company-events.ts',
+  // Enmienda QC-277 (design §10.3.1): los tres casos de uso de añadidos exigen `empresas.*`.
+  'lib/modules/identity/domain/get-company-addons.ts',
+  'lib/modules/identity/domain/set-company-addon.ts',
+  'lib/modules/identity/domain/set-all-company-addons.ts',
 ]);
 
 describe('R17 — ningun archivo de produccion fuera del catalogo (y las rutas abiertas) nombra los permisos de empresas', () => {

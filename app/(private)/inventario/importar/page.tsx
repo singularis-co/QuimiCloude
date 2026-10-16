@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { buttonVariants } from '@/components/ui/button';
+import { requirePageAddon } from '@/lib/modules/identity/adapters/driving/require-page-addon';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { getInventoryImportValuesAction } from '@/lib/modules/inventario/adapters/driving/inventory-import-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
@@ -29,6 +30,7 @@ export const maxDuration = 300;
 
 export default async function InventoryImportPage() {
   await requirePagePermission('inventario.modificar');
+  await requirePageAddon('importacion_excel');
 
   // Si el catálogo de unidades no se puede leer, la importación sigue disponible; solo los
   // diálogos de alta de faltantes se quedan sin unidades que ofrecer.

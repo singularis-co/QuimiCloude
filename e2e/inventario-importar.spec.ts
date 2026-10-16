@@ -46,6 +46,7 @@ import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_IMPORT_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { exactProductNameCellText, PRESENTATION_CELL_TESTID } from './helpers/product-name-cell';
@@ -217,6 +218,7 @@ test.beforeAll(async () => {
     })
   ).id;
   companyId = ownCompanyId;
+  await enableAllAddons(ownCompanyId);
 
   const role = await prisma.role.findUnique({
     where: { name: ROLE_ADMINISTRADOR },

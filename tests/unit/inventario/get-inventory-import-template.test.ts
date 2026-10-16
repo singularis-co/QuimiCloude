@@ -7,7 +7,7 @@ import {
   type ImportTemplateSheet,
 } from '@/lib/modules/inventario';
 
-const ACTOR = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar'] };
+const ACTOR = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar'], addons: ['importacion_excel'] };
 const BYTES = new Uint8Array([0x50, 0x4b]);
 
 function build() {

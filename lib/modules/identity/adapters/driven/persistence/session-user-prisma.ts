@@ -13,6 +13,7 @@ type FilaSesion = {
   company_id: string | null;
   company_deleted_at: Date | null;
   permissions: string[];
+  company_addons: string[];
   account_status: string;
   locked_until: Date | null;
   sessions_valid_from: Date;
@@ -68,6 +69,10 @@ type FilaSesion = {
  * `findActiveByUsername` (`user-credentials-prisma.ts`) lee `users`, `roles` y `companies` por
  * `$queryRaw` igual.
  *
+ * Añadidos (QC-277): `ARRAY(SELECT ...)` sobre `company_addon_overrides` con `enabled`, por el
+ * prefijo de su clave primaria; en la MISMA sentencia. Sin empresa (Maestro) da `{}`, o sea `[]`.
+ * Claves cortas, sin PII y fuera de todo log.
+ *
  * **Cero escrituras** (R40 de QC-23): aqui no se purga nada. La purga vive en las dos operaciones
  * de `session-revocation-prisma.ts`, nunca en el camino de lectura.
  */
@@ -82,6 +87,10 @@ export async function findActiveSessionUserById(
            ARRAY(
              SELECT rp.permission_code FROM role_permissions rp WHERE rp.role_id = u.role_id
            ) AS permissions,
+           ARRAY(
+             SELECT o.addon_key FROM company_addon_overrides o
+             WHERE o.company_id = u.company_id AND o.enabled
+           ) AS company_addons,
            u.account_status::text AS account_status, u.locked_until, u.sessions_valid_from,
            (
              SELECT rs.revoked_at FROM revoked_sessions rs
@@ -108,6 +117,7 @@ export async function findActiveSessionUserById(
     companyId: fila.company_id,
     // La marca cruda; sin empresa no hay marca. Quien decide si «esta viva» es el dominio.
     companyDeletedAt: fecha(fila.company_deleted_at),
+    companyAddons: fila.company_addons,
     // QC-74 R7: los permisos salen de la ASIGNACION rol-permiso, nunca del nombre del rol.
     permissions: fila.permissions,
     // QC-78 R7, R20: los dos crudos. Quien traduce «lo que la columna dice» a «lo que significa

@@ -1,4 +1,4 @@
-import { requirePermission, type Actor } from './actor';
+import { requireAddon, requirePermission, type Actor } from './actor';
 import {
   buildInventoryImportTemplateSheets,
   IMPORT_TEMPLATE_FILE_NAME,
@@ -39,6 +39,7 @@ async function readValues(reader: ImportTemplateValuesReader, companyId: string)
 export function createGetInventoryImportValues(deps: GetInventoryImportValuesDeps): GetInventoryImportValues {
   return async function getInventoryImportValues(actor) {
     requirePermission(actor, 'inventario.modificar');
+    requireAddon(actor, 'importacion_excel');
     return readValues(deps.values, actor.companyId);
   };
 }
@@ -47,6 +48,7 @@ export function createGetInventoryImportValues(deps: GetInventoryImportValuesDep
 export function createGetInventoryImportTemplate(deps: GetInventoryImportTemplateDeps): GetInventoryImportTemplate {
   return async function getInventoryImportTemplate(actor) {
     requirePermission(actor, 'inventario.modificar');
+    requireAddon(actor, 'importacion_excel');
 
     const values = await readValues(deps.values, actor.companyId);
     const bytes = await deps.writer.write(buildInventoryImportTemplateSheets(values));

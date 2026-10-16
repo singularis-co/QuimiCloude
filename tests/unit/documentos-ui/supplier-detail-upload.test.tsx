@@ -127,7 +127,12 @@ import {
   DOCUMENT_UPLOAD_SUBMIT_TESTID,
   DOCUMENT_UPLOAD_TESTID,
 } from '@/components/shared/document-upload';
-import { PERMISSIONS } from '@/lib/modules/identity';
+import {
+  PERMISSIONS,
+  ROLE_ADMINISTRADOR,
+  SEED_ROLE_PERMISSIONS,
+  effectivePermissions,
+} from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { AI_PROVIDER_INTEGRATION_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
@@ -318,6 +323,20 @@ describe('el montaje en la pantalla de proveedores', () => {
     expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
     expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).not.toBeInTheDocument();
     expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R15 R23 con los permisos del Administrador recortados por la empresa sin lectura de PDF no hay boton ni subida', async () => {
+    // Con `proveedores` prendido: sin él la pantalla entera responde 404 y no habría botón que buscar.
+    getSessionUserMock.mockResolvedValue({
+      ...sesionCon(effectivePermissions(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [], ['proveedores'])),
+      addons: ['proveedores'],
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('supplier-detail')).toBeInTheDocument();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeInTheDocument();
   });
 
   it('proveedor inexistente: sin boton (R7)', async () => {

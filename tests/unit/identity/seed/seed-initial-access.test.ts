@@ -12,6 +12,7 @@ import {
   SEED_ADMIN_ACCOUNT_STATUS,
 } from '@/lib/modules/identity/domain/account-status';
 import { INITIAL_COMPANY_NAME } from '@/lib/modules/identity/domain/companies';
+import { ADDONS } from '@/lib/modules/identity/domain/company-addons';
 import { normalizeCompanyName } from '@/lib/modules/identity/domain/company-name';
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type';
 import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
@@ -28,6 +29,9 @@ import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-ac
 import type { CredentialRule } from '@/lib/modules/identity/domain/credential-policy';
 import type { InitialAdminCredentials } from '@/lib/modules/identity/ports/initial-access-credentials';
 import type { InitialAccessRepository } from '@/lib/modules/identity/ports/initial-access-repository';
+import { createInitialAccessRepository } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
+
+vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 /** Credencial de test evidentemente ficticia: nunca se persiste (R8). */
 const CREDENCIAL_DE_PRUEBA = 'credencial-de-prueba-no-real';
@@ -1564,6 +1568,37 @@ describe('seedInitialAccess', () => {
     expect(obtenido.createdAdmin).toBe(true);
     expect(obtenido.createdCompany).toBe(INITIAL_COMPANY_NAME);
     expect(obtenido.createdMaestro).toBe(true);
+  });
+
+  it('R7: full crea la empresa inicial una vez por el puerto, y el adaptador la crea con las cinco excepciones prendidas y sin autor', async () => {
+    const repository = crearRepositorioFalso();
+    await seedInitialAccess({ ...depsDelSeed(repository), scope: 'full' });
+    expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createCompany')).toHaveLength(1);
+
+    const create = vi.fn(async () => ({ id: 'empresa-nueva' }));
+    const db = { company: { create } } as unknown as Parameters<typeof createInitialAccessRepository>[0];
+    const id = await createInitialAccessRepository(db).createCompany({
+      name: INITIAL_COMPANY_NAME,
+      nameNormalized: NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL,
+    });
+
+    expect(id).toBe('empresa-nueva');
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith({
+      data: {
+        name: INITIAL_COMPANY_NAME,
+        nameNormalized: NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL,
+        // Las cinco excepciones prendidas en el mismo `create`, sin autor: las siembra el sistema.
+        addonOverrides: { create: ADDONS.map((addonKey) => ({ addonKey, enabled: true })) },
+      },
+    });
+  });
+
+  it('R7: platform-only no crea ninguna empresa, así que tampoco prende añadidos', async () => {
+    const repository = crearRepositorioFalso();
+    await seedInitialAccess({ ...depsDelSeed(repository), scope: 'platform-only' });
+    expect(repository.llamadas.length).toBeGreaterThan(0);
+    expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createCompany')).toEqual([]);
   });
 
   // Caso 9 (R18) — corre AL FINAL a proposito: revisa lo acumulado por todos los casos

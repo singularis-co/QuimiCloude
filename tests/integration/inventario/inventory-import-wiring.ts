@@ -120,5 +120,5 @@ export function csvFile(rows: readonly Partial<ImportCells>[], fileName = 'inven
 }
 
 export function actorOf(empresa: { readonly companyId: string; readonly userId: string }): Actor {
-  return { id: empresa.userId, companyId: empresa.companyId, permissions: ['inventario.modificar'] };
+  return { id: empresa.userId, companyId: empresa.companyId, permissions: ['inventario.modificar'], addons: ['importacion_excel'] };
 }

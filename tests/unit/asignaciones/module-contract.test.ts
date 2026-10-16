@@ -53,6 +53,8 @@ const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
 const ASIGNACIONES = 'lib/modules/asignaciones'
 const BARRIL = `${ASIGNACIONES}/index.ts`
 const CATALOGO_DE_PERMISOS = 'lib/modules/identity/domain/permissions.ts'
+// Catalogo de anadidos (QC-277): clasifica cada permiso como nucleo o anadido, y por eso lo nombra.
+const CATALOGO_DE_ANADIDOS = 'lib/modules/identity/domain/company-addons.ts'
 
 /** Ruta comparable: separadores POSIX, para que esto corra igual en Windows. */
 function toPosix(file: string): string {
@@ -362,7 +364,8 @@ const RAICES_VIGILADAS = ['app/', 'components/', 'lib/shared/', 'lib/modules/'] 
  *
  * DENTRO: `app/**`, `components/**`, `lib/shared/**` y `lib/modules/**`, menos el catalogo que
  * DECLARA los dos codigos —`lib/modules/identity/domain/permissions.ts`—, que por definicion los
- * nombra.
+ * nombra—, y el catalogo de anadidos —`lib/modules/identity/domain/company-addons.ts`, QC-277—,
+ * que los clasifica como nucleo o anadido. Ambos por igualdad exacta, nunca por carpeta.
  *
  * FUERA, y no por descuido: `tests/**` (este mismo archivo los escribe literalmente, y el test del
  * catalogo y el del seed tambien), `db/**` (el SQL de la migracion de esta ficha los inserta, que
@@ -370,7 +373,7 @@ const RAICES_VIGILADAS = ['app/', 'components/', 'lib/shared/', 'lib/modules/'] 
  * escribe la cadena» convertiria en rojo justo el trabajo que R28 y R25 mandan hacer.
  */
 export function isScopedForPermissionCodes(relPath: string): boolean {
-  if (relPath === CATALOGO_DE_PERMISOS) return false
+  if (relPath === CATALOGO_DE_PERMISOS || relPath === CATALOGO_DE_ANADIDOS) return false
   return RAICES_VIGILADAS.some((raiz) => relPath.startsWith(raiz))
 }
 
@@ -794,6 +797,12 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
       for (const codigo of CODIGOS_NUEVOS) {
         expect(stripComments((catalogo as { content: string }).content)).toContain(codigo)
       }
+      // Igual para el catalogo de anadidos: si deja de leerse, su exclusion seria ceguera.
+      const anadidos = appSources.find((file) => file.relPath === CATALOGO_DE_ANADIDOS)
+      expect(anadidos, `no se leyo ${CATALOGO_DE_ANADIDOS}`).toBeDefined()
+      for (const codigo of CODIGOS_NUEVOS) {
+        expect(stripComments((anadidos as { content: string }).content)).toContain(codigo)
+      }
     })
 
     it('detecta el consumo de los dos codigos desde app/, components/, lib/shared/ y otro modulo (R29)', () => {
@@ -925,9 +934,13 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
       ).toBe(false)
     })
 
-    it('el alcance excluye permissions.ts, tests/, db/ y specs/, y tambien las simples menciones en comentarios (R29)', () => {
+    it('el alcance excluye permissions.ts, company-addons.ts, tests/, db/ y specs/, y tambien las simples menciones en comentarios (R29)', () => {
       // El catalogo DECLARA los dos codigos: es su trabajo (R25), no una violacion de R29.
       expect(isScopedForPermissionCodes(CATALOGO_DE_PERMISOS)).toBe(false)
+      // El catalogo de anadidos los clasifica (QC-277); la exclusion es por ruta exacta: un vecino
+      // de la misma carpeta sigue vigilado.
+      expect(isScopedForPermissionCodes(CATALOGO_DE_ANADIDOS)).toBe(false)
+      expect(isScopedForPermissionCodes('lib/modules/identity/domain/company-addons-extra.ts')).toBe(true)
       // `tests/**`, `db/**` y `specs/**` estan fuera a proposito: este mismo archivo escribe las
       // dos cadenas, el SQL de la migracion las inserta (R28) y la ficha las explica. Incluirlos
       // convertiria en rojo justo el trabajo que R25 y R28 mandan hacer.

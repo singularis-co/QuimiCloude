@@ -37,6 +37,7 @@ import { normalizeSupplierName } from '@/lib/modules/proveedores';
 import { prisma } from '@/lib/shared/db/prisma';
 import { FORMULAS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -182,6 +183,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   companyId = company.id;
+  await enableAllAddons(companyId);
 
   // El rol tiene que llamarse EXACTAMENTE asi: lo siembra `pnpm run db:seed` y lleva
   // `proveedores.consultar` —que abre la pantalla— y `documentos.modificar` —que el caso de uso de
