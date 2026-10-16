@@ -14,7 +14,6 @@ export {
   type ExecutionTraceTableProps,
 } from './execution-trace-table';
 export {
-  ActiveOrderMark,
   DeletedOrderMark,
   TRACE_ACTIONS_LABEL_PREFIX,
   TRACE_FORMULA_COLUMN_ID,
@@ -26,7 +25,6 @@ export {
   type ExecutionTraceColumnsDeps,
 } from './execution-trace-columns';
 export {
-  ACTIVE_ORDER_MARK,
   CONDITIONING_TEXTS,
   DELETED_ORDER_MARK,
   EXECUTION_ACTION_LABELS,

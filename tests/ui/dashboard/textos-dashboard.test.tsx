@@ -99,7 +99,7 @@ const TEXTOS = {
     error: 'No se pudo cargar la lista de pedidos ejecutados.',
     reintentar: 'Reintentar',
   },
-  marcas: { baja: 'Dado de baja', enCurso: 'En curso', vueltaAtras: 'Vuelta atrás' },
+  marcas: { baja: 'Dado de baja', vueltaAtras: 'Vuelta atrás' },
   recorrido: {
     volver: 'Volver a la lista',
     titulo: (numero: string) => `Recorrido del pedido ${numero}`,
@@ -361,14 +361,12 @@ describe('R21 - textos del Dashboard', () => {
     );
   });
 
-  it('R21 - las marcas de la lista dicen «Dado de baja» y «En curso»', () => {
+  it('R21 - la marca de la lista dice «Dado de baja»; una fila activa no lleva chip «En curso»', () => {
     montarTabla();
     const filaBaja = screen.getByTestId(`data-table-row-${DE_BAJA.orderId}`);
     expect(within(filaBaja).getByTestId('execution-trace-deleted').textContent).toBe(TEXTOS.marcas.baja);
     const filaActiva = screen.getByTestId(`data-table-row-${ACTIVO.orderId}`);
-    expect(within(filaActiva).getByTestId('execution-trace-active').textContent).toBe(
-      TEXTOS.marcas.enCurso,
-    );
+    expect(within(filaActiva).queryByTestId('execution-trace-active')).toBeNull();
   });
 });
 
@@ -429,9 +427,9 @@ describe('R21 - textos del recorrido', () => {
     expect(vistas).toEqual(ocho.sort());
   });
 
-  it('R21 - las marcas del recorrido dicen «En curso», «Dado de baja» y «Vuelta atrás»', () => {
+  it('R21 - las marcas del recorrido dicen «Dado de baja» y «Vuelta atrás», sin chip «En curso»', () => {
     render(<ExecutionTraceDetail trace={TRACE} backHref={BACK_HREF} />);
-    expect(screen.getByTestId('execution-trace-active').textContent).toBe(TEXTOS.marcas.enCurso);
+    expect(screen.queryByTestId('execution-trace-active')).toBeNull();
     expect(screen.getByTestId('execution-trace-step-go-back').textContent).toBe(TEXTOS.marcas.vueltaAtras);
     cleanup();
 

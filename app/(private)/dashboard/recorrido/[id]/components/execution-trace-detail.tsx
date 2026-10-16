@@ -6,7 +6,6 @@ import { PageHeader } from '@/components/shared/page-header';
 import { PageShell } from '@/components/shared/page-shell';
 import { StatusBadge } from '@/components/shared/status-badge';
 import {
-  ActiveOrderMark,
   DeletedOrderMark,
   PHASE_DURATION_LABELS,
   PHASE_OPEN_MARK,
@@ -121,7 +120,6 @@ export function ExecutionTraceDetail({ trace, evidence, backHref }: ExecutionTra
               data-status={trace.status}
             />
             {trace.deleted ? <DeletedOrderMark /> : null}
-            {!trace.deleted && trace.active ? <ActiveOrderMark /> : null}
           </Stat>
           {PHASE_ORDER.map((phase) => {
             const duration = trace.durations[phase];
