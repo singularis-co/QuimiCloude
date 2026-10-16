@@ -463,6 +463,16 @@ export const E2E_ESPERADOS = [
   // ficha, no ve la columna ni ninguna foto. No lee ni afirma nada sobre el identificador de
   // peticion ni sobre `reference`.
   'consulta-de-evidencia.spec.ts',
+  // Alta el 2026-10-16 (QC-291 T11) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en las tres pantallas de ejecucion del operario,
+  // cabecera y pie fijos con scroll interno a 1440, 834 y 390 px y botones del pie con su minimo; a
+  // 1440 px la columna lateral de 320 px; a 834 px los botones flotantes de 56 px y el panel lateral
+  // que abre y cierra con X, con un toque fuera y con Escape; a 390 px el panel al ancho menos los
+  // margenes; el panel con scroll propio y su ultimo material alcanzable; y la unidad elegida que
+  // sigue al cerrar y reabrir el panel y al pasar a la columna. No lee ni afirma nada sobre el
+  // identificador de peticion ni sobre `reference`.
+  'pantalla-operario-rediseno.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

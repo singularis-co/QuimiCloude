@@ -1,6 +1,103 @@
 # QC-291 — bitácora de implementación
 
-## Estado (implementer, 2026-10-16) — PARADO en tanda 1 por dos contradicciones spec/código
+## Cierre (implementer, 2026-10-16) — T13
+
+**Estado de las tasks.**
+- Hechas: T1 a T11.
+- **T12, sin marcar.** El trabajo está hecho, pero no cumple del todo su «Hecho» («cada spec de la
+  lista, en verde»). `e2e/envases-del-pedido.spec.ts` y `e2e/acondicionamiento.spec.ts` siguen con
+  un rojo cada uno, y cuatro specs de la lista «sin cambio previsto» también salen rojos. Todos son
+  rojos previos a QC-291 (detalle en «Tanda 5», abajo). Decide el leader o el reviewer.
+- **T13, sin marcar.** El mapa está completo y las guardias pasan. `./init.sh` no lo corre el
+  implementer: es del leader (`AGENTS.md > Quién corre qué`).
+
+Commits, todos publicados: 471500d1 (tanda 1), 2e97433a (tanda 2), 883fcfab (tanda 3),
+3b1057a0 (T11), cd742047 (T12) y el commit de cierre.
+
+**B1 y B2 cerrados por el humano** (requirements.md > Decisiones cerradas, commit 324836f8). Las
+secciones «Bloqueo B1/B2» de más abajo quedan como historia.
+
+### Mapa R → test
+
+Unitarios en `tests/unit/asignaciones-ui/` salvo que se diga otro. E2E nuevo:
+`e2e/pantalla-operario-rediseno.spec.ts` (`PO`). Los nombres exactos están en la sección de cada
+task, más abajo.
+
+| R | Test |
+|---|---|
+| R1 | `operator-screen-frame.test.tsx` «R1: la raíz ocupa el alto…», «R1: el pie va en flujo…»; `PO` «R1, R6 — con el paso desplazado hasta el final…» |
+| R2 | `operator-screen-frame.test.tsx` «R2: pinta la fase y el número…»; `order-execution-screen.test.tsx` «R2: no hay `order-execution-presentation`…»; `packing-order-screen.test.tsx` «R2: la cabecera pinta «Empaque · número»…»; `conditioning-order-screen.test.tsx` «R2: fase y número…» |
+| R3 | `operator-screen-frame.test.tsx` «R3: sin running…»; «R3: PENDIENTE: la vuelta es un enlace…» (fabricación); «R3: sin comenzar…» (empaque); «R3: en %s la cabecera lleva el enlace…» (acondicionamiento) |
+| R4 | `operator-screen-frame.test.tsx` «R4: con running…»; «R4: EN_CURSO: … «Fabricando»…»; `order-execution-page.test.tsx` «R4: EN_CURSO retoma…»; «R4: comenzado por el actor… «Empacando»»; «R4: … «Acondicionando»» |
+| R5 | `operator-screen-frame.test.tsx` «R5: a nombre de otro…»; `packing-order-screen.test.tsx` «R5: a nombre de otra persona…»; `conditioning-order-screen.test.tsx` «R5: en curso a nombre de otra persona…» |
+| R6 | `tests/unit/recetas-ui/step-reader.test.tsx` «R6: con slots, la barra, «Paso N de M»…», «R6: StepProgress sale por el barrel…»; `PO` «R1, R6 — …» |
+| R7 | `operator-screen-frame.test.tsx` «R7: la cabecera conserva «Cambiar tema»…» |
+| R8 | «R8: PENDIENTE pinta en el pie un único botón «Comenzar la fabricación»…»; «R8: sin comenzar, el pie tiene un único botón «Comenzar el empaque»…»; «R8: sin comenzar y con candidatos…» (acondicionamiento) |
+| R9 | `step-reader.test.tsx` «R9: con slots, el motivo y los botones van por portal al pie…»; `operator-screen-frame.test.tsx` «R9: footerSlotRef y progressSlotRef…»; `order-execution-screen.test.tsx` «R9: «Anterior» y «Siguiente» van en el pie del marco…»; `packing-order-screen.test.tsx` «QC-291 R9: con pasos…» |
+| R10 | `packing-order-screen.test.tsx` «R10: comenzado sin pasos…»; `conditioning-order-screen.test.tsx` «R10: comenzado por el actor, un único botón «Terminar el acondicionamiento»…» |
+| R11 | `operator-screen-frame.test.tsx` «R11: la cabecera reserva el margen seguro…»; `PO` «R11 — en {pantalla}, los botones del pie miden al menos 52 px…» |
+| R12 | `step-reader.test.tsx` «R12: el paso abre con la insignia «N de M»…» |
+| R13 | `step-reader.test.tsx` «R13: cada comprobación es una tarjeta de 60 px…» |
+| R14 | `step-reader.test.tsx` «R14: «Comprueba» y el contador «X de Y»…» (×3) |
+| R15 | `step-reader.test.tsx` «R15: con slots, el anillo y la cuenta van dentro de Siguiente en el pie…»; `e2e/operario-rediseno.spec.ts` R37, que se conserva |
+| R16 | `step-reader.test.tsx` «R16: con slots, los párrafos van en letra de entrada…» |
+| R17 | «R17: PENDIENTE pinta «Revisa antes de comenzar»… número de pasos»; «R17: sin comenzar…» (empaque); «R17: sin comenzar…» (acondicionamiento). Ver A1 |
+| R18 | `step-reader.test.tsx`: los casos existentes, sin tocar, y «R18: en "ejecucion" sin slots…»; `order-execution-screen.test.tsx`, la lista cerrada de QC-125 (B2) |
+| R19 | `operator-side-panels.test.tsx` «R19 y R27: la columna se oculta…»; `PO` «R19 — en {pantalla}, a 1440 × 900… 320px» |
+| R20 | `section-tones.test.ts` (tokens y contraste ≥ 4.5:1); `order-execution-collapsible-card.test.tsx` «R20: con tone=%s…»; `operator-side-panels.test.tsx` «R20: pinta solo las secciones recibidas…»; las tres pantallas «R20: … solo Materiales y Herramientas / solo Envases / solo Envases y Equipo» |
+| R21 | `operator-side-panels.test.tsx` y `order-execution-screen.test.tsx` «R21: sin herramientas no hay tarjeta… ni su botón flotante» |
+| R22 | `order-execution-lines.test.tsx` «R22: dos listas con el mismo mapa…»; `order-execution-screen.test.tsx` «R22: la unidad elegida en la columna sale en el panel…»; `PO` «R22 — a 834 × 1112 la unidad elegida…» |
+| R23 | `conditioning-team-list.test.tsx` «R23: agrupa… «Personas»…» (×3); `conditioning-order-screen.test.tsx` «R23: sin equipo no hay tarjeta Equipo ni botón flotante…» |
+| R24 | `conditioning-team-list.test.tsx` «R24: con el actor en el equipo, «Tú» va solo en su fila»; `conditioning-order-page.test.tsx` «QC-291 R24: pasa el actor de la sesión…» |
+| R25 | `packing-order-screen.test.tsx` «R25: Envases lleva las líneas con imagen…»; `conditioning-order-screen.test.tsx` «R25: Envases muestra el reparto de hoy…» |
+| R26 | `conditioning-order-screen.test.tsx` «R26: «Lo acondiciona <nombre>.» va en el contenido principal…» |
+| R27 | `operator-side-panels.test.tsx` «R27: un botón redondo de 56 px por sección…»; `PO` «R27 — en {pantalla}, a 834 × 1112… 56 × 56 px» |
+| R28 | `operator-side-panels.test.tsx` «R28: pulsar un botón abre el panel de su sección…»; `PO` «R28, R29 — a 834 × 1112 el panel de materiales abre…» |
+| R29 | `operator-side-panels.test.tsx` «R29: «Cerrar» / Escape / tocar fuera… devuelve el foco»; `PO` «R28, R29 — …» |
+| R30 | `operator-side-panels.test.tsx` «R30: con un panel abierto la pila se oculta…»; `PO` «R30 — a 390 × 844 el panel abierto ocupa el ancho menos 16 px por lado…» |
+| R31 | `PO` «R31 — a {834 × 1112, 390 × 844}, con 24 materiales el panel hace scroll dentro…» |
+| R32 | «R32: comenzar llama a startAssignedOrderAction…», «R32: cambiar de paso registra el movimiento…» (fabricación); «R32: Comenzar/Terminar llama a start/finishPackingAction…» (empaque); «R32: ni la página ni la pantalla son Server Actions…», «R32: el modal de comenzar recibe los mismos candidatos…» (acondicionamiento) |
+| R33 | `packing-order-screen.test.tsx` «R33: a nombre de otra persona (%s), el pie no tiene botones…»; `conditioning-order-screen.test.tsx` «R33: %s el pie no lleva ningún botón y solo la línea del motivo» (×4). Ver A2 |
+| R34 | `step-reader.test.tsx` «R34: con stepNote…», «R34: sin stepNote, con null o con cadena vacía…», «R34: la nota sigue al paso actual…»; `order-execution-screen.test.tsx` «R34: la fabricación no pasa nota…» |
+
+Ningún R se queda sin test.
+
+### WebKit (`design.md > 6`)
+
+`e2e/pantalla-operario-rediseno.spec.ts --project=webkit`: `16 passed (1.3m)`. El navegador
+webkit-2336 ya estaba instalado. Es el motor WebKit de Playwright, no un iOS real: el scroll
+anidado queda verificado en WebKit y **sin verificar en un iPhone físico**.
+
+### Guardias
+
+`pnpm exec vitest run guard`: ver el final de este archivo (sección «Guardias del cierre»).
+
+### Abiertos para el leader, el reviewer o el humano
+
+- **A1 — R17.** Empaque y acondicionamiento leen distinto «no comenzada por el actor» (ver
+  «Tanda 3 — cierre»).
+- **A2 — R33.** Si un acondicionamiento está en curso a nombre de otra persona y no hay nombre, el
+  pie queda vacío: P11 no trae texto para ese caso.
+- **A3 — QC-269 R6.** QC-269 R6 dice que el panel de materiales no tiene scroll propio, pero R31
+  exige que a 390 px sí lo tenga. §7 ya describe el cambio del E2E, pero §1.1 no cita QC-269 R6
+  como enmendado y su spec no lleva nota.
+- **A4 — el panel pisa el pie 2 px.** A 390 px en fabricación el pie mide 134 px y el panel se ancla
+  en `bottom-[132px]`, como dice §3.3. El panel queda por encima del pie, así que R31 se cumple. No
+  se tocó la app.
+- **A5 — rojos E2E previos a QC-291**, con evidencia en «Tanda 5»:
+  - falta pulsar «Comenzar» (d4ff52c6);
+  - sufijo de volumen en las líneas de reparto (9a330ab2);
+  - `empaque:701`;
+  - `datos-de-lote-en-acondicionamiento:450` (08b69744);
+  - `recorrido-acondicionamiento:631` (`/dashboard` 404).
+
+  Ninguno está en `tests/baseline-rojos.json`.
+- **A6 — rojo unitario ajeno.** `tests/unit/marca/tablas-marca.test.tsx` (`product-columns.tsx`,
+  inventario) sale rojo en `vitest related` y no está en el baseline.
+- **Entorno.** El runner de Playwright no carga `.env`, así que los E2E se corrieron con
+  `set -a; . ./.env; set +a`. Se copiaron al worktree `.env` y `.env.local`, ignorados por git.
+
+## Estado (implementer, 2026-10-16) — PARADO en tanda 1 por dos contradicciones spec/código (histórico)
 
 Hechas: T1, T2, T4, T5, T7. Sin empezar: T6, T8–T13 (esperan a las decisiones de abajo).
 
@@ -430,3 +527,17 @@ cada task están en verde. La salida de `vitest related` de cada subagente está
   - `empaque`, `pedido-en-varias-presentaciones`, `datos-de-lote-en-acondicionamiento` y `recorrido-acondicionamiento`: solo los fallos ajenos de arriba.
 
 **Veredicto:** T12 hecha. Los E2E de la tabla están ajustados y la parte de QC-291 pasa en todos, y las tres specs llevan su enmienda. Quedan rojos ajenos a esta feature, documentados arriba.
+
+## Guardias del cierre (implementer)
+
+La primera corrida tuvo 1 rojo:
+`guard-identificador-de-request.test.ts` R21, porque `e2e/pantalla-operario-rediseno.spec.ts` no
+estaba en la lista cerrada `E2E_ESPERADOS`. Se arregló con un alta aditiva al final de la lista,
+con su comentario. Es su punto de extensión, y el archivo se comparte con QC-288.
+`e2e/helpers/operario.ts` no cuenta: la guardia solo mira `e2e/*.spec.ts`.
+
+```
+pnpm exec vitest run guard
+ Test Files  80 passed (80)
+      Tests  1096 passed | 20 skipped (1116)
+```
