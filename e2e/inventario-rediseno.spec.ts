@@ -21,6 +21,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import {
+  CHOOSE_ANOTHER_TESTID,
   CONFIRM_BUTTON_TESTID,
   DIALOG_CANCEL_TESTID,
   DIALOG_SUBMIT_TESTID,
@@ -39,10 +40,11 @@ import {
   REVIEW_BUTTON_TESTID,
   ROW_STATUS_TESTID,
   UNIT_DIALOG_TESTID,
+  UPLOAD_CHANGE_LABEL,
   UPLOAD_INPUT_TESTID,
   importStepTestId,
 } from '@/app/(private)/inventario/importar/components/import-texts';
-import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
+import { normalizeCompanyName, ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizeProductName } from '@/lib/modules/inventario';
 import { normalizeUnitName } from '@/lib/modules/unidades';
@@ -51,7 +53,7 @@ import { INVENTORY_IMPORT_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
-import { loginAndLand } from './helpers/landing';
+import { loginAndLand, permissionsForUsername, type Credentials } from './helpers/landing';
 import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc263_e2e_';
@@ -66,6 +68,11 @@ const IMPORT_PREFIX = `${TOKEN}_im`;
 const adminUser = {
   username: `${TOKEN}_admin`,
   password: `Qc263-Admin-${RUN_ID}`,
+} as const;
+// Consulta el inventario pero no cumple `canViewUnitCosts` (no tiene `inventario.modificar`).
+const operatorUser = {
+  username: `${TOKEN}_oper`,
+  password: `Qc263-Oper-${RUN_ID}`,
 } as const;
 
 const VIEWPORTS = {
@@ -83,6 +90,10 @@ const SHEET_MAX_PX = 900;
 const HISTORY_MAX_PX = 1000;
 const HISTORY_MIN_GUTTER_PX = 16;
 const EXPIRING_IN_DAYS = 10;
+// Moneda con dos decimales y la unidad del producto: el promedio de «varios» es (12·3.5 + 8·4) / 20.
+const COST_OF_EXPIRING_BATCH = /^\$3\.50 \/ \S+$/;
+const AVERAGE_COST_OF_MULTI = /^\$3\.70 \/ \S+$/;
+const SCREEN_ENTER = 'screen-enter';
 
 // Textos de la pantalla escritos a mano: si cambian, este recorrido tiene que enterarse.
 const TAB_NAMES = ['Todos', 'Producto', 'Máquina', 'Envase', 'Producto terminado'] as const;
@@ -212,13 +223,42 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<void> {
   await prisma.company.deleteMany({ where: { id: { in: [...companyIds] } } });
 }
 
-test.beforeAll(async () => {
-  const role = await prisma.role.findUnique({ where: { name: ROLE_ADMINISTRADOR }, select: { id: true } });
+async function roleId(name: string): Promise<string> {
+  const role = await prisma.role.findUnique({ where: { name }, select: { id: true } });
   if (role === null) {
-    throw new Error(
-      `falta el rol "${ROLE_ADMINISTRADOR}": siembra la base con \`pnpm run db:seed\` antes.`,
-    );
+    throw new Error(`falta el rol "${name}": siembra la base con \`pnpm run db:seed\` antes.`);
   }
+  return role.id;
+}
+
+async function createUser(params: {
+  readonly credentials: Credentials;
+  readonly role: string;
+  readonly ownerCompanyId: string;
+  readonly firstNames: string;
+}): Promise<string> {
+  return (
+    await createFixtureUser({
+      data: {
+        firstNames: params.firstNames,
+        lastNames: 'Inventario',
+        birthDate: new Date('1990-01-01'),
+        email: `${params.credentials.username}@example.test`,
+        phone: '+573000000000',
+        documentTypeCode: 'CC',
+        documentNumber: params.credentials.username,
+        username: params.credentials.username,
+        passwordHash: await createPasswordHash(params.credentials.password),
+        roleId: await roleId(params.role),
+        companyId: params.ownerCompanyId,
+        accountStatus: 'active',
+      },
+      select: { id: true },
+    })
+  ).id;
+}
+
+test.beforeAll(async () => {
 
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
   const orphans = await prisma.company.findMany({
@@ -236,25 +276,18 @@ test.beforeAll(async () => {
   companyId = ownCompanyId;
   await enableAllAddons(ownCompanyId);
 
-  const adminId = (
-    await createFixtureUser({
-      data: {
-        firstNames: `Qc263${RUN_ID.slice(0, 6)}`,
-        lastNames: 'Inventario',
-        birthDate: new Date('1990-01-01'),
-        email: `${adminUser.username}@example.test`,
-        phone: '+573000000000',
-        documentTypeCode: 'CC',
-        documentNumber: adminUser.username,
-        username: adminUser.username,
-        passwordHash: await createPasswordHash(adminUser.password),
-        roleId: role.id,
-        companyId: ownCompanyId,
-        accountStatus: 'active',
-      },
-      select: { id: true },
-    })
-  ).id;
+  const adminId = await createUser({
+    credentials: adminUser,
+    role: ROLE_ADMINISTRADOR,
+    ownerCompanyId: ownCompanyId,
+    firstNames: `Qc263${RUN_ID.slice(0, 6)}`,
+  });
+  await createUser({
+    credentials: operatorUser,
+    role: ROLE_OPERADOR,
+    ownerCompanyId: ownCompanyId,
+    firstNames: `Qc263Op${RUN_ID.slice(0, 6)}`,
+  });
 
   const kilogram = await prisma.unit.findFirst({
     where: { companyId: null, nameNormalized: normalizeUnitName('kilogramo') },
@@ -308,9 +341,10 @@ async function openInventory(
   page: Page,
   viewport: { readonly width: number; readonly height: number },
   type?: string,
+  credentials: Credentials = adminUser,
 ): Promise<void> {
   await page.setViewportSize(viewport);
-  await loginAndLand(page, adminUser);
+  await loginAndLand(page, credentials);
   await page.goto(listUrl(type));
   await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('data-table').first()).toBeVisible({ timeout: 60_000 });
@@ -426,11 +460,85 @@ async function expectRightAligned(head: Locator, cell: Locator, label: string): 
   expect(await textAlign(head), `${label}: cabecera`).toMatch(/^(right|end)$/);
   expect(await textAlign(cell), `${label}: celda`).toMatch(/^(right|end)$/);
   const headContent = await box(head.locator(':scope > div').first());
-  const cellContent = await box(cell.locator(':scope > span').first());
+  // El rótulo de tarjeta va delante de la cifra y, en la tabla, no tiene caja.
+  const cellContent = await box(cell.locator(':scope > :not([data-card-label])').first());
   expect(
     Math.abs(headContent.x + headContent.width - (cellContent.x + cellContent.width)),
     `${label}: misma x final`,
   ).toBeLessThanOrEqual(EDGE_TOLERANCE_PX);
+}
+
+/** Cabeceras que se ven, en su orden. */
+async function visibleHeadIds(table: Locator): Promise<readonly (string | null)[]> {
+  return table
+    .locator('thead th')
+    .evaluateAll((els) =>
+      els
+        .filter((el) => el.getClientRects().length > 0)
+        .map((el) => el.getAttribute('data-testid')),
+    );
+}
+
+/** Dentro de una tabla, los rótulos de tarjeta están en el DOM pero no se ven. */
+async function expectCardLabelsHidden(scope: Locator, label: string): Promise<void> {
+  const labels = scope.locator('[data-card-label]');
+  expect(await labels.count(), `${label}: tiene rótulos de tarjeta`).toBeGreaterThan(0);
+  for (const found of await labels.all()) {
+    await expect(found, `${label}: rótulo oculto en la tabla`).toBeHidden();
+  }
+}
+
+/** El campo de la tarjeta con su rótulo visible delante y la cifra sin el rótulo. */
+async function expectCardLabel(card: Locator, columnId: string, text: string): Promise<void> {
+  const field = card.getByTestId(`data-table-card-field-${columnId}`);
+  const found = field.locator('[data-card-label]');
+  await expect(found, `rótulo de ${columnId}`).toBeVisible();
+  await expect(found, `rótulo de ${columnId}`).toHaveText(text);
+  for (const valueEl of await field.locator('[data-testid]').all()) {
+    await expect(valueEl, `${columnId}: el testid lleva solo su valor`).not.toContainText(text);
+  }
+}
+
+type CellStyle = {
+  readonly id: string | null;
+  readonly background: string;
+  readonly sticky: boolean;
+  readonly animation: string;
+};
+
+async function cellStyles(row: Locator): Promise<readonly CellStyle[]> {
+  return row.locator(':scope > td').evaluateAll((els) =>
+    els.map((el) => {
+      const style = getComputedStyle(el);
+      return {
+        id: el.getAttribute('data-testid'),
+        background: style.backgroundColor,
+        sticky: style.position === 'sticky',
+        animation: style.animationName,
+      };
+    }),
+  );
+}
+
+/** Opacidad de un color calculado, sea `rgba(…)`, `oklab(… / a)` o `color(… / a)`. */
+function alphaOf(color: string): number {
+  if (color === 'transparent') return 0;
+  const slash = /\/\s*([\d.]+)(%?)\s*\)$/.exec(color);
+  if (slash !== null) return slash[2] === '%' ? Number(slash[1]) / 100 : Number(slash[1]);
+  const rgba = /^rgba\(([^)]+)\)$/.exec(color);
+  if (rgba !== null) return Number(rgba[1]?.split(',')[3] ?? '1');
+  return 1;
+}
+
+async function boxStyle(locator: Locator) {
+  return locator.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return {
+      background: style.backgroundColor,
+      animation: style.animationName,
+      radius: Number.parseFloat(style.borderTopLeftRadius),
+    };
+  });
 }
 
 /** Pulsa un disparador hasta que su diálogo abre: en WebKit un clic antes de hidratar se pierde. */
@@ -521,7 +629,10 @@ test.describe('/inventario a 1440 px', () => {
         /^(left|start)$/,
       );
     }
-    const available = row.getByTestId('data-table-cell-available').locator(':scope > span').first();
+    const available = row
+      .getByTestId('data-table-cell-available')
+      .locator(':scope > :not([data-card-label])')
+      .first();
     expect(
       Number(await available.evaluate((el) => getComputedStyle(el).fontWeight)),
       '«Disponible» en negrita',
@@ -598,7 +709,7 @@ test.describe('/inventario a 1440 px', () => {
       expiringRow.getByTestId('data-table-cell-averageUnitCost'),
       'costo de la sub-fila',
     );
-    await expect(expiringRow.getByTestId('product-batch-row-cost')).toHaveText('3.5');
+    await expect(expiringRow.getByTestId('product-batch-row-cost')).toHaveText(COST_OF_EXPIRING_BATCH);
 
     // R48: la fecha del lote que vence en diez días, en ámbar y con su relativo.
     const expiry = expiringRow.getByTestId('product-batch-row-expiry-date');
@@ -695,8 +806,9 @@ test.describe('/inventario a 1440 px', () => {
     }
     const entry = list.getByTestId(`data-table-row-opening-${expiring.openingId}`);
     await expect(entry).toBeVisible();
-    await expect(entry.getByTestId('data-table-cell-reason')).toHaveText(EMPTY);
-    await expect(entry.getByTestId('data-table-cell-order')).toHaveText(EMPTY);
+    // `innerText`: el rótulo de tarjeta sigue en el DOM de la celda, oculto en la tabla.
+    await expect(entry.getByTestId('data-table-cell-reason')).toHaveText(EMPTY, { useInnerText: true });
+    await expect(entry.getByTestId('data-table-cell-order')).toHaveText(EMPTY, { useInnerText: true });
     await expect(list.getByTestId(`data-table-card-opening-${expiring.openingId}`)).toBeHidden();
 
     // R23: cerrar el historial deja el panel abierto.
@@ -727,6 +839,173 @@ test.describe('/inventario a 1440 px', () => {
     await expect(adjust).toHaveCount(0);
     await expect(panel).toBeVisible();
   });
+
+  test('R54, R6 — como Administrador «Costo unitario» es la última cabecera antes de las acciones, a la derecha y en moneda con unidad', async ({
+    page,
+  }) => {
+    const { multi } = seeded();
+    await openInventory(page, VIEWPORTS.desktop);
+    const row = productRow(page, multi);
+    await expect(row).toBeVisible({ timeout: 60_000 });
+
+    const heads = await visibleHeadIds(page.getByTestId('data-table').first());
+    expect(heads.at(-1), 'las acciones cierran la tabla').toBe('data-table-head-actions');
+    expect(heads.at(-2), '«Costo unitario» justo antes de las acciones').toBe(
+      'data-table-head-averageUnitCost',
+    );
+    const head = page.getByTestId('data-table-head-averageUnitCost');
+    await expect(head).toContainText('Costo unitario');
+    await expectRightAligned(head, row.getByTestId('data-table-cell-averageUnitCost'), 'Costo unitario');
+    const cost = row.getByTestId('product-cost');
+    await expect(cost).toHaveText(AVERAGE_COST_OF_MULTI);
+  });
+
+  test('R54 — sin permiso de costos no hay «Costo unitario» en la tabla, ni «Costo» en la tarjeta ni en las sub-filas', async ({
+    page,
+  }) => {
+    const permissions = await permissionsForUsername(operatorUser.username);
+    expect(permissions, 'la premisa: consulta el inventario').toContain('inventario.consultar');
+    expect(permissions, 'la premisa: no cumple canViewUnitCosts').not.toContain('inventario.modificar');
+
+    const { multi } = seeded();
+    await openInventory(page, VIEWPORTS.desktop, undefined, operatorUser);
+    const row = productRow(page, multi);
+    await expect(row).toBeVisible({ timeout: 60_000 });
+
+    await expect(page.getByTestId('data-table-head-averageUnitCost')).toHaveCount(0);
+    await expect(page.getByRole('columnheader', { name: /Costo/ })).toHaveCount(0);
+    await expect(page.getByTestId('product-cost')).toHaveCount(0);
+    await expect(page.getByTestId('data-table-card-field-averageUnitCost')).toHaveCount(0);
+
+    await expandBatches(row.getByTestId('product-batches-toggle'));
+    const subRow = page.getByTestId(`data-table-row-${subRowId(multi, firstBatch(multi))}`);
+    await expect(subRow).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('product-batch-row-cost')).toHaveCount(0);
+  });
+
+  test('R15, R21, R55 — las fechas del panel «Lotes» y la «Fecha» del historial a la derecha, sin rótulos de tarjeta en la tabla', async ({
+    page,
+  }) => {
+    const { multi } = seeded();
+    const batch = firstBatch(multi);
+    await openInventory(page, VIEWPORTS.desktop);
+
+    await (
+      await openRowActionsMenuItem(
+        page,
+        productRow(page, multi).getByTestId('product-row-actions'),
+        'product-batches-open',
+      )
+    ).click();
+    const panel = sheet(page);
+    await expect(panel).toBeVisible({ timeout: 60_000 });
+    await waitForAnimationsToSettle(panel);
+    const batchRow = panel.getByTestId(`data-table-row-${batch.id}`);
+    await expect(batchRow).toBeVisible({ timeout: 60_000 });
+    for (const columnId of ['purchaseDate', 'expiryDate']) {
+      await expectRightAligned(
+        panel.getByTestId(`data-table-head-${columnId}`),
+        batchRow.getByTestId(`data-table-cell-${columnId}`),
+        `panel: ${columnId}`,
+      );
+    }
+    await expectCardLabelsHidden(batchRow, 'fila del lote');
+
+    await (
+      await openRowActionsMenuItem(page, batchActionsTrigger(batchRow), 'batch-history-trigger')
+    ).click();
+    const list = historyDialog(page).getByTestId('batch-history-list');
+    await expect(list).toBeVisible({ timeout: 60_000 });
+    const entry = list.getByTestId(`data-table-row-opening-${batch.openingId}`);
+    await expect(entry).toBeVisible({ timeout: 60_000 });
+    await expectRightAligned(
+      list.getByTestId('data-table-head-date'),
+      entry.getByTestId('data-table-cell-date'),
+      'historial: Fecha',
+    );
+    await expectCardLabelsHidden(entry, 'fila del historial');
+  });
+
+  test('R47, R55, R57 — la sub-fila con fondo propio en todas sus celdas, «Nombre» sangrado, animada salvo con movimiento reducido y sin rótulos en la tabla', async ({
+    page,
+  }) => {
+    const { multi } = seeded();
+    const batch = firstBatch(multi);
+    await openInventory(page, VIEWPORTS.desktop);
+    const row = productRow(page, multi);
+    await expect(row).toBeVisible({ timeout: 60_000 });
+    const toggle = row.getByTestId('product-batches-toggle');
+    await expandBatches(toggle);
+    const subRow = page.getByTestId(`data-table-row-${subRowId(multi, batch)}`);
+    await expect(subRow).toBeVisible({ timeout: 60_000 });
+    // Sin el puntero encima: el realce de hover de la fila del producto no cuenta.
+    await page.mouse.move(0, 0);
+    await waitForAnimationsToSettle(subRow);
+
+    const productCells = await cellStyles(row);
+    const subCells = await cellStyles(subRow);
+    expect(subCells.map((cell) => cell.id)).toEqual(productCells.map((cell) => cell.id));
+    for (const [index, cell] of subCells.entries()) {
+      expect(cell.background, `fondo de ${cell.id}`).not.toBe(productCells[index]?.background);
+      expect(cell.animation, `entrada de ${cell.id}`).toBe(SCREEN_ENTER);
+    }
+    // A 1440 px la tabla ya se desplaza en horizontal y lo desplazado pasa por debajo de las celdas
+    // fijadas: su fondo tiene que ser opaco o se ve a través.
+    const pinned = subCells.filter((cell) => cell.sticky);
+    expect(pinned.length, 'la sub-fila tiene celdas fijadas').toBeGreaterThan(0);
+    const underPinned = await subRow.evaluate((tr) => {
+      let scroller = tr.parentElement;
+      while (scroller !== null && !['auto', 'scroll'].includes(getComputedStyle(scroller).overflowX)) {
+        scroller = scroller.parentElement;
+      }
+      if (scroller === null || scroller.scrollWidth <= scroller.clientWidth) return 0;
+      scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
+      const cells = [...tr.children].filter((cell) => cell.getClientRects().length > 0);
+      const isSticky = (cell: Element) => getComputedStyle(cell).position === 'sticky';
+      let overlaps = 0;
+      for (const fixed of cells.filter(isSticky)) {
+        const f = fixed.getBoundingClientRect();
+        for (const moving of cells.filter((cell) => !isSticky(cell))) {
+          const m = moving.getBoundingClientRect();
+          if (m.left < f.right - 1 && m.right > f.left + 1) overlaps += 1;
+        }
+      }
+      scroller.scrollLeft = 0;
+      return overlaps;
+    });
+    expect(underPinned, 'con scroll, una celda pasa por debajo de una fijada').toBeGreaterThan(0);
+    for (const cell of pinned) {
+      expect(alphaOf(cell.background), `fondo opaco en la celda fijada ${cell.id}`).toBe(1);
+    }
+
+    // «Nombre» sangrado respecto del producto.
+    const subRoot = subRow.locator('[data-batch-subrow]');
+    expect(
+      Number.parseFloat(await subRoot.evaluate((el) => getComputedStyle(el).paddingLeft)),
+      'sangría de la sub-fila',
+    ).toBeGreaterThanOrEqual(40);
+    expect((await box(subRow.getByTestId('product-batch-row-lot'))).x).toBeGreaterThan(
+      (await box(row.getByTestId('product-name'))).x,
+    );
+
+    // R55: los rótulos existen pero no se ven en la tabla; la celda lee solo la cifra.
+    await expectCardLabelsHidden(row, 'fila del producto');
+    await expectCardLabelsHidden(subRow, 'sub-fila');
+    await expect(row.getByTestId('data-table-cell-stock')).not.toContainText('Existencia', {
+      useInnerText: true,
+    });
+
+    // Con movimiento reducido, la sub-fila entra sin animación.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(subRow).toHaveCount(0);
+    await expandBatches(toggle);
+    await expect(subRow).toBeVisible({ timeout: 60_000 });
+    for (const cell of await cellStyles(subRow)) {
+      expect(cell.animation, `sin entrada en ${cell.id}`).toBe('none');
+    }
+  });
 });
 
 // --- /inventario a 820 ---
@@ -744,7 +1023,8 @@ test.describe('/inventario a 820 px', () => {
     const card = productCard(page, multi);
     await expect(card).toBeVisible();
     await expect(card.getByTestId('product-name')).toHaveText(multi.name);
-    await expect(card.getByTestId('product-batches-toggle')).toBeVisible();
+    await expect(card.getByTestId('product-batches-card-toggle')).toBeVisible();
+    await expect(card.getByTestId('product-batches-toggle')).toBeHidden();
     await expect(card.getByTestId('product-type')).toBeVisible();
     for (const columnId of ['presentationName', 'stock', 'averageUnitCost', 'qtyAlert', 'available']) {
       await expect(card.getByTestId(`data-table-card-field-${columnId}`), columnId).toBeVisible();
@@ -847,7 +1127,7 @@ test.describe('/inventario a 390 px', () => {
     await expect(menu).toHaveCount(0);
 
     // R47: las sub-filas, tarjetas propias justo debajo de la del producto, sin imagen ni «Acciones».
-    await expandBatches(card.getByTestId('product-batches-toggle'));
+    await expandBatches(card.getByTestId('product-batches-card-toggle'));
     for (const batch of multi.batches) {
       await expect(page.getByTestId(`data-table-card-${subRowId(multi, batch)}`)).toBeVisible({
         timeout: 60_000,
@@ -873,6 +1153,120 @@ test.describe('/inventario a 390 px', () => {
       await expect(subCard.getByTestId('product-image')).toHaveCount(0);
     }
     await expectNoHorizontalScroll(page, '/inventario a 390 px con lotes desplegados');
+  });
+
+  test('R13, R47, R55, R57, R58 — rótulos en la tarjeta, «Mostrar lotes» al pie de 44 px que despliega, sin chevrón en el título, y tarjetas de lote con fondo propio, desplazadas y animadas salvo con movimiento reducido', async ({
+    page,
+  }) => {
+    const { multi } = seeded();
+    await openInventory(page, VIEWPORTS.phone);
+    const card = productCard(page, multi);
+    await expect(card).toBeVisible({ timeout: 60_000 });
+
+    // R55: cada cifra con su rótulo visible delante.
+    for (const [columnId, text] of [
+      ['stock', 'Existencia'],
+      ['qtyAlert', 'Alerta'],
+      ['available', 'Disponible'],
+      ['averageUnitCost', 'Costo'],
+    ] as const) {
+      await expectCardLabel(card, columnId, text);
+    }
+
+    // R58: sin chevrón en el título; «Mostrar lotes» al pie, a la izquierda de «Acciones».
+    await expect(card.getByTestId('product-batches-toggle')).toBeHidden();
+    const toggle = card.getByTestId('product-batches-card-toggle');
+    await expect(toggle).toHaveText('Mostrar lotes');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expectMinHeight(toggle, MIN_TARGET_PX, '«Mostrar lotes»');
+    const toggleBox = await box(toggle);
+    const actionsBox = await box(card.getByTestId('product-row-actions'));
+    expect(toggleBox.x + toggleBox.width, 'a la izquierda de «Acciones»').toBeLessThanOrEqual(
+      actionsBox.x + 0.5,
+    );
+    const lastField = await box(card.getByTestId('data-table-card-field-averageUnitCost'));
+    expect(toggleBox.y, 'al pie, debajo de las cifras').toBeGreaterThanOrEqual(
+      lastField.y + lastField.height - 0.5,
+    );
+
+    await expandBatches(toggle);
+    await expect(toggle).toHaveText('Ocultar lotes');
+    await page.mouse.move(0, 0);
+    const cardBox = await box(card);
+    const cardStyle = await boxStyle(card);
+    for (const batch of multi.batches) {
+      const subCard = page.getByTestId(`data-table-card-${subRowId(multi, batch)}`);
+      await expect(subCard).toBeVisible({ timeout: 60_000 });
+      await waitForAnimationsToSettle(subCard);
+      // R55: los rótulos de la tarjeta del lote.
+      for (const [columnId, text] of [
+        ['stock', 'Existencia'],
+        ['available', 'Disponible'],
+        ['averageUnitCost', 'Costo'],
+      ] as const) {
+        await expectCardLabel(subCard, columnId, text);
+      }
+      await expect(subCard.getByTestId('product-batches-card-toggle')).toHaveCount(0);
+      // R57: fondo propio, desplazada a la derecha, esquinas redondeadas y animada.
+      const subStyle = await boxStyle(subCard);
+      expect(subStyle.background, `fondo de ${batch.lot}`).not.toBe(cardStyle.background);
+      expect(subStyle.radius, `esquinas de ${batch.lot}`).toBeGreaterThan(0);
+      expect(subStyle.animation, `entrada de ${batch.lot}`).toBe(SCREEN_ENTER);
+      expect((await box(subCard)).x, `${batch.lot} desplazada a la derecha`).toBeGreaterThanOrEqual(
+        cardBox.x + 8,
+      );
+    }
+    expect(cardStyle.animation, 'la tarjeta del producto no se anima').toBe('none');
+
+    // Con movimiento reducido, las tarjetas de lote entran sin animación.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toHaveText('Mostrar lotes');
+    await expandBatches(toggle);
+    for (const batch of multi.batches) {
+      const subCard = page.getByTestId(`data-table-card-${subRowId(multi, batch)}`);
+      await expect(subCard).toBeVisible({ timeout: 60_000 });
+      expect((await boxStyle(subCard)).animation, `sin entrada en ${batch.lot}`).toBe('none');
+    }
+  });
+
+  test('R56 — rótulos visibles en las tarjetas de lote del panel y de asiento del historial; cada celda lee solo su valor', async ({
+    page,
+  }) => {
+    const { multi } = seeded();
+    const batch = firstBatch(multi);
+    await openInventory(page, VIEWPORTS.phone);
+
+    const menu = await openCenteredMenu(page, productCard(page, multi).getByTestId('product-row-actions'), multi.name);
+    await menu.getByTestId('product-batches-open').click();
+    const panel = sheet(page);
+    await expect(panel).toBeVisible({ timeout: 60_000 });
+    const batchCard = panel.getByTestId(`data-table-card-${batch.id}`);
+    await expect(batchCard).toBeVisible({ timeout: 60_000 });
+    for (const [columnId, text] of [
+      ['quantity', 'Cantidad'],
+      ['reserved', 'Apartado'],
+      ['available', 'Disponible'],
+      ['purchaseDate', 'Fecha de compra'],
+      ['expiryDate', 'Vencimiento'],
+    ] as const) {
+      await expectCardLabel(batchCard, columnId, text);
+    }
+
+    const batchMenu = await openCenteredMenu(page, batchActionsTrigger(batchCard), batch.lot);
+    await batchMenu.getByTestId('batch-history-trigger').click();
+    const list = historyDialog(page).getByTestId('batch-history-list');
+    const entryCard = list.getByTestId(`data-table-card-opening-${batch.openingId}`);
+    await expect(entryCard).toBeVisible({ timeout: 60_000 });
+    for (const [columnId, text] of [
+      ['previousStock', 'Existencia anterior'],
+      ['countedStock', 'Total contado'],
+      ['reason', 'Motivo'],
+      ['order', 'Pedido'],
+    ] as const) {
+      await expectCardLabel(entryCard, columnId, text);
+    }
   });
 
   test('R19, R23, R42 — lotes e historial en tarjetas; historial, ajuste y borrado enteros y centrados con botones de 44 px', async ({
@@ -1113,5 +1507,59 @@ test.describe('importar inventario', () => {
     await page.getByTestId(RESTART_TESTID).click();
     await expectCurrentStep(page, 1);
     await expect(page.getByTestId(GUIDE_TESTID)).toBeVisible();
+  });
+
+  test('R59, R32 — del paso 2, «Elegir otro archivo» vuelve al paso 1 sin recargar, sin archivo ni vista previa, sin importar y sin avisos', async ({
+    page,
+  }) => {
+    const ownCompanyId = companyId;
+    if (ownCompanyId === null) throw new Error('el fixture no existe: falló el beforeAll');
+    await page.setViewportSize(VIEWPORTS.phone);
+    await loginAndLand(page, adminUser);
+    await page.goto(INVENTORY_IMPORT_ROUTE);
+    await expect(page.getByTestId(REVIEW_BUTTON_TESTID)).toBeVisible({ timeout: 60_000 });
+    await expectCurrentStep(page, 1);
+
+    // Una recarga borraría este marcador.
+    const marker = randomUUID();
+    await page.evaluate((value) => {
+      (window as unknown as { __qc263Marker?: string }).__qc263Marker = value;
+    }, marker);
+
+    await page
+      .getByTestId(UPLOAD_INPUT_TESTID)
+      .setInputFiles([{ name: IMPORT_FILE_NAME, mimeType: 'text/csv', buffer: importCsv() }]);
+    await page.getByTestId(REVIEW_BUTTON_TESTID).click();
+    const summary = page.getByTestId(PREVIEW_SUMMARY_TESTID);
+    await expect(summary).toBeVisible({ timeout: 60_000 });
+    await expectCurrentStep(page, 2);
+
+    const choose = summary.getByTestId(CHOOSE_ANOTHER_TESTID);
+    await expect(choose).toHaveText(UPLOAD_CHANGE_LABEL);
+    await expect(choose).toBeEnabled();
+    await expectMinHeight(choose, MIN_TARGET_PX, '«Elegir otro archivo»');
+    await expect(summary).toContainText(IMPORT_FILE_NAME);
+
+    const importsBefore = await prisma.inventoryImport.count({ where: { companyId: ownCompanyId } });
+    const productsBefore = await prisma.product.count({
+      where: { companyId: ownCompanyId, name: { startsWith: IMPORT_PREFIX } },
+    });
+    await choose.click();
+
+    await expectCurrentStep(page, 1);
+    await expect(page.getByTestId(PREVIEW_SUMMARY_TESTID)).toHaveCount(0);
+    await expect(page.getByTestId(PREVIEW_TABLE_TESTID)).toHaveCount(0);
+    await expect(page.getByTestId(UPLOAD_INPUT_TESTID)).toHaveValue('');
+    await expect(page.getByTestId(REVIEW_BUTTON_TESTID)).toBeDisabled();
+    await expect(page.getByTestId(GUIDE_TESTID)).toBeVisible();
+    expect(
+      await page.evaluate(() => (window as unknown as { __qc263Marker?: string }).__qc263Marker),
+      'la página no se recargó',
+    ).toBe(marker);
+    await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+    expect(await prisma.inventoryImport.count({ where: { companyId: ownCompanyId } })).toBe(importsBefore);
+    expect(
+      await prisma.product.count({ where: { companyId: ownCompanyId, name: { startsWith: IMPORT_PREFIX } } }),
+    ).toBe(productsBefore);
   });
 });

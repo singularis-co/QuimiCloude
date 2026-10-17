@@ -282,7 +282,7 @@ T8h.
   `confirmInventoryImportAction` y sin `toast`; deshabilitado mientras se importa),
   `import-preview.test.tsx` (el botón está en la cabecera, con el texto `UPLOAD_CHANGE_LABEL` y
   `touch`), `import-steps.test.tsx` sin cambio. *Hecho:* tests en verde.
-- [ ] **T8g. E2E** (R13, R15, R47, R54, R55, R57, R58, R59; depende de T8b–T8f).
+- [x] **T8g. E2E** (R13, R15, R47, R54, R55, R57, R58, R59; depende de T8b–T8f).
   `e2e/inventario-rediseno.spec.ts`: a 1440, como Administrador «Costo unitario» es la última cabecera
   antes de acciones y a la derecha; las fechas del panel y la «Fecha» del historial a la derecha; al desplegar, el fondo
   computado de las celdas de la sub-fila difiere del de la fila del producto, su «Nombre» está

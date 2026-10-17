@@ -815,7 +815,7 @@ describe('aspecto de las sub-filas de lote', () => {
     const entrada = 'animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]';
     expect(clases).toEqual(
       expect.arrayContaining([
-        '[&_tr:has([data-batch-subrow])>td]:bg-muted/55',
+        '[&_tr:has([data-batch-subrow])>td]:bg-[color-mix(in_oklch,var(--muted)_55%,var(--card))]',
         `motion-safe:[&_tr:has([data-batch-subrow])>td]:${entrada}`,
         '[&_li:has([data-batch-subrow])]:ml-5',
         '[&_li:has([data-batch-subrow])]:rounded-lg',

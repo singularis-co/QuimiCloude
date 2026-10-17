@@ -1607,3 +1607,99 @@ $ pnpm exec vitest run tests/unit/inventario tests/unit/inventario-ui tests/unit
 
 T8e hecha: fechas del panel y «Fecha» del historial a la derecha, rótulos de tarjeta de R56 con los
 testids intactos; único rojo, el conocido de Pedidos.
+
+## Tanda 8 (T8g) — 2026-10-16 · frontend_dev
+
+Sobre `cba2eb6e` (T8e). Sin commit. `components/shared/**` sin cambios.
+
+### Archivos
+
+- `e2e/inventario-rediseno.spec.ts`: 7 casos nuevos (15 × 2 navegadores) y ajustes a los de T7a:
+  - fixture: un Operador (`inventario.consultar` sin `inventario.modificar`, no cumple `canViewUnitCosts`)
+    con `createUser` / `roleId`; `openInventory` acepta credenciales.
+  - helpers: `visibleHeadIds`, `expectCardLabelsHidden`, `expectCardLabel`, `cellStyles`, `alphaOf`,
+    `boxStyle`. `expectRightAligned` mide el primer hijo que **no** es `[data-card-label]` (en la tabla
+    el rótulo no tiene caja).
+  - casos de T7a: a 820 y 390 el conmutador de la tarjeta es `product-batches-card-toggle` (el chevrón
+    se afirma oculto); la cifra de costo de la sub-fila pasa de «3.5» a moneda con unidad
+    (`/^\$3\.50 \/ \S+$/`, de `dev`); «Disponible» en negrita y `reason`/`order` del historial se leen
+    sin el rótulo (`:not([data-card-label])`, `useInnerText`).
+- `app/(private)/inventario/components/product-table.tsx` (**bug de producción, R57**): en
+  `PRODUCT_TABLE_SCOPE_CLASS`, `[&_tr:has([data-batch-subrow])>td]:bg-muted/55` →
+  `bg-[color-mix(in_oklch,var(--muted)_55%,var(--card))]` (el del tablero, opaco). Medido en Chromium a
+  1440: el scroll de la tabla es 1780 / 1112 px (ya se desplaza en horizontal) y el fondo de las celdas
+  fijadas de la sub-fila (`image`, `actions`) era `oklab(… / 0.55)`: con scroll, las celdas que pasan
+  por debajo se veían a través. Solo cambia la clase de ámbito; `DataTable` no se toca.
+- `tests/unit/inventario/product-batch-rows.test.tsx`: la clase esperada del caso «R57 — la clase de
+  ambito…» sigue al cambio (misma aserción).
+- `tests/unit/paridad/__snapshots__/inventario-paridad.test.tsx.snap`: 2 actualizados; el único cambio
+  es esa clase en el envoltorio.
+
+Ningún otro E2E nombra `product-batches-toggle`, `product-batch-row-cost` ni `product-cost` (grep en
+`e2e/`): no se toca otro spec.
+
+### Mapa R → caso E2E (`e2e/inventario-rediseno.spec.ts`)
+
+| R | Caso |
+| --- | --- |
+| R54, R6 | `/inventario a 1440 px › R54, R6 — como Administrador «Costo unitario» es la última cabecera antes de las acciones, a la derecha y en moneda con unidad` |
+| R54 | `/inventario a 1440 px › R54 — sin permiso de costos no hay «Costo unitario» en la tabla, ni «Costo» en la tarjeta ni en las sub-filas` (Operador) |
+| R15, R21, R55 | `/inventario a 1440 px › R15, R21, R55 — las fechas del panel «Lotes» y la «Fecha» del historial a la derecha, sin rótulos de tarjeta en la tabla` |
+| R47, R55, R57 | `/inventario a 1440 px › R47, R55, R57 — la sub-fila con fondo propio en todas sus celdas, «Nombre» sangrado, animada salvo con movimiento reducido y sin rótulos en la tabla` (fondo distinto celda a celda, celdas fijadas opacas con una celda debajo al desplazar, `padding-left` ≥ 40 px y lote a la derecha del nombre, `animation-name: screen-enter` y `none` con `emulateMedia({ reducedMotion: 'reduce' })`) |
+| R13, R47, R55, R57, R58 | `/inventario a 390 px › R13, R47, R55, R57, R58 — rótulos en la tarjeta, «Mostrar lotes» al pie de 44 px que despliega, sin chevrón en el título, y tarjetas de lote con fondo propio, desplazadas y animadas salvo con movimiento reducido` |
+| R13, R58 | `/inventario a 820 px › R13, R5, R52 …` (conmutador de tarjeta visible, chevrón oculto) |
+| R56 (y R55 en lotes) | `/inventario a 390 px › R56 — rótulos visibles en las tarjetas de lote del panel y de asiento del historial; cada celda lee solo su valor` |
+| R59, R32 | `importar inventario › R59, R32 — del paso 2, «Elegir otro archivo» vuelve al paso 1 sin recargar, sin archivo ni vista previa, sin importar y sin avisos` (marcador en `window`, sin `[data-sonner-toast]`, `inventoryImport` y productos `_im` sin cambio, botón de 44 px en la cabecera de la vista previa) |
+
+### Salida real
+
+```
+$ pnpm exec playwright test e2e/inventario-rediseno.spec.ts   (línea base, antes de tocar nada)
+  --project=chromium: 5 failed, 3 passed (2.5m)
+    R1…R14  Error: el elemento no tiene caja (expectRightAligned: el primer span es el rótulo oculto)
+    R47…R12 Error: el elemento no tiene caja (ídem)
+    R11…R52 Expected "—" Received "Motivo —" (textContent incluye el rótulo oculto)
+    R13…820 Expected visible Received hidden (product-batches-toggle en la tarjeta, l. 747)
+    R2…390  locator.click: Timeout 30000ms (product-batches-toggle en la tarjeta, l. 850)
+
+$ pnpm exec playwright test e2e/inventario-rediseno.spec.ts --project=chromium   (con los casos nuevos)
+  3 failed, 12 passed (39.3s)
+    «Disponible» en negrita Expected >= 600 Received 400 (medía el rótulo) -> arreglado en el test
+    el valor exacto en title: Received "" (3.70 es exacto: exactDecimalTitle no pone title)
+                                -> aserción retirada; el title lo cubre product-batch-rows.test.tsx
+    fondo opaco en la celda fijada data-table-cell-image Expected 1 Received 0.55 -> bug R57 (arriba)
+  sonda: scroll 1780/1112 a 1440, 1780/952 a 1280, 1780/772 a 1100; a 1024 ya son tarjetas;
+         image y actions: oklab(0.964998 -0.00492409 -0.00341874 / 0.55)
+
+$ pnpm exec playwright test e2e/inventario-rediseno.spec.ts --project=chromium   (tras el arreglo)
+  15 passed (44.6s)
+
+$ pnpm exec playwright test e2e/inventario-rediseno.spec.ts
+  30 passed (1.8m)      chromium 15/15  webkit 15/15
+
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm run lint
+✖ 10 problems (0 errors, 10 warnings)   (los mismos 4 archivos ajenos de tandas anteriores)
+
+$ pnpm exec vitest run tests/unit/paridad/inventario-paridad -u
+  Snapshots 2 updated · Test Files 1 passed (1) · Tests 13 passed (13)
+
+$ pnpm exec vitest related --run app/(private)/inventario/components/product-table.tsx tests/unit/inventario/product-batch-rows.test.tsx
+  FAIL tablas-marca > … R11, R13: en 'order-columns.tsx' … (rojo conocido de dev)
+  Test Files 1 failed | 36 passed (37) · Tests 1 failed | 651 passed (652)
+
+$ pnpm exec vitest run tests/unit/inventario/product-route-contract.test.ts tests/unit/inventario/scope.test.ts
+  Test Files 2 passed (2) · Tests 28 passed (28)
+
+$ pnpm exec vitest run guard
+  Test Files 81 passed (81) · Tests 1106 passed | 20 skipped (1126)
+```
+
+### Veredicto
+
+T8g hecha: `inventario-rediseno.spec.ts` pasa en Chromium y WebKit (30/30) con los casos de R13, R15,
+R47, R54, R55, R57, R58, R59, y el fondo translúcido de las celdas fijadas de la sub-fila (R57)
+arreglado a opaco en la clase de ámbito; único rojo, el conocido de Pedidos.

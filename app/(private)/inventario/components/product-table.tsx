@@ -145,7 +145,8 @@ export const PRODUCT_TABLE_SCOPE_CLASS = [
   '[&_[data-testid=data-table-head-batchesToggle]]:hidden',
   '[&_[data-testid=data-table-cell-batchesToggle]]:hidden',
   '[&_[data-testid=data-table-cards]_[data-testid=product-batches-toggle]]:hidden',
-  '[&_tr:has([data-batch-subrow])>td]:bg-muted/55',
+  // Opaco: las celdas fijadas (imagen, acciones) tapan lo que pasa por debajo con scroll horizontal.
+  '[&_tr:has([data-batch-subrow])>td]:bg-[color-mix(in_oklch,var(--muted)_55%,var(--card))]',
   'motion-safe:[&_tr:has([data-batch-subrow])>td]:animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]',
   '[&_li:has([data-batch-subrow])]:ml-5',
   '[&_li:has([data-batch-subrow])]:rounded-lg',
