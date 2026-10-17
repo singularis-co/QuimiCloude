@@ -178,6 +178,61 @@ describe('columna «Presentación» segun la pestana de tipo', () => {
     }
   });
 
+  // El conmutador del pie de la tarjeta tiene cabecera en el DOM, pero la oculta la clase de
+  // ambito de la tabla (product-cards.test.tsx lo afirma); aqui se mira el orden que se ve.
+  function cabecerasVisibles(): (string | null)[] {
+    return within(screen.getByRole('table'))
+      .getAllByRole('columnheader')
+      .map((celda) => celda.getAttribute('data-testid')?.replace('data-table-head-', '') ?? null)
+      .filter((id) => id !== 'batchesToggle');
+  }
+
+  it('R6, R53, R54 — en «Todos», con `canSeeCost`, el orden completo de cabeceras es el de hoy', () => {
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} canSeeCost />);
+
+    expect(cabecerasVisibles()).toEqual([
+      'image',
+      'name',
+      'type',
+      'presentationName',
+      'stock',
+      'available',
+      'reserved',
+      'qtyAlert',
+      'averageUnitCost',
+      'actions',
+    ]);
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveTextContent('Costo unitario');
+  });
+
+  it('R53 — en «Producto» el orden es el mismo sin «Tipo» ni «Presentación»', () => {
+    render(
+      <ProductTable
+        products={[producto()]}
+        params={conTipo(PRODUCT_TYPES.PRODUCT)}
+        totalPages={1}
+        canSeeCost
+      />,
+    );
+
+    expect(cabecerasVisibles()).toEqual([
+      'image',
+      'name',
+      'stock',
+      'available',
+      'reserved',
+      'qtyAlert',
+      'averageUnitCost',
+      'actions',
+    ]);
+  });
+
+  it('R54 — sin `canSeeCost` no hay «Costo unitario» y las acciones siguen a la alerta', () => {
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    expect(cabecerasVisibles().slice(-2)).toEqual(['qtyAlert', 'actions']);
+  });
+
   it('`buildProductColumns` la pinta por defecto y `showPresentation: false` la quita', () => {
     const ids = (showPresentation?: boolean) =>
       buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }), showPresentation }).map(

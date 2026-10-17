@@ -471,3 +471,37 @@ describe('fila «Sin pedido»', () => {
     expect(listOrderBatchesActionMock).toHaveBeenCalledWith(null, 'product-2');
   });
 });
+
+describe('rotulos de la tarjeta', () => {
+  function campo(card: HTMLElement, columnId: string): HTMLElement {
+    return within(card).getByTestId(`data-table-card-field-${columnId}`);
+  }
+
+  function rotulo(field: HTMLElement): string | null {
+    return field.querySelector('[data-card-label]')?.textContent?.trim() ?? null;
+  }
+
+  it('R55 — la tarjeta de la linea rotula «Existencia» y «Alerta», con la cifra intacta', async () => {
+    const user = setupUser();
+    montar([pedido({ packagedStock: null, products: [{ product: producto(), stock: '10', packagedStock: null }] })]);
+
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
+    const card = await screen.findByTestId('data-table-card-order-1--product-1');
+
+    expect(rotulo(campo(card, 'stock'))).toBe('Existencia');
+    expect(rotulo(campo(card, 'qtyAlert'))).toBe('Alerta');
+    expect(within(campo(card, 'stock')).getByTestId('product-stock').textContent).toBe('10 L');
+    expect(within(campo(card, 'qtyAlert')).getByTestId('product-qty-alert').textContent).toBe('3 L');
+    for (const label of campo(card, 'stock').querySelectorAll('[data-card-label]')) {
+      expect(label).toHaveClass('[table_&]:hidden');
+    }
+  });
+
+  it('R55 — la tarjeta del pedido rotula su existencia y no la alerta, que no tiene', () => {
+    montar([sinPedido()]);
+
+    const card = screen.getByTestId('data-table-card-without-product-2');
+    expect(rotulo(campo(card, 'stock'))).toBe('Existencia');
+    expect(campo(card, 'qtyAlert')).toBeEmptyDOMElement();
+  });
+});

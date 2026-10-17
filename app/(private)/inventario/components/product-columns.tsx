@@ -18,6 +18,7 @@ import {
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { cn } from '@/lib/utils';
 
+import { withCardFieldLabel } from './card-field-label';
 import { EXPIRING_CLASS, ExpiryDate } from './expiry-date';
 import { productNameWithoutPresentation } from './product-base-name';
 import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
@@ -65,6 +66,9 @@ export const IMAGE_COLUMN_ID = 'image';
 /** Id de la columna de acciones. Tampoco es un campo: es marcado. */
 export const ACTIONS_COLUMN_ID = 'actions';
 
+/** Id del conmutador de lotes del pie de la tarjeta. Marcado; en la tabla se oculta. */
+export const BATCHES_TOGGLE_COLUMN_ID = 'batchesToggle';
+
 /**
  * Id valido de columna. **Es la primera defensa de R7, y es de tipos**: escribir
  * `id: 'createdBy'` en la declaracion de abajo no compila. El test en negativo sigue haciendo
@@ -74,7 +78,8 @@ export const ACTIONS_COLUMN_ID = 'actions';
 export type ProductColumnId =
   | Exclude<keyof ProductView, HiddenProductField>
   | typeof IMAGE_COLUMN_ID
-  | typeof ACTIONS_COLUMN_ID;
+  | typeof ACTIONS_COLUMN_ID
+  | typeof BATCHES_TOGGLE_COLUMN_ID;
 
 /** Estado de la carga de los lotes de un producto desplegado. */
 export type ProductBatchesStatus =
@@ -113,6 +118,8 @@ export type ProductColumn = DataTableColumn<ProductTableRow> & { readonly id: Pr
 /** Textos de las sub-filas de lotes. */
 export const PRODUCT_BATCH_ROW_TEXTS = {
   toggle: (name: string) => `Mostrar lotes de ${name}`,
+  cardToggle: (expanded: boolean) => (expanded ? 'Ocultar lotes' : 'Mostrar lotes'),
+  cardToggleColumn: 'Lotes',
   lot: 'Lote:',
   purchaseDate: 'Fecha de compra:',
   expiryDate: 'Vencimiento:',
@@ -121,6 +128,15 @@ export const PRODUCT_BATCH_ROW_TEXTS = {
   empty: 'Sin lotes con existencia.',
   error: 'No se pudieron cargar los lotes.',
   retry: 'Reintentar',
+} as const;
+
+/** Rótulos de las cifras en la tarjeta; en la tabla no se ven. */
+export const PRODUCT_CARD_LABELS = {
+  stock: 'Existencia',
+  qtyAlert: 'Alerta',
+  available: 'Disponible',
+  unitCost: 'Costo',
+  reserved: 'Reservado',
 } as const;
 
 /** Encabezado de la columna de imagen. Constante para que ningun test dependa del literal. */
@@ -375,9 +391,12 @@ function costColumn(units: readonly UnitRef[] | undefined): ProductColumn {
     cell: (row) => {
       if (row.kind === 'batchesStatus') return null;
       const label = productUnitLabel(row.product, units);
-      return row.kind === 'product'
-        ? unitCostCell(row.product.averageUnitCost, 'product-cost', label)
-        : unitCostCell(row.batch.unitCost, 'product-batch-row-cost', label);
+      return withCardFieldLabel(
+        PRODUCT_CARD_LABELS.unitCost,
+        row.kind === 'product'
+          ? unitCostCell(row.product.averageUnitCost, 'product-cost', label)
+          : unitCostCell(row.batch.unitCost, 'product-batch-row-cost', label),
+      );
     },
   };
 }
@@ -432,7 +451,11 @@ function productNameCell(
 function batchDetailCell(row: Extract<ProductTableRow, { kind: 'batch' }>): ReactNode {
   const { batch } = row;
   return (
-    <dl data-testid="product-batch-row" className="space-y-1 pl-12 text-sm">
+    <dl
+      data-testid="product-batch-row"
+      data-batch-subrow
+      className="space-y-1 pl-12 text-sm @max-[760px]:pl-0"
+    >
       <div className="block">
         <dt className={BATCH_KEY_CLASS}>{PRODUCT_BATCH_ROW_TEXTS.lot}</dt>{' '}
         <dd data-testid="product-batch-row-lot" className="inline font-mono tabular-nums">
@@ -467,20 +490,32 @@ function batchesStatusCell(
   const { state } = row;
   if (state.status === 'loading') {
     return (
-      <p data-testid="product-batches-row-loading" className="pl-12 text-sm text-muted-foreground">
+      <p
+        data-testid="product-batches-row-loading"
+        data-batch-subrow
+        className="pl-12 text-sm text-muted-foreground @max-[760px]:pl-0"
+      >
         {PRODUCT_BATCH_ROW_TEXTS.loading}
       </p>
     );
   }
   if (state.status === 'empty') {
     return (
-      <p data-testid="product-batches-row-empty" className="pl-12 text-sm text-muted-foreground">
+      <p
+        data-testid="product-batches-row-empty"
+        data-batch-subrow
+        className="pl-12 text-sm text-muted-foreground @max-[760px]:pl-0"
+      >
         {PRODUCT_BATCH_ROW_TEXTS.empty}
       </p>
     );
   }
   return (
-    <div className="flex flex-wrap items-center gap-2 pl-12" data-testid="product-batches-row-error">
+    <div
+      className="flex flex-wrap items-center gap-2 pl-12 @max-[760px]:pl-0"
+      data-testid="product-batches-row-error"
+      data-batch-subrow
+    >
       <p data-testid="product-batches-row-error-message" className="text-sm text-destructive">
         {state.message}
       </p>
@@ -513,6 +548,36 @@ function reservedOrAvailableCell(
     : aggregateQuantityCell(row.batch[field], `product-batch-row-${field}`, label);
 }
 
+/**
+ * El conmutador de lotes del pie de la tarjeta. Es una columna porque la tarjeta solo pinta
+ * columnas; en la tabla la oculta la clase de ámbito de `ProductTable`, que ya tiene el chevrón.
+ */
+function batchesToggleColumn(onToggle: (productId: string) => void): ProductColumn {
+  return {
+    id: BATCHES_TOGGLE_COLUMN_ID,
+    label: PRODUCT_BATCH_ROW_TEXTS.cardToggleColumn,
+    align: 'start',
+    pinnable: false,
+    cell: (row) =>
+      row.kind === 'product' ? (
+        <Button
+          type="button"
+          variant="ghost"
+          touch
+          aria-expanded={row.expanded}
+          data-testid="product-batches-card-toggle"
+          onClick={() => onToggle(row.product.id)}
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={cn('transition-transform', row.expanded && 'rotate-90')}
+          />
+          {PRODUCT_BATCH_ROW_TEXTS.cardToggle(row.expanded)}
+        </Button>
+      ) : null,
+  };
+}
+
 export function buildProductColumns({
   menu,
   units,
@@ -541,6 +606,7 @@ export function buildProductColumns({
           />
         ) : null,
     },
+    ...(onToggle === undefined ? [] : [batchesToggleColumn(onToggle)]),
     {
       id: 'name',
       label: 'Nombre',
@@ -564,16 +630,13 @@ export function buildProductColumns({
       sortable: true,
       filter: { kind: 'numberRange' },
       cell: (row) => {
-        if (row.kind === 'product') return stockCell(row.product, units);
-        if (row.kind === 'batch') {
-          return stockAmountCell(
-            row.batch.stock,
-            productUnitLabel(row.product, units),
-            false,
-            'batch-stock',
-          );
-        }
-        return null;
+        if (row.kind === 'batchesStatus') return null;
+        return withCardFieldLabel(
+          PRODUCT_CARD_LABELS.stock,
+          row.kind === 'product'
+            ? stockCell(row.product, units)
+            : stockAmountCell(row.batch.stock, productUnitLabel(row.product, units), false, 'batch-stock'),
+        );
       },
     },
     {
@@ -581,7 +644,8 @@ export function buildProductColumns({
       label: 'Disponible',
       tabular: true,
       align: 'end',
-      cell: (row) => reservedOrAvailableCell(row, 'available', units),
+      cell: (row) =>
+        withCardFieldLabel(PRODUCT_CARD_LABELS.available, reservedOrAvailableCell(row, 'available', units)),
     },
     {
       id: 'reserved',
@@ -598,7 +662,10 @@ export function buildProductColumns({
       align: 'end',
       sortable: true,
       filter: { kind: 'numberRange' },
-      cell: (row) => (row.kind === 'product' ? qtyAlertCell(row.product, units) : null),
+      cell: (row) =>
+        row.kind === 'product'
+          ? withCardFieldLabel(PRODUCT_CARD_LABELS.qtyAlert, qtyAlertCell(row.product, units))
+          : null,
     },
     ...(showCost ? [costColumn(units)] : []),
     {

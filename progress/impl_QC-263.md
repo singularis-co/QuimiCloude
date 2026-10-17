@@ -1387,3 +1387,151 @@ y `scope.test.ts`: en verde.
 
 T8a hecha: merge sin marcadores y en el índice sin commit, columnas de `dev` con la alineación,
 `menu`, ámbar, `card` y anfitrión de la rama; único rojo, el conocido de Pedidos (PR #265).
+
+## Tanda 8 (T8f) — 2026-10-16 · frontend_dev
+
+### Archivos modificados
+
+- `app/(private)/inventario/importar/components/import-preview-summary.tsx`: prop `onChooseAnother`;
+  la cabecera de la tarjeta «Vista previa» pasa a fila (título, archivo y descripción a la
+  izquierda; a la derecha `<Button variant="outline" touch disabled={confirming}
+  data-testid="inventory-import-choose-another">` con `UPLOAD_CHANGE_LABEL`); con 760 px o menos se
+  apila a todo el ancho (`@max-[760px]:flex-col @max-[760px]:items-stretch`, como `STACKED_ACTIONS_CLASS`).
+- `app/(private)/inventario/importar/components/inventory-import-screen.tsx`: `onChooseAnother={restart}`
+  (el mismo `restart` de «Importar otro archivo»: archivo, resultado y error a `null`; no llama a
+  ninguna action ni a `toast`).
+- `app/(private)/inventario/importar/components/import-texts.ts`: `CHOOSE_ANOTHER_TESTID`. El literal
+  «Elegir otro archivo» no se duplica (se reusa `UPLOAD_CHANGE_LABEL`).
+- `tests/unit/inventario/importar/import-preview.test.tsx`: `onChooseAnother` en los renders y 2 tests.
+- `tests/unit/inventario/importar/inventory-import-screen.test.tsx`: 3 tests.
+- `import-steps.test.tsx`: sin cambio.
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R59 | `import-preview.test.tsx` › «R59 «Elegir otro archivo» va en la cabecera de la tarjeta, junto al título y el archivo, con talla touch»; «R59 … queda deshabilitado mientras se importa» |
+| R32, R59 | `inventory-import-screen.test.tsx` › «R32 R59 «Elegir otro archivo» del paso 2 vuelve al paso 1 sin archivo, sin vista previa, sin importar ni avisar» |
+| R59 | `inventory-import-screen.test.tsx` › «R59 tras un error al confirmar, «Elegir otro archivo» también limpia el error»; «R59 mientras importa, «Elegir otro archivo» queda deshabilitado» |
+
+«Sin recargar la página» lo prueba el E2E de T8g (marcador en `window`); en unidad se ve que el
+paso 1 se pinta en el mismo render.
+
+### Salida real
+
+- `pnpm run typecheck` → `tsc --noEmit` sin errores.
+- `pnpm run lint` → `✖ 10 problems (0 errors, 10 warnings)` (avisos previos en tests de otros módulos).
+- `pnpm exec vitest related --run <3 componentes + 2 tests>` → `Test Files 9 passed (9)`, `Tests 184 passed (184)`.
+- `pnpm exec vitest run guard` → `Test Files 81 passed (81)`, `Tests 1106 passed | 20 skipped (1126)`.
+- `pnpm exec vitest run tests/unit/inventario/importar tests/unit/inventario/scope.test.ts tests/unit/inventario/product-route-contract.test.ts`
+  → `Test Files 1 failed | 10 passed (11)`. Importar y `scope` en verde. Los rojos están en
+  `product-route-contract.test.ts` y vienen de archivos de T8b–T8d, que otro frontend_dev está
+  editando en paralelo (no son de T8f): «`product-columns.tsx` no debe contener «.cost»» y
+  «`product-table.tsx` no debe contener «filter(»». En la primera pasada salió además un tercero,
+  «los componentes de ruta se exponen por el barrel…», que en la siguiente pasada ya estaba verde
+  (era una edición a medias del otro agente).
+
+### Veredicto
+
+T8f hecha: «Elegir otro archivo» en la cabecera del paso 2 vuelve al paso 1 limpio sin importar ni
+avisar; importar en verde. Los rojos de `product-route-contract` son de T8b–T8d, que van en paralelo.
+
+## Tanda 8 (T8b-T8d) — 2026-10-16 · frontend_dev
+
+Sobre `9f7e7b07` (T8a). Sin commit. `components/shared/**` sin cambios (`git diff --stat components/`
+vacío): `DataTable` y `DataTableCards` no se tocan; el `footer` de `DataTableCardLayout` ya existía.
+
+### Archivos
+
+- `app/(private)/inventario/components/card-field-label.tsx` (nuevo): `cardFieldLabel(text)` →
+  `<span data-card-label className="text-muted-foreground [table_&]:hidden">` y
+  `withCardFieldLabel(text, value)` (el rótulo delante de la celda; `null` sin rótulo). Sin
+  `'use client'`, exportados por el barrel, listos para T8e (`product-batch-columns.tsx`, `batch-history.tsx`).
+- `product-columns.tsx`: `BATCHES_TOGGLE_COLUMN_ID` (en `ProductColumnId`), `PRODUCT_CARD_LABELS`,
+  `PRODUCT_BATCH_ROW_TEXTS.cardToggle(expanded)` / `cardToggleColumn` («Lotes»); columna
+  `batchesToggle` (`align: 'start'`, `pinnable: false`, `Button ghost touch` con `ChevronRight` que
+  gira, `aria-expanded`, `product-batches-card-toggle`; `null` en sub-filas), solo con `onToggle`
+  (así `PRODUCT_SKELETON_COLUMN_COUNT` sigue en 8); rótulos en `stock`, `available`, `qtyAlert` y
+  `averageUnitCost` (sub-fila: `stock`, `available`, `averageUnitCost`); `data-batch-subrow` y
+  `@max-[760px]:pl-0` en la raíz de las celdas `name` de `batch` y de los tres `batchesStatus`.
+  `averageUnitCost` ya estaba en `align: 'end'` y con el orden de `dev` desde T8a.
+- `product-table.tsx`: `productTableCard({ showType, showPresentation, canSeeCost })` = `card` de F3
+  con `footer: BATCHES_TOGGLE_COLUMN_ID`; `useMemo` sobre `[showType, showPresentation, canSeeCost]`
+  (cierra el pendiente de T8a); `PRODUCT_TABLE_SCOPE_CLASS` (F4 + F5) en un `div` que envuelve al
+  `DataTable` **solo en la vista con filas**: en cargando / vacío / error el `DataTable` sale sin
+  envoltorio (no hay sub-filas ni tarjetas que alcanzar, y el snapshot de esos estados no cambia);
+  el esqueleto cuenta las columnas sin `batchesToggle`.
+- `finished-stock-columns.tsx`: rótulos «Existencia» y «Alerta» en `stock` y `qtyAlert`.
+- `index.ts`: `cardFieldLabel`, `withCardFieldLabel`, `BATCHES_TOGGLE_COLUMN_ID`,
+  `PRODUCT_CARD_LABELS`, `PRODUCT_TABLE_SCOPE_CLASS`, `productTableCard`, `ProductTableCardOptions`.
+- Tests: `product-cards.test.tsx`, `product-batch-rows.test.tsx`, `product-type-column.test.tsx`,
+  `finished-stock-table.test.tsx`; `.snap` de `inventario-paridad` (3 actualizados).
+
+**DOM comprobado antes de la clase:** `th` lleva `data-testid="data-table-head-<id>"`
+(`data-table-header-menu.tsx` l. 212) y `td` `data-testid="data-table-cell-<id>"` (`data-table.tsx`
+l. 362); el test «R13, R58 — la clase de ambito … alcanza la cabecera y las celdas» lo fija (`TH`, `TD`).
+
+**Desvíos y decisiones de esta tanda (para el reviewer):**
+
+1. `PRODUCT_CARD_LABELS` usa la clave `unitCost` y no `cost` (F3): `product-route-contract.test.ts`
+   prohíbe `.cost` en la ruta (QC-52 R5/R6: el producto no tiene campo `cost`). Mismo texto «Costo».
+2. La columna `batchesToggle` va **justo después de la imagen**: oculta en la tabla, su posición no
+   se ve; detrás de las acciones rompería la caída fijada a la derecha y delante de ellas el caso de
+   `dev` «Costo unitario justo antes de las acciones» (que cuenta `columnheader` en jsdom, sin CSS).
+3. `withCardFieldLabel` añadido a `card-field-label.tsx` junto a `cardFieldLabel` (el «sin rótulo
+   donde la celda devuelve `null`» en un solo sitio). «—» de alerta o de costo sí lleva rótulo
+   (la celda pinta algo).
+4. `product-route-contract` prohíbe `filter(` en la ruta: el recuento del esqueleto usa `some`.
+5. Observación, sin cambiar el diseño: `bg-muted/55` es translúcido y alcanza también las celdas
+   fijadas (imagen, acciones), que por debajo llevan `bg-background`; con scroll horizontal la
+   sub-fila dejaría entrever lo que pasa por debajo de esas dos celdas. El tablero usa un
+   `color-mix(... var(--muted) 55%, var(--card))` opaco. Lo mide el E2E de T8g; si molesta, se
+   cambia el valor en la clase de ámbito, sin tocar `DataTable`.
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R6, R53, R54 | `product-batch-rows.test.tsx` › «R6, R53, R54 — con `canSeeCost`, al final antes de acciones y a la derecha, en moneda con unidad, exacto en `title` y el costo del lote en su sub-fila» («$2,500.00 / L», `title` 2500.004, «—», «$2,400.01 / L») y los de `dev` (sin `canSeeCost` ni columna ni costo de sub-fila) |
+| R6, R53, R54 | `product-type-column.test.tsx` › «R6, R53, R54 — en «Todos», con `canSeeCost`, el orden completo de cabeceras es el de hoy»; «R53 — en «Producto» el orden es el mismo sin «Tipo» ni «Presentación»»; «R54 — sin `canSeeCost` no hay «Costo unitario»…» |
+| R13, R53 | `product-cards.test.tsx` › «R13, R53 — las cifras son Presentacion, Existencia, Alerta, Disponible y Costo…»; «R13, R53 — en «Producto» la tarjeta no pinta «Presentación», tambien al cambiar de pestana» (dep. `showPresentation` del `useMemo`) |
+| R13, R54 | `product-cards.test.tsx` › «R13, R54 — la cifra «Costo» de la tarjeta sale solo con `canSeeCost`» (dep. `canSeeCost`); «R13, R53 — la linea es una tarjeta … sin «Disponible» ni «Costo»» (producto terminado) |
+| R55 | `product-cards.test.tsx` › «R55 — cada cifra lleva delante su rotulo…»; «R55 — el rotulo lleva `[table_&]:hidden`…»; «R55 — la tarjeta del lote rotula existencia, disponible y costo…»; «R55 — la tarjeta de estado de lotes no lleva ningun rotulo»; `finished-stock-table.test.tsx` › «R55 — la tarjeta de la linea rotula «Existencia» y «Alerta»…»; «R55 — la tarjeta del pedido rotula su existencia y no la alerta…» |
+| R13, R47, R58 | `product-cards.test.tsx` › «R58 — el pie pinta «Mostrar lotes» a la izquierda de «Acciones», de 44 px, que despliega los lotes y pasa a «Ocultar lotes»»; «R58 — el chevron del titulo lo oculta en la tarjeta la clase de ambito…»; «R13, R58 — la clase de ambito va en el envoltorio y alcanza la cabecera y las celdas…»; los R47 de tarjetas de lote despliegan ahora con `product-batches-card-toggle` |
+| R57 | `product-batch-rows.test.tsx` › «R57 — `data-batch-subrow` marca la sub-fila de lote, la de cargando, la vacia y la de error, y no la del producto»; «R57 — mientras carga…»; «R57 — la clase de ambito pone fondo y entrada (solo con movimiento)…» |
+
+Los computados (fondo, sangría, animación, rótulos invisibles a 1440, 44 px) son de T8g (jsdom no
+aplica Tailwind). **Aviso para T8g:** `e2e/inventario-rediseno.spec.ts` l. 747 y l. 850 usan
+`product-batches-toggle` dentro de la tarjeta (a 390 ahora oculto): pasan a `product-batches-card-toggle`.
+
+### Salida real
+
+```
+$ pnpm run typecheck   → tsc --noEmit, sin errores
+$ pnpm run lint        → ESLint: 0 errors, 10 warnings in 4 files (no-unused-vars en
+                         confirm-catalog-import.test.ts, list-execution-traces.test.ts,
+                         order-service.test.ts, step-evidence.tsx; ninguno de esta tanda)
+$ pnpm exec vitest run tests/unit/paridad/inventario-paridad -u
+  Snapshots 3 updated · Test Files 1 passed (1) · Tests 13 passed (13)
+$ pnpm exec vitest related --run <5 de la ruta + 4 tests>
+  FAIL tablas-marca > … 'order-columns.tsx' (rojo conocido, PR #265)
+  Test Files 1 failed | 37 passed (38) · Tests 1 failed | 708 passed (709)
+$ pnpm exec vitest run guard
+  Test Files 81 passed (81) · Tests 1106 passed | 20 skipped (1126)
+$ pnpm exec vitest run product-route-contract.test.ts scope.test.ts unit-cost-visibility.test.ts
+    product-type-column.test.tsx
+  Test Files 4 passed (4) · Tests 51 passed (51)
+$ pnpm exec vitest run tests/unit/inventario tests/unit/inventario-ui tests/unit/paridad tests/unit/marca
+  FAIL tablas-marca > … 'order-columns.tsx' (rojo conocido)
+  Test Files 1 failed | 170 passed (171) · Tests 1 failed | 2760 passed | 5 skipped (2766)
+```
+
+**Snapshot contra el de T8a (design.md > 6):** solo cambia la vista con filas de productos y la de
+producto terminado: el envoltorio con `PRODUCT_TABLE_SCOPE_CLASS` (sangría de un nivel), la
+cabecera y las celdas `batchesToggle` con «Mostrar lotes», los `span[data-card-label]`
+(«Existencia», «Alerta», «Disponible») y la tarjeta con su pie. Cargando, vacío y error, intactos.
+
+### Veredicto
+
+T8b–T8d hechas: tarjeta de F3 con rótulos y «Mostrar lotes» al pie, clase de ámbito con columna
+oculta y sub-filas marcadas, `DataTable` sin cambios; único rojo, el conocido de Pedidos (PR #265).

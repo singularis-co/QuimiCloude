@@ -24,6 +24,7 @@ import type { UnitRef } from '@/lib/modules/unidades';
 import { useLocalToday } from './expiry-date';
 import { daysUntil, isExpiringSoon } from './expiry-warning';
 import {
+  BATCHES_TOGGLE_COLUMN_ID,
   buildProductColumns,
   IMAGE_COLUMN_ID,
   PRODUCT_BATCH_ROW_TEXTS,
@@ -109,23 +110,48 @@ export const PRODUCT_TABLE_TEXTS: DataTableTexts = {
   closeMenu: 'Cerrar',
 };
 
-const PRODUCT_CARD_META = [
-  'presentationName',
-  STOCK_COLUMN_ID,
-  'averageUnitCost',
-  QTY_ALERT_COLUMN_ID,
-  'available',
-] as const;
+export type ProductTableCardOptions = {
+  readonly showType: boolean;
+  readonly showPresentation: boolean;
+  readonly canSeeCost: boolean;
+};
 
-/** La tarjeta del producto; «Tipo» solo sale donde sale su columna, en «Todos». */
-export function productTableCard(showType: boolean): DataTableCardLayout {
+/** La tarjeta del producto: cada campo sale solo donde sale su columna. */
+export function productTableCard({
+  showType,
+  showPresentation,
+  canSeeCost,
+}: ProductTableCardOptions): DataTableCardLayout {
   return {
     primary: IMAGE_COLUMN_ID,
     status: showType ? TYPE_COLUMN_ID : undefined,
     title: 'name',
-    meta: PRODUCT_CARD_META,
+    meta: [
+      ...(showPresentation ? ['presentationName'] : []),
+      STOCK_COLUMN_ID,
+      QTY_ALERT_COLUMN_ID,
+      'available',
+      ...(canSeeCost ? ['averageUnitCost'] : []),
+    ],
+    footer: BATCHES_TOGGLE_COLUMN_ID,
   };
 }
+
+/**
+ * Va en el envoltorio de la tabla. En la tabla oculta el conmutador del pie (ya está el chevrón
+ * del nombre) y en la tarjeta el chevrón; las sub-filas de lote ganan fondo, sangría y entrada.
+ */
+export const PRODUCT_TABLE_SCOPE_CLASS = [
+  '[&_[data-testid=data-table-head-batchesToggle]]:hidden',
+  '[&_[data-testid=data-table-cell-batchesToggle]]:hidden',
+  '[&_[data-testid=data-table-cards]_[data-testid=product-batches-toggle]]:hidden',
+  '[&_tr:has([data-batch-subrow])>td]:bg-muted/55',
+  'motion-safe:[&_tr:has([data-batch-subrow])>td]:animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]',
+  '[&_li:has([data-batch-subrow])]:ml-5',
+  '[&_li:has([data-batch-subrow])]:rounded-lg',
+  '[&_li:has([data-batch-subrow])]:bg-muted',
+  'motion-safe:[&_li:has([data-batch-subrow])]:animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]',
+].join(' ');
 
 export type ProductTableProps = {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega. */
@@ -297,7 +323,10 @@ export function ProductTable({
   const showPresentation = !(
     typeFilter?.kind === 'select' && typeFilter.values[0] === PRODUCT_TYPES.PRODUCT
   );
-  const card = useMemo(() => productTableCard(showType), [showType]);
+  const card = useMemo(
+    () => productTableCard({ showType, showPresentation, canSeeCost }),
+    [showType, showPresentation, canSeeCost],
+  );
   const columns = useMemo(() => {
     const loadBatches = (productId: string) => {
       // Cada peticion lleva su propia identidad. Si la lista se invalido mientras tanto (y quiza
@@ -376,6 +405,10 @@ export function ProductTable({
     });
   };
 
+  // El conmutador del pie es una columna que la tabla no pinta.
+  const hasCardToggle = columns.some((column) => column.id === BATCHES_TOGGLE_COLUMN_ID);
+  const tableColumnCount = hasCardToggle ? columns.length - 1 : columns.length;
+
   const table = (
     <DataTable
       tableId={PRODUCT_TABLE_ID}
@@ -391,7 +424,7 @@ export function ProductTable({
         pageSize: params.pageSize,
         error,
         empty,
-        columns: columns.length,
+        columns: tableColumnCount,
       })}
       card={card}
     />
@@ -423,7 +456,7 @@ export function ProductTable({
         <p className="text-xs text-muted-foreground">{PRODUCT_TABLE_TEXTS.loading}</p>
       ) : null}
       <ProductTypeTabs params={params} />
-      {table}
+      <div className={PRODUCT_TABLE_SCOPE_CLASS}>{table}</div>
       <ProductRowDialogs
         active={active}
         open={activeOpen}

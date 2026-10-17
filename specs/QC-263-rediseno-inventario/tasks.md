@@ -237,7 +237,7 @@ T8h.
   `vitest related` del diff y `vitest run guard` en verde; `tests/unit/inventario/unit-cost-visibility.test.ts`
   y `product-type-column.test.tsx` en verde sin cambio de aserciones de `dev`; el impl lista cada
   conflicto y cómo se resolvió.
-- [ ] **T8b. «Costo» de `dev` en la tabla y la tarjeta** (F2, R6, R53, R54; depende de T8a).
+- [x] **T8b. «Costo» de `dev` en la tabla y la tarjeta** (F2, R6, R53, R54; depende de T8a).
   `align: 'end'` en `averageUnitCost`; orden de `dev`; «Presentación» fuera de la pestaña
   «Producto» también en la tarjeta. Tests: `product-batch-rows.test.tsx` (con `canSeeCost`, «Costo
   unitario» al final antes de acciones, a la derecha, «$2,500.00 / L» con el exacto en `title`, «—»
@@ -246,7 +246,7 @@ T8h.
   «Presentación» en esta), `product-cards.test.tsx` (cifra «Costo» solo con `canSeeCost`; sin
   «Costo» en «Producto terminado»). *Hecho:* tests en verde; snapshot de paridad con la fila de
   `design.md > 6`.
-- [ ] **T8c [P]. Tarjeta del producto: orden, rótulos y «Mostrar lotes» al pie** (F3, F4, R13, R47,
+- [x] **T8c [P]. Tarjeta del producto: orden, rótulos y «Mostrar lotes» al pie** (F3, F4, R13, R47,
   R55, R58; depende de T8b). `card-field-label.tsx` con `cardFieldLabel`; `PRODUCT_CARD_LABELS`;
   `card` de F3; columna `batchesToggle` como `footer`; `PRODUCT_TABLE_SCOPE_CLASS` en el `div` que
   envuelve al `DataTable`; rótulos en `FinishedStockTable`. Antes de escribir la clase, comprobar en
@@ -259,7 +259,7 @@ T8h.
   de «Acciones», que al pulsarlo despliega las tarjetas de lote y pasa a «Ocultar lotes»; la clase de
   ámbito presente en el envoltorio; el rótulo lleva `[table_&]:hidden`. `finished-stock-table.test.tsx`:
   rótulos «Existencia» y «Alerta». *Hecho:* tests en verde.
-- [ ] **T8d [P]. Sub-filas de lote en escritorio y teléfono** (F5, R57; decisión P26; depende de T8b).
+- [x] **T8d [P]. Sub-filas de lote en escritorio y teléfono** (F5, R57; decisión P26; depende de T8b).
   `data-batch-subrow` en la raíz de la celda `name` de `batch` y `batchesStatus`; fondo y entrada en
   `PRODUCT_TABLE_SCOPE_CLASS`, sobre las celdas (`tr:has(…)>td`) y sobre la tarjeta
   (`li:has(…)`: sangría `ml-5`, `rounded-lg`, `bg-muted`, misma entrada). Test en

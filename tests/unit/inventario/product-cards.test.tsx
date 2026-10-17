@@ -9,8 +9,11 @@ import {
   BELOW_ALERT_LABEL,
   FINISHED_STOCK_TABLE_TEXTS,
   FinishedStockTable,
+  PRODUCT_CARD_LABELS,
+  PRODUCT_TABLE_SCOPE_CLASS,
   PRODUCT_TABLE_TEXTS,
   ProductTable,
+  cardFieldLabel,
 } from '@/app/(private)/inventario/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import {
@@ -100,18 +103,33 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
 
 const ACIDO = producto();
 
-function montar(params: DataTableParams = TODOS, products: readonly ProductView[] = [ACIDO]) {
-  // Como el Administrador: con `canSeeCost` la tarjeta lleva tambien el costo.
-  render(
+function montar(
+  params: DataTableParams = TODOS,
+  products: readonly ProductView[] = [ACIDO],
+  canSeeCost = true,
+) {
+  // Por defecto como el Administrador: con `canSeeCost` la tarjeta lleva tambien el costo.
+  return render(
     <ProductTable
       products={products}
       params={params}
       totalPages={1}
       units={[KILO]}
       canAdjust
-      canSeeCost
+      canSeeCost={canSeeCost}
     />,
   );
+}
+
+/** Ids de los campos de la tarjeta, en el orden en que se pintan. */
+function camposDe(card: HTMLElement): string[] {
+  return Array.from(card.querySelectorAll('[data-testid^="data-table-card-field-"]')).map((el) =>
+    (el.getAttribute('data-testid') ?? '').replace('data-table-card-field-', ''),
+  );
+}
+
+function rotulo(field: HTMLElement): HTMLElement | null {
+  return field.querySelector<HTMLElement>('[data-card-label]');
 }
 
 function tarjetas(): HTMLElement[] {
@@ -127,7 +145,7 @@ function campo(card: HTMLElement, columnId: string): HTMLElement {
 }
 
 async function desplegarEnTarjeta(user: ReturnType<typeof setupUser>, id = ACIDO.id) {
-  await user.click(within(tarjeta(id)).getByTestId('product-batches-toggle'));
+  await user.click(within(tarjeta(id)).getByTestId('product-batches-card-toggle'));
 }
 
 beforeEach(() => {
@@ -157,12 +175,16 @@ describe('cada producto en su tarjeta', () => {
     expect(campo(card, 'name')).toHaveClass('font-semibold');
   });
 
-  it('R13, R47 — el titulo lleva el conmutador de lotes', () => {
+  it('R58 — el chevron del titulo lo oculta en la tarjeta la clase de ambito del envoltorio', () => {
     montar();
 
-    const conmutador = within(campo(tarjeta(ACIDO.id), 'name')).getByTestId('product-batches-toggle');
-    expect(conmutador).toHaveAccessibleName('Mostrar lotes de Acido citrico');
-    expect(conmutador).toHaveAttribute('aria-expanded', 'false');
+    // jsdom no aplica Tailwind: se afirma que el chevron esta donde lo alcanza la regla.
+    const chevron = within(campo(tarjeta(ACIDO.id), 'name')).getByTestId('product-batches-toggle');
+    expect(chevron.closest('[data-testid="data-table-cards"]')).not.toBeNull();
+    expect(PRODUCT_TABLE_SCOPE_CLASS.split(' ')).toContain(
+      '[&_[data-testid=data-table-cards]_[data-testid=product-batches-toggle]]:hidden',
+    );
+    expect(screen.getByTestId('data-table').parentElement?.className).toBe(PRODUCT_TABLE_SCOPE_CLASS);
   });
 
   it('R13, R53 — en «Todos», «Tipo» va como estado de la tarjeta', () => {
@@ -181,18 +203,166 @@ describe('cada producto en su tarjeta', () => {
     expect(within(tarjeta(ACIDO.id)).queryByTestId('product-type')).toBeNull();
   });
 
-  it('R13, R53 — las cifras son Presentacion, Existencia, Costo, Alerta y Disponible, iguales que en la fila', () => {
+  it('R13, R53 — las cifras son Presentacion, Existencia, Alerta, Disponible y Costo, iguales que en la fila, y el pie lleva el conmutador', () => {
     montar();
     const card = tarjeta(ACIDO.id);
     const fila = screen.getByTestId(`data-table-row-${ACIDO.id}`);
 
+    expect(camposDe(card)).toEqual([
+      'image',
+      'type',
+      'name',
+      'presentationName',
+      'stock',
+      'qtyAlert',
+      'available',
+      'averageUnitCost',
+      'batchesToggle',
+    ]);
     for (const columnId of ['presentationName', 'stock', 'averageUnitCost', 'qtyAlert', 'available']) {
       const celda = within(fila).getByTestId(`data-table-cell-${columnId}`);
       expect(campo(card, columnId).textContent).toBe(celda.textContent);
     }
     expect(campo(card, 'presentationName')).toHaveTextContent('Saco 25 kg');
-    expect(within(campo(card, 'averageUnitCost')).getByTestId('product-cost')).toHaveTextContent('3.25');
+    expect(within(campo(card, 'averageUnitCost')).getByTestId('product-cost')).toHaveTextContent(
+      /^\$3\.25 \/ kg$/,
+    );
     expect(campo(card, 'stock')).toHaveClass('font-mono', 'tabular-nums');
+  });
+
+  it('R13, R53 — en «Producto» la tarjeta no pinta «Presentación», tambien al cambiar de pestana', () => {
+    const { rerender } = montar(TODOS);
+    expect(camposDe(tarjeta(ACIDO.id))).toContain('presentationName');
+
+    rerender(
+      <ProductTable
+        products={[ACIDO]}
+        params={SOLO_PRODUCTO}
+        totalPages={1}
+        units={[KILO]}
+        canAdjust
+        canSeeCost
+      />,
+    );
+
+    expect(camposDe(tarjeta(ACIDO.id))).toEqual([
+      'image',
+      'name',
+      'stock',
+      'qtyAlert',
+      'available',
+      'averageUnitCost',
+      'batchesToggle',
+    ]);
+    expect(within(tarjeta(ACIDO.id)).queryByText('Saco 25 kg')).toBeNull();
+  });
+
+  it('R13, R54 — la cifra «Costo» de la tarjeta sale solo con `canSeeCost`', () => {
+    const { rerender } = montar(TODOS, [ACIDO], false);
+    expect(within(tarjeta(ACIDO.id)).queryByTestId('data-table-card-field-averageUnitCost')).toBeNull();
+    expect(within(tarjeta(ACIDO.id)).queryByTestId('product-cost')).toBeNull();
+
+    rerender(
+      <ProductTable products={[ACIDO]} params={TODOS} totalPages={1} units={[KILO]} canAdjust canSeeCost />,
+    );
+
+    expect(
+      within(campo(tarjeta(ACIDO.id), 'averageUnitCost')).getByTestId('product-cost'),
+    ).toBeInTheDocument();
+  });
+
+  it('R55 — cada cifra lleva delante su rotulo, fuera del elemento de la cifra, cuyo texto no cambia', () => {
+    montar();
+    const card = tarjeta(ACIDO.id);
+    const fila = screen.getByTestId(`data-table-row-${ACIDO.id}`);
+
+    const esperados = [
+      ['stock', 'product-stock', 'Existencia'],
+      ['qtyAlert', 'product-qty-alert', 'Alerta'],
+      ['available', 'product-available', 'Disponible'],
+      ['averageUnitCost', 'product-cost', 'Costo'],
+    ] as const;
+    for (const [columnId, testId, texto] of esperados) {
+      const label = rotulo(campo(card, columnId));
+      const cifra = within(campo(card, columnId)).getByTestId(testId);
+      expect(label, columnId).not.toBeNull();
+      expect(label?.textContent?.trim(), columnId).toBe(texto);
+      expect(cifra.contains(label), columnId).toBe(false);
+      expect(label?.compareDocumentPosition(cifra), columnId).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(cifra.textContent, columnId).toBe(within(fila).getByTestId(testId).textContent);
+    }
+    expect(within(campo(card, 'available')).getByTestId('product-available').textContent).toBe('10 kg');
+    expect(within(campo(card, 'averageUnitCost')).getByTestId('product-cost').textContent).toBe(
+      '$3.25 / kg',
+    );
+    expect(PRODUCT_CARD_LABELS).toMatchObject({
+      stock: 'Existencia',
+      qtyAlert: 'Alerta',
+      available: 'Disponible',
+      unitCost: 'Costo',
+      reserved: 'Reservado',
+    });
+    expect(rotulo(campo(card, 'presentationName'))).toBeNull();
+  });
+
+  it('R55 — el rotulo lleva `[table_&]:hidden`: dentro de la tabla no se ve', () => {
+    montar();
+
+    const enLaTabla = screen.getByRole('table').querySelectorAll('[data-card-label]');
+    expect(enLaTabla.length).toBeGreaterThan(0);
+    for (const label of enLaTabla) expect(label).toHaveClass('[table_&]:hidden');
+    cleanup();
+
+    const { container } = render(<>{cardFieldLabel('Existencia')}</>);
+    expect(container.querySelector('[data-card-label]')).toHaveClass(
+      '[table_&]:hidden',
+      'text-muted-foreground',
+    );
+  });
+
+  it('R58 — el pie pinta «Mostrar lotes» a la izquierda de «Acciones», de 44 px, que despliega los lotes y pasa a «Ocultar lotes»', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote()] });
+    const user = setupUser();
+    montar();
+    const card = tarjeta(ACIDO.id);
+
+    const boton = within(campo(card, 'batchesToggle')).getByTestId('product-batches-card-toggle');
+    const acciones = within(card).getByTestId('product-row-actions');
+    expect(boton).toHaveAccessibleName('Mostrar lotes');
+    expect(boton).toHaveAttribute('aria-expanded', 'false');
+    expect(boton.className).toContain('min-h-11');
+    expect(boton.querySelector('svg.lucide-chevron-right')).not.toBeNull();
+    expect(boton.compareDocumentPosition(acciones) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(campo(card, 'batchesToggle').parentElement?.contains(acciones)).toBe(true);
+
+    await user.click(boton);
+
+    expect(await screen.findByTestId(`data-table-card-${ACIDO.id}--batch-batch-1`)).toBeInTheDocument();
+    const desplegado = within(tarjeta(ACIDO.id)).getByTestId('product-batches-card-toggle');
+    expect(desplegado).toHaveAccessibleName('Ocultar lotes');
+    expect(desplegado).toHaveAttribute('aria-expanded', 'true');
+    expect(listAliveProductBatchesActionMock).toHaveBeenCalledWith(ACIDO.id);
+
+    await user.click(desplegado);
+    expect(screen.queryByTestId(`data-table-card-${ACIDO.id}--batch-batch-1`)).toBeNull();
+  });
+
+  it('R13, R58 — la clase de ambito va en el envoltorio y alcanza la cabecera y las celdas del conmutador del pie', () => {
+    montar();
+
+    const envoltorio = screen.getByTestId('data-table').parentElement as HTMLElement;
+    expect(envoltorio.className).toBe(PRODUCT_TABLE_SCOPE_CLASS);
+    const clases = PRODUCT_TABLE_SCOPE_CLASS.split(' ');
+    expect(clases).toContain('[&_[data-testid=data-table-head-batchesToggle]]:hidden');
+    expect(clases).toContain('[&_[data-testid=data-table-cell-batchesToggle]]:hidden');
+    expect(within(screen.getByRole('table')).getByTestId('data-table-head-batchesToggle').tagName).toBe(
+      'TH',
+    );
+    const celda = within(screen.getByTestId(`data-table-row-${ACIDO.id}`)).getByTestId(
+      'data-table-cell-batchesToggle',
+    );
+    expect(celda.tagName).toBe('TD');
+    expect(envoltorio.contains(celda)).toBe(true);
   });
 
   it('R13 — la tarjeta no repite «Reservado»', () => {
@@ -289,6 +459,38 @@ describe('las sub-filas de lote salen como tarjetas justo detras de la del produ
     expect(within(campo(card, 'stock')).getByTestId('batch-stock')).toHaveTextContent('12 kg');
     expect(within(campo(card, 'averageUnitCost')).getByTestId('product-batch-row-cost')).toHaveTextContent('3');
     expect(within(campo(card, 'available')).getByTestId('product-batch-row-available')).toHaveTextContent('10 kg');
+  });
+
+  it('R55 — la tarjeta del lote rotula existencia, disponible y costo, y no rotula donde no hay cifra', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote()] });
+    const user = setupUser();
+    montar();
+
+    await desplegarEnTarjeta(user);
+    const card = await screen.findByTestId(`data-table-card-${ACIDO.id}--batch-batch-1`);
+
+    const esperados = [
+      ['stock', 'batch-stock', 'Existencia', '12 kg'],
+      ['available', 'product-batch-row-available', 'Disponible', '10 kg'],
+      ['averageUnitCost', 'product-batch-row-cost', 'Costo', '$3.00 / kg'],
+    ] as const;
+    for (const [columnId, testId, texto, cifra] of esperados) {
+      expect(rotulo(campo(card, columnId))?.textContent?.trim(), columnId).toBe(texto);
+      expect(within(campo(card, columnId)).getByTestId(testId).textContent, columnId).toBe(cifra);
+    }
+    expect(campo(card, 'qtyAlert')).toBeEmptyDOMElement();
+    expect(within(card).queryByTestId('data-table-card-field-reserved')).toBeNull();
+    expect(within(card).queryByTestId('product-batches-card-toggle')).toBeNull();
+  });
+
+  it('R55 — la tarjeta de estado de lotes no lleva ningun rotulo', async () => {
+    listAliveProductBatchesActionMock.mockReturnValue(new Promise(() => undefined));
+    const user = setupUser();
+    montar();
+
+    await desplegarEnTarjeta(user);
+
+    expect(tarjeta(`${ACIDO.id}--batches`).querySelector('[data-card-label]')).toBeNull();
   });
 
   it('R47 — mientras carga, la tarjeta de estado dice «Cargando lotes…» y no tiene «Acciones»', async () => {

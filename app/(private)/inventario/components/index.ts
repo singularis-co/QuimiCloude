@@ -5,6 +5,7 @@
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
 export { AdjustBatchDialog, type AdjustBatchDialogProps } from './adjust-batch-dialog';
 export { BatchHistory, movementKindLabel } from './batch-history';
+export { cardFieldLabel, withCardFieldLabel } from './card-field-label';
 export { DeleteProductDialog } from './delete-product-dialog';
 export {
   buildFinishedStockColumns,
@@ -29,6 +30,8 @@ export {
 export { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
 export {
   ACTIONS_COLUMN_ID,
+  BATCHES_TOGGLE_COLUMN_ID,
+  PRODUCT_CARD_LABELS,
   BELOW_ALERT_LABEL,
   IMAGE_COLUMN_ID,
   PRODUCT_BATCH_ROW_TEXTS,
@@ -150,7 +153,10 @@ export { ProductListSection } from './product-list-section';
 export { ProductSheet } from './product-sheet';
 export {
   PRODUCT_TABLE_ID,
+  PRODUCT_TABLE_SCOPE_CLASS,
   PRODUCT_TABLE_TEXTS,
   ProductTable,
+  productTableCard,
+  type ProductTableCardOptions,
   type ProductTableProps,
 } from './product-table';

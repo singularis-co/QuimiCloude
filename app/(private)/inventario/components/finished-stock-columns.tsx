@@ -18,6 +18,7 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
+import { withCardFieldLabel } from './card-field-label';
 import {
   ACTIONS_COLUMN_ID,
   ACTIONS_COLUMN_LABEL,
@@ -26,6 +27,7 @@ import {
   IMAGE_COLUMN_ID,
   IMAGE_COLUMN_LABEL,
   isBelowAlert,
+  PRODUCT_CARD_LABELS,
   productUnitLabel,
   qtyAlertCell,
   stockAmountCell,
@@ -230,14 +232,20 @@ export function buildFinishedStockColumns({
       tabular: true,
       align: 'end',
       cell: (item) =>
-        item.kind === 'group' ? groupStockCell(item.row, units) : lineStockCell(item.line, units),
+        withCardFieldLabel(
+          PRODUCT_CARD_LABELS.stock,
+          item.kind === 'group' ? groupStockCell(item.row, units) : lineStockCell(item.line, units),
+        ),
     },
     {
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
       tabular: true,
       align: 'end',
-      cell: (item) => (item.kind === 'line' ? qtyAlertCell(item.line.product, units) : null),
+      cell: (item) =>
+        item.kind === 'line'
+          ? withCardFieldLabel(PRODUCT_CARD_LABELS.qtyAlert, qtyAlertCell(item.line.product, units))
+          : null,
     },
     actionsColumn<FinishedStockTableRow>({
       id: ACTIONS_COLUMN_ID,

@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ProductTable } from '@/app/(private)/inventario/components';
+import { PRODUCT_TABLE_SCOPE_CLASS, ProductTable } from '@/app/(private)/inventario/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { PRODUCT_TYPES, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
@@ -699,5 +699,134 @@ describe('columna «Costo unitario» de la tabla de productos', () => {
     expect(screen.queryAllByTestId('data-table-cell-averageUnitCost')).toEqual([]);
     expect(screen.queryByTestId('product-cost')).toBeNull();
     expect(screen.queryByTestId('product-batch-row-cost')).toBeNull();
+  });
+});
+
+describe('«Costo unitario» de la enmienda 2', () => {
+  const LITRO = { id: 'unit-l', name: 'Litro', symbol: 'L' } as UnitRef;
+
+  it('R6, R53, R54 — con `canSeeCost`, al final antes de acciones y a la derecha, en moneda con unidad, exacto en `title` y el costo del lote en su sub-fila', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [lote({ unitId: 'unit-l', unitCost: '2400.0050' })],
+    });
+    const user = setupUser();
+    render(
+      <ProductTable
+        products={[
+          producto({ unitId: 'unit-l', averageUnitCost: '2500.0040' }),
+          producto({ id: 'product-2', name: 'Sal', unitId: 'unit-l', averageUnitCost: null }),
+        ]}
+        params={TODOS}
+        totalPages={1}
+        units={[LITRO]}
+        canSeeCost
+      />,
+    );
+
+    const cabeceras = enLaTabla()
+      .getAllByRole('columnheader')
+      .map((celda) => celda.getAttribute('data-testid'))
+      .filter((id) => id !== 'data-table-head-batchesToggle');
+    expect(cabeceras.slice(-2)).toEqual(['data-table-head-averageUnitCost', 'data-table-head-actions']);
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveClass('text-right');
+
+    const fila = screen.getByTestId('data-table-row-product-1');
+    expect(within(fila).getByTestId('data-table-cell-averageUnitCost')).toHaveClass('text-right');
+    const costo = within(fila).getByTestId('product-cost');
+    expect(costo.textContent).toBe('$2,500.00 / L');
+    expect(costo).toHaveAttribute('title', '2500.004');
+
+    const sinCosto = screen.getByTestId('data-table-row-product-2');
+    expect(within(sinCosto).getByTestId('data-table-cell-averageUnitCost')).toHaveTextContent(EMPTY_MARK);
+    expect(within(sinCosto).queryByTestId('product-cost')).toBeNull();
+
+    await user.click(toggle());
+    await enLaTabla().findByTestId('product-batch-row');
+    const costoLote = within(screen.getByTestId('data-table-row-product-1--batch-batch-1')).getByTestId(
+      'product-batch-row-cost',
+    );
+    expect(costoLote.textContent).toBe('$2,400.01 / L');
+    expect(costoLote).toHaveAttribute('title', '2400.005');
+  });
+});
+
+describe('aspecto de las sub-filas de lote', () => {
+  it('R57 — `data-batch-subrow` marca la sub-fila de lote, la de cargando, la vacia y la de error, y no la del producto', async () => {
+    const pendiente = deferred<unknown>();
+    listAliveProductBatchesActionMock
+      .mockReturnValueOnce(pendiente.promise)
+      .mockResolvedValueOnce({ status: 'success', data: [] })
+      .mockResolvedValueOnce({ status: 'error', code: 'UNAUTHORIZED', message: 'No tienes permiso.' });
+    const user = setupUser();
+    render(
+      <ProductTable
+        products={[
+          producto(),
+          producto({ id: 'product-2', name: 'Glicerina' }),
+          producto({ id: 'product-3', name: 'Sal' }),
+        ]}
+        params={TODOS}
+        totalPages={1}
+      />,
+    );
+
+    await user.click(toggle());
+    await user.click(toggle('Glicerina'));
+    await user.click(toggle('Sal'));
+    await enLaTabla().findByTestId('product-batches-row-empty');
+    await enLaTabla().findByTestId('product-batches-row-error');
+
+    const subFilas = [
+      enLaTabla().getByTestId('product-batches-row-loading'),
+      enLaTabla().getByTestId('product-batches-row-empty'),
+      enLaTabla().getByTestId('product-batches-row-error'),
+    ];
+    await act(async () => {
+      pendiente.resolve({ status: 'success', data: [lote()] });
+    });
+    subFilas[0] = await enLaTabla().findByTestId('product-batch-row');
+
+    for (const raiz of subFilas) {
+      expect(raiz, raiz.getAttribute('data-testid') ?? '').toHaveAttribute('data-batch-subrow');
+      expect(raiz.closest('td')).toHaveAttribute('data-testid', 'data-table-cell-name');
+    }
+    for (const id of ['product-1', 'product-2', 'product-3']) {
+      expect(screen.getByTestId(`data-table-row-${id}`).querySelector('[data-batch-subrow]')).toBeNull();
+    }
+  });
+
+  it('R57 — mientras carga, la sub-fila de estado tambien lleva la marca', async () => {
+    listAliveProductBatchesActionMock.mockReturnValue(new Promise(() => undefined));
+    const user = setupUser();
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    await user.click(toggle());
+
+    expect(enLaTabla().getByTestId('product-batches-row-loading')).toHaveAttribute('data-batch-subrow');
+  });
+
+  it('R57 — la clase de ambito pone fondo y entrada (solo con movimiento) en la fila y en la tarjeta, y la sangria de tarjeta', () => {
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    const envoltorio = screen.getByTestId('data-table').parentElement as HTMLElement;
+    expect(envoltorio.className).toBe(PRODUCT_TABLE_SCOPE_CLASS);
+    const clases = PRODUCT_TABLE_SCOPE_CLASS.split(' ');
+    const entrada = 'animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]';
+    expect(clases).toEqual(
+      expect.arrayContaining([
+        '[&_tr:has([data-batch-subrow])>td]:bg-muted/55',
+        `motion-safe:[&_tr:has([data-batch-subrow])>td]:${entrada}`,
+        '[&_li:has([data-batch-subrow])]:ml-5',
+        '[&_li:has([data-batch-subrow])]:rounded-lg',
+        '[&_li:has([data-batch-subrow])]:bg-muted',
+        `motion-safe:[&_li:has([data-batch-subrow])]:${entrada}`,
+      ]),
+    );
+    // Sin `motion-safe` no hay animacion: con movimiento reducido no entra.
+    expect(clases.filter((clase) => clase.includes('animate-'))).toHaveLength(2);
+    for (const clase of clases.filter((c) => c.includes('animate-'))) {
+      expect(clase.startsWith('motion-safe:')).toBe(true);
+    }
   });
 });
