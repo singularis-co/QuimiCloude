@@ -121,7 +121,7 @@ Las dos piezas compartidas ganan su fila en el catálogo en el mismo commit, con
 - **Esqueleto del detalle** (decisión cerrada del 2026-10-16, enmienda R34): el detalle no lleva
   esqueleto; lee la empresa antes de pintar para que R27 responda un 404 real. El Historial sí.
 - **Iconos de los diálogos** (revisión, 2026-10-16; en lo visual manda el tablero): la baja de
-  empresa, la de Administrador y el reenvío del enlace llevan el icono del tablero.
+  empresa, la de Administrador, la reactivación y el reenvío del enlace llevan el icono del tablero.
   `ConfirmDialog` gana una prop opcional `icon` que se pinta en `AlertDialogMedia` (paso 2 de la
   regla de decisión: extensión aditiva, sin cambio para los consumidores actuales).
 - **Orden del diálogo de baja de empresa** (revisión, 2026-10-16): cifras de impacto → aviso →
@@ -130,8 +130,8 @@ Las dos piezas compartidas ganan su fila en el catálogo en el mismo commit, con
   `descriptionPlacement: 'header' | 'after-aside'` (`'header'` por defecto, sin cambio para los
   consumidores actuales), y la baja usa `'after-aside'`. Moverlo a `children` dejaba la cabecera
   sin descripción o con el texto repetido.
-- **Icono de la reactivación:** el tablero también lo pinta (`dlg-ic info`); queda fuera de esta
-  vuelta (no estaba en lo decidido) y se añade con la misma prop si se pide.
+- **Icono de la reactivación:** el del tablero (`dlg-ic info`, girar): `RotateCcwIcon` en tono
+  `info`, con la misma prop.
 
 ### 2.3 Listas cerradas que amplía la ficha
 

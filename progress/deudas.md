@@ -457,3 +457,21 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   composición, pero no E2E: los E2E de documentos recorren el webhook con todo prendido
   (`enableAllAddons`). Falta el camino «descartado» de punta a punta.
 - **Dueño:** sin asignar.
+
+### D61 — La hoja de `CountrySelect` cambia de altura al filtrar en teléfono (QC-235)
+- **Origen:** revisión visual de QC-166 (2026-10-16), m10 (`progress/impl_QC-166.md > m10`,
+  capturas `progress/qc166-revision-visual/country-select-375-*.png`).
+- **Qué falta:** a 375 px la hoja inferior no tiene altura fija y se ajusta al número de
+  resultados: con la lista completa mide 690 px (arranca en y=122), con «rep» 301 px (y=511) y con
+  «zzz» 197 px (y=615). Mientras se escribe, el título y el buscador saltan hacia abajo; con el
+  teclado abierto en un teléfono real el campo se movería bajo el dedo. El tablero solo dibuja la
+  hoja con la lista llena. Pieza de QC-235; QC-166 no la tocó.
+- **Dueño:** sin asignar.
+
+### D62 — El popup de `CountrySelect` tapa ~6 px de los botones del panel en escritorio (QC-235)
+- **Origen:** revisión visual de QC-166 (2026-10-16), m10 (`progress/impl_QC-166.md > m10`,
+  capturas `progress/qc166-revision-visual/country-select-1440-*.png`).
+- **Qué falta:** a 1440 px, en el panel «Editar empresa», el popup abierto con la lista completa
+  cubre con su borde inferior unos 6 px de la parte de arriba de «Cancelar» y «Guardar». Pieza de
+  QC-235; QC-166 no la tocó.
+- **Dueño:** sin asignar.
