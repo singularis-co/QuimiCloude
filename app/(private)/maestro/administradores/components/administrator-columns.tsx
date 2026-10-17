@@ -30,7 +30,7 @@ import type { ActiveCompany } from './load-active-companies';
 export const ADMINISTRATOR_COLUMN_COUNT = 6;
 
 // Vive aquí y no con los parámetros de la URL: el estado no se filtra desde la dirección, y solo
-// este archivo lo pinta (`design.md > 5.2`).
+// este archivo lo pinta.
 export const ADMINISTRATOR_STATUS_COLUMN_ID = 'accountStatus';
 
 export type AdministratorRowAction = 'edit' | 'resend' | 'delete';
