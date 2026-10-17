@@ -1535,3 +1535,75 @@ cabecera y las celdas `batchesToggle` con «Mostrar lotes», los `span[data-card
 
 T8b–T8d hechas: tarjeta de F3 con rótulos y «Mostrar lotes» al pie, clase de ámbito con columna
 oculta y sub-filas marcadas, `DataTable` sin cambios; único rojo, el conocido de Pedidos (PR #265).
+
+## Tanda 8 (T8e) — 2026-10-16 · frontend_dev
+
+Sobre `7c085b7a`. Sin commit. `components/shared/**` sin cambios.
+
+### Archivos
+
+- `app/(private)/inventario/components/product-batch-columns.tsx`: `align: 'end'` en `purchaseDate`
+  y `expiryDate` (F6); rótulos de tarjeta con `withCardFieldLabel` (de `card-field-label.tsx`, T8b)
+  en `quantity`, `reserved`, `available`, `purchaseDate`, `expiryDate` (F3). Los textos son los de
+  `PRODUCT_BATCH_COLUMN_LABELS` (mismo texto que la cabecera; sin literal duplicado). En `quantity`
+  el rótulo va delante del `span` en columna (cantidad + envases), no dentro, para no apilarse.
+- `app/(private)/inventario/components/batch-history.tsx`: `align: 'end'` en `date` (P27); rótulos
+  en `previousStock`, `countedStock`, `reason`, `order` con los textos de
+  `BATCH_HISTORY_COLUMN_LABELS`; `author` y `date` sin rótulo.
+- `tests/unit/inventario/product-batches-panel.test.tsx`: el caso de alineación pasa las dos fechas a
+  `end`; nuevos «R15 — la cabecera y la celda…» y `describe('R56 — rotulos de la tarjeta del lote')`.
+- `tests/unit/inventario/batch-history.test.tsx`: nuevo `describe('R21, R56 — fecha a la derecha y
+  rotulos de la tarjeta del asiento')`.
+- Snapshots: ninguno cambia (los de `inventario-paridad` no pintan el panel ni el historial).
+
+**Decisiones (para el reviewer):**
+
+1. El «—» de una celda vacía (sin vencimiento, sin motivo, sin pedido, sin existencias) **lleva**
+   rótulo, como en T8b: la celda pinta algo y `withCardFieldLabel` solo se lo quita a `null`.
+2. `product-batch-expiry-date` ya contenía su relativo («vence en … días», 08b69744); el test de
+   R56 afirma que empieza por la fecha y no contiene el rótulo, no que sea solo la fecha.
+
+### Mapa R → test
+
+| R | Test |
+| --- | --- |
+| R15 | `product-batches-panel.test.tsx` › «R15 — lote, cifras y fechas en cifras tabulares; las cifras y las dos fechas a la derecha»; «R15 — la cabecera y la celda de «Fecha de compra» y «Vencimiento» van a la derecha» (`text-right` en `data-table-head-*` y `data-table-cell-*`) |
+| R21 | `batch-history.test.tsx` › «R21 — la cabecera y la celda de «Fecha» van a la derecha» |
+| R56 | `product-batches-panel.test.tsx` › «R56 — «Cantidad», «Apartado», «Disponible», «Fecha de compra» y «Vencimiento» van delante de su cifra; el lote, sin rotulo»; «R56 — el texto de cada `product-batch-*` sigue siendo solo su valor»; «R56 — en la fila de la tabla el rotulo lleva `[table_&]:hidden`…» |
+| R56 | `batch-history.test.tsx` › «R56 — «Existencia anterior», «Total contado», «Motivo» y «Pedido» van delante de su valor; autor y fecha, sin rotulo»; «R56 — el texto de cada `batch-history-entry-*` sigue siendo solo su valor»; «R56 — sin dato, el «—» lleva su rotulo y en la tabla el rotulo se oculta» |
+
+### Salida real
+
+```
+$ pnpm run typecheck
+> tsc --noEmit
+(exit 0)
+
+$ pnpm run lint
+✖ 10 problems (0 errors, 10 warnings)        # avisos previos, ninguno en archivos de esta tanda
+$ pnpm exec eslint <los 4 archivos>
+ESLint: No issues found
+
+$ pnpm exec vitest related --run <2 componentes + 2 tests>
+ Test Files  1 failed | 36 passed (37)
+      Tests  1 failed | 651 passed (652)
+ × tablas-marca › R11, R13: en 'order-columns.tsx' …   # rojo conocido de dev
+
+$ pnpm exec vitest run guard
+ Test Files  81 passed (81)
+      Tests  1106 passed | 20 skipped (1126)
+
+$ pnpm exec vitest run tests/unit/inventario/product-route-contract.test.ts tests/unit/inventario/scope.test.ts
+ Test Files  2 passed (2)
+      Tests  28 passed (28)
+
+$ pnpm exec vitest run tests/unit/inventario tests/unit/inventario-ui tests/unit/paridad tests/unit/marca
+ Test Files  1 failed | 170 passed (171)
+      Tests  1 failed | 2768 passed | 5 skipped (2774)
+ × tablas-marca › R11, R13: en 'order-columns.tsx' …   # el mismo rojo conocido
+```
+
+### Veredicto
+
+T8e hecha: fechas del panel y «Fecha» del historial a la derecha, rótulos de tarjeta de R56 con los
+testids intactos; único rojo, el conocido de Pedidos.

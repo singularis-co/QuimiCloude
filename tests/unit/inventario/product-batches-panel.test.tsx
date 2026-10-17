@@ -88,17 +88,25 @@ describe('R15 — el panel de lotes es una tabla', () => {
     expect(buildProductBatchColumns({}).map((columna) => columna.id)).not.toContain('actions');
   });
 
-  it('R15 — lote, cifras y fechas en cifras tabulares; las cifras a la derecha', () => {
+  it('R15 — lote, cifras y fechas en cifras tabulares; las cifras y las dos fechas a la derecha', () => {
     const columnas = new Map(buildProductBatchColumns({ menu: menuDeLote }).map((c) => [c.id, c]));
     for (const id of ['lot', 'quantity', 'purchaseDate', 'expiryDate', 'reserved', 'available']) {
       expect(columnas.get(id)?.tabular, id).toBe(true);
     }
-    for (const id of ['quantity', 'reserved', 'available']) {
+    for (const id of ['quantity', 'purchaseDate', 'expiryDate', 'reserved', 'available']) {
       expect(columnas.get(id)?.align, id).toBe('end');
     }
-    for (const id of ['lot', 'purchaseDate', 'expiryDate']) {
-      expect(columnas.get(id)?.align, id).toBe('start');
+    expect(columnas.get('lot')?.align).toBe('start');
+  });
+
+  it('R15 — la cabecera y la celda de «Fecha de compra» y «Vencimiento» van a la derecha', () => {
+    render(<ProductBatchesPanel batches={[lote({ id: 'b1', expiryDate: '2027-03-05' })]} />);
+
+    for (const columna of ['purchaseDate', 'expiryDate']) {
+      expect(screen.getByTestId(`data-table-head-${columna}`), columna).toHaveClass('text-right');
+      expect(celda('b1', columna), columna).toHaveClass('text-right');
     }
+    expect(celda('b1', 'lot')).not.toHaveClass('text-right');
   });
 
   it('R15 — cada lote es una fila de la tabla con los testids de hoy en su celda', () => {
@@ -400,6 +408,92 @@ describe('R19 — cada lote en tarjeta', () => {
     render(<ProductBatchesPanel batches={[lote({ id: 'b1' })]} />);
 
     expect(within(tarjeta('b1')).queryByRole('button')).toBeNull();
+  });
+});
+
+describe('R56 — rotulos de la tarjeta del lote', () => {
+  function campoDeTarjeta(id: string, columna: string): HTMLElement {
+    return within(tarjeta(id)).getByTestId(`data-table-card-field-${columna}`);
+  }
+
+  function rotuloDe(campo: HTMLElement): HTMLElement | null {
+    return campo.querySelector<HTMLElement>('[data-card-label]');
+  }
+
+  function panelConUnLote() {
+    const kilogramo = unidad({ id: 'unit-kg', symbol: 'kg' });
+    render(
+      <ProductBatchesPanel
+        batches={[
+          lote({
+            id: 'b1',
+            lot: 'L-001',
+            stock: '10',
+            unitId: 'unit-kg',
+            purchaseDate: '2026-03-05',
+            expiryDate: '2027-03-05',
+            reserved: '4',
+            available: '6',
+          }),
+        ]}
+        units={[kilogramo]}
+        batchMenu={menuDeLote}
+      />,
+    );
+  }
+
+  it('R56 — «Cantidad», «Apartado», «Disponible», «Fecha de compra» y «Vencimiento» van delante de su cifra; el lote, sin rotulo', () => {
+    panelConUnLote();
+
+    const esperados: Record<string, string> = {
+      quantity: 'Cantidad',
+      reserved: 'Apartado',
+      available: 'Disponible',
+      purchaseDate: 'Fecha de compra',
+      expiryDate: 'Vencimiento',
+    };
+    for (const [columna, texto] of Object.entries(esperados)) {
+      const campo = campoDeTarjeta('b1', columna);
+      const etiqueta = rotuloDe(campo);
+      expect(etiqueta, columna).not.toBeNull();
+      expect(etiqueta?.textContent?.trim(), columna).toBe(texto);
+      expect(campo.textContent?.startsWith(texto), columna).toBe(true);
+      expect(etiqueta, columna).toHaveClass('text-muted-foreground', '[table_&]:hidden');
+    }
+    expect(rotuloDe(campoDeTarjeta('b1', 'lot'))).toBeNull();
+  });
+
+  it('R56 — el texto de cada `product-batch-*` sigue siendo solo su valor', () => {
+    panelConUnLote();
+    const card = tarjeta('b1');
+
+    expect(within(card).getByTestId('product-batch-lot').textContent).toBe('L-001');
+    expect(within(card).getByTestId('product-batch-quantity').textContent).toBe('10 kg');
+    expect(within(card).getByTestId('product-batch-reserved').textContent).toBe('4 kg');
+    expect(within(card).getByTestId('product-batch-available').textContent).toBe('6 kg');
+    expect(within(card).getByTestId('product-batch-purchase-date').textContent).toBe('2026-03-05');
+    // La fecha de vencimiento lleva dentro su relativo de hoy («vence en …», 08b69744), no el rotulo.
+    const vencimiento = within(card).getByTestId('product-batch-expiry-date').textContent ?? '';
+    expect(vencimiento.startsWith('2027-03-05')).toBe(true);
+    expect(vencimiento).not.toContain('Vencimiento');
+    for (const testId of [
+      'product-batch-quantity',
+      'product-batch-reserved',
+      'product-batch-available',
+      'product-batch-purchase-date',
+      'product-batch-expiry-date',
+    ]) {
+      expect(within(card).getByTestId(testId).querySelector('[data-card-label]'), testId).toBeNull();
+    }
+  });
+
+  it('R56 — en la fila de la tabla el rotulo lleva `[table_&]:hidden` y la cabecera no cambia', () => {
+    panelConUnLote();
+
+    const etiqueta = celda('b1', 'quantity').querySelector('[data-card-label]');
+    expect(etiqueta).toHaveClass('[table_&]:hidden');
+    expect(etiqueta?.closest('table')).not.toBeNull();
+    expect(screen.getByTestId('data-table-head-quantity')).toHaveTextContent('Cantidad');
   });
 });
 

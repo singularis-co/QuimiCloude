@@ -391,6 +391,89 @@ describe('BatchHistory encima del panel «Lotes»', () => {
   });
 });
 
+describe('R21, R56 — fecha a la derecha y rotulos de la tarjeta del asiento', () => {
+  const completo = asiento({
+    id: 'completo-1',
+    kind: 'adjustment',
+    quantity: '-3',
+    previousStock: '12',
+    countedStock: '9',
+    reason: 'conteo_fisico',
+    orderNumberText: 'PED-0042',
+    authorName: 'Carla Duarte',
+    createdAt: '2026-09-10T08:15:00.000Z',
+  });
+
+  function tarjetaDe(entry: Pick<BatchHistoryEntry, 'kind' | 'id'>) {
+    return screen.findByTestId(`data-table-card-${entry.kind}-${entry.id}`);
+  }
+
+  function rotuloDe(card: HTMLElement, columna: string): HTMLElement | null {
+    return within(card).getByTestId(`data-table-card-field-${columna}`).querySelector<HTMLElement>('[data-card-label]');
+  }
+
+  it('R21 — la cabecera y la celda de «Fecha» van a la derecha', async () => {
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [completo] });
+    abrir();
+
+    const row = await fila(completo);
+    expect(screen.getByTestId('data-table-head-date')).toHaveClass('text-right');
+    expect(within(row).getByTestId('data-table-cell-date')).toHaveClass('text-right');
+    expect(within(row).getByTestId('data-table-cell-author')).not.toHaveClass('text-right');
+  });
+
+  it('R56 — «Existencia anterior», «Total contado», «Motivo» y «Pedido» van delante de su valor; autor y fecha, sin rotulo', async () => {
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [completo] });
+    abrir();
+
+    const card = await tarjetaDe(completo);
+    const esperados: Record<string, string> = {
+      previousStock: 'Existencia anterior',
+      countedStock: 'Total contado',
+      reason: 'Motivo',
+      order: 'Pedido',
+    };
+    for (const [columna, texto] of Object.entries(esperados)) {
+      const etiqueta = rotuloDe(card, columna);
+      expect(etiqueta, columna).not.toBeNull();
+      expect(etiqueta?.textContent?.trim(), columna).toBe(texto);
+      expect(etiqueta, columna).toHaveClass('text-muted-foreground', '[table_&]:hidden');
+      expect(within(card).getByTestId(`data-table-card-field-${columna}`).textContent?.startsWith(texto), columna).toBe(
+        true,
+      );
+    }
+    expect(rotuloDe(card, 'author')).toBeNull();
+    expect(rotuloDe(card, 'date')).toBeNull();
+  });
+
+  it('R56 — el texto de cada `batch-history-entry-*` sigue siendo solo su valor', async () => {
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [completo] });
+    abrir();
+
+    const card = await tarjetaDe(completo);
+    expect(within(card).getByTestId('batch-history-entry-previous-stock').textContent).toBe('12');
+    expect(within(card).getByTestId('batch-history-entry-counted-stock').textContent).toBe('9');
+    expect(within(card).getByTestId('batch-history-entry-reason').textContent).toBe(movementReasonLabel('conteo_fisico'));
+    expect(within(card).getByTestId('batch-history-entry-order').textContent).toBe('PED-0042');
+    expect(within(card).getByTestId('batch-history-entry-author').textContent).toBe('Carla Duarte');
+    expect(within(card).getByTestId('batch-history-entry-date').textContent).toBe('2026-09-10 08:15');
+  });
+
+  it('R56 — sin dato, el «—» lleva su rotulo y en la tabla el rotulo se oculta', async () => {
+    const alta = asiento({ id: 'alta-1', kind: 'opening', quantity: '20', reason: null, orderNumberText: null });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [alta] });
+    abrir();
+
+    const card = await tarjetaDe(alta);
+    expect(within(card).getByTestId('data-table-card-field-reason')).toHaveTextContent(`Motivo ${EMPTY_MARK}`);
+    const etiquetaEnTabla = within(await fila(alta))
+      .getByTestId('data-table-cell-reason')
+      .querySelector('[data-card-label]');
+    expect(etiquetaEnTabla).toHaveClass('[table_&]:hidden');
+    expect(etiquetaEnTabla?.closest('table')).not.toBeNull();
+  });
+});
+
 describe('movementReasonLabel', () => {
   it.each([
     ['merma', 'Merma'],

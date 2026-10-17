@@ -13,9 +13,11 @@ import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
+import { withCardFieldLabel } from './card-field-label';
 import { ExpiryDate, useLocalToday } from './expiry-date';
 import { daysUntil, isExpiringSoon } from './expiry-warning';
 
+/** Cabeceras de la tabla; las cifras y fechas repiten el texto como rótulo de la tarjeta. */
 export const PRODUCT_BATCH_COLUMN_LABELS = {
   lot: 'Lote',
   quantity: 'Cantidad',
@@ -205,7 +207,8 @@ export function buildProductBatchColumns({
       tabular: true,
       cell: (batch) => {
         const packages = packageCountLabel(batch);
-        return (
+        return withCardFieldLabel(
+          PRODUCT_BATCH_COLUMN_LABELS.quantity,
           <span className="inline-flex flex-col">
             <AmountValue
               value={batch.stock}
@@ -218,52 +221,61 @@ export function buildProductBatchColumns({
                 {packages}
               </span>
             )}
-          </span>
+          </span>,
         );
       },
     },
     {
       id: 'purchaseDate',
       label: PRODUCT_BATCH_COLUMN_LABELS.purchaseDate,
-      align: 'start',
+      align: 'end',
       tabular: true,
-      cell: (batch) => <span data-testid="product-batch-purchase-date">{batch.purchaseDate}</span>,
+      cell: (batch) =>
+        withCardFieldLabel(
+          PRODUCT_BATCH_COLUMN_LABELS.purchaseDate,
+          <span data-testid="product-batch-purchase-date">{batch.purchaseDate}</span>,
+        ),
     },
     {
       id: 'expiryDate',
       label: PRODUCT_BATCH_COLUMN_LABELS.expiryDate,
-      align: 'start',
+      align: 'end',
       tabular: true,
-      cell: (batch) => <BatchExpiryCell expiryDate={batch.expiryDate} />,
+      cell: (batch) =>
+        withCardFieldLabel(PRODUCT_BATCH_COLUMN_LABELS.expiryDate, <BatchExpiryCell expiryDate={batch.expiryDate} />),
     },
     {
       id: 'reserved',
       label: PRODUCT_BATCH_COLUMN_LABELS.reserved,
       align: 'end',
       tabular: true,
-      cell: (batch) => (
-        <AmountValue
-          value={batch.reserved}
-          unitId={batchUnitId(batch, product)}
-          units={units}
-          testId="product-batch-reserved"
-        />
-      ),
+      cell: (batch) =>
+        withCardFieldLabel(
+          PRODUCT_BATCH_COLUMN_LABELS.reserved,
+          <AmountValue
+            value={batch.reserved}
+            unitId={batchUnitId(batch, product)}
+            units={units}
+            testId="product-batch-reserved"
+          />,
+        ),
     },
     {
       id: 'available',
       label: PRODUCT_BATCH_COLUMN_LABELS.available,
       align: 'end',
       tabular: true,
-      cell: (batch) => (
-        <AmountValue
-          value={batch.available}
-          unitId={batchUnitId(batch, product)}
-          units={units}
-          testId="product-batch-available"
-          className="font-semibold"
-        />
-      ),
+      cell: (batch) =>
+        withCardFieldLabel(
+          PRODUCT_BATCH_COLUMN_LABELS.available,
+          <AmountValue
+            value={batch.available}
+            unitId={batchUnitId(batch, product)}
+            units={units}
+            testId="product-batch-available"
+            className="font-semibold"
+          />,
+        ),
     },
   ];
 

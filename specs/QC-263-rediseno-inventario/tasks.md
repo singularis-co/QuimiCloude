@@ -267,7 +267,7 @@ T8h.
   error) y no en la fila del producto; la clase de ámbito declara fondo y animación `screen-enter`
   con `motion-safe` para la fila y para la tarjeta. *Hecho:* tests en verde; `DataTable` sin
   cambios en el diff.
-- [ ] **T8e [P]. Panel «Lotes» e historial: fechas y rótulos** (F3, F6, R15, R21, R56; decisión P27;
+- [x] **T8e [P]. Panel «Lotes» e historial: fechas y rótulos** (F3, F6, R15, R21, R56; decisión P27;
   depende de T8a). `align: 'end'` en `purchaseDate` y `expiryDate` y en `date` del historial;
   rótulos de tarjeta en `product-batch-columns.tsx` y `batch-history.tsx`. Tests: `product-batches-panel.test.tsx` (cabecera y celda de las dos fechas
   con la clase de alineación a la derecha; rótulos «Cantidad», «Apartado», «Disponible», «Fecha de

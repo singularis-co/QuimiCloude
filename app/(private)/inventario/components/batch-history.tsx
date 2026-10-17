@@ -20,6 +20,7 @@ import type { BatchHistoryEntry } from '@/lib/modules/inventario';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
+import { withCardFieldLabel } from './card-field-label';
 import { movementReasonLabel } from './movement-reason-label';
 
 const HISTORY_TITLE = 'Historial del lote';
@@ -30,6 +31,7 @@ const BEFORE_LEDGER_MESSAGE = 'Este lote es anterior al libro de movimientos: no
 /** Sin autor, lo hizo el sistema: caducidad, la migracion que aparta pedidos vivos. */
 const SYSTEM_AUTHOR = 'Sistema';
 
+/** Cabeceras; en la tarjeta repiten texto como rótulo, salvo autor y fecha, que van sin él. */
 const BATCH_HISTORY_COLUMN_LABELS = {
   kind: 'Tipo',
   quantity: 'Cantidad',
@@ -141,28 +143,40 @@ const BATCH_HISTORY_COLUMNS: readonly DataTableColumn<BatchHistoryEntry>[] = [
     label: BATCH_HISTORY_COLUMN_LABELS.previousStock,
     align: 'end',
     tabular: true,
-    cell: (entry) => optionalDecimal(entry.previousStock, 'batch-history-entry-previous-stock'),
+    cell: (entry) =>
+      withCardFieldLabel(
+        BATCH_HISTORY_COLUMN_LABELS.previousStock,
+        optionalDecimal(entry.previousStock, 'batch-history-entry-previous-stock'),
+      ),
   },
   {
     id: 'countedStock',
     label: BATCH_HISTORY_COLUMN_LABELS.countedStock,
     align: 'end',
     tabular: true,
-    cell: (entry) => optionalDecimal(entry.countedStock, 'batch-history-entry-counted-stock'),
+    cell: (entry) =>
+      withCardFieldLabel(
+        BATCH_HISTORY_COLUMN_LABELS.countedStock,
+        optionalDecimal(entry.countedStock, 'batch-history-entry-counted-stock'),
+      ),
   },
   {
     id: 'reason',
     label: BATCH_HISTORY_COLUMN_LABELS.reason,
     align: 'start',
     cell: (entry) =>
-      optionalText(entry.reason === null ? null : movementReasonLabel(entry.reason), 'batch-history-entry-reason'),
+      withCardFieldLabel(
+        BATCH_HISTORY_COLUMN_LABELS.reason,
+        optionalText(entry.reason === null ? null : movementReasonLabel(entry.reason), 'batch-history-entry-reason'),
+      ),
   },
   {
     id: 'order',
     label: BATCH_HISTORY_COLUMN_LABELS.order,
     align: 'start',
     tabular: true,
-    cell: (entry) => optionalText(entry.orderNumberText, 'batch-history-entry-order'),
+    cell: (entry) =>
+      withCardFieldLabel(BATCH_HISTORY_COLUMN_LABELS.order, optionalText(entry.orderNumberText, 'batch-history-entry-order')),
   },
   {
     id: 'author',
@@ -173,7 +187,7 @@ const BATCH_HISTORY_COLUMNS: readonly DataTableColumn<BatchHistoryEntry>[] = [
   {
     id: 'date',
     label: BATCH_HISTORY_COLUMN_LABELS.date,
-    align: 'start',
+    align: 'end',
     tabular: true,
     cell: (entry) => <span data-testid="batch-history-entry-date">{formatMovementDate(entry.createdAt)}</span>,
   },
