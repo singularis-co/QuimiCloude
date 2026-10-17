@@ -257,3 +257,38 @@ código, el veredicto pasa a OK.
 Decisiones humanas pendientes:
 - aprobar las capturas de `CountrySelect` (m10) y las deudas D64 y D65;
 - revisar a ojo los iconos y el tono `info` de los diálogos (m11).
+
+## Vuelta 3 (acotada a 16a23491..37864266)
+
+Hice `git fetch`: la rama está al día con `origin/feature/QC-166-area-del-maestro` y lleva **0
+commits por detrás de `origin/dev`**.
+
+### Verificación ejecutada
+
+| Qué | Resultado |
+|---|---|
+| `pnpm run typecheck` | verde |
+| `pnpm run lint` | 0 errores; los mismos 10 warnings ajenos |
+| `pnpm exec vitest run guard` | 80 archivos, 1096 pass / 20 skip |
+| `vitest related` de `confirm-dialog.tsx` y de su test de extensión (todos sus consumidores) | 274 archivos, 4680 pass / 1 skip, 0 fail |
+| Tests no guardia que leen `CATALOGO.md` | 2 archivos, 18 pass |
+| Citas `QC-`/`R<n>`/`design.md` en líneas añadidas de producción | ninguna |
+
+### Hallazgos
+
+- **B3 — resuelto** (`b1396174`). La celda `Diseño` de `ConfirmDialog` cita
+  `docs/diseno/canvas/ModalesMaestro.dc.html` y `docs/diseno/canvas/MaestroAdministradores.dc.html`.
+- **`f77225d8` no cambia el modo por defecto.**
+  - `AlertDialogDescription` solo recibe `LATE_DESCRIPTION_CLASS` si la descripción no va en la
+    cabecera.
+  - `AlertDialogHeader` solo recibe `HEADER_WITHOUT_DESCRIPTION_CLASS` con `after-aside` y
+    además un icono.
+  - En cualquier otro caso las dos clases quedan en `undefined`, como antes.
+  - Siguen en verde los tests «con header el árbol es el mismo» y «sin icon el árbol no cambia», los
+    2 tests nuevos y los 274 archivos de consumidores.
+- **m11 — hay capturas** (`b87cf3a5`). La de la baja de empresa a 1440 px enseña icono, cifras,
+  aviso y campo en el orden del tablero. Aprobar el tono `info` sigue siendo cosa del humano.
+
+### Veredicto de la vuelta 3
+
+**OK.** No queda ningún bloqueante.
