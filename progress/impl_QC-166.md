@@ -500,3 +500,5 @@ diálogo se confirmó: se cerraron con «Volver» o Escape. Script de un solo us
 
 Veredicto: los cuatro diálogos pintan el icono de 44 px con el tono esperado; la baja de empresa
 respeta el orden cifras→aviso→campo pero desalinea el título (centrado) y estrecha el aviso.
+
+- Corregido y recapturado (2026-10-17): `ConfirmDialog` con `icon` y `descriptionPlacement='after-aside'` fija las columnas de la cabecera a `auto 1fr` (título a x=604, junto al icono) y quita a la descripción tardía el `text-balance`/`md:text-pretty` de la cabecera (`text-left text-wrap md:text-wrap`: líneas hasta x≈850 de 896). `dialogo-1440-baja-empresa.png` recapturada; fixtures `qc166_vis_` borradas (quedan 0). Test en `tests/unit/shared-ui/confirm-dialog-extension.test.tsx`.

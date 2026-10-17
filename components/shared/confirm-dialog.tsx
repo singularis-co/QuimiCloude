@@ -96,6 +96,13 @@ const ICON_TONE_CLASS: Readonly<Record<ConfirmDialogIconTone, string>> = {
   success: 'bg-success-subtle text-success-text',
 };
 
+// Sin la descripción en la cabecera, las dos columnas implícitas se reparten el sobrante y el título
+// se aleja del icono: la del icono se ajusta a él y la del título se queda el resto.
+const HEADER_WITHOUT_DESCRIPTION_CLASS =
+  'sm:group-data-[size=default]/alert-dialog-content:grid-cols-[auto_1fr]';
+// Fuera de la cabecera ocupa el ancho del cuerpo: el `text-pretty` de la cabecera recorta las líneas.
+const LATE_DESCRIPTION_CLASS = 'text-left text-wrap md:text-wrap';
+
 const ERROR_REGION_CLASS = 'rounded-lg border border-destructive/40 p-3 text-sm text-destructive';
 const ERROR_INLINE_CLASS = 'text-sm text-destructive';
 
@@ -208,14 +215,21 @@ export function ConfirmDialogBody({
   const pending = isPending === true;
   const showPendingText = pending && texts.pending !== undefined;
 
-  const description = (
-    <AlertDialogDescription data-testid={testIds.message}>{texts.description}</AlertDialogDescription>
-  );
   const descriptionInHeader = descriptionPlacement === 'header';
+  const description = (
+    <AlertDialogDescription
+      className={descriptionInHeader ? undefined : LATE_DESCRIPTION_CLASS}
+      data-testid={testIds.message}
+    >
+      {texts.description}
+    </AlertDialogDescription>
+  );
   const lateDescription = descriptionInHeader ? null : description;
 
   const header = (
-    <AlertDialogHeader>
+    <AlertDialogHeader
+      className={descriptionInHeader || icon === undefined ? undefined : HEADER_WITHOUT_DESCRIPTION_CLASS}
+    >
       {icon === undefined ? null : (
         <AlertDialogMedia
           className={cn(ICON_BOX_CLASS, ICON_TONE_CLASS[icon.tone ?? 'neutral'])}

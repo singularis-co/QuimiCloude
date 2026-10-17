@@ -265,6 +265,46 @@ describe('ConfirmDialog: icon', () => {
     expect(screen.getByRole('alertdialog')).toHaveAccessibleName(TEXTS.title);
   });
 
+  it('con icon y «after-aside» el título va junto al icono y la descripción ocupa el cuerpo, alineada a la izquierda', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={{ ...TEST_IDS, message: 'mensaje' }}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="error-in-form"
+        aside={<p data-testid="aside">Cifras</p>}
+        descriptionPlacement="after-aside"
+        icon={{ glyph: TrashIcon, tone: 'danger', testId: 'icono' }}
+      />,
+    );
+
+    const cabecera = screen.getByTestId('icono').parentElement;
+    expect(cabecera).toHaveAttribute('data-slot', 'alert-dialog-header');
+    // La columna del icono se ajusta a él; sin esto las dos implícitas se reparten el sobrante.
+    expect(cabecera).toHaveClass('sm:group-data-[size=default]/alert-dialog-content:grid-cols-[auto_1fr]');
+    const mensaje = screen.getByTestId('mensaje');
+    expect(mensaje).toHaveClass('text-left', 'text-wrap', 'md:text-wrap');
+    expect(mensaje).not.toHaveClass('text-balance', 'md:text-pretty');
+  });
+
+  it('con icon y la descripción en la cabecera, ni la cabecera ni la descripción cambian de clases', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={{ ...TEST_IDS, message: 'mensaje' }}
+        icon={{ glyph: TrashIcon, tone: 'danger', testId: 'icono' }}
+      />,
+    );
+
+    expect(screen.getByTestId('icono').parentElement).not.toHaveClass(
+      'sm:group-data-[size=default]/alert-dialog-content:grid-cols-[auto_1fr]',
+    );
+    expect(screen.getByTestId('mensaje')).toHaveClass('text-balance', 'md:text-pretty');
+    expect(screen.getByTestId('mensaje')).not.toHaveClass('text-left', 'text-wrap');
+  });
+
   it('sin tone usa el fondo neutro', () => {
     render(<ConfirmDialog open texts={TEXTS} testIds={TEST_IDS} icon={{ glyph: TrashIcon, testId: 'icono' }} />);
 
