@@ -186,3 +186,74 @@ ajustados) está bien.
 Decisiones humanas pendientes: m2 (orden del aviso de baja), m4 (iconos de los diálogos), m5
 (formato del campo de fecha), m10 (revisión visual de `CountrySelect`), y aceptar m1/m3 como
 desvíos del design/tablero.
+
+## Vuelta 2 (acotada a db3d52ea..16a23491)
+
+Revisado solo ese rango contra B1, B2 y los menores de la vuelta 1, más sus regresiones. 11 commits;
+en código tocan `components/shared/confirm-dialog.tsx`, su fila de `CATALOGO.md`, los cuatro diálogos
+del área, `administrator-columns.tsx` y `maestro-rol.test.ts`.
+
+### Verificación ejecutada
+
+| Qué | Resultado |
+|---|---|
+| `pnpm run typecheck` | verde |
+| `pnpm run lint` | 0 errores; los mismos 10 warnings ajenos |
+| `pnpm exec vitest run guard` | 80 archivos, 1096 pass / 20 skip |
+| `vitest related` de `confirm-dialog.tsx` y de los archivos del rango (todos los consumidores de `ConfirmDialog`) | 275 archivos, 4689 pass / 1 skip, 0 fail |
+| Barrido otra vez de los tests que leen del disco (148 de `tests/unit` y `tests/ui`; los de la vuelta 1 más los que leen fuentes por ruta), en tres tandas | 148/148 en verde. En la primera tanda, 4 se cortaron por el timeout de 20 s bajo carga (`clientes-convenciones`, `configuracion-convenciones`, `pdf-converter`, `catalogo-sin-total-fijo`); corridos solos: 4/4 en verde. **`maestro-rol.test.ts` en verde.** |
+| Citas `QC-`/`R<n>`/`design.md` en líneas añadidas de `app/`, `components/` y `lib/` | ninguna |
+
+### Estado de los hallazgos de la vuelta 1
+
+- **B1 — resuelto** (`eb68f1c7`). Entran las cuatro rutas exactas en `RUTAS_ABIERTAS_EMPRESAS` con su
+  bloque «Enmienda QC-166»; el anti-cegado sigue con `toEqual` exacto; el test pasa.
+- **B2 — resuelto** (`62ec0f37`). El comentario se queda con el motivo, sin la cita.
+- **m1, m3, m5, m6 — resueltos en `design.md`** (`54ad432c`, `c3270e2b`). Anotados como desvíos con
+  su motivo; ya figuran teléfono y documento obligatorios y el detalle sin esqueleto.
+- **m2 — resuelto** (`1d1f10d4`). Nueva prop opcional `descriptionPlacement: 'header' | 'after-aside'`.
+  Motivo dado para no usar `children` (`design.md`): moverlo dejaba la cabecera sin descripción o con
+  el texto repetido. Es válido: así el aviso sigue siendo el `AlertDialogDescription`, y por tanto
+  la descripción accesible del diálogo.
+- **m4 — resuelto** (`6cf6341c`, `c34fc7e1`). Nueva prop opcional `icon` con `glyph`, `tone` y
+  `testId`, pintada en `AlertDialogMedia`. La llevan las dos bajas, el reenvío y la reactivación. Los
+  tokens de tono existen en `app/globals.css`. Hay tests en cada diálogo.
+- **m9 — al día** en la ficha.
+- **m10 — hecho** (`040bf0cb`). Hay 15 capturas en `progress/qc166-revision-visual/`; lo que salió
+  va a las deudas D64 y D65. Aprobar las capturas sigue siendo cosa del humano.
+- **m7 y m8**: sin cambios y siguen siendo aceptables; m7 es de otra ficha.
+
+### ¿Las dos props nuevas de `ConfirmDialog` son aditivas?
+
+**Sí.**
+- `descriptionPlacement` vale `'header'` por defecto, y entonces `lateDescription` es `null`.
+- Con `icon` en `undefined` no se pinta `AlertDialogMedia`.
+- La descripción conserva su `data-testid` en las dos posiciones.
+
+Ningún consumidor existente las pasa. `tests/unit/shared-ui/confirm-dialog-extension.test.tsx`
+comprueba que, sin las props o con `'header'`, el árbol es idéntico, y cubre las tres disposiciones
+con `after-aside` y los tonos del icono. Los 275 archivos relacionados están en verde.
+
+### Hallazgos de la vuelta 2
+
+- **B3 (BLOQUEANTE, regla 11 del perfil y `checkpoints-proyecto > Calidad`).** La fila de
+  `ConfirmDialog` en `components/shared/CATALOGO.md` gana `icon` y `descriptionPlacement`, que son un
+  cambio visual de una pieza compartida sacado de los tableros del Maestro. Sin embargo, la celda
+  `Diseño` sigue en «previo al rediseño».
+  - El repo sigue esta convención cuando extiende una pieza «previa»: `Avatar` con `tone` cita
+    `Dominio.dc.html`, y `Checkbox` y `RowActionsMenu` citan el suyo.
+  - Qué falta: poner en esa celda `docs/diseno/canvas/ModalesMaestro.dc.html` (icono y orden de la
+    baja de empresa) y `docs/diseno/canvas/MaestroAdministradores.dc.html` (icono del reenvío).
+  - `design.md` ya cita el tablero, así que es solo esa celda.
+- **menor m11.** El tono `info` del icono usa `bg-accent text-accent-foreground`. No he podido
+  comprobar que sea el mismo color que el `dlg-ic info` del tablero. Las capturas de m10 son de
+  `CountrySelect`, no de los diálogos. Que lo mire el humano en la revisión visual.
+
+### Veredicto de la vuelta 2
+
+**RECHAZADO**, solo por B3, que es una celda del catálogo. Con B3 corregido, y sin más cambios de
+código, el veredicto pasa a OK.
+
+Decisiones humanas pendientes:
+- aprobar las capturas de `CountrySelect` (m10) y las deudas D64 y D65;
+- revisar a ojo los iconos y el tono `info` de los diálogos (m11).
