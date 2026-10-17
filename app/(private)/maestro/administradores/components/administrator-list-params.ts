@@ -20,7 +20,6 @@ export const ADMINISTRATOR_USERNAME_COLUMN_ID = 'username';
 export const ADMINISTRATOR_EMAIL_COLUMN_ID = 'email';
 /** El mismo nombre que el filtro de la acción: `DataTable` filtra por el id de la columna. */
 export const ADMINISTRATOR_COMPANY_COLUMN_ID = 'companyId';
-export const ADMINISTRATOR_STATUS_COLUMN_ID = 'accountStatus';
 
 export const ADMINISTRATOR_FIRST_PAGE = 1;
 

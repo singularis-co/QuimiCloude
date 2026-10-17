@@ -391,6 +391,16 @@ const SITIOS_PERMITIDOS = [
   // en el `select` de la fila y la ficha, ordena por ella y escribe `pending` SOLO al nacer
   // (`design.md > 5`). No la filtra ni la mueve despues del alta.
   'lib/modules/identity/adapters/driven/persistence/administrator-prisma.ts',
+
+  // RETENSADO 2026-10-16 (QC-166, area-del-maestro). Mismo trato que el bloque de QC-67: la
+  // pantalla de Administradores del Maestro PINTA el estado de cuenta, y es un unico archivo.
+  // QC-166 R35, R36 (`design.md > 5.2` y `> 5.3`) — la columna Estado pinta el `accountStatus`
+  // ALMACENADO con su etiqueta, y el item «Reenviar enlace» solo se declara en filas `pending`,
+  // porque el servidor responde `user_not_pending` a cualquier otra. Importa la etiqueta de
+  // `administrator-labels.ts`; no declara un segundo conjunto ni escribe el estado. Su
+  // `administrator-list-params.ts` NO entra: el estado no se filtra desde la URL, asi que el id
+  // de la columna vive en este archivo y no alli.
+  'app/(private)/maestro/administradores/components/administrator-columns.tsx',
 ] as const;
 
 /**

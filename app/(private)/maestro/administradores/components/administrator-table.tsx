@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 
 import {
   ADMINISTRATOR_COLUMN_COUNT,
+  ADMINISTRATOR_STATUS_COLUMN_ID,
   buildAdministratorColumns,
   type AdministratorRowAction,
 } from './administrator-columns';
@@ -32,7 +33,6 @@ import {
   ADMINISTRATOR_EMAIL_COLUMN_ID,
   ADMINISTRATOR_FIRST_PAGE,
   ADMINISTRATOR_NAME_COLUMN_ID,
-  ADMINISTRATOR_STATUS_COLUMN_ID,
   ADMINISTRATOR_USERNAME_COLUMN_ID,
   administratorListHref,
   companyFilterValues,
