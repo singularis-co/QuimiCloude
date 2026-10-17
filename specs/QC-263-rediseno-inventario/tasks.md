@@ -217,7 +217,8 @@ T8h.
   (`pnpm exec playwright test <spec>`); los que solo esperan `inventario-title` pasan sin cambios.
   *Enmienda (E15):* `e2e/pedido-bloqueado.spec.ts` no es de ese grupo: se corre y debe pasar sin
   cambio (filas `data-table-row-` con `product-stock`).
-- [ ] **T7c. Deudas y cierre.** `progress/deudas.md`: D41 resuelta; D53 ampliada (T0b lo vio: 9
+- [x] **T7c. Deudas y cierre** — **sustituida por T8h** (enmienda 2, m10 del review): no se cierra
+  por separado; su contenido y su condición (`gate-completo` en verde) viven en T8h. Texto original: `progress/deudas.md`: D41 resuelta; D53 ampliada (T0b lo vio: 9
   columnas de esqueleto contra 10 / 9 / 7 reales y sin tarjeta; decisión P22: no se arregla aquí); nuevas de P4, P10 y del icono
   del borrado si quedan por defecto (P9 ya no: la regla llegó de `dev`). `./init.sh --completo` en
   verde. *Enmienda 2: se cierra dentro de T8h.*
@@ -254,7 +255,8 @@ T8h.
   Tests en `product-cards.test.tsx`: la `meta` sale en el orden Presentación, Existencia, Alerta,
   Disponible, Costo; cada cifra con su rótulo (`[data-card-label]`) y el texto de
   `product-stock`/`product-available`/`product-cost` igual que hoy; la sub-fila con rótulos en
-  existencia, disponible y costo y sin rótulo donde no hay cifra; el pie con
+  existencia, disponible y costo, sin «Reservado», y con rótulo también cuando la cifra es «—»
+  (sin rótulo solo donde la celda no pinta nada); el pie con
   `product-batches-card-toggle` («Mostrar lotes», `aria-expanded="false"`, `touch`) a la izquierda
   de «Acciones», que al pulsarlo despliega las tarjetas de lote y pasa a «Ocultar lotes»; la clase de
   ámbito presente en el envoltorio; el rótulo lleva `[table_&]:hidden`. `finished-stock-table.test.tsx`:
@@ -294,7 +296,9 @@ T8h.
   recargar (un marcador puesto en `window` sigue ahí). Con un usuario sin permiso de costos, sin
   «Costo unitario». Los E2E de T7b que nombren `product-batches-toggle` en tarjetas pasan al de la
   tarjeta. *Hecho:* pasa en Chromium y WebKit; los specs tocados pasan por separado.
-- [x] **T8h. Deudas y cierre** (F8, F9; sustituye a T7c). `progress/deudas.md`: D41 resuelta; D53
+- [ ] **T8h. Deudas y cierre** (F8, F9; sustituye a T7c). **Abierta hasta que `gate-completo` salga
+  en verde en el PR** (m10): la parte de `progress/deudas.md` y `./init.sh` puede estar hecha, pero la
+  casilla no se marca antes del CI. `progress/deudas.md`: D41 resuelta; D53
   ampliada con los números medidos tras el merge; **D55 ampliada** con los cierres locales de 44 px de
   `batch-history.tsx` y `adjust-batch-dialog.tsx` (se retiran al arreglar la primitiva) y la X de
   32 px del `Sheet` «Lotes»; nueva deuda de rótulos y pie de tarjeta hechos en la ruta (A12); las de

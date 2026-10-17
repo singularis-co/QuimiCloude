@@ -90,6 +90,7 @@ La ficha llegó sin `/afinar-feature`. Estas filas son decisiones del humano ya 
 | P25 | Cabecera «Costo unitario» (de `dev`); rótulo «Costo» en la tarjeta (del tablero) | humano, 2026-10-16 | 6a665e3f | R54, R55 |
 | P26 | Manda el tablero: fondo suave, sangría y animación también en las tarjetas de lote del teléfono; con movimiento reducido, sin animación | humano, 2026-10-16 (criterio: tarjetas y fechas, manda el tablero) | — | R57 |
 | P27 | Manda el tablero: la «Fecha» del historial alineada a la derecha (`ModalesInventario`) | humano, 2026-10-16 (criterio: tarjetas y fechas, manda el tablero) | — | R21 |
+| m8 | Manda el tablero: la tarjeta del lote en teléfono no lleva «Reservado»; una cifra vacía («—») sí lleva su rótulo | humano, 2026-10-16 (review QC-263 vuelta 2, m8) | — | R55, R56 |
 
 ## Requisitos (EARS)
 
@@ -358,15 +359,17 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   5496bd16)*
 - **R55.** MIENTRAS el contenedor de la tabla de productos (o de «Producto terminado») mide 760 px o
   menos, cada cifra de la tarjeta de producto DEBE llevar delante su rótulo visible («Existencia», «Alerta», «Disponible»,
-  «Costo») y cada cifra de la tarjeta de una sub-fila de lote el suyo («Existencia», «Reservado»,
-  «Disponible», «Costo»), sin rótulo donde la celda no pinta cifra; el texto de cada `data-testid`
-  de cifra DEBE seguir siendo solo la cifra; MIENTRAS el contenedor mide más de 760 px, la tabla NO
-  DEBE pintar esos rótulos dentro de las celdas. *(enmienda 2, H2·H3; tablero
+  «Costo») y cada cifra de la tarjeta de una sub-fila de lote el suyo («Existencia», «Disponible»,
+  «Costo»); la tarjeta de la sub-fila de lote NO DEBE pintar «Reservado»; una cifra vacía que se
+  pinta como «—» DEBE llevar su rótulo, y solo un campo que no pinta nada queda sin él; el texto
+  de cada `data-testid` de cifra DEBE seguir siendo solo la cifra; MIENTRAS el contenedor mide más de 760 px, la tabla NO
+  DEBE pintar esos rótulos dentro de las celdas. *(enmienda 2, H2·H3; sin «Reservado» en la tarjeta
+  del lote por decisión del humano del 2026-10-16, m8 del review; tablero
   `InventarioColumnasLotes`, teléfono)*
 - **R56.** MIENTRAS el contenedor de la tabla de lotes o del historial mide 760 px o menos, la
   tarjeta de cada lote DEBE rotular «Cantidad», «Apartado», «Disponible», «Fecha de compra» y
   «Vencimiento», y la de cada asiento del historial «Existencia anterior», «Total contado»,
-  «Motivo» y «Pedido» (el autor y la fecha, sin rótulo); el texto de cada `data-testid` de celda
+  «Motivo» y «Pedido» (el autor y la fecha, sin rótulo), también cuando el valor se pinta como «—»; el texto de cada `data-testid` de celda
   DEBE seguir siendo solo su valor. *(enmienda 2, H2·H3; tablero `ModalesInventario`)*
 - **R57.** Cada sub-fila de lote y de estado (R47) DEBE pintarse con un fondo suave distinto del de
   su producto y sangrada respecto de él, y entrar con la animación de entrada de 300 ms del repo:
