@@ -110,7 +110,36 @@ Las dos piezas compartidas ganan su fila en el catálogo en el mismo commit, con
 - **Fecha de nacimiento:** el tablero no la marca obligatoria; el servidor la exige (QC-162 R12 =
   reglas del alta de usuario). El campo lleva la marca de obligatorio para no prometer lo que el
   servidor rechaza.
+- **Teléfono y número de documento del Administrador** (decisión cerrada del 2026-10-16): también
+  llevan la marca de obligatorio, por el mismo motivo; el servidor los exige (QC-165). Los seis
+  obligatorios de texto de `AdministratorFields` son Nombres, Apellidos, Correo, Teléfono, Número
+  de documento y Nombre de usuario, más la Fecha de nacimiento.
 - **Fechas:** pregunta abierta 2.
+- **Placeholder de Fecha de nacimiento** (aceptado en la revisión, 2026-10-16): `aaaa-mm-dd`, lo
+  que pinta `DatePicker`, no el `dd/mm/aaaa` del tablero. Las fechas de lista e Historial sí van
+  en `dd/mm/aaaa`.
+- **Esqueleto del detalle** (decisión cerrada del 2026-10-16, enmienda R34): el detalle no lleva
+  esqueleto; lee la empresa antes de pintar para que R27 responda un 404 real. El Historial sí.
+- **Iconos de los diálogos** (revisión, 2026-10-16; en lo visual manda el tablero): la baja de
+  empresa, la de Administrador y el reenvío del enlace llevan el icono del tablero.
+  `ConfirmDialog` gana una prop opcional `icon` que se pinta en `AlertDialogMedia` (paso 2 de la
+  regla de decisión: extensión aditiva, sin cambio para los consumidores actuales).
+- **Orden del diálogo de baja de empresa** (revisión, 2026-10-16): cifras de impacto → aviso →
+  campo de confirmación, como el tablero; el aviso va en `children` de `ConfirmDialog`, antes del
+  campo.
+
+### 2.3 Listas cerradas que amplía la ficha
+
+Las guardias que fijan con igualdad exacta quién puede hacer algo se amplían con su bloque
+fechado, sin aflojar el `toEqual`:
+
+| Test | Qué entra |
+|---|---|
+| `tests/unit/identity/roles/maestro-rol.test.ts` (R17, `RUTAS_ABIERTAS_EMPRESAS`) | Bloque «Enmienda QC-166»: `lib/shared/navigation/private-nav.ts` (el menú declara `empresas.consultar` en sus enlaces) y las páginas `maestro/empresas/page.tsx`, `maestro/empresas/[id]/page.tsx` y `maestro/administradores/page.tsx` (cortan con él). |
+| `tests/unit/shared/data-table-alcance.test.ts` (R34) | `/maestro/empresas` y `/maestro/administradores` como consumidoras de `DataTable`. |
+| `tests/guards/guard-pantallas-exigen-permiso.test.ts` | Las tres pantallas del área. |
+| `tests/guards/guard-identificador-de-request.test.ts` | Los tres specs E2E de § 10. |
+| `tests/unit/identity/account-status-scope.test.ts` (R19) | `administrator-columns.tsx` (columna Estado y «Reenviar enlace» solo en `pending`). |
 
 ## 3. Rutas y navegación
 
@@ -151,12 +180,20 @@ export const MAESTRO_ADMINISTRATORS_ROUTE = '/maestro/administradores';
 
 | Archivo | Corte | Lee | Monta |
 |---|---|---|---|
-| `app/(private)/maestro/empresas/page.tsx` | `requirePagePermission('empresas.consultar')` en la primera línea | `canModify` (`assertPermission(user, 'empresas.modificar', …)`, patrón de `clientes/page.tsx`); `searchParams` después del corte | `PageHeader` («Plataforma» / «Empresas», «Nueva empresa» si `canModify`), `<Suspense key={query}>` con `CompanyListSection` |
+| `app/(private)/maestro/empresas/page.tsx` | `requirePagePermission('empresas.consultar')` en la primera línea | `canModify` (`assertPermission(user, 'empresas.modificar', …)`, patrón de `clientes/page.tsx`); `searchParams` después del corte | `PageHeader` («Plataforma» / «Empresas», «Nueva empresa» si `canModify`), `<Suspense>` (sin `key`, ver abajo) con `CompanyListSection` |
 | `app/(private)/maestro/empresas/[id]/page.tsx` | Ídem | `params.id` (no UUID → `notFound()`), `getCompanyAction(id)` (`company_not_found` → `notFound()`; otro error → `ErrorState`), `tab`, `page` del historial | `CompanyDetailHeader`, `UrlTabs`, el panel de la pestaña vigente |
 | `app/(private)/maestro/administradores/page.tsx` | Ídem | `canModify`, `searchParams`, las empresas activas para el filtro y el panel (§ 5.5) | `PageHeader` («Nuevo administrador» si `canModify`), `<Suspense>` con `AdministratorListSection` |
 
 Cada página: `export const metadata = { title: \`${LABEL} · ${BRAND_LABEL}\` }`, contenedor
 `PageShell`, sin landmark `main` propio.
+
+Ajustes aceptados en la revisión (2026-10-16):
+- **Lista de empresas:** `<Suspense>` **sin** `key={query}`. Con la clave, cada búsqueda remonta
+  la sección y quien escribe pierde el foco. R15 se cumple en la primera carga; en las
+  navegaciones la tabla queda con `aria-busy` dentro de `startTransition`, el patrón de
+  `clientes/page.tsx`.
+- **Detalle:** sin `loading.tsx` ni `Suspense` alrededor de la lectura de la empresa (§ 2.2,
+  esqueleto del detalle); el `Suspense` con esqueleto queda solo en el Historial.
 
 ### 3.4 Parámetros de la dirección
 
@@ -277,8 +314,9 @@ la plataforma; si un día pesa, se cambia por búsqueda (§ 9.B).
 
 ### 6.1 Cabecera
 
-`CompanyDetailHeader` (cliente): `PageHeader` con miga «Empresas» (`MAESTRO_COMPANIES_ROUTE`),
-título = nombre, `StatusBadge`, y acciones según estado y `canModify` (R28, pregunta 5). Abre
+`CompanyDetailHeader` (cliente): `PageHeader` con migas «Empresas» (`MAESTRO_COMPANIES_ROUTE`,
+enlazada) › nombre de la empresa (último paso, el actual; el tablero pinta solo «Empresas ›», se
+acepta la convención del repo, como `producto-terminado/[id]`), título = nombre, `StatusBadge`, y acciones según estado y `canModify` (R28, pregunta 5). Abre
 `CompanyEditSheet`, `CompanyDeleteDialog` y `CompanyReactivateDialog`, los mismos de la lista.
 
 ### 6.2 Pestañas
