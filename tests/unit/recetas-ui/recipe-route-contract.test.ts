@@ -1485,6 +1485,10 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
         'WHATSAPP_WEBHOOK_ROUTE_BASE',
         'whatsappWebhookPath',
+        // Las pantallas del Maestro, bajo /maestro: ninguna es del asistente de lectura.
+        'MAESTRO_ADMINISTRATORS_ROUTE',
+        'MAESTRO_COMPANIES_ROUTE',
+        'maestroCompanyRoute',
       ].sort(),
     );
   });
