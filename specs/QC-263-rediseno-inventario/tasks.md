@@ -275,7 +275,7 @@ T8h.
   «Fecha» con la clase de alineación a la derecha; rótulos «Existencia anterior», «Total contado»,
   «Motivo», «Pedido»; autor y fecha sin rótulo).
   *Hecho:* tests en verde.
-- [ ] **T8f [P]. «Elegir otro archivo» en el paso 2** (F7, R32, R59; depende de T8a). `onChooseAnother`
+- [x] **T8f [P]. «Elegir otro archivo» en el paso 2** (F7, R32, R59; depende de T8a). `onChooseAnother`
   en `ImportPreviewSummary` y `restart` en `InventoryImportScreen`. Tests:
   `inventory-import-screen.test.tsx` (en la vista previa, pulsar `inventory-import-choose-another`
   deja el paso 1 vigente, sin archivo, sin vista previa ni error, sin llamar a

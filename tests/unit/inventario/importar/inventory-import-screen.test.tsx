@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ALREADY_IMPORTED_TESTID,
+  CHOOSE_ANOTHER_TESTID,
   CONFIRMING_LABEL,
   CONFIRM_BUTTON_TESTID,
   EXAMPLE_ROW_NOTICE_TESTID,
@@ -42,6 +43,7 @@ import {
   ROW_STATUS_TESTID,
   SCREEN_ERROR_TESTID,
   UNIT_DIALOG_TESTID,
+  UPLOAD_FILE_NAME_TESTID,
   UPLOAD_INPUT_TESTID,
   UPLOAD_TOO_LARGE_TESTID,
   alreadyImportedMessage,
@@ -517,6 +519,55 @@ describe('barra de pasos', () => {
     await user.click(screen.getByTestId(RESTART_TESTID));
     expect(pasoVigente()).toBe(importStepTestId(1));
     expect(screen.getByTestId(UPLOAD_INPUT_TESTID)).toBeInTheDocument();
+  });
+
+  it('R32 R59 «Elegir otro archivo» del paso 2 vuelve al paso 1 sin archivo, sin vista previa, sin importar ni avisar', async () => {
+    const user = await subirYRevisar();
+    await screen.findByTestId(PREVIEW_TABLE_TESTID);
+    expect(pasoVigente()).toBe(importStepTestId(2));
+
+    await user.click(screen.getByTestId(CHOOSE_ANOTHER_TESTID));
+
+    expect(pasoVigente()).toBe(importStepTestId(1));
+    expect(screen.getByTestId(UPLOAD_INPUT_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(UPLOAD_FILE_NAME_TESTID)).toBeNull();
+    expect(screen.getByTestId(REVIEW_BUTTON_TESTID)).toBeDisabled();
+    expect(screen.queryByTestId(PREVIEW_TABLE_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PREVIEW_CARD_TESTID)).toBeNull();
+    expect(screen.queryByTestId(SCREEN_ERROR_TESTID)).toBeNull();
+    expect(confirmMock).not.toHaveBeenCalled();
+    expect(previewMock).toHaveBeenCalledTimes(1);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it('R59 tras un error al confirmar, «Elegir otro archivo» también limpia el error', async () => {
+    confirmMock.mockResolvedValue({ status: 'error', code: 'unauthorized', message: 'Sin permiso.' });
+    const user = await subirYRevisar();
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+    await screen.findByTestId(SCREEN_ERROR_TESTID);
+    vi.mocked(toast.error).mockClear();
+
+    await user.click(screen.getByTestId(CHOOSE_ANOTHER_TESTID));
+
+    expect(pasoVigente()).toBe(importStepTestId(1));
+    expect(screen.queryByTestId(SCREEN_ERROR_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PREVIEW_TABLE_TESTID)).toBeNull();
+    expect(confirmMock).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('R59 mientras importa, «Elegir otro archivo» queda deshabilitado', async () => {
+    let responder: (value: ConfirmInventoryImportResult) => void = () => undefined;
+    confirmMock.mockReturnValue(new Promise((resolve) => (responder = resolve)));
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    await waitFor(() => expect(screen.getByTestId(CHOOSE_ANOTHER_TESTID)).toBeDisabled());
+    responder({ status: 'success', data: resultado() });
+    await screen.findByTestId(RESULT_TESTID);
   });
 
   it('R32 con el archivo rechazado sigue en el paso 1', async () => {

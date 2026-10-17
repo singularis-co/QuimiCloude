@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  CHOOSE_ANOTHER_TESTID,
   CONFIRM_BUTTON_TESTID,
   ERROR_FILE_BUTTON_TESTID,
   EXAMPLE_ROW_NOTICE_TESTID,
@@ -29,6 +30,7 @@ import {
   previewDetailAddFileRow,
   statusFilterTestId,
   totalTestId,
+  UPLOAD_CHANGE_LABEL,
 } from '@/app/(private)/inventario/importar/components';
 
 import { setupUser } from '../../../helpers/user-event';
@@ -51,15 +53,17 @@ function filasVisibles(): number[] {
 function renderResumen(preview = vistaPrevia(), confirming = false) {
   const onConfirm = vi.fn<() => void>();
   const onDownloadErrors = vi.fn<() => void>();
+  const onChooseAnother = vi.fn<() => void>();
   render(
     <ImportPreviewSummary
       preview={preview}
       confirming={confirming}
       onConfirm={onConfirm}
       onDownloadErrors={onDownloadErrors}
+      onChooseAnother={onChooseAnother}
     />,
   );
-  return { onConfirm, onDownloadErrors };
+  return { onConfirm, onDownloadErrors, onChooseAnother };
 }
 
 describe('resumen de la vista previa', () => {
@@ -90,6 +94,33 @@ describe('resumen de la vista previa', () => {
       expect(cifra.querySelector('dt')).toHaveTextContent(etiqueta);
       expect(cifra.querySelector('dd')).toHaveClass('tabular-nums');
     }
+  });
+
+  it('R59 «Elegir otro archivo» va en la cabecera de la tarjeta, junto al título y el archivo, con talla touch', async () => {
+    const { onChooseAnother, onConfirm } = renderResumen(vistaPrevia());
+
+    const tarjeta = screen.getByTestId(PREVIEW_CARD_TESTID);
+    const boton = within(tarjeta).getByTestId(CHOOSE_ANOTHER_TESTID);
+    const cabecera = within(tarjeta).getByRole('heading', { level: 2 }).parentElement?.parentElement;
+    expect(cabecera).toContainElement(boton);
+    expect(cabecera).toContainElement(within(tarjeta).getByTestId(IMPORT_FILE_NAME_TESTID));
+    expect(cabecera).toHaveClass('@max-[760px]:flex-col', '@max-[760px]:items-stretch');
+    expect(boton).toHaveAccessibleName(UPLOAD_CHANGE_LABEL);
+    expect(boton).toHaveAttribute('type', 'button');
+    expect(boton).toHaveClass('min-h-11', 'min-w-11');
+    expect(boton).toBeEnabled();
+    expect(within(screen.getByTestId(PREVIEW_ACTIONS_TESTID)).queryByTestId(CHOOSE_ANOTHER_TESTID)).toBeNull();
+
+    await setupUser().click(boton);
+
+    expect(onChooseAnother).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('R59 «Elegir otro archivo» queda deshabilitado mientras se importa', () => {
+    renderResumen(vistaPrevia(), true);
+
+    expect(screen.getByTestId(CHOOSE_ANOTHER_TESTID)).toBeDisabled();
   });
 
   it('R36 cada cifra se pinta en el tono de su estado; «Filas» queda sin tono', () => {
@@ -129,6 +160,7 @@ describe('resumen de la vista previa', () => {
         confirming={false}
         onConfirm={vi.fn()}
         onDownloadErrors={vi.fn()}
+        onChooseAnother={vi.fn()}
       >
         <div data-testid="lo-que-sigue" />
       </ImportPreviewSummary>,

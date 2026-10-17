@@ -185,6 +185,7 @@ export const PREVIEW_TABLE_TESTID = 'inventory-import-preview-table';
 export const RESULT_TABLE_TESTID = 'inventory-import-result-table';
 export const EXAMPLE_ROW_NOTICE_TESTID = 'inventory-import-example-ignored';
 export const CONFIRM_BUTTON_TESTID = 'inventory-import-confirm';
+export const CHOOSE_ANOTHER_TESTID = 'inventory-import-choose-another';
 export const NO_VALID_ROWS_TESTID = 'inventory-import-no-valid-rows';
 export const ERROR_FILE_BUTTON_TESTID = 'inventory-import-error-file';
 export const STATUS_FILTER_TESTID = 'inventory-import-status-filter';

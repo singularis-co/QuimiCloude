@@ -11,6 +11,7 @@ import type { InventoryImportPreview } from '@/lib/modules/inventario';
 import { cn } from '@/lib/utils';
 
 import {
+  CHOOSE_ANOTHER_TESTID,
   CONFIRMING_LABEL,
   CONFIRM_BUTTON_TESTID,
   ERROR_FILE_BUTTON_LABEL,
@@ -28,6 +29,7 @@ import {
   PREVIEW_SUMMARY_TESTID,
   PREVIEW_TITLE,
   PREVIEW_TOTAL_LABELS,
+  UPLOAD_CHANGE_LABEL,
   confirmLabelParts,
   formatCount,
   ignoredColumnsSummary,
@@ -120,6 +122,8 @@ export type ImportPreviewSummaryProps = {
   readonly confirming: boolean;
   readonly onConfirm: () => void;
   readonly onDownloadErrors: () => void;
+  /** «Elegir otro archivo»: vuelve al paso 1 sin importar nada (R59). */
+  readonly onChooseAnother: () => void;
   /** Lo que va entre los avisos y los botones: los faltantes y la tabla de filas. */
   readonly children?: ReactNode;
 };
@@ -129,6 +133,7 @@ export function ImportPreviewSummary({
   confirming,
   onConfirm,
   onDownloadErrors,
+  onChooseAnother,
   children,
 }: ImportPreviewSummaryProps) {
   const { totals } = preview;
@@ -142,12 +147,24 @@ export function ImportPreviewSummary({
   return (
     <section className="flex min-w-0 flex-col gap-5" data-testid={PREVIEW_SUMMARY_TESTID}>
       <Card className="gap-4 rounded-[14px] px-5 py-5" data-testid={PREVIEW_CARD_TESTID}>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold">{PREVIEW_TITLE}</h2>
-          <span className="font-mono text-xs text-muted-foreground" data-testid={IMPORT_FILE_NAME_TESTID}>
-            {preview.fileName}
-          </span>
-          <p className="text-sm text-muted-foreground">{PREVIEW_DESCRIPTION}</p>
+        <div className="flex items-start justify-between gap-3 @max-[760px]:flex-col @max-[760px]:items-stretch">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h2 className="text-lg font-semibold">{PREVIEW_TITLE}</h2>
+            <span className="font-mono text-xs text-muted-foreground" data-testid={IMPORT_FILE_NAME_TESTID}>
+              {preview.fileName}
+            </span>
+            <p className="text-sm text-muted-foreground">{PREVIEW_DESCRIPTION}</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            touch
+            disabled={confirming}
+            data-testid={CHOOSE_ANOTHER_TESTID}
+            onClick={onChooseAnother}
+          >
+            {UPLOAD_CHANGE_LABEL}
+          </Button>
         </div>
         <ImportTotals totals={totals} labels={PREVIEW_TOTAL_LABELS} tones={PREVIEW_TOTAL_TONES} />
       </Card>

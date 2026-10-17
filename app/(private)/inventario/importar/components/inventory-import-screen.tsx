@@ -237,6 +237,7 @@ export function InventoryImportScreen({ units }: InventoryImportScreenProps) {
             preview={outcome.preview}
             confirming={busy === 'confirm'}
             onConfirm={() => void confirm(outcome.importKey)}
+            onChooseAnother={restart}
             onDownloadErrors={() =>
               downloadFile(buildInventoryImportErrorFile(outcome.preview.rows, outcome.preview.fileName))
             }
