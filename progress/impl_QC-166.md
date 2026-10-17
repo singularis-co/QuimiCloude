@@ -406,3 +406,70 @@ Rutas: `tests/ui/maestro/`, `tests/unit/maestro/`, `tests/unit/navegacion/`, `te
 | R47 | administrator-resend-link-dialog.test.tsx |
 | R48 | administrator-resend-link-dialog.test.tsx |
 | R49 | administrator-resend-link-dialog.test.tsx |
+
+## m10 · Revisión visual de CountrySelect (2026-10-16)
+
+Cierra la revisión que pedía el «Hecho» de QC-235 T9 (m4 de `progress/review_QC-235.md`), contra el
+tablero `docs/diseno/canvas/CountrySelect.dc.html`.
+
+**Cómo se hizo.** Script Playwright de un solo uso fuera del repo (scratchpad de la sesión; no está en
+`e2e/` ni se versiona), con su propia config que levanta `pnpm run dev --port 3117` en este worktree
+igual que `playwright.config.ts` y lo cierra al terminar. Chromium. Entra con el Maestro sembrado
+(`SEED_MAESTRO_*` del `.env`), abre `/maestro/empresas`, «Editar» en la única empresa existente
+(QuimiCloud, sin país: no se creó ni modificó ningún dato) y en cada ancho captura y mide (posición y
+tamaño de disparador, popup, lista y opciones; recorte por `scrollWidth`; desborde horizontal de la
+página; `document.activeElement`). Anchos: 1440×900 (ratón), 820×1180 y 375×812 (táctiles,
+`hasTouch` + `isMobile`). DPR 1. El botón «N» abajo a la izquierda es el indicador de `next dev`, no
+la app.
+
+**Capturas** (`progress/qc166-revision-visual/`), por ancho 1440, 820 y 375:
+- `country-select-<ancho>-cerrado.png`: panel «Editar empresa» con País cerrado.
+- `country-select-<ancho>-abierto.png`: selector recién abierto.
+- `country-select-<ancho>-filtrado.png`: tras escribir `rep` (3 resultados).
+- `country-select-<ancho>-sin-resultados.png`: tras escribir `zzz`.
+- `country-select-<ancho>-tras-escape.png`: tras Escape.
+El filtro por prefijo (`+1`, 25 resultados) se midió pero no se capturó.
+
+**1440 px** (panel de 384 px a la derecha).
+- Disparador 351×44, «Sin país» en gris, chevron gira al abrir. Sin recorte.
+- Popup anclado bajo el campo, mismo ancho que el disparador (351), buscador arriba y lista con
+  `max-height` 264 px y scroll, como el tablero. Dentro de la pantalla (borde inferior en y=847 de 900).
+- Opciones de 44 px también con ratón. El tablero solo pide 44 en táctil; no es un defecto, es más
+  generoso.
+- Nombre más largo («República Democrática del Congo») cabe sin recorte; el prefijo va en mono y gris.
+- «Sin país» primero, marcado con el check y a la vista. «Ningún país coincide con «zzz».» sale bien.
+- Foco: al abrir va al buscador (`combobox` «Buscar país por nombre o prefijo»); Escape lo devuelve al
+  disparador y cierra sin cambiar el valor.
+- Observación menor: con la lista completa, el borde inferior del popup (y=847) tapa unos 6 px del
+  borde superior de «Cancelar»/«Guardar» del pie del panel (botones desde y≈841). Es una capa
+  flotante encima del pie, y se cierra antes de usarlos. No afecta al uso.
+
+**820 px** (panel de 384 px a la derecha, táctil).
+- Igual que escritorio: popup anclado (no hoja), 351 px, lista de 264 px, opciones de 44 px. Coincide
+  con «Tablet · popup anclado, igual que escritorio» y «Opciones de 44 px en táctil».
+- Sin recorte ni desborde horizontal; popup dentro de la pantalla. Foco igual que en 1440.
+
+**375 px** (panel a pantalla completa, táctil).
+- Disparador 342×44, sin recorte.
+- Al abrir monta la hoja inferior (≤ 640 px) con asa, título «País», botón «Cerrar» (X), buscador de
+  ~48 px y opciones de 48 px a lo ancho (351 px): coincide con el tablero. El foco va al buscador.
+- Sin desborde horizontal ni recortes.
+- **Hallazgo (a decidir por el leader):** la hoja no tiene altura fija; se ajusta al número de
+  resultados. Con la lista completa ocupa de y=122 al final (690 px); al escribir `rep` encoge a
+  301 px (arranca en y=511) y con `zzz` a 197 px (y=615). Es decir, el título y el buscador saltan
+  hacia abajo mientras se escribe, y el formulario de detrás vuelve a verse. En un teléfono real, con el
+  teclado abierto, el campo en el que se está escribiendo se mueve bajo el dedo en cada letra que cambia
+  el número de resultados. El tablero de teléfono muestra la hoja con lista llena y no dice nada del
+  caso filtrado; lo esperable sería altura estable (p. ej. la de la lista completa o un `min-height`).
+- Diferencia de rol (sin impacto visible): en escritorio/tablet el disparador es `role="combobox"`
+  con `aria-haspopup="dialog"`; en teléfono es un `button` con `aria-haspopup="dialog"`. Ambos son
+  correctos para lo que abren.
+- Escape cierra la hoja y el foco vuelve al disparador.
+
+**No cubierto:** el estado «Con país» (lista que arranca en el país elegido, m5 de QC-235) porque la
+única empresa no tiene país y no se cambiaron datos; ese caso lo ejercita `e2e/maestro-empresas.spec.ts`
+al editar a Colombia. Tampoco WebKit.
+
+Veredicto: CountrySelect coincide con el tablero en los tres anchos (popup anclado de 264 px en 1440 y
+820, hoja con 48 px en 375, foco y Escape correctos, sin recortes ni desbordes); un hallazgo de diseño
+en teléfono (la hoja cambia de altura al filtrar) queda para el leader.
