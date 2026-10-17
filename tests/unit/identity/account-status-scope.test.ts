@@ -379,6 +379,28 @@ const SITIOS_PERMITIDOS = [
   // QC-162 R11 — el alta de empresa crea su primer Administrador en `pending`, en la misma
   // transaccion que la empresa, con los invariantes del alta de usuario. Solo lo escribe al nacer.
   'lib/modules/identity/adapters/driven/persistence/company-prisma.ts',
+
+  // QC-165 R5, R10 — la fila y la ficha del Administrador que ve el Maestro llevan el estado de
+  // cuenta ALMACENADO, como `UserRow` (`design.md > 3.2`). Importa `UserAccountStatus` de
+  // `account-status.ts`: no declara un segundo conjunto, no lo traduce y no lo escribe.
+  'lib/modules/identity/domain/administrator-view.ts',
+  // QC-165 R8 — la lista blanca del listado de Administradores declara `accountStatus` como campo
+  // ORDENABLE (`design.md > 3.3`). Solo ordena: no es filtrable ni decide nada sobre el valor.
+  'lib/modules/identity/domain/administrator-queryable.ts',
+  // QC-165 R5, R8, R10, R14 — el adaptador de los Administradores del Maestro enumera la columna
+  // en el `select` de la fila y la ficha, ordena por ella y escribe `pending` SOLO al nacer
+  // (`design.md > 5`). No la filtra ni la mueve despues del alta.
+  'lib/modules/identity/adapters/driven/persistence/administrator-prisma.ts',
+
+  // RETENSADO 2026-10-16 (QC-166, area-del-maestro). Mismo trato que el bloque de QC-67: la
+  // pantalla de Administradores del Maestro PINTA el estado de cuenta, y es un unico archivo.
+  // QC-166 R35, R36 (`design.md > 5.2` y `> 5.3`) — la columna Estado pinta el `accountStatus`
+  // ALMACENADO con su etiqueta, y el item «Reenviar enlace» solo se declara en filas `pending`,
+  // porque el servidor responde `user_not_pending` a cualquier otra. Importa la etiqueta de
+  // `administrator-labels.ts`; no declara un segundo conjunto ni escribe el estado. Su
+  // `administrator-list-params.ts` NO entra: el estado no se filtra desde la URL, asi que el id
+  // de la columna vive en este archivo y no alli.
+  'app/(private)/maestro/administradores/components/administrator-columns.tsx',
 ] as const;
 
 /**

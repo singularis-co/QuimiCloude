@@ -22,7 +22,6 @@ import {
   buildOrderColumns,
   ORDER_CUSTOMER_NAME_COLUMN_ID,
   ORDER_NUMBER_COLUMN_ID,
-  QUANTITY_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
 } from './order-columns';
 import { OrderCustomerFilter } from './order-customer-filter';
@@ -110,7 +109,7 @@ const ORDER_TABLE_CARD: DataTableCardLayout = {
   primary: ORDER_NUMBER_COLUMN_ID,
   status: STATUS_COLUMN_ID,
   title: RECIPE_NAME_COLUMN_ID,
-  meta: [ORDER_CUSTOMER_NAME_COLUMN_ID, QUANTITY_COLUMN_ID, CREATED_AT_COLUMN_ID],
+  meta: [ORDER_CUSTOMER_NAME_COLUMN_ID, CREATED_AT_COLUMN_ID],
   footer: PRIORITY_COLUMN_ID,
 };
 

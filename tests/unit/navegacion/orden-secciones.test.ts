@@ -19,6 +19,7 @@ import {
   NAV_SECTION_CONFIGURATION,
   NAV_SECTION_DIRECTORY,
   NAV_SECTION_OPERATION,
+  NAV_SECTION_PLATFORM,
   NAV_SECTION_PRODUCTION,
   NAV_SECTION_TRACKING,
   PRIVATE_NAV_ITEMS,
@@ -33,6 +34,8 @@ import {
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
+  MAESTRO_ADMINISTRATORS_ROUTE,
+  MAESTRO_COMPANIES_ROUTE,
   ORDERS_ROUTE,
   PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
@@ -64,7 +67,7 @@ function aterrizaje(permisos: readonly string[]): string | null {
 }
 
 describe('orden de secciones y entradas del menu', () => {
-  it('con todos los permisos: Seguimiento, Operación, Producción, Directorio y Configuración, cada una con sus entradas en orden', () => {
+  it('R2: con todos los permisos: Seguimiento, Operación, Producción, Directorio, Configuración y Plataforma, cada una con sus entradas en orden', () => {
     expect(menuPorSecciones(TODOS_LOS_PERMISOS)).toEqual([
       { label: NAV_SECTION_TRACKING, items: [DASHBOARD_ROUTE] },
       { label: NAV_SECTION_OPERATION, items: [INVENTORY_ROUTE, ORDERS_ROUTE, ASSIGNED_ORDERS_ROUTE] },
@@ -73,6 +76,10 @@ describe('orden de secciones y entradas del menu', () => {
       {
         label: NAV_SECTION_CONFIGURATION,
         items: [USERS_ROUTE, PRESENTATIONS_ROUTE, UNITS_ROUTE, 'nav-integraciones'],
+      },
+      {
+        label: NAV_SECTION_PLATFORM,
+        items: [MAESTRO_COMPANIES_ROUTE, MAESTRO_ADMINISTRATORS_ROUTE],
       },
     ]);
   });
@@ -115,7 +122,7 @@ describe('las secciones sin entradas visibles no salen', () => {
     }
   });
 
-  it('con los permisos del Operador solo queda Operación, sin encabezados de las demas', () => {
+  it('R2: con los permisos del Operador solo queda Operación, sin encabezados de las demas', () => {
     expect(menuPorSecciones(permisosDe(ROLE_OPERADOR))).toEqual([
       { label: NAV_SECTION_OPERATION, items: [INVENTORY_ROUTE, ASSIGNED_ORDERS_ROUTE] },
     ]);
@@ -136,12 +143,12 @@ describe('destino tras el login de cada rol del seed (primer enlace visible)', (
     ['Operador', ROLE_OPERADOR, INVENTORY_ROUTE],
     ['Empacador', ROLE_EMPACADOR, ASSIGNED_ORDERS_ROUTE],
     ['Acondicionamiento', ROLE_ACONDICIONAMIENTO, ASSIGNED_ORDERS_ROUTE],
-  ])('%s aterriza en su ruta', (_nombre, rol, esperado) => {
+  ])('R5: %s aterriza en su ruta', (_nombre, rol, esperado) => {
     expect(aterrizaje(permisosDe(rol))).toBe(esperado);
   });
 
-  it('Maestro no ve ningun enlace del menu: no hay primer enlace y el login usa su respaldo', () => {
-    expect(aterrizaje(permisosDe(ROLE_MAESTRO))).toBeNull();
+  it('R4: Maestro aterriza en Empresas, el primer enlace de «Plataforma»', () => {
+    expect(aterrizaje(permisosDe(ROLE_MAESTRO))).toBe(MAESTRO_COMPANIES_ROUTE);
   });
 
   it('con todos los permisos aterriza en el dashboard', () => {

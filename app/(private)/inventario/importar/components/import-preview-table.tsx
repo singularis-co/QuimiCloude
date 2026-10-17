@@ -1,21 +1,16 @@
 'use client';
 
-import {
-  CircleAlertIcon,
-  CirclePlusIcon,
-  CopyIcon,
-  LayersIcon,
-  type LucideIcon,
-} from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import {
   DataTable,
   createDefaultParams,
   withPage,
+  type DataTableCardLayout,
   type DataTableColumn,
   type DataTableParams,
 } from '@/components/shared/data-table';
+import { StatusBadge, type StatusTone } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
 import {
   IMPORT_TYPE_LABELS,
@@ -28,7 +23,6 @@ import {
   type ImportRowType,
 } from '@/lib/modules/inventario';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
-import { cn } from '@/lib/utils';
 
 import {
   PREVIEW_DETAIL_ADD_EXISTING,
@@ -52,6 +46,13 @@ import {
 } from './import-texts';
 
 const ALL_STATUSES = 'all';
+
+const ROWS_CARD_LAYOUT: DataTableCardLayout = {
+  primary: 'row',
+  status: 'status',
+  title: 'product',
+  meta: ['detail'],
+};
 
 type ImportTableRow = {
   readonly rowNumber: number;
@@ -77,8 +78,7 @@ function IgnoredColumnsNotice({ columns }: { readonly columns: readonly ImportCo
 
 export type ImportStatusPresentation = {
   readonly label: string;
-  readonly icon: LucideIcon;
-  readonly className: string;
+  readonly tone: StatusTone;
 };
 
 export type ImportStatusOption<TStatus extends string> = {
@@ -93,16 +93,13 @@ export function ImportStatusLabel({
   readonly status: string;
   readonly presentation: ImportStatusPresentation;
 }) {
-  const Icon = presentation.icon;
   return (
-    <span
-      className={cn('inline-flex items-center gap-1.5 font-medium whitespace-nowrap', presentation.className)}
+    <StatusBadge
+      tone={presentation.tone}
+      label={presentation.label}
       data-testid={ROW_STATUS_TESTID}
       data-status={status}
-    >
-      <Icon className="size-4 shrink-0" aria-hidden />
-      {presentation.label}
-    </span>
+    />
   );
 }
 
@@ -167,7 +164,7 @@ export function ImportRowsTable<TRow extends ImportTableRow>({
 
   const columns = useMemo<readonly DataTableColumn<TRow>[]>(
     () => [
-      { id: 'row', label: ROWS_COLUMN_LABELS.row, align: 'end', cell: (row) => row.rowNumber },
+      { id: 'row', label: ROWS_COLUMN_LABELS.row, align: 'end', tabular: true, cell: (row) => row.rowNumber },
       { id: 'status', label: ROWS_COLUMN_LABELS.status, align: 'start', cell: renderStatus },
       { id: 'product', label: ROWS_COLUMN_LABELS.product, align: 'start', cell: productCell },
       {
@@ -213,11 +210,13 @@ export function ImportRowsTable<TRow extends ImportTableRow>({
             type="button"
             variant={filter === option.value ? 'default' : 'outline'}
             touch
+            className="rounded-full"
             aria-pressed={filter === option.value}
             data-testid={statusFilterTestId(option.value)}
             onClick={() => chooseFilter(option.value)}
           >
-            {option.label} ({formatCount(option.count)})
+            {option.label}{' '}
+            <span className="font-mono tabular-nums">{formatCount(option.count)}</span>
           </Button>
         ))}
       </div>
@@ -232,22 +231,28 @@ export function ImportRowsTable<TRow extends ImportTableRow>({
         status="idle"
         texts={ROWS_TABLE_TEXTS}
         searchable={false}
+        card={ROWS_CARD_LAYOUT}
       />
     </div>
   );
 }
 
-const PREVIEW_STATUS_PRESENTATION: Readonly<Record<ImportPreviewStatus, ImportStatusPresentation>> = {
-  create: { label: PREVIEW_STATUS_LABELS.create, icon: CirclePlusIcon, className: 'text-foreground' },
-  add_batch: { label: PREVIEW_STATUS_LABELS.add_batch, icon: LayersIcon, className: 'text-foreground' },
-  duplicate: { label: PREVIEW_STATUS_LABELS.duplicate, icon: CopyIcon, className: 'text-muted-foreground' },
-  error: { label: PREVIEW_STATUS_LABELS.error, icon: CircleAlertIcon, className: 'text-destructive' },
+export const PREVIEW_STATUS_TONES: Readonly<Record<ImportPreviewStatus, StatusTone>> = {
+  create: 'success',
+  add_batch: 'info',
+  duplicate: 'waiting',
+  error: 'danger',
 };
 
 const PREVIEW_STATUS_ORDER: readonly ImportPreviewStatus[] = ['create', 'add_batch', 'duplicate', 'error'];
 
 function previewStatus(row: ImportPreviewRow): ReactNode {
-  return <ImportStatusLabel status={row.status} presentation={PREVIEW_STATUS_PRESENTATION[row.status]} />;
+  return (
+    <ImportStatusLabel
+      status={row.status}
+      presentation={{ label: PREVIEW_STATUS_LABELS[row.status], tone: PREVIEW_STATUS_TONES[row.status] }}
+    />
+  );
 }
 
 function previewDetail(row: ImportPreviewRow): ReactNode {

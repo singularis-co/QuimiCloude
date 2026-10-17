@@ -29,6 +29,7 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 import {
   createLocalKey,
   isStepDocumentEmpty,
+  type RecipeStepErrorMessages,
   type RecipeStepErrors,
   type RecipeStepFormValue,
 } from './recipe-form-state';
@@ -76,6 +77,16 @@ function emptyStepDocument(): RecipeStepDocument {
 export { isStepDocumentEmpty };
 
 /** Título y ayuda de la sección de envasado; los comparten el alta, la edición y la importación. */
+/**
+ * Textos propios para los issues de forma de zod sobre un paso: el genérico de zod sale en inglés.
+ * Los que escribe el esquema («Un paso no puede quedar vacio.», el ítem vacío, el tope de
+ * elementos) pasan tal cual (`recipe-form-state.ts`).
+ */
+export const RECIPE_STEP_ERROR_MESSAGES: RecipeStepErrorMessages = {
+  checklistWithoutItems: 'Una lista de verificación necesita al menos un ítem.',
+  invalid: 'Revisa el contenido de este paso.',
+};
+
 export const PACKING_STEPS_FIELD_TEXTS = {
   title: 'Pasos de envasado',
   optionalHelp:

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
 import ClientesPage from '@/app/(private)/clientes/page';
@@ -635,7 +635,9 @@ const TABLAS: readonly Tabla[] = [
           searchParams: Promise.resolve({ type: PRODUCT_TYPES.FINISHED_PRODUCT }),
         }),
       );
-      for (const desplegar of screen.getAllByTestId('finished-stock-toggle')) {
+      // Solo los de la tabla: el de la tarjeta es el mismo conmutador y lo volveria a plegar.
+      const enLasFilas = filas().flatMap((fila) => within(fila).queryAllByTestId('finished-stock-toggle'));
+      for (const desplegar of enLasFilas) {
         fireEvent.click(desplegar);
       }
       await asentar();

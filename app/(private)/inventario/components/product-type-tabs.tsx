@@ -1,71 +1,42 @@
-'use client';
-
-import { useMemo } from 'react';
-
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { PRODUCT_TYPE_VALUES, type ProductType } from '@/lib/modules/inventario';
-import { productListHref, TYPE_COLUMN_ID } from './product-list-params';
-import { PRODUCT_TYPE_LABELS as TYPE_LABELS } from './product-type-label';
+import { UrlTabs } from '@/components/shared/url-tabs';
 import type { DataTableParams } from '@/components/shared/data-table';
+import { PRODUCT_TYPE_VALUES, type ProductType } from '@/lib/modules/inventario';
+
+import { productTypeTabHref, TYPE_COLUMN_ID } from './product-list-params';
+import { PRODUCT_TYPE_LABELS } from './product-type-label';
+
+export const PRODUCT_TYPE_TABS_LABEL = 'Filtrar por tipo de producto';
+export const PRODUCT_TYPE_TABS_TESTID = 'product-type-tabs';
+export const ALL_TYPES_TAB_LABEL = 'Todos';
 
 export type ProductTypeTabsProps = {
   readonly params: DataTableParams;
-  readonly onNavigate: (href: string) => void;
 };
 
-export function ProductTypeTabs({ params, onNavigate }: ProductTypeTabsProps) {
-  const currentType = useMemo(() => {
-    const filter = params.filters[TYPE_COLUMN_ID];
-    if (filter?.kind === 'select' && filter.values.length > 0) {
-      return filter.values[0] as ProductType;
-    }
-    return 'all' as const;
-  }, [params.filters]);
-
-  const tabs = useMemo(
-    () => [
-      { value: 'all', label: 'Todos' },
-      ...PRODUCT_TYPE_VALUES.map((type) => ({
-        value: type,
-        label: TYPE_LABELS[type],
-      })),
-    ],
-    [],
-  );
-
-  function handleChange(value: string) {
-    const nextParams = { ...params, page: 1 };
-    if (value !== 'all') {
-      nextParams.filters = {
-        ...params.filters,
-        [TYPE_COLUMN_ID]: { kind: 'select', values: [value as ProductType] },
-      };
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { [TYPE_COLUMN_ID]: _typeFilter, ...restFilters } = params.filters;
-      nextParams.filters = restFilters;
-    }
-    onNavigate(productListHref(nextParams));
+function currentTypeOf(params: DataTableParams): ProductType | 'all' {
+  const filter = params.filters[TYPE_COLUMN_ID];
+  if (filter?.kind === 'select' && filter.values.length > 0) {
+    return filter.values[0] as ProductType;
   }
+  return 'all';
+}
+
+export function ProductTypeTabs({ params }: ProductTypeTabsProps) {
+  const tabs: readonly { value: ProductType | 'all'; label: string }[] = [
+    { value: 'all', label: ALL_TYPES_TAB_LABEL },
+    ...PRODUCT_TYPE_VALUES.map((type) => ({ value: type, label: PRODUCT_TYPE_LABELS[type] })),
+  ];
 
   return (
-    <Tabs value={currentType ?? 'all'} onValueChange={handleChange}>
-      <TabsList className="w-full" role="tablist" aria-label="Filtrar por tipo de producto">
-        {tabs.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value} className="flex-1">
-            {tab.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-      <TabsContent value={currentType} className="pt-4">
-        {currentType === 'all' ? (
-          <p className="text-sm text-muted-foreground">Mostrando todos los tipos</p>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Filtrando por: <strong>{TYPE_LABELS[currentType]}</strong>
-          </p>
-        )}
-      </TabsContent>
-    </Tabs>
+    <UrlTabs
+      label={PRODUCT_TYPE_TABS_LABEL}
+      testId={PRODUCT_TYPE_TABS_TESTID}
+      current={currentTypeOf(params)}
+      items={tabs.map(({ value, label }) => ({
+        value,
+        label,
+        href: productTypeTabHref(params, value),
+      }))}
+    />
   );
 }

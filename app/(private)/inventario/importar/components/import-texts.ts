@@ -9,10 +9,24 @@ export const IMPORT_SCREEN_TESTID = 'inventory-import-screen';
 export const IMPORT_TITLE_TESTID = 'inventory-import-title';
 export const IMPORT_BACK_LINK_TESTID = 'inventory-import-back-link';
 
+export const IMPORT_STEPS_LABEL = 'Pasos';
+export const IMPORT_STEP_LABELS = {
+  1: 'Elegir archivo',
+  2: 'Vista previa',
+  3: 'Importación terminada',
+} as const;
+export const IMPORT_STEPS_TESTID = 'inventory-import-steps';
+
+export function importStepTestId(step: number): string {
+  return `inventory-import-step-${step}`;
+}
+
 export const UPLOAD_INPUT_LABEL = 'Archivo de inventario';
 export const UPLOAD_TRIGGER_LABEL = 'Elegir archivo';
 export const UPLOAD_CHANGE_LABEL = 'Elegir otro archivo';
-export const UPLOAD_NO_FILE = 'Ningún archivo elegido.';
+export const UPLOAD_FORMATS_LABEL = '.xlsx · .csv';
+export const UPLOAD_FILE_SIZE_TESTID = 'inventory-import-upload-file-size';
+export const UPLOAD_EMPTY_TESTID = 'inventory-import-upload-empty';
 
 export const UPLOAD_FIELD_TESTID = 'inventory-import-upload';
 export const UPLOAD_INPUT_TESTID = 'inventory-import-upload-input';
@@ -140,8 +154,21 @@ export function ignoredColumnsSummary(rows: number): string {
     : `${formatCount(rows)} filas traen valores en columnas que su tipo no usa: esos valores se ignoran y las filas se importan igual.`;
 }
 
+export function confirmLabelParts(validRows: number): {
+  readonly before: string;
+  readonly count: string;
+  readonly after: string;
+} {
+  return {
+    before: 'Importar',
+    count: formatCount(validRows),
+    after: validRows === 1 ? 'fila válida' : 'filas válidas',
+  };
+}
+
 export function confirmLabel(validRows: number): string {
-  return validRows === 1 ? 'Importar 1 fila válida' : `Importar ${formatCount(validRows)} filas válidas`;
+  const { before, count, after } = confirmLabelParts(validRows);
+  return `${before} ${count} ${after}`;
 }
 export const CONFIRMING_LABEL = 'Importando…';
 export const NO_VALID_ROWS_NOTICE = 'No hay ninguna fila válida que importar.';
@@ -150,10 +177,15 @@ export const PARTIAL_IMPORT_NOTICE =
 export const ERROR_FILE_BUTTON_LABEL = 'Descargar filas con error';
 
 export const PREVIEW_SUMMARY_TESTID = 'inventory-import-preview-summary';
+export const PREVIEW_CARD_TESTID = 'inventory-import-preview-card';
+export const PREVIEW_ACTIONS_TESTID = 'inventory-import-preview-actions';
+export const IMPORT_FILE_NAME_TESTID = 'inventory-import-file-name';
+export const RESULT_CARD_TESTID = 'inventory-import-result-card';
 export const PREVIEW_TABLE_TESTID = 'inventory-import-preview-table';
 export const RESULT_TABLE_TESTID = 'inventory-import-result-table';
 export const EXAMPLE_ROW_NOTICE_TESTID = 'inventory-import-example-ignored';
 export const CONFIRM_BUTTON_TESTID = 'inventory-import-confirm';
+export const CHOOSE_ANOTHER_TESTID = 'inventory-import-choose-another';
 export const NO_VALID_ROWS_TESTID = 'inventory-import-no-valid-rows';
 export const ERROR_FILE_BUTTON_TESTID = 'inventory-import-error-file';
 export const STATUS_FILTER_TESTID = 'inventory-import-status-filter';
@@ -237,6 +269,7 @@ export const UNIT_FIELD_LABELS = {
   factor: 'Factor',
 } as const;
 export const NO_BASE_UNIT_LABEL = 'No deriva de ninguna';
+export const UNIT_CREATED_TOAST = 'Unidad creada.';
 
 export const PRESENTATION_DIALOG_TITLE = 'Nueva presentación';
 export const PRESENTATION_DIALOG_DESCRIPTION = 'Se crea igual que desde la pantalla de presentaciones.';
@@ -244,6 +277,7 @@ export const PRESENTATION_FIELD_LABELS = {
   name: 'Nombre',
   content: 'Contenido',
 } as const;
+export const PRESENTATION_CREATED_TOAST = 'Presentación creada.';
 
 export const UNIT_DIALOG_TESTID = 'inventory-import-unit-dialog';
 export const PRESENTATION_DIALOG_TESTID = 'inventory-import-presentation-dialog';

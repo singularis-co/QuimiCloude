@@ -18,6 +18,7 @@ import {
   NAV_SECTION_CONFIGURATION,
   NAV_SECTION_DIRECTORY,
   NAV_SECTION_OPERATION,
+  NAV_SECTION_PLATFORM,
   NAV_SECTION_PRODUCTION,
   NAV_SECTION_TRACKING,
   PRIVATE_NAV_ITEMS,
@@ -102,6 +103,9 @@ const ITEMS_PREVIOS = [
   { testId: 'nav-usuarios', section: NAV_SECTION_CONFIGURATION },
   { testId: 'nav-presentaciones', section: NAV_SECTION_CONFIGURATION },
   { testId: 'nav-unidades', section: NAV_SECTION_CONFIGURATION },
+  // Llegaron después del grupo, en su propia sección y al final del menú.
+  { testId: 'nav-empresas', section: NAV_SECTION_PLATFORM },
+  { testId: 'nav-administradores', section: NAV_SECTION_PLATFORM },
 ] as const;
 
 describe('el grupo Integraciones y sus tres hijos', () => {
@@ -210,13 +214,18 @@ describe('el grupo no cambia nada de lo que ya existia', () => {
     );
   });
 
-  it('R6: sin el grupo, el menu es elemento a elemento los diez items previos', () => {
+  it('R6: sin el grupo, el menu es elemento a elemento los items previos y los de «Plataforma»', () => {
     expect(MENU_SIN_EL_GRUPO.map(({ testId, section }) => ({ testId, section }))).toEqual(
       ITEMS_PREVIOS,
     );
   });
 
-  it('R6: el grupo es el ultimo item del array', () => {
-    expect(PRIVATE_NAV_ITEMS[PRIVATE_NAV_ITEMS.length - 1]).toBe(GRUPO);
+  it('R6: el grupo es el ultimo item de «Configuración»; detras solo queda «Plataforma»', () => {
+    const posicion = PRIVATE_NAV_ITEMS.findIndex((item) => item === GRUPO);
+    const detras = PRIVATE_NAV_ITEMS.slice(posicion + 1);
+
+    expect(posicion).toBeGreaterThanOrEqual(0);
+    expect(detras.length).toBeGreaterThan(0);
+    expect(detras.every((item) => item.section === NAV_SECTION_PLATFORM)).toBe(true);
   });
 });

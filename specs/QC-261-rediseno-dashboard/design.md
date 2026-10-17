@@ -99,6 +99,8 @@ export type EmptyStateProps = {
 - `execution-trace-columns.tsx`:
   - «Nº de pedido»: número + `DeletedOrderMark` / `ActiveOrderMark`, que pasan a ser `StatusBadge`
     (`muted` / `progress`) conservando sus `data-testid` (R6).
+    **Enmienda 2026-10-16 (`0f135128`):** `ActiveOrderMark` deja de pintarse en la fila, en la
+    tarjeta y en el detalle; solo queda `DeletedOrderMark` (R6 enmendado).
   - «Estado»: `StatusBadge` con `ORDER_STATUS_TONES` y `data-testid` / `data-status` (R4).
   - «Primera anotación», «Última anotación», «Duración»: `tabular: true`, `align: 'end'` (R3).
   - «Vueltas atrás»: `align: 'end'`; `StatusBadge tone="waiting"` con la cifra si > 0, `0`
@@ -304,6 +306,8 @@ merge-base con `origin/dev` sin archivos bajo `lib/`, `db/`, `middleware.ts` ni 
 | R19 | `tests/unit/navegacion/no-encontrada-rediseno.test.tsx`, `tests/unit/navegacion/private-not-found.test.tsx`, `tests/unit/shared-ui/empty-state.test.tsx` |
 | R20 | `e2e/dashboard-rediseno.spec.ts` (chromium y webkit; 390, 820, 1440) |
 | R21 | `tests/ui/dashboard/textos-dashboard.test.tsx` |
+| R6 enmendado (2026-10-16, `0f135128`) | `tests/ui/dashboard/dashboard-rediseno.test.tsx` › «R6 - un pedido dado de baja lleva «Dado de baja» en tono muted junto al número y nunca «En curso»» y «R6 - un pedido activo no lleva chip «En curso» junto al número: el estado ya dice el paso»; `tests/ui/dashboard/recorrido-rediseno.test.tsx` › «R12: «Dado de baja» va junto al estado y ningún pedido, activo o de baja, lleva chip «En curso»»; `tests/ui/dashboard/textos-dashboard.test.tsx` › «R21 - la marca de la lista dice «Dado de baja»; una fila activa no lleva chip «En curso»» y «R21 - las marcas del recorrido dicen «Dado de baja» y «Vuelta atrás», sin chip «En curso»» |
+| R4 con C10 (2026-10-16, `440ff5b2`) | `tests/ui/dashboard/execution-trace-table.test.tsx` › «R3 - la fila activa muestra su estado y su duracion abierta» («En fabricación»); `tests/unit/dashboard/execution-trace-format.test.ts` › «R3 - EN_CURSO se lee «En fabricación»» |
 | R22 | `tests/guards/guard-qc261-limites-de-la-ficha.test.ts` |
 | R23 | `tests/guards/guard-catalogo-de-componentes.test.ts`, `tests/guards/guard-qc261-limites-de-la-ficha.test.ts` |
 | R24 | `e2e/recorrido-ejecucion.spec.ts` |

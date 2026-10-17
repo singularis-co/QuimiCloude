@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Administradores del Maestro</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" area="maestro" active="administradores" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><span class="crumb">Plataforma</span><h1 class="h1">Administradores</h1></div>
+          <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-pri b-touch-m" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo administrador</button></div>
+        </div>
+
+        <div class="toolbar" role="toolbar" aria-label="Filtros de administradores">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar administradores por nombre, correo o nombre de usuario" aria-label="Buscar administradores por nombre, correo o nombre de usuario"></label>
+          <button class="{{ chipCls }}" type="button" aria-pressed="{{ filteredStr }}" onClick="{{ cycleFilter }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Empresa<sc-if value="{{ filtered }}" hint-placeholder-val="{{ false }}"><span class="v">{{ filterLabel }}</span></sc-if></button>
+        </div>
+
+        <div class="tw">
+          <div class="scroll">
+            <table class="collapse">
+              <thead><tr><th scope="col">Nombre</th><th scope="col">Usuario</th><th scope="col">Correo</th><th scope="col">Empresa</th><th scope="col">Estado</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+              <tbody class="{{ bodyCls }}">
+                <sc-for list="{{ rows }}" as="u" hint-placeholder-count="6">
+                  <tr>
+                    <td><span class="person" style="min-height: 0"><span class="{{ u.avCls }}">{{ u.ini }}</span><span class="strong">{{ u.name }}</span></span></td>
+                    <td class="mono">{{ u.user }}</td>
+                    <td>{{ u.mail }}</td>
+                    <td><a href="MaestroEmpresa.dc.html" style="color: inherit">{{ u.co }}</a></td>
+                    <td><span class="{{ u.stCls }}"><i></i>{{ u.st }}</span></td>
+                    <td class="rowact anchor">
+                      <button class="b b-gho b-ico" type="button" aria-label="{{ u.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ u.open }}" onClick="{{ u.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                      <div class="{{ u.menuCls }}" role="menu" style="min-width: 220px">
+                        <button class="mi" type="button" role="menuitem" onClick="{{ u.edit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+                        <sc-if value="{{ u.pending }}" hint-placeholder-val="{{ false }}"><button class="mi" type="button" role="menuitem" onClick="{{ u.resend }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6"></path></svg>Reenviar enlace</button></sc-if>
+                        <div class="sep"></div>
+                        <button class="mi danger" type="button" role="menuitem" onClick="{{ u.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Dar de baja</button>
+                      </div>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <sc-for list="{{ rows }}" as="u" hint-placeholder-count="5">
+                <div class="rm">
+                  <div class="rm-top"><span class="person" style="min-height: 0"><span class="{{ u.avCls }}">{{ u.ini }}</span><span class="strong">{{ u.name }}</span></span><span class="{{ u.stCls }}"><i></i>{{ u.st }}</span></div>
+                  <div class="rm-meta"><span class="mono">{{ u.user }}</span><span>{{ u.mail }}</span></div>
+                  <div class="rm-top"><span class="cap">{{ u.co }}</span><button class="b b-out b-sm" type="button" style="height: 44px" onClick="{{ u.mobileActs }}" aria-label="{{ u.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="pg"><span>Página <span class="mono">1</span> de <span class="mono">1</span> · <span class="mono">{{ count }}</span> en total</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" area="maestro" active="administradores" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <aside class="{{ sheetCls }}" role="dialog" aria-modal="true" aria-labelledby="ad-sh">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="ad-sh" class="h2">{{ sheetTitle }}</h2><p class="sub">{{ sheetDesc }}</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <sc-if value="{{ isNew }}" hint-placeholder-val="{{ true }}"><div class="f"><label for="ad-e">Empresa<span class="req" aria-hidden="true">*</span></label><button id="ad-e" class="in trig" type="button" aria-haspopup="listbox"><span class="{{ coCls }}">{{ fCo }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button><span class="help">Solo empresas activas.</span></div></sc-if><sc-if value="{{ isEditSheet }}" hint-placeholder-val="{{ false }}"><div class="f"><span class="fl">Empresa</span><span class="strong">{{ fCo }}</span></div></sc-if>
+      <div class="g2 cq-1">
+        <div class="f"><label for="ad-n">Nombres<span class="req" aria-hidden="true">*</span></label><input id="ad-n" class="in" type="text" value="{{ fFirst }}"></div>
+        <div class="f"><label for="ad-a">Apellidos<span class="req" aria-hidden="true">*</span></label><input id="ad-a" class="in" type="text" value="{{ fLast }}"></div>
+      </div>
+      <div class="g2 cq-1">
+        <div class="f"><label for="ad-c">Correo<span class="req" aria-hidden="true">*</span></label><input id="ad-c" class="in" type="email" value="{{ fMail }}"></div>
+        <div class="f"><label for="ad-t">Teléfono</label><input id="ad-t" class="in mono" type="tel"></div>
+      </div>
+      <div class="cq-1" style="display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px">
+        <div class="f"><label for="ad-td">Tipo de documento</label><button id="ad-td" class="in trig" type="button"><span>CC</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+        <div class="f"><label for="ad-nd">Número de documento</label><input id="ad-nd" class="in mono" type="text"></div>
+      </div>
+      <div class="f"><label for="ad-u">Nombre de usuario<span class="req" aria-hidden="true">*</span></label><input id="ad-u" class="in mono" type="text" value="{{ fUser }}"></div>
+      <div class="f"><span class="fl">Rol</span><span class="sb t-neutral" style="align-self: flex-start"><i></i>Administrador</span></div>
+      <sc-if value="{{ isNew }}" hint-placeholder-val="{{ true }}"><div class="nt n-i"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6"></path></svg><span>Le llegará un correo con un enlace para fijar su contraseña.</span></div></sc-if>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ save }}">{{ saveLabel }}</button></div>
+  </aside>
+
+  <div class="{{ delCls }}" role="alertdialog" aria-modal="true" aria-labelledby="ad-de">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+    <h2 id="ad-de" class="h2">Dar de baja a {{ tName }}</h2>
+    <p class="sub">{{ tName }} deja de poder entrar a <span class="strong">{{ tCo }}</span>.</p>
+    <sc-if value="{{ tLast }}" hint-placeholder-val="{{ false }}"><div class="nt n-w"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span><b>Es el último Administrador de {{ tCo }}</b>Crea otro Administrador para esta empresa antes de darlo de baja.</span></div></sc-if>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" aria-disabled="{{ tLastStr }}" onClick="{{ confirmDel }}">Dar de baja</button></div>
+  </div>
+
+  <div class="{{ resendCls }}" role="alertdialog" aria-modal="true" aria-labelledby="ad-rs">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6"></path></svg></div>
+    <h2 id="ad-rs" class="h2">¿Reenviar el enlace a {{ tName }}?</h2>
+    <p class="sub">Le llegará a <span class="strong">{{ tMail }}</span> un correo nuevo para fijar su contraseña. El enlace anterior deja de servir.</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-pri" type="button" onClick="{{ confirmResend }}">Reenviar enlace</button></div>
+  </div>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="{{ actsLabel }}">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">{{ tName }}</span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <button class="mi" type="button" role="menuitem" onClick="{{ aEdit }}">Editar</button>
+    <sc-if value="{{ tPending }}" hint-placeholder-val="{{ false }}"><button class="mi" type="button" role="menuitem" onClick="{{ aResend }}">Reenviar enlace</button></sc-if>
+    <div class="sep"></div>
+    <button class="mi danger" type="button" role="menuitem" onClick="{{ aDel }}">Dar de baja</button>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const P = [
+{ id: 'a1', first: 'Diana', last: 'Mejía', ini: 'DM', c: 'c3', user: 'dmejia', mail: 'dmejia@quimicosvalle.co', co: 'Químicos del Valle S.A.S.', st: 'active' },
+{ id: 'a2', first: 'Julián', last: 'Castro', ini: 'JC', c: '', user: 'jcastro', mail: 'jcastro@quimicosvalle.co', co: 'Químicos del Valle S.A.S.', st: 'pending' },
+{ id: 'a3', first: 'Natalia', last: 'Ríos', ini: 'NR', c: 'c4', user: 'nrios', mail: 'admin@labandinos.co', co: 'Laboratorios Andinos', st: 'active' },
+{ id: 'a4', first: 'Felipe', last: 'Ortega', ini: 'FO', c: 'c2', user: 'fortega', mail: 'fortega@pinturasdelsur.ec', co: 'Pinturas del Sur', st: 'active' },
+{ id: 'a5', first: 'Paula', last: 'Gil', ini: 'PG', c: 'c6', user: 'pgil', mail: 'gerencia@aseocaribe.co', co: 'Aseo Caribe', st: 'active' },
+{ id: 'a6', first: 'Carlos', last: 'Restrepo', ini: 'CR', c: 'c5', user: 'crestrepo', mail: 'crestrepo@quimicloud.co', co: 'QuimiCloud', st: 'active' }
+];
+const ST = { active: ['Activo', 'success'], pending: ['Pendiente', 'neutral'] };
+const byId = {}; P.forEach((p) => { byId[p.id] = p; });
+const nameOf = (p) => p.first + ' ' + p.last;
+const gone = s.gone || {};
+const cos = ['todas', 'Químicos del Valle S.A.S.', 'Laboratorios Andinos'];
+const fi = s.fi || 0; const fco = cos[fi];
+const k = s.k || 0; const open = s.open;
+const closed = { sheet: null, dlg: null, menu: false, acts: null, open: null };
+const flash = (msg, extra) => { this.setState(Object.assign({ toast: true, toastMsg: msg }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+let list = P.filter((p) => !gone[p.id]);
+if (fi) list = list.filter((p) => p.co === fco);
+const n = list.length;
+const countBy = {}; P.filter((p) => !gone[p.id]).forEach((p) => { countBy[p.co] = (countBy[p.co] || 0) + 1; });
+const rows = list.map((p, i) => {
+const st = ST[p.st]; const nm = nameOf(p); const up = i >= n - 2 && n > 3;
+return { name: nm, ini: p.ini, avCls: p.c ? 'av sm ' + p.c : 'av sm', user: p.user, mail: p.mail, co: p.co, st: st[0], stCls: 'sb t-' + st[1],
+open: open === p.id ? 'true' : 'false', menuCls: 'pop right at-row' + (up ? ' up' : '') + (open === p.id ? ' open' : ''),
+menuLabel: 'Acciones de ' + nm,
+toggle: () => this.setState({ open: open === p.id ? null : p.id }),
+edit: () => this.setState(Object.assign({}, closed, { sheet: 'edit', target: p.id })),
+del: () => this.setState(Object.assign({}, closed, { dlg: 'del', target: p.id })),
+resend: () => this.setState(Object.assign({}, closed, { dlg: 'resend', target: p.id })), pending: p.st === 'pending',
+mobileActs: () => this.setState(Object.assign({}, closed, { acts: true, target: p.id })) };
+});
+const t = s.target ? byId[s.target] : null;
+const isEdit = s.sheet === 'edit';
+const ov = s.sheet || s.dlg || s.menu || s.acts;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false', openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+filtered: fi > 0, filteredStr: fi > 0 ? 'true' : 'false', filterLabel: fi ? fco : '', chipCls: fi ? 'chip on' : 'chip',
+cycleFilter: () => this.setState({ fi: (fi + 1) % cos.length, open: null, k: k + 1 }),
+rows: rows, count: n, bodyCls: k % 2 ? 'fade' : '',
+openNew: () => this.setState(Object.assign({}, closed, { sheet: 'new', target: null })),
+sheetCls: s.sheet ? 'sheet wide open' : 'sheet wide',
+sheetTitle: isEdit ? 'Editar administrador' : 'Nuevo administrador',
+sheetDesc: isEdit ? 'Cambia los datos de la persona.' : 'Elige la empresa y describe a la persona que la va a administrar.',
+isNew: !isEdit, isEditSheet: isEdit,
+fCo: isEdit && t ? t.co : '[Elige una empresa]', coCls: isEdit ? '' : 'dim',
+fFirst: isEdit && t ? t.first : '', fLast: isEdit && t ? t.last : '', fMail: isEdit && t ? t.mail : '', fUser: isEdit && t ? t.user : 'jperez',
+saveLabel: isEdit ? 'Guardar' : 'Crear administrador',
+save: () => flash(isEdit ? 'Administrador actualizado.' : 'Administrador creado. Enviamos el enlace.', closed),
+tName: t ? nameOf(t) : '', tCo: t ? t.co : '', tLast: t ? (countBy[t.co] || 0) <= 1 : false, tLastStr: t && (countBy[t.co] || 0) <= 1 ? 'true' : 'false',
+delCls: s.dlg === 'del' ? 'dlg open' : 'dlg',
+confirmDel: () => { if (t && (countBy[t.co] || 0) <= 1) return; const nx = Object.assign({}, gone); nx[s.target] = true; flash('Administrador dado de baja.', Object.assign({}, closed, { gone: nx, k: k + 1 })); },
+actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsLabel: 'Acciones de ' + (t ? nameOf(t) : ''),
+aEdit: () => this.setState(Object.assign({}, closed, { sheet: 'edit', target: s.target })),
+aDel: () => this.setState(Object.assign({}, closed, { dlg: 'del', target: s.target })),
+aResend: () => this.setState(Object.assign({}, closed, { dlg: 'resend', target: s.target })),
+resendCls: s.dlg === 'resend' ? 'dlg open' : 'dlg', tMail: t ? t.mail : '', tPending: !!t && t.st === 'pending',
+confirmResend: () => flash('Enviamos el enlace a ' + (t ? nameOf(t) : '') + '.', closed),
+ovCls: ov ? 'ov open' : 'ov', closeAll: () => this.setState(closed),
+toastCls: s.toast ? 'toast show' : 'toast', toastMsg: s.toastMsg || ''
+};
+}
+}
+</script>
+</body>
+</html>

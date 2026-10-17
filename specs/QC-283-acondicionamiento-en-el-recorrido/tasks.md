@@ -97,6 +97,8 @@
     tablero;
   - la marca «En curso», con `trace.active`.
 - Si `formatTraceDuration` queda sin consumidores, se borra junto con su test.
+- *(Enmienda 2026-10-16, aprobada por el usuario, sin tarjeta; `0f135128`: las dos marcas «En curso»
+  de arriba ya no se pintan; R28 enmendado. La insignia de fase abierta de las tarjetas sigue.)*
 
 **Tests:**
 

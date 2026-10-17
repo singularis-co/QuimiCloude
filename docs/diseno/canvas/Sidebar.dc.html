@@ -17,7 +17,7 @@
   <sc-if value="{{ rail }}" hint-placeholder-val="{{ true }}"><button class="railbtn" type="button" aria-label="Plegar o desplegar la barra lateral" aria-expanded="{{ expanded }}" onClick="{{ toggleCol }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button></sc-if>
   <nav class="nav" aria-label="Navegación principal">
     <span class="ind" style="transform: translateY({{ indY }}px)" aria-hidden="true"></span>
-    <sc-for list="{{ nav }}" as="n" hint-placeholder-count="16">
+    <sc-for list="{{ nav }}" as="n" hint-placeholder-count="14">
       <sc-if value="{{ n.isGroup }}" hint-placeholder-val="{{ false }}"><span class="grp">{{ n.label }}</span></sc-if>
       <sc-if value="{{ n.isItem }}" hint-placeholder-val="{{ true }}">
         <a class="it" href="#" aria-current="{{ n.current }}" onClick="{{ n.go }}" title="{{ n.label }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ n.icon }}"></path></svg><span class="lbl">{{ n.label }}</span></a>
@@ -30,10 +30,10 @@
       </sc-if>
     </sc-for>
   </nav>
-  <div class="side-user"><span class="av c2">CR</span><span class="lbl" style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 13px; font-weight: 500">Carlos Restrepo</span><span style="font-size: 12px; color: var(--sb-muted)">Administrador</span></span></div>
+  <div class="side-user"><span class="av c2">{{ userIni }}</span><span class="lbl" style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 13px; font-weight: 500">{{ userName }}</span><span style="font-size: 12px; color: var(--sb-muted)">{{ userRole }}</span></span></div>
 </aside>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["asignacion","dashboard","inventario","pedidos","usuarios","formulas","proveedores","clientes","presentaciones","unidades","proveedor-ia","inventarios","whatsapp"],"default":"pedidos"},"sheet":{"editor":"boolean","default":false},"$preview":{"width":272,"height":780}}'>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["asignacion","dashboard","inventario","pedidos","usuarios","formulas","proveedores","clientes","presentaciones","unidades","proveedor-ia","inventarios","whatsapp","empresas","administradores"],"default":"pedidos"},"area":{"editor":"enum","options":["erp","maestro"],"default":"erp"},"sheet":{"editor":"boolean","default":false},"$preview":{"width":272,"height":760}}'>
 class Component extends DCLogic {
 renderVals() {
 const s = this.state || {};
@@ -43,22 +43,25 @@ dashboard: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
 inventario: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5',
 pedidos: 'M8 3h8l1 3H7zM5 6h14v15H5zM9 11h6M9 15h6',
 usuarios: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
-formulas: 'M10 2v6l-6 11a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-6-11V2M8.5 2h7M6.5 15h11',
+produccion: 'M3 21V10l6 4v-4l6 4V5h6v16zM7 17h2M12 17h2M17 17h2',
 proveedores: 'M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
 clientes: 'M4 4h16v16H4zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 18c1-2 3-3 5-3s4 1 5 3',
 presentaciones: 'M3 13h8v8H3zM13 13h8v8h-8zM8 3h8v8H8z',
 unidades: 'M3 17 17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2',
-integraciones: 'M14 3v3a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 0 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 0 0-4H3V3z'
+integraciones: 'M14 3v3a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 0 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 0 0-4H3V3z',
+empresas: 'M4 21V5l8-3v19M12 8h8v13M4 21h18M8 7h.01M8 11h.01M8 15h.01M16 12h.01M16 16h.01',
+administradores: 'M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM8 17c.8-1.8 2.2-2.6 4-2.6s3.2.8 4 2.6'
 };
-const def = [
-['g','Seguimiento'],['i','dashboard','Dashboard'],
-['g','Operación'],['i','inventario','Inventario'],['i','pedidos','Pedidos'],['i','asignacion','Asignación'],
-['g','Producción'],['i','formulas','Fórmulas'],
-['g','Directorio'],['i','proveedores','Proveedores'],['i','clientes','Clientes'],
-['g','Configuración'],['i','usuarios','Usuarios'],['i','presentaciones','Presentaciones'],['i','unidades','Unidades'],['p','integraciones','Integraciones',[['proveedor-ia','Proveedor IA'],['inventarios','Inventarios'],['whatsapp','WhatsApp']]]
+const maestro = this.props.area === 'maestro';
+const def = maestro ? [
+['g','Plataforma'],['i','empresas','Empresas'],['i','administradores','Administradores']
+] : [
+['g','Operación'],['i','asignacion','Asignación'],['i','dashboard','Dashboard'],['i','inventario','Inventario'],['i','pedidos','Pedidos'],['i','usuarios','Usuarios'],
+['g','Cadena'],['p','produccion','Producción',[['formulas','Fórmulas']]],['i','proveedores','Proveedores'],['i','clientes','Clientes'],
+['g','Configuración'],['i','presentaciones','Presentaciones'],['i','unidades','Unidades'],['p','integraciones','Integraciones',[['proveedor-ia','Proveedor IA'],['inventarios','Inventarios'],['whatsapp','WhatsApp']]]
 ];
-const cur = s.cur || this.props.active || 'pedidos';
-const open = Object.assign({ integraciones: true }, s.open || {});
+const cur = s.cur || this.props.active || (maestro ? 'empresas' : 'pedidos');
+const open = Object.assign({ produccion: true, integraciones: true }, s.open || {});
 const go = (k) => (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ cur: k }); };
 let y = 0; let indY = 0;
 const nav = def.map((d) => {
@@ -75,7 +78,8 @@ return {
 sideCls: 'side' + (sheet ? ' in-sheet force' : '') + (col && !sheet ? ' col' : ''),
 rail: !sheet, expanded: col ? 'false' : 'true',
 toggleCol: () => this.setState({ col: !col }),
-nav: nav, indY: indY
+nav: nav, indY: indY,
+userIni: maestro ? 'MQ' : 'CR', userName: maestro ? '[NOMBRE DEL MAESTRO]' : 'Carlos Restrepo', userRole: maestro ? 'Maestro' : 'Administrador'
 };
 }
 }

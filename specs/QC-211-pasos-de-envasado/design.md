@@ -235,6 +235,21 @@ instancia tiene su propio `DndContext`, así que arrastrar en una lista no mueve
 anuncios de `aria-live` hablan de «paso» en las dos; no hace falta distinguirlos porque el foco ya
 está dentro de la sección.
 
+> **Enmienda 2026-10-16 (D14; aprobada por el usuario, sin tarjeta; commit `5f2cc171`).** La prop
+> `addLabel` y los botones `recipe-step-add` / `recipe-packing-step-add` desaparecen. Cada fila lleva
+> en su barra «+» (`<prefijo>-add-N`, «Añadir un paso después del N») y «×» (`<prefijo>-remove-N`),
+> junto a «Requiere evidencia», como las filas de Ingredientes. La lista arranca con una fila vacía
+> que vive fuera de `steps` hasta que se escribe en ella, así que una fila sin tocar no se envía.
+> Nuevas props `optionalHelp` (marca «(opcional)» y tooltip, `<prefijo>s-optional` /
+> `<prefijo>s-help-text`) para la sección de envasado, y un divisor
+> `recipe-form-steps-separator` entre las dos secciones. El formulario de versión no cambia.
+>
+> | R | Test |
+> |---|---|
+> | R7 (D14) | `tests/unit/recetas-ui/recipe-form-packing-steps.test.tsx` › «las dos secciones van separadas por un divisor y sin botones «Añadir paso…»», «la sección de envasado se marca «(opcional)» y su ayuda explica para qué sirve» |
+> | R8 (D14) | `tests/unit/recetas-ui/recipe-form-packing-steps.test.tsx` › «las filas en blanco sin tocar no se envían: sin pasos se mandan las dos listas vacías», «una sección cuyo único paso quedó en blanco se envía vacía y sin error», «R9: una lectura sin la clave de pasos de envasado abre la sección con su fila en blanco» |
+> | R12 (sin cambios) | `tests/unit/recetas-ui/recipe-version-form.test.tsx` › «R12 — los pasos de envasado heredados se leen dentro de un contenedor inert, sin editor ni marcado» |
+
 ### 5.4 Formulario de fórmula (`recipe-form.tsx`, `recipe-form-state.ts`)
 
 - `RecipeFormState.packingSteps: readonly RecipeStepFormValue[]`; `buildInitialState` la carga

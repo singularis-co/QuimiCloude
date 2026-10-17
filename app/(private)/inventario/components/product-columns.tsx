@@ -1,9 +1,9 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn, type RowActionsSpec } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import {
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { cn } from '@/lib/utils';
 
+import { withCardFieldLabel } from './card-field-label';
 import { EXPIRING_CLASS, ExpiryDate } from './expiry-date';
 import { productNameWithoutPresentation } from './product-base-name';
 import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
@@ -37,9 +38,7 @@ import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
  * `ProductView` sino las dos columnas de MARCADO -miniatura y acciones-. El test en negativo
  * sigue haciendo falta y sigue ahi.
  *
- * **Es una FACTORIA y no un array del modulo** por lo mismo que en pedidos: la celda de acciones
- * monta el panel de edicion y el dialogo de baja, que son componentes de cliente. Mientras fue un
- * array de datos, esas acciones vivian incrustadas en la tabla.
+ * Es una factoría porque el menú de la fila y el despliegue de lotes llegan de quien monta la tabla.
  *
  * **Que columna ordena y que columna filtra sale de `PRODUCT_QUERYABLE`**, la lista blanca del
  * modulo, no de una decision de esta pantalla: declarar `sortable` en una cabecera que el backend
@@ -67,6 +66,9 @@ export const IMAGE_COLUMN_ID = 'image';
 /** Id de la columna de acciones. Tampoco es un campo: es marcado. */
 export const ACTIONS_COLUMN_ID = 'actions';
 
+/** Id del conmutador de lotes del pie de la tarjeta. Marcado; en la tabla se oculta. */
+export const BATCHES_TOGGLE_COLUMN_ID = 'batchesToggle';
+
 /**
  * Id valido de columna. **Es la primera defensa de R7, y es de tipos**: escribir
  * `id: 'createdBy'` en la declaracion de abajo no compila. El test en negativo sigue haciendo
@@ -76,7 +78,8 @@ export const ACTIONS_COLUMN_ID = 'actions';
 export type ProductColumnId =
   | Exclude<keyof ProductView, HiddenProductField>
   | typeof IMAGE_COLUMN_ID
-  | typeof ACTIONS_COLUMN_ID;
+  | typeof ACTIONS_COLUMN_ID
+  | typeof BATCHES_TOGGLE_COLUMN_ID;
 
 /** Estado de la carga de los lotes de un producto desplegado. */
 export type ProductBatchesStatus =
@@ -115,6 +118,8 @@ export type ProductColumn = DataTableColumn<ProductTableRow> & { readonly id: Pr
 /** Textos de las sub-filas de lotes. */
 export const PRODUCT_BATCH_ROW_TEXTS = {
   toggle: (name: string) => `Mostrar lotes de ${name}`,
+  cardToggle: (expanded: boolean) => (expanded ? 'Ocultar lotes' : 'Mostrar lotes'),
+  cardToggleColumn: 'Lotes',
   lot: 'Lote:',
   purchaseDate: 'Fecha de compra:',
   expiryDate: 'Vencimiento:',
@@ -123,6 +128,14 @@ export const PRODUCT_BATCH_ROW_TEXTS = {
   empty: 'Sin lotes con existencia.',
   error: 'No se pudieron cargar los lotes.',
   retry: 'Reintentar',
+} as const;
+
+/** Rótulos de las cifras en la tarjeta; en la tabla no se ven. */
+export const PRODUCT_CARD_LABELS = {
+  stock: 'Existencia',
+  qtyAlert: 'Alerta',
+  available: 'Disponible',
+  unitCost: 'Costo',
 } as const;
 
 /** Encabezado de la columna de imagen. Constante para que ningun test dependa del literal. */
@@ -166,8 +179,27 @@ export function productUnitLabel(
   return product.unitId === null ? null : unitLabel(product.unitId, units);
 }
 
+/** Texto del aviso de existencia en alarma: `title` de la celda y texto para lectores de pantalla. */
+export const BELOW_ALERT_LABEL = 'Por debajo de la alerta de cantidad';
+
+/** Clase de la cifra en alarma, compartida con la existencia en envases de producto terminado. */
+export const BELOW_ALERT_CLASS = 'font-semibold text-warning-text';
+
 /**
- * Una existencia junto a su unidad, tenida de rojo cuando esta en alarma.
+ * Icono y texto oculto que acompanan a una cifra en alarma: el color solo no basta. El `title`
+ * va aqui y no en la celda, que lo reserva para la cifra exacta cuando se redondea.
+ */
+export function BelowAlertMark(): ReactNode {
+  return (
+    <span title={BELOW_ALERT_LABEL}>
+      <TriangleAlert aria-hidden="true" className="mr-1 inline size-3.5 align-[-0.125em]" />
+      <span className="sr-only">{BELOW_ALERT_LABEL}</span>
+    </span>
+  );
+}
+
+/**
+ * Una existencia junto a su unidad, en el tono de advertencia cuando esta en alarma.
  *
  * Se pinta a dos decimales: la celda no es donde se vuelve a guardar. El `aria-label` lleva la
  * cifra exacta. `data-alert` acompana a la clase para que la alarma sea afirmable sin depender
@@ -187,10 +219,11 @@ export function stockAmountCell(
     <span
       data-testid={testId}
       data-alert={alerted ? 'true' : undefined}
-      className={alerted ? 'font-semibold text-destructive' : undefined}
+      className={alerted ? BELOW_ALERT_CLASS : undefined}
       title={exactDecimalTitle(stock)}
       aria-label={label === null ? exact : `${exact} ${label}`}
     >
+      {alerted ? <BelowAlertMark /> : null}
       {label === null ? amount : `${amount} ${label}`}
     </span>
   );
@@ -210,13 +243,19 @@ function productQuantityCell(
   return quantityCell(value, testId, productUnitLabel(product, units));
 }
 
-function quantityCell(value: string, testId: string, label: string | null): ReactNode {
+function quantityCell(
+  value: string,
+  testId: string,
+  label: string | null,
+  className?: string,
+): ReactNode {
   const amount = formatDecimalDisplay(value);
   const exact = trimDecimal(value);
 
   return (
     <span
       data-testid={testId}
+      className={className}
       title={exactDecimalTitle(value)}
       aria-label={label === null ? exact : `${exact} ${label}`}
     >
@@ -241,36 +280,44 @@ function aggregateQuantityCell(
   value: string | undefined,
   testId: string,
   label: string | null,
+  className?: string,
 ): ReactNode {
   if (value === undefined) return EMPTY_MARK;
-  return quantityCell(value, testId, label);
+  return quantityCell(value, testId, label, className);
 }
 
 /** Encabezado de la columna de costo. Constante para que ningun test dependa del literal. */
-export const COST_COLUMN_LABEL = 'Costo';
+export const COST_COLUMN_LABEL = 'Costo unitario';
 
 /**
  * Celda de un costo unitario: el del producto (promedio ponderado de sus lotes con existencia y
  * costo) o el del lote. Se pinta como DINERO con `formatMoneyDisplay`: «$», separador de miles y
  * siempre dos decimales redondeados («$1,234.56», «$12.50»), sin pasar por coma flotante. Un costo
  * que a dos decimales se leeria «$0.00» (0.0020) no se pierde: el valor exacto queda en el `title`
- * (`exactDecimalTitle`), a un hover, como en las cantidades. Sin costo, el marcador de vacio.
+ * (`exactDecimalTitle`), a un hover, como en las cantidades. Con unidad conocida se lee «por
+ * unidad» («$2,500.00 / L»); sin ella -tampoco con una unidad que no esta en el catalogo, que
+ * `unitLabel` marca con el vacio-, el importe solo. Sin costo, el marcador de vacio.
  */
-function unitCostCell(value: string | null | undefined, testId: string): ReactNode {
+function unitCostCell(
+  value: string | null | undefined,
+  testId: string,
+  label: string | null,
+): ReactNode {
   if (value === undefined || value === null) return EMPTY_MARK;
+  const amount = formatMoneyDisplay(value);
   return (
     <span data-testid={testId} title={exactDecimalTitle(value)}>
-      {formatMoneyDisplay(value)}
+      {label === null || label === EMPTY_MARK ? amount : `${amount} / ${label}`}
     </span>
   );
 }
 
+/** Las sub-filas de lote y de estado no tienen menú: sin ítems, no se pinta. */
+const NO_ROW_ACTIONS: RowActionsSpec = { items: [], triggerLabel: '' };
+
 export type ProductColumnsDeps = {
-  /**
-   * Acciones de la fila (el menu de la fila). Es un **slot**: la declaracion de columnas no
-   * importa el panel lateral ni el dialogo, los enchufa quien monta la tabla.
-   */
-  readonly rowActions: (product: ProductView) => ReactNode;
+  /** El menú de la fila de un producto, como datos: lo pintan la fila y la tarjeta. */
+  readonly menu: (product: ProductView) => RowActionsSpec;
   /**
    * Catalogo de unidades para resolver el simbolo de la existencia. Sin el (lectura fallida en la
    * pagina), la celda sigue pintando la cantidad, sin etiqueta.
@@ -282,7 +329,7 @@ export type ProductColumnsDeps = {
    */
   readonly showType?: boolean;
   /**
-   * Anade la columna «Costo». Solo la ve el Administrador: la decide el Server Component con el
+   * Anade la columna «Costo unitario». Solo la ve el Administrador: la decide el Server Component con el
    * permiso de la sesion (`canViewUnitCosts`) y baja por props. Defecto `false`: falla cerrado,
    * como `canAdjust`. Presentacion, no autorizacion: quien deja de enviar el costo a quien no
    * debe verlo es el servidor.
@@ -330,20 +377,28 @@ const presentationColumn: ProductColumn = {
 };
 
 /**
- * Columna «Costo»: el promedio en la fila del producto y el propio en la del lote. No ordena ni
- * filtra: es un agregado de los lotes, no una columna de `products`.
+ * Columna «Costo unitario»: el promedio en la fila del producto y el propio en la del lote, los dos
+ * en la unidad del producto. No ordena ni filtra: es un agregado de los lotes, no una columna de
+ * `products`.
  */
-const costColumn: ProductColumn = {
-  id: 'averageUnitCost',
-  label: COST_COLUMN_LABEL,
-  tabular: true,
-  align: 'center',
-  cell: (row) => {
-    if (row.kind === 'product') return unitCostCell(row.product.averageUnitCost, 'product-cost');
-    if (row.kind === 'batch') return unitCostCell(row.batch.unitCost, 'product-batch-row-cost');
-    return null;
-  },
-};
+function costColumn(units: readonly UnitRef[] | undefined): ProductColumn {
+  return {
+    id: 'averageUnitCost',
+    label: COST_COLUMN_LABEL,
+    tabular: true,
+    align: 'end',
+    cell: (row) => {
+      if (row.kind === 'batchesStatus') return null;
+      const label = productUnitLabel(row.product, units);
+      return withCardFieldLabel(
+        PRODUCT_CARD_LABELS.unitCost,
+        row.kind === 'product'
+          ? unitCostCell(row.product.averageUnitCost, 'product-cost', label)
+          : unitCostCell(row.batch.unitCost, 'product-batch-row-cost', label),
+      );
+    },
+  };
+}
 
 const BATCH_ROW_EXPIRY_TEST_IDS = {
   date: 'product-batch-row-expiry-date',
@@ -395,7 +450,11 @@ function productNameCell(
 function batchDetailCell(row: Extract<ProductTableRow, { kind: 'batch' }>): ReactNode {
   const { batch } = row;
   return (
-    <dl data-testid="product-batch-row" className="space-y-1 pl-12 text-sm">
+    <dl
+      data-testid="product-batch-row"
+      data-batch-subrow
+      className="space-y-1 pl-12 text-sm @max-[760px]:pl-0"
+    >
       <div className="block">
         <dt className={BATCH_KEY_CLASS}>{PRODUCT_BATCH_ROW_TEXTS.lot}</dt>{' '}
         <dd data-testid="product-batch-row-lot" className="inline font-mono tabular-nums">
@@ -430,20 +489,32 @@ function batchesStatusCell(
   const { state } = row;
   if (state.status === 'loading') {
     return (
-      <p data-testid="product-batches-row-loading" className="pl-12 text-sm text-muted-foreground">
+      <p
+        data-testid="product-batches-row-loading"
+        data-batch-subrow
+        className="pl-12 text-sm text-muted-foreground @max-[760px]:pl-0"
+      >
         {PRODUCT_BATCH_ROW_TEXTS.loading}
       </p>
     );
   }
   if (state.status === 'empty') {
     return (
-      <p data-testid="product-batches-row-empty" className="pl-12 text-sm text-muted-foreground">
+      <p
+        data-testid="product-batches-row-empty"
+        data-batch-subrow
+        className="pl-12 text-sm text-muted-foreground @max-[760px]:pl-0"
+      >
         {PRODUCT_BATCH_ROW_TEXTS.empty}
       </p>
     );
   }
   return (
-    <div className="flex flex-wrap items-center gap-2 pl-12" data-testid="product-batches-row-error">
+    <div
+      className="flex flex-wrap items-center gap-2 pl-12 @max-[760px]:pl-0"
+      data-testid="product-batches-row-error"
+      data-batch-subrow
+    >
       <p data-testid="product-batches-row-error-message" className="text-sm text-destructive">
         {state.message}
       </p>
@@ -470,13 +541,44 @@ function reservedOrAvailableCell(
 ): ReactNode {
   if (row.kind === 'batchesStatus') return null;
   const label = productUnitLabel(row.product, units);
+  const emphasis = row.kind === 'product' && field === 'available' ? 'font-semibold' : undefined;
   return row.kind === 'product'
-    ? aggregateQuantityCell(row.product[field], `product-${field}`, label)
+    ? aggregateQuantityCell(row.product[field], `product-${field}`, label, emphasis)
     : aggregateQuantityCell(row.batch[field], `product-batch-row-${field}`, label);
 }
 
+/**
+ * El conmutador de lotes del pie de la tarjeta. Es una columna porque la tarjeta solo pinta
+ * columnas; en la tabla la oculta la clase de ámbito de `ProductTable`, que ya tiene el chevrón.
+ */
+function batchesToggleColumn(onToggle: (productId: string) => void): ProductColumn {
+  return {
+    id: BATCHES_TOGGLE_COLUMN_ID,
+    label: PRODUCT_BATCH_ROW_TEXTS.cardToggleColumn,
+    align: 'start',
+    pinnable: false,
+    cell: (row) =>
+      row.kind === 'product' ? (
+        <Button
+          type="button"
+          variant="ghost"
+          touch
+          aria-expanded={row.expanded}
+          data-testid="product-batches-card-toggle"
+          onClick={() => onToggle(row.product.id)}
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={cn('transition-transform', row.expanded && 'rotate-90')}
+          />
+          {PRODUCT_BATCH_ROW_TEXTS.cardToggle(row.expanded)}
+        </Button>
+      ) : null,
+  };
+}
+
 export function buildProductColumns({
-  rowActions,
+  menu,
   units,
   showType = false,
   showCost = false,
@@ -503,6 +605,7 @@ export function buildProductColumns({
           />
         ) : null,
     },
+    ...(onToggle === undefined ? [] : [batchesToggleColumn(onToggle)]),
     {
       id: 'name',
       label: 'Nombre',
@@ -522,53 +625,54 @@ export function buildProductColumns({
       id: 'stock',
       label: 'Existencia',
       tabular: true,
-      align: 'center',
+      align: 'end',
       sortable: true,
       filter: { kind: 'numberRange' },
       cell: (row) => {
-        if (row.kind === 'product') return stockCell(row.product, units);
-        if (row.kind === 'batch') {
-          return stockAmountCell(
-            row.batch.stock,
-            productUnitLabel(row.product, units),
-            false,
-            'batch-stock',
-          );
-        }
-        return null;
+        if (row.kind === 'batchesStatus') return null;
+        return withCardFieldLabel(
+          PRODUCT_CARD_LABELS.stock,
+          row.kind === 'product'
+            ? stockCell(row.product, units)
+            : stockAmountCell(row.batch.stock, productUnitLabel(row.product, units), false, 'batch-stock'),
+        );
       },
-    },
-    ...(showCost ? [costColumn] : []),
-    {
-      id: 'qtyAlert',
-      label: 'Alerta de cantidad',
-      tabular: true,
-      align: 'center',
-      sortable: true,
-      filter: { kind: 'numberRange' },
-      cell: (row) => (row.kind === 'product' ? qtyAlertCell(row.product, units) : null),
-    },
-    {
-      id: 'reserved',
-      label: 'Reservado',
-      tabular: true,
-      align: 'center',
-      // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
-      cell: (row) => reservedOrAvailableCell(row, 'reserved', units),
     },
     {
       id: 'available',
       label: 'Disponible',
       tabular: true,
-      align: 'center',
-      cell: (row) => reservedOrAvailableCell(row, 'available', units),
+      align: 'end',
+      cell: (row) =>
+        withCardFieldLabel(PRODUCT_CARD_LABELS.available, reservedOrAvailableCell(row, 'available', units)),
     },
+    {
+      id: 'reserved',
+      label: 'Reservado',
+      tabular: true,
+      align: 'end',
+      // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
+      cell: (row) => reservedOrAvailableCell(row, 'reserved', units),
+    },
+    {
+      id: 'qtyAlert',
+      label: 'Alerta de cantidad',
+      tabular: true,
+      align: 'end',
+      sortable: true,
+      filter: { kind: 'numberRange' },
+      cell: (row) =>
+        row.kind === 'product'
+          ? withCardFieldLabel(PRODUCT_CARD_LABELS.qtyAlert, qtyAlertCell(row.product, units))
+          : null,
+    },
+    ...(showCost ? [costColumn(units)] : []),
     {
       ...actionsColumn<ProductTableRow>({
         id: ACTIONS_COLUMN_ID,
         label: ACTIONS_COLUMN_LABEL,
         defaultPinned: 'right',
-        cell: (row) => (row.kind === 'product' ? rowActions(row.product) : null),
+        menu: (row) => (row.kind === 'product' ? menu(row.product) : NO_ROW_ACTIONS),
       }),
       id: ACTIONS_COLUMN_ID,
     },

@@ -5,11 +5,20 @@ import type { SessionUser } from '@/lib/modules/identity';
 import {
   PERMISSIONS,
   ROLE_ADMINISTRADOR,
+  ROLE_MAESTRO,
   ROLE_OPERADOR,
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity';
-import { PRIVATE_NAV_ITEMS, PRIVATE_NAV_LABEL } from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import {
+  NAV_SECTION_PLATFORM,
+  PRIVATE_NAV_ITEMS,
+  PRIVATE_NAV_LABEL,
+} from '@/lib/shared/navigation/private-nav';
+import {
+  DASHBOARD_ROUTE,
+  MAESTRO_ADMINISTRATORS_ROUTE,
+  MAESTRO_COMPANIES_ROUTE,
+} from '@/lib/shared/routes';
 
 import {
   clearSidebarStateCookie,
@@ -109,8 +118,11 @@ const testId = {
   // Item de la seccion «Directorio», junto a Proveedores. Declara `clientes.consultar`, que el seed
   // da SOLO al Administrador -el Operador no lo tiene-, igual que unidades.
   clientes: 'nav-clientes',
-  // Grupo de la seccion «Configuración», ULTIMO del array.
+  // Grupo de la seccion «Configuración», ultimo antes de «Plataforma».
   integraciones: 'nav-integraciones',
+  // Los dos de «Plataforma», al final; declaran `empresas.consultar`, que solo tiene el Maestro.
+  empresas: 'nav-empresas',
+  administradores: 'nav-administradores',
 } as const;
 
 /** Los codigos del catalogo de QC-74, sin escribir ninguno a mano. QC-38 lo dejo en ONCE al
@@ -327,7 +339,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(screen.queryByTestId(testId.unidades)).toBeNull();
   });
 
-  it('ancla: el menu real tiene los once items que este test vigila', async () => {
+  it('ancla: el menu real tiene los trece items que este test vigila', async () => {
     // Anti-vacuidad: si alguien renombra un `testId` de `PRIVATE_NAV_ITEMS`, los
     // `queryByTestId(...) === null` de arriba pasarian por buenos sin comprobar nada. Lista EXACTA
     // y en orden, nunca un «al menos N».
@@ -345,7 +357,40 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       testId.presentaciones,
       testId.unidades,
       testId.integraciones,
+      testId.empresas,
+      testId.administradores,
     ]);
+  });
+
+  it('R2, R3: con los permisos del Maestro el layout pinta solo «Plataforma» con Empresas y Administradores', async () => {
+    const permisos = SEED_ROLE_PERMISSIONS[ROLE_MAESTRO];
+    expect(permisos, 'el seed deberia asignar permisos al Maestro').toBeDefined();
+
+    await renderLayout(permisos ?? []);
+
+    const navegacion = screen.getByRole('navigation', { name: PRIVATE_NAV_LABEL });
+    expect(
+      within(navegacion)
+        .getAllByRole('link')
+        .map((enlace) => enlace.getAttribute('href')),
+    ).toEqual([MAESTRO_COMPANIES_ROUTE, MAESTRO_ADMINISTRATORS_ROUTE]);
+    expect(
+      within(navegacion)
+        .getAllByTestId('private-nav-section')
+        .map((seccion) => seccion.textContent),
+    ).toEqual([NAV_SECTION_PLATFORM]);
+  });
+
+  it('R2: sin empresas.consultar la seccion «Plataforma» no llega al arbol', async () => {
+    const { container } = await renderLayout(
+      TODOS_LOS_PERMISOS.filter((codigo) => codigo !== 'empresas.consultar'),
+    );
+
+    expect(screen.getByTestId(testId.inventario)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.empresas)).toBeNull();
+    expect(screen.queryByTestId(testId.administradores)).toBeNull();
+    expect(container.innerHTML).not.toContain('/maestro/');
+    expect(screen.queryByText(NAV_SECTION_PLATFORM)).toBeNull();
   });
 
   it('con los permisos del Administrador el layout pinta el item de clientes', async () => {

@@ -750,3 +750,15 @@ describe('la lista de pedidos lleva la columna «Por entregar», traida del dash
     expect(cabeceras[presentacion + 1]).toContain('Por entregar');
   });
 });
+
+describe('la lista de pedidos ya no lleva la columna «Cantidad» (decision humana del 2026-10-16)', () => {
+  it('ninguna cabecera dice «Cantidad» y «Presentación» y «Por entregar» siguen', () => {
+    montar();
+    const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+
+    expect(cabeceras.some((texto) => texto.includes('Cantidad'))).toBe(false);
+    expect(screen.queryByTestId('data-table-head-quantity')).toBeNull();
+    expect(cabeceras.some((texto) => texto.includes('Presentación'))).toBe(true);
+    expect(cabeceras.some((texto) => texto.includes('Por entregar'))).toBe(true);
+  });
+});

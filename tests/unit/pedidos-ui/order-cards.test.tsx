@@ -183,17 +183,19 @@ describe('cada pedido en su tarjeta', () => {
     expect(numero.compareDocumentPosition(campo(card, 'recipeName')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('R15: cliente, cantidad y fecha de solicitud como datos secundarios, iguales que en la fila', () => {
+  it('R15: cliente y fecha de solicitud como datos secundarios, iguales que en la fila', () => {
     montar();
     const card = tarjeta(CON_CLIENTE);
     const fila = screen.getByTestId(`data-table-row-${CON_CLIENTE.id}`);
 
     expect(campo(card, 'customer')).toHaveTextContent('Ana Garcia');
-    for (const columnId of ['customer', 'quantity', 'createdAt']) {
+    for (const columnId of ['customer', 'createdAt']) {
       const celda = within(fila).getByTestId(`data-table-cell-${columnId}`);
       expect(campo(card, columnId).textContent).toBe(celda.textContent);
     }
-    expect(campo(card, 'quantity')).toHaveTextContent('12.5');
+    // La cantidad salio de la lista el 2026-10-16: ni celda ni campo de tarjeta.
+    expect(within(card).queryByTestId('data-table-card-field-quantity')).toBeNull();
+    expect(within(fila).queryByTestId('data-table-cell-quantity')).toBeNull();
   });
 
   it('R15: sin cliente, la tarjeta pinta el mismo marcador de ausencia que la fila', () => {

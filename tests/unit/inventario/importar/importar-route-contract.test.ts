@@ -315,6 +315,25 @@ describe('contrato de la ruta de importacion de inventario', () => {
     expect(sinComentarios(leer(BARREL_PATH))).not.toContain('use client');
   });
 
+  it('R29 la pagina exige el permiso en su primera linea y el añadido en la segunda', () => {
+    const pagina = sinComentarios(leer(PAGE_PATH));
+    const cuerpo = pagina.slice(pagina.indexOf('export default async function'));
+    const sentencias = cuerpo
+      .slice(cuerpo.indexOf('{') + 1)
+      .split('\n')
+      .map((linea) => linea.trim())
+      .filter((linea) => linea !== '');
+    expect(sentencias[0]).toBe("await requirePagePermission('inventario.modificar');");
+    expect(sentencias[1]).toBe("await requirePageAddon('importacion_excel');");
+  });
+
+  it('R30 la pagina pinta «Volver a inventario» con ArrowLink y no con un Link de texto', () => {
+    const pagina = sinComentarios(leer(PAGE_PATH));
+    expect(pagina).toContain('<ArrowLink');
+    expect(pagina).not.toMatch(/<Link(?![A-Za-z])/);
+    expect(pagina).not.toContain("from 'next/link'");
+  });
+
   it('ningun archivo de produccion fuera de components/ entra en un componente de la ruta por ruta profunda', () => {
     const profundos: string[] = [];
 

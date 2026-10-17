@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn, type RowActionsSpec } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { Button } from '@/components/ui/button';
 import type {
@@ -18,12 +18,16 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
+import { withCardFieldLabel } from './card-field-label';
 import {
   ACTIONS_COLUMN_ID,
   ACTIONS_COLUMN_LABEL,
+  BELOW_ALERT_CLASS,
+  BelowAlertMark,
   IMAGE_COLUMN_ID,
   IMAGE_COLUMN_LABEL,
   isBelowAlert,
+  PRODUCT_CARD_LABELS,
   productUnitLabel,
   qtyAlertCell,
   stockAmountCell,
@@ -98,10 +102,11 @@ function packagedStockCell(
     <span
       data-testid="finished-stock-packaged"
       data-alert={alerted ? 'true' : undefined}
-      className={alerted ? 'font-semibold text-destructive' : undefined}
+      className={alerted ? BELOW_ALERT_CLASS : undefined}
       title={label}
       aria-label={label}
     >
+      {alerted ? <BelowAlertMark /> : null}
       {label}
     </span>
   );
@@ -122,16 +127,19 @@ function lineStockCell(
   return stockAmountCell(line.stock, productUnitLabel(line.product, units), alerted);
 }
 
+/** La fila del pedido no tiene menú: sin ítems, no se pinta. */
+const NO_GROUP_ACTIONS: RowActionsSpec = { items: [], triggerLabel: '' };
+
 export type FinishedStockColumnsDeps = {
   readonly onToggle: (key: string) => void;
-  /** Acciones de producto de una sub-fila: las enchufa quien monta la tabla. */
-  readonly lineActions: (parent: FinishedStockRow, line: FinishedStockProductLine) => ReactNode;
+  /** El menú de una línea de producto, como datos: lo pintan la fila y la tarjeta. */
+  readonly menu: (parent: FinishedStockRow, line: FinishedStockProductLine) => RowActionsSpec;
   readonly units?: readonly UnitRef[];
 };
 
 export function buildFinishedStockColumns({
   onToggle,
-  lineActions,
+  menu,
   units,
 }: FinishedStockColumnsDeps): readonly DataTableColumn<FinishedStockTableRow>[] {
   return [
@@ -222,22 +230,28 @@ export function buildFinishedStockColumns({
       id: 'stock',
       label: 'Existencia',
       tabular: true,
-      align: 'center',
+      align: 'end',
       cell: (item) =>
-        item.kind === 'group' ? groupStockCell(item.row, units) : lineStockCell(item.line, units),
+        withCardFieldLabel(
+          PRODUCT_CARD_LABELS.stock,
+          item.kind === 'group' ? groupStockCell(item.row, units) : lineStockCell(item.line, units),
+        ),
     },
     {
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
       tabular: true,
-      align: 'center',
-      cell: (item) => (item.kind === 'line' ? qtyAlertCell(item.line.product, units) : null),
+      align: 'end',
+      cell: (item) =>
+        item.kind === 'line'
+          ? withCardFieldLabel(PRODUCT_CARD_LABELS.qtyAlert, qtyAlertCell(item.line.product, units))
+          : null,
     },
     actionsColumn<FinishedStockTableRow>({
       id: ACTIONS_COLUMN_ID,
       label: ACTIONS_COLUMN_LABEL,
       defaultPinned: 'right',
-      cell: (item) => (item.kind === 'line' ? lineActions(item.parent, item.line) : null),
+      menu: (item) => (item.kind === 'line' ? menu(item.parent, item.line) : NO_GROUP_ACTIONS),
     }),
   ];
 }

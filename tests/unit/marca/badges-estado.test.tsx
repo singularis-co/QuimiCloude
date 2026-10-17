@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -150,7 +150,7 @@ describe('badges de estado con la nueva marca', () => {
     }
   });
 
-  it('R7: «Sobre-reservado» del panel de lotes es un badge de tono error con su testid y su texto', () => {
+  it('R7: «Sobre-reservado» del panel de lotes es un StatusBadge de tono error con su testid y su texto', () => {
     render(
       <ProductBatchesPanel
         batches={[
@@ -169,8 +169,9 @@ describe('badges de estado con la nueva marca', () => {
         ]}
       />,
     );
-    const marca = screen.getByTestId('product-batch-over-reserved');
+    const marca = within(screen.getByTestId('data-table-row-b1')).getByTestId('product-batch-over-reserved');
     expect(marca).toHaveAttribute('data-slot', 'badge');
+    expect(marca).toHaveAttribute('data-tone', 'danger');
     expect(marca).toHaveTextContent('Sobre-reservado');
     expectTone(marca, 'destructive');
   });
