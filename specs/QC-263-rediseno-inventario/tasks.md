@@ -32,6 +32,11 @@ aprobación»:
 T2a, T2b y T2d tocan `inventario-paridad` (snapshot): si se hacen antes que T2c, cada una regenera
 solo su parte y el commit cita la fila de `design.md > 6`.
 
+**Enmienda 2 (2026-10-16, vuelta 2 del review)** (`design.md > 12 > Enmienda 2`): el humano decidió
+H1–H6. Las tareas nuevas son la **tanda 8**, que va **antes que nada** en F2.3: T8a integra
+`origin/dev` y las demás dependen de ella. Las tandas 0–7 siguen hechas; T7c se cierra dentro de
+T8h.
+
 ## Tanda 0 — Censo y comprobaciones (antes de tocar producción)
 
 - [x] **T0a. Censo con grep.** Repetir el barrido de `design.md > 7` en `tests/unit`, `tests/guards`,
@@ -215,7 +220,86 @@ solo su parte y el commit cita la fila de `design.md > 6`.
 - [ ] **T7c. Deudas y cierre.** `progress/deudas.md`: D41 resuelta; D53 ampliada (T0b lo vio: 9
   columnas de esqueleto contra 10 / 9 / 7 reales y sin tarjeta; decisión P22: no se arregla aquí); nuevas de P4, P10 y del icono
   del borrado si quedan por defecto (P9 ya no: la regla llegó de `dev`). `./init.sh --completo` en
-  verde.
+  verde. *Enmienda 2: se cierra dentro de T8h.*
+
+## Tanda 8 — Vuelta 2: integrar `dev` y enmienda 2 (F2.3; T8a primero, el resto depende de ella)
+
+- [ ] **T8a. Integrar `origin/dev`** (F1, `design.md > 12 > Enmienda 2`). `git fetch origin` y merge de
+  `origin/dev` en la rama, resolviendo los seis conflictos con las reglas de F1:
+  `app/(private)/inventario/components/product-columns.tsx` y `product-table.tsx` (columnas, orden y
+  visibilidad de `dev`; alineación, `menu`, ámbar, `card` y anfitrión de la rama),
+  `tests/unit/inventario/product-batch-rows.test.tsx`, `tests/unit/inventario/product-page.test.tsx`,
+  `tests/unit/marca/tablas-marca.test.tsx` (todos los casos de `dev` conservados, incluido el de
+  `order-columns` de 0f71d5af, y ajustados a derecha y a la fila visible) y
+  `tests/unit/paridad/__snapshots__/inventario-paridad.test.tsx.snap` (regenerado sobre el de `dev`).
+  Comprobar si 6939047b toca Inventario y anotarlo en el impl (si cambia algo de este spec, parar y
+  avisar al leader). *Hecho:* merge sin marcadores; `pnpm run typecheck`, `pnpm run lint`,
+  `vitest related` del diff y `vitest run guard` en verde; `tests/unit/inventario/unit-cost-visibility.test.ts`
+  y `product-type-column.test.tsx` en verde sin cambio de aserciones de `dev`; el impl lista cada
+  conflicto y cómo se resolvió.
+- [ ] **T8b. «Costo» de `dev` en la tabla y la tarjeta** (F2, R6, R53, R54; depende de T8a).
+  `align: 'end'` en `averageUnitCost`; orden de `dev`; «Presentación» fuera de la pestaña
+  «Producto» también en la tarjeta. Tests: `product-batch-rows.test.tsx` (con `canSeeCost`, «Costo
+  unitario» al final antes de acciones, a la derecha, «$2,500.00 / L» con el exacto en `title`, «—»
+  sin costo, costo del lote en la sub-fila; sin él, ni columna ni costo de sub-fila),
+  `product-type-column.test.tsx` (orden completo de cabeceras en «Todos» y en «Producto», sin
+  «Presentación» en esta), `product-cards.test.tsx` (cifra «Costo» solo con `canSeeCost`; sin
+  «Costo» en «Producto terminado»). *Hecho:* tests en verde; snapshot de paridad con la fila de
+  `design.md > 6`.
+- [ ] **T8c [P]. Tarjeta del producto: orden, rótulos y «Mostrar lotes» al pie** (F3, F4, R13, R47,
+  R55, R58; depende de T8b). `card-field-label.tsx` con `cardFieldLabel`; `PRODUCT_CARD_LABELS`;
+  `card` de F3; columna `batchesToggle` como `footer`; `PRODUCT_TABLE_SCOPE_CLASS` en el `div` que
+  envuelve al `DataTable`; rótulos en `FinishedStockTable`. Antes de escribir la clase, comprobar en
+  el DOM que `th` y `td` llevan `data-table-head-batchesToggle` y `data-table-cell-batchesToggle`.
+  Tests en `product-cards.test.tsx`: la `meta` sale en el orden Presentación, Existencia, Alerta,
+  Disponible, Costo; cada cifra con su rótulo (`[data-card-label]`) y el texto de
+  `product-stock`/`product-available`/`product-cost` igual que hoy; la sub-fila con rótulos en
+  existencia, disponible y costo y sin rótulo donde no hay cifra; el pie con
+  `product-batches-card-toggle` («Mostrar lotes», `aria-expanded="false"`, `touch`) a la izquierda
+  de «Acciones», que al pulsarlo despliega las tarjetas de lote y pasa a «Ocultar lotes»; la clase de
+  ámbito presente en el envoltorio; el rótulo lleva `[table_&]:hidden`. `finished-stock-table.test.tsx`:
+  rótulos «Existencia» y «Alerta». *Hecho:* tests en verde.
+- [ ] **T8d [P]. Sub-filas de lote en escritorio y teléfono** (F5, R57; decisión P26; depende de T8b).
+  `data-batch-subrow` en la raíz de la celda `name` de `batch` y `batchesStatus`; fondo y entrada en
+  `PRODUCT_TABLE_SCOPE_CLASS`, sobre las celdas (`tr:has(…)>td`) y sobre la tarjeta
+  (`li:has(…)`: sangría `ml-5`, `rounded-lg`, `bg-muted`, misma entrada). Test en
+  `product-batch-rows.test.tsx`: el atributo en las tres clases de sub-fila (lote, cargando/vacío,
+  error) y no en la fila del producto; la clase de ámbito declara fondo y animación `screen-enter`
+  con `motion-safe` para la fila y para la tarjeta. *Hecho:* tests en verde; `DataTable` sin
+  cambios en el diff.
+- [ ] **T8e [P]. Panel «Lotes» e historial: fechas y rótulos** (F3, F6, R15, R21, R56; decisión P27;
+  depende de T8a). `align: 'end'` en `purchaseDate` y `expiryDate` y en `date` del historial;
+  rótulos de tarjeta en `product-batch-columns.tsx` y `batch-history.tsx`. Tests: `product-batches-panel.test.tsx` (cabecera y celda de las dos fechas
+  con la clase de alineación a la derecha; rótulos «Cantidad», «Apartado», «Disponible», «Fecha de
+  compra», «Vencimiento»; texto de `product-batch-*` igual), `batch-history.test.tsx` (cabecera y celda de
+  «Fecha» con la clase de alineación a la derecha; rótulos «Existencia anterior», «Total contado»,
+  «Motivo», «Pedido»; autor y fecha sin rótulo).
+  *Hecho:* tests en verde.
+- [ ] **T8f [P]. «Elegir otro archivo» en el paso 2** (F7, R32, R59; depende de T8a). `onChooseAnother`
+  en `ImportPreviewSummary` y `restart` en `InventoryImportScreen`. Tests:
+  `inventory-import-screen.test.tsx` (en la vista previa, pulsar `inventory-import-choose-another`
+  deja el paso 1 vigente, sin archivo, sin vista previa ni error, sin llamar a
+  `confirmInventoryImportAction` y sin `toast`; deshabilitado mientras se importa),
+  `import-preview.test.tsx` (el botón está en la cabecera, con el texto `UPLOAD_CHANGE_LABEL` y
+  `touch`), `import-steps.test.tsx` sin cambio. *Hecho:* tests en verde.
+- [ ] **T8g. E2E** (R13, R15, R47, R54, R55, R57, R58, R59; depende de T8b–T8f).
+  `e2e/inventario-rediseno.spec.ts`: a 1440, como Administrador «Costo unitario» es la última cabecera
+  antes de acciones y a la derecha; las fechas del panel y la «Fecha» del historial a la derecha; al desplegar, el fondo
+  computado de las celdas de la sub-fila difiere del de la fila del producto, su «Nombre» está
+  sangrado y la animación se aplica (y con `emulateMedia({ reducedMotion: 'reduce' })`, no); los
+  rótulos no se ven en la tabla; a 390, rótulos visibles en tarjetas de producto, de lote del panel y
+  de historial, «Mostrar lotes» al pie de 44 px o más que despliega las tarjetas de lote, y sin
+  chevrón en el título; cada tarjeta de lote con fondo computado distinto del de la del producto,
+  desplazada a la derecha respecto de ella y animada (sin animación con movimiento reducido); en la importación, del paso 2 «Elegir otro archivo» vuelve al paso 1 sin
+  recargar (un marcador puesto en `window` sigue ahí). Con un usuario sin permiso de costos, sin
+  «Costo unitario». Los E2E de T7b que nombren `product-batches-toggle` en tarjetas pasan al de la
+  tarjeta. *Hecho:* pasa en Chromium y WebKit; los specs tocados pasan por separado.
+- [ ] **T8h. Deudas y cierre** (F8, F9; sustituye a T7c). `progress/deudas.md`: D41 resuelta; D53
+  ampliada con los números medidos tras el merge; **D55 ampliada** con los cierres locales de 44 px de
+  `batch-history.tsx` y `adjust-batch-dialog.tsx` (se retiran al arreglar la primitiva) y la X de
+  32 px del `Sheet` «Lotes»; nueva deuda de rótulos y pie de tarjeta hechos en la ruta (A12); las de
+  P4, P10 y el icono del borrado como ya decía T7c. *Hecho:* `./init.sh` en verde y `gate-completo`
+  en verde en el PR.
 
 ## Trazabilidad R → test
 
@@ -224,21 +308,21 @@ solo su parte y el commit cita la fila de `design.md > 6`.
 | R1, R2 | `tests/unit/inventario/product-page.test.tsx`, `e2e/inventario-rediseno.spec.ts` |
 | R3, R4 | `tests/unit/inventario/product-type-tabs.test.tsx`, `tests/unit/inventario/product-list-params.test.ts` (R3), `tests/guards/guard-inventario-rediseno.test.ts` (R4) |
 | R5 | `e2e/inventario-rediseno.spec.ts` |
-| R6 | `tests/unit/inventario/product-page.test.tsx`, `tests/unit/marca/tablas-marca.test.tsx`, `tests/unit/inventario/product-batch-rows.test.tsx` (enmienda: «Costo» y sub-filas), `e2e/inventario-rediseno.spec.ts` |
+| R6 | `tests/unit/inventario/product-page.test.tsx`, `tests/unit/marca/tablas-marca.test.tsx`, `tests/unit/inventario/product-batch-rows.test.tsx` (enmienda: «Costo» y sub-filas; enmienda 2: «Costo unitario» de `dev` a la derecha), `e2e/inventario-rediseno.spec.ts` |
 | R7, R8 | `tests/unit/inventario/product-stock-alert.test.tsx`, `tests/guards/guard-inventario-rediseno.test.ts` (R7), `e2e/inventario-rediseno.spec.ts` (R7) |
 | R9, R10 | `tests/unit/inventario/product-row-actions.test.tsx`, `tests/unit/paridad/acciones-por-fila.test.tsx` |
 | R11, R12 | `tests/unit/inventario/product-row-dialogs.test.tsx`, `tests/unit/inventario/finished-stock-table.test.tsx` (R12), `e2e/inventario-rediseno.spec.ts` (R11) |
-| R13 | `tests/unit/inventario/product-cards.test.tsx`, `e2e/inventario-rediseno.spec.ts` |
+| R13 | `tests/unit/inventario/product-cards.test.tsx` (enmienda 2: orden de la `meta`, «Presentación» fuera de «Producto», pie), `e2e/inventario-rediseno.spec.ts` |
 | R14 | `tests/unit/shared-ui/row-actions-menu-separator.test.tsx`, `e2e/inventario-rediseno.spec.ts` |
-| R15, R16, R17 | `tests/unit/inventario/product-batches-panel.test.tsx`, `tests/unit/marca/badges-estado.test.tsx` (R17) |
+| R15, R16, R17 | `tests/unit/inventario/product-batches-panel.test.tsx` (enmienda 2: fechas a la derecha), `tests/unit/marca/badges-estado.test.tsx` (R17), `e2e/inventario-rediseno.spec.ts` (R15, fechas a la derecha) |
 | R18, R20 | `tests/unit/inventario/product-batches-sheet.test.tsx`, `e2e/inventario-rediseno.spec.ts` (R20) |
 | R19 | `tests/unit/inventario/product-batches-panel.test.tsx`, `e2e/inventario-rediseno.spec.ts` |
-| R21, R22, R23 | `tests/unit/inventario/batch-history.test.tsx`, `e2e/inventario-rediseno.spec.ts` (R21, R23) |
+| R21, R22, R23 | `tests/unit/inventario/batch-history.test.tsx` (enmienda 2: «Fecha» a la derecha), `e2e/inventario-rediseno.spec.ts` (R21, R23) |
 | R24, R25, R26 | `tests/unit/inventario/adjust-batch-dialog.test.tsx`, `e2e/inventario-rediseno.spec.ts` (R25), `e2e/ajuste-de-inventario.spec.ts` (R24) |
 | R27, R28 | `tests/unit/inventario/inventario-toasts.test.tsx`, `e2e/inventario-rediseno.spec.ts` (R28) |
 | R29 | `tests/unit/inventario/importar/importar-page.test.tsx` |
 | R30 | `tests/guards/guard-inventario-rediseno.test.ts` |
-| R31, R32 | `tests/unit/inventario/importar/import-steps.test.tsx`, `tests/unit/inventario/importar/inventory-import-screen.test.tsx`, `e2e/inventario-rediseno.spec.ts` |
+| R31, R32 | `tests/unit/inventario/importar/import-steps.test.tsx`, `tests/unit/inventario/importar/inventory-import-screen.test.tsx` (enmienda 2: «Elegir otro archivo» → paso 1), `e2e/inventario-rediseno.spec.ts` |
 | R33 | `e2e/inventario-rediseno.spec.ts` |
 | R34 | `tests/unit/inventario/importar/import-upload.test.tsx` |
 | R35, R36, R38, R39 | `tests/unit/inventario/importar/import-preview.test.tsx`, `e2e/inventario-rediseno.spec.ts` (R38) |
@@ -248,13 +332,19 @@ solo su parte y el commit cita la fila de `design.md > 6`.
 | R44 | `tests/guards/guard-catalogo-de-componentes.test.ts`, `tests/unit/shared-ui/catalogo-qc256.test.ts` |
 | R45 | `e2e/inventario.spec.ts`, `e2e/inventario-importar.spec.ts`, `e2e/ajuste-de-inventario.spec.ts`, `e2e/producto-terminado.spec.ts`, `e2e/reserva-de-material.spec.ts`, `e2e/aislamiento-inventario.spec.ts` |
 | R46 | `tests/guards/guard-inventario-rediseno.test.ts`, `tests/guards/guard-piezas-base.test.ts`, `tests/unit/inventario/batch-history.test.tsx` (mapa exhaustivo) |
-| R47 *(enmienda)* | `tests/unit/inventario/product-batch-rows.test.tsx`, `tests/unit/inventario/product-cards.test.tsx`, `tests/unit/inventario/product-row-dialogs.test.tsx` (sin menú en sub-filas), `e2e/inventario-rediseno.spec.ts` |
+| R47 *(enmienda; enmienda 2)* | `tests/unit/inventario/product-batch-rows.test.tsx`, `tests/unit/inventario/product-cards.test.tsx` (también desde «Mostrar lotes»), `tests/unit/inventario/product-row-dialogs.test.tsx` (sin menú en sub-filas), `e2e/inventario-rediseno.spec.ts` |
 | R48 *(enmienda)* | `tests/unit/inventario/product-batch-rows.test.tsx`, `tests/unit/inventario/product-batches-panel.test.tsx`, `tests/guards/guard-inventario-rediseno.test.ts`, `e2e/inventario-rediseno.spec.ts` |
 | R49 *(enmienda)* | `tests/unit/inventario/importar/importar-page.test.tsx`, `tests/unit/inventario/importar/import-guide.test.tsx`, `e2e/inventario-rediseno.spec.ts` |
 | R50 *(enmienda)* | `tests/unit/inventario/importar/import-preview.test.tsx`, `tests/unit/inventario/importar/inventory-import-screen.test.tsx` |
 | R51 *(enmienda)* | `tests/unit/inventario/importar/inventory-import-screen.test.tsx`, `tests/unit/inventario/inventario-toasts.test.tsx` |
 | R52 *(enmienda)* | `tests/unit/inventario/batch-history.test.tsx` (clase), `e2e/inventario-rediseno.spec.ts` (medida a 820) |
-| R53 *(enmienda)* | `tests/unit/inventario/product-type-column.test.tsx`, `tests/unit/inventario/product-batch-rows.test.tsx`, `tests/unit/inventario/finished-stock-table.test.tsx`, `tests/unit/paridad/inventario-paridad.test.tsx` |
+| R53 *(enmienda; enmienda 2)* | `tests/unit/inventario/product-type-column.test.tsx` (orden de `dev`, sin «Presentación» en «Producto»), `tests/unit/inventario/product-batch-rows.test.tsx`, `tests/unit/inventario/finished-stock-table.test.tsx`, `tests/unit/paridad/inventario-paridad.test.tsx` |
+| R54 *(enmienda 2)* | `tests/unit/inventario/product-batch-rows.test.tsx` (columna, formato, unidad, sub-fila, sin permiso), `tests/unit/inventario/product-cards.test.tsx` (cifra «Costo» solo con permiso), `tests/unit/inventario/unit-cost-visibility.test.ts` (de `dev`: regla y no-envío, sin cambio), `e2e/inventario-rediseno.spec.ts` |
+| R55 *(enmienda 2)* | `tests/unit/inventario/product-cards.test.tsx`, `tests/unit/inventario/finished-stock-table.test.tsx`, `e2e/inventario-rediseno.spec.ts` (visibles a 390, ocultos a 1440) |
+| R56 *(enmienda 2)* | `tests/unit/inventario/product-batches-panel.test.tsx`, `tests/unit/inventario/batch-history.test.tsx`, `e2e/inventario-rediseno.spec.ts` |
+| R57 *(enmienda 2)* | `tests/unit/inventario/product-batch-rows.test.tsx` (marca y clase), `e2e/inventario-rediseno.spec.ts` (fondo, sangría, animación y movimiento reducido medidos, a 1440 en la fila y a 390 en la tarjeta) |
+| R58 *(enmienda 2)* | `tests/unit/inventario/product-cards.test.tsx`, `e2e/inventario-rediseno.spec.ts` (44 px, despliega, sin chevrón en el título) |
+| R59 *(enmienda 2)* | `tests/unit/inventario/importar/inventory-import-screen.test.tsx`, `tests/unit/inventario/importar/import-preview.test.tsx`, `e2e/inventario-rediseno.spec.ts` (sin recarga) |
 
 ## Archivos esperados
 
@@ -282,7 +372,7 @@ Producción:
 - `app/(private)/inventario/components/product-sheet.tsx`
 - `app/(private)/inventario/components/movement-reason-label.ts` (D9: `movementReasonLabel` vive aquí desde ded3d3d8, QC-281; censo T0a)
 - `app/(private)/inventario/components/expiry-date.tsx` (enmienda E4/E5: `EXPIRING_CLASS` en ámbar, `as` de `ExpiryDate`)
-- `app/(private)/inventario/importar/page.tsx`
+- `app/(private)/inventario/components/card-field-label.tsx` (enmienda 2, F3: rótulo de tarjeta)- `app/(private)/inventario/importar/page.tsx`
 - `app/(private)/inventario/importar/components/index.ts`
 - `app/(private)/inventario/importar/components/inventory-import-screen.tsx`
 - `app/(private)/inventario/importar/components/import-steps.tsx`
@@ -312,6 +402,7 @@ Tests y guardias:
 - `tests/unit/inventario/finished-stock-table.test.tsx`
 - `tests/unit/inventario/product-batch-rows.test.tsx` (sub-filas de lote de dev; censo T0a)
 - `tests/unit/inventario/product-type-column.test.tsx` (enmienda E1: monta `ProductTable`; columna «Tipo» en la tarjeta)
+- `tests/unit/inventario/unit-cost-visibility.test.ts` (enmienda 2: de `dev`, 6a665e3f; debe seguir en verde sin cambio)
 - `tests/unit/inventario/importar/import-guide.test.tsx` (enmienda E8: sin cambio esperado; R49)
 - `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts` (origen de `movementReasonLabel` en el barrel; censo T0a)
 - `tests/unit/shared-ui/confirm-dialog-montado.test.tsx` (monta `ProductTable` y abre el borrado; censo T0a)

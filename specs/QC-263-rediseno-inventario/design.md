@@ -20,6 +20,9 @@
 | `ImportRowsTable` ya usa `DataTable` con parámetros locales para una lista que vive en el cliente | `import-preview-table.tsx` | Es el patrón que siguen las tablas de lotes y de historial (D7, D8) |
 | **QC-262 (aprobado, sin implementar)** extiende `RowActionsMenu` con `separatorBefore` por ítem | `.worktrees/QC-262-rediseno-pedidos/specs/QC-262-rediseno-pedidos/design.md > D7`, su R14 | Mismo contrato, sin variante propia (D12, P16). **2026-10-16: ya en `dev` (a6a224e5)**, con su test y su fila del catálogo |
 | **Enmienda 2026-10-16 — en `dev` desde el spec:** sub-filas de lote desplegables (f978ef29), columnas «Costo» (b0eaa866), «Tipo» (6f08e379) y «Presentación» con nombre sin presentación (c2ac0e65), vencimiento relativo y chip «Vencido» (08b69744), panel de lotes en tres líneas (ccde16f7), `movementReasonLabel` en su archivo con «Conteo físico» (ded3d3d8, QC-281), guía de importación y aviso de columnas ignoradas (c4f824fe, 6cc59959), toasts del desenlace de importación (da435d96), enlace a la ficha de producto terminado (f34f8bb7) | `product-columns.tsx`, `product-table.tsx`, `expiry-date.tsx`, `expiry-warning.ts`, `product-batches-panel.tsx`, `movement-reason-label.ts`, `import-guide.tsx`, `import-preview-summary.tsx`, `inventory-import-screen.tsx`, `finished-stock-columns.tsx` | Se conservan; el rediseño los incluye (§ 12, R47–R53) |
+| **Enmienda 2 (2026-10-16) — en `origin/dev` después del primer merge:** «Costo unitario» solo para quien cumple `canViewUnitCosts` (el servidor no lo envía a los demás), en moneda con `formatMoneyDisplay` y exacto en `title` (6a665e3f), con la unidad del producto (5496bd16), al final antes de las acciones y nuevo orden de cifras (fb140780); «Presentación» fuera de la pestaña «Producto» (`showPresentation`); esqueleto de 8 columnas; QC-52 R35–R37 y la ficha de `InventarioMovil` enmendadas (070a8c71); `tablas-marca.test.tsx` tocado por 0f71d5af (pedidos) | `product-columns.tsx` (`showCost`, `showPresentation`, `unitCostCell`, `COST_COLUMN_LABEL`), `product-table.tsx`, `product-list-section.tsx`, `page.tsx`, `product-columns-skeleton.ts`, `lib/modules/inventario` (`canViewUnitCosts`) | Se conservan; el rediseño se monta encima (§ 12 > Enmienda 2, R53, R54) |
+| `DataTableCards` ya tiene hueco `footer` (columna a la izquierda de «Acciones») y cada celda lleva `data-table-cell-<id>` / `data-table-head-<id>` | `components/shared/data-table/data-table-cards.tsx`, `data-table.tsx`, `data-table-header-menu.tsx` | «Mostrar lotes» va en `footer` sin tocar la pieza (§ 12 > Enmienda 2 > F4) |
+| `:has()` ya se usa en el repo para estilar desde fuera (pantallas del operario) | `app/globals.css` | Precedente del fondo de las sub-filas desde la ruta (F5) |
 | QC-270 (`done`): la cabecera de `DataTable` sigue la alineación de su columna | `components/shared/data-table/` | Basta con `align: 'end'` en la columna (D3) |
 | QC-265 (`done`) dejó el patrón de tarjetas, el E2E a 1440/820/390 y D53 (esqueletos sin tarjeta) | `specs/QC-265-rediseno-operario/`, `progress/deudas.md > D53` | Se imita; D53 se amplía a `/inventario` si su esqueleto tampoco casa (T0b) |
 | D41: `batch-history.tsx` conserva `TOUCH_TARGET` con dueño QC-223 (`done`) | `progress/deudas.md > D41`, exclusión en `tests/guards/guard-piezas-base.test.ts` | Se resuelve aquí (P15, R46) |
@@ -170,9 +173,9 @@ devuelve el spec del producto solo con `row.kind === 'product'` y un spec sin í
 reutiliza la caché de las sub-filas para decidir `batchTarget`.
 Al cerrar se deja `open: false` sin soltar `active`, para que el panel anime su salida, como hoy.
 
-**D6 — Tarjetas (R13).** *Enmienda 2026-10-16 (P17, P18): el `card` de `ProductTable` es el de
-§ 12 > E1, que sustituye a la línea siguiente. Tablero del pase `/design` de P17/P18: pendiente de
-aprobación (§ 12).* `ProductTable`:
+**D6 — Tarjetas (R13).** *Enmienda 2 (2026-10-16): el `card` de `ProductTable` es el de
+§ 12 > Enmienda 2 > F3/F4, que sustituye al de E1 y a la línea siguiente. Enmienda 2026-10-16 (P17,
+P18): tablero aprobado el 2026-10-16 (§ 12).* `ProductTable`:
 `card={{ primary: IMAGE_COLUMN_ID, title: 'name', meta: ['stock', 'qtyAlert', 'available'] }}`;
 `FinishedStockTable`: `card={{ primary: IMAGE_COLUMN_ID, status: 'orderNumber', title: 'name',
 meta: ['stock', 'qtyAlert'] }}` (el conmutador de despliegue va dentro de la celda `name`, así que
@@ -359,6 +362,10 @@ por defecto, `expiry-date.tsx` no declara `text-destructive` en `EXPIRING_CLASS`
 | `ProductColumnsDeps.rowActions` *(enmienda)* | `(product) => ReactNode` en la celda `cell` | `menu: (product) => RowActionsSpec`; sub-filas sin ítems |
 | `EXPIRING_CLASS` *(enmienda, P19)* | `'font-semibold text-destructive'` | `'font-semibold text-warning-text'` |
 | `ProductBatchesPanel` líneas *(enmienda)* | `product-batch-line-lot/-amounts/-dates` (ccde16f7) | desaparecen; celdas de tabla (P20) |
+| `buildProductColumns` *(enmienda 2)* | `showCost`, `showPresentation` de `dev`; cifras centradas | se conservan; cifras y «Costo unitario» `align: 'end'`; + columna `batchesToggle` (F4); celdas con rótulo de tarjeta (F3) |
+| `cardFieldLabel` *(enmienda 2)* | — | nuevo, interno de la ruta (`card-field-label.tsx`): rótulo visible solo en la tarjeta |
+| `PRODUCT_TABLE_SCOPE_CLASS` *(enmienda 2)* | — | nuevo en `product-table.tsx`: estilo de la ruta sobre el `DataTable` (oculta `batchesToggle` en la tabla y el chevrón en la tarjeta, fondo y entrada de sub-filas) |
+| `ImportPreviewSummary` *(enmienda 2)* | sin vuelta atrás | + `onChooseAnother: () => void`, botón «Elegir otro archivo» en la cabecera |
 
 ## 6. Snapshots y árboles que cambian (aceptados)
 
@@ -366,7 +373,7 @@ Toda diferencia de paridad que no esté aquí es un fallo de la tanda:
 
 | Archivo | Cambio | Requisito |
 | --- | --- | --- |
-| `tests/unit/paridad/inventario-paridad.test.tsx` (+ `.snap`) | `PageHeader`, `UrlTabs` sin texto de filtro, columnas a la derecha (también «Costo», enmienda), aviso ámbar, vencimiento cercano en ámbar (P19), `actionsColumn`, tarjetas. La base es el snapshot que `dev` regeneró (c2ac0e65, f978ef29, 08b69744, b0eaa866), no el de `f7cc5be2` | R1, R3, R4, R6, R7, R9, R13, R48, R53 |
+| `tests/unit/paridad/inventario-paridad.test.tsx` (+ `.snap`) | `PageHeader`, `UrlTabs` sin texto de filtro, columnas a la derecha (también «Costo», enmienda), aviso ámbar, vencimiento cercano en ámbar (P19), `actionsColumn`, tarjetas. La base es el snapshot que `dev` regeneró (c2ac0e65, f978ef29, 08b69744, b0eaa866), no el de `f7cc5be2`. *Enmienda 2:* la base vuelve a ser la de `origin/dev` tras 6a665e3f, 5496bd16 y fb140780 (orden de columnas, «Costo unitario» solo con permiso, sin «Presentación» en «Producto»); encima, rótulos de tarjeta, columna `batchesToggle` oculta en la tabla, «Mostrar lotes» al pie y la clase de ámbito de la ruta | R1, R3, R4, R6, R7, R9, R13, R48, R53, R54, R55, R57, R58 |
 | `tests/unit/paridad/acciones-por-fila.test.tsx` (+ `.snap`) | «productos» y «producto terminado» ganan «Historial» y, con permiso, «Ajustar existencia» | R9, R10 |
 | `tests/unit/paridad/confirmaciones-paridad.test.tsx` (+ `.snap`) | ninguno esperado (el borrado de producto no cambia); se lista porque lo monta | — |
 | `tests/unit/paridad/campos-paridad.test.tsx` (+ `.snap`) | ninguno esperado (`DialogTextField` no cambia); se lista porque lo monta | — |
@@ -498,6 +505,20 @@ T0a repite el grep antes de tocar nada y lo deja en `progress/impl_QC-263.md`.
   (cerrada) reserva el rojo para el error, y el tablero pinta el vencimiento cercano con el token de
   advertencia (`--w-fg` en `ModalesInventario`, lote `L-2026-0921`). Queda como alternativa si el
   humano lo elige en P19.
+- **A12 — Extender `DataTableCards` con rótulos por campo y un hueco de pie propio** (enmienda 2,
+  H2·H3). Sería lo limpio (paso 2 de la regla de decisión: `card.labels`, fila de catálogo y
+  tablero), pero H2·H3 piden expresamente hacerlo dentro de la ruta sin tocar el `DataTable`
+  compartido, y lo usan las demás listas del rediseño. Queda como deuda si una segunda ruta lo
+  necesita (§ 11).
+- **A13 — Conmutador de lotes en una columna propia visible en la tabla** (enmienda 2, R58). Evita
+  ocultar la columna desde la ruta, pero añade al escritorio una columna vacía de cabecera que el
+  tablero no tiene (el chevrón va dentro de «Nombre»).
+- **A14 — Rótulos con la consulta de contenedor `@max-[760px]`** (enmienda 2, R55). Depende de que el
+  contenedor más cercano de la celda sea el mismo que decide tabla o tarjeta; ocultarlos con
+  `[table_&]:hidden` no depende de eso y vale igual dentro del panel y del diálogo.
+- **A15 — «Elegir otro archivo» que abre directamente el selector de archivos** (enmienda 2, R59).
+  Ahorra un clic, pero si la persona cancela el selector se queda en el paso 2 con una vista previa
+  de un archivo que ya no quiere, y el paso 1 ya tiene su zona de archivo; H5 dice «vuelve al paso 1».
 
 ## 9. Riesgos y coordinación
 
@@ -539,6 +560,18 @@ T0a repite el grep antes de tocar nada y lo deja en `progress/impl_QC-263.md`.
 - **D53** se amplía a `/inventario` si T0b ve que su esqueleto no casa con la tabla en tarjetas.
   *T0b lo vio (2026-10-16):* esqueleto de 9 columnas sin tarjeta; la tabla real tiene 10 en «Todos»,
   9 con un tipo filtrado y 7 en «Producto terminado» (P22).
+  *Enmienda 2:* tras el merge de `origin/dev` el esqueleto pinta 8 columnas
+  (`PRODUCT_SKELETON_COLUMN_COUNT`) y la tabla depende de la pestaña y del permiso de costo (y gana
+  la columna `batchesToggle`, oculta en la tabla). T8h vuelve a medirlo y corrige los números de
+  D53.
+- **D55** se amplía (enmienda 2, m3 del review): en `/inventario` hay dos cierres locales de 44 px
+  (`showCloseButton={false}` más un `DialogClose` propio `size="icon"` + `touch`, como
+  `batch-evidence-dialog.tsx`) en `batch-history.tsx` y `adjust-batch-dialog.tsx`, que se retiran
+  cuando se arregle la primitiva; y la X de 32 px del `Sheet` «Lotes» sigue (preexistente, no la
+  añade esta ficha). T8h lo escribe en `progress/deudas.md`.
+- **Nueva, si A12 se descarta para siempre:** rótulos y pie de tarjeta hechos en la ruta
+  (`cardFieldLabel`, columna `batchesToggle` oculta, `PRODUCT_TABLE_SCOPE_CLASS`). Si otra ruta los
+  necesita, se suben a `DataTableCards` (paso 2) y se retira el apaño. T8h la abre.
 - **Nuevas, si las preguntas quedan por defecto:** vencimiento «por vencer» (P9), arrastrar y soltar en
   la importación (P10), formato de cifras y fechas del tablero (P4), icono del diálogo de borrado
   (compartida con QC-262 P5).
@@ -605,6 +638,50 @@ T2c y la tanda 3 quedan libres (`tasks.md`). La guía y los avisos no cambian de
 «Presentación»; R11 decía solo «la misma lectura que Lotes»; R12 no hablaba de sub-filas; R13 tenía
 imagen, nombre, «Existencia», «Alerta de cantidad», «Disponible» y el aviso; R15 no nombraba el
 relativo ni «Vencido»; R46 no nombraba `movement-reason-label.ts`. R47–R53 son nuevos.
+
+### Enmienda 2 (2026-10-16)
+
+**Por qué.** El review de la vuelta 1 (`progress/review_QC-263.md`) rechazó por B1: la rama
+(HEAD `774a293c`) quedó 22 commits detrás de `origin/dev` (`0f71d5af`, merge-base `27fdd133`), y
+`git merge-tree` da seis conflictos (`product-columns.tsx`, `product-table.tsx`,
+`product-batch-rows.test.tsx`, `product-page.test.tsx`, `tablas-marca.test.tsx` e
+`inventario-paridad.test.tsx.snap`). El humano decidió el 2026-10-16 H1–H6
+(`requirements.md > Decisiones cerradas`). **Regla, la misma: lo que `dev` trajo se conserva.**
+
+**Cómo se leyó `dev`.** Esta enmienda se escribió sin shell: no se pudo correr `git fetch` ni
+`git show origin/dev:…`. Lo de `dev` se leyó en el worktree `QC-166-area-del-maestro`, que ya integra
+`origin/dev` hasta `0f71d5af` (lo cita su bitácora), y en el review. **6939047b no se pudo leer**:
+T8a lo comprueba al integrar y, si toca Inventario, lo anota en el impl antes de resolver (no
+cambia ningún requisito sin volver aquí).
+
+**070a8c71** (enmiendas de specs por los cambios directos a `dev`) no toca este spec: enmienda QC-52
+(R6 con nota, R35–R37 nuevos), QC-225 (R37) y QC-227, y añade la fila «Enmienda 2026-10-16» a las
+fichas de `InventarioMovil` y `ProductoTerminadoMovil` y a `docs/diseno/README.md`. Este spec se
+alinea con QC-52 R35–R37 salvo en dos cosas, ya decididas: «Costo» va al final (fb140780, H4; QC-52
+R35 dice «justo después de la existencia», que fb140780 dejó atrás) y las cifras se alinean a la
+derecha (P18; `dev` las centra).
+
+**Cambios, cada uno con su commit de origen:**
+
+| # | Commit | Qué cambia en el spec | Dónde | R / decisión |
+| --- | --- | --- | --- | --- |
+| F1 | 6a665e3f, 5496bd16, fb140780, 0f71d5af | **Integrar `origin/dev` antes de nada (T8a).** Reglas para los seis conflictos: en `product-columns.tsx` y `product-table.tsx` gana el **conjunto, el orden y la visibilidad** de columnas de `dev` (`showType`, `showPresentation`, `showCost` / `canSeeCost`, `costColumn(units)`, `unitCostCell`, `COST_COLUMN_LABEL`) y gana la rama en **alineación** (`align: 'end'` en toda cifra, también en `averageUnitCost`, que `dev` deja `center`), en `menu` en vez de `rowActions`, en `stockAmountCell` ámbar, en `card` y en el anfitrión único; el `useMemo` de columnas y el del `card` dependen de `showType`, `showPresentation` y `canSeeCost`. En los tres tests se conservan **todos** los casos de `dev` (costo solo con permiso, moneda, unidad, orden, sin «Presentación» en «Producto»; en `tablas-marca`, el cambio de `order-columns` de 0f71d5af) y se les aplican los ajustes de la rama (derecha, duplicados de tarjeta acotados a `data-table-row-…`). El snapshot de paridad se regenera sobre el de `origin/dev` y su diferencia es solo la de § 6 | `product-columns.tsx`, `product-table.tsx`, 3 tests, `.snap` | R6, R53, R54; H4 |
+| F2 | 6a665e3f, 5496bd16, fb140780 | **«Costo» de `dev`.** R53 fija el orden de `dev`: imagen, «Nombre», «Tipo», «Presentación», «Existencia», «Disponible», «Reservado», «Alerta de cantidad», «Costo unitario», acciones. R54 fija visibilidad y formato (`formatMoneyDisplay`, `exactDecimalTitle`, unidad, «—»); la regla y el no-envío siguen en `lib/modules/inventario` (`canViewUnitCosts`, QC-52 R36), que esta ficha no toca. Sustituye al «sin redondear» y al «para todos» del R53 de la enmienda 1; E3 (derecha) se mantiene | D3, § 12 > E3 | R6, R53, R54; H4, P23 |
+| F3 | — (tablero `InventarioColumnasLotes`, teléfono; `ModalesInventario`) | **Tarjeta del producto y rótulos.** `card` de `ProductTable`: `{ primary: IMAGE_COLUMN_ID, status: showType ? 'type' : undefined, title: 'name', meta: [...(showPresentation ? ['presentationName'] : []), 'stock', 'qtyAlert', 'available', ...(canSeeCost ? ['averageUnitCost'] : [])], footer: BATCHES_TOGGLE_COLUMN_ID }` (orden del tablero, H2·H3; sustituye la `meta` de E1). Rótulos: nuevo `card-field-label.tsx` con `cardFieldLabel(text)` → `<span data-card-label className="text-muted-foreground [table_&]:hidden">{text} </span>`, que la celda pinta **delante y fuera** del elemento con `data-testid` de la cifra (su texto no cambia); dentro de una `<table>` no se ve, en la tarjeta (`<ul>`) sí. Textos en `PRODUCT_CARD_LABELS` (`stock` «Existencia», `qtyAlert` «Alerta», `available` «Disponible», `cost` «Costo», `reserved` «Reservado»). Sub-fila de lote: rótulo en `stock`, `available` y `averageUnitCost`; su `meta` es la del producto, así que «Reservado» no sale en su tarjeta (el tablero tampoco lo pinta), y donde la celda devuelve `null` no hay rótulo. `FinishedStockTable` igual en `stock` y `qtyAlert`. Panel «Lotes»: rótulos en `quantity` «Cantidad», `reserved` «Apartado», `available` «Disponible», `purchaseDate` «Fecha de compra», `expiryDate` «Vencimiento». Historial: `previousStock` «Existencia anterior», `countedStock` «Total contado», `reason` «Motivo», `order` «Pedido»; `author` y `date` sin rótulo | D6, D7, D8 | R13, R55, R56; H2·H3, P24, P25 |
+| F4 | — (tablero, teléfono) | **«Mostrar lotes» al pie.** Nueva columna de la ruta `batchesToggle` (`BATCHES_TOGGLE_COLUMN_ID`, `label: 'Lotes'`, `align: 'start'`, `pinnable: false`): en la fila `product` pinta `<Button variant="ghost" touch aria-expanded data-testid="product-batches-card-toggle">` con `ChevronRight` (gira 90° como el de la tabla) y «Mostrar lotes» / «Ocultar lotes» (`PRODUCT_BATCH_ROW_TEXTS.cardToggle(expanded)`); en las sub-filas, `null`. Llama al mismo `onToggle`. Va como `card.footer`, que `DataTableCards` ya pinta a la izquierda de «Acciones». En la tabla, la columna se oculta desde la ruta con `PRODUCT_TABLE_SCOPE_CLASS` (`[&_[data-testid=data-table-head-batchesToggle]]:hidden [&_[data-testid=data-table-cell-batchesToggle]]:hidden`), y el chevrón del título se oculta en la tarjeta (`[&_[data-testid=data-table-cards]_[data-testid=product-batches-toggle]]:hidden`). La clase va en un `div` que envuelve al `DataTable` en `ProductTable`; `DataTable` no cambia. T8c confirma en el DOM que `th` y `td` llevan esos `data-testid` (`data-table-header-menu.tsx`, `data-table.tsx`) | D6, `product-columns.tsx`, `product-table.tsx` | R13, R47, R58; H2·H3; A13 |
+| F5 | — (tablero, escritorio: `tr.lot td{background…;animation:qc-rise…}`) | **Sub-filas en escritorio.** La raíz de la celda `name` de las filas `batch` y `batchesStatus` gana `data-batch-subrow`; `PRODUCT_TABLE_SCOPE_CLASS` añade `[&_tr:has([data-batch-subrow])>td]:bg-muted/55` y `motion-safe:[&_tr:has([data-batch-subrow])>td]:animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]` (la animación de entrada que ya existe en `globals.css`, 300 ms). La sangría es el `pl-12` de hoy en la celda, que en la tarjeta se quita (`@max-[760px]:pl-0`, E1). **Teléfono (decisión P26, manda el tablero `.lot-m`):** la misma clase de ámbito añade sobre la tarjeta de la sub-fila `[&_li:has([data-batch-subrow])]:ml-5 [&_li:has([data-batch-subrow])]:rounded-lg [&_li:has([data-batch-subrow])]:bg-muted` y `motion-safe:[&_li:has([data-batch-subrow])]:animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]`; el `<li>` lo pinta `DataTableCards` y no se toca. Revoca la frase de P17 «la ficha no cambia el aspecto de la sub-fila en la tabla» y la «tarjeta de `DataTable` sin extensión» en su aspecto (sigue sin imagen ni «Acciones») | D6, `product-columns.tsx`, `product-table.tsx` | R57; H2·H3, P26 |
+| F6 | — (`ModalesInventario`, l. 80 y l. 120, m1 del review) | **Fechas a la derecha.** `align: 'end'` en `purchaseDate` y `expiryDate` de `product-batch-columns.tsx` y, por la decisión P27, en la columna `date` de `batch-history.tsx` | D7, D8 | R15, R21; H2·H3, P27 |
+| F7 | — (H5) | **«Elegir otro archivo» en el paso 2.** `ImportPreviewSummary` gana `onChooseAnother` y pinta en la cabecera de la tarjeta «Vista previa», a la derecha del título y del nombre del archivo, `<Button variant="outline" touch data-testid="inventory-import-choose-another">` con `UPLOAD_CHANGE_LABEL` («Elegir otro archivo», ya en `import-texts.ts`, el que usa la zona del paso 1; no se duplica el literal), `disabled` con `confirming`. `InventoryImportScreen` le pasa `restart` (el mismo de «Importar otro archivo»: archivo, resultado y error a `null`), así que `importStepOf(null)` da el paso 1. No llama a ninguna action ni a `toast`. Con 760 px o menos la cabecera apila el botón a todo el ancho | D15 | R32, R59; H5; A15 |
+| F8 | — (m3 del review) | **D55 ampliada** con los dos cierres locales y la X del `Sheet` «Lotes» (§ 11). R42 no cambia: no nombra el panel | § 11 | — |
+| F9 | 6f08e379, 6a665e3f | **D53 a medir de nuevo** tras el merge (esqueleto de 8 columnas en `dev`) | § 11 | P22 |
+| F10 | — (H1, H6) | **P12 y el chip «Tipo» con tono, confirmados.** El leader corrige los tableros (`InventarioColumnasLotes*`, `InventarioTablet`); *Hecho por el leader el 2026-10-16 (decisión P23):* `InventarioColumnasLotes` corregido y copiado a `docs/diseno/canvas/` en la rama: orden de `dev`, «Costo unitario» en moneda redondeada con unidad y exacto en `title`, chip «Tipo» con tono (info/neutral/waiting/success) y sin «Presentación» en «Producto» | — | R13, R53 |
+| F11 | — (decisiones P23–P27, 2026-10-16) | **Preguntas de la enmienda 2 cerradas.** P23, P24 y P25 con la opción por defecto (ya escrita en F2, F3); P26 y P27 con el tablero (F5 teléfono, F6 historial) | — | R13, R21, R53, R54, R55, R57 |
+
+**Requisitos antes de la enmienda 2** (para el reviewer): R6 nombraba «Costo» sin condición y en el
+orden de E1; R13 llevaba el conmutador en el nombre, las cifras «Presentación, Existencia, Costo,
+Alerta, Disponible» sin rótulos y «Costo» para todos; R15 alineaba a la derecha solo las cifras;
+R21 no fijaba la alineación de «Fecha»; R32 solo volvía al paso 1 con «Importar otro archivo»; R47 nombraba solo el chevrón; R53 decía
+«Costo» sin redondear, para todos, y «Presentación» en todas las pestañas. R54–R59 son nuevos.
 
 ## Dependencias de terceros
 

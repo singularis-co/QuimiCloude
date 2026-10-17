@@ -46,6 +46,19 @@ el rediseño se adapta para incluirlo.** Ninguna decisión cerrada se reabre. La
 `design.md > 12`. Requisitos tocados: R6, R11, R12, R13, R15, R46. Requisitos nuevos:
 R47–R53. Lo que los requisitos tocados decían antes queda en `design.md > 12`.
 
+### Enmienda 2 (2026-10-16, vuelta 2 del review)
+
+El review de la implementación (`progress/review_QC-263.md`, B1) encontró la rama 22 commits por
+detrás de `origin/dev`, y `dev` había vuelto a cambiar Inventario: «Costo» solo para el
+Administrador, en moneda y con unidad, al final de la tabla, y sin «Presentación» en la pestaña
+«Producto» (6a665e3f, 5496bd16, fb140780; tablero `InventarioMovil` enmendado en 070a8c71; QC-52
+R35–R37). El humano decidió el 2026-10-16 las filas H1–H6 de `## Decisiones cerradas`. **Misma regla
+que la enmienda 1: lo que `dev` trajo se conserva.** Además, el humano decidió que **el tablero
+manda en tarjetas y sub-filas** y añadió «Elegir otro archivo» en el paso 2. Requisitos tocados:
+R6, R13, R15, R21, R32, R47, R53. Requisitos nuevos: R54–R59. Preguntas P23–P27, cerradas el
+mismo día. Lo que los tocados decían antes queda en
+`design.md > 12 > Enmienda 2`.
+
 ## Decisiones cerradas (no reabrir)
 
 La ficha llegó sin `/afinar-feature`. Estas filas son decisiones del humano ya tomadas en
@@ -55,8 +68,8 @@ La ficha llegó sin `/afinar-feature`. Estas filas son decisiones del humano ya 
 | --- | --- | --- | --- | --- |
 | D2 | Acciones de fila siempre en el menú ⋯. En teléfono la tabla pasa a tarjetas y «Acciones» abre el menú centrado en la pantalla visible. «Volver…» nunca es enlace de texto: es botón con flecha | humano, 2026-10-10 (`progress/rediseno.md` D2) | — | R9, R12, R13, R14, R18, R19, R23, R29, R30 |
 | D3 | Tonos por significado con un único `StatusBadge` y un único mapa por dominio (ámbar = waiting, danger = Error, success = Añadido/Nuevo…) | humano, 2026-10-10 (D3) | QC-227 (variante de `Badge` de «Sobre-reservado») | R7, R17, R36, R38, R48 |
-| D6 | Importar inventario con barra de pasos: Elegir archivo · Vista previa · Importación terminada | humano, 2026-10-10 (D6) | — | R31, R32, R33, R49, R50 |
-| D7 | Tallas de botón: sm 32 · default 36 · touch 44 · xl 52 | humano, 2026-10-10 (D7) | — | R2, R13, R34, R42 |
+| D6 | Importar inventario con barra de pasos: Elegir archivo · Vista previa · Importación terminada | humano, 2026-10-10 (D6) | — | R31, R32, R33, R49, R50, R59 |
+| D7 | Tallas de botón: sm 32 · default 36 · touch 44 · xl 52 | humano, 2026-10-10 (D7) | — | R2, R13, R34, R42, R58, R59 |
 | D9 | Corregir textos sin tildes y el voseo («Elegi un motivo.» → «Elige un motivo.») | humano, 2026-10-10 (D9) | QC-92 (etiqueta derivada «Conteo fisico») | R24, R25, R46 |
 | D10 | Agregar los toasts que faltan | humano, 2026-10-10 (D10) | — | R27, R28, R51 |
 | D14 | Lo demás del canvas queda aprobado; cada pantalla en escritorio, tablet y teléfono | humano, 2026-10-10 (D14) | — | R1, R5, R6, R15, R19, R29, R35, R39, R42, R43, R47, R52, R53 |
@@ -68,6 +81,15 @@ La ficha llegó sin `/afinar-feature`. Estas filas son decisiones del humano ya 
 | P20 | Panel «Lotes» como la tabla del tablero (tarjetas en teléfono), conservando el vencimiento relativo y el chip «Vencido» | humano, 2026-10-16 (P20) | ccde16f7 | R15, R19 |
 | P21 | Guía de importación y avisos de la vista previa con su aspecto de hoy, sin pase `/design` | humano, 2026-10-16 (P21) | c4f824fe, 6cc59959 | R49, R50 |
 | P22 | El esqueleto de la lista no se arregla aquí; se amplía D53 en T7c | humano, 2026-10-16 (P22) | 6f08e379 | — (deuda D53) |
+| H4 | Se sigue lo de `dev`: «Costo» solo lo ve el Administrador (y el servidor no lo envía a los demás), en moneda redondeada con el valor exacto en `title` y con la unidad del producto, al final de la tabla antes de las acciones (coincide con el tablero); «Presentación» fuera de la pestaña «Producto». Se reescriben R6, R13 y R53 para conservar lo mergeado | humano, 2026-10-16 (review QC-263, B1 y H4) | 6a665e3f, 5496bd16, fb140780 (QC-52 R35–R37) | R6, R13, R53, R54 |
+| H2·H3 | Manda el tablero (`InventarioColumnasLotes*`, `ModalesInventario`) en tarjetas y sub-filas: rótulos en las tarjetas de producto, de lote y de historial, dentro de la ruta y sin tocar `DataTable`; fondo suave, sangría y animación en las sub-filas de lote en escritorio; «Mostrar lotes» al pie de la tarjeta en teléfono, no en el título; fechas del panel «Lotes» a la derecha; orden de las cifras de la tarjeta como el tablero (Existencia, Alerta, Disponible, Costo) | humano, 2026-10-16 (review QC-263, H2, H3, m1, m2, m4, m5) | — | R13, R15, R47, R55, R56, R57, R58 |
+| H5 | En el paso 2 de importar se añade un botón secundario «Elegir otro archivo» en la cabecera del paso, que vuelve al paso 1 sin recargar la página | humano, 2026-10-16 (review QC-263, H5) | — | R32, R59 |
+| H1·H6 | Se confirman P12 (tarjetas a 820 px) y el chip «Tipo» con el tono de su tipo (R53); el leader corrige los tableros para que coincidan | humano, 2026-10-16 (review QC-263, H1, H6) | 6f08e379 | R13, R53 |
+| P23 | Orden de columnas de `dev` (fb140780): Existencia · Disponible · Reservado · Alerta de cantidad · Costo unitario. El leader corrigió el tablero `InventarioColumnasLotes` (orden de `dev`, «Costo unitario» en moneda redondeada con unidad y exacto en `title`, chip «Tipo» con tono, sin «Presentación» en «Producto») y lo copió a `docs/diseno/canvas/` | humano, 2026-10-16 (criterio: columnas y costo, manda `dev`) | fb140780 | R53 |
+| P24 | En la tarjeta, «Tipo» arriba a la derecha (hueco de estado) y «Presentación» la primera de la `meta`, sin rótulo, delante de las cifras | humano, 2026-10-16 | — | R13 |
+| P25 | Cabecera «Costo unitario» (de `dev`); rótulo «Costo» en la tarjeta (del tablero) | humano, 2026-10-16 | 6a665e3f | R54, R55 |
+| P26 | Manda el tablero: fondo suave, sangría y animación también en las tarjetas de lote del teléfono; con movimiento reducido, sin animación | humano, 2026-10-16 (criterio: tarjetas y fechas, manda el tablero) | — | R57 |
+| P27 | Manda el tablero: la «Fecha» del historial alineada a la derecha (`ModalesInventario`) | humano, 2026-10-16 (criterio: tarjetas y fechas, manda el tablero) | — | R21 |
 
 ## Requisitos (EARS)
 
@@ -94,11 +116,13 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
 
 ### Inventario — tabla y aviso de existencia
 
-- **R6.** Las columnas «Existencia», «Costo», «Alerta de cantidad», «Reservado» y «Disponible» (y
-  «Existencia» y «Alerta de cantidad» en «Producto terminado») DEBEN alinearse a la derecha en la
-  celda y en la cabecera, en cifras tabulares, también en las sub-filas de lote (R47); «Tipo» y
-  «Presentación» DEBEN alinearse a la izquierda; la cifra de «Disponible» de la fila de producto
-  DEBE pintarse en negrita. *(enmienda 2026-10-16; decisión P18; tablero `docs/diseno/canvas/InventarioColumnasLotes*.dc.html`, aprobado 2026-10-16)*
+- **R6.** Las columnas «Existencia», «Disponible», «Reservado», «Alerta de cantidad» y, cuando se
+  pinta (R54), «Costo unitario» (y «Existencia» y «Alerta de cantidad» en «Producto terminado»)
+  DEBEN alinearse a la derecha en la celda y en la cabecera, en cifras tabulares, también en las
+  sub-filas de lote (R47); «Tipo» y «Presentación» DEBEN alinearse a la izquierda; la cifra de
+  «Disponible» de la fila de producto DEBE pintarse en negrita. *(enmienda 2026-10-16; decisión
+  P18; enmienda 2: el orden y la visibilidad de «Costo unitario» son los de `dev`, H4; tablero
+  `docs/diseno/canvas/InventarioColumnasLotes*.dc.html`, aprobado 2026-10-16)*
 - **R7.** SI la alerta de cantidad de un producto supera su existencia (la regla de hoy: supera, no
   iguala), ENTONCES la celda de existencia DEBE pintarse en el tono de advertencia (ámbar), con un
   icono de advertencia oculto a lectores de pantalla y el texto «Por debajo de la alerta de cantidad»
@@ -128,12 +152,14 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   Las sub-filas de lote y de estado del R47 y la fila de grupo de «Producto terminado» NO DEBEN
   pintar menú ⋯ ni «Acciones». *(enmienda 2026-10-16)*
 - **R13.** MIENTRAS el contenedor de la tabla mide 760 px o menos, el sistema DEBE pintar cada producto
-  como tarjeta con imagen, nombre con el conmutador de lotes del R47 (y número de pedido en
-  «Producto terminado»), el chip de «Tipo» (solo en «Todos»), «Presentación», «Existencia»,
-  «Costo» (salvo en «Producto terminado»), «Alerta de cantidad», «Disponible» (salvo en «Producto
-  terminado») y el aviso del R7, y un botón «Acciones» de 44 px que abre el menú centrado con el
-  nombre del producto como título e ítems de al menos 48 px. *(supuesto P12; decisión P18;
-  enmienda 2026-10-16; tablero `docs/diseno/canvas/InventarioColumnasLotes*.dc.html`, aprobado 2026-10-16)*
+  como tarjeta con imagen, nombre (y número de pedido en «Producto terminado»), el chip de «Tipo»
+  (solo en «Todos»), «Presentación» (salvo en la pestaña «Producto») y, en este orden, las cifras
+  «Existencia», «Alerta de cantidad», «Disponible» (salvo en «Producto terminado») y «Costo»
+  (solo DONDE el R54 lo pinta, y salvo en «Producto terminado»), con sus rótulos (R55) y el aviso
+  del R7; al pie, el conmutador «Mostrar lotes» del R58 (en la tabla de productos) y un botón
+  «Acciones» de 44 px que abre el menú centrado con el nombre del producto como título e ítems de
+  al menos 48 px. *(decisión P12, confirmada en H1; decisión P18; enmienda 2026-10-16; enmienda 2:
+  H2·H3 y H4; tablero `docs/diseno/canvas/InventarioColumnasLotes*.dc.html`, aprobado 2026-10-16)*
 - **R14.** DONDE un ítem de `RowActionsMenu` declara un separador delante, el menú DEBE pintar una
   línea divisoria (`role="separator"`) antes de ese ítem, en el desplegable y en el diálogo
   centrado, nunca antes del primer ítem que se pinta; sin la declaración, el árbol DEBE ser el de
@@ -143,8 +169,9 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
 
 - **R15.** El panel «Lotes» DEBE pintar «Lotes» encima del título (el nombre del producto con su
   unidad, como hoy) y una tabla con las columnas «Lote», «Cantidad», «Fecha de compra»,
-  «Vencimiento», «Apartado», «Disponible» y acciones; lote, cifras y fechas en cifras tabulares y
-  las cifras a la derecha; las celdas DEBEN conservar sus `data-testid` de hoy
+  «Vencimiento», «Apartado», «Disponible» y acciones; lote, cifras y fechas en cifras tabulares, y
+  las cifras y las dos fechas («Fecha de compra» y «Vencimiento») alineadas a la derecha en la
+  celda y en la cabecera *(enmienda 2, H2·H3: el tablero `ModalesInventario` las marca `num`)*; las celdas DEBEN conservar sus `data-testid` de hoy
   (`product-batch-lot`, `-quantity`, `-packages`, `-purchase-date`, `-expiry-date`, `-reserved`,
   `-available`); la celda «Vencimiento» DEBE conservar el texto relativo
   (`product-batch-expiry-relative`) y el chip «Vencido» (`product-batch-expired`) de hoy, con
@@ -170,7 +197,8 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   <lote>» (lote en cifras tabulares) con una tabla de columnas «Tipo», «Cantidad», «Existencia
   anterior», «Total contado», «Motivo», «Pedido», «Autor» y «Fecha»; los asientos, su orden, los
   textos de tipo, el autor «Sistema» y la fecha DEBEN ser los de hoy, y un dato ausente DEBE pintar
-  «—».
+  «—»; la columna «Fecha» DEBE alinearse a la derecha en la celda y en la cabecera. *(enmienda 2,
+  decisión P27)*
 - **R22.** El historial DEBE pedir los asientos la primera vez que se abre y conservar sus estados de
   hoy (cargando, error, lote anterior al libro) con sus textos y `data-testid`
   (`batch-history-entry-*`).
@@ -214,7 +242,8 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   `aria-current="step"`; los pasos NO DEBEN ser controles. *(supuesto P6)*
 - **R32.** El paso vigente DEBE ser el 1 mientras no hay vista previa ni resultado (también con el
   archivo rechazado o un error), el 2 con la vista previa y el 3 con la importación hecha, sin nada
-  importado o ya importada; CUANDO se pulsa «Importar otro archivo», el vigente DEBE volver al 1.
+  importado o ya importada; CUANDO se pulsa «Importar otro archivo» (paso 3) o «Elegir otro
+  archivo» (paso 2, R59), el vigente DEBE volver al 1. *(enmienda 2, H5)*
 - **R33.** MIENTRAS la barra de pasos no cabe en el ancho, el sistema DEBE desplazarla en horizontal
   sin saltar de línea y sin desbordar la página.
 
@@ -280,12 +309,14 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
 
 ### Enmienda 2026-10-16 — lo que trajo `dev`
 
-- **R47.** CUANDO se pulsa el conmutador de lotes de un producto (`product-batches-toggle`), el
+- **R47.** CUANDO se pulsa el conmutador de lotes de un producto (el chevrón `product-batches-toggle`
+  en la tabla, o «Mostrar lotes» al pie de la tarjeta, R58), el
   sistema DEBE desplegar debajo una sub-fila por lote vivo (lote, fecha de compra, vencimiento,
-  existencia, costo, reservado y disponible) o una sub-fila de estado (cargando, «Sin lotes con
+  existencia, costo si el R54 lo pinta, reservado y disponible) o una sub-fila de estado (cargando, «Sin lotes con
   existencia.», error con «Reintentar»), con sus textos, su lectura y sus `data-testid` de hoy; MIENTRAS
   el contenedor de la tabla mide 760 px o menos, cada sub-fila DEBE pintarse como tarjeta propia
-  justo debajo de la del producto, sin imagen ni «Acciones». *(decisión P17; tablero `docs/diseno/canvas/InventarioColumnasLotes*.dc.html`, aprobado 2026-10-16)*
+  justo debajo de la del producto, sin imagen ni «Acciones». *(decisión P17; enmienda 2: H2·H3, H4;
+  tablero `docs/diseno/canvas/InventarioColumnasLotes*.dc.html`, aprobado 2026-10-16)*
 - **R48.** SI un lote vence a menos de 30 días o ya venció (la regla de hoy, `expiry-warning.ts`),
   ENTONCES su fecha de vencimiento (en la sub-fila y en el panel «Lotes») y el nombre del producto en
   la tabla DEBEN pintarse en el tono de advertencia (ámbar), conservar `data-expiring="true"` y el
@@ -306,11 +337,55 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   DEBE pintarse igual con el aviso emergente que sin él.
 - **R52.** MIENTRAS la ventana mide 640 px o más, el diálogo «Historial del lote» DEBE medir como
   máximo 1000 px y dejar al menos 16 px libres a cada lado de la ventana.
-- **R53.** La tabla de productos DEBE conservar las columnas de hoy «Tipo» (chip con su tono, solo en
-  «Todos»), «Presentación» y «Costo» (promedio ponderado del producto y costo del lote en la
-  sub-fila, sin redondear, «—» sin costo), y el nombre sin la presentación, con sus `data-testid`
-  de hoy; la de «Producto terminado» DEBE conservar «Presentación» y el enlace del nombre a la ficha
-  del producto terminado.
+- **R53.** La tabla de productos DEBE conservar las columnas y el orden de hoy (fb140780): imagen,
+  «Nombre» (sin la presentación), «Tipo» (chip con el tono de su tipo, solo en «Todos»),
+  «Presentación» (salvo en la pestaña «Producto»), «Existencia», «Disponible», «Reservado»,
+  «Alerta de cantidad», «Costo unitario» (solo DONDE el R54 lo pinta) y las acciones, con sus
+  `data-testid` de hoy; MIENTRAS la pestaña vigente es «Producto», NO DEBE pintar «Presentación»
+  ni en la tabla ni en la tarjeta; la de «Producto terminado» DEBE conservar «Presentación», sin
+  «Costo unitario», y el enlace del nombre a la ficha del producto terminado. *(enmienda 2, H4 y
+  H1·H6; QC-52 R37)*
+
+### Enmienda 2 (2026-10-16) — costo de `dev`, tablero en tarjetas y sub-filas, «Elegir otro archivo»
+
+- **R54.** DONDE la sesión cumple la regla de hoy para ver costos unitarios (`canViewUnitCosts`), la
+  tabla de productos DEBE pintar «Costo unitario» y la tarjeta la cifra «Costo», en moneda con dos
+  decimales redondeados y la unidad del producto («$2,500.00 / L»; sin unidad conocida, solo el
+  importe), con el valor exacto en `title`, el promedio ponderado en la fila del producto y el
+  costo del lote en su sub-fila, y «—» sin costo; SI la sesión no la cumple, ENTONCES la columna,
+  la cifra de la tarjeta y el costo de las sub-filas NO DEBEN pintarse, y el servidor NO DEBE
+  enviar el costo (la regla y el envío son los de hoy, QC-52 R35–R36). *(enmienda 2, H4; 6a665e3f,
+  5496bd16)*
+- **R55.** MIENTRAS el contenedor de la tabla de productos (o de «Producto terminado») mide 760 px o
+  menos, cada cifra de la tarjeta de producto DEBE llevar delante su rótulo visible («Existencia», «Alerta», «Disponible»,
+  «Costo») y cada cifra de la tarjeta de una sub-fila de lote el suyo («Existencia», «Reservado»,
+  «Disponible», «Costo»), sin rótulo donde la celda no pinta cifra; el texto de cada `data-testid`
+  de cifra DEBE seguir siendo solo la cifra; MIENTRAS el contenedor mide más de 760 px, la tabla NO
+  DEBE pintar esos rótulos dentro de las celdas. *(enmienda 2, H2·H3; tablero
+  `InventarioColumnasLotes`, teléfono)*
+- **R56.** MIENTRAS el contenedor de la tabla de lotes o del historial mide 760 px o menos, la
+  tarjeta de cada lote DEBE rotular «Cantidad», «Apartado», «Disponible», «Fecha de compra» y
+  «Vencimiento», y la de cada asiento del historial «Existencia anterior», «Total contado»,
+  «Motivo» y «Pedido» (el autor y la fecha, sin rótulo); el texto de cada `data-testid` de celda
+  DEBE seguir siendo solo su valor. *(enmienda 2, H2·H3; tablero `ModalesInventario`)*
+- **R57.** Cada sub-fila de lote y de estado (R47) DEBE pintarse con un fondo suave distinto del de
+  su producto y sangrada respecto de él, y entrar con la animación de entrada de 300 ms del repo:
+  MIENTRAS el contenedor de la tabla de productos mide más de 760 px, en todas sus celdas y con su
+  contenido de «Nombre» sangrado; MIENTRAS mide 760 px o menos, en su tarjeta, que DEBE quedar
+  sangrada respecto de la del producto y con esquinas redondeadas. DONDE la persona pide movimiento
+  reducido, la sub-fila NO DEBE animarse. El componente compartido `DataTable` NO DEBE cambiar.
+  *(enmienda 2, H2·H3 y decisión P26; tablero `InventarioColumnasLotes`, escritorio y teléfono)*
+- **R58.** MIENTRAS el contenedor de la tabla de productos mide 760 px o menos, la tarjeta de cada
+  producto DEBE pintar al pie, a la izquierda de «Acciones», un botón de texto «Mostrar lotes»
+  («Ocultar lotes» con los lotes desplegados) de al menos 44 px de alto, con icono de chevrón,
+  `aria-expanded` y `data-testid="product-batches-card-toggle"`, que hace lo mismo que el chevrón
+  de la tabla (R47); la tarjeta NO DEBE pintar el chevrón en el título. *(enmienda 2, H2·H3;
+  tablero `InventarioColumnasLotes`, teléfono)*
+- **R59.** El paso 2 de `/inventario/importar` DEBE pintar en su cabecera, junto a «Vista previa» y el
+  nombre del archivo, un botón secundario «Elegir otro archivo» de al menos 44 px
+  (`data-testid="inventory-import-choose-another"`), deshabilitado mientras se importa; CUANDO se
+  pulsa, el sistema DEBE volver al paso 1 sin recargar la página, sin archivo elegido, sin vista
+  previa ni error, sin importar nada y sin lanzar ningún aviso emergente. *(enmienda 2, H5)*
 
 ## Preguntas abiertas
 
@@ -402,3 +477,31 @@ falta un pase `/design` antes de la tanda 3 (`docs/perfil-agentes.md > Pase de d
   real tiene 10 en «Todos» y 7 en «Producto terminado» (6f08e379) y pasa a tarjeta con `card`. *Por
   defecto:* no se arregla aquí; D53 se amplía a `/inventario` con estos números (T7c), como ya decía
   `design.md > 11`.
+
+### Preguntas de la enmienda 2 (2026-10-16)
+
+**Resueltas por el humano el 2026-10-16:** las cinco pasan a `## Decisiones cerradas` (filas
+P23–P27). P23, P24 y P25 con la opción por defecto; **P26 y P27 con el tablero, no con el defecto**
+(R57 y R21 reescritos). El texto de abajo se conserva como historia.
+
+Las abre la enmienda 2. Ninguna reabre H1–H6: son detalles que esas filas no cubren.
+
+- **P23. Orden de las columnas de la tabla: tablero contra `dev`.** El tablero de escritorio
+  (`InventarioColumnasLotes`) dibuja Existencia · Alerta · Reservado · Disponible · Costo; `dev`
+  (fb140780) pinta Existencia · Disponible · Reservado · Alerta · Costo unitario. H4 solo fija
+  «Costo» al final. *Por defecto:* el orden de `dev` (regla de la enmienda: lo mergeado se conserva;
+  el review ya decía que la tabla no tiene requisito de orden) (R53), y el leader corrige el
+  tablero. El mismo tablero dice «sin redondear» del costo, contra H4: también lo corrige el leader.
+- **P24. Dónde van «Tipo» y «Presentación» en la tarjeta.** El tablero los pone en una línea bajo el
+  nombre. `DataTable` no tiene un hueco bajo el título distinto de `meta`, y H2·H3 prohíben tocarlo.
+  *Por defecto:* «Tipo» en el hueco de estado, arriba a la derecha (como ya está), y «Presentación»
+  la primera de la `meta`, sin rótulo, justo bajo el nombre y delante de las cifras (R13).
+- **P25. Rótulo del costo en la tarjeta.** La cabecera de `dev` dice «Costo unitario»
+  (`COST_COLUMN_LABEL`) y la tarjeta del tablero dice «Costo». *Por defecto:* «Costo unitario» en
+  la cabecera (es de `dev`) y «Costo» en la tarjeta (manda el tablero, H2·H3) (R54, R55).
+- **P26. Fondo y sangría de las tarjetas de lote en teléfono.** H2·H3 piden fondo, sangría y
+  animación «en escritorio»; el tablero de teléfono también dibuja fondo suave y sangría en la
+  tarjeta de cada lote (`.lot-m`). *Por defecto:* solo escritorio, como dice H2·H3; en teléfono la
+  sub-fila sigue siendo la tarjeta de `DataTable` sin extensión (P17, R47).
+- **P27. «Fecha» del historial a la derecha.** `ModalesInventario` la marca `num`, como las fechas del
+  panel «Lotes», pero H2·H3 solo nombran las fechas del panel. *Por defecto:* sin cambio (R21).
