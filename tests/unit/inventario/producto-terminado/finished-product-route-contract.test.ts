@@ -185,7 +185,10 @@ const LECTURAS_DE_EVIDENCIA = new Set(['getOrderEvidenceAction', 'countOrderEvid
 // pinta el diálogo de anular; las demás de `pedidos` y todas las de producto y lote siguen prohibidas.
 const ACCIONES_DE_PEDIDOS = ACCIONES_DE_ESCRITURA[3];
 const ESCRITURAS_SIN_PEDIDO = new Set(['deliverDirectAction', 'voidDirectDeliveryAction']);
-const LECTURAS_SIN_PEDIDO = new Set(['getDirectDeliveryForVoidAction']);
+// 2026-10-16 (enmienda QC-288, decisión del humano tras el bloqueo de F3): la página lee además el
+// excedente del producto para decidir si pinta «Entregar» en la cabecera. Es una lectura; las
+// aserciones previas no cambian.
+const LECTURAS_SIN_PEDIDO = new Set(['getDirectDeliveryForVoidAction', 'listDirectDeliverySurplusAction']);
 
 function nombreDePedidosPermitido(nombre: string): boolean {
   return (
@@ -286,6 +289,8 @@ describe('contrato de la ficha de producto terminado', () => {
     }
 
     expect(usados.has('voidDirectDeliveryAction')).toBe(true);
+    expect(usados.has('listDirectDeliverySurplusAction')).toBe(true);
+    expect(nombresImportadosDe(leer(PAGE_PATH), ACCIONES_DE_PEDIDOS)).toEqual(['listDirectDeliverySurplusAction']);
     for (const nombre of usados) {
       expect(ESCRITURAS_SIN_PEDIDO.has(nombre) || LECTURAS_SIN_PEDIDO.has(nombre), nombre).toBe(true);
     }

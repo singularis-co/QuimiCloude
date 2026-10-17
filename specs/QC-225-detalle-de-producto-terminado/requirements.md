@@ -74,6 +74,18 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
   ajustar existencia, entregar, anular, borrar), y ningún archivo de su ruta DEBE importar una
   Server Action de escritura.
 
+  > **Enmienda 2026-10-16 (enmienda QC-288, aprobada por el humano).** La ficha ofrece «Entregar» sin
+  > pedido en la cabecera, solo con `entregas.modificar` y excedente mayor que cero, y «Anular» en las
+  > filas de Entregas sin pedido, con `entregas.anular` (QC-288 R5, R43). De
+  > `pedidos/adapters/driving/order-actions` la ruta importa solo `deliverDirectAction`,
+  > `voidDirectDeliveryAction` (escrituras) y `getDirectDeliveryForVoidAction`,
+  > `listDirectDeliverySurplusAction` (lecturas). Sigue prohibido todo lo demás: `voidDeliveryAction`,
+  > las otras actions de `pedidos` y las de producto y lote. La página importa `DirectDeliveryButton`
+  > (módulo de cliente) por su ruta directa, no por el barrel de `/inventario`, así que la regla del
+  > contrato que solo admite valores de servidor de ese barrel (casos «R16» de
+  > `finished-product-route-contract.test.ts`) no cambia. Lo hace cumplir
+  > `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts`, con nota fechada.
+
 ### Tabs
 
 - **R8** [Tabs] La ficha DEBE mostrar el nombre del producto y siete tabs, en este orden: General,

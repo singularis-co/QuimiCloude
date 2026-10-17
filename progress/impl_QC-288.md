@@ -5,9 +5,8 @@
 - **Hechas y subidas:** T0, B1–B5, F1, F2, F5. Commits `c5277de2` … `89a4d9bf`.
 - **Bloqueadas por decisión de diseño/contrato** (detalle y opciones en
   `progress/features/QC-288.md > Preguntas abiertas`):
-  - **F3 parcial:** la página `producto-terminado/[id]/page.tsx` choca con
-    `finished-product-route-contract.test.ts`: la action del excedente no está permitida, y la R16
-    prohíbe un valor `'use client'` desde el barrel.
+  - **F3:** hecha (2026-10-16), tras la decisión (a): contrato enmendado y botón por su ruta directa.
+    Ver «Cierre» en la sección F3.
   - **F4:** hecha (2026-10-16), tras la decisión (a): «Anular» en el menú de acciones de la fila y,
     en teléfono, la tabla con scroll horizontal. Ver la sección F4.
 - **Pendientes porque dependen de lo anterior:** TC, TI (E2E) y TZ. TC ya tiene identificados sus
@@ -170,7 +169,7 @@ Veredicto: F5 hecha; historial y movimientos muestran la entrega sin pedido y su
   `guard-formularios-y-acciones` R28 sobre
   `producto-terminado/[id]/components/finished-product-deliveries-table.tsx:103`, archivo de F4 en curso.
 
-## F3 — Entradas: cabecera de la ficha y menú del listado (frontend_dev, 2026-10-16) — PARCIAL
+## F3 — Entradas: cabecera de la ficha y menú del listado (frontend_dev, 2026-10-16) — cerrada (ver Cierre)
 
 **Bloqueada la parte de `producto-terminado/[id]/page.tsx`.** Lo que pide `design.md > 7.4` para la
 ficha choca con `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts`, que
@@ -228,6 +227,48 @@ se pintan como JSX) o cambiar el diseño. Hasta entonces R5 solo tiene cubierta 
   (`guard-asignacion-componentizada`, `guard-archivos-en-vuelo-sin-ruido`: con `--testTimeout=120000`,
   `2 passed`, `31 passed`). El rojo real sigue siendo `guard-formularios-y-acciones` R28 sobre
   `finished-product-deliveries-table.tsx:103`, de F4.
+
+### Cierre (frontend_dev, 2026-10-16)
+
+Decisión del humano (`requirements.md > Decisiones cerradas`, commit `68be26f5`): se enmienda el
+contrato de la ruta y el botón se importa por su ruta directa. Grafo: sin proyecto para este worktree;
+Grep/Read.
+
+Archivos:
+- `app/(private)/inventario/producto-terminado/[id]/page.tsx`: tras `getFinishedProductAction`, con
+  `entregas.modificar` (`assertPermission` sobre `identity.getSessionUser()`) llama una vez a
+  `listDirectDeliverySurplusAction([product.id])`; con excedente > 0 pasa
+  `actions={<DirectDeliveryButton productId=… />}` a `FinishedProductHeader`. Sin permiso, sin sesión,
+  con error, con rechazo o con 0, no pasa nada. `DirectDeliveryButton` se importa de
+  `@/app/(private)/inventario/components/direct-delivery-button`, no del barrel.
+- `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts`: nota fechada
+  2026-10-16; `listDirectDeliverySurplusAction` entra en las lecturas de `pedidos` admitidas, y el caso
+  «QC-225 R7 (enmienda QC-288), R43» exige ahora que la página importe solo esa action de `pedidos`.
+  Las aserciones previas (incluidas las R16) no cambian.
+- `tests/unit/inventario-ui/finished-product-page.test.tsx`: dobles de `@/lib/composition` y de
+  `order-actions` (nota fechada) y bloque «Entregar» en la cabecera (7 casos R5).
+- `specs/QC-225-detalle-de-producto-terminado/requirements.md`: enmienda fechada bajo R7.
+- `specs/QC-288-entrega-sin-pedido/tasks.md`: F3 `[x]`; ese spec, en `Archivos esperados`.
+
+R → test (completa el mapa de arriba):
+- R5 → `finished-product-page.test.tsx` («R5 — con entregas.modificar y excedente > 0, la cabecera
+  muestra «Entregar» (tab general/stock)», «R5 — con excedente cero…», «R5 — sin el producto en la
+  respuesta…», «R5 — si el excedente no se pudo leer…», «R5 — sin entregas.modificar o sin sesión…»,
+  «R5 — el permiso decide, no el rol…») y `finished-product-header.test.tsx` (2).
+
+Gate (salida real):
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 9 problems (0 errors, 9 warnings)`, los 9 previos y ajenos.
+- `finished-product-page` + `finished-product-route-contract` + `product-route-contract`:
+  `Test Files 3 passed (3)`, `Tests 55 passed (55)`.
+- `finished-product-route-contract` + `product-route-contract` + `finished-product-header` +
+  `direct-delivery-button`: `Test Files 4 passed (4)`, `Tests 44 passed (44)`.
+- `pnpm exec vitest related --run page.tsx`: `Test Files 1 passed (1)`, `Tests 15 passed (15)`.
+- `pnpm exec vitest run guard`: primer pase `1 failed | 79 passed (80)`, un tiempo agotado (24,9 s) en
+  `guard-asignacion-componentizada`; sola, `22 passed (22)`; segundo pase completo
+  `Test Files 80 passed (80)`, `Tests 1099 passed | 20 skipped (1119)`.
+
+Veredicto: F3 hecha; R5–R8 de pantalla en verde, con el contrato de la ruta enmendado y R16 intacta.
 
 ## F4 — Tab Entregas y diálogo de anular (frontend_dev, 2026-10-16)
 

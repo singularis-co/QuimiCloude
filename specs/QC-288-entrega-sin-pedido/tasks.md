@@ -225,7 +225,7 @@ commit.
 
 ---
 
-## [ ] F3 — Entradas: cabecera de la ficha y menú del listado (depende de F2)
+## [x] F3 — Entradas: cabecera de la ficha y menú del listado (depende de F2)
 
 - `app/(private)/inventario/components/direct-delivery-button.tsx` (nuevo).
 - `finished-product-header.tsx`: prop `actions`.
@@ -449,6 +449,10 @@ Tests:
 - `tests/integration/inventario/deliverable-batches.int.test.ts`
 - `tests/integration/inventario/ledger-cuadre.int.test.ts`
 - `e2e/entrega-sin-pedido.spec.ts`
+
+Specs de otras fichas (enmienda fechada 2026-10-16):
+- `specs/QC-225-detalle-de-producto-terminado/requirements.md` (R7: actions de `pedidos` que la ruta
+  de la ficha admite; el botón «Entregar» por su ruta directa).
 
 Rutas de los tests de UI confirmadas en T0 (2026-10-16): `finished-product-tables.test.tsx` vive en
 `tests/unit/inventario-ui/` y `batch-history.test.tsx` en `tests/unit/inventario/`.
