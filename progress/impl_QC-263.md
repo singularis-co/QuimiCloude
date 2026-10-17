@@ -1703,3 +1703,78 @@ $ pnpm exec vitest run guard
 T8g hecha: `inventario-rediseno.spec.ts` pasa en Chromium y WebKit (30/30) con los casos de R13, R15,
 R47, R54, R55, R57, R58, R59, y el fondo translúcido de las celdas fijadas de la sub-fila (R57)
 arreglado a opaco en la clase de ámbito; único rojo, el conocido de Pedidos.
+
+## Tanda 8 (regresion E2E y medida D53)
+
+Tras el merge de dev y los rotulos/pie de tarjeta, sub-filas, fechas a la derecha y «Elegir otro
+archivo». Sin cambios de codigo en esta tanda: ningun spec fallo por la UI nueva.
+
+### Archivos creados/modificados
+
+- `progress/impl_QC-263.md` (esta seccion).
+
+### Regresion E2E (cada spec por separado, Chromium + WebKit, puerto 3117)
+
+```
+$ pnpm exec playwright test e2e/inventario.spec.ts                         16 passed (2.6m)
+$ pnpm exec playwright test e2e/inventario-importar.spec.ts                 2 passed (41.5s)
+$ pnpm exec playwright test e2e/ajuste-de-inventario.spec.ts                8 passed (1.7m)
+$ pnpm exec playwright test e2e/producto-terminado.spec.ts                  2 passed (2.0m)
+$ pnpm exec playwright test e2e/reserva-de-material.spec.ts                 1 failed | 1 passed (3.0m)
+    [webkit] R48 … reserva-de-material.spec.ts:717 — getByTestId('order-execution-start-button')
+    no visible en 60 s (pantalla del Operador en /asignacion, no /inventario)
+  reintento:                                                                 2 passed (1.1m)
+$ pnpm exec playwright test e2e/aislamiento-inventario.spec.ts              2 passed (40.7s)
+$ pnpm exec playwright test e2e/insumo-por-unidad.spec.ts                   2 passed (51.9s)
+$ pnpm exec playwright test e2e/datos-de-lote-en-acondicionamiento.spec.ts  2 passed (1.1m)
+$ pnpm exec playwright test e2e/pedido-bloqueado.spec.ts                    1 failed | 1 passed (24.9s)
+    [webkit] R40 … pedido-bloqueado.spec.ts:488 — ancho del boton «Entrar» de /asignacion:
+    Expected >= 44, Received 43.99998474121094 (redondeo subpixel de WebKit)
+  reintento:                                                                 2 passed (51.7s)
+```
+
+Los dos rojos son de WebKit, en pantallas de Pedidos/Asignacion, y pasan al reintentar: ajenos a
+QC-263. El de `pedido-bloqueado` es una fragilidad real del assert (compara un `boundingBox`
+subpixel con `>= 44` exacto); se reporta, no se toca aqui.
+
+### Medida D53 — celdas del esqueleto frente a columnas visibles (DERIVADO del codigo)
+
+Derivado de `buildProductColumns` (`product-columns.tsx`), `ProductTable` (`tableColumnCount =
+columns.length - 1` por el conmutador de pie, oculto en tabla), el `fallback` del `<Suspense>` de
+`page.tsx` (un `ProductTable status="loading"` con los `params` y `canSeeCost` de la pagina),
+`buildFinishedStockColumns` y `DataTable`/`TableSkeleton`. No se midio en el navegador: el
+`fallback` solo vive durante la primera carga y las navegaciones posteriores no lo pintan (la tabla
+se atenua con `aria-busy`, sin esqueleto).
+
+| Vista | Admin (con Costo): esqueleto / real | Sin permiso de costos: esqueleto / real |
+|---|---|---|
+| «Todos» (con Tipo y Presentación) | 10 / 10 | 9 / 9 |
+| Tipo filtrado (Materia prima, Envase, …) | 9 / 9 | 8 / 8 |
+| Tipo «Producto» (sin Presentación) | 8 / 8 | 7 / 7 |
+| «Producto terminado» | **9 / 7** | **8 / 7** |
+
+- «Producto terminado»: el `fallback` es un `ProductTable` (columnas de producto: Disponible,
+  Reservado y Costo), pero la tabla real es `FinishedStockTable` (Imagen, Pedido, Nombre,
+  Presentación, Existencia, Alerta, Acciones = 7, sin Costo). Descuadra en 2 (admin) o 1.
+  `PRODUCT_SKELETON_COLUMN_COUNT = 8` solo lo usa `FinishedStockTable` en su estado de error, nunca
+  en carga.
+- Bajo 760 px el esqueleto NO pasa a tarjeta: `DataTable` devuelve `<TableSkeleton>` antes del
+  envoltorio `@container`, y `TableSkeleton` siempre pinta `<table>`; las filas reales si pasan a
+  tarjeta (`@max-[760px]`).
+
+### Verificacion
+
+```
+$ pnpm run typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm run lint
+✖ 10 problems (0 errors, 10 warnings)   (los mismos archivos ajenos de tandas anteriores)
+```
+
+### Veredicto
+
+Regresion E2E en verde (9 specs, Chromium y WebKit; dos rojos ajenos de WebKit que pasan al
+reintentar) y D53 medida: el esqueleto casa en todas las vistas salvo «Producto terminado» (9/8
+frente a 7) y nunca pasa a tarjeta bajo 760 px.

@@ -294,7 +294,7 @@ T8h.
   recargar (un marcador puesto en `window` sigue ahí). Con un usuario sin permiso de costos, sin
   «Costo unitario». Los E2E de T7b que nombren `product-batches-toggle` en tarjetas pasan al de la
   tarjeta. *Hecho:* pasa en Chromium y WebKit; los specs tocados pasan por separado.
-- [ ] **T8h. Deudas y cierre** (F8, F9; sustituye a T7c). `progress/deudas.md`: D41 resuelta; D53
+- [x] **T8h. Deudas y cierre** (F8, F9; sustituye a T7c). `progress/deudas.md`: D41 resuelta; D53
   ampliada con los números medidos tras el merge; **D55 ampliada** con los cierres locales de 44 px de
   `batch-history.tsx` y `adjust-batch-dialog.tsx` (se retiran al arreglar la primitiva) y la X de
   32 px del `Sheet` «Lotes»; nueva deuda de rótulos y pie de tarjeta hechos en la ruta (A12); las de

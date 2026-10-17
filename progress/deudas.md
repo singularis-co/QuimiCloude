@@ -412,6 +412,13 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Ampliada (2026-10-16, QC-263, T0b, P22):** `/inventario` igual. El esqueleto de
   `product-columns-skeleton.ts` pinta 9 columnas y sin tarjeta; la tabla real tiene 10 en «Todos»,
   9 con un tipo filtrado y 7 en «Producto terminado», y bajo 760 px sale en tarjetas.
+- **Medida de nuevo tras el merge (2026-10-16, QC-263, T8h, F9; derivada del código):** `ProductTable`
+  pinta el esqueleto con su número real de columnas, así que cuadra en «Todos» (10 con Costo / 9
+  sin permiso de costos), con un tipo filtrado (9 / 8) y en «Producto» (8 / 7). Queda descuadre en
+  «Producto terminado»: mientras carga se pinta el esqueleto de `ProductTable` (9 / 8) y la tabla
+  real, `FinishedStockTable`, tiene 7. `PRODUCT_SKELETON_COLUMN_COUNT` (8) solo se usa en el error de
+  esa tabla. Bajo 760 px el esqueleto sigue siendo tabla: `DataTable` devuelve `TableSkeleton` antes
+  del contenedor `@container`.
 - **Dueño:** sin asignar.
 
 ### D54 — `guard-dobles-e2e` lee `.env.example` con una regex que cruza líneas
@@ -423,6 +430,10 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 ### D55 — La X de cerrar de `Dialog` y `Sheet` compartidos mide 32 px
 - **Origen:** censo de QC-262 (T0b, 2026-10-13), medido a 390 px en «Cliente», «Reparto y unidad» y el panel de entrega de `/pedidos`.
 - **Qué falta:** el botón de cerrar de las primitivas compartidas `Dialog` y `Sheet` no llega al objetivo táctil de 44 px que cumplen los botones de acción. Se arregla en la primitiva compartida, una sola vez para todas las pantallas, con la revisión visual de cada diálogo. El leader decidió dejarlo fuera de QC-262 (R18 cuenta los botones de acción).
+- **Ampliada (2026-10-16, QC-263, m3 del review):** en `/inventario` hay dos cierres locales de
+  44 px (`showCloseButton={false}` más un `DialogClose` propio `size="icon"` + `touch`, como
+  `batch-evidence-dialog.tsx`) en `batch-history.tsx` y `adjust-batch-dialog.tsx`: se retiran al
+  arreglar la primitiva. La X de 32 px del `Sheet` «Lotes» sigue (preexistente; R42 no nombra el panel).
 - **Dueño:** sin asignar.
 
 ### D56 — `ConfirmDialog` sin icono en la cabecera (QC-262, P5)
@@ -481,3 +492,12 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   o la zona propia con `drop`.
 - **Dueño:** sin asignar.
 
+### D63 — Inventario: rótulos y pie de tarjeta hechos en la ruta (QC-263, A12)
+- **Origen:** QC-263 (2026-10-16), enmienda 2, H2·H3 y `design.md > 8 > A12`.
+- **Qué falta:** `DataTableCards` no tiene rótulos por campo ni pie propio. `/inventario` los hace
+  dentro de la ruta: `cardFieldLabel`/`withCardFieldLabel` (`card-field-label.tsx`, rótulo con
+  `[table_&]:hidden`), la columna `batchesToggle` oculta en la tabla como `footer` de la tarjeta y
+  `PRODUCT_TABLE_SCOPE_CLASS` (fondo y entrada de las sub-filas). Si una segunda ruta lo necesita, se
+  sube a `DataTableCards` (paso 2 de la regla de decisión, con su fila de catálogo y tablero) y se
+  retira el apaño.
+- **Dueño:** sin asignar.
