@@ -125,8 +125,13 @@ Las dos piezas compartidas ganan su fila en el catálogo en el mismo commit, con
   `ConfirmDialog` gana una prop opcional `icon` que se pinta en `AlertDialogMedia` (paso 2 de la
   regla de decisión: extensión aditiva, sin cambio para los consumidores actuales).
 - **Orden del diálogo de baja de empresa** (revisión, 2026-10-16): cifras de impacto → aviso →
-  campo de confirmación, como el tablero; el aviso va en `children` de `ConfirmDialog`, antes del
-  campo.
+  campo de confirmación, como el tablero. El aviso es la descripción del diálogo (sigue siendo su
+  descripción accesible): `ConfirmDialog` gana una segunda prop opcional,
+  `descriptionPlacement: 'header' | 'after-aside'` (`'header'` por defecto, sin cambio para los
+  consumidores actuales), y la baja usa `'after-aside'`. Moverlo a `children` dejaba la cabecera
+  sin descripción o con el texto repetido.
+- **Icono de la reactivación:** el tablero también lo pinta (`dlg-ic info`); queda fuera de esta
+  vuelta (no estaba en lo decidido) y se añade con la misma prop si se pide.
 
 ### 2.3 Listas cerradas que amplía la ficha
 
