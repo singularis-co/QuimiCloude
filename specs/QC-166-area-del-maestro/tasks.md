@@ -115,12 +115,12 @@ mergeado; `design.md > 5` ya está alineado con su `design.md`, reenvío incluid
   - **Hecho:** los dos toasts, `user_not_pending` dentro del diálogo, sin refresco de la lista, sin
     doble envío.
 
-- [ ] **T11 · E2E de Administradores** (R45). Depende de T10b.
+- [x] **T11 · E2E de Administradores** (R45). Depende de T10b.
   - `e2e/maestro-administradores.spec.ts`; correr solo ese. El aviso del reenvío se acepta en sus
     dos variantes (el transporte de correo del entorno decide).
   - **Hecho:** en verde en local; salida en `progress/impl_QC-166.md`.
 
-- [ ] **T12 · Cierre**. Depende de T8 y T11.
+- [x] **T12 · Cierre**. Depende de T8 y T11.
   - `progress/impl_QC-166.md` con el mapa `R<n> -> test` completo (R1–R49) y la salida de los E2E.
   - Anotar en `progress/features/QC-166.md` el contrato para QC-278 (`design.md > 6.4`, `> 6.5`).
   - `./init.sh` en verde.

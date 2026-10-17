@@ -311,3 +311,98 @@ T10b:
 - El tablero pinta un icono de correo en el diálogo de reenvío. `ConfirmDialog` no tiene hueco para icono y
   no lo he extendido. «Rol» se muestra fijo en el alta y en la edición; el aviso del correo, solo en el alta.
 - Están aplicados los textos por defecto de las preguntas abiertas 6 y 8.
+
+## T11 · E2E de Administradores (R45) — frontend_dev, 2026-10-16
+
+Commit `7cfad454` `test(QC-166): T11 E2E de Administradores del Maestro`.
+
+### Archivos
+- `e2e/maestro-administradores.spec.ts` (nuevo).
+- `tests/guards/guard-identificador-de-request.test.ts`: alta de `maestro-administradores.spec.ts` en la
+  lista cerrada, con la cita de `design.md > 10`. No usa los testids de la tabla compartida, así que la
+  R36 de `tests/unit/shared/data-table-alcance.test.ts` no se toca.
+
+### Mapa R45 -> caso
+| R | Caso |
+|---|---|
+| R45 | `e2e/maestro-administradores.spec.ts` «el Maestro da de alta un Administrador eligiendo empresa, lo edita, le reenvía el enlace, no puede dar de baja al último y da de baja al que no lo es (R45)», pasos 1 (alta eligiendo empresa en el panel, fila «Pendiente», empresa en la base), 2 (edición con empresa fija, apellido nuevo en la lista), 3 (sin «Reenviar enlace» en la fila activa; reenvío a la pendiente con aviso `sent` o `failed`), 4 (baja del que no es el último) y 5 (el último: aviso y «Dar de baja» deshabilitado; sigue vivo en la base) |
+
+Fixture: empresa `qc166_adm_<run>_c` y su primer Administrador activo sembrados con `prisma.company.create`
+y `createFixtureUser`; limpieza con `deleteFixtureCompanies('qc166_adm_')` (huérfanos de más de una hora en
+`beforeAll`, los de la ejecución en `afterAll`).
+
+### Salida
+- `pnpm exec playwright test e2e/maestro-administradores.spec.ts` (segunda corrida verde):
+  ```
+  Running 2 tests using 2 workers
+    ok 2 [chromium] › e2e\maestro-administradores.spec.ts:140:5 › el Maestro da de alta un Administrador eligiendo empresa, lo edita, le reenvía el enlace, no puede dar de baja al último y da de baja al que no lo es (R45) (21.7s)
+    ok 1 [webkit] › e2e\maestro-administradores.spec.ts:140:5 › el Maestro da de alta un Administrador eligiendo empresa, lo edita, le reenvía el enlace, no puede dar de baja al último y da de baja al que no lo es (R45) (35.6s)
+    2 passed (50.1s)
+  ```
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errores y 10 warnings, todos previos y en archivos ajenos.
+- `pnpm exec vitest run guard`: 80 archivos, 1096 passed / 20 skipped.
+
+### Notas
+- Las dos primeras corridas fallaron por el spec, no por la app. (1) `administrator-email` y
+  `administrator-username` son a la vez testids de las celdas de la lista y de los campos del panel, así
+  que los campos se buscan dentro de `administrator-form`. (2) `administrator-name` lleva delante las
+  iniciales del avatar, así que se usa `toContainText`. No hay bug en T9–T10b.
+
+Veredicto: T11 en verde en chromium y webkit; R45 cubierto.
+
+## T12 · Mapa consolidado R<n> -> test (R1–R49, 2026-10-16)
+
+Rutas: `tests/ui/maestro/`, `tests/unit/maestro/`, `tests/unit/navegacion/`, `tests/unit/identity/login-action.test.ts`, `tests/ui/shared/administrator-fields.test.tsx`, `tests/unit/shared/addon-names.test.ts` y `e2e/`. Sin huecos: cada R tiene al menos un caso que lo nombra.
+
+| R | Test(s) |
+|---|---|
+| R1 | maestro-pages-permission.test.tsx, maestro-acceso.spec.ts |
+| R2 | private-nav-maestro.test.ts, orden-secciones.test.ts, private-layout-menu.test.tsx, maestro-acceso.spec.ts |
+| R3 | private-nav-maestro.test.ts, private-layout-menu.test.tsx, maestro-acceso.spec.ts |
+| R4 | private-nav-maestro.test.ts, orden-secciones.test.ts, login-action.test.ts, maestro-acceso.spec.ts |
+| R5 | private-nav-maestro.test.ts, orden-secciones.test.ts |
+| R6 | administrator-sheet.test.tsx, administrator-table.test.tsx, company-create-sheet.test.tsx, company-detail-header.test.tsx, company-detail-page.test.tsx, company-table.test.tsx, maestro-pages-permission.test.tsx |
+| R7 | administrator-delete-dialog.test.tsx, administrator-sheet.test.tsx, company-create-sheet.test.tsx, company-delete-dialog.test.tsx, company-reactivate-dialog.test.tsx |
+| R8 | company-table.test.tsx, maestro-pages-permission.test.tsx |
+| R9 | company-table.test.tsx, company-list-params.test.ts |
+| R10 | company-table.test.tsx, company-list-params.test.ts |
+| R11 | company-table.test.tsx, maestro-pages-permission.test.tsx, company-list-params.test.ts |
+| R12 | company-table.test.tsx |
+| R13 | company-table.test.tsx |
+| R14 | company-table.test.tsx |
+| R15 | company-table.test.tsx, company-list-params.test.ts |
+| R16 | company-table.test.tsx |
+| R17 | company-create-sheet.test.tsx, administrator-fields.test.tsx |
+| R18 | company-create-sheet.test.tsx |
+| R19 | company-create-sheet.test.tsx, company-edit-sheet.test.tsx, administrator-fields.test.tsx |
+| R20 | company-edit-sheet.test.tsx, company-table.test.tsx |
+| R21 | company-edit-sheet.test.tsx |
+| R22 | company-edit-sheet.test.tsx |
+| R23 | company-delete-dialog.test.tsx, company-table.test.tsx |
+| R24 | company-delete-dialog.test.tsx |
+| R25 | company-delete-dialog.test.tsx |
+| R26 | company-reactivate-dialog.test.tsx, company-table.test.tsx |
+| R27 | company-detail-header.test.tsx, company-detail-page.test.tsx |
+| R28 | company-detail-header.test.tsx, company-detail-page.test.tsx |
+| R29 | company-data-panel.test.tsx |
+| R30 | company-detail-page.test.tsx |
+| R31 | company-detail-page.test.tsx, company-history-panel.test.tsx, company-event-text.test.ts |
+| R32 | company-history-panel.test.tsx, company-event-text.test.ts, addon-names.test.ts |
+| R33 | company-history-panel.test.tsx, company-event-text.test.ts, addon-names.test.ts |
+| R34 | company-detail-page.test.tsx, company-history-panel.test.tsx |
+| R35 | administrator-table.test.tsx, maestro-pages-permission.test.tsx |
+| R36 | administrator-table.test.tsx |
+| R37 | administrator-sheet.test.tsx |
+| R38 | administrator-sheet.test.tsx, administrator-table.test.tsx |
+| R39 | administrator-delete-dialog.test.tsx, administrator-table.test.tsx |
+| R40 | administrator-delete-dialog.test.tsx, administrator-table.test.tsx |
+| R41 | administrator-sheet.test.tsx |
+| R42 | administrator-table.test.tsx, maestro-pages-permission.test.tsx |
+| R43 | maestro-acceso.spec.ts |
+| R44 | maestro-empresas.spec.ts |
+| R45 | maestro-administradores.spec.ts |
+| R46 | administrator-resend-link-dialog.test.tsx, administrator-table.test.tsx |
+| R47 | administrator-resend-link-dialog.test.tsx |
+| R48 | administrator-resend-link-dialog.test.tsx |
+| R49 | administrator-resend-link-dialog.test.tsx |
