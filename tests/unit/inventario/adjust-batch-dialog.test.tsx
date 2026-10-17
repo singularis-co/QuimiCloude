@@ -2,10 +2,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  AdjustBatchDialog,
-  ProductBatchesPanel,
-} from '@/app/(private)/inventario/components';
+import { AdjustBatchDialog } from '@/app/(private)/inventario/components';
 import type { AdjustBatchStockFormState } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { ProductBatchView } from '@/lib/modules/inventario';
 import { ADJUST_FORM_STATES } from '../../fixtures/adjust-batch-stock';
@@ -109,7 +106,7 @@ describe('el dialogo pide el total contado frente a la existencia registrada', (
 
     const dialogo = await abrirDialogo(user);
 
-    expect(screen.getByTestId('adjust-batch-recorded-stock')).toHaveTextContent('10');
+    expect(screen.getByTestId('adjust-batch-recorded-stock')).toHaveValue('10');
     expect(dialogo).toHaveTextContent('Existencia registrada');
     const campo = screen.getByTestId('adjust-batch-counted');
     expect(campo).toHaveAttribute('name', 'countedStock');
@@ -117,7 +114,8 @@ describe('el dialogo pide el total contado frente a la existencia registrada', (
     expect(screen.getByLabelText('Total contado')).toBe(campo);
     expect(screen.queryByTestId('adjust-batch-delta')).toBeNull();
     expect(dialogo.querySelector('[name="delta"]')).toBeNull();
-    expect(within(dialogo).getAllByRole('textbox')).toEqual([campo]);
+    const registrada = screen.getByTestId('adjust-batch-recorded-stock');
+    expect(within(dialogo).getAllByRole('textbox')).toEqual([registrada, campo]);
     expect(within(dialogo).queryByRole('spinbutton')).toBeNull();
   });
 
@@ -139,7 +137,7 @@ describe('el dialogo pide el total contado frente a la existencia registrada', (
 
     await abrirDialogo(user);
     const existencia = screen.getByTestId('adjust-batch-recorded-stock');
-    expect(existencia).toHaveTextContent('12.35');
+    expect(existencia).toHaveValue('12.35');
     expect(existencia).toHaveAttribute('title', '12.3456');
   });
 
@@ -267,16 +265,26 @@ describe('el motivo depende del sentido de la diferencia', () => {
     expect(screen.getByTestId('adjust-batch-reason')).toHaveTextContent('Conteo físico');
   });
 
-  it('sin motivo, muestra el mensaje y NO invoca la action', async () => {
+  it('R25 — sin motivo, «Elige un motivo.» sale bajo el campo, lo marca inválido y lo describe, y NO invoca la action', async () => {
     const user = setupUser();
     render(<AdjustBatchDialog batch={lote()} canAdjust />);
 
     await abrirDialogo(user);
     await escribirTotal(user, '5');
+    const selector = screen.getByTestId('adjust-batch-reason');
+    expect(selector).not.toHaveAttribute('aria-invalid');
     await user.click(screen.getByTestId('adjust-batch-confirm'));
 
     const aviso = await screen.findByTestId('adjust-batch-reason-error');
     expect(aviso).toHaveAttribute('role', 'alert');
+    expect(aviso).toHaveTextContent('Elige un motivo.');
+    expect(aviso.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(selector).toHaveAttribute('aria-invalid', 'true');
+    expect(selector.getAttribute('aria-describedby')?.split(' ')).toContain(aviso.id);
+    // Debajo del selector, no arriba del formulario.
+    expect(selector.compareDocumentPosition(aviso) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('adjust-batch-counted').compareDocumentPosition(aviso) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('adjust-batch-dialog')).not.toHaveTextContent('Elegi un motivo');
     expect(adjustBatchStockActionMock).not.toHaveBeenCalled();
   });
 
@@ -420,7 +428,7 @@ describe('rechazo por existencia cambiada', () => {
     expect(aviso).toHaveAttribute('role', 'alert');
     expect(aviso).toHaveTextContent(ADJUST_FORM_STATES.stockChanged.message);
     expect(screen.getByTestId('adjust-batch-dialog')).toBeInTheDocument();
-    expect(screen.getByTestId('adjust-batch-recorded-stock')).toHaveTextContent('8');
+    expect(screen.getByTestId('adjust-batch-recorded-stock')).toHaveValue('8');
     expect(screen.getByTestId('adjust-batch-seen-stock')).toHaveValue('8.0000');
     expect(screen.getByTestId('adjust-batch-counted')).toHaveValue('9');
 
@@ -477,35 +485,29 @@ describe('rechazo por existencia cambiada', () => {
     await waitFor(() => expect(screen.queryByTestId('adjust-batch-dialog')).toBeNull());
 
     await abrirDialogo(user);
-    expect(screen.getByTestId('adjust-batch-recorded-stock')).toHaveTextContent('10');
+    expect(screen.getByTestId('adjust-batch-recorded-stock')).toHaveValue('10');
     expect(screen.queryByTestId('adjust-batch-stock-changed')).toBeNull();
     expect(screen.getByTestId('adjust-batch-counted')).toHaveValue('');
   });
 });
 
 describe('el Operador, que solo tiene inventario.consultar, no encuentra el control', () => {
-  it('R21 — sin canAdjust el panel se ve pero el disparador del ajuste no existe en el DOM', () => {
+  it('R21 — sin canAdjust el disparador del ajuste no existe en el DOM, ni abierto desde fuera', () => {
     render(
-      <ProductBatchesPanel
-        batches={[lote()]}
-        renderBatchActions={(batch) => <AdjustBatchDialog batch={batch} canAdjust={false} />}
-      />,
+      <>
+        <AdjustBatchDialog batch={lote()} canAdjust={false} />
+        <AdjustBatchDialog batch={lote({ id: 'batch-43' })} canAdjust={false} open onOpenChange={() => undefined} />
+      </>,
     );
 
-    expect(screen.getByTestId('product-batches-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('adjust-batch-open')).toBeNull();
     expect(screen.queryByTestId('adjust-batch-dialog')).toBeNull();
     expect(screen.queryByTestId('adjust-batch-counted')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ajustar existencia' })).toBeNull();
   });
 
-  it('R21 — con canAdjust el control SI esta, para el mismo panel', () => {
-    render(
-      <ProductBatchesPanel
-        batches={[lote()]}
-        renderBatchActions={(batch) => <AdjustBatchDialog batch={batch} canAdjust />}
-      />,
-    );
+  it('R21 — con canAdjust el control SI esta', () => {
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
 
     expect(screen.getByTestId('adjust-batch-open')).toBeInTheDocument();
   });
@@ -536,6 +538,108 @@ describe('aviso de solo restar en lotes de producto terminado', () => {
 
     await abrirDialogo(user);
     expect(screen.queryByTestId('adjust-batch-finished-product-notice')).toBeNull();
+  });
+});
+
+describe('aspecto del rediseño', () => {
+  it('R24 — debajo del título, «<producto> · Lote <lote>», con el lote en cifras tabulares', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote({ lot: 'L-2026-0912' })} canAdjust productName="Hipoclorito de sodio 13 %" />);
+
+    const dialogo = await abrirDialogo(user);
+    expect(within(dialogo).getByRole('heading', { name: 'Ajustar existencia' })).toBeInTheDocument();
+    const descripcion = screen.getByTestId('adjust-batch-description');
+    expect(descripcion).toHaveTextContent('Hipoclorito de sodio 13 % · Lote L-2026-0912');
+    expect(within(descripcion).getByText('L-2026-0912')).toHaveClass('font-mono', 'tabular-nums');
+    expect(dialogo).toHaveAccessibleDescription('Hipoclorito de sodio 13 % · Lote L-2026-0912');
+  });
+
+  it('R24 — sin el nombre del producto, solo el lote', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
+
+    await abrirDialogo(user);
+    expect(screen.getByTestId('adjust-batch-description')).toHaveTextContent(/^Lote L-001$/);
+  });
+
+  it('R24 — «Existencia registrada» es un campo deshabilitado, con su etiqueta y sin viajar en el envío', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote({ stock: '12.3456' })} canAdjust />);
+
+    await abrirDialogo(user);
+    const registrada = screen.getByTestId('adjust-batch-recorded-stock');
+    expect(registrada.tagName).toBe('INPUT');
+    expect(registrada).toBeDisabled();
+    expect(registrada).toHaveValue('12.35');
+    expect(screen.getByLabelText('Existencia registrada')).toBe(registrada);
+    expect(registrada).not.toHaveAttribute('name');
+    expect(registrada.className).toMatch(/min-h-11/);
+  });
+
+  it('R24 — la diferencia lleva una flecha hacia abajo al disminuir y hacia arriba al aumentar', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
+
+    await abrirDialogo(user);
+    await escribirTotal(user, '7');
+    const disminucion = screen.getByTestId('adjust-batch-difference');
+    expect(within(disminucion).getByTestId('adjust-batch-difference-decrease-icon')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(disminucion).queryByTestId('adjust-batch-difference-increase-icon')).toBeNull();
+    expect(disminucion).toHaveTextContent('Disminución de 3');
+
+    await escribirTotal(user, '12');
+    const aumento = screen.getByTestId('adjust-batch-difference');
+    expect(within(aumento).getByTestId('adjust-batch-difference-increase-icon')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(aumento).queryByTestId('adjust-batch-difference-decrease-icon')).toBeNull();
+    expect(aumento).toHaveTextContent('Aumento de 2');
+  });
+
+  it('R26 — la ayuda de aumento sale solo mientras la diferencia es un aumento, y describe el motivo', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
+
+    await abrirDialogo(user);
+    expect(screen.queryByTestId('adjust-batch-increase-hint')).toBeNull();
+
+    await escribirTotal(user, '8');
+    expect(screen.queryByTestId('adjust-batch-increase-hint')).toBeNull();
+
+    await escribirTotal(user, '12');
+    const ayuda = screen.getByTestId('adjust-batch-increase-hint');
+    expect(ayuda).toHaveTextContent('Para aumentar solo valen Conteo físico y Error de carga.');
+    expect(screen.getByTestId('adjust-batch-reason').getAttribute('aria-describedby')?.split(' ')).toContain(ayuda.id);
+
+    await escribirTotal(user, '10');
+    expect(screen.queryByTestId('adjust-batch-increase-hint')).toBeNull();
+  });
+
+  it('R24 — los motivos se leen con tilde en la opción y en el valor elegido', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
+
+    await abrirDialogo(user);
+    await escribirTotal(user, '8');
+    await elegirMotivo(user, 'Conteo físico');
+    expect(screen.getByTestId('adjust-batch-reason')).toHaveTextContent('Conteo físico');
+    expect(screen.getByTestId('adjust-batch-dialog')).not.toHaveTextContent('Conteo fisico');
+  });
+
+  it('R24 — en modo controlado no pinta disparador y abre con la prop', async () => {
+    const onOpenChange = vi.fn<(open: boolean) => void>();
+    const user = setupUser();
+    const { rerender } = render(
+      <AdjustBatchDialog batch={lote()} canAdjust productName="Ácido cítrico" open={false} onOpenChange={onOpenChange} />,
+    );
+    expect(screen.queryByTestId('adjust-batch-open')).toBeNull();
+    expect(screen.queryByTestId('adjust-batch-dialog')).toBeNull();
+
+    rerender(<AdjustBatchDialog batch={lote()} canAdjust productName="Ácido cítrico" open onOpenChange={onOpenChange} />);
+    expect(await screen.findByTestId('adjust-batch-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('adjust-batch-description')).toHaveTextContent('Ácido cítrico · Lote L-001');
+    expect(screen.queryByTestId('adjust-batch-open')).toBeNull();
+
+    await user.click(screen.getByTestId('adjust-batch-cancel'));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
 

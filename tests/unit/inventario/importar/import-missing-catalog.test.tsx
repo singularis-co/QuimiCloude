@@ -10,7 +10,10 @@ import {
   MISSING_NAME_TESTID,
   MISSING_PRESENTATION_TESTID,
   MISSING_ROWS_TESTID,
+  MISSING_PRESENTATIONS_TITLE,
   MISSING_SECTION_TESTID,
+  MISSING_SECTION_TITLE,
+  MISSING_UNITS_TITLE,
   MISSING_UNIT_TESTID,
   PRESENTATION_DIALOG_TESTID,
   UNIT_DIALOG_TESTID,
@@ -115,6 +118,31 @@ describe('lista de faltantes', () => {
     const presentaciones = screen.getAllByTestId(MISSING_PRESENTATION_TESTID);
     expect(presentaciones).toHaveLength(1);
     expect(within(presentaciones[0]!).getByTestId(MISSING_NAME_TESTID)).toHaveTextContent('Bidón 20 L');
+  });
+
+  it('R37 se pinta como tarjeta con borde e icono de advertencia', () => {
+    renderCatalogo();
+
+    const tarjeta = screen.getByTestId(MISSING_SECTION_TESTID);
+    expect(tarjeta).toHaveAttribute('data-slot', 'card');
+    expect(tarjeta).toHaveClass('border-warning-border');
+    expect(within(tarjeta).getByRole('heading', { level: 2 })).toHaveTextContent(MISSING_SECTION_TITLE);
+    const icono = tarjeta.querySelector('.text-warning-text svg');
+    expect(icono).not.toBeNull();
+    expect(icono).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('R37 «Unidades» y «Presentaciones» van en dos columnas, una sola con 760 px o menos', () => {
+    renderCatalogo();
+
+    const columnas = screen.getByTestId(MISSING_SECTION_TESTID).querySelector('[data-slot="missing-catalog-columns"]');
+    expect(columnas).not.toBeNull();
+    expect(columnas).toHaveClass('grid', 'grid-cols-2', '@max-[760px]:grid-cols-1');
+    const titulos = within(columnas as HTMLElement)
+      .getAllByRole('heading', { level: 3 })
+      .map((titulo) => titulo.textContent);
+    expect(titulos).toEqual([MISSING_UNITS_TITLE, MISSING_PRESENTATIONS_TITLE]);
+    expect(within(columnas as HTMLElement).getAllByTestId(MISSING_CREATE_TESTID)).toHaveLength(2);
   });
 
   it('R20 sin faltantes no pinta la sección', () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState, useTransition, type FormEvent } from 'react';
+import { toast } from 'sonner';
 
 import { PresentationUnitSelect } from '@/components/shared/presentation-unit-select';
 import {
@@ -16,6 +17,7 @@ import type { UnitRef } from '@/lib/modules/unidades';
 
 import { DIALOG_CONTENT_CLASS, DialogActions, DialogFormError, DialogTextField } from './import-dialog-parts';
 import {
+  PRESENTATION_CREATED_TOAST,
   PRESENTATION_DIALOG_DESCRIPTION,
   PRESENTATION_DIALOG_TESTID,
   PRESENTATION_DIALOG_TITLE,
@@ -72,7 +74,9 @@ export function ImportCreatePresentationDialog({
         setError(result);
         return;
       }
-      if (result.status === 'success') onCreated();
+      if (result.status !== 'success') return;
+      toast.success(PRESENTATION_CREATED_TOAST);
+      onCreated();
     });
   }
 

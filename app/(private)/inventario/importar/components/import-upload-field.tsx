@@ -1,6 +1,6 @@
 'use client';
 
-import { FileSpreadsheetIcon, UploadIcon } from 'lucide-react';
+import { FileIcon, FileSpreadsheetIcon, UploadIcon } from 'lucide-react';
 import { useId, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,17 @@ import {
   INVENTORY_IMPORT_MAX_FILE_BYTES,
   INVENTORY_IMPORT_MAX_ROWS,
 } from '@/lib/modules/inventario';
+import { cn } from '@/lib/utils';
 
 import {
   UPLOAD_CHANGE_LABEL,
+  UPLOAD_EMPTY_TESTID,
   UPLOAD_FIELD_TESTID,
   UPLOAD_FILE_NAME_TESTID,
+  UPLOAD_FILE_SIZE_TESTID,
+  UPLOAD_FORMATS_LABEL,
   UPLOAD_INPUT_LABEL,
   UPLOAD_INPUT_TESTID,
-  UPLOAD_NO_FILE,
   UPLOAD_TOO_LARGE_TESTID,
   UPLOAD_TRIGGER_LABEL,
   UPLOAD_TRIGGER_TESTID,
@@ -28,6 +31,12 @@ import {
 export function exceedsImportMaxBytes(file: File): boolean {
   return file.size > INVENTORY_IMPORT_MAX_FILE_BYTES;
 }
+
+const ZONE_CLASS =
+  'flex rounded-xl border-[1.5px] border-dashed border-input bg-card transition-[border-color,background-color] duration-(--dur-base) ease-(--ease-standard)';
+
+const ICON_BOX_CLASS =
+  'inline-flex flex-none items-center justify-center rounded-lg border border-border bg-muted text-primary';
 
 export type ImportUploadFieldProps = {
   readonly file: File | null;
@@ -41,6 +50,20 @@ export function ImportUploadField({ file, onSelect, disabled = false }: ImportUp
   const warningId = `${inputId}-warning`;
   const inputRef = useRef<HTMLInputElement>(null);
   const tooLarge = file !== null && exceedsImportMaxBytes(file);
+
+  const trigger = (
+    <Button
+      type="button"
+      variant="outline"
+      touch
+      disabled={disabled}
+      data-testid={UPLOAD_TRIGGER_TESTID}
+      onClick={() => inputRef.current?.click()}
+    >
+      <FileIcon aria-hidden />
+      {file === null ? UPLOAD_TRIGGER_LABEL : UPLOAD_CHANGE_LABEL}
+    </Button>
+  );
 
   return (
     <div className="flex flex-col gap-2" data-testid={UPLOAD_FIELD_TESTID}>
@@ -67,30 +90,36 @@ export function ImportUploadField({ file, onSelect, disabled = false }: ImportUp
           if (picked !== undefined) onSelect(picked);
         }}
       />
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant={file === null ? 'default' : 'outline'}
-          touch
-          disabled={disabled}
-          data-testid={UPLOAD_TRIGGER_TESTID}
-          onClick={() => inputRef.current?.click()}
+      {file === null ? (
+        <div
+          className={cn(ZONE_CLASS, 'flex-col items-center justify-center gap-2 px-6 py-10 text-center')}
+          data-testid={UPLOAD_EMPTY_TESTID}
         >
-          <UploadIcon aria-hidden />
-          {file === null ? UPLOAD_TRIGGER_LABEL : UPLOAD_CHANGE_LABEL}
-        </Button>
-        <p className="flex min-w-0 items-center gap-1.5 text-sm" data-testid={UPLOAD_FILE_NAME_TESTID}>
-          {file === null ? (
-            <span className="text-muted-foreground">{UPLOAD_NO_FILE}</span>
-          ) : (
-            <>
-              <FileSpreadsheetIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              <span className="truncate font-medium">{file.name}</span>
-              <span className="shrink-0 text-muted-foreground">({formatBytes(file.size)})</span>
-            </>
-          )}
-        </p>
-      </div>
+          <span className={cn(ICON_BOX_CLASS, 'size-16 rounded-[10px]')}>
+            <UploadIcon className="size-6" aria-hidden />
+          </span>
+          <span className="font-mono text-xs text-muted-foreground">{UPLOAD_FORMATS_LABEL}</span>
+          {trigger}
+        </div>
+      ) : (
+        <div
+          className={cn(ZONE_CLASS, 'flex-row flex-wrap items-center gap-3.5 p-3.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-(--dur-base)')}
+        >
+          <span className={cn(ICON_BOX_CLASS, 'size-10')}>
+            <FileSpreadsheetIcon className="size-5" aria-hidden />
+          </span>
+          <p className="flex min-w-0 flex-1 flex-col gap-0.5" data-testid={UPLOAD_FILE_NAME_TESTID}>
+            <span className="truncate font-mono text-sm font-semibold tabular-nums">{file.name}</span>
+            <span
+              className="font-mono text-xs text-muted-foreground tabular-nums"
+              data-testid={UPLOAD_FILE_SIZE_TESTID}
+            >
+              {formatBytes(file.size)}
+            </span>
+          </p>
+          {trigger}
+        </div>
+      )}
       <p id={hintId} className="text-xs text-muted-foreground">
         {uploadHint(INVENTORY_IMPORT_MAX_FILE_BYTES, INVENTORY_IMPORT_MAX_ROWS)}
       </p>

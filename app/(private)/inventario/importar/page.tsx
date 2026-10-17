@@ -1,15 +1,14 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
-import { buttonVariants } from '@/components/ui/button';
+import { ArrowLink } from '@/components/shared/arrow-link';
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import { requirePageAddon } from '@/lib/modules/identity/adapters/driving/require-page-addon';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { getInventoryImportValuesAction } from '@/lib/modules/inventario/adapters/driving/inventory-import-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
-import { cn } from '@/lib/utils';
 
 import {
   IMPORT_BACK_LABEL,
@@ -18,6 +17,7 @@ import {
   IMPORT_PAGE_TITLE,
   IMPORT_TITLE_TESTID,
   ImportGuide,
+  ImportTemplateButton,
   InventoryImportScreen,
 } from './components';
 
@@ -40,25 +40,22 @@ export default async function InventoryImportPage() {
   const values = valuesResult.status === 'success' ? valuesResult.data : null;
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <h1 data-testid={IMPORT_TITLE_TESTID} className="text-2xl font-semibold">
-            {IMPORT_PAGE_TITLE}
-          </h1>
-          <p className="text-sm text-muted-foreground">{IMPORT_PAGE_DESCRIPTION}</p>
-        </div>
-        <Link
+    <PageShell>
+      <div className="flex flex-col gap-2.5">
+        <ArrowLink
+          direction="back"
           href={INVENTORY_ROUTE}
-          data-slot="button"
-          data-testid={IMPORT_BACK_LINK_TESTID}
-          className={cn(buttonVariants({ variant: 'outline' }), touchTarget)}
+          touch
+          testId={IMPORT_BACK_LINK_TESTID}
+          className="self-start"
         >
           {IMPORT_BACK_LABEL}
-        </Link>
+        </ArrowLink>
+        <PageHeader title={IMPORT_PAGE_TITLE} titleTestId={IMPORT_TITLE_TESTID} actions={<ImportTemplateButton />} />
+        <p className="max-w-[720px] text-sm text-muted-foreground">{IMPORT_PAGE_DESCRIPTION}</p>
       </div>
       <InventoryImportScreen units={units} />
       <ImportGuide values={values} />
-    </div>
+    </PageShell>
   );
 }
