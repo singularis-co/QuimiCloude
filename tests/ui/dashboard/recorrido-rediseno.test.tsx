@@ -10,7 +10,6 @@ import {
   ExecutionTraceDetailError,
 } from '@/app/(private)/dashboard/recorrido/[id]/components';
 import {
-  ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
   EXECUTION_ACTION_LABELS,
   GO_BACK_MARK,
@@ -363,12 +362,10 @@ describe('ExecutionTraceDetail', () => {
     expect(goBacks).toHaveTextContent(/^0$/);
   });
 
-  it('R12: «En curso» y «Dado de baja» van junto al estado, y un dado de baja nunca lleva «En curso»', () => {
+  it('R12: «Dado de baja» va junto al estado y ningún pedido, activo o de baja, lleva chip «En curso»', () => {
     renderDetail({ status: 'EN_EMPAQUE', active: true });
-    const active = screen.getByTestId('execution-trace-active');
-    expect(active).toHaveTextContent(ACTIVE_ORDER_MARK);
-    expect(active).toHaveAttribute('data-tone', 'progress');
-    expect(statValue('Estado').contains(active)).toBe(true);
+    expect(screen.queryByTestId('execution-trace-active')).toBeNull();
+    expect(statValue('Estado').textContent).not.toContain('En curso');
     expect(screen.queryByTestId('execution-trace-deleted')).toBeNull();
     cleanup();
 

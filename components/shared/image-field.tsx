@@ -29,7 +29,7 @@ const ACCEPTED_TYPES: readonly UploadableFileType[] = ['image/jpeg', 'image/png'
 
 export type ImageFieldProps = {
   readonly mode: 'create' | 'edit';
-  /** Imagen guardada, que se ensena mientras el campo siga `untouched`. `null` en el alta. */
+  /** Imagen guardada, que se ensena mientras el campo siga `untouched`. `null` si no hay. */
   readonly initialImageUrl: string | null;
   readonly value: ImageFieldState;
   readonly onChange: (next: ImageFieldState) => void;
@@ -62,6 +62,7 @@ export function ImageField({
       label={label}
       // La zona de arrastre se explica sola; la etiqueta queda para el lector de pantalla.
       hideLabel
+      variant="image"
       accept={ACCEPTED_TYPES}
       maxBytes={maxBytes}
       testIdPrefix={testIdPrefix}

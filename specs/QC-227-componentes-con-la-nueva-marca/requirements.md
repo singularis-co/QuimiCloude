@@ -62,6 +62,7 @@ tokens que dejó QC-226.
 | D10 | Los valores de los tokens no se tocan: la paleta «Verde Petróleo» la cerró QC-226 | humano, 2026-10-08 (QC-226 D2) | — | R2, R10, R15, R18, R20, R21, R23 |
 | D11 | Enmienda: con la barra colapsada (modo icono), los iconos, el isotipo y el indicador o fondo del ítem activo quedan centrados en el eje del carril (±1 px); el isotipo, a un tamaño legible según la guía de marca; la vista expandida no cambia | humano, 2026-10-09 (enmienda al spec aprobado) | — | R31–R37 |
 | D12 | Enmienda: los dos controles de colapso (encabezado y pastilla del borde) muestran un icono visible, sin recorte y con contraste AA sobre su fondo, en claro y oscuro y en los dos estados; el icono indica la acción (abrir si está colapsado, cerrar si está expandido), con lucide | humano, 2026-10-09 (enmienda al spec aprobado) | — | R38, R39 |
+| D13 | Enmienda: la columna «Costo» nueva de la lista de productos de /inventario (solo Administrador, QC-52 R35) entra en la lista cerrada de R11 (Plex Mono con cifras tabulares); el «Costo» de P9 no era esa columna. Enmienda aprobada por el usuario, sin tarjeta (commits `b0eaa866`, `6a665e3f`) | usuario, 2026-10-16 | P9 (solo para esta columna) | R11, R13 |
 
 ## Requisitos (EARS)
 
@@ -328,6 +329,10 @@ lotes.
 «Costo», «Duración», «Vueltas atrás», «Pasos», «Tiempo de entrega», «Medidas», «Equivalencia»,
 «Teléfono». **Propuesta: se quedan en Plex Sans** (R13). Si el humano quiere alguna en Mono, se
 añade a la lista de `design.md > 4.2` antes de implementar.
+*(Enmienda 2026-10-16, aprobada por el usuario, sin tarjeta; `b0eaa866`, `6a665e3f`: el «Costo» de
+esta lista no era la columna «Costo» de la lista de productos de /inventario, que entonces no
+existía; las que ya estaban siguen en Sans. La nueva sí va en Mono con cifras tabulares, R11; ver
+`design.md > 4.2`.)*
 
 > 2026-10-09: el humano aprobó el spec con los valores por defecto de P1–P9 (incluidos los dos cambios de tono de P2). Quedan cerradas.
 

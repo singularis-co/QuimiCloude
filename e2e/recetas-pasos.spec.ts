@@ -315,13 +315,9 @@ test.describe('editor y lectura de pasos', () => {
     await page.goto(NEW_RECIPE_ROUTE);
     await expect(page.getByTestId('recipe-form')).toBeVisible({ timeout: 60_000 });
 
-    // --- 2. AÑADIR EL PASO ES LO PRIMERO, y el orden no es capricho: la fila del paso solo aparece
-    // si React ya esta hidratado, asi que ver el area editable ACREDITA que el formulario responde
-    // a su estado. Escribir antes de eso deja el valor en el DOM y la hidratacion se lo lleva
-    // -exactamente lo que pasaba en WebKit, que hidrata mas tarde que Chromium: el nombre viajaba
-    // vacio y el guardado moria en «revisa los campos marcados»-.
-    await page.getByTestId('recipe-step-add').click();
-
+    // --- 2. ESPERAR AL AREA EDITABLE ES LO PRIMERO: el editor solo se monta en el cliente, asi que
+    // verla ACREDITA que el formulario responde a su estado. Escribir antes deja el valor en el DOM
+    // y la hidratacion se lo lleva -lo que pasaba en WebKit, que hidrata mas tarde que Chromium-.
     const editable = page.getByTestId('recipe-step-text-0');
     const boldButton = page.getByTestId('recipe-step-text-0-bold');
     const checklistButton = page.getByTestId('recipe-step-text-0-checklist');

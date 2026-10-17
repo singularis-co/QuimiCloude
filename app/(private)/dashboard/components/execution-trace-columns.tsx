@@ -20,7 +20,6 @@ import {
 } from '@/lib/shared/ui/presentation-quantities';
 
 import {
-  ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
   TRACE_DURATION_SUFFIXES,
   TRACE_ORDER_STATUS_LABELS,
@@ -51,10 +50,6 @@ export const TRACE_MENU_TITLE_PREFIX = 'Pedido ';
 
 export function DeletedOrderMark() {
   return <StatusBadge tone="muted" label={DELETED_ORDER_MARK} data-testid="execution-trace-deleted" />;
-}
-
-export function ActiveOrderMark() {
-  return <StatusBadge tone="progress" label={ACTIVE_ORDER_MARK} data-testid="execution-trace-active" />;
 }
 
 function TraceTotal({ duration }: { readonly duration: TraceDuration }) {
@@ -114,7 +109,6 @@ export function buildExecutionTraceColumns({
         <span className="flex flex-wrap items-center gap-2">
           <span data-testid="execution-trace-number">{row.numberText}</span>
           {row.deleted ? <DeletedOrderMark /> : null}
-          {!row.deleted && row.active ? <ActiveOrderMark /> : null}
         </span>
       ),
     },

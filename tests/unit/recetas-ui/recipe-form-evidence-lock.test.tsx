@@ -233,7 +233,7 @@ describe('QC-214 R8 — bloqueo de mover y quitar con pedidos en curso con fotos
     }
   });
 
-  it('R8: el texto, el interruptor y «Añadir paso» siguen activos', async () => {
+  it('R8: el texto, el interruptor y el «+» del último paso siguen activos; el de los demás no', async () => {
     const user = setupUser();
     renderEdit(LOCKED_RECIPE, 2);
     const operator = screen.getByTestId('recipe-steps-field');
@@ -250,8 +250,11 @@ describe('QC-214 R8 — bloqueo de mover y quitar con pedidos en curso con fotos
     await user.click(evidenceSwitch(packing, 1));
     expect(evidenceSwitch(packing, 1)).toHaveAttribute('aria-checked', 'true');
 
-    await user.click(screen.getByTestId('recipe-step-add'));
-    await user.click(screen.getByTestId('recipe-packing-step-add'));
+    // Insertar en medio movería los pasos siguientes: bloqueado solo se añade al final.
+    expect(screen.getByTestId('recipe-step-add-0')).toBeDisabled();
+    expect(screen.getByTestId('recipe-packing-step-add-0')).toBeDisabled();
+    await user.click(screen.getByTestId('recipe-step-add-1'));
+    await user.click(screen.getByTestId('recipe-packing-step-add-1'));
     expect(within(operator).getAllByTestId('recipe-step-row')).toHaveLength(3);
     expect(within(packing).getAllByTestId('recipe-packing-step-row')).toHaveLength(3);
   });

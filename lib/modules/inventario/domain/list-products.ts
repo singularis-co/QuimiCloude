@@ -1,4 +1,4 @@
-import { requirePermission, type Actor } from './actor';
+import { canViewUnitCosts, requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { PRODUCT_QUERYABLE } from './product-queryable';
@@ -18,6 +18,13 @@ export type ListProductsDeps = {
   /** Compone `imageUrl` de cada fila. Sin el, las filas salen sin ella. */
   readonly images?: Pick<ProductImageStorage, 'publicUrl'>;
 };
+
+/** El producto sin `averageUnitCost`: la clave desaparece, no queda en `null`. */
+function withoutAverageUnitCost(product: ProductView): ProductView {
+  const copy: { -readonly [K in keyof ProductView]: ProductView[K] } = { ...product };
+  delete copy.averageUnitCost;
+  return copy;
+}
 
 /** Nombre con el que este listado se identifica en el log de campos omitidos (R6). */
 const LIST_NAME = 'products';
@@ -68,9 +75,17 @@ export function createListProducts(
     const { query, ignored } = sanitizeListQuery(parsed.data, PRODUCT_QUERYABLE);
     deps.log.ignoredFields(LIST_NAME, ignored);
 
-    const page = await deps.products.listAlive(query, { companyId: actor.companyId });
-    if (deps.images === undefined) return page;
+    // Los costos unitarios solo los pide quien cumple `canViewUnitCosts`: sin el, el adaptador no
+    // los consulta y, por si acaso, la clave se quita aqui antes de salir.
+    const withUnitCosts = canViewUnitCosts(actor);
+    const page = await deps.products.listAlive(query, { companyId: actor.companyId }, { withUnitCosts });
     const images = deps.images;
-    return { ...page, items: page.items.map((product) => withImageUrl(product, images)) };
+    return {
+      ...page,
+      items: page.items.map((product) => {
+        const visible = withUnitCosts ? product : withoutAverageUnitCost(product);
+        return images === undefined ? visible : withImageUrl(visible, images);
+      }),
+    };
   };
 }

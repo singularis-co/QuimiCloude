@@ -101,7 +101,17 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
 const ACIDO = producto();
 
 function montar(params: DataTableParams = TODOS, products: readonly ProductView[] = [ACIDO]) {
-  render(<ProductTable products={products} params={params} totalPages={1} units={[KILO]} canAdjust />);
+  // Como el Administrador: con `canSeeCost` la tarjeta lleva tambien el costo.
+  render(
+    <ProductTable
+      products={products}
+      params={params}
+      totalPages={1}
+      units={[KILO]}
+      canAdjust
+      canSeeCost
+    />,
+  );
 }
 
 function tarjetas(): HTMLElement[] {

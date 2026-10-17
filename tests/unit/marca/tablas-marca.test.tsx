@@ -264,8 +264,8 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   },
   {
     archivo: 'product-columns.tsx',
-    construir: async () => buildProductColumns({ menu: sinMenu }),
-    esperadas: ['Existencia', 'Costo', 'Alerta de cantidad', 'Reservado', 'Disponible'],
+    construir: async () => buildProductColumns({ menu: sinMenu, showCost: true }),
+    esperadas: ['Existencia', 'Disponible', 'Reservado', 'Alerta de cantidad', 'Costo unitario'],
   },
   {
     archivo: 'finished-stock-columns.tsx',
@@ -368,7 +368,7 @@ describe('alineación de las cifras de inventario', () => {
   }
 
   it('R6: en product-columns.tsx las cifras, «Costo» incluido, van a la derecha y «Tipo» y «Presentación» a la izquierda', () => {
-    const align = alineaciones(buildProductColumns({ menu: sinMenu, showType: true }));
+    const align = alineaciones(buildProductColumns({ menu: sinMenu, showType: true, showCost: true }));
     for (const id of ['stock', 'averageUnitCost', 'qtyAlert', 'reserved', 'available']) {
       expect(align[id], id).toBe('end');
     }

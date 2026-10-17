@@ -8,7 +8,6 @@ import {
   type OrderSummary,
 } from '@/lib/modules/pedidos';
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
-import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import { formatPresentationQuantities } from '@/lib/shared/ui/presentation-quantities';
 
@@ -40,8 +39,8 @@ import {
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
- * Las DIEZ columnas de la lista de pedidos, declaradas **como datos** (R8-R12, R14, R19, R23,
- * `design.md > 7`).
+ * Las DOCE columnas de la lista de pedidos (once de datos y la de acciones), declaradas
+ * **como datos** (R8-R12, R14, R19, R23, `design.md > 7`).
  *
  * **Modulo de CLIENTE, y no por gusto** (`design.md > 6.1`): la columna de acciones devuelve
  * elementos y las demas devuelven funciones de celda, y una configuracion con funciones no cruza
@@ -64,17 +63,10 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
  * el servidor en QC-68, y `createdBy`/`updatedBy` son identificadores, no nombres. El test de R8
  * lo comprueba recorriendo esta misma declaracion.
  *
- * **La cantidad se pinta REDONDEADA A DOS DECIMALES** (enmienda del 2026-09-17 a R39,
- * decision humana). Es una cadena decimal del contrato y llega con la escala de la columna
- * -«12.5000»-, pero cuatro decimales de relleno no informan de nada y compiten por la atencion
- * con los que si: la celda la pasa por `formatDecimalDisplay` y muestra «12.5».
- *
- * Lo que R39 protege de fondo sigue vigilado y sin una sola excepcion: NI `Intl.NumberFormat`,
- * NI `toFixed`, NI coma flotante, NI aritmetica de `number` —tampoco para un total, que aqui no
- * existe—. `formatDecimalDisplay` redondea con enteros `BigInt` sobre el texto, que es exacto.
- * Y es PRESENTACION: esta celda no alimenta ningun envio, el pedido guardado conserva sus
- * cuatro decimales y reabrirlo para editar no los pierde (el formulario precarga con
- * `trimDecimal`, que no redondea).
+ * **No hay columna de cantidad** (decision humana del 2026-10-16): ni en la tabla ni en
+ * la tarjeta movil, que se compone con estos mismos ids. Una URL vieja con `sort=quantity` sigue
+ * siendo valida -`ORDER_QUERYABLE.sortable` la admite y el servidor ordena por ella-; solo deja de
+ * haber cabecera que la muestre.
  *
  * **QC-35bis (2026-09-07): no hay columna de unidad ni de precio unitario.** Salieron del pedido
  * entero -formulario, contrato del modulo y tabla `orders`-, asi que no queda dato que pintar.
@@ -92,7 +84,6 @@ export const ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 /** Ids de las columnas que no filtran ni ordenan, pero que los tests localizan por su celda. */
 export const RECIPE_NAME_COLUMN_ID = 'recipeName';
 export const ORDER_CUSTOMER_NAME_COLUMN_ID = 'customer';
-export const QUANTITY_COLUMN_ID = 'quantity';
 export const PRESENTATION_NAME_COLUMN_ID = 'presentationName';
 export const PENDING_DELIVERY_COLUMN_ID = 'pendingDelivery';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
@@ -278,20 +269,6 @@ export function buildOrderColumns({
         ) : (
           orderCustomerLabel(order.customer)
         ),
-    },
-    {
-      id: QUANTITY_COLUMN_ID,
-      label: 'Cantidad',
-      tabular: true,
-      align: 'center',
-      // Se pinta redondeada a dos decimales y el `title` lleva el valor exacto, para el caso
-      // en que el redondeo esconda una diferencia real.
-      cell: (order) => (
-        <span title={exactDecimalTitle(order.quantity)}>
-          {formatDecimalDisplay(order.quantity)}
-          {order.unitLabel === null ? null : ` ${order.unitLabel}`}
-        </span>
-      ),
     },
     {
       id: PRESENTATION_NAME_COLUMN_ID,

@@ -1306,3 +1306,84 @@ ESLint: 0 errors, 10 warnings in 4 files   (los mismos 4 archivos ajenos de tand
 T7a hecha: `e2e/inventario-rediseno.spec.ts` pasa en Chromium y WebKit (16/16), dado de alta en
 las dos listas cerradas, y un bug de R42 (cierre de 32 px en historial y ajuste) arreglado en sus
 componentes.
+
+## Tanda 8 (T8a) — 2026-10-16 · frontend_dev
+
+Integración de `origin/dev` (`0f71d5af`) con las reglas F1 de `design.md > 12 > Enmienda 2`. El
+merge lo abrió el leader (`git fetch origin && git merge origin/dev`); aquí se resolvieron los seis
+conflictos y se dejaron en el índice, **sin commit**. Lo que trae `dev` en `HEAD..MERGE_HEAD`: 22
+commits (QC-165 completo, 5f2cc171 recetas, 7239dcbf mensajes, 0f135128 dashboard, 070a8c71 specs,
+6a665e3f, 5496bd16, fb140780, 6939047b, 0f71d5af). Sin migraciones.
+
+### Qué trae 6939047b
+
+Solo tests, sin código: `product-batch-rows.test.tsx` (7 líneas), `product-page.test.tsx` (6),
+`tablas-marca.test.tsx` (2) y el `.snap` de `inventario-paridad` (48). Siguen el orden nuevo de
+fb140780 (`Existencia, Disponible, Reservado, Alerta de cantidad, Costo unitario`, costo justo
+antes de acciones). Toca Inventario, pero coincide con H4 / R53 de la enmienda 2: **no cambia nada
+de este spec**, no hubo que parar.
+
+### Conflictos y resolución
+
+| Archivo | Rama (HEAD) | `dev` | Resolución |
+| --- | --- | --- | --- |
+| `product-columns.tsx` (2 trozos) | Orden viejo (Costo tras Existencia), todas las cifras `align: 'end'`, `menu` | Orden de fb140780, `align: 'center'`, `rowActions` | Orden, `showType`/`showPresentation`/`showCost`, `costColumn(units)`, `unitCostCell` con moneda y unidad, `COST_COLUMN_LABEL` de `dev`; `align: 'end'` en `available`, `qtyAlert` y también en `costColumn` (`averageUnitCost`, que `dev` dejó `center` fuera del trozo en conflicto); `menu` y `stockAmountCell` ámbar de la rama (auto-fusionados) |
+| `product-table.tsx` (3 trozos) | `card` (`productTableCard(showType)`), `handleAction` en deps | `typeFilter`/`showPresentation`, `canSeeCost`, `columns: columns.length` del esqueleto | Los dos: `showPresentation` de `dev` + `card` de la rama; deps `[units, canAdjust, canSeeCost, showType, showPresentation, batches, handleAction]`; `states` con `columns.length` y `card={card}`. Anfitrión único (`ProductRowDialogs`) de la rama, intacto |
+| `product-batch-rows.test.tsx` | Casos R6 / R47 / R53 de derecha y negrita | Casos de moneda, unidad, «—», orden y sin `canSeeCost` | Todos. A los de la rama: `canSeeCost` y cifras en moneda (`$9.00 / kg`, `$3.13 / kg`). Al de `dev` «sin `canSeeCost`…»: `screen.findByTestId('product-batch-row')` → `enLaTabla().findByTestId(...)` (la tarjeta duplica el testid) |
+| `product-page.test.tsx` | `buildProductColumns({ menu })` | `({ rowActions, showCost: true })` | `({ menu, showCost: true })`. Fuera del trozo, `rowActions: () => null` → `menu` (l. 639). Los dos casos de `dev` de costo (`getByTestId('product-cost')`) acotados a la fila visible (`within(getAllByTestId(testId.fila)[0])`): la tarjeta duplicaba el testid |
+| `tablas-marca.test.tsx` | `({ menu: sinMenu })`, esperadas del orden viejo | `({ rowActions, showCost: true })`, esperadas de fb140780 | `({ menu: sinMenu, showCost: true })` con las esperadas de `dev`. Caso de la rama «R6: … a la derecha»: `showCost: true` (sin él no hay `averageUnitCost`). El caso de `order-columns` se deja como lo trae `dev` |
+| `inventario-paridad.test.tsx.snap` | — | — | `git checkout --theirs` y `vitest run tests/unit/paridad/inventario-paridad -u` (13 actualizados) |
+
+Fuera de los seis conflictos, por la API `menu` de la rama o por la visibilidad de `dev`:
+
+- `product-type-column.test.tsx` (caso nuevo de `dev`): `rowActions: () => null` → `menu: () => ({ items: [], triggerLabel: '' })` en dos llamadas. **Sin cambio de aserciones.**
+- `product-cards.test.tsx` (rama): `montar` pasa `canSeeCost` (Administrador); sin él la tarjeta ya no tiene costo y R13 / R47 fallaban. Las aserciones no cambian. Los casos «Costo solo con `canSeeCost`» de la tarjeta son de T8b.
+- `card` de la tarjeta: se queda el de E1 con `useMemo([showType])`. `DataTableCards` salta en `meta` la columna que no existe (`byId.get` → `null`), así que sin `canSeeCost` o en «Producto» no pinta costo ni «Presentación». El `card` de F3 con sus deps (`showPresentation`, `canSeeCost`) es T8c.
+
+**Snapshot contra el de `dev`:** las filas (`tr name=…`) son idénticas a las de `dev`, incluido
+el orden y «Costo unitario»; las únicas líneas con «Costo» que cambian son la cabecera
+`averageUnitCost` (`text-center` → `text-right`). El resto del diff es de la rama: `PageHeader`
+(título 30 px, contenedor `@container`, botón con icono `upload`), `UrlTabs` sin el párrafo de
+filtro, `justify-center` → `justify-end` en cabeceras de cifras, aviso ámbar y tarjetas.
+**Contra el de `HEAD`:** solo lo de `dev` (orden de fb140780, «Costo» → «Costo unitario», esqueleto
+con `columns.length` celdas). 70 líneas (+46 −24).
+
+### Rojo conocido (no se arregla aquí)
+
+`tablas-marca.test.tsx > lista cerrada … > R11, R13: en 'order-columns.tsx'` espera
+`['Cantidad', 'Fecha de solicitud']`; 0f71d5af quitó «Cantidad» de Pedidos y no actualizó este
+test (en `MERGE_HEAD` la l. 243 sigue esperando «Cantidad»). Es de Pedidos, no de Inventario; lo
+arregla el PR #265.
+
+### Salida real
+
+```
+$ git diff --check            → sin salida (exit 0)
+$ grep '^<<<<<<<|^>>>>>>>|^=======$' app components lib tests e2e → sin coincidencias
+$ pnpm run typecheck          → tsc --noEmit, sin errores
+$ pnpm run lint               → ✖ 10 problems (0 errors, 10 warnings) — todos no-unused-vars en
+                                confirm-catalog-import.test.ts, list-execution-traces.test.ts,
+                                order-service.test.ts y step-evidence.tsx (ninguno de este merge)
+$ pnpm exec vitest run tests/unit/paridad/inventario-paridad -u
+  Snapshots  13 updated · Test Files 1 passed (1) · Tests 13 passed (13)
+$ pnpm exec vitest related --run <12 archivos de app/(private)/inventario del merge>
+  FAIL tests/unit/marca/tablas-marca.test.tsx > … 'order-columns.tsx' (rojo conocido)
+  Test Files  1 failed | 40 passed (41) · Tests  1 failed | 808 passed (809)
+$ pnpm exec vitest run guard
+  Test Files  81 passed (81) · Tests  1106 passed | 20 skipped (1126)
+$ pnpm exec vitest run product-cards product-page tablas-marca product-batch-rows
+    product-type-column unit-cost-visibility product-route-contract scope
+  FAIL tablas-marca > … 'order-columns.tsx' (rojo conocido)
+  Test Files  1 failed | 7 passed (8) · Tests  1 failed | 207 passed (208)
+$ pnpm exec vitest run tests/unit/inventario tests/unit/inventario-ui tests/unit/paridad tests/unit/marca
+  FAIL tablas-marca > … 'order-columns.tsx' (rojo conocido)
+  Test Files  1 failed | 170 passed (171) · Tests  1 failed | 2738 passed | 5 skipped (2744)
+```
+
+`unit-cost-visibility.test.ts`, `product-type-column.test.tsx`, `product-route-contract.test.ts`
+y `scope.test.ts`: en verde.
+
+### Veredicto
+
+T8a hecha: merge sin marcadores y en el índice sin commit, columnas de `dev` con la alineación,
+`menu`, ámbar, `card` y anfitrión de la rama; único rojo, el conocido de Pedidos (PR #265).

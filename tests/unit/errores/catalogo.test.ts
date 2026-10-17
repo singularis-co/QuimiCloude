@@ -77,7 +77,8 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // `company_name_mismatch` y `company_not_deleted`.
       // QC-281 2026-10-14: 101 y no 99: entran `packed_exceeds_quantity` y
       // `packaging_stock_insufficient`.
-      expect(ERROR_CODES).toHaveLength(101)
+      // 2026-10-16: 102 y no 101: entra `company_last_administrator`.
+      expect(ERROR_CODES).toHaveLength(102)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -625,5 +626,22 @@ describe('equipo de acondicionamiento — conditioning_team_member_not_allowed y
   it('R16, R17: las dos clases del modulo llevan esos codigos', () => {
     expect(new ConditioningTeamMemberNotAllowedError().code).toBe('conditioning_team_member_not_allowed')
     expect(new ConditioningTeamEmptyError().code).toBe('conditioning_team_empty')
+  })
+})
+
+describe('ultimo Administrador de una empresa — company_last_administrator', () => {
+  it('R23: company_last_administrator esta en el catalogo con su clave y su texto exactos', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain('company_last_administrator')
+    expect(ERROR_MESSAGE_KEY.company_last_administrator).toBe('errors.company_last_administrator')
+    expect(errorMessage('company_last_administrator')).toBe(
+      'Es el único Administrador de la empresa: crea otro antes de darlo de baja.',
+    )
+  })
+
+  it('R23: es un codigo propio, distinto de last_administrator y con otro texto', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain('last_administrator')
+    expect(errorMessage('company_last_administrator')).not.toBe(errorMessage('last_administrator'))
   })
 })

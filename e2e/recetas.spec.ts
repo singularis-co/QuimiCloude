@@ -368,7 +368,6 @@ test.describe('catalogo de recetas', () => {
     await page.getByTestId('recipe-line-percentage-0').fill('100');
 
     // --- 5. Un paso.
-    await page.getByTestId('recipe-step-add').click();
     await page.getByTestId('recipe-step-text-0').fill(`Mezclar ${RUN_ID.slice(0, 8)}`);
 
     // --- 6. Guardar: la Server Action REAL de `recetas` (QC-25) contra Postgres, sin `fetch` de

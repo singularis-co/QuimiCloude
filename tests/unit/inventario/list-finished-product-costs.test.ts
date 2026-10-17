@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ROLE_ADMINISTRADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
+import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 import { createListFinishedProductCosts } from '@/lib/modules/inventario/domain/list-finished-product-costs';
 import { ProductNotFoundError, UnauthorizedError, ValidationError } from '@/lib/modules/inventario/domain/errors';
 import {
@@ -22,7 +22,9 @@ import type {
 } from '@/lib/modules/inventario/ports/finished-product-detail-repository';
 
 const EMPRESA = 'company-a';
-const LECTOR: Actor = { id: 'u-lector', companyId: EMPRESA, permissions: ['inventario.consultar'] };
+// Ver costos exige ademas `canViewUnitCosts` (hoy `inventario.modificar`, solo el Administrador).
+const LECTOR: Actor = { id: 'u-lector', companyId: EMPRESA, permissions: ['inventario.consultar', 'inventario.modificar'] };
+const SOLO_CONSULTA: Actor = { id: 'u-operador', companyId: EMPRESA, permissions: ['inventario.consultar'] };
 
 const REGISTRO: FinishedProductRecord = {
   id: FINISHED_PRODUCT_ID,
@@ -86,7 +88,7 @@ describe('listFinishedProductCosts', () => {
     const deOtroRol: Actor = {
       id: 'u-auditor',
       companyId: EMPRESA,
-      permissions: ['proveedores.consultar', 'inventario.consultar'],
+      permissions: ['proveedores.consultar', 'inventario.consultar', 'inventario.modificar'],
     };
 
     await expect(m.listar(FINISHED_PRODUCT_ID, {}, deOtroRol)).resolves.toEqual(finishedProductPage([finishedProductCostRow()]));
@@ -104,7 +106,20 @@ describe('listFinishedProductCosts', () => {
     ningunPuerto(m);
   });
 
-  it('R4: con solo inventario.consultar, sin recetas ni pedidos, ve el costo y el pedido', async () => {
+  it('solo el Administrador ve costos: con inventario.consultar sin canViewUnitCosts responde unauthorized y no llama a ningun puerto', async () => {
+    const m = montar();
+    const operador: Actor = { id: 'u-op', companyId: EMPRESA, permissions: [...SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]] };
+
+    await expect(m.listar(FINISHED_PRODUCT_ID, {}, SOLO_CONSULTA)).rejects.toBeInstanceOf(UnauthorizedError);
+    await expect(m.listar('no-es-uuid', { page: -1 }, operador)).rejects.toBeInstanceOf(UnauthorizedError);
+    ningunPuerto(m);
+
+    const admin: Actor = { id: 'u-admin', companyId: EMPRESA, permissions: [...SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]] };
+    await expect(m.listar(FINISHED_PRODUCT_ID, {}, admin)).resolves.toMatchObject({ items: [{ unitCost: '2.5000' }] });
+    expect(m.products.findAliveFinished).toHaveBeenCalledWith(FINISHED_PRODUCT_ID, { companyId: EMPRESA });
+  });
+
+  it('R4: con inventario.consultar y canViewUnitCosts, sin recetas ni pedidos, ve el costo y el pedido', async () => {
     const m = montar();
 
     const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);

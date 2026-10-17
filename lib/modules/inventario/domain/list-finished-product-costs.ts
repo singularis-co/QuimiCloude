@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import { requirePermission, type Actor } from './actor';
-import { ProductNotFoundError, ValidationError } from './errors';
+import { canViewUnitCosts, requirePermission, type Actor } from './actor';
+import { ProductNotFoundError, UnauthorizedError, ValidationError } from './errors';
 import {
   packagedQuantityOf,
   productionCostTotal,
@@ -25,7 +25,13 @@ const pageSchema = z.strictObject({
   pageSize: z.number().int().min(1).optional(),
 });
 
-/** El costo sale del costo unitario guardado en el lote, no de los costos actuales de los insumos. */
+/**
+ * El costo sale del costo unitario guardado en el lote, no de los costos actuales de los insumos.
+ *
+ * La pestaña entera es dato de costo: ademas de `inventario.consultar` exige `canViewUnitCosts`
+ * (decision del humano, 2026-10-16: solo el Administrador). Sin el, el mismo `UnauthorizedError`
+ * que sin permiso, antes de validar y de tocar cualquier puerto.
+ */
 export function createListFinishedProductCosts(
   deps: ListFinishedProductCostsDeps,
 ): (id: string, input: unknown, actor: Actor | null | undefined) => Promise<Page<FinishedProductCostRow>> {
@@ -35,6 +41,7 @@ export function createListFinishedProductCosts(
     actor: Actor | null | undefined,
   ): Promise<Page<FinishedProductCostRow>> {
     requirePermission(actor, 'inventario.consultar');
+    if (!canViewUnitCosts(actor)) throw new UnauthorizedError();
 
     const scope = { companyId: actor.companyId };
     if (!productIdSchema.safeParse(id).success) throw new ProductNotFoundError();

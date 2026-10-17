@@ -223,15 +223,58 @@ describe('QC-211 R7 — sección «Pasos de envasado» en el formulario de fórm
     const operator = screen.getByTestId('recipe-steps-field');
     const packing = screen.getByTestId('recipe-packing-steps-field');
     expect(within(operator).getByRole('heading', { name: 'Pasos' })).toBeInTheDocument();
-    expect(within(packing).getByRole('heading', { name: 'Pasos de envasado' })).toBeInTheDocument();
-    expect(within(packing).getByTestId('recipe-packing-step-add')).toHaveTextContent(
-      'Añadir paso de envasado',
-    );
+    expect(
+      within(packing).getByRole('heading', { name: /^Pasos de envasado/ }),
+    ).toBeInTheDocument();
     expect(operator.contains(packing)).toBe(false);
     expect(packing.contains(operator)).toBe(false);
     expect(follows(operator, packing)).toBe(true);
     expect(follows(packing, screen.getByTestId('recipe-form-submit'))).toBe(true);
-    expect(within(packing).queryAllByTestId('recipe-packing-step-row')).toHaveLength(0);
+    // Cada sección arranca con UNA fila en blanco, como la de ingredientes.
+    expect(within(operator).getAllByTestId('recipe-step-row')).toHaveLength(1);
+    expect(within(packing).getAllByTestId('recipe-packing-step-row')).toHaveLength(1);
+  });
+
+  it('las dos secciones van separadas por un divisor y sin botones «Añadir paso…»', () => {
+    renderCreate();
+
+    const separator = screen.getByTestId('recipe-form-steps-separator');
+    expect(follows(screen.getByTestId('recipe-steps-field'), separator)).toBe(true);
+    expect(follows(separator, screen.getByTestId('recipe-packing-steps-field'))).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Añadir paso' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Añadir paso de envasado' })).toBeNull();
+    expect(screen.queryByTestId('recipe-step-add')).toBeNull();
+    expect(screen.queryByTestId('recipe-packing-step-add')).toBeNull();
+  });
+
+  it('la sección de envasado se marca «(opcional)» y su ayuda explica para qué sirve', async () => {
+    const user = setupUser();
+    renderCreate();
+
+    const packing = screen.getByTestId('recipe-packing-steps-field');
+    expect(within(packing).getByTestId('recipe-packing-steps-optional')).toHaveTextContent(
+      '(opcional)',
+    );
+    expect(within(screen.getByTestId('recipe-steps-field')).queryByText('(opcional)')).toBeNull();
+
+    const help = within(packing).getByRole('button', { name: 'Qué son los pasos de envasado' });
+    await user.hover(help);
+    expect(await screen.findByTestId('recipe-packing-steps-help-text')).toHaveTextContent(
+      'Opcional. Pasos que sigue el empacador uno a uno al empacar el pedido.',
+    );
+  });
+
+  it('las filas en blanco sin tocar no se envían: sin pasos se mandan las dos listas vacías', async () => {
+    const user = setupUser();
+    renderEdit(recipeDetail({ steps: [], packingSteps: [] }));
+
+    expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(1);
+    expect(screen.getAllByTestId('recipe-packing-step-row')).toHaveLength(1);
+
+    const payload = await submitAndReadUpdate(user);
+    expect(payload.steps).toEqual([]);
+    expect(payload.packingSteps).toEqual([]);
+    expect(screen.queryByTestId('recipe-packing-step-field-error-0')).toBeNull();
   });
 
   it('R7: la edición también la muestra, con el editor completo en cada paso de envasado', () => {
@@ -251,9 +294,8 @@ describe('QC-211 R7 — sección «Pasos de envasado» en el formulario de fórm
     const user = setupUser();
     renderEdit(recipeDetail());
 
-    await user.click(screen.getByTestId('recipe-packing-step-add'));
     await writePackingStep(0, 'Descartar');
-    await user.click(screen.getByTestId('recipe-packing-step-add'));
+    await user.click(screen.getByTestId('recipe-packing-step-add-0'));
     await writePackingStep(
       1,
       'Sellar y rotular Tapa firme',
@@ -262,7 +304,7 @@ describe('QC-211 R7 — sección «Pasos de envasado» en el formulario de fórm
         visible: 'Tapa firme',
       },
     );
-    await user.click(screen.getByTestId('recipe-packing-step-add'));
+    await user.click(screen.getByTestId('recipe-packing-step-add-1'));
     await writePackingStep(2, 'Paletizar');
     await user.click(screen.getByTestId('recipe-packing-step-remove-0'));
 
@@ -386,6 +428,15 @@ describe('QC-211 R8 — los errores no cruzan de sección', () => {
     expect(screen.queryByTestId('recipe-packing-step-field-error-1')).toBeNull();
   });
 
+  it('una sección cuyo único paso quedó en blanco se envía vacía y sin error', async () => {
+    const user = setupUser();
+    renderEdit(recipeDetail({ steps: [paragraph('Pesar')], packingSteps: [EMPTY_STEP] }));
+
+    const payload = await submitAndReadUpdate(user);
+    expect(payload.packingSteps).toEqual([]);
+    expect(plainTexts(payload.steps)).toEqual(['Pesar']);
+  });
+
   it('R8: sin pasos de envasado se envía la clave propia vacía', async () => {
     const user = setupUser();
     renderEdit(recipeDetail());
@@ -413,7 +464,7 @@ describe('QC-211 R9 — la edición carga los pasos de envasado intactos', () =>
     expect(plainTexts(payload.steps)).toEqual(['Mezclar']);
   });
 
-  it('R9: una lectura sin la clave de pasos de envasado abre la sección vacía', () => {
+  it('R9: una lectura sin la clave de pasos de envasado abre la sección con su fila en blanco', () => {
     const legacy = Object.fromEntries(
       Object.entries(recipeDetail()).filter(([key]) => key !== 'packingSteps'),
     ) as unknown as RecipeDetail;
@@ -421,6 +472,19 @@ describe('QC-211 R9 — la edición carga los pasos de envasado intactos', () =>
     renderEdit(legacy);
 
     expect(screen.getByTestId('recipe-packing-steps-field')).toBeInTheDocument();
-    expect(screen.queryAllByTestId('recipe-packing-step-row')).toHaveLength(0);
+    expect(screen.getAllByTestId('recipe-packing-step-row')).toHaveLength(1);
+    expect(screen.getByTestId('recipe-packing-step-text-0')).toHaveTextContent('');
+  });
+
+  it('la edición con pasos guardados muestra solo esos pasos, sin fila en blanco extra', () => {
+    renderEdit(
+      recipeDetail({
+        steps: [paragraph('Pesar'), paragraph('Mezclar')],
+        packingSteps: [paragraph('Etiquetar')],
+      }),
+    );
+
+    expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(2);
+    expect(screen.getAllByTestId('recipe-packing-step-row')).toHaveLength(1);
   });
 });

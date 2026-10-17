@@ -1,7 +1,7 @@
 import { toBirthDate } from './birth-date';
 import { createCompanySchema, toCompanyWrite } from './company-input';
 import { throwDuplicate } from './create-user';
-import { credentialSetupLinkExpiresAt } from './credential-setup-link';
+import { sendCredentialSetupLink } from './credential-setup-mail';
 import { CompanyDuplicateNameError, CompanyDuplicateTaxIdError, ValidationError } from './errors';
 import { requirePlatformPermission, type PlatformActor } from './platform-actor';
 
@@ -58,29 +58,4 @@ export function createCreateCompany(
     const mail = await sendCredentialSetupLink(deps, companyId, administratorId, instante);
     return { companyId, administratorId, mail };
   };
-}
-
-// El enlace se emite despues del alta y fuera de su transaccion: si falla, la empresa queda creada
-// y se informa como correo no enviado.
-async function sendCredentialSetupLink(
-  deps: CreateCompanyDeps,
-  companyId: string,
-  administratorId: string,
-  instante: Date,
-): Promise<'sent' | 'failed'> {
-  const { secret, digest } = deps.secrets.create();
-  const emision = await deps.links.issueForPendingUser({
-    userId: administratorId,
-    companyId,
-    digest,
-    expiresAt: credentialSetupLinkExpiresAt(instante),
-    now: instante,
-  });
-
-  if (typeof emision === 'object') {
-    return deps.mailer.sendCredentialSetupLink({ to: emision.email, secret });
-  }
-  // Otra emision simultanea gano y ya envio su correo.
-  if (emision === 'superseded') return 'sent';
-  return 'failed';
 }

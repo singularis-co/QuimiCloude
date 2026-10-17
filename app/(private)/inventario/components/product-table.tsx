@@ -17,7 +17,7 @@ import {
   type DataTableTexts,
 } from '@/components/shared/data-table';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
-import type { ProductBatchView, ProductView } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import { listAliveProductBatchesAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 
@@ -140,6 +140,11 @@ export type ProductTableProps = {
    * falla cerrado, como el resto de esta ruta.
    */
   readonly canAdjust?: boolean;
+  /**
+   * Si se pinta la columna «Costo» (solo el Administrador), resuelto en el servidor con
+   * `canViewUnitCosts` y bajado por props. Defecto `false`: falla cerrado, como `canAdjust`.
+   */
+  readonly canSeeCost?: boolean;
   /** Defecto `'idle'`. `'loading'` es la primera carga, el `fallback` del `<Suspense>`. */
   readonly status?: ProductTableStatus;
   /** El error de la consulta, entero; solo se pinta con `status="error"`. */
@@ -165,14 +170,17 @@ export function productTableStates({
   pageSize,
   error,
   empty,
+  columns = PRODUCT_SKELETON_COLUMN_COUNT,
 }: {
   readonly pageSize: number;
   readonly error?: OperationError;
   readonly empty?: ProductTableEmpty;
+  /** Celdas por fila del esqueleto: las columnas que de verdad se van a pintar. */
+  readonly columns?: number;
 }): DataTableStates {
   return {
     loading: {
-      columns: PRODUCT_SKELETON_COLUMN_COUNT,
+      columns,
       rows: pageSize,
       label: PRODUCT_TABLE_TEXTS.loading,
       testId: 'product-table-skeleton',
@@ -254,6 +262,7 @@ export function ProductTable({
   totalPages,
   units,
   canAdjust = false,
+  canSeeCost = false,
   status = 'idle',
   error,
   empty,
@@ -282,7 +291,12 @@ export function ProductTable({
 
   // La columna «Tipo» solo sale en la pestana «Todos» (sin filtro de tipo): con un tipo
   // filtrado, todas las filas dirian lo mismo.
-  const showType = params.filters[TYPE_COLUMN_ID] === undefined;
+  const typeFilter = params.filters[TYPE_COLUMN_ID];
+  const showType = typeFilter === undefined;
+  // La pestana «Producto» no pinta «Presentación»; «Todos» y el resto de pestanas, si.
+  const showPresentation = !(
+    typeFilter?.kind === 'select' && typeFilter.values[0] === PRODUCT_TYPES.PRODUCT
+  );
   const card = useMemo(() => productTableCard(showType), [showType]);
   const columns = useMemo(() => {
     const loadBatches = (productId: string) => {
@@ -312,6 +326,8 @@ export function ProductTable({
       menu: (product) => productRowActionsSpec({ product, units, canAdjust, onAction: handleAction }),
       units,
       showType,
+      showCost: canSeeCost,
+      showPresentation,
       onToggle: (productId) => {
         setExpanded((current) => {
           const next = new Set(current);
@@ -324,7 +340,7 @@ export function ProductTable({
       },
       onRetry: loadBatches,
     });
-  }, [units, canAdjust, showType, batches, handleAction]);
+  }, [units, canAdjust, canSeeCost, showType, showPresentation, batches, handleAction]);
 
   const tableRows = useMemo(
     () =>
@@ -371,7 +387,12 @@ export function ProductTable({
       onParamsChange={(next) => navigate(productListHref(next))}
       status={status}
       texts={PRODUCT_TABLE_TEXTS}
-      states={productTableStates({ pageSize: params.pageSize, error, empty })}
+      states={productTableStates({
+        pageSize: params.pageSize,
+        error,
+        empty,
+        columns: columns.length,
+      })}
       card={card}
     />
   );

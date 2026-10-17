@@ -224,7 +224,7 @@ T8h.
 
 ## Tanda 8 — Vuelta 2: integrar `dev` y enmienda 2 (F2.3; T8a primero, el resto depende de ella)
 
-- [ ] **T8a. Integrar `origin/dev`** (F1, `design.md > 12 > Enmienda 2`). `git fetch origin` y merge de
+- [x] **T8a. Integrar `origin/dev`** (F1, `design.md > 12 > Enmienda 2`). `git fetch origin` y merge de
   `origin/dev` en la rama, resolviendo los seis conflictos con las reglas de F1:
   `app/(private)/inventario/components/product-columns.tsx` y `product-table.tsx` (columnas, orden y
   visibilidad de `dev`; alineación, `menu`, ámbar, `card` y anfitrión de la rama),

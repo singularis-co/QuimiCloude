@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  ACTIVE_ORDER_MARK,
   CANCELLED_ONLY_LABEL,
   DELETED_ORDER_MARK,
   EXECUTION_TRACE_SECTION_TESTID,
@@ -244,14 +243,14 @@ describe('R2 - columnas de la fila', () => {
 
 // El total de la lista se trunca a minutos, sin segundos.
 describe('R3 - R15 - en curso y duracion', () => {
-  it('R3 - la fila activa se marca «En curso» y su duracion es abierta', () => {
+  it('R3 - la fila activa muestra su estado y su duracion abierta', () => {
     montar();
     const activa = fila(ACTIVO.orderId);
     expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('En fabricación');
     expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('45 min (en curso)');
   });
 
-  it('R3 - una fila activa en POR_EMPACAR lleva la marca «En curso» aparte del estado y su duracion abierta', () => {
+  it('R3 - una fila activa en POR_EMPACAR no lleva chip «En curso»: el estado ya dice el paso; su duracion es abierta', () => {
     render(
       <ExecutionTraceTable
         rows={[ACTIVO_POR_EMPACAR, ...ROWS]}
@@ -261,11 +260,10 @@ describe('R3 - R15 - en curso y duracion', () => {
       />,
     );
     const activa = fila(ACTIVO_POR_EMPACAR.orderId);
-    expect(within(activa).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+    expect(within(activa).queryByTestId('execution-trace-active')).toBeNull();
     expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('Por empacar');
     expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('50 min (en curso)');
-    expect(within(fila(ACTIVO.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
-  });
+    expect(within(fila(ACTIVO.orderId)).queryByTestId('execution-trace-active')).toBeNull();  });
 
   it('R3 - la fila dada de baja en EN_CURSO no lleva la marca de actividad aunque su estado diga «En fabricación»', () => {
     montar();
@@ -291,7 +289,7 @@ describe('R3 - R15 - en curso y duracion', () => {
   });
 });
 
-describe('R26 - R28 - total por fila y marca «En curso» con acondicionamiento', () => {
+describe('R26 - R28 - total por fila con acondicionamiento, sin chip «En curso»', () => {
   function montarAcondicionamiento() {
     render(
       <ExecutionTraceTable rows={CONDITIONING_TRACE_ROWS} personOptions={[]} params={params()} totalPages={1} />,
@@ -321,14 +319,10 @@ describe('R26 - R28 - total por fila y marca «En curso» con acondicionamiento'
     expect(cerrada.children).toHaveLength(0);
   });
 
-  it('R28 - En curso segun active; nunca en dado de baja', () => {
+  it('R28 - ninguna fila lleva chip «En curso», ni activa ni dada de baja', () => {
     montarAcondicionamiento();
-    expect(within(fila(OPEN_TOTAL_ROW.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(
-      ACTIVE_ORDER_MARK,
-    );
-    expect(within(fila(ACTIVE_CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(
-      ACTIVE_ORDER_MARK,
-    );
+    expect(within(fila(OPEN_TOTAL_ROW.orderId)).queryByTestId('execution-trace-active')).toBeNull();
+    expect(within(fila(ACTIVE_CLOSED_TOTAL_ROW.orderId)).queryByTestId('execution-trace-active')).toBeNull();
     expect(within(fila(ACTIVE_CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration')).toHaveAttribute(
       'data-kind',
       'closed',

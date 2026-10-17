@@ -7,6 +7,7 @@ import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import {
   confirmFormulaImportAction,
@@ -29,6 +30,7 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import {
   createLocalKey,
+  PACKING_STEPS_FIELD_TEXTS,
   RecipeStepsField,
   type ProductPickerOption,
   type RecipeStepFormValue,
@@ -40,8 +42,6 @@ import { FormulaNameClash } from './formula-name-clash';
 
 const FIELD_TEXT = 'text-base';
 
-const PACKING_STEPS_TITLE = 'Pasos de envasado';
-const PACKING_STEPS_ADD_LABEL = 'Añadir paso de envasado';
 const PACKING_STEPS_TESTID_PREFIX = 'recipe-packing-step';
 
 /** Modo de asignacion de producto de una fila, distinto del `kind` de `DraftLine`: una fila
@@ -401,14 +401,18 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
         Suma: {formatPercentage(issues.total)} %
       </p>
 
-      {/* `RecipeStepsField` se importa TAL CUAL del barrel de formulas: no se toca. */}
       <RecipeStepsField steps={steps} onChange={setSteps} />
+
+      <Separator data-testid="formula-import-steps-separator" />
 
       <RecipeStepsField
         steps={packingSteps}
         onChange={setPackingSteps}
-        title={PACKING_STEPS_TITLE}
-        addLabel={PACKING_STEPS_ADD_LABEL}
+        title={PACKING_STEPS_FIELD_TEXTS.title}
+        optionalHelp={{
+          text: PACKING_STEPS_FIELD_TEXTS.optionalHelp,
+          label: PACKING_STEPS_FIELD_TEXTS.optionalHelpLabel,
+        }}
         testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
       />
 

@@ -122,3 +122,69 @@ describe('columna «Tipo» de la tabla de inventario', () => {
     expect(screen.queryByTestId('product-type')).toBeNull();
   });
 });
+
+describe('columna «Presentación» segun la pestana de tipo', () => {
+  function conTipo(type: (typeof PRODUCT_TYPE_VALUES)[number]): DataTableParams {
+    return { ...TODOS, filters: { type: { kind: 'select', values: [type] } } };
+  }
+
+  it('en la pestana «Producto» no sale, y el esqueleto cuenta una columna menos', () => {
+    render(
+      <ProductTable
+        products={[producto({ type: PRODUCT_TYPES.PRODUCT })]}
+        params={conTipo(PRODUCT_TYPES.PRODUCT)}
+        totalPages={1}
+      />,
+    );
+
+    expect(screen.queryByTestId('data-table-head-presentationName')).toBeNull();
+    expect(screen.queryByTestId('data-table-cell-presentationName')).toBeNull();
+    cleanup();
+
+    render(
+      <ProductTable
+        status="loading"
+        products={[]}
+        params={conTipo(PRODUCT_TYPES.PRODUCT)}
+        totalPages={0}
+      />,
+    );
+    const filaEsqueleto = screen.getAllByTestId('product-row-skeleton')[0] as HTMLElement;
+    expect(within(filaEsqueleto).getAllByRole('cell')).toHaveLength(
+      buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }), showPresentation: false })
+        .length,
+    );
+  });
+
+  it('en «Todos» sale', () => {
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    expect(screen.getByTestId('data-table-head-presentationName')).toBeInTheDocument();
+  });
+
+  it('en el resto de pestanas (no «Producto») sale', () => {
+    const otros = PRODUCT_TYPE_VALUES.filter(
+      (type) => type !== PRODUCT_TYPES.PRODUCT && type !== PRODUCT_TYPES.FINISHED_PRODUCT,
+    );
+    expect(otros.length).toBeGreaterThan(0);
+
+    for (const type of otros) {
+      render(<ProductTable products={[producto({ type })]} params={conTipo(type)} totalPages={1} />);
+      expect(
+        screen.getByTestId('data-table-head-presentationName'),
+        `falta «Presentación» en la pestana «${type}»`,
+      ).toBeInTheDocument();
+      cleanup();
+    }
+  });
+
+  it('`buildProductColumns` la pinta por defecto y `showPresentation: false` la quita', () => {
+    const ids = (showPresentation?: boolean) =>
+      buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }), showPresentation }).map(
+        (c) => c.id,
+      );
+
+    expect(ids()).toContain('presentationName');
+    expect(ids(false)).not.toContain('presentationName');
+  });
+});
