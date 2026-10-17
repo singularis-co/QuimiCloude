@@ -1778,3 +1778,15 @@ $ pnpm run lint
 Regresion E2E en verde (9 specs, Chromium y WebKit; dos rojos ajenos de WebKit que pasan al
 reintentar) y D53 medida: el esqueleto casa en todas las vistas salvo «Producto terminado» (9/8
 frente a 7) y nunca pasa a tarjeta bajo 760 px.
+
+## Nota de la vuelta 2 del reviewer (m9)
+
+El commit `e8c41a4b` lleva tipo `test(QC-263)` pero también toca producción:
+`app/(private)/inventario/components/product-table.tsx`, donde la clase de ámbito
+`PRODUCT_TABLE_SCOPE_CLASS` pasa a pintar las celdas fijadas de la sub-fila con un fondo opaco
+(`color-mix`) en lugar de `bg-muted/55`. Ese es el arreglo de R57 descrito en «Tanda 8 (T8g)». No se
+reescribe la historia: queda anotado aquí.
+
+La cita «(R59)» del comentario de `import-preview-summary.tsx` (B2) se quita en el mismo commit
+`fix(QC-263)` que lleva esta nota. Tras ese cambio, ninguna línea añadida en `app/`, `lib/` ni `components/`
+cita `R<n>`, `QC-<n>` ni `design.md`.

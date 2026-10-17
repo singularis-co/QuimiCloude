@@ -122,7 +122,7 @@ export type ImportPreviewSummaryProps = {
   readonly confirming: boolean;
   readonly onConfirm: () => void;
   readonly onDownloadErrors: () => void;
-  /** «Elegir otro archivo»: vuelve al paso 1 sin importar nada (R59). */
+  /** «Elegir otro archivo»: vuelve al paso 1 sin importar nada. */
   readonly onChooseAnother: () => void;
   /** Lo que va entre los avisos y los botones: los faltantes y la tabla de filas. */
   readonly children?: ReactNode;
