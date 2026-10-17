@@ -1,5 +1,6 @@
 'use client';
 
+import { RotateCcwIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
@@ -15,6 +16,7 @@ import {
 import { COMPANY_REACTIVATE_TEXTS } from './company-labels';
 
 export const COMPANY_REACTIVATE_DIALOG_TESTID = 'company-reactivate-dialog';
+export const COMPANY_REACTIVATE_ICON_TESTID = 'company-reactivate-icon';
 export const COMPANY_REACTIVATE_MESSAGE_TESTID = 'company-reactivate-message';
 export const COMPANY_REACTIVATE_CONFIRM_TESTID = 'company-reactivate-confirm';
 export const COMPANY_REACTIVATE_DISMISS_TESTID = 'company-reactivate-dismiss';
@@ -47,6 +49,7 @@ export function CompanyReactivateDialog({ company, open, onOpenChange }: Company
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
+      icon={{ glyph: RotateCcwIcon, tone: 'info', testId: COMPANY_REACTIVATE_ICON_TESTID }}
       texts={{
         title: COMPANY_REACTIVATE_TEXTS.title(company.name),
         description: COMPANY_REACTIVATE_TEXTS.description,

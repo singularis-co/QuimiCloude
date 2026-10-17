@@ -68,6 +68,15 @@ describe('el dialogo de reactivacion', () => {
     expect(screen.getByTestId('company-reactivate-confirm')).toHaveTextContent('Reactivar');
   });
 
+  it('R26: tablero: lleva el icono de reactivar en tono info, decorativo y delante del titulo', () => {
+    render(<CompanyReactivateDialog company={LA_CEJA} open onOpenChange={onOpenChange} />);
+    const icono = screen.getByTestId('company-reactivate-icon');
+    expect(icono).toHaveAttribute('data-tone', 'info');
+    expect(icono.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    const titulo = screen.getByRole('heading', { name: `¿Reactivar ${LA_CEJA.name}?` });
+    expect(icono.compareDocumentPosition(titulo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('R26: con exito cierra, avisa «Empresa reactivada.» y refresca', async () => {
     reactivateMock.mockResolvedValue({ status: 'success' });
     await montarYConfirmar();
