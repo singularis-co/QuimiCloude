@@ -473,3 +473,30 @@ al editar a Colombia. Tampoco WebKit.
 Veredicto: CountrySelect coincide con el tablero en los tres anchos (popup anclado de 264 px en 1440 y
 820, hoja con 48 px en 375, foco y Escape correctos, sin recortes ni desbordes); un hallazgo de diseño
 en teléfono (la hoja cambia de altura al filtrar) queda para el leader.
+
+## m11 · Capturas de los diálogos con icono (2026-10-17)
+
+Chromium, 1440x900, `deviceScaleFactor` 1, `next dev` en el puerto 3117, Maestro sembrado.
+Fixtures `qc166_vis_` sembradas por la base (una empresa activa con un Administrador activo y uno
+pendiente, y una empresa de baja), borradas al final (`deleteFixtureCompanies`, quedan 0). Ningún
+diálogo se confirmó: se cerraron con «Volver» o Escape. Script de un solo uso fuera del repo.
+
+- `progress/qc166-revision-visual/dialogo-1440-baja-empresa.png` — icono `trash` de 44 px, tono
+  `danger` (fondo `destructive-subtle`, glifo `destructive-text`); orden correcto: cifras («Usuarios
+  activos» 2, «Pedidos abiertos» 0) → aviso → campo «Escribe … para confirmar»; «Dar de baja»
+  deshabilitado con el campo vacío. Defecto: el título queda centrado en su columna (x=637 px frente a
+  x=604 px de los otros tres diálogos), separado del icono en vez de alineado a la izquierda junto a
+  él; y el aviso, que empieza bajo el icono (x=544), corta las líneas hacia x≈820 y no usa todo el
+  ancho del cuerpo (hasta x=896).
+- `progress/qc166-revision-visual/dialogo-1440-baja-administrador.png` — icono `trash` de 44 px, tono
+  `danger`; título y descripción alineados a la izquierda junto al icono; «Dar de baja» en rojo. Al
+  abrir, «Volver» muestra el anillo de foco (foco inicial en cancelar); en los otros tres no se ve
+  anillo en la captura.
+- `progress/qc166-revision-visual/dialogo-1440-reenvio.png` — icono `mail` de 44 px, tono `info`
+  (fondo `accent`, glifo `accent-foreground`); título, correo en negrita y descripción alineados junto
+  al icono; sin defectos a la vista.
+- `progress/qc166-revision-visual/dialogo-1440-reactivar.png` — icono `rotate-ccw` de 44 px, tono `info`
+  (mismo `accent` que el reenvío); título y descripción junto al icono; sin defectos a la vista.
+
+Veredicto: los cuatro diálogos pintan el icono de 44 px con el tono esperado; la baja de empresa
+respeta el orden cifras→aviso→campo pero desalinea el título (centrado) y estrecha el aviso.
