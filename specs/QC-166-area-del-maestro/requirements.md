@@ -162,8 +162,10 @@ Vocabulario de este archivo:
 - **R33.** SI un evento trae un tipo que la pantalla no conoce, o un campo o añadido que no
   conoce, ENTONCES el sistema DEBE pintarlo igual con el texto genérico de la pregunta abierta 4,
   sin fallar.
-- **R34.** MIENTRAS el detalle o el historial cargan, el sistema DEBE mostrar un esqueleto. SI su
-  consulta falla, ENTONCES DEBE mostrar el recuadro de error con su referencia y «Reintentar».
+- **R34.** MIENTRAS el historial carga, el sistema DEBE mostrar un esqueleto; el detalle NO lleva
+  esqueleto: lee la empresa antes de pintar, para que R27 responda un 404 real (decisión cerrada
+  del 2026-10-16). SI la consulta del detalle o del historial falla, ENTONCES DEBE mostrar el
+  recuadro de error con su referencia y «Reintentar».
 
 ### Administradores
 
@@ -300,6 +302,8 @@ cosa al aprobar, se implementa esa.
 | 2026-10-16 | ¿Último Administrador? | No se puede dar de baja: primero hay que crear otro. El diálogo lo dice y no deja confirmar (decidido para **QC-165**). |
 | 2026-10-16 | ¿Mover un Administrador de empresa? | No. En Editar la empresa se muestra fija (decidido para **QC-165**). |
 | 2026-10-16 | ¿Reenviar el enlace a un Administrador? | **Sí** (humano, 2026-10-16; enmienda el «Lo que NO entra» sembrado). Acción «Reenviar enlace» en el menú de la fila de Administradores, con el servidor de **QC-165**. |
+| 2026-10-16 | ¿Esqueleto del detalle de empresa? | **No.** El detalle lee la empresa antes de pintar, para que una empresa inexistente responda un 404 real (enmienda R34). El Historial sí lleva esqueleto. |
+| 2026-10-16 | ¿Marca de obligatorio en teléfono y número de documento del Administrador? | **Sí.** Llevan «*» como los demás obligatorios, porque el servidor los exige (QC-165). |
 | 2026-10-16 | ¿Permisos? | `empresas.consultar` para ver y `empresas.modificar` para escribir, validado en el service (heredado de **QC-161**). |
 | 2026-10-16 | ¿E2E? | Sí. Paga el diferido de **QC-161, QC-162, QC-165 y QC-235**, más el caso «el Maestro cambia el país y lo ve en el listado». |
 | 2026-10-16 | ¿Estados? | Cargando con esqueleto, vacío (filtro «De baja») y error con «Reintentar», con los componentes del catálogo. |
