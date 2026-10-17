@@ -94,6 +94,23 @@ describe('el dialogo de baja', () => {
     expect(screen.getByLabelText(`Escribe ${VALLE.name} para confirmar`)).toBeInTheDocument();
   });
 
+  it('R23: el orden del tablero: titulo, cifras, aviso y campo de confirmacion', async () => {
+    await impactoListo();
+    const titulo = screen.getByRole('heading', { name: `Dar de baja a ${VALLE.name}` });
+    const cifras = screen.getByTestId('company-delete-impact');
+    const aviso = screen.getByTestId('company-delete-message');
+    const campo = screen.getByTestId('company-delete-confirmation');
+    const sigue = (a: Node, b: Node) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(sigue(titulo, cifras)).toBe(true);
+    expect(sigue(cifras, aviso)).toBe(true);
+    expect(sigue(aviso, campo)).toBe(true);
+    // El aviso sigue siendo la descripcion del dialogo.
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
+      'Sus usuarios no podrán entrar y se cerrarán las sesiones que tengan abiertas. Podrás reactivarla después.',
+    );
+  });
+
   it('R24: sin impacto cargado «Dar de baja» sigue deshabilitado aunque haya texto', () => {
     impactMock.mockReturnValue(new Promise(() => {}));
     montar();

@@ -121,3 +121,101 @@ describe('ConfirmDialog: contentClassName y confirmSlot', () => {
     expect(contenido).toHaveClass('max-h-[100dvh]', 'overflow-y-auto', 'fixed');
   });
 });
+
+function sigue(a: Node, b: Node): boolean {
+  return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
+describe('ConfirmDialog: descriptionPlacement', () => {
+  const MENSAJE = 'extension-message';
+  const conMensaje = { ...TEST_IDS, message: MENSAJE } as const;
+
+  function arbolSinPlacement(): string {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={conMensaje}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="error-in-form"
+        aside={<p data-testid="aside">Cifras</p>}
+      />,
+    );
+    const arbol = arbolAccesible();
+    cleanup();
+    return arbol;
+  }
+
+  it('con «header» el árbol es el mismo que sin pasarla', () => {
+    const antes = arbolSinPlacement();
+
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={conMensaje}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="error-in-form"
+        aside={<p data-testid="aside">Cifras</p>}
+        descriptionPlacement="header"
+      />,
+    );
+
+    expect(arbolAccesible()).toBe(antes);
+    expect(sigue(screen.getByTestId(MENSAJE), screen.getByTestId('aside'))).toBe(true);
+  });
+
+  it('con «after-aside» la descripción va tras aside y antes de children, y sigue describiendo el diálogo', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={conMensaje}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="error-in-form"
+        aside={<p data-testid="aside">Cifras</p>}
+        descriptionPlacement="after-aside"
+      >
+        <input aria-label="Campo" data-testid="campo" />
+      </ConfirmDialog>,
+    );
+
+    const titulo = screen.getByRole('heading', { name: TEXTS.title });
+    const mensaje = screen.getByTestId(MENSAJE);
+    expect(sigue(titulo, screen.getByTestId('aside'))).toBe(true);
+    expect(sigue(screen.getByTestId('aside'), mensaje)).toBe(true);
+    expect(sigue(mensaje, screen.getByTestId('campo'))).toBe(true);
+    expect(titulo.parentElement).not.toContainElement(mensaje);
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(TEXTS.description);
+  });
+
+  it('con «after-aside» y form-wraps-all la descripción va dentro del form tras la cabecera', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={conMensaje}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="form-wraps-all"
+        descriptionPlacement="after-aside"
+      />,
+    );
+
+    const form = screen.getByTestId(TEST_IDS.form);
+    expect(within(form).getByTestId(MENSAJE)).toHaveTextContent(TEXTS.description);
+  });
+
+  it('con «after-aside» sin form la descripción va tras aside', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={conMensaje}
+        aside={<p data-testid="aside">Cifras</p>}
+        descriptionPlacement="after-aside"
+      />,
+    );
+
+    expect(sigue(screen.getByTestId('aside'), screen.getByTestId(MENSAJE))).toBe(true);
+  });
+});

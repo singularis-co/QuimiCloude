@@ -156,6 +156,7 @@ export function CompanyDeleteDialog({ company, open, onOpenChange }: CompanyDele
       error={regionError}
       errorId={errorId}
       aside={<ImpactBlock state={impact} />}
+      descriptionPlacement="after-aside"
     >
       <TextField
         id={`${fieldId}-confirmation`}

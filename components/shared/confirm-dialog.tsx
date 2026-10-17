@@ -68,6 +68,12 @@ export type ConfirmDialogLayout = 'error-before-form' | 'error-in-form' | 'form-
  */
 export type ConfirmDialogErrorStyle = 'region' | 'inline';
 
+/**
+ * `header`: bajo el título. `after-aside`: tras `aside` y antes del error y del form; con
+ * `form-wraps-all`, dentro del form tras la cabecera.
+ */
+export type ConfirmDialogDescriptionPlacement = 'header' | 'after-aside';
+
 const ERROR_REGION_CLASS = 'rounded-lg border border-destructive/40 p-3 text-sm text-destructive';
 const ERROR_INLINE_CLASS = 'text-sm text-destructive';
 
@@ -141,6 +147,8 @@ export type ConfirmDialogBodyBaseProps = {
   readonly layout?: ConfirmDialogLayout;
   /** Entre la cabecera y el error, fuera del form. */
   readonly aside?: ReactNode;
+  /** Sin ella, la descripción va en la cabecera. */
+  readonly descriptionPlacement?: ConfirmDialogDescriptionPlacement;
   /** Dentro del form tras los campos ocultos; sin form, antes del pie. */
   readonly children?: ReactNode;
 };
@@ -169,17 +177,22 @@ export function ConfirmDialogBody({
   errorAlertProps,
   layout = 'error-before-form',
   aside,
+  descriptionPlacement = 'header',
   children,
 }: ConfirmDialogBodyProps) {
   const pending = isPending === true;
   const showPendingText = pending && texts.pending !== undefined;
 
+  const description = (
+    <AlertDialogDescription data-testid={testIds.message}>{texts.description}</AlertDialogDescription>
+  );
+  const descriptionInHeader = descriptionPlacement === 'header';
+  const lateDescription = descriptionInHeader ? null : description;
+
   const header = (
     <AlertDialogHeader>
       <AlertDialogTitle>{texts.title}</AlertDialogTitle>
-      <AlertDialogDescription data-testid={testIds.message}>
-        {texts.description}
-      </AlertDialogDescription>
+      {descriptionInHeader ? description : null}
     </AlertDialogHeader>
   );
 
@@ -256,6 +269,7 @@ export function ConfirmDialogBody({
       <>
         {header}
         {aside}
+        {lateDescription}
         {errorRegion}
         {children}
         {footer}
@@ -276,6 +290,7 @@ export function ConfirmDialogBody({
   const form = (
     <form action={submit.action} className={submit.formClassName} data-testid={testIds.form}>
       {layout === 'form-wraps-all' ? header : null}
+      {layout === 'form-wraps-all' ? lateDescription : null}
       {hiddenFields}
       {children}
       {layout === 'error-before-form' ? null : errorRegion}
@@ -289,6 +304,7 @@ export function ConfirmDialogBody({
     <>
       {header}
       {aside}
+      {lateDescription}
       {layout === 'error-before-form' ? errorRegion : null}
       {form}
     </>
