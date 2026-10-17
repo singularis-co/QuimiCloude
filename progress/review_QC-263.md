@@ -255,3 +255,53 @@ R1–R59 completa y verificación en verde: typecheck, lint, `vitest related`, g
 disco y el E2E `inventario-rediseno` en Chromium (15/15). Los cinco desvíos del implementer quedan
 aceptados. La vuelta 3 puede limitarse al diff que arregle B2, con m7, m8 y m10 recogidos en el
 spec y en `tasks.md`.
+
+## Vuelta 3 (acotada a 37ebaca5..e854920d)
+
+Commits revisados: `a97b7e5c`, `f4dbbfb1`, `899394ca`, `f392d537` y `e854920d`. Tras `git fetch`, HEAD
+es `e854920d` y `origin/dev` sigue en `aa1ed9d7`: la rama está **0 commits por detrás** (dev no ha avanzado).
+
+### Verificación ejecutada
+
+| Qué | Resultado |
+| --- | --- |
+| `pnpm run typecheck` | exit 0 |
+| `pnpm exec eslint` sobre los 4 archivos de código y test del diff | sin problemas |
+| `pnpm exec vitest related --run` sobre esos 4 archivos | 44 archivos, 850 passed |
+| `pnpm exec vitest run guard` + `product-route-contract` + `scope` | 83 archivos, 1134 passed, 20 skipped |
+| Grep de `PRODUCT_CARD_LABELS` y `.reserved` en `app/`, `tests/` y `e2e/` | ningún uso de la clave `reserved` quitada. Solo queda la aserción nueva `not.toHaveProperty('reserved')` |
+
+### Lo que se comprobó
+
+- [x] **B2 resuelto.** `import-preview-summary.tsx:125` ya no cita «(R59)», y el archivo no contiene
+  ni `R<n>` ni `QC-<n>`.
+- [x] **m8 (spec y tests).**
+  - R55 ahora dice «sin "Reservado" en la tarjeta del lote» y «"—" lleva rótulo; solo lo que no pinta
+    nada queda sin él». R56 dice que los rótulos se pintan «también cuando el valor se pinta como "—"».
+    La decisión está anotada como fila m8.
+  - Tests nuevos de R55, en `product-cards.test.tsx`:
+    - la tarjeta del lote no tiene ni texto «Reservado» ni `product-batch-row-reserved`, y sus rótulos
+      son exactamente `['Existencia', 'Disponible', 'Costo']`;
+    - con costo nulo, el producto y el lote pintan «Costo —» con rótulo y sin el testid de la cifra;
+    - `qtyAlert`, que no pinta nada en la sub-fila, queda sin rótulo.
+  - Test nuevo de R56, en `batch-history.test.tsx`: un asiento con los cuatro valores nulos pinta cada
+    rótulo seguido de «—».
+  - Los tests afirman lo que dicen R55 y R56.
+- [x] **Clave `reserved` quitada:** no rompe nada (grep, tipos y tests en verde).
+- [x] **m7.** F3 dice ahora `unitCost` (y explica por qué) y F5 dice el `color-mix` opaco.
+- [x] **m10.** T7c pasa a «sustituida por T8h» y T8h queda `[ ]` hasta que `gate-completo` salga en verde.
+  Es la forma correcta de que la casilla refleje el estado real.
+- [x] **m9.** Anotado en `a97b7e5c`; no se reescribe la historia.
+
+### Hallazgos
+
+- **menor m11:** `design.md > F3` sigue listando `reserved` «Reservado» entre los textos de
+  `PRODUCT_CARD_LABELS`, y `f392d537` quitó esa clave. Es solo texto: hay que quitar `reserved` de esa
+  enumeración la próxima vez que se toque el spec. No bloquea.
+- Ningún bloqueante.
+
+### Veredicto (vuelta 3)
+
+**OK.** B2 está resuelto. m7, m8 y m10 están recogidos en el spec y en los tests, y la verificación
+acotada sale en verde. Queda pendiente, fuera de esta revisión, que `gate-completo` salga en verde en
+el PR para cerrar T8h.
