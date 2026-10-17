@@ -541,3 +541,29 @@ pnpm exec vitest run guard
  Test Files  80 passed (80)
       Tests  1096 passed | 20 skipped (1116)
 ```
+
+## Vuelta 1 de review (frontend_dev, 2026-10-17)
+
+Archivos modificados:
+- `app/globals.css` (M1: los dos comentarios ya no citan la ficha)
+- `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx` (m1: la tarjeta «Revisa antes de comenzar» solo con `canStart`)
+- `app/(private)/asignacion/components/operator-side-panels.tsx` (m2: panel del teléfono, ≤ 560 px, en `bottom-[calc(140px+safe-area)]` y `max-h-[calc(100dvh-338px)]`; antes 132 px y 330 px)
+- `tests/unit/asignaciones-ui/packing-order-screen.test.tsx` (caso nuevo)
+- `tests/unit/paridad/__snapshots__/asignacion-acondicionamiento-paridad.test.tsx.snap` (solo «en empaque por otra persona»: sin la tarjeta)
+
+Mapa: R17 (empaque, a nombre de otro) → `packing-order-screen.test.tsx` «R17: a nombre de otra persona no se pinta «Revisa antes de comenzar»»; paridad «R11 R13 R24 — en empaque por otra persona».
+
+Citas `QC-<n>`/`R<n>` en líneas `+` de `app/` y `components/` contra `origin/dev`: 0.
+
+Salida:
+```
+pnpm run typecheck   -> tsc --noEmit (sin errores)
+pnpm run lint        -> ✖ 10 problems (0 errors, 10 warnings)
+pnpm exec vitest related --run <4 archivos>
+ Test Files  1 failed | 53 passed (54)   (snapshot de paridad, cambio esperado por m1; actualizado)
+pnpm exec vitest run paridad + packing-order-screen
+ Test Files  2 passed (2)
+      Tests  122 passed (122)
+```
+
+Veredicto: M1, m1 y m2 resueltos; typecheck, lint y tests relacionados en verde.

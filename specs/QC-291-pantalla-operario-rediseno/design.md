@@ -33,7 +33,7 @@ ejecución», «columna lateral», «botón flotante», «equipo de acondicionam
 | `StepDocumentView` | `components/shared/step-reader/step-document-view.tsx` | Párrafos y comprobaciones | 2. Prop opcional `variant` |
 | `OrderExecutionCollapsibleCard` | `app/(private)/asignacion/[id]/components/order-execution-collapsible-card.tsx` | Tarjeta plegable de cada sección | 2. Prop opcional `tone`; se mueve a `app/(private)/asignacion/components/` (ver §3.4) |
 | `OrderExecutionLines` | `app/(private)/asignacion/[id]/components/order-execution-lines.tsx` | Materiales con selector de unidad | 2. Estado de unidad controlable desde fuera (ver §3.5) |
-| `OrderExecutionTools` | `app/(private)/asignacion/[id]/components/order-execution-tools.tsx` | Lista de herramientas | 1. Tal cual |
+| `OrderExecutionTools` | `app/(private)/asignacion/[id]/components/order-execution-tools.tsx` | Lista de herramientas | 2. Se extiende: prop opcional `label` (pone `aria-label` y no pinta su título, porque lo da la tarjeta); el id del título sale de `useId()` en lugar del fijo `order-execution-tools-heading`, que se repetía con el panel abierto, y el archivo pasa a `'use client'`. Sin `label` se ve igual que hoy |
 | `OrderExecutionToolsPanel` | `app/(private)/asignacion/[id]/components/order-execution-tools-panel.tsx` | Hoy compone las dos tarjetas | Se sustituye por `OperatorSidePanels`; el archivo se borra |
 | `ConditioningTeamList` | `app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-team-list.tsx` | Sección Equipo | 2. Avatar, «Personas», contador por grupo y `actorId` opcional |
 | `groupResponsiblesByOrigin` | `lib/shared/ui/responsible-groups.ts` | Agrupado del equipo | 1. Tal cual, sin reordenar (ver §3.6) |
@@ -102,6 +102,7 @@ requisito, sin reescribirlo (T12):
 | `specs/QC-195-envases-del-pedido-como-productos` R44 | La pantalla de empaque **y la de ejecución** nombran los envases de cada línea | Solo la de empaque. La de ejecución (fabricación) ya no muestra la presentación. Se borra la comprobación «R44: la ejecución nombra los envases» de `e2e/envases-del-pedido.spec.ts:624-635`; la de empaque (`:671`) se queda | D11 |
 | `specs/QC-265-rediseno-operario` R23 | Cabecera con «Pedido … · Presentación: <reparto>» | «Cantidad …», sin presentación (R2) | D11 |
 | `specs/QC-265-rediseno-operario` R29, R31 y R34 | El pie pinta siempre los dos botones; los que no aplican, deshabilitados | Un botón según el estado (R8, R10) y, sin acción posible, ningún botón y una línea con el motivo (R33) | D12 |
+| `specs/QC-269-layout-operario` R4, R5 y R6 | Pie fijo y desplazamiento de la página; el panel «Herramientas / Materiales» sin desplazamiento propio | Pie en flujo dentro del marco y desplazamiento solo en la zona central (R1); a 834 y 390 px el panel flotante tiene desplazamiento propio si no cabe (R31). Las aserciones de QC-269 R4, R5 y R6 en `e2e/operario-rediseno.spec.ts` se reescriben a esa conducta | Review vuelta 1, M3 (2026-10-17) |
 
 QC-265 R37, la cuenta dentro del botón, **no** se enmienda (D13).
 
@@ -243,6 +244,7 @@ export type OperatorSection = {
 
 export type OperatorSidePanelsProps = {
   readonly sections: readonly OperatorSection[];  // ya en orden R20, sin las vacías (R21)
+  readonly columnTestId?: string;  // testid del aside; fabricación pasa `order-execution-materials`, que leen los E2E
 };
 
 /** Devuelve las dos mitades: la columna y la capa flotante. */
@@ -263,6 +265,8 @@ export function useOperatorSidePanels(props: OperatorSidePanelsProps): {
   - El panel es un `Dialog` controlado (`open = sección activa`) con `DialogContent
     showCloseButton={false}` y `className` propio:
     - anclado a la derecha y por encima del pie (`right-[88px] bottom-[132px]`, `w-[min(380px,…)]`);
+      a 560 px o menos sube a `bottom-[calc(140px+safe-area)]` con `max-h-[calc(100dvh-338px)]`, para no
+      pisar el pie de fabricación, que a 390 px mide 134 px (review vuelta 1, m2);
     - por debajo de 560 px, `inset-x-4` (R30).
   - Cabecera con `DialogTitle`, el contador y un `DialogClose` de 44 px con `aria-label` «Cerrar»
     (R28).

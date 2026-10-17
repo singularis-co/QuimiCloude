@@ -168,7 +168,7 @@
   --avatar-6: oklch(0.92 0.05 0);
   --avatar-6-text: oklch(0.42 0.11 0);
   --sidebar-muted-foreground: oklch(0.78 0.03 195);
-  /* Secciones de la pantalla del operario (QC-291 R20, R27). */
+  /* Secciones de la pantalla del operario. */
   --section-materials: oklch(0.57 0.15 55);
   --section-tools: oklch(0.55 0.15 255);
   --section-team: oklch(0.54 0.13 160);
@@ -245,7 +245,7 @@
   --avatar-6: oklch(0.34 0.05 0);
   --avatar-6-text: oklch(0.92 0.05 0);
   --sidebar-muted-foreground: oklch(0.72 0.025 195);
-  /* Secciones de la pantalla del operario (QC-291 R20, R27). */
+  /* Secciones de la pantalla del operario. */
   --section-materials: oklch(0.68 0.14 60);
   --section-tools: oklch(0.64 0.14 255);
   --section-team: oklch(0.64 0.12 160);

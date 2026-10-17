@@ -1120,6 +1120,13 @@ describe('QC-291 — el empaque con la cabecera, el pie y la columna nuevos', ()
     expect(screen.queryByTestId(PACKING_ORDER_NOT_STARTED_TESTID)).toBeNull();
   });
 
+  it('R17: a nombre de otra persona no se pinta «Revisa antes de comenzar»', () => {
+    pintar(deOtro({ packingSteps: DOS_PASOS }));
+
+    expect(screen.queryByTestId(PACKING_ORDER_NOT_STARTED_TESTID)).toBeNull();
+    expect(screen.queryByText('Revisa antes de comenzar')).toBeNull();
+  });
+
   it.each([
     ['sin comenzar', () => fila()],
     ['comenzado', () => propio()],

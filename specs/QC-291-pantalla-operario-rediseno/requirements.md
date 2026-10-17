@@ -137,6 +137,9 @@ la pantalla está comenzada por el actor y pinta `StepReader` con al menos un pa
   la tarjeta «Revisa antes de comenzar» con el texto que explica qué pasa al comenzar en esa
   fase. DONDE la pantalla conozca los pasos antes de comenzar, que hoy es solo fabricación, la
   tarjeta DEBE decir cuántos pasos tiene la receta. La tarjeta NO DEBE listar los pasos.
+  > **Aclaración (2026-10-17, review vuelta 1, m1).** «No comenzada por el actor» se lee como «el
+  > actor puede comenzarla»: la tarjeta sale solo con `canStart`. No sale con el pedido en curso a
+  > nombre de otra persona, ni en `TERMINADO` o `ENTREGADO`.
 - **R18.** `StepReader` en `mode="lectura"` y cualquier uso que no pase las props nuevas DEBEN
   comportarse exactamente igual que hoy. Sus tests actuales siguen verdes sin cambios.
 

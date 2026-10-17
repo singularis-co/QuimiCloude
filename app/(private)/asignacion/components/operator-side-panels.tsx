@@ -196,7 +196,7 @@ export function useOperatorSidePanels({
               // El marco ocupa toda la ventana, así que sus cortes de ancho coinciden con los de
               // la ventana aunque el panel se pinte fuera de él, en el portal.
               'top-auto right-[88px] bottom-[calc(132px+env(safe-area-inset-bottom))] left-auto flex max-h-[calc(100dvh-300px)] w-[min(380px,calc(100%-104px))] max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0 sm:max-w-none',
-              'max-[560px]:inset-x-4 max-[560px]:max-h-[calc(100dvh-330px)] max-[560px]:w-auto',
+              'max-[560px]:inset-x-4 max-[560px]:bottom-[calc(140px+env(safe-area-inset-bottom))] max-[560px]:max-h-[calc(100dvh-338px)] max-[560px]:w-auto',
             )}
           >
             <div

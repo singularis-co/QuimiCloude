@@ -423,7 +423,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
             />
           ) : null}
 
-          {canFinish ? null : (
+          {canStart ? (
             <Card
               className="items-start gap-3 rounded-2xl border border-dashed border-input p-6 ring-0"
               data-testid={PACKING_ORDER_NOT_STARTED_TESTID}
@@ -431,7 +431,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
               <h3 className="text-lg font-semibold">{PACKING_ORDER_TEXTS.startTitle}</h3>
               <p className="text-base text-muted-foreground">{PACKING_ORDER_TEXTS.startBody}</p>
             </Card>
-          )}
+          ) : null}
 
           {showsPackingSteps ? (
             <div data-testid={PACKING_ORDER_STEPS_TESTID}>

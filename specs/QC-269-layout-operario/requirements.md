@@ -56,13 +56,28 @@ entero por encima del pie fijo el borde inferior del panel «Herramientas / Mate
 material, sea cual sea el número de materiales de la receta, tanto con la pantalla en dos columnas
 (1440 × 900) como en una (390 × 844).
 
+> **Enmienda (2026-10-17, QC-291 R1, R31).** El pie ya no es fijo: va en flujo al final del marco y
+> solo se desplaza la zona central (`operator-scroll`), no la página. A 1440 px el panel es la columna
+> lateral de 320 px; a 834 y 390 px es un panel flotante que se abre con su botón. Lo que se exige es
+> que el último material quede a la vista sin que lo tape el pie. Detalle en
+> `specs/QC-291-pantalla-operario-rediseno/design.md > 1.1`.
+
 **R5.** CUANDO el operario desplaza la pantalla de ejecución hasta el final, el sistema DEBE mostrar
 entero por encima del pie fijo el último elemento del paso en curso, sea cual sea su número de
 elementos, en los dos anchos de R4.
 
+> **Enmienda (2026-10-17, QC-291 R1).** «Por encima del pie fijo» pasa a ser «por encima del pie del
+> marco», y el desplazamiento es el de la zona central (`operator-scroll`), no el de la página.
+> Detalle en `specs/QC-291-pantalla-operario-rediseno/design.md > 1.1`.
+
 **R6.** El sistema NO DEBE dar al panel «Herramientas / Materiales» un desplazamiento propio, y DEBE
 mantener el pie del paso a paso anclado al borde inferior de la ventana: todo el contenido del panel
 se alcanza con el desplazamiento de la página.
+
+> **Enmienda (2026-10-17, QC-291 R1, R31).** La página ya no se desplaza: solo lo hace la zona
+> central. El panel flotante (834 y 390 px) sí tiene desplazamiento propio cuando su contenido no
+> cabe (QC-291 R31), y el pie sigue abajo, ahora en flujo dentro del marco. Detalle en
+> `specs/QC-291-pantalla-operario-rediseno/design.md > 1.1`.
 
 **R7.** MIENTRAS la pantalla de empaque muestra el paso a paso y pinta dos columnas, CUANDO el
 empacador la desplaza hasta el final, el sistema DEBE mostrar entera por encima del pie fijo la
