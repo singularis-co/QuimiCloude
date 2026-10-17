@@ -34,12 +34,15 @@ export const ADMINISTRATOR_FIELD_LABELS: Readonly<Record<AdministratorFieldName,
 
 export const ADMINISTRATOR_BIRTH_DATE_PLACEHOLDER = 'aaaa-mm-dd';
 
-// La fecha de nacimiento va marcada aunque el tablero no lo haga: el servidor la exige.
+// Fecha de nacimiento, Teléfono y Número de documento van marcados aunque el tablero no lo
+// haga: el servidor los exige.
 const REQUIRED_FIELDS: ReadonlySet<AdministratorFieldName> = new Set([
   'firstNames',
   'lastNames',
   'birthDate',
   'email',
+  'phone',
+  'documentNumber',
   'username',
 ]);
 

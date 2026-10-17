@@ -117,19 +117,23 @@ describe('AdministratorFields', () => {
     expect(vacio.get('birthDate')).toBe('');
   });
 
-  it('R17: marca como obligatorios Nombres, Apellidos, Fecha de nacimiento, Correo y Nombre de usuario', () => {
+  it('R17: marca como obligatorios Nombres, Apellidos, Fecha de nacimiento, Correo, Teléfono, Número de documento y Nombre de usuario', () => {
     montar();
 
-    for (const campo of ['firstNames', 'lastNames', 'email', 'username'] as const) {
-      expect(screen.getByTestId(administratorFieldTestId(PREFIJO, campo))).toHaveAttribute(
-        'aria-required',
-        'true',
-      );
-    }
-    for (const campo of ['phone', 'documentNumber'] as const) {
-      expect(screen.getByTestId(administratorFieldTestId(PREFIJO, campo))).not.toHaveAttribute(
-        'aria-required',
-      );
+    const obligatorios = [
+      'firstNames',
+      'lastNames',
+      'email',
+      'phone',
+      'documentNumber',
+      'username',
+    ] as const;
+    for (const campo of obligatorios) {
+      const control = screen.getByTestId(administratorFieldTestId(PREFIJO, campo));
+      expect(control, campo).toHaveAttribute('aria-required', 'true');
+      expect(control, campo).not.toHaveAttribute('required');
+      const etiqueta = screen.getByText(ADMINISTRATOR_FIELD_LABELS[campo]);
+      expect(etiqueta.querySelector('[aria-hidden="true"]')?.textContent, campo).toBe('*');
     }
     const fecha = screen.getByText(ADMINISTRATOR_FIELD_LABELS.birthDate);
     expect(fecha.querySelector('[aria-hidden="true"]')?.textContent).toBe('*');
