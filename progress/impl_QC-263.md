@@ -1790,3 +1790,72 @@ reescribe la historia: queda anotado aquí.
 La cita «(R59)» del comentario de `import-preview-summary.tsx` (B2) se quita en el mismo commit
 `fix(QC-263)` que lleva esta nota. Tras ese cambio, ninguna línea añadida en `app/`, `lib/` ni `components/`
 cita `R<n>`, `QC-<n>` ni `design.md`.
+
+## Vuelta 2: R55/R56 (m7, m8, m10) — 2026-10-17 · frontend_dev
+
+Spec ajustado en `f4dbbfb1` (R55: la tarjeta del lote rotula «Existencia», «Disponible», «Costo», sin
+«Reservado»; una cifra «—» lleva su rótulo. R56: los rótulos del historial también con «—»). El código
+ya lo cumplía (`withCardFieldLabel` solo deja sin rótulo un `null`; `EMPTY_MARK` sí lo lleva). m7 y m10
+no tocan frontend.
+
+### Archivos
+
+- `app/(private)/inventario/components/product-columns.tsx`: se quita la clave `reserved` de
+  `PRODUCT_CARD_LABELS`, sin uso en producción (m8, decisión del humano: sin «Reservado» en la
+  tarjeta del lote). No cambia nada visible: sin snapshot de paridad ni E2E que regenerar.
+- `tests/unit/inventario/product-cards.test.tsx`:
+  - en «cada cifra lleva delante su rotulo», `PRODUCT_CARD_LABELS` ya no tiene `reserved`;
+  - en «la tarjeta del lote rotula…», `qtyAlert` (que no pinta nada) no lleva rótulo;
+  - nuevo «R55 — la tarjeta del lote no pinta «Reservado», ni rotulo ni cifra»: ni texto
+    «Reservado» ni `product-batch-row-reserved`, y los `[data-card-label]` de la tarjeta son
+    exactamente `Existencia, Disponible, Costo`;
+  - nuevo «R55 — una cifra vacia pintada como «—» lleva su rotulo…»: con `canSeeCost`, producto con
+    `averageUnitCost: null` y lote con `unitCost: null`, el campo `averageUnitCost` de las dos
+    tarjetas lleva el rótulo «Costo» y se lee «Costo —», sin el `data-testid` de la cifra.
+- `tests/unit/inventario/batch-history.test.tsx`: nuevo «R56 — cada rotulo del asiento sale tambien
+  cuando todo su valor es «—»»: asiento con `previousStock`, `countedStock`, `reason` y
+  `orderNumberText` a `null`; cada campo lleva su `[data-card-label]` («Existencia anterior», «Total
+  contado», «Motivo», «Pedido») y se lee `<rótulo> —`, sin los `batch-history-entry-*`.
+
+### Mapa
+
+- R55 → `product-cards.test.tsx` «R55 — la tarjeta del lote no pinta «Reservado»…», «R55 — una cifra
+  vacia pintada como «—» lleva su rotulo…», «R55 — la tarjeta del lote rotula existencia…».
+- R56 → `batch-history.test.tsx` «R56 — cada rotulo del asiento sale tambien cuando todo su valor es «—»».
+
+### Salida real
+
+```
+pnpm exec vitest run tests/unit/inventario/product-cards.test.tsx tests/unit/inventario/batch-history.test.tsx
+ Test Files  2 passed (2)
+      Tests  58 passed (58)
+
+pnpm run typecheck            -> tsc --noEmit, sin errores
+pnpm run lint                 -> exit 0, ✖ 10 problems (0 errors, 10 warnings), todos ajenos (no-unused-vars en otros módulos)
+
+pnpm exec vitest related --run app/(private)/inventario/components/product-columns.tsx tests/unit/inventario/product-cards.test.tsx tests/unit/inventario/batch-history.test.tsx
+ Test Files  38 passed (38)
+      Tests  720 passed (720)
+
+pnpm exec vitest run guard
+ Test Files  81 passed (81)
+      Tests  1106 passed | 20 skipped (1126)
+
+pnpm exec vitest run product-route-contract scope unit-cost-visibility product-type-column (tests/unit/inventario)
+ Test Files  4 passed (4)
+      Tests  51 passed (51)
+
+pnpm exec vitest run tests/unit/inventario tests/unit/paridad tests/unit/marca
+ Test Files  1 failed | 170 passed (171)
+      Tests  1 failed | 2771 passed | 5 skipped (2777)
+ FAIL adjust-batch-dialog.test.tsx > R9 — con el lote sobre-reservado… (toastExito llamado 0 veces, por tiempo bajo carga)
+pnpm exec vitest run tests/unit/inventario/adjust-batch-dialog.test.tsx   (reintento aislado)
+ Test Files  1 passed (1)
+      Tests  37 passed (37)
+```
+
+El rojo del acotado es intermitente y ajeno: `adjust-batch-dialog` no usa `product-columns.tsx` ni
+`PRODUCT_CARD_LABELS`, y pasa entero al correrlo solo. Paridad y marca en verde, sin regenerar snapshot.
+
+Veredicto: R55 y R56 cubiertos por tests en verde; el único cambio de código es quitar la clave
+`reserved`, que no se usaba.

@@ -472,6 +472,40 @@ describe('R21, R56 — fecha a la derecha y rotulos de la tarjeta del asiento', 
     expect(etiquetaEnTabla).toHaveClass('[table_&]:hidden');
     expect(etiquetaEnTabla?.closest('table')).not.toBeNull();
   });
+
+  it('R56 — cada rotulo del asiento sale tambien cuando todo su valor es «—»', async () => {
+    const vacio = asiento({
+      id: 'vacio-1',
+      kind: 'opening',
+      quantity: '20',
+      previousStock: null,
+      countedStock: null,
+      reason: null,
+      orderNumberText: null,
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [vacio] });
+    abrir();
+
+    const card = await tarjetaDe(vacio);
+    const esperados: Record<string, string> = {
+      previousStock: 'Existencia anterior',
+      countedStock: 'Total contado',
+      reason: 'Motivo',
+      order: 'Pedido',
+    };
+    for (const [columna, texto] of Object.entries(esperados)) {
+      const etiqueta = rotuloDe(card, columna);
+      expect(etiqueta, columna).not.toBeNull();
+      expect(etiqueta?.textContent?.trim(), columna).toBe(texto);
+      expect(within(card).getByTestId(`data-table-card-field-${columna}`), columna).toHaveTextContent(
+        `${texto} ${EMPTY_MARK}`,
+      );
+    }
+    expect(within(card).queryByTestId('batch-history-entry-previous-stock')).toBeNull();
+    expect(within(card).queryByTestId('batch-history-entry-counted-stock')).toBeNull();
+    expect(within(card).queryByTestId('batch-history-entry-reason')).toBeNull();
+    expect(within(card).queryByTestId('batch-history-entry-order')).toBeNull();
+  });
 });
 
 describe('movementReasonLabel', () => {

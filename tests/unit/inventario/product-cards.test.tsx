@@ -300,8 +300,8 @@ describe('cada producto en su tarjeta', () => {
       qtyAlert: 'Alerta',
       available: 'Disponible',
       unitCost: 'Costo',
-      reserved: 'Reservado',
     });
+    expect(PRODUCT_CARD_LABELS).not.toHaveProperty('reserved');
     expect(rotulo(campo(card, 'presentationName'))).toBeNull();
   });
 
@@ -479,8 +479,40 @@ describe('las sub-filas de lote salen como tarjetas justo detras de la del produ
       expect(within(campo(card, columnId)).getByTestId(testId).textContent, columnId).toBe(cifra);
     }
     expect(campo(card, 'qtyAlert')).toBeEmptyDOMElement();
+    expect(rotulo(campo(card, 'qtyAlert'))).toBeNull();
     expect(within(card).queryByTestId('data-table-card-field-reserved')).toBeNull();
     expect(within(card).queryByTestId('product-batches-card-toggle')).toBeNull();
+  });
+
+  it('R55 — la tarjeta del lote no pinta «Reservado», ni rotulo ni cifra', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote()] });
+    const user = setupUser();
+    montar();
+
+    await desplegarEnTarjeta(user);
+    const card = await screen.findByTestId(`data-table-card-${ACIDO.id}--batch-batch-1`);
+
+    expect(within(card).queryByText(/Reservado/)).toBeNull();
+    expect(within(card).queryByTestId('product-batch-row-reserved')).toBeNull();
+    const rotulos = Array.from(card.querySelectorAll('[data-card-label]')).map((el) => el.textContent?.trim());
+    expect(rotulos).toEqual(['Existencia', 'Disponible', 'Costo']);
+  });
+
+  it('R55 — una cifra vacia pintada como «—» lleva su rotulo en la tarjeta del lote y en la del producto', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote({ unitCost: null })] });
+    const user = setupUser();
+    montar(TODOS, [producto({ averageUnitCost: null })]);
+
+    const card = tarjeta(ACIDO.id);
+    expect(rotulo(campo(card, 'averageUnitCost'))?.textContent?.trim()).toBe('Costo');
+    expect(campo(card, 'averageUnitCost')).toHaveTextContent(/^Costo —$/);
+    expect(within(card).queryByTestId('product-cost')).toBeNull();
+
+    await desplegarEnTarjeta(user);
+    const sub = await screen.findByTestId(`data-table-card-${ACIDO.id}--batch-batch-1`);
+    expect(rotulo(campo(sub, 'averageUnitCost'))?.textContent?.trim()).toBe('Costo');
+    expect(campo(sub, 'averageUnitCost')).toHaveTextContent(/^Costo —$/);
+    expect(within(sub).queryByTestId('product-batch-row-cost')).toBeNull();
   });
 
   it('R55 — la tarjeta de estado de lotes no lleva ningun rotulo', async () => {

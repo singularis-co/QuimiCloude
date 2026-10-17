@@ -136,7 +136,6 @@ export const PRODUCT_CARD_LABELS = {
   qtyAlert: 'Alerta',
   available: 'Disponible',
   unitCost: 'Costo',
-  reserved: 'Reservado',
 } as const;
 
 /** Encabezado de la columna de imagen. Constante para que ningun test dependa del literal. */
