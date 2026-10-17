@@ -144,3 +144,114 @@ del contenido del diff (entre ellos están `pdf-converter`, `pedidos-convencione
 y ninguna regla del perfil rota. Pero no se puede mergear sobre `origin/dev` sin conflictos, y el
 spec contradice lo que dev ya trajo sobre «Costo» y «Presentación». Para la vuelta 2: re-enmienda
 del spec (H4), integración de dev y m1 a m3. H1 a H3, H5 y H6 las decide el humano.
+
+## Vuelta 2 (acotada a 774a293c..37ebaca5)
+
+Rama `feature/QC-263-rediseno-inventario`, HEAD `37ebaca5`. Tras `git fetch`, `origin/dev` es
+`aa1ed9d7`, que es también el merge-base: la rama está **0 commits por detrás** y 29 por delante.
+Lo revisado: la enmienda 2 del spec (`cef9ba32`: R54–R59 nuevos; R6, R13, R15, R21, R32, R47, R53 y
+R57 cambiados; H1–H6 y P23–P27), el merge T8a (`9f7e7b07`) y T8b–T8h (`82340ef4`, `7c085b7a`,
+`cba2eb6e`, `e8c41a4b`, `197f7f57`, `37ebaca5`). MCP del grafo: no se usó; bastaron Grep/Read y `git show`.
+
+### Verificación ejecutada (salida propia)
+
+| Qué | Resultado |
+| --- | --- |
+| `git rev-list --count HEAD..origin/dev` | 0 (merge-base = `origin/dev`): no puede haber conflictos |
+| `pnpm run typecheck` | sin errores |
+| `pnpm run lint` | 0 errores; 10 warnings ajenos al diff, los mismos de la vuelta 1 |
+| `pnpm exec vitest related --run <63 archivos de app/ y tests/ del diff>` | 60 archivos: 59 en verde y 1 rojo de archivo, `tests/unit/identity/session-once-per-request-render.test.tsx`, que solo sale con carga. Solo, pasa 12/12. 1187 passed, 15 skipped. No es del diff |
+| `pnpm exec vitest run guard` | 81 archivos, 1106 passed, 20 skipped |
+| Barrido de tests que leen del disco y nombran inventario o `e2e/` (135 archivos fuera de guardias) | 134 archivos en verde, 2814 passed, 92 skipped, 0 rojos. `tablas-marca`, `product-route-contract` y `scope` incluidos. El rojo de `order-columns` que anotó T8a ya no aparece |
+| `pnpm exec playwright test e2e/inventario-rediseno.spec.ts --project=chromium` | **15 passed** (50 s) |
+
+### Checklist
+
+- [x] **B1 resuelto.** La rama está al día con `origin/dev`. Los seis conflictos de T8a se
+  resolvieron según F1, como se lista en la bitácora. El spec se re-enmendó contra lo que trajo dev
+  (H4: «Costo unitario» solo con `canViewUnitCosts`, en moneda con unidad, exacto en `title`, al final;
+  sin «Presentación» en «Producto»).
+- [x] **Trazabilidad R1–R59.** Comprobado por título de test en cada archivo de `tasks.md > Trazabilidad`.
+  - Cada R nuevo o cambiado tiene al menos un test unitario y un caso E2E con su número: R54 (`product-batch-rows`,
+    `product-cards`, `product-type-column`, E2E con Operador), R55 (`product-cards`,
+    `finished-stock-table`, E2E), R56 (`product-batches-panel`, `batch-history`, E2E), R57
+    (`product-batch-rows`, E2E con fondo, sangría, animación y movimiento reducido), R58 (`product-cards`,
+    E2E con 44 px) y R59 (`import-preview`, `inventory-import-screen`, E2E con marcador en `window`).
+  - Los tests de R55 que leí comparan texto, posición y contención del rótulo frente a la cifra:
+    no son tests vacíos.
+  - R1–R53 siguen como en la vuelta 1.
+- [~] **Tasks.** T8a–T8h están `[x]`. T7c sigue `[ ]` («se cierra dentro de T8h»), y T8h está `[x]` aunque su
+  *Hecho* pide `gate-completo` en verde en el PR, que aún no existe → m10.
+- [x] **`## Lo que ya existe`.** Presente. El diff no re-crea nada: `card-field-label.tsx` es interno de la
+  ruta y no existe ningún rótulo de tarjeta en `components/shared` ni en `CATALOGO.md`. Queda
+  justificado en A12 y como deuda D63.
+- [x] **Dependencias.** El diff contra `origin/dev` no toca `package.json`, `components/`, `lib/`,
+  `hooks/` ni `db/`.
+- [x] **Multiplataforma.** Ni `100vh`, ni `:hover` como única vía. Botones nuevos a 44 px:
+  `product-batches-card-toggle` e `inventory-import-choose-another`, los dos `touch`, medidos en el E2E.
+  Animación detrás de `motion-safe`.
+- [x] **Catálogo y diseño.** `DataTable` y `DataTableCards` sin cambios. Los tableros
+  `InventarioColumnasLotes*` y `ModalesInventario` están citados en F3–F6.
+- [x] **Aislamiento y seguridad.** Sin modelos ni consultas nuevas. El no-envío del costo es el de dev
+  (`unit-cost-visibility.test.ts`, en verde).
+- [ ] **Comentarios (punto 9):** un comentario nuevo cita un `R<n>` → B2.
+- [x] **Menores de la vuelta 1.**
+  - m1 resuelto (T8e: fechas `align: 'end'`).
+  - m2 resuelto (orden de dev en la tabla y del tablero en la tarjeta).
+  - m3 resuelto (D55 ampliada con los dos cierres locales y la X del `Sheet`).
+  - m4 resuelto (R55 y R56).
+  - m5 resuelto (R57).
+  - m6 sigue → m10.
+- [ ] `gate-completo` en CI: pendiente, no hay PR.
+
+### Desvíos anotados por el implementer
+
+| # | Desvío | Clasificación |
+| --- | --- | --- |
+| d1 | Clave `unitCost` en vez de `cost` en `PRODUCT_CARD_LABELS` | **Aceptado.** `product-route-contract.test.ts` prohíbe `.cost` en la ruta (el producto no tiene ese campo) y el texto visible es el mismo. Menor documental: F3 de `design.md` sigue diciendo `cost` → m7 |
+| d2 | `some` en vez de `filter(` para contar las columnas del esqueleto | **No es hallazgo.** El diseño no fija la forma y lo exige la misma guardia de ruta |
+| d3 | Columna `batchesToggle` justo después de la imagen, oculta en la tabla | **Aceptado.** F4 no fija la posición. Con `display:none` en `th` y `td`, su botón sale del orden de tabulación y su menú de cabecera no se ve. `pinnable: false`, y el divisor de la última columna no cambia. Así se respetan la caída fijada a la derecha y el caso de dev «Costo unitario justo antes de las acciones» |
+| d4 | «—» con rótulo en la tarjeta (alerta, costo, motivo, pedido…) | **Aceptado**, coincide con F3 («donde la celda devuelve `null` no hay rótulo»). Una raya sin rótulo no se entendería en la tarjeta. Pero el texto de R55 («sin rótulo donde la celda no pinta cifra») se puede leer al revés → m8, aclaración del spec |
+| d5 | Fondo `color-mix(in oklch, var(--muted) 55%, var(--card))` en vez de `bg-muted/55` en las celdas de sub-fila, solo en `PRODUCT_TABLE_SCOPE_CLASS` | **Aceptado, y es un arreglo correcto.** Es el valor del tablero y lo destapó el E2E: con `/55`, las celdas fijadas eran translúcidas al desplazar. R57 se cumple y `DataTable` no cambia. Menores: F5 de `design.md` sigue diciendo `bg-muted/55` → m7; el arreglo de producción va en un commit `test(...)` (`e8c41a4b`) → m9 |
+
+### Hallazgos
+
+#### BLOQUEANTE
+
+- **B2 — Comentario que cita un requisito en código de producción (perfil, punto 9).**
+  `app/(private)/inventario/importar/components/import-preview-summary.tsx:125`, añadido en `82340ef4`:
+  `/** «Elegir otro archivo»: vuelve al paso 1 sin importar nada (R59). */`. Para cumplirlo, quitar
+  «(R59)» (el resto del comentario puede quedarse). Es el único caso: busqué `QC-<n>`, `R<n>`,
+  `design.md` y «decisión cerrada» en todas las líneas de comentario añadidas en `app/`.
+
+#### menor
+
+- **m7 — `design.md` desfasado de lo implementado en dos puntos.** F3 nombra la clave `cost` (es
+  `unitCost`, d1) y F5 el fondo `bg-muted/55` (es el `color-mix` opaco, d5). Que spec_author corrija el texto.
+- **m8 — R55 dice dos cosas que el diseño y el tablero no hacen.**
+  - Incluye «Reservado» entre los rótulos de la tarjeta de sub-fila. Ni F3 («"Reservado" no sale en
+    su tarjeta; el tablero tampoco lo pinta») ni `InventarioColumnasLotesMovil` lo pintan, y la `meta`
+    no lo incluye. El implementer siguió el diseño y el tablero. Por eso `PRODUCT_CARD_LABELS.reserved`
+    no se usa en producción (solo lo afirma un test).
+  - «Sin rótulo donde la celda no pinta cifra» admite la lectura de d4.
+  - Para cumplirlo: spec_author ajusta el texto de R55 (quitar «Reservado» de la sub-fila y precisar
+    «donde la celda no pinta nada»), y el implementer quita la clave `reserved` sin uso o la deja si
+    el humano quiere «Reservado» en la tarjeta del lote.
+- **m9 — Commit con el tipo equivocado.** `e8c41a4b` es `test(QC-263)` pero cambia producción
+  (`product-table.tsx`, fondo opaco). Se anota; no hace falta reescribir la historia.
+- **m10 — T7c sigue `[ ]` y T8h está `[x]` sin su *Hecho*.** El *Hecho* de T8h es «`gate-completo` en
+  verde en el PR». Cerrar las dos cuando el CI salga verde, o desmarcar T8h hasta entonces.
+
+### Decisiones humanas pendientes
+
+- Ninguna nueva que bloquee. H1–H6 quedaron cerradas en la enmienda 2.
+- Solo m8 pide una palabra del humano: ¿«Reservado» va en la tarjeta del lote en teléfono? El
+  tablero y F3 dicen que no; R55, que sí. Si no va, es una corrección de texto del spec.
+
+### Veredicto (vuelta 2)
+
+**RECHAZADO** solo por B2: hay que quitar «(R59)» de un comentario. B1 está resuelto. Trazabilidad
+R1–R59 completa y verificación en verde: typecheck, lint, `vitest related`, guardias, barrido de
+disco y el E2E `inventario-rediseno` en Chromium (15/15). Los cinco desvíos del implementer quedan
+aceptados. La vuelta 3 puede limitarse al diff que arregle B2, con m7, m8 y m10 recogidos en el
+spec y en `tasks.md`.
