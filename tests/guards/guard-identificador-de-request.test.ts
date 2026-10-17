@@ -463,6 +463,29 @@ export const E2E_ESPERADOS = [
   // ficha, no ve la columna ni ninguna foto. No lee ni afirma nada sobre el identificador de
   // peticion ni sobre `reference`.
   'consulta-de-evidencia.spec.ts',
+  // Alta el 2026-10-16 (QC-166 R43, `specs/QC-166-area-del-maestro/design.md > 10`) por el MISMO
+  // motivo y en el MISMO sitio que las demas: la lista es CERRADA y darse de alta en ella es su
+  // punto de extension por diseno. El ancla NO se relaja -el archivo se nombra, uno a uno-. Lo que
+  // ejercita: el login del Maestro aterriza en `/maestro/empresas` con solo «Plataforma» en el menu,
+  // una pantalla del ERP le responde el 404 privado, un usuario de empresa recibe el 404 en
+  // `/maestro/empresas` sin ver «Plataforma», y el Maestro cierra sesion. No lee ni afirma nada sobre
+  // el identificador de peticion ni sobre `reference`.
+  'maestro-acceso.spec.ts',
+  // Alta el 2026-10-16 (QC-166 R44, `specs/QC-166-area-del-maestro/design.md > 10`) por el MISMO
+  // motivo. Lo que ejercita: el Maestro da de alta una empresa con su Administrador inicial, le
+  // cambia el pais y lo ve en la lista, la intenta dar de baja con un nombre que no coincide, la da
+  // de baja y la ve solo con «De baja», la reactiva y ve en el Historial el alta, la edicion que
+  // nombra «País», la baja y la reactivacion; la sesion abierta en esa empresa se corta en su
+  // siguiente peticion. No lee ni afirma nada sobre el identificador de peticion ni sobre
+  // `reference`.
+  'maestro-empresas.spec.ts',
+  // Alta el 2026-10-16 (QC-166 R45, `specs/QC-166-area-del-maestro/design.md > 10`) por el MISMO
+  // motivo. Lo que ejercita: el Maestro da de alta un Administrador eligiendo la empresa en el
+  // panel, lo edita, le reenvia el enlace (solo en la fila pendiente) y ve el aviso de correo
+  // enviado o fallido, lo da de baja porque no es el ultimo, y ve deshabilitada la baja del ultimo
+  // Administrador de la empresa. No lee ni afirma nada sobre el identificador de peticion ni sobre
+  // `reference`.
+  'maestro-administradores.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

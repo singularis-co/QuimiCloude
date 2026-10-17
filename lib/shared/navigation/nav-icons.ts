@@ -1,6 +1,7 @@
 import {
   Bell,
   Boxes,
+  Building2,
   ClipboardCheck,
   ClipboardList,
   Contact,
@@ -9,6 +10,7 @@ import {
   Package,
   Puzzle,
   Ruler,
+  ShieldUser,
   ShoppingCart,
   SquareUser,
   Truck,
@@ -53,4 +55,6 @@ export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   puzzle: Puzzle,
   ruler: Ruler,
   'square-user': SquareUser,
+  'building-2': Building2,
+  'shield-user': ShieldUser,
 };
