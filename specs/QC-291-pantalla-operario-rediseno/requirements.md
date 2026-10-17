@@ -53,6 +53,9 @@ Lo que NO entra:
 | 2026-10-16 | ¿Spec aprobado? | Sí, por el humano en F1.4, incluidas las enmiendas a QC-195 R44 y QC-265 (`design.md > 1.1`). |
 | 2026-10-16 | Bloqueo B1 del implementer: el ámbar y el verde claros no llegan a 4,5:1 (F2.1) | Se oscurecen manteniendo croma y tono: materiales `oklch(0.57 0.15 55)` (4,56) y equipo `oklch(0.54 0.13 160)` (4,57). El umbral de T3 sigue en 4,5:1. Tablero actualizado. |
 | 2026-10-16 | Bloqueo B2 del implementer: la lista cerrada de QC-125 R18 solo admite `step-reader.tsx` (F2.1) | Se amplía con `components/shared/step-reader/step-document-view.tsx` y `components/shared/step-reader/index.ts`. Enmienda QC-125; T12 anota la enmienda fechada en su spec. |
+| 2026-10-17 | Review vuelta 1, M2: E2E en rojo heredados de commits anteriores (envases-del-pedido, acondicionamiento, empaque, pedido-en-varias-presentaciones, datos-de-lote-en-acondicionamiento, recorrido-acondicionamiento) | Se arreglan los 6 en esta rama, actualizando los specs a la conducta vigente de `origin/dev`. No se anotan en el baseline. |
+| 2026-10-17 | Review vuelta 1, M3: QC-269 R4, R5 y R6 quedan contradichos | Se enmiendan, con notas fechadas bajo esos requisitos y una fila en `design.md > 1.1`. |
+| 2026-10-17 | Review vuelta 1, m1: la tarjeta «Revisa antes de comenzar» de empaque sale con el pedido a nombre de otra persona | Solo sale cuando el actor puede comenzar (`canStart`), igual que en acondicionamiento. R17 se aclara en ese sentido. |
 
 ## Requisitos (EARS)
 
