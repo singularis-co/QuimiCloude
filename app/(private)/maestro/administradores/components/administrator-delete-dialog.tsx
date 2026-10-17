@@ -1,5 +1,6 @@
 'use client';
 
+import { TrashIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
@@ -15,6 +16,7 @@ import {
 import { ADMINISTRATOR_DELETE_TEXTS, administratorDisplayName } from './administrator-labels';
 
 export const ADMINISTRATOR_DELETE_DIALOG_TESTID = 'administrator-delete-dialog';
+export const ADMINISTRATOR_DELETE_ICON_TESTID = 'administrator-delete-icon';
 export const ADMINISTRATOR_DELETE_MESSAGE_TESTID = 'administrator-delete-message';
 export const ADMINISTRATOR_DELETE_CONFIRM_TESTID = 'administrator-delete-confirm';
 export const ADMINISTRATOR_DELETE_DISMISS_TESTID = 'administrator-delete-dismiss';
@@ -64,6 +66,7 @@ export function AdministratorDeleteDialog({
       open={open}
       onOpenChange={onOpenChange}
       variant="destructive"
+      icon={{ glyph: TrashIcon, tone: 'danger', testId: ADMINISTRATOR_DELETE_ICON_TESTID }}
       texts={{
         title: ADMINISTRATOR_DELETE_TEXTS.title(name),
         description: ADMINISTRATOR_DELETE_TEXTS.description(name, company),

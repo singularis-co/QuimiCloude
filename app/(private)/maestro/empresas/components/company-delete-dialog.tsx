@@ -1,5 +1,6 @@
 'use client';
 
+import { TrashIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
@@ -19,6 +20,7 @@ import {
 import { COMPANY_DELETE_TEXTS } from './company-labels';
 
 export const COMPANY_DELETE_DIALOG_TESTID = 'company-delete-dialog';
+export const COMPANY_DELETE_ICON_TESTID = 'company-delete-icon';
 export const COMPANY_DELETE_MESSAGE_TESTID = 'company-delete-message';
 export const COMPANY_DELETE_CONFIRM_TESTID = 'company-delete-confirm';
 export const COMPANY_DELETE_DISMISS_TESTID = 'company-delete-dismiss';
@@ -129,6 +131,7 @@ export function CompanyDeleteDialog({ company, open, onOpenChange }: CompanyDele
       open={open}
       onOpenChange={onOpenChange}
       variant="destructive"
+      icon={{ glyph: TrashIcon, tone: 'danger', testId: COMPANY_DELETE_ICON_TESTID }}
       texts={{
         title: COMPANY_DELETE_TEXTS.title(company.name),
         description: COMPANY_DELETE_TEXTS.warning,

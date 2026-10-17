@@ -89,6 +89,15 @@ describe('el dialogo de baja', () => {
     expect(screen.queryByTestId('administrator-delete-last')).toBeNull();
   });
 
+  it('tablero: lleva el icono de papelera en tono danger, decorativo y delante del titulo', () => {
+    montar(DIANA);
+    const icono = screen.getByTestId('administrator-delete-icon');
+    expect(icono).toHaveAttribute('data-tone', 'danger');
+    expect(icono.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    const titulo = screen.getByRole('heading', { name: 'Dar de baja a Diana Mejía' });
+    expect(icono.compareDocumentPosition(titulo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('R39: confirmar manda solo el id; con exito cierra, avisa y refresca', async () => {
     deleteAdministratorActionMock.mockResolvedValue({ status: 'success' });
     const user = setupUser();

@@ -1,5 +1,6 @@
 'use client';
 
+import { MailIcon } from 'lucide-react';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
@@ -13,6 +14,7 @@ import {
 import { ADMINISTRATOR_RESEND_TEXTS, administratorDisplayName } from './administrator-labels';
 
 export const ADMINISTRATOR_RESEND_DIALOG_TESTID = 'administrator-resend-dialog';
+export const ADMINISTRATOR_RESEND_ICON_TESTID = 'administrator-resend-icon';
 export const ADMINISTRATOR_RESEND_MESSAGE_TESTID = 'administrator-resend-message';
 export const ADMINISTRATOR_RESEND_CONFIRM_TESTID = 'administrator-resend-confirm';
 export const ADMINISTRATOR_RESEND_DISMISS_TESTID = 'administrator-resend-dismiss';
@@ -53,6 +55,7 @@ export function AdministratorResendLinkDialog({
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
+      icon={{ glyph: MailIcon, tone: 'info', testId: ADMINISTRATOR_RESEND_ICON_TESTID }}
       texts={{
         title: ADMINISTRATOR_RESEND_TEXTS.title(name),
         description: (

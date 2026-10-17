@@ -1,4 +1,5 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
+import { TrashIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -217,5 +218,58 @@ describe('ConfirmDialog: descriptionPlacement', () => {
     );
 
     expect(sigue(screen.getByTestId('aside'), screen.getByTestId(MENSAJE))).toBe(true);
+  });
+});
+
+describe('ConfirmDialog: icon', () => {
+  it('sin icon el árbol no cambia y no hay media', () => {
+    const antes = arbolSinExtensiones();
+
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={TEST_IDS}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="form-wraps-all"
+        icon={undefined}
+      />,
+    );
+
+    expect(arbolAccesible()).toBe(antes);
+    expect(
+      screen.getByTestId(TEST_IDS.dialog).querySelector('[data-slot="alert-dialog-media"]'),
+    ).toBeNull();
+  });
+
+  it('con icon pinta el glifo decorativo en AlertDialogMedia, delante del título, con su tono', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={TEST_IDS}
+        icon={{ glyph: TrashIcon, tone: 'danger', testId: 'icono' }}
+      />,
+    );
+
+    const icono = screen.getByTestId('icono');
+    expect(icono).toHaveAttribute('data-slot', 'alert-dialog-media');
+    expect(icono).toHaveAttribute('data-tone', 'danger');
+    expect(icono).toHaveClass('size-11', 'bg-destructive-subtle', 'text-destructive-text');
+    const glifo = icono.querySelector('svg');
+    expect(glifo).toHaveAttribute('aria-hidden', 'true');
+    expect(glifo).toHaveClass('size-5');
+    const titulo = screen.getByRole('heading', { name: TEXTS.title });
+    expect(sigue(icono, titulo)).toBe(true);
+    // Decorativo: no cambia el nombre accesible del diálogo.
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleName(TEXTS.title);
+  });
+
+  it('sin tone usa el fondo neutro', () => {
+    render(<ConfirmDialog open texts={TEXTS} testIds={TEST_IDS} icon={{ glyph: TrashIcon, testId: 'icono' }} />);
+
+    const icono = screen.getByTestId('icono');
+    expect(icono).toHaveAttribute('data-tone', 'neutral');
+    expect(icono).toHaveClass('bg-muted');
   });
 });

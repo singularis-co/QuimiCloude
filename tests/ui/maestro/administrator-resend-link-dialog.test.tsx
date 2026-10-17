@@ -91,6 +91,15 @@ describe('el dialogo «Reenviar enlace»', () => {
     expect(within(dialogo).queryAllByRole('combobox')).toHaveLength(0);
   });
 
+  it('tablero: lleva el icono de correo en tono info, decorativo y delante del titulo', () => {
+    montar();
+    const icono = screen.getByTestId('administrator-resend-icon');
+    expect(icono).toHaveAttribute('data-tone', 'info');
+    expect(icono.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    const titulo = screen.getByRole('heading', { name: '¿Reenviar el enlace a Julián Castro?' });
+    expect(icono.compareDocumentPosition(titulo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('R46: confirmar manda un FormData con solo el id', async () => {
     resendActionMock.mockResolvedValue({ status: 'success', mail: 'sent' });
     const user = setupUser();

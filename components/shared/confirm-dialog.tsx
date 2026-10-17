@@ -1,5 +1,6 @@
 'use client';
 
+import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps, ReactElement, ReactNode } from 'react';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
@@ -11,12 +12,14 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import type { ErrorState } from '@/lib/modules/errores';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { cn } from '@/lib/utils';
 
 export type ConfirmDialogTexts = {
   readonly title: ReactNode;
@@ -73,6 +76,25 @@ export type ConfirmDialogErrorStyle = 'region' | 'inline';
  * `form-wraps-all`, dentro del form tras la cabecera.
  */
 export type ConfirmDialogDescriptionPlacement = 'header' | 'after-aside';
+
+export type ConfirmDialogIconTone = 'neutral' | 'danger' | 'warning' | 'info' | 'success';
+
+export type ConfirmDialogIcon = {
+  readonly glyph: LucideIcon;
+  /** Sin él, el fondo neutro de `AlertDialogMedia`. */
+  readonly tone?: ConfirmDialogIconTone;
+  readonly testId?: string;
+};
+
+// Recuadro de 44 px, radio 12 e icono de 20 px, con los fondos y tintas de los tonos del tablero.
+const ICON_BOX_CLASS = 'size-11 rounded-xl';
+const ICON_TONE_CLASS: Readonly<Record<ConfirmDialogIconTone, string>> = {
+  neutral: '',
+  danger: 'bg-destructive-subtle text-destructive-text',
+  warning: 'bg-warning-subtle text-warning-text',
+  info: 'bg-accent text-accent-foreground',
+  success: 'bg-success-subtle text-success-text',
+};
 
 const ERROR_REGION_CLASS = 'rounded-lg border border-destructive/40 p-3 text-sm text-destructive';
 const ERROR_INLINE_CLASS = 'text-sm text-destructive';
@@ -149,6 +171,8 @@ export type ConfirmDialogBodyBaseProps = {
   readonly aside?: ReactNode;
   /** Sin ella, la descripción va en la cabecera. */
   readonly descriptionPlacement?: ConfirmDialogDescriptionPlacement;
+  /** Icono decorativo delante del título; sin él la cabecera no cambia. */
+  readonly icon?: ConfirmDialogIcon;
   /** Dentro del form tras los campos ocultos; sin form, antes del pie. */
   readonly children?: ReactNode;
 };
@@ -178,6 +202,7 @@ export function ConfirmDialogBody({
   layout = 'error-before-form',
   aside,
   descriptionPlacement = 'header',
+  icon,
   children,
 }: ConfirmDialogBodyProps) {
   const pending = isPending === true;
@@ -191,6 +216,15 @@ export function ConfirmDialogBody({
 
   const header = (
     <AlertDialogHeader>
+      {icon === undefined ? null : (
+        <AlertDialogMedia
+          className={cn(ICON_BOX_CLASS, ICON_TONE_CLASS[icon.tone ?? 'neutral'])}
+          data-tone={icon.tone ?? 'neutral'}
+          data-testid={icon.testId}
+        >
+          <icon.glyph aria-hidden className="size-5" />
+        </AlertDialogMedia>
+      )}
       <AlertDialogTitle>{texts.title}</AlertDialogTitle>
       {descriptionInHeader ? description : null}
     </AlertDialogHeader>

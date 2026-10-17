@@ -111,6 +111,15 @@ describe('el dialogo de baja', () => {
     );
   });
 
+  it('tablero: lleva el icono de papelera en tono danger, decorativo y delante del titulo', async () => {
+    await impactoListo();
+    const icono = screen.getByTestId('company-delete-icon');
+    expect(icono).toHaveAttribute('data-tone', 'danger');
+    expect(icono.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    const titulo = screen.getByRole('heading', { name: `Dar de baja a ${VALLE.name}` });
+    expect(icono.compareDocumentPosition(titulo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('R24: sin impacto cargado «Dar de baja» sigue deshabilitado aunque haya texto', () => {
     impactMock.mockReturnValue(new Promise(() => {}));
     montar();
