@@ -113,7 +113,7 @@
     R5, R12, R16 y R17 del mapa (design § 7.1) pasan; quitar una clave de `ADDON_DETAILS` rompe el
     typecheck.
 
-- [ ] **T7 — Cierre** · depende de T6b
+- [x] **T7 — Cierre** · depende de T6b
   - Mapa `R<n> → test` en `progress/impl_QC-278-pantalla-modulos-por-empresa.md`.
   - Guardias (`pnpm exec vitest run guard`) y `./init.sh` en verde.
   - **Hecho:** las 25 filas del mapa tienen test que pasa; ningún componente de esta ficha en

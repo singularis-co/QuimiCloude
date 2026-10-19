@@ -231,7 +231,7 @@ describe('/maestro/empresas/[id]', () => {
     expect(notFoundMock).not.toHaveBeenCalled();
   });
 
-  it('R1 (QC-278): con tab=modulos el panel Módulos monta la pestaña con las cuatro props', async () => {
+  it('R30 (QC-166) / R1 (QC-278): con tab=modulos el panel Módulos monta la pestaña con las cuatro props', async () => {
     const arbol = await invocar(ID, { tab: 'modulos' });
     const panel = hijosDe(arbol).find(
       (nodo) => isValidElement(nodo) && (nodo.props as { role?: string }).role === 'tabpanel',
@@ -253,7 +253,7 @@ describe('/maestro/empresas/[id]', () => {
     });
   });
 
-  it('R1 (QC-278): la página no importa ni llama a getCompanyAddonsAction; la pide la pestaña', async () => {
+  it('R30 (QC-166) / R1 (QC-278): la página no importa ni llama a getCompanyAddonsAction; la pide la pestaña', async () => {
     await invocar(ID, { tab: 'modulos' });
     expect(getCompanyAddonsActionMock).not.toHaveBeenCalled();
     expect(readFileSync(join(DETALLE, 'page.tsx'), 'utf8')).not.toMatch(/getCompanyAddonsAction/);

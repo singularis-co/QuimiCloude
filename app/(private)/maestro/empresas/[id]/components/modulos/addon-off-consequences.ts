@@ -1,7 +1,8 @@
 import type { Addon, CompanyAddonsView } from '@/lib/modules/identity';
+import { ADDON_NAMES } from '@/lib/shared/ui/addon-names';
 
 const HIDDEN_REVIEWS = 'Las revisiones sin confirmar quedan ocultas hasta que lo vuelvas a prender.';
-const PDF_STOPS = 'Lectura de PDF con IA deja de funcionar aunque siga prendida, porque la necesita.';
+const PDF_STOPS = `${ADDON_NAMES.lectura_pdf} deja de funcionar aunque siga prendida, porque la necesita.`;
 
 // Solo los añadidos que descartan algo al apagarse; el resto lee `?? []`.
 const OFF_CONSEQUENCES: Readonly<Partial<Record<Addon, readonly string[]>>> = {

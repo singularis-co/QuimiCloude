@@ -293,3 +293,19 @@ Running 2 tests using 2 workers
 ### Veredicto
 
 T6b hecha. El E2E de T6 está en verde en los dos navegadores. Queda pendiente del humano la verificación manual a 390 y 768 px contra `MaestroEmpresaMovil.dc.html` y `MaestroEmpresaTablet.dc.html`.
+
+## Arreglos review v1 (frontend_dev + implementer, 2026-10-19)
+
+Fuente: `progress/review_QC-278.md` (OK, 0 mayores). Solo m3 y m4; m2 queda como está.
+
+- m3: `addon-off-consequences.ts` toma el nombre de `ADDON_NAMES.lectura_pdf` (vale «Lectura de PDF con IA»; sin cambio visible).
+- m4: `tests/ui/maestro/company-detail-page.test.tsx`, los dos casos reescritos por E5 se titulan «R30 (QC-166) / R1 (QC-278): …» (ambos cubren R1); el mapa de QC-166 sigue encontrando R30. Aserciones intactas.
+- `tasks.md`: T7 `[x]` (gate `./init.sh` verde del leader, 2026-10-19). T6 sigue `[ ]` hasta la verificación manual del humano.
+
+```
+pnpm exec vitest run tests/ui/maestro/company-detail-page.test.tsx tests/unit/maestro/addon-labels.test.ts tests/ui/maestro/addon-switch-list.test.tsx
+ Test Files  3 passed (3)
+      Tests  46 passed (46)
+npx tsc --noEmit -p .        0 errores (frontend_dev)
+npx eslint <los 2 archivos>  No issues found (frontend_dev)
+```
