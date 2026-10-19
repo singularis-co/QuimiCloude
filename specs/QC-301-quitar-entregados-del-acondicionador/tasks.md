@@ -11,7 +11,7 @@
 
 ## Tasks
 
-- [ ] **T1 — Dominio y fachada** (R1, R3, R6, R7)
+- [x] **T1 — Dominio y fachada** (R1, R3, R6, R7)
   - Código:
     - `assignment-views.ts`: sale `'acondicionados_entregados'` del tipo y del `push`, y se
       ajusta el JSDoc.
@@ -61,7 +61,7 @@
   - **Hecho:** pasan `pnpm exec playwright test e2e/acondicionamiento.spec.ts` y
     `pnpm exec playwright test e2e/operario-rediseno.spec.ts`.
 
-- [ ] **T5 [P] — Enmienda en QC-219** (trazabilidad)
+- [x] **T5 [P] — Enmienda en QC-219** (trazabilidad)
   - En `specs/QC-219-datos-de-lote-en-acondicionamiento/requirements.md`, bajo R20, va la nota:
     *«(Derogado por QC-301, 2026-10-19: el acondicionador ya no tiene «Entregados»; los
     `ENTREGADO` salen de sus vistas.)»*
