@@ -185,7 +185,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
 - [x] **T8b [P]. Toasts** (D11, R46). Test nuevo `tests/unit/recetas-ui/formulas-toasts.test.tsx` con
   `sonner` simulado: un único `toast.success` con su texto en cada uno de los seis éxitos y en la
   edición con versión por revisar; ninguno en error.
-- [ ] **T8c. Guardia** (D16, R44, R45). `tests/guards/guard-formulas-rediseno.test.ts`. *Hecho:*
+- [x] **T8c. Guardia** (D16, R44, R45). `tests/guards/guard-formulas-rediseno.test.ts`. *Hecho:*
   `pnpm exec vitest run guard` en verde y la guardia falla con una copia que importa `Badge` en la ruta.
 
 ## Tanda 9 — E2E (depende de todas)
