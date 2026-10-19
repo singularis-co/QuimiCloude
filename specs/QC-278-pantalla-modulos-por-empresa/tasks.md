@@ -37,7 +37,7 @@
     de 68 px (patrón de `CompanyHistorySkeleton`, `company-history-panel.tsx:207-224`).
   - **Hecho:** cubierto por el caso R3 de T5.
 
-- [ ] **T4 — `AddonSwitchList`** (R5–R18, R20–R24) · depende de T1
+- [x] **T4 — `AddonSwitchList`** (R5–R18, R20–R24) · depende de T1
   - `addon-switch-list.tsx` (`'use client'`), según design § 4.2–4.4: vista local inicializada con
     `initialView`, escritura única en vuelo, diálogo `ConfirmDialog` controlado con sus `testIds`,
     `ErrorAlert` por fila o bajo los botones, `toast.success`, aviso `Notice` de baja, rejilla
