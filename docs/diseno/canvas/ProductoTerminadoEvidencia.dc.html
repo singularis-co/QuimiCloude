@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ficha con evidencia</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.cl{display:inline-flex;align-items:center;gap:8px}
+.cl.col{flex-direction:column;align-items:flex-start;gap:4px}
+.vr{font-size:12px;color:var(--muted-fg);white-space:normal;max-width:220px}
+.bc{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;padding:0;list-style:none;font-size:13px;color:var(--muted-fg)}
+.bc a{color:var(--muted-fg);text-decoration:none;border-radius:4px}
+.bc a:hover{color:var(--fg);text-decoration:underline;text-underline-offset:4px}
+.demo{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 8px;border:1px dashed var(--border);border-radius:10px;font-size:12px;color:var(--muted-fg)}
+.demo-l{font-weight:600;margin:0 4px 0 8px}
+.demo-l:first-child{margin-left:0}
+.ev-cta{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.ev-dlg{max-height:calc(100% - 48px);overflow-y:auto}
+.ev-grp{display:flex;flex-direction:column;gap:4px}
+.ev-ro{display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid var(--border)}
+.ev-ro-hd{display:flex;align-items:center;gap:8px;font-size:13px}
+.ev-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-width:372px}
+.ev-tile{position:relative;aspect-ratio:1/1;min-width:0;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--muted);animation:qc-rise var(--d-s) var(--e-in) both;transition:border-color var(--d-i)}
+.ev-tile:hover{border-color:var(--primary)}
+.ev-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;text-align:center;font-size:12px;line-height:1.3;color:var(--fg)}
+.ev-ph .ic{color:var(--muted-fg)}
+.ev-view{position:absolute;inset:0;width:100%;height:100%;border:0;padding:0;background:transparent;cursor:zoom-in}
+.ev-view:focus-visible{outline:2px solid var(--primary);outline-offset:-4px;border-radius:12px}
+.ev-exp{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;text-align:center;font-size:12px;line-height:1.3;background:var(--w-bg);color:var(--w-fg)}
+.ev-n{position:absolute;left:8px;bottom:8px;min-width:24px;height:24px;padding:0 7px;border-radius:999px;background:color-mix(in oklch,var(--card) 90%,transparent);font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.ev-big{width:min(640px,80vw);aspect-ratio:4/3;border-radius:12px;background:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--fg);font-size:15px}
+.ev-big .ic{width:40px;height:40px;color:var(--muted-fg)}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="inventario" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="demo" role="toolbar" aria-label="Controles de demostración del tablero">
+          <span class="demo-l">Demo · Ver como:</span>
+          <sc-for list="{{ roles }}" as="m" hint-placeholder-count="2"><button class="{{ m.cls }}" type="button" aria-pressed="{{ m.on }}" onClick="{{ m.pick }}" style="min-height: 32px">{{ m.label }}</button></sc-for>
+          <span class="demo-l">Fotos:</span>
+          <sc-for list="{{ modes }}" as="m" hint-placeholder-count="4"><button class="{{ m.cls }}" type="button" aria-pressed="{{ m.on }}" onClick="{{ m.pick }}" style="min-height: 32px">{{ m.label }}</button></sc-for>
+        </div>
+
+        <sc-if value="{{ noExiste }}" hint-placeholder-val="{{ false }}">
+          <div class="box" role="status">
+            <h1 class="h1" style="font-size: 26px">Producto no encontrado</h1>
+            <p class="sub" style="margin: 0">Este producto terminado no existe o fue dado de baja.</p>
+            <a class="b b-out b-back b-touch-m" href="Inventario.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a producto terminado</a>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ errPage }}" hint-placeholder-val="{{ false }}">
+          <div class="box error" role="alert">
+            <span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg></span>
+            <span class="h3">No se pudo cargar el producto terminado.</span>
+            <p class="sub" style="margin: 0">[Mensaje del catálogo de errores]</p>
+            <span class="mono cap">[código]</span>
+            <button class="b b-out b-touch-m" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reintentar</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ existe }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: flex-end; gap: 16px">
+            <span class="{{ thumbCls }}" role="img" aria-label="{{ imgAlt }}"><sc-if value="{{ sinImagen }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></sc-if></span>
+            <div class="ph-t" style="flex: 1; min-width: 0">
+              <nav aria-label="Ruta de navegación">
+                <ol class="bc">
+                  <li><a href="Inventario.dc.html">Inventario</a></li>
+                  <li aria-hidden="true" style="display: flex"><svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg></li>
+                  <li><a href="Inventario.dc.html">Producto terminado</a></li>
+                  <li aria-hidden="true" style="display: flex"><svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg></li>
+                  <li><span aria-current="page" style="color: var(--fg)">Hipoclorito de sodio 5 %</span></li>
+                </ol>
+              </nav>
+              <h1 class="h1">Hipoclorito de sodio 5 %</h1>
+            </div>
+          </div>
+
+          <nav class="tabs scroll" aria-label="Secciones del producto terminado">
+            <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="7"><button class="tab" type="button" aria-current="{{ t.cur }}" onClick="{{ t.pick }}" style="min-height: 44px">{{ t.label }}</button></sc-for>
+          </nav>
+
+          <sc-if value="{{ isGeneral }}" hint-placeholder-val="{{ true }}">
+            <section aria-labelledby="pt-gen" class="cq-stack" style="display: flex; gap: 16px; align-items: flex-start">
+              <div style="width: 100%; max-width: 192px; flex: none">
+                <div class="{{ bigImgCls }}" role="img" aria-label="{{ imgAlt }}" style="width: 100%; aspect-ratio: 1 / 1; height: auto; border-radius: 12px"><sc-if value="{{ sinImagen }}" hint-placeholder-val="{{ false }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></sc-if></div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0">
+                <h2 id="pt-gen" class="h2">Datos generales</h2>
+                <dl class="cq-1" style="display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 12px 32px; margin: 0; font-size: 14px">
+                  <dt class="dim">Nombre</dt><dd style="margin: 0">Hipoclorito de sodio 5 %</dd>
+                  <dt class="dim">Presentación</dt><dd style="margin: 0">Galón · <span class="mono">4 L</span></dd>
+                  <dt class="dim">Unidad base</dt><dd style="margin: 0">L</dd>
+                  <dt class="dim">Alerta de cantidad</dt><dd class="mono" style="margin: 0">20 L</dd>
+                </dl>
+              </div>
+            </section>
+          </sc-if>
+
+          <sc-if value="{{ isStock }}" hint-placeholder-val="{{ false }}">
+            <section aria-labelledby="pt-stk" style="display: flex; flex-direction: column; gap: 16px">
+              <h2 id="pt-stk" class="h2">Existencia</h2>
+              <dl class="cq-1" style="display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 12px 32px; margin: 0; font-size: 14px">
+                <dt class="dim">Total en unidad base</dt><dd class="mono strong" style="margin: 0">126 L</dd>
+                <dt class="dim">En envases</dt><dd style="margin: 0"><ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px"><li class="mono">30 envases de 4 L + 2 L</li></ul></dd>
+                <dt class="dim">Sin envase</dt><dd class="mono" style="margin: 0">4 L</dd>
+              </dl>
+            </section>
+          </sc-if>
+
+          <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+            <sc-if value="{{ showSkeleton }}" hint-placeholder-val="{{ false }}">
+              <div class="tw" aria-busy="true">
+                <span class="sr">Cargando…</span>
+                <div class="scroll">
+                  <table style="min-width: 720px">
+                    <tbody>
+                      <sc-for list="{{ skRows }}" as="sr" hint-placeholder-count="10">
+                        <tr><sc-for list="{{ sr.cells }}" as="sc" hint-placeholder-count="6"><td><span class="sk" style="width: 72%"></span></td></sc-for></tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+              <div class="box">
+                <p class="sub" style="margin: 0">{{ emptyMsg }}</p>
+                <sc-if value="{{ pastEnd }}" hint-placeholder-val="{{ false }}"><button class="b b-out b-touch-m" type="button">Volver a la primera página</button></sc-if>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ showListError }}" hint-placeholder-val="{{ false }}">
+              <div class="box error" role="alert">
+                <span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg></span>
+                <span class="h3">{{ errTitle }}</span>
+                <p class="sub" style="margin: 0">[Mensaje del catálogo de errores]</p>
+                <span class="mono cap">[código]</span>
+                <button class="b b-out b-touch-m" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reintentar</button>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ showRows }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-direction: column; gap: 12px">
+                <sc-if value="{{ isEntregas }}" hint-placeholder-val="{{ false }}">
+                  <p style="margin: 0; font-size: 14px"><span class="dim">Total entregado: </span><span class="mono strong">56 L</span><span class="dim"> · </span><span class="mono strong">14 envases</span></p>
+                </sc-if>
+                <div class="tw">
+                  <div class="scroll">
+                    <table style="{{ tableStyle }}">
+                      <thead><tr><sc-for list="{{ cols }}" as="c" hint-placeholder-count="7"><th scope="col" class="{{ c.cls }}">{{ c.t }}</th></sc-for></tr></thead>
+                      <tbody class="fade">
+                        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+                          <tr>
+                            <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="7">
+                              <td class="{{ c.cls }}">
+                                <span class="{{ c.wrap }}">
+                                  <sc-if value="{{ c.hasText }}" hint-placeholder-val="{{ true }}"><span>{{ c.t }}</span></sc-if>
+                                  <sc-if value="{{ c.hasBadge }}" hint-placeholder-val="{{ false }}"><span class="{{ c.badgeCls }}"><i></i>{{ c.badge }}</span></sc-if>
+                                  <sc-if value="{{ c.hasSub }}" hint-placeholder-val="{{ false }}"><span class="vr">{{ c.sub }}</span></sc-if>
+                                  <sc-if value="{{ c.hasEv }}" hint-placeholder-val="{{ false }}"><button class="b b-out b-sm ev-cta" type="button" aria-label="{{ c.evAria }}" onClick="{{ c.openEv }}" style="width: auto; min-height: 36px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg><span class="mono">{{ c.evTxt }}</span></button></sc-if>
+                                </span>
+                              </td>
+                            </sc-for>
+                          </tr>
+                        </sc-for>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="pg">
+                    <span class="pgb" style="display: flex; align-items: center; gap: 8px"><button class="b b-out b-ico b-touch-m" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><span role="status">Página 1 de 1</span><button class="b b-out b-ico b-touch-m" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span>
+                    <button class="in trig" type="button" aria-label="Filas por página" style="width: 76px; height: 44px"><span class="mono">10</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+          </sc-if>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="inventario" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="{{ evCls }}" role="dialog" aria-modal="true" aria-labelledby="pt-ev">
+    <div class="dlg-hd">
+      <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+        <h2 id="pt-ev" class="h2">Evidencia · Lote <span class="mono">{{ evLote }}</span> · Pedido <span class="mono">{{ evPedido }}</span></h2>
+        <p class="sub" style="margin: 0">Fotos tomadas durante la ejecución del pedido. Solo consulta.</p>
+      </div>
+      <button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeEv }}" style="width: 44px; height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+    </div>
+    <sc-if value="{{ evErr }}" hint-placeholder-val="{{ false }}">
+      <div class="nt n-d" role="alert" style="align-items: center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span style="flex: 1">No se pudieron cargar las fotos.</span><button class="b b-out b-sm" type="button" onClick="{{ retry }}" style="min-height: 44px; width: auto">Reintentar</button></div>
+    </sc-if>
+    <sc-if value="{{ evBody }}" hint-placeholder-val="{{ true }}">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+        <section class="ev-grp" aria-labelledby="{{ g.id }}">
+          <h3 id="{{ g.id }}" class="h3" style="display: flex; align-items: center; gap: 8px">{{ g.name }}<span class="count" aria-label="{{ g.countLabel }}">{{ g.count }}</span></h3>
+          <sc-for list="{{ g.rows }}" as="o" hint-placeholder-count="2">
+            <div class="ev-ro" role="group" aria-label="{{ o.aria }}">
+              <div class="ev-ro-hd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg><span class="strong">{{ o.title }}</span><span class="count mono" aria-label="{{ o.countLabel }}">{{ o.count }}</span></div>
+              <sc-if value="{{ evLoad }}" hint-placeholder-val="{{ false }}">
+                <div class="ev-grid" aria-busy="true"><span class="sr">Cargando fotos…</span><sc-for list="{{ o.sk }}" as="k" hint-placeholder-count="2"><div class="ev-tile" style="border: 0"><span class="sk" style="height: 100%; border-radius: 12px"></span></div></sc-for></div>
+              </sc-if>
+              <sc-if value="{{ evShow }}" hint-placeholder-val="{{ true }}">
+                <div class="ev-grid">
+                  <sc-for list="{{ o.tiles }}" as="p" hint-placeholder-count="2">
+                    <div class="ev-tile" style="{{ p.delay }}">
+                      <div class="ev-ph" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg><span>{{ p.label }}</span></div>
+                      <sc-if value="{{ p.isOk }}" hint-placeholder-val="{{ true }}"><button class="ev-view" type="button" aria-label="{{ p.viewLabel }}" onClick="{{ p.view }}"></button><span class="ev-n mono" aria-hidden="true">{{ p.n }}</span></sc-if>
+                      <sc-if value="{{ p.isExp }}" hint-placeholder-val="{{ false }}"><div class="ev-exp"><span class="strong">Vista vencida</span><button class="b b-out b-sm" type="button" aria-label="{{ p.reloadLabel }}" onClick="{{ retry }}" style="min-height: 44px; width: auto">Recargar</button></div></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </section>
+      </sc-for>
+    </sc-if>
+  </div>
+
+  <div class="{{ ov2Cls }}" onClick="{{ closeView }}" style="z-index: 42"></div>
+  <div class="{{ viewCls }}" role="dialog" aria-modal="true" aria-label="{{ viewLabel }}" style="width: auto; max-width: none; z-index: 43">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px"><h2 class="h3">{{ viewLabel }}</h2><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeView }}" style="width: 44px; height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="ev-big" role="img" aria-label="{{ viewLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg><span>{{ viewPh }}</span></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"tab":{"editor":"enum","options":["General","Stock","Lotes","Entradas","Salidas","Entregas","Costo de producción"],"default":"Lotes"},"rol":{"editor":"enum","options":["Administrador","Operador"],"default":"Administrador"},"fotos":{"editor":"enum","options":["Normal","Cargando","Error","Enlace vencido"],"default":"Normal"},"dialogo":{"editor":"boolean","default":false},"visor":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["Con datos","Cargando","Vacío","Página vacía","Error del listado","Producto no encontrado","Error de carga"],"default":"Con datos"},"imagen":{"editor":"boolean","default":true},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.lt); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const labels = ['General', 'Stock', 'Lotes', 'Entradas', 'Salidas', 'Entregas', 'Costo de producción'];
+const keys = ['general', 'stock', 'lotes', 'entradas', 'salidas', 'entregas', 'costo'];
+const fromProp = labels.indexOf(this.props.tab || 'Lotes');
+const ti = s.tab !== undefined ? s.tab : (fromProp < 0 ? 0 : fromProp);
+const key = keys[ti];
+const est = this.props.estado || 'Con datos';
+const noExiste = est === 'Producto no encontrado';
+const errPage = est === 'Error de carga';
+const existe = !noExiste && !errPage;
+const isList = ti >= 2;
+const loading = isList && (!!s.loading || est === 'Cargando');
+const conImagen = this.props.imagen !== false;
+const E = '—';
+const c = (t, cls) => ({ t: t, cls: (cls || '') + (t === E ? ' dim' : ''), wrap: 'cl', hasText: true, hasBadge: false, hasSub: false, badge: '', badgeCls: '', sub: '', hasEv: false, evTxt: '', evAria: '', openEv: () => {} });
+const tx = (t) => c(t, '');
+const mo = (t) => c(t, 'mono');
+const nu = (t) => c(t, 'num mono');
+const cust = (name, baja) => Object.assign(tx(name), { hasBadge: !!baja, badge: 'Dado de baja', badgeCls: 'sb t-muted' });
+const voidCell = (reason) => reason ? Object.assign(tx(''), { wrap: 'cl col', hasText: false, hasBadge: true, badge: 'Anulada', badgeCls: 'sb t-danger', hasSub: true, sub: reason }) : Object.assign(tx(''), { hasText: false });
+const H = (t, num) => ({ t: t, cls: num ? 'num' : '' });
+// QC-271: evidencia por lote (solo Administrador, pedidos.consultar). Paso -> cantidad de fotos.
+const admin = (s.rol || this.props.rol || 'Administrador') === 'Administrador';
+const mode = s.mode || this.props.fotos || 'Normal';
+const EV = {
+'L-2026-1003': { fab: { 1: 2, 3: 1, 5: 1 }, env: { 1: 2 } },
+'L-2026-0921': { fab: { 2: 1 }, env: {} },
+'L-2026-0905': { fab: {}, env: {} }
+};
+const sum = (o) => Object.keys(o).reduce((a, k) => a + o[k], 0);
+const evCell = (lote, pedido) => {
+const d = pedido ? EV[lote] : null;
+const n = d ? sum(d.fab) + sum(d.env) : 0;
+if (!n) return mo(E);
+const txt = n + (n === 1 ? ' foto' : ' fotos');
+return Object.assign(tx(''), { hasText: false, hasEv: true, evTxt: txt, evAria: 'Ver evidencia del lote ' + lote + ': ' + txt, openEv: () => this.setState({ ev: { lote: lote, pedido: pedido }, view: null }) });
+};
+const T = {
+lotes: {
+cols: [H('Lote'), H('Pedido de origen'), H('Fecha de entrada'), H('Fecha de producción'), H('Vencimiento'), H('Contenido de envase', 1), H('Existencia', 1), H('En envases', 1)].concat(admin ? [H('Evidencia')] : []),
+rows: [
+[mo('L-2026-1003'), mo('2026-0000013'), mo('2026-10-03'), mo('2026-10-02'), mo('2027-10-02'), nu('4 L'), nu('80 L'), nu('20 envases')].concat(admin ? [evCell('L-2026-1003', '2026-0000013')] : []),
+[mo('L-2026-0921'), mo('2026-0000008'), mo('2026-09-21'), mo('2026-09-20'), mo('2027-09-20'), nu('4 L'), nu('42 L'), nu('10 envases + 2 L')].concat(admin ? [evCell('L-2026-0921', '2026-0000008')] : []),
+[mo('L-2026-0905'), mo('2026-0000005'), mo('2026-09-05'), mo('2026-09-04'), mo(E), nu('4 L'), nu('0 L'), nu('0 envases')].concat(admin ? [evCell('L-2026-0905', '2026-0000005')] : []),
+[mo('L-2026-0812'), tx('Sin pedido'), mo('2026-08-12'), mo(E), mo(E), nu(E), nu('4 L'), nu(E)].concat(admin ? [evCell('L-2026-0812', null)] : [])
+] },
+entradas: {
+cols: [H('Fecha'), H('Origen'), H('Lote'), H('Cantidad', 1), H('En envases', 1), H('Pedido'), H('Motivo')],
+rows: [
+[mo('2026-10-11 16:40'), tx('Anulación de entrega'), mo('L-2026-0921'), nu('8 L'), nu('2 envases'), mo('2026-0000008'), tx(E)],
+[mo('2026-10-03 09:15'), tx('Producción'), mo('L-2026-1003'), nu('80 L'), nu('20 envases'), mo('2026-0000013'), tx(E)],
+[mo('2026-09-21 10:02'), tx('Producción'), mo('L-2026-0921'), nu('60 L'), nu('15 envases'), mo('2026-0000008'), tx(E)],
+[mo('2026-09-05 11:30'), tx('Producción'), mo('L-2026-0905'), nu('40 L'), nu('10 envases'), mo('2026-0000005'), tx(E)],
+[mo('2026-08-20 08:10'), tx('Ajuste'), mo('L-2026-0812'), nu('2 L'), nu(E), mo(E), tx('Conteo fisico')],
+[mo('2026-08-12 08:00'), tx('Apertura (alta o importación)'), mo('L-2026-0812'), nu('2 L'), nu(E), mo(E), tx(E)]
+] },
+salidas: {
+cols: [H('Fecha'), H('Tipo'), H('Lote'), H('Cantidad', 1), H('En envases', 1), H('Pedido'), H('Motivo')],
+rows: [
+[mo('2026-10-10 15:20'), tx('Entrega a cliente'), mo('L-2026-0921'), nu('8 L'), nu('2 envases'), mo('2026-0000008'), tx(E)],
+[mo('2026-10-08 12:00'), tx('Entrega a cliente'), mo('L-2026-0921'), nu('16 L'), nu('4 envases'), mo('2026-0000008'), tx(E)],
+[mo('2026-09-30 17:45'), tx('Ajuste'), mo('L-2026-0921'), nu('2 L'), nu('0 envases + 2 L'), mo(E), tx('Merma')],
+[mo('2026-09-15 09:40'), tx('Entrega a cliente'), mo('L-2026-0905'), nu('40 L'), nu('10 envases'), mo('2026-0000005'), tx(E)]
+] },
+entregas: {
+cols: [H('Fecha'), H('Cliente'), H('Pedido'), H('Lote'), H('Envases', 1), H('Cantidad', 1), H('Anulación')],
+rows: [
+[mo('2026-10-10 15:20'), cust('María Pérez'), mo('2026-0000008'), mo('L-2026-0921'), nu('2'), nu('8 L'), voidCell('El cliente devolvió el envío completo.')],
+[mo('2026-10-08 12:00'), cust('María Pérez'), mo('2026-0000008'), mo('L-2026-0921'), nu('4'), nu('16 L'), voidCell(null)],
+[mo('2026-09-15 09:40'), cust('Juan Rodríguez', true), mo('2026-0000005'), mo('L-2026-0905'), nu('10'), nu('40 L'), voidCell(null)]
+] },
+costo: {
+cols: [H('Lote'), H('Pedido'), H('Cantidad producida', 1), H('En envases', 1), H('Costo unitario', 1), H('Costo total', 1)],
+rows: [
+[mo('L-2026-1003'), mo('2026-0000013'), nu('80 L'), nu('20 envases'), nu('1.85'), nu('148')],
+[mo('L-2026-0921'), mo('2026-0000008'), nu('60 L'), nu('15 envases'), nu('1.9'), nu('114')],
+[mo('L-2026-0905'), mo('2026-0000005'), nu('40 L'), nu('10 envases'), nu('1.7625'), nu('70.5')]
+] }
+};
+const emptyMsgs = { lotes: 'Este producto todavía no tiene lotes.', entradas: 'Este producto todavía no tiene entradas.', salidas: 'Este producto todavía no tiene salidas.', entregas: 'Este producto todavía no se ha entregado.', costo: 'Ningún lote de este producto salió de un pedido.' };
+const errTitles = { lotes: 'No se pudieron cargar los lotes.', entradas: 'No se pudieron cargar las entradas.', salidas: 'No se pudieron cargar las salidas.', entregas: 'No se pudieron cargar las entregas.', costo: 'No se pudo cargar el costo de producción.' };
+const tbl = T[key] || { cols: [], rows: [] };
+const skCells = [1, 2, 3, 4, 5, 6].map(() => ({}));
+const evSel = admin ? (s.ev !== undefined ? s.ev : (this.props.dialogo ? { lote: 'L-2026-1003', pedido: '2026-0000013' } : null)) : null;
+const evOpen = !!evSel;
+const view = evOpen ? (s.view !== undefined ? s.view : (this.props.visor ? { label: 'Foto 1 del paso 1 · Fabricación', ph: 'Foto 1 · Paso 1' } : null)) : null;
+const evData = evSel ? EV[evSel.lote] : null;
+const envNames = { 1: 'Envasar en galón 4 L' };
+const mkRows = (o, phase, names) => Object.keys(o).map(Number).map((step) => {
+const tiles = [];
+for (let j = 1; j <= o[step]; j++) {
+tiles.push({
+n: String(j), label: 'Foto ' + j + ' · Paso ' + step, delay: 'animation-delay: ' + ((j - 1) * 40) + 'ms',
+viewLabel: 'Foto ' + j + ' del paso ' + step, reloadLabel: 'Recargar la foto ' + j + ' del paso ' + step,
+isOk: mode !== 'Enlace vencido', isExp: mode === 'Enlace vencido',
+view: () => this.setState({ view: { label: 'Foto ' + j + ' del paso ' + step + ' · ' + phase, ph: 'Foto ' + j + ' · Paso ' + step } })
+});
+}
+return { title: 'Paso ' + step + (names && names[step] ? ' · ' + names[step] : ''), count: o[step] + '/3', countLabel: o[step] + ' de 3 fotos', aria: 'Evidencia de ' + phase.toLowerCase() + ', paso ' + step, tiles: tiles, sk: tiles.map(() => ({})) };
+});
+const groups = evData ? [
+{ id: 'pt-ev-fab', name: 'Fabricación', o: evData.fab, names: null },
+{ id: 'pt-ev-env', name: 'Envasado', o: evData.env, names: envNames }
+].filter((g) => sum(g.o) > 0).map((g) => ({ id: g.id, name: g.name, count: String(sum(g.o)), countLabel: sum(g.o) + ' fotos', rows: mkRows(g.o, g.name, g.names) })) : [];
+const pick = (i) => () => { clearTimeout(this.lt); this.setState({ tab: i, loading: i >= 2 }); if (i >= 2) { this.lt = setTimeout(() => this.setState({ loading: false }), 700); } };
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+ovCls: s.menu || evOpen ? 'ov open' : 'ov',
+closeAll: () => this.setState({ menu: false, ev: null, view: null }),
+roles: ['Administrador', 'Operador'].map((r) => ({ label: r, on: (admin ? 'Administrador' : 'Operador') === r ? 'true' : 'false', cls: (admin ? 'Administrador' : 'Operador') === r ? 'b b-pri b-sm' : 'b b-out b-sm', pick: () => this.setState({ rol: r, ev: null, view: null }) })),
+modes: ['Normal', 'Cargando', 'Error', 'Enlace vencido'].map((m) => ({ label: m, on: m === mode ? 'true' : 'false', cls: m === mode ? 'b b-pri b-sm' : 'b b-out b-sm', pick: () => this.setState({ mode: m }) })),
+evCls: evOpen ? 'dlg wide full-m ev-dlg open' : 'dlg wide full-m ev-dlg',
+evLote: evSel ? evSel.lote : '',
+evPedido: evSel ? evSel.pedido : '',
+closeEv: () => this.setState({ ev: null, view: null }),
+evErr: mode === 'Error', evLoad: mode === 'Cargando', evShow: mode === 'Normal' || mode === 'Enlace vencido', evBody: mode !== 'Error',
+retry: () => this.setState({ mode: 'Normal' }),
+groups: groups,
+viewCls: view ? 'dlg open' : 'dlg',
+ov2Cls: view ? 'ov open' : 'ov',
+viewLabel: view ? view.label : 'Foto',
+viewPh: view ? view.ph : '',
+closeView: () => this.setState({ view: null }),
+noExiste: noExiste, errPage: errPage, existe: existe,
+sinImagen: !conImagen,
+thumbCls: conImagen ? 'thumb photo' : 'thumb',
+bigImgCls: conImagen ? 'thumb photo' : 'thumb',
+imgAlt: conImagen ? 'Hipoclorito de sodio 5 %' : 'Sin imagen',
+tabs: labels.map((l, i) => ({ label: l, cur: i === ti ? 'page' : 'false', pick: pick(i) })),
+isGeneral: ti === 0, isStock: ti === 1, isList: isList,
+isEntregas: key === 'entregas',
+showSkeleton: loading,
+showEmpty: !loading && (est === 'Vacío' || est === 'Página vacía'),
+pastEnd: est === 'Página vacía',
+emptyMsg: est === 'Página vacía' ? 'Esta página ya no tiene filas.' : (emptyMsgs[key] || ''),
+showListError: !loading && est === 'Error del listado',
+errTitle: errTitles[key] || '',
+showRows: !loading && (est === 'Con datos' || est === 'Cargando'),
+skRows: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(() => ({ cells: skCells })),
+cols: tbl.cols,
+rows: tbl.rows.map((cells) => ({ cells: cells })),
+tableStyle: key === 'entregas' ? 'min-width: 900px' : (key === 'lotes' && admin ? 'min-width: 960px' : 'min-width: 820px')
+};
+}
+}
+</script>
+</body>
+</html>

@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 
 import { StepReader } from '@/components/shared/step-reader';
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { ImageField } from '@/components/shared/image-field';
+import { Notice } from '@/components/shared/notice';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,12 +20,15 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createRecipeSchema,
+  MAX_IMAGE_BYTES,
   sumPercentages,
   updateRecipeSchema,
+  validateRecipeImage,
   type CreateRecipeInput,
   type RecipeDetail,
   type RecipeVersionSummary,
@@ -40,9 +45,18 @@ import { cn } from '@/lib/utils';
 
 import type { ProductPickerOption } from './product-picker';
 import { PropagateVersionsDialog } from './propagate-versions-dialog';
-import { RecipeImageField } from './recipe-image-field';
-import { RECIPE_TOOL_ERROR_MESSAGES, RecipeLinesField } from './recipe-lines-field';
-import { RecipeStepsField } from './recipe-steps-field';
+import {
+  RECIPE_LINE_ERROR_MESSAGES,
+  RECIPE_LINES_GENERAL_ERROR_MESSAGE,
+  RECIPE_TOOL_ERROR_MESSAGES,
+  RECIPE_TOOLS_GENERAL_ERROR_MESSAGE,
+  RecipeLinesField,
+} from './recipe-lines-field';
+import {
+  PACKING_STEPS_FIELD_TEXTS,
+  RECIPE_STEP_ERROR_MESSAGES,
+  RecipeStepsField,
+} from './recipe-steps-field';
 import {
   buildRecipePayload,
   createLocalKey,
@@ -54,6 +68,7 @@ import {
   extractToolErrors,
   toLineFormValues,
   toToolFormValues,
+  type RecipeFieldErrorMessages,
   type RecipeFormState,
   type RecipeLineErrors,
   type RecipeStepErrors,
@@ -75,14 +90,18 @@ import {
  *
  * **Validación previa con los esquemas del CONTRATO** (`createRecipeSchema`/`updateRecipeSchema`
  * del barrel de `recetas`, R26): se ejecutan con `safeParse` ANTES de invocar la operación, sobre
- * el payload que arma `buildRecipePayload` -nunca sobre el estado crudo-, y sus mensajes -nunca
- * reescritos aquí- alimentan los errores por campo, por línea (R31) y por paso. El servidor
- * revalida igual: el cliente nunca es la frontera.
+ * el payload que arma `buildRecipePayload` -nunca sobre el estado crudo-, y sus issues alimentan
+ * los errores por campo, por línea (R31) y por paso. La REGLA es la del esquema; el TEXTO se
+ * traduce aquí: los `refine` del esquema ya traen su mensaje en español y pasan tal cual, y los
+ * issues de forma de zod (`too_small`, `too_big`, …), que traen el genérico en inglés, se
+ * sustituyen por el texto propio del formulario (`NAME_ERROR_MESSAGES`, `RECIPE_*_ERROR_MESSAGES`),
+ * igual que `product-form.tsx`. El servidor revalida igual: el cliente nunca es la frontera.
  *
  * **Errores de la operación (R23)**: `recipe_duplicate_name` va junto al campo nombre;
  * `recipe_not_found` se presenta con un enlace a la lista; cualquier otro código (`invalid_input`,
  * `unauthorized`, …) va en la región `role="alert"` del formulario. Ninguno navega fuera del
- * formulario ni pierde lo que el usuario había escrito.
+ * formulario ni pierde lo que el usuario había escrito. El código se pinta bajo el mensaje salvo
+ * `invalid_input`: su mensaje ya dice qué hacer y el código no le dice nada al usuario.
  *
  * QC-70 (R20, R21, R32): los dos códigos que se comparan son los ABIERTOS por caso -los genéricos
  * `duplicate_name` y `not_found` ya no existen en el catálogo-, el código está tipado con
@@ -99,14 +118,19 @@ import {
 
 const FIELD_TEXT = 'text-base';
 
-const PACKING_STEPS_TITLE = 'Pasos de envasado';
-const PACKING_STEPS_ADD_LABEL = 'Añadir paso de envasado';
 const PACKING_STEPS_TESTID_PREFIX = 'recipe-packing-step';
 
 const PREVIEW_OPEN_LABEL = 'Vista previa';
 const PREVIEW_TITLE = 'Vista previa';
 const PREVIEW_DESCRIPTION =
   'Asi se leera esta receta, paso a paso. Nada de lo que hagas aqui se guarda.';
+
+const STEP_LOCK_TITLE = (orders: number) =>
+  orders === 1
+    ? '1 pedido en curso ya tiene fotos de evidencia'
+    : `${orders} pedidos en curso ya tienen fotos de evidencia`;
+const STEP_LOCK_BODY =
+  'Mientras sigan en curso no puedes mover ni quitar pasos. Sí puedes cambiar el texto, encender o apagar «Requiere evidencia» y añadir pasos al final.';
 
 const SAVE_SUCCESS_CREATE = 'Receta creada.';
 const SAVE_SUCCESS_EDIT = 'Receta actualizada.';
@@ -117,6 +141,16 @@ const SAVE_SUCCESS_EDIT = 'Receta actualizada.';
  */
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const INVALID_INPUT_MESSAGE = 'Revisa los campos marcados.';
+
+/** Texto propio del nombre y la descripción para los issues de forma de zod (tope en el esquema). */
+const NAME_ERROR_MESSAGES: RecipeFieldErrorMessages = {
+  invalid: 'Escribe el nombre de la fórmula.',
+  tooLong: 'El nombre admite como máximo 120 caracteres.',
+};
+const DESCRIPTION_ERROR_MESSAGES: RecipeFieldErrorMessages = {
+  invalid: 'Revisa la descripción.',
+  tooLong: 'La descripción admite como máximo 500 caracteres.',
+};
 
 export type RecipeFormProductPage = {
   readonly items: readonly ProductPickerOption[];
@@ -134,6 +168,8 @@ export type RecipeFormProps =
       readonly mode: 'edit';
       readonly recipe: RecipeDetail;
       readonly versions: readonly RecipeVersionSummary[];
+      /** Pedidos en curso con fotos de evidencia de esta fórmula; con más de 0 no se mueven ni quitan pasos. */
+      readonly lockingOrders?: number;
       readonly units: readonly UnitRef[];
       readonly initialProductPage: RecipeFormProductPage;
       readonly initialMachinePage: RecipeFormProductPage;
@@ -214,6 +250,8 @@ export function RecipeForm(props: RecipeFormProps) {
   const [underReview, setUnderReview] = useState<readonly UnderReviewVersion[]>([]);
 
   const isEdit = props.mode === 'edit';
+  const lockingOrders = props.mode === 'edit' ? (props.lockingOrders ?? 0) : 0;
+  const stepsLocked = lockingOrders > 0;
 
   // Se recalcula en CADA render con la misma función que el indicador de suma y que el
   // esquema del contrato -nunca una copia local de la regla-, también con cero líneas. La
@@ -244,14 +282,14 @@ export function RecipeForm(props: RecipeFormProps) {
     if (!parsed.success) {
       const issues = parsed.error.issues;
       setFieldErrors({
-        name: extractFieldError(issues, 'name'),
-        description: extractFieldError(issues, 'description'),
-        lines: extractLineErrors(issues),
-        linesGeneral: extractGeneralLinesError(issues),
+        name: extractFieldError(issues, 'name', NAME_ERROR_MESSAGES),
+        description: extractFieldError(issues, 'description', DESCRIPTION_ERROR_MESSAGES),
+        lines: extractLineErrors(issues, RECIPE_LINE_ERROR_MESSAGES),
+        linesGeneral: extractGeneralLinesError(issues, RECIPE_LINES_GENERAL_ERROR_MESSAGE),
         tools: extractToolErrors(issues, RECIPE_TOOL_ERROR_MESSAGES),
-        toolsGeneral: extractGeneralToolsError(issues),
-        steps: extractStepErrors(issues),
-        packingSteps: extractStepErrors(issues, 'packingSteps'),
+        toolsGeneral: extractGeneralToolsError(issues, RECIPE_TOOLS_GENERAL_ERROR_MESSAGE),
+        steps: extractStepErrors(issues, RECIPE_STEP_ERROR_MESSAGES),
+        packingSteps: extractStepErrors(issues, RECIPE_STEP_ERROR_MESSAGES, 'packingSteps'),
       });
       // R23: la validación previa rechazada tampoco invoca la operación, pero SÍ es un rechazo
       // que el usuario tiene que ver -no un silencio-, así que también alimenta la región de error
@@ -338,13 +376,21 @@ export function RecipeForm(props: RecipeFormProps) {
           renderCatalogued={(catalogued) => (
             <>
               <p data-testid="recipe-form-error-message">{catalogued.message}</p>
-              <p className="text-xs" data-testid="recipe-form-error-code">
-                {catalogued.code}
-              </p>
+              {catalogued.code === INVALID_INPUT_CODE ? null : (
+                <p className="text-xs" data-testid="recipe-form-error-code">
+                  {catalogued.code}
+                </p>
+              )}
             </>
           )}
         />
       )}
+
+      {stepsLocked ? (
+        <Notice tone="warning" title={STEP_LOCK_TITLE(lockingOrders)} testId="recipe-form-steps-locked">
+          {STEP_LOCK_BODY}
+        </Notice>
+      ) : null}
 
       {props.mode === 'edit' && underReview.length > 0 ? (
         <div
@@ -372,11 +418,14 @@ export function RecipeForm(props: RecipeFormProps) {
       {/* La imagen manda a la izquierda (3 de 12) y los datos de texto la acompanan (9). */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
         <div className="sm:col-span-3">
-          <RecipeImageField
+          <ImageField
             mode={props.mode}
             initialImageUrl={props.mode === 'edit' ? props.recipe.imageUrl : null}
             value={state.image}
             onChange={(image) => setState((previous) => ({ ...previous, image }))}
+            maxBytes={MAX_IMAGE_BYTES}
+            validate={validateRecipeImage}
+            testIdPrefix="recipe-image"
           />
         </div>
 
@@ -445,15 +494,24 @@ export function RecipeForm(props: RecipeFormProps) {
         steps={state.steps}
         onChange={(steps) => setState((previous) => ({ ...previous, steps }))}
         errors={fieldErrors.steps}
+        showEvidenceSwitch
+        locked={stepsLocked}
       />
+
+      <Separator data-testid="recipe-form-steps-separator" />
 
       <RecipeStepsField
         steps={state.packingSteps}
         onChange={(packingSteps) => setState((previous) => ({ ...previous, packingSteps }))}
         errors={fieldErrors.packingSteps}
-        title={PACKING_STEPS_TITLE}
-        addLabel={PACKING_STEPS_ADD_LABEL}
+        title={PACKING_STEPS_FIELD_TEXTS.title}
+        optionalHelp={{
+          text: PACKING_STEPS_FIELD_TEXTS.optionalHelp,
+          label: PACKING_STEPS_FIELD_TEXTS.optionalHelpLabel,
+        }}
         testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
+        showEvidenceSwitch
+        locked={stepsLocked}
       />
 
       <div className="flex justify-end gap-2">

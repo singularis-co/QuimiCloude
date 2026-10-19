@@ -22,6 +22,7 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { ProductPicker, type ProductPickerOption } from './product-picker';
 import {
   createLocalKey,
+  type RecipeLineErrorMessages,
   type RecipeLineErrors,
   type RecipeLineFormValue,
   type RecipeToolErrorMessages,
@@ -71,6 +72,18 @@ export const RECIPE_TOOL_ERROR_MESSAGES: RecipeToolErrorMessages = {
   quantity: 'La cantidad debe ser un número entero mayor que 0.',
 };
 
+/**
+ * Textos propios para los issues de forma de zod sobre las líneas y las herramientas: el genérico
+ * de zod sale en inglés. Los mensajes que ya escribe el esquema (porcentaje, suma, repetidos)
+ * pasan tal cual (`recipe-form-state.ts`).
+ */
+export const RECIPE_LINE_ERROR_MESSAGES: RecipeLineErrorMessages = {
+  productId: 'Elige un ingrediente.',
+  percentage: 'Escribe un porcentaje mayor que 0 y hasta 100.',
+};
+export const RECIPE_LINES_GENERAL_ERROR_MESSAGE = 'Revisa los ingredientes de la fórmula.';
+export const RECIPE_TOOLS_GENERAL_ERROR_MESSAGE = 'Revisa las herramientas de la fórmula.';
+
 /** Más dígitos que el tope del contrato no aportan nada y desbordarían el entero. */
 const MAX_TOOL_QUANTITY_DIGITS = 10;
 
@@ -117,6 +130,16 @@ function remainingHundredths(lines: readonly RecipeLineFormValue[], exceptIndex:
   }, BigInt(0));
   const remaining = MAX_PERCENTAGE_HUNDREDTHS - othersHundredths;
   return remaining < BigInt(0) ? BigInt(0) : remaining;
+}
+
+/**
+ * `true` si a la línea le falta algo: sin producto, con producto no disponible, o con un
+ * porcentaje vacío, que no parsea o que es cero. Con una así no se ofrece añadir otra.
+ */
+export function isLineIncomplete(line: RecipeLineFormValue): boolean {
+  if (line.productId === '' || line.productName === null) return true;
+  const hundredths = percentageToHundredths(line.percentage.replace(',', '.'));
+  return hundredths === null || hundredths === BigInt(0);
 }
 
 /**
@@ -258,6 +281,11 @@ export function RecipeLinesField({
   /** `true` si lo que se está pintando es el fantasma y no una línea real de `lines`. */
   const isGhost = lines.length === 0;
   const rows: readonly RecipeLineFormValue[] = isGhost ? [GHOST_LINE] : lines;
+
+  // Un único booleano para todos los «+»: no se añade otra línea mientras la suma ya llegue a
+  // 100 % ni mientras quede alguna línea a medias. El fantasma cuenta como línea a medias.
+  const canAddLine =
+    !total.isComplete && !total.difference.startsWith('-') && !rows.some(isLineIncomplete);
 
   function addLineAfter(index: number) {
     // Con el fantasma en pantalla no hay nada que conservar todavía: se materializa y se le
@@ -518,7 +546,7 @@ export function RecipeLinesField({
                   touch
                   aria-label={`Añadir una línea después de la ${index + 1}`}
                   data-testid={`recipe-line-add-${index}`}
-                  disabled={line.productId === '' || line.productName === null}
+                  disabled={!canAddLine}
                   onClick={() => addLineAfter(index)}
                 >
                   <PlusIcon aria-hidden />

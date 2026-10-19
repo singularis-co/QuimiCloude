@@ -10,12 +10,15 @@ export {
   type ImportCreateUnitDialogProps,
 } from './import-create-unit-dialog';
 export { ImportFileRejection, describeRejection } from './import-file-rejection';
+export { ImportGuide, type ImportGuideProps } from './import-guide';
+export { GUIDE_CATALOG_LINK_ROUTES, GUIDE_COLUMN_DESCRIPTIONS } from './import-guide-descriptions';
 export { ImportMissingCatalog, type ImportMissingCatalogProps } from './import-missing-catalog';
 export {
   ErrorFileButton,
   ExampleRowIgnoredNotice,
   ImportPreviewSummary,
   ImportTotals,
+  PREVIEW_TOTAL_TONES,
   type ImportPreviewSummaryProps,
 } from './import-preview-summary';
 export {
@@ -23,6 +26,7 @@ export {
   ImportPreviewTable,
   ImportRowsTable,
   ImportStatusLabel,
+  PREVIEW_STATUS_TONES,
   PREVIEW_TABLE_ID,
   type ImportRowsTableProps,
   type ImportStatusOption,
@@ -32,10 +36,12 @@ export {
   ImportAlreadyDoneNotice,
   ImportNothingImportedSummary,
   ImportResultSummary,
+  RESULT_STATUS_TONES,
   RESULT_TABLE_ID,
   type ImportNothingImportedSummaryProps,
   type ImportResultSummaryProps,
 } from './import-result-summary';
+export { ImportSteps, importStepOf, type ImportStep } from './import-steps';
 export { ImportTemplateButton } from './import-template-button';
 export * from './import-texts';
 export {

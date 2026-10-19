@@ -101,7 +101,8 @@ const productName = `${FIXTURE_PREFIX}producto_${RUN_ID}`;
 /** Nombre de la receta que el recorrido del Administrador da de alta POR LA UI. */
 const recipeName = `${FIXTURE_PREFIX}receta_${RUN_ID}`;
 
-// Solo difieren en la letra: su orden relativo delata el sentido del orden por nombre.
+// Solo difieren en la letra: su orden relativo delata el sentido del orden por nombre. La `a` se
+// siembra como la mas nueva (QC-289), asi el orden por defecto y el de nombre DESC difieren.
 const orderRecipeAName = `${FIXTURE_PREFIX}orden_a_${RUN_ID}`;
 const orderRecipeBName = `${FIXTURE_PREFIX}orden_b_${RUN_ID}`;
 
@@ -281,11 +282,19 @@ test.beforeAll(async () => {
   // existe sin lineas. De la MISMA empresa en la que abre sesion el Administrador -QC-50 hizo
   // `recipes.company_id` obligatoria-: si fuera de otra, el aislamiento por empresa las
   // ocultaria de la lista y este spec dejaria de ver sus propias filas.
+  // QC-289: el orden por defecto es `created_at DESC`, asi que `created_at` va EXPLICITO -un
+  // `createMany` les daria el mismo instante y las dejaria al azar del `id`-. La `a` es la mas
+  // NUEVA: por defecto sale primero, y el orden por nombre descendente la manda detras.
+  const ahora = Date.now();
   await prisma.recipe.createMany({
-    data: [orderRecipeAName, orderRecipeBName].map((name) => ({
+    data: [
+      { name: orderRecipeAName, createdAt: new Date(ahora - 1_000) },
+      { name: orderRecipeBName, createdAt: new Date(ahora - 2_000) },
+    ].map(({ name, createdAt }) => ({
       name,
       nameNormalized: normalizeRecipeName(name),
       companyId: empresaDelWorker,
+      createdAt,
     })),
   });
 });
@@ -359,7 +368,6 @@ test.describe('catalogo de recetas', () => {
     await page.getByTestId('recipe-line-percentage-0').fill('100');
 
     // --- 5. Un paso.
-    await page.getByTestId('recipe-step-add').click();
     await page.getByTestId('recipe-step-text-0').fill(`Mezclar ${RUN_ID.slice(0, 8)}`);
 
     // --- 6. Guardar: la Server Action REAL de `recetas` (QC-25) contra Postgres, sin `fetch` de
@@ -417,6 +425,7 @@ test.describe('catalogo de recetas', () => {
 
     await expect(rowOf(orderRecipeAName)).toBeVisible({ timeout: 60_000 });
     await expect(rowOf(orderRecipeBName)).toBeVisible({ timeout: 60_000 });
+    // Por defecto, la mas nueva primero (QC-289): la `a`.
     await expect.poll(ownOrderNames, { timeout: 60_000 }).toEqual([orderRecipeAName, orderRecipeBName]);
 
     await page.getByTestId(`data-table-header-menu-${NAME_COLUMN_ID}`).click();

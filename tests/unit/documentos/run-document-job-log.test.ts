@@ -6,7 +6,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createRunDocumentJob } from '@/lib/modules/documentos/domain/run-document-job';
+import { trabajoConProveedor } from './run-document-job-doubles';
+
 
 import type {
   BatchStatus,
@@ -111,7 +112,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const repo = dobleDeRepositorio();
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoOk()),
@@ -140,7 +141,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const repo = dobleDeRepositorio();
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoOk()),
@@ -161,7 +162,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const repo = dobleDeRepositorio();
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoOk()),
@@ -181,7 +182,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const almacenamiento = dobleDeAlmacenamiento();
     almacenamiento.remove.mockRejectedValueOnce(new Error('corte del bucket'));
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoOk()),
@@ -206,7 +207,7 @@ describe('documentos — runDocumentJob con registro', () => {
     repo.claim.mockRejectedValueOnce(new Error('corte de base'));
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoOk()),
@@ -231,7 +232,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const repo = dobleDeRepositorio();
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoFallidoReintentable()),
@@ -262,7 +263,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
     const proceso = vi.fn(async () => trabajoOk());
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: proceso,

@@ -132,6 +132,15 @@
   dentro del área sin tumbar la pantalla; interruptor y enlaces con `min-h-11 min-w-11`, `label`
   accesible y operables por teclado. Cubre **R1, R2, R3, R5, R6, R7, R8, R9, R11, R15, R26**.
 
+  > **Enmienda 2026-10-16 (aprobada por el usuario, sin tarjeta; `0f135128`, `440ff5b2`).** T9 y T10
+  > quedan hechos con otro texto: `EN_CURSO` se lee «En fabricación» y la fila activa ya **no** lleva
+  > chip «En curso», solo la duración «(en curso)» (R3 enmendado). Tests que lo cubren hoy:
+  > `tests/ui/dashboard/execution-trace-table.test.tsx` › «R3 - la fila activa muestra su estado y su
+  > duracion abierta», «R3 - una fila activa en POR_EMPACAR no lleva chip «En curso»: el estado ya dice
+  > el paso; su duracion es abierta», «R3 - la fila dada de baja en EN_CURSO no lleva la marca de
+  > actividad aunque su estado diga «En fabricación»»; `tests/unit/dashboard/execution-trace-format.test.ts`
+  > › «R3 - una duracion abierta se marca (en curso)» y «R3 - EN_CURSO se lee «En fabricación»».
+
 - [x] **T11 — Detalle del recorrido.** `app/(private)/dashboard/recorrido/[id]/page.tsx` y
   `components/{execution-trace-detail.tsx,index.ts}` (`design.md > 4.3`). *Depende de T7, T8, T9.*
   **Hecho cuando** (proyecto `ui`): primera línea `requirePagePermission('dashboard.consultar')`;

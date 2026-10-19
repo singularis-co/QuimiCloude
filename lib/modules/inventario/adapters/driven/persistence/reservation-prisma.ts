@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { addQuantities, compareQuantities, subtractQuantities } from '../../../domain/decimal-quantity';
+import { addQuantities, ceilToScale4, compareQuantities, minQuantity, subtractQuantities } from '../../../domain/decimal-quantity';
 import { planReservation, type ReservationCandidateBatch } from '../../../domain/plan-reservation';
 import type { ProductId } from '../../../domain/product-catalog';
 import { netReservedByBatch, type ReservationMovementKind } from '../../../domain/reservation-ledger';
@@ -19,7 +19,7 @@ import type { InventoryScope } from '../../../domain/inventory-scope';
 import { consumeBatchStock, recalculateProductStock } from './product-prisma';
 
 /**
- * `syncForOrder`, `releaseForOrder` y `consumeForOrder`. Reciben el
+ * `syncForOrder`, `releaseForOrder`, `consumeForOrder` y `settlePackagingForOrder`. Reciben el
  * cliente que abre quien llama -global o transaccional- y no abren transaccion propia: el
  * pedido y su reserva tienen que comitear o deshacerse juntos, y esa transaccion la abre
  * `pedidos`, nunca este archivo.
@@ -317,6 +317,137 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         const productId = batchProduct.get(batchId);
         if (productId !== undefined) touchedProductIds.add(productId);
       }
+      for (const productId of touchedProductIds) await recalculateProductStock(db, productId, scope);
+
+      return { kind: 'consumed' };
+    },
+
+    async settlePackagingForOrder(input): Promise<ConsumptionOutcome> {
+      const { orderId, companyId, actorId, now } = input;
+      const scope: InventoryScope = { companyId };
+
+      const needByProduct = new Map<string, string>();
+      for (const line of input.requirement) {
+        needByProduct.set(line.productId, addQuantities(needByProduct.get(line.productId) ?? ZERO, ceilToScale4(line.quantity)));
+      }
+      if (needByProduct.size === 0) return { kind: 'nothing_to_consume' };
+
+      const productIds = [...needByProduct.keys()];
+      const productUnits = await lockProductsAscending(db, companyId, productIds);
+
+      const batches = await db.productBatch.findMany({
+        where: { companyId, productId: { in: productIds } },
+        select: { id: true, productId: true, lot: true, purchaseDate: true, stock: true },
+      });
+      const batchProduct = new Map(batches.map((batch) => [batch.id, batch.productId]));
+      const ownRows =
+        batches.length === 0
+          ? []
+          : await db.reservationMovement.findMany({
+              where: { companyId, orderId, batchId: { in: batches.map((batch) => batch.id) } },
+              select: { batchId: true, kind: true, quantity: true },
+            });
+      const ownByBatch = new Map(
+        [...netReservedByBatch(ownRows.map(toLedgerRow))].filter(([, quantity]) => isPositive(quantity)),
+      );
+
+      const ownTotalByProduct = new Map<string, string>();
+      for (const [batchId, quantity] of ownByBatch) {
+        const productId = batchProduct.get(batchId) as string;
+        ownTotalByProduct.set(productId, addQuantities(ownTotalByProduct.get(productId) ?? ZERO, quantity));
+      }
+
+      const fromOwnRequirement: ReservationRequirementLine[] = [];
+      const remainingByProduct = new Map<string, string>();
+      for (const [productId, need] of needByProduct) {
+        const fromOwn = minQuantity(need, ownTotalByProduct.get(productId) ?? ZERO);
+        if (isPositive(fromOwn)) fromOwnRequirement.push({ productId: productId as ProductId, quantity: fromOwn });
+        remainingByProduct.set(productId, subtractQuantities(need, fromOwn));
+      }
+
+      // Lo apartado se reparte con la misma regla que lo aparto (mas antiguo primero), usando
+      // como disponible de cada lote solo lo que ESTE pedido tiene apartado en el.
+      const ownCandidates: ReservationCandidateBatch[] = batches
+        .filter((batch) => ownByBatch.has(batch.id))
+        .map((batch) => ({
+          id: batch.id,
+          productId: batch.productId as ProductId,
+          lot: batch.lot,
+          purchaseDate: toCivilDate(batch.purchaseDate),
+          available: ownByBatch.get(batch.id) as string,
+        }));
+      const ownPlan = planReservation({ requirement: fromOwnRequirement, products: productUnits, batches: ownCandidates });
+      if (ownPlan.kind === 'insufficient') {
+        throw new Error('reservation-prisma: lo apartado no cubre una cantidad acotada a lo apartado');
+      }
+      const takenByBatch = new Map(ownPlan.allocations.map((allocation) => [allocation.batchId, allocation.quantity]));
+
+      const touchedProductIds = new Set<string>();
+      for (const [batchId, reserved] of ownByBatch) {
+        const productId = batchProduct.get(batchId) as string;
+        const taken = takenByBatch.get(batchId) ?? ZERO;
+
+        if (isPositive(taken)) {
+          const result = await consumeBatchStock(db, { batchId, quantity: taken, orderId, actorId }, now, scope);
+          if (result.kind === 'insufficient') {
+            // Merma sobre el lote apartado: se toma lo que quede y el resto sale del disponible libre.
+            const available = isPositive(result.available) ? result.available : ZERO;
+            if (isPositive(available)) {
+              const partial = await consumeBatchStock(db, { batchId, quantity: available, orderId, actorId }, now, scope);
+              if (partial.kind !== 'consumed') {
+                throw new Error('reservation-prisma: consumo parcial inesperado bajo el bloqueo del producto');
+              }
+            }
+            remainingByProduct.set(productId, addQuantities(remainingByProduct.get(productId) ?? ZERO, subtractQuantities(taken, available)));
+          }
+          touchedProductIds.add(productId);
+          await db.reservationMovement.create({
+            data: { companyId, orderId, batchId, kind: 'consume', quantity: new Prisma.Decimal(taken), createdBy: actorId, createdAt: now },
+          });
+        }
+
+        const released = subtractQuantities(reserved, taken);
+        if (isPositive(released)) {
+          await db.reservationMovement.create({
+            data: { companyId, orderId, batchId, kind: 'release', quantity: new Prisma.Decimal(released), createdBy: actorId, createdAt: now },
+          });
+        }
+      }
+
+      const extraRequirement: ReservationRequirementLine[] = [...remainingByProduct]
+        .filter(([, quantity]) => isPositive(quantity))
+        .map(([productId, quantity]) => ({ productId: productId as ProductId, quantity }));
+
+      if (extraRequirement.length > 0) {
+        const extraProductIds = extraRequirement.map((line) => line.productId);
+        // Se releen despues de consumir lo apartado: la existencia ya bajo y lo propio de estos
+        // productos ya quedo resuelto en el libro, asi que lo apartado que queda es de otros.
+        const candidateRows = await db.productBatch.findMany({
+          where: { companyId, productId: { in: extraProductIds } },
+          select: { id: true, productId: true, lot: true, purchaseDate: true, stock: true },
+        });
+        const candidateIds = candidateRows.map((row) => row.id);
+        const reservedRows =
+          candidateIds.length === 0
+            ? []
+            : await db.reservationMovement.findMany({
+                where: { companyId, batchId: { in: candidateIds } },
+                select: { batchId: true, kind: true, quantity: true },
+              });
+        const candidateBatches = toCandidateBatches(candidateRows, netReservedByBatch(reservedRows.map(toLedgerRow)));
+
+        const plan = planReservation({ requirement: extraRequirement, products: productUnits, batches: candidateBatches });
+        if (plan.kind === 'insufficient') return { kind: 'insufficient', productIds: plan.productIds };
+
+        for (const allocation of plan.allocations) {
+          const result = await consumeBatchStock(db, { batchId: allocation.batchId, quantity: allocation.quantity, orderId, actorId }, now, scope);
+          if (result.kind !== 'consumed') {
+            throw new Error('reservation-prisma: consumo del exceso inesperado bajo el bloqueo del producto');
+          }
+          touchedProductIds.add(batchProduct.get(allocation.batchId) as string);
+        }
+      }
+
       for (const productId of touchedProductIds) await recalculateProductStock(db, productId, scope);
 
       return { kind: 'consumed' };

@@ -22,7 +22,7 @@ const ARCHIVO = '44444444-4444-4444-8444-444444444444';
 const PRESENTACION_LITRO = '55555555-5555-4555-8555-555555555555';
 
 function actorConPermiso(): Actor {
-  return { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION] };
+  return { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION], addons: ['lectura_pdf'] };
 }
 
 const JSON_UNA_LINEA_NUEVA = JSON.stringify({
@@ -305,9 +305,9 @@ describe('createPreviewCatalogImport', () => {
     const actoresDenegados: readonly (readonly [string, Actor | null | undefined])[] = [
       ['actor nulo', null],
       ['actor ausente', undefined],
-      ['sin el permiso exigido', { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.consultar'] }],
-      ['con el conjunto vacio', { id: PERSONA, companyId: EMPRESA, permissions: [] }],
-      ['R8 — solo con `documentos.modificar`', { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'] }],
+      ['sin el permiso exigido', { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.consultar'], addons: ['lectura_pdf'] }],
+      ['con el conjunto vacio', { id: PERSONA, companyId: EMPRESA, permissions: [], addons: ['lectura_pdf'] }],
+      ['R8 — solo con `documentos.modificar`', { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'], addons: ['lectura_pdf'] }],
     ];
 
     for (const [nombre, actor] of actoresDenegados) {
@@ -345,7 +345,7 @@ describe('createPreviewCatalogImport', () => {
       const bitacora: Bitacora = [];
       const deps = crearDeps(bitacora);
       const preview = createPreviewCatalogImport(deps);
-      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION] };
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION], addons: ['lectura_pdf'] };
 
       const resultado = await preview(actor, { supplierId: PROVEEDOR, documentFileId: ARCHIVO });
 

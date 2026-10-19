@@ -1111,6 +1111,39 @@ describe('R36 — por producto: total, reservado y disponible, incluido el caso 
   });
 });
 
+describe('nextExpiryDate — vencimiento mas proximo por producto, en la misma consulta por pagina', () => {
+  it('toma el minimo de los lotes con existencia > 0 y fecha; ignora los agotados y los sin fecha', async () => {
+    const fixture = await createFixture();
+    const { productId } = await createProductWithBatch(fixture, { expiryDate: '2027-03-10' });
+    const { productId: sinFechaId } = await createProductWithBatch(fixture, { expiryDate: null });
+    const { productId: soloAgotadoId, batchId: soloAgotadoBatchId } = await createProductWithBatch(fixture, {
+      expiryDate: '2026-11-15',
+    });
+
+    try {
+      await addBatchToAlive(productId, newBatch(fixture, { expiryDate: null }), new Date(), ambito(fixture));
+      const agotado = await addBatchToAlive(
+        productId,
+        newBatch(fixture, { expiryDate: '2026-12-01' }),
+        new Date(),
+        ambito(fixture),
+      );
+      if (agotado === null || agotado === 'finished_product') throw new Error('alta de lote inesperada');
+      // Lote con la fecha mas temprana pero existencia 0: no cuenta para el vencimiento.
+      await adjustByDelta(agotado.batchId, '-10', 'merma', fixture.actorId, new Date(), ambito(fixture));
+      // Unico lote con fecha del producto, agotado: el producto queda sin vencimiento.
+      await adjustByDelta(soloAgotadoBatchId, '-10', 'merma', fixture.actorId, new Date(), ambito(fixture));
+
+      const pagina = await listAliveProducts(listQueryOf(), ambito(fixture));
+      expect(pagina.items.find((item) => item.id === productId)?.nextExpiryDate).toBe('2027-03-10');
+      expect(pagina.items.find((item) => item.id === sinFechaId)?.nextExpiryDate).toBeNull();
+      expect(pagina.items.find((item) => item.id === soloAgotadoId)?.nextExpiryDate).toBeNull();
+    } finally {
+      await dropFixture(fixture, [productId, sinFechaId, soloAgotadoId], []);
+    }
+  });
+});
+
 describe('R38 — el historial de un lote une los dos libros, del mas reciente al mas antiguo', () => {
   it('intercala apartados, liberaciones y consumos con el alta y el ajuste, con el pedido crudo en orderNumberText', async () => {
     const fixture = await createFixture();

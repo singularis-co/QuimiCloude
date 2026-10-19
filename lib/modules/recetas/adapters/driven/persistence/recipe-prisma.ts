@@ -273,15 +273,14 @@ export async function findAliveRecipeById(id: string, scope: RecipeScope): Promi
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.RecipeOrderByWithRelationInput;
 
 /**
- * Orden POR DEFECTO: exactamente el de hoy, `name ASC` (R11). Sin `sort`, la lista no se mueve;
- * el desempate por `id` que se le anade detras no la cambia -el nombre es unico entre vivas, asi
- * que no hay empates que romper- y la deja estable el dia que deje de serlo.
+ * Orden POR DEFECTO: mas nuevas primero, `created_at DESC, id ASC`. Dos altas del mismo
+ * instante empatan en `created_at`, y el desempate por `id` las deja en un orden estable.
  *
  * Se construye en CADA llamada, no como constante compartida: Prisma exige un array mutable en
  * `orderBy`, y devolver siempre la misma instancia dejaria que un llamante la mutara para todos.
  */
 function defaultOrderBy(): Prisma.RecipeOrderByWithRelationInput[] {
-  return [{ name: 'asc' }, TIE_BREAKER];
+  return [{ createdAt: 'desc' }, TIE_BREAKER];
 }
 
 /**
@@ -616,6 +615,17 @@ export async function listAliveRecipeVersions(
     orderBy: [{ name: 'asc' }, TIE_BREAKER],
   });
   return rows.map(toRecipeRow);
+}
+
+export async function listRecipeVersionIdsIncludingDeleted(
+  originalId: string,
+  scope: RecipeScope,
+): Promise<readonly string[]> {
+  const rows = await prisma.recipe.findMany({
+    where: { parentRecipeId: originalId, ...recipeCompanyScope(scope) },
+    select: { id: true },
+  });
+  return rows.map((row) => row.id);
 }
 
 function toLineData(line: { productId: string; percentage: Prisma.Decimal }): RecipeLineData {

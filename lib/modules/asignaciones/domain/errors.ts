@@ -251,6 +251,25 @@ export class OrderPackingTakenError extends AsignacionesError {
   }
 }
 
+/** Terminar el empaque con mas envases reales de los que caben en la cantidad del pedido. */
+export class PackedExceedsQuantityError extends AsignacionesError {
+  readonly code = 'packed_exceeds_quantity';
+
+  constructor(diagnostic?: string) {
+    super('packed_exceeds_quantity', diagnostic);
+  }
+}
+
+/** Terminar el empaque con mas envases reales de los apartados y sin stock libre del envase para
+ *  la diferencia; puede pasar si otro pedido lo aparto despues de abrir el dialogo. */
+export class PackagingStockInsufficientError extends AsignacionesError {
+  readonly code = 'packaging_stock_insufficient';
+
+  constructor(diagnostic?: string) {
+    super('packaging_stock_insufficient', diagnostic);
+  }
+}
+
 /** Comenzar o Terminar sobre un pedido cuyo estado actual no admite esa accion de empaque. */
 export class OrderNotPackableError extends AsignacionesError {
   readonly code = 'order_not_packable';
@@ -350,8 +369,7 @@ export class OrderWithoutDistributionError extends AsignacionesError {
   }
 }
 
-/** El vencimiento de alguna linea no es posterior a hoy. `batchId` es el lote de la primera linea
- *  culpable, para que la pantalla la marque; va tambien como diagnostico. */
+/** El vencimiento no es posterior a hoy. `batchId`, si llega, es solo diagnostico. */
 export class BatchExpiryNotFutureError extends AsignacionesError {
   readonly code = 'batch_expiry_not_future';
   readonly batchId?: string;
@@ -362,8 +380,7 @@ export class BatchExpiryNotFutureError extends AsignacionesError {
   }
 }
 
-/** El dia de produccion de alguna linea es posterior a hoy. `batchId` como en
- *  `BatchExpiryNotFutureError`. */
+/** El dia de produccion es posterior a hoy. `batchId` como en `BatchExpiryNotFutureError`. */
 export class BatchProductionDateFutureError extends AsignacionesError {
   readonly code = 'batch_production_date_future';
   readonly batchId?: string;
@@ -386,9 +403,9 @@ export class ConditioningBatchDataMissingError extends AsignacionesError {
   }
 }
 
-/** El lote ya es el de otro lote de la empresa, o se repite en la entrada. Mismo `code` que
- *  `BatchDuplicateLotError` de `inventario`. Sin `batchId` cuando el choque lo detecto el indice
- *  unico en carrera y no se sabe que linea lo causo. */
+/** Otro lote de la empresa con el mismo producto y presentacion ya lleva ese codigo. Mismo `code`
+ *  que `BatchDuplicateLotError` de `inventario`. `batchId` es el lote del pedido que choca, como
+ *  diagnostico; falta cuando el choque lo detecto el indice unico en carrera. */
 export class ConditioningBatchDuplicateLotError extends AsignacionesError {
   readonly code = 'batch_duplicate_lot';
   readonly batchId?: string;
@@ -399,7 +416,7 @@ export class ConditioningBatchDuplicateLotError extends AsignacionesError {
   }
 }
 
-/** El lote no es el de una linea de ese pedido. Mismo `code` que `BatchNotFoundError` de
+/** El pedido no tiene ninguna linea con lote. Mismo `code` que `BatchNotFoundError` de
  *  `inventario`. */
 export class ConditioningBatchNotFoundError extends AsignacionesError {
   readonly code = 'batch_not_found';
@@ -408,5 +425,41 @@ export class ConditioningBatchNotFoundError extends AsignacionesError {
   constructor(batchId?: string) {
     super('batch_not_found', batchId);
     this.batchId = batchId;
+  }
+}
+
+/** Avanzar o terminar con un paso que exige evidencia y no tiene ninguna foto. */
+export class EvidenceRequiredError extends AsignacionesError {
+  readonly code = 'evidence_required';
+
+  constructor(diagnostic?: string) {
+    super('evidence_required', diagnostic);
+  }
+}
+
+/** El paso ya tiene sus 3 fotos y la peticion no sustituye a ninguna. */
+export class EvidenceLimitError extends AsignacionesError {
+  readonly code = 'evidence_limit';
+
+  constructor(diagnostic?: string) {
+    super('evidence_limit', diagnostic);
+  }
+}
+
+/** Lo subido no existe, o por su contenido no es JPEG, PNG ni WebP de hasta 4.4 MB. */
+export class EvidenceInvalidFileError extends AsignacionesError {
+  readonly code = 'evidence_invalid_file';
+
+  constructor(diagnostic?: string) {
+    super('evidence_invalid_file', diagnostic);
+  }
+}
+
+/** La foto no existe en ese pedido, fase y paso, o es de otra empresa. */
+export class EvidenceNotFoundError extends AsignacionesError {
+  readonly code = 'evidence_not_found';
+
+  constructor(diagnostic?: string) {
+    super('evidence_not_found', diagnostic);
   }
 }

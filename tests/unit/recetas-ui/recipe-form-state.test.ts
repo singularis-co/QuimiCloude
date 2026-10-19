@@ -131,7 +131,7 @@ describe('extractToolErrors — errores por fila a partir del path', () => {
   it('el producto repetido no apunta a una fila: sale como error general', () => {
     const issues = issuesOf([tool({ key: 'a' }), tool({ key: 'b' })]);
     expect(extractToolErrors(issues, MESSAGES)).toEqual({});
-    expect(extractGeneralToolsError(issues)).toBe(
+    expect(extractGeneralToolsError(issues, 'fallback')).toBe(
       'No puede haber dos herramientas con el mismo producto.',
     );
   });

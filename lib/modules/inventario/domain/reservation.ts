@@ -61,6 +61,19 @@ export interface MaterialReservations {
     readonly actorId: string;
     readonly now: Date;
   }): Promise<ConsumptionOutcome>;
+
+  /** Consume de cada producto de `requirement` exactamente su cantidad: primero de lo que el pedido
+   *  tiene apartado, y lo que exceda, del disponible que no aparta ningun otro pedido. Lo apartado
+   *  que sobra se libera. Un producto con cantidad 0 se libera entero; uno que no viene en
+   *  `requirement` no se toca. Con `insufficient` ya hay escrituras: quien llama deshace la
+   *  transaccion. */
+  settlePackagingForOrder(input: {
+    readonly orderId: string;
+    readonly companyId: string;
+    readonly requirement: readonly ReservationRequirementLine[];
+    readonly actorId: string;
+    readonly now: Date;
+  }): Promise<ConsumptionOutcome>;
 }
 
 /** Lectura, fuera de transaccion. */

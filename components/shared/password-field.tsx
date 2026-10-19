@@ -26,6 +26,7 @@ export type PasswordFieldProps = {
   readonly autoComplete?: 'current-password' | 'new-password' | 'off';
   readonly variant?: 'password' | 'secret';
   readonly texts?: { readonly show?: string; readonly hide?: string };
+  readonly placeholder?: string;
   readonly error?: string;
   readonly describedBy?: string;
   readonly testId?: string;
@@ -53,6 +54,7 @@ function FieldShell({
   autoComplete,
   variant = 'password',
   texts,
+  placeholder,
   error,
   describedBy,
   testId,
@@ -76,6 +78,7 @@ function FieldShell({
           name={name}
           type={visible ? 'text' : 'password'}
           autoComplete={autoComplete}
+          placeholder={placeholder}
           required={required}
           aria-required={required ? true : undefined}
           spellCheck={variant === 'secret' ? false : undefined}

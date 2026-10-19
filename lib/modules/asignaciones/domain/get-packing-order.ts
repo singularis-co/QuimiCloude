@@ -8,8 +8,17 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { OrderNotFoundError, ValidationError } from './errors';
-import { composePackingOrderRows, type PackingOrderDetail, type PackingOrderViewDeps } from './packing-order-view';
+import { readStepEvidence } from './evidence-photos';
+import {
+  composePackingFinishView,
+  composePackingOrderRows,
+  type PackingFinishViewDeps,
+  type PackingOrderDetail,
+  type PackingOrderViewDeps,
+} from './packing-order-view';
 
+import type { EvidenceStorage } from '../ports/evidence-storage';
+import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipePackingStepsReader } from '@/lib/modules/recetas';
 
@@ -19,9 +28,11 @@ const getPackingOrderSchema = z.strictObject({
   orderId: z.string().uuid(),
 });
 
-export type GetPackingOrderDeps = PackingOrderViewDeps & {
+export type GetPackingOrderDeps = PackingOrderViewDeps & PackingFinishViewDeps & {
   readonly orders: OrderCatalog;
   readonly packingSteps: RecipePackingStepsReader;
+  readonly evidence: StepEvidenceRepository;
+  readonly storage: EvidenceStorage;
 };
 
 export function createGetPackingOrder(
@@ -51,12 +62,22 @@ export function createGetPackingOrder(
     const [row] = await composePackingOrderRows(deps, actor.companyId, [summary]);
     if (row === undefined) throw new OrderNotFoundError();
 
-    // Antes de Comenzar, o si empaca otro, los pasos no salen ni en la respuesta.
-    const packingSteps =
-      summary.status === 'EN_EMPAQUE' && summary.packedBy === actor.id
-        ? ((await deps.packingSteps.findPackingStepsById(summary.recipeId, actor.companyId)) ?? [])
-        : [];
+    // Antes de Comenzar, o si empaca otro, ni los pasos, ni las fotos, ni el conteo salen en la respuesta.
+    if (summary.status !== 'EN_EMPAQUE' || summary.packedBy !== actor.id) {
+      return { ...row, packingSteps: [], packingEvidence: [], finish: null };
+    }
+    const packingSteps = (await deps.packingSteps.findPackingStepsById(summary.recipeId, actor.companyId)) ?? [];
+    const packingEvidence = await readStepEvidence(
+      deps.evidence,
+      deps.storage,
+      actor.companyId,
+      orderId,
+      'packing',
+      packingSteps,
+    );
 
-    return { ...row, packingSteps };
+    const finish = await composePackingFinishView(deps, actor.companyId, summary);
+
+    return { ...row, packingSteps, packingEvidence, finish };
   };
 }

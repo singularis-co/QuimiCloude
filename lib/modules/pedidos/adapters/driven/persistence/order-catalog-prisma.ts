@@ -8,6 +8,7 @@ import type { OrderStatus } from '../../../domain/order-classification';
 import type {
   AssignedOrderSummary,
   OrderAssignmentTarget,
+  OrderDeliveryProgress,
   OrderHistorySummary,
   OrderSummaryFilter,
   OrderSummaryOrdering,
@@ -65,8 +66,11 @@ export async function findAliveOrderTargetById(
 /** Una fila de `order_presentation_lines`, ya en el orden de alta: la
  *  consulta pide `createdAt asc, id asc`, asi que este adaptador no reordena nada en memoria. */
 type AssignedOrderPresentationLineRow = {
+  readonly id: string;
   readonly presentationId: string;
   readonly packages: number;
+  readonly packedPackages: number | null;
+  readonly presentationContent: { toFixed(digits: number): string } | null;
   readonly packagingProductId: string | null;
 };
 
@@ -102,7 +106,14 @@ const SUMMARY_SELECT = {
   status: true,
   unitId: true,
   presentationLines: {
-    select: { presentationId: true, packages: true, packagingProductId: true },
+    select: {
+      id: true,
+      presentationId: true,
+      packages: true,
+      packedPackages: true,
+      presentationContent: true,
+      packagingProductId: true,
+    },
     orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
   },
   finishedAt: true,
@@ -130,6 +141,21 @@ const FINISHED_RECENT_FIRST_ORDER_BY = [
   { id: 'asc' },
 ] as const;
 
+/** Como el «orden de terminados», pero con los nulos PRIMERO: los que aun no tienen fecha de
+ *  terminado (siguen en acondicionamiento) arriba, luego la fecha descendente. Mismo desempate. */
+const UNFINISHED_THEN_RECENT_ORDER_BY = [
+  { finishedAt: { sort: 'desc', nulls: 'first' } },
+  { orderYear: 'desc' },
+  { orderSequence: 'desc' },
+  { id: 'asc' },
+] as const;
+
+const ORDER_BY_BY_ORDERING = {
+  work_queue: WORK_QUEUE_ORDER_BY,
+  finished_recent_first: FINISHED_RECENT_FIRST_ORDER_BY,
+  unfinished_then_recent: UNFINISHED_THEN_RECENT_ORDER_BY,
+} as const satisfies Record<OrderSummaryOrdering, readonly unknown[]>;
+
 /** `quantity` llega como `Prisma.Decimal` -tipado aqui por su forma minima para no importar
  *  `@prisma/client`- y se fija a 4 decimales, la escala de la columna `Decimal(14,4)`. */
 export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummaryRecord {
@@ -143,8 +169,11 @@ export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummary
     unitId: row.unitId,
     presentationLines: row.presentationLines.map(
       (line): OrderSummaryLineRecord => ({
+        id: line.id,
         presentationId: line.presentationId,
         packages: line.packages,
+        packedPackages: line.packedPackages,
+        presentationContent: line.presentationContent === null ? null : line.presentationContent.toFixed(4),
         packagingProductId: line.packagingProductId,
       }),
     ),
@@ -254,6 +283,61 @@ export async function listOrderHistoryByIdsIncludingDeleted(
   return buildPage(rows.map(toOrderHistorySummary), total, page, limit);
 }
 
+type OrderDeliveryProgressRow = {
+  readonly id: string;
+  readonly recipeId: string;
+  readonly presentationLines: readonly {
+    readonly presentationId: string;
+    readonly packages: number;
+    readonly packedPackages: number | null;
+    readonly deliveryLines: readonly { readonly packages: number }[];
+  }[];
+};
+
+/** Suma lo entregado de cada linea; la consulta ya deja fuera las lineas de entrega anuladas. */
+export function toOrderDeliveryProgress(row: OrderDeliveryProgressRow): OrderDeliveryProgress {
+  return {
+    id: row.id,
+    recipeId: row.recipeId,
+    lines: row.presentationLines.map((line) => ({
+      presentationId: line.presentationId,
+      packages: line.packages,
+      packedPackages: line.packedPackages,
+      deliveredPackages: line.deliveryLines.reduce((total, delivery) => total + delivery.packages, 0),
+    })),
+  };
+}
+
+/**
+ * Implementa `OrderCatalog['listDeliveryProgressByIdsIncludingDeleted']`: una sola consulta para
+ * toda la pagina. Incluye los dados de baja, como el historial; el ambito de empresa va en el
+ * `where` del pedido y las lineas cuelgan de el. Lo anulado no cuenta como entregado, mismo
+ * criterio que `sumOrderDeliveredPackages`.
+ */
+export async function listOrderDeliveryProgressByIdsIncludingDeleted(
+  companyId: string,
+  ids: readonly string[],
+): Promise<readonly OrderDeliveryProgress[]> {
+  if (ids.length === 0) return [];
+  const rows = await prisma.order.findMany({
+    where: { AND: [orderCompanyScope({ companyId }), { id: { in: [...ids] } }] },
+    select: {
+      id: true,
+      recipeId: true,
+      presentationLines: {
+        select: {
+          presentationId: true,
+          packages: true,
+          packedPackages: true,
+          deliveryLines: { where: { voidLine: { is: null } }, select: { packages: true } },
+        },
+        orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
+      },
+    },
+  });
+  return rows.map(toOrderDeliveryProgress);
+}
+
 /**
  * Implementa `OrderSummaryReader['listAliveInCompany']`: el mismo
  * resumen que `listAliveOrderSummariesByIds`, pero SIN filtro de ids -toda la empresa-, para
@@ -279,10 +363,7 @@ export async function listAliveOrderSummariesInCompany(
       },
     ],
   };
-  const orderBy =
-    ordering === 'finished_recent_first'
-      ? [...FINISHED_RECENT_FIRST_ORDER_BY]
-      : [...WORK_QUEUE_ORDER_BY];
+  const orderBy = [...ORDER_BY_BY_ORDERING[ordering]];
 
   const [rows, total] = await Promise.all([
     prisma.order.findMany({

@@ -1,103 +1,122 @@
 'use client';
 
-import { LayersIcon, PencilIcon, Trash2Icon } from 'lucide-react';
-import { useState } from 'react';
+import { HistoryIcon, LayersIcon, PencilIcon, ScaleIcon, Trash2Icon } from 'lucide-react';
 
-import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
+import type { RowActionsSpec } from '@/components/shared/data-table';
+import {
+  RowActionsMenu,
+  type RowActionMenuItem,
+  type RowActionsMenuProps,
+} from '@/components/shared/row-actions-menu';
 import { productDisplayName, type ProductView } from '@/lib/modules/inventario';
-import type { ProductBatchesResult } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 
-import { DeleteProductDialog } from './delete-product-dialog';
-import { ProductBatchesSheet } from './product-batches-sheet';
+import { productNameWithoutPresentation } from './product-base-name';
 import { productUnitLabel } from './product-columns';
-import { ProductSheet } from './product-sheet';
-
-/**
- * Las acciones de fila de un producto -lotes, editar y borrar- en el menu de tres puntos de la
- * fila. La usan el catalogo y la pestana de producto terminado.
- *
- * El disparador nombra el producto, con su unidad, en su nombre accesible; los items dicen solo el
- * verbo.
- *
- * El panel de lotes, el de edicion y el dialogo de baja quedan montados y se abren por estado:
- * asi el cierre anima su salida.
- */
 
 export const PRODUCT_ROW_ACTIONS_TESTID = 'product-row-actions';
 export const PRODUCT_ACTION_BATCHES_TESTID = 'product-batches-open';
+export const PRODUCT_ACTION_HISTORY_TESTID = 'product-history-open';
+export const PRODUCT_ACTION_ADJUST_TESTID = 'product-adjust-open';
 export const PRODUCT_ACTION_EDIT_TESTID = 'product-edit-open';
 export const PRODUCT_ACTION_DELETE_TESTID = 'product-delete-open';
 
-const BATCHES_ACTION_LABEL = 'Lotes';
-const EDIT_ACTION_LABEL = 'Editar';
-const DELETE_ACTION_LABEL = 'Borrar';
+export const PRODUCT_ROW_ACTION_LABELS = {
+  batches: 'Lotes',
+  history: 'Historial',
+  adjust: 'Ajustar existencia',
+  edit: 'Editar',
+  delete: 'Borrar',
+} as const;
 
 /** Nombre accesible del disparador del menu de la fila. */
 export function productRowActionsLabel(name: string): string {
   return `Acciones de ${name}`;
 }
 
-export type ProductRowActionsProps = {
+export type ProductRowAction = 'batches' | 'history' | 'adjust' | 'edit' | 'delete';
+
+// La especificación llega a `RowActionsMenu` por propagación: `data-product-id` sale en el
+// disparador de la fila y en el de la tarjeta.
+export type ProductRowActionsSpec = RowActionsSpec & Pick<RowActionsMenuProps, 'triggerDataAttributes'>;
+
+export type ProductRowActionsSpecInput = {
   readonly product: ProductView;
   readonly units?: readonly UnitRef[];
   /** Falla cerrado: el permiso baja por props, esta pantalla no lo resuelve. */
   readonly canAdjust: boolean;
-  /** Que lotes pide el panel. Sin el, todos los del producto. */
-  readonly loadBatches?: () => Promise<ProductBatchesResult>;
+  readonly onAction: (action: ProductRowAction, product: ProductView) => void;
 };
 
-export function ProductRowActions({ product, units, canAdjust, loadBatches }: ProductRowActionsProps) {
-  const [batchesOpen, setBatchesOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+export function productRowActionsSpec({
+  product,
+  units,
+  canAdjust,
+  onAction,
+}: ProductRowActionsSpecInput): ProductRowActionsSpec {
+  const emit = (action: ProductRowAction) => () => onAction(action, product);
 
   const items: RowActionMenuItem[] = [
     {
       key: 'batches',
-      label: BATCHES_ACTION_LABEL,
+      label: PRODUCT_ROW_ACTION_LABELS.batches,
       icon: LayersIcon,
-      onSelect: () => setBatchesOpen(true),
+      onSelect: emit('batches'),
       testId: PRODUCT_ACTION_BATCHES_TESTID,
     },
     {
+      key: 'history',
+      label: PRODUCT_ROW_ACTION_LABELS.history,
+      icon: HistoryIcon,
+      onSelect: emit('history'),
+      testId: PRODUCT_ACTION_HISTORY_TESTID,
+    },
+  ];
+
+  if (canAdjust) {
+    items.push({
+      key: 'adjust',
+      label: PRODUCT_ROW_ACTION_LABELS.adjust,
+      icon: ScaleIcon,
+      onSelect: emit('adjust'),
+      testId: PRODUCT_ACTION_ADJUST_TESTID,
+    });
+  }
+
+  items.push(
+    {
       key: 'edit',
-      label: EDIT_ACTION_LABEL,
+      label: PRODUCT_ROW_ACTION_LABELS.edit,
       icon: PencilIcon,
-      onSelect: () => setEditOpen(true),
+      onSelect: emit('edit'),
       testId: PRODUCT_ACTION_EDIT_TESTID,
     },
     {
       key: 'delete',
-      label: DELETE_ACTION_LABEL,
+      label: PRODUCT_ROW_ACTION_LABELS.delete,
       icon: Trash2Icon,
-      onSelect: () => setDeleteOpen(true),
+      onSelect: emit('delete'),
       destructive: true,
+      separatorBefore: true,
       testId: PRODUCT_ACTION_DELETE_TESTID,
     },
-  ];
-
-  return (
-    <>
-      <RowActionsMenu
-        items={items}
-        triggerLabel={productRowActionsLabel(
-          productDisplayName(product.name, productUnitLabel(product, units)),
-        )}
-        triggerTestId={PRODUCT_ROW_ACTIONS_TESTID}
-        triggerDataAttributes={{ 'data-product-id': product.id }}
-      />
-
-      <ProductBatchesSheet
-        product={product}
-        units={units}
-        canAdjust={canAdjust}
-        loadBatches={loadBatches}
-        open={batchesOpen}
-        onOpenChange={setBatchesOpen}
-      />
-      <ProductSheet product={product} units={units} open={editOpen} onOpenChange={setEditOpen} />
-      <DeleteProductDialog product={product} open={deleteOpen} onOpenChange={setDeleteOpen} />
-    </>
   );
+
+  return {
+    items,
+    triggerLabel: productRowActionsLabel(
+      productDisplayName(product.name, productUnitLabel(product, units)),
+    ),
+    triggerTestId: PRODUCT_ROW_ACTIONS_TESTID,
+    triggerDataAttributes: { 'data-product-id': product.id },
+    title: productNameWithoutPresentation(product),
+  };
+}
+
+export type ProductRowActionsProps = ProductRowActionsSpecInput &
+  Pick<RowActionsMenuProps, 'presentation' | 'texts'>;
+
+/** El menú de la fila de un producto; lo que abre cada ítem lo monta quien recibe `onAction`. */
+export function ProductRowActions({ presentation, texts, ...input }: ProductRowActionsProps) {
+  return <RowActionsMenu {...productRowActionsSpec(input)} presentation={presentation} texts={texts} />;
 }

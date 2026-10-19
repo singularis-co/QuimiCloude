@@ -77,13 +77,14 @@ const PERMISOS_DE_LA_PANTALLA = ['recetas.consultar', 'recetas.modificar'] as co
 
 const DOCUMENT_FILE_ID = 'ARCHIVO-ID-NO-VISIBLE';
 
-function sesionCon(permissions: readonly string[]) {
+function sesionCon(permissions: readonly string[], addons: readonly string[] = ['lectura_pdf', 'integraciones']) {
   return {
     id: '99999999-9999-4999-8999-999999999999',
     username: 'admin.prueba',
     displayName: 'Admin De Prueba',
     roleName: 'Administrador',
     permissions,
+    addons,
   };
 }
 
@@ -182,6 +183,18 @@ describe('el corte por permiso ocurre antes de leer nada (R32)', () => {
     });
   }
 
+  it('R13 R15 R23 con los dos permisos y sin el añadido lectura_pdf responde 404 y no llega a leer nada', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(PERMISOS_DE_LA_PANTALLA, ['integraciones']));
+
+    await expect(arbolDeLaPantalla()).rejects.toThrow();
+
+    expect(notFoundMock).toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(listUnitsActionMock).not.toHaveBeenCalled();
+    expect(listProductsActionMock).not.toHaveBeenCalled();
+    expect(previewFormulaImportActionMock).not.toHaveBeenCalled();
+  });
+
   it('con los DOS permisos entra y pide las unidades, los productos y la vista previa en paralelo', async () => {
     await renderPantalla();
 
@@ -195,16 +208,17 @@ describe('el corte por permiso ocurre antes de leer nada (R32)', () => {
 });
 
 /**
- * Quita los identificadores que React (`useId`) y `dnd-kit` regeneran en cada montaje -nunca
+ * Quita los identificadores que React (`useId`, también los de Base UI) y `dnd-kit` regeneran en cada montaje -nunca
  * estables entre dos renders de la MISMA suite, aunque si lo son entre dos peticiones reales a la
  * pantalla-: sin esto, la comparacion de R2 fallaria por un contador interno que no tiene nada
  * que ver con lo que la pantalla pinta.
  */
 function sinIdentificadoresVolatiles(html: string): string {
   return html
-    .replace(/id="_r_\d+_"/g, 'id="_r_"')
-    .replace(/aria-labelledby="_r_\d+_"/g, 'aria-labelledby="_r_"')
-    .replace(/id="Dnd(DescribedBy|LiveRegion)-\d+"/g, 'id="Dnd$1"');
+    .replace(/id="(base-ui-)?_r_[0-9a-z]+_"/g, 'id="$1_r_"')
+    .replace(/aria-labelledby="_r_[0-9a-z]+_"/g, 'aria-labelledby="_r_"')
+    .replace(/id="Dnd(DescribedBy|LiveRegion)-\d+"/g, 'id="Dnd$1"')
+    .replace(/aria-describedby="DndDescribedBy-\d+"/g, 'aria-describedby="DndDescribedBy"');
 }
 
 describe('la pantalla se puede abrir de nuevo y muestra lo mismo (R2)', () => {

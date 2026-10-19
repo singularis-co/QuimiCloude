@@ -36,7 +36,7 @@ const listQuerySchema = createListQuerySchema();
  *   4. el log de lo podado (R6).
  *   5. el puerto, con la consulta YA SANEADA (R13).
  *
- * El defecto de 10, el tope de 25 (R29), el orden por defecto `name ASC, id ASC` (R11) y el
+ * El defecto de 10, el tope de 25 (R29), el orden por defecto `created_at DESC, id ASC` y el
  * filtro de los dados de baja (R7) siguen siendo del adaptador driven, que es el unico que
  * puede importar `lib/shared/pagination` y conocer la base.
  *

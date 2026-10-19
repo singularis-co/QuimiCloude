@@ -1,8 +1,8 @@
-// QC-102 T14 — La seccion de responsables abre DENTRO del panel que ya existe: R23, R24, R26, R29.
+// QC-102 T14 — La hoja de responsables: R23, R24, R26, R29.
 //
-// Se ejercita la fila VIVA —desde `<OrderTable>`, con la factoria de columnas por dentro—, que es
-// la unica manera de comprobar lo que R23 dice de verdad: que la entrada «Responsables» de la fila
-// y el `+N` de la columna abren **el mismo** panel, y que no aparece ninguna pantalla aparte.
+// Se ejercita la fila VIVA —desde `<OrderTable>`, con la factoria de columnas por dentro—: la
+// entrada «Responsables» de la fila y el `+N` de la columna abren la misma hoja, con la ficha del
+// pedido en solo lectura, y «Editar» abre el formulario sin responsables.
 //
 // **Las actions de `asignaciones` estan mockeadas y se CUENTAN**: R26 es exactamente «abrir el
 // panel no emite ninguna consulta», y eso solo se demuestra con el contador a cero.
@@ -10,11 +10,16 @@
 // **Ninguna navegacion**: `router.push` es un doble, y que siga sin llamarse es la mitad de «ni
 // ruta nueva» de R23.
 
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ORDER_FORM_TESTID,
+  ORDER_RECIPE_IMAGE_TESTID,
+  ORDER_RESPONSIBLES_CLOSE_TESTID,
+  ORDER_RESPONSIBLES_SHEET_LABELS,
+  ORDER_RESPONSIBLES_SHEET_TESTID,
+  ORDER_RESPONSIBLES_SUMMARY_TESTID,
   ORDER_RESPONSIBLES_TESTID,
   ORDER_SHEET_RESPONSIBLES_TESTID,
   ORDER_SHEET_TESTID,
@@ -175,7 +180,9 @@ function pedido(status: OrderStatus): OrderSummary {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
   };
 }
 
@@ -209,75 +216,92 @@ afterEach(() => {
   resetViewport();
 });
 
-describe('la seccion vive DENTRO del panel que ya existe (R23)', () => {
-  it('la entrada «Responsables» de la fila abre UN solo panel, el de siempre, y no navega', async () => {
+async function abrirResponsablesPorLaFila(user: ReturnType<typeof setupUser>) {
+  await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
+  await user.click(
+    await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
+  );
+}
+
+describe('«Responsables» abre su propia hoja: ficha de solo lectura y gestion de responsables (R23)', () => {
+  it('la entrada de la fila abre UNA hoja de responsables, sin formulario de edicion, y no navega', async () => {
     const user = setupUser();
     montarLista();
 
-    // Cerrada la fila, no hay ningun panel montado.
-    expect(screen.queryByTestId(ORDER_SHEET_TESTID)).toBeNull();
+    expect(screen.queryByTestId(ORDER_RESPONSIBLES_SHEET_TESTID)).toBeNull();
 
-    await user.click(screen.getByTestId('order-row-actions'));
-    await user.click(
-      await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
-    );
+    await abrirResponsablesPorLaFila(user);
 
-    // UNA sola instancia de panel, y es el `order-sheet` de QC-35: no hay panel nuevo.
-    const paneles = await screen.findAllByTestId(ORDER_SHEET_TESTID);
-    expect(paneles).toHaveLength(1);
-    // Y dentro de EL, la seccion de responsables, abierta por su seccion.
-    const seccion = within(paneles[0]).getByTestId(ORDER_SHEET_RESPONSIBLES_TESTID);
+    const hojas = await screen.findAllByTestId(ORDER_RESPONSIBLES_SHEET_TESTID);
+    expect(hojas).toHaveLength(1);
+    const seccion = within(hojas[0]).getByTestId(ORDER_SHEET_RESPONSIBLES_TESTID);
     expect(seccion).toHaveAttribute('data-section', 'responsibles');
     expect(within(seccion).getByTestId(ORDER_RESPONSIBLES_TESTID)).toBeInTheDocument();
 
-    // Ni ruta nueva ni pantalla aparte: nadie ha navegado.
+    expect(screen.queryByTestId(ORDER_SHEET_TESTID)).toBeNull();
+    expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
     expect(routerMock.push).not.toHaveBeenCalled();
     expect(routerMock.replace).not.toHaveBeenCalled();
   });
 
-  it('el `+N` de la columna abre ESE MISMO panel, tambien uno solo (R35, H5)', async () => {
+  it('la ficha muestra los datos del pedido como texto: ningun campo de edicion del pedido', async () => {
+    const user = setupUser();
+    montarLista();
+
+    await abrirResponsablesPorLaFila(user);
+
+    const ficha = await screen.findByTestId(ORDER_RESPONSIBLES_SUMMARY_TESTID);
+    expect(ficha).toHaveTextContent(RECETA.name);
+    expect(ficha).toHaveTextContent(formatOrderNumber({ year: 2026, sequence: 42 }));
+    expect(ficha).toHaveTextContent('12.5');
+    expect(within(ficha).getByTestId('order-status')).toHaveAttribute('data-status', 'PENDIENTE');
+    expect(within(ficha).getByTestId('order-priority')).toHaveAttribute('data-priority', 'MEDIA');
+    expect(within(ficha).getByText(ORDER_RESPONSIBLES_SHEET_LABELS.distribution)).toBeInTheDocument();
+    expect(within(ficha).getByText(ORDER_RESPONSIBLES_SHEET_LABELS.customer)).toBeInTheDocument();
+    expect(within(ficha).getByTestId(ORDER_RECIPE_IMAGE_TESTID)).toBeInTheDocument();
+
+    expect(within(ficha).queryAllByRole('textbox')).toHaveLength(0);
+    expect(within(ficha).queryAllByRole('combobox')).toHaveLength(0);
+    expect(within(ficha).queryAllByRole('spinbutton')).toHaveLength(0);
+    expect(within(ficha).queryAllByRole('button')).toHaveLength(0);
+    expect(ficha.querySelectorAll('input, select, textarea')).toHaveLength(0);
+  });
+
+  it('el `+N` de la columna abre ESA MISMA hoja, tambien una sola (R35, H5)', async () => {
     const user = setupUser();
     montarLista();
 
     await user.click(screen.getByRole('button', { name: responsiblesOverflowLabel(2) }));
 
-    const paneles = await screen.findAllByTestId(ORDER_SHEET_TESTID);
-    expect(paneles).toHaveLength(1);
-    expect(within(paneles[0]).getByTestId(ORDER_SHEET_RESPONSIBLES_TESTID)).toHaveAttribute(
-      'data-section',
-      'responsibles',
-    );
+    const hojas = await screen.findAllByTestId(ORDER_RESPONSIBLES_SHEET_TESTID);
+    expect(hojas).toHaveLength(1);
+    expect(within(hojas[0]).getByTestId(ORDER_RESPONSIBLES_SUMMARY_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it('editar abre el MISMO panel, pero en la seccion del formulario (R24)', async () => {
+  it('«Editar» abre el formulario SIN la seccion de responsables (R24)', async () => {
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
     await user.click(await esperarInteractiva(await screen.findByTestId('order-action-edit')));
 
-    const paneles = await screen.findAllByTestId(ORDER_SHEET_TESTID);
-    expect(paneles).toHaveLength(1);
-    expect(screen.getByTestId(ORDER_FORM_TESTID)).toBeInTheDocument();
-    expect(screen.getByTestId(ORDER_SHEET_RESPONSIBLES_TESTID)).toHaveAttribute(
-      'data-section',
-      'form',
-    );
+    expect(await screen.findByTestId(ORDER_FORM_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(ORDER_SHEET_RESPONSIBLES_TESTID)).toBeNull();
+    expect(screen.queryByTestId(ORDER_RESPONSIBLES_TESTID)).toBeNull();
+    expect(screen.queryByTestId(RESPONSIBLE_SEARCH_TESTID)).toBeNull();
+    expect(screen.queryByTestId(ORDER_RESPONSIBLES_SUMMARY_TESTID)).toBeNull();
   });
 
-  it('abierto por «Responsables», el panel sigue siendo el de siempre: no se duplica nada', async () => {
+  it('«Cerrar» cierra la hoja de responsables', async () => {
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-row-actions'));
-    await user.click(
-      await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
-    );
+    await abrirResponsablesPorLaFila(user);
+    await user.click(await screen.findByTestId(ORDER_RESPONSIBLES_CLOSE_TESTID));
 
-    expect(await screen.findByTestId(ORDER_FORM_TESTID)).toBeInTheDocument();
-    // Una sola seccion de responsables en todo el documento, no una por cada via de apertura.
-    expect(screen.getAllByTestId(ORDER_RESPONSIBLES_TESTID)).toHaveLength(1);
+    await waitFor(() => expect(screen.queryByTestId(ORDER_RESPONSIBLES_SUMMARY_TESTID)).toBeNull());
   });
 });
 
@@ -286,7 +310,7 @@ describe('abrir el panel NO emite ninguna consulta de responsables (R26)', () =>
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
     await user.click(
       await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
     );
@@ -334,7 +358,7 @@ describe('con el pedido ENTREGADO o CANCELADO la seccion CALLA (R29)', () => {
       // permiso. Si se cayera el corte por estado, este caso lo dice.
       montarLista(status);
 
-      await user.click(screen.getByTestId('order-row-actions'));
+      await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
       await user.click(
         await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
       );
@@ -368,7 +392,7 @@ describe('con el pedido ENTREGADO o CANCELADO la seccion CALLA (R29)', () => {
       const user = setupUser();
       montarLista(status);
 
-      await user.click(screen.getByTestId('order-row-actions'));
+      await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO_ID}`)).getByTestId('order-row-actions'));
       await user.click(
         await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
       );

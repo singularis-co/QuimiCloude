@@ -3,14 +3,15 @@
 
 import {
   Boxes,
+  Building2,
   ClipboardCheck,
   ClipboardList,
-  Factory,
   FlaskConical,
   LayoutDashboard,
   Package,
   Puzzle,
   Ruler,
+  ShieldUser,
   SquareUser,
   Truck,
   Users,
@@ -37,13 +38,14 @@ const TABLA_DE_ICONOS: ReadonlyArray<readonly [string, NavIconName, LucideIcon]>
   ['nav-inventario', 'package', Package],
   ['nav-pedidos', 'clipboard-list', ClipboardList],
   ['nav-usuarios', 'users', Users],
-  ['nav-produccion', 'factory', Factory],
   ['nav-produccion-recetas', 'flask-conical', FlaskConical],
   ['nav-proveedores', 'truck', Truck],
   ['nav-clientes', 'square-user', SquareUser],
   ['nav-presentaciones', 'boxes', Boxes],
   ['nav-unidades', 'ruler', Ruler],
   ['nav-integraciones', 'puzzle', Puzzle],
+  ['nav-empresas', 'building-2', Building2],
+  ['nav-administradores', 'shield-user', ShieldUser],
 ];
 
 const SIN_ICONO = [
@@ -94,7 +96,7 @@ describe('iconos del menú lateral', () => {
     expect(DESTINOS.map((d) => d.testId).sort()).toEqual(cubiertos);
   });
 
-  it('R3: etiqueta, ruta, testId, permiso, sección y orden no cambian', () => {
+  it('R3: etiqueta, ruta, testId, permiso, sección y orden de cada destino', () => {
     const forma = DESTINOS.map((item) =>
       item.kind === 'group'
         ? { kind: item.kind, label: item.label, testId: item.testId, section: item.section }
@@ -109,21 +111,22 @@ describe('iconos del menú lateral', () => {
     );
 
     expect(forma).toEqual([
-      { kind: 'link', label: 'Asignación', href: '/asignacion', testId: 'nav-asignacion', permission: 'asignaciones.consultar', section: 'Operación' },
-      { kind: 'link', label: 'Dashboard', href: '/dashboard', testId: 'nav-dashboard', permission: 'dashboard.consultar', section: 'Operación' },
+      { kind: 'link', label: 'Dashboard', href: '/dashboard', testId: 'nav-dashboard', permission: 'dashboard.consultar', section: 'Seguimiento' },
       { kind: 'link', label: 'Inventario', href: '/inventario', testId: 'nav-inventario', permission: 'inventario.consultar', section: 'Operación' },
       { kind: 'link', label: 'Pedidos', href: '/pedidos', testId: 'nav-pedidos', permission: 'pedidos.consultar', section: 'Operación' },
-      { kind: 'group', label: 'Producción', testId: 'nav-produccion', section: 'Cadena' },
-      { kind: 'link', label: 'Fórmulas', href: '/produccion/formulas', testId: 'nav-produccion-recetas', permission: 'recetas.consultar', section: undefined },
-      { kind: 'link', label: 'Proveedores', href: '/proveedores', testId: 'nav-proveedores', permission: 'proveedores.consultar', section: 'Cadena' },
+      { kind: 'link', label: 'Asignación', href: '/asignacion', testId: 'nav-asignacion', permission: 'asignaciones.consultar', section: 'Operación' },
+      { kind: 'link', label: 'Fórmulas', href: '/produccion/formulas', testId: 'nav-produccion-recetas', permission: 'recetas.consultar', section: 'Producción' },
+      { kind: 'link', label: 'Proveedores', href: '/proveedores', testId: 'nav-proveedores', permission: 'proveedores.consultar', section: 'Directorio' },
+      { kind: 'link', label: 'Clientes', href: '/clientes', testId: 'nav-clientes', permission: 'clientes.consultar', section: 'Directorio' },
+      { kind: 'link', label: 'Usuarios', href: '/configuracion/usuarios', testId: 'nav-usuarios', permission: 'usuarios.consultar', section: 'Configuración' },
       { kind: 'link', label: 'Presentaciones', href: '/configuracion/presentaciones', testId: 'nav-presentaciones', permission: 'inventario.modificar', section: 'Configuración' },
       { kind: 'link', label: 'Unidades', href: '/configuracion/unidades', testId: 'nav-unidades', permission: 'unidades.consultar', section: 'Configuración' },
-      { kind: 'link', label: 'Usuarios', href: '/configuracion/usuarios', testId: 'nav-usuarios', permission: 'usuarios.consultar', section: 'Operación' },
-      { kind: 'link', label: 'Clientes', href: '/clientes', testId: 'nav-clientes', permission: 'clientes.consultar', section: 'Cadena' },
       { kind: 'group', label: 'Integraciones', testId: 'nav-integraciones', section: 'Configuración' },
       { kind: 'link', label: 'Proveedor IA', href: '/integraciones/proveedor-ia', testId: 'nav-integraciones-proveedor-ia', permission: 'integraciones.modificar', section: undefined },
       { kind: 'link', label: 'Inventarios', href: '/integraciones/inventarios', testId: 'nav-integraciones-inventarios', permission: 'integraciones.modificar', section: undefined },
       { kind: 'link', label: 'WhatsApp', href: '/integraciones/whatsapp', testId: 'nav-integraciones-whatsapp', permission: 'integraciones.modificar', section: undefined },
+      { kind: 'link', label: 'Empresas', href: '/maestro/empresas', testId: 'nav-empresas', permission: 'empresas.consultar', section: 'Plataforma' },
+      { kind: 'link', label: 'Administradores', href: '/maestro/administradores', testId: 'nav-administradores', permission: 'empresas.consultar', section: 'Plataforma' },
     ]);
   });
 });

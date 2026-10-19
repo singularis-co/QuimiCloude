@@ -390,8 +390,8 @@ describe('QC-195 reviewBlockedOrders — los envases del reparto', () => {
   function conReparto(): LockedOrderRow {
     return bloqueado(PEDIDO_1, {
       presentationLines: [
-        { presentationId: PRESENTACION, packages: 10, packagingProductId: ENVASE },
-        { presentationId: 'antigua', packages: 3, packagingProductId: null },
+        { presentationId: PRESENTACION, packages: 10, packagingProductId: ENVASE, presentationContent: null },
+        { presentationId: 'antigua', packages: 3, packagingProductId: null, presentationContent: null },
       ],
     });
   }

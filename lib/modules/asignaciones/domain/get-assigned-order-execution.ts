@@ -3,10 +3,13 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
-import { toDistributionLines, unitLabelOf } from './order-distribution-view';
+import { readStepEvidence } from './evidence-photos';
+import { toDistributionLines, toDistributionPresentations, unitLabelOf } from './order-distribution-view';
 
 import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-order-execution-view';
+import type { EvidenceStorage } from '../ports/evidence-storage';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
+import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 
 import { formatOrderNumber, resolveLineNeed, type OrderCatalog } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -24,6 +27,8 @@ export type GetAssignedOrderExecutionDeps = {
   readonly units: UnitCatalog;
   readonly products: ProductCatalog;
   readonly presentations: PresentationCatalog;
+  readonly evidence: StepEvidenceRepository;
+  readonly storage: EvidenceStorage;
 };
 
 /** La base efectiva de una unidad: la que declara, o ella misma si no deriva de nadie. */
@@ -86,11 +91,28 @@ export function createGetAssignedOrderExecution(
           .filter((unitId): unitId is string => unitId !== null),
       ),
     ];
+    const presentationIds = [...new Set(summary.presentationLines.map((line) => line.presentationId))];
+    const presentations =
+      presentationIds.length === 0
+        ? []
+        : await deps.presentations.findRefs(presentationIds, actor.companyId);
+
+    // Las unidades de las lineas, la del pedido y las de las presentaciones del reparto, juntas.
     const orderUnitId = summary.unitId;
-    const unitIdsToRead = orderUnitId === null ? unitIds : [...new Set([...unitIds, orderUnitId])];
+    const unitIdsToRead = [
+      ...new Set([
+        ...unitIds,
+        ...(orderUnitId === null ? [] : [orderUnitId]),
+        ...presentations.map((presentation) => presentation.unitId),
+      ]),
+    ];
     const ownUnits = unitIdsToRead.length > 0 ? await deps.units.findRefs(unitIdsToRead, actor.companyId) : [];
     const ownUnitsById = new Map(ownUnits.map((unit) => [unit.id, unit]));
     const orderUnit = orderUnitId === null ? null : ownUnitsById.get(orderUnitId) ?? null;
+    const distributionPresentations = toDistributionPresentations(
+      presentations,
+      new Map(ownUnits.map((unit) => [unit.id, unitLabelOf(unit)])),
+    );
     const bridge = orderUnitId === null ? null : await deps.units.findMassVolumeBridge();
 
     const sisterUnits =
@@ -129,12 +151,12 @@ export function createGetAssignedOrderExecution(
       };
     });
 
-    const presentationIds = [...new Set(summary.presentationLines.map((line) => line.presentationId))];
-    const presentations =
-      presentationIds.length === 0
-        ? []
-        : await deps.presentations.findRefs(presentationIds, actor.companyId);
-    const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
+
+    // Un pedido PENDIENTE todavia no puede tener fotos.
+    const evidence =
+      target.status === 'EN_CURSO'
+        ? await readStepEvidence(deps.evidence, deps.storage, actor.companyId, orderId, 'manufacturing', steps)
+        : [];
 
     return {
       orderId: summary.id,
@@ -148,9 +170,10 @@ export function createGetAssignedOrderExecution(
         productName: productRefsById.get(tool.productId)?.name ?? null,
         quantity: tool.quantity,
       })),
-      presentationLines: toDistributionLines(summary.presentationLines, presentationNames),
+      presentationLines: toDistributionLines(summary.presentationLines, distributionPresentations),
       unitId: summary.unitId,
       unitLabel: orderUnit === null ? null : unitLabelOf(orderUnit),
+      evidence,
     };
   };
 }

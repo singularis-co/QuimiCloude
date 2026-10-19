@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Proveedor IA</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="proveedor-ia" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page">
+        <div class="ph">
+          <div class="ph-t"><span class="crumb">Integraciones<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg></span><h1 class="h1">Proveedor IA</h1></div>
+        </div>
+        <p class="sub" style="max-width: 720px; margin: 0 0 18px">La lectura de fórmulas y catálogos en PDF usa la cuenta de IA de tu empresa. Elige el proveedor, pega tu API key y prueba la conexión. La key se guarda cifrada y nunca se vuelve a mostrar.</p>
+
+        <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ true }}">
+          <div class="card" style="max-width: 760px; gap: 18px">
+            <div class="card-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 class="h2">Conecta tu proveedor</h2><p class="sub">Sin proveedor configurado no se pueden leer PDF.</p></div><span class="sb t-neutral"><i></i>Sin configurar</span></div>
+
+            <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+              <legend class="fl" style="margin-bottom: 8px">Proveedor</legend>
+              <div role="radiogroup" aria-label="Proveedor" class="g2" style="gap: 10px">
+                <sc-for list="{{ providers }}" as="p" hint-placeholder-count="4">
+                  <button class="{{ p.cls }}" type="button" role="radio" aria-checked="{{ p.sel }}" onClick="{{ p.pick }}" style="display: flex; align-items: center; gap: 12px; padding: 12px; min-height: 64px; border-radius: 10px; border: 1px solid {{ p.border }}; background: {{ p.bg }}; text-align: left; cursor: pointer; font: inherit; color: inherit; box-shadow: {{ p.ring }}; transition: border-color 100ms, box-shadow 100ms">
+                    <span aria-hidden="true" style="flex: none; width: 40px; height: 40px; border-radius: 8px; border: 1px dashed var(--input); display: grid; place-items: center; font: 600 15px 'IBM Plex Sans', sans-serif; color: var(--muted-fg)">{{ p.mono }}</span>
+                    <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1"><span style="font-weight: 600">{{ p.name }}</span><span class="cap">{{ p.hint }}</span></span>
+                    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="opacity: {{ p.op }}; color: var(--primary)"><path d="m5 12 5 5 9-10"></path></svg>
+                  </button>
+                </sc-for>
+              </div>
+              <span class="help">Recuadro punteado = [LOGO OFICIAL del proveedor]; el definitivo sale del kit de marca de cada uno.</span>
+            </fieldset>
+
+            <div class="f"><label for="ia-key">API key de {{ selName }}</label>
+              <div class="pw"><input id="ia-key" class="{{ keyCls }}" type="{{ keyType }}" value="{{ keyVal }}" autocomplete="off" spellcheck="false" onInput="{{ onKey }}" placeholder="Pega aquí tu API key"><button class="pw-eye" type="button" aria-pressed="{{ keyPressed }}" aria-label="{{ keyLabel }}" aria-controls="ia-key" onClick="{{ toggleKey }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path class="eye-slash" d="M3 3l18 18"></path></svg></button></div>
+              <span class="help">Créala en la consola de {{ selName }}: <a href="#">[ENLACE A LA CONSOLA]</a>. Se usa con los modelos {{ selModels }}.</span>
+            </div>
+
+            <div aria-live="polite" style="min-height: 22px">
+              <sc-if value="{{ testOk }}" hint-placeholder-val="{{ false }}"><span class="sb t-success"><i></i>Conexión correcta · respondió en 0,8 s</span></sc-if>
+              <sc-if value="{{ testErr }}" hint-placeholder-val="{{ false }}"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Error con tu proveedor: la key fue rechazada. Revísala y vuelve a probar.</span></sc-if>
+            </div>
+
+            <div class="actions cq-stack">
+              <button class="b b-out b-touch-m" type="button" onClick="{{ test }}" disabled="{{ noKey }}"><sc-if value="{{ testing }}" hint-placeholder-val="{{ false }}"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></sc-if>Probar conexión</button>
+              <button class="b b-pri b-touch-m" type="button" onClick="{{ save }}" disabled="{{ noKey }}"><sc-if value="{{ saving }}" hint-placeholder-val="{{ false }}"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></sc-if>Guardar y conectar</button>
+            </div>
+            <span class="cap">«Guardar y conectar» hace la misma prueba pequeña antes de guardar: con la key rechazada no se guarda nada.</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isOn }}" hint-placeholder-val="{{ false }}">
+          <div class="card" style="max-width: 760px; gap: 16px">
+            <div class="card-hd">
+              <div style="display: flex; align-items: center; gap: 12px; min-width: 0">
+                <span aria-hidden="true" style="flex: none; width: 44px; height: 44px; border-radius: 8px; border: 1px dashed var(--input); display: grid; place-items: center; font: 600 16px 'IBM Plex Sans', sans-serif; color: var(--muted-fg)">{{ selMono }}</span>
+                <div style="display: flex; flex-direction: column; gap: 2px"><h2 class="h2">{{ selName }}</h2><p class="sub">Key guardada el 13/10/2026 · cifrada</p></div>
+              </div>
+              <span class="{{ stateBadge }}"><i></i>{{ stateLabel }}</span>
+            </div>
+            <dl class="spec" style="margin: 0">
+              <dt>Receta (fórmula desde PDF)</dt><dd class="mono">{{ selRecipe }}</dd>
+              <dt>Catálogo desde PDF</dt><dd class="mono">{{ selCatalog }}</dd>
+              <dt>Última prueba</dt><dd>{{ lastTest }}</dd>
+            </dl>
+            <sc-if value="{{ isErr }}" hint-placeholder-val="{{ false }}">
+              <div role="alert" style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid color-mix(in oklch, var(--destructive) 40%, transparent); background: color-mix(in oklch, var(--destructive) 8%, transparent)">
+                <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--destructive); flex: none; margin-top: 2px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>
+                <div style="display: flex; flex-direction: column; gap: 2px"><strong>Error con tu proveedor</strong><span class="sub">La última lectura falló: {{ selName }} rechazó la key (401). Hasta que la reemplaces o vuelva a responder, no se pueden leer PDF.</span></div>
+              </div>
+            </sc-if>
+            <div aria-live="polite" style="min-height: 22px"><sc-if value="{{ testOk }}" hint-placeholder-val="{{ false }}"><span class="sb t-success"><i></i>Conexión correcta · respondió en 0,8 s</span></sc-if></div>
+            <div class="actions cq-stack" style="justify-content: space-between">
+              <button class="b b-des b-touch-m" type="button" onClick="{{ askOff }}">Desconectar</button>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap" class="cq-stack">
+                <button class="b b-out b-touch-m" type="button" onClick="{{ test }}"><sc-if value="{{ testing }}" hint-placeholder-val="{{ false }}"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></sc-if>Probar conexión</button>
+                <button class="b b-pri b-touch-m" type="button" onClick="{{ change }}">Cambiar key o proveedor</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ confirmOff }}" hint-placeholder-val="{{ false }}">
+          <div role="alertdialog" aria-labelledby="ia-off-t" class="card" style="max-width: 460px; margin-top: 16px; gap: 12px; box-shadow: var(--shadow-pop)">
+            <h2 id="ia-off-t" class="h2">¿Desconectar {{ selName }}?</h2>
+            <p class="sub">La key se borra y no se puede recuperar. Mientras no conectes otro proveedor, nadie de tu empresa podrá leer fórmulas ni catálogos en PDF.</p>
+            <div class="actions cq-stack"><button class="b b-out b-touch-m" type="button" onClick="{{ cancelOff }}">Cancelar</button><button class="b b-des b-touch-m" type="button" onClick="{{ doOff }}">Desconectar</button></div>
+          </div>
+        </sc-if>
+
+        <section aria-labelledby="ia-block" style="display: flex; flex-direction: column; gap: 10px; margin-top: 28px; padding-top: 22px; border-top: 1px dashed var(--input); max-width: 760px">
+          <span id="ia-block" class="lab">Así se ve el bloqueo donde se sube un PDF (Fórmulas, Inventario), si la empresa no tiene proveedor</span>
+          <div role="status" style="display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--muted)">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="flex: none; margin-top: 2px; color: var(--muted-fg)"><path d="M12 3a4 4 0 0 0-4 4v3H6v11h12V10h-2V7a4 4 0 0 0-4-4zM10 10V7a2 2 0 1 1 4 0v3"></path></svg>
+            <div style="display: flex; flex-direction: column; gap: 8px"><span><strong>Para leer PDF, conecta el proveedor IA de tu empresa.</strong> La lectura usa tu propia API key.</span><a class="b b-out b-sm" href="#" style="align-self: flex-start">Ir a Proveedor IA</a><span class="cap">Quien no tiene <span class="mono">integraciones.modificar</span> ve el mismo aviso con «Pídele a un administrador que lo configure» en vez del botón.</span></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="proveedor-ia" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div style="position: absolute; left: 50%; bottom: 20px; translate: -50% 0; z-index: 45; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px; border-radius: 14px; border: 1px dashed var(--input); background: color-mix(in oklch, var(--card) 92%, transparent); box-shadow: var(--shadow-pop)">
+    <span class="cap">Selector del tablero (no es parte de la app)</span>
+    <div class="tabs" role="tablist" aria-label="Estado que se muestra">
+      <sc-for list="{{ views }}" as="v" hint-placeholder-count="3"><button class="tab" type="button" role="tab" aria-selected="{{ v.sel }}" onClick="{{ v.pick }}">{{ v.label }}</button></sc-for>
+    </div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite" style="bottom: 110px"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["sin-configurar","conectado","error"],"default":"sin-configurar"},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.tt); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const view = s.view || this.props.estado || 'sin-configurar';
+const P = [
+  ['anthropic', 'Claude', 'Anthropic', 'C', '[MODELO RECETA]', '[MODELO CATÁLOGO]'],
+  ['google', 'Gemini', 'Google', 'G', '[MODELO RECETA]', '[MODELO CATÁLOGO]'],
+  ['openai', 'OpenAI', 'GPT', 'O', '[MODELO RECETA]', '[MODELO CATÁLOGO]'],
+  ['openrouter', 'OpenRouter', 'Muchos modelos con una key', 'R', '[MODELO RECETA]', '[MODELO CATÁLOGO]']
+];
+const sel = s.sel || 'anthropic';
+const cur = P.filter((p) => p[0] === sel)[0];
+const key = s.key === undefined ? '' : s.key;
+const show = !!s.show;
+const later = (fn, ms) => { clearTimeout(this.tt); this.tt = setTimeout(fn, ms); };
+const toast = (msg) => { this.setState({ toast: msg }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: null }), 3200); };
+const bad = key.trim().toLowerCase() === 'mala';
+const V = [['sin-configurar', 'Sin configurar'], ['conectado', 'Conectado'], ['error', 'Error']];
+return {
+  rootCls: dark ? 'qc app dk' : 'qc app',
+  toggleDark: () => this.setState({ dark: !dark }),
+  menuStr: s.menu ? 'true' : 'false', openMenu: () => this.setState({ menu: true }),
+  menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l', ovCls: s.menu ? 'ov open' : 'ov', closeAll: () => this.setState({ menu: false }),
+  views: V.map((v) => ({ label: v[1], sel: v[0] === view ? 'true' : 'false', pick: () => this.setState({ view: v[0], test: null, confirmOff: false }) })),
+  isEmpty: view === 'sin-configurar', isOn: view !== 'sin-configurar', isErr: view === 'error',
+  providers: P.map((p) => ({ name: p[1], hint: p[2], mono: p[3], sel: p[0] === sel ? 'true' : 'false', op: p[0] === sel ? '1' : '0',
+    border: p[0] === sel ? 'var(--primary)' : 'var(--border)', bg: p[0] === sel ? 'color-mix(in oklch, var(--primary) 6%, var(--card))' : 'var(--card)',
+    ring: p[0] === sel ? '0 0 0 3px color-mix(in oklch, var(--ring) 35%, transparent)' : 'none', cls: 'prov',
+    pick: () => this.setState({ sel: p[0], test: null }) })),
+  selName: cur[1], selMono: cur[3], selRecipe: cur[4], selCatalog: cur[5], selModels: cur[4] + ' y ' + cur[5],
+  keyVal: key, onKey: (e) => this.setState({ key: e && e.target ? e.target.value : '', test: null }),
+  keyType: show ? 'text' : 'password', keyPressed: show ? 'true' : 'false', keyLabel: show ? 'Ocultar la key' : 'Mostrar la key',
+  keyCls: show ? 'in mono' : 'in mono secret-mask', toggleKey: () => this.setState({ show: !show }),
+  noKey: view === 'sin-configurar' && key.trim() === '',
+  testing: s.test === 'run', testOk: s.test === 'ok', testErr: s.test === 'err',
+  test: () => { if (s.test === 'run') return; this.setState({ test: 'run' }); later(() => this.setState({ test: (view === 'error' || bad) ? 'err' : 'ok' }), 900); },
+  saving: !!s.saving,
+  save: () => { if (s.saving) return; this.setState({ saving: true, test: null }); later(() => { if (bad) { this.setState({ saving: false, test: 'err' }); return; } this.setState({ saving: false, view: 'conectado', key: '' }); toast('Proveedor IA conectado'); }, 1000); },
+  stateBadge: view === 'error' ? 'sb t-danger' : 'sb t-success', stateLabel: view === 'error' ? 'Error' : 'Conectado',
+  lastTest: view === 'error' ? 'Falló el 13/10/2026 17:20 · key rechazada (401)' : 'Correcta el 13/10/2026 17:05',
+  change: () => this.setState({ view: 'sin-configurar', test: null }),
+  confirmOff: !!s.confirmOff, askOff: () => this.setState({ confirmOff: true }), cancelOff: () => this.setState({ confirmOff: false }),
+  doOff: () => { this.setState({ confirmOff: false, view: 'sin-configurar', key: '' }); toast('Proveedor IA desconectado'); },
+  toastCls: s.toast ? 'toast show' : 'toast', toastMsg: s.toast || ''
+};
+}
+}
+</script>
+</body>
+</html>

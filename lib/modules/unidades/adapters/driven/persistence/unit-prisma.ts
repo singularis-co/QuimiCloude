@@ -77,12 +77,13 @@ function toUnitView(row: UnitRow): UnitView {
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.UnitOrderByWithRelationInput;
 
 /**
- * Orden POR DEFECTO: exactamente el de hoy, `name ASC` (R11). Se construye en CADA llamada, no
- * como constante compartida: Prisma exige un array mutable en `orderBy`, y devolver siempre la
- * misma instancia dejaria que un llamante la mutara para todos.
+ * Orden POR DEFECTO: mas nuevas primero, `created_at DESC, id ASC`; el `id` desempata
+ * dos altas del mismo instante. Se construye en CADA llamada, no como constante compartida:
+ * Prisma exige un array mutable en `orderBy`, y devolver siempre la misma instancia dejaria que
+ * un llamante la mutara para todos.
  */
 function defaultOrderBy(): Prisma.UnitOrderByWithRelationInput[] {
-  return [{ name: 'asc' }, TIE_BREAKER];
+  return [{ createdAt: 'desc' }, TIE_BREAKER];
 }
 
 /**
@@ -161,6 +162,10 @@ export function buildUnitWhere(query: ListQuery, scope: UnitScope): Prisma.UnitW
  * `listAll` de `UnitRepository` (R40 de QC-32, R27, R28): el catalogo ENTERO, siempre con `take`
  * -ninguna consulta sin cota-, con el orden y la busqueda del contrato aplicados. Sin `count`:
  * este modo no devuelve `total` porque no hay ventana, y contar seria una consulta de mas.
+ *
+ * Sin `sort`, este modo sigue ALFABETICO (`name ASC, id ASC`) y no toma el «mas nuevas primero»
+ * del listado paginado: lo consumen los selectores de unidad de recetas, proveedores y
+ * pedidos, y los combos se quedan por nombre.
  */
 export async function listUnits(
   limit: number,
@@ -169,7 +174,7 @@ export async function listUnits(
 ): Promise<readonly UnitView[]> {
   const rows = await prisma.unit.findMany({
     where: buildUnitWhere(query, scope),
-    orderBy: unitOrderBy(query.sort),
+    orderBy: query.sort === null ? [{ name: 'asc' }, TIE_BREAKER] : unitOrderBy(query.sort),
     select: UNIT_SELECT,
     take: limit,
   });

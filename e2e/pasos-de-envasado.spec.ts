@@ -36,7 +36,7 @@ import {
 } from '@/lib/shared/routes';
 
 import {
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
@@ -454,8 +454,7 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     await expect(page.getByTestId('recipe-form')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('recipe-packing-steps-field')).toBeVisible({ timeout: 60_000 });
 
-    // Que aparezca la fila del paso acredita que React ya hidrato: antes, lo escrito se pierde.
-    await page.getByTestId('recipe-step-add').click();
+    // El editor solo se monta en el cliente: verlo acredita que React ya hidrato.
     const operatorEditable = page.getByTestId('recipe-step-text-0');
     await expect(operatorEditable).toBeVisible({ timeout: 60_000 });
 
@@ -466,7 +465,6 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     await typeInEditor(page, operatorEditable, OPERATOR_STEP_TEXT);
 
     // Primer paso de envasado: un parrafo y una lista de verificacion de un elemento.
-    await page.getByTestId('recipe-packing-step-add').click();
     const packingEditable1 = page.getByTestId('recipe-packing-step-text-0');
     await typeInEditor(page, packingEditable1, PACKING_STEP_1_TEXT);
     await page.keyboard.press('Enter');
@@ -477,7 +475,7 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     await expect(packingEditable1.locator('li[data-type="taskItem"]')).toHaveCount(1);
 
     // Segundo paso de envasado: solo texto.
-    await page.getByTestId('recipe-packing-step-add').click();
+    await page.getByTestId('recipe-packing-step-add-0').click();
     await typeInEditor(page, page.getByTestId('recipe-packing-step-text-1'), PACKING_STEP_2_TEXT);
 
     await page.getByTestId('recipe-form-submit').click();
@@ -539,12 +537,13 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     // --- 3. El Operario ejecuta el pedido: ve su paso y ninguno de envasado.
     await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
     expect(await orderStatus(orderId)).toBe('PENDIENTE');
-    await clickAndConfirm(page, assignedRow.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, assignedRow.getByTestId(ENTER_TESTID));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderId), {
       timeout: 60_000,
     });

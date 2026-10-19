@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState, useTransition, type FormEvent } from 'react';
+import { toast } from 'sonner';
 
 import {
   Dialog,
@@ -30,6 +31,7 @@ import {
 } from './import-dialog-parts';
 import {
   NO_BASE_UNIT_LABEL,
+  UNIT_CREATED_TOAST,
   UNIT_DIALOG_DESCRIPTION,
   UNIT_DIALOG_TESTID,
   UNIT_DIALOG_TITLE,
@@ -104,7 +106,9 @@ export function ImportCreateUnitDialog({ initialName, units, onClose, onCreated 
         setError(result);
         return;
       }
-      if (result.status === 'success') onCreated();
+      if (result.status !== 'success') return;
+      toast.success(UNIT_CREATED_TOAST);
+      onCreated();
     });
   }
 

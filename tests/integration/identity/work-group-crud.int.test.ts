@@ -517,11 +517,19 @@ describe('R24 + R25 + R26 — el listado pagina 10/25, ordena estable y trae DOS
     });
   });
 
-  it('R25 — el orden por nombre es estable: recorrer las tres paginas devuelve a cada grupo EXACTAMENTE una vez, y en orden', async () => {
+  it('R25 — el orden por defecto (mas nuevos primero, QC-289) es estable: recorrer las tres paginas devuelve a cada grupo EXACTAMENTE una vez, y en orden', async () => {
     await withCompany(async (companyId) => {
       const actor = actorOf(companyId);
       const nombres = Array.from({ length: 23 }, (_, i) => `Grupo ${String(i).padStart(2, '0')}`);
       for (const name of nombres) await identity.createWorkGroup(actor, { name });
+      // `created_at` fijado a mano y DECRECIENTE con el nombre: el orden por defecto es
+      // `created_at DESC`, y asi el resultado esperado no depende del reloj.
+      for (const [i, name] of nombres.entries()) {
+        await prisma.workGroup.updateMany({
+          where: { companyId, name },
+          data: { createdAt: new Date(Date.UTC(2031, 0, 1, 0, 0, 59 - i)) },
+        });
+      }
 
       const recorrido: WorkGroupRow[] = [];
       for (const page of [1, 2, 3]) {

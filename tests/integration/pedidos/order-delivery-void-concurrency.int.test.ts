@@ -93,11 +93,16 @@ async function entregar(e: Escenario, porLote: readonly [number, number]): Promi
     {
       orderId: e.orderId,
       deliveryKey,
-      customerId: e.customerId,
-      allocations: [
-        { presentationLineId: e.lineId, batchId: e.batchId, packages: porLote[0] },
-        { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: porLote[1] },
-      ].filter((a) => a.packages > 0),
+      // 2026-10-15: la entrega lleva sus asignaciones por cliente.
+      customers: [
+        {
+          customerId: e.customerId,
+          allocations: [
+            { presentationLineId: e.lineId, batchId: e.batchId, packages: porLote[0] },
+            { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: porLote[1] },
+          ].filter((a) => a.packages > 0),
+        },
+      ],
     },
     e.empresa.actor,
   );
@@ -171,6 +176,8 @@ function voidDeliveryConLecturaPreviaSincronizada(participantes: number) {
   });
 }
 
+// 2026-10-15: las anulaciones se piden por par cliente-presentacion; aqui la entrega tiene un
+// solo cliente.
 describe('R30: anulaciones simultaneas', () => {
   it('R30: dos anulaciones a la vez de la misma presentacion: una aplicada y la otra delivery_already_voided, y los envases vuelven una sola vez', async () => {
     const e = await crearEscenario('anulacion-doble');
@@ -180,7 +187,7 @@ describe('R30: anulaciones simultaneas', () => {
       expect(await stockDeLote(e.secondBatchId)).toBe('8.0000');
       const anulacion = () =>
         pedidos.voidDelivery(
-          { deliveryId, voidKey: randomUUID(), presentationLineIds: [e.lineId], reason: 'Devolucion del cliente' },
+          { deliveryId, voidKey: randomUUID(), items: [{ customerId: e.customerId, presentationLineId: e.lineId }], reason: 'Devolucion del cliente' },
           e.admin,
         );
 
@@ -207,7 +214,7 @@ describe('R30: anulaciones simultaneas', () => {
       const deliveryId = await entregar(e, [5, 0]);
       expect((await prisma.order.findUniqueOrThrow({ where: { id: e.orderId } })).status).toBe('ENTREGADO');
       const anular = voidDeliveryConLecturaPreviaSincronizada(2);
-      const entrada = { deliveryId, voidKey: randomUUID(), presentationLineIds: [e.lineId], reason: 'Devolucion' };
+      const entrada = { deliveryId, voidKey: randomUUID(), items: [{ customerId: e.customerId, presentationLineId: e.lineId }], reason: 'Devolucion' };
 
       const resultados = await Promise.all([anular(entrada, e.admin), anular(entrada, e.admin)]);
 
@@ -232,15 +239,14 @@ describe('R30: anulaciones simultaneas', () => {
 
       const resultados = await Promise.allSettled([
         pedidos.voidDelivery(
-          { deliveryId, voidKey: randomUUID(), presentationLineIds: [e.lineId], reason: 'Devolucion del cliente' },
+          { deliveryId, voidKey: randomUUID(), items: [{ customerId: e.customerId, presentationLineId: e.lineId }], reason: 'Devolucion del cliente' },
           e.admin,
         ),
         pedidos.deliverOrder(
           {
             orderId: e.orderId,
             deliveryKey: randomUUID(),
-            customerId: e.customerId,
-            allocations: [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 2 }],
+            customers: [{ customerId: e.customerId, allocations: [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 2 }] }],
           },
           e.empresa.actor,
         ),
@@ -270,15 +276,14 @@ describe('R30: anulaciones simultaneas', () => {
 
       const resultados = await Promise.allSettled([
         pedidos.voidDelivery(
-          { deliveryId, voidKey: randomUUID(), presentationLineIds: [e.lineId], reason: 'Devolucion del cliente' },
+          { deliveryId, voidKey: randomUUID(), items: [{ customerId: e.customerId, presentationLineId: e.lineId }], reason: 'Devolucion del cliente' },
           e.admin,
         ),
         pedidos.deliverOrder(
           {
             orderId: e.orderId,
             deliveryKey: randomUUID(),
-            customerId: e.customerId,
-            allocations: [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 4 }],
+            customers: [{ customerId: e.customerId, allocations: [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 4 }] }],
           },
           e.empresa.actor,
         ),

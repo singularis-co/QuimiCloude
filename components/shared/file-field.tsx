@@ -35,6 +35,7 @@ import { useEffect, useId, useRef, useState, type DragEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 import { compressImage } from './compress-image';
 import {
@@ -93,6 +94,12 @@ export type FileFieldProps = {
   readonly emptyImageSrc?: string;
   /** Validacion de dominio sobre los bytes finales (firma, cabeceras...). */
   readonly validateBytes?: (bytes: Uint8Array, type: UploadableFileType) => FileFieldValidation;
+  /**
+   * `image`: la vista previa ocupa la zona entera sin recortar la imagen y, con un archivo
+   * elegido, solo queda el texto para cambiarlo, sin nombre ni tamaño. `file` (por defecto):
+   * miniatura y nombre y tamaño del archivo.
+   */
+  readonly variant?: 'file' | 'image';
   /** Prefijo de los `data-testid`: `<prefijo>-field`, `-input`, `-error`, `-preview`, `-clear`. */
   readonly testIdPrefix: string;
 };
@@ -104,6 +111,11 @@ const DROPZONE_IDLE =
   'border-input bg-transparent hover:border-ring hover:bg-accent/40 focus-within:border-ring';
 const DROPZONE_DRAGGING = 'border-primary bg-primary/5';
 const DROPZONE_INVALID = 'border-destructive bg-destructive/5';
+const DROPZONE_IMAGE_PADDING = 'p-2';
+/** Alto fijo: sin él, `h-full` en la imagen no tendría contra qué medirse. */
+const IMAGE_PREVIEW_FRAME = 'flex h-48 w-full items-center justify-center';
+const IMAGE_PREVIEW_FILL = 'h-full w-full rounded-lg object-contain';
+const CHANGE_HINT = 'Haz clic o arrastra otro para cambiarla';
 
 export function FileField({
   label,
@@ -119,8 +131,10 @@ export function FileField({
   placeholder = 'Arrastra un archivo aquí o haz clic para elegirlo',
   emptyImageSrc,
   validateBytes,
+  variant = 'file',
   testIdPrefix,
 }: FileFieldProps) {
+  const isImageVariant = variant === 'image';
   const inputId = useId();
   const errorId = `${inputId}-error`;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -235,7 +249,11 @@ export function FileField({
       </Label>
 
       <div
-        className={`${DROPZONE_BASE} ${dropzoneState}`}
+        className={cn(
+          DROPZONE_BASE,
+          dropzoneState,
+          isImageVariant && displayUrl !== null && DROPZONE_IMAGE_PADDING,
+        )}
         data-testid={`${testIdPrefix}-dropzone`}
         data-dragging={isDragging ? '' : undefined}
         // La zona es una comodidad de ratón: reenvía el clic al input, que es el control real.
@@ -244,7 +262,17 @@ export function FileField({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {displayUrl !== null ? (
+        {displayUrl !== null && isImageVariant ? (
+          <div className={IMAGE_PREVIEW_FRAME}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- vista previa local o URL ya compuesta por el backend, sin optimizacion propia */}
+            <img
+              src={displayUrl}
+              alt=""
+              className={IMAGE_PREVIEW_FILL}
+              data-testid={`${testIdPrefix}-preview`}
+            />
+          </div>
+        ) : displayUrl !== null ? (
           // eslint-disable-next-line @next/next/no-img-element -- vista previa local o URL ya compuesta por el backend, sin optimizacion propia
           <img
             src={displayUrl}
@@ -292,6 +320,10 @@ export function FileField({
             </p>
             <p className="text-xs text-muted-foreground">{hint}</p>
           </div>
+        ) : isImageVariant ? (
+          <p className="text-xs text-muted-foreground" data-testid={`${testIdPrefix}-change-hint`}>
+            {CHANGE_HINT}
+          </p>
         ) : (
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium" data-testid={`${testIdPrefix}-file-name`}>
@@ -301,7 +333,7 @@ export function FileField({
               {formatFileSize(chosen.size)}
               {chosen.compressed ? ' · comprimida para caber en el límite' : ''}
             </p>
-            <p className="text-xs text-muted-foreground">Haz clic o arrastra otro para cambiarla</p>
+            <p className="text-xs text-muted-foreground">{CHANGE_HINT}</p>
           </div>
         )}
 

@@ -533,6 +533,47 @@ const MIGRACION_QC211 = [
   'db/migrations/20261005120000_recipe_packing_steps/down.sql',
 ];
 
+// QC-214 (2026-10-13): evidencia por paso. Exactamente los archivos que el diff de esta rama toca
+// bajo `lib/modules/recetas/`, ninguno mas.
+const EVIDENCIA_POR_PASO_QC214 = [
+  'lib/modules/recetas/index.ts',
+  'lib/modules/recetas/domain/errors.ts',
+  'lib/modules/recetas/domain/get-recipe-step-lock.ts',
+  'lib/modules/recetas/domain/recipe-input.ts',
+  'lib/modules/recetas/domain/recipe-step-lock.ts',
+  'lib/modules/recetas/domain/update-recipe.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+  'lib/modules/recetas/ports/recipe-step-lock-reader.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+  'lib/modules/recetas/adapters/driving/recipe-actions.ts',
+];
+
+// La tabla `order_step_evidence` y `db/schema.prisma` con el modelo nuevo.
+const MIGRACION_QC214 = [
+  'db/schema.prisma',
+  'db/migrations/20261013120000_order_step_evidence/migration.sql',
+  'db/migrations/20261013120000_order_step_evidence/down.sql',
+];
+
+// QC-275 2026-10-13: la tabla `ai_providers` (proveedor IA propio por empresa) y
+// `db/schema.prisma` con el modelo nuevo. No toca ninguna tabla de recetas. Lista nombrada como
+// las demas: cualquier otro archivo de `db/` en el diff sigue en rojo.
+const MIGRACION_QC275 = [
+  'db/schema.prisma',
+  'db/migrations/20261013150000_ai_providers/migration.sql',
+  'db/migrations/20261013150000_ai_providers/down.sql',
+];
+
+// QC-277 2026-10-15: las tablas de añadidos (catalogo y excepciones por empresa) y
+// `db/schema.prisma` con esas tablas. No toca ninguna tabla de recetas; la rama entra aqui
+// porque la pantalla de importar formulas llama a `requirePageAddon`. Lista nombrada como las
+// demas: cualquier otro archivo de `db/` en el diff sigue en rojo.
+const MIGRACION_QC277 = [
+  'db/schema.prisma',
+  'db/migrations/20261015190000_company_addons/migration.sql',
+  'db/migrations/20261015190000_company_addons/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
@@ -541,6 +582,7 @@ export const RECETAS_PERMITIDAS: readonly string[] = [
   ...CANTIDADES_EN_PORCENTAJE_QC147,
   ...HERRAMIENTAS_DE_LA_RECETA_QC194,
   ...PASOS_DE_ENVASADO_QC211,
+  ...EVIDENCIA_POR_PASO_QC214,
 ];
 
 export const DB_PERMITIDAS: readonly string[] = [
@@ -561,6 +603,9 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC147,
   ...MIGRACION_QC194,
   ...MIGRACION_QC211,
+  ...MIGRACION_QC214,
+  ...MIGRACION_QC275,
+  ...MIGRACION_QC277,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
@@ -847,6 +892,11 @@ describe('contrato de la ruta de recetas', () => {
       'listRecipeVersionsAction',
       'createRecipeVersionAction',
       'updateRecipeVersionAction',
+      // QC-214 (design § 5.8): conteo de pedidos con fotos para el aviso de bloqueo.
+      'getRecipeStepLockAction',
+      // QC-275 2026-10-13: la pagina de formulas consulta si la empresa tiene proveedor IA
+      // configurado para habilitar la lectura de PDF. Solo lectura; la lista sigue CERRADA.
+      'getAiProviderReadinessAction',
     ]);
 
     for (const ruta of FUENTES_DE_LA_RUTA_SIN_IMPORTAR) {
@@ -856,7 +906,7 @@ describe('contrato de la ruta de recetas', () => {
       while ((encaje = patron.exec(codigo)) !== null) {
         expect(
           permitidas.has(encaje[1]),
-          `${ruta}: «${encaje[1]}» no es una de las diez operaciones publicadas`,
+          `${ruta}: «${encaje[1]}» no es una de las operaciones publicadas`,
         ).toBe(true);
       }
     }
@@ -1372,6 +1422,9 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'DELIVERED_ORDER_PRODUCT_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
+        // No es una pantalla: redirige al primer enlace del menu efectivo (logo y /login con
+        // sesion). No es del asistente de lectura. La lista sigue CERRADA.
+        'HOME_ROUTE',
         // La pantalla de importar inventario: cuelga de /inventario, no del asistente de lectura.
         'INVENTORY_IMPORT_ROUTE',
         'INVENTORY_ROUTE',
@@ -1395,6 +1448,11 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // `DASHBOARD_ROUTE` (`/dashboard/recorrido/<id>`). No es del asistente de lectura: no la
         // marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
         'executionTraceRoute',
+        // Alta el 2026-10-13 (ficha de producto terminado): la ficha de un producto terminado,
+        // derivada de `INVENTORY_ROUTE` (`/inventario/producto-terminado/<id>`). No es del
+        // asistente de lectura: no la marca el patron de arriba ni apunta a ninguna de sus URL. La
+        // lista sigue CERRADA.
+        'finishedProductDetailRoute',
         // Vive en /asignacion (pantalla de empaque), no en Pedidos: no estrena ninguna ruta del
         // asistente de lectura.
         'packingOrderRoute',
@@ -1427,6 +1485,10 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
         'WHATSAPP_WEBHOOK_ROUTE_BASE',
         'whatsappWebhookPath',
+        // Las pantallas del Maestro, bajo /maestro: ninguna es del asistente de lectura.
+        'MAESTRO_ADMINISTRATORS_ROUTE',
+        'MAESTRO_COMPANIES_ROUTE',
+        'maestroCompanyRoute',
       ].sort(),
     );
   });

@@ -4,6 +4,7 @@ export type DeliveryForVoid = { readonly id: string; readonly orderId: string };
 
 export type DeliveryLineForVoid = {
   readonly id: string;
+  readonly customerId: string;
   readonly presentationLineId: string;
   readonly batchId: string;
   readonly packages: number;
@@ -47,10 +48,10 @@ export interface OrderDeliveryVoidRepository {
 
 export type DeliveryHistoryRow = {
   readonly id: string;
-  readonly customerId: string;
   readonly createdBy: string;
   readonly createdAt: Date;
   readonly lines: readonly {
+    readonly customerId: string;
     readonly presentationLineId: string;
     readonly batchId: string;
     readonly packages: number;

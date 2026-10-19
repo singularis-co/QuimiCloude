@@ -1,6 +1,6 @@
 // Guardia: los dobles de E2E de cada modulo no se encienden solos y no se eligen a ciegas.
-// Vigila una VARIABLE por fila de `VIGILADAS`: hoy la de `documentos` y la de `integraciones`. Cada
-// fila dice donde esta escrita su decision.
+// Vigila una VARIABLE por fila de `VIGILADAS`: hoy la de `documentos`, la de `integraciones` y
+// la de `asignaciones`. Cada fila dice donde esta escrita su decision.
 //
 // Dos motivos de rojo por fila, y uno por cada mitad de la decision:
 //
@@ -63,10 +63,24 @@ const VIGILADAS: readonly Vigilada[] = [
   {
     variable: 'INTEGRATIONS_E2E_DOUBLES',
     consulta: 'integrationsE2EDoublesEnabled(',
-    dobles: ['lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned'],
+    dobles: [
+      'lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned',
+      'lib/modules/integraciones/adapters/driven/ai/ai-provider-probe-canned',
+    ],
     design: 'specs/QC-237-conexion-whatsapp-por-empresa/design.md > 9',
     requisito: 'R41',
     ejemplo: 'whatsappGraphClientCanned',
+  },
+  {
+    variable: 'EVIDENCE_E2E_DOUBLES',
+    consulta: 'evidenceE2EDoublesEnabled(',
+    // QC-271: la composicion elige `evidenceStorageMemoryForE2E`, que firma la lectura de rutas
+    // sembradas desde otro proceso (decision del leader, 2026-10-14).
+    dobles: ['lib/modules/asignaciones/adapters/driven/storage/evidence-storage-memory'],
+    design:
+      'specs/QC-214-evidencia-por-paso/design.md > 4.2; specs/QC-271-consulta-de-evidencia-por-paso/design.md > 4',
+    requisito: 'R30; QC-271 R27',
+    ejemplo: 'evidenceStorageMemoryForE2E',
   },
 ];
 
@@ -303,4 +317,28 @@ describe.each(VIGILADAS)('guardia: los dobles de E2E de $variable ($design, $req
 
     expect(eleccionesSinConsulta(conLaOtra, vigilada)).toEqual([`const elegido: Puerto = ${otra?.consulta ?? ''})`]);
   });
+});
+
+it('SENSIBILIDAD: el lector por empresa de documentos consulta DOCUMENTS_E2E_DOUBLES y quitarla pondria la guardia en rojo (QC-275 R41)', () => {
+  // QC-275 design.md > 13: la fila de `documentos` cubre la eleccion de `readCannedText` en el
+  // camino por empresa (`aiProviderGateway.readerFor`, junto a `READER_BY_PROVIDER`). Se comprueba
+  // sobre el fuente REAL de la composicion, mutado EN MEMORIA: no se escribe nada en el arbol.
+  const documentos = VIGILADAS.find((fila) => fila.variable === 'DOCUMENTS_E2E_DOUBLES');
+  expect(documentos, 'la tabla deberia tener la fila de documentos').toBeTruthy();
+  if (documentos === undefined) return;
+
+  const fuente = CENSO.get(COMPOSICION) ?? '';
+  const cabecera = 'const aiProviderGateway: AiProviderGateway = {';
+  const gateway = declaracionesDe(fuente).find((declaracion) => declaracion.trim().startsWith(cabecera));
+
+  expect(gateway, `${COMPOSICION} deberia declarar \`${cabecera}\`; si se renombro, actualiza este caso`).toBeTruthy();
+  expect(gateway).toContain('readCannedText');
+  expect(gateway).toContain('READER_BY_PROVIDER');
+  expect(gateway).toContain(documentos.consulta);
+
+  const sinConsulta = fuente.replace(
+    gateway ?? '',
+    (gateway ?? '').split(`${documentos.consulta})`).join('false'),
+  );
+  expect(eleccionesSinConsulta(sinConsulta, documentos)).toContain(cabecera);
 });

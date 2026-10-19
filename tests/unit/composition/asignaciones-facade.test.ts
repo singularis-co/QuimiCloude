@@ -16,7 +16,7 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-215) — la fachada de `asignaciones` lista sus VEINTIDOS operaciones', () => {
+describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-215, QC-218, QC-219, QC-214, la de abrir la pantalla y QC-271) — la fachada de `asignaciones` lista sus TREINTA Y CINCO operaciones', () => {
   // El censo CRECE, no se afloja: primero llegaron las tres de la pantalla de ejecucion, luego
   // las tres de las vistas nuevas -`listFinishedOrders`, `listCompanyOrders`,
   // `listResponsibleCandidates`- y ahora las CUATRO del empaque de QC-168. Siguen nombradas UNA A
@@ -29,16 +29,26 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-
   // 2026-10-08: crece con `listConditioningOrders`, `listConditionedOrders` y `getConditioningOrder`.
   // 2026-10-08 (QC-218): crece con `listConditioningTeamCandidates`.
   // 2026-10-09 (QC-219): crece con `saveConditioningBatchData` y `listDeliveredConditionedOrders`.
-  it('R31: expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167, las DOS de QC-215, las TRES del acondicionamiento, los candidatos del equipo y las DOS de QC-219, y ninguna mas', () => {
+  // 2026-10-13 (QC-214): crece con TRES operaciones de la evidencia por paso, `registerEvidence`,
+  // `removeEvidence` y `requestEvidenceUpload` (T13, `design.md` de QC-214). Ninguna previa se
+  // quita; el censo pasa de veintiocho a TREINTA Y UNA.
+  // Crece con `openAssignedOrder`: abrir la pantalla sin comenzar un PENDIENTE. Pasa a TREINTA Y DOS.
+  // 2026-10-14 (QC-271): crece con TRES lecturas de las fotos de un pedido ejecutado,
+  // `getExecutionEvidence`, `getOrderEvidence` y `countOrderEvidence`. Ninguna previa se quita; el
+  // censo pasa de treinta y dos a TREINTA Y CINCO.
+  it('R31: expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167, las DOS de QC-215, las TRES del acondicionamiento, los candidatos del equipo, las DOS de QC-219, las TRES de QC-214, la de abrir la pantalla y las TRES de QC-271, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
       'cancelAssignedOrder',
+      'countOrderEvidence',
       'finishAssignedOrder',
       'finishConditioning',
       'finishPacking',
       'getAssignedOrderExecution',
       'getConditioningOrder',
+      'getExecutionEvidence',
       'getExecutionTrace',
+      'getOrderEvidence',
       'getPackingOrder',
       'listAssignedOrders',
       'listCompanyOrders',
@@ -52,8 +62,12 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-
       'listPackingOrders',
       'listResponsibleCandidates',
       'listResponsiblesForOrders',
+      'openAssignedOrder',
       'recordStepMove',
+      'registerEvidence',
+      'removeEvidence',
       'removeWorkGroupFromOrder',
+      'requestEvidenceUpload',
       'saveConditioningBatchData',
       'startAssignedOrder',
       'startConditioning',
@@ -260,6 +274,30 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-
         { id: 'u', companyId: 'c', permissions: ['asignaciones.modificar', 'usuarios.consultar'] },
         {},
       )
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('QC-271 R1: `getExecutionEvidence` rechaza sin `dashboard.consultar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .getExecutionEvidence({ id: 'u', companyId: 'c', permissions: ['pedidos.consultar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('QC-271 R2: `getOrderEvidence` rechaza sin `pedidos.consultar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .getOrderEvidence({ id: 'u', companyId: 'c', permissions: ['inventario.consultar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('QC-271 R2: `countOrderEvidence` rechaza sin `pedidos.consultar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .countOrderEvidence({ id: 'u', companyId: 'c', permissions: ['inventario.consultar'] }, { orderIds: [] })
       .catch((caught: unknown) => caught);
 
     expect((error as { code?: string }).code).toBe('unauthorized');

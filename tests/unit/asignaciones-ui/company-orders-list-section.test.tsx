@@ -42,7 +42,7 @@ const ORDER: CompanyOrderView = {
   numberText: '2026-000123',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],
   unitId: null,
   unitLabel: null,
   priority: 'ALTA',

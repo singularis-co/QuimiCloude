@@ -92,6 +92,32 @@ describe('OperatorScreenFrame', () => {
     expect(link.className).toMatch(/\bmin-w-11\b/);
   });
 
+  it('con back deshabilitado la vuelta se ve, pero no navega ni recibe el foco', () => {
+    render(
+      <OperatorScreenFrame
+        {...BASE}
+        back={{
+          href: '/asignacion',
+          label: 'Volver a mis pedidos asignados',
+          testId: 'back-link',
+          disabled: true,
+        }}
+      >
+        <p>contenido</p>
+      </OperatorScreenFrame>,
+    );
+
+    const vuelta = screen.getByTestId('back-link');
+    expect(vuelta.tagName).not.toBe('A');
+    expect(vuelta).not.toHaveAttribute('href');
+    expect(vuelta).not.toHaveAttribute('tabindex');
+    expect(vuelta).toHaveAttribute('aria-disabled', 'true');
+    expect(vuelta).toHaveTextContent('Volver a mis pedidos asignados');
+    expect(vuelta.className).toMatch(/\bopacity-50\b/);
+    expect(vuelta.className).toMatch(/\bmin-h-11\b/);
+    expect(screen.getByRole('link', { name: 'Volver a mis pedidos asignados' })).toBe(vuelta);
+  });
+
   it('sin back no pinta enlace de vuelta', () => {
     render(
       <OperatorScreenFrame {...BASE}>

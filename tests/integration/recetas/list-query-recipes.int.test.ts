@@ -6,7 +6,7 @@
  * completo ANTES de paginar (R13). Esa es exactamente la diferencia entre filtrar en la base y
  * filtrar la pagina ya traida —lo que QC-22 y QC-26 rechazaron por enganoso—, y solo Postgres
  * puede demostrarla. Por eso el caso central siembra MAS FILAS QUE UNA PAGINA y comprueba que la
- * fila que corresponde aparece en la pagina 1 aunque en el orden de hoy estuviera en la 3.
+ * fila que corresponde aparece en la pagina 1 aunque en el orden por defecto estuviera en la 3.
  *
  * AISLAMIENTO: `listAliveRecipes` llama al cliente Prisma GLOBAL, no a un `tx` inyectado, asi
  * que una transaccion que se deshace NO lo envuelve (esta explicado con detalle en la cabecera de
@@ -110,30 +110,35 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
   );
 
   beforeAll(async () => {
-    await sembrar(NOMBRES.map((name) => ({ name })));
+    // `created_at` EXPLICITO y creciente con el nombre: el orden por defecto (QC-289) es por
+    // `created_at DESC`, y no puede depender de que dos altas seguidas no empaten en el reloj.
+    await sembrar(
+      NOMBRES.map((name, i) => ({ name, createdAt: new Date(Date.UTC(2031, 0, 1, 0, 0, i)) })),
+    );
   });
 
-  it('la fila que en el orden de hoy esta en la pagina 3 aparece en la 1 al ordenar al reves', async () => {
+  it('la fila que en el orden por defecto esta en la pagina 3 aparece en la 1 al ordenar al reves', async () => {
     // R13 — el aserto que distingue filtrar en la BASE de filtrar la pagina ya traida.
-    const nombreDeLaUltima = NOMBRES[NOMBRES.length - 1];
+    const nombreDeLaPrimera = NOMBRES[0];
 
-    // En el orden de HOY (`name ASC`, R11), con paginas de 5, la fila 12 cae en la pagina 3.
+    // En el orden por defecto (`created_at DESC`, QC-289), con paginas de 5, la fila sembrada
+    // primero -la mas antigua- cae en la pagina 3.
     const porDefectoPagina3 = await listar(consulta({ page: 3, pageSize: 5, search: LOCAL }));
-    expect(porDefectoPagina3.nombres).toContain(nombreDeLaUltima);
+    expect(porDefectoPagina3.nombres).toContain(nombreDeLaPrimera);
     const porDefectoPagina1 = await listar(consulta({ page: 1, pageSize: 5, search: LOCAL }));
-    expect(porDefectoPagina1.nombres).not.toContain(nombreDeLaUltima);
+    expect(porDefectoPagina1.nombres).not.toContain(nombreDeLaPrimera);
 
-    // Pidiendo el orden inverso, la MISMA fila sale en la pagina 1: si el orden se aplicara
-    // sobre la pagina ya traida, seguiria estando en la 3.
-    const desc = await listar(
+    // Pidiendo otro orden, la MISMA fila sale en la pagina 1: si el orden se aplicara sobre la
+    // pagina ya traida, seguiria estando en la 3.
+    const asc = await listar(
       consulta({
         page: 1,
         pageSize: 5,
         search: LOCAL,
-        sort: { columnId: 'name', direction: 'desc' },
+        sort: { columnId: 'name', direction: 'asc' },
       }),
     );
-    expect(desc.nombres[0]).toBe(nombreDeLaUltima);
+    expect(asc.nombres[0]).toBe(nombreDeLaPrimera);
   });
 
   it('el total describe el conjunto YA FILTRADO, no el catalogo entero (R14)', async () => {
@@ -154,11 +159,11 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
     expect(pagina.nombres.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
   });
 
-  it('sin orden explicito, el orden es el de HOY: nombre ascendente (R11)', async () => {
-    // R11 — la lista no se mueve para quien no pide nada.
+  it('sin orden explicito, las mas nuevas primero: created_at DESC (R11, QC-289)', async () => {
+    // Sembradas con `created_at` creciente: el orden por defecto es el inverso del de siembra.
     const pagina = await listar(consulta({ pageSize: 25, search: LOCAL }));
 
-    expect([...pagina.nombres].sort()).toEqual(pagina.nombres);
+    expect(pagina.nombres).toEqual([...NOMBRES].reverse());
   });
 });
 

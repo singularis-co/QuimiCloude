@@ -33,7 +33,7 @@ Si no, el gate se pone en rojo con «features en vuelo sin assignee».
 | Paso | Con el agente | A mano |
 | --- | --- | --- |
 | Elegir | «toma la siguiente feature» o «toma QC-123» | elige en el board una tarea **sin responsable** cuya dependencia esté hecha |
-| Comprobar choques con el equipo | lo hace solo | `node scripts/archivos-en-vuelo.mjs --candidata QC-123` → `exit 1` = choca, espera |
+| Comprobar choques con el equipo | lo hace solo | `node scripts/archivos-en-vuelo.mjs --candidata QC-123` → `exit 1` = choca, espera; con otra persona, `--acepto <key>` si el humano lo acepta |
 | Asignártela | lo hace solo (relee, asigna, relee) | en Jira: *Responsable* = tú. Recarga y confirma que sigue siendo tuya |
 | Candado y worktree | lo hace solo | `./scripts/wt.sh new QC-123 <slug>`. Si sale **`TOMADA`** (código 4), otro ganó: quítate de responsable y elige otra |
 | Etiquetas | lo hace solo | en el issue, labels `zone:<frontend\|backend\|fullstack>` y `complexity:<low\|medium\|high>` |

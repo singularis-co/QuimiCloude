@@ -22,7 +22,7 @@ type PriorityLevel = 1 | 2 | 3 | 4;
 
 export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatusKey, string>> = {
   PENDIENTE: 'Pendiente',
-  EN_CURSO: 'En curso',
+  EN_CURSO: 'En fabricación',
   POR_EMPACAR: 'Por empacar',
   EN_EMPAQUE: 'En empaque',
   ENTREGADO: 'Entregado',

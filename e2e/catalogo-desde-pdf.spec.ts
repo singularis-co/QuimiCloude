@@ -39,6 +39,7 @@ import { normalizeSupplierName } from '@/lib/modules/proveedores';
 import { prisma } from '@/lib/shared/db/prisma';
 import { supplierDetailRoute } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -53,6 +54,9 @@ const RUN_ID = randomUUID().replace(/-/g, '');
  * la vez: borrar por prefijo a secas se llevaria lo que el otro proyecto acaba de crear.
  */
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
+
+/** Valor de la columna cifrada de la conexion sembrada; nunca se descifra (ver `beforeAll`). */
+const E2E_AI_PROVIDER_KEY_ENC = 'v1:e2e-sin-descifrar';
 
 /** El origen al que los dobles de almacenamiento firman sus subidas y sus miniaturas de recorte. */
 const STORAGE_ORIGIN = 'https://documentos-e2e.invalid';
@@ -117,6 +121,7 @@ test.beforeAll(async () => {
   if (orphanCompanyIds.length > 0) {
     await prisma.documentFile.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.documentBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.aiProviderConnection.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.supplierCatalogLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
@@ -137,6 +142,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   companyId = company.id;
+  await enableAllAddons(companyId);
 
   const role = await prisma.role.findUnique({
     where: { name: ROLE_ADMINISTRADOR },
@@ -149,7 +155,7 @@ test.beforeAll(async () => {
     );
   }
 
-  await createFixtureUser({
+  const admin = await createFixtureUser({
     data: {
       firstNames: `Qc158${RUN_ID.slice(0, 8)}`,
       lastNames: 'Catalogo',
@@ -165,6 +171,21 @@ test.beforeAll(async () => {
       accountStatus: 'active',
     },
     select: { id: true },
+  });
+
+  // Sin conexion la subida no se abre: la pagina pinta el aviso de bloqueo en lugar del boton. La
+  // key no se descifra nunca: con el doble de lectura encendido la lectura no la usa.
+  await prisma.aiProviderConnection.create({
+    data: {
+      id: randomUUID(),
+      companyId: company.id,
+      provider: 'ANTHROPIC',
+      apiKeyEnc: E2E_AI_PROVIDER_KEY_ENC,
+      status: 'ACTIVE',
+      keyUpdatedAt: new Date(),
+      createdById: admin.id,
+      updatedById: admin.id,
+    },
   });
 
   const supplier = await prisma.supplier.create({
@@ -224,6 +245,8 @@ test.afterAll(async () => {
     if (companyId !== null) {
       await prisma.documentFile.deleteMany({ where: { companyId } });
       await prisma.documentBatch.deleteMany({ where: { companyId } });
+      // Antes que el usuario (`created_by`) y que la empresa: las dos FK son RESTRICT.
+      await prisma.aiProviderConnection.deleteMany({ where: { companyId } });
     }
   } finally {
     try {

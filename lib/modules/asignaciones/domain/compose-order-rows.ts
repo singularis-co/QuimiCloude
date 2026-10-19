@@ -10,6 +10,7 @@
 import {
   distributionPresentationIds,
   toDistributionLines,
+  toDistributionPresentations,
   unitLabelOf,
   type OrderDistributionLineView,
 } from './order-distribution-view';
@@ -55,13 +56,17 @@ export async function composeOrderRows(
   const presentationIds = distributionPresentationIds(orders);
   const presentations =
     presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, companyId);
-  const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
 
+  // Las unidades de los pedidos y las de sus presentaciones, en una sola llamada.
   const unitIds = [
-    ...new Set(orders.map((row) => row.unitId).filter((id): id is string => id !== null)),
+    ...new Set([
+      ...orders.map((row) => row.unitId).filter((id): id is string => id !== null),
+      ...presentations.map((presentation) => presentation.unitId),
+    ]),
   ];
   const units = unitIds.length === 0 ? [] : await deps.units.findRefs(unitIds, companyId);
   const unitLabels = new Map(units.map((unit) => [unit.id, unitLabelOf(unit)]));
+  const distributionPresentations = toDistributionPresentations(presentations, unitLabels);
 
   const orderIds = orders.map((row) => row.id);
   const assignmentRows =
@@ -90,7 +95,7 @@ export async function composeOrderRows(
   for (const row of orders) {
     result.set(row.id, {
       recipeName: recipeNames.get(row.recipeId) ?? null,
-      presentationLines: toDistributionLines(row.presentationLines, presentationNames),
+      presentationLines: toDistributionLines(row.presentationLines, distributionPresentations),
       unitLabel: row.unitId === null ? null : unitLabels.get(row.unitId) ?? null,
       responsibles: responsiblesByOrder.get(row.id) ?? [],
     });

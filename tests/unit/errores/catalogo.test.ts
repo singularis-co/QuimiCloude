@@ -70,7 +70,15 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // `whatsapp_connection_exists` y `whatsapp_phone_number_taken`.
       // 2026-10-09: 87 y no 85: entran `delivery_not_found` y `delivery_already_voided`.
       // QC-235 2026-10-13: 88 y no 87: entra `company_not_found`.
-      expect(ERROR_CODES).toHaveLength(88)
+      // QC-214 2026-10-13: 93 y no 88: entran `evidence_required`, `evidence_limit`,
+      // `evidence_invalid_file`, `evidence_not_found` y `recipe_steps_locked`.
+      // QC-275 2026-10-13: 95 y no 93: entran `ai_provider_missing` y `ai_provider_error`.
+      // QC-162 2026-10-14: 99 y no 95: entran `company_duplicate_name`, `company_duplicate_tax_id`,
+      // `company_name_mismatch` y `company_not_deleted`.
+      // QC-281 2026-10-14: 101 y no 99: entran `packed_exceeds_quantity` y
+      // `packaging_stock_insufficient`.
+      // 2026-10-16: 102 y no 101: entra `company_last_administrator`.
+      expect(ERROR_CODES).toHaveLength(102)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -193,12 +201,12 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   })
 
   describe('QC-81 R13 — el lote duplicado en la empresa tiene codigo y texto propios', () => {
-    it('batch_duplicate_lot esta en el catalogo con su clave y su texto exacto', () => {
+    it('QC-284 R8: batch_duplicate_lot conserva su codigo y su clave, con el texto por producto y presentacion', () => {
       const codigos: readonly string[] = ERROR_CODES
       expect(codigos).toContain('batch_duplicate_lot')
       expect(ERROR_MESSAGE_KEY.batch_duplicate_lot).toBe('errors.batch_duplicate_lot')
       expect(errorMessage('batch_duplicate_lot')).toBe(
-        'Ya existe un lote con ese valor en esta empresa.',
+        'Ya existe un lote con ese valor para ese producto y presentacion.',
       )
     })
 
@@ -618,5 +626,22 @@ describe('equipo de acondicionamiento — conditioning_team_member_not_allowed y
   it('R16, R17: las dos clases del modulo llevan esos codigos', () => {
     expect(new ConditioningTeamMemberNotAllowedError().code).toBe('conditioning_team_member_not_allowed')
     expect(new ConditioningTeamEmptyError().code).toBe('conditioning_team_empty')
+  })
+})
+
+describe('ultimo Administrador de una empresa — company_last_administrator', () => {
+  it('R23: company_last_administrator esta en el catalogo con su clave y su texto exactos', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain('company_last_administrator')
+    expect(ERROR_MESSAGE_KEY.company_last_administrator).toBe('errors.company_last_administrator')
+    expect(errorMessage('company_last_administrator')).toBe(
+      'Es el único Administrador de la empresa: crea otro antes de darlo de baja.',
+    )
+  })
+
+  it('R23: es un codigo propio, distinto de last_administrator y con otro texto', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain('last_administrator')
+    expect(errorMessage('company_last_administrator')).not.toBe(errorMessage('last_administrator'))
   })
 })

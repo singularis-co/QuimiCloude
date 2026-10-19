@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useEffectEvent, useId, useRef, useState } from 'react';
 
 import { CountdownRing } from '@/components/shared/countdown-ring';
 import { CountdownTimer } from '@/components/shared/countdown-timer';
@@ -25,7 +25,9 @@ import { StepDocumentView } from './step-document-view';
  *
  * **El bloqueo (R17)** no es solo `disabled`: el motivo va en un parrafo de **texto visible**
  * junto al boton y asociado por `aria-describedby`. Un `title` no vale, porque en tactil no hay
- * `:hover` (R26) y una pantalla que no responde sin decir por que es una pantalla rota.
+ * `:hover` (R26) y una pantalla que no responde sin decir por que es una pantalla rota. En
+ * `mode="ejecucion"` la espera minima es la excepcion: su cuenta va visible dentro del boton
+ * primario y su motivo, solo para lectores de pantalla (decision humana, fuera de SDD).
  *
  * Los textos viven en UNA constante para que la i18n futura sea sustituirla.
  *
@@ -38,7 +40,7 @@ import { StepDocumentView } from './step-document-view';
  * ampare. Quien busque trazabilidad completa, que la pida — hoy no existe.
  */
 
-/** En `'ejecucion'` los botones van en talla `xl` y llenan su columna del pie. */
+/** En `'ejecucion'` los botones van en talla `xl` y llenan su columna del pie, a partes iguales. */
 const PRIMARY_TOUCH_TARGET_EJECUCION = 'w-full min-w-11';
 
 const TEXTS = {
@@ -50,6 +52,7 @@ const TEXTS = {
   blocked: (pending: number) => `Marca los ${pending} elementos pendientes para continuar.`,
   waitPrefix: 'Espera',
   waitSuffix: 'para continuar.',
+  waitReasonEjecucion: 'Espera a que termine la cuenta regresiva para continuar.',
 } as const;
 
 export type StepReaderProps = {
@@ -72,6 +75,14 @@ export type StepReaderProps = {
     direction: 'advance' | 'go_back';
     position: number;
   }) => void;
+  /** Contenido extra del paso actual (posición desde 1), debajo del documento del paso. */
+  readonly renderStepAddon?: (position: number) => ReactNode;
+  /** Motivo extra que bloquea el paso actual (posición desde 1); `null` si no bloquea. Se muestra
+   *  solo cuando no quedan elementos por marcar. */
+  readonly stepBlockReason?: (position: number) => string | null;
+  /** Cada `id` nuevo lleva al paso `position` (desde 1), aunque el actual esté bloqueado, y avisa
+   *  a `onStepChange` si el paso cambia. El `id` con el que se monta no navega. */
+  readonly stepRequest?: { readonly position: number; readonly id: number };
 };
 
 /**
@@ -150,6 +161,9 @@ export function StepReader({
   finishBusy = false,
   initialStepPosition,
   onStepChange,
+  renderStepAddon,
+  stepBlockReason,
+  stepRequest,
 }: StepReaderProps) {
   const isEjecucion = mode === 'ejecucion';
   const baseId = useId();
@@ -181,6 +195,25 @@ export function StepReader({
     }
   }, [arrival, isEjecucion]);
 
+  const requestId = stepRequest?.id;
+  const handledRequestId = useRef(requestId);
+
+  const followStepRequest = useEffectEvent(() => {
+    if (stepRequest === undefined || steps.length === 0) return;
+    const from = Math.min(index, steps.length - 1);
+    const target = (clampStepPosition(stepRequest.position, steps.length) ?? 1) - 1;
+    if (target === from) return;
+    setArrival((previous) => previous + 1);
+    setIndex(target);
+    onStepChange?.({ direction: target > from ? 'advance' : 'go_back', position: target + 1 });
+  });
+
+  useEffect(() => {
+    if (requestId === undefined || requestId === handledRequestId.current) return;
+    handledRequestId.current = requestId;
+    followStepRequest();
+  }, [requestId]);
+
   if (steps.length === 0) {
     // R21: estado vacio explicito y NINGUNA navegacion entre pasos.
     return (
@@ -207,8 +240,10 @@ export function StepReader({
   const isFirst = currentIndex === 0;
   const pending = countPendingItems(current, currentIndex, checkedItems);
   const waiting = waitEnabled && waitedArrival !== arrival;
-  const blocked = pending > 0 || waiting;
-  const reasonIds = [pending > 0 ? reasonId : undefined, waiting ? waitReasonId : undefined]
+  const extraReason = stepBlockReason?.(currentIndex + 1) ?? null;
+  const reasonText = pending > 0 ? TEXTS.blocked(pending) : extraReason;
+  const blocked = pending > 0 || extraReason !== null || waiting;
+  const reasonIds = [reasonText !== null ? reasonId : undefined, waiting ? waitReasonId : undefined]
     .filter((id): id is string => id !== undefined)
     .join(' ');
   const describedBy = reasonIds === '' ? undefined : reasonIds;
@@ -268,20 +303,47 @@ export function StepReader({
     />
   );
 
-  const waitReason = waiting && (
-    <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
-      {isEjecucion && (
-        <CountdownRing
-          key={`ring-${arrival}`}
-          seconds={minStepSeconds ?? 0}
-          testId="step-reader-wait-ring"
-        />
-      )}
-      {TEXTS.waitPrefix}{' '}
-      <CountdownTimer key={`timer-${arrival}`} seconds={minStepSeconds} onEnd={() => setWaitedArrival(arrival)} />
-      {' '}
-      {TEXTS.waitSuffix}
-    </p>
+  const stepAddon = renderStepAddon?.(currentIndex + 1);
+
+  const waitTimer = (
+    <CountdownTimer
+      key={`timer-${arrival}`}
+      seconds={minStepSeconds}
+      onEnd={() => setWaitedArrival(arrival)}
+      className={isEjecucion ? 'text-current' : undefined}
+    />
+  );
+
+  // En 'lectura' el motivo de espera, con su cuenta, es texto visible en el cuerpo del paso.
+  // En 'ejecucion' la cuenta va dentro del boton primario y el motivo queda solo para lectores
+  // de pantalla, sin la cuenta: anunciar cada segundo seria ruido.
+  const waitReason =
+    waiting &&
+    (isEjecucion ? (
+      <p id={waitReasonId} data-testid="step-reader-wait-reason" className="sr-only">
+        {TEXTS.waitReasonEjecucion}
+      </p>
+    ) : (
+      <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
+        {TEXTS.waitPrefix} {waitTimer} {TEXTS.waitSuffix}
+      </p>
+    ));
+
+  // `aria-hidden`: el nombre accesible del boton se queda en su texto, no cambia con cada tick.
+  const buttonCountdown = isEjecucion && waiting && (
+    <span
+      aria-hidden="true"
+      data-testid="step-reader-button-countdown"
+      className="inline-flex items-center gap-1.5"
+    >
+      <CountdownRing
+        key={`ring-${arrival}`}
+        seconds={minStepSeconds ?? 0}
+        testId="step-reader-wait-ring"
+        className="size-5 [&_[data-slot=countdown-ring-progress]]:stroke-primary-foreground [&_[data-slot=countdown-ring-track]]:stroke-primary-foreground/30"
+      />
+      {waitTimer}
+    </span>
   );
 
   const buttonSize = isEjecucion ? 'xl' : 'default';
@@ -314,6 +376,7 @@ export function StepReader({
       onClick={finish}
     >
       {finishLabel}
+      {buttonCountdown}
     </Button>
   ) : (
     <Button
@@ -327,6 +390,7 @@ export function StepReader({
       onClick={goNext}
     >
       {TEXTS.next}
+      {buttonCountdown}
     </Button>
   );
 
@@ -363,7 +427,7 @@ export function StepReader({
 
         {documentView}
 
-        {waitReason}
+        {stepAddon}
 
         <div
           data-testid="step-reader-actions"
@@ -375,12 +439,13 @@ export function StepReader({
               <p
                 id={reasonId}
                 data-testid="step-reader-blocked-reason"
-                className={cn('text-center text-base', pending === 0 && 'invisible')}
+                className={cn('text-center text-base', reasonText === null && 'invisible')}
               >
-                {TEXTS.blocked(pending)}
+                {reasonText ?? TEXTS.blocked(pending)}
               </p>
+              {waitReason}
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {previousButton}
               {primaryButton}
             </div>
@@ -410,9 +475,11 @@ export function StepReader({
       {/* R14: solo `steps[currentIndex]` esta en el DOM; los demas NO se renderizan. */}
       {documentView}
 
-      {pending > 0 && (
+      {stepAddon}
+
+      {reasonText !== null && (
         <p id={reasonId} data-testid="step-reader-blocked-reason" className="text-base">
-          {TEXTS.blocked(pending)}
+          {reasonText}
         </p>
       )}
 

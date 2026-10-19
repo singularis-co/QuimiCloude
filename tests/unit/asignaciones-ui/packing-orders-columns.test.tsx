@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   PACKING_ORDER_NUMBER_COLUMN_ID,
-  PACKING_ORDER_PACKAGES_COLUMN_ID,
   PACKING_ORDER_PACKER_COLUMN_ID,
   PACKING_ORDER_PRESENTATION_COLUMN_ID,
   PACKING_ORDER_RECIPE_NAME_COLUMN_ID,
@@ -23,10 +22,9 @@ const POR_EMPACAR_ORDER: PackingOrderRow = {
   numberText: '2026-0000021',
   recipeName: 'Jarabe simple',
   quantity: '40',
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],
   unitId: null,
   unitLabel: null,
-  packages: '8',
   status: 'POR_EMPACAR',
   packedByName: null,
   packedById: null,
@@ -47,20 +45,33 @@ function renderCell(columnId: string, order: PackingOrderRow) {
   return render(<>{column.cell(order)}</>);
 }
 
-describe('R14 - las seis columnas de «Por empacar», y el menú', () => {
-  it('declara numero, receta, presentacion, envases, estado y quien empaca, en ese orden, y el menú al final', () => {
+describe('R14 - las cinco columnas de «Por empacar», y el menú', () => {
+  it('declara numero, receta, presentacion, estado y quien empaca, en ese orden, y el menú al final', () => {
     const columns = buildPackingOrdersColumns();
 
     expect(columns.map((column) => column.id)).toEqual([
       PACKING_ORDER_NUMBER_COLUMN_ID,
       PACKING_ORDER_RECIPE_NAME_COLUMN_ID,
       PACKING_ORDER_PRESENTATION_COLUMN_ID,
-      PACKING_ORDER_PACKAGES_COLUMN_ID,
       PACKING_ORDER_STATUS_COLUMN_ID,
       PACKING_ORDER_PACKER_COLUMN_ID,
       'actions',
     ]);
     expect(columns.filter((column) => column.menu === undefined)).toHaveLength(PACKING_ORDERS_COLUMN_COUNT);
+  });
+});
+
+describe('R12 - sin columna «Envases»', () => {
+  it('R12: ninguna columna de «Por empacar» se llama ni pinta «Envases»', () => {
+    const columns = buildPackingOrdersColumns({ canViewTrace: true });
+
+    expect(columns.map((column) => column.label)).not.toContain('Envases');
+    expect(columns.map((column) => column.id)).not.toContain('packages');
+    for (const column of columns.filter((entry) => entry.menu === undefined)) {
+      const { container } = render(<>{column.cell(POR_EMPACAR_ORDER)}</>);
+      expect(container.textContent ?? '').not.toMatch(/Envases/);
+      cleanup();
+    }
   });
 });
 
@@ -111,14 +122,6 @@ describe('R14 - receta, presentacion y envases', () => {
 
     renderCell(PACKING_ORDER_RECIPE_NAME_COLUMN_ID, { ...POR_EMPACAR_ORDER, recipeName: null });
     expect(screen.getByTestId('packing-order-missing-recipeName')).toBeInTheDocument();
-    cleanup();
-
-    renderCell(PACKING_ORDER_PACKAGES_COLUMN_ID, POR_EMPACAR_ORDER);
-    expect(screen.getByText('8')).toBeInTheDocument();
-    cleanup();
-
-    renderCell(PACKING_ORDER_PACKAGES_COLUMN_ID, { ...POR_EMPACAR_ORDER, packages: null });
-    expect(screen.getByTestId('packing-order-missing-packages')).toBeInTheDocument();
     cleanup();
 
     renderCell(PACKING_ORDER_PRESENTATION_COLUMN_ID, POR_EMPACAR_ORDER);

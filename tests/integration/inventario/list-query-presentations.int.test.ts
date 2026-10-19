@@ -3,7 +3,7 @@
  *
  * Mismo motivo que su hermano de productos: un doble del puerto no puede demostrar que el motor
  * filtro y ordeno el conjunto completo ANTES de paginar (R13). Aqui tambien se siembran mas
- * filas que una pagina y se comprueba que la fila que en el orden de hoy caia en la pagina 3
+ * filas que una pagina y se comprueba que la fila que en el orden por defecto caia en la pagina 3
  * aparece en la 1 cuando se pide otro orden.
  *
  * DIFERENCIA DE FONDO CON PRODUCTOS: `presentations` **no tiene `deleted_at`** (D6 de QC-20, el
@@ -116,25 +116,30 @@ describe('orden, filtro y busqueda sobre el conjunto completo (R13, R14, R29)', 
   );
 
   beforeAll(async () => {
-    await sembrar(NOMBRES);
+    // `created_at` EXPLICITO y creciente con el nombre: el orden por defecto (QC-289) es por
+    // `created_at DESC`, y no puede depender de que dos altas seguidas no empaten en el reloj.
+    for (const [i, name] of NOMBRES.entries()) {
+      await sembrar([name], new Date(Date.UTC(2031, 0, 1, 0, 0, i)));
+    }
   });
 
-  it('la fila que en el orden de hoy esta en la pagina 3 aparece en la 1 al ordenar al reves (R13)', async () => {
-    const ultima = NOMBRES[NOMBRES.length - 1];
+  it('la fila que en el orden por defecto esta en la pagina 3 aparece en la 1 al ordenar al reves (R13)', async () => {
+    // Por defecto van las mas nuevas primero (QC-289): la PRIMERA sembrada cae en la pagina 3.
+    const primera = NOMBRES[0];
 
     const pagina3 = await listPresentations(consulta({ page: 3, pageSize: 5, search: MARCA }), ambito());
-    expect(pagina3.items.map((p) => p.name)).toContain(ultima);
+    expect(pagina3.items.map((p) => p.name)).toContain(primera);
 
-    const descPagina1 = await listPresentations(
+    const ascPagina1 = await listPresentations(
       consulta({
         page: 1,
         pageSize: 5,
         search: MARCA,
-        sort: { columnId: 'name', direction: 'desc' },
+        sort: { columnId: 'name', direction: 'asc' },
       }),
       ambito(),
     );
-    expect(descPagina1.items[0]?.name).toBe(ultima);
+    expect(ascPagina1.items[0]?.name).toBe(primera);
   });
 
   it('el total y el numero de paginas describen el conjunto YA filtrado (R14)', async () => {
@@ -154,11 +159,11 @@ describe('orden, filtro y busqueda sobre el conjunto completo (R13, R14, R29)', 
     expect(pagina.items).toHaveLength(NOMBRES.length);
   });
 
-  it('sin orden, el orden es el de hoy: nombre ascendente (R11)', async () => {
+  it('sin orden, las mas nuevas primero: created_at DESC (R11, QC-289)', async () => {
     const pagina = await listPresentations(consulta({ pageSize: 25, search: MARCA }), ambito());
 
-    const nombres = pagina.items.map((p) => p.name);
-    expect(nombres).toEqual([...nombres].sort());
+    // Sembradas con `created_at` creciente: el orden por defecto es el inverso del de siembra.
+    expect(pagina.items.map((p) => p.name)).toEqual([...NOMBRES].reverse());
   });
 });
 

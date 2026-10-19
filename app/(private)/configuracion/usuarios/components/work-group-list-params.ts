@@ -44,8 +44,8 @@ import { GROUPS_TAB, TAB_PARAM } from './usuarios-tabs';
  *
  * **El orden se valida contra `WORK_GROUP_QUERYABLE.sortable`, LEIDA del contrato** (R15): no es
  * una copia de la lista, es la lista. Un campo que no este en ella no es un error, es «sin orden»,
- * y la consulta cae al orden por defecto del adaptador (`name ASC, id ASC`), que esta pantalla no
- * reproduce.
+ * y la consulta cae al orden por defecto del adaptador (`createdAt DESC, id ASC`), que esta
+ * pantalla no reproduce.
  *
  * **La cadena canonica conserva `tab=grupos`** (R3, R7): navegar dentro de la lista de grupos
  * —cambiar de pagina, de orden, de tamano o de termino— no puede devolver al usuario a la pestana

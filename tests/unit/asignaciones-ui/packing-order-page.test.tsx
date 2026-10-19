@@ -75,6 +75,14 @@ function sesionCon(permissions: readonly string[]) {
   };
 }
 
+// En empaque a nombre propio la vista trae `finish`; sin el, Terminar queda deshabilitado.
+const FINISH = {
+  orderQuantity: '10',
+  orderUnit: { id: 'unit-1', baseUnitId: null, factor: null },
+  orderUnitLabel: 'u',
+  lines: [],
+};
+
 function filaCon(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: 'order-1',
@@ -84,11 +92,12 @@ function filaCon(overrides: Partial<Record<string, unknown>> = {}) {
     presentationLines: [{ presentationId: 'presentation-1', presentationName: 'Caja x 12', packages: 4 }],
     unitId: 'unit-1',
     unitLabel: 'kg',
-    packages: '4',
     status: 'POR_EMPACAR',
     packedByName: null,
     packedById: null,
     packingSteps: [],
+    packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }
@@ -155,7 +164,7 @@ describe('pagina del pedido de empaque — los tres desenlaces de R17', () => {
 
   it('`EN_EMPAQUE` a nombre del propio actor ofrece Terminar y ningun Comenzar', async () => {
     getPackingOrderMock.mockResolvedValue(
-      filaCon({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Empacador de Prueba' }),
+      filaCon({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Empacador de Prueba', finish: FINISH }),
     );
 
     const arbol = await arbolDeLaPagina();
@@ -208,7 +217,7 @@ describe('pagina del pedido de empaque — errores de Comenzar y Terminar visibl
       message: 'Otro empacador está empacando este pedido.',
     });
     getPackingOrderMock.mockResolvedValue(
-      filaCon({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Empacador de Prueba' }),
+      filaCon({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Empacador de Prueba', finish: FINISH }),
     );
 
     const arbol = await arbolDeLaPagina();
@@ -252,7 +261,7 @@ describe('pagina del pedido de empaque — objetivos tactiles de 44x44 (R43)', (
 
   it('el boton de Terminar cumple el minimo tactil', async () => {
     getPackingOrderMock.mockResolvedValue(
-      filaCon({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Empacador de Prueba' }),
+      filaCon({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Empacador de Prueba', finish: FINISH }),
     );
 
     const arbol = await arbolDeLaPagina();

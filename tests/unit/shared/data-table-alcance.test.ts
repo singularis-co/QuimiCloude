@@ -20,6 +20,8 @@ import {
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
+  MAESTRO_ADMINISTRATORS_ROUTE,
+  MAESTRO_COMPANIES_ROUTE,
   ORDERS_ROUTE,
   PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
@@ -187,6 +189,17 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
   // la fila y se TENSA el resto del centinela -el ancla de consumidores minimos sube de siete a
   // ocho-, nunca se afloja: la lista sigue CERRADA y una DECIMA pantalla vuelve a poner esto en
   // rojo.
+  //
+  // AMPLIADO el 2026-10-16 (QC-166, area-del-maestro): entra la UNDECIMA pantalla declarada -la
+  // lista de empresas del maestro-, y la trae una decision de diseno aprobada, no un descuido:
+  // `specs/QC-166-area-del-maestro/design.md > Componentes nuevos` dice que `CompanyTable` compone
+  // `DataTable`. Se anade la fila y se TENSA el ancla de consumidores minimos de diez a once, nunca
+  // se afloja: la lista sigue CERRADA y una DUODECIMA pantalla vuelve a poner esto en rojo.
+  //
+  // AMPLIADO el 2026-10-16 (QC-166, area-del-maestro): entra la DUODECIMA -la lista de
+  // Administradores del maestro- por la misma decision de diseno (`design.md > Componentes nuevos`
+  // y `> 7.4`: `AdministratorTable` es `DataTable` con filtro «Empresa» y tarjeta). El ancla sube de
+  // once a doce; una DECIMOTERCERA pantalla vuelve a poner esto en rojo.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
   /**
@@ -216,6 +229,13 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     // 2026-10-08 (QC-167): la lista del recorrido de ejecucion del dashboard se monta sobre la
     // tabla compartida por decision de diseno (`design.md` de QC-167 > 4.3). Es la DECIMA.
     DASHBOARD_ROUTE,
+    // 2026-10-16 (QC-166): la lista de empresas del maestro se monta sobre la tabla compartida por
+    // decision de diseno (`design.md` de QC-166 > Componentes nuevos: `CompanyTable` compone
+    // `DataTable`). Es la UNDECIMA.
+    MAESTRO_COMPANIES_ROUTE,
+    // 2026-10-16 (QC-166): la lista de Administradores del maestro, por la misma decision
+    // (`design.md` de QC-166 > 7.4). Es la DUODECIMA.
+    MAESTRO_ADMINISTRATORS_ROUTE,
   ].map(carpetaDeRuta)
 
   function carpetaDeRuta(ruta: string): string {
@@ -228,7 +248,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     )
   }
 
-  it('solo las diez pantallas autorizadas importan components/shared/data-table', () => {
+  it('solo las doce pantallas autorizadas importan components/shared/data-table', () => {
     let consumidores = 0
     for (const relDir of consumerDirs) {
       const files = walkCodeFiles(join(repoRoot, ...relDir.split('/')))
@@ -236,7 +256,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
         if (!/components\/shared\/data-table/.test(readSource(file))) continue
         expect(
           autorizada(file),
-          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las diez pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion, clientes, dashboard): migrar una undecima es una decision, no un descuido (R29, R34)`,
+          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las doce pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion, clientes, dashboard, empresas y administradores del maestro): migrar una decimotercera es una decision, no un descuido (R29, R34)`,
         ).toBe(true)
         consumidores += 1
       }
@@ -244,8 +264,9 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor. El ancla se
     // TENSA con cada alta: hoy son NUEVE pantallas autorizadas, asi que se exige al menos un
     // consumidor por pantalla (2026-09-25; antes eran ocho). 2026-10-08 (QC-167): DIEZ, con el
-    // dashboard.
-    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(9)
+    // dashboard. 2026-10-16 (QC-166): ONCE, con la lista de empresas del maestro, y DOCE con la de
+    // Administradores.
+    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(11)
   })
 
   it('la pantalla de recetas SI consume la tabla compartida (R29)', () => {
@@ -618,7 +639,71 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // `data-table-row-<id>` para abrir «Entregas» y anular una entrega. El centinela pasa de CUARENTA
   // a CUARENTA Y UNO; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve a
   // ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuarenta y uno', () => {
+  //
+  // 2026-10-13: entra `e2e/detalle-de-producto-terminado.spec.ts` (ficha de producto terminado), y no afloja la lista.
+  // No estrena pantalla de tabla compartida propia en la lista: recorre la lista de pedidos y la
+  // pestana de terminados de `/inventario`, ya en esta lista, localiza sus filas por
+  // `data-table-row-<id>` y cuenta las filas de cada tab de la ficha por el mismo prefijo. El
+  // centinela pasa de CUARENTA Y UNO a CUARENTA Y DOS; la lista sigue CERRADA, y un spec mas que
+  // referencie `data-table` vuelve a ponerla en rojo.
+  //
+  // Alta el 2026-10-13 (QC-262) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: entra `e2e/pedidos-rediseno.spec.ts`, que no
+  // estrena tabla. Mide la lista de pedidos, ya en esta lista, a 1440, 820 y 390 px: una sola
+  // `data-table-filters` con buscador, cliente y `data-table-chips` en orden, las doce cabeceras
+  // `data-table-head-<id>` con el numero fijado, el menu de la fila `data-table-row-<id>` con su
+  // separador, las tarjetas `data-table-card-<id>` dentro de `data-table-cards` y los dialogos y
+  // paneles que abre «Acciones». El centinela pasa de CUARENTA Y DOS a CUARENTA Y TRES; la lista
+  // sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
+  //
+  // 2026-10-13 (QC-262): entran `e2e/helpers/order-distribution.ts` y
+  // `e2e/pedido-en-varias-presentaciones.spec.ts`, y no aflojan la lista. Ninguno estrena tabla: la
+  // tarjeta de la lista de pedidos, ya en esta lista, repite el disparador `order-row-actions` con
+  // el mismo `data-order-id`, asi que su localizador de pagina entera encontraba dos y ahora se
+  // acota a `data-table-row-<id>`. El centinela pasa de CUARENTA Y TRES a CUARENTA Y CINCO; la lista
+  // sigue CERRADA.
+  //
+  // 2026-10-14: entra `e2e/helpers/product-name-cell.ts`, y no afloja la lista. No estrena tabla:
+  // localiza la fila por `data-table-row-<id>` y la celda `data-table-cell-presentationName` de
+  // inventario, ya en esta lista. El centinela pasa de CUARENTA Y CINCO a CUARENTA Y SEIS; la lista
+  // sigue CERRADA.
+  //
+  // 2026-10-14: entra `e2e/recorrido-acondicionamiento.spec.ts` (QC-283), y no afloja la lista. No
+  // estrena tabla: recorre la lista del recorrido de ejecucion del dashboard, ya en esta lista
+  // (QC-167), y localiza la fila del pedido y la del senuelo por `data-table-row-<id>`. El centinela
+  // pasa de CUARENTA Y SEIS a CUARENTA Y SIETE; la lista sigue CERRADA.
+  //
+  // 2026-10-15: entra `e2e/envases-reales-empaque.spec.ts` (QC-281), y no afloja la lista. No
+  // estrena tabla: tras terminar el empaque lee el reparto del producto terminado, ya en esta lista
+  // (ficha de producto terminado), y localiza sus filas por `data-table-row-<id>`. El centinela
+  // pasa de CUARENTA Y SIETE a CUARENTA Y OCHO; la lista sigue CERRADA.
+  //
+  // 2026-10-14 (QC-271, TI): entra `e2e/consulta-de-evidencia.spec.ts`, y no afloja la lista. No
+  // estrena tabla: recorre la pestana Lotes de la ficha de producto terminado, que ya monta la tabla
+  // compartida, cuenta su fila por `data-table-row-<id>` y afirma la cabecera
+  // `data-table-head-evidence` de la columna «Evidencia» (presente con `pedidos.consultar`, ausente
+  // sin el). El centinela pasa de CUARENTA Y OCHO a CUARENTA Y NUEVE; la lista sigue CERRADA.
+  //
+  // Alta el 2026-10-16 (QC-263) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: entra `e2e/ajuste-de-inventario.spec.ts`, que no
+  // estrena tabla. La lista de inventario y el panel «Lotes», ya en esta lista, pintan cada fila
+  // tambien como tarjeta con los mismos `data-testid` dentro, y el historial del lote pasa a la
+  // tabla compartida: el spec acota la fila del producto, la del lote y la del asiento por
+  // `data-table-row-<id>`. El centinela pasa de CUARENTA Y NUEVE a CINCUENTA; la lista sigue CERRADA.
+  //
+  // Alta el 2026-10-16 (QC-263) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: entra `e2e/inventario-rediseno.spec.ts`, que no
+  // estrena tabla. Mide la lista de inventario, el panel «Lotes» y el historial del lote, ya en esta
+  // lista, a 1440, 820 y 390 px: localiza la fila por `data-table-row-<id>` (tambien las sub-filas
+  // `<id>--batch-<lote>` y los asientos `opening-<id>`), sus celdas por `data-table-cell-<id>` y sus
+  // cabeceras por `data-table-head-<id>`, y las tarjetas por `data-table-cards`,
+  // `data-table-card-<id>` y `data-table-card-field-<id>`; en la importacion, las filas de la vista
+  // previa y del resultado por `data-table-row-<fila>`. El centinela pasa de CINCUENTA a CINCUENTA Y
+  // UNO; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y uno', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -628,7 +713,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cuarenta y uno E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cincuenta y uno E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -644,6 +729,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/aislamiento-pedidos.spec.ts',
       // Las filas servidas de la lista de recetas con sesion en una empresa: ver la nota de arriba.
       'e2e/aislamiento-recetas.spec.ts',
+      // Ver la nota de arriba (2026-10-16, QC-263). Tras `aislamiento-...` porque la lista esta
+      // ORDENADA: 'ai' precede a 'aj', y 'aj' precede a 'an'.
+      'e2e/ajuste-de-inventario.spec.ts',
       // Ver la nota de arriba (2026-10-13). Tras `aislamiento-...` porque la lista esta ORDENADA:
       // 'ai' precede a 'an'.
       'e2e/anular-entrega.spec.ts',
@@ -653,12 +741,18 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba. Va antes que `e2e/ejecucion-receta.spec.ts` porque la lista esta
       // ORDENADA y 'c' precede a 'e'.
       'e2e/clientes.spec.ts',
+      // Ver la nota de arriba (2026-10-14, QC-271). Entre `clientes` y `dashboard-rediseno` porque
+      // la lista esta ORDENADA: 'cl' precede a 'co', y 'c' precede a 'd'.
+      'e2e/consulta-de-evidencia.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-261). Entre `clientes` y `datos-de-lote-...` porque la
       // lista esta ORDENADA: 'das' precede a 'dat'.
       'e2e/dashboard-rediseno.spec.ts',
       // Ver la nota de arriba (2026-10-09, QC-219). Entre `clientes` y `ejecucion-receta` porque
       // la lista esta ORDENADA: 'd' va entre 'c' y 'e'.
       'e2e/datos-de-lote-en-acondicionamiento.spec.ts',
+      // Ver la nota de arriba (2026-10-13). Entre `datos-de-lote-...` y `ejecucion-receta`
+      // porque la lista esta ORDENADA: 'dat' precede a 'det', y 'd' precede a 'e'.
+      'e2e/detalle-de-producto-terminado.spec.ts',
       // La DECIMOSEXTA la trae QC-63 el 2026-09-17 (R29, R30): ver la nota de arriba. Llega a la
       // tabla por la lista de pedidos asignados, que ya la consumia.
       'e2e/ejecucion-receta.spec.ts',
@@ -668,13 +762,25 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-10-08, QC-223). Entre `empaque` y `grupos-de-trabajo` porque la
       // lista esta ORDENADA: 'm' precede a 'n', y 'e' precede a 'g'.
       'e2e/entregar-producto-terminado.spec.ts',
+      // Ver la nota de arriba (2026-10-15, QC-281). Tras `entregar-producto-terminado` porque la
+      // lista esta ORDENADA: 'ent' precede a 'env'.
+      'e2e/envases-reales-empaque.spec.ts',
       // La OCTAVA la trae QC-85 el 2026-09-12 (R42): ver la nota de arriba.
       'e2e/grupos-de-trabajo.spec.ts',
+      // Ver la nota de arriba (2026-10-13, QC-262). Tras `grupos-de-trabajo` porque la lista esta
+      // ORDENADA: 'g' precede a 'h'.
+      'e2e/helpers/order-distribution.ts',
+      // Ver la nota de arriba (2026-10-14). Tras `helpers/order-distribution` porque la lista esta
+      // ORDENADA: 'o' precede a 'p'.
+      'e2e/helpers/product-name-cell.ts',
       // QC-199: ver la nota de arriba.
       'e2e/insumo-por-unidad.spec.ts',
       // Ver la nota de arriba (2026-10-06, QC-209). Va antes que `inventario.spec.ts` porque la
       // lista esta ORDENADA y '-' precede a '.'.
       'e2e/inventario-importar.spec.ts',
+      // Ver la nota de arriba (2026-10-16, QC-263). Entre `inventario-importar` e `inventario`
+      // porque la lista esta ORDENADA: 'i' precede a 'r', y '-' precede a '.'.
+      'e2e/inventario-rediseno.spec.ts',
       'e2e/inventario.spec.ts',
       // La DECIMA la trae QC-93 el 2026-09-15 (R18): ver la nota de arriba. Es la sonda del usuario
       // sin permisos de modulo: afirma que `data-table` NO esta, no consume la tabla.
@@ -697,6 +803,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-10-06, QC-156). Entre `pedido-bloqueado` y `pedidos-asignados`
       // porque la lista esta ORDENADA: 'b' precede a 'c', y '-' precede a 's'.
       'e2e/pedido-con-cliente.spec.ts',
+      // Ver la nota de arriba (2026-10-13, QC-262). Entre `pedido-con-cliente` y `pedidos-asignados`
+      // porque la lista esta ORDENADA: 'c' precede a 'e', y '-' precede a 's'.
+      'e2e/pedido-en-varias-presentaciones.spec.ts',
       // Ver la nota de arriba. Va antes que `pedidos-busqueda` porque la lista esta ORDENADA.
       'e2e/pedidos-asignados.spec.ts',
       // La VIGESIMA la trae QC-122 el 2026-09-23: ver la nota de arriba. Va antes que
@@ -705,6 +814,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La VIGESIMOPRIMERA la trae QC-151 el 2026-09-23 (R11): ver la nota de arriba. Va antes que
       // `pedidos-responsables` porque la lista esta ORDENADA y 'c' precede a 'r'.
       'e2e/pedidos-cotizacion.spec.ts',
+      // Ver la nota de arriba (2026-10-13, QC-262). Entre `pedidos-cotizacion` y
+      // `pedidos-responsables` porque la lista esta ORDENADA: 'red' precede a 'res'.
+      'e2e/pedidos-rediseno.spec.ts',
       // La NOVENA la trae QC-102 el 2026-09-13 (T16, R37): ver la nota de arriba. Va antes que
       // `e2e/pedidos.spec.ts` porque la lista esta ORDENADA y '-' precede a '.'.
       'e2e/pedidos-responsables.spec.ts',
@@ -726,6 +838,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // '-' precede a '.', igual que en pedidos.
       'e2e/recetas-pasos.spec.ts',
       'e2e/recetas.spec.ts',
+      // Ver la nota de arriba (2026-10-14, QC-283). Antes que `recorrido-ejecucion` porque la lista
+      // esta ORDENADA: 'a' precede a 'e'.
+      'e2e/recorrido-acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-08, QC-167). Entre `recetas` y `registro-ejecucion` porque
       // la lista esta ORDENADA: 'e' precede a 'o', y 'c' precede a 'g'.
       'e2e/recorrido-ejecucion.spec.ts',

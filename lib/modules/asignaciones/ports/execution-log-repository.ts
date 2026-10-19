@@ -13,7 +13,9 @@ export interface ExecutionLogRepository {
   append(entry: NewExecutionEntry): Promise<void>;
   /** La posicion de la ultima anotacion con posicion de ese pedido en esa empresa, o `null`. */
   findLastStepPosition(companyId: string, orderId: string): Promise<number | null>;
-  /** Ids distintos de los pedidos con alguna anotacion que cumpla el filtro. Sin orden prometido. */
+  /** Ids distintos de los pedidos con alguna anotacion que cumpla el filtro. Sin orden prometido.
+   *  Con `userId`, tambien los pedidos en cuyo equipo esta esa persona, si su Comenzar anotado cae
+   *  en el rango. */
   listExecutedOrderIds(companyId: string, filter: ExecutedOrdersFilter): Promise<readonly string[]>;
   /** Todas las anotaciones de esos pedidos, por pedido y luego por instante e `id` ascendentes. */
   listEntriesForOrders(companyId: string, orderIds: readonly string[]): Promise<readonly ExecutionEntryRecord[]>;

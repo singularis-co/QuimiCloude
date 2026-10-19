@@ -403,3 +403,48 @@ export class CompanyNotFoundError extends IdentityError {
     super('company_not_found', diagnostic);
   }
 }
+
+/** Otra empresa viva ya tiene ese nombre en forma normalizada. Las de baja no cuentan. */
+export class CompanyDuplicateNameError extends IdentityError {
+  readonly code = 'company_duplicate_name';
+
+  constructor(diagnostic?: string) {
+    super('company_duplicate_name', diagnostic);
+  }
+}
+
+/** Otra empresa viva ya tiene esa identificacion fiscal en forma normalizada. Las de baja no cuentan. */
+export class CompanyDuplicateTaxIdError extends IdentityError {
+  readonly code = 'company_duplicate_tax_id';
+
+  constructor(diagnostic?: string) {
+    super('company_duplicate_tax_id', diagnostic);
+  }
+}
+
+/** La confirmacion de la baja no coincide, en forma normalizada, con el nombre de la empresa. */
+export class CompanyNameMismatchError extends IdentityError {
+  readonly code = 'company_name_mismatch';
+
+  constructor(diagnostic?: string) {
+    super('company_name_mismatch', diagnostic);
+  }
+}
+
+/** Reactivar una empresa que esta viva: no hay baja que deshacer. */
+export class CompanyNotDeletedError extends IdentityError {
+  readonly code = 'company_not_deleted';
+
+  constructor(diagnostic?: string) {
+    super('company_not_deleted', diagnostic);
+  }
+}
+
+/** Dar de baja al unico Administrador vivo de su empresa: primero hay que crear otro. */
+export class CompanyLastAdministratorError extends IdentityError {
+  readonly code = 'company_last_administrator';
+
+  constructor(diagnostic?: string) {
+    super('company_last_administrator', diagnostic);
+  }
+}

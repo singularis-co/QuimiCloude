@@ -17,11 +17,16 @@ const MAESTRO: PlatformActor = {
   permissions: ['empresas.consultar', 'empresas.modificar'],
 };
 
+const NOW = new Date('2026-10-14T12:00:00.000Z');
+
 function setup(outcome: 'ok' | 'not_found' = 'ok') {
   const setCountryOfAlive = vi.fn<CompanyCountryRepository['setCountryOfAlive']>(
     async () => outcome,
   );
-  const setCompanyCountry = createSetCompanyCountry({ companies: { setCountryOfAlive } });
+  const setCompanyCountry = createSetCompanyCountry({
+    companies: { setCountryOfAlive },
+    now: () => NOW,
+  });
   return { setCompanyCountry, setCountryOfAlive };
 }
 
@@ -34,7 +39,7 @@ describe('setCompanyCountry', () => {
     ).resolves.toBeUndefined();
 
     expect(setCountryOfAlive).toHaveBeenCalledTimes(1);
-    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, 'CO');
+    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, 'CO', MAESTRO.id, NOW);
   });
 
   it('R3: el valor vacio llega al puerto como null', async () => {
@@ -42,7 +47,7 @@ describe('setCompanyCountry', () => {
 
     await setCompanyCountry(MAESTRO, { companyId: COMPANY_ID, country: '' });
 
-    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, null);
+    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, null, MAESTRO.id, NOW);
   });
 
   const SIN_PERMISO: ReadonlyArray<{ caso: string; actor: unknown }> = [
@@ -75,7 +80,7 @@ describe('setCompanyCountry', () => {
     ).resolves.toBeUndefined();
 
     expect('companyId' in sinEmpresa).toBe(false);
-    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, 'MX');
+    expect(setCountryOfAlive).toHaveBeenCalledWith(COMPANY_ID, 'MX', sinEmpresa.id, NOW);
   });
 
   for (const country of ['co', ' CO', 'CO ', 'COL', 'ZZ']) {
@@ -119,5 +124,19 @@ describe('setCompanyCountry', () => {
 
     expect(error).toBeInstanceOf(CompanyNotFoundError);
     expect(error).toMatchObject({ code: 'company_not_found' });
+  });
+
+  it('R36 (QC-162): el puerto recibe el id del actor y el instante, para el evento del historial', async () => {
+    const { setCompanyCountry, setCountryOfAlive } = setup();
+    const otro: PlatformActor = {
+      id: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d',
+      permissions: ['empresas.modificar'],
+    };
+
+    await setCompanyCountry(otro, { companyId: COMPANY_ID, country: 'PE' });
+
+    expect(setCountryOfAlive).toHaveBeenCalledTimes(1);
+    expect(setCountryOfAlive.mock.calls[0]?.[2]).toBe(otro.id);
+    expect(setCountryOfAlive.mock.calls[0]?.[3]).toBe(NOW);
   });
 });

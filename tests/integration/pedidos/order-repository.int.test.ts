@@ -471,7 +471,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
 })
 
 describe('R41 — el orden del listado, con las filas sembradas EN DESORDEN', () => {
-  it('prioridad DESC, antiguedad ASC dentro de cada prioridad, y el correlativo desempata', async () => {
+  it('prioridad DESC, mas nuevos primero dentro de cada prioridad (QC-289), y el correlativo DESC desempata', async () => {
     const creados: string[] = []
     try {
       // Tres instantes del ano de prueba. `t1 < t2 < t3`, y `t1` se repite AL MILISEGUNDO en
@@ -492,20 +492,20 @@ describe('R41 — el orden del listado, con las filas sembradas EN DESORDEN', ()
       const altaT1 = await altaReal(creados, YEAR_ORDEN, t1, { priority: 'ALTA' })
 
       // Los dos CRITICA de `t1` comparten instante al milisegundo: lo unico que los separa es
-      // el correlativo, y el que lo tiene menor va primero.
+      // el correlativo, y desde QC-289 el que lo tiene MAYOR -el ultimo creado- va primero.
       expect(criticaT1a.createdAt.getTime()).toBe(criticaT1b.createdAt.getTime())
       expect(criticaT1a.number.sequence).toBeLessThan(criticaT1b.number.sequence)
 
       const mios = (await recorrerTodo()).filter((row) => creados.includes(row.id))
 
       expect(mios.map((row) => row.id)).toEqual([
-        criticaT1a.id,
-        criticaT1b.id,
         criticaT3.id,
-        altaT1.id,
+        criticaT1b.id,
+        criticaT1a.id,
         altaT2.id,
-        mediaT1.id,
+        altaT1.id,
         mediaT2.id,
+        mediaT1.id,
         bajaT1.id,
       ])
       // Y la prioridad baja de mayor a menor: `priority DESC` sobre el enum da el orden de
@@ -732,7 +732,7 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
 
       const resumenConReparto = pagina.items.find((item) => item.id === conReparto.id)
       const resumenSinReparto = pagina.items.find((item) => item.id === filaSinReparto.id)
-      expect(resumenConReparto?.presentationLines).toEqual([{ presentationId, packages: 3, packagingName: null }])
+      expect(resumenConReparto?.presentationLines).toEqual([{ id: expect.any(String), presentationId, packages: 3, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null, packagingImageUrl: null }])
       expect(resumenConReparto?.unitId).toBe(unitId)
       expect(resumenSinReparto?.presentationLines).toEqual([])
       expect(resumenSinReparto?.unitId).toBeNull()
@@ -757,10 +757,10 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
       const pagina = await listAliveOrderSummariesByIds(companyId, [conEnvase.id, antiguo.id], ['PENDIENTE'], 1)
 
       expect(pagina.items.find((item) => item.id === conEnvase.id)?.presentationLines).toEqual([
-        { presentationId, packages: 2, packagingName: nombreEnvase },
+        { id: expect.any(String), presentationId, packages: 2, packedPackages: null, presentationContent: null, packagingProductId: envaseId, packagingName: nombreEnvase, packagingImageUrl: null },
       ])
       expect(pagina.items.find((item) => item.id === antiguo.id)?.presentationLines).toEqual([
-        { presentationId, packages: 5, packagingName: null },
+        { id: expect.any(String), presentationId, packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null, packagingImageUrl: null },
       ])
     } finally {
       await limpiar(creados)
@@ -778,10 +778,10 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
       })
       const sinReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 11))
 
-      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4, packagingProductId: null }])
+      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4, presentationContent: null, packagingProductId: null }])
 
       const ficha = await findAliveOrderById(conReparto.id, scope())
-      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4, packagingProductId: null }])
+      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4, presentationContent: null, packagingProductId: null }])
       // Lo que devuelve el alta y la relectura no pueden divergir tampoco en el reparto.
       expect(ficha).toEqual(conReparto)
 
@@ -790,9 +790,26 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
 
       const todos = await recorrerTodo()
       expect(todos.find((fila) => fila.id === conReparto.id)?.presentationLines).toEqual([
-        { presentationId, packages: 4, packagingProductId: null },
+        { presentationId, packages: 4, presentationContent: null, packagingProductId: null },
       ])
       expect(todos.find((fila) => fila.id === sinReparto.id)?.presentationLines).toEqual([])
+    } finally {
+      await limpiar(creados)
+    }
+  })
+
+  it('la linea devuelve el contenido copiado al guardarla, igual en el alta y en la relectura', async () => {
+    const creados: string[] = []
+    try {
+      const conCopia = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 12), {
+        presentationLines: [{ presentationId, packages: 9, content: '300', packagingProductId: null }],
+      })
+
+      expect(conCopia.presentationLines).toEqual([
+        { presentationId, packages: 9, presentationContent: '300.0000', packagingProductId: null },
+      ])
+      const ficha = await findAliveOrderById(conCopia.id, scope())
+      expect(ficha?.presentationLines).toEqual(conCopia.presentationLines)
     } finally {
       await limpiar(creados)
     }

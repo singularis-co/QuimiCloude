@@ -150,12 +150,12 @@ const ANCLAS_DE_LA_PANTALLA: Readonly<Record<string, readonly string[]>> = {
   // QC-35: la declaracion de columnas. QC-102 le añade una; las siete de antes siguen.
   // `ORDER_DEFAULT_PINNED_COLUMNS` salio a proposito: el defecto vive en la columna
   // (`defaultPinned: 'left'`) y la prop de tabla `defaultPinnedColumns` ya no existe.
+  // `QUANTITY_COLUMN_ID` salio el 2026-10-16 con la columna «Cantidad» (decision humana).
   'order-columns.tsx': [
     'ACTIONS_COLUMN_ID',
     'CANCELLATION_REASON_COLUMN_ID',
     'MISSING_VALUE_MARK',
     'ORDER_NUMBER_COLUMN_ID',
-    'QUANTITY_COLUMN_ID',
     'RECIPE_NAME_COLUMN_ID',
     'buildOrderColumns',
     'OrderColumnsDeps',
@@ -212,7 +212,13 @@ const ANCLAS_DE_LA_PANTALLA: Readonly<Record<string, readonly string[]>> = {
   ],
   'order-list-section.tsx': ['OrderListSection'],
   'order-list-skeleton.tsx': ['ORDER_SKELETON_COLUMN_COUNT', 'OrderListSkeleton'],
-  'order-row-actions.tsx': ['OrderRowActions', 'isFinalOrderStatus', 'OrderRowActionsProps'],
+  'order-row-actions.tsx': [
+    'OrderRowAction',
+    'OrderRowActions',
+    'OrderRowActionsProps',
+    'isFinalOrderStatus',
+    'orderRowActionsSpec',
+  ],
   'order-sheet.tsx': [
     'ORDER_CREATE_OPEN_TESTID',
     'ORDER_SHEET_TESTID',

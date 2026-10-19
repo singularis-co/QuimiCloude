@@ -17,6 +17,9 @@ export type ArrowLinkProps = {
   readonly touch?: boolean | 'mobile';
   readonly testId?: string;
   readonly className?: string;
+  /** Pinta el mismo aspecto atenuado y sin `href`: no navega ni recibe el foco, y lo anuncia
+   *  con `aria-disabled`. */
+  readonly disabled?: boolean;
 };
 
 // Tailwind v4 ya limita `hover` a `@media (hover: hover)`: en tacto la flecha no se mueve.
@@ -31,21 +34,35 @@ export function ArrowLink({
   touch,
   testId,
   className,
+  disabled = false,
 }: ArrowLinkProps) {
   const isBack = direction === 'back';
   const resolvedVariant = variant ?? (isBack ? 'outline' : 'default');
+  const classes = cn(
+    buttonVariants({ variant: resolvedVariant, size, touch }),
+    isBack && 'pl-2.5',
+    className,
+  );
+
+  // Sin `<a>`: un enlace sin `href` no es enlace, y uno con `href` se seguiria pudiendo abrir.
+  if (disabled) {
+    return (
+      <span
+        role="link"
+        aria-disabled="true"
+        data-testid={testId}
+        data-direction={direction}
+        className={cn(classes, 'pointer-events-none cursor-not-allowed opacity-50')}
+      >
+        {isBack ? <ArrowLeft aria-hidden /> : null}
+        {children}
+        {isBack ? null : <ArrowRight aria-hidden />}
+      </span>
+    );
+  }
 
   return (
-    <Link
-      href={href}
-      data-testid={testId}
-      data-direction={direction}
-      className={cn(
-        buttonVariants({ variant: resolvedVariant, size, touch }),
-        isBack && 'pl-2.5',
-        className,
-      )}
-    >
+    <Link href={href} data-testid={testId} data-direction={direction} className={classes}>
       {isBack ? (
         <ArrowLeft
           aria-hidden

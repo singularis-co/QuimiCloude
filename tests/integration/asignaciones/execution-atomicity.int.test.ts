@@ -39,11 +39,17 @@ vi.mock('@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-pr
 });
 
 import { asignaciones, pedidos } from '@/lib/composition';
-import { MaterialShortageError, OrderBlockedError, OrderDeliveredFrozenError } from '@/lib/modules/asignaciones';
+import {
+  MaterialShortageError,
+  OrderBlockedError,
+  OrderDeliveredFrozenError,
+  PackagingStockInsufficientError,
+} from '@/lib/modules/asignaciones';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { packedCountsOfPlan } from '../../helpers/packed-counts';
 import { seedPackaging } from '../../helpers/packaging-seed';
 
 /** El rechazo viene de Postgres: uno de los dos CHECK de posicion de la tabla. */
@@ -513,7 +519,7 @@ describe('asignaciones · la anotacion y el pedido se confirman juntos (Postgres
   it('R20: anotar un paso sobre un ENTREGADO no escribe nada', async () => {
     await conFixture(async (fixture) => {
       const { orderId } = await enEmpaque(fixture);
-      await asignaciones.finishPacking(empacador(fixture), { orderId });
+      await asignaciones.finishPacking(empacador(fixture), { orderId, lines: await packedCountsOfPlan(orderId) });
       expect((await pedidoEnBase(orderId)).status).toBe('POR_ACONDICIONAR');
       // Ninguna accion de la aplicacion escribe ENTREGADO: se fija a mano para sembrar el caso.
       await prisma.order.update({ where: { id: orderId }, data: { status: 'ENTREGADO' } });
@@ -552,9 +558,10 @@ describe('asignaciones · el empaque y su anotacion se confirman juntos (Postgre
       const antes = await anotaciones(orderId);
       const apartadoAntes = await apartadoNeto(orderId);
       const asientosAntes = await asientosDeInventario(orderId);
+      const lines = await packedCountsOfPlan(orderId);
 
       await expect(
-        conAnotacionFallida(() => asignaciones.finishPacking(empacador(fixture), { orderId })),
+        conAnotacionFallida(() => asignaciones.finishPacking(empacador(fixture), { orderId, lines })),
       ).rejects.toThrow(CHECK_DE_POSICION);
 
       const fila = await pedidoEnBase(orderId);
@@ -568,7 +575,7 @@ describe('asignaciones · el empaque y su anotacion se confirman juntos (Postgre
     });
   });
 
-  it('R24: terminar empaque sin envases suficientes no anota, no da de alta lote y no consume nada', async () => {
+  it('R18, R24: terminar empaque sin envases suficientes rechaza con packaging_stock_insufficient, no anota, no da de alta lote y no consume nada', async () => {
     await conFixture(async (fixture) => {
       const { orderId } = await enEmpaque(fixture);
       // Merma por fuera de la aplicacion: quedan 4 envases de los 10 apartados.
@@ -578,8 +585,8 @@ describe('asignaciones · el empaque y su anotacion se confirman juntos (Postgre
       const apartadoAntes = await apartadoNeto(orderId);
       const asientosAntes = await asientosDeInventario(orderId);
 
-      await expect(asignaciones.finishPacking(empacador(fixture), { orderId })).rejects.toBeInstanceOf(
-        MaterialShortageError,
+      await expect(asignaciones.finishPacking(empacador(fixture), { orderId, lines: await packedCountsOfPlan(orderId) })).rejects.toBeInstanceOf(
+        PackagingStockInsufficientError,
       );
 
       const fila = await pedidoEnBase(orderId);
@@ -611,7 +618,7 @@ describe('asignaciones · el empaque y su anotacion se confirman juntos (Postgre
       const { orderId } = await porEmpacar(fixture);
 
       await asignaciones.startPacking(empacador(fixture), { orderId });
-      await asignaciones.finishPacking(empacador(fixture), { orderId });
+      await asignaciones.finishPacking(empacador(fixture), { orderId, lines: await packedCountsOfPlan(orderId) });
 
       const fila = await pedidoEnBase(orderId);
       expect(fila.status).toBe('POR_ACONDICIONAR');

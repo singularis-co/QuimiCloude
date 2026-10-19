@@ -834,6 +834,9 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
         searchRefs: explota('customerCatalog.searchRefs'),
       } as unknown as CustomerCatalog,
       log,
+      deliveryProgress: {
+        listDeliveryProgressByIdsIncludingDeleted: explota('deliveryProgress.listDeliveryProgressByIdsIncludingDeleted'),
+      },
     }
 
     // Los casos de uso DE VERDAD detras de la composicion simulada.

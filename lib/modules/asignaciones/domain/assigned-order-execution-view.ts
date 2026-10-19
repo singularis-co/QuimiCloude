@@ -3,6 +3,7 @@ import type { RecipeStepView } from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import type { OrderDistributionLineView } from './order-distribution-view';
+import type { StepEvidenceView } from './step-evidence';
 
 /**
  * Proyeccion cerrada de la pantalla de ejecucion. Sin autoria, sin marcas de tiempo y sin
@@ -25,6 +26,8 @@ export type AssignedOrderExecutionView = {
   /** La unidad de `orderQuantity`; los dos `null` = pedido sin unidad, la cifra va sola. */
   readonly unitId: string | null;
   readonly unitLabel: string | null;
+  /** Las fotos de fabricacion por paso, con URL de lectura firmada. Vacio antes de comenzar. */
+  readonly evidence: readonly StepEvidenceView[];
 };
 
 /** La vista al abrir, con el paso por el que retoma; `null` si la receta no tiene pasos. */

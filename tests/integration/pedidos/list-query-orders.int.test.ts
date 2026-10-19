@@ -252,22 +252,23 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
   it('la fila que en el orden de hoy esta en la pagina 3 aparece en la 1 al ordenar al reves', async () => {
     // R13 — el aserto que distingue filtrar en la BASE de filtrar la pagina ya traida.
-    const ultimo = sembrados[sembrados.length - 1]?.id
+    const primero = sembrados[0]?.id
 
-    // Orden de HOY: `priority DESC, created_at ASC, ...`. Todas comparten prioridad, asi que el
-    // ultimo sembrado -el `created_at` mas alto- cae en la pagina 3 con paginas de cinco.
+    // Orden por defecto (QC-289): `priority DESC, created_at DESC, ...`. Todas comparten
+    // prioridad, asi que el PRIMER sembrado -el `created_at` mas bajo- cae en la pagina 3 con
+    // paginas de cinco.
     const pagina3 = await listAliveOrders(consulta({ page: 3, pageSize: 5 }), null, scope())
-    expect(pagina3.items.map((o) => o.id)).toContain(ultimo)
+    expect(pagina3.items.map((o) => o.id)).toContain(primero)
     const pagina1 = await listAliveOrders(consulta({ page: 1, pageSize: 5 }), null, scope())
-    expect(pagina1.items.map((o) => o.id)).not.toContain(ultimo)
+    expect(pagina1.items.map((o) => o.id)).not.toContain(primero)
 
     // Pidiendo el orden inverso por el correlativo, la MISMA fila sale en la pagina 1.
-    const desc = await listAliveOrders(
-      consulta({ page: 1, pageSize: 5, sort: { columnId: 'orderNumber', direction: 'desc' } }),
+    const asc = await listAliveOrders(
+      consulta({ page: 1, pageSize: 5, sort: { columnId: 'orderNumber', direction: 'asc' } }),
       null,
       scope(),
     )
-    expect(desc.items[0]?.id).toBe(ultimo)
+    expect(asc.items[0]?.id).toBe(primero)
   })
 
   it('un filtro que deja fuera casi todo trae la fila en la pagina 1 y el total describe lo filtrado (R14)', async () => {
@@ -444,14 +445,11 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
     )
 
     expect(pagina.total).toBe(6)
-    // Orden por defecto: `priority DESC, created_at ASC`. Los seis comparten prioridad `MEDIA`,
-    // asi que manda el `created_at`, que es el orden de alta.
-    expect(pagina.items.map((o) => o.id)).toEqual([
-      ordenAlfa.id,
-      ordenBeta.id,
-      ordenBaja.id,
-      ...ordenesComunes.map((o) => o.id),
-    ])
+    // Orden por defecto (QC-289): `priority DESC, created_at DESC`. Los seis comparten prioridad
+    // `MEDIA`, asi que manda el `created_at`: el orden de alta, al reves.
+    expect(pagina.items.map((o) => o.id)).toEqual(
+      [ordenAlfa.id, ordenBeta.id, ordenBaja.id, ...ordenesComunes.map((o) => o.id)].reverse(),
+    )
   })
 
   it('R6: el pedido BORRADO con el nombre exacto de su receta no aparece, y el total da cero', async () => {
@@ -579,7 +577,7 @@ describe('`priority` ordena por el ORDEN DEL ENUM, no por el alfabetico', () => 
     expect(pagina.items.map((o) => o.priority)).not.toEqual(alfabeticoDesc)
   })
 
-  it('sin orden explicito, el orden es el de HOY: priority DESC primero (R11)', async () => {
+  it('sin orden explicito, priority DESC sigue primero (R11; QC-289 solo invierte created_at)', async () => {
     const pagina = await listAliveOrders(
       consulta({
         pageSize: 25,

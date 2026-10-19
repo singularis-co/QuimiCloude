@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { OrderNotFoundError, UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
+import { buildExecutionTrace } from '@/lib/modules/asignaciones/domain/execution-trace';
 import { createGetExecutionTrace } from '@/lib/modules/asignaciones/domain/get-execution-trace';
 import { createListExecutionTraces } from '@/lib/modules/asignaciones/domain/list-execution-traces';
 import { PERMISSIONS, type PersonRef } from '@/lib/modules/identity';
@@ -13,6 +14,8 @@ import { ORDER_STATUS_VALUES, type OrderCatalog, type OrderHistorySummary } from
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { ExecutionAction, ExecutionEntryRecord } from '@/lib/modules/asignaciones/domain/execution-entry';
+import type { ConditioningBatchSnapshotLine } from '@/lib/modules/asignaciones/domain/conditioning-trace';
+import type { ConditioningTeamMemberRow } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
 import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
 import type { PeopleDirectory } from '@/lib/modules/identity';
 
@@ -41,6 +44,7 @@ function anotacion(action: ExecutionAction, offsetMin: number, userId = ANA, ste
     action,
     stepPosition,
     reason: action === 'cancel' ? 'sin material' : null,
+    batchLines: null,
     occurredAt: new Date(T0 + offsetMin * MIN),
   } satisfies ExecutionEntryRecord;
 }
@@ -60,6 +64,7 @@ function montar(options?: {
   readonly order?: OrderHistorySummary | null;
   readonly entries?: readonly ExecutionEntryRecord[];
   readonly people?: readonly PersonRef[];
+  readonly team?: readonly (ConditioningTeamMemberRow & { readonly orderId: string })[];
 }) {
   const order = options?.order === undefined ? resumen() : options.order;
   const entries = options?.entries ?? RECORRIDO;
@@ -85,18 +90,28 @@ function montar(options?: {
       return { items, total: items.length, page, pageSize: pageSize ?? 10, totalPages: 1 };
     },
   );
-  const orders = { listSummariesByIdsIncludingDeleted } as unknown as OrderCatalog;
+  // Solo la lista lee el reparto; sin reparto, recetas y presentaciones no se consultan.
+  const listDeliveryProgressByIdsIncludingDeleted = vi.fn(async () => []);
+  const orders = { listSummariesByIdsIncludingDeleted, listDeliveryProgressByIdsIncludingDeleted } as unknown as OrderCatalog;
+  const recipes = { findRefsIncludingDeleted: vi.fn(async () => []) };
+  const presentations = { findRefs: vi.fn(async () => []) };
 
   const directorio = options?.people ?? [
-    { id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [] },
-    { id: BEA, displayName: 'Bea Gomez', isActive: false, permissions: [] },
+    { id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [], roleName: 'Operador' },
+    { id: BEA, displayName: 'Bea Gomez', isActive: false, permissions: [], roleName: 'Operador' },
   ];
   const findRefsIncludingDeletedInCompany = vi.fn(
     async (_companyId: string, ids: readonly string[]) => directorio.filter((ref) => ids.includes(ref.id)),
   );
   const people = { findRefsIncludingDeletedInCompany } as unknown as PeopleDirectory;
 
+  const listByOrdersInCompany = vi.fn(async (_companyId: string, ids: readonly string[]) =>
+    (options?.team ?? []).filter((row) => ids.includes(row.orderId)),
+  );
+  const team = { listByOrdersInCompany };
+
   const todos = [
+    listByOrdersInCompany,
     listEntriesForOrders,
     listExecutedOrderIds,
     listUserIdsWithEntries,
@@ -106,9 +121,10 @@ function montar(options?: {
     findRefsIncludingDeletedInCompany,
   ];
   return {
-    abrir: createGetExecutionTrace({ log, orders, people }),
-    listar: createListExecutionTraces({ log, orders, people }),
+    abrir: createGetExecutionTrace({ log, orders, people, team }),
+    listar: createListExecutionTraces({ log, orders, people, team, recipes, presentations }),
     listEntriesForOrders,
+    listByOrdersInCompany,
     listSummariesByIdsIncludingDeleted,
     findRefsIncludingDeletedInCompany,
     ningunPuertoLlamado: () => todos.every((fn) => fn.mock.calls.length === 0),
@@ -122,7 +138,7 @@ describe('getExecutionTrace — autorizacion antes de todo', () => {
     ['ausente (null)', null],
     ['ausente (undefined)', undefined],
     ['sin conjunto de permisos', { id: ANA, companyId: EMPRESA } as unknown as Actor],
-    ['con el conjunto vacio', { id: ANA, companyId: EMPRESA, permissions: [] }],
+    ['con el conjunto vacio', { id: ANA, companyId: EMPRESA, permissions: [], roleName: 'Operador' }],
     ['con todo el catalogo menos dashboard.consultar', { id: ANA, companyId: EMPRESA, permissions: sinElPermiso }],
   ])('R19: un actor %s se rechaza sin llamar a ningun puerto', async (_caso, actor) => {
     const m = montar();
@@ -180,7 +196,8 @@ describe('getExecutionTrace — sin recorrido, el mismo 404', () => {
     const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
     expect(recorrido.deleted).toBe(true);
     expect(recorrido.steps).toHaveLength(RECORRIDO.length);
-    expect(recorrido.duration.kind).not.toBe('open');
+    expect(recorrido.active).toBe(false);
+    expect(recorrido.durations.production?.kind).not.toBe('open');
   });
 
   it('R12 R18: pide a pedidos el pedido en cualquier estado, incluidos los dados de baja', async () => {
@@ -215,12 +232,12 @@ describe('getExecutionTrace — lo que muestra', () => {
   });
 
   it('R13: una persona que el directorio ya no devuelve sale sin nombre, no rompe el recorrido', async () => {
-    const m = montar({ people: [{ id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [] }] });
+    const m = montar({ people: [{ id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [], roleName: 'Operador' }] });
     const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
     expect(recorrido.steps.map((step) => step.userDisplayName)).toEqual(['Ana Perez', 'Ana Perez', null, null]);
   });
 
-  it('R15: la duracion del detalle es la misma cifra que la de la fila de la lista', async () => {
+  it('R15 R27: el detalle trae el desglose y la fila su suma, del mismo calculo', async () => {
     for (const order of [
       resumen({ status: 'CANCELADO' }),
       resumen({ status: 'EN_CURSO' }),
@@ -229,15 +246,22 @@ describe('getExecutionTrace — lo que muestra', () => {
       const m = montar({ order });
       const detalle = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
       const { page } = await m.listar(ACTOR, {}, NOW);
-      expect(detalle.duration).toEqual(page.items[0]!.duration);
+      const esperado = buildExecutionTrace(RECORRIDO, order, NOW);
+      expect(detalle.durations).toEqual(esperado.durations);
+      expect(page.items[0]!.totalDuration).toEqual(esperado.totalDuration);
+      expect(detalle.active).toBe(page.items[0]!.active);
       expect(detalle.goBackCount).toBe(page.items[0]!.goBackCount);
     }
   });
 
-  it('R15: con la ultima anotacion de cierre y el pedido cancelado, la duracion es cerrada', async () => {
+  it('R15 R24: con el cancel en produccion y el pedido cancelado, produccion es cerrada', async () => {
     const m = montar();
     const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
-    expect(recorrido.duration).toEqual({ kind: 'closed', ms: 40 * MIN });
+    expect(recorrido.durations).toEqual({
+      production: { kind: 'closed', ms: 40 * MIN },
+      packing: null,
+      conditioning: null,
+    });
   });
 
   it('R23: todas las llamadas llevan la empresa del actor', async () => {
@@ -246,5 +270,141 @@ describe('getExecutionTrace — lo que muestra', () => {
     expect(m.listSummariesByIdsIncludingDeleted.mock.calls[0]![0]).toBe(EMPRESA);
     expect(m.listEntriesForOrders).toHaveBeenCalledWith(EMPRESA, [PEDIDO]);
     expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledWith(EMPRESA, [ANA, BEA], NOW);
+  });
+});
+
+describe('getExecutionTrace — las anotaciones del acondicionamiento', () => {
+  const CARLA = uuid('5');
+  const DIEGO = uuid('6');
+  const ELENA = uuid('7');
+  const GRUPO = uuid('8');
+  const directorio: readonly PersonRef[] = [
+    { id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [], roleName: 'Supervisor' },
+    { id: BEA, displayName: 'Bea Gomez', isActive: true, permissions: [], roleName: 'Operador' },
+    { id: CARLA, displayName: 'Carla Diaz Actual', isActive: true, permissions: [], roleName: 'Operador' },
+    { id: DIEGO, displayName: 'Diego Sanz', isActive: false, permissions: [], roleName: 'Operador' },
+  ];
+  const lineas: readonly ConditioningBatchSnapshotLine[] = [
+    {
+      batchId: uuid('b'),
+      presentationId: uuid('c'),
+      presentationName: 'Frasco 250 ml',
+      lot: 'L-001',
+      expiryDate: '2027-10-01',
+      productionDate: '2026-10-01',
+    },
+    {
+      batchId: uuid('d'),
+      presentationId: uuid('e'),
+      presentationName: null,
+      lot: 'L-002',
+      expiryDate: '2027-11-01',
+      productionDate: '2026-10-01',
+    },
+  ];
+  const acondicionado: readonly ExecutionEntryRecord[] = [
+    anotacion('conditioning_start', 0, ANA, null),
+    { ...anotacion('conditioning_batch_save', 10, BEA, null), batchLines: lineas },
+    anotacion('conditioning_finish', 30, ANA, null),
+  ];
+  const equipo = [
+    { orderId: PEDIDO, userId: CARLA, workGroupId: GRUPO, workGroupName: 'Turno manana (al comenzar)' },
+    { orderId: PEDIDO, userId: DIEGO, workGroupId: null, workGroupName: null },
+    { orderId: PEDIDO, userId: ELENA, workGroupId: null, workGroupName: null },
+  ];
+
+  it('R11: sin dashboard.consultar no lee registro ni equipo', async () => {
+    const m = montar({ order: resumen({ status: 'TERMINADO' }), entries: acondicionado, team: equipo });
+    const sinConsultar = PERMISSIONS.map((p) => p.code).filter((code) => code !== 'dashboard.consultar');
+    await expect(
+      m.abrir({ id: ANA, companyId: EMPRESA, permissions: sinConsultar }, { orderId: PEDIDO }, NOW),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(m.listEntriesForOrders).not.toHaveBeenCalled();
+    expect(m.listByOrdersInCompany).not.toHaveBeenCalled();
+  });
+
+  it('R13: equipo con nombres actuales y grupo foto', async () => {
+    const m = montar({
+      order: resumen({ status: 'TERMINADO' }),
+      entries: acondicionado,
+      people: directorio,
+      team: equipo,
+    });
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    const comenzar = recorrido.steps[0]!;
+    expect(comenzar.action).toBe('conditioning_start');
+    if (comenzar.action !== 'conditioning_start') throw new Error('se esperaba el Comenzar');
+    // El supervisor es quien firma el Comenzar.
+    expect([comenzar.userId, comenzar.userDisplayName]).toEqual([ANA, 'Ana Perez']);
+    expect(comenzar.team).toEqual([
+      {
+        userId: CARLA,
+        displayName: 'Carla Diaz Actual',
+        origin: { kind: 'workGroup', workGroupId: GRUPO, workGroupName: 'Turno manana (al comenzar)' },
+      },
+      // Dado de baja: el directorio lo sigue devolviendo con su nombre.
+      { userId: DIEGO, displayName: 'Diego Sanz', origin: { kind: 'direct' } },
+      // El directorio no lo devuelve: sin nombre, sin romper el recorrido.
+      { userId: ELENA, displayName: null, origin: { kind: 'direct' } },
+    ]);
+    expect(m.listByOrdersInCompany).toHaveBeenCalledWith(EMPRESA, [PEDIDO]);
+    expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledTimes(1);
+    expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledWith(EMPRESA, [ANA, BEA, CARLA, DIEGO, ELENA], NOW);
+  });
+
+  it('R13: Comenzar sin equipo lleva la lista vacia', async () => {
+    const m = montar({ order: resumen({ status: 'EN_ACONDICIONAMIENTO' }), entries: [acondicionado[0]!] });
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    expect(recorrido.steps[0]).toMatchObject({ action: 'conditioning_start', team: [], stepPosition: null, reason: null });
+    expect(recorrido.durations.conditioning).toEqual({ kind: 'open', ms: NOW.getTime() - T0 });
+    expect(recorrido.active).toBe(true);
+  });
+
+  it('R13: el guardado lleva su foto como lines y el Terminar solo quien firma', async () => {
+    const m = montar({ order: resumen({ status: 'TERMINADO' }), entries: acondicionado, people: directorio });
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    const [, guardado, terminar] = recorrido.steps;
+    expect(guardado).toEqual({
+      id: acondicionado[1]!.id,
+      orderId: PEDIDO,
+      userId: BEA,
+      userDisplayName: 'Bea Gomez',
+      occurredAt: acondicionado[1]!.occurredAt,
+      gapToNextMs: 20 * MIN,
+      isGoBack: false,
+      action: 'conditioning_batch_save',
+      stepPosition: null,
+      reason: null,
+      lines: lineas,
+    });
+    expect(terminar).toEqual({
+      id: acondicionado[2]!.id,
+      orderId: PEDIDO,
+      userId: ANA,
+      userDisplayName: 'Ana Perez',
+      occurredAt: acondicionado[2]!.occurredAt,
+      gapToNextMs: null,
+      isGoBack: false,
+      action: 'conditioning_finish',
+      stepPosition: null,
+      reason: null,
+    });
+    expect(recorrido.durations.conditioning).toEqual({ kind: 'closed', ms: 30 * MIN });
+  });
+
+  it('R13: los pasos de produccion no llevan batchLines ni campos de acondicionamiento', async () => {
+    const m = montar();
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    for (const step of recorrido.steps) {
+      expect(Object.keys(step).sort()).toEqual(
+        ['action', 'gapToNextMs', 'id', 'isGoBack', 'occurredAt', 'orderId', 'reason', 'stepPosition', 'userDisplayName', 'userId'],
+      );
+    }
+  });
+
+  it('R32: sin Comenzar anotado no consulta el equipo', async () => {
+    const m = montar({ team: equipo });
+    await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    expect(m.listByOrdersInCompany).not.toHaveBeenCalled();
   });
 });

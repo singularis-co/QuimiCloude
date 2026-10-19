@@ -358,6 +358,8 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // ningun script tocan `orders`.
     const DUENOS_DE_ORDERS = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      // 2026-10-14: el contador de pedidos en curso de una empresa, para el impacto de su baja.
+      'lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma.ts',
       // `OrderNumberDirectory` de `inventario` -el numero visible de un pedido para el
       // historial de un lote-, tercer y ultimo dueno.
       'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
@@ -488,13 +490,21 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, ENTREGAS, ANULACIONES, DUENO_DE_PRISMA, UNIDAD_DE_TRABAJO]
     // `order-number-directory-prisma.ts` (`OrderNumberDirectory` de `inventario`) tambien abre
     // el cliente compartido, sin importar `@prisma/client`.
+    // 2026-10-13: `order-delivery-directory-prisma.ts` (`FinishedDeliveryDirectory` de
+    // `inventario`, solo lectura) abre el cliente compartido, sin importar `@prisma/client`.
+    // 2026-10-14: `packed-lines-directory-prisma.ts` (`FinishedDistributionDirectory` de
+    // `inventario`, solo lectura) igual, sin importar `@prisma/client`.
+    // Las dos listas siguen CERRADAS.
     const DUENOS_DEL_CLIENTE = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      'lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma.ts',
+      'lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma.ts',
       ENTREGAS,
       ANULACIONES,
       'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
       DUENO_DE_PRISMA,
       UNIDAD_DE_TRABAJO,
+      'lib/modules/pedidos/adapters/driven/persistence/packed-lines-directory-prisma.ts',
     ]
     expect(
       pedidosSources.filter((file) => /@prisma\/client/.test(read(file))).map(etiqueta),

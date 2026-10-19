@@ -18,14 +18,21 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVerticalIcon } from 'lucide-react';
-import { useId } from 'react';
+import { CircleAlertIcon, GripVerticalIcon, PlusIcon, XIcon } from 'lucide-react';
+import { useId, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-import { createLocalKey, type RecipeStepErrors, type RecipeStepFormValue } from './recipe-form-state';
+import {
+  createLocalKey,
+  isStepDocumentEmpty,
+  type RecipeStepErrorMessages,
+  type RecipeStepErrors,
+  type RecipeStepFormValue,
+} from './recipe-form-state';
 import { RecipeStepEditor } from './recipe-step-editor';
 
 /**
@@ -67,15 +74,72 @@ function emptyStepDocument(): RecipeStepDocument {
   return { blocks: [{ kind: 'paragraph', spans: [] }] };
 }
 
+export { isStepDocumentEmpty };
+
+/** Título y ayuda de la sección de envasado; los comparten el alta, la edición y la importación. */
+/**
+ * Textos propios para los issues de forma de zod sobre un paso: el genérico de zod sale en inglés.
+ * Los que escribe el esquema («Un paso no puede quedar vacio.», el ítem vacío, el tope de
+ * elementos) pasan tal cual (`recipe-form-state.ts`).
+ */
+export const RECIPE_STEP_ERROR_MESSAGES: RecipeStepErrorMessages = {
+  checklistWithoutItems: 'Una lista de verificación necesita al menos un ítem.',
+  invalid: 'Revisa el contenido de este paso.',
+};
+
+export const PACKING_STEPS_FIELD_TEXTS = {
+  title: 'Pasos de envasado',
+  optionalHelp:
+    'Opcional. Pasos que sigue el empacador uno a uno al empacar el pedido.',
+  optionalHelpLabel: 'Qué son los pasos de envasado',
+} as const;
+
+const FIELD_TEXTS = {
+  optional: '(opcional)',
+  addAfter: (position: number) => `Añadir un paso después del ${position}`,
+  remove: (position: number) => `Quitar paso ${position}`,
+} as const;
+
+const EVIDENCE_TEXTS = {
+  summary: (count: number) =>
+    count === 0
+      ? 'Ningún paso pide evidencia'
+      : count === 1
+        ? '1 paso pide evidencia'
+        : `${count} pasos piden evidencia`,
+  switchLabel: (position: number) => `Requiere evidencia en el paso ${position}`,
+  lockedHandle: (position: number) =>
+    `No se puede mover el paso ${position}: hay pedidos en curso con fotos`,
+  lockedRemove: (position: number) =>
+    `No se puede quitar el paso ${position}: hay pedidos en curso con fotos`,
+} as const;
+
+/**
+ * El editor devuelve solo el contenido del paso; la marca se copia aparte para que escribir no la
+ * apague. Apagada, la clave desaparece: el JSON de una fórmula que nunca la usó no cambia.
+ */
+function withEvidence(document: RecipeStepDocument, on: boolean): RecipeStepDocument {
+  const next: RecipeStepDocument = { ...document };
+  if (on) next.requiresEvidence = true;
+  else delete next.requiresEvidence;
+  return next;
+}
+
 export type RecipeStepsFieldProps = {
   readonly steps: readonly RecipeStepFormValue[];
   readonly onChange: (steps: readonly RecipeStepFormValue[]) => void;
   readonly errors?: RecipeStepErrors;
   readonly title?: string;
-  readonly addLabel?: string;
+  /** Marca la sección como opcional junto al título y explica para qué sirve en un tooltip. */
+  readonly optionalHelp?: { readonly text: string; readonly label: string };
   /** Raiz de los `data-testid` y de los `id` de error: dos instancias en la misma pagina no
    *  deben colisionar. */
   readonly testIdPrefix?: string;
+  /** Pinta el interruptor «Requiere evidencia» en cada paso y el resumen de la lista. */
+  readonly showEvidenceSwitch?: boolean;
+  /** Deshabilita mover y quitar pasos; editar el texto y la marca siguen activos, y añadir solo
+   *  al final (añadir se apaga mientras haya un paso vacío, con o sin `locked`). */
+  readonly locked?: boolean;
 };
 
 /**
@@ -111,28 +175,54 @@ export function RecipeStepsField({
   onChange,
   errors,
   title = 'Pasos',
-  addLabel = 'Añadir paso',
+  optionalHelp,
   testIdPrefix = 'recipe-step',
+  showEvidenceSwitch = false,
+  locked = false,
 }: RecipeStepsFieldProps) {
   const headingId = useId();
+  // La fila en blanco de arranque vive fuera de `steps` hasta que se escribe en ella, como la de
+  // ingredientes. Al materializarse se queda con esta clave para que el editor no se remonte y
+  // conserve el foco; la siguiente fila en blanco estrena otra.
+  const [ghostKey, setGhostKey] = useState(() => createLocalKey('step'));
+  const isGhost = steps.length === 0;
+  const rows: readonly RecipeStepFormValue[] = isGhost
+    ? [{ key: ghostKey, document: emptyStepDocument() }]
+    : steps;
+  const evidenceCount = steps.filter((step) => step.document.requiresEvidence === true).length;
+  // Con algún paso vacío no se añade otro: primero se rellena el que ya está.
+  const canAddStep = !rows.some((step) => isStepDocumentEmpty(step.document));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  function addStep() {
-    // El paso ya no tiene tipo (QC-62 R9) y tampoco es texto (QC-64 R1): un paso nuevo es un
-    // DOCUMENTO VACIO VALIDO -un parrafo sin fragmentos-, que es lo que el editor monta como
-    // documento en blanco y lo que `recipeStepSchema` acepta sin limpieza previa.
-    onChange([...steps, { key: createLocalKey('step'), document: emptyStepDocument() }]);
+  function blankStep(): RecipeStepFormValue {
+    return { key: createLocalKey('step'), document: emptyStepDocument() };
+  }
+
+  function addStepAfter(index: number) {
+    if (isGhost) {
+      setGhostKey(createLocalKey('step'));
+      onChange([{ key: ghostKey, document: emptyStepDocument() }, blankStep()]);
+      return;
+    }
+    onChange([...steps.slice(0, index + 1), blankStep(), ...steps.slice(index + 1)]);
   }
 
   function updateStep(index: number, patch: Partial<RecipeStepFormValue>) {
+    if (isGhost) {
+      setGhostKey(createLocalKey('step'));
+      onChange([{ key: ghostKey, document: emptyStepDocument(), ...patch }]);
+      return;
+    }
     onChange(steps.map((step, i) => (i === index ? { ...step, ...patch } : step)));
   }
 
   function removeStep(index: number) {
+    // La fila en blanco no está en `steps`: quitarla no deja la sección sin filas.
+    if (isGhost) return;
     onChange(steps.filter((_, i) => i !== index));
   }
 
@@ -153,32 +243,78 @@ export function RecipeStepsField({
       data-testid={`${testIdPrefix}s-field`}
       className="flex flex-col gap-3"
     >
-      <div className="flex items-center justify-between gap-2">
-        <h2 id={headingId} className="text-lg font-medium">
-          {title}
-        </h2>
-        <Button type="button" touch data-testid={`${testIdPrefix}-add`} onClick={addStep}>
-          {addLabel}
-        </Button>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-1">
+          <h2 id={headingId} className="text-lg font-medium">
+            {title}
+            {optionalHelp === undefined ? null : (
+              <span
+                className="ml-1 text-sm font-normal text-muted-foreground"
+                data-testid={`${testIdPrefix}s-optional`}
+              >
+                {FIELD_TEXTS.optional}
+              </span>
+            )}
+          </h2>
+          {optionalHelp === undefined ? null : (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label={optionalHelp.label}
+                    className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`}
+                    data-testid={`${testIdPrefix}s-help`}
+                  />
+                }
+              >
+                <CircleAlertIcon aria-hidden="true" className="size-4" />
+              </TooltipTrigger>
+              <TooltipContent data-testid={`${testIdPrefix}s-help-text`}>
+                {optionalHelp.text}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+        {showEvidenceSwitch ? (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid={`${testIdPrefix}-evidence-summary`}
+          >
+            {EVIDENCE_TEXTS.summary(evidenceCount)}
+          </p>
+        ) : null}
       </div>
 
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        accessibility={{ announcements: buildAnnouncements(steps) }}
+        accessibility={{ announcements: buildAnnouncements(rows) }}
         onDragEnd={handleDragEnd}
       >
-        <SortableContext items={steps.map((step) => step.key)} strategy={verticalListSortingStrategy}>
+        <SortableContext items={rows.map((step) => step.key)} strategy={verticalListSortingStrategy}>
           <ol className="flex flex-col gap-2" data-testid={`${testIdPrefix}s-list`}>
-            {steps.map((step, index) => (
+            {rows.map((step, index) => (
               <RecipeStepRow
                 key={step.key}
                 step={step}
                 index={index}
-                total={steps.length}
+                total={rows.length}
                 testIdPrefix={testIdPrefix}
                 error={errors?.[index]}
-                onChangeDocument={(document) => updateStep(index, { document })}
+                showEvidenceSwitch={showEvidenceSwitch}
+                locked={locked}
+                // Bloqueado solo se añade al final: insertar en medio movería los pasos siguientes.
+                canAdd={canAddStep && (!locked || index === rows.length - 1)}
+                onAdd={() => addStepAfter(index)}
+                onChangeDocument={(document) =>
+                  updateStep(index, {
+                    document: withEvidence(document, step.document.requiresEvidence === true),
+                  })
+                }
+                onChangeEvidence={(on) =>
+                  updateStep(index, { document: withEvidence(step.document, on) })
+                }
                 onRemove={() => removeStep(index)}
               />
             ))}
@@ -195,7 +331,12 @@ type RecipeStepRowProps = {
   readonly total: number;
   readonly testIdPrefix: string;
   readonly error?: string;
+  readonly showEvidenceSwitch: boolean;
+  readonly locked: boolean;
+  readonly canAdd: boolean;
+  readonly onAdd: () => void;
   readonly onChangeDocument: (document: RecipeStepDocument) => void;
+  readonly onChangeEvidence: (on: boolean) => void;
   readonly onRemove: () => void;
 };
 
@@ -205,12 +346,19 @@ function RecipeStepRow({
   total,
   testIdPrefix,
   error,
+  showEvidenceSwitch,
+  locked,
+  canAdd,
+  onAdd,
   onChangeDocument,
+  onChangeEvidence,
   onRemove,
 }: RecipeStepRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: step.key,
+    disabled: locked,
   });
+  const evidenceOn = showEvidenceSwitch && step.document.requiresEvidence === true;
   const style = { transform: CSS.Transform.toString(transform), transition };
   const errorId = `${testIdPrefix}-error-${index}`;
 
@@ -219,15 +367,22 @@ function RecipeStepRow({
       ref={setNodeRef}
       style={style}
       data-testid={`${testIdPrefix}-row`}
-      className={`flex items-start gap-2 rounded-lg border p-2 ${isDragging ? 'opacity-70' : ''}`}
+      className={`flex items-start gap-2 rounded-lg border p-2 ${isDragging ? 'opacity-70' : ''} ${
+        evidenceOn ? 'border-[color-mix(in_oklch,var(--primary)_45%,var(--border))]' : ''
+      }`}
     >
       {/* Asa de arrastre: SIEMPRE visible, >= 44x44 px, y con nombre accesible que INCLUYE la posición (R34, R50). */}
       <button
         type="button"
         {...attributes}
         {...listeners}
-        className={`${touchTarget} flex shrink-0 touch-none items-center justify-center rounded-lg border bg-muted`}
-        aria-label={`Arrastrar el paso en la posición ${index + 1} de ${total}`}
+        className={`${touchTarget} flex shrink-0 touch-none items-center justify-center rounded-lg border bg-muted disabled:cursor-not-allowed disabled:opacity-50`}
+        disabled={locked}
+        aria-label={
+          locked
+            ? EVIDENCE_TEXTS.lockedHandle(index + 1)
+            : `Arrastrar el paso en la posición ${index + 1} de ${total}`
+        }
         data-testid={`${testIdPrefix}-handle-${index}`}
       >
         <GripVerticalIcon aria-hidden="true" />
@@ -250,6 +405,45 @@ function RecipeStepRow({
           editableTestId={`${testIdPrefix}-text-${index}`}
           error={error}
           errorId={errorId}
+          evidence={
+            showEvidenceSwitch
+              ? {
+                  checked: evidenceOn,
+                  onCheckedChange: onChangeEvidence,
+                  label: EVIDENCE_TEXTS.switchLabel(index + 1),
+                }
+              : undefined
+          }
+          actions={
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                touch
+                disabled={locked}
+                aria-label={
+                  locked ? EVIDENCE_TEXTS.lockedRemove(index + 1) : FIELD_TEXTS.remove(index + 1)
+                }
+                data-testid={`${testIdPrefix}-remove-${index}`}
+                onClick={onRemove}
+              >
+                <XIcon aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                touch
+                disabled={!canAdd}
+                aria-label={FIELD_TEXTS.addAfter(index + 1)}
+                data-testid={`${testIdPrefix}-add-${index}`}
+                onClick={onAdd}
+              >
+                <PlusIcon aria-hidden />
+              </Button>
+            </>
+          }
         />
         {error === undefined ? null : (
           <p id={errorId} className="text-sm text-destructive" data-testid={`${testIdPrefix}-field-error-${index}`}>
@@ -257,17 +451,6 @@ function RecipeStepRow({
           </p>
         )}
       </div>
-
-      <Button
-        type="button"
-        variant="ghost"
-        touch
-        aria-label={`Quitar paso ${index + 1}`}
-        data-testid={`${testIdPrefix}-remove-${index}`}
-        onClick={onRemove}
-      >
-        Quitar
-      </Button>
     </li>
   );
 }

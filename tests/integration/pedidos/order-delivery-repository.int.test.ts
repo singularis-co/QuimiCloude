@@ -200,8 +200,9 @@ async function newBatch(tx: Prisma.TransactionClient, t: Tenant): Promise<string
   return id
 }
 
+// 2026-10-15: la entrega ya no lleva `customerId`; el cliente va en cada linea (`addLines`).
 function newDelivery(t: Tenant, deliveryKey: string = randomUUID()) {
-  return { deliveryKey, orderId: t.orderId, customerId: t.customerId, actorId: t.userId, now: AHORA }
+  return { deliveryKey, orderId: t.orderId, actorId: t.userId, now: AHORA }
 }
 
 async function createdId(
@@ -212,6 +213,22 @@ async function createdId(
   const outcome = await repo.create(newDelivery(t, deliveryKey), { companyId: t.companyId })
   if (outcome.kind !== 'created') throw new Error('se esperaba una entrega creada')
   return outcome.id
+}
+
+async function newCustomer(tx: Prisma.TransactionClient, t: Tenant): Promise<string> {
+  const { id } = await tx.customer.create({
+    data: {
+      firstNames: 'Marta',
+      firstNamesNormalized: 'marta',
+      lastNames: 'Diaz',
+      lastNamesNormalized: 'diaz',
+      city: 'Cali',
+      cityNormalized: 'cali',
+      companyId: t.companyId,
+    },
+    select: { id: true },
+  })
+  return id
 }
 
 function prismaCode(error: unknown): string | null {
@@ -226,7 +243,9 @@ afterAll(async () => {
 // --- Casos ----------------------------------------------------------------------------------
 
 describe('OrderDeliveryRepository contra Postgres real', () => {
-  it('R25: create guarda la entrega con su empresa, pedido, cliente, clave, autor e instante', async () => {
+  // 2026-10-15: la entrega deja de guardar cliente (pasa a sus lineas); el resto de la fila se
+  // sigue comprobando igual y se anade que la columna ya no existe.
+  it('R25: create guarda la entrega con su empresa, pedido, clave, autor e instante, sin cliente propio', async () => {
     await inRolledBackTransaction(async (tx) => {
       const a = await createTenant(tx, 'A')
       const repo = createOrderDeliveryRepository(tx)
@@ -240,11 +259,11 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       expect(fila).toMatchObject({
         companyId: a.companyId,
         orderId: a.orderId,
-        customerId: a.customerId,
         deliveryKey: key,
         createdBy: a.userId,
         createdAt: AHORA,
       })
+      expect(fila).not.toHaveProperty('customerId')
     })
   })
 
@@ -296,13 +315,14 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       const repo = createOrderDeliveryRepository(tx)
 
       const error = await errorOf(tx, () =>
-        repo.create({ ...newDelivery(a), customerId: b.customerId, actorId: b.userId }, { companyId: b.companyId }),
+        repo.create({ ...newDelivery(a), actorId: b.userId }, { companyId: b.companyId }),
       )
       expect(prismaCode(error)).toBe('P2003')
     })
   })
 
-  it('R25: addLines guarda linea del reparto, lote, envases y cantidad con la empresa del ambito', async () => {
+  // 2026-10-15: cada linea guarda tambien su cliente; las columnas anteriores se comprueban igual.
+  it('QC-282 R25, R30: addLines guarda cliente, linea del reparto, lote, envases y cantidad con la empresa del ambito', async () => {
     await inRolledBackTransaction(async (tx) => {
       const a = await createTenant(tx, 'A')
       const repo = createOrderDeliveryRepository(tx)
@@ -312,19 +332,74 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       await repo.addLines(
         deliveryId,
         [
-          { presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.5000' },
-          { presentationLineId: a.lineIds[0], batchId: otroLote, packages: 1, quantity: '1.2500' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.5000' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: otroLote, packages: 1, quantity: '1.2500' },
         ],
         { companyId: a.companyId },
       )
 
       const filas = await tx.orderDeliveryLine.findMany({ where: { deliveryId }, orderBy: { packages: 'desc' } })
       expect(
-        filas.map((f) => [f.companyId, f.orderPresentationLineId, f.batchId, f.packages, f.quantity.toFixed(4)]),
+        filas.map((f) => [f.companyId, f.customerId, f.orderPresentationLineId, f.batchId, f.packages, f.quantity.toFixed(4)]),
       ).toEqual([
-        [a.companyId, a.lineIds[0], a.batchId, 2, '2.5000'],
-        [a.companyId, a.lineIds[0], otroLote, 1, '1.2500'],
+        [a.companyId, a.customerId, a.lineIds[0], a.batchId, 2, '2.5000'],
+        [a.companyId, a.customerId, a.lineIds[0], otroLote, 1, '1.2500'],
       ])
+    })
+  })
+
+  it('QC-282 R30: addLines guarda en una entrega el mismo lote para dos clientes, cada linea con el suyo', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const otroCliente = await newCustomer(tx, a)
+      const otroLote = await newBatch(tx, a)
+      const repo = createOrderDeliveryRepository(tx)
+      const deliveryId = await createdId(repo, a)
+
+      await repo.addLines(
+        deliveryId,
+        [
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.0000' },
+          { customerId: otroCliente, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 3, quantity: '3.0000' },
+          { customerId: otroCliente, presentationLineId: a.lineIds[1], batchId: otroLote, packages: 1, quantity: '1.0000' },
+        ],
+        { companyId: a.companyId },
+      )
+
+      const filas = await tx.orderDeliveryLine.findMany({ where: { deliveryId }, orderBy: { packages: 'asc' } })
+      expect(filas.map((f) => [f.customerId, f.orderPresentationLineId, f.batchId, f.packages])).toEqual([
+        [otroCliente, a.lineIds[1], otroLote, 1],
+        [a.customerId, a.lineIds[0], a.batchId, 2],
+        [otroCliente, a.lineIds[0], a.batchId, 3],
+      ])
+      expect(new Map(await repo.sumDeliveredPackages(a.orderId, { companyId: a.companyId }))).toEqual(
+        new Map([
+          [a.lineIds[0], 5],
+          [a.lineIds[1], 1],
+        ]),
+      )
+    })
+  })
+
+  it('QC-282 R30: addLines rechaza por FK el cliente de otra empresa y no escribe ninguna linea', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const b = await createTenant(tx, 'B')
+      const repo = createOrderDeliveryRepository(tx)
+      const deliveryId = await createdId(repo, a)
+
+      const error = await errorOf(tx, () =>
+        repo.addLines(
+          deliveryId,
+          [
+            { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 1, quantity: '1.0000' },
+            { customerId: b.customerId, presentationLineId: a.lineIds[1], batchId: a.batchId, packages: 1, quantity: '1.0000' },
+          ],
+          { companyId: a.companyId },
+        ),
+      )
+      expect(prismaCode(error)).toBe('P2003')
+      expect(await tx.orderDeliveryLine.count({ where: { deliveryId } })).toBe(0)
     })
   })
 
@@ -339,8 +414,8 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
         repo.addLines(
           deliveryId,
           [
-            { presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 1, quantity: '1.0000' },
-            { presentationLineId: a.lineIds[1], batchId: b.batchId, packages: 1, quantity: '1.0000' },
+            { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 1, quantity: '1.0000' },
+            { customerId: a.customerId, presentationLineId: a.lineIds[1], batchId: b.batchId, packages: 1, quantity: '1.0000' },
           ],
           { companyId: a.companyId },
         ),
@@ -361,7 +436,7 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       const error = await errorOf(tx, () =>
         repo.addLines(
           deliveryId,
-          [{ presentationLineId: b.lineIds[0], batchId: b.batchId, packages: 1, quantity: '1.0000' }],
+          [{ customerId: b.customerId, presentationLineId: b.lineIds[0], batchId: b.batchId, packages: 1, quantity: '1.0000' }],
           { companyId: b.companyId },
         ),
       )
@@ -380,15 +455,15 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       await repo.addLines(
         primera,
         [
-          { presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.0000' },
-          { presentationLineId: a.lineIds[0], batchId: otroLote, packages: 3, quantity: '3.0000' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.0000' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: otroLote, packages: 3, quantity: '3.0000' },
         ],
         scope,
       )
       const segunda = await createdId(repo, a)
       await repo.addLines(
         segunda,
-        [{ presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 1, quantity: '1.0000' }],
+        [{ customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 1, quantity: '1.0000' }],
         scope,
       )
 
@@ -407,13 +482,13 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       const deA = await createdId(repo, a)
       await repo.addLines(
         deA,
-        [{ presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 4, quantity: '4.0000' }],
+        [{ customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 4, quantity: '4.0000' }],
         { companyId: a.companyId },
       )
       const deB = await createdId(repo, b)
       await repo.addLines(
         deB,
-        [{ presentationLineId: b.lineIds[0], batchId: b.batchId, packages: 7, quantity: '7.0000' }],
+        [{ customerId: b.customerId, presentationLineId: b.lineIds[0], batchId: b.batchId, packages: 7, quantity: '7.0000' }],
         { companyId: b.companyId },
       )
 
@@ -435,15 +510,15 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       await repo.addLines(
         deliveryId,
         [
-          { presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.0000' },
-          { presentationLineId: a.lineIds[1], batchId: otroLote, packages: 3, quantity: '3.0000' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.0000' },
+          { customerId: a.customerId, presentationLineId: a.lineIds[1], batchId: otroLote, packages: 3, quantity: '3.0000' },
         ],
         scope,
       )
       const segunda = await createdId(repo, a)
       await repo.addLines(
         segunda,
-        [{ presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 4, quantity: '4.0000' }],
+        [{ customerId: a.customerId, presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 4, quantity: '4.0000' }],
         scope,
       )
       expect(new Map(await repo.sumDeliveredPackages(a.orderId, scope))).toEqual(

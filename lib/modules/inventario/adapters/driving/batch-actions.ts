@@ -3,6 +3,7 @@
 import { identity, inventario, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import {
+  aliveBatches,
   BatchStockChangedError,
   InventarioError,
   type Actor,
@@ -100,6 +101,20 @@ export async function listProductBatchesAction(productId: string): Promise<Produ
   try {
     const data = await inventario.listProductBatches(productId, actor);
     return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Como `listProductBatchesAction`, pero solo con los lotes que conservan existencia. */
+export async function listAliveProductBatchesAction(
+  productId: string,
+): Promise<ProductBatchesResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await inventario.listProductBatches(productId, actor);
+    return { status: 'success', data: aliveBatches(data) };
   } catch (error) {
     return toErrorState(error);
   }

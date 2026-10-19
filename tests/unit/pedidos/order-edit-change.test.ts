@@ -33,9 +33,9 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationLines: [
-      { presentationId: PRES_A, packages: 4, packagingProductId: ENVASE_A },
-      { presentationId: PRES_B, packages: 2, packagingProductId: ENVASE_B },
-      { presentationId: PRES_ANTIGUA, packages: 1, packagingProductId: null },
+      { presentationId: PRES_A, packages: 4, packagingProductId: ENVASE_A, presentationContent: null },
+      { presentationId: PRES_B, packages: 2, packagingProductId: ENVASE_B, presentationContent: null },
+      { presentationId: PRES_ANTIGUA, packages: 1, packagingProductId: null, presentationContent: null },
     ],
     unitId: UNIDAD,
     customerId: null,

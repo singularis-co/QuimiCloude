@@ -1,7 +1,10 @@
 // lib/modules/asignaciones/domain/list-finished-orders.ts
 /**
- * Los pedidos `TERMINADO` de la empresa: la fecha de terminado los ordena y la composicion de
- * responsables no descarta al actor, porque aqui no hay un «yo» al que restar de la lista.
+ * «Terminados». Quien ejecuta pedidos ve los `TERMINADO` de la empresa, por fecha de terminado.
+ * Quien no ejecuta (el empacador) ve lo que empaco el mismo y ya salio de empaque:
+ * `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` o `TERMINADO`, con los aun sin fecha de terminado
+ * primero. La composicion de responsables no descarta al actor, porque aqui no hay un «yo» al
+ * que restar de la lista.
  */
 import { z } from 'zod';
 
@@ -11,7 +14,10 @@ import { ValidationError } from './errors';
 
 import type { FinishedOrderView } from './finished-order-view';
 
-import { formatOrderNumber, type OrderCatalog, type Page } from '@/lib/modules/pedidos';
+import { formatOrderNumber, type OrderCatalog, type OrderStatus, type Page } from '@/lib/modules/pedidos';
+
+/** Lo que el empacador ya saco de empaque: en acondicionamiento o terminado. */
+const PACKED_STATUSES: readonly OrderStatus[] = ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'];
 
 const listFinishedOrdersSchema = z.strictObject({
   page: z.number().int().min(1).default(1),
@@ -36,18 +42,26 @@ export function createListFinishedOrders(
     if (!parsed.success) throw new ValidationError();
     const { page, pageSize } = parsed.data;
 
-    // Quien no ejecuta pedidos solo ve los que empaco el mismo. El filtro va en la consulta para
-    // que `total` y la paginacion describan lo que se muestra.
-    const filter = canExecuteAssignedOrders(actor) ? undefined : { packedBy: actor.id };
-
-    const ordersPage = await deps.orders.listAliveSummariesInCompany(
-      actor.companyId,
-      ['TERMINADO'],
-      'finished_recent_first',
-      page,
-      pageSize,
-      filter,
-    );
+    // Quien no ejecuta pedidos solo ve los que empaco el mismo, tambien los que siguen en
+    // acondicionamiento (sin fecha de terminado). El filtro va en la consulta para que `total` y
+    // la paginacion describan lo que se muestra.
+    const ordersPage = canExecuteAssignedOrders(actor)
+      ? await deps.orders.listAliveSummariesInCompany(
+          actor.companyId,
+          ['TERMINADO'],
+          'finished_recent_first',
+          page,
+          pageSize,
+          undefined,
+        )
+      : await deps.orders.listAliveSummariesInCompany(
+          actor.companyId,
+          PACKED_STATUSES,
+          'unfinished_then_recent',
+          page,
+          pageSize,
+          { packedBy: actor.id },
+        );
 
     const composed = await composeOrderRows(deps, actor.companyId, ordersPage.items);
 

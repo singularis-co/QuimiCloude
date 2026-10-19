@@ -11,6 +11,7 @@ import {
   BLOCKED_ORDER_DISMISS_TESTID,
   BLOCKED_ORDER_MESSAGE_TESTID,
   ORDER_ACTION_DISTRIBUTION_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_DISMISS_TESTID,
   ORDER_DISTRIBUTION_AVAILABLE_TESTID,
   ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID,
   ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID,
@@ -18,8 +19,9 @@ import {
   ORDER_DISTRIBUTION_WARNING_TESTID,
   OrderDistributionDialog,
   OrderRowActions,
-  OrderRowSheetActions,
+  OrderTable,
 } from '@/app/(private)/pedidos/components';
+import { createDefaultParams } from '@/components/shared/data-table';
 import {
   ORDER_STATUS_VALUES,
   formatOrderNumber,
@@ -29,6 +31,7 @@ import {
 import type { OrderMutationFormState } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type { UnitView } from '@/lib/modules/unidades';
 import { setupUser } from '../../helpers/user-event';
+import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { updateDistributionMock, quoteAvailabilityMock, routerMock } = vi.hoisted(() => ({
   updateDistributionMock:
@@ -65,7 +68,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
   };
 });
 
-// `OrderRowSheetActions` monta tambien el panel de edicion general, que pide la receta.
+// La tabla monta tambien el panel de edicion general, que pide la receta.
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   getRecipeAction: vi.fn(async () => ({
     status: 'error' as const,
@@ -126,11 +129,15 @@ function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSum
         packages: 2,
         packagingProductId: ENVASE_ID,
         packagingName: 'Bidón PET 20 L',
+        presentationContent: null,
+        presentationUnitLabel: null,
       },
     ],
     unitId: UNIDAD_ID,
     unitLabel: 'L',
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -157,6 +164,10 @@ afterEach(() => {
 });
 
 describe('accion de fila «Reparto y unidad»', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
   it('R11: con permiso de modificar pedidos y en POR_EMPACAR se pinta', async () => {
     render(<OrderRowActions order={pedido('POR_EMPACAR')} canEditDistribution />);
 
@@ -198,8 +209,10 @@ describe('accion de fila «Reparto y unidad»', () => {
   it('R11: pulsarla abre el dialogo acotado de esa fila', async () => {
     const user = setupUser();
     render(
-      <OrderRowSheetActions
-        order={pedido('POR_EMPACAR')}
+      <OrderTable
+        orders={[pedido('POR_EMPACAR')]}
+        params={createDefaultParams()}
+        totalPages={1}
         recipes={{ items: [], totalPages: 1 }}
         units={UNIDADES}
         bridge={null}
@@ -207,7 +220,7 @@ describe('accion de fila «Reparto y unidad»', () => {
       />,
     );
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeInTheDocument();
@@ -308,7 +321,7 @@ describe('dialogo «Reparto y unidad»', () => {
     montarDialogo(
       pedido('POR_EMPACAR', {
         presentationLines: [
-          { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null },
+          { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
@@ -350,10 +363,16 @@ describe('dialogo «Reparto y unidad»', () => {
 });
 
 describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
   function accionesDeFila(order: OrderSummary) {
     return (
-      <OrderRowSheetActions
-        order={order}
+      <OrderTable
+        orders={[order]}
+        params={createDefaultParams()}
+        totalPages={1}
         recipes={{ items: [], totalPages: 1 }}
         units={UNIDADES}
         bridge={null}
@@ -363,7 +382,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
   }
 
   async function guardarEnvases(user: ReturnType<typeof setupUser>, envases: string) {
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
     const campo = await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
     await user.clear(campo);
@@ -380,7 +399,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     render(accionesDeFila(pedido()));
 
     await guardarEnvases(user, '5');
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(5);
@@ -391,7 +410,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     render(accionesDeFila(pedido()));
 
     await guardarEnvases(user, '5');
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
     await user.click(await screen.findByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
 
@@ -417,12 +436,14 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
               packages: 7,
               packagingProductId: ENVASE_ID,
               packagingName: 'Bidón PET 20 L',
+              presentationContent: null,
+              presentationUnitLabel: null,
             },
           ],
         }),
       ),
     );
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(7);
@@ -485,5 +506,15 @@ describe('«Reparto y unidad» con falta de envases (R17, R37)', () => {
     expect(updateDistributionMock).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeInTheDocument();
     expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('los textos del dialogo son los de hoy (QC-262 R20)', () => {
+  it('R20: «Reparto y unidad» con «Cancelar» y «Guardar»', () => {
+    montarDialogo();
+
+    expect(screen.getByRole('dialog', { name: 'Reparto y unidad' })).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_DISMISS_TESTID)).toHaveTextContent(/^Cancelar$/);
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toHaveTextContent(/^Guardar$/);
   });
 });

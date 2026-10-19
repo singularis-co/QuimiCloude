@@ -37,5 +37,17 @@ export function createConditioningTeamRepository(db: PrismaLike = prisma): Condi
         select: { userId: true, workGroupId: true, workGroupName: true },
       });
     },
+
+    async listByOrdersInCompany(
+      companyId: string,
+      orderIds: readonly string[],
+    ): Promise<readonly (ConditioningTeamMemberRow & { readonly orderId: string })[]> {
+      if (orderIds.length === 0) return [];
+      return db.orderConditioningTeamMember.findMany({
+        where: { companyId, orderId: { in: [...orderIds] } },
+        orderBy: [{ orderId: 'asc' }, { position: 'asc' }],
+        select: { orderId: true, userId: true, workGroupId: true, workGroupName: true },
+      });
+    },
   };
 }

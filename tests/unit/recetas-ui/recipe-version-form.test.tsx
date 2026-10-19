@@ -211,9 +211,13 @@ describe('RecipeVersionForm — guardar habilitado solo con 100,00 % y todo con 
     renderCreate();
     await user.type(screen.getByTestId('recipe-version-field-name'), 'Nueva');
 
-    await user.click(screen.getByTestId('recipe-line-add-1'));
+    // Al 100 % el «+» está apagado: se libera el 40 %, se añade la línea y se le da ese 40 %
+    // sin elegir producto.
+    await user.click(screen.getByTestId('recipe-line-remove-1'));
+    await user.click(screen.getByTestId('recipe-line-add-0'));
+    await user.type(screen.getByTestId('recipe-line-percentage-1'), '40');
 
-    expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(3);
+    expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(2);
     expect(screen.getByTestId('recipe-lines-sum')).toHaveAttribute('data-complete', 'true');
     expect(screen.getByTestId('recipe-version-form-submit')).toBeDisabled();
     screen.getByTestId('recipe-version-field-name').focus();
@@ -336,7 +340,13 @@ describe('RecipeVersionForm — errores del guardado', () => {
       const region = await screen.findByTestId('recipe-version-form-error');
       expect(region).toHaveAttribute('role', 'alert');
       expect(within(region).getByTestId('recipe-version-form-error-message')).toHaveTextContent(message);
-      expect(within(region).getByTestId('recipe-version-form-error-code')).toHaveTextContent(code);
+      if (code === 'invalid_input') {
+        // `invalid_input` no se pinta: el mensaje ya dice qué hacer.
+        expect(within(region).queryByTestId('recipe-version-form-error-code')).toBeNull();
+        expect(region).not.toHaveTextContent('invalid_input');
+      } else {
+        expect(within(region).getByTestId('recipe-version-form-error-code')).toHaveTextContent(code);
+      }
       expect(screen.queryByTestId('recipe-version-error-name')).toBeNull();
       expect(screen.getByTestId('recipe-version-field-name')).toHaveValue('Escrito a mano');
       expect(percentageValues()).toEqual(['70,00', '30,00']);

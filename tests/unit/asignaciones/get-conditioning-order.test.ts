@@ -1,6 +1,6 @@
 // El detalle del acondicionador: la misma fila de «Por acondicionar» para un pedido, y el mismo
 // `order_not_found` en todos los casos que no debe abrir.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createGetConditioningOrder } from '@/lib/modules/asignaciones/domain/get-conditioning-order';
 import { createListConditioningOrders } from '@/lib/modules/asignaciones/domain/list-conditioning-orders';
@@ -12,7 +12,7 @@ import {
 } from '@/lib/modules/asignaciones/domain/errors';
 import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 
-import type { FinishedBatchOfOrderLine } from '@/lib/modules/inventario';
+import type { FinishedBatchLabels, FinishedBatchOfOrderLine } from '@/lib/modules/inventario';
 import type { AssignedOrderSummary } from '@/lib/modules/pedidos';
 import type { ConditioningTeamMemberRow } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
 
@@ -33,8 +33,8 @@ import {
 } from './conditioning-doubles';
 
 const LINEAS = [
-  { presentationId: 'pres-500', packages: 12, packagingName: '500 g' },
-  { presentationId: 'pres-1k', packages: 4, packagingName: '1 kg' },
+  { id: 'linea-1', presentationId: 'pres-500', packages: 12, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: '500 g' },
+  { id: 'linea-2', presentationId: 'pres-1k', packages: 4, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: '1 kg' },
 ];
 
 function montarCon(item: AssignedOrderSummary | null, batches?: readonly FinishedBatchOfOrderLine[]) {
@@ -353,6 +353,14 @@ describe('QC-219 — los datos de lote del detalle', () => {
         },
       ],
       missingCount: 1,
+      // QC-284 R15: una linea con datos y otra sin ellos = lotes distintos, con el codigo actual.
+      form: {
+        kind: 'divergent',
+        lines: [
+          { presentationId: 'pres-500', lot: 'CR-2610-A' },
+          { presentationId: 'pres-1k', lot: 'AUTO-pres-1k' },
+        ],
+      },
     });
   });
 
@@ -373,7 +381,35 @@ describe('QC-219 — los datos de lote del detalle', () => {
 
     const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
 
-    expect(detalle.batchData).toEqual({ lines: [], missingCount: 0 });
+    expect(detalle.batchData).toEqual({ lines: [], missingCount: 0, form: { kind: 'no_batches' } });
+  });
+
+  it('QC-284 R14: con las dos lineas con los mismos datos, el formulario abre relleno', async () => {
+    const { deps } = montarCon(
+      resumen(PEDIDO_1, { status: 'TERMINADO', conditionedBy: ANA, finishedAt: new Date(), presentationLines: LINEAS }),
+      [loteDeLinea('pres-500', LOTE_500, DATOS), loteDeLinea('pres-1k', LOTE_1K, DATOS)],
+    );
+
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.batchData?.form).toEqual({ kind: 'shared', ...DATOS });
+  });
+
+  it('QC-284 R16: abrir el detalle solo lee los lotes, nunca escribe', async () => {
+    const { deps, listOfOrder } = montarCon(
+      resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA, presentationLines: LINEAS }),
+      [loteDeLinea('pres-500', LOTE_500, DATOS), loteDeLinea('pres-1k', LOTE_1K)],
+    );
+    const writeForOrder = vi.fn<FinishedBatchLabels['writeForOrder']>();
+
+    const detalle = await createGetConditioningOrder({ ...deps, batches: { listOfOrder, writeForOrder } as never })(
+      ACONDICIONADOR,
+      { orderId: PEDIDO_1 },
+    );
+
+    expect(detalle.batchData?.form.kind).toBe('divergent');
+    expect(listOfOrder).toHaveBeenCalledTimes(1);
+    expect(writeForOrder).not.toHaveBeenCalled();
   });
 
   it('D13 (QC-219 R21): un ENTREGADO propio abre con su equipo', async () => {
@@ -385,5 +421,46 @@ describe('QC-219 — los datos de lote del detalle', () => {
 
     expect(detalle.status).toBe('ENTREGADO');
     expect(listTeamByOrderInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+  });
+});
+
+describe('QC-281 — acondicionamiento con los envases reales', () => {
+  const LOTE_500 = uuid('7');
+  const DATOS = { lot: 'CR-2610-A', expiryDate: '2027-04-30', productionDate: '2026-10-01' };
+  const CONTADAS = [
+    { ...LINEAS[0], packedPackages: 10 },
+    { ...LINEAS[1], packedPackages: 0 },
+  ];
+
+  it('R23: la fila y los datos de lote muestran los envases reales, y la linea en 0 no cuenta como sin datos', async () => {
+    const item = resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA, presentationLines: CONTADAS });
+    const detalle = montarCon(item, [loteDeLinea('pres-500', LOTE_500, DATOS)]);
+    const lista = montarCon(item);
+
+    const order = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const [deLaLista] = (await createListConditioningOrders(lista.deps)(ACONDICIONADOR, { page: 1 })).items;
+
+    expect(order.presentationLines.map((line) => [line.lineId, line.packages, line.packedPackages])).toEqual([
+      ['linea-1', 10, 10],
+      ['linea-2', 0, 0],
+    ]);
+    expect(deLaLista?.presentationLines.map((line) => line.packages)).toEqual([10, 0]);
+    expect(order.batchData?.lines.map((line) => line.packages)).toEqual([10, 0]);
+    expect(order.batchData?.missingCount).toBe(0);
+  });
+
+  it('R25: un pedido empacado sin conteo guardado sigue mostrando el plan y contando como hoy', async () => {
+    const { deps } = montarCon(
+      resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA, presentationLines: LINEAS }),
+      [loteDeLinea('pres-500', LOTE_500, DATOS)],
+    );
+
+    const order = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(order.presentationLines.map((line) => [line.packages, line.packedPackages])).toEqual([
+      [12, null],
+      [4, null],
+    ]);
+    expect(order.batchData?.missingCount).toBe(1);
   });
 });

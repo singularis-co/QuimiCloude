@@ -62,7 +62,7 @@ export const ROW_ENVASE: Partial<ImportCells> = {
   name: 'Bidón',
   presentation: 'Bidón 20 L',
   stock: '10',
-  totalCost: '100',
+  unitCost: '10',
   qtyAlert: '2',
 };
 export const ROW_INSTRUMENTO: Partial<ImportCells> = { type: 'Instrumento', name: 'Balanza', stock: '1' };
@@ -125,7 +125,7 @@ export const CSV_FILE = { fileName: 'inventario.csv', bytes: new TextEncoder().e
 export type CatalogState = {
   products?: ImportProductRef[];
   finishedProducts?: ImportProductRef[];
-  batches?: { lot: string; productId: string }[];
+  batches?: { lot: string; productId: string; presentationId: string | null }[];
 };
 
 /** Puertos de lectura con espias; el estado se puede cambiar entre llamadas. */
