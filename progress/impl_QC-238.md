@@ -1,9 +1,9 @@
 # QC-238 — recepcion-webhook-whatsapp · bitácora de implementación
 
-## Estado: T1–T7 hechas (2026-10-19); sigue T8, ver «Tasks»
+## Estado (2026-10-19): T1–T15 hechas; T16 para el humano; T17 sin marcar (`./init.sh` cortado por el board)
 
-`tasks.md` exige contrastar §4.3 de `design.md` con la documentación vigente de la Cloud API antes
-de T1, y parar si una diferencia cambia un requisito. Hay dos. No se ha tocado código.
+Ver «Cierre (T17)» al final. El humano decidió las dos diferencias del contraste con Meta (últimas
+filas de «Decisiones cerradas»), y el spec se enmendó en 5a2bcb70 antes de T1.
 
 ## Contraste con la documentación de Meta (previo a T1)
 
@@ -271,3 +271,85 @@ quitado ni relajado. Resultado: 1/1 archivo, 9/9 verdes (antes 3 rojos 2BP01).
 - `vitest run tests/guards/guard-aislamiento-integracion.test.ts`: 6 passed.
 
 **Veredicto:** T14 y T15 hechas según spec, en verde contra la base de test, sin tocar producción.
+
+## Cierre (T17)
+
+### Archivos
+
+Están los de `tasks.md > Archivos esperados`. Además se tocaron estos, todos obligados por el
+método nuevo del puerto, por la FK nueva, por listas exactas de tests ajenos o por una decisión del
+humano:
+- `tests/integration/integraciones/whatsapp-connection-prisma.int.test.ts`: el repositorio se arma a
+  mano en el test y necesitaba una línea más.
+- `tests/unit/composition/integraciones-graph-doubles.test.ts`: el `vi.mock` y la lista exacta de la
+  fachada.
+- `tests/unit/integraciones/encryption-keys-env.test.ts`: la lista exacta de la fachada.
+- `tests/integration/integraciones/whatsapp-connection-migration.int.test.ts` (QC-237): la FK de T1
+  hacía fallar su DOWN con 2BP01. Se aplicó el patrón `DEPENDIENTES_POSTERIORES` de
+  `customers-migration`.
+- `tests/guards/guard-firma-sesion-unica.test.ts`: la excepción con nombre que decidió el humano.
+- `tests/guards/guard-identificador-de-request.test.ts`: el alta de la migración.
+
+`lib/composition/index.ts` solo recibe añadidos: 30 líneas, sin reordenar nada.
+
+### Mapa R → test
+
+| R | Test |
+|---|---|
+| R1 | `whatsapp-webhook-route.test.ts` (`decideRouteAccess` sin sesión) |
+| R2 | `whatsapp-inbox-prisma.int.test.ts` (status de otra empresa), `verify-whatsapp-webhook.test.ts`, `receive-whatsapp-webhook.test.ts`, `guard-ambito-empresa-integraciones.test.ts` |
+| R3 | `verify-whatsapp-webhook.test.ts`, `receive-whatsapp-webhook.test.ts` |
+| R4, R5, R6, R7 | `verify-whatsapp-webhook.test.ts`, `whatsapp-webhook-route.int.test.ts` |
+| R8 | `whatsapp-webhook-route.test.ts`, `whatsapp-webhook-route.int.test.ts` |
+| R9 | `receive-whatsapp-webhook.test.ts`, `whatsapp-webhook-route.test.ts`, `whatsapp-webhook-route.int.test.ts` |
+| R10 | `webhook-signature-hmac.test.ts`, `receive-whatsapp-webhook.test.ts` |
+| R11, R12 | `webhook-signature-hmac.test.ts` / `receive-whatsapp-webhook.test.ts`, `whatsapp-webhook-route.test.ts`, `whatsapp-webhook-route.int.test.ts` |
+| R13 | `whatsapp-webhook-payload.test.ts`, `module-shape.test.ts` |
+| R14, R15 | `whatsapp-webhook-payload.test.ts` |
+| R16 | `whatsapp-webhook-payload.test.ts` (un contacto ⇒ su `wa_id`; varios o ninguno ⇒ `from`; `from` siempre en el `payload`), `whatsapp-inbox-prisma.int.test.ts`, `whatsapp-webhook-route.int.test.ts` |
+| R17, R18 | `whatsapp-webhook-payload.test.ts`, `whatsapp-inbox-prisma.int.test.ts`, `whatsapp-webhook-route.int.test.ts` |
+| R19 | `whatsapp-webhook-payload.test.ts` (cada fila de §4.3; reacción sin `emoji` o con `emoji` vacío) |
+| R20 | `whatsapp-webhook-payload.test.ts`, `whatsapp-webhook-route.int.test.ts` |
+| R21 | `whatsapp-message-status.test.ts`, `whatsapp-webhook-payload.test.ts`, `whatsapp-inbox-prisma.int.test.ts`, `whatsapp-webhook-route.int.test.ts` |
+| R22 | `whatsapp-webhook-payload.test.ts`, `whatsapp-inbox-prisma.int.test.ts` |
+| R23 | `receive-whatsapp-webhook.test.ts`, `whatsapp-webhook-route.test.ts`, `whatsapp-inbox-prisma.int.test.ts`, `whatsapp-webhook-route.int.test.ts` (si la transacción falla quedan 0 filas; el reintento deja 1) |
+| R24 | `receive-whatsapp-webhook.test.ts`, `whatsapp-inbox-prisma.int.test.ts`, `whatsapp-webhook-route.int.test.ts` |
+| R25 | `whatsapp-inbox-prisma.int.test.ts` (dos `record` concurrentes), `whatsapp-webhook-route.int.test.ts` |
+| R26 | `receive-whatsapp-webhook.test.ts`, `verify-whatsapp-webhook.test.ts` |
+| R27 | `whatsapp-webhook-route.test.ts` (logs espiados) |
+| R28, R29 | `whatsapp-messages-constraints.int.test.ts`, `whatsapp-messages-migration.int.test.ts` |
+| R30 | `whatsapp-messages-constraints.int.test.ts` |
+| R31 | `guard-rutas-fuera-de-sesion.test.ts` |
+| R32 | `guard-ambito-empresa-integraciones.test.ts` (forma de la excepción y sus casos de sensibilidad), `whatsapp-messages-constraints.int.test.ts` |
+| R33 | **Sin test propio**: es una prohibición. `git diff --name-only origin/dev...HEAD` no toca `package.json`, `pnpm-lock.yaml`, `.env.example`, permisos, menú ni el catálogo de errores (comprobado el 2026-10-19), y el gate de dependencias lo vigila. Si eso basta lo decide el reviewer. |
+
+### Salida real (2026-10-19, después del último merge de `origin/dev`)
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: exit 0, `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos de la feature.
+- `pnpm exec vitest run guard`: `Test Files 81 passed (81)`, `Tests 1130 passed | 20 skipped (1150)`.
+- `pnpm exec vitest run tests/unit/integraciones tests/integration/integraciones tests/unit/composition/integraciones-graph-doubles.test.ts`:
+  `Test Files 54 passed (54)`, `Tests 943 passed | 1 skipped (944)`.
+- `./init.sh` (rápido): **exit 1 en la validación del board, antes de los pasos de código**.
+  - En `feature_list.json` (worktree principal) hay 4 `in_progress` en backend (QC-131, QC-238,
+    QC-274, QC-279) y 4 en fullstack (QC-137, QC-203, QC-288, QC-301); el máximo es 3 por zona.
+  - `specs/QC-278-...` no tiene ficha.
+  - Nada de esto es de la feature: lo resuelve el leader en el board.
+  - Los pasos de código del gate se corrieron a mano (las cuatro líneas de arriba).
+  - **T17 queda sin marcar** hasta que `./init.sh` pase.
+
+### T16 — verificación manual con Meta (la hace el humano; sin marcar)
+
+1. Levantar el servidor local (`pnpm dev`) con las variables de QC-234 (claves de cifrado) y
+   `APP_BASE_URL` apuntando al túnel.
+2. Correr `cloudflared tunnel --url http://localhost:3000` y anotar la URL pública.
+3. Tener una conexión de WhatsApp con su App Secret y su verify token. La pantalla de la conexión
+   muestra la URL del webhook: `<túnel>/api/integraciones/whatsapp/webhook/<conexionId>`.
+4. En la app de Meta, en Webhooks, pulsar «Verificar y guardar» con esa URL y el verify token.
+   Esperado: `200`, y la conexión pasa a `ACTIVE` con `lastWebhookAt`.
+5. Suscribir el campo `messages`.
+6. Desde un teléfono, mandar un texto y una imagen al número de la conexión.
+7. Comprobar en la base, **sin copiar números ni textos a esta bitácora**, que hay dos filas `IN`
+   (`TEXT` e `IMAGE`) en `whatsapp_messages`, cada una con su fila en `whatsapp_contacts`. La imagen
+   lleva solo `media_id` y `mime_type`, sin descarga.
+8. Anotar aquí el resultado (códigos y conteos, sin datos) y marcar T16.
