@@ -117,7 +117,7 @@ export function RecipeStepEditor({
       attributes: {
         // `text-base` = 16 px: por debajo, iOS hace zoom al enfocar el area editable (R26).
         class:
-          'min-h-11 w-full rounded-b-lg px-3 py-2.5 text-base leading-normal outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50 [&_ul]:list-none [&_li]:flex [&_li]:items-start [&_li]:gap-2 [&_li>div]:flex-1',
+          'min-h-11 w-full rounded-b-lg px-3 py-2.5 text-base leading-normal outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring[&_ul]:list-none [&_li]:flex [&_li]:items-start [&_li]:gap-2 [&_li>div]:flex-1',
         'aria-label': label,
         'aria-multiline': 'true',
         'data-testid': editableTestId,
