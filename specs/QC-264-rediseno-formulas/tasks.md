@@ -197,7 +197,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   lista es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
   archivo se nombra, uno a uno-. Lo que ejercita: …». *Hecho:* pasa en Chromium y WebKit;
   `pnpm exec vitest run guard-identificador-de-request data-table-alcance` en verde.
-- [ ] **T9b. E2E existentes** (R49 y la tabla de `design.md > 7`). Migrar `versiones-en-la-receta.spec.ts`
+- [x] **T9b. E2E existentes** (R49 y la tabla de `design.md > 7`). Migrar `versiones-en-la-receta.spec.ts`
   (localizador acotado a la fila de tabla y «Abrir la versión X») y los demás que T0a marque. *Hecho:*
   cada spec tocado pasa por separado (`pnpm exec playwright test <spec>`); los que solo leen testids
   conservados pasan sin cambios. *Enmienda (E19):* se corren también, sin cambios esperados,
