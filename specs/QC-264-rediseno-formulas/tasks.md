@@ -75,7 +75,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   y `data-*`); tests de `design.md > 7` de `documentos-ui` actualizados; snapshot de `catalogo-paridad`
   (fila de `design.md > 6`). *Enmienda (E10):* el disparador conserva `disabled` (con el icono) y la
   fila, su motivo de error; `document-upload-flow`, `-errors` y `-strategy` en verde.
-- [ ] **T1d. Catálogo** (R48; depende de T1a–T1c). Filas de `StepReader` (punto de extensión `layout`,
+- [x] **T1d. Catálogo** (R48; depende de T1a–T1c). Filas de `StepReader` (punto de extensión `layout`,
   `Diseño` + `Formula.dc.html`, `ModalesProduccion.dc.html`), `DocumentUpload…` (`Alcance` con los
   tonos, `Diseño` = `Formulas.dc.html`, `ModalesProduccion.dc.html`) y, si T1a se hizo aquí,
   `RowActionsMenu`. *Hecho:* `pnpm exec vitest run guard-catalogo-de-componentes catalogo-qc256` en

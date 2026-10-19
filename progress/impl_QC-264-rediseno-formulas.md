@@ -119,6 +119,58 @@ página desplaza la ventana.
 - **Clase final:** `sticky bottom-0 z-10 -mx-4 -mb-6 md:-mx-7 md:-mb-8` + lo visual de D7.
   `PageShell` no necesita relleno inferior extra.
 
+## Tanda 1 — Piezas compartidas
+
+### T1b — `StepReader` con `layout="panel"` (frontend_dev, 2026-10-19; commit `811bddae`)
+
+- **Archivos:** `components/shared/step-reader/step-reader.tsx` (prop `layout?: 'inline' | 'panel'`,
+  solo en `lectura`; testids nuevos solo en `panel`: `step-reader-heading`, `-body`, `-step`,
+  `data-layout="panel"`), `tests/unit/recetas-ui/step-reader.test.tsx` (8 casos nuevos; los snapshots
+  en línea de `inline` y `ejecucion` se generaron antes de tocar el componente).
+- **Mapa:** R26 -> «sin layout / inline, árbol de hoy» y «ejecucion, árbol de hoy aunque reciba
+  panel»; R22 -> cabecera y tramos, `Notice` info/warning con `aria-describedby`, `stepBlockReason` y
+  `renderStepAddon` en el cuerpo, pie de 44 px; R24 -> `data-direction` = `onStepChange` (también tras
+  `stepRequest`), animación 200 ms con `motion-reduce:animate-none`.
+- **Salidas:** typecheck verde; lint 0 errores (10 avisos ajenos); `vitest related` 46 archivos,
+  997/997; `recipe-route-contract` 28/28.
+- **Nota:** `Notice` es `role="status"`; `notice.tsx` no se tocó.
+
+### T1c — Subir PDFs (frontend_dev, 2026-10-19; commit `776b57b2`)
+
+- **Snapshot de `recetas-paridad`:** también cambió, solo en el diálogo de subida que pinta el listado
+  (icono del disparador y clases del diálogo, 7 casos). Es la misma pieza; se aceptó en T1c.
+  `recetas-paridad` + `catalogo-paridad`: 26/26.
+
+- **Archivos:** `components/shared/document-upload/{document-upload-dialog.tsx, document-upload-row.tsx,
+  labels.ts, index.ts}`; test nuevo `tests/unit/documentos-ui/document-upload-tones.test.tsx`;
+  migrados `document-upload-dialog.test.tsx` (QC-160 `85dvh` -> `max-h-[calc(100dvh-32px)]`, § 10) y
+  `document-upload-convenciones.test.ts` (paquetes de la pieza: `next/link` sale porque el enlace va por
+  `ArrowLink`; entra `lucide-react`, ya en el stack); snapshot `catalogo-paridad` (solo el diálogo de
+  subida: icono del disparador y clases del diálogo, 7 casos).
+- **Hecho:** disparador con `UploadIcon` (sigue `disabled`); diálogo con las clases de T0b; fila con
+  icono de documento, fase/estado en `StatusBadge` con `BROWSER_PHASE_TONES`/`FILE_STATUS_TONES`
+  (mismos testid y `data-phase`/`data-status`), «Revisar» como `ArrowLink forward sm touch` con su
+  testid, error y motivo debajo; `CLEAR_LABEL` y `UNKNOWN_BATCH_LABEL` con tildes. API sin cambios.
+- **Mapa:** R7 -> `document-upload-tones` «R7: la ventana…» y `document-upload-dialog` (R15);
+  R8 -> `document-upload-tones` «R8: …» (mapas, 4 fases, 4 estados, motivo); R9 -> «R9: Revisar…» y
+  «R9: el disparador…»; R45 (subida) -> «R45: Quitar la selección…».
+- **Salidas:** `typecheck` 0 errores; `lint` 0 errores, 10 avisos ajenos; `vitest related` 56 archivos,
+  925 ok, 1 skip; lista a mano (documentos-ui, catalog-pdf-upload, catalogo-paridad,
+  module-contract) 17 archivos, 117 ok. `flow`, `errors`, `strategy` y `catalog-pdf-upload` sin cambios.
+- **Veredicto:** T1c lista; la fila de `CATALOGO.md` queda para T1d.
+
+### T1d — Catálogo (frontend_dev, 2026-10-19)
+
+- `components/shared/CATALOGO.md`: fila `StepReader` (alcance con `panel`, punto de extensión
+  `layout`, `Diseño` + `Formula.dc.html`, `ModalesProduccion.dc.html`) y fila `DocumentUpload…`
+  (alcance con tonos, icono, «Revisar» con `ArrowLink`; extensión `BROWSER_PHASE_TONES` /
+  `FILE_STATUS_TONES`; `Diseño` = `Formulas.dc.html`, `ModalesProduccion.dc.html`; `Base de` + 
+  `StatusBadge`, `ArrowLink`, que el código ya usa). `RowActionsMenu` sin cambio (E3).
+- **Mapa:** R48 -> `tests/guards/guard-catalogo-de-componentes.test.ts`.
+- **Salidas:** `guard-catalogo-de-componentes catalogo-qc256` 2 archivos, 65/65; `vitest run guard`
+  81 archivos, 1106 ok / 20 skip, 0 rojos. Cierre de tanda: typecheck 0 errores; lint 0 errores,
+  10 avisos ajenos.
+
 ## Archivos creados / modificados
 
 ## Mapa R -> test
