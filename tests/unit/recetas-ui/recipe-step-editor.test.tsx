@@ -595,6 +595,14 @@ describe('RecipeStepEditor — «Requiere evidencia»', () => {
     expect(grupo.className).toContain('md:w-auto');
   });
 
+  it('R20: el grupo del interruptor y las acciones se parte en líneas para no desbordar a 390 px', async () => {
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    const grupo = screen.getByTestId(`${TEST_ID}-row-tools`);
+    expect(grupo.className).toContain('flex-wrap');
+  });
+
   it('R1: el interruptor no entra en la barra de formato, que sigue con tres acciones', async () => {
     render(<EvidenceHarness inicial />);
     const barra = await screen.findByTestId(`${TEST_ID}-toolbar`);
