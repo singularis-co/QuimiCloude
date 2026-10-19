@@ -312,9 +312,7 @@ test.describe('versiones en la ficha de la receta', () => {
     const table = page.getByTestId('recipe-table');
     await expect(table).toBeVisible({ timeout: 60_000 });
     // El menu sale en la fila de la tabla y en la tarjeta: se cuentan solo las filas de la tabla.
-    const rowActions = page
-      .locator('[data-testid^="data-table-row-"]')
-      .getByTestId('recipe-row-actions');
+    const rowActions = page.getByRole('table').getByTestId('recipe-row-actions');
     await expect(rowActions).toHaveCount(1);
     await expect(rowActions).toHaveAttribute('aria-label', `Acciones de ${ORIGINAL_NAME}`);
     await expect(await openRowActionsMenuItem(page, rowActions, 'recipe-edit-open')).toHaveAttribute(
