@@ -19,8 +19,7 @@ export type AssignmentViewKind =
   | 'todos'
   | 'por_empacar'
   | 'por_acondicionar'
-  | 'acondicionados'
-  | 'acondicionados_entregados';
+  | 'acondicionados';
 
 const PEDIDOS_CONSULTAR: PermissionCode = 'pedidos.consultar';
 const TERMINADOS_CONSULTAR: PermissionCode = 'terminados.consultar';
@@ -53,9 +52,9 @@ function hasPermission(
  * El trabajo pendiente va antes que el historial: `por_empacar` (con `empaque.modificar`) se
  * ofrece detras de «Todos» o de «Mis asignados», pero DELANTE de «Terminados». Asi el empacador
  * sin ejecucion aterriza en `por_empacar`, y quien ejecuta pedidos sigue aterrizando en `asignados`.
- * Detras van `por_acondicionar`, `acondicionados` y `acondicionados_entregados`, con
- * `acondicionamiento.modificar`; a quien solo tiene esas no se le anade la reserva, y aterriza en
- * `por_acondicionar`.
+ * Detras van `por_acondicionar` y `acondicionados`, con `acondicionamiento.modificar`; a quien
+ * solo tiene esas no se le anade la reserva, y aterriza en `por_acondicionar`. El acondicionador
+ * no tiene vista de pedidos `ENTREGADO`: una vista que pida esos cae en la de defecto.
  */
 export function resolveAssignmentViews(
   bearer: PermissionBearer | null | undefined,
@@ -71,7 +70,7 @@ export function resolveAssignmentViews(
     if (hasPermission(bearer, TERMINADOS_CONSULTAR)) views.push('terminados');
   }
   if (hasPermission(bearer, ACONDICIONAMIENTO_MODIFICAR)) {
-    views.push('por_acondicionar', 'acondicionados', 'acondicionados_entregados');
+    views.push('por_acondicionar', 'acondicionados');
   }
   // La vista vacia de «Mis asignados» es el aterrizaje de quien no tiene ninguna otra.
   return views.length > 0 ? views : ['asignados'];

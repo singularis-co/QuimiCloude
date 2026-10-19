@@ -538,3 +538,18 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 ### D68 — `confirmaciones-paridad.test.tsx` intermitente («R1 R13 — pendiente, con la operacion en vuelo»)
 - **Origen:** CI del PR #269 (QC-288), 2026-10-19. Falló una vez con la instantánea del estado de usuario distinta y pasó al relanzar la ejecución completa sin cambios de código. QC-288 no toca ese componente.
 - **Qué falta:** estabilizar el caso «en vuelo» (esperar el estado pendiente antes de la instantánea, o no capturar el popover). Si vuelve a fallar en otra rama, va al baseline con su motivo.
+
+### D69 — Restos del worktree de QC-244 en disco
+- **Origen:** cierre de QC-244 (2026-10-19).
+- **Qué falta:** `./scripts/wt.sh done QC-244-menu-clientes-desplegable` desregistró el worktree, pero
+  no pudo borrar `.worktrees/QC-244-menu-clientes-desplegable/` (archivo en uso en Windows). Siguen la
+  rama local y la remota `feature/QC-244-menu-clientes-desplegable`, ya integradas en `dev` (PR #270).
+  Borrar la carpeta y las ramas cuando nada la tenga abierta.
+- **Dueño:** Christian Quevedo.
+
+### D70 — E2E de QC-244 sin correr en local
+- **Origen:** cierre de QC-244 (2026-10-19).
+- **Qué falta:** `e2e/clientes.spec.ts` y `e2e/movimiento.spec.ts` se escribieron sin correrlos en
+  local, porque el worktree no tenía `.env`. R6 (navegar a cada página desde el grupo) solo lo cubren
+  ellos. Correrlos en local, o confirmar que pasan en el E2E del PR a producción.
+- **Dueño:** Christian Quevedo.

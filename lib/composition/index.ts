@@ -497,7 +497,6 @@ import {
   createListConditionedOrders,
   createGetConditioningOrder,
   createListConditioningTeamCandidates,
-  createListDeliveredConditionedOrders,
   createSaveConditioningBatchData,
   createRequestEvidenceUpload,
   createRegisterEvidence,
@@ -2286,15 +2285,6 @@ export const asignaciones = {
   listConditioningTeamCandidates: createListConditioningTeamCandidates({
     people: peopleDirectory,
     groups: workGroupDirectory,
-    now: () => new Date(),
-  }),
-  listDeliveredConditionedOrders: createListDeliveredConditionedOrders({
-    orders: orderCatalog,
-    assignments: orderAssignmentRepository,
-    recipes: recipeCatalog,
-    people: peopleDirectory,
-    presentations: presentationCatalog,
-    units: unitCatalog,
     now: () => new Date(),
   }),
   saveConditioningBatchData: createSaveConditioningBatchData({

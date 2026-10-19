@@ -542,7 +542,7 @@ describe('«Datos de lote» en el detalle', () => {
     expect(terminar).not.toHaveAttribute('aria-describedby');
   });
 
-  it('R21: en ENTREGADO no habilita «Acondicionar» ni «Terminar» y la vuelta es «Volver a «Entregados»»', () => {
+  it('R21, QC-301 R4: en ENTREGADO no habilita «Acondicionar» ni «Terminar» y la vuelta es «Volver a «Acondicionados»»', () => {
     render(
       <ConditioningOrderScreen
         order={{ ...MINE, status: 'ENTREGADO', batchData: { lines: [LINE], missingCount: 1, form: { kind: 'empty' } } }}
@@ -553,8 +553,8 @@ describe('«Datos de lote» en el detalle', () => {
     expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
     expect(screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID)).toHaveTextContent('Entregado');
     const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
-    expect(back).toHaveTextContent('Volver a «Entregados»');
-    expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados_entregados');
+    expect(back).toHaveTextContent('Volver a «Acondicionados»');
+    expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados');
     expect(back.className).toContain('min-h-11');
   });
 });
