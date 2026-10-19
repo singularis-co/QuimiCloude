@@ -742,6 +742,9 @@ export const MIGRACIONES_ESPERADAS = [
   '20261015190000_company_addons',
   // QC-289 2026-10-16: el ultimo lote cargado de cada producto; no toca el identificador.
   '20261016120000_products_last_batch_at',
+  // 2026-10-19: correctiva, quita `whatsapp_connections.meta_app_id` que QC-237 retiro editando la
+  // migracion original; no toca el identificador.
+  '20261019120000_whatsapp_connections_drop_meta_app_id',
 ] as const
 
 export function hallazgosDeMigraciones(
