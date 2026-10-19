@@ -429,3 +429,106 @@ y la migración con su down en verde; el único rojo de `vitest related` es el a
 ### Cierre de la tanda 2 (implementer)
 - Tasks marcadas `[x]`: T9, T11 y T20. **T10 sigue abierta**: falta la parte de UI (`components/shared/document-upload/document-upload.tsx`, que manda `names`, y `tests/unit/documentos-ui/document-upload-names.test.tsx`). El leader acotó esta tanda a backend, así que pasa a frontend_dev en la tanda siguiente.
 - Decisiones fuera del spec (1–8 de arriba), pendientes de validar con el reviewer y el leader. Las que más se apartan del design: el puerto aparte `BatchNoticeReader`, `NewBatch.originalNames?` en lugar de `files`, que `documentos/index.ts` no se tocó y el horario del cron.
+
+## Tanda 3 — T10 (UI), T12, Bloques D y E (frontend_dev, implementer)
+
+Commits: `61784c61` (T10 UI, T12, T17), `c0da969f` (bloque D, T13–T16), y el de cierre de T18, T19 y T19b.
+
+### Decisión humana 2026-10-19 (prevalece sobre el spec)
+Las notificaciones son núcleo: no hay permiso `notificaciones.consultar` ni añadido `notificaciones` por empresa.
+En esta tanda, la campana, el panel y el feed no dependen de ese permiso ni del añadido. Todo usuario con sesión ve la campana.
+No se revirtió nada de la tanda 1. Una tanda posterior quitará el permiso, el añadido y su migración, con una enmienda al spec.
+- **Eliminado por decisión humana 2026-10-19:** la condición de T18 «el layout privado monta `NotificationsProvider` y la campana solo con el permiso efectivo». Se monta para toda sesión.
+- **Eliminado por decisión humana 2026-10-19:** el caso de T18 «R19: sin permiso, el layout no monta ni la campana ni el proveedor». Lo sustituyen dos casos de `notification-bell.test.tsx`:
+  - «con sesión monta la campana en la cabecera aunque no tenga ningún permiso» (con `[]` y con `['inventario.consultar']`);
+  - «el layout no condiciona la campana a ningún permiso ni añadido de notificaciones».
+
+### Archivos creados
+- `app/(private)/components/notifications/`:
+  - `notification-feed.ts`, `notification-list-state.ts`;
+  - `chime.ts`, `chime-coordinator.ts`, `tab-bus.ts`, `relative-time.ts`;
+  - `notifications-provider.tsx`, `unread-count-badge.tsx`, `notification-item.tsx`;
+  - `notification-bell.tsx`, `notification-list-tail.tsx`, `index.ts`.
+- `tests/unit/notificaciones-ui/`:
+  - `polling-feed.test.ts`, `notification-list-state.test.ts`;
+  - `chime.test.ts`, `chime-coordinator.test.ts`, `tab-bus.test.ts`, `relative-time.test.ts`;
+  - `notifications-provider.test.tsx`, `notification-item.test.tsx`;
+  - `notification-bell.test.tsx`, `solo-campana.test.ts`.
+- `tests/unit/documentos-ui/document-upload-names.test.tsx`, `tests/guards/guard-notificaciones-desacople.test.ts`.
+
+### Archivos modificados
+- Producción:
+  - `components/shared/document-upload/document-upload.tsx` (manda `names`);
+  - `components/ui/popover.tsx` (`anchor`, `collisionPadding`, `positionerClassName`);
+  - `components/shared/CATALOGO.md`;
+  - `app/globals.css` (`@keyframes notification-count-bump`);
+  - `app/(private)/components/index.ts`, `app/(private)/layout.tsx`.
+- Tests existentes:
+  - `tests/unit/documentos-ui/{document-upload-flow,document-upload-strategy,formulas-upload,supplier-detail-upload}.test.tsx` (añaden `names` al payload esperado);
+  - `tests/unit/private-layout.test.tsx`, `tests/unit/navegacion/private-layout-menu.test.tsx` (`vi.mock` de `notification-actions`);
+  - `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts` (T19b).
+
+### Mapa R<n> → test (tanda 3)
+| R | Test |
+| --- | --- |
+| R5 | `guard-notificaciones-desacople.test.ts` (repo verde, sintéticos rojos: alias, subruta, relativa, `import type`, reexport, `import()`, `require()`, varias líneas, fuente real mutado) |
+| R19 | eliminado por decisión humana 2026-10-19 (ver arriba) |
+| R22 | `notifications-provider.test.tsx` (0 sin insignia, 100 → «99+», insignia y nombre accesible del mismo número); `notification-bell.test.tsx` (`aria-label`) |
+| R23 | `notification-bell.test.tsx` «al abrir pinta el primer lote de 10…» |
+| R24 | `solo-campana.test.ts` (sin página, sin NavLink ni badge, sin prefijo, `firstVisibleNavHref` de los 5 roles) |
+| R25 | `notification-list-state.test.ts`; `notification-bell.test.tsx` «el centinela a la vista pide el lote siguiente…»; `guard-convenciones-showcase.test.ts` «R18 (ampliada por QC-137)» |
+| R26 | `notification-list-state.test.ts` (fallo → `tail = 'error'`, `retryMore` con el mismo cursor); `notification-bell.test.tsx` |
+| R27 | `notification-list-state.test.ts`; `notification-bell.test.tsx` «No hay más avisos. Se conservan 90 días.» |
+| R28 | `notification-list-state.test.ts` ×4 |
+| R29 | `notification-item.test.tsx` (icono por tono, no leído con «… Sin leer») |
+| R30 | `relative-time.test.ts` (bordes 59 s … 7 días y 1 min, zona fija) |
+| R31 | `notification-item.test.tsx`, `notifications-provider.test.tsx`, `notification-bell.test.tsx` «el clic en un aviso lo marca leído, cierra el panel y lleva a su origen» |
+| R32 | `notification-list-state.test.ts`, `notifications-provider.test.tsx`, `notification-bell.test.tsx` |
+| R33 | `notification-list-state.test.ts` ×4; `notification-bell.test.tsx` ×2 (esqueletos, vacío, error con «Reintentar») |
+| R34 | `notification-bell.test.tsx` (escritorio 400×520 con scroll; tablet 820 px como escritorio) |
+| R35 | `notification-bell.test.tsx` (ancla = cabecera, `collisionPadding` 8/8/8/16, `w-[calc(100vw-16px)]`, `max-h-(--available-height)`, filas `min-h-11`) |
+| R36 | `notification-item.test.tsx`, `notifications-provider.test.tsx` (llegada, fundido y pulso bajo `motion-safe`). **El balanceo de la campana (700 ms) no está hecho.** |
+| R37 | `polling-feed.test.ts` (cada 30 s, sin solapes); `notifications-provider.test.tsx` (lista sin cargar → solo conteo; cargada → mezcla arriba) |
+| R38 | `polling-feed.test.ts` (oculta no consulta; al volver visible sí) |
+| R39 | `tab-bus.test.ts` ×4; `notifications-provider.test.tsx` ×3 |
+| R40 | `polling-feed.test.ts` (`unauthorized` y `forbidden` paran) |
+| R41–R43 | `chime-coordinator.test.ts` |
+| R44 | `chime.test.ts` |
+| R45 | `chime-coordinator.test.ts` ×3; `chime.test.ts` |
+| R47 | `notification-item.test.tsx` (`{hora}` → `HH:MM`, `<b>` como texto); `relative-time.test.ts` |
+| R50, R51 | `document-upload-names.test.tsx` (`names` alineado con `paths`; un archivo que falla no va en ninguno de los dos) |
+
+### Verificación (salida real, resumida, de los subagentes)
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: 0 errors, 10 warnings, todos de archivos ajenos.
+- `pnpm exec vitest run tests/unit/notificaciones-ui`: Test Files 10 passed (10), Tests 105 passed (105).
+- `pnpm exec vitest run guard`: Test Files 81 passed (81), Tests 1101 passed | 20 skipped.
+- `vitest run tests/unit/documentos-ui tests/unit/proveedores-ui`: 38 files passed, 343 passed | 6 skipped.
+- `vitest related --run`:
+  - popover y document-upload: 1 failed | 270 passed files. El fallo es `tests/unit/marca/tablas-marca.test.tsx`: rojo conocido y ajeno, y no está en `tests/baseline-rojos.json`.
+  - bloque D: 11 passed (122 tests).
+  - bloque E: 1 failed | 17 passed. El fallo es `tests/unit/identity/session-once-per-request-render.test.tsx` por «Hook timed out in 60000ms» en `beforeAll`; corrido solo pasa (12 passed). Se atribuye a la carga de la máquina; lo confirmará CI.
+- Rojo de la guardia de T19b comprobado a mano: un importador temporal `tmp-probe-guard.ts` la puso roja; tras borrarlo, verde.
+
+### Decisiones fuera del spec (a validar)
+1. **T10: se cambiaron 5 tests existentes**, contra el criterio «sin cambios», porque comparaban el payload exacto `{strategy, paths}`. Añaden `names` al valor esperado y la comparación sigue siendo exacta. Son `document-upload-flow` ×2, `document-upload-strategy`, `formulas-upload` y `supplier-detail-upload`.
+2. **T17 por el plan A:** `@base-ui/react` 1.7.0 tiene `anchor` y `collisionPadding` y expone `--available-height`. No hace falta el plan B.
+3. **`app/globals.css`**, que no está en «Archivos esperados», gana `@keyframes notification-count-bump` (pulso de 360 ms).
+4. **El contexto se amplió:** `summary.arrivals` y `summary.checkedAt` (el «ahora» de la hora relativa), y `list` expone el estado completo del reductor.
+5. **Bus:** un resumen que llega de otra pestaña se aplica sin `refresh()`, para que las pestañas no se reboten el resumen sin fin. Un «leído» sí pide `refresh()`. El design §9.3 pide `refresh()` en los dos casos.
+6. **`onStop` del feed** es `'unauthorized' | 'forbidden'`; el design solo nombraba `'unauthorized'`.
+7. **Proveedor:** solo exige `userId`; `feed`, `actions`, `bus` y `chime` son opcionales, y con `null` quedan desactivados.
+8. **`NotificationItem`** navega con `next/link` y su `onSelect` marca y cierra el panel, en vez del `router.push` del design §10.1. Con `href = null` pinta un `<button>`.
+9. **Textos de interfaz como constantes exportadas** de cada archivo; no hay archivo de textos nuevo.
+10. **El error del primer lote se compone con `EmptyState` + `Button` dentro de `role="alert"`,** en vez de reutilizar `ErrorState`, que exige un error del catálogo y no admite un `retryFirst()`. El design dice «1. Reutiliza»; aquí es «3. Compón».
+11. **Punto de corte del teléfono: `useIsMobile()` (768 px)**, el que usa la cabecera (`md:hidden`). El design dice `sm`. La tablet (820 px) se comporta como escritorio.
+12. **El ancla del teléfono es `() => trigger.closest('header')`,** así el `<header>` del layout sigue siendo Server Component.
+13. **Hora relativa:** `now = max(summary.checkedAt, instante de apertura)`, para no leer el reloj en el render.
+14. **Dos tests de layout tocados** (`private-layout.test.tsx`, `navegacion/private-layout-menu.test.tsx`). Ganan un `vi.mock` de `notification-actions`, porque montar el proveedor en jsdom añadía una segunda lectura de sesión. Las aserciones no cambian. T19 pedía «sin cambios» para los tests de navegación: lo valida el reviewer.
+
+### Abierto / bloqueo
+- **R36, balanceo de la campana de 700 ms: sin implementar.** `tests/guards/guard-movimiento.test.ts` (QC-228 R1) prohíbe animaciones de más de 400 ms en `app/` y `components/`. Lo decide el leader o el humano: o una excepción nombrada en la guardia, o bajar la duración por debajo de 400 ms (enmienda al spec).
+- Rojo ajeno y conocido que sigue: `tests/unit/marca/tablas-marca.test.tsx`.
+
+### Veredicto
+Tanda 3 hecha: T10, T12, T13–T19b. Typecheck, lint, `notificaciones-ui` y las guardias en verde. Queda abierto el balanceo de R36. No se hizo push.

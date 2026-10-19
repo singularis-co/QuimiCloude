@@ -74,6 +74,15 @@ vi.mock('@/lib/composition', () => ({
   },
 }));
 
+// La campana consulta su resumen por Server Action, que en el navegador es otra peticion y no una
+// lectura de sesion de este pintado. Sin respuesta, no cuenta como lectura ni cambia el arbol.
+vi.mock('@/lib/modules/notificaciones/adapters/driving/notification-actions', () => ({
+  getNotificationSummaryAction: vi.fn(() => new Promise(() => undefined)),
+  listNotificationsAction: vi.fn(() => new Promise(() => undefined)),
+  markNotificationReadAction: vi.fn(() => new Promise(() => undefined)),
+  markAllNotificationsReadAction: vi.fn(() => new Promise(() => undefined)),
+}));
+
 const RUTA_SIN_COINCIDENCIA = '/ruta-que-no-esta-en-la-navegacion';
 const CHILD_TEST_ID = 'pantalla-de-prueba';
 

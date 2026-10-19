@@ -239,7 +239,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
   - Fila de `Popover` en `CATALOGO.md` con el punto de extensión.
   - **Hecho:** los tests existentes que usan `Popover` siguen verdes sin cambios;
     `guard-catalogo-de-componentes` verde.
-- [ ] **T18. Campana y panel con carga al hacer scroll** (design §10.1, §10.2, §10.3). Depende de
+- [x] **T18. Campana y panel con carga al hacer scroll** (design §10.1, §10.2, §10.3). Depende de
   T16 y T17.
   - `notification-bell.tsx` y `notification-list-tail.tsx` (centinela con `useInView` de
     `react-intersection-observer`, `root` = área con scroll, `rootMargin` de 120 px, `skip` fuera de
@@ -264,13 +264,13 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     - R19: sin permiso, el layout no monta ni la campana ni el proveedor.
 
     Los tests del layout privado siguen verdes.
-- [ ] **T19. Solo campana** `[P]` (R24, design §10.4). Depende de T18.
+- [x] **T19. Solo campana** `[P]` (R24, design §10.4). Depende de T18.
   - **Hecho:** `tests/unit/notificaciones-ui/solo-campana.test.ts` verde: no existe
     `app/(private)/notificaciones/`, ningún `NavLink` de `PRIVATE_NAV_ITEMS` apunta a
     `/notificaciones` ni lleva `badge`, `PRIVATE_ROUTE_PREFIXES` no tiene `/notificaciones` y
     `firstVisibleNavHref` da lo mismo que hoy para los cinco roles. Los tests existentes de
     navegación y de `AppSidebar` siguen verdes **sin cambios**.
-- [ ] **T19b. Ampliar la guardia de QC-140** `[P]` (R25, design §10.2, §15). Depende de T18.
+- [x] **T19b. Ampliar la guardia de QC-140** `[P]` (R25, design §10.2, §15). Depende de T18.
   - `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts`: `ARCHIVO_AUTORIZADO` pasa a
     `ARCHIVOS_AUTORIZADOS` con `showcase-load-trigger.tsx` y
     `app/(private)/components/notifications/notification-list-tail.tsx`; el caso R18 compara con

@@ -19,7 +19,15 @@ const RAIZ = join(__dirname, '..', '..', '..');
 const CARPETA_LISTA = join('app', '(private)', SUPPLIERS_ROUTE.replace(/^\//, ''));
 
 const LIBRERIA_DE_INTERSECCION = 'react-intersection-observer';
-const ARCHIVO_AUTORIZADO = join(CARPETA_LISTA, 'components', 'showcase-load-trigger.tsx');
+
+/**
+ * Lista cerrada: un centinela por pantalla que carga al hacer scroll. QC-137 la amplio con el del
+ * panel de la campana; sustituir la libreria sigue siendo reescribir solo estos archivos.
+ */
+const ARCHIVOS_AUTORIZADOS = [
+  join('app', '(private)', 'components', 'notifications', 'notification-list-tail.tsx'),
+  join(CARPETA_LISTA, 'components', 'showcase-load-trigger.tsx'),
+];
 
 /** Carpetas de codigo de PRODUCCION que se barren; `tests/` queda fuera a proposito. */
 const CARPETAS_DE_PRODUCCION = ['app', 'components', 'lib'] as const;
@@ -124,12 +132,12 @@ function baseDeFusionOMuda(ctx: Pick<import('vitest').TestContext, 'skip'>): str
 }
 
 describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
-  it('R18: react-intersection-observer solo la importa showcase-load-trigger.tsx', () => {
+  it('R18 (ampliada por QC-137): react-intersection-observer solo la importan showcase-load-trigger.tsx y notification-list-tail.tsx', () => {
     const importadores = FUENTES_DE_PRODUCCION.filter((archivo) =>
       fuenteSinComentarios(archivo).includes(LIBRERIA_DE_INTERSECCION),
     );
 
-    expect(importadores).toEqual([aPosix(ARCHIVO_AUTORIZADO)]);
+    expect(importadores).toEqual(ARCHIVOS_AUTORIZADOS.map(aPosix).sort());
   });
 
   it('D8: ningun archivo de la vista crea un IntersectionObserver a mano ni escucha el scroll', () => {
