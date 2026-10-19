@@ -86,6 +86,7 @@ describe('la estrategia de una tanda', () => {
     expect(encolado).toEqual({
       strategy: 'formula',
       paths: signedUploads(2).map((upload) => upload.path),
+      names: ['uno.pdf', 'dos.pdf'],
     });
   });
 });

@@ -133,7 +133,7 @@
 
     `tests/integration/documentos/batch-notice.int.test.ts` cubre `readBatchNotice`: conteos, los
     3 primeros nombres de los fallidos en orden de subida y `uploadedAt` (R51).
-- [ ] **T10. Nombre original de cada archivo** `[P]` (design §6.3, §3.2.3). Depende de T9.
+- [x] **T10. Nombre original de cada archivo** `[P]` (design §6.3, §3.2.3). Depende de T9.
   - _Estado (tanda 2): parte backend hecha en 1e657082 (migración, `file-name.ts`, `names`, `createBatch`, `enqueue-names.test.ts`). Pendiente para frontend_dev: `DocumentUpload` manda `names` y `document-upload-names.test.tsx`._
   - Migración `<ts>_document_files_original_name` con `down.sql`.
   - `file-name.ts` (`fileNameSchema`), `names` opcional en `enqueue-input.ts`, `NewBatch.files` y
@@ -167,7 +167,7 @@
 
     `tests/unit/composition/documentos-batch-notice.test.ts` cubre R5: el `dedupeKey` es el de la
     tanda y `documentos` no importa `notificaciones`.
-- [ ] **T12. Guardia de desacople** `[P]` (R5). Depende de T4.
+- [x] **T12. Guardia de desacople** `[P]` (R5). Depende de T4.
   - `tests/guards/guard-notificaciones-desacople.test.ts`: ningún archivo de `lib/modules/*`,
     salvo `notificaciones`, importa `@/lib/modules/notificaciones`. Incluye su autocomprobación
     con un fuente sintético.
@@ -230,7 +230,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 
 ## Bloque E — Campana
 
-- [ ] **T17. `PopoverContent` con ancla opcional** `[P]` (design §10.3, «Lo que ya existe»).
+- [x] **T17. `PopoverContent` con ancla opcional** `[P]` (design §10.3, «Lo que ya existe»).
   No depende de nada.
   - `components/ui/popover.tsx`: `anchor`, `collisionPadding` y `positionerClassName` opcionales,
     pasados al `Positioner`. Comprobar contra la versión instalada de `@base-ui/react` que existen
