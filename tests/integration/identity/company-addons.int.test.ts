@@ -315,7 +315,7 @@ describe('apply', () => {
     })
   })
 
-  it('R29, R33: apagar todos con los cinco prendidos escribe cinco filas false y cinco eventos', async () => {
+  it('R29, R33: apagar todos con los seis prendidos escribe seis filas false y seis eventos', async () => {
     await inRolledBackTransaction(async (tx) => {
       const repo = createCompanyAddonRepository(tx)
       const actorId = await createMaestro(tx)
@@ -325,19 +325,19 @@ describe('apply', () => {
 
       expect(result).toEqual({ stored: [], changed: ADDONS.map((addon) => ({ addon, enabled: false })) })
       const filas = await overridesOf(tx, companyId)
-      expect(filas).toHaveLength(5)
+      expect(filas).toHaveLength(ADDONS.length)
       for (const fila of filas) {
         expect(fila, fila.addonKey).toMatchObject({ enabled: false, createdBy: actorId, createdAt: at(3) })
       }
       const eventos = await eventsOf(tx, companyId)
-      expect(eventos).toHaveLength(5)
+      expect(eventos).toHaveLength(ADDONS.length)
       expect(eventos.map((e) => (e.details as { addon: string }).addon).sort()).toEqual([...ADDONS].sort())
       for (const evento of eventos) expect(evento).toMatchObject({ kind: 'addon.disabled', actorId, occurredAt: at(3) })
       expect((await readCompany(tx, companyId)).updatedAt).toEqual(at(3))
     })
   })
 
-  it('R29, R33: si falla un evento a mitad de apagar todos, las cinco excepciones y updated_at quedan como estaban', async () => {
+  it('R29, R33: si falla un evento a mitad de apagar todos, las seis excepciones y updated_at quedan como estaban', async () => {
     await inRolledBackTransaction(async (tx) => {
       const actorId = await createMaestro(tx)
       const companyId = await seedCompany(tx, { addons: [...ADDONS] })
@@ -427,7 +427,7 @@ describe('apply', () => {
 })
 
 describe('lo que no cambia al apagar', () => {
-  it('R24: apagar los cinco no toca recetas, proveedores, lineas de catalogo, lotes ni la conexion de IA', async () => {
+  it('R24: apagar los seis no toca recetas, proveedores, lineas de catalogo, lotes ni la conexion de IA', async () => {
     await inRolledBackTransaction(async (tx) => {
       const repo = createCompanyAddonRepository(tx)
       const actorId = await createMaestro(tx)
@@ -550,6 +550,109 @@ describe('alta y lectura de sistema', () => {
       expect(await isActive(conTodo, 'lectura_pdf')).toBe(true)
       expect(await isActive(deBaja, 'lectura_pdf')).toBe(false)
       expect(await isActive(randomUUID(), 'lectura_pdf')).toBe(false)
+    })
+  })
+})
+
+describe('añadido notificaciones', () => {
+  it('QC-137 R20: una empresa dada de alta con createWithAdministrator nace con notificaciones apagado', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const actorId = await createMaestro(tx)
+      const marca = tag()
+      const name = `Avisos ${marca}`
+      const created = await createCompanyRepository(tx).createWithAdministrator({
+        company: {
+          name,
+          nameNormalized: normalizeCompanyName(name),
+          taxId: null,
+          taxIdNormalized: null,
+          contactEmail: null,
+          contactPhone: null,
+        },
+        administrator: {
+          firstNames: 'Ana',
+          lastNames: 'Admin',
+          birthDate: new Date('1990-01-01T00:00:00.000Z'),
+          email: `qc137.admin.${marca}@example.test`,
+          phone: '3001112233',
+          documentTypeCode: DOCUMENT_TYPE_CC,
+          documentNumber: marca.slice(0, 20),
+          username: `qc137.admin.${marca}`,
+        },
+        actorId,
+        now: NOW,
+      })
+      if (typeof created === 'string') throw new Error(`el alta no debia fallar: ${created}`)
+
+      const isActive = createIsCompanyAddonActive({ addons: createCompanyAddonRepository(tx) })
+      expect(await isActive(created.companyId, 'notificaciones')).toBe(false)
+      expect(
+        await tx.companyAddonOverride.count({
+          where: { companyId: created.companyId, addonKey: 'notificaciones' },
+        }),
+      ).toBe(0)
+
+      const record = await findActiveSessionUserById(created.administratorId, randomUUID())
+      if (record === null) throw new Error('el administrador esta vivo')
+      expect(record.permissions).toContain('notificaciones.consultar')
+      expect(effectivePermissions(record.permissions, effectiveAddons(record.companyAddons))).not.toContain(
+        'notificaciones.consultar',
+      )
+    })
+  })
+
+  it('QC-137 R18: con el añadido prendido, el Administrador lo tiene efectivo; al apagarlo, la siguiente lectura lo pierde', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createCompanyAddonRepository(tx)
+      const actorId = await createMaestro(tx)
+      const companyId = await seedCompany(tx, { addons: ['notificaciones'] })
+      const userId = await createUser(tx, ROLE_ADMINISTRADOR, companyId)
+      const efectivos = async (): Promise<readonly string[]> => {
+        const record = await findActiveSessionUserById(userId, randomUUID())
+        if (record === null) throw new Error('el usuario esta vivo')
+        return effectivePermissions(record.permissions, effectiveAddons(record.companyAddons))
+      }
+
+      expect(await efectivos()).toContain('notificaciones.consultar')
+
+      await repo.apply({ companyId, disable: ['notificaciones'], actorId, now: at(1) })
+
+      expect(await efectivos()).not.toContain('notificaciones.consultar')
+    })
+  })
+
+  it('QC-137 R53: prender y apagar notificaciones con integraciones apagada no exige ni cambia ningun otro añadido', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createCompanyAddonRepository(tx)
+      const isActive = createIsCompanyAddonActive({ addons: repo })
+      const actorId = await createMaestro(tx)
+      const companyId = await seedCompany(tx, { addons: ['dashboard', 'lectura_pdf'], off: ['integraciones'] })
+      const otrasAntes = (await overridesOf(tx, companyId)).filter((fila) => fila.addonKey !== 'notificaciones')
+
+      const prendido = await repo.apply({ companyId, enable: ['notificaciones'], actorId, now: at(1) })
+
+      expect(prendido).toEqual({
+        stored: ['dashboard', 'lectura_pdf', 'notificaciones'],
+        changed: [{ addon: 'notificaciones', enabled: true }],
+      })
+      expect(await isActive(companyId, 'notificaciones')).toBe(true)
+      expect(await isActive(companyId, 'integraciones')).toBe(false)
+      expect(await isActive(companyId, 'lectura_pdf')).toBe(false)
+
+      const apagado = await repo.apply({ companyId, disable: ['notificaciones'], actorId, now: at(2) })
+
+      expect(apagado).toEqual({
+        stored: ['dashboard', 'lectura_pdf'],
+        changed: [{ addon: 'notificaciones', enabled: false }],
+      })
+      expect(await isActive(companyId, 'notificaciones')).toBe(false)
+      expect((await overridesOf(tx, companyId)).filter((fila) => fila.addonKey !== 'notificaciones')).toEqual(
+        otrasAntes,
+      )
+      expect((await eventsOf(tx, companyId)).map((e) => [e.kind, (e.details as { addon: string }).addon])).toEqual([
+        ['addon.enabled', 'notificaciones'],
+        ['addon.disabled', 'notificaciones'],
+      ])
     })
   })
 })

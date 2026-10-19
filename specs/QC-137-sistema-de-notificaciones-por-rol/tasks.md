@@ -14,7 +14,7 @@
 
 ## Bloque A — Datos y permisos
 
-- [ ] **T1. Esquema y migración de las tablas** (design §3, §3.1, §3.2.1)
+- [x] **T1. Esquema y migración de las tablas** (design §3, §3.1, §3.2.1)
   - Modelos `Notification` y `NotificationRead` en `db/schema.prisma`, con `/// @module
     notificaciones` y marcas `@db.Timestamptz(6)`.
   - Migración `<ts>_notifications` con su `down.sql`: CHECK de un destinatario, `UNIQUE
@@ -27,7 +27,7 @@
     - R14: rechaza una lectura con empresa distinta a la del aviso;
     - R47: rechaza un `body` con `{hora}` sin `body_time` y al revés;
     - la cascada de borrado de las lecturas.
-- [ ] **T2. Permiso y añadido** (design §7, §3.2.2).
+- [x] **T2. Permiso y añadido** (design §7, §3.2.2).
   Depende de T1.
   - `permissions.ts`: `notificaciones.consultar` y los cuatro roles de empresa en
     `SEED_ROLE_PERMISSIONS`.
@@ -43,7 +43,7 @@
     empresa creada después no. Además, verdes:
     - el test de integración que compara la migración con las constantes;
     - `guard-catalogo` de añadidos.
-- [ ] **T3. `identity.isUserInCompany`** `[P]` (design §7). Depende de T1.
+- [x] **T3. `identity.isUserInCompany`** `[P]` (design §7). Depende de T1.
   - **Hecho:** test unitario del caso de uso y test de integración del adaptador (otra empresa →
     `false`).
 

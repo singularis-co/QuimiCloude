@@ -132,6 +132,41 @@ describe('setCompanyAddon', () => {
     expect(apply).toHaveBeenCalledTimes(1);
   });
 
+  it('QC-137 R53: prender y apagar notificaciones con integraciones apagada solo pide esa clave al puerto', async () => {
+    const prender = setup({ stored: ['notificaciones'], changed: [{ addon: 'notificaciones', enabled: true }] });
+
+    const prendida = await prender.setCompanyAddon(MAESTRO, {
+      companyId: COMPANY_ID,
+      addon: 'notificaciones',
+      enabled: true,
+    });
+
+    expect(prender.apply).toHaveBeenCalledWith({
+      companyId: COMPANY_ID,
+      enable: ['notificaciones'],
+      actorId: MAESTRO.id,
+      now: NOW,
+    });
+    expect(prendida.addons.filter((a) => a.enabled || a.active).map((a) => a.addon)).toEqual(['notificaciones']);
+    expect(prendida.addons.find((a) => a.addon === 'integraciones')).toMatchObject({ enabled: false, active: false });
+
+    const apagar = setup({ stored: [], changed: [{ addon: 'notificaciones', enabled: false }] });
+
+    const apagada = await apagar.setCompanyAddon(MAESTRO, {
+      companyId: COMPANY_ID,
+      addon: 'notificaciones',
+      enabled: false,
+    });
+
+    expect(apagar.apply).toHaveBeenCalledWith({
+      companyId: COMPANY_ID,
+      disable: ['notificaciones'],
+      actorId: MAESTRO.id,
+      now: NOW,
+    });
+    expect(apagada.addons.every((a) => !a.enabled && !a.active)).toBe(true);
+  });
+
   it('R31: el puerto responde not_found (inexistente o de baja) → company_not_found', async () => {
     const { setCompanyAddon } = setup('not_found');
 

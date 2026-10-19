@@ -719,7 +719,7 @@ describe('findActiveSessionUserById con el rol de acondicionamiento', () => {
     return { id, username };
   }
 
-  it('QC-216 R20: la sesion de un usuario con el rol trae exactamente sus dos permisos, ni uno mas', async () => {
+  it('QC-216 R20: la sesion de un usuario con el rol trae exactamente sus permisos (QC-137 R21 suma notificaciones.consultar), ni uno mas', async () => {
     const usuario = await crearAcondicionador();
 
     try {
@@ -746,6 +746,7 @@ describe('findActiveSessionUserById con el rol de acondicionamiento', () => {
       expect([...(resuelta?.user.permissions ?? [])].sort()).toEqual([
         'acondicionamiento.modificar',
         'asignaciones.consultar',
+        'notificaciones.consultar',
       ]);
       expect([...(resuelta?.user.permissions ?? [])].sort()).toEqual(
         [...(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? [])].sort(),

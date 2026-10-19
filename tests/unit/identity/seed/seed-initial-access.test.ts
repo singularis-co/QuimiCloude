@@ -832,14 +832,14 @@ describe('seedInitialAccess', () => {
       paresCreados
         .filter((par) => par.roleId === rolesCreados.get(ROLE_OPERADOR))
         .map((par) => par.permissionCode),
-    ).toEqual(['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar']);
-    // El Empacador nace con exactamente sus tres permisos, en el orden de
+    ).toEqual(['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar', 'notificaciones.consultar']);
+    // El Empacador nace con exactamente sus cuatro permisos, en el orden de
     // `SEED_ROLE_PERMISSIONS`.
     expect(
       paresCreados
         .filter((par) => par.roleId === rolesCreados.get(ROLE_EMPACADOR))
         .map((par) => par.permissionCode),
-    ).toEqual(['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar']);
+    ).toEqual(['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar', 'notificaciones.consultar']);
 
     // Y el orden del algoritmo: los roles ANTES que los permisos, y los permisos ANTES
     // que el administrador (`design.md > 3`). Sin ese orden, una asignacion no tendria
@@ -1570,7 +1570,7 @@ describe('seedInitialAccess', () => {
     expect(obtenido.createdMaestro).toBe(true);
   });
 
-  it('R7: full crea la empresa inicial una vez por el puerto, y el adaptador la crea con las cinco excepciones prendidas y sin autor', async () => {
+  it('R7: full crea la empresa inicial una vez por el puerto, y el adaptador la crea con una excepcion prendida por añadido y sin autor', async () => {
     const repository = crearRepositorioFalso();
     await seedInitialAccess({ ...depsDelSeed(repository), scope: 'full' });
     expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createCompany')).toHaveLength(1);
@@ -1588,7 +1588,7 @@ describe('seedInitialAccess', () => {
       data: {
         name: INITIAL_COMPANY_NAME,
         nameNormalized: NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL,
-        // Las cinco excepciones prendidas en el mismo `create`, sin autor: las siembra el sistema.
+        // Las excepciones prendidas en el mismo `create`, sin autor: las siembra el sistema.
         addonOverrides: { create: ADDONS.map((addonKey) => ({ addonKey, enabled: true })) },
       },
     });

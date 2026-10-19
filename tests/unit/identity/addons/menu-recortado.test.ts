@@ -55,7 +55,7 @@ describe('menú con el permiso efectivo de la empresa', () => {
     expect(testIds(menu)).toEqual(expect.arrayContaining(['nav-inventario', 'nav-pedidos', 'nav-produccion-recetas']));
   });
 
-  it('R12 con los cinco añadidos aparecen dashboard, proveedores y el grupo «Integraciones»', () => {
+  it('R12 con todos los añadidos aparecen dashboard, proveedores y el grupo «Integraciones»', () => {
     const menu = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, effectivePermissions(PERMISOS_ADMINISTRADOR, ADDONS));
 
     expect(testIds(menu)).toEqual(expect.arrayContaining(['nav-dashboard', 'nav-proveedores', 'nav-integraciones']));

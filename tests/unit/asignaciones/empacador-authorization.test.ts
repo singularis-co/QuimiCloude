@@ -112,7 +112,7 @@ function doblesDe(deps: object): unknown[] {
 describe('el Empacador no ejecuta pedidos asignados', () => {
   it('R4: el conjunto del seed del Empacador no trae `asignaciones.ejecutar`', () => {
     expect([...PERMISOS_DEL_EMPACADOR].sort()).toEqual(
-      ['asignaciones.consultar', 'empaque.modificar', 'terminados.consultar'].sort(),
+      ['asignaciones.consultar', 'empaque.modificar', 'terminados.consultar', 'notificaciones.consultar'].sort(),
     );
   });
 

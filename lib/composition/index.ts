@@ -518,11 +518,15 @@ import {
   createReactivateCompany,
   createUpdateCompany,
 } from '@/lib/modules/identity';
-import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
+import {
+  createCompanyMembershipReader,
+  createCompanyRepository,
+} from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
 import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma';
 import {
   createGetCompanyAddons,
   createIsCompanyAddonActive,
+  createIsUserInCompany,
   createSetAllCompanyAddons,
   createSetCompanyAddon,
 } from '@/lib/modules/identity';
@@ -985,6 +989,7 @@ export const identity = {
   listCompanyEvents: createListCompanyEvents({ companies: companyRepository }),
   // Sin actor: la usan los trabajos que corren sin sesión.
   isCompanyAddonActive: createIsCompanyAddonActive({ addons: companyAddonRepository }),
+  isUserInCompany: createIsUserInCompany({ members: createCompanyMembershipReader() }),
   getCompanyAddons: createGetCompanyAddons({ addons: companyAddonRepository }),
   setCompanyAddon: createSetCompanyAddon({ addons: companyAddonRepository }),
   setAllCompanyAddons: createSetAllCompanyAddons({ addons: companyAddonRepository }),

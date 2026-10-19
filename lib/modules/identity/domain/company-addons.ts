@@ -1,6 +1,13 @@
 import type { PermissionCode } from './permissions';
 
-export const ADDONS = ['dashboard', 'proveedores', 'lectura_pdf', 'importacion_excel', 'integraciones'] as const;
+export const ADDONS = [
+  'dashboard',
+  'proveedores',
+  'lectura_pdf',
+  'importacion_excel',
+  'integraciones',
+  'notificaciones',
+] as const;
 export type Addon = (typeof ADDONS)[number];
 
 export const ADDON_PERMISSIONS: Readonly<Record<Addon, readonly PermissionCode[]>> = {
@@ -9,6 +16,7 @@ export const ADDON_PERMISSIONS: Readonly<Record<Addon, readonly PermissionCode[]
   lectura_pdf: ['documentos.consultar', 'documentos.modificar'],
   importacion_excel: [],
   integraciones: ['integraciones.modificar'],
+  notificaciones: ['notificaciones.consultar'],
 };
 
 export const ADDON_REQUIRES: Readonly<Record<Addon, readonly Addon[]>> = {
@@ -17,6 +25,7 @@ export const ADDON_REQUIRES: Readonly<Record<Addon, readonly Addon[]>> = {
   importacion_excel: [],
   integraciones: [],
   lectura_pdf: ['integraciones'],
+  notificaciones: [],
 };
 
 // Escrito uno a uno, no derivado: un permiso nuevo tiene que clasificarse a mano.
