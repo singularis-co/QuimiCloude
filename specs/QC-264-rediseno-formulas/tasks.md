@@ -115,7 +115,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   `lockingOrders`. `recipe-form-evidence-lock.test.tsx` en verde (o migrado si localiza por posición).
 - [x] **T3b. Pestañas con contador** (D5, R12). `recipe-lines-field.tsx`. `recipe-lines-tabs.test.tsx`:
   cifra junto a la etiqueta, no cuenta la fila fantasma, cambia al añadir o quitar; testids de hoy.
-- [ ] **T3c. Lista de versiones** (D12, D14, R14, R30, R31). `recipe-version-list.tsx`,
+- [x] **T3c. Lista de versiones** (D12, D14, R14, R30, R31). `recipe-version-list.tsx`,
   `recipe-version-tones.ts`. `recipe-version-list.test.tsx`: nombre con `truncate` y `title`, «Por
   revisar» `waiting`, «Abrir» con su nombre accesible y dirección, borrado de hoy, `originalId={null}`
   con «Nueva versión» deshabilitado y el vacío. `badges-estado.test.tsx` enmendado (`design.md > 10`).

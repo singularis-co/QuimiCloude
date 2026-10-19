@@ -176,7 +176,8 @@ describe('badges de estado con la nueva marca', () => {
     expectTone(marca, 'destructive');
   });
 
-  it('R8: «En revisión» se pinta con el tono de información en la lista de versiones', () => {
+  // Enmienda de QC-264: «Por revisar» de la lista pasa a StatusBadge en tono waiting (ámbar).
+  it('R8: «Por revisar» se pinta como StatusBadge waiting en la lista de versiones', () => {
     render(
       <RecipeVersionList
         originalId="11111111-1111-4111-8111-111111111111"
@@ -191,7 +192,9 @@ describe('badges de estado con la nueva marca', () => {
         ]}
       />,
     );
-    expectTone(screen.getByTestId('recipe-version-under-review'), 'info');
+    const marca = screen.getByTestId('recipe-version-under-review');
+    expect(marca).toHaveAttribute('data-tone', 'waiting');
+    expectTone(marca, 'warning');
   });
 
   it('R8: «En revisión» se pinta con el tono de información en el formulario de versión', () => {
