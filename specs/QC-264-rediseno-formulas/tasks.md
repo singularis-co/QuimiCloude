@@ -128,7 +128,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 4 — Editor de pasos (depende de T1b solo por el orden de commits) [P con 2, 3, 5–7]
 
-- [ ] **T4a.** (D8, R16–R19) `recipe-steps-field.tsx`, `recipe-step-editor.tsx`. Tests en
+- [x] **T4a.** (D8, R16–R19) `recipe-steps-field.tsx`, `recipe-step-editor.tsx`. Tests en
   `recipe-steps-field.test.tsx`: número bajo el asa, quitar con icono y «Quitar paso N», «Añadir paso»
   al final con su testid, `data-dragging` en la tomada y `data-drop-target` en las demás mientras se
   arrastra (teclado: Espacio para tomar) y ninguna marca tras soltar o cancelar, orden y anuncios de hoy.
