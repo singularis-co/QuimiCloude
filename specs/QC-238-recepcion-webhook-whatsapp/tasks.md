@@ -73,14 +73,14 @@
 
 ## Bloque D — Casos de uso (tras B y C)
 
-- [ ] **T8 — Conexión de la URL y handshake** (R2, R3, R4, R5, R6, R7). Depende de: T5
+- [x] **T8 — Conexión de la URL y handshake** (R2, R3, R4, R5, R6, R7). Depende de: T5
   - `domain/webhook-connection.ts` (`resolveWebhookConnection`, §4.1) y
     `domain/verify-whatsapp-webhook.ts` (§4.2).
   - `tests/unit/integraciones/whatsapp/verify-whatsapp-webhook.test.ts`.
   - **Hecho:** cada causa de `forbidden` probada sin `recordWebhookHandshake`; un id sin forma de
     UUID no llama a ningún puerto; el ámbito pasado a `findLiveById` es el que devolvió `directory`.
 
-- [ ] **T9 — Recepción** (R4, R9, R10, R11, R12, R13, R23, R26). Depende de: T3, T4, T8
+- [x] **T9 — Recepción** (R4, R9, R10, R11, R12, R13, R23, R26). Depende de: T3, T4, T8
   - `domain/receive-whatsapp-webhook.ts` (§4.2).
   - `tests/unit/integraciones/whatsapp/receive-whatsapp-webhook.test.ts`.
   - **Hecho:** el orden «resolver → descifrar → firma → parsear → guardar» queda fijado por

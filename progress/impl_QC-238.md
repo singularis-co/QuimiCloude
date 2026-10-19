@@ -127,3 +127,55 @@ T1–T7 hechas (T3 cerrada con la excepción nombrada de la última fila de «De
   2→4 envolturas, resolutor sin ámbito): los tres los resuelve T12.
 
 **Veredicto:** T3, T6 y T7 hechas según spec; hay un rojo en la migración de QC-237 que no cubre ninguna task.
+
+## Tanda 2026-10-19 (b) — reparación de la migración de QC-237, T8 y T9
+
+**Reparación (no cambia el spec).** `tests/integration/integraciones/whatsapp-connection-migration.int.test.ts`:
+patrón `DEPENDIENTES_POSTERIORES` de `clientes/customers-migration.int.test.ts` (detección transitiva
+por `REFERENCES`, DOWN de dependientes de la más reciente a la más antigua antes del propio, UP
+después), ancla `toContain('20261019140000_whatsapp_contacts_and_messages')` y nota fechada
+2026-10-19. El caso del DOWN descuenta también las tablas creadas por las dependientes. Ningún caso
+quitado ni relajado. Resultado: 1/1 archivo, 9/9 verdes (antes 3 rojos 2BP01).
+
+**Archivos**
+- T8: `lib/modules/integraciones/domain/webhook-connection.ts`, `domain/verify-whatsapp-webhook.ts`,
+  `tests/unit/integraciones/whatsapp/verify-whatsapp-webhook.test.ts`.
+- T9: `domain/receive-whatsapp-webhook.ts`, `tests/unit/integraciones/whatsapp/receive-whatsapp-webhook.test.ts`.
+- `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`: + `makeWebhookDirectory`, `makeIntegrationsSwitch` (añadido).
+- El id se valida con `isWhatsappConnectionId` (zod uuid, ya existente); el token se compara con
+  `SecretDigest.matches` (SHA-256 + `timingSafeEqual`).
+
+**Mapa R → test (esta tanda)**
+- R2 → verify: «el ámbito pasado a findLiveById y devuelto es el que dio el resolutor», «si el resolutor
+  da otra empresa… ⇒ missing», «el resolutor recibe el id de la URL y nada más»; receive: «guarda el
+  lote… con el ámbito de la fila».
+- R3 → verify: «el id %j sin forma de UUID ⇒ forbidden(missing) sin llamar a ningún puerto» (5 ids),
+  resolutor «R3: un id sin forma de UUID»; receive: «R3, R9: un id sin forma de UUID».
+- R4 → verify: «añadido integraciones apagado ⇒ forbidden(addon_off)…»; receive: «R9, R4: … con el añadido apagado».
+- R5 → verify: «con token correcto devuelve el challenge tal cual…», «el token se compara contra el resumen».
+- R6 → verify: «deja ACTIVE una conexión PENDING», «una conexión ACTIVE/ERROR conserva su estado…»,
+  «si la deshabilitan entre la lectura y la escritura, sigue DISABLED».
+- R7 → verify: 8 casos `bad_request` sin puertos, inexistente, fila desaparecida, DISABLED, addon_off,
+  token_mismatch; ninguno llama a `recordWebhookHandshake`.
+- R9 → receive: «conexión inexistente/DISABLED/añadido apagado ⇒ ignored sin descifrar, sin firma y sin guardar».
+- R10 → receive: «el orden es resolver → descifrar → firma → parsear → guardar» (espías con
+  `invocationCallOrder`), «la firma se comprueba sobre los bytes exactos…», «con firma mala, un cuerpo
+  que no es JSON ni UTF-8 no lanza».
+- R11 → receive: «falta la cabecera / cabecera que no coincide ⇒ unauthorized, sin parsear y sin escribir».
+- R12 → receive: «SecretUnreadableError ⇒ secret_unreadable, la conexión queda en ERROR…», «un fallo
+  del cifrador que no es SecretUnreadableError se propaga».
+- R13 → receive: 4 cuerpos firmados ilegibles ⇒ `ignored(unparseable)`.
+- R23 → receive: «una excepción del inbox se propaga tal cual».
+- R24 (dominio) → receive: «un POST firmado sin nada que guardar llama igualmente al inbox».
+- R26 → receive y verify: `fetch` espiado no se llama; los deps no incluyen Graph.
+
+**Verificación**
+- `pnpm run typecheck`: verde (sin salida de errores).
+- `pnpm run lint`: 0 errores, 10 warnings preexistentes ajenos; `eslint` sobre los archivos tocados: limpio.
+- `vitest run verify-whatsapp-webhook receive-whatsapp-webhook`: 2/2 archivos, 47/47.
+- `vitest run tests/integration/integraciones/whatsapp-connection-migration.int.test.ts` (con `.env`): 1/1, 9/9.
+- `vitest related --run` sobre los 3 archivos de dominio nuevos + `whatsapp-doubles.ts`: 7/7 archivos, 142/142.
+- `vitest run tests/guards`: 72/73 archivos, 1005 verdes, 3 rojos, los mismos de la tanda anterior en
+  `guard-ambito-empresa-integraciones` (4→5 métodos, envolturas, resolutor): los cierra T12.
+
+**Veredicto:** T8 y T9 hechas según spec y el rojo de la migración de QC-237 reparado; sigue el rojo conocido de la guardia de ámbito, que es de T12.

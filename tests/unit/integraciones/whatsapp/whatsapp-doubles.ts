@@ -9,6 +9,7 @@ import { SecretUnreadableError } from '@/lib/modules/integraciones/domain/errors
 import type { IntegracionesScope } from '@/lib/modules/integraciones/domain/integraciones-scope'
 import type { SecretContext } from '@/lib/modules/integraciones/domain/secret-context'
 import type { WhatsappConnectionRecord } from '@/lib/modules/integraciones/domain/whatsapp-connection'
+import type { IntegrationsSwitch } from '@/lib/modules/integraciones/ports/integrations-switch'
 import type { RandomSource } from '@/lib/modules/integraciones/ports/random-source'
 import type { SecretCipher } from '@/lib/modules/integraciones/ports/secret-cipher'
 import type { SecretDigest } from '@/lib/modules/integraciones/ports/secret-digest'
@@ -18,6 +19,7 @@ import type {
   WhatsappConnectionRepository,
 } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository'
 import type { GraphProbeResult, WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client'
+import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory'
 
 export const COMPANY_ID = '00000000-0000-4000-8000-0000000000aa'
 export const OTHER_COMPANY_ID = '00000000-0000-4000-8000-0000000000bb'
@@ -197,4 +199,20 @@ export function storedConnection(
     lastWebhookAt: null,
     ...overrides,
   }
+}
+
+/** Resolutor de empresa del webhook: `companies` dice de que empresa es cada id de conexion. */
+export function makeWebhookDirectory(companies: Record<string, string> = { [CONNECTION_ID]: COMPANY_ID }) {
+  const companyOfConnection = vi.fn<WhatsappWebhookDirectory['companyOfConnection']>(
+    async (connectionId) => companies[connectionId] ?? null,
+  )
+  const directory: WhatsappWebhookDirectory = { companyOfConnection }
+  return { directory, companyOfConnection }
+}
+
+/** Interruptor del anadido `integraciones`, prendido por defecto. */
+export function makeIntegrationsSwitch(on = true) {
+  const isOn = vi.fn<IntegrationsSwitch['isOn']>(async () => on)
+  const integrations: IntegrationsSwitch = { isOn }
+  return { integrations, isOn }
 }
