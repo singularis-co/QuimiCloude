@@ -203,7 +203,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   conservados pasan sin cambios. *Enmienda (E19):* se corren también, sin cambios esperados,
   `e2e/integraciones-proveedor-ia.spec.ts`, `e2e/modulos-por-empresa.spec.ts` y
   `e2e/ejecucion-receta.spec.ts`.
-- [ ] **T9c. Deudas.** `progress/deudas.md`: la nueva de P14 y las de P6, P8 y P10 si se confirman
+- [x] **T9c. Deudas.** `progress/deudas.md`: la nueva de P14 y las de P6, P8 y P10 si se confirman
   fuera; D53 ampliada si aplica. *Enmienda (E16–E18):* con P17 por defecto, en vez de la de P14 se
   amplía D56 con el diálogo de propagar; con P18 por defecto, deuda nueva de tildes; deuda nueva del
   «Volver a la lista» como enlace de texto en «no encontrada».

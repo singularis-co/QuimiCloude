@@ -412,6 +412,9 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Ampliada (2026-10-16, QC-263, T0b, P22):** `/inventario` igual. El esqueleto de
   `product-columns-skeleton.ts` pinta 9 columnas y sin tarjeta; la tabla real tiene 10 en «Todos»,
   9 con un tipo filtrado y 7 en «Producto terminado», y bajo 760 px sale en tarjetas.
+- **Ampliada (2026-10-19, QC-264; derivada del código, no medida):** `/produccion/formulas` sale en
+  tarjetas bajo 760 px de contenedor, y su esqueleto de carga, que es el `TableSkeleton` de
+  `DataTable`, sigue siendo tabla.
 - **Medida de nuevo tras el merge (2026-10-16, QC-263, T8h, F9; derivada del código):** `ProductTable`
   pinta el esqueleto con su número real de columnas, así que cuadra en «Todos» (10 con Costo / 9
   sin permiso de costos), con un tipo filtrado (9 / 8) y en «Producto» (8 / 7). Queda descuadre en
@@ -448,6 +451,9 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   `icon` (glifo y tono, pintada en `AlertDialogMedia`, fila del catálogo al día). Solo falta usarla
   en los diálogos de pedidos («Cancelar el pedido», «Eliminar el pedido», «Material insuficiente»)
   con su revisión visual.
+- **Ampliada (2026-10-19, QC-264, P17):** en `/produccion/formulas` los dos borrados (receta y
+  versión) ya llevan el icono; falta el diálogo de propagar cambios a las versiones
+  (`propagate-versions-dialog.tsx`), que es un `AlertDialog` propio y no pasa por `ConfirmDialog`.
 - **Dueño:** sin asignar.
 
 ### D57 — Selector de prioridad del pedido sin `PriorityMark` (QC-262, P10)
@@ -504,6 +510,12 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   `PRODUCT_TABLE_SCOPE_CLASS` (fondo y entrada de las sub-filas). Si una segunda ruta lo necesita, se
   sube a `DataTableCards` (paso 2 de la regla de decisión, con su fila de catálogo y tablero) y se
   retira el apaño.
+- **En parte resuelta (2026-10-19, QC-264, decisión del humano):** `card-field-label.tsx` subió a
+  `components/shared` (fila en el catálogo) y lo usan inventario y `/produccion/formulas`. Sigue en
+  la ruta de inventario el pie de tarjeta (`batchesToggle`) y `PRODUCT_TABLE_SCOPE_CLASS`. Queda
+  además que el rótulo sale en mono, como la cifra: `DataTableCards` pone `font-mono` al campo
+  entero de una columna `tabular`, y los tableros (`Formulas.dc.html:66`) solo ponen la cifra en mono.
+  Cambiarlo toca `DataTableCards` y los snapshots de inventario.
 - **Dueño:** sin asignar.
 
 ### D64 — La hoja de `CountrySelect` cambia de altura al filtrar en teléfono (QC-235)
@@ -522,4 +534,39 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Qué falta:** a 1440 px, en el panel «Editar empresa», el popup abierto con la lista completa
   cubre con su borde inferior unos 6 px de la parte de arriba de «Cancelar» y «Guardar». Pieza de
   QC-235; QC-166 no la tocó.
+- **Dueño:** sin asignar.
+
+### D66 — Fórmulas: sin tiempo de espera por paso en el editor (QC-264, P6)
+- **Origen:** QC-264 (2026-10-19), P6 por defecto.
+- **Qué falta:** el tablero `Formula.dc.html` pone un campo de espera en la barra de cada paso. La
+  espera es hoy de la empresa (`minStepSeconds`, QC-125); hacerla por paso cambia el modelo
+  (`lib/modules/recetas`) y el lector (`StepReader`).
+- **Dueño:** sin asignar.
+
+### D67 — Versión de receta: sin «Devolver» un ingrediente quitado (QC-264, P8)
+- **Origen:** QC-264 (2026-10-19), P8 por defecto.
+- **Qué falta:** `FormulaVersion.dc.html` dibuja «Devolver» en cada ingrediente quitado y el texto
+  «No se quitó nada de la original.» cuando no hay quitados. Es conducta nueva, marcada «por confirmar»
+  en el tablero; el rediseño solo pinta el quitado (`StatusBadge` `danger` y nombre tachado).
+- **Dueño:** sin asignar.
+
+### D68 — Revisión de importación sin el nombre del PDF (QC-264, P10)
+- **Origen:** QC-264 (2026-10-19), P10 por defecto.
+- **Qué falta:** `ImportarFormula.dc.html` pinta el nombre del PDF bajo «Revisar fórmula». La vista
+  previa del módulo `documentos` no lo devuelve; es trabajo de módulo, no de pantalla.
+- **Dueño:** sin asignar.
+
+### D69 — Tildes pendientes en el editor de pasos y en `recipe-input.ts` (QC-264, P18)
+- **Origen:** QC-264 (2026-10-19), E17 con P18 por defecto.
+- **Qué falta:** «Lista de verificacion» y «el maximo es» (`recipe-step-editor.tsx`), «Elemento de la
+  lista de verificacion» (`recipe-step-schema.ts`) y dos mensajes de
+  `lib/modules/recetas/domain/recipe-input.ts`. Hay tests que afirman esos textos; cambiarlos es una
+  ficha propia con su censo.
+- **Dueño:** sin asignar.
+
+### D70 — «Volver a la lista» de «no encontrada» sigue como enlace de texto (QC-264, E18)
+- **Origen:** QC-264 (2026-10-19), enmienda E18.
+- **Qué falta:** las ramas «receta no encontrada» (`app/(private)/produccion/formulas/[id]/page.tsx`,
+  `components/recipe-form.tsx`) y las de las páginas de versión pintan el «Volver» como enlace de
+  texto, no como `ArrowLink` con flecha (D2 del humano). Ningún requisito de QC-264 lo cubría.
 - **Dueño:** sin asignar.
