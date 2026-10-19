@@ -178,3 +178,80 @@ Lo que vuelve al implementer:
 
 **H3** necesita una decisión del humano, que el leader debe traer. **H5** es del leader: registrar el rojo de
 QC-263.
+
+## Vuelta 2 (acotada a f8c5101e..f3ef6ce2)
+
+Alcance: los arreglos de H1–H4 y, por `docs/gate.md > La vuelta 2 del reviewer`, la extensión de
+`components/shared/data-table` que trae H3 (componente compartido). No se rehace la trazabilidad.
+Conocido y fuera de hallazgos: `scripts/validate-features.mjs` falla en local porque
+`feature_list.json` no tiene QC-278 (F0 del leader).
+
+### Verificación ejecutable (salida real, en el worktree)
+
+- `pnpm exec vitest run tests/unit/shared-ui tests/unit/shared/data-table-header-menu.test.tsx
+  tests/unit/shared/data-table.test.tsx tests/unit/clientes-ui/data-table-intacta-clientes.test.ts
+  tests/unit/configuracion-ui tests/unit/inventario-ui/finished-product-tables.test.tsx
+  tests/unit/inventario-ui/finished-product-page.test.tsx tests/guards/guard-catalogo-de-componentes.test.ts
+  tests/guards/guard-formularios-y-acciones.test.ts tests/guards/guard-identificador-de-request.test.ts`
+  → `Test Files 121 passed (121)`, `Tests 1798 passed | 38 skipped`. Hubo un aviso de cierre de un worker
+  (`Timeout terminating forks worker`), no un fallo.
+- `pnpm exec tsc --noEmit -p .` → sin errores.
+- `pnpm exec eslint` sobre los archivos tocados por H3 y H4 → sin errores.
+- `git merge-base --is-ancestor origin/dev HEAD` → sí; `git merge-tree --write-tree HEAD origin/dev` → limpio.
+
+### Checklist de la vuelta
+
+- [x] **H1** — `specs/QC-288-entrega-sin-pedido/requirements.md` tiene una sola copia: 57 requisitos R1–R57.
+  Las líneas 1–320 son idénticas a las de `f8c5101e` (`diff` vacío). Las líneas `R<n>` coinciden una a una con
+  la versión anterior, deduplicada. La segunda copia, la de 357–630, también es idéntica, línea a línea,
+  a la que queda. Se van el encabezado roto y la segunda «Preguntas abiertas» con P1–P4 abiertas. Las
+  cinco filas (cuatro del 2026-10-16 F2.1 y una del 2026-10-19, «Cliente») pasan de la tabla «Cobertura»
+  a «Decisiones cerradas (no reabrir)», al final, sin cambio de texto. Ningún requisito cambia.
+- [x] **H2** — Las notas fechadas «Enmienda 2026-10-19 (enmienda QC-288, aprobada por el humano en F1.4;
+  design.md §11)» están, cada una bajo su requisito: QC-223 R25, R29 y R31; QC-224 R18 y R32; QC-225
+  R16, R17, R19 y R36. El diff de los tres specs solo añade líneas: ningún texto original cambia. La
+  nota de QC-225 R36 admite «Anular» en el tab Entregas para las entregas sin pedido no anuladas: menú
+  de la fila con un único elemento, solo con `entregas.anular` y fuera del DOM sin él. Para las
+  entregas de pedido mantiene «sin control de anular» y para la marca y el total, `inventario.consultar`.
+  Cuadra con QC-288 R43/R53 y con la decisión F2.1. `tasks.md > Lo que se enmienda` lo registra.
+- [x] **H3** — `finished-product-deliveries-table.tsx` pasa `srOnlyLabel: true` a `actionsColumn`. El test nuevo
+  (`finished-product-tables.test.tsx`, «R43 — la cabecera … solo la ve el lector de pantalla») prueba
+  tres cosas: `columnheader` con nombre «Acciones», que es `data-table-head-actions`, y el texto con
+  `sr-only`. Cumple `design.md §7.5` y el tablero.
+- [x] **H4** — `4be2b22c` integra `origin/dev` (QC-278, `d4822ee2`). En
+  `tests/guards/guard-identificador-de-request.test.ts` quedan las dos altas de `E2E_ESPERADOS`, una
+  sola vez cada una y en este orden: `'entrega-sin-pedido.spec.ts'` y `'maestro-modulos.spec.ts'`. Los
+  dos archivos existen en `e2e/`. No quedan marcadores de conflicto. El lado de QC-288 del merge
+  (`4be2b22c^2..4be2b22c`) solo trae QC-278. La guardia pasa.
+
+### Alcance ampliado: `srOnlyLabel` en `components/shared/data-table`
+
+- [x] **Aditiva.** La prop es opcional en `DataTableColumn` y en `ActionsColumnOptions`. `actionsColumn`
+  solo la copia si es `true`; si falta, la columna sale igual que antes, sin la clave. El test lo
+  comprueba con `col.srOnlyLabel` `undefined`.
+- [x] **Las demás tablas no cambian.** `DataTableHeaderCell` pone `className={undefined}` cuando falta la
+  prop, y React no pinta el atributo. El único consumidor es la tab Entregas (`grep srOnlyLabel` en
+  `app/`, `components/` y `lib/`). Los `data-table-intacta-*` (clientes, configuración, unidades,
+  usuarios), `data-table.test.tsx`, `data-table-header-menu.test.tsx` y `data-table-acciones` /
+  `-tarjetas` pasan sin cambios. Las tarjetas usan `texts.cardActions`, no `column.label`.
+- [x] **CATALOGO.md.** La fila `DataTable` añade `srOnlyLabel` a las props por columna («cabecera solo para
+  lector; ausente = visible») y a `actionsColumn` («`srOnlyLabel` opcional»). La guardia del catálogo pasa.
+- [x] **Tests.** `actions-column.test.tsx` cubre los dos casos en el componente real de la cabecera: por
+  defecto, visible y sin `sr-only`; con la prop, nombre accesible intacto y `sr-only`. A eso se suma el
+  test de pantalla de la tab Entregas.
+
+### Hallazgos de la vuelta 2
+
+- **menor H6 — `srOnlyLabel` no hace nada en una columna ordenable, y nada lo avisa.**
+  `DataTableHeaderCell` solo la aplica en la rama sin orden (`data-table-header-menu.tsx`, el
+  `<span>` de la rama `else`). En una columna con `sortable`, el `<span>` del botón la ignora sin
+  avisar. El tipo (`data-table-types.ts`) y la fila de `CATALOGO.md` la ofrecen «por columna» sin esa
+  salvedad. Hoy no afecta a nadie: el único uso es `actionsColumn`, que nunca es ordenable. Basta con
+  una línea en el JSDoc y en el catálogo («solo en columnas sin orden»), o con aplicarla también al
+  botón. No bloquea.
+
+Sin regresiones en el rango revisado. H5 sigue siendo del leader (rojo E2E de QC-263); no se re-evalúa aquí.
+
+### Veredicto de la vuelta 2
+
+**OK** — 0 bloqueantes, 1 menor (H6). H1, H2, H3 y H4 quedan resueltos.
