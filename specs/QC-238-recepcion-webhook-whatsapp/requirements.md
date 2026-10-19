@@ -61,6 +61,7 @@ Ninguna. P1–P4 cerradas por el humano en F1.4 (ver «Decisiones cerradas»).
 | 2026-10-19 | ¿Spec aprobado? | Sí, por el humano en F1.4. |
 | 2026-10-19 | F2.1, contraste con la doc de Meta (Graph v24+): ¿reacción quitada? | `reaction.emoji` es opcional; ausente o vacío = reacción quitada. Enmienda R19/R20. |
 | 2026-10-19 | F2.1: ¿qué identifica al remitente, `from` o `contacts[].wa_id`? | `contacts[].wa_id` cuando el cuerpo trae un solo contacto; si no, `from`. Es el `wa_id` del contacto (único `(connection_id, wa_id)`) y el que usará QC-239. `from` queda en el `payload`. Enmienda R16 y R29. |
+| 2026-10-19 | F2.1, T3: `guard-firma-sesion-unica` prohíbe `createHmac` fuera de la cookie de sesión, y la firma de Meta (`X-Hub-Signature-256`) lo necesita. | Excepción nombrada en la guardia, solo para `lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac.ts`, con un caso de sensibilidad que demuestra que cualquier otro archivo sigue fallando. La guardia protege la firma de sesión y no prohíbe otras firmas: la de Meta es otro algoritmo con otro dueño. |
 
 ## Requisitos (EARS)
 
@@ -257,4 +258,3 @@ cambiarlas, quedan cerradas como están.
   sobre una conexión en `error` pone `lastWebhookAt` pero la deja en `error` (lo que falló es la
   prueba contra Graph, que el handshake no arregla; la siguiente prueba buena la deja `active` por
   QC-237 D12); el `POST` no cambia nunca el estado, solo `lastWebhookAt`. ¿Vale?
-| 2026-10-19 | F2.1, T3: `guard-firma-sesion-unica` prohíbe `createHmac` fuera de la cookie de sesión, y la firma de Meta (`X-Hub-Signature-256`) lo necesita. | Excepción nombrada en la guardia, solo para `lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac.ts`, con un caso de sensibilidad que demuestra que cualquier otro archivo sigue fallando. La guardia protege la firma de sesión y no prohíbe otras firmas: la de Meta es otro algoritmo con otro dueño. |
