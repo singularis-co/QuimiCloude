@@ -102,3 +102,13 @@ Veredicto: T2 y T3 hechas; typecheck, lint y los 7 archivos de test en verde.
 | R6 | `tests/unit/composition/asignaciones-facade.test.ts`, `tests/unit/identity/roles/acondicionamiento-rol.test.ts` |
 | R7 | `assignment-views.test.ts` (roles sin el permiso no cambian); sin migraciones |
 | R8 | gate: typecheck y guardia de dependencias |
+
+## Rojo heredado de 9a330ab2, arreglado en esta rama (2026-10-19)
+
+- Lo decidió el humano el 2026-10-17: los rojos E2E heredados se arreglan en la rama de la
+  feature, no se pasan al baseline.
+- En `e2e/acondicionamiento.spec.ts`, el paso 2 ahora espera en `order-distribution-full` el volumen
+  de cada línea que añadió `9a330ab2` («2 × …envase1 · 1 l / 3 × …envase2 · 1 l»), con la constante
+  nueva `PRESENTATION_VOLUME`. Solo cambia el test; el código de producto no se toca.
+- `set -a; . ./.env; set +a; pnpm exec playwright test e2e/acondicionamiento.spec.ts` →
+  `6 passed (42.9s)`: R22 y R23 ×2, en chromium y webkit.

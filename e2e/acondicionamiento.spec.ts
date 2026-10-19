@@ -66,6 +66,8 @@ const PACKAGING_2_LOT = `${SHARED_TOKEN}_le2`;
 const PACKAGING_STOCK = '10';
 const PACKAGING_UNIT_COST = '0.5000';
 const PRESENTATION_CONTENT = '1';
+/** El volumen que el reparto pinta tras el envase (9a330ab2): contenido de la presentación + «l» de litro. */
+const PRESENTATION_VOLUME = `${PRESENTATION_CONTENT} l`;
 const LINE_1_PACKAGES = 2;
 const LINE_2_PACKAGES = 3;
 const ORDER_QUANTITY = String(LINE_1_PACKAGES + LINE_2_PACKAGES);
@@ -423,7 +425,7 @@ test.describe('las pestañas del acondicionador (R22)', () => {
     await expect(rowA).toHaveCount(1, { timeout: 60_000 });
     await expect(rowA.getByTestId(ORDER_DISTRIBUTION_FULL_TESTID)).toHaveText(
       exactText(
-        `${LINE_1_PACKAGES} × ${PACKAGING_1_NAME} / ${LINE_2_PACKAGES} × ${PACKAGING_2_NAME}`,
+        `${LINE_1_PACKAGES} × ${PACKAGING_1_NAME} · ${PRESENTATION_VOLUME} / ${LINE_2_PACKAGES} × ${PACKAGING_2_NAME} · ${PRESENTATION_VOLUME}`,
       ),
     );
     await expect(rowA.getByTestId(ROW_STATUS_TESTID)).toHaveAttribute('data-status', 'POR_ACONDICIONAR');
