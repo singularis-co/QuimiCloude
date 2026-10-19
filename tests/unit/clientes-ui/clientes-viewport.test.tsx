@@ -65,7 +65,11 @@ vi.mock('next/navigation', async (importOriginal) => ({
 }));
 
 vi.mock('@/lib/composition', () => ({
-  identity: { getSessionUser: getSessionUserMock },
+  identity: {
+    getSessionUser: getSessionUserMock,
+    getSessionContext: vi.fn(async () => null),
+    getCompanyCountry: vi.fn(async () => null),
+  },
 }));
 
 // Las cinco actions de clientes. Las de escritura FALLAN si se les llama: este archivo mide la

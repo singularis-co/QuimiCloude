@@ -98,7 +98,12 @@ vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () =
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: vi.fn(async () => null) },
-  identity: { getSessionUser: entorno.getSessionUserMock, endSession: vi.fn() },
+  identity: {
+    getSessionUser: entorno.getSessionUserMock,
+    getSessionContext: vi.fn(async () => null),
+    getCompanyCountry: vi.fn(async () => null),
+    endSession: vi.fn(),
+  },
 }));
 
 vi.mock('@/lib/modules/clientes/adapters/driving/customer-actions', () => ({

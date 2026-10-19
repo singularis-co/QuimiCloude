@@ -195,3 +195,120 @@ Los textos con formato se derivan de `formatPhoneNational` (p. ej. `NATIONAL = f
 ### Veredicto
 
 T9 hecho: campo de teléfono con país en alta y edición, errores bajo el campo y `companyCountry` bajando por la ruta; typecheck, lint, tests relacionados y guardias en verde.
+
+## T10 y T11
+
+### Archivos
+
+- **Creados**
+  - `tests/ui/clientes/customer-columns-phone.test.tsx`
+  - `e2e/clientes-telefono.spec.ts`
+- **Modificados (producción)**
+  - `app/(private)/clientes/page.tsx`: tras `requirePagePermission('clientes.consultar')` lee `identity.getSessionContext()` → `identity.getCompanyCountry(companyId)` y pasa `companyCountry` a `CustomerListSection` y al `CustomerTable` del `fallback`.
+  - `app/(private)/clientes/components/customer-columns.tsx`: la celda «Teléfono» usa `describeCustomerPhone` (internacional en mono; aviso con el `phone` antiguo en gris y mono + `StatusBadge tone="waiting"` con la etiqueta corta, `data-testid="customer-phone-issue-<id>"`; sin teléfono, `MissingValue`).
+- **Modificados (tests)**
+  - `tests/unit/clientes-ui/clientes-page.test.tsx`: el doble de `identity` gana `getSessionContext` y `getCompanyCountry`; tres casos nuevos (R2, R3 y el orden corte → lectura).
+  - `tests/unit/clientes-ui/clientes-viewport.test.tsx`, `tests/unit/paridad/clientes-paridad.test.tsx`, `tests/unit/paridad/acciones-por-fila.test.tsx`: el doble de `identity` gana `getSessionContext` y `getCompanyCountry` (devuelven `null`).
+  - `tests/unit/paridad/clientes-paridad.test.tsx` + su instantánea: el cliente del fixture pasa a `phoneCountry: 'CO'`, `phoneE164: '573001234567'`; instantánea regenerada solo para «R1 R16-R18 — con filas» (`-u -t`). La celda queda `+57 300 1234567` (literal de la librería; ver Desviaciones 2).
+  - `tests/unit/clientes-ui/customer-columns.test.tsx` (QC-154): el fixture del teléfono pasa a uno coherente con D1 (`phoneE164`); el caso «sin valor» de `phone` anula también `phoneE164` y `phoneCountry`.
+  - `tests/unit/identity/session-once-per-request-render.test.tsx`: se añade `/clientes` (layout + página + `CustomerListSection`) a las pantallas contadas; la página lee ahora `getSessionContext` y el conteo sigue en 1.
+  - `tests/guards/guard-identificador-de-request.test.ts`: alta de `clientes-telefono.spec.ts` en la lista cerrada de specs E2E (su punto de extensión).
+  - `e2e/clientes.spec.ts`: el alta sin número afirma además `phoneCountry`, `phoneE164` y `phoneIssue` nulos (R10); comentario del fixture actualizado.
+
+### Mapa R → test (T10 y T11)
+
+| R | Test |
+| --- | --- |
+| R2 | `clientes-page.test.tsx` «R2 — la página pide el país de la empresa de la sesión y el alta abre con él», «R2 — sin el permiso de consulta no se lee el país: el corte va antes»; E2E «R2, R11, R29, R12 — empresa con CO: …» |
+| R3 | `clientes-page.test.tsx` «R3 — si la empresa no tiene país, el alta abre sin país»; E2E «R3, R8 — empresa sin país: …» |
+| R8 | E2E «R3, R8 — empresa sin país: …» |
+| R9 | E2E «R9 — un número no válido para Colombia se marca en el campo y no se guarda» |
+| R10 | E2E `clientes.spec.ts` «… lo da de baja (R41; QC-236 R10)» |
+| R11 | E2E «R2, R11, R29, R12 — …» (en la base `CO` y `573001234567`) |
+| R12 | E2E «R2, R11, R29, R12 — …» (segunda alta → `customer-error-phone-number` con `errorMessage('customer_duplicate_phone')`) |
+| R29 | `customer-columns-phone.test.tsx` «R29 — un cliente con phone_e164 muestra el número en formato internacional, en mono», «R29 — un cliente sin teléfono muestra la marca de dato ausente»; E2E «R2, R11, R29, R12 — …» |
+| R30 | `customer-columns-phone.test.tsx` «R30 — invalid_format: … «Sin formato válido» …», «R30 — duplicate: … «Duplicado: revisar» …»; E2E «R30 — los clientes sembrados con phone_issue …» |
+| R33 | E2E «R33 — a 390 px el disparador dice CO +57 y la hoja se titula «País del teléfono»» |
+
+Una sola lectura de sesión por petición: `session-once-per-request-render.test.tsx` «/clientes lee la ficha de sesion exactamente 1 vez» (nuevo) y los demás casos del archivo, en verde.
+
+### Verificación (salida real, 2026-10-19)
+
+- `pnpm run typecheck` → exit 0 (incluye `e2e/`).
+- `pnpm run lint` → `✖ 10 problems (0 errors, 10 warnings)`, los mismos 10 avisos previos.
+- `pnpm exec vitest related --run --project ui --project node <page.tsx, customer-columns.tsx y los 7 tests tocados>` → `Test Files 22 passed (22)`, `Tests 445 passed (445)`. Pasadas previas en rojo, corregidas: la instantánea de paridad (celda nueva) y el fixture de `customer-columns.test.tsx` (teléfono sin `phoneE164`). En una pasada intermedia `session-once-per-request-render.test.tsx` cayó entero en el `beforeAll` (carga bajo la ejecución en paralelo); solo y en la pasada final, verde.
+- `pnpm exec vitest run --project ui tests/unit/identity/session-once-per-request-render.test.tsx` (con `/clientes` añadido) → `Tests 13 passed (13)`.
+- `pnpm exec vitest run guard` → `Test Files 81 passed (81)`, `Tests 1110 passed | 20 skipped (1130)` (antes del alta en la lista, `guard-identificador-de-request` daba 1 rojo por el spec E2E nuevo).
+- `pnpm exec playwright test e2e/clientes-telefono.spec.ts e2e/clientes.spec.ts --list` → `Total: 16 tests in 2 files` (5 + 3 por proyecto, chromium y webkit).
+- **E2E escrito y SIN correr**: no hay base ni `.env` en este entorno. Lo corre CI o un humano con la base migrada y sembrada.
+
+### Desviaciones y puntos abiertos
+
+1. **La lista de clientes no tiene tarjeta en teléfono.** `CustomerTable` no pasa `card` a `DataTable`, así que a ≤ 640 px se ve la misma tabla, no la tarjeta del tablero (`TelefonoCliente.dc.html`, `rm-meta`). `design.md § 8.4` dice que la tarjeta «no necesita código propio» y que, si lo necesita, se para y se dice: lo necesita (un `card` para `CustomerTable`, cambio visual de la lista). No se ha hecho; decide el humano. R29 en la tabla queda cubierto en todos los anchos.
+2. **Formato internacional pendiente de decisión.** `formatPhoneInternational('573001234567')` da `+57 300 1234567`; el spec y el tablero dicen `+57 300 123 4567`. Ni el test de la columna ni el E2E fijan el literal: los dos lo derivan de `formatPhoneInternational`. La instantánea de paridad sí lleva el de la librería y se regenera si cambia.
+3. **`companyCountry` sigue opcional** (por defecto `null`) en los componentes de la ruta: volverlo obligatorio obliga a tocar unos 12 archivos de tests que montan esas piezas sueltas. La página lo pasa siempre.
+4. **Texto «CO +57» y «Colombia» en el E2E de R33** van escritos: son los que pide T11 y los mismos que el test de UI de T9.
+5. **Archivos fuera de «Archivos esperados»:** `tests/guards/guard-identificador-de-request.test.ts` (alta del spec nuevo, obligatoria por la guardia), `tests/unit/identity/session-once-per-request-render.test.tsx`, `tests/unit/clientes-ui/{clientes-page,clientes-viewport,customer-columns}.test.tsx` y `tests/unit/paridad/{clientes-paridad,acciones-por-fila}.test.tsx` (dobles de `identity` y fixtures del teléfono).
+6. El `phone` antiguo del aviso va en mono además de gris, como el tablero.
+
+### Veredicto
+
+T10 hecho y en verde; T11 escrito, compila y se enumera, sin correr por falta de base.
+
+## Cierre · implementer (2026-10-19)
+
+### Mapa consolidado R1–R34 → test
+
+Detalle por caso en las secciones de arriba. «[int]» = integración escrita y sin correr (no hay
+`DATABASE_URL` en el worktree); «[e2e]» = E2E escrito, enumerado por `playwright --list`, sin correr.
+
+| R | Test(s) |
+| --- | --- |
+| R1 | `tests/ui/clientes/customer-phone-field.test.tsx`, `tests/ui/shared/country-select-pinned.test.tsx`, `tests/unit/clientes/customer-actions.test.ts` |
+| R2 | `tests/unit/clientes-ui/clientes-page.test.tsx`, `customer-phone-field.test.tsx`, `tests/integration/identity/company-country-read.int.test.ts` [int], `e2e/clientes-telefono.spec.ts` [e2e] |
+| R3 | `clientes-page.test.tsx`, `customer-phone-field.test.tsx`, `company-country-read.int.test.ts` [int], [e2e] |
+| R4 | `customer-phone-field.test.tsx`, `tests/unit/clientes/customer-phone.test.ts` |
+| R5 | `country-select-pinned.test.tsx`, `customer-phone-field.test.tsx` |
+| R6, R7 | `customer-phone.test.ts`, `customer-phone-field.test.tsx` |
+| R8, R9 | `customer-phone.test.ts`, `customer-input.test.ts`, `customer-service.test.ts`, `customer-actions.test.ts`, `customer-phone-field.test.tsx`, [e2e] |
+| R10 | `customer-service.test.ts`, `customer-phone-field.test.tsx`, `customer-phone-uniqueness.int.test.ts` [int], `e2e/clientes.spec.ts` [e2e] |
+| R11 | `customer-phone.test.ts`, `customer-phone-field.test.tsx`, [e2e] |
+| R12 | `customer-service.test.ts`, `customer-actions.test.ts`, `customer-phone-field.test.tsx`, `customer-phone-uniqueness.int.test.ts` [int], [e2e] |
+| R13 | `customer-phone-uniqueness.int.test.ts` [int] |
+| R14 | `tests/unit/clientes/schema/customers-phone-migration.test.ts`, `customers-phone-migration.int.test.ts` [int], `customer-phone-uniqueness.int.test.ts` [int] |
+| R15, R16 | `customers-phone-migration.test.ts`, `customer-phone.test.ts`, `customer-input.test.ts`, `customers-phone-migration.int.test.ts` [int] |
+| R17 | `customer-service.test.ts` |
+| R18–R22 | `tests/unit/clientes/phone-matches-wa-id.test.ts` |
+| R23 | `customers-phone-migration.test.ts`, `customers-phone-migration.int.test.ts` [int] |
+| R24–R26 | `tests/unit/clientes/legacy-phone-backfill.test.ts`, `customer-phone.test.ts`, `legacy-phone-backfill.int.test.ts` [int], `company-country-read.int.test.ts` [int] (R24, parte identity) |
+| R27 | `legacy-phone-backfill.test.ts`, `legacy-phone-backfill.int.test.ts` [int] |
+| R28 | `tests/unit/scripts/build.test.ts`, `tests/unit/identity/seed/deploy-hook.test.ts`, `tests/guards/guard-despliegue-produccion.test.ts` |
+| R29, R30 | `tests/ui/clientes/customer-columns-phone.test.tsx`, `customer-phone.test.ts`, [e2e] |
+| R31 | `customer-phone-field.test.tsx` |
+| R32 | `customer-service.test.ts`, `customer-phone-field.test.tsx`, `customer-phone-uniqueness.int.test.ts` [int] |
+| R33 | `country-select-pinned.test.tsx`, `customer-phone-field.test.tsx`, [e2e] |
+| R34 | `customer-service.test.ts`, `customer-phone-field.test.tsx`, `customer-phone-uniqueness.int.test.ts` [int] |
+
+### Sin correr
+
+- Integración: `customers-phone-migration`, `customer-phone-uniqueness`, `legacy-phone-backfill`
+  (clientes) y `company-country-read` (identity). Sin `.env` en el worktree.
+- E2E: `e2e/clientes-telefono.spec.ts` y `e2e/clientes.spec.ts` (T11 abierta por eso).
+- `pnpm db:seed:demo` (T7), revisión visual a 1440/820/375 y `./init.sh` (T12): pendientes.
+
+### Decisiones abiertas para el humano
+
+1. **Formato colombiano.** `libphonenumber-js` 1.13.15 da `+57 300 1234567` / `300 1234567`; el
+   spec, R6/R11/R29 y el tablero dicen `300 123 4567`. Se usó la librería sin formato propio;
+   los tests derivan el esperado de `formatPhone*`, salvo la instantánea de
+   `clientes-paridad.test.tsx`, que hay que regenerar si cambia.
+2. **Nombre de la migración:** `20261019130000_customers_phone_e164` (el `120000` del spec choca
+   con `20261019120000_whatsapp_connections_drop_meta_app_id` y rompería `db:rollback`).
+3. **Orden en el build (R28):** el relleno va tras `migrate` y `generate`, no justo tras `migrate`.
+4. **Relleno por empresa activa:** sin `listCompaniesWithPending` ni `FOR UPDATE` (la guardia de
+   ámbito los prohíbe); las empresas dadas de baja no se rellenan.
+5. **Lista en teléfono:** `CustomerTable` no tiene tarjeta; la del tablero necesita código nuevo
+   (§ 8.4 dice parar). R29 queda cubierto en la tabla a cualquier ancho.
+6. **País al editar un cliente sin teléfono:** sale de su `phone_country` (Sin país), no del de la
+   empresa. El spec no lo fija.
+7. `CountrySelect` ganó también la prop opcional `errorId` (T9), con su fila del catálogo.

@@ -175,7 +175,7 @@
       (`design.md § 1`): «…si lo dejas vacío, se conserva.» (R31);
     - guardar un migrado con el número vacío manda `phoneNumber=''` y no pinta ningún error (R34).
 
-- [ ] **T10 · Página y lista** (R2, R29, R30). Depende de: T6, T7, T9.
+- [x] **T10 · Página y lista** (R2, R29, R30). Depende de: T6, T7, T9.
   - **Qué se hace:**
     - `page.tsx` lee el país de la empresa tras el corte por permiso (§ 7);
     - `customer-columns.tsx` con `describeCustomerPhone` y `StatusBadge` (§ 8.4).

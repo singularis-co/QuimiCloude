@@ -38,7 +38,11 @@ vi.mock('next/navigation', async (importOriginal) => ({
 }));
 
 vi.mock('@/lib/composition', () => ({
-  identity: { getSessionUser: getSessionUserMock },
+  identity: {
+    getSessionUser: getSessionUserMock,
+    getSessionContext: vi.fn(async () => null),
+    getCompanyCountry: vi.fn(async () => null),
+  },
 }));
 
 vi.mock('@/lib/modules/clientes/adapters/driving/customer-actions', () => ({
@@ -63,8 +67,8 @@ const CLIENTE: CustomerView = {
   lastNames: 'Lopez',
   city: 'Bogota',
   phone: '3001234567',
-  phoneCountry: null,
-  phoneE164: null,
+  phoneCountry: 'CO',
+  phoneE164: '573001234567',
   phoneIssue: null,
   email: null,
   address: null,

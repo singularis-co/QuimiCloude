@@ -225,6 +225,8 @@ let UserListSection: (typeof import('@/app/(private)/configuracion/usuarios/comp
 let UnidadesPage: (typeof import('@/app/(private)/configuracion/unidades/page'))['default'];
 let UnitListSection: (typeof import('@/app/(private)/configuracion/unidades/components/unit-list-section'))['UnitListSection'];
 let PedidosPage: (typeof import('@/app/(private)/pedidos/page'))['default'];
+let ClientesPage: (typeof import('@/app/(private)/clientes/page'))['default'];
+let CustomerListSection: (typeof import('@/app/(private)/clientes/components/customer-list-section'))['CustomerListSection'];
 let OrderListSection: (typeof import('@/app/(private)/pedidos/components/order-list-section'))['OrderListSection'];
 let AsignacionPage: (typeof import('@/app/(private)/asignacion/page'))['default'];
 let PackingOrdersListSection: (typeof import('@/app/(private)/asignacion/components'))['PackingOrdersListSection'];
@@ -249,6 +251,10 @@ beforeAll(async () => {
     '@/app/(private)/configuracion/unidades/components/unit-list-section'
   ));
   ({ default: PedidosPage } = await import('@/app/(private)/pedidos/page'));
+  ({ default: ClientesPage } = await import('@/app/(private)/clientes/page'));
+  ({ CustomerListSection } = await import(
+    '@/app/(private)/clientes/components/customer-list-section'
+  ));
   ({ OrderListSection } = await import('@/app/(private)/pedidos/components/order-list-section'));
   ({ default: AsignacionPage } = await import('@/app/(private)/asignacion/page'));
   ({
@@ -342,6 +348,16 @@ async function pintarPedidos(): Promise<void> {
   await listWorkGroupsAction({ page: 1, pageSize: 25 });
 }
 
+/**
+ * `/clientes`: layout + pagina (que tambien lee el pais de la empresa de la sesion) + la seccion
+ * de lista.
+ */
+async function pintarClientes(): Promise<void> {
+  await pintarLayout();
+  await ClientesPage({ searchParams: Promise.resolve({}) });
+  await CustomerListSection({ params: PARAMS, canModify: true, companyCountry: null });
+}
+
 /** `/asignacion?vista=por_empacar`: layout + pagina + la seccion de lista que la pagina monta. */
 async function pintarPorEmpacar(): Promise<void> {
   await pintarLayout();
@@ -395,6 +411,7 @@ const PANTALLAS = [
   { ruta: '/configuracion/usuarios', pintar: pintarUsuarios },
   { ruta: '/configuracion/unidades', pintar: pintarUnidades },
   { ruta: '/pedidos', pintar: pintarPedidos },
+  { ruta: '/clientes', pintar: pintarClientes },
   { ruta: '/asignacion?vista=por_empacar', pintar: pintarPorEmpacar },
   { ruta: '/asignacion/empaque/[id]', pintar: pintarPantallaDeEmpaque },
   { ruta: '/asignacion?vista=por_acondicionar', pintar: pintarPorAcondicionar },

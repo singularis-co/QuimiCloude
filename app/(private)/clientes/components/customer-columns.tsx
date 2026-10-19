@@ -3,7 +3,8 @@
 import type { ReactNode } from 'react';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
-import { CUSTOMER_QUERYABLE, type CustomerView } from '@/lib/modules/clientes';
+import { StatusBadge } from '@/components/shared/status-badge';
+import { CUSTOMER_QUERYABLE, describeCustomerPhone, type CustomerView } from '@/lib/modules/clientes';
 import { formatCivilDate } from '@/lib/shared/ui/date-civil';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
@@ -46,6 +47,25 @@ function MissingValue({ field }: { readonly field: string }) {
   );
 }
 
+function PhoneCell({ customer }: { readonly customer: CustomerView }) {
+  const phone = describeCustomerPhone(customer);
+  if (phone.kind === 'international') {
+    return <span className="font-mono">{phone.text}</span>;
+  }
+  if (phone.kind === 'issue') {
+    return (
+      <span
+        data-testid={`customer-phone-issue-${customer.id}`}
+        className="inline-flex flex-wrap items-center gap-2"
+      >
+        <span className="font-mono text-muted-foreground">{phone.legacyPhone}</span>
+        <StatusBadge tone="waiting" label={phone.label} />
+      </span>
+    );
+  }
+  return <MissingValue field={PHONE_COLUMN_ID} />;
+}
+
 function isSortable(id: string): boolean {
   return CUSTOMER_QUERYABLE.sortable.includes(id);
 }
@@ -78,7 +98,7 @@ export function buildCustomerColumns({ rowActions }: CustomerColumnsDeps): reado
       id: PHONE_COLUMN_ID,
       label: 'Teléfono',
       align: 'start',
-      cell: (customer) => customer.phone ?? <MissingValue field={PHONE_COLUMN_ID} />,
+      cell: (customer) => <PhoneCell customer={customer} />,
     },
     {
       id: EMAIL_COLUMN_ID,

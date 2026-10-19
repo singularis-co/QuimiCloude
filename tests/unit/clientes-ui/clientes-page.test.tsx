@@ -21,6 +21,7 @@ import {
   CUSTOMER_ACTION_DELETE_TESTID,
   CUSTOMER_ACTION_EDIT_TESTID,
   CUSTOMER_CREATE_OPEN_TESTID,
+  CUSTOMER_FORM_TESTID,
   CUSTOMER_ROW_ACTIONS_TESTID,
 } from '@/app/(private)/clientes/components';
 import ClientesPage from '@/app/(private)/clientes/page';
@@ -38,9 +39,19 @@ import { openRowActionsMenu } from '../../helpers/row-actions-menu';
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
-const { getSessionUserMock, listCustomersActionMock, notFoundMock, redirectMock, routerMock } = vi.hoisted(
+const {
+  getSessionUserMock,
+  getSessionContextMock,
+  getCompanyCountryMock,
+  listCustomersActionMock,
+  notFoundMock,
+  redirectMock,
+  routerMock,
+} = vi.hoisted(
   () => ({
     getSessionUserMock: vi.fn<() => Promise<unknown>>(),
+    getSessionContextMock: vi.fn<() => Promise<unknown>>(),
+    getCompanyCountryMock: vi.fn<(companyId: string) => Promise<string | null>>(),
     listCustomersActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
     routerMock: {
       push: vi.fn<(href: string) => void>(),
@@ -69,7 +80,11 @@ vi.mock('next/navigation', async (importOriginal) => ({
 }));
 
 vi.mock('@/lib/composition', () => ({
-  identity: { getSessionUser: getSessionUserMock },
+  identity: {
+    getSessionUser: getSessionUserMock,
+    getSessionContext: getSessionContextMock,
+    getCompanyCountry: getCompanyCountryMock,
+  },
 }));
 
 // Las CINCO actions de clientes. Las cuatro de escritura son dobles que FALLAN si se les llama:
@@ -134,6 +149,12 @@ const CLIENTE: CustomerView = {
   updatedBy: null,
 };
 
+const CONTEXTO = {
+  userId: '99999999-9999-4999-8999-999999999999',
+  companyId: '22222222-2222-4222-8222-222222222222',
+  roleName: ROLE_ADMINISTRADOR,
+};
+
 function paginaCon(items: readonly CustomerView[]) {
   return {
     status: 'success',
@@ -188,6 +209,8 @@ beforeEach(() => {
   // HEREDADO (`tests/helpers/viewport.ts`), nunca con una copia local.
   setViewportWidth(WIDE_VIEWPORT);
   getSessionUserMock.mockResolvedValue(sesionCon(CODIGOS_DE_CLIENTES));
+  getSessionContextMock.mockResolvedValue(CONTEXTO);
+  getCompanyCountryMock.mockResolvedValue(null);
   listCustomersActionMock.mockResolvedValue(paginaCon([CLIENTE]));
 });
 
@@ -375,5 +398,40 @@ describe('a nivel de pantalla, con los tres conjuntos de permisos del seed (R6)'
         expect(screen.queryByTestId(testid), testid).toBeNull();
       }
     }
+  });
+});
+
+describe('el país de la empresa baja de la página al alta (QC-236)', () => {
+  const paisDelAlta = () =>
+    screen
+      .getByTestId(CUSTOMER_FORM_TESTID)
+      .querySelector<HTMLInputElement>('input[type="hidden"][name="phoneCountry"]');
+
+  it('R2 — la página pide el país de la empresa de la sesión y el alta abre con él', async () => {
+    getCompanyCountryMock.mockResolvedValue('CO');
+
+    await renderPantalla();
+    await setupUser().click(screen.getByTestId(CUSTOMER_CREATE_OPEN_TESTID));
+    await screen.findByTestId(CUSTOMER_FORM_TESTID);
+
+    expect(getCompanyCountryMock).toHaveBeenCalledWith(CONTEXTO.companyId);
+    expect(paisDelAlta()).toHaveValue('CO');
+  });
+
+  it('R3 — si la empresa no tiene país, el alta abre sin país', async () => {
+    await renderPantalla();
+    await setupUser().click(screen.getByTestId(CUSTOMER_CREATE_OPEN_TESTID));
+    await screen.findByTestId(CUSTOMER_FORM_TESTID);
+
+    expect(paisDelAlta()).toHaveValue('');
+  });
+
+  it('R2 — sin el permiso de consulta no se lee el país: el corte va antes', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon([PERMISO_DE_ESCRITURA]));
+
+    await expect(arbolDeLaPantalla()).rejects.toThrow();
+
+    expect(getSessionContextMock).not.toHaveBeenCalled();
+    expect(getCompanyCountryMock).not.toHaveBeenCalled();
   });
 });
