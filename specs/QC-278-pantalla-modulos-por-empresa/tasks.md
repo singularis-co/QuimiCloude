@@ -48,7 +48,7 @@
   - **Hecho:** todos los casos R5–R18 y R20–R24 del mapa pasan, incluido el estático de R22 (no
     importa `effectiveAddons` ni `ADDON_REQUIRES`).
 
-- [ ] **T5 — `ModulesSection`, `CompanyModulesTab` y barrel** (R1–R4, R20) · depende de T2, T3, T4
+- [x] **T5 — `ModulesSection`, `CompanyModulesTab` y barrel** (R1–R4, R20) · depende de T2, T3, T4
   - `modules-section.tsx` (Server async): una llamada a `getCompanyAddonsAction`; error →
     `ErrorState` «No pudimos cargar los módulos» con `testId="company-modules-error"`,
     `retry={{ kind: 'refresh' }}` y `retryTestId="company-modules-retry"`; éxito →
