@@ -523,3 +523,14 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   cubre con su borde inferior unos 6 px de la parte de arriba de «Cancelar» y «Guardar». Pieza de
   QC-235; QC-166 no la tocó.
 - **Dueño:** sin asignar.
+
+## QC-288 (review, 2026-10-19)
+
+### D66 — E2E rojo en `detalle-de-producto-terminado.spec.ts:548` heredado de QC-263
+- **Origen:** review de QC-288, hallazgo H5. Lo causa `c09844b7` (QC-263): la tabla de producto terminado pasa `card=` al DataTable, que pinta a la vez las filas y las tarjetas, y el locator `finished-stock-name` encuentra 2 elementos.
+- **Qué falta:** acotar el locator a la tabla, o no montar las tarjetas en escritorio. El spec y los componentes son idénticos en `origin/dev`; QC-288 ni lo causa ni lo empeora.
+- **Dueño:** sin ficha. Bloquea el PR a producción, que corre E2E; no bloquea el PR a `dev`.
+
+### D67 — `srOnlyLabel` se ignora en columnas ordenables
+- **Origen:** review de QC-288, vuelta 2, hallazgo H6 (menor). En `components/shared/data-table/data-table-header-menu.tsx`, `srOnlyLabel` solo se aplica a columnas no ordenables.
+- **Qué falta:** documentarlo en el tipo y en `CATALOGO.md`, o aplicarlo también al botón de ordenar. Hoy no afecta a nada: `actionsColumn` nunca es ordenable.
