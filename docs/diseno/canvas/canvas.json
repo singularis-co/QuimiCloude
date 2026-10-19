@@ -1214,6 +1214,15 @@
       "title": "ProductoTerminadoEvidenciaMovil (QC-271)",
       "page": "inventario",
       "is_interactive": true
+    },
+    "TelefonoCliente.dc.html": {
+      "h": 2140,
+      "is_interactive": true,
+      "page": "proveedores",
+      "title": "Teléfono del cliente (QC-236)",
+      "w": 1440,
+      "x": 0,
+      "y": 10190
     }
   },
   "createdOnFiles": {
@@ -1877,6 +1886,7 @@
     "FormulaEvidenciaTablet.dc.html",
     "FormulaEvidenciaMovil.dc.html",
     "CountrySelect.dc.html",
+    "TelefonoCliente.dc.html",
     "ProductoTerminado.dc.html",
     "ProductoTerminadoTablet.dc.html",
     "ProductoTerminadoMovil.dc.html",
