@@ -308,7 +308,7 @@ están en verde y hay commit.
 
 ---
 
-## [ ] TZ — Cierre (depende de TI)
+## [x] TZ — Cierre (depende de TI)
 
 - `./init.sh` en verde.
 - Mapa `R<n> → test` completo en `progress/impl_QC-288.md` (R1–R57). Ningún requisito sin test.

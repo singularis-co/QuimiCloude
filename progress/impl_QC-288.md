@@ -1,17 +1,257 @@
 # QC-288 — entrega-sin-pedido · bitácora de implementación
 
-## Estado (implementer, 2026-10-16)
+## Estado (implementer, 2026-10-19)
 
-- **Hechas y subidas:** T0, B1–B5, F1, F2, F5. Commits `c5277de2` … `89a4d9bf`.
-- **Bloqueadas por decisión de diseño/contrato** (detalle y opciones en
-  `progress/features/QC-288.md > Preguntas abiertas`):
-  - **F3:** hecha (2026-10-16), tras la decisión (a): contrato enmendado y botón por su ruta directa.
-    Ver «Cierre» en la sección F3.
-  - **F4:** hecha (2026-10-16), tras la decisión (a): «Anular» en el menú de acciones de la fila y,
-    en teléfono, la tabla con scroll horizontal. Ver la sección F4.
-- **Pendientes porque dependen de lo anterior:** TC, TI (E2E) y TZ. TC ya tiene identificados sus
-  rojos de censo: `order-delivery-append-only` R32/R33 y `module-contract`/`scope` R57.
-- **Mapa R<n> → test:** parcial, en las secciones de cada tanda. El mapa completo (R1–R57) llega en TZ.
+- **Hechas y subidas, T0–TI** (`git log --oneline origin/dev..HEAD`):
+  - T0 contrato: `c5277de2` (marca `2eedd7d5`).
+  - F1 bloques de entrega a `components/shared`: `03acde62`.
+  - F5 historial y tabs de movimientos: `a72e407a`.
+  - F2 sheet y borrador: `2aa0a133`.
+  - B1 migraciones: `33549f7b`. B2 adaptadores de pedidos: `4bba97f1`. B3 salida/devolución de
+    inventario: `1d9fb746`. B4 casos de uso: `85196262`. B5 actions y composición: `89a4d9bf`.
+  - F3 entradas: `62f1214e` (listado y hueco de la ficha) y `72db4457` (entrada en la ficha).
+  - F4 tab Entregas y anular: `340f64e7`.
+  - TC barrido de censos y guardias: `f58206c3`.
+  - TI E2E: `169be815`.
+  - Bitácora: `6cb244d4`, `d12932ff`.
+- **Decisiones humanas F3/F4:** cerradas en `requirements.md > Decisiones cerradas`, commit `68be26f5`
+  (F3 opción (a), contrato enmendado; F4 opción (a), «Anular» en el menú de la fila; sin tarjetas en
+  teléfono).
+- **Merge `593450fc` de `origin/dev` (QC-263, QC-166):** decisión humana (a), «Cliente» como novena
+  columna del historial del lote (enmienda QC-263 R21/R23).
+- **Pendiente:**
+  - TZ del leader: `./init.sh` lo corre el leader (`AGENTS.md > Quién corre qué`).
+  - Rojo E2E conocido, para que el leader lo clasifique: `e2e/detalle-de-producto-terminado.spec.ts`
+    «R31, R27, R26: tras una entrega parcial…» (l. 548): `finished-stock-name` resuelve a 2 elementos
+    por la tabla + tarjeta de QC-263. El código es idéntico al de `origin/dev`; no es de QC-288.
+  - Revisión (reviewer).
+- **Mapa R<n> → test:** completo, R1–R57, en «Mapa R<n> → test (consolidado)» abajo.
+
+## Mapa R<n> → test (consolidado)
+
+Salida de grep sobre los casos (`it`/`test`/`describe`/`it.each`) añadidos por la rama
+(`git diff origin/dev...HEAD -- tests e2e`). Un caso concreto por requisito (se prefiere `it`/`test` a `describe`); la columna «n» es cuántos casos
+añadidos llevan ese R en el nombre. R1 y R57 se cubren con tests que la rama no toca (ver notas).
+
+| R | n | archivo | caso |
+|---|---|---|---|
+| R1 | — | `tests/unit/identity/permissions.test.ts` | R1: ningun otro rol recibe entregas.modificar / …entregas.anular (sin cambios en la rama; diff de permisos … |
+| R2 | 6 | `tests/unit/pedidos/deliver-direct.test.ts` | R2: sin entregas.modificar responde unauthorized antes de validar, y ningun puerto se llama |
+| R3 | 4 | `tests/unit/pedidos/get-direct-delivery-for-void.test.ts` | R3: sin entregas.anular responde unauthorized antes de validar el id y sin leer nada |
+| R4 | 12 | `tests/unit/pedidos/deliver-direct.test.ts` | R4: un actor con entregas.modificar y un rol distinto de Administrador es aceptado |
+| R5 | 7 | `tests/unit/inventario-ui/finished-product-header.test.tsx` | R5: con `actions`, la cabecera las pinta en el hueco de acciones de PageHeader |
+| R6 | 6 | `tests/unit/inventario-ui/finished-stock-list-section.test.tsx` | R6: si la lectura del excedente falla, la tabla recibe el mapa vacio |
+| R7 | 3 | `tests/unit/inventario-ui/direct-delivery-button.test.tsx` | R7: pulsar «Entregar» abre el sheet «Entregar sin pedido» de ese producto |
+| R8 | 11 | `tests/unit/inventario-ui/finished-stock-list-section.test.tsx` | R8: pide el excedente de los productos distintos de la pagina en una sola llamada y lo pasa a la tabla |
+| R9 | 15 | `tests/integration/inventario/deliverable-batches.int.test.ts` | R9: un lote sin contenido de envase no suma envases ni sale como entregable; los lotes van por fecha y lote |
+| R10 | 5 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R10: muestra la tarjeta «Excedente» con lo de la vista |
+| R11 | 2 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R11: el contador suma lo escrito en todos los bloques |
+| R12 | 3 | `tests/unit/inventario-ui/direct-delivery-draft.test.ts` | R12: un borrador nuevo tiene un solo bloque vacio, la nota vacia y la clave de entrega dada |
+| R13 | 1 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R13: cada bloque lista los lotes entregables con su codigo, sus disponibles y un campo, sin fechas |
+| R14 | 5 | `tests/unit/inventario-ui/direct-delivery-draft.test.ts` | R14: añadir pone al final un bloque vacio con una clave nueva |
+| R15 | 1 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R15: el buscador de cliente de cada bloque pide los clientes con purpose="deliver" |
+| R16 | 3 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R16: los disponibles de un lote restan lo escrito en todos los bloques, igual en todos |
+| R17 | 1 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R17: si lo escrito en un lote supera sus disponibles, marca «Solo hay N» en todos los bloques, avisa y desh… |
+| R18 | 1 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R18: si los escritos superan el excedente, avisa con el excedente y deshabilita «Entregar» |
+| R19 | 3 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R19: un bloque sin cliente muestra «Elige el cliente.» bajo su campo y no envia |
+| R20 | 2 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R20: una nota de mas de 500 caracteres sin los espacios de los extremos avisa y no envia |
+| R21 | 2 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R21: con excedente cero muestra «No hay envases libres…» con el stock, sin bloques ni nota y «Entregar» des… |
+| R22 | 2 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R22: envia una sola entrega con la clave del borrador, el producto, cada bloque con sus envases > 0 por lot… |
+| R23 | 30 | `tests/unit/pedidos/direct-delivery.test.ts` | R23: lo que falta es lo pedido menos lo entregado |
+| R24 | 1 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R24: tras %s borra el borrador, cierra, avisa y refresca |
+| R25 | 3 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R25: tras %s sigue abierto, muestra el mensaje, relee y conserva el borrador |
+| R26 | 2 | `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx` | R26: tras %s muestra el mensaje y sigue abierto con los bloques y la nota |
+| R27 | 11 | `tests/unit/inventario-ui/direct-delivery-draft.test.ts` | R27: la clave es propia del producto |
+| R28 | 6 | `tests/unit/inventario-ui/direct-delivery-draft.test.ts` | R28: quita de todos los bloques los envases de los lotes que ya no se ofrecen y lo avisa |
+| R29 | 7 | `tests/unit/pedidos/deliver-direct.test.ts` | R29: ${caso} responde invalid_input sin leer ni escribir nada |
+| R30 | 8 | `tests/integration/pedidos/direct-delivery.int.test.ts` | R30: producto inexistente, dado de baja, que no es terminado o de otra empresa: product_not_found |
+| R31 | 5 | `tests/integration/pedidos/direct-delivery.int.test.ts` | R31: un cliente inexistente, dado de baja o de otra empresa: customer_not_found |
+| R32 | 10 | `tests/integration/inventario/finished-goods-dispatch.int.test.ts` | R32: el producto de la empresa B pedido con el ambito de A no se bloquea; un producto dado de baja tampoco |
+| R33 | 8 | `tests/integration/pedidos/direct-delivery.int.test.ts` | R33: 20 en stock y 8 que esperan: 13 envases son delivery_exceeds_surplus sin escribir nada y 12 pasan |
+| R34 | 6 | `tests/integration/inventario/finished-goods-dispatch.int.test.ts` | R34: si la suma de los clientes para un lote supera sus envases, insufficient con los disponibles y nada es… |
+| R35 | 7 | `tests/integration/pedidos/direct-delivery-concurrency.int.test.ts` | R35: dos entregas sin pedido a la vez que juntas superan el excedente (7 + 7 con 12): una aplicada y la otr… |
+| R36 | 9 | `tests/integration/pedidos/direct-delivery-repository.int.test.ts` | R36, R37: create guarda la entrega sin pedido con su empresa, producto, nota, clave, autor e instante |
+| R37 | 9 | `tests/integration/inventario/finished-goods-dispatch.int.test.ts` | R37: con un lote repetido entre clientes, un decremento y un asiento direct_delivery por lote con la suma, … |
+| R38 | 18 | `tests/integration/pedidos/direct-delivery-repository.int.test.ts` | R38: la misma clave en la misma empresa da duplicate_key y no deja una segunda fila |
+| R39 | 6 | `tests/integration/pedidos/direct-delivery.int.test.ts` | R39: si falla la escritura de las lineas, despues de la salida de todos los lotes, no queda ni entrega, ni … |
+| R40 | 13 | `tests/integration/pedidos/direct-delivery-constraints.int.test.ts` | R40: control positivo: una entrega sin pedido con su linea, su asiento, su anulacion y su devolucion se acepta |
+| R41 | 8 | `tests/integration/pedidos/direct-delivery-constraints.int.test.ts` | R41: las cuatro tablas siguen con RLS activada y forzada y sin updated_at ni deleted_at |
+| R42 | 10 | `tests/integration/pedidos/direct-deliveries-migration.int.test.ts` | R42: existe exactamente una carpeta de cada migracion y la del tipo va antes |
+| R43 | 6 | `tests/unit/inventario-ui/finished-product-tables.test.tsx` | R43 — con el permiso, el menú de acciones solo en las filas sin pedido no anuladas, con su aria-label |
+| R44 | 11 | `tests/integration/pedidos/direct-delivery-void.int.test.ts` | R44: fecha, presentacion y los clientes con su parte sin anular; tras anular a Ana solo queda Bruno |
+| R45 | 5 | `tests/unit/inventario-ui/direct-delivery-void-dialog.test.tsx` | R45 — sin ningún cliente marcado avisa «No hay nada que anular» y no envía |
+| R46 | 6 | `tests/unit/inventario-ui/direct-delivery-void-dialog.test.tsx` | R46 — envía la entrega, la clave, el motivo y solo los clientes marcados |
+| R47 | 6 | `tests/integration/pedidos/direct-delivery-void.int.test.ts` | R47: un cliente sin lineas en esa entrega, y una entrada mal formada, responden invalid_input |
+| R48 | 13 | `tests/integration/pedidos/direct-delivery-void.int.test.ts` | R48: una entrega inexistente, de otra empresa o de pedido responde delivery_not_found; la anulacion de pedi… |
+| R49 | 5 | `tests/integration/pedidos/direct-delivery-void.int.test.ts` | R49: anulada Ana, pedir Ana y Bruno responde delivery_already_voided y Bruno sigue sin anular |
+| R50 | 13 | `tests/integration/inventario/finished-goods-return.int.test.ts` | R50: un asiento direct_delivery_void por lote con la suma en positivo, la anulacion, el autor, sin pedido n… |
+| R51 | 16 | `tests/integration/pedidos/direct-delivery-void-concurrency.int.test.ts` | R51: dos anulaciones a la vez que comparten a Ana: una aplicada y la otra delivery_already_voided, y el lot… |
+| R52 | 8 | `tests/integration/pedidos/order-delivery-directory.int.test.ts` | R52: las lineas sin pedido salen mezcladas con las de pedido, en el mismo orden, con orderId nulo y su nota |
+| R53 | 4 | `tests/integration/pedidos/order-delivery-directory.int.test.ts` | R53: el total entregado suma las lineas no anuladas de las entregas sin pedido |
+| R54 | 14 | `tests/integration/pedidos/order-delivery-directory.int.test.ts` | R54: por asiento, los clientes de la entrega o de la anulacion en ese lote, ordenados y sin repetir |
+| R55 | 1 | `tests/unit/inventario-ui/finished-product-tables.test.tsx` | R55 — Salidas muestra «Entrega sin pedido» y Entradas «Anulación de entrega sin pedido», sin número de pedido |
+| R56 | 2 | `e2e/entrega-sin-pedido.spec.ts` | R56: entrega sin pedido a dos clientes que comparten un lote con nota, tope del excedente, tab Entregas con… |
+| R57 | — | `tests/guards/guard-dependencias-aprobadas.test.ts` | toda dependencia de package.json tiene su fila en el registro (guardia sin R en el nombre) + diff de packag… |
+
+Notas:
+- **R1** es un «NO DEBE»: lo fija `permissions.test.ts` (y `tests/guards/guard-permisos-sembrados.test.ts`), verdes sin editarse; el diff de la rama no toca `lib/modules/identity/domain/permissions.ts` ni seeds de permisos.
+- **R57**: `git diff origin/dev...HEAD -- package.json pnpm-lock.yaml` vacío (2026-10-19) y
+  `pnpm exec vitest run tests/guards/guard-dependencias-aprobadas.test.ts` → `Test Files 1 passed (1)`, `Tests 2 passed (2)`.
+  Los casos «(R57)» de `tests/unit/pedidos/scope.test.ts` son el R57 de QC-35 (alcance del módulo), no este.
+
+## Archivos tocados (consolidado)
+
+`git diff --name-status origin/dev...HEAD` (2026-10-19), 144 archivos.
+
+### Producción (70)
+- M `app/(private)/inventario/components/batch-history.tsx`
+- A `app/(private)/inventario/components/direct-delivery-button.tsx`
+- A `app/(private)/inventario/components/direct-delivery-draft.ts`
+- A `app/(private)/inventario/components/direct-delivery-sheet.tsx`
+- A `app/(private)/inventario/components/direct-delivery-surplus-card.tsx`
+- M `app/(private)/inventario/components/finished-stock-list-section.tsx`
+- M `app/(private)/inventario/components/finished-stock-table.tsx`
+- M `app/(private)/inventario/components/index.ts`
+- M `app/(private)/inventario/components/product-row-actions.tsx`
+- M `app/(private)/inventario/components/product-row-dialogs.tsx`
+- A `app/(private)/inventario/components/use-direct-delivery-draft.ts`
+- A `app/(private)/inventario/producto-terminado/[id]/components/direct-delivery-void-dialog.tsx`
+- M `app/(private)/inventario/producto-terminado/[id]/components/finished-product-deliveries-table.tsx`
+- M `app/(private)/inventario/producto-terminado/[id]/components/finished-product-header.tsx`
+- M `app/(private)/inventario/producto-terminado/[id]/components/finished-product-list-section.tsx`
+- M `app/(private)/inventario/producto-terminado/[id]/components/finished-product-movements-table.tsx`
+- M `app/(private)/inventario/producto-terminado/[id]/components/index.ts`
+- M `app/(private)/inventario/producto-terminado/[id]/page.tsx`
+- M `app/(private)/pedidos/components/index.ts`
+- M `app/(private)/pedidos/components/order-columns.tsx`
+- M `app/(private)/pedidos/components/order-customer-dialog.tsx`
+- M `app/(private)/pedidos/components/order-customer-filter.tsx`
+- M `app/(private)/pedidos/components/order-delivery-sheet.tsx`
+- M `app/(private)/pedidos/components/order-form.tsx`
+- M `app/(private)/pedidos/components/order-list-section.tsx`
+- M `app/(private)/pedidos/components/order-responsibles-sheet.tsx`
+- M `app/(private)/pedidos/components/order-table.tsx`
+- R `components/shared/order-customer-label.ts`
+- R `components/shared/order-customer-picker.tsx`
+- R `components/shared/order-delivery-customer-block.tsx`
+- A `db/migrations/20261016130000_inventory_movement_kind_direct_delivery/down.sql`
+- A `db/migrations/20261016130000_inventory_movement_kind_direct_delivery/migration.sql`
+- A `db/migrations/20261016130100_direct_deliveries/down.sql`
+- A `db/migrations/20261016130100_direct_deliveries/migration.sql`
+- M `db/schema.prisma`
+- M `lib/composition/index.ts`
+- M `lib/modules/errores/domain/error-catalog.ts`
+- M `lib/modules/errores/domain/error-codes.ts`
+- M `lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma.ts`
+- M `lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma.ts`
+- M `lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma.ts`
+- M `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
+- M `lib/modules/inventario/domain/finished-goods-dispatch.ts`
+- M `lib/modules/inventario/domain/finished-goods-return.ts`
+- M `lib/modules/inventario/domain/finished-product-detail.ts`
+- M `lib/modules/inventario/domain/inventory-movement.ts`
+- M `lib/modules/inventario/domain/list-batch-movements.ts`
+- M `lib/modules/inventario/domain/list-finished-product-deliveries.ts`
+- M `lib/modules/inventario/domain/reservation.ts`
+- M `lib/modules/inventario/index.ts`
+- M `lib/modules/inventario/ports/product-repository.ts`
+- A `lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma.ts`
+- M `lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma.ts`
+- M `lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma.ts`
+- M `lib/modules/pedidos/adapters/driven/persistence/order-delivery-void-prisma.ts`
+- M `lib/modules/pedidos/adapters/driving/order-actions.ts`
+- A `lib/modules/pedidos/domain/deliver-direct.ts`
+- M `lib/modules/pedidos/domain/deliver-order.ts`
+- A `lib/modules/pedidos/domain/direct-delivery.ts`
+- M `lib/modules/pedidos/domain/errors.ts`
+- A `lib/modules/pedidos/domain/get-direct-delivery-for-void.ts`
+- A `lib/modules/pedidos/domain/get-direct-delivery.ts`
+- A `lib/modules/pedidos/domain/list-direct-delivery-surplus.ts`
+- M `lib/modules/pedidos/domain/void-delivery.ts`
+- A `lib/modules/pedidos/domain/void-direct-delivery.ts`
+- M `lib/modules/pedidos/index.ts`
+- A `lib/modules/pedidos/ports/direct-delivery-repository.ts`
+- A `lib/modules/pedidos/ports/direct-delivery-unit-of-work.ts`
+- M `lib/modules/pedidos/ports/order-delivery-repository.ts`
+- M `lib/modules/pedidos/ports/order-delivery-void-repository.ts`
+
+### Tests (62)
+- A `e2e/entrega-sin-pedido.spec.ts`
+- M `tests/fixtures/adjust-batch-stock.ts`
+- A `tests/fixtures/direct-delivery.ts`
+- M `tests/fixtures/finished-product-detail.ts`
+- M `tests/guards/guard-buscadores.test.ts`
+- M `tests/guards/guard-identificador-de-request.test.ts`
+- M `tests/guards/guard-piezas-base.test.ts`
+- A `tests/helpers/direct-delivery-seed.ts`
+- M `tests/integration/aislamiento.json`
+- M `tests/integration/inventario/deliverable-batches.int.test.ts`
+- M `tests/integration/inventario/finished-goods-dispatch.int.test.ts`
+- M `tests/integration/inventario/finished-goods-return.int.test.ts`
+- M `tests/integration/inventario/finished-product-detail.int.test.ts`
+- M `tests/integration/inventario/ledger-cuadre.int.test.ts`
+- A `tests/integration/pedidos/direct-deliveries-migration.int.test.ts`
+- A `tests/integration/pedidos/direct-delivery-concurrency.int.test.ts`
+- A `tests/integration/pedidos/direct-delivery-constraints.int.test.ts`
+- A `tests/integration/pedidos/direct-delivery-repository.int.test.ts`
+- A `tests/integration/pedidos/direct-delivery-void-concurrency.int.test.ts`
+- A `tests/integration/pedidos/direct-delivery-void.int.test.ts`
+- A `tests/integration/pedidos/direct-delivery.int.test.ts`
+- M `tests/integration/pedidos/order-delivery-directory.int.test.ts`
+- M `tests/integration/pedidos/order-delivery-void-repository.int.test.ts`
+- M `tests/unit/errores/catalogo.test.ts`
+- M `tests/unit/identity/session-once-per-request-actions.test.ts`
+- A `tests/unit/inventario-ui/direct-delivery-button.test.tsx`
+- A `tests/unit/inventario-ui/direct-delivery-draft.test.ts`
+- A `tests/unit/inventario-ui/direct-delivery-sheet.test.tsx`
+- A `tests/unit/inventario-ui/direct-delivery-surplus-card.test.tsx`
+- A `tests/unit/inventario-ui/direct-delivery-void-dialog.test.tsx`
+- A `tests/unit/inventario-ui/finished-product-header.test.tsx`
+- M `tests/unit/inventario-ui/finished-product-page.test.tsx`
+- M `tests/unit/inventario-ui/finished-product-tables.test.tsx`
+- A `tests/unit/inventario-ui/finished-stock-list-section.test.tsx`
+- M `tests/unit/inventario/adjust-batch-stock.test.ts`
+- M `tests/unit/inventario/authorization.test.ts`
+- M `tests/unit/inventario/batch-history.test.tsx`
+- M `tests/unit/inventario/batch-movement-prisma.test.ts`
+- M `tests/unit/inventario/finished-goods-dispatch-prisma.test.ts`
+- M `tests/unit/inventario/finished-goods-return-prisma.test.ts`
+- M `tests/unit/inventario/finished-stock-table.test.tsx`
+- A `tests/unit/inventario/list-batch-movements.test.ts`
+- M `tests/unit/inventario/list-finished-product-deliveries.test.ts`
+- M `tests/unit/inventario/product-page.test.tsx`
+- M `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts`
+- M `tests/unit/inventario/schema/finished-product-enum-values-migration.test.ts`
+- M `tests/unit/inventario/schema/inventario-schema.test.ts`
+- M `tests/unit/paridad/inventario-paridad.test.tsx`
+- A `tests/unit/pedidos/deliver-direct.test.ts`
+- M `tests/unit/pedidos/deliver-order.test.ts`
+- A `tests/unit/pedidos/direct-delivery.test.ts`
+- A `tests/unit/pedidos/get-direct-delivery-for-void.test.ts`
+- A `tests/unit/pedidos/get-direct-delivery.test.ts`
+- A `tests/unit/pedidos/list-direct-delivery-surplus.test.ts`
+- M `tests/unit/pedidos/module-contract.test.ts`
+- M `tests/unit/pedidos/order-actions.test.ts`
+- M `tests/unit/pedidos/order-delivery-append-only.test.ts`
+- A `tests/unit/pedidos/schema/direct-deliveries-migration.test.ts`
+- M `tests/unit/pedidos/schema/pedidos-schema.test.ts`
+- M `tests/unit/pedidos/scope.test.ts`
+- M `tests/unit/pedidos/void-delivery.test.ts`
+- A `tests/unit/pedidos/void-direct-delivery.test.ts`
+
+### Specs y docs (12)
+- M `components/shared/CATALOGO.md`
+- A `docs/diseno/canvas/EntregaSinPedido.dc.html`
+- A `docs/diseno/canvas/EntregaSinPedidoMovil.dc.html`
+- A `docs/diseno/canvas/EntregaSinPedidoTablet.dc.html`
+- M `docs/diseno/canvas/canvas.json`
+- A `progress/features/QC-288.md`
+- A `progress/impl_QC-288.md`
+- M `specs/QC-225-detalle-de-producto-terminado/requirements.md`
+- M `specs/QC-263-rediseno-inventario/requirements.md`
+- A `specs/QC-288-entrega-sin-pedido/design.md`
+- A `specs/QC-288-entrega-sin-pedido/requirements.md`
+- A `specs/QC-288-entrega-sin-pedido/tasks.md`
 
 ## T0 — Verificaciones previas y contrato (2026-10-16)
 
