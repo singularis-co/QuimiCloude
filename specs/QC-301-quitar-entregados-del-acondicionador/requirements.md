@@ -21,6 +21,7 @@ Fuera de alcance:
 | D2 | Los `ENTREGADO` desaparecen de las vistas del acondicionador. La consulta que alimenta la pestaña (`listDeliveredConditionedOrders`: caso de uso, puerto y adaptador) se borra si nada más la usa; se verifica con grep. | R1, R2, R5, R6 |
 | D3 | `?vista=acondicionados_entregados` cae a la vista por defecto del rol, como cualquier vista que el rol no tiene. | R3 |
 | D4 | Nada cambia para otros roles ni permisos. | R1, R7 |
+| 2026-10-19 | ¿Spec aprobado? | Sí, por el humano en F1.4, incluidas las notas de enmienda en QC-219 R20 y R21. |
 
 ## Requisitos (EARS)
 
