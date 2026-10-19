@@ -9,10 +9,8 @@
 > tocar `private-nav.ts`, `AppSidebar` ni `firstVisibleNavHref` (QC-75). El panel trae el historial
 > por lotes de 10 con cursor y carga al hacer scroll.
 >
-> **Antes de T1:** necesitan respuesta del humano las preguntas abiertas 4 (textos y umbral), 5
-> (añadido prendido en las empresas existentes), 6 (dependencia de Integraciones), 7 (un aviso por
-> tanda), 9 (`supplier_id`), 10 (margen inferior en el teléfono) y 11 (librería del observador).
-> Las tareas afectadas lo dicen.
+> **Respuestas del humano del 2026-10-19:** las preguntas 4 a 11 están cerradas (filas del
+> 2026-10-19 en `requirements.md > Decisiones cerradas`). No queda ninguna que bloquee T1.
 
 ## Bloque A — Datos y permisos
 
@@ -27,15 +25,22 @@
     - R12: rechaza un aviso sin destinatario y uno con los dos;
     - R3: rechaza un `dedupe_key` repetido en la misma empresa y lo admite en otra;
     - R14: rechaza una lectura con empresa distinta a la del aviso;
+    - R47: rechaza un `body` con `{hora}` sin `body_time` y al revés;
     - la cascada de borrado de las lecturas.
-- [ ] **T2. Permiso y añadido** (design §7, §3.2.2). Depende de T1. **Pregunta 5 y 6.**
+- [ ] **T2. Permiso y añadido** (design §7, §3.2.2).
+  Depende de T1.
   - `permissions.ts`: `notificaciones.consultar` y los cuatro roles de empresa en
     `SEED_ROLE_PERMISSIONS`.
-  - `company-addons.ts`: `notificaciones` en `ADDONS`, `ADDON_PERMISSIONS` y `ADDON_REQUIRES`.
-  - Migración de datos `<ts>_notifications_addon` con su `down.sql`.
+  - `company-addons.ts`: `notificaciones` en `ADDONS`, `ADDON_PERMISSIONS` y
+    `ADDON_REQUIRES.notificaciones = []`.
+  - Migración de datos `<ts>_notifications_addon` con su `down.sql`, que prende el añadido en cada
+    empresa existente, como la de QC-277.
   - Actualizar los tests de QC-277 que cuentan cinco añadidos.
   - **Hecho:** tests de R18 (permiso efectivo = rol ∩ añadido), R20 (una empresa nueva no lo
-    tiene) y R21 (cuatro roles sí, Maestro no). Además, verdes:
+    tiene), R21 (cuatro roles sí, Maestro no) y R53 (prender y apagar notificaciones con
+    «Integraciones» apagada no exige ni cambia nada más). El test de integración de la migración
+    cubre R52: tras aplicarla, todas las empresas existentes tienen el añadido prendido, y una
+    empresa creada después no. Además, verdes:
     - el test de integración que compara la migración con las constantes;
     - `guard-catalogo` de añadidos.
 - [ ] **T3. `identity.isUserInCompany`** `[P]` (design §7). Depende de T1.
@@ -99,8 +104,8 @@
     - `tests/unit/notificaciones/notification-actions.test.ts` cubre R40 (sin sesión, código
       `unauthorized`; sin permiso, `forbidden`), R14 (id que no es uuid: rechazado en el borde) y
       R25 (cursor que no es texto o vacío: `invalid_input`);
-    - `tests/unit/notificaciones/notification-links.test.ts` cubre R49: los tres destinos y uno
-      desconocido sin enlace;
+    - `tests/unit/notificaciones/notification-links.test.ts` cubre R49: los dos destinos
+      (fórmulas y lista de proveedores) y uno desconocido sin enlace;
     - el test de una lectura de sesión por petición sigue verde.
 - [ ] **T8. Cableado en composición** (design §4.2, §5, §6.1). Depende de T3, T5, T6 y T7.
   - `lib/composition/index.ts`:
@@ -118,29 +123,46 @@
   - `readBatchNotice` en el puerto y en `document-batch-repository-prisma.ts`.
   - Llamadas en `run-document-job.ts` y `get-batch-status.ts`, con listener opcional.
   - **Hecho:** `tests/unit/documentos/batch-finished.test.ts` cubre R46:
-    - avisa al terminar el último archivo, sea `done` o `error`;
+    - avisa **una vez** al terminar el último archivo, sea `done` o `error`, y nunca por cada
+      archivo que falla antes;
     - no avisa con un `requeue` ni con archivos pendientes;
     - avisa tras una caducidad que cierra la tanda.
 
     Cubre también R7: el listener que lanza no cambia el `RunDocumentJobResult`. Los tests
     existentes de `documentos` siguen verdes sin cambios.
-- [ ] **T10. Proveedor de la tanda de catálogo** `[P]` (design §6.3, §3.2.3). Depende de T9.
-  **Pregunta 9.**
-  - Migración `<ts>_document_batches_supplier` con `down.sql`.
-  - `supplierId` opcional en `enqueue-input.ts`, `NewBatch` y `createBatch`.
-  - Prop `supplierId` en `DocumentUpload` y `DocumentUploadDialog`, que pasa
-    `CatalogPdfUpload`. Fila de `CATALOGO.md` actualizada.
-  - **Hecho:** test del esquema de encolado (uuid opcional, rechaza no-uuid). Un test de la
-    pieza compartida comprueba que `supplierId` llega a `enqueueBatchAction`. Los tests existentes
-    de `DocumentUpload` siguen verdes.
-- [ ] **T11. Evento del catálogo y suscripción** (design §6.1, §6.4). Depende de T4, T8 y T9.
-  **Pregunta 4 y 7.**
-  - Entrada `documentos.tanda_terminada` en `NOTIFICATION_CATALOG`.
+
+    `tests/integration/documentos/batch-notice.int.test.ts` cubre `readBatchNotice`: conteos, los
+    3 primeros nombres de los fallidos en orden de subida y `uploadedAt` (R51).
+- [ ] **T10. Nombre original de cada archivo** `[P]` (design §6.3, §3.2.3). Depende de T9.
+  - Migración `<ts>_document_files_original_name` con `down.sql`.
+  - `file-name.ts` (`fileNameSchema`), `names` opcional en `enqueue-input.ts`, `NewBatch.files` y
+    `createBatch`.
+  - `DocumentUpload` manda `names` en el mismo orden que `paths`.
+  - **Hecho:**
+    - `tests/unit/documentos/enqueue-names.test.ts` cubre R50: se queda sin carpetas
+      (`C:\x\a.pdf` → `a.pdf`), recorta, rechaza vacío, más de 255 y longitud distinta de
+      `paths`, y sin `names` encola con nombres `NULL`;
+    - `tests/unit/documentos-ui/document-upload-names.test.tsx` comprueba que `names` llega a `enqueueBatchAction` alineado con
+      `paths`, sin los archivos que fallaron al subir;
+    - `tests/integration/documentos/batch-notice.int.test.ts` comprueba que `createBatch` guarda
+      `original_name` y que una fila sin nombre (como las anteriores a la migración) queda con
+      `NULL` y el aviso usa el texto genérico (R50, R51);
+    - los tests existentes de `DocumentUpload`, `CatalogPdfUpload` y `FormulaPdfUpload` siguen
+      verdes sin cambios.
+- [ ] **T11. Evento del catálogo y suscripción** (design §6.1, §6.3b, §6.4). Depende de T4, T8, T9
+  y T10.
+  - `file-list-phrase.ts` y la entrada `documentos.tanda_terminada` en `NOTIFICATION_CATALOG`.
   - `batchFinishedListener` en composición, pasado a `runDocumentJob` y `getBatchStatus`.
   - **Hecho:** `tests/unit/notificaciones/documentos-event.test.ts` cubre:
-    - R47: los cuatro desenlaces con su tono y sus textos;
+    - R47: las seis filas de la tabla de design §6.4, con nombres y sin nombres, con su tono, su
+      título, su `{hora}` y `bodyTime = uploadedAt`;
     - R48: sin autor, ni aviso ni `notify`, con log;
-    - R49: formula → fórmulas; catálogo con y sin proveedor.
+    - R49: formula → fórmulas con «Ver fórmulas»; catálogo → lista de proveedores con «Ver
+      proveedores», y el payload no lleva proveedor.
+
+    `tests/unit/notificaciones/file-list-phrase.test.ts` cubre R51: uno, dos y tres nombres;
+    cuatro fallidos con nombre → tres y «y 1 más»; un nombre y dos sin nombre → «"a.pdf" y 2
+    más»; un nombre de 61 caracteres se recorta a 59 + «…» y uno de 60 no.
 
     `tests/unit/composition/documentos-batch-notice.test.ts` cubre R5: el `dedupeKey` es el de la
     tanda y `documentos` no importa `notificaciones`.
@@ -195,7 +217,10 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     - R22: 0 sin insignia, 100 → «99+», y la insignia y el nombre accesible leen el mismo número
       del contexto;
     - R29: icono por tono, no leído con su marca y su nombre accesible «… Sin leer»;
-    - R30: las cinco ramas de la hora;
+    - R30: las cinco ramas de la hora y sus bordes (59 s, 59 min, 23 h 59 min, 1 día, 7 días,
+      7 días y 1 min → fecha), con una zona horaria fija en el test;
+    - R47: `NotificationItem` sustituye `{hora}` por `HH:MM` de `bodyTime` en la zona del
+      navegador; el nombre de archivo con `<b>` se pinta como texto;
     - R36: las clases de animación (llegada y fundido de lote) van bajo `motion-safe`;
     - R37: con la lista cargada, un `newest` nuevo pide el primer lote y lo mezcla arriba; con la
       lista sin cargar, solo cambia el conteo.
@@ -205,7 +230,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 ## Bloque E — Campana
 
 - [ ] **T17. `PopoverContent` con ancla opcional** `[P]` (design §10.3, «Lo que ya existe»).
-  Depende de nada. **Pregunta 10.**
+  No depende de nada.
   - `components/ui/popover.tsx`: `anchor`, `collisionPadding` y `positionerClassName` opcionales,
     pasados al `Positioner`. Comprobar contra la versión instalada de `@base-ui/react` que existen
     y que `--available-height` se expone; si no, aplicar el plan B de §10.3 y anotarlo en
@@ -215,16 +240,16 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     `guard-catalogo-de-componentes` verde.
 - [ ] **T18. Campana y panel con carga al hacer scroll** (design §10.1, §10.2, §10.3). Depende de
   T16 y T17.
-  - `notification-bell.tsx` y `notification-list-tail.tsx` (centinela con `IntersectionObserver`
-    por puerto y respaldo por `scroll`). El layout privado monta `NotificationsProvider` y la
-    campana solo con el permiso efectivo.
-  - **Hecho:** `tests/unit/notificaciones-ui/notification-bell.test.tsx`, con un observador falso,
-    cubre:
+  - `notification-bell.tsx` y `notification-list-tail.tsx` (centinela con `useInView` de
+    `react-intersection-observer`, `root` = área con scroll, `rootMargin` de 120 px, `skip` fuera de
+    `tail === 'more'` y `fallbackInView: true`). El layout privado monta `NotificationsProvider` y
+    la campana solo con el permiso efectivo.
+  - **Hecho:** `tests/unit/notificaciones-ui/notification-bell.test.tsx`, con
+    `mockAllIsIntersecting` de `react-intersection-observer/test-utils`, cubre:
     - R22: `aria-label` con y sin no leídos;
     - R23: al abrir, 10 avisos del más reciente al más antiguo; «Marcar todas…» solo con no leídos;
-    - R25: el centinela a la vista pide el lote siguiente y pinta «Cargando más avisos…»; el
-      observador se crea con `root` = área con scroll del panel y `rootMargin` de 120 px abajo; sin
-      `IntersectionObserver`, el respaldo por `scroll` pide igual;
+    - R25: el centinela a la vista pide el lote siguiente y pinta «Cargando más avisos…»; con el
+      lote en vuelo, otro cruce del centinela no pide nada;
     - R26: el fallo pinta «No se pudieron cargar más avisos.» y «Reintentar», conserva las filas y
       no vuelve a pedir solo;
     - R27: al final pinta «No hay más avisos. Se conservan 90 días.»;
@@ -233,8 +258,8 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     - R33: esqueletos, «No tienes notificaciones.» y «No se pudieron cargar las notificaciones.» con
       «Reintentar»;
     - R34: en escritorio, 400 px de ancho y 520 px de alto con scroll;
-    - R35: en el teléfono, el `anchor` es la cabecera, `collisionPadding` 8, ancho
-      `calc(100vw - 16px)`, alto máximo `--available-height` y filas de 44 px;
+    - R35: en el teléfono, el `anchor` es la cabecera, `collisionPadding` 8 a los lados y arriba y
+      16 abajo, ancho `calc(100vw - 16px)`, alto máximo `--available-height` y filas de 44 px;
     - R19: sin permiso, el layout no monta ni la campana ni el proveedor.
 
     Los tests del layout privado siguen verdes.
@@ -244,6 +269,15 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     `/notificaciones` ni lleva `badge`, `PRIVATE_ROUTE_PREFIXES` no tiene `/notificaciones` y
     `firstVisibleNavHref` da lo mismo que hoy para los cinco roles. Los tests existentes de
     navegación y de `AppSidebar` siguen verdes **sin cambios**.
+- [ ] **T19b. Ampliar la guardia de QC-140** `[P]` (R25, design §10.2, §15). Depende de T18.
+  - `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts`: `ARCHIVO_AUTORIZADO` pasa a
+    `ARCHIVOS_AUTORIZADOS` con `showcase-load-trigger.tsx` y
+    `app/(private)/components/notifications/notification-list-tail.tsx`; el caso R18 compara con
+    `toEqual` la lista ordenada y su nombre y comentario dicen que QC-137 la amplió. El caso D8 no
+    cambia.
+  - **Hecho:** la guardia verde en el repo; rojo comprobado a mano añadiendo un tercer importador
+    temporal y quitándolo después (anotado en `progress/impl_QC-137.md`);
+    `pnpm exec vitest run guard` verde.
 
 ## Bloque F — Retención
 
@@ -259,12 +293,15 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 - [ ] **T21. README del módulo** `[P]` (design §4.4). Depende de T11.
   - `lib/modules/notificaciones/README.md`: cómo agregar un evento y cómo agregar un canal.
   - **Hecho:** cada paso del README nombra el archivo real y el test de R6/R10 que lo demuestra.
-- [ ] **T22. E2E de aislamiento, primer evento y scroll** (R13, R19, R24, R25, R27, R46).
-  Depende de T18, T19 y T11.
+- [ ] **T22. E2E de aislamiento, primer evento y scroll** (R13, R19, R24, R25, R27, R46, R49,
+  R50, R51). Depende de T18, T19 y T11.
   - `e2e/notificaciones.spec.ts`, con los dobles de `e2e/formula-desde-pdf.spec.ts` (lector
     enlatado y cola en línea):
     1. El Administrador de la empresa A sube un PDF de fórmula. Sin recargar, su campana muestra
-       1 y el aviso lleva a fórmulas.
+       1 y el aviso, con «Ver fórmulas», lleva a fórmulas.
+    1b. Sube desde un proveedor una tanda de dos PDFs en la que el lector enlatado falla uno: un
+       solo aviso «Tanda procesada con errores» que nombra el archivo fallido por su nombre
+       original, y «Ver proveedores» lleva a la lista de proveedores.
     2. El Administrador de la empresa B **no** lo ve en el panel de su campana.
     3. Con un aviso dirigido al rol Administrador de A, sembrado por helper, el Operador de A
        **no** lo ve y el Administrador de A sí.
@@ -279,7 +316,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     - tono tras un toque;
     - toast «Notificaciones sin sonido» sin toque previo;
     - dos pestañas suenan una vez;
-    - panel anclado a la pantalla: 8 px por lado, hasta el borde inferior, scroll dentro y sin
+    - panel anclado a la pantalla: 8 px por lado, 16 px del borde inferior, scroll dentro y sin
       salirse;
     - carga al hacer scroll dentro del panel, con el dedo.
   - **Hecho:** resultado anotado en `progress/impl_QC-137.md`, con lo que no se pudo comprobar
@@ -313,7 +350,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 | R22 | T6, T16, T18 |
 | R23 | T5, T18 |
 | R24 | T19, T22 |
-| R25 | T5, T7, T15, T18, T22 |
+| R25 | T5, T7, T15, T18, T19b, T22 |
 | R26 | T15, T18 |
 | R27 | T5, T15, T18, T22 |
 | R28 | T5, T6, T15 |
@@ -335,9 +372,13 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 | R44 | T14 |
 | R45 | T14, T23 |
 | R46 | T9, T22 |
-| R47 | T11 |
+| R47 | T1, T11, T16 |
 | R48 | T11 |
-| R49 | T7, T11 |
+| R49 | T7, T11, T22 |
+| R50 | T10, T22 |
+| R51 | T9, T10, T11, T22 |
+| R52 | T2 |
+| R53 | T2 |
 
 ## Archivos esperados
 
@@ -346,11 +387,12 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 - `db/migrations/<ts>_notifications/down.sql`
 - `db/migrations/<ts>_notifications_addon/migration.sql`
 - `db/migrations/<ts>_notifications_addon/down.sql`
-- `db/migrations/<ts>_document_batches_supplier/migration.sql`
-- `db/migrations/<ts>_document_batches_supplier/down.sql`
+- `db/migrations/<ts>_document_files_original_name/migration.sql`
+- `db/migrations/<ts>_document_files_original_name/down.sql`
 - `lib/modules/notificaciones/index.ts`
 - `lib/modules/notificaciones/README.md`
 - `lib/modules/notificaciones/domain/catalog.ts`
+- `lib/modules/notificaciones/domain/file-list-phrase.ts`
 - `lib/modules/notificaciones/domain/notification-event.ts`
 - `lib/modules/notificaciones/domain/notify.ts`
 - `lib/modules/notificaciones/domain/channel-factory.ts`
@@ -380,6 +422,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 - `lib/modules/documentos/domain/run-document-job.ts`
 - `lib/modules/documentos/domain/get-batch-status.ts`
 - `lib/modules/documentos/domain/enqueue-input.ts`
+- `lib/modules/documentos/domain/file-name.ts`
 - `lib/modules/documentos/domain/enqueue-batch.ts`
 - `lib/modules/documentos/ports/document-batch-repository.ts`
 - `lib/modules/documentos/adapters/driven/persistence/document-batch-repository-prisma.ts`
@@ -392,7 +435,6 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 - `components/ui/popover.tsx`
 - `components/shared/CATALOGO.md`
 - `components/shared/document-upload/document-upload.tsx`
-- `components/shared/document-upload/document-upload-dialog.tsx`
 - `app/(private)/layout.tsx`
 - `app/(private)/components/index.ts`
 - `app/(private)/components/notifications/index.ts`
@@ -407,12 +449,16 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 - `app/(private)/components/notifications/notification-item.tsx`
 - `app/(private)/components/notifications/unread-count-badge.tsx`
 - `app/(private)/components/notifications/relative-time.ts`
-- `app/(private)/proveedores/[id]/components/catalog-pdf-upload.tsx`
 - `app/api/cron/purgar-notificaciones/route.ts`
 - `vercel.json`
 - `tests/integration/notificaciones/notifications-schema.int.test.ts`
 - `tests/integration/notificaciones/notification-inbox.int.test.ts`
 - `tests/integration/identity/company-addons.int.test.ts`
+- `tests/integration/documentos/batch-notice.int.test.ts`
+- `tests/unit/notificaciones/file-list-phrase.test.ts`
+- `tests/unit/documentos/enqueue-names.test.ts`
+- `tests/unit/documentos-ui/document-upload-names.test.tsx`
+- `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts`
 - `tests/unit/notificaciones/notify.test.ts`
 - `tests/unit/notificaciones/channel-factory.test.ts`
 - `tests/unit/notificaciones/add-event.test.ts`

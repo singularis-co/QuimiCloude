@@ -45,7 +45,7 @@
 .nf-tail .b{height:36px}
 @container (max-width: 760px){
 .tb-right.anchor{position:static}
-.nf-pop{position:absolute;top:64px;left:8px;right:8px;width:auto;max-height:calc(100% - 80px);transform-origin:top center}
+.nf-pop{position:absolute;top:64px;left:8px;right:8px;width:auto;max-height:calc(100% - 80px);bottom:auto;transform-origin:top center}
 .nf-pop-bd{height:auto;flex:1;min-height:0;max-height:none}
 .nf-row{grid-template-columns:32px 1fr;padding:14px 12px}
 .nf-when{grid-column:2;flex-direction:row;align-items:center;justify-content:space-between}
@@ -136,18 +136,18 @@ bad: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M10 13l
 const base = [
 ['n0','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 14:52.','Ver fórmulas','hace 1 min',true],
 ['n1','ok','Tanda de PDFs procesada','Se leyeron los 4 archivos de la tanda que subiste a las 14:20.','Ver fórmulas','hace 3 min',true],
-['n2','bad','Falló la lectura de la tanda','No se pudo leer ningún archivo de la tanda que subiste a las 14:02.','Ver proveedor','hace 12 min',true],
+['n2','bad','Falló la lectura de la tanda','No se pudo leer ningún archivo de la tanda que subiste a las 14:02.','Ver proveedores','hace 12 min',true],
 ['n3','warn','Tanda procesada con errores','Se leyeron 2 de 3 archivos. Uno no se pudo leer.','Ver fórmulas','hace 48 min',true],
-['n4','ok','Tanda de PDFs procesada','Se leyeron los 6 archivos de la tanda que subiste a las 16:58.','Ver proveedor','ayer 17:05',false],
+['n4','ok','Tanda de PDFs procesada','Se leyeron los 6 archivos de la tanda que subiste a las 16:58.','Ver proveedores','ayer 17:05',false],
 ['n5','warn','Tanda procesada con errores','Se leyeron 4 de 5 archivos. Uno no se pudo leer.','Ver fórmulas','14/10/2026 09:12',false],
 ['n6','ok','Tanda de PDFs procesada','Se leyeron los 2 archivos de la tanda que subiste a las 16:31.','Ver fórmulas','13/10/2026 16:40',false],
-['n7','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 10:05.','Ver proveedor','12/10/2026 10:11',false],
+['n7','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 10:05.','Ver proveedores','12/10/2026 10:11',false],
 ['n8','bad','Falló la lectura de la tanda','No se pudo leer ningún archivo de la tanda que subiste a las 08:40.','Ver fórmulas','10/10/2026 08:44',false],
 ['n9','ok','Tanda de PDFs procesada','Se leyeron los 5 archivos de la tanda que subiste a las 15:22.','Ver fórmulas','09/10/2026 15:30',false],
-['n10','ok','Tanda de PDFs procesada','Se leyeron los 2 archivos de la tanda que subiste a las 11:47.','Ver proveedor','07/10/2026 11:52',false],
+['n10','ok','Tanda de PDFs procesada','Se leyeron los 2 archivos de la tanda que subiste a las 11:47.','Ver proveedores','07/10/2026 11:52',false],
 ['n11','warn','Tanda procesada con errores','Se leyeron 1 de 2 archivos. Uno no se pudo leer.','Ver fórmulas','05/10/2026 09:03',false],
 ['n12','ok','Tanda de PDFs procesada','Se leyeron los 4 archivos de la tanda que subiste a las 14:10.','Ver fórmulas','02/10/2026 14:18',false],
-['n13','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 09:30.','Ver proveedor','29/09/2026 09:36',false]
+['n13','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 09:30.','Ver proveedores','29/09/2026 09:36',false]
 ];
 const data = fresh ? base : base.slice(1);
 const read = s.read || {};

@@ -1,6 +1,6 @@
 # QC-137 — sistema-de-notificaciones-por-rol · design.md
 
-> Requisitos en `requirements.md` (R1–R49). Tableros aprobados el 2026-10-16 y revisados el mismo
+> Requisitos en `requirements.md` (R1–R53). Tableros aprobados el 2026-10-16 y revisados el mismo
 > día para «solo campana»:
 > `docs/diseno/canvas/Notificaciones.dc.html` (escritorio, con el panel en el contenedor estrecho),
 > `NotificacionesTablet.dc.html`, `NotificacionesMovil.dc.html` (lleva la ficha: Reutiliza / Nuevo
@@ -12,6 +12,13 @@
 > `private-nav.ts` y el `landing: false` de `firstVisibleNavHref` (QC-75 ya no se toca). Entra la
 > lista completa en el panel con carga por cursor al hacer scroll (§8.1, §10.2) y el anclaje a la
 > pantalla en el teléfono (§10.3).
+>
+> **Respuestas del humano del 2026-10-19.** Un aviso por tanda; el enlace va a la lista de
+> Fórmulas o a la de Proveedores, **sin `supplier_id`**; el añadido nace prendido en las empresas
+> existentes y no depende de nada; la carga al hacer scroll usa **`react-intersection-observer`**
+> (ya aprobada), ampliando la guardia de QC-140; se **guarda el nombre original** de cada archivo y
+> el aviso nombra los fallidos (R50, R51); hora relativa hasta 7 días; teléfono con 8 px a los
+> lados y 16 px abajo.
 
 ## Lo que ya existe
 
@@ -21,13 +28,16 @@
 | Dónde | Qué apareció | Qué se hace |
 | --- | --- | --- |
 | Board (`feature_list.json`) | QC-247/QC-248: WhatsApp al cliente final. QC-292…QC-298: fichas hijas de esta (eventos y canales) | Ya en «Lo que NO entra» y pregunta abierta 2. Nada que choque |
-| `specs/` | QC-11/QC-8: ítem «Notificaciones» de relleno, retirado en QC-13. QC-107 D5/D6: el tiempo real y el aviso de fin de tanda son encargo de QC-137. QC-277 D3: notificaciones como añadido futuro | Se cumple el encargo de QC-107 (R46–R49) y se crea el añadido de QC-277 D3 (R18–R20). El ítem del menú **no** vuelve (R24) |
+| `specs/` | QC-11/QC-8: ítem «Notificaciones» de relleno, retirado en QC-13. QC-107 D5/D6: el tiempo real y el aviso de fin de tanda son encargo de QC-137. QC-277 D3: notificaciones como añadido futuro | Se cumple el encargo de QC-107 (R46–R51) y se crea el añadido de QC-277 D3 (R18–R20, R52, R53). El ítem del menú **no** vuelve (R24) |
 | Código | `lib/shared/navigation/private-nav.ts`: `NavLink.badge?: number`, fijo y sin uso; `NavIconName` ya incluye `'bell'` | **No se toca** (R24). `private-nav.ts`, `AppSidebar` y `firstVisibleNavHref` quedan como en `dev` |
 | Código | `lib/modules/inventario/domain/stock-increase-listener.ts` y su cableado en `lib/composition/index.ts` | **Patrón que se copia** para el emisor de `documentos` (§6) |
 | Código | `components/shared/document-upload/use-batch-status.ts`: sondeo por Server Action (`getBatchStatusAction`) cada 2 s | **Precedente** de lectura desde el cliente por Server Action, sin librería de fetch (§9) |
 | Código | `identity.isCompanyAddonActive(companyId, addon)`, ya usado por `documentos` fuera de sesión | Se reutiliza para no crear avisos con el añadido apagado (R19) |
 | Código | `lib/shared/pagination.ts`: `DEFAULT_PAGE_SIZE = 10`, `toOffsetLimit`, `buildPage` | Se reutiliza **solo** `DEFAULT_PAGE_SIZE` como tamaño de lote. `toOffsetLimit` y `buildPage` no: son por desplazamiento y repetirían o saltarían avisos al llegar uno nuevo (R28, A12) |
-| Código | `app/(private)/proveedores/components/showcase-load-trigger.tsx` usa `react-intersection-observer` (aprobada en `docs/dependencias.md`), y `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts` (QC-140 R18) exige que sea su **único** importador | La decisión cerrada pide el `IntersectionObserver` del navegador **sin librería**: no se importa la librería y la guardia de QC-140 sigue verde sin cambios. Pregunta abierta 11 y A11 |
+| Código | `app/(private)/proveedores/components/showcase-load-trigger.tsx` usa `react-intersection-observer` (aprobada en `docs/dependencias.md`), y `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts` (QC-140 R18) exige que sea su **único** importador | **Se reutiliza la librería** (decisión del 2026-10-19). El centinela nuevo `notification-list-tail.tsx` es el segundo y último importador autorizado, y la guardia de QC-140 se amplía a una lista cerrada de dos archivos (§10.2, §15). `ShowcaseLoadTrigger` no se reutiliza tal cual: no admite `root` ni `rootMargin`, y extenderlo obligaría a subirlo a `shared` (A15) |
+| Código | `react-intersection-observer/test-utils` (`mockAllIsIntersecting`), ya usado en `tests/unit/proveedores-ui/` | Se usa igual en los tests del panel (R25) |
+| Código | `lib/modules/documentos/domain/document-path.ts`: la ruta del PDF es `<empresa>/<uuid>.pdf`; el nombre original no llega a la base | `document_files` gana `original_name` (§6.3, R50) |
+| Código | `lib/` no tiene zona horaria de empresa; las pantallas formatean fechas con la del navegador (`whatsapp-connection-card.tsx`, `ai-provider-card.tsx`) | La hora «a las HH:MM» del aviso se pinta en el navegador (§3, §9.6) |
 | Código | `app/api/cron/caducar-pedidos/route.ts` + `vercel.json` | Patrón del cron de borrado (§11) |
 | Código | `app/(private)/layout.tsx` ya monta `<Toaster richColors />` | El toast «Notificaciones sin sonido» usa esa región (R45) |
 | Código | `db/schema.prisma`: las marcas de tiempo son `@db.Timestamptz(6)` | El cursor lleva la marca con microsegundos (§8.1) |
@@ -46,7 +56,7 @@
 | `DataTable` | Descartada | Es una tabla con orden y columnas: la bandeja es una lista |
 | `Notice` | Descartada | Aviso en línea; el tablero pide toast |
 | `UrlTabs`, `PageShell`, `PageHeader` | Descartadas en la revisión | Eran de la página `/notificaciones`, que ya no existe |
-| `DocumentUpload`, `DocumentUploadDialog`, `DocumentUploadRow` | 2. Extiende | Prop opcional `supplierId` que viaja al encolar (§6.3). Los consumidores actuales no cambian |
+| `DocumentUpload`, `DocumentUploadDialog`, `DocumentUploadRow` | Cambio interno, sin prop nueva | `DocumentUpload` manda al encolar el `name` de cada `File` junto a su ruta (§6.3). Ni la API ni lo visible cambian: no hay pase `/design` que hacer. Sus consumidores no cambian |
 
 **Piezas nuevas** (las del bloque «Nuevo» de la ficha del tablero). Todas tienen **un solo
 consumidor**, la cabecera del layout privado, así que viven en la carpeta de la ruta,
@@ -59,7 +69,7 @@ subirlas a `shared`.
 | Fila de aviso (`NotificationItem`) | 3. Compón (icono `lucide-react` + textos + punto) | Solo la pinta el panel |
 | Fuente única del conteo y de la lista (`NotificationsProvider`, `useNotifications`) | 4. Crea (no es UI) | La leen la campana, su insignia, su nombre accesible y el panel (R22) |
 | Insignia de conteo (`UnreadCountBadge`: oculta con 0, «99+») | 3. Compón (`Badge`) | Solo la campana |
-| Final de la lista (`NotificationListTail`: centinela + «Cargando más avisos…» / error con «Reintentar» / «No hay más avisos…») | 3. Compón (`Button` + icono de giro) | Estados 5, 6 y 7 del tablero |
+| Final de la lista (`NotificationListTail`: centinela con `useInView` + «Cargando más avisos…» / error con «Reintentar» / «No hay más avisos…») | 3. Compón (`Button` + icono de giro + `react-intersection-observer`) | Estados 5, 6 y 7 del tablero |
 | Campana con panel (`NotificationBell`) | 3. Compón (`Popover` + `Button` + `UnreadCountBadge` + `NotificationItem` + `NotificationListTail`) | El layout privado |
 
 ## 1. Resumen de la solución
@@ -81,6 +91,7 @@ lib/modules/notificaciones/
   index.ts                                   contrato: reexporta de ./domain
   domain/
     catalog.ts                               NOTIFICATION_CATALOG (R1) y sus tipos
+    file-list-phrase.ts                      la lista L de archivos fallidos (R51)
     notification-event.ts                    NotificationEvent { key, companyId, dedupeKey, payload }
     notify.ts                                createNotify: el motor (R2–R4, R7, R8, R11, R19)
     channel-factory.ts                       createChannelFactory (R8–R10)
@@ -128,9 +139,10 @@ no cruce de módulo.
 | `company_id` | `uuid` NOT NULL | FK `companies(id)` `ON DELETE CASCADE` |
 | `event_key` | `text` NOT NULL | `CHECK (event_key ~ '^[a-z_]+\.[a-z_]+$')` |
 | `tone` | `text` NOT NULL | `CHECK (tone IN ('success','warning','danger'))` |
-| `title`, `body`, `link_label` | `text` NOT NULL | Texto ya resuelto por el catálogo al crear: cambiar un texto del catálogo no reescribe el historial (máx. 90 días) |
+| `title`, `body`, `link_label` | `text` NOT NULL | Texto ya resuelto por el catálogo al crear: cambiar un texto del catálogo no reescribe el historial (máx. 90 días). Única excepción: `body` puede llevar la marca `{hora}`, que el navegador sustituye (fila siguiente) |
+| `body_time` | `timestamptz(6)` NULL | El instante que `{hora}` representa (la subida de la tanda, R47). El servidor no conoce la zona horaria del usuario (en `lib/` no hay ninguna), así que «HH:MM» se pinta en el navegador, como las demás fechas de la app. `CHECK ((body_time IS NULL) = (position('{hora}' in body) = 0))` |
 | `target_kind` | `text` NULL | Destino abstracto (§4.3), nunca una URL |
-| `target_params` | `jsonb` NULL | Parámetros del destino (p. ej. `{ "supplierId": "…" }`) |
+| `target_params` | `jsonb` NULL | Parámetros del destino para eventos futuros que lleven un id; el de PDFs no lleva |
 | `recipient_user_id` | `uuid` NULL | FK `users(id)` `ON DELETE CASCADE` |
 | `recipient_role` | `text` NULL | FK `roles(name)` `ON UPDATE CASCADE ON DELETE RESTRICT`. Ver §3.3 |
 | `dedupe_key` | `text` NOT NULL | Idempotencia (R3) |
@@ -174,14 +186,16 @@ el caso de uso (R15, `docs/architecture.md > Acceso a datos y autorizacion`).
    - `role_permissions` para Administrador, Operador, Empacador y Acondicionamiento, resueltos
      por nombre (R21);
    - fila `notificaciones` en `addons`;
-   - si se confirma la pregunta abierta 5, una excepción `enabled = true` por cada empresa
-     existente.
+   - una excepción `enabled = true` en `company_addon_overrides` por cada empresa **existente**,
+     como hizo la migración de QC-277 (R52, decisión del 2026-10-19). Las empresas que se creen
+     después no la tienen y nacen apagadas (R20).
 
    Todo idempotente con `ON CONFLICT DO NOTHING`, como
    `20261009120200_delivery_void_permission`. El `down.sql` borra exactamente esas filas.
-3. `db/migrations/<ts>_document_batches_supplier/`: `ALTER TABLE document_batches ADD COLUMN
-   supplier_id uuid NULL` (§6.3, pregunta abierta 9), sin FK porque es otro módulo. El `down.sql`
-   quita la columna.
+3. `db/migrations/<ts>_document_files_original_name/`: `ALTER TABLE document_files ADD COLUMN
+   original_name text NULL` con `CHECK (original_name IS NULL OR char_length(original_name)
+   BETWEEN 1 AND 255)` (§6.3, R50). Las filas que ya existen quedan con `NULL`: no hay de dónde
+   sacar su nombre. El `down.sql` quita la columna. **No** hay columna `supplier_id` (R49).
 
 ### 3.3 Por qué el rol se guarda por su nombre
 
@@ -205,7 +219,8 @@ type CatalogEntry<P> = {
   schema: z.ZodType<P>;                    // forma del payload (R4)
   tone: (p: P) => 'success' | 'warning' | 'danger';
   title: (p: P) => string;
-  body: (p: P) => string;
+  body: (p: P) => string;                  // puede llevar '{hora}'
+  bodyTime: (p: P) => Date | null;         // el instante de '{hora}', o null si no la lleva
   linkLabel: (p: P) => string;
   target: (p: P) => NotificationTarget | null;
   audience: Audience<P>;
@@ -238,12 +253,11 @@ pero el camino se construye y se prueba (R12, R13, R16) porque es una decisión 
 `NotificationTarget` es una unión cerrada:
 
 - `{ kind: 'formulas' }`
-- `{ kind: 'supplier'; supplierId: string }`
 - `{ kind: 'suppliers' }`
 
-Se guarda en `target_kind`/`target_params`. `adapters/driving/notification-links.ts` lo
-convierte en `href` con `FORMULAS_ROUTE`, `supplierDetailRoute` y `SUPPLIERS_ROUTE` de
-`lib/shared/routes.ts`. Un `kind` desconocido da un aviso sin enlace, que sigue marcándose como
+Se guarda en `target_kind`/`target_params` (`target_params` queda para eventos futuros que
+necesiten un id; el de PDFs no lleva). `adapters/driving/notification-links.ts` lo convierte en
+`href` con `FORMULAS_ROUTE` y `SUPPLIERS_ROUTE` de `lib/shared/routes.ts`. Un `kind` desconocido da un aviso sin enlace, que sigue marcándose como
 leído al pulsarlo. Así el dominio no importa `lib/shared` y, si cambia una URL, cambia en un sitio
 y los avisos ya guardados la siguen. `lib/shared/routes.ts` **no cambia**: ya no hay ruta nueva.
 
@@ -297,8 +311,10 @@ export interface BatchFinishedListener {
   /** Se llama con la tanda ya cerrada. No debe lanzar: el desenlace de los archivos ya está escrito. */
   onBatchFinished(input: {
     companyId: string; batchId: string; strategy: PdfStrategy;
-    createdBy: string | null; supplierId: string | null;
-    total: number; done: number; failed: number; occurredAt: Date;
+    createdBy: string | null; uploadedAt: Date;
+    total: number; done: number; failed: number;
+    failedNames: readonly string[];   // hasta 3, en orden de subida, solo los que tienen nombre
+    occurredAt: Date;
   }): Promise<void>;
 }
 ```
@@ -312,8 +328,8 @@ const batchFinishedListener: BatchFinishedListener = {
     await notificaciones.notify({
       key: 'documentos.tanda_terminada', companyId: e.companyId,
       dedupeKey: `documentos.tanda_terminada:${e.batchId}`,
-      payload: { recipientUserId: e.createdBy, strategy: e.strategy, supplierId: e.supplierId,
-                 total: e.total, done: e.done, failed: e.failed },
+      payload: { recipientUserId: e.createdBy, strategy: e.strategy, uploadedAt: e.uploadedAt,
+                 total: e.total, done: e.done, failed: e.failed, failedNames: e.failedNames },
     });
   },
 };
@@ -339,38 +355,59 @@ Método nuevo del puerto `DocumentBatchRepository`:
 
 ```ts
 readBatchNotice(batchId: string, companyId: string): Promise<{
-  strategy: PdfStrategy; createdBy: string | null; supplierId: string | null;
+  strategy: PdfStrategy; createdBy: string | null; uploadedAt: Date;
   total: number; done: number; failed: number; pending: number;
+  failedNames: string[];   // los 3 primeros con nombre, ORDER BY created_at, id
 } | null>;
 ```
 
-Un solo `SELECT` con conteos agrupados por estado. No reutiliza `readBatch` porque esa función
+Un `SELECT` con conteos agrupados por estado y otro con `original_name` de los fallidos con
+nombre, `LIMIT 3`. `uploadedAt` es `document_batches.created_at`. El `failed` total sale del
+conteo, así que «y N más» (R51) es `failed - failedNames.length`. No reutiliza `readBatch` porque esa función
 alimenta la respuesta al cliente, y añadirle `createdBy` lo filtraría a la UI.
 
-### 6.3 Proveedor de la tanda de catálogo (R49, pregunta abierta 9)
+### 6.3 Nombre original de cada archivo (R50)
 
-- `enqueueBatchSchema` gana `supplierId: z.uuid().optional()`.
-- `NewBatch` y `createBatch` lo guardan en `document_batches.supplier_id`.
-- `DocumentUpload` y `DocumentUploadDialog` ganan la prop opcional `supplierId`, que se pasa a
-  `enqueueBatchAction`. Es el paso 2 de la regla de decisión y se anota en su fila de
-  `CATALOGO.md`.
-- `CatalogPdfUpload` la pasa. `FormulaPdfUpload` no cambia.
+- `enqueueBatchSchema` gana `names: z.array(fileNameSchema).optional()`, con un `refine` que exige
+  la misma longitud que `paths` cuando viene. `fileNameSchema` (`documentos/domain/file-name.ts`):
+  se queda con lo que va tras la última `/` o `\`, recorta espacios, quita caracteres de control y
+  exige de 1 a 255 caracteres. Sin `names` la tanda se encola igual, con nombres `NULL`: así un
+  cliente viejo en caché no rompe.
+- `NewBatch` pasa a `files: { path, originalName: string | null }[]`, y `createBatch` escribe
+  `document_files.original_name`.
+- `DocumentUpload` manda `names` con el `File.name` de cada archivo subido con éxito, en el mismo
+  orden que `paths`. No hay prop nueva ni cambio visible; `DocumentUploadDialog`,
+  `CatalogPdfUpload` y `FormulaPdfUpload` no cambian.
+- El nombre es texto del usuario: el aviso lo muestra como texto (React escapa), nunca como HTML.
 
-No se valida que el proveedor sea de la empresa: solo sirve para el enlace, y el detalle del
-proveedor ya responde 404 con un proveedor ajeno (aislamiento de QC-44).
+### 6.3b Destino (R49)
 
-### 6.4 Textos del evento (R47; definitivos según la pregunta abierta 4)
+`strategy = 'formula'` → `{ kind: 'formulas' }`, «Ver fórmulas». `strategy = 'catalogo'` →
+`{ kind: 'suppliers' }`, «Ver proveedores». La tanda de catálogo solo se sube desde un proveedor,
+así que la estrategia basta para saber desde dónde se subió. No se guarda el proveedor (decisión
+del 2026-10-19).
 
-| Desenlace | `tone` | `title` | `body` |
-| --- | --- | --- | --- |
-| `failed = 0` | `success` | Tanda de PDFs procesada | Se leyeron los {total} archivos de la tanda. (con 1: «Se leyó el archivo de la tanda.») |
-| `done > 0` y `failed > 0` | `warning` | Tanda procesada con errores | Se leyeron {done} de {total} archivos. |
-| `done = 0`, `total = 1` | `danger` | Falló la lectura de un archivo | No se pudo leer el archivo. Revisa el archivo y vuelve a subirlo. |
-| `done = 0`, `total > 1` | `danger` | No se pudo leer ningún archivo de la tanda | Revisa los archivos y vuelve a subirlos. |
+### 6.4 Textos del evento (R47, R51; los del tablero, decisión del 2026-10-19)
 
-Enlace: `formula` → `{ kind: 'formulas' }`, con el texto «Ver fórmulas». `catalogo` con
-proveedor → `{ kind: 'supplier', supplierId }`, con «Ver proveedor». Sin proveedor →
-`{ kind: 'suppliers' }`, con «Ver proveedores».
+`{hora}` se guarda tal cual y `body_time = uploadedAt` (§3). L = `fileListPhrase(failedNames,
+failed)` (R51); «con nombres» quiere decir `failedNames.length > 0`.
+
+| Desenlace | `tone` | `title` | `body` con nombres | `body` sin nombres |
+| --- | --- | --- | --- | --- |
+| `failed = 0`, `total > 1` | `success` | Tanda de PDFs procesada | — | Se leyeron los {total} archivos de la tanda que subiste a las {hora}. |
+| `failed = 0`, `total = 1` | `success` | Tanda de PDFs procesada | — | Se leyó el archivo de la tanda que subiste a las {hora}. |
+| `done > 0`, `failed = 1` | `warning` | Tanda procesada con errores | Se leyeron {done} de {total} archivos. No se pudo leer L. | Se leyeron {done} de {total} archivos. Uno no se pudo leer. |
+| `done > 0`, `failed > 1` | `warning` | Tanda procesada con errores | Se leyeron {done} de {total} archivos. No se pudieron leer L. | Se leyeron {done} de {total} archivos. {failed} no se pudieron leer. |
+| `done = 0`, `total = 1` | `danger` | Falló la lectura de la tanda | No se pudo leer L, de la tanda que subiste a las {hora}. | No se pudo leer el archivo de la tanda que subiste a las {hora}. |
+| `done = 0`, `total > 1` | `danger` | Falló la lectura de la tanda | No se pudo leer ningún archivo de la tanda que subiste a las {hora}: L. | No se pudo leer ningún archivo de la tanda que subiste a las {hora}. |
+
+`fileListPhrase` (`domain/file-list-phrase.ts`, puro): cada nombre entre comillas rectas, recortado
+a 59 caracteres + «…» si pasa de 60; une con «, » y « y »; si `failed > failedNames.length`, añade
+« y N más» con `N = failed - failedNames.length`. Ejemplos: `"a.pdf"`; `"a.pdf" y "b.pdf"`;
+`"a.pdf", "b.pdf" y "c.pdf"`; `"a.pdf", "b.pdf", "c.pdf" y 4 más`; `"a.pdf" y 2 más`. Tope de 3:
+el panel tiene 400 px y el texto no debe pasar de unas cuatro líneas.
+
+Enlace: §6.3b.
 
 ## 7. Añadido, permiso y lo que cambia en `identity`
 
@@ -378,7 +415,8 @@ proveedor → `{ kind: 'supplier', supplierId }`, con «Ver proveedor». Sin pro
   `SEED_ROLE_PERMISSIONS` de los cuatro roles de empresa (R21).
 - `identity/domain/company-addons.ts`: `ADDONS` gana `'notificaciones'`;
   `ADDON_PERMISSIONS.notificaciones = ['notificaciones.consultar']`;
-  `ADDON_REQUIRES.notificaciones = []` (pregunta abierta 6). El permiso efectivo ya sale de
+  `ADDON_REQUIRES.notificaciones = []` (R53, decisión del 2026-10-19: no depende de
+  «Integraciones» ni de ningún otro). El permiso efectivo ya sale de
   `effectivePermissions`, así que la campana y las acciones se recortan solas (R18, R19).
   **Enmienda QC-277 R2**, que dice «exactamente cinco añadidos»: pasan a ser seis. Los tests de
   QC-277 que cuentan cinco se actualizan.
@@ -414,7 +452,8 @@ Con `roleName = null`, solo la mitad del usuario. «No leído» añade
 | `markNotificationReadAction(id)` | `z.uuid()` | `{ ok: true }` o `{ ok: false, code: 'not_found' }` si no es visible (R14) | R14, R16, R31 |
 | `markAllNotificationsReadAction()` | — | `{ ok: true, data: { marked } }` | R32 |
 
-- `NotificationView = { id, tone, title, body, linkLabel, href: string | null, createdAt: string (ISO), read: boolean }`.
+- `NotificationView = { id, tone, title, body, bodyTime: string (ISO) | null, linkLabel, href: string | null, createdAt: string (ISO), read: boolean }`.
+  `body` viaja con la marca `{hora}` sin sustituir; la sustituye `NotificationItem` (§9.6).
 - El resumen ya **no** trae avisos: el panel los pide por lotes. Así la consulta de cada 30 s es
   un `COUNT` y un `SELECT … LIMIT 1` por índice.
 - **Marcar** es `INSERT INTO notification_reads … SELECT … FROM notifications WHERE <visibles> AND id = $id ON CONFLICT DO NOTHING`.
@@ -528,8 +567,9 @@ Solo con APIs del navegador, sin librería:
   - Sin `navigator.locks`, se hace el mismo «leer, comparar y escribir» sin candado. Riesgo
     aceptado: dos pestañas que reciben el mismo aviso en el mismo milisegundo sonarían dos veces.
 - Las APIs del navegador (`BroadcastChannel`, `navigator.locks`, `localStorage`, `AudioContext`,
-  `document.visibilityState`, `IntersectionObserver`) entran por **puertos inyectables**. jsdom no
-  tiene varias de ellas, y los tests usan dobles.
+  `document.visibilityState`) entran por **puertos inyectables**. jsdom no tiene varias de ellas,
+  y los tests usan dobles. El `IntersectionObserver` lo envuelve la librería y se simula con sus
+  `test-utils` (§10.2).
 
 ### 9.4 Tono (R44, R45)
 
@@ -562,10 +602,25 @@ Solo con APIs del navegador, sin librería:
 
 ### 9.6 Hora relativa (R30)
 
-Con `Intl.DateTimeFormat('es')` y aritmética propia en `relative-time.ts`. Se pinta **en el
-cliente** (`'use client'`) para que el servidor y el navegador no discrepen de hora y no haya
-desajuste de hidratación. Se recalcula con cada resumen. No hace falta librería de fechas: son
-cinco ramas.
+Con `Intl.DateTimeFormat('es')` y aritmética propia en `relative-time.ts`, en la zona horaria del
+navegador (decisión del 2026-10-19):
+
+| Antigüedad | Texto |
+| --- | --- |
+| < 1 min | ahora |
+| < 60 min | hace N min |
+| < 24 h | hace N h |
+| de 24 h a 7 días (incluido el día 7) | hace N días («hace 1 día» con 1) |
+| > 7 días | DD/MM/AAAA HH:MM |
+
+N es la parte entera. Se pinta **en el cliente** (`'use client'`) para que el servidor y el
+navegador no discrepen de hora y no haya desajuste de hidratación. Se recalcula con cada resumen.
+No hace falta librería de fechas: son cinco ramas.
+
+`{hora}` del cuerpo (R47) se sustituye en el mismo componente por `HH:MM` de `bodyTime` con
+`Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })`. Si un
+cuerpo trae `{hora}` sin `bodyTime` (no debería: lo impide el `CHECK` de §3), se quita la marca
+junto con « a las ».
 
 ## 10. UI
 
@@ -589,14 +644,28 @@ cinco ramas.
 
 ### 10.2 Lista y carga al hacer scroll (R25–R28, R33)
 
-- **Centinela:** `NotificationListTail` pinta un `div` de 1 px al final de la lista y lo observa
-  con `new IntersectionObserver(cb, { root: <área con scroll del panel>, rootMargin: '0px 0px 120px
-  0px' })`. Los 120 px son «acercarse al final»: el siguiente lote se pide antes de tocar fondo. El
-  observador se crea **solo** con `tail === 'more'` y se desconecta al salir de ese estado, así que
-  nunca hay dos peticiones a la vez (R25) y tras un error no se reintenta solo (R26).
-- **Sin `IntersectionObserver`** (navegador antiguo): el mismo componente escucha `scroll` del área
-  y compara `scrollHeight - scrollTop - clientHeight <= 120`. No añade UI. Entra por el puerto del
-  §9.3, así que el test cubre las dos ramas.
+- **Centinela con `react-intersection-observer`** (decisión del 2026-10-19):
+  `NotificationListTail` pinta un `div` de 1 px al final de la lista con el `ref` de
+  `useInView({ root: <área con scroll del panel>, rootMargin: '0px 0px 120px 0px', skip: tail !==
+  'more', onChange: (inView) => inView && loadMore() })`. Es el mismo patrón que
+  `ShowcaseLoadTrigger`. Los 120 px son «acercarse al final»: el siguiente lote se pide antes de
+  tocar fondo. Con `skip` el observador solo vive con `tail === 'more'`, así que nunca hay dos
+  peticiones a la vez (R25) y tras un error no se reintenta solo (R26).
+- `root` es el elemento del área con scroll, guardado en estado con un `ref` de callback: hasta que
+  existe, `skip` sigue en `true`.
+- **Sin `IntersectionObserver`** (navegador antiguo): `fallbackInView: true`. El centinela cuenta
+  como visible y el panel va pidiendo lotes uno tras otro hasta el final. Como mucho son 90 días
+  de avisos, y no hace falta escuchar `scroll` a mano.
+- **Aislamiento de la librería:** `notification-list-tail.tsx` es el **único** archivo de
+  notificaciones que la importa. La guardia de QC-140
+  (`tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts`, caso R18) pasa de «solo la
+  importa `showcase-load-trigger.tsx`» a una **lista cerrada** de dos archivos:
+  `ARCHIVOS_AUTORIZADOS = [showcase-load-trigger.tsx, notification-list-tail.tsx]`, con
+  `expect(importadores).toEqual(ARCHIVOS_AUTORIZADOS)`. Cualquier tercer importador, o la falta de
+  uno de los dos, la pone en rojo. Se renombra el caso a «R18 (ampliada por QC-137)» y se comenta
+  por qué. El caso D8 (sin observador a mano ni `scroll` en la vista de proveedores) no cambia.
+- **Tests:** `mockAllIsIntersecting` de `react-intersection-observer/test-utils`, como en
+  `tests/unit/proveedores-ui/`.
 - **Lista corta:** si el primer lote no llena el área, el centinela ya está a la vista y pide el
   siguiente; con `nextCursor = null` no hay nada que pedir y se pinta el final.
 - **Final de la lista**, según `tail`:
@@ -615,8 +684,9 @@ cinco ramas.
 Por debajo del punto de corte de teléfono (`sm`, el mismo que usa la cabecera):
 
 - `PopoverContent` recibe `anchor` = la cabecera del layout (un `ref` al `<header>`), no la
-  campana; `collisionPadding={8}`, `sideOffset={8}` y en el `Positioner`
-  `w-[calc(100vw-16px)]`. Así el panel ocupa el ancho con 8 px por lado y empieza bajo la cabecera.
+  campana; `collisionPadding={{ top: 8, right: 8, bottom: 16, left: 8 }}`, `sideOffset={8}` y en
+  el `Positioner` `w-[calc(100vw-16px)]`. Así el panel ocupa el ancho con 8 px por lado, empieza
+  bajo la cabecera y se queda a 16 px del borde inferior (decisión del 2026-10-19).
 - Alto: `max-h-(--available-height)` sobre el panel, la variable que el `Positioner`
   de Base UI expone con el espacio libre hasta el borde de la pantalla menos el `collisionPadding`.
   El área de la lista es `flex-1 min-h-0 overflow-y-auto`: el scroll queda dentro (R35) y el
@@ -625,8 +695,7 @@ Por debajo del punto de corte de teléfono (`sm`, el mismo que usa la cabecera):
 - **A verificar en T16 contra la versión instalada de `@base-ui/react`:** que `Positioner` acepte
   `anchor` y `collisionPadding` y exponga `--available-height`. Si alguna falta, el plan B es
   `positionMethod="fixed"` con `inset-x-2`, `top` = alto de la cabecera + 8 px y
-  `max-h-[calc(100dvh-<top>-8px)]`, mismo resultado visible. No cambia ningún requisito.
-- El margen inferior de 8 px está pendiente de la pregunta abierta 10.
+  `max-h-[calc(100dvh-<top>-16px)]`, mismo resultado visible. No cambia ningún requisito.
 
 ### 10.4 Lo que no se toca (R24)
 
@@ -747,32 +816,44 @@ visible.
   conservaría los viejos para siempre. Solo sirve de plan B si el plan de Vercel no admite el
   segundo cron, junto con el filtro de lectura, que ya garantiza que no se ven.
 - **A8. Un aviso por archivo fallido, además del de fin de tanda.** Daría dos avisos por la misma
-  tanda. Pregunta abierta 7.
+  tanda. Ver A17.
 - **A9. Guardar el rol por `role_id`.** Ver §3.3.
 - **A10. Que la bandeja sea un canal más (`in_app` escribe la fila).** Un fallo del canal se
   llevaría la bandeja por delante, contra la decisión cerrada. La bandeja va antes y aparte (§5).
-- **A11. Reutilizar `react-intersection-observer` (ya aprobada) o subir `ShowcaseLoadTrigger` a
-  `shared`.** Ahorraría unas 15 líneas de alta y baja del observador. Se descarta porque la
-  decisión cerrada pide el observador del navegador sin librería, y porque la guardia de QC-140
-  (R18) fija un único importador de esa librería: usarla obligaría a reabrir una regla de otra
-  ficha. Si el humano lo prefiere, es la pregunta abierta 11.
+- **A11. `IntersectionObserver` del navegador a mano, sin librería.** Lo propuso el leader en el
+  tablero. Habría dejado la guardia de QC-140 intacta, pero reescribe lo que ya resuelve una
+  librería aprobada y probada en el repo: el alta y la baja del observador, el `skip`, el respaldo
+  sin soporte y los dobles de test. Descartada por el humano el 2026-10-19.
 - **A12. Paginación por desplazamiento (`OFFSET`, `toOffsetLimit`/`buildPage`).** Ya existe y es
   más corta, pero un aviso nuevo que entra arriba empuja todo una posición: el lote siguiente
   repetiría el último aviso visto, y uno que vence entre lotes haría saltar otro. Rompe R28. Además
   el `OFFSET` recorre las filas saltadas en cada lote.
 - **A13. Botón «Cargar más» en vez de carga automática.** Más simple de probar, pero la decisión
   cerrada pide carga automática y el tablero no lo dibuja. Tampoco se usa como respaldo sin
-  `IntersectionObserver`: el respaldo es escuchar `scroll`, que no añade UI (§10.2).
+  `IntersectionObserver`: el respaldo es `fallbackInView`, que no añade UI (§10.2).
 - **A14. Volver a pedir la lista entera desde el principio al llegar un aviso.** Perdería la
   posición del scroll y lo ya cargado. Se mezcla arriba el primer lote (§9.2).
+- **A15. Reutilizar `ShowcaseLoadTrigger` subiéndolo a `shared`.** No admite `root` ni
+  `rootMargin`, y el panel los necesita: el scroll es del panel, no de la página. Extenderlo y
+  moverlo tocaría la vista de proveedores y sus guardias D8/R18 más de lo necesario. Se compone un
+  centinela propio con el mismo patrón.
+- **A16. Guardar `document_batches.supplier_id` para llevar al detalle del proveedor.** Descartada
+  por el humano el 2026-10-19: el enlace va a la lista de proveedores (R49).
+- **A17. Un aviso por cada archivo fallido.** Descartada por el humano el 2026-10-19 (R46). Lo
+  sustituye nombrar los fallidos en el aviso de la tanda (R51).
+- **A18. Formatear «a las HH:MM» en el servidor al crear el aviso.** No hay zona horaria de
+  empresa ni de usuario en el código, y el servidor de Vercel corre en UTC: la hora saldría mal.
+  Se guarda el instante (`body_time`) y se pinta en el navegador (§3, §9.6).
+- **A19. Nombrar todos los archivos fallidos, sin tope.** Una tanda puede traer hasta
+  `MAX_FILES_PER_BATCH`: el texto no cabría en la fila del panel. Tope de 3 y «y N más» (R51).
 
 ## 14. Dependencias
 
 **Ninguna nueva.** Web Audio API, `BroadcastChannel`, Web Locks API, Page Visibility API,
 `IntersectionObserver`, `localStorage`/`sessionStorage` e `Intl` son APIs del navegador.
 `lucide-react` (`Bell`, `FileCheck`, `FileWarning`, `FileX`, `VolumeX`, `Loader2`), `sonner`,
-`@base-ui/react` y `zod` ya están aprobados. `react-intersection-observer` está aprobada pero **no
-se usa** (A11). Esta decisión no enmienda `docs/architecture.md`.
+`@base-ui/react`, `zod` y `react-intersection-observer` ya están aprobados (filas en
+`docs/dependencias.md`). Esta decisión no enmienda `docs/architecture.md`.
 
 ## 15. Lo que toca de otras fichas
 
@@ -784,11 +865,16 @@ se usa** (A11). Esta decisión no enmienda `docs/architecture.md`.
   - si existe la pantalla del Maestro que pinta un interruptor por añadido, necesita la etiqueta
     del sexto. No está en esta rama (buscado `ADDONS` en `app/`: nada).
 - **QC-141:** el test de `vercel.json` (§11).
-- **QC-107:** `DocumentUpload` gana `supplierId` opcional (§6.3). `run-document-job` y
+- **QC-107:** `document_files` gana `original_name`, `enqueueBatchSchema` gana `names` opcional y
+  `DocumentUpload` manda el nombre de cada archivo al encolar (§6.3). `run-document-job` y
   `get-batch-status` ganan un listener opcional (§6.2). Su R16 («NO emitir avisos») era una frontera
   de alcance de aquella ficha, que dejaba el aviso en manos de esta: los avisos los emite
   `notificaciones`, no la pantalla.
-- **QC-140:** su guardia de `react-intersection-observer` no cambia (A11).
+- **QC-140:** el caso R18 de `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts` pasa
+  de un importador autorizado a una lista cerrada de dos (§10.2). Su intención no cambia: la
+  librería sigue aislada en un archivo por pantalla, y sustituirla es reescribir esos dos archivos.
+  Su test: el propio caso, en verde con los dos archivos y en rojo si aparece un tercer importador
+  o falta uno de los dos. El caso D8 no cambia.
 - **QC-75 / QC-13:** **ya no se tocan** (revisión del 2026-10-16): ni `private-nav.ts`, ni
   `AppSidebar`, ni `firstVisibleNavHref`.
 - **`components/ui/popover.tsx`:** tres props opcionales en `PopoverContent` (§10.3), sin cambio

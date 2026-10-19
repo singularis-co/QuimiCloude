@@ -167,15 +167,15 @@ Vocabulario de este documento:
 - **R29** — Cada aviso DEBE mostrar un icono según su tono, su título, su texto, el enlace a su
   origen y su hora. Un aviso no leído DEBE distinguirse de uno leído por el fondo tintado, el
   título en negrita y un punto, y su nombre accesible DEBE terminar en «Sin leer».
-- **R30** — La hora de un aviso DEBE mostrarse con estas reglas:
+- **R30** — La hora de un aviso DEBE mostrarse según su antigüedad, en la zona horaria del
+  navegador:
   - con menos de 1 minuto, «ahora»;
   - con menos de 60 minutos, «hace N min»;
-  - del mismo día, «hace N h»;
-  - del día anterior, «ayer HH:MM»;
-  - con más antigüedad, «DD/MM/AAAA HH:MM».
+  - con menos de 24 horas, «hace N h»;
+  - de 1 a 7 días, «hace N días» («hace 1 día» con 1);
+  - con más de 7 días, la fecha y la hora, «DD/MM/AAAA HH:MM» (p. ej. «14/10/2026 09:12»).
 
-  Es la propuesta por defecto de la pregunta abierta 4: si el humano la cambia, cambia solo este
-  requisito.
+  N es la parte entera de la antigüedad en esa unidad.
 - **R31** — CUANDO el usuario hace clic en un aviso, el sistema DEBE marcarlo como leído para ese
   usuario y llevarlo a la pantalla de origen del aviso.
 - **R32** — CUANDO el usuario pulsa «Marcar todas como leídas», el sistema DEBE marcar como leídos
@@ -189,8 +189,8 @@ Vocabulario de este documento:
 - **R34** — En escritorio y tablet, el panel DEBE abrirse bajo la campana con 400 px de ancho y un
   alto fijo de 520 px, con scroll dentro del panel.
 - **R35** — En el teléfono, el panel DEBE anclarse a la pantalla y no a la campana: DEBE ocupar el
-  ancho de la pantalla con 8 px de margen a cada lado, y su alto máximo DEBE llegar hasta el borde
-  inferior de la pantalla, con scroll dentro del panel. El panel NO DEBE salirse de la pantalla por
+  ancho de la pantalla con 8 px de margen a cada lado, y su alto máximo DEBE llegar hasta 16 px
+  del borde inferior de la pantalla, con scroll dentro del panel. El panel NO DEBE salirse de la pantalla por
   ningún lado. Cada aviso DEBE tener un área táctil de al menos 44 px de alto.
 - **R36** — CUANDO llega un aviso nuevo con la pantalla abierta, el sistema DEBE animarlo así: la
   campana se balancea 700 ms, el conteo da un pulso de 360 ms y, con el panel abierto, la fila nueva
@@ -231,20 +231,47 @@ Vocabulario de este documento:
 
 - **R46** — CUANDO el último archivo pendiente de una tanda de PDFs queda leído o con error, el
   sistema DEBE emitir un único evento de fin de tanda, dirigido a quien subió la tanda y en la
-  empresa de la tanda. Da igual que el archivo termine por el procesamiento o por la caducidad.
-- **R47** — El aviso de fin de tanda DEBE decir:
-  - con todos los archivos leídos, «Tanda de PDFs procesada», en tono de éxito;
-  - con algunos leídos y otros con error, «Tanda procesada con errores» y «Se leyeron N de M
-    archivos», en tono de advertencia;
-  - con todos los archivos con error, «Falló la lectura de un archivo» en una tanda de uno, o «No
-    se pudo leer ningún archivo de la tanda» en una de varios, en tono de error.
+  empresa de la tanda. Da igual que el archivo termine por el procesamiento o por la caducidad. El
+  sistema NO DEBE crear un aviso por cada archivo que falla.
+- **R47** — El aviso de fin de tanda DEBE decir, con «HH:MM» la hora a la que se subió la tanda en
+  la zona horaria del navegador que lo muestra:
+  - con todos los archivos leídos, en tono de éxito: título «Tanda de PDFs procesada»; texto «Se
+    leyeron los N archivos de la tanda que subiste a las HH:MM.», o «Se leyó el archivo de la tanda
+    que subiste a las HH:MM.» con un solo archivo;
+  - con algunos leídos y otros con error, en tono de advertencia: título «Tanda procesada con
+    errores»; texto «Se leyeron N de M archivos.» seguido de, con nombres, «No se pudo leer L.»
+    (un fallido) o «No se pudieron leer L.» (varios), y sin nombres, «Uno no se pudo leer.» o «K no
+    se pudieron leer.»;
+  - con todos los archivos con error, en tono de error: título «Falló la lectura de la tanda»;
+    texto, en una tanda de uno, «No se pudo leer L, de la tanda que subiste a las HH:MM.» o, sin
+    nombre, «No se pudo leer el archivo de la tanda que subiste a las HH:MM.»; en una tanda de
+    varios, «No se pudo leer ningún archivo de la tanda que subiste a las HH:MM: L.» o, sin nombres,
+    la misma frase terminada en «HH:MM.».
 
-  Los textos exactos quedan sujetos a la pregunta abierta 4.
+  L es la lista de archivos fallidos de R51 y K el número de fallidos.
 - **R48** — SI la tanda no tiene registrado quién la subió, ENTONCES el sistema NO DEBE crear el
   aviso y DEBE registrarlo en el log.
-- **R49** — El aviso de fin de tanda DEBE llevar a la pantalla donde se subió la tanda: la lista de
-  fórmulas en la estrategia de fórmula, y el detalle del proveedor en la de catálogo. SI la tanda de
-  catálogo no tiene proveedor registrado, ENTONCES DEBE llevar a la lista de proveedores.
+- **R49** — El aviso de fin de tanda DEBE llevar a la pantalla desde la que se subió la tanda: a la
+  lista de fórmulas, con el enlace «Ver fórmulas», si se subió desde Fórmulas; y a la lista de
+  proveedores, con el enlace «Ver proveedores», si se subió desde un proveedor. El sistema NO DEBE
+  guardar el proveedor de la tanda.
+- **R50** — CUANDO se encola una tanda, el sistema DEBE guardar con cada archivo el nombre original
+  que tenía en el equipo de quien lo subió, sin carpetas. Los archivos ya guardados antes de este
+  cambio DEBEN quedar sin nombre.
+- **R51** — La lista de archivos fallidos (L) DEBE nombrar, entre comillas y en el orden en que se
+  subieron, como mucho los tres primeros archivos fallidos que tengan nombre guardado:
+  - con todos los fallidos nombrados: «"a.pdf"», «"a.pdf" y "b.pdf"» o «"a.pdf", "b.pdf" y
+    "c.pdf"»;
+  - si quedan fallidos sin nombrar (más de tres, o alguno sin nombre guardado): los nombrados
+    separados por comas y «y N más», donde N cuenta los fallidos no nombrados: «"a.pdf", "b.pdf",
+    "c.pdf" y 4 más».
+
+  Un nombre de más de 60 caracteres DEBE recortarse a sus primeros 59 seguidos de «…». SI ningún
+  archivo fallido tiene nombre guardado, ENTONCES el aviso DEBE usar el texto genérico de R47.
+- **R52** — CUANDO se aplica la migración del añadido, cada empresa que ya existía DEBE quedar con
+  el añadido de notificaciones prendido. Las empresas que se den de alta después siguen R20.
+- **R53** — El añadido de notificaciones NO DEBE depender de ningún otro añadido: prenderlo o
+  apagarlo NO DEBE exigir ni cambiar el estado de «Integraciones» ni de ningún otro.
 
 ### Cobertura de las decisiones cerradas
 
@@ -275,6 +302,14 @@ Vocabulario de este documento:
 | Mecanismo de tiempo real: consulta periódica | R37, R38, R39, R40 |
 | ¿Dónde se ve? (revisión): solo campana | R22, R23, R24 |
 | Historial en el panel con carga al hacer scroll | R23, R25, R26, R27, R28, R33 |
+| Un aviso por tanda (2026-10-19) | R46 |
+| Destino del aviso de PDFs (2026-10-19) | R49 |
+| Añadido prendido en las empresas existentes (2026-10-19) | R52 |
+| El añadido no depende de «Integraciones» (2026-10-19) | R53 |
+| Carga al hacer scroll con `react-intersection-observer` (2026-10-19) | R25 (la guardia de QC-140 ampliada lo comprueba, `design.md > 10.2`) |
+| Nombre del archivo que falló (2026-10-19) | R47, R50, R51 |
+| Hora relativa y textos (2026-10-19) | R30, R47 |
+| Panel en el teléfono (2026-10-19) | R35 |
 
 ## Preguntas abiertas
 
@@ -286,53 +321,16 @@ Vocabulario de este documento:
 3. **Para las fichas de canal, no para esta:** qué es «teléfono» (SMS, llamada o los dos), de
    dónde salen el correo, el teléfono o el chat de Telegram de cada usuario, y si cada usuario
    elige por qué canal recibe cada evento.
-4. **Lo que el pase `/design` dejó «Por confirmar».** El pase quedó aprobado el 2026-10-16 y
-   revisado el mismo día para «solo campana» (tableros en
-   `docs/diseno/canvas/Notificaciones{,Tablet,Movil,Estados}.dc.html`). «Marcar todas como leídas»
-   y el lote de 10 del scroll pasaron a `## Decisiones cerradas`. Siguen abiertos:
-   - **Texto exacto del enlace al origen.** El tablero usa «Ver la tanda» y «Ver el archivo».
-     Pero no existe pantalla de una tanda ni de un archivo con error: el enlace lleva a la
-     pantalla donde se subió (R49). Propuesta: «Ver fórmulas» en la estrategia de fórmula y «Ver
-     proveedor» en la de catálogo. Lo mismo vale para el título y el texto de cada aviso (R47).
-   - **Hora relativa.** Falta hasta qué antigüedad se usa y desde cuándo se pasa a fecha. El spec
-     propone la regla de R30, coherente con los ejemplos del tablero («hace 48 min», «ayer 17:05»,
-     «14/10/2026 09:12»).
-5. **¿Las empresas que ya existen arrancan con el añadido prendido?** La migración de QC-277
-   prendió los cinco añadidos de entonces para todas las empresas existentes, y QC-277 D7 dice que
-   una empresa **nueva** nace solo con el núcleo (R20). Para las existentes hay dos opciones:
-   prendido, como hizo QC-277, o apagado hasta que el Maestro lo prenda. El spec propone
-   **prendido**, para que el primer evento llegue sin otro paso. Falta tu confirmación.
-6. **¿El añadido de notificaciones depende de «Integraciones»?** QC-277 D1 dice que
-   «Integraciones» «arrastra la lectura de PDF, Contactos y las notificaciones», y QC-277 D3 lista
-   las notificaciones como añadido propio. El spec propone que **no dependa** de nada: el aviso de
-   PDFs ya depende de la lectura de PDF, y esta de Integraciones. Si D1 quería decir que sí, se
-   añade la dependencia (`ADDON_REQUIRES`) y nada más cambia.
-7. **Un aviso por tanda, no uno por archivo.** El tablero muestra a la vez «Falló la lectura de un
-   archivo» y «Tanda procesada con errores». El spec emite **un solo aviso al terminar la tanda**
-   (R46, R47): evita dos avisos por la misma tanda. Si quieres además un aviso inmediato por cada
-   archivo que falla, es otro evento del catálogo (R6).
-8. **El nombre del archivo no se guarda.** La ruta del PDF es `<empresa>/<uuid>.pdf`, y el nombre
-   que puso quien subió no llega a la base (`lib/modules/documentos/domain/document-path.ts`). Por
-   eso el aviso no puede decir «No se pudo leer "cotizacion-proveedor.pdf"», como el tablero.
-   Guardarlo es una columna nueva en `document_files` y queda fuera de este spec, salvo que lo
-   pidas.
-9. **El proveedor de una tanda de catálogo.** Hoy la tanda no guarda desde qué proveedor se
-   subió, y el aviso no puede llevar a su detalle. El spec propone guardarlo
-   (`document_batches.supplier_id`, opcional, `design.md > 6.3`). La alternativa barata es llevar
-   a la lista de proveedores, que ya es el plan B de R49.
-10. **El alto del panel en el teléfono no coincide dentro del tablero.** La ficha de
-    `NotificacionesMovil.dc.html` aún dice «alto máximo 70 % de la pantalla», pero tu instrucción
-    del 2026-10-16 y el CSS corregido del tablero (`Notificaciones.dc.html`, regla del contenedor
-    de menos de 760 px) lo llevan hasta el borde inferior con scroll interno. El spec sigue tu
-    instrucción (R35) y propone **8 px de margen abajo**, igual que a los lados (la maqueta deja
-    16 px). Confirma el margen inferior; la línea de la ficha se corrige en el próximo pase.
-11. **Ya hay una librería aprobada para la carga al hacer scroll.** `react-intersection-observer`
-    está en `package.json` y en `docs/dependencias.md`, aislada por QC-140 en
-    `app/(private)/proveedores/components/showcase-load-trigger.tsx` (lo vigila
-    `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts`, R18: un solo importador). Tu
-    decisión es usar el `IntersectionObserver` del navegador, sin librería, y el spec la sigue
-    (`design.md > 10.2`, alternativa A11). Si prefieres reutilizar la librería, hay que tocar esa
-    guardia de QC-140 para admitir un segundo importador; nada más cambia.
+4–11. **CERRADAS el 2026-10-19** por el humano (hora relativa y textos, añadido prendido, sin
+   dependencia de «Integraciones», un aviso por tanda, nombre del archivo, destino sin
+   `supplier_id`, margen del teléfono y librería del observador). Ver las filas del 2026-10-19 en
+   `## Decisiones cerradas` y R30, R35, R46, R47, R49–R53.
+
+Sin preguntas abiertas que bloqueen QC-137. Las 2 y 3 son de otras fichas.
+
+**Nota para el próximo pase `/design`, no es una pregunta:** la ficha de
+`NotificacionesMovil.dc.html` todavía dice «alto máximo 70 %» y sus enlaces de ejemplo dicen «Ver
+proveedor». Manda R35 y R49; hay que corregir la ficha para que coincida.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -363,3 +361,11 @@ Vocabulario de este documento:
 | 2026-10-16 | Mecanismo de tiempo real | **Consulta periódica** (polling), y solo con la pestaña visible, detrás de una interfaz propia de entrega al cliente: campana, menú y pestaña «No leídas» leen el conteo sin saber cómo llega. Supabase Realtime Broadcast queda **descartado hoy**, con el camino de migración y su umbral en `design.md`. Sin dependencia nueva ni enmienda a `docs/architecture.md` por esta decisión. Decisión del humano. |
 | 2026-10-16 | ¿Dónde se ve? (revisión) | **Solo campana**, sin página `/notificaciones` ni ítem «Notificaciones» en el menú lateral; el menú lateral no cambia (vuelve a su versión de `dev`). **Sustituye** a la fila «¿Dónde se ve?», deja sin objeto la parte «y menú» de «¿Conteo?» y la parte «y en la página `/notificaciones`» de «Marcar todas como leídas», y las menciones al menú y a la pestaña «No leídas» de «Mecanismo de tiempo real». Decisión del humano, reflejada en Jira y en los tableros. |
 | 2026-10-16 | Historial en el panel | El panel de la campana muestra **todos los avisos guardados (hasta 90 días)** con **carga automática al hacer scroll**: trae 10 y, al acercarse al final, pide los siguientes, con el `IntersectionObserver` del navegador y sin librería. Al final de la lista: «Cargando más avisos…», error con «Reintentar» que conserva lo ya cargado, y «No hay más avisos. Se conservan 90 días.». En el teléfono el panel se ancla a la pantalla, no a la campana. Decisión del humano, reflejada en Jira y en los tableros. |
+| 2026-10-19 | ¿Un aviso por tanda o por archivo? | **Uno por tanda**, al terminar. No hay aviso por cada archivo fallido. Decisión del humano (pregunta 7). |
+| 2026-10-19 | ¿Adónde lleva el aviso de PDFs? | A donde se subió la tanda: la lista de **Fórmulas** si se subió desde Fórmulas, y la **lista de Proveedores** si se subió desde un proveedor. **No se guarda `supplier_id`.** Enlaces «Ver fórmulas» / «Ver proveedores». Decisión del humano (pregunta 9). |
+| 2026-10-19 | ¿Empresas existentes? | El añadido arranca **prendido** en las empresas que ya existen, con una migración como la de QC-277. Las nuevas nacen apagadas (QC-277 D7). Decisión del humano (pregunta 5). |
+| 2026-10-19 | ¿Depende de «Integraciones»? | **No.** El añadido no depende de ningún otro. Decisión del humano (pregunta 6). |
+| 2026-10-19 | ¿Con qué se hace la carga al hacer scroll? | Con **`react-intersection-observer`**, ya aprobada. Se amplía la guardia de QC-140 para admitir el archivo nuevo que la importa, con su test. **Sustituye** la parte «con el `IntersectionObserver` del navegador y sin librería» de la fila «Historial en el panel»: la había propuesto el leader en el tablero, no fue decisión del humano. Decisión del humano (pregunta 11). |
+| 2026-10-19 | ¿Se nombra el archivo que falló? | **Sí.** Se guarda el nombre original de cada archivo (columna nueva, migración con `down.sql`). Los archivos ya guardados quedan sin nombre y su aviso usa el texto genérico. Con varios fallidos, el aviso los nombra con un tope y «y N más» (R51). Decisión del humano (pregunta 8). |
+| 2026-10-19 | Hora relativa y textos | Relativa hasta 7 días («hace 3 min», «hace 5 h», «hace 3 días»); después, fecha y hora («14/10/2026 09:12»). Textos de los avisos: los del tablero, ajustados a lo anterior. Decisión del humano (pregunta 4). |
+| 2026-10-19 | Panel en el teléfono | 8 px a los lados y 16 px abajo. Decisión del humano (pregunta 10). |
