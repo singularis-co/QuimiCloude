@@ -59,6 +59,8 @@ Ninguna. P1–P4 cerradas por el humano en F1.4 (ver «Decisiones cerradas»).
 | D5 | Los statuses no retroceden | Meta no garantiza el orden. |
 | 2026-10-19 | P1–P4 (F1.4) | Aprobadas como las propuso el spec: P1 la consulta de `company_id` por id de conexión sin filtro de empresa, como excepción con nombre en `guard-ambito-empresa-integraciones`; P2 add-on `integraciones` apagado = conexión deshabilitada; P3 `failed` es final; P4 GET en `disabled` → 403, GET válido en `error` marca `lastWebhookAt` sin cambiar el estado, POST solo toca `lastWebhookAt`. |
 | 2026-10-19 | ¿Spec aprobado? | Sí, por el humano en F1.4. |
+| 2026-10-19 | F2.1, contraste con la doc de Meta (Graph v24+): ¿reacción quitada? | `reaction.emoji` es opcional; ausente o vacío = reacción quitada. Enmienda R19/R20. |
+| 2026-10-19 | F2.1: ¿qué identifica al remitente, `from` o `contacts[].wa_id`? | `contacts[].wa_id` cuando el cuerpo trae un solo contacto; si no, `from`. Es el `wa_id` del contacto (único `(connection_id, wa_id)`) y el que usará QC-239. `from` queda en el `payload`. Enmienda R16 y R29. |
 
 ## Requisitos (EARS)
 
