@@ -65,7 +65,7 @@
     de `components/modulos/` importa `@/lib/composition`, `next/headers`, `assertPermission` ni
     `requirePagePermission`); el barrel solo exporta `CompanyModulesTab` y su tipo.
 
-- [ ] **T6 — Montaje en el detalle, test de QC-166 y E2E** (R1, R25) · depende de T5
+- [x] **T6 — Montaje en el detalle, test de QC-166 y E2E** (R1, R25) · depende de T5
   - `app/(private)/maestro/empresas/[id]/page.tsx`: sustituir el comentario de la l. 120 por la
     línea de montaje de design § 3 (`isDeleted={company.status === 'deleted'}`,
     `canModify={canModify}`) y añadir `CompanyModulesTab` al import de `'./components'`
@@ -85,9 +85,8 @@
     verde (incluida `guard-identificador-de-request`); el E2E pasa en Chromium y WebKit;
     verificación manual en 390 px y 768 px contra `MaestroEmpresaMovil.dc.html` y
     `MaestroEmpresaTablet.dc.html` anotada en el `impl`.
-  - **Estado (2026-10-19, implementer):** todo hecho y el E2E en verde en Chromium y WebKit. Falta
-    solo la verificación manual a 390 y 768 px, que queda para el humano porque el repo no
-    tiene un patrón de capturas.
+  - **Estado (2026-10-19, implementer):** todo hecho y el E2E en verde en Chromium y WebKit. La
+    verificación manual a 390 y 768 px la hizo el humano (Carlos Restrepo) el 2026-10-19.
 
 - [x] **T6b — Enmienda tras la tanda 1** (R5, R12, R16; design § 0.1, E17–E19) · depende de T6
   - `lib/shared/ui/addon-details.ts` (nuevo): `ADDON_DETAILS` como `Record<AddonNameKey, {

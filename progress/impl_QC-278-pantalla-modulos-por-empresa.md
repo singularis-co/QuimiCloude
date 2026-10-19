@@ -309,3 +309,7 @@ pnpm exec vitest run tests/ui/maestro/company-detail-page.test.tsx tests/unit/ma
 npx tsc --noEmit -p .        0 errores (frontend_dev)
 npx eslint <los 2 archivos>  No issues found (frontend_dev)
 ```
+
+## Verificación manual (T6)
+
+- 2026-10-19 · Carlos Restrepo revisó a mano la pestaña Módulos a 390 px y 768 px contra `MaestroEmpresaMovil.dc.html` y `MaestroEmpresaTablet.dc.html`: «ya lo revisé, dale». Sin cambios pedidos.
