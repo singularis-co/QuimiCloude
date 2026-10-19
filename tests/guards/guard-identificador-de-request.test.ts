@@ -754,6 +754,9 @@ export const MIGRACIONES_ESPERADAS = [
   // y sin pedido; no tocan el identificador.
   '20261016130000_inventory_movement_kind_direct_delivery',
   '20261016130100_direct_deliveries',
+  // 2026-10-19: correctiva, quita `whatsapp_connections.meta_app_id` que QC-237 retiro editando la
+  // migracion original; no toca el identificador.
+  '20261019120000_whatsapp_connections_drop_meta_app_id',
 ] as const
 
 export function hallazgosDeMigraciones(
