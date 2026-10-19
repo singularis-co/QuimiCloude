@@ -162,7 +162,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 7 — Revisión de importación (depende de T3a) [P con 2, 4–6]
 
-- [ ] **T7a.** (D15, R37–R43) `importar/[documentoId]/page.tsx` y sus cuatro componentes. Test nuevo
+- [x] **T7a.** (D15, R37–R43) `importar/[documentoId]/page.tsx` y sus cuatro componentes. Test nuevo
   `tests/unit/recetas-ui/formula-import-layout.test.tsx`: «Volver al listado» con flecha, `h1` único,
   tarjetas con «N · S %» y la suma de hoy, número y «Referencia del PDF» por ingrediente, quitar con
   «Quitar el ingrediente N» y el texto oculto bajo 640 px, «Añadir ingrediente» discontinuo, «Confirmar»
