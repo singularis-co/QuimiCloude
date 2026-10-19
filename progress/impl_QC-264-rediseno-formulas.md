@@ -204,6 +204,27 @@ por `href` y `data-direction="back"`).
 y `formula-import-summary`; `IngredientRowState`, `toDraftLine`/`toConfirmLine`, `buildConfirmReasons`
 y los manejadores no se tocaron. `page.tsx` conserva sus tres primeras líneas.
 
+## Tanda 8 (2026-10-19)
+
+| Tarea | Commit | Qué | Casos |
+| --- | --- | --- | --- |
+| Rótulos (decisión humana 1) | `799d9d85` | `card-field-label.tsx` sube de inventario a `components/shared` (mismo código y exports), fila nueva en `CATALOGO.md`, imports de inventario y `product-cards.test.tsx` actualizados; `recipe-columns.tsx` rotula `stepCount`, `createdAt`, `updatedAt` con `withCardFieldLabel` | `recipe-cards.test.tsx`: R5 ×2 (rótulo y cifra en mono; rótulo oculto en la fila) |
+| T8a | `a48b61ea` | Sin cambio de código: ningún archivo de `app/`, `components/`, `lib/`, `tests/` ni `e2e/` tiene los cuatro textos viejos. E17/P18 sin tocar | — |
+| T8b | `51f5d61c` | `tests/unit/recetas-ui/formulas-toasts.test.tsx`, `sonner` simulado | R46 ×13 (7 éxitos con un único `toast.success`, 6 errores sin toast) |
+| T8c | `041299ad` | `tests/guards/guard-formulas-rediseno.test.ts` | R44 ×3, R45 ×2 |
+
+- **Prueba de rojo de la guardia:** una copia temporal `components/zz-guardia-temporal.tsx` que importa
+  `Badge` dio «1 failed | 4 passed» (`zz-guardia-temporal.tsx:1 importa Badge`); borrada.
+- **Snapshots:** `recetas-paridad`, solo «R1 R16-R18 — con filas» (rótulo oculto en celdas y en
+  tarjetas). Inventario: ningún snapshot cambió.
+- **Salidas:** typecheck limpio; lint 0 errores (10 avisos ajenos); `vitest related` (rótulos) 69
+  archivos, 1235/1235; `guard + paridad + module-contract` 105 archivos, 1535 ok / 20 skip;
+  `formulas-toasts` 13/13; `guard-formulas-rediseno` 5/5; `vitest run guard` 82 archivos, 1111 ok / 20 skip.
+- **Desviación:** el rótulo de la tarjeta sale en mono, como la cifra. `DataTable` pone `font-mono` al
+  campo entero de una columna `tabular`; el tablero (`Formulas.dc.html:66`) solo pone la cifra en mono.
+  Inventario ya se ve así; cambiarlo toca `DataTable` y los snapshots de inventario. Anotado en el «No
+  cubre» de la fila del catálogo. Pendiente de decisión (o deuda, T9c).
+
 ## Archivos creados / modificados
 
 Ver las tablas de cada tanda. Nuevos: `components/form-footer-bar.tsx`, `components/recipe-version-tones.ts`
@@ -230,8 +251,8 @@ Ver las tablas de cada tanda. Nuevos: `components/form-footer-bar.tsx`, `compone
 | R32, R36 | `recipe-version-pages.test.tsx`, `recipe-version-form.test.tsx` |
 | R33, R34, R35 | `recipe-version-marks.test.tsx`, `badges-estado.test.tsx` |
 | R37–R43 | `formula-import-layout.test.tsx`, `formula-import-page.test.tsx`, `formula-import-review.test.tsx` |
-| R44, R45 | guardia `guard-formulas-rediseno` pendiente (T8c); R45 de la subida en `document-upload-tones` |
-| R46 | `formulas-toasts.test.tsx` pendiente (T8b) |
+| R44, R45 | `tests/guards/guard-formulas-rediseno.test.ts`; R45 de la subida en `document-upload-tones` |
+| R46 | `tests/unit/recetas-ui/formulas-toasts.test.tsx` |
 | R47 | E2E pendiente (T9a) |
 | R48 | `guard-catalogo-de-componentes.test.ts` |
 | R49 | `recipe-form.test.tsx`, `guard-pantallas-de-anadido`, E2E existentes (T9b) |
@@ -259,14 +280,19 @@ Cierre de las tandas 2–7 (HEAD `1b61a76b`):
   sigue siendo `onAction`.
 - **T2b, rótulos de la tarjeta (abierto).** El tablero (`Formulas.dc.html:66`) pinta «Pasos N · Creado … ·
   Actualizado …»; D3 no dice cómo, y la pieza que lo hace (`card-field-label.tsx`) vive solo en
-  inventario. Las tarjetas salen sin rótulos. Decisión pendiente: subirla a `components/shared`
-  (segunda ruta) o deuda.
+  inventario. Las tarjetas salían sin rótulos. **Decidido (humano, 2026-10-19):** sube a
+  `components/shared` con su fila en el catálogo, inventario actualiza sus imports y las tarjetas de
+  Fórmulas la usan (tanda 8).
 - **T2b, barrel.** `recipeRowActionsSpec`, `RecipeRowActionsSpec`, `RecipeRowAction` y
   `RECIPE_ROW_ACTION_LABELS` no están en `components/index.ts`; los tests importan del archivo. Ninguna
   `page.tsx` los usa.
 - **T3d / T7a, snapshots que no existen.** `confirmaciones-paridad` no tiene caso de propagar y
   `recetas-paridad` no tiene casos de la revisión de importación ni de formulario con datos (solo
   errores): `design.md > 6` los daba por existentes. No se dieron de alta; lo cubren los tests nuevos.
+  **Corrección (humano, Carlos Restrepo, 2026-10-19):** confirmado, NO se dan de alta. Las filas de
+  `design.md > 6` que nombran propagar (confirmaciones-paridad) y formulario/revisión
+  (recetas-paridad) quedan sin efecto; su cobertura es `propagate-versions-dialog.test.tsx`,
+  `recipe-form-layout.test.tsx`, `recipe-form-preview.test.tsx` y `formula-import-layout.test.tsx`.
 - **T4a.** Sin `opacity-70` en la tarjeta tomada (el tablero no la atenúa). Testids nuevos `-number-N`
   y `-bar`. El tablero de evidencia aún dibuja quitar en tercera columna y botón final: manda la
   enmienda (P16).
