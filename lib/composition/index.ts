@@ -2787,7 +2787,7 @@ const whatsappWebhookDeps = {
   inbox: whatsappInboxRepository,
 };
 
-type WhatsappWebhookUrl ={ readonly url: string; readonly complete: boolean };
+type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
 
 /** Sin `APP_BASE_URL` devuelve la ruta relativa: la pantalla avisa en vez de fallar. */
 function whatsappWebhookUrl(connectionId: string): WhatsappWebhookUrl {
