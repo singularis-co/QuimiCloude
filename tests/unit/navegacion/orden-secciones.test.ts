@@ -30,7 +30,6 @@ import {
 } from '@/lib/shared/navigation/private-nav';
 import {
   ASSIGNED_ORDERS_ROUTE,
-  CUSTOMERS_ROUTE,
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
@@ -72,7 +71,7 @@ describe('orden de secciones y entradas del menu', () => {
       { label: NAV_SECTION_TRACKING, items: [DASHBOARD_ROUTE] },
       { label: NAV_SECTION_OPERATION, items: [INVENTORY_ROUTE, ORDERS_ROUTE, ASSIGNED_ORDERS_ROUTE] },
       { label: NAV_SECTION_PRODUCTION, items: [FORMULAS_ROUTE] },
-      { label: NAV_SECTION_DIRECTORY, items: [SUPPLIERS_ROUTE, CUSTOMERS_ROUTE] },
+      { label: NAV_SECTION_DIRECTORY, items: [SUPPLIERS_ROUTE, 'nav-clientes'] },
       {
         label: NAV_SECTION_CONFIGURATION,
         items: [USERS_ROUTE, PRESENTATIONS_ROUTE, UNITS_ROUTE, 'nav-integraciones'],

@@ -1,6 +1,7 @@
 import {
   AI_PROVIDER_INTEGRATION_ROUTE,
   ASSIGNED_ORDERS_ROUTE,
+  CUSTOMER_CONTACTS_ROUTE,
   CUSTOMERS_ROUTE,
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
@@ -119,6 +120,7 @@ export const USERS_LABEL = 'Usuarios';
  * Mismo criterio que `SUPPLIERS_LABEL`, `ORDERS_LABEL`, `PRESENTATIONS_LABEL` y `UNITS_LABEL`.
  */
 export const CUSTOMERS_LABEL = 'Clientes';
+export const CUSTOMER_CONTACTS_LABEL = 'Contactos';
 
 /** Lleva tilde a proposito: es el texto que se lee en pantalla, no el segmento de la URL. */
 export const ASSIGNED_ORDERS_LABEL = 'Asignación';
@@ -323,16 +325,31 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     icon: 'truck',
     section: NAV_SECTION_DIRECTORY,
   },
-  // El permiso es el mismo que exige la pantalla con `requirePagePermission`; lo vigila
-  // `tests/unit/clientes-ui/private-nav-clientes.test.ts`, que lo lee de la fuente de `page.tsx`.
+  // El permiso de cada hijo es el que exige su pantalla con `requirePagePermission`; lo vigila
+  // `tests/unit/clientes-ui/private-nav-clientes.test.ts`, que lo lee de la fuente de cada
+  // `page.tsx`.
   {
-    kind: 'link',
-    href: CUSTOMERS_ROUTE,
+    kind: 'group',
     label: CUSTOMERS_LABEL,
     testId: 'nav-clientes',
-    permission: 'clientes.consultar',
     icon: 'square-user',
     section: NAV_SECTION_DIRECTORY,
+    items: [
+      {
+        kind: 'link',
+        href: CUSTOMERS_ROUTE,
+        label: CUSTOMERS_LABEL,
+        testId: 'nav-clientes-lista',
+        permission: 'clientes.consultar',
+      },
+      {
+        kind: 'link',
+        href: CUSTOMER_CONTACTS_ROUTE,
+        label: CUSTOMER_CONTACTS_LABEL,
+        testId: 'nav-clientes-contactos',
+        permission: 'clientes.consultar',
+      },
+    ],
   },
   // El permiso es el mismo que exige la pantalla con `requirePagePermission`; lo vigila
   // `tests/unit/configuracion-ui/private-nav-usuarios.test.ts`, que lo lee de la fuente de
