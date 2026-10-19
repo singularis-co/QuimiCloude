@@ -534,3 +534,7 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 ### D67 — `srOnlyLabel` se ignora en columnas ordenables
 - **Origen:** review de QC-288, vuelta 2, hallazgo H6 (menor). En `components/shared/data-table/data-table-header-menu.tsx`, `srOnlyLabel` solo se aplica a columnas no ordenables.
 - **Qué falta:** documentarlo en el tipo y en `CATALOGO.md`, o aplicarlo también al botón de ordenar. Hoy no afecta a nada: `actionsColumn` nunca es ordenable.
+
+### D68 — `confirmaciones-paridad.test.tsx` intermitente («R1 R13 — pendiente, con la operacion en vuelo»)
+- **Origen:** CI del PR #269 (QC-288), 2026-10-19. Falló una vez con la instantánea del estado de usuario distinta y pasó al relanzar la ejecución completa sin cambios de código. QC-288 no toca ese componente.
+- **Qué falta:** estabilizar el caso «en vuelo» (esperar el estado pendiente antes de la instantánea, o no capturar el popover). Si vuelve a fallar en otra rama, va al baseline con su motivo.
