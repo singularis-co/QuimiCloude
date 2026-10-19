@@ -7,10 +7,7 @@ export type PurgeExpiredNotificationsDeps = {
   readonly now: () => Date;
 };
 
-/**
- * Sin actor ni añadido: lo llama la tarea diaria, una empresa cada vez, y borra también con el
- * añadido apagado.
- */
+/** Sin actor: lo llama la tarea diaria, una empresa cada vez, viva o dada de baja. */
 export function createPurgeExpiredNotifications(deps: PurgeExpiredNotificationsDeps) {
   return async function purgeExpiredNotifications(
     companyId: string,

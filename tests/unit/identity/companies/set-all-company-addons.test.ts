@@ -1,4 +1,4 @@
-// Prender o apagar los seis añadidos a la vez con el puerto simulado; los dobles no previstos
+// Prender o apagar los cinco añadidos a la vez con el puerto simulado; los dobles no previstos
 // fallan si se les llama.
 import { describe, expect, it, vi } from 'vitest';
 
@@ -68,7 +68,7 @@ describe('setAllCompanyAddons', () => {
     });
   }
 
-  it('R29: prender todos es UNA llamada al puerto con los seis en enable', async () => {
+  it('R29: prender todos es UNA llamada al puerto con los cinco en enable', async () => {
     const { setAllCompanyAddons, apply } = setup();
 
     await setAllCompanyAddons(MAESTRO, { companyId: COMPANY_ID, enabled: true });
@@ -82,7 +82,7 @@ describe('setAllCompanyAddons', () => {
     });
   });
 
-  it('R29: apagar todos es UNA llamada al puerto con los seis en disable', async () => {
+  it('R29: apagar todos es UNA llamada al puerto con los cinco en disable', async () => {
     const { setAllCompanyAddons, apply } = setup({ stored: [], changed: [] });
 
     await setAllCompanyAddons(MAESTRO, { companyId: COMPANY_ID, enabled: false });
@@ -93,23 +93,6 @@ describe('setAllCompanyAddons', () => {
       disable: [...ADDONS],
       actorId: MAESTRO.id,
       now: NOW,
-    });
-  });
-
-  it('QC-137 R53: prender todos incluye notificaciones y, sin dependencias, también queda activo', async () => {
-    const { setAllCompanyAddons, apply } = setup({
-      stored: [...ADDONS],
-      changed: ADDONS.map((addon) => ({ addon, enabled: true })),
-    });
-
-    const vista = await setAllCompanyAddons(MAESTRO, { companyId: COMPANY_ID, enabled: true });
-
-    expect(apply.mock.calls[0]?.[0].enable).toContain('notificaciones');
-    expect(vista.addons.find((a) => a.addon === 'notificaciones')).toEqual({
-      addon: 'notificaciones',
-      enabled: true,
-      active: true,
-      requires: [],
     });
   });
 

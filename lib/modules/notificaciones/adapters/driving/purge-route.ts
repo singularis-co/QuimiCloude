@@ -1,6 +1,6 @@
 /**
  * La tarea diaria que borra los avisos vencidos. Sin usuario delante: la única puerta es el
- * secreto del cron, y se comprueba antes de leer nada. Borra también con el añadido apagado.
+ * secreto del cron, y se comprueba antes de leer nada. Recorre también las empresas dadas de baja.
  */
 import { notificaciones } from '@/lib/composition';
 

@@ -1,16 +1,12 @@
 // El resumen que el navegador consulta cada 30 s: conteo y aviso más reciente, sin lista.
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  createGetNotificationSummary,
-  NOTIFICATIONS_READ_PERMISSION,
-} from '@/lib/modules/notificaciones';
+import { createGetNotificationSummary } from '@/lib/modules/notificaciones';
 
 const READER = {
   id: '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40',
   companyId: '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13',
   roleName: null,
-  permissions: [NOTIFICATIONS_READ_PERMISSION],
 };
 
 describe('resumen de la bandeja', () => {

@@ -11,7 +11,7 @@ export type NotificationSummary =
   | { readonly status: 'ready'; readonly unreadCount: number; readonly newest: NewestNotificationRef }
   | { readonly status: 'error' };
 
-export type FeedStopReason = 'unauthorized' | 'forbidden';
+export type FeedStopReason = 'unauthorized';
 
 export interface NotificationFeed {
   start(
@@ -52,7 +52,7 @@ async function fetchOnce(fetchSummary: PollingFeedDeps['fetchSummary']): Promise
         summary: { status: 'ready', unreadCount: result.data.unreadCount, newest: result.data.newest },
       };
     }
-    if (result.code === 'unauthorized' || result.code === 'forbidden') {
+    if (result.code === 'unauthorized') {
       return { kind: 'stop', reason: result.code };
     }
     return { kind: 'summary', summary: { status: 'error' } };

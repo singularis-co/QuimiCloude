@@ -40,7 +40,7 @@ function engine(catalog: NotificationCatalog) {
   const notify = createNotify({
     catalog,
     inbox: { insertIfAbsent },
-    addon: { isOn: async () => true },
+    companies: { isActive: async () => true },
     recipients: { belongsToCompany },
     channels: createChannelFactory({ in_app: { key: 'in_app', deliver } }),
     log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },

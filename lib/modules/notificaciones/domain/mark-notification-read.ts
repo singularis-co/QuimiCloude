@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type { NotificationInbox } from '../ports/notification-inbox';
 
-import { inboxScopeOf, NOTIFICATIONS_READ_PERMISSION, requirePermission, type Actor } from './actor';
+import { inboxScopeOf, type Actor } from './actor';
 import { ValidationError } from './errors';
 
 export const notificationIdSchema = z.uuid();
@@ -17,10 +17,9 @@ export type MarkNotificationReadOutcome = 'marked' | 'not_found';
 
 export function createMarkNotificationRead(deps: MarkNotificationReadDeps) {
   return async function markNotificationRead(
-    actor: Actor | null | undefined,
+    actor: Actor,
     notificationId: unknown,
   ): Promise<MarkNotificationReadOutcome> {
-    requirePermission(actor, NOTIFICATIONS_READ_PERMISSION);
     const parsed = notificationIdSchema.safeParse(notificationId);
     if (!parsed.success) throw new ValidationError('markNotificationRead: id no es uuid');
 

@@ -505,7 +505,10 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
-import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
+import {
+  listActiveCompanyIds,
+  listAllCompanyIds,
+} from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import { createSetCompanyCountry } from '@/lib/modules/identity';
 import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
 import {
@@ -525,6 +528,7 @@ import {
 import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma';
 import {
   createGetCompanyAddons,
+  createIsCompanyActive,
   createIsCompanyAddonActive,
   createIsUserInCompany,
   createSetAllCompanyAddons,
@@ -839,6 +843,7 @@ const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAlive
 
 const companyRepository = createCompanyRepository();
 const companyAddonRepository = createCompanyAddonRepository();
+const companyMembershipReader = createCompanyMembershipReader();
 
 // `orders` es de `pedidos`: `identity` solo ve el puerto.
 const companyOpenOrdersCounter: CompanyOpenOrdersCounter = {
@@ -989,7 +994,8 @@ export const identity = {
   listCompanyEvents: createListCompanyEvents({ companies: companyRepository }),
   // Sin actor: la usan los trabajos que corren sin sesión.
   isCompanyAddonActive: createIsCompanyAddonActive({ addons: companyAddonRepository }),
-  isUserInCompany: createIsUserInCompany({ members: createCompanyMembershipReader() }),
+  isUserInCompany: createIsUserInCompany({ members: companyMembershipReader }),
+  isCompanyActive: createIsCompanyActive({ members: companyMembershipReader }),
   getCompanyAddons: createGetCompanyAddons({ addons: companyAddonRepository }),
   setCompanyAddon: createSetCompanyAddon({ addons: companyAddonRepository }),
   setAllCompanyAddons: createSetAllCompanyAddons({ addons: companyAddonRepository }),
@@ -2801,7 +2807,7 @@ import {
 import { createInAppChannel } from '@/lib/modules/notificaciones/adapters/driven/channels/in-app-channel';
 import { createNotificationLogConsole } from '@/lib/modules/notificaciones/adapters/driven/observability/notification-log-console';
 import { createNotificationInboxPrisma } from '@/lib/modules/notificaciones/adapters/driven/persistence/notification-inbox-prisma';
-import type { NotificationsSwitch } from '@/lib/modules/notificaciones/ports/notifications-switch';
+import type { CompanyStatus } from '@/lib/modules/notificaciones/ports/company-status';
 import type { RecipientDirectory } from '@/lib/modules/notificaciones/ports/recipient-directory';
 
 const notificationLog = createNotificationLogConsole();
@@ -2811,9 +2817,8 @@ const notificationsClock = () => new Date();
 // Hoy solo el canal de la aplicación; los demás se registran aquí cuando existan.
 const notificationChannels: ChannelRegistry = { in_app: createInAppChannel(notificationLog) };
 
-// La clave del añadido vive aquí: `notificaciones` no conoce el catálogo de añadidos.
-const notificationsSwitch: NotificationsSwitch = {
-  isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'notificaciones'),
+const notificationCompanies: CompanyStatus = {
+  isActive: (companyId) => identity.isCompanyActive(companyId),
 };
 
 const notificationRecipients: RecipientDirectory = {
@@ -2827,7 +2832,7 @@ export const notificaciones = {
   notify: createNotify({
     catalog: NOTIFICATION_CATALOG,
     inbox: notificationInbox,
-    addon: notificationsSwitch,
+    companies: notificationCompanies,
     recipients: notificationRecipients,
     channels: createChannelFactory(notificationChannels),
     log: notificationLog,
@@ -2839,5 +2844,5 @@ export const notificaciones = {
   purgeExpiredNotifications: createPurgeExpiredNotifications(notificationReadDeps),
   // La tarea diaria de borrado: la misma puerta que el cron de pedidos y las empresas de una en una.
   verifyCronSecret,
-  listCompanyIds: listActiveCompanyIds,
+  listCompanyIds: listAllCompanyIds,
 } as const;

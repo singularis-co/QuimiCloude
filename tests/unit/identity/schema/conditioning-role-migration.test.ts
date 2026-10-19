@@ -68,10 +68,7 @@ const downSource = readFileSync(join(migrationDir, 'down.sql'), 'utf8')
 
 const ROL_SEED_ROW = SEED_ROLES.find((role) => role.name === ROLE_ACONDICIONAMIENTO)
 const PERMISO = PERMISSIONS.find((permission) => permission.code === CODIGO)
-// `notificaciones.consultar` llega al rol en una migracion posterior, no en esta.
-const CODIGOS_DEL_ROL = (SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? []).filter(
-  (codigo) => codigo !== 'notificaciones.consultar',
-)
+const CODIGOS_DEL_ROL = SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? []
 
 const OTROS_ROLES = [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO] as const
 

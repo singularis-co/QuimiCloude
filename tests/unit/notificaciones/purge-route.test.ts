@@ -105,6 +105,22 @@ describe('notificaciones — la tarea diaria de borrado', () => {
     expect(consoleError).toHaveBeenCalledWith('notification_purge_failed', { companyId: B, error: 'Error' });
   });
 
+  it('R17: recorre también las empresas dadas de baja', async () => {
+    // La lista de la fachada es la de todas las empresas (lo fija `notificaciones-wiring.test.ts`); la
+    // ruta no filtra ninguna por su estado.
+    const DE_BAJA = '44444444-4444-4444-8444-444444444444';
+    verifyCronSecret.mockReturnValue('ok');
+    listCompanyIds.mockResolvedValue([A, DE_BAJA]);
+    purgeExpiredNotifications.mockResolvedValue({ deleted: 3 });
+
+    const response = await GET(request({ authorization: 'Bearer bueno' }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ deleted: 6 });
+    expect(listCompanyIds).toHaveBeenCalledTimes(1);
+    expect(purgeExpiredNotifications.mock.calls).toEqual([[A], [DE_BAJA]]);
+  });
+
   it('R17: sin empresas no borra nada y responde 200', async () => {
     verifyCronSecret.mockReturnValue('ok');
     listCompanyIds.mockResolvedValue([]);

@@ -47,7 +47,7 @@ function engine() {
   const notify = createNotify({
     catalog: NOTIFICATION_CATALOG,
     inbox: { insertIfAbsent },
-    addon: { isOn: async () => true },
+    companies: { isActive: async () => true },
     recipients: { belongsToCompany: async () => true },
     channels: createChannelFactory({ in_app: { key: 'in_app', deliver: async () => undefined } }),
     log,

@@ -62,7 +62,7 @@ let adminUsername = '';
 let adminPassword = '';
 
 /**
- * Deja prendidos exactamente `addons`: una excepción por cada añadido, `enabled = true` si
+ * Deja prendidos exactamente `addons`: una excepción por cada uno de los cinco, `enabled = true` si
  * está en la lista y `false` si no (apagar no borra la fila). Sin autor, como el fixture (P7).
  */
 async function setAddons(addons: readonly Addon[]): Promise<void> {
@@ -223,7 +223,7 @@ test.describe('módulos por empresa', () => {
     expect(redirectChain(response)).toEqual([LOGIN_ROUTE, HOME_ROUTE, INVENTORY_ROUTE]);
   });
 
-  test('al prender todos los añadidos con la sesión abierta, la siguiente petición trae los enlaces, el botón de importar, el dashboard y el logo al dashboard sin volver a entrar (R36, R9, R18)', async ({
+  test('al prender los cinco añadidos con la sesión abierta, la siguiente petición trae los enlaces, el botón de importar, el dashboard y el logo al dashboard sin volver a entrar (R36, R9, R18)', async ({
     page,
   }) => {
     await setAddons([]);

@@ -1,6 +1,6 @@
 import type { InboxItem, NotificationInbox } from '../ports/notification-inbox';
 
-import { inboxScopeOf, NOTIFICATIONS_READ_PERMISSION, requirePermission, type Actor } from './actor';
+import { inboxScopeOf, type Actor } from './actor';
 import { ValidationError } from './errors';
 import {
   decodeNotificationCursor,
@@ -27,10 +27,9 @@ export type NotificationBatch = {
  */
 export function createListNotifications(deps: ListNotificationsDeps) {
   return async function listNotifications(
-    actor: Actor | null | undefined,
+    actor: Actor,
     input: unknown,
   ): Promise<NotificationBatch> {
-    requirePermission(actor, NOTIFICATIONS_READ_PERMISSION);
     const parsed = listNotificationsInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError('listNotifications: entrada no valida');
     const after = parsed.data.cursor === null ? null : decodeNotificationCursor(parsed.data.cursor);

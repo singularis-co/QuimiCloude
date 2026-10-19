@@ -2,9 +2,9 @@
 
 import { identity, notificaciones } from '@/lib/composition';
 import {
+  decodeNotificationCursor,
   listNotificationsInputSchema,
   notificationIdSchema,
-  UnauthorizedError,
   ValidationError,
   type Actor,
   type NotificationItem,
@@ -14,16 +14,8 @@ import { runInRequestScope } from '@/lib/shared/request-scope';
 
 import { notificationHref } from './notification-links';
 
-/**
- * `unauthorized`: no hay sesión. `forbidden`: hay sesión pero no el permiso efectivo (también con el
- * añadido apagado). Con cualquiera de los dos el navegador deja de consultar.
- */
-export type NotificationActionCode =
-  | 'unauthorized'
-  | 'forbidden'
-  | 'invalid_input'
-  | 'not_found'
-  | 'unexpected';
+/** `unauthorized` solo cuando no hay sesión: con él el navegador deja de consultar. */
+export type NotificationActionCode = 'unauthorized' | 'invalid_input' | 'not_found' | 'unexpected';
 
 export type NotificationActionFailure = { readonly ok: false; readonly code: NotificationActionCode };
 
@@ -54,21 +46,28 @@ export type NotificationBatchView = {
 
 const log = forModule('notificaciones');
 
-async function currentActor(): Promise<Actor | null> {
+/**
+ * `no_company`: hay sesión pero no empresa (el Maestro). No tiene bandeja, así que recibe respuestas
+ * vacías y la consulta del navegador sigue sin errores.
+ */
+type CurrentActor =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'no_company' }
+  | { readonly kind: 'company'; readonly actor: Actor };
+
+async function currentActor(): Promise<CurrentActor> {
   const [sessionUser, sessionContext] = await runInRequestScope(() =>
     Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
   );
-  if (sessionUser === null || sessionContext === null) return null;
+  if (sessionUser === null) return { kind: 'none' };
+  if (sessionContext === null) return { kind: 'no_company' };
   return {
-    id: sessionUser.id,
-    companyId: sessionContext.companyId,
-    roleName: sessionUser.roleName,
-    permissions: sessionUser.permissions,
+    kind: 'company',
+    actor: { id: sessionUser.id, companyId: sessionContext.companyId, roleName: sessionUser.roleName },
   };
 }
 
 function failure(error: unknown, action: string): NotificationActionFailure {
-  if (error instanceof UnauthorizedError) return { ok: false, code: 'forbidden' };
   if (error instanceof ValidationError) return { ok: false, code: 'invalid_input' };
   // Solo el nombre: el mensaje puede traer datos de la consulta.
   log.error('notification_action_failed', {
@@ -93,13 +92,16 @@ function toView(item: NotificationItem): NotificationView {
 }
 
 const UNAUTHORIZED: NotificationActionFailure = { ok: false, code: 'unauthorized' };
+const NOT_FOUND: NotificationActionFailure = { ok: false, code: 'not_found' };
 
 /** El conteo y el más reciente. Es lo que el navegador consulta cada 30 s. */
 export async function getNotificationSummaryAction(): Promise<
   NotificationActionResult<NotificationSummaryView>
 > {
-  const actor = await currentActor();
-  if (actor === null) return UNAUTHORIZED;
+  const current = await currentActor();
+  if (current.kind === 'none') return UNAUTHORIZED;
+  if (current.kind === 'no_company') return { ok: true, data: { unreadCount: 0, newest: null } };
+  const { actor } = current;
   try {
     const summary = await notificaciones.getNotificationSummary(actor);
     log.info('notification_summary_read', { companyId: actor.companyId });
@@ -118,18 +120,21 @@ export async function getNotificationSummaryAction(): Promise<
   }
 }
 
-/**
- * Un lote de hasta 10. Una entrada que no pasa el esquema llega cruda al caso de uso: así el
- * permiso se comprueba antes que la forma, y quien no lo tiene recibe `forbidden` igual.
- */
+/** Un lote de hasta 10. */
 export async function listNotificationsAction(
   input: unknown,
 ): Promise<NotificationActionResult<NotificationBatchView>> {
-  const actor = await currentActor();
-  if (actor === null) return UNAUTHORIZED;
+  const current = await currentActor();
+  if (current.kind === 'none') return UNAUTHORIZED;
   const parsed = listNotificationsInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: 'invalid_input' };
   try {
-    const batch = await notificaciones.listNotifications(actor, parsed.success ? parsed.data : input);
+    if (current.kind === 'no_company') {
+      // Sin bandeja que leer, pero un cursor mal formado se rechaza igual que con empresa.
+      if (parsed.data.cursor !== null) decodeNotificationCursor(parsed.data.cursor);
+      return { ok: true, data: { items: [], nextCursor: null } };
+    }
+    const batch = await notificaciones.listNotifications(current.actor, parsed.data);
     return { ok: true, data: { items: batch.items.map(toView), nextCursor: batch.nextCursor } };
   } catch (error) {
     return failure(error, 'list');
@@ -140,12 +145,15 @@ export async function listNotificationsAction(
 export async function markNotificationReadAction(
   id: unknown,
 ): Promise<{ readonly ok: true } | NotificationActionFailure> {
-  const actor = await currentActor();
-  if (actor === null) return UNAUTHORIZED;
+  const current = await currentActor();
+  if (current.kind === 'none') return UNAUTHORIZED;
   const parsed = notificationIdSchema.safeParse(id);
+  if (!parsed.success) return { ok: false, code: 'invalid_input' };
+  // Sin empresa no hay avisos: responde como uno inexistente.
+  if (current.kind === 'no_company') return NOT_FOUND;
   try {
-    const outcome = await notificaciones.markNotificationRead(actor, parsed.success ? parsed.data : id);
-    return outcome === 'marked' ? { ok: true } : { ok: false, code: 'not_found' };
+    const outcome = await notificaciones.markNotificationRead(current.actor, parsed.data);
+    return outcome === 'marked' ? { ok: true } : NOT_FOUND;
   } catch (error) {
     return failure(error, 'mark');
   }
@@ -154,10 +162,11 @@ export async function markNotificationReadAction(
 export async function markAllNotificationsReadAction(): Promise<
   NotificationActionResult<{ readonly marked: number }>
 > {
-  const actor = await currentActor();
-  if (actor === null) return UNAUTHORIZED;
+  const current = await currentActor();
+  if (current.kind === 'none') return UNAUTHORIZED;
+  if (current.kind === 'no_company') return { ok: true, data: { marked: 0 } };
   try {
-    return { ok: true, data: await notificaciones.markAllNotificationsRead(actor) };
+    return { ok: true, data: await notificaciones.markAllNotificationsRead(current.actor) };
   } catch (error) {
     return failure(error, 'mark_all');
   }

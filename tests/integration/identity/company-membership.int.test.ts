@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { afterAll, describe, expect, it } from 'vitest'
 
-import { createIsUserInCompany, normalizeCompanyName } from '@/lib/modules/identity'
+import { createIsCompanyActive, createIsUserInCompany, normalizeCompanyName } from '@/lib/modules/identity'
 import { createCompanyMembershipReader } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma'
 import { NO_CREDENTIAL_SENTINEL } from '@/lib/modules/identity/domain/credential-setup-link'
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type'
@@ -43,10 +43,10 @@ function tag(): string {
   return randomUUID().replaceAll('-', '')
 }
 
-async function createCompany(tx: Tx): Promise<string> {
+async function createCompany(tx: Tx, deleted = false): Promise<string> {
   const name = `Pertenencia ${tag()}`
   const company = await tx.company.create({
-    data: { name, nameNormalized: normalizeCompanyName(name) },
+    data: { name, nameNormalized: normalizeCompanyName(name), deletedAt: deleted ? new Date() : null },
     select: { id: true },
   })
   return company.id
@@ -107,6 +107,35 @@ describe('isUserInCompany sobre el adaptador real', () => {
       expect(await isUserInCompany(maestro, companyId)).toBe(false)
       expect(await isUserInCompany(randomUUID(), companyId)).toBe(false)
       expect(await isUserInCompany(maestro, randomUUID())).toBe(false)
+    })
+  })
+
+  it('QC-137 R55: un usuario dado de baja de esa empresa da false', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const isUserInCompany = createIsUserInCompany({ members: createCompanyMembershipReader(tx) })
+      const companyId = await createCompany(tx)
+      const userId = await createUser(tx, { role: ROLE_OPERADOR, companyId })
+
+      expect(await isUserInCompany(userId, companyId)).toBe(true)
+
+      await tx.user.update({ where: { id: userId }, data: { deletedAt: new Date() } })
+
+      expect(await isUserInCompany(userId, companyId)).toBe(false)
+    })
+  })
+})
+
+describe('isCompanyActive sobre el adaptador real', () => {
+  it('QC-137 R57: isCompanyActive da false para una empresa dada de baja y true para una viva', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const isCompanyActive = createIsCompanyActive({ members: createCompanyMembershipReader(tx) })
+      const viva = await createCompany(tx)
+      const deBaja = await createCompany(tx, true)
+
+      expect(await isCompanyActive(viva)).toBe(true)
+      expect(await isCompanyActive(deBaja)).toBe(false)
+      expect(await isCompanyActive(randomUUID())).toBe(false)
+      expect(await isCompanyActive('no-es-uuid')).toBe(false)
     })
   })
 })

@@ -153,10 +153,7 @@ if (PERMISO === undefined) {
   throw new Error('PERMISSIONS no declara acondicionamiento.modificar: este archivo no puede afirmar sobre su fila');
 }
 
-// `notificaciones.consultar` llega al rol en una migracion posterior, no en esta.
-const CODIGOS_DEL_ROL = [...(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? [])]
-  .filter((codigo) => codigo !== 'notificaciones.consultar')
-  .sort();
+const CODIGOS_DEL_ROL = [...(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? [])].sort();
 if (CODIGOS_DEL_ROL.length === 0) {
   throw new Error('SEED_ROLE_PERMISSIONS no declara el rol de acondicionamiento');
 }

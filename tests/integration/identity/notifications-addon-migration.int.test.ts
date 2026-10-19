@@ -1,8 +1,9 @@
-// La migracion `db/migrations/*_notifications_addon/` contra Postgres real.
+// La migracion `db/migrations/*_notifications_addon_removal/` contra Postgres real, junto con la de
+// datos que deshace (`*_notifications_addon`, que se queda en el repo sin editar).
 //
 // AISLAMIENTO — `transaccion`: cada caso corre dentro de una transaccion interactiva que termina en
-// ROLLBACK. El SQL se lee de los archivos, no se copia. La «base anterior a la migracion» se simula
-// dentro de la transaccion borrando las filas que la migracion escribe.
+// ROLLBACK. El SQL se lee de los archivos, no se copia. «La de datos se llego a aplicar» se simula
+// aplicando su UP dentro de la transaccion; «no se llego a aplicar», sin aplicarlo.
 
 import { randomUUID } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -12,19 +13,10 @@ import { fileURLToPath } from 'node:url'
 import { Prisma } from '@prisma/client'
 import { afterAll, describe, expect, it } from 'vitest'
 
-import {
-  ADDONS,
-  ADDON_PERMISSIONS,
-  PERMISSIONS,
-  SEED_ROLE_PERMISSIONS,
-  normalizeCompanyName,
-} from '@/lib/modules/identity'
-import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma'
-import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma'
+import { ADDONS, PERMISSIONS, normalizeCompanyName } from '@/lib/modules/identity'
 import { NO_CREDENTIAL_SENTINEL } from '@/lib/modules/identity/domain/credential-setup-link'
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type'
-import { createIsCompanyAddonActive } from '@/lib/modules/identity/domain/is-company-addon-active'
-import { ROLE_MAESTRO } from '@/lib/modules/identity/domain/roles'
+import { ROLE_MAESTRO, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles'
 import { prisma } from '@/lib/shared/db/prisma'
 
 type Tx = Prisma.TransactionClient
@@ -64,10 +56,12 @@ function findRepoRoot(startDir: string): string {
   }
 }
 
-function locateMigrationDir(): string {
-  const migrationsDir = join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), 'db', 'migrations')
-  const carpetas = readdirSync(migrationsDir).filter((name) => /^\d{14}_notifications_addon$/.test(name))
-  expect(carpetas, 'debe existir exactamente una migracion del añadido de notificaciones').toHaveLength(1)
+const migrationsDir = join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), 'db', 'migrations')
+
+function locateMigrationDir(suffix: string): string {
+  const pattern = new RegExp(`^\\d{14}_${suffix}$`)
+  const carpetas = readdirSync(migrationsDir).filter((name) => pattern.test(name))
+  expect(carpetas, `debe existir exactamente una migracion *_${suffix}`).toHaveLength(1)
   return join(migrationsDir, carpetas[0] as string)
 }
 
@@ -82,12 +76,22 @@ function statementsOf(sql: string): readonly string[] {
     .filter((statement) => statement.length > 0)
 }
 
-const migrationDir = locateMigrationDir()
-const UP = statementsOf(readFileSync(join(migrationDir, 'migration.sql'), 'utf8'))
-const DOWN = statementsOf(readFileSync(join(migrationDir, 'down.sql'), 'utf8'))
+function readStatements(dir: string, file: string): readonly string[] {
+  return statementsOf(readFileSync(join(dir, file), 'utf8'))
+}
 
-expect(UP, 'el UP son exactamente cuatro sentencias').toHaveLength(4)
-expect(DOWN, 'el DOWN son exactamente cuatro sentencias').toHaveLength(4)
+const addonDir = locateMigrationDir('notifications_addon')
+const removalDir = locateMigrationDir('notifications_addon_removal')
+const ADDON_UP = readStatements(addonDir, 'migration.sql')
+const REMOVAL_UP = readStatements(removalDir, 'migration.sql')
+
+expect(REMOVAL_UP, 'la retirada son exactamente cuatro sentencias').toHaveLength(4)
+// La migracion ya commiteada no se edita: su DOWN y el UP de la retirada son el mismo SQL.
+expect(REMOVAL_UP).toEqual(readStatements(addonDir, 'down.sql'))
+// Y el DOWN de la retirada vuelve a escribir exactamente lo que escribe la de datos.
+expect(readStatements(removalDir, 'down.sql')).toEqual(ADDON_UP)
+// La retirada esta despues de la de datos, asi que en una base nueva corre detras de ella.
+expect(removalDir > addonDir).toBe(true)
 
 async function apply(tx: Tx, statements: readonly string[]): Promise<void> {
   for (const statement of statements) await tx.$executeRawUnsafe(statement)
@@ -95,43 +99,18 @@ async function apply(tx: Tx, statements: readonly string[]): Promise<void> {
 
 const ADDON = 'notificaciones'
 const CODIGO = 'notificaciones.consultar'
-const ENTRADA = PERMISSIONS.find((permission) => permission.code === CODIGO)
-if (ENTRADA === undefined) throw new Error(`PERMISSIONS no declara ${CODIGO}`)
-
-const ROLES_CON_EL_PERMISO = Object.entries(SEED_ROLE_PERMISSIONS)
-  .filter(([, codes]) => (codes as readonly string[]).includes(CODIGO))
-  .map(([role]) => role)
-  .sort()
 
 function tag(): string {
   return randomUUID().replaceAll('-', '')
 }
 
 async function createCompany(tx: Tx, deleted = false): Promise<string> {
-  const name = `Migracion avisos ${tag()}`
+  const name = `Retirada avisos ${tag()}`
   const company = await tx.company.create({
     data: { name, nameNormalized: normalizeCompanyName(name), deletedAt: deleted ? new Date() : null },
     select: { id: true },
   })
   return company.id
-}
-
-async function eraseFeatureRows(tx: Tx): Promise<void> {
-  await tx.companyAddonOverride.deleteMany({ where: { addonKey: ADDON } })
-  await tx.addon.deleteMany({ where: { key: ADDON } })
-  await tx.rolePermission.deleteMany({ where: { permissionCode: CODIGO } })
-  await tx.permission.deleteMany({ where: { code: CODIGO } })
-}
-
-async function snapshot(tx: Tx) {
-  return {
-    permissions: await tx.permission.findMany({ orderBy: { code: 'asc' } }),
-    rolePermissions: await tx.rolePermission.findMany({ orderBy: [{ roleId: 'asc' }, { permissionCode: 'asc' }] }),
-    roles: await tx.role.findMany({ orderBy: { id: 'asc' } }),
-    addons: await tx.addon.findMany({ orderBy: { key: 'asc' } }),
-    overrides: await tx.companyAddonOverride.findMany({ orderBy: [{ companyId: 'asc' }, { addonKey: 'asc' }] }),
-    companies: await tx.company.findMany({ orderBy: { id: 'asc' } }),
-  }
 }
 
 async function createMaestro(tx: Tx): Promise<string> {
@@ -142,11 +121,11 @@ async function createMaestro(tx: Tx): Promise<string> {
       firstNames: 'Ana',
       lastNames: 'Maestra',
       birthDate: new Date('1990-01-01T00:00:00.000Z'),
-      email: `qc137.maestro.${marca}@example.test`,
+      email: `qc137.retirada.${marca}@example.test`,
       phone: '000000000',
       documentTypeCode: DOCUMENT_TYPE_CC,
       documentNumber: marca.slice(0, 20),
-      username: `qc137.maestro.${marca}`,
+      username: `qc137.retirada.${marca}`,
       passwordHash: NO_CREDENTIAL_SENTINEL,
       roleId: role.id,
       companyId: null,
@@ -157,135 +136,112 @@ async function createMaestro(tx: Tx): Promise<string> {
   return user.id
 }
 
+/** Lo que la retirada vigila: las cuatro filas del permiso y el añadido. */
+async function featureRows(tx: Tx) {
+  return {
+    permissions: await tx.permission.count({ where: { code: CODIGO } }),
+    rolePermissions: await tx.rolePermission.count({ where: { permissionCode: CODIGO } }),
+    addons: await tx.addon.count({ where: { key: ADDON } }),
+    overrides: await tx.companyAddonOverride.count({ where: { addonKey: ADDON } }),
+  }
+}
+
+const NONE = { permissions: 0, rolePermissions: 0, addons: 0, overrides: 0 }
+
+/** Todo lo demas de las mismas tablas, para comprobar que la retirada no lo toca. */
+async function restOfTables(tx: Tx) {
+  return {
+    permissions: await tx.permission.findMany({ where: { code: { not: CODIGO } }, orderBy: { code: 'asc' } }),
+    rolePermissions: await tx.rolePermission.findMany({
+      where: { permissionCode: { not: CODIGO } },
+      orderBy: [{ roleId: 'asc' }, { permissionCode: 'asc' }],
+    }),
+    addons: await tx.addon.findMany({ where: { key: { not: ADDON } }, orderBy: { key: 'asc' } }),
+    overrides: await tx.companyAddonOverride.findMany({
+      where: { addonKey: { not: ADDON } },
+      orderBy: [{ companyId: 'asc' }, { addonKey: 'asc' }],
+    }),
+    companies: await tx.company.findMany({ orderBy: { id: 'asc' } }),
+  }
+}
+
 afterAll(async () => {
   await prisma.$disconnect()
 })
 
-describe('migracion notifications_addon contra Postgres real', () => {
-  it('QC-137 R52: tras aplicarla, cada empresa que ya existia, viva o de baja, tiene notificaciones prendido y sin autor', async () => {
+describe('migracion notifications_addon_removal contra Postgres real', () => {
+  it('QC-137 R54: tras las migraciones no queda permiso, asignación, añadido ni excepción', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const viva = await createCompany(tx)
-      const deBaja = await createCompany(tx, true)
-      await eraseFeatureRows(tx)
-      const otrasAntes = await tx.companyAddonOverride.findMany({
-        where: { addonKey: { not: ADDON } },
-        orderBy: [{ companyId: 'asc' }, { addonKey: 'asc' }],
-      })
-
-      await apply(tx, UP)
-
-      const empresas = await tx.company.findMany({ select: { id: true } })
-      expect(empresas.map((empresa) => empresa.id)).toEqual(expect.arrayContaining([viva, deBaja]))
-      const excepciones = await tx.companyAddonOverride.findMany({
-        where: { addonKey: ADDON },
-        select: { companyId: true, enabled: true, source: true, createdBy: true },
-      })
-      expect(excepciones.map((fila) => fila.companyId).sort()).toEqual(empresas.map((empresa) => empresa.id).sort())
-      for (const fila of excepciones) {
-        expect(fila, fila.companyId).toMatchObject({ enabled: true, source: 'manual', createdBy: null })
-      }
-      const isActive = createIsCompanyAddonActive({ addons: createCompanyAddonRepository(tx) })
-      expect(await isActive(viva, ADDON)).toBe(true)
-      expect(
-        await tx.companyAddonOverride.findMany({
-          where: { addonKey: { not: ADDON } },
-          orderBy: [{ companyId: 'asc' }, { addonKey: 'asc' }],
-        }),
-      ).toEqual(otrasAntes)
-    })
-  })
-
-  it('QC-137 R52, R20: una empresa dada de alta despues de la migracion no tiene el añadido', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      await eraseFeatureRows(tx)
-      await apply(tx, UP)
-      const actorId = await createMaestro(tx)
-      const marca = tag()
-      const name = `Posterior ${marca}`
-
-      const created = await createCompanyRepository(tx).createWithAdministrator({
-        company: {
-          name,
-          nameNormalized: normalizeCompanyName(name),
-          taxId: null,
-          taxIdNormalized: null,
-          contactEmail: null,
-          contactPhone: null,
-        },
-        administrator: {
-          firstNames: 'Ana',
-          lastNames: 'Admin',
-          birthDate: new Date('1990-01-01T00:00:00.000Z'),
-          email: `qc137.posterior.${marca}@example.test`,
-          phone: '3001112233',
-          documentTypeCode: DOCUMENT_TYPE_CC,
-          documentNumber: marca.slice(0, 20),
-          username: `qc137.posterior.${marca}`,
-        },
-        actorId,
-        now: new Date(),
-      })
-      if (typeof created === 'string') throw new Error(`el alta no debia fallar: ${created}`)
-
-      expect(
-        await tx.companyAddonOverride.count({ where: { companyId: created.companyId, addonKey: ADDON } }),
-      ).toBe(0)
-      const isActive = createIsCompanyAddonActive({ addons: createCompanyAddonRepository(tx) })
-      expect(await isActive(created.companyId, ADDON)).toBe(false)
-    })
-  })
-
-  it('QC-137 R18, R21: las filas que escribe coinciden con las constantes de la app', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      await eraseFeatureRows(tx)
-
-      await apply(tx, UP)
-
-      expect(await tx.permission.findUnique({ where: { code: CODIGO } })).toMatchObject({
-        code: ENTRADA.code,
-        module: ENTRADA.module,
-        action: ENTRADA.action,
-        description: ENTRADA.description,
-      })
-      const asignaciones = await tx.rolePermission.findMany({
-        where: { permissionCode: CODIGO },
-        include: { role: { select: { name: true } } },
-      })
-      expect(asignaciones.map((fila) => fila.role.name).sort()).toEqual(ROLES_CON_EL_PERMISO)
-      expect(ROLES_CON_EL_PERMISO).not.toContain(ROLE_MAESTRO)
-      expect(ROLES_CON_EL_PERMISO).toHaveLength(4)
-      expect(ADDON_PERMISSIONS.notificaciones).toEqual([CODIGO])
+      // La base de la corrida ya tiene todas las migraciones aplicadas, la de datos y la retirada.
+      expect(await featureRows(tx)).toEqual(NONE)
       expect((await tx.addon.findMany({ select: { key: true } })).map((fila) => fila.key).sort()).toEqual(
         [...ADDONS].sort(),
       )
+      expect(PERMISSIONS.map((permiso) => permiso.code)).not.toContain(CODIGO)
+
+      // Una base donde la de datos si llego a escribir, con empresas vivas y de baja.
+      await createCompany(tx)
+      await createCompany(tx, true)
+      const before = await restOfTables(tx)
+      await apply(tx, ADDON_UP)
+      const written = await featureRows(tx)
+      expect(written.permissions).toBe(1)
+      expect(written.rolePermissions).toBe(4)
+      expect(written.addons).toBe(1)
+      expect(written.overrides).toBeGreaterThanOrEqual(2)
+
+      await apply(tx, REMOVAL_UP)
+
+      expect(await featureRows(tx)).toEqual(NONE)
+      expect(await restOfTables(tx)).toEqual(before)
     })
   })
 
-  it('QC-137 R52: aplicarla dos veces no falla, no duplica y no reescribe ninguna fila', async () => {
+  it('QC-137 R54: aplicar la retirada dos veces no falla ni cambia nada', async () => {
     await inRolledBackTransaction(async (tx) => {
       await createCompany(tx)
-      await eraseFeatureRows(tx)
-      await apply(tx, UP)
-      const trasLaPrimera = await snapshot(tx)
+      const before = await restOfTables(tx)
 
-      await apply(tx, UP)
+      // Sin la de datos aplicada: las filas no existen y la retirada no falla.
+      await apply(tx, REMOVAL_UP)
+      expect(await featureRows(tx)).toEqual(NONE)
+      expect(await restOfTables(tx)).toEqual(before)
 
-      expect(await snapshot(tx)).toEqual(trasLaPrimera)
+      // Con la de datos aplicada, la segunda corrida deja lo mismo que la primera.
+      await apply(tx, ADDON_UP)
+      await apply(tx, REMOVAL_UP)
+      const once = await restOfTables(tx)
+      await apply(tx, REMOVAL_UP)
+
+      expect(await featureRows(tx)).toEqual(NONE)
+      expect(await restOfTables(tx)).toEqual(once)
+      expect(once).toEqual(before)
     })
   })
 
-  it('QC-137 R52: el DOWN deja la base exactamente como antes del UP', async () => {
+  it('QC-137 R54: la retirada limpia también filas que la migración de datos no escribió (asignación o excepción a mano)', async () => {
     await inRolledBackTransaction(async (tx) => {
-      await createCompany(tx)
-      await eraseFeatureRows(tx)
-      const antes = await snapshot(tx)
+      await apply(tx, ADDON_UP)
+      const maestro = await createMaestro(tx)
+      // Una empresa dada de alta despues de la de datos no tiene excepcion; se la pone un Maestro a mano.
+      const posterior = await createCompany(tx)
+      await tx.companyAddonOverride.create({
+        data: { companyId: posterior, addonKey: ADDON, enabled: false, source: 'manual', createdBy: maestro },
+      })
+      // Y una asignacion del permiso a un rol que la de datos no toca.
+      const maestroRole = await tx.role.findUniqueOrThrow({ where: { name: ROLE_MAESTRO }, select: { id: true } })
+      await tx.rolePermission.create({ data: { roleId: maestroRole.id, permissionCode: CODIGO } })
+      // Y una asignacion que la de datos ya escribio y que alguien borro y volvio a poner.
+      const operador = await tx.role.findUniqueOrThrow({ where: { name: ROLE_OPERADOR }, select: { id: true } })
+      await tx.rolePermission.delete({
+        where: { roleId_permissionCode: { roleId: operador.id, permissionCode: CODIGO } },
+      })
+      await tx.rolePermission.create({ data: { roleId: operador.id, permissionCode: CODIGO } })
+      expect((await featureRows(tx)).rolePermissions).toBe(5)
 
-      await apply(tx, UP)
-      expect(await tx.companyAddonOverride.count({ where: { addonKey: ADDON } })).toBeGreaterThan(0)
+      await apply(tx, REMOVAL_UP)
 
-      await apply(tx, DOWN)
-
-      expect(await snapshot(tx)).toEqual(antes)
+      expect(await featureRows(tx)).toEqual(NONE)
     })
   })
 })

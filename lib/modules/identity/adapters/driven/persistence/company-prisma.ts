@@ -415,5 +415,12 @@ export function createCompanyMembershipReader(db: PrismaLike = prisma): CompanyM
       });
       return row !== null;
     },
+    async isCompanyActive(companyId) {
+      const row = await db.company.findFirst({
+        where: { id: companyId, deletedAt: null },
+        select: { id: true },
+      });
+      return row !== null;
+    },
   };
 }

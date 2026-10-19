@@ -5,7 +5,6 @@ import {
   createListNotifications,
   decodeNotificationCursor,
   encodeNotificationCursor,
-  NOTIFICATIONS_READ_PERMISSION,
   ValidationError,
 } from '@/lib/modules/notificaciones';
 import type { NotificationInbox } from '@/lib/modules/notificaciones/ports/notification-inbox';
@@ -16,7 +15,6 @@ const READER = {
   id: '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40',
   companyId: '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13',
   roleName: 'Operador',
-  permissions: [NOTIFICATIONS_READ_PERMISSION],
 };
 
 function encodeRaw(value: unknown): string {

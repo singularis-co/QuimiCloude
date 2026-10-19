@@ -81,13 +81,12 @@ describe('getCompanyAddons', () => {
         { addon: 'lectura_pdf', enabled: true, active: false, requires: ['integraciones'] },
         { addon: 'importacion_excel', enabled: false, active: false, requires: [] },
         { addon: 'integraciones', enabled: false, active: false, requires: [] },
-        { addon: 'notificaciones', enabled: false, active: false, requires: [] },
       ],
     });
     expect(vista.addons.map((a) => a.addon)).toEqual([...ADDONS]);
   });
 
-  it('R27: con los seis prendidos, los seis son activos', async () => {
+  it('R27: con los cinco prendidos, los cinco son activos', async () => {
     const { getCompanyAddons } = setup({ stored: [...ADDONS], alive: true });
 
     const vista = await getCompanyAddons(MAESTRO, { companyId: COMPANY_ID });

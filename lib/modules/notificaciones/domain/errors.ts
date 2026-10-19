@@ -15,15 +15,6 @@ export abstract class NotificacionesError extends Error {
   }
 }
 
-/** Sin el permiso de consultar avisos, o con el añadido apagado: no se distinguen. */
-export class UnauthorizedError extends NotificacionesError {
-  readonly code = 'unauthorized';
-
-  constructor(diagnostic?: string) {
-    super('unauthorized', diagnostic);
-  }
-}
-
 export class ValidationError extends NotificacionesError {
   readonly code = 'invalid_input';
 

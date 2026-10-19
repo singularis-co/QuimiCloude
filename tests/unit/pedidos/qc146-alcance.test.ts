@@ -130,13 +130,7 @@ describe('R13 — el costo de ingredientes no nombra la presentacion', () => {
 // ---------------------------------------------------------------------------------------------
 
 // QC-201 le suma `asignaciones.ejecutar`; esta ficha sigue sin sumarle ni quitarle ninguno.
-// 2026-10-19: suma `notificaciones.consultar`, que no tiene que ver con la presentacion.
-const OPERADOR_ESPERADOS = [
-  'inventario.consultar',
-  'asignaciones.consultar',
-  'asignaciones.ejecutar',
-  'notificaciones.consultar',
-]
+const OPERADOR_ESPERADOS = ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar']
   .slice()
   .sort();
 
@@ -160,7 +154,7 @@ describe('R15 — ningun permiso nombra la presentacion, y el Operador conserva 
     ).toEqual([]);
   });
 
-  it('el Operador tiene EXACTAMENTE `inventario.consultar`, `asignaciones.consultar`, `asignaciones.ejecutar` (QC-201 R3) y `notificaciones.consultar` (QC-137 R21), ni uno mas ni uno menos', () => {
+  it('el Operador tiene EXACTAMENTE `inventario.consultar`, `asignaciones.consultar` y `asignaciones.ejecutar` (QC-201 R3), ni uno mas ni uno menos', () => {
     const delOperador = [...SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]].sort();
     expect(
       delOperador,
@@ -191,20 +185,12 @@ describe('R15 — ningun permiso nombra la presentacion, y el Operador conserva 
     expect(permisosQueNombranLaPresentacion(catalogoLimpio)).toEqual([]);
 
     expect(
-      [
-        ...['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar', 'notificaciones.consultar'],
-      ].sort(),
+      [...['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar']].sort(),
     ).toEqual(OPERADOR_ESPERADOS);
     expect(['inventario.consultar'].sort()).not.toEqual(OPERADOR_ESPERADOS);
     expect(['inventario.consultar', 'asignaciones.consultar'].sort()).not.toEqual(OPERADOR_ESPERADOS);
     expect(
-      [
-        'inventario.consultar',
-        'asignaciones.consultar',
-        'asignaciones.ejecutar',
-        'notificaciones.consultar',
-        'asignaciones.modificar',
-      ].sort(),
+      ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar', 'asignaciones.modificar'].sort(),
     ).not.toEqual(OPERADOR_ESPERADOS);
   });
 });

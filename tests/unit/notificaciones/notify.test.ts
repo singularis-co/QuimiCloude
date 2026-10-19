@@ -54,18 +54,18 @@ function setup(overrides: Partial<NotifyDeps> = {}) {
   const deliver = vi.fn(async () => undefined);
   const channel: NotificationChannel = { key: 'in_app', deliver };
   const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
-  const isOn = vi.fn(async () => true);
+  const isActive = vi.fn(async () => true);
   const belongsToCompany = vi.fn(async () => true);
   const deps: NotifyDeps = {
     catalog: CATALOG,
     inbox: { insertIfAbsent },
-    addon: { isOn },
+    companies: { isActive },
     recipients: { belongsToCompany },
     channels: createChannelFactory({ in_app: channel }),
     log,
     ...overrides,
   };
-  return { notify: createNotify(deps), insertIfAbsent, deliver, log, isOn, belongsToCompany, stored };
+  return { notify: createNotify(deps), insertIfAbsent, deliver, log, isActive, belongsToCompany, stored };
 }
 
 describe('notify — el motor de avisos', () => {
@@ -125,14 +125,14 @@ describe('notify — el motor de avisos', () => {
   });
 
   it('R4: un payload sin la forma del catálogo no crea aviso, queda en el log y no lanza', async () => {
-    const { notify, insertIfAbsent, isOn, log } = setup();
+    const { notify, insertIfAbsent, isActive, log } = setup();
 
     await expect(
       notify(event({ payload: { recipientUserId: USER, total: 'tres' } })),
     ).resolves.toBeUndefined();
 
     expect(insertIfAbsent).not.toHaveBeenCalled();
-    expect(isOn).not.toHaveBeenCalled();
+    expect(isActive).not.toHaveBeenCalled();
     expect(log.warn).toHaveBeenCalledWith(
       'notification_rejected',
       expect.objectContaining({ reason: 'invalid_payload' }),
@@ -158,15 +158,19 @@ describe('notify — el motor de avisos', () => {
     expect(JSON.stringify(log.error.mock.calls)).not.toContain('datos sensibles');
   });
 
-  it('R7: si el interruptor del añadido lanza, notify tampoco lanza', async () => {
-    const { notify, insertIfAbsent, log } = setup({
-      addon: { isOn: vi.fn(async () => Promise.reject(new Error('sin base'))) },
+  it('R57: si la consulta de la empresa lanza, notify no lanza', async () => {
+    const { notify, insertIfAbsent, deliver, log } = setup({
+      companies: { isActive: vi.fn(async () => Promise.reject(new Error('sin base'))) },
     });
 
     await expect(notify(event())).resolves.toBeUndefined();
 
     expect(insertIfAbsent).not.toHaveBeenCalled();
-    expect(log.error).toHaveBeenCalledWith('notification_failed', expect.anything());
+    expect(deliver).not.toHaveBeenCalled();
+    expect(log.error).toHaveBeenCalledWith(
+      'notification_failed',
+      expect.objectContaining({ eventKey: 'pruebas.tanda_lista', companyId: COMPANY, error: 'Error' }),
+    );
   });
 
   it('R12: un destinatario que no es de la empresa del evento se rechaza y queda en el log', async () => {
@@ -183,14 +187,48 @@ describe('notify — el motor de avisos', () => {
     );
   });
 
-  it('R19: con el añadido apagado en la empresa no se escribe nada en la bandeja', async () => {
-    const isOn = vi.fn(async () => false);
-    const { notify, insertIfAbsent, deliver } = setup({ addon: { isOn } });
+  it('R55: con el directorio en false no se crea el aviso y queda en el log', async () => {
+    // El directorio responde `false` para un usuario dado de baja: lo prueba la integración del
+    // adaptador. Aquí basta con que el motor trate ese `false` como «no es de la empresa».
+    const belongsToCompany = vi.fn(async () => false);
+    const { notify, insertIfAbsent, deliver, log } = setup({ recipients: { belongsToCompany } });
+
+    await expect(notify(event())).resolves.toBeUndefined();
+
+    expect(insertIfAbsent).not.toHaveBeenCalled();
+    expect(deliver).not.toHaveBeenCalled();
+    expect(log.warn).toHaveBeenCalledWith(
+      'notification_rejected',
+      expect.objectContaining({ eventKey: 'pruebas.tanda_lista', companyId: COMPANY, reason: 'recipient_outside_company' }),
+    );
+  });
+
+  it('R19: crea el aviso sin consultar ningún añadido', async () => {
+    const { notify, insertIfAbsent, deliver, isActive } = setup();
 
     await notify(event());
 
-    expect(isOn).toHaveBeenCalledWith(COMPANY);
+    // `NotifyDeps` ya no tiene puerto de añadido: lo único que se pregunta de la empresa es si vive.
+    expect(isActive).toHaveBeenCalledWith(COMPANY);
+    expect(insertIfAbsent).toHaveBeenCalledTimes(1);
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('R57: con la empresa dada de baja no escribe la bandeja, no entrega por ningún canal y registra el descarte', async () => {
+    const isActive = vi.fn(async () => false);
+    const { notify, insertIfAbsent, deliver, belongsToCompany, log } = setup({ companies: { isActive } });
+
+    await expect(notify(event())).resolves.toBeUndefined();
+
+    expect(isActive).toHaveBeenCalledWith(COMPANY);
+    expect(belongsToCompany).not.toHaveBeenCalled();
     expect(insertIfAbsent).not.toHaveBeenCalled();
     expect(deliver).not.toHaveBeenCalled();
+    expect(log.info).toHaveBeenCalledWith('notification_company_inactive', {
+      eventKey: 'pruebas.tanda_lista',
+      companyId: COMPANY,
+    });
+    expect(log.warn).not.toHaveBeenCalled();
+    expect(log.error).not.toHaveBeenCalled();
   });
 });

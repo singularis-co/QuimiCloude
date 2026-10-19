@@ -532,3 +532,91 @@ No se revirtió nada de la tanda 1. Una tanda posterior quitará el permiso, el 
 
 ### Veredicto
 Tanda 3 hecha: T10, T12, T13–T19b. Typecheck, lint, `notificaciones-ui` y las guardias en verde. Queda abierto el balanceo de R36. No se hizo push.
+
+## Tanda 4 — parte backend: T24 (servidor), T25, T26, T28 (servidor), T21 (backend_dev)
+
+Sin commit (lo hace el leader). Base de la vuelta atrás de la tanda 1: `a1467b6a` (padre de `4252273a`).
+
+### Archivos creados
+- `db/migrations/20261019120300_notifications_addon_removal/{migration.sql,down.sql}` (R54).
+- `lib/modules/notificaciones/ports/company-status.ts` (`CompanyStatus.isActive`, R57).
+- `lib/modules/identity/domain/is-company-active.ts` (`createIsCompanyActive`; un id que no es UUID da `false` sin tocar el puerto).
+- `tests/unit/identity/is-company-active.test.ts`.
+
+### Archivos borrados
+- `lib/modules/notificaciones/ports/notifications-switch.ts`.
+
+### Archivos modificados
+- `identity`:
+  - `domain/permissions.ts` y `domain/company-addons.ts`: contenido de `a1467b6a`, incluidas las dos frases del JSDoc de `SEED_ROLE_PERMISSIONS`;
+  - `ports/company-membership-reader.ts`: gana `isCompanyActive`;
+  - `domain/is-user-in-company.ts`: las deps usan `Pick<…, 'isUserInCompany'>`;
+  - `adapters/driven/persistence/company-prisma.ts`: gana `isCompanyActive`, un `findFirst` con `deletedAt: null`;
+  - `adapters/driven/persistence/company-directory-prisma.ts`: gana `listAllCompanyIds`;
+  - `index.ts`: exporta `createIsCompanyActive`.
+- `notificaciones`:
+  - `domain/actor.ts`: sin permiso, y `Actor` sin `permissions`;
+  - `domain/errors.ts`: sin `UnauthorizedError`;
+  - los cuatro casos de uso: sin `requirePermission`, con `actor: Actor`;
+  - `domain/notify.ts`: `NotifyDeps.companies` y el log `notification_company_inactive`;
+  - `index.ts`;
+  - `adapters/driving/notification-actions.ts`: sin `forbidden`; `currentActor()` con tres casos; el Maestro recibe vacío;
+  - `adapters/driving/purge-route.ts` y `domain/purge-expired-notifications.ts`: solo el JSDoc.
+- `lib/composition/index.ts`:
+  - `identity.isCompanyActive`, con un solo `companyMembershipReader`;
+  - `notificationCompanies` en lugar del interruptor;
+  - `listCompanyIds: listAllCompanyIds`.
+- `app/(private)/components/notifications/notification-feed.ts`: **solo el tipo**, `FeedStopReason = 'unauthorized'`, y su comparación. Es el cambio mínimo autorizado para que compile.
+- Tests de otras fichas: los 20 de la lista de T24 (incluidos `e2e/helpers/addons.ts` y `e2e/modulos-por-empresa.spec.ts`) vuelven íntegros a `a1467b6a`. Sobre esa base solo se **añaden** los casos que nombra la tabla de Enmiendas: R21 en `permissions.test.ts` y R18 en `addons/company-addons.test.ts`.
+- `tests/guards/guard-identificador-de-request.test.ts`: gana la migración nueva.
+- Tests propios:
+  - `tests/unit/notificaciones/`: `authorization`, `notify`, `notification-actions`, `purge-route`, `summary`, `notification-cursor`, `add-event`, `channel-factory` y `documentos-event`;
+  - `tests/unit/composition/notificaciones-wiring.test.ts`;
+  - `tests/integration/identity/`: `notifications-addon-migration`, `company-membership` y `company-directory-addons`.
+
+### Mapa R<n> → test (tanda 4, backend)
+| R | Test |
+| --- | --- |
+| R15 | `tests/unit/notificaciones/authorization.test.ts` › «R15: un actor sin ningún permiso lee su bandeja con empresa, usuario, rol y corte de 90 días» (una vez por operación) y «R15: marcar pasa a la bandeja el mismo alcance» |
+| R17 | `tests/unit/notificaciones/purge-route.test.ts` › «R17: recorre también las empresas dadas de baja», más los R17 que ya estaban; `tests/unit/composition/notificaciones-wiring.test.ts` › «R17: la lista de empresas del cron es la de todas, no la de activas»; `tests/integration/identity/company-directory-addons.int.test.ts` › «QC-137 R17: listAllCompanyIds incluye las empresas dadas de baja» |
+| R18 | `tests/unit/identity/addons/company-addons.test.ts` › «QC-137 R18: ADDONS no incluye notificaciones»; y los de R54 |
+| R19 | `tests/unit/notificaciones/notify.test.ts` › «R19: crea el aviso sin consultar ningún añadido»; `tests/unit/notificaciones/notification-actions.test.ts` › «R19: con sesión y sin ningún permiso las cuatro acciones responden ok». Los dos de `notification-bell.test.tsx` los renombra frontend_dev |
+| R21 | `tests/unit/identity/permissions.test.ts` › «QC-137 R21: el catálogo no tiene notificaciones.consultar y cada rol tiene los permisos de antes de QC-137» |
+| R40 | `tests/unit/notificaciones/notification-actions.test.ts` › «R40: sin sesión responde unauthorized sin tocar la bandeja» (una vez por acción) |
+| R54 | `tests/integration/identity/notifications-addon-migration.int.test.ts` › «QC-137 R54: tras las migraciones no queda permiso, asignación, añadido ni excepción», «QC-137 R54: aplicar la retirada dos veces no falla ni cambia nada» y «QC-137 R54: la retirada limpia también filas que la migración de datos no escribió (asignación o excepción a mano)» |
+| R55 | `tests/integration/identity/company-membership.int.test.ts` › «QC-137 R55: un usuario dado de baja de esa empresa da false»; `tests/unit/notificaciones/notify.test.ts` › «R55: con el directorio en false no se crea el aviso y queda en el log» |
+| R56 | `tests/unit/notificaciones/notification-actions.test.ts` › «R56: una sesión sin empresa recibe resumen, lote y marcar todas vacíos y con éxito, sin leer la bandeja» y «R56: sin sesión sigue respondiendo unauthorized». Los de la UI son de frontend_dev |
+| R57 | `tests/unit/notificaciones/notify.test.ts` › «R57: con la empresa dada de baja no escribe la bandeja, no entrega por ningún canal y registra el descarte» y «R57: si la consulta de la empresa lanza, notify no lanza»; `tests/integration/identity/company-membership.int.test.ts` › «QC-137 R57: isCompanyActive da false para una empresa dada de baja y true para una viva»; `tests/unit/composition/notificaciones-wiring.test.ts` › «R57: el motor pregunta a identity.isCompanyActive»; `tests/unit/identity/is-company-active.test.ts` |
+
+Casos borrados:
+- los de R18 (rol ∩ añadido), R20, R52 y R53;
+- «R15: sin notificaciones.consultar…» y «R19: con el añadido apagado…», en `authorization.test.ts` y en `notify.test.ts`;
+- «R7: si el interruptor del añadido lanza…» y «R19: el interruptor del motor pregunta por el añadido…»;
+- «R40: … forbidden» y «R25: sin permiso, una entrada mal formada responde forbidden».
+
+### Verificación (salida real)
+- `pnpm run typecheck`: 1 error, en `tests/unit/notificaciones-ui/polling-feed.test.ts(140,82)`: `'forbidden'` ya no es un `NotificationActionCode`. Es un archivo de frontend_dev; el resto compila.
+- `pnpm run lint`: 0 errores. Los 10 avisos son previos y de archivos que no toqué.
+- Unitarios tocados (`vitest run`, 74 archivos): 1278 pass, 1 fail y 3 skipped. El fallo es `polling-feed.test.ts` › «R40: con forbidden deja de consultar y avisa», de frontend_dev.
+- Integración tocada, sobre la base efímera `qct_tpl_4660b575f629` (construida ya con la migración nueva):
+  - 7 archivos de `identity`: 87 pass;
+  - `notificaciones` + `documentos/batch-notice`: 27 pass.
+- `pnpm exec vitest run guard`: 81 archivos, 1101 pass y 20 skipped, sin el README (ver «Abierto»).
+- `db:migrate` y `db:rollback` en bases desechables, borradas al terminar:
+  - **Base nueva vacía.** `migrate` aplica todo hasta `20261019120300` y quedan 0 filas. `rollback` deja permiso 1, asignaciones 2 (solo existen los roles que crean las migraciones) y añadido 1. `migrate` vuelve a 0.
+  - **Con la `20261019120100` aplicada antes.** Copia de la plantilla sembrada, con la retirada revertida: permiso 1, asignaciones 4, añadido 1, excepción 1. `migrate` deja 0; `rollback` lo devuelve; `migrate` vuelve a 0.
+
+### Decisiones fuera del spec (a validar)
+1. `isCompanyActive` tiene su propio caso de uso, `domain/is-company-active.ts`, como `is-user-in-company.ts`. Las deps de los dos usan `Pick` del puerto, así los dobles que ya existen no cambian.
+2. En `notification-actions.ts` la forma de la entrada se valida en el borde: después de la sesión y antes de mirar la empresa. Así el Maestro recibe `invalid_input` con un cursor o un id mal formados, como pide design §8.2. Un cursor válido del Maestro se decodifica sin leer la bandeja.
+3. `Actor.permissions` sale del tipo, porque nada lo lee (design §7 lo permite).
+4. JSDoc de `purge-route.ts` y `purge-expired-notifications.ts`: «borra también con el añadido apagado» pasa a decir que recorre también las dadas de baja.
+5. Los casos de R18 y R21 se añaden al final de los archivos de otras fichas ya restaurados. Sus nombres, que fija la tabla de Enmiendas, son las únicas menciones a `notificaciones.consultar` o `notificaciones` fuera de las migraciones y del test de R54.
+
+### Abierto / bloqueo
+- **T21 bloqueada por una guardia.** `tests/guards/guard-arquitectura-modulos.test.ts` (bloque 1, R1) no admite en la raíz de `lib/modules/<m>/` ningún archivo que no sea `index.ts`, y `lib/modules/notificaciones/README.md` la pone roja. El borrador está escrito, fuera del repo. Lo decide el leader o el humano: una excepción en la guardia, u otra ruta para el README (enmienda a design §4.4 y a T21).
+- Para frontend_dev: `polling-feed.test.ts` (el caso `forbidden` y R56), `notification-bell.test.tsx` (R19 en los nombres y R56) y T27.
+- Rojo ajeno y conocido: `tests/unit/marca/tablas-marca.test.tsx`.
+
+### Veredicto
+La parte servidor de T24, T25, T26 y T28 está hecha y en verde, salvo `polling-feed.test.ts`, que es de frontend_dev. T21 está escrita pero sin colocar, porque la guardia de arquitectura la bloquea.

@@ -8,25 +8,15 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
-  PERMISSIONS as PERMISSIONS_REALES,
+  PERMISSIONS,
   ROLE_ADMINISTRADOR,
   ROLE_OPERADOR,
   ROLE_EMPACADOR,
   ROLE_MAESTRO,
   ROLE_ACONDICIONAMIENTO,
-  SEED_ROLE_PERMISSIONS as SEED_ROLE_PERMISSIONS_REALES,
+  SEED_ROLE_PERMISSIONS,
   ADMIN_EXCLUDED_PERMISSIONS,
 } from '@/lib/modules/identity'
-
-// 2026-10-19: `notificaciones.consultar` entra al final del catalogo y de los cuatro roles de
-// empresa. Los casos de fichas previas fijan el catalogo y el seed anteriores, asi que leen las dos
-// constantes sin el; el bloque del final del archivo afirma sobre las reales.
-const NOTIFICACIONES = 'notificaciones.consultar'
-const sinNotificaciones = (codigo: string): boolean => codigo !== NOTIFICACIONES
-const PERMISSIONS = PERMISSIONS_REALES.filter((permiso) => sinNotificaciones(permiso.code))
-const SEED_ROLE_PERMISSIONS: typeof SEED_ROLE_PERMISSIONS_REALES = Object.fromEntries(
-  Object.entries(SEED_ROLE_PERMISSIONS_REALES).map(([rol, lista]) => [rol, lista.filter(sinNotificaciones)]),
-)
 
 /** Los codigos del catalogo, copiados a mano -no derivados de el-: si el catalogo cambia, este
  *  test tiene que cambiar tambien, que es justamente lo que se quiere. */
@@ -1457,68 +1447,22 @@ describe('el Administrador no consulta la pantalla «Asignación»', () => {
   })
 })
 
-describe('QC-137 — el permiso notificaciones.consultar', () => {
-  const citaFichaORequisito = /QC-\d+|\bR\d+\b|\bD\d+\b|design\.md|decisi[oó]n cerrada/i
-  const ROLES_DE_EMPRESA = [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_ACONDICIONAMIENTO]
-
-  const ENTRADA_DE_NOTIFICACIONES = {
-    code: 'notificaciones.consultar',
-    module: 'notificaciones',
-    action: 'consultar',
-    description: 'Consultar los avisos propios y marcarlos como leídos.',
-  } as const
-
-  function parrafoDeNotificaciones(): string | undefined {
-    const raiz = join(__dirname, '..', '..', '..')
-    const fuente = readFileSync(
-      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
-      'utf8',
-    ).replace(/\r\n/g, '\n')
-    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
-    return jsdoc
-      .split(/\n\s*\*\s*\n/)
-      .map((bloque) => bloque.trim())
-      .find((bloque) => bloque.includes('`notificaciones`'))
-  }
-
-  it('R18: el catalogo es el previo, en el mismo orden y con los mismos campos, mas notificaciones.consultar al final', () => {
-    expect(PERMISSIONS_REALES.at(-1)).toEqual(ENTRADA_DE_NOTIFICACIONES)
-    expect(PERMISSIONS_REALES.filter((permiso) => permiso.code === NOTIFICACIONES)).toHaveLength(1)
-    expect(PERMISSIONS_REALES.slice(0, -1)).toEqual(PERMISSIONS)
+describe('QC-137 — las notificaciones no tienen permiso propio', () => {
+  // El catalogo y cada rol se comparan con listas escritas a mano: si alguien vuelve a sumar un
+  // permiso de consultar avisos, cambia la igualdad exacta sin tener que nombrarlo aqui.
+  it('QC-137 R21: el catálogo no tiene notificaciones.consultar y cada rol tiene los permisos de antes de QC-137', () => {
     expect(PERMISSIONS.map((permiso) => permiso.code)).toEqual([...CODIGOS_DEL_REQUISITO])
-  })
-
-  it('R18: notificaciones solo declara consultar', () => {
-    expect(
-      PERMISSIONS_REALES.filter((permiso) => permiso.module === 'notificaciones').map((p) => p.action),
-    ).toEqual(['consultar'])
-  })
-
-  it('R21: los cuatro roles de empresa lo reciben al final, una vez, y el resto de su conjunto no cambia', () => {
-    for (const rol of ROLES_DE_EMPRESA) {
-      const real = SEED_ROLE_PERMISSIONS_REALES[rol] ?? []
-      expect(real.at(-1), rol).toBe(NOTIFICACIONES)
-      expect(real.filter((codigo) => codigo === NOTIFICACIONES), rol).toHaveLength(1)
-      expect(real.slice(0, -1), rol).toEqual(SEED_ROLE_PERMISSIONS[rol])
-    }
-    expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain(NOTIFICACIONES)
-  })
-
-  it('R21: el Maestro no lo recibe y conserva exactamente sus dos permisos', () => {
-    expect(SEED_ROLE_PERMISSIONS_REALES[ROLE_MAESTRO]).toEqual(['empresas.consultar', 'empresas.modificar'])
-  })
-
-  it('R21: ningun otro rol tiene el permiso', () => {
-    const conPermiso = Object.entries(SEED_ROLE_PERMISSIONS_REALES)
-      .filter(([, lista]) => lista.includes(NOTIFICACIONES))
-      .map(([rol]) => rol)
-    expect(conPermiso.sort()).toEqual([...ROLES_DE_EMPRESA].sort())
-  })
-
-  it('R18: el JSDoc del catalogo tiene el parrafo de notificaciones, corto y sin citas', () => {
-    const parrafo = parrafoDeNotificaciones()
-    expect(parrafo).toBeDefined()
-    expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
-    expect(parrafo).not.toMatch(citaFichaORequisito)
+    expect(Object.keys(SEED_ROLE_PERMISSIONS).sort()).toEqual(
+      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_ACONDICIONAMIENTO].sort(),
+    )
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_ADMINISTRADOR])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
+      'asignaciones.consultar',
+      'terminados.consultar',
+      'empaque.modificar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual([...CODIGOS_DE_EMPRESAS])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]).toEqual([CONSULTAR_ASIGNACIONES, ACONDICIONAMIENTO])
   })
 })

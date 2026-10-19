@@ -701,6 +701,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261019120100_notifications_addon',
   // QC-137 2026-10-19: el nombre original de cada archivo de una tanda; no toca el identificador.
   '20261019120200_document_files_original_name',
+  // QC-137 2026-10-19: retira el permiso y el añadido de notificaciones; no toca el identificador.
+  '20261019120300_notifications_addon_removal',
 ] as const
 
 export function hallazgosDeMigraciones(

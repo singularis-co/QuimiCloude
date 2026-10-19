@@ -8,7 +8,7 @@ import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
 } from '@/lib/modules/notificaciones/adapters/driving/notification-actions';
-import { encodeNotificationCursor, NOTIFICATIONS_READ_PERMISSION } from '@/lib/modules/notificaciones';
+import { encodeNotificationCursor } from '@/lib/modules/notificaciones';
 
 const { getSessionUserMock, getSessionContextMock, inbox } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn(),
@@ -43,7 +43,7 @@ const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
 const NOTICE_ID = '9a1d4e77-2c3b-4f58-8e06-1b7a9d3c5e02';
 
-function sessionWith(permissions: readonly string[]) {
+function sessionWith(permissions: readonly string[] = []) {
   getSessionUserMock.mockResolvedValue({
     id: USER_ID,
     username: 'ana.perez',
@@ -67,7 +67,7 @@ function inboxUntouched() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  sessionWith([NOTIFICATIONS_READ_PERMISSION]);
+  sessionWith();
   inbox.summary.mockResolvedValue({ unreadCount: 0, newest: null });
   inbox.listBatch.mockResolvedValue({ items: [], next: null });
   inbox.markRead.mockResolvedValue(true);
@@ -83,12 +83,46 @@ describe('Server Actions de la bandeja', () => {
       inboxUntouched();
     });
 
-    it('R40: con sesión y sin el permiso efectivo responde forbidden sin tocar la bandeja', async () => {
-      sessionWith(['inventario.consultar']);
+  });
 
-      expect(await run()).toEqual({ ok: false, code: 'forbidden' });
-      inboxUntouched();
+  it('R19: con sesión y sin ningún permiso las cuatro acciones responden ok', async () => {
+    sessionWith([]);
+
+    expect(await getNotificationSummaryAction()).toEqual({ ok: true, data: { unreadCount: 0, newest: null } });
+    expect(await listNotificationsAction({ cursor: null })).toEqual({ ok: true, data: { items: [], nextCursor: null } });
+    expect(await markNotificationReadAction(NOTICE_ID)).toEqual({ ok: true });
+    expect(await markAllNotificationsReadAction()).toEqual({ ok: true, data: { marked: 0 } });
+    for (const method of Object.values(inbox)) expect(method).toHaveBeenCalledTimes(1);
+  });
+
+  it('R56: una sesión sin empresa recibe resumen, lote y marcar todas vacíos y con éxito, sin leer la bandeja', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: USER_ID,
+      username: 'maestro',
+      displayName: 'Maestro',
+      roleName: 'Maestro',
+      permissions: ['empresas.consultar', 'empresas.modificar'],
     });
+    getSessionContextMock.mockResolvedValue(null);
+
+    expect(await getNotificationSummaryAction()).toEqual({ ok: true, data: { unreadCount: 0, newest: null } });
+    expect(await listNotificationsAction({ cursor: null })).toEqual({ ok: true, data: { items: [], nextCursor: null } });
+    expect(await markAllNotificationsReadAction()).toEqual({ ok: true, data: { marked: 0 } });
+    // Marcar uno responde como un aviso inexistente; la campana nunca lo pide porque no hay filas.
+    expect(await markNotificationReadAction(NOTICE_ID)).toEqual({ ok: false, code: 'not_found' });
+    // Una entrada mal formada sigue siendo invalid_input.
+    expect(await listNotificationsAction({ cursor: 7 })).toEqual({ ok: false, code: 'invalid_input' });
+    expect(await listNotificationsAction({ cursor: 'no-es-un-cursor' })).toEqual({ ok: false, code: 'invalid_input' });
+    expect(await markNotificationReadAction('no-es-uuid')).toEqual({ ok: false, code: 'invalid_input' });
+    inboxUntouched();
+  });
+
+  it('R56: sin sesión sigue respondiendo unauthorized', async () => {
+    getSessionUserMock.mockResolvedValue(null);
+    getSessionContextMock.mockResolvedValue(null);
+
+    for (const run of Object.values(ACTIONS)) expect(await run()).toEqual({ ok: false, code: 'unauthorized' });
+    inboxUntouched();
   });
 
   it('R22: el resumen viaja con el conteo y el más reciente en ISO', async () => {
@@ -156,14 +190,6 @@ describe('Server Actions de la bandeja', () => {
     ['mal formado', { cursor: 'no-es-un-cursor' }],
   ])('R25: un cursor que no es texto válido (%s) responde invalid_input sin tocar la bandeja', async (_case, input) => {
     expect(await listNotificationsAction(input)).toEqual({ ok: false, code: 'invalid_input' });
-    inboxUntouched();
-  });
-
-  it('R25: sin permiso, una entrada mal formada responde forbidden: el permiso va antes que la forma', async () => {
-    sessionWith([]);
-
-    expect(await listNotificationsAction({ cursor: 7 })).toEqual({ ok: false, code: 'forbidden' });
-    expect(await markNotificationReadAction('no-es-uuid')).toEqual({ ok: false, code: 'forbidden' });
     inboxUntouched();
   });
 

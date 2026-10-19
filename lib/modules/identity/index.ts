@@ -417,6 +417,7 @@ export {
   createIsCompanyAddonActive,
   type IsCompanyAddonActiveDeps,
 } from './domain/is-company-addon-active';
+export { createIsCompanyActive, type IsCompanyActiveDeps } from './domain/is-company-active';
 export { createIsUserInCompany, type IsUserInCompanyDeps } from './domain/is-user-in-company';
 export {
   companyAddonsQuerySchema,

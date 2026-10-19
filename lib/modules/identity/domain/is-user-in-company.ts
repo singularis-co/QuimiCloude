@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { CompanyMembershipReader } from '../ports/company-membership-reader';
 
 export type IsUserInCompanyDeps = {
-  readonly members: CompanyMembershipReader;
+  readonly members: Pick<CompanyMembershipReader, 'isUserInCompany'>;
 };
 
 const uuid = z.string().uuid();

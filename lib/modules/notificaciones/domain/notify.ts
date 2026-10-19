@@ -1,6 +1,6 @@
+import type { CompanyStatus } from '../ports/company-status';
 import type { NotificationInbox } from '../ports/notification-inbox';
 import type { NotificationLog } from '../ports/notification-log';
-import type { NotificationsSwitch } from '../ports/notifications-switch';
 import type { RecipientDirectory } from '../ports/recipient-directory';
 
 import type { NotificationCatalog, NotificationRecipient } from './catalog';
@@ -10,7 +10,7 @@ import type { NotificationEvent } from './notification-event';
 export type NotifyDeps = {
   readonly catalog: NotificationCatalog;
   readonly inbox: Pick<NotificationInbox, 'insertIfAbsent'>;
-  readonly addon: NotificationsSwitch;
+  readonly companies: CompanyStatus;
   readonly recipients: RecipientDirectory;
   readonly channels: ChannelFactory;
   readonly log: NotificationLog;
@@ -38,8 +38,8 @@ export function createNotify(deps: NotifyDeps): Notify {
       }
       const payload = parsed.data;
 
-      if (!(await deps.addon.isOn(event.companyId))) {
-        deps.log.info('notification_skipped', { ...where, reason: 'addon_off' });
+      if (!(await deps.companies.isActive(event.companyId))) {
+        deps.log.info('notification_company_inactive', where);
         return;
       }
 

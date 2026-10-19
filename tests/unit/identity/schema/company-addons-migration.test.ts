@@ -26,9 +26,6 @@ function findRepoRoot(startDir: string): string {
   }
 }
 
-// `notificaciones` lo siembra una migracion posterior.
-const ADDONS_DE_ESTA_MIGRACION = ADDONS.filter((addon) => addon !== 'notificaciones')
-
 const migrationsDir = join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), 'db', 'migrations')
 const carpetas = readdirSync(migrationsDir).filter((name) => /^\d{14}_company_addons$/.test(name))
 
@@ -144,8 +141,8 @@ describe('migración: catálogo de añadidos y excepciones por empresa', () => {
     expect(sentencias(up).some((s) => /^ALTER TABLE "companies"/.test(s))).toBe(false)
   })
 
-  it('R6 — crea `addons` con PK y CHECK de forma, y el INSERT lista exactamente los cinco primeros de ADDONS', () => {
-    expect(upCreaElCatalogo(up, ADDONS_DE_ESTA_MIGRACION)).toBe(true)
+  it('R6 — crea `addons` con PK y CHECK de forma, y el INSERT lista exactamente ADDONS', () => {
+    expect(upCreaElCatalogo(up, ADDONS)).toBe(true)
   })
 
   it('R6 — crea `company_addon_overrides` con PK compuesta, índices y FK (empresa CASCADE, añadido y autor RESTRICT)', () => {
@@ -186,7 +183,7 @@ describe('migración: catálogo de añadidos y excepciones por empresa', () => {
 
     for (const mutado of [faltaUna, sobraUna, sinCheck]) {
       expect(mutado).not.toBe(up)
-      expect(upCreaElCatalogo(mutado, ADDONS_DE_ESTA_MIGRACION)).toBe(false)
+      expect(upCreaElCatalogo(mutado, ADDONS)).toBe(false)
     }
     for (const mutado of [empresaRestrict, sinIndiceAutor]) {
       expect(mutado).not.toBe(up)

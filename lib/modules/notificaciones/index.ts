@@ -16,12 +16,8 @@ export {
   type ChannelFactory,
   type ChannelRegistry,
 } from './domain/channel-factory';
-export { NotificacionesError, UnauthorizedError, ValidationError } from './domain/errors';
-export {
-  NOTIFICATIONS_READ_PERMISSION,
-  requirePermission,
-  type Actor,
-} from './domain/actor';
+export { NotificacionesError, ValidationError } from './domain/errors';
+export type { Actor } from './domain/actor';
 export { RETENTION_DAYS, retentionCutoff } from './domain/retention';
 export {
   decodeNotificationCursor,

@@ -30,22 +30,14 @@ describe('catálogo de añadidos', () => {
     expect(CORE_PERMISSIONS.filter((p) => deAnadidos.includes(p))).toEqual([])
   })
 
-  it('R2, QC-137 R18 — exactamente seis añadidos, con sus permisos', () => {
-    expect([...ADDONS]).toEqual([
-      'dashboard',
-      'proveedores',
-      'lectura_pdf',
-      'importacion_excel',
-      'integraciones',
-      'notificaciones',
-    ])
+  it('R2 — exactamente cinco añadidos, con sus permisos', () => {
+    expect([...ADDONS]).toEqual(['dashboard', 'proveedores', 'lectura_pdf', 'importacion_excel', 'integraciones'])
     expect(ADDON_PERMISSIONS).toEqual({
       dashboard: ['dashboard.consultar'],
       proveedores: ['proveedores.consultar', 'proveedores.modificar'],
       lectura_pdf: ['documentos.consultar', 'documentos.modificar'],
       importacion_excel: [],
       integraciones: ['integraciones.modificar'],
-      notificaciones: ['notificaciones.consultar'],
     })
   })
 
@@ -53,7 +45,7 @@ describe('catálogo de añadidos', () => {
     expect(ADDON_PERMISSIONS.importacion_excel).toEqual([])
   })
 
-  it('R2 — isAddon reconoce solo las seis claves, exactas', () => {
+  it('R2 — isAddon reconoce solo las cinco claves, exactas', () => {
     for (const addon of ADDONS) expect(isAddon(addon)).toBe(true)
     for (const otra of ['pedidos', 'x', '', 'Dashboard', ' dashboard', 'lectura-pdf']) {
       expect(isAddon(otra)).toBe(false)
@@ -149,42 +141,11 @@ describe('assertAddon / hasAddon', () => {
   })
 })
 
-describe('añadido notificaciones', () => {
-  const PERMISO = 'notificaciones.consultar'
-  const otros = ADDONS.filter((addon) => addon !== 'notificaciones')
-
-  it('QC-137 R18 — el permiso efectivo es rol ∩ añadido: hace falta que el rol lo tenga y el añadido esté activo', () => {
-    expect(effectivePermissions([PERMISO, 'inventario.consultar'], ['notificaciones'])).toContain(PERMISO)
-    expect(effectivePermissions([PERMISO, 'inventario.consultar'], otros)).not.toContain(PERMISO)
-    expect(effectivePermissions([PERMISO], [])).toEqual([])
-    expect(effectivePermissions(['inventario.consultar'], ADDONS)).not.toContain(PERMISO)
-  })
-
-  it('QC-137 R18 — su permiso es del añadido, no del núcleo', () => {
-    expect(CORE_PERMISSIONS).not.toContain(PERMISO)
-    expect(catalogo).toContain(PERMISO)
-  })
-
-  it('QC-137 R53 — no depende de ningún otro añadido: activo solo, sin integraciones', () => {
-    expect(ADDON_REQUIRES.notificaciones).toEqual([])
-    expect(effectiveAddons(['notificaciones'])).toEqual(['notificaciones'])
-  })
-
-  it('QC-137 R53 — ningún añadido depende de él: prenderlo o apagarlo no cambia los demás', () => {
-    for (const addon of ADDONS) expect(ADDON_REQUIRES[addon]).not.toContain('notificaciones')
-
-    const combinaciones: readonly (readonly string[])[] = [
-      [],
-      ['integraciones'],
-      ['lectura_pdf'],
-      ['lectura_pdf', 'integraciones'],
-      otros,
-    ]
-    for (const resto of combinaciones) {
-      const sin = effectiveAddons(resto)
-      const con = effectiveAddons([...resto, 'notificaciones'])
-      expect(con.filter((addon) => addon !== 'notificaciones'), resto.join(',')).toEqual(sin)
-      expect(con).toContain('notificaciones')
-    }
+describe('QC-137 — las notificaciones son núcleo', () => {
+  it('QC-137 R18: ADDONS no incluye notificaciones', () => {
+    // Lista escrita a mano: un añadido nuevo rompe la igualdad sin tener que nombrarlo aquí.
+    expect([...ADDONS]).toEqual(['dashboard', 'proveedores', 'lectura_pdf', 'importacion_excel', 'integraciones'])
+    expect(Object.keys(ADDON_PERMISSIONS).sort()).toEqual([...ADDONS].sort())
+    expect(Object.keys(ADDON_REQUIRES).sort()).toEqual([...ADDONS].sort())
   })
 })

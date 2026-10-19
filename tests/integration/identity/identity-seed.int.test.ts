@@ -664,9 +664,9 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       });
       expect(second.createdRoles).toEqual([ROLE_OPERADOR]);
       expect(second.createdAdmin).toBe(false);
-      // El rol vuelve con sus cuatro permisos, y el catalogo ya estaba.
+      // El rol vuelve con sus tres permisos, y el catalogo ya estaba.
       expect(second.createdPermissions).toEqual([]);
-      expect(second.createdRolePermissions).toBe(4);
+      expect(second.createdRolePermissions).toBe(3);
 
       const operadorAfter = await tx.role.findUnique({ where: { name: ROLE_OPERADOR } });
       expect(operadorAfter).not.toBeNull();
@@ -674,7 +674,6 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         'asignaciones.consultar',
         'asignaciones.ejecutar',
         'inventario.consultar',
-        'notificaciones.consultar',
       ]);
 
       const administradorAfter = await tx.role.findUniqueOrThrow({ where: { name: ROLE_ADMINISTRADOR } });
@@ -846,7 +845,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
     });
   });
 
-  it('QC-277 R7: con alcance full la empresa inicial nace con una excepcion prendida por añadido y sin autor, y la segunda corrida no las toca', async () => {
+  it('QC-277 R7: con alcance full la empresa inicial nace con cinco excepciones prendidas y sin autor, y la segunda corrida no las toca', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
       const deps = {
@@ -916,13 +915,11 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         'asignaciones.consultar',
         'asignaciones.ejecutar',
         'inventario.consultar',
-        'notificaciones.consultar',
       ]);
       expect(codigosSembradosDe(ROLE_OPERADOR)).toEqual([
         'asignaciones.consultar',
         'asignaciones.ejecutar',
         'inventario.consultar',
-        'notificaciones.consultar',
       ]);
       // QC-86 R27, dicho EN NEGATIVO y por su nombre: `recetas.consultar` abre hoy tambien el
       // formulario de edicion, y el Operador no lo tiene. La igualdad de arriba ya lo excluye;
@@ -957,7 +954,6 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         'asignaciones.consultar',
         'asignaciones.ejecutar',
         'inventario.consultar',
-        'notificaciones.consultar',
       ]);
     });
   });
@@ -1045,15 +1041,9 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         'asignaciones.consultar',
         EJECUTAR,
         'inventario.consultar',
-        'notificaciones.consultar',
       ]);
       expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).toEqual(empacadorAntes);
-      expect(empacadorAntes).toEqual([
-        'asignaciones.consultar',
-        'empaque.modificar',
-        'notificaciones.consultar',
-        'terminados.consultar',
-      ]);
+      expect(empacadorAntes).toEqual(['asignaciones.consultar', 'empaque.modificar', 'terminados.consultar']);
       expect(await codigosEnBaseDe(tx, ROLE_MAESTRO)).toEqual(maestroAntes);
       expect(maestroAntes).not.toContain(EJECUTAR);
 
@@ -1208,7 +1198,6 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).toEqual([
         'asignaciones.consultar',
         'empaque.modificar',
-        'notificaciones.consultar',
         'terminados.consultar',
       ]);
       expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).not.toContain('inventario.consultar');
@@ -1268,7 +1257,6 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(await codigosEnBaseDe(tx, ROLE_ACONDICIONAMIENTO)).toEqual([
         'acondicionamiento.modificar',
         'asignaciones.consultar',
-        'notificaciones.consultar',
       ]);
       expect(await codigosEnBaseDe(tx, ROLE_ACONDICIONAMIENTO)).toEqual(codigosSembradosDe(ROLE_ACONDICIONAMIENTO));
       expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).not.toContain('acondicionamiento.modificar');
@@ -1562,7 +1550,6 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
           'asignaciones.consultar',
           'asignaciones.ejecutar',
           'inventario.consultar',
-          'notificaciones.consultar',
         ]);
         expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).not.toContain('recetas.consultar');
       }

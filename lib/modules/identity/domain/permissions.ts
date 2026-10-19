@@ -80,9 +80,6 @@ import {
  * `entregas.anular` es la segunda accion que no es `consultar` ni `modificar`: separa entregar de
  * deshacer una entrega, que devuelve producto al inventario. Lo recibe el Administrador.
  *
- * `notificaciones` declara solo `consultar`: marcar un aviso como leido es parte de consultar la
- * bandeja propia. Lo reciben los cuatro roles de empresa; el Maestro no.
- *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
 export const PERMISSIONS = [
@@ -256,12 +253,6 @@ export const PERMISSIONS = [
     action: 'anular',
     description: 'Anular entregas de producto terminado de los pedidos de la empresa.',
   },
-  {
-    code: 'notificaciones.consultar',
-    module: 'notificaciones',
-    action: 'consultar',
-    description: 'Consultar los avisos propios y marcarlos como leídos.',
-  },
 ] as const;
 
 /**
@@ -278,8 +269,14 @@ export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
  * `recetas.consultar` ni ningun otro. Las claves salen de
  * `./roles`, nunca del literal. Sin empresa: el permiso cuelga del rol y de nada mas (R6).
  *
+ * El Empacador nace con exactamente `asignaciones.consultar`, `terminados.consultar` y
+ * `empaque.modificar`, sin `inventario.consultar` ni `asignaciones.modificar`.
+ *
  * El Maestro nace con exactamente `empresas.consultar` y `empresas.modificar`, y ningun rol de
  * empresa recibe ninguno de los dos.
+ *
+ * El Administrador de acondicionamiento nace con exactamente `asignaciones.consultar` y
+ * `acondicionamiento.modificar`.
  */
 export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionCode[]>> = {
   [ROLE_ADMINISTRADOR]: [
@@ -306,26 +303,11 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'integraciones.modificar',
     'entregas.modificar',
     'entregas.anular',
-    'notificaciones.consultar',
   ],
-  [ROLE_OPERADOR]: [
-    'inventario.consultar',
-    'asignaciones.consultar',
-    'asignaciones.ejecutar',
-    'notificaciones.consultar',
-  ],
-  [ROLE_EMPACADOR]: [
-    'asignaciones.consultar',
-    'terminados.consultar',
-    'empaque.modificar',
-    'notificaciones.consultar',
-  ],
+  [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],
+  [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
   [ROLE_MAESTRO]: ['empresas.consultar', 'empresas.modificar'],
-  [ROLE_ACONDICIONAMIENTO]: [
-    'asignaciones.consultar',
-    'acondicionamiento.modificar',
-    'notificaciones.consultar',
-  ],
+  [ROLE_ACONDICIONAMIENTO]: ['asignaciones.consultar', 'acondicionamiento.modificar'],
 };
 
 /**

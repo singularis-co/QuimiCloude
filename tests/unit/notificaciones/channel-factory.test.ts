@@ -65,7 +65,7 @@ function engine(catalog: NotificationCatalog, registry: Parameters<typeof create
   const notify = createNotify({
     catalog,
     inbox,
-    addon: { isOn: async () => true },
+    companies: { isActive: async () => true },
     recipients: { belongsToCompany: async () => true },
     channels: createChannelFactory(registry),
     log,
@@ -149,7 +149,7 @@ describe('notify con varios canales', () => {
     const notify = createNotify({
       catalog: { 'pruebas.falla_uno': entry([FAKE, 'in_app']) },
       inbox,
-      addon: { isOn: async () => true },
+      companies: { isActive: async () => true },
       recipients: { belongsToCompany: async () => true },
       channels: createChannelFactory(registryOf([inApp.channel, failing.channel])),
       log,
