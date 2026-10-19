@@ -44,8 +44,9 @@
 .nf-tail{display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;font-size:13px;color:var(--muted-fg);text-align:center}
 .nf-tail .b{height:36px}
 @container (max-width: 760px){
-.nf-pop{position:absolute;top:60px;left:8px;right:8px;width:auto}
-.nf-pop-bd{height:auto;max-height:70vh}
+.tb-right.anchor{position:static}
+.nf-pop{position:absolute;top:64px;left:8px;right:8px;width:auto;max-height:calc(100% - 80px);transform-origin:top center}
+.nf-pop-bd{height:auto;flex:1;min-height:0;max-height:none}
 .nf-row{grid-template-columns:32px 1fr;padding:14px 12px}
 .nf-when{grid-column:2;flex-direction:row;align-items:center;justify-content:space-between}
 }
