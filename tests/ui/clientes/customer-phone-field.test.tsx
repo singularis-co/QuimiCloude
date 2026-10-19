@@ -215,6 +215,36 @@ describe('CustomerPhoneField · valor inicial', () => {
     expect(numberInput()).toHaveValue(NATIONAL);
   });
 
+  it('R35 — la edición de un cliente sin phone_country abre con el país de la empresa marcado y el número vacío', async () => {
+    await openEdit(BASE, 'EC');
+
+    expect(countryTrigger()).toHaveTextContent('Ecuador');
+    expect(hiddenCountry()).toHaveValue('EC');
+    expect(numberInput()).toHaveValue('');
+  });
+
+  it('R4 — en la edición, un phone_country propio distinto al de la empresa se conserva', async () => {
+    await openEdit({ ...BASE, phoneCountry: 'CO' }, 'EC');
+
+    expect(countryTrigger()).toHaveTextContent('Colombia');
+    expect(hiddenCountry()).toHaveValue('CO');
+  });
+
+  it('R31 — un migrado con aviso conserva su país aunque la empresa tenga otro', async () => {
+    await openEdit(MIGRATED_INVALID, 'EC');
+
+    expect(countryTrigger()).toHaveTextContent('Colombia');
+    expect(hiddenCountry()).toHaveValue('CO');
+    expect(numberInput()).toHaveValue('');
+  });
+
+  it('R35 — la edición de un cliente sin phone_country, en una empresa sin país, abre en «Sin país»', async () => {
+    await openEdit(BASE, null);
+
+    expect(countryTrigger()).toHaveTextContent('Sin país');
+    expect(hiddenCountry()).toHaveValue('');
+  });
+
   it('R5 — con país de empresa, la lista abre con el grupo «País de la empresa» arriba', async () => {
     const user = setupUser();
     await openCreate(user, 'CO');

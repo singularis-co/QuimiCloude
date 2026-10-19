@@ -78,6 +78,18 @@ export type CustomerPhoneFieldProps = {
   readonly testIds: CustomerPhoneFieldTestIds;
 };
 
+// Sin teléfono, la edición abre con el país de la empresa, como el alta (humano, 2026-10-19).
+// Un migrado con aviso conserva el suyo (R31).
+function initialCountry(
+  customer: CustomerView | undefined,
+  companyCountry: CountryCode | null,
+): CountryCode | null {
+  if (customer === undefined) return companyCountry;
+  const own = asCountryCode(customer.phoneCountry);
+  if (own !== null || customer.phoneIssue !== null) return own;
+  return companyCountry;
+}
+
 function initialNumber(customer: CustomerView | undefined, country: CountryCode | null): string {
   const e164 = customer?.phoneE164 ?? null;
   if (e164 === null || country === null) return '';
@@ -98,7 +110,7 @@ export function CustomerPhoneField({
   const helpId = `${baseId}-help`;
 
   const [country, setCountry] = useState<CountryCode | null>(() =>
-    customer === undefined ? companyCountry : asCountryCode(customer.phoneCountry),
+    initialCountry(customer, companyCountry),
   );
   const [number, setNumber] = useState(() =>
     initialNumber(customer, asCountryCode(customer?.phoneCountry)),

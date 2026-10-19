@@ -169,6 +169,21 @@ describe('createBackfillLegacyPhones', () => {
     expect(resumen).toEqual({ companies: 2, converted: 2, invalid: 1, duplicate: 0 })
   })
 
+  it('R24 — el caso de uso solo procesa las empresas que da listCompanyIds', async () => {
+    // `empresa-sin-pais` tiene filas pendientes, pero no esta en la lista (una empresa desactivada).
+    const { legacyPhones, companyCountryOf, vistos } = puertos({ 'empresa-mx': 'MX', 'empresa-sin-pais': null })
+    const listCompanyIds = vi.fn(async () => ['empresa-mx'])
+    const backfill = createBackfillLegacyPhones({ listCompanyIds, legacyPhones, companyCountryOf })
+
+    const resumen = await backfill()
+
+    expect(listCompanyIds).toHaveBeenCalledTimes(1)
+    expect(legacyPhones.processCompany.mock.calls.map((c) => c[1])).toEqual([{ companyId: 'empresa-mx' }])
+    expect(companyCountryOf.mock.calls.map((c) => c[0])).toEqual(['empresa-mx'])
+    expect(vistos.map((v) => v.companyId)).toEqual(['empresa-mx'])
+    expect(resumen).toEqual({ companies: 1, converted: 1, invalid: 0, duplicate: 0 })
+  })
+
   it('R27 — sin empresas termina sin error y con el resumen a cero', async () => {
     const { legacyPhones, companyCountryOf } = puertos({})
     const backfill = createBackfillLegacyPhones({ listCompanyIds: async () => [], legacyPhones, companyCountryOf })

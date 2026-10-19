@@ -20,6 +20,7 @@ import { createBackfillLegacyPhones } from '@/lib/modules/clientes';
 import { processLegacyPhonesOfCompany } from '@/lib/modules/clientes/adapters/driven/persistence/legacy-phone-prisma';
 import { createGetCompanyCountry, normalizeCompanyName } from '@/lib/modules/identity';
 import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
+import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 function token(): string {
@@ -228,6 +229,36 @@ describe('R24–R27 — el relleno sobre filas sembradas con texto libre', () =>
 
     expect(segunda).toEqual({ companies: 1, converted: 0, invalid: 0, duplicate: 0 });
     expect(await filasDe(colombia)).toEqual(antes);
+  });
+
+  it('R24 — los clientes de una empresa desactivada quedan sin tocar', async () => {
+    const activa = await crearEmpresa('CO');
+    const desactivada = await crearEmpresa('CO');
+    const enActiva = await clienteAntiguo(activa, '304 555 6677', ENERO);
+    const enDesactivada = await clienteAntiguo(desactivada, '304 555 6677', ENERO);
+    await prisma.company.update({ where: { id: desactivada.companyId }, data: { deletedAt: FEBRERO } });
+
+    // La lista REAL de empresas activas de `identity`, recortada a las dos de este caso para no
+    // tocar filas de otros archivos: el filtro de empresas activas es el de produccion.
+    const deEsteCaso = new Set([activa.companyId, desactivada.companyId]);
+    const resumen = await createBackfillLegacyPhones({
+      listCompanyIds: async () => (await listActiveCompanyIds()).filter((id) => deEsteCaso.has(id)),
+      legacyPhones: { processCompany: processLegacyPhonesOfCompany },
+      companyCountryOf: createGetCompanyCountry({ companies: createCompanyCountryRepository() }),
+    })();
+
+    expect(resumen).toEqual({ companies: 1, converted: 1, invalid: 0, duplicate: 0 });
+    expect(await prisma.customer.findUniqueOrThrow({ where: { id: enActiva } })).toMatchObject({
+      phoneCountry: 'CO',
+      phoneE164: '573045556677',
+      phoneIssue: null,
+    });
+    expect(await prisma.customer.findUniqueOrThrow({ where: { id: enDesactivada } })).toMatchObject({
+      phone: '304 555 6677',
+      phoneCountry: null,
+      phoneE164: null,
+      phoneIssue: null,
+    });
   });
 
   it('R27 — con cero clientes termina sin error', async () => {

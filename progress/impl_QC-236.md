@@ -302,13 +302,52 @@ Detalle por caso en las secciones de arriba. «[int]» = integración escrita y 
    spec, R6/R11/R29 y el tablero dicen `300 123 4567`. Se usó la librería sin formato propio;
    los tests derivan el esperado de `formatPhone*`, salvo la instantánea de
    `clientes-paridad.test.tsx`, que hay que regenerar si cambia.
+   **Resuelto (humano, 2026-10-19):** se acepta el formato de la librería.
 2. **Nombre de la migración:** `20261019130000_customers_phone_e164` (el `120000` del spec choca
    con `20261019120000_whatsapp_connections_drop_meta_app_id` y rompería `db:rollback`).
 3. **Orden en el build (R28):** el relleno va tras `migrate` y `generate`, no justo tras `migrate`.
 4. **Relleno por empresa activa:** sin `listCompaniesWithPending` ni `FOR UPDATE` (la guardia de
    ámbito los prohíbe); las empresas dadas de baja no se rellenan.
+   **Resuelto (humano, 2026-10-19):** se acepta rellenar solo las empresas activas.
 5. **Lista en teléfono:** `CustomerTable` no tiene tarjeta; la del tablero necesita código nuevo
    (§ 8.4 dice parar). R29 queda cubierto en la tabla a cualquier ancho.
+   **Resuelto (humano, 2026-10-19):** la tarjeta en teléfono queda como deuda.
 6. **País al editar un cliente sin teléfono:** sale de su `phone_country` (Sin país), no del de la
    empresa. El spec no lo fija.
+   **Resuelto (humano, 2026-10-19):** viene marcado el país de la empresa, como en el alta; con
+   `phone_country` propio se usa el suyo y un migrado con aviso conserva el suyo. Ver la sección
+   «Cambio tras decisión del humano (2026-10-19)».
 7. `CountrySelect` ganó también la prop opcional `errorId` (T9), con su fila del catálogo.
+
+## Cambio tras decisión del humano (2026-10-19)
+
+**Cambio.** El país inicial del campo de teléfono en la edición sale de `initialCountry`: con
+`phone_country` propio, el suyo; con `phone_issue`, el suyo (R31, sin cambios); sin teléfono, el
+país de la empresa (`companyCountry`), o «Sin país» si la empresa no lo tiene. El alta no cambia.
+
+**Archivos.**
+- `app/(private)/clientes/components/customer-phone-field.tsx` (función `initialCountry`).
+- `tests/ui/clientes/customer-phone-field.test.tsx` (4 casos nuevos en «valor inicial»).
+
+**Casos → test** (`tests/ui/clientes/customer-phone-field.test.tsx`):
+- R35 — la edición de un cliente sin phone_country abre con el país de la empresa marcado y el número vacío (T13).
+- R4 — en la edición, un phone_country propio distinto al de la empresa se conserva.
+- R31 — un migrado con aviso conserva su país aunque la empresa tenga otro.
+- R35 — la edición de un cliente sin phone_country, en una empresa sin país, abre en «Sin país» (T13).
+
+**Salida.**
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `0 errors, 10 warnings` (todas en archivos ajenos; `eslint` sobre los dos
+  archivos tocados: `No issues found`).
+- `pnpm exec vitest related --run --project ui --project node <los dos archivos>`:
+  `Test Files 22 passed (22)`, `Tests 450 passed (450)`.
+
+**Veredicto:** cambio aplicado y verde en typecheck, lint y tests relacionados.
+
+### T14 (R24, empresas activas)
+
+- `tests/unit/clientes/legacy-phone-backfill.test.ts`: «R24 — el caso de uso solo procesa las
+  empresas que da listCompanyIds». `vitest run` del archivo: 13/13 en verde.
+- `tests/integration/clientes/legacy-phone-backfill.int.test.ts`: «R24 — los clientes de una empresa
+  desactivada quedan sin tocar». Escrito, sin correr (no hay base).
+- Mapa: R35 → `tests/ui/clientes/customer-phone-field.test.tsx` (los dos casos «R35 —»).
