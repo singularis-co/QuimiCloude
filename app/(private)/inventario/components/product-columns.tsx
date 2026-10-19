@@ -3,6 +3,7 @@
 import { ChevronRight, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { withCardFieldLabel } from '@/components/shared/card-field-label';
 import { actionsColumn, type DataTableColumn, type RowActionsSpec } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -18,7 +19,6 @@ import {
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { cn } from '@/lib/utils';
 
-import { withCardFieldLabel } from './card-field-label';
 import { EXPIRING_CLASS, ExpiryDate } from './expiry-date';
 import { productNameWithoutPresentation } from './product-base-name';
 import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';

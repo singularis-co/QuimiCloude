@@ -126,6 +126,36 @@ describe('cada receta en su tarjeta', () => {
     }
   });
 
+  it('R5: cada dato secundario lleva su rótulo «Pasos», «Creado» y «Actualizado» delante de la cifra en mono', () => {
+    render(<RecipeTable recipes={[DETERGENTE]} params={PARAMS} totalPages={1} />);
+
+    const card = tarjeta(DETERGENTE.id);
+    const esperados = [
+      ['stepCount', 'Pasos', '7'],
+      ['createdAt', 'Creado', formatCivilDate(DETERGENTE.createdAt)],
+      ['updatedAt', 'Actualizado', formatCivilDate(DETERGENTE.updatedAt)],
+    ] as const;
+    for (const [id, rotulo, cifra] of esperados) {
+      const field = campo(card, id);
+      const label = field.querySelector('[data-card-label]');
+      expect(label, id).not.toBeNull();
+      expect(label?.textContent?.trim(), id).toBe(rotulo);
+      expect(field.firstChild, `${id}: el rótulo va delante`).toBe(label);
+      expect(field.textContent?.replace(label?.textContent ?? '', ''), id).toBe(cifra);
+      expect(field, id).toHaveClass('font-mono');
+    }
+  });
+
+  it('R5: en la fila de la tabla el rótulo de tarjeta se oculta', () => {
+    render(<RecipeTable recipes={[DETERGENTE]} params={PARAMS} totalPages={1} />);
+
+    const fila = screen.getByTestId(`data-table-row-${DETERGENTE.id}`);
+    for (const id of ['stepCount', 'createdAt', 'updatedAt']) {
+      const label = within(fila).getByTestId(`data-table-cell-${id}`).querySelector('[data-card-label]');
+      expect(label?.className, id).toContain('[table_&]:hidden');
+    }
+  });
+
   it('R5: el botón «Acciones» de la tarjeta mide al menos 44 px y nombra la receta', () => {
     render(<RecipeTable recipes={[DETERGENTE]} params={PARAMS} totalPages={1} />);
 
