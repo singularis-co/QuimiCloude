@@ -58,7 +58,13 @@ function delPrimerCliente(presentationLineIds: readonly string[]): Pick<VoidDeli
 
 const ANULADOR: Actor = { id: 'u-anula', companyId: EMPRESA, permissions: ['entregas.anular'] }
 
-const ENTREGA: DeliveryForVoid = { id: NEWER_DELIVERY_ID, orderId: VOID_ORDER_ID }
+// 2026-10-16 (QC-288): la entrega de un pedido no tiene producto; lleva su instante.
+const ENTREGA: DeliveryForVoid = {
+  id: NEWER_DELIVERY_ID,
+  orderId: VOID_ORDER_ID,
+  productId: null,
+  createdAt: new Date('2026-10-08T15:30:00.000Z'),
+}
 
 /** La presentacion abierta sale en dos lotes; la anulada, en uno; la otra, en uno. */
 const LINEAS: readonly DeliveryLineForVoid[] = [
@@ -622,5 +628,29 @@ describe('voidDelivery — pares cliente-presentacion (R3, R39, R40, R41)', () =
       now: AHORA,
     })
     expect(m.tx.voids.create).toHaveBeenCalledTimes(1)
+  })
+})
+
+// 2026-10-16 (QC-288): una entrega sin pedido no se anula por aqui.
+describe('QC-288 voidDelivery — entregas sin pedido', () => {
+  it('R48: la anulacion de pedido sobre una entrega sin pedido responde delivery_not_found sin abrir la transaccion', async () => {
+    const m = montar({
+      entrega: { id: NEWER_DELIVERY_ID, orderId: null, productId: AJENA, createdAt: new Date('2026-10-08T15:30:00.000Z') },
+    })
+
+    expect(await codigoDelFallo(() => createVoidDelivery(m.deps)(voidInput(), ANULADOR))).toBe('delivery_not_found')
+    expect(m.run).not.toHaveBeenCalled()
+    expect(m.tx.orders.lockAliveById).not.toHaveBeenCalled()
+    nadaEscrito(m)
+  })
+
+  it('R48: una clave de anulacion ya usada por la anulacion de una entrega sin pedido es invalid_input, sin escribir', async () => {
+    const m = montar({ registrada: { id: VOID_ID, orderId: null } })
+
+    expect(await codigoDelFallo(() => createVoidDelivery(m.deps)(voidInput(), ANULADOR))).toBe('invalid_input')
+    expect(m.findDelivery).not.toHaveBeenCalled()
+    expect(m.findAliveById).not.toHaveBeenCalled()
+    expect(m.run).not.toHaveBeenCalled()
+    nadaEscrito(m)
   })
 })

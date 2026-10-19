@@ -42,6 +42,8 @@ function asiento(overrides: Partial<BatchHistoryEntry> = {}): BatchHistoryEntry 
     createdAt: '2026-09-10T08:15:00.000Z',
     previousStock: null,
     countedStock: null,
+    // 2026-10-16 (QC-288): solo los asientos de entrega sin pedido llevan clientes.
+    customerNames: null,
     ...overrides,
   };
 }
@@ -56,6 +58,9 @@ function abrir() {
 function fila(entry: Pick<BatchHistoryEntry, 'kind' | 'id'>) {
   return screen.findByTestId(`data-table-row-${entry.kind}-${entry.id}`);
 }
+
+/** Alias: en los casos R54 `fila` nombra el elemento. */
+const filaDe = fila;
 
 function cabeceras(): string[] {
   const tabla = within(screen.getByTestId('batch-history-list')).getByRole('table');
@@ -91,7 +96,8 @@ describe('BatchHistory en diálogo', () => {
     expect(dialogo).not.toHaveClass('sm:max-w-[1000px]');
   });
 
-  it('R21 — la tabla tiene las ocho columnas, en orden', async () => {
+  // 2026-10-19 (enmienda QC-288): «Cliente» entra como novena columna, entre «Pedido» y «Autor».
+  it('R21 — la tabla tiene las nueve columnas, en orden', async () => {
     listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [asiento()] });
     abrir();
 
@@ -103,6 +109,7 @@ describe('BatchHistory en diálogo', () => {
       'Total contado',
       'Motivo',
       'Pedido',
+      'Cliente',
       'Autor',
       'Fecha',
     ]);
@@ -276,6 +283,7 @@ describe('BatchHistory en diálogo', () => {
     expect(await fila(reserva)).toBeInTheDocument();
   });
 
+  // 2026-10-19 (enmienda QC-288): la tarjeta suma el campo «Cliente» en la misma posición que la tabla.
   it('R23 — cada asiento tiene también su tarjeta, con el tipo delante y la cantidad como estado', async () => {
     const conteo = historyEntry({ id: 'conteo-1', quantity: '-2.5000', previousStock: '12.3456', countedStock: '9.8456' });
     listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [conteo] });
@@ -292,6 +300,7 @@ describe('BatchHistory en diálogo', () => {
       'data-table-card-field-countedStock',
       'data-table-card-field-reason',
       'data-table-card-field-order',
+      'data-table-card-field-customer',
       'data-table-card-field-author',
       'data-table-card-field-date',
     ]);
@@ -520,5 +529,119 @@ describe('movementReasonLabel', () => {
 
   it('R46 — hay un caso por cada motivo del dominio', () => {
     expect([...MOVEMENT_REASONS].sort()).toEqual(['conteo_fisico', 'error_de_carga', 'merma', 'rotura']);
+  });
+
+  // 2026-10-16 (QC-288): la entrega sin pedido y su anulación nombran al cliente, no un pedido.
+  it('R54 — un asiento de entrega sin pedido se pinta «Entrega sin pedido», en negativo y con los clientes en vez del pedido', async () => {
+    const entrega = asiento({
+      id: 'directa-1',
+      kind: 'direct_delivery',
+      quantity: '-6.0000',
+      reason: null,
+      orderNumberText: null,
+      authorName: 'Carla Duarte',
+      createdAt: '2026-10-16T10:05:00.000Z',
+      customerNames: ['Laura Gómez', 'Mario Ruiz'],
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [entrega] });
+
+    abrir();
+
+    const fila = await filaDe(entrega);
+    const tipo = within(fila).getByTestId('batch-history-entry-kind');
+    expect(tipo).toHaveTextContent('Entrega sin pedido');
+    expect(tipo.querySelector('[data-tone]')).toHaveAttribute('data-tone', 'info');
+    expect(movementKindLabel('direct_delivery')).toBe('Entrega sin pedido');
+    const cantidad = within(fila).getByTestId('batch-history-entry-quantity');
+    expect(cantidad).toHaveAttribute('aria-label', '-6');
+    expect(cantidad.textContent).toMatch(/^-6/);
+    const clientes = within(fila).getByTestId('batch-history-entry-customers');
+    expect(clientes).toHaveTextContent('Laura Gómez, Mario Ruiz');
+    expect(within(fila).getByTestId('data-table-cell-customer')).toContainElement(clientes);
+    expect(within(fila).queryByTestId('batch-history-entry-order')).toBeNull();
+    expect(within(fila).getByTestId('data-table-cell-order')).toHaveTextContent(EMPTY_MARK);
+    expect(within(fila).getByTestId('batch-history-entry-author')).toHaveTextContent('Carla Duarte');
+    expect(within(fila).getByTestId('batch-history-entry-date')).toHaveTextContent('2026-10-16 10:05');
+
+    const tarjeta = screen.getByTestId(`data-table-card-${entrega.kind}-${entrega.id}`);
+    expect(within(tarjeta).getByTestId('data-table-card-field-customer')).toHaveTextContent(
+      'Cliente Laura Gómez, Mario Ruiz',
+    );
+    expect(within(tarjeta).getByTestId('data-table-card-field-order')).toHaveTextContent(`Pedido ${EMPTY_MARK}`);
+  });
+
+  it('R54 — un asiento de anulación de entrega sin pedido se pinta con su tipo, en positivo y con el cliente', async () => {
+    const anulacion = asiento({
+      id: 'directa-anulada-1',
+      kind: 'direct_delivery_void',
+      quantity: '2.0000',
+      reason: null,
+      orderNumberText: null,
+      authorName: 'Laura Gomez',
+      createdAt: '2026-10-14T11:30:00.000Z',
+      customerNames: ['Mario Ruiz'],
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [anulacion] });
+
+    abrir();
+
+    const fila = await filaDe(anulacion);
+    const tipo = within(fila).getByTestId('batch-history-entry-kind');
+    expect(tipo).toHaveTextContent('Anulación de entrega sin pedido');
+    expect(tipo.querySelector('[data-tone]')).toHaveAttribute('data-tone', 'muted');
+    expect(movementKindLabel('direct_delivery_void')).not.toBe(movementKindLabel('delivery_void'));
+    const cantidad = within(fila).getByTestId('batch-history-entry-quantity');
+    expect(cantidad).toHaveAttribute('aria-label', '2');
+    expect(cantidad.textContent).not.toContain('-');
+    expect(within(fila).getByTestId('data-table-cell-customer')).toHaveTextContent('Mario Ruiz');
+    expect(within(fila).queryByTestId('batch-history-entry-order')).toBeNull();
+    expect(within(fila).getByTestId('data-table-cell-order')).toHaveTextContent(EMPTY_MARK);
+    expect(within(fila).queryByTestId('batch-history-entry-reason')).toBeNull();
+  });
+
+  it('R54 — sin clientes resueltos el asiento sin pedido pinta la marca de vacío; los demás tipos no llevan cliente', async () => {
+    const sinClientes = asiento({
+      id: 'directa-sin-clientes',
+      kind: 'direct_delivery',
+      quantity: '-1.0000',
+      reason: null,
+      customerNames: [],
+    });
+    const dePedido = asiento({
+      id: 'de-pedido',
+      kind: 'delivery',
+      quantity: '-1.0000',
+      reason: null,
+      orderNumberText: '2026-0000007',
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [sinClientes, dePedido] });
+
+    abrir();
+
+    const fila = await filaDe(sinClientes);
+    expect(within(fila).queryByTestId('batch-history-entry-customers')).toBeNull();
+    expect(within(fila).getByTestId('data-table-cell-customer')).toHaveTextContent(EMPTY_MARK);
+    const otra = await filaDe(dePedido);
+    expect(within(otra).queryByTestId('batch-history-entry-customers')).toBeNull();
+    expect(within(otra).getByTestId('data-table-cell-customer')).toHaveTextContent(EMPTY_MARK);
+    expect(within(otra).getByTestId('batch-history-entry-order')).toHaveTextContent('2026-0000007');
+    expect(within(otra).getByTestId('batch-history-entry-kind').querySelector('[data-tone]')).toBeNull();
+  });
+
+  it('R54 — los dos tipos sin pedido tienen etiqueta propia, distinta de las demás', () => {
+    const kinds: readonly BatchHistoryEntry['kind'][] = [
+      'opening',
+      'adjustment',
+      'consumption',
+      'reserve',
+      'release',
+      'expire',
+      'consume',
+      'delivery',
+      'delivery_void',
+      'direct_delivery',
+      'direct_delivery_void',
+    ];
+    expect(new Set(kinds.map(movementKindLabel)).size).toBe(kinds.length);
   });
 });

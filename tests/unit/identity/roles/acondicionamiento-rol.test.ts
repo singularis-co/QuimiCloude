@@ -56,9 +56,9 @@ const CASOS_DE_USO_QUE_LO_EXIGEN = [
   'lib/modules/asignaciones/domain/list-conditioned-orders.ts',
   'lib/modules/asignaciones/domain/get-conditioning-order.ts',
   'lib/modules/asignaciones/domain/list-conditioning-team-candidates.ts',
-  // 2026-10-09 (QC-219 R26): guardar los datos de lote y listar «Entregados».
+  // 2026-10-09 (QC-219 R26): guardar los datos de lote. 2026-10-19 (QC-301 R6): sale el caso de
+  // uso de listar «Entregados», que se borro.
   'lib/modules/asignaciones/domain/save-conditioning-batch-data.ts',
-  'lib/modules/asignaciones/domain/list-delivered-conditioned-orders.ts',
 ] as const;
 
 // Consumidores que no son caso de uso, cada uno con la forma exacta en que debe nombrar el permiso.
@@ -235,8 +235,8 @@ describe('R17, R21 — solo el catalogo, los casos de uso del acondicionamiento 
     ...CONSUMIDORES_QUE_NO_SON_CASO_DE_USO,
   ];
 
-  it('R21, R31, QC-219 R26: son doce rutas exactas: los dos catalogos (permisos y anadidos), ocho casos de uso (con los candidatos del equipo, guardar los datos de lote y «Entregados») y dos consumidores', () => {
-    expect(new Set(permitidos).size).toBe(12);
+  it('R21, R31, QC-219 R26, QC-301 R6: son once rutas exactas: los dos catalogos (permisos y anadidos), siete casos de uso (con los candidatos del equipo y guardar los datos de lote) y dos consumidores', () => {
+    expect(new Set(permitidos).size).toBe(11);
   });
 
   it('R17, R21: el codigo solo aparece en el catalogo de permisos y en las rutas exactas abiertas', () => {

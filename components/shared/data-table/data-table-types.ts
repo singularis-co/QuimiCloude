@@ -104,6 +104,8 @@ export type DataTableColumn<TRow> = {
   readonly hideText?: boolean;
   /** Celda de lote, cantidad o fecha: Plex Mono con cifras tabulares. Solo el cuerpo. */
   readonly tabular?: boolean;
+  /** `true` = la etiqueta de la cabecera solo la anuncia el lector de pantalla. Ausente = visible. */
+  readonly srOnlyLabel?: boolean;
   /** Acciones de la fila como datos (ver `actionsColumn`). */
   readonly menu?: (row: TRow) => RowActionsSpec;
 };

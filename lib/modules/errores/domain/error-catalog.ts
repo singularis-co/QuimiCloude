@@ -106,6 +106,7 @@ export const ERROR_MESSAGE_KEY = {
   company_not_deleted: 'errors.company_not_deleted',
   packed_exceeds_quantity: 'errors.packed_exceeds_quantity',
   packaging_stock_insufficient: 'errors.packaging_stock_insufficient',
+  delivery_exceeds_surplus: 'errors.delivery_exceeds_surplus',
   company_last_administrator: 'errors.company_last_administrator',
   customer_phone_country_required: 'errors.customer_phone_country_required',
   customer_phone_invalid: 'errors.customer_phone_invalid',
@@ -270,6 +271,8 @@ export const ERROR_MESSAGES_ES = {
   'errors.company_not_deleted': 'La empresa ya está activa.',
   'errors.packed_exceeds_quantity': 'Lo envasado supera la cantidad del pedido.',
   'errors.packaging_stock_insufficient': 'No alcanza el stock del envase.',
+  'errors.delivery_exceeds_surplus':
+    'La entrega supera el excedente: hay pedidos terminados esperando esos envases.',
   'errors.company_last_administrator':
     'Es el único Administrador de la empresa: crea otro antes de darlo de baja.',
   'errors.customer_phone_country_required': 'Elige el país del teléfono.',

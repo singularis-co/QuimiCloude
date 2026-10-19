@@ -323,6 +323,58 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         reason: 'El cliente devolvio el producto',
       }),
   },
+  // QC-288 2026-10-16: las cinco acciones de la entrega sin pedido resuelven el actor con `currentActor()`.
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'getDirectDeliveryAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).getDirectDeliveryAction(
+        '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+      ),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'listDirectDeliverySurplusAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).listDirectDeliverySurplusAction([
+        '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+      ]),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'deliverDirectAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).deliverDirectAction({
+        productId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        deliveryKey: '8b3e2c51-4d6e-4f7a-8b29-1e5c7a3f9d42',
+        note: null,
+        customers: [
+          {
+            customerId: '9c4f3d62-5e7f-4a8b-9c3a-2f6d8b4a0e53',
+            allocations: [{ batchId: 'be6b5f84-7a9b-4cad-9e5c-4b8fad6c2a75', packages: 1 }],
+          },
+        ],
+      }),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'getDirectDeliveryForVoidAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).getDirectDeliveryForVoidAction(
+        'cf7c6a95-8bac-4dbe-8f6d-5c9a0b7d3b86',
+      ),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'voidDirectDeliveryAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).voidDirectDeliveryAction({
+        deliveryId: 'cf7c6a95-8bac-4dbe-8f6d-5c9a0b7d3b86',
+        voidKey: 'd08d7ba6-9cbd-4ecf-9a7e-6dab1c8e4c97',
+        customerIds: ['9c4f3d62-5e7f-4a8b-9c3a-2f6d8b4a0e53'],
+        reason: 'El cliente devolvio el producto',
+      }),
+  },
   {
     // Anadido el 2026-09-17 por QC-63, que estrena la pantalla de ejecucion: su archivo de
     // `driving/` resuelve las dos caras de la sesion, asi que el censo tiene que cubrirlo o R15

@@ -131,6 +131,9 @@ empresa; operación que mueve existencias idempotente y auditable).
 - **R25** [D4, D9, A] CUANDO el servidor aplica una entrega, DEBE guardarla con el pedido, el
   cliente elegido, el autor y el instante. Por cada lote DEBE guardar la línea del reparto, el lote,
   los envases y la cantidad descontada. NO DEBE cambiar el cliente del pedido.
+
+  > **Enmienda 2026-10-19 (enmienda QC-288, aprobada por el humano en F1.4; `specs/QC-288-entrega-sin-pedido/design.md` §11).** Una entrega es de un pedido o, sin pedido,
+  > de un producto (QC-288 R36). Las entregas de pedido siguen igual que dice este requisito.
 - **R26** [D2] CUANDO, tras aplicar una entrega, a alguna presentación del pedido le sigan faltando
   envases, el pedido DEBE seguir `TERMINADO`.
 - **R27** [D1, D2] CUANDO, tras aplicar una entrega, no le falten envases a ninguna presentación del
@@ -147,6 +150,9 @@ empresa; operación que mueve existencias idempotente y auditable).
   actual del pedido de esa entrega. *(Aprobado por el humano en F1.3, 2026-10-08. Enmienda,
   decisión del humano 2026-10-08: antes decía «con el mismo estado del pedido que dejó la primera»;
   si una entrega parcial se reintenta después de que otra completó el pedido, responde `ENTREGADO`.)*
+
+  > **Enmienda 2026-10-19 (enmienda QC-288, aprobada por el humano en F1.4; `specs/QC-288-entrega-sin-pedido/design.md` §11).** Además, si una entrega de pedido llega con
+  > la clave de una entrega sin pedido, el servidor responde `invalid_input` sin escribir nada (QC-288 R38).
 - **R30** [A] SI cualquier paso de una entrega falla, ENTONCES NO DEBE quedar escrito nada de ella:
   ni entrega, ni línea, ni asiento, ni cambio de existencia, ni cambio de estado del pedido.
 - **R31** [A, D10] La base DEBE rechazar cada uno de estos casos:
@@ -158,6 +164,9 @@ empresa; operación que mueve existencias idempotente y auditable).
     la del lote o la del usuario que la registra (este último caso, decisión del humano
     2026-10-08);
   - dos entregas con la misma clave en la misma empresa.
+
+  > **Enmienda 2026-10-19 (enmienda QC-288, aprobada por el humano en F1.4; `specs/QC-288-entrega-sin-pedido/design.md` §11).** La lista se mantiene tal cual para los
+  > asientos de tipo `delivery`; además, la base rechaza los casos de QC-288 R40.
 - **R32** [D7] El sistema NO DEBE ofrecer ningún camino de aplicación que modifique o borre una
   entrega, una línea de entrega o su asiento: ningún caso de uso, Server Action ni control de UI.
 

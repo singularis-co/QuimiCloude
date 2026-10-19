@@ -16,6 +16,8 @@ export type ActionsColumnOptions<T> = {
   readonly align?: 'end';
   /** Sin valor, la columna no se puede fijar: asi no tapa las columnas de datos. */
   readonly defaultPinned?: 'right';
+  /** `true` = cabecera solo para lector de pantalla. Ausente = visible, como siempre. */
+  readonly srOnlyLabel?: boolean;
 } & (
   | { readonly cell: (row: T) => ReactNode; readonly menu?: undefined }
   /** Con `menu`, la tarjeta de la fila tiene de dónde sacar sus acciones. */
@@ -34,7 +36,8 @@ export function actionsColumn<T>(opts: ActionsColumnOptions<T>): DataTableColumn
     align: opts.align ?? 'end',
   } as const;
 
-  const base = opts.menu === undefined ? { ...common, cell: opts.cell } : withMenu(common, opts.menu);
+  const columnBase = opts.menu === undefined ? { ...common, cell: opts.cell } : withMenu(common, opts.menu);
+  const base = opts.srOnlyLabel === true ? { ...columnBase, srOnlyLabel: true } : columnBase;
 
   return opts.defaultPinned === undefined
     ? { ...base, pinnable: false }

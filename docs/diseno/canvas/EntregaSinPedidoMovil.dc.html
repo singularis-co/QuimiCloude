@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Entregar sin pedido · teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}" style="width: 390px; box-sizing: border-box; display: flex; flex-direction: column; font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--fg)">
+  <dc-import name="EntregaSinPedido" estado="{{ estado }}" oscuro="{{ oscuro }}" hint-size="390px,5200px"></dc-import>
+
+  <div style="padding: 0 16px 40px">
+    <div class="card" style="gap: 12px">
+      <span class="lab">Ficha por plataforma · Entregar sin pedido</span>
+      <dl style="margin: 0; display: grid; grid-template-columns: 1fr; gap: 10px; font-size: 14px">
+        <div><dt class="strong">Reutiliza</dt><dd style="margin: 4px 0 0" class="sub">El sheet «Entregar» de QC-282 (bloques por cliente, tabla y tarjetas de lotes, «Añadir cliente», borrador y aviso de borrador ajustado), el AlertDialog de anular, el tab Entregas de QC-225 y la insignia de estado (`sb`).</dd></div>
+        <div><dt class="strong">Librerías</dt><dd style="margin: 4px 0 0" class="sub">Ninguna nueva: las del sheet y el diálogo ya catalogados.</dd></div>
+        <div><dt class="strong">Escritorio</dt><dd style="margin: 4px 0 0" class="sub">Sheet lateral ancho; lotes en tabla; tab Entregas en tabla con la columna de acciones.</dd></div>
+        <div><dt class="strong">Tablet</dt><dd style="margin: 4px 0 0" class="sub">El mismo sheet a ancho completo del panel; tablas con scroll horizontal en su caja.</dd></div>
+        <div><dt class="strong">Teléfono</dt><dd style="margin: 4px 0 0" class="sub">Sheet a pantalla completa; lotes y filas del tab Entregas como tarjetas; «Anular» y «Entregar» con objetivo táctil de 44 px.</dd></div>
+        <div><dt class="strong">Animación</dt><dd style="margin: 4px 0 0" class="sub">La del sheet y el diálogo existentes; el bloque nuevo entra con `fade`. Sin animaciones propias.</dd></div>
+        <div><dt class="strong">Por confirmar</dt><dd style="margin: 4px 0 0" class="sub">[Ninguna]</dd></div>
+      </dl>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["Dos clientes","Con errores","Se pasa del excedente","Sin excedente","Borrador ajustado"],"default":"Dos clientes"},"$preview":{"width":390,"height":6400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { estado: this.props.estado ?? 'Dos clientes', oscuro: !!this.props.oscuro, rootCls: this.props.oscuro ? 'qc dk' : 'qc' };
+  }
+}
+</script>
+</body>
+</html>

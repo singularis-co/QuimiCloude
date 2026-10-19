@@ -40,6 +40,12 @@ function pairKey(pair: { readonly customerId: string; readonly presentationLineI
   return `${pair.customerId}:${pair.presentationLineId}`;
 }
 
+type OrderDeliveryLineForVoid = DeliveryLineForVoid & { readonly presentationLineId: string };
+
+function isOrderLine(line: DeliveryLineForVoid): line is OrderDeliveryLineForVoid {
+  return line.presentationLineId !== null;
+}
+
 const voidDeliverySchema = z
   .strictObject({
     deliveryId: z.string().uuid(),
@@ -76,7 +82,7 @@ function linesToVoid(
   items: readonly VoidItem[],
 ): readonly DeliveryLineForVoid[] {
   const requested = new Set(items.map(pairKey));
-  const selected = deliveryLines.filter((line) => requested.has(pairKey(line)));
+  const selected = deliveryLines.filter(isOrderLine).filter((line) => requested.has(pairKey(line)));
   const present = new Set(selected.map(pairKey));
   if (items.some((item) => !present.has(pairKey(item)))) throw new ValidationError();
   if (selected.some((line) => line.voided)) throw new DeliveryAlreadyVoidedError();
@@ -86,7 +92,7 @@ function linesToVoid(
 async function voidInTransaction(
   tx: OrderDeliveryVoidTransactionScope,
   input: VoidDeliveryInput,
-  delivery: DeliveryForVoid,
+  delivery: DeliveryForVoid & { readonly orderId: string },
   actorId: string,
   now: Date,
   scope: OrderScope,
@@ -137,9 +143,11 @@ async function voidInTransaction(
  *  empresa, no por entrega. */
 async function alreadyRegistered(
   orders: OrderRepository,
-  orderId: string,
+  orderId: string | null,
   scope: OrderScope,
 ): Promise<VoidDeliveryResult> {
+  // La clave es de la anulacion de una entrega sin pedido: no es un reintento de esta.
+  if (orderId === null) throw new ValidationError();
   const order = await orders.findAliveById(orderId, scope);
   if (order === null) throw new OrderNotFoundError();
   if (order.status !== 'TERMINADO' && order.status !== 'ENTREGADO') throw new ActionNotAllowedError();
@@ -165,8 +173,9 @@ export function createVoidDelivery(
     const registered = await deps.voids.findByKey(data.voidKey, scope);
     if (registered !== null) return alreadyRegistered(deps.orders, registered.orderId, scope);
 
-    const delivery = await deps.voids.findDelivery(data.deliveryId, scope);
-    if (delivery === null) throw new DeliveryNotFoundError();
+    const found = await deps.voids.findDelivery(data.deliveryId, scope);
+    if (found === null || found.orderId === null) throw new DeliveryNotFoundError();
+    const delivery = { ...found, orderId: found.orderId };
 
     try {
       return await deps.unitOfWork.run((tx) => voidInTransaction(tx, data, delivery, actor.id, now(), scope));

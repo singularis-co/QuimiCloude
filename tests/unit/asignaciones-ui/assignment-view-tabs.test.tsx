@@ -11,6 +11,7 @@ const { listas, getSessionUserMock, getSessionContextMock } = vi.hoisted(() => {
       listPackingOrders: lista(),
       listConditioningOrders: lista(),
       listConditionedOrders: lista(),
+      // QC-301: ya no esta en la fachada; se deja el doble para comprobar que nadie lo llama.
       listDeliveredConditionedOrders: lista(),
     },
     getSessionUserMock: vi.fn<() => Promise<unknown>>(),
@@ -36,7 +37,7 @@ afterEach(() => {
   cleanup();
 });
 
-const ACONDICIONADOR = ['por_acondicionar', 'acondicionados', 'acondicionados_entregados'] as const;
+const ACONDICIONADOR = ['por_acondicionar', 'acondicionados'] as const;
 
 describe('AssignmentViewTabs', () => {
   it('R7: la vista `acondicionados` se llama «Acondicionados» y las demás conservan su etiqueta', () => {
@@ -47,7 +48,6 @@ describe('AssignmentViewTabs', () => {
       por_empacar: 'Por empacar',
       por_acondicionar: 'Por acondicionar',
       acondicionados: 'Acondicionados',
-      acondicionados_entregados: 'Entregados',
     });
 
     render(<AssignmentViewTabs current="acondicionados" views={ACONDICIONADOR} />);
@@ -84,15 +84,12 @@ describe('AssignmentViewTabs', () => {
       <AssignmentViewTabs
         current="por_acondicionar"
         views={ACONDICIONADOR}
-        counts={{ por_acondicionar: 4, acondicionados: 12, acondicionados_entregados: 0 }}
+        counts={{ por_acondicionar: 4, acondicionados: 12 }}
       />,
     );
 
     expect(screen.getByTestId('assignment-view-tab-por_acondicionar')).toHaveTextContent('Por acondicionar4');
     expect(screen.getByTestId('assignment-view-tab-acondicionados')).toHaveTextContent('Acondicionados12');
-    expect(screen.getByTestId('assignment-view-tab-acondicionados_entregados')).toHaveTextContent(
-      'Entregados0',
-    );
     const contador = screen
       .getByTestId('assignment-view-tab-acondicionados')
       .querySelector('[data-slot="url-tabs-count"]');
@@ -123,7 +120,6 @@ describe('AssignmentViewTabsSection', () => {
     getSessionContextMock.mockResolvedValue({ companyId: 'company-1' });
     listas.listConditioningOrders.mockResolvedValue({ total: 4 });
     listas.listConditionedOrders.mockRejectedValue(new Error('fallo'));
-    listas.listDeliveredConditionedOrders.mockResolvedValue({ total: 2 });
   });
 
   it('R10: cada vista lee su propia lista con el actor de la sesión y la primera página de una fila', async () => {
@@ -132,7 +128,6 @@ describe('AssignmentViewTabsSection', () => {
     const actor = { id: 'u-1', companyId: 'company-1', permissions: ['acondicionamiento.modificar'] };
     expect(listas.listConditioningOrders).toHaveBeenCalledWith(actor, { page: 1, pageSize: 1 });
     expect(listas.listConditionedOrders).toHaveBeenCalledWith(actor, { page: 1, pageSize: 1 });
-    expect(listas.listDeliveredConditionedOrders).toHaveBeenCalledWith(actor, { page: 1, pageSize: 1 });
     expect(listas.listAssignedOrders).not.toHaveBeenCalled();
     expect(listas.listCompanyOrders).not.toHaveBeenCalled();
   });
@@ -142,6 +137,32 @@ describe('AssignmentViewTabsSection', () => {
 
     expect(screen.getByTestId('assignment-view-tab-por_acondicionar')).toHaveTextContent('Por acondicionar4');
     expect(screen.getByTestId('assignment-view-tab-acondicionados')).toHaveTextContent(/^Acondicionados$/);
-    expect(screen.getByTestId('assignment-view-tab-acondicionados_entregados')).toHaveTextContent('Entregados2');
+  });
+});
+
+describe('QC-301: sin «Entregados» para el acondicionador', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getSessionUserMock.mockResolvedValue({ id: 'u-1', permissions: ['acondicionamiento.modificar'] });
+    getSessionContextMock.mockResolvedValue({ companyId: 'company-1' });
+    listas.listConditioningOrders.mockResolvedValue({ total: 4 });
+    listas.listConditionedOrders.mockResolvedValue({ total: 7 });
+  });
+
+  it('QC-301 R2: pinta exactamente dos pestañas, «Por acondicionar» y «Acondicionados», con su contador', async () => {
+    render(await AssignmentViewTabsSection({ current: 'por_acondicionar', views: ACONDICIONADOR }));
+
+    const lista = screen.getByRole('tablist', { name: 'Vistas de asignación' });
+    expect(within(lista).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Por acondicionar4',
+      'Acondicionados7',
+    ]);
+    expect(screen.queryByText('Entregados')).toBeNull();
+  });
+
+  it('QC-301 R2: no lee el número de pedidos entregados', async () => {
+    await AssignmentViewTabsSection({ current: 'por_acondicionar', views: ACONDICIONADOR });
+
+    expect(listas.listDeliveredConditionedOrders).not.toHaveBeenCalled();
   });
 });

@@ -237,7 +237,8 @@ export const CONSTANTES_QUE_NO_SON_EL_PAR = [
   ['components/shared/row-actions-menu.tsx', 'ITEM_TOUCH_TARGET'],
   [`${CARPETA_ASISTENTE}/step-reader.tsx`, 'PRIMARY_TOUCH_TARGET_EJECUCION'],
   ['components/shared/supplier/supplier-field.tsx', 'TOUCH_TARGET'],
-  ['app/(private)/pedidos/components/order-customer-picker.tsx', 'OPTION_TOUCH_CLASSES'],
+  // 2026-10-16 (QC-288 F1): solo cambia la ruta; el buscador subio a components/shared con la misma API.
+  ['components/shared/order-customer-picker.tsx', 'OPTION_TOUCH_CLASSES'],
   ['app/(private)/proveedores/components/supplier-showcase-filters.tsx', 'TOUCH_TARGET'],
 ] as const
 
