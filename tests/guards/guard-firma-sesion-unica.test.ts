@@ -64,6 +64,30 @@ const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx'])
  */
 const UNICO_DUENO = 'lib/modules/identity/adapters/driven/session/session-token.ts'
 
+/**
+ * Excepciones con nombre: archivos que firman OTRA cosa, con otro algoritmo y otro dueño, y que
+ * por eso no son una segunda implementacion de la firma de sesion.
+ *
+ * QC-238 (decision del humano, `requirements.md > Decisiones cerradas`, opcion a): la firma
+ * `X-Hub-Signature-256` de los webhooks de Meta es un HMAC-SHA256 del cuerpo crudo con el App
+ * Secret de la conexion. No es el codec de la cookie, no comparte formato ni secreto con el, y su
+ * dueño es Meta: reutilizar `signSessionValue()` ahi seria un error. La lista es exacta: una ruta
+ * entera, sin comodines ni prefijos, y el caso de sensibilidad de abajo falla si se ensancha.
+ */
+const EXENTOS_DE_LA_FIRMA_DE_SESION: ReadonlySet<string> = new Set([
+  'lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac.ts',
+])
+
+/**
+ * `true` si el archivo (ruta relativa POSIX + su fuente) es un intruso: implementa el algoritmo de
+ * firma y no es ni el unico dueño ni una excepcion con nombre. Comparacion exacta de ruta.
+ */
+export function isSignatureIntruder(relativePath: string, source: string): boolean {
+  if (relativePath === UNICO_DUENO) return false
+  if (EXENTOS_DE_LA_FIRMA_DE_SESION.has(relativePath)) return false
+  return mentionsSignatureAlgorithm(source)
+}
+
 /** Ruta comparable: separadores POSIX, para que esto corra igual en Windows. */
 function toPosix(file: string): string {
   return file.split(sep).join('/')
@@ -172,7 +196,9 @@ describe('guardia — un unico dueño de la firma de sesion (R5)', () => {
   it('el algoritmo de firma solo aparece en el codec que emite y verifica la cookie', () => {
     const encontrados = findSignatureAlgorithmUsers(repoRoot)
 
-    const intrusos = encontrados.filter((file) => file !== UNICO_DUENO)
+    const intrusos = encontrados.filter(
+      (file) => isSignatureIntruder(file, readFileSync(join(repoRoot, file), 'utf8')),
+    )
 
     expect(
       intrusos,
@@ -308,5 +334,41 @@ describe('guardia — un unico dueño de la firma de sesion (R5)', () => {
 
     // Lo que ya barria sigue barriendose.
     expect(relativos).toContain(UNICO_DUENO)
+  })
+
+  // QC-238 — la excepcion de la firma de Meta es exacta: un archivo, por su ruta entera.
+  it('la unica excepcion es la firma del webhook de Meta, y cualquier otra ruta con createHmac sigue siendo intrusa', () => {
+    const exento = 'lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac.ts'
+    const conHmac = [
+      "import { createHmac } from 'node:crypto';",
+      "export const firma = createHmac('sha256', secreto).update(cuerpo).digest();",
+    ].join('\n')
+
+    // La lista es exactamente esa ruta: ensancharla tiene que verse aqui.
+    expect([...EXENTOS_DE_LA_FIRMA_DE_SESION]).toEqual([exento])
+
+    // La ruta exenta pasa con un createHmac sintetico.
+    expect(isSignatureIntruder(exento, conHmac)).toBe(false)
+
+    // Cualquier otra ruta, incluidas las vecinas y las que se le parecen, sigue fallando.
+    for (const otra of [
+      'lib/modules/integraciones/adapters/driven/security/otra-firma.ts',
+      'lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac.tsx',
+      'lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac.ts.bak.ts',
+      'lib/modules/integraciones/adapters/driven/persistence/webhook-signature-hmac.ts',
+      'lib/modules/otro/adapters/driven/security/webhook-signature-hmac.ts',
+      'app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts',
+      'lib/modules/integraciones/adapters/driven/security',
+      'middleware.ts',
+    ]) {
+      expect(isSignatureIntruder(otra, conHmac), otra).toBe(true)
+    }
+
+    // El dueño de la sesion sigue fuera de la cuenta, y una ruta sin firma no es intrusa.
+    expect(isSignatureIntruder(UNICO_DUENO, conHmac)).toBe(false)
+    expect(isSignatureIntruder('lib/modules/otro/x.ts', 'export const x = 1')).toBe(false)
+
+    // La excepcion no esta obsoleta: el archivo existe y de verdad firma con createHmac.
+    expect(findSignatureAlgorithmUsers(repoRoot)).toContain(exento)
   })
 })

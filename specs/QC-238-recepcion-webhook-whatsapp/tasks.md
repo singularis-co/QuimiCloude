@@ -30,7 +30,7 @@
     estado actual × status entrante.
   - **Hecho:** test verde; `RECEIVED` y `FAILED` no aparecen como predecesores de nada que los saque.
 
-- [ ] **T3 [P] — Firma de Meta** (R10, R11). Depende de: —
+- [x] **T3 [P] — Firma de Meta** (R10, R11). Depende de: —
   - `ports/webhook-signature.ts` y `adapters/driven/security/webhook-signature-hmac.ts` (§5.4).
   - Test `tests/unit/integraciones/whatsapp/webhook-signature-hmac.test.ts` con los casos de §10.1.
   - **Hecho:** test verde; `node:crypto` solo en el adaptador.
@@ -57,11 +57,11 @@
 
 ## Bloque C — Persistencia (tras T1, T2, T5)
 
-- [ ] **T6 [P] — Resolutor de empresa** (R32). Depende de: T5
+- [x] **T6 [P] — Resolutor de empresa** (R32). Depende de: T5
   - `adapters/driven/persistence/whatsapp-webhook-directory-prisma.ts` con la función única de §5.1.
   - **Hecho:** compila; lo prueban T12 (forma) y T15 (comportamiento).
 
-- [ ] **T7 [P] — Guardado del lote** (R16, R17, R18, R21, R22, R23, R24, R25, R2). Depende de: T2, T5
+- [x] **T7 [P] — Guardado del lote** (R16, R17, R18, R21, R22, R23, R24, R25, R2). Depende de: T2, T5
   - `adapters/driven/persistence/company-scope.ts`: `whatsappContactCompanyScope` y
     `whatsappMessageCompanyScope`.
   - `adapters/driven/persistence/whatsapp-inbox-prisma.ts`: `recordWhatsappInbound` con los cuatro

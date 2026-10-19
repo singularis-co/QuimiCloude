@@ -1,6 +1,6 @@
 # QC-238 — recepcion-webhook-whatsapp · bitácora de implementación
 
-## Estado: PARADA en T3 (2026-10-19), ver «Tasks»
+## Estado: T1–T7 hechas (2026-10-19); sigue T8, ver «Tasks»
 
 `tasks.md` exige contrastar §4.3 de `design.md` con la documentación vigente de la Cloud API antes
 de T1, y parar si una diferencia cambia un requisito. Hay dos. No se ha tocado código.
@@ -51,7 +51,7 @@ errores de status, firma `X-Hub-Signature-256: sha256=<hex>` (§5.4) y handshake
 
 ## Tasks
 
-T1 hecha (20f70aec). T2, T4, T5 hechas. **T3 bloqueada**: `guard-firma-sesion-unica` prohíbe `createHmac`/`crypto.subtle` fuera de `lib/modules/identity/adapters/driven/session/session-token.ts`, sin lista de exenciones, y §5.4 exige `createHmac` en `adapters/driven/security/webhook-signature-hmac.ts`. Pide decisión humana: exención con nombre en esa guardia, o enmienda del spec. `guard-ambito-empresa-integraciones` (4→5 métodos) en rojo esperado hasta T12.
+T1–T7 hechas (T3 cerrada con la excepción nombrada de la última fila de «Decisiones cerradas»; detalle en «Tanda T3, T6, T7»). Historia de T3: `guard-firma-sesion-unica` prohíbe `createHmac`/`crypto.subtle` fuera de `lib/modules/identity/adapters/driven/session/session-token.ts`, sin lista de exenciones, y §5.4 exige `createHmac` en `adapters/driven/security/webhook-signature-hmac.ts`. Pide decisión humana: exención con nombre en esa guardia, o enmienda del spec. `guard-ambito-empresa-integraciones` (4→5 métodos) en rojo esperado hasta T12.
 
 ## Tanda T2–T5 (backend_dev, 2026-10-19)
 
@@ -90,3 +90,40 @@ T1 hecha (20f70aec). T2, T4, T5 hechas. **T3 bloqueada**: `guard-firma-sesion-un
      esta guardia; pide decisión humana** (p. ej. exención con nombre para el HMAC de Meta).
 
 **Veredicto:** T2–T5 hechas según spec; gate rojo por `guard-firma-sesion-unica` hasta que el humano decida.
+
+## Tanda T3, T6, T7 (backend_dev, 2026-10-19)
+
+**Archivos**
+- T3: `tests/guards/guard-firma-sesion-unica.test.ts`: `EXENTOS_DE_LA_FIRMA_DE_SESION` con una sola
+  ruta exacta (`webhook-signature-hmac.ts`), `isSignatureIntruder()` y un caso de sensibilidad
+  (la lista es exactamente esa ruta; la exenta pasa; vecinas, `.tsx`, otro módulo, otra carpeta,
+  la ruta del webhook y `middleware.ts` con `createHmac` siguen siendo intrusas; la exenta sigue
+  casando con la huella).
+- T6: `lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma.ts`.
+- T7: `adapters/driven/persistence/company-scope.ts` (+2 envolturas),
+  `adapters/driven/persistence/whatsapp-inbox-prisma.ts`,
+  `tests/integration/integraciones/whatsapp-inbox-prisma.int.test.ts`,
+  `tests/integration/aislamiento.json` (entrada `commit`, añadido).
+
+**Mapa R → test (esta tanda)**, en `whatsapp-inbox-prisma.int.test.ts`:
+- R16, R17, R24 → «crea el contacto y el mensaje entrante…»; R24 → «un lote vacío solo deja lastWebhookAt».
+- R16 → «un lote más viejo no retrocede…»; R16, R25 → «dos record concurrentes del mismo número…».
+- R18, R25 → «un wamid ya guardado…». R23 → «si un paso falla no queda nada escrito…».
+- R21 → «avanza SENT -> READ…», «FAILED desde SENT…», «un status nunca toca un entrante».
+- R22 → «un status de un wamid desconocido…». R2 → «un status de la empresa B…».
+- R32 (T6) → lo prueban T12 (forma) y T15 (comportamiento), según `tasks.md`.
+
+**Verificación**
+- `pnpm run typecheck`: verde. `pnpm run lint`: 0 errores, 10 warnings preexistentes ajenos.
+- `vitest run guard-firma-sesion-unica webhook-signature-hmac`: 2/2 archivos, 23/23.
+- `vitest related` sobre los archivos nuevos + la guardia (con `.env`): 2/2 archivos, 19/19.
+  `vitest related` con `company-scope.ts` arrastra la composición (>40 min); se cortó y se corrió
+  en su lugar `vitest run tests/unit/integraciones tests/integration/integraciones`: 45/47 archivos,
+  829 verdes, 5 rojos, ninguno de esta tanda:
+  - `module-shape.test.ts` R13 y R18: listas exactas que tensa T13.
+  - `whatsapp-connection-migration.int.test.ts` (3): su `down.sql` de QC-237 no puede borrar
+    `whatsapp_connections` porque ahora dependen de ella las FK de T1. **Ninguna task lo cubre.**
+- `vitest run guard`: 80/81 archivos; 3 rojos en `guard-ambito-empresa-integraciones` (4→5 métodos,
+  2→4 envolturas, resolutor sin ámbito): los tres los resuelve T12.
+
+**Veredicto:** T3, T6 y T7 hechas según spec; hay un rojo en la migración de QC-237 que no cubre ninguna task.
