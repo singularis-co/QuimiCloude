@@ -129,7 +129,8 @@ Vocabulario de este documento:
 - **R18** — Las notificaciones DEBEN ser núcleo: NO DEBEN ser un añadido por empresa ni tener un
   permiso propio. La lista de añadidos NO DEBE incluir `notificaciones` y la base NO DEBE tener la
   fila del añadido ni ninguna excepción por empresa de él. *(Enmienda 2026-10-19, E1.)*
-- **R19** — El sistema DEBE crear los avisos de cualquier empresa sin consultar ningún añadido.
+- **R19** — El sistema DEBE crear los avisos de cualquier empresa activa sin consultar ningún
+  añadido (las dadas de baja siguen R57).
   MIENTRAS un usuario tenga sesión en una empresa, DEBE ver la campana y DEBE poder consultar y
   marcar sus avisos, sea cual sea su rol y aunque su rol no tenga ningún permiso. *(Enmienda
   2026-10-19, E1.)*
@@ -289,6 +290,14 @@ Vocabulario de este documento:
 - **R55** — SI el usuario destinatario de un evento está dado de baja, ENTONCES el sistema DEBE
   tratarlo como un usuario que no es de la empresa: NO DEBE crear el aviso y DEBE registrar el
   rechazo en el log (R12). *(E2.)*
+- **R56** — MIENTRAS un usuario tenga sesión sin empresa (el Maestro), la cabecera de la zona
+  privada DEBE mostrarle la campana sin insignia y con el nombre accesible «Notificaciones, ninguna
+  sin leer», y el panel DEBE mostrar «No tienes notificaciones.». Sus consultas DEBEN responder
+  con éxito y vacías (conteo 0, sin avisos, nada que marcar) sin leer la bandeja, NO DEBEN mostrar
+  ningún error y NO DEBEN detener la consulta periódica (R40 no se aplica). *(E7.)*
+- **R57** — SI un módulo emite un evento para una empresa dada de baja, ENTONCES el sistema NO DEBE
+  crear el aviso ni entregarlo por ningún canal, DEBE registrar el descarte en el log y NO DEBE
+  lanzar error al módulo que lo emitió (R7). *(E8.)*
 
 ### Cobertura de las decisiones cerradas
 
@@ -332,6 +341,8 @@ Vocabulario de este documento:
 | E3. `paths[]` + `originalNames?[]` y orden por `createdAt` (enmienda 2026-10-19) | R50, R51 (cambio de diseño, sin requisito nuevo: `design.md > 6.3`) |
 | E4. El cron borra también avisos de empresas dadas de baja (enmienda 2026-10-19) | R17 |
 | E5. Balanceo de 700 ms con excepción en la guardia (enmienda 2026-10-19) | R36 |
+| E7. El Maestro ve la campana vacía, sin errores (enmienda 2026-10-19) | R56 |
+| E8. Sin avisos para una empresa dada de baja (enmienda 2026-10-19) | R19, R57 |
 
 ## Preguntas abiertas
 
@@ -348,19 +359,12 @@ Vocabulario de este documento:
    `supplier_id`, margen del teléfono y librería del observador). Ver las filas del 2026-10-19 en
    `## Decisiones cerradas` y R30, R35, R46, R47, R49–R53.
 
-12. **Maestro y otros usuarios sin empresa (enmienda E1).** R19 dice «todo usuario con sesión en
-    una empresa». El Maestro no tiene empresa (`SessionUserRecord.companyId = null`) y la bandeja
-    es por empresa. Hoy, si una sesión sin empresa monta el layout privado, la acción responde
-    `unauthorized` (`getSessionContext()` da `null`) y la consulta se para (R40), con la campana
-    montada. Queda abierto si el Maestro debe ver la campana (vacía) o no verla. No bloquea T24–T27:
-    el código actual no cambia hasta que se responda.
-13. **Avisos de una empresa dada de baja (enmienda E1).** Antes, el interruptor del añadido decidía
-    si se creaban. Sin él, una tanda que termina en una empresa dada de baja crea su aviso (que
-    nadie puede leer, porque sus usuarios no entran). R17 los borra a los 90 días (E4). Queda
-    abierto si `notify` debe además rechazarlos. No bloquea: no cambia ningún requisito actual.
+12. **Maestro y otros usuarios sin empresa. CERRADA el 2026-10-19** por el humano: ve la campana,
+    vacía y sin errores, y la consulta no se para. Ver E7 y R56.
+13. **Avisos de una empresa dada de baja. CERRADA el 2026-10-19** por el humano: `notify` no los
+    crea; los descarta y lo registra en el log. Ver E8 y R57.
 
-Sin preguntas abiertas que bloqueen QC-137. Las 2 y 3 son de otras fichas; la 12 y la 13 no
-bloquean T24–T27.
+Sin preguntas abiertas que bloqueen QC-137. Las 2 y 3 son de otras fichas.
 
 **Nota para el próximo pase `/design`, no es una pregunta:** la ficha de
 `NotificacionesMovil.dc.html` todavía dice «alto máximo 70 %» y sus enlaces de ejemplo dicen «Ver
@@ -370,7 +374,7 @@ proveedor». Manda R35 y R49; hay que corregir la ficha para que coincida.
 
 ### 2026-10-19 — decisiones del humano tras las tandas 1–3
 
-Decisiones del humano del 2026-10-19 (E1–E5) y recogida de las decisiones de implementación de
+Decisiones del humano del 2026-10-19 (E1–E5, y E7–E8, que cierran las preguntas 12 y 13) y recogida de las decisiones de implementación de
 las tandas 1–3 (E6). Las E1–E5 son del humano y no se reabren. Las de E6 constan en
 `progress/impl_QC-137-sistema-de-notificaciones-por-rol.md` como «fuera del spec»: se recogen en
 `design.md > 16` y quedan **pendientes de validar por el reviewer**.
@@ -382,6 +386,8 @@ las tandas 1–3 (E6). Las E1–E5 son del humano y no se reabren. Las de E6 con
 | E3 | `NewBatch` usa `paths[]` + `originalNames?[]` alineados por posición, no `files[]`. El orden de subida se fija con `createdAt` + 1 ms por archivo. | R50, R51 sin cambio de texto | — (ya hecho en T10; `design.md > 6.3`) |
 | E4 | El cron de borrado a 90 días borra también los avisos de las empresas **dadas de baja** (hoy solo recorre las activas). | R17 cambia | T26 |
 | E5 | El **balanceo de 700 ms** de la campana se mantiene: excepción con nombre, solo para la campana, en `tests/guards/guard-movimiento.test.ts` (QC-228 R1), con su motivo. | R36 sin cambio de texto | T27 |
+| E7 | El **Maestro** (sesión sin empresa) ve la campana, vacía y sin errores. Ningún `unauthorized` que detenga la consulta periódica. Cierra la pregunta 12. | R56 nuevo | T28 |
+| E8 | `notify` **no crea avisos para una empresa dada de baja**: los descarta y lo registra en el log. Cierra la pregunta 13. | R19 (precisión), R57 nuevo | T24 |
 
 **Textos anteriores, para la historia:**
 
@@ -419,6 +425,8 @@ el permiso o el añadido, **se borran o se reescriben** en T24: un requisito ret
 | R40 | `tests/unit/notificaciones-ui/polling-feed.test.ts` › «R40: se para con unauthorized» (tanda 3, sin el caso `forbidden` tras T24); `notification-actions.test.ts` › «R40: sin sesión responde unauthorized» (tanda 1) |
 | R54 | `tests/integration/identity/notifications-addon-migration.int.test.ts`, reescrito en T24: «QC-137 R54: tras las migraciones no queda permiso, asignación, añadido ni excepción», «QC-137 R54: aplicar la retirada dos veces no falla ni cambia nada», «QC-137 R54: la retirada limpia también filas que la migración de datos no escribió (asignación o excepción a mano)» |
 | R55 | `tests/integration/identity/company-membership.int.test.ts` › «QC-137 R55: un usuario dado de baja de esa empresa da false» (T25); `tests/unit/notificaciones/notify.test.ts` › «R55: con el directorio en false no se crea el aviso y queda en el log» (T25, o el caso R12 actual si ya lo cubre: lo comprueba T25) |
+| R56 | `tests/unit/notificaciones/notification-actions.test.ts` › «R56: una sesión sin empresa recibe resumen, lote y marcar todas vacíos y con éxito, sin leer la bandeja» y «R56: sin sesión sigue respondiendo unauthorized» (T28); `tests/unit/notificaciones-ui/polling-feed.test.ts` › «R56: un resumen vacío no detiene la consulta» (T28); `tests/unit/notificaciones-ui/notification-bell.test.tsx` › «R56: con el resumen vacío del Maestro, campana sin insignia, "ninguna sin leer" y panel "No tienes notificaciones." sin error» (T28) |
+| R57 | `tests/unit/notificaciones/notify.test.ts` › «R57: con la empresa dada de baja no escribe la bandeja, no entrega por ningún canal y registra el descarte», «R57: si la consulta de la empresa lanza, notify no lanza» (T24); `tests/integration/identity/company-membership.int.test.ts` › «QC-137 R57: isCompanyActive da false para una empresa dada de baja y true para una viva» (T24); `tests/unit/composition/notificaciones-wiring.test.ts` › «R57: el motor pregunta a identity.isCompanyActive» (T24) |
 
 ## Decisiones cerradas (no reabrir)
 

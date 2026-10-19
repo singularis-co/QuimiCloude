@@ -26,7 +26,9 @@
 > dado de baja no es miembro, con el puerto `company-membership-reader.ts` (§7, T25); **E3**
 > `NewBatch` con `paths[]` + `originalNames?[]` y orden por `createdAt` + 1 ms (§6.3); **E4** el
 > cron borra también avisos de empresas dadas de baja (§11, T26); **E5** el balanceo de 700 ms se
-> queda, con una excepción con nombre en la guardia de movimiento (§9.5, T27). Las decisiones de
+> queda, con una excepción con nombre en la guardia de movimiento (§9.5, T27); **E7** el Maestro
+> ve la campana vacía y sin errores (§8.2, T28); **E8** `notify` descarta los eventos de una
+> empresa dada de baja (§4.2, T24). Las decisiones de
 > implementación de las tandas 1–3 que la bitácora marca «fuera del spec» se recogen en §16, todas
 > **pendientes de validar por el reviewer**. Donde este documento dice otra cosa en las secciones
 > anteriores, mandan las notas «Enmienda 2026-10-19» y §16.
@@ -121,6 +123,7 @@ lib/modules/notificaciones/
     notification-channel.ts                  NotificationChannel (el puerto único de canal)
     notification-inbox.ts                    la bandeja (persistencia)
     notifications-switch.ts                  SE BORRA en T24 (E1): ya no hay añadido que consultar
+    company-status.ts                        NUEVO en T24 (E8): isActive(companyId), empresa no dada de baja (R57)
     recipient-directory.ts                   el usuario destinatario es de esa empresa y no está de baja (R55)
     notification-log.ts
   adapters/
@@ -275,7 +278,14 @@ pero el camino se construye y se prueba (R12, R13, R16) porque es una decisión 
    `notification_rejected` y termina (R4).
 2. ~~Llama a `switch.isOn(companyId)`. Si el añadido está apagado, termina sin escribir (R19).~~
    **Enmienda 2026-10-19 (E1):** el paso se quita. `NotifyDeps` pierde `addon` y el puerto
-   `notifications-switch.ts` se borra (T24). Se crea el aviso en cualquier empresa (R19).
+   `notifications-switch.ts` se borra (T24). Se crea el aviso en cualquier empresa activa (R19).
+   **En su lugar (E8, R57):** `companies.isActive(companyId)`, del puerto nuevo
+   `ports/company-status.ts` (`CompanyStatus`; `NotifyDeps.addon` pasa a `NotifyDeps.companies`).
+   Si da `false`, registra `notification_company_inactive` (solo `companyId` y `key`) y termina
+   sin escribir la bandeja ni entregar. Si lanza, lo recoge el `try/catch` exterior (R7). Va
+   después de validar el catálogo y antes del directorio. La composición lo ata a
+   `identity.isCompanyActive(companyId)` (§7). Es lo que hacía de paso el interruptor antiguo:
+   `isCompanyAddonActive` ya devolvía `false` para una empresa no viva.
 3. Si el destinatario es un usuario, `recipients.belongsToCompany(userId, companyId)`. Si no
    pertenece, lo rechaza y lo registra (R12). Un usuario dado de baja no pertenece (R55, E2). Lo
    implementa `identity` (§7).
@@ -475,9 +485,14 @@ Enlace: §6.3b.
 >   cuatro operaciones ya no lanzan `UnauthorizedError`; si el error queda sin uso en el módulo, se
 >   quita.
 > - **Acciones:** con sesión de empresa responden `ok`, sea cual sea el rol (R19). El código
->   `forbidden` deja de existir en `NotificationActionFailure`; quedan `unauthorized` (sin sesión, o
->   sesión sin empresa: `getSessionContext()` da `null`), `invalid_input`, `not_found` y
->   `unexpected`. La decisión D-T1-B2 de la bitácora (orden «permiso antes que forma») queda sin
+>   `forbidden` deja de existir en `NotificationActionFailure`; quedan `unauthorized` (**solo** sin
+>   sesión), `invalid_input`, `not_found` y `unexpected`. Una sesión **sin empresa** (el Maestro)
+>   responde con éxito y vacío (§8.2, R56, E7).
+> - **Empresa activa (E8, R57):** `identity` gana `isCompanyActive(companyId)` en su contrato,
+>   consulta del sistema sin actor. Va en el mismo puerto `CompanyMembershipReader`
+>   (`ports/company-membership-reader.ts`) y su adaptador en `createCompanyMembershipReader`
+>   (`company-prisma.ts`): `findFirst({ where: { id: companyId, deletedAt: null } })`. Un id que no
+>   es UUID da `false` sin tocar el puerto, como `isUserInCompany`. La decisión D-T1-B2 de la bitácora (orden «permiso antes que forma») queda sin
 >   objeto: una entrada mal formada responde siempre `invalid_input`.
 > - **Composición:** la fachada `notificaciones` pierde el interruptor
 >   `identity.isCompanyAddonActive(…, 'notificaciones')`.
@@ -541,9 +556,28 @@ Con `roleName = null`, solo la mitad del usuario. «No leído» añade
   estén o no cargados en el panel (R32).
 - ~~Con el añadido apagado, el permiso efectivo no está, y las cuatro acciones responden
   `{ ok: false, code: 'forbidden' }` antes de tocar la bandeja (R19, R15).~~ **Enmienda
-  2026-10-19 (E1):** no hay añadido ni permiso; sin sesión de empresa las cuatro responden
-  `unauthorized` antes de tocar la bandeja (R15, R40), y con sesión responden sobre los avisos
-  visibles del actor (§7).
+  2026-10-19 (E1, E7):** no hay añadido ni permiso; sin sesión las cuatro responden
+  `unauthorized` antes de tocar la bandeja (R15, R40); con sesión sin empresa, vacío (§8.2); y con
+  sesión de empresa, sobre los avisos visibles del actor (§7).
+
+### 8.2 Sesión sin empresa: el Maestro (enmienda 2026-10-19, E7, R56)
+
+- `currentActor()` de `notification-actions.ts` distingue tres casos con las dos lecturas que ya
+  hace (`getSessionUser()` y `getSessionContext()`, una lectura de sesión por petición):
+  - sin `SessionUser` → `unauthorized`;
+  - con `SessionUser` y sin `SessionContext` (no tiene empresa) → **sesión sin empresa**;
+  - con los dos → `Actor` de empresa, como hoy.
+- Con sesión sin empresa, las acciones responden sin llamar a ningún caso de uso ni a la bandeja:
+  resumen `{ unreadCount: 0, newest: null }`, lote `{ items: [], nextCursor: null }`, marcar
+  todas `{ marked: 0 }`, y marcar uno `{ ok: false, code: 'not_found' }` (igual que un aviso
+  inexistente, R14; la UI nunca lo pide porque no hay filas). Una entrada mal formada sigue
+  respondiendo `invalid_input`.
+- El navegador no distingue al Maestro: recibe un resumen vacío y válido, así que la campana sale
+  sin insignia, con «Notificaciones, ninguna sin leer», el panel con «No tienes notificaciones.» y
+  la consulta sigue cada 30 s (R37, R38) sin pararse. Coste: una invocación cada 30 s por pestaña
+  visible del Maestro, sin lectura de la bandeja; se acepta (pocos usuarios Maestro).
+- El dominio no cambia: `Actor.companyId` sigue siendo `string`. El caso sin empresa se resuelve en
+  el borde.
 
 ### 8.1 Lotes por cursor (R25, R27, R28)
 
@@ -994,6 +1028,15 @@ Añadidas por la enmienda del 2026-10-19:
 - **A24. Excepción de la guardia de movimiento por archivo entero** (`notification-bell.tsx` libre de
   la regla de 400 ms). Más simple, pero dejaría pasar cualquier otra animación larga que alguien
   añada a ese archivo. La excepción va por nombre de animación, archivo y ms exactos.
+- **A25. No montar la campana al Maestro, o responderle `unauthorized`.** Ahorra las consultas de
+  sus pestañas, pero el humano decidió que la vea, vacía y sin errores, y sin que la consulta se
+  pare (E7, R56). Además `unauthorized` mezclaría «sin sesión» con «sin empresa».
+- **A26. Rechazar los eventos de empresas dadas de baja en `documentos`, antes de emitir.** Cada
+  emisor tendría que repetir la comprobación, contra R6 (agregar un evento es catálogo + `emit`).
+  Se hace una vez en el motor (§4.2, R57).
+- **A27. `isCompanyActive` sobre `isCompanyAddonActive` o `CompanyAddonRepository.findByCompany`.**
+  Ya devuelve `alive`, pero lee también los añadidos, que ya no importan aquí. Se añade una
+  consulta propia, más barata, al puerto de pertenencia.
 
 ## 14. Dependencias
 
@@ -1081,3 +1124,5 @@ silencioso. El id es `D-T<tanda>-<n.º en la bitácora>`.
 | D-T3-13 | Hora relativa con `now = max(summary.checkedAt, instante de apertura)`, sin leer el reloj en el render | §9.6 | Pendiente de validar por el reviewer |
 | D-T3-14 | `private-layout.test.tsx` y `navegacion/private-layout-menu.test.tsx` ganan un `vi.mock` de `notification-actions` (sin cambiar aserciones), contra el «sin cambios» de T19 | §10.4 | Pendiente de validar por el reviewer |
 | D-T3-R36 | El balanceo de 700 ms quedó sin hacer por la guardia de movimiento | §9.5 | **Humano (E5): se hace en T27** |
+| P12 | El Maestro (sesión sin empresa) recibía `unauthorized` y la consulta se paraba | §8.2 | **Humano (E7): campana vacía, sin errores y sin parar; se hace en T28** |
+| P13 | Sin el interruptor del añadido, `notify` creaba avisos para empresas dadas de baja | §4.2 | **Humano (E8): se descartan con log; se hace en T24** |

@@ -15,7 +15,8 @@
 > **Enmienda del 2026-10-19 (tras las tandas 1–3; `requirements.md > Enmiendas`, `design.md > 16`):**
 > notificaciones núcleo (E1, T24), usuario dado de baja no es miembro (E2, T25), `paths[]` +
 > `originalNames?[]` (E3, ya hecho en T10), el cron borra también empresas dadas de baja (E4, T26)
-> y balanceo de 700 ms con excepción en la guardia de movimiento (E5, T27). Las tareas ya cerradas
+> y balanceo de 700 ms con excepción en la guardia de movimiento (E5, T27); el Maestro ve la
+> campana vacía (E7, T28) y no hay avisos para empresas dadas de baja (E8, T24). Las tareas ya cerradas
 > que la enmienda deja atrás llevan una nota; no se desmarcan, las corrige la tarea nueva.
 
 ## Bloque A — Datos y permisos
@@ -351,9 +352,13 @@ T22 depende de T24. T26 y T27 van después de T24 porque comparten archivos con 
 (`lib/composition/index.ts` y `notificaciones-wiring.test.ts` con T26; `notification-bell.test.tsx`
 con T27). T25 es independiente.
 
-- [ ] **T24. Notificaciones núcleo: quitar permiso, añadido y su migración de datos** (E1; R15,
-  R18, R19, R21, R22, R37, R40, R54; design §3.2.4, §4.2, §7, §8, §9). No depende de ninguna
-  tarea abierta.
+- [ ] **T24. Notificaciones núcleo: quitar permiso, añadido y su migración de datos; descartar
+  empresas dadas de baja** (E1, E8; R15, R18, R19, R21, R22, R37, R40, R54, R57; design §3.2.4,
+  §4.2, §7, §8, §9). No depende de ninguna tarea abierta.
+  - **Empresa dada de baja (E8, R57):** puerto nuevo `ports/company-status.ts` (`CompanyStatus.isActive`)
+    en lugar del interruptor; `notify` descarta con `notification_company_inactive` en el log;
+    `identity.isCompanyActive` en `CompanyMembershipReader` y `createCompanyMembershipReader`, y en
+    el contrato de `identity`; la composición lo ata (design §4.2, §7).
   - **Migración nueva** `db/migrations/<ts>_notifications_addon_removal/` (`<ts>` posterior a
     `20261019120200`) con `migration.sql` y `down.sql`, como dice design §3.2.4. **No** se borra ni
     se edita `20261019120100_notifications_addon`. La lista de
@@ -391,8 +396,8 @@ con T27). T25 es independiente.
     Los dos casos de la tanda 3 de `notification-bell.test.tsx` que cubren R19 llevan «R19» en el
     nombre.
   - **Hecho:**
-    - los tests de `requirements.md > Enmiendas > Trazabilidad` para R15, R18, R19, R21, R40 y R54,
-      en verde;
+    - los tests de `requirements.md > Enmiendas > Trazabilidad` para R15, R18, R19, R21, R40, R54 y
+      R57, en verde;
     - ningún test ni archivo de producción nombra `notificaciones.consultar` ni el añadido
       `notificaciones`, salvo la migración `20261019120100` y la de retirada y el test de R54
       (comprobado con `rg`);
@@ -434,6 +439,20 @@ con T27). T25 es independiente.
       ese nombre, en esos archivos y a 700 ms», con tres casos negativos (otro nombre a 700 ms, el
       mismo nombre en otro archivo, el mismo nombre a 701 ms) que la ponen roja;
     - `pnpm exec vitest run guard` en verde.
+- [ ] **T28. El Maestro ve la campana vacía, sin errores** (E7; R56; design §8.2). Depende de T24:
+  los dos tocan `notification-actions.ts`, `notification-actions.test.ts`, `polling-feed.test.ts` y
+  `notification-bell.test.tsx`.
+  - `notification-actions.ts`: `currentActor()` distingue sin sesión, sesión sin empresa y sesión
+    de empresa; con sesión sin empresa, las cuatro acciones responden vacío y con éxito sin llamar
+    a la bandeja (design §8.2). Sin cambios en el dominio ni en el navegador.
+  - **Hecho:**
+    - `notification-actions.test.ts` › «R56: una sesión sin empresa recibe resumen, lote y marcar
+      todas vacíos y con éxito, sin leer la bandeja» y «R56: sin sesión sigue respondiendo
+      unauthorized»;
+    - `polling-feed.test.ts` › «R56: un resumen vacío no detiene la consulta»;
+    - `notification-bell.test.tsx` › «R56: con el resumen vacío del Maestro, campana sin insignia,
+      "ninguna sin leer" y panel "No tienes notificaciones." sin error»;
+    - el test de una lectura de sesión por petición sigue verde.
 
 ## Trazabilidad prevista
 
@@ -495,6 +514,8 @@ con T27). T25 es independiente.
 | R53 | Retirado (E1) |
 | R54 | T24 |
 | R55 | T25 |
+| R56 | T28 |
+| R57 | T24 |
 
 ## Archivos esperados
 
@@ -614,6 +635,7 @@ sin estar en esta lista.
 - `lib/modules/identity/ports/company-membership-reader.ts`
 - `lib/modules/identity/adapters/driven/persistence/company-directory-prisma.ts`
 - `lib/modules/notificaciones/ports/notifications-switch.ts`
+- `lib/modules/notificaciones/ports/company-status.ts`
 - `app/globals.css`
 - `tests/guards/guard-movimiento.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
