@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Entregar sin pedido · tablet</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 834px; box-sizing: border-box; font-family: 'IBM Plex Sans', sans-serif">
+  <dc-import name="EntregaSinPedido" estado="{{ estado }}" oscuro="{{ oscuro }}" hint-size="834px,4200px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["Dos clientes","Con errores","Se pasa del excedente","Sin excedente","Borrador ajustado"],"default":"Dos clientes"},"$preview":{"width":834,"height":4200}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { estado: this.props.estado ?? 'Dos clientes', oscuro: !!this.props.oscuro };
+  }
+}
+</script>
+</body>
+</html>

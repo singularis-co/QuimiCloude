@@ -500,6 +500,14 @@ export const E2E_ESPERADOS = [
   // Administrador de la empresa. No lee ni afirma nada sobre el identificador de peticion ni sobre
   // `reference`.
   'maestro-administradores.spec.ts',
+  // Alta el 2026-10-19 (QC-288 R56, TI) por el MISMO motivo y en el MISMO sitio que las demas: la
+  // lista es CERRADA y darse de alta en ella es su punto de extension por diseno. Lo que ejercita:
+  // desde la ficha de un producto con excedente, una entrega sin pedido a dos clientes que comparten
+  // un lote, con nota; «Entregar» deshabilitado al pasarse del excedente; un producto sin excedente
+  // sin «Entregar» en su ficha ni en el menu de su fila; el tab Entregas con «Sin pedido» y la nota,
+  // y la anulacion de la parte de un cliente; el historial del lote con «Entrega sin pedido». No lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'entrega-sin-pedido.spec.ts',
   // Alta el 2026-10-19 (QC-278 R25, `specs/QC-278-pantalla-modulos-por-empresa/design.md > 7.2`)
   // por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA y darse de alta en
   // ella es su punto de extension por diseno. El ancla NO se relaja -el archivo se nombra, uno a
@@ -742,6 +750,10 @@ export const MIGRACIONES_ESPERADAS = [
   '20261015190000_company_addons',
   // QC-289 2026-10-16: el ultimo lote cargado de cada producto; no toca el identificador.
   '20261016120000_products_last_batch_at',
+  // QC-288 2026-10-16: los dos tipos de asiento de la entrega sin pedido y la entrega con producto
+  // y sin pedido; no tocan el identificador.
+  '20261016130000_inventory_movement_kind_direct_delivery',
+  '20261016130100_direct_deliveries',
   // 2026-10-19: correctiva, quita `whatsapp_connections.meta_app_id` que QC-237 retiro editando la
   // migracion original; no toca el identificador.
   '20261019120000_whatsapp_connections_drop_meta_app_id',
@@ -938,7 +950,8 @@ export const SUPERFICIES_QUE_APLANAN: readonly SuperficieAplanada[] = [
       'no aplanar haria falta que ese contrato aceptara un ErrorState (Opcion A, descartada).',
   },
   {
-    archivo: 'app/(private)/pedidos/components/order-customer-picker.tsx',
+    // 2026-10-16 (QC-288 F1): solo cambia la ruta; el buscador subio a components/shared con la misma API.
+    archivo: 'components/shared/order-customer-picker.tsx',
     idioma: 'throw-new-error',
     ocurrencias: 1,
     motivo: 'mismo canal `error: string` de AsyncAutocomplete que product-name-picker.',

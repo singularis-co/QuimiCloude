@@ -173,6 +173,9 @@ export function finishedProductDeliveryRow(
     packages: 4,
     quantity: '4.0000',
     void: null,
+    // 2026-10-16 (QC-288): la fila puede ser de una entrega sin pedido, con su nota.
+    withoutOrder: false,
+    note: null,
     ...overrides,
   };
 }

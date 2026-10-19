@@ -203,6 +203,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
     expect(doble.movementFindMany).not.toHaveBeenCalled();
   });
 
+  // 2026-10-16 (QC-288): el asiento lleva `customerNames`, nulo salvo en la entrega sin pedido.
   it('con el lote visible, devuelve el historial del mas reciente al mas antiguo', async () => {
     doble.productBatchFindFirst.mockResolvedValue({ id: LOTE_ID });
     doble.movementFindMany.mockResolvedValue([
@@ -241,6 +242,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         createdAt: '2026-09-17T14:00:00.000Z',
         previousStock: null,
         countedStock: null,
+        customerNames: null,
       },
       {
         id: 'movimiento-1',
@@ -252,6 +254,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         createdAt: AHORA.toISOString(),
         previousStock: null,
         countedStock: null,
+        customerNames: null,
       },
     ]);
 
@@ -304,6 +307,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         createdAt: '2026-09-17T12:00:00.000Z',
         previousStock: null,
         countedStock: null,
+        customerNames: null,
       },
       {
         id: 'movimiento-1',
@@ -315,6 +319,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         createdAt: '2026-09-17T10:00:00.000Z',
         previousStock: null,
         countedStock: null,
+        customerNames: null,
       },
     ]);
   });
@@ -387,5 +392,50 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
     doble.movementFindMany.mockResolvedValue([]);
 
     await expect(findBatchMovements(LOTE_ID, AMBITO)).resolves.toEqual([]);
+  });
+});
+
+// 2026-10-16 (QC-288): cada asiento del libro fisico trae la entrega o la anulacion que cita, para
+// que el caso de uso resuelva los clientes de la entrega sin pedido.
+describe('findBatchMovements — referencias de entrega y anulacion', () => {
+  it('R37, R50: selecciona orderDeliveryId y orderDeliveryVoidId y los devuelve en cada asiento', async () => {
+    doble.productBatchFindFirst.mockResolvedValue({ id: LOTE_ID });
+    doble.movementFindMany.mockResolvedValue([
+      {
+        id: 'movimiento-2',
+        kind: 'direct_delivery_void',
+        quantity: new Prisma.Decimal(5),
+        reason: null,
+        orderId: null,
+        createdBy: ACTOR_ID,
+        createdAt: new Date('2026-10-16T12:00:00.000Z'),
+        stockBefore: null,
+        countedStock: null,
+        orderDeliveryId: null,
+        orderDeliveryVoidId: 'anulacion-1',
+      },
+      {
+        id: 'movimiento-1',
+        kind: 'direct_delivery',
+        quantity: new Prisma.Decimal(-5),
+        reason: null,
+        orderId: null,
+        createdBy: ACTOR_ID,
+        createdAt: new Date('2026-10-16T10:00:00.000Z'),
+        stockBefore: null,
+        countedStock: null,
+        orderDeliveryId: 'entrega-1',
+        orderDeliveryVoidId: null,
+      },
+    ]);
+
+    const historial = await findBatchMovements(LOTE_ID, AMBITO);
+
+    expect(historial?.map((m) => [m.kind, m.quantity, m.orderNumberText, m.orderDeliveryId, m.orderDeliveryVoidId])).toEqual([
+      ['direct_delivery_void', '5.0000', null, null, 'anulacion-1'],
+      ['direct_delivery', '-5.0000', null, 'entrega-1', null],
+    ]);
+    const llamada = doble.movementFindMany.mock.calls[0]?.[0] as { select: Record<string, unknown> };
+    expect(llamada.select).toMatchObject({ orderDeliveryId: true, orderDeliveryVoidId: true });
   });
 });

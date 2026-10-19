@@ -180,9 +180,11 @@ async function deliverInTransaction(
  *  la entrega exige `TERMINADO` y `TERMINADO` no se cancela. */
 async function alreadyRegistered(
   orders: OrderRepository,
-  orderId: string,
+  orderId: string | null,
   scope: OrderScope,
 ): Promise<DeliverOrderResult> {
+  // La clave es de una entrega sin pedido: no es un reintento de esta.
+  if (orderId === null) throw new ValidationError();
   const order = await orders.findAliveById(orderId, scope);
   if (order === null) throw new OrderNotFoundError();
   if (order.status !== 'TERMINADO' && order.status !== 'ENTREGADO') throw new ActionNotAllowedError();

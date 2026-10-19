@@ -1,6 +1,6 @@
 'use client';
 
-import { HistoryIcon, LayersIcon, PencilIcon, ScaleIcon, Trash2Icon } from 'lucide-react';
+import { HistoryIcon, LayersIcon, PencilIcon, ScaleIcon, Trash2Icon, TruckIcon } from 'lucide-react';
 
 import type { RowActionsSpec } from '@/components/shared/data-table';
 import {
@@ -20,9 +20,11 @@ export const PRODUCT_ACTION_HISTORY_TESTID = 'product-history-open';
 export const PRODUCT_ACTION_ADJUST_TESTID = 'product-adjust-open';
 export const PRODUCT_ACTION_EDIT_TESTID = 'product-edit-open';
 export const PRODUCT_ACTION_DELETE_TESTID = 'product-delete-open';
+export const PRODUCT_ACTION_DIRECT_DELIVERY_TESTID = 'product-action-direct-delivery';
 
 export const PRODUCT_ROW_ACTION_LABELS = {
   batches: 'Lotes',
+  directDelivery: 'Entregar',
   history: 'Historial',
   adjust: 'Ajustar existencia',
   edit: 'Editar',
@@ -34,7 +36,7 @@ export function productRowActionsLabel(name: string): string {
   return `Acciones de ${name}`;
 }
 
-export type ProductRowAction = 'batches' | 'history' | 'adjust' | 'edit' | 'delete';
+export type ProductRowAction = 'batches' | 'direct-delivery' | 'history' | 'adjust' | 'edit' | 'delete';
 
 // La especificación llega a `RowActionsMenu` por propagación: `data-product-id` sale en el
 // disparador de la fila y en el de la tarjeta.
@@ -45,6 +47,8 @@ export type ProductRowActionsSpecInput = {
   readonly units?: readonly UnitRef[];
   /** Falla cerrado: el permiso baja por props, esta pantalla no lo resuelve. */
   readonly canAdjust: boolean;
+  /** Solo con permiso y excedente: lo decide el servidor que monta la tabla. */
+  readonly directDelivery?: { readonly productId: string };
   readonly onAction: (action: ProductRowAction, product: ProductView) => void;
 };
 
@@ -52,6 +56,7 @@ export function productRowActionsSpec({
   product,
   units,
   canAdjust,
+  directDelivery,
   onAction,
 }: ProductRowActionsSpecInput): ProductRowActionsSpec {
   const emit = (action: ProductRowAction) => () => onAction(action, product);
@@ -64,6 +69,17 @@ export function productRowActionsSpec({
       onSelect: emit('batches'),
       testId: PRODUCT_ACTION_BATCHES_TESTID,
     },
+    ...(directDelivery === undefined
+      ? []
+      : [
+          {
+            key: 'direct-delivery',
+            label: PRODUCT_ROW_ACTION_LABELS.directDelivery,
+            icon: TruckIcon,
+            onSelect: emit('direct-delivery'),
+            testId: PRODUCT_ACTION_DIRECT_DELIVERY_TESTID,
+          },
+        ]),
     {
       key: 'history',
       label: PRODUCT_ROW_ACTION_LABELS.history,

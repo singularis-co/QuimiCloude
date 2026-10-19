@@ -262,3 +262,26 @@ describe('createFinishedGoodsReturn — la fabrica sobre la tx de quien llama', 
     expect(lockSql(txDouble).values[0]).toBe('company-2');
   });
 });
+
+// 2026-10-16 (QC-288): con `orderId` nulo -la anulacion de una entrega sin pedido- el asiento es
+// direct_delivery_void, sin pedido; el resto del camino no cambia.
+describe('returnFinishedGoods — anulacion de una entrega sin pedido', () => {
+  it('R50: un asiento direct_delivery_void por lote, positivo, con la anulacion, sin pedido ni motivo, y el bloqueo sin mirar deleted_at', async () => {
+    const { tx, txDouble } = makeTx(THREE_BATCHES);
+
+    const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid({
+      companyId: COMPANY,
+      ...baseInput({ orderId: null }),
+    });
+
+    expect(outcome).toEqual({ kind: 'returned' });
+    const datos = txDouble.inventoryMovement.create.mock.calls.map((call) => call[0].data);
+    expect(datos.map((d) => [d.batchId, d.kind, d.quantity, d.orderId, d.reason, d.orderDeliveryVoidId])).toEqual([
+      ['batch-1', 'direct_delivery_void', '15.0000', null, null, 'void-1'],
+      ['batch-2', 'direct_delivery_void', '1.5000', null, null, 'void-1'],
+      ['batch-3', 'direct_delivery_void', '2.0000', null, null, 'void-1'],
+    ]);
+    expect(lockSql(txDouble).sql).not.toMatch(/deleted_at/u);
+    expect(txDouble.$executeRaw).toHaveBeenCalledTimes(2);
+  });
+});

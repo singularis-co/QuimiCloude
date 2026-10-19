@@ -1,8 +1,10 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  DIRECT_DELIVERY_SHEET_TESTID,
   FinishedStockTable,
+  PRODUCT_ACTION_DIRECT_DELIVERY_TESTID,
   packagedStockLabel,
 } from '@/app/(private)/inventario/components';
 import type { DataTableParams } from '@/components/shared/data-table';
@@ -15,6 +17,7 @@ import {
 import type { UnitRef } from '@/lib/modules/unidades';
 import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { directDeliveryView } from '../../fixtures/direct-delivery';
 import { clickRowAction, openRowActionsMenu } from '../../helpers/row-actions-menu';
 import { setupUser } from '../../helpers/user-event';
 
@@ -30,6 +33,7 @@ const {
   listOrderBatchesActionMock,
   listBatchMovementsActionMock,
   adjustBatchStockActionMock,
+  getDirectDeliveryActionMock,
 } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn(),
@@ -43,6 +47,14 @@ const {
   listOrderBatchesActionMock: vi.fn(),
   listBatchMovementsActionMock: vi.fn(),
   adjustBatchStockActionMock: vi.fn(),
+  getDirectDeliveryActionMock: vi.fn(),
+}));
+
+// 2026-10-16: la fila ofrece «Entregar» (entrega sin pedido), cuyo sheet lee de las actions de pedidos.
+vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
+  getDirectDeliveryAction: getDirectDeliveryActionMock,
+  deliverDirectAction: vi.fn(),
+  searchOrderCustomersAction: vi.fn(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -469,6 +481,98 @@ describe('fila «Sin pedido»', () => {
 
     expect(await screen.findByTestId('product-batches-sheet')).toBeInTheDocument();
     expect(listOrderBatchesActionMock).toHaveBeenCalledWith(null, 'product-2');
+  });
+});
+
+describe('«Entregar» sin pedido en el menu de la fila', () => {
+  const SIN_EXCEDENTE = 'product-1';
+  const CON_EXCEDENTE = 'product-3';
+
+  function conDosProductos(surplusByProduct?: Readonly<Record<string, number>>) {
+    const otro = producto({ id: CON_EXCEDENTE, name: 'Desengrasante · Botella 1 L' });
+    render(
+      <FinishedStockTable
+        rows={[
+          pedido({
+            products: [
+              { product: producto(), stock: '1.5', packagedStock: [entrada()] },
+              { product: otro, stock: '2', packagedStock: null },
+            ],
+          }),
+        ]}
+        params={PARAMS}
+        totalPages={1}
+        units={UNITS}
+        canAdjust
+        surplusByProduct={surplusByProduct}
+      />,
+    );
+  }
+
+  async function itemsDelMenu(user: ReturnType<typeof setupUser>, productId: string): Promise<string[]> {
+    const sub = screen.getByTestId(`data-table-row-order-1--${productId}`);
+    const menu = await openRowActionsMenu(user, within(sub).getByTestId('product-row-actions'));
+    const ids = within(menu)
+      .getAllByRole('menuitem')
+      .map((item) => item.getAttribute('data-testid') ?? '');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    return ids;
+  }
+
+  beforeEach(() => {
+    getDirectDeliveryActionMock.mockResolvedValue({ status: 'success', data: directDeliveryView() });
+  });
+
+  it('R6: solo la fila con excedente mayor que cero ofrece «Entregar»; en cero no existe en el DOM del menu', async () => {
+    const user = setupUser();
+    conDosProductos({ [SIN_EXCEDENTE]: 0, [CON_EXCEDENTE]: 4 });
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
+
+    expect(await itemsDelMenu(user, CON_EXCEDENTE)).toEqual([
+      'product-batches-open',
+      PRODUCT_ACTION_DIRECT_DELIVERY_TESTID,
+      'product-history-open',
+      'product-adjust-open',
+      'product-edit-open',
+      'product-delete-open',
+    ]);
+    expect(await itemsDelMenu(user, SIN_EXCEDENTE)).toEqual([
+      'product-batches-open',
+      'product-history-open',
+      'product-adjust-open',
+      'product-edit-open',
+      'product-delete-open',
+    ]);
+  });
+
+  it('R6: sin mapa de excedente (sin permiso o sin lectura) ninguna fila ofrece «Entregar» y el menu no cambia', async () => {
+    const user = setupUser();
+    conDosProductos();
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
+
+    for (const productId of [SIN_EXCEDENTE, CON_EXCEDENTE]) {
+      expect(await itemsDelMenu(user, productId)).toEqual([
+        'product-batches-open',
+        'product-history-open',
+        'product-adjust-open',
+        'product-edit-open',
+        'product-delete-open',
+      ]);
+    }
+  });
+
+  it('R7: «Entregar» del menu abre el sheet «Entregar sin pedido» de ese producto', async () => {
+    const user = setupUser();
+    conDosProductos({ [CON_EXCEDENTE]: 4 });
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
+    expect(screen.queryByTestId(DIRECT_DELIVERY_SHEET_TESTID)).toBeNull();
+
+    const sub = screen.getByTestId(`data-table-row-order-1--${CON_EXCEDENTE}`);
+    await clickRowAction(user, within(sub).getByTestId('product-row-actions'), PRODUCT_ACTION_DIRECT_DELIVERY_TESTID);
+
+    expect(await screen.findByTestId(DIRECT_DELIVERY_SHEET_TESTID)).toBeInTheDocument();
+    expect(getDirectDeliveryActionMock).toHaveBeenCalledWith(CON_EXCEDENTE);
   });
 });
 
