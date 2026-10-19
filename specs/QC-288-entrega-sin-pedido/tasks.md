@@ -292,7 +292,7 @@ lleva su nota y hay commit.
 
 ---
 
-## [ ] TI — E2E (depende de TC)
+## [x] TI — E2E (depende de TC)
 
 - `e2e/entrega-sin-pedido.spec.ts` (nuevo), con los cinco recorridos de R56 y sus comprobaciones en
   Postgres.

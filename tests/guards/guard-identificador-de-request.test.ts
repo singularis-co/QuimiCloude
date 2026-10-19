@@ -500,6 +500,14 @@ export const E2E_ESPERADOS = [
   // Administrador de la empresa. No lee ni afirma nada sobre el identificador de peticion ni sobre
   // `reference`.
   'maestro-administradores.spec.ts',
+  // Alta el 2026-10-19 (QC-288 R56, TI) por el MISMO motivo y en el MISMO sitio que las demas: la
+  // lista es CERRADA y darse de alta en ella es su punto de extension por diseno. Lo que ejercita:
+  // desde la ficha de un producto con excedente, una entrega sin pedido a dos clientes que comparten
+  // un lote, con nota; «Entregar» deshabilitado al pasarse del excedente; un producto sin excedente
+  // sin «Entregar» en su ficha ni en el menu de su fila; el tab Entregas con «Sin pedido» y la nota,
+  // y la anulacion de la parte de un cliente; el historial del lote con «Entrega sin pedido». No lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'entrega-sin-pedido.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

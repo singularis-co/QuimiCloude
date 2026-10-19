@@ -761,3 +761,46 @@ Entorno de integración: `.env` del repo principal exportado solo en el comando.
   `guard-permisos-sembrados`): `Test Files 5 passed (5)`, `Tests 197 passed (197)`.
 
 Veredicto: TC hecha; cuatro censos enmendados con nota y lista por archivo, ninguna violación de diseño, sin tocar producción.
+
+## TI — E2E (frontend_dev, 2026-10-19)
+
+### Archivos
+- `e2e/entrega-sin-pedido.spec.ts` (nuevo).
+- `tests/guards/guard-identificador-de-request.test.ts`: alta de `entrega-sin-pedido.spec.ts` en `E2E_ESPERADOS`
+  (nota 2026-10-19).
+- `specs/QC-288-entrega-sin-pedido/tasks.md`: TI `[x]`.
+
+Base local (`localhost`): `pnpm run db:migrate` aplicó `20261016130000_inventory_movement_kind_direct_delivery` y
+`20261016130100_direct_deliveries` (aditivas; nada revertido ni reseteado).
+
+### R → test
+- R56 → `e2e/entrega-sin-pedido.spec.ts`:
+  - «R56: entrega sin pedido a dos clientes que comparten un lote con nota, tope del excedente, tab Entregas con
+    «Sin pedido», anulacion de un cliente e historial del lote»: viñetas 1, 2, 4 y 5 (Postgres: una entrega con
+    `order_id` NULL, `product_id` y nota; tres líneas por cliente y lote; un asiento `direct_delivery` por lote con
+    la suma; existencia de cada lote; pedido intacto y ninguna entrega de pedido; anulación solo de A, lote 1 +3,
+    B conserva sus dos líneas; historial con «Entrega sin pedido» + «Ana…, Bea…» y la anulación con A).
+  - «R56: un producto sin excedente no tiene «Entregar» ni en la cabecera de su ficha ni en el menu de su fila; el
+    que tiene excedente lo ofrece despues de «Lotes»»: viñeta 3.
+
+### Salida real
+- `pnpm exec playwright test e2e/entrega-sin-pedido.spec.ts`: `4 passed (2.2m)` (2 tests × chromium/webkit).
+- Los cuatro citados, primera corrida (6 workers): `7 failed, 5 passed (6.3m)`. Seis eran `page.waitForURL: Timeout
+  60000ms` en el login de chromium (saturación de `next dev` con 6 workers en frío).
+- Los cuatro citados, segunda corrida `--workers=2`: `2 failed, 10 passed (3.0m)`:
+  - `entrega-a-varios-clientes.spec.ts`: 2/2 passed.
+  - `anular-entrega.spec.ts`: 4/4 passed.
+  - `producto-terminado.spec.ts`: 2/2 passed.
+  - `detalle-de-producto-terminado.spec.ts`: 2 passed, 2 failed («R31, R27, R26: tras una entrega parcial…», en
+    chromium y webkit). Paso 4, l. 548: `getByTestId('finished-stock-name').filter(receta)` → `Received: 2`
+    (`Expected: 1`). En la pestaña «Producto terminado» de `/inventario` el nombre del grupo sale en la fila y en
+    la tarjeta del rediseño QC-263. El spec, `finished-stock-columns.tsx` y `components/shared/data-table` no
+    cambian contra `origin/dev`, y QC-288 no toca ese paso. No se reescribe aquí; no se corrió sobre `origin/dev`.
+    Así queda para el leader.
+  Ninguno de los cuatro necesitó cambios de import ni de selector por F1/F4.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, todos previos; los dos archivos tocados, limpios.
+- `pnpm exec vitest run guard`: `Test Files 81 passed (81)`, `Tests 1109 passed | 20 skipped (1129)`.
+
+Veredicto: TI hecha; el E2E de R56 queda en verde en los dos navegadores. Hay un rojo ajeno en
+`detalle-de-producto-terminado.spec.ts` (selector roto por QC-263 en dev), que queda reportado.
