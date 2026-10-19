@@ -115,11 +115,6 @@ export {
   type ConditioningOrdersEmptyProps,
 } from './conditioning-orders-empty';
 export {
-  DELIVERED_CONDITIONED_ORDERS_EMPTY_TEXT,
-  DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID,
-  DeliveredConditionedOrdersListSection,
-} from './delivered-conditioned-orders-list-section';
-export {
   CONDITIONING_ORDERS_SECTION_TESTID,
   ConditioningOrdersListSection,
 } from './conditioning-orders-list-section';
