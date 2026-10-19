@@ -703,7 +703,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // `data-table-card-<id>` y `data-table-card-field-<id>`; en la importacion, las filas de la vista
   // previa y del resultado por `data-table-row-<fila>`. El centinela pasa de CINCUENTA a CINCUENTA Y
   // UNO; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y uno', () => {
+  //
+  // 2026-10-19 (QC-288, R56): entra `e2e/entrega-sin-pedido.spec.ts`, y no afloja la lista. No
+  // estrena tabla: recorre la lista de inventario y el panel «Lotes», ya en esta lista, y localiza
+  // la fila del producto, la del lote y los asientos del historial del lote por
+  // `data-table-row-<id>`. El centinela pasa de CINCUENTA Y UNO a CINCUENTA Y DOS; la lista sigue
+  // CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y dos', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -713,7 +719,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cincuenta y uno E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cincuenta y dos E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -759,6 +765,10 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-09-25, QC-168). Va antes que `grupos-de-trabajo` porque la
       // lista esta ORDENADA y 'e' precede a 'g'.
       'e2e/empaque.spec.ts',
+      // Ver la nota de arriba (2026-10-19, QC-288). Entre `empaque` y `entregar-producto-terminado`
+      // porque la lista esta ORDENADA: 'm' precede a 'n', y 'entrega-' precede a 'entregar' ('-'
+      // precede a 'r').
+      'e2e/entrega-sin-pedido.spec.ts',
       // Ver la nota de arriba (2026-10-08, QC-223). Entre `empaque` y `grupos-de-trabajo` porque la
       // lista esta ORDENADA: 'm' precede a 'n', y 'e' precede a 'g'.
       'e2e/entregar-producto-terminado.spec.ts',

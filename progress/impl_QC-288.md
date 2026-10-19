@@ -1059,3 +1059,24 @@ Veredicto: TI hecha; el E2E de R56 queda en verde en los dos navegadores. Hay un
 - `pnpm run typecheck`: exit 0. `pnpm run lint`: 0 errors, 10 warnings (previos).
 - `vitest run tests/unit/inventario-ui tests/unit/shared-ui tests/unit/shared/data-table.test.tsx`: 71 files, 865 passed.
 - `vitest run guard`: 81 files, 1109 passed | 20 skipped.
+
+## CI del PR #269 (backend_dev, 2026-10-19)
+
+`gate-completo` rojo en tres archivos, los tres por QC-288:
+
+- `tests/unit/shared/data-table-alcance.test.ts` (QC-55 R36): alta explicita de
+  `e2e/entrega-sin-pedido.spec.ts` en la lista cerrada (51 → 52), con nota fechada.
+- `tests/unit/clientes/scope.test.ts` (R28): alta de `entrega-sin-pedido.spec.ts` como excepcion,
+  mismo criterio que QC-156/QC-282; nota de enmienda fechada bajo R28 en
+  `specs/QC-153-modelo-de-clientes/requirements.md`.
+- `tests/integration/inventario/qc195-packaging-constraints.int.test.ts` (R32): el `down.sql` de
+  QC-195 suelta `products_company_id_id_key`, de la que depende la FK posterior
+  `order_deliveries_product_id_fkey` (2BP01). Sin precedente en el test. Arreglo solo en el test:
+  antes del down suelta las FK posteriores que dependen de la clave (lista cerrada, hoy solo la
+  nuestra, leida de `pg_constraint`) y tras el up las recrea con `pg_get_constraintdef`. Sin tocar
+  migraciones ni aserciones de QC-195. El rollback real no cambia: nuestro `down.sql` suelta la FK
+  antes y se revierte primero (`direct-deliveries-migration.int.test.ts` verde).
+
+Evidencia: los dos unit (52 ok | 2 skip); qc195 int 6/6; 38 int que aplican `down.sql` 311/311;
+47 archivos de scope/schema/migracion 635 ok; `typecheck` limpio; `lint` 0 errores (10 warnings
+previos, ajenos); guardias 81 archivos, 1109 ok | 20 skip.
