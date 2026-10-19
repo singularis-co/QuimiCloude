@@ -259,3 +259,169 @@ $ pnpm exec vitest run guard
 
 Bloque B (T4–T8) hecho: typecheck, lint, integración y guardias en verde; el único rojo de
 `vitest related` es el ajeno conocido (`tablas-marca.test.tsx` por `product-columns.tsx`).
+
+## Tanda 2 — Bloques C y F
+
+Alcance: T9, T10 (solo backend), T11 y T20. Fuera: `components/shared/document-upload/document-upload.tsx`
+y `tests/unit/documentos-ui/document-upload-names.test.tsx` (UI, tanda de frontend_dev). Sin
+dependencias nuevas.
+
+### Archivos creados
+
+| Archivo | Task | Qué es |
+| --- | --- | --- |
+| `lib/modules/documentos/domain/batch-finished-listener.ts` | T9 | `BatchFinishedListener` y `BatchFinishedEvent` (forma de design §6.1) |
+| `lib/modules/documentos/domain/notify-if-batch-finished.ts` | T9 | `createNotifyIfBatchFinished({ notices, listener, log?, now? })`: lee el resumen; si `pending = 0` llama al listener. Nunca lanza (log `warn`) |
+| `db/migrations/20261019120200_document_files_original_name/{migration,down}.sql` | T10 | `original_name TEXT NULL` + CHECK 1–255 (`char_length`); el down quita la columna |
+| `lib/modules/documentos/domain/file-name.ts` | T10 | `fileNameSchema`: sin carpetas (`/` y `\`), sin `\p{Cc}`, recortado, 1–255 puntos de código |
+| `lib/modules/notificaciones/domain/file-list-phrase.ts` | T11 | `fileListPhrase(names, failed)` |
+| `lib/modules/notificaciones/adapters/driving/purge-route.ts` | T20 | `GET`: secreto → empresas una a una → `purgeExpiredNotifications`; 401/500/200; el fallo de una empresa no corta a las demás (500 con `failedCount`) |
+| `app/api/cron/purgar-notificaciones/route.ts` | T20 | Reexporta `GET`, `runtime = 'nodejs'` literal |
+| `tests/unit/documentos/batch-finished.test.ts` | T9 | 12 casos |
+| `tests/unit/documentos/enqueue-names.test.ts` | T10 | 12 casos |
+| `tests/integration/documentos/batch-notice.int.test.ts` | T9/T10 | 8 casos, modo `commit` |
+| `tests/unit/notificaciones/documentos-event.test.ts` | T11 | 18 casos (10 filas de texto con `it.each`) |
+| `tests/unit/notificaciones/file-list-phrase.test.ts` | T11 | 8 casos |
+| `tests/unit/composition/documentos-batch-notice.test.ts` | T11 | 5 casos |
+| `tests/unit/notificaciones/purge-route.test.ts` | T20 | 8 casos |
+
+### Archivos modificados
+
+- `db/schema.prisma`: una línea, `originalName String? @map("original_name")` en `DocumentFile`.
+- `lib/modules/documentos/ports/document-batch-repository.ts`: `NewBatch.originalNames?`, tipo
+  `BatchNotice` y puerto `BatchNoticeReader.readBatchNotice` (decisión 1).
+- `lib/modules/documentos/adapters/driven/persistence/document-batch-repository-prisma.ts`:
+  `createBatch` escribe `originalName` y un `createdAt` creciente por posición (decisión 3);
+  `readBatchNotice` (tanda + `groupBy` por estado + 3 fallidos con nombre `ORDER BY created_at, id`);
+  `documentBatchRepositoryPrisma` tipado `DocumentBatchRepository & BatchNoticeReader`.
+- `lib/modules/documentos/domain/run-document-job.ts`: `batchFinished?` opcional; `terminar` recibe
+  la fila reclamada y, tras un `finish` que no es `requeue`, llama a `notifyIfBatchFinished`.
+- `lib/modules/documentos/domain/get-batch-status.ts`: `batchFinished?` opcional; aviso tras `expireStale`.
+- `lib/modules/documentos/domain/enqueue-input.ts` (`names` opcional + `refine` de longitud) y
+  `enqueue-batch.ts` (pasa `originalNames` solo si vino `names`).
+- `lib/modules/notificaciones/domain/catalog.ts`: entrada `documentos.tanda_terminada` (esquema
+  estricto, textos de §6.4, tono, título, destino, «Ver fórmulas»/«Ver proveedores», audiencia de usuario).
+- `lib/composition/index.ts`: `batchFinishedDeps` justo antes de `runDocumentJob` (R48 + `notify`
+  con `dedupeKey = documentos.tanda_terminada:<batchId>`), pasado a `runDocumentJob` y
+  `getBatchStatus`; `notificaciones` gana `verifyCronSecret` y `listCompanyIds` al final de su bloque.
+- `vercel.json`: tarea `/api/cron/purgar-notificaciones`, `30 7 * * *`.
+- Tests: `tests/guards/guard-rutas-fuera-de-sesion.test.ts` (entrada núcleo con su prueba),
+  `tests/guards/guard-identificador-de-request.test.ts` (migración nueva en la lista),
+  `tests/integration/aislamiento.json` (`batch-notice.int.test.ts` en `commit`),
+  `tests/unit/pedidos/vercel-cron.test.ts` (reescrito: filtra la tarea de caducidad, no fija el
+  total), `tests/unit/composition/notificaciones-wiring.test.ts` (dos claves nuevas de la fachada).
+- `lib/modules/documentos/index.ts`: **no se tocó** (decisión 4).
+
+### Mapa R<n> → test (tanda 2)
+
+| R | Test |
+| --- | --- |
+| R5 | `documentos-batch-notice.test.ts` › «R5: el aviso de fin de tanda se emite con la clave del evento y el dedupeKey de la tanda», «R5: ningún archivo de lib/modules/documentos importa @/lib/modules/notificaciones» |
+| R7 | `batch-finished.test.ts` › «R7: un listener que lanza no cambia el RunDocumentJobResult, y el fallo queda en el log», «R7: una lectura de la tanda que lanza tampoco cambia el resultado, también con error», «R7: notifyIfBatchFinished nunca lanza, aunque no tenga log» |
+| R17 | `purge-route.test.ts` › «R17: sin el secreto responde 401…», «R17: con un secreto que no casa responde 401», «R17: sin CRON_SECRET configurado responde 500 y no borra», «R17: con el secreto hace una llamada a borrar por empresa, de una en una», «R17: si falla una empresa sigue con las demás y responde 500», «R17: la tarea está declarada en vercel.json una vez al día» (+ `guard-rutas-fuera-de-sesion` verde con la entrada núcleo) |
+| R46 | `batch-finished.test.ts` › «R46: con tres archivos, el aviso sale al terminar el tercero y no con los dos primeros», «R46: los archivos que fallan antes del último no avisan…», «R46: el último archivo terminado en done también cierra la tanda», «R46: un requeue no avisa ni consulta la tanda…», «R46: con archivos todavía pendientes no avisa», «R46: un archivo colgado que caduca cierra la tanda y sale un aviso…» (getBatchStatus); `documentos-batch-notice.test.ts` › «R46: runDocumentJob y getBatchStatus reciben el mismo aviso…»; `batch-notice.int.test.ts` › «QC-137 R46: una tanda de otra empresa o inexistente da null» |
+| R47 | `documentos-event.test.ts` › «R47: <fila>» ×10 (las seis filas de §6.4, con y sin nombres: tono, título, cuerpo, `{hora}` y `bodyTime`) |
+| R48 | `documentos-batch-notice.test.ts` › «R48: sin autor no se llama a notify y queda en el log»; `documentos-event.test.ts` › «R48: sin autor no se crea el aviso y queda el rechazo en el log» |
+| R49 | `documentos-event.test.ts` › «R49: una tanda de fórmula lleva a fórmulas con «Ver fórmulas»», «R49: una tanda de catálogo lleva a la lista de proveedores…», «R49: el payload no admite el proveedor…»; `documentos-batch-notice.test.ts` › «R49: el payload que llega a notify no lleva proveedor» |
+| R50 | `enqueue-names.test.ts` › «R50: se queda sin carpetas…», «R50: recorta espacios y quita caracteres de control», «R50: rechaza un nombre vacío…», «R50: admite 255 caracteres y rechaza 256», «R50: una longitud distinta de paths se rechaza», «R50: sin names se encola igual y el repositorio no recibe nombres, así quedan NULL» (+6); `batch-notice.int.test.ts` › «QC-137 R50: cada fila guarda su nombre, alineado con su ruta», «QC-137 R50: sin nombres las filas quedan con NULL…», «QC-137 R50: la base rechaza un nombre vacío y uno de más de 255 caracteres» |
+| R51 | `file-list-phrase.test.ts` › «R51: uno, dos y tres nombres…», «R51: cuatro fallidos con nombre nombran tres y «y 1 más»», «R51: un nombre y dos fallidos sin nombre…», «R51: un nombre de 61 caracteres se recorta a 59 + «…» y uno de 60 no» (+4); `batch-notice.int.test.ts` › «QC-137 R51: conteos por estado, autor, estrategia y uploadedAt…», «QC-137 R51: los tres primeros fallidos con nombre, en orden de subida…», «QC-137 R51: los fallidos sin nombre se saltan…», «QC-137 R50, R51: una tanda con filas sin nombre da failedNames vacío y el aviso usa el texto genérico»; `documentos-event.test.ts` › «R51: sin ningún fallido con nombre se usa el texto genérico…» |
+
+### Verificación (salida real)
+
+```
+$ pnpm run typecheck
+> tsc --noEmit                     (sin errores)
+
+$ pnpm run lint
+✖ 10 problems (0 errors, 10 warnings)   (los mismos 10 de la tanda 1, en archivos que este diff no toca)
+$ pnpm exec eslint <los 25 .ts tocados>   (sin salida, exit 0)
+
+$ pnpm exec vitest run <los 8 tests nuevos/reescritos + las 2 guardias tocadas>
+ Test Files  10 passed (10)
+      Tests  99 passed (99)
+
+$ pnpm exec vitest run --project node tests/unit/documentos tests/unit/notificaciones tests/unit/composition tests/unit/pedidos/vercel-cron.test.ts
+ Test Files  102 passed (102)
+      Tests  1139 passed | 30 skipped (1169)
+ (los tests existentes de documentos, sin cambios, en verde)
+
+$ pnpm exec vitest related --run --project node --project ui <23 .ts tocados, sin los .int> db/schema.prisma vercel.json
+ FAIL  |ui| tests/unit/marca/tablas-marca.test.tsx > lista cerrada de columnas en Plex Mono > R11, R13: en 'product-columns.tsx' llevan tabular exactamente las columnas de la lista
+ Test Files  1 failed | 383 passed (384)
+      Tests  1 failed | 6372 passed | 2 skipped (6375)
+ (único rojo: el ajeno conocido; sigue sin estar en tests/baseline-rojos.json)
+
+$ pnpm exec vitest run --project integration tests/integration/documentos/batch-notice.int.test.ts
+test-db: plantilla lista: qct_tpl_93de319bb683   (construida de nuevo: la migración cambió la huella)
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+
+$ pnpm exec vitest run --project integration tests/integration/documentos tests/integration/notificaciones
+test-db: plantilla reutilizada: qct_tpl_93de319bb683 (las migraciones no han cambiado)
+ Test Files  8 passed (8)
+      Tests  54 passed (54)
+
+$ pnpm exec vitest run guard
+ Test Files  80 passed (80)
+      Tests  1096 passed | 20 skipped (1116)
+```
+
+**db:migrate / db:rollback** sobre `qct_qc137_migcheck_t2` (copia de la plantilla `qct_tpl_93de319bb683`,
+borrada al terminar; la base de desarrollo no se tocó). Estado leído con `pg` en cada paso
+(columna, CHECK, fila de `_prisma_migrations`):
+
+- inicio: `{"column":1,"check":1,"migrationRow":1}`
+- `db:rollback` → «aplicando down.sql de 20261019120200_document_files_original_name y borrando su
+  fila de _prisma_migrations», «20261019120200_document_files_original_name revertida»;
+  `{"column":0,"check":0,"migrationRow":0}`; `prisma migrate status`: «Following migration have not yet been applied».
+- `db:migrate` → «Applying migration `20261019120200_document_files_original_name`», «All migrations
+  have been successfully applied»; `{"column":1,"check":1,"migrationRow":1}`. Segunda corrida: «No pending migrations to apply».
+- `prisma migrate diff` base → esquema: `document_files` sale cambiada solo por la FK compuesta escrita
+  a mano (drift previo); ninguna línea nombra `original_name`.
+
+Para la integración y la migración se cargó el `.env` del checkout principal (el worktree no tiene `.env`).
+
+### Decisiones fuera del spec (a validar)
+
+1. **`readBatchNotice` en un puerto aparte, `BatchNoticeReader`, en el mismo archivo
+   `ports/document-batch-repository.ts`.** Añadirlo a `DocumentBatchRepository` rompía el typecheck
+   de 7 tests existentes de `documentos` que declaran dobles tipados con ese puerto. El adaptador
+   Prisma lo implementa en el mismo archivo y el objeto exportado cumple los dos.
+2. **`NewBatch` conserva `paths` y gana `originalNames?` (alineado por índice), en vez de
+   `files: { path, originalName }[]`.** Con `files`, `enqueue-batch.test.ts` (R2: claves exactas
+   de la entrada; su doble usa `input.paths.map`) y `document-batch-repository-prisma.test.ts` se
+   ponían rojos. `originalNames` solo viaja si vino `names`, para que la entrada sin nombres conserve
+   sus cuatro claves.
+3. **`createBatch` escribe `createdAt = ahora + índice ms` en cada archivo.** Las filas de una tanda
+   se insertan en la misma transacción y pueden compartir instante, así que `ORDER BY created_at, id`
+   ordenaría por el uuid y no por orden de subida (R51). Lo cubre el caso de los seis fallidos
+   terminados en orden inverso.
+4. **`lib/modules/documentos/index.ts` no se tocó.** `module-contract.test.ts` congela también los
+   tipos del barril; exportar `BatchFinishedListener` lo ponía rojo. La composición tipa el aviso con
+   `NonNullable<Parameters<typeof createRunDocumentJob>[0]['batchFinished']>`.
+5. **`batchFinishedDeps` se declara junto a `runDocumentJob` y no en el bloque de `notificaciones`
+   del final:** `createRunDocumentJob` lo necesita al construirse. Lee `notificaciones.notify` al
+   llamar, no al construir. El log de R48 es `forModule('documentos')` (`batch_notice_without_author`).
+6. **`bodyTime` es `uploadedAt` solo cuando el cuerpo lleva `{hora}`.** Las filas «Tanda procesada con
+   errores» de §6.4 no la llevan, y el CHECK de la tabla exige que la marca y la hora vayan juntas;
+   con `bodyTime = uploadedAt` siempre, la inserción fallaría.
+7. **Esquema del payload:** `strictObject` (por eso un `supplierId` se rechaza), `recipientUserId`
+   uuid, `strategy` con los dos literales (sin importar `documentos`), `done + failed = total`,
+   `failedNames.length ≤ failed` y máximo 3 nombres.
+8. **El cron recorre `listActiveCompanyIds`** (empresas sin baja), la misma lista que el cron de
+   pedidos. Los avisos de una empresa dada de baja no los borra esta tarea.
+9. **Puerta y lista de empresas en la fachada `notificaciones`** (`verifyCronSecret`, el mismo de
+   pedidos, y `listCompanyIds`); el recorrido vive en el driving `purge-route.ts`. Responde
+   `{ deleted }`, o 500 con `{ deleted, failedCount }`, como `order-expiry-cron-route`.
+10. **Horario del cron:** `30 7 * * *` (media hora después del de pedidos). El design solo dice «una
+    vez al día». Sin `maxDuration`: borrar 3-4 empresas no se acerca al defecto. El plan de Vercel
+    y su límite de crons siguen desconocidos (design §11).
+11. **`getBatchStatus` avisa en cada consulta de una tanda ya cerrada** (lo que dice §6.2). Cada
+    sondeo posterior repite `readBatchNotice` + `notify`, y el `UNIQUE (company_id, dedupe_key)` lo
+    deja en `notification_duplicate`.
+12. Grafo de código: no se usó; exploración con Grep/Read.
+
+### Veredicto
+
+Bloques C (T9, T10 backend, T11) y F (T20) hechos: typecheck, lint, unitarios, integración, guardias
+y la migración con su down en verde; el único rojo de `vitest related` es el ajeno conocido.

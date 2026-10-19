@@ -2837,4 +2837,7 @@ export const notificaciones = {
   markNotificationRead: createMarkNotificationRead(notificationReadDeps),
   markAllNotificationsRead: createMarkAllNotificationsRead(notificationReadDeps),
   purgeExpiredNotifications: createPurgeExpiredNotifications(notificationReadDeps),
+  // La tarea diaria de borrado: la misma puerta que el cron de pedidos y las empresas de una en una.
+  verifyCronSecret,
+  listCompanyIds: listActiveCompanyIds,
 } as const;

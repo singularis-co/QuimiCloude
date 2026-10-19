@@ -44,6 +44,10 @@ export const RUTAS_FUERA_DE_SESION: Readonly<Record<string, Clasificacion>> = {
     anadido: 'lectura_pdf',
     prueba: 'tests/unit/documentos/run-document-job-addon.test.ts',
   },
+  'app/api/cron/purgar-notificaciones/route.ts': {
+    nucleo: true,
+    prueba: 'tests/unit/notificaciones/purge-route.test.ts',
+  },
 };
 
 export function listApiRoutes(root: string): readonly string[] {

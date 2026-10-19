@@ -71,15 +71,17 @@ describe('notificaciones — cableado en composición', () => {
     }
   });
 
-  it('la fachada expone el motor y los casos de uso de la bandeja', () => {
+  it('la fachada expone el motor, los casos de uso de la bandeja y lo que usa la tarea de borrado', () => {
     expect(Object.keys(notificaciones).sort()).toEqual(
       [
         'getNotificationSummary',
+        'listCompanyIds',
         'listNotifications',
         'markAllNotificationsRead',
         'markNotificationRead',
         'notify',
         'purgeExpiredNotifications',
+        'verifyCronSecret',
       ].sort(),
     );
   });
