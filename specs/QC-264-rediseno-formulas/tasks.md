@@ -178,7 +178,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 8 — Textos, toasts y guardia (depende de 2–7)
 
-- [ ] **T8a [P]. Tildes** (R21, R45). `PREVIEW_DESCRIPTION` en `recipe-form.tsx` (si no entró en T5a) y
+- [x] **T8a [P]. Tildes** (R21, R45). `PREVIEW_DESCRIPTION` en `recipe-form.tsx` (si no entró en T5a) y
   los de T1c. Tests que afirmaban el texto viejo, actualizados. *Enmienda (E17; supuesto P18):* nada
   más; «Lista de verificacion», «el maximo es» y «Elemento de la lista de verificacion» no se tocan
   salvo que el humano cierre P18 con la alternativa.
