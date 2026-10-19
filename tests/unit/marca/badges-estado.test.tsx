@@ -197,7 +197,8 @@ describe('badges de estado con la nueva marca', () => {
     expectTone(marca, 'warning');
   });
 
-  it('R8: «En revisión» se pinta con el tono de información en el formulario de versión', () => {
+  // Enmienda de QC-264: también el formulario de versión pinta «Por revisar» en waiting.
+  it('R8: «Por revisar» se pinta como StatusBadge waiting en el formulario de versión', () => {
     const version: RecipeDetail = {
       id: '22222222-2222-4222-8222-222222222222',
       name: 'Sin sal',
@@ -226,7 +227,10 @@ describe('badges de estado con la nueva marca', () => {
         initialMachinePage={{ items: [], totalPages: 1 }}
       />,
     );
-    expectTone(screen.getByTestId('recipe-version-form-under-review'), 'info');
+    const marca = screen.getByTestId('recipe-version-form-under-review');
+    expect(marca).toHaveAttribute('data-tone', 'waiting');
+    expect(marca).toHaveTextContent('Por revisar');
+    expectTone(marca, 'warning');
   });
 
   it('R9: los badges conservan su texto visible, su data-testid y sus atributos data-*', () => {
