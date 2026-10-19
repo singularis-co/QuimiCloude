@@ -177,7 +177,7 @@
 
 Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»).
 
-- [ ] **T13. Feed por consulta periódica** (design §9.1, §9.2). Depende de T7.
+- [x] **T13. Feed por consulta periódica** (design §9.1, §9.2). Depende de T7.
   - `notification-feed.ts` (interfaz + `createPollingFeed`) con puertos de visibilidad y temporizador.
   - **Hecho:** `tests/unit/notificaciones-ui/polling-feed.test.ts`, con temporizadores falsos,
     cubre:
@@ -185,7 +185,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     - R38: no consulta oculta, y consulta al volver visible;
     - R40: se para con `unauthorized` y con `forbidden`;
     - un error deja `summary.status = 'error'` y el ciclo sigue.
-- [ ] **T14. Bus entre pestañas y tono** `[P]` (design §9.3, §9.4). Depende de T13.
+- [x] **T14. Bus entre pestañas y tono** `[P]` (design §9.3, §9.4). Depende de T13.
   - `tab-bus.ts`, `chime-coordinator.ts`, `chime.ts`, todos con puertos inyectables.
   - **Hecho:** `tests/unit/notificaciones-ui/chime-coordinator.test.ts` cubre:
     - R41: suena con un `newest` posterior a la marca;
@@ -197,7 +197,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     actualizan el conteo y los avisos cargados de la otra pestaña.
     `tests/unit/notificaciones-ui/chime.test.ts` cubre R44: el tono se genera con osciladores,
     sin cargar audio, y no existe API para silenciar.
-- [ ] **T15. Estado de la lista** (design §8.1, §9.1, §9.2). Depende de T13.
+- [x] **T15. Estado de la lista** (design §8.1, §9.1, §9.2). Depende de T13.
   - `notification-list-state.ts`: reductor puro de `list` (primer lote, `tail`, mezcla arriba,
     sustitución sin solape, marcar uno, marcar todos).
   - **Hecho:** `tests/unit/notificaciones-ui/notification-list-state.test.ts` cubre:
@@ -210,7 +210,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
       cursor;
     - R32: marcar todos deja todos los cargados en `read: true`;
     - R33: el primer lote pasa por `loading` → `ready` / `error`, y `retryFirst` lo vuelve a pedir.
-- [ ] **T16. Proveedor, insignia, fila y hora relativa** (design §9.1, §9.5, §9.6). Depende de
+- [x] **T16. Proveedor, insignia, fila y hora relativa** (design §9.1, §9.5, §9.6). Depende de
   T14 y T15.
   - `NotificationsProvider`, `useNotifications`, `UnreadCountBadge`, `NotificationItem`,
     `relative-time.ts` e `index.ts`.
