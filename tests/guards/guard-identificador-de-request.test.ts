@@ -508,6 +508,15 @@ export const E2E_ESPERADOS = [
   // y la anulacion de la parte de un cliente; el historial del lote con «Entrega sin pedido». No lee
   // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'entrega-sin-pedido.spec.ts',
+  // Alta el 2026-10-19 (QC-278 R25, `specs/QC-278-pantalla-modulos-por-empresa/design.md > 7.2`)
+  // por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA y darse de alta en
+  // ella es su punto de extension por diseno. El ancla NO se relaja -el archivo se nombra, uno a
+  // uno-. Lo que ejercita: con el Administrador de una empresa de prueba con la sesion abierta, el
+  // Maestro prende Proveedores en la pestaña Módulos del detalle y, al recargar, el Administrador ve
+  // Proveedores en su menu sin volver a entrar; el Maestro lo apaga con su confirmacion y, al
+  // recargar, ya no lo ve. No lee ni afirma nada sobre el identificador de peticion ni sobre
+  // `reference`.
+  'maestro-modulos.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

@@ -23,6 +23,7 @@ import {
   CompanyDetailHeader,
   CompanyHistoryPanel,
   CompanyHistorySkeleton,
+  CompanyModulesTab,
   companyDetailPanelTestId,
   companyDetailTabItems,
   isCompanyId,
@@ -117,7 +118,14 @@ export default async function MaestroEmpresaPage({
             <CompanyHistoryPanel companyId={company.id} page={historyPage} />
           </Suspense>
         ) : null}
-        {/* Módulos se deja vacía: su contenido se monta aquí y es quien pedirá los añadidos. */}
+        {tab === 'modulos' ? (
+          <CompanyModulesTab
+            companyId={company.id}
+            companyName={company.name}
+            isDeleted={company.status === 'deleted'}
+            canModify={canModify}
+          />
+        ) : null}
       </div>
     </PageShell>
   );

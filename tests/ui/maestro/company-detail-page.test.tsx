@@ -1,6 +1,6 @@
 // El detalle de empresa del Maestro. La página se invoca como lo hace el App Router y su árbol
 // se pinta entero: la cabecera, las pestañas y el panel vigente. Las acciones están simuladas.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { cleanup, render, screen, within } from '@testing-library/react';
@@ -66,6 +66,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/company-actions', () => ({
 import {
   CompanyHistoryPanel,
   CompanyHistorySkeleton,
+  CompanyModulesTab,
 } from '@/app/(private)/maestro/empresas/[id]/components';
 import MaestroEmpresaPage from '@/app/(private)/maestro/empresas/[id]/page';
 
@@ -124,13 +125,6 @@ function buscar(arbol: ReactNode, tipo: unknown): ReactElement<Record<string, un
   const encontrado = hijosDe(arbol).find((nodo) => isValidElement(nodo) && nodo.type === tipo);
   if (!isValidElement(encontrado)) throw new Error('no esta en el arbol');
   return encontrado as ReactElement<Record<string, unknown>>;
-}
-
-function archivosDe(dir: string): string[] {
-  return readdirSync(dir).flatMap((nombre) => {
-    const ruta = join(dir, nombre);
-    return statSync(ruta).isDirectory() ? archivosDe(ruta) : [ruta];
-  });
 }
 
 beforeEach(() => {
@@ -237,20 +231,32 @@ describe('/maestro/empresas/[id]', () => {
     expect(notFoundMock).not.toHaveBeenCalled();
   });
 
-  it('R30: con tab=modulos deja el panel «Módulos» vacio y no pide los añadidos', async () => {
-    await pintar({ tab: 'modulos' });
-    expect(screen.getByRole('tab', { name: 'Módulos' })).toHaveAttribute('aria-selected', 'true');
-    const panel = screen.getByRole('tabpanel', { name: 'Módulos' });
-    expect(panel).toBeEmptyDOMElement();
-    expect(getCompanyAddonsActionMock).not.toHaveBeenCalled();
+  it('R30 (QC-166) / R1 (QC-278): con tab=modulos el panel Módulos monta la pestaña con las cuatro props', async () => {
+    const arbol = await invocar(ID, { tab: 'modulos' });
+    const panel = hijosDe(arbol).find(
+      (nodo) => isValidElement(nodo) && (nodo.props as { role?: string }).role === 'tabpanel',
+    ) as ReactElement<Record<string, unknown>>;
+    expect(panel.props['aria-label']).toBe('Módulos');
+    expect(panel.props['data-testid']).toBe('company-detail-panel-modulos');
+    expect(buscar(panel, CompanyModulesTab).props).toEqual({
+      companyId: ID,
+      companyName: 'Químicos del Valle',
+      isDeleted: false,
+      canModify: true,
+    });
+
+    getCompanyActionMock.mockResolvedValue({ status: 'success', data: DE_BAJA });
+    getSessionUserMock.mockResolvedValue(SOLO_CONSULTA);
+    expect(buscar(await invocar(ID, { tab: 'modulos' }), CompanyModulesTab).props).toMatchObject({
+      isDeleted: true,
+      canModify: false,
+    });
   });
 
-  it('R30: ni la pagina ni sus componentes importan los añadidos ni una carpeta de modulos', () => {
-    const archivos = archivosDe(DETALLE);
-    expect(archivos.some((ruta) => ruta.includes(join('components', 'modulos')))).toBe(false);
-    for (const ruta of archivos) {
-      expect(readFileSync(ruta, 'utf8'), ruta).not.toMatch(/getCompanyAddonsAction|CompanyModulesTab/);
-    }
+  it('R30 (QC-166) / R1 (QC-278): la página no importa ni llama a getCompanyAddonsAction; la pide la pestaña', async () => {
+    await invocar(ID, { tab: 'modulos' });
+    expect(getCompanyAddonsActionMock).not.toHaveBeenCalled();
+    expect(readFileSync(join(DETALLE, 'page.tsx'), 'utf8')).not.toMatch(/getCompanyAddonsAction/);
   });
 
   it('R6: con solo empresas.consultar la cabecera no ofrece ninguna escritura', async () => {
