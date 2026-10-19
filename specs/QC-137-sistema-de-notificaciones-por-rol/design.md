@@ -1,6 +1,7 @@
 # QC-137 — sistema-de-notificaciones-por-rol · design.md
 
-> Requisitos en `requirements.md` (R1–R53). Tableros aprobados el 2026-10-16 y revisados el mismo
+> Requisitos en `requirements.md` (R1–R55; R20, R52 y R53 retirados por la enmienda del
+> 2026-10-19). Tableros aprobados el 2026-10-16 y revisados el mismo
 > día para «solo campana»:
 > `docs/diseno/canvas/Notificaciones.dc.html` (escritorio, con el panel en el contenedor estrecho),
 > `NotificacionesTablet.dc.html`, `NotificacionesMovil.dc.html` (lleva la ficha: Reutiliza / Nuevo
@@ -19,6 +20,16 @@
 > (ya aprobada), ampliando la guardia de QC-140; se **guarda el nombre original** de cada archivo y
 > el aviso nombra los fallidos (R50, R51); hora relativa hasta 7 días; teléfono con 8 px a los
 > lados y 16 px abajo.
+>
+> **Enmienda del 2026-10-19 (tras las tandas 1–3; `requirements.md > Enmiendas`).** Decisiones del
+> humano: **E1** notificaciones núcleo, sin permiso ni añadido (§7, §3.2, T24); **E2** un usuario
+> dado de baja no es miembro, con el puerto `company-membership-reader.ts` (§7, T25); **E3**
+> `NewBatch` con `paths[]` + `originalNames?[]` y orden por `createdAt` + 1 ms (§6.3); **E4** el
+> cron borra también avisos de empresas dadas de baja (§11, T26); **E5** el balanceo de 700 ms se
+> queda, con una excepción con nombre en la guardia de movimiento (§9.5, T27). Las decisiones de
+> implementación de las tandas 1–3 que la bitácora marca «fuera del spec» se recogen en §16, todas
+> **pendientes de validar por el reviewer**. Donde este documento dice otra cosa en las secciones
+> anteriores, mandan las notas «Enmienda 2026-10-19» y §16.
 
 ## Lo que ya existe
 
@@ -32,7 +43,9 @@
 | Código | `lib/shared/navigation/private-nav.ts`: `NavLink.badge?: number`, fijo y sin uso; `NavIconName` ya incluye `'bell'` | **No se toca** (R24). `private-nav.ts`, `AppSidebar` y `firstVisibleNavHref` quedan como en `dev` |
 | Código | `lib/modules/inventario/domain/stock-increase-listener.ts` y su cableado en `lib/composition/index.ts` | **Patrón que se copia** para el emisor de `documentos` (§6) |
 | Código | `components/shared/document-upload/use-batch-status.ts`: sondeo por Server Action (`getBatchStatusAction`) cada 2 s | **Precedente** de lectura desde el cliente por Server Action, sin librería de fetch (§9) |
-| Código | `identity.isCompanyAddonActive(companyId, addon)`, ya usado por `documentos` fuera de sesión | Se reutiliza para no crear avisos con el añadido apagado (R19) |
+| Código | `identity.isCompanyAddonActive(companyId, addon)`, ya usado por `documentos` fuera de sesión | ~~Se reutiliza para no crear avisos con el añadido apagado (R19)~~. **Enmienda 2026-10-19 (E1):** ya no se usa; no hay añadido |
+| Código | `lib/modules/identity/adapters/driven/persistence/company-directory-prisma.ts`: `listActiveCompanyIds()` (solo `deletedAt: null`), la usa el cron de pedidos | **Enmienda 2026-10-19 (E4):** gana `listAllCompanyIds()`, sin filtro de baja, para el cron de borrado (§11). `listActiveCompanyIds` no cambia |
+| Código | `tests/guards/guard-movimiento.test.ts` (QC-228 R1, R2, R23): tope de 400 ms en `app/` y `components/`; su única zona exenta es el bloque «Pantallas de acceso» de `app/globals.css` | **Enmienda 2026-10-19 (E5):** gana una excepción con nombre, solo para el balanceo de la campana (§9.5) |
 | Código | `lib/shared/pagination.ts`: `DEFAULT_PAGE_SIZE = 10`, `toOffsetLimit`, `buildPage` | Se reutiliza **solo** `DEFAULT_PAGE_SIZE` como tamaño de lote. `toOffsetLimit` y `buildPage` no: son por desplazamiento y repetirían o saltarían avisos al llegar uno nuevo (R28, A12) |
 | Código | `app/(private)/proveedores/components/showcase-load-trigger.tsx` usa `react-intersection-observer` (aprobada en `docs/dependencias.md`), y `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts` (QC-140 R18) exige que sea su **único** importador | **Se reutiliza la librería** (decisión del 2026-10-19). El centinela nuevo `notification-list-tail.tsx` es el segundo y último importador autorizado, y la guardia de QC-140 se amplía a una lista cerrada de dos archivos (§10.2, §15). `ShowcaseLoadTrigger` no se reutiliza tal cual: no admite `root` ni `rootMargin`, y extenderlo obligaría a subirlo a `shared` (A15) |
 | Código | `react-intersection-observer/test-utils` (`mockAllIsIntersecting`), ya usado en `tests/unit/proveedores-ui/` | Se usa igual en los tests del panel (R25) |
@@ -50,7 +63,7 @@
 | `Button`, `buttonVariants` | 1. Reutiliza | Campana, «Marcar todas como leídas», «Reintentar» |
 | `Badge`, `badgeVariants` | 1. Reutiliza | Insignia del conteo de la campana |
 | `EmptyState` | 1. Reutiliza | «No tienes notificaciones.» |
-| `ErrorState` | 1. Reutiliza | Error del primer lote con «Reintentar» (R33) |
+| `ErrorState` | ~~1. Reutiliza~~ → descartada en la tanda 3 | Error del primer lote con «Reintentar» (R33). **Se compuso con `EmptyState` + `Button` dentro de `role="alert"`** (paso 3): `ErrorState` exige un error del catálogo de `errores` y no admite `retryFirst()`. §16, D-T3-10, pendiente de validar por el reviewer |
 | `Skeleton` | 1. Reutiliza | Carga del primer lote (R33). `TableSkeleton` se descarta: la lista no es una tabla |
 | `Toaster` (`components/ui/sonner.tsx`) + `toast` de `sonner` | 1. Reutiliza | «Notificaciones sin sonido» |
 | `DataTable` | Descartada | Es una tabla con orden y columnas: la bandeja es una lista |
@@ -93,7 +106,7 @@ lib/modules/notificaciones/
     catalog.ts                               NOTIFICATION_CATALOG (R1) y sus tipos
     file-list-phrase.ts                      la lista L de archivos fallidos (R51)
     notification-event.ts                    NotificationEvent { key, companyId, dedupeKey, payload }
-    notify.ts                                createNotify: el motor (R2–R4, R7, R8, R11, R19)
+    notify.ts                                createNotify: el motor (R2–R4, R7, R8, R11, R19, R55)
     channel-factory.ts                       createChannelFactory (R8–R10)
     notification-cursor.ts                   cursor opaco: codificar/decodificar con zod (R28, §8.1)
     list-notifications.ts                    un lote por cursor (R13, R15, R23, R25, R27, R28)
@@ -102,13 +115,13 @@ lib/modules/notificaciones/
     mark-all-notifications-read.ts          (R32)
     purge-expired-notifications.ts          (R17)
     retention.ts                             RETENTION_DAYS = 90, cutoff(now)
-    actor.ts                                 NOTIFICATIONS_READ_PERMISSION, requirePermission
+    actor.ts                                 Actor y su alcance (E1: sin permiso ni requirePermission)
     errors.ts
   ports/
     notification-channel.ts                  NotificationChannel (el puerto único de canal)
     notification-inbox.ts                    la bandeja (persistencia)
-    notifications-switch.ts                  isOn(companyId): añadido activo
-    recipient-directory.ts                   el usuario destinatario es de esa empresa
+    notifications-switch.ts                  SE BORRA en T24 (E1): ya no hay añadido que consultar
+    recipient-directory.ts                   el usuario destinatario es de esa empresa y no está de baja (R55)
     notification-log.ts
   adapters/
     driven/persistence/notification-inbox-prisma.ts
@@ -181,7 +194,9 @@ el caso de uso (R15, `docs/architecture.md > Acceso a datos y autorizacion`).
 
 1. `db/migrations/<ts>_notifications/`: las dos tablas, restricciones, índices y RLS. El
    `down.sql` las borra en orden inverso.
-2. `db/migrations/<ts>_notifications_addon/`, **de datos**:
+2. `db/migrations/<ts>_notifications_addon/` (`20261019120100`, commiteada en la tanda 1),
+   **de datos**. **Enmienda 2026-10-19 (E1): la deshace la migración 4**; se queda en el repo tal
+   cual:
    - permiso `notificaciones.consultar` (módulo `notificaciones`, acción `consultar`);
    - `role_permissions` para Administrador, Operador, Empacador y Acondicionamiento, resueltos
      por nombre (R21);
@@ -196,6 +211,21 @@ el caso de uso (R15, `docs/architecture.md > Acceso a datos y autorizacion`).
    original_name text NULL` con `CHECK (original_name IS NULL OR char_length(original_name)
    BETWEEN 1 AND 255)` (§6.3, R50). Las filas que ya existen quedan con `NULL`: no hay de dónde
    sacar su nombre. El `down.sql` quita la columna. **No** hay columna `supplier_id` (R49).
+4. **Enmienda 2026-10-19 (E1, R54).** `db/migrations/<ts>_notifications_addon_removal/`, **de
+   datos**, con `<ts>` posterior a `20261019120200`. La migración 2 ya está commiteada y en push,
+   así que pudo aplicarse en algún entorno: **no se borra ni se edita**, se deshace con esta.
+   - `migration.sql`: las cuatro sentencias del `down.sql` de la 2, en su orden (hijas antes que
+     catálogos, las FK son `RESTRICT`): excepciones de `company_addon_overrides` con
+     `addon_key = 'notificaciones'`, la fila de `addons`, las asignaciones de `role_permissions` con
+     `permission_code = 'notificaciones.consultar'` y el permiso. Son `DELETE … WHERE`, así que es
+     idempotente y no falla si la 2 nunca llegó a aplicarse (base nueva: la 2 escribe y la 4 borra
+     en la misma corrida).
+   - `down.sql`: vuelve a escribir lo que escribe la 2 (mismo SQL idempotente, `ON CONFLICT DO
+     NOTHING`). Es un restablecimiento **aproximado**: prende el añadido en todas las empresas que
+     existan al revertir, no en las que lo tenían; los interruptores reales que se apagaron entre
+     medias no se recuperan. Se acepta: el `down` solo sirve para volver a la versión de la tanda
+     1, que el humano ya descartó.
+   - La lista de migraciones de `tests/guards/guard-identificador-de-request.test.ts` gana la nueva.
 
 ### 3.3 Por qué el rol se guarda por su nombre
 
@@ -206,8 +236,12 @@ con `ON UPDATE CASCADE`: renombrar un rol arrastra sus avisos. Con `role_id` hab
 nombre → id en cada consulta.
 
 **Aviso al reviewer:** `docs/architecture.md` dice que `roleName` «no autoriza nada». Aquí no
-autoriza: la autorización es el permiso `notificaciones.consultar` (R15). `roleName` solo **acota**
-qué avisos son del usuario (R13), igual que `companyId`.
+autoriza. **Enmienda 2026-10-19 (E1):** ya no hay permiso `notificaciones.consultar`; leer y marcar
+la bandeja **propia** no pide permiso (R15, R19). La frontera sigue en el caso de uso: el actor sale
+de la sesión del servidor (empresa y usuario de `getSessionContext()`, rol y permisos de
+`getSessionUser()`), y cada consulta aplica «avisos visibles» (§8). `roleName` solo **acota** qué
+avisos son del usuario (R13), igual que `companyId`. Es la decisión cerrada «Autorización»: «cada
+usuario lee y marca solo sus avisos».
 
 ## 4. Catálogo y motor
 
@@ -239,9 +273,12 @@ pero el camino se construye y se prueba (R12, R13, R16) porque es una decisión 
 
 1. Busca la entrada del catálogo y valida el `payload` con su `schema`. Si falla, registra
    `notification_rejected` y termina (R4).
-2. Llama a `switch.isOn(companyId)`. Si el añadido está apagado, termina sin escribir (R19).
+2. ~~Llama a `switch.isOn(companyId)`. Si el añadido está apagado, termina sin escribir (R19).~~
+   **Enmienda 2026-10-19 (E1):** el paso se quita. `NotifyDeps` pierde `addon` y el puerto
+   `notifications-switch.ts` se borra (T24). Se crea el aviso en cualquier empresa (R19).
 3. Si el destinatario es un usuario, `recipients.belongsToCompany(userId, companyId)`. Si no
-   pertenece, lo rechaza y lo registra (R12). Lo implementa `identity` (§7).
+   pertenece, lo rechaza y lo registra (R12). Un usuario dado de baja no pertenece (R55, E2). Lo
+   implementa `identity` (§7).
 4. `inbox.insertIfAbsent(nuevoAviso)`. Devuelve `null` si `(company_id, dedupe_key)` ya existía,
    y en ese caso termina sin entregar (R3).
 5. Para cada canal de `factory.channelsFor(entry.channels)`, llama a `deliver(aviso)` dentro de su
@@ -361,6 +398,12 @@ readBatchNotice(batchId: string, companyId: string): Promise<{
 } | null>;
 ```
 
+**Enmienda 2026-10-19 (§16, D-T2-1, pendiente de validar por el reviewer):** `readBatchNotice` no
+entra en `DocumentBatchRepository` sino en un puerto aparte, `BatchNoticeReader`, en el mismo
+archivo `ports/document-batch-repository.ts` (el tipo de retorno se llama `BatchNotice`). Añadirlo
+al puerto existente rompía el typecheck de 7 tests de `documentos` con dobles tipados. El adaptador
+Prisma implementa los dos y el objeto exportado es `DocumentBatchRepository & BatchNoticeReader`.
+
 Un `SELECT` con conteos agrupados por estado y otro con `original_name` de los fallidos con
 nombre, `LIMIT 3`. `uploadedAt` es `document_batches.created_at`. El `failed` total sale del
 conteo, así que «y N más» (R51) es `failed - failedNames.length`. No reutiliza `readBatch` porque esa función
@@ -373,8 +416,14 @@ alimenta la respuesta al cliente, y añadirle `createdBy` lo filtraría a la UI.
   se queda con lo que va tras la última `/` o `\`, recorta espacios, quita caracteres de control y
   exige de 1 a 255 caracteres. Sin `names` la tanda se encola igual, con nombres `NULL`: así un
   cliente viejo en caché no rompe.
-- `NewBatch` pasa a `files: { path, originalName: string | null }[]`, y `createBatch` escribe
-  `document_files.original_name`.
+- ~~`NewBatch` pasa a `files: { path, originalName: string | null }[]`~~. **Enmienda 2026-10-19
+  (E3, decisión del humano):** `NewBatch` conserva `paths: string[]` y gana `originalNames?:
+  string[]`, alineado con `paths` por posición. `enqueueBatch` solo lo pasa si vino `names`, así la
+  entrada sin nombres conserva sus claves. `createBatch` escribe `document_files.original_name` y
+  un `created_at = ahora + i ms` en el archivo `i` de la tanda: las filas de una tanda se insertan
+  en la misma transacción y pueden compartir instante, y sin ese desfase `ORDER BY created_at, id`
+  ordenaría por el uuid y no por orden de subida (R51). Con `files[]` se ponían rojos
+  `enqueue-batch.test.ts` (claves exactas de la entrada) y `document-batch-repository-prisma.test.ts`.
 - `DocumentUpload` manda `names` con el `File.name` de cada archivo subido con éxito, en el mismo
   orden que `paths`. No hay prop nueva ni cambio visible; `DocumentUploadDialog`,
   `CatalogPdfUpload` y `FormulaPdfUpload` no cambian.
@@ -410,6 +459,36 @@ el panel tiene 400 px y el texto no debe pasar de unas cuatro líneas.
 Enlace: §6.3b.
 
 ## 7. Añadido, permiso y lo que cambia en `identity`
+
+> **Enmienda 2026-10-19 (E1, E2). Lo que vale desde ahora:**
+>
+> - **Sin permiso y sin añadido.** `permissions.ts` y `company-addons.ts` vuelven a su contenido
+>   anterior a la tanda 1: sin `notificaciones.consultar`, sin la entrada en
+>   `SEED_ROLE_PERMISSIONS`, sin `'notificaciones'` en `ADDONS`, `ADDON_PERMISSIONS` ni
+>   `ADDON_REQUIRES`, y con las dos frases del JSDoc de `SEED_ROLE_PERMISSIONS` que la tanda 1 quitó
+>   (R18, R21). La enmienda a QC-277 R2 («pasan a ser seis») **se deshace**: vuelven a ser cinco.
+> - **Los tests de otras fichas que la tanda 1 ajustó** (filtros «sin X», conteos de «seis», textos
+>   de E2E) vuelven a su versión anterior a la tanda 1, salvo en lo que no tenga que ver con el
+>   permiso o el añadido (lista en T24).
+> - **Casos de uso:** `actor.ts` pierde `NOTIFICATIONS_READ_PERMISSION` y `requirePermission`. El
+>   `Actor` conserva `id`, `companyId` y `roleName`; `permissions` sale si nada más lo lee. Las
+>   cuatro operaciones ya no lanzan `UnauthorizedError`; si el error queda sin uso en el módulo, se
+>   quita.
+> - **Acciones:** con sesión de empresa responden `ok`, sea cual sea el rol (R19). El código
+>   `forbidden` deja de existir en `NotificationActionFailure`; quedan `unauthorized` (sin sesión, o
+>   sesión sin empresa: `getSessionContext()` da `null`), `invalid_input`, `not_found` y
+>   `unexpected`. La decisión D-T1-B2 de la bitácora (orden «permiso antes que forma») queda sin
+>   objeto: una entrada mal formada responde siempre `invalid_input`.
+> - **Composición:** la fachada `notificaciones` pierde el interruptor
+>   `identity.isCompanyAddonActive(…, 'notificaciones')`.
+> - **Pertenencia (E2, R55):** `identity.isUserInCompany(userId, companyId)` vive en su puerto propio
+>   `lib/modules/identity/ports/company-membership-reader.ts` (`CompanyMembershipReader`), no en
+>   `CompanyRepository` (añadirlo ahí obligaba a tocar ~10 dobles de test). Su adaptador,
+>   `createCompanyMembershipReader` en `company-prisma.ts`, busca con `deletedAt: null`: un usuario
+>   dado de baja da `false`, como los demás `findFirst` de `identity` (`user-admin-prisma`,
+>   `work-group-prisma`). Decisión del humano: se queda así.
+>
+> El texto de abajo es el diseño original y queda solo como historia en lo que contradiga esta nota.
 
 - `identity/domain/permissions.ts`: permiso `notificaciones.consultar`, que se añade a
   `SEED_ROLE_PERMISSIONS` de los cuatro roles de empresa (R21).
@@ -460,8 +539,11 @@ Con `roleName = null`, solo la mitad del usuario. «No leído» añade
   Si el aviso no es visible, no inserta nada y responde `not_found`: lo mismo para uno ajeno que
   para uno inexistente (R14). **Marcar todas** es el mismo `INSERT … SELECT` sobre los no leídos,
   estén o no cargados en el panel (R32).
-- Con el añadido apagado, el permiso efectivo no está, y las cuatro acciones responden
-  `{ ok: false, code: 'forbidden' }` antes de tocar la bandeja (R19, R15).
+- ~~Con el añadido apagado, el permiso efectivo no está, y las cuatro acciones responden
+  `{ ok: false, code: 'forbidden' }` antes de tocar la bandeja (R19, R15).~~ **Enmienda
+  2026-10-19 (E1):** no hay añadido ni permiso; sin sesión de empresa las cuatro responden
+  `unauthorized` antes de tocar la bandeja (R15, R40), y con sesión responden sobre los avisos
+  visibles del actor (§7).
 
 ### 8.1 Lotes por cursor (R25, R27, R28)
 
@@ -496,8 +578,10 @@ export interface NotificationFeed {
 export function createPollingFeed(deps: { fetchSummary; intervalMs; visibility: VisibilityPort; timers }): NotificationFeed;
 ```
 
-`NotificationsProvider` se monta en el layout privado **solo si** el usuario tiene
-`notificaciones.consultar` efectivo. Recibe un `NotificationFeed` y una función `fetchBatch`
+`NotificationsProvider` se monta en el layout privado ~~**solo si** el usuario tiene
+`notificaciones.consultar` efectivo~~ **para toda sesión** (enmienda 2026-10-19, E1; así se hizo en
+la tanda 3). `onStop` recibe hoy `'unauthorized' | 'forbidden'` (§16, D-T3-6); tras T24 vuelve a
+`'unauthorized'`, porque `forbidden` deja de existir. Recibe un `NotificationFeed` y una función `fetchBatch`
 (la Server Action del lote), y expone por contexto:
 
 ```ts
@@ -527,7 +611,8 @@ un **reductor puro** (`notification-list-state.ts`) para probar R25–R28 sin DO
   en el acto y se reanuda el ciclo.
 - **Sin solapes:** el siguiente `setTimeout` se programa al terminar la consulta, nunca con
   `setInterval`. Es el patrón de `use-batch-status.ts`.
-- Con `ok: false` por sesión o permiso (`unauthorized`/`forbidden`), se para (R40). Con otro
+- Con `ok: false` por sesión (`unauthorized`), se para (R40). *(Enmienda 2026-10-19, E1: el caso
+  `forbidden` se quita en T24.)* Con otro
   error, `summary.status = 'error'` y el ciclo sigue.
 - **Lo que hace el resumen con la lista (R37, R28):** si `summary.newest.id` no es el primer aviso
   de `list.items` y la lista ya está cargada, el proveedor pide el **primer lote** (sin cursor) y
@@ -552,7 +637,9 @@ Solo con APIs del navegador, sin librería:
 - **Bus entre pestañas:** un `BroadcastChannel('qc-notificaciones')`. Cada pestaña publica
   `{ type: 'summary', userId, summary }` al recibir un resumen y `{ type: 'read', userId, ids | 'all' }`
   al marcar. Las demás aplican el resumen, marcan como leídos los `ids` que tengan cargados y piden
-  `refresh()` (R39). Si `BroadcastChannel` no existe, se usa el evento `storage` de `localStorage`
+  `refresh()` (R39). **Tanda 3 (§16, D-T3-5, pendiente de validar por el reviewer):** un resumen que
+  llega por el bus se aplica **sin** `refresh()`, para que las pestañas no se reboten el resumen sin
+  fin; un «leído» sí pide `refresh()`. Si `BroadcastChannel` no existe, se usa el evento `storage` de `localStorage`
   como respaldo.
 - **Tono una sola vez (R41–R43):**
   - `localStorage['qc-notificaciones:ultimo:<userId>']` guarda `{ createdAt, id }` del aviso más
@@ -600,6 +687,28 @@ Solo con APIs del navegador, sin librería:
 
 `tests/guards/guard-movimiento.test.ts` ya vigila el respeto al movimiento reducido.
 
+**Enmienda 2026-10-19 (E5, decisión del humano).** La guardia de movimiento (QC-228 R1) prohíbe
+toda duración de más de 400 ms en `app/` y `components/`, y el balanceo de la campana dura 700 ms
+(R36). La tanda 3 lo dejó sin hacer. Se queda en 700 ms con una **excepción con nombre** en la
+guardia (T27):
+
+- **Dónde vive el balanceo:** `@keyframes notification-bell-swing` en `app/globals.css` (junto a
+  `notification-count-bump`, el pulso de la tanda 3) y su uso, bajo `motion-safe:`, en
+  `app/(private)/components/notifications/notification-bell.tsx`. Una sola vez por llegada: sin
+  `infinite` ni repetición (R23 de QC-228 sigue vigente). La curva sale de un token
+  `--ease-*` (R2 de QC-228 sigue vigente). Solo se exime la **duración**.
+- **La excepción en la guardia:** una constante `EXCEPCIONES_DE_DURACION`, lista cerrada de una
+  entrada: `{ nombre: 'notification-bell-swing', ms: 700, archivos: ['app/globals.css',
+  'app/(private)/components/notifications/notification-bell.tsx'], motivo: 'QC-137 R36: balanceo
+  de la campana al llegar un aviso, 700 ms por decisión del humano del 2026-10-19' }`. La guardia
+  solo deja pasar una duración de más de 400 ms si es **exactamente** esos ms, en una declaración
+  que nombra esa animación y en uno de esos archivos. Cualquier otra cosa sigue roja.
+- **Casos negativos de la excepción**, como los demás detectores de la guardia: 700 ms con otro
+  nombre de animación, el mismo nombre en otro archivo y el mismo nombre a 701 ms siguen rojos.
+  El caso «el bloque del login … es lo único que la guardia deja fuera» se ajusta para nombrar
+  también esta excepción.
+- El comentario de cabecera de la guardia cita la excepción y su motivo, junto a la del login.
+
 ### 9.6 Hora relativa (R30)
 
 Con `Intl.DateTimeFormat('es')` y aritmética propia en `relative-time.ts`, en la zona horaria del
@@ -637,7 +746,9 @@ junto con « a las ».
   siguientes enseña lo cargado y refresca arriba (§9.2).
 - Escritorio y tablet: `w-[400px]`, área con scroll de `h-[520px]` (R34), anclado bajo la campana
   como hoy.
-- Clic en un aviso: `markRead(id)` (local en el acto, luego la acción) y `router.push(href)`. Si el
+- Clic en un aviso: `markRead(id)` (local en el acto, luego la acción) y ~~`router.push(href)`~~
+  navegación con **`next/link`** cuyo `onSelect` marca y cierra el panel; con `href = null` la
+  fila es un `<button>` (tanda 3, §16, D-T3-8, pendiente de validar por el reviewer). Si el
   marcado falla, se navega igual y el siguiente resumen corrige el conteo (R31).
 - «Marcar todas»: todos los `items` cargados pasan a `read: true` y el conteo a 0 en el acto;
   luego la acción y la publicación en el bus (R32, R39).
@@ -674,17 +785,21 @@ junto con « a las ».
     `retryMore()` con el **mismo** cursor (estado 6, R26);
   - `end` con al menos un aviso: «No hay más avisos. Se conservan 90 días.» (estado 7, R27).
 - **Primer lote** (`list.status`): `loading` → cinco `Skeleton` de fila (estado 9); `error` →
-  `ErrorState` «No se pudieron cargar las notificaciones.» + «Reintentar» → `retryFirst()`
+  ~~`ErrorState`~~ `EmptyState` + `Button` dentro de `role="alert"` (tanda 3, §16, D-T3-10)
+  «No se pudieron cargar las notificaciones.» + «Reintentar» → `retryFirst()`
   (estado 10); `ready` sin avisos → `EmptyState` «No tienes notificaciones.» (estado 8).
 - **Teclado:** el foco por tabulación recorre las filas; al llegar a la última, el área se desplaza
   y el centinela entra, como con el ratón.
 
 ### 10.3 Teléfono: panel anclado a la pantalla (R35)
 
-Por debajo del punto de corte de teléfono (`sm`, el mismo que usa la cabecera):
+Por debajo del punto de corte de teléfono ~~(`sm`, el mismo que usa la cabecera)~~ **768 px,
+con `useIsMobile()`**, el que usa de verdad la cabecera (`md:hidden`); la tablet (820 px) se
+comporta como escritorio (tanda 3, §16, D-T3-11, pendiente de validar por el reviewer):
 
-- `PopoverContent` recibe `anchor` = la cabecera del layout (un `ref` al `<header>`), no la
-  campana; `collisionPadding={{ top: 8, right: 8, bottom: 16, left: 8 }}`, `sideOffset={8}` y en
+- `PopoverContent` recibe `anchor` = la cabecera del layout, no la campana. ~~(un `ref` al
+  `<header>`)~~ Se resuelve con `() => trigger.closest('header')`, para que el `<header>` del layout
+  siga siendo Server Component (§16, D-T3-12); `collisionPadding={{ top: 8, right: 8, bottom: 16, left: 8 }}`, `sideOffset={8}` y en
   el `Positioner` `w-[calc(100vw-16px)]`. Así el panel ocupa el ancho con 8 px por lado, empieza
   bajo la cabecera y se queda a 16 px del borde inferior (decisión del 2026-10-19).
 - Alto: `max-h-(--available-height)` sobre el panel, la variable que el `Positioner`
@@ -728,6 +843,18 @@ Por debajo del punto de corte de teléfono (`sm`, el mismo que usa la cabecera):
   - recorre las empresas **una a una** y, en cada una, ejecuta
     `DELETE FROM notifications WHERE company_id = $1 AND created_at < $cutoff`; las lecturas caen
     por la cascada.
+  - **Enmienda 2026-10-19 (E4, decisión del humano):** recorre **todas** las empresas, también las
+    dadas de baja. Hoy `listCompanyIds` de la fachada es `listActiveCompanyIds` (la lista del cron
+    de pedidos, `deletedAt: null`), así que los avisos de una empresa dada de baja no se borraban
+    nunca. `company-directory-prisma.ts` gana `listAllCompanyIds()` (mismo `findMany` sin el
+    filtro de baja, `orderBy: { id: 'asc' }`) y la fachada `notificaciones` lo usa. El cron de
+    pedidos sigue con `listActiveCompanyIds`. Una empresa borrada físicamente ya se lleva sus
+    avisos por la FK `ON DELETE CASCADE` (§3).
+  - Horario `30 7 * * *` en `vercel.json` (media hora después del de pedidos), sin `maxDuration`;
+    responde `{ deleted }`, o 500 con `{ deleted, failedCount }` si falla alguna empresa, sin cortar
+    las demás. La puerta (`verifyCronSecret`, el mismo de pedidos) y la lista de empresas están en
+    la fachada; el recorrido, en `purge-route.ts` (tanda 2, §16, D-T2-9 y D-T2-10, pendientes de
+    validar por el reviewer).
 - Es **núcleo**: borra con el añadido apagado. Entra en `RUTAS_FUERA_DE_SESION` de
   `tests/guards/guard-rutas-fuera-de-sesion.test.ts`, con su prueba.
 - **Borrado físico, a propósito:** `docs/architecture.md` prohíbe el `DELETE` en tablas
@@ -847,6 +974,27 @@ visible.
 - **A19. Nombrar todos los archivos fallidos, sin tope.** Una tanda puede traer hasta
   `MAX_FILES_PER_BATCH`: el texto no cabría en la fila del panel. Tope de 3 y «y N más» (R51).
 
+Añadidas por la enmienda del 2026-10-19:
+
+- **A20. Quitar el añadido borrando o editando la migración `20261019120100_notifications_addon`.**
+  Más corto y sin migración nueva, pero esa migración ya está commiteada y en push: pudo aplicarse
+  en otra base (la de test de otra persona, una de vista previa), y `prisma migrate` detectaría el
+  cambio de huella o dejaría filas huérfanas que nadie borra. Se deshace con una migración nueva
+  (§3.2.4, R54).
+- **A21. Dejar el permiso y el añadido y solo dejar de comprobarlos.** No toca tests de otras
+  fichas, pero deja en la base y en el catálogo de añadidos un permiso y un añadido que no hacen
+  nada, y que cualquier pantalla de añadidos pintaría como un interruptor que no apaga nada.
+  Contradice R18 (E1).
+- **A22. Borrar los vencidos con un solo `DELETE … WHERE created_at < $cutoff`, sin recorrer
+  empresas.** Cubriría también las dadas de baja sin lista nueva, pero es una consulta de negocio
+  sin `company_id`, contra la regla de aislamiento y contra R17 («una a una»). Se añade
+  `listAllCompanyIds` (§11).
+- **A23. Bajar el balanceo de la campana a 400 ms o menos.** No toca la guardia de QC-228, pero
+  cambia R36, que el humano mantiene en 700 ms (E5). Se exime solo esa animación, con nombre (§9.5).
+- **A24. Excepción de la guardia de movimiento por archivo entero** (`notification-bell.tsx` libre de
+  la regla de 400 ms). Más simple, pero dejaría pasar cualquier otra animación larga que alguien
+  añada a ese archivo. La excepción va por nombre de animación, archivo y ms exactos.
+
 ## 14. Dependencias
 
 **Ninguna nueva.** Web Audio API, `BroadcastChannel`, Web Locks API, Page Visibility API,
@@ -857,7 +1005,14 @@ visible.
 
 ## 15. Lo que toca de otras fichas
 
-- **QC-277:**
+- **QC-277 — enmienda 2026-10-19 (E1):** lo de abajo **se deshace**. QC-277 R2 vuelve a «cinco
+  añadidos» y sus tests vuelven a su versión anterior a la tanda 1 (T24).
+- **QC-228 — enmienda 2026-10-19 (E5):** `tests/guards/guard-movimiento.test.ts` gana una excepción
+  de duración con nombre, solo para `notification-bell-swing` a 700 ms (§9.5). La intención de su
+  R1 no cambia para nada más.
+- **Pedidos (cron) — enmienda 2026-10-19 (E4):** `listActiveCompanyIds` no cambia; el cron de
+  notificaciones usa la lista nueva `listAllCompanyIds` (§11).
+- **QC-277 (texto original):**
   - R2 (cinco añadidos) pasa a seis (§7);
   - se actualizan `tests/unit/identity/addons/company-addons.test.ts`,
     `tests/unit/identity/companies/set-all-company-addons.test.ts` y
@@ -879,3 +1034,50 @@ visible.
   `AppSidebar`, ni `firstVisibleNavHref`.
 - **`components/ui/popover.tsx`:** tres props opcionales en `PopoverContent` (§10.3), sin cambio
   para los usos actuales.
+
+## 16. Decisiones de las tandas 1–3 fuera del spec (enmienda del 2026-10-19)
+
+Fuente: `progress/impl_QC-137-sistema-de-notificaciones-por-rol.md`. Las marcadas **Humano** son
+las E1–E5 de `requirements.md > Enmiendas` y no se reabren. Las demás quedan **pendientes de
+validar por el reviewer**: si alguna se rechaza, la corrección es una tarea nueva, no un cambio
+silencioso. El id es `D-T<tanda>-<n.º en la bitácora>`.
+
+| Id | Decisión | Dónde | Estado |
+| --- | --- | --- | --- |
+| D-T1-2 | `isUserInCompany` en un puerto propio, `identity/ports/company-membership-reader.ts`, y no en `CompanyRepository` | §7 | **Humano (E2)** |
+| D-T1-3 | Un usuario dado de baja no es miembro (`deletedAt: null`) | §7, R55 | **Humano (E2)** |
+| D-T1-4 | Descripción del permiso «Consultar los avisos propios y marcarlos como leídos.» | — | Sin objeto tras E1 (T24 quita el permiso) |
+| D-T1-5 | ~55 asserts de permisos por rol de otras fichas ajustados con filtros «sin X» | §7 | **Humano (E1): se deshacen en T24** |
+| D-T1-B1 | Sin códigos nuevos en el catálogo de errores; `markNotificationRead` devuelve `'marked' \| 'not_found'`; `forbidden` y `not_found` solo como `code` de la respuesta de las acciones | §8 | Pendiente de validar por el reviewer (tras E1, `forbidden` desaparece) |
+| D-T1-B2 | Orden de cortes en las acciones: sesión → forma → permiso en el caso de uso | §8 | Sin objeto tras E1 (no hay permiso) |
+| D-T1-B3 | Reloj inyectado (`now`) en los casos de uso; el corte de 90 días se calcula en el dominio y viaja en `InboxScope.cutoff` | §8, §11 | Pendiente de validar por el reviewer |
+| D-T1-B4 | Nombres no fijados: `NotifyDeps.addon`, `InboxScope`, `InboxCursor`, `StoredTarget`, `notificationHref` | §4, §8 | Pendiente de validar por el reviewer (`NotifyDeps.addon` sale en T24) |
+| D-T1-B5 | `getNotificationSummaryAction` registra cada lectura (`notification_summary_read`, solo `companyId`): una línea cada 30 s por pestaña visible | §12.3 | Pendiente de validar por el reviewer |
+| D-T1-B6 | `summary.newest` es el más reciente visible, leído o no; el tono exige además `unreadCount > 0` | §9.3 | Pendiente de validar por el reviewer |
+| D-T2-1 | `readBatchNotice` en un puerto aparte, `BatchNoticeReader` (tipo `BatchNotice`), en `ports/document-batch-repository.ts` | §6.2 | Pendiente de validar por el reviewer |
+| D-T2-2 | `NewBatch` con `paths` + `originalNames?` por posición, no `files[]` | §6.3 | **Humano (E3)** |
+| D-T2-3 | `createBatch` escribe `createdAt = ahora + i ms` por archivo | §6.3 | **Humano (E3)** |
+| D-T2-4 | `lib/modules/documentos/index.ts` no se toca (`module-contract.test.ts` congela sus tipos); la composición tipa el listener con `NonNullable<Parameters<typeof createRunDocumentJob>[0]['batchFinished']>` | §6.1 | Pendiente de validar por el reviewer |
+| D-T2-5 | `batchFinishedDeps` se declara junto a `runDocumentJob` y lee `notificaciones.notify` al llamar; log de R48 `forModule('documentos')`, `batch_notice_without_author` | §6.1 | Pendiente de validar por el reviewer |
+| D-T2-6 | `bodyTime = uploadedAt` solo cuando el cuerpo lleva `{hora}` (las filas «con errores» no la llevan y el CHECK exige marca y hora juntas) | §3, §6.4 | Pendiente de validar por el reviewer |
+| D-T2-7 | Esquema del payload: `strictObject`, `recipientUserId` uuid, `strategy` con los dos literales, `done + failed = total`, `failedNames.length ≤ failed`, máximo 3 | §6.4 | Pendiente de validar por el reviewer |
+| D-T2-8 | El cron recorre solo `listActiveCompanyIds` | §11 | **Humano (E4): se cambia en T26** |
+| D-T2-9 | Puerta (`verifyCronSecret`) y lista de empresas en la fachada; recorrido en `purge-route.ts`; respuesta `{ deleted }` / 500 `{ deleted, failedCount }` | §11 | Pendiente de validar por el reviewer |
+| D-T2-10 | Horario del cron `30 7 * * *`, sin `maxDuration` | §11 | Pendiente de validar por el reviewer |
+| D-T2-11 | `getBatchStatus` avisa en cada consulta de una tanda ya cerrada; el `UNIQUE (company_id, dedupe_key)` deja el resto en `notification_duplicate` | §6.2 | Pendiente de validar por el reviewer |
+| D-T3-H | La campana, el panel y el feed se montan para toda sesión, sin permiso ni añadido; el caso de T18 «R19: sin permiso, el layout no monta la campana» se sustituye por dos casos de `notification-bell.test.tsx` | §9.1, R19 | **Humano (E1)** |
+| D-T3-1 | T10: cinco tests existentes de `documentos-ui` cambiados (añaden `names` al payload esperado; la comparación sigue exacta), contra «sin cambios» | §6.3 | Pendiente de validar por el reviewer |
+| D-T3-2 | T17 por el plan A: `@base-ui/react` 1.7.0 tiene `anchor`, `collisionPadding` y `--available-height` | §10.3 | Pendiente de validar por el reviewer |
+| D-T3-3 | `app/globals.css` gana `@keyframes notification-count-bump` (pulso de 360 ms); no estaba en «Archivos esperados» | §9.5 | Pendiente de validar por el reviewer (el archivo entra en «Archivos esperados» con esta enmienda) |
+| D-T3-4 | Contexto ampliado: `summary.arrivals`, `summary.checkedAt`; `list` expone el estado completo del reductor | §9.1 | Pendiente de validar por el reviewer |
+| D-T3-5 | Un resumen que llega por el bus se aplica sin `refresh()`; un «leído» sí lo pide | §9.3 | Pendiente de validar por el reviewer |
+| D-T3-6 | `onStop` del feed es `'unauthorized' \| 'forbidden'` | §9.1 | Pendiente de validar por el reviewer; tras T24 vuelve a `'unauthorized'` |
+| D-T3-7 | `NotificationsProvider` solo exige `userId`; `feed`, `actions`, `bus` y `chime` opcionales (con `null`, desactivados) | §9.1 | Pendiente de validar por el reviewer |
+| D-T3-8 | `NotificationItem` navega con `next/link` (su `onSelect` marca y cierra); con `href = null` pinta un `<button>` | §10.1 | Pendiente de validar por el reviewer |
+| D-T3-9 | Textos de interfaz como constantes exportadas de cada archivo, sin archivo de textos nuevo | §10 | Pendiente de validar por el reviewer |
+| D-T3-10 | Error del primer lote con `EmptyState` + `Button` en `role="alert"`, no `ErrorState` | «Lo que ya existe», §10.2 | Pendiente de validar por el reviewer |
+| D-T3-11 | Punto de corte del teléfono: `useIsMobile()` (768 px), no `sm`; la tablet de 820 px va como escritorio | §10.3 | Pendiente de validar por el reviewer |
+| D-T3-12 | Ancla del teléfono `() => trigger.closest('header')`, para que el `<header>` siga siendo Server Component | §10.3 | Pendiente de validar por el reviewer |
+| D-T3-13 | Hora relativa con `now = max(summary.checkedAt, instante de apertura)`, sin leer el reloj en el render | §9.6 | Pendiente de validar por el reviewer |
+| D-T3-14 | `private-layout.test.tsx` y `navegacion/private-layout-menu.test.tsx` ganan un `vi.mock` de `notification-actions` (sin cambiar aserciones), contra el «sin cambios» de T19 | §10.4 | Pendiente de validar por el reviewer |
+| D-T3-R36 | El balanceo de 700 ms quedó sin hacer por la guardia de movimiento | §9.5 | **Humano (E5): se hace en T27** |

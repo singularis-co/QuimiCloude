@@ -11,6 +11,12 @@
 >
 > **Respuestas del humano del 2026-10-19:** las preguntas 4 a 11 están cerradas (filas del
 > 2026-10-19 en `requirements.md > Decisiones cerradas`). No queda ninguna que bloquee T1.
+>
+> **Enmienda del 2026-10-19 (tras las tandas 1–3; `requirements.md > Enmiendas`, `design.md > 16`):**
+> notificaciones núcleo (E1, T24), usuario dado de baja no es miembro (E2, T25), `paths[]` +
+> `originalNames?[]` (E3, ya hecho en T10), el cron borra también empresas dadas de baja (E4, T26)
+> y balanceo de 700 ms con excepción en la guardia de movimiento (E5, T27). Las tareas ya cerradas
+> que la enmienda deja atrás llevan una nota; no se desmarcan, las corrige la tarea nueva.
 
 ## Bloque A — Datos y permisos
 
@@ -29,6 +35,8 @@
     - la cascada de borrado de las lecturas.
 - [x] **T2. Permiso y añadido** (design §7, §3.2.2).
   Depende de T1.
+  - _Enmienda 2026-10-19 (E1): lo de esta tarea **se deshace en T24**. La migración
+    `20261019120100_notifications_addon` se queda en el repo; la anula una migración nueva._
   - `permissions.ts`: `notificaciones.consultar` y los cuatro roles de empresa en
     `SEED_ROLE_PERMISSIONS`.
   - `company-addons.ts`: `notificaciones` en `ADDONS`, `ADDON_PERMISSIONS` y
@@ -44,6 +52,8 @@
     - el test de integración que compara la migración con las constantes;
     - `guard-catalogo` de añadidos.
 - [x] **T3. `identity.isUserInCompany`** `[P]` (design §7). Depende de T1.
+  - _Enmienda 2026-10-19 (E2): el puerto propio `ports/company-membership-reader.ts` y el `false`
+    para un usuario dado de baja se quedan; T25 añade su test de R55._
   - **Hecho:** test unitario del caso de uso y test de integración del adaptador (otra empresa →
     `false`).
 
@@ -87,6 +97,8 @@
   - `get-notification-summary`, `list-notifications`, `notification-cursor`,
     `mark-notification-read`, `mark-all-notifications-read`, `purge-expired-notifications`,
     `actor.ts`.
+  - _Enmienda 2026-10-19 (E1): los casos R15/R19 de permiso de `authorization.test.ts` se
+    reescriben en T24._
   - **Hecho:**
     - `tests/unit/notificaciones/authorization.test.ts` cubre R15 (sin `notificaciones.consultar`
       lanza antes de llamar a la bandeja, en las cuatro operaciones), R19 (añadido apagado =
@@ -115,6 +127,7 @@
     - el `RecipientDirectory` con `identity.isUserInCompany`.
   - **Hecho:** `tests/unit/composition/notificaciones-wiring.test.ts` cubre R9 (solo `in_app`) y
     R19 (el interruptor usa la clave `notificaciones`).
+  - _Enmienda 2026-10-19 (E1): el interruptor sale de la composición en T24._
 
 ## Bloque C — Emisor `documentos`
 
@@ -136,8 +149,9 @@
 - [x] **T10. Nombre original de cada archivo** `[P]` (design §6.3, §3.2.3). Depende de T9.
   - _Estado (tanda 2): parte backend hecha en 1e657082 (migración, `file-name.ts`, `names`, `createBatch`, `enqueue-names.test.ts`). Pendiente para frontend_dev: `DocumentUpload` manda `names` y `document-upload-names.test.tsx`._
   - Migración `<ts>_document_files_original_name` con `down.sql`.
-  - `file-name.ts` (`fileNameSchema`), `names` opcional en `enqueue-input.ts`, `NewBatch.files` y
-    `createBatch`.
+  - `file-name.ts` (`fileNameSchema`), `names` opcional en `enqueue-input.ts`, ~~`NewBatch.files`~~
+    `NewBatch.originalNames?` alineado con `paths` (enmienda 2026-10-19, E3) y `createBatch` con
+    `createdAt` + 1 ms por archivo.
   - `DocumentUpload` manda `names` en el mismo orden que `paths`.
   - **Hecho:**
     - `tests/unit/documentos/enqueue-names.test.ts` cubre R50: se queda sin carpetas
@@ -244,7 +258,8 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
   - `notification-bell.tsx` y `notification-list-tail.tsx` (centinela con `useInView` de
     `react-intersection-observer`, `root` = área con scroll, `rootMargin` de 120 px, `skip` fuera de
     `tail === 'more'` y `fallbackInView: true`). El layout privado monta `NotificationsProvider` y
-    la campana solo con el permiso efectivo.
+    la campana ~~solo con el permiso efectivo~~ para toda sesión (enmienda 2026-10-19, E1; así se
+    hizo en la tanda 3).
   - **Hecho:** `tests/unit/notificaciones-ui/notification-bell.test.tsx`, con
     `mockAllIsIntersecting` de `react-intersection-observer/test-utils`, cubre:
     - R22: `aria-label` con y sin no leídos;
@@ -261,7 +276,10 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     - R34: en escritorio, 400 px de ancho y 520 px de alto con scroll;
     - R35: en el teléfono, el `anchor` es la cabecera, `collisionPadding` 8 a los lados y arriba y
       16 abajo, ancho `calc(100vw - 16px)`, alto máximo `--available-height` y filas de 44 px;
-    - R19: sin permiso, el layout no monta ni la campana ni el proveedor.
+    - ~~R19: sin permiso, el layout no monta ni la campana ni el proveedor.~~ Enmienda 2026-10-19
+      (E1): R19 lo cubren «con sesión monta la campana en la cabecera aunque no tenga ningún
+      permiso» y «el layout no condiciona la campana a ningún permiso ni añadido de
+      notificaciones».
 
     Los tests del layout privado siguen verdes.
 - [x] **T19. Solo campana** `[P]` (R24, design §10.4). Depende de T18.
@@ -288,6 +306,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
   - `tests/unit/pedidos/vercel-cron.test.ts` se reescribe sin fijar el total de tareas.
   - **Hecho:** `tests/unit/notificaciones/purge-route.test.ts` cubre R17: 401 sin secreto, 500 sin
     variable, y una llamada a borrar por empresa. `guard-rutas-fuera-de-sesion` verde.
+  - _Enmienda 2026-10-19 (E4): recorre solo las empresas activas; T26 lo amplía a todas._
 
 ## Bloque G — Documentación, E2E y QA
 
@@ -295,7 +314,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
   - `lib/modules/notificaciones/README.md`: cómo agregar un evento y cómo agregar un canal.
   - **Hecho:** cada paso del README nombra el archivo real y el test de R6/R10 que lo demuestra.
 - [ ] **T22. E2E de aislamiento, primer evento y scroll** (R13, R19, R24, R25, R27, R46, R49,
-  R50, R51). Depende de T18, T19 y T11.
+  R50, R51). Depende de T18, T19, T11 y, por la enmienda del 2026-10-19, T24.
   - `e2e/notificaciones.spec.ts`, con los dobles de `e2e/formula-desde-pdf.spec.ts` (lector
     enlatado y cola en línea):
     1. El Administrador de la empresa A sube un PDF de fórmula. Sin recargar, su campana muestra
@@ -309,7 +328,9 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     4. Con 12 avisos sembrados para un usuario, el panel abre con 10; al hacer scroll hasta el
        final aparecen los 2 restantes y «No hay más avisos. Se conservan 90 días.», sin
        repetidos (observador real del navegador).
-    5. Con el añadido apagado en A, no hay campana.
+    5. ~~Con el añadido apagado en A, no hay campana.~~ Enmienda 2026-10-19 (E1): con la migración
+       de T24 aplicada (sin permiso ni añadido de notificaciones en la base), el Operador de A ve la
+       campana y abre el panel (R19).
     6. `/notificaciones` responde 404 y el menú lateral no tiene «Notificaciones».
   - **Hecho:** `pnpm exec playwright test e2e/notificaciones.spec.ts` verde.
 - [ ] **T23. QA multiplataforma manual** (design §10.5). Depende de T22.
@@ -322,6 +343,97 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
     - carga al hacer scroll dentro del panel, con el dedo.
   - **Hecho:** resultado anotado en `progress/impl_QC-137.md`, con lo que no se pudo comprobar
     dicho como tal.
+
+## Bloque H — Enmienda del 2026-10-19
+
+Decisiones del humano E1, E2, E4 y E5 (`requirements.md > Enmiendas`). Van **antes** de T21–T23:
+T22 depende de T24. T26 y T27 van después de T24 porque comparten archivos con ella
+(`lib/composition/index.ts` y `notificaciones-wiring.test.ts` con T26; `notification-bell.test.tsx`
+con T27). T25 es independiente.
+
+- [ ] **T24. Notificaciones núcleo: quitar permiso, añadido y su migración de datos** (E1; R15,
+  R18, R19, R21, R22, R37, R40, R54; design §3.2.4, §4.2, §7, §8, §9). No depende de ninguna
+  tarea abierta.
+  - **Migración nueva** `db/migrations/<ts>_notifications_addon_removal/` (`<ts>` posterior a
+    `20261019120200`) con `migration.sql` y `down.sql`, como dice design §3.2.4. **No** se borra ni
+    se edita `20261019120100_notifications_addon`. La lista de
+    `tests/guards/guard-identificador-de-request.test.ts` gana la nueva.
+  - **`identity`:** `permissions.ts` y `company-addons.ts` vuelven a su contenido anterior a la
+    tanda 1, incluidas las dos frases del JSDoc de `SEED_ROLE_PERMISSIONS` que la tanda 1 quitó.
+    Para encontrarlo: `git log --oneline -- <archivo>` y el padre del commit de la tanda 1 que lo
+    cambió (`4252273a` o `a1997388`).
+  - **`notificaciones`:** `actor.ts` sin `NOTIFICATIONS_READ_PERMISSION` ni `requirePermission`;
+    los cuatro casos de uso sin comprobación de permiso; `notify.ts` sin el paso del interruptor
+    (`NotifyDeps.addon` fuera); se **borra** `ports/notifications-switch.ts`;
+    `notification-actions.ts` sin el código `forbidden`; `UnauthorizedError` fuera si queda sin uso.
+  - **Composición:** fuera el interruptor `identity.isCompanyAddonActive(…, 'notificaciones')`.
+  - **Navegador:** `notification-feed.ts` con `onStop: (reason: 'unauthorized')`.
+  - **Tests de otras fichas que la tanda 1 ajustó por el permiso o el añadido:** vuelven a su
+    versión anterior a la tanda 1 en lo que toca al permiso o al añadido (filtros «sin
+    `notificaciones.consultar`», «seis añadidos», textos «seis» de E2E). Lo demás que la tanda 1
+    añadió a esos archivos por otras razones (la migración nueva en
+    `guard-identificador-de-request`, `aislamiento.json`) se queda. Lista de la bitácora:
+    `tests/unit/identity/{permissions,company-actions}.test.ts`,
+    `tests/unit/identity/addons/{company-addons,menu-recortado}.test.ts`,
+    `tests/unit/identity/companies/{get-company-addons,set-all-company-addons,set-company-addon}.test.ts`,
+    `tests/unit/identity/schema/{company-addons-migration,conditioning-role-migration}.test.ts`,
+    `tests/unit/identity/seed/seed-initial-access.test.ts`,
+    `tests/unit/navegacion/qc75-convenciones.test.ts`, `tests/unit/pedidos/qc146-alcance.test.ts`,
+    `tests/unit/asignaciones/empacador-authorization.test.ts`,
+    `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`,
+    `tests/integration/identity/{company-addons,conditioning-role-migration,identity-seed,session-user}.int.test.ts`,
+    `e2e/helpers/addons.ts` y `e2e/modulos-por-empresa.spec.ts`.
+  - **Tests propios:** se borran o reescriben los casos que nombran R18 (rol ∩ añadido), R20, R52 y
+    R53, y los R15/R19/R40 que prueban el permiso, el añadido o `forbidden`, en
+    `authorization.test.ts`, `notify.test.ts`, `notificaciones-wiring.test.ts`,
+    `notification-actions.test.ts`, `polling-feed.test.ts` y los de `identity` de arriba.
+    `tests/integration/identity/notifications-addon-migration.int.test.ts` se reescribe para R54.
+    Los dos casos de la tanda 3 de `notification-bell.test.tsx` que cubren R19 llevan «R19» en el
+    nombre.
+  - **Hecho:**
+    - los tests de `requirements.md > Enmiendas > Trazabilidad` para R15, R18, R19, R21, R40 y R54,
+      en verde;
+    - ningún test ni archivo de producción nombra `notificaciones.consultar` ni el añadido
+      `notificaciones`, salvo la migración `20261019120100` y la de retirada y el test de R54
+      (comprobado con `rg`);
+    - los tests de otras fichas de la lista de arriba, en verde, y `git diff <padre de la tanda
+      1>..HEAD` sobre ellos sin líneas del permiso ni del añadido;
+    - `pnpm run db:migrate` y `db:rollback` de la migración nueva contra una base desechable, en
+      los dos casos: con la `20261019120100` aplicada antes y sobre una base nueva;
+    - `pnpm exec vitest run guard` en verde.
+- [ ] **T25. Usuario dado de baja no es miembro** `[P]` (E2; R12, R55; design §7). No depende de
+  ninguna tarea abierta.
+  - Sin cambio de producción esperado: el adaptador ya filtra `deletedAt: null`. Si el JSDoc del
+    puerto `company-membership-reader.ts` no lo dice, se añade una línea.
+  - **Hecho:** `tests/integration/identity/company-membership.int.test.ts` › «QC-137 R55: un
+    usuario dado de baja de esa empresa da false», y `tests/unit/notificaciones/notify.test.ts`
+    con un caso «R55» (o el caso R12 existente renombrado si ya lo cubre), en verde.
+- [ ] **T26. El cron borra también avisos de empresas dadas de baja** (E4; R17; design §11).
+  Depende de T24.
+  - `company-directory-prisma.ts` gana `listAllCompanyIds()`; la fachada `notificaciones` de
+    `lib/composition/index.ts` lo usa en `listCompanyIds`. El cron de pedidos no cambia.
+  - **Hecho:**
+    - `tests/integration/identity/company-directory-addons.int.test.ts` (el que ya prueba
+      `listActiveCompanyIds`) › «QC-137 R17: listAllCompanyIds incluye las empresas dadas de baja»
+      (y `listActiveCompanyIds` sigue sin ellas);
+    - `tests/unit/composition/notificaciones-wiring.test.ts` › «R17: la lista de empresas del cron
+      es la de todas, no la de activas»;
+    - `tests/unit/notificaciones/purge-route.test.ts` › «R17: recorre también las empresas dadas de
+      baja».
+- [ ] **T27. Balanceo de la campana con excepción en la guardia de movimiento** (E5; R36;
+  design §9.5). Depende de T24: los dos tocan `notification-bell.test.tsx`.
+  - `@keyframes notification-bell-swing` (700 ms, una vez, curva de un token `--ease-*`) en
+    `app/globals.css`, aplicado bajo `motion-safe:` en `notification-bell.tsx` al llegar un aviso
+    nuevo con la pantalla abierta (no al cargar).
+  - `tests/guards/guard-movimiento.test.ts`: `EXCEPCIONES_DE_DURACION` con una sola entrada y su
+    motivo, como dice design §9.5; comentario de cabecera y el caso del login ajustados.
+  - **Hecho:**
+    - `notification-bell.test.tsx` › «R36: al llegar un aviso la campana se balancea bajo
+      motion-safe, y no al cargar»;
+    - `guard-movimiento.test.ts` › «QC-137 R36: la excepción del balanceo de la campana admite solo
+      ese nombre, en esos archivos y a 700 ms», con tres casos negativos (otro nombre a 700 ms, el
+      mismo nombre en otro archivo, el mismo nombre a 701 ms) que la ponen roja;
+    - `pnpm exec vitest run guard` en verde.
 
 ## Trazabilidad prevista
 
@@ -341,13 +453,14 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 | R12 | T1, T4 |
 | R13 | T5, T22 |
 | R14 | T1, T6, T7 |
-| R15 | T6 |
+| R12 (dado de baja) | T25 |
+| R15 | T6, T24 |
 | R16 | T5 |
-| R17 | T5, T20 |
-| R18 | T2 |
-| R19 | T4, T6, T8, T18, T22 |
-| R20 | T2 |
-| R21 | T2 |
+| R17 | T5, T20, T26 |
+| R18 | T24 (antes T2) |
+| R19 | T18, T22, T24 (antes T4, T6, T8) |
+| R20 | Retirado (E1) |
+| R21 | T24 (antes T2) |
 | R22 | T6, T16, T18 |
 | R23 | T5, T18 |
 | R24 | T19, T22 |
@@ -362,11 +475,11 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 | R33 | T15, T18 |
 | R34 | T18 |
 | R35 | T17, T18, T23 |
-| R36 | T16 |
+| R36 | T16, T27 |
 | R37 | T13, T16 |
 | R38 | T13 |
 | R39 | T14 |
-| R40 | T7, T13 |
+| R40 | T7, T13, T24 |
 | R41 | T14 |
 | R42 | T14 |
 | R43 | T14, T23 |
@@ -378,8 +491,10 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 | R49 | T7, T11, T22 |
 | R50 | T10, T22 |
 | R51 | T9, T10, T11, T22 |
-| R52 | T2 |
-| R53 | T2 |
+| R52 | Retirado (E1) |
+| R53 | Retirado (E1) |
+| R54 | T24 |
+| R55 | T25 |
 
 ## Archivos esperados
 
@@ -490,3 +605,43 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 - `tests/guards/guard-notificaciones-desacople.test.ts`
 - `tests/guards/guard-rutas-fuera-de-sesion.test.ts`
 - `e2e/notificaciones.spec.ts`
+
+Añadidos por la enmienda del 2026-10-19: los que T24–T27 tocan y los que las tandas 1–3 ya tocaron
+sin estar en esta lista.
+
+- `db/migrations/<ts>_notifications_addon_removal/migration.sql`
+- `db/migrations/<ts>_notifications_addon_removal/down.sql`
+- `lib/modules/identity/ports/company-membership-reader.ts`
+- `lib/modules/identity/adapters/driven/persistence/company-directory-prisma.ts`
+- `lib/modules/notificaciones/ports/notifications-switch.ts`
+- `app/globals.css`
+- `tests/guards/guard-movimiento.test.ts`
+- `tests/guards/guard-identificador-de-request.test.ts`
+- `tests/integration/aislamiento.json`
+- `tests/integration/identity/notifications-addon-migration.int.test.ts`
+- `tests/integration/identity/company-membership.int.test.ts`
+- `tests/integration/identity/company-directory-addons.int.test.ts`
+- `tests/integration/identity/conditioning-role-migration.int.test.ts`
+- `tests/integration/identity/identity-seed.int.test.ts`
+- `tests/integration/identity/session-user.int.test.ts`
+- `tests/unit/identity/permissions.test.ts`
+- `tests/unit/identity/company-actions.test.ts`
+- `tests/unit/identity/addons/menu-recortado.test.ts`
+- `tests/unit/identity/companies/get-company-addons.test.ts`
+- `tests/unit/identity/companies/set-company-addon.test.ts`
+- `tests/unit/identity/schema/company-addons-migration.test.ts`
+- `tests/unit/identity/schema/conditioning-role-migration.test.ts`
+- `tests/unit/identity/seed/seed-initial-access.test.ts`
+- `tests/unit/identity/session-once-per-request-actions.test.ts`
+- `tests/unit/navegacion/qc75-convenciones.test.ts`
+- `tests/unit/navegacion/private-layout-menu.test.tsx`
+- `tests/unit/private-layout.test.tsx`
+- `tests/unit/pedidos/qc146-alcance.test.ts`
+- `tests/unit/asignaciones/empacador-authorization.test.ts`
+- `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`
+- `tests/unit/documentos-ui/document-upload-flow.test.tsx`
+- `tests/unit/documentos-ui/document-upload-strategy.test.tsx`
+- `tests/unit/documentos-ui/formulas-upload.test.tsx`
+- `tests/unit/documentos-ui/supplier-detail-upload.test.tsx`
+- `e2e/helpers/addons.ts`
+- `e2e/modulos-por-empresa.spec.ts`

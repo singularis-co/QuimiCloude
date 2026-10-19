@@ -115,31 +115,34 @@ Vocabulario de este documento:
 - **R14** — SI un usuario intenta marcar como leído un aviso que no le corresponde (de otra
   empresa, de otro rol, de otro usuario o inexistente), ENTONCES el sistema DEBE responder igual
   que si el aviso no existiera y NO DEBE cambiar ningún estado de lectura.
-- **R15** — El sistema DEBE validar en el caso de uso, antes de leer o escribir la bandeja, que el
-  usuario tiene el permiso de consultar notificaciones y que el aviso le corresponde.
+- **R15** — El sistema DEBE validar en el caso de uso, antes de leer o escribir la bandeja, que hay
+  un usuario con sesión en una empresa y que el aviso le corresponde (R13). Consultar y marcar los
+  avisos propios NO DEBE exigir ningún permiso. *(Enmienda 2026-10-19, E1.)*
 - **R16** — CUANDO un usuario marca como leído un aviso dirigido a su rol, el sistema DEBE dejarlo
   leído solo para él. Los demás usuarios del rol DEBEN seguir viéndolo sin leer.
 - **R17** — El sistema DEBE excluir de toda consulta los avisos con más de 90 días. Además, una
-  tarea diaria DEBE borrarlos de la base, junto con su estado de lectura, recorriendo las empresas
-  una a una.
+  tarea diaria DEBE borrarlos de la base, junto con su estado de lectura, recorriendo una a una
+  **todas** las empresas, también las dadas de baja. *(Enmienda 2026-10-19, E4.)*
 
-### Módulo activable por empresa
+### Núcleo: sin permiso ni añadido *(enmienda 2026-10-19, E1; antes «Módulo activable por empresa»)*
 
-- **R18** — Las notificaciones DEBEN ser un añadido por empresa con su propio permiso de consulta.
-  Un usuario DEBE tener ese permiso efectivo solo si su rol lo tiene y el añadido está activo en su
-  empresa.
-- **R19** — MIENTRAS el añadido esté apagado en una empresa, el sistema NO DEBE crear avisos para
-  ella, sus usuarios NO DEBEN ver la campana, y toda consulta o marcado de avisos de esos usuarios
-  DEBE responder como «sin permiso» sin leer la bandeja.
-- **R20** — CUANDO se da de alta una empresa nueva, el añadido de notificaciones DEBE nacer
-  apagado.
-- **R21** — Los roles de empresa (Administrador, Operador, Empacador y Acondicionamiento) DEBEN
-  tener el permiso de consultar notificaciones. El Maestro NO DEBE tenerlo.
+- **R18** — Las notificaciones DEBEN ser núcleo: NO DEBEN ser un añadido por empresa ni tener un
+  permiso propio. La lista de añadidos NO DEBE incluir `notificaciones` y la base NO DEBE tener la
+  fila del añadido ni ninguna excepción por empresa de él. *(Enmienda 2026-10-19, E1.)*
+- **R19** — El sistema DEBE crear los avisos de cualquier empresa sin consultar ningún añadido.
+  MIENTRAS un usuario tenga sesión en una empresa, DEBE ver la campana y DEBE poder consultar y
+  marcar sus avisos, sea cual sea su rol y aunque su rol no tenga ningún permiso. *(Enmienda
+  2026-10-19, E1.)*
+- **R20** — *Retirado por la enmienda del 2026-10-19 (E1).* Decía que el añadido nacía apagado en
+  una empresa nueva; ya no hay añadido.
+- **R21** — El catálogo de permisos NO DEBE tener `notificaciones.consultar`, y cada rol DEBE tener
+  exactamente los permisos que tenía antes de QC-137. *(Enmienda 2026-10-19, E1.)*
 
 ### Campana y panel
 
-- **R22** — MIENTRAS el usuario tenga el permiso efectivo, la cabecera de la zona privada DEBE
-  mostrar una campana con el conteo. Con conteo 0 la campana NO DEBE llevar insignia, y con más de
+- **R22** — MIENTRAS el usuario tenga sesión en una empresa, la cabecera de la zona privada DEBE
+  mostrar una campana con el conteo *(enmienda 2026-10-19, E1: antes «MIENTRAS el usuario tenga el
+  permiso efectivo»)*. Con conteo 0 la campana NO DEBE llevar insignia, y con más de
   99 la insignia DEBE decir «99+». El nombre accesible del botón DEBE ser «Notificaciones, N sin
   leer», o «Notificaciones, ninguna sin leer» con conteo 0. La insignia, el nombre accesible y la
   presencia de «Marcar todas como leídas» DEBEN salir de una sola fuente del conteo en el
@@ -196,12 +199,14 @@ Vocabulario de este documento:
   campana se balancea 700 ms, el conteo da un pulso de 360 ms y, con el panel abierto, la fila nueva
   entra desde arriba con un fundido. Las filas de un lote cargado por scroll DEBEN entrar con un
   fundido. MIENTRAS el sistema operativo pida movimiento reducido, NO DEBE haber balanceo, ni
-  pulso, ni entrada, ni fundido de filas.
+  pulso, ni entrada, ni fundido de filas. *(Enmienda 2026-10-19, E5: los 700 ms del balanceo se
+  mantienen, con una excepción con nombre en la guardia de movimiento de QC-228.)*
 
 ### Llegada sin recargar
 
-- **R37** — MIENTRAS una pestaña de la zona privada esté visible y el usuario tenga el permiso
-  efectivo, el sistema DEBE consultar sus avisos cada 30 segundos. Con lo que llegue, DEBE
+- **R37** — MIENTRAS una pestaña de la zona privada esté visible y el usuario tenga sesión, el
+  sistema DEBE consultar sus avisos cada 30 segundos *(enmienda 2026-10-19, E1: sin la condición
+  del permiso efectivo)*. Con lo que llegue, DEBE
   actualizar sin recargar la página el conteo de la campana y, si la lista del panel ya está
   cargada, añadir arriba los avisos nuevos.
 - **R38** — MIENTRAS la pestaña esté oculta, el sistema NO DEBE consultar. CUANDO la pestaña vuelve
@@ -209,8 +214,9 @@ Vocabulario de este documento:
 - **R39** — CUANDO una pestaña recibe un conteo nuevo o el usuario marca avisos como leídos en
   ella, las demás pestañas del mismo usuario en el mismo navegador DEBEN actualizar su conteo sin
   esperar a su siguiente consulta.
-- **R40** — SI la consulta responde que no hay sesión o que el usuario ya no tiene el permiso
-  efectivo, ENTONCES el sistema DEBE dejar de consultar en esa pestaña.
+- **R40** — SI la consulta responde que no hay sesión, ENTONCES el sistema DEBE dejar de consultar
+  en esa pestaña. *(Enmienda 2026-10-19, E1: sin el caso «ya no tiene el permiso efectivo», que deja
+  de existir.)*
 
 ### Tono
 
@@ -268,10 +274,21 @@ Vocabulario de este documento:
 
   Un nombre de más de 60 caracteres DEBE recortarse a sus primeros 59 seguidos de «…». SI ningún
   archivo fallido tiene nombre guardado, ENTONCES el aviso DEBE usar el texto genérico de R47.
-- **R52** — CUANDO se aplica la migración del añadido, cada empresa que ya existía DEBE quedar con
-  el añadido de notificaciones prendido. Las empresas que se den de alta después siguen R20.
-- **R53** — El añadido de notificaciones NO DEBE depender de ningún otro añadido: prenderlo o
-  apagarlo NO DEBE exigir ni cambiar el estado de «Integraciones» ni de ningún otro.
+- **R52** — *Retirado por la enmienda del 2026-10-19 (E1).* Decía que la migración del añadido lo
+  prendía en las empresas existentes; lo sustituye R54.
+- **R53** — *Retirado por la enmienda del 2026-10-19 (E1).* Decía que el añadido no dependía de
+  ningún otro; ya no hay añadido.
+
+### Añadidos por la enmienda del 2026-10-19
+
+- **R54** — CUANDO se aplica la migración que retira el añadido, la base DEBE quedar sin el permiso
+  `notificaciones.consultar`, sin ninguna asignación de ese permiso a un rol, sin la fila
+  `notificaciones` de los añadidos y sin ninguna excepción por empresa de ese añadido, tanto si la
+  migración de datos de la tanda 1 se llegó a aplicar como si no. Aplicarla de nuevo NO DEBE fallar
+  ni cambiar nada. Las migraciones ya commiteadas NO DEBEN borrarse ni editarse. *(E1.)*
+- **R55** — SI el usuario destinatario de un evento está dado de baja, ENTONCES el sistema DEBE
+  tratarlo como un usuario que no es de la empresa: NO DEBE crear el aviso y DEBE registrar el
+  rechazo en el log (R12). *(E2.)*
 
 ### Cobertura de las decisiones cerradas
 
@@ -295,7 +312,7 @@ Vocabulario de este documento:
 | ¿E2E? | R13 |
 | Desacople | R5, R6 |
 | ¿Un fallo al notificar rompe la operación? | R7 |
-| ¿Se activa por empresa? | R18, R19, R20 |
+| ¿Se activa por empresa? | Sustituida por la enmienda E1 (núcleo): R18, R19, R21, R54 |
 | Identificadores de la DB | R12 (lo comprueba el test de integración del esquema, `design.md > 3`) |
 | Autorización | R14, R15 |
 | «Marcar todas como leídas» | R22, R23, R32. La parte de la página queda sin objeto por «¿Dónde se ve? (revisión)» |
@@ -304,12 +321,17 @@ Vocabulario de este documento:
 | Historial en el panel con carga al hacer scroll | R23, R25, R26, R27, R28, R33 |
 | Un aviso por tanda (2026-10-19) | R46 |
 | Destino del aviso de PDFs (2026-10-19) | R49 |
-| Añadido prendido en las empresas existentes (2026-10-19) | R52 |
-| El añadido no depende de «Integraciones» (2026-10-19) | R53 |
+| Añadido prendido en las empresas existentes (2026-10-19) | Sin objeto por la enmienda E1: R54 retira lo que esa migración escribió |
+| El añadido no depende de «Integraciones» (2026-10-19) | Sin objeto por la enmienda E1 (R18) |
 | Carga al hacer scroll con `react-intersection-observer` (2026-10-19) | R25 (la guardia de QC-140 ampliada lo comprueba, `design.md > 10.2`) |
 | Nombre del archivo que falló (2026-10-19) | R47, R50, R51 |
 | Hora relativa y textos (2026-10-19) | R30, R47 |
 | Panel en el teléfono (2026-10-19) | R35 |
+| E1. Notificaciones núcleo (enmienda 2026-10-19) | R15, R18, R19, R21, R22, R37, R40, R54 (R20, R52 y R53 retirados) |
+| E2. Usuario dado de baja no es miembro (enmienda 2026-10-19) | R12, R55 |
+| E3. `paths[]` + `originalNames?[]` y orden por `createdAt` (enmienda 2026-10-19) | R50, R51 (cambio de diseño, sin requisito nuevo: `design.md > 6.3`) |
+| E4. El cron borra también avisos de empresas dadas de baja (enmienda 2026-10-19) | R17 |
+| E5. Balanceo de 700 ms con excepción en la guardia (enmienda 2026-10-19) | R36 |
 
 ## Preguntas abiertas
 
@@ -326,11 +348,77 @@ Vocabulario de este documento:
    `supplier_id`, margen del teléfono y librería del observador). Ver las filas del 2026-10-19 en
    `## Decisiones cerradas` y R30, R35, R46, R47, R49–R53.
 
-Sin preguntas abiertas que bloqueen QC-137. Las 2 y 3 son de otras fichas.
+12. **Maestro y otros usuarios sin empresa (enmienda E1).** R19 dice «todo usuario con sesión en
+    una empresa». El Maestro no tiene empresa (`SessionUserRecord.companyId = null`) y la bandeja
+    es por empresa. Hoy, si una sesión sin empresa monta el layout privado, la acción responde
+    `unauthorized` (`getSessionContext()` da `null`) y la consulta se para (R40), con la campana
+    montada. Queda abierto si el Maestro debe ver la campana (vacía) o no verla. No bloquea T24–T27:
+    el código actual no cambia hasta que se responda.
+13. **Avisos de una empresa dada de baja (enmienda E1).** Antes, el interruptor del añadido decidía
+    si se creaban. Sin él, una tanda que termina en una empresa dada de baja crea su aviso (que
+    nadie puede leer, porque sus usuarios no entran). R17 los borra a los 90 días (E4). Queda
+    abierto si `notify` debe además rechazarlos. No bloquea: no cambia ningún requisito actual.
+
+Sin preguntas abiertas que bloqueen QC-137. Las 2 y 3 son de otras fichas; la 12 y la 13 no
+bloquean T24–T27.
 
 **Nota para el próximo pase `/design`, no es una pregunta:** la ficha de
 `NotificacionesMovil.dc.html` todavía dice «alto máximo 70 %» y sus enlaces de ejemplo dicen «Ver
 proveedor». Manda R35 y R49; hay que corregir la ficha para que coincida.
+
+## Enmiendas
+
+### 2026-10-19 — decisiones del humano tras las tandas 1–3
+
+Decisiones del humano del 2026-10-19 (E1–E5) y recogida de las decisiones de implementación de
+las tandas 1–3 (E6). Las E1–E5 son del humano y no se reabren. Las de E6 constan en
+`progress/impl_QC-137-sistema-de-notificaciones-por-rol.md` como «fuera del spec»: se recogen en
+`design.md > 16` y quedan **pendientes de validar por el reviewer**.
+
+| Id | Decisión del humano | Requisitos | Tarea |
+| --- | --- | --- | --- |
+| E1 | Las notificaciones son **núcleo**: sin permiso `notificaciones.consultar` y sin añadido `notificaciones` por empresa. Todo usuario con sesión tiene campana y bandeja. Sustituye las filas «¿Se activa por empresa?», «¿Empresas existentes?» y «¿Depende de "Integraciones"?» de `## Decisiones cerradas`. | R15, R18, R19, R21, R22, R37, R40 cambian; R20, R52, R53 se retiran; R54 nuevo | T24 |
+| E2 | Un usuario **dado de baja** no cuenta como miembro: `isUserInCompany` responde `false`. Se queda el puerto `lib/modules/identity/ports/company-membership-reader.ts`. | R55 nuevo (refina R12) | T25 |
+| E3 | `NewBatch` usa `paths[]` + `originalNames?[]` alineados por posición, no `files[]`. El orden de subida se fija con `createdAt` + 1 ms por archivo. | R50, R51 sin cambio de texto | — (ya hecho en T10; `design.md > 6.3`) |
+| E4 | El cron de borrado a 90 días borra también los avisos de las empresas **dadas de baja** (hoy solo recorre las activas). | R17 cambia | T26 |
+| E5 | El **balanceo de 700 ms** de la campana se mantiene: excepción con nombre, solo para la campana, en `tests/guards/guard-movimiento.test.ts` (QC-228 R1), con su motivo. | R36 sin cambio de texto | T27 |
+
+**Textos anteriores, para la historia:**
+
+- R15: «… que el usuario tiene el permiso de consultar notificaciones y que el aviso le corresponde.»
+- R17: «… recorriendo las empresas una a una.»
+- R18: «Las notificaciones DEBEN ser un añadido por empresa con su propio permiso de consulta. Un
+  usuario DEBE tener ese permiso efectivo solo si su rol lo tiene y el añadido está activo en su
+  empresa.»
+- R19: «MIENTRAS el añadido esté apagado en una empresa, el sistema NO DEBE crear avisos para ella,
+  sus usuarios NO DEBEN ver la campana, y toda consulta o marcado de avisos de esos usuarios DEBE
+  responder como "sin permiso" sin leer la bandeja.»
+- R20: «CUANDO se da de alta una empresa nueva, el añadido de notificaciones DEBE nacer apagado.»
+- R21: «Los roles de empresa (Administrador, Operador, Empacador y Acondicionamiento) DEBEN tener el
+  permiso de consultar notificaciones. El Maestro NO DEBE tenerlo.»
+- R22 y R37: condicionados a «el permiso efectivo».
+- R40: «SI la consulta responde que no hay sesión o que el usuario ya no tiene el permiso efectivo …»
+- R52: «CUANDO se aplica la migración del añadido, cada empresa que ya existía DEBE quedar con el
+  añadido de notificaciones prendido. …»
+- R53: «El añadido de notificaciones NO DEBE depender de ningún otro añadido …»
+
+**Trazabilidad de los requisitos cambiados y nuevos.** Los tests existentes vienen de la bitácora;
+los «(T2x)» los escribe o reescribe esa tarea. Los tests que nombran R20, R52 o R53, o que prueban
+el permiso o el añadido, **se borran o se reescriben** en T24: un requisito retirado no se prueba.
+
+| R | Test |
+| --- | --- |
+| R15 | `tests/unit/notificaciones/authorization.test.ts` › «R15: un actor sin ningún permiso lee su bandeja con empresa, usuario, rol y corte de 90 días» y «R15: marcar pasa a la bandeja el mismo alcance» (T24) |
+| R17 | `tests/unit/notificaciones/purge-route.test.ts` (los casos R17 actuales) + «R17: recorre también las empresas dadas de baja» (T26); `tests/unit/composition/notificaciones-wiring.test.ts` › «R17: la lista de empresas del cron es la de todas, no la de activas» (T26); `tests/integration/identity/company-directory-addons.int.test.ts` (el que ya prueba `listActiveCompanyIds`) › «QC-137 R17: listAllCompanyIds incluye las empresas dadas de baja» (T26) |
+| R18 | `tests/unit/identity/addons/company-addons.test.ts` › «QC-137 R18: ADDONS no incluye notificaciones» (T24); `tests/integration/identity/notifications-addon-migration.int.test.ts` (R54) |
+| R19 | `tests/unit/notificaciones/notify.test.ts` › «R19: crea el aviso sin consultar ningún añadido» (T24); `tests/unit/notificaciones-ui/notification-bell.test.tsx` › «con sesión monta la campana en la cabecera aunque no tenga ningún permiso» y «el layout no condiciona la campana a ningún permiso ni añadido de notificaciones» (tanda 3, renombrados con «R19» en T24); `tests/unit/notificaciones/notification-actions.test.ts` › «R19: con sesión y sin ningún permiso las cuatro acciones responden ok» (T24) |
+| R21 | `tests/unit/identity/permissions.test.ts` › «QC-137 R21: el catálogo no tiene notificaciones.consultar y cada rol tiene los permisos de antes de QC-137» (T24) |
+| R22 | Los de la tanda 3 (`notifications-provider.test.tsx`, `notification-bell.test.tsx`) |
+| R36 | `tests/unit/notificaciones-ui/notification-bell.test.tsx` › «R36: al llegar un aviso la campana se balancea bajo motion-safe, y no al cargar» (T27); `tests/guards/guard-movimiento.test.ts` › «QC-137 R36: la excepción del balanceo de la campana admite solo ese nombre, en esos archivos y a 700 ms» y sus casos negativos (T27); los de la tanda 3 para pulso, entrada y fundido |
+| R37 | `tests/unit/notificaciones-ui/polling-feed.test.ts` (tanda 3) |
+| R40 | `tests/unit/notificaciones-ui/polling-feed.test.ts` › «R40: se para con unauthorized» (tanda 3, sin el caso `forbidden` tras T24); `notification-actions.test.ts` › «R40: sin sesión responde unauthorized» (tanda 1) |
+| R54 | `tests/integration/identity/notifications-addon-migration.int.test.ts`, reescrito en T24: «QC-137 R54: tras las migraciones no queda permiso, asignación, añadido ni excepción», «QC-137 R54: aplicar la retirada dos veces no falla ni cambia nada», «QC-137 R54: la retirada limpia también filas que la migración de datos no escribió (asignación o excepción a mano)» |
+| R55 | `tests/integration/identity/company-membership.int.test.ts` › «QC-137 R55: un usuario dado de baja de esa empresa da false» (T25); `tests/unit/notificaciones/notify.test.ts` › «R55: con el directorio en false no se crea el aviso y queda en el log» (T25, o el caso R12 actual si ya lo cubre: lo comprueba T25) |
 
 ## Decisiones cerradas (no reabrir)
 
