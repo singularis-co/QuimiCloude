@@ -267,12 +267,16 @@ function describir(infracciones: readonly Infraccion[]): string {
 // `/maestro/empresas/[id]`, el detalle de empresa del Maestro. Llama a `requirePagePermission` UNA
 // sola vez -`empresas.consultar`-, el mismo permiso que `/maestro/empresas`: escribir lo autoriza
 // el caso de uso con `empresas.modificar`.
+//
+// TENSADA: de veintinueve a TREINTA, con `/clientes/contactos`. Llama a `requirePagePermission` UNA
+// sola vez, con `clientes.consultar`, el mismo permiso que `/clientes`.
 const RUTAS_ESPERADAS_HOY = [
   '/asignacion',
   '/asignacion/[id]',
   '/asignacion/acondicionamiento/[id]',
   '/asignacion/empaque/[id]',
   '/clientes',
+  '/clientes/contactos',
   '/configuracion/presentaciones',
   '/configuracion/unidades',
   '/configuracion/usuarios',
@@ -300,7 +304,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las veintinueve pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las treinta pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);

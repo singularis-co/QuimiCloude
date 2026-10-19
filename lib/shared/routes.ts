@@ -309,6 +309,9 @@ export const CANCELLED_ORDER_PARAM = 'cancelado';
  */
 export const CUSTOMERS_ROUTE = '/clientes';
 
+/** Sin fila propia en `PRIVATE_ROUTE_PREFIXES`: la de `CUSTOMERS_ROUTE` ya la cubre por segmentos. */
+export const CUSTOMER_CONTACTS_ROUTE = `${CUSTOMERS_ROUTE}/contactos`;
+
 export const AI_PROVIDER_INTEGRATION_ROUTE = '/integraciones/proveedor-ia';
 export const INVENTORY_INTEGRATION_ROUTE = '/integraciones/inventarios';
 export const WHATSAPP_INTEGRATION_ROUTE = '/integraciones/whatsapp';
