@@ -362,9 +362,18 @@ Para cada `change`:
 - `metadata.phone_number_id !== record.phoneNumberId` ⇒ se salta (R15). El conteo de saltados
   vuelve al driving para su log, sin el número.
 
-Cada mensaje se valida primero con su cabecera común —`id` (wamid), `from` (wa_id), `timestamp`
+Cada mensaje se valida primero con su cabecera común —`id` (wamid), `from`, `timestamp`
 (string de dígitos) y `type` (string)—. Si la cabecera no casa, el mensaje no se puede guardar ni
-como `unsupported` (no hay `wamid`, no hay contacto) y se salta con conteo. Si casa, el tipo decide:
+como `unsupported` (no hay `wamid`, no hay contacto) y se salta con conteo.
+
+El `wa_id` del remitente (R16): si `value.contacts` trae **exactamente un** elemento, su `wa_id`;
+si trae varios o ninguno, el `from` del mensaje. Meta documenta `from` como el teléfono y
+`contacts[].wa_id` como el id de usuario, y avisa de que pueden no coincidir (Graph v24+). El
+`profileName` sale del contacto único en el primer caso; en el segundo, del elemento de
+`contacts[]` cuyo `wa_id` sea igual a `from`, o `null`. `from` se guarda siempre en el `payload`
+(clave `from`, en todas las filas de la tabla; en `UNSUPPORTED` ya va dentro del mensaje entero).
+
+Si la cabecera casa, el tipo decide (las columnas `payload` omiten el `from` común):
 
 | `type` de Meta | `type` | `body` | `payload` |
 |---|---|---|---|
@@ -373,7 +382,7 @@ como `unsupported` (no hay `wamid`, no hay contacto) y se salta con conteo. Si c
 | `document` | `DOCUMENT` | `caption` si viene, si no `null` | `{ media_id, mime_type, caption?, filename? }` |
 | `location` | `LOCATION` | `name` o `address` si vienen, si no `null` | `{ latitude, longitude, name?, address? }` |
 | `contacts` | `CONTACTS` | `null` | `{ contacts: <el arreglo tal como llegó> }` |
-| `reaction` | `REACTION` | `emoji` (vacío = quitó la reacción) | `{ message_id, emoji }` |
+| `reaction` | `REACTION` | `emoji` si viene y no es vacío, si no `null` (ausente o vacío = quitó la reacción; Meta lo omite al quitarla) | `{ message_id, emoji: <string o null> }` |
 | `button` | `BUTTON` | `button.text` | `{ text, payload? }` |
 | `interactive` con `button_reply` o `list_reply` | `INTERACTIVE` | `title` | `{ reply_type, id, title, description? }` |
 | cualquier otro, o uno de arriba cuyo objeto no casa con su zod | `UNSUPPORTED` | `null` | el mensaje entero tal como llegó (R20) |
@@ -395,7 +404,7 @@ type InboundBatch = {
 ```
 
 - `contacts` se agrega por `wa_id` en el dominio: `latestAt` = el mayor `metaTimestamp` de sus
-  mensajes del lote; `profileName` = el de `value.contacts[]` para ese `wa_id`, o `null`. Solo
+  mensajes del lote; `profileName` según la regla del `wa_id` del remitente de arriba. Solo
   remitentes de mensajes, nunca `recipient_id` de un status.
 - Statuses: `status` fuera de los cuatro ⇒ se salta (R22). Con `failed`, `errorCode =
   String(errors[0].code)` y `errorReason = errors[0].error_data?.details ?? errors[0].message ??
@@ -664,7 +673,7 @@ despliegue de QC-237. Sin las de cifrado, el `POST` termina en `500` con
 |---|---|
 | `tests/unit/integraciones/whatsapp/verify-whatsapp-webhook.test.ts` | R3 (id no UUID: ningún puerto llamado), R4 (añadido apagado ⇒ `forbidden`), R5, R6 (`PENDING`/`ACTIVE`/`ERROR`: `recordWebhookHandshake` llamado con `now()` y el ámbito de la fila), R7 (cada causa ⇒ `forbidden`, ningún `recordWebhookHandshake`; `bad_request` sin tocar puertos), R2 (el ámbito sale de `directory`, nunca de la entrada) |
 | `tests/unit/integraciones/whatsapp/receive-whatsapp-webhook.test.ts` | R9 (`missing`/`disabled`/`addon_off` sin `decrypt` ni `signature`), R4, R10 (orden: firma antes de `JSON.parse`; con firma mala, un cuerpo no JSON no lanza), R11, R12 (`SecretUnreadableError` ⇒ `secret_unreadable` y `update` a `ERROR` con el mensaje de QC-237), R13, R23 (una excepción del `inbox` se propaga), R26 (`deps` sin Graph; `fetch` espiado no se llama) |
-| `tests/unit/integraciones/whatsapp/whatsapp-webhook-payload.test.ts` | R14, R15, R16 (agregado por `wa_id`, `latestAt` el mayor, `profileName` de `contacts[]`), R17, R19 (cada fila de la tabla de §4.3), R20 (tipo desconocido, `interactive` de otro subtipo y un `image` sin `id` ⇒ `UNSUPPORTED` con el mensaje entero), R22 (status desconocido), cabecera rota ⇒ saltado |
+| `tests/unit/integraciones/whatsapp/whatsapp-webhook-payload.test.ts` | R14, R15, R16 (agregado por `wa_id`, `latestAt` el mayor, `profileName` de `contacts[]`; `from` ≠ `contacts[].wa_id` con un solo contacto ⇒ manda `wa_id`; varios contactos o ninguno ⇒ manda `from`; `from` en el `payload`), R17, R19 (cada fila de la tabla de §4.3, y reacción sin `emoji` y con `emoji` vacío ⇒ `REACTION` con `emoji: null`), R20 (tipo desconocido, `interactive` de otro subtipo y un `image` sin `id` ⇒ `UNSUPPORTED` con el mensaje entero), R22 (status desconocido), cabecera rota ⇒ saltado |
 | `tests/unit/integraciones/whatsapp/whatsapp-message-status.test.ts` | R21: la tabla completa de transiciones (cada estado actual × cada status entrante) |
 | `tests/unit/integraciones/whatsapp/webhook-signature-hmac.test.ts` | R10, R11: vector conocido calculado en el test con `createHmac`; un byte cambiado ⇒ `false`; cabecera sin `sha256=`, con 63 hex o nula ⇒ `false` sin lanzar; bytes no UTF-8 en el cuerpo firman bien (prueba de que se firma el binario, no un texto) |
 | `tests/unit/integraciones/whatsapp/whatsapp-webhook-route.test.ts` | R1 (`decideRouteAccess` con sesión anónima y la ruta ⇒ `allow`), R8 (solo `hub_*` ⇒ el caso de uso recibe `null`), traducción de cada resultado a su código, `content-type` `text/plain` y cuerpo exacto del challenge, R27 (con `console.warn`/`error` espiados, ningún argumento contiene el cuerpo, la firma, el token, un `wa_id` ni el texto de prueba), una excepción del caso de uso ⇒ `500` |

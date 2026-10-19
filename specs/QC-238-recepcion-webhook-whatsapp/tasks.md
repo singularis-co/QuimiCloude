@@ -42,7 +42,8 @@
     datos reales) y `tests/unit/integraciones/whatsapp/whatsapp-webhook-payload.test.ts`.
   - **Hecho:** un caso por fila de la tabla de §4.3, más tipo desconocido, subtipo interactivo
     desconocido, adjunto sin `id`, cabecera rota, `field` distinto de `messages`, teléfono ajeno y
-    status desconocido.
+    status desconocido; reacción sin `emoji` y con `emoji` vacío; `from` ≠ `contacts[].wa_id` con un
+    solo contacto; varios contactos y ninguno (manda `from`); `from` en el `payload`.
 
 - [ ] **T5 — Puertos y repositorio de conexión** (R6). Depende de: T1
   - `ports/whatsapp-connection-repository.ts`: `lastWebhookAt` en el `patch` y

@@ -147,7 +147,9 @@ del mismo `POST`. [A, D3]
 ### Recepción (POST): lo que se guarda
 
 **R16.** CUANDO un POST firmado trae mensajes entrantes, el sistema DEBE crear o actualizar un
-contacto por cada `(conexión, wa_id)` remitente, con el nombre de perfil que trae `contacts[]`,
+contacto por cada `(conexión, wa_id)` remitente, con el nombre de perfil que trae `contacts[]`;
+el `wa_id` del remitente es `contacts[].wa_id` cuando el `value` trae exactamente un contacto, y
+`from` del mensaje en otro caso (varios contactos o ninguno), y `from` DEBE quedar en el `payload`;
 `lastInboundAt` y `lastMessageAt` iguales al instante de Meta más reciente entre el guardado y los
 recibidos (nunca retroceden) y `customerId` nulo. [A]
 
@@ -164,10 +166,11 @@ crear otra fila ni modificar la existente, y el `POST` DEBE terminar igual que s
 ubicación, contactos, reacción, respuesta de botón y respuesta interactiva de botón o de lista,
 guardando en `body` y `payload` lo que fija `design.md > 4.3` para cada uno; de los adjuntos DEBE
 guardar solo `media_id`, `mime_type`, `caption` y `filename` (los que vengan) y NO DEBE descargar
-el archivo. [A]
+el archivo. Una reacción sin `emoji`, o con `emoji` vacío, es una reacción quitada y se guarda como
+reacción, no como `unsupported`. [A]
 
 **R20.** SI un mensaje entrante es de un tipo que no está en R19, o de un tipo de R19 cuyo contenido
-no tiene la forma esperada, ENTONCES el sistema DEBE guardarlo con `type = unsupported`, `body`
+no tiene la forma esperada (una reacción sin `emoji` sí la tiene, R19), ENTONCES el sistema DEBE guardarlo con `type = unsupported`, `body`
 nulo y el mensaje tal como llegó en `payload`, y responder `200`. [A, D4]
 
 **R21.** CUANDO un POST firmado trae un status (`sent`, `delivered`, `read` o `failed`) de un
@@ -208,7 +211,8 @@ Secret, la firma, un `wa_id` ni el texto de un mensaje. [QC-237 D4]
 su `down.sql` que la revierte. [A]
 
 **R29.** El sistema DEBE guardar los mensajes en `whatsapp_messages` con `company_id` obligatorio,
-`wamid` único, índice `(connection_id, contact_id, meta_timestamp)`, los campos de salida de la
+`wamid` único, `contact_id` apuntando al contacto del `wa_id` de R16, índice
+`(connection_id, contact_id, meta_timestamp)`, los campos de salida de la
 ficha, RLS activada y forzada, en la misma migración de R28. [A]
 
 **R30.** La base DEBE rechazar un contacto o un mensaje cuya empresa no sea la de su conexión, y un
