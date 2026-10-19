@@ -57,6 +57,8 @@ _Pendiente: los escribe spec_author (F1.2)._
 | 2026-10-16 | Asignación requerida: ¿entre quiénes? | Entre el equipo elegido al pulsar «Acondicionar» (QC-218) y el propio acondicionador. Uno o varios; al menos uno para avanzar. |
 | 2026-10-16 | ¿Se puede cambiar el responsable de un paso ya pasado? | Sí, mientras el pedido sigue en acondicionamiento. Al «Terminar» queda fijo. Cada cambio entra en el recorrido como un registro nuevo; el anterior no se edita ni se borra (heredado de QC-82). |
 | 2026-10-16 | ¿Qué pasa al recargar? | Retoma donde iba: el avance por los pasos de acondicionamiento se guarda en el servidor. Responsables y fotos ya puestos se conservan. |
+| 2026-10-19 | ¿Cuántos responsables por paso? | Uno o más, del equipo del pedido, incluido el propio acondicionador. Ninguno no deja avanzar un paso con «Asignación requerida». |
+| 2026-10-19 | ¿Cómo se ven los switches en la fórmula? | Solo icono (cámara = evidencia, persona = asignación), con el nombre completo para lector de pantalla, y un icono «!» con tooltip que explica los dos. |
 | 2026-10-16 | ¿Dónde se ven los responsables? | Solo en el recorrido de ejecución (QC-283). El detalle del pedido no cambia. |
 | 2026-10-16 | ¿Importación desde PDF? | No entra: los PDF no especifican pasos de acondicionamiento. Se aparta de QC-211 D5. |
 | 2026-10-16 | ¿Datos de lote? | Pasos primero; «Terminar» al final sigue exigiendo los datos de lote como hoy (QC-219). |
