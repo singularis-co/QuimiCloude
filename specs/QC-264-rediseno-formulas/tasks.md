@@ -153,7 +153,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 6 — Versión (depende de T3a, T3c) [P con 2, 4, 5, 7]
 
-- [ ] **T6a.** (D13, D14, R32–R36) páginas `versiones/nueva` y `versiones/[versionId]`,
+- [x] **T6a.** (D13, D14, R32–R36) páginas `versiones/nueva` y `versiones/[versionId]`,
   `recipe-version-form.tsx`, `recipe-lines-field.tsx`. Test nuevo
   `tests/unit/recetas-ui/recipe-version-marks.test.tsx`: tono por marca con `data-mark` de hoy, original
   tachado en «Cambiado», «Quitado» `danger`, resumen «Igual/Cambiado/Añadido N» que cambia al editar una
