@@ -69,7 +69,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   hoy (snapshot del árbol existente sin cambios). *Enmienda (E8):* con `panel`, `renderStepAddon` sale
   en el cuerpo y el motivo de `stepBlockReason` en el mismo `Notice` `info`; `data-direction` también
   tras un `stepRequest`.
-- [ ] **T1c [P]. Subir PDFs** (D4, R7–R9, R45; P1). `document-upload-dialog.tsx`,
+- [x] **T1c [P]. Subir PDFs** (D4, R7–R9, R45; P1). `document-upload-dialog.tsx`,
   `document-upload-row.tsx`, `labels.ts` (`BROWSER_PHASE_TONES`, `FILE_STATUS_TONES`, tildes). Test
   nuevo `tests/unit/documentos-ui/document-upload-tones.test.tsx` (cada fase y estado con su tono, testid
   y `data-*`); tests de `design.md > 7` de `documentos-ui` actualizados; snapshot de `catalogo-paridad`
