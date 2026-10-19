@@ -27,6 +27,7 @@ import type {
   CustomerMutationFormState,
 } from '@/lib/modules/clientes/adapters/driving/customer-actions';
 import { setupUser } from '../../helpers/user-event';
+import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
 
 const { routerMock, createCustomerActionMock, updateCustomerActionMock } = vi.hoisted(() => ({
   routerMock: {
@@ -106,6 +107,8 @@ let toastExito: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // El selector de pais del telefono decide popup u hoja con `matchMedia`, que jsdom no trae.
+  setViewportWidth(WIDE_VIEWPORT);
   createCustomerActionMock.mockResolvedValue({ status: 'success', id: crypto.randomUUID() });
   updateCustomerActionMock.mockResolvedValue({ status: 'success' });
   toastExito = vi.spyOn(toast, 'success');
@@ -115,6 +118,7 @@ afterEach(() => {
   cleanup();
   toast.dismiss();
   vi.restoreAllMocks();
+  resetViewport();
 });
 
 /** Abre el alta y espera al formulario. */

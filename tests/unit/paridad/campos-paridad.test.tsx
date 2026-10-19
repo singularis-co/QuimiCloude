@@ -472,7 +472,7 @@ describe('paridad de campos — texto', () => {
   it('R1 R16 R17 — T1 CustomerTextField, sin error (obligatorio, telefono y correo)', async () => {
     await editarCliente();
     expect(campo('customer-field-first-names')).toMatchSnapshot();
-    expect(campo('customer-field-phone')).toMatchSnapshot();
+    expect(campo('customer-field-phone-number')).toMatchSnapshot();
     expect(campo('customer-field-email')).toMatchSnapshot();
   });
 

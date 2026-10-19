@@ -49,6 +49,18 @@ export {
   type CustomerPhoneDescription,
 } from './domain/customer-phone';
 export { phoneMatchesWaId } from './domain/phone-matches-wa-id';
+export {
+  planLegacyPhoneBackfill,
+  type LegacyPhoneRow,
+  type LegacyPhoneOutcome,
+  type LegacyPhonePlan,
+  type TakenE164,
+} from './domain/legacy-phone-backfill';
+export {
+  createBackfillLegacyPhones,
+  type BackfillLegacyPhonesDeps,
+  type BackfillLegacyPhonesSummary,
+} from './domain/backfill-legacy-phones';
 // Servicio de solo lectura para otros modulos; lo implementa un adaptador driven y lo ata
 // `lib/composition`.
 export type { CustomerCatalog, CustomerRef, CustomerRefSearch } from './domain/customer-catalog';

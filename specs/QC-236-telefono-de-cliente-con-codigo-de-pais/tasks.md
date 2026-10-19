@@ -82,7 +82,7 @@
     ajustan para el teléfono y siguen cubriendo el correo y los demás campos.
   - Cualquier guardia que enumere los códigos de error sigue verde.
 
-- [ ] **T5 · Adaptador de persistencia y relleno** (R10, R12, R13, R14, R24–R27, R32, R34).
+- [x] **T5 · Adaptador de persistencia y relleno** (R10, R12, R13, R14, R24–R27, R32, R34).
   Depende de: T1, T4.
   - **Qué se hace:**
     - en `customer-prisma.ts`, las columnas nuevas y la traducción de la violación del índice
@@ -122,7 +122,7 @@
     - una empresa sin país da `null`;
     - una empresa dada de baja o inexistente da `null`.
 
-- [ ] **T7 · Composición, action, script y build** (R28, R12). Depende de: T4, T5, T6.
+- [x] **T7 · Composición, action, script y build** (R28, R12). Depende de: T4, T5, T6.
   - **Qué se hace:**
     - en `lib/composition/index.ts`: `identity.getCompanyCountry`, `clientes.backfillLegacyPhones` y
       el puerto `CompanyCountryLookup` atado a la lectura de `identity`;
@@ -156,7 +156,7 @@
   - Los tests de QC-235 de `CountrySelect` siguen verdes sin tocarlos, y la guardia del catálogo
     también.
 
-- [ ] **T9 · `CustomerPhoneField` y `CustomerForm`** (R1–R4, R6–R10, R12, R31, R32). Depende de: T3,
+- [x] **T9 · `CustomerPhoneField` y `CustomerForm`** (R1–R4, R6–R10, R12, R31, R32). Depende de: T3,
   T4, T8.
   - **Qué se hace:**
     - `customer-phone-field.tsx` (§ 8.1), en el barrel de la ruta;

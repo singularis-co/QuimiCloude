@@ -254,7 +254,8 @@ describe.each(VIEWPORTS)('pantalla de clientes en viewport %s (%i px)', (_nombre
     await user.click(screen.getByTestId(CUSTOMER_CREATE_OPEN_TESTID));
     await screen.findByTestId(CUSTOMER_FORM_TESTID);
 
-    const campos = Object.values(CUSTOMER_FIELD_TESTIDS).map((testid) => screen.getByTestId(testid));
+    const { phoneCountry, ...textos } = CUSTOMER_FIELD_TESTIDS;
+    const campos = Object.values(textos).map((testid) => screen.getByTestId(testid));
 
     for (const campo of campos) {
       const nombre = campo.getAttribute('data-testid');
@@ -262,6 +263,14 @@ describe.each(VIEWPORTS)('pantalla de clientes en viewport %s (%i px)', (_nombre
         expect(campo.className, `${nombre} a ${ancho}px`).toContain(token);
       }
       expect(campo.className, `${nombre} a ${ancho}px`).toContain('min-h-11');
+    }
+
+    // El pais del telefono es un disparador sin `md:text-sm`: su 16 px no cambia en escritorio.
+    const pais = screen.getByTestId(phoneCountry);
+    expect(pais.className, `${phoneCountry} a ${ancho}px`).toContain('text-base');
+    expect(pais.className, `${phoneCountry} a ${ancho}px`).not.toContain('md:text-sm');
+    for (const token of AREA_TACTIL) {
+      expect(pais.className, `${phoneCountry} a ${ancho}px`).toContain(token);
     }
 
     for (const accion of [CUSTOMER_FORM_SUBMIT_TESTID, CUSTOMER_FORM_CANCEL_TESTID]) {

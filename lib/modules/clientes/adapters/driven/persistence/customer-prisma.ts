@@ -71,6 +71,55 @@ function toCustomerView(row: CustomerRow): CustomerView {
   };
 }
 
+const PHONE_UNIQUE_INDEX = 'customers_company_phone_e164_key';
+const PHONE_E164_COLUMN = 'phone_e164';
+
+function targetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string[] {
+  const target = error.meta?.target;
+  if (typeof target === 'string') return [target];
+  if (Array.isArray(target)) return target.filter((item): item is string => typeof item === 'string');
+  return [];
+}
+
+/**
+ * El indice parcial vive solo en la migracion, y `meta.target` puede traer su nombre o sus
+ * columnas (`user-admin-prisma.ts`). `phone_e164` no esta en ningun otro indice unico de
+ * `customers`.
+ */
+export function isPhoneUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
+  return targetsOf(error).some(
+    (target) => target.includes(PHONE_UNIQUE_INDEX) || target.includes(PHONE_E164_COLUMN),
+  );
+}
+
+type BusinessColumns = Pick<
+  Prisma.CustomerUncheckedUpdateManyInput,
+  | 'firstNames'
+  | 'firstNamesNormalized'
+  | 'lastNames'
+  | 'lastNamesNormalized'
+  | 'city'
+  | 'cityNormalized'
+  | 'email'
+  | 'address'
+>;
+
+function businessColumns(data: NewCustomer): BusinessColumns {
+  return {
+    firstNames: data.firstNames,
+    firstNamesNormalized: data.firstNamesNormalized,
+    lastNames: data.lastNames,
+    lastNamesNormalized: data.lastNamesNormalized,
+    city: data.city,
+    cityNormalized: data.cityNormalized,
+    email: data.email,
+    address: data.address,
+  };
+}
+
+const NO_PHONE = { phone: null, phoneCountry: null, phoneE164: null, phoneIssue: null } as const;
+
 /**
  * `create` de `CustomerRepository`. Escribe `created_by` Y `updated_by` con el mismo
  * `actorId`, y los seis datos junto con las tres formas normalizadas que ya trae `data`: este
@@ -82,26 +131,31 @@ export async function createCustomer(
   now: Date,
   scope: CustomerScope,
 ): Promise<{ id: string } | 'duplicate_phone'> {
-  const created = await prisma.customer.create({
-    data: {
-      ...companyScopeColumns(scope),
-      firstNames: data.firstNames,
-      firstNamesNormalized: data.firstNamesNormalized,
-      lastNames: data.lastNames,
-      lastNamesNormalized: data.lastNamesNormalized,
-      city: data.city,
-      cityNormalized: data.cityNormalized,
-      ...data.phone,
-      email: data.email,
-      address: data.address,
-      createdAt: now,
-      updatedAt: now,
-      createdBy: actorId,
-      updatedBy: actorId,
-    },
-    select: { id: true },
-  });
-  return { id: created.id };
+  try {
+    const created = await prisma.customer.create({
+      data: {
+        ...companyScopeColumns(scope),
+        firstNames: data.firstNames,
+        firstNamesNormalized: data.firstNamesNormalized,
+        lastNames: data.lastNames,
+        lastNamesNormalized: data.lastNamesNormalized,
+        city: data.city,
+        cityNormalized: data.cityNormalized,
+        ...data.phone,
+        email: data.email,
+        address: data.address,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: actorId,
+        updatedBy: actorId,
+      },
+      select: { id: true },
+    });
+    return { id: created.id };
+  } catch (error) {
+    if (isPhoneUniqueViolation(error)) return 'duplicate_phone';
+    throw error;
+  }
 }
 
 /** `findAliveById`: `deleted_at IS NULL` y el ambito de empresa en el `where`. */
@@ -128,24 +182,43 @@ export async function updateAliveCustomer(
   now: Date,
   scope: CustomerScope,
 ): Promise<'ok' | 'not_found' | 'duplicate_phone'> {
-  const phoneColumns = 'kind' in data.phone ? {} : data.phone;
-  const { count } = await prisma.customer.updateMany({
-    where: { id, deletedAt: null, ...customerCompanyScope(scope) },
-    data: {
-      firstNames: data.firstNames,
-      firstNamesNormalized: data.firstNamesNormalized,
-      lastNames: data.lastNames,
-      lastNamesNormalized: data.lastNamesNormalized,
-      city: data.city,
-      cityNormalized: data.cityNormalized,
-      ...phoneColumns,
-      email: data.email,
-      address: data.address,
-      updatedAt: now,
-      updatedBy: actorId,
-    },
+  if ('kind' in data.phone) return updateKeepingLegacyPhone(id, data, actorId, now, scope);
+  try {
+    const { count } = await prisma.customer.updateMany({
+      where: { id, deletedAt: null, ...customerCompanyScope(scope) },
+      data: { ...businessColumns(data), ...data.phone, updatedAt: now, updatedBy: actorId },
+    });
+    return count === 1 ? 'ok' : 'not_found';
+  } catch (error) {
+    if (isPhoneUniqueViolation(error)) return 'duplicate_phone';
+    throw error;
+  }
+}
+
+/**
+ * Edicion con el numero vacio. El primer `UPDATE` deja la fila bloqueada hasta el final de la
+ * transaccion, asi que el segundo decide con el `phone_issue` que hay en la base: con aviso el
+ * telefono antiguo se conserva, sin aviso se borra.
+ */
+async function updateKeepingLegacyPhone(
+  id: string,
+  data: NewCustomer,
+  actorId: string,
+  now: Date,
+  scope: CustomerScope,
+): Promise<'ok' | 'not_found'> {
+  return prisma.$transaction(async (tx) => {
+    const { count } = await tx.customer.updateMany({
+      where: { id, deletedAt: null, ...customerCompanyScope(scope) },
+      data: { ...businessColumns(data), updatedAt: now, updatedBy: actorId },
+    });
+    if (count !== 1) return 'not_found';
+    await tx.customer.updateMany({
+      where: { id, deletedAt: null, phoneIssue: null, ...customerCompanyScope(scope) },
+      data: { ...NO_PHONE, updatedAt: now, updatedBy: actorId },
+    });
+    return 'ok';
   });
-  return count === 1 ? 'ok' : 'not_found';
 }
 
 /**

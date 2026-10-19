@@ -19,6 +19,7 @@ import type { RecipeDetail } from '@/lib/modules/recetas';
 import type { UnitRef, UnitView } from '@/lib/modules/unidades';
 
 import { setupUser } from '../../helpers/user-event';
+import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
 import { arbolAccesible } from './arbol-accesible';
 
 /**
@@ -410,12 +411,15 @@ function porDefecto() {
 beforeEach(() => {
   vi.clearAllMocks();
   porDefecto();
+  // El selector de pais del telefono del cliente decide popup u hoja con `matchMedia`.
+  setViewportWidth(WIDE_VIEWPORT);
 });
 
 afterEach(async () => {
   cleanup();
   for (const soltar of enVuelo.splice(0)) soltar();
   await act(async () => {});
+  resetViewport();
 });
 
 type Formulario = {

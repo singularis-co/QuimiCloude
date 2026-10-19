@@ -18,7 +18,14 @@ import {
   type CustomerMutationFormState,
 } from '@/lib/modules/clientes/adapters/driving/customer-actions'
 import { errorMessage } from '@/lib/modules/errores'
-import { CustomerNotFoundError, UnauthorizedError, ValidationError } from '@/lib/modules/clientes'
+import {
+  CustomerDuplicatePhoneError,
+  CustomerNotFoundError,
+  CustomerPhoneCountryRequiredError,
+  CustomerPhoneInvalidError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/modules/clientes'
 
 const {
   createCustomerMock,
@@ -80,7 +87,8 @@ const VALID_CUSTOMER_FIELDS = {
   firstNames: 'Maria Jose',
   lastNames: 'Perez Munoz',
   city: 'Bogota',
-  phone: '+57 1 234 5678',
+  phoneCountry: 'CO',
+  phoneNumber: '300 123 4567',
   email: 'maria@example.com',
   address: 'Calle 1 # 2-3',
 }
@@ -169,18 +177,19 @@ describe('Server Actions de clientes — actor, forma de entrada y errores', () 
     updateCustomerMock.mockResolvedValue(undefined)
     deleteCustomerMock.mockResolvedValue(undefined)
 
-    // 1. COMPORTAMIENTO: las mutaciones leen de verdad los campos del FormData. `phone` viaja
+    // 1. COMPORTAMIENTO: las mutaciones leen de verdad los campos del FormData. `phoneNumber` viaja
     //    presente-pero-en-blanco (la conversion a ausencia es del esquema, no del borde);
     //    `address` esta ausente del formulario y llega como `undefined`, no `''`.
     await createCustomerAction(
       CREATE_CUSTOMER_INITIAL,
-      formDataOf({ firstNames: '  Ana  ', lastNames: 'Diaz', city: 'Cali', phone: '  ', email: 'a@a.com' }),
+      formDataOf({ firstNames: '  Ana  ', lastNames: 'Diaz', city: 'Cali', phoneCountry: 'CO', phoneNumber: '  ', email: 'a@a.com' }),
     )
     expect(createCustomerMock.mock.calls[0]?.[0]).toEqual({
       firstNames: '  Ana  ',
       lastNames: 'Diaz',
       city: 'Cali',
-      phone: '  ',
+      phoneCountry: 'CO',
+      phoneNumber: '  ',
       email: 'a@a.com',
       address: undefined,
     })
@@ -311,5 +320,49 @@ describe('Server Actions de clientes — actor, forma de entrada y errores', () 
         })
       }
     }
+  })
+})
+
+describe('Server Actions de clientes — telefono con pais (QC-236)', () => {
+  it('R1, R11 (QC-236) — alta y edicion mandan phoneCountry y phoneNumber tal cual y ya no leen phone', async () => {
+    createCustomerMock.mockResolvedValue({ id: 'customer-1' })
+    updateCustomerMock.mockResolvedValue(undefined)
+
+    const campos = { ...VALID_CUSTOMER_FIELDS, phoneCountry: 'EC', phoneNumber: ' +593 99 123 4567 ', phone: 'ignorado' }
+    await createCustomerAction(CREATE_CUSTOMER_INITIAL, formDataOf(campos))
+    await updateCustomerAction(CUSTOMER_ID, CUSTOMER_MUTATION_INITIAL, formDataOf(campos))
+
+    for (const candidato of [createCustomerMock.mock.calls[0]?.[0], updateCustomerMock.mock.calls[0]?.[1]]) {
+      expect(candidato).toMatchObject({ phoneCountry: 'EC', phoneNumber: ' +593 99 123 4567 ' })
+      expect(candidato).not.toHaveProperty('phone')
+    }
+  })
+
+  it('R3, R10 (QC-236) — sin campos de telefono en el formulario viajan ausentes, no como cadena vacia', async () => {
+    createCustomerMock.mockResolvedValue({ id: 'customer-1' })
+    await createCustomerAction(
+      CREATE_CUSTOMER_INITIAL,
+      formDataOf({ firstNames: 'Ana', lastNames: 'Diaz', city: 'Cali' }),
+    )
+    expect(createCustomerMock.mock.calls[0]?.[0]).toMatchObject({ phoneCountry: undefined, phoneNumber: undefined })
+  })
+
+  it('R8, R9, R12 (QC-236) — los tres errores del telefono salen con su code estable', async () => {
+    const CASOS = [
+      { error: new CustomerPhoneCountryRequiredError(), code: 'customer_phone_country_required' },
+      { error: new CustomerPhoneInvalidError(), code: 'customer_phone_invalid' },
+      { error: new CustomerDuplicatePhoneError(), code: 'customer_duplicate_phone' },
+    ] as const
+
+    for (const caso of CASOS) {
+      createCustomerMock.mockRejectedValueOnce(caso.error)
+      const alta = await createCustomerAction(CREATE_CUSTOMER_INITIAL, formDataOf(VALID_CUSTOMER_FIELDS))
+      expect(alta).toEqual({ status: 'error', code: caso.code, message: errorMessage(caso.code) })
+
+      updateCustomerMock.mockRejectedValueOnce(caso.error)
+      const edicion = await updateCustomerAction(CUSTOMER_ID, CUSTOMER_MUTATION_INITIAL, formDataOf(VALID_CUSTOMER_FIELDS))
+      expect(edicion).toEqual({ status: 'error', code: caso.code, message: errorMessage(caso.code) })
+    }
+    expect(errorMessage('customer_duplicate_phone')).toBe('Este teléfono ya está registrado en otro cliente.')
   })
 })

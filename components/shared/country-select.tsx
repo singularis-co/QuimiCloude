@@ -99,6 +99,11 @@ export type CountrySelectProps = {
   readonly hideLabel?: boolean;
   /** En la hoja de teléfono el disparador muestra solo código y prefijo, p. ej. `CO +57`. */
   readonly compactOnMobile?: boolean;
+  /**
+   * Id de un error que pinta el consumidor fuera del campo, p. ej. bajo una fila de controles. Con
+   * él, `error` solo marca el disparador como inválido y lo enlaza: el campo no pinta el suyo.
+   */
+  readonly errorId?: string;
 };
 
 export function CountrySelect({
@@ -112,11 +117,12 @@ export function CountrySelect({
   pinned,
   hideLabel = false,
   compactOnMobile = false,
+  errorId: externalErrorId,
 }: CountrySelectProps) {
   const generatedId = useId();
   const baseId = id ?? generatedId;
   const labelId = `${baseId}-label`;
-  const errorId = `${baseId}-error`;
+  const errorId = externalErrorId ?? `${baseId}-error`;
   const listId = `${baseId}-list`;
 
   const isMobile = useIsMobile(SHEET_BREAKPOINT);
@@ -357,7 +363,7 @@ export function CountrySelect({
       <FieldError
         id={errorId}
         message={
-          error === undefined ? undefined : (
+          error === undefined || externalErrorId !== undefined ? undefined : (
             <span className="flex items-center gap-1.5">
               <CircleAlertIcon aria-hidden className="size-4 shrink-0" />
               {error}

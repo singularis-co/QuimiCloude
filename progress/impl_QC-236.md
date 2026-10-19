@@ -71,3 +71,127 @@
 ### Veredicto
 
 T1–T4 hechos y en verde salvo el test de formulario que rehace T9; quedan dos decisiones para el leader (sello de la migración y formato de CO).
+
+## T5 y T7 · backend_dev (persistencia, relleno, composición, action, script y build)
+
+### Archivos
+
+- **Creados (producción)**
+  - `lib/modules/clientes/domain/legacy-phone-backfill.ts` (`planLegacyPhoneBackfill`, puro)
+  - `lib/modules/clientes/domain/backfill-legacy-phones.ts` (`createBackfillLegacyPhones`, sin actor)
+  - `lib/modules/clientes/ports/legacy-phone-repository.ts`, `lib/modules/clientes/ports/company-country-lookup.ts`
+  - `lib/modules/clientes/adapters/driven/persistence/legacy-phone-prisma.ts`
+  - `scripts/backfill-customer-phones.ts`
+- **Modificados (producción)**
+  - `customer-prisma.ts`: `isPhoneUniqueViolation` (P2002 que nombra `customers_company_phone_e164_key` o `phone_e164`) → `'duplicate_phone'` en `create` y `updateAlive`; con `keep_legacy_or_clear`, transacción de dos `UPDATE` (ver Desviaciones 3).
+  - `lib/modules/clientes/index.ts` (barrel: plan, caso de uso y tipos)
+  - `lib/composition/index.ts`: `identity.getCompanyCountry`, `clientes.backfillLegacyPhones`, `legacyPhoneRepository`, `companyCountryLookup = identity.getCompanyCountry`
+  - `customer-actions.ts`: `phoneCountry` y `phoneNumber` en lugar de `phone`
+  - `scripts/build.mjs` (paso `RELLENAR_TELEFONOS`), `package.json` (`db:backfill:customer-phones`; sin dependencias), `scripts/seed-demo/gateway.ts` (`phoneCountry: 'CO'`, `phoneNumber`)
+- **Tests**
+  - Nuevo: `tests/unit/clientes/legacy-phone-backfill.test.ts`
+  - Nuevos, **escritos y NO corridos** (no hay base ni `.env`): `tests/integration/clientes/customer-phone-uniqueness.int.test.ts`, `tests/integration/clientes/legacy-phone-backfill.int.test.ts`; los dos en `aislamiento.json` como `commit` con motivo y `desde`.
+  - Ajustados: `tests/unit/clientes/customer-actions.test.ts` (campos nuevos + bloque QC-236), `tests/unit/clientes/scope.test.ts` (lista cerrada de archivos del módulo: +5), `tests/unit/scripts/build.test.ts`, `tests/unit/identity/seed/deploy-hook.test.ts`, `tests/guards/guard-despliegue-produccion.test.ts` (bloque nuevo del relleno).
+
+### Mapa R → test (T5, T7)
+
+| R | Test |
+| --- | --- |
+| R10 | int (no corrido) `customer-phone-uniqueness` «R10 — sin aviso y con el numero vacio el cliente queda sin telefono» y «R10 — …otra empresa sigue siendo not_found…»; `customer-actions.test.ts` «R3, R10 (QC-236) — sin campos de telefono…» |
+| R12 | int (no corrido) «R12 — un alta con el phone_e164 de otro cliente vivo…» y «R12 — una edicion que pone el numero de otro…»; `customer-actions.test.ts` «R8, R9, R12 (QC-236) — los tres errores del telefono salen con su code estable» |
+| R13 | int (no corrido) «R13 — …otra empresa», «R13 — …dado de baja…», «R13 — editar … conservando su propio numero…» |
+| R14 | int (no corrido) «R14 — dos altas simultaneas con el mismo numero dejan un solo cliente vivo» |
+| R24 | `legacy-phone-backfill.test.ts` «R24 — …» (×4, plan y caso de uso); int (no corrido) `legacy-phone-backfill` «R24, R25, R26 — convierte…» y «R24 — usa CO cuando la empresa no tiene pais…» |
+| R25 | `legacy-phone-backfill.test.ts` «R25 — lo que no se puede interpretar…»; int (no corrido) «R24, R25, R26 —…» |
+| R26 | `legacy-phone-backfill.test.ts` «R26 —…» (×4: más reciente por `createdAt`, empate por `id`, grupo entero si está en `taken`, nunca dos asignaciones); int (no corrido) «R24, R25, R26 —…» |
+| R27 | `legacy-phone-backfill.test.ts` «R27 — sin filas…», «R27 — sin empresas…»; int (no corrido) «R27 — deja phone, updated_at y updated_by byte a byte iguales…», «R27 — una segunda pasada no cambia ninguna fila…», «R27 — con cero clientes termina sin error» |
+| R28 | `build.test.ts` bloque «R28 (QC-236)…» (×3 entornos con base, ×3 sin base, fallo del relleno tumba el build); `deploy-hook.test.ts` «…los cinco pasos… (R19; R28 de QC-236)»; `guard-despliegue-produccion.test.ts` «R28 (QC-236) — en local, production y preview…» y «…el script npm del relleno…»; `legacy-phone-backfill.test.ts` «R28 — un fallo de una empresa se propaga» |
+| R32 | int (no corrido) «R32 — con aviso y un numero valido se reemplaza el phone antiguo…» |
+| R34 | int (no corrido) «R34 — con %s y el numero vacio se conservan…» (×2: `invalid_format`, `duplicate`) |
+| R1, R11 (action) | `customer-actions.test.ts` «R1, R11 (QC-236) — alta y edicion mandan phoneCountry y phoneNumber tal cual y ya no leen phone» |
+
+### Verificación (salida real, 2026-10-19)
+
+- `pnpm run typecheck` → sin errores.
+- `pnpm run lint` → `✖ 10 problems (0 errors, 10 warnings)`; los 10 en archivos que esta tanda no toca.
+- `pnpm exec vitest run guard` → `Test Files 1 failed | 80 passed (81)`, `Tests 2 failed | 1108 passed | 20 skipped`. Los 2 rojos son *timeouts* de 20 s de `guard-asignacion-componentizada` (ajena) con la máquina cargada; sola → `22 passed`.
+- `pnpm exec vitest related --run --project ui --project node <archivos de T5/T7>` → 32 rojos, todos en `tests/unit/clientes-ui/{customer-form,customer-sheet}` y paridad, que el frontend_dev estaba reescribiendo (T9) durante la corrida. Repetidos al terminar: `vitest run --project ui tests/unit/clientes-ui tests/unit/paridad tests/ui/clientes` → `35 passed`, `583 passed`.
+- Mis tests y las guardias que tocan lo mío, directos: `vitest run --project node tests/unit/clientes tests/unit/scripts/build.test.ts tests/unit/identity/seed/deploy-hook.test.ts tests/unit/shared/qc289-orden-por-defecto.test.ts tests/guards/{guard-despliegue-produccion,guard-ambito-empresa-clientes,guard-aislamiento-integracion,guard-arquitectura-modulos}.test.ts` → `Test Files 28 passed`, `Tests 455 passed | 5 skipped`.
+- **No corrido:** los dos `.int` nuevos (sin `DATABASE_URL`), las migraciones y `pnpm db:seed:demo` (no hay base). Los cuatro teléfonos demo (`+57 310 000 300x`) se comprobaron válidos con `libphonenumber-js/max` por `node -e`.
+
+### Desviaciones y bloqueos
+
+1. **Orden del paso en el build (R28 dice «justo después de `migrate deploy`»).** El relleno va en `[migrate, generate, relleno, seed, …]`, no antes de `generate`: lee las columnas nuevas con el cliente Prisma, y `build.mjs`/`deploy-hook.test.ts` ya documentan que Vercel cachea `node_modules` con el cliente viejo (por eso el seed va tras `generate`). Antes de `generate` fallaría en Vercel. Sigue siendo el primer paso que usa la base tras migrar, y su fallo tumba el build. **Confirmar con el humano**; si no se acepta, es mover una constante.
+2. **`listCompaniesWithPending` del puerto no existe.** Una consulta de `customers` que cruce empresas la prohíbe `guard-ambito-empresa-clientes` («`clientes` NO tiene ninguna consulta sin ámbito aprobada», sin lista de excepciones). Se usa el precedente de `expireStaleOrders`: el caso de uso recibe `listCompanyIds` = `listActiveCompanyIds` de `identity` y procesa cada empresa con `processCompany(plan, scope)`. Consecuencia: los clientes de una empresa **dada de baja** no se rellenan (no se ven en ninguna pantalla).
+3. **Sin `SELECT … FOR UPDATE`.** Lo exigiría SQL crudo con `company_id`, que la misma guardia prohíbe leer fuera de `company-scope.ts`. Equivalente sin crudo:
+   - edición con `keep_legacy_or_clear`: transacción con un `UPDATE` de los datos (bloquea la fila) y un segundo `UPDATE` que vacía el teléfono con `phone_issue IS NULL` en el `where`; Postgres decide con la fila bloqueada;
+   - relleno: cada `UPDATE` repite la condición de pendiente en el `where`, así que una fila editada entre la lectura y la escritura se salta. El choque con el índice (alta concurrente) deshace la empresa y se reintenta una vez, como dice el diseño.
+4. **`isPhoneUniqueViolation` reconoce el nombre del índice o la columna `phone_e164`.** En este repo, con `@prisma/client@6.19.3`, `meta.target` de un índice parcial llega como columnas (medido en `user-admin-prisma.ts`); el nombre solo no bastaría. `phone_e164` no está en ningún otro índice único de `customers`.
+5. **`phone_country` de un duplicado** es el país del número interpretado (igual al por defecto salvo que el texto traiga `+` de otro país); el de un `invalid_format`, el país por defecto usado.
+6. **`pnpm db:seed:demo` no se corrió** (T7 «Hecho cuando»): no hay base.
+
+### Veredicto
+
+T5 y T7 implementados, typecheck/lint/guardias/tests unitarios en verde; los dos `.int` están escritos sin correr y quedan dos puntos para el humano (orden del paso del build y no rellenar empresas dadas de baja).
+
+## T9 · frontend_dev (`CustomerPhoneField` y `CustomerForm`)
+
+### Archivos
+
+- **Creados**
+  - `app/(private)/clientes/components/customer-phone-field.tsx` (en el barrel `index.ts`)
+  - `tests/ui/clientes/customer-phone-field.test.tsx`
+- **Modificados (producción)**
+  - `app/(private)/clientes/components/{customer-form.tsx, customer-sheet.tsx, customer-row-actions.tsx, customer-table.tsx, customer-list-section.tsx, index.ts}`
+  - `components/shared/country-select.tsx` + su fila en `components/shared/CATALOGO.md`: prop opcional `errorId` (ver Desviaciones 1)
+- **Modificados (tests, solo lo que toca al teléfono)**
+  - `tests/unit/clientes-ui/customer-form.test.tsx`: el de «el máximo de los tres opcionales» (rojo heredado) ahora usa `phoneNumber`; los demás casos que leían `phone` pasan a `phoneCountry`/`phoneNumber`; «aceptan texto sin formato» queda solo para el correo (el teléfono ya se valida, D1); el fixture lleva `phoneE164`.
+  - `tests/unit/clientes-ui/{customer-form,customer-sheet}.test.tsx`, `tests/unit/paridad/formularios-paridad.test.tsx`: `setViewportWidth`/`resetViewport` (el `CountrySelect` usa `matchMedia`, que jsdom no trae).
+  - `tests/unit/clientes-ui/clientes-viewport.test.tsx`: el disparador del país se mide aparte (16 px sin `md:text-sm` y 44 × 44).
+  - `tests/unit/paridad/campos-paridad.test.tsx` → `customer-field-phone-number`; instantáneas de cliente regeneradas con `-u -t` (solo `paridad de formularios — cliente` y el campo de teléfono; 8).
+
+### Mapa R → test (T9, `tests/ui/clientes/customer-phone-field.test.tsx`)
+
+| R | Caso |
+| --- | --- |
+| R1 | «R1 — un grupo «Teléfono» con el selector … y el número …, opcional» |
+| R2 | «R2 — en el alta con país de empresa, ese país viene marcado» |
+| R3 | «R3 — en el alta sin país de empresa, el selector queda en «Sin país»» |
+| R4 | «R4 — la edición de un cliente con phone_e164 muestra su país y el número en formato nacional» |
+| R5 | «R5 — con país de empresa, la lista abre con el grupo «País de la empresa» arriba» |
+| R6 | «R6 — mientras se escribe no se reformatea; al salir del campo queda en formato nacional» |
+| R7 | «R7 — pegar un número con +593 marca Ecuador…», «R7 — escribir un número con + y salir…», «R7 — un prefijo que no identifica un único país…» |
+| R8 | «R8 — número sin país: no se guarda y … enlazado al selector», «R8 — el código customer_phone_country_required del servidor…» |
+| R9 | «R9 — … al salir del campo, enlazado al número», «R9 — al guardar un número no válido…», «R9 — el código customer_phone_invalid del servidor…» |
+| R10 | «R10 — con el número vacío y un país marcado se guarda sin error…» |
+| R11 | «R11 — un número válido viaja como phoneCountry y phoneNumber» |
+| R12 | «R12 — customer_duplicate_phone del servidor se pinta bajo el número…», «R12 — el duplicado sigue a la vista si se sale del número sin cambiarlo» |
+| R31 | «R31 — sin formato válido: …», «R31 — duplicado: …», «R31 — un cliente sin aviso no muestra etiqueta» |
+| R32 | «R32 — guardar un migrado con un número válido lo manda…» |
+| R33 | «R33 — a 390 px el país es compacto (CO +57…) y el número mide 48 px con letra de 16 px» |
+| R34 | «R34 — guardar un migrado con el número vacío manda phoneNumber vacío y no pinta ningún error» |
+
+Los textos con formato se derivan de `formatPhoneNational` (p. ej. `NATIONAL = formatPhoneNational('573001234567', 'CO')`); ninguno fija `300 123 4567` ni `300 1234567`.
+
+### Verificación (salida real, 2026-10-19)
+
+- `pnpm run typecheck` → exit 0.
+- `pnpm run lint` → `✖ 10 problems (0 errors, 10 warnings)`, los mismos 10 avisos previos de archivos que T9 no toca.
+- `pnpm exec vitest related --run --project ui --project node <7 de la ruta + country-select.tsx + 6 tests>` → `Test Files 33 passed (33)`, `Tests 609 passed (609)`. La primera pasada dio 32 rojos (`matchMedia` ausente en tres archivos y 7 instantáneas de cliente); corregidos como se lista arriba.
+- `pnpm exec vitest run guard` → `Test Files 81 passed (81)`, `Tests 1110 passed | 20 skipped (1130)`.
+
+### Desviaciones y puntos abiertos
+
+1. **`CountrySelect` gana `errorId` (opcional, paso 2 de la regla de decisión).** El tablero pinta «Elige el país del teléfono.» bajo toda la fila, y el `FieldError` interno del selector solo se puede pintar dentro de su columna (112 px en teléfono) y sin `data-testid`. Con `errorId`, el selector marca el disparador `aria-invalid` y lo enlaza por `aria-describedby`, y el error lo pinta `CustomerPhoneField` bajo la fila con `customer-error-phone-country`. Sin la prop no cambia nada; fila del catálogo actualizada.
+2. **El error del número va bajo el número**, en su columna (el `FieldError` de `TextField`), no bajo toda la fila como en el tablero: `TextField` no deja pintarlo fuera.
+3. **Sin placeholder en el número:** `TextField` no tiene la prop, y el `300 123 4567` del tablero es justo el formato pendiente de decisión.
+4. **Sin `qc-err`:** en la app no existe esa animación ni `FieldError` la aplica; el error entra sin animar, como el resto de errores de campo.
+5. **El disparador del país mide 44 px en teléfono**, no 48: es el alto de `CountrySelect` (T8). El número sí mide 48 px por debajo de `lg` (`max-lg:min-h-12`); «tablet» se toma como < 1024 px.
+6. **Ayudas del alta** del tablero («Opcional. El país viene marcado…» / «Opcional. Elige el país…») y la del migrado van bajo la fila, enlazadas al `role="group"` por `aria-describedby`, no al número.
+7. **Los valores tras un fallo** (§ 8.1) no se pasan como prop: el número y el país son estado controlado del campo y React no los borra al resetear el formulario. Los `data-testid` se pasan como objeto `testIds`, no como una base.
+8. **Edición de un cliente sin teléfono:** el país sale de su `phone_country` (nulo → «Sin país»), no del de la empresa; el spec solo fija el alta (R2) y el cliente con número (R4). Decisión del humano si se quiere el de la empresa.
+9. **`companyCountry` es opcional (`?: CountryCode | null`, por defecto `null`)** en `CustomerListSection`, `CustomerTable`, `CustomerRowActions`, `CustomerSheet` y `CustomerForm` hasta que T10 lo pase desde `page.tsx`. Hasta entonces el alta abre en «Sin país».
+
+### Veredicto
+
+T9 hecho: campo de teléfono con país en alta y edición, errores bajo el campo y `companyCountry` bajando por la ruta; typecheck, lint, tests relacionados y guardias en verde.

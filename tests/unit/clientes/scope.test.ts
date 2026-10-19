@@ -116,9 +116,11 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       // QC-156: el adaptador del servicio que `clientes` ofrece a otros modulos.
       'adapters/driven/persistence/customer-catalog-prisma.ts',
       'adapters/driven/persistence/customer-prisma.ts',
+      'adapters/driven/persistence/legacy-phone-prisma.ts',
       'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driving/customer-actions.ts',
       'domain/actor.ts',
+      'domain/backfill-legacy-phones.ts',
       'domain/create-customer.ts',
       // QC-156: el contrato de ese servicio.
       'domain/customer-catalog.ts',
@@ -133,13 +135,16 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'domain/delete-customer.ts',
       'domain/errors.ts',
       'domain/get-customer.ts',
+      'domain/legacy-phone-backfill.ts',
       'domain/list-customers.ts',
       'domain/list-query.ts',
       'domain/page.ts',
       'domain/phone-matches-wa-id.ts',
       'domain/update-customer.ts',
       'index.ts',
+      'ports/company-country-lookup.ts',
       'ports/customer-repository.ts',
+      'ports/legacy-phone-repository.ts',
       'ports/list-query-log.ts',
     ]
     const archivosReales = filesIn(moduloDir, /\.tsx?$/)
