@@ -22,6 +22,12 @@
 > el detalle (`app/(private)/maestro/empresas/[id]/page.tsx:108-121`). Rutas, nombres, citas,
 > tests y guardias: lista completa con citas en `design.md > 0. Enmienda contra dev (2026-10-19)`
 > (E1–E16).
+>
+> **Enmienda tras la tanda 1 (2026-10-19, Carlos Restrepo).** Tres decisiones del humano
+> (`progress/features/QC-278.md > Decisiones`, última entrada): (a) las descripciones e iconos de
+> los añadidos viven en `lib/shared/ui/`, no en `app/` (sin cambio de comportamiento; solo
+> `design.md`); (b) **R16** añade la línea «El interruptor vuelve a su posición anterior.»; (c)
+> **R12** gana su forma en singular. Detalle y citas: `design.md > 0.1` (E17–E19).
 
 ## Requisitos (EARS)
 
@@ -93,6 +99,11 @@ Vocabulario (el de **QC-277**):
   - los nombres de los añadidos que se apagan y el nombre de la empresa;
   - lo que se descarta, sin repetir líneas;
   - «Volver», que cierra sin guardar, y «Apagar todos», que guarda.
+
+  DONDE solo haya un añadido prendido, el título DEBE ser «¿Apagar el módulo prendido?» y el
+  texto DEBE ir en singular («<nombre> desaparece para todos los usuarios de <empresa> desde su
+  siguiente acción. Lo ya confirmado no se borra.»), con el resto igual (enmienda 2026-10-19, mismo
+  criterio que la pregunta 4).
 - **R13** — MIENTRAS no haya ningún añadido apagado, «Prender todos» DEBE estar deshabilitado.
   MIENTRAS no haya ningún añadido prendido, «Apagar todos» DEBE estar deshabilitado.
 - **R14** — MIENTRAS una escritura está en curso, el sistema DEBE:
@@ -106,7 +117,9 @@ Vocabulario (el de **QC-277**):
     «Se prendió 1 módulo.» o «Se apagó 1 módulo.» (pregunta 4 cerrada).
 - **R16** — SI una escritura de un solo añadido falla, ENTONCES el sistema DEBE devolver su
   interruptor a la posición anterior y mostrar junto a su fila el aviso de error «No se guardó el
-  cambio», con el mensaje del catálogo de errores y la referencia si el error es inesperado.
+  cambio», con el mensaje del catálogo de errores y la referencia si el error es inesperado, y
+  bajo él la línea «El interruptor vuelve a su posición anterior.» (enmienda 2026-10-19,
+  `docs/diseno/canvas/ModalesMaestro.dc.html` l. 114).
 - **R17** — SI «Prender todos» o «Apagar todos» falla, ENTONCES el sistema DEBE dejar todos los
   interruptores como estaban y mostrar el mismo aviso de error bajo los dos botones.
 - **R18** — CUANDO el Maestro cambia de nuevo un interruptor o pulsa un botón, el sistema DEBE

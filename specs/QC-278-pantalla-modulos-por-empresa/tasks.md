@@ -9,6 +9,10 @@
 > esperan a nadie; los tests van a las carpetas de QC-166 (`tests/ui/maestro/`,
 > `tests/unit/maestro/`); T6 pone siempre el montaje, reescribe dos casos de QC-166 R30 y da de
 > alta el E2E en su guardia. Detalle y citas: `design.md > 0` (E1–E16).
+>
+> **Enmienda tras la tanda 1 (2026-10-19).** T6b, nueva, entre T6 y T7: descripciones e iconos a
+> `lib/shared/ui/addon-details.ts`, línea bajo el error de la fila (R16) y «Apagar todos» en
+> singular (R12). Detalle: `design.md > 0.1` (E17–E19).
 
 ## Tasks
 
@@ -82,7 +86,31 @@
     verificación manual en 390 px y 768 px contra `MaestroEmpresaMovil.dc.html` y
     `MaestroEmpresaTablet.dc.html` anotada en el `impl`.
 
-- [ ] **T7 — Cierre** · depende de T6
+- [ ] **T6b — Enmienda tras la tanda 1** (R5, R12, R16; design § 0.1, E17–E19) · depende de T6
+  - `lib/shared/ui/addon-details.ts` (nuevo): `ADDON_DETAILS` como `Record<AddonNameKey, {
+    description; icon }>`, con las descripciones de la pregunta 1 y los iconos que hoy están en
+    `addon-labels.ts` (design § 5). Sin importar dominio.
+  - `addon-labels.ts`: quita descripciones e iconos; arma `ADDON_LABELS` iterando las claves de
+    `ADDON_NAMES` con `ADDON_DETAILS`, sin ninguna clave ni texto literal de añadido.
+  - `addon-off-consequences.ts`: `OFF_CONSEQUENCES` como `Partial<Record<Addon, …>>` sin la entrada
+    vacía de `proveedores` (y sin las demás vacías), con `?? []`.
+  - `components/shared/CATALOGO.md`: fila de `ADDON_DETAILS` en `## Apoyos — lib/shared/ui y
+    hooks` y, en la de `ADDON_NAMES` (l. 111), el «No cubre» remitiendo a `ADDON_DETAILS`.
+  - `addon-switch-list.tsx`: bajo el `ErrorAlert` de la **fila**, la línea de apoyo «El
+    interruptor vuelve a su posición anterior.» (no bajo el de «todos»); diálogo de «Apagar
+    todos» con un solo añadido: «¿Apagar el módulo prendido?» y «<A> desaparece para todos los
+    usuarios de <empresa> desde su siguiente acción. Lo ya confirmado no se borra.».
+  - Tests: `tests/unit/maestro/addon-labels.test.ts` (R5 compara también descripción e icono con
+    `ADDON_DETAILS`); `tests/ui/maestro/addon-switch-list.test.tsx` (caso nuevo «R12: con un solo
+    añadido prendido, Apagar todos va en singular»; el caso R16 afirma la línea bajo la fila y su
+    ausencia en el error de «todos», R17).
+  - **Hecho:** `pnpm exec vitest run tests/unit/proveedores/module-contract.test.ts` en verde **sin
+    tocar la guardia**; `rg -i "proveedores|supplier" "app/(private)/maestro"` sin resultados;
+    `pnpm exec vitest run guard` en verde (incluida `guard-catalogo-de-componentes`); los casos
+    R5, R12, R16 y R17 del mapa (design § 7.1) pasan; quitar una clave de `ADDON_DETAILS` rompe el
+    typecheck.
+
+- [ ] **T7 — Cierre** · depende de T6b
   - Mapa `R<n> → test` en `progress/impl_QC-278-pantalla-modulos-por-empresa.md`.
   - Guardias (`pnpm exec vitest run guard`) y `./init.sh` en verde.
   - **Hecho:** las 25 filas del mapa tienen test que pasa; ningún componente de esta ficha en
@@ -107,6 +135,11 @@ Nuevos:
 - `tests/ui/maestro/company-modules-tab.test.tsx`
 - `e2e/maestro-modulos.spec.ts`
 - `progress/impl_QC-278-pantalla-modulos-por-empresa.md`
+- `lib/shared/ui/addon-details.ts` (T6b, enmienda E17)
+
+Modificados (catálogo compartido, T6b):
+
+- `components/shared/CATALOGO.md`
 
 Modificados (de QC-166, ya en `dev`; los pone esta ficha en T6):
 

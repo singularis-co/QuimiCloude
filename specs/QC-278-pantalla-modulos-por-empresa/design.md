@@ -6,6 +6,8 @@
 > **Spec aprobado el 2026-10-19** («Apruebo con defectos», P1–P4 con su defecto) y **enmendado el
 > mismo día contra `dev`** (merge `a01b5c11`, que trae QC-166 y QC-263): ver § 0. La enmienda solo
 > corrige rutas, nombres, citas, tests y tareas; no cambia el comportamiento de R1–R25.
+> **Segunda enmienda el mismo día, tras la tanda 1** (§ 0.1, E17–E19): descripciones e iconos a
+> `lib/shared/ui/`, línea bajo el error de la fila (R16) y «Apagar todos» en singular (R12).
 
 ## 0. Enmienda contra dev (2026-10-19)
 
@@ -37,6 +39,18 @@ QC-263): `StatusBadge` con tonos `success`, `waiting`, `muted` (`lib/shared/ui/s
 `Notice` con `tone="warning"` (`components/shared/notice.tsx:10`), `ErrorAlert` con `before`
 (`components/shared/error-alert.tsx:22`), `Badge` `outline`, `Skeleton`, `Spinner`, y las filas del
 catálogo citadas abajo. QC-263 no toca nada de lo que usa esta ficha.
+
+### 0.1 Enmienda 2026-10-19 tras la tanda 1
+
+Decisiones de Carlos Restrepo tras el gate rojo de la tanda 1 (`progress/features/QC-278.md >
+Decisiones`, última entrada). E17 no cambia comportamiento; E18 y E19 sí, y por eso enmiendan R16
+y R12.
+
+| # | Qué decía el spec | Qué hay | Qué cambia aquí |
+|---|---|---|---|
+| E17 | Descripciones e iconos en `components/modulos/addon-labels.ts`, con un `Record<Addon, …>` de claves literales (§ 5; alternativa D) | La guardia `tests/unit/proveedores/module-contract.test.ts:364-376` prohíbe `/proveedores\|supplier/i` en el contenido sin comentarios de **todo** `app/` fuera de `app/(private)/proveedores`. Hoy la rompen `addon-labels.ts:25-27` (clave `proveedores`, `ADDON_NAMES.proveedores` y la descripción) y `addon-off-consequences.ts:8` (clave `proveedores: []`). La guardia **no se toca** | Descripciones **e iconos** (el mapa de iconos también lleva la clave) se mueven a un archivo hermano, `lib/shared/ui/addon-details.ts` (`ADDON_DETAILS`, `Record<AddonNameKey, …>`), junto a `ADDON_NAMES`; `lib/shared/**` puede importar paquetes npm (`docs/architecture.md:399`; precedente `lucide-react` en `lib/shared/navigation/nav-icons.ts:19`). Ningún archivo de esta ficha bajo `app/` contiene la palabra: `ADDON_LABELS` se arma **iterando** las claves de `ADDON_NAMES`, y `OFF_CONSEQUENCES` pasa a `Partial<Record<Addon, …>>` solo con los tres que descartan algo (`?? []`). El E2E (`e2e/`) y los tests (`tests/`) no están bajo `app/` y no les aplica. Al ser `lib/shared/ui/`, lleva fila en `components/shared/CATALOGO.md > Apoyos` (lo exige `tests/guards/guard-catalogo-de-componentes.test.ts:137`) y el «No cubre» de la fila de `ADDON_NAMES` (l. 111) pasa a remitir a `ADDON_DETAILS`. § 4, § 5, § 8 D, § 10 |
+| E18 | R16: `ErrorAlert` «No se guardó el cambio» junto a la fila, sin más texto | El tablero pinta bajo el aviso `<p class="cap">El interruptor vuelve a su posición anterior.</p>` (`docs/diseno/canvas/ModalesMaestro.dc.html:114`) | R16 añade esa línea, en texto de apoyo, bajo el `ErrorAlert` de la **fila** (no en el de «todos», R17). § 4.2 |
+| E19 | R12: título «¿Apagar los <n> módulos prendidos?» y «<A>, <B> y <C> desaparecen…» siempre en plural | Con un solo añadido prendido saldría «¿Apagar los 1 módulos prendidos?» y «<A> desaparecen» | Con un solo añadido: «¿Apagar el módulo prendido?» y «<A> desaparece para todos los usuarios de **<empresa>** desde su siguiente acción. Lo ya confirmado no se borra.». Botón, lista y acción iguales (sigue `setAllCompanyAddonsAction`, § 4.2 `via`). Mismo criterio que P4. § 4.3 |
 
 ## Lo que ya existe
 
@@ -178,10 +192,16 @@ app/(private)/maestro/empresas/[id]/components/modulos/
   modules-skeleton.tsx           ← Server: «Cargando los módulos…», role="status" + aria-busy, 4 Skeleton de 68 px (R3; patrón CompanyHistorySkeleton)
   addon-switch-list.tsx          ← 'use client': estado, escrituras, diálogo, toasts, errores (R5–R18, R20–R24)
   core-module-chips.tsx          ← Server: sección «Núcleo» con 11 Badge y candado (R19)
-  addon-labels.ts                ← nombres, descripciones, iconos y textos de toast por añadido (§ 5)
+  addon-labels.ts                ← ADDON_LABELS armado por iteración de ADDON_NAMES + ADDON_DETAILS; textos de toast (§ 5)
   core-modules.ts                ← nombres del núcleo, en orden (§ 5)
   addon-off-consequences.ts      ← qué se descarta al apagar, y el armado de la lista sin repetir (R10, R12)
+
+lib/shared/ui/
+  addon-details.ts               ← descripción e icono de cada añadido, junto a addon-names.ts (enmienda E17)
 ```
+
+Ningún archivo de `components/modulos/` contiene «proveedores» ni «supplier» (guardia
+`tests/unit/proveedores/module-contract.test.ts:364-376`; enmienda E17).
 
 ### 4.1 `ModulesSection` (Server, async)
 
@@ -255,7 +275,9 @@ function write(addons: readonly Addon[], enabled: boolean, via: 'one' | 'all') {
 - **Una escritura a la vez** (R14): mientras hay una en vuelo, todo queda deshabilitado. Ver la
   alternativa B de § 8.
 - **Errores**: `<ErrorAlert error={…} before={<b>No se guardó el cambio</b>} />` bajo la fila
-  (`at === addon`) o bajo los botones (`at === 'all'`), con `role="alert"` (R16, R17). El mensaje
+  (`at === addon`) o bajo los botones (`at === 'all'`), con `role="alert"` (R16, R17). Bajo el de
+  la **fila**, y solo ahí, un `<p>` de texto de apoyo «El interruptor vuelve a su posición
+  anterior.» (R16, enmienda E18; `ModalesMaestro.dc.html:114`). El mensaje
   sale del catálogo de errores (`company_not_found` si la empresa se dio de baja mientras tanto,
   `unauthorized`, inesperado con referencia).
 - **`via`**: «Prender todos» y «Apagar todos» usan siempre `setAllCompanyAddonsAction`
@@ -277,6 +299,11 @@ function write(addons: readonly Addon[], enabled: boolean, via: 'one' | 'all') {
 | Cuerpo | «Desaparece del menú y de las pantallas de todos los usuarios de **<empresa>** desde su siguiente acción. Lo ya confirmado no se borra.» | «<A>, <B> y <C> desaparecen para todos los usuarios de **<empresa>** desde su siguiente acción. Lo ya confirmado no se borra.» |
 | Lista | `offConsequences([addon], view)` | `offConsequences(prendidos, view)` |
 | Botones | «Volver» · «Apagar» | «Volver» · «Apagar todos» |
+
+**«Todos» con un solo añadido prendido** (R12, enmienda E19): título «¿Apagar el módulo
+prendido?» y cuerpo «<A> desaparece para todos los usuarios de **<empresa>** desde su siguiente
+acción. Lo ya confirmado no se borra.». Lista, botones y acción (`setAllCompanyAddonsAction`) no
+cambian.
 
 `offConsequences(addons, view)` (en `addon-off-consequences.ts`, pura):
 
@@ -301,32 +328,41 @@ excepción de escritorio.**
 
 ## 5. Dónde viven las etiquetas (no existen en código)
 
-En la carpeta de la pestaña, **no en el dominio**:
+**No en el dominio.** Descripciones e iconos en `lib/shared/ui/`, junto a los nombres (enmienda
+E17); en la carpeta de la pestaña solo el armado, sin ninguna clave literal:
 
 ```ts
-// addon-labels.ts
-import type { Addon } from '@/lib/modules/identity';   // solo el tipo (index.ts:413): no arrastra servidor al cliente
-import { ADDON_NAMES } from '@/lib/shared/ui/addon-names';   // de QC-166, en dev: fuente única de los nombres
-// `ADDON_NAMES` está tipado con `AddonNameKey`, igual a `Addon` (tests/unit/shared/addon-names.test.ts:8):
-// `ADDON_NAMES[addon]` con `addon: Addon` compila sin conversión.
+// lib/shared/ui/addon-details.ts  (hermano de addon-names.ts; no importa dominio)
+import type { LucideIcon } from 'lucide-react';
+import type { AddonNameKey } from './addon-names';
 
-const ADDON_DETAILS: Readonly<Record<Addon, { description: string; icon: LucideIcon }>> = {
-  dashboard:         { description: '…', icon: LayoutDashboard },
-  proveedores:       { description: '…', icon: Truck },
-  lectura_pdf:       { description: '…', icon: FileText },
-  importacion_excel: { description: '…', icon: Sheet },
-  integraciones:     { description: 'Proveedor IA, Inventarios y WhatsApp.', icon: Puzzle },
+export const ADDON_DETAILS: Readonly<Record<AddonNameKey, { description: string; icon: LucideIcon }>> = {
+  /* una entrada por cada AddonNameKey: descripción de P1 e icono de lucide-react (abajo) */
 };
-
-export const ADDON_LABELS: Readonly<Record<Addon, { name: string; description: string; icon: LucideIcon }>> =
-  /* por cada clave: { name: ADDON_NAMES[addon], ...ADDON_DETAILS[addon] } */;
 ```
 
-- **`Record<Addon, …>`**: un sexto añadido en `ADDONS` rompe el typecheck hasta tener etiqueta.
+```ts
+// app/(private)/maestro/empresas/[id]/components/modulos/addon-labels.ts
+import type { Addon } from '@/lib/modules/identity';   // solo el tipo (index.ts:413): no arrastra servidor al cliente
+import { ADDON_NAMES, type AddonNameKey } from '@/lib/shared/ui/addon-names';   // de QC-166: fuente única de los nombres
+import { ADDON_DETAILS } from '@/lib/shared/ui/addon-details';                   // enmienda E17
+// `AddonNameKey` es igual a `Addon` (tests/unit/shared/addon-names.test.ts:8): se indexa sin conversión.
+
+export const ADDON_LABELS: Readonly<Record<Addon, { name: string; description: string; icon: LucideIcon }>> =
+  /* Object.fromEntries((Object.keys(ADDON_NAMES) as AddonNameKey[])
+       .map((addon) => [addon, { name: ADDON_NAMES[addon], ...ADDON_DETAILS[addon] }])) */;
+```
+
+- **Sin claves literales en `app/`** (E17): `ADDON_LABELS` se arma iterando `ADDON_NAMES`;
+  `addon-off-consequences.ts` usa `Partial<Record<Addon, readonly string[]>>` solo con
+  `lectura_pdf`, `importacion_excel` e `integraciones`, y `?? []` para el resto.
+- **`Record<AddonNameKey, …>`** en `ADDON_DETAILS`: un sexto añadido en `ADDON_NAMES` (y por el
+  test de tipos, en `ADDONS`) rompe el typecheck hasta tener descripción e icono.
 - **Nombres**: **no se escriben aquí**. Salen de `ADDON_NAMES` (`lib/shared/ui/addon-names.ts:9-15`,
   en `dev` desde QC-166, que ya lo usa en `company-event-text.ts:27`): los del tablero, que son
-  los de QC-277 D3 con mayúscula inicial. Esta ficha no edita ese archivo ni su fila del catálogo
-  (`components/shared/CATALOGO.md:111`, que deja descripción e icono a quien pinta).
+  los de QC-277 D3 con mayúscula inicial. Esta ficha no edita ese archivo; de su fila del catálogo
+  (`components/shared/CATALOGO.md:111`) solo cambia el «No cubre: descripción ni icono», que pasa a
+  remitir a `ADDON_DETAILS`, y se añade la fila de `ADDON_DETAILS` en `## Apoyos` (E17).
 - **Descripciones**: las de la pregunta 1, **cerrada el 2026-10-19 con el texto propuesto**. La de
   Integraciones ya está en el tablero.
 - **Iconos**: de `lucide-react`; el tablero dibuja trazos propios y no nombra el icono, así que el
@@ -361,10 +397,12 @@ QC-166 (enmienda E6): componentes en `tests/ui/maestro/`, puros en `tests/unit/m
 | `tests/ui/maestro/company-modules-tab.test.tsx` | ui | R1 (props, sin leer sesión: ningún archivo de `components/modulos/` importa `@/lib/composition`, `next/headers`, `assertPermission` ni `requirePagePermission`, enmienda E9), R2 (una llamada con el `companyId`), R3 (el `fallback` del `Suspense` es `ModulesSkeleton`; el esqueleto pinta «Cargando los módulos…» en `role="status"`), R4 (error → título, mensaje, referencia y «Reintentar»; sin `switch` ni Núcleo) |
 | `tests/ui/maestro/addon-switch-list.test.tsx` | ui | R5–R18, R20–R24 (ver mapa) |
 | `tests/ui/maestro/core-module-chips.test.tsx` | ui | R19 (11 fichas en orden, sin `switch` ni botón) |
-| `tests/unit/maestro/addon-labels.test.ts` | unit | R5 (una etiqueta por cada `ADDONS`, ni una más), R15 (`changedAddons`, mensajes singular y plural), R10/R12 (`offConsequences`: líneas por añadido, sin repetir, regla de Integraciones) |
+| `tests/unit/maestro/addon-labels.test.ts` | unit | R5 (una etiqueta por cada `ADDONS`, ni una más; nombre, descripción e icono tomados de `ADDON_NAMES` y `ADDON_DETAILS`, E17), R15 (`changedAddons`, mensajes singular y plural), R10/R12 (`offConsequences`: líneas por añadido, sin repetir, regla de Integraciones) |
 | `e2e/maestro-modulos.spec.ts` | E2E (Playwright) | R25 |
 | `tests/ui/maestro/company-detail-page.test.tsx` (de QC-166, **se modifica**) | ui | R1 (montaje): los dos casos de QC-166 R30 de las l. 240-253 se reescriben (enmienda E5): con `tab=modulos` el panel «Módulos» contiene la pestaña montada con `companyId`, `companyName`, `isDeleted` y `canModify` de la página, y `page.tsx` sigue sin importar ni llamar a `getCompanyAddonsAction` (la llama la pestaña) |
 | `tests/guards/guard-identificador-de-request.test.ts` (**se modifica**) | guardia | Alta de `maestro-modulos.spec.ts` en `E2E_ESPERADOS` (l. 57-503) con su motivo (enmienda E14) |
+| `tests/unit/proveedores/module-contract.test.ts` (**no se toca**) | guardia | Debe quedar en verde: ningún archivo de esta ficha bajo `app/` menciona «proveedores» ni «supplier» (enmienda E17) |
+| `tests/guards/guard-catalogo-de-componentes.test.ts` (**no se toca**) | guardia | Debe quedar en verde con la fila nueva de `ADDON_DETAILS` en `CATALOGO.md` (enmienda E17) |
 
 ### 7.1 Mapa `R<n> → test`
 
@@ -381,11 +419,11 @@ QC-166 (enmienda E6): componentes en `tests/ui/maestro/`, puros en `tests/unit/m
 | R9 | `addon-switch-list.test.tsx` «R9: prender un añadido llama a setCompanyAddonAction sin diálogo» |
 | R10 | `addon-switch-list.test.tsx` «R10: apagar un añadido abre la confirmación con su nombre, la empresa y lo que se descarta», «R10: Volver cierra sin escribir»; `addon-labels.test.ts` «R10: Integraciones solo avisa de la lectura si está prendida» |
 | R11 | `addon-switch-list.test.tsx` «R11: Prender todos llama a setAllCompanyAddonsAction con enabled=true sin diálogo» |
-| R12 | `addon-switch-list.test.tsx` «R12: Apagar todos confirma con el número, los nombres y las consecuencias sin repetir» |
+| R12 | `addon-switch-list.test.tsx` «R12: Apagar todos confirma con el número, los nombres y las consecuencias sin repetir», «R12: con un solo añadido prendido, Apagar todos va en singular» (E19) |
 | R13 | `addon-switch-list.test.tsx` «R13: Prender todos deshabilitado sin apagados y Apagar todos sin prendidos» |
 | R14 | `addon-switch-list.test.tsx` «R14: mientras guarda hay spinner en el interruptor afectado y todo deshabilitado» |
 | R15 | `addon-switch-list.test.tsx` «R15: con éxito pinta la vista devuelta sin releer y avisa por toast»; `addon-labels.test.ts` «R15: mensajes de toast en singular y plural» |
-| R16 | `addon-switch-list.test.tsx` «R16: si falla uno, el interruptor vuelve y aparece No se guardó el cambio junto a su fila» |
+| R16 | `addon-switch-list.test.tsx` «R16: si falla uno, el interruptor vuelve y aparece No se guardó el cambio junto a su fila» (con la línea «El interruptor vuelve a su posición anterior.» bajo el aviso de la fila y no bajo el de «todos», E18) |
 | R17 | `addon-switch-list.test.tsx` «R17: si falla todos, nada cambia y el error va bajo los botones» |
 | R18 | `addon-switch-list.test.tsx` «R18: el siguiente cambio quita el error anterior» |
 | R19 | `core-module-chips.test.tsx` «R19: once fichas del núcleo con candado y nada pulsable» |
@@ -463,12 +501,15 @@ seguidos sin esperar; para eso está «Prender todos».
 mantener una vista provisional y a deshacerla; con el interruptor controlado por la última vista
 del servidor, R16 («vuelve a su posición») sale gratis y R22 se cumple por construcción.
 
-**D. Etiquetas en el dominio (`identity/domain/company-addons.ts`), o todas en `lib/shared/ui/`.**
-Se descarta: el dominio no lleva textos de pantalla. De `lib/shared/ui/` sube **solo lo que usan
-dos rutas**: los nombres, que también pinta el Historial de QC-166 («Prendió Proveedores»), y que
-por eso QC-166 crea en `lib/shared/ui/addon-names.ts`. Descripciones e iconos solo los usa esta
-pestaña y se quedan en su carpeta. **Repetir los nombres aquí** también se descarta: dos copias
-divergen.
+**D. Etiquetas en el dominio (`identity/domain/company-addons.ts`).** Se descarta: el dominio no
+lleva textos de pantalla. **Repetir los nombres aquí** también se descarta: dos copias divergen.
+*(Enmienda E17.)* El spec original dejaba descripciones e iconos en la carpeta de la pestaña
+porque solo los usa una ruta; se descartó tras la tanda 1: un mapa con la clave `proveedores` en
+`app/` rompe `tests/unit/proveedores/module-contract.test.ts:364-376`. **D2. Relajar esa guardia**
+(excepción para `components/modulos/`) también se descarta, por decisión del humano: la guardia
+cierra que nada de `app/` fuera de la pantalla de QC-44 conozca el módulo, y una excepción por
+ficha la abre. **D3. Meterlas en `addon-names.ts`** se descarta: es de QC-166, es solo texto y lo
+consume también el Historial; un hermano deja intactos su archivo y su test.
 
 **E. Un `<form action>` por fila con `useActionState`.** Se descarta por B y porque apagar pasa
 por el diálogo, que ya llama por callback (`onConfirm`). El patrón de llamar a la acción con un
@@ -494,6 +535,8 @@ por el diálogo, que ya llama por callback (`onConfirm`). El patrón de llamar a
 | `tests/ui/maestro/company-detail-page.test.tsx` | QC-166 (dueño, mergeado) | Se reescriben los dos casos de R30 que exigían el panel vacío y ninguna carpeta `modulos` (l. 240-253; enmienda E5) |
 | `tests/guards/guard-identificador-de-request.test.ts` | Toda ficha con E2E nuevo | Una entrada en `E2E_ESPERADOS` (enmienda E14) |
 | `lib/shared/ui/addon-names.ts` | QC-166 (dueño, en `dev`) | **Solo se importa** `ADDON_NAMES`; no se edita |
+| `lib/shared/ui/addon-details.ts` | Nadie (nuevo, enmienda E17) | Lo crea esta ficha, hermano de `addon-names.ts` |
+| `components/shared/CATALOGO.md` | Toda ficha que añade una pieza | Una fila nueva (`ADDON_DETAILS`) en `## Apoyos` y el «No cubre» de la fila de `ADDON_NAMES` (l. 111) remitiendo a ella (E17) |
 | `e2e/helpers/*` | Toda ficha con E2E | Solo se leen; no se cambian |
 
 ## 11. Dependencias de terceros
