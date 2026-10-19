@@ -98,14 +98,14 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   `acciones-por-fila` y `recetas-paridad` (fila de listado) actualizados. *Enmienda (E4):*
   `recipeRowActionsSpec` devuelve `RecipeRowActionsSpec` (tipo local, como `ProductRowActionsSpec`);
   `data-table-types.ts` no se toca.
-- [ ] **T2c [P]. Icono de los borrados** (*enmienda E16*; D17, R50; supuesto P17).
+- [x] **T2c [P]. Icono de los borrados** (*enmienda E16*; D17, R50; supuesto P17).
   `delete-recipe-dialog.tsx`. Test en `delete-recipe-dialog.test.tsx`: con receta y con versión, el
   diálogo pinta `delete-recipe-icon` delante del título y los textos, botones y `data-testid` de hoy no
   cambian. Snapshot de `confirmaciones-paridad` (fila de borrar).
 
 ## Tanda 3 — Formulario: estructura, versiones y propagar (depende de T0c, T0d) [P con 2, 4–7]
 
-- [ ] **T3a. `FormFooterBar` y estructura** (D5, D6, D7, R10–R15). `form-footer-bar.tsx`, `recipe-form.tsx`
+- [x] **T3a. `FormFooterBar` y estructura** (D5, D6, D7, R10–R15). `form-footer-bar.tsx`, `recipe-form.tsx`
   (`aside`, `form=`), `nueva/page.tsx`, `[id]/page.tsx`. Test nuevo
   `tests/unit/recetas-ui/recipe-form-layout.test.tsx`: «Volver a la lista» con flecha y dirección, `h1`
   de hoy, tarjetas en orden, `aside` fuera del `<form>`, pie con «Vista previa» / «Cancelar» / «Guardar»
