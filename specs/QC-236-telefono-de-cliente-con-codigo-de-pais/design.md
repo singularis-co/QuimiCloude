@@ -22,7 +22,7 @@
 
 | Pieza | Fila del catálogo | Paso de la regla de decisión |
 | --- | --- | --- |
-| `CountrySelect` | `components/shared/country-select.tsx` | **2. Extender**: props opcionales nuevas, `pinned`, `hideLabel` y `compactOnMobile` (§ 8.2). Sin ellas, sus usos de hoy (`company-edit-sheet.tsx`) no cambian. |
+| `CountrySelect` | `components/shared/country-select.tsx` | **2. Extender**: props opcionales nuevas, `pinned`, `hideLabel`, `compactOnMobile` y `errorId` (§ 8.2; `errorId` por D20). Sin ellas, sus usos de hoy (`company-edit-sheet.tsx`) no cambian. |
 | `listCountryOptions`, `countryOptionLabel` | `components/shared/country-options.ts` | 1. Reutilizar. |
 | `TextField` | `components/shared/text-field.tsx` | 1. Reutilizar, para el número (`type="tel"`, `inputMode`, `onBlur`, `error`, `hint`). |
 | `FieldError` | `components/shared/field-error.tsx` | 1. Reutilizar, para el error del país enlazado al disparador. |
@@ -54,6 +54,16 @@ esta nota.
   duplicado: revisar»). Coincide con lo que ya dibuja el tablero.
 - **Consecuencia aceptada de D12:** desde el formulario no se puede dejar sin teléfono a un cliente
   migrado; solo se reemplaza por un número válido.
+
+**Enmienda al tablero (humano y leader, 2026-10-19, tras la implementación, D14 y D18).** El dibujo
+tampoco se toca; donde choque, manda esta nota.
+
+- **Formato del número (D14).** El tablero escribe `+57 300 123 4567` en la lista y `300 123 4567`
+  en el campo (y en el placeholder). Manda el formato de `libphonenumber-js`, sin formato propio: en
+  Colombia, `+57 300 1234567` en la lista y `300 1234567` en el campo. Los tests derivan el texto
+  esperado de `formatPhoneNational` / `formatPhoneInternational`, no de un literal del tablero.
+- **Tarjeta de la lista en teléfono (D18).** La tarjeta (`rm-meta`) del tablero queda fuera de esta
+  ficha, como deuda. A ≤ 640 px la lista es la misma tabla que en escritorio (§ 8.4).
 
 ## 2. Modelo de datos
 
@@ -100,7 +110,11 @@ No se crea ninguna tabla. `customers` ya tiene RLS activada y forzada desde QC-1
 La autorización sigue en el caso de uso: `requirePermission(actor, 'clientes.modificar')` es la
 primera línea y la empresa sale del actor (R17).
 
-### 2.4 Migración de esquema `db/migrations/20261019120000_customers_phone_e164/`
+### 2.4 Migración de esquema `db/migrations/20261019130000_customers_phone_e164/`
+
+**Sello `130000` y no `120000` (D15).** `20261019120000_whatsapp_connections_drop_meta_app_id` ya
+está en `dev`. Con el mismo sello, la nuestra ordenaría antes que ella y `db:rollback`, que revierte
+la última por orden de nombre, revertiría la de WhatsApp.
 
 - **`migration.sql` (UP):** `ALTER TABLE customers ADD COLUMN` × 3, nulas y sin `DEFAULT`; los cuatro
   CHECK; el índice de § 2.2. Sin `UPDATE`.
@@ -142,10 +156,15 @@ planLegacyPhoneBackfill(rows, country: CountryCode, taken: TakenE164): LegacyPho
 - **Dependencias:**
   - `legacyPhones: LegacyPhoneRepository`, un puerto nuevo;
   - `companyCountryOf: CompanyCountryLookup`, un puerto nuevo de `clientes` con la forma
-    `(companyId) => Promise<CountryCode | null>`.
+    `(companyId) => Promise<CountryCode | null>`;
+  - `listCompanyIds`: los ids de las empresas activas. La composición lo ata a
+    `listActiveCompanyIds` de `identity`, el mismo precedente que `expireStaleOrders` (D17).
 - **Sin actor:** corre fuera de sesión, como los crons (`docs/architecture.md > Server Actions vs
-  Route Handlers`). Tampoco lee varias empresas a la vez: recorre las empresas con pendientes y
-  procesa cada una en su propia transacción.
+  Route Handlers`). Tampoco lee varias empresas a la vez: recorre **las empresas activas** una por
+  una y procesa cada una en su propia transacción (D17).
+- **Los clientes de una empresa desactivada no se rellenan.** No hay forma de alcanzarlos sin una
+  consulta que cruce empresas, y esa la prohíbe `guard-ambito-empresa-clientes`. Quedan como deuda
+  (§ 13).
 - **Por cada empresa:**
   1. `country = (await companyCountryOf(id)) ?? 'CO'`.
   2. `legacyPhones.processCompany(companyId, (rows, taken) => planLegacyPhoneBackfill(rows, country, taken))`.
@@ -154,15 +173,22 @@ planLegacyPhoneBackfill(rows, country: CountryCode, taken: TakenE164): LegacyPho
 ### 3.3 Puerto y adaptador
 
 - **Puerto** `ports/legacy-phone-repository.ts`:
-  - `listCompaniesWithPending(): Promise<string[]>`;
   - `processCompany(companyId, plan)`.
-- **Adaptador** `adapters/driven/persistence/legacy-phone-prisma.ts`. Dentro de una transacción por
-  empresa:
-  1. `SELECT id, phone, created_at FROM customers WHERE company_id = $1 AND deleted_at IS NULL AND phone IS NOT NULL AND phone_e164 IS NULL AND phone_issue IS NULL FOR UPDATE`.
+  - **No hay `listCompaniesWithPending`** (D17): sería una consulta de `customers` que cruza
+    empresas, y `guard-ambito-empresa-clientes` no admite ninguna en `clientes`. La lista de empresas
+    la da `listCompanyIds` (§ 3.2).
+- **Adaptador** `adapters/driven/persistence/legacy-phone-prisma.ts`, con el ámbito de empresa de
+  `company-scope.ts` y sin SQL crudo. Dentro de una transacción por empresa:
+  1. Lee los clientes pendientes de la empresa (vivos, con `phone`, `phone_e164` y `phone_issue`
+     nulos), **sin `FOR UPDATE`** (D17: exigiría SQL crudo con `company_id`, que la misma guardia
+     prohíbe fuera de `company-scope.ts`).
   2. Lee los `phone_e164` vivos ya asignados en la empresa.
   3. Llama a `plan`.
   4. Hace un `UPDATE` por fila que toca **solo** `phone_country`, `phone_e164` y `phone_issue`
      (R27). Sin `updated_at` ni `updated_by`: no es una edición de negocio.
+     - Cada `UPDATE` repite en su `where` la condición de pendiente. Así, una fila que alguien editó
+       entre la lectura y la escritura ya no es pendiente y se salta: es lo que sustituye al
+       `FOR UPDATE`.
 - **Si una fila choca con el índice** (un alta concurrente con el mismo número entre el `SELECT` y
   el `UPDATE`), se reintenta la empresa una vez. En la segunda vuelta ese número ya está en `taken` y
   la fila sale `duplicate`.
@@ -185,8 +211,12 @@ planLegacyPhoneBackfill(rows, country: CountryCode, taken: TakenE164): LegacyPho
   exento de las guardias de capa.
 - **`package.json`:** `"db:backfill:customer-phones": "tsx scripts/backfill-customer-phones.ts"`.
 - **`scripts/build.mjs`:**
-  - un paso nuevo, `RELLENAR_TELEFONOS = 'tsx scripts/backfill-customer-phones.ts'`, justo después
-    de `MIGRAR`, en `CON_TODO` y en `CON_TODO_Y_DEMO`, y añadido a `DE_BASE`;
+  - un paso nuevo, `RELLENAR_TELEFONOS = 'tsx scripts/backfill-customer-phones.ts'`, después de
+    `MIGRAR` **y de `prisma generate`** (orden `[migrate, generate, relleno, seed, …]`), en `CON_TODO`
+    y en `CON_TODO_Y_DEMO`, y añadido a `DE_BASE` (D16);
+  - va tras `generate` porque el relleno lee las columnas nuevas con el cliente Prisma, y Vercel
+    cachea `node_modules` con el cliente viejo: antes de `generate` fallaría. Es el mismo motivo por el
+    que el seed ya va tras `generate`. Sigue siendo el primer paso que usa la base tras migrar;
   - mismo criterio de entornos que `migrate`: local/CI, production y preview sí; development, vacío
     o sin `VERCEL_ENV`, no.
   - Si falla, el build falla (como `migrate`).
@@ -217,6 +247,9 @@ planLegacyPhoneBackfill(rows, country: CountryCode, taken: TakenE164): LegacyPho
   `+`.
 - **`formatPhoneNational(e164, country)`** para el formulario (R4, R6).
 - **`formatPhoneInternational(e164)`** para la lista (R29).
+- **Formato (D14):** `formatInternational()` y `formatNational()` de la librería tal cual, sin
+  formato propio. Con `libphonenumber-js` 1.13.15, un móvil de Colombia sale `+57 300 1234567` y
+  `300 1234567`. Si una versión nueva de los metadatos lo cambia, cambia con ella.
 - **`countryFromInternationalInput(text)`** para R7: devuelve un `CountryCode`, o `null` si el
   prefijo no da un país único.
 
@@ -282,11 +315,17 @@ Se exporta desde el barrel. Este spec no fija qué hace con él QC-239.
 - **Los casos de uso** traducen `'duplicate_phone'` a `CustomerDuplicatePhoneError` (R12).
 - **Conservar el teléfono antiguo al editar (R34, D12).** Cuando el número llega vacío,
   `update-customer.ts` manda en `NewCustomer` el teléfono como `{ kind: 'keep_legacy_or_clear' }`
-  en vez de los cuatro nulos. Dentro de la transacción de `updateAlive`, el adaptador bloquea la
-  fila (`SELECT … FOR UPDATE`) y decide con lo que hay en la base, no con lo que dice la UI:
-  - con `phone_issue` presente, no escribe `phone`, `phone_country`, `phone_e164` ni `phone_issue`;
-  - sin él, los pone a nulo (R10).
+  en vez de los cuatro nulos. Dentro de la transacción de `updateAlive`, el adaptador decide con lo
+  que hay en la base, no con lo que dice la UI, con dos `UPDATE` y sin `SELECT … FOR UPDATE` (D21):
+  1. un `UPDATE` de los demás datos del cliente, que bloquea la fila hasta el final de la
+     transacción;
+  2. un segundo `UPDATE` que pone a nulo `phone`, `phone_country`, `phone_e164` y `phone_issue`,
+     con `phone_issue IS NULL` repetido en su `where`.
+  - Con `phone_issue` presente, el segundo `UPDATE` no encuentra la fila y el teléfono antiguo se
+    conserva (R34); sin él, queda sin teléfono (R10). Postgres lo decide sobre la fila ya bloqueada.
   - Los demás datos del cliente se guardan igual en los dos casos.
+  - **Por qué no `FOR UPDATE`:** exigiría SQL crudo con `company_id`, que `guard-ambito-empresa-clientes`
+    prohíbe fuera de `company-scope.ts` (la misma razón que D17; alternativa descartada en § 10).
   - El alta no usa esta variante: con el número vacío guarda los nulos.
 - **Editar conservando el propio número** no choca (R13): el índice compara con las demás filas.
 - **`CustomerCatalog`** (lo consume `pedidos`) no cambia de forma.
@@ -355,9 +394,12 @@ sola lectura de sesión por petición») debe seguir verde.
   - un `<input type="hidden" name="phoneCountry">` con su valor. `CountrySelect` no pone `name`, así
     que lo pone el consumidor, como dice su fila;
   - `TextField name="phoneNumber" type="tel" inputMode="tel" autoComplete="tel-national"`, con
-    `aria-label` «Número de teléfono» y el placeholder del tablero.
+    `aria-label` «Número de teléfono». Si lleva placeholder, va en el formato de D14, no en el del
+    tablero.
 - **Valor inicial:**
   - **Alta:** país = `companyCountry` (R2, R3), número vacío.
+  - **Edición sin `phoneCountry`:** país = `companyCountry`, igual que el alta (R35, D19), número
+    vacío.
   - **Edición con `phoneE164`:** país = `phoneCountry`, número =
     `formatPhoneNational(phoneE164, phoneCountry)` (R4).
   - **Edición con `phoneIssue`:** país = `phoneCountry`, número vacío, y bajo el campo la
@@ -370,7 +412,9 @@ sola lectura de sesión por petición») debe seguir verde.
   - **Al pegar** (`onPaste`) se hace el paso 1 en cuanto se lee el texto pegado.
   - No se reformatea en `onChange` (D10).
 - **Errores:**
-  - el del país va con `FieldError` enlazado al disparador (`aria-invalid` + `aria-describedby`);
+  - el del país lo pinta `CustomerPhoneField` con `FieldError` bajo toda la fila
+    (`customer-error-phone-country`) y se lo pasa a `CountrySelect` por `errorId` (D20), que marca el
+    disparador con `aria-invalid` y lo enlaza por `aria-describedby`;
   - el del número y el de duplicado, con el `error` de `TextField`.
   - La entrada de error usa `qc-err`, como dice el tablero.
 
@@ -381,6 +425,7 @@ sola lectura de sesión por petición») debe seguir verde.
 | `pinned?: { code: CountryCode; label: string }` | Con el buscador vacío y `pinned` presente, pinta un grupo arriba con el rótulo `label` (aquí «País de la empresa») y la opción de ese país, un separador y el grupo «Todos» con «Sin país» primero y la lista completa (el país fijado se repite en su sitio). Con texto en el buscador: una sola lista filtrada, sin rótulos. | R5 |
 | `hideLabel?: boolean` | La etiqueta queda solo para lectores de pantalla (`sr-only`). Sigue siendo el nombre del disparador y el título de la hoja en teléfono («País del teléfono»). | R1, R33 |
 | `compactOnMobile?: boolean` | A ≤ 640 px el disparador muestra `CO +57` en mono y su `aria-label` lleva el nombre completo. | R33 |
+| `errorId?: string` (D20) | El error lo pinta el consumidor fuera del selector, con ese `id`. El disparador queda con `aria-invalid` y `aria-describedby={errorId}`. Hace falta porque el `FieldError` interno solo se puede pintar dentro de la columna del selector (112 px en teléfono) y el tablero pone «Elige el país del teléfono.» bajo toda la fila. | R8 |
 
 Su fila del catálogo se actualiza en el mismo commit: los puntos de extensión y
 `TelefonoCliente.dc.html` en «Diseño».
@@ -409,15 +454,19 @@ La celda «Teléfono» usa `describeCustomerPhone(view)`, de dominio y exportada
   con la etiqueta corta (D13: «Sin formato válido» / «Duplicado: revisar», R30). El `data-testid` es `customer-phone-issue-<id>`.
 - **Sin teléfono:** `MissingValue`, como hoy.
 
-La tarjeta de teléfono sale de las mismas columnas en `DataTable` y no necesita código propio. Si
-la implementación descubre que sí lo necesita, se para y se dice.
+**Sin tarjeta en teléfono (D18).** `CustomerTable` no pasa `card` a `DataTable`, así que a ≤ 640 px
+se ve la misma tabla. La tarjeta del tablero necesitaría código nuevo (un `card` para
+`CustomerTable`, un cambio visual de la lista) y queda fuera de esta ficha, como deuda (§ 13). R29 se
+cumple en la tabla, a cualquier ancho.
 
 ### 8.5 Desviaciones del tablero, declaradas
 
 - **Texto de ayuda de la edición de un migrado:** cambia por D12 (enmienda de § 1).
 - **El tablero dice «`CountrySelect` sin cambios de forma»**, pero el disparador compacto `CO +57`
   del mismo tablero necesita `compactOnMobile` (§ 8.2). Es una extensión opcional, no un cambio de
-  los usos existentes.
+  los usos existentes. Lo mismo vale para `errorId` (D20).
+- **Formato del número:** el de `libphonenumber-js`, no el del tablero (D14, enmienda de § 1).
+- **Sin tarjeta de la lista en teléfono:** deuda (D18, § 8.4).
 
 ## 9. Datos de demostración y otros consumidores de `createCustomer`
 
@@ -451,6 +500,17 @@ la implementación descubre que sí lo necesita, se para y se dice.
 7. **Llevar el país de la empresa en la sesión firmada.** Cambiaría el formato de la cookie (QC-48)
    por un dato que solo usa una pantalla, y un cambio de país no se vería hasta el siguiente inicio
    de sesión. La lectura en la página (§ 7) es una consulta corta.
+8. **Relleno con `listCompaniesWithPending` y `SELECT … FOR UPDATE`** (el diseño original de § 3.3).
+   Alcanzaba también a las empresas desactivadas, pero necesita una consulta de `customers` que
+   cruza empresas y SQL crudo con `company_id`, y `guard-ambito-empresa-clientes` prohíbe las dos.
+   Descartada por D17: se recorren las empresas activas y el `where` de cada `UPDATE` sustituye al
+   bloqueo.
+9. **Un formato propio para Colombia (`300 123 4567`)**, como dibuja el tablero. Sería código nuevo
+   que mantener por país. Descartada por D14.
+10. **`SELECT … FOR UPDATE` en la edición que conserva el teléfono antiguo** (el diseño original de
+    § 4.5). Bloqueaba la fila antes de decidir, pero necesita SQL crudo con `company_id`, que
+    `guard-ambito-empresa-clientes` prohíbe. Descartada por D21: el primer `UPDATE` ya bloquea la
+    fila y el `where` del segundo decide.
 
 ## 11. Dependencias
 
@@ -472,3 +532,11 @@ No entra ninguna. `libphonenumber-js` ya está aprobada (D1, `docs/dependencias.
   `customer-service.test.ts` R19 y, si resulta que afirma algo sobre el comentario `///` del modelo,
   `customers-schema.test.ts`; no se ha comprobado que lo haga): se ajustan **en lo que toca al
   teléfono**, y el `impl_` lo declara.
+
+## 13. Deuda que deja esta ficha (D17, D18)
+
+- **Clientes de empresas desactivadas sin convertir (D17).** El relleno no los alcanza: siguen con
+  `phone_e164` y `phone_issue` nulos. No se ven en ninguna pantalla mientras su empresa siga
+  desactivada.
+- **Tarjeta de la lista en teléfono (D18).** El tablero la dibuja; la lista usa la misma tabla en
+  todos los anchos.

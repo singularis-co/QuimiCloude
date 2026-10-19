@@ -11,6 +11,9 @@
   - `pnpm exec vitest related --run <archivos>`
   - `pnpm exec vitest run guard`
 - **Preguntas abiertas:** ninguna. P1–P3 quedaron cerradas el 2026-10-19 como D11–D13.
+- **Enmienda del 2026-10-19 (D14–D20, tras la implementación):** corrige el texto de T1, T3, T5, T7,
+  T8, T10, T11 y T12 a lo que ya está hecho en la rama y añade T13 (R35) y T14 (R24, empresas
+  activas), las dos pendientes.
 
 ## Bloque A — Datos
 
@@ -18,8 +21,8 @@
   - **Qué se hace:**
     - en `db/schema.prisma`, las tres columnas de `design.md § 2.1`;
     - se reescribe el comentario `///` del modelo `Customer`;
-    - `db/migrations/20261019120000_customers_phone_e164/migration.sql` y su `down.sql` (§ 2.2,
-      § 2.4).
+    - `db/migrations/20261019130000_customers_phone_e164/migration.sql` y su `down.sql` (§ 2.2,
+      § 2.4; sello `130000` por D15).
   - **Hecho cuando:**
     - un test de texto del SQL comprueba que hay tres `ADD COLUMN` nulos, los cuatro CHECK, un único
       `CREATE UNIQUE INDEX` parcial con `WHERE deleted_at IS NULL AND phone_e164 IS NOT NULL`, ningún
@@ -50,7 +53,7 @@
     `'libphonenumber-js/max'` a `PURE_PACKAGES` y a la tabla de `docs/architecture.md > La regla de
     dependencias`.
   - **Hecho cuando** hay unit tests que comprueban:
-    - `CO` + `300 123 4567` → `573001234567` y `+57 300 123 4567`;
+    - `CO` + `300 123 4567` → `573001234567` y `+57 300 1234567` (el formato de la librería, D14);
     - `CO` + `300 12` → `invalid_number`;
     - un número de longitud correcta pero dígitos no válidos para el país → `invalid_number` (el
       motivo de usar `max`);
@@ -58,7 +61,9 @@
     - blanco → `none`;
     - `ZZ` → `invalid_country`;
     - `countryFromInternationalInput('+593 99 123 4567')` → `EC`, y un prefijo ambiguo → `null`;
-    - `formatPhoneNational` y `formatPhoneInternational`;
+    - `formatPhoneNational` y `formatPhoneInternational` dan lo mismo que `formatNational()` y
+      `formatInternational()` de la librería, sin formato propio (en `CO`, `300 1234567` y
+      `+57 300 1234567`; D14);
     - `describeCustomerPhone` en sus tres casos (R29, R30).
 
 - [x] **T4 · Esquema de entrada, errores y casos de uso** (R8, R9, R10, R11, R12, R17). Depende de:
@@ -89,7 +94,8 @@
       `customers_company_phone_e164_key` (§ 4.5);
     - `domain/legacy-phone-backfill.ts`, `domain/backfill-legacy-phones.ts`,
       `ports/legacy-phone-repository.ts`, `ports/company-country-lookup.ts` y
-      `adapters/driven/persistence/legacy-phone-prisma.ts` (§ 3.1–3.3).
+      `adapters/driven/persistence/legacy-phone-prisma.ts` (§ 3.1–3.3): empresa por empresa, solo
+      las activas, sin `listCompaniesWithPending` ni `FOR UPDATE` (D17).
   - **Hecho cuando hay unit tests de `planLegacyPhoneBackfill`** que cubren:
     - válidos;
     - no válidos;
@@ -128,13 +134,13 @@
       el puerto `CompanyCountryLookup` atado a la lectura de `identity`;
     - `customer-actions.ts` lee `phoneCountry` y `phoneNumber` (§ 5);
     - el script `scripts/backfill-customer-phones.ts` y su entrada en `package.json`;
-    - el paso en `scripts/build.mjs` justo después de `migrate` (§ 3.4);
+    - el paso en `scripts/build.mjs` después de `migrate` y de `generate` (§ 3.4, D16);
     - `scripts/seed-demo/gateway.ts` con la entrada nueva (§ 9).
   - **Hecho cuando:**
     - `tests/unit/scripts/build.test.ts`, `tests/unit/identity/seed/deploy-hook.test.ts` (si fija
       la lista de pasos) y `tests/guards/guard-despliegue-produccion.test.ts` afirman el paso nuevo
-      tras `migrate` en local, production y preview, y su ausencia en development o sin
-      `VERCEL_ENV`;
+      tras `migrate` y `generate` en local, production y preview, y su ausencia en development o
+      sin `VERCEL_ENV`;
     - `customer-actions.test.ts` cubre los dos campos nuevos;
     - `pnpm db:seed:demo` en la base local termina sin error.
 
@@ -143,6 +149,7 @@
 - [x] **T8 [P] · `CountrySelect`: extensión** (R5, R33). Depende de: nada.
   - **Qué se hace:**
     - props `pinned`, `hideLabel` y `compactOnMobile` (§ 8.2);
+    - la prop opcional `errorId` (§ 8.2, D20). La añadió T9 en la rama, con su fila del catálogo;
     - su fila en `components/shared/CATALOGO.md`: puntos de extensión y `TelefonoCliente.dc.html`
       en «Diseño».
   - **Hecho cuando** hay tests de UI (`*.test.tsx`) que comprueban:
@@ -152,7 +159,9 @@
     - sin `pinned`, la lista de siempre;
     - con `hideLabel`, la etiqueta es solo para lectores y el disparador conserva su nombre;
     - con `compactOnMobile` a ≤ 640 px, el disparador dice `CO +57` y su `aria-label` lleva el
-      nombre.
+      nombre;
+    - con `errorId`, el disparador queda `aria-invalid` y su `aria-describedby` apunta a ese `id`
+      (R8, D20). Hoy lo cubren los casos R8 de `customer-phone-field.test.tsx`.
   - Los tests de QC-235 de `CountrySelect` siguen verdes sin tocarlos, y la guardia del catálogo
     también.
 
@@ -182,6 +191,7 @@
   - **Hecho cuando:**
     - un test de UI de la columna cubre el número internacional, `invalid_format` («Sin formato
       válido»), `duplicate` («Duplicado: revisar») y sin teléfono (R30, D13);
+    - la lista no lleva tarjeta en teléfono: la misma tabla en todos los anchos (D18);
     - el test de «una sola lectura de sesión por petición» sigue verde.
 
 ## Bloque D — Recorrido completo
@@ -190,7 +200,8 @@
   - **Qué se hace:** `e2e/clientes.spec.ts` (o un spec nuevo
     `e2e/clientes-telefono.spec.ts`), con estos casos:
     - una empresa con `CO`: el alta abre con Colombia, escribe `300 123 4567`, guarda y la lista
-      muestra `+57 300 123 4567`;
+      muestra el formato internacional de la librería (`+57 300 1234567`, D14), derivado de
+      `formatPhoneInternational` y no escrito a mano;
     - en la base quedan `CO` y `573001234567`;
     - la misma alta otra vez da el error de duplicado bajo el campo;
     - una empresa sin país: el número sin país da error;
@@ -199,19 +210,41 @@
   - **Hecho cuando:** `pnpm exec playwright test <spec>` sale verde y los casos de
     `e2e/clientes.spec.ts` que tocaban `phone` están actualizados.
 
-- [ ] **T12 · Cierre**. Depende de: todo.
+- [ ] **T12 · Cierre**. Depende de: todo, también T13 y T14.
   - **Qué se hace:**
-    - el mapa `R1…R34 → test` en `progress/impl_QC-236.md`, con la salida real de los tests;
-    - la revisión visual contra `TelefonoCliente.dc.html` a 1440, 820 y 375 px;
+    - el mapa `R1…R35 → test` en `progress/impl_QC-236.md`, con la salida real de los tests;
+    - la revisión visual contra `TelefonoCliente.dc.html` a 1440, 820 y 375 px, leída con las
+      enmiendas de `design.md § 1` (formato de D14 y sin tarjeta de la lista, D18);
     - `./init.sh` en verde (el gate completo lo corre CI en el PR).
   - **Hecho cuando:** ningún `R<n>` queda sin test y se declaran las desviaciones de
-    `design.md § 8.5`.
+    `design.md § 8.5` y la deuda de `design.md § 13`.
+
+## Bloque E — Enmienda del 2026-10-19 (D17, D19)
+
+- [ ] **T13 · Edición de un cliente sin país** (R35). Depende de: T9, T10.
+  - **Qué se hace:** en `customer-phone-field.tsx`, el valor inicial del país en la edición de un
+    cliente sin `phoneCountry` es `companyCountry`, como en el alta (`design.md § 8.1`, D19).
+  - **Hecho cuando** `tests/ui/clientes/customer-phone-field.test.tsx` tiene estos casos:
+    - «R35 — la edición de un cliente sin phone_country abre con el país de la empresa marcado y el
+      número vacío»;
+    - «R35 — la edición de un cliente sin phone_country, en una empresa sin país, abre en «Sin
+      país»»;
+    - los casos R4 y R31 siguen verdes: un cliente con `phoneCountry` muestra el suyo.
+
+- [ ] **T14 · El relleno solo toca empresas activas** (R24, D17). Depende de: T5.
+  - **Qué se hace:** solo tests; el código ya está en la rama (`design.md § 3.2`, § 3.3).
+  - **Hecho cuando:**
+    - `tests/unit/clientes/legacy-phone-backfill.test.ts` tiene «R24 — el caso de uso solo procesa
+      las empresas que da listCompanyIds»;
+    - `tests/integration/clientes/legacy-phone-backfill.int.test.ts` tiene «R24 — los clientes de
+      una empresa desactivada quedan sin tocar», con `phone_country`, `phone_e164` y `phone_issue`
+      nulos tras el relleno.
 
 ## Archivos esperados
 
 - `db/schema.prisma`
-- `db/migrations/20261019120000_customers_phone_e164/migration.sql`
-- `db/migrations/20261019120000_customers_phone_e164/down.sql`
+- `db/migrations/20261019130000_customers_phone_e164/migration.sql`
+- `db/migrations/20261019130000_customers_phone_e164/down.sql`
 - `lib/modules/clientes/index.ts`
 - `lib/modules/clientes/domain/customer.ts`
 - `lib/modules/clientes/domain/customer-view.ts`
