@@ -41,7 +41,9 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   y qué clases hacen falta para que la vista previa ocupe `100dvh` sin hueco y el diálogo de subida
   quede entero (D4, D9). *Hecho:* las clases exactas quedan en el impl; `dialog.tsx` no se edita.
   *Enmienda (E14):* se parte de las clases de `batch-evidence-dialog.tsx:42` (QC-271) y solo se mide.
-- [ ] **T0c. Envío con `form=`.** Prueba desechable (no se commitea) de un `<Button type="submit"
+- [x] **T0c. Envío con `form=`.** *Resultado (2026-10-19):* pasa en Chromium y WebKit; en jsdom el
+  Enter con el botón fuera no envía (límite del simulador). Humano: opción (a), sigue D6; en jsdom
+  solo el clic, «Enter guarda» va en el E2E de T9a; plan B (A4) descartado. Prueba desechable (no se commitea) de un `<Button type="submit"
   form={id}>` fuera del `<form>`: clic y Enter en un campo envían una sola vez en jsdom (vitest `ui`) y
   en WebKit (Playwright). *Hecho:* resultado en el impl; si falla, se aplica el plan B de `design.md >
   D6` (A4) y se anota como desviación antes de la tanda 3.
@@ -59,7 +61,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   primer ítem, sin la prop el árbol de hoy) y `row-actions-menu-centrado.test.tsx` en verde. Si falta
   `triggerDataAttributes` en `RowActionsSpec`, se añade a su `Pick`. El leader avisa a los dueños de
   QC-262 y QC-263 antes de empezar.
-- [ ] **T1b [P]. `StepReader` con `layout="panel"`** (D9, R22, R24, R26). Tests en
+- [x] **T1b [P]. `StepReader` con `layout="panel"`** (D9, R22, R24, R26). Tests en
   `tests/unit/recetas-ui/step-reader.test.tsx`: con `panel`, cabecera con «Paso N de M» y un tramo por
   paso marcado hasta el actual; motivo como `Notice` `info` y espera como `Notice` `warning` con sus
   testids y el `aria-describedby` de los botones; pie con «Anterior» y «Siguiente»/«Finalizar» de 44 px;

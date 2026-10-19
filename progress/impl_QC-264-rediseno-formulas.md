@@ -127,7 +127,8 @@ página desplaza la ventana.
 
 ## Desviaciones
 
-- **T0c (pendiente de decisión).** `form=` funciona en Chromium y WebKit, pero en jsdom el Enter en
+- **T0c — decidido (humano, 2026-10-19): opción (a).** D6 se mantiene; en jsdom solo el clic; «Enter
+  guarda» en el E2E de T9a (Chromium y WebKit); plan B (A4) descartado. Contexto: `form=` funciona en Chromium y WebKit, pero en jsdom el Enter en
   un campo no envía cuando el botón está fuera del `<form>`. Opciones: (a) seguir con D6 (aside fuera
   del form) y comprobar «Enter envía» en el E2E de T9a, dejando en jsdom solo el clic (y, si se
   quiere, `form.requestSubmit()`); (b) plan B A4 literal: `aside` dentro del `<form>` tras comprobar
