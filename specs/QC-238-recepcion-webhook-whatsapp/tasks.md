@@ -122,7 +122,7 @@
 
 ## Bloque G — Integración contra la base (tras E)
 
-- [ ] **T14 — Recorrido real de la ruta** (R4, R5, R6, R7, R9, R11, R12, R16, R17, R18, R20, R21,
+- [x] **T14 — Recorrido real de la ruta** (R4, R5, R6, R7, R9, R11, R12, R16, R17, R18, R20, R21,
   R23, R24, R25). Depende de: T11
   - `tests/integration/integraciones/whatsapp-webhook-route.int.test.ts` (§8 y §10.1), con
     empresa efímera, añadido `integraciones` prendido (y apagado en su caso), conexión sembrada
@@ -131,7 +131,7 @@
   - **Hecho:** verde contra la base de test; el caso de la transacción que falla deja cero filas y
     el reintento deja una.
 
-- [ ] **T15 [P] — Restricciones y migración** (R28, R29, R30, R32). Depende de: T1, T6
+- [x] **T15 [P] — Restricciones y migración** (R28, R29, R30, R32). Depende de: T1, T6
   - `tests/integration/integraciones/whatsapp-messages-constraints.int.test.ts` y
     `tests/integration/integraciones/whatsapp-messages-migration.int.test.ts`, con sus entradas en
     `tests/integration/aislamiento.json`.

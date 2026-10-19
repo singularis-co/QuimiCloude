@@ -234,3 +234,40 @@ quitado ni relajado. Resultado: 1/1 archivo, 9/9 verdes (antes 3 rojos 2BP01).
 - `pnpm exec vitest run tests/unit/integraciones/module-shape.test.ts`: 103 passed, 1 skipped (R22, solo en la rama de QC-234).
 
 **Veredicto:** T12 y T13 hechas; guardias y forma del módulo en verde, sin tocar producción.
+
+## Tanda T14 + T15 — integración contra la base
+
+**Archivos** (solo tests; ningún cambio de producción)
+- `tests/integration/integraciones/whatsapp-webhook-route.int.test.ts` (T14): `GET`/`POST` de `whatsapp-webhook-route.ts` con la composición real; empresa efímera con el añadido `integraciones` prendido o apagado (override), conexión con App Secret cifrado (AES-GCM, clave generada en el test) y verify token resumido; firma calculada con `createHmac`. La transacción que falla: `vi.spyOn(prisma, '$transaction')` que ejecuta el callback real, cuenta lo escrito dentro (1) y lanza.
+- `tests/integration/integraciones/whatsapp-messages-constraints.int.test.ts` (T15): columnas, únicos, CHECK, índice por nombre, RLS forzada, FK compuestas y `companyOfWhatsappConnection`.
+- `tests/integration/integraciones/whatsapp-messages-migration.int.test.ts` (T15): patrón de `whatsapp-connection-migration` (snapshot de las dos tablas y los cuatro enums; DOWN; ida-vuelta-ida; sensibilidad sin el `FORCE`).
+- `tests/integration/aislamiento.json`: + `commit` para route y constraints (con `motivo` y `desde`); + `transaccion` para la de migración (corre en `$transaction` con `RollbackSignal`, como su precedente).
+
+**R → test**
+- R4 → route «R4: con el anadido integraciones apagado el handshake…403», «R4: …un POST firmado responde 200 y no guarda nada».
+- R5, R6 → route «R5 R6: el handshake correcto…», «R6: una conexion en ERROR sigue en ERROR…».
+- R7 (y R8) → route «R7 R8: token malo, modo distinto, sin challenge o solo hub_*…», «R7: una conexion DISABLED o inexistente ⇒ 403…».
+- R9 → route «R9: una conexion inexistente, sin forma de UUID o DISABLED ⇒ 200…».
+- R11 → route «R11: firma mala, firma de otro secreto, cabecera mal formada o ausente ⇒ 401…».
+- R12 → route «R12: un App Secret cifrado con otra clave ⇒ 500…ERROR».
+- R16 → route «R16 R17 R24: un texto firmado…», «R16: con un solo contacto cuyo wa_id difiere de from…», «R16: con varios contactos o ninguno manda from…».
+- R17 → route «R16 R17 R24…», «R17: una imagen…IMAGE…».
+- R18, R25 → route «R18 R25: el mismo POST dos veces…».
+- R20 → route «R20: un tipo desconocido se guarda UNSUPPORTED…».
+- R21 → route «R21: un status avanza el saliente, no retrocede, guarda el error de failed…».
+- R23, R25 → route «R23 R25: si la transaccion falla despues de escribir responde 500…; el reintento guarda una sola vez».
+- R24 → route «R16 R17 R24…», «R24: un POST firmado sin nada que guardar…».
+- R28 → constraints «R28: company_id obligatorio, customer_id opcional y RLS…», «R28: el mismo wa_id…», «R28: un wa_id vacio…»; migration «R28 R29: …», «R28 (sensibilidad)…».
+- R29 → constraints «R29: company_id obligatorio, indice…RLS», «R29: el wamid es unico…»; migration «R28 R29: el DOWN…», «R28 R29: ida, vuelta e ida…».
+- R30 → constraints «R30: un contacto con la empresa B y la conexion de A…», «R30: un mensaje con la empresa B…», «R30: un mensaje de B con el contacto de A…», «R30: …contacto de otra conexion de la misma empresa…», «R30 (control)…».
+- R32 → constraints «R32: una conexion viva devuelve solo el id de su empresa», «R32: una conexion borrada o un id inexistente devuelven null».
+
+**Comandos (salida real; con `.env` cargado, uno tras otro)**
+- `pnpm run typecheck`: verde (`tsc --noEmit` sin salida).
+- `pnpm run lint`: 0 errores, 10 avisos preexistentes; ninguno en los archivos tocados.
+- `vitest run …whatsapp-webhook-route.int.test.ts`: 1 archivo, 18 passed.
+- `vitest run …whatsapp-messages-constraints.int.test.ts`: 1 archivo, 12 passed.
+- `vitest run …whatsapp-messages-migration.int.test.ts`: 1 archivo, 5 passed.
+- `vitest run tests/guards/guard-aislamiento-integracion.test.ts`: 6 passed.
+
+**Veredicto:** T14 y T15 hechas según spec, en verde contra la base de test, sin tocar producción.

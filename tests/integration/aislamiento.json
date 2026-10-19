@@ -45,6 +45,7 @@
     "identity/packing-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
     "integraciones/whatsapp-connection-migration.int.test.ts",
+    "integraciones/whatsapp-messages-migration.int.test.ts",
     "integraciones/ai-provider-migration.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
@@ -655,6 +656,16 @@
     {
       "archivo": "integraciones/whatsapp-inbox-prisma.int.test.ts",
       "motivo": "Ejercita 'recordWhatsappInbound' de whatsapp-inbox-prisma.ts, que abre su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria; ademas el caso de dos 'record' concurrentes del mismo numero necesita dos transacciones que confirmen de verdad contra el unico (connection_id, wa_id). Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
+      "archivo": "integraciones/whatsapp-webhook-route.int.test.ts",
+      "motivo": "Recorre los GET/POST exportados por whatsapp-webhook-route.ts con la composicion real: el POST guarda en la PROPIA 'prisma.$transaction' de recordWhatsappInbound sobre el cliente GLOBAL, y el handshake y el descifrado ilegible escriben la conexion con el mismo cliente, asi que una transaccion del test con ROLLBACK no los envolveria; el caso de la transaccion que falla necesita ademas que el reintento confirme de verdad. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa con o sin el anadido integraciones, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa (los anadidos caen en cascada). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
+      "archivo": "integraciones/whatsapp-messages-constraints.int.test.ts",
+      "motivo": "Ejercita 'companyOfWhatsappConnection' de whatsapp-webhook-directory-prisma.ts y las altas de conexion de whatsapp-connection-prisma.ts, que usan el cliente Prisma GLOBAL y no un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria. Las altas que la base debe rechazar (unicos, CHECK y FK compuestas de empresa) no dejan fila. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-19"
     },
     {
