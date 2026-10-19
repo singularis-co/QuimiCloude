@@ -121,7 +121,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   con «Nueva versión» deshabilitado y el vacío. `badges-estado.test.tsx` enmendado (`design.md > 10`).
   *Enmienda (E12):* «Abrir la versión X» sale de `Abrir` + `<span className="sr-only">` dentro del
   `ArrowLink`; `ArrowLink` no se toca.
-- [ ] **T3d. Propagar** (D10, R27–R29). `propagate-versions-dialog.tsx`. Test nuevo
+- [x] **T3d. Propagar** (D10, R27–R29). `propagate-versions-dialog.tsx`. Test nuevo
   `tests/unit/recetas-ui/propagate-versions-dialog.test.tsx`: singular y plural con el número en mono,
   filas de 48 px, «Por revisar» solo en las que lo están, conducta de hoy; `recipe-form-propagation.test.tsx`
   en verde. Snapshots de `recetas-paridad` (formulario) y `confirmaciones-paridad` (propagar).
