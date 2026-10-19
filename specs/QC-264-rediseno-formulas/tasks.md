@@ -17,7 +17,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 0 — Censo y comprobaciones (antes de tocar producción)
 
-- [ ] **T0a. Censo con grep.** Repetir el barrido de `design.md > 7` en `tests/unit`, `tests/guards`,
+- [x] **T0a. Censo con grep.** Repetir el barrido de `design.md > 7` en `tests/unit`, `tests/guards`,
   `tests/integration` y `e2e` para cada símbolo, texto, testid o nombre accesible que la ficha cambia:
   `recipe-row-actions`, `rowActions`, `RecipeRowActions`, `buildRecipeColumns`, `recipe-version-link`,
   `recipe-version-row`, `recipe-version-under-review`, `recipe-version-form-under-review`,
@@ -36,7 +36,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   `recipe-form-steps-locked`, `Requiere evidencia`, `No se puede mover`, `No se puede quitar`,
   `ai-provider-required-tooltip`, `document-upload-row-reason-`, `delete-recipe-dialog` y
   `getRecipeStepLockAction`, en los archivos de `design.md > 12 > E19`.
-- [ ] **T0b. Diálogos a pantalla completa.** Con el servidor de desarrollo, a 390 × 844 y 1440 × 900,
+- [x] **T0b. Diálogos a pantalla completa.** Con el servidor de desarrollo, a 390 × 844 y 1440 × 900,
   comprobar cómo `components/ui/dialog.tsx` posiciona `DialogContent` (traslación, `max-w`, relleno)
   y qué clases hacen falta para que la vista previa ocupe `100dvh` sin hueco y el diálogo de subida
   quede entero (D4, D9). *Hecho:* las clases exactas quedan en el impl; `dialog.tsx` no se edita.
@@ -45,7 +45,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   form={id}>` fuera del `<form>`: clic y Enter en un campo envían una sola vez en jsdom (vitest `ui`) y
   en WebKit (Playwright). *Hecho:* resultado en el impl; si falla, se aplica el plan B de `design.md >
   D6` (A4) y se anota como desviación antes de la tanda 3.
-- [ ] **T0d. Pie fijo.** En `/produccion/formulas/nueva` con el servidor de desarrollo, medir si un pie
+- [x] **T0d. Pie fijo.** En `/produccion/formulas/nueva` con el servidor de desarrollo, medir si un pie
   `sticky bottom-0` dentro de `PageShell` queda visible sin desplazar a 390 × 844 y 1440 × 900 y si
   tapa el último campo. *Hecho:* clase final en el impl (D7).
 
@@ -324,6 +324,8 @@ Tests y guardias:
 - `tests/unit/documentos-ui/document-upload-flow.test.tsx` (enmienda E10; solo si cambia)
 - `tests/unit/documentos-ui/document-upload-errors.test.tsx` (enmienda E10; solo si cambia)
 - `tests/unit/documentos-ui/document-upload-strategy.test.tsx` (enmienda E10; solo si cambia)
+- `tests/unit/shared-ui/confirm-dialog-montado.test.tsx` (censo T0a; monta `RecipeTable` y abre el borrado; solo si cambia)
+- `tests/unit/proveedores-ui/catalog-pdf-upload.test.tsx` (censo T0a; usa el diálogo de subida compartido; solo si cambia)
 - `tests/unit/marca/badges-estado.test.tsx`
 - `tests/unit/marca/tablas-marca.test.tsx`
 - `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` (enmienda E19; solo si `page.tsx` pide otro mock)
