@@ -26,6 +26,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { submitOrderWithLeftover } from './helpers/order-distribution';
 import { netReservedInBatch } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc204_e2e_';
@@ -156,7 +157,8 @@ async function fillNewOrder(
 }
 
 async function submitAndFindOrder(page: Page, recipeId: string) {
-  await page.getByTestId('order-form-submit').click();
+  // Sin reparto toda la cantidad queda sin envasar: Guardar pregunta antes.
+  await submitOrderWithLeftover(page, page.getByTestId('order-form'));
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 
   return prisma.order.findFirstOrThrow({

@@ -173,8 +173,8 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
   const base = {
     name: state.name,
     description: state.description.trim() === '' ? null : state.description,
-    steps: state.steps.map((step): RecipeStepPayload => step.document),
-    packingSteps: state.packingSteps.map((step): RecipeStepPayload => step.document),
+    steps: toStepPayloads(state.steps),
+    packingSteps: toStepPayloads(state.packingSteps),
     lines: toLinePayloads(state.lines),
     tools: toToolPayloads(state.tools),
   };
@@ -188,6 +188,28 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
     case 'cleared':
       return { ...base, image: null };
   }
+}
+
+/**
+ * `true` si el documento no aporta ningún carácter visible: recorre TODOS los bloques -párrafos
+ * e ítems de cada lista de verificación- y mira si algún fragmento tiene texto tras `trim`.
+ */
+export function isStepDocumentEmpty(document: RecipeStepDocument): boolean {
+  const hasText = (spans: readonly { readonly text: string }[]) =>
+    spans.some((span) => span.text.trim() !== '');
+  return !document.blocks.some((block) =>
+    block.kind === 'paragraph' ? hasText(block.spans) : block.items.some((item) => hasText(item.spans)),
+  );
+}
+
+/**
+ * Una sección cuyo único paso está en blanco se envía vacía: es la fila de arranque, que el
+ * usuario tocó y dejó sin texto. Con dos o más pasos, el vacío sí llega al esquema y se señala.
+ */
+export function toStepPayloads(steps: readonly RecipeStepFormValue[]): RecipeStepPayload[] {
+  const [only] = steps;
+  if (steps.length === 1 && only !== undefined && isStepDocumentEmpty(only.document)) return [];
+  return steps.map((step): RecipeStepPayload => step.document);
 }
 
 function toLinePayloads(lines: readonly RecipeLineFormValue[]): RecipeLinePayload[] {
@@ -269,45 +291,106 @@ export function createLocalKey(prefix: string): string {
   return `${prefix}-${localKeySequence}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * QUÉ TEXTO SE PINTA POR CADA ISSUE. El esquema del contrato es la regla y no se toca; el
+ * formulario solo traduce. Los issues `custom` -los `refine`/`superRefine` del esquema- ya traen
+ * su mensaje en español y pasan tal cual. Los de forma de zod (`too_small`, `too_big`,
+ * `invalid_format`, …) traen el genérico en inglés («Too small: expected string…») y se sustituyen
+ * por el texto propio del formulario, igual que `product-form.tsx` con sus `FIELD_MESSAGES`.
+ */
+function isSchemaMessage(issue: ZodIssue): boolean {
+  return issue.code === 'custom';
+}
+
 /** Campos de línea a los que el esquema del contrato puede atribuir un error (R31). */
 export type RecipeLineFieldName = 'productId' | 'percentage';
 
 /** Errores por línea, indexados por posición, tal como sale de `error.issues[].path` (R31). */
 export type RecipeLineErrors = Readonly<Record<number, Partial<Record<RecipeLineFieldName, string>>>>;
 
+/** Texto propio de cada campo de línea, para los issues de forma de zod. */
+export type RecipeLineErrorMessages = Readonly<Record<RecipeLineFieldName, string>>;
+
 /** Errores por paso, indexados por posición (R32). */
 export type RecipeStepErrors = Readonly<Record<number, string>>;
 
 /**
- * Extrae de `error.issues` los mensajes que identifican una línea concreta -`path` con forma
- * `['lines', <índice>, <campo>]`- SIN reescribir ninguna regla propia: el mensaje es el que ya
- * trae el issue de zod (R26). No confundir con el error de "dos líneas con el mismo producto",
- * cuyo `path` es `['lines']` sin índice -lo captura `extractGeneralLinesError`-.
+ * Texto propio de un paso para los issues de forma de zod: la lista de verificación sin ítems
+ * (`items` con `min(1)`) tiene el suyo; cualquier otro (fragmento vacío, clave extra) usa el
+ * genérico.
  */
-export function extractLineErrors(issues: readonly ZodIssue[]): RecipeLineErrors {
+export type RecipeStepErrorMessages = Readonly<{
+  checklistWithoutItems: string;
+  invalid: string;
+}>;
+
+/** Texto propio de un campo raíz (`name`, `description`): pasarse del tope o cualquier otro. */
+export type RecipeFieldErrorMessages = Readonly<{
+  tooLong: string;
+  invalid: string;
+}>;
+
+/**
+ * El porcentaje es el único campo de forma cuyo `regex` YA trae en el esquema un mensaje en
+ * español (`invalid_format` con `message`): ese también pasa tal cual.
+ */
+function isLineSchemaMessage(field: RecipeLineFieldName, issue: ZodIssue): boolean {
+  return isSchemaMessage(issue) || (field === 'percentage' && issue.code === 'invalid_format');
+}
+
+/**
+ * Extrae de `error.issues` los mensajes que identifican una línea concreta -`path` con forma
+ * `['lines', <índice>, <campo>]`-. La regla es la del esquema (R26); el texto, el del esquema si
+ * lo escribió él y el propio (`messages`) si es el genérico de zod. No confundir con el error de
+ * "dos líneas con el mismo producto", cuyo `path` es `['lines']` sin índice -lo captura
+ * `extractGeneralLinesError`-.
+ */
+export function extractLineErrors(
+  issues: readonly ZodIssue[],
+  messages: RecipeLineErrorMessages,
+): RecipeLineErrors {
   const result: Record<number, Partial<Record<RecipeLineFieldName, string>>> = {};
   for (const issue of issues) {
     const [root, index, field] = issue.path;
     if (root !== 'lines' || typeof index !== 'number') continue;
     if (field !== 'productId' && field !== 'percentage') continue;
-    result[index] = { ...result[index], [field]: issue.message };
+    const message = isLineSchemaMessage(field, issue) ? issue.message : messages[field];
+    result[index] = { ...result[index], [field]: message };
   }
   return result;
 }
 
+function stepMessage(issue: ZodIssue, messages: RecipeStepErrorMessages): string {
+  if (isSchemaMessage(issue)) return issue.message;
+  if (issue.code === 'too_small' && issue.path[issue.path.length - 1] === 'items') {
+    return messages.checklistWithoutItems;
+  }
+  return messages.invalid;
+}
+
 /**
- * Extrae de `error.issues` los mensajes que identifican un paso concreto.
+ * Extrae de `error.issues` los mensajes que identifican un paso concreto, sea cual sea la
+ * profundidad del `path` dentro del documento. Si un paso trae varios, gana el primero que
+ * escribió el esquema: es el más concreto.
  * `root` separa los pasos del operador de los de envasado: comparten índices.
  */
 export function extractStepErrors(
   issues: readonly ZodIssue[],
+  messages: RecipeStepErrorMessages,
   root: 'steps' | 'packingSteps' = 'steps',
 ): RecipeStepErrors {
   const result: Record<number, string> = {};
+  const fromSchema = new Set<number>();
   for (const issue of issues) {
     const [issueRoot, index] = issue.path;
     if (issueRoot !== root || typeof index !== 'number') continue;
-    result[index] = issue.message;
+    if (fromSchema.has(index)) continue;
+    if (isSchemaMessage(issue)) {
+      result[index] = issue.message;
+      fromSchema.add(index);
+    } else if (result[index] === undefined) {
+      result[index] = stepMessage(issue, messages);
+    }
   }
   return result;
 }
@@ -315,11 +398,15 @@ export function extractStepErrors(
 /**
  * Mensaje que no identifica ninguna línea concreta -típicamente "dos líneas con el mismo
  * producto", cuyo `path` es exactamente `['lines']`-. Se presenta junto al bloque de líneas, no
- * junto a una fila.
+ * junto a una fila. `fallback` cubre un issue de forma de zod sobre la lista entera.
  */
-export function extractGeneralLinesError(issues: readonly ZodIssue[]): string | undefined {
+export function extractGeneralLinesError(
+  issues: readonly ZodIssue[],
+  fallback: string,
+): string | undefined {
   const issue = issues.find((candidate) => candidate.path.length === 1 && candidate.path[0] === 'lines');
-  return issue?.message;
+  if (issue === undefined) return undefined;
+  return isSchemaMessage(issue) ? issue.message : fallback;
 }
 
 export type RecipeToolFieldName = 'productId' | 'quantity';
@@ -347,13 +434,27 @@ export function extractToolErrors(
 }
 
 /** Error del array entero (producto repetido): no apunta a ninguna fila. */
-export function extractGeneralToolsError(issues: readonly ZodIssue[]): string | undefined {
+export function extractGeneralToolsError(
+  issues: readonly ZodIssue[],
+  fallback: string,
+): string | undefined {
   const issue = issues.find((candidate) => candidate.path.length === 1 && candidate.path[0] === 'tools');
-  return issue?.message;
+  if (issue === undefined) return undefined;
+  return isSchemaMessage(issue) ? issue.message : fallback;
 }
 
-/** Mensaje de un campo raíz del formulario (`name`, `description`), por su nombre exacto de `path`. */
-export function extractFieldError(issues: readonly ZodIssue[], field: string): string | undefined {
+/**
+ * Mensaje de un campo raíz del formulario (`name`, `description`), por su nombre exacto de
+ * `path`. El `refine` del esquema pasa tal cual; `too_big` usa `messages.tooLong` y cualquier
+ * otro issue de forma (vacío, tipo) `messages.invalid`.
+ */
+export function extractFieldError(
+  issues: readonly ZodIssue[],
+  field: string,
+  messages: RecipeFieldErrorMessages,
+): string | undefined {
   const issue = issues.find((candidate) => candidate.path.length === 1 && candidate.path[0] === field);
-  return issue?.message;
+  if (issue === undefined) return undefined;
+  if (isSchemaMessage(issue)) return issue.message;
+  return issue.code === 'too_big' ? messages.tooLong : messages.invalid;
 }

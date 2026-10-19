@@ -50,8 +50,9 @@ function hasPermission(
  * tiene ninguno de los permisos igual recibe `['asignados']`, porque esta funcion no decide
  * si el usuario puede entrar a `/asignacion` en absoluto, solo que vistas le tocan si entra.
  *
- * `por_empacar` se anade SIEMPRE AL FINAL, sea cual sea la vista por defecto que ya se calculo:
- * no cambia el aterrizaje de nadie, solo ofrece la pestana a quien tiene `empaque.modificar`.
+ * El trabajo pendiente va antes que el historial: `por_empacar` (con `empaque.modificar`) se
+ * ofrece detras de «Todos» o de «Mis asignados», pero DELANTE de «Terminados». Asi el empacador
+ * sin ejecucion aterriza en `por_empacar`, y quien ejecuta pedidos sigue aterrizando en `asignados`.
  * Detras van `por_acondicionar`, `acondicionados` y `acondicionados_entregados`, con
  * `acondicionamiento.modificar`; a quien solo tiene esas no se le anade la reserva, y aterriza en
  * `por_acondicionar`.
@@ -60,12 +61,15 @@ export function resolveAssignmentViews(
   bearer: PermissionBearer | null | undefined,
 ): readonly AssignmentViewKind[] {
   const views: AssignmentViewKind[] = [];
-  if (hasPermission(bearer, PEDIDOS_CONSULTAR)) views.push('todos');
-  else {
+  const empaca = hasPermission(bearer, EMPAQUE_MODIFICAR);
+  if (hasPermission(bearer, PEDIDOS_CONSULTAR)) {
+    views.push('todos');
+    if (empaca) views.push('por_empacar');
+  } else {
     if (canExecuteAssignedOrders(bearer)) views.push('asignados');
+    if (empaca) views.push('por_empacar');
     if (hasPermission(bearer, TERMINADOS_CONSULTAR)) views.push('terminados');
   }
-  if (hasPermission(bearer, EMPAQUE_MODIFICAR)) views.push('por_empacar');
   if (hasPermission(bearer, ACONDICIONAMIENTO_MODIFICAR)) {
     views.push('por_acondicionar', 'acondicionados', 'acondicionados_entregados');
   }

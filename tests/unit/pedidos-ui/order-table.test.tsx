@@ -116,7 +116,9 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -735,5 +737,28 @@ describe('R13: la tabla monta un solo panel o dialogo, el del pedido elegido', (
     rerender(tabla(PEDIDOS.filter((order) => order.id !== 'o2')));
 
     expect(screen.getByTestId(CANCEL_ORDER_ID_TESTID)).toHaveValue('o2');
+  });
+});
+
+describe('la lista de pedidos lleva la columna «Por entregar», traida del dashboard', () => {
+  it('su cabecera aparece, justo despues de «Presentación»', () => {
+    montar();
+    const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+    const presentacion = cabeceras.findIndex((texto) => texto.includes('Presentación'));
+
+    expect(presentacion).toBeGreaterThanOrEqual(0);
+    expect(cabeceras[presentacion + 1]).toContain('Por entregar');
+  });
+});
+
+describe('la lista de pedidos ya no lleva la columna «Cantidad» (decision humana del 2026-10-16)', () => {
+  it('ninguna cabecera dice «Cantidad» y «Presentación» y «Por entregar» siguen', () => {
+    montar();
+    const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+
+    expect(cabeceras.some((texto) => texto.includes('Cantidad'))).toBe(false);
+    expect(screen.queryByTestId('data-table-head-quantity')).toBeNull();
+    expect(cabeceras.some((texto) => texto.includes('Presentación'))).toBe(true);
+    expect(cabeceras.some((texto) => texto.includes('Por entregar'))).toBe(true);
   });
 });

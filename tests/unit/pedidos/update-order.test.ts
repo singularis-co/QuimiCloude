@@ -649,7 +649,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const repo = repositorioDePedidos();
     repo.lockAliveById.mockResolvedValue({
       ...filaExistente(),
-      presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1, packagingProductId: null }],
+      presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1, packagingProductId: null, presentationContent: null }],
       reservedAt: null,
       packagingCost: null,
     });
@@ -682,7 +682,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const repo = repositorioDePedidos();
     repo.lockAliveById.mockResolvedValue({
       ...filaExistente(),
-      presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1, packagingProductId: null }],
+      presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1, packagingProductId: null, presentationContent: null }],
       reservedAt: null,
       packagingCost: null,
     });

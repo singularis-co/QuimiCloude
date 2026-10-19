@@ -217,6 +217,18 @@ describe('StepEvidence', () => {
     expect(input).toHaveAttribute('capture', 'environment');
     expect(input).not.toHaveAttribute('multiple');
   });
+
+  it('la foto llena su casilla sin recortarse y no se pinta el nombre del archivo', () => {
+    render(<StepEvidence stepPosition={1} photos={[OK_1]} />);
+
+    const tile = screen.getByTestId('step-evidence-tile-1');
+    const img = tile.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img?.className).toContain('size-full');
+    expect(img?.className).toContain('object-contain');
+    expect(img?.className).not.toContain('object-cover');
+    expect(tile).not.toHaveTextContent('1.webp');
+  });
 });
 
 describe('StepEvidence en modo consulta', () => {

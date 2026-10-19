@@ -53,9 +53,15 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
 - **R3** [Permiso] El servidor DEBE decidir el acceso por el permiso y nunca por el rol: un actor con
   `inventario.consultar` y un rol cualquiera DEBE ser aceptado, y un Administrador sin ese permiso
   en su conjunto DEBE ser rechazado.
-- **R4** [Permiso] El tab Entregas, incluido el nombre del cliente, y el tab Costo de producción NO
-  DEBEN exigir ningún permiso además de `inventario.consultar` (ni `pedidos.consultar` ni
-  `clientes.consultar`).
+- **R4** [Permiso] El tab Entregas, incluido el nombre del cliente, NO DEBE exigir ningún permiso
+  además de `inventario.consultar` (ni `pedidos.consultar` ni `clientes.consultar`). El tab Costo de
+  producción NO DEBE exigir `pedidos.consultar` ni `recetas.consultar`, pero sí lo que pide R37.
+
+  > **Enmendado el 2026-10-16 (enmienda aprobada por el usuario, sin tarjeta; commits `b0eaa866`,
+  > `6a665e3f`).** Texto original: «El tab Entregas, incluido el nombre del cliente, y el tab Costo
+  > de producción NO DEBEN exigir ningún permiso además de `inventario.consultar` (ni
+  > `pedidos.consultar` ni `clientes.consultar`).» **Queda sustituido en la parte del Costo de
+  > producción** por R37: el costo solo lo ve el Administrador. La parte de Entregas sigue igual.
 
 ### Producto no encontrado
 
@@ -94,6 +100,12 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
   dirección, de modo que recargar o compartir el enlace abra el mismo tab y la misma página. CUANDO
   cambia de tab, DEBE volver a la página 1. SI el tab de la dirección no es uno de los siete,
   ENTONCES DEBE abrir General.
+
+  > **Enmienda del 2026-10-16 a R8 y R9** (aprobada por el usuario, sin tarjeta; `b0eaa866`,
+  > `6a665e3f`). El tab Costo de producción solo se muestra a quien cumple R37; para el resto la
+  > ficha tiene un tab menos y el orden de los demás no cambia. SI la dirección pide `?tab=costo` y
+  > la sesión no cumple R37, ENTONCES la ficha DEBE abrir General, igual que con un tab desconocido.
+  > (El tab Reparto que hoy cierra la lista no es de esta enmienda.)
 
 ### General y Stock
 
@@ -213,6 +225,18 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
   DEBEN exigir ningún permiso además de `inventario.consultar` (ni `pedidos.consultar` ni
   `entregas.anular`), y la ficha NO DEBE ofrecer ningún control para anular una entrega.
 
+### Costo solo para el Administrador
+
+*(Añadido el 2026-10-16: enmienda aprobada por el usuario, sin tarjeta; commits `b0eaa866` y
+`6a665e3f`. Sustituye a R4 en la parte del Costo de producción.)*
+
+- **R37** [Costos visibles, Permiso] SI el actor tiene `inventario.consultar` pero no cumple la regla
+  de ver costos unitarios (hoy, tener `inventario.modificar`, que entre los roles sembrados solo
+  tiene el Administrador), ENTONCES la lectura del Costo de producción DEBE responder `unauthorized`
+  sin llamar a ningún puerto, y la ficha NO DEBE mostrar el tab Costo de producción. La regla DEBE
+  decidirse por permiso y no por rol, y DEBE fallar cerrada (sin sesión o sin permisos, no se ven
+  costos).
+
 ### Cobertura de las decisiones cerradas
 
 | Decisión (tema) | Requisitos |
@@ -223,9 +247,9 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
 | «Salidas» frente a «Entregas» [Salidas] | R17, R18, R19, R20 |
 | «Ventas» [Ventas] | R17 |
 | ¿Qué muestra «Costo de producción»? [Costo] | R21, R22 |
-| ¿Se muestran costos? [Costos visibles] | R4, R21 |
+| ¿Se muestran costos? [Costos visibles] | R21, R37 (R4 en su parte de costo, sustituida el 2026-10-16) |
 | ¿Solo consulta o con acciones? [Solo consulta] | R7, R36 |
-| ¿Quién puede ver la ficha? [Permiso] | R1, R2, R3, R4, R25, R29, R36 |
+| ¿Quién puede ver la ficha? [Permiso] | R1, R2, R3, R4, R25, R29, R36, R37 |
 | Producto borrado [Borrado] | R5, R6 |
 | ¿Lleva E2E? [E2E] | R31 |
 | Unidades [Unidades] | R11, R12, R13, R15, R17, R19, R21, R34 |
@@ -233,6 +257,7 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
 | Listados largos [Paginación] | R23, R24 |
 | Identificadores y borrado [Identificadores] | R5 (borrado lógico), R32 (sin identificadores nuevos en la base) |
 | Entrega anulada en Entregas y en Entradas [Anulación] (2026-10-13) | R33, R34, R35, R36 |
+| Costo solo para el Administrador [Costos visibles] (2026-10-16) | R4 (enmendado), R8/R9 (enmienda), R37 |
 
 ## Preguntas abiertas
 
@@ -248,7 +273,7 @@ Ninguna. P1 se cerró el 2026-10-13 tal como se proponía (ver `## Decisiones ce
 | 2026-10-09 | ¿Qué es «Salidas» y en qué se diferencia de «Entregas»? | Salidas es el libro completo de lo que restó stock: entregas y ajustes que restan. Entregas es el detalle de cada entrega: cliente, pedido, lote y envases. Una entrega aparece en los dos tabs. |
 | 2026-10-09 | «Ventas» | No existe un modelo de venta. Las ventas registradas como ajustes que restan (QC-150 D7) se ven en Salidas. |
 | 2026-10-09 | ¿Qué muestra «Costo de producción»? | Por cada lote producido: la orden, la cantidad que entró, el costo unitario y el costo total. Usa los datos guardados (QC-150 D4/D12). Sin desglose de insumos. |
-| 2026-10-09 | ¿Se muestran costos? | Sí, igual que en /inventario: lo ve quien tiene `inventario.consultar`. |
+| 2026-10-09 | ¿Se muestran costos? | Sí, igual que en /inventario: lo ve quien tiene `inventario.consultar`. **Sustituida el 2026-10-16** (fila del final). |
 | 2026-10-09 | ¿Solo consulta o con acciones? | Solo consulta. |
 | 2026-10-09 | ¿Quién puede ver la ficha? | Quien tiene `inventario.consultar` (Administrador, Operador). Se valida en el service, por permiso y nunca por rol. El tab Entregas, incluido el cliente, no exige `pedidos.consultar`. |
 | 2026-10-09 | ¿Qué pasa con un producto borrado (borrado lógico)? | La ficha muestra «no encontrado», como el detalle de proveedor. Lo mismo para un id de otra empresa o de un producto que no es terminado. |
@@ -259,3 +284,4 @@ Ninguna. P1 se cerró el 2026-10-13 tal como se proponía (ver `## Decisiones ce
 | 2026-10-09 | Identificadores y borrado | Heredado de QC-150 D10 / QC-4: identificadores en inglés, borrado lógico. |
 | 2026-10-13 | ¿Cómo se ve una entrega anulada? (era P2; QC-224 ya está en `dev`) | En Entregas, una entrega con presentaciones anuladas conserva su fila, marcada «Anulada» con su motivo, y lo anulado no cuenta en el total entregado. El asiento `delivery_void` sale en Entradas con la etiqueta «Anulación de entrega». |
 | 2026-10-13 | ¿Se pinta el enlace desde /pedidos si quien ve la lista no tiene `inventario.consultar`? (era P1) | No: se aprueba la propuesta de R29. Sin `inventario.consultar` no se pinta el enlace, porque llevaría a una ficha que responde 404 (R1); y si la consulta falla, la lista se pinta igual, sin enlaces. |
+| 2026-10-16 | ¿Quién ve el Costo de producción? | **Enmienda aprobada por el usuario, sin tarjeta** (commits `b0eaa866`, `6a665e3f`). Solo el Administrador: hace falta `inventario.modificar` (`canViewUnitCosts`) además de `inventario.consultar`. El servidor responde `unauthorized` a los demás; el tab no se pinta y `?tab=costo` cae a General. Sustituye la fila «¿Se muestran costos?» del 2026-10-09 y R4 en su parte de costo. Cubierta por R37 y la enmienda a R8/R9. |

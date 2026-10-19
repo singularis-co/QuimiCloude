@@ -32,6 +32,8 @@ import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { ListQuery } from '@/lib/modules/pedidos/domain/list-query'
+import type { OrderDeliveryProgress } from '@/lib/modules/pedidos/domain/order-catalog'
+import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { Page } from '@/lib/modules/pedidos/domain/page'
 import type { ListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log'
@@ -40,6 +42,7 @@ import type { CustomerRef } from '@/lib/modules/clientes'
 import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades'
+import { fakeDeliveryProgress } from '../../helpers/delivery-progress-double'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double'
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
@@ -99,6 +102,7 @@ function dobles(opciones: {
   presentaciones?: readonly PresentationRef[]
   unidades?: readonly UnitRef[]
   clientes?: readonly CustomerRef[]
+  progreso?: readonly OrderDeliveryProgress[]
 }) {
   // Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- porque lo que este archivo
   // afirma es lo que se LE PASO a cada doble: sin ellos, TypeScript infiere una tupla vacia y
@@ -154,8 +158,12 @@ function dobles(opciones: {
 
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() }
 
+  const deliveryProgress = fakeDeliveryProgress(opciones.progreso)
+
   return {
     orders,
+    deliveryProgress,
+    listDeliveryProgress: deliveryProgress.listDeliveryProgressByIdsIncludingDeleted,
     customerCatalog: { findRefsIncludingDeleted: findCustomerRefs },
     findCustomerRefs,
     recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
@@ -320,6 +328,36 @@ describe('listOrders — lo que devuelve cada fila (R43, R44, R46, R29)', () => 
     expect(salida.items[1]?.recipeName).toBe('Acido citrico 50%')
     expect(salida.items[1]?.recipeVersion).toBeNull()
     // Sigue siendo UNA llamada al catalogo para versiones y originales.
+    expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
+  })
+
+  it('cada fila lleva la imagen de su receta, la de la original para una version, con una sola llamada', async () => {
+    const VERSION = '55555555-5555-4555-8555-555555555555'
+    const URL_A = 'https://cdn.test/recetas/acido.jpg'
+    const d = dobles({
+      pagina: pagina([
+        fila({ id: 'o-1', recipeId: VERSION }),
+        fila({ id: 'o-2', recipeId: RECETA_A }),
+        fila({ id: 'o-3', recipeId: RECETA_B }),
+      ]),
+      recetas: [
+        ...REFS_RECETA.map((ref) => (ref.id === RECETA_A ? { ...ref, imageUrl: URL_A } : ref)),
+        {
+          id: VERSION,
+          name: 'Acido citrico 50% · Sin perfume',
+          ownName: 'Sin perfume',
+          isUnderReview: false,
+          original: { id: RECETA_A, name: 'Acido citrico 50%' },
+          isDeleted: false,
+          // El catalogo ya resuelve la de la original para una version.
+          imageUrl: URL_A,
+        },
+      ],
+    })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(salida.items.map((item) => item.recipeImageUrl)).toEqual([URL_A, URL_A, null])
     expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
   })
 
@@ -748,11 +786,11 @@ describe('listOrders — el reparto del pedido (R21, R22, R26, R27)', () => {
       fila({
         id: 'o-1',
         presentationLines: [
-          { presentationId: PRESENTACION_A, packages: 5, packagingProductId: null },
-          { presentationId: PRESENTACION_B, packages: 1, packagingProductId: null },
+          { presentationId: PRESENTACION_A, packages: 5, packagingProductId: null, presentationContent: null },
+          { presentationId: PRESENTACION_B, packages: 1, packagingProductId: null, presentationContent: null },
         ],
       }),
-      fila({ id: 'o-2', presentationLines: [{ presentationId: PRESENTACION_A, packages: 3, packagingProductId: null }] }),
+      fila({ id: 'o-2', presentationLines: [{ presentationId: PRESENTACION_A, packages: 3, packagingProductId: null, presentationContent: null }] }),
       fila({ id: 'o-3', presentationLines: [] }),
     ]
     const d = dobles({
@@ -768,11 +806,11 @@ describe('listOrders — el reparto del pedido (R21, R22, R26, R27)', () => {
     expect(d.findRefs).toHaveBeenCalledTimes(1)
     expect(d.findRefs.mock.calls[0]?.[0]).toEqual([PRESENTACION_A, PRESENTACION_B])
     expect(salida.items[0]?.presentationLines).toEqual([
-      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null },
-      { presentationId: PRESENTACION_B, presentationName: 'Botella 1L', packages: 1, packagingProductId: null, packagingName: null },
+      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
+      { presentationId: PRESENTACION_B, presentationName: 'Botella 1L', packages: 1, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ])
     expect(salida.items[1]?.presentationLines).toEqual([
-      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 3, packagingProductId: null, packagingName: null },
+      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 3, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ])
     // R27: sin reparto, lista vacia; no es un error de carga.
     expect(salida.items[2]?.presentationLines).toEqual([])
@@ -851,5 +889,170 @@ describe("listOrders — la unidad del pedido (R42, [Q4] deroga QC-35bis)", () =
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
     expect(salida.items[0]?.unitLabel).toBe('Litro')
+  })
+})
+
+// «Por entregar» paso del dashboard al listado de pedidos con el mismo criterio que tenia alli:
+// lo contado al empacar menos lo entregado sin anular, por presentacion. La fila distingue lo que
+// aun no se empaco (`not_packed`) de lo empacado y ya entregado (`delivered`).
+describe('listOrders — por entregar', () => {
+  const GALON = '77777777-7777-4777-8777-777777777777'
+  const VASO = '99999999-9999-4999-8999-999999999999'
+  const PRESENTACIONES: readonly PresentationRef[] = [
+    { id: GALON, name: 'Galón', content: null, unitId: 'unidad-1' },
+    { id: VASO, name: 'Vaso', content: null, unitId: 'unidad-1' },
+  ]
+  type Linea = { presentationId: string; packages: number; packedPackages?: number | null; deliveredPackages?: number }
+  const reparto = (...ids: readonly string[]) =>
+    ids.map((presentationId) => ({ presentationId, packages: 1, presentationContent: null, packagingProductId: null }))
+  function progreso(id: string, lineas: readonly Linea[]): OrderDeliveryProgress {
+    return {
+      id,
+      recipeId: RECETA_A,
+      lines: lineas.map((l) => ({
+        presentationId: l.presentationId,
+        packages: l.packages,
+        packedPackages: l.packedPackages ?? null,
+        deliveredPackages: l.deliveredPackages ?? 0,
+      })),
+    }
+  }
+  async function estadoDe(status: OrderStatus, lineas: readonly Linea[]) {
+    const d = dobles({
+      pagina: pagina([fila({ id: 'o-1', status, presentationLines: reparto(GALON, VASO) })]),
+      presentaciones: PRESENTACIONES,
+      progreso: [progreso('o-1', lineas)],
+    })
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+    return salida.items[0]?.pendingDelivery
+  }
+
+  it('sin nada entregado falta todo lo empacado, en el orden del reparto', async () => {
+    const estado = await estadoDe('TERMINADO', [
+      { presentationId: GALON, packages: 10, packedPackages: 10 },
+      { presentationId: VASO, packages: 5, packedPackages: 5 },
+    ])
+
+    expect(estado).toEqual({
+      kind: 'pending',
+      items: [
+        { label: 'Galón', quantity: 10 },
+        { label: 'Vaso', quantity: 5 },
+      ],
+    })
+  })
+
+  it('descuenta lo entregado de lo contado al empacar y omite la linea que ya no debe nada', async () => {
+    const estado = await estadoDe('TERMINADO', [
+      { presentationId: GALON, packages: 10, packedPackages: 8, deliveredPackages: 3 },
+      { presentationId: VASO, packages: 5, packedPackages: 5, deliveredPackages: 5 },
+    ])
+
+    expect(estado).toEqual({ kind: 'pending', items: [{ label: 'Galón', quantity: 5 }] })
+  })
+
+  it('un TERMINADO que empaco y entrego todo es entregado', async () => {
+    const estado = await estadoDe('TERMINADO', [
+      { presentationId: GALON, packages: 4, packedPackages: 4, deliveredPackages: 4 },
+      { presentationId: VASO, packages: 2, packedPackages: 3, deliveredPackages: 3 },
+    ])
+
+    expect(estado).toEqual({ kind: 'delivered' })
+  })
+
+  it('un TERMINADO sin conteo guardado usa el plan, como el sheet de entrega', async () => {
+    const estado = await estadoDe('TERMINADO', [{ presentationId: GALON, packages: 6, deliveredPackages: 2 }])
+
+    expect(estado).toEqual({ kind: 'pending', items: [{ label: 'Galón', quantity: 4 }] })
+  })
+
+  it('lo empacado y aun sin acondicionar ya queda por entregar', async () => {
+    const estado = await estadoDe('POR_ACONDICIONAR', [{ presentationId: VASO, packages: 3, packedPackages: 2 }])
+
+    expect(estado).toEqual({ kind: 'pending', items: [{ label: 'Vaso', quantity: 2 }] })
+  })
+
+  it('un pedido que empaco cero envases no tiene nada empacado', async () => {
+    const estado = await estadoDe('TERMINADO', [
+      { presentationId: GALON, packages: 4, packedPackages: 0 },
+      { presentationId: VASO, packages: 2, packedPackages: 0 },
+    ])
+
+    expect(estado).toEqual({ kind: 'not_packed' })
+  })
+
+  it('un pedido de un estado de empaque sin lineas no tiene nada empacado', async () => {
+    expect(await estadoDe('TERMINADO', [])).toEqual({ kind: 'not_packed' })
+  })
+
+  it('un pedido ENTREGADO es entregado aunque no tenga entregas anotadas', async () => {
+    expect(await estadoDe('ENTREGADO', [{ presentationId: GALON, packages: 10 }])).toEqual({ kind: 'delivered' })
+  })
+
+  it('un ENTREGADO antiguo, sin lineas de reparto, es entregado', async () => {
+    expect(await estadoDe('ENTREGADO', [])).toEqual({ kind: 'delivered' })
+  })
+
+  it.each(['PENDIENTE', 'EN_CURSO', 'BLOQUEADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'] as const)(
+    'un pedido %s no tiene nada empacado, mire lo que mire el reparto',
+    async (status) => {
+      const estado = await estadoDe(status, [
+        { presentationId: GALON, packages: 4, packedPackages: 4 },
+        { presentationId: VASO, packages: 2 },
+      ])
+
+      expect(estado).toEqual({ kind: 'not_packed' })
+    },
+  )
+
+  it('una linea cuya presentacion no vuelve del catalogo cuenta para el estado pero no se pinta', async () => {
+    const OTRA = '00000000-0000-4000-8000-000000000000'
+    const d = dobles({
+      pagina: pagina([fila({ id: 'o-1', status: 'TERMINADO', presentationLines: reparto(OTRA, VASO) })]),
+      presentaciones: PRESENTACIONES,
+      progreso: [progreso('o-1', [{ presentationId: OTRA, packages: 4 }, { presentationId: VASO, packages: 2 }])],
+    })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(salida.items[0]?.pendingDelivery).toEqual({ kind: 'pending', items: [{ label: 'Vaso', quantity: 2 }] })
+  })
+
+  it('una sola consulta de lo entregado por pagina, con los ids de la pagina y la empresa del actor', async () => {
+    const d = dobles({
+      pagina: pagina(
+        [
+          fila({ id: 'o-1', status: 'TERMINADO', presentationLines: reparto(GALON) }),
+          fila({ id: 'o-2', status: 'TERMINADO', presentationLines: reparto(VASO) }),
+          fila({ id: 'o-3', status: 'TERMINADO', presentationLines: reparto(GALON) }),
+        ],
+        { total: 3 },
+      ),
+      presentaciones: PRESENTACIONES,
+      progreso: [
+        progreso('o-1', [{ presentationId: GALON, packages: 1 }]),
+        progreso('o-2', [{ presentationId: VASO, packages: 2 }]),
+      ],
+    })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(d.listDeliveryProgress).toHaveBeenCalledTimes(1)
+    expect(d.listDeliveryProgress).toHaveBeenCalledWith(ADMIN.companyId, ['o-1', 'o-2', 'o-3'])
+    // Las presentaciones de lo pendiente salen de la misma consulta del reparto: no hay otra.
+    expect(d.findRefs).toHaveBeenCalledTimes(1)
+    expect(salida.items.map((item) => item.pendingDelivery)).toEqual([
+      { kind: 'pending', items: [{ label: 'Galón', quantity: 1 }] },
+      { kind: 'pending', items: [{ label: 'Vaso', quantity: 2 }] },
+      { kind: 'not_packed' },
+    ])
+  })
+
+  it('una pagina vacia no consulta lo entregado', async () => {
+    const d = dobles({ pagina: pagina([]) })
+
+    await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(d.listDeliveryProgress).not.toHaveBeenCalled()
   })
 })

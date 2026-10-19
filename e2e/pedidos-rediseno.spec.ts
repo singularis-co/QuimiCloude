@@ -33,6 +33,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, type Credentials } from './helpers/landing';
+import { submitOrderWithLeftover } from './helpers/order-distribution';
 
 const FIXTURE_PREFIX = 'qc262_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -735,7 +736,8 @@ test.describe('Pedidos rediseñado', () => {
     await form.getByTestId(TESTIDS.quantity).fill(BLOCKING_QUANTITY);
     await form.getByTestId(TESTIDS.unitSelect).click();
     await page.locator(`[data-testid="${TESTIDS.unitOption}"][data-value="${unit}"]`).click();
-    await form.getByTestId(TESTIDS.orderSubmit).click();
+    // Sin reparto toda la cantidad queda sin envasar: Guardar pregunta antes del bloqueo.
+    await submitOrderWithLeftover(page, form);
 
     const dialog = page.getByTestId(TESTIDS.blockedDialog);
     await expectCenteredAndWhole(page, dialog, 'Material insuficiente');

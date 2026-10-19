@@ -14,20 +14,17 @@ export {
   type ExecutionTraceTableProps,
 } from './execution-trace-table';
 export {
-  ActiveOrderMark,
   DeletedOrderMark,
   TRACE_ACTIONS_LABEL_PREFIX,
   TRACE_FORMULA_COLUMN_ID,
   TRACE_IMAGE_COLUMN_ID,
   TRACE_LINK_TEXT,
   TRACE_MENU_TITLE_PREFIX,
-  TRACE_PENDING_COLUMN_ID,
   TRACE_PRESENTATIONS_COLUMN_ID,
   buildExecutionTraceColumns,
   type ExecutionTraceColumnsDeps,
 } from './execution-trace-columns';
 export {
-  ACTIVE_ORDER_MARK,
   CONDITIONING_TEXTS,
   DELETED_ORDER_MARK,
   EXECUTION_ACTION_LABELS,
@@ -36,10 +33,8 @@ export {
   PHASE_OPEN_MARK,
   PHASE_UNCLOSED_MARK,
   TRACE_DURATION_SUFFIXES,
-  TRACE_NOTHING_PENDING_MARK,
   TRACE_ORDER_STATUS_LABELS,
   formatElapsed,
-  formatTracePresentations,
   formatElapsedMinutes,
   formatSnapshotDate,
   formatTraceInstant,

@@ -27,6 +27,7 @@
     "clientes/customers-migration.int.test.ts",
     "clientes/customers-search-migration.int.test.ts",
     "documentos/document-batches-and-files-constraints.int.test.ts",
+    "identity/administrator.int.test.ts",
     "identity/company-addons.int.test.ts",
     "identity/company-country.int.test.ts",
     "identity/company-directory-addons.int.test.ts",
@@ -125,6 +126,11 @@
       "archivo": "identity/assignment-directory.int.test.ts",
       "motivo": "QC-87 T3: ejercita el adaptador driven assignment-directory-prisma, que habla con el cliente Prisma GLOBAL y reutiliza listMembersAliveInCompany de QC-84, tambien global. Envolver esas llamadas en una transaccion del test seria un aislamiento de mentira -correrian en otra conexion del pool y no verian ni una fila del fixture-. Cada caso fabrica su empresa efimera (randomUUID) y la borra en un finally en el orden que respetan las FK; el afterAll afirma que no quedo ninguna. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-13"
+    },
+    {
+      "archivo": "identity/administrator-concurrency.int.test.ts",
+      "motivo": "QC-165 T10: prueba que el 'SELECT ... FOR UPDATE' del conjunto de Administradores vivos en 'softDelete' de 'administrator-prisma.ts' serializa DOS transacciones que CONFIRMAN, con dos PrismaClient de pools distintos y el repositorio construido sobre cada uno. Una transaccion del test que se deshace es incompatible por construccion con lo que aqui se mide. Cada caso fabrica su propia empresa con nombre irrepetible y sus Administradores, y los borra en un 'finally' (usuarios y despues empresa, por las FK RESTRICT); 'afterAll' comprueba que no quedo ninguna. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
     },
     {
       "archivo": "identity/credential-setup.int.test.ts",

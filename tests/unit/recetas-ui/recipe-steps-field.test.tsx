@@ -85,7 +85,7 @@ function DoubleHarness() {
         steps={packing}
         onChange={setPacking}
         title="Pasos de envasado"
-        addLabel="Añadir paso de envasado"
+        optionalHelp={{ text: 'Ayuda de envasado', label: 'Qué son los pasos de envasado' }}
         testIdPrefix="recipe-packing-step"
         errors={{ 1: 'Paso de envasado vacio' }}
       />
@@ -94,12 +94,16 @@ function DoubleHarness() {
 }
 
 describe('RecipeStepsField reutilizable (QC-211)', () => {
-  it('R7: sin props nuevas conserva titulo, texto de añadir y todos los data-testid de hoy', () => {
+  it('R7: sin props nuevas conserva titulo y los data-testid de hoy, sin botón «Añadir paso» ni «(opcional)»', () => {
     render(<SingleHarness />);
 
     const field = screen.getByTestId('recipe-steps-field');
     expect(within(field).getByRole('heading', { name: 'Pasos' })).toBeInTheDocument();
-    expect(screen.getByTestId('recipe-step-add')).toHaveTextContent('Añadir paso');
+    expect(screen.queryByTestId('recipe-step-add')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Añadir paso' })).toBeNull();
+    expect(screen.queryByTestId('recipe-steps-optional')).toBeNull();
+    expect(screen.queryByTestId('recipe-steps-help')).toBeNull();
+    expect(screen.getByTestId('recipe-step-add-0')).toBeInTheDocument();
     expect(screen.getByTestId('recipe-steps-list')).toBeInTheDocument();
     expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(1);
     expect(screen.getByTestId('recipe-step-handle-0')).toBeInTheDocument();
@@ -109,12 +113,14 @@ describe('RecipeStepsField reutilizable (QC-211)', () => {
     expect(screen.getByTestId('recipe-step-field-error-0')).toHaveAttribute('id', 'recipe-step-error-0');
   });
 
-  it('R7: con testIdPrefix de envasado salen titulo, texto de añadir y data-testid propios', () => {
+  it('R7: con testIdPrefix de envasado salen titulo, «(opcional)» y data-testid propios', () => {
     render(<DoubleHarness />);
 
     const field = screen.getByTestId('recipe-packing-steps-field');
-    expect(within(field).getByRole('heading', { name: 'Pasos de envasado' })).toBeInTheDocument();
-    expect(screen.getByTestId('recipe-packing-step-add')).toHaveTextContent('Añadir paso de envasado');
+    expect(within(field).getByRole('heading', { name: /^Pasos de envasado/ })).toBeInTheDocument();
+    expect(screen.queryByTestId('recipe-packing-step-add')).toBeNull();
+    expect(screen.getByTestId('recipe-packing-steps-optional')).toHaveTextContent('(opcional)');
+    expect(screen.getByTestId('recipe-packing-step-add-1')).toBeInTheDocument();
     expect(screen.getByTestId('recipe-packing-steps-list')).toBeInTheDocument();
     expect(screen.getAllByTestId('recipe-packing-step-row')).toHaveLength(2);
     expect(screen.getByTestId('recipe-packing-step-handle-1')).toBeInTheDocument();
@@ -133,7 +139,7 @@ describe('RecipeStepsField reutilizable (QC-211)', () => {
     const user = setupUser();
     render(<DoubleHarness />);
 
-    await user.click(screen.getByTestId('recipe-packing-step-add'));
+    await user.click(screen.getByTestId('recipe-packing-step-add-1'));
     expect(screen.getAllByTestId('recipe-packing-step-row')).toHaveLength(3);
     expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(2);
 
@@ -207,7 +213,7 @@ describe('RecipeStepsField — «Requiere evidencia» (QC-214)', () => {
     render(<EvidenceHarness initial={[step('a', 'Pesar')]} />);
 
     expect(evidenceSwitch(1)).toHaveAttribute('aria-checked', 'false');
-    await user.click(screen.getByTestId('recipe-step-add'));
+    await user.click(screen.getByTestId('recipe-step-add-0'));
     expect(evidenceSwitch(2)).toHaveAttribute('aria-checked', 'false');
     expect(lastSteps[1]?.document.requiresEvidence).toBeUndefined();
   });
@@ -255,7 +261,7 @@ describe('RecipeStepsField — «Requiere evidencia» (QC-214)', () => {
     );
   });
 
-  it('R8: bloqueado, mover y quitar se deshabilitan con su motivo; el interruptor y añadir siguen activos', async () => {
+  it('R8: bloqueado, mover y quitar se deshabilitan con su motivo; el interruptor y añadir al final siguen activos', async () => {
     const user = setupUser();
     render(<EvidenceHarness initial={[step('a', 'Pesar'), step('b', 'Mezclar')]} locked />);
 
@@ -270,12 +276,14 @@ describe('RecipeStepsField — «Requiere evidencia» (QC-214)', () => {
 
     await user.click(evidenceSwitch(1));
     expect(evidenceSwitch(1)).toHaveAttribute('aria-checked', 'true');
-    await user.click(screen.getByTestId('recipe-step-add'));
+    expect(screen.getByTestId('recipe-step-add-0')).toBeDisabled();
+    await user.click(screen.getByTestId('recipe-step-add-1'));
     expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(3);
+    expect(lastSteps.map((s) => s.key).slice(0, 2)).toEqual(['a', 'b']);
   });
 });
 
-describe('RecipeStepsField — «Añadir paso» solo con todos los pasos rellenos', () => {
+describe('RecipeStepsField — el «+» de cada fila solo con todos los pasos rellenos', () => {
   it('isStepDocumentEmpty recorre párrafos e ítems de checklist y solo cuenta texto tras trim', () => {
     expect(isStepDocumentEmpty({ blocks: [] })).toBe(true);
     expect(isStepDocumentEmpty({ blocks: [{ kind: 'paragraph', spans: [] }] })).toBe(true);
@@ -291,22 +299,28 @@ describe('RecipeStepsField — «Añadir paso» solo con todos los pasos relleno
     expect(isStepDocumentEmpty(doc('Mezclar'))).toBe(false);
   });
 
-  it('sin pasos, añadir está activo', () => {
-    render(<SingleHarness initial={[]} />);
-    expect(screen.getByTestId('recipe-step-add')).toBeEnabled();
-  });
-
-  it('con un paso vacío, añadir se deshabilita; con todos con texto, vuelve a estar activo', async () => {
+  it('con un paso vacío, el «+» se deshabilita en todas las filas; con todos con texto, vuelve a estar activo', async () => {
     const user = setupUser();
     render(<SingleHarness initial={[step('a', 'Pesar')]} />);
-    expect(screen.getByTestId('recipe-step-add')).toBeEnabled();
+    expect(screen.getByTestId('recipe-step-add-0')).toBeEnabled();
 
-    await user.click(screen.getByTestId('recipe-step-add'));
+    await user.click(screen.getByTestId('recipe-step-add-0'));
     expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(2);
-    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+    expect(screen.getByTestId('recipe-step-add-0')).toBeDisabled();
+    expect(screen.getByTestId('recipe-step-add-1')).toBeDisabled();
   });
 
-  it('cuando el paso vacío recibe texto, añadir vuelve a estar activo', () => {
+  it('el «+» inserta el paso nuevo justo después de su fila', async () => {
+    const user = setupUser();
+    render(<EvidenceHarness initial={[step('a', 'Pesar'), step('b', 'Mezclar')]} />);
+
+    await user.click(screen.getByTestId('recipe-step-add-0'));
+    expect(lastSteps.map((s) => s.key)[0]).toBe('a');
+    expect(lastSteps.map((s) => s.key)[2]).toBe('b');
+    expect(isStepDocumentEmpty(lastSteps[1]?.document ?? doc('x'))).toBe(true);
+  });
+
+  it('cuando el paso vacío recibe texto, el «+» vuelve a estar activo', () => {
     const noop = () => undefined;
     const { rerender } = render(
       <RecipeStepsField
@@ -314,13 +328,14 @@ describe('RecipeStepsField — «Añadir paso» solo con todos los pasos relleno
         onChange={noop}
       />,
     );
-    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+    expect(screen.getByTestId('recipe-step-add-0')).toBeDisabled();
 
     rerender(<RecipeStepsField steps={[step('a', 'Pesar'), step('b', 'Mezclar')]} onChange={noop} />);
-    expect(screen.getByTestId('recipe-step-add')).toBeEnabled();
+    expect(screen.getByTestId('recipe-step-add-0')).toBeEnabled();
+    expect(screen.getByTestId('recipe-step-add-1')).toBeEnabled();
   });
 
-  it('`locked` no cambia la regla: con un paso vacío añadir sigue deshabilitado', () => {
+  it('`locked` no cambia la regla: con un paso vacío el «+» sigue deshabilitado', () => {
     render(
       <RecipeStepsField
         steps={[{ key: 'a', document: { blocks: [{ kind: 'paragraph', spans: [] }] } }]}
@@ -328,12 +343,12 @@ describe('RecipeStepsField — «Añadir paso» solo con todos los pasos relleno
         locked
       />,
     );
-    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+    expect(screen.getByTestId('recipe-step-add-0')).toBeDisabled();
   });
 
   it('un paso con solo espacios cuenta como vacío', () => {
     render(<SingleHarness initial={[step('a', 'Pesar'), step('b', '   ')]} />);
-    expect(screen.getByTestId('recipe-step-add')).toBeDisabled();
+    expect(screen.getByTestId('recipe-step-add-1')).toBeDisabled();
   });
 
   it('la regla aplica igual a los pasos de envasado', () => {
@@ -346,6 +361,112 @@ describe('RecipeStepsField — «Añadir paso» solo con todos los pasos relleno
       );
     }
     render(<PackingHarness />);
-    expect(screen.getByTestId('recipe-packing-step-add')).toBeDisabled();
+    expect(screen.getByTestId('recipe-packing-step-add-0')).toBeDisabled();
+  });
+});
+
+describe('RecipeStepsField — fila en blanco de arranque, como la de ingredientes', () => {
+  function GhostHarness({ prefix }: { readonly prefix?: string }) {
+    const [steps, setSteps] = useState<readonly RecipeStepFormValue[]>([]);
+    return (
+      <RecipeStepsField
+        steps={steps}
+        onChange={(next) => {
+          lastSteps = next;
+          setSteps(next);
+        }}
+        testIdPrefix={prefix}
+        showEvidenceSwitch
+      />
+    );
+  }
+
+  it('sin pasos pinta UNA fila en blanco con su «x» y su «+», sin entrar en `steps`', () => {
+    lastSteps = [];
+    render(<GhostHarness />);
+
+    expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(1);
+    expect(screen.getByTestId('recipe-step-text-0')).toHaveTextContent('');
+    expect(screen.getByRole('button', { name: 'Quitar paso 1' })).toBeInTheDocument();
+    // Vacía, no se ofrece otra: primero se rellena la que hay.
+    expect(screen.getByRole('button', { name: 'Añadir un paso después del 1' })).toBeDisabled();
+    expect(lastSteps).toEqual([]);
+  });
+
+  it('la «x» de la fila en blanco no deja la sección sin filas', async () => {
+    const user = setupUser();
+    render(<GhostHarness prefix="recipe-packing-step" />);
+
+    await user.click(screen.getByTestId('recipe-packing-step-remove-0'));
+    expect(screen.getAllByTestId('recipe-packing-step-row')).toHaveLength(1);
+  });
+
+  it('encender la evidencia en la fila en blanco la convierte en paso de verdad', async () => {
+    const user = setupUser();
+    lastSteps = [];
+    render(<GhostHarness />);
+
+    await user.click(evidenceSwitch(1));
+    expect(lastSteps).toHaveLength(1);
+    expect(lastSteps[0]?.document.requiresEvidence).toBe(true);
+    expect(evidenceSwitch(1)).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('quitar el último paso vuelve a la fila en blanco, con el editor vacío', async () => {
+    const user = setupUser();
+    render(<EvidenceHarness initial={[step('a', 'Pesar')]} />);
+
+    await user.click(screen.getByTestId('recipe-step-remove-0'));
+    expect(lastSteps).toEqual([]);
+    expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(1);
+    expect(screen.getByTestId('recipe-step-text-0')).toHaveTextContent('');
+  });
+});
+
+describe('RecipeStepsField — «+» y «x» en el grupo de «Requiere evidencia»', () => {
+  it('los dos botones son iconos táctiles en el mismo grupo que el interruptor, alineados con él', () => {
+    render(<EvidenceHarness initial={[step('a', 'Pesar')]} />);
+
+    const tools = screen.getByTestId('recipe-step-text-0-row-tools');
+    expect(tools).toContainElement(evidenceSwitch(1));
+    const remove = screen.getByTestId('recipe-step-remove-0');
+    const add = screen.getByTestId('recipe-step-add-0');
+    expect(tools).toContainElement(remove);
+    expect(tools).toContainElement(add);
+    expect(tools.className).toContain('items-center');
+    expect(tools.className).toContain('md:ml-auto');
+    for (const button of [remove, add]) {
+      expect(button.className).toContain('size-9');
+      expect(button.className).toContain('min-h-11');
+      expect(button.className).toContain('min-w-11');
+      expect(button.querySelector('svg')).not.toBeNull();
+      expect(button.textContent).toBe('');
+    }
+    expect(remove).toHaveAccessibleName('Quitar paso 1');
+    expect(add).toHaveAccessibleName('Añadir un paso después del 1');
+  });
+
+  it('sin interruptor de evidencia, «+» y «x» siguen en su grupo de la fila', () => {
+    render(<SingleHarness />);
+    const tools = screen.getByTestId('recipe-step-text-0-row-tools');
+    expect(tools).toContainElement(screen.getByTestId('recipe-step-remove-0'));
+    expect(tools).toContainElement(screen.getByTestId('recipe-step-add-0'));
+    expect(within(tools).queryByRole('switch')).toBeNull();
+  });
+});
+
+describe('RecipeStepsField — sección opcional con ayuda', () => {
+  it('con optionalHelp, el título lleva «(opcional)» y el icono abre la ayuda en un tooltip', async () => {
+    const user = setupUser();
+    render(<DoubleHarness />);
+
+    const trigger = screen.getByRole('button', { name: 'Qué son los pasos de envasado' });
+    expect(trigger.querySelector('svg')).not.toBeNull();
+    expect(screen.queryByTestId('recipe-packing-steps-help-text')).toBeNull();
+
+    await user.hover(trigger);
+    expect(await screen.findByTestId('recipe-packing-steps-help-text')).toHaveTextContent(
+      'Ayuda de envasado',
+    );
   });
 });

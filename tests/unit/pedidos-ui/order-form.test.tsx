@@ -238,6 +238,8 @@ const LINEA_ENVASE = {
   packages: 1,
   packagingProductId: ENVASE.id,
   packagingName: ENVASE.name,
+  presentationContent: null,
+  presentationUnitLabel: null,
 };
 
 /** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta. */
@@ -298,7 +300,9 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     presentationLines: [LINEA_ENVASE],
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -360,9 +364,10 @@ beforeEach(() => {
     status: 'success',
     data: { items: [ENVASE], page: 1, pageSize: 25, total: 1, totalPages: 1 },
   });
+  // Sin sobrante por defecto: con sobrante, Guardar pregunta antes de enviar.
   quoteAvailabilityMock.mockResolvedValue({
     status: 'success',
-    data: { kind: 'ok', available: '0.1005' },
+    data: { kind: 'ok', available: '0' },
   });
 });
 
@@ -578,7 +583,7 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
     renderFormulario(
       pedido({
         presentationLines: [
-          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2, packagingProductId: null, packagingName: null },
+          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
@@ -684,6 +689,10 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
   });
 
   it('R6: el disponible se pide con la cantidad, la unidad y el reparto vigentes', async () => {
+    quoteAvailabilityMock.mockResolvedValue({
+      status: 'success',
+      data: { kind: 'ok', available: '0.1005' },
+    });
     renderFormulario(pedido());
 
     await waitFor(() =>
@@ -855,6 +864,7 @@ describe('formulario de edicion de pedido (R7, R28, R34)', () => {
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(screen.getByTestId('order-error-quantity')).toBeInTheDocument());
+    expect(screen.getByTestId('order-error-quantity')).toHaveTextContent('Ingresa un número mayor a 0.');
     expect(updateOrderActionMock).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
   });

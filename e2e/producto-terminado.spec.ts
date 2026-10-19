@@ -76,10 +76,10 @@ import {
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
-import { addPackagingLine } from './helpers/order-distribution';
+import { addPackagingLine, submitOrderWithLeftover } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
-import { openRowActionsMenuItem } from './helpers/row-actions-menu';
+import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc150_e2e_';
 
@@ -292,7 +292,8 @@ async function createOrder(page: Page, quantity: string, packages: string): Prom
     { timeout: 60_000 },
   );
 
-  await page.getByTestId('order-form-submit').click();
+  // 50.5 en 50 envases de 1: queda sobrante y Guardar pregunta antes.
+  await submitOrderWithLeftover(page, page.getByTestId('order-form'));
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 }
 
@@ -312,14 +313,15 @@ async function openFinishedGoodsBatchesPanel(
     { timeout: 60_000 },
   );
 
-  // La pestana lista pedidos: el producto aparece al desplegar el pedido de la receta.
+  // La pestana lista pedidos: el producto aparece al desplegar el pedido de la receta. Se cuenta
+  // la fila: la tarjeta del pedido (oculta en una lista ancha) repite su nombre.
   const orderName = page
     .getByTestId(ORDER_GROUP_NAME_TESTID)
     .filter({ hasText: exactOrderGroupText(RECIPE_NAME) });
-  await expect(orderName).toHaveCount(1, { timeout: 60_000 });
   const orderRow = page
     .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({ has: orderName });
+  await expect(orderRow).toHaveCount(1, { timeout: 60_000 });
   const toggle = orderRow.getByTestId(ORDER_GROUP_TOGGLE_TESTID);
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -738,7 +740,8 @@ test.describe('producto terminado', () => {
     await loginAndLand(page, adminUser);
 
     let batchesSheet = await openFinishedGoodsBatchesPanel(page, RECIPE_NAME, PRESENTATION_NAME);
-    const batchRow = batchesSheet.locator('[data-testid^="product-batch-"]').first();
+    // La fila de la tabla de lotes: la tarjeta (oculta en un panel ancho) repite sus celdas.
+    const batchRow = batchesSheet.locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`).first();
     await expect(batchRow.getByTestId('product-batch-quantity')).toContainText('50');
     await expect(batchRow.getByTestId('product-batch-packages')).toHaveText(EXPECTED_PACKAGES_LABEL);
 
@@ -747,14 +750,16 @@ test.describe('producto terminado', () => {
     await setPresentationContent(page, PRESENTATION_CONTENT_CHANGED);
 
     batchesSheet = await openFinishedGoodsBatchesPanel(page, RECIPE_NAME, PRESENTATION_NAME);
-    const batchRowAfter = batchesSheet.locator('[data-testid^="product-batch-"]').first();
+    const batchRowAfter = batchesSheet.locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`).first();
     await expect(batchRowAfter.getByTestId('product-batch-quantity')).toContainText('50');
     await expect(batchRowAfter.getByTestId('product-batch-packages')).toHaveText(
       EXPECTED_PACKAGES_LABEL,
     );
 
     // --- 7. El dialogo de ajuste del lote avisa que solo se admiten cantidades que restan.
-    await batchRowAfter.getByTestId('adjust-batch-open').click();
+    await (
+      await openRowActionsMenuItem(page, batchActionsTrigger(batchRowAfter), 'adjust-batch-open')
+    ).click();
     await expect(page.getByTestId('adjust-batch-dialog')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('adjust-batch-finished-product-notice')).toHaveText(
       'Solo se admiten ajustes que restan.',

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import {
+  useCallback,
   useMemo,
   useState,
   useTransition,
@@ -10,25 +11,34 @@ import {
 
 import {
   DataTable,
+  type DataTableCardLayout,
   type DataTableParams,
   type DataTableStates,
   type DataTableTexts,
 } from '@/components/shared/data-table';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
-import type { ProductBatchView, ProductView } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import { listAliveProductBatchesAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { useLocalToday } from './expiry-date';
 import { daysUntil, isExpiringSoon } from './expiry-warning';
 import {
+  BATCHES_TOGGLE_COLUMN_ID,
   buildProductColumns,
+  IMAGE_COLUMN_ID,
   PRODUCT_BATCH_ROW_TEXTS,
   type ProductTableRow,
 } from './product-columns';
 import { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
-import { productListHref, TYPE_COLUMN_ID } from './product-list-params';
-import { ProductRowActions } from './product-row-actions';
+import {
+  productListHref,
+  QTY_ALERT_COLUMN_ID,
+  STOCK_COLUMN_ID,
+  TYPE_COLUMN_ID,
+} from './product-list-params';
+import { ProductRowDialogs, type ProductRowDialogsActive } from './product-row-dialogs';
+import { productRowActionsSpec, type ProductRowAction } from './product-row-actions';
 import { ProductTypeTabs } from './product-type-tabs';
 
 /**
@@ -42,7 +52,7 @@ import { ProductTypeTabs } from './product-type-tabs';
  * un solo sitio donde se arreglan los tres.
  *
  * **Ahora es `'use client'`**, y antes no: la tabla compartida es interactiva -emite
- * `onParamsChange`- y las celdas de accion montan el panel y el dialogo. El Server Component
+ * `onParamsChange`- y monta el panel o el dialogo que abre el menu de la fila. El Server Component
  * sigue siendo `ProductListSection`, que es quien pide los datos (R30); aqui solo llegan filas ya
  * resueltas y los parametros con los que se pidieron.
  *
@@ -96,7 +106,53 @@ export const PRODUCT_TABLE_TEXTS: DataTableTexts = {
   lastWeek: 'Última semana',
   lastMonth: 'Último mes',
   lastYear: 'Último año',
+  cardActions: 'Acciones',
+  closeMenu: 'Cerrar',
 };
+
+export type ProductTableCardOptions = {
+  readonly showType: boolean;
+  readonly showPresentation: boolean;
+  readonly canSeeCost: boolean;
+};
+
+/** La tarjeta del producto: cada campo sale solo donde sale su columna. */
+export function productTableCard({
+  showType,
+  showPresentation,
+  canSeeCost,
+}: ProductTableCardOptions): DataTableCardLayout {
+  return {
+    primary: IMAGE_COLUMN_ID,
+    status: showType ? TYPE_COLUMN_ID : undefined,
+    title: 'name',
+    meta: [
+      ...(showPresentation ? ['presentationName'] : []),
+      STOCK_COLUMN_ID,
+      QTY_ALERT_COLUMN_ID,
+      'available',
+      ...(canSeeCost ? ['averageUnitCost'] : []),
+    ],
+    footer: BATCHES_TOGGLE_COLUMN_ID,
+  };
+}
+
+/**
+ * Va en el envoltorio de la tabla. En la tabla oculta el conmutador del pie (ya está el chevrón
+ * del nombre) y en la tarjeta el chevrón; las sub-filas de lote ganan fondo, sangría y entrada.
+ */
+export const PRODUCT_TABLE_SCOPE_CLASS = [
+  '[&_[data-testid=data-table-head-batchesToggle]]:hidden',
+  '[&_[data-testid=data-table-cell-batchesToggle]]:hidden',
+  '[&_[data-testid=data-table-cards]_[data-testid=product-batches-toggle]]:hidden',
+  // Opaco: las celdas fijadas (imagen, acciones) tapan lo que pasa por debajo con scroll horizontal.
+  '[&_tr:has([data-batch-subrow])>td]:bg-[color-mix(in_oklch,var(--muted)_55%,var(--card))]',
+  'motion-safe:[&_tr:has([data-batch-subrow])>td]:animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]',
+  '[&_li:has([data-batch-subrow])]:ml-5',
+  '[&_li:has([data-batch-subrow])]:rounded-lg',
+  '[&_li:has([data-batch-subrow])]:bg-muted',
+  'motion-safe:[&_li:has([data-batch-subrow])]:animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]',
+].join(' ');
 
 export type ProductTableProps = {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega. */
@@ -111,6 +167,11 @@ export type ProductTableProps = {
    * falla cerrado, como el resto de esta ruta.
    */
   readonly canAdjust?: boolean;
+  /**
+   * Si se pinta la columna «Costo» (solo el Administrador), resuelto en el servidor con
+   * `canViewUnitCosts` y bajado por props. Defecto `false`: falla cerrado, como `canAdjust`.
+   */
+  readonly canSeeCost?: boolean;
   /** Defecto `'idle'`. `'loading'` es la primera carga, el `fallback` del `<Suspense>`. */
   readonly status?: ProductTableStatus;
   /** El error de la consulta, entero; solo se pinta con `status="error"`. */
@@ -136,14 +197,17 @@ export function productTableStates({
   pageSize,
   error,
   empty,
+  columns = PRODUCT_SKELETON_COLUMN_COUNT,
 }: {
   readonly pageSize: number;
   readonly error?: OperationError;
   readonly empty?: ProductTableEmpty;
+  /** Celdas por fila del esqueleto: las columnas que de verdad se van a pintar. */
+  readonly columns?: number;
 }): DataTableStates {
   return {
     loading: {
-      columns: PRODUCT_SKELETON_COLUMN_COUNT,
+      columns,
       rows: pageSize,
       label: PRODUCT_TABLE_TEXTS.loading,
       testId: 'product-table-skeleton',
@@ -225,6 +289,7 @@ export function ProductTable({
   totalPages,
   units,
   canAdjust = false,
+  canSeeCost = false,
   status = 'idle',
   error,
   empty,
@@ -244,12 +309,25 @@ export function ProductTable({
     setBatches(new Map());
   }
 
-  // Las acciones de fila se enchufan aqui, no en la declaracion de columnas: asi esa declaracion
-  // no importa el panel ni el dialogo. `useMemo` para que la identidad del array no cambie en
-  // cada render y la tabla compartida no se reconstruya entera.
+  const [active, setActive] = useState<ProductRowDialogsActive | null>(null);
+  const [activeOpen, setActiveOpen] = useState(false);
+  const handleAction = useCallback((action: ProductRowAction, product: ProductView) => {
+    setActive({ product, action });
+    setActiveOpen(true);
+  }, []);
+
   // La columna «Tipo» solo sale en la pestana «Todos» (sin filtro de tipo): con un tipo
   // filtrado, todas las filas dirian lo mismo.
-  const showType = params.filters[TYPE_COLUMN_ID] === undefined;
+  const typeFilter = params.filters[TYPE_COLUMN_ID];
+  const showType = typeFilter === undefined;
+  // La pestana «Producto» no pinta «Presentación»; «Todos» y el resto de pestanas, si.
+  const showPresentation = !(
+    typeFilter?.kind === 'select' && typeFilter.values[0] === PRODUCT_TYPES.PRODUCT
+  );
+  const card = useMemo(
+    () => productTableCard({ showType, showPresentation, canSeeCost }),
+    [showType, showPresentation, canSeeCost],
+  );
   const columns = useMemo(() => {
     const loadBatches = (productId: string) => {
       // Cada peticion lleva su propia identidad. Si la lista se invalido mientras tanto (y quiza
@@ -275,11 +353,11 @@ export function ProductTable({
     };
 
     return buildProductColumns({
-      rowActions: (product) => (
-        <ProductRowActions product={product} units={units} canAdjust={canAdjust} />
-      ),
+      menu: (product) => productRowActionsSpec({ product, units, canAdjust, onAction: handleAction }),
       units,
       showType,
+      showCost: canSeeCost,
+      showPresentation,
       onToggle: (productId) => {
         setExpanded((current) => {
           const next = new Set(current);
@@ -292,7 +370,7 @@ export function ProductTable({
       },
       onRetry: loadBatches,
     });
-  }, [units, canAdjust, showType, batches]);
+  }, [units, canAdjust, canSeeCost, showType, showPresentation, batches, handleAction]);
 
   const tableRows = useMemo(
     () =>
@@ -328,6 +406,10 @@ export function ProductTable({
     });
   };
 
+  // El conmutador del pie es una columna que la tabla no pinta.
+  const hasCardToggle = columns.some((column) => column.id === BATCHES_TOGGLE_COLUMN_ID);
+  const tableColumnCount = hasCardToggle ? columns.length - 1 : columns.length;
+
   const table = (
     <DataTable
       tableId={PRODUCT_TABLE_ID}
@@ -339,7 +421,13 @@ export function ProductTable({
       onParamsChange={(next) => navigate(productListHref(next))}
       status={status}
       texts={PRODUCT_TABLE_TEXTS}
-      states={productTableStates({ pageSize: params.pageSize, error, empty })}
+      states={productTableStates({
+        pageSize: params.pageSize,
+        error,
+        empty,
+        columns: tableColumnCount,
+      })}
+      card={card}
     />
   );
 
@@ -352,7 +440,11 @@ export function ProductTable({
     <div
       data-testid="product-table"
       aria-busy={isPending}
-      className={isPending ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+      className={
+        isPending
+          ? 'flex flex-col gap-4 opacity-60 transition-opacity'
+          : 'flex flex-col gap-4 transition-opacity'
+      }
     >
       {/*
         La senal de «en vuelo»: un rotulo visible con el texto de `PRODUCT_TABLE_TEXTS.loading`
@@ -364,8 +456,15 @@ export function ProductTable({
       {isPending ? (
         <p className="text-xs text-muted-foreground">{PRODUCT_TABLE_TEXTS.loading}</p>
       ) : null}
-      <ProductTypeTabs params={params} onNavigate={navigate} />
-      {table}
+      <ProductTypeTabs params={params} />
+      <div className={PRODUCT_TABLE_SCOPE_CLASS}>{table}</div>
+      <ProductRowDialogs
+        active={active}
+        open={activeOpen}
+        onOpenChange={setActiveOpen}
+        units={units}
+        canAdjust={canAdjust}
+      />
     </div>
   );
 }

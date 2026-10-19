@@ -39,6 +39,7 @@
  * `company_not_deleted`.
  * **2026-10-14**: `packed_exceeds_quantity`, `packaging_stock_insufficient`.
  * **2026-10-16**: `delivery_exceeds_surplus`.
+ * **2026-10-16**: `company_last_administrator`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -226,6 +227,9 @@ export const ERROR_CODES = [
   // Distinto de `delivery_exceeds_remaining`: no hay pedido; lo que se pasa es lo que queda tras
   // apartar lo que esperan los pedidos terminados.
   'delivery_exceeds_surplus',
+  // Distinto de `last_administrator`: cuenta los Administradores vivos de la empresa, sea cual sea su
+  // estado de cuenta, no los que estan en `active`.
+  'company_last_administrator',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

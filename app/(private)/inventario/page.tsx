@@ -1,12 +1,15 @@
+import { UploadIcon } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import { buttonVariants } from '@/components/ui/button';
 import { identity } from '@/lib/composition';
 import { hasAddon } from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
-import { canAdjustBatchStock, type ProductFormUnits } from '@/lib/modules/inventario';
+import { canAdjustBatchStock, canViewUnitCosts, type ProductFormUnits } from '@/lib/modules/inventario';
 import { listProductFormUnitsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
@@ -86,30 +89,33 @@ export default async function InventarioPage({
     identity.getSessionUser(),
   ]);
   const canImport = canAdjustBatchStock(sessionUser) && hasAddon(sessionUser, 'importacion_excel');
+  const canSeeCost = canViewUnitCosts(sessionUser);
   const units = unitsResult.status === 'success' ? unitsResult.data : undefined;
   const formUnits: ProductFormUnits =
     formUnitsResult.status === 'success' ? formUnitsResult.data : [];
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 data-testid="inventario-title" className="text-2xl font-semibold">
-          Inventario
-        </h1>
-        <div className="flex flex-wrap items-center gap-2">
-          {canImport ? (
-            <Link
-              href={INVENTORY_IMPORT_ROUTE}
-              data-slot="button"
-              data-testid="inventory-import-link"
-              className={cn(buttonVariants({ variant: 'outline' }), touchTarget)}
-            >
-              Importar
-            </Link>
-          ) : null}
-          <ProductSheet units={units} formUnits={formUnits} />
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Inventario"
+        titleTestId="inventario-title"
+        actions={
+          <>
+            {canImport ? (
+              <Link
+                href={INVENTORY_IMPORT_ROUTE}
+                data-slot="button"
+                data-testid="inventory-import-link"
+                className={cn(buttonVariants({ variant: 'outline' }), touchTarget)}
+              >
+                <UploadIcon aria-hidden="true" />
+                Importar
+              </Link>
+            ) : null}
+            <ProductSheet units={units} formUnits={formUnits} />
+          </>
+        }
+      />
       {/*
         SIN `key`: este limite NO se vuelve a montar en cada cambio de consulta. La llevaba (la
         cadena canonica) para que el esqueleto reapareciera en cada cambio, pero remontar el
@@ -120,10 +126,18 @@ export default async function InventarioPage({
         primera carga.
       */}
       <Suspense
-        fallback={<ProductTable status="loading" products={[]} params={params} totalPages={0} />}
+        fallback={
+          <ProductTable
+            status="loading"
+            products={[]}
+            params={params}
+            totalPages={0}
+            canSeeCost={canSeeCost}
+          />
+        }
       >
         <ProductListSection params={params} units={units} formUnits={formUnits} />
       </Suspense>
-    </div>
+    </PageShell>
   );
 }

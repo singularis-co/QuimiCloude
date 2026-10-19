@@ -33,6 +33,7 @@ import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
+import { fakeDeliveryProgress } from '../../helpers/delivery-progress-double';
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -79,7 +80,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationLines: [{ presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null }],
+    presentationLines: [{ presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null, presentationContent: null }],
     unitId: UNIT_ID,
     customerId: null,
     ...overrides,
@@ -325,6 +326,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       recipeId: RECIPE_ID,
       recipeName: 'Acido citrico 50%',
       recipeVersion: null,
+      recipeImageUrl: null,
       quantity: '10.0000',
       priority: 'BAJA',
       status: 'PENDIENTE',
@@ -336,7 +338,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       createdBy: 'admin-0',
       updatedBy: 'admin-0',
       // R26: el reparto, con el nombre de cada presentacion resuelto por el contrato.
-      presentationLines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null }],
+      presentationLines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
       // [Q4]: la unidad y su etiqueta, resueltas por el contrato de `unidades`.
       unitId: UNIT_ID,
       unitLabel: 'L',
@@ -358,8 +360,8 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
     const d = dobles({
       fila: fila({
         presentationLines: [
-          { presentationId: OTRA, packages: 2, packagingProductId: null },
-          { presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null },
+          { presentationId: OTRA, packages: 2, packagingProductId: null, presentationContent: null },
+          { presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null, presentationContent: null },
         ],
       }),
     })
@@ -370,8 +372,8 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
     expect(d.findPresentationRefs.mock.calls[0]?.[0]).toEqual([OTRA, PRESENTATION_ID])
     // `OTRA` no vuelve del doble del catalogo: la linea sigue saliendo, con el nombre a `null`.
     expect(vista.presentationLines).toEqual([
-      { presentationId: OTRA, presentationName: null, packages: 2, packagingProductId: null, packagingName: null },
-      { presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null },
+      { presentationId: OTRA, presentationName: null, packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
+      { presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ])
   })
 
@@ -452,6 +454,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
       packaging: fakePackagingCatalog(),
       units: { findRefs: vi.fn(async () => []) } as unknown as UnitCatalog,
       log,
+      deliveryProgress: fakeDeliveryProgress(),
     })({ page: 1 }, ADMIN)
 
     expect(pagina.items[0]?.ingredientsCost).toBe('1234.5600')

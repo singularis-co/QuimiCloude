@@ -22,7 +22,7 @@ const POR_EMPACAR_ORDER: PackingOrderRow = {
   numberText: '2026-0000021',
   recipeName: 'Jarabe simple',
   quantity: '40',
-  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],
   unitId: null,
   unitLabel: null,
   status: 'POR_EMPACAR',

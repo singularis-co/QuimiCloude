@@ -82,6 +82,7 @@ export {
 } from './finished-product-not-found';
 export {
   DEFAULT_FINISHED_PRODUCT_TAB,
+  FINISHED_PRODUCT_COST_TAB,
   FINISHED_PRODUCT_TABLE_TEXTS,
   FINISHED_PRODUCT_TABS,
   PAGE_PARAM,
@@ -93,6 +94,8 @@ export {
   isFinishedProductListTab,
   isFinishedProductTab,
   parseFinishedProductParams,
+  resolveFinishedProductTab,
+  visibleFinishedProductTabs,
   type FinishedProductListTab,
   type FinishedProductPaging,
   type FinishedProductSearchParams,

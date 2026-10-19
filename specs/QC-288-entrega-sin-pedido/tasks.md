@@ -453,6 +453,8 @@ Tests:
 Specs de otras fichas (enmienda fechada 2026-10-16):
 - `specs/QC-225-detalle-de-producto-terminado/requirements.md` (R7: actions de `pedidos` que la ruta
   de la ficha admite; el botón «Entregar» por su ruta directa).
+- `specs/QC-263-rediseno-inventario/requirements.md` (2026-10-19: nota bajo R21 y R23; «Cliente»
+  como novena columna del historial del lote y campo de su tarjeta).
 
 Rutas de los tests de UI confirmadas en T0 (2026-10-16): `finished-product-tables.test.tsx` vive en
 `tests/unit/inventario-ui/` y `batch-history.test.tsx` en `tests/unit/inventario/`.

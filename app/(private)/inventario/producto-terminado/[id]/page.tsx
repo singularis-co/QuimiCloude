@@ -13,9 +13,9 @@ import { PageShell } from '@/components/shared/page-shell';
 import { TableSkeleton } from '@/components/shared/table-skeleton';
 import { identity } from '@/lib/composition';
 import type { ErrorCode } from '@/lib/modules/errores';
-import { assertPermission } from '@/lib/modules/identity';
+import { assertPermission, type PermissionBearer } from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
-import { PRODUCT_TYPES } from '@/lib/modules/inventario';
+import { canViewUnitCosts, PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { getFinishedProductAction } from '@/lib/modules/inventario/adapters/driving/finished-product-actions';
 import { listDirectDeliverySurplusAction } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
@@ -29,6 +29,7 @@ import {
   FinishedProductTabs,
   isFinishedProductListTab,
   parseFinishedProductParams,
+  resolveFinishedProductTab,
   unitLabelOf,
   type FinishedProductSearchParams,
 } from './components';
@@ -56,9 +57,9 @@ const PERMISSION_DENIED = new Error('permiso denegado');
  * Presentación, no autorización: decide si la cabecera pinta «Entregar»; la action de entregar vuelve a
  * exigir el permiso. Sin permiso, con error o sin excedente, el botón no existe.
  */
-async function canDeliverDirect(productId: string): Promise<boolean> {
+async function canDeliverDirect(actor: PermissionBearer | null, productId: string): Promise<boolean> {
   try {
-    assertPermission(await identity.getSessionUser(), 'entregas.modificar', () => PERMISSION_DENIED);
+    assertPermission(actor, 'entregas.modificar', () => PERMISSION_DENIED);
   } catch (error) {
     if (error !== PERMISSION_DENIED) throw error;
     return false;
@@ -102,8 +103,14 @@ export default async function FinishedProductDetailPage({
 
   const product = result.data;
   const unitLabel = unitLabelOf(product.unit);
-  const { tab } = view;
-  const deliverable = await canDeliverDirect(product.id);
+  // Presentacion, no autorizacion: decide si existe el tab de costos. Sin el permiso, un
+  // `?tab=costo` escrito a mano cae al tab por defecto y la seccion de costos no se monta; el caso
+  // de uso de costos rechaza igualmente a quien no es Administrador.
+  // Una sola lectura de la sesion para los dos: el tab de costos y «Entregar».
+  const sessionUser = await identity.getSessionUser();
+  const canViewCosts = canViewUnitCosts(sessionUser);
+  const tab = resolveFinishedProductTab(view.tab, canViewCosts);
+  const deliverable = await canDeliverDirect(sessionUser, product.id);
 
   return (
     <PageShell>
@@ -113,7 +120,7 @@ export default async function FinishedProductDetailPage({
         finishedListHref={finishedListHref}
         actions={deliverable ? <DirectDeliveryButton productId={product.id} /> : undefined}
       />
-      <FinishedProductTabs productId={product.id} current={tab} />
+      <FinishedProductTabs productId={product.id} current={tab} canViewCosts={canViewCosts} />
       {tab === 'general' ? <FinishedProductGeneral product={product} /> : null}
       {tab === 'stock' ? <FinishedProductStock stock={product.stock} unitLabel={unitLabel} /> : null}
       {isFinishedProductListTab(tab) ? (

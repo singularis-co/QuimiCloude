@@ -43,6 +43,7 @@ import {
 import { packagesKey, type OrderDeliveryDraft } from './order-delivery-draft';
 import { OrderDeliverySummary, type OrderDeliverySummaryLabels, type OrderDeliverySummaryLine } from './order-delivery-summary';
 import { type OrderCustomerChoice } from '@/components/shared/order-customer-label';
+import { OrderRecipeImage } from './order-recipe-image';
 import { useOrderDeliveryDraft } from './use-order-delivery-draft';
 
 export const ORDER_DELIVERY_SHEET_TESTID = 'order-delivery-sheet';
@@ -53,10 +54,12 @@ export const ORDER_DELIVERY_DRAFT_ADJUSTED_TESTID = 'order-delivery-draft-adjust
 export const ORDER_DELIVERY_STOCK_OVER_TESTID = 'order-delivery-stock-over';
 export const ORDER_DELIVERY_SUBMIT_TESTID = 'order-delivery-submit';
 export const ORDER_DELIVERY_CANCEL_TESTID = 'order-delivery-cancel';
+export const ORDER_DELIVERY_NUMBER_TESTID = 'order-delivery-number';
 
 const LABELS = {
-  title: (numberText: string) => `Entregar pedido ${numberText}`,
-  description: 'Elige el cliente y, por presentación, de qué lotes salen los envases.',
+  /** Respaldo del título cuando el pedido no trae el nombre de su receta. */
+  fallbackTitle: (numberText: string) => `Entregar pedido ${numberText}`,
+  orderNumber: 'Pedido',
   adjusted: 'Algunos lotes del borrador ya no están disponibles y se quitaron sus envases.',
   stockOver: 'Entre todos los clientes se pasa de lo disponible en un lote. Baja los envases para poder entregar.',
   addCustomer: 'Añadir cliente',
@@ -222,7 +225,12 @@ function ErrorNotice({ error, testId }: { readonly error: ErrorState; readonly t
 }
 
 export type OrderDeliverySheetProps = {
-  readonly order: Pick<OrderSummary, 'id' | 'numberText'>;
+  /**
+   * `recipeName` da el título; sin él, el título es «Entregar pedido <número>». `recipeImageUrl`
+   * es la imagen del resumen; `null` o ausente pinta el marcador.
+   */
+  readonly order: Pick<OrderSummary, 'id' | 'numberText'> &
+    Partial<Pick<OrderSummary, 'recipeName' | 'recipeImageUrl'>>;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 };
@@ -239,6 +247,8 @@ type LoadState =
  */
 export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliverySheetProps) {
   const router = useRouter();
+  const recipeName = order.recipeName?.trim() ?? '';
+  const title = recipeName === '' ? LABELS.fallbackTitle(order.numberText) : recipeName;
   const store = useOrderDeliveryDraft(order.id);
   const { sync, hasDraft } = store;
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
@@ -361,8 +371,10 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
         }
       >
         <SheetHeader>
-          <SheetTitle>{LABELS.title(order.numberText)}</SheetTitle>
-          <SheetDescription>{LABELS.description}</SheetDescription>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription data-testid={ORDER_DELIVERY_NUMBER_TESTID}>
+            {LABELS.orderNumber} <span className="font-mono">{order.numberText}</span>
+          </SheetDescription>
         </SheetHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
@@ -389,7 +401,11 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
                 </p>
               ) : null}
 
-              <OrderDeliverySummary lines={summaryLines(view, evaluation)} labels={LABELS.summary} />
+              <OrderDeliverySummary
+                lines={summaryLines(view, evaluation)}
+                labels={LABELS.summary}
+                image={<OrderRecipeImage imageUrl={order.recipeImageUrl ?? null} name={recipeName} />}
+              />
 
               {draft.blocks.map((block, index) => {
                 const issue = attempted ? evaluation.issues.get(index) : undefined;

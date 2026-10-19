@@ -26,6 +26,12 @@ guardia del catálogo exige que sean idénticos).
     el `…Movil` lleva además la ficha por plataforma de la pantalla (Reutiliza / Librerías /
     Escritorio / Tablet / Teléfono / Animación / Por confirmar);
   - `Modales<Modulo>.dc.html` = todos los modales del módulo abiertos.
+- **Excepción a «sin editar» (2026-10-16).** Los cambios de UI aprobados por el usuario sin tarjeta
+  ni pase `/design` (commits `440ff5b2`, `b0eaa866`, `6a665e3f`, `27fdd133`, `5f2cc171`, `0f135128`)
+  se anotaron como una fila `Enmienda 2026-10-16` en la ficha de estos `…Movil`: `DashboardMovil`,
+  `DashboardAcondicionamientoMovil`, `RecorridoAcondicionamientoMovil`, `FormulaMovil`,
+  `FormulaEvidenciaMovil`, `InventarioMovil`, `PedidosMovil` y `ProductoTerminadoMovil`. El dibujo de
+  los tableros no se tocó: donde choque con esa fila, manda la fila y el spec que cita.
 - `support.js`, el runtime del canvas, **no se versiona**. Los tableros lo cargan (`./support.js`),
   así que abiertos desde aquí no se ven como en el canvas: la copia de `canvas/` es **fuente
   legible** y la vista viva es el canvas.

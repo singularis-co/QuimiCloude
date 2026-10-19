@@ -11,10 +11,8 @@ import type { ExecutedOrdersFilter, ExecutionLogRepository } from '../ports/exec
 import type { PeopleDirectory, PersonRef } from '@/lib/modules/identity';
 import type { PresentationCatalog } from '@/lib/modules/inventario';
 import {
-  effectivePackages,
   formatOrderNumber,
   ORDER_STATUS_VALUES,
-  remainingPackages,
   type OrderCatalog,
   type OrderDeliveryProgress,
   type OrderStatus,
@@ -78,9 +76,6 @@ export type ExecutionTraceRow = {
   readonly formulaImageUrl: string | null;
   /** Lo que pide el pedido: los envases planeados de cada linea, en el orden de alta. */
   readonly presentations: readonly ExecutionTracePresentation[];
-  /** Lo que falta por entregar, mismo criterio que el sheet de entrega (contados al empacar menos
-   *  lo entregado sin anular); solo lineas con algo pendiente. Vacio en un pedido ENTREGADO. */
-  readonly pendingDelivery: readonly ExecutionTracePresentation[];
 };
 
 export type ExecutionTraceList = {
@@ -128,25 +123,15 @@ async function listOrderContents(
 /** Una linea cuya presentacion no vuelve del catalogo se omite: se devuelve lo que hay. */
 export function toTracePresentations(
   progress: OrderDeliveryProgress | undefined,
-  status: OrderStatus,
   presentationNames: ReadonlyMap<string, string>,
-): Pick<ExecutionTraceRow, 'presentations' | 'pendingDelivery'> {
+): Pick<ExecutionTraceRow, 'presentations'> {
   const presentations: ExecutionTracePresentation[] = [];
-  const pendingDelivery: ExecutionTracePresentation[] = [];
   for (const line of progress?.lines ?? []) {
     const label = presentationNames.get(line.presentationId);
     if (label === undefined) continue;
     presentations.push({ label, quantity: line.packages });
-    // Un ENTREGADO anterior a las entregas por linea no tiene nada anotado y ya no debe nada.
-    if (status === 'ENTREGADO') continue;
-    const pending = remainingPackages({
-      presentationLineId: line.presentationId,
-      orderedPackages: effectivePackages(line),
-      deliveredPackages: line.deliveredPackages,
-    });
-    if (pending > 0) pendingDelivery.push({ label, quantity: pending });
   }
-  return { presentations, pendingDelivery };
+  return { presentations };
 }
 
 function startOfDayUtc(day: string): Date {
@@ -324,7 +309,7 @@ export function createListExecutionTraces(
         totalDuration: trace.totalDuration,
         goBackCount: trace.goBackCount,
         ...toTraceFormula(contents, order.id),
-        ...toTracePresentations(contents.progress.get(order.id), order.status, contents.presentationNames),
+        ...toTracePresentations(contents.progress.get(order.id), contents.presentationNames),
       }));
 
       return {

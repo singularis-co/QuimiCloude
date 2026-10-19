@@ -256,7 +256,7 @@ describe('barra lateral privada', () => {
     );
     // La lista va A MANO y no sale de `groupNavItemsBySection`: si esa funcion ordenara mal, una
     // expectativa derivada de ella se moveria junto con el DOM y R6 dejaria de cazar el fallo.
-    // Secciones: Seguimiento, Operación, Producción, Directorio y Configuración.
+    // Secciones: Seguimiento, Operación, Producción, Directorio, Configuración y Plataforma.
     const esperado = [
       'nav-dashboard',
       'nav-inventario',
@@ -269,6 +269,8 @@ describe('barra lateral privada', () => {
       'nav-presentaciones',
       'nav-unidades',
       'nav-integraciones',
+      'nav-empresas',
+      'nav-administradores',
     ];
 
     expect(enDom).toEqual(esperado);
@@ -526,11 +528,11 @@ describe('el borrado de items de relleno (QC-13)', () => {
     }
   });
 
-  it('PRIVATE_NAV_ITEMS tiene exactamente once entradas de nivel superior en orden', () => {
+  it('PRIVATE_NAV_ITEMS tiene exactamente trece entradas de nivel superior en orden', () => {
     // R5. Centinela de POSICION: exige la lista exacta y su orden, asi que una entrada nueva sin
     // ficha que la respalde lo pone en rojo. El orden del array decide tambien el aterrizaje tras
     // el login (`firstVisibleNavHref`).
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(11);
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(13);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-dashboard',
       'nav-inventario',
@@ -543,6 +545,8 @@ describe('el borrado de items de relleno (QC-13)', () => {
       'nav-presentaciones',
       'nav-unidades',
       'nav-integraciones',
+      'nav-empresas',
+      'nav-administradores',
     ]);
   });
 

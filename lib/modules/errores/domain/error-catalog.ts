@@ -107,6 +107,7 @@ export const ERROR_MESSAGE_KEY = {
   packed_exceeds_quantity: 'errors.packed_exceeds_quantity',
   packaging_stock_insufficient: 'errors.packaging_stock_insufficient',
   delivery_exceeds_surplus: 'errors.delivery_exceeds_surplus',
+  company_last_administrator: 'errors.company_last_administrator',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -269,4 +270,6 @@ export const ERROR_MESSAGES_ES = {
   'errors.packaging_stock_insufficient': 'No alcanza el stock del envase.',
   'errors.delivery_exceeds_surplus':
     'La entrega supera el excedente: hay pedidos terminados esperando esos envases.',
+  'errors.company_last_administrator':
+    'Es el único Administrador de la empresa: crea otro antes de darlo de baja.',
 } as const satisfies Record<ErrorMessageKey, string>;

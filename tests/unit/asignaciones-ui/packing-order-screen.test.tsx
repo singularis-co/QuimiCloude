@@ -84,9 +84,9 @@ function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
-      { lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-      { lineId: 'linea-2', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2 },
-      { lineId: 'linea-3', packedPackages: null, presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1 },
+      { lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-2', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2, presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-3', packedPackages: null, presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1, presentationContent: null, presentationUnitLabel: null },
     ],
     unitId: 'unit-1',
     unitLabel: 'kg',
@@ -135,8 +135,10 @@ describe('pantalla del Empacador — el reparto completo en solo lectura', () =>
             packagingName: 'Galón 4 L',
             packagingImageUrl: 'https://cdn.example/galon.png',
             packages: 3,
+            presentationContent: null,
+            presentationUnitLabel: null,
           },
-          { lineId: 'linea-2', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: 'Botella 1 L', packagingImageUrl: null, packages: 12 },
+          { lineId: 'linea-2', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: 'Botella 1 L', packagingImageUrl: null, packages: 12, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
@@ -244,7 +246,7 @@ describe('pantalla del Empacador — el nombre del envase de cada linea', () => 
     pintar(
       fila({
         presentationLines: [
-          { lineId: 'linea-4', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: 'Botella PET ámbar 200 ml', packages: 5 },
+          { lineId: 'linea-4', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: 'Botella PET ámbar 200 ml', packages: 5, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
@@ -253,12 +255,25 @@ describe('pantalla del Empacador — el nombre del envase de cada linea', () => 
     expect(lineas.map((linea) => linea.textContent)).toEqual(['5 × Botella PET ámbar 200 ml']);
   });
 
+  it('una linea con envase y volumen conocido pinta el envase y el volumen', () => {
+    pintar(
+      fila({
+        presentationLines: [
+          { lineId: 'linea-7', packedPackages: null, presentationId: 'p-1', presentationName: '300 ml', packagingName: 'Embase pequeño 2', packages: 9, presentationContent: '300.0000', presentationUnitLabel: 'ml' },
+        ],
+      }),
+    );
+
+    const lineas = screen.getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID);
+    expect(lineas.map((linea) => linea.textContent)).toEqual(['9 × Embase pequeño 2 · 300 ml']);
+  });
+
   it('R44: una linea antigua (`packagingName` null) pinta el nombre de su presentacion', () => {
     pintar(
       fila({
         presentationLines: [
-          { lineId: 'linea-5', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella PET', packagingName: 'Botella PET ámbar 200 ml', packages: 5 },
-          { lineId: 'linea-6', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2 },
+          { lineId: 'linea-5', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella PET', packagingName: 'Botella PET ámbar 200 ml', packages: 5, presentationContent: null, presentationUnitLabel: null },
+          { lineId: 'linea-6', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );

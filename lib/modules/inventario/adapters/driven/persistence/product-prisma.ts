@@ -15,6 +15,7 @@ import { quantityForPackages, wholePackagesIn } from '../../../domain/finished-g
 import { isWholeQuantity } from '../../../domain/product-input';
 import { normalizeProductName } from '../../../domain/product-name';
 import { netReservedQuantity } from '../../../domain/reservation-ledger';
+import { weightedAverageUnitCost, type CostedBatchQuantity } from '../../../domain/unit-cost';
 
 import { writeMovement } from './batch-movement-prisma';
 import {
@@ -45,6 +46,7 @@ import type { NewProductBatch } from '../../../domain/product-batch';
 import type { ProductBatchView } from '../../../domain/product-batch-view';
 import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../../../domain/stock-adjustment';
 import type { NewProduct, PackagingIdentity, ProductView, ProductType } from '../../../domain/product-view';
+import type { ListAliveOptions } from '../../../ports/product-repository';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
 import { PRODUCT_PRESENTATION_UNIT_FILTER, PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
 
@@ -375,10 +377,55 @@ async function findNextExpiryDateByProduct(
   return toNextExpiryByProduct(rows);
 }
 
+type CostedBatchRow = {
+  readonly productId: string;
+  readonly stock: Prisma.Decimal;
+  readonly unitCost: Prisma.Decimal | null;
+};
+
+/** De los lotes leidos al mapa producto -> costo medio ponderado. Un producto sin lotes que
+ *  ponderar no entra: el llamante lo resuelve a `null`. La aritmetica es del dominio. */
+export function toAverageUnitCostByProduct(rows: readonly CostedBatchRow[]): ReadonlyMap<string, string> {
+  const byProduct = new Map<string, CostedBatchQuantity[]>();
+  for (const row of rows) {
+    const batches = byProduct.get(row.productId) ?? [];
+    batches.push({ stock: row.stock.toFixed(4), unitCost: row.unitCost === null ? null : row.unitCost.toFixed(4) });
+    byProduct.set(row.productId, batches);
+  }
+  return new Map(
+    [...byProduct].flatMap(([productId, batches]) => {
+      const average = weightedAverageUnitCost(batches);
+      return average === null ? [] : [[productId, average] as const];
+    }),
+  );
+}
+
+/** UNA consulta por pagina: los lotes con existencia > 0 y costo de los productos de la pagina.
+ *  La existencia es la guardada en el lote (`stock`, la que pinta la columna «Existencia»), no la
+ *  disponible neta de apartados. */
+async function findAverageUnitCostByProduct(
+  productIds: readonly string[],
+  scope: InventoryScope,
+): Promise<ReadonlyMap<string, string>> {
+  if (productIds.length === 0) return new Map();
+  const rows = await prisma.productBatch.findMany({
+    where: {
+      AND: [
+        batchCompanyScope(scope),
+        { productId: { in: [...productIds] }, stock: { gt: 0 }, unitCost: { not: null } },
+      ],
+    },
+    select: { productId: true, stock: true, unitCost: true },
+  });
+  return toAverageUnitCostByProduct(rows);
+}
+
 export async function listAliveProducts(
   query: ListQuery,
   scope: InventoryScope,
+  options: ListAliveOptions = {},
 ): Promise<Page<ProductView>> {
+  const withUnitCosts = options.withUnitCosts === true;
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
   const unitFilter = query.filters[PRODUCT_PRESENTATION_UNIT_FILTER];
   const presentationIdsByUnit =
@@ -399,9 +446,11 @@ export async function listAliveProducts(
   // UNA consulta agregada mas para la pagina entera, nunca una por fila: `reserved`/`available`
   // salen del libro de reservas, sumados por producto.
   const productIds = rows.map((row) => row.id);
-  const [reservedByProduct, nextExpiryByProduct] = await Promise.all([
+  const [reservedByProduct, nextExpiryByProduct, averageUnitCostByProduct] = await Promise.all([
     findReservedAndAvailableByProduct(prisma, scope.companyId, productIds),
     findNextExpiryDateByProduct(productIds, scope),
+    // Sin costos pedidos, la consulta de costos ni se lanza.
+    withUnitCosts ? findAverageUnitCostByProduct(productIds, scope) : null,
   ]);
   const presentations = await findFixedPresentations(
     [...new Set(rows.flatMap((row) => (row.presentationId === null ? [] : [row.presentationId])))],
@@ -415,6 +464,9 @@ export async function listAliveProducts(
       reserved: aggregate?.reserved ?? ZERO_QUANTITY,
       available: aggregate?.available ?? ZERO_QUANTITY,
       nextExpiryDate: nextExpiryByProduct.get(row.id) ?? null,
+      ...(averageUnitCostByProduct === null
+        ? {}
+        : { averageUnitCost: averageUnitCostByProduct.get(row.id) ?? null }),
       ...(fixed ?? NO_FIXED_PRESENTATION),
     };
   });
@@ -973,6 +1025,7 @@ const BATCH_VIEW_SELECT = {
   purchaseDate: true,
   expiryDate: true,
   packageContent: true,
+  unitCost: true,
   // La del producto y no la de la presentacion: los lotes de insumo ya no llevan presentacion, y
   // los que la llevan estan en la misma unidad que su producto.
   product: { select: { unitId: true } },
@@ -994,6 +1047,7 @@ function toBatchView(row: BatchViewRow): ProductBatchView {
     purchaseDate: toCivilDate(row.purchaseDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
     packageContent: row.packageContent === null ? null : row.packageContent.toFixed(4),
+    unitCost: row.unitCost === null ? null : row.unitCost.toFixed(4),
   };
 }
 

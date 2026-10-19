@@ -11,9 +11,9 @@ import {
   type CompanyRow,
   type CreateCompanyResult,
   type Page,
-  type PlatformActor,
 } from '@/lib/modules/identity';
-import { runInRequestScope } from '@/lib/shared/request-scope';
+
+import { currentPlatformActor } from './platform-session';
 
 export type SetCompanyCountryFormState = { status: 'idle' } | { status: 'success' } | ErrorState;
 
@@ -49,14 +49,6 @@ export type CompanyAddonsFormState =
   | ErrorState;
 
 const toErrorState = createErrorStateTranslator(IdentityError, observabilidad.readRequestIdHeader);
-
-// Solo el usuario de la sesion, sin `getSessionContext()`: exigir empresa dejaria fuera al Maestro,
-// que no tiene ninguna y es quien tiene el permiso.
-async function currentPlatformActor(): Promise<PlatformActor | null> {
-  const sessionUser = await runInRequestScope(() => identity.getSessionUser());
-  if (sessionUser === null) return null;
-  return { id: sessionUser.id, permissions: sessionUser.permissions };
-}
 
 // Los campos van crudos: uno ausente llega como `null` y lo rechaza el esquema del dominio.
 function companyDataFromFormData(formData: FormData): Record<string, unknown> {

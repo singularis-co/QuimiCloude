@@ -2,14 +2,12 @@ import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import type {
   ExecutionAction,
   ExecutionPhase,
-  ExecutionTracePresentation,
   ExecutionTraceRow,
   TraceDuration,
 } from '@/lib/modules/asignaciones';
 
 export const DELETED_ORDER_MARK = 'Dado de baja';
 export const GO_BACK_MARK = 'Vuelta atrás';
-export const ACTIVE_ORDER_MARK = 'En curso';
 
 export const EXECUTION_ACTION_LABELS: Readonly<Record<ExecutionAction, string>> = {
   start: 'Arrancar',
@@ -27,14 +25,6 @@ export const EXECUTION_ACTION_LABELS: Readonly<Record<ExecutionAction, string>> 
 
 export const TRACE_ORDER_STATUS_LABELS: Readonly<Record<ExecutionTraceRow['status'], string>> =
   ORDER_STATUS_LABELS;
-
-/** «Por entregar» sin nada pendiente: el mismo texto que el estado `ENTREGADO` de pedidos. */
-export const TRACE_NOTHING_PENDING_MARK = ORDER_STATUS_LABELS.ENTREGADO;
-
-/** «10 galones, 5 vasos»: cantidad y nombre de cada presentacion, en el orden recibido. */
-export function formatTracePresentations(items: readonly ExecutionTracePresentation[]): string {
-  return items.map((item) => `${item.quantity} ${item.label}`).join(', ');
-}
 
 export const TRACE_DURATION_SUFFIXES:Readonly<Record<TraceDuration['kind'], string>> = {
   closed: '',

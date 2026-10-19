@@ -29,8 +29,8 @@ const ROW: ConditioningOrderRow = {
   unitId: null,
   unitLabel: null,
   presentationLines: [
-    { lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12 },
-    { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: '1 kg', packages: 4 },
+    { lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12, presentationContent: null, presentationUnitLabel: null },
+    { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: '1 kg', packages: 4, presentationContent: null, presentationUnitLabel: null },
   ],
   status: 'POR_ACONDICIONAR',
   conditionedByName: null,
@@ -42,7 +42,7 @@ const FINISHED: FinishedOrderView = {
   numberText: '2026-0000041',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
-  presentationLines: [{ lineId: 'linea-3', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-3', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],
   unitId: null,
   unitLabel: null,
   finishedAt: new Date('2026-09-20T15:30:00.000Z'),
@@ -119,6 +119,21 @@ describe('«Por acondicionar»: cinco columnas y el menú', () => {
         { presentationId: 'p2', presentationName: null, packagingName: null, packages: 2 },
       ]),
     ).toBe('3 × Caja x 12 / 2 × —');
+  });
+
+  it('una línea con envase y volumen conocido pinta el envase y el volumen', () => {
+    expect(
+      orderDistributionFullText([
+        {
+          presentationId: 'p1',
+          presentationName: '300 ml',
+          packagingName: 'Embase pequeño 2',
+          packages: 9,
+          presentationContent: '300.0000',
+          presentationUnitLabel: 'ml',
+        },
+      ]),
+    ).toBe('9 × Embase pequeño 2 · 300 ml');
   });
 
   it('R8: el estado pinta «Por acondicionar» y «En acondicionamiento» con data-status', () => {

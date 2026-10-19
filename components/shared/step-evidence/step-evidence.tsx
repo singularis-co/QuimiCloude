@@ -22,7 +22,7 @@ export const STEP_EVIDENCE_TEXTS = {
   countLabel: (ok: number) => `${ok} de ${MAX_STEP_EVIDENCE_PHOTOS} fotos`,
   required: 'Obligatoria · de 1 a 3 fotos',
   fixed: 'Fijada al terminar',
-  hint: `JPG, PNG o WebP · hasta ${EVIDENCE_MAX_SIZE_LABEL} · se comprime antes de subir.`,
+  hint: `JPG, PNG o WebP`,
   fixedHint: 'El pedido ya terminó: las fotos no se pueden cambiar ni quitar.',
   add: 'Añadir foto',
   addAnother: 'Añadir otra foto',
@@ -233,7 +233,7 @@ export function StepEvidence({
                     key={photo.url}
                     src={photo.url}
                     alt=""
-                    className={cn('absolute inset-0 size-full object-cover', pending && 'opacity-0')}
+                    className={cn('absolute inset-0 size-full object-contain', pending && 'opacity-0')}
                     // La imagen puede terminar antes de que la hidratación enganche onLoad/onError
                     // y ese evento se pierde: al montar, se lee su estado. `withUrl` devuelve el
                     // mismo Set si la URL ya está, así que repetirlo no vuelve a renderizar.

@@ -446,7 +446,7 @@ describe('updateOrderPresentationLines — escritura conjunta y reemplazo comple
 describe('QC-195 updateOrderPresentationLines — lineas antiguas y dos envases con la misma presentacion', () => {
   it('R35: una linea antigua que llega igual a la guardada se conserva sin envase', async () => {
     const { orders, updatePresentationLinesAlive } = ordersDoble(
-      filaBloqueada({ presentationLines: [{ presentationId: PRESENTACION_A, packages: 1, packagingProductId: null }] }),
+      filaBloqueada({ presentationLines: [{ presentationId: PRESENTACION_A, packages: 1, packagingProductId: null, presentationContent: null }] }),
     );
     const update = montar({ orders });
 
@@ -465,7 +465,7 @@ describe('QC-195 updateOrderPresentationLines — lineas antiguas y dos envases 
 
   it('R34: una linea antigua con los envases cambiados -> invalid_lines, sin escribir', async () => {
     const { orders, updatePresentationLinesAlive } = ordersDoble(
-      filaBloqueada({ presentationLines: [{ presentationId: PRESENTACION_A, packages: 1, packagingProductId: null }] }),
+      filaBloqueada({ presentationLines: [{ presentationId: PRESENTACION_A, packages: 1, packagingProductId: null, presentationContent: null }] }),
     );
     const update = montar({ orders });
 

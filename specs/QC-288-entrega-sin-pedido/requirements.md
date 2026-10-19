@@ -322,6 +322,7 @@ enmienda. La lista de enmiendas está en `design.md > 11`.
 | 2026-10-16 | Bloqueo F4: `guard-formularios-y-acciones` R28 exige un único menú de acciones por fila (F2.1) | La fila de la tab Entregas usa el menú de acciones con un único elemento «Anular». Se aparta del tablero, que pintaba un botón suelto. La guardia no cambia. |
 | 2026-10-16 | Tab Entregas en teléfono: las tarjetas duplican `data-testid` (F2.1) | Sin tarjetas: en teléfono queda la tabla con scroll horizontal, como hoy. Las tarjetas quedan para otra ficha. |
 | 2026-10-16 | Elecciones menores del implementer (F2.1) | Aceptadas: «Entregar» va después de «Lotes» en el menú de la fila; «Ver los pedidos que esperan» se muestra siempre; B4 lee la receta y la presentación sin bloqueo antes del paso 0; la lectura de anular trae los clientes en una segunda llamada. |
+| 2026-10-19 | ¿Dónde va el cliente en el historial del lote tras QC-263? | Columna nueva «Cliente» (novena), solo con valor en entregas sin pedido; enmienda QC-263 R21/R23. |
 
 ## Preguntas abiertas
 

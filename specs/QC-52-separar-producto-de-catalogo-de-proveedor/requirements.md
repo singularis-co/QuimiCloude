@@ -75,6 +75,13 @@ persistirlo correctamente sin ellos.
 **R6.** La lista de productos NO DEBE mostrar ninguna columna ni ningún valor derivado del costo,
 la compra mínima o el tiempo de entrega.
 
+> **Enmendado el 2026-10-16 (enmienda aprobada por el usuario, sin tarjeta; commits `b0eaa866`,
+> `6a665e3f`).** R6 sigue valiendo para los tres campos que el producto perdió (`cost`,
+> `min_purchase`, `delivery_time`): ninguno vuelve. Lo que ya no vale es leer «ningún valor derivado
+> del costo» como prohibición de mostrar el **costo unitario de los lotes**, que sí se muestra al
+> Administrador en la columna «Costo» de R35. Se escribe aquí porque es la lectura literal de R6 la
+> que la columna contradice.
+
 **R7.** El E2E de la pantalla de productos DEBE seguir cubriendo el camino completo del
 Administrador —entrar, abrir la pantalla, dar de alta un producto con presentación nueva y verlo
 en la lista— y el rechazo del que no es Administrador, DEBE hacerlo **sin rellenar ni consultar
@@ -221,6 +228,30 @@ unidades, que pertenecen a otros módulos.
 **R34.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
 requisitos anteriores.
 
+### Lista de productos: costo de los lotes y columna «Presentación» (enmienda del 2026-10-16)
+
+*(Añadidos el 2026-10-16: enmienda aprobada por el usuario, sin tarjeta; commits `b0eaa866` (#261) y
+`6a665e3f`. Esta ficha es la que fija qué columnas no tiene la lista de productos, y por eso los
+recoge.)*
+
+**R35.** DONDE la sesión cumpla la regla de ver costos unitarios (hoy, `inventario.modificar`, que
+entre los roles sembrados solo tiene el Administrador), la lista de productos DEBE mostrar una
+columna «Costo» justo después de la existencia, que NO DEBE ordenar ni filtrar, con:
+- en la fila del producto, el costo unitario **promedio ponderado** por la existencia de sus lotes
+  con existencia mayor que cero y costo unitario; los lotes sin costo no pesan ni cuentan como cero;
+- en la fila de cada lote, su propio costo unitario;
+- el marcador de vacío «—» cuando no hay costo que mostrar;
+- el importe en formato moneda: «$», separador de miles y dos decimales (p. ej. `$1,234.57`); SI el
+  redondeo a dos decimales pierde cifras, ENTONCES el valor exacto DEBE ir en el `title`.
+
+**R36.** SI la sesión no cumple la regla de R35, ENTONCES la lista NO DEBE pintar la columna
+«Costo», y el servidor NO DEBE enviarle el costo: ni el promedio del producto en el listado (sin
+lanzar siquiera la consulta de costos) ni el costo unitario en los lotes de un producto o de un
+pedido. La regla DEBE decidirse por permiso, no por rol, y DEBE fallar cerrada.
+
+**R37.** MIENTRAS la lista de productos esté en la pestaña «Producto», NO DEBE mostrar la columna
+«Presentación»; en «Todos» y en las demás pestañas de tipo la columna DEBE seguir.
+
 ### Cobertura de las decisiones cerradas
 
 Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con los
@@ -244,6 +275,7 @@ requisitos que la hacen testeable. Ninguna queda sin `R<n>`.
 | 14 | RLS habilitada y forzada en las dos tablas; la migración no la toca | R26 |
 | 15 | Solo el Administrador, validado en el service | R25 |
 | 16 | Ninguna dependencia nueva | R34 |
+| 17 | (2026-10-16) Costo de los lotes en la lista, solo para el Administrador; «Presentación» fuera de la pestaña «Producto» | R6 (enmendado), R35, R36, R37 |
 
 Requisitos que no salen de una fila de la tabla, y de dónde salen: **R24** de la pregunta abierta
 **P6**, añadida por `spec_author` porque al desaparecer `product_id` la línea deja de tener la
@@ -345,3 +377,5 @@ al leader**; no la rellena con supuestos.
 | 2026-09-04 | **P6** — ¿la edición de una línea puede cambiar nombre y presentación? | **Sí: la edición es reemplazo completo de los campos de negocio**, nombre y presentación incluidos, porque al desaparecer `product_id` el argumento de QC-43 R33 desaparece con él y una errata en el nombre sería incorregible. Puede chocar con el índice único igual que un renombrado (QC-43 R15). **Lo único que nunca cambia es el proveedor.** La escribe **R24**. Cerrada por el humano en F1.4 |
 | 2026-09-04 | **T13** — Prisma 6.19.3 no entrega `meta.field_name` en un `P2003`, así que decidir por él es indecidible | **Se acepta el estado actual.** El clasificador queda escrito como pide `design.md > 6.2` y el test de integración afirma el comportamiento observable de hoy: la base rechaza con `23503` y el adaptador relanza el `P2003` crudo. **Se descartan** mover de versión de Prisma (dependencia nueva, regla 7) y el pre-`SELECT` de existencia (reabre la dependencia que esta ficha viene a cortar). **Agujero aceptado y anotado:** ese `P2003` escapa sin código de dominio estable; hoy es inalcanzable desde la interfaz porque QC-44 no existe, y `inventario` lo hereda igual |
 | 2026-09-04 | El E2E de productos necesita rellenar `qtyAlert`, que el spec nunca rellenaba | **El `fill` se queda.** Es un **segundo fallo preexistente** del E2E, distinto del de `product-field-cost`: el `required` de `qtyAlert` lo puso `b4822de` y ya está en `origin/dev`, y la validación nativa del navegador bloqueaba el envío. No es una tirita sobre una regresión de QC-52. **Queda escrito aparte** que `./init.sh` no corre Playwright, así que ese recorrido estuvo rojo en `dev` sin que ningún gate lo dijera |
+| 2026-10-16 | ¿La lista de productos muestra costos? | **Enmienda aprobada por el usuario, sin tarjeta** (commits `b0eaa866`, `6a665e3f`). Sí, el costo unitario **de los lotes**, solo al Administrador (`inventario.modificar`, `canViewUnitCosts`): promedio ponderado en el producto, el propio en el lote, «—» si no hay, en moneda `$1,234.57` con el exacto en el `title`. A los demás el servidor no les envía el costo. El producto sigue sin `cost` propio (R1, R6). Cubierta por R6 (nota), R35 y R36. |
+| 2026-10-16 | ¿«Presentación» en la pestaña «Producto»? | **Enmienda aprobada por el usuario, sin tarjeta** (llegó con `b0eaa866` / `6a665e3f`). No: esa pestaña oculta la columna. Cubierta por R37. |

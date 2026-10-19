@@ -133,6 +133,9 @@ export const D11_SIN_HALLAZGOS = [
   // Alta el 2026-10-12 (QC-265, R43): el barrel ya no reexporta `MISSING_VALUE_MARK`, asi que su
   // exclusion estrecha sobraba y se retira; sin esta alta, `EXCLUSIONES` lo excluiria ENTERO.
   'app/(private)/asignacion/components/index.ts',
+  // Alta el 2026-10-16 (QC-263, D41): el historial ya no tiene disparador propio y `TOUCH_TARGET`
+  // se borro, asi que la exclusion entera de `batch-history.tsx` sobraba y se retira.
+  'app/(private)/inventario/components/batch-history.tsx',
 ] as const
 
 /** La credencial sale de QC-231 (D3): solo `components/submit-button.tsx` se toca (D12). */

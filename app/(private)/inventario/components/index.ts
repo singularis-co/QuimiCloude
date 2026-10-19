@@ -5,6 +5,7 @@
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
 export { AdjustBatchDialog, type AdjustBatchDialogProps } from './adjust-batch-dialog';
 export { BatchHistory, movementKindLabel } from './batch-history';
+export { cardFieldLabel, withCardFieldLabel } from './card-field-label';
 export { DeleteProductDialog } from './delete-product-dialog';
 export {
   DIRECT_DELIVERY_OPEN_TESTID,
@@ -80,6 +81,9 @@ export {
 export { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
 export {
   ACTIONS_COLUMN_ID,
+  BATCHES_TOGGLE_COLUMN_ID,
+  PRODUCT_CARD_LABELS,
+  BELOW_ALERT_LABEL,
   IMAGE_COLUMN_ID,
   PRODUCT_BATCH_ROW_TEXTS,
   buildProductColumns,
@@ -102,15 +106,29 @@ export { ExpiryDate, type ExpiryDateProps, useLocalToday } from './expiry-date';
 export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 export { productNameWithoutPresentation } from './product-base-name';
 export {
+  PRODUCT_ACTION_ADJUST_TESTID,
   PRODUCT_ACTION_BATCHES_TESTID,
   PRODUCT_ACTION_DELETE_TESTID,
   PRODUCT_ACTION_DIRECT_DELIVERY_TESTID,
   PRODUCT_ACTION_EDIT_TESTID,
+  PRODUCT_ACTION_HISTORY_TESTID,
+  PRODUCT_ROW_ACTION_LABELS,
   PRODUCT_ROW_ACTIONS_TESTID,
   ProductRowActions,
   productRowActionsLabel,
+  productRowActionsSpec,
+  type ProductRowAction,
   type ProductRowActionsProps,
+  type ProductRowActionsSpec,
+  type ProductRowActionsSpecInput,
 } from './product-row-actions';
+export {
+  ProductRowDialogs,
+  batchTarget,
+  type BatchTarget,
+  type ProductRowDialogsActive,
+  type ProductRowDialogsProps,
+} from './product-row-dialogs';
 export {
   COST_INPUT_SCALE,
   divideCost,
@@ -127,11 +145,23 @@ export {
   type ProductBatchDateFieldName,
 } from './product-batch-date-field';
 export {
+  PRODUCT_BATCHES_CARD,
+  PRODUCT_BATCHES_TABLE_ID,
+  PRODUCT_BATCHES_TABLE_TEXTS,
+  PRODUCT_BATCH_COLUMN_LABELS,
+  buildProductBatchColumns,
+  type ProductBatchColumnsDeps,
+  type ProductBatchColumnsProduct,
+} from './product-batch-columns';
+export {
   ProductBatchesPanel,
   type ProductBatchesPanelProps,
 } from './product-batches-panel';
 export {
+  BATCH_ADJUST_ITEM_TESTID,
+  BATCH_HISTORY_ITEM_TESTID,
   ProductBatchesSheet,
+  batchActionsLabel,
   type ProductBatchesSheetProps,
 } from './product-batches-sheet';
 export {
@@ -159,16 +189,26 @@ export {
   buildProductListQuery,
   parseProductListParams,
   productListHref,
+  productTypeTabHref,
   type ProductListSearchParams,
   type ProductPageSize,
 } from './product-list-params';
 export { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
-export { ProductTypeTabs, type ProductTypeTabsProps } from './product-type-tabs';
+export {
+  ALL_TYPES_TAB_LABEL,
+  PRODUCT_TYPE_TABS_LABEL,
+  PRODUCT_TYPE_TABS_TESTID,
+  ProductTypeTabs,
+  type ProductTypeTabsProps,
+} from './product-type-tabs';
 export { ProductListSection } from './product-list-section';
 export { ProductSheet } from './product-sheet';
 export {
   PRODUCT_TABLE_ID,
+  PRODUCT_TABLE_SCOPE_CLASS,
   PRODUCT_TABLE_TEXTS,
   ProductTable,
+  productTableCard,
+  type ProductTableCardOptions,
   type ProductTableProps,
 } from './product-table';
