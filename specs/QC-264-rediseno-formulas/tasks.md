@@ -145,7 +145,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 5 — Vista previa (depende de T1b, T3a) [P con 2, 4, 6, 7]
 
-- [ ] **T5a.** (D9, R21–R25) `recipe-form.tsx`. Test nuevo `tests/unit/recetas-ui/recipe-form-preview.test.tsx`
+- [x] **T5a.** (D9, R21–R25) `recipe-form.tsx`. Test nuevo `tests/unit/recetas-ui/recipe-form-preview.test.tsx`
   (monta `RecipeForm`; no importa `@/components/shared/step-reader`): título, descripción con tildes,
   «Cerrar» de 44 px, `StepReader` en `panel` con los pasos del estado actual, nada se guarda ni navega,
   al cerrar se desmonta y el foco vuelve a «Vista previa»; clases de pantalla completa por debajo de

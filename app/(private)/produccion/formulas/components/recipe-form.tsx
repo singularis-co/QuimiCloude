@@ -1,6 +1,6 @@
 'use client';
 
-import { EyeIcon } from 'lucide-react';
+import { EyeIcon, XIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useId, useRef, useState, useTransition, type ReactNode } from 'react';
@@ -14,6 +14,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -125,7 +126,12 @@ const PACKING_STEPS_TESTID_PREFIX = 'recipe-packing-step';
 const PREVIEW_OPEN_LABEL = 'Vista previa';
 const PREVIEW_TITLE = 'Vista previa';
 const PREVIEW_DESCRIPTION =
-  'Asi se leera esta receta, paso a paso. Nada de lo que hagas aqui se guarda.';
+  'Así se leerá esta receta, paso a paso. Nada de lo que hagas aquí se guarda.';
+const PREVIEW_CLOSE_LABEL = 'Cerrar';
+// Por debajo de 768 px ocupa la pantalla visible entera; desde ahí, centrado con tope de 920 × 900.
+// `dvh` y no `vh`: en el móvil la barra del navegador se come parte del alto de ventana.
+const PREVIEW_DIALOG_CLASS =
+  'top-0 left-0 flex h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none p-0 sm:max-w-none md:top-1/2 md:left-1/2 md:h-[min(900px,calc(100dvh-64px))] md:w-[min(920px,calc(100vw-48px))] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl';
 
 const STEP_LOCK_TITLE = (orders: number) =>
   orders === 1
@@ -375,23 +381,32 @@ export function RecipeForm(props: RecipeFormProps) {
         <EyeIcon aria-hidden />
         {PREVIEW_OPEN_LABEL}
       </DialogTrigger>
-      {/* R26: alto POR CONTENIDO con tope en `85dvh` y scroll interno; el alto de
-          viewport completo esta prohibido -en movil la barra del navegador se come
-          esa medida y el modal deja de caber-. */}
       <DialogContent
         data-testid="recipe-form-preview"
-        className="flex max-h-[85dvh] flex-col gap-4 sm:max-w-lg"
+        className={PREVIEW_DIALOG_CLASS}
         finalFocus={previewTriggerRef}
+        showCloseButton={false}
       >
-        <DialogHeader>
-          <DialogTitle>{PREVIEW_TITLE}</DialogTitle>
-          <DialogDescription>{PREVIEW_DESCRIPTION}</DialogDescription>
-        </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="flex items-start justify-between gap-3 border-b px-6 pt-[max(1.25rem,env(safe-area-inset-top))] pb-4 md:pt-5">
+          <DialogHeader className="min-w-0 gap-1">
+            <DialogTitle className="text-lg leading-snug font-semibold">{PREVIEW_TITLE}</DialogTitle>
+            <DialogDescription>{PREVIEW_DESCRIPTION}</DialogDescription>
+          </DialogHeader>
+          <DialogClose
+            data-testid="recipe-form-preview-close"
+            render={
+              <Button type="button" variant="ghost" size="icon" touch aria-label={PREVIEW_CLOSE_LABEL} />
+            }
+          >
+            <XIcon aria-hidden />
+          </DialogClose>
+        </div>
+        <div className="min-h-0 flex-1">
           {isPreviewOpen && (
             <StepReader
               steps={state.steps.map((step) => step.document)}
               onFinish={() => setPreviewOpen(false)}
+              layout="panel"
             />
           )}
         </div>
