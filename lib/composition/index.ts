@@ -2644,6 +2644,7 @@ import {
   findLiveWhatsappConnection,
   findLiveWhatsappConnectionById,
   insertWhatsappConnection,
+  recordWhatsappWebhookHandshake,
   updateLiveWhatsappConnection,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
@@ -2665,6 +2666,7 @@ const whatsappConnectionRepository: WhatsappConnectionRepository = {
   findLiveById: findLiveWhatsappConnectionById,
   create: insertWhatsappConnection,
   update: updateLiveWhatsappConnection,
+  recordWebhookHandshake: recordWhatsappWebhookHandshake,
 };
 
 const randomSource: RandomSource = randomSourceNode;

@@ -146,18 +146,25 @@ export function makeRepository(initial: (WhatsappConnectionRecord & { deleted?: 
   const update = vi.fn(async (id: string, patch: WhatsappConnectionPatch, scope: IntegracionesScope) => {
     const row = rows.get(id)
     if (row === undefined || !visible(row, scope)) return null
-    const next = { ...row, ...patch }
+    const next = { ...row, ...patch, lastWebhookAt: patch.lastWebhookAt === undefined ? row.lastWebhookAt : patch.lastWebhookAt }
     rows.set(id, next)
     return strip(next)
   })
+  /** Igual que los dos `UPDATE` condicionados del adaptador: una conexion apagada no cambia. */
+  const recordWebhookHandshake = vi.fn(async (id: string, at: Date, scope: IntegracionesScope) => {
+    const row = rows.get(id)
+    if (row === undefined || !visible(row, scope) || row.status === 'DISABLED') return
+    rows.set(id, { ...row, lastWebhookAt: at, status: row.status === 'PENDING' ? 'ACTIVE' : row.status })
+  })
 
-  const connections: WhatsappConnectionRepository = { findLive, findLiveById, create, update }
+  const connections: WhatsappConnectionRepository = { findLive, findLiveById, create, update, recordWebhookHandshake }
   return {
     connections,
     findLive,
     findLiveById,
     create,
     update,
+    recordWebhookHandshake,
     row: (id: string) => {
       const row = rows.get(id)
       return row === undefined ? undefined : strip(row)

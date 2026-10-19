@@ -23,7 +23,7 @@
 
 ## Bloque B — Dominio y adaptadores sin base (tras T1)
 
-- [ ] **T2 [P] — Tipos y orden de statuses** (R17, R21). Depende de: T1
+- [x] **T2 [P] — Tipos y orden de statuses** (R17, R21). Depende de: T1
   - `domain/whatsapp-message.ts` (constantes de dirección, tipo, estado, origen) y
     `domain/whatsapp-message-status.ts` (`STATUS_PREDECESSORS`, §4.4).
   - Test `tests/unit/integraciones/whatsapp/whatsapp-message-status.test.ts`: la tabla completa
@@ -35,7 +35,7 @@
   - Test `tests/unit/integraciones/whatsapp/webhook-signature-hmac.test.ts` con los casos de §10.1.
   - **Hecho:** test verde; `node:crypto` solo en el adaptador.
 
-- [ ] **T4 — Lectura del cuerpo de Meta** (R14, R15, R16, R17, R19, R20, R22). Depende de: T2
+- [x] **T4 — Lectura del cuerpo de Meta** (R14, R15, R16, R17, R19, R20, R22). Depende de: T2
   - `domain/whatsapp-inbound-message.ts` (tabla de §4.3) y `domain/whatsapp-webhook-payload.ts`
     (`parseWhatsappWebhook` → `InboundBatch`).
   - `tests/unit/integraciones/whatsapp/whatsapp-webhook-fixtures.ts` (constructores de cuerpos, sin
@@ -45,7 +45,7 @@
     status desconocido; reacción sin `emoji` y con `emoji` vacío; `from` ≠ `contacts[].wa_id` con un
     solo contacto; varios contactos y ninguno (manda `from`); `from` en el `payload`.
 
-- [ ] **T5 — Puertos y repositorio de conexión** (R6). Depende de: T1
+- [x] **T5 — Puertos y repositorio de conexión** (R6). Depende de: T1
   - `ports/whatsapp-connection-repository.ts`: `lastWebhookAt` en el `patch` y
     `recordWebhookHandshake` (§5.2). `ports/whatsapp-webhook-directory.ts`,
     `ports/whatsapp-inbox-repository.ts`, `ports/integrations-switch.ts`.

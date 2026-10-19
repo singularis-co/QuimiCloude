@@ -15,6 +15,7 @@ vi.mock('@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connec
   findLiveWhatsappConnectionById: vi.fn(),
   insertWhatsappConnection: insertMock,
   updateLiveWhatsappConnection: vi.fn(),
+  recordWhatsappWebhookHandshake: vi.fn(),
 }))
 
 import { integraciones } from '@/lib/composition'

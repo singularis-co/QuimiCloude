@@ -166,10 +166,30 @@ export async function updateLiveWhatsappConnection(
         status: patch.status,
         lastError: patch.lastError,
         lastCheckedAt: patch.lastCheckedAt,
+        lastWebhookAt: patch.lastWebhookAt,
       },
     }));
   } catch (error) {
     throw translateUniqueViolation(error);
   }
   return count === 0 ? null : findLiveWhatsappConnectionById(id, scope);
+}
+
+/**
+ * Dos `UPDATE` con la condición en su `where`, sin transacción: si la conexión se apaga entre la
+ * lectura y esta escritura, ninguno casa. Si cae entre los dos, la siguiente prueba buena la activa.
+ */
+export async function recordWhatsappWebhookHandshake(
+  id: string,
+  at: Date,
+  scope: IntegracionesScope,
+): Promise<void> {
+  await prisma.whatsappConnection.updateMany({
+    where: { id, deletedAt: null, status: { not: 'DISABLED' }, ...whatsappConnectionCompanyScope(scope) },
+    data: { lastWebhookAt: at },
+  });
+  await prisma.whatsappConnection.updateMany({
+    where: { id, deletedAt: null, status: 'PENDING', ...whatsappConnectionCompanyScope(scope) },
+    data: { status: 'ACTIVE' },
+  });
 }
