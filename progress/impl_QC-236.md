@@ -351,3 +351,50 @@ país de la empresa (`companyCountry`), o «Sin país» si la empresa no lo tien
 - `tests/integration/clientes/legacy-phone-backfill.int.test.ts`: «R24 — los clientes de una empresa
   desactivada quedan sin tocar». Escrito, sin correr (no hay base).
 - Mapa: R35 → `tests/ui/clientes/customer-phone-field.test.tsx` (los dos casos «R35 —»).
+
+## Vuelta 1 del reviewer · backend (H1, H2, H5)
+
+Grafo: no consultado; Grep/Read sobre el worktree.
+
+**Archivos**
+- `tests/unit/clientes/scope.test.ts` (H1): `clientes-telefono.spec.ts` entra en `E2E_PERMITIDOS`
+  con nota fechada 2026-10-19 (QC-236). La lista sigue cerrada.
+- `lib/modules/clientes/adapters/driven/persistence/customer-prisma.ts` (H2):
+  `updateKeepingLegacyPhone` solo vacia las cuatro columnas con
+  `phone_issue IS NULL AND (phone IS NULL OR phone_e164 IS NOT NULL)` en el `where` del segundo
+  `UPDATE`. Una fila con aviso o pendiente de relleno conserva su telefono.
+- `lib/modules/clientes/domain/customer-phone.ts` (H2/H4): `CustomerPhoneDescription` gana
+  `{ kind: 'legacy'; legacyPhone: string }` para `phone` sin `phoneE164` ni `phoneIssue`. El tipo ya
+  salia por el barrel; no hace falta tocar `index.ts`. La UI (`customer-columns.tsx`) no se toco:
+  hoy esa variante cae en `MissingValue` hasta que el frontend la pinte.
+- `lib/modules/clientes/adapters/driven/persistence/legacy-phone-prisma.ts` (H5): el resumen suma
+  solo los resultados cuyo `updateMany` devolvio `count` 1.
+- `tests/unit/clientes/customer-phone.test.ts`, `tests/unit/clientes/legacy-phone-prisma.test.ts`
+  (nuevo) y `tests/integration/clientes/customer-phone-uniqueness.int.test.ts`.
+
+El caso de uso (`update-customer.ts`) no cambia: con el numero vacio siempre manda
+`keep_legacy_or_clear` y la decision es del adaptador, que ya cubre la fila pendiente.
+
+**Casos**
+- `customer-phone.test.ts`: «R34 — pendiente de relleno (phone sin phoneE164 ni phoneIssue): el
+  texto antiguo, sin etiqueta».
+- `legacy-phone-prisma.test.ts`: «R24, R25, R26 — con todas las filas escritas, cuenta
+  convertidas, invalidas y duplicadas» y «R24 — una fila que dejo de estar pendiente (count 0) no
+  entra en el resumen».
+- `customer-phone-uniqueness.int.test.ts`: «R34 — editar una fila pendiente de relleno con el
+  numero vacio conserva phone y deja phone_country, phone_e164 y phone_issue nulos». Escrito, SIN
+  correr (no hay base).
+
+**Salidas**
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, todos en archivos ajenos.
+- `pnpm exec vitest run guard`: `Test Files 81 passed (81)`, `Tests 1113 passed | 20 skipped`.
+- `vitest run --project node --project ui` sobre `scope`, `customer-phone`, `legacy-phone-prisma`,
+  `legacy-phone-backfill` y `customer-service`: `Test Files 5 passed (5)`, `Tests 99 passed (99)`.
+- `pnpm exec vitest related --run --project ui --project node <customer-phone.ts, customer-prisma.ts,
+  legacy-phone-prisma.ts y los tres tests unitarios tocados>`: `Test Files 400 passed (400)`,
+  `Tests 6858 passed | 1 skipped (6859)`, exit 0.
+
+**Veredicto:** H1, H2 (adaptador y dominio) y H5 resueltos y en verde. Queda pendiente: el `.int`
+nuevo, sin correr; pintar la variante `legacy` en la UI, que le toca a frontend; y H3, H6 y H7,
+que estaban fuera del encargo.

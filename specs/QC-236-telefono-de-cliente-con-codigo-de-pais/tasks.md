@@ -221,7 +221,7 @@
 
 ## Bloque E — Enmienda del 2026-10-19 (D17, D19)
 
-- [ ] **T13 · Edición de un cliente sin país** (R35). Depende de: T9, T10.
+- [x] **T13 · Edición de un cliente sin país** (R35). Depende de: T9, T10.
   - **Qué se hace:** en `customer-phone-field.tsx`, el valor inicial del país en la edición de un
     cliente sin `phoneCountry` es `companyCountry`, como en el alta (`design.md § 8.1`, D19).
   - **Hecho cuando** `tests/ui/clientes/customer-phone-field.test.tsx` tiene estos casos:
@@ -231,7 +231,7 @@
       país»»;
     - los casos R4 y R31 siguen verdes: un cliente con `phoneCountry` muestra el suyo.
 
-- [ ] **T14 · El relleno solo toca empresas activas** (R24, D17). Depende de: T5.
+- [x] **T14 · El relleno solo toca empresas activas** (R24, D17). Depende de: T5.
   - **Qué se hace:** solo tests; el código ya está en la rama (`design.md § 3.2`, § 3.3).
   - **Hecho cuando:**
     - `tests/unit/clientes/legacy-phone-backfill.test.ts` tiene «R24 — el caso de uso solo procesa

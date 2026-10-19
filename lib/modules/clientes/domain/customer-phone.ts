@@ -107,6 +107,7 @@ export type CustomerPhoneDescription =
       readonly issue: CustomerPhoneIssue;
       readonly label: string;
     }
+  | { readonly kind: 'legacy'; readonly legacyPhone: string }
   | { readonly kind: 'none' };
 
 const ISSUE_SHORT_LABEL: Readonly<Record<CustomerPhoneIssue, string>> = {
@@ -114,7 +115,10 @@ const ISSUE_SHORT_LABEL: Readonly<Record<CustomerPhoneIssue, string>> = {
   duplicate: 'Duplicado: revisar',
 };
 
-/** Lo que muestra la lista en la columna del telefono. */
+/**
+ * Lo que muestra la lista en la columna del telefono. Una fila con `phone` y sin `phoneE164` ni
+ * `phoneIssue` aun no ha pasado por el relleno: se muestra su texto antiguo, sin etiqueta.
+ */
 export function describeCustomerPhone(
   customer: Pick<Customer, 'phone' | 'phoneE164' | 'phoneIssue'>,
 ): CustomerPhoneDescription {
@@ -129,5 +133,6 @@ export function describeCustomerPhone(
       label: ISSUE_SHORT_LABEL[customer.phoneIssue],
     };
   }
+  if (customer.phone !== null) return { kind: 'legacy', legacyPhone: customer.phone };
   return { kind: 'none' };
 }

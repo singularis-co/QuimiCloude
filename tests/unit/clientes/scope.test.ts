@@ -344,6 +344,11 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
   // fijado por specs/QC-288-entrega-sin-pedido/tasks.md). Siembra dos clientes por Prisma -la
   // entrega sin pedido se reparte entre ellos- con la normalizacion del barrel de `clientes`, la
   // unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
+  // 2026-10-19 (QC-236): entra `clientes-telefono.spec.ts`, el E2E del telefono de cliente con
+  // pais (nombre fijado por specs/QC-236-telefono-de-cliente-con-codigo-de-pais/tasks.md > T11).
+  // Recorre la pantalla de clientes: alta con el pais de la empresa, duplicado, empresa sin pais,
+  // avisos de los migrados en la lista y el campo en telefono. Siembra clientes por Prisma con la
+  // normalizacion del barrel de `clientes`, la unica definicion. La lista sigue CERRADA.
   const E2E_PERMITIDOS: ReadonlySet<string> = new Set([
     'clientes.spec.ts',
     'pedido-con-cliente.spec.ts',
@@ -355,6 +360,7 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
     'pedidos-rediseno.spec.ts',
     'entrega-a-varios-clientes.spec.ts',
     'entrega-sin-pedido.spec.ts',
+    'clientes-telefono.spec.ts',
   ])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 

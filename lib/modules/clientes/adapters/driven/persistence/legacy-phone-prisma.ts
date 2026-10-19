@@ -49,8 +49,11 @@ async function processCompanyOnce(
         new Set(taken.map((row) => row.phoneE164).filter((e164): e164 is string => e164 !== null)),
       );
 
+      // El resumen cuenta lo que se escribio, no el plan: una fila que dejo de estar pendiente da
+      // `count` 0 y no entra.
+      const written: LegacyPhoneOutcome[] = [];
       for (const outcome of outcomes) {
-        await tx.customer.updateMany({
+        const { count } = await tx.customer.updateMany({
           where: { id: outcome.id, ...PENDING, ...customerCompanyScope(scope) },
           data: {
             phoneCountry: outcome.phoneCountry,
@@ -58,8 +61,9 @@ async function processCompanyOnce(
             phoneIssue: outcome.phoneIssue,
           },
         });
+        if (count === 1) written.push(outcome);
       }
-      return summarize(outcomes);
+      return summarize(written);
     },
     { maxWait: 10_000, timeout: 60_000 },
   );

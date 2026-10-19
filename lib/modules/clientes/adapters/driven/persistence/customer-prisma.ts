@@ -197,8 +197,9 @@ export async function updateAliveCustomer(
 
 /**
  * Edicion con el numero vacio. El primer `UPDATE` deja la fila bloqueada hasta el final de la
- * transaccion, asi que el segundo decide con el `phone_issue` que hay en la base: con aviso el
- * telefono antiguo se conserva, sin aviso se borra.
+ * transaccion, asi que el segundo decide con lo que hay en la base. El telefono antiguo se
+ * conserva si la fila tiene aviso o si aun no ha pasado por el relleno (`phone` sin
+ * `phone_e164`); en cualquier otro caso se borra.
  */
 async function updateKeepingLegacyPhone(
   id: string,
@@ -214,7 +215,13 @@ async function updateKeepingLegacyPhone(
     });
     if (count !== 1) return 'not_found';
     await tx.customer.updateMany({
-      where: { id, deletedAt: null, phoneIssue: null, ...customerCompanyScope(scope) },
+      where: {
+        id,
+        deletedAt: null,
+        phoneIssue: null,
+        OR: [{ phone: null }, { phoneE164: { not: null } }],
+        ...customerCompanyScope(scope),
+      },
       data: { ...NO_PHONE, updatedAt: now, updatedBy: actorId },
     });
     return 'ok';
