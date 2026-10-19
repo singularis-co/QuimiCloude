@@ -12,7 +12,7 @@
 
 ## Tasks
 
-- [ ] **T1 [P] — Etiquetas y textos puros** (R5, R10, R12, R15, R19)
+- [x] **T1 [P] — Etiquetas y textos puros** (R5, R10, R12, R15, R19)
   - `addon-labels.ts`: `ADDON_LABELS` como `Record<Addon, …>` con `name` tomado de `ADDON_NAMES`
     (`lib/shared/ui/addon-names.ts`, ya en `dev`; sin repetir nombres), descripciones de la
     pregunta 1 (cerrada) e iconos de `lucide-react`; `changedAddons(prev, next)` y
@@ -24,14 +24,14 @@
     `ADDON_LABELS` rompe el typecheck; `addon-labels.ts` no contiene ningún nombre de añadido
     literal (el test R5 compara `ADDON_LABELS[a].name` con `ADDON_NAMES[a]`).
 
-- [ ] **T2 [P] — `CoreModuleChips`** (R19)
+- [x] **T2 [P] — `CoreModuleChips`** (R19)
   - `core-module-chips.tsx` (Server): `h2` «Núcleo», subtítulo, una `Badge` `outline` con `Lock`
     por cada `CORE_MODULE_NAMES`. Depende de `core-modules.ts` (si T1 no ha terminado, se crea aquí
     y T1 lo completa).
   - Test: `tests/ui/maestro/core-module-chips.test.tsx`.
   - **Hecho:** «R19: once fichas…» pasa; ningún `role="switch"` ni `button` en la sección.
 
-- [ ] **T3 [P] — `ModulesSkeleton`** (R3)
+- [x] **T3 [P] — `ModulesSkeleton`** (R3)
   - `modules-skeleton.tsx`: `role="status"`, `aria-busy="true"`, `aria-label` «Cargando los
     módulos…», `data-testid="company-modules-skeleton"`, `Spinner` + el texto, cuatro `Skeleton`
     de 68 px (patrón de `CompanyHistorySkeleton`, `company-history-panel.tsx:207-224`).
