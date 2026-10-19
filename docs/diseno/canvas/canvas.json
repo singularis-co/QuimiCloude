@@ -1214,6 +1214,90 @@
       "title": "ProductoTerminadoEvidenciaMovil (QC-271)",
       "page": "inventario",
       "is_interactive": true
+    },
+    "FormulaAcondicionamiento.dc.html": {
+      "expand": "fill",
+      "h": 1400,
+      "is_interactive": true,
+      "page": "pasosacond",
+      "title": "Fórmula con pasos de acondicionamiento (QC-299)",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "FormulaAcondicionamientoMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "pasosacond",
+      "title": "FormulaAcondicionamientoMovil",
+      "w": 960,
+      "x": 2504,
+      "y": 0
+    },
+    "FormulaAcondicionamientoTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "pasosacond",
+      "title": "FormulaAcondicionamientoTablet",
+      "w": 904,
+      "x": 1520,
+      "y": 0
+    },
+    "AcondicionamientoPasos.dc.html": {
+      "expand": "fill",
+      "h": 1100,
+      "is_interactive": true,
+      "page": "pasosacond",
+      "title": "Acondicionamiento paso a paso (QC-299)",
+      "w": 1440,
+      "x": 0,
+      "y": 1640
+    },
+    "AcondicionamientoPasosMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "pasosacond",
+      "title": "AcondicionamientoPasosMovil",
+      "w": 960,
+      "x": 2504,
+      "y": 1640
+    },
+    "AcondicionamientoPasosTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "pasosacond",
+      "title": "AcondicionamientoPasosTablet",
+      "w": 904,
+      "x": 1520,
+      "y": 1640
+    },
+    "RecorridoPasosAcondicionamiento.dc.html": {
+      "expand": "fill",
+      "h": 1300,
+      "is_interactive": true,
+      "page": "pasosacond",
+      "title": "Recorrido con responsables por paso (QC-299)",
+      "w": 1440,
+      "x": 0,
+      "y": 3180
+    },
+    "RecorridoPasosAcondicionamientoMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "pasosacond",
+      "title": "RecorridoPasosAcondicionamientoMovil",
+      "w": 960,
+      "x": 2504,
+      "y": 3180
+    },
+    "RecorridoPasosAcondicionamientoTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "pasosacond",
+      "title": "RecorridoPasosAcondicionamientoTablet",
+      "w": 904,
+      "x": 1520,
+      "y": 3180
     }
   },
   "createdOnFiles": {
@@ -1776,6 +1860,39 @@
       "maxH": 70,
       "fill": "gray",
       "page": "inventario"
+    },
+    "c_FormulaAcondicionamiento": {
+      "bold": true,
+      "fill": "gray",
+      "maxH": 70,
+      "page": "pasosacond",
+      "size": 40,
+      "text": "Fórmula: sección Acondicionamiento con dos switches (QC-299)  ·  escritorio · tablet · teléfono",
+      "w": 1400,
+      "x": 0,
+      "y": -110
+    },
+    "c_AcondicionamientoPasos": {
+      "bold": true,
+      "fill": "gray",
+      "maxH": 70,
+      "page": "pasosacond",
+      "size": 40,
+      "text": "Acondicionamiento paso a paso con responsables (QC-299)  ·  escritorio · tablet · teléfono",
+      "w": 1400,
+      "x": 0,
+      "y": 1530
+    },
+    "c_RecorridoPasosAcondicionamiento": {
+      "bold": true,
+      "fill": "gray",
+      "maxH": 70,
+      "page": "pasosacond",
+      "size": 40,
+      "text": "Recorrido: responsables por paso (QC-299)  ·  escritorio · tablet · teléfono",
+      "w": 1400,
+      "x": 0,
+      "y": 3070
     }
   },
   "order": [
@@ -1904,6 +2021,15 @@
     "FiltrosBarra.dc.html",
     "FiltrosBarraTablet.dc.html",
     "FiltrosBarraMovil.dc.html",
+    "FormulaAcondicionamiento.dc.html",
+    "FormulaAcondicionamientoTablet.dc.html",
+    "FormulaAcondicionamientoMovil.dc.html",
+    "AcondicionamientoPasos.dc.html",
+    "AcondicionamientoPasosTablet.dc.html",
+    "AcondicionamientoPasosMovil.dc.html",
+    "RecorridoPasosAcondicionamiento.dc.html",
+    "RecorridoPasosAcondicionamientoTablet.dc.html",
+    "RecorridoPasosAcondicionamientoMovil.dc.html",
     "RecorridoEvidencia.dc.html",
     "RecorridoEvidenciaTablet.dc.html",
     "RecorridoEvidenciaMovil.dc.html",
