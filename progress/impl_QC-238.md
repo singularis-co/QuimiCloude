@@ -212,3 +212,25 @@ quitado ni relajado. Resultado: 1/1 archivo, 9/9 verdes (antes 3 rojos 2BP01).
   Pendiente de T12: `guard-rutas-fuera-de-sesion` (ruta nueva) y `guard-ambito-empresa-integraciones`.
 
 **Veredicto:** T10 y T11 hechas según spec; quedan los rojos de forma/guardias que tensan T12 y T13.
+
+## Tanda T12 + T13 — guardias y forma del módulo
+
+**Archivos** (solo tests; ningún cambio de producción)
+- `tests/guards/guard-rutas-fuera-de-sesion.test.ts`: + la ruta del webhook como añadido `integraciones` con la prueba `tests/unit/integraciones/whatsapp/receive-whatsapp-webhook.test.ts`; el ancla anti-vacuidad la incluye; caso propio de la clasificación.
+- `tests/guards/guard-ambito-empresa-integraciones.test.ts`: puerto de conexión con 5 métodos; `WhatsappInboxRepository` (1 método) con el mismo barrido (`describe.each` sobre `PUERTOS`, ayudantes `applyStatus`/`upsertContact` en lista exacta); 4 envolturas exactas; `update` (1) y `recordWebhookHandshake` (2) con ámbito y `deletedAt: null` en cada `updateMany`; `EXENTOS_DEL_AMBITO` con una sola entrada (`whatsapp-webhook-directory-prisma.ts`, motivo P1/R32) y su forma vigilada (`formaDeLaExencion`: una función `companyOfWhatsappConnection`, un único acceso `prisma.whatsappConnection.findFirst`, `select` exactamente `{ companyId: true }`, `where` con `deletedAt: null`, sin SQL crudo ni alias de `prisma`); cableado del puerto `WhatsappWebhookDirectory` comprobado; «ninguna lista de excepciones» pasa a «la única es `EXENTOS_DEL_AMBITO`, declarada una vez, y el módulo no declara ninguna».
+- `tests/unit/integraciones/module-shape.test.ts`: R18 + 15 archivos de §1; R20 + 2 fábricas; R19 + la ruta como importador y + 2 miembros y 4 `typeOf`; R13 cinco modelos. Todo con `toEqual` exacto.
+
+**Sensibilidad (mutación manual, revertida):** quitar la regla del `select` ⇒ 2 rojos; la de una sola función ⇒ 2; la exención por nombre (`if (true)`) ⇒ 5; la del `where` ⇒ 1; la del acceso ⇒ 1; la de «una sola vez» ⇒ 1.
+
+**R → test**
+- R31 → guard-rutas-fuera-de-sesion «QC-238 R31: el webhook de WhatsApp es del añadido `integraciones`…», «R26, QC-238 R31: ancla anti-vacuidad…».
+- R32 → guard-ambito-empresa-integraciones «R32 — la lista de exentos tiene UNA sola entrada…», «whatsapp-webhook-directory-prisma.ts: exento por nombre (…), con la forma exacta…», «R32 — sensibilidad: …» (segundo campo en el `select`, segunda función, otro nombre de archivo, `where` sin `deletedAt`, otro acceso, SQL crudo).
+- R2 → guard-ambito-empresa-integraciones «R2 — cada metodo de WhatsappConnectionRepository/WhatsappInboxRepository…», «R2 — las escrituras sobre una conexion existente…».
+
+**Comandos (salida real)**
+- `pnpm run typecheck`: verde (`tsc --noEmit` sin salida).
+- `pnpm run lint`: 0 errores, 10 avisos preexistentes; ninguno en los archivos tocados.
+- `pnpm exec vitest run guard`: 81/81 archivos, 1130 passed, 20 skipped.
+- `pnpm exec vitest run tests/unit/integraciones/module-shape.test.ts`: 103 passed, 1 skipped (R22, solo en la rama de QC-234).
+
+**Veredicto:** T12 y T13 hechas; guardias y forma del módulo en verde, sin tocar producción.

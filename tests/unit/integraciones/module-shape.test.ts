@@ -143,11 +143,15 @@ const MODULE_CODE_FILES = [
   'adapters/driven/persistence/ai-provider-connection-prisma.ts',
   'adapters/driven/persistence/company-scope.ts',
   'adapters/driven/persistence/whatsapp-connection-prisma.ts',
+  'adapters/driven/persistence/whatsapp-inbox-prisma.ts',
+  'adapters/driven/persistence/whatsapp-webhook-directory-prisma.ts',
   'adapters/driven/security/random-source-node.ts',
   'adapters/driven/security/secret-cipher-aes-gcm.ts',
   'adapters/driven/security/secret-digest-sha256.ts',
+  'adapters/driven/security/webhook-signature-hmac.ts',
   'adapters/driving/ai-provider-actions.ts',
   'adapters/driving/whatsapp-connection-actions.ts',
+  'adapters/driving/whatsapp-webhook-route.ts',
   'domain/actor.ts',
   'domain/ai-provider-failure.ts',
   'domain/ai-provider-input.ts',
@@ -162,6 +166,7 @@ const MODULE_CODE_FILES = [
   'domain/get-whatsapp-connection.ts',
   'domain/graph-failure.ts',
   'domain/integraciones-scope.ts',
+  'domain/receive-whatsapp-webhook.ts',
   'domain/regenerate-whatsapp-verify-token.ts',
   'domain/report-ai-provider-outcome.ts',
   'domain/resolve-ai-provider-for-reading.ts',
@@ -173,17 +178,27 @@ const MODULE_CODE_FILES = [
   'domain/test-saved-ai-provider.ts',
   'domain/test-whatsapp-connection.ts',
   'domain/update-whatsapp-connection.ts',
+  'domain/verify-whatsapp-webhook.ts',
+  'domain/webhook-connection.ts',
   'domain/whatsapp-connection-input.ts',
   'domain/whatsapp-connection.ts',
+  'domain/whatsapp-inbound-message.ts',
+  'domain/whatsapp-message-status.ts',
+  'domain/whatsapp-message.ts',
+  'domain/whatsapp-webhook-payload.ts',
   'index.ts',
   'ports/ai-provider-catalog.ts',
   'ports/ai-provider-connection-repository.ts',
   'ports/ai-provider-probe.ts',
+  'ports/integrations-switch.ts',
   'ports/random-source.ts',
   'ports/secret-cipher.ts',
   'ports/secret-digest.ts',
+  'ports/webhook-signature.ts',
   'ports/whatsapp-connection-repository.ts',
   'ports/whatsapp-graph-client.ts',
+  'ports/whatsapp-inbox-repository.ts',
+  'ports/whatsapp-webhook-directory.ts',
 ] as const
 
 /** ¿El fuente importa la criptografia de Node, con o sin prefijo `node:`? */
@@ -334,7 +349,7 @@ describe('la forma del modulo integraciones', () => {
     expect(adaptadores).toEqual(['driven/', 'driving/'])
   })
 
-  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso, y solo desde ./domain', () => {
+  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso (con las dos del webhook, QC-238), y solo desde ./domain', () => {
     const { otherStatements, reexports } = contractReexports(readFileSync(join(moduleDir, 'index.ts'), 'utf8'))
 
     expect(otherStatements, 'el contrato solo reexporta: ni declaraciones ni export *').toBe(0)
@@ -373,6 +388,7 @@ describe('la forma del modulo integraciones', () => {
       'createGetAiProviderReadiness',
       'createGetAiProviderStatus',
       'createGetWhatsappConnection',
+      'createReceiveWhatsappWebhook',
       'createRegenerateWhatsappVerifyToken',
       'createReportAiProviderOutcome',
       'createResolveAiProviderForReading',
@@ -382,6 +398,7 @@ describe('la forma del modulo integraciones', () => {
       'createTestSavedAiProvider',
       'createTestWhatsappConnection',
       'createUpdateWhatsappConnection',
+      'createVerifyWhatsappWebhook',
       'isAccountFailure',
     ])
     expect(reexports.filter((r) => r.typeOnly).map((r) => r.name).sort()).toEqual([
@@ -419,7 +436,7 @@ describe('la forma del modulo integraciones', () => {
     expect(reexports).toEqual([{ name: 'SecretCipher', typeOnly: true, from: './ports/secret-cipher' }])
   })
 
-  it('R18: los archivos de codigo del modulo son exactamente los del cifrado de secretos y los de la conexion de WhatsApp', () => {
+  it('R18: los archivos de codigo del modulo son exactamente los del cifrado de secretos, los de la conexion de WhatsApp y los de su webhook (QC-238)', () => {
     const relativos = listFiles(moduleDir).map((file) => toPosix(relative(moduleDir, file)))
     expect(codeFilesAmong(relativos).sort()).toEqual([...MODULE_CODE_FILES])
   })
@@ -465,7 +482,7 @@ describe('la forma del modulo integraciones', () => {
     expect(hallazgos.join('\n')).toContain('node:crypto')
   })
 
-  it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes', () => {
+  it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes, y la ruta del webhook (QC-238)', () => {
     expect(filesImportingTheModule()).toEqual([
       'lib/composition/index.ts',
       'lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic.ts',
@@ -489,6 +506,7 @@ describe('la forma del modulo integraciones', () => {
       'app/(private)/integraciones/whatsapp/page.tsx',
       'app/(private)/produccion/formulas/page.tsx',
       'app/(private)/proveedores/[id]/page.tsx',
+      'app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts',
     ])
   })
 
@@ -530,7 +548,7 @@ describe('la forma del modulo integraciones', () => {
     ])
   })
 
-  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones y la URL del webhook, con sus puertos tipados', () => {
+  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones, la URL del webhook y su recepcion (QC-238), con sus puertos tipados', () => {
     const cableado = integracionesWiring(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8'))
 
     expect(cableado, 'lib/composition/index.ts deberia exportar const integraciones = { ... }').not.toBeNull()
@@ -541,6 +559,7 @@ describe('la forma del modulo integraciones', () => {
       'getAiProviderReadiness',
       'getAiProviderStatus',
       'getWhatsappConnection',
+      'receiveWhatsappWebhook',
       'regenerateWhatsappVerifyToken',
       'reportAiProviderOutcome',
       'resolveAiProviderForReading',
@@ -552,6 +571,7 @@ describe('la forma del modulo integraciones', () => {
       'testSavedAiProvider',
       'testWhatsappConnection',
       'updateWhatsappConnection',
+      'verifyWhatsappWebhook',
       'whatsappWebhookUrl',
     ])
     expect(cableado?.typeOf.secretCipher).toBe('SecretCipher')
@@ -563,6 +583,10 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.typeOf.aiProviderCatalog).toBe('AiProviderCatalog')
     expect(cableado?.typeOf.aiProviderProbe).toBe('AiProviderProbe')
     expect(cableado?.typeOf.aiProviderGateway).toBe('AiProviderGateway')
+    expect(cableado?.typeOf.whatsappWebhookDirectory).toBe('WhatsappWebhookDirectory')
+    expect(cableado?.typeOf.whatsappInboxRepository).toBe('WhatsappInboxRepository')
+    expect(cableado?.typeOf.webhookSignature).toBe('WebhookSignature')
+    expect(cableado?.typeOf.integrationsSwitch).toBe('IntegrationsSwitch')
   })
 
   it('R19: el lector del cableado ve un miembro de mas y un tipo que no es el puerto', () => {
@@ -626,7 +650,7 @@ describe('la forma del modulo integraciones', () => {
     expect(branchRange(FEATURE_BRANCH, 'abc')).toEqual({ mergeBase: 'abc' })
   })
 
-  it('R13: db/schema.prisma tiene exactamente tres modelos de integraciones: WhatsappConnection, AiProvider y AiProviderConnection', () => {
+  it('R13: db/schema.prisma tiene exactamente cinco modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), AiProvider y AiProviderConnection', () => {
     const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8').replace(/\r\n/g, '\n')
     // El `/// @module` va encima del `model`, con solo lineas `///` entre medias.
     const modelos = [
@@ -634,8 +658,14 @@ describe('la forma del modulo integraciones', () => {
         /\/\/\/\s*@module\s+integraciones\b[^\n]*\n(?:[ \t]*\/\/\/[^\n]*\n)*[ \t]*model\s+(\w+)/g,
       ),
     ].map((match) => match[1])
-    expect(modelos).toEqual(['WhatsappConnection', 'AiProvider', 'AiProviderConnection'])
-    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(3)
+    expect(modelos).toEqual([
+      'WhatsappConnection',
+      'WhatsappContact',
+      'WhatsappMessage',
+      'AiProvider',
+      'AiProviderConnection',
+    ])
+    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(5)
     expect(esquema).toMatch(/@module\s+identity\b/)
   })
 })

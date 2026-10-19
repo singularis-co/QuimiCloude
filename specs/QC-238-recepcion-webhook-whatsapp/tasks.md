@@ -105,7 +105,7 @@
 
 ## Bloque F — Guardias y tests de forma (tras E)
 
-- [ ] **T12 [P] — Guardias** (R2, R31, R32). Depende de: T6, T7, T10, T11
+- [x] **T12 [P] — Guardias** (R2, R31, R32). Depende de: T6, T7, T10, T11
   - `tests/guards/guard-rutas-fuera-de-sesion.test.ts`: la ruta nueva como añadido
     `integraciones`, con la prueba de T9; el ancla anti-vacuidad la incluye.
   - `tests/guards/guard-ambito-empresa-integraciones.test.ts`: 5 métodos en el puerto de conexión,
@@ -115,7 +115,7 @@
   - **Hecho:** `pnpm exec vitest run guard` en verde, y cada caso de sensibilidad nuevo falla si se
     quita la regla que prueba.
 
-- [ ] **T13 [P] — Forma del módulo**. Depende de: T10, T11
+- [x] **T13 [P] — Forma del módulo**. Depende de: T10, T11
   - `tests/unit/integraciones/module-shape.test.ts`: R13 (cinco modelos), R18 (archivos), R19
     (importadores y cableado), R20 (contrato), según §10.2.
   - **Hecho:** verde, con las listas exactas (sin `toContain` donde hoy hay `toEqual`).
