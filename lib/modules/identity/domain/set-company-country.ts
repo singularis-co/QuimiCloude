@@ -5,7 +5,7 @@ import { requirePlatformPermission, type PlatformActor } from './platform-actor'
 import type { CompanyCountryRepository } from '../ports/company-country-repository';
 
 export type SetCompanyCountryDeps = {
-  readonly companies: CompanyCountryRepository;
+  readonly companies: Pick<CompanyCountryRepository, 'setCountryOfAlive'>;
   readonly now?: () => Date;
 };
 

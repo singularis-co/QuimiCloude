@@ -15,11 +15,13 @@ import {
   Autocomplete,
   AutocompleteContent,
   AutocompleteEmpty,
+  AutocompleteGroup,
   AutocompleteIcon,
   AutocompleteInput,
   AutocompleteInputGroup,
   AutocompleteItem,
   AutocompleteList,
+  AutocompleteSeparator,
   AutocompleteTrigger,
 } from '@/components/ui/autocomplete';
 import { Button } from '@/components/ui/button';
@@ -33,6 +35,8 @@ const NO_COUNTRY_LABEL = 'Sin país';
 const SEARCH_LABEL = 'Buscar país por nombre o prefijo';
 const SEARCH_PLACEHOLDER = 'Busca por nombre o prefijo';
 const CLOSE_LABEL = 'Cerrar';
+const ALL_GROUP_LABEL = 'Todos';
+const ALL_GROUP_NAME = 'Todos los países';
 const noMatchesLabel = (query: string) => `Ningún país coincide con «${query}».`;
 
 /** La hoja de teléfono se usa a 640 px o menos. */
@@ -51,6 +55,9 @@ const CHEVRON_CLASS =
   'size-4 shrink-0 text-muted-foreground transition-transform duration-(--dur-base) group-aria-expanded/trigger:rotate-180 motion-reduce:transition-none';
 
 const SEARCH_INPUT_CLASS = 'pl-9 text-base md:text-base';
+
+const GROUP_LABEL_CLASS =
+  'px-2.5 pt-2 pb-1 text-[10.5px] font-semibold tracking-[0.12em] text-muted-foreground uppercase';
 
 const ITEM_CLASS =
   'gap-2.5 px-2.5 text-sm transition-colors duration-100 data-selected:bg-accent data-selected:text-accent-foreground motion-reduce:transition-none';
@@ -86,6 +93,12 @@ export type CountrySelectProps = {
   readonly id?: string;
   /** `data-testid` del disparador; la lista y las opciones derivan de él. */
   readonly testId?: string;
+  /** País que va arriba, en su propio grupo con este rótulo, mientras el buscador está vacío. */
+  readonly pinned?: { readonly code: CountryCode; readonly label: string };
+  /** La etiqueta queda solo para lectores de pantalla; sigue nombrando el disparador y la hoja. */
+  readonly hideLabel?: boolean;
+  /** En la hoja de teléfono el disparador muestra solo código y prefijo, p. ej. `CO +57`. */
+  readonly compactOnMobile?: boolean;
 };
 
 export function CountrySelect({
@@ -96,6 +109,9 @@ export function CountrySelect({
   error,
   id,
   testId,
+  pinned,
+  hideLabel = false,
+  compactOnMobile = false,
 }: CountrySelectProps) {
   const generatedId = useId();
   const baseId = id ?? generatedId;
@@ -113,10 +129,20 @@ export function CountrySelect({
     () => (value === null ? undefined : options.find((option) => option.code === value)),
     [options, value],
   );
+  const pinnedCode = pinned?.code;
+  // Copia propia: el país fijado sale dos veces en la lista y cada aparición es una opción distinta.
+  const pinnedItem = useMemo<CountryOption | undefined>(() => {
+    const option = options.find((candidate) => candidate.code === pinnedCode);
+    return option === undefined ? undefined : { ...option };
+  }, [options, pinnedCode]);
+  const showPinned = pinnedItem !== undefined && query.trim() === '';
   const items = useMemo<CountryItem[]>(() => {
     const filtered = filterCountryOptions(options, query);
-    return query.trim() === '' ? [NO_COUNTRY, ...filtered] : [...filtered];
-  }, [options, query]);
+    if (query.trim() !== '') return [...filtered];
+    return pinnedItem === undefined
+      ? [NO_COUNTRY, ...filtered]
+      : [pinnedItem, NO_COUNTRY, ...filtered];
+  }, [options, query, pinnedItem]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -147,9 +173,11 @@ export function CountrySelect({
   };
 
   const invalid = error !== undefined;
+  const compact = compactOnMobile && isMobile;
   const triggerProps = {
     id: baseId,
-    'aria-labelledby': labelId,
+    'aria-labelledby': compact ? undefined : labelId,
+    'aria-label': compact ? `${label}: ${selected?.name ?? NO_COUNTRY_LABEL}` : undefined,
     'aria-invalid': invalid || undefined,
     'aria-describedby': invalid ? errorId : undefined,
     disabled,
@@ -161,6 +189,10 @@ export function CountrySelect({
     <>
       {selected === undefined ? (
         <span className="truncate text-muted-foreground">{NO_COUNTRY_LABEL}</span>
+      ) : compact ? (
+        <span className="truncate font-mono">
+          {selected.code} +{selected.callingCode}
+        </span>
       ) : (
         <span className="truncate">
           {selected.name}{' '}
@@ -173,15 +205,19 @@ export function CountrySelect({
 
   const renderItem = (itemClassName: string) =>
     function renderCountryItem(item: CountryItem, index: number): ReactNode {
-      const isSelected = item.code === value;
+      const isPinned = showPinned && item === pinnedItem;
+      // Con el país fijado elegido, solo se marca su aparición de arriba.
+      const isPinnedRepeat = showPinned && !isPinned && item.code === pinnedCode;
+      const isSelected = item.code === value && !isPinnedRepeat;
+      const key = isPinned ? `pinned-${itemKey(item)}` : itemKey(item);
       return (
         <AutocompleteItem
-          key={itemKey(item)}
+          key={key}
           index={index}
           value={item}
           aria-selected={isSelected}
           data-selected={isSelected ? '' : undefined}
-          data-testid={testId === undefined ? undefined : `${testId}-option-${itemKey(item)}`}
+          data-testid={testId === undefined ? undefined : `${testId}-option-${key}`}
           className={cn(ITEM_CLASS, itemClassName)}
           ref={isSelected ? scrollIntoViewOnMount : undefined}
           onClick={() => choose(item)}
@@ -221,7 +257,25 @@ export function CountrySelect({
         data-testid={testId === undefined ? undefined : `${testId}-list`}
         className={cn('gap-0.5 overflow-y-auto overscroll-contain', listClassName)}
       >
-        {renderItem(itemClassName)}
+        {showPinned ? (
+          <>
+            <AutocompleteGroup aria-label={pinned?.label}>
+              <div aria-hidden className={GROUP_LABEL_CLASS}>
+                {pinned?.label}
+              </div>
+              {renderItem(itemClassName)(pinnedItem, 0)}
+            </AutocompleteGroup>
+            <AutocompleteSeparator className="mx-0.5 my-1" />
+            <AutocompleteGroup aria-label={ALL_GROUP_NAME}>
+              <div aria-hidden className={GROUP_LABEL_CLASS}>
+                {ALL_GROUP_LABEL}
+              </div>
+              {items.slice(1).map((item, index) => renderItem(itemClassName)(item, index + 1))}
+            </AutocompleteGroup>
+          </>
+        ) : (
+          renderItem(itemClassName)
+        )}
       </AutocompleteList>
       <AutocompleteEmpty className="px-2.5 text-left empty:p-0">
         {items.length === 0 ? noMatchesLabel(query.trim()) : null}
@@ -240,7 +294,7 @@ export function CountrySelect({
 
   return (
     <div className="flex flex-col gap-2">
-      <Label id={labelId} htmlFor={baseId}>
+      <Label id={labelId} htmlFor={baseId} className={hideLabel ? 'sr-only' : undefined}>
         {label}
       </Label>
 

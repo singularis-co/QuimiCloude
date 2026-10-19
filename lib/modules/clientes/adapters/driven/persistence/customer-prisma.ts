@@ -11,7 +11,8 @@ import { dateRangeCondition } from './list-query-sql';
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
 import type { CustomerScope } from '../../../domain/customer-scope';
-import type { NewCustomer, CustomerView } from '../../../domain/customer-view';
+import type { CustomerPhoneIssue } from '../../../domain/customer-phone';
+import type { CustomerPhoneColumns, NewCustomer, CustomerView } from '../../../domain/customer-view';
 
 /**
  * Implementa `CustomerRepository` con Prisma. Junto con `company-scope.ts` y
@@ -31,6 +32,9 @@ const CUSTOMER_SELECT = {
   lastNames: true,
   city: true,
   phone: true,
+  phoneCountry: true,
+  phoneE164: true,
+  phoneIssue: true,
   email: true,
   address: true,
   createdAt: true,
@@ -41,7 +45,13 @@ const CUSTOMER_SELECT = {
 
 type CustomerRow = Prisma.CustomerGetPayload<{ select: typeof CUSTOMER_SELECT }>;
 
-/** Fila de Prisma -> `CustomerView` del puerto. Sin ninguna traduccion de negocio. */
+/** La base solo admite estos dos valores (CHECK); cualquier otro seria un bug de datos. */
+function toPhoneIssue(value: string | null): CustomerPhoneIssue | null {
+  if (value === null || value === 'invalid_format' || value === 'duplicate') return value;
+  throw new Error(`customers.phone_issue con un valor desconocido: ${value}`);
+}
+
+/** Fila de Prisma -> `CustomerView` del puerto. */
 function toCustomerView(row: CustomerRow): CustomerView {
   return {
     id: row.id,
@@ -49,6 +59,9 @@ function toCustomerView(row: CustomerRow): CustomerView {
     lastNames: row.lastNames,
     city: row.city,
     phone: row.phone,
+    phoneCountry: row.phoneCountry,
+    phoneE164: row.phoneE164,
+    phoneIssue: toPhoneIssue(row.phoneIssue),
     email: row.email,
     address: row.address,
     createdAt: row.createdAt,
@@ -64,11 +77,11 @@ function toCustomerView(row: CustomerRow): CustomerView {
  * adaptador no vuelve a normalizar nada.
  */
 export async function createCustomer(
-  data: NewCustomer,
+  data: NewCustomer & { readonly phone: CustomerPhoneColumns },
   actorId: string,
   now: Date,
   scope: CustomerScope,
-): Promise<{ id: string }> {
+): Promise<{ id: string } | 'duplicate_phone'> {
   const created = await prisma.customer.create({
     data: {
       ...companyScopeColumns(scope),
@@ -78,7 +91,7 @@ export async function createCustomer(
       lastNamesNormalized: data.lastNamesNormalized,
       city: data.city,
       cityNormalized: data.cityNormalized,
-      phone: data.phone,
+      ...data.phone,
       email: data.email,
       address: data.address,
       createdAt: now,
@@ -114,7 +127,8 @@ export async function updateAliveCustomer(
   actorId: string,
   now: Date,
   scope: CustomerScope,
-): Promise<'ok' | 'not_found'> {
+): Promise<'ok' | 'not_found' | 'duplicate_phone'> {
+  const phoneColumns = 'kind' in data.phone ? {} : data.phone;
   const { count } = await prisma.customer.updateMany({
     where: { id, deletedAt: null, ...customerCompanyScope(scope) },
     data: {
@@ -124,7 +138,7 @@ export async function updateAliveCustomer(
       lastNamesNormalized: data.lastNamesNormalized,
       city: data.city,
       cityNormalized: data.cityNormalized,
-      phone: data.phone,
+      ...phoneColumns,
       email: data.email,
       address: data.address,
       updatedAt: now,

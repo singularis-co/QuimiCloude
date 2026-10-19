@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
-import type { CountryCode } from 'libphonenumber-js';
+import { isSupportedCountry, type CountryCode } from 'libphonenumber-js';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -39,6 +39,15 @@ export function createCompanyCountryRepository(db: PrismaLike = prisma): Company
         });
         return 'ok' as const;
       });
+    },
+
+    async findCountryOf(companyId: string) {
+      const rows = await db.$queryRaw<Array<{ country: string | null }>>`
+        SELECT country FROM companies WHERE id = ${companyId}::uuid AND deleted_at IS NULL`;
+      const country = rows[0]?.country ?? null;
+      // El CHECK de la base solo exige dos mayusculas; un codigo que la libreria no conoce no
+      // sirve para interpretar telefonos, asi que cuenta como sin pais.
+      return country !== null && isSupportedCountry(country) ? country : null;
     },
   };
 }

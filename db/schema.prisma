@@ -1043,13 +1043,13 @@ model DocumentFile {
   @@map("document_files")
 }
 
-/// Nada es unico: dos clientes pueden repetir todos sus datos, asi que no hay indice unico de
-/// negocio. Las tres columnas `*Normalized` son derivadas, escritas por la aplicacion para la
-/// busqueda sin acentos; no llevan `@unique` ni `@@index` porque sus indices de trigramas son
-/// parciales y viven solo en la migracion. `companyId`, `createdBy` y `updatedBy` van sin
-/// `@relation` para que un `include` no cruce a otro modulo; sus FK estan escritas a mano y son
-/// drift. `customers_company_id_id_key` es la clave candidata para las FK compuestas de las
-/// tablas que apunten a un cliente.
+/// Lo unico que no se repite es `phoneE164` entre los vivos de una empresa; ese indice es parcial
+/// y vive solo en la migracion, como sus CHECK de formato. Las tres columnas `*Normalized` son
+/// derivadas, escritas por la aplicacion para la busqueda sin acentos; no llevan `@unique` ni
+/// `@@index` porque sus indices de trigramas son parciales y viven solo en la migracion.
+/// `companyId`, `createdBy` y `updatedBy` van sin `@relation` para que un `include` no cruce a
+/// otro modulo; sus FK estan escritas a mano y son drift. `customers_company_id_id_key` es la
+/// clave candidata para las FK compuestas de las tablas que apunten a un cliente.
 /// @module clientes
 model Customer {
   id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -1057,6 +1057,9 @@ model Customer {
   lastNames            String    @map("last_names")
   city                 String
   phone                String?
+  phoneCountry         String?   @map("phone_country") @db.VarChar(2)
+  phoneE164            String?   @map("phone_e164") @db.VarChar(15)
+  phoneIssue           String?   @map("phone_issue") @db.VarChar(20)
   email                String?
   address              String?
   firstNamesNormalized String    @map("first_names_normalized")

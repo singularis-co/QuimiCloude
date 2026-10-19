@@ -4,7 +4,15 @@
 export { type Customer } from './domain/customer';
 export { requirePermission, type Actor } from './domain/actor';
 export { type CustomerScope } from './domain/customer-scope';
-export { ClientesError, UnauthorizedError, CustomerNotFoundError, ValidationError } from './domain/errors';
+export {
+  ClientesError,
+  UnauthorizedError,
+  CustomerNotFoundError,
+  ValidationError,
+  CustomerPhoneCountryRequiredError,
+  CustomerPhoneInvalidError,
+  CustomerDuplicatePhoneError,
+} from './domain/errors';
 export { type Page } from './domain/page';
 export { CUSTOMER_QUERYABLE } from './domain/customer-queryable';
 export { normalizeCustomerText } from './domain/customer-text';
@@ -21,7 +29,26 @@ export {
   type CreateCustomerInput,
   type UpdateCustomerInput,
 } from './domain/customer-input';
-export { type NewCustomer, type CustomerView } from './domain/customer-view';
+export {
+  type NewCustomer,
+  type NewCustomerPhone,
+  type CustomerPhoneColumns,
+  type KeepLegacyOrClearPhone,
+  type CustomerView,
+} from './domain/customer-view';
+export {
+  parseCustomerPhone,
+  parseCustomerPhoneText,
+  formatPhoneNational,
+  formatPhoneInternational,
+  countryFromInternationalInput,
+  describeCustomerPhone,
+  type CustomerPhoneIssue,
+  type ParsedCustomerPhone,
+  type ParsedLegacyPhone,
+  type CustomerPhoneDescription,
+} from './domain/customer-phone';
+export { phoneMatchesWaId } from './domain/phone-matches-wa-id';
 // Servicio de solo lectura para otros modulos; lo implementa un adaptador driven y lo ata
 // `lib/composition`.
 export type { CustomerCatalog, CustomerRef, CustomerRefSearch } from './domain/customer-catalog';

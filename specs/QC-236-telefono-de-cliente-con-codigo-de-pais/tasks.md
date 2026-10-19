@@ -14,7 +14,7 @@
 
 ## Bloque A — Datos
 
-- [ ] **T1 · Esquema y migración** (R15, R16, R23). Depende de: nada.
+- [x] **T1 · Esquema y migración** (R15, R16, R23). Depende de: nada.
   - **Qué se hace:**
     - en `db/schema.prisma`, las tres columnas de `design.md § 2.1`;
     - se reescribe el comentario `///` del modelo `Customer`;
@@ -32,7 +32,7 @@
 
 ## Bloque B — Dominio (depende de T1 solo por los tipos de Prisma en el adaptador)
 
-- [ ] **T2 [P] · `phoneMatchesWaId`** (R18–R22). Depende de: nada.
+- [x] **T2 [P] · `phoneMatchesWaId`** (R18–R22). Depende de: nada.
   - **Qué se hace:** `lib/modules/clientes/domain/phone-matches-wa-id.ts`, exportado en el barrel.
   - **Hecho cuando:** hay unit tests por requisito con estos casos:
     - igualdad;
@@ -43,7 +43,7 @@
     - vacío y caracteres que no son dígitos;
     - `57`/`571` y `55` sin el `9` en la posición 5 dan `false`.
 
-- [ ] **T3 [P] · Teléfono del cliente: interpretar y formatear** (R6, R7, R9, R10, R11, R15).
+- [x] **T3 [P] · Teléfono del cliente: interpretar y formatear** (R6, R7, R9, R10, R11, R15).
   Depende de: nada.
   - **Qué se hace:** `domain/customer-phone.ts` (§ 4.1) con `libphonenumber-js/max`.
   - **Guardia de capas:** confirma si la de módulos acepta el subpath. Si no, añade
@@ -61,7 +61,7 @@
     - `formatPhoneNational` y `formatPhoneInternational`;
     - `describeCustomerPhone` en sus tres casos (R29, R30).
 
-- [ ] **T4 · Esquema de entrada, errores y casos de uso** (R8, R9, R10, R11, R12, R17). Depende de:
+- [x] **T4 · Esquema de entrada, errores y casos de uso** (R8, R9, R10, R11, R12, R17). Depende de:
   T3.
   - **Qué se hace:**
     - `customer-input.ts` con `phoneCountry` y `phoneNumber` (§ 4.3);
@@ -113,7 +113,7 @@
     - una segunda pasada no cambia ninguna fila (R27);
     - con cero clientes termina sin error.
 
-- [ ] **T6 [P] · País de la empresa en `identity`** (R2, R3, R24). Depende de: nada.
+- [x] **T6 [P] · País de la empresa en `identity`** (R2, R3, R24). Depende de: nada.
   - **Qué se hace:**
     - `findCountryOf` en `ports/company-country-repository.ts` y en `company-country-prisma.ts`;
     - `domain/get-company-country.ts`, exportado en el barrel.
@@ -140,7 +140,7 @@
 
 ## Bloque C — UI (depende de T3 y T4; T8 y T9 en paralelo)
 
-- [ ] **T8 [P] · `CountrySelect`: extensión** (R5, R33). Depende de: nada.
+- [x] **T8 [P] · `CountrySelect`: extensión** (R5, R33). Depende de: nada.
   - **Qué se hace:**
     - props `pinned`, `hideLabel` y `compactOnMobile` (§ 8.2);
     - su fila en `components/shared/CATALOGO.md`: puntos de extensión y `TelefonoCliente.dc.html`

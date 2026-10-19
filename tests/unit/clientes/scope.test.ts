@@ -124,6 +124,7 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'domain/customer-catalog.ts',
       'domain/customer-id.ts',
       'domain/customer-input.ts',
+      'domain/customer-phone.ts',
       'domain/customer-queryable.ts',
       'domain/customer-scope.ts',
       'domain/customer-text.ts',
@@ -135,6 +136,7 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'domain/list-customers.ts',
       'domain/list-query.ts',
       'domain/page.ts',
+      'domain/phone-matches-wa-id.ts',
       'domain/update-customer.ts',
       'index.ts',
       'ports/customer-repository.ts',
@@ -526,6 +528,9 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       'lastNames',
       'city',
       'phone',
+      'phoneCountry',
+      'phoneE164',
+      'phoneIssue',
       'email',
       'address',
       // F1.4: las tres unicas columnas nuevas de esta ficha.
@@ -569,6 +574,7 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       '20261006160000_orders_customer',
       '20261008150100_order_deliveries',
       '20261015130000_order_delivery_lines_customer',
+      '20261019130000_customers_phone_e164',
     ])
   })
 
