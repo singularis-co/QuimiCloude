@@ -58,6 +58,7 @@
     "inventario/qc195-packaging-constraints.int.test.ts",
     "inventario/reservations-and-decimal-stock-migration.int.test.ts",
     "inventario/reserve-existing-orders-migration.int.test.ts",
+    "notificaciones/notification-inbox.int.test.ts",
     "notificaciones/notifications-schema.int.test.ts",
     "pedidos/company-scope.int.test.ts",
     "pedidos/order-company-stats.int.test.ts",

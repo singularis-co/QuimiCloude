@@ -49,7 +49,7 @@
 
 ## Bloque B — Módulo `notificaciones` (dominio y adaptadores)
 
-- [ ] **T4. Catálogo, motor y factory** (design §4, §5). Depende de T1.
+- [x] **T4. Catálogo, motor y factory** (design §4, §5). Depende de T1.
   - `catalog.ts`, `notify.ts`, `channel-factory.ts`, puertos y `errors.ts`.
   - **Hecho:** `tests/unit/notificaciones/notify.test.ts`, con puertos simulados, cubre:
     - R2 (un aviso con el destinatario del catálogo) y R3 (duplicado: sin segunda entrega);
@@ -66,7 +66,7 @@
     `tests/unit/notificaciones/add-event.test.ts` cubre R6: un evento de prueba nuevo en el
     catálogo crea su aviso, y un evento con destinatario por rol se guarda con
     `recipient_role` (R1).
-- [ ] **T5. Bandeja con Prisma** (design §3, §8, §8.1). Depende de T1 y T4.
+- [x] **T5. Bandeja con Prisma** (design §3, §8, §8.1). Depende de T1 y T4.
   - `notification-inbox-prisma.ts`: `insertIfAbsent`, resumen (conteo + más reciente), lote por
     cursor (pide 11, devuelve 10 y el cursor con microsegundos), marcar, marcar todas y borrar
     vencidos por empresa.
@@ -83,7 +83,7 @@
       dos lotes no repite ni salta ninguno del lote siguiente;
     - R32: marcar todas toca los visibles no leídos, también los que no estarían en el primer
       lote.
-- [ ] **T6. Casos de uso de lectura** `[P]` (design §8, §8.1). Depende de T4.
+- [x] **T6. Casos de uso de lectura** `[P]` (design §8, §8.1). Depende de T4.
   - `get-notification-summary`, `list-notifications`, `notification-cursor`,
     `mark-notification-read`, `mark-all-notifications-read`, `purge-expired-notifications`,
     `actor.ts`.
@@ -97,7 +97,7 @@
       rechaza sin llamar a la bandeja;
     - `tests/unit/notificaciones/summary.test.ts` cubre R22: el resumen trae el conteo y el más
       reciente, y no trae lista.
-- [ ] **T7. Server Actions y enlaces** (design §4.3, §8). Depende de T5 y T6.
+- [x] **T7. Server Actions y enlaces** (design §4.3, §8). Depende de T5 y T6.
   - `notification-actions.ts` (`'use server'`, zod en el borde): resumen, lote, marcar y marcar
     todas. `notification-links.ts`.
   - **Hecho:**
@@ -107,7 +107,7 @@
     - `tests/unit/notificaciones/notification-links.test.ts` cubre R49: los dos destinos
       (fórmulas y lista de proveedores) y uno desconocido sin enlace;
     - el test de una lectura de sesión por petición sigue verde.
-- [ ] **T8. Cableado en composición** (design §4.2, §5, §6.1). Depende de T3, T5, T6 y T7.
+- [x] **T8. Cableado en composición** (design §4.2, §5, §6.1). Depende de T3, T5, T6 y T7.
   - `lib/composition/index.ts`:
     - la fachada `notificaciones`;
     - el registro de canales con **solo** `in_app`;

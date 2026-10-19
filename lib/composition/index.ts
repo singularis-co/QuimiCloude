@@ -2756,3 +2756,55 @@ export const integraciones = {
   resolveAiProviderForReading: createResolveAiProviderForReading(aiProviderDeps),
   reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
 } as const;
+
+import {
+  createChannelFactory,
+  createGetNotificationSummary,
+  createListNotifications,
+  createMarkAllNotificationsRead,
+  createMarkNotificationRead,
+  createNotify,
+  createPurgeExpiredNotifications,
+  NOTIFICATION_CATALOG,
+  type ChannelRegistry,
+} from '@/lib/modules/notificaciones';
+import { createInAppChannel } from '@/lib/modules/notificaciones/adapters/driven/channels/in-app-channel';
+import { createNotificationLogConsole } from '@/lib/modules/notificaciones/adapters/driven/observability/notification-log-console';
+import { createNotificationInboxPrisma } from '@/lib/modules/notificaciones/adapters/driven/persistence/notification-inbox-prisma';
+import type { NotificationsSwitch } from '@/lib/modules/notificaciones/ports/notifications-switch';
+import type { RecipientDirectory } from '@/lib/modules/notificaciones/ports/recipient-directory';
+
+const notificationLog = createNotificationLogConsole();
+const notificationInbox = createNotificationInboxPrisma();
+const notificationsClock = () => new Date();
+
+// Hoy solo el canal de la aplicación; los demás se registran aquí cuando existan.
+const notificationChannels: ChannelRegistry = { in_app: createInAppChannel(notificationLog) };
+
+// La clave del añadido vive aquí: `notificaciones` no conoce el catálogo de añadidos.
+const notificationsSwitch: NotificationsSwitch = {
+  isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'notificaciones'),
+};
+
+const notificationRecipients: RecipientDirectory = {
+  belongsToCompany: (userId, companyId) => identity.isUserInCompany(userId, companyId),
+};
+
+const notificationReadDeps = { inbox: notificationInbox, now: notificationsClock };
+
+/** Fachada de `notificaciones`. El actor lo resuelve la Server Action; `notify` no lo lleva. */
+export const notificaciones = {
+  notify: createNotify({
+    catalog: NOTIFICATION_CATALOG,
+    inbox: notificationInbox,
+    addon: notificationsSwitch,
+    recipients: notificationRecipients,
+    channels: createChannelFactory(notificationChannels),
+    log: notificationLog,
+  }),
+  getNotificationSummary: createGetNotificationSummary(notificationReadDeps),
+  listNotifications: createListNotifications(notificationReadDeps),
+  markNotificationRead: createMarkNotificationRead(notificationReadDeps),
+  markAllNotificationsRead: createMarkAllNotificationsRead(notificationReadDeps),
+  purgeExpiredNotifications: createPurgeExpiredNotifications(notificationReadDeps),
+} as const;
