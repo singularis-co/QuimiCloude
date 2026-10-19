@@ -27,7 +27,7 @@
     - `resolveAssignmentView('acondicionados_entregados', …)` cae a `allowed[0]`;
     - un grep de `listDeliveredConditionedOrders` en `lib/` y `app/` sale vacío.
 
-- [ ] **T2 [P] — UI de `/asignacion`** (R2, R3, R5)
+- [x] **T2 [P] — UI de `/asignacion`** (R2, R3, R5)
   - Código:
     - se borra `delivered-conditioned-orders-list-section.tsx`, con su exportación en
       `components/index.ts`;
@@ -45,7 +45,7 @@
     - `?vista=acondicionados_entregados` monta «Por acondicionar»;
     - un grep de `acondicionados_entregados` en `app/` y `lib/` sale vacío.
 
-- [ ] **T3 [P] — Vuelta desde un `ENTREGADO`** (R4)
+- [x] **T3 [P] — Vuelta desde un `ENTREGADO`** (R4)
   - Código: en `conditioning-order-screen.tsx`, `ENTREGADO` vuelve a «Acondicionados» y sale
     `backToDelivered`.
   - Tests: se ajustan `conditioning-order-screen.test.tsx`, `conditioning-order-page.test.tsx` y
