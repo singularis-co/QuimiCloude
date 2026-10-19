@@ -190,7 +190,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 9 — E2E (depende de todas)
 
-- [ ] **T9a. E2E nuevo** `e2e/formulas-rediseno.spec.ts` con los casos de `design.md > 7` (R1–R3, R5,
+- [x] **T9a. E2E nuevo** `e2e/formulas-rediseno.spec.ts` con los casos de `design.md > 7` (R1–R3, R5,
   R13, R15, R20, R22, R23, R27, R30, R47) y su alta en `E2E_ESPERADOS` de
   `tests/guards/guard-identificador-de-request.test.ts` y en `tests/unit/shared/data-table-alcance.test.ts`,
   con el comentario «Alta el <fecha> (QC-264) por el MISMO motivo y en el MISMO sitio que las demas: la
