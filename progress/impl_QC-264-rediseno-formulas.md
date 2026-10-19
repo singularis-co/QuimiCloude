@@ -171,13 +171,109 @@ página desplaza la ventana.
   81 archivos, 1106 ok / 20 skip, 0 rojos. Cierre de tanda: typecheck 0 errores; lint 0 errores,
   10 avisos ajenos.
 
+## Tandas 2–7 (2026-10-19)
+
+En dos olas de frontend_dev en paralelo, con archivos disjuntos: listado (T2a–T2c); formulario
+(T3c, T3a, T3d, T5a, único dueño del barrel y de `recipe-route-contract`); pestañas (T3b); pasos
+(T4a). Después, versión (T6a) y revisión de importación (T7a). Los snapshots compartidos los
+regeneró el implementer al final (`1b61a76b`).
+
+| Tarea | Commit | Archivos principales | Casos nuevos |
+| --- | --- | --- | --- |
+| T2a | `2825e4ed` | `formulas/page.tsx`, `recipe-page.test.tsx` | R1 ×4 (h1 único, orden e icono, sin permiso, sin proveedor IA deshabilitado en el globo) |
+| T2b | `10ef152c` | `recipe-row-actions.tsx`, `recipe-columns.tsx`, `recipe-table.tsx`; `recipe-row-actions-spec.test.tsx` (nuevo), `recipe-cards.test.tsx` (nuevo), `tablas-marca`, `recipe-page` | R3, R4 ×11; R2, R5, R6 ×9 |
+| T2c | `215870e1` | `delete-recipe-dialog.tsx` y su test | R50 ×5 |
+| T3c | `0e9a2fd2` | `recipe-version-tones.ts` (nuevo), `recipe-version-list.tsx`, barrel; `recipe-version-list.test.tsx`, `badges-estado` | R30 ×4, R31, R14 |
+| T3a | `81c1ce45` | `form-footer-bar.tsx` (nuevo), `recipe-form.tsx`, `nueva/page.tsx`, `[id]/page.tsx`, barrel; `recipe-form-layout.test.tsx` (nuevo), `recipe-form-packing-steps` | R10 ×2, R11, R51, R13 ×4, R14, R15 ×6 |
+| T3b | `9d4b5254` | `recipe-lines-field.tsx` (pestañas), `recipe-lines-tabs.test.tsx` | R12 ×4 |
+| T3d | `45cb196e` | `propagate-versions-dialog.tsx`; `propagate-versions-dialog.test.tsx` (nuevo) | R27 ×2, R28 ×2, R29 ×4 |
+| T4a | `3dc779e6`, `4a86a744` | `recipe-steps-field.tsx`, `recipe-step-editor.tsx` y sus tests | R16–R19 ×12 |
+| T5a | `70f1fa92` | `recipe-form.tsx`; `recipe-form-preview.test.tsx` (nuevo, no importa `step-reader`) | R21, R22, R23 ×3, R25 ×2 |
+| T6a | `a1a9cffe` | páginas de versión, `recipe-version-form.tsx`, `recipe-lines-field.tsx` (marcas); `recipe-version-marks.test.tsx` (nuevo), `recipe-version-pages`, `recipe-version-form`, `badges-estado` | R32, R33 ×7, R34 ×3, R35 ×2, R36 |
+| T7a | `4f9d1bd6` | `importar/[documentoId]/page.tsx` y sus 4 componentes; `formula-import-layout.test.tsx` (nuevo), `formula-import-page`, `formula-import-review` | R37–R43 ×12 |
+| Snapshots | `1b61a76b` | `recetas-paridad.snap` (7 casos de lista), `confirmaciones-paridad.snap` (icono en 7 borrados) | — |
+
+**Migraciones de tests (por qué):** `recipe-version-list` (el nombre deja de ser enlace, QC-174 en
+`design.md > 10`); `badges-estado` («Por revisar» de lista y formulario `info` -> `waiting`, § 10);
+`tablas-marca` (`rowActions` -> `menu`; Pasos en mono); `recipe-page` (menú y miniatura acotados a la
+fila, por las tarjetas); `recipe-form-packing-steps` (pasos y envasado en tarjetas separadas, sin
+`Separator`); `formula-import-review` (choque `role="status"`); `formula-import-page` (enlace de error
+por `href` y `data-direction="back"`).
+
+**Choque con QC-203 (T7a):** solo marcado y clases en `formula-import-review`, `formula-ingredient-row`
+y `formula-import-summary`; `IngredientRowState`, `toDraftLine`/`toConfirmLine`, `buildConfirmReasons`
+y los manejadores no se tocaron. `page.tsx` conserva sus tres primeras líneas.
+
 ## Archivos creados / modificados
+
+Ver las tablas de cada tanda. Nuevos: `components/form-footer-bar.tsx`, `components/recipe-version-tones.ts`
+(bajo `app/(private)/produccion/formulas/`); tests nuevos: `step-reader` (casos), `document-upload-tones`,
+`recipe-row-actions-spec`, `recipe-cards`, `recipe-form-layout`, `recipe-form-preview`,
+`propagate-versions-dialog`, `recipe-version-marks`, `formula-import-layout`.
 
 ## Mapa R -> test
 
+| R | Test |
+| --- | --- |
+| R1 | `recipe-page.test.tsx` (T2a); E2E pendiente (T9a) |
+| R2, R5, R6 | `recipe-cards.test.tsx`; E2E R2/R5 pendiente |
+| R3, R4 | `recipe-row-actions-spec.test.tsx`; E2E R3 pendiente |
+| R7, R8, R9 | `document-upload-tones.test.tsx`, `document-upload-dialog.test.tsx` |
+| R10, R11, R13, R14, R15 | `recipe-form-layout.test.tsx`, `recipe-version-list.test.tsx` (R14); «Enter guarda» y R13/R15 en E2E pendiente |
+| R12 | `recipe-lines-tabs.test.tsx` |
+| R16–R19 | `recipe-steps-field.test.tsx`, `recipe-step-editor.test.tsx`, `recipe-form-packing-steps.test.tsx`, `guard-editor-aislado`, `recipe-route-contract` |
+| R20 | E2E pendiente (T9a) |
+| R21, R23, R25 | `recipe-form-preview.test.tsx` |
+| R22, R24, R26 | `step-reader.test.tsx` (y R22 en `recipe-form-preview`) |
+| R27, R28, R29 | `propagate-versions-dialog.test.tsx`, `recipe-form-propagation.test.tsx` |
+| R30, R31 | `recipe-version-list.test.tsx`, `badges-estado.test.tsx` |
+| R32, R36 | `recipe-version-pages.test.tsx`, `recipe-version-form.test.tsx` |
+| R33, R34, R35 | `recipe-version-marks.test.tsx`, `badges-estado.test.tsx` |
+| R37–R43 | `formula-import-layout.test.tsx`, `formula-import-page.test.tsx`, `formula-import-review.test.tsx` |
+| R44, R45 | guardia `guard-formulas-rediseno` pendiente (T8c); R45 de la subida en `document-upload-tones` |
+| R46 | `formulas-toasts.test.tsx` pendiente (T8b) |
+| R47 | E2E pendiente (T9a) |
+| R48 | `guard-catalogo-de-componentes.test.ts` |
+| R49 | `recipe-form.test.tsx`, `guard-pantallas-de-anadido`, E2E existentes (T9b) |
+| R50 | `delete-recipe-dialog.test.tsx`, `confirmaciones-paridad` |
+| R51 | `recipe-form-layout.test.tsx`, `recipe-form-evidence-lock.test.tsx` |
+
 ## Salidas de tests
 
+Cierre de las tandas 2–7 (HEAD `1b61a76b`):
+
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 10 avisos `no-unused-vars` en archivos ajenos.
+- `pnpm exec vitest related --run <46 archivos cambiados desde d0eaa824>`: 39 archivos, 718/718.
+- `pnpm exec vitest run guard tests/unit/proveedores/module-contract.test.ts tests/unit/paridad tests/unit/marca tests/unit/recetas-ui tests/unit/shared-ui/confirm-dialog-montado.test.tsx tests/unit/documentos-ui`:
+  161 archivos, 2450 ok / 20 skip, 0 rojos.
+
 ## Desviaciones
+
+- **T3c, nombre accesible de «Abrir».** E12 pedía `Abrir<span className="sr-only"> la versión X</span>`;
+  jsdom recorta el espacio inicial y da «Abrirla versión X». Se pinta
+  `<span aria-hidden>Abrir</span><span className="sr-only">Abrir la versión X</span>`. `ArrowLink`
+  no se toca.
+- **T2b, prop interna.** `recipe-route-contract` toma cualquier `xxxAction(` por Server Action; dentro
+  de `recipeRowActionsSpec` el `onAction` desestructurado se renombra a `notify`. La firma pública
+  sigue siendo `onAction`.
+- **T2b, rótulos de la tarjeta (abierto).** El tablero (`Formulas.dc.html:66`) pinta «Pasos N · Creado … ·
+  Actualizado …»; D3 no dice cómo, y la pieza que lo hace (`card-field-label.tsx`) vive solo en
+  inventario. Las tarjetas salen sin rótulos. Decisión pendiente: subirla a `components/shared`
+  (segunda ruta) o deuda.
+- **T2b, barrel.** `recipeRowActionsSpec`, `RecipeRowActionsSpec`, `RecipeRowAction` y
+  `RECIPE_ROW_ACTION_LABELS` no están en `components/index.ts`; los tests importan del archivo. Ninguna
+  `page.tsx` los usa.
+- **T3d / T7a, snapshots que no existen.** `confirmaciones-paridad` no tiene caso de propagar y
+  `recetas-paridad` no tiene casos de la revisión de importación ni de formulario con datos (solo
+  errores): `design.md > 6` los daba por existentes. No se dieron de alta; lo cubren los tests nuevos.
+- **T4a.** Sin `opacity-70` en la tarjeta tomada (el tablero no la atenúa). Testids nuevos `-number-N`
+  y `-bar`. El tablero de evidencia aún dibuja quitar en tercera columna y botón final: manda la
+  enmienda (P16).
+- **T5a.** Ya lleva la tilde de `PREVIEW_DESCRIPTION` (parte de T8a; T8a sin marcar).
+- **T7a.** Choque en línea, no en diálogo (P9); sin nombre del PDF bajo el `h1` (la página no recibe
+  el dato; P10).
+- **T1c (antes).** El snapshot de `recetas-paridad` cambió también por la subida del listado.
 
 - **T0c — decidido (humano, 2026-10-19): opción (a).** D6 se mantiene; en jsdom solo el clic; «Enter
   guarda» en el E2E de T9a (Chromium y WebKit); plan B (A4) descartado. Contexto: `form=` funciona en Chromium y WebKit, pero en jsdom el Enter en
