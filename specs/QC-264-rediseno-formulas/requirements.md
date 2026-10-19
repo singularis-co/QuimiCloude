@@ -1,5 +1,13 @@
 # QC-264 — Rediseño de Fórmulas · requirements.md
 
+> **Enmienda contra dev (2026-10-19).** El spec se aprobó el 2026-10-13 (P1–P15 por defecto) y se
+> enmendó tras el merge de `origin/dev` en la rama (`6fcbafe6`), que trajo QC-211 D14, QC-214,
+> QC-262, QC-263, QC-275/QC-280, QC-277 y QC-166. Regla: en lo visual manda el tablero; en datos y
+> conducta, lo mergeado. Lista completa de cambios, con su cita, en `design.md > 12` (E1–E22).
+> Requisitos tocados: R1, R16, R17, R19, R49. Requisitos nuevos: R50 *(supuesto P17)* y R51.
+> Preguntas nuevas P16–P18 (`## Preguntas abiertas > Preguntas de la enmienda 2026-10-19`); P14 y
+> P15 quedan anotadas. Lo que decían los requisitos tocados queda en `design.md > 12`.
+
 ## Alcance
 
 Lleva al diseño del canvas (página 5) las pantallas de Fórmulas y sus modales: el **listado**
@@ -34,9 +42,12 @@ ruta («Receta actualizada.» incluido).
 - **Nombre del PDF** bajo el título de la revisión: la vista previa de la importación no lo trae; es
   trabajo de módulo (`documentos`) (P10).
 - **Icono en la cabecera de los diálogos** (`dlg-ic` del tablero): `ConfirmDialog` no lo tiene; queda
-  como la deuda que abrió QC-262 (P14).
-- Versiones creadas desde el alta y «Guardar y salir» (QC-210), fases de ingredientes (QC-173), pasos
-  propios de la versión (QC-198) y evidencia por paso (QC-214): no se adelanta nada de ellas.
+  como la deuda que abrió QC-262 (P14). *Enmienda 2026-10-19 (E16):* QC-166 ya le dio la prop `icon`;
+  ver P17 (por defecto, entra en los dos borrados, R50; propagar sigue fuera).
+- Versiones creadas desde el alta y «Guardar y salir» (QC-210), fases de ingredientes (QC-173) y pasos
+  propios de la versión (QC-198): no se adelanta nada de ellas. *Enmienda 2026-10-19 (E7):* la
+  evidencia por paso (QC-214) ya está en `dev`; no se amplía, pero el rediseño la conserva
+  (interruptor «Requiere evidencia», resumen y bloqueo de mover y quitar; R16, R51).
 - Pasar el import profundo de `StepDocumentView` por el barrel de `step-reader` (QC-268).
 
 ## Decisiones cerradas (no reabrir)
@@ -68,7 +79,10 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
 - **R1.** La pantalla del listado DEBE pintar dentro de `PageShell` un `PageHeader` con «Fórmulas» como
   único `h1` (`data-testid="recipes-title"`) y, como acciones y en este orden, «Subir PDFs» (contorno)
   y «Nueva fórmula» (principal, `data-testid="recipe-create-open"`); DONDE el usuario no puede subir
-  documentos, «Subir PDFs» NO DEBE pintarse, como hoy.
+  documentos (también cuando la lectura de PDF con IA está apagada para su empresa, QC-277 R15),
+  «Subir PDFs» NO DEBE pintarse, como hoy; DONDE puede subir pero la empresa no tiene proveedor IA
+  conectado, «Subir PDFs» DEBE pintarse deshabilitado dentro de `AiProviderRequiredTooltip`, en el
+  mismo sitio, como hoy (QC-280). *(Enmienda 2026-10-19, E1)*
 - **R2.** La tabla de recetas DEBE pintar las columnas Imagen, Nombre, Pasos, Creado, Actualizado y la
   de acciones, en ese orden; Pasos, Creado y Actualizado DEBEN alinearse al final de la celda, con su
   cabecera alineada igual y cifras tabulares. El orden, el filtro de fecha y la búsqueda «Buscar
@@ -125,20 +139,27 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
 ### Editor de pasos (Pasos y Pasos de envasado)
 
 - **R16.** Cada paso DEBE pintarse como tarjeta con el asa de arrastre y, debajo, el número del paso a
-  la izquierda; el editor con su barra de formato (Negrilla, Cursiva, Lista de verificación) encima del
-  área editable en el centro; y a la derecha el botón de quitar con icono y nombre accesible «Quitar
-  paso N». Cada control DEBE medir al menos 44 × 44 px y los `data-testid` DEBEN ser los de hoy.
-  *(supuesto P5)*
-- **R17.** «Añadir paso» y «Añadir paso de envasado» DEBEN pintarse al final de su lista, a todo el
-  ancho y con borde discontinuo, con sus `data-testid` de hoy.
+  la izquierda, y a su derecha el editor: encima del área editable, una barra con el formato
+  (Negrilla, Cursiva, Lista de verificación) a la izquierda y, a la derecha, el interruptor «Requiere
+  evidencia» DONDE la lista lo muestra, el botón de quitar con icono («Quitar paso N») y el de añadir
+  con icono («Añadir un paso después del N»); MIENTRAS la ventana mide menos de 768 px, esa barra
+  DEBE partirse en dos líneas (formato arriba; interruptor y botones abajo). Cada botón DEBE medir al
+  menos 44 × 44 px, el interruptor DEBE tener la talla de su pieza (44 px de alto por debajo de
+  768 px) y los `data-testid` y nombres accesibles DEBEN ser los de hoy. *(supuestos P5 y P16;
+  enmienda 2026-10-19, E5–E7)*
+- **R17.** NO DEBE pintarse ningún botón «Añadir paso» ni «Añadir paso de envasado» al final de la
+  lista: se añade con el botón de añadir de cada paso, con su conducta de hoy (deshabilitado mientras
+  haya un paso vacío y, con los pasos bloqueados, activo solo en el último), y con la lista vacía la
+  fila en blanco de arranque ofrece el suyo. *(supuesto P16; enmienda 2026-10-19, E5)*
 - **R18.** MIENTRAS se arrastra un paso, su tarjeta DEBE marcarse como tomada (sombra elevada, borde
   en el color principal y escala 1,01, `data-dragging="true"`) y las demás tarjetas de esa lista como
   destino (borde discontinuo, `data-drop-target="true"`); CUANDO se suelta o se cancela, ninguna
   tarjeta DEBE conservar esas marcas. Con `prefers-reduced-motion`, la tarjeta tomada NO DEBE escalar.
   *(supuesto P4)*
 - **R19.** El arrastre con puntero (umbral de 8 px), el equivalente por teclado, los anuncios de
-  posición, el nombre del asa («Arrastrar el paso en la posición N de M») y el orden resultante DEBEN
-  ser los de hoy, y solo `recipe-steps-field.tsx` DEBE importar `@dnd-kit/*`.
+  posición, el nombre del asa («Arrastrar el paso en la posición N de M», o con los pasos bloqueados
+  «No se puede mover el paso N: hay pedidos en curso con fotos») y el orden resultante DEBEN ser los de
+  hoy, y solo `recipe-steps-field.tsx` DEBE importar `@dnd-kit/*`. *(enmienda 2026-10-19, E7)*
 - **R20.** CUANDO el formulario de receta, el de versión o la revisión de importación se abren en una
   ventana de 390 × 844, ninguno DEBE desbordar en horizontal, cada fila de ingrediente DEBE partirse en
   dos líneas (producto arriba; porcentaje, cantidad y quitar abajo) y todo control interactivo DEBE
@@ -252,7 +273,19 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   al día en el mismo commit, con su tablero en `Diseño`.
 - **R49.** Crear, editar y borrar receta, crear, editar y borrar versión, propagar, subir PDFs y
   confirmar una importación DEBEN enviar los mismos campos a las mismas Server Actions que hoy, con los
-  mismos permisos de página, y sus errores DEBEN pintarse con los `data-testid` de hoy.
+  mismos permisos de página (y, en la revisión de importación, el corte por el añadido
+  `lectura_pdf` de hoy, QC-277), y sus errores DEBEN pintarse con los `data-testid` de hoy.
+  *(enmienda 2026-10-19, E2)*
+
+### Añadidos de la enmienda 2026-10-19
+
+- **R50.** Los diálogos de borrar una receta y de borrar una versión DEBEN pintar delante del título
+  el icono de borrado en tono `danger` con la prop `icon` de `ConfirmDialog`, sin cambiar sus textos,
+  su conducta ni sus `data-testid`. *(supuesto P17; E16)*
+- **R51.** MIENTRAS la receta que se edita tiene pedidos en curso con fotos de evidencia, el formulario
+  DEBE pintar el aviso de bloqueo de hoy (`Notice` `warning`, `data-testid="recipe-form-steps-locked"`)
+  encima de las tarjetas, con mover y quitar pasos deshabilitados y el texto, «Requiere evidencia» y
+  añadir al final activos, como hoy (QC-214). *(E7)*
 
 ## Preguntas abiertas
 
@@ -300,6 +333,34 @@ Cada una lleva su opción por defecto, con la que están escritos los requisitos
 - **P13. Umbral de las dos columnas del formulario.** El tablero reparte 560 px + 300 px + 20 px de
   hueco. *Por defecto:* 880 px de contenedor (a 1440 px se ven dos columnas; a 820 px, una).
 - **P14. Icono en la cabecera de los diálogos** (borrar, propagar, choque). *Por defecto:* fuera; se
-  amplía la deuda de QC-262 (P5 de esa ficha) a esta ruta.
+  amplía la deuda de QC-262 (P5 de esa ficha) a esta ruta. *Enmienda 2026-10-19:* el motivo cambió
+  (`ConfirmDialog` ya tiene `icon`, QC-166); la reabre P17.
 - **P15. Separador del menú ⋯.** *Por defecto:* el contrato de QC-262 D7 (`separatorBefore`); si al
   empezar no está en `dev`, lo implementa esta ficha con ese mismo contrato y el test que QC-262 nombra.
+  *Resuelta por `dev` (E3):* `separatorBefore` ya está en `RowActionsMenu` con su test; esta ficha solo
+  lo usa.
+
+### Preguntas de la enmienda 2026-10-19
+
+Abiertas por lo que trajo `dev` (`design.md > 12`). Los requisitos están escritos con el defecto.
+
+- **P16. Barra del paso y «Añadir paso».** R16 y R17 se aprobaron con «quitar» a la derecha de la
+  tarjeta y «Añadir paso» discontinuo al final de la lista (`Formula.dc.html`). Después, el humano
+  aprobó QC-211 D14 (2026-10-16, commit `5f2cc171`, tableros `FormulaEvidencia*` enmendados): **no hay
+  botón «Añadir paso»**; se añade con el «+» de la barra de cada paso, junto al interruptor de QC-214, y
+  con los pasos bloqueados solo el del último sigue activo. *Por defecto:* manda lo posterior
+  (`FormulaEvidencia*`): la barra lleva formato, interruptor, «×» y «+»; no se pinta el botón del final;
+  de `Formula.dc.html` se toman la tarjeta, el asa con el número debajo y los estados de arrastre (R16,
+  R17, R18). Alternativa: volver a poner el botón del final, lo que reabre QC-211 D14.
+- **P17. Icono en la cabecera de los diálogos (P14 reabierta).** `ConfirmDialog` ya pinta el `dlg-ic`
+  del tablero con `icon` (glifo y tono; la usan los borrados del Maestro). *Por defecto:* entra en los
+  dos borrados de esta ruta (`DeleteConfirmDialog` la reenvía; R50); propagar sigue sin icono porque no
+  es `ConfirmDialog` (es un `AlertDialog` propio) y queda en la deuda D56. Alternativa: dejar P14 como
+  se aprobó (todo fuera).
+- **P18. Tildes que el censo no vio.** En la ruta quedan sin tilde el nombre accesible «Lista de
+  verificacion» (`recipe-step-editor.tsx:45`), «el maximo es» (`:50`) y «Elemento de la lista de
+  verificacion» (`recipe-step-schema.ts:65`), y en el módulo los mensajes de `recipe-input.ts:108` y
+  `:196`, que el formulario pinta tal cual. Los nombres accesibles los leen 16 archivos de tests y E2E
+  (también los del operario). *Por defecto:* fuera de esta ficha y anotados como deuda (R45 no cambia):
+  corregirlos toca E2E de otras pantallas y el módulo, que este spec no toca. Alternativa: corregir los
+  tres de la ruta aquí (D9) y dejar solo los del módulo en la deuda.
