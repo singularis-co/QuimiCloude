@@ -126,6 +126,7 @@ function voidColumn(
 ): DataTableColumn<FinishedProductDeliveryRow> {
   return actionsColumn<FinishedProductDeliveryRow>({
     label: DIRECT_DELIVERY_ACTIONS_LABEL,
+    srOnlyLabel: true,
     menu: (row) => voidMenu(row, onVoid),
   });
 }

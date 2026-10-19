@@ -582,6 +582,14 @@ describe('Entregas', () => {
     expect(screen.getByTestId('data-table-head-actions')).toHaveTextContent('Acciones');
   });
 
+  it('R43 — la cabecera de la columna de acciones se llama «Acciones» y solo la ve el lector de pantalla', () => {
+    renderMixed(true);
+
+    const cabecera = screen.getByRole('columnheader', { name: 'Acciones' });
+    expect(cabecera).toBe(screen.getByTestId('data-table-head-actions'));
+    expect(within(cabecera).getByText('Acciones')).toHaveClass('sr-only');
+  });
+
   it('R43 — el menú de la fila sin pedido tiene un único ítem «Anular»', async () => {
     const user = setupUser();
     renderMixed(true);

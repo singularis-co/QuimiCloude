@@ -1044,3 +1044,18 @@ Base local (`localhost`): `pnpm run db:migrate` aplicó `20261016130000_inventor
 
 Veredicto: TI hecha; el E2E de R56 queda en verde en los dos navegadores. Hay un rojo ajeno en
 `detalle-de-producto-terminado.spec.ts` (selector roto por QC-263 en dev), que queda reportado.
+
+## Revisión vuelta 1
+
+### H3 — Cabecera «Acciones» solo para lector en la tab Entregas (frontend_dev, 2026-10-19)
+- No había mecanismo previo. Extensión opcional `srOnlyLabel?: boolean` en `DataTableColumn`
+  (`data-table-types.ts`), pintada como `sr-only` en `DataTableHeaderCell` (`data-table-header-menu.tsx`) y
+  aceptada por `actionsColumn` (`actions-column.tsx`), que solo la añade si vale `true`: los usuarios actuales no
+  cambian (el `toEqual` de R24 sigue en verde). Fila de `DataTable` en `components/shared/CATALOGO.md` actualizada.
+- Solo la usa `finished-product-deliveries-table.tsx`.
+- Tests: `finished-product-tables.test.tsx` «R43 — la cabecera de la columna de acciones se llama «Acciones» y
+  solo la ve el lector de pantalla»; `tests/unit/shared-ui/actions-column.test.tsx`: por defecto visible / con
+  `srOnlyLabel` oculta y con nombre accesible.
+- `pnpm run typecheck`: exit 0. `pnpm run lint`: 0 errors, 10 warnings (previos).
+- `vitest run tests/unit/inventario-ui tests/unit/shared-ui tests/unit/shared/data-table.test.tsx`: 71 files, 865 passed.
+- `vitest run guard`: 81 files, 1109 passed | 20 skipped.
