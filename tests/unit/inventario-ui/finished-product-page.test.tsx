@@ -7,6 +7,7 @@ import {
   parseProductListParams,
   productListHref,
 } from '@/app/(private)/inventario/components';
+import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { FinishedProductResult } from '@/lib/modules/inventario/adapters/driving/finished-product-actions';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
@@ -17,8 +18,15 @@ import {
   finishedProductDetail,
 } from '../../fixtures/finished-product-detail';
 
-const { requirePagePermissionMock, getFinishedProductActionMock, listMock, routerMock } = vi.hoisted(
+const {
+  requirePagePermissionMock,
+  getFinishedProductActionMock,
+  listMock,
+  routerMock,
+  getSessionUserMock,
+} = vi.hoisted(
   () => ({
+    getSessionUserMock: vi.fn(),
     requirePagePermissionMock: vi.fn<(permission: string) => Promise<void>>(),
     getFinishedProductActionMock: vi.fn<(id: string) => Promise<FinishedProductResult>>(),
     listMock: vi.fn(),
@@ -36,6 +44,15 @@ const { requirePagePermissionMock, getFinishedProductActionMock, listMock, route
 vi.mock('@/lib/modules/identity/adapters/driving/require-page-permission', () => ({
   requirePagePermission: requirePagePermissionMock,
 }));
+
+// La sesion decide si existe el tab de costos (solo el Administrador). Por defecto, Administrador.
+vi.mock('@/lib/composition', () => ({
+  identity: { getSessionUser: getSessionUserMock },
+  observabilidad: { readRequestIdHeader: vi.fn(async () => 'req-1') },
+}));
+
+const ADMINISTRADOR = { permissions: SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] };
+const OPERADOR = { permissions: SEED_ROLE_PERMISSIONS[ROLE_OPERADOR] };
 
 vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', () => ({
   getFinishedProductAction: getFinishedProductActionMock,
@@ -69,6 +86,7 @@ const FINISHED_LIST_HREF = productListHref(
 beforeEach(() => {
   vi.clearAllMocks();
   requirePagePermissionMock.mockResolvedValue(undefined);
+  getSessionUserMock.mockResolvedValue(ADMINISTRADOR);
   getFinishedProductActionMock.mockResolvedValue({ status: 'success', data: finishedProductDetail() });
 });
 
@@ -125,6 +143,41 @@ describe('pagina de la ficha de producto terminado', () => {
 
     expect(screen.getByTestId('finished-product-name')).toHaveTextContent(finishedProductDetail().name);
     expect(within(screen.getByRole('tablist')).getAllByRole('tab')).toHaveLength(8);
+  });
+
+  it('el tab «Costo de produccion» lo ve el Administrador y lo abre con `?tab=costo`', async () => {
+    listMock.mockResolvedValue({
+      status: 'success',
+      data: { items: [], page: 1, pageSize: 10, total: 0, totalPages: 0 },
+    });
+    await renderPage({ tab: 'costo' });
+
+    expect(screen.getByTestId('finished-product-tab-costo')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('finished-product-general')).toBeNull();
+  });
+
+  it('sin permiso de costos falta el tab, y `?tab=costo` cae al tab por defecto sin pedir costos', async () => {
+    getSessionUserMock.mockResolvedValue(OPERADOR);
+
+    await renderPage({ tab: 'costo' });
+
+    const pestanas = within(screen.getByRole('tablist')).getAllByRole('tab');
+    expect(pestanas).toHaveLength(7);
+    expect(screen.queryByTestId('finished-product-tab-costo')).toBeNull();
+    expect(screen.getByTestId('finished-product-tab-general')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('finished-product-general')).toBeInTheDocument();
+    expect(screen.queryByTestId('finished-product-list-skeleton')).toBeNull();
+    expect(listMock).not.toHaveBeenCalled();
+  });
+
+  it('sin sesion, igual: falla cerrado', async () => {
+    getSessionUserMock.mockResolvedValue(null);
+
+    await renderPage({ tab: 'costo' });
+
+    expect(screen.queryByTestId('finished-product-tab-costo')).toBeNull();
+    expect(screen.getByTestId('finished-product-general')).toBeInTheDocument();
+    expect(listMock).not.toHaveBeenCalled();
   });
 
   it('R10 — General muestra nombre, imagen, presentacion con su contenido, unidad base y alerta', async () => {

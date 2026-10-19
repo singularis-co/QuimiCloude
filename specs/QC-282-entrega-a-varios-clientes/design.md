@@ -569,6 +569,12 @@ Las aprueba el humano con este spec.
 | QC-224 | R17, R20, R21, R22, R24 | R39, R40, R41, R42 |
 | QC-225 | R19, R33 | R43, R44 (fila por línea de entrega, columna «Presentación») |
 
+**Enmienda del 2026-10-16 (aprobada por el usuario, sin tarjeta; commit `27fdd133`).** La columna
+«Por entregar» de la lista del dashboard (añadida sin requisito escrito) se mueve a la lista de
+/pedidos: R49–R51. `listOrders` compone `pendingDelivery` (`order-pending-delivery.ts`,
+`deliveryStateOf`) con una lectura de lo entregado por página; `order-columns.tsx` pinta la celda
+(`PENDING_DELIVERY_COLUMN_ID`). El dashboard la pierde.
+
 ## 11. Alternativas descartadas
 
 - **A1 — Tabla `order_delivery_customers` (un bloque por fila) con las líneas colgando de ella.**
@@ -635,6 +641,9 @@ Rutas abreviadas:
 | R45, R46 | ui `order-delivery-draft.test.ts` (v2, lectura de v1, ajuste) + `order-delivery-sheet.test.tsx` |
 | R47 | e2e |
 | R48 | `tests/guards/guard-dependencias-aprobadas.test.ts` |
+| R49 (2026-10-16, `27fdd133`) | u `pedidos/list-orders.test.ts` › describe «listOrders — por entregar» (pendiente en orden del reparto, descuenta lo entregado, `delivered`, plan sin conteo, `not_packed` por estado y por cero envases, presentación sin nombre); pui `order-columns.test.tsx` › describe «la columna «Por entregar», traida del dashboard»; pui `order-table.test.tsx` › describe «la lista de pedidos lleva la columna «Por entregar», traida del dashboard» |
+| R50 (2026-10-16) | u `pedidos/list-orders.test.ts` › «una sola consulta de lo entregado por pagina, con los ids de la pagina y la empresa del actor» y «una pagina vacia no consulta lo entregado» |
+| R51 (2026-10-16) | ui `tests/ui/dashboard/execution-trace-table.test.tsx` › ««Por entregar» ya no es columna del dashboard: vive en la lista de pedidos» |
 
 ## 13. Dependencias e integraciones
 

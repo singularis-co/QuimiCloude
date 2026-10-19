@@ -9,10 +9,24 @@ export const IMPORT_SCREEN_TESTID = 'inventory-import-screen';
 export const IMPORT_TITLE_TESTID = 'inventory-import-title';
 export const IMPORT_BACK_LINK_TESTID = 'inventory-import-back-link';
 
+export const IMPORT_STEPS_LABEL = 'Pasos';
+export const IMPORT_STEP_LABELS = {
+  1: 'Elegir archivo',
+  2: 'Vista previa',
+  3: 'Importación terminada',
+} as const;
+export const IMPORT_STEPS_TESTID = 'inventory-import-steps';
+
+export function importStepTestId(step: number): string {
+  return `inventory-import-step-${step}`;
+}
+
 export const UPLOAD_INPUT_LABEL = 'Archivo de inventario';
 export const UPLOAD_TRIGGER_LABEL = 'Elegir archivo';
 export const UPLOAD_CHANGE_LABEL = 'Elegir otro archivo';
-export const UPLOAD_NO_FILE = 'Ningún archivo elegido.';
+export const UPLOAD_FORMATS_LABEL = '.xlsx · .csv';
+export const UPLOAD_FILE_SIZE_TESTID = 'inventory-import-upload-file-size';
+export const UPLOAD_EMPTY_TESTID = 'inventory-import-upload-empty';
 
 export const UPLOAD_FIELD_TESTID = 'inventory-import-upload';
 export const UPLOAD_INPUT_TESTID = 'inventory-import-upload-input';
@@ -140,8 +154,21 @@ export function ignoredColumnsSummary(rows: number): string {
     : `${formatCount(rows)} filas traen valores en columnas que su tipo no usa: esos valores se ignoran y las filas se importan igual.`;
 }
 
+export function confirmLabelParts(validRows: number): {
+  readonly before: string;
+  readonly count: string;
+  readonly after: string;
+} {
+  return {
+    before: 'Importar',
+    count: formatCount(validRows),
+    after: validRows === 1 ? 'fila válida' : 'filas válidas',
+  };
+}
+
 export function confirmLabel(validRows: number): string {
-  return validRows === 1 ? 'Importar 1 fila válida' : `Importar ${formatCount(validRows)} filas válidas`;
+  const { before, count, after } = confirmLabelParts(validRows);
+  return `${before} ${count} ${after}`;
 }
 export const CONFIRMING_LABEL = 'Importando…';
 export const NO_VALID_ROWS_NOTICE = 'No hay ninguna fila válida que importar.';
@@ -150,10 +177,15 @@ export const PARTIAL_IMPORT_NOTICE =
 export const ERROR_FILE_BUTTON_LABEL = 'Descargar filas con error';
 
 export const PREVIEW_SUMMARY_TESTID = 'inventory-import-preview-summary';
+export const PREVIEW_CARD_TESTID = 'inventory-import-preview-card';
+export const PREVIEW_ACTIONS_TESTID = 'inventory-import-preview-actions';
+export const IMPORT_FILE_NAME_TESTID = 'inventory-import-file-name';
+export const RESULT_CARD_TESTID = 'inventory-import-result-card';
 export const PREVIEW_TABLE_TESTID = 'inventory-import-preview-table';
 export const RESULT_TABLE_TESTID = 'inventory-import-result-table';
 export const EXAMPLE_ROW_NOTICE_TESTID = 'inventory-import-example-ignored';
 export const CONFIRM_BUTTON_TESTID = 'inventory-import-confirm';
+export const CHOOSE_ANOTHER_TESTID = 'inventory-import-choose-another';
 export const NO_VALID_ROWS_TESTID = 'inventory-import-no-valid-rows';
 export const ERROR_FILE_BUTTON_TESTID = 'inventory-import-error-file';
 export const STATUS_FILTER_TESTID = 'inventory-import-status-filter';
@@ -237,6 +269,7 @@ export const UNIT_FIELD_LABELS = {
   factor: 'Factor',
 } as const;
 export const NO_BASE_UNIT_LABEL = 'No deriva de ninguna';
+export const UNIT_CREATED_TOAST = 'Unidad creada.';
 
 export const PRESENTATION_DIALOG_TITLE = 'Nueva presentación';
 export const PRESENTATION_DIALOG_DESCRIPTION = 'Se crea igual que desde la pantalla de presentaciones.';
@@ -244,6 +277,7 @@ export const PRESENTATION_FIELD_LABELS = {
   name: 'Nombre',
   content: 'Contenido',
 } as const;
+export const PRESENTATION_CREATED_TOAST = 'Presentación creada.';
 
 export const UNIT_DIALOG_TESTID = 'inventory-import-unit-dialog';
 export const PRESENTATION_DIALOG_TESTID = 'inventory-import-presentation-dialog';
@@ -278,6 +312,24 @@ export function resultDescription(fileName: string, importedAt: string): string 
 }
 
 export const NOTHING_IMPORTED_TITLE = 'No se importó nada';
+
+function countLabel(value: number, singular: string, plural: string): string {
+  return `${formatCount(value)} ${value === 1 ? singular : plural}`;
+}
+
+/** Aviso flotante al terminar una importación: lo creado, lo sumado y lo que se quedó fuera. */
+export function importedToastMessage(totals: {
+  readonly created: number;
+  readonly batchAdded: number;
+  readonly duplicate: number;
+  readonly error: number;
+}): string {
+  const done = `Inventario importado: ${countLabel(totals.created, 'producto creado', 'productos creados')} y ${countLabel(totals.batchAdded, 'lote sumado', 'lotes sumados')}.`;
+  const skipped = totals.duplicate + totals.error;
+  return skipped === 0
+    ? done
+    : `${done} ${countLabel(skipped, 'fila no se importó', 'filas no se importaron')}.`;
+}
 
 export function nothingImportedMessage(fileName: string): string {
   return `Al confirmar, «${fileName}» no tenía ninguna fila válida, así que no se ha importado nada. Revisa el motivo de cada fila, corrígelas y vuelve a subir el archivo.`;
@@ -329,7 +381,7 @@ export const GUIDE_COLUMN_DESCRIPTION_TEXTS: Readonly<Record<ImportColumnKey, st
   purchaseDate: 'Fecha en que entró el lote. Si va vacía, se usa la fecha de hoy automáticamente; no puede ser futura.',
   expiryDate: 'Fecha en que vence el lote.',
   qtyAlert:
-    'Existencia mínima del producto: cuando la existencia queda por debajo de este valor, el inventario lo resalta y se notifica.',
+    'Cantidad mínima del producto: cuando la cantidad en inventario queda por debajo de este valor, el inventario lo resalta y se notifica.',
 };
 /** Columnas de la guía cuya descripción enlaza al módulo donde se gestiona su catálogo. */
 export type GuideCatalogColumn = 'unit' | 'presentation' | 'formula';
@@ -353,7 +405,7 @@ export const GUIDE_RULE_OPTIONAL_AUTO_LABEL = 'Opcional · automático si va vac
 export const GUIDE_RULES_NOTES: readonly string[] = [
   '«Se ignora»: si la columna trae un valor, no se importa y la fila sigue; la vista previa lo avisa.',
   'Producto terminado no lleva «Nombre»: se arma como «Fórmula · Presentación». La presentación debe tener contenido declarado.',
-  'Envase y Producto terminado cuentan la existencia en envases enteros; en Producto terminado, mayor que 0.',
+  'En Envase y Producto terminado, «Cantidad» cuenta envases enteros; en Producto terminado, mayor que 0.',
   '«Unidad» se reconoce por su nombre o por su símbolo.',
   'Si el producto ya existe (mismo nombre y unidad; en envases, misma presentación), la fila le suma un lote.',
   '«Lote» vacío: se genera solo. «Fecha de compra» vacía: hoy; no puede ser futura.',

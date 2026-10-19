@@ -124,6 +124,65 @@ export function formatDecimalDisplay(
   return parsed === null ? value : formatDecimal(roundDecimal(parsed, digits));
 }
 
+/** Simbolo de moneda de un importe pintado. */
+export const MONEY_SYMBOL = '$';
+
+/** Separador de miles de un importe pintado. El decimal sigue siendo el punto de toda la app. */
+export const THOUSANDS_SEPARATOR = ',';
+
+/** Cifras de un grupo de miles. */
+const THOUSANDS_GROUP = 3;
+
+/**
+ * Entero escalado -> texto con EXACTAMENTE `digits` decimales (sin recortar ceros) y la parte
+ * entera agrupada de tres en tres: `{ unscaled: 123456, scale: 2 }` -> «1,234.56». Sin signo: el
+ * signo lo pone quien llama, delante del simbolo.
+ */
+function formatGroupedFixed({ unscaled, scale }: DecimalValue, digits: number): string {
+  const absolute = unscaled < ZERO ? -unscaled : unscaled;
+  // Tras `roundDecimal`, `scale <= digits`: se completa con ceros por la derecha hasta `digits`.
+  const scaled = absolute * TEN ** BigInt(digits - scale);
+  const allDigits = scaled.toString().padStart(digits + 1, '0');
+  const cut = allDigits.length - digits;
+  const integerPart = allDigits.slice(0, cut);
+  const fractionPart = allDigits.slice(cut);
+
+  // Agrupacion con un bucle y no con un patron: misma razon que el recorte de `formatDecimal`.
+  let grouped = '';
+  for (let end = integerPart.length; end > 0; end -= THOUSANDS_GROUP) {
+    const start = Math.max(0, end - THOUSANDS_GROUP);
+    const group = integerPart.slice(start, end);
+    grouped = grouped === '' ? group : `${group}${THOUSANDS_SEPARATOR}${grouped}`;
+  }
+
+  return fractionPart === '' ? grouped : `${grouped}.${fractionPart}`;
+}
+
+/**
+ * Importe listo para PINTAR: simbolo de moneda, separador de miles y SIEMPRE `digits` decimales
+ * (dos por defecto), redondeados como `formatDecimalDisplay` -al mas cercano, empate lejos del
+ * cero-. «1234.5600» -> «$1,234.56», «12.5000» -> «$12.50», «0.0020» -> «$0.00»,
+ * «-0.125» -> «-$0.13».
+ *
+ * A diferencia de una cantidad, en dinero los ceros de la derecha SI se escriben: «$12.50» y no
+ * «$12.5». Un importe que redondea a cero sale «$0.00», sin signo: el valor exacto queda en el
+ * `title` (`exactDecimalTitle`), igual que en las demas celdas de lectura.
+ *
+ * Solo para celdas de solo lectura. Igual que sus hermanas, un texto que no es un decimal en
+ * notacion plana sale tal cual.
+ */
+export function formatMoneyDisplay(
+  value: string,
+  digits: number = DISPLAY_FRACTION_DIGITS,
+): string {
+  const parsed = parseDecimal(value);
+  if (parsed === null) return value;
+
+  const rounded = roundDecimal(parsed, digits);
+  const sign = rounded.unscaled < ZERO ? '-' : '';
+  return `${sign}${MONEY_SYMBOL}${formatGroupedFixed(rounded, digits)}`;
+}
+
 /**
  * El valor EXACTO para poner en un `title`, o `undefined` cuando no hace falta porque lo pintado
  * ya es exacto.

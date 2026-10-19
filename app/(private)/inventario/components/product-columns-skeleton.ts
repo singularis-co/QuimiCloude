@@ -11,5 +11,10 @@
  *
  * Archivo aparte -y sin `'use client'`- justamente para poder importarse desde el servidor sin
  * tocar la declaracion de columnas.
+ *
+ * Es el recuento de las columnas POR DEFECTO (sin «Tipo» y sin «Costo», con «Presentación»).
+ * `ProductTable` pinta su esqueleto con la longitud real de sus columnas, asi que una pestana o
+ * un permiso que anada o quite una columna no deja el esqueleto desalineado; esta constante es el
+ * defecto de quien no tiene columnas propias (la tabla de producto terminado).
  */
 export const PRODUCT_SKELETON_COLUMN_COUNT = 8;

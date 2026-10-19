@@ -141,6 +141,15 @@ con esa etiqueta.
 Las columnas de P9 se quedan fuera. `assigned-orders-columns`, `user-columns`, `work-group-columns`
 y `unit-columns` no tienen columnas de la lista.
 
+> **Enmienda 2026-10-16 (aprobada por el usuario, sin tarjeta; commits `b0eaa866`, `6a665e3f`).**
+> `product-columns.tsx` gana la columna «Costo» (costo unitario de los lotes, solo para el
+> Administrador; QC-52 R35) con `tabular: true`, entre Existencia y Alerta de cantidad: va en Mono
+> con cifras tabulares. La fila de arriba queda «Existencia, Costo, Alerta de cantidad, Reservado,
+> Disponible» **cuando la columna se pinta**. El «Costo» de P9 no era esta columna, que entonces no
+> existía; las que ya estaban siguen en Sans. Test: `tests/unit/marca/tablas-marca.test.tsx`
+> › «R11, R13: en $archivo llevan tabular exactamente las columnas de la lista» (caso
+> `product-columns.tsx`).
+
 **Panel de lotes (R12, P8).** En `product-batches-panel.tsx`, los `<dd>` de lote, cantidad,
 fecha de compra, vencimiento, apartado y disponible ganan `font-mono tabular-nums`. Los `<dt>` no.
 

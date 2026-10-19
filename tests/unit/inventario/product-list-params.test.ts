@@ -9,10 +9,13 @@ import {
   SORT_PARAM,
   STOCK_MAX_PARAM,
   STOCK_MIN_PARAM,
+  TYPE_PARAM,
   buildProductListQuery,
   parseProductListParams,
+  productTypeTabHref,
 } from '@/app/(private)/inventario/components';
-import { PRODUCT_QUERYABLE } from '@/lib/modules/inventario';
+import { PRODUCT_QUERYABLE, PRODUCT_TYPES } from '@/lib/modules/inventario';
+import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 /**
@@ -215,5 +218,53 @@ describe('orden, filtros y busqueda (2026-09-07: la pantalla estrena la tabla co
 
     expect(consulta).not.toContain(SEARCH_PARAM);
     expect(consulta).not.toContain(SORT_PARAM);
+  });
+});
+
+describe('productTypeTabHref: destino de cada pestaña de tipo', () => {
+  const consulta = (href: string) => {
+    const [ruta, query] = href.split('?');
+    return { ruta, query: new URLSearchParams(query) };
+  };
+  const VIGENTE = {
+    page: 3,
+    pageSize: MAX_PAGE_SIZE,
+    sort: { columnId: 'name', direction: 'desc' },
+    search: 'acido',
+    filters: {
+      stock: { kind: 'numberRange', min: 2, max: null },
+      type: { kind: 'select', values: [PRODUCT_TYPES.MACHINE] },
+    },
+  } as const;
+
+  it('R3 — una pestaña de tipo pone su filtro, vuelve a la página 1 y deja intactos búsqueda, orden y demás filtros', () => {
+    const { ruta, query } = consulta(productTypeTabHref(VIGENTE, PRODUCT_TYPES.FINISHED_PRODUCT));
+
+    expect(ruta).toBe(INVENTORY_ROUTE);
+    expect(query.get(TYPE_PARAM)).toBe(PRODUCT_TYPES.FINISHED_PRODUCT);
+    expect(query.get(PAGE_PARAM)).toBe(String(PRIMERA_PAGINA));
+    expect(query.get(PAGE_SIZE_PARAM)).toBe(String(MAX_PAGE_SIZE));
+    expect(query.get(SEARCH_PARAM)).toBe('acido');
+    expect(query.get(SORT_PARAM)).toBe('name:desc');
+    expect(query.get(STOCK_MIN_PARAM)).toBe('2');
+  });
+
+  it('R3 — «Todos» quita el filtro de tipo y conserva el resto de la consulta', () => {
+    const { query } = consulta(productTypeTabHref(VIGENTE, 'all'));
+
+    expect(query.has(TYPE_PARAM)).toBe(false);
+    expect(query.get(PAGE_PARAM)).toBe(String(PRIMERA_PAGINA));
+    expect(query.get(SEARCH_PARAM)).toBe('acido');
+    expect(query.get(STOCK_MIN_PARAM)).toBe('2');
+  });
+
+  it('R3 — lo que produce se vuelve a leer igual: parse(href) es la consulta con el tipo cambiado', () => {
+    const { query } = consulta(productTypeTabHref(VIGENTE, PRODUCT_TYPES.PACKAGING));
+
+    expect(parseProductListParams(Object.fromEntries(query))).toEqual({
+      ...VIGENTE,
+      page: PRIMERA_PAGINA,
+      filters: { ...VIGENTE.filters, type: { kind: 'select', values: [PRODUCT_TYPES.PACKAGING] } },
+    });
   });
 });

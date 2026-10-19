@@ -47,7 +47,7 @@ const ROWS: (ImportPreviewRow | ImportResultRow)[] = [
     productName: null,
     status: 'error',
     issues: [
-      { code: 'number_format_invalid', column: 'stock', message: 'Existencia: usa un solo separador decimal.' },
+      { code: 'number_format_invalid', column: 'stock', message: 'Cantidad: usa un solo separador decimal.' },
       { code: 'unit_not_found', column: 'unit', message: 'Unidad: no existe.' },
     ],
   },
@@ -91,7 +91,7 @@ describe('plantilla', () => {
       'Unidad',
       'Presentación',
       'Fórmula',
-      'Existencia',
+      'Cantidad',
       'Costo unitario',
       'Lote',
       'Fecha de compra',
@@ -154,7 +154,7 @@ describe('archivo de errores', () => {
       [
         '3',
         ...INVENTORY_IMPORT_COLUMNS.map((column) => TRICKY[column.key]),
-        'Existencia: usa un solo separador decimal. | Unidad: no existe.',
+        'Cantidad: usa un solo separador decimal. | Unidad: no existe.',
       ],
       ['7', 'Maquina', ...HEADERS.slice(1).map(() => ''), 'Tipo: no es uno de los tipos.'],
     ]);

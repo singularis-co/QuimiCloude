@@ -32,6 +32,7 @@
 | D11 | Lectura en vivo, sin copia en el pedido: editar los pasos de envasado afecta a los pedidos que ya están en empaque. El avance no se guarda. | Heredado QC-64; ejecución actual | R13, R30, R31 |
 | D12 | Una prueba E2E: el Administrador crea la fórmula con pasos de envasado; el empacador comienza, recorre y termina; el operador no los ve. | Humano, 2026-10-05 | R32 |
 | D13 | Las fórmulas existentes no se migran: quedan sin pasos de envasado. | Heredado, patrón QC-173 y D1 | R1, R5 |
+| D14 | Formulario de fórmula: sin botones «Añadir paso» / «Añadir paso de envasado»; Pasos y Envasado separados por un divisor; cada sección abre con una fila vacía y se añade y quita con «+» / «×» en la barra de la fila, junto a «Requiere evidencia», como Ingredientes; Envasado marcado «(opcional)» con ayuda «Opcional. Pasos que sigue el empacador uno a uno al empacar el pedido.»; las filas vacías sin tocar no se envían; el formulario de versión no cambia. Enmienda aprobada por el usuario, sin tarjeta (commit `5f2cc171`). | Usuario, 2026-10-16 | R7, R8 |
 
 ## Preguntas abiertas
 > **F1.4 aprobado por el humano el 2026-10-05** con un «aprobado» sin matices: se toma el spec tal cual. Prompt de `design.md > 6.2` aprobado como está (T15 manual del humano); P1 = sin control para mover pasos; P2 = el botón del último paso sigue diciendo «Terminar»; al editar, `packingSteps` ausente = lista vacía.
@@ -88,6 +89,14 @@
   «Pasos de envasado», separada de la sección «Pasos», con el mismo editor: añadir un paso,
   escribir con negrilla, cursiva y lista de verificación, quitar un paso y reordenarlos por
   arrastre y por teclado.
+  - **Enmienda 2026-10-16 (D14; aprobada por el usuario, sin tarjeta; commit `5f2cc171`).** Las dos
+    secciones DEBEN ir separadas por un divisor y NO DEBEN tener botón «Añadir paso» ni «Añadir paso
+    de envasado». Cada sección DEBE abrir con una fila vacía y añadir y quitar DEBEN hacerse con los
+    controles «+» y «×» de la barra de cada fila, junto a «Requiere evidencia», como en Ingredientes.
+    El título de envasado DEBE llevar «(opcional)» y una ayuda con el texto «Opcional. Pasos que
+    sigue el empacador uno a uno al empacar el pedido.». CUANDO se guarde, una fila vacía que el
+    usuario no tocó NO DEBE enviarse (sin pasos, las dos listas van vacías). El formulario de
+    versión (R12) no cambia.
 - **R8.** (D3) CUANDO se guarde el formulario, el sistema DEBE enviar los pasos de envasado en el
   orden en que el usuario los ve. SI un paso de envasado no es válido, ENTONCES el formulario DEBE
   mostrar el error junto a ese paso de envasado y NO DEBE atribuirlo a ningún paso del operador; y

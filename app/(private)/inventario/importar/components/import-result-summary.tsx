@@ -1,15 +1,11 @@
 'use client';
 
-import {
-  CircleAlertIcon,
-  CircleCheckIcon,
-  CopyIcon,
-  InfoIcon,
-  LayersIcon,
-} from 'lucide-react';
+import { CircleAlertIcon, CircleCheckIcon, InfoIcon, UploadIcon, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import type { StatusTone } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import type {
   ImportAlreadyDone,
   ImportNothingImported,
@@ -17,21 +13,24 @@ import type {
   ImportResultTotals,
   InventoryImportResult,
 } from '@/lib/modules/inventario';
+import { cn } from '@/lib/utils';
 
-import { ErrorFileButton, ExampleRowIgnoredNotice, ImportTotals } from './import-preview-summary';
 import {
-  ImportIssueList,
-  ImportRowsTable,
-  ImportStatusLabel,
-  type ImportStatusPresentation,
-} from './import-preview-table';
+  ErrorFileButton,
+  ExampleRowIgnoredNotice,
+  ImportTotals,
+  STACKED_ACTIONS_CLASS,
+} from './import-preview-summary';
+import { ImportIssueList, ImportRowsTable, ImportStatusLabel } from './import-preview-table';
 import {
   ALREADY_IMPORTED_TESTID,
+  IMPORT_FILE_NAME_TESTID,
   NOTHING_IMPORTED_MESSAGE_TESTID,
   NOTHING_IMPORTED_TESTID,
   NOTHING_IMPORTED_TITLE,
   RESTART_LABEL,
   RESTART_TESTID,
+  RESULT_CARD_TESTID,
   RESULT_STATUS_LABELS,
   RESULT_TABLE_TESTID,
   RESULT_TESTID,
@@ -47,19 +46,31 @@ import {
 
 type ResultStatus = ImportResultRow['status'];
 
-const RESULT_STATUS_PRESENTATION: Readonly<Record<ResultStatus, ImportStatusPresentation>> = {
-  created: { label: RESULT_STATUS_LABELS.created, icon: CircleCheckIcon, className: 'text-foreground' },
-  batch_added: { label: RESULT_STATUS_LABELS.batch_added, icon: LayersIcon, className: 'text-foreground' },
-  duplicate: { label: RESULT_STATUS_LABELS.duplicate, icon: CopyIcon, className: 'text-muted-foreground' },
-  error: { label: RESULT_STATUS_LABELS.error, icon: CircleAlertIcon, className: 'text-destructive' },
+export const RESULT_STATUS_TONES: Readonly<Record<ResultStatus, StatusTone>> = {
+  created: 'success',
+  batch_added: 'info',
+  duplicate: 'waiting',
+  error: 'danger',
 };
+
+const RESULT_TOTAL_TONES = {
+  created: 'success',
+  batchAdded: 'info',
+  duplicate: 'waiting',
+  error: 'danger',
+} as const satisfies Partial<Record<keyof ImportResultTotals, StatusTone>>;
 
 const RESULT_STATUS_ORDER: readonly ResultStatus[] = ['created', 'batch_added', 'duplicate', 'error'];
 
 export const RESULT_TABLE_ID = 'inventario-importar-resultado';
 
 function resultStatus(row: ImportResultRow): ReactNode {
-  return <ImportStatusLabel status={row.status} presentation={RESULT_STATUS_PRESENTATION[row.status]} />;
+  return (
+    <ImportStatusLabel
+      status={row.status}
+      presentation={{ label: RESULT_STATUS_LABELS[row.status], tone: RESULT_STATUS_TONES[row.status] }}
+    />
+  );
 }
 
 function resultDetail(row: ImportResultRow): ReactNode {
@@ -77,53 +88,101 @@ function resultDetail(row: ImportResultRow): ReactNode {
 
 function RestartButton({ onRestart }: { readonly onRestart: () => void }) {
   return (
-    <Button
-      type="button"
-      variant="outline"
-      touch
-      data-testid={RESTART_TESTID}
-      onClick={onRestart}
-    >
+    <Button type="button" touch data-testid={RESTART_TESTID} onClick={onRestart}>
+      <UploadIcon aria-hidden />
       {RESTART_LABEL}
     </Button>
   );
 }
 
-function ResultRows({
-  totals,
-  rows,
-  exampleRowIgnored,
+const OUTCOME_ICON_CLASS: Readonly<Record<'success' | 'danger' | 'info', string>> = {
+  success: 'bg-success-subtle text-success-text',
+  danger: 'bg-destructive-subtle text-destructive-text',
+  info: 'bg-info-subtle text-info-text',
+};
+
+/** Cabecera centrada del paso 3: icono, título, archivo y lo que pasó. */
+function OutcomeCard({
+  icon: Icon,
+  tone,
+  title,
+  fileName,
+  children,
+}: {
+  readonly icon: LucideIcon;
+  readonly tone: keyof typeof OUTCOME_ICON_CLASS;
+  readonly title?: string;
+  readonly fileName?: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <Card
+      className="mx-auto w-full max-w-[720px] items-center gap-4 rounded-[14px] px-6 py-10 text-center"
+      data-testid={RESULT_CARD_TESTID}
+    >
+      <span
+        className={cn('flex size-14 flex-none items-center justify-center rounded-2xl', OUTCOME_ICON_CLASS[tone])}
+      >
+        <Icon className="size-7" aria-hidden />
+      </span>
+      {title === undefined ? null : <h2 className="text-[22px] font-semibold">{title}</h2>}
+      {fileName === undefined ? null : (
+        <span className="font-mono text-xs text-muted-foreground" data-testid={IMPORT_FILE_NAME_TESTID}>
+          {fileName}
+        </span>
+      )}
+      {children}
+    </Card>
+  );
+}
+
+function OutcomeActions({
+  hasErrors,
   onDownloadErrors,
   onRestart,
 }: {
-  readonly totals: ImportResultTotals;
-  readonly rows: readonly ImportResultRow[];
-  readonly exampleRowIgnored: boolean;
-  readonly onDownloadErrors: () => void;
+  readonly hasErrors: boolean;
+  readonly onDownloadErrors?: () => void;
   readonly onRestart: () => void;
 }) {
+  return (
+    <div className={cn(STACKED_ACTIONS_CLASS, 'w-full justify-center')}>
+      {hasErrors && onDownloadErrors !== undefined ? <ErrorFileButton onDownload={onDownloadErrors} /> : null}
+      <RestartButton onRestart={onRestart} />
+    </div>
+  );
+}
+
+function ResultTable({ rows }: { readonly rows: readonly ImportResultRow[] }) {
   const statuses = RESULT_STATUS_ORDER.map((value) => ({
     value,
     count: rows.reduce((total, row) => (row.status === value ? total + 1 : total), 0),
   }));
 
   return (
+    <ImportRowsTable
+      tableId={RESULT_TABLE_ID}
+      testId={RESULT_TABLE_TESTID}
+      rows={rows}
+      statuses={statuses}
+      statusLabels={RESULT_STATUS_LABELS}
+      renderStatus={resultStatus}
+      renderDetail={resultDetail}
+    />
+  );
+}
+
+function ResultFigures({
+  totals,
+  exampleRowIgnored,
+}: {
+  readonly totals: ImportResultTotals;
+  readonly exampleRowIgnored: boolean;
+}) {
+  return (
     <>
-      <ImportTotals totals={totals} labels={RESULT_TOTAL_LABELS} />
+      <ImportTotals totals={totals} labels={RESULT_TOTAL_LABELS} tones={RESULT_TOTAL_TONES} />
       {exampleRowIgnored ? <ExampleRowIgnoredNotice /> : null}
-      <div className="flex flex-wrap gap-2">
-        {totals.error > 0 ? <ErrorFileButton onDownload={onDownloadErrors} /> : null}
-        <RestartButton onRestart={onRestart} />
-      </div>
-      <ImportRowsTable
-        tableId={RESULT_TABLE_ID}
-        testId={RESULT_TABLE_TESTID}
-        rows={rows}
-        statuses={statuses}
-        statusLabels={RESULT_STATUS_LABELS}
-        renderStatus={resultStatus}
-        renderDetail={resultDetail}
-      />
     </>
   );
 }
@@ -136,18 +195,17 @@ export type ImportResultSummaryProps = {
 
 export function ImportResultSummary({ result, onDownloadErrors, onRestart }: ImportResultSummaryProps) {
   return (
-    <section className="flex min-w-0 flex-col gap-4" data-testid={RESULT_TESTID}>
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">{RESULT_TITLE}</h2>
+    <section className="flex min-w-0 flex-col gap-5" data-testid={RESULT_TESTID}>
+      <OutcomeCard icon={CircleCheckIcon} tone="success" title={RESULT_TITLE} fileName={result.fileName}>
         <p className="text-sm text-muted-foreground">{resultDescription(result.fileName, result.importedAt)}</p>
-      </div>
-      <ResultRows
-        totals={result.totals}
-        rows={result.rows}
-        exampleRowIgnored={result.exampleRowIgnored}
-        onDownloadErrors={onDownloadErrors}
-        onRestart={onRestart}
-      />
+        <ResultFigures totals={result.totals} exampleRowIgnored={result.exampleRowIgnored} />
+        <OutcomeActions
+          hasErrors={result.totals.error > 0}
+          onDownloadErrors={onDownloadErrors}
+          onRestart={onRestart}
+        />
+      </OutcomeCard>
+      <ResultTable rows={result.rows} />
     </section>
   );
 }
@@ -164,25 +222,19 @@ export function ImportNothingImportedSummary({
   onRestart,
 }: ImportNothingImportedSummaryProps) {
   return (
-    <section className="flex min-w-0 flex-col gap-4" data-testid={NOTHING_IMPORTED_TESTID}>
-      <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">{NOTHING_IMPORTED_TITLE}</h2>
-        <p
-          role="status"
-          className="flex items-start gap-2 rounded-lg border border-destructive/40 p-3 text-sm"
-          data-testid={NOTHING_IMPORTED_MESSAGE_TESTID}
-        >
-          <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
+    <section className="flex min-w-0 flex-col gap-5" data-testid={NOTHING_IMPORTED_TESTID}>
+      <OutcomeCard icon={CircleAlertIcon} tone="danger" title={NOTHING_IMPORTED_TITLE} fileName={nothing.fileName}>
+        <p role="status" className="text-sm text-muted-foreground" data-testid={NOTHING_IMPORTED_MESSAGE_TESTID}>
           {nothingImportedMessage(nothing.fileName)}
         </p>
-      </div>
-      <ResultRows
-        totals={nothing.totals}
-        rows={nothing.rows}
-        exampleRowIgnored={nothing.exampleRowIgnored}
-        onDownloadErrors={onDownloadErrors}
-        onRestart={onRestart}
-      />
+        <ResultFigures totals={nothing.totals} exampleRowIgnored={nothing.exampleRowIgnored} />
+        <OutcomeActions
+          hasErrors={nothing.totals.error > 0}
+          onDownloadErrors={onDownloadErrors}
+          onRestart={onRestart}
+        />
+      </OutcomeCard>
+      <ResultTable rows={nothing.rows} />
     </section>
   );
 }
@@ -195,12 +247,13 @@ export function ImportAlreadyDoneNotice({
   readonly onRestart: () => void;
 }) {
   return (
-    <section className="flex flex-col items-start gap-3" data-testid={ALREADY_IMPORTED_TESTID}>
-      <p role="status" className="flex items-start gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
-        <InfoIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
-        {alreadyImportedMessage(done.importedAt)}
-      </p>
-      <RestartButton onRestart={onRestart} />
+    <section className="flex min-w-0 flex-col gap-5" data-testid={ALREADY_IMPORTED_TESTID}>
+      <OutcomeCard icon={InfoIcon} tone="info">
+        <p role="status" className="text-sm">
+          {alreadyImportedMessage(done.importedAt)}
+        </p>
+        <OutcomeActions hasErrors={false} onRestart={onRestart} />
+      </OutcomeCard>
     </section>
   );
 }

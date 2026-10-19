@@ -83,6 +83,7 @@ usen sin crear nada.
 | D15 (P6) | Los textos del ojo para keys los pone el consumidor (`PasswordField` acepta textos propios); los decide QC-237 o la ficha de Integraciones | humano, 2026-10-10 (aprobación del spec) | — | R21 |
 | D16 (P7) | Tarjetas y acciones a todo el ancho con contenedor ≤ 760 px; `touch="mobile"` y el relleno de `PageShell` con ventana < 768 px | humano, 2026-10-10 (aprobación del spec) | — | R4, R27, R30, R34 |
 | D17 | Las piezas compartidas no conocen el dominio: `StatusBadge` recibe `tone` + `label` y `PriorityMark` recibe `level` (1–4) + `label`, sin importar `lib/modules/*`. El mapa único de pedido sale de `components/shared/` y va a `lib/shared/ui/order-status.ts`, porque `components/` no puede importar `@/lib/modules/pedidos` (scope.test de QC-34/35 y module-contract de QC-33) | el humano, opción 2, 2026-10-10 (durante la implementación) | — | R10, R11, R12, R13 |
+| D18 | El estado `EN_CURSO` se lee «En fabricación» en toda la app (antes «En curso»). Solo cambia el texto; el código y el tono siguen. Enmienda aprobada por el usuario, sin tarjeta (commit `440ff5b2`, #256) | usuario, 2026-10-16 | R10 (texto «conserva los textos de hoy» de la design: deja de valer para `EN_CURSO`) | R10, R11 |
 
 ## Requisitos (EARS)
 
@@ -112,9 +113,14 @@ usen sin crear nada.
   color del texto al nuevo tono en 200 ms con la curva estándar, sin animar el ancho.
 - **R10.** El sistema DEBE tener **una sola** fuente de etiqueta y tono para el estado, la cobertura
   y la prioridad de un pedido, en `lib/shared/ui/order-status.ts` (D17), con este reparto de tonos: Pendiente
-  `neutral`; En curso, En empaque y En acondicionamiento `progress`; Por empacar y Por acondicionar
-  `waiting`; Terminado y Entregado `success`; Cancelado `muted`; Bloqueado `danger`; Apartado
-  `success`; Sin apartar `neutral`; Sin cobertura completa `waiting`.
+  `neutral`; En fabricación (`EN_CURSO`), En empaque y En acondicionamiento `progress`; Por empacar y
+  Por acondicionar `waiting`; Terminado y Entregado `success`; Cancelado `muted`; Bloqueado `danger`;
+  Apartado `success`; Sin apartar `neutral`; Sin cobertura completa `waiting`.
+
+  > **Enmendado el 2026-10-16 (D18; enmienda aprobada por el usuario, sin tarjeta; commit
+  > `440ff5b2`, #256).** Texto original: «…En curso, En empaque y En acondicionamiento `progress`…».
+  > La etiqueta de `EN_CURSO` pasa de «En curso» a «En fabricación». Solo cambia el texto visible: el
+  > código del estado y su tono `progress` siguen igual.
 - **R11.** Las constantes de etiquetas de estado y prioridad de pedido que hoy declaran las rutas
   (`ORDER_STATUS_LABELS`, `ORDER_PRIORITY_LABELS`, `ORDER_COVERAGE_LABELS`,
   `COMPANY_ORDER_STATUS_LABELS`, `COMPANY_ORDER_PRIORITY_LABELS`, `ASSIGNED_ORDER_STATUS_LABELS`,

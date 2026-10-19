@@ -15,6 +15,7 @@ import {
   AI_PROVIDER_INTEGRATION_ROUTE,
   DASHBOARD_ROUTE,
   INVENTORY_ROUTE,
+  MAESTRO_COMPANIES_ROUTE,
 } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
@@ -382,7 +383,7 @@ describe('loginAction', () => {
 describe('aterrizaje del Maestro (QC-161)', () => {
   const PERMISOS_DEL_MAESTRO = ['empresas.consultar', 'empresas.modificar'] as const;
 
-  it('QC-161 R33: con solo empresas.* y sin destino de vuelta aterriza en el respaldo calculado con el menu', async () => {
+  it('R4: con solo empresas.* y sin destino de vuelta aterriza en Empresas, calculado con el menu', async () => {
     verifyCredentialsMock.mockResolvedValue({ ok: true });
     getSessionUserMock.mockResolvedValue({
       ...usuarioCon(PERMISOS_DEL_MAESTRO),
@@ -399,9 +400,8 @@ describe('aterrizaje del Maestro (QC-161)', () => {
 
     expect(redirect).toHaveBeenCalledTimes(1);
     expect(redirect).toHaveBeenCalledWith(esperado);
-    // Y hoy ese destino es el respaldo de siempre: ningun enlace del menu pide `empresas.*`.
-    expect(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_DEL_MAESTRO)).toEqual([]);
-    expect(esperado).toBe(DASHBOARD_ROUTE);
+    // El primer enlace que exige `empresas.consultar` es Empresas.
+    expect(esperado).toBe(MAESTRO_COMPANIES_ROUTE);
   });
 
   it('QC-161 R33: un destino de vuelta interno valido sigue mandando tambien para el Maestro', async () => {

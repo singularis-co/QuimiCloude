@@ -1,6 +1,6 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { identity } from '@/lib/composition';
-import { canAdjustBatchStock, PRODUCT_TYPES, type ProductFormUnits } from '@/lib/modules/inventario';
+import { canAdjustBatchStock, canViewUnitCosts, PRODUCT_TYPES, type ProductFormUnits } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 
@@ -38,7 +38,8 @@ type ProductListSectionProps = {
  *
  * **Aqui no se decide autorizacion.** La sesion se lee solo para preguntar a
  * `canAdjustBatchStock` si se pinta el control de ajuste -presentacion, no permiso-; no se repite
- * `requireAdmin` ni se ocultan columnas por rol. La autorizacion sobre los datos la aporta el caso
+ * `requireAdmin`. La columna «Costo» se pinta solo con `canViewUnitCosts` (presentacion, no
+ * permiso; el servidor es quien deja de enviar el costo). La autorizacion sobre los datos la aporta el caso
  * de uso, y si responde `unauthorized` se pinta el estado de error **sin un solo dato del
  * catalogo**.
  *
@@ -69,7 +70,10 @@ export async function ProductListSection({ params, units, formUnits }: ProductLi
   const { items, page: currentPage, totalPages } = result.data;
   // Presentacion, no autorizacion: decide si se pinta el control de ajuste.
   // Quien autoriza de verdad es requirePermission en adjust-batch-stock.ts.
-  const canAdjust = canAdjustBatchStock(await identity.getSessionUser());
+  const sessionUser = await identity.getSessionUser();
+  const canAdjust = canAdjustBatchStock(sessionUser);
+  // Presentacion, no autorizacion: decide si se pinta la columna «Costo» (solo el Administrador).
+  const canSeeCost = canViewUnitCosts(sessionUser);
 
   // Hay filtros activos si: busqueda, tipo, rango stock o rango alerta
   const hasActiveFilters =
@@ -89,6 +93,7 @@ export async function ProductListSection({ params, units, formUnits }: ProductLi
         totalPages={totalPages}
         units={units}
         canAdjust={canAdjust}
+        canSeeCost={canSeeCost}
         empty={{
           firstPageHref:
             currentPage > FIRST_PAGE
@@ -112,6 +117,7 @@ export async function ProductListSection({ params, units, formUnits }: ProductLi
         totalPages={totalPages}
         units={units}
         canAdjust={canAdjust}
+        canSeeCost={canSeeCost}
       />
     </div>
   );

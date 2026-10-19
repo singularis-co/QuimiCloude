@@ -66,6 +66,10 @@
   cambiar el texto, encender o apagar «Requiere evidencia» y añadir pasos al final.», y DEBE
   deshabilitar mover y quitar pasos en las dos listas, dejando activos editar el texto, el switch
   y «Añadir paso».
+  *(Enmienda 2026-10-16, QC-211 D14, commit `5f2cc171`: ya no hay botón «Añadir paso»; añadir es el
+  «+» de la barra de cada fila, y con el bloqueo solo queda activo el «+» del último paso, que
+  añade al final. Test: `tests/unit/recetas-ui/recipe-form-evidence-lock.test.tsx` › «R8: el
+  texto, el interruptor y el «+» del último paso siguen activos; el de los demás no».)*
 - **R9.** SI se guarda una fórmula que tiene al menos un pedido en curso con fotos y alguna de sus
   dos listas llega con menos pasos que los guardados, ENTONCES el sistema DEBE rechazar el
   guardado con `recipe_steps_locked` y no persistir nada.
@@ -232,3 +236,4 @@ cosa al aprobarlo.
 | 2026-10-13 | Identificadores y empresa | **Inglés** (QC-106 D18). Tabla nueva con columna de empresa y test de rechazo entre empresas (`docs/checkpoints-proyecto.md`). |
 | 2026-10-13 | ¿E2E? | **Sí**: se extiende el E2E del flujo del Operador (QC-63), con storage simulado (QC-171). |
 | 2026-10-13 | Pase `/design` (era la pregunta abierta 1, bloqueante) | **Aprobado por el humano.** Tableros copiados a `docs/diseno/canvas/` (commit `e0e73640`): bloque de evidencia en Ejecución y Empaque → `EvidenciaPaso.dc.html`, `EvidenciaPasoTablet.dc.html`, `EvidenciaPasoMovil.dc.html` (ficha en el …Movil); switch «Requiere evidencia» en el editor de pasos → `FormulaEvidencia.dc.html`, `FormulaEvidenciaTablet.dc.html`, `FormulaEvidenciaMovil.dc.html` (ficha en el …Movil). Pieza nueva `components/ui/switch` sobre `@base-ui/react` Switch (dependencia ya aprobada). |
+| 2026-10-16 | ¿Con qué se añade un paso bajo el bloqueo? | **Enmienda aprobada por el usuario, sin tarjeta** (commit `5f2cc171`, QC-211 D14). Sin botón «Añadir paso»: con el «+» de la barra de la fila. Bajo el bloqueo solo el «+» del último paso sigue activo, así que se sigue añadiendo solo al final. Cubierta por R8 (nota de enmienda). |

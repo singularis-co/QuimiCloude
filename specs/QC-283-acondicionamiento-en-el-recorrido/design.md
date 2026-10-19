@@ -740,6 +740,8 @@ nuevas), realce al pasar el puntero y fundido al filtrar.
 
   Cada tarjeta lleva `data-testid="execution-trace-duration"`, `data-phase` y `data-kind`.
 - **Estado:** la marca «En curso» pasa a depender de `trace.active` (R28).
+  **Enmienda 2026-10-16 (`0f135128`):** la marca ya no se pinta junto al estado; `trace.active` se
+  sigue entregando, pero la pantalla no dibuja ningún chip con él (R28 enmendado).
 
 ### Línea de tiempo (`execution-timeline.tsx` + `conditioning-step-details.tsx`) — R12–R18
 
@@ -775,7 +777,8 @@ nuevas), realce al pasar el puntero y fundido al filtrar.
   - El sufijo va en texto pequeño y atenuado, igual que en el tablero.
   - En las tarjetas de teléfono, el mismo texto va en la línea de datos.
 - **«En curso».** La marca depende de `row.active` y no se mueve de sitio (junto al número,
-  QC-261 P4).
+  QC-261 P4). **Enmienda 2026-10-16 (`0f135128`):** la marca se quita de la fila y de la tarjeta;
+  solo queda «Dado de baja» junto al número (R28 enmendado).
 - **Personas.** `ResponsibleAvatars` sin cambios. El orden lo da el backend (R29).
 
 ### Formato y textos (`execution-trace-format.ts`)
@@ -829,7 +832,7 @@ nuevas), realce al pasar el puntero y fundido al filtrar.
 | R25 | `execution-trace-detail.test.tsx` › «R25: tarjetas por fase con insignias; fase null no se pinta» | ui |
 | R26 | `execution-trace.test.ts` › «R26: total = suma, null = 0, precedencia del kind»; `execution-trace-format.test.ts` › «R26: formatTraceTotal trunca a minutos»; `tests/ui/dashboard/execution-trace-table.test.tsx` › «R26: celda de duración con total y sufijo» | unit + ui |
 | R27 | `list-execution-traces.test.ts` › «R27: la fila trae totalDuration y no el desglose» | unit |
-| R28 | `execution-trace-table.test.tsx` y `execution-trace-detail.test.tsx` › «R28: En curso según active; nunca en dado de baja» | ui |
+| R28 | ~~`execution-trace-table.test.tsx` y `execution-trace-detail.test.tsx` › «R28: En curso según active; nunca en dado de baja»~~ Enmendado el 2026-10-16 (`0f135128`): `execution-trace-table.test.tsx` › «R28 - ninguna fila lleva chip «En curso», ni activa ni dada de baja» y «R28 - una fila dada de baja con active a true tampoco lleva la marca»; `execution-trace-detail.test.tsx` › «R28 - sin chip «En curso» ni activo ni dado de baja» | ui |
 | R29 | `list-execution-traces.test.ts` › «R29: firmantes y después equipo, sin repetir» | unit |
 | R30 | `execution-log-read.int.test.ts` › «R30: filtro por miembro del equipo, con rango sobre el Comenzar» | int |
 | R31 | `list-execution-traces.test.ts` › «R31: opciones solo de firmantes» | unit |

@@ -553,11 +553,11 @@ describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asign
     expect(findRefsPresentations).toHaveBeenCalledTimes(1);
     expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
     expect(pagina.items[0]?.presentationLines).toEqual([
-      { lineId: 'linea-3', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: null },
-      { lineId: 'linea-4', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null },
+      { lineId: 'linea-3', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-4', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ]);
     expect(pagina.items[1]?.presentationLines).toEqual([
-      { lineId: 'linea-5', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 2, packedPackages: null, packagingName: null },
+      { lineId: 'linea-5', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 2, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ]);
   });
 
@@ -586,7 +586,7 @@ describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asign
     const pagina = await listAssignedOrders(ACTOR, { page: 1 });
 
     expect(pagina.items[0]?.presentationLines).toEqual([
-      { lineId: 'linea-6', presentationId: PRESENTACION, presentationName: null, packages: 3, packedPackages: null, packagingName: null },
+      { lineId: 'linea-6', presentationId: PRESENTACION, presentationName: null, packages: 3, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ]);
   });
 

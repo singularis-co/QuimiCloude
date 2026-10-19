@@ -72,6 +72,11 @@ export type ProductView = {
    *  que suman todos los lotes. `null` si ningun lote con existencia tiene fecha. Solo lo rellena
    *  `listAliveProducts`. */
   readonly nextExpiryDate?: string | null;
+  /** Costo unitario medio ponderado por existencia (`weightedAverageUnitCost`) de los lotes con
+   *  existencia > 0 y costo, en cadena decimal de cuatro decimales. `null` si ningun lote cumple
+   *  las dos. Solo lo rellena `listAliveProducts`, con una consulta por pagina, y solo cuando el
+   *  caso de uso le pide costos (`canViewUnitCosts`); sin ese permiso la clave no viaja. */
+  readonly averageUnitCost?: string | null;
   /** Presentacion fija del producto; `null` si no la tiene (un envase anterior a tenerla). */
   readonly presentationId?: string | null;
   readonly presentationName?: string | null;

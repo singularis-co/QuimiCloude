@@ -115,9 +115,9 @@ describe('R7 — cada fila trae numero, receta, reparto completo, estado y quien
     const [fila] = (await createListConditioningOrders(deps)(ACONDICIONADOR, { page: 1 })).items;
 
     expect(fila?.presentationLines).toEqual([
-      { lineId: 'linea-1', presentationId: 'pres-500', presentationName: 'Bolsa 500 g', packages: 12, packedPackages: null, packagingName: '500 g' },
-      { lineId: 'linea-2', presentationId: 'pres-1k', presentationName: 'Bolsa 1 kg', packages: 4, packedPackages: null, packagingName: '1 kg' },
-      { lineId: 'linea-3', presentationId: 'pres-2k', presentationName: null, packages: 1, packedPackages: null, packagingName: null },
+      { lineId: 'linea-1', presentationId: 'pres-500', presentationName: 'Bolsa 500 g', packages: 12, packedPackages: null, packagingName: '500 g', presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-2', presentationId: 'pres-1k', presentationName: 'Bolsa 1 kg', packages: 4, packedPackages: null, packagingName: '1 kg', presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-3', presentationId: 'pres-2k', presentationName: null, packages: 1, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ]);
   });
 

@@ -80,7 +80,7 @@ const PREVIEW: InventoryImportPreview = {
       productName: 'Mal',
       cells: cells({ type: 'Insumo', name: 'Mal', stock: 'x' }),
       status: 'error',
-      issues: [{ code: 'stock_invalid', column: 'stock', message: 'Existencia: no es un numero.' }],
+      issues: [{ code: 'stock_invalid', column: 'stock', message: 'Cantidad: no es un numero.' }],
     },
   ],
   missingUnits: [],
@@ -162,7 +162,7 @@ describe('previewInventoryImportAction', () => {
   });
 
   it('R32 un archivo rechazado es un exito con su motivo', async () => {
-    const rejected = { kind: 'file_rejected', rejection: { code: 'missing_columns', columns: ['Existencia'] } };
+    const rejected = { kind: 'file_rejected', rejection: { code: 'missing_columns', columns: ['Cantidad'] } };
     previewMock.mockResolvedValue(rejected);
 
     await expect(previewInventoryImportAction(form({ file: xlsx() }))).resolves.toEqual({ status: 'success', data: rejected });

@@ -1,8 +1,8 @@
 import { UrlTabs } from '@/components/shared/url-tabs';
 
 import {
-  FINISHED_PRODUCT_TABS,
   finishedProductTabHref,
+  visibleFinishedProductTabs,
   type FinishedProductTab,
 } from './finished-product-params';
 
@@ -27,15 +27,24 @@ export function finishedProductTabTestId(tab: FinishedProductTab): string {
 export type FinishedProductTabsProps = {
   readonly productId: string;
   readonly current: FinishedProductTab;
+  /**
+   * Si se pinta el tab «Costo de producción» (solo el Administrador). Lo resuelve la pagina con
+   * `canViewUnitCosts` y baja por props. Defecto `false`: falla cerrado.
+   */
+  readonly canViewCosts?: boolean;
 };
 
-export function FinishedProductTabs({ productId, current }: FinishedProductTabsProps) {
+export function FinishedProductTabs({
+  productId,
+  current,
+  canViewCosts = false,
+}: FinishedProductTabsProps) {
   return (
     <UrlTabs
       label={FINISHED_PRODUCT_TABS_LABEL}
       testId={FINISHED_PRODUCT_TABS_TESTID}
       current={current}
-      items={FINISHED_PRODUCT_TABS.map((tab) => ({
+      items={visibleFinishedProductTabs(canViewCosts).map((tab) => ({
         value: tab,
         href: finishedProductTabHref(productId, tab),
         label: FINISHED_PRODUCT_TAB_LABELS[tab],

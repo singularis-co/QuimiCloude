@@ -247,11 +247,13 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     createdBy: null,
     updatedBy: null,
     presentationLines: [
-      { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1, packagingProductId: null, packagingName: null },
+      { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ],
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -266,6 +268,8 @@ function lineaConEnvase(packages: number) {
     packages,
     packagingProductId: ENVASE_ID,
     packagingName: 'Bidón PET 20 L',
+    presentationContent: null,
+    presentationUnitLabel: null,
   };
 }
 

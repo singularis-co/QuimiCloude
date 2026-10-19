@@ -137,6 +137,11 @@ function filaDeGrupo(key: string) {
   return screen.getByTestId(`data-table-row-${key}`);
 }
 
+/** jsdom no evalua las consultas de contenedor: la tabla y sus tarjetas estan las dos en el arbol. */
+function enLaTabla() {
+  return within(screen.getByRole('table'));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   listOrderBatchesActionMock.mockResolvedValue({ status: 'success', data: [] });
@@ -214,7 +219,7 @@ describe('fila de pedido', () => {
     expect(posicion).toBeGreaterThan(-1);
     expect(cabeceras[posicion + 1]).toBe('Nombre');
 
-    await user.click(screen.getByTestId('finished-stock-toggle'));
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
     const sub = screen.getByTestId('data-table-row-order-1--product-1');
     expect(within(sub).queryByTestId('finished-stock-order-number')).toBeNull();
   });
@@ -246,7 +251,7 @@ describe('nombre y presentacion', () => {
     montar([pedido({ products: [{ product: conPresentacion, stock: '1.5', packagedStock: [entrada()] }] })]);
 
     expect(within(filaDeGrupo('order-1')).getByTestId('data-table-cell-presentationName').textContent).toBe('');
-    await user.click(screen.getByTestId('finished-stock-toggle'));
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
 
     const sub = screen.getByTestId('data-table-row-order-1--product-1');
     expect(within(sub).getByTestId('finished-stock-line-name').textContent).toBe('Desengrasante');
@@ -256,7 +261,7 @@ describe('nombre y presentacion', () => {
   it('sin presentacion conocida, el nombre queda entero y la columna pinta el marcador', async () => {
     const user = setupUser();
     montar([pedido()]);
-    await user.click(screen.getByTestId('finished-stock-toggle'));
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
 
     const sub = screen.getByTestId('data-table-row-order-1--product-1');
     expect(within(sub).getByTestId('finished-stock-line-name').textContent).toBe(
@@ -295,7 +300,7 @@ describe('desplegar', () => {
     montar([pedido()]);
     expect(screen.queryByTestId('data-table-row-order-1--product-1')).toBeNull();
 
-    const toggle = screen.getByTestId('finished-stock-toggle');
+    const toggle = enLaTabla().getByTestId('finished-stock-toggle');
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
@@ -308,9 +313,15 @@ describe('desplegar', () => {
     expect(existencia).toHaveAttribute('title', '6 × Botella 250 ml');
     expect(within(sub).getByTestId('product-qty-alert')).toHaveTextContent('3');
     const menu = await openRowActionsMenu(user, within(sub).getByTestId('product-row-actions'));
-    expect(within(menu).getByTestId('product-batches-open')).toBeInTheDocument();
-    expect(within(menu).getByTestId('product-edit-open')).toBeInTheDocument();
-    expect(within(menu).getByTestId('product-delete-open')).toBeInTheDocument();
+    expect(
+      within(menu).getAllByRole('menuitem').map((item) => item.getAttribute('data-testid')),
+    ).toEqual([
+      'product-batches-open',
+      'product-history-open',
+      'product-adjust-open',
+      'product-edit-open',
+      'product-delete-open',
+    ]);
     await user.keyboard('{Escape}');
 
     await user.click(toggle);
@@ -334,7 +345,7 @@ describe('desplegar', () => {
     expect(within(fila).queryByRole('link')).toBeNull();
     expect(within(fila).queryByTestId('finished-stock-line-link')).toBeNull();
 
-    await user.click(screen.getByTestId('finished-stock-toggle'));
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
 
     const primera = within(screen.getByTestId('data-table-row-order-1--product-1')).getByTestId(
       'finished-stock-line-link',
@@ -353,7 +364,7 @@ describe('desplegar', () => {
     const user = setupUser();
     const product = producto();
     montar([pedido({ products: [{ product, stock: '1.5', packagedStock: null }] })]);
-    await user.click(screen.getByTestId('finished-stock-toggle'));
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
 
     const sub = screen.getByTestId('data-table-row-order-1--product-1');
     expect(within(sub).getByTestId('product-stock')).toHaveAttribute('aria-label', '1.5 L');
@@ -362,7 +373,7 @@ describe('desplegar', () => {
   it('el panel de lotes de la sub-fila pide solo los lotes de ese pedido y ese producto', async () => {
     const user = setupUser();
     montar([pedido()]);
-    await user.click(screen.getByTestId('finished-stock-toggle'));
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
 
     const sub = screen.getByTestId('data-table-row-order-1--product-1');
     await clickRowAction(user, within(sub).getByTestId('product-row-actions'), 'product-batches-open');
@@ -372,10 +383,47 @@ describe('desplegar', () => {
     expect(listProductBatchesActionMock).not.toHaveBeenCalled();
   });
 
+  it('R12 — «Historial» de una linea pide los lotes de ese pedido y ese producto y, con uno, abre su historial', async () => {
+    const user = setupUser();
+    listOrderBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [
+        {
+          id: 'batch-7',
+          lot: 'L-007',
+          stock: '2',
+          unitId: 'unit-l',
+          purchaseDate: '2026-03-05',
+          expiryDate: null,
+          packageContent: null,
+        },
+      ],
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [] });
+    montar([pedido()]);
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
+
+    const sub = screen.getByTestId('data-table-row-order-1--product-1');
+    await clickRowAction(user, within(sub).getByTestId('product-row-actions'), 'product-history-open');
+
+    expect(await screen.findByTestId('batch-history-before-ledger')).toBeInTheDocument();
+    expect(listOrderBatchesActionMock).toHaveBeenCalledWith('order-1', 'product-1');
+    expect(listProductBatchesActionMock).not.toHaveBeenCalled();
+    expect(listBatchMovementsActionMock).toHaveBeenCalledWith('batch-7');
+    expect(screen.queryByTestId('product-batches-sheet')).toBeNull();
+  });
+
+  it('R12 — la fila del pedido no pinta menu ni en la tabla ni en su tarjeta', () => {
+    montar([pedido()]);
+
+    expect(within(filaDeGrupo('order-1')).queryByTestId('product-row-actions')).toBeNull();
+    expect(within(screen.getByTestId('data-table-card-order-1')).queryByTestId('product-row-actions')).toBeNull();
+  });
+
   it('dar de baja desde la sub-fila abre el dialogo del producto', async () => {
     const user = setupUser();
     montar([pedido()]);
-    await user.click(screen.getByTestId('finished-stock-toggle'));
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
 
     const sub = screen.getByTestId('data-table-row-order-1--product-1');
     await clickRowAction(user, within(sub).getByTestId('product-row-actions'), 'product-delete-open');
@@ -385,7 +433,7 @@ describe('desplegar', () => {
   it('editar desde la sub-fila abre el panel del producto terminado con el tipo de solo lectura', async () => {
     const user = setupUser();
     montar([pedido()]);
-    await user.click(screen.getByTestId('finished-stock-toggle'));
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
 
     const sub = screen.getByTestId('data-table-row-order-1--product-1');
     await clickRowAction(user, within(sub).getByTestId('product-row-actions'), 'product-edit-open');
@@ -411,7 +459,7 @@ describe('fila «Sin pedido»', () => {
   it('se despliega igual y su panel de lotes pide los lotes sin pedido del producto', async () => {
     const user = setupUser();
     montar([sinPedido()]);
-    const toggle = screen.getByTestId('finished-stock-toggle');
+    const toggle = enLaTabla().getByTestId('finished-stock-toggle');
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
@@ -421,5 +469,39 @@ describe('fila «Sin pedido»', () => {
 
     expect(await screen.findByTestId('product-batches-sheet')).toBeInTheDocument();
     expect(listOrderBatchesActionMock).toHaveBeenCalledWith(null, 'product-2');
+  });
+});
+
+describe('rotulos de la tarjeta', () => {
+  function campo(card: HTMLElement, columnId: string): HTMLElement {
+    return within(card).getByTestId(`data-table-card-field-${columnId}`);
+  }
+
+  function rotulo(field: HTMLElement): string | null {
+    return field.querySelector('[data-card-label]')?.textContent?.trim() ?? null;
+  }
+
+  it('R55 — la tarjeta de la linea rotula «Existencia» y «Alerta», con la cifra intacta', async () => {
+    const user = setupUser();
+    montar([pedido({ packagedStock: null, products: [{ product: producto(), stock: '10', packagedStock: null }] })]);
+
+    await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
+    const card = await screen.findByTestId('data-table-card-order-1--product-1');
+
+    expect(rotulo(campo(card, 'stock'))).toBe('Existencia');
+    expect(rotulo(campo(card, 'qtyAlert'))).toBe('Alerta');
+    expect(within(campo(card, 'stock')).getByTestId('product-stock').textContent).toBe('10 L');
+    expect(within(campo(card, 'qtyAlert')).getByTestId('product-qty-alert').textContent).toBe('3 L');
+    for (const label of campo(card, 'stock').querySelectorAll('[data-card-label]')) {
+      expect(label).toHaveClass('[table_&]:hidden');
+    }
+  });
+
+  it('R55 — la tarjeta del pedido rotula su existencia y no la alerta, que no tiene', () => {
+    montar([sinPedido()]);
+
+    const card = screen.getByTestId('data-table-card-without-product-2');
+    expect(rotulo(campo(card, 'stock'))).toBe('Existencia');
+    expect(campo(card, 'qtyAlert')).toBeEmptyDOMElement();
   });
 });

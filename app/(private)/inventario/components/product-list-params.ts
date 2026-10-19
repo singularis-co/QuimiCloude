@@ -4,7 +4,7 @@ import {
   type DataTableParams,
   type DataTableSort,
 } from '@/components/shared/data-table';
-import { PRODUCT_QUERYABLE } from '@/lib/modules/inventario';
+import { PRODUCT_QUERYABLE, type ProductType } from '@/lib/modules/inventario';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
@@ -228,6 +228,14 @@ export function buildProductListQuery(params: DataTableParams): string {
  */
 export function productListHref(params: DataTableParams): string {
   return `${INVENTORY_ROUTE}?${buildProductListQuery(params)}`;
+}
+
+export function productTypeTabHref(params: DataTableParams, type: ProductType | 'all'): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { [TYPE_COLUMN_ID]: _typeFilter, ...restFilters } = params.filters;
+  const filters: Record<string, DataTableFilterValue> =
+    type === 'all' ? restFilters : { ...restFilters, [TYPE_COLUMN_ID]: { kind: 'select', values: [type] } };
+  return productListHref({ ...params, page: FIRST_PAGE, filters });
 }
 
 /**

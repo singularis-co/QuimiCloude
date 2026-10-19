@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  ACTIVE_ORDER_MARK,
   CANCELLED_ONLY_LABEL,
   DELETED_ORDER_MARK,
   EXECUTION_TRACE_SECTION_TESTID,
@@ -74,7 +73,6 @@ const ACTIVO: ExecutionTraceRow = {
     { label: 'galones', quantity: 10 },
     { label: 'vasos', quantity: 5 },
   ],
-  pendingDelivery: [{ label: 'galones', quantity: 4 }],
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -91,7 +89,6 @@ const DE_BAJA: ExecutionTraceRow = {
   formulaName: null,
   formulaImageUrl: null,
   presentations: [],
-  pendingDelivery: [],
 };
 
 const CERRADO: ExecutionTraceRow = {
@@ -108,7 +105,6 @@ const CERRADO: ExecutionTraceRow = {
   formulaName: 'Jabón líquido',
   formulaImageUrl: null,
   presentations: [{ label: 'galones', quantity: 3 }],
-  pendingDelivery: [],
 };
 
 const ROWS = [ACTIVO, DE_BAJA, CERRADO];
@@ -127,7 +123,6 @@ const ACTIVO_POR_EMPACAR: ExecutionTraceRow = {
   formulaName: null,
   formulaImageUrl: null,
   presentations: [],
-  pendingDelivery: [],
 };
 
 function params(overrides: Partial<ExecutionTraceListParams> = {}): ExecutionTraceListParams {
@@ -186,16 +181,23 @@ describe('R2 - columnas de la fila', () => {
     expect(within(activa).getByRole('img', { name: ANA.displayName })).toBeInTheDocument();
   });
 
-  it('R2 - tras «Nº de pedido» van Foto, Fórmula, Presentaciones y Por entregar', () => {
+  it('R2 - tras «Nº de pedido» van Foto, Fórmula, Presentaciones y Estado', () => {
     montar();
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
     const desde = cabeceras.findIndex((texto) => texto.includes('Nº de pedido'));
-    ['Foto', 'Fórmula', 'Presentaciones', 'Por entregar', 'Estado'].forEach((etiqueta, i) =>
+    ['Foto', 'Fórmula', 'Presentaciones', 'Estado'].forEach((etiqueta, i) =>
       expect(cabeceras[desde + 1 + i]).toContain(etiqueta),
     );
   });
 
-  it('R2 - la fila pinta la foto, la fórmula, las presentaciones y lo pendiente', () => {
+  it('«Por entregar» ya no es columna del dashboard: vive en la lista de pedidos', () => {
+    montar();
+    const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+    expect(cabeceras.some((texto) => texto.includes('Por entregar'))).toBe(false);
+    expect(screen.queryByTestId('execution-trace-pending')).toBeNull();
+  });
+
+  it('R2 - la fila pinta la foto, la fórmula y las presentaciones', () => {
     montar();
     const activa = fila(ACTIVO.orderId);
     const foto = within(activa).getByTestId('execution-trace-image');
@@ -205,16 +207,12 @@ describe('R2 - columnas de la fila', () => {
     expect(within(activa).getByTestId('execution-trace-presentations')).toHaveTextContent(
       '10 galones, 5 vasos',
     );
-    expect(within(activa).getByTestId('execution-trace-pending')).toHaveTextContent('4 galones');
   });
 
-  it('R2 - sin imagen sale el marcador; sin pendiente, «Entregado» atenuado', () => {
+  it('R2 - sin imagen sale el marcador', () => {
     montar();
     const cerrada = fila(CERRADO.orderId);
     expect(within(cerrada).getByTestId('execution-trace-image')).toHaveAttribute('data-missing', 'true');
-    const pendiente = within(cerrada).getByTestId('execution-trace-pending');
-    expect(pendiente).toHaveTextContent('Entregado');
-    expect(pendiente).toHaveClass('text-muted-foreground');
   });
 
   it('R2 - sin fórmula ni presentaciones, la raya atenuada', () => {
@@ -245,14 +243,14 @@ describe('R2 - columnas de la fila', () => {
 
 // El total de la lista se trunca a minutos, sin segundos.
 describe('R3 - R15 - en curso y duracion', () => {
-  it('R3 - la fila activa se marca «En curso» y su duracion es abierta', () => {
+  it('R3 - la fila activa muestra su estado y su duracion abierta', () => {
     montar();
     const activa = fila(ACTIVO.orderId);
     expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('En fabricación');
     expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('45 min (en curso)');
   });
 
-  it('R3 - una fila activa en POR_EMPACAR lleva la marca «En curso» aparte del estado y su duracion abierta', () => {
+  it('R3 - una fila activa en POR_EMPACAR no lleva chip «En curso»: el estado ya dice el paso; su duracion es abierta', () => {
     render(
       <ExecutionTraceTable
         rows={[ACTIVO_POR_EMPACAR, ...ROWS]}
@@ -262,11 +260,10 @@ describe('R3 - R15 - en curso y duracion', () => {
       />,
     );
     const activa = fila(ACTIVO_POR_EMPACAR.orderId);
-    expect(within(activa).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+    expect(within(activa).queryByTestId('execution-trace-active')).toBeNull();
     expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('Por empacar');
     expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('50 min (en curso)');
-    expect(within(fila(ACTIVO.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
-  });
+    expect(within(fila(ACTIVO.orderId)).queryByTestId('execution-trace-active')).toBeNull();  });
 
   it('R3 - la fila dada de baja en EN_CURSO no lleva la marca de actividad aunque su estado diga «En fabricación»', () => {
     montar();
@@ -292,7 +289,7 @@ describe('R3 - R15 - en curso y duracion', () => {
   });
 });
 
-describe('R26 - R28 - total por fila y marca «En curso» con acondicionamiento', () => {
+describe('R26 - R28 - total por fila con acondicionamiento, sin chip «En curso»', () => {
   function montarAcondicionamiento() {
     render(
       <ExecutionTraceTable rows={CONDITIONING_TRACE_ROWS} personOptions={[]} params={params()} totalPages={1} />,
@@ -322,14 +319,10 @@ describe('R26 - R28 - total por fila y marca «En curso» con acondicionamiento'
     expect(cerrada.children).toHaveLength(0);
   });
 
-  it('R28 - En curso segun active; nunca en dado de baja', () => {
+  it('R28 - ninguna fila lleva chip «En curso», ni activa ni dada de baja', () => {
     montarAcondicionamiento();
-    expect(within(fila(OPEN_TOTAL_ROW.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(
-      ACTIVE_ORDER_MARK,
-    );
-    expect(within(fila(ACTIVE_CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(
-      ACTIVE_ORDER_MARK,
-    );
+    expect(within(fila(OPEN_TOTAL_ROW.orderId)).queryByTestId('execution-trace-active')).toBeNull();
+    expect(within(fila(ACTIVE_CLOSED_TOTAL_ROW.orderId)).queryByTestId('execution-trace-active')).toBeNull();
     expect(within(fila(ACTIVE_CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration')).toHaveAttribute(
       'data-kind',
       'closed',

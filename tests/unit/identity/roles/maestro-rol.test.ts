@@ -222,6 +222,21 @@ const RUTAS_ABIERTAS_EMPRESAS = new Set([
   'lib/modules/identity/domain/get-company-addons.ts',
   'lib/modules/identity/domain/set-company-addon.ts',
   'lib/modules/identity/domain/set-all-company-addons.ts',
+  // Enmienda QC-165 (design §3.6): los seis casos de uso de Administradores por el Maestro exigen
+  // `empresas.*` en su primera linea. Se abren solo sus rutas exactas.
+  'lib/modules/identity/domain/list-administrators.ts',
+  'lib/modules/identity/domain/get-administrator.ts',
+  'lib/modules/identity/domain/create-administrator.ts',
+  'lib/modules/identity/domain/update-administrator.ts',
+  'lib/modules/identity/domain/delete-administrator.ts',
+  'lib/modules/identity/domain/resend-administrator-link.ts',
+  // Enmienda QC-166 (2026-10-16): el area del Maestro. El menu declara `empresas.consultar` como
+  // permiso de sus enlaces; las tres paginas cortan con el en su primera linea y sus acciones
+  // de servidor exigen `empresas.modificar`. Se abren solo sus rutas exactas.
+  'lib/shared/navigation/private-nav.ts',
+  'app/(private)/maestro/empresas/page.tsx',
+  'app/(private)/maestro/empresas/[id]/page.tsx',
+  'app/(private)/maestro/administradores/page.tsx',
 ]);
 
 describe('R17 — ningun archivo de produccion fuera del catalogo (y las rutas abiertas) nombra los permisos de empresas', () => {

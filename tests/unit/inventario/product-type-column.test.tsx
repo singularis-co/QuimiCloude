@@ -63,14 +63,14 @@ const TODOS: DataTableParams = { page: 1, pageSize: 10, sort: null, filters: {},
 
 describe('columna «Tipo» de la tabla de inventario', () => {
   it('sin `showType` no existe y el esqueleto sigue contando las columnas por defecto', () => {
-    const columnas = buildProductColumns({ rowActions: () => null });
+    const columnas = buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }) });
 
     expect(columnas.some((columna) => columna.id === 'type')).toBe(false);
     expect(PRODUCT_SKELETON_COLUMN_COUNT).toBe(columnas.length);
   });
 
   it('con `showType` va justo despues del nombre, sin orden ni filtro de cabecera', () => {
-    const columnas = buildProductColumns({ rowActions: () => null, showType: true });
+    const columnas = buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }), showType: true });
     const ids = columnas.map((columna) => columna.id);
     const tipo = columnas.find((columna) => columna.id === 'type');
 
@@ -93,7 +93,7 @@ describe('columna «Tipo» de la tabla de inventario', () => {
     render(<ProductTable products={productos} params={TODOS} totalPages={1} />);
 
     expect(screen.getByTestId('data-table-head-type')).toBeInTheDocument();
-    const chips = screen.getAllByTestId('product-type');
+    const chips = within(screen.getByRole('table')).getAllByTestId('product-type');
     expect(chips).toHaveLength(PRODUCT_TYPE_VALUES.length);
 
     for (const type of PRODUCT_TYPE_VALUES) {
@@ -120,5 +120,126 @@ describe('columna «Tipo» de la tabla de inventario', () => {
 
     expect(screen.queryByTestId('data-table-head-type')).toBeNull();
     expect(screen.queryByTestId('product-type')).toBeNull();
+  });
+});
+
+describe('columna «Presentación» segun la pestana de tipo', () => {
+  function conTipo(type: (typeof PRODUCT_TYPE_VALUES)[number]): DataTableParams {
+    return { ...TODOS, filters: { type: { kind: 'select', values: [type] } } };
+  }
+
+  it('en la pestana «Producto» no sale, y el esqueleto cuenta una columna menos', () => {
+    render(
+      <ProductTable
+        products={[producto({ type: PRODUCT_TYPES.PRODUCT })]}
+        params={conTipo(PRODUCT_TYPES.PRODUCT)}
+        totalPages={1}
+      />,
+    );
+
+    expect(screen.queryByTestId('data-table-head-presentationName')).toBeNull();
+    expect(screen.queryByTestId('data-table-cell-presentationName')).toBeNull();
+    cleanup();
+
+    render(
+      <ProductTable
+        status="loading"
+        products={[]}
+        params={conTipo(PRODUCT_TYPES.PRODUCT)}
+        totalPages={0}
+      />,
+    );
+    const filaEsqueleto = screen.getAllByTestId('product-row-skeleton')[0] as HTMLElement;
+    expect(within(filaEsqueleto).getAllByRole('cell')).toHaveLength(
+      buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }), showPresentation: false })
+        .length,
+    );
+  });
+
+  it('en «Todos» sale', () => {
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    expect(screen.getByTestId('data-table-head-presentationName')).toBeInTheDocument();
+  });
+
+  it('en el resto de pestanas (no «Producto») sale', () => {
+    const otros = PRODUCT_TYPE_VALUES.filter(
+      (type) => type !== PRODUCT_TYPES.PRODUCT && type !== PRODUCT_TYPES.FINISHED_PRODUCT,
+    );
+    expect(otros.length).toBeGreaterThan(0);
+
+    for (const type of otros) {
+      render(<ProductTable products={[producto({ type })]} params={conTipo(type)} totalPages={1} />);
+      expect(
+        screen.getByTestId('data-table-head-presentationName'),
+        `falta «Presentación» en la pestana «${type}»`,
+      ).toBeInTheDocument();
+      cleanup();
+    }
+  });
+
+  // El conmutador del pie de la tarjeta tiene cabecera en el DOM, pero la oculta la clase de
+  // ambito de la tabla (product-cards.test.tsx lo afirma); aqui se mira el orden que se ve.
+  function cabecerasVisibles(): (string | null)[] {
+    return within(screen.getByRole('table'))
+      .getAllByRole('columnheader')
+      .map((celda) => celda.getAttribute('data-testid')?.replace('data-table-head-', '') ?? null)
+      .filter((id) => id !== 'batchesToggle');
+  }
+
+  it('R6, R53, R54 — en «Todos», con `canSeeCost`, el orden completo de cabeceras es el de hoy', () => {
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} canSeeCost />);
+
+    expect(cabecerasVisibles()).toEqual([
+      'image',
+      'name',
+      'type',
+      'presentationName',
+      'stock',
+      'available',
+      'reserved',
+      'qtyAlert',
+      'averageUnitCost',
+      'actions',
+    ]);
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveTextContent('Costo unitario');
+  });
+
+  it('R53 — en «Producto» el orden es el mismo sin «Tipo» ni «Presentación»', () => {
+    render(
+      <ProductTable
+        products={[producto()]}
+        params={conTipo(PRODUCT_TYPES.PRODUCT)}
+        totalPages={1}
+        canSeeCost
+      />,
+    );
+
+    expect(cabecerasVisibles()).toEqual([
+      'image',
+      'name',
+      'stock',
+      'available',
+      'reserved',
+      'qtyAlert',
+      'averageUnitCost',
+      'actions',
+    ]);
+  });
+
+  it('R54 — sin `canSeeCost` no hay «Costo unitario» y las acciones siguen a la alerta', () => {
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    expect(cabecerasVisibles().slice(-2)).toEqual(['qtyAlert', 'actions']);
+  });
+
+  it('`buildProductColumns` la pinta por defecto y `showPresentation: false` la quita', () => {
+    const ids = (showPresentation?: boolean) =>
+      buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }), showPresentation }).map(
+        (c) => c.id,
+      );
+
+    expect(ids()).toContain('presentationName');
+    expect(ids(false)).not.toContain('presentationName');
   });
 });

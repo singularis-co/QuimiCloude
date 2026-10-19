@@ -208,16 +208,17 @@ describe('el corte por permiso ocurre antes de leer nada (R32)', () => {
 });
 
 /**
- * Quita los identificadores que React (`useId`) y `dnd-kit` regeneran en cada montaje -nunca
+ * Quita los identificadores que React (`useId`, también los de Base UI) y `dnd-kit` regeneran en cada montaje -nunca
  * estables entre dos renders de la MISMA suite, aunque si lo son entre dos peticiones reales a la
  * pantalla-: sin esto, la comparacion de R2 fallaria por un contador interno que no tiene nada
  * que ver con lo que la pantalla pinta.
  */
 function sinIdentificadoresVolatiles(html: string): string {
   return html
-    .replace(/id="_r_\d+_"/g, 'id="_r_"')
-    .replace(/aria-labelledby="_r_\d+_"/g, 'aria-labelledby="_r_"')
-    .replace(/id="Dnd(DescribedBy|LiveRegion)-\d+"/g, 'id="Dnd$1"');
+    .replace(/id="(base-ui-)?_r_[0-9a-z]+_"/g, 'id="$1_r_"')
+    .replace(/aria-labelledby="_r_[0-9a-z]+_"/g, 'aria-labelledby="_r_"')
+    .replace(/id="Dnd(DescribedBy|LiveRegion)-\d+"/g, 'id="Dnd$1"')
+    .replace(/aria-describedby="DndDescribedBy-\d+"/g, 'aria-describedby="DndDescribedBy"');
 }
 
 describe('la pantalla se puede abrir de nuevo y muestra lo mismo (R2)', () => {

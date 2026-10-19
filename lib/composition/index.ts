@@ -519,6 +519,15 @@ import {
   createUpdateCompany,
 } from '@/lib/modules/identity';
 import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
+import {
+  createCreateAdministrator,
+  createDeleteAdministrator,
+  createGetAdministrator,
+  createListAdministrators,
+  createResendAdministratorLink,
+  createUpdateAdministrator,
+} from '@/lib/modules/identity';
+import { createAdministratorRepository } from '@/lib/modules/identity/adapters/driven/persistence/administrator-prisma';
 import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma';
 import {
   createGetCompanyAddons,
@@ -835,6 +844,7 @@ const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAlive
 
 const companyRepository = createCompanyRepository();
 const companyAddonRepository = createCompanyAddonRepository();
+const administratorRepository = createAdministratorRepository();
 
 // `orders` es de `pedidos`: `identity` solo ve el puerto.
 const companyOpenOrdersCounter: CompanyOpenOrdersCounter = {
@@ -988,6 +998,27 @@ export const identity = {
   getCompanyAddons: createGetCompanyAddons({ addons: companyAddonRepository }),
   setCompanyAddon: createSetCompanyAddon({ addons: companyAddonRepository }),
   setAllCompanyAddons: createSetAllCompanyAddons({ addons: companyAddonRepository }),
+  // Operaciones de plataforma sobre los Administradores de cualquier empresa: el actor no lleva
+  // empresa.
+  listAdministrators: createListAdministrators({
+    administrators: administratorRepository,
+    log: identityListQueryLog,
+  }),
+  getAdministrator: createGetAdministrator({ administrators: administratorRepository }),
+  createAdministrator: createCreateAdministrator({
+    administrators: administratorRepository,
+    secrets: credentialSetupSecrets,
+    links: credentialSetupLinkRepository,
+    mailer: credentialSetupMailer,
+  }),
+  updateAdministrator: createUpdateAdministrator({ administrators: administratorRepository }),
+  deleteAdministrator: createDeleteAdministrator({ administrators: administratorRepository }),
+  resendAdministratorLink: createResendAdministratorLink({
+    administrators: administratorRepository,
+    secrets: credentialSetupSecrets,
+    links: credentialSetupLinkRepository,
+    mailer: credentialSetupMailer,
+  }),
 } as const;
 
 /**
@@ -1644,6 +1675,7 @@ export const pedidos = {
   }),
   listOrders: createListOrders({
     orders: orderRepository,
+    deliveryProgress: { listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted },
     recipes: recipeCatalog,
     presentations: presentationCatalog,
     packaging: packagingCatalog,

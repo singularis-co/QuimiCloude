@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import DashboardPage from '@/app/(private)/dashboard/page';
 import {
-  ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
   DashboardContent,
   EXECUTION_TRACE_SECTION_TESTID,
@@ -75,7 +74,6 @@ const ACTIVO: ExecutionTraceRow = {
   formulaName: null,
   formulaImageUrl: null,
   presentations: [],
-  pendingDelivery: [],
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -92,7 +90,6 @@ const DE_BAJA: ExecutionTraceRow = {
   formulaName: null,
   formulaImageUrl: null,
   presentations: [],
-  pendingDelivery: [],
 };
 
 const ENTREGADO: ExecutionTraceRow = {
@@ -109,7 +106,6 @@ const ENTREGADO: ExecutionTraceRow = {
   formulaName: null,
   formulaImageUrl: null,
   presentations: [],
-  pendingDelivery: [],
 };
 
 const ROWS = [ACTIVO, DE_BAJA, ENTREGADO];
@@ -220,7 +216,6 @@ describe('R3 - columnas', () => {
       'Foto',
       'Fórmula',
       'Presentaciones',
-      'Por entregar',
       'Estado',
       'Personas',
       'Primera anotación',
@@ -274,7 +269,7 @@ describe('R5 - vueltas atrás', () => {
   });
 });
 
-describe('R6 - marcas de baja y en curso', () => {
+describe('R6 - marca de baja, sin chip «En curso»', () => {
   it('R6 - un pedido dado de baja lleva «Dado de baja» en tono muted junto al número y nunca «En curso»', () => {
     montar();
     const numero = celda(DE_BAJA, 'orderNumber');
@@ -284,12 +279,11 @@ describe('R6 - marcas de baja y en curso', () => {
     expect(within(numero).queryByTestId('execution-trace-active')).toBeNull();
   });
 
-  it('R6 - un pedido activo lleva «En curso» en tono progress junto al número', () => {
+  it('R6 - un pedido activo no lleva chip «En curso» junto al número: el estado ya dice el paso', () => {
     montar();
     const numero = celda(ACTIVO, 'orderNumber');
-    const activa = within(numero).getByTestId('execution-trace-active');
-    expect(activa).toHaveTextContent(ACTIVE_ORDER_MARK);
-    expect(activa).toHaveAttribute('data-tone', 'progress');
+    expect(within(numero).queryByTestId('execution-trace-active')).toBeNull();
+    expect(numero.textContent).not.toContain('En curso');
     expect(within(numero).queryByTestId('execution-trace-deleted')).toBeNull();
   });
 });

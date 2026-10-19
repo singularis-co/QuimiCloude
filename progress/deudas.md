@@ -191,6 +191,9 @@
   `TOUCH_TARGET = 'min-h-11 min-w-11'`. `guard-piezas-base` lo excluye por D11 con motivo que cita
   QC-232. Pasar a `touchTarget` y retirar la exclusión.
 - **Dueño:** ficha **QC-223**.
+- **Resuelta (2026-10-16, QC-263, P15/R46):** `batch-history.tsx` es ahora un diálogo sin
+  `TOUCH_TARGET` y `guard-piezas-base` lo pasa a `D11_SIN_HALLAZGOS` (sigue en `ARCHIVOS_D11`
+  porque R33 de QC-231 vigila esa lista).
 
 ### D42 — Asignación: `OrderDistributionFull` sin mover a shared (QC-232 → QC-217)
 - **Origen:** QC-232 (2026-10-09), `design.md > 7` (último punto de la ficha).
@@ -406,6 +409,16 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   No rompe ningún requisito: R21 habla de la lista, no de la carga.
 - **Ampliada (2026-10-13, QC-262, P12):** `/pedidos` igual. `OrderListSkeleton` pinta filas de
   tabla también en teléfono, donde la lista ya sale en tarjetas.
+- **Ampliada (2026-10-16, QC-263, T0b, P22):** `/inventario` igual. El esqueleto de
+  `product-columns-skeleton.ts` pinta 9 columnas y sin tarjeta; la tabla real tiene 10 en «Todos»,
+  9 con un tipo filtrado y 7 en «Producto terminado», y bajo 760 px sale en tarjetas.
+- **Medida de nuevo tras el merge (2026-10-16, QC-263, T8h, F9; derivada del código):** `ProductTable`
+  pinta el esqueleto con su número real de columnas, así que cuadra en «Todos» (10 con Costo / 9
+  sin permiso de costos), con un tipo filtrado (9 / 8) y en «Producto» (8 / 7). Queda descuadre en
+  «Producto terminado»: mientras carga se pinta el esqueleto de `ProductTable` (9 / 8) y la tabla
+  real, `FinishedStockTable`, tiene 7. `PRODUCT_SKELETON_COLUMN_COUNT` (8) solo se usa en el error de
+  esa tabla. Bajo 760 px el esqueleto sigue siendo tabla: `DataTable` devuelve `TableSkeleton` antes
+  del contenedor `@container`.
 - **Dueño:** sin asignar.
 
 ### D54 — `guard-dobles-e2e` lee `.env.example` con una regex que cruza líneas
@@ -417,6 +430,10 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 ### D55 — La X de cerrar de `Dialog` y `Sheet` compartidos mide 32 px
 - **Origen:** censo de QC-262 (T0b, 2026-10-13), medido a 390 px en «Cliente», «Reparto y unidad» y el panel de entrega de `/pedidos`.
 - **Qué falta:** el botón de cerrar de las primitivas compartidas `Dialog` y `Sheet` no llega al objetivo táctil de 44 px que cumplen los botones de acción. Se arregla en la primitiva compartida, una sola vez para todas las pantallas, con la revisión visual de cada diálogo. El leader decidió dejarlo fuera de QC-262 (R18 cuenta los botones de acción).
+- **Ampliada (2026-10-16, QC-263, m3 del review):** en `/inventario` hay dos cierres locales de
+  44 px (`showCloseButton={false}` más un `DialogClose` propio `size="icon"` + `touch`, como
+  `batch-evidence-dialog.tsx`) en `batch-history.tsx` y `adjust-batch-dialog.tsx`: se retiran al
+  arreglar la primitiva. La X de 32 px del `Sheet` «Lotes» sigue (preexistente; R42 no nombra el panel).
 - **Dueño:** sin asignar.
 
 ### D56 — `ConfirmDialog` sin icono en la cabecera (QC-262, P5)
@@ -425,6 +442,12 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   título de «Cancelar el pedido», «Eliminar el pedido» y «Material insuficiente» (`dlg-ic`).
   `ConfirmDialog` no lo admite y lo usan todos los módulos: es una ficha transversal sobre la pieza
   compartida, con la revisión visual de cada confirmación.
+- **Ampliada (2026-10-16, QC-263):** `/inventario` igual: el diálogo de borrado de producto
+  (`DeleteConfirmDialog`) sale sin el icono que dibuja `ModalesInventario.dc.html`.
+- **Estado (2026-10-16):** en parte resuelta por QC-166: `ConfirmDialog` ya tiene la prop opcional
+  `icon` (glifo y tono, pintada en `AlertDialogMedia`, fila del catálogo al día). Solo falta usarla
+  en los diálogos de pedidos («Cancelar el pedido», «Eliminar el pedido», «Material insuficiente»)
+  con su revisión visual.
 - **Dueño:** sin asignar.
 
 ### D57 — Selector de prioridad del pedido sin `PriorityMark` (QC-262, P10)
@@ -456,4 +479,47 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Qué falta:** el corte del webhook con el añadido apagado (R22) tiene cobertura unitaria y de
   composición, pero no E2E: los E2E de documentos recorren el webhook con todo prendido
   (`enableAllAddons`). Falta el camino «descartado» de punta a punta.
+- **Dueño:** sin asignar.
+
+### D61 — Inventario: cifras y fechas sin el formato del tablero (QC-263, P4)
+- **Origen:** QC-263 (2026-10-16), `requirements.md > P4` cerrada por defecto.
+- **Qué falta:** los tableros de inventario escriben `120,00` y `12/09/2026 10:14`; la app sigue con
+  `formatDecimalDisplay` y `YYYY-MM-DD HH:mm`. Cambiarlo es transversal (todas las tablas), no de
+  una ruta.
+- **Dueño:** sin asignar.
+
+### D62 — Importar inventario: sin arrastrar y soltar (QC-263, P10)
+- **Origen:** QC-263 (2026-10-16), `requirements.md > P10` cerrada por defecto.
+- **Qué falta:** el tablero pide la zona de `FileField` con arrastrar y soltar; `FileField` no
+  admite `.xlsx`, comprime imágenes y entrega bytes, no el `File` que necesita la action. Se quedó
+  `ImportUploadField` con el aspecto de la zona y sin arrastrar y soltar (R34). Extender `FileField`
+  o la zona propia con `drop`.
+- **Dueño:** sin asignar.
+
+### D63 — Inventario: rótulos y pie de tarjeta hechos en la ruta (QC-263, A12)
+- **Origen:** QC-263 (2026-10-16), enmienda 2, H2·H3 y `design.md > 8 > A12`.
+- **Qué falta:** `DataTableCards` no tiene rótulos por campo ni pie propio. `/inventario` los hace
+  dentro de la ruta: `cardFieldLabel`/`withCardFieldLabel` (`card-field-label.tsx`, rótulo con
+  `[table_&]:hidden`), la columna `batchesToggle` oculta en la tabla como `footer` de la tarjeta y
+  `PRODUCT_TABLE_SCOPE_CLASS` (fondo y entrada de las sub-filas). Si una segunda ruta lo necesita, se
+  sube a `DataTableCards` (paso 2 de la regla de decisión, con su fila de catálogo y tablero) y se
+  retira el apaño.
+- **Dueño:** sin asignar.
+
+### D64 — La hoja de `CountrySelect` cambia de altura al filtrar en teléfono (QC-235)
+- **Origen:** revisión visual de QC-166 (2026-10-16), m10 (`progress/impl_QC-166.md > m10`,
+  capturas `progress/qc166-revision-visual/country-select-375-*.png`).
+- **Qué falta:** a 375 px la hoja inferior no tiene altura fija y se ajusta al número de
+  resultados: con la lista completa mide 690 px (arranca en y=122), con «rep» 301 px (y=511) y con
+  «zzz» 197 px (y=615). Mientras se escribe, el título y el buscador saltan hacia abajo; con el
+  teclado abierto en un teléfono real el campo se movería bajo el dedo. El tablero solo dibuja la
+  hoja con la lista llena. Pieza de QC-235; QC-166 no la tocó.
+- **Dueño:** sin asignar.
+
+### D65 — El popup de `CountrySelect` tapa ~6 px de los botones del panel en escritorio (QC-235)
+- **Origen:** revisión visual de QC-166 (2026-10-16), m10 (`progress/impl_QC-166.md > m10`,
+  capturas `progress/qc166-revision-visual/country-select-1440-*.png`).
+- **Qué falta:** a 1440 px, en el panel «Editar empresa», el popup abierto con la lista completa
+  cubre con su borde inferior unos 6 px de la parte de arriba de «Cancelar» y «Guardar». Pieza de
+  QC-235; QC-166 no la tocó.
 - **Dueño:** sin asignar.

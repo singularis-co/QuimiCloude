@@ -19,6 +19,30 @@ export type FinishedProductListTab = Exclude<FinishedProductTab, 'general' | 'st
 
 export const DEFAULT_FINISHED_PRODUCT_TAB: FinishedProductTab = 'general';
 
+/** El tab de costos de produccion: solo lo ve quien puede ver costos (el Administrador). */
+export const FINISHED_PRODUCT_COST_TAB = 'costo' satisfies FinishedProductTab;
+
+/**
+ * Los tabs que se pintan para esta sesion, en su orden. Sin `canViewCosts` falta el de costos.
+ * Presentacion, no autorizacion: el caso de uso de costos rechaza por su cuenta.
+ */
+export function visibleFinishedProductTabs(canViewCosts: boolean): readonly FinishedProductTab[] {
+  return canViewCosts
+    ? FINISHED_PRODUCT_TABS
+    : FINISHED_PRODUCT_TABS.filter((tab) => tab !== FINISHED_PRODUCT_COST_TAB);
+}
+
+/**
+ * El tab que de verdad se abre: uno que la sesion no puede ver (`?tab=costo` escrito a mano sin
+ * permiso) cae al defecto, igual que un tab que no se entiende.
+ */
+export function resolveFinishedProductTab(
+  tab: FinishedProductTab,
+  canViewCosts: boolean,
+): FinishedProductTab {
+  return visibleFinishedProductTabs(canViewCosts).includes(tab) ? tab : DEFAULT_FINISHED_PRODUCT_TAB;
+}
+
 export const TAB_PARAM = 'tab';
 export const PAGE_PARAM = 'page';
 export const PAGE_SIZE_PARAM = 'pageSize';

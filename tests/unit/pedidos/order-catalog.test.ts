@@ -616,6 +616,25 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     ])
   })
 
+  it('con `unfinished_then_recent`, pone los sin finishedAt PRIMERO, luego finishedAt DESC, y desempata por numero DESC e id', async () => {
+    await listAliveSummariesInCompany(
+      EMPRESA,
+      ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'],
+      'unfinished_then_recent',
+      1,
+      undefined,
+      { packedBy: 'emp-1' },
+    )
+
+    const orderBy = findMany.mock.calls[0]?.[0]?.orderBy
+    expect(orderBy).toEqual([
+      { finishedAt: { sort: 'desc', nulls: 'first' } },
+      { orderYear: 'desc' },
+      { orderSequence: 'desc' },
+      { id: 'asc' },
+    ])
+  })
+
   it('el resumen paginado incluye finishedAt (R20, R21, R31)', async () => {
     findMany.mockResolvedValue([
       {
@@ -746,6 +765,48 @@ describe('listAliveSummariesByIds — el nombre del envase de cada linea', () =>
       null,
       'https://cdn.test/productos/env-1.png',
     ])
+  })
+})
+
+describe('listOrderDeliveryProgressByIdsIncludingDeleted — receta, reparto y lo entregado de una pagina', () => {
+  it('una sola consulta, acotada por empresa, sin filtrar los dados de baja y sin contar lo anulado', async () => {
+    findMany.mockResolvedValue([
+      {
+        id: 'o-1',
+        recipeId: 'r-1',
+        presentationLines: [
+          { presentationId: 'p-1', packages: 10, packedPackages: 8, deliveryLines: [{ packages: 2 }, { packages: 1 }] },
+          { presentationId: 'p-2', packages: 5, packedPackages: null, deliveryLines: [] },
+        ],
+      },
+    ])
+
+    const progreso = await listOrderDeliveryProgressByIdsIncludingDeleted(EMPRESA, ['o-1', 'o-2'])
+
+    expect(findMany).toHaveBeenCalledTimes(1)
+    const args = findMany.mock.calls[0]![0] as {
+      where: { AND: readonly Record<string, unknown>[] }
+      select: { presentationLines: { select: { deliveryLines: { where: unknown } } } }
+    }
+    expect(args.where.AND).toEqual([{ companyId: EMPRESA }, { id: { in: ['o-1', 'o-2'] } }])
+    expect(args.where.AND.some((termino) => 'deletedAt' in termino)).toBe(false)
+    // Lo anulado no cuenta como entregado.
+    expect(args.select.presentationLines.select.deliveryLines.where).toEqual({ voidLine: { is: null } })
+    expect(progreso).toEqual([
+      {
+        id: 'o-1',
+        recipeId: 'r-1',
+        lines: [
+          { presentationId: 'p-1', packages: 10, packedPackages: 8, deliveredPackages: 3 },
+          { presentationId: 'p-2', packages: 5, packedPackages: null, deliveredPackages: 0 },
+        ],
+      },
+    ])
+  })
+
+  it('con ids vacio no consulta', async () => {
+    await expect(listOrderDeliveryProgressByIdsIncludingDeleted(EMPRESA, [])).resolves.toEqual([])
+    expect(findMany).not.toHaveBeenCalled()
   })
 })
 

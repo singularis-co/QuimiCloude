@@ -26,7 +26,7 @@ export const INVENTORY_IMPORT_COLUMNS = [
   { key: 'unit',         header: 'Unidad',               headerRequired: false, rules: { PRODUCT: 'required',  PACKAGING: 'forbidden', MACHINE: 'forbidden', FINISHED_PRODUCT: 'forbidden' } },
   { key: 'presentation', header: 'Presentación',         headerRequired: false, rules: { PRODUCT: 'forbidden', PACKAGING: 'required',  MACHINE: 'forbidden', FINISHED_PRODUCT: 'required'  } },
   { key: 'formula',      header: 'Fórmula',              headerRequired: false, rules: { PRODUCT: 'forbidden', PACKAGING: 'forbidden', MACHINE: 'forbidden', FINISHED_PRODUCT: 'required'  } },
-  { key: 'stock',        header: 'Existencia',           headerRequired: true,  rules: { PRODUCT: 'required',  PACKAGING: 'required',  MACHINE: 'required',  FINISHED_PRODUCT: 'required'  } },
+  { key: 'stock',        header: 'Cantidad',             headerRequired: true,  rules: { PRODUCT: 'required',  PACKAGING: 'required',  MACHINE: 'required',  FINISHED_PRODUCT: 'required'  } },
   { key: 'unitCost',     header: 'Costo unitario',       headerRequired: false, rules: { PRODUCT: 'required',  PACKAGING: 'required',  MACHINE: 'optional',  FINISHED_PRODUCT: 'required'  } },
   { key: 'lot',         header: 'Lote',                 headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
   { key: 'purchaseDate', header: 'Fecha de compra',      headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },

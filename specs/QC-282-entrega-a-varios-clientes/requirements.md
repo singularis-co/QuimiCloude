@@ -231,6 +231,28 @@ La lista de enmiendas está en `design.md > 10`.
     cliente con la columna «Presentación».
 - **R48** [D10] La feature NO DEBE añadir ninguna dependencia a `package.json`.
 
+### Lista de pedidos: columna «Por entregar»
+
+*(Añadido el 2026-10-16: enmienda aprobada por el usuario, sin tarjeta; commit `27fdd133`. La
+columna vivía en la lista del dashboard sin requisito escrito; pasa a la lista de /pedidos.)*
+
+- **R49** [D19] La lista de /pedidos DEBE mostrar una columna «Por entregar» justo después de
+  «Presentación», que NO DEBE ordenar ni filtrar. Su valor DEBE salir de los envases contados al
+  empacar cada presentación (o de los del reparto si no hay conteo guardado) menos los envases
+  entregados sin anular, y DEBE pintarse así:
+  - SI al pedido le falta algo por entregar, ENTONCES «<envases> <presentación>» por cada
+    presentación a la que le falte, en el orden del reparto y separadas por coma, con el mismo texto
+    en el `title`; una presentación que el catálogo no devuelve cuenta para el estado pero no se
+    pinta, y si no queda ninguna que pintar, el marcador de ausencia «—»;
+  - SI el pedido está `ENTREGADO`, o ya se empacó y no le falta nada, ENTONCES «Entregado»,
+    atenuado;
+  - SI el pedido aún no se empacó (`PENDIENTE`, `EN_CURSO`, `BLOQUEADO`, `CANCELADO`, `POR_EMPACAR`,
+    `EN_EMPAQUE`, o se empacaron cero envases o no hay líneas), ENTONCES «—», atenuado, y NO DEBE
+    decir «Entregado».
+- **R50** [D19, A] El listado de pedidos DEBE leer lo entregado con una sola consulta por página,
+  con los pedidos de esa página y la empresa del actor, y NO DEBE consultarlo con una página vacía.
+- **R51** [D19] La lista del dashboard NO DEBE mostrar la columna «Por entregar».
+
 ### Cobertura de las decisiones cerradas
 
 | Decisión | Requisitos |
@@ -253,6 +275,7 @@ La lista de enmiendas está en `design.md > 10`.
 | D16 stock por lote sumando los clientes | R13, R14, R15, R20, R24, R26 |
 | D17 aviso de borrador sin cambios | R46 |
 | D18 pase `/design` aprobado | R4–R18, R33–R37, R43 (la UI sigue los tableros; `design.md > Lo que ya existe`) |
+| D19 «Por entregar» en la lista de pedidos (2026-10-16) | R49, R50, R51 |
 
 ## Preguntas abiertas
 
@@ -282,3 +305,4 @@ Ninguna.
 | 2026-10-15 | ¿Pase `/design`? | Aprobado por el humano. Tableros en `docs/diseno/canvas/`: `EntregaVariosClientes.dc.html`, `EntregaVariosClientesTablet.dc.html` y `EntregaVariosClientesMovil.dc.html` (página «Pedidos» del canvas; origen https://claude.ai/artifact/WUkjAyEcpu73NyNRmA6iMk). |
 | 2026-10-15 | ¿Fecha de entrada del lote en el sheet? (P1 del spec) | Se quita también: el sheet sigue el tablero aprobado, sin fechas. Aprobado con el spec. |
 | 2026-10-15 | ¿Progreso por presentación? (P2 del spec) | Resumen «Por entregar» con Y = envases que faltan; deja de mostrarse «Pedidos · Entregados · Faltan» de QC-223 R6. Aprobado con el spec. |
+| 2026-10-16 | ¿Dónde se ve lo que falta por entregar fuera del sheet? | **Enmienda aprobada por el usuario, sin tarjeta** (commit `27fdd133`). La columna «Por entregar» sale del dashboard y pasa a la lista de /pedidos, después de «Presentación». «Entregado» solo si ya se empacó y se entregó todo (o el pedido está `ENTREGADO`); «—» si aún no se empacó. Cubierta por R49, R50 y R51. |
