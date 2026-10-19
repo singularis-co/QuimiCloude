@@ -89,13 +89,13 @@
 
 ## Bloque E — Cableado y borde (tras D)
 
-- [ ] **T10 — Contrato y composición**. Depende de: T3, T6, T7, T8, T9
+- [x] **T10 — Contrato y composición**. Depende de: T3, T6, T7, T8, T9
   - `lib/modules/integraciones/index.ts`: las dos fábricas.
   - `lib/composition/index.ts`: el bloque de §6, sin reordenar nada.
   - **Hecho:** `typecheck` verde; importar la composición no lee ninguna variable de entorno (el
     test de QC-234/QC-237 que lo vigila sigue verde).
 
-- [ ] **T11 — Route handler** (R1, R8, R27). Depende de: T10
+- [x] **T11 — Route handler** (R1, R8, R27). Depende de: T10
   - `lib/modules/integraciones/adapters/driving/whatsapp-webhook-route.ts` (§3.2).
   - `app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts` (§3.1).
   - `tests/unit/integraciones/whatsapp/whatsapp-webhook-route.test.ts`.

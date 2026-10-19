@@ -179,3 +179,36 @@ quitado ni relajado. Resultado: 1/1 archivo, 9/9 verdes (antes 3 rojos 2BP01).
   `guard-ambito-empresa-integraciones` (4→5 métodos, envolturas, resolutor): los cierra T12.
 
 **Veredicto:** T8 y T9 hechas según spec y el rojo de la migración de QC-237 reparado; sigue el rojo conocido de la guardia de ámbito, que es de T12.
+
+## Tanda T10–T11 (contrato, composición y route handler)
+
+**Archivos**
+- `lib/modules/integraciones/index.ts`: + `createVerifyWhatsappWebhook`, `createReceiveWhatsappWebhook`.
+- `lib/composition/index.ts`: solo añadidos en el bloque de WhatsApp (imports, `whatsappWebhookDirectory`,
+  `whatsappInboxRepository`, `webhookSignature`, `integrationsSwitch`, `whatsappWebhookDeps`, y los dos
+  miembros al final de `integraciones`). Nada reordenado ni reformateado.
+- `lib/modules/integraciones/adapters/driving/whatsapp-webhook-route.ts` (nuevo, §3.2). El id solo se loguea
+  si es UUID (zod local: el driving no puede importar `domain/` por ruta profunda, bloque 13 de la guardia).
+- `app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts` (nuevo, §3.1): reexporta GET/POST, `runtime = 'nodejs'`.
+- `tests/unit/integraciones/whatsapp/whatsapp-webhook-route.test.ts` (nuevo, 22 tests).
+- Tensados (listas exactas de la fachada, + 2 claves): `tests/unit/integraciones/encryption-keys-env.test.ts`,
+  `tests/unit/composition/integraciones-graph-doubles.test.ts`.
+
+**R → test** (`whatsapp-webhook-route.test.ts`)
+- R1 → «decideRouteAccess deja pasar la ruta… sesion anonima», «GET y POST responden sin cookie».
+- R8 → «lee hub.* con punto», «verificado ⇒ 200, text/plain, sin cache y el challenge exacto», «solo hub_* ⇒ null y 403».
+- R7 → `it.each` forbidden(5 razones) ⇒ 403 idéntico. R9/R13 → ignored ⇒ 200; R11 → 401; R12 → 500; R23 → excepción ⇒ 500.
+- R27 → «recorriendo cada resultado… ningún argumento logueado contiene cuerpo, firma, token, wa_id ni texto», más
+  `expectSinDatosSensibles()` en cada caso y el id no UUID nunca logueado.
+
+**Verificación**
+- `pnpm run typecheck`: verde. `pnpm run lint`: 0 errores, 10 warnings preexistentes ajenos; eslint sobre los 7 archivos tocados: limpio.
+- `vitest run whatsapp-webhook-route.test.ts`: 1/1, 22/22.
+- `vitest run encryption-keys-env.test.ts integraciones-graph-doubles.test.ts` (env de composición): 2/2, 33/33.
+- `vitest related --run` (driving route, `route.ts`, `index.ts` del módulo; con `.env`): 429/430 archivos,
+  7291 verdes, 1 rojo (`integraciones-graph-doubles`, lista de la fachada) → tensado y ahora verde.
+- `vitest run module-shape.test.ts guard-arquitectura-modulos.test.ts`: la guardia verde; `module-shape` con 5
+  rojos esperados (R13 cinco modelos, R18 archivos, R19 importadores y cableado, R20 contrato): los cierra T13.
+  Pendiente de T12: `guard-rutas-fuera-de-sesion` (ruta nueva) y `guard-ambito-empresa-integraciones`.
+
+**Veredicto:** T10 y T11 hechas según spec; quedan los rojos de forma/guardias que tensan T12 y T13.

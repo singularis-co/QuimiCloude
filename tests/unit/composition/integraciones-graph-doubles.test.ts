@@ -116,6 +116,7 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'getAiProviderReadiness',
       'getAiProviderStatus',
       'getWhatsappConnection',
+      'receiveWhatsappWebhook',
       'regenerateWhatsappVerifyToken',
       'reportAiProviderOutcome',
       'resolveAiProviderForReading',
@@ -127,6 +128,7 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'testSavedAiProvider',
       'testWhatsappConnection',
       'updateWhatsappConnection',
+      'verifyWhatsappWebhook',
       'whatsappWebhookUrl',
     ])
   })
