@@ -308,6 +308,33 @@
       "x": 1520,
       "y": 4740
     },
+    "EntregaSinPedido.dc.html": {
+      "h": 3600,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "Entregar sin pedido (QC-288)",
+      "w": 1440,
+      "x": 0,
+      "y": 15250
+    },
+    "EntregaSinPedidoMovil.dc.html": {
+      "h": 6400,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "EntregaSinPedidoMovil",
+      "w": 390,
+      "x": 2434,
+      "y": 15250
+    },
+    "EntregaSinPedidoTablet.dc.html": {
+      "h": 4200,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "EntregaSinPedidoTablet",
+      "w": 834,
+      "x": 1520,
+      "y": 15250
+    },
     "EstablecerContrasena.dc.html": {
       "expand": "fill",
       "h": 1000,
@@ -372,6 +399,34 @@
       "w": 904,
       "x": 1520,
       "y": 10820
+    },
+    "FiltrosBarra.dc.html": {
+      "expand": "fill",
+      "h": 2100,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "Barra de filtros",
+      "w": 1440,
+      "x": 0,
+      "y": 13030
+    },
+    "FiltrosBarraMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "FiltrosBarraMovil",
+      "w": 960,
+      "x": 2504,
+      "y": 13030
+    },
+    "FiltrosBarraTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "FiltrosBarraTablet",
+      "w": 904,
+      "x": 1520,
+      "y": 13030
     },
     "Formula.dc.html": {
       "expand": "fill",
@@ -837,6 +892,34 @@
       "x": 0,
       "y": 8180
     },
+    "ProductoTerminadoEvidencia.dc.html": {
+      "expand": "fill",
+      "h": 1000,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "Ficha de producto terminado con evidencia (QC-271) (QC-271)",
+      "w": 1440,
+      "x": 3600,
+      "y": 8180
+    },
+    "ProductoTerminadoEvidenciaMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "ProductoTerminadoEvidenciaMovil (QC-271)",
+      "w": 960,
+      "x": 6104,
+      "y": 8180
+    },
+    "ProductoTerminadoEvidenciaTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "ProductoTerminadoEvidenciaTablet (QC-271)",
+      "w": 904,
+      "x": 5120,
+      "y": 8180
+    },
     "ProductoTerminadoMovil.dc.html": {
       "h": 1300,
       "is_interactive": true,
@@ -1030,6 +1113,34 @@
       "x": 1520,
       "y": 8260
     },
+    "RecorridoEvidencia.dc.html": {
+      "expand": "fill",
+      "h": 1240,
+      "is_interactive": true,
+      "page": "acceso",
+      "title": "Recorrido del pedido con evidencia (QC-271) (QC-271)",
+      "w": 1440,
+      "x": 3600,
+      "y": 4740
+    },
+    "RecorridoEvidenciaMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "acceso",
+      "title": "RecorridoEvidenciaMovil (QC-271)",
+      "w": 960,
+      "x": 6104,
+      "y": 4740
+    },
+    "RecorridoEvidenciaTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "acceso",
+      "title": "RecorridoEvidenciaTablet (QC-271)",
+      "w": 904,
+      "x": 5120,
+      "y": 4740
+    },
     "RecorridoMovil.dc.html": {
       "h": 1300,
       "is_interactive": true,
@@ -1130,90 +1241,6 @@
       "w": 904,
       "x": 1520,
       "y": 0
-    },
-    "FiltrosBarra.dc.html": {
-      "x": 0,
-      "y": 13030,
-      "w": 1440,
-      "h": 2100,
-      "title": "Barra de filtros",
-      "page": "inventario",
-      "is_interactive": true,
-      "expand": "fill"
-    },
-    "FiltrosBarraTablet.dc.html": {
-      "x": 1520,
-      "y": 13030,
-      "w": 904,
-      "h": 1300,
-      "title": "FiltrosBarraTablet",
-      "page": "inventario",
-      "is_interactive": true
-    },
-    "FiltrosBarraMovil.dc.html": {
-      "x": 2504,
-      "y": 13030,
-      "w": 960,
-      "h": 1300,
-      "title": "FiltrosBarraMovil",
-      "page": "inventario",
-      "is_interactive": true
-    },
-    "RecorridoEvidencia.dc.html": {
-      "x": 3600,
-      "y": 4740,
-      "w": 1440,
-      "h": 1240,
-      "title": "Recorrido del pedido con evidencia (QC-271) (QC-271)",
-      "page": "acceso",
-      "is_interactive": true,
-      "expand": "fill"
-    },
-    "RecorridoEvidenciaTablet.dc.html": {
-      "x": 5120,
-      "y": 4740,
-      "w": 904,
-      "h": 1300,
-      "title": "RecorridoEvidenciaTablet (QC-271)",
-      "page": "acceso",
-      "is_interactive": true
-    },
-    "RecorridoEvidenciaMovil.dc.html": {
-      "x": 6104,
-      "y": 4740,
-      "w": 960,
-      "h": 1300,
-      "title": "RecorridoEvidenciaMovil (QC-271)",
-      "page": "acceso",
-      "is_interactive": true
-    },
-    "ProductoTerminadoEvidencia.dc.html": {
-      "x": 3600,
-      "y": 8180,
-      "w": 1440,
-      "h": 1000,
-      "title": "Ficha de producto terminado con evidencia (QC-271) (QC-271)",
-      "page": "inventario",
-      "is_interactive": true,
-      "expand": "fill"
-    },
-    "ProductoTerminadoEvidenciaTablet.dc.html": {
-      "x": 5120,
-      "y": 8180,
-      "w": 904,
-      "h": 1300,
-      "title": "ProductoTerminadoEvidenciaTablet (QC-271)",
-      "page": "inventario",
-      "is_interactive": true
-    },
-    "ProductoTerminadoEvidenciaMovil.dc.html": {
-      "x": 6104,
-      "y": 8180,
-      "w": 960,
-      "h": 1300,
-      "title": "ProductoTerminadoEvidenciaMovil (QC-271)",
-      "page": "inventario",
-      "is_interactive": true
     }
   },
   "createdOnFiles": {
@@ -1357,6 +1384,17 @@
       "w": 1400,
       "x": 0,
       "y": 10710
+    },
+    "c_FiltrosBarra": {
+      "bold": true,
+      "fill": "gray",
+      "maxH": 70,
+      "page": "inventario",
+      "size": "l",
+      "text": "Barra de filtros: buscador q, «Filtros» y cinco tipos de control  ·  escritorio · tablet · teléfono",
+      "w": 1400,
+      "x": 0,
+      "y": 12920
     },
     "c_Formula": {
       "bold": true,
@@ -1765,17 +1803,6 @@
       "w": 240,
       "x": 0,
       "y": 6620
-    },
-    "c_FiltrosBarra": {
-      "x": 0,
-      "y": 12920,
-      "text": "Barra de filtros: buscador q, «Filtros» y cinco tipos de control  ·  escritorio · tablet · teléfono",
-      "size": "l",
-      "bold": true,
-      "w": 1400,
-      "maxH": 70,
-      "fill": "gray",
-      "page": "inventario"
     }
   },
   "order": [
@@ -1909,7 +1936,10 @@
     "RecorridoEvidenciaMovil.dc.html",
     "ProductoTerminadoEvidencia.dc.html",
     "ProductoTerminadoEvidenciaTablet.dc.html",
-    "ProductoTerminadoEvidenciaMovil.dc.html"
+    "ProductoTerminadoEvidenciaMovil.dc.html",
+    "EntregaSinPedido.dc.html",
+    "EntregaSinPedidoTablet.dc.html",
+    "EntregaSinPedidoMovil.dc.html"
   ],
   "pages": [
     {

@@ -200,12 +200,18 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   textos de tipo, el autor «Sistema» y la fecha DEBEN ser los de hoy, y un dato ausente DEBE pintar
   «—»; la columna «Fecha» DEBE alinearse a la derecha en la celda y en la cabecera. *(enmienda 2,
   decisión P27)*
+  > *Nota 2026-10-19 (enmienda QC-288):* la tabla pasa a nueve columnas: «Cliente» entra entre
+  > «Pedido» y «Autor». Solo los asientos de entrega sin pedido y de su anulación la rellenan (los
+  > clientes separados por comas, en orden alfabético) y en ellos «Pedido» pinta «—»; en el resto
+  > de tipos «Cliente» pinta «—».
 - **R22.** El historial DEBE pedir los asientos la primera vez que se abre y conservar sus estados de
   hoy (cargando, error, lote anterior al libro) con sus textos y `data-testid`
   (`batch-history-entry-*`).
 - **R23.** CUANDO se cierra el historial o el ajuste abierto desde el panel «Lotes», el panel DEBE
   seguir abierto; MIENTRAS el contenedor del historial mide 760 px o menos, cada asiento DEBE
   pintarse como tarjeta.
+  > *Nota 2026-10-19 (enmienda QC-288):* la tarjeta del asiento suma el campo «Cliente», con su
+  > rótulo, entre «Pedido» y el autor: la misma posición relativa que la novena columna de R21.
 
 ### Ajustar existencia
 

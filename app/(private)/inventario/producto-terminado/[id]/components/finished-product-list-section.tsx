@@ -7,6 +7,7 @@ import { identity } from '@/lib/composition';
 import { canConsultOrderEvidence } from '@/lib/modules/asignaciones';
 import { countOrderEvidenceAction } from '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
+import { assertPermission, type PermissionCode, type SessionUser } from '@/lib/modules/identity';
 import {
   MOVEMENT_REASONS,
   type FinishedProductBatchRow,
@@ -154,6 +155,19 @@ async function loadEvidenceCounts(
   return new Map(result.data.map((count) => [count.orderId, count.photoCount]));
 }
 
+const PERMISSION_DENIED = new Error('permiso denegado');
+
+/** Presentación, no autorización: decide si se pinta «Anular»; la action vuelve a exigir el permiso. */
+function hasPermission(user: SessionUser | null, code: PermissionCode): boolean {
+  try {
+    assertPermission(user, code, () => PERMISSION_DENIED);
+    return true;
+  } catch (error) {
+    if (error !== PERMISSION_DENIED) throw error;
+    return false;
+  }
+}
+
 /** Pide solo el listado del tab activo. */
 export async function FinishedProductListSection(props: FinishedProductListSectionProps) {
   const { productId, tab, paging, unitLabel, presentation } = props;
@@ -191,10 +205,19 @@ export async function FinishedProductListSection(props: FinishedProductListSecti
           />
         ),
       );
-    case 'entregas':
-      return dispatch(props, await listFinishedProductDeliveriesAction(productId, input), (page) => (
-        <FinishedProductDeliveriesTable productId={productId} page={page} unitLabel={unitLabel} />
+    case 'entregas': {
+      const result = await listFinishedProductDeliveriesAction(productId, input);
+      const canVoidDirect =
+        result.status === 'success' && hasPermission(await identity.getSessionUser(), 'entregas.anular');
+      return dispatch(props, result, (page) => (
+        <FinishedProductDeliveriesTable
+          productId={productId}
+          page={page}
+          unitLabel={unitLabel}
+          canVoidDirect={canVoidDirect}
+        />
       ));
+    }
     case 'costo':
       return dispatch(props, await listFinishedProductCostsAction(productId, input), (page) => (
         <FinishedProductCostsTable productId={productId} page={page} unitLabel={unitLabel} />

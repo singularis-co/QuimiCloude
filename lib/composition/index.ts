@@ -131,8 +131,15 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import { createFinishedBatchLabels } from '@/lib/modules/inventario/adapters/driven/persistence/finished-batch-labels-prisma';
-import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
-import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
+import {
+  createFinishedGoodsDirectDispatch,
+  createFinishedGoodsDispatch,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
+import {
+  findDeliverableBatches,
+  findForDelivery,
+  findSurplusBases,
+} from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
   findAliveFinishedProduct,
@@ -327,6 +334,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
+  findCustomerIdsForMovements,
   listDeliveryLinesByBatchIds,
   summarizeDeliveredByBatchIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
@@ -353,6 +361,23 @@ import {
   createFinishedGoodsReturn,
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma';
 import type { OrderDeliveryVoidUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-void-unit-of-work';
+import {
+  createDeliverDirect,
+  createGetDirectDelivery,
+  createGetDirectDeliveryForVoid,
+  createListDirectDeliverySurplus,
+  createVoidDirectDelivery,
+} from '@/lib/modules/pedidos';
+import type {
+  DirectDeliveryUnitOfWork,
+  DirectDeliveryVoidUnitOfWork,
+} from '@/lib/modules/pedidos/ports/direct-delivery-unit-of-work';
+import {
+  createDirectDeliveryRepository,
+  createWaitingOrdersLock,
+  createWaitingOrdersReader,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma';
+import type { DeliveryCustomerDirectory, FinishedProductDeliveryCatalog } from '@/lib/modules/inventario';
 import {
   createRecipeExecutionReader,
   findAliveRecipeByNormalizedName,
@@ -1074,6 +1099,8 @@ const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
   summarizeDelivered: summarizeDeliveredByBatchIds,
 };
 
+const deliveryCustomerDirectory: DeliveryCustomerDirectory = { findCustomerIds: findCustomerIdsForMovements };
+
 const finishedDistributionDirectory: FinishedDistributionDirectory = {
   listPackedLines: listPackedLinesByCombination,
 };
@@ -1207,6 +1234,10 @@ export const inventario = {
     products: productRepository,
     people: assignmentDirectoryPrisma,
     orders: orderNumberDirectory,
+    deliveryCustomers: deliveryCustomerDirectory,
+    customers: {
+      findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
+    },
   }),
   listOrderBatches: createListOrderBatches({ finishedOrders: finishedOrderRepository }),
   listFinishedStock: createListFinishedStock({
@@ -1654,6 +1685,32 @@ const orderDeliveryVoidUnitOfWork: OrderDeliveryVoidUnitOfWork = {
     ),
 };
 
+const finishedProductDeliveryCatalog: FinishedProductDeliveryCatalog = { findForDelivery, findSurplusBases };
+
+/** La entrega sin pedido y la salida de `inventario` confirman o se deshacen juntas. */
+const directDeliveryUnitOfWork: DirectDeliveryUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        deliveries: createDirectDeliveryRepository(tx),
+        waiting: createWaitingOrdersReader(tx),
+        waitingLock: createWaitingOrdersLock(tx),
+        finishedGoods: createFinishedGoodsDirectDispatch(tx),
+      }),
+    ),
+};
+
+/** La anulacion sin pedido y la devolucion a `inventario` confirman o se deshacen juntas. */
+const directDeliveryVoidUnitOfWork: DirectDeliveryVoidUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        voids: createOrderDeliveryVoidRepository(tx),
+        finishedGoods: createFinishedGoodsReturn(tx),
+      }),
+    ),
+};
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1761,6 +1818,29 @@ export const pedidos = {
     unitOfWork: orderDeliveryVoidUnitOfWork,
     voids: createOrderDeliveryVoidRepository(),
     orders: orderRepository,
+  }),
+  getDirectDelivery: createGetDirectDelivery({
+    catalog: finishedProductDeliveryCatalog,
+    waiting: createWaitingOrdersReader(),
+  }),
+  listDirectDeliverySurplus: createListDirectDeliverySurplus({
+    catalog: finishedProductDeliveryCatalog,
+    waiting: createWaitingOrdersReader(),
+  }),
+  deliverDirect: createDeliverDirect({
+    customerCatalog,
+    catalog: finishedProductDeliveryCatalog,
+    unitOfWork: directDeliveryUnitOfWork,
+    deliveries: createDirectDeliveryRepository(),
+  }),
+  getDirectDeliveryForVoid: createGetDirectDeliveryForVoid({
+    voids: createOrderDeliveryVoidRepository(),
+    catalog: finishedProductDeliveryCatalog,
+    customerCatalog,
+  }),
+  voidDirectDelivery: createVoidDirectDelivery({
+    unitOfWork: directDeliveryVoidUnitOfWork,
+    voids: createOrderDeliveryVoidRepository(),
   }),
 } as const;
 

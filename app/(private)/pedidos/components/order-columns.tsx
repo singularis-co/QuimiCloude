@@ -11,7 +11,7 @@ import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import { formatPresentationQuantities } from '@/lib/shared/ui/presentation-quantities';
 
-import { orderCustomerLabel } from './order-customer-label';
+import { orderCustomerLabel } from '@/components/shared/order-customer-label';
 import {
   OrderProducedPresentations,
   type ProducedProductsByOrder,
