@@ -698,3 +698,66 @@ Entorno: `DATABASE_URL`, `DIRECT_URL` y `SEED_*` exportadas solo en el comando d
 - `vitest related` no se corrió sobre `lib/composition/index.ts` (conjunto = suite entera; disco C: casi lleno).
 
 Veredicto: B5 hecha; composición sin dobles y R52–R54 de dominio en verde; los censos de TC siguen igual.
+
+## TC — Barrido de censos y guardias (backend_dev, 2026-10-19)
+
+Sobre `593450fc` (merge de `origin/dev` con QC-263 y QC-166). Sin cambios en código de producción.
+
+### Archivos
+- `tests/unit/pedidos/order-delivery-append-only.test.ts` — nota QC-288; `NOMBRES_ADMITIDOS` se amplía
+  con `createVoidDirectDelivery` y `voidDirectDeliveryAction` (cerrada: cuatro y solo cuatro; los dos de
+  QC-224 se siguen afirmando aparte); bloque nuevo «la entrega sin pedido es solo de inserción (QC-288 R41)»:
+  `direct-delivery-prisma.ts` en el barrido, solo `orderDelivery.create`/`orderDeliveryLine.createMany`, sin
+  `update`/`delete`/`upsert`; los dos nombres nuevos exportados una vez en `lib/` y su archivo limpio; caso
+  sintético con un tercer nombre que sigue en rojo.
+- `tests/unit/pedidos/scope.test.ts` (R57) — `CONSUMIDORES_DE_LA_ENTREGA_SIN_PEDIDO`, exclusión nombrada por
+  ARCHIVO (7 de `inventario`, 2 de `components/shared`); `consumosPorDentroDelModulo` intacto; anclas nuevas:
+  cada nombre consume de verdad `pedidos`, y otro archivo de `inventario` o de `components/shared` sigue cayendo.
+- `tests/unit/pedidos/module-contract.test.ts` («un solo archivo driving») — la misma lista por archivo; esos
+  archivos siguen obligados a consumir solo el barrel o el driving por ruta exacta; ancla: los nueve se ven.
+- `tests/guards/guard-buscadores.test.ts` — la ruta vieja del buscador es registro HISTÓRICO de QC-233
+  (`NO_SE_TOCAN_R21` solo se aplica al diff de la rama de QC-233 y el detector compara contra esa lista):
+  texto conservado y nota fechada en la lista y en el caso sintético. No es censo vivo.
+- `specs/QC-288-entrega-sin-pedido/tasks.md` — TC `[x]`.
+
+### design.md §9, fila por fila
+| Fila | Resultado |
+|---|---|
+| `guard-identificador-de-request` | verificada: las dos migraciones están (l. 738–739); `entrega-sin-pedido.spec.ts` es de TI |
+| `inventario-schema.test.ts` | verificada (enmendada en B1/T0) |
+| `pedidos-schema.test.ts` | verificada (enmendada en B1) |
+| `order-delivery-constraints` / `order-delivery-void-constraints` (int) | sin cambio, verdes: `Test Files 2 passed (2)`, `Tests 25 passed (25)` |
+| `clientes/scope.test.ts` | sin cambio, verde |
+| `inventario/scope.test.ts`, `company-scope.test.ts` | sin cambio, verdes; el censo de migraciones de `scope` mide modelos aislados por empresa, no FK hacia `products` |
+| `guard-libro-de-inventario`, `qc121-alcance`, `qc91-alcance` | sin cambio, verdes; el diff contra `origin/dev` en `lib/` y `app/` no añade ni quita ningún `productBatch.create/update/upsert/delete` ni `UPDATE/INSERT/DELETE` sobre `product_batches` |
+| `order-delivery-append-only` | **enmendada** (arriba) |
+| `pedidos/module-contract.test.ts` | **enmendada**: §9 decía «sin cambio», pero los consumidores de `/inventario` y `components/shared` (§7.1, §7.2, §7.4) la ponían en rojo |
+| `pedidos/scope.test.ts` R57 | **enmendada** (no estaba en §9; mismo motivo) |
+| `session-once-per-request-actions` | verificada (enmendada en B5) |
+| `finished-product-route-contract` | verificada (enmendada en F4) |
+| `product-route-contract` | verde, sin cambio |
+| `guard-catalogo-de-componentes` + `CATALOGO.md` | verificada: tres filas (l. 79–81) |
+| `aislamiento.json` | verificada: las 7 suites `.int.test.ts` nuevas tienen modo |
+| `tests/unit/errores/*` | verificada: `delivery_exceeds_surplus` (catalogo.test.ts l. 81) |
+| `guard-buscadores` | nota histórica (arriba) |
+
+### R → test
+- R1 → sin cambio en `lib/modules/identity/domain/permissions.ts` ni en ninguna migración/seed de permisos
+  (diff contra `origin/dev`); lo fijan `tests/unit/identity/permissions.test.ts` («R2: contiene exactamente los
+  códigos…», `SEED_ROLE_PERMISSIONS[...]).toEqual(...)`, «R1: ningún otro rol recibe entregas.modificar/anular») y
+  `tests/guards/guard-permisos-sembrados.test.ts`, verdes sin editarse.
+- R41 → `order-delivery-append-only.test.ts` («R41: el adaptador de la entrega sin pedido…», «R41: los dos nombres
+  de la anulación sin pedido…», «R41: un tercer nombre…», y R32/R33 ampliados), además de los de B1.
+
+### Gate (salida real)
+Entorno de integración: `.env` del repo principal exportado solo en el comando.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, todos previos y ajenos; los 4 archivos tocados, limpios.
+- `pnpm exec vitest run guard`: `Test Files 81 passed (81)`, `Tests 1109 passed | 20 skipped (1129)`.
+- `pnpm exec vitest run tests/unit/pedidos tests/unit/inventario tests/unit/inventario-ui tests/unit/pedidos-ui
+  tests/unit/errores tests/unit/identity tests/unit/clientes`: `Test Files 470 passed (470)`,
+  `Tests 8720 passed | 44 skipped (8764)`.
+- Censos de lotes y permisos (`qc121-alcance`, `qc91-alcance`, `guard-libro-de-inventario`, `permissions`,
+  `guard-permisos-sembrados`): `Test Files 5 passed (5)`, `Tests 197 passed (197)`.
+
+Veredicto: TC hecha; cuatro censos enmendados con nota y lista por archivo, ninguna violación de diseño, sin tocar producción.

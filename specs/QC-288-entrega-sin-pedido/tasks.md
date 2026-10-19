@@ -278,7 +278,7 @@ Cubre: R54, R55.
 
 ---
 
-## [ ] TC — Barrido de censos y guardias (depende de B1–B5 y F1–F5)
+## [x] TC — Barrido de censos y guardias (depende de B1–B5 y F1–F5)
 
 Recorre la tabla de `design.md > 9` fila por fila:
 - verifica las marcadas «sin cambio»;
