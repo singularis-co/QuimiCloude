@@ -1,8 +1,9 @@
 'use client';
 
+import { EyeIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, useTransition } from 'react';
+import { useId, useRef, useState, useTransition, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { StepReader } from '@/components/shared/step-reader';
@@ -10,6 +11,7 @@ import { ErrorAlert } from '@/components/shared/error-alert';
 import { ImageField } from '@/components/shared/image-field';
 import { Notice } from '@/components/shared/notice';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +22,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
@@ -43,6 +44,7 @@ import { FORMULAS_ROUTE, recipeVersionRoute } from '@/lib/shared/routes';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
+import { FormFooterBar } from './form-footer-bar';
 import type { ProductPickerOption } from './product-picker';
 import { PropagateVersionsDialog } from './propagate-versions-dialog';
 import {
@@ -157,7 +159,9 @@ export type RecipeFormProductPage = {
   readonly totalPages: number;
 };
 
-export type RecipeFormProps =
+const CARD_CLASS = 'gap-4 overflow-visible rounded-[14px] px-5 py-5';
+
+export type RecipeFormProps = (
   | {
       readonly mode: 'create';
       readonly units: readonly UnitRef[];
@@ -173,7 +177,14 @@ export type RecipeFormProps =
       readonly units: readonly UnitRef[];
       readonly initialProductPage: RecipeFormProductPage;
       readonly initialMachinePage: RecipeFormProductPage;
-    };
+    }
+) & {
+  /**
+   * Columna lateral (las versiones). Se pinta fuera del `<form>`: un envío desde un diálogo suyo
+   * subiría por el árbol de React hasta el `onSubmit` de la receta.
+   */
+  readonly aside?: ReactNode;
+};
 
 type FieldErrors = {
   readonly name?: string;
@@ -238,6 +249,7 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
 
 export function RecipeForm(props: RecipeFormProps) {
   const router = useRouter();
+  const formId = useId();
   const [state, setState] = useState<RecipeFormState>(() => buildInitialState(props));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [saveError, setSaveError] = useState<SaveError | null>(null);
@@ -352,208 +364,237 @@ export function RecipeForm(props: RecipeFormProps) {
     });
   }
 
-  return (
-    <form
-      data-testid="recipe-form"
-      className="flex flex-col gap-6"
-      onSubmit={(event) => {
-        event.preventDefault();
-        handleSubmit();
-      }}
-    >
-      {saveError === null ? null : saveError.code === 'recipe_not_found' ? (
-        <div role="alert" data-testid="recipe-form-not-found" className="rounded-lg border p-3 text-sm">
-          <p data-testid="recipe-form-not-found-message">{saveError.message}</p>
-          <Link href={FORMULAS_ROUTE} className="underline" data-testid="recipe-form-not-found-link">
-            Volver a la lista
-          </Link>
-        </div>
-      ) : (
-        <ErrorAlert
-          error={saveError}
-          className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          testId="recipe-form-error"
-          renderCatalogued={(catalogued) => (
-            <>
-              <p data-testid="recipe-form-error-message">{catalogued.message}</p>
-              {catalogued.code === INVALID_INPUT_CODE ? null : (
-                <p className="text-xs" data-testid="recipe-form-error-code">
-                  {catalogued.code}
-                </p>
-              )}
-            </>
+  // Proyecta el estado actual del formulario, no lo guardado; el lector solo se monta con el
+  // diálogo abierto, así que cerrarlo lo desmonta y se lleva lo marcado.
+  const previewDialog = (
+    <Dialog open={isPreviewOpen} onOpenChange={setPreviewOpen}>
+      <DialogTrigger
+        data-testid="recipe-form-preview-open"
+        render={<Button type="button" variant="outline" ref={previewTriggerRef} touch />}
+      >
+        <EyeIcon aria-hidden />
+        {PREVIEW_OPEN_LABEL}
+      </DialogTrigger>
+      {/* R26: alto POR CONTENIDO con tope en `85dvh` y scroll interno; el alto de
+          viewport completo esta prohibido -en movil la barra del navegador se come
+          esa medida y el modal deja de caber-. */}
+      <DialogContent
+        data-testid="recipe-form-preview"
+        className="flex max-h-[85dvh] flex-col gap-4 sm:max-w-lg"
+        finalFocus={previewTriggerRef}
+      >
+        <DialogHeader>
+          <DialogTitle>{PREVIEW_TITLE}</DialogTitle>
+          <DialogDescription>{PREVIEW_DESCRIPTION}</DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {isPreviewOpen && (
+            <StepReader
+              steps={state.steps.map((step) => step.document)}
+              onFinish={() => setPreviewOpen(false)}
+            />
           )}
-        />
-      )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
-      {stepsLocked ? (
-        <Notice tone="warning" title={STEP_LOCK_TITLE(lockingOrders)} testId="recipe-form-steps-locked">
-          {STEP_LOCK_BODY}
-        </Notice>
-      ) : null}
-
-      {props.mode === 'edit' && underReview.length > 0 ? (
-        <div
-          role="status"
-          className="flex flex-col gap-2 rounded-lg border p-3 text-sm"
-          data-testid="recipe-form-under-review"
+  return (
+    <div data-slot="recipe-form-layout" className="flex flex-col gap-5">
+      {/* Con 880 px o más caben las dos bases (560 + 20 + 300) y el lateral va a la derecha. */}
+      <div className="flex flex-wrap items-start gap-5">
+        <form
+          id={formId}
+          data-testid="recipe-form"
+          className="flex min-w-0 flex-[3_1_560px] flex-col gap-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleSubmit();
+          }}
         >
-          <p>{UNDER_REVIEW_MESSAGE}</p>
-          <ul className="flex flex-col">
-            {underReview.map((version) => (
-              <li key={version.id}>
-                <Link
-                  href={recipeVersionRoute(props.recipe.id, version.id)}
-                  className={cn('inline-flex items-center underline', touchTarget)}
-                  data-testid="recipe-form-under-review-link"
-                >
-                  {version.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {/* La imagen manda a la izquierda (3 de 12) y los datos de texto la acompanan (9). */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
-        <div className="sm:col-span-3">
-          <ImageField
-            mode={props.mode}
-            initialImageUrl={props.mode === 'edit' ? props.recipe.imageUrl : null}
-            value={state.image}
-            onChange={(image) => setState((previous) => ({ ...previous, image }))}
-            maxBytes={MAX_IMAGE_BYTES}
-            validate={validateRecipeImage}
-            testIdPrefix="recipe-image"
-          />
-        </div>
-
-        <div className="flex flex-col gap-4 sm:col-span-9">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="recipe-field-name-input">Nombre</Label>
-            <Input
-              id="recipe-field-name-input"
-              type="text"
-              value={state.name}
-              onChange={(event) => setState((previous) => ({ ...previous, name: event.target.value }))}
-              className={`${touchTarget} ${FIELD_TEXT}`}
-              aria-invalid={fieldErrors.name === undefined ? undefined : true}
-              aria-describedby={fieldErrors.name === undefined ? undefined : 'recipe-error-name'}
-              data-testid="recipe-field-name"
+          {saveError === null ? null : saveError.code === 'recipe_not_found' ? (
+            <div role="alert" data-testid="recipe-form-not-found" className="rounded-lg border p-3 text-sm">
+              <p data-testid="recipe-form-not-found-message">{saveError.message}</p>
+              <Link href={FORMULAS_ROUTE} className="underline" data-testid="recipe-form-not-found-link">
+                Volver a la lista
+              </Link>
+            </div>
+          ) : (
+            <ErrorAlert
+              error={saveError}
+              className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+              testId="recipe-form-error"
+              renderCatalogued={(catalogued) => (
+                <>
+                  <p data-testid="recipe-form-error-message">{catalogued.message}</p>
+                  {catalogued.code === INVALID_INPUT_CODE ? null : (
+                    <p className="text-xs" data-testid="recipe-form-error-code">
+                      {catalogued.code}
+                    </p>
+                  )}
+                </>
+              )}
             />
-            {fieldErrors.name === undefined ? null : (
-              <p id="recipe-error-name" className="text-sm text-destructive" data-testid="recipe-error-name">
-                {fieldErrors.name}
-              </p>
-            )}
-        </div>
+          )}
 
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="recipe-field-description-input">Descripción</Label>
-            <Textarea
-              id="recipe-field-description-input"
-              rows={4}
-              value={state.description}
-              onChange={(event) =>
-                setState((previous) => ({ ...previous, description: event.target.value }))
-              }
-              className={`${touchTarget} ${FIELD_TEXT}`}
-              aria-invalid={fieldErrors.description === undefined ? undefined : true}
-              aria-describedby={fieldErrors.description === undefined ? undefined : 'recipe-error-description'}
-              data-testid="recipe-field-description"
+          {stepsLocked ? (
+            <Notice tone="warning" title={STEP_LOCK_TITLE(lockingOrders)} testId="recipe-form-steps-locked">
+              {STEP_LOCK_BODY}
+            </Notice>
+          ) : null}
+
+          {props.mode === 'edit' && underReview.length > 0 ? (
+            <div
+              role="status"
+              className="flex flex-col gap-2 rounded-lg border p-3 text-sm"
+              data-testid="recipe-form-under-review"
+            >
+              <p>{UNDER_REVIEW_MESSAGE}</p>
+              <ul className="flex flex-col">
+                {underReview.map((version) => (
+                  <li key={version.id}>
+                    <Link
+                      href={recipeVersionRoute(props.recipe.id, version.id)}
+                      className={cn('inline-flex items-center underline', touchTarget)}
+                      data-testid="recipe-form-under-review-link"
+                    >
+                      {version.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <Card className={CARD_CLASS}>
+            {/* La imagen manda a la izquierda (3 de 12) y los datos de texto la acompanan (9). */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
+              <div className="sm:col-span-3">
+                <ImageField
+                  mode={props.mode}
+                  initialImageUrl={props.mode === 'edit' ? props.recipe.imageUrl : null}
+                  value={state.image}
+                  onChange={(image) => setState((previous) => ({ ...previous, image }))}
+                  maxBytes={MAX_IMAGE_BYTES}
+                  validate={validateRecipeImage}
+                  testIdPrefix="recipe-image"
+                />
+              </div>
+
+              <div className="flex flex-col gap-4 sm:col-span-9">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="recipe-field-name-input">Nombre</Label>
+                  <Input
+                    id="recipe-field-name-input"
+                    type="text"
+                    value={state.name}
+                    onChange={(event) => setState((previous) => ({ ...previous, name: event.target.value }))}
+                    className={`${touchTarget} ${FIELD_TEXT}`}
+                    aria-invalid={fieldErrors.name === undefined ? undefined : true}
+                    aria-describedby={fieldErrors.name === undefined ? undefined : 'recipe-error-name'}
+                    data-testid="recipe-field-name"
+                  />
+                  {fieldErrors.name === undefined ? null : (
+                    <p id="recipe-error-name" className="text-sm text-destructive" data-testid="recipe-error-name">
+                      {fieldErrors.name}
+                    </p>
+                  )}
+              </div>
+
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="recipe-field-description-input">Descripción</Label>
+                  <Textarea
+                    id="recipe-field-description-input"
+                    rows={4}
+                    value={state.description}
+                    onChange={(event) =>
+                      setState((previous) => ({ ...previous, description: event.target.value }))
+                    }
+                    className={`${touchTarget} ${FIELD_TEXT}`}
+                    aria-invalid={fieldErrors.description === undefined ? undefined : true}
+                    aria-describedby={fieldErrors.description === undefined ? undefined : 'recipe-error-description'}
+                    data-testid="recipe-field-description"
+                  />
+                  {fieldErrors.description === undefined ? null : (
+                    <p
+                      id="recipe-error-description"
+                      className="text-sm text-destructive"
+                      data-testid="recipe-error-description"
+                    >
+                      {fieldErrors.description}
+                    </p>
+                  )}
+              </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className={CARD_CLASS}>
+            <RecipeLinesField
+              lines={state.lines}
+              onChange={(lines) => setState((previous) => ({ ...previous, lines }))}
+              tools={state.tools}
+              onToolsChange={(tools) => setState((previous) => ({ ...previous, tools }))}
+              units={props.units}
+              initialProductPage={props.initialProductPage}
+              initialMachinePage={props.initialMachinePage}
+              errors={fieldErrors.lines}
+              generalError={fieldErrors.linesGeneral}
+              toolErrors={fieldErrors.tools}
+              toolsGeneralError={fieldErrors.toolsGeneral}
             />
-            {fieldErrors.description === undefined ? null : (
-              <p
-                id="recipe-error-description"
-                className="text-sm text-destructive"
-                data-testid="recipe-error-description"
-              >
-                {fieldErrors.description}
-              </p>
-            )}
-        </div>
-        </div>
+          </Card>
+
+          <Card className={CARD_CLASS}>
+            <RecipeStepsField
+              steps={state.steps}
+              onChange={(steps) => setState((previous) => ({ ...previous, steps }))}
+              errors={fieldErrors.steps}
+              showEvidenceSwitch
+              locked={stepsLocked}
+            />
+          </Card>
+
+          <Card className={CARD_CLASS}>
+            <RecipeStepsField
+              steps={state.packingSteps}
+              onChange={(packingSteps) => setState((previous) => ({ ...previous, packingSteps }))}
+              errors={fieldErrors.packingSteps}
+              title={PACKING_STEPS_FIELD_TEXTS.title}
+              optionalHelp={{
+                text: PACKING_STEPS_FIELD_TEXTS.optionalHelp,
+                label: PACKING_STEPS_FIELD_TEXTS.optionalHelpLabel,
+              }}
+              testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
+              showEvidenceSwitch
+              locked={stepsLocked}
+            />
+          </Card>
+
+          {props.mode === 'edit' && props.versions.length > 0 ? (
+            <PropagateVersionsDialog
+              open={pendingPayload !== null}
+              versions={props.versions}
+              onOpenChange={(open) => {
+                if (!open) setPendingPayload(null);
+              }}
+              onSave={(propagateToVersionIds) => {
+                if (pendingPayload === null) return;
+                setPendingPayload(null);
+                save(pendingPayload, propagateToVersionIds);
+              }}
+            />
+          ) : null}
+        </form>
+        {props.aside === undefined ? null : (
+          <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">{props.aside}</aside>
+        )}
       </div>
 
-      <RecipeLinesField
-        lines={state.lines}
-        onChange={(lines) => setState((previous) => ({ ...previous, lines }))}
-        tools={state.tools}
-        onToolsChange={(tools) => setState((previous) => ({ ...previous, tools }))}
-        units={props.units}
-        initialProductPage={props.initialProductPage}
-        initialMachinePage={props.initialMachinePage}
-        errors={fieldErrors.lines}
-        generalError={fieldErrors.linesGeneral}
-        toolErrors={fieldErrors.tools}
-        toolsGeneralError={fieldErrors.toolsGeneral}
-      />
-
-      <RecipeStepsField
-        steps={state.steps}
-        onChange={(steps) => setState((previous) => ({ ...previous, steps }))}
-        errors={fieldErrors.steps}
-        showEvidenceSwitch
-        locked={stepsLocked}
-      />
-
-      <Separator data-testid="recipe-form-steps-separator" />
-
-      <RecipeStepsField
-        steps={state.packingSteps}
-        onChange={(packingSteps) => setState((previous) => ({ ...previous, packingSteps }))}
-        errors={fieldErrors.packingSteps}
-        title={PACKING_STEPS_FIELD_TEXTS.title}
-        optionalHelp={{
-          text: PACKING_STEPS_FIELD_TEXTS.optionalHelp,
-          label: PACKING_STEPS_FIELD_TEXTS.optionalHelpLabel,
-        }}
-        testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
-        showEvidenceSwitch
-        locked={stepsLocked}
-      />
-
-      <div className="flex justify-end gap-2">
-        {/* R11: se proyecta el estado ACTUAL del formulario -`state.steps.map(...)`-, no lo
-            guardado; el asistente se monta solo mientras el modal esta abierto, asi que cerrarlo
-            lo desmonta y se lleva su marcado con el (R13, R19, R22). */}
-        <Dialog open={isPreviewOpen} onOpenChange={setPreviewOpen}>
-          <DialogTrigger
-            data-testid="recipe-form-preview-open"
-            render={
-              <Button
-                type="button"
-                variant="outline"
-                ref={previewTriggerRef}
-                touch
-              />
-            }
-          >
-            {PREVIEW_OPEN_LABEL}
-          </DialogTrigger>
-          {/* R26: alto POR CONTENIDO con tope en `85dvh` y scroll interno; el alto de
-              viewport completo esta prohibido -en movil la barra del navegador se come
-              esa medida y el modal deja de caber-. */}
-          <DialogContent
-            data-testid="recipe-form-preview"
-            className="flex max-h-[85dvh] flex-col gap-4 sm:max-w-lg"
-            finalFocus={previewTriggerRef}
-          >
-            <DialogHeader>
-              <DialogTitle>{PREVIEW_TITLE}</DialogTitle>
-              <DialogDescription>{PREVIEW_DESCRIPTION}</DialogDescription>
-            </DialogHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {isPreviewOpen && (
-                <StepReader
-                  steps={state.steps.map((step) => step.document)}
-                  onFinish={() => setPreviewOpen(false)}
-                />
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+      <FormFooterBar
+        testId="recipe-form-footer"
+        leading={previewDialog}
+      >
         <Link
           href={FORMULAS_ROUTE}
           data-slot="button"
@@ -562,8 +603,10 @@ export function RecipeForm(props: RecipeFormProps) {
         >
           Cancelar
         </Link>
+        {/* Fuera del `<form>`: `form` lo asocia y sigue siendo el botón por defecto del Enter. */}
         <Button
           type="submit"
+          form={formId}
           touch
           disabled={isPending || !canSubmit}
           aria-busy={isPending}
@@ -571,22 +614,7 @@ export function RecipeForm(props: RecipeFormProps) {
         >
           {isPending ? 'Guardando…' : 'Guardar'}
         </Button>
-      </div>
-
-      {props.mode === 'edit' && props.versions.length > 0 ? (
-        <PropagateVersionsDialog
-          open={pendingPayload !== null}
-          versions={props.versions}
-          onOpenChange={(open) => {
-            if (!open) setPendingPayload(null);
-          }}
-          onSave={(propagateToVersionIds) => {
-            if (pendingPayload === null) return;
-            setPendingPayload(null);
-            save(pendingPayload, propagateToVersionIds);
-          }}
-        />
-      ) : null}
-    </form>
+      </FormFooterBar>
+    </div>
   );
 }

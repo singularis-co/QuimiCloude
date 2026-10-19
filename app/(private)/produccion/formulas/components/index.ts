@@ -97,6 +97,7 @@ export {
   RecipeStepsField,
   type RecipeStepsFieldProps,
 } from './recipe-steps-field';
+export { FormFooterBar, type FormFooterBarProps } from './form-footer-bar';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
 export {
   PropagateVersionsDialog,
