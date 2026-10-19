@@ -2405,6 +2405,34 @@ function documentPipelineFor(reader: AiReader) {
  */
 const documentJobLog: DocumentJobLog = forModule('documentos');
 
+// `notificaciones` se lee al llamar, no al construir: su fachada se declara más abajo.
+const batchFinishedDeps: NonNullable<Parameters<typeof createRunDocumentJob>[0]['batchFinished']> = {
+  notices: documentBatchRepositoryPrisma,
+  log: documentJobLog,
+  listener: {
+    async onBatchFinished(e) {
+      if (e.createdBy === null) {
+        documentJobLog.warn('batch_notice_without_author', { batchId: e.batchId, companyId: e.companyId });
+        return;
+      }
+      await notificaciones.notify({
+        key: 'documentos.tanda_terminada',
+        companyId: e.companyId,
+        dedupeKey: `documentos.tanda_terminada:${e.batchId}`,
+        payload: {
+          recipientUserId: e.createdBy,
+          strategy: e.strategy,
+          uploadedAt: e.uploadedAt,
+          total: e.total,
+          done: e.done,
+          failed: e.failed,
+          failedNames: e.failedNames,
+        },
+      });
+    },
+  },
+};
+
 const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
@@ -2413,6 +2441,7 @@ const runDocumentJob = createRunDocumentJob({
   pdfReading: { isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'lectura_pdf') },
   pipelineFor: documentPipelineFor,
   log: documentJobLog,
+  batchFinished: batchFinishedDeps,
 });
 
 const processingQueue: ProcessingQueue = {
@@ -2531,6 +2560,7 @@ export const documentos = {
   getBatchStatus: createGetBatchStatus({
     repository: documentBatchRepository,
     config: processingConfig,
+    batchFinished: batchFinishedDeps,
   }),
   queueSignature,
   // Las DOS operaciones nuevas de la revision de catalogo, ya cableadas con `catalogImportDeps`

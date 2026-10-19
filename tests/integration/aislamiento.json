@@ -119,6 +119,11 @@
       "desde": "2026-09-25"
     },
     {
+      "archivo": "documentos/batch-notice.int.test.ts",
+      "motivo": "QC-137 T9/T10: ejercita `createBatch` y `readBatchNotice` de `document-batch-repository-prisma.ts`, que usan el cliente Prisma GLOBAL; `createBatch` abre ademas SU PROPIA `prisma.$transaction`, asi que envolverlos en una transaccion del test con ROLLBACK seria un aislamiento de mentira. Cada caso fabrica su empresa efimera con randomUUID (y el usuario autor cuando lo necesita) y `afterAll` las borra en el orden que exigen las FK (archivos -> tandas -> usuarios -> empresas) y afirma que no quedo ninguna. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
       "archivo": "documentos/document-batch-claim-concurrency.int.test.ts",
       "motivo": "QC-111 T17: mide la ATOMICIDAD del `UPDATE ... WHERE status='queued' ... RETURNING` de `claim` (`document-batch-repository-prisma.ts`), que llama al cliente Prisma GLOBAL sin abrir su propia transaccion. Envolver la corrida en una transaccion del test con ROLLBACK seria aislamiento de mentira: dentro de una unica transaccion no hay dos conexiones compitiendo por la fila, que es justo lo que R10 exige demostrar con `Promise.all`. Cada caso fabrica su empresa, tanda y archivo efimeros con randomUUID y los borra en un `finally` en el orden que exigen las FK (archivo -> tanda -> empresa); se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-18"

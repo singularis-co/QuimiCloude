@@ -15,6 +15,8 @@ export type NewBatch = {
   readonly strategy: PdfStrategy;
   readonly createdBy: string | null;
   readonly paths: readonly string[];
+  /** Alineado con `paths`. Sin él, o con `null` en una posición, el archivo queda sin nombre. */
+  readonly originalNames?: readonly (string | null)[];
 };
 
 /** La tanda ya escrita, con el identificador de cada archivo para poder publicar un mensaje por uno. */
@@ -57,4 +59,24 @@ export interface DocumentBatchRepository {
   /** El archivo con lo que su revision necesita. `null` si no existe o es de otra empresa: los
    *  dos casos se ven igual desde fuera. */
   readFileForReview(documentFileId: string, companyId: string): Promise<FileForReview | null>;
+}
+
+/** Lo que el aviso de fin de tanda necesita. Lleva `createdBy`, así que no viaja al cliente. */
+export type BatchNotice = {
+  readonly strategy: PdfStrategy;
+  readonly createdBy: string | null;
+  readonly uploadedAt: Date;
+  readonly total: number;
+  readonly done: number;
+  readonly failed: number;
+  /** `queued` más `processing`. */
+  readonly pending: number;
+  /** Los tres primeros fallidos con nombre, en orden de subida. */
+  readonly failedNames: readonly string[];
+};
+
+// Puerto aparte para que los dobles de `DocumentBatchRepository` no tengan que implementarlo.
+export interface BatchNoticeReader {
+  /** `null` si la tanda no existe o es de otra empresa. */
+  readBatchNotice(batchId: string, companyId: string): Promise<BatchNotice | null>;
 }

@@ -699,6 +699,8 @@ export const MIGRACIONES_ESPERADAS = [
   // QC-137 2026-10-19: las tablas de avisos y su añadido; no tocan el identificador.
   '20261019120000_notifications',
   '20261019120100_notifications_addon',
+  // QC-137 2026-10-19: el nombre original de cada archivo de una tanda; no toca el identificador.
+  '20261019120200_document_files_original_name',
 ] as const
 
 export function hallazgosDeMigraciones(

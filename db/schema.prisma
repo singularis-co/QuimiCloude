@@ -1028,6 +1028,7 @@ model DocumentFile {
   batchId        String             @map("batch_id") @db.Uuid
   companyId      String             @map("company_id") @db.Uuid
   path           String
+  originalName   String?            @map("original_name")
   status         DocumentFileStatus @default(queued)
   extractedText  String?            @map("extracted_text")
   errorCode      String?            @map("error_code")
