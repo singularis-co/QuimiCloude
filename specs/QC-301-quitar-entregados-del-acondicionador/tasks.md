@@ -52,7 +52,7 @@
     la instantánea de paridad del detalle.
   - **Hecho:** el enlace dice «Volver a «Acondicionados»» con href `/asignacion?vista=acondicionados`.
 
-- [ ] **T4 — E2E** (R2, R3, R5)
+- [x] **T4 — E2E** (R2, R3, R5)
   - `e2e/acondicionamiento.spec.ts`:
     - el paso 1 espera dos pestañas;
     - un paso nuevo comprueba que `?vista=acondicionados_entregados` aterriza en «Por
