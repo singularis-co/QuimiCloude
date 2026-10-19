@@ -12,7 +12,7 @@
 
 ## Bloque A — Base
 
-- [ ] **T1 — Esquema y migración** (R28, R29, R30). Depende de: —
+- [x] **T1 — Esquema y migración** (R28, R29, R30). Depende de: —
   - `db/schema.prisma`: 4 enums y los modelos `WhatsappContact` y `WhatsappMessage` de §2.1, cada
     uno con `/// @module integraciones`, al final del bloque de `integraciones`.
   - `db/migrations/20261019140000_whatsapp_contacts_and_messages/migration.sql` y `down.sql`

@@ -745,6 +745,8 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-10-19: correctiva, quita `whatsapp_connections.meta_app_id` que QC-237 retiro editando la
   // migracion original; no toca el identificador.
   '20261019120000_whatsapp_connections_drop_meta_app_id',
+  // QC-238 2026-10-19: contactos y mensajes de WhatsApp; no toca el identificador.
+  '20261019140000_whatsapp_contacts_and_messages',
 ] as const
 
 export function hallazgosDeMigraciones(
