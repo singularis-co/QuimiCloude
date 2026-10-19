@@ -225,6 +225,59 @@ y los manejadores no se tocaron. `page.tsx` conserva sus tres primeras líneas.
   Inventario ya se ve así; cambiarlo toca `DataTable` y los snapshots de inventario. Anotado en el «No
   cubre» de la fila del catálogo. Pendiente de decisión (o deuda, T9c).
 
+## Tanda 9 (2026-10-19)
+
+| Tarea | Commit | Qué |
+| --- | --- | --- |
+| Arreglo R20 | `2dd05c45` | `recipe-step-editor.tsx`: `row-tools` con `flex-wrap` y las acciones con `shrink-0`; a 390 px el grupo quitar/añadir desbordaba 11 px (llegaba a x=401,5 en 390). Caso nuevo R20 en `recipe-step-editor.test.tsx` |
+| T9a | `ec29b315` | `e2e/formulas-rediseno.spec.ts` (7 casos) + alta en `E2E_ESPERADOS` y en `data-table-alcance` (ahora 52) |
+| T9b | `38a2292f`, `5371411b`, `e0d320ba` | Migra `versiones-en-la-receta.spec.ts` («Abrir la versión X»; menú acotado a `getByRole('table')` para no nombrar `data-table`, lista cerrada); los demás pasan sin cambios |
+| T9c | `09f029fc` | `progress/deudas.md`: D66–D70 nuevas; D53, D56, D63 ampliadas |
+
+**T9a — casos:** 1440: cabecera, columnas y menú (R1, R2, R3); 1440: formulario (R13, R15, R22, R23,
+R27, R30); 1440: «Enter guarda» con una sola Server Action, un toast y el nombre cambiado en la base
+(R15, decisión T0c); 820: tarjetas y «Versiones» debajo (R5, R13); 390: tarjetas, menú, borrar y subir
+(R5, R47); 390: formulario, versión y vista previa sin desborde (R15, R20, R23, R47); 390: revisión del
+PDF sin desborde (R20).
+
+**Salidas E2E (últimas líneas reales):**
+
+```
+formulas-rediseno     [chromium] 7 passed (23.8s)   [webkit] 7 passed (27.8s)   (tras 2dd05c45)
+  antes del arreglo:  [chromium] 1 failed, 6 passed (26.6s)  [webkit] 1 failed, 6 passed (30.3s)
+                      «390 formulario: el documento no desborda en horizontal — Expected: <= 0, Received: 11»
+versiones-en-la-receta [chromium] 1 passed (25.5s)  [webkit] 1 passed (28.2s)   (tras 5371411b)
+recetas               [chromium] 3 passed (12.5s)
+recetas-pasos         [chromium] 1 passed (14.0s)
+recetas-porcentaje    [chromium] 4 passed (19.2s)
+versiones-de-receta   [chromium] 1 passed (16.5s)
+aislamiento-recetas   [chromium] 1 passed (12.4s)
+errores               [chromium] 1 passed (8.7s)
+ejecucion-receta      [chromium] 4 passed (42.9s)
+formula-desde-pdf     [chromium] 1 passed (18.3s)
+documentos            [chromium] 3 passed (16.2s)
+catalogo-desde-pdf    [chromium] 1 passed (18.3s)
+movimiento            [chromium] 4 passed (18.8s)
+integraciones-proveedor-ia [chromium] 2 passed (13.9s)
+modulos-por-empresa   [chromium] 5 passed (22.0s)
+pasos-de-envasado     [chromium] 1 failed (R32, :435) — ajeno, ver abajo
+```
+
+**Rojo ajeno — `e2e/pasos-de-envasado.spec.ts:435` (R32), en `:624`:** `expect(finish).toHaveText('Terminar')`
+recibe «Terminar00:01». El cronómetro del botón (`buttonCountdown` de `step-reader.tsx`, solo en
+`ejecucion`) entró en `dev` con `cb39a83d` («cronómetro en el botón Siguiente»), ancestro del merge
+`6fcbafe6`; el diff de QC-264 en ese archivo (`811bddae`) no lo toca. No se migró (también es archivo
+de QC-291). El E2E corre en CI solo en el PR a producción; queda para el leader.
+
+**Observaciones de `next dev`:** el indicador del overlay de desarrollo tapa «Vista previa» a 390 px
+(el E2E la abre por teclado); aviso de hidratación de `@dnd-kit` (`aria-describedby="DndDescribedBy-N"`)
+en `RecipeStepsField`, que no se tocó (sensores y contexto de arrastre fuera de alcance, D8).
+
+**Verificación final (HEAD `5371411b`):** typecheck limpio; lint 0 errores (10 avisos ajenos);
+`vitest run guard + data-table-alcance + recetas-ui + paridad + module-contract + inventario`:
+284 archivos, 4508 ok / 27 skip (el único rojo, `data-table-alcance`, se arregló en `5371411b`: 18 ok / 2 skip).
+Base sin filas `qc%e2e%`.
+
 ## Archivos creados / modificados
 
 Ver las tablas de cada tanda. Nuevos: `components/form-footer-bar.tsx`, `components/recipe-version-tones.ts`
@@ -236,14 +289,14 @@ Ver las tablas de cada tanda. Nuevos: `components/form-footer-bar.tsx`, `compone
 
 | R | Test |
 | --- | --- |
-| R1 | `recipe-page.test.tsx` (T2a); E2E pendiente (T9a) |
-| R2, R5, R6 | `recipe-cards.test.tsx`; E2E R2/R5 pendiente |
-| R3, R4 | `recipe-row-actions-spec.test.tsx`; E2E R3 pendiente |
+| R1 | `recipe-page.test.tsx`, `formulas-upload.test.tsx`, `e2e/formulas-rediseno.spec.ts`, `e2e/integraciones-proveedor-ia.spec.ts` |
+| R2, R5, R6 | `recipe-cards.test.tsx`, `e2e/formulas-rediseno.spec.ts` |
+| R3, R4 | `recipe-row-actions-spec.test.tsx`, `e2e/formulas-rediseno.spec.ts` |
 | R7, R8, R9 | `document-upload-tones.test.tsx`, `document-upload-dialog.test.tsx` |
-| R10, R11, R13, R14, R15 | `recipe-form-layout.test.tsx`, `recipe-version-list.test.tsx` (R14); «Enter guarda» y R13/R15 en E2E pendiente |
+| R10, R11, R13, R14, R15 | `recipe-form-layout.test.tsx`, `recipe-version-list.test.tsx` (R14), `e2e/formulas-rediseno.spec.ts` (R13, R15, «Enter guarda») |
 | R12 | `recipe-lines-tabs.test.tsx` |
 | R16–R19 | `recipe-steps-field.test.tsx`, `recipe-step-editor.test.tsx`, `recipe-form-packing-steps.test.tsx`, `guard-editor-aislado`, `recipe-route-contract` |
-| R20 | E2E pendiente (T9a) |
+| R20 | `e2e/formulas-rediseno.spec.ts`, `recipe-step-editor.test.tsx` (clase) |
 | R21, R23, R25 | `recipe-form-preview.test.tsx` |
 | R22, R24, R26 | `step-reader.test.tsx` (y R22 en `recipe-form-preview`) |
 | R27, R28, R29 | `propagate-versions-dialog.test.tsx`, `recipe-form-propagation.test.tsx` |
@@ -253,9 +306,9 @@ Ver las tablas de cada tanda. Nuevos: `components/form-footer-bar.tsx`, `compone
 | R37–R43 | `formula-import-layout.test.tsx`, `formula-import-page.test.tsx`, `formula-import-review.test.tsx` |
 | R44, R45 | `tests/guards/guard-formulas-rediseno.test.ts`; R45 de la subida en `document-upload-tones` |
 | R46 | `tests/unit/recetas-ui/formulas-toasts.test.tsx` |
-| R47 | E2E pendiente (T9a) |
+| R47 | `e2e/formulas-rediseno.spec.ts` |
 | R48 | `guard-catalogo-de-componentes.test.ts` |
-| R49 | `recipe-form.test.tsx`, `guard-pantallas-de-anadido`, E2E existentes (T9b) |
+| R49 | `recipe-form.test.tsx`, `guard-pantallas-de-anadido`, E2E de T9b (tabla de arriba), `e2e/modulos-por-empresa.spec.ts` |
 | R50 | `delete-recipe-dialog.test.tsx`, `confirmaciones-paridad` |
 | R51 | `recipe-form-layout.test.tsx`, `recipe-form-evidence-lock.test.tsx` |
 
