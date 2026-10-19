@@ -44,7 +44,9 @@
 >
 > Este archivo **no venía sembrado** por `/afinar-feature`. El Alcance y la tabla de decisiones son
 > la ficha de Jira QC-238, copiadas sin cambios. Lo que la ficha no resuelve y este spec propone
-> está marcado **[P<n>]** y espera la confirmación del humano en `## Preguntas abiertas`.
+> está marcado **[P<n>]** y espera la confirmación del humano en `## Preguntas abiertas
+
+Ninguna. P1–P4 cerradas por el humano en F1.4 (ver «Decisiones cerradas»).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -55,6 +57,8 @@
 | D3 | Firma validada antes de parsear, con el secreto de la conexión de la URL | No se procesa nada que no venga de la app de esa empresa. |
 | D4 | `200` para una conexión inexistente o deshabilitada, o un tipo desconocido | Un `500` haría que Meta reintentara sin fin. |
 | D5 | Los statuses no retroceden | Meta no garantiza el orden. |
+| 2026-10-19 | P1–P4 (F1.4) | Aprobadas como las propuso el spec: P1 la consulta de `company_id` por id de conexión sin filtro de empresa, como excepción con nombre en `guard-ambito-empresa-integraciones`; P2 add-on `integraciones` apagado = conexión deshabilitada; P3 `failed` es final; P4 GET en `disabled` → 403, GET válido en `error` marca `lastWebhookAt` sin cambiar el estado, POST solo toca `lastWebhookAt`. |
+| 2026-10-19 | ¿Spec aprobado? | Sí, por el humano en F1.4. |
 
 ## Requisitos (EARS)
 
