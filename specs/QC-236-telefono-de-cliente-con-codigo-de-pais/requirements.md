@@ -65,8 +65,11 @@ Al correo y a los demás campos esas reglas les siguen aplicando igual.
 | D6 | Se conserva el `phone` original | La migración no destruye nada y se puede revisar a mano. | R23, R27 |
 | D7 | El campo Teléfono lleva su propio pase `/design` (`TelefonoCliente.dc.html`); no se aplica la excepción (humano, 2026-10-19) | Es un cambio visual del formulario de cliente. | R1, R33 |
 | D8 | El país de la empresa aparece primero en la lista del selector de país del teléfono, con el rótulo «País de la empresa», y además viene marcado al crear. Se resuelve con una prop nueva de `CountrySelect` para fijar un país arriba (humano, 2026-10-19) | Resuelve el «Por confirmar» pendiente en `CountrySelect.dc.html`. | R5 |
-| D9 | Los clientes migrados sin número válido o con número duplicado muestran el texto antiguo y una etiqueta («Teléfono sin formato válido» / «Teléfono duplicado: revisar»), en la lista y en la edición (humano, 2026-10-19) | Lo migrado se puede revisar a mano sin perder el dato. | R30, R31 |
+| D9 | Los clientes migrados sin número válido o con número duplicado muestran el texto antiguo y una etiqueta, en la lista y en la edición. El texto de la etiqueta en cada sitio lo fija D13 (humano, 2026-10-19; ajustada por D13) | Lo migrado se puede revisar a mano sin perder el dato. | R30, R31 |
 | D10 | El número se formatea al salir del campo, no mientras se escribe. Si se pega un número con `+`, el país se elige solo (humano, 2026-10-19) | Formatear mientras se escribe mueve el cursor. | R6, R7 |
+| D11 | En los duplicados de la migración, «el más reciente» es el de `created_at` más tardío y, si empatan, el de `id` mayor (humano, 2026-10-19; era P1) | Un criterio estable y determinista. | R26 |
+| D12 | Al editar un cliente migrado (con `phone_issue`), si se guarda con el número vacío se conserva el teléfono antiguo: no se tocan `phone`, `phone_country` ni `phone_issue`. El antiguo solo se reemplaza cuando se escribe un número válido (humano, 2026-10-19; era P2) | Editar otro dato del cliente no puede borrar sin querer su teléfono antiguo. | R32, R34 |
+| D13 | En la lista, la etiqueta corta («Sin formato válido» / «Duplicado: revisar»), como en el tablero. En el formulario, la larga («Teléfono sin formato válido» / «Teléfono duplicado: revisar») (humano, 2026-10-19; era P3) | En la columna cabe la forma corta; en el formulario la etiqueta va sola bajo el campo. | R30, R31 |
 
 ## Requisitos (EARS)
 
@@ -103,7 +106,7 @@ Al correo y a los demás campos esas reglas les siguen aplicando igual.
   - El servidor debe rechazar el guardado con el código `customer_phone_invalid`, sin escribir nada.
 - **R10.** SI el número está vacío o solo tiene espacios, ENTONCES el sistema DEBE guardar el cliente
   sin teléfono: `phone`, `phone_country`, `phone_e164` y `phone_issue` nulos, sea cual sea el país
-  marcado.
+  marcado. La única excepción es la edición de un cliente migrado con `phone_issue` (R34).
 
 ### Guardado y datos
 
@@ -166,7 +169,8 @@ Al correo y a los demás campos esas reglas les siguen aplicando igual.
   - `phone_country` con el país usado;
   - `phone_issue = 'invalid_format'`.
 - **R26.** SI varios clientes vivos de una misma empresa dan el mismo `phone_e164`, ENTONCES el
-  relleno DEBE asignárselo solo al más reciente (criterio en la pregunta abierta P1). Los demás quedan
+  relleno DEBE asignárselo solo al más reciente: el de `created_at` más tardío y, si empatan, el de
+  `id` mayor (D11). Los demás quedan
   con `phone_e164` nulo, `phone_country` con el país usado y `phone_issue = 'duplicate'`.
   - Si el número ya lo tiene un cliente vivo guardado después de la migración, todos los migrados con
     ese número quedan como `duplicate`.
@@ -183,19 +187,23 @@ Al correo y a los demás campos esas reglas les siguen aplicando igual.
 - **R29.** El sistema DEBE mostrar en la columna «Teléfono» de la lista, y en la tarjeta de teléfono
   (≤ 640 px), el `phone_e164` del cliente en formato internacional (`+57 300 123 4567`).
 - **R30.** SI un cliente tiene `phone_issue`, ENTONCES la lista DEBE mostrar su `phone` antiguo en
-  gris, seguido de una `StatusBadge` en tono `waiting`:
-  - «Teléfono sin formato válido» si es `invalid_format`;
-  - «Teléfono duplicado: revisar» si es `duplicate`.
-  - Texto exacto: ver la pregunta abierta P3.
+  gris, seguido de una `StatusBadge` en tono `waiting` con la etiqueta corta (D13):
+  - «Sin formato válido» si es `invalid_format`;
+  - «Duplicado: revisar» si es `duplicate`.
 - **R31.** CUANDO se abre la edición de un cliente con `phone_issue`, el sistema DEBE mostrar:
   - el número vacío y el país marcado con su `phone_country`;
-  - bajo el campo, la etiqueta de R30 y el texto antiguo: «Antes: <phone>. Escribe el número o
-    déjalo vacío.» en el caso inválido, y «Antes: <phone>, que ya tiene otro cliente.» en el
-    duplicado.
-- **R32.** CUANDO se guarda la edición de un cliente con `phone_issue`, el sistema DEBE dejar
-  `phone_issue` nulo.
-  - Con un número válido, aplica R11 y R12.
-  - Con el número vacío, aplica R10: el cliente queda sin teléfono (ver la pregunta abierta P2).
+  - bajo el campo, la etiqueta larga (D13), «Teléfono sin formato válido» o «Teléfono duplicado:
+    revisar», seguida del texto de ayuda:
+    - en el caso inválido: «Antes: <phone>. Escribe un número válido para reemplazarlo; si lo dejas
+      vacío, se conserva.»;
+    - en el duplicado: «Antes: <phone>, que ya tiene otro cliente. Escribe otro número para
+      reemplazarlo; si lo dejas vacío, se conserva.».
+- **R32.** CUANDO se guarda la edición de un cliente con `phone_issue` y un número válido, el sistema
+  DEBE aplicar R11 y R12, reemplazar el `phone` antiguo y dejar `phone_issue` nulo.
+- **R34.** SI se guarda la edición de un cliente con `phone_issue` y el número está vacío o solo
+  tiene espacios, ENTONCES el sistema DEBE conservar sin cambios `phone`, `phone_country`,
+  `phone_e164` (nulo) y `phone_issue`, y guardar normalmente los demás datos del cliente (D12).
+  - Elegir otro país sin escribir número no cambia nada del teléfono.
 
 ### Plataformas
 
@@ -228,18 +236,4 @@ Al correo y a los demás campos esas reglas les siguen aplicando igual.
 
 ## Preguntas abiertas
 
-- **P1 · ¿Qué es el «más reciente» en los duplicados de la migración?** La ficha no lo dice.
-  **Propuesta:** el de `created_at` más tardío y, si empatan, el `id` mayor. La otra lectura posible
-  es `updated_at`. R26 queda escrito con la propuesta hasta que el humano confirme.
-- **P2 · ¿Guardar la edición de un migrado con el número vacío borra el texto antiguo?** El tablero
-  dice «Escribe el número o déjalo vacío», y R32 lo lee como «queda sin teléfono» (R10), así que
-  `phone` se borra.
-  - **Riesgo:** quien edita solo la ciudad de un cliente migrado borra sin querer su teléfono antiguo,
-    porque el campo del número abre vacío.
-  - **La otra opción:** si el número llega vacío y el cliente tenía `phone_issue`, conservar `phone`
-    y la etiqueta.
-  - Lo decide el humano.
-- **P3 · ¿Texto de la etiqueta en la lista?** La decisión D9 dice «Teléfono sin formato válido» /
-  «Teléfono duplicado: revisar» en la lista y en la edición. El tablero, en la lista, dibuja la forma
-  corta («Sin formato válido» / «Duplicado: revisar»). R30 sigue a D9, la forma larga. Si vale la
-  corta en la lista, se cambia solo ese texto.
+Ninguna. P1, P2 y P3 las cerró el humano el 2026-10-19 al aprobar el spec: ahora son D11, D12 y D13.

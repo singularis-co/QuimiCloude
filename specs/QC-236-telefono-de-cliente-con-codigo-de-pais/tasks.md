@@ -10,8 +10,7 @@
   - `pnpm run lint`
   - `pnpm exec vitest related --run <archivos>`
   - `pnpm exec vitest run guard`
-- **Preguntas abiertas:** P1–P3 de `requirements.md` no bloquean empezar. Si el humano cambia P1 o
-  P2, solo cambian T5 (P1) y T8 (P2).
+- **Preguntas abiertas:** ninguna. P1–P3 quedaron cerradas el 2026-10-19 como D11–D13.
 
 ## Bloque A — Datos
 
@@ -76,12 +75,15 @@
     - que sin permiso se lanza `unauthorized` **antes** de validar el teléfono y sin llegar al puerto
       (R17);
     - que `'duplicate_phone'` del puerto se traduce a `customer_duplicate_phone` (R12);
-    - que el número vacío con país marcado guarda los cuatro campos nulos (R10).
+    - que el número vacío con país marcado guarda los cuatro campos nulos en el alta (R10);
+    - que en la edición, con el número vacío, el caso de uso manda al puerto la variante
+      `keep_legacy_or_clear` y no los cuatro nulos (R34).
   - Los tests de QC-154 R17 (`customer-input.test.ts`) y R19 (`customer-service.test.ts`) se
     ajustan para el teléfono y siguen cubriendo el correo y los demás campos.
   - Cualquier guardia que enumere los códigos de error sigue verde.
 
-- [ ] **T5 · Adaptador de persistencia y relleno** (R12, R13, R14, R24–R27). Depende de: T1, T4.
+- [ ] **T5 · Adaptador de persistencia y relleno** (R10, R12, R13, R14, R24–R27, R32, R34).
+  Depende de: T1, T4.
   - **Qué se hace:**
     - en `customer-prisma.ts`, las columnas nuevas y la traducción de la violación del índice
       `customers_company_phone_e164_key` (§ 4.5);
@@ -91,13 +93,18 @@
   - **Hecho cuando hay unit tests de `planLegacyPhoneBackfill`** que cubren:
     - válidos;
     - no válidos;
-    - el grupo duplicado (se lo queda el más reciente por `createdAt`, y por `id` si empatan; P1);
+    - el grupo duplicado (se lo queda el más reciente por `createdAt`, y por `id` si empatan; D11);
     - un número ya tomado en `taken`, que deja el grupo entero como `duplicate`.
   - **Y hay tests de integración** (con su entrada en `tests/integration/aislamiento.json`) que
     comprueban:
     - un duplicado en la misma empresa da `'duplicate_phone'`;
     - el mismo número en otra empresa o sobre un cliente dado de baja se acepta (R13);
     - editar conservando el propio número pasa;
+    - editar un cliente con `phone_issue` cambiando la ciudad y con el número vacío deja `phone`,
+      `phone_country`, `phone_e164` y `phone_issue` como estaban y guarda la ciudad (R34);
+    - editar ese mismo cliente con un número válido reemplaza `phone` y deja `phone_issue` nulo
+      (R32);
+    - editar con el número vacío un cliente válido (sin `phone_issue`) lo deja sin teléfono (R10);
     - dos altas simultáneas con el mismo número dejan una sola (R14);
     - el relleno, sobre filas sembradas con texto libre, convierte las válidas y marca
       `invalid_format` y `duplicate`;
@@ -164,16 +171,17 @@
     - número sin país da el error en el país;
     - un número no válido da «Este número no es válido para Colombia (+57).»;
     - `customer_duplicate_phone` del servidor se pinta bajo el número;
-    - la edición de un migrado muestra la etiqueta y «Antes: …»;
-    - guardar un migrado con el número vacío manda `phoneNumber=''` (R32, P2).
+    - la edición de un migrado muestra la etiqueta larga y el texto de ayuda de la enmienda
+      (`design.md § 1`): «…si lo dejas vacío, se conserva.» (R31);
+    - guardar un migrado con el número vacío manda `phoneNumber=''` y no pinta ningún error (R34).
 
 - [ ] **T10 · Página y lista** (R2, R29, R30). Depende de: T6, T7, T9.
   - **Qué se hace:**
     - `page.tsx` lee el país de la empresa tras el corte por permiso (§ 7);
     - `customer-columns.tsx` con `describeCustomerPhone` y `StatusBadge` (§ 8.4).
   - **Hecho cuando:**
-    - un test de UI de la columna cubre el número internacional, `invalid_format`, `duplicate` y sin
-      teléfono;
+    - un test de UI de la columna cubre el número internacional, `invalid_format` («Sin formato
+      válido»), `duplicate` («Duplicado: revisar») y sin teléfono (R30, D13);
     - el test de «una sola lectura de sesión por petición» sigue verde.
 
 ## Bloque D — Recorrido completo
@@ -193,7 +201,7 @@
 
 - [ ] **T12 · Cierre**. Depende de: todo.
   - **Qué se hace:**
-    - el mapa `R1…R33 → test` en `progress/impl_QC-236.md`, con la salida real de los tests;
+    - el mapa `R1…R34 → test` en `progress/impl_QC-236.md`, con la salida real de los tests;
     - la revisión visual contra `TelefonoCliente.dc.html` a 1440, 820 y 375 px;
     - `./init.sh` en verde (el gate completo lo corre CI en el PR).
   - **Hecho cuando:** ningún `R<n>` queda sin test y se declaran las desviaciones de

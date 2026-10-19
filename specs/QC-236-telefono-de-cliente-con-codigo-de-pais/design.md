@@ -39,6 +39,22 @@
 
 En lo visual manda el tablero. Las desviaciones están declaradas en § 8.5.
 
+**Enmienda al tablero (humano, 2026-10-19, D12 y D13).** El dibujo no se toca; donde choque, manda
+esta nota.
+
+- **Texto de ayuda de la edición de un migrado.** Las tarjetas «Edición · teléfono antiguo…» dicen
+  «Escribe el número o déjalo vacío». Con D12, dejarlo vacío **conserva** el teléfono antiguo, así
+  que el texto pasa a ser:
+  - inválido: «Antes: <phone>. Escribe un número válido para reemplazarlo; si lo dejas vacío, se
+    conserva.»;
+  - duplicado: «Antes: <phone>, que ya tiene otro cliente. Escribe otro número para reemplazarlo;
+    si lo dejas vacío, se conserva.».
+- **Etiquetas (D13).** En la lista, la forma corta del tablero («Sin formato válido» / «Duplicado:
+  revisar»). En el formulario, la larga del tablero («Teléfono sin formato válido» / «Teléfono
+  duplicado: revisar»). Coincide con lo que ya dibuja el tablero.
+- **Consecuencia aceptada de D12:** desde el formulario no se puede dejar sin teléfono a un cliente
+  migrado; solo se reemplaza por un número válido.
+
 ## 2. Modelo de datos
 
 ### 2.1 Columnas nuevas en `customers` (modelo `Customer`, `/// @module clientes`)
@@ -118,7 +134,7 @@ planLegacyPhoneBackfill(rows, country: CountryCode, taken: TakenE164): LegacyPho
 2. Agrupa las válidas por e164.
    - Si el e164 está en `taken`, todo el grupo sale `duplicate`.
    - Si no, el más reciente se queda el número y el resto sale `duplicate` (R26). «Más reciente» es
-     `createdAt` desc y, si empatan, `id` desc (pregunta abierta P1).
+     `createdAt` desc y, si empatan, `id` desc (D11).
 3. Es determinista y no tiene E/S: se prueba entera con unit tests.
 
 ### 3.2 Caso de uso `createBackfillLegacyPhones`, en `domain/backfill-legacy-phones.ts`
@@ -264,6 +280,14 @@ Se exporta desde el barrel. Este spec no fija qué hace con él QC-239.
     `customers_company_phone_e164_key`** a `'duplicate_phone'`. Cualquier otro error se relanza.
   - No hay `SELECT` previo: el índice es la garantía (R14; alternativa descartada en § 10).
 - **Los casos de uso** traducen `'duplicate_phone'` a `CustomerDuplicatePhoneError` (R12).
+- **Conservar el teléfono antiguo al editar (R34, D12).** Cuando el número llega vacío,
+  `update-customer.ts` manda en `NewCustomer` el teléfono como `{ kind: 'keep_legacy_or_clear' }`
+  en vez de los cuatro nulos. Dentro de la transacción de `updateAlive`, el adaptador bloquea la
+  fila (`SELECT … FOR UPDATE`) y decide con lo que hay en la base, no con lo que dice la UI:
+  - con `phone_issue` presente, no escribe `phone`, `phone_country`, `phone_e164` ni `phone_issue`;
+  - sin él, los pone a nulo (R10).
+  - Los demás datos del cliente se guardan igual en los dos casos.
+  - El alta no usa esta variante: con el número vacío guarda los nulos.
 - **Editar conservando el propio número** no choca (R13): el índice compara con las demás filas.
 - **`CustomerCatalog`** (lo consume `pedidos`) no cambia de forma.
 
@@ -337,7 +361,8 @@ sola lectura de sesión por petición») debe seguir verde.
   - **Edición con `phoneE164`:** país = `phoneCountry`, número =
     `formatPhoneNational(phoneE164, phoneCountry)` (R4).
   - **Edición con `phoneIssue`:** país = `phoneCountry`, número vacío, y bajo el campo la
-    `StatusBadge` `waiting` con la etiqueta de D9 y el texto «Antes: …» (R31).
+    `StatusBadge` `waiting` con la etiqueta larga (D13) y el texto de ayuda de la enmienda de § 1
+    (R31).
 - **Al salir del número** (`onBlur`):
   1. Si empieza por `+`, `countryFromInternationalInput` y, si da país, se cambia el selector (R7).
   2. Si es válido para el país, se reescribe con `formatPhoneNational` (R6).
@@ -381,7 +406,7 @@ La celda «Teléfono» usa `describeCustomerPhone(view)`, de dominio y exportada
 
 - **`phoneE164`:** `formatPhoneInternational`, en mono (R29).
 - **`phoneIssue`:** el `phone` antiguo en `text-muted-foreground` + `StatusBadge tone="waiting"`
-  con la etiqueta de D9 (R30). El `data-testid` es `customer-phone-issue-<id>`.
+  con la etiqueta corta (D13: «Sin formato válido» / «Duplicado: revisar», R30). El `data-testid` es `customer-phone-issue-<id>`.
 - **Sin teléfono:** `MissingValue`, como hoy.
 
 La tarjeta de teléfono sale de las mismas columnas en `DataTable` y no necesita código propio. Si
@@ -389,8 +414,7 @@ la implementación descubre que sí lo necesita, se para y se dice.
 
 ### 8.5 Desviaciones del tablero, declaradas
 
-- **Texto de la etiqueta en la lista:** el tablero dibuja la forma corta y D9 dice la larga. El spec
-  sigue a D9 (pregunta abierta P3).
+- **Texto de ayuda de la edición de un migrado:** cambia por D12 (enmienda de § 1).
 - **El tablero dice «`CountrySelect` sin cambios de forma»**, pero el disparador compacto `CO +57`
   del mismo tablero necesita `compactOnMobile` (§ 8.2). Es una extensión opcional, no un cambio de
   los usos existentes.
@@ -448,4 +472,3 @@ No entra ninguna. `libphonenumber-js` ya está aprobada (D1, `docs/dependencias.
   `customer-service.test.ts` R19 y, si resulta que afirma algo sobre el comentario `///` del modelo,
   `customers-schema.test.ts`; no se ha comprobado que lo haga): se ajustan **en lo que toca al
   teléfono**, y el `impl_` lo declara.
-- **Pregunta abierta P2:** borrar el teléfono antiguo al guardar una edición con el número vacío.
