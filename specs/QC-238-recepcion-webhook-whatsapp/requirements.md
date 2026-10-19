@@ -257,3 +257,4 @@ cambiarlas, quedan cerradas como están.
   sobre una conexión en `error` pone `lastWebhookAt` pero la deja en `error` (lo que falló es la
   prueba contra Graph, que el handshake no arregla; la siguiente prueba buena la deja `active` por
   QC-237 D12); el `POST` no cambia nunca el estado, solo `lastWebhookAt`. ¿Vale?
+| 2026-10-19 | F2.1, T3: `guard-firma-sesion-unica` prohíbe `createHmac` fuera de la cookie de sesión, y la firma de Meta (`X-Hub-Signature-256`) lo necesita. | Excepción nombrada en la guardia, solo para `lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac.ts`, con un caso de sensibilidad que demuestra que cualquier otro archivo sigue fallando. La guardia protege la firma de sesión y no prohíbe otras firmas: la de Meta es otro algoritmo con otro dueño. |
