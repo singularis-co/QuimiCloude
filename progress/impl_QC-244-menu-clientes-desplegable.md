@@ -100,6 +100,7 @@ Ningún archivo queda fuera de `tasks.md > Archivos esperados`. No se tocan:
 - Cómo se lanzó y por qué:
   - **Sin el proyecto `integration`**, porque su `globalSetup` exige `DATABASE_URL`: «test-db: falta DATABASE_URL» en el primer intento. El worktree no tiene `.env` y, por indicación del leader, no se lee ni se copia.
   - **Con rutas absolutas**: con rutas relativas en Windows, `related` puede responder «No test files found».
+- **Segunda corrida (implementer, tras T8, mismo comando, sin otra en paralelo):** `Test Files  452 passed (452)`, `Tests  7480 passed | 46 skipped (7526)`, exit 0. El timeout de la primera no se repite.
 - Archivos tocados más el barrido de §6.2, corridos directamente: 31 archivos, `461 passed | 23 skipped`, 0 rojos.
 
 ## E2E: pendiente en local
