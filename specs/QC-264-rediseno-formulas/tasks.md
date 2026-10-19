@@ -83,7 +83,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
 
 ## Tanda 2 — Listado (depende de T1a o de que esté en `dev`) [P con 3–7]
 
-- [ ] **T2a. Cabecera** (D1, R1). `page.tsx` con `PageShell` + `PageHeader`; orden de acciones; icono
+- [x] **T2a. Cabecera** (D1, R1). `page.tsx` con `PageShell` + `PageHeader`; orden de acciones; icono
   en «Nueva fórmula». Test en `recipe-page.test.tsx`: único `h1` «Fórmulas» con `recipes-title`, «Subir
   PDFs» antes de «Nueva fórmula», sin permiso de subir no hay «Subir PDFs». *Enmienda (E1):* también
   sin proveedor IA: «Subir PDFs» deshabilitado dentro del globo, en el mismo sitio y antes de «Nueva

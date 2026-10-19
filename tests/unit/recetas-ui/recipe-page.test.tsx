@@ -49,6 +49,7 @@ import type {
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { getAiProviderReadinessAction } from '@/lib/modules/integraciones/adapters/driving/ai-provider-actions';
 
 import {
   NARROW_VIEWPORT,
@@ -396,6 +397,76 @@ describe('pantalla de recetas — ubicacion y navegacion', () => {
     ).find((item) => item.testId === 'nav-produccion-recetas');
     expect(declarado?.href).toBe(FORMULAS_ROUTE);
     expect(declarado?.label).toBe(RECIPES_LABEL);
+  });
+});
+
+describe('pantalla de recetas — cabecera', () => {
+  const SUBIR = 'document-upload-open';
+  const GLOBO_PROVEEDOR_IA = 'ai-provider-required-tooltip-trigger';
+
+  function sigueA(antes: HTMLElement, despues: HTMLElement): boolean {
+    return (antes.compareDocumentPosition(despues) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  }
+
+  it('R1: la cabecera es un PageHeader dentro de PageShell con «Fórmulas» como único h1', async () => {
+    await renderPantalla();
+
+    const titulo = screen.getByTestId(testId.titulo);
+    expect(screen.getAllByRole('heading', { level: 1 })).toEqual([titulo]);
+    expect(titulo).toHaveTextContent(RECIPES_LABEL);
+
+    const cabecera = titulo.closest('[data-slot="page-header"]');
+    expect(cabecera).not.toBeNull();
+    const armazon = cabecera?.closest('[data-slot="page-shell"]');
+    expect(armazon).not.toBeNull();
+    expect(armazon).toContainElement(screen.getByTestId(testId.tabla));
+  });
+
+  it('R1: «Subir PDFs» va antes que «Nueva fórmula», las dos en las acciones de la cabecera, y crear lleva icono', async () => {
+    await renderPantalla();
+
+    const acciones = screen
+      .getByTestId(testId.titulo)
+      .closest('[data-slot="page-header"]')
+      ?.querySelector('[data-slot="page-header-actions"]') as HTMLElement;
+    const subir = within(acciones).getByTestId(SUBIR);
+    const crear = within(acciones).getByTestId(testId.crear);
+
+    expect(subir).toBeEnabled();
+    expect(sigueA(subir, crear)).toBe(true);
+    expect(crear).toHaveTextContent('Nueva fórmula');
+    expect(crear.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('R1: sin permiso de subir documentos no se pinta «Subir PDFs» y «Nueva fórmula» sigue', async () => {
+    getSessionUserMock.mockResolvedValue({
+      ...USUARIO_DEL_TEST,
+      permissions: USUARIO_DEL_TEST.permissions.filter((codigo) => !codigo.startsWith('documentos.')),
+    });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(SUBIR)).toBeNull();
+    expect(screen.queryByTestId(GLOBO_PROVEEDOR_IA)).toBeNull();
+    expect(screen.getByTestId(testId.crear)).toBeInTheDocument();
+  });
+
+  it('R1: sin proveedor IA «Subir PDFs» sale deshabilitado dentro del globo, en el mismo sitio y antes de «Nueva fórmula»', async () => {
+    vi.mocked(getAiProviderReadinessAction).mockResolvedValueOnce({
+      configured: false,
+      canConfigure: false,
+    });
+
+    await renderPantalla();
+
+    const subir = screen.getByTestId(SUBIR);
+    const globo = screen.getByTestId(GLOBO_PROVEEDOR_IA);
+    const crear = screen.getByTestId(testId.crear);
+    expect(subir).toBeDisabled();
+    expect(globo).toContainElement(subir);
+    expect(globo.parentElement).toBe(crear.parentElement);
+    expect(globo.parentElement).toHaveAttribute('data-slot', 'page-header-actions');
+    expect(sigueA(globo, crear)).toBe(true);
   });
 });
 
