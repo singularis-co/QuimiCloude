@@ -1,8 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
-
-import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn, type RowActionsSpec } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import type { RecipeSummary } from '@/lib/modules/recetas';
 import { formatCivilDate } from '@/lib/shared/ui/date-civil';
@@ -31,16 +29,16 @@ export type RecipeColumnId =
 export type RecipeColumn = DataTableColumn<RecipeSummary> & { readonly id: RecipeColumnId };
 
 export type RecipeColumnsDeps = {
-  /** Slot: quien monta la tabla enchufa el menu de acciones de la fila. */
-  readonly rowActions: (recipe: RecipeSummary) => ReactNode;
+  /** Las acciones como datos: la fila y la tarjeta pintan el mismo menú. */
+  readonly menu: (recipe: RecipeSummary) => RowActionsSpec;
 };
 
 /**
- * Factoria y no array del modulo porque las acciones son componentes de cliente que llegan por
- * parametro. `sortable` y `filter` replican `RECIPE_QUERYABLE`: una cabecera ordenable que el
- * servidor ignora seria un control que miente.
+ * Factoria y no array del modulo porque las acciones dependen de quien monta la tabla. `sortable`
+ * y `filter` replican `RECIPE_QUERYABLE`: una cabecera ordenable que el servidor ignora seria un
+ * control que miente.
  */
-export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly RecipeColumn[] {
+export function buildRecipeColumns({ menu }: RecipeColumnsDeps): readonly RecipeColumn[] {
   return [
     {
       id: IMAGE_COLUMN_ID,
@@ -69,14 +67,15 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
     {
       id: 'stepCount',
       label: 'Pasos',
-      align: 'center',
+      tabular: true,
+      align: 'end',
       cell: (recipe) => String(recipe.stepCount),
     },
     {
       id: 'createdAt',
       label: 'Creado',
       tabular: true,
-      align: 'start',
+      align: 'end',
       sortable: true,
       filter: { kind: 'dateRange' },
       cell: (recipe) => formatCivilDate(recipe.createdAt),
@@ -85,12 +84,12 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
       id: 'updatedAt',
       label: 'Actualizado',
       tabular: true,
-      align: 'start',
+      align: 'end',
       sortable: true,
       cell: (recipe) => formatCivilDate(recipe.updatedAt),
     },
     {
-      ...actionsColumn<RecipeSummary>({ label: ACTIONS_COLUMN_LABEL, cell: rowActions }),
+      ...actionsColumn<RecipeSummary>({ id: ACTIONS_COLUMN_ID, label: ACTIONS_COLUMN_LABEL, menu }),
       id: ACTIONS_COLUMN_ID,
     },
   ];

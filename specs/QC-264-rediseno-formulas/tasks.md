@@ -89,7 +89,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   sin proveedor IA: «Subir PDFs» deshabilitado dentro del globo, en el mismo sitio y antes de «Nueva
   fórmula» (mock de `getAiProviderReadinessAction` con `configured: false`); `formulas-upload.test.tsx`
   en verde.
-- [ ] **T2b. Menú como datos, un diálogo por tabla y tarjetas** (D2, D3, R2–R6). `recipe-row-actions.tsx`,
+- [x] **T2b. Menú como datos, un diálogo por tabla y tarjetas** (D2, D3, R2–R6). `recipe-row-actions.tsx`,
   `recipe-columns.tsx`, `recipe-table.tsx`. Tests nuevos `tests/unit/recetas-ui/recipe-row-actions-spec.test.tsx`
   (ítems, orden, separador, destructivo, href, testids, `data-recipe-id`, `title`; «Borrar» abre el
   diálogo de esa receta; un solo `delete-recipe-dialog` montado) y `tests/unit/recetas-ui/recipe-cards.test.tsx`
