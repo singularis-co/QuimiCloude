@@ -1,7 +1,42 @@
 # QC-278 — pantalla-modulos-por-empresa · design.md
 
-> Zona: `frontend` · `depends_on`: QC-166 (detalle de empresa, en especificación en paralelo) y
+> Zona: `frontend` · `depends_on`: QC-166 (detalle de empresa, mergeado en `dev`, PR #267) y
 > QC-277 (motor de módulos, en `dev`). Requisitos: `requirements.md` (R1–R25).
+>
+> **Spec aprobado el 2026-10-19** («Apruebo con defectos», P1–P4 con su defecto) y **enmendado el
+> mismo día contra `dev`** (merge `a01b5c11`, que trae QC-166 y QC-263): ver § 0. La enmienda solo
+> corrige rutas, nombres, citas, tests y tareas; no cambia el comportamiento de R1–R25.
+
+## 0. Enmienda contra dev (2026-10-19)
+
+El spec se escribió contra el **spec** de QC-166; esto es lo que cambia al contrastarlo con su
+**código** mergeado. Regla: en lo visual manda el tablero (no cambia nada visual); en columnas y
+datos manda lo mergeado. Ningún requisito cambia de comportamiento.
+
+| # | Qué decía el spec | Qué hay en `dev` | Qué cambia aquí |
+|---|---|---|---|
+| E1 | La línea de montaje en `page.tsx` y `export * from './modulos';` «solo si QC-166 no la deja puesta» | `page.tsx` deja el panel vacío con un comentario (`app/(private)/maestro/empresas/[id]/page.tsx:108-121`, comentario en l. 120); el barrel no exporta `./modulos` (`[id]/components/index.ts:1-5`) | Las dos líneas las pone **siempre** esta ficha (T6). § 3, § 10, tasks T6 y `Archivos esperados` |
+| E2 | Uso: `isDeleted={company.deletedAt !== null}` | `CompanyDetail.status: 'active' \| 'deleted'` y `deletedAt` (`lib/modules/identity/domain/company-view.ts:3, 15-24`); QC-166 fija `company.status === 'deleted'` (`specs/QC-166-area-del-maestro/design.md:354-356`) | El snippet de § 3 usa `company.status === 'deleted'` (equivalente) |
+| E3 | Uso: `canModify={permissions.includes('empresas.modificar')}` | La página ya calcula `canModify` con `canModifyCompanies()` → `assertPermission(user, 'empresas.modificar', …)` (`page.tsx:45-54, 96`) | El snippet de § 3 pasa la `canModify` que ya existe |
+| E4 | La pestaña «se monta cuando `tab === 'modulos'`» | El panel `role="tabpanel"` con `aria-label` «Módulos» y `data-testid="company-detail-panel-modulos"` ya lo pinta la página (`page.tsx:108-113`; `company-detail-tabs.ts:15-19, 28-30`) | `CompanyModulesTab` va **dentro** de ese panel y no pinta otro `tabpanel` (§ 3) |
+| E5 | Ningún test existente se tocaba | Dos casos de QC-166 R30 se ponen rojos al montar la pestaña: «con tab=modulos deja el panel «Módulos» vacio y no pide los añadidos» (`tests/ui/maestro/company-detail-page.test.tsx:240-246`) y «ni la pagina ni sus componentes importan los añadidos ni una carpeta de modulos» (`:248-253`) | T6 los reescribe: con `tab=modulos` el panel monta la pestaña con las cuatro props y la **página** sigue sin llamar a `getCompanyAddonsAction` (la llama la pestaña, R2). Se listan en `Archivos esperados`. Lo que QC-166 R30 pedía era el hueco «listo para que lo llene QC-278» (`specs/QC-166-area-del-maestro/requirements.md:151-152`) |
+| E6 | Tests en `tests/ui/maestro/` | QC-166 pone los de componente en `tests/ui/maestro/` (`company-detail-page.test.tsx`, `company-history-panel.test.tsx`, …) y los puros en `tests/unit/maestro/` (`company-event-text.test.ts`) | Los `*.test.tsx` van a `tests/ui/maestro/` y `addon-labels.test.ts` a `tests/unit/maestro/`. Caen en los mismos proyectos de vitest (`vitest.config.mts:60, 75`). § 7, tasks y `Archivos esperados` |
+| E7 | `ADDON_NAMES` «lo crea QC-166»; T1 dependía de su merge; riesgo de orden de merge | Existe: `lib/shared/ui/addon-names.ts:2-15`, clave `AddonNameKey` igualada a `Addon` por `tests/unit/shared/addon-names.test.ts:8`; fila en `components/shared/CATALOGO.md:111`; ya lo consume `company-event-text.ts:2, 27` | Se quita la dependencia de T1 y el riesgo de § 12. `ADDON_NAMES[addon]` se indexa con `Addon` sin conversión (los tipos son iguales) |
+| E8 | Acciones en `company-actions.ts:44-49, 222-266` | Tipos en `lib/modules/identity/adapters/driving/company-actions.ts:44-49`; acciones en `:214-258`. `CompanyAddonState`/`CompanyAddonsView` en `domain/company-addons-view.ts:3-15`, exportados por `lib/modules/identity/index.ts:428`; `type Addon` en `:413` | Citas corregidas (§ Lo que ya existe, § 6) |
+| E9 | R1 estático: «no importa `getSessionUser` ni `next/headers`» | La sesión se lee como `identity.getSessionUser()` de `@/lib/composition`, y el permiso con `assertPermission`/`requirePagePermission` (`page.tsx:9, 11, 13, 46, 64`) | El test de R1 comprueba que los archivos de la pestaña no importan `@/lib/composition`, `next/headers`, `assertPermission` ni `requirePagePermission` (§ 7.1) |
+| E10 | `<ErrorState … retry={{ kind: 'refresh' }} … />` | `testId` es obligatorio y `retryTestId` va con `retry` (`components/shared/error-state.tsx:14-27`); patrón de QC-166 en `company-history-panel.tsx:234-244` | § 4.1 nombra `testId="company-modules-error"` y `retryTestId="company-modules-retry"` |
+| E11 | Esqueleto con `role="status"` | QC-166 lo hace con `role="status"`, `aria-busy="true"` y `aria-label` del texto de carga (`company-history-panel.tsx:207-224`) | `ModulesSkeleton` sigue ese patrón (`data-testid="company-modules-skeleton"`); R3 no cambia |
+| E12 | `ConfirmDialog` «controlado, `onConfirm` por callback» | Además exige `testIds` `{ dialog, dismiss, confirm }` (`components/shared/confirm-dialog.tsx:33-41, 365`); `onConfirm` se llama tras `onOpenChange(false)` (`:159-160`) | § 4.3 nombra los `testIds`. El cierre antes de escribir ya era el flujo de § 4.2 |
+| E13 | E2E con `createFixtureUser` y limpieza «como `modulos-por-empresa.spec.ts`» | QC-166 dejó `maestroCredentials()` y `deleteFixtureCompanies(prefix, createdBefore)` (`e2e/helpers/maestro.ts:32-37, 44-65`), usados por `e2e/maestro-empresas.spec.ts:35-40, 124`; `loginAndLand` en `e2e/helpers/landing.ts:78`; `maestroCompanyRoute(id, 'modulos')` en `lib/shared/routes.ts:319-322` | § 7.2 usa esos helpers en vez de leer `SEED_MAESTRO_*` o borrar a mano |
+| E14 | Nada sobre guardias de E2E | Todo spec E2E nuevo se da de alta, uno a uno y con su motivo, en la lista cerrada `E2E_ESPERADOS` de `tests/guards/guard-identificador-de-request.test.ts:57-503` (precedentes: QC-277 en `:430-441`, QC-166 en `:480-502`) | T6 añade `maestro-modulos.spec.ts` a esa lista. En `Archivos esperados` |
+| E15 | «el `Switch` ya da 44 px bajo 768 px» | `touchTarget` = `min-h-11 min-w-11` y `md:min-h-9` (`components/ui/switch.tsx:22-23`, `lib/shared/ui/touch-target.ts:2`); `Button` `touch="mobile"` = `max-md:min-h-11` (`components/ui/button.tsx:40-44`) | Confirmado: R24 sin clases propias de talla |
+| E16 | `<Toaster />` en `app/(private)/layout.tsx:152` | `<Toaster richColors />` en esa línea | Sin cambio |
+
+Comprobado sin cambios (las piezas y props que usa § 4 existen tal cual en el árbol tras el merge de
+QC-263): `StatusBadge` con tonos `success`, `waiting`, `muted` (`lib/shared/ui/status-tone.ts:1`),
+`Notice` con `tone="warning"` (`components/shared/notice.tsx:10`), `ErrorAlert` con `before`
+(`components/shared/error-alert.tsx:22`), `Badge` `outline`, `Skeleton`, `Spinner`, y las filas del
+catálogo citadas abajo. QC-263 no toca nada de lo que usa esta ficha.
 
 ## Lo que ya existe
 
@@ -14,9 +49,10 @@ Búsqueda hecha el 2026-10-16 (`docs/specs.md > Antes de especificar: lo que ya 
 |---|---|---|
 | Board (`feature_list.json`) | QC-277 (motor, `depends_on`), QC-166 (detalle de empresa que monta la pestaña, `depends_on`). Ninguna otra ficha con la pantalla de interruptores | Se consume QC-277 y se monta en QC-166; nada duplicado |
 | `specs/` | Solo `specs/QC-277-modulos-por-empresa/design.md` cita las acciones (§ 6.5) y deja la pantalla a QC-278 (§ 6.1 «para que QC-278 no tenga que releer», § 12) | Contrato de I/O tomado de ahí |
-| `.worktrees/QC-166-area-del-maestro/specs/QC-166-area-del-maestro/` | Al empezar, solo `requirements.md` (Alcance: «pestañas Datos, Módulos (la llena QC-278) e Historial»). Después, su `design.md` adoptó el contrato de § 3 tal cual y declaró `lib/shared/ui/addon-names.ts` (`ADDON_NAMES`) para su Historial (QC-166 `design.md > 6.5`) | Se monta según § 3; los nombres de los añadidos se toman de `ADDON_NAMES` (§ 5) |
-| Código (grafo + Grep) | `getCompanyAddonsAction`, `setCompanyAddonAction`, `setAllCompanyAddonsAction` y sus tipos `CompanyAddonsResult`, `CompanyAddonsFormState` en `lib/modules/identity/adapters/driving/company-actions.ts:44-49, 222-266`; `CompanyAddonsView` en `lib/modules/identity/domain/company-addons-view.ts`; `ADDONS`, `ADDON_REQUIRES`, `type Addon` en `lib/modules/identity/domain/company-addons.ts`. Ninguna ruta `app/**/maestro/**`. Ningún nombre visible de añadido ni del núcleo en código | Se reutilizan tal cual; las etiquetas se crean (§ 5) |
-| `e2e/` | `e2e/modulos-por-empresa.spec.ts` (QC-277: interruptores por Prisma, menú del Administrador), `e2e/helpers/addons.ts`, `e2e/helpers/landing.ts`, `e2e/helpers/fixture-user.ts` | El E2E nuevo reutiliza los helpers y los `data-testid` del menú (`nav-proveedores`) |
+| `specs/QC-166-area-del-maestro/` (en `dev` desde PR #267) | Su `design.md > 6.4` adopta el contrato de § 3 tal cual; `> 6.5` crea `lib/shared/ui/addon-names.ts` (`ADDON_NAMES`) para su Historial | Se monta según § 3; los nombres de los añadidos se toman de `ADDON_NAMES` (§ 5) |
+| Código de QC-166 (en `dev`) | `app/(private)/maestro/empresas/[id]/page.tsx` (detalle, `UrlTabs`, panel `role="tabpanel"` vacío para Módulos en l. 108-121, `canModify` en l. 45-54 y 96), `[id]/components/index.ts` (barrel), `[id]/components/company-detail-tabs.ts` (`COMPANY_DETAIL_TABS`, `companyDetailPanelTestId`), `[id]/components/company-history-panel.tsx` (patrón de panel async + esqueleto + `ErrorState`), `lib/shared/ui/addon-names.ts`, `e2e/helpers/maestro.ts`, `tests/ui/maestro/company-detail-page.test.tsx` | Se monta en el panel existente; se sigue el patrón del Historial; se reescriben dos casos de R30 (§ 0, E5) |
+| Código de QC-277 (grafo + Grep) | `getCompanyAddonsAction`, `setCompanyAddonAction`, `setAllCompanyAddonsAction` y sus tipos `CompanyAddonsResult`, `CompanyAddonsFormState` en `lib/modules/identity/adapters/driving/company-actions.ts:44-49, 214-258`; `CompanyAddonsView` en `lib/modules/identity/domain/company-addons-view.ts:12-15`; `ADDONS`, `ADDON_REQUIRES`, `type Addon` en `lib/modules/identity/domain/company-addons.ts:3-14`. Ninguna descripción ni icono de añadido ni nombre del núcleo en código | Se reutilizan tal cual; descripciones, iconos y núcleo se crean (§ 5) |
+| `e2e/` | `e2e/modulos-por-empresa.spec.ts` (QC-277: interruptores por Prisma, menú del Administrador), `e2e/maestro-empresas.spec.ts` (QC-166), `e2e/helpers/maestro.ts`, `e2e/helpers/landing.ts`, `e2e/helpers/fixture-user.ts` | El E2E nuevo reutiliza los helpers y los `data-testid` del menú (`nav-proveedores`) |
 
 ### Filas de `components/shared/CATALOGO.md` consultadas
 
@@ -88,40 +124,49 @@ export { CompanyModulesTab, type CompanyModulesTabProps } from './company-module
 export type CompanyModulesTabProps = {
   readonly companyId: string;    // CompanyDetail.id
   readonly companyName: string;  // CompanyDetail.name — lo citan los diálogos (R10, R12)
-  readonly isDeleted: boolean;   // CompanyDetail.deletedAt !== null (R20)
+  readonly isDeleted: boolean;   // CompanyDetail.status === 'deleted' (≡ deletedAt !== null) (R20)
   readonly canModify: boolean;   // la sesión trae `empresas.modificar` (R21); lo resuelve la página
 };
 ```
 
-Uso esperado en la página de QC-166 (Server Component):
+Montaje en la página de QC-166 (Server Component), **en lugar del comentario** de
+`page.tsx:120`, dentro del `<div role="tabpanel">` que ya existe (`page.tsx:108-113`; enmienda E1,
+E4):
 
 ```tsx
 {tab === 'modulos' ? (
   <CompanyModulesTab
     companyId={company.id}
     companyName={company.name}
-    isDeleted={company.deletedAt !== null}
-    canModify={permissions.includes('empresas.modificar')}
+    isDeleted={company.status === 'deleted'}
+    canModify={canModify}            // la de `canModifyCompanies()`, page.tsx:96
   />
 ) : null}
 ```
 
+El import se añade a la lista que la página ya trae de `'./components'` (`page.tsx:17-31`).
+
 - `CompanyModulesTab` es un **Server Component** que envuelve `ModulesSection` en un
   `<Suspense fallback={<ModulesSkeleton />}>` (R3). La página no tiene que poner su propio
-  `Suspense`.
+  `Suspense` (el Historial sí lo pone en la página, `page.tsx:115-119`; aquí el contrato aprobado
+  lo deja dentro de la pestaña y no se cambia).
+- **No pinta otro `tabpanel`**: el panel, su nombre accesible «Módulos» y su
+  `data-testid="company-detail-panel-modulos"` son de la página (`page.tsx:108-113`,
+  `company-detail-tabs.ts:28-30`).
 - **No lee la sesión ni decide permisos** (R1): `canModify` llega hecho. Que el Maestro tenga
-  `empresas.consultar` para ver la página lo comprueba QC-166; y si no lo tuviera, la acción
-  responde `unauthorized` y la pestaña pinta el error de R4.
+  `empresas.consultar` para ver la página lo comprueba QC-166 (`requirePagePermission`,
+  `page.tsx:64`); y si no lo tuviera, la acción responde `unauthorized` y la pestaña pinta el error
+  de R4.
 - **Barrel.** Los componentes de la pestaña viven en la subcarpeta `components/modulos/` con su
   propio `index.ts`; el `components/index.ts` de la ruta (de QC-166) solo gana la línea
   `export * from './modulos';`. Así las dos fichas no se pisan el barrel (§ 10).
 - **Carpeta.** `app/(private)/maestro/empresas/[id]/`, fijada por el spec de QC-166 (pregunta
   abierta 5, cerrada). El área del Maestro no tiene layout propio: el `<Toaster />` que pide R15 es
   el de `app/(private)/layout.tsx:152`.
-- **Alineación con QC-166.** Su `design.md` adopta este contrato tal cual (props y montaje).
-- **Nombres de los añadidos.** QC-166 crea `lib/shared/ui/addon-names.ts` con `ADDON_NAMES`
-  (solo nombres, los del tablero) para su Historial (QC-166 `design.md > 6.5`). Esta ficha los
-  toma de ahí y no los repite (§ 5).
+- **Alineación con QC-166.** Su `design.md > 6.4` adopta este contrato tal cual (props y montaje)
+  y deja a esta ficha las dos líneas (`specs/QC-166-area-del-maestro/design.md:356-357`).
+- **Nombres de los añadidos.** `lib/shared/ui/addon-names.ts` (`ADDON_NAMES`, l. 9-15) ya está en
+  `dev` (QC-166 `design.md > 6.5`). Esta ficha los toma de ahí y no los repite (§ 5).
 
 ## 4. Componentes y flujo
 
@@ -130,7 +175,7 @@ app/(private)/maestro/empresas/[id]/components/modulos/
   index.ts                       ← barrel de la pestaña (sin 'use client')
   company-modules-tab.tsx        ← Server: <Suspense fallback={<ModulesSkeleton/>}><ModulesSection …/></Suspense>
   modules-section.tsx            ← Server async: getCompanyAddonsAction(companyId) → error (R4) o lista + núcleo
-  modules-skeleton.tsx           ← Server: «Cargando los módulos…», role="status", 4 Skeleton de 68 px (R3)
+  modules-skeleton.tsx           ← Server: «Cargando los módulos…», role="status" + aria-busy, 4 Skeleton de 68 px (R3; patrón CompanyHistorySkeleton)
   addon-switch-list.tsx          ← 'use client': estado, escrituras, diálogo, toasts, errores (R5–R18, R20–R24)
   core-module-chips.tsx          ← Server: sección «Núcleo» con 11 Badge y candado (R19)
   addon-labels.ts                ← nombres, descripciones, iconos y textos de toast por añadido (§ 5)
@@ -141,10 +186,11 @@ app/(private)/maestro/empresas/[id]/components/modulos/
 ### 4.1 `ModulesSection` (Server, async)
 
 1. `const result = await getCompanyAddonsAction(companyId)` — importada por su ruta exacta
-   (`@/lib/modules/identity/adapters/driving/company-actions`), como `customer-list-section.tsx`.
-   Una sola llamada (R2).
+   (`@/lib/modules/identity/adapters/driving/company-actions`), como `CompanyHistoryPanel` con
+   `listCompanyEventsAction` (`company-history-panel.tsx:21, 232`). Una sola llamada (R2).
 2. `result.status === 'error'` → `<ErrorState error={result} title="No pudimos cargar los módulos"
-   retry={{ kind: 'refresh' }} … />` y nada más (R4).
+   testId="company-modules-error" retry={{ kind: 'refresh' }} retryTestId="company-modules-retry" />`
+   y nada más (R4). Mismo patrón que `company-history-panel.tsx:234-244` (enmienda E10).
 3. Éxito → `<AddonSwitchList initialView={result.data} companyName isDeleted canModify />` (que
    pinta arriba el `Notice` de baja si `isDeleted`, R20) y `<CoreModuleChips />`.
 
@@ -219,7 +265,11 @@ function write(addons: readonly Addon[], enabled: boolean, via: 'one' | 'all') {
 
 ### 4.3 Diálogo (R10, R12)
 
-`ConfirmDialog` controlado (`open={confirm !== null}`), `variant="destructive"`, `onConfirm`:
+`ConfirmDialog` controlado (`open={confirm !== null}`, `onOpenChange` que pone `confirm` a `null`),
+`variant="destructive"`, `onConfirm` (se llama después de `onOpenChange(false)`,
+`confirm-dialog.tsx:159-160`) y `testIds` obligatorios
+`{ dialog: 'company-addon-off-dialog', dismiss: 'company-addon-off-dismiss', confirm: 'company-addon-off-confirm' }`
+(`confirm-dialog.tsx:33-41, 365`; enmienda E12):
 
 | | Un añadido | Todos |
 |---|---|---|
@@ -235,7 +285,7 @@ function write(addons: readonly Addon[], enabled: boolean, via: 'one' | 'all') {
 - `importacion_excel` → «Las revisiones sin confirmar quedan ocultas hasta que lo vuelvas a
   prender.»;
 - `integraciones` → «Lectura de PDF con IA deja de funcionar aunque siga prendida, porque la
-  necesita.», solo si va sola y `lectura_pdf` tiene el interruptor prendido (pregunta abierta 3);
+  necesita.», solo si va sola y `lectura_pdf` tiene el interruptor prendido (P3, cerrada con este defecto el 2026-10-19);
 - sin repetir líneas, en el orden de `ADDONS` (R12).
 
 La unión de nombres «A, B y C» usa `Intl.ListFormat('es', { type: 'conjunction' })` (soportado en
@@ -255,8 +305,10 @@ En la carpeta de la pestaña, **no en el dominio**:
 
 ```ts
 // addon-labels.ts
-import type { Addon } from '@/lib/modules/identity';   // solo el tipo: no arrastra servidor al cliente
-import { ADDON_NAMES } from '@/lib/shared/ui/addon-names';   // de QC-166: fuente única de los nombres
+import type { Addon } from '@/lib/modules/identity';   // solo el tipo (index.ts:413): no arrastra servidor al cliente
+import { ADDON_NAMES } from '@/lib/shared/ui/addon-names';   // de QC-166, en dev: fuente única de los nombres
+// `ADDON_NAMES` está tipado con `AddonNameKey`, igual a `Addon` (tests/unit/shared/addon-names.test.ts:8):
+// `ADDON_NAMES[addon]` con `addon: Addon` compila sin conversión.
 
 const ADDON_DETAILS: Readonly<Record<Addon, { description: string; icon: LucideIcon }>> = {
   dashboard:         { description: '…', icon: LayoutDashboard },
@@ -271,15 +323,16 @@ export const ADDON_LABELS: Readonly<Record<Addon, { name: string; description: s
 ```
 
 - **`Record<Addon, …>`**: un sexto añadido en `ADDONS` rompe el typecheck hasta tener etiqueta.
-- **Nombres**: **no se escriben aquí**. Salen de `ADDON_NAMES` (`lib/shared/ui/addon-names.ts`,
-  lo crea QC-166 para su Historial, QC-166 `design.md > 6.5`): los del tablero, que son los de
-  QC-277 D3 con mayúscula inicial. Esta ficha no edita ese archivo ni su fila del catálogo.
-- **Descripciones**: las de la pregunta abierta 1 (propuestas; el humano las confirma en la
-  revisión). La de Integraciones ya está en el tablero.
+- **Nombres**: **no se escriben aquí**. Salen de `ADDON_NAMES` (`lib/shared/ui/addon-names.ts:9-15`,
+  en `dev` desde QC-166, que ya lo usa en `company-event-text.ts:27`): los del tablero, que son
+  los de QC-277 D3 con mayúscula inicial. Esta ficha no edita ese archivo ni su fila del catálogo
+  (`components/shared/CATALOGO.md:111`, que deja descripción e icono a quien pinta).
+- **Descripciones**: las de la pregunta 1, **cerrada el 2026-10-19 con el texto propuesto**. La de
+  Integraciones ya está en el tablero.
 - **Iconos**: de `lucide-react`; el tablero dibuja trazos propios y no nombra el icono, así que el
   implementer elige el de `lucide-react` más parecido a cada uno (cuadrícula, camión, documento,
   hoja de cálculo, pieza de puzle; candado `Lock` para el núcleo; eslabón `Link` para «Necesita»).
-- **`core-modules.ts`**: `CORE_MODULE_NAMES`, los 11 del tablero (pregunta abierta 2).
+- **`core-modules.ts`**: `CORE_MODULE_NAMES`, los 11 del tablero (P2, cerrada con este defecto el 2026-10-19).
   No se deriva de `CORE_PERMISSIONS`: son permisos, no módulos con nombre.
 
 ## 6. Contratos de entrada y salida (QC-277, sin cambios)
@@ -299,22 +352,25 @@ la respuesta: decisión cerrada «¿Releer tras guardar?»).
 ## 7. Pruebas y trazabilidad
 
 Tests de componente en el proyecto `ui` de vitest (`*.test.tsx`, `docs/perfil-agentes.md >
-frontend_dev > Tests`), con las tres acciones simuladas con `vi.mock` de su ruta exacta y
-`sonner` simulado. Prefijo `tests/unit/maestro-ui/`.
+frontend_dev > Tests`), con las tres acciones simuladas con `vi.mock` de su ruta exacta (la forma
+de `tests/ui/maestro/company-detail-page.test.tsx:51-64`) y `sonner` simulado. Carpetas las de
+QC-166 (enmienda E6): componentes en `tests/ui/maestro/`, puros en `tests/unit/maestro/`.
 
 | Archivo | Tipo | Qué cubre |
 |---|---|---|
-| `tests/unit/maestro-ui/company-modules-tab.test.tsx` | ui | R1 (props, sin leer sesión: el módulo no importa `getSessionUser` ni `next/headers`), R2 (una llamada con el `companyId`), R3 (el `fallback` del `Suspense` es `ModulesSkeleton`; el esqueleto pinta «Cargando los módulos…» en `role="status"`), R4 (error → título, mensaje, referencia y «Reintentar»; sin `switch` ni Núcleo) |
-| `tests/unit/maestro-ui/addon-switch-list.test.tsx` | ui | R5–R18, R20–R24 (ver mapa) |
-| `tests/unit/maestro-ui/core-module-chips.test.tsx` | ui | R19 (11 fichas en orden, sin `switch` ni botón) |
-| `tests/unit/maestro-ui/addon-labels.test.ts` | unit | R5 (una etiqueta por cada `ADDONS`, ni una más), R15 (`changedAddons`, mensajes singular y plural), R10/R12 (`offConsequences`: líneas por añadido, sin repetir, regla de Integraciones) |
+| `tests/ui/maestro/company-modules-tab.test.tsx` | ui | R1 (props, sin leer sesión: ningún archivo de `components/modulos/` importa `@/lib/composition`, `next/headers`, `assertPermission` ni `requirePagePermission`, enmienda E9), R2 (una llamada con el `companyId`), R3 (el `fallback` del `Suspense` es `ModulesSkeleton`; el esqueleto pinta «Cargando los módulos…» en `role="status"`), R4 (error → título, mensaje, referencia y «Reintentar»; sin `switch` ni Núcleo) |
+| `tests/ui/maestro/addon-switch-list.test.tsx` | ui | R5–R18, R20–R24 (ver mapa) |
+| `tests/ui/maestro/core-module-chips.test.tsx` | ui | R19 (11 fichas en orden, sin `switch` ni botón) |
+| `tests/unit/maestro/addon-labels.test.ts` | unit | R5 (una etiqueta por cada `ADDONS`, ni una más), R15 (`changedAddons`, mensajes singular y plural), R10/R12 (`offConsequences`: líneas por añadido, sin repetir, regla de Integraciones) |
 | `e2e/maestro-modulos.spec.ts` | E2E (Playwright) | R25 |
+| `tests/ui/maestro/company-detail-page.test.tsx` (de QC-166, **se modifica**) | ui | R1 (montaje): los dos casos de QC-166 R30 de las l. 240-253 se reescriben (enmienda E5): con `tab=modulos` el panel «Módulos» contiene la pestaña montada con `companyId`, `companyName`, `isDeleted` y `canModify` de la página, y `page.tsx` sigue sin importar ni llamar a `getCompanyAddonsAction` (la llama la pestaña) |
+| `tests/guards/guard-identificador-de-request.test.ts` (**se modifica**) | guardia | Alta de `maestro-modulos.spec.ts` en `E2E_ESPERADOS` (l. 57-503) con su motivo (enmienda E14) |
 
 ### 7.1 Mapa `R<n> → test`
 
 | R | Test |
 |---|---|
-| R1 | `company-modules-tab.test.tsx` «R1: recibe empresa, baja y canModify por props y no lee la sesión» |
+| R1 | `company-modules-tab.test.tsx` «R1: recibe empresa, baja y canModify por props y no lee la sesión»; `company-detail-page.test.tsx` «R1 (QC-278): con tab=modulos el panel Módulos monta la pestaña con las cuatro props» |
 | R2 | `company-modules-tab.test.tsx` «R2: pide la vista de añadidos una sola vez con el id de la empresa» |
 | R3 | `company-modules-tab.test.tsx` «R3: mientras carga muestra Cargando los módulos… en una región status» |
 | R4 | `company-modules-tab.test.tsx` «R4: si la lectura falla muestra No pudimos cargar los módulos con Reintentar y ningún interruptor» |
@@ -357,26 +413,35 @@ frontend_dev > Tests`), con las tres acciones simuladas con `vi.mock` de su ruta
 
 ### 7.2 E2E — `e2e/maestro-modulos.spec.ts` (R25, flujo de permisos)
 
-- **Fixture:** empresa propia con prefijo `qc278_e2e_` y limpieza por edad, y un Administrador,
-  como `e2e/modulos-por-empresa.spec.ts` (`createFixtureUser`, `normalizeCompanyName`). Se fija
-  Proveedores apagado al empezar con Prisma (mismo `upsert` que su `setAddons`).
-- **Maestro:** el del seed, con `SEED_MAESTRO_USERNAME` y `SEED_MAESTRO_PASSWORD` (los pone
-  `.github/workflows/gate.yml:191-193, 374-376`). Sin ellos el spec falla con un mensaje que lo
-  dice; no se salta. Un Maestro efímero no vale: la empresa vacía es única del Maestro
-  (`e2e/integraciones.spec.ts:101-107`).
+- **Fixture:** empresa propia con prefijo `qc278_e2e_` y un Administrador, como
+  `e2e/modulos-por-empresa.spec.ts` (`createFixtureUser` de `e2e/helpers/fixture-user.ts:30`,
+  `normalizeCompanyName`). Limpieza por edad con `deleteFixtureCompanies(prefix, createdBefore)`
+  (`e2e/helpers/maestro.ts:44-65`), como `e2e/maestro-empresas.spec.ts:124`. Se fija Proveedores
+  apagado al empezar con Prisma (mismo `upsert` que el `setAddons` local de
+  `e2e/modulos-por-empresa.spec.ts:68-81`).
+- **Maestro:** el del seed, con `maestroCredentials()` (`e2e/helpers/maestro.ts:32-37`), que lee
+  `SEED_MAESTRO_USERNAME` y `SEED_MAESTRO_PASSWORD` (los pone `.github/workflows/gate.yml:191-193,
+  374-376`) y falla nombrando la variable si falta; no se salta. Un Maestro efímero no vale: la
+  empresa vacía es única del Maestro (`e2e/integraciones.spec.ts:100-105`).
+- **Entrada:** los dos con `loginAndLand` (`e2e/helpers/landing.ts:78`; lo exige
+  `tests/guards/guard-e2e-landing.test.ts`). La URL del detalle con
+  `maestroCompanyRoute(id, 'modulos')` (`lib/shared/routes.ts:319-322`).
 - **Dos contextos** de navegador: el del Maestro y el del Administrador.
+- **Guardia:** el archivo se da de alta en `E2E_ESPERADOS`
+  (`tests/guards/guard-identificador-de-request.test.ts:57-503`), con el motivo de las demás: no
+  lee ni afirma nada sobre el identificador de petición ni sobre `reference` (enmienda E14).
 
 Casos:
 
 1. El Administrador entra; su menú no tiene `nav-proveedores`.
-2. El Maestro abre `/maestro/empresas/<id>?tab=modulos`, pulsa el `switch` «Prender
+2. El Maestro abre `maestroCompanyRoute(<id>, 'modulos')` (`/maestro/empresas/<id>?tab=modulos`), pulsa el `switch` «Prender
    Proveedores»; ve el toast «Proveedores prendido.» y el estado «Prendido».
 3. El Administrador recarga, sin volver a entrar: `nav-proveedores` aparece.
 4. El Maestro pulsa «Apagar Proveedores», ve el diálogo «¿Apagar Proveedores?», pulsa «Apagar»;
    ve «Proveedores apagado.».
 5. El Administrador recarga: `nav-proveedores` ya no está.
 
-Depende de que QC-166 haya mergeado la ruta (T6).
+La ruta de QC-166 ya está en `dev` (enmienda E1): T6 no espera a nadie.
 
 ## 8. Alternativas descartadas
 
@@ -414,9 +479,9 @@ por el diálogo, que ya llama por callback (`onConfirm`). El patrón de llamar a
 
 | Punto | Resuelto por |
 |---|---|
-| Descripción de cada añadido | Pregunta abierta 1 (propuesta en el seed) |
+| Descripción de cada añadido | P1, cerrada el 2026-10-19 con el texto propuesto en el seed |
 | Si apagar pide confirmación | Decisión cerrada «¿Confirmación?» |
-| Nombres de los módulos del núcleo | Decisión cerrada «¿Núcleo?» + pregunta abierta 2 |
+| Nombres de los módulos del núcleo | Decisión cerrada «¿Núcleo?» + P2 (cerrada el 2026-10-19: 11 fichas) |
 | Si el Historial nombra al Maestro | De QC-166, fuera de esta ficha |
 | Texto de error al guardar | Decisión cerrada «¿Error al guardar?»: `ErrorAlert` junto a la fila |
 
@@ -424,9 +489,11 @@ por el diálogo, que ya llama por callback (`onConfirm`). El patrón de llamar a
 
 | Archivo | Con quién | Cómo se resuelve |
 |---|---|---|
-| `app/(private)/maestro/empresas/[id]/page.tsx` | QC-166 (dueño) | **No se toca.** QC-166 monta `CompanyModulesTab` con el contrato de § 3. Si QC-166 se mergea antes y deja el hueco, la línea de montaje la pone QC-166; si no, esta ficha la añade en F2.3 al integrar |
-| `app/(private)/maestro/empresas/[id]/components/index.ts` | QC-166 (dueño) | Una línea: `export * from './modulos';` |
-| `lib/shared/ui/addon-names.ts` | QC-166 (dueño, lo crea) | **Solo se importa** `ADDON_NAMES`; no se edita. T1 depende de que exista en la rama (merge de QC-166 o `origin/dev`) |
+| `app/(private)/maestro/empresas/[id]/page.tsx` | QC-166 (dueño, mergeado) | QC-166 dejó el hueco vacío (`page.tsx:120`): **esta ficha** pone el import y la línea de montaje de § 3 (T6; enmienda E1) |
+| `app/(private)/maestro/empresas/[id]/components/index.ts` | QC-166 (dueño, mergeado) | Una línea: `export * from './modulos';` (T6) |
+| `tests/ui/maestro/company-detail-page.test.tsx` | QC-166 (dueño, mergeado) | Se reescriben los dos casos de R30 que exigían el panel vacío y ninguna carpeta `modulos` (l. 240-253; enmienda E5) |
+| `tests/guards/guard-identificador-de-request.test.ts` | Toda ficha con E2E nuevo | Una entrada en `E2E_ESPERADOS` (enmienda E14) |
+| `lib/shared/ui/addon-names.ts` | QC-166 (dueño, en `dev`) | **Solo se importa** `ADDON_NAMES`; no se edita |
 | `e2e/helpers/*` | Toda ficha con E2E | Solo se leen; no se cambian |
 
 ## 11. Dependencias de terceros
@@ -436,8 +503,8 @@ Ninguna nueva. Se usan `@base-ui/react` (vía `Switch` y `ConfirmDialog`), `sonn
 
 ## 12. Riesgos y desconocidos
 
-- **Orden de merge con QC-166.** T1 necesita `lib/shared/ui/addon-names.ts` y T6 la ruta. Si
-  esta ficha se implementa antes de que QC-166 esté en `dev`, T1 se integra desde la rama de
-  QC-166 o espera; **no** se crea aquí una copia de `ADDON_NAMES`.
+- ~~**Orden de merge con QC-166.**~~ **Resuelto el 2026-10-19:** QC-166 está en `dev` y en la
+  rama (merge `a01b5c11`), con `lib/shared/ui/addon-names.ts` y la ruta (enmiendas E1, E7). Sigue
+  valiendo que **no** se crea aquí una copia de `ADDON_NAMES`.
 - **Maestro del seed en local.** `progress/deudas.md` D27 registra entornos sin `SEED_MAESTRO_*`
   en `.env`; ahí el E2E falla con su mensaje. En CI están.

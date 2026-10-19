@@ -12,6 +12,16 @@
 > Sembrado por `/afinar-feature` el 2026-10-16. El bloque de Alcance y la tabla de «Decisiones
 > cerradas» los fijó el humano ANTES del spec. `spec_author` los respeta, no los reabre y no los
 > reescribe: su trabajo aquí es `## Requisitos (EARS)`.
+>
+> **Aprobado el 2026-10-19** («Apruebo con defectos»: P1–P4 quedan con su defecto).
+>
+> **Enmienda contra dev (2026-10-19).** Tras el merge de `origin/dev` (`a01b5c11`: QC-166 #267 y
+> QC-263 #266), el spec se contrastó con el **código** mergeado. Ningún requisito cambia de
+> comportamiento. Aquí solo cambia: (a) R10, R15 y R19 citan la pregunta cerrada en vez de
+> «sujeto a la pregunta abierta», con el mismo defecto aprobado; (b) R1 nombra el panel que ya pinta
+> el detalle (`app/(private)/maestro/empresas/[id]/page.tsx:108-121`). Rutas, nombres, citas,
+> tests y guardias: lista completa con citas en `design.md > 0. Enmienda contra dev (2026-10-19)`
+> (E1–E16).
 
 ## Requisitos (EARS)
 
@@ -29,10 +39,10 @@ Vocabulario (el de **QC-277**):
 
 ### Montaje y carga
 
-- **R1** — El sistema DEBE ofrecer la pestaña como una pieza que QC-166 monta en
-  `/maestro/empresas/[id]?tab=modulos`. Recibe del detalle el identificador de la empresa, su
-  nombre, si está de baja y si quien mira puede modificar. La pestaña no lee la sesión ni decide
-  permisos.
+- **R1** — El sistema DEBE ofrecer la pestaña como una pieza que se monta en el panel «Módulos»
+  del detalle de QC-166, en `/maestro/empresas/[id]?tab=modulos`. Recibe del detalle el
+  identificador de la empresa, su nombre, si está de baja y si quien mira puede modificar. La
+  pestaña no lee la sesión ni decide permisos.
 - **R2** — CUANDO se abre la pestaña, el sistema DEBE pedir la vista de añadidos de esa empresa
   una sola vez, en el servidor.
 - **R3** — MIENTRAS la vista de añadidos no haya llegado, el sistema DEBE mostrar «Cargando los
@@ -73,7 +83,7 @@ Vocabulario (el de **QC-277**):
   - lo que se descarta al apagarlo (Lectura de PDF con IA: las lecturas en cola terminan como
     fallidas y las revisiones sin confirmar quedan ocultas; Importación desde Excel: las
     revisiones sin confirmar quedan ocultas; Integraciones: Lectura de PDF con IA deja de
-    funcionar, sujeto a la pregunta abierta 3);
+    funcionar, solo si el interruptor de Lectura de PDF con IA está prendido, pregunta 3 cerrada);
   - «Volver», que cierra sin guardar, y «Apagar», que guarda.
 - **R11** — CUANDO el Maestro pulsa «Prender todos», el sistema DEBE prender a la vez todos los
   añadidos apagados, sin pedir confirmación.
@@ -92,8 +102,8 @@ Vocabulario (el de **QC-277**):
   - pintar la vista de añadidos que devuelve la propia escritura, sin volver a pedirla ni
     recargar la página;
   - avisar con un toast: «<nombre> prendido.», «<nombre> apagado.», «Se prendieron <n>
-    módulos.» o «Se apagaron <n> módulos.», con <n> los añadidos que cambiaron (forma singular:
-    pregunta abierta 4).
+    módulos.» o «Se apagaron <n> módulos.», con <n> los añadidos que cambiaron; con uno solo,
+    «Se prendió 1 módulo.» o «Se apagó 1 módulo.» (pregunta 4 cerrada).
 - **R16** — SI una escritura de un solo añadido falla, ENTONCES el sistema DEBE devolver su
   interruptor a la posición anterior y mostrar junto a su fila el aviso de error «No se guardó el
   cambio», con el mensaje del catálogo de errores y la referencia si el error es inesperado.
@@ -108,7 +118,7 @@ Vocabulario (el de **QC-277**):
   prendido en todas las empresas. No se puede apagar.») con una ficha con candado por cada módulo
   del núcleo de QC-277 D2, sin interruptor y sin nada que se pueda pulsar: Usuarios y grupos,
   Unidades, Presentaciones, Inventario, Fórmulas, Pedidos, Asignación y ejecución, Empaque,
-  Acondicionamiento, Terminados y entregas, y Clientes (sujeto a la pregunta abierta 2).
+  Acondicionamiento, Terminados y entregas, y Clientes: 11 fichas (pregunta 2 cerrada).
 
 ### Empresa de baja y permisos
 
@@ -142,7 +152,11 @@ Vocabulario (el de **QC-277**):
 
 ## Preguntas abiertas
 
-1. **Descripción de cada añadido.** Se proponen: Dashboard y recorrido «Indicadores del día y
+**P1–P4 cerradas el 2026-10-19** con su defecto («Apruebo con defectos», Carlos Restrepo;
+`progress/features/QC-278.md > Decisiones`). P5 se cerró el 2026-10-16. **No queda ninguna
+abierta**, tampoco tras la enmienda contra dev (`design.md > 0`).
+
+1. ~~**Descripción de cada añadido.**~~ **Cerrada el 2026-10-19: se usan las propuestas tal cual.** Se proponen: Dashboard y recorrido «Indicadores del día y
    recorrido de cada pedido.»; Proveedores «Directorio de proveedores y su catálogo.»; Lectura de
    PDF con IA «Lee fórmulas y catálogos desde un PDF.»; Importación desde Excel «Carga inventario
    y catálogos desde una hoja de cálculo.»; Integraciones «Proveedor IA, Inventarios y
@@ -151,16 +165,19 @@ Vocabulario (el de **QC-277**):
 Añadidas por `spec_author` (F1.2). Ninguna bloquea el spec: cada una lleva el defecto con el que
 se diseñó, y cambiarlo toca solo lo que se cita.
 
-2. **Terminados y entregas: ¿una ficha o dos?** QC-277 D2 nombra «terminados, entregas» por
+2. ~~**Terminados y entregas: ¿una ficha o dos?**~~ **Cerrada el 2026-10-19 con el defecto: una
+   ficha, 11 en total.** QC-277 D2 nombra «terminados, entregas» por
    separado; el tablero aprobado (`MaestroEmpresa.dc.html`) los junta en una ficha, «Terminados y
    entregas», y pinta 11. **Defecto:** el tablero (11 fichas, R19). Cambiarlo toca la lista de
    R19 y `core-modules.ts`.
-3. **Línea de Integraciones en la confirmación.** El tablero añade siempre «Lectura de PDF con IA
+3. ~~**Línea de Integraciones en la confirmación.**~~ **Cerrada el 2026-10-19 con el defecto: solo
+   si Lectura de PDF con IA está prendida, y nunca en «Apagar todos».** El tablero añade siempre «Lectura de PDF con IA
    deja de funcionar aunque siga prendida, porque la necesita.» al apagar Integraciones, también
    si la lectura ya está apagada, cuando la frase es falsa. **Defecto:** se muestra solo si el
    interruptor de Lectura de PDF con IA está prendido; en «Apagar todos» no se muestra nunca (la
    lectura se apaga a la vez), como en el tablero. Cambiarlo toca R10 y `addon-off-consequences.ts`.
-4. **Singular en el toast de «todos».** El tablero solo trae el plural («Se prendieron N
+4. ~~**Singular en el toast de «todos».**~~ **Cerrada el 2026-10-19 con el defecto: «Se prendió 1
+   módulo.» / «Se apagó 1 módulo.».** El tablero solo trae el plural («Se prendieron N
    módulos.»). Con un solo añadido por cambiar saldría «Se prendieron 1 módulos.». **Defecto:**
    «Se prendió 1 módulo.» / «Se apagó 1 módulo.». Cambiarlo toca R15 y `addon-labels.ts`.
 5. ~~**Carpeta de la ruta del detalle.**~~ **Cerrada el 2026-10-16:** el spec de QC-166 pone el
