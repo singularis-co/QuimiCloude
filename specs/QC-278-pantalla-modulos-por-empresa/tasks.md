@@ -85,8 +85,11 @@
     verde (incluida `guard-identificador-de-request`); el E2E pasa en Chromium y WebKit;
     verificación manual en 390 px y 768 px contra `MaestroEmpresaMovil.dc.html` y
     `MaestroEmpresaTablet.dc.html` anotada en el `impl`.
+  - **Estado (2026-10-19, implementer):** todo hecho y el E2E en verde en Chromium y WebKit. Falta
+    solo la verificación manual a 390 y 768 px, que queda para el humano porque el repo no
+    tiene un patrón de capturas.
 
-- [ ] **T6b — Enmienda tras la tanda 1** (R5, R12, R16; design § 0.1, E17–E19) · depende de T6
+- [x] **T6b — Enmienda tras la tanda 1** (R5, R12, R16; design § 0.1, E17–E19) · depende de T6
   - `lib/shared/ui/addon-details.ts` (nuevo): `ADDON_DETAILS` como `Record<AddonNameKey, {
     description; icon }>`, con las descripciones de la pregunta 1 y los iconos que hoy están en
     `addon-labels.ts` (design § 5). Sin importar dominio.

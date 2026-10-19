@@ -24,7 +24,7 @@
 
 | R | Test |
 |---|---|
-| R5 | `tests/unit/maestro/addon-labels.test.ts` «R5: hay una etiqueta por añadido del catálogo», «R5: las descripciones son las de la pregunta 1, cerrada» |
+| R5 | `tests/unit/maestro/addon-labels.test.ts` «R5: hay una etiqueta por añadido del catálogo, con nombre, descripción e icono de lib/shared/ui», «R5: las descripciones son las de la pregunta 1, cerrada» |
 | R10 | `tests/unit/maestro/addon-labels.test.ts` «R10: cada añadido lista lo que se descarta al apagarlo», «R10: Integraciones solo avisa de la lectura si está prendida» |
 | R12 | `tests/unit/maestro/addon-labels.test.ts` «R12: Apagar todos junta lo que se descarta sin repetir, en el orden del catálogo y sin la línea de Integraciones» |
 | R15 | `tests/unit/maestro/addon-labels.test.ts` «R15: devuelve solo los añadidos cuyo interruptor cambió, en el orden de la vista», «R15: mensajes de toast en singular y plural» |
@@ -96,8 +96,8 @@ ninguna dependencia.
 | R13 | «R13: Prender todos deshabilitado sin apagados y Apagar todos sin prendidos» |
 | R14 | «R14: mientras guarda hay spinner en el interruptor afectado y todo deshabilitado» |
 | R15 | «R15: con éxito pinta la vista devuelta sin releer y avisa por toast» |
-| R16 | «R16: si falla uno, el interruptor vuelve y aparece No se guardó el cambio junto a su fila» |
-| R17 | «R17: si falla todos, nada cambia y el error va bajo los botones» |
+| R16 | «R16: si falla uno, el interruptor vuelve y aparece No se guardó el cambio junto a su fila» (afirma también «El interruptor vuelve a su posición anterior.» dentro de la fila, tras el aviso; E18) |
+| R17 | «R17: si falla todos, nada cambia y el error va bajo los botones» (afirma que la línea de apoyo de R16 no aparece) |
 | R18 | «R18: el siguiente cambio quita el error anterior» |
 | R20 | «R20: empresa de baja: aviso y todos los controles deshabilitados» |
 | R21 | «R21: sin empresas.modificar todos los controles deshabilitados» |
@@ -218,33 +218,33 @@ T5 hecha y T6 hecha en código: 22/22 en los dos tests de ui, guardias, typechec
 | R2 | `company-modules-tab.test.tsx` «R2: pide la vista de añadidos una sola vez con el id de la empresa» |
 | R3 | `company-modules-tab.test.tsx` «R3: mientras carga muestra Cargando los módulos… en una región status» |
 | R4 | `company-modules-tab.test.tsx` «R4: si la lectura falla muestra No pudimos cargar los módulos con Reintentar y ningún interruptor» |
-| R5 | `tests/ui/maestro/addon-switch-list.test.tsx` «R5: pinta los cinco añadidos en el orden de la vista con nombre, descripción y estado»; `tests/unit/maestro/addon-labels.test.ts` «R5: hay una etiqueta por añadido del catálogo», «R5: las descripciones son las de la pregunta 1, cerrada» |
+| R5 | `tests/ui/maestro/addon-switch-list.test.tsx` «R5: pinta los cinco añadidos en el orden de la vista con nombre, descripción y estado»; `tests/unit/maestro/addon-labels.test.ts` «R5: hay una etiqueta por añadido del catálogo, con nombre, descripción e icono de lib/shared/ui», «R5: las descripciones son las de la pregunta 1, cerrada» |
 | R6 | `addon-switch-list.test.tsx` «R6: Prendido si activo, Sin efecto si prendido sin activo, Apagado si apagado» |
 | R7 | `addon-switch-list.test.tsx` «R7: Lectura de PDF dice Necesita Integraciones y en advertencia si está Sin efecto» |
 | R8 | `addon-switch-list.test.tsx` «R8: la cabecera cuenta los interruptores prendidos de cinco» |
 | R9 | `addon-switch-list.test.tsx` «R9: prender un añadido llama a setCompanyAddonAction sin diálogo» |
 | R10 | `addon-switch-list.test.tsx` «R10: apagar un añadido abre la confirmación con su nombre, la empresa y lo que se descarta», «R10: Volver cierra sin escribir»; `addon-labels.test.ts` «R10: cada añadido lista lo que se descarta al apagarlo», «R10: Integraciones solo avisa de la lectura si está prendida» |
 | R11 | `addon-switch-list.test.tsx` «R11: Prender todos llama a setAllCompanyAddonsAction con enabled=true sin diálogo» |
-| R12 | `addon-switch-list.test.tsx` «R12: Apagar todos confirma con el número, los nombres y las consecuencias sin repetir»; `addon-labels.test.ts` «R12: Apagar todos junta lo que se descarta sin repetir, en el orden del catálogo y sin la línea de Integraciones» |
+| R12 | `addon-switch-list.test.tsx` «R12: Apagar todos confirma con el número, los nombres y las consecuencias sin repetir», «R12: con un solo añadido prendido, Apagar todos va en singular» (E19); `addon-labels.test.ts` «R12: Apagar todos junta lo que se descarta sin repetir, en el orden del catálogo y sin la línea de Integraciones» |
 | R13 | `addon-switch-list.test.tsx` «R13: Prender todos deshabilitado sin apagados y Apagar todos sin prendidos» |
 | R14 | `addon-switch-list.test.tsx` «R14: mientras guarda hay spinner en el interruptor afectado y todo deshabilitado» |
 | R15 | `addon-switch-list.test.tsx` «R15: con éxito pinta la vista devuelta sin releer y avisa por toast»; `addon-labels.test.ts` «R15: mensajes de toast en singular y plural», «R15: devuelve solo los añadidos cuyo interruptor cambió, en el orden de la vista» |
-| R16 | `addon-switch-list.test.tsx` «R16: si falla uno, el interruptor vuelve y aparece No se guardó el cambio junto a su fila» |
-| R17 | `addon-switch-list.test.tsx` «R17: si falla todos, nada cambia y el error va bajo los botones» |
+| R16 | `addon-switch-list.test.tsx` «R16: si falla uno, el interruptor vuelve y aparece No se guardó el cambio junto a su fila» (afirma también «El interruptor vuelve a su posición anterior.» dentro de la fila, tras el aviso; E18) |
+| R17 | `addon-switch-list.test.tsx` «R17: si falla todos, nada cambia y el error va bajo los botones» (afirma que la línea de apoyo de R16 no aparece) |
 | R18 | `addon-switch-list.test.tsx` «R18: el siguiente cambio quita el error anterior» |
 | R19 | `tests/ui/maestro/core-module-chips.test.tsx` «R19: once fichas del núcleo con candado y nada pulsable» |
 | R20 | `addon-switch-list.test.tsx` «R20: empresa de baja: aviso y todos los controles deshabilitados»; `company-modules-tab.test.tsx` «R20: de baja también muestra añadidos y Núcleo» |
 | R21 | `addon-switch-list.test.tsx` «R21: sin empresas.modificar todos los controles deshabilitados» |
 | R22 | `addon-switch-list.test.tsx` «R22: el estado sale de active de la vista aunque enabled y requires digan otra cosa», «R22: el componente no importa effectiveAddons ni ADDON_REQUIRES» |
 | R23 | `addon-switch-list.test.tsx` «R23: cada interruptor es un switch con nombre Prender o Apagar y responde a teclado» |
-| R24 | `addon-switch-list.test.tsx` «R24: clases mobile-first: Switch junto al nombre y botones a todo el ancho bajo md»; verificación manual 390/768 px **pendiente** |
-| R25 | `e2e/maestro-modulos.spec.ts` «R25: el Maestro prende y apaga Proveedores y el menú del Administrador lo sigue» — **escrito, no ejecutado en verde**: falla en `beforeAll` por entorno (Docker/PG en localhost:5433 caído), salida en la tanda 3 |
+| R24 | `addon-switch-list.test.tsx` «R24: clases mobile-first: Switch junto al nombre y botones a todo el ancho bajo md»; verificación manual 390/768 px **pendiente del humano** (el repo no tiene patrón de capturas en `e2e/`) |
+| R25 | `e2e/maestro-modulos.spec.ts` «R25: el Maestro prende y apaga Proveedores y el menú del Administrador lo sigue» — **verde en Chromium y WebKit** (2 passed, 28.2s; salida en la tanda 4) |
 
 ### Estado de las tasks
 
-- T1–T5 `[x]`. T6 hecha en código; queda `[ ]` hasta que el E2E pase en Chromium y WebKit y se haga la verificación manual en 390 y 768 px (su «Hecho»). T7 pendiente del gate (`./init.sh`) del leader.
+- T1–T5 y T6b `[x]`. T6: E2E en verde; queda `[ ]` solo por la verificación manual en 390 y 768 px, pendiente del humano. T7 pendiente del gate (`./init.sh`) del leader.
 
-### Puntos para decidir (no bloquean el código; hoy se sigue el spec al pie de la letra)
+### Puntos que estaban para decidir (resueltos por la enmienda E18–E19, tanda 4)
 
 1. `ModalesMaestro.dc.html` l. 114 trae «El interruptor vuelve a su posición anterior.» bajo el error de la fila. R16 y el design no la piden; no se pintó.
 2. «Apagar todos» con un solo añadido prendido: con R12 literal sale «¿Apagar los 1 módulos prendidos?» y «<A> desaparecen…». Ni spec ni tablero traen singular (mismo caso que la pregunta 4 resolvió para el toast).
@@ -254,3 +254,42 @@ T5 hecha y T6 hecha en código: 22/22 en los dos tests de ui, guardias, typechec
 - `successMessage(changed, enabled, via)` lleva un tercer argumento (R15 distingue «Proveedores prendido.» de «Se prendió 1 módulo.»).
 - Diálogo con booleano `offOpen` + última petición `offRequest`, para que el texto no se vacíe al cerrarse; mismo comportamiento.
 - El error previo también se limpia al abrir el diálogo de apagar (lectura de R18).
+
+## Tanda 4 — T6b y cierre del E2E de T6 (frontend_dev + implementer, 2026-10-19)
+
+### Archivos
+
+- Nuevo: `lib/shared/ui/addon-details.ts` (`ADDON_DETAILS: Readonly<Record<AddonNameKey, AddonDetail>>`, descripciones e iconos lucide; sin dominio).
+- Modificados: `app/(private)/maestro/empresas/[id]/components/modulos/addon-labels.ts` (`ADDON_LABELS` iterando `ADDON_NAMES` + `ADDON_DETAILS`), `addon-off-consequences.ts` (`Partial<Record<Addon, …>>` con `?? []`), `addon-switch-list.tsx` (línea de apoyo bajo el error de la fila; singular en «Apagar todos»), `components/shared/CATALOGO.md` (fila `ADDON_DETAILS`; «No cubre» de `ADDON_NAMES` remite a ella), `tests/unit/maestro/addon-labels.test.ts`, `tests/ui/maestro/addon-switch-list.test.tsx`.
+
+### Notas
+
+- `OFF_CONSEQUENCES` queda con `lectura_pdf` e `importacion_excel`: la entrada de `integraciones` era `[]` (su línea sale de `pdfStopsWhenAlone`) y T6b pide quitar las vacías. El design E17 habla de «los tres que descartan algo»; el comportamiento es idéntico. Lo decide el reviewer.
+- La línea de apoyo de R16 no tiene `data-testid` (el spec no define ninguno); el test la busca por texto.
+- Quitar `integraciones` de `ADDON_DETAILS` da `TS2741` (comprobado y revertido por frontend_dev).
+- La base local (`localhost:5433`, `quimicloude-pg17`) ya estaba migrada (`prisma migrate status`: up to date) y sembrada (5 roles); no se migró ni sembró nada.
+
+### Salida de los comandos
+
+```
+pnpm exec vitest run tests/unit/proveedores/module-contract.test.ts tests/unit/maestro/addon-labels.test.ts   tests/ui/maestro/addon-switch-list.test.tsx tests/ui/maestro/company-modules-tab.test.tsx tests/ui/maestro/company-detail-page.test.tsx
+ Test Files  5 passed (5)
+      Tests  60 passed (60)
+
+pnpm exec vitest run guard            (frontend_dev)
+ 81 archivos pasan; 1106 tests pasan, 20 se saltan, 0 fallan (incluye guard-catalogo-de-componentes)
+
+pnpm run typecheck                    0 errores (tras el E2E, sin tocar .next/dev/types)
+pnpm run lint                         0 errores, 10 avisos en archivos ajenos a esta ficha
+grep -riE "proveedores|supplier" "app/(private)/maestro" | wc -l   ->  0
+
+pnpm exec playwright test e2e/maestro-modulos.spec.ts --reporter=line
+Running 2 tests using 2 workers
+  2 passed (28.2s)
+```
+
+(1 test × proyectos `chromium` y `webkit` de `playwright.config.ts`.)
+
+### Veredicto
+
+T6b hecha. El E2E de T6 está en verde en los dos navegadores. Queda pendiente del humano la verificación manual a 390 y 768 px contra `MaestroEmpresaMovil.dc.html` y `MaestroEmpresaTablet.dc.html`.
