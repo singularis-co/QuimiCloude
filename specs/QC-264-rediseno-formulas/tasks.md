@@ -113,7 +113,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   *Enmienda (E7, E9, E21):* la imagen sigue siendo `ImageField`; el aviso `recipe-form-steps-locked`
   queda dentro del `<form>`, encima de las tarjetas (R51); `[id]/page.tsx` conserva sus seis lecturas y
   `lockingOrders`. `recipe-form-evidence-lock.test.tsx` en verde (o migrado si localiza por posición).
-- [ ] **T3b. Pestañas con contador** (D5, R12). `recipe-lines-field.tsx`. `recipe-lines-tabs.test.tsx`:
+- [x] **T3b. Pestañas con contador** (D5, R12). `recipe-lines-field.tsx`. `recipe-lines-tabs.test.tsx`:
   cifra junto a la etiqueta, no cuenta la fila fantasma, cambia al añadir o quitar; testids de hoy.
 - [ ] **T3c. Lista de versiones** (D12, D14, R14, R30, R31). `recipe-version-list.tsx`,
   `recipe-version-tones.ts`. `recipe-version-list.test.tsx`: nombre con `truncate` y `title`, «Por

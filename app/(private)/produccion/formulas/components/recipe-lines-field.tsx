@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import {
   consumedQuantity,
@@ -209,6 +209,14 @@ const MARK_VARIANT: Record<VersionLineMark['kind'], 'secondary' | 'outline' | 'd
   added: 'default',
 };
 
+// La pastilla activa la pinta `TabsIndicator`: la pestaña activa queda transparente para no taparla.
+const TAB_LIST_CLASS =
+  'relative h-auto max-w-full flex-nowrap justify-start gap-1 overflow-x-auto rounded-[10px] p-1 [scrollbar-width:none] group-data-horizontal/tabs:h-auto';
+const TAB_CLASS =
+  'h-auto min-h-11 flex-none gap-2 rounded-lg px-3.5 text-[13px] text-muted-foreground transition-colors duration-(--dur-base) ease-(--ease-standard) hover:text-foreground data-active:bg-transparent data-active:text-foreground group-data-[variant=default]/tabs-list:data-active:shadow-none dark:text-muted-foreground dark:data-active:border-transparent dark:data-active:bg-transparent';
+const TAB_COUNT_CLASS =
+  'inline-flex h-5 min-w-5 flex-none items-center justify-center rounded-full bg-foreground/8 px-1.5 font-mono text-[11px] font-semibold tabular-nums';
+
 /** Fantasma del tab de herramientas: misma idea que `GHOST_LINE`, sin porcentaje. */
 const GHOST_TOOL: RecipeToolFormValue = {
   key: 'maquina-en-blanco',
@@ -398,12 +406,19 @@ export function RecipeLinesField({
       )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList aria-label="Líneas de la receta por tipo">
-          <TabsTrigger value="ingredients" data-testid="recipe-lines-tab-ingredients">
-            Ingredientes
+        <TabsList aria-label="Líneas de la receta por tipo" className={TAB_LIST_CLASS}>
+          <TabsIndicator />
+          <TabsTrigger value="ingredients" data-testid="recipe-lines-tab-ingredients" className={TAB_CLASS}>
+            <span>Ingredientes</span>{' '}
+            <span className={TAB_COUNT_CLASS} data-testid="recipe-lines-tab-ingredients-count">
+              {lines.length}
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="machines" data-testid="recipe-lines-tab-machines">
-            Herramientas
+          <TabsTrigger value="machines" data-testid="recipe-lines-tab-machines" className={TAB_CLASS}>
+            <span>Herramientas</span>{' '}
+            <span className={TAB_COUNT_CLASS} data-testid="recipe-lines-tab-machines-count">
+              {tools.length}
+            </span>
           </TabsTrigger>
         </TabsList>
 
