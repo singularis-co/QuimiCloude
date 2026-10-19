@@ -343,12 +343,13 @@ describe('R15 — sensibilidad: el puerto falso si registra a quien lo toca', ()
 });
 
 describe('R2 — en /asignacion el rol recibe exactamente sus vistas (enmienda la vista de reserva)', () => {
-  it("R2, QC-219 R20: resolveAssignmentViews con los permisos del rol devuelve exactamente ['por_acondicionar', 'acondicionados', 'acondicionados_entregados']", () => {
-    expect(resolveAssignmentViews(ACTOR_ASIGNACIONES)).toEqual([
-      'por_acondicionar',
-      'acondicionados',
-      'acondicionados_entregados',
-    ]);
+  it("R2, QC-301 R1: resolveAssignmentViews con los permisos del rol devuelve exactamente ['por_acondicionar', 'acondicionados']", () => {
+    expect(resolveAssignmentViews(ACTOR_ASIGNACIONES)).toEqual(['por_acondicionar', 'acondicionados']);
+  });
+
+  it('QC-301 R3: pedir `acondicionados_entregados` con las vistas del rol cae a `por_acondicionar`', () => {
+    const vistas = resolveAssignmentViews(ACTOR_ASIGNACIONES);
+    expect(resolveAssignmentView('acondicionados_entregados', vistas)).toBe('por_acondicionar');
   });
 
   it('R2: no incluye asignados, todos, terminados ni por_empacar', () => {
