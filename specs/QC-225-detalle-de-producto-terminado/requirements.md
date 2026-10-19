@@ -137,11 +137,17 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
   lleva y motivo si es un ajuste.
 - **R16** [Entradas] El origen de cada entrada DEBE distinguir, al menos: producción (con su pedido),
   apertura (alta o importación) y ajuste que suma (con su motivo).
+
+  > **Enmienda 2026-10-19 (enmienda QC-288, aprobada por el humano en F1.4; `specs/QC-288-entrega-sin-pedido/design.md` §11).** Además, el origen «Anulación de entrega sin
+  > pedido», sin número de pedido (QC-288 R55).
 - **R17** [Salidas, Ventas] El tab Salidas DEBE listar todos los asientos de los lotes del producto
   cuya cantidad es negativa, y solo esos, cada uno con fecha, tipo (entrega a cliente o ajuste que
   resta, con su motivo), lote, cantidad restada en valor absoluto en unidad base, envases enteros más
   resto si el lote tiene contenido de envase y número de pedido si el asiento lo lleva. Una venta
   registrada como ajuste que resta DEBE aparecer aquí como ajuste, con su motivo.
+
+  > **Enmienda 2026-10-19 (enmienda QC-288, aprobada por el humano en F1.4; `specs/QC-288-entrega-sin-pedido/design.md` §11).** Además, el tipo «Entrega sin pedido», sin
+  > número de pedido (QC-288 R55).
 - **R18** [Entradas, Salidas] El sistema DEBE clasificar un asiento en Entradas o en Salidas por el
   signo de su cantidad y no por su tipo: un ajuste que suma DEBE salir solo en Entradas y uno que
   resta solo en Salidas.
@@ -151,6 +157,10 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
 - **R19** [Salidas] El tab Entregas DEBE listar cada lote de cada entrega del producto, con fecha,
   cliente, número de pedido, lote, envases entregados y cantidad en unidad base. Cada fila de
   Entregas DEBE tener su asiento correspondiente en Salidas.
+
+  > **Enmienda 2026-10-19 (enmienda QC-288, aprobada por el humano en F1.4; `specs/QC-288-entrega-sin-pedido/design.md` §11).** Las filas de entrega sin pedido muestran
+  > «Sin pedido» en lugar del número de pedido y, debajo, su nota si la tiene (QC-288 R52). También
+  > tienen su asiento en Salidas (QC-288 R55).
 - **R20** [Salidas] SI el cliente de una entrega está dado de baja, ENTONCES la fila DEBE mostrar su
   nombre con la marca de dado de baja. SI el cliente no se puede resolver, ENTONCES DEBE mostrar el
   marcador de ausencia. En ningún caso la fila DEBE ocultarse.
@@ -224,6 +234,13 @@ tema: [Llegada], [Tabs], [Entradas], [Salidas], [Ventas], [Costo], [Costos visib
 - **R36** [Anulación, Permiso, Solo consulta] La marca «Anulada», su motivo y el total entregado NO
   DEBEN exigir ningún permiso además de `inventario.consultar` (ni `pedidos.consultar` ni
   `entregas.anular`), y la ficha NO DEBE ofrecer ningún control para anular una entrega.
+
+  > **Enmienda 2026-10-19 (enmienda QC-288, aprobada por el humano en F1.4; `specs/QC-288-entrega-sin-pedido/design.md` §11).** La ficha sigue sin ofrecer control de anular
+  > para las entregas de pedido. QC-288 añade «Anular» en el tab Entregas para las entregas sin pedido
+  > no anuladas: el menú de acciones de la fila, con un único elemento «Anular», solo con
+  > `entregas.anular`; sin el permiso no existe en el DOM (QC-288 R43; menú por la decisión de F2.1 en
+  > `specs/QC-288-entrega-sin-pedido/requirements.md > Decisiones cerradas`). La marca «Anulada», su
+  > motivo y el total entregado siguen sin exigir más permiso que `inventario.consultar` (QC-288 R53).
 
 ### Costo solo para el Administrador
 

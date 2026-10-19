@@ -451,8 +451,12 @@ Tests:
 - `e2e/entrega-sin-pedido.spec.ts`
 
 Specs de otras fichas (enmienda fechada 2026-10-16):
+- `specs/QC-223-entregar-producto-terminado/requirements.md` (2026-10-19: nota bajo R25, R29 y R31;
+  design.md §11).
+- `specs/QC-224-anular-entrega/requirements.md` (2026-10-19: nota bajo R18 y R32; design.md §11).
 - `specs/QC-225-detalle-de-producto-terminado/requirements.md` (R7: actions de `pedidos` que la ruta
-  de la ficha admite; el botón «Entregar» por su ruta directa).
+  de la ficha admite; el botón «Entregar» por su ruta directa. 2026-10-19: nota bajo R16, R17, R19 y
+  R36; design.md §11).
 - `specs/QC-263-rediseno-inventario/requirements.md` (2026-10-19: nota bajo R21 y R23; «Cliente»
   como novena columna del historial del lote y campo de su tarjeta).
 
