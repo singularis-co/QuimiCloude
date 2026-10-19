@@ -118,7 +118,7 @@
 
 ## Bloque C — Emisor `documentos`
 
-- [ ] **T9. Puerto y detección de fin de tanda** (design §6.1, §6.2). Depende de T1.
+- [x] **T9. Puerto y detección de fin de tanda** (design §6.1, §6.2). Depende de T1.
   - `batch-finished-listener.ts` y `notify-if-batch-finished.ts`.
   - `readBatchNotice` en el puerto y en `document-batch-repository-prisma.ts`.
   - Llamadas en `run-document-job.ts` y `get-batch-status.ts`, con listener opcional.
@@ -134,6 +134,7 @@
     `tests/integration/documentos/batch-notice.int.test.ts` cubre `readBatchNotice`: conteos, los
     3 primeros nombres de los fallidos en orden de subida y `uploadedAt` (R51).
 - [ ] **T10. Nombre original de cada archivo** `[P]` (design §6.3, §3.2.3). Depende de T9.
+  - _Estado (tanda 2): parte backend hecha en 1e657082 (migración, `file-name.ts`, `names`, `createBatch`, `enqueue-names.test.ts`). Pendiente para frontend_dev: `DocumentUpload` manda `names` y `document-upload-names.test.tsx`._
   - Migración `<ts>_document_files_original_name` con `down.sql`.
   - `file-name.ts` (`fileNameSchema`), `names` opcional en `enqueue-input.ts`, `NewBatch.files` y
     `createBatch`.
@@ -149,7 +150,7 @@
       `NULL` y el aviso usa el texto genérico (R50, R51);
     - los tests existentes de `DocumentUpload`, `CatalogPdfUpload` y `FormulaPdfUpload` siguen
       verdes sin cambios.
-- [ ] **T11. Evento del catálogo y suscripción** (design §6.1, §6.3b, §6.4). Depende de T4, T8, T9
+- [x] **T11. Evento del catálogo y suscripción** (design §6.1, §6.3b, §6.4). Depende de T4, T8, T9
   y T10.
   - `file-list-phrase.ts` y la entrada `documentos.tanda_terminada` en `NOTIFICATION_CATALOG`.
   - `batchFinishedListener` en composición, pasado a `runDocumentJob` y `getBatchStatus`.
@@ -281,7 +282,7 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 
 ## Bloque F — Retención
 
-- [ ] **T20. Cron de borrado** (design §11). Depende de T6 y T8.
+- [x] **T20. Cron de borrado** (design §11). Depende de T6 y T8.
   - `app/api/cron/purgar-notificaciones/route.ts`, `vercel.json` y la entrada en
     `RUTAS_FUERA_DE_SESION`.
   - `tests/unit/pedidos/vercel-cron.test.ts` se reescribe sin fijar el total de tareas.

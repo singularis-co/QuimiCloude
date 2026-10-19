@@ -425,3 +425,7 @@ Para la integración y la migración se cargó el `.env` del checkout principal 
 
 Bloques C (T9, T10 backend, T11) y F (T20) hechos: typecheck, lint, unitarios, integración, guardias
 y la migración con su down en verde; el único rojo de `vitest related` es el ajeno conocido.
+
+### Cierre de la tanda 2 (implementer)
+- Tasks marcadas `[x]`: T9, T11 y T20. **T10 sigue abierta**: falta la parte de UI (`components/shared/document-upload/document-upload.tsx`, que manda `names`, y `tests/unit/documentos-ui/document-upload-names.test.tsx`). El leader acotó esta tanda a backend, así que pasa a frontend_dev en la tanda siguiente.
+- Decisiones fuera del spec (1–8 de arriba), pendientes de validar con el reviewer y el leader. Las que más se apartan del design: el puerto aparte `BatchNoticeReader`, `NewBatch.originalNames?` en lugar de `files`, que `documentos/index.ts` no se tocó y el horario del cron.
