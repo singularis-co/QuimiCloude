@@ -182,7 +182,7 @@ P1–P15 de `requirements.md` (o acepta los valores por defecto).
   los de T1c. Tests que afirmaban el texto viejo, actualizados. *Enmienda (E17; supuesto P18):* nada
   más; «Lista de verificacion», «el maximo es» y «Elemento de la lista de verificacion» no se tocan
   salvo que el humano cierre P18 con la alternativa.
-- [ ] **T8b [P]. Toasts** (D11, R46). Test nuevo `tests/unit/recetas-ui/formulas-toasts.test.tsx` con
+- [x] **T8b [P]. Toasts** (D11, R46). Test nuevo `tests/unit/recetas-ui/formulas-toasts.test.tsx` con
   `sonner` simulado: un único `toast.success` con su texto en cada uno de los seis éxitos y en la
   edición con versión por revisar; ninguno en error.
 - [ ] **T8c. Guardia** (D16, R44, R45). `tests/guards/guard-formulas-rediseno.test.ts`. *Hecho:*
