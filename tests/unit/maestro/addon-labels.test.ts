@@ -8,6 +8,7 @@ import {
 } from '@/app/(private)/maestro/empresas/[id]/components/modulos/addon-labels';
 import { offConsequences } from '@/app/(private)/maestro/empresas/[id]/components/modulos/addon-off-consequences';
 import { ADDONS, type Addon, type CompanyAddonsView } from '@/lib/modules/identity';
+import { ADDON_DETAILS } from '@/lib/shared/ui/addon-details';
 import { ADDON_NAMES } from '@/lib/shared/ui/addon-names';
 
 const LECTURAS_FALLIDAS = 'Las lecturas de PDF en cola terminan como fallidas.';
@@ -28,10 +29,13 @@ function vista(prendidos: readonly Addon[]): CompanyAddonsView {
 }
 
 describe('ADDON_LABELS', () => {
-  it('R5: hay una etiqueta por añadido del catálogo', () => {
+  it('R5: hay una etiqueta por añadido del catálogo, con nombre, descripción e icono de lib/shared/ui', () => {
     expect(Object.keys(ADDON_LABELS)).toEqual([...ADDONS]);
+    expect(Object.keys(ADDON_DETAILS)).toEqual([...ADDONS]);
     for (const addon of ADDONS) {
       expect(ADDON_LABELS[addon].name).toBe(ADDON_NAMES[addon]);
+      expect(ADDON_LABELS[addon].description).toBe(ADDON_DETAILS[addon].description);
+      expect(ADDON_LABELS[addon].icon).toBe(ADDON_DETAILS[addon].icon);
       expect(ADDON_LABELS[addon].description).not.toBe('');
       expect(ADDON_LABELS[addon].icon).toBeDefined();
     }

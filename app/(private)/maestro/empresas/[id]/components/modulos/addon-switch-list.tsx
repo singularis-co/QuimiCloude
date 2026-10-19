@@ -52,11 +52,14 @@ export const ADDON_SWITCH_LIST_TEXTS = {
   requires: 'Necesita',
   requiresFix: 'Préndela para que funcione.',
   saveError: 'No se guardó el cambio',
+  saveErrorHint: 'El interruptor vuelve a su posición anterior.',
   dismiss: 'Volver',
   confirmOne: 'Apagar',
   confirmAll: 'Apagar todos',
   oneBodyBefore: 'Desaparece del menú y de las pantallas de todos los usuarios de',
   allBodyBefore: 'desaparecen para todos los usuarios de',
+  allOneTitle: '¿Apagar el módulo prendido?',
+  allOneBodyBefore: 'desaparece para todos los usuarios de',
   bodyAfter: 'desde su siguiente acción. Lo ya confirmado no se borra.',
 } as const;
 
@@ -179,7 +182,12 @@ function AddonRow({ state, locked, busy, error, onToggle }: AddonRowProps) {
           <Switch {...switchProps} />
         )}
       </div>
-      {error === null ? null : <SaveError error={error} testId={ADDON_SWITCH_LIST_TESTIDS.error(addon)} />}
+      {error === null ? null : (
+        <>
+          <SaveError error={error} testId={ADDON_SWITCH_LIST_TESTIDS.error(addon)} />
+          <p className="text-xs text-muted-foreground">{ADDON_SWITCH_LIST_TEXTS.saveErrorHint}</p>
+        </>
+      )}
     </li>
   );
 }
@@ -200,11 +208,12 @@ function offDialogTexts(request: OffRequest, companyName: string) {
       confirm: T.confirmOne,
     };
   }
+  const single = request.addons.length === 1;
   return {
-    title: `¿Apagar los ${request.addons.length} módulos prendidos?`,
+    title: single ? T.allOneTitle : `¿Apagar los ${request.addons.length} módulos prendidos?`,
     description: (
       <>
-        {namesOf(request.addons)} {T.allBodyBefore} {company} {T.bodyAfter}
+        {namesOf(request.addons)} {single ? T.allOneBodyBefore : T.allBodyBefore} {company} {T.bodyAfter}
       </>
     ),
     dismiss: T.dismiss,

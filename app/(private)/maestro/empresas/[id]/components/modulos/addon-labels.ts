@@ -1,14 +1,8 @@
-import {
-  FileTextIcon,
-  LayoutDashboardIcon,
-  PuzzleIcon,
-  SheetIcon,
-  TruckIcon,
-  type LucideIcon,
-} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import type { Addon, CompanyAddonsView } from '@/lib/modules/identity';
-import { ADDON_NAMES } from '@/lib/shared/ui/addon-names';
+import { ADDON_DETAILS } from '@/lib/shared/ui/addon-details';
+import { ADDON_NAMES, type AddonNameKey } from '@/lib/shared/ui/addon-names';
 
 export type AddonLabel = {
   readonly name: string;
@@ -16,33 +10,13 @@ export type AddonLabel = {
   readonly icon: LucideIcon;
 };
 
-export const ADDON_LABELS: Readonly<Record<Addon, AddonLabel>> = {
-  dashboard: {
-    name: ADDON_NAMES.dashboard,
-    description: 'Indicadores del día y recorrido de cada pedido.',
-    icon: LayoutDashboardIcon,
-  },
-  proveedores: {
-    name: ADDON_NAMES.proveedores,
-    description: 'Directorio de proveedores y su catálogo.',
-    icon: TruckIcon,
-  },
-  lectura_pdf: {
-    name: ADDON_NAMES.lectura_pdf,
-    description: 'Lee fórmulas y catálogos desde un PDF.',
-    icon: FileTextIcon,
-  },
-  importacion_excel: {
-    name: ADDON_NAMES.importacion_excel,
-    description: 'Carga inventario y catálogos desde una hoja de cálculo.',
-    icon: SheetIcon,
-  },
-  integraciones: {
-    name: ADDON_NAMES.integraciones,
-    description: 'Proveedor IA, Inventarios y WhatsApp.',
-    icon: PuzzleIcon,
-  },
-};
+// Se arma iterando ADDON_NAMES: `AddonNameKey` es igual a `Addon` (test de tipos de addon-names).
+export const ADDON_LABELS: Readonly<Record<Addon, AddonLabel>> = Object.fromEntries(
+  (Object.keys(ADDON_NAMES) as AddonNameKey[]).map((addon) => [
+    addon,
+    { name: ADDON_NAMES[addon], ...ADDON_DETAILS[addon] },
+  ]),
+) as Record<AddonNameKey, AddonLabel>;
 
 export type AddonWriteVia = 'one' | 'all';
 

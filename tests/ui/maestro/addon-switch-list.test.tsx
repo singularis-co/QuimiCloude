@@ -342,6 +342,39 @@ describe('AddonSwitchList', () => {
     expect(setCompanyAddonActionMock).not.toHaveBeenCalled();
   });
 
+  it('R12: con un solo añadido prendido, Apagar todos va en singular', async () => {
+    setAllCompanyAddonsActionMock.mockResolvedValue({ status: 'success', data: TODO_APAGADO });
+    const user = setupUser();
+    montar({
+      initialView: vista({
+        dashboard: OFF,
+        proveedores: OFF,
+        lectura_pdf: ON,
+        importacion_excel: OFF,
+        integraciones: OFF,
+      }),
+    });
+
+    await user.click(screen.getByTestId(IDS.allOff));
+    const dialogo = await screen.findByTestId(IDS.dialog);
+
+    expect(within(dialogo).getByRole('heading', { name: '¿Apagar el módulo prendido?' })).toBeInTheDocument();
+    expect(dialogo).toHaveTextContent(
+      `Lectura de PDF con IA desaparece para todos los usuarios de ${EMPRESA} desde su siguiente acción. Lo ya confirmado no se borra.`,
+    );
+    expect(within(dialogo).getByText(EMPRESA).tagName).toBe('STRONG');
+    expect(within(dialogo).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Las lecturas de PDF en cola terminan como fallidas.',
+      'Las revisiones sin confirmar quedan ocultas hasta que lo vuelvas a prender.',
+    ]);
+    expect(screen.getByTestId(IDS.confirm)).toHaveTextContent('Apagar todos');
+
+    await user.click(await esperarInteractiva(screen.getByTestId(IDS.confirm)));
+    await waitFor(() => expect(setAllCompanyAddonsActionMock).toHaveBeenCalledTimes(1));
+    expect(campos(setAllCompanyAddonsActionMock.mock.calls[0]?.[1])).toEqual({ companyId: ID, enabled: 'false' });
+    expect(setCompanyAddonActionMock).not.toHaveBeenCalled();
+  });
+
   it('R13: Prender todos deshabilitado sin apagados y Apagar todos sin prendidos', () => {
     montar();
     expect(screen.getByTestId(IDS.allOn)).toBeEnabled();
@@ -420,6 +453,8 @@ describe('AddonSwitchList', () => {
     expect(aviso).toHaveTextContent('No se guardó el cambio');
     expect(aviso).toHaveTextContent('Ocurrio un error inesperado. Intentalo de nuevo.');
     expect(aviso).toHaveTextContent('req-qc278-1');
+    const apoyo = within(fila).getByText('El interruptor vuelve a su posición anterior.');
+    expect(aviso.compareDocumentPosition(apoyo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(interruptor('importacion_excel')).toHaveAttribute('aria-checked', 'false');
     expect(estado('importacion_excel')).toBe('Apagado');
     expect(screen.queryByTestId(IDS.allError)).not.toBeInTheDocument();
@@ -447,6 +482,7 @@ describe('AddonSwitchList', () => {
     for (const addon of ORDEN) {
       expect(screen.queryByTestId(IDS.error(addon))).not.toBeInTheDocument();
     }
+    expect(screen.queryByText('El interruptor vuelve a su posición anterior.')).not.toBeInTheDocument();
     expect(toastMock.success).not.toHaveBeenCalled();
   });
 
