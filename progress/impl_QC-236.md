@@ -398,3 +398,47 @@ El caso de uso (`update-customer.ts`) no cambia: con el numero vacio siempre man
 **Veredicto:** H1, H2 (adaptador y dominio) y H5 resueltos y en verde. Queda pendiente: el `.int`
 nuevo, sin correr; pintar la variante `legacy` en la UI, que le toca a frontend; y H3, H6 y H7,
 que estaban fuera del encargo.
+
+## Vuelta 1 del reviewer · frontend (H2 UI, H3, N1–N4)
+
+### Archivos
+- `app/(private)/clientes/components/customer-columns.tsx`: variante `legacy`, con el `phone` antiguo en gris y mono y sin etiqueta.
+- `app/(private)/clientes/components/customer-phone-field.tsx`:
+  - pendiente de relleno: número vacío y la ayuda «Antes: <phone>. Escribe un número para reemplazarlo; si lo dejas vacío, se conserva.»;
+  - el país mide 48 px por debajo de escritorio (`max-lg:h-12`, como el número);
+  - el número lleva de placeholder el ejemplo de móvil del país (`getExampleNumber` con `libphonenumber-js/mobile/examples`, que ya está en el paquete instalado, sin dependencia nueva);
+  - errores de país y de número bajo toda la fila, con `FieldError`, el icono de `CountrySelect` y la entrada de `qc-err` (fade + 4 px desde arriba, `--dur-fast`, `--ease-enter`, con tw-animate-css y solo con `motion-safe`);
+  - fuera el comentario que citaba R31.
+- `components/shared/country-select.tsx`: prop opcional `triggerClassName`.
+- `components/shared/text-field.tsx`: props opcionales `placeholder` y `errorOutside`.
+- `components/shared/CATALOGO.md`: filas de `CountrySelect` y `TextField`.
+- Tests:
+  - `tests/ui/clientes/customer-columns-phone.test.tsx`;
+  - `tests/ui/clientes/customer-phone-field.test.tsx`;
+  - `tests/ui/shared/country-select-pinned.test.tsx`;
+  - `tests/ui/shared/text-field-extension.test.tsx` (nuevo);
+  - instantánea `tests/unit/paridad/__snapshots__/formularios-paridad.test.tsx.snap`. La regeneré porque el cliente de prueba tiene `phone` sin `phoneE164`: ahora sale la ayuda y el disparador tiene `max-lg:h-12`.
+
+### Mapa → test
+| Punto | Test |
+| --- | --- |
+| H2/H4 lista | `customer-columns-phone` › «R29 — un cliente pendiente de relleno muestra su teléfono antiguo…» |
+| H2 edición | `customer-phone-field` › «R35 — un cliente pendiente de relleno abre con el número vacío…» y «R34 — guardar un cliente pendiente de relleno…» |
+| N1 (48 px) | `customer-phone-field` › «R33 — a 390 px … el país y el número miden 48 px…»; `country-select-pinned` › `triggerClassName` (2) |
+| N2 placeholder | `customer-phone-field` › «R33 — el número lleva de placeholder…» y «R33 — sin país elegido…»; `text-field-extension` › placeholder (2) |
+| N3/N4 error | `customer-phone-field` › «R9 — el error del número va bajo toda la fila…» y «R8 — el error del país también…»; `text-field-extension` › `errorOutside` (2) |
+| H3 | `country-select-pinned` › `CountrySelect · errorId` (3) |
+
+### Desviación
+- El ejemplo de Colombia que da la librería es `321 1234567` y no el `300 123 4567` del tablero. Es coherente con D14.
+
+### Verificación (salida real, 2026-10-19)
+- `pnpm run typecheck` → `tsc --noEmit`, sin errores (exit 0).
+- `pnpm exec eslint` sobre los 8 archivos tocados → sin salida (exit 0).
+- `pnpm exec vitest related --run --project ui --project node <rutas absolutas>` → `Test Files 1 failed | 218 passed (219)`, `Tests 5 failed | 3824 passed | 1 skipped`.
+  - Los 5 rojos eran las instantáneas de `formularios-paridad` › cliente, con el cambio esperado: la ayuda del pendiente y `max-lg:h-12`.
+- `pnpm exec vitest run --project ui -u tests/unit/paridad/formularios-paridad.test.tsx` → `Snapshots 5 updated`, `Test Files 387 passed (387)`, `Tests 5921 passed | 1 skipped`.
+  - El filtro de ruta no se aplicó en Windows y corrió todo el proyecto `ui`. Solo se actualizaron esas 5 instantáneas.
+
+### Veredicto
+H2 (UI), H3 y N1–N4 resueltos en el campo y en la lista. Verde en typecheck, lint y tests.

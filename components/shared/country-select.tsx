@@ -104,6 +104,8 @@ export type CountrySelectProps = {
    * él, `error` solo marca el disparador como inválido y lo enlaza: el campo no pinta el suyo.
    */
   readonly errorId?: string;
+  /** Clases extra del disparador, p. ej. otra altura para alinearlo con los controles vecinos. */
+  readonly triggerClassName?: string;
 };
 
 export function CountrySelect({
@@ -118,6 +120,7 @@ export function CountrySelect({
   hideLabel = false,
   compactOnMobile = false,
   errorId: externalErrorId,
+  triggerClassName,
 }: CountrySelectProps) {
   const generatedId = useId();
   const baseId = id ?? generatedId;
@@ -187,7 +190,7 @@ export function CountrySelect({
     'aria-invalid': invalid || undefined,
     'aria-describedby': invalid ? errorId : undefined,
     disabled,
-    className: TRIGGER_CLASS,
+    className: cn(TRIGGER_CLASS, triggerClassName),
     'data-testid': testId,
   };
 

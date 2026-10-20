@@ -83,6 +83,17 @@ describe('columna «Teléfono» de la lista de clientes', () => {
     expect(issue).not.toHaveTextContent('Teléfono duplicado: revisar');
   });
 
+  it('R29 — un cliente pendiente de relleno muestra su teléfono antiguo en gris y en mono, sin etiqueta', () => {
+    renderPhoneCell({ ...BASE, phone: '300-123-4567 casa' });
+
+    const legacy = screen.getByTestId(`customer-phone-legacy-${BASE.id}`);
+    expect(legacy).toHaveTextContent('300-123-4567 casa');
+    expect(legacy).toHaveClass('text-muted-foreground');
+    expect(legacy).toHaveClass('font-mono');
+    expect(screen.getByTestId('celda').querySelector('[data-tone]')).toBeNull();
+    expect(screen.queryByTestId(`customer-missing-${PHONE_COLUMN_ID}`)).toBeNull();
+  });
+
   it('R29 — un cliente sin teléfono muestra la marca de dato ausente', () => {
     renderPhoneCell(BASE);
 

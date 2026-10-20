@@ -1,7 +1,9 @@
 'use client';
 
+import { CircleAlertIcon } from 'lucide-react';
 import { useId, useState, type ClipboardEvent } from 'react';
-import type { CountryCode } from 'libphonenumber-js';
+import { getExampleNumber, type CountryCode } from 'libphonenumber-js';
+import mobileExamples from 'libphonenumber-js/mobile/examples';
 
 import { countryOptionLabel, listCountryOptions } from '@/components/shared/country-options';
 import { CountrySelect } from '@/components/shared/country-select';
@@ -11,6 +13,7 @@ import { TextField } from '@/components/shared/text-field';
 import {
   CUSTOMER_PHONE_MAX_LENGTH,
   countryFromInternationalInput,
+  describeCustomerPhone,
   formatPhoneNational,
   parseCustomerPhone,
   type CustomerPhoneIssue,
@@ -39,9 +42,45 @@ const ISSUE_HELP_AFTER_PHONE: Readonly<Record<CustomerPhoneIssue, string>> = {
 };
 
 const ISSUE_HELP_BEFORE_PHONE = 'Antes: ';
+const LEGACY_HELP_AFTER_PHONE = '. Escribe un número para reemplazarlo; si lo dejas vacío, se conserva.';
 
 /** 48 px por debajo de escritorio; 44 px y 16 px de letra en todos los anchos. */
 const NUMBER_INPUT_CLASS = 'min-h-11 max-lg:min-h-12 font-mono text-base md:text-base';
+/** El país mide lo mismo que el número para que la fila quede alineada. */
+const COUNTRY_TRIGGER_CLASS = 'max-lg:h-12';
+
+const ERROR_MESSAGE_CLASS =
+  'flex items-center gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-(--dur-fast) motion-safe:ease-(--ease-enter)';
+
+function examplePhoneNational(country: CountryCode | null): string | undefined {
+  if (country === null) return undefined;
+  return getExampleNumber(country, mobileExamples)?.formatNational();
+}
+
+function RowError({
+  id,
+  message,
+  testId,
+}: {
+  readonly id: string;
+  readonly message?: string;
+  readonly testId: string;
+}) {
+  return (
+    <FieldError
+      id={id}
+      testId={testId}
+      message={
+        message === undefined ? undefined : (
+          <span key={message} className={ERROR_MESSAGE_CLASS}>
+            <CircleAlertIcon aria-hidden className="size-4 shrink-0" />
+            {message}
+          </span>
+        )
+      }
+    />
+  );
+}
 
 function asCountryCode(value: string | null | undefined): CountryCode | null {
   if (value === null || value === undefined) return null;
@@ -79,7 +118,6 @@ export type CustomerPhoneFieldProps = {
 };
 
 // Sin teléfono, la edición abre con el país de la empresa, como el alta (humano, 2026-10-19).
-// Un migrado con aviso conserva el suyo (R31).
 function initialCountry(
   customer: CustomerView | undefined,
   companyCountry: CountryCode | null,
@@ -107,6 +145,7 @@ export function CustomerPhoneField({
   const countryId = `${baseId}-country`;
   const countryErrorId = `${baseId}-country-error`;
   const numberId = `${baseId}-number`;
+  const numberErrorId = `${baseId}-number-error`;
   const helpId = `${baseId}-help`;
 
   const [country, setCountry] = useState<CountryCode | null>(() =>
@@ -163,6 +202,8 @@ export function CustomerPhoneField({
 
   const issue = customer?.phoneIssue ?? null;
   const legacyPhone = customer?.phone ?? null;
+  const pendingLegacy =
+    customer !== undefined && describeCustomerPhone(customer).kind === 'legacy';
   const help =
     issue !== null && legacyPhone !== null ? (
       <p
@@ -176,6 +217,12 @@ export function CustomerPhoneField({
           <span className="font-mono">{legacyPhone}</span>
           {ISSUE_HELP_AFTER_PHONE[issue]}
         </span>
+      </p>
+    ) : pendingLegacy ? (
+      <p id={helpId} className="text-sm text-muted-foreground">
+        {ISSUE_HELP_BEFORE_PHONE}
+        <span className="font-mono">{legacyPhone}</span>
+        {LEGACY_HELP_AFTER_PHONE}
       </p>
     ) : customer === undefined ? (
       <p id={helpId} className="text-sm text-muted-foreground">
@@ -207,6 +254,7 @@ export function CustomerPhoneField({
             pinned={companyCountry === null ? undefined : { code: companyCountry, label: PINNED_LABEL }}
             error={shown.country}
             errorId={countryErrorId}
+            triggerClassName={COUNTRY_TRIGGER_CLASS}
             testId={testIds.country}
           />
         </div>
@@ -222,6 +270,7 @@ export function CustomerPhoneField({
             inputMode="tel"
             autoComplete="tel-national"
             maxLength={CUSTOMER_PHONE_MAX_LENGTH}
+            placeholder={examplePhoneNational(country)}
             ariaRequired={false}
             value={number}
             onValueChange={(next) => {
@@ -231,13 +280,15 @@ export function CustomerPhoneField({
             onBlur={() => settle(number, country, edited)}
             inputClassName={NUMBER_INPUT_CLASS}
             error={shown.number}
+            errorId={numberErrorId}
+            errorOutside
             testId={testIds.number}
-            errorTestId={testIds.numberError}
           />
         </div>
       </div>
 
-      <FieldError id={countryErrorId} message={shown.country} testId={testIds.countryError} />
+      <RowError id={countryErrorId} message={shown.country} testId={testIds.countryError} />
+      <RowError id={numberErrorId} message={shown.number} testId={testIds.numberError} />
       {help}
     </div>
   );

@@ -37,7 +37,10 @@ afterEach(() => {
 });
 
 type HarnessProps = Partial<
-  Pick<CountrySelectProps, 'pinned' | 'hideLabel' | 'compactOnMobile'>
+  Pick<
+    CountrySelectProps,
+    'pinned' | 'hideLabel' | 'compactOnMobile' | 'error' | 'errorId' | 'triggerClassName'
+  >
 > & {
   readonly initial?: CountryCode | null;
   readonly onChange?: (value: CountryCode | null) => void;
@@ -263,5 +266,57 @@ describe('CountrySelect · compactOnMobile', () => {
 
     expect(trigger()).toHaveTextContent('Colombia (+57)');
     expect(trigger()).toHaveAccessibleName(LABEL);
+  });
+});
+
+describe('CountrySelect · errorId', () => {
+  const ERROR = 'Elige el país del teléfono.';
+  const EXTERNAL_ID = 'fila-telefono-error';
+
+  it('R8 — con `errorId`, el disparador queda inválido y enlazado a ese id, y el campo no pinta su error', () => {
+    render(
+      <>
+        <Harness error={ERROR} errorId={EXTERNAL_ID} />
+        <p id={EXTERNAL_ID}>{ERROR}</p>
+      </>,
+    );
+
+    expect(trigger()).toHaveAttribute('aria-invalid', 'true');
+    expect(trigger()).toHaveAttribute('aria-describedby', EXTERNAL_ID);
+    expect(trigger()).toHaveAccessibleDescription(ERROR);
+    expect(screen.getAllByText(ERROR)).toHaveLength(1);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('R8 — con `errorId` y sin error, el disparador no queda inválido ni descrito', () => {
+    render(<Harness errorId={EXTERNAL_ID} />);
+
+    expect(trigger()).not.toHaveAttribute('aria-invalid');
+    expect(trigger()).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('R8 — sin `errorId`, el campo pinta su propio error enlazado al disparador', () => {
+    render(<Harness error={ERROR} />);
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(ERROR);
+    expect(trigger()).toHaveAttribute('aria-describedby', alert.id);
+  });
+});
+
+describe('CountrySelect · triggerClassName', () => {
+  it('R33 — `triggerClassName` se suma a las clases del disparador en escritorio', () => {
+    render(<Harness triggerClassName="max-lg:h-12" />);
+
+    expect(trigger()).toHaveClass('max-lg:h-12');
+    expect(trigger()).toHaveClass('h-11');
+  });
+
+  it('R33 — `triggerClassName` también llega al disparador de la hoja de teléfono', () => {
+    setViewportWidth(PHONE);
+    render(<Harness triggerClassName="max-lg:h-12" compactOnMobile />);
+
+    expect(trigger()).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(trigger()).toHaveClass('max-lg:h-12');
   });
 });

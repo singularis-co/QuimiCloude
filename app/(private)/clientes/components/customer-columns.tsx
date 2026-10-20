@@ -63,6 +63,16 @@ function PhoneCell({ customer }: { readonly customer: CustomerView }) {
       </span>
     );
   }
+  if (phone.kind === 'legacy') {
+    return (
+      <span
+        data-testid={`customer-phone-legacy-${customer.id}`}
+        className="font-mono text-muted-foreground"
+      >
+        {phone.legacyPhone}
+      </span>
+    );
+  }
   return <MissingValue field={PHONE_COLUMN_ID} />;
 }
 

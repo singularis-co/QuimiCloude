@@ -4,7 +4,8 @@
 // el doble. Los textos con formato salen de las funciones del dominio, no se escriben a mano.
 
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import type { CountryCode } from 'libphonenumber-js';
+import { getExampleNumber, type CountryCode } from 'libphonenumber-js';
+import mobileExamples from 'libphonenumber-js/mobile/examples';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -112,6 +113,14 @@ const MIGRATED_DUPLICATE: CustomerView = {
   phoneCountry: 'CO',
   phoneIssue: 'duplicate',
 };
+
+const PENDING_LEGACY: CustomerView = {
+  ...BASE,
+  phone: '300-123-4567 casa',
+};
+
+const exampleNational = (country: CountryCode) =>
+  getExampleNumber(country, mobileExamples)!.formatNational();
 
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 
@@ -257,6 +266,27 @@ describe('CustomerPhoneField · valor inicial', () => {
   });
 });
 
+describe('CustomerPhoneField · placeholder', () => {
+  it('R33 — el número lleva de placeholder el ejemplo del país elegido en formato nacional', async () => {
+    const user = setupUser();
+    await openCreate(user, 'CO');
+
+    expect(numberInput()).toHaveAttribute('placeholder', exampleNational('CO'));
+
+    await user.click(numberInput());
+    await user.paste('+593 99 123 4567');
+    await waitFor(() => expect(hiddenCountry()).toHaveValue('EC'));
+    expect(numberInput()).toHaveAttribute('placeholder', exampleNational('EC'));
+  });
+
+  it('R33 — sin país elegido el número no lleva placeholder', async () => {
+    const user = setupUser();
+    await openCreate(user, null);
+
+    expect(numberInput()).not.toHaveAttribute('placeholder');
+  });
+});
+
 describe('CustomerPhoneField · formato y país al escribir', () => {
   it('R6 — mientras se escribe no se reformatea; al salir del campo queda en formato nacional', async () => {
     const user = setupUser();
@@ -348,6 +378,42 @@ describe('CustomerPhoneField · errores', () => {
     expect(numberInput()).toHaveAttribute('aria-invalid', 'true');
     expect(numberInput()).toHaveAttribute('aria-describedby', error.id);
     expect(numberInput()).toHaveValue('300 12');
+  });
+
+  it('R9 — el error del número va bajo toda la fila, con su icono y la animación de entrada', async () => {
+    const user = setupUser();
+    await openCreate(user, 'CO');
+
+    await user.type(numberInput(), '300 12');
+    await user.tab();
+
+    const error = await screen.findByTestId(CUSTOMER_ERROR_TESTIDS.phoneNumber);
+    const group = screen.getByRole('group', { name: 'Teléfono' });
+    expect(group).not.toContainElement(error);
+    expect(group.compareDocumentPosition(error) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(error.parentElement).toBe(group.parentElement);
+    expect(error).toHaveAttribute('role', 'alert');
+    expect(error.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    const message = error.firstElementChild!;
+    expect(message).toHaveClass('motion-safe:animate-in');
+    expect(message).toHaveClass('motion-safe:slide-in-from-top-1');
+    expect(screen.getAllByText(INVALID_FOR_CO)).toHaveLength(1);
+  });
+
+  it('R8 — el error del país también va bajo toda la fila, con su icono y la animación de entrada', async () => {
+    const user = setupUser();
+    await openCreate(user, null);
+    await fillRequired(user);
+
+    await user.type(numberInput(), '3001234567');
+    await user.click(screen.getByTestId(CUSTOMER_FORM_SUBMIT_TESTID));
+
+    const error = await screen.findByTestId(CUSTOMER_ERROR_TESTIDS.phoneCountry);
+    const group = screen.getByRole('group', { name: 'Teléfono' });
+    expect(group).not.toContainElement(error);
+    expect(error.parentElement).toBe(group.parentElement);
+    expect(error.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(error.firstElementChild).toHaveClass('motion-safe:animate-in');
   });
 
   it('R9 — al guardar un número no válido no se llama a la operación y se pinta el error con el país', async () => {
@@ -474,6 +540,30 @@ describe('CustomerPhoneField · clientes migrados', () => {
     );
   });
 
+  it('R35 — un cliente pendiente de relleno abre con el número vacío, sin etiqueta y con la ayuda de que se conserva', async () => {
+    await openEdit(PENDING_LEGACY, 'CO');
+
+    expect(numberInput()).toHaveValue('');
+    expect(hiddenCountry()).toHaveValue('CO');
+    expect(screen.queryByTestId(CUSTOMER_PHONE_ISSUE_TESTID)).toBeNull();
+    const group = screen.getByRole('group', { name: 'Teléfono' });
+    expect(group).toHaveAccessibleDescription(
+      'Antes: 300-123-4567 casa. Escribe un número para reemplazarlo; si lo dejas vacío, se conserva.',
+    );
+    expect(within(group.parentElement!).getByText('300-123-4567 casa')).toHaveClass('font-mono');
+  });
+
+  it('R34 — guardar un cliente pendiente de relleno con el número vacío manda phoneNumber vacío sin errores', async () => {
+    const user = setupUser();
+    await openEdit(PENDING_LEGACY, 'CO');
+
+    await user.click(screen.getByTestId(CUSTOMER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateCustomerActionMock).toHaveBeenCalledTimes(1));
+    expect(sentUpdate().get('phoneNumber')).toBe('');
+    expect(screen.queryByTestId(CUSTOMER_ERROR_TESTIDS.phoneNumber)).toBeNull();
+  });
+
   it('R31 — un cliente sin aviso no muestra etiqueta', async () => {
     await openEdit(VALID);
     expect(screen.queryByTestId(CUSTOMER_PHONE_ISSUE_TESTID)).toBeNull();
@@ -506,7 +596,7 @@ describe('CustomerPhoneField · clientes migrados', () => {
 });
 
 describe('CustomerPhoneField · teléfono', () => {
-  it('R33 — a 390 px el país es compacto (CO +57, nombre en aria-label) y el número mide 48 px con letra de 16 px', async () => {
+  it('R33 — a 390 px el país es compacto (CO +57, nombre en aria-label), el país y el número miden 48 px y el número lleva letra de 16 px', async () => {
     setViewportWidth(PHONE);
     const user = setupUser();
     await openCreate(user, 'CO');
@@ -516,6 +606,7 @@ describe('CustomerPhoneField · teléfono', () => {
     expect(numberInput().className).toContain('max-lg:min-h-12');
     expect(numberInput().className).toContain('text-base');
     expect(numberInput().className).toContain('min-h-11');
+    expect(countryTrigger()).toHaveClass('max-lg:h-12');
 
     await user.click(countryTrigger());
     expect(await screen.findByRole('dialog', { name: 'País del teléfono' })).toBeInTheDocument();
