@@ -1190,6 +1190,100 @@ model WhatsappConnection {
   @@map("whatsapp_connections")
 }
 
+enum WhatsappMessageDirection {
+  IN
+  OUT
+
+  @@map("whatsapp_message_direction")
+}
+
+enum WhatsappMessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+  STICKER
+  LOCATION
+  CONTACTS
+  REACTION
+  BUTTON
+  INTERACTIVE
+  TEMPLATE
+  UNSUPPORTED
+
+  @@map("whatsapp_message_type")
+}
+
+enum WhatsappMessageStatus {
+  RECEIVED
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+
+  @@map("whatsapp_message_status")
+}
+
+enum WhatsappMessageOrigin {
+  USER
+  SYSTEM
+
+  @@map("whatsapp_message_origin")
+}
+
+/// Sin `@relation`: las FK compuestas con `company_id` (a la conexion y, en los mensajes, al
+/// contacto) estan escritas a mano en la migracion, para que ningun `include` cruce de empresa.
+/// @module integraciones
+model WhatsappContact {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  connectionId  String    @map("connection_id") @db.Uuid
+  waId          String    @map("wa_id")
+  profileName   String?   @map("profile_name")
+  customerId    String?   @map("customer_id") @db.Uuid
+  lastInboundAt DateTime? @map("last_inbound_at") @db.Timestamptz(6)
+  lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([connectionId, waId], map: "whatsapp_contacts_connection_id_wa_id_key")
+  @@unique([companyId, id], map: "whatsapp_contacts_company_id_id_key")
+  @@unique([companyId, connectionId, id], map: "whatsapp_contacts_company_connection_id_key")
+  @@index([customerId], map: "whatsapp_contacts_customer_id_idx")
+  @@map("whatsapp_contacts")
+}
+
+/// @module integraciones
+model WhatsappMessage {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String                   @map("company_id") @db.Uuid
+  connectionId   String                   @map("connection_id") @db.Uuid
+  contactId      String                   @map("contact_id") @db.Uuid
+  direction      WhatsappMessageDirection
+  wamid          String?                  @unique(map: "whatsapp_messages_wamid_key")
+  type           WhatsappMessageType
+  body           String?
+  payload        Json                     @default("{}")
+  status         WhatsappMessageStatus
+  errorCode      String?                  @map("error_code")
+  errorReason    String?                  @map("error_reason")
+  metaTimestamp  DateTime?                @map("meta_timestamp") @db.Timestamptz(6)
+  origin         WhatsappMessageOrigin?
+  sentById       String?                  @map("sent_by") @db.Uuid
+  templateName   String?                  @map("template_name")
+  attempts       Int                      @default(0)
+  queueMessageId String?                  @map("queue_message_id")
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([connectionId, contactId, metaTimestamp], map: "whatsapp_messages_connection_contact_ts_idx")
+  @@index([sentById], map: "whatsapp_messages_sent_by_idx")
+  @@map("whatsapp_messages")
+}
+
 enum EvidencePhase {
   MANUFACTURING
   PACKING

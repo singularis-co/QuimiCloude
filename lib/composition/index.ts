@@ -2701,10 +2701,12 @@ const secretDigest: SecretDigest = secretDigestSha256;
 import {
   createCreateWhatsappConnection,
   createGetWhatsappConnection,
+  createReceiveWhatsappWebhook,
   createRegenerateWhatsappVerifyToken,
   createSetWhatsappConnectionEnabled,
   createTestWhatsappConnection,
   createUpdateWhatsappConnection,
+  createVerifyWhatsappWebhook,
 } from '@/lib/modules/integraciones';
 import { integrationsE2EDoublesEnabled } from '@/lib/modules/integraciones/adapters/driven/config/e2e-doubles-env';
 import { readPublicBaseUrl } from '@/lib/modules/integraciones/adapters/driven/config/public-base-url-env';
@@ -2714,12 +2716,20 @@ import {
   findLiveWhatsappConnection,
   findLiveWhatsappConnectionById,
   insertWhatsappConnection,
+  recordWhatsappWebhookHandshake,
   updateLiveWhatsappConnection,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma';
+import { recordWhatsappInbound } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma';
+import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
+import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
+import type { IntegrationsSwitch } from '@/lib/modules/integraciones/ports/integrations-switch';
 import type { RandomSource } from '@/lib/modules/integraciones/ports/random-source';
+import type { WebhookSignature } from '@/lib/modules/integraciones/ports/webhook-signature';
 import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository';
 import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client';
+import type { WhatsappInboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-inbox-repository';
+import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory';
 import { whatsappWebhookPath } from '@/lib/shared/routes';
 
 /** El doble se elige en cada llamada: la variable puede cambiar dentro del mismo proceso. */
@@ -2735,6 +2745,7 @@ const whatsappConnectionRepository: WhatsappConnectionRepository = {
   findLiveById: findLiveWhatsappConnectionById,
   create: insertWhatsappConnection,
   update: updateLiveWhatsappConnection,
+  recordWebhookHandshake: recordWhatsappWebhookHandshake,
 };
 
 const randomSource: RandomSource = randomSourceNode;
@@ -2745,6 +2756,25 @@ const whatsappDeps = {
   cipher: secretCipher,
   digest: secretDigest,
   random: randomSource,
+};
+
+const whatsappWebhookDirectory: WhatsappWebhookDirectory = { companyOfConnection: companyOfWhatsappConnection };
+const whatsappInboxRepository: WhatsappInboxRepository = { record: recordWhatsappInbound };
+const webhookSignature: WebhookSignature = webhookSignatureHmac;
+/** La clave del anadido vive aqui, no en el modulo. */
+const integrationsSwitch: IntegrationsSwitch = {
+  isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'integraciones'),
+};
+
+/** Sin Graph ni cola: recibir un webhook no llama hacia fuera. */
+const whatsappWebhookDeps = {
+  directory: whatsappWebhookDirectory,
+  integrations: integrationsSwitch,
+  connections: whatsappConnectionRepository,
+  digest: secretDigest,
+  cipher: secretCipher,
+  signature: webhookSignature,
+  inbox: whatsappInboxRepository,
 };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
@@ -2851,4 +2881,6 @@ export const integraciones = {
   getAiProviderStatus: createGetAiProviderStatus(aiProviderDeps),
   resolveAiProviderForReading: createResolveAiProviderForReading(aiProviderDeps),
   reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
+  verifyWhatsappWebhook: createVerifyWhatsappWebhook(whatsappWebhookDeps),
+  receiveWhatsappWebhook: createReceiveWhatsappWebhook(whatsappWebhookDeps),
 } as const;
