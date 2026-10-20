@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { companyIdOfPath } from '../../../domain/document-path';
 import {
   MILLISECONDS_PER_SECOND,
   PROVIDER_UPLOAD_LINK_TTL_SECONDS,
@@ -40,11 +41,24 @@ const BYTES_ILEGIBLES = new TextEncoder().encode(`no es un PDF (${UNREADABLE_E2E
 /** El nombre original que subio quien encolo esa ruta, o `null` si no lo hay. */
 export type OriginalNameOf = (path: string) => Promise<string | null>;
 
-/** La ruta es unica por empresa y empieza por ella, asi que basta para dar con su fila. */
-const originalNameInDatabase: OriginalNameOf = async (path) => {
-  const file = await prisma.documentFile.findFirst({ where: { path }, select: { originalName: true } });
+/** Busca el nombre original de la fila `(companyId, path)`. */
+export type FindOriginalName = (where: { companyId: string; path: string }) => Promise<string | null>;
+
+/** Una ruta sin empresa valida al frente no tiene fila: se responde sin consultar. */
+export function createOriginalNameOf(find: FindOriginalName): OriginalNameOf {
+  return (path) => {
+    const companyId = companyIdOfPath(path);
+    return companyId === null ? Promise.resolve(null) : find({ companyId, path });
+  };
+}
+
+const originalNameInDatabase: OriginalNameOf = createOriginalNameOf(async (where) => {
+  const file = await prisma.documentFile.findFirst({
+    where: { companyId: where.companyId, path: where.path },
+    select: { originalName: true },
+  });
   return file?.originalName ?? null;
-};
+});
 
 /**
  * Dominio reservado por el estandar: NO resuelve en ningun DNS. Si alguien olvidara interceptar la

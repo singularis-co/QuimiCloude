@@ -2,11 +2,12 @@
 // marca en el nombre original, unos bytes que no son un PDF (QC-137 T22 1b: un archivo que falla
 // en una tanda de dos). El nombre se inyecta: aqui no hay base.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { countPages } from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
 import {
   createDocumentStorageMemory,
+  createOriginalNameOf,
   UNREADABLE_E2E_NAME_MARK,
 } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-memory';
 
@@ -58,5 +59,27 @@ describe('documentos — almacenamiento en memoria del E2E', () => {
     const b = storageWithName(null);
     await a.createSignedUpload(RUTA);
     expect(() => b.download(RUTA)).toThrow(/no firmo la ruta/);
+  });
+});
+
+describe('documentos — nombre original del E2E, filtrado por empresa', () => {
+  const EMPRESA = '33333333-3333-4333-8333-333333333333';
+
+  it('consulta por la empresa del prefijo de la ruta y por la ruta', async () => {
+    const find = vi.fn(async () => 'catalogo.pdf');
+    const ruta = `${EMPRESA}/archivo-1.pdf`;
+
+    expect(await createOriginalNameOf(find)(ruta)).toBe('catalogo.pdf');
+    expect(find).toHaveBeenCalledWith({ companyId: EMPRESA, path: ruta });
+  });
+
+  it('una ruta sin empresa valida al frente da null sin consultar', async () => {
+    const find = vi.fn(async () => 'no deberia leerse.pdf');
+    const originalNameOf = createOriginalNameOf(find);
+
+    for (const ruta of [RUTA, `/${EMPRESA}/x.pdf`, `${EMPRESA}/../otra/x.pdf`, '']) {
+      expect(await originalNameOf(ruta), ruta).toBeNull();
+    }
+    expect(find).not.toHaveBeenCalled();
   });
 });
