@@ -514,6 +514,7 @@ describe('createCompanyAction', () => {
         documentNumber: '123456',
         username: 'ana.perez',
       },
+      country: null,
     });
     expect(puertos.companies.createWithAdministrator).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -525,6 +526,32 @@ describe('createCompanyAction', () => {
     expect(puertos.issueForPendingUser).toHaveBeenCalledWith(
       expect.objectContaining({ userId: ADMIN_ID, companyId: COMPANY_ID }),
     );
+  });
+
+  it('country: el campo country del formulario llega al caso de uso y el alta guarda el pais', async () => {
+    const resultado = await createCompanyAction(
+      IDLE,
+      formData({ ...CAMPOS_EMPRESA, ...CAMPOS_ADMINISTRADOR, country: 'CO' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'success', companyId: COMPANY_ID });
+    expect(puertos.casos.createCompany).toHaveBeenCalledWith(
+      ACTOR_DE_SESION,
+      expect.objectContaining({ country: 'CO' }),
+    );
+    expect(puertos.companies.createWithAdministrator).toHaveBeenCalledWith(
+      expect.objectContaining({ country: 'CO' }),
+    );
+  });
+
+  it('country: un pais invalido responde invalid_input sin tocar ningun puerto', async () => {
+    const resultado = await createCompanyAction(
+      IDLE,
+      formData({ ...CAMPOS_EMPRESA, ...CAMPOS_ADMINISTRADOR, country: 'XX' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+    ningunPuertoTocado();
   });
 
   it('R3, R15: el correo fallido sale como mail failed dentro del exito', async () => {
@@ -581,7 +608,8 @@ describe('createCompanyAction', () => {
       company: Record<string, unknown>;
       administrator: Record<string, unknown>;
     };
-    expect(Object.keys(entrada).sort()).toEqual(['administrator', 'company']);
+    expect(Object.keys(entrada).sort()).toEqual(['administrator', 'company', 'country']);
+    expect(entrada).toHaveProperty('country', 'CO');
     expect(Object.keys(entrada.company).sort()).toEqual(
       ['contactEmail', 'contactPhone', 'name', 'taxId'].sort(),
     );
