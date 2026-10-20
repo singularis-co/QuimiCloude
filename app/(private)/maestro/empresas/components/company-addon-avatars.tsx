@@ -61,7 +61,8 @@ export function CompanyAddonAvatars({ addons, limit = COMPANY_ADDON_AVATARS_LIMI
   const restNames = addons.slice(limit).map((addon) => ADDON_NAMES[addon]);
 
   return (
-    <div className="flex -space-x-1.5" data-testid={COMPANY_ADDONS_TESTID}>
+    // `span`: en la tarjeta la fila va dentro del `span` del hueco del pie.
+    <span className="flex -space-x-1.5" data-testid={COMPANY_ADDONS_TESTID}>
       {shown.map((addon) => (
         <AddonAvatar key={addon} addon={addon} />
       ))}
@@ -89,6 +90,6 @@ export function CompanyAddonAvatars({ addons, limit = COMPANY_ADDON_AVATARS_LIMI
           </TooltipContent>
         </Tooltip>
       )}
-    </div>
+    </span>
   );
 }

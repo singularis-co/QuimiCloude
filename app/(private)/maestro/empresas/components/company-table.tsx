@@ -18,8 +18,10 @@ import type { CompanyRow } from '@/lib/modules/identity';
 import { cn } from '@/lib/utils';
 
 import {
+  CONTACT_COLUMN_ID,
   COUNTRY_COLUMN_ID,
   COMPANY_COLUMN_COUNT,
+  MODULES_COLUMN_ID,
   TAX_ID_COLUMN_ID,
   USERS_COLUMN_ID,
   buildCompanyColumns,
@@ -52,11 +54,14 @@ export const COMPANY_LIST_CLEAR_FILTER_TESTID = 'company-list-clear-filter';
 export const COMPANY_LIST_CLEAR_SEARCH_TESTID = 'company-list-clear-search';
 export const COMPANY_LIST_FIRST_PAGE_TESTID = 'company-list-first-page';
 
+// La tarjeta del teléfono muestra lo mismo que la tabla: el contacto debajo del nombre y los
+// módulos al pie, junto a «Acciones»; las celdas son las mismas de las columnas.
 const COMPANY_CARD: DataTableCardLayout = {
   primary: NAME_COLUMN_ID,
   status: STATUS_COLUMN_ID,
-  meta: [TAX_ID_COLUMN_ID, COUNTRY_COLUMN_ID, CREATED_AT_COLUMN_ID],
-  footer: USERS_COLUMN_ID,
+  title: CONTACT_COLUMN_ID,
+  meta: [TAX_ID_COLUMN_ID, COUNTRY_COLUMN_ID, USERS_COLUMN_ID, CREATED_AT_COLUMN_ID],
+  footer: MODULES_COLUMN_ID,
 };
 
 export type CompanyActionTarget = {

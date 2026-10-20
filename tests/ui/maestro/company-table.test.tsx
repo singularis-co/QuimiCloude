@@ -456,6 +456,61 @@ describe('tarjetas en contenedor estrecho', () => {
     expect(within(card).getByTestId('company-created-at')).toHaveTextContent('creada 14/09/2026');
   });
 
+  it('la tarjeta lleva el contacto debajo del nombre, con la misma celda que la columna «Contacto»', () => {
+    const ambos: CompanyRow = { ...QUIMICLOUD, contactEmail: 'compras@quimicloud.co', contactPhone: '+57 300 123 4567' };
+    const soloCorreo: CompanyRow = { ...VALLE, contactEmail: 'info@valle.co', contactPhone: null };
+    montar({ companies: [ambos, soloCorreo, LA_CEJA] });
+
+    const card = tarjeta(ambos.id);
+    const hueco = within(card).getByTestId('data-table-card-field-contact');
+    // Debajo del nombre: el hueco sigue a la fila de nombre y estado.
+    expect(hueco.previousElementSibling).toContainElement(within(card).getByRole('link', { name: ambos.name }));
+    const contacto = within(hueco).getByTestId('company-contact');
+    expect(within(contacto).getByTestId('company-contact-email')).toHaveTextContent('compras@quimicloud.co');
+    expect(within(contacto).getByTestId('company-contact-phone')).toHaveTextContent('+57 300 123 4567');
+
+    const parcial = within(tarjeta(soloCorreo.id)).getByTestId('company-contact');
+    expect(within(parcial).getByTestId('company-contact-email')).toHaveTextContent('info@valle.co');
+    expect(within(parcial).getByTestId('company-contact-phone')).toHaveTextContent('—');
+    expect(within(parcial).getByLabelText('Sin teléfono de contacto')).toBeInTheDocument();
+  });
+
+  it('la tarjeta sin correo ni teléfono pinta una sola marca «—» con «Sin contacto»', () => {
+    montar();
+    const vacio = within(tarjeta(QUIMICLOUD.id)).getByTestId('company-contact');
+    expect(vacio.textContent).toBe('—');
+    expect(vacio).toHaveAttribute('data-empty', 'true');
+    expect(vacio).toHaveAttribute('aria-label', 'Sin contacto');
+  });
+
+  it('la tarjeta cierra con los avatares de módulos, con su nombre accesible y su tooltip', async () => {
+    const user = setupUser();
+    const conModulos: CompanyRow = { ...VALLE, activeAddons: ['dashboard', 'proveedores'] };
+    montar({ companies: [QUIMICLOUD, conModulos] });
+
+    const card = tarjeta(conModulos.id);
+    const pie = within(card).getByTestId('data-table-card-field-modules');
+    // Al final: el pie es el último bloque de la tarjeta, junto a «Acciones».
+    expect(card.lastElementChild).toContainElement(pie);
+    expect(card.lastElementChild).toContainElement(within(card).getByTestId('company-actions'));
+    const avatares = within(pie).getAllByTestId('company-addon-avatar');
+    expect(avatares.map((a) => a.getAttribute('aria-label'))).toEqual(['Dashboard y recorrido', 'Proveedores']);
+    expect(avatares.every((a) => a.getAttribute('role') === 'img')).toBe(true);
+
+    await user.hover(within(pie).getByRole('img', { name: 'Proveedores' }));
+    await waitFor(() =>
+      expect(
+        Array.from(document.querySelectorAll('[data-slot="tooltip-content"]')).some(
+          (popup) => popup.textContent === 'Proveedores',
+        ),
+      ).toBe(true),
+    );
+
+    const vacio = within(tarjeta(QUIMICLOUD.id)).getByTestId('company-addons');
+    expect(vacio.textContent).toBe('—');
+    expect(vacio).toHaveAttribute('aria-label', 'Sin módulos');
+  });
+
   it('R16: el boton «Acciones» de la tarjeta mide al menos 44 px y abre el menu centrado', async () => {
     const user = setupUser();
     montar();

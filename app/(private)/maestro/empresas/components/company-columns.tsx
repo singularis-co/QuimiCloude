@@ -49,13 +49,19 @@ function ContactLine({ value, emptyLabel }: { readonly value: string | null; rea
 function CompanyContact({ company }: { readonly company: CompanyRow }) {
   if (company.contactEmail === null && company.contactPhone === null) {
     return (
-      <span aria-label={COMPANY_CONTACT_EMPTY_LABELS.both} data-testid="company-contact" data-empty="true">
+      <span
+        aria-label={COMPANY_CONTACT_EMPTY_LABELS.both}
+        data-testid="company-contact"
+        data-empty="true"
+        className="font-normal"
+      >
         {EMPTY_MARK}
       </span>
     );
   }
   return (
-    <span className="flex flex-col" data-testid="company-contact">
+    // `font-normal`: en la tarjeta va en el hueco del título, que pone negrita.
+    <span className="flex flex-col font-normal" data-testid="company-contact">
       <span data-testid="company-contact-email">
         <ContactLine value={company.contactEmail} emptyLabel={COMPANY_CONTACT_EMPTY_LABELS.email} />
       </span>
