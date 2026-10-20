@@ -257,7 +257,8 @@ Promise<{ conexionId: string }> })`.
 | `{ kind: 'ignored', reason }` (`missing`, `addon_off`, `disabled`, `unparseable`) | `200` sin cuerpo | `console.warn('whatsapp_webhook_ignored', { reason })` |
 | `{ kind: 'unauthorized' }` | `401` sin cuerpo | `console.warn('whatsapp_webhook_bad_signature')` |
 | `{ kind: 'secret_unreadable' }` | `500` sin cuerpo | `console.error('whatsapp_webhook_secret_unreadable', { connectionId })` |
-| `{ kind: 'stored', counts }` | `200` sin cuerpo | ninguno (o `counts` si el implementer lo ve útil: solo números) |
+| `{ kind: 'stored', counts, skipped }` sin nada saltado | `200` sin cuerpo | ninguno |
+| `{ kind: 'stored', counts, skipped }` con algún saltado (R15, §4.3) | `200` sin cuerpo | `console.warn('whatsapp_webhook_changes_skipped', { connectionId, changes, messages, statuses })`: solo los números de `skipped`, nunca el `phone_number_id` ni nada de R27 |
 | excepción (la transacción falló) | `500` sin cuerpo | `console.error('whatsapp_webhook_store_failed', { connectionId, error: mensaje })` |
 
 - `connectionId` solo entra en un log **después** de validarse como UUID (no se registra lo que
