@@ -174,6 +174,8 @@ const MODULE_CODE_FILES = [
   'domain/secret-context.ts',
   'domain/set-whatsapp-connection-enabled.ts',
   'domain/stored-secret.ts',
+  'domain/template-graph-failure.ts',
+  'domain/template-sync-plan.ts',
   'domain/test-ai-provider-key.ts',
   'domain/test-saved-ai-provider.ts',
   'domain/test-whatsapp-connection.ts',
@@ -185,6 +187,11 @@ const MODULE_CODE_FILES = [
   'domain/whatsapp-inbound-message.ts',
   'domain/whatsapp-message-status.ts',
   'domain/whatsapp-message.ts',
+  'domain/whatsapp-template-components.ts',
+  'domain/whatsapp-template-draft.ts',
+  'domain/whatsapp-template-languages.ts',
+  'domain/whatsapp-template-meta.ts',
+  'domain/whatsapp-template.ts',
   'domain/whatsapp-webhook-payload.ts',
   'index.ts',
   'ports/ai-provider-catalog.ts',
@@ -486,6 +493,24 @@ describe('la forma del modulo integraciones', () => {
     )
     expect(hallazgos.length).toBeGreaterThan(0)
     expect(hallazgos.join('\n')).toContain('node:crypto')
+  })
+
+  it('R6: el validador de borradores de plantilla y lo que importa solo usan zod y archivos de domain/ que tampoco salen de ahi', () => {
+    const pendientes = ['domain/whatsapp-template-draft.ts']
+    const vistos = new Set<string>()
+    const ajenos: string[] = []
+    while (pendientes.length > 0) {
+      const rel = pendientes.pop() as string
+      if (vistos.has(rel)) continue
+      vistos.add(rel)
+      for (const spec of importSpecifiers(readFileSync(join(moduleDir, rel), 'utf8'))) {
+        if (spec === 'zod') continue
+        if (spec.startsWith('./') && !spec.slice(2).includes('/')) pendientes.push(`domain/${spec.slice(2)}.ts`)
+        else ajenos.push(`${rel} -> ${spec}`)
+      }
+    }
+    expect(vistos.size).toBeGreaterThan(1)
+    expect(ajenos).toEqual([])
   })
 
   it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes, y la ruta del webhook (QC-238)', () => {

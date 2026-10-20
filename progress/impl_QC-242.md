@@ -25,7 +25,7 @@ Fuentes (developers.facebook.com/documentation/business-messaging/whatsapp/…; 
 | §3.3 teléfono `^\+[1-9]\d{7,14}$` | Meta: cadena de ≤ 20 caracteres, ejemplo sin `+`, sin exigir E.164 | Se mantiene la regla del spec: es un subconjunto válido de lo que acepta Meta; abierto |
 | §3.3 largos en puntos de código | No encontrado (Meta no dice cómo cuenta) | Se mantiene; abierto |
 | Reglas de Meta que el spec no recoge: variable al principio o al final (2388299), proporción variables/palabras (2388293) | Nuevas | **No** se añaden al validador (cambiarían R10). Meta las rechaza ⇒ rechazo genérico (`WhatsappTemplateRejectedError`). Abierto para QC-243 |
-| §3.2 idiomas (70 códigos) | **Corregido**: Meta lista 111. No sobra ninguno; faltan 41: ar_EG ar_AE ar_LB ar_MA ar_QA be_BY bn_IN prs_AF nl_BE en_AE en_AU en_CA en_GH en_IE en_IN en_JM en_MY en_NZ en_QA en_SG en_UG en_ZA fr_BE fr_CA fr_CH fr_CI fr_MA de_AT de_CH ps_AF si_LK es_CL es_CO es_CR es_DO es_EC es_HN es_PA es_PE es_UY | Se usa la lista vigente de 111. R8 apunta a «la lista de §3.2 [POR CONFIRMAR]»: es la corrección que pedía el contraste, no cambia el alcance |
+| §3.2 idiomas (71 códigos) | **Corregido**: Meta lista 111. No sobra ninguno; faltan 40: ar_EG ar_AE ar_LB ar_MA ar_QA be_BY bn_IN prs_AF nl_BE en_AE en_AU en_CA en_GH en_IE en_IN en_JM en_MY en_NZ en_QA en_SG en_UG en_ZA fr_BE fr_CA fr_CH fr_CI fr_MA de_AT de_CH ps_AF si_LK es_CL es_CO es_CR es_DO es_EC es_HN es_PA es_PE es_UY | Se usa la lista vigente de 111. R8 apunta a «la lista de §3.2 [POR CONFIRMAR]»: es la corrección que pedía el contraste, no cambia el alcance |
 | §6 crear: `POST …/message_templates` `{name, language, category, components}` ⇒ `{id, status, category}`; forma de componentes de §3.4 | Confirmado (idéntica al ejemplo de Meta) | Sin cambio |
 | §6 listar: `fields`, `after`, `{data, paging:{cursors, next}}` | Confirmado | Sin cambio |
 | §6 `limit=100` | Máximo no documentado (solo «min 1») | Se mantiene 100; abierto |
@@ -76,3 +76,47 @@ vitest run catalogo.test.ts module-shape.test.ts -> Test Files 2 passed (2); Tes
 vitest run guard-empresa-en-esquema -> Test Files 1 passed; Tests 15 passed
 vitest run guard-rls-force          -> Test Files 1 passed; Tests 4 passed
 ```
+
+## Tanda 2 — T3, T4, T5, T6 (backend_dev)
+
+Archivos (todos en `lib/modules/integraciones/domain/` salvo tests):
+- nuevos: `whatsapp-template.ts`, `whatsapp-template-languages.ts` (111 códigos),
+  `whatsapp-template-draft.ts`, `whatsapp-template-components.ts`, `whatsapp-template-meta.ts`,
+  `template-sync-plan.ts`, `template-graph-failure.ts`
+- `graph-failure.ts`: `code?` y `subcode?` opcionales (`number | null`).
+- tests nuevos en `tests/unit/integraciones/whatsapp/templates/`: `whatsapp-template-draft`,
+  `whatsapp-template-components`, `whatsapp-template-meta`, `template-sync-plan`,
+  `template-graph-failure` (`.test.ts`).
+- `tests/unit/integraciones/module-shape.test.ts`: 7 archivos nuevos en la lista; caso R6 de pureza
+  del validador (solo `zod` y `./` de domain, recorriendo sus imports).
+- `tests/guards/guard-identificador-de-request.test.ts`: la migración de T1 en la lista esperada
+  (estaba roja desde T1).
+- `index.ts` sin tocar (ningún test lo exige todavía).
+
+Decisiones no escritas en el spec (abiertas para revisión):
+- El validador rechaza U+0000 en cualquier texto (`invalid_chars`): llegaría a Meta y la base no lo guarda.
+- `header`/`footer` ausentes = `null`; `buttons` y `body.examples` ausentes = `[]`.
+- Plan: un `metaTemplateId` repetido en la lista se toma una vez (el primero).
+- Recuento real del contraste: la lista del spec tenía 71 códigos y se añaden 40 (total 111, igual).
+
+R → test (archivos de `templates/` salvo indicación):
+- R4: draft `statusOf > R4: …` (2) y meta `R4: IN_APPEAL da OTHER…`
+- R6: draft `R6: …` (4) y module-shape `R6: el validador … solo usan zod…`
+- R7–R13: draft `describe('R7'…'R13')`, un caso por fila en el límite y límite+1
+- R19: graph-failure `R19: …` (5)
+- R21: graph-failure `R21: …` (3)
+- R23–R25: sync-plan tabla `R23/R24/R25: …` y meta `R23: …`
+- R26: meta `R26: …` (3)
+- R43: graph-failure `R43: …` (2)
+- R46: components `R46: …` (5)
+
+Salida:
+```
+pnpm run typecheck -> tsc --noEmit sin errores
+pnpm run lint      -> 0 errors, 10 warnings (preexistentes)
+vitest run templates/ graph-failure module-shape -> Test Files 7 passed (7); Tests 175 passed | 1 skipped
+vitest run create-whatsapp-connection test-and-enable update-whatsapp-connection -> 3 passed; 53 passed
+vitest run guard -> 1 failed (guard-identificador: migración de T1 sin listar) -> corregido;
+vitest run guard-identificador-de-request -> 23 passed
+```
+Veredicto: T3–T6 hechos y verdes.

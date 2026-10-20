@@ -31,24 +31,24 @@
 
 ## Bloque B — Dominio puro (tras T2)
 
-- [ ] **T3 — Tipos, idiomas y validador** (R4, R6–R13). Depende de: T2 y el contraste previo
+- [x] **T3 — Tipos, idiomas y validador** (R4, R6–R13). Depende de: T2 y el contraste previo
   - `domain/whatsapp-template.ts`, `domain/whatsapp-template-languages.ts`,
     `domain/whatsapp-template-draft.ts` (§3.1–3.3).
   - `tests/unit/integraciones/whatsapp/templates/whatsapp-template-draft.test.ts`.
   - **Hecho:** un caso por fila de §3.3 en el límite y en el límite + 1; el archivo del validador solo
     importa `zod` y `domain/`.
 
-- [ ] **T4 [P] — Componentes y plantilla de Meta** (R4, R26, R46). Depende de: T3
+- [x] **T4 [P] — Componentes y plantilla de Meta** (R4, R26, R46). Depende de: T3
   - `domain/whatsapp-template-components.ts`, `domain/whatsapp-template-meta.ts` (§3.4, §3.5).
   - Tests `whatsapp-template-components.test.ts` y `whatsapp-template-meta.test.ts`.
   - **Hecho:** ida y vuelta borrador ⇄ componentes; `contentOf` ⇒ `null` con componentes de otra fase;
     `IN_APPEAL` ⇒ `OTHER` con su valor.
 
-- [ ] **T5 [P] — Plan de sincronización** (R23–R25). Depende de: T3
+- [x] **T5 [P] — Plan de sincronización** (R23–R25). Depende de: T3
   - `domain/template-sync-plan.ts` (§4.3) y `template-sync-plan.test.ts`.
   - **Hecho:** tabla de casos de §4.3 verde.
 
-- [ ] **T6 [P] — Fallos de Graph** (R19, R21, R43). Depende de: T2
+- [x] **T6 [P] — Fallos de Graph** (R19, R21, R43). Depende de: T2
   - `domain/graph-failure.ts`: `code` y `subcode` opcionales en `GraphFailure`.
   - `domain/template-graph-failure.ts` (§4.9) con su test dentro de `create-whatsapp-template.test.ts`
     (T10) o propio.
