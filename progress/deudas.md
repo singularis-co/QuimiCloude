@@ -536,27 +536,57 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   QC-235; QC-166 no la tocó.
 - **Dueño:** sin asignar.
 
-### D66 — Fórmulas: sin tiempo de espera por paso en el editor (QC-264, P6)
+## QC-288 (review, 2026-10-19)
+
+### D66 — E2E rojo en `detalle-de-producto-terminado.spec.ts:548` heredado de QC-263
+- **Origen:** review de QC-288, hallazgo H5. Lo causa `c09844b7` (QC-263): la tabla de producto terminado pasa `card=` al DataTable, que pinta a la vez las filas y las tarjetas, y el locator `finished-stock-name` encuentra 2 elementos.
+- **Qué falta:** acotar el locator a la tabla, o no montar las tarjetas en escritorio. El spec y los componentes son idénticos en `origin/dev`; QC-288 ni lo causa ni lo empeora.
+- **Dueño:** sin ficha. Bloquea el PR a producción, que corre E2E; no bloquea el PR a `dev`.
+
+### D67 — `srOnlyLabel` se ignora en columnas ordenables
+- **Origen:** review de QC-288, vuelta 2, hallazgo H6 (menor). En `components/shared/data-table/data-table-header-menu.tsx`, `srOnlyLabel` solo se aplica a columnas no ordenables.
+- **Qué falta:** documentarlo en el tipo y en `CATALOGO.md`, o aplicarlo también al botón de ordenar. Hoy no afecta a nada: `actionsColumn` nunca es ordenable.
+
+### D68 — `confirmaciones-paridad.test.tsx` intermitente («R1 R13 — pendiente, con la operacion en vuelo»)
+- **Origen:** CI del PR #269 (QC-288), 2026-10-19. Falló una vez con la instantánea del estado de usuario distinta y pasó al relanzar la ejecución completa sin cambios de código. QC-288 no toca ese componente.
+- **Qué falta:** estabilizar el caso «en vuelo» (esperar el estado pendiente antes de la instantánea, o no capturar el popover). Si vuelve a fallar en otra rama, va al baseline con su motivo.
+
+### D69 — Restos del worktree de QC-244 en disco
+- **Origen:** cierre de QC-244 (2026-10-19).
+- **Qué falta:** `./scripts/wt.sh done QC-244-menu-clientes-desplegable` desregistró el worktree, pero
+  no pudo borrar `.worktrees/QC-244-menu-clientes-desplegable/` (archivo en uso en Windows). Siguen la
+  rama local y la remota `feature/QC-244-menu-clientes-desplegable`, ya integradas en `dev` (PR #270).
+  Borrar la carpeta y las ramas cuando nada la tenga abierta.
+- **Dueño:** Christian Quevedo.
+
+### D70 — E2E de QC-244 sin correr en local
+- **Origen:** cierre de QC-244 (2026-10-19).
+- **Qué falta:** `e2e/clientes.spec.ts` y `e2e/movimiento.spec.ts` se escribieron sin correrlos en
+  local, porque el worktree no tenía `.env`. R6 (navegar a cada página desde el grupo) solo lo cubren
+  ellos. Correrlos en local, o confirmar que pasan en el E2E del PR a producción.
+- **Dueño:** Christian Quevedo.
+
+### D71 — Fórmulas: sin tiempo de espera por paso en el editor (QC-264, P6)
 - **Origen:** QC-264 (2026-10-19), P6 por defecto.
 - **Qué falta:** el tablero `Formula.dc.html` pone un campo de espera en la barra de cada paso. La
   espera es hoy de la empresa (`minStepSeconds`, QC-125); hacerla por paso cambia el modelo
   (`lib/modules/recetas`) y el lector (`StepReader`).
 - **Dueño:** sin asignar.
 
-### D67 — Versión de receta: sin «Devolver» un ingrediente quitado (QC-264, P8)
+### D72 — Versión de receta: sin «Devolver» un ingrediente quitado (QC-264, P8)
 - **Origen:** QC-264 (2026-10-19), P8 por defecto.
 - **Qué falta:** `FormulaVersion.dc.html` dibuja «Devolver» en cada ingrediente quitado y el texto
   «No se quitó nada de la original.» cuando no hay quitados. Es conducta nueva, marcada «por confirmar»
   en el tablero; el rediseño solo pinta el quitado (`StatusBadge` `danger` y nombre tachado).
 - **Dueño:** sin asignar.
 
-### D68 — Revisión de importación sin el nombre del PDF (QC-264, P10)
+### D73 — Revisión de importación sin el nombre del PDF (QC-264, P10)
 - **Origen:** QC-264 (2026-10-19), P10 por defecto.
 - **Qué falta:** `ImportarFormula.dc.html` pinta el nombre del PDF bajo «Revisar fórmula». La vista
   previa del módulo `documentos` no lo devuelve; es trabajo de módulo, no de pantalla.
 - **Dueño:** sin asignar.
 
-### D69 — Tildes pendientes en el editor de pasos y en `recipe-input.ts` (QC-264, P18)
+### D74 — Tildes pendientes en el editor de pasos y en `recipe-input.ts` (QC-264, P18)
 - **Origen:** QC-264 (2026-10-19), E17 con P18 por defecto.
 - **Qué falta:** «Lista de verificacion» y «el maximo es» (`recipe-step-editor.tsx`), «Elemento de la
   lista de verificacion» (`recipe-step-schema.ts`) y dos mensajes de
@@ -564,14 +594,14 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   ficha propia con su censo.
 - **Dueño:** sin asignar.
 
-### D70 — «Volver a la lista» de «no encontrada» sigue como enlace de texto (QC-264, E18)
+### D75 — «Volver a la lista» de «no encontrada» sigue como enlace de texto (QC-264, E18)
 - **Origen:** QC-264 (2026-10-19), enmienda E18.
 - **Qué falta:** las ramas «receta no encontrada» (`app/(private)/produccion/formulas/[id]/page.tsx`,
   `components/recipe-form.tsx`) y las de las páginas de versión pintan el «Volver» como enlace de
   texto, no como `ArrowLink` con flecha (D2 del humano). Ningún requisito de QC-264 lo cubría.
 - **Dueño:** sin asignar.
 
-### D71 — E2E `pasos-de-envasado` R32 rojo por el cronómetro del botón (dev, cb39a83d)
+### D76 — E2E `pasos-de-envasado` R32 rojo por el cronómetro del botón (dev, cb39a83d)
 - **Origen:** tanda 9 de QC-264 (2026-10-19); review v1 m4. No lo causa QC-264: el reviewer lo
   comprobó con `git merge-base` (cb39a83d es ancestro del merge 6fcbafe6).
 - **Qué falta:** `e2e/pasos-de-envasado.spec.ts:435` espera el botón «Terminar» y recibe

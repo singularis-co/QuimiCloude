@@ -13,6 +13,7 @@ import { Prisma } from '@prisma/client'
 import { afterAll, describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
+import { createDirectDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma'
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma'
 import {
   createOrderDeliveryHistoryReader,
@@ -288,6 +289,37 @@ async function addSecondCustomer(tx: Prisma.TransactionClient, t: Tenant, delive
   return { customerId, lineId }
 }
 
+// 2026-10-16 (QC-288): una entrega sin pedido del producto de los lotes de A, con sus dos lotes.
+async function seedDirectDelivery(
+  tx: Prisma.TransactionClient,
+  t: Tenant,
+): Promise<{ deliveryId: string; productId: string; deliveryKey: string; lineIds: readonly [string, string] }> {
+  const { productId } = await tx.productBatch.findUniqueOrThrow({ where: { id: t.batchIds[0] }, select: { productId: true } })
+  const deliveries = createDirectDeliveryRepository(tx)
+  const scope = { companyId: t.companyId }
+  const deliveryKey = randomUUID()
+  const outcome = await deliveries.create(
+    { deliveryKey, productId, note: 'Venta de mostrador', actorId: t.userId, now: ENTREGA_2 },
+    scope,
+  )
+  if (outcome.kind !== 'created') throw new Error('se esperaba una entrega sin pedido creada')
+  await deliveries.addLines(
+    outcome.id,
+    [
+      { customerId: t.customerId, batchId: t.batchIds[0], packages: 2, quantity: '2.0000' },
+      { customerId: t.customerId, batchId: t.batchIds[1], packages: 1, quantity: '1.5000' },
+    ],
+    scope,
+  )
+  const lineas = await tx.orderDeliveryLine.findMany({ where: { deliveryId: outcome.id }, select: { id: true, batchId: true } })
+  const idDe = (batchId: string): string => {
+    const linea = lineas.find((l) => l.batchId === batchId)
+    if (linea === undefined) throw new Error('linea de entrega sin pedido no sembrada')
+    return linea.id
+  }
+  return { deliveryId: outcome.id, productId, deliveryKey, lineIds: [idDe(t.batchIds[0]), idDe(t.batchIds[1])] }
+}
+
 function newVoid(t: Tenant, deliveryId: string, voidKey: string = randomUUID()) {
   return { voidKey, deliveryId, reason: 'Cliente devolvio la mercancia', actorId: t.userId, now: ANULACION }
 }
@@ -398,9 +430,12 @@ describe('OrderDeliveryVoidRepository contra Postgres real', () => {
       const { deliveryId } = await seedDelivery(tx, a)
       const repo = createOrderDeliveryVoidRepository(tx)
 
+      // 2026-10-16 (QC-288): la entrega trae tambien su producto (nulo en una de pedido) y su instante.
       expect(await repo.findDelivery(deliveryId, { companyId: a.companyId })).toEqual({
         id: deliveryId,
         orderId: a.orderId,
+        productId: null,
+        createdAt: ENTREGA_1,
       })
       expect(await repo.findDelivery(deliveryId, { companyId: b.companyId })).toBeNull()
       expect(await repo.findDelivery(randomUUID(), { companyId: a.companyId })).toBeNull()
@@ -622,6 +657,90 @@ describe('OrderDeliveryHistoryReader contra Postgres real', () => {
       ])
       expect(await reader.listByOrder(a.orderId, { companyId: b.companyId })).toEqual([])
       expect(await reader.listByOrder(randomUUID(), { companyId: a.companyId })).toEqual([])
+    })
+  })
+})
+
+describe('OrderDeliveryVoidRepository con entregas sin pedido (QC-288)', () => {
+  it('R48: findDelivery devuelve la entrega sin pedido con orderId nulo, su producto y su instante; con el ambito de B, null', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const b = await createTenant(tx, 'B')
+      const directa = await seedDirectDelivery(tx, a)
+      const repo = createOrderDeliveryVoidRepository(tx)
+
+      expect(await repo.findDelivery(directa.deliveryId, { companyId: a.companyId })).toEqual({
+        id: directa.deliveryId,
+        orderId: null,
+        productId: directa.productId,
+        createdAt: ENTREGA_2,
+      })
+      expect(await repo.findDelivery(directa.deliveryId, { companyId: b.companyId })).toBeNull()
+    })
+  })
+
+  it('R47, R50: findDeliveryLines de una entrega sin pedido trae las lineas con presentationLineId nulo y su marca de anulada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const b = await createTenant(tx, 'B')
+      const directa = await seedDirectDelivery(tx, a)
+      const repo = createOrderDeliveryVoidRepository(tx)
+      const scope = { companyId: a.companyId }
+      const voidId = await createdVoidId(repo, a, directa.deliveryId)
+      expect(await repo.addLines(voidId, directa.deliveryId, [directa.lineIds[0]], scope)).toBe('ok')
+
+      const lineas = await repo.findDeliveryLines(directa.deliveryId, scope)
+
+      expect(lineas).toEqual(
+        expect.arrayContaining([
+          {
+            id: directa.lineIds[0],
+            customerId: a.customerId,
+            presentationLineId: null,
+            batchId: a.batchIds[0],
+            packages: 2,
+            quantity: '2.0000',
+            voided: true,
+          },
+          {
+            id: directa.lineIds[1],
+            customerId: a.customerId,
+            presentationLineId: null,
+            batchId: a.batchIds[1],
+            packages: 1,
+            quantity: '1.5000',
+            voided: false,
+          },
+        ]),
+      )
+      expect(lineas).toHaveLength(2)
+      expect(await repo.findDeliveryLines(directa.deliveryId, { companyId: b.companyId })).toEqual([])
+    })
+  })
+
+  it('R51: findByKey de la anulacion de una entrega sin pedido devuelve orderId nulo; la de otra empresa no se ve', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const b = await createTenant(tx, 'B')
+      const directa = await seedDirectDelivery(tx, a)
+      const repo = createOrderDeliveryVoidRepository(tx)
+      const key = randomUUID()
+      const id = await createdVoidId(repo, a, directa.deliveryId, key)
+
+      expect(await repo.findByKey(key, { companyId: a.companyId })).toEqual({ id, orderId: null })
+      expect(await repo.findByKey(key, { companyId: b.companyId })).toBeNull()
+    })
+  })
+
+  it('R48: listByOrder (historial del pedido) no trae las entregas sin pedido de la empresa', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const dePedido = await seedDelivery(tx, a)
+      await seedDirectDelivery(tx, a)
+
+      const filas = await createOrderDeliveryHistoryReader(tx).listByOrder(a.orderId, { companyId: a.companyId })
+
+      expect(filas.map((f) => f.id)).toEqual([dePedido.deliveryId])
     })
   })
 })

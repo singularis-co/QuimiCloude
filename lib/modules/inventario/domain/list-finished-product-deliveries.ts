@@ -60,7 +60,9 @@ export function createListFinishedProductDeliveries(
     const page = await deps.deliveries.listDeliveryLines(actor.companyId, batchIds, parsed.data);
     if (page.total === 0) return { ...page, items: [], delivered: NOTHING_DELIVERED };
 
-    const orderIds = unique(page.items.map((item) => item.orderId));
+    const orderIds = unique(
+      page.items.map((item) => item.orderId).filter((orderId): orderId is string => orderId !== null),
+    );
     const customerIds = unique(page.items.map((item) => item.customerId));
 
     // El total cubre todos los lotes del producto, no solo los de la pagina.
@@ -86,13 +88,15 @@ export function createListFinishedProductDeliveries(
         orderDeliveryId: line.orderDeliveryId,
         createdAt: line.createdAt,
         customer: customersById.get(line.customerId) ?? null,
-        orderNumberText: numbers.get(line.orderId) ?? null,
+        orderNumberText: line.orderId === null ? null : (numbers.get(line.orderId) ?? null),
         presentationName,
         batchId: line.batchId,
         lot: lotOf(lotsById, line.batchId),
         packages: line.packages,
         quantity: line.quantity,
         void: line.void,
+        withoutOrder: line.orderId === null,
+        note: line.note,
       })),
       delivered,
     };

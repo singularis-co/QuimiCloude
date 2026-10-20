@@ -298,10 +298,6 @@ export {
 } from './domain/get-conditioning-order';
 export type { ConditioningBatchData, ConditioningBatchLineView } from './domain/conditioning-order-view';
 export {
-  createListDeliveredConditionedOrders,
-  type ListDeliveredConditionedOrdersDeps,
-} from './domain/list-delivered-conditioned-orders';
-export {
   createSaveConditioningBatchData,
   saveConditioningBatchDataSchema,
   type SaveConditioningBatchDataDeps,

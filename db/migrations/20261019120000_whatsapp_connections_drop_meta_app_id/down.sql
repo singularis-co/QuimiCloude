@@ -1,0 +1,8 @@
+-- DOWN de `whatsapp_connections_drop_meta_app_id`: NO-OP a proposito, sin sentencias.
+--
+-- No hay un estado anterior unico al que volver: en las bases creadas despues de QC-237 la columna
+-- nunca existio, y en las anteriores era `TEXT NOT NULL`. Recrearla `NOT NULL` volveria a romper
+-- todo INSERT (el esquema no la escribe), y recrearla nullable anadiria a las bases nuevas una
+-- columna que no tuvieron nunca y que `db/schema.prisma` no declara. La columna no guardaba nada
+-- que el codigo leyera, asi que no hay dato que restaurar. `pnpm run db:rollback` solo borra la
+-- fila de `_prisma_migrations`.

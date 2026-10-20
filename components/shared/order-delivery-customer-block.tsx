@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-import { type OrderCustomerChoice } from './order-customer-label';
-import { OrderCustomerPicker } from './order-customer-picker';
+import { type OrderCustomerChoice } from '@/components/shared/order-customer-label';
+import { OrderCustomerPicker } from '@/components/shared/order-customer-picker';
 
 export const ORDER_DELIVERY_BLOCK_TESTID = 'order-delivery-block';
 export const ORDER_DELIVERY_BLOCK_REMOVE_TESTID = 'order-delivery-block-remove';

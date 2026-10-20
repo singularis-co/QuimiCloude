@@ -39,8 +39,8 @@ export type ConditionedOrdersTableProps = {
   readonly rows: readonly FinishedOrderView[];
   readonly params: DataTableParams;
   readonly totalPages: number;
-  /** La vista a la que vuelve al paginar: «Terminados» y «Entregados» comparten tabla. */
-  readonly view?: Extract<AssignmentViewKind, 'acondicionados' | 'acondicionados_entregados'>;
+  /** La vista a la que vuelve al paginar. */
+  readonly view?: Extract<AssignmentViewKind, 'acondicionados'>;
   readonly canViewTrace?: boolean;
 };
 

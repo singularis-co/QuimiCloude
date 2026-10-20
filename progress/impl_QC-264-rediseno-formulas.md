@@ -232,7 +232,7 @@ y los manejadores no se tocaron. `page.tsx` conserva sus tres primeras líneas.
 | Arreglo R20 | `2dd05c45` | `recipe-step-editor.tsx`: `row-tools` con `flex-wrap` y las acciones con `shrink-0`; a 390 px el grupo quitar/añadir desbordaba 11 px (llegaba a x=401,5 en 390). Caso nuevo R20 en `recipe-step-editor.test.tsx` |
 | T9a | `ec29b315` | `e2e/formulas-rediseno.spec.ts` (7 casos) + alta en `E2E_ESPERADOS` y en `data-table-alcance` (ahora 52) |
 | T9b | `38a2292f`, `5371411b`, `e0d320ba` | Migra `versiones-en-la-receta.spec.ts` («Abrir la versión X»; menú acotado a `getByRole('table')` para no nombrar `data-table`, lista cerrada); los demás pasan sin cambios |
-| T9c | `09f029fc` | `progress/deudas.md`: D66–D70 nuevas; D53, D56, D63 ampliadas |
+| T9c | `09f029fc` | `progress/deudas.md`: D71–D75 nuevas (D66–D70 al crearse; renumeradas en el merge de dev); D53, D56, D63 ampliadas |
 
 **T9a — casos:** 1440: cabecera, columnas y menú (R1, R2, R3); 1440: formulario (R13, R15, R22, R23,
 R27, R30); 1440: «Enter guarda» con una sola Server Action, un toast y el nombre cambiado en la base

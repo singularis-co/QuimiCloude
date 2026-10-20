@@ -13,7 +13,6 @@ export const ASSIGNMENT_VIEW_LABELS: Readonly<Record<AssignmentViewKind, string>
   por_empacar: 'Por empacar',
   por_acondicionar: 'Por acondicionar',
   acondicionados: 'Acondicionados',
-  acondicionados_entregados: 'Entregados',
 };
 
 export const ASSIGNMENT_VIEW_TAB_TESTIDS: Readonly<Record<AssignmentViewKind, string>> = {
@@ -23,7 +22,6 @@ export const ASSIGNMENT_VIEW_TAB_TESTIDS: Readonly<Record<AssignmentViewKind, st
   por_empacar: 'assignment-view-tab-por_empacar',
   por_acondicionar: 'assignment-view-tab-por_acondicionar',
   acondicionados: 'assignment-view-tab-acondicionados',
-  acondicionados_entregados: 'assignment-view-tab-acondicionados_entregados',
 };
 
 export type AssignmentViewCounts = Readonly<Partial<Record<AssignmentViewKind, number>>>;

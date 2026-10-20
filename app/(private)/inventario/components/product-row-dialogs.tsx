@@ -12,6 +12,7 @@ import type { UnitRef } from '@/lib/modules/unidades';
 import { AdjustBatchDialog } from './adjust-batch-dialog';
 import { BatchHistory } from './batch-history';
 import { DeleteProductDialog } from './delete-product-dialog';
+import { DirectDeliverySheet } from './direct-delivery-sheet';
 import { productNameWithoutPresentation } from './product-base-name';
 import { ProductBatchesSheet } from './product-batches-sheet';
 import type { ProductRowAction } from './product-row-actions';
@@ -92,6 +93,11 @@ export function ProductRowDialogs({ active, open, onOpenChange, units, canAdjust
 
   if (action === 'delete') {
     return <DeleteProductDialog key={product.id} product={product} open={open} onOpenChange={onOpenChange} />;
+  }
+
+  // El sheet lee su vista al montarse: solo existe mientras está abierto.
+  if (action === 'direct-delivery') {
+    return open ? <DirectDeliverySheet key={key} productId={product.id} open onOpenChange={onOpenChange} /> : null;
   }
 
   if (action === 'batches' || target?.kind === 'choose') {

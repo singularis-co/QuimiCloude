@@ -13,6 +13,7 @@ import {
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
+import { StatusBadge, type StatusTone } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { listBatchMovementsAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
@@ -39,6 +40,7 @@ const BATCH_HISTORY_COLUMN_LABELS = {
   countedStock: 'Total contado',
   reason: 'Motivo',
   order: 'Pedido',
+  customer: 'Cliente',
   author: 'Autor',
   date: 'Fecha',
 } as const;
@@ -70,7 +72,7 @@ const BATCH_HISTORY_TABLE_TEXTS: DataTableTexts = {
 const BATCH_HISTORY_CARD: DataTableCardLayout = {
   primary: 'kind',
   status: 'quantity',
-  meta: ['previousStock', 'countedStock', 'reason', 'order', 'author', 'date'],
+  meta: ['previousStock', 'countedStock', 'reason', 'order', 'customer', 'author', 'date'],
 };
 
 /**
@@ -88,6 +90,14 @@ const KIND_LABELS: Record<BatchHistoryEntry['kind'], string> = {
   consume: 'Consumo',
   delivery: 'Entrega a cliente',
   delivery_void: 'Anulación de entrega',
+  direct_delivery: 'Entrega sin pedido',
+  direct_delivery_void: 'Anulación de entrega sin pedido',
+};
+
+/** Los asientos sin pedido se distinguen con una insignia; el resto pinta el tipo en texto llano. */
+const DIRECT_KIND_TONES: Partial<Record<BatchHistoryEntry['kind'], StatusTone>> = {
+  direct_delivery: 'info',
+  direct_delivery_void: 'muted',
 };
 
 /** Etiqueta del tipo de asiento. */
@@ -119,6 +129,21 @@ function optionalText(value: string | null, testId: string) {
   return value === null ? EMPTY_MARK : <span data-testid={testId}>{value}</span>;
 }
 
+function isDirectKind(kind: BatchHistoryEntry['kind']): boolean {
+  return kind === 'direct_delivery' || kind === 'direct_delivery_void';
+}
+
+/** Los asientos sin pedido no citan pedido: nombran a sus clientes. */
+function orderText(entry: BatchHistoryEntry): string | null {
+  return isDirectKind(entry.kind) ? null : entry.orderNumberText;
+}
+
+/** Solo los asientos sin pedido llevan clientes, ya en orden alfabético; en el resto la celda queda vacía. */
+function customerNamesText(entry: BatchHistoryEntry): string | null {
+  if (!isDirectKind(entry.kind) || entry.customerNames === null || entry.customerNames.length === 0) return null;
+  return entry.customerNames.join(', ');
+}
+
 // Los dos libros tienen tipos disjuntos y cada `id` es unico dentro del suyo.
 function entryRowId(entry: BatchHistoryEntry): string {
   return `${entry.kind}-${entry.id}`;
@@ -129,7 +154,18 @@ const BATCH_HISTORY_COLUMNS: readonly DataTableColumn<BatchHistoryEntry>[] = [
     id: 'kind',
     label: BATCH_HISTORY_COLUMN_LABELS.kind,
     align: 'start',
-    cell: (entry) => <span data-testid="batch-history-entry-kind">{movementKindLabel(entry.kind)}</span>,
+    cell: (entry) => {
+      const tone = DIRECT_KIND_TONES[entry.kind];
+      return (
+        <span data-testid="batch-history-entry-kind">
+          {tone === undefined ? (
+            movementKindLabel(entry.kind)
+          ) : (
+            <StatusBadge tone={tone} label={movementKindLabel(entry.kind)} />
+          )}
+        </span>
+      );
+    },
   },
   {
     id: 'quantity',
@@ -176,7 +212,14 @@ const BATCH_HISTORY_COLUMNS: readonly DataTableColumn<BatchHistoryEntry>[] = [
     align: 'start',
     tabular: true,
     cell: (entry) =>
-      withCardFieldLabel(BATCH_HISTORY_COLUMN_LABELS.order, optionalText(entry.orderNumberText, 'batch-history-entry-order')),
+      withCardFieldLabel(BATCH_HISTORY_COLUMN_LABELS.order, optionalText(orderText(entry), 'batch-history-entry-order')),
+  },
+  {
+    id: 'customer',
+    label: BATCH_HISTORY_COLUMN_LABELS.customer,
+    align: 'start',
+    cell: (entry) =>
+      withCardFieldLabel(BATCH_HISTORY_COLUMN_LABELS.customer, optionalText(customerNamesText(entry), 'batch-history-entry-customers')),
   },
   {
     id: 'author',

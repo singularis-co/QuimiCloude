@@ -684,6 +684,9 @@ describe('inventario.listFinishedProductDeliveries con su cableado real', () => 
         packages: 1,
         quantity: '5.0000',
         void: { reason: 'Cliente devolvio el pedido' },
+        // 2026-10-16 (QC-288): la fila dice si es de una entrega sin pedido y trae su nota; la de pedido no la tiene.
+        withoutOrder: false,
+        note: null,
       },
     ])
     expect(page.delivered).toEqual({ quantity: '0.0000', packages: 0 })

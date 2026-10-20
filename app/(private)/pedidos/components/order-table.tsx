@@ -25,7 +25,7 @@ import {
   RECIPE_NAME_COLUMN_ID,
 } from './order-columns';
 import { OrderCustomerFilter } from './order-customer-filter';
-import type { OrderCustomerChoice } from './order-customer-label';
+import type { OrderCustomerChoice } from '@/components/shared/order-customer-label';
 import type { ProducedProductsByOrder } from './order-produced-presentations';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
 import type { OrderRowAction } from './order-row-actions';

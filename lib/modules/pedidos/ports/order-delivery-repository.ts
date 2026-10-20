@@ -7,10 +7,11 @@ export type NewOrderDelivery = {
   readonly now: Date;
 };
 
-/** Lo minimo de una entrega ya registrada para responder a un reintento con su clave. */
+/** Lo minimo de una entrega ya registrada para responder a un reintento con su clave. `orderId` es
+ *  `null` si la clave es de una entrega sin pedido. */
 export type RegisteredOrderDelivery = {
   readonly id: string;
-  readonly orderId: string;
+  readonly orderId: string | null;
 };
 
 export type NewOrderDeliveryLine = {

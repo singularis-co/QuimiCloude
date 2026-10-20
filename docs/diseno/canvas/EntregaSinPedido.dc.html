@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Entregar sin pedido</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}" style="width: 100%; box-sizing: border-box; padding: 40px; display: flex; flex-direction: column; gap: 24px; container-type: inline-size; font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--fg)">
+  <div class="ph"><div class="ph-t"><span class="lab">QC-288 · tablero de diseño</span><h1 class="h1">Entregar sin pedido</h1><p class="sub">Entrega de producto terminado desde el stock, sin pedido de por medio: acción «Entregar» en la ficha, sheet con bloques por cliente y tope en el excedente, anulación por cliente y la entrega marcada «Sin pedido» en el tab Entregas y en el historial del lote.</p></div></div>
+
+  <div class="modal-grid cq-1">
+
+    <!-- 1. Cabecera de la ficha de producto terminado con la acción Entregar -->
+    <div class="card" style="gap: 16px">
+      <span class="lab">Ficha de producto terminado · cabecera con la acción «Entregar»</span>
+      <nav aria-label="Ruta"><ol style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted-fg)"><li><a href="#" style="color: var(--muted-fg)">Inventario</a></li><li aria-hidden="true">/</li><li><a href="#" style="color: var(--muted-fg)">Producto terminado</a></li><li aria-hidden="true">/</li><li aria-current="page" style="color: var(--fg)">Limpiador limón · Botella 1 L</li></ol></nav>
+      <div class="ph">
+        <div class="ph-t"><h2 class="h1" style="font-size: 26px; margin: 0">Limpiador limón</h2><p class="sub" style="margin: 0">Botella 1 L · <span class="mono">{{ stockTotal }}</span> envases en stock</p></div>
+        <sc-if value="{{ hasSurplus }}" hint-placeholder-val="{{ true }}">
+          <button class="b b-pri b-touch" type="button" onClick="{{ openSheet }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path></svg>Entregar</button>
+        </sc-if>
+      </div>
+      <span class="cap">«Entregar» está en la cabecera, visible en cualquier tab de la ficha. Solo existe si hay excedente; sin excedente no se muestra (estado «Sin excedente»).</span>
+      <nav class="tabs scroll" aria-label="Secciones del producto terminado">
+        <button class="tab" type="button" style="min-height: 44px">General</button><button class="tab" type="button" style="min-height: 44px">Stock</button><button class="tab" type="button" style="min-height: 44px">Lotes</button><button class="tab" type="button" style="min-height: 44px">Entradas</button><button class="tab" type="button" style="min-height: 44px">Salidas</button><button class="tab" type="button" aria-selected="true" style="min-height: 44px">Entregas</button>
+      </nav>
+    </div>
+
+    <!-- 1b. Listado de producto terminado: «Entregar» en el menú de acciones de la fila -->
+    <div class="card" style="gap: 14px">
+      <span class="lab">Inventario · listado de producto terminado · menú de acciones de la fila</span>
+      <p class="sub" style="margin: 0">«Entregar» en el menú de acciones abre el mismo sheet. Solo aparece en las filas con excedente: sin excedente, la acción no está en el menú.</p>
+      <div class="tw"><div class="scroll"><table style="min-width: 760px">
+        <thead><tr><th scope="col">Producto</th><th scope="col">Presentación</th><th scope="col" class="num">En stock</th><th scope="col" class="num">Esperan pedidos</th><th scope="col" class="num">Excedente</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+        <tbody>
+          <sc-for list="{{ listRows }}" as="p" hint-placeholder-count="3">
+            <tr><td class="strong">{{ p.name }}</td><td>{{ p.pres }}</td><td class="num mono">{{ p.stock }}</td><td class="num mono">{{ p.reserved }}</td><td class="num mono">{{ p.surplus }}</td><td style="text-align: right"><button class="b b-gho b-ico" type="button" aria-label="{{ p.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ p.openStr }}" onClick="{{ p.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6h.01M12 12h.01M12 18h.01"></path></svg></button></td></tr>
+            <sc-if value="{{ p.open }}" hint-placeholder-val="{{ false }}">
+              <tr><td colspan="6" style="text-align: right"><div role="menu" aria-label="{{ p.menuLabel }}" class="card" style="display: inline-flex; flex-direction: column; gap: 2px; padding: 4px; min-width: 200px; text-align: left">
+                <button class="b b-gho" role="menuitem" type="button" style="justify-content: flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path></svg>Ver ficha</button>
+                <sc-if value="{{ p.canDeliver }}" hint-placeholder-val="{{ true }}"><button class="b b-gho" role="menuitem" type="button" style="justify-content: flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path></svg>Entregar</button></sc-if>
+                <button class="b b-gho" role="menuitem" type="button" style="justify-content: flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"></path></svg>Ajustar stock</button>
+              </div></td></tr>
+            </sc-if>
+          </sc-for>
+        </tbody>
+      </table></div></div>
+    </div>
+
+    <!-- 2. Sheet Entregar sin pedido (interactivo) -->
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Entregar sin pedido · {{ estado }}</span>
+      <aside class="sheet wide static" role="dialog" aria-modal="true" aria-labelledby="sp-t">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="sp-t" class="h2">Entregar sin pedido</h2><p class="sub">Limpiador limón · Botella 1 L. Elige los clientes y de qué lotes salen los envases.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+
+          <sc-if value="{{ noSurplus }}" hint-placeholder-val="{{ false }}">
+            <div class="card" role="status" style="padding: 20px; gap: 8px; align-items: flex-start">
+              <svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>
+              <span class="h3">No hay envases libres para entregar sin pedido</span>
+              <span class="sub" style="font-size: 14px">Los <span class="mono">{{ stockTotal }}</span> envases en stock esperan a pedidos terminados. Entrégalos desde cada pedido.</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ hasSurplus }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-direction: column; gap: 16px">
+
+              <sc-if value="{{ adjusted }}" hint-placeholder-val="{{ false }}">
+                <div class="card" role="status" style="padding: 12px 16px; gap: 6px; flex-direction: row; align-items: flex-start; background: var(--muted)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg><span style="font-size: 14px">Algunos lotes del borrador ya no están disponibles y se quitaron sus envases.</span></div>
+              </sc-if>
+
+              <div class="card" style="padding: 16px; gap: 10px">
+                <span class="h3">Excedente</span>
+                <dl style="margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; font-size: 14px">
+                  <dt class="dim">En stock</dt><dd style="margin: 0; text-align: right"><span class="mono">{{ stockTotal }}</span> envases</dd>
+                  <dt class="dim">Esperan pedidos terminados</dt><dd style="margin: 0; text-align: right"><span class="mono">−{{ reservedTotal }}</span> envases</dd>
+                  <dt class="strong" style="border-top: 1px solid var(--border); padding-top: 6px">Se puede entregar</dt><dd class="strong" style="margin: 0; text-align: right; border-top: 1px solid var(--border); padding-top: 6px"><span class="mono">{{ surplus }}</span> envases</dd>
+                </dl>
+                <details style="font-size: 13px">
+                  <summary class="dim" style="cursor: pointer; min-height: 32px; display: flex; align-items: center">Ver los pedidos que esperan</summary>
+                  <ul style="margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px">
+                    <sc-for list="{{ waiting }}" as="w" hint-placeholder-count="2"><li>Pedido <span class="mono">{{ w.order }}</span> · faltan <span class="mono">{{ w.missing }}</span> envases</li></sc-for>
+                  </ul>
+                </details>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; border-top: 1px solid var(--border); padding-top: 10px">
+                  <span><span class="dim">Entregas </span><span class="mono strong">{{ written }}</span><span class="dim"> de </span><span class="mono">{{ surplus }}</span></span>
+                  <span class="{{ tagCls }}"><i></i>{{ tag }}</span>
+                </div>
+              </div>
+
+              <sc-for list="{{ blocks }}" as="b" hint-placeholder-count="2">
+                <div class="card fade" style="padding: 16px; gap: 14px">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+                    <span class="h3">{{ b.title }}</span>
+                    <sc-if value="{{ b.canRemove }}" hint-placeholder-val="{{ true }}">
+                      <button class="b b-gho b-sm" type="button" aria-label="{{ b.removeLabel }}" onClick="{{ b.remove }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path></svg>Quitar</button>
+                    </sc-if>
+                  </div>
+                  <div class="f">
+                    <label for="{{ b.inId }}">Cliente <span class="req">*</span></label>
+                    <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="{{ b.inId }}" class="in" type="text" placeholder="Busca un cliente por su nombre" value="{{ b.client }}" onChange="{{ b.onClient }}" aria-invalid="{{ b.invalid }}"></label>
+                    <sc-if value="{{ b.hasErr }}" hint-placeholder-val="{{ false }}">
+                      <span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>{{ b.errText }}</span>
+                    </sc-if>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 8px">
+                    <div class="rm-top"><span class="h3" style="font-size: 14px">Botella 1 L</span><span class="cap"><span class="mono">{{ b.sum }}</span> envases</span></div>
+                    <div class="tw"><div class="scroll"><table class="collapse">
+                      <thead><tr><th scope="col">Lote</th><th scope="col" class="num">Disponibles</th><th scope="col">Entrada</th></tr></thead>
+                      <tbody>
+                        <sc-for list="{{ b.lots }}" as="l" hint-placeholder-count="2">
+                          <tr><td class="mono">{{ l.lot }}</td><td class="num mono"><span class="{{ l.dispCls }}">{{ l.disp }}</span></td><td><span style="display: flex; flex-direction: column; gap: 4px"><input class="in mono num" type="text" inputmode="numeric" value="{{ l.val }}" onChange="{{ l.onVal }}" aria-label="{{ l.label }}" aria-invalid="{{ l.invalid }}" style="width: 88px; height: 36px"><sc-if value="{{ l.over }}" hint-placeholder-val="{{ false }}"><span class="err">Solo hay {{ l.stock }}</span></sc-if></span></td></tr>
+                        </sc-for>
+                      </tbody>
+                    </table>
+                    <div class="rows-m">
+                      <sc-for list="{{ b.lots }}" as="l" hint-placeholder-count="2">
+                        <div class="rm"><div class="rm-top"><span class="mono strong">{{ l.lot }}</span><span>Disponibles <span class="mono {{ l.dispCls }}">{{ l.disp }}</span></span></div><div class="f"><label for="{{ l.mId }}">Entrada</label><input id="{{ l.mId }}" class="in mono num" type="text" inputmode="numeric" value="{{ l.val }}" onChange="{{ l.onVal }}" aria-invalid="{{ l.invalid }}"><sc-if value="{{ l.over }}" hint-placeholder-val="{{ false }}"><span class="err">Solo hay {{ l.stock }}</span></sc-if></div></div>
+                      </sc-for>
+                    </div></div></div>
+                  </div>
+                </div>
+              </sc-for>
+
+              <button class="b b-dash" type="button" onClick="{{ addBlock }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir cliente</button>
+
+              <div class="f">
+                <label for="sp-nota">Nota <span class="dim">(opcional)</span></label>
+                <textarea id="sp-nota" class="in" rows="2" placeholder="Por ejemplo: venta de mostrador, factura 0012">{{ note }}</textarea>
+                <span class="cap">Se ve en el tab Entregas del producto.</span>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ overSurplus }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 10px 24px 0"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Entre todos los clientes se pasa del excedente: solo se pueden entregar {{ surplus }} envases sin tocar lo que esperan los pedidos.</span></div>
+        </sc-if>
+        <sc-if value="{{ stockOver }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 10px 24px 0"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Entre todos los clientes se pasa de lo disponible en un lote. Baja los envases para poder entregar.</span></div>
+        </sc-if>
+        <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ reset }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ submit }}" disabled="{{ blockSubmit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path></svg>Entregar</button></div>
+        <sc-if value="{{ done }}" hint-placeholder-val="{{ false }}">
+          <div class="toastwrap" style="position: absolute; left: 16px; right: 16px; bottom: 84px"><div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Entrega sin pedido registrada</span></div></div>
+        </sc-if>
+      </aside>
+    </div>
+
+    <!-- 3. AlertDialog Anular la entrega sin pedido: por cliente (interactivo) -->
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Anular la entrega sin pedido</span>
+      <div class="dlg static" role="alertdialog" aria-modal="true" aria-labelledby="sp-an" style="width: min(500px, calc(100% - 24px))">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+        <h2 id="sp-an" class="h2">Anular la entrega sin pedido</h2>
+        <p class="sub">Entrega del <span class="mono">2026-10-16 10:05</span> · Botella 1 L. Marca los clientes cuya parte se anula. Sus envases vuelven a los lotes de los que salieron.</p>
+        <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--border); padding-top: 8px">
+          <legend class="sr">Clientes de la entrega</legend>
+          <sc-for list="{{ voidItems }}" as="it" hint-placeholder-count="2">
+            <div style="display: flex; align-items: center; gap: 12px; min-height: 44px">
+              <button class="cb" type="button" role="checkbox" aria-checked="{{ it.on }}" aria-label="{{ it.label }}" onClick="{{ it.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button>
+              <span style="font-size: 14px"><span class="strong">{{ it.client }}</span> <span class="dim">· <span class="mono">{{ it.packages }}</span> envases</span></span>
+            </div>
+          </sc-for>
+        </fieldset>
+        <sc-if value="{{ voidEmpty }}" hint-placeholder-val="{{ false }}">
+          <span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>No hay nada que anular: marca al menos un cliente.</span>
+        </sc-if>
+        <div class="f"><label for="sp-m">Motivo de la anulación <span class="req">*</span></label><textarea id="sp-m" class="in" rows="2">El cliente devolvió las botellas.</textarea></div>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button" onClick="{{ tryVoid }}">Anular</button></div>
+      </div>
+    </div>
+
+    <!-- 4. Tab Entregas: las de pedido y las sin pedido juntas -->
+    <div class="card" style="gap: 14px">
+      <span class="lab">Producto terminado · tab Entregas (QC-225) con las entregas sin pedido</span>
+      <p class="sub" style="margin: 0">Una fila por cliente y lote. Las entregas sin pedido se marcan «Sin pedido» en la columna Pedido, con su nota debajo, y se anulan desde su fila.</p>
+      <p style="margin: 0; font-size: 14px"><span class="dim">Total entregado: </span><span class="mono strong">{{ ptTotal }} envases</span></p>
+      <div class="tw"><div class="scroll"><table style="min-width: 980px">
+        <thead><tr><th scope="col">Fecha</th><th scope="col">Cliente</th><th scope="col">Pedido</th><th scope="col">Presentación</th><th scope="col">Lote</th><th scope="col" class="num">Envases</th><th scope="col" class="num">Cantidad</th><th scope="col">Anulación</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+        <tbody>
+          <sc-for list="{{ ptRows }}" as="r" hint-placeholder-count="6">
+            <tr>
+              <td class="mono">{{ r.date }}</td>
+              <td>{{ r.client }}</td>
+              <td><sc-if value="{{ r.free }}" hint-placeholder-val="{{ false }}"><span style="display: flex; flex-direction: column; gap: 2px"><span class="sb t-info"><i></i>Sin pedido</span><span class="dim" style="font-size: 12px">{{ r.note }}</span></span></sc-if><sc-if value="{{ r.fromOrder }}" hint-placeholder-val="{{ true }}"><span class="mono">{{ r.order }}</span></sc-if></td>
+              <td>Botella 1 L</td>
+              <td class="mono">{{ r.lot }}</td>
+              <td class="num mono">{{ r.packages }}</td>
+              <td class="num mono">{{ r.qty }}</td>
+              <td><sc-if value="{{ r.voided }}" hint-placeholder-val="{{ false }}"><span style="display: flex; flex-direction: column; gap: 2px"><span class="sb t-danger"><i></i>Anulada</span><span class="dim" style="font-size: 12px">{{ r.reason }}</span></span></sc-if><sc-if value="{{ r.notVoided }}" hint-placeholder-val="{{ true }}"><span class="dim">—</span></sc-if></td>
+              <td><sc-if value="{{ r.canVoid }}" hint-placeholder-val="{{ false }}"><button class="b b-out b-sm" type="button" aria-label="{{ r.voidLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Anular</button></sc-if></td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table></div></div>
+      <div class="rows-m">
+        <sc-for list="{{ ptRows }}" as="r" hint-placeholder-count="6">
+          <div class="rm">
+            <div class="rm-top"><span class="strong">{{ r.client }}</span><span class="mono dim">{{ r.date }}</span></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 13px">
+              <sc-if value="{{ r.free }}" hint-placeholder-val="{{ false }}"><span class="sb t-info"><i></i>Sin pedido</span></sc-if>
+              <sc-if value="{{ r.fromOrder }}" hint-placeholder-val="{{ true }}"><span>Pedido <span class="mono">{{ r.order }}</span></span></sc-if>
+              <span>Lote <span class="mono">{{ r.lot }}</span></span>
+              <span><span class="mono">{{ r.packages }}</span> envases · <span class="mono">{{ r.qty }}</span></span>
+            </div>
+            <sc-if value="{{ r.hasNote }}" hint-placeholder-val="{{ false }}"><span class="dim" style="font-size: 12px">{{ r.note }}</span></sc-if>
+            <sc-if value="{{ r.voided }}" hint-placeholder-val="{{ false }}"><span style="display: flex; flex-direction: column; gap: 2px"><span class="sb t-danger"><i></i>Anulada</span><span class="dim" style="font-size: 12px">{{ r.reason }}</span></span></sc-if>
+            <sc-if value="{{ r.canVoid }}" hint-placeholder-val="{{ false }}"><button class="b b-out b-touch" type="button" aria-label="{{ r.voidLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Anular</button></sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- 5. Historial del lote: el asiento de la entrega sin pedido -->
+    <div class="card" style="gap: 14px">
+      <span class="lab">Lote L-2610-02 · historial de movimientos</span>
+      <p class="sub" style="margin: 0">La entrega sin pedido sale como «Entrega sin pedido», con el cliente en vez del pedido. Su anulación sale como «Anulación de entrega sin pedido».</p>
+      <div class="tw"><div class="scroll"><table style="min-width: 760px">
+        <thead><tr><th scope="col">Fecha</th><th scope="col">Movimiento</th><th scope="col">Origen</th><th scope="col" class="num">Envases</th><th scope="col" class="num">Cantidad</th></tr></thead>
+        <tbody>
+          <sc-for list="{{ ledger }}" as="m" hint-placeholder-count="4">
+            <tr><td class="mono">{{ m.date }}</td><td><span class="{{ m.cls }}"><i></i>{{ m.kind }}</span></td><td>{{ m.origin }}</td><td class="num mono">{{ m.packages }}</td><td class="num mono">{{ m.qty }}</td></tr>
+          </sc-for>
+        </tbody>
+      </table></div></div>
+      <div class="rows-m">
+        <sc-for list="{{ ledger }}" as="m" hint-placeholder-count="4">
+          <div class="rm"><div class="rm-top"><span class="{{ m.cls }}"><i></i>{{ m.kind }}</span><span class="mono dim">{{ m.date }}</span></div><div style="display: flex; justify-content: space-between; gap: 8px; font-size: 13px"><span>{{ m.origin }}</span><span class="mono">{{ m.qty }}</span></div></div>
+        </sc-for>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["Dos clientes","Con errores","Se pasa del excedente","Sin excedente","Borrador ajustado"],"default":"Dos clientes"},"$preview":{"width":1440,"height":3600}}'>
+var LOTS = [
+  { key: 'l2', lot: 'L-2610-02', disp: 12 },
+  { key: 'l7', lot: 'L-2610-07', disp: 8 }
+];
+var WAITING = [
+  { order: '2026-0000006', missing: 5 },
+  { order: '2026-0000009', missing: 3 }
+];
+
+function seed(estado) {
+  if (estado === 'Con errores') {
+    return { tried: true, blocks: [
+      { id: 1, client: 'Laura Gómez', q: { l2: 4 } },
+      { id: 2, client: 'Laura Gómez', q: { l7: 2 } },
+      { id: 3, client: '', q: {} }
+    ] };
+  }
+  if (estado === 'Se pasa del excedente') {
+    return { tried: false, blocks: [
+      { id: 1, client: 'Laura Gómez', q: { l2: 10 } },
+      { id: 2, client: 'Ferretería El Sol', q: { l7: 6 } }
+    ] };
+  }
+  if (estado === 'Borrador ajustado') {
+    return { tried: false, adjusted: true, blocks: [ { id: 1, client: 'Laura Gómez', q: { l2: 3 } } ] };
+  }
+  return { tried: false, blocks: [
+    { id: 1, client: 'Laura Gómez', q: { l2: 6 } },
+    { id: 2, client: 'Ferretería El Sol', q: { l2: 2, l7: 2 } }
+  ] };
+}
+
+var ROWS = [
+  { date: '2026-10-16 10:05', client: 'Laura Gómez', free: true, note: 'Venta de mostrador, factura 0012', lot: 'L-2610-02', packages: 4 },
+  { date: '2026-10-16 10:05', client: 'Ferretería El Sol', free: true, note: 'Venta de mostrador, factura 0012', lot: 'L-2610-07', packages: 2 },
+  { date: '2026-10-15 15:42', client: 'Distribuidora Andina', order: '2026-0000006', lot: 'L-2610-02', packages: 3 },
+  { date: '2026-10-14 09:20', client: 'Mario Ruiz', free: true, note: '', lot: 'L-2610-02', packages: 2, voided: 'Se registró por error.' },
+  { date: '2026-10-12 09:10', client: 'Ferretería El Sol', order: '2026-0000004', lot: 'L-2610-01', packages: 6 }
+];
+
+var LIST = [
+  { name: 'Limpiador limón', pres: 'Botella 1 L', stock: 20, reserved: 8 },
+  { name: 'Desengrasante', pres: 'Garrafa 5 L', stock: 6, reserved: 6 },
+  { name: 'Hipoclorito', pres: 'Bidón 20 L', stock: 4, reserved: 0 }
+];
+
+var LEDGER = [
+  { date: '2026-10-16 10:05', kind: 'Entrega sin pedido', cls: 'sb t-info', origin: 'Laura Gómez', packages: '−4', qty: '−4 L' },
+  { date: '2026-10-15 15:42', kind: 'Entrega', cls: 'sb t-neutral', origin: 'Pedido 2026-0000006', packages: '−3', qty: '−3 L' },
+  { date: '2026-10-14 11:30', kind: 'Anulación de entrega sin pedido', cls: 'sb t-muted', origin: 'Mario Ruiz', packages: '+2', qty: '+2 L' },
+  { date: '2026-10-14 09:20', kind: 'Entrega sin pedido', cls: 'sb t-info', origin: 'Mario Ruiz', packages: '−2', qty: '−2 L' },
+  { date: '2026-10-10 17:02', kind: 'Producción', cls: 'sb t-success', origin: 'Pedido 2026-0000006', packages: '+21', qty: '+21 L' }
+];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var s = seed(props.estado ?? 'Dos clientes');
+    this.state = { blocks: s.blocks, tried: s.tried, adjusted: !!s.adjusted, done: false, nextId: 10, voidSel: {}, voidTried: false, menuOpen: 1 };
+  }
+
+  componentDidUpdate(prev) {
+    if (prev.estado !== this.props.estado) this.reset();
+  }
+
+  reset() {
+    var s = seed(this.props.estado ?? 'Dos clientes');
+    this.setState({ blocks: s.blocks, tried: s.tried, adjusted: !!s.adjusted, done: false });
+  }
+
+  updateBlock(id, fn) {
+    this.setState({ done: false, blocks: this.state.blocks.map(function (b) { return b.id === id ? fn(b) : b; }) });
+  }
+
+  renderVals() {
+    var self = this;
+    var st = this.state;
+    var estado = this.props.estado ?? 'Dos clientes';
+    var noSurplus = estado === 'Sin excedente';
+    var lots = noSurplus ? [ { key: 'l2', lot: 'L-2610-02', disp: 5 }, { key: 'l7', lot: 'L-2610-07', disp: 3 } ] : LOTS;
+    var stockTotal = lots.reduce(function (a, l) { return a + l.disp; }, 0);
+    var reserved = WAITING.reduce(function (a, w) { return a + w.missing; }, 0);
+    var surplus = Math.max(stockTotal - reserved, 0);
+    var blocks = st.blocks;
+    var norm = function (s) { return (s || '').trim().toLowerCase(); };
+
+    var lotUsed = {};
+    lots.forEach(function (l) { lotUsed[l.key] = blocks.reduce(function (a, b) { return a + (Number(b.q[l.key]) || 0); }, 0); });
+    var written = lots.reduce(function (a, l) { return a + lotUsed[l.key]; }, 0);
+    var stockOver = lots.some(function (l) { return lotUsed[l.key] > l.disp; });
+    var overSurplus = written > surplus;
+    var blockPackages = function (b) { return Object.keys(b.q).reduce(function (a, k) { return a + (Number(b.q[k]) || 0); }, 0); };
+
+    var errFor = function (b, i) {
+      if (!st.tried) return '';
+      if (norm(b.client) === '') return 'Elige el cliente.';
+      var dup = blocks.some(function (o, j) { return j < i && norm(o.client) === norm(b.client); });
+      if (dup) return 'Este cliente ya está en la entrega.';
+      return blockPackages(b) === 0 ? 'Este cliente no lleva envases: indica al menos uno.' : '';
+    };
+
+    var vb = blocks.map(function (b, i) {
+      var err = errFor(b, i);
+      return {
+        title: 'Cliente ' + (i + 1),
+        inId: 'sp-c-' + b.id,
+        client: b.client,
+        onClient: function (e) { var v = e.target.value; self.updateBlock(b.id, function (x) { return Object.assign({}, x, { client: v }); }); },
+        canRemove: blocks.length > 1,
+        removeLabel: 'Quitar el cliente ' + (i + 1),
+        remove: function () { self.setState({ done: false, blocks: self.state.blocks.filter(function (x) { return x.id !== b.id; }) }); },
+        hasErr: err !== '',
+        errText: err,
+        invalid: err !== '' ? 'true' : 'false',
+        sum: String(blockPackages(b)),
+        lots: lots.map(function (l) {
+          return {
+            lot: l.lot,
+            disp: String(Math.max(l.disp - lotUsed[l.key], 0)),
+            dispCls: l.disp - lotUsed[l.key] <= 0 ? 'dim' : '',
+            stock: String(l.disp),
+            over: lotUsed[l.key] > l.disp,
+            invalid: lotUsed[l.key] > l.disp ? 'true' : 'false',
+            val: b.q[l.key] ? String(b.q[l.key]) : '',
+            mId: 'sp-m-' + b.id + '-' + l.key,
+            label: 'Envases del lote ' + l.lot + ' para el cliente ' + (i + 1),
+            onVal: function (e) {
+              var v = e.target.value.replace(/[^0-9]/g, '');
+              var others = lotUsed[l.key] - (Number(b.q[l.key]) || 0);
+              var n = v === '' ? 0 : Math.min(Number(v), Math.max(l.disp - others, 0));
+              self.updateBlock(b.id, function (x) { var q = Object.assign({}, x.q); q[l.key] = n; return Object.assign({}, x, { q: q }); });
+            }
+          };
+        })
+      };
+    });
+
+    var tag = written === 0 ? 'Sin envases' : (overSurplus ? 'Sobran ' + (written - surplus) : 'Quedan ' + (surplus - written) + ' libres');
+    var tagCls = written === 0 ? 'sb t-muted' : (overSurplus ? 'sb t-danger' : 'sb t-success');
+
+    var VOID = [ { key: 'v1', client: 'Laura Gómez', packages: 4 }, { key: 'v2', client: 'Ferretería El Sol', packages: 2 } ];
+    var sel = st.voidSel;
+    var anySel = Object.keys(sel).some(function (k) { return sel[k]; });
+    var voidItems = VOID.map(function (it) {
+      return {
+        client: it.client,
+        packages: String(it.packages),
+        on: sel[it.key] ? 'true' : 'false',
+        label: 'Anular lo de ' + it.client + ' · ' + it.packages + ' envases',
+        toggle: function () { var next = Object.assign({}, self.state.voidSel); next[it.key] = !next[it.key]; self.setState({ voidSel: next, voidTried: false }); }
+      };
+    });
+
+    var ptTotal = 0;
+    var ptRows = ROWS.map(function (r) {
+      if (!r.voided) ptTotal += r.packages;
+      return {
+        date: r.date, client: r.client, free: !!r.free, fromOrder: !r.free, order: r.order || '',
+        note: r.note || '', hasNote: !!r.note, lot: r.lot, packages: String(r.packages), qty: r.packages + ' L',
+        voided: !!r.voided, notVoided: !r.voided, reason: r.voided || '',
+        canVoid: !!r.free && !r.voided, voidLabel: 'Anular la entrega sin pedido del ' + r.date
+      };
+    });
+
+    return {
+      rootCls: this.props.oscuro ? 'qc dk' : 'qc',
+      estado: estado,
+      noSurplus: noSurplus,
+      hasSurplus: !noSurplus,
+      stockTotal: String(stockTotal),
+      reservedTotal: String(reserved),
+      surplus: String(surplus),
+      waiting: WAITING.map(function (w) { return { order: w.order, missing: String(w.missing) }; }),
+      written: String(written),
+      tag: tag,
+      tagCls: tagCls,
+      blocks: vb,
+      note: estado === 'Dos clientes' ? 'Venta de mostrador, factura 0012' : '',
+      adjusted: st.adjusted,
+      done: st.done,
+      overSurplus: !noSurplus && overSurplus,
+      stockOver: !noSurplus && stockOver,
+      blockSubmit: noSurplus || overSurplus || stockOver,
+      openSheet: function () {},
+      addBlock: function () {
+        var id = self.state.nextId;
+        self.setState({ nextId: id + 1, done: false, blocks: self.state.blocks.concat([{ id: id, client: '', q: {} }]) });
+      },
+      reset: function () { self.reset(); },
+      submit: function () {
+        var bad = self.state.blocks.some(function (b, i) {
+          if (norm(b.client) === '') return true;
+          if (blockPackages(b) === 0) return true;
+          return self.state.blocks.some(function (o, j) { return j < i && norm(o.client) === norm(b.client); });
+        });
+        self.setState({ tried: true, done: !bad && !overSurplus && !stockOver });
+      },
+      voidItems: voidItems,
+      voidEmpty: st.voidTried && !anySel,
+      tryVoid: function () { self.setState({ voidTried: true }); },
+      ptRows: ptRows,
+      ptTotal: String(ptTotal),
+      ledger: LEDGER,
+      listRows: LIST.map(function (p, i) {
+        var open = st.menuOpen === i;
+        return {
+          name: p.name, pres: p.pres, stock: String(p.stock), reserved: String(p.reserved),
+          surplus: String(Math.max(p.stock - p.reserved, 0)),
+          canDeliver: p.stock - p.reserved > 0,
+          open: open, openStr: open ? 'true' : 'false',
+          menuLabel: 'Acciones de ' + p.name + ' · ' + p.pres,
+          toggle: function () { self.setState({ menuOpen: self.state.menuOpen === i ? -1 : i }); }
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

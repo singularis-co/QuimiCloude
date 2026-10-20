@@ -1145,3 +1145,29 @@ describe('QC-282 R23 + QC-281 — tope por envases reales sobre la suma de los c
     expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
   })
 })
+
+// 2026-10-16 (QC-288): la clave es unica por empresa y la comparten las entregas sin pedido.
+describe('QC-288 deliverOrder — clave de una entrega sin pedido', () => {
+  it('R38: una entrega de pedido con la clave de una entrega sin pedido es invalid_input, sin abrir la transaccion', async () => {
+    const m = montar({ registrada: { id: DELIVERY_ID, orderId: null } })
+
+    expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entradaDeUnCliente(), ENTREGADOR))).toBe('invalid_input')
+    expect(m.run).not.toHaveBeenCalled()
+    expect(m.findAliveById).not.toHaveBeenCalled()
+    nadaEscrito(m)
+  })
+
+  it('R38: si la clave la inserta a la vez una entrega sin pedido, duplicate_key relee y responde invalid_input sin despachar', async () => {
+    const m = montar({ creada: { kind: 'duplicate_key' } })
+    const findByKey = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: DELIVERY_ID, orderId: null } satisfies RegisteredOrderDelivery)
+    const deps: DeliverOrderDeps = { ...m.deps, deliveries: { findByKey } }
+
+    expect(await codigoDelFallo(() => createDeliverOrder(deps)(entradaDeUnCliente(), ENTREGADOR))).toBe('invalid_input')
+    expect(findByKey).toHaveBeenCalledTimes(2)
+    expect(m.findAliveById).not.toHaveBeenCalled()
+    nadaEscrito(m)
+  })
+})

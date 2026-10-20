@@ -94,7 +94,12 @@ async function sumOrderDeliveredPackages(
     where: { ...columns, delivery: { ...columns, orderId }, voidLine: null },
     _sum: { packages: true },
   });
-  return new Map(rows.map((row) => [row.orderPresentationLineId, row._sum.packages ?? 0]));
+  // Las lineas de una entrega de pedido siempre tienen linea del reparto: el disparador lo exige.
+  return new Map(
+    rows.flatMap((row) =>
+      row.orderPresentationLineId === null ? [] : [[row.orderPresentationLineId, row._sum.packages ?? 0] as const],
+    ),
+  );
 }
 
 /** Sobre el cliente global para la lectura del sheet, o sobre el `tx` de la entrega. Sin `update`,

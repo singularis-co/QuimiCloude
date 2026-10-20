@@ -142,7 +142,7 @@ HEAD revisado: `4de481b4`. `62e3ce1a` es ancestro de HEAD.
   de alta queda citada.
 - [x] **m3 — cerrado**: el humano aceptó el rótulo en mono como deuda D63
   (`progress/features/QC-264.md:61`).
-- [x] **m4 — cerrado** (`62e3ce1a`): D71 en `progress/deudas.md`, con origen, qué falta y dueño
+- [x] **m4 — cerrado** (`62e3ce1a`): D76 (antes D71, renumerada en el merge de dev) en `progress/deudas.md`, con origen, qué falta y dueño
   candidato (QC-291).
 
 ### Regresiones

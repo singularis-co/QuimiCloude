@@ -13,7 +13,11 @@ import { Prisma } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
-import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
+import {
+  findDeliverableBatches,
+  findForDelivery,
+  findSurplusBases,
+} from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import {
   addImportedFinishedGoodsBatch,
   receiveFinishedGoods,
@@ -323,5 +327,91 @@ describe('findDeliverableBatches (R7)', () => {
 
   it('R7: sin presentaciones pedidas no consulta y devuelve vacio', async () => {
     expect(await findDeliverableBatches(randomUUID(), [], randomUUID())).toEqual([]);
+  });
+});
+
+// 2026-10-16 (QC-288): la entrega sin pedido lee el producto terminado por su id, con los envases en
+// stock de sus lotes con contenido, y las bases del excedente de varios productos en una consulta.
+describe('findForDelivery y findSurplusBases (entrega sin pedido)', () => {
+  it('R9: un lote sin contenido de envase no suma envases ni sale como entregable; los lotes van por fecha y lote', async () => {
+    const a = await sembrarEmpresa();
+    try {
+      const receta = await sembrarReceta(a);
+      const p1 = await sembrarPresentacion(a, '2.0000');
+      const produccion = await recibirPorProduccion(a, receta, p1, 5);
+      const marca = token();
+      const importado = await recibirPorImportacion(a, produccion.productId, p1, '6.0000', '2.0000', `${marca}-A`, '2026-09-01');
+      // Sin contenido de envase (8 de stock), menos de un envase y sin existencia: ninguno suma.
+      await sembrarLoteDirecto(a, produccion.productId, p1, '8.0000', null);
+      await sembrarLoteDirecto(a, produccion.productId, p1, '1.9999', '2.0000');
+      await sembrarLoteDirecto(a, produccion.productId, p1, '0.0000', '2.0000');
+
+      const producto = await findForDelivery(produccion.productId, a.companyId);
+
+      expect(producto).toMatchObject({
+        productId: produccion.productId,
+        recipeId: receta,
+        presentationId: p1,
+        stockPackages: 5 + 3,
+      });
+      expect(producto?.presentationName).toMatch(/^Botella /u);
+      expect(producto?.batches.map((lote) => [lote.batchId, lote.availablePackages])).toEqual([
+        [importado, 3],
+        [produccion.batchId, 5],
+      ]);
+      expect(producto?.batches[0]).toEqual({
+        batchId: importado,
+        presentationId: p1,
+        lot: `${marca}-A`,
+        purchaseDate: '2026-09-01',
+        expiryDate: '2027-03-01',
+        packageContent: '2.0000',
+        availablePackages: 3,
+      });
+
+      expect(await findSurplusBases([produccion.productId], a.companyId)).toEqual([
+        { productId: produccion.productId, recipeId: receta, presentationId: p1, stockPackages: 8 },
+      ]);
+    } finally {
+      await limpiar(a);
+    }
+  });
+
+  it('R9: ni el producto de otra empresa, ni el dado de baja, ni uno que no es terminado vuelven', async () => {
+    const a = await sembrarEmpresa();
+    const b = await sembrarEmpresa();
+    try {
+      const receta = await sembrarReceta(a);
+      const p1 = await sembrarPresentacion(a, '1.0000');
+      const p2 = await sembrarPresentacion(a, '1.0000');
+      const vivo = await sembrarTerminado(a, receta, p1);
+      await sembrarLoteDirecto(a, vivo, p1, '4.0000', '1.0000');
+      const deBaja = await sembrarTerminado(a, receta, p2, new Date());
+      await sembrarLoteDirecto(a, deBaja, p2, '4.0000', '1.0000');
+      const nombre = `Insumo ${token()}`;
+      const { id: insumo } = await prisma.product.create({
+        data: { name: nombre, nameNormalized: normalizar(nombre), unitId: a.unitId, companyId: a.companyId },
+        select: { id: true },
+      });
+      const recetaB = await sembrarReceta(b);
+      const pB = await sembrarPresentacion(b, '1.0000');
+      const terminadoB = await sembrarTerminado(b, recetaB, pB);
+      await sembrarLoteDirecto(b, terminadoB, pB, '9.0000', '1.0000');
+
+      expect(await findForDelivery(terminadoB, a.companyId)).toBeNull();
+      expect(await findForDelivery(vivo, b.companyId)).toBeNull();
+      expect(await findForDelivery(deBaja, a.companyId)).toBeNull();
+      expect(await findForDelivery(insumo, a.companyId)).toBeNull();
+      expect((await findForDelivery(terminadoB, b.companyId))?.stockPackages).toBe(9);
+
+      expect(await findSurplusBases([terminadoB, deBaja, insumo, vivo, randomUUID()], a.companyId)).toEqual([
+        { productId: vivo, recipeId: receta, presentationId: p1, stockPackages: 4 },
+      ]);
+      expect(await findSurplusBases([vivo], b.companyId)).toEqual([]);
+      expect(await findSurplusBases([], a.companyId)).toEqual([]);
+    } finally {
+      await limpiar(a);
+      await limpiar(b);
+    }
   });
 });
