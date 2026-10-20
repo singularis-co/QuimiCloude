@@ -2717,10 +2717,17 @@ const secretDigest: SecretDigest = secretDigestSha256;
 
 import {
   createCreateWhatsappConnection,
+  createCreateWhatsappTemplate,
+  createDeleteWhatsappTemplate,
   createGetWhatsappConnection,
+  createGetWhatsappTemplate,
+  createListWhatsappTemplates,
   createReceiveWhatsappWebhook,
   createRegenerateWhatsappVerifyToken,
+  createResyncWhatsappTemplates,
   createSetWhatsappConnectionEnabled,
+  createSyncAllWhatsappTemplates,
+  createSyncWhatsappTemplates,
   createTestWhatsappConnection,
   createUpdateWhatsappConnection,
   createVerifyWhatsappWebhook,
@@ -2818,7 +2825,7 @@ const integrationsSwitch: IntegrationsSwitch = {
   isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'integraciones'),
 };
 
-/** Sin Graph ni cola: recibir un webhook no llama hacia fuera. */
+/** `graph` solo lo usa la resincronización, que corre después de responder a Meta. */
 const whatsappWebhookDeps = {
   directory: whatsappWebhookDirectory,
   integrations: integrationsSwitch,
@@ -2828,7 +2835,10 @@ const whatsappWebhookDeps = {
   signature: webhookSignature,
   inbox: whatsappInboxRepository,
   templates: whatsappTemplateRepository,
+  graph: whatsappGraphClient,
 };
+
+const whatsappTemplateCronDeps = { ...whatsappWebhookDeps, listCompanyIds: listActiveCompanyIds };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
 
@@ -2936,4 +2946,12 @@ export const integraciones = {
   reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
   verifyWhatsappWebhook: createVerifyWhatsappWebhook(whatsappWebhookDeps),
   receiveWhatsappWebhook: createReceiveWhatsappWebhook(whatsappWebhookDeps),
+  listWhatsappTemplates: createListWhatsappTemplates(whatsappDeps),
+  getWhatsappTemplate: createGetWhatsappTemplate(whatsappDeps),
+  createWhatsappTemplate: createCreateWhatsappTemplate(whatsappDeps),
+  syncWhatsappTemplates: createSyncWhatsappTemplates(whatsappDeps),
+  deleteWhatsappTemplate: createDeleteWhatsappTemplate(whatsappDeps),
+  resyncWhatsappTemplates: createResyncWhatsappTemplates(whatsappWebhookDeps),
+  syncAllWhatsappTemplates: createSyncAllWhatsappTemplates(whatsappTemplateCronDeps),
+  verifyCronSecret,
 } as const;

@@ -115,24 +115,24 @@
 
 ## Bloque E — Bordes y cableado (tras el bloque D)
 
-- [ ] **T15 — Composición y contrato** (R47). Depende de: T8–T14
+- [x] **T15 — Composición y contrato** (R47). Depende de: T8–T14
   - `lib/composition/index.ts` (§10) y `lib/modules/integraciones/index.ts` (§11).
   - `tests/unit/integraciones/module-shape.test.ts` tensado (§14.2).
   - **Hecho:** `module-shape` y `guard-arquitectura-modulos` verdes.
 
-- [ ] **T16 [P] — Server Actions** (R5, R47, R48). Depende de: T15
+- [x] **T16 [P] — Server Actions** (R5, R47, R48). Depende de: T15
   - `adapters/driving/whatsapp-template-actions.ts` (§9) y `whatsapp-template-actions.test.ts`.
   - **Hecho:** contrato y claves exactas de cada `data`; el test de una lectura de sesión por petición
     verde con la acción nueva.
 
-- [ ] **T17 [P] — Ruta del cron** (R31, R33–R35). Depende de: T15
+- [x] **T17 [P] — Ruta del cron** (R31, R33–R35). Depende de: T15
   - `adapters/driving/whatsapp-template-cron-route.ts`,
     `app/api/cron/sincronizar-plantillas-whatsapp/route.ts`, `vercel.json` (§8).
   - Tests `whatsapp-template-cron-route.test.ts`; `tests/unit/pedidos/vercel-cron.test.ts` por
     `path`; `tests/guards/guard-rutas-fuera-de-sesion.test.ts` con la ruta nueva.
   - **Hecho:** tests y guardias verdes; `route-segment-config` acepta los literales.
 
-- [ ] **T18 [P] — Ruta del webhook con `after`** (R38, R40). Depende de: T15
+- [x] **T18 [P] — Ruta del webhook con `after`** (R38, R40). Depende de: T15
   - `adapters/driving/whatsapp-webhook-route.ts` (§7.4) y `whatsapp-webhook-route.test.ts` ampliado.
   - **Hecho:** `after` una vez con `followUp`, ninguna sin él; el fallo de la resincronización no
     cambia el `200`; los casos de QC-238 siguen verdes.

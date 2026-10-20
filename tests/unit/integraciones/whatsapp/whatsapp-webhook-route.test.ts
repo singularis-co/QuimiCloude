@@ -16,17 +16,24 @@ import {
   whatsappWebhookPath,
 } from '@/lib/shared/routes'
 
-const { verifyMock, receiveMock } = vi.hoisted(() => ({
+const { verifyMock, receiveMock, resyncMock, afterMock } = vi.hoisted(() => ({
   verifyMock: vi.fn(),
   receiveMock: vi.fn(),
+  resyncMock: vi.fn(),
+  afterMock: vi.fn(),
 }))
 
 vi.mock('@/lib/composition', () => ({
   integraciones: {
     verifyWhatsappWebhook: verifyMock,
     receiveWhatsappWebhook: receiveMock,
+    resyncWhatsappTemplates: resyncMock,
   },
 }))
+
+// `after` se sustituye por una cola: la tarea no corre hasta que el test la vacia, igual que en
+// Next no corre hasta despues de mandar la respuesta.
+vi.mock('next/server', () => ({ after: afterMock }))
 
 const CONEXION = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
 const NO_UUID = 'no-es-un-uuid'
@@ -38,7 +45,14 @@ const CUERPO = JSON.stringify(messagesNotification([textMessage(TEXTO)]))
 
 const SENSIBLES = [CUERPO, TOKEN, FIRMA, 'ab'.repeat(32), SENDER, TEXTO, PHONE_NUMBER_ID]
 
-const SIN_SALTADOS = { changes: 0, messages: 0, statuses: 0 }
+const SIN_SALTADOS = { changes: 0, messages: 0, statuses: 0, templates: 0 }
+
+/** Las tareas que la ruta dejo en `after`, en orden; vaciarla las corre y espera a todas. */
+const pendientes: (() => Promise<unknown>)[] = []
+
+async function vaciarAfter(): Promise<void> {
+  while (pendientes.length > 0) await (pendientes.shift() as () => Promise<unknown>)()
+}
 
 function contexto(conexionId: string = CONEXION) {
   return { params: Promise.resolve({ conexionId }) }
@@ -83,6 +97,12 @@ function expectSinDatosSensibles(): void {
 beforeEach(() => {
   verifyMock.mockReset()
   receiveMock.mockReset()
+  resyncMock.mockReset()
+  afterMock.mockReset()
+  pendientes.length = 0
+  afterMock.mockImplementation((tarea: () => Promise<unknown>) => {
+    pendientes.push(tarea)
+  })
   warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
   errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -107,7 +127,7 @@ describe('R1: la ruta del webhook queda fuera de la sesion', () => {
 
   it('R1: GET y POST responden sin cookie ni cabecera de sesion', async () => {
     verifyMock.mockResolvedValue({ kind: 'verified', challenge: CHALLENGE })
-    receiveMock.mockResolvedValue({ kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: SIN_SALTADOS })
+    receiveMock.mockResolvedValue({ kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: SIN_SALTADOS, followUp: null })
 
     expect((await getCon(QUERY_PUNTO)).status).toBe(200)
     expect((await postCon()).status).toBe(200)
@@ -176,7 +196,7 @@ describe('GET: el handshake de Meta', () => {
 
 describe('POST: la entrega de Meta', () => {
   it('R10: pasa al caso de uso los bytes exactos del cuerpo, la cabecera de firma y el id de la URL', async () => {
-    receiveMock.mockResolvedValue({ kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: SIN_SALTADOS })
+    receiveMock.mockResolvedValue({ kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: SIN_SALTADOS, followUp: null })
     // Un BOM y un byte que no es UTF-8 valido: decodificar y volver a codificar los cambiaria.
     const bytes = new Uint8Array([0xef, 0xbb, 0xbf, 0x7b, 0xff, 0x7d])
 
@@ -203,6 +223,7 @@ describe('POST: la entrega de Meta', () => {
       kind: 'stored',
       counts: { messages: 2, statuses: 1 },
       skipped: SIN_SALTADOS,
+      followUp: null,
     })
 
     const response = await postCon()
@@ -217,7 +238,8 @@ describe('POST: la entrega de Meta', () => {
     receiveMock.mockResolvedValue({
       kind: 'stored',
       counts: { messages: 1, statuses: 0 },
-      skipped: { changes: 1, messages: 2, statuses: 3 },
+      skipped: { changes: 1, messages: 2, statuses: 3, templates: 0 },
+      followUp: null,
     })
 
     const response = await postCon()
@@ -230,8 +252,30 @@ describe('POST: la entrega de Meta', () => {
       changes: 1,
       messages: 2,
       statuses: 3,
+      templates: 0,
     })
     expect(errorSpy).not.toHaveBeenCalled()
+  })
+
+  it('R39: stored con solo cambios de plantillas saltados ⇒ la misma linea de log, con su conteo', async () => {
+    receiveMock.mockResolvedValue({
+      kind: 'stored',
+      counts: { messages: 0, statuses: 0 },
+      skipped: { changes: 0, messages: 0, statuses: 0, templates: 2 },
+      followUp: null,
+    })
+
+    const response = await postCon()
+
+    expect(response.status).toBe(200)
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(warnSpy).toHaveBeenCalledWith('whatsapp_webhook_changes_skipped', {
+      connectionId: CONEXION,
+      changes: 0,
+      messages: 0,
+      statuses: 0,
+      templates: 2,
+    })
   })
 
   it.each(['addon_off', 'disabled', 'unparseable'] as const)(
@@ -320,8 +364,13 @@ describe('R27: ningun log de la ruta lleva datos sensibles', () => {
       { kind: 'ignored', reason: 'unparseable' },
       { kind: 'unauthorized' },
       { kind: 'secret_unreadable' },
-      { kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: SIN_SALTADOS },
-      { kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: { changes: 1, messages: 1, statuses: 1 } },
+      { kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: SIN_SALTADOS, followUp: null },
+      {
+        kind: 'stored',
+        counts: { messages: 1, statuses: 0 },
+        skipped: { changes: 1, messages: 1, statuses: 1, templates: 1 },
+        followUp: null,
+      },
     ]) {
       receiveMock.mockResolvedValueOnce(result)
       await postCon()
@@ -332,5 +381,125 @@ describe('R27: ningun log de la ruta lleva datos sensibles', () => {
     expect(warnSpy.mock.calls.length + errorSpy.mock.calls.length).toBeGreaterThan(0)
     expect(warnSpy.mock.calls.map((llamada: unknown[]) => llamada[0])).toContain('whatsapp_webhook_changes_skipped')
     expectSinDatosSensibles()
+  })
+})
+
+describe('R38: la resincronizacion de plantillas corre despues de responder', () => {
+  const STORED_CON_SEGUIMIENTO = {
+    kind: 'stored',
+    counts: { messages: 0, statuses: 0 },
+    skipped: SIN_SALTADOS,
+    followUp: 'resync_templates',
+  } as const
+  const SUMMARY = { imported: 1, updated: 0, deleted: 0, skipped: 0, syncedAt: '2026-10-20T12:00:00.000Z' }
+
+  it('R38: con followUp ⇒ 200 y after llamado UNA vez; la resincronizacion no corre antes de responder', async () => {
+    receiveMock.mockResolvedValue(STORED_CON_SEGUIMIENTO)
+    resyncMock.mockResolvedValue({ kind: 'synced', summary: SUMMARY })
+
+    const response = await postCon()
+
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('')
+    expect(afterMock).toHaveBeenCalledTimes(1)
+    expect(resyncMock).not.toHaveBeenCalled()
+
+    await vaciarAfter()
+
+    expect(resyncMock).toHaveBeenCalledTimes(1)
+    expect(resyncMock).toHaveBeenCalledWith(CONEXION)
+    expect(errorSpy).not.toHaveBeenCalled()
+  })
+
+  it('R38: sin followUp after no se llama, en ningun resultado', async () => {
+    for (const result of [
+      { kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: SIN_SALTADOS, followUp: null },
+      {
+        kind: 'stored',
+        counts: { messages: 0, statuses: 0 },
+        skipped: { changes: 1, messages: 0, statuses: 0, templates: 1 },
+        followUp: null,
+      },
+      { kind: 'ignored', reason: 'missing' },
+      { kind: 'ignored', reason: 'addon_off' },
+      { kind: 'ignored', reason: 'disabled' },
+      { kind: 'ignored', reason: 'unparseable' },
+      { kind: 'unauthorized' },
+      { kind: 'secret_unreadable' },
+    ]) {
+      receiveMock.mockResolvedValueOnce(result)
+      await postCon()
+    }
+    receiveMock.mockRejectedValueOnce(new Error('fallo'))
+    await postCon()
+
+    expect(afterMock).not.toHaveBeenCalled()
+    expect(resyncMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { kind: 'failed', code: 'whatsapp_meta_unreachable' },
+    { kind: 'failed', code: 'unexpected' },
+  ] as const)('R38: un fallo de la resincronizacion ($code) no cambia el 200 y deja una linea de log con el codigo', async (outcome) => {
+    receiveMock.mockResolvedValue(STORED_CON_SEGUIMIENTO)
+    resyncMock.mockResolvedValue(outcome)
+
+    const response = await postCon()
+    await vaciarAfter()
+
+    expect(response.status).toBe(200)
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    expect(errorSpy).toHaveBeenCalledWith('whatsapp_templates_resync_failed', {
+      connectionId: CONEXION,
+      code: outcome.code,
+    })
+    expectSinDatosSensibles()
+  })
+
+  it.each(['missing', 'addon_off', 'disabled'] as const)(
+    'R38: una resincronizacion saltada (%s) no escribe log ni cambia el 200',
+    async (reason) => {
+      receiveMock.mockResolvedValue(STORED_CON_SEGUIMIENTO)
+      resyncMock.mockResolvedValue({ kind: 'skipped', reason })
+
+      const response = await postCon()
+      await vaciarAfter()
+
+      expect(response.status).toBe(200)
+      expect(errorSpy).not.toHaveBeenCalled()
+      expect(warnSpy).not.toHaveBeenCalled()
+    },
+  )
+
+  it('R40: con followUp y cambios saltados, la linea de saltos y la resincronizacion salen las dos', async () => {
+    receiveMock.mockResolvedValue({
+      ...STORED_CON_SEGUIMIENTO,
+      counts: { messages: 1, statuses: 0 },
+      skipped: { changes: 0, messages: 0, statuses: 0, templates: 1 },
+    })
+    resyncMock.mockResolvedValue({ kind: 'synced', summary: SUMMARY })
+
+    const response = await postCon()
+    await vaciarAfter()
+
+    expect(response.status).toBe(200)
+    expect(warnSpy).toHaveBeenCalledWith('whatsapp_webhook_changes_skipped', {
+      connectionId: CONEXION,
+      changes: 0,
+      messages: 0,
+      statuses: 0,
+      templates: 1,
+    })
+    expect(afterMock).toHaveBeenCalledTimes(1)
+    expect(resyncMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('R40: si guardar los cambios de plantillas falla, el caso de uso lanza ⇒ 500 y no se programa nada', async () => {
+    receiveMock.mockRejectedValue(new Error('fallo al guardar las plantillas'))
+
+    const response = await postCon()
+
+    expect(response.status).toBe(500)
+    expect(afterMock).not.toHaveBeenCalled()
   })
 })

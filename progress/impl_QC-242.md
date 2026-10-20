@@ -330,3 +330,44 @@ vitest run guard   -> Test Files 83 passed (83); Tests 1161 passed | 21 skipped 
 .int.test.ts       -> no corridos (sin base en el worktree); los corre CI
 ```
 Veredicto: T12, T13 y T14 hechos; unit y guardias verdes, integración pendiente de CI; la ruta del webhook sin `after` (T18).
+
+## Tanda 6 — T15-T18
+
+backend_dev escribió el código y lo detuvo el leader (3 h sin cerrar, ya en T18). El implementer
+revisó lo que dejó en el worktree, lo verificó y cerró dos rojos mecánicos en tests.
+
+Archivos:
+- `lib/composition/index.ts`: casos de uso de plantillas, `syncAllWhatsappTemplates` y
+  `verifyCronSecret` en `integraciones`, como en §10.
+- `lib/modules/integraciones/index.ts`: contrato de §11.
+- `adapters/driving/whatsapp-template-actions.ts`: Server Actions (§9).
+- `adapters/driving/whatsapp-template-cron-route.ts`, `app/api/cron/sincronizar-plantillas-whatsapp/route.ts` y `vercel.json` con `0 8 * * *`.
+- `adapters/driving/whatsapp-webhook-route.ts`: `after` con `followUp`, log
+  `whatsapp_templates_resync_failed` y `templates` en el log de saltos.
+- Tests:
+  - nuevos: `templates/whatsapp-template-actions.test.ts` y `templates/whatsapp-template-cron-route.test.ts`;
+  - ampliados: `whatsapp-webhook-route.test.ts`, `module-shape.test.ts`, `tests/unit/pedidos/vercel-cron.test.ts`, `tests/unit/identity/session-once-per-request-actions.test.ts` y `tests/guards/guard-rutas-fuera-de-sesion.test.ts`;
+  - tensados por el implementer: `tests/unit/composition/integraciones-graph-doubles.test.ts` y `tests/unit/integraciones/encryption-keys-env.test.ts`. La lista exacta de la fachada suma los 8 miembros nuevos. En `module-shape`, `WHATSAPP_TEMPLATE_LANGUAGES` pasa a su sitio según `.sort()`.
+
+Salida:
+```
+pnpm run typecheck -> sin errores
+pnpm run lint      -> 0 errors, 10 warnings (preexistentes)
+vitest run whatsapp-webhook-route, template-actions, template-cron-route, module-shape, vercel-cron, session-once-per-request-actions
+                   -> 1 failed | 5 passed (orden en module-shape); tras el arreglo module-shape: 104 passed | 1 skipped
+vitest run --project node tests/unit/integraciones/ tests/unit/composition/
+                   -> 2 failed | 54 passed (listas de la fachada); tras el arreglo esos dos: 33 passed
+vitest run guard   -> Test Files 83 passed; Tests 1162 passed | 21 skipped
+```
+
+R<n> -> test:
+- R5: `whatsapp-template-actions.test.ts`, 3 casos «R5: …» (actor de la sesión, sin sesión ⇒ unauthorized, sin permiso ⇒ unauthorized).
+- R31: `whatsapp-template-cron-route.test.ts`, 3 casos «R31: …» (sin cabecera, secreto incorrecto, CRON_SECRET sin definir).
+- R33: `whatsapp-template-cron-route.test.ts`, 3 casos «R33: …».
+- R34: `tests/unit/pedidos/vercel-cron.test.ts`, 2 casos «R34: …» (una tarea a la ruta, a las 08:00).
+- R35: `whatsapp-template-cron-route.test.ts`, «reexporta solo GET…» y «declara runtime y maxDuration como literales…», más `guard-rutas-fuera-de-sesion` con la ruta nueva.
+- R38: `whatsapp-webhook-route.test.ts`: «R38: con followUp ⇒ 200 y after llamado UNA vez…», «R38: sin followUp after no se llama…» y el caso del fallo de la resincronización (log `whatsapp_templates_resync_failed`, 200 igual).
+- R39: `whatsapp-webhook-route.test.ts`, «R39: stored con solo cambios de plantillas saltados…».
+- R40: `whatsapp-webhook-route.test.ts`, 2 casos «R40: …».
+- R47: `whatsapp-template-actions.test.ts`, 8 casos «R47: …»; `module-shape.test.ts` «R20: el contrato reexporta exactamente…».
+- R48: `whatsapp-template-actions.test.ts`, 6 casos «R48: …».

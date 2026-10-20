@@ -640,6 +640,15 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/integraciones/adapters/driving/ai-provider-actions')
       ).getAiProviderConnectionAction(),
   },
+  {
+    // La lectura es la mas barata; la accion captura el error y devuelve un estado.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-template-actions.ts',
+    nombre: 'listWhatsappTemplatesAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-template-actions')
+      ).listWhatsappTemplatesAction(),
+  },
 ];
 
 /**
