@@ -255,3 +255,147 @@ Para pasar a OK:
 2. H2: que editar una fila pendiente no borre su `phone`, con un test `.int`.
 3. Que el humano decida las desviaciones 1–7 y N1–N4, y que el spec se enmiende con lo que se acepte.
 4. Que T11 y T12 se cierren con el E2E y los `.int` en verde en CI.
+
+## Vuelta 2 (acotada a 7b017082..HEAD; amplía a piezas compartidas: `country-select.tsx`, `text-field.tsx` y `CATALOGO.md`)
+
+Commits: 5574e902 (T13, T14), 15da3fd6 (merge de `origin/dev`; solo se miran `canvas.json` y
+`catalogo.test.ts`), 174ebc6d (H1, H2, H5 en backend), 82b1bd3c (H2 en la UI, H3, N1–N4) y la
+enmienda del spec 944d9e5e (D14–D21). Grafo: no consultado; Grep/Read sobre el worktree.
+
+### Verificación ejecutada (salida real)
+- `pnpm run typecheck` → `tsc --noEmit` sin errores.
+- `eslint` sobre los 9 archivos de producción y test tocados → exit 0, sin salida.
+- `vitest run` de `catalogo`, `scope`, `customer-phone`, `legacy-phone-prisma`,
+  `legacy-phone-backfill`, `tests/ui/clientes`, `text-field-extension`, `country-select-pinned` y
+  `formularios-paridad` → `Test Files 10 passed`, `Tests 255 passed`.
+- `vitest related --run --project ui --project node` sobre los 7 archivos de producción tocados
+  (incluidos `country-select.tsx` y `text-field.tsx`, que arrastran `company-edit-sheet` y los
+  16 usos de `TextField`) → `Test Files 403 passed (403)`, `Tests 6878 passed | 1 skipped`.
+- `vitest run tests/guards` → `Test Files 73 passed`, `Tests 1011 passed | 14 skipped`.
+- `git merge-tree HEAD origin/dev` → limpio.
+- Los `.int` y el E2E siguen sin correr (no hay base): pendiente conocido.
+
+### Checklist
+- [x] **H1 cerrado.** `clientes-telefono.spec.ts` está en `E2E_PERMITIDOS`, con nota fechada.
+  `scope.test.ts` en verde.
+- [x] **H2 cerrado en el código.** El segundo `UPDATE` de `updateKeepingLegacyPhone` tiene
+  `phoneIssue: null, OR: [{ phone: null }, { phoneE164: { not: null } }]` más `deletedAt` y el
+  ámbito. Se vacía solo con `phone_issue IS NULL AND (phone IS NULL OR phone_e164 IS NOT NULL)`.
+  Revisado caso por caso:
+  - fila con aviso: se conserva;
+  - pendiente (`phone`, sin `e164` ni aviso): se conserva;
+  - convertida: se vacía;
+  - sin teléfono: se vacía (no-op).
+
+  El primer `UPDATE` sigue bloqueando la fila, así que el criterio de D21 se mantiene.
+  `.int` «R34 — editar una fila pendiente de relleno…» escrito, sin correr. La UI pinta la variante
+  `legacy` en la lista y la ayuda «Antes: …» en el formulario, con tests.
+- [x] **H3 cerrado.** Hay 3 casos `CountrySelect · errorId` en `country-select-pinned.test.tsx`.
+- [x] **H4 cerrado.** La lista muestra el `phone` de la fila pendiente en gris y mono.
+- [x] **H5 cerrado.** `summarize(written)` solo cuenta los `count === 1`. Tiene un test unitario
+  nuevo con `count` 0.
+- [x] **H6 cerrado.**
+  - Merge resuelto. `canvas.json` es JSON válido y conserva las entradas de dev (QC-288 y otras) y
+    la de `TelefonoCliente.dc.html` (una vez en `boards` y otra en `order`). No se solapa con
+    ningún tablero de la página «proveedores».
+  - `catalogo.test.ts` en 106 (103 de dev más 3 códigos de QC-236), en verde.
+  - Hoy mergea limpio con `origin/dev`.
+- [x] **H7 cerrado.** El spec nombra `20261019130000` en design § 2.4 y en tasks T1 y «Archivos
+  esperados».
+- [x] **D14–D21 y R35 frente al código:**
+  - D14: formato de la librería; el placeholder del número también lo es.
+  - D15, D16 y D17 (más T14): tests unitarios del filtro de empresas activas y `.int` escrito.
+  - D18: sin tarjeta.
+  - D19 y R35: `initialCountry`; con aviso sin país conserva el suyo, sin teléfono va el de la
+    empresa, y R4 y R31 siguen verdes.
+  - D20: `errorId`.
+  - D21: dos `UPDATE`.
+
+  Excepción: el arreglo de H2 (hallazgo V2-H1).
+- [x] **N1–N4 según el tablero.**
+  - N1: país `max-lg:h-12`, 48 px como el número.
+  - N2: placeholder con el ejemplo de móvil del país.
+  - N3: entrada `motion-safe:animate-in fade-in slide-in-from-top-1` con `--dur-fast` y
+    `--ease-enter`; `tw-animate-css` ya está en `package.json` y en `globals.css`.
+  - N4: los dos errores van bajo toda la fila, con icono y `role="alert"`; el número queda
+    enlazado por `errorId`.
+- [x] **Piezas compartidas.**
+  - `CountrySelect.triggerClassName` se añade con `cn` y no cambia nada si se omite.
+  - `TextField.placeholder` y `errorOutside` (por defecto `false`): con `errorOutside`, el
+    `input` conserva `aria-invalid` y `aria-describedby={errorId}`.
+  - `TextField` no tenía rest props, así que ningún uso de fuera podía pasar ya `placeholder`.
+  - El único otro uso de `CountrySelect` es `company-edit-sheet.tsx`: no pasa las props nuevas y
+    sus tests están en verde.
+  - `CATALOGO.md` tiene las tres props nuevas, en las filas de `CountrySelect` y `TextField`, con
+    «sin ellas no cambia nada».
+  - Ninguna es un cambio visual por defecto: la regla 11 no aplica.
+- [x] **`libphonenumber-js/mobile/examples`.**
+  - Lo importa `app/(private)/clientes/components/customer-phone-field.tsx`, no el dominio:
+    `PURE_PACKAGES` y `guard-arquitectura-modulos` no aplican, y las guardias están en verde.
+  - Es un subpath del paquete aprobado: no hay dependencia nueva ni cambia `package.json`.
+  - `getExampleNumber` sale del punto de entrada `min`, pero `country-options.ts` ya cargaba ese
+    bundle.
+  - Comprobado en los 245 países: el `formatNational()` del ejemplo es idéntico con `min` y con
+    `max`, y ninguno falta.
+- [x] **Instantáneas de `formularios-paridad` (5).**
+  - 1 de alta: solo añade `max-lg:h-12` al disparador.
+  - 4 de edición: `max-lg:h-12`, `aria-describedby="<id>-help"` en el grupo y el párrafo «Antes:
+    3001234567. Escribe un número…».
+  - Las causa que el cliente de prueba tiene `phone` sin `phoneE164` (fila pendiente). El cambio
+    es el esperado y no se ha colado ningún otro.
+- [x] **Comentarios.** Ninguna línea añadida en `app/`, `lib/` o `components/` cita `R<n>`, `D<n>`,
+  `QC-<n>` ni `design.md`. Se quitó el comentario que citaba R31. Hay un matiz menor en V2-m1.
+- [ ] **Tasks.** T13 y T14 están `[x]`. T11 y T12 siguen `[ ]`: es el pendiente conocido (E2E y
+  `.int` en CI).
+
+### Hallazgos
+
+**V2-H1 · BLOQUEANTE: el spec no recoge el arreglo de H2, y el código contradice R10 tal como
+está escrito.**
+
+Qué dice hoy el spec y qué hace el código:
+- **R10:** «La única excepción es la edición de un cliente migrado con `phone_issue` (R34)». El
+  adaptador tiene ahora una segunda excepción: la fila pendiente conserva `phone`.
+- **`design.md § 4.5`** (conservar el teléfono antiguo) describe el segundo `UPDATE` con solo
+  `phone_issue IS NULL`.
+- **`design.md § 3.3`** sigue diciendo que «tras el despliegue, ningún guardado deja una fila en
+  ese estado».
+- **`design.md § 4.1` y `§ 8.4`** no tienen la variante `{ kind: 'legacy' }` de
+  `describeCustomerPhone` ni su celda en la lista.
+- **`design.md § 8.1`** no tiene la ayuda del formulario para la fila pendiente. Su texto («Antes:
+  <phone>. Escribe un número para reemplazarlo; si lo dejas vacío, se conserva.») es nuevo, no está
+  en el tablero y nadie lo ha aprobado.
+- **Tests:** los casos nuevos se llaman `R34 —`, `R35 —` y `R29 —`, pero ninguno de esos
+  requisitos describe la fila pendiente. La trazabilidad apunta a requisitos que no lo dicen.
+
+No se reabre ninguna decisión: el comportamiento es el correcto y el que pedía H2. Lo que falta es
+que esté especificado. Falta:
+- una enmienda del spec (`spec_author`) que añada la fila pendiente como excepción en R10/R34 o
+  en un requisito nuevo, y su presentación en lista y formulario, con su D;
+- que el humano apruebe el texto de la ayuda;
+- renombrar los casos de test al requisito que corresponda.
+
+**V2-m1 · menor: comentario con historia en producción.**
+`customer-phone-field.tsx:120` dice «… como el alta (humano, 2026-10-19)». No cita `R`, `D` ni
+`QC`, pero quién lo decidió y cuándo es historia que vive en `specs/` (`docs/conventions.md >
+Comentarios`). Basta con quitar el paréntesis.
+
+**V2-m2 · menor: el subpath `libphonenumber-js/mobile/examples` no está documentado.**
+- `design.md § 11` solo habla de `/max` y su coste de bundle.
+- La fila de `docs/dependencias.md` no nombra los ejemplos.
+- No es una dependencia nueva, pero conviene una línea con el uso (placeholder) y el coste.
+
+**V2-m3 · menor: rango de la enmienda.** La cabecera de `requirements.md` (l. 4 y l. 260) y la de
+`tasks.md` (l. 14) dicen «D14–D20», y D21 existe.
+
+### Veredicto
+
+**RECHAZADO**: 1 bloqueante (V2-H1, solo de spec) y 3 menores (V2-m1–m3). H1–H7 de la vuelta 1
+están cerrados en el código, verdes y sin regresiones en las piezas compartidas.
+
+Para pasar a OK:
+1. Enmendar el spec con la fila pendiente (R10/R34 o un R nuevo, y design § 3.3, § 4.1, § 4.5,
+   § 8.1 y § 8.4), con el texto de la ayuda aprobado por el humano.
+2. Renombrar los casos de test al requisito que corresponda.
+
+Siguen pendientes, fuera de esta vuelta, T11 y T12 con los `.int` y el E2E en verde en CI.
