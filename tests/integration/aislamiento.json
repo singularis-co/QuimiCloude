@@ -687,6 +687,11 @@
       "desde": "2026-10-20"
     },
     {
+      "archivo": "integraciones/whatsapp-template-flow.int.test.ts",
+      "motivo": "QC-242 T20: el recorrido de plantillas por la fachada 'integraciones' (crear, eliminar, recibir el webhook y resincronizar) y por el 'POST' de la ruta del webhook; todos escriben con el cliente Prisma GLOBAL y la ruta abre su PROPIA 'prisma.$transaction', asi que una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa con el anadido 'integraciones', usuario y conexion) y 'afterAll' borra plantillas -> mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda nada y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
       "archivo": "recetas/step-evidence-flag.int.test.ts",
       "motivo": "QC-214 T1: ejercita `createRecipe`, `createRecipeVersion`, `replaceAliveRecipe` y `findAliveRecipeById` de `recipe-prisma.ts` y `findRecipeExecutionContentById` / `findRecipePackingStepsById` de `recipe-catalog-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria. Una empresa efimera (randomUUID) nace en `beforeAll` y muere en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-13"

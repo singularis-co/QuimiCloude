@@ -144,7 +144,7 @@
 
 ## Bloque F — Recorrido y cierre
 
-- [ ] **T20 — Recorrido de integración** (criterios de aceptación de la ficha). Depende de: T16–T18
+- [x] **T20 — Recorrido de integración** (criterios de aceptación de la ficha). Depende de: T16–T18
   - `tests/integration/integraciones/whatsapp-template-flow.int.test.ts` (§14.1), entrada en
     `aislamiento.json`.
   - **Hecho:** crear ⇒ `PENDING`; webhook `APPROVED`/`REJECTED`/categoría; id desconocido ⇒
