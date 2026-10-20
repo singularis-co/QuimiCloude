@@ -1554,7 +1554,7 @@ Ninguna (R52). `jsonb_path_exists` es de Postgres 12+, ya en uso por Supabase. N
 
 ## 19. Enmienda 2 — 2026-10-20 (tarde): las constantes las define el front (R87–R96)
 
-Decisiones F1–F4 y propuestas [P19]–[P22] en `requirements.md > Enmienda 2`.
+Decisiones F1–F4 y P19–P22 (aprobadas el 2026-10-20) en `requirements.md > Enmienda 2`.
 
 ### 19.1 Lo que ya existe (sin commit en el worktree, hecho sobre §18)
 

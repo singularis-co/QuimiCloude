@@ -12,8 +12,8 @@
 >
 > **Enmienda 2 — 2026-10-20 (tarde), las constantes las define el front.** Rango nuevo: **R87–R96** y
 > **T36–T40**. Reemplaza R53, R55, R56, R60 y R66; cambia R67, R74, R75 y R81 (cada uno lleva su
-> marca); reemplaza P10 y retira P11. Decisiones F1–F4 cerradas; propuestas **[P19]–[P22]**
-> pendientes.
+> marca); reemplaza P10 y retira P11. Decisiones F1–F4 cerradas; **[P19]–[P22]** aprobadas por el
+> humano el 2026-10-20 (en la tabla de la Enmienda 2).
 >
 > **Alcance** (ficha de Jira QC-242, copiada sin cambios de fondo). El Administrador puede crear
 > plantillas de mensaje en Meta desde la app, ver su estado de aprobación y eliminarlas. La app guarda
@@ -557,6 +557,10 @@ cambia en cada una está en `tasks.md > Enmienda 2`.
 | F2 | **Al relacionar un `{{n}}`, el back acepta cualquier clave con formato válido**: si coincide con una variable propia de la empresa, es una relación a esa propia; si no, se trata como constante del front. Con todas sus variables con clave, la plantilla queda «relacionada». | R91, R93 |
 | F3 | **Al enviar** (QC-245, QC-247): el front manda ya resueltos los valores de las constantes; el back completa las variables propias con su valor guardado. | (frontera: `design.md > 19.6`) |
 | F4 | **Formato**: las constantes llevan punto, `entidad.campo` (`cliente.nombre`, `pedido.numero`); las propias no admiten punto, así que nunca chocan. Reemplaza P10. | R88, R89 |
+| P19 (2026-10-20) | Una clave sin punto que no es una variable propia de la empresa se rechaza: clave desconocida al crear y `whatsapp_variable_key_not_found` al relacionar. Aprobado por el humano. | R91, R93 |
+| P20 (2026-10-20) | La petición de crear trae la etiqueta de cada constante usada (`constantLabels`); el back la usa como ejemplo para Meta sin guardarla, y si falta es un error en ese campo. Aprobado por el humano. | R92 |
+| P21 (2026-10-20) | Una plantilla con variables con nombre (`{{first_name}}`) queda siempre «sin relacionar» y nunca se habilita, en el dominio y en el relleno de la migración. Aprobado por el humano. | R95 |
+| P22 (2026-10-20) | `contentOf` acepta el `example` del botón URL como texto o como lista (con lista, el primero). Aprobado por el humano. | R96 |
 
 **Ejemplo canónico, corregido (sustituye al de E16).** La pantalla escribe `Hola {{cliente.nombre}}`.
 A Meta se le envía `Hola {{1}}`. La plantilla guarda `body.1 = cliente.nombre` (constante: el back no
@@ -622,27 +626,10 @@ datos de Meta y de la plataforma, que no cambian la propuesta aprobada:
 ### De la enmienda 2026-10-20
 
 El humano aprobó la enmienda el 2026-10-20 («aprobado»): P10, P11, P13, P14, P16 y P18 pasan a
-«Decisiones cerradas» de la enmienda; P12, P15 y P17 se retiraron antes (E14, E15). Queda abierto:
+«Decisiones cerradas» de la enmienda; P12, P15 y P17 se retiraron antes (E14, E15). La enmienda 2 se
+aprobó el mismo día con P19–P22 como se propusieron (tabla de la Enmienda 2). No queda ninguna
+propuesta abierta; solo el riesgo de abajo.
 
-- **Enmienda 2 (propuestas del spec, pendientes de aprobación):**
-  - **[P19] Clave con forma propia que no existe en la empresa** (p. ej. `{{nombre}}` sin variable
-    propia `nombre`). F2 dice «si no coincide con una propia, es constante», pero F4 dice que las
-    constantes llevan punto. Propuesta: se rechaza (clave desconocida al crear,
-    `whatsapp_variable_key_not_found` al relacionar), porque sin punto no puede ser una constante.
-    Alternativa: aceptarla como constante, y entonces las constantes también podrían ir sin punto y F4
-    dejaría de garantizar que no chocan.
-  - **[P20] Etiqueta de una constante al crear.** E15 manda la etiqueta como ejemplo a Meta, pero el
-    back ya no conoce las constantes (F1). Propuesta: la petición de crear trae
-    `constantLabels: { "<clave>": "<etiqueta>" }` con la etiqueta de cada constante usada, y el back la
-    usa como ejemplo sin guardarla. Alternativa: mandar la clave misma (`cliente.nombre`) como ejemplo.
-  - **[P21] Plantilla de Meta con variables con nombre** (`{{first_name}}`). Hoy el dominio no ve
-    huecos y la da por «relacionada», y el relleno SQL la deja «sin relacionar»: no coinciden.
-    Propuesta: no relacionable, siempre «sin relacionar» y nunca habilitada (R95), igual que el relleno.
-    Las variables `NAMED` están fuera de alcance de la ficha.
-  - **[P22] `example` de un botón URL como texto en el `GET`.** El contraste de T26 salió sin bloqueo,
-    salvo que Meta puede devolver ese `example` como texto y no como lista. Propuesta: `contentOf`
-    acepta los dos y toma el primer elemento si es lista (R96); así `componentsChanged` no ve un cambio
-    donde solo cambia la forma.
 - **[P11]** Retirada por F1. Los dos datos que tenía abiertos (`nombre` y `pedido_numero`) los decide
   el front. Texto anterior, para la historia:
 - **[P11] Dos datos que el spec no propuso** (los dejó como pregunta, no como propuesta; la aprobación

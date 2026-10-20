@@ -280,8 +280,7 @@
 
 > Decisiones F1–F4 en `requirements.md > Enmienda 2`; diseño en `design.md > 19`. T22–T25 están
 > implementadas **sin commit** sobre la versión anterior: T36–T38 las corrigen encima, sin rehacerlas
-> desde cero. Las propuestas [P19]–[P22] van con esta enmienda a aprobación; si el humano cambia
-> alguna, cambia la task que la implementa.
+> desde cero. [P19]–[P22] aprobadas por el humano el 2026-10-20 como se propusieron.
 
 - [ ] **T36 — Corregir T22** (R88, R84). Depende de: —
   - Migración `20261020180000_whatsapp_variable_keys`: `CHECK whatsapp_template_variables_system_key_format`
