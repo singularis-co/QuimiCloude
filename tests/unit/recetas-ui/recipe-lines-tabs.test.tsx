@@ -44,9 +44,16 @@ function lineValue(key: string, percentage: string): RecipeLineFormValue {
   return { key, productId: `product-${key}`, productName: `Producto ${key}`, percentage, productUnitId: null };
 }
 
-function Harness({ initialLines = [] as readonly RecipeLineFormValue[] }) {
+function toolValue(key: string): RecipeToolFormValue {
+  return { key, productId: `machine-${key}`, productName: `Herramienta ${key}`, quantity: '1' };
+}
+
+function Harness({
+  initialLines = [] as readonly RecipeLineFormValue[],
+  initialTools = [] as readonly RecipeToolFormValue[],
+}) {
   const [lines, setLines] = useState(initialLines);
-  const [tools, setTools] = useState<readonly RecipeToolFormValue[]>([]);
+  const [tools, setTools] = useState<readonly RecipeToolFormValue[]>(initialTools);
   return (
     <RecipeLinesField
       lines={lines}
@@ -135,6 +142,77 @@ describe('tabs de líneas: ingredientes y máquinas', () => {
     expect(screen.getByTestId('recipe-lines-sum')).toHaveTextContent(
       'Suma: 60,00 % — faltan 40,00 %',
     );
+  });
+});
+
+describe('pestañas con contador', () => {
+  it('R12: cada pestaña pinta su cifra junto a la etiqueta y conserva su data-testid', () => {
+    render(
+      <Harness
+        initialLines={[lineValue('a', '30'), lineValue('b', '20'), lineValue('c', '10')]}
+        initialTools={[toolValue('x')]}
+      />,
+    );
+
+    const ingredients = screen.getByTestId('recipe-lines-tab-ingredients');
+    const machines = screen.getByTestId('recipe-lines-tab-machines');
+    expect(ingredients).toHaveAttribute('role', 'tab');
+    expect(machines).toHaveAttribute('role', 'tab');
+
+    const ingredientsCount = screen.getByTestId('recipe-lines-tab-ingredients-count');
+    const machinesCount = screen.getByTestId('recipe-lines-tab-machines-count');
+    expect(ingredients).toContainElement(ingredientsCount);
+    expect(machines).toContainElement(machinesCount);
+    expect(ingredientsCount).toHaveTextContent(/^3$/);
+    expect(machinesCount).toHaveTextContent(/^1$/);
+    expect(ingredientsCount).toHaveClass('font-mono', 'tabular-nums');
+
+    expect(screen.getByRole('tab', { name: 'Ingredientes 3' })).toBe(ingredients);
+    expect(screen.getByRole('tab', { name: 'Herramientas 1' })).toBe(machines);
+  });
+
+  it('R12: la fila en blanco de arranque no cuenta', async () => {
+    const user = setupUser();
+    render(<Harness />);
+
+    expect(screen.getByTestId('recipe-line-product-0')).toBeInTheDocument();
+    expect(screen.getByTestId('recipe-lines-tab-ingredients-count')).toHaveTextContent(/^0$/);
+
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    expect(screen.getByTestId('recipe-machine-product-0')).toBeInTheDocument();
+    expect(screen.getByTestId('recipe-lines-tab-machines-count')).toHaveTextContent(/^0$/);
+  });
+
+  it('R12: la cifra cambia al añadir o quitar líneas', async () => {
+    const user = setupUser();
+    render(<Harness initialLines={[lineValue('a', '30'), lineValue('b', '20')]} />);
+
+    const ingredientsCount = screen.getByTestId('recipe-lines-tab-ingredients-count');
+    expect(ingredientsCount).toHaveTextContent(/^2$/);
+    await user.click(screen.getByTestId('recipe-line-add-1'));
+    expect(ingredientsCount).toHaveTextContent(/^3$/);
+    await user.click(screen.getByTestId('recipe-line-remove-0'));
+    expect(ingredientsCount).toHaveTextContent(/^2$/);
+
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    const machinesCount = screen.getByTestId('recipe-lines-tab-machines-count');
+    await user.click(screen.getByTestId('recipe-machine-product-0'));
+    await user.click(await screen.findByRole('option', { name: 'Agitador industrial' }));
+    expect(machinesCount).toHaveTextContent(/^1$/);
+    await user.click(screen.getByTestId('recipe-machine-add-0'));
+    expect(machinesCount).toHaveTextContent(/^2$/);
+    await user.click(screen.getByTestId('recipe-machine-remove-1'));
+    expect(machinesCount).toHaveTextContent(/^1$/);
+  });
+
+  it('R12: la pastilla activa es TabsIndicator dentro de una lista con relative', () => {
+    render(<Harness />);
+
+    const list = screen.getByRole('tablist', { name: 'Líneas de la receta por tipo' });
+    expect(list).toHaveClass('relative');
+    const indicator = list.querySelector('[data-slot="tabs-indicator"]');
+    expect(indicator).not.toBeNull();
+    expect(list.firstElementChild).toBe(indicator);
   });
 });
 

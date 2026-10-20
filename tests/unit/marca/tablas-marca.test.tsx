@@ -251,8 +251,9 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   },
   {
     archivo: 'recipe-columns.tsx',
-    construir: async () => buildRecipeColumns({ rowActions: sinAcciones }),
-    esperadas: ['Creado', 'Actualizado'],
+    construir: async () => buildRecipeColumns({ menu: sinMenu }),
+    // El tablero Fórmulas pinta también «Pasos» en Mono, alineado al final.
+    esperadas: ['Pasos', 'Creado', 'Actualizado'],
   },
   {
     archivo: 'catalog-columns.tsx',

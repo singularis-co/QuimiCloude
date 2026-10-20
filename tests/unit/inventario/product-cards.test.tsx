@@ -13,8 +13,8 @@ import {
   PRODUCT_TABLE_SCOPE_CLASS,
   PRODUCT_TABLE_TEXTS,
   ProductTable,
-  cardFieldLabel,
 } from '@/app/(private)/inventario/components';
+import { cardFieldLabel } from '@/components/shared/card-field-label';
 import type { DataTableParams } from '@/components/shared/data-table';
 import {
   PRODUCT_TYPES,

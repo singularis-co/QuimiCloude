@@ -5,7 +5,6 @@
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
 export { AdjustBatchDialog, type AdjustBatchDialogProps } from './adjust-batch-dialog';
 export { BatchHistory, movementKindLabel } from './batch-history';
-export { cardFieldLabel, withCardFieldLabel } from './card-field-label';
 export { DeleteProductDialog } from './delete-product-dialog';
 export {
   DIRECT_DELIVERY_OPEN_TESTID,
