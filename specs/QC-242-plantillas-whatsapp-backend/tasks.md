@@ -82,7 +82,7 @@
 
 ## Bloque D — Casos de uso (tras el bloque C)
 
-- [ ] **T10 — Conexión utilizable, crear, eliminar, listar** (R5, R14–R21, R42–R46). Depende de: T7,
+- [x] **T10 — Conexión utilizable, crear, eliminar, listar** (R5, R14–R21, R42–R46). Depende de: T7,
   T4, T6
   - `domain/template-connection.ts`, `create-whatsapp-template.ts`, `delete-whatsapp-template.ts`,
     `list-whatsapp-templates.ts` (§4.1, §4.4–4.6).
@@ -90,7 +90,7 @@
     `list-whatsapp-templates.test.ts`.
   - **Hecho:** casos de §14.1; sin permiso, ningún puerto llamado.
 
-- [ ] **T11 — Sincronizar: núcleo, manual y reintento** (R22–R28, R38). Depende de: T5, T7, T10
+- [x] **T11 — Sincronizar: núcleo, manual y reintento** (R22–R28, R38). Depende de: T5, T7, T10
   - `domain/sync-whatsapp-templates.ts` (§4.2) y `sync-whatsapp-templates.test.ts`.
   - **Hecho:** una página fallida ⇒ `applySync` no se llama; `createTemplate`/`deleteTemplate`
     nunca llamados; el reintento no lanza.

@@ -186,3 +186,67 @@ vitest run guard   -> Test Files 83 passed (83); Tests 1161 passed | 21 skipped
 .int.test.ts       -> no corridos (sin base en el worktree); los corre CI
 ```
 Veredicto: T7–T9 hechos; unit y guardias verdes, integración pendiente de CI.
+
+## Tanda 4 — T10, T11 (backend_dev)
+
+Archivos:
+- nuevos en `lib/modules/integraciones/domain/`: `template-connection.ts` (`requireTemplateConnection`,
+  `templateFailureSecrets`), `create-whatsapp-template.ts`, `delete-whatsapp-template.ts`,
+  `list-whatsapp-templates.ts` (`createListWhatsappTemplates`, `createGetWhatsappTemplate`,
+  `toWhatsappTemplateView`, `isWhatsappTemplateId`), `sync-whatsapp-templates.ts` (`syncConnectionTemplates`,
+  `createSyncWhatsappTemplates`, `createResyncWhatsappTemplates`, `MAX_TEMPLATE_PAGES = 20`).
+- tests nuevos en `tests/unit/integraciones/whatsapp/templates/`: `create-whatsapp-template.test.ts`,
+  `delete-whatsapp-template.test.ts`, `list-whatsapp-templates.test.ts`, `sync-whatsapp-templates.test.ts` y el
+  montaje común `template-use-case-setup.ts` (dobles que explotan si los llaman, borrador válido).
+- `tests/unit/integraciones/module-shape.test.ts`: los 5 archivos nuevos en la lista.
+- `index.ts` y `lib/composition` sin tocar (T15); typecheck no lo exige.
+
+Decisiones / desvíos (abiertos para revisión):
+- `syncConnectionTemplates` recibe `cipher` en `deps` además de `graph`, `templates` y `now` (§4.2 no lo lista): §4.1.3
+  pide tachar también el App Secret del texto de Meta leyéndolo con `readStoredSecret` solo si hay fallo. T12 tiene que
+  pasarlo (ya lo tiene). Si el App Secret no se puede leer, se tacha solo el token (sin escribir en la conexión).
+- `toWhatsappTemplateView` vive en `list-whatsapp-templates.ts` (como dice §4.6); en `whatsapp-template.ts` crearía un
+  ciclo de imports (`components` → `draft` → `whatsapp-template`).
+- Crear: una categoría de Meta ausente o desconocida deja la pedida (`categoryOf(res.category) ?? draft.category`).
+  El diagnóstico de `ValidationError` lleva `campo:código` de cada problema.
+- Eliminar: si `markDeleted` da `false` tras el `ok` de Meta (otra petición la marcó en medio) se devuelve `{ id }`
+  igual: Meta ya la borró. El spec no lo dice.
+- Consultar exige conexión viva (habilitada o no), igual que listar; leer no toca Meta.
+- Resumen de la sincronización: `deleted` sale del plan. El adaptador no borra lo creado desde `startedAt` (R24) y
+  `applySync` devuelve `void`, así que en esa carrera el conteo puede pasar en 1 al real. Abierto (cambiaría el puerto).
+- Reintento: no lanza nunca; cualquier excepción (directorio, base, Graph, secreto) vuelve como
+  `{ kind: 'failed', code }` con el código del catálogo o `unexpected`, nunca el mensaje.
+
+R → test (todos en `templates/`):
+- R5: create `R5: %s rechaza…` (3), delete `R5: …` (3), list `R5: listar…` (3) y `R5: consultar…` (2), sync `R5: …` (3);
+  dobles que explotan: ningún puerto llamado
+- R14: create `R14: un borrador invalido…`, `R14 R6: aplica el validador…`
+- R15: create (3), delete (2), sync `sincronizar a mano > R15` (2)
+- R16: create `R16: manda a Meta…`, `R16: nace PENDING…`, `R16: una conexion %s sirve…` (2)
+- R17: create `R17: …` (2)
+- R18: create `R18: …` (2)
+- R19: create `R19: %s responde su codigo…` (4, una por fila de §4.9)
+- R20: create, delete y sync `R20: un token ilegible…`; sync `R38 R20`
+- R21: create `R21: …` (2), delete `R21: …`, sync `R22 R21: …`
+- R22: sync `R22 R23 R25: lee las tres paginas…`, `R22: si falla la segunda…`, `R22: …tope de paginas`, `R22: …escritura`
+- R23, R25: sync `R22 R23 R25: …` (el resto, en `template-sync-plan.test.ts` y la integración de T9)
+- R24: sync `R24: marca eliminadas…`
+- R26: sync `R26: salta las que no se pueden interpretar…`
+- R27: sync `R27: nunca llama a crear ni a borrar…` (espía + `@ts-expect-error` sobre el tipo)
+- R28: sync `R28: sincroniza la conexion viva…`
+- R38: sync `describe reintento del webhook` (8: synced, 3 skipped, no UUID, failed de Meta, secreto, unexpected, directorio)
+- R42: delete `R42: pide a Meta borrar por hsm_id…`
+- R43: delete `R43: un id que no es UUID…`, `R43: si %s…` (4), `R43: si Meta %s…` (2)
+- R44: list `R44: …` (7)
+- R45: list `R45: …` (7)
+- R46: list `R46: …` (3)
+
+Salida:
+```
+pnpm run typecheck -> tsc --noEmit sin errores
+pnpm run lint      -> 0 errors, 10 warnings (preexistentes)
+vitest run tests/unit/integraciones/whatsapp/templates/ tests/unit/integraciones/module-shape.test.ts
+                   -> Test Files 12 passed (12); Tests 289 passed | 1 skipped (290)
+vitest run guard   -> Test Files 83 passed (83); Tests 1161 passed | 21 skipped (1182)
+```
+Veredicto: T10 y T11 hechos y verdes; sin cablear en composición ni contrato (T15).
