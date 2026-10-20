@@ -570,3 +570,13 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   `components/recipe-form.tsx`) y las de las páginas de versión pintan el «Volver» como enlace de
   texto, no como `ArrowLink` con flecha (D2 del humano). Ningún requisito de QC-264 lo cubría.
 - **Dueño:** sin asignar.
+
+### D71 — E2E `pasos-de-envasado` R32 rojo por el cronómetro del botón (dev, cb39a83d)
+- **Origen:** tanda 9 de QC-264 (2026-10-19); review v1 m4. No lo causa QC-264: el reviewer lo
+  comprobó con `git merge-base` (cb39a83d es ancestro del merge 6fcbafe6).
+- **Qué falta:** `e2e/pasos-de-envasado.spec.ts:435` espera el botón «Terminar» y recibe
+  «Terminar00:01». El cronómetro en el botón entró con cb39a83d («materiales plegables y cronómetro en
+  el botón Siguiente») sin ajustar este E2E. Hay que decidir si cambia el E2E o el nombre accesible
+  del botón. El archivo también lo toca QC-291 (Rediseño de la pantalla del operario). Frena el PR a
+  producción, donde corre el E2E.
+- **Dueño:** sin asignar (candidato: QC-291).
