@@ -13,6 +13,7 @@ import {
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { FormSheet } from '@/components/shared/form-sheet';
 import { Notice } from '@/components/shared/notice';
+import { nextUsernameCandidate } from '@/components/shared/username-from-names';
 import { Sheet } from '@/components/ui/sheet';
 import { useEntitySheet } from '@/hooks/use-entity-sheet';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
@@ -136,6 +137,10 @@ export function CompanyCreateSheet({ open, onOpenChange }: CompanyCreateSheetPro
   const field = state.status === 'error' ? state.field : undefined;
   const message = state.status === 'error' ? state.error.message : '';
   const formError = state.status === 'error' && field === undefined ? state.error : undefined;
+  const usernameSuggestion =
+    state.status === 'error' && state.error.code === 'duplicate_username'
+      ? nextUsernameCandidate(values.adminUsername ?? '')
+      : undefined;
 
   return (
     <Sheet open={open} onOpenChange={changeOpen}>
@@ -185,6 +190,8 @@ export function CompanyCreateSheet({ open, onOpenChange }: CompanyCreateSheetPro
             testIdPrefix={COMPANY_CREATE_ADMIN_PREFIX}
             defaultValues={adminValues(values)}
             errors={adminErrors(field, message)}
+            usernameAutofill
+            usernameSuggestion={usernameSuggestion}
           />
           <Notice tone="info" testId="company-create-mail-notice">
             {COMPANY_MAIL_NOTICE}

@@ -14,6 +14,7 @@ import { FormSheet } from '@/components/shared/form-sheet';
 import { Notice } from '@/components/shared/notice';
 import { SelectField } from '@/components/shared/select-field';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { nextUsernameCandidate } from '@/components/shared/username-from-names';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEntitySheet } from '@/hooks/use-entity-sheet';
@@ -190,6 +191,10 @@ function AdministratorCreateSheet({ companies, open, onOpenChange }: CreateSheet
   }, [state, handleSaved, changeOpen, router]);
 
   const failed = state.status === 'error' ? state : undefined;
+  const usernameSuggestion =
+    failed?.error.code === 'duplicate_username'
+      ? nextUsernameCandidate(failed.values.username ?? '')
+      : undefined;
 
   return (
     <Sheet open={open} onOpenChange={changeOpen}>
@@ -225,6 +230,8 @@ function AdministratorCreateSheet({ companies, open, onOpenChange }: CreateSheet
           testIdPrefix={ADMINISTRATOR_FIELD_PREFIX}
           defaultValues={failed?.values ?? {}}
           errors={personErrors(failed)}
+          usernameAutofill
+          usernameSuggestion={usernameSuggestion}
         />
         <RoleField />
         <Notice tone="info" testId={ADMINISTRATOR_MAIL_NOTICE_TESTID}>

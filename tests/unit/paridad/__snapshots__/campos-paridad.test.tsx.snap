@@ -1025,11 +1025,14 @@ input name="firstNames" type="text" autocomplete="off" required="" value="Ana Ma
 exports[`paridad de campos — texto > R1 R16 R17 — T3 UserTextField no controlado, en la edicion (texto, fecha, correo, telefono) 2`] = `
 "
 div role=generic class="flex flex-col gap-2"
-  label class="flex font-medium gap-2 group-data-[disabled=true]:opacity-50 group-data-[disabled=true]:pointer-events-none items-center leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50 select-none text-sm"
+  span role=generic class="font-medium text-sm"
     "Fecha de nacimiento"
-  input data-testid="user-field-birth-date" type="date" class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring h-8 md:text-base min-h-11 min-w-0 outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
+  input data-testid="user-field-birth-date-value" type="hidden"
+  button role=button name="Fecha de nacimiento" aria-expanded="false" aria-haspopup="dialog" aria-labelledby="<id>" data-testid="user-field-birth-date" type="button" class="bg-background border border-input focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring gap-1.5 hover:bg-muted inline-flex items-center min-h-11 min-w-11 outline-none px-2.5 rounded-lg text-sm"
+    svg aria-hidden="true" height="24" width="24" class="lucide lucide-calendar size-4"
+    "1990-04-17"
 controles:
-input name="birthDate" type="date" autocomplete="off" required="" value="1990-04-17"
+input name="birthDate" type="hidden" value="1990-04-17"
 "
 `;
 

@@ -13,6 +13,7 @@ import {
   ADMINISTRATOR_FIELD_NAMES,
   administratorFieldErrorTestId,
   administratorFieldTestId,
+  administratorUsernameSuggestionTestIds,
 } from '@/components/shared/administrator-fields';
 import type { ErrorState } from '@/lib/modules/errores';
 import { DOCUMENT_TYPE_CODES, type AdministratorDetail } from '@/lib/modules/identity';
@@ -264,6 +265,29 @@ describe('rechazos del alta', () => {
     },
   );
 
+  it('el alta propone el nombre de usuario a partir de nombres y apellidos', async () => {
+    const user = await abrirAlta();
+
+    await user.type(campo('firstNames'), 'Paula Andrea');
+    await user.type(campo('lastNames'), 'Gil');
+
+    expect(campo('username')).toHaveValue('paulaag');
+  });
+
+  it('duplicate_username en el alta recomienda el siguiente nombre de usuario y el boton lo aplica', async () => {
+    createAdministratorActionMock.mockResolvedValue(rechazo('duplicate_username', 'Ya existe.'));
+    const user = await abrirAlta();
+    await elegirEmpresa(user, ANDINOS);
+    escribir();
+    await enviar(user, createAdministratorActionMock);
+
+    const ids = administratorUsernameSuggestionTestIds(ADMINISTRATOR_FIELD_PREFIX);
+    await user.click(within(await screen.findByTestId(ids.suggestion)).getByTestId(ids.apply));
+
+    expect(campo('username')).toHaveValue('pgil1');
+    expect(screen.queryByTestId(ids.suggestion)).toBeNull();
+  });
+
   it('R41: company_not_found va a la region de error del panel', async () => {
     createAdministratorActionMock.mockResolvedValue(
       rechazo('company_not_found', 'La empresa no existe.'),
@@ -348,6 +372,22 @@ describe('el panel «Editar administrador»', () => {
     await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith('Administrador actualizado.'));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('la edicion no propone el nombre de usuario ni lo recomienda tras duplicate_username', async () => {
+    updateAdministratorActionMock.mockResolvedValue(rechazo('duplicate_username', 'Ya existe.'));
+    const user = await abrirEdicion();
+
+    await user.type(campo('firstNames'), ' Jose');
+    expect(campo('username')).toHaveValue('dmejia');
+
+    await enviar(user, updateAdministratorActionMock);
+    await screen.findByTestId(administratorFieldErrorTestId(ADMINISTRATOR_FIELD_PREFIX, 'username'));
+    expect(
+      screen.queryByTestId(
+        administratorUsernameSuggestionTestIds(ADMINISTRATOR_FIELD_PREFIX).suggestion,
+      ),
+    ).toBeNull();
   });
 
   it('R41: un duplicado en la edicion va junto a su campo con lo escrito conservado', async () => {

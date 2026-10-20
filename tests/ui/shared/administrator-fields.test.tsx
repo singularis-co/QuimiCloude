@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 
 import {
   ADMINISTRATOR_FIELD_LABELS,
@@ -7,9 +7,12 @@ import {
   administratorFieldErrorTestId,
   administratorFieldName,
   administratorFieldTestId,
+  administratorUsernameSuggestionTestIds,
   type AdministratorFieldName,
 } from '@/components/shared/administrator-fields';
 import { DOCUMENT_TYPE_CODES } from '@/lib/modules/identity';
+
+import { setupUser } from '../../helpers/user-event';
 
 const PREFIJO = 'adm';
 
@@ -189,5 +192,82 @@ describe('AdministratorFields', () => {
       const input = screen.getByTestId(administratorFieldTestId(PREFIJO, campo)) as HTMLInputElement;
       expect(input.labels?.[0]?.textContent, campo).toContain(ADMINISTRATOR_FIELD_LABELS[campo]);
     }
+  });
+});
+
+describe('AdministratorFields: nombre de usuario propuesto en el alta', () => {
+  const campo = (field: AdministratorFieldName) =>
+    screen.getByTestId(administratorFieldTestId(PREFIJO, field));
+
+  it('con `usernameAutofill` lo propone a partir de nombres y apellidos mientras se escribe', async () => {
+    const user = setupUser();
+    montar({ usernameAutofill: true });
+
+    await user.type(campo('firstNames'), 'José Carlos');
+    expect(campo('username')).toHaveValue('josec');
+
+    await user.type(campo('lastNames'), 'Pérez Núñez');
+    expect(campo('username')).toHaveValue('josecpn');
+  });
+
+  it('deja de proponerlo para siempre en cuanto se edita a mano, aunque se vacíe', async () => {
+    const user = setupUser();
+    montar({ usernameAutofill: true });
+
+    await user.type(campo('firstNames'), 'Ana');
+    await user.type(campo('username'), 'x');
+    expect(campo('username')).toHaveValue('anax');
+
+    await user.type(campo('lastNames'), 'Lopez');
+    expect(campo('username')).toHaveValue('anax');
+
+    await user.clear(campo('username'));
+    await user.type(campo('firstNames'), ' Maria');
+    expect(campo('username')).toHaveValue('');
+  });
+
+  it('sin `usernameAutofill` (edición) no lo toca', async () => {
+    const user = setupUser();
+    montar({ defaultValues: VALORES });
+
+    await user.type(campo('firstNames'), ' Jose');
+    expect(campo('username')).toHaveValue(VALORES.username);
+  });
+
+  it('con `usernameAutofill` arranca con los valores de partida y viajan con su nombre de campo', () => {
+    const form = montar({ usernameAutofill: true, namePrefix: 'admin', defaultValues: VALORES });
+    const datos = new FormData(form);
+
+    expect(datos.get('adminFirstNames')).toBe(VALORES.firstNames);
+    expect(datos.get('adminLastNames')).toBe(VALORES.lastNames);
+    expect(datos.get('adminUsername')).toBe(VALORES.username);
+  });
+
+  it('la recomendación se aplica como edición manual y desaparece al aplicarse', async () => {
+    const user = setupUser();
+    const ids = administratorUsernameSuggestionTestIds(PREFIJO);
+    const sugerido = `${VALORES.username}1`;
+    montar({ usernameAutofill: true, defaultValues: VALORES, usernameSuggestion: sugerido });
+
+    const aplicar = within(screen.getByTestId(ids.suggestion)).getByTestId(ids.apply);
+    expect(aplicar).toHaveAttribute('type', 'button');
+    expect(aplicar).toHaveAccessibleName(new RegExp(sugerido));
+    expect(aplicar.className).toContain('min-h-11');
+
+    await user.click(aplicar);
+
+    expect(campo('username')).toHaveValue(sugerido);
+    expect(screen.queryByTestId(ids.suggestion)).toBeNull();
+
+    await user.type(campo('firstNames'), ' Jose');
+    expect(campo('username')).toHaveValue(sugerido);
+  });
+
+  it('sin `usernameSuggestion` no hay recomendación', () => {
+    montar({ usernameAutofill: true });
+
+    expect(
+      screen.queryByTestId(administratorUsernameSuggestionTestIds(PREFIJO).suggestion),
+    ).toBeNull();
   });
 });
