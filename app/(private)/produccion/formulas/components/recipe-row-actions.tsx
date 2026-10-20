@@ -3,65 +3,89 @@
 import { PencilIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 
-import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
+import type { RowActionsSpec } from '@/components/shared/data-table';
+import {
+  RowActionsMenu,
+  type RowActionMenuItem,
+  type RowActionsMenuProps,
+} from '@/components/shared/row-actions-menu';
 import type { RecipeSummary } from '@/lib/modules/recetas';
 import { recipeEditRoute } from '@/lib/shared/routes';
 
 import { DeleteRecipeDialog } from './delete-recipe-dialog';
 
-/**
- * Las dos acciones de fila de una receta, editar y borrar, en el menu de tres puntos de la fila.
- *
- * Editar es un enlace a la pagina de la receta, no abre panel. Borrar abre el dialogo de esta
- * fila, que queda siempre montado y se abre y cierra por estado: asi su salida anima.
- *
- * El disparador nombra a la receta en su nombre accesible; los items dicen solo el verbo.
- */
-
 export const RECIPE_ROW_ACTIONS_TESTID = 'recipe-row-actions';
 export const RECIPE_ACTION_EDIT_TESTID = 'recipe-edit-open';
 export const RECIPE_ACTION_DELETE_TESTID = 'recipe-delete-open';
 
-const EDIT_ACTION_LABEL = 'Editar';
-const DELETE_ACTION_LABEL = 'Borrar';
+export const RECIPE_ROW_ACTION_LABELS = {
+  edit: 'Editar',
+  delete: 'Borrar',
+} as const;
 
 /** Nombre accesible del disparador del menu de la fila. */
 export function recipeRowActionsLabel(name: string): string {
   return `Acciones de ${name}`;
 }
 
-export type RecipeRowActionsProps = {
+/** Editar es un enlace: la única acción que abre algo en la pantalla es borrar. */
+export type RecipeRowAction = 'delete';
+
+// La especificación llega a `RowActionsMenu` por propagación: `data-recipe-id` sale en el
+// disparador de la fila y en el de la tarjeta.
+export type RecipeRowActionsSpec = RowActionsSpec & Pick<RowActionsMenuProps, 'triggerDataAttributes'>;
+
+export type RecipeRowActionsSpecInput = {
   readonly recipe: RecipeSummary;
+  readonly onAction: (action: RecipeRowAction, recipe: RecipeSummary) => void;
 };
 
-export function RecipeRowActions({ recipe }: RecipeRowActionsProps) {
-  const [deleteOpen, setDeleteOpen] = useState(false);
-
+export function recipeRowActionsSpec({
+  recipe,
+  onAction: notify,
+}: RecipeRowActionsSpecInput): RecipeRowActionsSpec {
   const items: RowActionMenuItem[] = [
     {
       key: 'edit',
-      label: EDIT_ACTION_LABEL,
+      label: RECIPE_ROW_ACTION_LABELS.edit,
       icon: PencilIcon,
       href: recipeEditRoute(recipe.id),
       testId: RECIPE_ACTION_EDIT_TESTID,
     },
     {
       key: 'delete',
-      label: DELETE_ACTION_LABEL,
+      label: RECIPE_ROW_ACTION_LABELS.delete,
       icon: Trash2Icon,
-      onSelect: () => setDeleteOpen(true),
+      onSelect: () => notify('delete', recipe),
       destructive: true,
+      separatorBefore: true,
       testId: RECIPE_ACTION_DELETE_TESTID,
     },
   ];
 
+  return {
+    items,
+    triggerLabel: recipeRowActionsLabel(recipe.name),
+    triggerTestId: RECIPE_ROW_ACTIONS_TESTID,
+    triggerDataAttributes: { 'data-recipe-id': recipe.id },
+    title: recipe.name,
+  };
+}
+
+export type RecipeRowActionsProps = {
+  readonly recipe: RecipeSummary;
+} & Pick<RowActionsMenuProps, 'presentation' | 'texts'>;
+
+/** El menú de una receta suelta, con su propio diálogo de borrado. */
+export function RecipeRowActions({ recipe, presentation, texts }: RecipeRowActionsProps) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
   return (
     <>
       <RowActionsMenu
-        items={items}
-        triggerLabel={recipeRowActionsLabel(recipe.name)}
-        triggerTestId={RECIPE_ROW_ACTIONS_TESTID}
-        triggerDataAttributes={{ 'data-recipe-id': recipe.id }}
+        {...recipeRowActionsSpec({ recipe, onAction: () => setDeleteOpen(true) })}
+        presentation={presentation}
+        texts={texts}
       />
       <DeleteRecipeDialog recipe={recipe} open={deleteOpen} onOpenChange={setDeleteOpen} />
     </>

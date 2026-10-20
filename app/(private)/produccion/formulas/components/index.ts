@@ -97,6 +97,7 @@ export {
   RecipeStepsField,
   type RecipeStepsFieldProps,
 } from './recipe-steps-field';
+export { FormFooterBar, type FormFooterBarProps } from './form-footer-bar';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
 export {
   PropagateVersionsDialog,
@@ -108,6 +109,11 @@ export {
   type RecipeVersionFormProps,
 } from './recipe-version-form';
 export { RecipeVersionList, type RecipeVersionListProps } from './recipe-version-list';
+export {
+  RECIPE_VERSION_MARK_TONES,
+  RECIPE_VERSION_UNDER_REVIEW_LABEL,
+  RECIPE_VERSION_UNDER_REVIEW_TONE,
+} from './recipe-version-tones';
 export {
   compareWithOriginal,
   type RemovedLine,

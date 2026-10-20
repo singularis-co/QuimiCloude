@@ -517,6 +517,19 @@ export const E2E_ESPERADOS = [
   // recargar, ya no lo ve. No lee ni afirma nada sobre el identificador de peticion ni sobre
   // `reference`.
   'maestro-modulos.spec.ts',
+  // Alta el 2026-10-19 (QC-264) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en chromium y webkit, `/produccion/formulas` a
+  // 1440 x 900 pinta un unico `h1` con «Subir PDFs» antes de «Nueva formula», las seis columnas en
+  // orden con Pasos, Creado y Actualizado al final de la celda y de su cabecera, y el menu de la
+  // fila con «Editar», separador y «Borrar» destructivo; la ficha pinta «Versiones» a la derecha,
+  // el pie fijo visible sin desplazar, «Por revisar» en una linea, la vista previa centrada de hasta
+  // 920 x 900 con su pie y el dialogo de propagar en plural; Enter en el nombre guarda una sola vez
+  // con «Guardar» fuera del `<form>`; a 820 x 1180, tarjetas y «Versiones» debajo; a 390 x 844,
+  // «Acciones» de 44 px, el menu centrado con items de 48 px, los dialogos de borrar, subir y
+  // propagar enteros, la vista previa a pantalla completa y formulario, version y revision sin
+  // desborde. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'formulas-rediseno.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

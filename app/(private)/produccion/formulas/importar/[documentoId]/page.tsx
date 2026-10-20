@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import type { Metadata } from 'next';
+import { CircleAlertIcon } from 'lucide-react';
 
 import { previewFormulaImportAction } from '@/lib/modules/documentos/adapters/driving/formula-import-actions';
 import type { ErrorState } from '@/lib/modules/errores';
@@ -11,10 +11,11 @@ import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-ac
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
-import { cn } from '@/lib/utils';
 
+import { ArrowLink } from '@/components/shared/arrow-link';
 import { ErrorAlert } from '@/components/shared/error-alert';
-import { buttonVariants } from '@/components/ui/button';
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 
 import { FormulaImportReview } from './components';
 
@@ -23,6 +24,7 @@ export const metadata: Metadata = {
 };
 
 const FIRST_PAGE = 1;
+const BACK_LABEL = 'Volver al listado';
 
 /**
  * Estado de error de esta pantalla: un rechazo de las unidades, de los productos o de la vista
@@ -34,29 +36,49 @@ function ImportErrorNotice({ error }: { readonly error: ErrorState }) {
   return (
     <ErrorAlert
       error={error}
-      className="flex flex-col items-start gap-3 rounded-lg border border-destructive/40 p-4"
+      className="flex flex-col items-center gap-2.5 rounded-xl border border-destructive-border bg-card px-5 py-8 text-center"
       testId="formula-import-error"
+      before={
+        <span
+          aria-hidden="true"
+          className="flex size-11 items-center justify-center rounded-xl bg-destructive-subtle text-destructive-text"
+        >
+          <CircleAlertIcon className="size-5" />
+        </span>
+      }
       renderCatalogued={(catalogued) => (
         <>
           <p className="text-sm text-muted-foreground" data-testid="formula-import-error-message">
             No se pudo abrir esta revisión.
           </p>
-          <p className="text-xs text-muted-foreground" data-testid="formula-import-error-code">
+          <p className="font-mono text-xs text-muted-foreground" data-testid="formula-import-error-code">
             {catalogued.code}
           </p>
         </>
       )}
       after={
-        <Link
-          href={FORMULAS_ROUTE}
-          data-slot="button"
-          className={cn(buttonVariants({ variant: 'outline', touch: true }))}
-          data-testid="formula-import-error-back-link"
-        >
-          Volver al listado
-        </Link>
+        <ArrowLink direction="back" href={FORMULAS_ROUTE} touch testId="formula-import-error-back-link">
+          {BACK_LABEL}
+        </ArrowLink>
       }
     />
+  );
+}
+
+function ImportPageHeading() {
+  return (
+    <div className="flex flex-col gap-3">
+      <ArrowLink
+        direction="back"
+        href={FORMULAS_ROUTE}
+        touch
+        testId="formula-import-back-link"
+        className="self-start"
+      >
+        {BACK_LABEL}
+      </ArrowLink>
+      <PageHeader title="Revisar fórmula" titleTestId="formula-import-title" />
+    </div>
   );
 }
 
@@ -96,33 +118,34 @@ export default async function FormulaImportPage({
 
   if (unitsResult.status === 'error') {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+      <PageShell>
+        <ImportPageHeading />
         <ImportErrorNotice error={unitsResult} />
-      </div>
+      </PageShell>
     );
   }
 
   if (productsResult.status === 'error') {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+      <PageShell>
+        <ImportPageHeading />
         <ImportErrorNotice error={productsResult} />
-      </div>
+      </PageShell>
     );
   }
 
   if (previewResult.status === 'error') {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+      <PageShell>
+        <ImportPageHeading />
         <ImportErrorNotice error={previewResult} />
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <h1 className="text-2xl font-semibold" data-testid="formula-import-title">
-        Revisar fórmula
-      </h1>
+    <PageShell>
+      <ImportPageHeading />
       <FormulaImportReview
         documentFileId={documentoId}
         units={unitsResult.data}
@@ -136,6 +159,6 @@ export default async function FormulaImportPage({
         }}
         preview={previewResult.data}
       />
-    </div>
+    </PageShell>
   );
 }

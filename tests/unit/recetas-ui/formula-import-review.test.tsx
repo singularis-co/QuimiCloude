@@ -449,6 +449,8 @@ describe('el choque de nombre exige elegir antes de confirmar (R17, R21)', () =>
       nameClash: { recipeId: 'receta-existente', recipeName: 'Detergente base' },
     });
 
+    // El aviso es un `Notice` en tono `warning`: se anuncia como `status`, ya no como `alert`.
+    expect(screen.getByTestId('formula-import-clash')).toHaveAttribute('role', 'status');
     expect(screen.getByTestId('formula-import-clash-message')).toHaveTextContent(
       'Ya existe la fórmula «Detergente base». Reemplazarla cambia sus ingredientes, pasos y descripción; los pedidos que la usan no cambian su coste guardado.',
     );

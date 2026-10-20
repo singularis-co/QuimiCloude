@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { withCardFieldLabel } from '@/components/shared/card-field-label';
 import { actionsColumn, type DataTableColumn, type RowActionsSpec } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,6 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
-import { withCardFieldLabel } from './card-field-label';
 import {
   ACTIONS_COLUMN_ID,
   ACTIONS_COLUMN_LABEL,
