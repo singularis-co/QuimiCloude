@@ -200,7 +200,7 @@ export function RecipeStepEditor({
           {evidence === undefined && actions === undefined ? null : (
             // En teléfono el interruptor baja a su propia línea; desde md se alinea a la derecha.
             // `flex-wrap`: a 390 px la columna del paso no cabe interruptor + botones de 44 px, y
-            // sin él las acciones se salían de la ventana (R20); así bajan a otra línea, a la derecha.
+            // sin él las acciones se salían de la ventana; así bajan a otra línea, a la derecha.
             <div
               className="flex w-full flex-wrap items-center gap-1 md:ml-auto md:w-auto"
               data-testid={`${editableTestId}-row-tools`}

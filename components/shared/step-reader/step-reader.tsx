@@ -85,7 +85,7 @@ export type StepReaderProps = {
   /** Cada `id` nuevo lleva al paso `position` (desde 1), aunque el actual esté bloqueado, y avisa
    *  a `onStepChange` si el paso cambia. El `id` con el que se monta no navega. */
   readonly stepRequest?: { readonly position: number; readonly id: number };
-  /** `'inline'` (por defecto) se apila con el resto de la pagina. `'panel'` llena el alto de su
+  /** `'inline'` (por defecto) se apila con el resto de la página. `'panel'` llena el alto de su
    *  contenedor, con cabecera, cuerpo desplazable y pie propios. Solo se lee en `mode="lectura"`. */
   readonly layout?: 'inline' | 'panel';
 };
@@ -428,7 +428,7 @@ export function StepReader({
 
         <div data-testid="step-reader-body" className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <div className="flex max-w-[640px] flex-col gap-3.5">
-            {/* La clave reinicia la animacion de entrada en cada cambio de paso. */}
+            {/* La clave reinicia la animación de entrada en cada cambio de paso. */}
             <div
               key={currentIndex}
               data-testid="step-reader-step"

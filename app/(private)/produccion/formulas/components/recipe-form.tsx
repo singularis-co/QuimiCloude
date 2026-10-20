@@ -482,7 +482,7 @@ export function RecipeForm(props: RecipeFormProps) {
           ) : null}
 
           <Card className={CARD_CLASS}>
-            {/* La imagen manda a la izquierda (3 de 12) y los datos de texto la acompanan (9). */}
+            {/* La imagen manda a la izquierda (3 de 12) y los datos de texto la acompañan (9). */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
               <div className="sm:col-span-3">
                 <ImageField
