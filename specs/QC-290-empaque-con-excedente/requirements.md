@@ -23,9 +23,6 @@ _Pendiente: los escribe spec_author (F1.2)._
 
 ## Preguntas abiertas
 
-- **P1:** caso con una presentación en exceso y otra en falta que aun así supera el total. Por
-  ejemplo: plan 5×1 L + 1×5 L, real 12×1 L + 0×5 L = 12 L. La regla por línea da 7×1 L libres y
-  el total da 2 L. ¿Cuál manda? Lo cierra el humano antes de F1.4.
 - **P2:** texto y tono del aviso informativo. Necesita pase `/design` aprobado
   (`docs/perfil-agentes.md > Pase de diseño para componentes nuevos`) y el humano fija el texto.
 
@@ -45,4 +42,5 @@ _Pendiente: los escribe spec_author (F1.2)._
 | 2026-10-20 | Permiso | Hereda D10 de QC-281: solo el Empacador que comenzó, sin permiso nuevo. |
 | 2026-10-20 | ¿E2E? | Sí (inventario, `docs/checkpoints-proyecto.md > Flujos criticos`). Se amplía `e2e/envases-reales-empaque.spec.ts`. |
 | 2026-10-20 | ¿Dependencias? | Ninguna nueva. |
+| 2026-10-20 | (P1) Caso mixto que supera el total: plan 5×1 L + 1×5 L, real 12×1 L + 0×5 L = 12 L | Lo libre nunca supera lo que excede el pedido (12 − 10 = 2 L), y sale de las líneas que pasaron su plan: 2 envases de 1 L libres. El pedido espera, por línea, envases reales − libres de esa línea (aquí 10×1 L + 0×5 L). Afecta al tope de entrega por presentación de QC-223 D3: el spec lo cubre. |
 | 2026-10-20 | QC-304 | Duplicado de esta ficha: cancelada, decisiones absorbidas aquí. |
