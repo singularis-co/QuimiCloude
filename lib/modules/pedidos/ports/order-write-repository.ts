@@ -38,7 +38,12 @@ export type FinishPackingLine = {
   readonly packagingProductId: string | null;
   /** `null` = todavia sin contar. */
   readonly packedPackages: number | null;
+  /** Envases del conteo real que el pedido no espera; 0 sin contar o sin excedente. */
+  readonly packedSurplusPackages: number;
 };
+
+/** El conteo de una linea con los envases que, de ese conteo, quedan libres en el lote. */
+export type RecordedPackedLine = PackedLineCount & { readonly packedSurplusPackages: number };
 
 /**
  * Puerto de escritura del pedido DENTRO de una transaccion compartida con `inventario`
@@ -154,7 +159,8 @@ export interface OrderWriteRepository {
    *  `UPDATE`. */
   findPresentationLinesForFinish(id: string, scope: OrderScope): Promise<readonly FinishPackingLine[]>;
 
-  /** Escribe el conteo de cada linea sin tocar `packages`. Una linea que no sea de ese pedido y
-   *  esa empresa no se escribe; quien llama ya comprobo los conteos contra las lineas leidas. */
-  recordPackedCounts(id: string, counts: readonly PackedLineCount[], scope: OrderScope): Promise<void>;
+  /** Escribe el conteo y los libres de cada linea sin tocar `packages`. Una linea que no sea de
+   *  ese pedido y esa empresa no se escribe; quien llama ya comprobo los conteos contra las
+   *  lineas leidas. */
+  recordPackedCounts(id: string, counts: readonly RecordedPackedLine[], scope: OrderScope): Promise<void>;
 }

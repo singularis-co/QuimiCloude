@@ -41,7 +41,7 @@
   - Hecho: `grep packed_exceeds_quantity` sin resultados fuera de `specs/` y `progress/`; guardia
     `guard-catalogo-de-errores` verde.
 
-- [ ] **T4 — Terminar con excedente** (backend). Depende de T0, T2, T3. R1–R4, R8–R10, R27.
+- [x] **T4 — Terminar con excedente** (backend). Depende de T0, T2, T3. R1–R4, R8–R10, R27.
   - Puertos y adaptador (design §3): `FinishPackingLine.packedSurplusPackages`,
     `RecordedPackedLine`, `order-prisma.ts` lee y escribe la columna.
   - `order-packing.ts`: `resolveSurplus` sustituye a `assertPackedWithinQuantity`; `RejectedFinish`

@@ -71,8 +71,8 @@ function entradaDeUnCliente(): DeliverOrderInput {
 }
 
 const LINEAS: readonly FinishPackingLine[] = [
-  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null },
-  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null },
+  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
+  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
 ]
 
 /** Pedidos 4 + 10; entregados 4 + 3: a la segunda linea le faltan 7. */
@@ -703,7 +703,7 @@ const GALLON_PRESENTATION = 'f0000000-0000-4000-8000-000000000003'
 /** Las de QC-223 mas el galon: pedidos 5, ninguno entregado. */
 const LINEAS_VARIOS: readonly FinishPackingLine[] = [
   ...LINEAS,
-  { id: SECOND_PENDING_LINE_ID, presentationId: GALLON_PRESENTATION, packages: 5, presentationContent: '4.0000', packagingProductId: null, packedPackages: null },
+  { id: SECOND_PENDING_LINE_ID, presentationId: GALLON_PRESENTATION, packages: 5, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
 ]
 
 type Bloque = DeliverOrderInput['customers'][number]

@@ -659,3 +659,40 @@ describe('QC-281 — finishPacking con el conteo real de envases', () => {
     expect(m.filas).toEqual([]);
   });
 });
+
+describe('finishPacking con excedente: mismo permiso y mismo empacador que hoy', () => {
+  // 12 envases de una linea planificada en 5: el excedente no cambia quien puede terminar.
+  const CON_EXCEDENTE = { orderId: PEDIDO, lines: [{ lineId: uuid('4'), packedPackages: 12, reason: 'conteo_fisico', reasonOther: null }] };
+
+  it('R27: el actor con `empaque.modificar` que empaca el pedido termina y el conteo llega a `pedidos` tal cual', async () => {
+    const m = montar();
+
+    await expect(createFinishPacking(m.deps)(ACTOR, CON_EXCEDENTE)).resolves.toMatchObject({ numberText: '2026-0000007' });
+
+    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA, CON_EXCEDENTE.lines);
+    expect(m.estado.confirmada).toBe(true);
+  });
+
+  it('R27: sin `empaque.modificar` rechaza antes de leer nada ni abrir la transaccion', async () => {
+    const m = montar();
+    const sinPermiso: Actor = { id: ANA, companyId: EMPRESA, permissions: [] };
+
+    await expect(createFinishPacking(m.deps)(sinPermiso, CON_EXCEDENTE)).rejects.toThrow(UnauthorizedError);
+    expect(m.findAliveById).not.toHaveBeenCalled();
+    expect(m.run).not.toHaveBeenCalled();
+  });
+
+  it('R27: si el pedido lo empaca otro rechaza con `OrderPackingTakenError` sin anotar', async () => {
+    const m = montar({ resultado: 'not_packer' });
+
+    await expect(createFinishPacking(m.deps)(ACTOR, CON_EXCEDENTE)).rejects.toBeInstanceOf(OrderPackingTakenError);
+    expect(m.filas).toEqual([]);
+  });
+
+  it('R27: si el pedido ya no esta EN_EMPAQUE rechaza con `OrderNotPackableError` sin anotar', async () => {
+    const m = montar({ resultado: 'not_packable' });
+
+    await expect(createFinishPacking(m.deps)(ACTOR, CON_EXCEDENTE)).rejects.toBeInstanceOf(OrderNotPackableError);
+    expect(m.filas).toEqual([]);
+  });
+});

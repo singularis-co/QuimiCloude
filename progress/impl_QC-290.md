@@ -74,3 +74,62 @@ Grafo (MCP) no consultado en esta tanda: Grep/Read sobre el worktree.
 ### Veredicto
 
 T0, T2 y T3 hechos; T4 parte de `assertPackedConvertible` y de los dos casos «se acepta».
+
+## T4 — Terminar con excedente (backend_dev, 2026-10-20)
+
+Grafo (MCP) no consultado en esta tanda: Grep/Read sobre el worktree.
+
+### Archivos
+
+- `lib/modules/pedidos/ports/order-write-repository.ts`: `FinishPackingLine.packedSurplusPackages`;
+  `RecordedPackedLine = PackedLineCount & { packedSurplusPackages }`; `recordPackedCounts` la recibe.
+- `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`: `findPresentationLinesForFinishOrder`
+  selecciona `packed_surplus_packages`; `recordPackedCountsForOrder` lo escribe en el mismo `UPDATE`.
+- `lib/modules/pedidos/domain/order-packing.ts`: `resolveSurplus` (sobre `packingSurplusByLine`) sustituye a
+  `assertPackedConvertible`; `withSurplus` añade los libres a cada conteo antes de `recordPackedCounts`,
+  en el mismo punto del flujo (antes de `settlePackaging`, dentro de la unidad de trabajo). Cabecera ajustada.
+- Tests:
+  - `tests/unit/pedidos/order-packing.test.ts`: `lineaDe` con `packedSurplusPackages: 0`; el caso R1 de
+    unidades mixtas afirma 1 libre de 200 ml; bloque nuevo «Terminar con excedente: plan 5 x 1 L + 1 x 5 L»;
+    el caso R16 (QC-281) afirma los conteos con `packedSurplusPackages: 0`.
+  - `tests/unit/asignaciones/finish-packing.test.ts`: bloque «finishPacking con excedente» (R27).
+  - `tests/integration/pedidos/order-packed-counts.int.test.ts`: `count` devuelve `RecordedPackedLine`;
+    bloque «envases libres» y CHECK de libres.
+  - `tests/integration/pedidos/finish-with-finished-goods.int.test.ts`: `lineasDe` lee la columna; caso
+    R1 ampliado con el libre; casos nuevos del «Hecho», R4 (rechazo y cubierto).
+  - `tests/unit/pedidos/{deliver-order,get-order-delivery,list-order-deliveries}.test.ts`: solo
+    `packedSurplusPackages: 0` en los fixtures de `FinishPackingLine` para compilar (T5 añade los casos).
+- `effectivePackages`: su docstring («entregar, acondicionar y consultar») sigue siendo cierto mientras la
+  entrega no pase a `orderedPackages`; se ajusta en T5.
+
+### R → test (T4)
+
+| R | Test |
+|---|---|
+| R1 | `order-packing.test.ts` «R1, R6, R8: lo envasado por encima de la cantidad… guarda sus libres», «R1, R6, R8, R9: con 12 x 1 L + 0 x 5 L acepta y guarda 2 libres…»; `finish-with-finished-goods.int.test.ts` «R1, R8, R9: lo envasado por encima…», «R1, R6, R8, R9, R10: plan 5 x 1 L + 1 x 5 L con real 12 x 1 L + 0 x 5 L termina…» |
+| R2 | `order-packing.test.ts` «R2: con excedente, la linea por encima del plan %s rechaza con invalid_packing_count sin guardar nada» (sin motivo, motivo de «menos», «Otro» en blanco, «Otro» de 201) |
+| R3 | `order-packing.test.ts` «R3: con excedente, una linea en una unidad que no se convierte… incompatible_units sin guardar libres» |
+| R4 | `order-packing.test.ts` «R4, R8: con excedente, sin stock libre del envase… deshace los libres ya escritos»; `finish-with-finished-goods.int.test.ts` «R4, R8: con excedente, si el exceso sobre el plan supera el stock libre…», «R4: con excedente, si el stock libre del envase cubre el exceso… termina» |
+| R5 | `order-packing.test.ts` «R5: con 9 x 1 L + 0 x 5 L no supera la cantidad y guarda 0 libres…» |
+| R6 | los de R1 (2 libres de 1 L; 1 libre de 200 ml); `order-packed-counts.int.test.ts` «R6, R8: los libres solo caben en una linea contada y por encima de su plan…» |
+| R8 | `order-packed-counts.int.test.ts` «R8: guarda los libres de cada linea con su conteo…», «R8, R11: un conteo sin libres guarda 0…», «R8: unos libres por encima de lo que la linea paso de su plan los rechaza la base…»; `finish-with-finished-goods.int.test.ts` los de R1 y R4 |
+| R9 | `finish-with-finished-goods.int.test.ts` «R1, R6, R8, R9, R10…» (un lote de 12 L, ninguno de la garrafa en 0); `order-packing.test.ts` «R1, R6, R8, R9…» |
+| R10 | `order-packing.test.ts` «R10: el coste del pedido se reparte entre los 12 L envasados…»; `finish-with-finished-goods.int.test.ts` «R1, R6, R8, R9, R10…» (coste del pedido intacto, unitario = coste / 12, suma = coste) |
+| R27 | `finish-packing.test.ts` «R27: el actor con `empaque.modificar` que empaca el pedido termina…», «R27: sin `empaque.modificar` rechaza…», «R27: si el pedido lo empaca otro…», «R27: si el pedido ya no esta EN_EMPAQUE…» |
+
+### Verificación
+
+- `pnpm run typecheck`: verde (`tsc --noEmit` sin salida).
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, todos en archivos que esta tanda no toca.
+- `pnpm exec vitest run guard`: `Test Files 84 passed (84)`, `Tests 1148 passed | 21 skipped (1169)`.
+- `pnpm exec vitest run` por archivo: `order-packing.test.ts` 63/63; `finish-packing.test.ts` 71/71;
+  `order-packed-counts.int.test.ts` 12/12; `finish-with-finished-goods.int.test.ts` 33/33 (con el `.env`
+  del repo principal; plantilla `qct_tpl_88f19b5be81c` reutilizada, base de corrida creada y borrada).
+- `pnpm exec vitest related --run <14 archivos tocados>` (con el `.env` del repo principal): salida 0,
+  `Test Files 537 passed (537)`, `Tests 9221 passed | 2 skipped (9223)`.
+
+### Veredicto
+
+T4 hecho: Terminar con excedente guarda los libres por línea en la misma transacción; el «Hecho»
+(5 x 1 L + 1 x 5 L → 12 x 1 L + 0 x 5 L: lote de 12 L, 2 libres en 1 L, coste = el del pedido) verde
+contra Postgres real. Sin bloqueos.

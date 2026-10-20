@@ -1399,7 +1399,15 @@ describe('Terminar con el conteo real de envases', () => {
   async function lineasDe(orderId: string) {
     return prisma.orderPresentationLine.findMany({
       where: { orderId },
-      select: { id: true, packagingProductId: true, packages: true, packedPackages: true, packedReason: true, packedReasonOther: true },
+      select: {
+        id: true,
+        packagingProductId: true,
+        packages: true,
+        packedPackages: true,
+        packedReason: true,
+        packedReasonOther: true,
+        packedSurplusPackages: true,
+      },
       orderBy: { packages: 'desc' },
     });
   }
@@ -1477,8 +1485,8 @@ describe('Terminar con el conteo real de envases', () => {
       expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '5' }] });
 
       expect(await lineasDe(creado.id)).toEqual([
-        { id: lineaUno.id, packagingProductId: fixture.packagingProductId, packages: 6, packedPackages: 5, packedReason: 'rotura', packedReasonOther: null },
-        { id: lineaDos.id, packagingProductId: otroEnvase, packages: 2, packedPackages: 0, packedReason: 'otro', packedReasonOther: 'Se contamino el lote' },
+        { id: lineaUno.id, packagingProductId: fixture.packagingProductId, packages: 6, packedPackages: 5, packedReason: 'rotura', packedReasonOther: null, packedSurplusPackages: 0 },
+        { id: lineaDos.id, packagingProductId: otroEnvase, packages: 2, packedPackages: 0, packedReason: 'otro', packedReasonOther: 'Se contamino el lote', packedSurplusPackages: 0 },
       ]);
 
       // R17: se consumen 5 y se libera 1; R19: el envase de la linea en 0 se libera entero.
@@ -1564,7 +1572,7 @@ describe('Terminar con el conteo real de envases', () => {
     }
   });
 
-  it('R1, R9: lo envasado por encima de la cantidad del pedido se acepta, pasa a POR_ACONDICIONAR y el lote lleva lo real', async () => {
+  it('R1, R8, R9: lo envasado por encima de la cantidad del pedido se acepta, pasa a POR_ACONDICIONAR, guarda el libre y el lote lleva lo real', async () => {
     const { fixture, productId, recipeId } = await sembrar();
     try {
       const { orderId, lineId } = await pedidoEnEmpaque(fixture, recipeId, '10.0000', 10);
@@ -1576,10 +1584,122 @@ describe('Terminar con el conteo real de envases', () => {
 
       const despues = await fotoDe(orderId, fixture, recipeId);
       expect(despues.order.status).toBe('POR_ACONDICIONAR');
-      expect(despues.lineas[0]?.packedPackages).toBe(11);
+      expect(despues.lineas[0]).toMatchObject({ packages: 10, packedPackages: 11, packedSurplusPackages: 1 });
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { stock: true } });
       expect(lote.stock.toFixed(4)).toBe('11.0000');
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R1, R6, R8, R9, R10: plan 5 x 1 L + 1 x 5 L con real 12 x 1 L + 0 x 5 L termina, da un lote de 12 L, guarda 2 libres en la linea de 1 L y el coste suma el del pedido', async () => {
+    const { fixture, productId, recipeId } = await sembrar();
+    const garrafa = await prisma.presentation.create({
+      data: { name: `Garrafa ${token()}`, nameNormalized: normalizeForTest(`Garrafa ${token()}`), unitId: fixture.unitId, companyId: fixture.companyId, content: '5.0000' },
+      select: { id: true },
+    });
+    const envaseGarrafa = await seedPackaging({ companyId: fixture.companyId, presentationId: garrafa.id, createdBy: fixture.actorId });
+
+    try {
+      const creado = await createOrder(
+        {
+          recipeId,
+          quantity: '10.0000',
+          priority: 'BAJA',
+          status: 'PENDIENTE',
+          unitId: fixture.unitId,
+          presentationLines: [
+            { packagingProductId: fixture.packagingProductId, packages: 5 },
+            { packagingProductId: envaseGarrafa, packages: 1 },
+          ],
+        },
+        actorDe(fixture),
+      );
+      await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
+      expect(await orderCatalog.startPackingAliveById(creado.id, fixture.companyId, fixture.actorId, new Date())).toBe('ok');
+      const [lineaLitro, lineaGarrafa] = await lineasDe(creado.id);
+      if (lineaLitro === undefined || lineaGarrafa === undefined) throw new Error('faltan lineas de reparto');
+      expect(lineaGarrafa.packagingProductId).toBe(envaseGarrafa);
+      const costeDelPedido = (await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } })).ingredientsCost;
+      if (costeDelPedido === null) throw new Error('el pedido no tiene coste guardado');
+
+      const resultado = await orderCatalog.finishPackingAliveById(creado.id, fixture.companyId, fixture.actorId, new Date(), [
+        { lineId: lineaLitro.id, packedPackages: 12, reason: 'conteo_fisico', reasonOther: null },
+        { lineId: lineaGarrafa.id, packedPackages: 0, reason: 'rotura', reasonOther: null },
+      ]);
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '12' }] });
+
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true } })).status).toBe('POR_ACONDICIONAR');
+      expect(await lineasDe(creado.id)).toEqual([
+        { id: lineaLitro.id, packagingProductId: fixture.packagingProductId, packages: 5, packedPackages: 12, packedReason: 'conteo_fisico', packedReasonOther: null, packedSurplusPackages: 2 },
+        { id: lineaGarrafa.id, packagingProductId: envaseGarrafa, packages: 1, packedPackages: 0, packedReason: 'rotura', packedReasonOther: null, packedSurplusPackages: 0 },
+      ]);
+
+      // R9: un solo lote, con los 12 reales, libres incluidos; la linea en 0 no da lote.
+      expect(await finishedProductDe(fixture.companyId, recipeId, garrafa.id)).toBeNull();
+      const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
+      const lotes = await prisma.productBatch.findMany({ where: { productId: producto?.id }, select: { stock: true, unitCost: true } });
+      expect(lotes).toHaveLength(1);
+      const [lote] = lotes;
+      expect(lote?.stock.toFixed(4)).toBe('12.0000');
+
+      // R10: el coste del pedido no cambia y se reparte entre los 12 L envasados.
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } })).ingredientsCost?.toFixed(4)).toBe(
+        costeDelPedido.toFixed(4),
+      );
+      expect(lote?.unitCost?.toFixed(4)).toBe(costeDelPedido.dividedBy(12).toFixed(4));
+      expect(Number(lote?.stock) * Number(lote?.unitCost)).toBeCloseTo(Number(costeDelPedido), 2);
+    } finally {
+      await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
+      await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+      await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
+      await dropPackaging([envaseGarrafa]);
+      await prisma.productBatch.deleteMany({ where: { product: { companyId: fixture.companyId, presentationId: garrafa.id } } });
+      await prisma.product.deleteMany({ where: { companyId: fixture.companyId, presentationId: garrafa.id } });
+      await prisma.presentation.deleteMany({ where: { id: garrafa.id } });
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R4, R8: con excedente, si el exceso sobre el plan supera el stock libre del envase rechaza con packaging_stock_insufficient sin guardar libres ni cambiar nada', async () => {
+    const { fixture, productId, recipeId } = await sembrar();
+    try {
+      const { orderId, lineId } = await pedidoEnEmpaque(fixture, recipeId, '10.0000', 10);
+      // 10 apartados por el pedido + 1 libre: 12 reales piden 2 de mas.
+      await prisma.productBatch.updateMany({ where: { productId: fixture.packagingProductId }, data: { stock: '11' } });
+      await prisma.product.update({ where: { id: fixture.packagingProductId }, data: { stock: '11' } });
+      const antes = await fotoDe(orderId, fixture, recipeId);
+
+      const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date(), [
+        { lineId, packedPackages: 12, reason: 'conteo_fisico', reasonOther: null },
+      ]);
+      expect(resultado).toBe('packaging_stock_insufficient');
+
+      const despues = await fotoDe(orderId, fixture, recipeId);
+      expect(despues).toEqual(antes);
+      expect(despues.order.status).toBe('EN_EMPAQUE');
+      expect(despues.lineas[0]).toMatchObject({ packedPackages: null, packedSurplusPackages: 0 });
+      expect(despues.productoTerminado).toBeNull();
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R4: con excedente, si el stock libre del envase cubre el exceso sobre el plan termina', async () => {
+    const { fixture, productId, recipeId } = await sembrar();
+    try {
+      const { orderId, lineId } = await pedidoEnEmpaque(fixture, recipeId, '10.0000', 10);
+      await prisma.productBatch.updateMany({ where: { productId: fixture.packagingProductId }, data: { stock: '12' } });
+      await prisma.product.update({ where: { id: fixture.packagingProductId }, data: { stock: '12' } });
+
+      const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date(), [
+        { lineId, packedPackages: 12, reason: 'conteo_fisico', reasonOther: null },
+      ]);
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '12' }] });
+      expect(await existenciaDe(fixture.packagingProductId)).toBe('0.0000');
+      expect((await lineasDe(orderId))[0]).toMatchObject({ packedPackages: 12, packedSurplusPackages: 2 });
     } finally {
       await borrarFixture(fixture, [productId]);
     }

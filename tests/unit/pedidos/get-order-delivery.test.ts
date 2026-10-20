@@ -29,9 +29,9 @@ const OTHER_PRESENTATION = 'f0000000-0000-4000-8000-000000000003'
 const ENTREGADOR: Actor = { id: 'u-entrega', companyId: EMPRESA, permissions: ['entregas.modificar'] }
 
 const LINEAS: readonly FinishPackingLine[] = [
-  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null },
-  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null },
-  { id: OTHER_PENDING_LINE_ID, presentationId: OTHER_PRESENTATION, packages: 2, presentationContent: '2.0000', packagingProductId: null, packedPackages: null },
+  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
+  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
+  { id: OTHER_PENDING_LINE_ID, presentationId: OTHER_PRESENTATION, packages: 2, presentationContent: '2.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
 ]
 
 const PRESENTACIONES: readonly PresentationRef[] = [

@@ -6,10 +6,10 @@
 //
 // `createFinishPacking` implementa `OrderCatalog['finishPackingAliveById']` (Terminar):
 // abre `OrderUnitOfWork`, mueve el estado con `OrderWriteRepository.finishPackingAlive`, guarda
-// el conteo real de cada linea, liquida los envases con ese conteo y da de alta, por cada linea
-// con envases, un lote de producto terminado con un unico coste por unidad del pedido, expresado
-// en la unidad de cada lote; todo en la MISMA transaccion. `asignaciones` solo conoce la firma de
-// `OrderCatalog`, nunca este archivo.
+// el conteo real y los envases libres de cada linea, liquida los envases con ese conteo y da de
+// alta, por cada linea con envases, un lote de producto terminado con un unico coste por unidad
+// del pedido, expresado en la unidad de cada lote; todo en la MISMA transaccion. `asignaciones`
+// solo conoce la firma de `OrderCatalog`, nunca este archivo.
 
 import { planFinishedGoodsLine } from '@/lib/modules/inventario';
 import { convertQuantity, type UnitConversion } from '@/lib/modules/unidades';
@@ -21,16 +21,16 @@ import {
   PresentationWithoutContentError,
   RecipeNotFoundError,
 } from './errors';
-import { sumInOrderUnit, validateDistribution } from './order-distribution';
+import { sumInOrderUnit } from './order-distribution';
 import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
-import { checkPackingCounts, type PackedLineCount } from './packing-count';
+import { checkPackingCounts, packingSurplusByLine, type PackedLineCount } from './packing-count';
 import { resolveLotCost } from './resolve-ingredients-cost';
 import { assertTransition } from './order-transitions';
 
 import type { FinishedGoodsReceipt, OrderCatalog } from './order-catalog';
 
 import type { OrderPackingRepository } from '../ports/order-packing-repository';
-import type { FinishPackingLine } from '../ports/order-write-repository';
+import type { FinishPackingLine, RecordedPackedLine } from '../ports/order-write-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '../ports/order-unit-of-work';
 
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -161,16 +161,33 @@ function toDistributionLines(unitById: ReadonlyMap<string, UnitConversion>, line
   }));
 }
 
-/** Lo envasado puede superar la cantidad del pedido, pero cada linea tiene que poder sumarse en su unidad. */
-function assertPackedConvertible(
+/** Los envases libres de cada linea por `lineId`. Lo envasado puede superar la cantidad sin
+ *  tope; solo deshace una linea que no se puede sumar en la unidad del pedido. */
+function resolveSurplus(
   quantity: string,
   orderUnit: UnitConversion,
   unitById: ReadonlyMap<string, UnitConversion>,
   lines: readonly ResolvedLine[],
-): void {
-  const result = validateDistribution(quantity, orderUnit, toDistributionLines(unitById, lines));
+): ReadonlyMap<string, number> {
+  const result = packingSurplusByLine(
+    quantity,
+    orderUnit,
+    lines.map(({ line, content, unitId, packedPackages }) => ({
+      lineId: line.id,
+      presentationId: line.presentationId,
+      packedPackages,
+      content,
+      unit: requireUnit(unitById, unitId),
+      plan: line.packages,
+    })),
+  );
   if (result.kind === 'incompatible_units') throw new IncompatibleUnitsError(result.presentationId);
   if (result.kind === 'presentation_without_content') throw new PresentationWithoutContentError(result.presentationId);
+  return result.byLine;
+}
+
+function withSurplus(counts: readonly PackedLineCount[], surplusById: ReadonlyMap<string, number>): readonly RecordedPackedLine[] {
+  return counts.map((count) => ({ ...count, packedSurplusPackages: surplusById.get(count.lineId) ?? 0 }));
 }
 
 /**
@@ -299,9 +316,9 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         const unitIds = [...new Set([updated.unitId, ...resolvedLines.map((line) => line.unitId)])];
         const unitById = new Map((await deps.units.findRefs(unitIds, companyId)).map((ref) => [ref.id, ref] as const));
         const orderUnit = requireUnit(unitById, updated.unitId);
-        assertPackedConvertible(updated.quantity, orderUnit, unitById, resolvedLines);
+        const surplusById = resolveSurplus(updated.quantity, orderUnit, unitById, resolvedLines);
 
-        await scope.orders.recordPackedCounts(id, counts, { companyId });
+        await scope.orders.recordPackedCounts(id, withSurplus(counts, surplusById), { companyId });
 
         await settlePackaging(scope, {
           orderId: id,
