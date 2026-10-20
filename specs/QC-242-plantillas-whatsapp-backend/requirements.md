@@ -44,8 +44,9 @@
 >
 > Este archivo **no venía sembrado** por `/afinar-feature`. El Alcance y la tabla de decisiones son la
 > ficha de Jira. Lo que la ficha deja al spec, o que el spec propone y la ficha no resuelve, va marcado
-> **[P<n>]** y espera al humano en `## Preguntas abiertas`. Los datos de Meta que no se pueden
-> confirmar con documentación del repo van marcados **[POR CONFIRMAR]**.
+> **[P<n>]**; el humano aprobó P1–P9 como las propuso el spec el 2026-10-20 (ver «Decisiones
+> cerradas»). Los datos de Meta que no se pueden confirmar con documentación del repo siguen marcados
+> **[POR CONFIRMAR]** (P2, P4 y el límite de crons de P9).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -58,6 +59,15 @@
 | D5 | Estado `OTHER` con el valor crudo | Meta agrega estados nuevos; no se pierde información ni falla el parser. | R4 |
 | D6 | Sincronización automática (al conectar y diaria) más botón manual (decisión del humano) | Nadie tiene que acordarse de sincronizar; el botón queda para ver al instante un cambio hecho en WhatsApp Manager. | R28–R35 |
 | D7 | Los Server Actions de plantillas van en esta ficha (decisión del humano) | Cada ficha respeta su zona: la pantalla recibe una API lista y queda 100 % frontend. | R47, R48 |
+| P1 (2026-10-20) | Único `(connectionId, name, language)` solo entre las vivas (`WHERE deleted_at IS NULL`), más único total `(connectionId, metaTemplateId)`. Aprobado por el humano como propuesta. | Con un único total, una plantilla eliminada bloquearía para siempre ese nombre e idioma. | R2 |
+| P2 (2026-10-20) | Límites de Meta de `design.md > 3.3` (nombre 512, body 1024, header y footer 60, botón 25, URL 2000, teléfono `+` y 8–15 dígitos, 10 botones / 2 URL / 1 teléfono, respuestas rápidas agrupadas, variables consecutivas, caracteres por punto de código). Aprobado por el humano como propuesta. **[POR CONFIRMAR]**: el implementer los contrasta con la documentación vigente de Meta antes de T3. | No hay documentación de Meta en el repo. | R7, R10–R13 |
+| P3 (2026-10-20) | Lista completa de idiomas de `design.md > 3.2` para crear; la sincronización importa cualquier idioma. Aprobado por el humano como propuesta. | Es la lista pública de Meta; recortarla no aporta seguridad. | R8 |
+| P4 (2026-10-20) | Códigos y formas de Meta de `design.md > 4.9, 6 y 7.1` (nombre repetido, límite de creaciones, respuesta de creación, cursor, webhooks de plantillas con `entry[].id` = WABA). Aprobado por el humano como propuesta. **[POR CONFIRMAR]**: el implementer los contrasta con la documentación vigente de Meta antes de T3. | Sin confirmar, un caso no reconocido cae en el rechazo genérico. | R19, R36, R37, R39 |
+| P5 (2026-10-20) | Solo se crean `MARKETING` y `UTILITY`; `AUTHENTICATION` se importa por sincronización. Aprobado por el humano como propuesta. | Las de autenticación llevan OTP, fuera de alcance. | R9, R23 |
+| P6 (2026-10-20) | Columna `templates_synced_at` en `whatsapp_connections`, puesta por cada sincronización completa. Aprobado por el humano como propuesta. | QC-243 muestra la hora de la última sincronización, también con cero plantillas. | R25, R44 |
+| P7 (2026-10-20) | Una plantilla de Meta con categoría desconocida se salta con conteo; no se añade `OTHER` a la categoría. Aprobado por el humano como propuesta. | La ficha fija tres categorías. | R26, R39 |
+| P8 (2026-10-20) | La línea nueva de la guía de la pestaña Conexión es un cambio de texto, sin pase `/design`. Aprobado por el humano como propuesta. | No hay componente nuevo ni cambio visual. | R49 |
+| P9 (2026-10-20) | Cron diario `0 8 * * *`. Aprobado por el humano como propuesta. **[POR CONFIRMAR]** el límite de crons del plan de Vercel (este es el segundo; QC-241 propone un tercero). | Una hora después de `caducar-pedidos`. | R34 |
 
 ## Requisitos (EARS)
 
@@ -288,42 +298,12 @@ webhook. **[P8]**
 
 ## Preguntas abiertas
 
-Para el humano en F1.4. Cada una trae la propuesta del spec; si se aprueba tal cual, el spec no
-cambia.
+P1–P9 cerradas por el humano el 2026-10-20 (ver «Decisiones cerradas»). Quedan sin confirmar solo
+datos de Meta y de la plataforma, que no cambian la propuesta aprobada:
 
-- **[P1] Único solo entre las vivas.** La ficha dice «Único `(connectionId, name, language)`». El spec
-  lo hace **parcial** (`WHERE deleted_at IS NULL`): con un único total, una plantilla eliminada
-  impediría para siempre importar o crear otra con el mismo nombre e idioma. Se añade un único total
-  `(connectionId, metaTemplateId)`, que es la clave de la sincronización. ¿Aprobado?
-- **[P2] Datos de Meta sin confirmar** (no hay documentación de Meta en el repo; los valores son los
-  que el spec cree vigentes y el implementer los contrasta antes de T3): largos de nombre (512), body
-  (1024), header y footer (60), texto de botón (25), URL (2000) y teléfono; cantidades de botones (10
-  en total, 2 URL, 1 teléfono) y la regla de agrupar las respuestas rápidas; numeración consecutiva de
-  variables; si Meta cuenta caracteres por punto de código. ¿Los confirma el humano o se aceptan como
-  quedan, con el contraste del implementer?
-- **[P3] Lista de idiomas** (`design.md > 3.2`): la del spec es la lista pública de Meta según la
-  conoce el spec, **[POR CONFIRMAR]**. ¿Se usa completa o se recorta a los idiomas que la empresa usa
-  de verdad (p. ej. `es`, `es_CO`, `es_MX`, `en`, `en_US`, `pt_BR`)? Una lista recortada da un
-  selector más corto en QC-243; la sincronización importa cualquier idioma igual.
-- **[P4] Errores y formas de Meta** (`design.md > 6`): códigos con que Meta señala «nombre repetido» y
-  «límite de creaciones», forma de la respuesta de creación, cursor de paginación, y forma de los
-  webhooks de plantillas (`entry[].id` = WABA, `event`, `reason`, `new_category`). **[POR CONFIRMAR]**:
-  el implementer los contrasta con la documentación vigente antes de T3 y para si alguno cambia un
-  requisito.
-- **[P5] Sin `AUTHENTICATION` al crear.** Las plantillas de autenticación de Meta llevan código (OTP),
-  que la ficha deja fuera; el spec solo deja crear `MARKETING` y `UTILITY`. La sincronización sí
-  importa las de autenticación que ya existan. ¿Aprobado?
-- **[P6] Hora de la última sincronización en la conexión.** QC-243 muestra «la hora de la última
-  sincronización (sea automática o manual)». La ficha no tiene dónde guardarla: el spec añade
-  `templates_synced_at` a `whatsapp_connections`, que pone cada sincronización completa. ¿Aprobado, o
-  se prefiere calcularla como la mayor `lastSyncedAt` de las plantillas (que queda vacía con cero
-  plantillas)?
-- **[P7] Categoría desconocida.** El modelo fija tres categorías. Si Meta devuelve otra (Meta ya
-  cambió las suyas antes), el spec salta la plantilla con conteo en vez de añadir `OTHER` a la
-  categoría. ¿Aprobado?
-- **[P8] La guía sin pase `/design`.** R49 añade una línea de texto a la lista de pasos de
-  `whatsapp-setup-guide.tsx`, sin componente nuevo ni cambio visual. El spec lo trata como cambio de
-  texto, fuera de la regla del pase `/design`. ¿Aprobado?
-- **[P9] Hora del cron y límite del plan.** El spec propone `0 8 * * *` (una hora después de
-  `caducar-pedidos`). El número de crons que admite el plan de Vercel del proyecto es
-  **[POR CONFIRMAR]**: este sería el segundo, y QC-241 propone un tercero.
+- **[P2] [POR CONFIRMAR]** Límites de Meta: el implementer los contrasta con la documentación vigente
+  de Meta antes de T3 y para si alguno cambia un requisito.
+- **[P4] [POR CONFIRMAR]** Códigos de error y formas de las respuestas y webhooks de Meta: el
+  implementer los contrasta con la documentación vigente de Meta antes de T3 y para si alguno cambia
+  un requisito.
+- **[P9] [POR CONFIRMAR]** Límite de crons del plan de Vercel del proyecto.

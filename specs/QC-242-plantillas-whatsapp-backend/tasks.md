@@ -137,7 +137,7 @@
   - **Hecho:** `after` una vez con `followUp`, ninguna sin él; el fallo de la resincronización no
     cambia el `200`; los casos de QC-238 siguen verdes.
 
-- [ ] **T19 [P] — Guía de la pestaña Conexión** (R49). Depende de: — (solo si [P8] se aprueba)
+- [ ] **T19 [P] — Guía de la pestaña Conexión** (R49). Depende de: — ([P8] aprobada el 2026-10-20)
   - `app/(private)/integraciones/whatsapp/components/whatsapp-setup-guide.tsx` (§13) y
     `tests/unit/integraciones-ui/whatsapp-page.test.tsx`.
   - **Hecho:** el paso aparece con los tres nombres de campo.

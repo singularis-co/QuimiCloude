@@ -741,7 +741,7 @@ adaptador de cualquier módulo.
 { "path": "/api/cron/sincronizar-plantillas-whatsapp", "schedule": "0 8 * * *" }
 ```
 
-[P9]: hora propuesta y límite de crons del plan sin confirmar. `tests/unit/pedidos/vercel-cron.test.ts`
+[P9]: hora aprobada el 2026-10-20; el límite de crons del plan de Vercel sigue [POR CONFIRMAR]. `tests/unit/pedidos/vercel-cron.test.ts`
 hoy exige **exactamente un** cron; se cambia para buscar el suyo por `path` (sigue fijando una sola
 ejecución al día) y se añade el caso equivalente para el nuevo (R34).
 
