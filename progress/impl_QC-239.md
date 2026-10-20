@@ -320,3 +320,27 @@ $ pnpm exec playwright test e2e/clientes-telefono.spec.ts --project=chromium --w
   `whatsapp-messages-migration.int`). Ahora reaplican las migraciones posteriores que hacen
   `ALTER TABLE … ADD COLUMN`.
 - `./init.sh` no se corrió (decisión del humano: el gate lo corre GitHub en el PR).
+
+## F2.3 — merge de `origin/dev` (40c84b3d)
+
+- **Qué trae:** QC-242 (plantillas de WhatsApp) y QC-137 (notificaciones).
+- **Conflictos:** 14, todos aditivos y resueltos por unión.
+  - El catálogo de errores queda en 113 códigos y sin `customer_duplicate_phone`.
+  - La guardia de ámbito de `integraciones` vigila 4 puertos. dev no añade exenciones, así que
+    R32 «dos entradas» sigue siendo el total real.
+  - La recepción descuenta los mensajes de contactos bloqueados y aplica las actualizaciones de
+    plantillas.
+  - `receive-whatsapp-webhook.test.ts` se fusionó solo pero hubo que ajustarlo al resultado
+    combinado.
+- **Migraciones:** `20261020120000_whatsapp_templates` comparte timestamp con la nuestra.
+  - No dependen entre sí y Prisma las ordena por nombre.
+  - Los tests que buscan migraciones «posteriores» comparan con `>` estricto: hoy no rompe nada,
+    pero sería frágil si una llegara a depender de la otra.
+  - `pnpm run db:migrate`: «No pending migrations to apply» (ya estaban aplicadas).
+- **Verificación:**
+  - typecheck limpio; lint con 0 errores.
+  - Tests unitarios y guardias de los archivos comunes (50 archivos): verdes tras el ajuste.
+    `authorization` 72/72.
+  - Integración, en serie: inbox 20/20, route 20/20, contact-links 17/17,
+    customer-phone-numbers-migration 10/10, whatsapp-messages-migration 5/5,
+    whatsapp-template-migration 6/6, whatsapp-template-flow 7/7, whatsapp-template-prisma 20/20.
