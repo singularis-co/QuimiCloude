@@ -244,7 +244,7 @@
 
 ## Bloque F — Enmienda de la vuelta 2 de revisión (D22, D23)
 
-- [ ] **T15 · La fila pendiente de relleno, trazada a R36** (R36, R10). Depende de: T13.
+- [x] **T15 · La fila pendiente de relleno, trazada a R36** (R36, R10). Depende de: T13.
   - **Qué se hace:** solo renombrar tests; el código y los casos ya están en la rama
     (`design.md § 4.1`, § 4.5, § 8.1, § 8.4). Los casos de la fila pendiente se llaman hoy `R34 —`,
     `R35 —` o `R29 —` (en el commit `38a432da`), y ninguno de esos requisitos la describe. Pasan a
