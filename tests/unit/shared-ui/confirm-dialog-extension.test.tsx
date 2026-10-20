@@ -1,4 +1,5 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
+import { TrashIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -119,5 +120,196 @@ describe('ConfirmDialog: contentClassName y confirmSlot', () => {
 
     const contenido = screen.getByTestId(TEST_IDS.dialog);
     expect(contenido).toHaveClass('max-h-[100dvh]', 'overflow-y-auto', 'fixed');
+  });
+});
+
+function sigue(a: Node, b: Node): boolean {
+  return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
+describe('ConfirmDialog: descriptionPlacement', () => {
+  const MENSAJE = 'extension-message';
+  const conMensaje = { ...TEST_IDS, message: MENSAJE } as const;
+
+  function arbolSinPlacement(): string {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={conMensaje}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="error-in-form"
+        aside={<p data-testid="aside">Cifras</p>}
+      />,
+    );
+    const arbol = arbolAccesible();
+    cleanup();
+    return arbol;
+  }
+
+  it('con «header» el árbol es el mismo que sin pasarla', () => {
+    const antes = arbolSinPlacement();
+
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={conMensaje}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="error-in-form"
+        aside={<p data-testid="aside">Cifras</p>}
+        descriptionPlacement="header"
+      />,
+    );
+
+    expect(arbolAccesible()).toBe(antes);
+    expect(sigue(screen.getByTestId(MENSAJE), screen.getByTestId('aside'))).toBe(true);
+  });
+
+  it('con «after-aside» la descripción va tras aside y antes de children, y sigue describiendo el diálogo', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={conMensaje}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="error-in-form"
+        aside={<p data-testid="aside">Cifras</p>}
+        descriptionPlacement="after-aside"
+      >
+        <input aria-label="Campo" data-testid="campo" />
+      </ConfirmDialog>,
+    );
+
+    const titulo = screen.getByRole('heading', { name: TEXTS.title });
+    const mensaje = screen.getByTestId(MENSAJE);
+    expect(sigue(titulo, screen.getByTestId('aside'))).toBe(true);
+    expect(sigue(screen.getByTestId('aside'), mensaje)).toBe(true);
+    expect(sigue(mensaje, screen.getByTestId('campo'))).toBe(true);
+    expect(titulo.parentElement).not.toContainElement(mensaje);
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(TEXTS.description);
+  });
+
+  it('con «after-aside» y form-wraps-all la descripción va dentro del form tras la cabecera', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={conMensaje}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="form-wraps-all"
+        descriptionPlacement="after-aside"
+      />,
+    );
+
+    const form = screen.getByTestId(TEST_IDS.form);
+    expect(within(form).getByTestId(MENSAJE)).toHaveTextContent(TEXTS.description);
+  });
+
+  it('con «after-aside» sin form la descripción va tras aside', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={conMensaje}
+        aside={<p data-testid="aside">Cifras</p>}
+        descriptionPlacement="after-aside"
+      />,
+    );
+
+    expect(sigue(screen.getByTestId('aside'), screen.getByTestId(MENSAJE))).toBe(true);
+  });
+});
+
+describe('ConfirmDialog: icon', () => {
+  it('sin icon el árbol no cambia y no hay media', () => {
+    const antes = arbolSinExtensiones();
+
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={TEST_IDS}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="form-wraps-all"
+        icon={undefined}
+      />,
+    );
+
+    expect(arbolAccesible()).toBe(antes);
+    expect(
+      screen.getByTestId(TEST_IDS.dialog).querySelector('[data-slot="alert-dialog-media"]'),
+    ).toBeNull();
+  });
+
+  it('con icon pinta el glifo decorativo en AlertDialogMedia, delante del título, con su tono', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={TEST_IDS}
+        icon={{ glyph: TrashIcon, tone: 'danger', testId: 'icono' }}
+      />,
+    );
+
+    const icono = screen.getByTestId('icono');
+    expect(icono).toHaveAttribute('data-slot', 'alert-dialog-media');
+    expect(icono).toHaveAttribute('data-tone', 'danger');
+    expect(icono).toHaveClass('size-11', 'bg-destructive-subtle', 'text-destructive-text');
+    const glifo = icono.querySelector('svg');
+    expect(glifo).toHaveAttribute('aria-hidden', 'true');
+    expect(glifo).toHaveClass('size-5');
+    const titulo = screen.getByRole('heading', { name: TEXTS.title });
+    expect(sigue(icono, titulo)).toBe(true);
+    // Decorativo: no cambia el nombre accesible del diálogo.
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleName(TEXTS.title);
+  });
+
+  it('con icon y «after-aside» el título va junto al icono y la descripción ocupa el cuerpo, alineada a la izquierda', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={{ ...TEST_IDS, message: 'mensaje' }}
+        submit={{ kind: 'action', action: () => undefined }}
+        layout="error-in-form"
+        aside={<p data-testid="aside">Cifras</p>}
+        descriptionPlacement="after-aside"
+        icon={{ glyph: TrashIcon, tone: 'danger', testId: 'icono' }}
+      />,
+    );
+
+    const cabecera = screen.getByTestId('icono').parentElement;
+    expect(cabecera).toHaveAttribute('data-slot', 'alert-dialog-header');
+    // La columna del icono se ajusta a él; sin esto las dos implícitas se reparten el sobrante.
+    expect(cabecera).toHaveClass('sm:group-data-[size=default]/alert-dialog-content:grid-cols-[auto_1fr]');
+    const mensaje = screen.getByTestId('mensaje');
+    expect(mensaje).toHaveClass('text-left', 'text-wrap', 'md:text-wrap');
+    expect(mensaje).not.toHaveClass('text-balance', 'md:text-pretty');
+  });
+
+  it('con icon y la descripción en la cabecera, ni la cabecera ni la descripción cambian de clases', () => {
+    render(
+      <ConfirmDialog
+        open
+        texts={TEXTS}
+        testIds={{ ...TEST_IDS, message: 'mensaje' }}
+        icon={{ glyph: TrashIcon, tone: 'danger', testId: 'icono' }}
+      />,
+    );
+
+    expect(screen.getByTestId('icono').parentElement).not.toHaveClass(
+      'sm:group-data-[size=default]/alert-dialog-content:grid-cols-[auto_1fr]',
+    );
+    expect(screen.getByTestId('mensaje')).toHaveClass('text-balance', 'md:text-pretty');
+    expect(screen.getByTestId('mensaje')).not.toHaveClass('text-left', 'text-wrap');
+  });
+
+  it('sin tone usa el fondo neutro', () => {
+    render(<ConfirmDialog open texts={TEXTS} testIds={TEST_IDS} icon={{ glyph: TrashIcon, testId: 'icono' }} />);
+
+    const icono = screen.getByTestId('icono');
+    expect(icono).toHaveAttribute('data-tone', 'neutral');
+    expect(icono).toHaveClass('bg-muted');
   });
 });

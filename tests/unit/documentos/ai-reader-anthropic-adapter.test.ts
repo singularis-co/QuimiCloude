@@ -1,7 +1,8 @@
-// El adaptador `@anthropic-ai/sdk` del puerto `AiReader`, proveedor principal de la lectura.
+// El adaptador `@anthropic-ai/sdk`: la lectura con la key y el modelo de la empresa, la prueba de
+// la conexion y la clasificacion de sus fallos.
 //
-// Ningun caso de este archivo toca la red: la libreria se dobla con `vi.mock`. El caso
-// "el doble reemplaza a la libreria de verdad" es el que sostiene esa afirmacion.
+// Ningun caso de este archivo toca la red: el cliente se dobla con `vi.mock` y las clases de error
+// son las REALES de la libreria, para que la clasificacion se pruebe contra lo que el SDK lanza.
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
@@ -9,19 +10,26 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { AiProviderError } from '@/lib/modules/documentos/domain/errors';
+
 const create = vi.fn();
+const retrieve = vi.fn();
 
 class AnthropicDouble {
   messages = { create };
+  models = { retrieve };
 }
 
-vi.mock('@anthropic-ai/sdk', () => ({ default: vi.fn(AnthropicDouble) }));
+vi.mock('@anthropic-ai/sdk', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@anthropic-ai/sdk')>();
+  return { ...real, default: vi.fn(AnthropicDouble) };
+});
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-const REQUIRED_VARS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_MODEL'] as const;
-
 const ADAPTADOR = 'lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic.ts';
+const KEY = 'sk-ant-CLAVE-RECONOCIBLE';
+const CONFIG = { apiKey: KEY, model: 'modelo-de-receta' };
 
 function archivosDe(absDir: string): readonly string[] {
   if (!existsSync(absDir)) return [];
@@ -60,7 +68,7 @@ function mensaje(overrides: Record<string, unknown>) {
     id: 'msg_1',
     type: 'message',
     role: 'assistant',
-    model: 'un-modelo',
+    model: 'modelo-de-receta',
     content: [],
     stop_reason: 'end_turn',
     stop_sequence: null,
@@ -73,18 +81,23 @@ async function adaptador() {
   return import('@/lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic');
 }
 
-function configurar() {
-  process.env.ANTHROPIC_API_KEY = 'una-clave';
-  process.env.ANTHROPIC_MODEL = 'un-modelo';
+async function sdk() {
+  return import('@anthropic-ai/sdk');
 }
 
-describe('documentos — el adaptador de lectura con Claude (@anthropic-ai/sdk)', () => {
-  const originalEnv = { ...process.env };
+/** Un `APIError` real del SDK con ese codigo y un cuerpo que delata cualquier fuga. */
+async function errorHttp(status: number) {
+  const { APIError } = await sdk();
+  return APIError.generate(status, { error: { message: `cuerpo con ${KEY}` } }, `fallo ${KEY}`, new Headers());
+}
 
-  afterEach(() => {
-    for (const name of REQUIRED_VARS) delete process.env[name];
-    Object.assign(process.env, originalEnv);
+const LEER = { prompt: 'x', parts: [], timeoutMs: 1000 } as const;
+
+describe('documentos — el adaptador de Claude (@anthropic-ai/sdk)', () => {
+  afterEach(async () => {
     create.mockReset();
+    retrieve.mockReset();
+    vi.mocked((await sdk()).default).mockClear();
   });
 
   describe('la libreria vive en un solo archivo de produccion', () => {
@@ -108,52 +121,54 @@ describe('documentos — el adaptador de lectura con Claude (@anthropic-ai/sdk)'
     });
   });
 
-  describe('importar sin claves no lanza, y no toca la red', () => {
-    it('importar el adaptador con las dos variables vacias no lanza', async () => {
-      for (const name of REQUIRED_VARS) process.env[name] = '';
+  describe('la config llega por parametro (R22)', () => {
+    it('R22 — el adaptador no lee ninguna variable de entorno', () => {
+      const fuente = fuenteSinComentarios(readFileSync(join(repoRoot, ADAPTADOR), 'utf8'));
+      expect(fuente).not.toMatch(/process\.env/);
+      expect(fuente).not.toMatch(/ANTHROPIC_/);
+    });
 
+    it('R22 — importar el adaptador no construye cliente ni llama a la libreria', async () => {
       const modulo = await adaptador();
-
-      expect(typeof modulo.readWithAnthropic).toBe('function');
+      expect(typeof modulo.createAnthropicReader).toBe('function');
+      expect((await sdk()).default).not.toHaveBeenCalled();
       expect(create).not.toHaveBeenCalled();
     });
 
-    it('invocar sin configuracion lanza nombrando las variables, sin llamar a la libreria', async () => {
-      for (const name of REQUIRED_VARS) delete process.env[name];
-      const { readWithAnthropic } = await adaptador();
+    it('R22 — cada lector usa SU key y SU modelo: dos empresas no se mezclan', async () => {
+      create.mockResolvedValue(mensaje({ content: [{ type: 'text', text: 'ok' }] }));
+      const { createAnthropicReader } = await adaptador();
 
-      let texto = '';
-      try {
-        await readWithAnthropic({ prompt: 'lee esto', parts: [], timeoutMs: 1000 });
-      } catch (error) {
-        texto = error instanceof Error ? error.message : String(error);
-      }
+      await createAnthropicReader({ apiKey: 'key-a', model: 'modelo-a' }).read(LEER);
+      await createAnthropicReader({ apiKey: 'key-b', model: 'modelo-b' }).read(LEER);
 
-      for (const name of REQUIRED_VARS) expect(texto).toContain(name);
-      expect(create).not.toHaveBeenCalled();
+      const constructor = (await sdk()).default;
+      expect(constructor).toHaveBeenNthCalledWith(1, { apiKey: 'key-a', maxRetries: 0, timeout: 1000 });
+      expect(constructor).toHaveBeenNthCalledWith(2, { apiKey: 'key-b', maxRetries: 0, timeout: 1000 });
+      expect(create.mock.calls.map((llamada) => (llamada[0] as { model: string }).model)).toEqual([
+        'modelo-a',
+        'modelo-b',
+      ]);
     });
   });
 
-  describe('la llamada, con el cliente doblado', () => {
+  describe('la lectura, con el cliente doblado', () => {
     it('el doble reemplaza a la libreria: cliente sin reintentos y con el plazo de la peticion', async () => {
-      configurar();
       create.mockResolvedValue(mensaje({ content: [{ type: 'text', text: 'ok' }] }));
+      const { createAnthropicReader } = await adaptador();
 
-      const sdk = await import('@anthropic-ai/sdk');
-      const { readWithAnthropic } = await adaptador();
+      await createAnthropicReader(CONFIG).read({ prompt: 'x', parts: [], timeoutMs: 4321 });
 
-      await readWithAnthropic({ prompt: 'x', parts: [], timeoutMs: 4321 });
-
-      expect(vi.isMockFunction(sdk.default)).toBe(true);
-      expect(sdk.default).toHaveBeenCalledWith({ apiKey: 'una-clave', maxRetries: 0, timeout: 4321 });
+      const constructor = (await sdk()).default;
+      expect(vi.isMockFunction(constructor)).toBe(true);
+      expect(constructor).toHaveBeenCalledWith({ apiKey: KEY, maxRetries: 0, timeout: 4321 });
     });
 
-    it('una sola llamada con el modelo configurado, el contenido traducido y una senal de aborto', async () => {
-      configurar();
+    it('una sola llamada con el modelo dado, el contenido traducido y una senal de aborto', async () => {
       create.mockResolvedValue(mensaje({ content: [{ type: 'text', text: 'ok' }] }));
-      const { readWithAnthropic } = await adaptador();
+      const { createAnthropicReader } = await adaptador();
 
-      await readWithAnthropic({
+      await createAnthropicReader(CONFIG).read({
         prompt: 'lee el documento',
         parts: [{ kind: 'pdf', bytes: new Uint8Array([1, 2, 3]) }],
         timeoutMs: 5000,
@@ -161,7 +176,7 @@ describe('documentos — el adaptador de lectura con Claude (@anthropic-ai/sdk)'
 
       expect(create).toHaveBeenCalledTimes(1);
       const [cuerpo, opciones] = create.mock.calls[0] as [Record<string, unknown>, { signal: AbortSignal }];
-      expect(cuerpo.model).toBe('un-modelo');
+      expect(cuerpo.model).toBe('modelo-de-receta');
       expect(cuerpo.max_tokens).toBe(16000);
       expect(cuerpo.messages).toEqual([
         {
@@ -179,11 +194,10 @@ describe('documentos — el adaptador de lectura con Claude (@anthropic-ai/sdk)'
     });
 
     it('no envia thinking, temperature, top_p ni un turno de asistente prefijado', async () => {
-      configurar();
       create.mockResolvedValue(mensaje({ content: [{ type: 'text', text: 'ok' }] }));
-      const { readWithAnthropic } = await adaptador();
+      const { createAnthropicReader } = await adaptador();
 
-      await readWithAnthropic({ prompt: 'x', parts: [], timeoutMs: 1000 });
+      await createAnthropicReader(CONFIG).read(LEER);
 
       const cuerpo = create.mock.calls[0]?.[0] as Record<string, unknown>;
       expect(Object.keys(cuerpo).sort()).toEqual(['max_tokens', 'messages', 'model']);
@@ -192,7 +206,6 @@ describe('documentos — el adaptador de lectura con Claude (@anthropic-ai/sdk)'
     });
 
     it('devuelve el texto tal cual, concatenando solo los bloques de texto', async () => {
-      configurar();
       create.mockResolvedValue(
         mensaje({
           content: [
@@ -202,59 +215,159 @@ describe('documentos — el adaptador de lectura con Claude (@anthropic-ai/sdk)'
           ],
         }),
       );
-      const { readWithAnthropic } = await adaptador();
+      const { createAnthropicReader } = await adaptador();
 
-      const resultado = await readWithAnthropic({ prompt: 'x', parts: [], timeoutMs: 1000 });
-
-      expect(resultado).toBe('  Texto  con espacios raros.\n\n');
+      expect(await createAnthropicReader(CONFIG).read(LEER)).toBe('  Texto  con espacios raros.\n\n');
     });
 
     it('si la respuesta no trae texto, lanza nombrando al proveedor', async () => {
-      configurar();
       create.mockResolvedValue(mensaje({ content: [] }));
-      const { readWithAnthropic } = await adaptador();
+      const { createAnthropicReader } = await adaptador();
 
-      await expect(readWithAnthropic({ prompt: 'x', parts: [], timeoutMs: 1000 })).rejects.toThrowError(
-        /claude/i,
-      );
+      await expect(createAnthropicReader(CONFIG).read(LEER)).rejects.toThrowError(/claude/i);
     });
 
     it('una negativa del modelo lanza, y el error no vuelca el contenido', async () => {
-      configurar();
       create.mockResolvedValue(
         mensaje({ stop_reason: 'refusal', content: [{ type: 'text', text: 'CONTENIDO-RECONOCIBLE' }] }),
       );
-      const { readWithAnthropic } = await adaptador();
+      const { createAnthropicReader } = await adaptador();
 
-      const error = await readWithAnthropic({ prompt: 'x', parts: [], timeoutMs: 1000 }).catch(
-        (e: unknown) => e,
-      );
+      const error = await createAnthropicReader(CONFIG).read(LEER).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(Error);
+      expect(error).not.toBeInstanceOf(AiProviderError);
       expect((error as Error).message).toMatch(/rechazada/);
       expect((error as Error).message).not.toContain('CONTENIDO-RECONOCIBLE');
     });
 
     it('un corte por max_tokens lanza en vez de devolver una lectura incompleta', async () => {
-      configurar();
       create.mockResolvedValue(
         mensaje({ stop_reason: 'max_tokens', content: [{ type: 'text', text: 'a medias' }] }),
       );
-      const { readWithAnthropic } = await adaptador();
+      const { createAnthropicReader } = await adaptador();
 
-      await expect(readWithAnthropic({ prompt: 'x', parts: [], timeoutMs: 1000 })).rejects.toThrowError(
-        /limite de tokens/,
-      );
+      await expect(createAnthropicReader(CONFIG).read(LEER)).rejects.toThrowError(/limite de tokens/);
+    });
+  });
+
+  describe('un fallo de cuenta al leer es `AiProviderError`; el resto, el error de siempre (R25, R26)', () => {
+    it.each([
+      [401, 'rejected_key'],
+      [403, 'rejected_key'],
+      [429, 'quota'],
+    ] as const)('R25 — %i al leer lanza AiProviderError (%s) sin la key ni el cuerpo', async (status, kind) => {
+      create.mockRejectedValue(await errorHttp(status));
+      const { createAnthropicReader } = await adaptador();
+
+      const error = await createAnthropicReader(CONFIG).read(LEER).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AiProviderError);
+      const deCuenta = error as AiProviderError;
+      expect(deCuenta.code).toBe('ai_provider_error');
+      expect(deCuenta.failure).toEqual({ kind, httpStatus: status, model: null });
+      expect(deCuenta.diagnostic).toBe(`claude messages.create respondió ${status}`);
+      expect(JSON.stringify({ m: deCuenta.message, d: deCuenta.diagnostic })).not.toContain(KEY);
+      expect(create).toHaveBeenCalledTimes(1);
     });
 
-    it('un error de la libreria se propaga sin reintentar', async () => {
-      configurar();
-      create.mockRejectedValue(new Error('fallo de red'));
-      const { readWithAnthropic } = await adaptador();
+    it.each([404, 500, 400])('R26 — %i al leer se propaga tal cual, sin AiProviderError', async (status) => {
+      const original = await errorHttp(status);
+      create.mockRejectedValue(original);
+      const { createAnthropicReader } = await adaptador();
 
-      await expect(readWithAnthropic({ prompt: 'x', parts: [], timeoutMs: 1000 })).rejects.toThrowError(
-        'fallo de red',
-      );
+      await expect(createAnthropicReader(CONFIG).read(LEER)).rejects.toBe(original);
       expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    it('R26 — un fallo de red se propaga sin reintentar', async () => {
+      const { APIConnectionError } = await sdk();
+      const original = new APIConnectionError({ message: 'fallo de red' });
+      create.mockRejectedValue(original);
+      const { createAnthropicReader } = await adaptador();
+
+      await expect(createAnthropicReader(CONFIG).read(LEER)).rejects.toBe(original);
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('la clasificacion de un fallo (R11, R25, R26)', () => {
+    it('R11 — cada codigo cae en su tipo; el 404 solo es de modelo si se consultaba uno', async () => {
+      const { classifyAnthropicError } = await adaptador();
+
+      expect(classifyAnthropicError(await errorHttp(401), 'm')).toEqual({ kind: 'rejected_key', httpStatus: 401, model: null });
+      expect(classifyAnthropicError(await errorHttp(403), 'm')).toEqual({ kind: 'rejected_key', httpStatus: 403, model: null });
+      expect(classifyAnthropicError(await errorHttp(429), 'm')).toEqual({ kind: 'quota', httpStatus: 429, model: null });
+      expect(classifyAnthropicError(await errorHttp(404), 'm')).toEqual({ kind: 'model_unavailable', httpStatus: 404, model: 'm' });
+      expect(classifyAnthropicError(await errorHttp(404), null)).toEqual({ kind: 'unexpected', httpStatus: 404, model: null });
+      expect(classifyAnthropicError(await errorHttp(500), 'm')).toEqual({ kind: 'unexpected', httpStatus: 500, model: null });
+      expect(classifyAnthropicError(await errorHttp(402), 'm')).toEqual({ kind: 'unexpected', httpStatus: 402, model: null });
+    });
+
+    it('R11 — sin respuesta (conexion, plazo o aborto) es `unreachable`; lo desconocido, `unexpected`', async () => {
+      const { APIConnectionError, APIConnectionTimeoutError, APIUserAbortError } = await sdk();
+      const { classifyAnthropicError } = await adaptador();
+      const sinRespuesta = { kind: 'unreachable', httpStatus: null, model: null };
+
+      expect(classifyAnthropicError(new APIConnectionError({ message: 'x' }), 'm')).toEqual(sinRespuesta);
+      expect(classifyAnthropicError(new APIConnectionTimeoutError(), 'm')).toEqual(sinRespuesta);
+      expect(classifyAnthropicError(new APIUserAbortError(), 'm')).toEqual(sinRespuesta);
+      expect(classifyAnthropicError(new DOMException('x', 'TimeoutError'), 'm')).toEqual(sinRespuesta);
+      expect(classifyAnthropicError(new Error('otra cosa'), 'm')).toEqual({
+        kind: 'unexpected',
+        httpStatus: null,
+        model: null,
+      });
+    });
+  });
+
+  describe('la prueba de la conexion (R10)', () => {
+    it('R10 — consulta cada modelo una vez, sin generar texto, sin reintentos y con plazo de 10 s', async () => {
+      retrieve.mockResolvedValue({ id: 'x' });
+      const { probeAnthropic } = await adaptador();
+
+      const resultado = await probeAnthropic({ apiKey: KEY, models: ['receta', 'catalogo'] });
+
+      expect(resultado.ok).toBe(true);
+      expect(resultado.ok && resultado.elapsedMs).toBeGreaterThanOrEqual(0);
+      expect((await sdk()).default).toHaveBeenCalledWith({ apiKey: KEY, maxRetries: 0, timeout: 10_000 });
+      expect(retrieve.mock.calls.map((llamada) => llamada[0]).sort()).toEqual(['catalogo', 'receta']);
+      for (const llamada of retrieve.mock.calls) {
+        expect((llamada[2] as { signal: AbortSignal }).signal).toBeInstanceOf(AbortSignal);
+      }
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('R10 — si receta y catalogo son el mismo modelo, se consulta una sola vez', async () => {
+      retrieve.mockResolvedValue({ id: 'x' });
+      const { probeAnthropic } = await adaptador();
+
+      await probeAnthropic({ apiKey: KEY, models: ['mismo', 'mismo'] });
+
+      expect(retrieve).toHaveBeenCalledTimes(1);
+    });
+
+    it('R11 — un 404 en el segundo modelo da `model_unavailable` con ESE modelo', async () => {
+      const noEsta = await errorHttp(404);
+      retrieve.mockImplementation(async (model: string) => {
+        if (model === 'catalogo') throw noEsta;
+        return { id: model };
+      });
+      const { probeAnthropic } = await adaptador();
+
+      expect(await probeAnthropic({ apiKey: KEY, models: ['receta', 'catalogo'] })).toEqual({
+        ok: false,
+        failure: { kind: 'model_unavailable', httpStatus: 404, model: 'catalogo' },
+      });
+    });
+
+    it('R11 — una key rechazada da `rejected_key` con su codigo', async () => {
+      retrieve.mockRejectedValue(await errorHttp(401));
+      const { probeAnthropic } = await adaptador();
+
+      expect(await probeAnthropic({ apiKey: KEY, models: ['receta'] })).toEqual({
+        ok: false,
+        failure: { kind: 'rejected_key', httpStatus: 401, model: null },
+      });
     });
   });
 
@@ -262,9 +375,7 @@ describe('documentos — el adaptador de lectura con Claude (@anthropic-ai/sdk)'
     it('un PDF se traduce a un bloque document en base64 con application/pdf', async () => {
       const { toAnthropicBlock } = await adaptador();
 
-      const bloque = toAnthropicBlock({ kind: 'pdf', bytes: new Uint8Array([1, 2, 3]) });
-
-      expect(bloque).toEqual({
+      expect(toAnthropicBlock({ kind: 'pdf', bytes: new Uint8Array([1, 2, 3]) })).toEqual({
         type: 'document',
         source: { type: 'base64', media_type: 'application/pdf', data: 'AQID' },
       });
@@ -273,9 +384,7 @@ describe('documentos — el adaptador de lectura con Claude (@anthropic-ai/sdk)'
     it('una imagen se traduce a un bloque image en base64 con image/png', async () => {
       const { toAnthropicBlock } = await adaptador();
 
-      const bloque = toAnthropicBlock({ kind: 'image', png: new Uint8Array([9, 9]), pageNumber: 1 });
-
-      expect(bloque).toEqual({
+      expect(toAnthropicBlock({ kind: 'image', png: new Uint8Array([9, 9]), pageNumber: 1 })).toEqual({
         type: 'image',
         source: { type: 'base64', media_type: 'image/png', data: Buffer.from([9, 9]).toString('base64') },
       });

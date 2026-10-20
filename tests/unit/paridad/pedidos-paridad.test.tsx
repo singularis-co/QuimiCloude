@@ -71,6 +71,13 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => ({
   })),
 }));
 
+// 2026-10-13 — la seccion pide tambien los productos terminados de los pedidos producidos, y esa
+// action lee `observabilidad` de `@/lib/composition` al cargarse, que aqui solo trae `identity`.
+// El doble responde sin enlaces: esta suite no mira esa columna.
+vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', () => ({
+  listProducedProductsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
+}));
+
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', () => ({
   assignResponsiblesAction: vi.fn(),
   unassignResponsibleAction: vi.fn(),
@@ -173,11 +180,15 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
         packages: 1,
         packagingProductId: null,
         packagingName: null,
+        presentationContent: null,
+        presentationUnitLabel: null,
       },
     ],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }

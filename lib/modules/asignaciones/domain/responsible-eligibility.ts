@@ -1,30 +1,18 @@
 // lib/modules/asignaciones/domain/responsible-eligibility.ts
 /**
- * Quien puede ser responsable de un pedido, decidido solo por permisos: nunca por el nombre del
- * rol. Quien puede consultar todos los pedidos de la empresa los supervisa, y no se le asigna
- * como responsable de ejecutar uno.
+ * Quien puede ser responsable de un pedido: persona viva de la empresa del actor, con la cuenta
+ * efectivamente activa y cuyo rol es Operador o Empacador.
  *
- * La pertenencia se resuelve con `assertPermission` capturado en `try/catch`, el mismo patron que
- * `canModifyAssignments` de `actor.ts` y que `resolveAssignmentViews` de `assignment-views.ts`: es
- * la unica implementacion de la regla y no se reimplementa con un `includes` propio, que podria
- * divergir el dia que la regla cambie.
+ * La regla vive en `identity` (`order-responsible.ts`), duena del nombre del rol: este modulo no
+ * lo lee (`guard-autorizacion-por-permiso`). Aqui solo se delega, igual que `requirePermission`
+ * delega en `assertPermission`. El selector pasa `ORDER_RESPONSIBLE_FILTERS` al directorio y el
+ * camino de escritura pregunta `canBeResponsible`: una sola definicion.
  */
-import { assertPermission, type PermissionBearer, type PermissionCode } from '@/lib/modules/identity';
+import { isOrderResponsible, type PersonRef } from '@/lib/modules/identity';
 
-const PEDIDOS_CONSULTAR: PermissionCode = 'pedidos.consultar';
-
-/**
- * Centinela privado y reutilizado: `assertPermission` exige una fabrica de error porque su
- * contrato es lanzar. La excepcion nunca sale de este archivo; solo sirve para leer el veredicto.
- */
-const DENEGADO = new Error('asignaciones: pedidos.consultar ausente al comprobar elegibilidad');
+export { ORDER_RESPONSIBLE_FILTERS } from '@/lib/modules/identity';
 
 /** Nunca lanza: es una pregunta, no una autorizacion. */
-export function canBeResponsible(person: PermissionBearer): boolean {
-  try {
-    assertPermission(person, PEDIDOS_CONSULTAR, () => DENEGADO);
-    return false;
-  } catch {
-    return true;
-  }
+export function canBeResponsible(person: PersonRef): boolean {
+  return isOrderResponsible(person);
 }

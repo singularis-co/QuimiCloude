@@ -180,6 +180,23 @@ export type { TransitionOrderDeps } from './domain/transition-order';
  *  `inventario`. `lib/composition` las cablea sobre el adaptador driven de `pedidos`. */
 export { createStartPacking, createFinishPacking } from './domain/order-packing';
 export type { StartPackingDeps, FinishPackingDeps } from './domain/order-packing';
+export {
+  PACKING_DIFFERENCE_REASONS,
+  PACKING_INCREASE_REASONS,
+  PACKING_REASON_OTHER_MAX,
+  checkPackingCounts,
+  effectivePackages,
+  maxPackagesForLine,
+  packedTotalInOrderUnit,
+} from './domain/packing-count';
+export type {
+  PackedDistributionLine,
+  PackedLineCount,
+  PackingCountCheck,
+  PackingDifferenceReason,
+  PackingLineError,
+  PackingPlanLine,
+} from './domain/packing-count';
 
 /** Implementan `OrderCatalog['startConditioningAliveById']` y `['finishConditioningAliveById']`:
  *  cada uno un `UPDATE` condicional, fuera de la unidad de trabajo de `inventario`. */
@@ -196,7 +213,7 @@ export { createListAliveSummariesByIds, createListAliveSummariesInCompany } from
 export type { ListOrderSummariesDeps } from './domain/list-order-summaries';
 export { createListSummariesByIdsIncludingDeleted } from './domain/list-order-summaries';
 export type { ListHistorySummariesDeps } from './domain/list-order-summaries';
-export type { OrderHistorySummary } from './domain/order-catalog';
+export type { OrderDeliveryProgress, OrderDeliveryProgressLine, OrderHistorySummary } from './domain/order-catalog';
 
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */
@@ -274,15 +291,23 @@ export type { GetOrderCustomerFilterOptionDeps } from './domain/get-order-custom
  *  casos de uso y sus errores propios. */
 export {
   DELIVERY_MAX_ALLOCATIONS,
+  batchesOverAvailable,
   checkDelivery,
+  checkDeliveryBlocks,
+  flattenBlocks,
+  packagesInLine,
+  packagesLeftInBatch,
   remainingPackages,
 } from './domain/order-delivery';
 export type {
   DeliveryAllocation,
   DeliveryBatchState,
+  DeliveryBlockIssue,
   DeliveryCheck,
+  DeliveryCustomerBlock,
   DeliveryLineState,
 } from './domain/order-delivery';
+export type { OrderDeliveryState, OrderPendingDelivery } from './domain/order-pending-delivery';
 export { createGetOrderDelivery } from './domain/get-order-delivery';
 export type {
   GetOrderDeliveryDeps,
@@ -303,3 +328,31 @@ export type { ListOrderDeliveriesDeps, OrderDeliveryHistoryView } from './domain
 export { createVoidDelivery } from './domain/void-delivery';
 export type { VoidDeliveryDeps, VoidDeliveryResult } from './domain/void-delivery';
 export { DeliveryAlreadyVoidedError, DeliveryNotFoundError } from './domain/errors';
+/** La entrega sin pedido: la regla pura que comparten el sheet y el servidor, sus casos de uso y su
+ *  error propio. */
+export {
+  DIRECT_DELIVERY_NOTE_MAX_LENGTH,
+  DIRECT_DELIVERY_SURPLUS_MAX_PRODUCTS,
+  checkDirectDelivery,
+  directAllocations,
+  normalizeDeliveryNote,
+  surplusPackages,
+  waitingOrders,
+  waitingPackages,
+} from './domain/direct-delivery';
+export type { DirectDeliveryCheck, WaitingOrder, WaitingOrderLine } from './domain/direct-delivery';
+export { createGetDirectDelivery } from './domain/get-direct-delivery';
+export type { DirectDeliveryView, GetDirectDeliveryDeps } from './domain/get-direct-delivery';
+export { createListDirectDeliverySurplus } from './domain/list-direct-delivery-surplus';
+export type { ListDirectDeliverySurplusDeps } from './domain/list-direct-delivery-surplus';
+export { createDeliverDirect } from './domain/deliver-direct';
+export type { DeliverDirectDeps, DeliverDirectResult } from './domain/deliver-direct';
+export { createGetDirectDeliveryForVoid } from './domain/get-direct-delivery-for-void';
+export type {
+  DirectDeliveryVoidCustomer,
+  DirectDeliveryVoidView,
+  GetDirectDeliveryForVoidDeps,
+} from './domain/get-direct-delivery-for-void';
+export { createVoidDirectDelivery } from './domain/void-direct-delivery';
+export type { VoidDirectDeliveryDeps, VoidDirectDeliveryResult } from './domain/void-direct-delivery';
+export { DeliveryExceedsSurplusError } from './domain/errors';

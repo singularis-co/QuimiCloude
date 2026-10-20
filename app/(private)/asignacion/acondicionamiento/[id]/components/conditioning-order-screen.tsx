@@ -39,7 +39,6 @@ export const CONDITIONING_ORDER_SCREEN_TEXTS = {
   conditionedBy: (name: string) => `Lo acondiciona ${name}.`,
   backToQueue: 'Volver a «Por acondicionar»',
   backToConditioned: 'Volver a «Acondicionados»',
-  backToDelivered: 'Volver a «Entregados»',
   batchDataMissing: (count: number) =>
     count === 1 ? 'Faltan los datos de lote de 1 línea.' : `Faltan los datos de lote de ${count} líneas.`,
 } as const;
@@ -47,14 +46,8 @@ export const CONDITIONING_ORDER_SCREEN_TEXTS = {
 const BATCH_DATA_MISSING_ID = 'conditioning-order-batch-data-missing';
 
 function backLink(status: OrderStatus): { readonly href: string; readonly label: string } {
-  if (status === 'TERMINADO') {
+  if (status === 'TERMINADO' || status === 'ENTREGADO') {
     return { href: assignmentViewHref('acondicionados'), label: CONDITIONING_ORDER_SCREEN_TEXTS.backToConditioned };
-  }
-  if (status === 'ENTREGADO') {
-    return {
-      href: assignmentViewHref('acondicionados_entregados'),
-      label: CONDITIONING_ORDER_SCREEN_TEXTS.backToDelivered,
-    };
   }
   return { href: assignmentViewHref('por_acondicionar'), label: CONDITIONING_ORDER_SCREEN_TEXTS.backToQueue };
 }
@@ -86,21 +79,31 @@ export function ConditioningOrderScreen({
   return (
     <OperatorScreenFrame
       testId={CONDITIONING_ORDER_SCREEN_TESTID}
-      back={{ href: back.href, label: back.label, testId: CONDITIONING_ORDER_BACK_LINK_TESTID }}
+      // `canFinish` es «en acondicionamiento a nombre del propio actor»: ya comenzado, la vuelta
+      // queda deshabilitada hasta terminar.
+      back={{
+        href: back.href,
+        label: back.label,
+        testId: CONDITIONING_ORDER_BACK_LINK_TESTID,
+        disabled: canFinish,
+      }}
       eyebrow={order.numberText}
       eyebrowTestId={CONDITIONING_ORDER_NUMBER_TESTID}
       title={order.recipeName ?? CONDITIONING_ORDER_SCREEN_TEXTS.recipeMissing}
       titleTestId={CONDITIONING_ORDER_RECIPE_TESTID}
       subtitle={
         <>
-          <span data-testid={CONDITIONING_ORDER_QUANTITY_TESTID} title={exactDecimalTitle(order.quantity)}>
+          <span
+            className="block"
+            data-testid={CONDITIONING_ORDER_QUANTITY_TESTID}
+            title={exactDecimalTitle(order.quantity)}
+          >
             {CONDITIONING_ORDER_SCREEN_TEXTS.quantityLabel} {formatDecimalDisplay(order.quantity)}
             {order.unitLabel === null ? null : ` ${order.unitLabel}`}
           </span>
-          <span aria-hidden="true">{' · '}</span>
-          <span data-testid={CONDITIONING_ORDER_DISTRIBUTION_TESTID}>
-            <OrderDistributionFull lines={order.presentationLines} />
-          </span>
+          <div className="mt-2" data-testid={CONDITIONING_ORDER_DISTRIBUTION_TESTID}>
+            <OrderDistributionFull lines={order.presentationLines} withImages />
+          </div>
           {order.conditionedByName === null ? null : (
             <span className="block" data-testid={CONDITIONING_ORDER_CONDITIONER_TESTID}>
               {CONDITIONING_ORDER_SCREEN_TEXTS.conditionedBy(order.conditionedByName)}
@@ -163,7 +166,10 @@ export function ConditioningOrderScreen({
               <CardContent>
                 <ConditioningBatchDataForm
                   orderId={order.id}
-                  lines={batchData.lines.map((line) => ({ ...line, label: orderDistributionFullText([line]) }))}
+                  form={batchData.form}
+                  divergentLabels={Object.fromEntries(
+                    batchData.lines.map((line) => [line.presentationId, orderDistributionFullText([line])]),
+                  )}
                 />
               </CardContent>
             </Card>

@@ -662,8 +662,14 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     // RETENSADO 2026-09-12 (QC-23): entra `RevokedSession` -R10, el lado inverso de
     // `revoked_sessions.user_id`, que Prisma EXIGE para el `@relation` del registro de sesiones
     // cerradas-. Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`.
+    // RETENSADO 2026-10-14 (QC-162): entra `CompanyEvent`, el lado inverso del autor del
+    // historial de empresas. Es de `identity`, no de `proveedores`: el caso b) lo sigue vigilando.
+    // RETENSADO 2026-10-15 (QC-277, D13–D16): entra `CompanyAddonOverride`, el lado inverso del
+    // autor de una excepcion de añadido. Tambien es de `identity`.
     expect(relationTargets('User')).toEqual([
       'Company',
+      'CompanyAddonOverride',
+      'CompanyEvent',
       'CredentialSetupToken',
       'DocumentType',
       'RevokedSession',
@@ -708,8 +714,14 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     // (`specs/QC-23-registro-de-sesiones/design.md > 2.2`), no de `proveedores`: sigue sin haber
     // ni un campo de `User` hacia este modulo, que es lo que este caso vigila. Y sigue siendo
     // igualdad EXACTA sobre el conjunto entero, no un `toContain`.
+    // RETENSADO 2026-10-14 (QC-162): entra `CompanyEvent`, el lado inverso del autor del
+    // historial de empresas; tampoco es de `proveedores`.
+    // RETENSADO 2026-10-15 (QC-277, D13–D16): entra `CompanyAddonOverride`, el lado inverso del
+    // autor de una excepcion de añadido; tampoco es de `proveedores`.
     expect(relationTargets('User')).toEqual([
       'Company',
+      'CompanyAddonOverride',
+      'CompanyEvent',
       'CredentialSetupToken',
       'DocumentType',
       'RevokedSession',

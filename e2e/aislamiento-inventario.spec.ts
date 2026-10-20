@@ -15,7 +15,6 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import {
   normalizePresentationName,
   normalizeProductName,
-  productDisplayName,
 } from '@/lib/modules/inventario';
 import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -304,14 +303,9 @@ test.describe('aislamiento por empresa del inventario', () => {
       'el producto de la empresa B no puede viajar en el HTML servido de una sesion de A',
     ).toBe(false);
 
-    // La celda del producto pinta «nombre · unidad», no solo el nombre. El fixture no declara
-    // `symbol` para su unidad, asi que la etiqueta es el NOMBRE de la unidad (`productUnitLabel`,
-    // `product-columns.tsx`): se compone con la misma funcion que usa la pantalla, en vez de
-    // adivinar el separador a mano.
+    // La celda del producto pinta solo el nombre; la unidad va junto a la existencia.
     await expect(
-      page
-        .getByTestId(NAME_CELL)
-        .filter({ hasText: exactText(productDisplayName(PRODUCT_A_NAME, UNIT_A_NAME)) }),
+      page.getByTestId(NAME_CELL).filter({ hasText: exactText(PRODUCT_A_NAME) }),
     ).toHaveCount(1, { timeout: 60_000 });
     await expect(
       page.getByTestId(NAME_CELL).filter({ hasText: exactText(PRODUCT_B_NAME) }),
@@ -343,7 +337,9 @@ test.describe('aislamiento por empresa del inventario', () => {
     await page.goto(listUrl(INVENTORY_ROUTE, SHARED_TOKEN));
     await expect(page.getByTestId(INVENTORY_TITLE)).toBeVisible({ timeout: 60_000 });
 
-    const menuDeFila = page.getByTestId(ROW_ACTIONS);
+    // Se cuentan los menus de las filas: la tarjeta de cada producto (oculta en una lista ancha)
+    // lleva el suyo.
+    const menuDeFila = page.locator('[data-testid^="data-table-row-"]').getByTestId(ROW_ACTIONS);
     await expect(menuDeFila, 'la lista de A debe ofrecer el borrado de su unico producto').toHaveCount(1, {
       timeout: 60_000,
     });

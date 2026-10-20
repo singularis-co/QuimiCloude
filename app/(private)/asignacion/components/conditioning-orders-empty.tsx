@@ -5,7 +5,6 @@ import { AssignmentListEmpty } from './assignment-list-parts';
 export const CONDITIONING_ORDERS_EMPTY_TEXTS = {
   por_acondicionar: 'No hay pedidos por acondicionar en tu empresa.',
   acondicionados: 'Todavía no has terminado ningún acondicionamiento.',
-  acondicionados_entregados: 'Todavía no se ha entregado ningún pedido que acondicionaste.',
 } as const;
 
 export type ConditioningOrdersEmptyProps = {

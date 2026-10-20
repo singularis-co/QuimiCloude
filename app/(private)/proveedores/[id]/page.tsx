@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { AiProviderRequiredTooltip } from '@/components/shared/ai-provider-required-tooltip';
 import { ErrorState } from '@/components/shared/error-state';
 import { identity } from '@/lib/composition';
 import { canUploadDocuments } from '@/lib/modules/documentos';
 import type { ErrorCode } from '@/lib/modules/errores';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import { getAiProviderReadinessAction } from '@/lib/modules/integraciones/adapters/driving/ai-provider-actions';
 import { getSupplierAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL, SUPPLIERS_LABEL } from '@/lib/shared/navigation/private-nav';
@@ -121,14 +123,22 @@ export default async function ProveedorDetallePage({
     );
   }
 
+  const readiness = canUpload ? await getAiProviderReadinessAction() : null;
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <SupplierDetailHeader supplier={supplierResult.data} />
-      {canUpload ? (
+      {readiness === null ? null : (
         <div className="flex justify-end">
-          <CatalogPdfUpload supplierId={supplierResult.data.id} />
+          {readiness.configured ? (
+            <CatalogPdfUpload supplierId={supplierResult.data.id} />
+          ) : (
+            <AiProviderRequiredTooltip>
+              <CatalogPdfUpload supplierId={supplierResult.data.id} disabled />
+            </AiProviderRequiredTooltip>
+          )}
         </div>
-      ) : null}
+      )}
       {/*
         SIN `key`: este limite no se remonta en cada cambio de consulta -eso destruia la barra de
         filtros y con ella el foco-. La senal de R24 llega desde dentro de `CatalogTable` mientras

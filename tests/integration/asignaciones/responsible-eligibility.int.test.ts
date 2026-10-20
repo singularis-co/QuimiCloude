@@ -2,12 +2,13 @@
 /**
  * Quien puede ser responsable de un pedido, contra Postgres real.
  *
+ * QC-274 (2026-10-13): por nombre de rol, Operador y Empacador; enmienda QC-145 R32/D13.
+ *
  * POR QUE AQUI Y NO SOLO EN UNIDAD. `tests/unit/asignaciones/assign-responsibles.test.ts` prueba
  * el caso de uso con un doble de `PeopleDirectory` que contesta lo que el test le dicta. Aqui el
- * permiso `pedidos.consultar` sale de una fila real de `role_permissions`, leida por
- * `assignment-directory-prisma.ts` con el `select` que compone `role -> rolePermissions ->
- * permission.code`: solo contra la base se demuestra que esa lectura, y no una promesa del doble,
- * es lo que decide la elegibilidad.
+ * nombre del rol sale de una fila real de `roles` (los roles SEMBRADOS), leida por
+ * `assignment-directory-prisma.ts`: solo contra la base se demuestra que esa lectura, y no una
+ * promesa del doble, decide la elegibilidad, y que el tope del selector no se come candidatos.
  *
  * Este archivo ademas ejercita los TRES casos de uso de ejecucion (`get-`, `start-` y
  * `finish-assigned-order.ts`) sin tocarlos: la receta del fixture nace SIN lineas ni pasos
@@ -33,6 +34,10 @@ vi.mock('@/lib/shared/db/prisma', async () => {
 
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
+import {
+  createListResponsibleCandidates,
+  MAX_CANDIDATES,
+} from '@/lib/modules/asignaciones/domain/list-responsible-candidates';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { createGetAssignedOrderExecution } from '@/lib/modules/asignaciones/domain/get-assigned-order-execution';
 import { createStartAssignedOrder } from '@/lib/modules/asignaciones/domain/start-assigned-order';
@@ -42,6 +47,12 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
+import {
+  ROLE_ACONDICIONAMIENTO,
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  ROLE_OPERADOR,
+} from '@/lib/modules/identity';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -58,12 +69,14 @@ import {
   createPerson,
   createWorkGroup,
   addMember,
+  findSeedRoleId,
   inRolledBackTransaction,
   withSavepoint,
   type Fixture,
 } from './use-case-fixture';
 import { realOrderSummaries } from '../../helpers/order-summaries';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
+import { evidenceRepositoryUnused, evidenceStorageUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
 
 const summaryReaders = realOrderSummaries();
 
@@ -123,6 +136,7 @@ function ordersReales(): OrderCatalog {
     listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
     listAliveSummariesInCompany: async () => noLlamar('orders.listAliveSummariesInCompany'),
     listSummariesByIdsIncludingDeleted: async () => noLlamar('orders.listSummariesByIdsIncludingDeleted'),
+    listDeliveryProgressByIdsIncludingDeleted: async () => noLlamar('orders.listDeliveryProgressByIdsIncludingDeleted'),
     transitionAliveById: transitionAliveByIdReal,
     startPackingAliveById: async () => noLlamar('orders.startPackingAliveById'),
     finishPackingAliveById: async () => noLlamar('orders.finishPackingAliveById'),
@@ -144,6 +158,8 @@ function wireExecutionUseCases(fixture: Fixture) {
     units: unitsQueNoSeLlaman,
     products: productsQueNoSeLlaman,
     presentations: presentationsQueNoSeLlaman,
+    evidence: evidenceRepositoryUnused,
+    storage: evidenceStorageUnused,
   };
 
   return {
@@ -156,6 +172,8 @@ function wireExecutionUseCases(fixture: Fixture) {
       groups: assignmentDirectoryPrisma,
       ...execution,
       now: () => NOW,
+      recipes: recipesWithoutEvidence,
+      evidence: evidenceRepositoryUnused,
     }),
   };
 }
@@ -177,13 +195,29 @@ async function createRoleWithPermission(
 }
 
 describe('asignaciones · quien puede ser responsable, contra la base (integracion)', () => {
-  it('R33: una persona con `pedidos.consultar` de verdad -> `user_cannot_be_responsible`, sin escribir', async () => {
+  it('QC-274: asignar a un Administrador de acondicionamiento se rechaza en el servidor, sin escribir', async () => {
     await inRolledBackTransaction(async (fixture) => {
-      const administradorRoleId = await createRoleWithPermission(fixture, 'pedidos.consultar');
-      const administrador = await createPerson(
-        { tx: fixture.tx, roleId: administradorRoleId },
-        fixture.companyA,
+      const roleId = await findSeedRoleId(fixture.tx, ROLE_ACONDICIONAMIENTO);
+      const acondicionador = await createPerson({ tx: fixture.tx, roleId }, fixture.companyA);
+      const pedido = await createOrder(fixture);
+
+      const error = await withSavepoint(fixture.tx, () =>
+        fixture.useCases.assign(
+          actorOf(fixture.companyA),
+          { orderId: pedido, userIds: [acondicionador], workGroupIds: [] },
+          NOW,
+        ),
       );
+
+      expect(codeOf(error)).toBe('user_cannot_be_responsible');
+      expect(await fixture.tx.orderAssignment.findMany({ where: { orderId: pedido } })).toEqual([]);
+    });
+  });
+
+  it('R33, QC-274: asignar a un Administrador se rechaza en el servidor, sin escribir', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const roleId = await findSeedRoleId(fixture.tx, ROLE_ADMINISTRADOR);
+      const administrador = await createPerson({ tx: fixture.tx, roleId }, fixture.companyA);
       const pedido = await createOrder(fixture);
 
       const error = await withSavepoint(fixture.tx, () =>
@@ -195,22 +229,51 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
       );
 
       expect(codeOf(error)).toBe('user_cannot_be_responsible');
-      expect(
-        await fixture.tx.orderAssignment.findMany({ where: { orderId: pedido } }),
-      ).toEqual([]);
+      expect(await fixture.tx.orderAssignment.findMany({ where: { orderId: pedido } })).toEqual([]);
     });
   });
 
-  it('R34, R36: un grupo con un Administrador y un Operador de verdad -> el Operador queda asignado, el Administrador sin fila', async () => {
+  it('QC-274: un Operador y un Empacador sueltos quedan asignados', async () => {
     await inRolledBackTransaction(async (fixture) => {
-      const administradorRoleId = await createRoleWithPermission(fixture, 'pedidos.consultar');
+      const operador = await createPerson(
+        { tx: fixture.tx, roleId: await findSeedRoleId(fixture.tx, ROLE_OPERADOR) },
+        fixture.companyA,
+      );
+      const empacador = await createPerson(
+        { tx: fixture.tx, roleId: await findSeedRoleId(fixture.tx, ROLE_EMPACADOR) },
+        fixture.companyA,
+      );
+      const pedido = await createOrder(fixture);
+
+      const outcome = await fixture.useCases.assign(
+        actorOf(fixture.companyA),
+        { orderId: pedido, userIds: [operador, empacador], workGroupIds: [] },
+        NOW,
+      );
+
+      expect(outcome).toEqual({ added: 2 });
+      const filas = await fixture.tx.orderAssignment.findMany({
+        where: { orderId: pedido },
+        select: { userId: true },
+      });
+      expect(filas.map((fila) => fila.userId).sort()).toEqual([operador, empacador].sort());
+    });
+  });
+
+  it('R34, R36, QC-274: un grupo con Administrador, Acondicionamiento y Operador -> solo el Operador queda asignado', async () => {
+    await inRolledBackTransaction(async (fixture) => {
       const administrador = await createPerson(
-        { tx: fixture.tx, roleId: administradorRoleId },
+        { tx: fixture.tx, roleId: await findSeedRoleId(fixture.tx, ROLE_ADMINISTRADOR) },
+        fixture.companyA,
+      );
+      const acondicionador = await createPerson(
+        { tx: fixture.tx, roleId: await findSeedRoleId(fixture.tx, ROLE_ACONDICIONAMIENTO) },
         fixture.companyA,
       );
       const operador = await createPerson(fixture, fixture.companyA);
       const grupo = await createWorkGroup(fixture.tx, fixture.companyA);
       await addMember(fixture.tx, fixture.companyA, grupo.id, administrador);
+      await addMember(fixture.tx, fixture.companyA, grupo.id, acondicionador);
       await addMember(fixture.tx, fixture.companyA, grupo.id, operador);
       const pedido = await createOrder(fixture);
 
@@ -226,6 +289,35 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
         select: { userId: true },
       });
       expect(filas.map((fila) => fila.userId)).toEqual([operador]);
+    });
+  });
+
+  it('QC-274: el selector solo ofrece Operador y Empacador activos y, con mas de 25 personas, el tope no se come ninguno', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const acondicionamientoId = await findSeedRoleId(fixture.tx, ROLE_ACONDICIONAMIENTO);
+      await createPerson(
+        { tx: fixture.tx, roleId: await findSeedRoleId(fixture.tx, ROLE_ADMINISTRADOR) },
+        fixture.companyA,
+        { lastNames: 'Aaa Admin' },
+      );
+      // MAX_CANDIDATES + 1 no elegibles que ordenan ANTES que cualquier candidato.
+      for (let i = 0; i < MAX_CANDIDATES + 1; i += 1) {
+        await createPerson({ tx: fixture.tx, roleId: acondicionamientoId }, fixture.companyA, {
+          lastNames: `Aab ${String(i).padStart(2, '0')}`,
+        });
+      }
+      await createPerson(fixture, fixture.companyA, { lastNames: 'Mmm Inactivo', accountStatus: 'inactive' });
+      const operador = await createPerson(fixture, fixture.companyA, { lastNames: 'Zza Operador' });
+      const empacador = await createPerson(
+        { tx: fixture.tx, roleId: await findSeedRoleId(fixture.tx, ROLE_EMPACADOR) },
+        fixture.companyA,
+        { lastNames: 'Zzb Empacador' },
+      );
+
+      const listar = createListResponsibleCandidates({ people: assignmentDirectoryPrisma, now: () => NOW });
+      const candidatos = await listar(actorOf(fixture.companyA, ['asignaciones.modificar']), {});
+
+      expect(candidatos.map((candidato) => candidato.id)).toEqual([operador, empacador]);
     });
   });
 

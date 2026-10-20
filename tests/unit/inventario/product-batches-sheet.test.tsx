@@ -1,12 +1,12 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProductTable } from '@/app/(private)/inventario/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { PRODUCT_TYPES, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
-import { clickRowAction } from '../../helpers/row-actions-menu';
-import { setupUser } from '../../helpers/user-event';
+import { clickRowAction, openRowActionsMenu } from '../../helpers/row-actions-menu';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 /**
  * Enganche del panel de lotes al listado (R22, `specs/QC-92-ajuste-de-inventario/tasks.md > T13`).
@@ -85,7 +85,7 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
 
 async function abrirPanel() {
   const user = setupUser();
-  await clickRowAction(user, screen.getByTestId('product-row-actions'), 'product-batches-open');
+  await clickRowAction(user, within(screen.getByRole('table')).getByTestId('product-row-actions'), 'product-batches-open');
   return user;
 }
 
@@ -115,9 +115,140 @@ describe('la fila abre el panel de lotes DEL producto (R22)', () => {
 
     await waitFor(() => expect(listProductBatchesActionMock).toHaveBeenCalledWith('product-9'));
 
-    expect(await screen.findByTestId('product-batch-lot')).toHaveTextContent('L-001');
-    expect(screen.getByTestId('product-batch-quantity')).toHaveTextContent('12');
-    expect(screen.getByTestId('product-batch-purchase-date')).toHaveTextContent('2026-03-05');
+    const fila = await screen.findByTestId('data-table-row-b1');
+    expect(within(fila).getByTestId('product-batch-lot')).toHaveTextContent('L-001');
+    expect(within(fila).getByTestId('product-batch-quantity')).toHaveTextContent('12');
+    expect(within(fila).getByTestId('product-batch-purchase-date')).toHaveTextContent('2026-03-05');
+  });
+});
+
+describe('R15, R20 — cabecera y ancho del panel', () => {
+  it('R15 — pinta «Lotes» encima del titulo, que sigue siendo el nombre del producto', async () => {
+    render(<ProductTable products={[producto({ name: 'Acido citrico' })]} params={PARAMS} totalPages={1} />);
+
+    await abrirPanel();
+
+    const titulo = await screen.findByRole('heading', { name: 'Acido citrico' });
+    const etiqueta = screen.getByTestId('product-batches-label');
+    expect(etiqueta).toHaveTextContent(/^Lotes$/);
+    expect(etiqueta.compareDocumentPosition(titulo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(etiqueta.closest('[data-slot="sheet-header"]')).toBe(titulo.closest('[data-slot="sheet-header"]'));
+    expect(screen.getByRole('dialog', { name: 'Acido citrico' })).toBeInTheDocument();
+  });
+
+  it('R20 — mide hasta 900 px y ocupa todo el ancho en una ventana mas estrecha', async () => {
+    render(<ProductTable products={[producto()]} params={PARAMS} totalPages={1} />);
+
+    await abrirPanel();
+
+    const panel = await screen.findByTestId('product-batches-sheet');
+    expect(panel).toHaveClass('data-[side=right]:w-full', 'data-[side=right]:sm:max-w-[900px]');
+    expect(panel).not.toHaveClass('data-[side=right]:w-3/4');
+    expect(panel).not.toHaveClass('data-[side=right]:sm:max-w-sm');
+  });
+});
+
+describe('R16 — estados del panel', () => {
+  it('R16 — mientras se piden los lotes pinta «Cargando lotes…»', async () => {
+    listProductBatchesActionMock.mockReturnValue(new Promise(() => {}));
+    render(<ProductTable products={[producto()]} params={PARAMS} totalPages={1} />);
+
+    await abrirPanel();
+
+    expect(await screen.findByTestId('product-batches-loading')).toHaveTextContent('Cargando lotes…');
+  });
+
+  it('R16 — sin lotes pinta el vacio de hoy', async () => {
+    render(<ProductTable products={[producto()]} params={PARAMS} totalPages={1} />);
+
+    await abrirPanel();
+
+    expect(await screen.findByTestId('product-batches-panel')).toHaveTextContent(
+      'Este producto todavía no tiene lotes registrados.',
+    );
+  });
+});
+
+async function abrirMenuDelLote(lot: string) {
+  const fila = await screen.findByTestId('data-table-row-b1');
+  return within(fila).getByRole('button', { name: `Acciones del lote ${lot}` });
+}
+
+describe('R18 — el menu de cada lote', () => {
+  it('R18 — con permiso ofrece «Historial» y «Ajustar existencia», en ese orden', async () => {
+    listProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote({ id: 'b1' })] });
+    render(<ProductTable products={[producto()]} params={PARAMS} totalPages={1} canAdjust />);
+
+    const user = await abrirPanel();
+    const menu = await openRowActionsMenu(user, await abrirMenuDelLote('L-001'));
+
+    const items = within(menu).getAllByRole('menuitem');
+    expect(items.map((item) => item.textContent)).toEqual(['Historial', 'Ajustar existencia']);
+    expect(items.map((item) => item.getAttribute('data-testid'))).toEqual([
+      'batch-history-trigger',
+      'adjust-batch-open',
+    ]);
+  });
+
+  it('R18 — sin permiso solo ofrece «Historial»', async () => {
+    listProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote({ id: 'b1' })] });
+    render(<ProductTable products={[producto()]} params={PARAMS} totalPages={1} canAdjust={false} />);
+
+    const user = await abrirPanel();
+    const menu = await openRowActionsMenu(user, await abrirMenuDelLote('L-001'));
+
+    expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Historial']);
+    expect(within(menu).queryByTestId('adjust-batch-open')).toBeNull();
+  });
+
+  it('R18 — «Historial» abre el historial de ese lote encima del panel', async () => {
+    listProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [lote({ id: 'b1', lot: 'L-001' })],
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [] });
+    render(<ProductTable products={[producto()]} params={PARAMS} totalPages={1} />);
+
+    const user = await abrirPanel();
+    await clickRowAction(user, await abrirMenuDelLote('L-001'), 'batch-history-trigger');
+
+    await waitFor(() => expect(listBatchMovementsActionMock).toHaveBeenCalledWith('b1'));
+    expect(await screen.findByTestId('batch-history-lot')).toHaveTextContent('L-001');
+    expect(screen.getByTestId('product-batches-sheet')).toBeInTheDocument();
+  });
+
+  it('R18 — «Ajustar existencia» abre el ajuste de ese lote y, tras ajustar, se vuelven a pedir los lotes', async () => {
+    listProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [lote({ id: 'b1', lot: 'L-001', stock: '12' })],
+    });
+    adjustBatchStockActionMock.mockResolvedValue({
+      status: 'success',
+      stock: '10.0000',
+      reserved: '0.0000',
+      overReserved: false,
+    });
+    render(<ProductTable products={[producto()]} params={PARAMS} totalPages={1} canAdjust />);
+
+    const user = await abrirPanel();
+    await clickRowAction(user, await abrirMenuDelLote('L-001'), 'adjust-batch-open');
+
+    expect(await screen.findByTestId('adjust-batch-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('adjust-batch-description')).toHaveTextContent('Acido citrico · Lote L-001');
+    await user.type(screen.getByTestId('adjust-batch-counted'), '10');
+    await user.click(screen.getByTestId('adjust-batch-reason'));
+    await user.click(await esperarInteractiva(await screen.findByRole('option', { name: 'Merma' })));
+    await user.click(screen.getByTestId('adjust-batch-confirm'));
+
+    await waitFor(() => expect(adjustBatchStockActionMock).toHaveBeenCalledTimes(1));
+    const enviado = adjustBatchStockActionMock.mock.calls[0]?.[1] as FormData;
+    expect(enviado.get('batchId')).toBe('b1');
+    await waitFor(() => expect(listProductBatchesActionMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId('data-table-row-b1')).toBeInTheDocument();
+    // Una sola recarga por ajuste, no una por cada repintado del panel.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(listProductBatchesActionMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('product-batches-sheet')).toBeInTheDocument();
   });
 });
 
@@ -166,8 +297,8 @@ describe('canAdjust decide si el control de ajuste existe en el DOM (R22, R21)',
     expect(screen.queryByTestId('adjust-batch-open')).toBeNull();
   });
 
-  it('con canAdjust el control de ajuste SI existe', async () => {
-    listProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote()] });
+  it('con canAdjust el control de ajuste SI existe, en el menu del lote', async () => {
+    listProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote({ id: 'b1' })] });
 
     render(
       <ProductTable
@@ -178,9 +309,10 @@ describe('canAdjust decide si el control de ajuste existe en el DOM (R22, R21)',
       />,
     );
 
-    await abrirPanel();
+    const user = await abrirPanel();
+    const menu = await openRowActionsMenu(user, await abrirMenuDelLote('L-001'));
 
-    expect(await screen.findByTestId('adjust-batch-open')).toBeInTheDocument();
+    expect(within(menu).getByTestId('adjust-batch-open')).toBeInTheDocument();
   });
 });
 
@@ -204,7 +336,7 @@ describe('el panel se titula "nombre · unidad" (T15)', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'Acciones de Acido citrico · kg' }),
+      within(screen.getByRole('table')).getByRole('button', { name: 'Acciones de Acido citrico · kg' }),
     ).toBeInTheDocument();
 
     await abrirPanel();
@@ -221,7 +353,7 @@ describe('el panel se titula "nombre · unidad" (T15)', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Acciones de Acido citrico' })).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByRole('button', { name: 'Acciones de Acido citrico' })).toBeInTheDocument();
 
     await abrirPanel();
 
@@ -238,7 +370,7 @@ describe('el panel se titula "nombre · unidad" (T15)', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Acciones de Acido citrico' })).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByRole('button', { name: 'Acciones de Acido citrico' })).toBeInTheDocument();
 
     await abrirPanel();
 

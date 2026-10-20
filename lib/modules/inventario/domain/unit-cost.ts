@@ -1,7 +1,8 @@
 /**
- * Derivacion del costo unitario a partir del costo total.
+ * Derivacion del costo unitario a partir del costo total, y costo unitario medio ponderado de
+ * los lotes de un producto (columna «Costo» del listado de inventario).
  *
- * Esta es la UNICA operacion aritmetica sobre un importe en todo el repo: el resto de los
+ * Las dos comparten escala y redondeo, por eso viven juntas: el resto de los
  * importes viajan como cadena decimal y la aritmetica la hace Postgres. Por eso se hace con
  * `BigInt` -del lenguaje- y no con una utilidad casera de decimales ni con una dependencia
  * nueva: `design.md > 5` evaluo la libreria de decimales y la descarto con argumento, y
@@ -86,4 +87,46 @@ export function deriveUnitCost(totalCost: string, stock: string): string | null 
   if (scaledUnitCost === ZERO) return null;
 
   return fromScaledInteger(scaledUnitCost);
+}
+
+/** Lo minimo de un lote para ponderar su costo: existencia y costo unitario, como cadena decimal. */
+export type CostedBatchQuantity = {
+  readonly stock: string;
+  readonly unitCost: string | null;
+};
+
+function toScaledIntegerOrThrow(amount: string): bigint {
+  const scaled = toScaledInteger(amount);
+  if (scaled === null) {
+    throw new Error(`unit-cost: no es un decimal(14,4) valido: ${JSON.stringify(amount)}`);
+  }
+  return scaled;
+}
+
+/**
+ * Costo unitario medio ponderado: `suma(unitCost x stock) / suma(stock)`, redondeado a 4
+ * decimales mitad arriba.
+ *
+ * Solo pondera los lotes con existencia mayor que cero Y con costo: un lote agotado no tiene
+ * peso y uno sin costo no se puede contar como costo cero. Sin ningun lote que cumpla las dos,
+ * devuelve `null`.
+ *
+ * El numerador se acumula exacto a 8 decimales (4 + 4) y la division por la existencia, a 4,
+ * deja el cociente en la escala de la columna. Una cadena que no tenga la forma de
+ * `decimal(14,4)` lanza: en un agregado, saltarse un lote en silencio daria una media falsa.
+ */
+export function weightedAverageUnitCost(batches: readonly CostedBatchQuantity[]): string | null {
+  let weightedCost = ZERO;
+  let totalStock = ZERO;
+
+  for (const batch of batches) {
+    if (batch.unitCost === null) continue;
+    const stock = toScaledIntegerOrThrow(batch.stock);
+    if (stock === ZERO) continue;
+    weightedCost += toScaledIntegerOrThrow(batch.unitCost) * stock;
+    totalStock += stock;
+  }
+
+  if (totalStock === ZERO) return null;
+  return fromScaledInteger(divideRoundingHalfUp(weightedCost, totalStock));
 }

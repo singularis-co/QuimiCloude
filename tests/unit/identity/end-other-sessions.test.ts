@@ -26,6 +26,7 @@ import type {
   SessionUserReader,
   SessionUserRecord,
 } from '@/lib/modules/identity/ports/session-user-reader';
+import { ADDONS } from '@/lib/modules/identity';
 
 const ACTOR_ID = '11111111-1111-4111-8111-111111111111';
 const COMPANY_ID = '99999999-9999-4999-8999-999999999999';
@@ -109,6 +110,7 @@ function crearMundo(resultado: 'ok' | 'not_found' = 'ok') {
         roleName: 'operador',
         companyId: COMPANY_ID,
         companyDeletedAt: null,
+        companyAddons: [...ADDONS],
         permissions: ['inventario.consultar'],
         accountStatus: 'active',
         lockedUntil: null,

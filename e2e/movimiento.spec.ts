@@ -30,7 +30,7 @@
  * prefijo y edad.
  *
  * ENTRADA: siempre por `loginAndLand`, que deriva el aterrizaje de los permisos reales. Despues se
- * navega por URL a «Clientes», hermano de «Proveedores» en la misma lista del menu.
+ * navega por URL a la lista de clientes, hermana de «Contactos» en el submenu de «Clientes».
  */
 import { randomUUID } from 'node:crypto';
 
@@ -39,9 +39,16 @@ import { expect, test, type Page } from '@playwright/test';
 import { normalizeCustomerText } from '@/lib/modules/clientes';
 import { DOCUMENT_TYPE_CC, ROLE_ADMINISTRADOR, normalizeCompanyName } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { CUSTOMER_CONTACTS_TITLE_TESTID } from '@/app/(private)/clientes/contactos/components';
 import { prisma } from '@/lib/shared/db/prisma';
-import { CUSTOMERS_ROUTE, FORMULAS_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes';
+import {
+  CUSTOMER_CONTACTS_ROUTE,
+  CUSTOMERS_ROUTE,
+  FORMULAS_ROUTE,
+  SUPPLIERS_ROUTE,
+} from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -53,6 +60,9 @@ const RUN_ID = randomUUID().replace(/-/g, '');
 
 /** Edad minima de un resto de otra ejecucion: el otro proyecto corre a la vez con sus filas. */
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
+
+/** Valor de la columna cifrada de la conexion sembrada; nunca se descifra (ver `beforeAll`). */
+const E2E_AI_PROVIDER_KEY_ENC = 'v1:e2e-sin-descifrar';
 
 /** Viewport de escritorio: la barra lateral es fija (no un `Sheet`) y la pastilla de colapso existe. */
 const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
@@ -86,7 +96,8 @@ const UPLOAD_DIALOG_TESTID = 'document-upload-dialog';
 const UPLOAD_CLOSE_TESTID = 'document-upload-close';
 const SEARCH_BOX_TESTID = 'data-table-search';
 const SEARCH_PARAM = 'q';
-const NAV_CUSTOMERS_TESTID = 'nav-clientes';
+const NAV_CUSTOMERS_TESTID = 'nav-clientes-lista';
+const NAV_CUSTOMER_CONTACTS_TESTID = 'nav-clientes-contactos';
 const NAV_SUPPLIERS_TESTID = 'nav-proveedores';
 const SUPPLIERS_TITLE_TESTID = 'proveedores-title';
 const SIDEBAR_EDGE_TOGGLE_TESTID = 'private-sidebar-edge-toggle';
@@ -282,11 +293,14 @@ async function waitForRecord(
   return records.filter((r) => r.target === target && r.phase === phase).at(-1) as MotionRecord;
 }
 
-/** Posicion relativa del indicador frente al boton activo de su misma lista. */
+/**
+ * Posicion relativa del indicador frente al boton activo de su misma lista. La lista es la mas
+ * cercana, submenu o menu: cada una lleva su propio indicador.
+ */
 async function indicatorFit(page: Page, testId: string) {
   return page.evaluate((id) => {
     const button = document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
-    const list = button?.closest('[data-slot="sidebar-menu"]');
+    const list = button?.closest('[data-slot="sidebar-menu-sub"], [data-slot="sidebar-menu"]');
     const container = list?.parentElement;
     const indicator = container?.querySelector<HTMLElement>(
       ':scope > [data-slot="sidebar-active-indicator"]',
@@ -329,7 +343,7 @@ async function watchSlide(page: Page, testId: string): Promise<void> {
     w.__slides = [];
     const button = document.querySelector(`[data-testid="${id}"]`);
     const indicator = button
-      ?.closest('[data-slot="sidebar-menu"]')
+      ?.closest('[data-slot="sidebar-menu-sub"], [data-slot="sidebar-menu"]')
       ?.parentElement?.querySelector<HTMLElement>(':scope > [data-slot="sidebar-active-indicator"]');
     if (!indicator) throw new Error(`no hay indicador en la lista de ${id}`);
     new MutationObserver(() => {
@@ -388,6 +402,7 @@ test.beforeAll(async () => {
   const orphanIds = orphans.map((c) => c.id);
   if (orphanIds.length > 0) {
     await prisma.customer.deleteMany({ where: { companyId: { in: orphanIds } } });
+    await prisma.aiProviderConnection.deleteMany({ where: { companyId: { in: orphanIds } } });
     await prisma.user.deleteMany({ where: { companyId: { in: orphanIds } } });
     await prisma.company.deleteMany({ where: { id: { in: orphanIds } } });
   }
@@ -398,6 +413,7 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
+  await enableAllAddons(companyId);
 
   const role = await prisma.role.findUnique({
     where: { name: ROLE_ADMINISTRADOR },
@@ -406,7 +422,7 @@ test.beforeAll(async () => {
   if (!role) {
     throw new Error(`falta el rol "${ROLE_ADMINISTRADOR}": siembra la base con \`pnpm run db:seed\``);
   }
-  await createFixtureUser({
+  const admin = await createFixtureUser({
     data: {
       firstNames: `Qc228${RUN_ID.slice(0, 8)}`,
       lastNames: 'Movimiento',
@@ -425,6 +441,22 @@ test.beforeAll(async () => {
     select: { id: true },
   });
 
+  // Sin conexion de proveedor IA el dialogo de subida de formulas no se pinta (QC-275 R37): la
+  // pagina muestra el aviso de bloqueo en su lugar. La key no se descifra nunca: abrir y cerrar el
+  // dialogo no lee nada.
+  await prisma.aiProviderConnection.create({
+    data: {
+      id: randomUUID(),
+      companyId,
+      provider: 'ANTHROPIC',
+      apiKeyEnc: E2E_AI_PROVIDER_KEY_ENC,
+      status: 'ACTIVE',
+      keyUpdatedAt: new Date(),
+      createdById: admin.id,
+      updatedById: admin.id,
+    },
+  });
+
   await prisma.customer.create({
     data: {
       ...seededCustomer,
@@ -438,10 +470,12 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  // Orden de la FK restrictiva: clientes -> usuarios -> empresa, solo de ESTE worker.
+  // Orden de la FK restrictiva: clientes -> conexion IA -> usuarios -> empresa, solo de ESTE worker.
   try {
     if (companyId) {
       await prisma.customer.deleteMany({ where: { companyId } });
+      // Antes que el usuario (`created_by`) y que la empresa: las dos FK son RESTRICT.
+      await prisma.aiProviderConnection.deleteMany({ where: { companyId } });
       await prisma.user.deleteMany({ where: { companyId } });
     }
   } finally {
@@ -605,31 +639,35 @@ for (const reduced of [false, true]) {
       ).toEqual([]);
       await expect(page.locator('[data-screen-enter]')).toHaveCount(0);
 
-      // --- R13 y R19: pasar a otro modulo de la MISMA lista desliza el indicador y repite la
-      // entrada de pantalla.
-      await watchSlide(page, NAV_SUPPLIERS_TESTID);
-      await page.getByTestId(NAV_SUPPLIERS_TESTID).click();
-      await page.waitForURL((url) => url.pathname === SUPPLIERS_ROUTE, { timeout: 60_000 });
-      await expect(page.getByTestId(SUPPLIERS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
+      // --- Pasar a un hermano de la MISMA lista desliza el indicador y repite la entrada de
+      // pantalla.
+      await watchSlide(page, NAV_CUSTOMER_CONTACTS_TESTID);
+      await page.getByTestId(NAV_CUSTOMER_CONTACTS_TESTID).click();
+      await page.waitForURL((url) => url.pathname === CUSTOMER_CONTACTS_ROUTE, { timeout: 60_000 });
+      await expect(page.getByTestId(CUSTOMER_CONTACTS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
       await expect
         .poll(
           async () =>
             (
               await page.evaluate(() => (window as unknown as ProbeWindow).__screenEnter)
-            ).some((r) => r.pathname === SUPPLIERS_ROUTE),
+            ).some((r) => r.pathname === CUSTOMER_CONTACTS_ROUTE),
           { message: 'cambiar de modulo debe poner data-screen-enter', timeout: 15_000 },
         )
         .toBe(true);
       const screen = (
         await page.evaluate(() => (window as unknown as ProbeWindow).__screenEnter)
-      ).find((r) => r.pathname === SUPPLIERS_ROUTE) as ScreenEnterRecord;
+      ).find((r) => r.pathname === CUSTOMER_CONTACTS_ROUTE) as ScreenEnterRecord;
       expect(screen.blocks.length, 'la pantalla nueva no trae bloques').toBeGreaterThanOrEqual(2);
       const [first, second] = screen.blocks as [BlockStyle, BlockStyle];
       expect(first.animationName).toBe('screen-enter');
       expect(second.animationName).toBe('screen-enter');
 
-      await expectIndicatorOver(page, NAV_SUPPLIERS_TESTID, 'expandida, tras cambiar de modulo');
+      await expectIndicatorOver(
+        page,
+        NAV_CUSTOMER_CONTACTS_TESTID,
+        'expandida, tras cambiar de modulo',
+      );
       const slides = await page.evaluate(() => (window as unknown as ProbeWindow).__slides);
       expect(slides.length, 'el indicador debe deslizarse dentro de la misma lista').toBeGreaterThan(0);
       const slide = slides[0] as ProbeWindow['__slides'][number];
@@ -652,6 +690,12 @@ for (const reduced of [false, true]) {
 
       // El atributo se retira al terminar la entrada.
       await expect(page.locator('[data-screen-enter]')).toHaveCount(0, { timeout: 10_000 });
+
+      // En modo icono el submenu se oculta: el activo tiene que estar en el primer nivel. El salto
+      // entre listas es un fundido y aqui no se mide.
+      await page.getByTestId(NAV_SUPPLIERS_TESTID).click();
+      await page.waitForURL((url) => url.pathname === SUPPLIERS_ROUTE, { timeout: 60_000 });
+      await expect(page.getByTestId(SUPPLIERS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
       // --- R15: en modo icono el indicador sigue sobre el item activo.
       await page.getByTestId(SIDEBAR_EDGE_TOGGLE_TESTID).click();

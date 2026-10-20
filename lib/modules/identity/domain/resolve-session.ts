@@ -8,6 +8,7 @@
 // Cubre R14, R15, R16, R17, R19, R20, R21. Los cortes que ya existian (QC-8 R1, R10-R14, R23) se
 // conservan en el mismo orden y con el mismo comentario.
 
+import { effectiveAddons, effectivePermissions } from './company-addons';
 import { buildDisplayName } from './display-name';
 import { effectiveAccountStatus } from './effective-account-status';
 import { isSessionExpired } from './session-claims';
@@ -152,16 +153,20 @@ export function createResolveSession(
     // 9. Compone las dos proyecciones. Salir por `null` en cualquiera de los ocho cortes es el
     // MISMO camino de salida de siempre: el layout privado redirige al login, no se borra
     // ninguna cookie y no hay mensaje que diga por que (R16, QC-78 R20, `design.md > 4.3`).
+    //
+    // El recorte por añadidos va después de los cortes: decide qué puede hacer la persona, no si
+    // hay sesión. Sin empresa no hay añadidos que mirar y los permisos del rol pasan enteros.
+    const addons = record.companyId === null ? [] : effectiveAddons(record.companyAddons);
+    const permissions =
+      record.companyId === null ? record.permissions : effectivePermissions(record.permissions, addons);
     return {
       user: {
         id: record.id,
         username: record.username,
         displayName: buildDisplayName(record.firstNames, record.lastNames, record.username),
         roleName: record.roleName,
-        // QC-74 R7, R11 — los permisos viajan TAL CUAL desde el record: sin normalizar, sin
-        // ordenar y sin deduplicar. Esta cadena decide si hay sesion, no que puede hacer quien
-        // la tiene; eso lo decide `assertPermission` en cada caso de uso.
-        permissions: record.permissions,
+        permissions,
+        addons,
       },
       context:
         record.companyId === null

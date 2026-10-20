@@ -2359,6 +2359,7 @@ exports[`paridad de ProductNamePicker > R1 R2 — elegir una opcion deja su nomb
     [
       {
         "id": "40000000-0000-4000-8000-000000000002",
+        "imageUrl": null,
         "name": "Tapa rosca",
         "qtyAlert": null,
         "type": "PACKAGING",

@@ -1,5 +1,6 @@
 'use client';
 
+import { CameraIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
@@ -9,7 +10,7 @@ import { toast } from 'sonner';
 // desde esta ficha; aqui hace falta la vista sin estado del documento.
 import { StepDocumentView } from '@/components/shared/step-reader/step-document-view';
 import { ErrorAlert } from '@/components/shared/error-alert';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,8 +32,15 @@ import { recipeEditRoute } from '@/lib/shared/routes';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
+import { FormFooterBar } from './form-footer-bar';
 import type { RecipeFormProductPage } from './recipe-form';
-import { RECIPE_TOOL_ERROR_MESSAGES, RecipeLinesField } from './recipe-lines-field';
+import {
+  RECIPE_LINE_ERROR_MESSAGES,
+  RECIPE_LINES_GENERAL_ERROR_MESSAGE,
+  RECIPE_TOOL_ERROR_MESSAGES,
+  RECIPE_TOOLS_GENERAL_ERROR_MESSAGE,
+  RecipeLinesField,
+} from './recipe-lines-field';
 import {
   buildRecipeVersionPayload,
   extractFieldError,
@@ -42,10 +50,15 @@ import {
   extractToolErrors,
   toLineFormValues,
   toToolFormValues,
+  type RecipeFieldErrorMessages,
   type RecipeLineErrors,
   type RecipeToolErrors,
   type RecipeVersionFormState,
 } from './recipe-form-state';
+import {
+  RECIPE_VERSION_UNDER_REVIEW_LABEL,
+  RECIPE_VERSION_UNDER_REVIEW_TONE,
+} from './recipe-version-tones';
 
 const FIELD_TEXT = 'text-base';
 
@@ -53,6 +66,12 @@ const SAVE_SUCCESS_CREATE = 'Versión creada.';
 const SAVE_SUCCESS_EDIT = 'Versión actualizada.';
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const INVALID_INPUT_MESSAGE = 'Revisa los campos marcados.';
+/** Texto propio del nombre para los issues de forma de zod: el genérico sale en inglés. */
+const NAME_ERROR_MESSAGES: RecipeFieldErrorMessages = {
+  invalid: 'Escribe el nombre de la versión.',
+  tooLong: 'El nombre admite como máximo 120 caracteres.',
+};
+const REQUIRES_EVIDENCE_MARK = 'Requiere evidencia';
 
 export type RecipeVersionFormOriginal = {
   readonly id: string;
@@ -97,6 +116,18 @@ function buildInitialState(props: RecipeVersionFormProps): RecipeVersionFormStat
 
 function noop(): void {}
 
+function RequiresEvidenceMark({ testId }: { readonly testId: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary"
+      data-testid={testId}
+    >
+      <CameraIcon aria-hidden="true" className="size-4" />
+      {REQUIRES_EVIDENCE_MARK}
+    </span>
+  );
+}
+
 function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) {
   return (
     <section
@@ -137,7 +168,12 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
           <ol className="flex flex-col gap-4">
             {version.steps.map((step, index) => (
               <li key={index} className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Paso {index + 1}</span>
+                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  Paso {index + 1}
+                  {step.requiresEvidence === true ? (
+                    <RequiresEvidenceMark testId={`recipe-version-step-${index}-evidence`} />
+                  ) : null}
+                </span>
                 <StepDocumentView
                   document={step}
                   isItemChecked={() => false}
@@ -165,7 +201,12 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
           <ol className="flex flex-col gap-4">
             {version.packingSteps.map((step, index) => (
               <li key={index} className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Paso {index + 1}</span>
+                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  Paso {index + 1}
+                  {step.requiresEvidence === true ? (
+                    <RequiresEvidenceMark testId={`recipe-version-packing-step-${index}-evidence`} />
+                  ) : null}
+                </span>
                 <StepDocumentView
                   document={step}
                   isItemChecked={() => false}
@@ -210,11 +251,11 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
     if (!parsed.success) {
       const issues = parsed.error.issues;
       setFieldErrors({
-        name: extractFieldError(issues, 'name'),
-        lines: extractLineErrors(issues),
-        linesGeneral: extractGeneralLinesError(issues),
+        name: extractFieldError(issues, 'name', NAME_ERROR_MESSAGES),
+        lines: extractLineErrors(issues, RECIPE_LINE_ERROR_MESSAGES),
+        linesGeneral: extractGeneralLinesError(issues, RECIPE_LINES_GENERAL_ERROR_MESSAGE),
         tools: extractToolErrors(issues, RECIPE_TOOL_ERROR_MESSAGES),
-        toolsGeneral: extractGeneralToolsError(issues),
+        toolsGeneral: extractGeneralToolsError(issues, RECIPE_TOOLS_GENERAL_ERROR_MESSAGE),
       });
       setSaveError({ status: 'error', code: INVALID_INPUT_CODE, message: INVALID_INPUT_MESSAGE });
       return;
@@ -253,9 +294,12 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
       }}
     >
       {props.mode === 'edit' && props.version.isUnderReview ? (
-        <Badge variant="info" className="self-start" data-testid="recipe-version-form-under-review">
-          Por revisar
-        </Badge>
+        <StatusBadge
+          tone={RECIPE_VERSION_UNDER_REVIEW_TONE}
+          label={RECIPE_VERSION_UNDER_REVIEW_LABEL}
+          className="self-start"
+          data-testid="recipe-version-form-under-review"
+        />
       ) : null}
 
       {saveError === null ? null : (
@@ -266,9 +310,12 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
           renderCatalogued={(catalogued) => (
             <>
               <p data-testid="recipe-version-form-error-message">{catalogued.message}</p>
-              <p className="text-xs" data-testid="recipe-version-form-error-code">
-                {catalogued.code}
-              </p>
+              {/* `invalid_input` no se pinta: el mensaje ya dice qué hacer. */}
+              {catalogued.code === INVALID_INPUT_CODE ? null : (
+                <p className="text-xs" data-testid="recipe-version-form-error-code">
+                  {catalogued.code}
+                </p>
+              )}
             </>
           )}
         />
@@ -314,7 +361,7 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
 
       {props.mode === 'edit' ? <InheritedFromOriginal version={props.version} /> : null}
 
-      <div className="flex justify-end gap-2">
+      <FormFooterBar testId="recipe-version-form-footer">
         <Link
           href={originalRoute}
           data-slot="button"
@@ -332,7 +379,7 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
         >
           {isPending ? 'Guardando…' : 'Guardar'}
         </Button>
-      </div>
+      </FormFooterBar>
     </form>
   );
 }

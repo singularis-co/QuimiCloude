@@ -141,7 +141,7 @@ const TESTIDS = {
   executionScreen: 'order-execution-screen',
   executionActions: 'order-execution-actions',
   executionMaterials: 'order-execution-materials',
-  executionToolsTrigger: 'order-execution-tools-panel-trigger',
+  executionMaterialsTrigger: 'order-execution-materials-panel-trigger',
   stepReaderActions: 'step-reader-actions',
   stepChecklistItem: 'step-reader-item-0-0',
   stepFinish: 'step-reader-finish',
@@ -175,7 +175,6 @@ const TESTIDS = {
 const TAB_TESTIDS = {
   porAcondicionar: 'assignment-view-tab-por_acondicionar',
   acondicionados: 'assignment-view-tab-acondicionados',
-  entregados: 'assignment-view-tab-acondicionados_entregados',
 } as const;
 
 const SIDEBAR = '[data-slot="sidebar"]';
@@ -660,7 +659,7 @@ const FRAMES: readonly FrameCase[] = [
   {
     ...SCREENS[0]!,
     footer: (page) => page.getByTestId(TESTIDS.stepReaderActions),
-    controls: [TESTIDS.themeToggle, TESTIDS.executionActions, TESTIDS.executionToolsTrigger],
+    controls: [TESTIDS.themeToggle, TESTIDS.executionActions, TESTIDS.executionMaterialsTrigger],
   },
   {
     ...SCREENS[1]!,
@@ -778,7 +777,6 @@ test.describe('R9 — contadores de las pestañas', () => {
     const expected: ReadonlyArray<readonly [string, string, string]> = [
       [TAB_TESTIDS.porAcondicionar, 'Por acondicionar', '2'],
       [TAB_TESTIDS.acondicionados, 'Acondicionados', '1'],
-      [TAB_TESTIDS.entregados, 'Entregados', '0'],
     ];
     for (const [testId, label, count] of expected) {
       const tab = viewTab(page, testId);
@@ -832,6 +830,7 @@ test.describe('R21 — tarjetas a 390 × 844', () => {
     const { execPending } = seeded();
     await page.setViewportSize(PHONE);
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(TESTIDS.asignacionTitle)).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByTestId(TESTIDS.cards)).toBeVisible({ timeout: 60_000 });
@@ -883,15 +882,19 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
     const { execPending, execRunning } = seeded();
     await page.setViewportSize(PHONE);
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
 
-    const card = page.getByTestId(`data-table-card-${execPending.id}`);
-    await expect(card).toBeVisible({ timeout: 60_000 });
-    await clickUntilVisible(card.getByTestId(TESTIDS.assignedEnter), page.getByTestId('assigned-order-start-dialog'));
+    // «Entrar» ya no pide nada: «Comenzar» vive en el pie de la pantalla del pedido pendiente.
+    const pendingScreen = await openScreen(page, assignedOrderRoute(execPending.id), TESTIDS.executionScreen);
+    await clickUntilVisible(
+      pendingScreen.getByTestId('order-execution-start-button'),
+      page.getByTestId('order-execution-start-dialog'),
+    );
     await expectOperatorDialog(page, {
       label: '¿Comenzar el pedido?',
-      dialog: 'assigned-order-start-dialog',
-      dismiss: 'assigned-order-start-dialog-cancel',
-      confirm: 'assigned-order-start-confirm',
+      dialog: 'order-execution-start-dialog',
+      dismiss: 'order-execution-start-dialog-cancel',
+      confirm: 'order-execution-start-confirm',
     });
 
     const screen = await openScreen(page, assignedOrderRoute(execRunning.id), TESTIDS.executionScreen);
@@ -1115,6 +1118,7 @@ test.describe('QC-269 R1, R2, R3 — «Entrar» en «Mis asignados»', () => {
 
     await page.setViewportSize(DESKTOP);
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(TESTIDS.asignacionTitle)).toBeVisible({ timeout: 60_000 });
 
     // R1, R2: en la tabla, los tres botones y sus avisos comparten el borde derecho.

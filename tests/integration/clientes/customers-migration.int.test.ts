@@ -64,16 +64,43 @@ function locateCustomersMigrationDir(): string {
 const migrationDir = locateCustomersMigrationDir()
 const migrationsDir = dirname(migrationDir)
 
+/**
+ * Nota 2026-10-15: respeta el cuerpo `$$ ... $$` de un bloque `DO`. La cadena de dependientes
+ * incluye `20261015130000_order_delivery_lines_customer`, cuyo UP y DOWN abren con un `DO $$` que
+ * aborta antes de cambiar nada; un `split(';')` ingenuo lo partia por la mitad (42601). Mismo
+ * recorrido que `inventario/reserve-existing-orders-migration.int.test.ts`. Sin `$$`, el resultado
+ * es identico al de antes.
+ */
 function statementsOf(sql: string): readonly string[] {
-  return sql
+  const withoutComments = sql
     .replace(/\r\n/g, '\n')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .split('\n')
     .map((line) => line.replace(/--.*$/, ''))
     .join('\n')
-    .split(';')
-    .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0)
+
+  const statements: string[] = []
+  let current = ''
+  let inDollarBlock = false
+  let i = 0
+  while (i < withoutComments.length) {
+    if (withoutComments.slice(i, i + 2) === '$$') {
+      inDollarBlock = !inDollarBlock
+      current += '$$'
+      i += 2
+      continue
+    }
+    const char = withoutComments[i] as string
+    if (char === ';' && !inDollarBlock) {
+      statements.push(current)
+      current = ''
+    } else {
+      current += char
+    }
+    i += 1
+  }
+  statements.push(current)
+  return statements.map((statement) => statement.trim()).filter((statement) => statement.length > 0)
 }
 
 const UP_SOURCE = readFileSync(join(migrationDir, 'migration.sql'), 'utf8')

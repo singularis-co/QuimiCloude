@@ -10,8 +10,8 @@
 // uno nuevo. Esta ficha no construye ninguna maquinaria de trabajo en segundo plano.
 import { requirePermission, type Actor } from './actor';
 import { resendCredentialSetupLinkSchema } from './credential-setup-input';
-import { credentialSetupLinkExpiresAt } from './credential-setup-link';
-import { UserNotFoundError, UserNotPendingError, ValidationError } from './errors';
+import { resendCredentialSetupLinkTo } from './credential-setup-mail';
+import { ValidationError } from './errors';
 
 import type { CredentialSetupLinkRepository } from '../ports/credential-setup-link-repository';
 import type { CredentialSetupMailer } from '../ports/credential-setup-mailer';
@@ -104,49 +104,11 @@ export function createIssueCredentialSetupLink(
     const parsed = resendCredentialSetupLinkSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
-    const instante = now();
-
-    // El secreto se genera ANTES de saber si el usuario sirve, porque el puerto necesita su huella
-    // para intentar el `INSERT` en la misma transaccion en la que resuelve al usuario -y una
-    // consulta previa de existencia seria justo la carrera que R11 prohibe-. Si el usuario no
-    // sirve, este secreto **no se persiste y no se envia**: muere aqui sin salir a ningun sitio.
-    const { secret, digest } = deps.secrets.create();
-
-    const emision = await deps.links.issueForPendingUser({
+    const mail = await resendCredentialSetupLinkTo(deps, {
       userId: parsed.data.userId,
-      // SIEMPRE la empresa del actor (R15). Ver arriba por que el alta pasa `null` y esto no.
       companyId: actor.companyId,
-      digest,
-      // R16: los 7 dias cuentan desde el instante del REENVIO, no desde la emision original. No
-      // existe ninguna forma de prolongar un enlace ya emitido: extenderlo es emitir uno nuevo, y
-      // eso es exactamente lo que hace esta linea (R8).
-      expiresAt: credentialSetupLinkExpiresAt(instante),
-      now: instante,
+      now: now(),
     });
-
-    if (typeof emision === 'object') {
-      // El destinatario lo resuelve el repositorio y no el llamante (`design.md > 6.2`): enviar a
-      // una direccion que viniera por parametro seria un vector para usar el ERP como reenviador.
-      return { mail: await deps.mailer.sendCredentialSetupLink({ to: emision.email, secret }) };
-    }
-
-    if (emision === 'not_found') throw new UserNotFoundError();
-    if (emision === 'user_not_pending') throw new UserNotPendingError();
-
-    if (emision === 'superseded') {
-      // La carrera de `design.md > 4.5`: otra emision simultanea gano el indice unico parcial y
-      // **ella** envio el correo. La perdedora **no reintenta y no manda un segundo correo** -su
-      // secreto ni siquiera llego a persistirse-, y responde exito porque «hay un enlace vivo y se
-      // envio» es la verdad observable. Para una carrera cuyo resultado es el que se queria no se
-      // inventa un error nuevo.
-      return { mail: 'sent' };
-    }
-
-    // `'issued'` sin destinatario: el enlace quedo emitido pero el repositorio no devolvio a quien
-    // escribir, asi que no hay nada que enviar. No deberia ocurrir -el adaptador devuelve el correo
-    // cuando la emision sale bien-, y si ocurre manda R30: la operacion **no falla**, se dice que el
-    // correo no salio y QC-67 vuelve a ofrecer el reenvio. Mismo criterio, y misma rama, que el
-    // alta de `create-user.ts`.
-    return { mail: 'failed' };
+    return { mail };
   };
 }

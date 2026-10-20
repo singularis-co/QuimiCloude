@@ -9,7 +9,10 @@
 import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
+import {
+  createFinishedGoodsDirectDispatch,
+  createFinishedGoodsDispatch,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
 import { dispatchFinishedGoods } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 
 type BatchRow = { readonly id: string; readonly packageContent: Prisma.Decimal | null };
@@ -66,8 +69,12 @@ function makeTx(overrides: {
   return { tx: tx as unknown as Prisma.TransactionClient, txDouble: tx, order };
 }
 
-function baseInput(overrides: Partial<Parameters<typeof dispatchFinishedGoods>[1]> = {}) {
+// 2026-10-16 (QC-288): la entrada lleva el origen discriminado; estos casos son los de pedido.
+type OrderDispatchInput = Extract<Parameters<typeof dispatchFinishedGoods>[1], { origin: 'order' }>;
+
+function baseInput(overrides: Partial<OrderDispatchInput> = {}): OrderDispatchInput {
   return {
+    origin: 'order',
     orderId: 'order-1',
     orderDeliveryId: 'delivery-1',
     recipeId: 'recipe-1',
@@ -183,6 +190,79 @@ describe('dispatchFinishedGoods — orden de pasos con un tx doblado', () => {
   });
 });
 
+// 2026-10-15: las asignaciones pueden repetir lote (una por cliente). Un lote repetido se descuenta
+// una vez por la suma, con un asiento, y las lineas siguen siendo una por asignacion.
+describe('dispatchFinishedGoods — lote repetido entre asignaciones', () => {
+  const REPEATED = [
+    { batchId: 'batch-1', packages: 3 },
+    { batchId: 'batch-2', packages: 2 },
+    { batchId: 'batch-1', packages: 4 },
+  ];
+
+  it('R26: un decremento y un asiento por lote con la suma, y una linea por asignacion en el mismo orden', async () => {
+    const { tx, txDouble, order } = makeTx({ productRows: [{ id: 'product-1' }], batchRows: TWO_BATCHES });
+
+    const outcome = await dispatchFinishedGoods(tx, baseInput({ allocations: REPEATED }), SCOPE);
+
+    expect(outcome).toEqual({
+      kind: 'dispatched',
+      lines: [
+        { batchId: 'batch-1', packages: 3, quantity: '15.0000' },
+        { batchId: 'batch-2', packages: 2, quantity: '1.5000' },
+        { batchId: 'batch-1', packages: 4, quantity: '20.0000' },
+      ],
+    });
+    expect(order).toEqual([
+      'product-lock',
+      'batches-read',
+      'batch-decrement',
+      'movement-create',
+      'batch-decrement',
+      'movement-create',
+      'recalculate-stock',
+    ]);
+    expect(txDouble.productBatch.findMany.mock.calls[0]).toEqual([
+      {
+        where: {
+          AND: [
+            { companyId: COMPANY },
+            { id: { in: ['batch-1', 'batch-2'] }, productId: 'product-1', packageContent: { not: null } },
+          ],
+        },
+        select: { id: true, packageContent: true },
+      },
+    ]);
+    const decrements = txDouble.productBatch.updateMany.mock.calls as unknown as [
+      { where: { AND: Record<string, unknown>[] }; data: { stock: { decrement: Prisma.Decimal } } },
+    ][];
+    expect(decrements.map(([args]) => [args.where.AND[1], args.data.stock.decrement.toFixed(4)])).toEqual([
+      [{ id: 'batch-1', productId: 'product-1', stock: { gte: new Prisma.Decimal('35') } }, '35.0000'],
+      [{ id: 'batch-2', productId: 'product-1', stock: { gte: new Prisma.Decimal('1.5') } }, '1.5000'],
+    ]);
+    const datos = txDouble.inventoryMovement.create.mock.calls.map((call) => call[0].data);
+    expect(datos.map((d) => [d.batchId, d.quantity])).toEqual([
+      ['batch-1', '-35.0000'],
+      ['batch-2', '-1.5000'],
+    ]);
+  });
+
+  it('R24: si la suma de un lote repetido no cabe, insufficient con los envases enteros del lote y sin asiento', async () => {
+    const { tx, txDouble } = makeTx({
+      productRows: [{ id: 'product-1' }],
+      batchRows: TWO_BATCHES,
+      updateCounts: [0],
+      currentStock: '34.9999',
+    });
+
+    const outcome = await dispatchFinishedGoods(tx, baseInput({ allocations: REPEATED }), SCOPE);
+
+    expect(outcome).toEqual({ kind: 'insufficient', batchId: 'batch-1', availablePackages: 6 });
+    expect(txDouble.productBatch.updateMany).toHaveBeenCalledTimes(1);
+    expect(txDouble.inventoryMovement.create).not.toHaveBeenCalled();
+    expect(txDouble.$executeRaw).not.toHaveBeenCalled();
+  });
+});
+
 describe('dispatchFinishedGoods — rechazos sin escribir', () => {
   function expectNothingWritten(txDouble: ReturnType<typeof makeTx>['txDouble']): void {
     expect(txDouble.productBatch.updateMany).not.toHaveBeenCalled();
@@ -275,6 +355,194 @@ describe('createFinishedGoodsDispatch — la fabrica sobre la tx de quien llama'
     expect(datos.map((d) => [d.companyId, d.orderDeliveryId])).toEqual([
       ['company-2', 'delivery-1'],
       ['company-2', 'delivery-1'],
+    ]);
+  });
+});
+
+// 2026-10-16 (QC-288): la salida sin pedido bloquea el producto por su id y asienta direct_delivery.
+describe('dispatchFinishedGoods — origen direct (entrega sin pedido)', () => {
+  type DirectDispatchInput = Extract<Parameters<typeof dispatchFinishedGoods>[1], { origin: 'direct' }>;
+
+  function directInput(overrides: Partial<DirectDispatchInput> = {}): DirectDispatchInput {
+    return {
+      origin: 'direct',
+      productId: 'product-1',
+      orderDeliveryId: 'delivery-9',
+      allocations: [
+        { batchId: 'batch-1', packages: 3 },
+        { batchId: 'batch-2', packages: 2 },
+        { batchId: 'batch-1', packages: 1 },
+      ],
+      actorId: 'actor-1',
+      now: NOW,
+      ...overrides,
+    };
+  }
+
+  function lockSql(txDouble: ReturnType<typeof makeTx>['txDouble']): Prisma.Sql {
+    return (txDouble.$queryRaw.mock.calls[0] as unknown as [Prisma.Sql])[0];
+  }
+
+  it('R37: bloquea el producto por id, un asiento direct_delivery por lote con la suma, sin pedido ni motivo, y un recalculo', async () => {
+    const { tx, txDouble, order } = makeTx({ productRows: [{ id: 'product-1' }], batchRows: TWO_BATCHES });
+
+    const outcome = await dispatchFinishedGoods(tx, directInput(), SCOPE);
+
+    expect(outcome).toEqual({
+      kind: 'dispatched',
+      lines: [
+        { batchId: 'batch-1', packages: 3, quantity: '15.0000' },
+        { batchId: 'batch-2', packages: 2, quantity: '1.5000' },
+        { batchId: 'batch-1', packages: 1, quantity: '5.0000' },
+      ],
+    });
+    const sql = lockSql(txDouble);
+    expect(sql.sql).toMatch(/AND "id" = \?::uuid/u);
+    expect(sql.sql).not.toMatch(/"recipe_id" =/u);
+    expect(sql.sql).toMatch(/FOR NO KEY UPDATE/u);
+    expect(sql.values).toEqual(expect.arrayContaining([COMPANY, 'product-1', 'FINISHED_PRODUCT']));
+    expect(order).toEqual([
+      'product-lock',
+      'batches-read',
+      'batch-decrement',
+      'movement-create',
+      'batch-decrement',
+      'movement-create',
+      'recalculate-stock',
+    ]);
+    const datos = txDouble.inventoryMovement.create.mock.calls.map((call) => call[0].data);
+    expect(datos).toEqual([
+      {
+        batchId: 'batch-1',
+        kind: 'direct_delivery',
+        quantity: '-20.0000',
+        reason: null,
+        orderId: null,
+        orderPresentationLineId: null,
+        orderDeliveryId: 'delivery-9',
+        createdBy: 'actor-1',
+        companyId: COMPANY,
+        createdAt: NOW,
+      },
+      {
+        batchId: 'batch-2',
+        kind: 'direct_delivery',
+        quantity: '-1.5000',
+        reason: null,
+        orderId: null,
+        orderPresentationLineId: null,
+        orderDeliveryId: 'delivery-9',
+        createdBy: 'actor-1',
+        companyId: COMPANY,
+        createdAt: NOW,
+      },
+    ]);
+  });
+
+  it('R32: sin producto terminado vivo con ese id, batch_not_found con el primer lote y nada escrito', async () => {
+    const { tx, txDouble } = makeTx({ productRows: [], batchRows: [] });
+
+    const outcome = await dispatchFinishedGoods(tx, directInput(), SCOPE);
+
+    expect(outcome).toEqual({ kind: 'batch_not_found', batchId: 'batch-1' });
+    expect(txDouble.productBatch.findMany).not.toHaveBeenCalled();
+    expect(txDouble.productBatch.updateMany).not.toHaveBeenCalled();
+    expect(txDouble.inventoryMovement.create).not.toHaveBeenCalled();
+  });
+
+  it('R32: un lote que no es del producto bloqueado no vuelve en la lectura: batch_not_found sin escribir', async () => {
+    const { tx, txDouble } = makeTx({
+      productRows: [{ id: 'product-1' }],
+      batchRows: [{ id: 'batch-1', packageContent: new Prisma.Decimal('5') }],
+    });
+
+    const outcome = await dispatchFinishedGoods(tx, directInput(), SCOPE);
+
+    expect(outcome).toEqual({ kind: 'batch_not_found', batchId: 'batch-2' });
+    expect(txDouble.productBatch.findMany.mock.calls[0]).toEqual([
+      {
+        where: {
+          AND: [
+            { companyId: COMPANY },
+            { id: { in: ['batch-1', 'batch-2'] }, productId: 'product-1', packageContent: { not: null } },
+          ],
+        },
+        select: { id: true, packageContent: true },
+      },
+    ]);
+    expect(txDouble.productBatch.updateMany).not.toHaveBeenCalled();
+    expect(txDouble.inventoryMovement.create).not.toHaveBeenCalled();
+  });
+
+  it('R34: si la suma de un lote no cabe, insufficient con sus envases enteros, sin asiento ni recalculo', async () => {
+    const { tx, txDouble } = makeTx({
+      productRows: [{ id: 'product-1' }],
+      batchRows: TWO_BATCHES,
+      updateCounts: [0],
+      currentStock: '19.9999',
+    });
+
+    const outcome = await dispatchFinishedGoods(tx, directInput(), SCOPE);
+
+    expect(outcome).toEqual({ kind: 'insufficient', batchId: 'batch-1', availablePackages: 3 });
+    expect(txDouble.inventoryMovement.create).not.toHaveBeenCalled();
+    expect(txDouble.$executeRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe('createFinishedGoodsDirectDispatch — la fabrica sobre la tx de quien llama', () => {
+  it('R9: lockForDirectDelivery bloquea por id y suma los envases enteros de los lotes con contenido', async () => {
+    const { tx, txDouble, order } = makeTx({ productRows: [], batchRows: [] });
+    txDouble.$queryRaw.mockImplementationOnce(async () => {
+      order.push('product-lock');
+      return [{ id: 'product-1', recipeId: 'recipe-1', presentationId: 'presentation-1' }] as unknown as { id: string }[];
+    });
+    txDouble.productBatch.findMany.mockImplementationOnce(async () => {
+      order.push('batches-read');
+      return [
+        { stock: new Prisma.Decimal('14.9999'), packageContent: new Prisma.Decimal('5') },
+        { stock: new Prisma.Decimal('3'), packageContent: new Prisma.Decimal('0.75') },
+        { stock: new Prisma.Decimal('0'), packageContent: new Prisma.Decimal('5') },
+      ] as unknown as BatchRow[];
+    });
+
+    const lock = await createFinishedGoodsDirectDispatch(tx).lockForDirectDelivery('product-1', 'company-2');
+
+    expect(lock).toEqual({ recipeId: 'recipe-1', presentationId: 'presentation-1', stockPackages: 2 + 4 });
+    expect(order).toEqual(['product-lock', 'batches-read']);
+    const sql = (txDouble.$queryRaw.mock.calls[0] as unknown as [Prisma.Sql])[0];
+    expect(sql.values).toEqual(expect.arrayContaining(['company-2', 'product-1']));
+    expect(txDouble.productBatch.findMany).toHaveBeenCalledWith({
+      where: { AND: [{ companyId: 'company-2' }, { productId: 'product-1', packageContent: { not: null } }] },
+      select: { stock: true, packageContent: true },
+    });
+    expect(txDouble.productBatch.updateMany).not.toHaveBeenCalled();
+    expect(txDouble.inventoryMovement.create).not.toHaveBeenCalled();
+  });
+
+  it('R32: lockForDirectDelivery devuelve null sin leer lotes si el producto no es terminado vivo de la empresa', async () => {
+    const { tx, txDouble } = makeTx({ productRows: [], batchRows: [] });
+
+    await expect(createFinishedGoodsDirectDispatch(tx).lockForDirectDelivery('product-1', COMPANY)).resolves.toBeNull();
+    expect(txDouble.productBatch.findMany).not.toHaveBeenCalled();
+  });
+
+  it('R37: dispatchDirect acota por la empresa de la entrada y asienta direct_delivery con su entrega', async () => {
+    const { tx, txDouble } = makeTx({ productRows: [{ id: 'product-1' }], batchRows: TWO_BATCHES });
+
+    const outcome = await createFinishedGoodsDirectDispatch(tx).dispatchDirect({
+      companyId: 'company-2',
+      productId: 'product-1',
+      orderDeliveryId: 'delivery-9',
+      allocations: [{ batchId: 'batch-1', packages: 1 }],
+      actorId: 'actor-1',
+      now: NOW,
+    });
+
+    expect(outcome).toEqual({ kind: 'dispatched', lines: [{ batchId: 'batch-1', packages: 1, quantity: '5.0000' }] });
+    const datos = txDouble.inventoryMovement.create.mock.calls.map((call) => call[0].data);
+    expect(datos.map((d) => [d.companyId, d.kind, d.orderId, d.orderDeliveryId])).toEqual([
+      ['company-2', 'direct_delivery', null, 'delivery-9'],
     ]);
   });
 });

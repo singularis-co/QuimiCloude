@@ -56,7 +56,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // `companies.name_normalized` se calcula con esta y con ninguna otra.
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
-import { PRODUCT_TYPES, productDisplayName } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
@@ -143,25 +143,20 @@ const qtyAlertValue = '3';
 const unitCostValue = '3.75';
 
 /**
- * Alta con SOLO costo total. Los nombres cuelgan de `productName` para que la limpieza por
+ * Alta que comprueba el costo total de solo lectura. Los nombres cuelgan de `productName` para que la limpieza por
  * `startsWith` de `afterAll` los arrastre sin enumerarlos.
  */
 const costProductName = `${productName}_costo`;
 
 /**
- * Los numeros del alta que escribe SOLO el costo total. NO son divisibles de forma exacta ni
- * trivial: la division `8000.05 / 7` da `1142.86428571...`. Asi el assert distingue el redondeo
- * correcto de un truncado y de cualquier paseo por coma flotante; con un total divisible los tres
- * darian lo mismo y el test no probaria nada.
- *
- * Quien deriva es el PANEL, no el servidor, y lo hace a 2 decimales: `1142.86428...` mitad arriba
- * es `1142.86`, y eso viaja escrito en el campo del unitario. La columna es `decimal(14,4)`, asi
- * que en la base se lee con sus cuatro (`1142.8600`).
+ * Los numeros del alta del costo total. El unitario es la UNICA entrada; el total, de solo
+ * lectura, lo calcula el PANEL: `1142.86 x 7 = 8000.02`. La columna es `decimal(14,4)`, asi que
+ * el unitario en la base se lee con sus cuatro decimales (`1142.8600`).
  */
 const costStockValue = '7';
-const costTotalValue = '8000.05';
-const derivedUnitCost = '1142.86';
-const derivedUnitCostStored = '1142.8600';
+const costUnitValue = '1142.86';
+const derivedTotalCost = '8000.02';
+const costUnitStored = '1142.8600';
 
 /**
  * Recorrido de QC-90 R17/R18: el mismo producto se da de alta DOS veces. La segunda se elige del
@@ -260,8 +255,8 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 /**
  * Recorre las paginas de la lista hasta encontrar la celda de nombre pedida.
  *
- * Hace falta porque la pantalla NO ofrece busqueda (R13, decision cerrada) y el orden es fijo
- * por nombre ascendente: un producto recien creado puede caer en cualquier pagina. Se avanza con
+ * Hace falta porque la pantalla NO ofrece busqueda (R13, decision cerrada) y el orden no depende
+ * del nombre: un producto recien creado puede caer en cualquier pagina. Se avanza con
  * el control real de paginacion -que de paso ejercita R11 en un navegador- y se para cuando
  * «siguiente» queda deshabilitado. El assert NUNCA mira «la primera fila» ni el total: solo si
  * existe una celda con ESTE nombre.
@@ -307,8 +302,7 @@ function textoNormalizado(texto: string | null): string {
 }
 
 /**
- * El nombre y la existencia de CADA fila cuyo nombre es exactamente `name` (con o sin la unidad
- * detras), recargando la lista desde la primera pagina. Los homonimos salen contiguos (nombre y
+ * El nombre y la existencia de CADA fila cuyo nombre es exactamente `name`, recargando la lista desde la primera pagina. Los homonimos salen contiguos (nombre y
  * luego id), pero pueden partirse entre dos paginas: si la ultima fila de una pagina es uno, se
  * sigue en la siguiente.
  */
@@ -339,9 +333,9 @@ async function filasDeHomonimos(page: Page, name: string): Promise<FilaDeInventa
   }
 }
 
-/** Orden estable para comparar filas sin depender del orden de la lista. */
-function porNombre(filas: readonly FilaDeInventario[]): FilaDeInventario[] {
-  return [...filas].sort((a, b) => a.nombre.localeCompare(b.nombre));
+/** Orden estable para comparar homonimos sin depender del orden de la lista. */
+function porExistencia(filas: readonly FilaDeInventario[]): FilaDeInventario[] {
+  return [...filas].sort((a, b) => a.existencia.localeCompare(b.existencia));
 }
 
 /** Abre el panel lateral de alta y espera a que este montado. */
@@ -644,7 +638,7 @@ test.describe('catalogo de productos', () => {
     ).toBe(1);
   });
 
-  test('el alta con solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7)', async ({
+  test('el costo total es de solo lectura y el lote guarda el unitario escrito (QC-90 R32)', async ({
     page,
   }) => {
     // POR QUE EN E2E Y NO SOLO EN INTEGRACION: la derivacion ya tiene su test de dominio (T1) y su
@@ -653,10 +647,8 @@ test.describe('catalogo de productos', () => {
     // convertirse en `number` y llegue a `decimal(14,4)`. Un `parseFloat` colado en el formulario
     // dejaria los otros dos tests en verde y solo este en rojo.
     //
-    // Escribir el total rellena el campo del unitario en la propia pantalla, a 2 decimales, asi
-    // que lo que se ejercita ya no es `deriveUnitCost` -viva en el dominio para el resto de
-    // llamantes- sino la derivacion del panel. Lo que vigila es lo mismo: que el importe no toque
-    // la coma flotante entre el `<input>` y Postgres.
+    // El total es de solo lectura: lo calcula el panel como unitario x existencia. Lo que vigila
+    // es lo mismo: que el importe no toque la coma flotante entre el `<input>` y Postgres.
     await loginAndLand(page, adminUser);
 
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
@@ -670,13 +662,12 @@ test.describe('catalogo de productos', () => {
 
     await elegirUnidad(page, unidadDelFixture(kilogramUnit));
 
-    // SOLO se ESCRIBE el costo total. El unitario no se teclea: lo rellena la pantalla al vuelo,
-    // dividiendo por la existencia.
-    await page.getByTestId('product-field-totalCost').fill(costTotalValue);
-    await expect(
-      page.getByTestId('product-field-unitCost'),
-      'escribir el total tiene que rellenar el unitario sin tocarlo',
-    ).toHaveValue(derivedUnitCost);
+    // SOLO se escribe el costo unitario. El total no se teclea: es de solo lectura y lo calcula
+    // la pantalla al vuelo, multiplicando por la existencia.
+    const totalCost = page.getByTestId('product-field-totalCost');
+    await expect(totalCost, 'el costo total es de solo lectura').not.toBeEditable();
+    await page.getByTestId('product-field-unitCost').fill(costUnitValue);
+    await expect(totalCost, 'el total es unitario x existencia').toHaveValue(derivedTotalCost);
 
     await guardarAlta(page);
 
@@ -684,7 +675,7 @@ test.describe('catalogo de productos', () => {
     const cell = await findProductCell(page, costProductName);
     await expect(cell.first()).toBeVisible({ timeout: 60_000 });
 
-    // Y el LOTE quedo escrito con el costo unitario DERIVADO. Se lee con `unit_cost::text`, nunca
+    // Y el LOTE quedo escrito con el costo unitario ESCRITO. Se lee con `unit_cost::text`, nunca
     // como `number`: es un importe y compararlo contra un literal numerico dejaria pasar
     // exactamente el error que esta ficha evita (QC-90 R4). Se filtra por ESTE nombre, no por «el
     // ultimo lote»: el otro proyecto esta dando de alta el suyo en el mismo instante.
@@ -698,8 +689,8 @@ test.describe('catalogo de productos', () => {
     expect(lotes, 'el alta debe crear exactamente un lote').toHaveLength(1);
     expect(
       lotes[0]?.unit_cost,
-      `${costTotalValue} / ${costStockValue} redondeado a 2 decimales por el panel, guardado en decimal(14,4)`,
-    ).toBe(derivedUnitCostStored);
+      `${costUnitValue} guardado en decimal(14,4)`,
+    ).toBe(costUnitStored);
     expect(Number(lotes[0]?.stock), 'la existencia escrita tambien va al lote').toBe(
       Number(costStockValue),
     );
@@ -915,17 +906,15 @@ test.describe('catalogo de productos', () => {
       .locator('xpath=ancestor::tr[1]');
     await expect(filasHomonimas).toHaveCount(2, { timeout: 60_000 });
 
-    // --- 3. El listado muestra DOS filas, «X · kg» y «X · <litro>»: cada celda de nombre lleva
-    // su propia unidad, y cada fila su propia existencia.
-    const kgRowName = productDisplayName(sameNameProductName, kg.label);
-    const literRowName = productDisplayName(sameNameProductName, liter.label);
+    // --- 3. El listado muestra DOS filas «X»: el nombre va solo y la unidad se lee en la
+    // existencia de cada fila.
     expect(
-      porNombre(await filasDeHomonimos(page, sameNameProductName)),
-      'dos filas con el mismo nombre, cada una con su unidad en el nombre y su propia existencia',
+      porExistencia(await filasDeHomonimos(page, sameNameProductName)),
+      'dos filas con el mismo nombre, cada una con su propia existencia y unidad',
     ).toEqual(
-      porNombre([
-        { nombre: kgRowName, existencia: `${sameNameKgFirstStock} ${kg.label}` },
-        { nombre: literRowName, existencia: `${sameNameLiterStock} ${liter.label}` },
+      porExistencia([
+        { nombre: sameNameProductName, existencia: `${sameNameKgFirstStock} ${kg.label}` },
+        { nombre: sameNameProductName, existencia: `${sameNameLiterStock} ${liter.label}` },
       ]),
     );
 
@@ -973,12 +962,12 @@ test.describe('catalogo de productos', () => {
       filasHomonimas.getByTestId('product-stock').filter({ hasText: kg.label }),
     ).toHaveText(`${kgStockAfter} ${kg.label}`, { timeout: 60_000 });
     expect(
-      porNombre(await filasDeHomonimos(page, sameNameProductName)),
+      porExistencia(await filasDeHomonimos(page, sameNameProductName)),
       'sube solo la fila en kg; la de L queda igual y no aparece una tercera',
     ).toEqual(
-      porNombre([
-        { nombre: kgRowName, existencia: `${kgStockAfter} ${kg.label}` },
-        { nombre: literRowName, existencia: `${sameNameLiterStock} ${liter.label}` },
+      porExistencia([
+        { nombre: sameNameProductName, existencia: `${kgStockAfter} ${kg.label}` },
+        { nombre: sameNameProductName, existencia: `${sameNameLiterStock} ${liter.label}` },
       ]),
     );
 

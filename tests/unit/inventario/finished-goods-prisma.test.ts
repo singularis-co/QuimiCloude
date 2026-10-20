@@ -1,7 +1,7 @@
 // tests/unit/inventario/finished-goods-prisma.test.ts
 //
 // `receiveFinishedGoods` con un `tx` doblado: nada de esto toca Postgres. Cubre el ORDEN de los
-// pasos (presentacion -> producto -> lote -> asiento -> recalculo) y que un rechazo temprano no
+// pasos (presentacion -> producto -> lote -> asiento -> recalculo -> ultimo lote) y que un rechazo temprano no
 // llega a escribir nada. La garantia real contra el `ON CONFLICT`, el indice parcial y el
 // `CHECK` de la base es de `finished-goods.int.test.ts`.
 
@@ -36,7 +36,7 @@ function makeTx(overrides: {
   ];
   let queryRawCall = 0;
 
-  const executeRawQueue = ['insert-product', 'advisory-lock', 'recalculate-stock'];
+  const executeRawQueue = ['insert-product', 'advisory-lock', 'recalculate-stock', 'mark-batch-loaded'];
   let executeRawCall = 0;
 
   const tx = {
@@ -86,7 +86,7 @@ function baseInput(overrides: Partial<Parameters<typeof receiveFinishedGoods>[1]
 }
 
 describe('receiveFinishedGoods — orden de pasos con un tx doblado', () => {
-  it('camino feliz: presentacion -> producto -> advisory lock -> max lote -> lote -> asiento -> recalculo', async () => {
+  it('camino feliz: presentacion -> producto -> advisory lock -> max lote -> lote -> asiento -> recalculo -> ultimo lote', async () => {
     const { tx, order } = makeTx({
       presentationRows: [{ name: 'Botella 1L', unitId: 'unit-1', content: '1.0000' }],
       productRows: [{ id: 'product-1', name: 'Desengrasante industrial · Botella 1L' }],
@@ -110,6 +110,7 @@ describe('receiveFinishedGoods — orden de pasos con un tx doblado', () => {
       'batch-create',
       'movement-create',
       'recalculate-stock',
+      'mark-batch-loaded',
     ]);
   });
 

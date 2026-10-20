@@ -57,8 +57,8 @@ describe('readCsv', () => {
   });
 
   it('R12 con separador , el decimal con coma va entre comillas y llega entero', () => {
-    expect(texts('Nombre,Existencia\nSal,"1234,5"')).toEqual([
-      ['Nombre', 'Existencia'],
+    expect(texts('Nombre,Cantidad\nSal,"1234,5"')).toEqual([
+      ['Nombre', 'Cantidad'],
       ['Sal', '1234,5'],
     ]);
   });

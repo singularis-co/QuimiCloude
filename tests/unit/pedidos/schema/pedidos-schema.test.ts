@@ -819,4 +819,66 @@ describe('db/schema.prisma — modelo de pedido', () => {
       expect(has(order, forbidden), `Order.${forbidden} no debe existir`).toBe(false)
     }
   })
+
+  // QC-282 2026-10-15: la referencia al cliente sin `@relation` sale de `OrderDelivery` y entra en
+  // `OrderDeliveryLine`. Los casos anteriores no cambian.
+  it('QC-282 R30, R31: el cliente es de la linea de entrega (uuid obligatorio sin @relation) y la entrega no lo declara', () => {
+    const delivery = parseModel('OrderDelivery')
+    const line = parseModel('OrderDeliveryLine')
+
+    expect(has(delivery, 'customerId')).toBe(false)
+    expect(delivery.body).not.toMatch(/customer/i)
+
+    const customerId = field(line, 'customerId')
+    expect(customerId.type).toBe('String')
+    expect(customerId.isOptional).toBe(false)
+    expect(customerId.attributes).toContain('@map("customer_id")')
+    expect(customerId.attributes).toContain('@db.Uuid')
+    expect(customerId.attributes).not.toMatch(/@relation|@default/)
+    expect(line.fields.filter((candidate) => candidate.type === 'Customer')).toEqual([])
+
+    expect(line.body).toMatch(
+      /@@unique\(\[deliveryId, customerId, batchId\],\s*map:\s*"order_delivery_lines_delivery_customer_batch_unique"\)/,
+    )
+    expect(line.body).not.toMatch(/@@unique\(\[deliveryId, batchId\]/)
+    expect(line.body).toMatch(/@@index\(\[companyId, customerId\],\s*map:\s*"order_delivery_lines_customer_id_idx"\)/)
+  })
+
+  // QC-288 2026-10-16: la entrega puede no tener pedido; entonces lleva su producto (otra
+  // referencia sin `@relation`, `Product` es de `inventario`) y su nota, y sus lineas no llevan
+  // linea del reparto. Los casos anteriores no cambian.
+  it('QC-288 R40, R41: la entrega declara pedido anulable, producto uuid anulable sin @relation y nota; la linea, linea del reparto anulable', () => {
+    const delivery = parseModel('OrderDelivery')
+    const line = parseModel('OrderDeliveryLine')
+
+    const orderId = field(delivery, 'orderId')
+    expect(orderId.type).toBe('String')
+    expect(orderId.isOptional).toBe(true)
+    expect(field(delivery, 'order').type).toBe('Order')
+    expect(field(delivery, 'order').isOptional).toBe(true)
+
+    const productId = field(delivery, 'productId')
+    expect(productId.type).toBe('String')
+    expect(productId.isOptional).toBe(true)
+    expect(productId.attributes).toContain('@map("product_id")')
+    expect(productId.attributes).toContain('@db.Uuid')
+    expect(productId.attributes).not.toMatch(/@relation|@default/)
+    expect(delivery.fields.filter((candidate) => candidate.type === 'Product')).toEqual([])
+    expect(delivery.body).toMatch(/@@index\(\[companyId, productId\],\s*map:\s*"order_deliveries_product_id_idx"\)/)
+
+    const note = field(delivery, 'note')
+    expect(note.type).toBe('String')
+    expect(note.isOptional).toBe(true)
+    expect(note.attributes).not.toMatch(/@default/)
+
+    for (const forbidden of ['updatedAt', 'deletedAt']) {
+      expect(has(delivery, forbidden), `OrderDelivery.${forbidden} no debe existir`).toBe(false)
+      expect(has(line, forbidden), `OrderDeliveryLine.${forbidden} no debe existir`).toBe(false)
+    }
+
+    const presentationLineId = field(line, 'orderPresentationLineId')
+    expect(presentationLineId.type).toBe('String')
+    expect(presentationLineId.isOptional).toBe(true)
+    expect(field(line, 'presentationLine').isOptional).toBe(true)
+  })
 })

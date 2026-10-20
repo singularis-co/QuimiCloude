@@ -15,7 +15,6 @@ import { DeleteRecipeDialog } from '@/app/(private)/produccion/formulas/componen
 import { DeleteCatalogLineDialog, DeleteSupplierDialog } from '@/app/(private)/proveedores/[id]/components';
 import { OrderCancelDialog } from '@/app/(private)/asignacion/[id]/components/order-cancel-dialog';
 import { OrderExecutionScreen } from '@/app/(private)/asignacion/[id]/components/order-execution-screen';
-import { AssignedOrderStartTrigger } from '@/app/(private)/asignacion/components/assigned-order-start-trigger';
 import { PackingOrderScreen } from '@/app/(private)/asignacion/empaque/[id]/components/packing-order-screen';
 import type { PackingOrderDetail, StartedOrderExecution } from '@/lib/modules/asignaciones';
 import type { CustomerView } from '@/lib/modules/clientes';
@@ -171,6 +170,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-execution-actions', (
   finishAssignedOrderAction: acciones.fn('finishAssignedOrderAction'),
   recordStepMoveAction: acciones.fn('recordStepMoveAction'),
   cancelAssignedOrderAction: acciones.fn('cancelAssignedOrderAction'),
+  startAssignedOrderAction: acciones.fn('startAssignedOrderAction'),
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-packing-actions', () => ({
@@ -295,7 +295,9 @@ const PEDIDO: OrderSummary = {
   presentationLines: [],
   unitId: UNIDAD.id,
   unitLabel: UNIDAD.symbol,
+  pendingDelivery: { kind: 'not_packed' },
   customer: null,
+  recipeImageUrl: null,
 };
 
 const EJECUCION: StartedOrderExecution = {
@@ -310,6 +312,7 @@ const EJECUCION: StartedOrderExecution = {
   presentationLines: [],
   unitId: null,
   unitLabel: null,
+  evidence: [],
   resumeStepPosition: null,
 };
 
@@ -322,15 +325,16 @@ function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOr
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
-      { presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+      { lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
     ],
     unitId: 'unit-1',
     unitLabel: 'kg',
-    packages: '8',
     status: 'POR_EMPACAR',
     packedByName: null,
     packedById: null,
     packingSteps: [],
+    packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }
@@ -701,26 +705,15 @@ describe('paridad de confirmaciones — borrar receta (transicion)', () => {
   });
 });
 
+// El «Comenzar» del operario se mudo de «Entrar» en la lista al pie de la pantalla de ejecucion.
 describe('paridad de confirmaciones — comenzar un pedido asignado (ConfirmActionDialog)', () => {
-  it('R1 — el disparador, cerrado', () => {
-    render(
-      <AssignedOrderStartTrigger href="/asignacion/order-1" testId="assigned-order-enter-order-1">
-        Entrar
-      </AssignedOrderStartTrigger>,
+  it('R1 R12 — abierto: solo el dialogo, en su portal', async () => {
+    const { container } = render(
+      <OrderExecutionScreen execution={{ ...EJECUCION, status: 'PENDIENTE' }} />,
     );
-    expect(arbolAccesible()).toMatchSnapshot();
-  });
-
-  it('R1 R12 — abierto', async () => {
-    const user = setupUser();
-    render(
-      <AssignedOrderStartTrigger href="/asignacion/order-1" testId="assigned-order-enter-order-1">
-        Entrar
-      </AssignedOrderStartTrigger>,
-    );
-    await user.click(screen.getByTestId('assigned-order-enter-order-1'));
-    await screen.findByTestId('assigned-order-start-dialog');
-    expect(arbolAccesible()).toMatchSnapshot();
+    fireEvent.click(screen.getByTestId('order-execution-start-button'));
+    await screen.findByTestId('order-execution-start-dialog');
+    expect(arbolDePortales(container)).toMatchSnapshot();
   });
 });
 
@@ -756,13 +749,28 @@ describe('paridad de confirmaciones — empaque (ConfirmActionDialog)', () => {
     expect(arbolDePortales(container)).toMatchSnapshot();
   });
 
-  it('R1 R12 — terminar, abierto: solo el dialogo, en su portal', async () => {
+  it('R1 R12 — terminar, abierto: el diálogo del conteo real, en su portal', async () => {
     const { container } = render(
       <PackingOrderScreen
         order={pedidoDeEmpaque({
           status: 'EN_EMPAQUE',
           packedById: EMPACADOR_ID,
           packedByName: 'Empacador de Prueba',
+          finish: {
+            orderQuantity: '12.5',
+            orderUnit: { id: 'unit-1', baseUnitId: null, factor: null },
+            orderUnitLabel: 'kg',
+            lines: [
+              {
+                lineId: 'linea-1',
+                label: 'Botella 200 ml',
+                plan: 5,
+                content: '0.2',
+                unit: { id: 'unit-1', baseUnitId: null, factor: null },
+                packaging: null,
+              },
+            ],
+          },
         })}
         actorId={EMPACADOR_ID}
         backHref="/asignacion?vista=por_empacar"

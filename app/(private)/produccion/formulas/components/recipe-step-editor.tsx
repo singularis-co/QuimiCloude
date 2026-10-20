@@ -1,8 +1,10 @@
 'use client';
 
 import { EditorContent, useEditor, useEditorState, type Content } from '@tiptap/react';
+import { BoldIcon, CameraIcon, CheckIcon, ItalicIcon, ListChecksIcon } from 'lucide-react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
+import { Switch } from '@/components/ui/switch';
 import {
   MAX_STEP_ELEMENTS,
   countRecipeStepElements,
@@ -42,6 +44,8 @@ const TEXTS = {
   italic: 'Cursiva',
   checklist: 'Lista de verificacion',
   toolbar: 'Formato del paso',
+  requiresEvidence: 'Requiere evidencia',
+  evidenceHelp: 'Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.',
   tooManyElements: (count: number, max: number) =>
     `Este paso tiene ${count} elementos y el maximo es ${max}. Quita elementos antes de guardar.`,
 } as const;
@@ -55,6 +59,17 @@ export type RecipeStepEditorProps = {
   readonly editableTestId: string;
   readonly error?: string;
   readonly errorId?: string;
+  /** Sin ella no se pinta el interruptor «Requiere evidencia». */
+  readonly evidence?: RecipeStepEvidenceControl;
+  /** Botones de la fila (añadir, quitar), en el mismo grupo que el interruptor. */
+  readonly actions?: ReactNode;
+};
+
+export type RecipeStepEvidenceControl = {
+  readonly checked: boolean;
+  readonly onCheckedChange: (checked: boolean) => void;
+  /** Nombre accesible del interruptor, por ejemplo «Requiere evidencia en el paso 1». */
+  readonly label: string;
 };
 
 /** Lo que la barra necesita de la seleccion. Se lee del editor; no se duplica en un `useState`. */
@@ -73,8 +88,12 @@ export function RecipeStepEditor({
   editableTestId,
   error,
   errorId,
+  evidence,
+  actions,
 }: RecipeStepEditorProps) {
   const warningId = useId();
+  const evidenceHelpId = useId();
+  const evidenceOn = evidence?.checked === true;
 
   // `onChange` puede cambiar de identidad en cada render del formulario, pero el editor se crea
   // UNA vez: sin esta referencia, `onUpdate` se quedaria con la primera version para siempre.
@@ -98,7 +117,7 @@ export function RecipeStepEditor({
       attributes: {
         // `text-base` = 16 px: por debajo, iOS hace zoom al enfocar el area editable (R26).
         class:
-          'min-h-11 w-full rounded-md border px-3 py-2 text-base outline-none focus-visible:ring-[3px] [&_ul]:list-none [&_li]:flex [&_li]:items-start [&_li]:gap-2 [&_li>div]:flex-1',
+          'min-h-11 w-full rounded-b-lg px-3 py-2.5 text-base leading-normal outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring[&_ul]:list-none [&_li]:flex [&_li]:items-start [&_li]:gap-2 [&_li>div]:flex-1',
         'aria-label': label,
         'aria-multiline': 'true',
         'data-testid': editableTestId,
@@ -139,47 +158,87 @@ export function RecipeStepEditor({
 
   return (
     <div className="flex flex-col gap-1" data-testid={`${editableTestId}-editor`}>
-      {/* R2: la barra ofrece TRES acciones y ninguna mas. No hay control ni menu de encabezado,
-          enlace, imagen, tabla, cita, lista numerada ni bloque de codigo, aqui ni en ningun otro
-          sitio del componente. */}
-      <div
-        role="toolbar"
-        aria-label={TEXTS.toolbar}
-        aria-orientation="horizontal"
-        className="flex flex-wrap gap-1"
-        data-testid={`${editableTestId}-toolbar`}
-      >
-        <ToolbarButton
-          label={TEXTS.bold}
-          pressed={estado.bold}
-          testId={`${editableTestId}-bold`}
-          onActivate={() => editor?.chain().focus().toggleBold().run()}
+      <div className="rounded-lg border border-input bg-card">
+        {/* La barra ofrece tres acciones y ninguna más: ni encabezados, enlaces, imágenes, tablas,
+            citas, listas numeradas ni bloques de código. */}
+        <div
+          className="flex flex-wrap items-center gap-1 rounded-t-lg border-b bg-muted p-1"
+          data-testid={`${editableTestId}-bar`}
         >
-          <strong aria-hidden="true">N</strong>
-        </ToolbarButton>
-        <ToolbarButton
-          label={TEXTS.italic}
-          pressed={estado.italic}
-          testId={`${editableTestId}-italic`}
-          onActivate={() => editor?.chain().focus().toggleItalic().run()}
-        >
-          <em aria-hidden="true">C</em>
-        </ToolbarButton>
-        <ToolbarButton
-          label={TEXTS.checklist}
-          pressed={estado.checklist}
-          testId={`${editableTestId}-checklist`}
-          onActivate={() => editor?.chain().focus().toggleTaskList().run()}
-        >
-          <span aria-hidden="true">&#9745;</span>
-        </ToolbarButton>
-      </div>
+          <div
+            role="toolbar"
+            aria-label={TEXTS.toolbar}
+            aria-orientation="horizontal"
+            className="flex flex-wrap gap-0.5"
+            data-testid={`${editableTestId}-toolbar`}
+          >
+            <ToolbarButton
+              label={TEXTS.bold}
+              pressed={estado.bold}
+              testId={`${editableTestId}-bold`}
+              onActivate={() => editor?.chain().focus().toggleBold().run()}
+            >
+              <BoldIcon aria-hidden="true" className="size-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              label={TEXTS.italic}
+              pressed={estado.italic}
+              testId={`${editableTestId}-italic`}
+              onActivate={() => editor?.chain().focus().toggleItalic().run()}
+            >
+              <ItalicIcon aria-hidden="true" className="size-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              label={TEXTS.checklist}
+              pressed={estado.checklist}
+              testId={`${editableTestId}-checklist`}
+              onActivate={() => editor?.chain().focus().toggleTaskList().run()}
+            >
+              <ListChecksIcon aria-hidden="true" className="size-4" />
+            </ToolbarButton>
+          </div>
+          {evidence === undefined && actions === undefined ? null : (
+            // En teléfono el interruptor baja a su propia línea; desde md se alinea a la derecha.
+            // `flex-wrap`: a 390 px la columna del paso no cabe interruptor + botones de 44 px, y
+            // sin él las acciones se salían de la ventana; así bajan a otra línea, a la derecha.
+            <div
+              className="flex w-full flex-wrap items-center gap-1 md:ml-auto md:w-auto"
+              data-testid={`${editableTestId}-row-tools`}
+            >
+              {evidence === undefined ? null : (
+                <Switch
+                  checked={evidenceOn}
+                  onCheckedChange={(checked) => evidence.onCheckedChange(checked)}
+                  aria-label={evidence.label}
+                  aria-describedby={evidenceOn ? evidenceHelpId : undefined}
+                  data-testid={`${editableTestId}-evidence`}
+                >
+                  <CameraIcon aria-hidden="true" className="size-4" />
+                  {TEXTS.requiresEvidence}
+                </Switch>
+              )}
+              {actions === undefined ? null : <div className="ml-auto flex shrink-0 gap-1">{actions}</div>}
+            </div>
+          )}
+        </div>
 
-      <EditorContent
-        editor={editor}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={describedBy}
-      />
+        <EditorContent
+          editor={editor}
+          aria-invalid={error === undefined ? undefined : true}
+          aria-describedby={describedBy}
+        />
+
+        {evidenceOn ? (
+          <p
+            id={evidenceHelpId}
+            className="flex animate-in items-center gap-1.5 px-3 pb-2.5 text-xs text-primary duration-(--dur-slow) ease-(--ease-enter) fade-in slide-in-from-bottom-[10px]"
+            data-testid={`${editableTestId}-evidence-help`}
+          >
+            <CheckIcon aria-hidden="true" className="size-4 shrink-0" />
+            {TEXTS.evidenceHelp}
+          </p>
+        ) : null}
+      </div>
 
       {excedeElTope && (
         <p
@@ -215,8 +274,8 @@ function ToolbarButton({ label, pressed, testId, onActivate, children }: Toolbar
       aria-pressed={pressed}
       data-testid={testId}
       onClick={onActivate}
-      className={`${touchTarget} flex items-center justify-center rounded-md border bg-background text-base ${
-        pressed ? 'bg-accent' : ''
+      className={`${touchTarget} flex items-center justify-center rounded-md text-foreground transition-colors hover:bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring ${
+        pressed ? 'bg-card' : 'bg-transparent'
       }`}
     >
       {children}

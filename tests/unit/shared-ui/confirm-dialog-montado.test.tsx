@@ -72,7 +72,7 @@ import {
   CANCEL_ORDER_REASON_TESTID,
   DELETE_ORDER_DIALOG_TESTID,
   DELETE_ORDER_DISMISS_TESTID,
-  OrderRowSheetActions,
+  OrderTable,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
 import { ProductTable } from '@/app/(private)/inventario/components';
@@ -548,15 +548,26 @@ describe('pedidos: cancelar y borrar desde la fila (R33)', () => {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
   };
 
   function montar() {
-    render(<OrderRowSheetActions order={PEDIDO} recipes={RECETAS} units={[]} bridge={null} />);
+    render(
+      <OrderTable
+        orders={[PEDIDO]}
+        params={parametros()}
+        totalPages={1}
+        recipes={RECETAS}
+        units={[]}
+        bridge={null}
+      />,
+    );
   }
 
   async function abrir(user: ReturnType<typeof setupUser>, accion: string) {
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${PEDIDO.id}`)).getByTestId('order-row-actions'));
     await user.click(await esperarInteractiva(await screen.findByTestId(accion)));
   }
 
@@ -802,9 +813,19 @@ const BAJAS_DE_FILA: readonly BajaDeFila[] = [
   },
 ];
 
+/**
+ * Con tarjetas, jsdom pinta la tabla y las tarjetas a la vez (no evalua las consultas de
+ * contenedor) y el disparador sale dos veces: el primero es el de la fila de la tabla.
+ */
+function disparadorDeLaFila(testId: string): HTMLElement {
+  const [primero] = screen.getAllByTestId(testId);
+  if (primero === undefined) throw new Error(`no hay ningun «${testId}»`);
+  return primero;
+}
+
 describe.each(BAJAS_DE_FILA)('$pantalla: baja desde el menu de la fila (R33)', (caso) => {
   async function abrir(user: ReturnType<typeof setupUser>) {
-    await clickRowAction(user, screen.getByTestId(caso.disparador), caso.accion);
+    await clickRowAction(user, disparadorDeLaFila(caso.disparador), caso.accion);
     return screen.findByTestId(caso.dialogo);
   }
 
@@ -861,7 +882,7 @@ describe('inventario: el panel de lotes de la fila (R33)', () => {
   it('tras cerrarse sigue en el DOM, cerrado, mientras sale', async () => {
     const user = setupUser();
     render(<ProductTable products={[PRODUCTO]} params={parametros()} totalPages={1} />);
-    await clickRowAction(user, screen.getByTestId('product-row-actions'), 'product-batches-open');
+    await clickRowAction(user, within(screen.getByRole('table')).getByTestId('product-row-actions'), 'product-batches-open');
     const panel = await screen.findByTestId('product-batches-sheet');
     expect(panel).toHaveAttribute('data-open');
 

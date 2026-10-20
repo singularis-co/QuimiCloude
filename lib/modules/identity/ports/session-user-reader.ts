@@ -22,6 +22,8 @@ export type SessionUserRecord = {
    * fuera del sitio donde se puede testear con objetos planos (`design.md > 3.1`).
    */
   readonly companyDeletedAt: Date | null;
+  /** Los interruptores de añadidos de su empresa, crudos: cuáles cuentan como activos lo decide el dominio. */
+  readonly companyAddons: readonly string[];
   /**
    * QC-74 (T8, R7, R11): los codigos de permiso del rol del usuario, tal y como estan HOY en
    * `role_permissions`. Salen del MISMO `findFirst` que ya se hacia, por la relacion

@@ -27,10 +27,10 @@ import type { ListQueryable } from './list-query';
 /**
  * El listado de GRUPOS (R24–R27).
  *
- * El orden por defecto —`name ASC, id ASC` (R25)— lo pone el adaptador; esta lista declara lo que
- * el cliente PUEDE pedir. El `id` del desempate no es adorno: dos grupos vivos de la misma empresa
- * no pueden llamarse igual (R12), pero cuando el orden pedido es `createdAt` el empate es trivial,
- * y sin desempate estable un grupo podria aparecer en dos paginas o en ninguna.
+ * El orden por defecto —`createdAt DESC, id ASC`, mas nuevos primero— lo pone el adaptador; esta
+ * lista declara lo que el cliente PUEDE pedir. El `id` del desempate no es adorno: dos grupos
+ * vivos de la misma empresa no pueden llamarse igual (R12), pero cuando el orden es `createdAt` el
+ * empate es trivial, y sin desempate estable un grupo podria aparecer en dos paginas o en ninguna.
  *
  * `filterable` vacio **no cierra nada** (R27): ninguna decision del humano pide un filtro hoy, y
  * anadir uno manana es una linea aqui que no cambia la firma —la leccion QC-38 → QC-39 que la

@@ -34,6 +34,7 @@ const USUARIO: SessionUser = {
   displayName: 'Carla Duarte Salas',
   roleName: 'Administrador',
   permissions: PERMISSIONS.map((permiso) => permiso.code),
+  addons: ['importacion_excel'],
 };
 
 const {
@@ -97,6 +98,15 @@ vi.mock('@/lib/modules/inventario/adapters/driving/batch-actions', () => ({
   listOrderBatchesAction: vi.fn(),
   listBatchMovementsAction: vi.fn(),
   adjustBatchStockAction: vi.fn(),
+}));
+
+// 2026-10-16: el barrel de la ruta exporta el sheet de entrega sin pedido, que importa las actions
+// de pedidos; sin este doble se cargaria la composicion real.
+vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
+  getDirectDeliveryAction: vi.fn(),
+  deliverDirectAction: vi.fn(),
+  listDirectDeliverySurplusAction: vi.fn(async () => ({ status: 'success', data: {} })),
+  searchOrderCustomersAction: vi.fn(),
 }));
 
 const UNIDAD = {

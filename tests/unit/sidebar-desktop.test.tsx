@@ -10,7 +10,7 @@ import {
   PRIVATE_NAV_ITEMS,
   type NavGroup,
 } from '@/lib/shared/navigation/private-nav';
-import { ASSIGNED_ORDERS_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
+import { HOME_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import {
@@ -217,13 +217,13 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
 
   it('activar el control alterna a modo icono y muestra la marca corta', async () => {
     // R24 (y R4 se conserva en los dos modos). ENMIENDA QC-226 (R12, R13): la marca larga es el
-    // logo horizontal y la corta, el isotipo.
+    // logo horizontal y la corta, el isotipo. ENMIENDA QC-277 (R18): el logo apunta a HOME_ROUTE.
     const user = setupUser();
     await renderLayout();
 
     const control = screen.getByTestId(testId.toggle);
     expect(srcDeLaMarca()).toBe(LOGO_HORIZONTAL);
-    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
+    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', HOME_ROUTE);
 
     await alternarBarra(user, 'collapsed');
 
@@ -231,14 +231,14 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
     expect(control).toHaveAttribute('aria-expanded', 'false');
     expect(srcDeLaMarca()).toBe(ISOTIPO_DEL_RAIL);
     expect(screen.getByTestId(testId.brandLink)).toHaveAccessibleName(BRAND_LABEL);
-    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
+    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', HOME_ROUTE);
 
     await alternarBarra(user, 'expanded');
 
     expect(panelDeEscritorio()).toHaveAttribute('data-collapsible', '');
     expect(control).toHaveAttribute('aria-expanded', 'true');
     expect(srcDeLaMarca()).toBe(LOGO_HORIZONTAL);
-    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
+    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', HOME_ROUTE);
   });
 
   it('en modo icono cada entrada conserva su nombre accesible', async () => {

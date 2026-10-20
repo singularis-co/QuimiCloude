@@ -41,6 +41,7 @@ import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
+import { fakeDeliveryProgress } from '../../helpers/delivery-progress-double';
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333'
 const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
@@ -172,7 +173,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       new Map([
         [
           RECETA,
-          { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false },
+          { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false, imageUrl: null },
         ],
       ]),
     )
@@ -196,7 +197,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
     })
     const recipes = {
       findRefsIncludingDeleted: vi.fn(async () => [
-        { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false },
+        { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false, imageUrl: null },
       ]),
       findExecutionContentById: vi.fn(async () => ({
         id: RECETA,
@@ -229,6 +230,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       presentations, packaging: fakePackagingCatalog(),
       units,
       log: { ignoredFields: vi.fn() },
+      deliveryProgress: fakeDeliveryProgress(),
     })({ page: 1 }, ACTOR)
     const alta = await createCreateOrder({ customerCatalog: fakeCustomerCatalog(), recipes, products, units, presentations, packaging: fakePackagingCatalog(), unitOfWork })(
       { recipeId: RECETA, quantity: '10.0000', unitId: UNIDAD },

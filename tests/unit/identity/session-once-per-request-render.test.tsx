@@ -44,6 +44,7 @@ import type { SessionUserRecord } from '@/lib/modules/identity/ports/session-use
 import { PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
 
 import type { DataTableParams } from '@/components/shared/data-table';
+import { ADDONS } from '@/lib/modules/identity';
 
 const { readClaimsMock, findActiveByIdMock, pintado, prismaDoble } = vi.hoisted(() => {
   /**
@@ -189,6 +190,7 @@ const RECORD: SessionUserRecord = {
   roleName: 'operador',
   companyId: COMPANY_ID,
   companyDeletedAt: null,
+  companyAddons: [...ADDONS],
   permissions: PERMISSIONS.map((permiso) => permiso.code),
   accountStatus: 'active',
   lockedUntil: null,

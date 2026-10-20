@@ -1,11 +1,14 @@
 import {
   AI_PROVIDER_INTEGRATION_ROUTE,
   ASSIGNED_ORDERS_ROUTE,
+  CUSTOMER_CONTACTS_ROUTE,
   CUSTOMERS_ROUTE,
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_INTEGRATION_ROUTE,
   INVENTORY_ROUTE,
+  MAESTRO_ADMINISTRATORS_ROUTE,
+  MAESTRO_COMPANIES_ROUTE,
   ORDERS_ROUTE,
   PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
@@ -117,6 +120,7 @@ export const USERS_LABEL = 'Usuarios';
  * Mismo criterio que `SUPPLIERS_LABEL`, `ORDERS_LABEL`, `PRESENTATIONS_LABEL` y `UNITS_LABEL`.
  */
 export const CUSTOMERS_LABEL = 'Clientes';
+export const CUSTOMER_CONTACTS_LABEL = 'Contactos';
 
 /** Lleva tilde a proposito: es el texto que se lee en pantalla, no el segmento de la URL. */
 export const ASSIGNED_ORDERS_LABEL = 'Asignación';
@@ -126,25 +130,25 @@ export const AI_PROVIDER_INTEGRATION_LABEL = 'Proveedor IA';
 export const INVENTORY_INTEGRATION_LABEL = 'Inventarios';
 export const WHATSAPP_INTEGRATION_LABEL = 'WhatsApp';
 
+export const COMPANIES_LABEL = 'Empresas';
+export const ADMINISTRATORS_LABEL = 'Administradores';
+
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
 
 /** Nombre accesible de la marca, que en pantalla se pinta solo como logo. */
 export const BRAND_LABEL = 'QuimiCloude';
 
-/** Titulos de las secciones en las que se agrupan los items de nivel superior. */
-export const NAV_SECTION_OPERATION = 'Operación';
-export const NAV_SECTION_CHAIN = 'Cadena';
 /**
- * Seccion de configuracion del producto (QC-45, R3). Nacio con **un solo item**,
- * «Presentaciones», y QC-39 le anadio su hermana «Unidades» (QC-39 R9): la seccion NO se crea de
- * nuevo, no se renombra y no se reordena su primer item.
- *
- * «Usuarios» ya NO vive aqui: nacio en esta seccion con QC-67 y paso a `NAV_SECTION_OPERATION`
- * por decision humana del 2026-09-21 (usuarios es operacion, no configuracion). La seccion se
- * queda con sus dos items originales, Presentaciones y Unidades.
+ * Titulos de las secciones en las que se agrupan los items de nivel superior. El orden en que se
+ * dibujan no lo dan estas constantes sino el de `PRIVATE_NAV_ITEMS`.
  */
+export const NAV_SECTION_TRACKING = 'Seguimiento';
+export const NAV_SECTION_OPERATION = 'Operación';
+export const NAV_SECTION_PRODUCTION = 'Producción';
+export const NAV_SECTION_DIRECTORY = 'Directorio';
 export const NAV_SECTION_CONFIGURATION = 'Configuración';
+export const NAV_SECTION_PLATFORM = 'Plataforma';
 
 /**
  * Nombre del icono de un item. **Es una cadena y no el componente a proposito.**
@@ -166,7 +170,6 @@ export type NavIconName =
   | 'clipboard-list'
   | 'clipboard-check'
   | 'truck'
-  | 'factory'
   | 'flask-conical'
   | 'boxes'
   // QC-67 R2: el item de usuarios. Es el UNICO nombre que esta ficha anade, y se anade porque
@@ -181,7 +184,9 @@ export type NavIconName =
   | 'contact'
   | 'puzzle'
   | 'ruler'
-  | 'square-user';
+  | 'square-user'
+  | 'building-2'
+  | 'shield-user';
 
 export type NavLink = {
   readonly kind: 'link';
@@ -249,21 +254,20 @@ export type NavGroup = {
 
 export type NavItem = NavLink | NavGroup;
 
+/**
+ * El orden de este array es el orden del menu Y el del aterrizaje tras el login.
+ *
+ * `groupNavItemsBySection` agrupa por orden de aparicion, asi que las secciones salen en el orden
+ * en que aparece su primer item: Seguimiento, Operación, Producción, Directorio y Configuración.
+ * Dentro de «Operación» el orden sigue el flujo del trabajo: Inventario, Pedidos, Asignación.
+ *
+ * `firstVisibleNavHref` aterriza en el primer enlace visible de este array, sin otra lista de
+ * prioridad. Por eso mover un item puede cambiar a donde llega alguien tras el login. Con este
+ * orden, en el seed: quien tiene `dashboard.consultar` llega a `/dashboard`; el Operador, a
+ * `/inventario`; Empacador y Acondicionamiento, a `/asignacion`. Lo fija
+ * `tests/unit/navegacion/orden-secciones.test.ts`.
+ */
 export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
-  {
-    kind: 'link',
-    href: ASSIGNED_ORDERS_ROUTE,
-    label: ASSIGNED_ORDERS_LABEL,
-    testId: 'nav-asignacion',
-    permission: 'asignaciones.consultar',
-    icon: 'clipboard-check',
-    section: NAV_SECTION_OPERATION,
-  },
-  // El dashboard va SEGUNDO, detras de «Asignación», y no primero a proposito:
-  // `firstVisibleNavHref` aterriza en el primer enlace visible, y asi quien tiene
-  // `asignaciones.consultar` sigue aterrizando en `/asignacion` aunque tambien vea el dashboard.
-  // En el seed el unico rol con `dashboard.consultar` es el Administrador, que tiene ademas
-  // `asignaciones.consultar`, asi que el item no cambia el aterrizaje de ningun rol sembrado.
   {
     kind: 'link',
     href: DASHBOARD_ROUTE,
@@ -271,7 +275,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     testId: 'nav-dashboard',
     permission: 'dashboard.consultar',
     icon: 'layout-dashboard',
-    section: NAV_SECTION_OPERATION,
+    section: NAV_SECTION_TRACKING,
   },
   {
     kind: 'link',
@@ -282,9 +286,6 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     icon: 'package',
     section: NAV_SECTION_OPERATION,
   },
-  // QC-35 R3: item de NIVEL SUPERIOR en la seccion «Operación» —un pedido es produccion, no
-  // cadena de suministro (decision humana del 2026-09-06)—. El icono `clipboard-list` ya existe
-  // en `NavIconName` y en `NAV_ICONS`: no se anade ningun icono.
   {
     kind: 'link',
     href: ORDERS_ROUTE,
@@ -295,25 +296,26 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     section: NAV_SECTION_OPERATION,
   },
   {
-    kind: 'group',
-    label: 'Producción',
-    testId: 'nav-produccion',
-    icon: 'factory',
-    section: NAV_SECTION_CHAIN,
-    items: [
-      {
-        kind: 'link',
-        href: FORMULAS_ROUTE,
-        label: RECIPES_LABEL,
-        testId: 'nav-produccion-recetas',
-        permission: 'recetas.consultar',
-        icon: 'flask-conical',
-      },
-    ],
+    kind: 'link',
+    href: ASSIGNED_ORDERS_ROUTE,
+    label: ASSIGNED_ORDERS_LABEL,
+    testId: 'nav-asignacion',
+    permission: 'asignaciones.consultar',
+    icon: 'clipboard-check',
+    section: NAV_SECTION_OPERATION,
   },
-  // QC-44 R4: item de NIVEL SUPERIOR en la seccion «Cadena», hermano del grupo «Producción» y
-  // **no un hijo suyo**: proveedores es modulo de dominio propio (epica QC-41, creada fuera de
-  // Catalogos y de Inventario). El icono `truck` ya existe en `NavIconName` y en `NAV_ICONS`.
+  // Enlace directo y no grupo: un grupo «Producción» dentro de la seccion «Producción» repetiria
+  // el mismo titulo dos veces para abrir un desplegable de un solo hijo. Conserva el testId que
+  // tenia como hijo del grupo, porque lo leen otros tests y el E2E de permisos.
+  {
+    kind: 'link',
+    href: FORMULAS_ROUTE,
+    label: RECIPES_LABEL,
+    testId: 'nav-produccion-recetas',
+    permission: 'recetas.consultar',
+    icon: 'flask-conical',
+    section: NAV_SECTION_PRODUCTION,
+  },
   {
     kind: 'link',
     href: SUPPLIERS_ROUTE,
@@ -321,21 +323,48 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     testId: 'nav-proveedores',
     permission: 'proveedores.consultar',
     icon: 'truck',
-    section: NAV_SECTION_CHAIN,
+    section: NAV_SECTION_DIRECTORY,
   },
-  // QC-45 R3, R4 — ULTIMA entrada de nivel superior y unica de la seccion «Configuración»: el
-  // catalogo de presentaciones no es operacion diaria ni cadena de suministro, y por eso estrena
-  // seccion propia en vez de colarse en una existente. Sigue siendo UNA sola: «Unidades» llega con
-  // QC-39. El icono `boxes` ya existe en `NavIconName` y en `NAV_ICONS`: no se anade ninguno.
-  //
-  // **El ocultado a quien no puede entrar lo hace el filtrado por PERMISO de QC-75**
-  // (`filterNavItemsByPermissions` en `app/(private)/layout.tsx`), no un campo `adminOnly`: el
-  // texto original de la T2 de QC-45 describia ese apaño por rol porque QC-75 aun no existia, y
-  // manda el mecanismo nuevo. `inventario.modificar` es el mismo codigo que exige la pantalla con
-  // `requirePagePermission`, asi que el item no puede salir en el menu de quien recibiria un 404
-  // al pulsarlo: el Operador del seed lleva `inventario.consultar` y NO este, asi que no lo ve.
-  // Al no quedarle ningun hijo visible, `groupNavItemsBySection` tampoco deja el encabezado
-  // «Configuración» huerfano.
+  // El permiso de cada hijo es el que exige su pantalla con `requirePagePermission`; lo vigila
+  // `tests/unit/clientes-ui/private-nav-clientes.test.ts`, que lo lee de la fuente de cada
+  // `page.tsx`.
+  {
+    kind: 'group',
+    label: CUSTOMERS_LABEL,
+    testId: 'nav-clientes',
+    icon: 'square-user',
+    section: NAV_SECTION_DIRECTORY,
+    items: [
+      {
+        kind: 'link',
+        href: CUSTOMERS_ROUTE,
+        label: CUSTOMERS_LABEL,
+        testId: 'nav-clientes-lista',
+        permission: 'clientes.consultar',
+      },
+      {
+        kind: 'link',
+        href: CUSTOMER_CONTACTS_ROUTE,
+        label: CUSTOMER_CONTACTS_LABEL,
+        testId: 'nav-clientes-contactos',
+        permission: 'clientes.consultar',
+      },
+    ],
+  },
+  // El permiso es el mismo que exige la pantalla con `requirePagePermission`; lo vigila
+  // `tests/unit/configuracion-ui/private-nav-usuarios.test.ts`, que lo lee de la fuente de
+  // `page.tsx`.
+  {
+    kind: 'link',
+    href: USERS_ROUTE,
+    label: USERS_LABEL,
+    testId: 'nav-usuarios',
+    permission: 'usuarios.consultar',
+    icon: 'users',
+    section: NAV_SECTION_CONFIGURATION,
+  },
+  // `inventario.modificar` y no `inventario.consultar`: es el codigo que exige la pantalla, y el
+  // Operador, que solo consulta inventario, veria un enlace que le da 404.
   {
     kind: 'link',
     href: PRESENTATIONS_ROUTE,
@@ -345,20 +374,9 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     icon: 'boxes',
     section: NAV_SECTION_CONFIGURATION,
   },
-  // QC-39 R9, R10 — SEGUNDO item de la seccion «Configuración», junto al de presentaciones y sin
-  // tocarlo: la seccion ya existia y esta ficha solo se da de alta en ella.
-  //
-  // **El permiso es `unidades.consultar`, uno de los DOS que exige la pantalla**
-  // (`specs/QC-39-pantalla-de-unidades/design.md > 6`). `NavLink.permission` es UNA cadena —y
-  // convertirlo en lista significaria reescribir el tipo, `filterNavItemsByPermissions` y su
-  // guardia, que R9 y R47 prohiben tocar—, asi que se declara el que sigue la forma normal
-  // `<modulo>.consultar` de QC-75 R5. **Aqui NO aplica la excepcion de QC-45**, que declaro
-  // `inventario.modificar` porque el Operador lleva `inventario.consultar` y habria visto un
-  // enlace que rebota: `unidades.consultar` no lo tiene nadie salvo el Administrador
-  // (`SEED_ROLE_PERMISSIONS`), que tambien tiene `unidades.modificar`, asi que nadie ve un enlace
-  // que le daria 404. Que eso siga siendo cierto lo vigila
-  // `tests/unit/configuracion-ui/permisos-unidades-coherentes.test.ts` (R11): se pone rojo el dia
-  // que un rol reciba exactamente uno de los dos.
+  // La pantalla exige `unidades.consultar` y `unidades.modificar`, pero `permission` es una sola
+  // cadena: se declara el de consulta. Nadie ve un enlace que le de 404 mientras ningun rol tenga
+  // solo uno de los dos; lo vigila `tests/unit/configuracion-ui/permisos-unidades-coherentes.test.ts`.
   {
     kind: 'link',
     href: UNITS_ROUTE,
@@ -367,53 +385,6 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     permission: 'unidades.consultar',
     icon: 'ruler',
     section: NAV_SECTION_CONFIGURATION,
-  },
-  // QC-67 R2, R3 origino este item dentro de «Configuración», al final del array y sin tocar los
-  // dos que ya vivian dentro de esa seccion. Por decision humana del 2026-09-21 paso a
-  // `NAV_SECTION_OPERATION`: usuarios es operacion de la organizacion, no configuracion del
-  // producto. El objeto NO se movio de sitio en el array a proposito —solo cambio su `section`—:
-  // `groupNavItemsBySection` agrupa por `section` conservando el orden de aparicion, asi que ya
-  // sale dibujado dentro de «Operación», detras de Pedidos; y `firstVisibleNavHref` recorre el
-  // array crudo de arriba abajo, asi que mover el objeto habria cambiado el aterrizaje de quien no
-  // tiene `dashboard.consultar`, algo que el humano no pidio.
-  //
-  // **El permiso es `usuarios.consultar`, EL MISMO codigo que exige la pantalla** con
-  // `requirePagePermission` (`design.md > 3`). Aqui NO aplica la excepcion de QC-45 —que declaro
-  // `inventario.modificar` para que el Operador no viera un enlace que rebota— ni hace falta la
-  // contencion de QC-39, que exigia DOS codigos y declaraba uno: con un solo codigo a cada lado, el
-  // enlace y el 404 coinciden exactamente y nadie ve un enlace que le daria 404. Que item y pagina
-  // sigan diciendo lo mismo lo vigila
-  // `tests/unit/configuracion-ui/private-nav-usuarios.test.ts`, que LEE el codigo de la fuente de
-  // `page.tsx` en vez de repetirlo aqui.
-  //
-  // El icono `users` SI es nuevo en `NavIconName` y en `NAV_ICONS`: ninguno de los ocho existentes
-  // habla de personas. No entra ninguna dependencia: `lucide-react` ya estaba.
-  {
-    kind: 'link',
-    href: USERS_ROUTE,
-    label: USERS_LABEL,
-    testId: 'nav-usuarios',
-    permission: 'usuarios.consultar',
-    icon: 'users',
-    section: NAV_SECTION_OPERATION,
-  },
-  // ULTIMO item del array, en «Cadena» junto a Proveedores:
-  // `groupNavItemsBySection` agrupa por orden de aparicion, asi que se dibuja tras Proveedores, y
-  // `firstVisibleNavHref` recorre el array crudo, asi que ponerlo al final no cambia el aterrizaje
-  // de ningun rol.
-  //
-  // El permiso es `clientes.consultar`, EL MISMO codigo que exige la pantalla con
-  // `requirePagePermission`. Que item y pagina sigan diciendo lo mismo lo vigila
-  // `tests/unit/clientes-ui/private-nav-clientes.test.ts`, que LEE el codigo de la fuente de
-  // `page.tsx` en vez de repetirlo aqui.
-  {
-    kind: 'link',
-    href: CUSTOMERS_ROUTE,
-    label: CUSTOMERS_LABEL,
-    testId: 'nav-clientes',
-    permission: 'clientes.consultar',
-    icon: 'square-user',
-    section: NAV_SECTION_CHAIN,
   },
   {
     kind: 'group',
@@ -444,6 +415,26 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
         permission: 'integraciones.modificar',
       },
     ],
+  },
+  // Al final a propósito: ningún rol de empresa tiene `empresas.*`, así que su aterrizaje no
+  // cambia, y para el Maestro el primer enlace visible es Empresas.
+  {
+    kind: 'link',
+    href: MAESTRO_COMPANIES_ROUTE,
+    label: COMPANIES_LABEL,
+    testId: 'nav-empresas',
+    permission: 'empresas.consultar',
+    icon: 'building-2',
+    section: NAV_SECTION_PLATFORM,
+  },
+  {
+    kind: 'link',
+    href: MAESTRO_ADMINISTRATORS_ROUTE,
+    label: ADMINISTRATORS_LABEL,
+    testId: 'nav-administradores',
+    permission: 'empresas.consultar',
+    icon: 'shield-user',
+    section: NAV_SECTION_PLATFORM,
   },
 ];
 
@@ -541,4 +532,16 @@ export function firstVisibleNavHref(items: readonly NavItem[]): string | null {
   }
 
   return null;
+}
+
+/**
+ * Adónde aterriza una persona según sus permisos efectivos: el login, el logo y `/login` con
+ * sesión comparten esta regla para que no diverjan. Con el menú vacío cae al dashboard, que
+ * responde el 404 dentro de la zona privada, con su salida.
+ */
+export function homeHrefFor(permissions: readonly string[]): string {
+  return (
+    firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permissions)) ??
+    DASHBOARD_ROUTE
+  );
 }

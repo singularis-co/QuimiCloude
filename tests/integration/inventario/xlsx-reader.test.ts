@@ -54,15 +54,15 @@ describe('lector .xlsx con mixto.xlsx', () => {
 
   it('R4 R12 los numeros nativos llegan como decimal sin redondear ni rellenar', async () => {
     const all = await rows();
-    expect(cell(all, 2, 'Existencia')).toEqual({ text: '25', origin: 'number' });
+    expect(cell(all, 2, 'Cantidad')).toEqual({ text: '25', origin: 'number' });
     expect(cell(all, 2, 'Costo unitario')).toEqual({ text: '3.5', origin: 'number' });
     expect(cell(all, 3, 'Costo unitario')).toEqual({ text: '0.0001', origin: 'number' });
-    expect(cell(all, 5, 'Existencia')).toEqual({ text: '1234567', origin: 'number' });
-    expect(cell(all, 5, 'Costo total')).toEqual({ text: '100.25', origin: 'number' });
+    expect(cell(all, 5, 'Cantidad')).toEqual({ text: '1234567', origin: 'number' });
+    expect(cell(all, 5, 'Costo unitario')).toEqual({ text: '100.25', origin: 'number' });
   });
 
   it('R4 R12 un numero nativo con mas de 4 decimales no se redondea: queda number_format_invalid', async () => {
-    const stock = cell(await rows(), 3, 'Existencia');
+    const stock = cell(await rows(), 3, 'Cantidad');
     expect(stock).toEqual({ text: '1.23456', origin: 'number' });
     expect(parseImportDecimal(stock!.text, 'number')).toEqual({ kind: 'number_format_invalid' });
   });

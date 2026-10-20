@@ -316,17 +316,30 @@ describe('nombre y descripcion con sus errores (R13)', () => {
 });
 
 describe('los pasos se corrigen, borran, añaden y una revision sin pasos confirma (R14)', () => {
-  it('añade y borra un paso', async () => {
+  const MEZCLAR = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Mezclar' }] }] };
+
+  it('añade y borra un paso con el «+» y la «x» de la fila; quitar el último deja la fila en blanco', async () => {
     const user = setupUser();
-    renderReview({ steps: [] });
+    renderReview({ steps: [MEZCLAR] });
 
-    expect(screen.getByTestId('recipe-steps-list').children).toHaveLength(0);
-
-    await user.click(screen.getByTestId('recipe-step-add'));
+    expect(screen.queryByTestId('recipe-step-add')).toBeNull();
     expect(screen.getByTestId('recipe-steps-list').children).toHaveLength(1);
 
+    await user.click(screen.getByTestId('recipe-step-add-0'));
+    expect(screen.getByTestId('recipe-steps-list').children).toHaveLength(2);
+
+    await user.click(screen.getByTestId('recipe-step-remove-1'));
     await user.click(screen.getByTestId('recipe-step-remove-0'));
-    expect(screen.getByTestId('recipe-steps-list').children).toHaveLength(0);
+    expect(screen.getByTestId('recipe-steps-list').children).toHaveLength(1);
+    expect(screen.getByTestId('recipe-step-text-0')).toHaveTextContent('');
+  });
+
+  it('sin pasos leidos, cada seccion arranca con una fila en blanco que no bloquea confirmar', () => {
+    renderReview({ steps: [], packingSteps: [] });
+
+    expect(screen.getByTestId('recipe-steps-list').children).toHaveLength(1);
+    expect(screen.getByTestId('recipe-packing-steps-list').children).toHaveLength(1);
+    expect(screen.queryByTestId('formula-import-reasons')?.textContent ?? '').not.toMatch(/pasos/);
   });
 });
 
@@ -436,6 +449,8 @@ describe('el choque de nombre exige elegir antes de confirmar (R17, R21)', () =>
       nameClash: { recipeId: 'receta-existente', recipeName: 'Detergente base' },
     });
 
+    // El aviso es un `Notice` en tono `warning`: se anuncia como `status`, ya no como `alert`.
+    expect(screen.getByTestId('formula-import-clash')).toHaveAttribute('role', 'status');
     expect(screen.getByTestId('formula-import-clash-message')).toHaveTextContent(
       'Ya existe la fórmula «Detergente base». Reemplazarla cambia sus ingredientes, pasos y descripción; los pedidos que la usan no cambian su coste guardado.',
     );
@@ -650,15 +665,28 @@ describe('los pasos de envasado tienen su propia seccion y sus propios motivos (
 
   it('R16: se añaden y borran sin tocar los pasos del operador', async () => {
     const user = setupUser();
+    renderReview({ steps: [MEZCLAR], packingSteps: [ENVASAR] });
+
+    expect(screen.queryByTestId('recipe-packing-step-add')).toBeNull();
+    await user.click(screen.getByTestId('recipe-packing-step-add-0'));
+    expect(screen.getByTestId('recipe-packing-steps-list').children).toHaveLength(2);
+
+    await user.click(screen.getByTestId('recipe-packing-step-remove-1'));
+    expect(screen.getByTestId('recipe-packing-steps-list').children).toHaveLength(1);
+    expect(screen.getByTestId('recipe-steps-list').children).toHaveLength(1);
+    expect(screen.getByTestId('recipe-steps-list')).toHaveTextContent('Mezclar');
+  });
+
+  it('la seccion de envasado va tras un divisor y se marca «(opcional)» con su ayuda', () => {
     renderReview({ steps: [MEZCLAR], packingSteps: [] });
 
-    expect(screen.getByTestId('recipe-packing-step-add')).toHaveTextContent('Añadir paso de envasado');
-    await user.click(screen.getByTestId('recipe-packing-step-add'));
-    expect(screen.getByTestId('recipe-packing-steps-list').children).toHaveLength(1);
-
-    await user.click(screen.getByTestId('recipe-packing-step-remove-0'));
-    expect(screen.getByTestId('recipe-packing-steps-list').children).toHaveLength(0);
-    expect(screen.getByTestId('recipe-steps-list').children).toHaveLength(1);
+    const separator = screen.getByTestId('formula-import-steps-separator');
+    const operator = screen.getByTestId('recipe-steps-field');
+    const packing = screen.getByTestId('recipe-packing-steps-field');
+    expect(operator.compareDocumentPosition(separator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(separator.compareDocumentPosition(packing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('recipe-packing-steps-optional')).toHaveTextContent('(opcional)');
+    expect(screen.getByRole('button', { name: 'Qué son los pasos de envasado' })).toBeInTheDocument();
   });
 
   it('R16: confirmar envia los pasos de envasado en orden y aparte de los del operador', async () => {

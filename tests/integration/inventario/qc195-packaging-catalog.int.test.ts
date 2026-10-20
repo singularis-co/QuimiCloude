@@ -8,11 +8,12 @@
 import { randomUUID } from 'node:crypto';
 
 import { Prisma } from '@prisma/client';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import {
+  createFindPackagingRefs,
   findPackagingCostingBatches,
   findPackagingRefs,
 } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
@@ -180,6 +181,7 @@ describe('QC-195 — PackagingCatalog', () => {
           content: '500.0000',
           unitId: presentation.unitId,
           available: '100.0000',
+          imageUrl: null,
         },
       ]);
     } finally {
@@ -198,6 +200,38 @@ describe('QC-195 — PackagingCatalog', () => {
       expect((await findPackagingRefs([botella.id], c.companyId, { excludeOrderId: orderId }))[0]?.available).toBe(
         '100.0000',
       );
+    } finally {
+      await dropCompany(c);
+    }
+  });
+
+  it('imagen — findRefs sin almacenamiento deja `imageUrl: null` aunque el envase tenga ruta guardada', async () => {
+    const c = await createCompany();
+    try {
+      const botella = await envase(c, '10', '0.5000');
+      await prisma.product.update({ where: { id: botella.id }, data: { imagePath: 'productos/botella.png' } });
+
+      expect((await findPackagingRefs([botella.id], c.companyId))[0]?.imageUrl).toBeNull();
+    } finally {
+      await dropCompany(c);
+    }
+  });
+
+  it('imagen — createFindPackagingRefs compone la URL con la ruta guardada y deja `null` el envase sin imagen', async () => {
+    const c = await createCompany();
+    try {
+      const conImagen = await envase(c, '10', '0.5000');
+      const sinImagen = await envase(c, '10', '0.5000');
+      await prisma.product.update({ where: { id: conImagen.id }, data: { imagePath: 'productos/galon.png' } });
+      const publicUrl = vi.fn((path: string) => `https://cdn.test/${path}`);
+
+      const refs = await createFindPackagingRefs({ publicUrl })([conImagen.id, sinImagen.id], c.companyId);
+
+      const urlPorId = new Map(refs.map((ref) => [ref.id, ref.imageUrl]));
+      expect(urlPorId.get(conImagen.id)).toBe('https://cdn.test/productos/galon.png');
+      expect(urlPorId.get(sinImagen.id)).toBeNull();
+      expect(publicUrl).toHaveBeenCalledTimes(1);
+      expect(publicUrl).toHaveBeenCalledWith('productos/galon.png');
     } finally {
       await dropCompany(c);
     }

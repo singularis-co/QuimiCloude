@@ -46,6 +46,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { DASHBOARD_ROUTE, executionTraceRoute } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
@@ -315,6 +316,7 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
+  await enableAllAddons(companyId);
   otherCompanyId = (
     await prisma.company.create({
       data: { name: OTHER_COMPANY_NAME, nameNormalized: normalizeCompanyName(OTHER_COMPANY_NAME) },

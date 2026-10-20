@@ -1,5 +1,15 @@
 import type { LucideIcon } from 'lucide-react';
-import { ArrowRight, Ban, CircleCheck, Package, Play, RotateCcw } from 'lucide-react';
+import {
+  ArrowRight,
+  Ban,
+  CircleCheck,
+  ClipboardCheck,
+  ClipboardList,
+  Download,
+  Package,
+  Play,
+  RotateCcw,
+} from 'lucide-react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
@@ -9,15 +19,20 @@ import {
   formatElapsed,
   formatTraceInstant,
 } from '@/app/(private)/dashboard/components';
-import type { ExecutionAction, ExecutionTraceDetailStep } from '@/lib/modules/asignaciones';
+import type { ExecutionAction, ExecutionTraceDetailStep, OrderEvidenceGroup } from '@/lib/modules/asignaciones';
+import type { ExecutionEvidenceResult } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 import { avatarTone } from '@/lib/shared/ui/avatar-tone';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { getInitials } from '@/lib/shared/ui/initials';
 import type { StatusTone } from '@/lib/shared/ui/status-tone';
 
+import { ConditioningBatchSaveBody, ConditioningStartBody, MISSING_DATA_LABEL } from './conditioning-step-details';
+import { placeManufacturingEvidence, type TraceEvidencePlacement } from './trace-evidence-placement';
+import { TraceEvidenceReadError, TraceOtherStepsEvidence } from './trace-other-steps-evidence';
+import { TraceStepEvidence } from './trace-step-evidence';
+
 const HEADING_TEXT = 'Anotaciones';
 const HEADING_ID = 'execution-trace-annotations';
-const MISSING_PERSON_LABEL = 'Sin dato';
 const STEP_STAGGER_MS = 40;
 
 type TimelineTone = Extract<StatusTone, 'neutral' | 'progress' | 'waiting' | 'success' | 'danger'>;
@@ -34,6 +49,9 @@ export const EXECUTION_TIMELINE_ACTIONS: Record<
   finish: { tone: 'success', icon: CircleCheck },
   pack_finish: { tone: 'success', icon: Package },
   cancel: { tone: 'danger', icon: Ban },
+  conditioning_start: { tone: 'progress', icon: ClipboardList },
+  conditioning_batch_save: { tone: 'neutral', icon: Download },
+  conditioning_finish: { tone: 'success', icon: ClipboardCheck },
 };
 
 const DOT_TONE_CLASS: Record<TimelineTone, string> = {
@@ -51,11 +69,12 @@ const BODY_BASE_CLASS = 'flex min-w-0 flex-col gap-1.5 rounded-xl border px-3.5 
 const BODY_HOVER_CLASS = 'hover:border-primary/40 hover:shadow-md';
 const BODY_DEFAULT_CLASS = 'border-border bg-card';
 const BODY_GO_BACK_CLASS = 'border-warning-border bg-warning-subtle/55';
+const STEP_META_CLASS = 'flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground';
 
 function StepPerson({ step }: { readonly step: ExecutionTraceDetailStep }) {
   if (step.userDisplayName === null) {
     return (
-      <span aria-label={MISSING_PERSON_LABEL} data-testid="execution-trace-step-person">
+      <span aria-label={MISSING_DATA_LABEL} data-testid="execution-trace-step-person">
         {EMPTY_MARK}
       </span>
     );
@@ -70,7 +89,46 @@ function StepPerson({ step }: { readonly step: ExecutionTraceDetailStep }) {
   );
 }
 
-function TimelineStep({ step, index }: { readonly step: ExecutionTraceDetailStep; readonly index: number }) {
+function StepBody({ step }: { readonly step: ExecutionTraceDetailStep }) {
+  switch (step.action) {
+    case 'conditioning_start':
+      return <ConditioningStartBody supervisor={<StepPerson step={step} />} team={step.team} />;
+    case 'conditioning_batch_save':
+      return <ConditioningBatchSaveBody savedBy={<StepPerson step={step} />} lines={step.lines} />;
+    case 'conditioning_finish':
+      return (
+        <div className={STEP_META_CLASS}>
+          <StepPerson step={step} />
+        </div>
+      );
+    default:
+      return (
+        <>
+          <div className={STEP_META_CLASS}>
+            {step.stepPosition === null ? null : (
+              <span data-testid="execution-trace-step-position">Paso {step.stepPosition}</span>
+            )}
+            <StepPerson step={step} />
+          </div>
+          {step.action === 'cancel' && step.reason !== null ? (
+            <p className="m-0 text-xs text-foreground" data-testid="execution-trace-step-reason">
+              <span className="font-semibold">Motivo</span> · {step.reason}
+            </p>
+          ) : null}
+        </>
+      );
+  }
+}
+
+function TimelineStep({
+  step,
+  index,
+  evidence,
+}: {
+  readonly step: ExecutionTraceDetailStep;
+  readonly index: number;
+  readonly evidence: OrderEvidenceGroup | undefined;
+}) {
   const { tone, icon: Icon } = EXECUTION_TIMELINE_ACTIONS[step.action];
   return (
     <li
@@ -103,17 +161,7 @@ function TimelineStep({ step, index }: { readonly step: ExecutionTraceDetailStep
             {formatTraceInstant(step.occurredAt)}
           </time>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {step.stepPosition === null ? null : (
-            <span data-testid="execution-trace-step-position">Paso {step.stepPosition}</span>
-          )}
-          <StepPerson step={step} />
-        </div>
-        {step.action === 'cancel' && step.reason !== null ? (
-          <p className="m-0 text-xs text-foreground" data-testid="execution-trace-step-reason">
-            <span className="font-semibold">Motivo</span> · {step.reason}
-          </p>
-        ) : null}
+        <StepBody step={step} />
         {step.gapToNextMs === null ? null : (
           <p className="m-0 text-xs text-muted-foreground" data-testid="execution-trace-step-gap">
             Hasta la siguiente: {formatElapsed(step.gapToNextMs)}
@@ -124,6 +172,7 @@ function TimelineStep({ step, index }: { readonly step: ExecutionTraceDetailStep
             {GO_BACK_MARK}
           </span>
         ) : null}
+        {evidence === undefined ? null : <TraceStepEvidence group={evidence} />}
       </div>
     </li>
   );
@@ -131,9 +180,14 @@ function TimelineStep({ step, index }: { readonly step: ExecutionTraceDetailStep
 
 export type ExecutionTimelineProps = {
   readonly steps: readonly ExecutionTraceDetailStep[];
+  readonly evidence?: ExecutionEvidenceResult;
 };
 
-export function ExecutionTimeline({ steps }: ExecutionTimelineProps) {
+const NO_PLACEMENT: TraceEvidencePlacement = { byStepId: new Map(), others: [] };
+
+export function ExecutionTimeline({ steps, evidence }: ExecutionTimelineProps) {
+  const placement =
+    evidence?.status === 'success' ? placeManufacturingEvidence(steps, evidence.data.manufacturing) : NO_PLACEMENT;
   return (
     <Card className="px-4" data-testid="execution-trace-timeline">
       <div className="flex items-center gap-2">
@@ -152,9 +206,11 @@ export function ExecutionTimeline({ steps }: ExecutionTimelineProps) {
         className="relative m-0 list-none p-0 before:absolute before:top-5 before:bottom-5 before:left-[19px] before:w-0.5 before:bg-border"
       >
         {steps.map((step, index) => (
-          <TimelineStep key={step.id} step={step} index={index} />
+          <TimelineStep key={step.id} step={step} index={index} evidence={placement.byStepId.get(step.id)} />
         ))}
       </ol>
+      {evidence?.status === 'error' ? <TraceEvidenceReadError /> : null}
+      {placement.others.length > 0 ? <TraceOtherStepsEvidence groups={placement.others} /> : null}
     </Card>
   );
 }

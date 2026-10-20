@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react';
 
+import { StatusBadge } from '@/components/shared/status-badge';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -16,18 +17,24 @@ import { Checkbox } from '@/components/ui/checkbox';
 import type { RecipeVersionSummary } from '@/lib/modules/recetas';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
+import {
+  RECIPE_VERSION_UNDER_REVIEW_LABEL,
+  RECIPE_VERSION_UNDER_REVIEW_TONE,
+} from './recipe-version-tones';
+
 const DESCRIPTION = 'Marca las versiones que deben recibir este cambio en sus líneas.';
 const PROPAGATE_LABEL = 'Guardar y propagar';
 const SAVE_WITHOUT_LABEL = 'Guardar sin propagar';
 const CANCEL_LABEL = 'Cancelar';
 
+// Solo el texto tras la cifra: la cifra se pinta aparte, en monoespaciada.
 function dialogTitle(count: number): string {
-  return count === 1 ? '1 versión parte de esta receta' : `${count} versiones parten de esta receta`;
+  return count === 1 ? 'versión parte de esta receta' : 'versiones parten de esta receta';
 }
 
 export type PropagateVersionsDialogProps = {
   readonly open: boolean;
-  readonly versions: readonly Pick<RecipeVersionSummary, 'id' | 'name'>[];
+  readonly versions: readonly Pick<RecipeVersionSummary, 'id' | 'name' | 'isUnderReview'>[];
   readonly onOpenChange: (open: boolean) => void;
   readonly onSave: (propagateToVersionIds: readonly string[]) => void;
 };
@@ -70,18 +77,24 @@ export function PropagateVersionsDialog({
       >
         <AlertDialogHeader>
           <AlertDialogTitle data-testid="propagate-versions-title">
+            <span className="font-mono" data-testid="propagate-versions-count">
+              {versions.length}
+            </span>{' '}
             {dialogTitle(versions.length)}
           </AlertDialogTitle>
           <AlertDialogDescription>{DESCRIPTION}</AlertDialogDescription>
         </AlertDialogHeader>
 
-        <ul className="min-h-0 flex-1 overflow-y-auto" data-testid="propagate-versions-list">
+        <ul
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[10px] border bg-card px-3 py-1"
+          data-testid="propagate-versions-list"
+        >
           {versions.map((version) => {
             const labelId = `${idPrefix}-${version.id}`;
             return (
               <li key={version.id}>
                 <label
-                  className={`flex ${touchTarget} cursor-pointer items-center gap-3 text-base`}
+                  className={`flex min-h-12 ${touchTarget} w-full cursor-pointer items-center gap-3 text-sm`}
                   data-testid="propagate-version-row"
                 >
                   <Checkbox
@@ -92,7 +105,16 @@ export function PropagateVersionsDialog({
                     data-testid="propagate-version-checkbox"
                     data-version-id={version.id}
                   />
-                  <span id={labelId}>{version.name}</span>
+                  <span id={labelId} className="min-w-0 flex-1">
+                    {version.name}
+                  </span>
+                  {version.isUnderReview ? (
+                    <StatusBadge
+                      tone={RECIPE_VERSION_UNDER_REVIEW_TONE}
+                      label={RECIPE_VERSION_UNDER_REVIEW_LABEL}
+                      data-testid="propagate-version-under-review"
+                    />
+                  ) : null}
                 </label>
               </li>
             );
