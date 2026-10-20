@@ -152,7 +152,6 @@ export {
   type UserFormEndSessions,
   type UserFormProps,
 } from './user-form';
-export { nextUsernameCandidate, usernameFromNames } from './username-from-names';
 export {
   USER_SHEET_ERROR_CODE_TESTID,
   USER_SHEET_ERROR_TESTID,

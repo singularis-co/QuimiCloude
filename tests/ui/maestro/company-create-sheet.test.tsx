@@ -13,6 +13,7 @@ import {
 import {
   administratorFieldErrorTestId,
   administratorFieldTestId,
+  administratorUsernameSuggestionTestIds,
 } from '@/components/shared/administrator-fields';
 import type { ErrorState } from '@/lib/modules/errores';
 import { DOCUMENT_TYPE_CODES } from '@/lib/modules/identity';
@@ -171,6 +172,15 @@ describe('el panel «Nueva empresa»', () => {
     expect(formData.get('adminDocumentTypeCode')).toBe(DOCUMENT_TYPE_CODES[0]);
   });
 
+  it('propone el nombre de usuario del administrador a partir de nombres y apellidos', async () => {
+    const user = await abrir();
+
+    await user.type(campoAdmin('firstNames'), 'Paula Andrea');
+    await user.type(campoAdmin('lastNames'), 'Gil');
+
+    expect(campoAdmin('username')).toHaveValue('paulaag');
+  });
+
   it('R6: sin empresas.modificar no hay disparador ni panel', () => {
     render(<CompanyCreateAction canModify={false} />);
     expect(screen.queryByTestId('company-create-open')).toBeNull();
@@ -251,6 +261,33 @@ describe('rechazos', () => {
       expect(routerMock.refresh).not.toHaveBeenCalled();
     },
   );
+
+  it('duplicate_username recomienda el siguiente nombre de usuario y el boton lo aplica', async () => {
+    createCompanyActionMock.mockResolvedValue(rechazo('duplicate_username', 'Ya existe.'));
+    const user = await abrir();
+    escribir();
+    await enviar(user);
+
+    const ids = administratorUsernameSuggestionTestIds(COMPANY_CREATE_ADMIN_PREFIX);
+    await user.click(within(await screen.findByTestId(ids.suggestion)).getByTestId(ids.apply));
+
+    expect(campoAdmin('username')).toHaveValue('pgil1');
+    expect(screen.queryByTestId(ids.suggestion)).toBeNull();
+  });
+
+  it('otro codigo no recomienda nombre de usuario', async () => {
+    createCompanyActionMock.mockResolvedValue(rechazo('duplicate_email', 'Ya existe.'));
+    const user = await abrir();
+    escribir();
+    await enviar(user);
+
+    await screen.findByTestId(administratorFieldErrorTestId(COMPANY_CREATE_ADMIN_PREFIX, 'email'));
+    expect(
+      screen.queryByTestId(
+        administratorUsernameSuggestionTestIds(COMPANY_CREATE_ADMIN_PREFIX).suggestion,
+      ),
+    ).toBeNull();
+  });
 
   it('R19: un codigo sin campo va a la region de error del panel', async () => {
     createCompanyActionMock.mockResolvedValue(rechazo('invalid_input', 'Los datos no son validos.'));

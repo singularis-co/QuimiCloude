@@ -29,20 +29,14 @@ import {
   USER_USERNAME_SUGGESTION_APPLY_TESTID,
   USER_USERNAME_SUGGESTION_TESTID,
   UserForm,
-  nextUsernameCandidate,
-  usernameFromNames,
   endUserSessionsLabel,
   type UserFieldName,
   type UserFormEndSessions,
 } from '@/app/(private)/configuracion/usuarios/components';
+import { nextUsernameCandidate } from '@/components/shared/username-from-names';
 import { Sheet } from '@/components/ui/sheet';
 import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
-import {
-  DOCUMENT_TYPE_CODES,
-  USER_USERNAME_MAX_LENGTH,
-  type RoleOption,
-  type UserDetail,
-} from '@/lib/modules/identity';
+import { DOCUMENT_TYPE_CODES, type RoleOption, type UserDetail } from '@/lib/modules/identity';
 import type {
   CreateUserFormState,
   UserMutationFormState,
@@ -561,46 +555,6 @@ describe('el alta propone el nombre de usuario a partir de nombres y apellidos',
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.lastNames), ' Nunez');
 
     expect(screen.getByTestId(USER_FIELD_TESTIDS.username)).toHaveValue(FICHA.username);
-  });
-});
-
-describe('`usernameFromNames`: primer nombre entero mas iniciales', () => {
-  it.each([
-    ['José Carlos', 'Pérez Núñez', 'josecpn'],
-    ['Ana', 'López', 'anal'],
-    ['  María   Fernanda  ', 'Restrepo de la Hoz', 'mariafrdlh'],
-    ['Peña', '', 'pena'],
-    ["O'Neil 2", 'Ñandú', 'oneil2n'],
-    ['', 'Pérez', ''],
-    ['   ', 'Pérez', ''],
-  ])('(%j, %j) -> %j', (nombres, apellidos, esperado) => {
-    expect(usernameFromNames(nombres, apellidos)).toBe(esperado);
-  });
-
-  it('recorta al maximo del contrato', () => {
-    const largo = 'a'.repeat(USER_USERNAME_MAX_LENGTH + 10);
-    expect(usernameFromNames(largo, 'Perez')).toHaveLength(USER_USERNAME_MAX_LENGTH);
-  });
-});
-
-describe('`nextUsernameCandidate`: el sufijo numerico final, mas uno', () => {
-  it.each([
-    ['josecpn', 'josecpn1'],
-    ['josecpn1', 'josecpn2'],
-    ['josecpn9', 'josecpn10'],
-    ['josecpn99', 'josecpn100'],
-    ['ana2lopez', 'ana2lopez1'],
-    ['', '1'],
-  ])('%j -> %j', (enviado, esperado) => {
-    expect(nextUsernameCandidate(enviado)).toBe(esperado);
-  });
-
-  it('recorta la base para no pasar del maximo del contrato', () => {
-    const lleno = 'a'.repeat(USER_USERNAME_MAX_LENGTH);
-    expect(nextUsernameCandidate(lleno)).toBe(`${'a'.repeat(USER_USERNAME_MAX_LENGTH - 1)}1`);
-
-    const conNueve = `${'a'.repeat(USER_USERNAME_MAX_LENGTH - 1)}9`;
-    expect(nextUsernameCandidate(conNueve)).toBe(`${'a'.repeat(USER_USERNAME_MAX_LENGTH - 2)}10`);
   });
 });
 

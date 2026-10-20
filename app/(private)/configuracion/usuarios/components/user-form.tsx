@@ -7,6 +7,12 @@ import { ErrorAlert } from '@/components/shared/error-alert';
 import { FormSheet } from '@/components/shared/form-sheet';
 import { SelectField } from '@/components/shared/select-field';
 import { TextField } from '@/components/shared/text-field';
+import {
+  USERNAME_SUGGESTION_HINT,
+  nextUsernameCandidate,
+  usernameFromNames,
+  usernameSuggestionApplyLabel,
+} from '@/components/shared/username-from-names';
 import { Button } from '@/components/ui/button';
 import { errorMessage, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { DOCUMENT_TYPE_CODES, type RoleOption, type UserDetail } from '@/lib/modules/identity';
@@ -17,7 +23,6 @@ import {
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { endUserSessionsLabel, toDateInputValue } from './user-labels';
-import { nextUsernameCandidate, usernameFromNames } from './username-from-names';
 
 /**
  * El formulario del alta y de la edicion de usuario (R23, R24, R25, R26, R27, R35, R36;
@@ -157,8 +162,6 @@ const EDIT_TITLE = 'Editar usuario';
 const CREATE_DESCRIPTION = 'Describe los datos de la persona que va a usar el sistema.';
 const EDIT_DESCRIPTION = 'Cambia los datos de la persona.';
 const ROLES_UNAVAILABLE = 'No se pudo cargar el catálogo de roles.';
-const USERNAME_SUGGESTION_HINT = 'Este nombre de usuario está libre:';
-const applySuggestionLabel = (username: string): string => `Usar ${username}`;
 
 type FieldValues = Partial<Record<UserFieldName, string>>;
 type FieldErrors = Partial<Record<UserFieldName, string>>;
@@ -531,7 +534,7 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
                   data-testid={USER_USERNAME_SUGGESTION_APPLY_TESTID}
                   onClick={() => changeUsername(suggestedUsername)}
                 >
-                  <span className="truncate">{applySuggestionLabel(suggestedUsername)}</span>
+                  <span className="truncate">{usernameSuggestionApplyLabel(suggestedUsername)}</span>
                 </Button>
               </div>
             )}
