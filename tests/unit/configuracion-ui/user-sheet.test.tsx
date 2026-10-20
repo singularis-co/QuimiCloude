@@ -10,7 +10,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,6 +21,7 @@ import {
   END_USER_SESSIONS_DISMISS_TESTID,
   END_USER_SESSIONS_ID_FIELD,
   END_USER_SESSIONS_MESSAGE_TESTID,
+  USER_BIRTH_DATE_VALUE_TESTID,
   USER_ERROR_TESTIDS,
   USER_FIELD_TESTIDS,
   USER_FORM_CANCEL_TESTID,
@@ -38,6 +39,7 @@ import {
   toDateInputValue,
 } from '@/app/(private)/configuracion/usuarios/components';
 import type { ErrorState } from '@/lib/modules/errores';
+import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
 import {
   USER_ACCOUNT_STATUSES,
   type RoleOption,
@@ -276,7 +278,7 @@ describe('la edicion precarga los NUEVE valores con la ficha individual (R26)', 
 
     expect(screen.getByTestId(USER_FIELD_TESTIDS.firstNames)).toHaveValue(FICHA.firstNames);
     expect(screen.getByTestId(USER_FIELD_TESTIDS.lastNames)).toHaveValue(FICHA.lastNames);
-    expect(screen.getByTestId(USER_FIELD_TESTIDS.birthDate)).toHaveValue(
+    expect(screen.getByTestId(USER_BIRTH_DATE_VALUE_TESTID)).toHaveValue(
       toDateInputValue(FICHA.birthDate),
     );
     expect(screen.getByTestId(USER_FIELD_TESTIDS.email)).toHaveValue(FICHA.email);
@@ -341,10 +343,16 @@ describe('con exito se cierra, avisa y refresca la MISMA URL (R28, R29)', () => 
 
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.firstNames), FICHA.firstNames);
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.lastNames), FICHA.lastNames);
-    // El campo de fecha no se teclea caracter a caracter: se le da su valor `YYYY-MM-DD`.
-    fireEvent.change(screen.getByTestId(USER_FIELD_TESTIDS.birthDate), {
-      target: { value: toDateInputValue(FICHA.birthDate) },
+    // La fecha se elige en el calendario: el dia 15 del mes que abre.
+    await user.click(screen.getByTestId(USER_FIELD_TESTIDS.birthDate));
+    const hoy = new Date();
+    const dia = formatDateLocalISO(new Date(hoy.getFullYear(), hoy.getMonth(), 15));
+    const boton = await waitFor(() => {
+      const encontrado = document.querySelector<HTMLElement>(`td[data-day="${dia}"] button`);
+      expect(encontrado).not.toBeNull();
+      return encontrado!;
     });
+    await user.click(await esperarInteractiva(boton));
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.email), FICHA.email);
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.phone), FICHA.phone);
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.documentNumber), FICHA.documentNumber);

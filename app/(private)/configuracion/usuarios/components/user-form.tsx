@@ -3,6 +3,8 @@
 import { LogOutIcon } from 'lucide-react';
 import { useActionState, useEffect, useId, useState, type ReactNode } from 'react';
 
+import { ADMINISTRATOR_BIRTH_DATE_PLACEHOLDER } from '@/components/shared/administrator-fields';
+import { DatePicker } from '@/components/shared/date-picker';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { FormSheet } from '@/components/shared/form-sheet';
 import { SelectField } from '@/components/shared/select-field';
@@ -20,6 +22,7 @@ import {
   createUserAction,
   updateUserAction,
 } from '@/lib/modules/identity/adapters/driving/user-actions';
+import { parseDateLocalISO } from '@/lib/shared/ui/date-civil';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { endUserSessionsLabel, toDateInputValue } from './user-labels';
@@ -124,6 +127,9 @@ export const USER_ERROR_TESTIDS: Readonly<Record<UserFieldName, string>> = {
   username: 'user-error-username',
   roleId: 'user-error-role',
 };
+
+/** El `input` oculto que lleva la fecha de nacimiento elegida, en `YYYY-MM-DD`. */
+export const USER_BIRTH_DATE_VALUE_TESTID = 'user-field-birth-date-value';
 
 export const USER_DOCUMENT_TYPE_OPTION_TESTID = 'user-option-document-type';
 export const USER_ROLE_OPTION_TESTID = 'user-option-role';
@@ -385,6 +391,7 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
 
   const initial = initialValuesOf(user);
   const valueOf = (field: UserFieldName): string => written?.[field] ?? initial[field];
+  const birthDate = valueOf(USER_BIRTH_DATE_FIELD);
 
   // Ya aplicada, la recomendacion sobra.
   const suggestedUsername =
@@ -458,15 +465,18 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
       {/* Fecha de nacimiento, correo y telefono EN UNA FILA (decision humana): 4+4+4 desde `sm`. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
         <div className="sm:col-span-4">
-          {/*
-            `type="date"`: emite `YYYY-MM-DD`, que es exactamente lo que `z.iso.date()` espera.
-          */}
-          <UserTextField
-            id={`${fieldId}-${USER_BIRTH_DATE_FIELD}`}
+          <DatePicker
+            // Remonta al cambiar el valor de partida: el día elegido vive en estado.
+            key={birthDate}
+            mode="single"
             name={USER_BIRTH_DATE_FIELD}
-            type="date"
-            value={valueOf(USER_BIRTH_DATE_FIELD)}
+            label={FIELD_LABELS.birthDate}
+            defaultValue={birthDate === '' ? undefined : parseDateLocalISO(birthDate)}
+            placeholder={ADMINISTRATOR_BIRTH_DATE_PLACEHOLDER}
+            triggerTestId={USER_FIELD_TESTIDS.birthDate}
+            valueTestId={USER_BIRTH_DATE_VALUE_TESTID}
             error={fieldErrors.birthDate}
+            errorTestId={USER_ERROR_TESTIDS.birthDate}
           />
         </div>
         <div className="sm:col-span-4">
@@ -602,7 +612,7 @@ function UserTextField({
 }: {
   readonly id: string;
   readonly name: UserFieldName;
-  readonly type?: 'text' | 'email' | 'tel' | 'date';
+  readonly type?: 'text' | 'email' | 'tel';
   readonly value: string;
   readonly onValueChange?: (value: string) => void;
   readonly error?: string;
