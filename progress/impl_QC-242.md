@@ -461,3 +461,17 @@ nombre, dentro de los archivos de test que toca esta rama (comprobado con grep s
 - **R2 → test:** `whatsapp-template-prisma-errors.test.ts > R2: el unico parcial de nombre e idioma...` (6 casos, sin base), ademas del `.int` existente.
 - **Salida:** `pnpm exec vitest run <test unitario>` → 1 file, 6 passed. `pnpm typecheck` → limpio. `pnpm lint` → 0 errores, 10 warnings preexistentes ajenos.
 - **Veredicto:** traduccion corregida; el `.int` se confirma en CI (no hay base local).
+
+### Segunda vuelta: forma medida (run 39489484672 seguia rojo)
+
+- **El arreglo fe812453 se adivino y no cerro el rojo.** La forma se midio contra el Postgres local con un `console.log` temporal en el `catch` de `insertCreatedWhatsappTemplate` (ya borrado, no commiteado).
+- **Forma medida:** `PrismaClientKnownRequestError`, `code: 'P2010'`, `meta: { code: '23505', message: 'Key (connection_id, name, language)=(<uuid>, duplicada, es) already exists.' }`; `message`: ``Invalid `prisma.$queryRaw()` invocation: ... Raw query failed. Code: `23505`. Message: `Key (connection_id, name, language)=(...) already exists.` ``. **No** hay `meta.target` ni el nombre del indice en ningun campo.
+- **Causa:** el traductor si se ejecutaba (el `catch` no envuelve ni relanza antes), pero en la via `P2010`/`23505` buscaba el nombre del indice, que Postgres no pone en el `DETAIL`; devolvia `false` y se relanzaba el error crudo.
+- **Arreglo:** en `23505`, `isNameLanguageTaken` lee la lista de columnas del `DETAIL` (`(...)=(`, el parentesis no depende del idioma del servidor) y acepta exactamente `{connection_id, name, language}`. Se conservan las vias `P2002` y nombre del indice. El test unitario usa ahora la forma medida (ingles y espanol) y el caso negativo `(connection_id, meta_template_id)`.
+- **Salida (local, Postgres localhost:5432, base desechable `qct_*`):**
+  - `pnpm exec vitest run --project integration tests/integration/integraciones/whatsapp-template-prisma.int.test.ts` → 1 file, 20 passed (antes: 1 failed | 19 passed, el caso R2).
+  - `... whatsapp-template-flow.int.test.ts` → 1 file, 7 passed.
+  - `... whatsapp-template-migration.int.test.ts` → 1 file, 6 passed.
+  - `pnpm exec vitest run tests/unit/integraciones/whatsapp/templates/whatsapp-template-prisma-errors.test.ts` → 1 file, 9 passed.
+  - `pnpm typecheck` → limpio. `pnpm lint` → 0 errores, 10 warnings preexistentes ajenos (los dos archivos tocados: sin issues). Guardias (`vitest run guard`) → 85 files passed.
+- **Veredicto:** traduccion corregida segun la forma medida; los tres `.int` de plantillas en verde en local.

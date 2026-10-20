@@ -31,6 +31,32 @@ describe('R2: el unico parcial de nombre e idioma entre vivas se traduce a Whats
     expect(isNameLanguageTaken(p2002(undefined))).toBe(false)
   })
 
+  // Forma MEDIDA contra Postgres local (console.log temporal en `insertCreatedWhatsappTemplate`,
+  // caso R2 de whatsapp-template-prisma.int.test.ts): el `$queryRaw` con ON CONFLICT lanza
+  // PrismaClientKnownRequestError code 'P2010', meta { code: '23505', message: 'Key (connection_id,
+  // name, language)=(<uuid>, duplicada, es) already exists.' }; el nombre del indice no aparece.
+  function p2010(detail: string): Prisma.PrismaClientKnownRequestError {
+    return new Prisma.PrismaClientKnownRequestError(
+      `\nInvalid \`prisma.$queryRaw()\` invocation:\n\n\nRaw query failed. Code: \`23505\`. Message: \`${detail}\``,
+      { code: 'P2010', clientVersion: 'test', meta: { code: '23505', message: detail } },
+    )
+  }
+
+  it('R2 — P2010 23505 con las columnas (connection_id, name, language) en el DETAIL (forma medida) es nombre tomado', () => {
+    const detail = 'Key (connection_id, name, language)=(35233d07-2df9-4818-9c61-70a9873b286e, duplicada, es) already exists.'
+    expect(isNameLanguageTaken(p2010(detail))).toBe(true)
+  })
+
+  it('R2 — P2010 23505 con el DETAIL en espanol tambien es nombre tomado (solo se leen las columnas)', () => {
+    const detail = 'Ya existe la llave (connection_id, name, language)=(35233d07-2df9-4818-9c61-70a9873b286e, duplicada, es).'
+    expect(isNameLanguageTaken(p2010(detail))).toBe(true)
+  })
+
+  it('R2 — P2010 23505 del unico (connection_id, meta_template_id) no es nombre tomado', () => {
+    const detail = 'Key (connection_id, meta_template_id)=(35233d07-2df9-4818-9c61-70a9873b286e, 123) already exists.'
+    expect(isNameLanguageTaken(p2010(detail))).toBe(false)
+  })
+
   it('R2 — P2010 con SQLSTATE 23505 que nombra el indice en el texto es nombre tomado', () => {
     const error = new Prisma.PrismaClientKnownRequestError(
       'Raw query failed. Code: `23505`. Message: `whatsapp_templates_name_language_live_key`',

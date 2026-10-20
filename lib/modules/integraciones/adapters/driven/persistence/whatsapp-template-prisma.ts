@@ -87,7 +87,7 @@ function syncedFields(template: MetaTemplateSnapshot) {
   };
 }
 
-/** Vive solo en la migración; un SQL crudo lo nombra en el texto del error de Postgres. */
+/** Vive solo en la migración. El error del `$queryRaw` no lo nombra (ver `isNameLanguageTaken`). */
 const NAME_LANGUAGE_LIVE_INDEX = 'whatsapp_templates_name_language_live_key';
 const UNIQUE_VIOLATION = '23505';
 
@@ -116,11 +116,30 @@ function targetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string
   return [];
 }
 
+const NAME_LANGUAGE_COLUMNS = ['connection_id', 'language', 'name'] as const;
+
 /**
- * Un índice parcial creado en SQL crudo llega como `P2002` con las COLUMNAS en `meta.target`
- * (`["connection_id","name","language"]`), no con su nombre (`user-admin-prisma.ts`). Se acepta
- * también el nombre, y el `P2010` con SQLSTATE `23505` que nombra el índice en el texto. El otro
- * único de la tabla, `(connection_id, meta_template_id)`, no lleva `name` ni `language`.
+ * Columnas del `DETAIL` de Postgres: `Key (a, b)=(...) already exists.`. El paréntesis no se
+ * traduce con el idioma del servidor, el resto sí; por eso se lee solo la lista de columnas.
+ */
+function detailColumnsOf(detail: string): readonly string[] {
+  const match = /\(([^()]*)\)=\(/.exec(detail);
+  if (match?.[1] === undefined) return [];
+  return match[1].split(',').map((column) => column.trim().replaceAll('"', ''));
+}
+
+function isNameLanguageColumnSet(columns: readonly string[]): boolean {
+  const sorted = [...columns].sort();
+  return sorted.length === NAME_LANGUAGE_COLUMNS.length && NAME_LANGUAGE_COLUMNS.every((column, i) => sorted[i] === column);
+}
+
+/**
+ * El alta va por `$queryRaw`, y ahí el único parcial NO llega como `P2002`: medido contra
+ * Postgres (`@prisma/client@6.19.3`) llega como `P2010` con
+ * `meta = { code: '23505', message: 'Key (connection_id, name, language)=(…) already exists.' }`,
+ * sin el nombre del índice en ningún campo. Se reconoce por las columnas del `DETAIL`. Se aceptan
+ * también el `P2002` del cliente tipado (columnas o nombre en `meta.target`) y el nombre del
+ * índice en el texto. El otro único, `(connection_id, meta_template_id)`, no casa.
  */
 export function isNameLanguageTaken(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -129,8 +148,14 @@ export function isNameLanguageTaken(error: unknown): boolean {
     return targets.includes('name') && targets.includes('language');
   }
   if (sqlStateOf(error) !== UNIQUE_VIOLATION || !(error instanceof Error)) return false;
-  const meta = error instanceof Prisma.PrismaClientKnownRequestError ? JSON.stringify(error.meta ?? {}) : '';
-  return `${error.message} ${meta}`.includes(NAME_LANGUAGE_LIVE_INDEX);
+  const detail = error instanceof Prisma.PrismaClientKnownRequestError ? metaMessageOf(error) : '';
+  if (isNameLanguageColumnSet(detailColumnsOf(detail))) return true;
+  return `${error.message} ${detail}`.includes(NAME_LANGUAGE_LIVE_INDEX);
+}
+
+function metaMessageOf(error: Prisma.PrismaClientKnownRequestError): string {
+  const message = error.meta?.message;
+  return typeof message === 'string' ? message : '';
 }
 
 export async function listLiveWhatsappTemplates(
