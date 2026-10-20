@@ -1,5 +1,6 @@
 'use client';
 
+import { withCardFieldLabel } from '@/components/shared/card-field-label';
 import {
   actionsColumn,
   type DataTableCardLayout,
@@ -13,7 +14,6 @@ import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
-import { withCardFieldLabel } from './card-field-label';
 import { ExpiryDate, useLocalToday } from './expiry-date';
 import { daysUntil, isExpiringSoon } from './expiry-warning';
 

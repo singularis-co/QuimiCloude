@@ -255,7 +255,7 @@ Cerrar B1 y B2 (y con ellos B3). La revisión se acota al rango nuevo, contra B1
 - [x] **B3 (T17).** Está marcada `[x]`. La evidencia está en `impl_QC-238.md`: typecheck, lint, guardias
   82/82 y tests de la feature 53/53. Mis corridas de arriba la confirman. `./init.sh` sigue rojo por el
   board, que es del leader y no de la feature.
-- [x] **m4.** Queda como D71 en `progress/deudas.md`, con origen, riesgo, qué falta y dueño.
+- [x] **m4.** Queda como D77 (renumerada al mergear dev, que ya traía D71–D76) en `progress/deudas.md`, con origen, riesgo, qué falta y dueño.
 
 ### Sigue abierto, sin bloquear
 

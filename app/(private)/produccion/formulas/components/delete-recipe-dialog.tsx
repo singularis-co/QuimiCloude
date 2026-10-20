@@ -13,6 +13,8 @@ import {
   listRecipeVersionsAction,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 
+export const DELETE_RECIPE_ICON_TESTID = 'delete-recipe-icon';
+
 const DELETE_SUCCESS = 'Receta borrada.';
 const DELETE_VERSION_SUCCESS = 'Versión borrada.';
 
@@ -168,6 +170,7 @@ export function DeleteRecipeDialog({
         confirm: 'delete-recipe-confirm',
         error: 'delete-recipe-error',
       }}
+      icon={{ glyph: Trash2Icon, tone: 'danger', testId: DELETE_RECIPE_ICON_TESTID }}
       submit={{ kind: 'transition', onConfirm: handleConfirm }}
       isPending={isPending}
       announceBusy={false}

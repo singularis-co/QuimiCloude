@@ -235,12 +235,19 @@ describe('QC-211 R7 — sección «Pasos de envasado» en el formulario de fórm
     expect(within(packing).getAllByTestId('recipe-packing-step-row')).toHaveLength(1);
   });
 
-  it('las dos secciones van separadas por un divisor y sin botones «Añadir paso…»', () => {
+  // QC-264 (R11): el divisor lo sustituyen las tarjetas; cada sección va en la suya.
+  it('las dos secciones van en tarjetas distintas y sin botones «Añadir paso…»', () => {
     renderCreate();
 
-    const separator = screen.getByTestId('recipe-form-steps-separator');
-    expect(follows(screen.getByTestId('recipe-steps-field'), separator)).toBe(true);
-    expect(follows(separator, screen.getByTestId('recipe-packing-steps-field'))).toBe(true);
+    const operatorCard = screen.getByTestId('recipe-steps-field').closest('[data-slot="card"]');
+    const packingCard = screen
+      .getByTestId('recipe-packing-steps-field')
+      .closest('[data-slot="card"]');
+    expect(operatorCard).not.toBeNull();
+    expect(packingCard).not.toBeNull();
+    expect(operatorCard).not.toBe(packingCard);
+    expect(follows(operatorCard as Element, packingCard as Element)).toBe(true);
+    expect(screen.queryByTestId('recipe-form-steps-separator')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Añadir paso' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Añadir paso de envasado' })).toBeNull();
     expect(screen.queryByTestId('recipe-step-add')).toBeNull();

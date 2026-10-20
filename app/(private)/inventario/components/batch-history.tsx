@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useState } from 'react';
 
 import { XIcon } from 'lucide-react';
 
+import { withCardFieldLabel } from '@/components/shared/card-field-label';
 import {
   DataTable,
   createDefaultParams,
@@ -21,7 +22,6 @@ import type { BatchHistoryEntry } from '@/lib/modules/inventario';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
-import { withCardFieldLabel } from './card-field-label';
 import { movementReasonLabel } from './movement-reason-label';
 
 const HISTORY_TITLE = 'Historial del lote';
