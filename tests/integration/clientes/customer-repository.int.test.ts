@@ -34,13 +34,12 @@ import type { CustomerScope } from '@/lib/modules/clientes/domain/customer-scope
 import type { ListQuery } from '@/lib/modules/clientes/domain/list-query';
 import type { CustomerPhoneColumns, NewCustomer } from '@/lib/modules/clientes/domain/customer-view';
 
-/** Ninguna semilla de este archivo lleva numero internacional: el alta nunca choca. */
+type SinCliente<T> = T extends [unknown, ...infer Resto] ? Resto : never;
+
 async function createCustomer(
-  ...args: Parameters<typeof createCustomerRow>
+  ...args: SinCliente<Parameters<typeof createCustomerRow>>
 ): Promise<{ id: string }> {
-  const created = await createCustomerRow(...args);
-  if (created === 'duplicate_phone') throw new Error('alta inesperadamente duplicada');
-  return created;
+  return createCustomerRow(prisma, ...args);
 }
 
 function token(): string {
@@ -308,13 +307,14 @@ describe('R21: la autoria de creacion y de modificacion', () => {
       expect(recienCreado.updatedBy).toBe(autorCreador.actorId);
 
       const editado = await updateAliveCustomer(
+        prisma,
         created.id,
         customerInput({ firstNames: `Editado ${token()}` }),
         autorEditor,
         new Date('2026-02-02T00:00:00Z'),
         autorCreador.scope,
       );
-      expect(editado).toBe('ok');
+      expect(editado).toMatchObject({ kind: 'ok' });
 
       const trasEditar = await prisma.customer.findUniqueOrThrow({
         where: { id: created.id },
@@ -400,6 +400,7 @@ describe('R23: un cliente ya dado de baja no cambia con una segunda operacion', 
 
       // Editar el ya dado de baja: `'not_found'`, tampoco cambia nada.
       const edicion = await updateAliveCustomer(
+        prisma,
         created.id,
         customerInput({ firstNames: `No deberia aplicarse ${token()}` }),
         empresaB.actorId,
@@ -530,6 +531,7 @@ describe('R10: un cliente de otra empresa responde como no encontrado y su fila 
       expect(await findAliveCustomerById(created.id, empresaA.scope)).toBeNull();
       expect(
         await updateAliveCustomer(
+          prisma,
           created.id,
           customerInput({ firstNames: `No deberia aplicarse ${token()}` }),
           empresaA.actorId,

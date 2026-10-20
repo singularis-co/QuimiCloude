@@ -137,12 +137,12 @@ async function sembrar(
   const ids: string[] = [];
   for (const semilla of semillas) {
     const created = await createCustomer(
+      prisma,
       customerInput(semilla),
       actorId,
       semilla.createdAt ?? new Date('2026-01-01T00:00:00Z'),
       scope,
     );
-    if (created === 'duplicate_phone') throw new Error('la semilla no lleva telefono');
     if (semilla.deletedAt !== undefined && semilla.deletedAt !== null) {
       await prisma.customer.update({
         where: { id: created.id },

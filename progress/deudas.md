@@ -624,3 +624,12 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Qué falta:** acotar `timestamp` en el zod de la cabecera y limpiar `\u0000`, o mandar esos
   mensajes a `UNSUPPORTED`. Puede ir en QC-239.
 - **Dueño:** Christian Quevedo.
+
+## QC-242 (review, 2026-10-20)
+
+### D78 — El doble `canned` de Graph no refleja un `APPROVED` llegado por webhook
+- **Origen:** review de QC-242, vuelta 1 (m1).
+- **Qué pasa:** el doble de Graph de plantillas devuelve una lista fija. Si un test aprueba una plantilla por webhook y después sincroniza, la sincronización la vuelve a dejar como la tiene el doble.
+- **Riesgo:** rompe el E2E de QC-243 si ese E2E sincroniza después de aprobar.
+- **Qué falta:** que el spec de QC-243 lo cite y, o bien no sincronice tras aprobar en el E2E, o bien el doble guarde el estado que llega por webhook.
+- **Dueño:** Christian Quevedo (QC-243).

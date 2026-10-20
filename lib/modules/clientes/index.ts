@@ -2,7 +2,7 @@
 // Solo reexporta simbolos de ./domain. Nada de 'use server', @prisma/client ni next/* en su
 // cierre de imports. El adaptador driving no pasa por aqui.
 export { type Customer } from './domain/customer';
-export { requirePermission, type Actor } from './domain/actor';
+export { requirePermission, CUSTOMER_MODIFY_PERMISSION, type Actor } from './domain/actor';
 export { type CustomerScope } from './domain/customer-scope';
 export {
   ClientesError,
@@ -11,7 +11,6 @@ export {
   ValidationError,
   CustomerPhoneCountryRequiredError,
   CustomerPhoneInvalidError,
-  CustomerDuplicatePhoneError,
 } from './domain/errors';
 export { type Page } from './domain/page';
 export { CUSTOMER_QUERYABLE } from './domain/customer-queryable';
@@ -43,18 +42,23 @@ export {
   formatPhoneInternational,
   countryFromInternationalInput,
   describeCustomerPhone,
+  parseWaIdPhone,
   type CustomerPhoneIssue,
   type ParsedCustomerPhone,
   type ParsedLegacyPhone,
   type CustomerPhoneDescription,
 } from './domain/customer-phone';
-export { phoneMatchesWaId } from './domain/phone-matches-wa-id';
+export { phoneMatchesWaId, waIdCandidates } from './domain/phone-matches-wa-id';
+export {
+  createCustomerPhoneLinks,
+  type CustomerPhoneLinksDeps,
+  type CustomerPhoneLinksService,
+} from './domain/customer-phone-links';
 export {
   planLegacyPhoneBackfill,
   type LegacyPhoneRow,
   type LegacyPhoneOutcome,
   type LegacyPhonePlan,
-  type TakenE164,
 } from './domain/legacy-phone-backfill';
 export {
   createBackfillLegacyPhones,

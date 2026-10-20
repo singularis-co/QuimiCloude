@@ -17,3 +17,19 @@ export function phoneMatchesWaId(phoneE164: string, waId: string): boolean {
   if (!DIGITS_ONLY.test(phoneE164) || !DIGITS_ONLY.test(waId)) return false;
   return canonical(phoneE164) === canonical(waId);
 }
+
+/**
+ * Todos los numeros que `phoneMatchesWaId` da por iguales a `digits`, incluido el mismo, para
+ * buscarlos por indice en lugar de recorrer todos los numeros.
+ */
+export function waIdCandidates(digits: string): readonly string[] {
+  if (!DIGITS_ONLY.test(digits)) return [];
+  const short = canonical(digits);
+  const candidates = new Set([digits, short]);
+  if (short.length === 12) {
+    if (short.startsWith('52')) candidates.add(`521${short.slice(2)}`);
+    else if (short.startsWith('54')) candidates.add(`549${short.slice(2)}`);
+    else if (short.startsWith('55')) candidates.add(`${short.slice(0, 4)}9${short.slice(4)}`);
+  }
+  return [...candidates];
+}

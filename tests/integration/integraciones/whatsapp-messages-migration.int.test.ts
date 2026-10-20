@@ -73,7 +73,11 @@ const ENUMS = [
 /**
  * Las migraciones POSTERIORES con una FK hacia estas tablas, con el mismo recorrido transitivo que
  * `whatsapp-connection-migration.int.test.ts`: sus DOWN van antes que el de esta (de la mas reciente
- * a la mas antigua) y sus UP despues. Hoy no hay ninguna.
+ * a la mas antigua) y sus UP despues. Hasta el 2026-10-20 no habia ninguna.
+ *
+ * Nota 2026-10-20: entra tambien toda migracion posterior que agrega columnas a estas tablas. El
+ * `DROP TABLE` se las lleva y este UP no las recrea, asi que sin su DOWN delante y su UP detras la
+ * ida y vuelta no deja el mismo esquema. La primera es la de telefonos de cliente n:m.
  */
 const timestampDe = (nombre: string): string => nombre.split('_')[0] as string
 const TABLAS_DEPENDIENTES = new Set<string>(TABLES)
@@ -85,7 +89,9 @@ const DEPENDIENTES_POSTERIORES = readdirSync(migrationsDir)
   .filter((nombre) => {
     const sql = readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8')
     const referenciadas = [...sql.matchAll(/REFERENCES\s+"(\w+)"/g)].map((m) => m[1] as string)
-    if (!referenciadas.some((tabla) => TABLAS_DEPENDIENTES.has(tabla))) return false
+    const ampliadas = [...sql.matchAll(/ALTER\s+TABLE\s+"(\w+)"\s+ADD\s+COLUMN/g)].map((m) => m[1] as string)
+    const tocaUna = (tabla: string): boolean => TABLAS_DEPENDIENTES.has(tabla)
+    if (!referenciadas.some(tocaUna) && !ampliadas.some(tocaUna)) return false
     for (const m of sql.matchAll(/CREATE\s+TABLE\s+"(\w+)"/g)) {
       TABLAS_DEPENDIENTES.add(m[1] as string)
       TABLAS_DE_DEPENDIENTES.add(m[1] as string)

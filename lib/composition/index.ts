@@ -652,20 +652,23 @@ import { requestScoped } from '@/lib/shared/request-scope';
 import {
   createBackfillLegacyPhones,
   createCreateCustomer,
+  createCustomerPhoneLinks,
   createDeleteCustomer,
   createGetCustomer,
   createListCustomers,
   createUpdateCustomer,
 } from '@/lib/modules/clientes';
+import { createCustomerPhoneRepository } from '@/lib/modules/clientes/adapters/driven/persistence/customer-phone-prisma';
+import { withCustomerTransaction } from '@/lib/modules/clientes/adapters/driven/persistence/customer-unit-of-work-prisma';
+import type { CustomerUnitOfWork, WhatsappLinkRefresher } from '@/lib/modules/clientes/ports/customer-unit-of-work';
 import { processLegacyPhonesOfCompany } from '@/lib/modules/clientes/adapters/driven/persistence/legacy-phone-prisma';
 import type { LegacyPhoneRepository } from '@/lib/modules/clientes/ports/legacy-phone-repository';
 import type { CompanyCountryLookup } from '@/lib/modules/clientes/ports/company-country-lookup';
 import {
-  createCustomer,
+  createCustomerWriteRepository,
   findAliveCustomerById,
   listAliveCustomers,
   softDeleteAliveCustomer,
-  updateAliveCustomer,
 } from '@/lib/modules/clientes/adapters/driven/persistence/customer-prisma';
 import type { ListQueryLog as ClientesListQueryLog } from '@/lib/modules/clientes/ports/list-query-log';
 import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository';
@@ -2694,11 +2697,38 @@ export const documentos = {
 const clientesListQueryLog: ClientesListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
 const customerRepository: CustomerRepository = {
-  create: createCustomer,
   findAliveById: findAliveCustomerById,
-  updateAlive: updateAliveCustomer,
   softDeleteAlive: softDeleteAliveCustomer,
   listAlive: listAliveCustomers,
+};
+
+type CustomerTransactionClient = Parameters<Parameters<typeof withCustomerTransaction>[0]>[0];
+
+/** El servicio de telefonos de `clientes` sobre la transaccion abierta: lo usan el recalculo de
+ *  contactos y las acciones de `integraciones` que escriben los telefonos de un cliente. */
+function customerPhoneLinksOn(tx: CustomerTransactionClient) {
+  return createCustomerPhoneLinks({ phones: createCustomerPhoneRepository(tx) });
+}
+
+/** `clientes` no importa `integraciones`: el recalculo de los contactos le llega por su puerto,
+ *  sobre el mismo `tx`. */
+function whatsappLinkRefreshOn(tx: CustomerTransactionClient): WhatsappLinkRefresher {
+  const refresh = createRefreshWhatsappContactLinks({
+    contacts: createWhatsappContactRepository(tx),
+    owners: { ownersOf: customerPhoneLinksOn(tx).ownersOf },
+  });
+  return { refresh: (numbers, companyId) => refresh(numbers, { companyId }) };
+}
+
+const customerUnitOfWork: CustomerUnitOfWork = {
+  run: (work) =>
+    withCustomerTransaction((tx) =>
+      work({
+        customers: createCustomerWriteRepository(tx),
+        phones: createCustomerPhoneRepository(tx),
+        whatsappLinks: whatsappLinkRefreshOn(tx),
+      }),
+    ),
 };
 
 const legacyPhoneRepository: LegacyPhoneRepository = {
@@ -2715,8 +2745,8 @@ const companyCountryLookup: CompanyCountryLookup = identity.getCompanyCountry;
  * recibe por parametro, y quien lo obtiene de las dos caras de la sesion es la Server Action.
  */
 export const clientes = {
-  createCustomer: createCreateCustomer({ customers: customerRepository }),
-  updateCustomer: createUpdateCustomer({ customers: customerRepository }),
+  createCustomer: createCreateCustomer({ unitOfWork: customerUnitOfWork }),
+  updateCustomer: createUpdateCustomer({ unitOfWork: customerUnitOfWork }),
   deleteCustomer: createDeleteCustomer({ customers: customerRepository }),
   getCustomer: createGetCustomer({ customers: customerRepository }),
   listCustomers: createListCustomers({ customers: customerRepository, log: clientesListQueryLog }),
@@ -2758,14 +2788,29 @@ const secretDigest: SecretDigest = secretDigestSha256;
 
 import {
   createCreateWhatsappConnection,
+  createCreateWhatsappTemplate,
+  createDeleteWhatsappTemplate,
   createGetWhatsappConnection,
+  createGetWhatsappTemplate,
+  createListWhatsappTemplates,
   createReceiveWhatsappWebhook,
   createRegenerateWhatsappVerifyToken,
+  createResyncWhatsappTemplates,
   createSetWhatsappConnectionEnabled,
+  createSyncAllWhatsappTemplates,
+  createSyncWhatsappTemplates,
   createTestWhatsappConnection,
   createUpdateWhatsappConnection,
   createVerifyWhatsappWebhook,
+  createRefreshWhatsappContactLinks,
+  createLinkWhatsappContact,
+  createUnlinkWhatsappContact,
+  createSetWhatsappContactBlocked,
 } from '@/lib/modules/integraciones';
+import { createWhatsappContactRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-prisma';
+import { withWhatsappContactTransaction } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-unit-of-work-prisma';
+import type { WhatsappContactRepository } from '@/lib/modules/integraciones/ports/whatsapp-contact-repository';
+import type { WhatsappContactUnitOfWork } from '@/lib/modules/integraciones/ports/whatsapp-contact-unit-of-work';
 import { integrationsE2EDoublesEnabled } from '@/lib/modules/integraciones/adapters/driven/config/e2e-doubles-env';
 import { readPublicBaseUrl } from '@/lib/modules/integraciones/adapters/driven/config/public-base-url-env';
 import { whatsappGraphClientCanned } from '@/lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned';
@@ -2777,7 +2822,17 @@ import {
   recordWhatsappWebhookHandshake,
   updateLiveWhatsappConnection,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma';
-import { recordWhatsappInbound } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma';
+import { createWhatsappInboxRecorder } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma';
+import {
+  applyWhatsappTemplateSync,
+  applyWhatsappTemplateWebhookUpdates,
+  findLiveWhatsappTemplateById,
+  findLiveWhatsappTemplateByNameAndLanguage,
+  insertCreatedWhatsappTemplate,
+  listLiveWhatsappTemplates,
+  listWhatsappTemplatesForSync,
+  markWhatsappTemplateDeleted,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-template-prisma';
 import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
 import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
@@ -2787,6 +2842,7 @@ import type { WebhookSignature } from '@/lib/modules/integraciones/ports/webhook
 import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository';
 import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client';
 import type { WhatsappInboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-inbox-repository';
+import type { WhatsappTemplateRepository } from '@/lib/modules/integraciones/ports/whatsapp-template-repository';
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory';
 import { whatsappWebhookPath } from '@/lib/shared/routes';
 
@@ -2796,6 +2852,18 @@ const whatsappGraphClient: WhatsappGraphClient = {
     integrationsE2EDoublesEnabled()
       ? whatsappGraphClientCanned.fetchPhoneNumber(input)
       : whatsappGraphClientFetch.fetchPhoneNumber(input),
+  createTemplate: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.createTemplate(input)
+      : whatsappGraphClientFetch.createTemplate(input),
+  listTemplatesPage: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.listTemplatesPage(input)
+      : whatsappGraphClientFetch.listTemplatesPage(input),
+  deleteTemplate: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.deleteTemplate(input)
+      : whatsappGraphClientFetch.deleteTemplate(input),
 };
 
 const whatsappConnectionRepository: WhatsappConnectionRepository = {
@@ -2806,10 +2874,22 @@ const whatsappConnectionRepository: WhatsappConnectionRepository = {
   recordWebhookHandshake: recordWhatsappWebhookHandshake,
 };
 
+const whatsappTemplateRepository: WhatsappTemplateRepository = {
+  listLive: listLiveWhatsappTemplates,
+  findLiveById: findLiveWhatsappTemplateById,
+  findLiveByNameAndLanguage: findLiveWhatsappTemplateByNameAndLanguage,
+  insertCreated: insertCreatedWhatsappTemplate,
+  markDeleted: markWhatsappTemplateDeleted,
+  listForSync: listWhatsappTemplatesForSync,
+  applySync: applyWhatsappTemplateSync,
+  applyWebhookUpdates: applyWhatsappTemplateWebhookUpdates,
+};
+
 const randomSource: RandomSource = randomSourceNode;
 
 const whatsappDeps = {
   connections: whatsappConnectionRepository,
+  templates: whatsappTemplateRepository,
   graph: whatsappGraphClient,
   cipher: secretCipher,
   digest: secretDigest,
@@ -2817,14 +2897,15 @@ const whatsappDeps = {
 };
 
 const whatsappWebhookDirectory: WhatsappWebhookDirectory = { companyOfConnection: companyOfWhatsappConnection };
-const whatsappInboxRepository: WhatsappInboxRepository = { record: recordWhatsappInbound };
+/** Los dueños de cada número se leen con el servicio de `clientes` sobre la transacción de la recepción. */
+const whatsappInboxRepository: WhatsappInboxRepository = createWhatsappInboxRecorder({ ownersOn: customerPhoneLinksOn });
 const webhookSignature: WebhookSignature = webhookSignatureHmac;
 /** La clave del anadido vive aqui, no en el modulo. */
 const integrationsSwitch: IntegrationsSwitch = {
   isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'integraciones'),
 };
 
-/** Sin Graph ni cola: recibir un webhook no llama hacia fuera. */
+/** `graph` solo lo usa la resincronización, que corre después de responder a Meta. */
 const whatsappWebhookDeps = {
   directory: whatsappWebhookDirectory,
   integrations: integrationsSwitch,
@@ -2833,7 +2914,21 @@ const whatsappWebhookDeps = {
   cipher: secretCipher,
   signature: webhookSignature,
   inbox: whatsappInboxRepository,
+  templates: whatsappTemplateRepository,
+  graph: whatsappGraphClient,
 };
+
+const whatsappContactRepository: WhatsappContactRepository = createWhatsappContactRepository();
+
+const whatsappContactUnitOfWork: WhatsappContactUnitOfWork = {
+  run: (work) =>
+    withWhatsappContactTransaction((tx) => {
+      const links = customerPhoneLinksOn(tx);
+      return work({ contacts: createWhatsappContactRepository(tx), customerPhones: links, owners: links });
+    }),
+};
+
+const whatsappTemplateCronDeps = { ...whatsappWebhookDeps, listCompanyIds: listActiveCompanyIds };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
 
@@ -2941,6 +3036,17 @@ export const integraciones = {
   reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
   verifyWhatsappWebhook: createVerifyWhatsappWebhook(whatsappWebhookDeps),
   receiveWhatsappWebhook: createReceiveWhatsappWebhook(whatsappWebhookDeps),
+  linkWhatsappContact: createLinkWhatsappContact({ unitOfWork: whatsappContactUnitOfWork }),
+  unlinkWhatsappContact: createUnlinkWhatsappContact({ unitOfWork: whatsappContactUnitOfWork }),
+  setWhatsappContactBlocked: createSetWhatsappContactBlocked({ contacts: whatsappContactRepository }),
+  listWhatsappTemplates: createListWhatsappTemplates(whatsappDeps),
+  getWhatsappTemplate: createGetWhatsappTemplate(whatsappDeps),
+  createWhatsappTemplate: createCreateWhatsappTemplate(whatsappDeps),
+  syncWhatsappTemplates: createSyncWhatsappTemplates(whatsappDeps),
+  deleteWhatsappTemplate: createDeleteWhatsappTemplate(whatsappDeps),
+  resyncWhatsappTemplates: createResyncWhatsappTemplates(whatsappWebhookDeps),
+  syncAllWhatsappTemplates: createSyncAllWhatsappTemplates(whatsappTemplateCronDeps),
+  verifyCronSecret,
 } as const;
 
 import {

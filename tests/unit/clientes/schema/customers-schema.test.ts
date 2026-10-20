@@ -269,7 +269,9 @@ describe('db/schema.prisma — modelo Customer', () => {
     expect(indexMaps).toEqual(['customers_created_by_idx', 'customers_updated_by_idx'])
   })
 
-  it('declara /// @module clientes, y ningun otro modelo lo reclama (R19)', () => {
+  // Nota 2026-10-20: los telefonos de cliente n:m suman `PhoneNumber` y `CustomerPhoneNumber` al
+  // modulo; la lista sigue cerrada.
+  it('declara /// @module clientes, y ningun otro modelo lo reclama salvo los de telefonos (R19; QC-239 R1)', () => {
     const owners = new Map<string, string>()
     for (const match of rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g)) {
       const [, moduleName, modelName] = match
@@ -281,7 +283,7 @@ describe('db/schema.prisma — modelo Customer', () => {
     const clientesModels = [...owners.entries()]
       .filter(([, moduleName]) => moduleName === 'clientes')
       .map(([modelName]) => modelName)
-    expect(clientesModels).toEqual(['Customer'])
+    expect(clientesModels).toEqual(['Customer', 'PhoneNumber', 'CustomerPhoneNumber'])
     // No se afirma el censo global del schema: otras fichas paralelas tocan otros modelos.
     expect(owners.get('Supplier')).toBe('proveedores')
   })

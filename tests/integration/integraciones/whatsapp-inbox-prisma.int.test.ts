@@ -2,16 +2,24 @@
 //
 // Aislamiento: `commit`. `recordWhatsappInbound` abre su PROPIA `prisma.$transaction` sobre el
 // cliente GLOBAL, y el caso de dos `record` concurrentes del mismo numero necesita dos conexiones
-// que confirmen de verdad. Cada caso fabrica su empresa efimera (tipo de documento, rol, empresa,
-// usuario y conexion) y `afterAll` borra mensajes -> contactos -> conexiones por `company_id`,
-// afirma contando que no queda nada y despues borra usuario -> rol -> tipo de documento -> empresa.
+// que confirmen de verdad. Los duenos de cada numero se leen con el servicio real de telefonos de
+// `clientes` sobre esa misma transaccion, como en lib/composition. Cada caso fabrica su empresa
+// efimera (tipo de documento, rol, empresa, usuario y conexion) y `afterAll` borra mensajes ->
+// contactos -> conexiones -> vinculos -> numeros -> clientes por `company_id`, afirma contando que
+// no queda nada y despues borra usuario -> rol -> tipo de documento -> empresa.
 
 import { randomUUID } from 'node:crypto'
 
 import { afterAll, describe, expect, it } from 'vitest'
 
+import { clientes } from '@/lib/composition'
+import { createCustomerPhoneLinks } from '@/lib/modules/clientes'
+import { createCustomerPhoneRepository } from '@/lib/modules/clientes/adapters/driven/persistence/customer-phone-prisma'
 import { insertWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma'
-import { recordWhatsappInbound } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma'
+import {
+  createWhatsappInboxRecorder,
+  type WhatsappInboxRecorderDeps,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 
@@ -27,6 +35,11 @@ import type { WhatsappMessageStatus } from '@/lib/modules/integraciones/domain/w
 function token(): string {
   return randomUUID().replace(/-/gu, '')
 }
+
+const duenosReales: WhatsappInboxRecorderDeps = {
+  ownersOn: (tx) => createCustomerPhoneLinks({ phones: createCustomerPhoneRepository(tx) }),
+}
+const { record: recordWhatsappInbound } = createWhatsappInboxRecorder(duenosReales)
 
 type Empresa = {
   readonly companyId: string
@@ -109,9 +122,15 @@ afterAll(async () => {
   await prisma.whatsappMessage.deleteMany(enEmpresas)
   await prisma.whatsappContact.deleteMany(enEmpresas)
   await prisma.whatsappConnection.deleteMany(enEmpresas)
+  await prisma.customerPhoneNumber.deleteMany(enEmpresas)
+  await prisma.phoneNumber.deleteMany(enEmpresas)
+  await prisma.customer.deleteMany(enEmpresas)
   expect(await prisma.whatsappMessage.count(enEmpresas)).toBe(0)
   expect(await prisma.whatsappContact.count(enEmpresas)).toBe(0)
   expect(await prisma.whatsappConnection.count(enEmpresas)).toBe(0)
+  expect(await prisma.customerPhoneNumber.count(enEmpresas)).toBe(0)
+  expect(await prisma.phoneNumber.count(enEmpresas)).toBe(0)
+  expect(await prisma.customer.count(enEmpresas)).toBe(0)
   for (const empresa of empresas) {
     await prisma.user.delete({ where: { id: empresa.userId } })
     await prisma.role.delete({ where: { id: empresa.roleId } })
@@ -146,7 +165,8 @@ function lote(partial: Partial<InboundBatch>): InboundBatch {
     contacts: [],
     messages: [],
     statuses: [],
-    skipped: { changes: 0, messages: 0, statuses: 0 },
+    templateUpdates: [],
+    skipped: { changes: 0, messages: 0, statuses: 0, templates: 0 },
     ...partial,
   }
 }
@@ -298,7 +318,7 @@ describe('recordWhatsappInbound — contactos y mensajes', () => {
         T2,
         empresa.scope,
       ),
-    ).resolves.toBeUndefined()
+    ).resolves.toEqual({ discardedBlocked: 0 })
 
     const filas = await prisma.whatsappMessage.findMany({ where: { companyId: empresa.companyId } })
     expect(filas).toHaveLength(1)
@@ -410,7 +430,7 @@ describe('recordWhatsappInbound — statuses', () => {
 
     await expect(
       recordWhatsappInbound(lote({ statuses: [status(wamid(), 'DELIVERED')] }), empresa.connectionId, T1, empresa.scope),
-    ).resolves.toBeUndefined()
+    ).resolves.toEqual({ discardedBlocked: 0 })
 
     const connection = await prisma.whatsappConnection.findUniqueOrThrow({ where: { id: empresa.connectionId } })
     expect(connection.lastWebhookAt).toEqual(T1)
@@ -429,5 +449,280 @@ describe('recordWhatsappInbound — statuses', () => {
     expect(await estadoDe(id)).toEqual({ status: 'SENT', errorCode: null, errorReason: null })
     const conexionA = await prisma.whatsappConnection.findUniqueOrThrow({ where: { id: a.connectionId } })
     expect(conexionA.lastWebhookAt).toEqual(T0)
+  })
+})
+
+// --- Vinculo con clientes y contactos bloqueados ------------------------------------------------
+
+function digitos(n: number): string {
+  return String(Math.floor(Math.random() * 10 ** n)).padStart(n, '0')
+}
+
+/** Un movil colombiano irrepetible entre corridas: su `wa_id` y su `phone_e164` son el mismo. */
+function numeroColombiano(): string {
+  return `57300${digitos(7)}`
+}
+
+async function clienteCon(empresa: Empresa, numero: { country: string; national: string } | string): Promise<string> {
+  const telefono =
+    typeof numero === 'string'
+      ? { phoneCountry: 'CO', phoneNumber: numero.slice(2) }
+      : { phoneCountry: numero.country, phoneNumber: numero.national }
+  const { id } = await clientes.createCustomer(
+    {
+      firstNames: `Nombre ${token()}`,
+      lastNames: `Apellido ${token()}`,
+      city: 'Bogota',
+      ...telefono,
+      email: null,
+      address: null,
+    },
+    { id: empresa.userId, companyId: empresa.companyId, permissions: ['clientes.modificar'] },
+  )
+  return id
+}
+
+function entrante(empresa: Empresa, numero: string, instante: Date = T1) {
+  return recordWhatsappInbound(
+    lote({ contacts: [contacto(numero, 'Perfil', instante)], messages: [texto(wamid(), numero, 'hola', instante)] }),
+    empresa.connectionId,
+    instante,
+    empresa.scope,
+  )
+}
+
+function contactoDe(empresa: Empresa, numero: string) {
+  return prisma.whatsappContact.findUniqueOrThrow({
+    where: { connectionId_waId: { connectionId: empresa.connectionId, waId: numero } },
+  })
+}
+
+async function vinculoDe(empresa: Empresa, numero: string) {
+  const { customerId, customerLinkedBy } = await contactoDe(empresa, numero)
+  return { customerId, customerLinkedBy }
+}
+
+function mensajesDe(empresa: Empresa) {
+  return prisma.whatsappMessage.count({ where: { companyId: empresa.companyId } })
+}
+
+/** Un contacto sembrado a mano, para fijar su vinculo o su bloqueo antes de recibir. */
+async function sembrarContacto(
+  empresa: Empresa,
+  numero: string,
+  data: { customerId?: string; customerLinkedBy?: string; blocked?: boolean } = {},
+): Promise<string> {
+  const { id } = await prisma.whatsappContact.create({
+    data: {
+      companyId: empresa.companyId,
+      connectionId: empresa.connectionId,
+      waId: numero,
+      profileName: 'Antes',
+      lastInboundAt: T0,
+      lastMessageAt: T0,
+      customerId: data.customerId ?? null,
+      customerLinkedBy: data.customerLinkedBy ?? null,
+      blockedAt: data.blocked === true ? T0 : null,
+      blockedBy: data.blocked === true ? empresa.userId : null,
+    },
+    select: { id: true },
+  })
+  return id
+}
+
+const SIN_CLIENTE = { customerId: null, customerLinkedBy: null }
+
+describe('recordWhatsappInbound — vinculo con clientes al recibir (QC-239)', () => {
+  it('R15: con un unico dueno el contacto queda vinculado a el como automatico, en el mismo guardado', async () => {
+    const empresa = await crearEmpresa()
+    const numero = numeroColombiano()
+    const dueno = await clienteCon(empresa, numero)
+
+    await expect(entrante(empresa, numero)).resolves.toEqual({ discardedBlocked: 0 })
+
+    expect(await vinculoDe(empresa, numero)).toEqual({ customerId: dueno, customerLinkedBy: null })
+    expect(await mensajesDe(empresa)).toBe(1)
+  })
+
+  it('R16: sin duenos o con varios el contacto queda sin cliente, y el contacto y su mensaje se guardan igual', async () => {
+    const empresa = await crearEmpresa()
+    const sinDueno = numeroColombiano()
+    const compartido = numeroColombiano()
+    await clienteCon(empresa, compartido)
+    await clienteCon(empresa, compartido)
+
+    await entrante(empresa, sinDueno)
+    await entrante(empresa, compartido)
+
+    expect(await vinculoDe(empresa, sinDueno)).toEqual(SIN_CLIENTE)
+    expect(await vinculoDe(empresa, compartido)).toEqual(SIN_CLIENTE)
+    expect(await contactoDe(empresa, compartido)).toMatchObject({ profileName: 'Perfil', lastInboundAt: T1 })
+    expect(await mensajesDe(empresa)).toBe(2)
+  })
+
+  it('R17: un cliente dado de baja, un vinculo quitado o un cliente de otra empresa no son duenos', async () => {
+    const empresa = await crearEmpresa()
+    const otra = await crearEmpresa()
+    const deBaja = numeroColombiano()
+    const quitado = numeroColombiano()
+    const ajeno = numeroColombiano()
+    const clienteDeBaja = await clienteCon(empresa, deBaja)
+    const clienteSinVinculo = await clienteCon(empresa, quitado)
+    await clienteCon(otra, ajeno)
+    await prisma.customer.update({ where: { id: clienteDeBaja }, data: { deletedAt: new Date() } })
+    await prisma.customerPhoneNumber.updateMany({
+      where: { customerId: clienteSinVinculo },
+      data: { deletedAt: new Date() },
+    })
+
+    for (const numero of [deBaja, quitado, ajeno]) await entrante(empresa, numero)
+
+    for (const numero of [deBaja, quitado, ajeno]) {
+      expect(await vinculoDe(empresa, numero), numero).toEqual(SIN_CLIENTE)
+    }
+    expect(await mensajesDe(empresa)).toBe(3)
+  })
+
+  it('R18: con varios duenos un vinculo automatico cae y uno manual de un cliente que sigue siendo dueno se conserva', async () => {
+    const empresa = await crearEmpresa()
+    const automatico = numeroColombiano()
+    const manual = numeroColombiano()
+    const primeroA = await clienteCon(empresa, automatico)
+    await clienteCon(empresa, automatico)
+    const primeroM = await clienteCon(empresa, manual)
+    await clienteCon(empresa, manual)
+    await sembrarContacto(empresa, automatico, { customerId: primeroA })
+    await sembrarContacto(empresa, manual, { customerId: primeroM, customerLinkedBy: empresa.userId })
+
+    await entrante(empresa, automatico)
+    await entrante(empresa, manual)
+
+    expect(await vinculoDe(empresa, automatico)).toEqual(SIN_CLIENTE)
+    expect(await vinculoDe(empresa, manual)).toEqual({ customerId: primeroM, customerLinkedBy: empresa.userId })
+  })
+
+  it('R19: un wa_id mexicano con 521 encuentra al cliente guardado con 52', async () => {
+    const empresa = await crearEmpresa()
+    const nacional = `55${digitos(8)}`
+    const dueno = await clienteCon(empresa, { country: 'MX', national: nacional })
+
+    await entrante(empresa, `521${nacional}`)
+
+    expect(await vinculoDe(empresa, `521${nacional}`)).toEqual({ customerId: dueno, customerLinkedBy: null })
+  })
+
+  it('R20: si la busqueda de duenos falla no queda nada del lote, ni el contacto ni lastWebhookAt', async () => {
+    const empresa = await crearEmpresa()
+    const numero = numeroColombiano()
+    const { record: conDuenosQueFallan } = createWhatsappInboxRecorder({
+      ownersOn: () => ({
+        ownersOf: async () => {
+          throw new Error('fallo forzado al buscar duenos')
+        },
+      }),
+    })
+
+    await expect(
+      conDuenosQueFallan(
+        lote({ contacts: [contacto(numero, 'Perfil', T1)], messages: [texto(wamid(), numero, 'hola', T1)] }),
+        empresa.connectionId,
+        T2,
+        empresa.scope,
+      ),
+    ).rejects.toThrow('fallo forzado al buscar duenos')
+
+    expect(await prisma.whatsappContact.count({ where: { companyId: empresa.companyId } })).toBe(0)
+    expect(await mensajesDe(empresa)).toBe(0)
+    const connection = await prisma.whatsappConnection.findUniqueOrThrow({ where: { id: empresa.connectionId } })
+    expect(connection.lastWebhookAt).toBeNull()
+  })
+})
+
+describe('recordWhatsappInbound — contactos bloqueados (QC-239)', () => {
+  it('R39: el mensaje de un contacto bloqueado no se guarda y el contacto no cambia (nombre, fechas ni vinculo)', async () => {
+    const empresa = await crearEmpresa()
+    const numero = numeroColombiano()
+    await clienteCon(empresa, numero)
+    await sembrarContacto(empresa, numero, { blocked: true })
+    const antes = await contactoDe(empresa, numero)
+
+    const resultado = await recordWhatsappInbound(
+      lote({ contacts: [contacto(numero, 'Despues', T2)], messages: [texto(wamid(), numero, 'hola', T2)] }),
+      empresa.connectionId,
+      T2,
+      empresa.scope,
+    )
+
+    expect(resultado).toEqual({ discardedBlocked: 1 })
+    expect(await contactoDe(empresa, numero)).toEqual(antes)
+    expect(await mensajesDe(empresa)).toBe(0)
+  })
+
+  it('R40: con un contacto bloqueado los statuses de sus salientes se aplican y lastWebhookAt se anota', async () => {
+    const empresa = await crearEmpresa()
+    const numero = numeroColombiano()
+    const contactId = await sembrarContacto(empresa, numero, { blocked: true })
+    const saliente = wamid()
+    await prisma.whatsappMessage.create({
+      data: {
+        companyId: empresa.companyId,
+        connectionId: empresa.connectionId,
+        contactId,
+        direction: 'OUT',
+        wamid: saliente,
+        type: 'TEXT',
+        body: 'saliente de prueba',
+        status: 'SENT',
+      },
+    })
+
+    const resultado = await recordWhatsappInbound(
+      lote({
+        contacts: [contacto(numero, 'Despues', T1)],
+        messages: [texto(wamid(), numero, 'descartado', T1)],
+        statuses: [status(saliente, 'READ')],
+      }),
+      empresa.connectionId,
+      T2,
+      empresa.scope,
+    )
+
+    expect(resultado).toEqual({ discardedBlocked: 1 })
+    expect(await estadoDe(saliente)).toEqual({ status: 'READ', errorCode: null, errorReason: null })
+    expect(await mensajesDe(empresa)).toBe(1)
+    const connection = await prisma.whatsappConnection.findUniqueOrThrow({ where: { id: empresa.connectionId } })
+    expect(connection.lastWebhookAt).toEqual(T2)
+  })
+
+  it('R41: en un lote con un contacto bloqueado y otro que no lo esta solo se guardan los del no bloqueado', async () => {
+    const empresa = await crearEmpresa()
+    const bloqueado = numeroColombiano()
+    const libre = numeroColombiano()
+    await sembrarContacto(empresa, bloqueado, { blocked: true })
+    const antes = await contactoDe(empresa, bloqueado)
+    const delLibre = wamid()
+
+    const resultado = await recordWhatsappInbound(
+      lote({
+        contacts: [contacto(bloqueado, 'Bloqueado', T1), contacto(libre, 'Libre', T1)],
+        messages: [
+          texto(wamid(), bloqueado, 'uno', T1),
+          texto(delLibre, libre, 'dos', T1),
+          texto(wamid(), bloqueado, 'tres', T1),
+        ],
+      }),
+      empresa.connectionId,
+      T1,
+      empresa.scope,
+    )
+
+    expect(resultado).toEqual({ discardedBlocked: 2 })
+    const guardados = await prisma.whatsappMessage.findMany({
+      where: { companyId: empresa.companyId },
+      select: { wamid: true },
+    })
+    expect(guardados).toEqual([{ wamid: delLibre }])
+    expect(await contactoDe(empresa, libre)).toMatchObject({ profileName: 'Libre', lastInboundAt: T1 })
+    expect(await contactoDe(empresa, bloqueado)).toEqual(antes)
   })
 })

@@ -1,5 +1,11 @@
 import { USER_USERNAME_MAX_LENGTH } from '@/lib/modules/identity';
 
+export const USERNAME_SUGGESTION_HINT = 'Este nombre de usuario está libre:';
+
+export function usernameSuggestionApplyLabel(username: string): string {
+  return `Usar ${username}`;
+}
+
 function tokens(value: string): string[] {
   return value
     .split(/\s+/)

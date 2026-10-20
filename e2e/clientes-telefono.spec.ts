@@ -21,6 +21,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { expect, test, type Page } from '@playwright/test';
+import type { Prisma } from '@prisma/client';
 
 import {
   describeCustomerPhone,
@@ -167,17 +168,27 @@ function hiddenPhoneCountry(page: Page) {
   return page.getByTestId(FORM_TESTID).locator('input[type="hidden"][name="phoneCountry"]');
 }
 
+/** Los vinculos de telefono apuntan al cliente sin borrado en cascada: se borran antes. */
+async function deleteCustomersWithPhones(where: Prisma.CustomerWhereInput): Promise<void> {
+  const ids = (await prisma.customer.findMany({ where, select: { id: true } })).map((row) => row.id);
+  await prisma.customerPhoneNumber.deleteMany({ where: { customerId: { in: ids } } });
+  await prisma.customer.deleteMany({ where: { id: { in: ids } } });
+}
+
 test.beforeAll(async () => {
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
-  await prisma.customer.deleteMany({
-    where: { firstNames: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
-  });
+  await deleteCustomersWithPhones({ firstNames: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } });
   await prisma.user.deleteMany({
     where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
-  await prisma.company.deleteMany({
-    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
-  });
+  const orphanCompanyIds = (
+    await prisma.company.findMany({
+      where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+      select: { id: true },
+    })
+  ).map((row) => row.id);
+  await prisma.phoneNumber.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+  await prisma.company.deleteMany({ where: { id: { in: orphanCompanyIds } } });
 
   companyWithCountryId = (
     await prisma.company.create({
@@ -208,6 +219,8 @@ test.afterAll(async () => {
     (id): id is string => id !== null,
   );
   try {
+    await prisma.customerPhoneNumber.deleteMany({ where: { companyId: { in: companyIds } } });
+    await prisma.phoneNumber.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.customer.deleteMany({ where: { companyId: { in: companyIds } } });
   } finally {
     try {
@@ -229,12 +242,12 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('teléfono de cliente con código de país', () => {
-  test('R2, R11, R29, R12 — empresa con CO: el alta abre con Colombia, guarda CO y 573001234567, la lista lo muestra internacional y la misma alta otra vez da duplicado bajo el número', async ({
+  test('R2, R11, R29, R7 (QC-239) — empresa con CO: el alta abre con Colombia, guarda CO y 573001234567, la lista lo muestra internacional y la misma alta otra vez también se guarda', async ({
     page,
   }) => {
     const companyId = requireId(companyWithCountryId);
     // Un reintento del mismo worker no debe tropezar con el alta del intento anterior.
-    await prisma.customer.deleteMany({ where: { companyId, phoneE164: EXPECTED_E164 } });
+    await deleteCustomersWithPhones({ companyId, phoneE164: EXPECTED_E164 });
 
     await loginAndLand(page, adminWithCountry);
     await openCustomers(page);
@@ -262,18 +275,14 @@ test.describe('teléfono de cliente con código de país', () => {
       page.getByTestId(`data-table-row-${created.id}`).getByTestId(PHONE_CELL_TESTID),
     ).toHaveText(formatPhoneInternational(EXPECTED_E164), { timeout: 60_000 });
 
-    // R12: la misma alta otra vez se rechaza bajo el número y el panel sigue abierto.
+    // R7 (QC-239): un número puede ser de varios clientes; la misma alta otra vez se guarda.
     await openCreateSheet(page);
     await fillRequired(page, `dup${RUN_ID.slice(0, 6)}`);
     await page.getByTestId(FIELD_PHONE_NUMBER_TESTID).fill(TYPED_NUMBER);
     await page.getByTestId(FORM_SUBMIT_TESTID).click();
 
-    await expect(page.getByTestId(ERROR_PHONE_NUMBER_TESTID)).toHaveText(
-      errorMessage('customer_duplicate_phone'),
-      { timeout: 60_000 },
-    );
-    await expect(page.getByTestId(SHEET_TESTID)).toBeVisible();
-    expect(await prisma.customer.count({ where: { companyId, phoneE164: EXPECTED_E164 } })).toBe(1);
+    await expect(page.getByTestId(SHEET_TESTID)).toHaveCount(0, { timeout: 60_000 });
+    expect(await prisma.customer.count({ where: { companyId, phoneE164: EXPECTED_E164 } })).toBe(2);
   });
 
   test('R9 — un número no válido para Colombia se marca en el campo y no se guarda', async ({

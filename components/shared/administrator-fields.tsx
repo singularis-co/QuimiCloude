@@ -1,12 +1,19 @@
 'use client';
 
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
 import { DatePicker } from '@/components/shared/date-picker';
 import { SelectField } from '@/components/shared/select-field';
 import { TextField } from '@/components/shared/text-field';
+import {
+  USERNAME_SUGGESTION_HINT,
+  usernameFromNames,
+  usernameSuggestionApplyLabel,
+} from '@/components/shared/username-from-names';
+import { Button } from '@/components/ui/button';
 import { DOCUMENT_TYPE_CODES } from '@/lib/modules/identity';
 import { parseDateLocalISO } from '@/lib/shared/ui/date-civil';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 export const ADMINISTRATOR_FIELD_NAMES = [
   'firstNames',
@@ -74,12 +81,36 @@ export function administratorFieldErrorTestId(
   return `${testIdPrefix}-error-${TEST_ID_SUFFIX[field]}`;
 }
 
+export function administratorUsernameSuggestionTestIds(testIdPrefix: string): {
+  readonly suggestion: string;
+  readonly apply: string;
+} {
+  return {
+    suggestion: `${testIdPrefix}-username-suggestion`,
+    apply: `${testIdPrefix}-username-suggestion-apply`,
+  };
+}
+
 export type AdministratorFieldsProps = {
   readonly namePrefix?: string;
   readonly defaultValues?: Partial<Record<AdministratorFieldName, string>>;
   readonly errors?: Partial<Record<AdministratorFieldName, string>>;
   readonly testIdPrefix: string;
+  /** Propone el nombre de usuario a partir de nombres y apellidos hasta que se edita a mano. */
+  readonly usernameAutofill?: boolean;
+  /** Nombre de usuario libre que se ofrece aplicar junto al campo. */
+  readonly usernameSuggestion?: string;
 };
+
+type AutofillValues = {
+  readonly firstNames: string;
+  readonly lastNames: string;
+  readonly username: string;
+};
+
+function isAutofillField(field: AdministratorFieldName): field is keyof AutofillValues {
+  return field === 'firstNames' || field === 'lastNames' || field === 'username';
+}
 
 function RequiredLabel({ field }: { readonly field: AdministratorFieldName }): ReactNode {
   const label = ADMINISTRATOR_FIELD_LABELS[field];
@@ -102,31 +133,75 @@ export function AdministratorFields({
   defaultValues = {},
   errors = {},
   testIdPrefix,
+  usernameAutofill = false,
+  usernameSuggestion,
 }: AdministratorFieldsProps) {
   const baseId = useId();
   const idOf = (field: AdministratorFieldName): string => `${baseId}-${field}`;
   const nameOf = (field: AdministratorFieldName): string =>
     administratorFieldName(field, namePrefix);
 
+  const [autofill, setAutofill] = useState<AutofillValues>(() => ({
+    firstNames: defaultValues.firstNames ?? '',
+    lastNames: defaultValues.lastNames ?? '',
+    username: defaultValues.username ?? '',
+  }));
+  const [usernameEdited, setUsernameEdited] = useState(false);
+
+  function changeName(field: 'firstNames' | 'lastNames', value: string) {
+    setAutofill((previous) => {
+      const next = { ...previous, [field]: value };
+      if (usernameEdited) return next;
+      return { ...next, username: usernameFromNames(next.firstNames, next.lastNames) };
+    });
+  }
+
+  function changeUsername(value: string) {
+    setUsernameEdited(true);
+    setAutofill((previous) => ({ ...previous, username: value }));
+  }
+
+  const onChangeOf: Readonly<Record<keyof AutofillValues, (value: string) => void>> = {
+    firstNames: (value) => changeName('firstNames', value),
+    lastNames: (value) => changeName('lastNames', value),
+    username: changeUsername,
+  };
+
   const text = (
     field: AdministratorFieldName,
     type?: 'text' | 'email' | 'tel',
     autoComplete?: string,
-  ) => (
-    <TextField
-      id={idOf(field)}
-      name={nameOf(field)}
-      label={<RequiredLabel field={field} />}
-      type={type}
-      autoComplete={autoComplete}
-      defaultValue={defaultValues[field] ?? ''}
-      remountOnDefault
-      ariaRequired={REQUIRED_FIELDS.has(field) ? true : undefined}
-      testId={administratorFieldTestId(testIdPrefix, field)}
-      error={errors[field]}
-      errorTestId={administratorFieldErrorTestId(testIdPrefix, field)}
-    />
-  );
+    children?: ReactNode,
+  ) => {
+    const autofillField = usernameAutofill && isAutofillField(field) ? field : undefined;
+    return (
+      <TextField
+        id={idOf(field)}
+        name={nameOf(field)}
+        label={<RequiredLabel field={field} />}
+        type={type}
+        autoComplete={autoComplete}
+        value={autofillField === undefined ? undefined : autofill[autofillField]}
+        onValueChange={autofillField === undefined ? undefined : onChangeOf[autofillField]}
+        defaultValue={autofillField === undefined ? (defaultValues[field] ?? '') : undefined}
+        remountOnDefault
+        ariaRequired={REQUIRED_FIELDS.has(field) ? true : undefined}
+        testId={administratorFieldTestId(testIdPrefix, field)}
+        error={errors[field]}
+        errorTestId={administratorFieldErrorTestId(testIdPrefix, field)}
+      >
+        {children}
+      </TextField>
+    );
+  };
+
+  const currentUsername = usernameAutofill ? autofill.username : undefined;
+  // Ya aplicada, la recomendacion sobra.
+  const suggestion =
+    usernameSuggestion === undefined || usernameSuggestion === currentUsername
+      ? undefined
+      : usernameSuggestion;
+  const suggestionTestIds = administratorUsernameSuggestionTestIds(testIdPrefix);
 
   const birthDate = defaultValues.birthDate ?? '';
   const birthDateDefault = birthDate === '' ? undefined : parseDateLocalISO(birthDate);
@@ -171,7 +246,25 @@ export function AdministratorFields({
         {text('documentNumber', 'text', 'off')}
       </div>
 
-      {text('username', 'text', 'off')}
+      {text(
+        'username',
+        'text',
+        'off',
+        suggestion === undefined ? null : (
+          <div className="flex flex-col gap-2 text-sm" data-testid={suggestionTestIds.suggestion}>
+            <p>{USERNAME_SUGGESTION_HINT}</p>
+            <Button
+              type="button"
+              variant="outline"
+              className={`w-full ${touchTarget}`}
+              data-testid={suggestionTestIds.apply}
+              onClick={() => changeUsername(suggestion)}
+            >
+              <span className="truncate">{usernameSuggestionApplyLabel(suggestion)}</span>
+            </Button>
+          </div>
+        ),
+      )}
     </div>
   );
 }

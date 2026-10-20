@@ -5,14 +5,15 @@
 // Aislamiento: `commit`. La ruta guarda en su PROPIA `prisma.$transaction` sobre el cliente GLOBAL,
 // asi que una transaccion del test con ROLLBACK no la envolveria. Cada caso fabrica su empresa
 // efimera (tipo de documento, rol, empresa con o sin el anadido `integraciones`, usuario y conexion)
-// y `afterAll` borra mensajes -> contactos -> conexiones por `company_id`, afirma contando que no
-// queda nada y despues borra usuario -> rol -> tipo de documento -> empresa (sus anadidos caen en
-// cascada).
+// y `afterAll` borra mensajes -> contactos -> conexiones -> vinculos -> numeros -> clientes por
+// `company_id`, afirma contando que no queda nada y despues borra usuario -> rol -> tipo de
+// documento -> empresa (sus anadidos caen en cascada).
 
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { clientes } from '@/lib/composition'
 import { GET, POST } from '@/lib/modules/integraciones/adapters/driving/whatsapp-webhook-route'
 import { insertWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma'
 import { secretCipherAesGcm } from '@/lib/modules/integraciones/adapters/driven/security/secret-cipher-aes-gcm'
@@ -190,9 +191,15 @@ afterAll(async () => {
   await prisma.whatsappMessage.deleteMany(enEmpresas)
   await prisma.whatsappContact.deleteMany(enEmpresas)
   await prisma.whatsappConnection.deleteMany(enEmpresas)
+  await prisma.customerPhoneNumber.deleteMany(enEmpresas)
+  await prisma.phoneNumber.deleteMany(enEmpresas)
+  await prisma.customer.deleteMany(enEmpresas)
   expect(await prisma.whatsappMessage.count(enEmpresas)).toBe(0)
   expect(await prisma.whatsappContact.count(enEmpresas)).toBe(0)
   expect(await prisma.whatsappConnection.count(enEmpresas)).toBe(0)
+  expect(await prisma.customerPhoneNumber.count(enEmpresas)).toBe(0)
+  expect(await prisma.phoneNumber.count(enEmpresas)).toBe(0)
+  expect(await prisma.customer.count(enEmpresas)).toBe(0)
   for (const empresa of empresas) {
     await prisma.user.delete({ where: { id: empresa.userId } })
     await prisma.role.delete({ where: { id: empresa.roleId } })
@@ -664,5 +671,77 @@ describe('POST — transaccion', () => {
 
     expect(await conteos(conexion.empresa)).toEqual({ contactos: 1, mensajes: 1 })
     expect((await filaDeConexion(conexion.id)).lastWebhookAt).not.toBeNull()
+  })
+})
+
+// --- POST: vinculo con clientes y contactos bloqueados -------------------------------------------
+
+/** Un movil colombiano irrepetible entre corridas: su `wa_id` y su `phone_e164` son el mismo. */
+function numeroColombiano(): string {
+  return `57300${String(Math.floor(Math.random() * 1e7)).padStart(7, '0')}`
+}
+
+async function clienteCon(empresa: Empresa, numero: string): Promise<string> {
+  const { id } = await clientes.createCustomer(
+    {
+      firstNames: `Nombre ${token()}`,
+      lastNames: `Apellido ${token()}`,
+      city: 'Bogota',
+      phoneCountry: 'CO',
+      phoneNumber: numero.slice(2),
+      email: null,
+      address: null,
+    },
+    { id: empresa.userId, companyId: empresa.companyId, permissions: ['clientes.modificar'] },
+  )
+  return id
+}
+
+describe('POST — vinculo con clientes y contactos bloqueados (QC-239)', () => {
+  it('R15: un texto de un numero con un unico cliente deja el contacto vinculado a el, como automatico', async () => {
+    const conexion = await crearConexion()
+    const numero = numeroColombiano()
+    const dueno = await clienteCon(conexion.empresa, numero)
+
+    const response = await entrega(conexion, mensajes(conexion, [texto('hola', { from: numero })], [contact(numero)]))
+
+    expect(response.status).toBe(200)
+    const contacto = await prisma.whatsappContact.findUniqueOrThrow({
+      where: { connectionId_waId: { connectionId: conexion.id, waId: numero } },
+    })
+    expect(contacto).toMatchObject({ customerId: dueno, customerLinkedBy: null })
+    expect(await conteos(conexion.empresa)).toEqual({ contactos: 1, mensajes: 1 })
+  })
+
+  it('R39: un texto de un contacto bloqueado responde 200 sin cuerpo, no guarda el mensaje y deja el contacto igual', async () => {
+    const conexion = await crearConexion()
+    const numero = numeroColombiano()
+    await clienteCon(conexion.empresa, numero)
+    const { id } = await prisma.whatsappContact.create({
+      data: {
+        companyId: conexion.empresa.companyId,
+        connectionId: conexion.id,
+        waId: numero,
+        profileName: 'Antes del bloqueo',
+        lastInboundAt: new Date('2026-10-01T10:00:00.000Z'),
+        lastMessageAt: new Date('2026-10-01T10:00:00.000Z'),
+        blockedAt: new Date('2026-10-02T10:00:00.000Z'),
+        blockedBy: conexion.empresa.userId,
+      },
+      select: { id: true },
+    })
+    const antes = await prisma.whatsappContact.findUniqueOrThrow({ where: { id } })
+    const momento = new Date()
+
+    const response = await entrega(
+      conexion,
+      mensajes(conexion, [texto('no deberia guardarse', { from: numero })], [contact(numero, 'Despues')]),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await respuestaVacia(response)).toBe('')
+    expect(await prisma.whatsappContact.findUniqueOrThrow({ where: { id } })).toEqual(antes)
+    expect(await conteos(conexion.empresa)).toEqual({ contactos: 1, mensajes: 0 })
+    expect((await filaDeConexion(conexion.id)).lastWebhookAt!.getTime()).toBeGreaterThanOrEqual(momento.getTime())
   })
 })

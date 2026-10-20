@@ -6,6 +6,8 @@ import {
   metaTimestampOf,
 } from './whatsapp-inbound-message';
 import type { WhatsappStatusUpdate } from './whatsapp-message-status';
+import type { TemplateWebhookUpdate } from './whatsapp-template';
+import { interpretTemplateChange, isTemplateWebhookField } from './whatsapp-template-webhook';
 
 import type { WhatsappMessagePayload, WhatsappMessageType } from './whatsapp-message';
 
@@ -38,8 +40,17 @@ export type InboundBatch = {
   readonly contacts: readonly InboundContact[];
   readonly messages: readonly InboundMessage[];
   readonly statuses: readonly InboundStatus[];
-  /** `changes` cuenta los de `messages` que no se procesaron: forma rota o teléfono de otra conexión. */
-  readonly skipped: { readonly changes: number; readonly messages: number; readonly statuses: number };
+  readonly templateUpdates: readonly TemplateWebhookUpdate[];
+  /**
+   * `changes` cuenta los de `messages` que no se procesaron: forma rota o teléfono de otra conexión.
+   * `templates`, los cambios de plantilla de otra cuenta o que no se pueden guardar.
+   */
+  readonly skipped: {
+    readonly changes: number;
+    readonly messages: number;
+    readonly statuses: number;
+    readonly templates: number;
+  };
 };
 
 const notificationSchema = z.object({
@@ -142,7 +153,7 @@ function accumulateContact(
  * `null` si el cuerpo no tiene la forma de una notificación. Lo que no se entiende dentro de una
  * notificación válida se salta con conteo y no tumba el resto.
  */
-export function parseWhatsappWebhook(json: unknown, phoneNumberId: string): InboundBatch | null {
+export function parseWhatsappWebhook(json: unknown, phoneNumberId: string, wabaId: string): InboundBatch | null {
   const notification = notificationSchema.safeParse(json);
   if (!notification.success) return null;
 
@@ -150,10 +161,18 @@ export function parseWhatsappWebhook(json: unknown, phoneNumberId: string): Inbo
   const messages: InboundMessage[] = [];
   const seenWamids = new Set<string>();
   const statuses: InboundStatus[] = [];
-  const skipped = { changes: 0, messages: 0, statuses: 0 };
+  const templateUpdates: TemplateWebhookUpdate[] = [];
+  const skipped = { changes: 0, messages: 0, statuses: 0, templates: 0 };
 
   for (const entry of notification.data.entry) {
     for (const change of entry.changes) {
+      if (isTemplateWebhookField(change.field)) {
+        // En los cambios de plantilla `entry.id` es la cuenta de WhatsApp Business.
+        const update = entry.id === wabaId ? interpretTemplateChange(change.field, change.value) : null;
+        if (update === null) skipped.templates += 1;
+        else templateUpdates.push(update);
+        continue;
+      }
       if (change.field !== 'messages') continue;
       const value = valueSchema.safeParse(change.value);
       if (!value.success || value.data.metadata.phone_number_id !== phoneNumberId) {
@@ -202,6 +221,7 @@ export function parseWhatsappWebhook(json: unknown, phoneNumberId: string): Inbo
     contacts: [...contacts.values()].map(({ waId, profileName, latestAt }) => ({ waId, profileName, latestAt })),
     messages,
     statuses,
+    templateUpdates,
     skipped,
   };
 }

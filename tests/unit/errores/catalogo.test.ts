@@ -27,6 +27,14 @@ import {
   RecipeNotFoundError,
   RecipeVersionUnderReviewError,
 } from '@/lib/modules/pedidos/domain/errors'
+import {
+  WhatsappMetaRejectedError,
+  WhatsappMetaUnreachableError,
+  WhatsappTemplateNameTakenError,
+  WhatsappTemplateNotFoundError,
+  WhatsappTemplateRateLimitedError,
+  WhatsappTemplateRejectedError,
+} from '@/lib/modules/integraciones'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
@@ -80,9 +88,14 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-288 2026-10-19 (merge de dev): 103 y no 102: entra también `delivery_exceeds_surplus`.
       // 2026-10-19: 106 y no 103: entran `customer_phone_country_required`,
       // `customer_phone_invalid` y `customer_duplicate_phone`.
-      // 2026-10-20: 105 y no 106: sale el error de lo envasado por encima de la cantidad del
-      // pedido, que Terminar ya no produce.
-      expect(ERROR_CODES).toHaveLength(105)
+      // 2026-10-20: 108 y no 106: entran `whatsapp_contact_not_found` y
+      // `whatsapp_contact_number_invalid`.
+      // QC-239 2026-10-20: 107 y no 108: sale `customer_duplicate_phone`.
+      // QC-242 2026-10-20: 112 y no 106: entran los seis codigos de plantillas y de Meta de WhatsApp.
+      // Merge de dev en QC-239 (2026-10-20): 113 = 106 + 2 de contactos - 1 retirado + 6 de plantillas.
+      // Merge de dev en QC-290 (2026-10-20): 112 = 113 - 1, sale el error de lo envasado por
+      // encima de la cantidad del pedido, que Terminar ya no produce.
+      expect(ERROR_CODES).toHaveLength(112)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -647,5 +660,41 @@ describe('ultimo Administrador de una empresa — company_last_administrator', (
     const codigos: readonly string[] = ERROR_CODES
     expect(codigos).toContain('last_administrator')
     expect(errorMessage('company_last_administrator')).not.toBe(errorMessage('last_administrator'))
+  })
+})
+
+describe('plantillas de WhatsApp — codigos de plantilla y de Meta', () => {
+  const esperados = {
+    whatsapp_template_not_found: 'No se encontró la plantilla.',
+    whatsapp_template_name_taken: 'Ya existe una plantilla con ese nombre en ese idioma.',
+    whatsapp_template_rate_limited:
+      'Meta no permite crear más plantillas por ahora. Intenta de nuevo más tarde.',
+    whatsapp_template_rejected: 'Meta rechazó la plantilla. Revisa el contenido e intenta de nuevo.',
+    whatsapp_meta_rejected: 'Meta rechazó la solicitud. Intenta de nuevo o revisa la conexión.',
+    whatsapp_meta_unreachable: 'No se pudo contactar con Meta. Intenta de nuevo en unos minutos.',
+  } as const satisfies Partial<Record<ErrorCode, string>>
+
+  it('R51: los seis codigos estan en el catalogo con su clave y su texto en español', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    for (const [code, texto] of Object.entries(esperados) as [keyof typeof esperados, string][]) {
+      expect(codigos, `falta el codigo ${code}`).toContain(code)
+      expect(ERROR_MESSAGE_KEY[code]).toBe(`errors.${code}`)
+      expect(errorMessage(code)).toBe(texto)
+    }
+  })
+
+  it('R51: cada clase de integraciones lleva su codigo y su texto', () => {
+    const casos = [
+      [new WhatsappTemplateNotFoundError(), 'whatsapp_template_not_found'],
+      [new WhatsappTemplateNameTakenError(), 'whatsapp_template_name_taken'],
+      [new WhatsappTemplateRateLimitedError(), 'whatsapp_template_rate_limited'],
+      [new WhatsappTemplateRejectedError(), 'whatsapp_template_rejected'],
+      [new WhatsappMetaRejectedError(), 'whatsapp_meta_rejected'],
+      [new WhatsappMetaUnreachableError(), 'whatsapp_meta_unreachable'],
+    ] as const
+    for (const [error, code] of casos) {
+      expect(error.code).toBe(code)
+      expect(error.message).toBe(esperados[code])
+    }
   })
 })

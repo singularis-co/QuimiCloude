@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { UNREADABLE_SECRET_MESSAGE } from '@/lib/modules/integraciones/domain/connection-secrets'
 import { createReceiveWhatsappWebhook } from '@/lib/modules/integraciones/domain/receive-whatsapp-webhook'
 import type { WhatsappConnectionRecord } from '@/lib/modules/integraciones/domain/whatsapp-connection'
+import type { WhatsappTemplateRecord } from '@/lib/modules/integraciones/domain/whatsapp-template'
 import { parseWhatsappWebhook } from '@/lib/modules/integraciones/domain/whatsapp-webhook-payload'
 import type { WebhookSignature } from '@/lib/modules/integraciones/ports/webhook-signature'
 import type { WhatsappInboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-inbox-repository'
@@ -12,16 +13,21 @@ import {
   COMPANY_ID,
   CONNECTION_ID,
   NOW,
+  TEMPLATE_ID,
   makeCipher,
   makeIntegrationsSwitch,
   makeRepository,
+  makeTemplateRepository,
   makeWebhookDirectory,
   storedConnection,
+  storedTemplate,
 } from './whatsapp-doubles'
 import {
   FOREIGN_PHONE_NUMBER_ID,
   PHONE_NUMBER_ID,
+  WABA_ID,
   change,
+  contact,
   messagesNotification,
   notification,
   status,
@@ -52,7 +58,7 @@ function makeSignature() {
 }
 
 function makeInbox() {
-  const record = vi.fn<WhatsappInboxRepository['record']>(async () => undefined)
+  const record = vi.fn<WhatsappInboxRepository['record']>(async () => ({ discardedBlocked: 0 }))
   const inbox: WhatsappInboxRepository = { record }
   return { inbox, record }
 }
@@ -61,6 +67,7 @@ type SetupOptions = {
   record?: Partial<WhatsappConnectionRecord>
   directoryCompany?: string | null
   addonOn?: boolean
+  templates?: WhatsappTemplateRecord[]
 }
 
 function setup(options: SetupOptions = {}) {
@@ -72,6 +79,7 @@ function setup(options: SetupOptions = {}) {
   const integrations = makeIntegrationsSwitch(options.addonOn ?? true)
   const signature = makeSignature()
   const inbox = makeInbox()
+  const templates = makeTemplateRepository(options.templates ?? [])
   const receive = createReceiveWhatsappWebhook({
     directory: directory.directory,
     integrations: integrations.integrations,
@@ -79,9 +87,10 @@ function setup(options: SetupOptions = {}) {
     cipher: cipher.cipher,
     signature: signature.signature,
     inbox: inbox.inbox,
+    templates: templates.templates,
     now: () => NOW,
   })
-  return { record, repo, cipher, directory, integrations, signature, inbox, receive }
+  return { record, repo, cipher, directory, integrations, signature, inbox, templates, receive }
 }
 
 afterEach(() => {
@@ -99,11 +108,12 @@ describe('receiveWhatsappWebhook: POST firmado', () => {
     expect(result).toEqual({
       kind: 'stored',
       counts: { messages: 2, statuses: 0 },
-      skipped: { changes: 0, messages: 0, statuses: 0 },
+      skipped: { changes: 0, messages: 0, statuses: 0, templates: 0 },
+      followUp: null,
     })
-    expect(parseSpy).toHaveBeenCalledWith(body, PHONE_NUMBER_ID)
+    expect(parseSpy).toHaveBeenCalledWith(body, PHONE_NUMBER_ID, WABA_ID)
     expect(inbox.record).toHaveBeenCalledTimes(1)
-    expect(inbox.record).toHaveBeenCalledWith(parseWhatsappWebhook(body, PHONE_NUMBER_ID), CONNECTION_ID, NOW, {
+    expect(inbox.record).toHaveBeenCalledWith(parseWhatsappWebhook(body, PHONE_NUMBER_ID, WABA_ID), CONNECTION_ID, NOW, {
       companyId: COMPANY_ID,
     })
   })
@@ -155,9 +165,45 @@ describe('receiveWhatsappWebhook: POST firmado', () => {
     expect(result).toEqual({
       kind: 'stored',
       counts: { messages: 0, statuses: 0 },
-      skipped: { changes: 0, messages: 0, statuses: 0 },
+      skipped: { changes: 0, messages: 0, statuses: 0, templates: 0 },
+      followUp: null,
     })
     expect(inbox.record).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('receiveWhatsappWebhook: contactos bloqueados', () => {
+  it('R39, R41: los mensajes que el inbox descarta por bloqueo no cuentan como guardados, y la respuesta sigue siendo stored', async () => {
+    const { receive, inbox } = setup()
+    inbox.record.mockResolvedValueOnce({ discardedBlocked: 2 })
+    const body = messagesNotification([textMessage(), textMessage(), textMessage()])
+
+    const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })
+
+    expect(result).toEqual({
+      kind: 'stored',
+      counts: { messages: 1, statuses: 0 },
+      skipped: { changes: 0, messages: 0, statuses: 0, templates: 0 },
+      followUp: null,
+    })
+    expect(inbox.record).toHaveBeenCalledTimes(1)
+  })
+
+  it('R40: con todo el lote descartado por bloqueo los statuses se siguen contando', async () => {
+    const { receive, inbox } = setup()
+    inbox.record.mockResolvedValueOnce({ discardedBlocked: 1 })
+    const body = notification(
+      change(value({ messages: [textMessage()], statuses: [status('wamid.saliente', 'delivered')] })),
+    )
+
+    const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })
+
+    expect(result).toEqual({
+      kind: 'stored',
+      counts: { messages: 0, statuses: 1 },
+      skipped: { changes: 0, messages: 0, statuses: 0, templates: 0 },
+      followUp: null,
+    })
   })
 })
 
@@ -179,7 +225,8 @@ describe('receiveWhatsappWebhook: cambios saltados', () => {
     expect(result).toEqual({
       kind: 'stored',
       counts: { messages: 1, statuses: 1 },
-      skipped: { changes: 1, messages: 1, statuses: 1 },
+      skipped: { changes: 1, messages: 1, statuses: 1, templates: 0 },
+      followUp: null,
     })
     expect(JSON.stringify(result)).not.toContain(FOREIGN_PHONE_NUMBER_ID)
     expect(inbox.record).toHaveBeenCalledTimes(1)
@@ -338,5 +385,128 @@ describe('receiveWhatsappWebhook: guardado', () => {
 
     expect(result.kind).toBe('stored')
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('receiveWhatsappWebhook: cambios de plantillas', () => {
+  const templateStatus = (id: number, event = 'APPROVED', reason: string | null = null) =>
+    change({ event, message_template_id: id, message_template_name: 'x', message_template_language: 'es', reason }, 'message_template_status_update')
+
+  function setupWithTemplates(rows = [storedTemplate({ metaTemplateId: '9001', status: 'PENDING' })]) {
+    const ctx = setup({ templates: rows })
+    return ctx
+  }
+
+  it('R36: un APPROVED de una plantilla conocida la pone al dia con el ambito de la fila y sin follow-up', async () => {
+    const { receive, templates } = setupWithTemplates()
+    const body = notification(templateStatus(9001))
+
+    const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })
+
+    expect(result).toEqual({
+      kind: 'stored',
+      counts: { messages: 0, statuses: 0 },
+      skipped: { changes: 0, messages: 0, statuses: 0, templates: 0 },
+      followUp: null,
+    })
+    expect(templates.applyWebhookUpdates).toHaveBeenCalledWith(
+      CONNECTION_ID,
+      [{ kind: 'status', metaTemplateId: '9001', status: 'APPROVED', statusRaw: null, rejectedReason: null }],
+      { companyId: COMPANY_ID },
+    )
+    expect(templates.row(TEMPLATE_ID)).toMatchObject({ status: 'APPROVED', rejectedReason: null })
+  })
+
+  it('R36: REJECTED guarda el motivo; R37: la categoria nueva se guarda', async () => {
+    const { receive, templates } = setupWithTemplates()
+    await receive({
+      connectionId: CONNECTION_ID,
+      rawBody: bytesOf(notification(templateStatus(9001, 'REJECTED', 'INVALID_FORMAT'))),
+      signature: GOOD_SIGNATURE,
+    })
+    expect(templates.row(TEMPLATE_ID)).toMatchObject({ status: 'REJECTED', rejectedReason: 'INVALID_FORMAT' })
+
+    await receive({
+      connectionId: CONNECTION_ID,
+      rawBody: bytesOf(
+        notification(change({ message_template_id: 9001, previous_category: 'UTILITY', new_category: 'MARKETING' }, 'template_category_update')),
+      ),
+      signature: GOOD_SIGNATURE,
+    })
+    expect(templates.row(TEMPLATE_ID)).toMatchObject({ category: 'MARKETING' })
+  })
+
+  it('R38: un id que no esta en la copia local pide resincronizar, una sola vez aunque haya varios', async () => {
+    const { receive } = setupWithTemplates()
+    const body = notification(templateStatus(9001), templateStatus(7777), templateStatus(8888))
+
+    const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })
+
+    expect(result).toMatchObject({ kind: 'stored', followUp: 'resync_templates' })
+  })
+
+  it('R38: recibir no sincroniza: ni Graph en los deps ni fetch', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const { receive, templates } = setupWithTemplates([])
+    await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(notification(templateStatus(7777))), signature: GOOD_SIGNATURE })
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(templates.applySync).not.toHaveBeenCalled()
+  })
+
+  it('R40: un POST con mensajes y cambios de plantillas guarda los dos', async () => {
+    const { receive, inbox, templates } = setupWithTemplates()
+    const body = notification(change(value({ contacts: [contact()], messages: [textMessage()] })), templateStatus(9001))
+
+    const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })
+
+    expect(result).toMatchObject({ kind: 'stored', counts: { messages: 1, statuses: 0 }, followUp: null })
+    expect(inbox.record).toHaveBeenCalledTimes(1)
+    expect(templates.applyWebhookUpdates).toHaveBeenCalledTimes(1)
+    expect(templates.row(TEMPLATE_ID)).toMatchObject({ status: 'APPROVED' })
+  })
+
+  it('R40: si falla guardar los cambios de plantillas la excepcion se propaga', async () => {
+    const { receive, inbox, templates } = setupWithTemplates()
+    const failure = new Error('la base fallo')
+    templates.applyWebhookUpdates.mockRejectedValueOnce(failure)
+    const body = notification(change(value({ contacts: [contact()], messages: [textMessage()] })), templateStatus(9001))
+
+    await expect(receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })).rejects.toBe(failure)
+    expect(inbox.record).toHaveBeenCalledTimes(1)
+  })
+
+  it('R40: sin cambios de plantillas no se llama al repositorio de plantillas', async () => {
+    const { receive, templates } = setupWithTemplates()
+    await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(messagesNotification([textMessage()])), signature: GOOD_SIGNATURE })
+    expect(templates.applyWebhookUpdates).not.toHaveBeenCalled()
+  })
+
+  it('R39 R41: lo saltado de otra WABA o ilegible se cuenta en skipped.templates y lo demas se aplica', async () => {
+    const { receive, templates } = setupWithTemplates()
+    const json = {
+      object: 'whatsapp_business_account',
+      entry: [
+        { id: '9999999999', changes: [templateStatus(9001, 'DISABLED')] },
+        { id: WABA_ID, changes: [templateStatus(0), templateStatus(9001)] },
+      ],
+    }
+
+    const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(json), signature: GOOD_SIGNATURE })
+
+    expect(result).toEqual({
+      kind: 'stored',
+      counts: { messages: 0, statuses: 0 },
+      skipped: { changes: 0, messages: 0, statuses: 0, templates: 2 },
+      followUp: null,
+    })
+    expect(templates.row(TEMPLATE_ID)).toMatchObject({ status: 'APPROVED' })
+  })
+
+  it('R39: la WABA que se compara es la de la conexion guardada', async () => {
+    const { receive, templates } = setup({ record: { wabaId: '5555' }, templates: [storedTemplate({ metaTemplateId: '9001' })] })
+    const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(notification(templateStatus(9001))), signature: GOOD_SIGNATURE })
+    expect(parseSpy).toHaveBeenCalledWith(expect.anything(), PHONE_NUMBER_ID, '5555')
+    expect(result).toMatchObject({ skipped: { templates: 1 } })
+    expect(templates.applyWebhookUpdates).not.toHaveBeenCalled()
   })
 })

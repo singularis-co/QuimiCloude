@@ -21,6 +21,7 @@ export type WhatsappConnectionRecord = {
   readonly lastError: string | null;
   readonly lastCheckedAt: Date | null;
   readonly lastWebhookAt: Date | null;
+  readonly templatesSyncedAt: Date | null;
 };
 
 /** Lo único que sale hacia la UI: sin secretos, valores cifrados ni resumen del verify token. */
