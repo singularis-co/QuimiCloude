@@ -48,6 +48,16 @@ export type WhatsappTemplateList = {
   readonly templatesSyncedAt: string | null;
 };
 
+export type TemplateWebhookUpdate =
+  | {
+      readonly kind: 'status';
+      readonly metaTemplateId: string;
+      readonly status: WhatsappTemplateStatus;
+      readonly statusRaw: string | null;
+      readonly rejectedReason: string | null;
+    }
+  | { readonly kind: 'category'; readonly metaTemplateId: string; readonly category: WhatsappTemplateCategory };
+
 export type TemplateSyncSummary = {
   readonly imported: number;
   readonly updated: number;

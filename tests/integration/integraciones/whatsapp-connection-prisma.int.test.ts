@@ -186,6 +186,7 @@ describe('R2: la empresa sale del ambito, nunca de la fila', () => {
       companyId: a.companyId,
       createdById: undefined,
       lastWebhookAt: null,
+      templatesSyncedAt: null,
     })
   })
 })

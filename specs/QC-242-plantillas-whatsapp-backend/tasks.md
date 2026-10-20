@@ -57,7 +57,7 @@
 
 ## Bloque C — Puertos y adaptadores (tras T1, T3, T6)
 
-- [ ] **T7 — Puertos** (R3). Depende de: T3, T5, T6
+- [x] **T7 — Puertos** (R3). Depende de: T3, T5, T6
   - `ports/whatsapp-template-repository.ts` (§5.1); `ports/whatsapp-graph-client.ts` + 3 métodos
     (§5.3).
   - `domain/whatsapp-connection.ts` y `whatsapp-connection-prisma.ts`: `templatesSyncedAt` en el
@@ -65,13 +65,13 @@
   - `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`: dobles del repositorio y de Graph.
   - **Hecho:** typecheck verde; los tests de QC-237/QC-238 que usan los dobles siguen verdes.
 
-- [ ] **T8 [P] — Graph real y doble** (R27). Depende de: T7
+- [x] **T8 [P] — Graph real y doble** (R27). Depende de: T7
   - `adapters/driven/graph/whatsapp-graph-client-fetch.ts` y `whatsapp-graph-client-canned.ts` (§6).
   - Tests `whatsapp-graph-client-templates.test.ts` y `whatsapp-graph-client-canned-templates.test.ts`.
   - **Hecho:** URL, método, cabecera y cursor comprobados con `fetch` espiado; el token nunca en la
     URL; `5xx` ⇒ `unreachable`.
 
-- [ ] **T9 [P] — Persistencia** (R1–R3, R23–R25, R36, R37). Depende de: T1, T7
+- [x] **T9 [P] — Persistencia** (R1–R3, R23–R25, R36, R37). Depende de: T1, T7
   - `adapters/driven/persistence/company-scope.ts` (+ `whatsappTemplateCompanyScope`) y
     `whatsapp-template-prisma.ts` (§5.2).
   - `tests/integration/integraciones/whatsapp-template-prisma.int.test.ts`,

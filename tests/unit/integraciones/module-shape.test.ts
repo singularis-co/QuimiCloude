@@ -144,6 +144,7 @@ const MODULE_CODE_FILES = [
   'adapters/driven/persistence/company-scope.ts',
   'adapters/driven/persistence/whatsapp-connection-prisma.ts',
   'adapters/driven/persistence/whatsapp-inbox-prisma.ts',
+  'adapters/driven/persistence/whatsapp-template-prisma.ts',
   'adapters/driven/persistence/whatsapp-webhook-directory-prisma.ts',
   'adapters/driven/security/random-source-node.ts',
   'adapters/driven/security/secret-cipher-aes-gcm.ts',
@@ -205,6 +206,7 @@ const MODULE_CODE_FILES = [
   'ports/whatsapp-connection-repository.ts',
   'ports/whatsapp-graph-client.ts',
   'ports/whatsapp-inbox-repository.ts',
+  'ports/whatsapp-template-repository.ts',
   'ports/whatsapp-webhook-directory.ts',
 ] as const
 

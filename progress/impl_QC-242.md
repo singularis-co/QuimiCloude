@@ -120,3 +120,69 @@ vitest run guard -> 1 failed (guard-identificador: migración de T1 sin listar) 
 vitest run guard-identificador-de-request -> 23 passed
 ```
 Veredicto: T3–T6 hechos y verdes.
+
+## Tanda 3 — T7, T8, T9 (backend_dev)
+
+Archivos:
+- nuevos: `lib/modules/integraciones/ports/whatsapp-template-repository.ts` (8 métodos, `NewCreatedTemplateRow`,
+  `TemplateSyncRow`), `adapters/driven/persistence/whatsapp-template-prisma.ts`,
+  `tests/unit/integraciones/whatsapp/templates/whatsapp-graph-client-templates.test.ts`,
+  `…/templates/whatsapp-graph-client-canned-templates.test.ts`,
+  `tests/integration/integraciones/whatsapp-template-prisma.int.test.ts`,
+  `tests/integration/integraciones/whatsapp-template-migration.int.test.ts`
+- `ports/whatsapp-graph-client.ts`: `createTemplate`, `listTemplatesPage`, `deleteTemplate` y sus tipos de resultado.
+- `domain/whatsapp-template.ts`: tipo `TemplateWebhookUpdate` (§7.2), lo necesita el puerto antes que el parser.
+- `domain/whatsapp-connection.ts` y `persistence/whatsapp-connection-prisma.ts`: `templatesSyncedAt` en record y select
+  (la vista no lo expone; `connection-view.test.ts` lo pone no nulo para que el test de claves exactas lo vigile).
+- `adapters/driven/graph/whatsapp-graph-client-fetch.ts`: las 3 llamadas; `fetchPhoneNumber` pasa por el mismo
+  `callGraph` sin cambiar su comportamiento. `…-canned.ts`: mapa en memoria, `resetCannedTemplates`, `e2e_repetida`.
+- `persistence/company-scope.ts`: `whatsappTemplateCompanyScope`.
+- `lib/composition/index.ts` (mínimo): las 3 llamadas de Graph con la misma elección por llamada,
+  `whatsappTemplateRepository` cableado y `templates` en `whatsappDeps` (la guardia de ámbito lee el cableado).
+- `tests/guards/guard-ambito-empresa-integraciones.test.ts`: tercer puerto (8 métodos), quinta envoltura, describe R3 de
+  escrituras de plantillas y 3 casos de sensibilidad. Endurecida: `TOCA_LA_BASE` ve también `prisma.$queryRaw` como
+  plantilla etiquetada (antes no lo veía).
+- `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`: `makeGraph` con los 3 métodos; `makeTemplateRepository`,
+  `storedTemplate`; `templatesSyncedAt: null` en los records.
+- `tests/unit/integraciones/module-shape.test.ts`: los 2 archivos nuevos en la lista.
+- `tests/integration/aislamiento.json`: migración en `transaccion`, prisma en `commit` con motivo.
+- `tests/integration/integraciones/whatsapp-connection-prisma.int.test.ts`: `templatesSyncedAt: null` en el `toEqual`
+  del record (si no, CI rojo).
+
+Decisiones / desvíos (abiertos para revisión):
+- `insertCreated` usa `prisma.$queryRaw` (una sentencia) en vez de `tx.$queryRaw`: una transacción para un solo
+  `INSERT … ON CONFLICT` no añade nada. El `DO UPDATE` lleva `WHERE company_id = EXCLUDED.company_id`; sin fila
+  devuelta lanza. El 23505 del parcial se reconoce por SQLSTATE + nombre del índice.
+- `applySync` usa `$transaction([...])` por lotes; las `updates` sin cambio van en un solo `updateMany` que solo pone
+  `lastSyncedAt`.
+- `listTemplatesPage`: `paging.next` sin `cursors.after` ⇒ `rejected` (cortar dejaría la lista a medias y la
+  sincronización borraría lo que falta). El spec no lo dice.
+- Doble canned: `deleteTemplate` es idempotente (`ok` aunque no exista); la lista no refleja un `APPROVED` llegado por
+  webhook, así que una sincronización en el E2E de QC-243 devolvería la plantilla a `PENDING`. Abierto para QC-243.
+- `NewCreatedTemplateRow.category` es `WhatsappTemplateCategory` (Meta puede reclasificar al crear).
+
+R → test:
+- R1: prisma.int `R1 — el alta guarda…`, `R1 — la base rechaza…`, `R1 — el alta con el ambito de otra empresa…`;
+  migration.int `R1 R50: la FK compuesta…`
+- R2: prisma.int `describe R2` (4 casos)
+- R3: prisma.int `describe R3` (3) y `lectura de las vivas` (2); guardia `R3 — las escrituras de plantillas…` (5) y
+  `R3 — sensibilidad…` (3); guardia `R2 — cada metodo de WhatsappTemplateRepository…` (10)
+- R22: prisma.int `R22 — si un paso falla no queda nada escrito…`
+- R23: prisma.int `R23 — importa sin creador…`, `R23 R24 — una borrada y vuelta a crear…`, carrera `R23 — si la sincronizacion ya inserto…`
+- R24: prisma.int `R24 — marca eliminadas…`
+- R25: prisma.int `R25 — anota la hora…`
+- R27: `whatsapp-graph-client-templates.test.ts` (describe R27, 2) y `…-canned-templates.test.ts` (6)
+- R36: prisma.int `R36 — el estado y el motivo…`
+- R37: prisma.int `R37 — la categoria nueva…`
+- R50: migration.int (5)
+
+Salida:
+```
+pnpm run typecheck -> tsc --noEmit sin errores
+pnpm run lint      -> 0 errors, 10 warnings (preexistentes)
+vitest run tests/unit/integraciones/whatsapp/ module-shape integraciones-graph-doubles -> Test Files 28 passed (28); Tests 579 passed | 1 skipped
+vitest run guard-ambito-empresa-integraciones -> Test Files 1 passed; Tests 57 passed
+vitest run guard   -> Test Files 83 passed (83); Tests 1161 passed | 21 skipped
+.int.test.ts       -> no corridos (sin base en el worktree); los corre CI
+```
+Veredicto: T7–T9 hechos; unit y guardias verdes, integración pendiente de CI.
