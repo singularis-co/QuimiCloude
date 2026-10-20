@@ -280,3 +280,77 @@ y «Reparto» siguen con reales. Sin bloqueos.
 ### Veredicto T7
 
 Hecho: el exceso ya no bloquea ni pinta error; aviso informativo con los libres de `packingSurplusByLine`; el stock del envase sigue bloqueando; `maxPackagesForLine` borrada. Sin bloqueos.
+
+## T8 — E2E (frontend_dev)
+
+### Archivos
+
+- Modificado: `e2e/envases-reales-empaque.spec.ts` (caso 4 nuevo; importa `PACKING_FINISH_SURPLUS_TESTID`,
+  `ORDERS_ROUTE`, `finishedProductDetailRoute` y los helpers `openOrderRowMenu`/`orderMenuTrigger`
+  de `e2e/helpers/order-distribution.ts`; testids del sheet de entrega y del de entrega sin pedido
+  como constantes locales, igual que sus specs). Sin dependencias nuevas.
+
+### Recorrido del caso
+
+Plan 5 × 1 l + 1 × 5 l (10 l = cantidad); el Empacador cuenta 7 × 1 l (Conteo físico) → 12 l.
+El aviso `packing-finish-surplus` dice «Sobran 2 L sobre el pedido.» / «Quedan libres en stock: 2
+envases de <envase 1 l>.», «Terminar» habilitado y sin error de línea → `POR_ACONDICIONAR`, línea 1 l
+con `packedPackages 7` y `packedSurplusPackages 2`, la de 5 l con 0 libres → lotes de 7 l y 5 l con
+coste `deriveUnitCost(cost, '12')` → pedido a `TERMINADO` por la base → el Administrador abre
+«Entregar» del pedido: «Faltan 5» en 1 l y «Faltan 1» en 5 l → ficha del producto 1 l, «Entregar»
+(sin pedido): En stock 7, Esperan −5, Se puede entregar 2.
+
+### Mapa R → test
+
+| R | Test |
+|---|---|
+| R29 | `e2e/envases-reales-empaque.spec.ts` › «R29, R1, R9, R12, R17 - Terminar con 2 envases de 1 l por encima del plan…» |
+| R1 | mismo caso: aviso informativo, «Terminar» habilitado, pedido `POR_ACONDICIONAR`, libres guardados |
+| R9 | mismo caso: lotes de 7 l y 5 l (libres incluidos), coste sobre 12 l |
+| R12 | mismo caso: sheet de entrega del pedido «Faltan 5» (no 7) en la línea de 1 l |
+| R17 | mismo caso: tarjeta de excedente de la entrega sin pedido = 2 envases |
+
+### Verificación
+
+- `pnpm run typecheck` → exit 0. `pnpm exec eslint e2e/envases-reales-empaque.spec.ts` → «No issues found».
+- Base: `pnpm exec tsx --env-file=../../.env scripts/test-db.ts template` (equivale a
+  `pnpm run db:test template` con el `.env` del repo principal) → «plantilla reutilizada:
+  qct_tpl_88f19b5be81c (108 migraciones)». `CREATE DATABASE qc290_e2e TEMPLATE "qct_tpl_88f19b5be81c"`;
+  Playwright con `DATABASE_URL`/`DIRECT_URL` → `qc290_e2e` (mismo host y credenciales). Al terminar,
+  `DROP DATABASE qc290_e2e`. QuimiCloude sin tocar; `quimicloude_e2e` sin usar.
+- Playwright se lanzó como `node --env-file=../../.env node_modules/@playwright/test/cli.js test
+  e2e/envases-reales-empaque.spec.ts` (el mismo CLI que `pnpm exec playwright`; el worktree no tiene
+  `.env` y así el `next dev` del webServer recibe el entorno con las URL ya apuntadas a `qc290_e2e`).
+
+Corrida 1 (chromium + webkit a la vez, `next dev` en frío):
+
+```
+  ✘  1 [chromium] › …:551:7 › … R19, R20, R21, R23, R26, R27 - una línea en 0 … (1.7m)
+  ✘  6 [chromium] › …:460:7 › … R17, R18, R20, R21, R26, R27 - una línea con 1 envase menos … (1.7m)
+  ✘  5 [chromium] › …:675:7 › … R29, R1, R9, R12, R17 - Terminar con 2 envases de 1 l … (1.7m)
+  ✘  3 [chromium] › …:643:7 › … R9 - un envase de más sin stock libre … (1.7m)
+  ✓  8 [webkit] › …:643:7 › … R9 - un envase de más sin stock libre … (39.8s)
+  ✓  4 [webkit] › …:460:7 › … R17, R18, R20, R21, R26, R27 - una línea con 1 envase menos … (3.7m)
+  ✓  2 [webkit] › …:551:7 › … R19, R20, R21, R23, R26, R27 - una línea en 0 … (3.7m)
+  ✓  7 [webkit] › …:675:7 › … R29, R1, R9, R12, R17 - Terminar con 2 envases de 1 l … (1.0m)
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.   (e2e/helpers/landing.ts:85, el login)
+  4 failed
+  4 passed (7.9m)
+```
+
+Los 4 rojos de chromium son el mismo: el `waitForURL` del login en `helpers/landing.ts` durante el
+arranque en frío de `next dev` con 8 workers (también los 3 casos previos, que no se tocaron).
+Corrida 2, solo chromium, servidor nuevo:
+
+```
+  ✓  3 [chromium] › …:643:7 › … R9 - un envase de más sin stock libre … (33.3s)
+  ✓  4 [chromium] › …:460:7 › … R17, R18, R20, R21, R26, R27 - una línea con 1 envase menos … (55.1s)
+  ✓  2 [chromium] › …:675:7 › … R29, R1, R9, R12, R17 - Terminar con 2 envases de 1 l … (1.0m)
+  ✓  1 [chromium] › …:551:7 › … R19, R20, R21, R23, R26, R27 - una línea en 0 … (1.1m)
+  4 passed (2.5m)
+```
+
+### Veredicto T8
+
+Hecho: el caso R29 está verde en chromium y webkit sobre una base propia copiada de la plantilla; la
+primera corrida conjunta tuvo un timeout del login en chromium (arranque en frío) que no es del caso nuevo.

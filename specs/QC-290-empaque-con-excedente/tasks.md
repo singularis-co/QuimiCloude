@@ -78,7 +78,7 @@
     bloqueando con excedente.
   - Hecho: tests verdes; paridad del diálogo con el tablero aprobado.
 
-- [ ] **T8 — E2E** (frontend/backend). Depende de T4, T5, T6, T7. R29 (y R1, R9, R12, R17 de punta a
+- [x] **T8 — E2E** (frontend/backend). Depende de T4, T5, T6, T7. R29 (y R1, R9, R12, R17 de punta a
   punta).
   - Caso nuevo en `e2e/envases-reales-empaque.spec.ts`: Terminar con una línea por encima del plan
     y envasado > cantidad → el aviso aparece y «Terminar» funciona → lote con lo real → el sheet de

@@ -11,6 +11,9 @@
  *   2. Una línea en 0: no nace su lote, su envase se libera entero y el acondicionamiento no la
  *      cuenta como línea sin datos de lote. La tab «Reparto» la marca «Sin lote».
  *   3. Un envase de más sin stock libre: el diálogo lo dice y no deja Terminar.
+ *   4. (QC-290) Lo envasado supera la cantidad del pedido: el diálogo avisa sin bloquear, los lotes
+ *      llevan lo real, el sheet de entrega del pedido pide solo lo pedido y los envases libres suman
+ *      al excedente entregable sin pedido del producto.
  *
  * El pedido se siembra ya `EN_EMPAQUE`: el recorrido de Finalizar y Comenzar lo cubren
  * `e2e/empaque.spec.ts` y `e2e/envases-del-pedido.spec.ts`. Los asertos de estado se leen de la base.
@@ -40,6 +43,7 @@ import {
   PACKING_FINISH_LINE_TESTID,
   PACKING_FINISH_REASON_OPTION_TESTID,
   PACKING_FINISH_REASON_TESTID,
+  PACKING_FINISH_SURPLUS_TESTID,
 } from '@/app/(private)/asignacion/empaque/[id]/components/packing-finish-dialog';
 import { finishedProductTabHref } from '@/app/(private)/inventario/producto-terminado/[id]/components/finished-product-params';
 import {
@@ -61,13 +65,16 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
+  ORDERS_ROUTE,
   PACKED_ORDER_PARAM,
   conditioningOrderRoute,
+  finishedProductDetailRoute,
   packingOrderRoute,
 } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
 import { batchStock, netReservedInBatch, seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc281_e2e_';
@@ -104,6 +111,19 @@ const DISTRIBUTION_DIFFERENCE_TESTID = 'finished-product-distribution-difference
 const DISTRIBUTION_REASON_TESTID = 'finished-product-distribution-reason';
 const DISTRIBUTION_REASON_NOTE_TESTID = 'finished-product-distribution-reason-note';
 const WITHOUT_BATCH_LABEL = 'Sin lote';
+
+// Sheet de entrega del pedido y sheet de entrega sin pedido: constantes locales, como en
+// `e2e/entregar-producto-terminado.spec.ts` y `e2e/entrega-sin-pedido.spec.ts`.
+const ORDERS_TITLE_TESTID = 'pedidos-title';
+const ORDER_ACTION_DELIVER_TESTID = 'order-action-deliver';
+const DELIVERY_SHEET_TESTID = 'order-delivery-sheet';
+const DELIVERY_SUBMIT_TESTID = 'order-delivery-submit';
+const DELIVERY_SUMMARY_LINE_TESTID = 'order-delivery-summary-line';
+const DELIVERY_LINE_MISSING_TESTID = 'order-delivery-line-missing';
+const FINISHED_PRODUCT_NAME_TESTID = 'finished-product-name';
+const DIRECT_OPEN_TESTID = 'direct-delivery-open';
+const DIRECT_SHEET_TESTID = 'direct-delivery-sheet';
+const DIRECT_SURPLUS_TESTID = 'direct-delivery-surplus';
 const MINUS_SIGN = '−';
 
 const TEXTS = PACKING_FINISH_DIALOG_TEXTS;
@@ -650,5 +670,112 @@ test.describe('envases reales al terminar el empaque', () => {
     expect(saved.packedPackages).toBeNull();
     expect(await batchStock(line.packagingBatchId)).toBe(2);
     expect(await netReservedInBatch(order.id, line.packagingBatchId)).toBe(2);
+  });
+
+  test('R29, R1, R9, R12, R17 - Terminar con 2 envases de 1 l por encima del plan y lo envasado por encima del pedido muestra el aviso sin bloquear, da lotes con lo real, el sheet de entrega pide solo lo pedido y los 2 libres suman al excedente entregable sin pedido', async ({
+    page,
+  }) => {
+    const { conditionerId, unitId } = seeded();
+    // Plan: 5 × 1 l + 1 × 5 l = 10 l (la cantidad). Real: 7 × 1 l + 1 × 5 l = 12 l → 2 libres de 1 l.
+    const cost = '100.0000';
+    const order = await seedPackingOrder(3, cost, [
+      { key: 'litro', content: '1', plan: 5, packagingStock: 10 },
+      { key: 'galon', content: '5', plan: 1, packagingStock: 5 },
+    ]);
+    const [litre, gallon] = order.lines as [SeededLine, SeededLine];
+    const unit = await prisma.unit.findUniqueOrThrow({ where: { id: unitId }, select: { name: true, symbol: true } });
+    const unitLabel = unit.symbol ?? unit.name;
+
+    await loginAndLand(page, empacadorUser);
+    const dialog = await openFinishDialog(page, order.id);
+
+    const litreRow = dialogLine(dialog, litre.id);
+    await litreRow.getByTestId(PACKING_FINISH_COUNT_TESTID).fill('7');
+    await expect(litreRow.getByTestId(PACKING_FINISH_BADGE_TESTID)).toHaveText(exactText('+2'));
+    await chooseReason(page, litreRow, 'conteo_fisico');
+    // Libre del envase: 10 de existencia − 5 apartados por este pedido.
+    await expect(litreRow.getByTestId(PACKING_FINISH_HELP_TESTID)).toHaveText(exactText(TEXTS.takeHelp(2, 5)));
+    await expect(litreRow.getByTestId(PACKING_FINISH_LINE_ERROR_TESTID)).toHaveCount(0);
+
+    // R29 / R1: el aviso es informativo y «Terminar» sigue habilitado.
+    const surplus = dialog.getByTestId(PACKING_FINISH_SURPLUS_TESTID);
+    await expect(surplus).toBeVisible();
+    await expect(surplus).toContainText(TEXTS.surplus(`2 ${unitLabel}`));
+    await expect(surplus).toContainText(TEXTS.surplusFree([TEXTS.freePackages(2, litre.packagingName)]));
+    await expect(dialog.getByTestId(PACKING_FINISH_CONFIRM_TESTID)).toBeEnabled();
+
+    await confirmFinish(page, dialog, order.numberText);
+
+    const after = await prisma.order.findUniqueOrThrow({ where: { id: order.id }, select: { status: true } });
+    expect(after.status).toBe('POR_ACONDICIONAR');
+    const savedLines = await prisma.orderPresentationLine.findMany({
+      where: { orderId: order.id },
+      select: { id: true, packages: true, packedPackages: true, packedSurplusPackages: true, packedReason: true },
+    });
+    expect(savedLines.find((line) => line.id === litre.id)).toMatchObject({
+      packages: 5,
+      packedPackages: 7,
+      packedSurplusPackages: 2,
+      packedReason: 'conteo_fisico',
+    });
+    expect(savedLines.find((line) => line.id === gallon.id)).toMatchObject({ packages: 1, packedSurplusPackages: 0 });
+    expect(await batchStock(litre.packagingBatchId)).toBe(10 - 7);
+    expect(await netReservedInBatch(order.id, litre.packagingBatchId)).toBe(0);
+
+    // R9: los lotes llevan lo envasado real, libres incluidos; el coste se reparte sobre 12 l.
+    const litreBatch = await finishedBatchOf(order.id, litre.presentationId);
+    const gallonBatch = await finishedBatchOf(order.id, gallon.presentationId);
+    expect(litreBatch, 'nace el lote de 1 l').not.toBeNull();
+    expect(gallonBatch, 'nace el lote de 5 l').not.toBeNull();
+    expect(litreBatch!.stock.equals('7')).toBe(true);
+    expect(gallonBatch!.stock.equals('5')).toBe(true);
+    expect(litreBatch!.unitCost?.toFixed(4)).toBe(deriveUnitCost(cost, '12'));
+
+    // El acondicionamiento no es lo que se prueba: el pedido pasa a `TERMINADO` por la base.
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'TERMINADO', conditionedBy: conditionerId, finishedAt: new Date() },
+    });
+
+    // R12: el sheet de entrega del pedido pide 5 de 1 l (lo pedido), no los 7 reales.
+    await switchUser(page, adminUser);
+    await expect(async () => {
+      await page.goto(`${ORDERS_ROUTE}?${new URLSearchParams({ pageSize: '25', sort: 'createdAt:desc' }).toString()}`);
+    }).toPass({ timeout: 60_000 });
+    await expect(page.getByTestId(ORDERS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId(`${TABLE_ROW_TESTID_PREFIX}${order.id}`)).toHaveCount(1, { timeout: 60_000 });
+    await (await openOrderRowMenu(page, orderMenuTrigger(page, order.id), ORDER_ACTION_DELIVER_TESTID)).click();
+    const deliverySheet = page.getByTestId(DELIVERY_SHEET_TESTID);
+    await expect(deliverySheet).toBeVisible({ timeout: 60_000 });
+    await expect(deliverySheet.getByTestId(DELIVERY_SUBMIT_TESTID)).toBeVisible({ timeout: 60_000 });
+    const summaryLine = (lineId: string) =>
+      deliverySheet.locator(`[data-testid="${DELIVERY_SUMMARY_LINE_TESTID}"][data-presentation-line-id="${lineId}"]`);
+    await expect(summaryLine(litre.id).getByTestId(DELIVERY_LINE_MISSING_TESTID)).toHaveText(exactText('Faltan 5'), {
+      timeout: 60_000,
+    });
+    await expect(summaryLine(gallon.id).getByTestId(DELIVERY_LINE_MISSING_TESTID)).toHaveText(exactText('Faltan 1'));
+
+    // R17: en stock 7, el pedido espera 5 → se pueden entregar sin pedido los 2 libres.
+    const product = await prisma.product.findUniqueOrThrow({
+      where: { id: litreBatch!.productId },
+      select: { name: true },
+    });
+    await expect(async () => {
+      await page.goto(finishedProductDetailRoute(litreBatch!.productId));
+    }).toPass({ timeout: 60_000 });
+    await expect(page.getByTestId(FINISHED_PRODUCT_NAME_TESTID)).toHaveText(exactText(product.name), {
+      timeout: 60_000,
+    });
+    const directTrigger = page.getByTestId(DIRECT_OPEN_TESTID);
+    const directSheet = page.getByTestId(DIRECT_SHEET_TESTID);
+    await expect(async () => {
+      if ((await directSheet.count()) === 0) await directTrigger.click();
+      await expect(directSheet).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
+    const card = directSheet.getByTestId(DIRECT_SURPLUS_TESTID);
+    await expect(card).toBeVisible({ timeout: 60_000 });
+    await expect(card.locator('[data-field="stock"]')).toHaveText(/^\s*7\s+envases\s*$/);
+    await expect(card.locator('[data-field="waiting"]')).toHaveText(new RegExp(`^\\s*${MINUS_SIGN}5\\s+envases\\s*$`));
+    await expect(card.locator('[data-field="surplus"]')).toHaveText(/^\s*2\s+envases\s*$/);
   });
 });
