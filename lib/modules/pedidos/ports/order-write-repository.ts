@@ -5,12 +5,8 @@ import type { PackedLineCount } from '../domain/packing-count';
 import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../domain/order-view';
 
 /** La fila que bloquea `lockAliveById`, con `reservedAt`: quien vuelve a comprobar el plazo bajo
- *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. `packagingCost` es la
- *  parte de envases incluida en `ingredientsCost`, y es `null` solo cuando este lo es. */
-export type LockedOrderRow = OrderRow & {
-  readonly reservedAt: Date | null;
-  readonly packagingCost: string | null;
-};
+ *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. */
+export type LockedOrderRow = OrderRow & { readonly reservedAt: Date | null };
 
 /** Lo que Terminar el empaque necesita del pedido cuando el
  *  `UPDATE` condicional SI lo mueve: la receta para el nombre del lote y el coste guardado -o

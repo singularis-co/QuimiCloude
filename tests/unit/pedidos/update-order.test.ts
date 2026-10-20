@@ -64,6 +64,7 @@ function filaExistente(): OrderRow {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: 'admin-0',

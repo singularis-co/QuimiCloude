@@ -51,31 +51,40 @@ const QUIMICLOUD: CompanyRow = {
   id: '0b6c7d8e-1f20-4a3b-8c4d-5e6f7a8b9c0d',
   name: 'QuimiCloud',
   taxId: null,
+  contactEmail: null,
+  contactPhone: null,
   country: 'CO',
   liveUserCount: 3,
   createdAt: new Date('2026-09-02T12:00:00.000Z'),
   status: 'active',
+  activeAddons: [],
 };
 
 const VALLE: CompanyRow = {
   id: '1c7d8e9f-2031-4b4c-9d5e-6f7a8b9c0d1e',
   name: 'Químicos del Valle S.A.S.',
   taxId: '900.481.227-3',
+  contactEmail: null,
+  contactPhone: null,
   country: null,
   liveUserCount: 14,
   // A las 23:30 UTC sigue siendo el 14 en UTC, aunque en otro huso ya fuera el 15.
   createdAt: new Date('2026-09-14T23:30:00.000Z'),
   status: 'active',
+  activeAddons: [],
 };
 
 const LA_CEJA: CompanyRow = {
   id: '2d8e9f0a-3142-4c5d-8e6f-7a8b9c0d1e2f',
   name: 'Detergentes La Ceja',
   taxId: '900.778.310-2',
+  contactEmail: null,
+  contactPhone: null,
   country: 'EC',
   liveUserCount: 0,
   createdAt: new Date('2026-10-03T09:00:00.000Z'),
   status: 'deleted',
+  activeAddons: [],
 };
 
 const ROWS = [QUIMICLOUD, VALLE, LA_CEJA] as const;
@@ -153,19 +162,61 @@ afterEach(() => {
 });
 
 describe('columnas y celdas', () => {
-  it('R8: las columnas son Nombre, Identificación fiscal, País, Usuarios, Creada y Estado', () => {
+  it('R8: las columnas son Nombre, Identificación fiscal, Contacto, País, Usuarios, Módulos, Creada y Estado', () => {
     montar();
     const cabeceras = screen
       .getAllByRole('columnheader')
       .map((th) => th.textContent?.trim() ?? '');
-    expect(cabeceras.slice(0, 6)).toEqual([
+    expect(cabeceras.slice(0, 8)).toEqual([
       'Nombre',
       'Identificación fiscal',
+      'Contacto',
       'País',
       'Usuarios',
+      'Módulos',
       'Creada',
       'Estado',
     ]);
+  });
+
+  it('contacto: correo arriba y teléfono debajo; «—» por cada dato que falta y uno solo si faltan los dos', () => {
+    const ambos: CompanyRow = { ...QUIMICLOUD, contactEmail: 'compras@quimicloud.co', contactPhone: '+57 300 123 4567' };
+    const soloCorreo: CompanyRow = { ...VALLE, contactEmail: 'info@valle.co', contactPhone: null };
+    const soloTelefono: CompanyRow = { ...LA_CEJA, contactEmail: null, contactPhone: '+593 99 000 1111' };
+    montar({ companies: [ambos, soloCorreo, soloTelefono] });
+
+    const a = within(fila(ambos.id)).getByTestId('company-contact');
+    expect(within(a).getByTestId('company-contact-email')).toHaveTextContent('compras@quimicloud.co');
+    expect(within(a).getByTestId('company-contact-phone')).toHaveTextContent('+57 300 123 4567');
+    expect(a.firstElementChild).toBe(within(a).getByTestId('company-contact-email'));
+
+    const c = within(fila(soloCorreo.id)).getByTestId('company-contact');
+    expect(within(c).getByTestId('company-contact-email')).toHaveTextContent('info@valle.co');
+    expect(within(c).getByTestId('company-contact-phone')).toHaveTextContent('—');
+    expect(within(c).getByLabelText('Sin teléfono de contacto')).toBeInTheDocument();
+
+    const t = within(fila(soloTelefono.id)).getByTestId('company-contact');
+    expect(within(t).getByTestId('company-contact-email')).toHaveTextContent('—');
+    expect(within(t).getByLabelText('Sin correo de contacto')).toBeInTheDocument();
+    expect(within(t).getByTestId('company-contact-phone')).toHaveTextContent('+593 99 000 1111');
+  });
+
+  it('contacto: sin correo ni teléfono se pinta una sola marca «—»', () => {
+    montar();
+    const vacio = within(fila(QUIMICLOUD.id)).getByTestId('company-contact');
+    expect(vacio.textContent).toBe('—');
+    expect(vacio).toHaveAttribute('data-empty', 'true');
+    expect(vacio).toHaveAttribute('aria-label', 'Sin contacto');
+  });
+
+  it('módulos: un avatar por añadido activo con su nombre como etiqueta; «—» sin añadidos', () => {
+    const conModulos: CompanyRow = { ...VALLE, activeAddons: ['dashboard', 'proveedores'] };
+    montar({ companies: [QUIMICLOUD, conModulos] });
+    const avatares = within(fila(conModulos.id)).getAllByTestId('company-addon-avatar');
+    expect(avatares.map((a) => a.getAttribute('aria-label'))).toEqual(['Dashboard y recorrido', 'Proveedores']);
+    const vacio = within(fila(QUIMICLOUD.id)).getByTestId('company-addons');
+    expect(vacio.textContent).toBe('—');
+    expect(vacio).toHaveAttribute('aria-label', 'Sin módulos');
   });
 
   it('R8: el pais va como «Nombre (+prefijo)» o «Sin país»; la identificacion vacia con la marca', () => {

@@ -237,6 +237,36 @@ describe('R24 — el filtro de estado', () => {
   })
 })
 
+describe('orden de la lista de trabajo — prioridad mas alta primero y, a igual prioridad, el mas antiguo', () => {
+  it('ordena CRITICA > ALTA > MEDIA > BAJA y desempata por createdAt ascendente, y devuelve los dos datos', async () => {
+    const bajaAntigua = await seedOrder(A, { priority: 'BAJA' })
+    const altaReciente = await seedOrder(A, { priority: 'ALTA' })
+    const altaAntigua = await seedOrder(A, { priority: 'ALTA' })
+    const critica = await seedOrder(A, { priority: 'CRITICA' })
+    const fechas = new Map([
+      [bajaAntigua, instant(1)],
+      [altaReciente, instant(10)],
+      [altaAntigua, instant(2)],
+      [critica, instant(15)],
+    ])
+    for (const [id, createdAt] of fechas) {
+      await prisma.order.update({ where: { id }, data: { createdAt } })
+    }
+    try {
+      const pagina = await listAliveSummariesInCompany(A.companyId, ['PENDIENTE'], 'work_queue', 1, 25)
+
+      const propios = pagina.items.filter((item) => fechas.has(item.id))
+      expect(propios.map((item) => item.id)).toEqual([critica, altaAntigua, altaReciente, bajaAntigua])
+      expect(propios.map((item) => item.priority)).toEqual(['CRITICA', 'ALTA', 'ALTA', 'BAJA'])
+      expect(propios.map((item) => item.createdAt.toISOString())).toEqual(
+        [critica, altaAntigua, altaReciente, bajaAntigua].map((id) => fechas.get(id)!.toISOString()),
+      )
+    } finally {
+      for (const id of fechas.keys()) await prisma.order.delete({ where: { id } })
+    }
+  })
+})
+
 describe('R27 — el total describe el conjunto ya filtrado, y la pagina lo respeta', () => {
   it('el total cuenta exactamente los pedidos que cumplen el filtro, no todos los de la empresa', async () => {
     const entregado1 = await seedOrder(A, { status: 'ENTREGADO' })

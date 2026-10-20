@@ -433,6 +433,8 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
 
       const releido = await orders.findAliveById(orderId, ambitoDe(A))
       expect(releido?.ingredientsCost).toBe('30.0000')
+      // Sin reparto no hay envases: la parte de envases es cero, no null.
+      expect(releido?.packagingCost).toBe('0.0000')
     } finally {
       if (orderId !== null) await borrarPedido(orderId)
       await borrarReceta(recipeId)
@@ -461,6 +463,7 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
       // aunque el lote siga con existencia de sobra.
       const ficha = await orders.findAliveById(orderId, ambitoDe(A))
       expect(ficha?.ingredientsCost).toBeNull()
+      expect(ficha?.packagingCost).toBeNull()
 
       const listado = await orders.listAlive(
         { page: 1, pageSize: 25, sort: null, filters: {}, search: '' },
@@ -469,6 +472,7 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
       )
       const enListado = listado.items.find((row) => row.id === orderId)
       expect(enListado?.ingredientsCost).toBeNull()
+      expect(enListado?.packagingCost).toBeNull()
 
       // Y la lectura, en si misma, no escribio nada: sigue en NULL.
       expect(await ingredientsCostCrudo(orderId)).toBeNull()

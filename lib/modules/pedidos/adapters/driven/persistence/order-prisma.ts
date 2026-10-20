@@ -77,6 +77,7 @@ const ORDER_SELECT = {
   status: true,
   cancellationReason: true,
   ingredientsCost: true,
+  packagingCost: true,
   createdAt: true,
   updatedAt: true,
   createdBy: true,
@@ -126,6 +127,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     // `null` sigue `null`: nunca se convierte en `'0.0000'`, `fromDecimal` solo se llama si hay
     // valor.
     ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
+    packagingCost: row.packagingCost === null ? null : fromDecimal(row.packagingCost),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
@@ -655,7 +657,6 @@ export async function softDeleteAliveOrder(
 type LockedOrderIdRow = {
   readonly id: string;
   readonly reserved_at: Date | null;
-  readonly packaging_cost: string | null;
 };
 
 /**
@@ -670,7 +671,7 @@ async function lockAliveOrderById(
 ): Promise<LockedOrderRow | null> {
   const { companyId } = companyScopeColumns(scope);
   const rows = await tx.$queryRaw<ReadonlyArray<LockedOrderIdRow>>(Prisma.sql`
-    SELECT "id", "reserved_at", "packaging_cost"::text AS "packaging_cost"
+    SELECT "id", "reserved_at"
       FROM "orders"
      WHERE "id" = ${id}::uuid
        AND "company_id" = ${companyId}::uuid
@@ -682,11 +683,7 @@ async function lockAliveOrderById(
 
   const row = await tx.order.findUnique({ where: { id: alive.id }, select: ORDER_SELECT });
   if (row === null) return null;
-  return {
-    ...toOrderRow(row),
-    reservedAt: alive.reserved_at,
-    packagingCost: alive.packaging_cost === null ? null : fromDecimal(toDecimalInput(alive.packaging_cost)),
-  };
+  return { ...toOrderRow(row), reservedAt: alive.reserved_at };
 }
 
 /**
@@ -760,6 +757,7 @@ async function insertAliveOrder(
     status: data.status,
     cancellationReason: null,
     ingredientsCost: cost === null ? null : fromDecimal(toDecimalInput(cost.total)),
+    packagingCost: cost === null ? null : fromDecimal(toDecimalInput(cost.packaging)),
     createdAt: now,
     updatedAt: now,
     createdBy: actorId,

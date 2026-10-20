@@ -879,13 +879,40 @@ describe('list', () => {
           id: viva,
           name: `Lista viva ${marca}`,
           taxId: `L-${marca}`,
+          contactEmail: null,
+          contactPhone: null,
           country: 'CO',
           liveUserCount: 2,
           createdAt: at(-5),
           status: 'active',
+          storedAddons: [],
         },
       ])
       expect(page).toMatchObject({ total: 1, page: 1, pageSize: 10, totalPages: 1 })
+    })
+  })
+
+  it('cada fila trae el contacto y solo los añadidos con interruptor prendido', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createCompanyRepository(tx)
+      const marca = tag()
+      const id = await seedCompany(tx, `Contacto ${marca}`)
+      await tx.company.update({
+        where: { id },
+        data: { contactEmail: 'compras@example.test', contactPhone: '+57 604 000 0000' },
+      })
+      await tx.companyAddonOverride.createMany({
+        data: [
+          { companyId: id, addonKey: 'proveedores', enabled: true },
+          { companyId: id, addonKey: 'lectura_pdf', enabled: true },
+          { companyId: id, addonKey: 'dashboard', enabled: false },
+        ],
+      })
+
+      const [fila] = (await repo.list(listQuery({ search: marca }))).items
+
+      expect(fila).toMatchObject({ contactEmail: 'compras@example.test', contactPhone: '+57 604 000 0000' })
+      expect([...(fila?.storedAddons ?? [])].sort()).toEqual(['lectura_pdf', 'proveedores'])
     })
   })
 

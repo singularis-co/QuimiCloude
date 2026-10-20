@@ -117,6 +117,9 @@ export type OrderRow = {
   readonly status: OrderStatus;
   readonly cancellationReason: string | null;
   readonly ingredientsCost: string | null;
+  /** La parte de envases que ya va dentro de `ingredientsCost`, no un sumando aparte. `null` si y
+   *  solo si `ingredientsCost` lo es. */
+  readonly packagingCost: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;
@@ -170,6 +173,9 @@ export type OrderView = {
   readonly status: OrderStatus;
   readonly cancellationReason: string | null;
   readonly ingredientsCost: string | null;
+  /** La parte de envases que ya va dentro de `ingredientsCost`, no un sumando aparte. `null` si y
+   *  solo si `ingredientsCost` lo es. */
+  readonly packagingCost: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;

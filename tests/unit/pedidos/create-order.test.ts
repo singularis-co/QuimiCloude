@@ -70,6 +70,7 @@ function filaCreada(): OrderRow {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: ACTOR_A.id,
