@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { messagesNotification, SENDER, textMessage } from './whatsapp-webhook-fixtures'
+import { messagesNotification, PHONE_NUMBER_ID, SENDER, textMessage } from './whatsapp-webhook-fixtures'
 
 import { decideRouteAccess } from '@/lib/modules/identity'
 import { GET, POST } from '@/lib/modules/integraciones/adapters/driving/whatsapp-webhook-route'
@@ -36,7 +36,9 @@ const FIRMA = `sha256=${'ab'.repeat(32)}`
 const TEXTO = 'texto de prueba que no debe registrarse'
 const CUERPO = JSON.stringify(messagesNotification([textMessage(TEXTO)]))
 
-const SENSIBLES = [CUERPO, TOKEN, FIRMA, 'ab'.repeat(32), SENDER, TEXTO]
+const SENSIBLES = [CUERPO, TOKEN, FIRMA, 'ab'.repeat(32), SENDER, TEXTO, PHONE_NUMBER_ID]
+
+const SIN_SALTADOS = { changes: 0, messages: 0, statuses: 0 }
 
 function contexto(conexionId: string = CONEXION) {
   return { params: Promise.resolve({ conexionId }) }
@@ -105,7 +107,7 @@ describe('R1: la ruta del webhook queda fuera de la sesion', () => {
 
   it('R1: GET y POST responden sin cookie ni cabecera de sesion', async () => {
     verifyMock.mockResolvedValue({ kind: 'verified', challenge: CHALLENGE })
-    receiveMock.mockResolvedValue({ kind: 'stored', counts: { messages: 1, statuses: 0 } })
+    receiveMock.mockResolvedValue({ kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: SIN_SALTADOS })
 
     expect((await getCon(QUERY_PUNTO)).status).toBe(200)
     expect((await postCon()).status).toBe(200)
@@ -174,7 +176,7 @@ describe('GET: el handshake de Meta', () => {
 
 describe('POST: la entrega de Meta', () => {
   it('R10: pasa al caso de uso los bytes exactos del cuerpo, la cabecera de firma y el id de la URL', async () => {
-    receiveMock.mockResolvedValue({ kind: 'stored', counts: { messages: 1, statuses: 0 } })
+    receiveMock.mockResolvedValue({ kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: SIN_SALTADOS })
     // Un BOM y un byte que no es UTF-8 valido: decodificar y volver a codificar los cambiaria.
     const bytes = new Uint8Array([0xef, 0xbb, 0xbf, 0x7b, 0xff, 0x7d])
 
@@ -196,14 +198,39 @@ describe('POST: la entrega de Meta', () => {
     expect(receiveMock.mock.calls[0][0].signature).toBeNull()
   })
 
-  it('R16: stored ⇒ 200 sin cuerpo y sin log', async () => {
-    receiveMock.mockResolvedValue({ kind: 'stored', counts: { messages: 2, statuses: 1 } })
+  it('R16: stored sin nada saltado ⇒ 200 sin cuerpo y sin log', async () => {
+    receiveMock.mockResolvedValue({
+      kind: 'stored',
+      counts: { messages: 2, statuses: 1 },
+      skipped: SIN_SALTADOS,
+    })
 
     const response = await postCon()
 
     expect(response.status).toBe(200)
     expect(await response.text()).toBe('')
     expect(warnSpy).not.toHaveBeenCalled()
+    expect(errorSpy).not.toHaveBeenCalled()
+  })
+
+  it('R15: stored con cambios saltados ⇒ 200 sin cuerpo y una sola linea de log con los conteos', async () => {
+    receiveMock.mockResolvedValue({
+      kind: 'stored',
+      counts: { messages: 1, statuses: 0 },
+      skipped: { changes: 1, messages: 2, statuses: 3 },
+    })
+
+    const response = await postCon()
+
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('')
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(warnSpy).toHaveBeenCalledWith('whatsapp_webhook_changes_skipped', {
+      connectionId: CONEXION,
+      changes: 1,
+      messages: 2,
+      statuses: 3,
+    })
     expect(errorSpy).not.toHaveBeenCalled()
   })
 
@@ -281,7 +308,7 @@ describe('POST: la entrega de Meta', () => {
 })
 
 describe('R27: ningun log de la ruta lleva datos sensibles', () => {
-  it('R27: recorriendo cada resultado de GET y POST, ningun argumento logueado contiene el cuerpo, la firma, el token, el wa_id ni el texto', async () => {
+  it('R27: recorriendo cada resultado de GET y POST, ningun argumento logueado contiene el cuerpo, la firma, el token, el wa_id, el texto ni el phone_number_id', async () => {
     for (const reason of ['bad_request', 'missing', 'addon_off', 'disabled', 'token_mismatch'] as const) {
       verifyMock.mockResolvedValueOnce({ kind: 'forbidden', reason })
       await getCon(QUERY_PUNTO)
@@ -293,7 +320,8 @@ describe('R27: ningun log de la ruta lleva datos sensibles', () => {
       { kind: 'ignored', reason: 'unparseable' },
       { kind: 'unauthorized' },
       { kind: 'secret_unreadable' },
-      { kind: 'stored', counts: { messages: 1, statuses: 0 } },
+      { kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: SIN_SALTADOS },
+      { kind: 'stored', counts: { messages: 1, statuses: 0 }, skipped: { changes: 1, messages: 1, statuses: 1 } },
     ]) {
       receiveMock.mockResolvedValueOnce(result)
       await postCon()
@@ -302,6 +330,7 @@ describe('R27: ningun log de la ruta lleva datos sensibles', () => {
     await postCon()
 
     expect(warnSpy.mock.calls.length + errorSpy.mock.calls.length).toBeGreaterThan(0)
+    expect(warnSpy.mock.calls.map((llamada: unknown[]) => llamada[0])).toContain('whatsapp_webhook_changes_skipped')
     expectSinDatosSensibles()
   })
 })

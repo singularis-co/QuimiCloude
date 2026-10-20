@@ -19,6 +19,7 @@ import {
   storedConnection,
 } from './whatsapp-doubles'
 import {
+  FOREIGN_PHONE_NUMBER_ID,
   PHONE_NUMBER_ID,
   change,
   messagesNotification,
@@ -95,7 +96,11 @@ describe('receiveWhatsappWebhook: POST firmado', () => {
 
     const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })
 
-    expect(result).toEqual({ kind: 'stored', counts: { messages: 2, statuses: 0 } })
+    expect(result).toEqual({
+      kind: 'stored',
+      counts: { messages: 2, statuses: 0 },
+      skipped: { changes: 0, messages: 0, statuses: 0 },
+    })
     expect(parseSpy).toHaveBeenCalledWith(body, PHONE_NUMBER_ID)
     expect(inbox.record).toHaveBeenCalledTimes(1)
     expect(inbox.record).toHaveBeenCalledWith(parseWhatsappWebhook(body, PHONE_NUMBER_ID), CONNECTION_ID, NOW, {
@@ -147,7 +152,36 @@ describe('receiveWhatsappWebhook: POST firmado', () => {
 
     const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })
 
-    expect(result).toEqual({ kind: 'stored', counts: { messages: 0, statuses: 0 } })
+    expect(result).toEqual({
+      kind: 'stored',
+      counts: { messages: 0, statuses: 0 },
+      skipped: { changes: 0, messages: 0, statuses: 0 },
+    })
+    expect(inbox.record).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('receiveWhatsappWebhook: cambios saltados', () => {
+  it('R15: el resultado stored trae solo los conteos de lo saltado (un cambio de otro número, un mensaje y un status ilegibles) y se guarda el resto', async () => {
+    const { receive, inbox } = setup()
+    const body = notification(
+      change(value({ phoneNumberId: FOREIGN_PHONE_NUMBER_ID, messages: [textMessage()] })),
+      change(
+        value({
+          messages: [textMessage(), { type: 'text' }],
+          statuses: [status('wamid.x', 'delivered'), status('wamid.y', 'desconocido')],
+        }),
+      ),
+    )
+
+    const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })
+
+    expect(result).toEqual({
+      kind: 'stored',
+      counts: { messages: 1, statuses: 1 },
+      skipped: { changes: 1, messages: 1, statuses: 1 },
+    })
+    expect(JSON.stringify(result)).not.toContain(FOREIGN_PHONE_NUMBER_ID)
     expect(inbox.record).toHaveBeenCalledTimes(1)
   })
 })

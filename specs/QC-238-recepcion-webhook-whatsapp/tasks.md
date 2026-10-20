@@ -148,7 +148,7 @@
     con su contacto. Si no se puede hacer (sin app de Meta a mano), se anota y lo hace el humano
     antes del merge a producción.
 
-- [ ] **T17 — Trazabilidad y gate local**. Depende de: T1–T15
+- [x] **T17 — Trazabilidad y gate local**. Depende de: T1–T15
   - `progress/impl_QC-238.md` con el mapa `R1`…`R33` → test concreto.
   - `./init.sh` en verde.
   - **Hecho:** ningún `R<n>` sin test; las guardias en verde; el diff no toca `package.json`,

@@ -25,7 +25,12 @@ export type ReceiveWhatsappWebhookResult =
   | { readonly kind: 'ignored'; readonly reason: 'missing' | 'addon_off' | 'disabled' | 'unparseable' }
   | { readonly kind: 'unauthorized' }
   | { readonly kind: 'secret_unreadable' }
-  | { readonly kind: 'stored'; readonly counts: { readonly messages: number; readonly statuses: number } };
+  | {
+      readonly kind: 'stored';
+      readonly counts: { readonly messages: number; readonly statuses: number };
+      /** Solo cuantos se saltaron: el log del driving no puede llevar el numero ni el contenido. */
+      readonly skipped: { readonly changes: number; readonly messages: number; readonly statuses: number };
+    };
 
 function decodeJson(rawBody: Uint8Array): { readonly ok: true; readonly json: unknown } | { readonly ok: false } {
   try {
@@ -67,6 +72,11 @@ export function createReceiveWhatsappWebhook(
     return {
       kind: 'stored',
       counts: { messages: batch.messages.length, statuses: batch.statuses.length },
+      skipped: {
+        changes: batch.skipped.changes,
+        messages: batch.skipped.messages,
+        statuses: batch.skipped.statuses,
+      },
     };
   };
 }

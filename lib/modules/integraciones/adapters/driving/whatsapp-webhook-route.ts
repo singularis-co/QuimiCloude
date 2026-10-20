@@ -98,7 +98,18 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
         connectionId: loggableConnectionId(conexionId),
       });
       return noBody(500);
-    case 'stored':
+    case 'stored': {
+      const { changes, messages, statuses } = result.skipped;
+      if (changes + messages + statuses > 0) {
+        // Solo numeros: quien mira el log ve que la URL o el numero de Meta no casan con la conexion.
+        console.warn('whatsapp_webhook_changes_skipped', {
+          connectionId: loggableConnectionId(conexionId),
+          changes,
+          messages,
+          statuses,
+        });
+      }
       return noBody(200);
+    }
   }
 }

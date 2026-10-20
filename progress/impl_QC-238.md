@@ -1,6 +1,6 @@
 # QC-238 — recepcion-webhook-whatsapp · bitácora de implementación
 
-## Estado (2026-10-19): T1–T15 hechas; T16 para el humano; T17 sin marcar (`./init.sh` cortado por el board)
+## Estado (2026-10-19): T1–T15 hechas; T16 para el humano; T17 cerrada con los pasos de código del gate a mano (review B3)
 
 Ver «Cierre (T17)» al final. El humano decidió las dos diferencias del contraste con Meta (últimas
 filas de «Decisiones cerradas»), y el spec se enmendó en 5a2bcb70 antes de T1.
@@ -305,7 +305,8 @@ humano:
 | R10 | `webhook-signature-hmac.test.ts`, `receive-whatsapp-webhook.test.ts` |
 | R11, R12 | `webhook-signature-hmac.test.ts` / `receive-whatsapp-webhook.test.ts`, `whatsapp-webhook-route.test.ts`, `whatsapp-webhook-route.int.test.ts` |
 | R13 | `whatsapp-webhook-payload.test.ts`, `module-shape.test.ts` |
-| R14, R15 | `whatsapp-webhook-payload.test.ts` |
+| R14 | `whatsapp-webhook-payload.test.ts` |
+| R15 | `whatsapp-webhook-payload.test.ts` (conteo), `receive-whatsapp-webhook.test.ts` (los conteos llegan en `stored`), `whatsapp-webhook-route.test.ts` (línea `whatsapp_webhook_changes_skipped` con solo números; sin saltados, sin log) |
 | R16 | `whatsapp-webhook-payload.test.ts` (un contacto ⇒ su `wa_id`; varios o ninguno ⇒ `from`; `from` siempre en el `payload`), `whatsapp-inbox-prisma.int.test.ts`, `whatsapp-webhook-route.int.test.ts` |
 | R17, R18 | `whatsapp-webhook-payload.test.ts`, `whatsapp-inbox-prisma.int.test.ts`, `whatsapp-webhook-route.int.test.ts` |
 | R19 | `whatsapp-webhook-payload.test.ts` (cada fila de §4.3; reacción sin `emoji` o con `emoji` vacío) |
@@ -321,7 +322,7 @@ humano:
 | R30 | `whatsapp-messages-constraints.int.test.ts` |
 | R31 | `guard-rutas-fuera-de-sesion.test.ts` |
 | R32 | `guard-ambito-empresa-integraciones.test.ts` (forma de la excepción y sus casos de sensibilidad), `whatsapp-messages-constraints.int.test.ts` |
-| R33 | **Sin test propio**: es una prohibición. `git diff --name-only origin/dev...HEAD` no toca `package.json`, `pnpm-lock.yaml`, `.env.example`, permisos, menú ni el catálogo de errores (comprobado el 2026-10-19), y el gate de dependencias lo vigila. Si eso basta lo decide el reviewer. |
+| R33 | `tests/guards/guard-qc238-limites-de-la-ficha.test.ts` (censo del diff de rama contra el merge-base con `origin/dev`, acotado a la rama, más caso sintético por cada archivo prohibido) |
 
 ### Salida real (2026-10-19, después del último merge de `origin/dev`)
 
@@ -336,7 +337,7 @@ humano:
   - `specs/QC-278-...` no tiene ficha.
   - Nada de esto es de la feature: lo resuelve el leader en el board.
   - Los pasos de código del gate se corrieron a mano (las cuatro líneas de arriba).
-  - **T17 queda sin marcar** hasta que `./init.sh` pase.
+  - T17 se cerró en la vuelta 1 de review (B3); ver el veredicto al final.
 
 ### T16 — verificación manual con Meta (la hace el humano; sin marcar)
 
@@ -353,3 +354,42 @@ humano:
    (`TEXT` e `IMAGE`) en `whatsapp_messages`, cada una con su fila en `whatsapp_contacts`. La imagen
    lleva solo `media_id` y `mime_type`, sin descarga.
 8. Anotar aquí el resultado (códigos y conteos, sin datos) y marcar T16.
+
+## Vuelta 1 de review (backend_dev, 2026-10-19) — B1 y B2
+
+Archivos:
+- Nuevo: `tests/guards/guard-qc238-limites-de-la-ficha.test.ts` (B1, R33). Censo del diff contra el
+  merge-base con `origin/dev`, acotado a `feature/QC-238-recepcion-webhook-whatsapp` (`ctx.skip` ruidoso
+  fuera de ella). Prohibidos: `package.json`, `pnpm-lock.yaml`, `.env.example`,
+  `lib/modules/identity/domain/permissions.ts`, `lib/shared/navigation/private-nav.ts`,
+  `lib/modules/errores/domain/error-codes.ts`, `lib/modules/errores/domain/error-catalog.ts` (los dos
+  archivos del catálogo que exporta `@/lib/modules/errores`). Lleva un caso sintético por archivo
+  prohibido, una lista permitida que pasa y una comprobación de que los prohibidos existen.
+- `lib/modules/integraciones/domain/receive-whatsapp-webhook.ts`: `stored` lleva
+  `skipped: { changes, messages, statuses }` (solo números) (B2).
+- `lib/modules/integraciones/adapters/driving/whatsapp-webhook-route.ts`: en `stored`, si hay algo
+  saltado, `console.warn('whatsapp_webhook_changes_skipped', { connectionId, changes, messages, statuses })`.
+  Si no hay nada saltado, no escribe nada (B2).
+- `tests/unit/integraciones/whatsapp/receive-whatsapp-webhook.test.ts`: caso R15 nuevo (cambio de otro
+  número, mensaje y status ilegibles ⇒ `skipped` 1/1/1, y el número ajeno no aparece en el resultado).
+  Los dos `stored` que ya había ahora esperan `skipped` en cero.
+- `tests/unit/integraciones/whatsapp/whatsapp-webhook-route.test.ts`: el caso «R16: stored ⇒ sin log»
+  pasa a ser «stored sin nada saltado». Caso R15 nuevo: línea exacta y `200`. R27 ampliado: recorre un
+  `stored` con saltados, comprueba que la línea nueva aparece y añade `PHONE_NUMBER_ID` a los datos
+  sensibles.
+
+Salida real:
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: exit 0, `✖ 10 problems (0 errors, 10 warnings)`. Son los mismos 10 de antes,
+  ninguno en archivos de la feature.
+- `pnpm exec vitest run guard`: `Test Files 82 passed (82)`, `Tests 1134 passed | 20 skipped (1154)`.
+  El caso de diff de la guardia nueva corre en esta rama (no se salta).
+- `pnpm exec vitest run tests/unit/integraciones tests/integration/integraciones`:
+  `Test Files 53 passed (53)`, `Tests 940 passed | 1 skipped (941)`.
+
+Veredicto: B1 y B2 cerrados. Cada R1–R33 tiene test.
+
+**T17 cerrada (B3).** Se cerró con los pasos de código del gate corridos a mano en esta vuelta:
+typecheck, lint, todas las guardias (82/82) y los tests de la feature (53/53). `./init.sh` sigue
+cortándose en la validación del board (`feature_list.json`: cupos de backend y fullstack excedidos,
+y QC-278 sin ficha). Es un problema del leader, ajeno a la feature.
