@@ -109,6 +109,8 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
   })
 
   it('la fachada expone exactamente el cifrado y los casos de uso de las dos conexiones', () => {
+    // Enmendado el 2026-10-20 (QC-239): la fachada gana `linkWhatsappContact`,
+    // `unlinkWhatsappContact` y `setWhatsappContactBlocked`. La lista sigue cerrada.
     expect(Object.keys(integraciones).sort()).toEqual([
       'createWhatsappConnection',
       'disconnectAiProvider',
@@ -116,6 +118,7 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'getAiProviderReadiness',
       'getAiProviderStatus',
       'getWhatsappConnection',
+      'linkWhatsappContact',
       'receiveWhatsappWebhook',
       'regenerateWhatsappVerifyToken',
       'reportAiProviderOutcome',
@@ -124,9 +127,11 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'secretCipher',
       'secretDigest',
       'setWhatsappConnectionEnabled',
+      'setWhatsappContactBlocked',
       'testAiProviderKey',
       'testSavedAiProvider',
       'testWhatsappConnection',
+      'unlinkWhatsappContact',
       'updateWhatsappConnection',
       'verifyWhatsappWebhook',
       'whatsappWebhookUrl',

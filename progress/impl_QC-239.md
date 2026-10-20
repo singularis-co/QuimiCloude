@@ -14,7 +14,8 @@ quitó el `case` del duplicado.
 | 5a3fe1a6 | T7: vincular, desvincular, bloquear |
 | 8d74ea2b | T8, T10: recepción con bloqueo y vínculo; restricciones de contactos |
 | 5950edee | T9: Server Actions |
-| (este) | T11 (spec E2E ajustado; corrida bloqueada, ver abajo), T12 |
+| 4a7c0e45 | T12: bitácora |
+| (vuelta 1) | `fix(QC-239)`: M1, m1, m2, m4; T11 verde |
 
 ## Decisiones del humano tomadas durante la implementación (ya en requirements.md y design.md)
 
@@ -143,7 +144,7 @@ Abreviaturas:
 | R11 | U-cpl «vaciar el numero quita el principal…», «vaciar el numero de un cliente sin principal…»; U-svc «R11, R21 (QC-239) — la edicion que vacia el numero…», «R11 (QC-239) — los telefonos se sincronizan con el `after`…» |
 | R12 | U-cpl «guardar el mismo numero no cambia ningun vinculo»; U-svc «R21, R12 (QC-239) …» |
 | R13 | U-`clientes/lbf.test.ts` «R13 — varias filas con el mismo numero salen TODAS con su phone_e164…», «R13 — ningun resultado sale con phone_issue duplicate»; U-`legacy-phone-prisma.test.ts` «R13, R49 — … cuenta convertidas, invalidas y reconvertidas»; I-lbf «R13, R8 — convierte las validas aunque compartan numero…» |
-| R14 | **Indirecto:** las columnas `phone*` siguen siendo lo que pintan la lista y el formulario (design § 3). El espejo = principal lo fija el R8 de I-cpn. El texto antiguo con su aviso lo cubren E2E `clientes-telefono.spec.ts` «R30 — los clientes sembrados con phone_issue muestran su teléfono antiguo y la etiqueta corta» y `tests/ui/clientes/customer-phone-field.test.tsx`, que siguen verdes. No hay un caso con el prefijo R14 de QC-239: **el reviewer decide si basta** |
+| R14 | I-cpn describe «R14 — …» (2 casos, vuelta 1 de review): en cada paso (alta, edición que cambia, vincular secundario, desvincular el principal, editar y vaciar; migrado con aviso y pendiente sin aviso, con vincular/desvincular) lo que leen la lista (`clientes.listCustomers`) y el formulario (`clientes.getCustomer`) —las cuatro columnas `phone*` y `describeCustomerPhone`— coincide con el principal de la tabla puente o, sin él, con el teléfono antiguo y su aviso. Además E2E «R30 — …» y `customer-phone-field.test.tsx` |
 | R15 | U-wcl «R15, R22: un contacto sin cliente cuyo numero tiene un solo dueno…», «R15: un vinculo automatico cuyo cliente sigue siendo el unico dueno no cambia»; I-inbox «R15: con un unico dueno…»; I-route «R15: un texto de un numero con un unico cliente…» |
 | R16 | U-wcl «R16: … no tiene dueno…», «R16: … tiene varios duenos…»; I-inbox «R16: sin duenos o con varios…» |
 | R17 | U-wcl «R17: un cliente dado de baja no esta entre los duenos…»; I-cpn «R17: excluye al cliente dado de baja, al vinculo quitado y al cliente de otra empresa», «R17, R19 — …variante de Mexico»; I-inbox «R17: …» |
@@ -211,30 +212,78 @@ completo lo corre GitHub en el PR. Typecheck y lint, al cierre de cada task:
 
 ### T11: E2E
 
-`pnpm exec playwright test e2e/clientes-telefono.spec.ts --project=chromium --workers=1`, en
-el worktree:
+Primera corrida, del 2026-10-20: cayó porque la base de desarrollo compartida aún no tenía la
+migración (`The table … does not exist`). El humano la migró. Segunda corrida, en vuelta 1 de review:
 
 ```
-1 failed
-  [chromium] › e2e\clientes-telefono.spec.ts:245:7 › … R2, R11, R29, R7 (QC-239) — … la misma alta otra vez también se guarda
-  4 did not run
-PrismaClientKnownRequestError: The table `(not available)` does not exist in the current database.
-  at e2e/clientes-telefono.spec.ts:222  prisma.customerPhoneNumber.deleteMany(...)
+$ pnpm exec playwright test e2e/clientes-telefono.spec.ts --project=chromium --workers=1 --reporter=line
+[1/5] … R2, R11, R29, R7 (QC-239) — empresa con CO: … la misma alta otra vez también se guarda
+[2/5] … R9 — un número no válido para Colombia se marca en el campo y no se guarda
+[3/5] … R3, R8 — empresa sin país: …
+[4/5] … R30 — los clientes sembrados con phone_issue muestran su teléfono antiguo y la etiqueta corta en la lista
+[5/5] … R33 — a 390 px el disparador dice CO +57 y la hoja se titula «País del teléfono»
+  5 passed (1.3m)
 ```
 
-**No es un fallo del código.**
-- El E2E levanta `next dev` contra la `DATABASE_URL` del `.env`, que es la base de desarrollo
-  compartida con el árbol principal. Esa base no tiene aplicada la migración
-  `20261020120000_customer_phone_numbers`.
-- No la apliqué: es estado compartido y no la base efímera de la feature. Hay que decidir si se
-  aplica `pnpm run db:migrate` a esa base o si el E2E corre solo en CI.
-- `e2e/integraciones-whatsapp.spec.ts` (el flujo crítico del webhook) no hace POST al webhook y
-  no depende de lo que se tocó, así que no se corrió.
+`e2e/integraciones-whatsapp.spec.ts` no hace POST al webhook. El flujo crítico del webhook lo cubre
+`whatsapp-webhook-route.int.test.ts` sobre la composición (design § 12.3).
+
+## Vuelta 1 de review (`progress/review_QC-239.md`)
+
+- **B1/M1:** `tests/unit/integraciones/encryption-keys-env.test.ts` y
+  `tests/unit/composition/integraciones-graph-doubles.test.ts` ganan `linkWhatsappContact`,
+  `setWhatsappContactBlocked` y `unlinkWhatsappContact`.
+  - La lista ordenada pasa a 23 claves y sigue comparándose con `toEqual` exacto. Lleva la nota
+    «Enmendado el 2026-10-20 (QC-239)».
+  - Se barrieron con grep las enumeraciones de las fachadas y barrels de `clientes` e
+    `integraciones` en `tests/`. Solo esas dos fijaban listas exactas. `module-shape.test.ts` ya
+    incluía el contrato nuevo. La fachada `clientes` de la composición no cambia de claves.
+  - `CustomerDuplicatePhoneError`, `TakenE164` y `customer_duplicate_phone` solo quedan en
+    aserciones de ausencia.
+- **m1:** hay un caso directo de R14 (ver el mapa).
+- **m2:** design § 12.3 recoge el cambio de T8 en la guardia de `integraciones`: la lectura del
+  inbox por fábrica y `findBlockedWaIds`.
+- **m3, deuda conocida:** `isCustomerPhoneLinkConflict` está duplicado en
+  `clientes/.../customer-phone-prisma.ts` y en `integraciones/.../whatsapp-contact-prisma.ts`.
+  - Está justificado: `integraciones` no puede importar un adaptador de `clientes`, y el archivo
+    exento solo admite una función.
+  - Riesgo: si una copia cambia y la otra no, el reintento diverge.
+  - Salida futura: una función en `lib/composition` que se pase a las dos unidades de trabajo.
+- **m4, el choque es real y está arreglado:**
+  - Con Prisma 6.19.3, el `phoneNumber.upsert` de `addLink` **no** sale como `ON CONFLICT` nativo.
+    El log de queries muestra `SELECT … WHERE company_id = $1 AND e164 = $2` y luego
+    `INSERT INTO phone_numbers …`.
+  - Dos altas simultáneas con el mismo número nuevo chocaban en
+    `phone_numbers_company_id_e164_key`. La segunda fallaba con `P2002 (company_id, e164)`, sin
+    reintento.
+  - El arreglo: los dos detectores reconocen también `P2002` con `modelName: 'PhoneNumber'` y la
+    columna `e164`, así que la unidad de trabajo reintenta una vez. Releer el existente dentro de
+    `addLink` no sirve: tras el `P2002` la transacción queda abortada.
+  - Tests de concurrencia, con el orden forzado esperando el `Lock` en `pg_stat_activity`:
+    - `customer-phone-numbers.int.test.ts` y `whatsapp-contact-links.int.test.ts` (prefijo R33);
+    - en los dos, la segunda unidad reintenta una vez (2 intentos), queda una sola fila en
+      `phone_numbers` y los dos clientes son dueños;
+    - contraprueba: con el detector de `integraciones` revertido, el test falla.
+  - **Punto abierto, pendiente de decisión:** el relleno (`legacy-phone-prisma.ts`) llama a
+    `addLink` en su propia `$transaction` y no reintenta. Design § 5.6 dice «Sin reintento por
+    unicidad: ya no hay índice que choque», y eso ya no es cierto para `phone_numbers`. Un relleno
+    y un alta simultáneos con el mismo número nuevo pueden chocar. No se tocó porque contradice el
+    design.
+
+| Comando (en serie) | Resultado |
+|---|---|
+| `pnpm run typecheck` | `tsc --noEmit` sin errores |
+| `pnpm run lint` | `✖ 10 problems (0 errors, 10 warnings)`, los mismos avisos ajenos |
+| `vitest run encryption-keys-env.test.ts` | 1 passed / 28 passed |
+| `vitest run integraciones-graph-doubles.test.ts` | 1 passed / 5 passed |
+| `vitest run customer-phone-numbers.int.test.ts` | 1 passed / 28 passed (25 + 2 de R14 + 1 de concurrencia) |
+| `vitest run whatsapp-contact-links.int.test.ts` | 1 passed / 17 passed |
+| `vitest run guard-ambito-empresa-clientes.test.ts` | 1 passed / 50 passed |
+| `vitest run guard-ambito-empresa-integraciones.test.ts` | 1 passed / 67 passed |
 
 ## Rojos conocidos y pendientes para el reviewer
 
-- **El E2E de T11 está sin verificar en local** (ver arriba).
-- **R14 se cubre de forma indirecta** (ver el mapa).
+- El relleno no reintenta ante el choque de `phone_numbers` (ver m4, punto abierto).
 - **Lo que cambió en las guardias de integraciones (T8):** el inbox se cablea por fábrica
   (`createWhatsappInboxRecorder({ ownersOn })`), como pide design § 7. Para que eso encaje, la
   guardia lee ahora `PUERTO_INBOX` de esa fábrica, vigila `findBlockedWaIds` y suma casos de

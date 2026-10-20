@@ -81,17 +81,22 @@ export async function setWhatsappContactBlocked(
 }
 
 /**
- * Choque contra uno de los dos únicos parciales de los vínculos vivos de un cliente, la tabla que
- * escribe `clientes` dentro de la misma transacción. Prisma trae sus columnas y no el nombre del
- * índice; los dos son los únicos de esa tabla que llevan `customer_id`.
+ * Choque de dos escrituras simultáneas en los teléfonos que escribe `clientes` dentro de la misma
+ * transacción: contra uno de los dos únicos parciales de los vínculos vivos de un cliente, o contra
+ * el único de `phone_numbers` cuando dos transacciones añaden el mismo número nuevo (Prisma resuelve
+ * ese `upsert` con un SELECT y un INSERT, no con `ON CONFLICT`). Prisma trae las columnas y no el
+ * nombre del índice: los de los vínculos son los únicos de su tabla con `customer_id`, y el de los
+ * números, el único con `e164`.
  */
 export function isCustomerPhoneLinkConflict(error: unknown): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
   const meta = error.meta ?? {};
-  if (meta.modelName !== 'CustomerPhoneNumber') return false;
   const target = meta.target;
   const columns = typeof target === 'string' ? [target] : Array.isArray(target) ? target : [];
-  return columns.some((column) => typeof column === 'string' && column.includes('customer_id'));
+  const hasColumn = (name: string) => columns.some((column) => typeof column === 'string' && column.includes(name));
+  if (meta.modelName === 'CustomerPhoneNumber') return hasColumn('customer_id');
+  if (meta.modelName === 'PhoneNumber') return hasColumn('e164');
+  return false;
 }
 
 /** Fábrica y no objeto ya construido: dentro de una transacción tiene que escribir por su `tx`. */

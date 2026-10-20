@@ -501,3 +501,55 @@ describe('R45 — todo se limita a la empresa del actor', () => {
     expect(await prisma.customerPhoneNumber.count({ where: { customerId: ajeno } })).toBe(0)
   })
 })
+
+describe('R33 — dos vinculos simultaneos que anaden el mismo numero nuevo a clientes distintos', () => {
+  /** Espera a que alguna sesion de esta base quede bloqueada esperando a otra transaccion. */
+  async function esperarUnaSesionBloqueada(): Promise<void> {
+    for (let vuelta = 0; vuelta < 200; vuelta += 1) {
+      const [fila] = await prisma.$queryRaw<{ esperando: number }[]>`
+        SELECT count(*)::int AS esperando FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock'`
+      if ((fila?.esperando ?? 0) > 0) return
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+    throw new Error('la segunda transaccion nunca quedo esperando a la primera')
+  }
+
+  it('R33: la segunda espera a la primera, choca en phone_numbers_company_id_e164_key y su unico reintento reutiliza el numero', async () => {
+    const numero = numeroColombiano()
+    const uno = await alta(A)
+    const otro = await alta(A)
+    const scope = { companyId: A.companyId }
+    let soltarLaPrimera = (): void => undefined
+    const puerta = new Promise<void>((resolve) => {
+      soltarLaPrimera = resolve
+    })
+    let avisarEscrito = (): void => undefined
+    const escrito = new Promise<void>((resolve) => {
+      avisarEscrito = resolve
+    })
+    let intentosDeLaSegunda = 0
+
+    const primera = withWhatsappContactTransaction(async (tx) => {
+      await createCustomerPhoneRepository(tx).addLink(uno, numero, true, new Date(), scope)
+      avisarEscrito()
+      await puerta
+    })
+    await escrito
+    const segunda = withWhatsappContactTransaction(async (tx) => {
+      intentosDeLaSegunda += 1
+      await createCustomerPhoneRepository(tx).addLink(otro, numero, true, new Date(), scope)
+    })
+    try {
+      await esperarUnaSesionBloqueada()
+    } finally {
+      soltarLaPrimera()
+    }
+    await Promise.all([primera, segunda])
+
+    expect(intentosDeLaSegunda).toBe(2)
+    expect(await prisma.phoneNumber.count({ where: { companyId: A.companyId, e164: numero } })).toBe(1)
+    expect(await telefonosDe(A, uno)).toEqual([{ e164: numero, main: true }])
+    expect(await telefonosDe(A, otro)).toEqual([{ e164: numero, main: true }])
+  })
+})

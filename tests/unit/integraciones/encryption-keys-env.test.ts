@@ -257,6 +257,8 @@ describe('la composición se importa sin las variables del cifrado', () => {
         '@/lib/modules/integraciones/adapters/driven/security/secret-digest-sha256'
       )
 
+      // Enmendado el 2026-10-20 (QC-239): la fachada gana `linkWhatsappContact`,
+      // `unlinkWhatsappContact` y `setWhatsappContactBlocked`. La lista sigue cerrada.
       expect(Object.keys(composition.integraciones).sort()).toEqual([
         'createWhatsappConnection',
         'disconnectAiProvider',
@@ -264,6 +266,7 @@ describe('la composición se importa sin las variables del cifrado', () => {
         'getAiProviderReadiness',
         'getAiProviderStatus',
         'getWhatsappConnection',
+        'linkWhatsappContact',
         'receiveWhatsappWebhook',
         'regenerateWhatsappVerifyToken',
         'reportAiProviderOutcome',
@@ -272,9 +275,11 @@ describe('la composición se importa sin las variables del cifrado', () => {
         'secretCipher',
         'secretDigest',
         'setWhatsappConnectionEnabled',
+        'setWhatsappContactBlocked',
         'testAiProviderKey',
         'testSavedAiProvider',
         'testWhatsappConnection',
+        'unlinkWhatsappContact',
         'updateWhatsappConnection',
         'verifyWhatsappWebhook',
         'whatsappWebhookUrl',

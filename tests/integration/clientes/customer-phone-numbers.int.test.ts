@@ -21,7 +21,7 @@ import {
 } from '@/lib/modules/clientes/adapters/driven/persistence/customer-prisma';
 import { createCustomerPhoneRepository } from '@/lib/modules/clientes/adapters/driven/persistence/customer-phone-prisma';
 import { withCustomerTransaction } from '@/lib/modules/clientes/adapters/driven/persistence/customer-unit-of-work-prisma';
-import { createCustomerPhoneLinks } from '@/lib/modules/clientes';
+import { createCustomerPhoneLinks, describeCustomerPhone, formatPhoneInternational } from '@/lib/modules/clientes';
 import { clientes } from '@/lib/composition';
 import { normalizeCustomerText } from '@/lib/modules/clientes/domain/customer-text';
 import { normalizeCompanyName } from '@/lib/modules/identity';
@@ -30,6 +30,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import type { CustomerScope } from '@/lib/modules/clientes/domain/customer-scope';
 import type {
   CustomerPhoneColumns,
+  CustomerView,
   NewCustomer,
   NewCustomerPhone,
 } from '@/lib/modules/clientes/domain/customer-view';
@@ -179,6 +180,29 @@ afterAll(async () => {
   }
   await prisma.$disconnect();
 });
+
+const actor = () => ({
+  id: empresaA.actorId,
+  companyId: empresaA.companyId,
+  permissions: ['clientes.consultar', 'clientes.modificar'],
+});
+
+function formulario(e164: string | null) {
+  return {
+    firstNames: `Nombre ${token()}`,
+    lastNames: `Apellido ${token()}`,
+    city: 'Bogota',
+    phoneCountry: 'CO',
+    phoneNumber: e164 === null ? '' : e164.slice(2),
+    email: null,
+    address: null,
+  };
+}
+
+/** El servicio de telefonos de `clientes` sobre una transaccion real, como lo cablea la composicion. */
+function enTransaccion<T>(work: (links: ReturnType<typeof createCustomerPhoneLinks>) => Promise<T>): Promise<T> {
+  return withCustomerTransaction((tx) => work(createCustomerPhoneLinks({ phones: createCustomerPhoneRepository(tx) })));
+}
 
 describe('R2 — varios telefonos por cliente y un numero de varios clientes', () => {
   it('R2 — un cliente guarda un principal y un secundario, y los lee como vinculos vivos', async () => {
@@ -422,25 +446,6 @@ describe('R8 — el espejo y la tabla puente no divergen tras ningun escritor', 
     return numero.e164 === phoneE164 ? null : `el principal es ${numero.e164} y phone_e164 es ${phoneE164}`;
   }
 
-  const actor = () => ({ id: empresaA.actorId, companyId: empresaA.companyId, permissions: ['clientes.modificar'] });
-
-  function formulario(e164: string | null) {
-    return {
-      firstNames: `Nombre ${token()}`,
-      lastNames: `Apellido ${token()}`,
-      city: 'Bogota',
-      phoneCountry: 'CO',
-      phoneNumber: e164 === null ? '' : e164.slice(2),
-      email: null,
-      address: null,
-    };
-  }
-
-  /** El servicio de telefonos de `clientes` sobre una transaccion real, como lo cablea la composicion. */
-  function enTransaccion<T>(work: (links: ReturnType<typeof createCustomerPhoneLinks>) => Promise<T>): Promise<T> {
-    return withCustomerTransaction((tx) => work(createCustomerPhoneLinks({ phones: createCustomerPhoneRepository(tx) })))
-  }
-
   it('R8, R9 — alta con numero y alta sin numero', async () => {
     const conNumero = await clientes.createCustomer(formulario(numeroColombiano()), actor());
     const sinNumero = await clientes.createCustomer(formulario(null), actor());
@@ -531,6 +536,98 @@ describe('R8 — el espejo y la tabla puente no divergen tras ningun escritor', 
   });
 });
 
+describe('R14 — la lista y el formulario muestran el principal o, sin principal, el telefono antiguo con su aviso', () => {
+  type LoMostrado = ReturnType<typeof describeCustomerPhone>;
+
+  /** Las columnas que lee el campo de telefono del formulario y la columna de la lista. */
+  function columnasMostradas(customer: CustomerView) {
+    const { phone, phoneCountry, phoneE164, phoneIssue } = customer;
+    return { phone, phoneCountry, phoneE164, phoneIssue };
+  }
+
+  /**
+   * Lo que pintan la lista (`listCustomers`) y el formulario (`getCustomer`), con la misma
+   * descripcion que usan sus componentes. Falla si las dos lecturas no coinciden.
+   */
+  async function loQueSeMuestra(id: string): Promise<LoMostrado> {
+    const ficha = await clientes.getCustomer(id, actor());
+    const pagina = await clientes.listCustomers({ search: ficha.firstNames }, actor());
+    const fila = pagina.items.find((customer) => customer.id === id);
+    if (fila === undefined) throw new Error(`el cliente ${id} no sale en la lista`);
+    expect(columnasMostradas(fila)).toEqual(columnasMostradas(ficha));
+    expect(describeCustomerPhone(fila)).toEqual(describeCustomerPhone(ficha));
+    return describeCustomerPhone(ficha);
+  }
+
+  async function principalDe(id: string): Promise<string | null> {
+    return (await phones.listAliveLinks(id, empresaA.scope)).find((link) => link.main)?.e164 ?? null;
+  }
+
+  const internacional = (e164: string): LoMostrado => ({ kind: 'international', text: formatPhoneInternational(e164) });
+
+  it('R14 — tras alta, edicion que cambia y que vacia, vincular y desvincular, lista y formulario muestran el principal', async () => {
+    const primero = numeroColombiano();
+    const segundo = numeroColombiano();
+    const secundario = numeroColombiano();
+    const { id } = await clientes.createCustomer(formulario(primero), actor());
+    expect(await principalDe(id)).toBe(primero);
+    expect(await loQueSeMuestra(id)).toEqual(internacional(primero));
+
+    await clientes.updateCustomer(id, formulario(segundo), actor());
+    expect(await principalDe(id)).toBe(segundo);
+    expect(await loQueSeMuestra(id)).toEqual(internacional(segundo));
+
+    await enTransaccion((links) => links.addWaId(id, secundario, empresaA.actorId, LUEGO, empresaA.companyId));
+    expect(await principalDe(id)).toBe(segundo);
+    expect(await loQueSeMuestra(id)).toEqual(internacional(segundo));
+
+    await enTransaccion((links) => links.removeWaId(id, segundo, empresaA.actorId, LUEGO, empresaA.companyId));
+    expect(await principalDe(id)).toBeNull();
+    expect(await loQueSeMuestra(id)).toEqual({ kind: 'none' });
+
+    await clientes.updateCustomer(id, formulario(primero), actor());
+    expect(await principalDe(id)).toBe(primero);
+    expect(await loQueSeMuestra(id)).toEqual(internacional(primero));
+
+    await clientes.updateCustomer(id, formulario(null), actor());
+    expect(await principalDe(id)).toBeNull();
+    expect(await loQueSeMuestra(id)).toEqual({ kind: 'none' });
+  });
+
+  it('R14 — sin principal, el migrado con aviso y el pendiente de relleno muestran su telefono antiguo; vincular lo sustituye por el principal', async () => {
+    const migrado = await alta(empresaA);
+    await prisma.customer.update({
+      where: { id: migrado },
+      data: { phone: 'tel. viejo 300-12', phoneCountry: 'CO', phoneIssue: 'invalid_format' },
+    });
+    const conAviso: LoMostrado = {
+      kind: 'issue',
+      legacyPhone: 'tel. viejo 300-12',
+      issue: 'invalid_format',
+      label: 'Sin formato válido',
+    };
+    expect(await principalDe(migrado)).toBeNull();
+    expect(await loQueSeMuestra(migrado)).toEqual(conAviso);
+
+    await clientes.updateCustomer(migrado, formulario(null), actor());
+    expect(await principalDe(migrado)).toBeNull();
+    expect(await loQueSeMuestra(migrado)).toEqual(conAviso);
+
+    const pendiente = await alta(empresaA);
+    await prisma.customer.update({ where: { id: pendiente }, data: { phone: '300 12 34' } });
+    expect(await loQueSeMuestra(pendiente)).toEqual({ kind: 'legacy', legacyPhone: '300 12 34' });
+
+    const vinculado = numeroColombiano();
+    await enTransaccion((links) => links.addWaId(migrado, vinculado, empresaA.actorId, LUEGO, empresaA.companyId));
+    expect(await principalDe(migrado)).toBe(vinculado);
+    expect(await loQueSeMuestra(migrado)).toEqual(internacional(vinculado));
+
+    await enTransaccion((links) => links.removeWaId(migrado, vinculado, empresaA.actorId, LUEGO, empresaA.companyId));
+    expect(await principalDe(migrado)).toBeNull();
+    expect(await loQueSeMuestra(migrado)).toEqual({ kind: 'none' });
+  });
+});
+
 describe('R9 — withCustomerTransaction confirma o deshace el cliente y sus telefonos juntos, y reintenta UNA vez un choque de vinculos', () => {
   it('R9 — un fallo dentro de la unidad, despues de escribir cliente y principal, no deja ni el cliente ni el vinculo', async () => {
     const numero = numeroColombiano();
@@ -592,5 +689,55 @@ describe('R9 — withCustomerTransaction confirma o deshace el cliente y sus tel
       }),
     ).rejects.toThrow('otro fallo');
     expect(intentos).toBe(1);
+  });
+});
+
+describe('R2, R9 — dos altas simultaneas de clientes distintos con el mismo numero nuevo', () => {
+  /** Espera a que alguna sesion de esta base quede bloqueada esperando a otra transaccion. */
+  async function esperarUnaSesionBloqueada(): Promise<void> {
+    for (let vuelta = 0; vuelta < 200; vuelta += 1) {
+      const [fila] = await prisma.$queryRaw<{ esperando: number }[]>`
+        SELECT count(*)::int AS esperando FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock'`;
+      if ((fila?.esperando ?? 0) > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error('la segunda transaccion nunca quedo esperando a la primera');
+  }
+
+  it('R2, R9 — la segunda espera a la primera, choca en phone_numbers_company_id_e164_key y su unico reintento reutiliza el numero', async () => {
+    const numero = numeroColombiano();
+    const uno = await alta(empresaA);
+    const otro = await alta(empresaA);
+    let soltarLaPrimera = (): void => undefined;
+    const puerta = new Promise<void>((resolve) => {
+      soltarLaPrimera = resolve;
+    });
+    let avisarEscrito = (): void => undefined;
+    const escrito = new Promise<void>((resolve) => {
+      avisarEscrito = resolve;
+    });
+    let intentosDeLaSegunda = 0;
+
+    const primera = withCustomerTransaction(async (tx) => {
+      await createCustomerPhoneRepository(tx).addLink(uno, numero, true, AHORA, empresaA.scope);
+      avisarEscrito();
+      await puerta;
+    });
+    await escrito;
+    const segunda = withCustomerTransaction(async (tx) => {
+      intentosDeLaSegunda += 1;
+      await createCustomerPhoneRepository(tx).addLink(otro, numero, true, AHORA, empresaA.scope);
+    });
+    try {
+      await esperarUnaSesionBloqueada();
+    } finally {
+      soltarLaPrimera();
+    }
+    await Promise.all([primera, segunda]);
+
+    expect(intentosDeLaSegunda).toBe(2);
+    expect(await prisma.phoneNumber.count({ where: { companyId: empresaA.companyId, e164: numero } })).toBe(1);
+    expect(await phones.findAliveOwners(numero, empresaA.scope)).toEqual([uno, otro].sort());
   });
 });

@@ -94,7 +94,7 @@
   `tests/integration/aislamiento.json` con su forma y su motivo.
 - **Hecho:** verdes.
 
-## T11 — E2E de teléfono de cliente (depende de T5)
+## [x] T11 — E2E de teléfono de cliente (depende de T5)
 - `e2e/clientes-telefono.spec.ts`: el caso de duplicado pasa a «se guarda» (R7).
 - **Hecho:** `pnpm exec playwright test e2e/clientes-telefono.spec.ts` verde.
 
