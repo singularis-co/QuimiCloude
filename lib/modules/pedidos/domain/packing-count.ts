@@ -104,7 +104,7 @@ export function checkPackingCounts(
   return { kind: 'invalid', missingLineIds, unexpectedLineIds, lineErrors };
 }
 
-/** Los envases que cuentan para entregar, acondicionar y consultar: sin conteo guardado, el plan. */
+/** Los envases reales de la linea, para acondicionar y consultar: sin conteo guardado, el plan. */
 export function effectivePackages(line: { readonly packages: number; readonly packedPackages: number | null }): number {
   return line.packedPackages ?? line.packages;
 }

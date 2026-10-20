@@ -52,7 +52,7 @@
   - Hecho: plan 5×1 L + 1×5 L con real 12×1 L + 0×5 L termina, da un lote de 12 L, guarda 2 libres
     en la línea de 1 L y el coste suma el del pedido.
 
-- [ ] **T5 [P] — Entrega espera solo lo pedido** (backend). Depende de T4. R12–R15, R18.
+- [x] **T5 [P] — Entrega espera solo lo pedido** (backend). Depende de T4. R12–R15, R18.
   - `OrderDeliveryProgressLine.packedSurplusPackages` y su lectura en `order-catalog-prisma.ts`.
   - `orderedPackages` en `deliver-order.ts`, `get-order-delivery.ts`, `order-pending-delivery.ts`
     (design §2.4). Acondicionamiento y «Reparto» siguen con `effectivePackages`.
@@ -61,7 +61,7 @@
   - Hecho: tests verdes; los de acondicionamiento (`get-conditioning-order.test.ts`,
     `conditioning-batch-data.test.ts`) siguen verdes sin tocarlos.
 
-- [ ] **T6 [P] — Lo libre suma al excedente sin pedido** (backend). Depende de T4. R16, R17.
+- [x] **T6 [P] — Lo libre suma al excedente sin pedido** (backend). Depende de T4. R16, R17.
   - `direct-delivery-prisma.ts` selecciona la columna y usa `orderedPackages`; comentario de
     `direct-delivery.ts`.
   - Test: `direct-delivery-repository.int.test.ts` (pedido `TERMINADO` con 12 reales y 2 libres →

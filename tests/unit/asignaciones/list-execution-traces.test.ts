@@ -87,6 +87,7 @@ function linea(
     presentationId,
     packages,
     packedPackages: overrides?.packedPackages ?? null,
+    packedSurplusPackages: 0,
     deliveredPackages: overrides?.deliveredPackages ?? 0,
   };
 }

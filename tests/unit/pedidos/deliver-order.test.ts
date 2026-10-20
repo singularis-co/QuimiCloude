@@ -1171,3 +1171,55 @@ describe('QC-288 deliverOrder — clave de una entrega sin pedido', () => {
     nadaEscrito(m)
   })
 })
+
+describe('QC-290 — deliverOrder espera solo lo pedido', () => {
+  /** Plan 4 + 10; la segunda linea termino con 12 reales y 2 libres: el pedido espera 10. */
+  const CON_LIBRES: readonly FinishPackingLine[] = [
+    { ...LINEAS[0]!, packedPackages: null },
+    { ...LINEAS[1]!, packedPackages: 12, packedSurplusPackages: 2 },
+  ]
+  const NADA_DE_LA_SEGUNDA = new Map([[COMPLETE_LINE_ID, 4]])
+
+  it('R13: 12 reales con 2 libres admiten como mucho 10: pedir 11 es delivery_exceeds_remaining sin escribir nada', async () => {
+    const m = montar({ lineas: CON_LIBRES, entregados: NADA_DE_LA_SEGUNDA })
+    const entrada = deliverInput({
+      customers: [
+        clienteA([
+          { presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 6 },
+          { presentationLineId: PENDING_LINE_ID, batchId: NEWER_BATCH_ID, packages: 5 },
+        ]),
+      ],
+    })
+
+    expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entrada, ENTREGADOR))).toBe('delivery_exceeds_remaining')
+    nadaEscrito(m)
+  })
+
+  it('R13: con 3 ya entregados, el tope es 10 - 3 = 7 aunque los reales sin libres admitirian 9', async () => {
+    const m = montar({ lineas: CON_LIBRES })
+    const entrada = deliverInput({
+      customers: [clienteA([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 8 }])],
+    })
+
+    expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entrada, ENTREGADOR))).toBe('delivery_exceeds_remaining')
+    nadaEscrito(m)
+  })
+
+  it('R13, R14: entregar los 10 que espera el pedido lo pasa a ENTREGADO aunque los 2 libres sigan en el lote', async () => {
+    const m = montar({ lineas: CON_LIBRES, entregados: NADA_DE_LA_SEGUNDA })
+    const entrada = deliverInput({
+      customers: [
+        clienteA([
+          { presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 6 },
+          { presentationLineId: PENDING_LINE_ID, batchId: NEWER_BATCH_ID, packages: 4 },
+        ]),
+      ],
+    })
+
+    await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).resolves.toEqual({
+      status: 'delivered',
+      orderStatus: 'ENTREGADO',
+    })
+    expect(m.tx.orders.setStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
+  })
+})

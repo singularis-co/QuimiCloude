@@ -319,6 +319,8 @@ export type OrderDeliveryProgressLine = {
   readonly packages: number;
   /** `null` = sin contar al terminar el empaque: vale `packages` (`effectivePackages`). */
   readonly packedPackages: number | null;
+  /** Envases del conteo que el pedido no espera; restan de lo que le falta (`orderedPackages`). */
+  readonly packedSurplusPackages: number;
   readonly deliveredPackages: number;
 };
 

@@ -133,3 +133,94 @@ Grafo (MCP) no consultado en esta tanda: Grep/Read sobre el worktree.
 T4 hecho: Terminar con excedente guarda los libres por línea en la misma transacción; el «Hecho»
 (5 x 1 L + 1 x 5 L → 12 x 1 L + 0 x 5 L: lote de 12 L, 2 libres en 1 L, coste = el del pedido) verde
 contra Postgres real. Sin bloqueos.
+
+## T6 — Lo libre suma al excedente sin pedido (R16, R17)
+
+### Archivos
+
+- `lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma.ts`: `listWaitingOrderLines`
+  selecciona `packedSurplusPackages` y calcula `orderedPackages` con `orderedPackages(line)` en vez de
+  `effectivePackages(line)`.
+- `lib/modules/pedidos/domain/direct-delivery.ts`: comentario de `WaitingOrderLine.orderedPackages`
+  (cita `orderedPackages`; los libres quedan para el excedente).
+- `tests/integration/pedidos/direct-delivery-repository.int.test.ts`: `OrderSeed` admite
+  `packedSurplusPackages`; motivo `conteo_fisico` cuando el conteo pasa del plan (el CHECK
+  `order_presentation_lines_packed_reason_matches_count` rechaza `merma` por encima); dos casos nuevos.
+
+### Mapa R → test
+
+| R | Test |
+|---|---|
+| R16 | `direct-delivery-repository.int.test.ts` «R16, R17: los libres de un pedido cubren lo que espera otro TERMINADO de la misma receta y presentacion» (12 en el lote: 10 del pedido con libres + 2 de otro pedido → excedente 0); y `finish-with-finished-goods.int.test.ts` «R1, R6, R8, R9, R10: plan 5 x 1 L + 1 x 5 L con real 12 x 1 L…» (el lote guarda los 12 L, libres incluidos) |
+| R17 | `direct-delivery-repository.int.test.ts` «R16, R17: un TERMINADO de 10 con 12 reales y 2 libres espera 10, y con sus 12 envases en el lote el excedente es 2» |
+
+### Salida real
+
+- `pnpm run typecheck` (`tsc --noEmit`): sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos de T6
+  (`eslint` sobre los 3 archivos: «No issues found»).
+- `pnpm exec vitest run tests/integration/pedidos/direct-delivery tests/unit/pedidos/direct-delivery
+  tests/unit/pedidos/deliver-direct tests/unit/pedidos/list-direct-delivery-surplus
+  tests/unit/pedidos/get-direct-delivery` (con `../../.env`, base de test efímera):
+  `Test Files  11 passed (11)` / `Tests  151 passed (151)`. Incluye los 6 `.int` direct-delivery* y los
+  5 unit de QC-288 (`deliver-direct`, `direct-delivery`, `get-direct-delivery`,
+  `get-direct-delivery-for-void`, `list-direct-delivery-surplus`).
+
+### Veredicto
+
+T6 hecho: los pedidos `TERMINADO` esperan reales − libres, y los libres suman al excedente sin pedido
+(12 reales, 2 libres → espera 10, excedente 2) verde contra Postgres real. Sin bloqueos.
+
+## T5 — Entrega espera solo lo pedido (R12–R15, R18) (backend_dev, 2026-10-20)
+
+Grafo (MCP) no consultado en esta tanda: Grep/Read sobre el worktree.
+
+### Archivos
+
+- `lib/modules/pedidos/domain/order-catalog.ts`: `OrderDeliveryProgressLine.packedSurplusPackages`.
+- `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts`: `listOrderDeliveryProgressByIdsIncludingDeleted`
+  selecciona `packedSurplusPackages`; `toOrderDeliveryProgress` lo pasa.
+- `lib/modules/pedidos/domain/deliver-order.ts`, `get-order-delivery.ts`, `order-pending-delivery.ts`:
+  `effectivePackages` → `orderedPackages` (docstring de `deliveryStateOf` ajustado).
+- `lib/modules/pedidos/domain/packing-count.ts`: docstring de `effectivePackages` sin «entregar».
+- Acondicionamiento (`conditioning-order-view.ts`, `conditioning-batch-data.ts`) y «Reparto»
+  (`inventario/.../finished-product-detail.ts`, `asignaciones/domain/order-distribution-view.ts`) sin tocar (R18).
+- Tests:
+  - `tests/unit/pedidos/deliver-order.test.ts`: bloque «QC-290 — deliverOrder espera solo lo pedido».
+  - `tests/unit/pedidos/get-order-delivery.test.ts`: bloque «QC-290 — getOrderDelivery espera solo lo pedido».
+  - `tests/unit/pedidos/list-orders.test.ts`: `Linea` con `packedSurplusPackages`; dos casos R12.
+  - `tests/unit/asignaciones/list-execution-traces.test.ts`: solo `packedSurplusPackages: 0` en el fixture
+    de `OrderDeliveryProgressLine` para compilar.
+  - `tests/integration/pedidos/order-delivery.int.test.ts`: bloque «QC-290 — la entrega espera solo lo
+    pedido, contra Postgres» (plan 10 × 1 L, 12 reales, 2 libres, lote de 12).
+- `list-order-deliveries.test.ts`: no aplica (su dominio no usa `effectivePackages`); sin cambios en T5.
+
+### R → test (T5)
+
+| R | Test |
+|---|---|
+| R12 | `get-order-delivery.test.ts` «R12, R15: los «pedidos» de cada presentacion son los reales menos los libres…», «R12: una linea cuyos libres cubren lo que paso de su plan, ya entregado el plan, no pide lotes»; `list-orders.test.ts` «R12: los envases libres no cuentan como pendientes: 12 reales con 2 libres esperan 10», «R12: entregados los 10 que espera el pedido, es entregado aunque los 2 libres sigan sin entregar»; `order-delivery.int.test.ts` «R12, R15: el sheet y el progreso del listado leen la columna y esperan 10, no los 12 reales» |
+| R13 | `deliver-order.test.ts` «R13: 12 reales con 2 libres admiten como mucho 10: pedir 11 es delivery_exceeds_remaining…», «R13: con 3 ya entregados, el tope es 10 - 3 = 7…», «R13, R14: entregar los 10…»; `order-delivery.int.test.ts` «R13: pedir 11 envases de 1 L con 12 reales y 2 libres es delivery_exceeds_remaining sin escribir nada» |
+| R14 | `deliver-order.test.ts` «R13, R14: entregar los 10 que espera el pedido lo pasa a ENTREGADO aunque los 2 libres sigan en el lote»; `order-delivery.int.test.ts` «R13, R14: entregar los 10 que espera el pedido lo deja ENTREGADO y los 2 libres siguen en la existencia del lote» |
+| R15 | `get-order-delivery.test.ts` «R12, R15: …»; `order-delivery.int.test.ts` «R12, R15: …» |
+| R18 | sin tocar y verdes: `get-conditioning-order.test.ts` «R23: la fila y los datos de lote muestran los envases reales…», «R25: un pedido empacado sin conteo guardado…»; `conditioning-batch-data.test.ts` «QC-281 R23: …» (×2), «QC-281 R25: …»; `list-finished-product-distribution.test.ts` «R27: devuelve tal cual las filas igual, menos, mas…» (tab «Reparto») |
+
+### Verificación
+
+- `pnpm run typecheck`: verde (`tsc --noEmit` sin salida).
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, las mismas de antes; las 2 de
+  `list-execution-traces.test.ts` (L154, L158) son previas, no de la línea tocada.
+- `pnpm exec vitest run guard`: `Test Files 84 passed (84)`, `Tests 1148 passed | 21 skipped (1169)`.
+- `pnpm exec vitest run` de los unit tocados (`deliver-order`, `get-order-delivery`, `list-orders`,
+  `list-execution-traces`, `list-order-deliveries`): `Test Files 5 passed (5)`, `Tests 245 passed (245)`.
+- R18: `get-conditioning-order`, `conditioning-batch-data`, `list-finished-product-distribution`,
+  `packing-count`: `Test Files 4 passed (4)`, `Tests 125 passed (125)`.
+- `order-delivery.int.test.ts` (con el `.env` del repo principal; plantilla `qct_tpl_88f19b5be81c`
+  reutilizada, base de corrida creada y borrada): `Tests 24 passed (24)`.
+- `pnpm exec vitest related --run <11 archivos tocados>` (con el `.env` del repo principal): salida 0,
+  `Test Files 536 passed (536)`, `Tests 9441 passed | 2 skipped (9443)`.
+
+### Veredicto
+
+T5 hecho: sheet, tope, paso a `ENTREGADO` y estado del listado esperan reales − libres; acondicionamiento
+y «Reparto» siguen con reales. Sin bloqueos.

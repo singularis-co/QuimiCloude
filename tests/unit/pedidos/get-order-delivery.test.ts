@@ -298,3 +298,43 @@ describe('QC-281 — getOrderDelivery con los envases reales del empaque', () =>
     ])
   })
 })
+
+describe('QC-290 — getOrderDelivery espera solo lo pedido', () => {
+  it('R12, R15: los «pedidos» de cada presentacion son los reales menos los libres, y «faltan» sale de ahi', async () => {
+    const m = montar({
+      lineas: [
+        { ...LINEAS[0]!, packedPackages: 6, packedSurplusPackages: 2 },
+        { ...LINEAS[1]!, packedPackages: 12, packedSurplusPackages: 2 },
+        { ...LINEAS[2]!, packedPackages: 2, packedSurplusPackages: 0 },
+      ],
+    })
+    const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)
+
+    expect(
+      vista.lines.map(({ presentationLineId, orderedPackages, deliveredPackages, remainingPackages, batches }) => ({
+        presentationLineId,
+        orderedPackages,
+        deliveredPackages,
+        remainingPackages,
+        lotes: batches.length,
+      })),
+    ).toEqual([
+      { presentationLineId: COMPLETE_LINE_ID, orderedPackages: 4, deliveredPackages: 4, remainingPackages: 0, lotes: 0 },
+      { presentationLineId: PENDING_LINE_ID, orderedPackages: 10, deliveredPackages: 3, remainingPackages: 7, lotes: 2 },
+      { presentationLineId: OTHER_PENDING_LINE_ID, orderedPackages: 2, deliveredPackages: 0, remainingPackages: 2, lotes: 1 },
+    ])
+  })
+
+  it('R12: una linea cuyos libres cubren lo que paso de su plan, ya entregado el plan, no pide lotes', async () => {
+    const m = montar({
+      lineas: [
+        { ...LINEAS[0]!, packedPackages: 6, packedSurplusPackages: 2 },
+        { ...LINEAS[1]!, packedPackages: 10, packedSurplusPackages: 0 },
+        { ...LINEAS[2]!, packedPackages: 2, packedSurplusPackages: 0 },
+      ],
+    })
+    await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)
+
+    expect(m.findDeliverableBatches).toHaveBeenCalledWith(RECETA, [PENDING_PRESENTATION, OTHER_PRESENTATION], EMPRESA)
+  })
+})
