@@ -64,6 +64,7 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: ACTOR_ID,

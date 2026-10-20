@@ -30,6 +30,7 @@ const CONNECTION_SELECT = {
   lastError: true,
   lastCheckedAt: true,
   lastWebhookAt: true,
+  templatesSyncedAt: true,
 } satisfies Prisma.WhatsappConnectionSelect;
 
 type ConnectionRow = Prisma.WhatsappConnectionGetPayload<{ select: typeof CONNECTION_SELECT }>;
@@ -51,6 +52,7 @@ function toRecord(row: ConnectionRow): WhatsappConnectionRecord {
     lastError: row.lastError,
     lastCheckedAt: row.lastCheckedAt,
     lastWebhookAt: row.lastWebhookAt,
+    templatesSyncedAt: row.templatesSyncedAt,
   };
 }
 

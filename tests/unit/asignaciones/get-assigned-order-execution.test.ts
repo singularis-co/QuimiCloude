@@ -52,6 +52,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     quantity: '200',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     presentationLines: [],
     unitId: null,
     finishedAt: null,

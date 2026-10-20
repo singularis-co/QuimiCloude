@@ -69,6 +69,8 @@ function pedido(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail
     unitId: 'unit-1',
     unitLabel: 'l',
     status: 'EN_EMPAQUE',
+    priority: 'MEDIA',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     packedByName: 'Empacador de Prueba',
     packedById: ACTOR_ID,
     packingSteps: [paso('Etiqueta los envases', true), paso('Sella las cajas')],

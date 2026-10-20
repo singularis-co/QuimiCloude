@@ -371,6 +371,7 @@ Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *D
 - **Qué falta:** el caso R32 espera `PrismaClientKnownRequestError` y recibe `ValidationError`. O el test se adapta a la validación previa, o la validación sobra. Entró al baseline con motivo; al arreglarlo, se borra la entrada.
 - **Estado:** resuelta el 2026-10-07 en `chore/rojos-sueltos-d33-packing`. No había validación previa ni la trajeron QC-209/QC-213: el adaptador no cambió desde QC-158. Causa: con un Postgres en inglés (`lc_messages = en_US.utf8`, el de Docker local y el `postgres:17` de CI) Prisma 6.19.3 sí entrega `meta.constraint` en el `P2003`, y el adaptador traduce como pide `QC-52 design.md > 6.2` (presentación/unidad → `invalid_input`, autor → crudo). El test afirmaba el comportamiento degradado de un Postgres en español. Ahora espía el `create` del delegado: exige el rechazo de la base con la restricción de la columna y la traducción correcta; muerde al quitar las FK y al traducir a ciegas o no traducir. Entrada borrada del baseline. Detalle: `progress/fix-rojos-sueltos.md`.
 - **Estado 2026-10-09:** R32 sigue en rojo en local con un Postgres cuyo `lc_messages` está en español (lo vieron QC-234 y QC-237); el CI con `postgres:17` lo pasa. Falta que el test no dependa del idioma o documentar que la base local debe tener `lc_messages=en_US`.
+- **Estado 2026-10-20:** resuelta en `chore/columnas-listas`. Sondeado en un Postgres 16.1 con `lc_messages = Spanish_Colombia.1252`: el `P2003` llega con `meta = { modelName: 'SupplierCatalogLine', constraint: null }`. `createRunDatabase` (`tests/helpers/test-database.ts`) fija ahora `ALTER DATABASE <corrida> SET lc_messages = 'C'`, así la corrida local ve los errores en inglés igual que CI. El test no cambia. Si el rol no es superusuario, avisa por consola y sigue.
 - **Dueño:** sin asignar.
 
 ### D34 — `credential-setup.int.test.ts` R11 intermitente en CI (resuelta)
@@ -623,3 +624,12 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Qué falta:** acotar `timestamp` en el zod de la cabecera y limpiar `\u0000`, o mandar esos
   mensajes a `UNSUPPORTED`. Puede ir en QC-239.
 - **Dueño:** Christian Quevedo.
+
+## QC-242 (review, 2026-10-20)
+
+### D78 — El doble `canned` de Graph no refleja un `APPROVED` llegado por webhook
+- **Origen:** review de QC-242, vuelta 1 (m1).
+- **Qué pasa:** el doble de Graph de plantillas devuelve una lista fija. Si un test aprueba una plantilla por webhook y después sincroniza, la sincronización la vuelve a dejar como la tiene el doble.
+- **Riesgo:** rompe el E2E de QC-243 si ese E2E sincroniza después de aprobar.
+- **Qué falta:** que el spec de QC-243 lo cite y, o bien no sincronice tras aprobar en el E2E, o bien el doble guarde el estado que llega por webhook.
+- **Dueño:** Christian Quevedo (QC-243).

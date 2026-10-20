@@ -15,6 +15,7 @@
  * importar nada y el dominio sigue sin conocer la plataforma. Es el mismo criterio con el que el
  * modulo de observabilidad genera su identificador de peticion.
  */
+import { z } from 'zod';
 
 /** Extension unica: este bucket solo guarda PDFs. */
 const PDF_EXTENSION = '.pdf';
@@ -57,6 +58,16 @@ export function isPathInCompany(path: string, companyId: string): boolean {
   const [head, ...rest] = path.split('/');
   if (head !== companyId || rest.length === 0 || rest.join('/').length === 0) return false;
   return !rest.includes('..');
+}
+
+/**
+ * La empresa de la ruta, o `null` si su primer segmento no es un UUID o la ruta no es valida para
+ * esa empresa. Una consulta por `company_id` con algo que no es UUID la rechazaria la base.
+ */
+export function companyIdOfPath(path: string): string | null {
+  const [head = ''] = path.split('/');
+  if (!z.uuid().safeParse(head).success) return null;
+  return isPathInCompany(path, head) ? head : null;
 }
 
 /** Nombre de archivo de un recorte: `<pagina>-<n>.png`, los dos numericos. */

@@ -25,6 +25,7 @@ const RESUMEN_1 = {
   quantity: '10.0000',
   priority: 'ALTA',
   status: 'POR_EMPACAR',
+  createdAt: new Date('2026-09-01T08:00:00.000Z'),
   presentationLines: [{ presentationId: 'presentacion-1', packages: 1, packagingName: null }],
   unitId: 'unidad-1',
   finishedAt: null,
@@ -39,6 +40,7 @@ const RESUMEN_2 = {
   quantity: '20.0000',
   priority: 'MEDIA',
   status: 'EN_EMPAQUE',
+  createdAt: new Date('2026-08-15T08:00:00.000Z'),
   presentationLines: [{ presentationId: 'presentacion-1', packages: 1, packagingName: null }],
   unitId: null,
   finishedAt: null,
@@ -164,6 +166,8 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
         unitId: 'unidad-1',
         unitLabel: 'L',
         status: 'POR_EMPACAR',
+        priority: 'ALTA',
+        createdAt: new Date('2026-09-01T08:00:00.000Z'),
         packedByName: null,
         packedById: null,
       },
@@ -176,9 +180,31 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
         unitId: null,
         unitLabel: null,
         status: 'EN_EMPAQUE',
+        priority: 'MEDIA',
+        createdAt: new Date('2026-08-15T08:00:00.000Z'),
         packedByName: 'Beto',
         packedById: BETO,
       },
+    ]);
+  });
+
+  it('las filas salen en el orden del catalogo, sin reordenar en memoria', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+    // El catalogo ya ordeno por prioridad desc: el pedido mas antiguo de prioridad menor va despues.
+    listAliveSummariesInCompany.mockResolvedValueOnce({
+      items: [RESUMEN_1, RESUMEN_2],
+      total: 2,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+    });
+    const listPackingOrders = createListPackingOrders(deps);
+
+    const page = await listPackingOrders(ACTOR, { page: 1 });
+
+    expect(page.items.map((item) => [item.id, item.priority])).toEqual([
+      [PEDIDO_1, 'ALTA'],
+      [PEDIDO_2, 'MEDIA'],
     ]);
   });
 

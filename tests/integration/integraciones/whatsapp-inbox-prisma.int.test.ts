@@ -165,7 +165,8 @@ function lote(partial: Partial<InboundBatch>): InboundBatch {
     contacts: [],
     messages: [],
     statuses: [],
-    skipped: { changes: 0, messages: 0, statuses: 0 },
+    templateUpdates: [],
+    skipped: { changes: 0, messages: 0, statuses: 0, templates: 0 },
     ...partial,
   }
 }

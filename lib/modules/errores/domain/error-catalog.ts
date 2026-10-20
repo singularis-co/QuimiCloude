@@ -112,6 +112,12 @@ export const ERROR_MESSAGE_KEY = {
   customer_phone_invalid: 'errors.customer_phone_invalid',
   whatsapp_contact_not_found: 'errors.whatsapp_contact_not_found',
   whatsapp_contact_number_invalid: 'errors.whatsapp_contact_number_invalid',
+  whatsapp_template_not_found: 'errors.whatsapp_template_not_found',
+  whatsapp_template_name_taken: 'errors.whatsapp_template_name_taken',
+  whatsapp_template_rate_limited: 'errors.whatsapp_template_rate_limited',
+  whatsapp_template_rejected: 'errors.whatsapp_template_rejected',
+  whatsapp_meta_rejected: 'errors.whatsapp_meta_rejected',
+  whatsapp_meta_unreachable: 'errors.whatsapp_meta_unreachable',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -280,4 +286,14 @@ export const ERROR_MESSAGES_ES = {
   'errors.customer_phone_invalid': 'Este número no es válido para el país elegido.',
   'errors.whatsapp_contact_not_found': 'La conversación no existe.',
   'errors.whatsapp_contact_number_invalid': 'El número de esta conversación no es un teléfono válido.',
+  'errors.whatsapp_template_not_found': 'No se encontró la plantilla.',
+  'errors.whatsapp_template_name_taken': 'Ya existe una plantilla con ese nombre en ese idioma.',
+  'errors.whatsapp_template_rate_limited':
+    'Meta no permite crear más plantillas por ahora. Intenta de nuevo más tarde.',
+  'errors.whatsapp_template_rejected':
+    'Meta rechazó la plantilla. Revisa el contenido e intenta de nuevo.',
+  'errors.whatsapp_meta_rejected':
+    'Meta rechazó la solicitud. Intenta de nuevo o revisa la conexión.',
+  'errors.whatsapp_meta_unreachable':
+    'No se pudo contactar con Meta. Intenta de nuevo en unos minutos.',
 } as const satisfies Record<ErrorMessageKey, string>;

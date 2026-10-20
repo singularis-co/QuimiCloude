@@ -34,6 +34,8 @@ import {
   PENDING_DELIVERY_TESTID,
   PRESENTATION_NAME_COLUMN_ID,
   PRIORITY_COLUMN_ID,
+  PRODUCTION_COST_COLUMN_ID,
+  PRODUCTION_COST_TESTID,
   RESPONSIBLES_COLUMN_ID,
   STATUS_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
@@ -92,6 +94,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -121,9 +124,10 @@ afterEach(() => {
 // tabla `orders` hacia arriba-, asi que sus dos columnas ya no tienen dato que pintar y la lista
 // acordada baja a ocho. Luego sube a diez con RESPONSABLES, a ONCE con COBERTURA, a DOCE con
 // CLIENTE y a TRECE con POR ENTREGAR, que llega desde el dashboard. El 2026-10-16 baja a DOCE: sale
-// CANTIDAD (decision humana). Sigue siendo cerrada y en un orden acordado.
-describe('las columnas declaradas son exactamente las doce acordadas (R8, R20, R35)', () => {
-  it('en positivo: los doce ids, en el orden acordado', () => {
+// CANTIDAD (decision humana). El 2026-10-20 sube a TRECE con COSTO DE PRODUCCION (decision
+// humana). Sigue siendo cerrada y en un orden acordado.
+describe('las columnas declaradas son exactamente las trece acordadas (R8, R20, R35)', () => {
+  it('en positivo: los trece ids, en el orden acordado', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
@@ -136,9 +140,10 @@ describe('las columnas declaradas son exactamente las doce acordadas (R8, R20, R
       CANCELLATION_REASON_COLUMN_ID,
       COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
+      PRODUCTION_COST_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(ORDER_COLUMNS).toHaveLength(12);
+    expect(ORDER_COLUMNS).toHaveLength(13);
   });
 
   it('en negativo: ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio', () => {
@@ -190,6 +195,7 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
       CANCELLATION_REASON_COLUMN_ID,
       COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
+      PRODUCTION_COST_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
     // `quantity` sigue en `ORDER_QUERYABLE.sortable` -una URL vieja con ese orden no rompe-, pero
@@ -568,12 +574,14 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
 // QC-123 T9 (R18) — el importe NO se pinta en esta ficha (lo pinta QC-122). En positivo, la
 // lista blanca de ids sigue sin ninguna columna de importe; en negativo, las celdas que SI se
 // pueden pintar sin montar el resto de la pantalla (router, dialogos) no dejan escapar el valor.
+// 2026-10-20 (decision humana): el costo SI se pinta, pero solo en su columna propia
+// (`PRODUCTION_COST_COLUMN_ID`, cubierta abajo); las demas celdas siguen sin dejarlo escapar.
 describe('la tabla de pedidos no pinta el importe (R18)', () => {
   it('la tabla de pedidos no pinta el importe (R18)', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
     expect(ids).not.toContain('ingredientsCost');
     expect(ids).not.toContain('importe');
-    expect(ids).toHaveLength(12);
+    expect(ids).toHaveLength(13);
 
     const VALOR_DELATOR = '999999.9999';
     const order = pedido({ ingredientsCost: VALOR_DELATOR });
@@ -592,6 +600,50 @@ describe('la tabla de pedidos no pinta el importe (R18)', () => {
       const { container } = pintarCelda(id, order);
       expect(container.textContent).not.toContain(VALOR_DELATOR);
     }
+  });
+});
+
+// 2026-10-20 — COSTO DE PRODUCCION (decision humana, sin spec): ultima columna de datos.
+describe('la columna «Costo de producción»', () => {
+  it('existe y es la ultima columna de datos, justo antes de las acciones', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+
+    expect(ids.at(-1)).toBe(ACTIONS_COLUMN_ID);
+    expect(ids.at(-2)).toBe(PRODUCTION_COST_COLUMN_ID);
+  });
+
+  it('no ordena ni filtra', () => {
+    const costo = ORDER_COLUMNS.find((column) => column.id === PRODUCTION_COST_COLUMN_ID);
+
+    expect(costo?.sortable).not.toBe(true);
+    expect(costo?.filter).toBeUndefined();
+  });
+
+  it('pinta el importe como dinero, con el valor exacto en el `title` si se redondea', () => {
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: '1234.5670', packagingCost: '0.0000' }));
+
+    const celda = screen.getByTestId(PRODUCTION_COST_TESTID);
+    expect(celda).toHaveTextContent('$1,234.57');
+    expect(celda).toHaveAttribute('title', '1234.567');
+  });
+
+  it('sin costo pinta el marcador de ausencia', () => {
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: null, packagingCost: null }));
+
+    expect(screen.queryByTestId(PRODUCTION_COST_TESTID)).toBeNull();
+    expect(screen.getByTestId(`order-missing-${PRODUCTION_COST_COLUMN_ID}`)).toHaveTextContent(
+      MISSING_VALUE_MARK,
+    );
+  });
+
+  it('NO suma `packagingCost`: los envases ya van dentro de `ingredientsCost`', () => {
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: '12.5000', packagingCost: '2.0000' }));
+
+    const celda = screen.getByTestId(PRODUCTION_COST_TESTID);
+    expect(celda).toHaveTextContent('$12.50');
+    expect(celda).not.toHaveTextContent('$14.50');
+    // Exacto a dos decimales: sin `title`.
+    expect(celda).not.toHaveAttribute('title');
   });
 });
 

@@ -4,6 +4,8 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { ErrorCode } from '@/lib/modules/errores';
 import type {
+  BatchNotice,
+  BatchNoticeReader,
   ClaimedFile,
   CreatedBatch,
   DocumentBatchRepository,
@@ -39,10 +41,19 @@ export async function createBatch(input: NewBatch): Promise<CreatedBatch> {
       select: { id: true },
     });
 
+    // Un milisegundo por posición: el aviso de fin de tanda nombra los fallidos en orden de
+    // subida, y dentro de una transacción todas las filas compartirían instante.
+    const uploadedAt = Date.now();
     const files = await Promise.all(
-      input.paths.map((path) =>
+      input.paths.map((path, index) =>
         tx.documentFile.create({
-          data: { batchId: batch.id, companyId: input.companyId, path },
+          data: {
+            batchId: batch.id,
+            companyId: input.companyId,
+            path,
+            originalName: input.originalNames?.[index] ?? null,
+            createdAt: new Date(uploadedAt + index),
+          },
           select: { id: true, path: true },
         }),
       ),
@@ -178,7 +189,50 @@ export async function readFileForReview(
   };
 }
 
-export const documentBatchRepositoryPrisma: DocumentBatchRepository = {
+const FAILED_NAMES_LIMIT = 3;
+
+/** No reutiliza `readBatch`: aquella alimenta la respuesta al cliente, y esta lleva `createdBy`. */
+export async function readBatchNotice(
+  batchId: string,
+  companyId: string,
+): Promise<BatchNotice | null> {
+  const batch = await prisma.documentBatch.findFirst({
+    where: { id: batchId, companyId },
+    select: { strategy: true, createdBy: true, createdAt: true },
+  });
+  if (batch === null) return null;
+
+  const counts = await prisma.documentFile.groupBy({
+    by: ['status'],
+    where: { batchId, companyId },
+    _count: { _all: true },
+  });
+  const countOf = (status: DocumentFileStatus): number =>
+    counts.find((row) => row.status === status)?._count._all ?? 0;
+
+  const named = await prisma.documentFile.findMany({
+    where: { batchId, companyId, status: 'error', originalName: { not: null } },
+    select: { originalName: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    take: FAILED_NAMES_LIMIT,
+  });
+
+  const done = countOf('done');
+  const failed = countOf('error');
+  const pending = countOf('queued') + countOf('processing');
+  return {
+    strategy: batch.strategy as PdfStrategy,
+    createdBy: batch.createdBy,
+    uploadedAt: batch.createdAt,
+    total: done + failed + pending,
+    done,
+    failed,
+    pending,
+    failedNames: named.flatMap((row) => (row.originalName === null ? [] : [row.originalName])),
+  };
+}
+
+export const documentBatchRepositoryPrisma: DocumentBatchRepository & BatchNoticeReader = {
   createBatch,
   attachMessageId,
   claim,
@@ -186,4 +240,5 @@ export const documentBatchRepositoryPrisma: DocumentBatchRepository = {
   expireStale,
   readBatch,
   readFileForReview,
+  readBatchNotice,
 };

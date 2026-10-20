@@ -529,7 +529,10 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
-import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
+import {
+  listActiveCompanyIds,
+  listAllCompanyIds,
+} from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import { createGetCompanyCountry, createSetCompanyCountry } from '@/lib/modules/identity';
 import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
 import {
@@ -542,7 +545,10 @@ import {
   createReactivateCompany,
   createUpdateCompany,
 } from '@/lib/modules/identity';
-import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
+import {
+  createCompanyMembershipReader,
+  createCompanyRepository,
+} from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
 import {
   createCreateAdministrator,
   createDeleteAdministrator,
@@ -555,7 +561,9 @@ import { createAdministratorRepository } from '@/lib/modules/identity/adapters/d
 import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma';
 import {
   createGetCompanyAddons,
+  createIsCompanyActive,
   createIsCompanyAddonActive,
+  createIsUserInCompany,
   createSetAllCompanyAddons,
   createSetCompanyAddon,
 } from '@/lib/modules/identity';
@@ -875,6 +883,7 @@ const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAlive
 
 const companyRepository = createCompanyRepository();
 const companyAddonRepository = createCompanyAddonRepository();
+const companyMembershipReader = createCompanyMembershipReader();
 const administratorRepository = createAdministratorRepository();
 
 // `orders` es de `pedidos`: `identity` solo ve el puerto.
@@ -1027,6 +1036,8 @@ export const identity = {
   listCompanyEvents: createListCompanyEvents({ companies: companyRepository }),
   // Sin actor: la usan los trabajos que corren sin sesión.
   isCompanyAddonActive: createIsCompanyAddonActive({ addons: companyAddonRepository }),
+  isUserInCompany: createIsUserInCompany({ members: companyMembershipReader }),
+  isCompanyActive: createIsCompanyActive({ members: companyMembershipReader }),
   getCompanyAddons: createGetCompanyAddons({ addons: companyAddonRepository }),
   setCompanyAddon: createSetCompanyAddon({ addons: companyAddonRepository }),
   setAllCompanyAddons: createSetAllCompanyAddons({ addons: companyAddonRepository }),
@@ -2509,6 +2520,34 @@ function documentPipelineFor(reader: AiReader) {
  */
 const documentJobLog: DocumentJobLog = forModule('documentos');
 
+// `notificaciones` se lee al llamar, no al construir: su fachada se declara más abajo.
+const batchFinishedDeps: NonNullable<Parameters<typeof createRunDocumentJob>[0]['batchFinished']> = {
+  notices: documentBatchRepositoryPrisma,
+  log: documentJobLog,
+  listener: {
+    async onBatchFinished(e) {
+      if (e.createdBy === null) {
+        documentJobLog.warn('batch_notice_without_author', { batchId: e.batchId, companyId: e.companyId });
+        return;
+      }
+      await notificaciones.notify({
+        key: 'documentos.tanda_terminada',
+        companyId: e.companyId,
+        dedupeKey: `documentos.tanda_terminada:${e.batchId}`,
+        payload: {
+          recipientUserId: e.createdBy,
+          strategy: e.strategy,
+          uploadedAt: e.uploadedAt,
+          total: e.total,
+          done: e.done,
+          failed: e.failed,
+          failedNames: e.failedNames,
+        },
+      });
+    },
+  },
+};
+
 const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
@@ -2517,6 +2556,7 @@ const runDocumentJob = createRunDocumentJob({
   pdfReading: { isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'lectura_pdf') },
   pipelineFor: documentPipelineFor,
   log: documentJobLog,
+  batchFinished: batchFinishedDeps,
 });
 
 const processingQueue: ProcessingQueue = {
@@ -2635,6 +2675,7 @@ export const documentos = {
   getBatchStatus: createGetBatchStatus({
     repository: documentBatchRepository,
     config: processingConfig,
+    batchFinished: batchFinishedDeps,
   }),
   queueSignature,
   // Las DOS operaciones nuevas de la revision de catalogo, ya cableadas con `catalogImportDeps`
@@ -2747,10 +2788,17 @@ const secretDigest: SecretDigest = secretDigestSha256;
 
 import {
   createCreateWhatsappConnection,
+  createCreateWhatsappTemplate,
+  createDeleteWhatsappTemplate,
   createGetWhatsappConnection,
+  createGetWhatsappTemplate,
+  createListWhatsappTemplates,
   createReceiveWhatsappWebhook,
   createRegenerateWhatsappVerifyToken,
+  createResyncWhatsappTemplates,
   createSetWhatsappConnectionEnabled,
+  createSyncAllWhatsappTemplates,
+  createSyncWhatsappTemplates,
   createTestWhatsappConnection,
   createUpdateWhatsappConnection,
   createVerifyWhatsappWebhook,
@@ -2775,6 +2823,16 @@ import {
   updateLiveWhatsappConnection,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma';
 import { createWhatsappInboxRecorder } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma';
+import {
+  applyWhatsappTemplateSync,
+  applyWhatsappTemplateWebhookUpdates,
+  findLiveWhatsappTemplateById,
+  findLiveWhatsappTemplateByNameAndLanguage,
+  insertCreatedWhatsappTemplate,
+  listLiveWhatsappTemplates,
+  listWhatsappTemplatesForSync,
+  markWhatsappTemplateDeleted,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-template-prisma';
 import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
 import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
@@ -2784,6 +2842,7 @@ import type { WebhookSignature } from '@/lib/modules/integraciones/ports/webhook
 import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository';
 import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client';
 import type { WhatsappInboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-inbox-repository';
+import type { WhatsappTemplateRepository } from '@/lib/modules/integraciones/ports/whatsapp-template-repository';
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory';
 import { whatsappWebhookPath } from '@/lib/shared/routes';
 
@@ -2793,6 +2852,18 @@ const whatsappGraphClient: WhatsappGraphClient = {
     integrationsE2EDoublesEnabled()
       ? whatsappGraphClientCanned.fetchPhoneNumber(input)
       : whatsappGraphClientFetch.fetchPhoneNumber(input),
+  createTemplate: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.createTemplate(input)
+      : whatsappGraphClientFetch.createTemplate(input),
+  listTemplatesPage: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.listTemplatesPage(input)
+      : whatsappGraphClientFetch.listTemplatesPage(input),
+  deleteTemplate: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.deleteTemplate(input)
+      : whatsappGraphClientFetch.deleteTemplate(input),
 };
 
 const whatsappConnectionRepository: WhatsappConnectionRepository = {
@@ -2803,10 +2874,22 @@ const whatsappConnectionRepository: WhatsappConnectionRepository = {
   recordWebhookHandshake: recordWhatsappWebhookHandshake,
 };
 
+const whatsappTemplateRepository: WhatsappTemplateRepository = {
+  listLive: listLiveWhatsappTemplates,
+  findLiveById: findLiveWhatsappTemplateById,
+  findLiveByNameAndLanguage: findLiveWhatsappTemplateByNameAndLanguage,
+  insertCreated: insertCreatedWhatsappTemplate,
+  markDeleted: markWhatsappTemplateDeleted,
+  listForSync: listWhatsappTemplatesForSync,
+  applySync: applyWhatsappTemplateSync,
+  applyWebhookUpdates: applyWhatsappTemplateWebhookUpdates,
+};
+
 const randomSource: RandomSource = randomSourceNode;
 
 const whatsappDeps = {
   connections: whatsappConnectionRepository,
+  templates: whatsappTemplateRepository,
   graph: whatsappGraphClient,
   cipher: secretCipher,
   digest: secretDigest,
@@ -2822,7 +2905,7 @@ const integrationsSwitch: IntegrationsSwitch = {
   isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'integraciones'),
 };
 
-/** Sin Graph ni cola: recibir un webhook no llama hacia fuera. */
+/** `graph` solo lo usa la resincronización, que corre después de responder a Meta. */
 const whatsappWebhookDeps = {
   directory: whatsappWebhookDirectory,
   integrations: integrationsSwitch,
@@ -2831,6 +2914,8 @@ const whatsappWebhookDeps = {
   cipher: secretCipher,
   signature: webhookSignature,
   inbox: whatsappInboxRepository,
+  templates: whatsappTemplateRepository,
+  graph: whatsappGraphClient,
 };
 
 const whatsappContactRepository: WhatsappContactRepository = createWhatsappContactRepository();
@@ -2842,6 +2927,8 @@ const whatsappContactUnitOfWork: WhatsappContactUnitOfWork = {
       return work({ contacts: createWhatsappContactRepository(tx), customerPhones: links, owners: links });
     }),
 };
+
+const whatsappTemplateCronDeps = { ...whatsappWebhookDeps, listCompanyIds: listActiveCompanyIds };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
 
@@ -2952,4 +3039,66 @@ export const integraciones = {
   linkWhatsappContact: createLinkWhatsappContact({ unitOfWork: whatsappContactUnitOfWork }),
   unlinkWhatsappContact: createUnlinkWhatsappContact({ unitOfWork: whatsappContactUnitOfWork }),
   setWhatsappContactBlocked: createSetWhatsappContactBlocked({ contacts: whatsappContactRepository }),
+  listWhatsappTemplates: createListWhatsappTemplates(whatsappDeps),
+  getWhatsappTemplate: createGetWhatsappTemplate(whatsappDeps),
+  createWhatsappTemplate: createCreateWhatsappTemplate(whatsappDeps),
+  syncWhatsappTemplates: createSyncWhatsappTemplates(whatsappDeps),
+  deleteWhatsappTemplate: createDeleteWhatsappTemplate(whatsappDeps),
+  resyncWhatsappTemplates: createResyncWhatsappTemplates(whatsappWebhookDeps),
+  syncAllWhatsappTemplates: createSyncAllWhatsappTemplates(whatsappTemplateCronDeps),
+  verifyCronSecret,
+} as const;
+
+import {
+  createChannelFactory,
+  createGetNotificationSummary,
+  createListNotifications,
+  createMarkAllNotificationsRead,
+  createMarkNotificationRead,
+  createNotify,
+  createPurgeExpiredNotifications,
+  NOTIFICATION_CATALOG,
+  type ChannelRegistry,
+} from '@/lib/modules/notificaciones';
+import { createInAppChannel } from '@/lib/modules/notificaciones/adapters/driven/channels/in-app-channel';
+import { createNotificationLogConsole } from '@/lib/modules/notificaciones/adapters/driven/observability/notification-log-console';
+import { createNotificationInboxPrisma } from '@/lib/modules/notificaciones/adapters/driven/persistence/notification-inbox-prisma';
+import type { CompanyStatus } from '@/lib/modules/notificaciones/ports/company-status';
+import type { RecipientDirectory } from '@/lib/modules/notificaciones/ports/recipient-directory';
+
+const notificationLog = createNotificationLogConsole();
+const notificationInbox = createNotificationInboxPrisma();
+const notificationsClock = () => new Date();
+
+// Hoy solo el canal de la aplicación; los demás se registran aquí cuando existan.
+const notificationChannels: ChannelRegistry = { in_app: createInAppChannel(notificationLog) };
+
+const notificationCompanies: CompanyStatus = {
+  isActive: (companyId) => identity.isCompanyActive(companyId),
+};
+
+const notificationRecipients: RecipientDirectory = {
+  belongsToCompany: (userId, companyId) => identity.isUserInCompany(userId, companyId),
+};
+
+const notificationReadDeps = { inbox: notificationInbox, now: notificationsClock };
+
+/** Fachada de `notificaciones`. El actor lo resuelve la Server Action; `notify` no lo lleva. */
+export const notificaciones = {
+  notify: createNotify({
+    catalog: NOTIFICATION_CATALOG,
+    inbox: notificationInbox,
+    companies: notificationCompanies,
+    recipients: notificationRecipients,
+    channels: createChannelFactory(notificationChannels),
+    log: notificationLog,
+  }),
+  getNotificationSummary: createGetNotificationSummary(notificationReadDeps),
+  listNotifications: createListNotifications(notificationReadDeps),
+  markNotificationRead: createMarkNotificationRead(notificationReadDeps),
+  markAllNotificationsRead: createMarkAllNotificationsRead(notificationReadDeps),
+  purgeExpiredNotifications: createPurgeExpiredNotifications(notificationReadDeps),
+  // La tarea diaria de borrado: la misma puerta que el cron de pedidos y las empresas de una en una.
+  verifyCronSecret,
+  listCompanyIds: listAllCompanyIds,
 } as const;

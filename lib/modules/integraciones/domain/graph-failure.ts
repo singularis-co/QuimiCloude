@@ -1,6 +1,8 @@
 export type GraphFailure = {
   readonly kind: 'rejected' | 'unreachable';
   readonly message: string | null;
+  readonly code?: number | null;
+  readonly subcode?: number | null;
 };
 
 export const GRAPH_UNREACHABLE_MESSAGE = 'No se pudo contactar con Meta.';

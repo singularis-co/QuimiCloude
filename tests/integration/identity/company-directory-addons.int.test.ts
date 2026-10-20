@@ -27,7 +27,10 @@ vi.mock('@/lib/shared/db/prisma', async (importOriginal) => {
 })
 
 import { ADDONS, normalizeCompanyName } from '@/lib/modules/identity'
-import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma'
+import {
+  listActiveCompanyIds,
+  listAllCompanyIds,
+} from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
 type Tx = Prisma.TransactionClient
@@ -95,6 +98,25 @@ describe('listActiveCompanyIds y los añadidos', () => {
       expect(ids).toContain(todosApagados)
       expect(ids).toContain(conTodos)
       expect(ids).not.toContain(deBaja)
+    })
+  })
+})
+
+describe('listAllCompanyIds', () => {
+  it('QC-137 R17: listAllCompanyIds incluye las empresas dadas de baja', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const viva = await seedCompany(tx, { addons: [] })
+      const deBaja = await seedCompany(tx, { addons: [], deleted: true })
+
+      const todas = await listAllCompanyIds()
+      const activas = await listActiveCompanyIds()
+
+      expect(todas).toContain(viva)
+      expect(todas).toContain(deBaja)
+      expect(activas).toContain(viva)
+      expect(activas).not.toContain(deBaja)
+      expect([...todas]).toEqual([...todas].sort())
+      expect(todas).toHaveLength(await tx.company.count())
     })
   })
 })

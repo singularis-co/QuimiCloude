@@ -13,6 +13,7 @@
  * La configuracion de segmento -`runtime`- NO vive aqui sino en `route.ts`: Next la extrae del
  * archivo de ruta analizandolo estaticamente y NO admite que se reexporte.
  */
+import { after } from 'next/server';
 import { z } from 'zod';
 
 import { integraciones } from '@/lib/composition';
@@ -34,6 +35,19 @@ function loggableConnectionId(connectionId: string): string | null {
 function errorMessageOf(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return message.slice(0, ERROR_MESSAGE_MAX_LENGTH);
+}
+
+/** Corre después de mandar el 200: Meta no espera a Graph y un fallo solo deja una línea de log. */
+function scheduleTemplateResync(connectionId: string): void {
+  after(async () => {
+    const outcome = await integraciones.resyncWhatsappTemplates(connectionId);
+    if (outcome.kind === 'failed') {
+      console.error('whatsapp_templates_resync_failed', {
+        connectionId: loggableConnectionId(connectionId),
+        code: outcome.code,
+      });
+    }
+  });
 }
 
 export async function GET(request: Request, context: RouteContext): Promise<Response> {
@@ -99,16 +113,18 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
       });
       return noBody(500);
     case 'stored': {
-      const { changes, messages, statuses } = result.skipped;
-      if (changes + messages + statuses > 0) {
+      const { changes, messages, statuses, templates } = result.skipped;
+      if (changes + messages + statuses + templates > 0) {
         // Solo numeros: quien mira el log ve que la URL o el numero de Meta no casan con la conexion.
         console.warn('whatsapp_webhook_changes_skipped', {
           connectionId: loggableConnectionId(conexionId),
           changes,
           messages,
           statuses,
+          templates,
         });
       }
+      if (result.followUp === 'resync_templates') scheduleTemplateResync(conexionId);
       return noBody(200);
     }
   }

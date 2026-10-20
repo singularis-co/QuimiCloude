@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Notificaciones en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Notificaciones" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Notificaciones · ficha (QC-137)</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">topbar · tb-btn · pop · box (vacío y error) · sk (carga) · spin · toast</span> · <span class="mono">shared/empty-state · error-state</span> · <span class="mono">components/ui/sonner</span></dd>
+      <dt>Nuevo</dt><dd>Campana de la cabecera con conteo de no leídos y panel con todos los avisos guardados · fila de aviso (icono por tono, título, texto, enlace al origen, hora, punto de no leído) · <b>sin página propia y sin ítem en el menú</b></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Popover) · <span class="mono">lucide-react</span> (<span class="mono">Bell</span>, <span class="mono">FileCheck</span>, <span class="mono">FileWarning</span>, <span class="mono">FileX</span>, <span class="mono">VolumeX</span>) · <span class="mono">sonner</span> · tono con la Web Audio API del navegador · carga al hacer scroll con <span class="mono">IntersectionObserver</span> del navegador, sin librería</dd>
+      <dt>Escritorio</dt><dd>Campana a la izquierda de «Cambiar tema» en todas las pantallas privadas · panel de 400 px bajo la campana, alto fijo 520 px con scroll · trae 10 avisos y al acercarse al final carga los siguientes solo · «Marcar todas como leídas» · clic en un aviso lo marca leído y abre su origen</dd>
+      <dt>Tablet</dt><dd>Igual que escritorio</dd>
+      <dt>Teléfono</dt><dd>Campana en la cabecera junto a «Alternar barra lateral» · el panel se ancla a la pantalla: 8 px a los lados y 16 px abajo, con scroll interno · objetivos de 44 px o más · la hora pasa bajo el texto</dd>
+      <dt>Animación</dt><dd>Llega un aviso: la campana se balancea 700 ms, su conteo pulsa 360 ms y la fila nueva entra desde arriba · las filas cargadas por scroll entran con fundido · panel 200/150 ms (pop) · con movimiento reducido nada de eso · el tono suena una vez por navegador, no por pestaña</dd>
+      <dt>Carga al hacer scroll</dt><dd>Al final de la lista: «Cargando más avisos…» con spinner · si falla, «No se pudieron cargar más avisos.» con «Reintentar» · al llegar al último: «No hay más avisos. Se conservan 90 días.»</dd>
+      <dt>Sin audio</dt><dd>Toast informativo «Notificaciones sin sonido» una vez por sesión, con cerrar · no hay botón para silenciar</dd>
+      <dt>Estados</dt><dd>Lista · vacío · cargando (esqueletos) · error con «Reintentar» · conteo 0 oculta la insignia · más de 99 se pinta «99+»</dd>
+      <dt>Por confirmar</dt><dd>Nada</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

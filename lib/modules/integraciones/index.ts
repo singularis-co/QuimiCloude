@@ -10,6 +10,12 @@ export {
   WhatsappContactNotFoundError,
   WhatsappContactNumberInvalidError,
   LinkedCustomerNotFoundError,
+  WhatsappTemplateNotFoundError,
+  WhatsappTemplateNameTakenError,
+  WhatsappTemplateRateLimitedError,
+  WhatsappTemplateRejectedError,
+  WhatsappMetaRejectedError,
+  WhatsappMetaUnreachableError,
 } from './domain/errors';
 export type { SecretContext } from './domain/secret-context';
 export type { Actor } from './domain/actor';
@@ -65,3 +71,24 @@ export {
   createResolveAiProviderForReading,
 } from './domain/resolve-ai-provider-for-reading';
 export { createReportAiProviderOutcome } from './domain/report-ai-provider-outcome';
+export type {
+  TemplateSyncSummary,
+  WhatsappTemplateCategory,
+  WhatsappTemplateList,
+  WhatsappTemplateStatus,
+  WhatsappTemplateView,
+} from './domain/whatsapp-template';
+export { CREATABLE_TEMPLATE_CATEGORIES } from './domain/whatsapp-template';
+export { WHATSAPP_TEMPLATE_LANGUAGES } from './domain/whatsapp-template-languages';
+export type {
+  WhatsappTemplateButton,
+  WhatsappTemplateContent,
+  WhatsappTemplateDraft,
+  WhatsappTemplateIssue,
+} from './domain/whatsapp-template-draft';
+export { TEMPLATE_LIMITS, validateWhatsappTemplateDraft } from './domain/whatsapp-template-draft';
+export { createGetWhatsappTemplate, createListWhatsappTemplates } from './domain/list-whatsapp-templates';
+export { createCreateWhatsappTemplate } from './domain/create-whatsapp-template';
+export { createDeleteWhatsappTemplate } from './domain/delete-whatsapp-template';
+export { createResyncWhatsappTemplates, createSyncWhatsappTemplates } from './domain/sync-whatsapp-templates';
+export { createSyncAllWhatsappTemplates } from './domain/sync-all-whatsapp-templates';
