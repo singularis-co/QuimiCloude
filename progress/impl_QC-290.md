@@ -354,3 +354,43 @@ Corrida 2, solo chromium, servidor nuevo:
 
 Hecho: el caso R29 está verde en chromium y webkit sobre una base propia copiada de la plantilla; la
 primera corrida conjunta tuvo un timeout del login en chromium (arranque en frío) que no es del caso nuevo.
+
+## T9 — Cierre: mapa consolidado R1–R29 → test (implementer, 2026-10-20)
+
+Archivos de toda la feature: `git diff 0105afe1 --stat` (44 archivos). Detalle por tanda en las secciones T0–T8 de arriba.
+`package.json`, `pnpm-lock.yaml` y `docs/dependencias.md` sin cambios desde `0105afe1`.
+
+| R | Test |
+|---|---|
+| R1 | `tests/unit/pedidos/order-packing.test.ts` «R1, R6, R8, R9: con 12 x 1 L + 0 x 5 L acepta y guarda 2 libres…»; `tests/integration/pedidos/finish-with-finished-goods.int.test.ts` «R1, R6, R8, R9, R10: plan 5 x 1 L + 1 x 5 L con real 12 x 1 L + 0 x 5 L termina…»; E2E «R29, R1, R9, R12, R17…» |
+| R2 | `order-packing.test.ts` «R2: con excedente, la linea por encima del plan %s rechaza con invalid_packing_count sin guardar nada» (4 casos); `tests/unit/pedidos/packing-count.test.ts` «R2: marca cada linea con error…» |
+| R3 | `packing-count.test.ts` «R3: una linea sin contenido se informa…», «R3: una unidad inconvertible se informa…»; `order-packing.test.ts` «R3: con excedente, una linea en una unidad que no se convierte…» |
+| R4 | `order-packing.test.ts` «R4, R8: con excedente, sin stock libre del envase…»; `finish-with-finished-goods.int.test.ts` «R4, R8: … supera el stock libre…», «R4: … si el stock libre del envase cubre el exceso… termina» |
+| R5 | `packing-count.test.ts` «R5: sin superar la cantidad no hay libres…», «R5: envasado exacto a la cantidad, sin libres»; `order-packing.test.ts` «R5: con 9 x 1 L + 0 x 5 L…» |
+| R6 | `packing-count.test.ts` «R6: 7 x 1 L + 1 x 5 L deja 2 libres de 1 L», «R6: 12 x 1 L + 0 x 5 L…», «R6: una linea nunca deja mas libres que reales menos plan…»; `order-packed-counts.int.test.ts` «R6, R8: los libres solo caben en una linea contada…» |
+| R7 | `packing-count.test.ts` «R7, P3: excedente de 5 L con 1 L +4 y 5 L +1…», «R7: lo que no llega a un envase entero sigue en el pedido», «R7: a igual contenido manda el orden del reparto» |
+| R8 | `tests/integration/pedidos/order-packed-counts.int.test.ts` «R8: guarda los libres de cada linea con su conteo…», «R8: unos libres por encima de lo que la linea paso de su plan los rechaza la base…»; migración «R8: down.sql revierte exactamente…» |
+| R9 | `finish-with-finished-goods.int.test.ts` «R1, R6, R8, R9, R10…» (un lote de 12 L); E2E (lotes 7 l y 5 l) |
+| R10 | `order-packing.test.ts` «R10: el coste del pedido se reparte entre los 12 L envasados…»; `finish-with-finished-goods.int.test.ts` «R1, R6, R8, R9, R10…» |
+| R11 | `tests/unit/pedidos/schema/order-presentation-lines-packed-surplus-migration.test.ts` «R8, R11: anade la columna entera, NOT NULL y con DEFAULT 0», «R11: no reescribe plan, conteo real ni motivos…»; `order-packed-counts.int.test.ts` «R8, R11: un conteo sin libres guarda 0…»; `packing-count.test.ts` «R11, R12: sin conteo guardado ni libres, espera el plan» |
+| R12 | `tests/unit/pedidos/get-order-delivery.test.ts` «R12, R15: los «pedidos»… reales menos los libres»; `tests/unit/pedidos/list-orders.test.ts` «R12: …12 reales con 2 libres esperan 10»; `tests/integration/pedidos/order-delivery.int.test.ts` «R12, R15: el sheet y el progreso del listado… esperan 10»; E2E |
+| R13 | `tests/unit/pedidos/deliver-order.test.ts` «R13: …pedir 11 es delivery_exceeds_remaining», «R13: con 3 ya entregados, el tope es 10 - 3 = 7»; `order-delivery.int.test.ts` «R13: pedir 11 envases… sin escribir nada» |
+| R14 | `deliver-order.test.ts` y `order-delivery.int.test.ts` «R13, R14: entregar los 10… ENTREGADO» |
+| R15 | `get-order-delivery.test.ts` y `order-delivery.int.test.ts` «R12, R15…» |
+| R16 | `tests/integration/pedidos/direct-delivery-repository.int.test.ts` «R16, R17: los libres de un pedido cubren lo que espera otro TERMINADO…»; `finish-with-finished-goods.int.test.ts` «R1, R6, R8, R9, R10…» (el lote guarda los 12 L) |
+| R17 | `direct-delivery-repository.int.test.ts` «R16, R17: un TERMINADO de 10 con 12 reales y 2 libres espera 10… el excedente es 2»; E2E (Se puede entregar 2) |
+| R18 | existentes, sin tocar y verdes: `get-conditioning-order.test.ts` «R23: la fila y los datos de lote muestran los envases reales…»; `conditioning-batch-data.test.ts` «QC-281 R23»; `list-finished-product-distribution.test.ts` «R27: devuelve tal cual las filas…» (tab Reparto) |
+| R19 | `tests/unit/asignaciones-ui/packing-finish-dialog.test.tsx` «R19, R24: Galón 16 supera 72 L → sin error de línea… Terminar activo», «R19: con excedente y motivos, Terminar envía el conteo real» |
+| R20 | `packing-finish-dialog.test.tsx` «R20: estado del tablero (Galón 16, Botella 17) → un aviso informativo encima del pie…», «R20: con una línea con error de conteo no hay aviso…» |
+| R21 | `packing-finish-dialog.test.tsx` «R21: igual o por debajo de la cantidad no hay aviso ni error», «R21: al volver por debajo de la cantidad el aviso desaparece» |
+| R22 | `packing-finish-dialog.test.tsx` «R22: %s → los libres del aviso son los de packingSurplusByLine» (3 casos); `packing-count.test.ts` «R22: el resultado solo depende de los datos…» |
+| R23 | `packing-finish-dialog.test.tsx` «R23: con excedente el stock del envase sigue bloqueando y sin aviso», «R23: …conteo vacío sigue siendo error…» |
+| R24 | `packing-finish-dialog.test.tsx` «R24: el pie dice siempre «Envasado: total de cantidad», también por encima» |
+| R25 | existentes de QC-170/QC-195, sin tocar: `tests/integration/pedidos/qc170-distribution-concurrency.int.test.ts:340` «bajar la cantidad por debajo de lo repartido rechaza con order_distribution_exceeds_quantity…»; `tests/unit/pedidos/create-order.test.ts:522` «R36 / QC-195 R13: el reparto en envases pasa de la cantidad del pedido…»; `tests/unit/pedidos/update-order.test.ts:615` |
+| R26 | `tests/unit/errores/catalogo.test.ts` (105 códigos); guardia `guard-catalogo-de-errores`; `grep -r packed_exceeds_quantity` vacío fuera de `specs/` y `progress/` |
+| R27 | `tests/unit/asignaciones/finish-packing.test.ts` «R27: el actor con `empaque.modificar` que empaca el pedido termina…», «R27: sin `empaque.modificar` rechaza…», «R27: si el pedido lo empaca otro…», «R27: si el pedido ya no esta EN_EMPAQUE…» |
+| R28 | dependencias sin cambios desde `0105afe1` (`package.json`, `pnpm-lock.yaml`, `docs/dependencias.md`); gate CI |
+| R29 | `e2e/envases-reales-empaque.spec.ts` «R29, R1, R9, R12, R17 - Terminar con 2 envases de 1 l por encima del plan…» (chromium 4/4 y webkit 4/4, en corridas separadas) |
+
+### Gate
+Por decisión del humano (2026-10-20), `./init.sh` no se corre al cerrar las tandas: la suite completa la corre CI (`gate-completo`) en el PR. Solo la tanda 1 lo corrió en local (verde). Lo que se verificó en local está en cada sección.

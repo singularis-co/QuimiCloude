@@ -85,7 +85,7 @@
     entrega pide solo lo pedido → el excedente entregable sin pedido del producto incluye los libres.
   - Hecho: `pnpm exec playwright test e2e/envases-reales-empaque.spec.ts` verde.
 
-- [ ] **T9 — Cierre de tanda**. Depende de todo.
+- [x] **T9 — Cierre de tanda**. Depende de todo.
   - Mapa `R<n> → test` en `progress/impl_QC-290.md` (design §10), incluido R25 con el test existente
     de QC-170 y R28 con el gate.
   - Hecho: `./init.sh` verde; ningún `R<n>` sin test.
