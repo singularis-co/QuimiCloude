@@ -2774,7 +2774,7 @@ import {
   recordWhatsappWebhookHandshake,
   updateLiveWhatsappConnection,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma';
-import { recordWhatsappInbound } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma';
+import { createWhatsappInboxRecorder } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma';
 import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
 import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
@@ -2814,7 +2814,8 @@ const whatsappDeps = {
 };
 
 const whatsappWebhookDirectory: WhatsappWebhookDirectory = { companyOfConnection: companyOfWhatsappConnection };
-const whatsappInboxRepository: WhatsappInboxRepository = { record: recordWhatsappInbound };
+/** Los dueños de cada número se leen con el servicio de `clientes` sobre la transacción de la recepción. */
+const whatsappInboxRepository: WhatsappInboxRepository = createWhatsappInboxRecorder({ ownersOn: customerPhoneLinksOn });
 const webhookSignature: WebhookSignature = webhookSignatureHmac;
 /** La clave del anadido vive aqui, no en el modulo. */
 const integrationsSwitch: IntegrationsSwitch = {

@@ -68,10 +68,10 @@ export function createReceiveWhatsappWebhook(
     const batch = parseWhatsappWebhook(decoded.json, record.phoneNumberId);
     if (batch === null) return { kind: 'ignored', reason: 'unparseable' };
 
-    await deps.inbox.record(batch, record.id, now(), scope);
+    const { discardedBlocked } = await deps.inbox.record(batch, record.id, now(), scope);
     return {
       kind: 'stored',
-      counts: { messages: batch.messages.length, statuses: batch.statuses.length },
+      counts: { messages: batch.messages.length - discardedBlocked, statuses: batch.statuses.length },
       skipped: {
         changes: batch.skipped.changes,
         messages: batch.skipped.messages,

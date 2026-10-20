@@ -63,7 +63,13 @@ type PuertoVigilado = {
   readonly ayudantes: readonly string[]
   /** Si existe, el cableado se lee de esta fabrica del adaptador y no de `lib/composition`. */
   readonly fabrica?: string
+  /** El unico parametro de la fabrica, que cada miembro reenvia primero. Sin el, `db: PrismaLike`. */
+  readonly parametroDeFabrica?: ParametroDeFabrica
 }
+
+type ParametroDeFabrica = { readonly nombre: string; readonly tipo: string }
+
+const PARAMETRO_DB: ParametroDeFabrica = { nombre: 'db', tipo: 'PrismaLike(?:\\s*=\\s*prisma)?' }
 
 const PUERTO: PuertoVigilado = {
   nombre: 'WhatsappConnectionRepository',
@@ -80,7 +86,9 @@ const PUERTO_INBOX: PuertoVigilado = {
   constante: 'whatsappInboxRepository',
   metodosEsperados: 1,
   adaptador: ADAPTADOR_INBOX,
-  ayudantes: ['applyStatus', 'upsertContact'],
+  ayudantes: ['applyStatus', 'findBlockedWaIds', 'upsertContact'],
+  fabrica: 'createWhatsappInboxRecorder',
+  parametroDeFabrica: { nombre: 'deps', tipo: 'WhatsappInboxRecorderDeps' },
 }
 
 const PUERTO_CONTACTOS: PuertoVigilado = {
@@ -488,19 +496,21 @@ function cableadoDe(constante: string, interfaz: string): ReadonlyMap<string, st
 }
 
 /**
- * El objeto que devuelve la fabrica `fabrica(db: PrismaLike [= prisma]): interfaz` del fuente:
- * `{ metodo -> funcion }`. Solo cuenta un miembro `metodo: (a, b) => funcion(db, a, b)`, con `db`
- * primero y los parametros reenviados tal cual y en orden; cualquier otra forma queda con un
- * valor que no es un nombre. `null` si la fabrica no esta, no tiene esa firma o no devuelve un objeto.
+ * El objeto que devuelve la fabrica `fabrica(db: PrismaLike [= prisma]): interfaz` del fuente (o la
+ * de otro parametro unico, como `deps: WhatsappInboxRecorderDeps`): `{ metodo -> funcion }`. Solo
+ * cuenta un miembro `metodo: (a, b) => funcion(db, a, b)`, con ese parametro primero y los demas
+ * reenviados tal cual y en orden; cualquier otra forma queda con un valor que no es un nombre.
+ * `null` si la fabrica no esta, no tiene esa firma o no devuelve un objeto.
  */
 function cableadoEnFabrica(
   fuente: string,
   fabrica: string,
   interfaz: string,
+  parametro: ParametroDeFabrica = PARAMETRO_DB,
 ): ReadonlyMap<string, string> | null {
   const source = vaciarCadenas(sinComentarios(fuente))
   const firma = new RegExp(
-    `^export\\s+function\\s+${fabrica}\\s*\\(\\s*db\\s*:\\s*PrismaLike(?:\\s*=\\s*prisma)?\\s*\\)\\s*:\\s*${interfaz}\\s*\\{`,
+    `^export\\s+function\\s+${fabrica}\\s*\\(\\s*${parametro.nombre}\\s*:\\s*${parametro.tipo}\\s*\\)\\s*:\\s*${interfaz}\\s*\\{`,
     'm',
   ).exec(source)
   if (firma === null) return null
@@ -521,7 +531,7 @@ function cableadoEnFabrica(
     }
     const parametros = porComasDeNivelCero(delegada[2] ?? '')
     const argumentos = porComasDeNivelCero(delegada[4] ?? '')
-    const reenvia = argumentos.join(',') === ['db', ...parametros].join(',')
+    const reenvia = argumentos.join(',') === [parametro.nombre, ...parametros].join(',')
     const funcion = delegada[3] ?? ''
     cableado.set(delegada[1] ?? '', reenvia ? funcion : `${funcion}(${argumentos.join(', ')})`)
   }
@@ -531,10 +541,11 @@ function cableadoEnFabrica(
 function cableadoDelPuerto(puerto: PuertoVigilado): ReadonlyMap<string, string> {
   if (puerto.fabrica === undefined) return cableadoDe(puerto.constante, puerto.nombre)
   const fuente = readFileSync(join(PERSISTENCE_ROOT, puerto.adaptador), 'utf8')
-  const cableado = cableadoEnFabrica(fuente, puerto.fabrica, puerto.nombre)
+  const parametro = puerto.parametroDeFabrica ?? PARAMETRO_DB
+  const cableado = cableadoEnFabrica(fuente, puerto.fabrica, puerto.nombre, parametro)
   expect(
     cableado,
-    `${puerto.adaptador} no declara \`export function ${puerto.fabrica}(db: PrismaLike): ${puerto.nombre}\` que devuelva un objeto`,
+    `${puerto.adaptador} no declara \`export function ${puerto.fabrica}(${parametro.nombre}: ...): ${puerto.nombre}\` que devuelva un objeto`,
   ).not.toBeNull()
   return cableado ?? new Map<string, string>()
 }
@@ -863,6 +874,68 @@ describe('R45 — sensibilidad: los adaptadores con `db` y su fabrica no escapan
     for (const fuente of [sinTipo, sinTipoDeCliente, sinObjeto, conMasCodigo, 'const x = {}\n']) {
       expect(cableadoEnFabrica(fuente, FABRICA, INTERFAZ)).toBeNull()
     }
+  })
+})
+
+// 2026-10-20, QC-239: la recepcion lee los duenos de un numero por su propia transaccion, asi que
+// su adaptador es una fabrica que recibe `deps` y no `db`. Hasta esta fecha el puerto se cableaba
+// en lib/composition a `recordWhatsappInbound` por nombre; ahora se lee de la fabrica, y
+// lib/composition tiene que construir el puerto con ella.
+describe('R2 — la recepcion se cablea por su fabrica, y la fabrica no escapa al barrido', () => {
+  const FABRICA = 'createWhatsappInboxRecorder'
+  const INTERFAZ = 'WhatsappInboxRepository'
+  const DEPS = PUERTO_INBOX.parametroDeFabrica ?? PARAMETRO_DB
+  const fabrica = (miembros: string, firma = `deps: WhatsappInboxRecorderDeps`): string =>
+    `export function ${FABRICA}(${firma}): ${INTERFAZ} {\n` +
+    '  return {\n' +
+    miembros +
+    '  };\n' +
+    '}\n'
+
+  it('lib/composition construye `whatsappInboxRepository` con la fabrica del adaptador, y con nada mas', () => {
+    const fuente = vaciarCadenas(sinComentarios(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8')))
+    expect(fuente).toMatch(new RegExp(`\\bconst\\s+whatsappInboxRepository\\s*:\\s*${INTERFAZ}\\s*=\\s*${FABRICA}\\s*\\(`))
+    expect(fuente).not.toMatch(/\brecordWhatsappInbound\b/)
+  })
+
+  it('control: el miembro que reenvia `deps` y todos sus parametros se lee con su nombre', () => {
+    const cableado = cableadoEnFabrica(
+      fabrica('    record: (batch, connectionId, receivedAt, scope) => recordWhatsappInbound(deps, batch, connectionId, receivedAt, scope),\n'),
+      FABRICA,
+      INTERFAZ,
+      DEPS,
+    )
+    expect([...(cableado?.entries() ?? [])]).toEqual([['record', 'recordWhatsappInbound']])
+  })
+
+  it('un miembro que pierde el ambito, no pasa `deps` primero o tiene cuerpo no queda cableado con nombre', () => {
+    for (const miembro of [
+      '    record: (batch, connectionId, receivedAt, scope) => recordWhatsappInbound(deps, batch, connectionId, receivedAt),\n',
+      '    record: (batch, connectionId, receivedAt, scope) => recordWhatsappInbound(batch, connectionId, receivedAt, scope),\n',
+      '    record: async (batch, connectionId, receivedAt, scope) => { return recordWhatsappInbound(deps, batch, connectionId, receivedAt, scope) },\n',
+    ]) {
+      const cableado = cableadoEnFabrica(fabrica(miembro), FABRICA, INTERFAZ, DEPS)
+      expect(cableado).not.toBeNull()
+      expect([...(cableado?.values() ?? [])].filter((nombre) => /^\w+$/.test(nombre))).toEqual([])
+    }
+  })
+
+  it('una fabrica con otro parametro o sin el tipo del puerto no se lee', () => {
+    const miembro = '    record: (b, c, r, scope) => recordWhatsappInbound(deps, b, c, r, scope),\n'
+    for (const fuente of [
+      fabrica(miembro, 'db: PrismaLike'),
+      fabrica(miembro, 'deps: unknown'),
+      fabrica(miembro).replace(`): ${INTERFAZ} {`, ') {'),
+    ]) {
+      expect(cableadoEnFabrica(fuente, FABRICA, INTERFAZ, DEPS)).toBeNull()
+    }
+  })
+
+  it('una consulta escrita dentro de la propia fabrica da hallazgo', () => {
+    const fuente =
+      "import { whatsappContactCompanyScope } from './company-scope'\n" +
+      fabrica('    record: (b, c, r, scope) => prisma.whatsappContact.findMany({ where: { waId: b } }),\n')
+    expect(hallazgosDe('x.ts', analizarFuente(fuente), false).join('\n')).toMatch(/sin declarar/)
   })
 })
 

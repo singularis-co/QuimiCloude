@@ -76,7 +76,7 @@
   a punta, R21–R24, R26–R29, R33–R35, R42, R45).
 - **Hecho:** verdes; `module-shape.test.ts` actualizado y verde.
 
-## T8 [P] — Recepción con bloqueo y vínculo (depende de T7)
+## [x] T8 [P] — Recepción con bloqueo y vínculo (depende de T7)
 - `whatsapp-inbox-prisma.ts` (`createWhatsappInboxRecorder`), `ports/whatsapp-inbox-repository.ts`,
   `receive-whatsapp-webhook.ts` y su cableado.
 - Tests: `whatsapp-inbox-prisma.int.test.ts` (R15–R20, R39–R41), `receive-whatsapp-webhook.test.ts`
@@ -89,7 +89,7 @@
   R44).
 - **Hecho:** verdes; el test del conteo de lecturas de sesión, verde.
 
-## T10 — Restricciones de contactos y aislamiento (depende de T8)
+## [x] T10 — Restricciones de contactos y aislamiento (depende de T8)
 - `whatsapp-messages-constraints.int.test.ts` (R47, CHECK). Entradas nuevas en
   `tests/integration/aislamiento.json` con su forma y su motivo.
 - **Hecho:** verdes.
