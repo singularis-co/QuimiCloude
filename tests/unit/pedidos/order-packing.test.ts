@@ -857,17 +857,17 @@ describe('createFinishPacking con el conteo real de envases', () => {
     });
   });
 
-  it('R15, R22: lo envasado por encima de la cantidad, sumado en la unidad del pedido, rechaza con packed_exceeds_quantity y deshace todo', async () => {
+  it('R1: lo envasado por encima de la cantidad, sumado en la unidad del pedido, se acepta sin tope propio', async () => {
     const { lines, catalogos, quantity } = lineasMixtas();
     const m = montarConteo({ lines, catalogos, quantity });
 
     // 4 x 200 ml + 1 x 0,4 L = 1,2 L de un pedido de 1 L.
-    await expect(m.terminar([conteo('linea-ml', 4, 'conteo_fisico'), conteo('linea-l', 1)])).resolves.toBe('packed_exceeds_quantity');
+    await expect(m.terminar([conteo('linea-ml', 4, 'conteo_fisico'), conteo('linea-l', 1)])).resolves.toMatchObject({ kind: 'ok' });
 
-    expect(m.deshecho()).toBe(true);
-    expect(m.recordPackedCounts).not.toHaveBeenCalled();
-    expect(m.settlePackagingForOrder).not.toHaveBeenCalled();
-    expect(m.receiveFromOrder).not.toHaveBeenCalled();
+    expect(m.deshecho()).toBe(false);
+    expect(m.recordPackedCounts).toHaveBeenCalled();
+    expect(m.settlePackagingForOrder).toHaveBeenCalled();
+    expect(m.receiveFromOrder).toHaveBeenCalled();
   });
 
   it('R15: lo envasado igual a la cantidad del pedido, con unidades mixtas, se acepta', async () => {

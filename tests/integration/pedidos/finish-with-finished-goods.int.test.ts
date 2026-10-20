@@ -1564,21 +1564,22 @@ describe('Terminar con el conteo real de envases', () => {
     }
   });
 
-  it('R15, R22: lo envasado por encima de la cantidad del pedido rechaza con packed_exceeds_quantity y no cambia nada', async () => {
+  it('R1, R9: lo envasado por encima de la cantidad del pedido se acepta, pasa a POR_ACONDICIONAR y el lote lleva lo real', async () => {
     const { fixture, productId, recipeId } = await sembrar();
     try {
       const { orderId, lineId } = await pedidoEnEmpaque(fixture, recipeId, '10.0000', 10);
-      const antes = await fotoDe(orderId, fixture, recipeId);
 
       const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date(), [
         { lineId, packedPackages: 11, reason: 'conteo_fisico', reasonOther: null },
       ]);
-      expect(resultado).toBe('packed_exceeds_quantity');
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '11' }] });
 
       const despues = await fotoDe(orderId, fixture, recipeId);
-      expect(despues).toEqual(antes);
-      expect(despues.order.status).toBe('EN_EMPAQUE');
-      expect(despues.productoTerminado).toBeNull();
+      expect(despues.order.status).toBe('POR_ACONDICIONAR');
+      expect(despues.lineas[0]?.packedPackages).toBe(11);
+      const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
+      const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { stock: true } });
+      expect(lote.stock.toFixed(4)).toBe('11.0000');
     } finally {
       await borrarFixture(fixture, [productId]);
     }

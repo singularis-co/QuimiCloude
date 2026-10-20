@@ -187,7 +187,9 @@ export {
   checkPackingCounts,
   effectivePackages,
   maxPackagesForLine,
+  orderedPackages,
   packedTotalInOrderUnit,
+  packingSurplusByLine,
 } from './domain/packing-count';
 export type {
   PackedDistributionLine,
@@ -196,6 +198,8 @@ export type {
   PackingDifferenceReason,
   PackingLineError,
   PackingPlanLine,
+  PackingSurplus,
+  SurplusLine,
 } from './domain/packing-count';
 
 /** Implementan `OrderCatalog['startConditioningAliveById']` y `['finishConditioningAliveById']`:

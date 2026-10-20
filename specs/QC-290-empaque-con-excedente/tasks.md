@@ -7,7 +7,7 @@
 
 ## Tasks
 
-- [ ] **T0 — Dominio puro de los libres** (backend). R3, R5, R6, R7, R22.
+- [x] **T0 — Dominio puro de los libres** (backend). R3, R5, R6, R7, R22.
   - `compareDecimals` en `order-distribution.ts`; `packingSurplusByLine` y `orderedPackages` en
     `packing-count.ts` (design §2.1); borrar `maxPackagesForLine`; publicar en `pedidos/index.ts`.
   - Tests en `packing-count.test.ts`: los ejemplos de R5, R6 y P3, una línea sin contenido, unidades
@@ -26,14 +26,14 @@
   - Hecho: tablero aprobado por el humano y copiado a `docs/diseno/canvas/`; texto de P2 escrito en
     `requirements.md > Decisiones cerradas` por `/afinar-feature` o por el humano, y P2 cerrada.
 
-- [ ] **T2 — Migración y esquema** (backend). Depende de T0 solo para el nombre del campo. R8, R11.
+- [x] **T2 — Migración y esquema** (backend). Depende de T0 solo para el nombre del campo. R8, R11.
   - `pnpm run db:migrate:create` → `<ts>_order_presentation_lines_packed_surplus` con
     `migration.sql` y `down.sql` de design §1.2; campo en `db/schema.prisma`.
   - Test de esquema `order-presentation-lines-packed-surplus-migration.test.ts`: columna, default 0,
     CHECK y que `down.sql` revierte exactamente.
   - Hecho: migración aplica y revierte sobre la base de test; test de esquema verde; guardias verdes.
 
-- [ ] **T3 [P] — Retirar `packed_exceeds_quantity`** (backend). R26.
+- [x] **T3 [P] — Retirar `packed_exceeds_quantity`** (backend). R26.
   - `error-codes.ts`, `error-catalog.ts`, `asignaciones/domain/errors.ts`, `asignaciones/index.ts`,
     `asignaciones/domain/finish-packing.ts`, unión en `pedidos/domain/order-catalog.ts` (design §2.5).
   - Tests: `catalogo.test.ts` 106 → 105; quitar los casos de `order-packing-actions.test.ts` (L207)

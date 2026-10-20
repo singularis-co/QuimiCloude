@@ -251,15 +251,6 @@ export class OrderPackingTakenError extends AsignacionesError {
   }
 }
 
-/** Terminar el empaque con mas envases reales de los que caben en la cantidad del pedido. */
-export class PackedExceedsQuantityError extends AsignacionesError {
-  readonly code = 'packed_exceeds_quantity';
-
-  constructor(diagnostic?: string) {
-    super('packed_exceeds_quantity', diagnostic);
-  }
-}
-
 /** Terminar el empaque con mas envases reales de los apartados y sin stock libre del envase para
  *  la diferencia; puede pasar si otro pedido lo aparto despues de abrir el dialogo. */
 export class PackagingStockInsufficientError extends AsignacionesError {

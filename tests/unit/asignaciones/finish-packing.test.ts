@@ -11,7 +11,6 @@ import {
   OrderPackingTakenError,
   OrderWithoutUnitError,
   PackagingStockInsufficientError,
-  PackedExceedsQuantityError,
   PresentationWithoutContentError,
   RecipeNotFoundError,
   UnauthorizedError,
@@ -52,7 +51,6 @@ type Resultado =
   | 'order_without_unit'
   | 'insufficient_material'
   | 'invalid_packing_count'
-  | 'packed_exceeds_quantity'
   | 'packaging_stock_insufficient';
 
 type Estado = { dentroDeRun: boolean; appendDentroDeRun: boolean | null; confirmada: boolean | null };
@@ -648,7 +646,6 @@ describe('QC-281 — finishPacking con el conteo real de envases', () => {
 
   it.each([
     ['invalid_packing_count', ValidationError, 'invalid_input'],
-    ['packed_exceeds_quantity', PackedExceedsQuantityError, 'packed_exceeds_quantity'],
     ['packaging_stock_insufficient', PackagingStockInsufficientError, 'packaging_stock_insufficient'],
   ] as const)('R13: `%s` de `pedidos` deshace la transaccion, no anota y rechaza con su codigo', async (resultado, Esperado, code) => {
     const m = montar({ resultado });

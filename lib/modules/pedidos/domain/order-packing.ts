@@ -76,7 +76,7 @@ type ResolvedLine = {
   readonly packedPackages: number;
 };
 
-type RejectedFinish = 'invalid_packing_count' | 'packed_exceeds_quantity' | 'packaging_stock_insufficient';
+type RejectedFinish = 'invalid_packing_count' | 'packaging_stock_insufficient';
 
 /** Rechazo tras mover el estado: se lanza para que la unidad de trabajo deshaga el `UPDATE`. */
 class FinishPackingRejectedSignal extends Error {
@@ -161,15 +161,14 @@ function toDistributionLines(unitById: ReadonlyMap<string, UnitConversion>, line
   }));
 }
 
-/** Lo envasado de verdad no puede pasar de la cantidad del pedido, con la conversion del reparto. */
-function assertPackedWithinQuantity(
+/** Lo envasado puede superar la cantidad del pedido, pero cada linea tiene que poder sumarse en su unidad. */
+function assertPackedConvertible(
   quantity: string,
   orderUnit: UnitConversion,
   unitById: ReadonlyMap<string, UnitConversion>,
   lines: readonly ResolvedLine[],
 ): void {
   const result = validateDistribution(quantity, orderUnit, toDistributionLines(unitById, lines));
-  if (result.kind === 'exceeds_quantity') throw new FinishPackingRejectedSignal('packed_exceeds_quantity');
   if (result.kind === 'incompatible_units') throw new IncompatibleUnitsError(result.presentationId);
   if (result.kind === 'presentation_without_content') throw new PresentationWithoutContentError(result.presentationId);
 }
@@ -300,7 +299,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         const unitIds = [...new Set([updated.unitId, ...resolvedLines.map((line) => line.unitId)])];
         const unitById = new Map((await deps.units.findRefs(unitIds, companyId)).map((ref) => [ref.id, ref] as const));
         const orderUnit = requireUnit(unitById, updated.unitId);
-        assertPackedWithinQuantity(updated.quantity, orderUnit, unitById, resolvedLines);
+        assertPackedConvertible(updated.quantity, orderUnit, unitById, resolvedLines);
 
         await scope.orders.recordPackedCounts(id, counts, { companyId });
 
