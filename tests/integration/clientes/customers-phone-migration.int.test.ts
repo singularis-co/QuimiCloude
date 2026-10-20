@@ -38,6 +38,9 @@ async function inRolledBackTransaction(
 }
 
 const CHECK_VIOLATION = '23514'
+/** `string_data_right_truncation`: `VARCHAR(2)` corta un valor mas largo antes de que el CHECK
+ *  llegue a mirarlo. Tambien es un rechazo de R15. */
+const STRING_TOO_LONG = '22001'
 const UNIQUE_VIOLATION = '23505'
 let savepointSeq = 0
 
@@ -194,7 +197,16 @@ describe('migracion customers_phone_e164 contra Postgres real', () => {
   it('R15: la base rechaza un phone_country que no son dos letras mayusculas', async () => {
     await inRolledBackTransaction(async (tx) => {
       const companyId = await createCompany(tx)
-      for (const valor of ['col', 'co', 'C1']) {
+      // Mas de dos caracteres: lo para la longitud de la columna. De dos caracteres invalidos: el CHECK.
+      for (const valor of ['col', 'COL']) {
+        const sqlState = await expectRejectedByDatabase(
+          tx,
+          () => insertCustomer(tx, companyId, { phone: '1', phoneCountry: valor }),
+          `phone_country=${valor}`,
+        )
+        expect(sqlState).toBe(STRING_TOO_LONG)
+      }
+      for (const valor of ['co', 'C1', 'c', 'C-']) {
         const sqlState = await expectRejectedByDatabase(
           tx,
           () => insertCustomer(tx, companyId, { phone: '1', phoneCountry: valor }),

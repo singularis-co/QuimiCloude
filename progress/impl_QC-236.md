@@ -449,3 +449,13 @@ que estaban fuera del encargo.
 
 ### Veredicto
 H2 (UI), H3 y N1–N4 resueltos en el campo y en la lista. Verde en typecheck, lint y tests.
+
+## Rojos de CI del PR #276 (2026-10-19)
+
+- Antes de tocar nada se mergeó `origin/dev` en la rama (merge limpio, 48 commits): la rama iba por detrás y `data-table-alcance` ya decía «cincuenta y tres» en `dev`; editar sobre la copia vieja habría chocado en el PR.
+- **Columnas** — `tests/integration/clientes/customers-constraints.int.test.ts`: la lista exacta de columnas de `customers` incluye `phone_country`, `phone_e164` y `phone_issue`.
+- **R15** — `tests/integration/clientes/customers-phone-migration.int.test.ts`: `col`/`COL` exigen `22001` (los corta `VARCHAR(2)`); `co`, `C1`, `c`, `C-` exigen `23514` (el CHECK `^[A-Z]{2}$`). La migración no cambia.
+- **R27 / D6, bug real** — `lib/modules/clientes/adapters/driven/persistence/legacy-phone-prisma.ts`: el `@updatedAt` de Prisma sellaba `updated_at` con la hora de la corrida. Ahora la lectura trae `updatedAt`. El `updateMany` lo reescribe con el valor leído y además exige en el `where` que no se haya movido (en el mismo milisegundo). Se mantienen `PENDING`, el ámbito y `count === 1`. No se pasó a SQL crudo porque el reintento depende de `P2002` (`isPhoneUniqueViolation`), y en `$executeRaw` ese error llega como `P2010`.
+  - Test: `tests/unit/clientes/legacy-phone-prisma.test.ts` › «R27 — cada UPDATE reescribe el updatedAt leido y exige que no se haya movido».
+- **Alcance de data-table** — `tests/unit/shared/data-table-alcance.test.ts`: entra `e2e/clientes-telefono.spec.ts` antes de `e2e/clientes.spec.ts` (`-` precede a `.`), y «cincuenta y tres» pasa a «cincuenta y cuatro».
+- Los `.int` no se corrieron aquí (no hay base de test). Se razonaron contra `db/migrations/20261019130000_customers_phone_e164/migration.sql`.

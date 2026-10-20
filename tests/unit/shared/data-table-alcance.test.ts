@@ -719,7 +719,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // las tarjetas `data-table-card-<id>` dentro de `data-table-cards` con sus campos
   // `data-table-card-field-<id>` y el menu centrado de «Acciones». El centinela pasa de CINCUENTA Y
   // DOS a CINCUENTA Y TRES; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y tres', () => {
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y cuatro', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -729,7 +729,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cincuenta y tres E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cincuenta y cuatro E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -756,6 +756,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/catalogo-desde-pdf.spec.ts',
       // Ver la nota de arriba. Va antes que `e2e/ejecucion-receta.spec.ts` porque la lista esta
       // ORDENADA y 'c' precede a 'e'.
+      'e2e/clientes-telefono.spec.ts',
       'e2e/clientes.spec.ts',
       // Ver la nota de arriba (2026-10-14, QC-271). Entre `clientes` y `dashboard-rediseno` porque
       // la lista esta ORDENADA: 'cl' precede a 'co', y 'c' precede a 'd'.
