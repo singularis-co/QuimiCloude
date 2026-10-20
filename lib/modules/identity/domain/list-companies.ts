@@ -3,7 +3,7 @@ import { ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { requirePlatformPermission, type PlatformActor } from './platform-actor';
 
-import type { CompanyRow } from './company-view';
+import { toCompanyRow, type CompanyRow } from './company-view';
 import type { Page } from './page';
 
 import type { CompanyRepository } from '../ports/company-repository';
@@ -33,6 +33,7 @@ export function createListCompanies(
     const { query, ignored } = sanitizeListQuery(parsed.data, COMPANY_QUERYABLE);
     deps.log.ignoredFields(LIST_NAME, ignored);
 
-    return deps.companies.list(query);
+    const page = await deps.companies.list(query);
+    return { ...page, items: page.items.map(toCompanyRow) };
   };
 }

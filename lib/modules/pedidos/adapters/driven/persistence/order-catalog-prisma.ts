@@ -82,6 +82,7 @@ type AssignedOrderSummaryRow = {
   readonly quantity: { toFixed(digits: number): string };
   readonly priority: string;
   readonly status: string;
+  readonly createdAt: Date;
   readonly unitId: string | null;
   readonly presentationLines: readonly AssignedOrderPresentationLineRow[];
   readonly finishedAt: Date | null;
@@ -104,6 +105,7 @@ const SUMMARY_SELECT = {
   quantity: true,
   priority: true,
   status: true,
+  createdAt: true,
   unitId: true,
   presentationLines: {
     select: {
@@ -166,6 +168,7 @@ export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummary
     quantity: row.quantity.toFixed(4),
     priority: row.priority as AssignedOrderSummary['priority'],
     status: row.status as OrderStatus,
+    createdAt: row.createdAt,
     unitId: row.unitId,
     presentationLines: row.presentationLines.map(
       (line): OrderSummaryLineRecord => ({

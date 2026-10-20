@@ -15,7 +15,7 @@ import type { CompanyEventKind, CompanyField } from '../../../domain/company-eve
 import type {
   CompanyDetail,
   CompanyEventView,
-  CompanyRow,
+  CompanyListRecord,
   CompanyStatus,
 } from '../../../domain/company-view';
 import type { ListQuery } from '../../../domain/list-query';
@@ -151,8 +151,11 @@ type CompanyListRow = {
   id: string;
   name: string;
   tax_id: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
   country: string | null;
   live_user_count: number;
+  addon_keys: string[];
   created_at: Date;
   deleted_at: Date | null;
 };
@@ -310,13 +313,16 @@ export function createCompanyRepository(db: PrismaLike = prisma): CompanyReposit
       );
     },
 
-    async list(query: ListQuery): Promise<Page<CompanyRow>> {
+    async list(query: ListQuery): Promise<Page<CompanyListRecord>> {
       const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
       const where = listWhere(query);
       const rows = await db.$queryRaw<CompanyListRow[]>`
-        SELECT c.id, c.name, c.tax_id, c.country, c.created_at, c.deleted_at,
+        SELECT c.id, c.name, c.tax_id, c.contact_email, c.contact_phone, c.country, c.created_at,
+          c.deleted_at,
           (SELECT count(*)::int FROM users u
-            WHERE u.company_id = c.id AND u.deleted_at IS NULL) AS live_user_count
+            WHERE u.company_id = c.id AND u.deleted_at IS NULL) AS live_user_count,
+          ARRAY(SELECT o.addon_key FROM company_addon_overrides o
+            WHERE o.company_id = c.id AND o.enabled) AS addon_keys
         FROM companies c
         ${where}
         ${listOrderBy(query)}
@@ -324,14 +330,17 @@ export function createCompanyRepository(db: PrismaLike = prisma): CompanyReposit
       const totals = await db.$queryRaw<Array<{ total: number }>>`
         SELECT count(*)::int AS total FROM companies c ${where}`;
       const items = rows.map(
-        (row): CompanyRow => ({
+        (row): CompanyListRecord => ({
           id: row.id,
           name: row.name,
           taxId: row.tax_id,
+          contactEmail: row.contact_email,
+          contactPhone: row.contact_phone,
           country: row.country,
           liveUserCount: row.live_user_count,
           createdAt: row.created_at,
           status: statusOf(row.deleted_at),
+          storedAddons: row.addon_keys,
         }),
       );
       return buildPage(items, totals[0]?.total ?? 0, query.page, limit);

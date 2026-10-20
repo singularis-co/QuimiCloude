@@ -14,7 +14,7 @@ import type { StepEvidenceView } from './step-evidence';
 
 import type { AssignedOrderSummary } from '@/lib/modules/pedidos';
 import type { RecipeStepView } from '@/lib/modules/recetas';
-import { formatOrderNumber, type OrderStatus } from '@/lib/modules/pedidos';
+import { formatOrderNumber, type OrderPriority, type OrderStatus } from '@/lib/modules/pedidos';
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import type { UnitConversion, UnitRef } from '@/lib/modules/unidades';
 
@@ -34,6 +34,9 @@ export type PackingOrderRow = {
   readonly unitId: string | null;
   readonly unitLabel: string | null;
   readonly status: OrderStatus;
+  readonly priority: OrderPriority;
+  /** La fecha de solicitud del pedido. */
+  readonly createdAt: Date;
   readonly packedByName: string | null;
   readonly packedById: string | null;
 };
@@ -108,6 +111,8 @@ export async function composePackingOrderRows(
       unitId: order.unitId,
       unitLabel: rowComposed?.unitLabel ?? null,
       status: order.status,
+      priority: order.priority,
+      createdAt: order.createdAt,
       packedByName: order.packedBy === null ? null : packerNames.get(order.packedBy) ?? order.packedBy,
       packedById: order.packedBy,
     };

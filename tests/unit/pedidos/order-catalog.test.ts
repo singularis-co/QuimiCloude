@@ -222,6 +222,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'PENDIENTE',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
       unitId: 'u-1',
       presentationLines: [
         { id: 'lp-1', presentationId: 'p-1', packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null },
@@ -244,6 +245,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'PENDIENTE',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
       unitId: null,
       presentationLines: [],
       finishedAt: null,
@@ -262,6 +264,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'PENDIENTE',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
       presentationLines: [],
       finishedAt: null,
       packedBy: null,
@@ -270,6 +273,28 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
 
     expect(toOrderSummaryRecord({ ...filaBase, unitId: 'u-1' }).unitId).toBe('u-1')
     expect(toOrderSummaryRecord({ ...filaBase, id: 'o-1c', unitId: null }).unitId).toBeNull()
+  })
+
+  it('copia la prioridad y la fecha de solicitud (createdAt) tal cual', () => {
+    const solicitado = new Date('2026-03-04T05:06:07.000Z')
+    const resumen = toOrderSummaryRecord({
+      id: 'o-1d',
+      orderYear: 2026,
+      orderSequence: 8,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'CRITICA',
+      status: 'POR_EMPACAR',
+      createdAt: solicitado,
+      unitId: null,
+      presentationLines: [],
+      finishedAt: null,
+      packedBy: null,
+      conditionedBy: null,
+    })
+
+    expect(resumen.priority).toBe('CRITICA')
+    expect(resumen.createdAt).toBe(solicitado)
   })
 
   it('R20: copia finishedAt tal cual, con y sin fecha', () => {
@@ -282,6 +307,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'ENTREGADO',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
       unitId: null,
       presentationLines: [],
       finishedAt: fecha,
@@ -298,6 +324,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'ENTREGADO',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
       unitId: null,
       presentationLines: [],
       finishedAt: null,
@@ -316,6 +343,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'EN_EMPAQUE',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
       unitId: null,
       presentationLines: [],
       finishedAt: null,
@@ -332,6 +360,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'POR_EMPACAR',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
       unitId: null,
       presentationLines: [],
       finishedAt: null,
@@ -358,6 +387,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       ...filaBase,
       id: 'o-7',
       status: 'EN_ACONDICIONAMIENTO',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
       conditionedBy: 'u-2',
     })
     expect(conAcondicionador.conditionedBy).toBe('u-2')
@@ -366,6 +396,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       ...filaBase,
       id: 'o-8',
       status: 'POR_ACONDICIONAR',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
       conditionedBy: null,
     })
     expect(sinAcondicionador.conditionedBy).toBeNull()
