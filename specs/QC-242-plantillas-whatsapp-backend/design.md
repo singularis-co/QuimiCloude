@@ -1,0 +1,954 @@
+# QC-242 — plantillas-whatsapp-backend · design.md
+
+> Zona: `backend` · Complejidad: `medium` · depends_on: QC-237, QC-238 · Rama:
+> `feature/QC-242-plantillas-whatsapp-backend`
+>
+> El **qué** está en `requirements.md` (R1–R52). Aquí va el **cómo**. Precedentes que se copian:
+>
+> - **QC-237**: `WhatsappConnectionRepository`, `decryptStoredSecret` (descifrar y dejar la conexión en
+>   `ERROR` si el secreto es ilegible), `metaMessageOf` (tachar secretos en un texto de Meta), el
+>   cliente de Graph con su doble `canned` para E2E, el patrón de Server Actions con `currentActor` y
+>   `createErrorStateTranslator`.
+> - **QC-238**: `parseWhatsappWebhook` → `InboundBatch`, `createReceiveWhatsappWebhook`, la ruta
+>   `whatsapp-webhook-route.ts`, `resolveWebhookConnection` (ámbito sacado de la fila) y la guardia
+>   `guard-ambito-empresa-integraciones.test.ts`.
+> - **QC-141**: el cron `caducar-pedidos` (`order-expiry-cron-route.ts`, `verifyCronSecret`,
+>   `createExpireStaleOrders` recorriendo empresas una a una con `listActiveCompanyIds`, presupuesto de
+>   240 s y `maxDuration = 300`).
+>
+> **Regla transversal.** Manda `docs/conventions.md > Comentarios`: ningún comentario nuevo cita
+> `QC-<n>`, `R<n>`, `design.md` ni «decisión cerrada». En los tests, `R<n>` va en el nombre del caso.
+
+---
+
+## Lo que ya existe
+
+Buscado `plantilla`, `template`, `message_template`, `hsm`, `WhatsappTemplate`/`whatsapp_templates`
+y `sincroniz` en:
+
+- `feature_list.json`, por `name` y `description`, en todos los estados;
+- `specs/` con grep;
+- el código: Grep sobre `lib/`, `app/`, `db/` y `tests/`. El MCP del grafo responde
+  (`list_projects`), pero no tiene indexado este worktree; se usó Grep/Read.
+
+| Apareció | Qué es | Qué se hace |
+|---|---|---|
+| QC-243 `plantillas-whatsapp-frontend` (`pending`) | La pantalla que consume esta ficha | Frontera en §15. No se solapa |
+| QC-240, QC-241 (`pending`) | Envío con plantilla (nombre, idioma, parámetros); `whatsapp_messages.template_name` | Consumidores; QC-240 dice «validar la plantilla contra el catálogo local: ficha de plantillas», y la ficha de aquí lo deja a Contactos. Frontera en §15 |
+| QC-245, QC-247 (`pending`) | Contactos y notificaciones: eligen plantillas aprobadas | Consumen el filtro «solo aprobadas» (R44) |
+| QC-119 `webhook-whatsapp-recepcion` (`cancelled`) | Épica antigua | Nada que reutilizar |
+| QC-237 (`done`) | `WhatsappGraphClient.fetchPhoneNumber`, `whatsappGraphClientFetch`/`Canned`, `GraphFailure`, `metaMessageOf`, `decryptStoredSecret`, `readStoredSecret`, `createCreateWhatsappConnection`, `whatsapp-connection-actions.ts`, `WHATSAPP_INTEGRATION_ROUTE`, `WHATSAPP_SETUP_GUIDE_STEPS` | **Se reutiliza.** El puerto de Graph gana tres métodos (§6), la creación de conexión gana la importación inicial (§4.7), la guía gana un paso (§13). QC-237 §13 ya dejó escrito que QC-242 amplía el cliente de Graph sobre `wabaId` |
+| QC-238 (`done`) | `parseWhatsappWebhook` (hoy salta todo `field !== 'messages'`), `createReceiveWhatsappWebhook`, `whatsapp-webhook-route.ts`, `resolveWebhookConnection`, `IntegrationsSwitch` | **Se reutiliza.** El parser gana los dos campos de plantillas (§7); el caso de uso gana un paso; la ruta programa la resincronización con `after` |
+| QC-141 (`done`) | `verifyCronSecret` (adaptador de `pedidos`), `order-expiry-cron-route.ts`, `listActiveCompanyIds` (adaptador de `identity`) | **Se reutiliza** `verifyCronSecret` y `listActiveCompanyIds` cableados en `lib/composition`; se copia la forma de la ruta y del recorrido |
+| `tests/unit/integraciones/whatsapp/whatsapp-webhook-payload.test.ts` R14 | Usa `message_template_status_update` como ejemplo de «campo que se ignora» | Se cambia el ejemplo por otro campo (`account_update`): el de plantillas deja de ignorarse |
+| Ningún modelo, puerto ni ruta de plantillas | — | Nacen aquí |
+
+Conclusión: no existe nada que resuelva parte del alcance; se sigue reutilizando lo de QC-237, QC-238
+y QC-141. La ficha no crea UI: el único archivo de `app/(private)` que toca es una cadena más en la
+lista de pasos de la guía (§13, [P8]); no se consulta `components/shared/CATALOGO.md` y no hay pase
+`/design`.
+
+---
+
+## 1. Qué cambia (resumen)
+
+```
+db/schema.prisma                                        ← 2 enums, WhatsappTemplate, + templatesSyncedAt en WhatsappConnection
+db/migrations/20261020120000_whatsapp_templates/{migration,down}.sql
+app/api/cron/sincronizar-plantillas-whatsapp/route.ts   ← reexporta GET, runtime, maxDuration
+vercel.json                                             ← + 1 cron
+app/(private)/integraciones/whatsapp/components/whatsapp-setup-guide.tsx  ← + 1 paso (texto)
+lib/modules/errores/domain/{error-codes,error-catalog}.ts                 ← + 6 códigos
+lib/modules/integraciones/
+  index.ts                                              ← + fábricas, validador, tipos
+  domain/
+    errors.ts                                           ← + 6 errores
+    whatsapp-template.ts                                ← constantes, tipos, record, vista
+    whatsapp-template-languages.ts                      ← lista de idiomas
+    whatsapp-template-draft.ts                          ← validador puro (R6–R13)
+    whatsapp-template-components.ts                     ← borrador ⇄ componentes de Meta
+    whatsapp-template-meta.ts                           ← interpretar una plantilla de Meta (R4, R26)
+    template-graph-failure.ts                           ← fallo de Graph → error de dominio (R19, R43)
+    template-sync-plan.ts                               ← plan puro de sincronización (R23–R25)
+    sync-whatsapp-templates.ts                          ← núcleo común + manual + reintento del webhook
+    sync-all-whatsapp-templates.ts                      ← el cron
+    list-whatsapp-templates.ts                          ← listar y consultar
+    create-whatsapp-template.ts
+    delete-whatsapp-template.ts
+    template-connection.ts                              ← conexión viva utilizable (R15, R20)
+    whatsapp-template-webhook.ts                        ← zod de los dos campos (R36–R41)
+    whatsapp-webhook-payload.ts                         ← + templateUpdates en InboundBatch
+    receive-whatsapp-webhook.ts                         ← + aplicar cambios de plantillas, followUp
+    create-whatsapp-connection.ts                       ← + importación inicial (R29, R30)
+    whatsapp-connection.ts                              ← + templatesSyncedAt en el record
+  ports/
+    whatsapp-graph-client.ts                            ← + createTemplate, listTemplatesPage, deleteTemplate
+    whatsapp-template-repository.ts                     ← nuevo
+  adapters/driven/
+    graph/whatsapp-graph-client-fetch.ts                ← + 3 llamadas
+    graph/whatsapp-graph-client-canned.ts               ← + 3 llamadas en memoria
+    persistence/company-scope.ts                        ← + whatsappTemplateCompanyScope
+    persistence/whatsapp-template-prisma.ts             ← nuevo
+    persistence/whatsapp-connection-prisma.ts           ← + templatesSyncedAt en el select
+  adapters/driving/
+    whatsapp-template-actions.ts                        ← 4 Server Actions
+    whatsapp-template-cron-route.ts                     ← GET del cron
+    whatsapp-webhook-route.ts                           ← + after(resync)
+    whatsapp-connection-actions.ts                      ← + log de la importación inicial fallida
+lib/composition/index.ts                                ← amplía `integraciones`
+tests/**                                                ← §14
+```
+
+---
+
+## 2. Modelo de datos
+
+### 2.1 Prisma
+
+```prisma
+enum WhatsappTemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+  @@map("whatsapp_template_category")
+}
+
+enum WhatsappTemplateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAUSED
+  DISABLED
+  OTHER
+  @@map("whatsapp_template_status")
+}
+
+/// @module integraciones
+model WhatsappTemplate {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String                   @map("company_id") @db.Uuid
+  connectionId   String                   @map("connection_id") @db.Uuid
+  metaTemplateId String                   @map("meta_template_id")
+  name           String
+  language       String
+  category       WhatsappTemplateCategory
+  components     Json                     @default("[]")
+  status         WhatsappTemplateStatus
+  statusRaw      String?                  @map("status_raw")
+  rejectedReason String?                  @map("rejected_reason")
+  lastSyncedAt   DateTime?                @map("last_synced_at") @db.Timestamptz(6)
+  createdById    String?                  @map("created_by") @db.Uuid
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?                @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([connectionId, metaTemplateId], map: "whatsapp_templates_connection_meta_id_key")
+  @@index([createdById], map: "whatsapp_templates_created_by_idx")
+  @@map("whatsapp_templates")
+}
+```
+
+`WhatsappConnection` gana `templatesSyncedAt DateTime? @map("templates_synced_at") @db.Timestamptz(6)`
+([P6]).
+
+Decisiones del modelo:
+
+- **`metaTemplateId` como texto.** Meta da el id como cadena de dígitos en Graph; como número en el
+  webhook (§7). Un número grande pierde precisión en `JSON.parse`: el id no casa, la plantilla parece
+  desconocida y R38 la resincroniza, que la corrige. Se acepta y se fija en un test.
+- **`statusRaw` solo con `OTHER`** (R4, D5): `CHECK ((status = 'OTHER') = (status_raw IS NOT NULL))`.
+- **`createdById` nulo** para las importadas (R23). FK a `users(id)` escrita a mano, como QC-237.
+- **`components` en el formato de Meta**, tal como lo devuelve `GET message_templates` (las creadas
+  aquí guardan lo enviado, que tiene la misma forma). Así una importada con header de imagen u OTP se
+  guarda entera, y la fase 2 de headers con archivo no cambia el modelo (D3).
+- **Único parcial `(connection_id, name, language) WHERE deleted_at IS NULL`** ([P1]) solo en la
+  migración (Prisma no expresa parciales), como `whatsapp_connections_company_live_key`. El único
+  total `(connection_id, meta_template_id)` sí va en Prisma: es la clave del `upsert` de la
+  sincronización y de la carrera de §4.4.
+- **Sin `@relation`**: FK compuestas a mano en la migración (QC-237, QC-238), para que ningún
+  `include` cruce de empresa.
+
+### 2.2 Migración `20261020120000_whatsapp_templates`
+
+Escrita a mano, en orden:
+
+1. `CREATE TYPE "whatsapp_template_category"` y `"whatsapp_template_status"`.
+2. `CREATE TABLE "whatsapp_templates"` con las columnas de §2.1; `updated_at` sin default;
+   `CHECK (length(meta_template_id) > 0)`, `CHECK (length(name) > 0)`, `CHECK (length(language) > 0)`
+   y el `CHECK` de `status_raw`.
+3. Índices: `whatsapp_templates_connection_meta_id_key` (único),
+   `CREATE UNIQUE INDEX "whatsapp_templates_name_language_live_key" ON "whatsapp_templates"
+   ("connection_id", "name", "language") WHERE "deleted_at" IS NULL`, `whatsapp_templates_created_by_idx`.
+4. FK (R1): `(company_id, connection_id) → whatsapp_connections (company_id, id)` (clave
+   `whatsapp_connections_company_id_id_key` de QC-237), `company_id → companies(id)`,
+   `created_by → users(id)`; todas `ON DELETE RESTRICT ON UPDATE CASCADE`.
+5. `ALTER TABLE "whatsapp_connections" ADD COLUMN "templates_synced_at" TIMESTAMPTZ(6)`.
+6. `ENABLE` y `FORCE ROW LEVEL SECURITY` en `whatsapp_templates`, sin policies (R50).
+
+`down.sql`: `ALTER TABLE "whatsapp_connections" DROP COLUMN "templates_synced_at"`,
+`DROP TABLE "whatsapp_templates"`, los dos `DROP TYPE`.
+
+`guard-empresa-en-esquema`: la tabla tiene `company_id`. `guard-rls-force` la ve por la migración. Sin
+filas de permisos: se usa `integraciones.modificar`, que ya existe.
+
+---
+
+## 3. Dominio: la plantilla
+
+### 3.1 Tipos (`domain/whatsapp-template.ts`)
+
+```ts
+export const WHATSAPP_TEMPLATE_CATEGORIES = ['MARKETING', 'UTILITY', 'AUTHENTICATION'] as const;
+export const CREATABLE_TEMPLATE_CATEGORIES = ['MARKETING', 'UTILITY'] as const;          // [P5]
+export const KNOWN_TEMPLATE_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'PAUSED', 'DISABLED'] as const;
+export type WhatsappTemplateStatus = (typeof KNOWN_TEMPLATE_STATUSES)[number] | 'OTHER';
+
+export type WhatsappTemplateRecord = {          // nunca sale del módulo
+  id; companyId; connectionId; metaTemplateId; name; language; category; components: unknown;
+  status; statusRaw: string | null; rejectedReason: string | null; lastSyncedAt: Date | null;
+  createdById: string | null; createdAt: Date; deletedAt: Date | null;
+};
+
+export type WhatsappTemplateView = {            // R46, campo a campo, sin spread
+  id; name; language; category; status; statusRaw; rejectedReason;
+  content: WhatsappTemplateContent | null;
+  lastSyncedAt: string | null; createdAt: string;
+};
+
+export type WhatsappTemplateList = {
+  templates: readonly WhatsappTemplateView[];
+  templatesSyncedAt: string | null;             // R44, R48
+};
+
+export type TemplateSyncSummary = {
+  imported: number; updated: number; deleted: number; skipped: number; syncedAt: string;
+};
+```
+
+`statusOf(raw: string) → { status, statusRaw }`: uno de los cinco conocidos (comparación exacta en
+mayúsculas) ⇒ `statusRaw: null`; cualquier otro ⇒ `OTHER` con `raw` recortado a 100 caracteres (R4).
+
+### 3.2 Idiomas (`domain/whatsapp-template-languages.ts`) — [P3] [POR CONFIRMAR]
+
+Lista de códigos de idioma que Meta acepta al crear, según la conoce el spec. **El implementer la
+contrasta con la página «Supported languages» de la documentación vigente de plantillas antes de T3**
+y anota en `progress/impl_QC-242.md` la fecha y las diferencias:
+
+```
+af sq ar az bn bg ca zh_CN zh_HK zh_TW hr cs da nl en en_GB en_US et fil fi fr ka de el gu ha he
+hi hu id ga it ja kn kk rw_RW ko ky_KG lo lv lt mk ms ml mr nb fa pl pt_BR pt_PT pa ro ru sr sk sl
+es es_AR es_ES es_MX sw sv ta te th tr uk ur uz vi zu
+```
+
+La lista restringe solo la **creación** (R8). La sincronización importa cualquier `language` que
+traiga Meta: es un dato de fuera, no una elección del usuario.
+
+### 3.3 El borrador y su validador (`domain/whatsapp-template-draft.ts`) — R6–R13
+
+```ts
+export type WhatsappTemplateButton =
+  | { type: 'QUICK_REPLY'; text: string }
+  | { type: 'URL'; text: string; url: string; example: string | null }
+  | { type: 'PHONE_NUMBER'; text: string; phoneNumber: string };
+
+export type WhatsappTemplateContent = {
+  header: { text: string; example: string | null } | null;
+  body: { text: string; examples: readonly string[] };
+  footer: string | null;
+  buttons: readonly WhatsappTemplateButton[];
+};
+
+export type WhatsappTemplateDraft = WhatsappTemplateContent & {
+  name: string; language: string; category: 'MARKETING' | 'UTILITY';
+};
+
+export type WhatsappTemplateIssue = { field: string; code: WhatsappTemplateIssueCode; message: string };
+
+export function validateWhatsappTemplateDraft(input: unknown):
+  | { ok: true; draft: WhatsappTemplateDraft }
+  | { ok: false; issues: readonly WhatsappTemplateIssue[] };
+```
+
+- **Puro** (R6): solo `zod` y constantes; no importa `../ports`, `errores` ni nada de servidor. Se
+  exporta desde `index.ts` junto a `TEMPLATE_LIMITS` y `WHATSAPP_TEMPLATE_LANGUAGES`, para que QC-243
+  lo importe en un componente de cliente como hoy se importa `cancelOrderSchema` de `pedidos`.
+  `module-shape.test.ts` fija que el archivo no importa nada fuera de `zod` y del propio `domain/`.
+- `field` usa rutas estables (`name`, `body.text`, `body.examples.1`, `buttons.2.url`…) y `message`
+  va en español; `code` es la palabra estable para la UI (`required`, `too_long`, `invalid_chars`,
+  `invalid_variable`, `variables_not_sequential`, `example_missing`, `example_extra`,
+  `too_many_buttons`, `buttons_not_grouped`, `invalid_url`, `invalid_phone`, `not_allowed`).
+- Los largos se miden en **puntos de código** (`[...texto].length`), no en unidades UTF-16: un emoji
+  cuenta 1. Cómo cuenta Meta es [P2] [POR CONFIRMAR].
+- Los textos no se recortan al validar; el validador rechaza los que son solo espacios.
+
+**Límites** (`TEMPLATE_LIMITS`, todos [P2] [POR CONFIRMAR], una sola constante para que la pantalla
+pinte los contadores con los mismos números):
+
+| Campo | Regla |
+|---|---|
+| `name` | `^[a-z0-9_]+$`, 1–512 |
+| `language` | en `WHATSAPP_TEMPLATE_LANGUAGES` |
+| `category` | `MARKETING` o `UTILITY` |
+| `header.text` | 1–60; como mucho una variable y solo `{{1}}`; con variable ⇒ `example` no vacío; sin variable ⇒ `example: null` |
+| `body.text` | obligatorio, 1–1024 |
+| variables del body | toda marca `{{…}}` casa con `\{\{([1-9]\d*)\}\}`; el conjunto de números es `{1…n}`; `examples.length === n`, todos no vacíos |
+| `footer` | 1–60, sin `{{` |
+| `buttons` | ≤ 10; `URL` ≤ 2; `PHONE_NUMBER` ≤ 1; los `QUICK_REPLY` contiguos (todos antes o todos después de los demás) |
+| `buttons[].text` | 1–25, sin variables |
+| `URL.url` | `https://`, ≤ 2000, como mucho un `{{1}}` y solo al final; con variable ⇒ `example` es una URL `https://`; sin variable ⇒ `example: null` |
+| `PHONE_NUMBER.phoneNumber` | `^\+[1-9]\d{7,14}$` |
+
+### 3.4 Borrador ⇄ componentes de Meta (`domain/whatsapp-template-components.ts`)
+
+`toMetaComponents(draft)` arma el arreglo que se envía y se guarda:
+
+```json
+[
+  { "type": "HEADER", "format": "TEXT", "text": "Pedido {{1}}", "example": { "header_text": ["A-102"] } },
+  { "type": "BODY", "text": "Hola {{1}}, tu pedido {{2}} está listo.", "example": { "body_text": [["Ana", "A-102"]] } },
+  { "type": "FOOTER", "text": "QuimiCloud" },
+  { "type": "BUTTONS", "buttons": [
+      { "type": "QUICK_REPLY", "text": "Gracias" },
+      { "type": "URL", "text": "Ver pedido", "url": "https://ejemplo.test/p/{{1}}", "example": ["https://ejemplo.test/p/A-102"] },
+      { "type": "PHONE_NUMBER", "text": "Llamar", "phone_number": "+573000000000" } ] }
+]
+```
+
+Sin `example` cuando no hay variables; sin `HEADER`, `FOOTER` o `BUTTONS` cuando no vienen. La forma
+es la de la Cloud API según la conoce el spec ([P4] [POR CONFIRMAR]).
+
+`contentOf(components: unknown): WhatsappTemplateContent | null` hace lo inverso con zod: devuelve el
+contenido si **todos** los componentes son de esta fase (header `TEXT`, body, footer y botones de
+los tres tipos), y `null` si aparece cualquier otro (header `IMAGE`/`VIDEO`/`DOCUMENT`/`LOCATION`,
+botones `OTP`, `COPY_CODE`, `FLOW`…, o una forma que no casa) (R46). Test de ida y vuelta:
+`contentOf(toMetaComponents(d))` reproduce el contenido de `d`.
+
+### 3.5 Una plantilla de Meta (`domain/whatsapp-template-meta.ts`) — R4, R26
+
+```ts
+export type MetaTemplateSnapshot = {
+  metaTemplateId: string; name: string; language: string;
+  category: WhatsappTemplateCategory; status: WhatsappTemplateStatus; statusRaw: string | null;
+  rejectedReason: string | null; components: unknown;
+};
+export function interpretMetaTemplate(raw: unknown):
+  | { ok: true; template: MetaTemplateSnapshot }
+  | { ok: false; metaTemplateId: string | null };
+```
+
+zod sobre `{ id: string (dígitos), name: string min 1, language: string min 1, status: string,
+category: string, components?: unknown[], rejected_reason?: string }` con `.passthrough()`. Categoría
+fuera de las tres ⇒ `ok: false` con su id, si lo hay ([P7]). `rejected_reason` igual a `NONE` o vacío
+⇒ `null` [POR CONFIRMAR]; solo se guarda con estado `REJECTED`. Textos con `\u0000` ⇒ `ok: false`
+(D77: no se le da a la base algo que rechaza).
+
+---
+
+## 4. Casos de uso
+
+Fábricas `createX(deps)` como el resto del módulo; `requirePermission(actor)` es la primera línea de
+los que llevan actor (R5).
+
+### 4.1 Conexión utilizable (`domain/template-connection.ts`)
+
+```ts
+export async function requireTemplateConnection(
+  deps: { connections; cipher }, scope,
+): Promise<{ record: WhatsappConnectionRecord; accessToken: string }>;
+```
+
+1. `connections.findLive(scope)`; `null` ⇒ `WhatsappConnectionNotFoundError` (R15).
+2. `status === 'DISABLED'` ⇒ `ActionNotAllowedError('conexión deshabilitada')` (R15).
+3. `decryptStoredSecret(deps, record, ACCESS_TOKEN_FIELD, scope)`: un secreto ilegible deja la
+   conexión en `ERROR` y relanza `SecretUnreadableError` (R20). No se descifra el App Secret: las
+   llamadas de plantillas no lo usan; sí entra en la lista de `metaMessageOf` cuando se tacha el
+   texto de Meta, leyéndolo con `readStoredSecret` solo si hay un fallo que tachar (R21).
+
+`PENDING` y `ERROR` se aceptan: el token puede funcionar aunque el webhook no se haya verificado, y
+la sincronización al crear (R29) corre sobre una conexión que nace `PENDING`.
+
+### 4.2 Núcleo de la sincronización (`domain/sync-whatsapp-templates.ts`)
+
+```ts
+async function syncConnectionTemplates(
+  deps: { graph; templates; now }, connection: WhatsappConnectionRecord, accessToken: string, scope,
+): Promise<TemplateSyncSummary>
+```
+
+1. `startedAt = now()`.
+2. **Leer todo** (R22): `graph.listTemplatesPage({ wabaId, accessToken, after })` en bucle con el
+   cursor `after` hasta que `next === null`. Tope de `MAX_TEMPLATE_PAGES = 20` páginas de 100: si se
+   alcanza sin terminar ⇒ `WhatsappMetaRejectedError('demasiadas páginas')` sin escribir. Un fallo de
+   cualquier página ⇒ error de §4.9 sin escribir.
+3. `interpretMetaTemplate` sobre cada elemento; los `ok: false` se cuentan en `skipped` y su id (si lo
+   hay) entra en `protectedIds` (R26).
+4. `current = await templates.listForSync(connection.id, scope)` (vivas y eliminadas).
+5. `plan = planTemplateSync(current, snapshots, protectedIds)` (§4.3, puro).
+6. `await templates.applySync(connection.id, plan, startedAt, now(), scope)` en **una** transacción
+   (§5.2). Una excepción se propaga (R22).
+7. Devuelve el resumen (R25).
+
+Nunca llama a `createTemplate` ni `deleteTemplate` (R27): `deps.graph` se tipa como
+`Pick<WhatsappGraphClient, 'listTemplatesPage'>`, así que un test lo fija por tipo y por espía.
+
+**Sincronización manual** (R28): `createSyncWhatsappTemplates(deps)(actor)` =
+`requirePermission` → `scopeOf` → `requireTemplateConnection` → `syncConnectionTemplates`.
+
+**Reintento del webhook** (R38): `createResyncWhatsappTemplates(deps)(connectionId)` sin actor:
+`resolveWebhookConnection` (directorio, añadido, `findLiveById`, no deshabilitada; el ámbito sale de la
+fila) → `decryptStoredSecret` del token → `syncConnectionTemplates`. Devuelve
+`{ kind: 'synced', summary } | { kind: 'skipped', reason } | { kind: 'failed', code }`; no lanza.
+
+### 4.3 Plan de sincronización (`domain/template-sync-plan.ts`) — R23–R25
+
+```ts
+type TemplateSyncPlan = {
+  inserts: readonly MetaTemplateSnapshot[];
+  updates: readonly { id: string; template: MetaTemplateSnapshot; changed: boolean }[];
+  deletes: readonly string[];      // ids locales
+};
+```
+
+- Por `metaTemplateId`: sin fila ⇒ `inserts`; con fila ⇒ `updates`, con `changed = true` si difiere
+  algún campo de R23 o tenía `deletedAt`. `components` se compara con igualdad estructural
+  (`JSON.stringify` de claves ordenadas), porque Meta puede devolver las claves en otro orden.
+- `deletes`: filas vivas cuyo `metaTemplateId` no está ni en los snapshots ni en `protectedIds`.
+- Resumen: `imported = inserts.length`, `updated = updates.filter(changed).length`,
+  `deleted = deletes.length`.
+
+Unit test con tabla: importar, actualizar estado, revivir una eliminada, no contar las que no
+cambian, no borrar una protegida, borrar la que falta.
+
+### 4.4 Crear (`domain/create-whatsapp-template.ts`) — R14, R16–R19
+
+`createCreateWhatsappTemplate(deps)(input, actor)`:
+
+1. `requirePermission`, `scopeOf`.
+2. `validateWhatsappTemplateDraft(input)`; inválido ⇒ `ValidationError` con los `code` en el
+   diagnóstico (R14). La Server Action devuelve `invalid_input`; los mensajes por campo los pinta la
+   pantalla con el mismo validador (D3 de QC-243).
+3. `requireTemplateConnection` (R15, R20).
+4. `templates.findLiveByNameAndLanguage(connection.id, name, language, scope)` ≠ `null` ⇒
+   `WhatsappTemplateNameTakenError` sin llamar a Meta (R18).
+5. `components = toMetaComponents(draft)`;
+   `graph.createTemplate({ wabaId, accessToken, name, language, category, components })`.
+6. Fallo ⇒ §4.9 (R19); no se escribe nada.
+7. Éxito ⇒ `templates.insertCreated({ metaTemplateId: res.id, name, language, category:
+   categoryOf(res.category) ?? draft.category, components, status: 'PENDING', createdById: actor.id,
+   lastSyncedAt: now() }, connection.id, scope)` (R16, R17).
+8. Devuelve `toWhatsappTemplateView(record)`.
+
+**Nace `PENDING`** aunque Meta conteste otro estado: lo pide la ficha; el webhook o la siguiente
+sincronización lo ponen al día.
+
+**La carrera con el webhook.** Meta puede mandar `APPROVED` antes de que el paso 7 escriba: el webhook
+no encuentra la plantilla y resincroniza (R38), y esa sincronización puede insertarla primero.
+`insertCreated` hace `INSERT … ON CONFLICT (connection_id, meta_template_id) DO UPDATE SET created_by =
+COALESCE(whatsapp_templates.created_by, EXCLUDED.created_by)` y no toca el estado: gana la fila de la
+sincronización, que es más reciente, y conserva al creador. Un choque con el único parcial de nombre
+e idioma (otra pestaña creó la misma entre 4 y 7) se traduce a `WhatsappTemplateNameTakenError`; en ese
+caso Meta ya la tiene, y la siguiente sincronización la importa.
+
+### 4.5 Eliminar (`domain/delete-whatsapp-template.ts`) — R42, R43
+
+1. `requirePermission`, `scopeOf`.
+2. `id` no UUID ⇒ `WhatsappTemplateNotFoundError` sin tocar puertos.
+3. `requireTemplateConnection`.
+4. `templates.findLiveById(id, scope)`; `null` o `connectionId !== connection.id` ⇒
+   `WhatsappTemplateNotFoundError` (R43).
+5. `graph.deleteTemplate({ wabaId, accessToken, hsmId: record.metaTemplateId, name: record.name })`
+   (D4: con `hsm_id`, Meta borra solo ese idioma).
+6. Fallo ⇒ §4.9 (`whatsapp_meta_rejected` o `whatsapp_meta_unreachable`) sin escribir.
+7. Éxito ⇒ `templates.markDeleted(id, now(), scope)`; devuelve `{ id }`.
+
+Si Meta dice que la plantilla ya no existe (se borró en WhatsApp Manager), el resultado es
+`whatsapp_meta_rejected` y la siguiente sincronización la marca eliminada. Reconocer ese caso
+necesitaría un código de Meta que el spec no puede confirmar.
+
+### 4.6 Listar y consultar (`domain/list-whatsapp-templates.ts`) — R44–R46
+
+- `createListWhatsappTemplates(deps)(input, actor)`: `input` con zod
+  `{ onlyApproved?: boolean }` (inválido ⇒ `ValidationError`). `connections.findLive(scope)`; `null` ⇒
+  `{ templates: [], templatesSyncedAt: null }`. Si no, `templates.listLive(connection.id,
+  { onlyApproved }, scope)` ordenado por `name`, `language`. **No exige** que la conexión esté
+  habilitada: leer la copia local no toca Meta.
+- `createGetWhatsappTemplate(deps)(id, actor)`: viva y de la conexión viva ⇒ vista; si no ⇒
+  `WhatsappTemplateNotFoundError`.
+
+`toWhatsappTemplateView` campo a campo (precedente `toWhatsappConnectionView`), con
+`content: contentOf(record.components)`.
+
+### 4.7 La importación al crear la conexión (`domain/create-whatsapp-connection.ts`) — R29, R30
+
+`CreateWhatsappConnectionDeps` gana `templates: WhatsappTemplateRepository` y el `graph` ya presente.
+Tras `connections.create(...)`:
+
+```ts
+let templateImport: { ok: true; summary: TemplateSyncSummary } | { ok: false; code: string };
+try {
+  templateImport = { ok: true, summary: await syncConnectionTemplates(deps, record, data.accessToken, scope) };
+} catch (error) {
+  templateImport = { ok: false, code: codeOf(error) };     // mismo codeOf que expire-stale-orders
+}
+return { status: 'created', connection, verifyToken, templateImport };
+```
+
+El fallo no se traga: viaja en el resultado y la Server Action lo registra con
+`console.error('whatsapp_templates_initial_sync_failed', { connectionId, code })` (R30). Se usa el
+token en claro que acaba de validarse; no se vuelve a descifrar.
+
+### 4.8 El cron (`domain/sync-all-whatsapp-templates.ts`) — R32, R33
+
+```ts
+export type SyncAllWhatsappTemplatesDeps = {
+  listCompanyIds: () => Promise<readonly string[]>;
+  integrations: IntegrationsSwitch;
+  connections; cipher; graph; templates; now?; budgetMs?;
+};
+export type SyncAllResult = {
+  synced: number;
+  failed: readonly ({ stage: 'companies'; code } | { stage: 'connection'; companyId; code })[];
+};
+```
+
+Forma de `createExpireStaleOrders`: lista de empresas (un fallo ⇒ `stage: 'companies'` y termina);
+por cada una, mientras quede presupuesto (240 s): `integrations.isOn(companyId)` falso ⇒ siguiente;
+`connections.findLive({ companyId })`; `null` o `status !== 'ACTIVE'` ⇒ siguiente (R32);
+`decryptStoredSecret` y `syncConnectionTemplates` dentro de un `try` por conexión; fallo ⇒
+`stage: 'connection'` y sigue (R33). Ninguna consulta lee dos empresas a la vez
+(`docs/architecture.md > Crons internos`).
+
+**Comprueba el añadido** aunque `docs/architecture.md` diga que los crons son núcleo: esta ruta es del
+añadido `integraciones` y así la clasifica la guardia de rutas fuera de sesión (R35), igual que el
+webhook.
+
+### 4.9 Fallos de Graph (`domain/template-graph-failure.ts`) — R19, R21, R43
+
+`GraphFailure` gana dos campos opcionales: `code: number | null` y `subcode: number | null` (los de
+`error.code`/`error.error_subcode` de Meta). `fetchPhoneNumber` no los rellena y sus usos no cambian.
+
+| Fallo | Crear | Sincronizar / eliminar |
+|---|---|---|
+| `unreachable` (red, timeout, 5xx) | `WhatsappMetaUnreachableError` | `WhatsappMetaUnreachableError` |
+| `rejected` con «nombre e idioma ya existen» [POR CONFIRMAR: `error_subcode` 2388024] | `WhatsappTemplateNameTakenError` | — |
+| `rejected` con «límite de creaciones» [POR CONFIRMAR: `code` 80008, o `error_subcode` del rango 23880xx] | `WhatsappTemplateRateLimitedError` | — |
+| cualquier otro `rejected` | `WhatsappTemplateRejectedError` | `WhatsappMetaRejectedError` |
+
+El adaptador `fetch` pasa a `unreachable` también las respuestas 5xx (hoy `fetchPhoneNumber` las trata
+como `rejected`; ese comportamiento no se toca, las tres llamadas nuevas usan su propia rama).
+
+El `diagnostic` de cada error lleva `code`, `subcode` y `metaMessageOf(failure, [accessToken,
+appSecret])`: va al log del traductor, nunca a la respuesta, y con los secretos tachados (R21).
+
+**Los números de la tabla son los que el spec cree vigentes y están sin confirmar** ([P4]): T3 los
+contrasta. Si un código no se puede confirmar, ese caso cae en la fila «cualquier otro» y el
+requisito se marca en la bitácora; no se inventa otro.
+
+---
+
+## 5. Puertos y adaptadores
+
+### 5.1 `WhatsappTemplateRepository` (`ports/whatsapp-template-repository.ts`)
+
+`scope` al final de cada firma, como `WhatsappConnectionRepository`:
+
+```ts
+export interface WhatsappTemplateRepository {
+  listLive(connectionId: string, filter: { onlyApproved: boolean }, scope): Promise<readonly WhatsappTemplateRecord[]>;
+  findLiveById(id: string, scope): Promise<WhatsappTemplateRecord | null>;
+  findLiveByNameAndLanguage(connectionId: string, name: string, language: string, scope): Promise<WhatsappTemplateRecord | null>;
+  insertCreated(row: NewCreatedTemplateRow, connectionId: string, scope): Promise<WhatsappTemplateRecord>;
+  markDeleted(id: string, at: Date, scope): Promise<boolean>;
+  listForSync(connectionId: string, scope): Promise<readonly TemplateSyncRow[]>;
+  applySync(connectionId: string, plan: TemplateSyncPlan, startedAt: Date, at: Date, scope): Promise<void>;
+  applyWebhookUpdates(connectionId: string, updates: readonly TemplateWebhookUpdate[], scope): Promise<{ unknown: number }>;
+}
+```
+
+### 5.2 `persistence/whatsapp-template-prisma.ts`
+
+Cada función con nombre declara `scope: IntegracionesScope` y filtra con
+`whatsappTemplateCompanyScope(scope)` (nueva envoltura en `company-scope.ts`) o escribe con
+`companyScopeColumns(scope)`.
+
+- `listLive`: `where { connectionId, deletedAt: null, ...scope, status: onlyApproved ? 'APPROVED' :
+  undefined }`, `orderBy [{ name: 'asc' }, { language: 'asc' }, { id: 'asc' }]`.
+- `insertCreated`: `tx.$queryRaw` con el `INSERT … ON CONFLICT (connection_id, meta_template_id) DO
+  UPDATE … RETURNING` de §4.4; un `23505` del índice `whatsapp_templates_name_language_live_key` ⇒
+  `WhatsappTemplateNameTakenError` (reconocido por nombre, como `translateUniqueViolation` de QC-237).
+- `markDeleted`: `updateMany where { id, deletedAt: null, ...scope }`; `count > 0`.
+- `applySync`: **un** `prisma.$transaction`, en este orden para que una plantilla borrada y vuelta a
+  crear en Meta con el mismo nombre e idioma no choque con el único parcial:
+  1. `updateMany where { id in plan.deletes, connectionId, deletedAt: null, createdAt: { lt:
+     startedAt }, ...scope } data { deletedAt: at, lastSyncedAt: at }` (R24: lo creado durante la
+     sincronización no se borra).
+  2. `updateMany` por cada `update` (por `id` y ámbito): campos de R23, `deletedAt: null`,
+     `lastSyncedAt: at`. Las que no cambian también reciben `lastSyncedAt` (R23).
+  3. `createMany({ data: inserts, skipDuplicates: true })` con `createdById: null`.
+  4. `whatsappConnection.updateMany where { id: connectionId, deletedAt: null, ...connectionScope }
+     data { templatesSyncedAt: at }` (R25, [P6]).
+- `applyWebhookUpdates`: un `updateMany` por cambio, `where { connectionId, metaTemplateId, deletedAt:
+  null, ...scope }`; `status` ⇒ `{ status, statusRaw, rejectedReason }`; `category` ⇒ `{ category }`.
+  `unknown` = cuántos dieron `count = 0`. Sin transacción: cada `UPDATE` es atómico e idempotente.
+
+`guard-ambito-empresa-integraciones.test.ts` gana el tercer puerto (8 métodos, mismo barrido) y la
+quinta envoltura; la lista de exentos no cambia.
+
+### 5.3 `WhatsappGraphClient` (se amplía)
+
+```ts
+createTemplate(input: { wabaId; accessToken; name; language; category; components: readonly unknown[] })
+  : Promise<{ ok: true; id: string; status: string | null; category: string | null } | ({ ok: false } & GraphFailure)>;
+listTemplatesPage(input: { wabaId; accessToken; after: string | null })
+  : Promise<{ ok: true; items: readonly unknown[]; next: string | null } | ({ ok: false } & GraphFailure)>;
+deleteTemplate(input: { wabaId; accessToken; hsmId: string; name: string })
+  : Promise<{ ok: true } | ({ ok: false } & GraphFailure)>;
+```
+
+Los elementos de la lista viajan sin interpretar (`unknown`): los interpreta el dominio (§3.5), como
+el cuerpo del webhook en QC-238.
+
+---
+
+## 6. Graph (`adapters/driven/graph/whatsapp-graph-client-fetch.ts`) — [P4] [POR CONFIRMAR]
+
+Misma forma que `fetchPhoneNumber`: versión por `readGraphApiVersion()`, token **solo** en
+`Authorization: Bearer`, `AbortSignal.timeout(10_000)`, `cache: 'no-store'`, nada registra la URL,
+la cabecera ni el cuerpo.
+
+| Llamada | Petición | Respuesta buena que se lee |
+|---|---|---|
+| crear | `POST /{v}/{waba_id}/message_templates`, JSON `{ name, language, category, components }` | `{ id: string, status?: string, category?: string }` |
+| listar | `GET /{v}/{waba_id}/message_templates?fields=id,name,language,status,category,components,rejected_reason&limit=100[&after=<cursor>]` | `{ data: unknown[], paging?: { cursors?: { after?: string }, next?: string } }`; `next = paging.next ? paging.cursors.after : null` |
+| borrar | `DELETE /{v}/{waba_id}/message_templates?hsm_id=<id>&name=<name>` | `{ success: true }` |
+
+- El cursor se pide con `after` y no se sigue la URL `paging.next` tal cual: esa URL la arma Meta y
+  puede llevar parámetros que no controlamos.
+- Error: `{ error: { message, code?, error_subcode? } }` ⇒ `rejected` con `code`/`subcode`; 5xx o
+  excepción de `fetch` ⇒ `unreachable`.
+- `encodeURIComponent` en `waba_id`, `hsm_id`, `name` y `after`.
+
+**Doble `canned`** (E2E de QC-243: «crear, ver pendiente, simular la aprobación por webhook»): guarda
+en memoria del proceso un mapa `wabaId → plantillas`. `createTemplate` asigna un id numérico
+creciente y la guarda; un nombre que empieza por `e2e_repetida` devuelve el fallo de «nombre
+repetido»; `listTemplatesPage` devuelve lo guardado en una sola página; `deleteTemplate` la quita. Se
+exporta `resetCannedTemplates()` para los tests. Sin esto, una sincronización manual en el E2E
+borraría lo que se acaba de crear.
+
+---
+
+## 7. Webhook
+
+### 7.1 Forma de los dos campos (`domain/whatsapp-template-webhook.ts`) — [P4] [POR CONFIRMAR]
+
+```ts
+// field: 'message_template_status_update'
+{ event: string, message_template_id: number | string, message_template_name?: string,
+  message_template_language?: string, reason?: string | null }
+// field: 'template_category_update'
+{ message_template_id: number | string, new_category: string, previous_category?: string }
+```
+
+`entry[].id` es el id de la WABA: un cambio de plantilla se acepta solo si coincide con
+`record.wabaId` (R39). (Los de `messages` siguen comparando `metadata.phone_number_id`.)
+
+### 7.2 Parser (`domain/whatsapp-webhook-payload.ts`)
+
+`InboundBatch` gana `templateUpdates: readonly TemplateWebhookUpdate[]` y `skipped.templates`:
+
+```ts
+type TemplateWebhookUpdate =
+  | { kind: 'status'; metaTemplateId: string; status; statusRaw; rejectedReason: string | null }
+  | { kind: 'category'; metaTemplateId: string; category: WhatsappTemplateCategory };
+```
+
+- `parseWhatsappWebhook(json, phoneNumberId, wabaId)` (firma nueva; el caso de uso pasa
+  `record.wabaId`).
+- `field` ∈ {`message_template_status_update`, `template_category_update`} ⇒ zod de §7.1. Se salta
+  con `skipped.templates += 1` si: `entry.id` ≠ `wabaId`, la forma no casa, el id no es un entero
+  positivo (`/^[1-9]\d*$/` tras `String(...)`), la categoría es desconocida o un texto trae `\u0000`
+  (R39, R41).
+- `event` ⇒ `statusOf` (R4); `rejectedReason` = `reason` solo si el estado es `REJECTED` y `reason`
+  no es vacío ni `NONE`, recortado a 500; si no, `null` (R36).
+- Cualquier otro `field` que no sea `messages` se sigue saltando sin conteo (R14 de QC-238).
+
+### 7.3 Caso de uso (`domain/receive-whatsapp-webhook.ts`)
+
+`deps` gana `templates: WhatsappTemplateRepository`. Tras `inbox.record(batch, …)`:
+
+```ts
+const { unknown } = batch.templateUpdates.length === 0
+  ? { unknown: 0 }
+  : await deps.templates.applyWebhookUpdates(record.id, batch.templateUpdates, scope);
+return { kind: 'stored', counts, skipped, followUp: unknown > 0 ? 'resync_templates' : null };
+```
+
+Dos escrituras separadas, no una transacción: los mensajes ya son idempotentes (`wamid` único) y los
+statuses no retroceden; los cambios de plantilla son `UPDATE` idempotentes. Si `applyWebhookUpdates`
+lanza, se propaga ⇒ `500` (R40) y el reintento de Meta repite las dos sin duplicar nada.
+
+### 7.4 Ruta (`adapters/driving/whatsapp-webhook-route.ts`)
+
+En el caso `stored`, si `result.followUp === 'resync_templates'`:
+
+```ts
+after(async () => {
+  const outcome = await integraciones.resyncWhatsappTemplates(conexionId);
+  if (outcome.kind === 'failed') console.error('whatsapp_templates_resync_failed', { connectionId, code: outcome.code });
+});
+```
+
+`after` de `next/server` corre después de mandar la respuesta: Meta recibe su `200` sin esperar a
+Graph (R38), y el fallo solo deja una línea de log. Como mucho una vez por `POST` porque `followUp` es
+un solo valor. `connectionId` en el log solo tras validarse como UUID, como hoy.
+
+No se añade `maxDuration` a la ruta: si la resincronización no termina, el cron diario la corrige
+(D1).
+
+---
+
+## 8. Cron
+
+### 8.1 `app/api/cron/sincronizar-plantillas-whatsapp/route.ts`
+
+```ts
+export { GET } from '@/lib/modules/integraciones/adapters/driving/whatsapp-template-cron-route';
+export const runtime = 'nodejs';
+export const maxDuration = 300;
+```
+
+Literales, por el motivo que documenta `caducar-pedidos/route.ts`.
+
+### 8.2 `adapters/driving/whatsapp-template-cron-route.ts`
+
+Copia de `order-expiry-cron-route.ts`:
+
+1. `integraciones.verifyCronSecret(request.headers.get('authorization'))`; `misconfigured` ⇒
+   `console.error('whatsapp_templates_cron_misconfigured')` y `500`; `unauthorized` ⇒ `401` (R31).
+2. `const result = await integraciones.syncAllWhatsappTemplates()`.
+3. Con fallos ⇒ `console.error('whatsapp_templates_cron_failed', { failedCount, failed })` y
+   `Response.json({ synced, failed: failedCount }, { status: 500 })`; sin fallos ⇒
+   `Response.json({ synced, failed: 0 })` (R33). `failed` lleva `stage`, `companyId` y `code`, nunca
+   un mensaje de Meta.
+
+`verifyCronSecret` es el adaptador de `pedidos` (`cron-secret-env.ts`), cableado en la fachada
+`integraciones` desde `lib/composition` (§10): la composición es el único sitio que puede importar un
+adaptador de cualquier módulo.
+
+### 8.3 `vercel.json`
+
+```json
+{ "path": "/api/cron/sincronizar-plantillas-whatsapp", "schedule": "0 8 * * *" }
+```
+
+[P9]: hora propuesta y límite de crons del plan sin confirmar. `tests/unit/pedidos/vercel-cron.test.ts`
+hoy exige **exactamente un** cron; se cambia para buscar el suyo por `path` (sigue fijando una sola
+ejecución al día) y se añade el caso equivalente para el nuevo (R34).
+
+---
+
+## 9. Server Actions (`adapters/driving/whatsapp-template-actions.ts`) — R47, R48
+
+`'use server'`, `currentActor()` y `toErrorState` como `whatsapp-connection-actions.ts`.
+
+```ts
+export type WhatsappTemplateListResult = { status: 'success'; data: WhatsappTemplateList } | ErrorState;
+export type WhatsappTemplateCreateResult = { status: 'success'; data: WhatsappTemplateView } | ErrorState;
+export type WhatsappTemplateSyncResult = { status: 'success'; data: TemplateSyncSummary } | ErrorState;
+export type WhatsappTemplateDeleteResult = { status: 'success'; data: { id: string } } | ErrorState;
+
+export async function listWhatsappTemplatesAction(input?: { onlyApproved?: boolean }): Promise<WhatsappTemplateListResult>;
+export async function createWhatsappTemplateAction(draft: unknown): Promise<WhatsappTemplateCreateResult>;
+export async function syncWhatsappTemplatesAction(): Promise<WhatsappTemplateSyncResult>;
+export async function deleteWhatsappTemplateAction(id: string): Promise<WhatsappTemplateDeleteResult>;
+```
+
+- **Argumentos planos, no `FormData`**: el borrador es anidado (botones, ejemplos) y `FormData` lo
+  aplana; QC-243 llama a la acción desde su `onSubmit`. El dominio valida igual cualquier cosa que
+  llegue (`unknown`).
+- Las tres de escritura llaman `revalidatePath(WHATSAPP_INTEGRATION_ROUTE)` en éxito.
+- Lo único de la conexión que sale es `templatesSyncedAt` (R48).
+- El test de «una lectura de sesión por petición» lee `adapters/driving/` del disco: la acción nueva
+  entra sola en su barrido.
+
+`whatsapp-connection-actions.ts` solo cambia en `createWhatsappConnectionAction`: el log de §4.7. Su
+estado de formulario no cambia.
+
+---
+
+## 10. Composición (`lib/composition/index.ts`)
+
+En el bloque de WhatsApp de `integraciones`, sin reordenar nada:
+
+```ts
+const whatsappGraphClient: WhatsappGraphClient = {
+  fetchPhoneNumber: …,                                 // como hoy
+  createTemplate: (i) => integrationsE2EDoublesEnabled() ? whatsappGraphClientCanned.createTemplate(i) : whatsappGraphClientFetch.createTemplate(i),
+  listTemplatesPage: (i) => …,                         // misma elección por llamada
+  deleteTemplate: (i) => …,
+};
+const whatsappTemplateRepository: WhatsappTemplateRepository = {
+  listLive: listLiveWhatsappTemplates, findLiveById: findLiveWhatsappTemplateById,
+  findLiveByNameAndLanguage: findLiveWhatsappTemplateByNameAndLanguage,
+  insertCreated: insertCreatedWhatsappTemplate, markDeleted: markWhatsappTemplateDeleted,
+  listForSync: listWhatsappTemplatesForSync, applySync: applyWhatsappTemplateSync,
+  applyWebhookUpdates: applyWhatsappTemplateWebhookUpdates,
+};
+// whatsappDeps gana `templates`; whatsappWebhookDeps gana `templates` y `graph`.
+const whatsappTemplateCronDeps = { ...whatsappWebhookDeps, listCompanyIds: listActiveCompanyIds };
+
+// en `integraciones`, al final:
+listWhatsappTemplates, getWhatsappTemplate, createWhatsappTemplate, syncWhatsappTemplates,
+deleteWhatsappTemplate, resyncWhatsappTemplates, syncAllWhatsappTemplates,
+verifyCronSecret,                                     // el de `pedidos`, ya importado arriba
+```
+
+`whatsappWebhookDeps` gana `graph` solo para `resyncWhatsappTemplates`; `receiveWhatsappWebhook`
+sigue sin llamarlo (el test de QC-238 «`fetch` espiado no se llama» sigue verde: la resincronización
+corre en `after`, fuera del caso de uso).
+
+---
+
+## 11. Contrato del módulo (`index.ts`)
+
+Se suman: `createListWhatsappTemplates`, `createGetWhatsappTemplate`, `createCreateWhatsappTemplate`,
+`createSyncWhatsappTemplates`, `createResyncWhatsappTemplates`, `createSyncAllWhatsappTemplates`,
+`createDeleteWhatsappTemplate`, `validateWhatsappTemplateDraft`, `TEMPLATE_LIMITS`,
+`WHATSAPP_TEMPLATE_LANGUAGES`, `CREATABLE_TEMPLATE_CATEGORIES`, los 6 errores, y los tipos
+`WhatsappTemplateView`, `WhatsappTemplateList`, `WhatsappTemplateContent`, `WhatsappTemplateDraft`,
+`WhatsappTemplateButton`, `WhatsappTemplateIssue`, `WhatsappTemplateStatus`,
+`WhatsappTemplateCategory`, `TemplateSyncSummary`.
+
+---
+
+## 12. Errores (`errores` + `integraciones/domain/errors.ts`) — R51
+
+Enmienda del catálogo (106 → 112 en `catalogo.test.ts`, o lo que haya en `dev` + 6 al sincronizar):
+
+| Código | Texto |
+|---|---|
+| `whatsapp_template_not_found` | No se encontró la plantilla. |
+| `whatsapp_template_name_taken` | Ya existe una plantilla con ese nombre en ese idioma. |
+| `whatsapp_template_rate_limited` | Meta no permite crear más plantillas por ahora. Intenta de nuevo más tarde. |
+| `whatsapp_template_rejected` | Meta rechazó la plantilla. Revisa el contenido e intenta de nuevo. |
+| `whatsapp_meta_rejected` | Meta rechazó la solicitud. Intenta de nuevo o revisa la conexión. |
+| `whatsapp_meta_unreachable` | No se pudo contactar con Meta. Intenta de nuevo en unos minutos. |
+
+Cada uno con su clase en `errors.ts` (`IntegracionesError`), exportada por `index.ts`.
+
+---
+
+## 13. La guía de la pestaña Conexión — R49, [P8]
+
+`WHATSAPP_SETUP_GUIDE_STEPS` gana, al final:
+
+> «Webhook: en tu app › WhatsApp › Configuración, suscribe los campos messages,
+> message_template_status_update y template_category_update.»
+
+Solo una cadena más en el arreglo; el componente, su marcado y sus estilos no cambian.
+`tests/unit/integraciones-ui/whatsapp-page.test.tsx` ya recorre todos los pasos; se añade un caso que
+busca los tres nombres de campo.
+
+---
+
+## 14. Tests
+
+### 14.1 Nuevos
+
+| Archivo | Cubre |
+|---|---|
+| `tests/unit/integraciones/whatsapp/templates/whatsapp-template-draft.test.ts` | R6 (sin imports de servidor, vía `module-shape`), R7–R13: un caso por fila de §3.3 en el límite exacto y uno más; `{{nombre}}`, `{{0}}`, `{{1}}{{3}}`, ejemplo de más; header con `{{2}}`; botones 11, 3 URL, 2 teléfonos, respuestas rápidas intercaladas; emoji cuenta 1 |
+| `…/templates/whatsapp-template-components.test.ts` | ida y vuelta borrador ⇄ componentes; `contentOf` con header `IMAGE`, botón `OTP` y forma rota ⇒ `null` (R46) |
+| `…/templates/whatsapp-template-meta.test.ts` | R4 (cinco conocidos y `IN_APPEAL` ⇒ `OTHER` crudo), R26 (sin id, sin nombre, categoría desconocida, `\u0000`), `rejected_reason` `NONE` ⇒ `null` |
+| `…/templates/template-sync-plan.test.ts` | R23–R25 por tabla (§4.3) |
+| `…/templates/sync-whatsapp-templates.test.ts` | R22 (tres páginas, falla la segunda ⇒ `applySync` no se llama), tope de páginas, R27 (espía: ni `createTemplate` ni `deleteTemplate`), R28, R15, R20, R5; reintento del webhook: conexión deshabilitada o añadido apagado ⇒ `skipped`, fallo ⇒ `failed` sin lanzar |
+| `…/templates/sync-all-whatsapp-templates.test.ts` | R32 (`ACTIVE` sí; `PENDING`/`ERROR`/`DISABLED` y añadido apagado no), R33 (la segunda falla, la tercera se sincroniza; `failed` con `companyId` y `code`), fallo al listar empresas, presupuesto agotado. Es la `prueba` de la guardia (R35) |
+| `…/templates/create-whatsapp-template.test.ts` | R5 (orden: sin permiso no valida), R14 (inválido ⇒ Graph no llamado), R15, R16 (`PENDING`, creador, componentes), R17, R18, R19 (cada fila de §4.9), R20, R21 (el token no aparece en ningún `diagnostic` ni mensaje) |
+| `…/templates/delete-whatsapp-template.test.ts` | R42 (Graph recibe `hsmId` y `name`), R43 (no UUID, de otra conexión, eliminada ⇒ sin Graph; Meta rechaza ⇒ sin `markDeleted`) |
+| `…/templates/list-whatsapp-templates.test.ts` | R44 (orden, «solo aprobadas», sin conexión ⇒ vacía), R45, R46 (claves exactas de la vista) |
+| `…/templates/whatsapp-template-actions.test.ts` | R47 (contrato de cada acción, `revalidatePath` en las tres de escritura), R48 (claves exactas de `data`), R5 (actor sin permiso ⇒ `unauthorized`) |
+| `…/templates/whatsapp-template-cron-route.test.ts` | R31 (sin cabecera, incorrecta, variable ausente ⇒ ningún caso de uso llamado), R33 (códigos y cuerpo) |
+| `…/templates/whatsapp-graph-client-templates.test.ts` | §6 con `fetch` espiado: URL, método, cabecera, cursor `after`, `5xx` ⇒ `unreachable`, `code`/`subcode` leídos; el token no está en la URL |
+| `…/templates/whatsapp-graph-client-canned-templates.test.ts` | el doble: crear, listar, borrar, `e2e_repetida` |
+| `tests/integration/integraciones/whatsapp-template-prisma.int.test.ts` | R1 (FK compuesta rechaza empresa distinta), R2 (único parcial: eliminada + nueva con el mismo nombre e idioma entra; dos vivas no), R3 (empresa B no ve ni actualiza las de A, también por webhook), R24 (una creada después de `startedAt` no se borra), R25 (`templatesSyncedAt`), la carrera de §4.4, `applySync` con borrada y recreada en Meta con el mismo nombre |
+| `tests/integration/integraciones/whatsapp-template-migration.int.test.ts` | R50: `down.sql` y vuelta dejan el mismo esquema; RLS forzada en `pg_class`; índices por nombre en `pg_indexes` |
+| `tests/integration/integraciones/whatsapp-template-flow.int.test.ts` | Recorrido real con el doble `canned`: crear ⇒ `PENDING`; webhook `APPROVED` firmado por la ruta ⇒ `APPROVED`; `REJECTED` ⇒ motivo; categoría; webhook de un id desconocido ⇒ `after` resincroniza (con `after` sustituido por una cola que el test vacía); eliminar en `es` no toca `en` (criterios de aceptación de la ficha) |
+
+### 14.2 Tests y guardias que se tensan (nunca se relajan)
+
+| Archivo | Cambio |
+|---|---|
+| `tests/unit/integraciones/whatsapp/whatsapp-webhook-payload.test.ts` | R14 de QC-238 usa `account_update` como campo ajeno; casos nuevos R36, R37, R39, R41 |
+| `tests/unit/integraciones/whatsapp/receive-whatsapp-webhook.test.ts` | R40 (mensajes + plantillas, y fallo de plantillas ⇒ lanza), `followUp` con un id desconocido |
+| `tests/unit/integraciones/whatsapp/whatsapp-webhook-route.test.ts` | R38: `after` llamado una vez con `followUp`, ninguna sin él; el fallo de la resincronización no cambia el `200` |
+| `tests/unit/integraciones/whatsapp/create-whatsapp-connection.test.ts` | R29 (sincroniza con el token del formulario), R30 (Graph de plantillas falla ⇒ `created` y `templateImport.ok === false`) |
+| `tests/unit/integraciones/whatsapp/whatsapp-connection-actions.test.ts` | R30: el log `whatsapp_templates_initial_sync_failed` sin secretos |
+| `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts` | doble del repositorio de plantillas y de los tres métodos de Graph |
+| `tests/unit/integraciones/module-shape.test.ts` | R18 lista de archivos; R20 contrato; R19 cableado y quién importa el módulo (+ la ruta del cron); R13 modelos de cinco a seis (+ `WhatsappTemplate`); caso nuevo R6 (el validador solo importa `zod` y `domain/`) |
+| `tests/guards/guard-ambito-empresa-integraciones.test.ts` | tercer puerto (8 métodos), quinta envoltura |
+| `tests/guards/guard-rutas-fuera-de-sesion.test.ts` | + `'app/api/cron/sincronizar-plantillas-whatsapp/route.ts': { anadido: 'integraciones', prueba: 'tests/unit/integraciones/whatsapp/templates/sync-all-whatsapp-templates.test.ts' }` (R35) |
+| `tests/unit/pedidos/vercel-cron.test.ts` | busca su cron por `path`; caso nuevo para el de plantillas (R34) |
+| `tests/unit/errores/catalogo.test.ts` | cuenta + 6 (R51) |
+| `tests/unit/integraciones-ui/whatsapp-page.test.tsx` | R49 |
+| `tests/integration/aislamiento.json` | los tres `.int.test.ts` nuevos, con `commit` y `motivo` como los de QC-238 |
+
+**Sin E2E de Playwright en esta ficha**: no hay pantalla. El E2E de plantillas lo pide QC-243 y usa el
+doble de §6. Verificación manual con Meta (opcional, fuera del gate): crear una plantilla en una WABA
+de prueba, ver el webhook `APPROVED`, borrarla; evidencia a `progress/impl_QC-242.md`.
+
+---
+
+## 15. Fronteras con otras fichas y choques previsibles
+
+- **QC-243** consume las cuatro acciones, `validateWhatsappTemplateDraft`, `TEMPLATE_LIMITS`,
+  `WHATSAPP_TEMPLATE_LANGUAGES` y la vista; habilita la pestaña. Su E2E usa el doble `canned`.
+- **QC-240/QC-241** envían por nombre e idioma; no validan contra esta tabla (lo dice su ficha).
+- **QC-245/QC-247** eligen plantillas con «solo aprobadas». Esta ficha exige `integraciones.modificar`
+  para listar (D2); si quien envía no es Administrador, esas fichas necesitarán una consulta propia.
+- **D77** (mensaje «veneno»): R41 evita que un cambio de plantilla abra un caso nuevo; los dos casos
+  de mensajes siguen abiertos.
+
+| Archivo | Con quién | Cómo se resuelve |
+|---|---|---|
+| `db/schema.prisma`, `db/migrations/` | Fichas con esquema en vuelo (QC-131, QC-274, QC-279 del mismo autor; otras según `archivos-en-vuelo --candidata`) | Bloque nuevo al final; timestamp re-fechado en F2.3 si `dev` trae una posterior |
+| `lib/composition/index.ts` | Todas las fichas con cableado | Solo el bloque de WhatsApp de `integraciones` |
+| `vercel.json`, `tests/unit/pedidos/vercel-cron.test.ts` | QC-241 (cron de barrido) | Entrada nueva; el test por `path` ya admite la de QC-241 |
+| `lib/modules/errores/domain/*`, `catalogo.test.ts` | Toda ficha con códigos nuevos | Se suma al final; la cuenta se ajusta al sincronizar con `dev` |
+| `tests/guards/guard-rutas-fuera-de-sesion.test.ts`, `tests/integration/aislamiento.json` | Fichas con rutas o tests de integración | Una entrada más |
+| `lib/modules/integraciones/**`, `module-shape.test.ts`, guardia de ámbito | QC-239, QC-240, QC-241 (mismo módulo) | La que llegue después amplía las listas exactas |
+
+---
+
+## 16. Alternativas descartadas
+
+1. **Consultar Meta en cada carga de la pantalla, sin copia local.** Lo descarta D1: cada carga
+   gastaría una llamada a Graph y la lista dependería de que Meta responda.
+2. **Resincronizar dentro del `POST` del webhook, antes de responder.** Una sincronización son varias
+   llamadas a Graph de hasta 10 s cada una: Meta esperaría la respuesta y reintentaría por timeout,
+   repitiendo todo el lote. Con `after` el `200` sale primero.
+3. **Encolar la resincronización en QStash.** Daría reintentos, pero añade un consumidor, una firma y
+   una ruta para algo que el cron diario ya corrige; `after` basta.
+4. **Una sola transacción para mensajes y cambios de plantillas del webhook.** Obliga a meter el
+   repositorio de plantillas dentro del `inbox` de QC-238. Las dos escrituras ya son idempotentes, así
+   que separarlas no deja estados a medias que un reintento no arregle.
+5. **Sincronizar escribiendo página a página.** Una página que falla a mitad dejaría marcadas como
+   eliminadas las plantillas de las páginas no leídas. Se lee todo y se escribe en una transacción.
+6. **Único total `(connectionId, name, language)`** como lo escribe la ficha: una plantilla eliminada
+   bloquearía para siempre ese nombre e idioma, incluso cuando Meta ya permite reutilizarlo ([P1]).
+7. **Copiar `cron-secret-env.ts` dentro de `integraciones`, o moverlo a `lib/shared/`.** Copiarlo
+   duplica código de seguridad que puede divergir; moverlo toca `pedidos` y sus tests fuera del
+   alcance. Cablear el mismo adaptador desde la composición reutiliza sin tocar `pedidos`.
+8. **Server Actions con `FormData`** como las de la conexión: el borrador anidado obligaría a un
+   formato de nombres de campo propio y a reconstruirlo en el servidor.
+9. **Guardar `PENDING` solo si Meta no devuelve estado.** Más exacto, pero la ficha pide que nazca
+   `PENDING` y su criterio de aceptación lo comprueba; el webhook lo corrige en segundos.
+10. **Añadir `OTHER` también a la categoría** ([P7]): la ficha fija tres valores y no hay caso
+    conocido de una cuarta hoy.
+
+---
+
+## 17. Dependencias de terceros y entorno
+
+**Ninguna** (R52). `after` es de `next/server` (Next 16.3.0, ya instalado); `zod` ya está; `fetch` y
+`AbortSignal.timeout` son de la plataforma. `package.json` no cambia. Ninguna variable nueva: se usan
+`CRON_SECRET` (QC-141), `WHATSAPP_GRAPH_API_VERSION` y las de cifrado (QC-234/QC-237).
