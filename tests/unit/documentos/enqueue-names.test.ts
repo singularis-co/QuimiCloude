@@ -24,8 +24,7 @@ function rutas(cantidad: number): string[] {
 }
 
 function nombre(entrada: string): string | null {
-  const parsed = fileNameSchema.safeParse(entrada);
-  return parsed.success ? parsed.data : null;
+  return fileNameSchema.parse(entrada);
 }
 
 function dobles() {
@@ -59,21 +58,29 @@ describe('R50: fileNameSchema deja el nombre que tenía el archivo en el equipo'
     expect(nombre('C:\\x\\\t  d.pdf\n')).toBe('d.pdf');
   });
 
-  it('R50: rechaza un nombre vacío, solo espacios o que solo era carpeta', () => {
+  it('R50: un nombre que queda vacío tras sanear es null, no un error', () => {
     expect(nombre('')).toBeNull();
     expect(nombre('    ')).toBeNull();
     expect(nombre('C:\\carpeta\\')).toBeNull();
     expect(nombre('\u0000\u0001')).toBeNull();
   });
 
-  it('R50: admite 255 caracteres y rechaza 256', () => {
+  it('R50: admite 255 caracteres y recorta a 255 lo que pasa del tope', () => {
     expect(nombre('a'.repeat(MAX_FILE_NAME_LENGTH))).toBe('a'.repeat(255));
-    expect(nombre('a'.repeat(MAX_FILE_NAME_LENGTH + 1))).toBeNull();
+    expect(nombre('a'.repeat(MAX_FILE_NAME_LENGTH + 1))).toBe('a'.repeat(255));
+    expect(nombre('a'.repeat(1000))).toBe('a'.repeat(255));
   });
 
-  it('R50: el tope cuenta caracteres, no unidades UTF-16', () => {
+  it('R50: el recorte cuenta puntos de código, no unidades UTF-16, y no parte un emoji', () => {
     expect(nombre('😀'.repeat(255))).toBe('😀'.repeat(255));
-    expect(nombre('😀'.repeat(256))).toBeNull();
+    const recortado = nombre('😀'.repeat(300));
+    expect(recortado).toBe('😀'.repeat(255));
+    expect([...(recortado ?? '')]).toHaveLength(MAX_FILE_NAME_LENGTH);
+    expect(nombre(`${'a'.repeat(254)}😀😀`)).toBe(`${'a'.repeat(254)}😀`);
+  });
+
+  it('R50: tras recortar se vuelven a quitar los espacios del final', () => {
+    expect(nombre(`${'a'.repeat(250)}     resto.pdf`)).toBe('a'.repeat(250));
   });
 });
 
@@ -94,11 +101,13 @@ describe('R50: enqueueBatchSchema acepta names opcional y alineado con paths', (
     ).toBe(false);
   });
 
-  it('R50: un nombre inválido rechaza la tanda entera', () => {
-    expect(
-      enqueueBatchSchema.safeParse({ strategy: 'formula', paths: rutas(2), names: ['a.pdf', 'x'.repeat(256)] })
-        .success,
-    ).toBe(false);
+  it('R50: un nombre malo ya no rechaza la tanda: se recorta o queda null', () => {
+    const parsed = enqueueBatchSchema.safeParse({
+      strategy: 'formula',
+      paths: rutas(3),
+      names: ['a.pdf', 'x'.repeat(256), '  \u0000 '],
+    });
+    expect(parsed.success && parsed.data.names).toEqual(['a.pdf', 'x'.repeat(255), null]);
   });
 
   it('R50: sin names la entrada sigue siendo válida', () => {
@@ -134,6 +143,15 @@ describe('R50: enqueueBatch pasa los nombres al repositorio', () => {
     const entrada = doble.createBatch.mock.calls[0]?.[0];
     expect(entrada?.paths).toEqual(rutas(2));
     expect(entrada).not.toHaveProperty('originalNames');
+  });
+
+  it('R50: una tanda con un nombre inservible se encola y ese archivo llega sin nombre', async () => {
+    const doble = dobles();
+    const paths = rutas(2);
+
+    await createEnqueueBatch(doble)(ACTOR, { strategy: 'formula', paths, names: ['a.pdf', 'C:\\carpeta\\'] });
+
+    expect(doble.createBatch.mock.calls[0]?.[0].originalNames).toEqual(['a.pdf', null]);
   });
 
   it('R50: names con otra longitud rechaza sin escribir', async () => {

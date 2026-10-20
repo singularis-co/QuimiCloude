@@ -786,3 +786,37 @@ Tasks de la tanda 4 cerradas: T21, T22, T24, T25, T26, T27 y T28. Queda T23, la 
 ### Rojos
 - `tests/unit/marca/tablas-marca.test.tsx` (el ajeno de las tandas anteriores): **desaparece** con el merge; corrido solo, pasa.
 - `tests/integration/proveedores/catalog-line.int.test.ts` › «R32: la base rechaza la presentacion y la unidad inexistentes…»: `TypeError: .toMatch() expects to receive a string, but got object` en la línea 784. Falla siempre, también corrido solo. Es **ajeno**: el test, `lib/modules/proveedores`, `tests/helpers`, `package.json` y el lockfile son idénticos a `origin/dev`. No está en `tests/baseline-rojos.json`. No se ha tocado.
+
+## Menores 3 y 4 del review (backend_dev, 2026-10-20)
+
+Cierra el **menor n.º 3** (consulta del doble de E2E sin `companyId`; regla de Dominio n.º 1) y el **menor n.º 4**: R50 no pedía rechazar la tanda, así que un nombre inservible ya no la tumba; se recorta a 255 puntos de código o se guarda `null`.
+
+### Archivos
+- `lib/modules/documentos/domain/document-path.ts`: nueva `companyIdOfPath(path)`, pura. Devuelve el primer segmento si es UUID y la ruta pasa `isPathInCompany` con él; si no, `null`.
+- `lib/modules/documentos/adapters/driven/storage/document-storage-memory.ts`: `createOriginalNameOf(find)` saca la empresa con `companyIdOfPath`; sin empresa válida devuelve `null` sin consultar. La consulta queda `findFirst({ where: { companyId, path } })`.
+- `lib/modules/documentos/domain/file-name.ts`: `fileNameSchema` ya no hace `refine`. Sanea, recorta a 255 puntos de código, vuelve a hacer `trim` y, si queda vacío, da `null`. El tipo de salida es `string | null`.
+- Tests: `tests/unit/documentos/enqueue-names.test.ts` (se reescriben los casos que esperaban rechazo), `tests/unit/documentos/limits-and-path.test.ts`, `tests/unit/documentos/document-storage-memory.test.ts`.
+
+### Tipo hacia abajo
+`enqueue-batch.ts` pasa `names` tal cual. `NewBatch.originalNames` ya era `readonly (string | null)[]`, y el repositorio Prisma escribe `?? null`. `DocumentFile.originalName` es `String?`. El CHECK de `20261019120200` admite NULL o 1..255. No hace falta migración.
+
+### Frase del aviso con nombre ausente
+Ya lo soporta:
+- `document-batch-repository-prisma.ts:214` solo lee los fallidos con `originalName` no nulo.
+- `file-list-phrase.ts:19-24` cuenta los que no tienen nombre como «y N más».
+- `catalog.ts:53-75` tiene frase para la lista vacía.
+
+### R → test
+- R50, recorte y null: `enqueue-names.test.ts`, los casos «recorta a 255», «puntos de código… no parte un emoji», «tras recortar… espacios», «queda vacío… es null».
+- R50, tanda con un nombre malo: `enqueue-names.test.ts`, «un nombre malo ya no rechaza la tanda» y «una tanda con un nombre inservible se encola».
+- R12, empresa de la ruta: `limits-and-path.test.ts`, los casos `companyIdOfPath`; `document-storage-memory.test.ts`, «nombre original del E2E, filtrado por empresa».
+
+### Verificación
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores y 10 avisos, los que ya había, en archivos no tocados.
+- `pnpm exec vitest run` de los 3 tests tocados (proyecto node): 3 archivos, 37 pass.
+- `pnpm exec vitest run guard`: 84 archivos; 1144 pass y 21 skipped.
+- `vitest related` sin filtro de proyecto: aborta por falta de `DATABASE_URL`, porque arrastra los `.int`. Con `--project node --project ui`: 428 archivos; 7212 pass y 2 skipped (unos 12 min).
+- `tests/integration/documentos/batch-notice.int.test.ts`, «la base rechaza un nombre vacío…»: sigue siendo válido, porque prueba el CHECK de la columna y no el esquema. No se corrió: no hay base.
+
+Veredicto: menores 3 y 4 resueltos, con tests en verde. Los `.int` quedan sin correr por falta de base.
