@@ -13,7 +13,7 @@
 
 ## Bloque A — Base
 
-- [ ] **T1 — Esquema y migración** (R1, R2, R50). Depende de: —
+- [x] **T1 — Esquema y migración** (R1, R2, R50). Depende de: —
   - `db/schema.prisma`: enums `WhatsappTemplateCategory` y `WhatsappTemplateStatus`, modelo
     `WhatsappTemplate` con `/// @module integraciones`, y `templatesSyncedAt` en `WhatsappConnection`
     (§2.1).
@@ -23,7 +23,7 @@
     aplicar; `prisma validate` y `generate` en verde; `guard-empresa-en-esquema` y `guard-rls-force`
     en verde.
 
-- [ ] **T2 [P] — Códigos de error** (R51). Depende de: —
+- [x] **T2 [P] — Códigos de error** (R51). Depende de: —
   - `lib/modules/errores/domain/error-codes.ts` y `error-catalog.ts`: los 6 códigos de §12.
   - `lib/modules/integraciones/domain/errors.ts`: las 6 clases.
   - `tests/unit/errores/catalogo.test.ts`: cuenta + 6.

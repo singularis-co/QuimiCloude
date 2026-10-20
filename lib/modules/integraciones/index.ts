@@ -7,6 +7,12 @@ export {
   WhatsappConnectionExistsError,
   WhatsappPhoneNumberTakenError,
   ActionNotAllowedError,
+  WhatsappTemplateNotFoundError,
+  WhatsappTemplateNameTakenError,
+  WhatsappTemplateRateLimitedError,
+  WhatsappTemplateRejectedError,
+  WhatsappMetaRejectedError,
+  WhatsappMetaUnreachableError,
 } from './domain/errors';
 export type { SecretContext } from './domain/secret-context';
 export type { Actor } from './domain/actor';

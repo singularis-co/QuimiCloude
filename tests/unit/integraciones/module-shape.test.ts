@@ -381,7 +381,13 @@ describe('la forma del modulo integraciones', () => {
       'WhatsappConnectionNotFoundError',
       'WhatsappConnectionStatus',
       'WhatsappConnectionView',
+      'WhatsappMetaRejectedError',
+      'WhatsappMetaUnreachableError',
       'WhatsappPhoneNumberTakenError',
+      'WhatsappTemplateNameTakenError',
+      'WhatsappTemplateNotFoundError',
+      'WhatsappTemplateRateLimitedError',
+      'WhatsappTemplateRejectedError',
       'createCreateWhatsappConnection',
       'createDisconnectAiProvider',
       'createGetAiProviderConnection',
@@ -650,7 +656,7 @@ describe('la forma del modulo integraciones', () => {
     expect(branchRange(FEATURE_BRANCH, 'abc')).toEqual({ mergeBase: 'abc' })
   })
 
-  it('R13: db/schema.prisma tiene exactamente cinco modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), AiProvider y AiProviderConnection', () => {
+  it('R13: db/schema.prisma tiene exactamente seis modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), WhatsappTemplate (QC-242), AiProvider y AiProviderConnection', () => {
     const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8').replace(/\r\n/g, '\n')
     // El `/// @module` va encima del `model`, con solo lineas `///` entre medias.
     const modelos = [
@@ -662,10 +668,11 @@ describe('la forma del modulo integraciones', () => {
       'WhatsappConnection',
       'WhatsappContact',
       'WhatsappMessage',
+      'WhatsappTemplate',
       'AiProvider',
       'AiProviderConnection',
     ])
-    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(5)
+    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(6)
     expect(esquema).toMatch(/@module\s+identity\b/)
   })
 })
