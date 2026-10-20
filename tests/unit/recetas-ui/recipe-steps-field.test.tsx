@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
@@ -452,6 +452,177 @@ describe('RecipeStepsField — «+» y «x» en el grupo de «Requiere evidencia
     expect(tools).toContainElement(screen.getByTestId('recipe-step-remove-0'));
     expect(tools).toContainElement(screen.getByTestId('recipe-step-add-0'));
     expect(within(tools).queryByRole('switch')).toBeNull();
+  });
+});
+
+function rows(prefix = 'recipe-step'): HTMLElement[] {
+  return screen.getAllByTestId(`${prefix}-row`);
+}
+
+function expectNoDragMarks(prefix = 'recipe-step'): void {
+  for (const row of rows(prefix)) {
+    expect(row).not.toHaveAttribute('data-dragging');
+    expect(row).not.toHaveAttribute('data-drop-target');
+  }
+}
+
+describe('RecipeStepsField — tarjeta del paso y estados de arrastre (rediseño)', () => {
+  it('R16: la tarjeta tiene dos columnas, asa con el número debajo y el editor entero a la derecha', () => {
+    render(<EvidenceHarness initial={[step('a', 'Pesar'), step('b', 'Mezclar')]} />);
+
+    const [first] = rows();
+    expect(first?.className).toContain('grid-cols-[44px_minmax(0,1fr)]');
+    expect(first?.children).toHaveLength(2);
+    const [left, right] = Array.from(first?.children ?? []);
+    const handle = screen.getByTestId('recipe-step-handle-0');
+    const number = screen.getByTestId('recipe-step-number-0');
+    expect(left).toContainElement(handle);
+    expect(left).toContainElement(number);
+    expect(handle.compareDocumentPosition(number) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(number).toHaveTextContent('1');
+    expect(number).toHaveAttribute('aria-hidden', 'true');
+    expect(number.className).toContain('font-mono');
+    expect(screen.getByTestId('recipe-step-number-1')).toHaveTextContent('2');
+    expect(right).toContainElement(screen.getByTestId('recipe-step-text-0-editor'));
+    expect(right).toContainElement(screen.getByTestId('recipe-step-remove-0'));
+    expect(right).toContainElement(screen.getByTestId('recipe-step-add-0'));
+  });
+
+  it('R16: quitar y añadir con icono y nombre de hoy en la barra; bajo 768 px la barra se parte en dos líneas', () => {
+    render(<EvidenceHarness initial={[step('a', 'Pesar')]} />);
+
+    const bar = screen.getByTestId('recipe-step-text-0-bar');
+    const tools = screen.getByTestId('recipe-step-text-0-row-tools');
+    expect(bar).toContainElement(screen.getByTestId('recipe-step-text-0-toolbar'));
+    expect(bar).toContainElement(tools);
+    expect(bar.className).toContain('flex-wrap');
+    expect(tools.className).toContain('w-full');
+    expect(tools.className).toContain('md:w-auto');
+    expect(within(tools).getByRole('button', { name: 'Quitar paso 1' })).toBeInTheDocument();
+    expect(within(tools).getByRole('button', { name: 'Añadir un paso después del 1' })).toBeInTheDocument();
+    expect(within(tools).getByRole('switch', { name: 'Requiere evidencia en el paso 1' })).toBeInTheDocument();
+  });
+
+  it('R17: no hay «Añadir paso» al final de ninguna lista; el «+» de cada paso conserva su regla', async () => {
+    const user = setupUser();
+    render(<DoubleHarness />);
+
+    expect(screen.queryByTestId('recipe-step-add')).toBeNull();
+    expect(screen.queryByTestId('recipe-packing-step-add')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Añadir paso/ })).toBeNull();
+    expect(screen.getByTestId('recipe-step-add-1')).toBeEnabled();
+
+    await user.click(screen.getByTestId('recipe-step-add-1'));
+    expect(screen.getByTestId('recipe-step-add-0')).toBeDisabled();
+    expect(screen.getByTestId('recipe-step-add-2')).toBeDisabled();
+    expect(screen.getByTestId('recipe-packing-step-add-1')).toBeEnabled();
+  });
+
+  it('R18, R19: con teclado, Espacio toma el paso, lo marca y marca las demás como destino; al soltar no queda ninguna marca y el orden cambia', async () => {
+    const uninstall = installRowRectStub();
+    try {
+      const user = setupUser();
+      render(<SingleHarness initial={[step('a', 'Pesar'), step('b', 'Mezclar'), step('c', 'Envasar')]} />);
+      expectNoDragMarks();
+
+      screen.getByTestId('recipe-step-handle-0').focus();
+      await user.keyboard(' ');
+      const [lifted, second, third] = rows();
+      expect(lifted).toHaveAttribute('data-dragging', 'true');
+      expect(lifted).not.toHaveAttribute('data-drop-target');
+      expect(lifted?.className).toContain('shadow-lg');
+      expect(lifted?.className).toContain('border-primary');
+      expect(lifted?.className).toContain('scale-[1.01]');
+      expect(lifted?.className).toContain('motion-reduce:scale-100');
+      for (const row of [second, third]) {
+        expect(row).toHaveAttribute('data-drop-target', 'true');
+        expect(row).not.toHaveAttribute('data-dragging');
+        expect(row?.className).toContain('border-dashed');
+      }
+      await user.keyboard('{ArrowDown}');
+      await waitFor(() => {
+        expect(document.body.textContent).toContain('El paso se movería a la posición 2 de 3.');
+      });
+      await user.keyboard(' ');
+      expectNoDragMarks();
+      expect(textOf('recipe-step-text-0')).toContain('Mezclar');
+      expect(textOf('recipe-step-text-1')).toContain('Pesar');
+    } finally {
+      uninstall();
+    }
+  });
+
+  it('R18: al cancelar con Escape no queda ninguna marca y el orden no cambia', async () => {
+    const uninstall = installRowRectStub();
+    try {
+      const user = setupUser();
+      render(<SingleHarness initial={[step('a', 'Pesar'), step('b', 'Mezclar')]} />);
+
+      screen.getByTestId('recipe-step-handle-0').focus();
+      await user.keyboard(' ');
+      expect(rows()[0]).toHaveAttribute('data-dragging', 'true');
+      await user.keyboard('{ArrowDown}');
+      await user.keyboard('{Escape}');
+
+      expectNoDragMarks();
+      expect(textOf('recipe-step-text-0')).toContain('Pesar');
+      expect(textOf('recipe-step-text-1')).toContain('Mezclar');
+    } finally {
+      uninstall();
+    }
+  });
+
+  it('R18: el arrastre de una lista no marca las tarjetas de la otra', async () => {
+    const uninstall = installRowRectStub();
+    try {
+      const user = setupUser();
+      render(<DoubleHarness />);
+
+      screen.getByTestId('recipe-packing-step-handle-0').focus();
+      await user.keyboard(' ');
+      expect(rows('recipe-packing-step')[1]).toHaveAttribute('data-drop-target', 'true');
+      expectNoDragMarks('recipe-step');
+      await user.keyboard('{Escape}');
+      expectNoDragMarks('recipe-packing-step');
+    } finally {
+      uninstall();
+    }
+  });
+
+  it('R19: con `locked`, asa y quitar deshabilitados con su nombre de hoy, sin marcas de arrastre ni cambio de orden', async () => {
+    const uninstall = installRowRectStub();
+    try {
+      const user = setupUser();
+      render(<EvidenceHarness initial={[step('a', 'Pesar'), step('b', 'Mezclar')]} locked />);
+
+      const handle = screen.getByTestId('recipe-step-handle-0');
+      expect(handle).toBeDisabled();
+      expect(handle).toHaveAccessibleName('No se puede mover el paso 1: hay pedidos en curso con fotos');
+      expect(screen.getByTestId('recipe-step-remove-0')).toHaveAccessibleName(
+        'No se puede quitar el paso 1: hay pedidos en curso con fotos',
+      );
+
+      handle.focus();
+      await user.keyboard(' ');
+      await user.keyboard('{ArrowDown}');
+      await user.keyboard(' ');
+
+      expectNoDragMarks();
+      expect(textOf('recipe-step-text-0')).toContain('Pesar');
+      expect(textOf('recipe-step-text-1')).toContain('Mezclar');
+    } finally {
+      uninstall();
+    }
+  });
+
+  it('R19: el asa conserva su nombre con la posición, `touch-none` y la talla táctil', () => {
+    render(<SingleHarness initial={[step('a', 'Pesar'), step('b', 'Mezclar')]} />);
+
+    const handle = screen.getByTestId('recipe-step-handle-1');
+    expect(handle).toHaveAccessibleName('Arrastrar el paso en la posición 2 de 2');
+    expect(handle.className).toContain('touch-none');
+    expect(handle.className).toContain('min-h-11');
+    expect(handle.className).toContain('min-w-11');
   });
 });
 

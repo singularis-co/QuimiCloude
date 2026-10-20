@@ -412,6 +412,9 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Ampliada (2026-10-16, QC-263, T0b, P22):** `/inventario` igual. El esqueleto de
   `product-columns-skeleton.ts` pinta 9 columnas y sin tarjeta; la tabla real tiene 10 en «Todos»,
   9 con un tipo filtrado y 7 en «Producto terminado», y bajo 760 px sale en tarjetas.
+- **Ampliada (2026-10-19, QC-264; derivada del código, no medida):** `/produccion/formulas` sale en
+  tarjetas bajo 760 px de contenedor, y su esqueleto de carga, que es el `TableSkeleton` de
+  `DataTable`, sigue siendo tabla.
 - **Medida de nuevo tras el merge (2026-10-16, QC-263, T8h, F9; derivada del código):** `ProductTable`
   pinta el esqueleto con su número real de columnas, así que cuadra en «Todos» (10 con Costo / 9
   sin permiso de costos), con un tipo filtrado (9 / 8) y en «Producto» (8 / 7). Queda descuadre en
@@ -448,6 +451,9 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   `icon` (glifo y tono, pintada en `AlertDialogMedia`, fila del catálogo al día). Solo falta usarla
   en los diálogos de pedidos («Cancelar el pedido», «Eliminar el pedido», «Material insuficiente»)
   con su revisión visual.
+- **Ampliada (2026-10-19, QC-264, P17):** en `/produccion/formulas` los dos borrados (receta y
+  versión) ya llevan el icono; falta el diálogo de propagar cambios a las versiones
+  (`propagate-versions-dialog.tsx`), que es un `AlertDialog` propio y no pasa por `ConfirmDialog`.
 - **Dueño:** sin asignar.
 
 ### D57 — Selector de prioridad del pedido sin `PriorityMark` (QC-262, P10)
@@ -504,6 +510,12 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   `PRODUCT_TABLE_SCOPE_CLASS` (fondo y entrada de las sub-filas). Si una segunda ruta lo necesita, se
   sube a `DataTableCards` (paso 2 de la regla de decisión, con su fila de catálogo y tablero) y se
   retira el apaño.
+- **En parte resuelta (2026-10-19, QC-264, decisión del humano):** `card-field-label.tsx` subió a
+  `components/shared` (fila en el catálogo) y lo usan inventario y `/produccion/formulas`. Sigue en
+  la ruta de inventario el pie de tarjeta (`batchesToggle`) y `PRODUCT_TABLE_SCOPE_CLASS`. Queda
+  además que el rótulo sale en mono, como la cifra: `DataTableCards` pone `font-mono` al campo
+  entero de una columna `tabular`, y los tableros (`Formulas.dc.html:66`) solo ponen la cifra en mono.
+  Cambiarlo toca `DataTableCards` y los snapshots de inventario.
 - **Dueño:** sin asignar.
 
 ### D64 — La hoja de `CountrySelect` cambia de altura al filtrar en teléfono (QC-235)
@@ -552,4 +564,62 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Qué falta:** `e2e/clientes.spec.ts` y `e2e/movimiento.spec.ts` se escribieron sin correrlos en
   local, porque el worktree no tenía `.env`. R6 (navegar a cada página desde el grupo) solo lo cubren
   ellos. Correrlos en local, o confirmar que pasan en el E2E del PR a producción.
+- **Dueño:** Christian Quevedo.
+
+### D71 — Fórmulas: sin tiempo de espera por paso en el editor (QC-264, P6)
+- **Origen:** QC-264 (2026-10-19), P6 por defecto.
+- **Qué falta:** el tablero `Formula.dc.html` pone un campo de espera en la barra de cada paso. La
+  espera es hoy de la empresa (`minStepSeconds`, QC-125); hacerla por paso cambia el modelo
+  (`lib/modules/recetas`) y el lector (`StepReader`).
+- **Dueño:** sin asignar.
+
+### D72 — Versión de receta: sin «Devolver» un ingrediente quitado (QC-264, P8)
+- **Origen:** QC-264 (2026-10-19), P8 por defecto.
+- **Qué falta:** `FormulaVersion.dc.html` dibuja «Devolver» en cada ingrediente quitado y el texto
+  «No se quitó nada de la original.» cuando no hay quitados. Es conducta nueva, marcada «por confirmar»
+  en el tablero; el rediseño solo pinta el quitado (`StatusBadge` `danger` y nombre tachado).
+- **Dueño:** sin asignar.
+
+### D73 — Revisión de importación sin el nombre del PDF (QC-264, P10)
+- **Origen:** QC-264 (2026-10-19), P10 por defecto.
+- **Qué falta:** `ImportarFormula.dc.html` pinta el nombre del PDF bajo «Revisar fórmula». La vista
+  previa del módulo `documentos` no lo devuelve; es trabajo de módulo, no de pantalla.
+- **Dueño:** sin asignar.
+
+### D74 — Tildes pendientes en el editor de pasos y en `recipe-input.ts` (QC-264, P18)
+- **Origen:** QC-264 (2026-10-19), E17 con P18 por defecto.
+- **Qué falta:** «Lista de verificacion» y «el maximo es» (`recipe-step-editor.tsx`), «Elemento de la
+  lista de verificacion» (`recipe-step-schema.ts`) y dos mensajes de
+  `lib/modules/recetas/domain/recipe-input.ts`. Hay tests que afirman esos textos; cambiarlos es una
+  ficha propia con su censo.
+- **Dueño:** sin asignar.
+
+### D75 — «Volver a la lista» de «no encontrada» sigue como enlace de texto (QC-264, E18)
+- **Origen:** QC-264 (2026-10-19), enmienda E18.
+- **Qué falta:** las ramas «receta no encontrada» (`app/(private)/produccion/formulas/[id]/page.tsx`,
+  `components/recipe-form.tsx`) y las de las páginas de versión pintan el «Volver» como enlace de
+  texto, no como `ArrowLink` con flecha (D2 del humano). Ningún requisito de QC-264 lo cubría.
+- **Dueño:** sin asignar.
+
+### D76 — E2E `pasos-de-envasado` R32 rojo por el cronómetro del botón (dev, cb39a83d)
+- **Origen:** tanda 9 de QC-264 (2026-10-19); review v1 m4. No lo causa QC-264: el reviewer lo
+  comprobó con `git merge-base` (cb39a83d es ancestro del merge 6fcbafe6).
+- **Qué falta:** `e2e/pasos-de-envasado.spec.ts:435` espera el botón «Terminar» y recibe
+  «Terminar00:01». El cronómetro en el botón entró con cb39a83d («materiales plegables y cronómetro en
+  el botón Siguiente») sin ajustar este E2E. Hay que decidir si cambia el E2E o el nombre accesible
+  del botón. El archivo también lo toca QC-291 (Rediseño de la pantalla del operario). Frena el PR a
+  producción, donde corre el E2E.
+- **Dueño:** sin asignar (candidato: QC-291).
+
+## QC-238 (review, 2026-10-19)
+
+### D77 — Un mensaje «veneno» firmado del webhook de WhatsApp se reintenta en bucle
+- **Origen:** review de QC-238, vuelta 1 (m4).
+- **Qué pasa:** en dos casos Prisma lanza, la ruta responde `500` y Meta reintenta el lote entero
+  hasta rendirse, tapando el resto de mensajes del lote:
+  - un `timestamp` con demasiados dígitos da `Invalid Date`;
+  - un `\u0000` en un texto, que `text`/`jsonb` de Postgres rechazan.
+- **Riesgo:** bajo, porque el mensaje tiene que traer la firma de Meta.
+- **Qué falta:** acotar `timestamp` en el zod de la cabecera y limpiar `\u0000`, o mandar esos
+  mensajes a `UNSUPPORTED`. Puede ir en QC-239.
 - **Dueño:** Christian Quevedo.

@@ -9,4 +9,7 @@ export interface CompanyCountryRepository {
     actorId: string,
     now: Date,
   ): Promise<'ok' | 'not_found'>;
+
+  /** Una empresa inexistente, dada de baja o sin pais responde igual: `null`. */
+  findCountryOf(companyId: string): Promise<CountryCode | null>;
 }

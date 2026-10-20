@@ -20,7 +20,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
-  createCustomer,
+  createCustomer as createCustomerRow,
   findAliveCustomerById,
   listAliveCustomers,
   softDeleteAliveCustomer,
@@ -32,7 +32,16 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { CustomerScope } from '@/lib/modules/clientes/domain/customer-scope';
 import type { ListQuery } from '@/lib/modules/clientes/domain/list-query';
-import type { NewCustomer } from '@/lib/modules/clientes/domain/customer-view';
+import type { CustomerPhoneColumns, NewCustomer } from '@/lib/modules/clientes/domain/customer-view';
+
+/** Ninguna semilla de este archivo lleva numero internacional: el alta nunca choca. */
+async function createCustomer(
+  ...args: Parameters<typeof createCustomerRow>
+): Promise<{ id: string }> {
+  const created = await createCustomerRow(...args);
+  if (created === 'duplicate_phone') throw new Error('alta inesperadamente duplicada');
+  return created;
+}
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -48,7 +57,9 @@ type CustomerOverrides = Partial<{
 }>;
 
 /** Entrada del puerto, con las tres formas normalizadas calculadas con la funcion REAL. */
-function customerInput(overrides: CustomerOverrides = {}): NewCustomer {
+function customerInput(
+  overrides: CustomerOverrides = {},
+): NewCustomer & { readonly phone: CustomerPhoneColumns } {
   const firstNames = overrides.firstNames ?? `Nombre ${token()}`;
   const lastNames = overrides.lastNames ?? `Apellido ${token()}`;
   const city = overrides.city ?? `Ciudad ${token()}`;
@@ -59,7 +70,12 @@ function customerInput(overrides: CustomerOverrides = {}): NewCustomer {
     lastNamesNormalized: normalizeCustomerText(lastNames),
     city,
     cityNormalized: normalizeCustomerText(city),
-    phone: 'phone' in overrides ? overrides.phone ?? null : null,
+    phone: {
+      phone: 'phone' in overrides ? overrides.phone ?? null : null,
+      phoneCountry: null,
+      phoneE164: null,
+      phoneIssue: null,
+    },
     email: 'email' in overrides ? overrides.email ?? null : null,
     address: 'address' in overrides ? overrides.address ?? null : null,
   };
@@ -444,7 +460,7 @@ describe('R24: la baja conserva la fila completa y marca deleted_at', () => {
         firstNames: input.firstNames,
         lastNames: input.lastNames,
         city: input.city,
-        phone: input.phone,
+        phone: input.phone.phone,
         email: input.email,
         address: input.address,
         createdBy: empresaA.actorId,
@@ -596,7 +612,7 @@ describe('R11: el listado y su total solo cuentan la empresa del actor', () => {
   });
 });
 
-/** Las 11 claves reales de `CustomerView`, en el orden que exige `Object.keys(...).sort()`. */
+/** Las 14 claves reales de `CustomerView`, en el orden que exige `Object.keys(...).sort()`. */
 const CUSTOMER_VIEW_KEYS = [
   'address',
   'city',
@@ -607,12 +623,15 @@ const CUSTOMER_VIEW_KEYS = [
   'id',
   'lastNames',
   'phone',
+  'phoneCountry',
+  'phoneE164',
+  'phoneIssue',
   'updatedAt',
   'updatedBy',
 ].sort();
 
 describe('R22 y R47: las claves de la fila real, no las del doble', () => {
-  it('R22 — findAliveCustomerById devuelve exactamente las 11 claves, sin companyId ni deletedAt', async () => {
+  it('R22 — findAliveCustomerById devuelve exactamente las 14 claves, sin companyId ni deletedAt', async () => {
     let customerId: string | null = null;
     try {
       const created = await createCustomer(
@@ -631,7 +650,7 @@ describe('R22 y R47: las claves de la fila real, no las del doble', () => {
     }
   });
 
-  it('R47 — cada item de listAliveCustomers devuelve exactamente las 11 claves, sin ninguna forma normalizada', async () => {
+  it('R47 — cada item de listAliveCustomers devuelve exactamente las 14 claves, sin ninguna forma normalizada', async () => {
     const marca = `r47claves${token().slice(0, 8)}`;
     let customerId: string | null = null;
     try {

@@ -170,6 +170,11 @@ export const E2E_ESPERADOS = [
   // lee ni afirma nada sobre el identificador ni sobre `reference`, asi que ese diferimiento
   // sigue INTACTO.
   'clientes.spec.ts',
+  // Alta el 2026-10-19 (QC-236) por el MISMO motivo y en el MISMO sitio que las demas. Lo que
+  // ejercita: el alta con el pais de la empresa marcado, lo que queda en la base, el duplicado bajo
+  // el numero, la empresa sin pais, los avisos de los migrados en la lista y el campo a 390 px. NO
+  // lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'clientes-telefono.spec.ts',
   // Alta el 2026-10-09 (QC-219) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
   // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
   // archivo se nombra, uno a uno-. Lo que ejercita: el acondicionador ve Terminar bloqueado, la
@@ -517,6 +522,19 @@ export const E2E_ESPERADOS = [
   // recargar, ya no lo ve. No lee ni afirma nada sobre el identificador de peticion ni sobre
   // `reference`.
   'maestro-modulos.spec.ts',
+  // Alta el 2026-10-19 (QC-264) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: en chromium y webkit, `/produccion/formulas` a
+  // 1440 x 900 pinta un unico `h1` con «Subir PDFs» antes de «Nueva formula», las seis columnas en
+  // orden con Pasos, Creado y Actualizado al final de la celda y de su cabecera, y el menu de la
+  // fila con «Editar», separador y «Borrar» destructivo; la ficha pinta «Versiones» a la derecha,
+  // el pie fijo visible sin desplazar, «Por revisar» en una linea, la vista previa centrada de hasta
+  // 920 x 900 con su pie y el dialogo de propagar en plural; Enter en el nombre guarda una sola vez
+  // con «Guardar» fuera del `<form>`; a 820 x 1180, tarjetas y «Versiones» debajo; a 390 x 844,
+  // «Acciones» de 44 px, el menu centrado con items de 48 px, los dialogos de borrar, subir y
+  // propagar enteros, la vista previa a pantalla completa y formulario, version y revision sin
+  // desborde. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'formulas-rediseno.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -757,6 +775,10 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-10-19: correctiva, quita `whatsapp_connections.meta_app_id` que QC-237 retiro editando la
   // migracion original; no toca el identificador.
   '20261019120000_whatsapp_connections_drop_meta_app_id',
+  // 2026-10-19: telefono internacional del cliente; no toca el identificador.
+  '20261019130000_customers_phone_e164',
+  // QC-238 2026-10-19: contactos y mensajes de WhatsApp; no toca el identificador.
+  '20261019140000_whatsapp_contacts_and_messages',
 ] as const
 
 export function hallazgosDeMigraciones(

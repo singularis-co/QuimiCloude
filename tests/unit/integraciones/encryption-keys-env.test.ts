@@ -264,6 +264,7 @@ describe('la composición se importa sin las variables del cifrado', () => {
         'getAiProviderReadiness',
         'getAiProviderStatus',
         'getWhatsappConnection',
+        'receiveWhatsappWebhook',
         'regenerateWhatsappVerifyToken',
         'reportAiProviderOutcome',
         'resolveAiProviderForReading',
@@ -275,6 +276,7 @@ describe('la composición se importa sin las variables del cifrado', () => {
         'testSavedAiProvider',
         'testWhatsappConnection',
         'updateWhatsappConnection',
+        'verifyWhatsappWebhook',
         'whatsappWebhookUrl',
       ])
       expect(composition.integraciones.secretCipher).toBe(secretCipherAesGcm)

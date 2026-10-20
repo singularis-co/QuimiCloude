@@ -25,10 +25,12 @@
     "asignaciones/unassign.int.test.ts",
     "clientes/customers-constraints.int.test.ts",
     "clientes/customers-migration.int.test.ts",
+    "clientes/customers-phone-migration.int.test.ts",
     "clientes/customers-search-migration.int.test.ts",
     "documentos/document-batches-and-files-constraints.int.test.ts",
     "identity/administrator.int.test.ts",
     "identity/company-addons.int.test.ts",
+    "identity/company-country-read.int.test.ts",
     "identity/company-country.int.test.ts",
     "identity/company-directory-addons.int.test.ts",
     "identity/company.int.test.ts",
@@ -45,6 +47,7 @@
     "identity/packing-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
     "integraciones/whatsapp-connection-migration.int.test.ts",
+    "integraciones/whatsapp-messages-migration.int.test.ts",
     "integraciones/ai-provider-migration.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
@@ -513,6 +516,16 @@
       "desde": "2026-10-06"
     },
     {
+      "archivo": "clientes/customer-phone-uniqueness.int.test.ts",
+      "motivo": "T5 (QC-236): ejercita createCustomer y updateAliveCustomer de customer-prisma.ts contra el indice unico parcial del telefono, y dos altas simultaneas con el mismo numero. Usan el cliente Prisma GLOBAL (y la edicion con el numero vacio abre su propia transaccion), asi que una transaccion del test con ROLLBACK no los envolveria. Dos empresas efimeras (randomUUID, con usuario, rol y tipo de documento) nacen en beforeAll; afterAll borra sus clientes por company_id, cuenta que no quedo ninguno y despues borra usuarios, rol, tipo de documento y empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
+      "archivo": "clientes/legacy-phone-backfill.int.test.ts",
+      "motivo": "T5 (QC-236): ejercita el relleno de telefonos (createBackfillLegacyPhones + legacy-phone-prisma.ts), que abre una transaccion por empresa sobre el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no lo envolveria. El caso de uso recorre SOLO las empresas efimeras del archivo (listCompanyIds inyectado), nunca filas de otros archivos. afterAll borra sus clientes por company_id, cuenta que no quedo ninguno y despues borra usuarios, rol, tipo de documento y empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
       "archivo": "proveedores/catalog-image-url.int.test.ts",
       "motivo": "T4 (QC-171): ejercita `listCatalogLines` y `listSupplierShowcase` ya cableados por `lib/composition`, cuyos adaptadores driven llaman al cliente Prisma GLOBAL (mismo criterio que supplier-showcase.int.test.ts), asi que una transaccion del test con ROLLBACK no los envolveria -correrian en otra conexion del pool y verian una base vacia-. Siembra una empresa efimera con randomUUID (proveedor, presentacion y dos lineas de catalogo) y COMMITEA; el afterAll borra lineas, proveedor, presentacion y empresa por su id exacto, en el orden que exigen las FK. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-25"
@@ -651,6 +664,21 @@
       "archivo": "integraciones/whatsapp-connection-prisma.int.test.ts",
       "motivo": "Ejercita las cuatro funciones de whatsapp-connection-prisma.ts, que llaman al cliente Prisma GLOBAL y no a un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria; ademas R6 necesita dos altas concurrentes de verdad contra el indice unico parcial. Cada caso fabrica sus empresas efimeras con randomUUID (tipo de documento, rol, empresa y usuario) y 'afterAll' borra sus conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-09"
+    },
+    {
+      "archivo": "integraciones/whatsapp-inbox-prisma.int.test.ts",
+      "motivo": "Ejercita 'recordWhatsappInbound' de whatsapp-inbox-prisma.ts, que abre su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria; ademas el caso de dos 'record' concurrentes del mismo numero necesita dos transacciones que confirmen de verdad contra el unico (connection_id, wa_id). Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
+      "archivo": "integraciones/whatsapp-webhook-route.int.test.ts",
+      "motivo": "Recorre los GET/POST exportados por whatsapp-webhook-route.ts con la composicion real: el POST guarda en la PROPIA 'prisma.$transaction' de recordWhatsappInbound sobre el cliente GLOBAL, y el handshake y el descifrado ilegible escriben la conexion con el mismo cliente, asi que una transaccion del test con ROLLBACK no los envolveria; el caso de la transaccion que falla necesita ademas que el reintento confirme de verdad. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa con o sin el anadido integraciones, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa (los anadidos caen en cascada). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
+      "archivo": "integraciones/whatsapp-messages-constraints.int.test.ts",
+      "motivo": "Ejercita 'companyOfWhatsappConnection' de whatsapp-webhook-directory-prisma.ts y las altas de conexion de whatsapp-connection-prisma.ts, que usan el cliente Prisma GLOBAL y no un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria. Las altas que la base debe rechazar (unicos, CHECK y FK compuestas de empresa) no dejan fila. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
     },
     {
       "archivo": "recetas/step-evidence-flag.int.test.ts",

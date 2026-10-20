@@ -19,6 +19,7 @@ import {
   findLiveWhatsappConnection,
   findLiveWhatsappConnectionById,
   insertWhatsappConnection,
+  recordWhatsappWebhookHandshake,
   updateLiveWhatsappConnection,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma'
 import { createCreateWhatsappConnection } from '@/lib/modules/integraciones/domain/create-whatsapp-connection'
@@ -344,6 +345,7 @@ describe('R9: a la base solo llegan valores cifrados y el resumen del verify tok
       findLiveById: findLiveWhatsappConnectionById,
       create: insertWhatsappConnection,
       update: updateLiveWhatsappConnection,
+      recordWebhookHandshake: recordWhatsappWebhookHandshake,
     }
     const create = createCreateWhatsappConnection({
       connections,

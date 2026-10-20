@@ -40,6 +40,8 @@
  * **2026-10-14**: `packed_exceeds_quantity`, `packaging_stock_insufficient`.
  * **2026-10-16**: `delivery_exceeds_surplus`.
  * **2026-10-16**: `company_last_administrator`.
+ * **2026-10-19**: `customer_phone_country_required`, `customer_phone_invalid`,
+ * `customer_duplicate_phone`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -230,6 +232,12 @@ export const ERROR_CODES = [
   // Distinto de `last_administrator`: cuenta los Administradores vivos de la empresa, sea cual sea su
   // estado de cuenta, no los que estan en `active`.
   'company_last_administrator',
+  // Distinto de `invalid_input`: hay numero de telefono, falta el pais con el que leerlo.
+  'customer_phone_country_required',
+  // Distinto de `invalid_input`: el numero tiene forma de texto valida, pero no existe en el pais
+  // elegido.
+  'customer_phone_invalid',
+  'customer_duplicate_phone',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

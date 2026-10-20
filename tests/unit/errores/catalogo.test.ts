@@ -79,7 +79,9 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // `packaging_stock_insufficient`.
       // 2026-10-16: 102 y no 101: entra `company_last_administrator`.
       // QC-288 2026-10-19 (merge de dev): 103 y no 102: entra también `delivery_exceeds_surplus`.
-      expect(ERROR_CODES).toHaveLength(103)
+      // 2026-10-19: 106 y no 103: entran `customer_phone_country_required`,
+      // `customer_phone_invalid` y `customer_duplicate_phone`.
+      expect(ERROR_CODES).toHaveLength(106)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

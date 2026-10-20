@@ -44,3 +44,40 @@ export class ValidationError extends ClientesError {
     super('invalid_input', diagnostic);
   }
 }
+
+/** Hay numero de telefono y no hay pais con el que leerlo. */
+export class CustomerPhoneCountryRequiredError extends ClientesError {
+  readonly code = 'customer_phone_country_required';
+
+  constructor(diagnostic?: string) {
+    super('customer_phone_country_required', diagnostic);
+  }
+}
+
+/** El numero no es valido para el pais elegido. */
+export class CustomerPhoneInvalidError extends ClientesError {
+  readonly code = 'customer_phone_invalid';
+
+  constructor(diagnostic?: string) {
+    super('customer_phone_invalid', diagnostic);
+  }
+}
+
+/** Otro cliente vivo de la misma empresa ya tiene ese numero. */
+export class CustomerDuplicatePhoneError extends ClientesError {
+  readonly code = 'customer_duplicate_phone';
+
+  constructor(diagnostic?: string) {
+    super('customer_duplicate_phone', diagnostic);
+  }
+}
+
+/**
+ * Fallo del esquema de entrada -> el error que toca. Los dos problemas de telefono que la pantalla
+ * pinta bajo su campo tienen codigo propio; el resto es `invalid_input`.
+ */
+export function inputError(reason: 'country_required' | 'invalid_number' | 'invalid_country' | null): ClientesError {
+  if (reason === 'country_required') return new CustomerPhoneCountryRequiredError();
+  if (reason === 'invalid_number') return new CustomerPhoneInvalidError();
+  return new ValidationError(reason ?? undefined);
+}

@@ -309,3 +309,60 @@ describe('DeleteRecipeDialog — objetivos táctiles', () => {
     },
   );
 });
+
+describe('DeleteRecipeDialog — icono de borrado', () => {
+  it.each([
+    { kind: 'recipe' as const, receta: ORIGINAL, titulo: 'Borrar receta' },
+    { kind: 'version' as const, receta: VERSION, titulo: 'Borrar versión' },
+  ])(
+    'R50: con $kind pinta el icono de borrado en tono danger delante del título',
+    async ({ kind, receta, titulo }) => {
+      const user = setupUser();
+      render(<DeleteRecipeDialog recipe={receta} kind={kind} />);
+
+      const dialogo = await abrir(user);
+      const icono = within(dialogo).getByTestId('delete-recipe-icon');
+      const encabezado = within(dialogo).getByRole('heading', { name: titulo });
+
+      expect(icono).toHaveAttribute('data-tone', 'danger');
+      expect(icono.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      expect(icono).not.toHaveAccessibleName();
+      expect(icono.compareDocumentPosition(encabezado) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    },
+  );
+
+  it.each([
+    {
+      kind: 'recipe' as const,
+      receta: ORIGINAL,
+      titulo: 'Borrar receta',
+      mensaje: TEXTO_DE_HOY,
+    },
+    {
+      kind: 'version' as const,
+      receta: VERSION,
+      titulo: 'Borrar versión',
+      mensaje: `Se va a borrar la versión «${VERSION.name}». Esta acción no se puede deshacer.`,
+    },
+  ])('R50: con $kind los textos, botones y testids de hoy no cambian', async ({ kind, receta, titulo, mensaje }) => {
+    const user = setupUser();
+    render(<DeleteRecipeDialog recipe={receta} kind={kind} />);
+
+    const dialogo = await abrir(user);
+    await waitFor(() => expect(screen.getByTestId(id.confirmar)).toBeEnabled());
+
+    expect(within(dialogo).getByRole('heading', { name: titulo })).toBeInTheDocument();
+    expect(within(dialogo).getByTestId(id.mensaje)).toHaveTextContent(mensaje);
+    expect(screen.getByTestId(id.cancelar)).toHaveTextContent('Cancelar');
+    expect(screen.getByTestId(id.confirmar)).toHaveTextContent('Borrar');
+    expect(screen.getByTestId(id.abrir)).toHaveAccessibleName(`Borrar ${receta.name}`);
+  });
+
+  it('R50: abierto desde fuera (controlado) también pinta el icono', async () => {
+    render(<DeleteRecipeDialog recipe={ORIGINAL} open onOpenChange={vi.fn()} />);
+
+    const dialogo = await screen.findByTestId(id.dialogo);
+    expect(within(dialogo).getByTestId('delete-recipe-icon')).toHaveAttribute('data-tone', 'danger');
+    expect(screen.queryByTestId(id.abrir)).toBeNull();
+  });
+});

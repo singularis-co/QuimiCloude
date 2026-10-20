@@ -3,11 +3,11 @@
 import { PlusIcon, XIcon } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import {
   consumedQuantity,
@@ -18,6 +18,7 @@ import {
 } from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { cn } from '@/lib/utils';
 
 import { ProductPicker, type ProductPickerOption } from './product-picker';
 import {
@@ -30,6 +31,7 @@ import {
   type RecipeToolFormValue,
 } from './recipe-form-state';
 import { compareWithOriginal, type VersionLineMark } from './recipe-version-diff';
+import { RECIPE_VERSION_MARK_TONES } from './recipe-version-tones';
 
 /**
  * Campo de líneas de producto en porcentaje, sin selector de unidad -el insumo ya trae la suya-.
@@ -203,11 +205,31 @@ const MARK_LABEL: Record<VersionLineMark['kind'], string> = {
   added: 'Añadido',
 };
 
-const MARK_VARIANT: Record<VersionLineMark['kind'], 'secondary' | 'outline' | 'default'> = {
-  same: 'secondary',
-  changed: 'outline',
-  added: 'default',
+const MARK_KINDS: readonly VersionLineMark['kind'][] = ['same', 'changed', 'added'];
+
+const MARK_ROW_CLASS: Record<VersionLineMark['kind'], string> = {
+  same: '',
+  changed: 'border-warning-border bg-warning-subtle/45',
+  added: 'border-success-border bg-success-subtle/45',
 };
+
+function countMarks(
+  marks: readonly (VersionLineMark | null)[],
+): Record<VersionLineMark['kind'], number> {
+  const counts = { same: 0, changed: 0, added: 0 };
+  for (const mark of marks) {
+    if (mark !== null) counts[mark.kind] += 1;
+  }
+  return counts;
+}
+
+// La pastilla activa la pinta `TabsIndicator`: la pestaña activa queda transparente para no taparla.
+const TAB_LIST_CLASS =
+  'relative h-auto max-w-full flex-nowrap justify-start gap-1 overflow-x-auto rounded-[10px] p-1 [scrollbar-width:none] group-data-horizontal/tabs:h-auto';
+const TAB_CLASS =
+  'h-auto min-h-11 flex-none gap-2 rounded-lg px-3.5 text-[13px] text-muted-foreground transition-colors duration-(--dur-base) ease-(--ease-standard) hover:text-foreground data-active:bg-transparent data-active:text-foreground group-data-[variant=default]/tabs-list:data-active:shadow-none dark:text-muted-foreground dark:data-active:border-transparent dark:data-active:bg-transparent';
+const TAB_COUNT_CLASS =
+  'inline-flex h-5 min-w-5 flex-none items-center justify-center rounded-full bg-foreground/8 px-1.5 font-mono text-[11px] font-semibold tabular-nums';
 
 /** Fantasma del tab de herramientas: misma idea que `GHOST_LINE`, sin porcentaje. */
 const GHOST_TOOL: RecipeToolFormValue = {
@@ -239,6 +261,7 @@ export function RecipeLinesField({
   const sumId = useId();
   const removedHeadingId = useId();
   const diff = baseline === undefined ? null : compareWithOriginal(baseline, lines);
+  const markCounts = diff === null ? null : countMarks(diff.marks);
   // Un rechazo que solo afecta a herramientas quedaría oculto tras el tab de ingredientes: al
   // llegar errores nuevos se abre el tab que los tiene. Se ajusta en render, no en un efecto.
   const onlyToolsFailed =
@@ -387,9 +410,29 @@ export function RecipeLinesField({
 
   return (
     <section aria-labelledby={headingId} data-testid="recipe-lines-field" className="flex flex-col gap-3">
-      <h2 id={headingId} className="text-lg font-medium">
-        Ingredientes y herramientas
-      </h2>
+      {markCounts === null ? (
+        <h2 id={headingId} className="text-lg font-medium">
+          Ingredientes y herramientas
+        </h2>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id={headingId} className="text-lg font-medium">
+            Ingredientes y herramientas
+          </h2>
+          <div className="flex flex-wrap gap-1.5" data-testid="recipe-lines-diff-summary">
+            {MARK_KINDS.map((kind) => (
+              <StatusBadge
+                key={kind}
+                tone={RECIPE_VERSION_MARK_TONES[kind]}
+                label={`${MARK_LABEL[kind]} ${markCounts[kind]}`}
+                data-testid={`recipe-lines-diff-summary-${kind}`}
+              >
+                {MARK_LABEL[kind]} <span className="font-mono tabular-nums">{markCounts[kind]}</span>
+              </StatusBadge>
+            ))}
+          </div>
+        </div>
+      )}
 
       {generalError === undefined ? null : (
         <p role="alert" className="text-sm text-destructive" data-testid="recipe-lines-error">
@@ -398,12 +441,19 @@ export function RecipeLinesField({
       )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList aria-label="Líneas de la receta por tipo">
-          <TabsTrigger value="ingredients" data-testid="recipe-lines-tab-ingredients">
-            Ingredientes
+        <TabsList aria-label="Líneas de la receta por tipo" className={TAB_LIST_CLASS}>
+          <TabsIndicator />
+          <TabsTrigger value="ingredients" data-testid="recipe-lines-tab-ingredients" className={TAB_CLASS}>
+            <span>Ingredientes</span>{' '}
+            <span className={TAB_COUNT_CLASS} data-testid="recipe-lines-tab-ingredients-count">
+              {lines.length}
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="machines" data-testid="recipe-lines-tab-machines">
-            Herramientas
+          <TabsTrigger value="machines" data-testid="recipe-lines-tab-machines" className={TAB_CLASS}>
+            <span>Herramientas</span>{' '}
+            <span className={TAB_COUNT_CLASS} data-testid="recipe-lines-tab-machines-count">
+              {tools.length}
+            </span>
           </TabsTrigger>
         </TabsList>
 
@@ -419,7 +469,10 @@ export function RecipeLinesField({
             <div
               key={line.key}
               data-testid="recipe-line-row"
-              className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-start"
+              className={cn(
+                'grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-start',
+                mark === null ? null : MARK_ROW_CLASS[mark.kind],
+              )}
             >
               <div
                 data-testid={isUnavailable ? `recipe-line-unavailable-${index}` : undefined}
@@ -446,19 +499,25 @@ export function RecipeLinesField({
                 />
                 {mark === null ? null : (
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant={MARK_VARIANT[mark.kind]}
+                    <StatusBadge
+                      tone={RECIPE_VERSION_MARK_TONES[mark.kind]}
+                      label={MARK_LABEL[mark.kind]}
                       data-testid={`recipe-line-mark-${index}`}
                       data-mark={mark.kind}
-                    >
-                      {MARK_LABEL[mark.kind]}
-                    </Badge>
+                    />
                     {mark.kind === 'changed' ? (
                       <span
                         className="text-sm text-muted-foreground"
                         data-testid={`recipe-line-original-${index}`}
                       >
-                        {`Original: ${formatPercentage(mark.originalPercentage)} %`}
+                        Original:{' '}
+                        <span
+                          className="font-mono tabular-nums line-through"
+                          data-testid={`recipe-line-original-value-${index}`}
+                        >
+                          {formatPercentage(mark.originalPercentage)}
+                        </span>{' '}
+                        %
                       </span>
                     ) : null}
                   </div>
@@ -573,8 +632,14 @@ export function RecipeLinesField({
                 data-testid={`recipe-line-removed-${index}`}
                 className="flex flex-wrap items-center gap-2 text-sm"
               >
-                <Badge variant="destructive">Quitado</Badge>
-                <span>{productPickerLabel(line.productName)}</span>
+                <StatusBadge
+                  tone={RECIPE_VERSION_MARK_TONES.removed}
+                  label="Quitado"
+                  data-testid={`recipe-line-removed-mark-${index}`}
+                />
+                <span className="line-through" data-testid={`recipe-line-removed-name-${index}`}>
+                  {productPickerLabel(line.productName)}
+                </span>
                 <span className="text-muted-foreground">{`${formatPercentage(line.percentage)} %`}</span>
               </li>
             ))}
