@@ -1,5 +1,14 @@
 # QC-266 — Rediseño de Proveedores y Clientes · requirements.md
 
+> **Enmienda contra dev (2026-10-19).** El spec se aprobó el 2026-10-13 (P1–P15 por defecto) y se
+> enmendó tras el merge de `origin/dev` en la rama (687 commits), que trajo QC-262, QC-263, QC-264,
+> QC-244, QC-275/QC-280, QC-277, QC-278, QC-165, QC-166 y cambios directos de Inventario y Pedidos.
+> Regla: en lo visual manda el tablero; en columnas, costos, datos y conducta, lo mergeado. Lista
+> completa de cambios, con su cita, en `design.md > 12` (E1–E18). Requisitos tocados: R15, R19, R31,
+> R38 (solo su verificación), R41. Requisito nuevo: R44 *(supuesto P16)*. P1 queda resuelta por `dev`.
+> Preguntas nuevas P16–P17 (`## Preguntas abiertas > Preguntas de la enmienda 2026-10-19`). Lo que
+> decían los requisitos tocados queda en `design.md > 12`.
+
 ## Alcance
 
 Lleva al diseño del canvas (página 7) cuatro pantallas y sus modales: la **vitrina de proveedores**
@@ -34,8 +43,10 @@ contenedor de 760 px o menos, tablas en tarjetas con «Acciones» que abre el me
 - **Animaciones de entrada** (escalonada, productos que entran desde la derecha, la fila editada que
   parpadea): P14. Sí entran el hover de las tarjetas, la opacidad de la fila excluida y el giro de
   «Confirmando…».
-- **Teléfono con código de país** del cliente (QC-236), **menú de Clientes con Contactos** (QC-244) y
-  **WhatsApp con clientes** (QC-239): fichas propias, `pending`. No se adelanta nada.
+- **Teléfono con código de país** del cliente (QC-236) y **WhatsApp con clientes** (QC-239): fichas
+  propias, `pending`. No se adelanta nada. *Enmienda E10:* el **menú de Clientes con Contactos**
+  (QC-244) ya está en `dev`; la pantalla `/clientes/contactos` que dejó no entra en esta ficha y no se
+  toca.
 - Cabecera de la zona privada, menú lateral e iconos: ya los dejó QC-257.
 
 ## Decisiones cerradas (no reabrir)
@@ -51,7 +62,7 @@ las abre este spec.
 | Ficha 3 / D3 | Tonos por significado con un único `StatusBadge` y un único mapa por dominio; la revisión del catálogo usa tonos unificados | humano, 2026-10-10 (D3) y descripción de QC-266 | — | R21, R22, R43 |
 | Ficha 4 / D10 | Agregar los toasts que faltan (p. ej. «Proveedor creado.») | humano, 2026-10-10 (D10) y descripción de QC-266 | — | R36, R37 |
 | D7 | Tallas de botón: sm 32 · default 36 · touch 44 · xl 52 | humano, 2026-10-10 (D7) | — | R1, R4, R12, R21, R24, R25, R34 |
-| D14 | Lo demás del canvas queda aprobado; cada pantalla en escritorio, tablet y teléfono | humano, 2026-10-10 (D14) | — | R1, R2, R5, R9, R10, R12, R18, R20, R24, R27, R28, R33, R34, R42 |
+| D14 | Lo demás del canvas queda aprobado; cada pantalla en escritorio, tablet y teléfono | humano, 2026-10-10 (D14) | — | R1, R2, R5, R9, R10, R12, R18, R20, R24, R27, R28, R33, R34, R42, R44 (enmienda E7) |
 | QC-262 D7 / R14 | El menú ⋯ separa grupos con `separatorBefore` por ítem de `RowActionsMenu`, sin cambiar el árbol de quien no lo pide | humano, 2026-10-13 (aprobación de QC-262) | — | R14, R30, R38 |
 | QC-264 P1 | El restilado de la subida compartida de PDF lo hace QC-264; el detalle de proveedor lo hereda | humano, 2026-10-13 (aprobación de QC-264) | — | R19 |
 | QC-140 R18, R48 | `react-intersection-observer` solo en `showcase-load-trigger.tsx`; nada de la vitrina se descubre solo con `:hover` | humano, 2026-09-24 (aprobación de QC-140) | — | R6, R9 |
@@ -122,7 +133,9 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
 - **R15.** MIENTRAS el contenedor del catálogo mide 760 px o menos, el sistema DEBE pintar cada línea
   como tarjeta con imagen, costo, nombre, presentación, unidad, mínimo de compra, tiempo de entrega,
   material, medidas y fecha de actualización, y el botón «Acciones» de 44 px que abre el menú centrado
-  con el nombre de la línea como título e ítems de 48 px. *(supuesto P8)*
+  con el nombre de la línea como título e ítems de 48 px. El mínimo de compra, el tiempo de entrega y
+  la fecha de actualización DEBEN llevar en la tarjeta su rótulo («Mínimo de compra», «Tiempo de
+  entrega», «Actualizado»), que en la tabla NO DEBE verse. *(supuestos P8, P17)*
 - **R16.** CUANDO se elige «Editar» o «Dar de baja» en el menú de una línea (fila o tarjeta), el
   sistema DEBE abrir el panel de edición o la confirmación de baja de esa línea, con sus campos,
   textos, envío y errores de hoy; NO DEBE haber más de un panel o diálogo de línea abierto a la vez.
@@ -134,10 +147,13 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   catálogo se dan de baja con él.» como `Notice` en tono `warning`
   (`data-testid="delete-supplier-cascade"`), con el título, la descripción, «Cancelar» y «Dar de baja»
   de hoy.
-- **R19.** DONDE la sesión puede subir documentos, el disparador «Subir PDFs» de la cabecera DEBE ser
-  el de la pieza compartida de subida con la estrategia de catálogo y la revisión de este proveedor;
-  SI no puede, ENTONCES NO DEBE pintarse. Esta ficha NO DEBE modificar ningún archivo de
-  `components/shared/document-upload/`.
+- **R19.** DONDE la sesión puede subir documentos y la empresa tiene proveedor IA conectado, el
+  disparador «Subir PDFs» de la cabecera DEBE ser el de la pieza compartida de subida con la
+  estrategia de catálogo y la revisión de este proveedor; DONDE puede subir y la empresa no tiene
+  proveedor IA, DEBE pintarse deshabilitado dentro del globo «Inscribir proveedor» de hoy; SI la
+  sesión no puede subir, ENTONCES NO DEBE pintarse. En los dos primeros casos DEBE ocupar el tercer
+  lugar de las acciones del R12. Esta ficha NO DEBE modificar ningún archivo de
+  `components/shared/document-upload/` ni `components/shared/ai-provider-required-tooltip.tsx`.
 
 ### Revisión del catálogo importado (`/proveedores/<id>/importar/<documentoId>`)
 
@@ -185,8 +201,9 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   «Acciones».
 - **R31.** MIENTRAS el contenedor de la lista mide 760 px o menos, el sistema DEBE pintar cada cliente
   como tarjeta con apellidos, nombres, ciudad, teléfono, correo, dirección y fecha de alta y, DONDE hay
-  permiso, «Acciones» de 44 px que abre el menú centrado con el nombre completo como título.
-  *(supuestos P7, P8)*
+  permiso, «Acciones» de 44 px que abre el menú centrado con el nombre completo como título. La fecha
+  de alta DEBE llevar en la tarjeta el rótulo «Fecha de alta», que en la tabla NO DEBE verse.
+  *(supuestos P7, P8, P17)*
 - **R32.** CUANDO se elige «Editar» o «Eliminar» en el menú de un cliente (fila o tarjeta), el sistema
   DEBE abrir el panel «Editar cliente» o «Eliminar el cliente» de ese cliente con sus campos, textos,
   envío y errores de hoy; NO DEBE haber más de un panel o diálogo de cliente abierto a la vez.
@@ -202,6 +219,10 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   «Nuevo/Editar cliente») DEBE ocupar todo el ancho, con sus campos en una columna y su pie visible.
 - **R35.** Los paneles y diálogos de la ficha DEBEN conservar sus títulos, descripciones, etiquetas,
   ayudas, errores y botones de hoy. *(supuesto P9)*
+- **R44.** CUANDO se abre «Dar de baja el proveedor», «Dar de baja la línea» o «Eliminar el cliente»,
+  el diálogo DEBE pintar delante del título el icono decorativo en tono de peligro (oculto a lectores
+  de pantalla): el círculo tachado en las dos bajas y la papelera en «Eliminar el cliente»; los
+  textos, botones y envío DEBEN ser los del R35. *(supuesto P16)*
 
 ### Avisos emergentes (D10)
 
@@ -219,7 +240,8 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
 - **R38.** DONDE un ítem de `RowActionsMenu` declara separador delante, el menú DEBE pintar una línea
   divisoria (`role="separator"`) antes de ese ítem, en el desplegable y en el diálogo centrado, nunca
   delante del primer ítem que se pinta; sin la declaración, el árbol DEBE ser el de hoy (contrato de
-  QC-262 R14). *(supuesto P1)*
+  QC-262 R14). *Enmienda E3:* el contrato ya está en `dev`; esta ficha solo lo usa y lo verifica, no
+  lo implementa (P1 resuelta).
 - **R39.** El disparador «Editar» de `SupplierSheet` en modo edición DEBE pintar el lápiz y el texto
   «Editar» en variante contorno; el disparador de alta DEBE seguir igual.
 - **R40.** CUANDO una pieza compartida gana un punto de extensión o cambia su aspecto en esta ficha,
@@ -229,8 +251,10 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
 
 - **R41.** Crear, editar y dar de baja proveedor y línea, subir PDFs, previsualizar y confirmar la
   importación y crear, editar y eliminar cliente DEBEN enviar los mismos campos a las mismas Server
-  Actions que hoy, con los mismos permisos de página y las mismas direcciones; los exports de los
-  barrels de las cuatro rutas DEBEN seguir existiendo.
+  Actions que hoy, con los mismos permisos de página, los mismos cortes por añadido de empresa
+  (`proveedores` en las tres pantallas de proveedores, por el permiso efectivo; `lectura_pdf` además
+  en la revisión) y las mismas direcciones; los exports de los barrels de las cuatro rutas DEBEN
+  seguir existiendo.
 - **R42.** CUANDO se abre cada una de las cuatro pantallas en ventanas de 1440 × 900 y de 390 × 844, la
   página NO DEBE desbordar en horizontal (salvo la caja de scroll propia de la tabla y de la tira de
   productos), y la cabecera, la barra y la primera tarjeta o fila DEBEN quedar dentro del ancho visible.
@@ -250,6 +274,8 @@ Cada una lleva su opción por defecto, con la que están escritos los requisitos
   `separatorBefore` con el MISMO contrato, el MISMO archivo de test
   (`row-actions-menu-separator.test.tsx`) y la misma fila del catálogo, y QC-262 lo reutiliza al
   rebasar. A QC-264 no se le adelanta nada en ningún caso.
+  *Resuelta por `dev` (enmienda E3, E18):* QC-262 y QC-264 están mergeadas y la rama las tiene;
+  `separatorBefore` y el diálogo de subida restilado ya existen.
 - **P2. Presentación bajo cada producto de la vitrina.** El tablero la pinta; `ShowcaseLine` no la
   trae. *Por defecto:* fuera (trabajo de módulo en `proveedores`); se anota como deuda.
 - **P3. Cuenta de productos de la tarjeta.** El tablero pinta «N productos» o «N+ productos». *Por
@@ -292,3 +318,20 @@ Cada una lleva su opción por defecto, con la que están escritos los requisitos
 - **P15. Etiquetas de los filtros de la vitrina.** Hoy hay etiqueta visible encima de cada campo; el
   tablero pinta solo la lupa y el texto de ayuda. *Por defecto:* la etiqueta queda solo para lectores
   de pantalla (`sr-only`) y el nombre accesible no cambia.
+
+### Preguntas de la enmienda 2026-10-19
+
+- **P16. Icono de peligro en las tres confirmaciones de baja** (`design.md > 12`, E7). El spec lo dejó
+  fuera porque `ConfirmDialog` no lo admitía; hoy tiene la prop `icon` (QC-166) y QC-264 la usa en sus
+  borrados (su R50). El tablero `ModalesProveedores.dc.html` lo dibuja (`dlg-ic danger`) en «Dar de
+  baja el proveedor», «Dar de baja la línea» y «Eliminar el cliente». *Por defecto:* entra en los
+  tres (R44), con el círculo tachado en las dos bajas y la papelera en el cliente, como el tablero;
+  `ConfirmDialog` no se toca. Si el humano dice que no, R44 sale y D56 se amplía a estas pantallas.
+- **P17. Rótulos de las cifras sueltas en las tarjetas** (`design.md > 12`, E8). Con contenedor
+  estrecho, la tarjeta pinta el mínimo de compra, el tiempo de entrega y las fechas sin su encabezado
+  de columna («10», «15», «2026-10-01»), y el tablero no dice cómo se leen. `dev` trae
+  `withCardFieldLabel` (`components/shared/card-field-label.tsx`), que Inventario y Fórmulas usan para
+  esto. *Por defecto:* rótulo con el texto del encabezado de su columna en «Mínimo de compra»,
+  «Tiempo de entrega» y «Actualizado» del catálogo y en «Fecha de alta» de Clientes (R15, R31); los
+  datos que se leen solos (presentación, unidad, material, medidas, teléfono, correo, dirección) van
+  sin rótulo. Alternativa: sin rótulos, como el spec aprobado.

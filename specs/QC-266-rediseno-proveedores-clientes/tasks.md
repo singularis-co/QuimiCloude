@@ -10,9 +10,19 @@ listas cerradas sin relación con el diff).
 P1–P15 de `requirements.md` (o acepta los valores por defecto) y, con P1 por defecto, QC-262 y QC-264
 están en `dev` y esta rama está rebasada sobre ellas.
 
+> **Enmienda contra dev (2026-10-19)** (`design.md > 12`, E1–E18). Tras el merge de `origin/dev`
+> (687 commits): QC-262 y QC-264 ya están en la rama (P1 resuelta); T1a solo verifica (E3) y T1b no
+> aplica (E4). Cambian T0a, T1d, T2a, T2b, T2d, T3a, T3b, T3c, T4a, T4c, T5a, T5b, T5c, T7a, T7b y
+> T7c (nota *Enmienda*
+> en cada una; las de más peso son T3a, por los tres estados de «Subir PDFs», y T7a, por dos listas
+> cerradas más). Antes de la tanda 1 el humano cierra también **P16–P17** (o acepta su defecto).
+> `## Archivos esperados` corregido: sin `row-actions-menu.tsx`, `data-table-types.ts`, los tests de
+> `RowActionsMenu` ni tres E2E de clientes que no tocan la pantalla; con `tablas-marca`,
+> `pantallas-exigen-permiso` y los dos `scope.test.ts` de proveedores y clientes.
+
 ## Tanda 0 — Censo y medidas (antes de tocar producción)
 
-- [ ] **T0a. Censo con grep.** En `tests/unit`, `tests/ui`, `tests/guards`, `tests/integration` y `e2e`,
+- [ ] **T0a. Censo con grep.** En `tests/unit`, `tests/guards`, `tests/integration` y `e2e`,
   cada símbolo, texto o testid que la ficha cambia o duplica: `supplier-detail-link`, «Ver el detalle
   de», «Ver ficha del proveedor», `supplier-showcase-row-empty`, `supplier-showcase-row-load-more`,
   `showcase-line-card`, `proveedores-title`, `supplier-edit-open`, `supplier-delete-open`,
@@ -26,6 +36,13 @@ están en `dev` y esta rama está rebasada sobre ellas.
   *Hecho:* `progress/impl_QC-266.md` tiene la tabla «archivo → qué nombra → qué le pasa» y el estado
   de las dos piezas; todo archivo que salga y no esté en `## Archivos esperados` se añade a esa
   sección en el mismo commit.
+  *Enmienda (E3, E4, E12, E13, E14):* el estado de las dos piezas ya está medido (`separatorBefore`
+  sí, `triggerDataAttributes` en `RowActionsSpec` no): se copia al impl, no se vuelve a buscar. El
+  censo suma `buildCatalogColumns`, `buildCustomerColumns`, `document-upload-open`,
+  `ai-provider-required-tooltip`, `supplierDetailRoute` y `CUSTOMERS_ROUTE` en `e2e/`, e incluye
+  `tests/unit/marca/tablas-marca.test.tsx`, `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`
+  y las listas cerradas de E2E por nombre (`tests/unit/proveedores/scope.test.ts`,
+  `tests/unit/clientes/scope.test.ts`). `tests/ui` no existe.
 - [ ] **T0b. Medidas.** Con el servidor de desarrollo, a 390 × 844: los tres paneles y los cuatro
   diálogos de la ficha (¿enteros?, ¿pie visible?) y el ancho del contenedor de las listas a 820 px
   (¿cae bajo 760 px?, P8). *Hecho:* lo medido queda en el impl; si difiere de `design.md > D11`, se
@@ -38,14 +55,20 @@ están en `dev` y esta rama está rebasada sobre ellas.
   QC-262 D7 y ese mismo test (con la prop hay `role="separator"` antes del ítem en las dos
   presentaciones; nunca delante del primero; sin la prop, `row-actions-menu-centrado.test.tsx` y
   `row-actions-menu-href.test.tsx` sin cambios).
-- [ ] **T1b [P]. `triggerDataAttributes` en `RowActionsSpec`** (D6), solo si T0a dice que falta.
-  *Hecho:* `typecheck` verde y los consumidores de hoy sin cambios.
+  *Enmienda E3:* P1 queda por defecto y `separatorBefore` está en `dev`: solo se verifica.
+  *Hecho:* `pnpm exec vitest run row-actions-menu-separator` en verde, sin tocar el componente.
+- [ ] ~~**T1b [P]. `triggerDataAttributes` en `RowActionsSpec`** (D6), solo si T0a dice que falta.
+  *Hecho:* `typecheck` verde y los consumidores de hoy sin cambios.~~
+  *Enmienda E4:* no aplica. El tipo local de cada ruta lo hacen T3b y T5b; `data-table-types.ts` no
+  se toca.
 - [ ] **T1c [P]. Disparador de edición de `SupplierSheet`** (D10, R39). Test en
   `tests/unit/shared/supplier-sheet.test.tsx`: en edición, contorno con lápiz y «Editar», `aria-label`
   y testid de hoy; el alta igual. Snapshot de `formularios-paridad` (fila de `design.md > 6`).
 - [ ] **T1d. Catálogo** (R40; depende de T1a–T1c). Filas de `SupplierSheet` (`Diseño` +
   `ProveedorDetalle.dc.html`) y, si T1a/T1b tocaron algo, de `RowActionsMenu` y `DataTable`. *Hecho:*
   `pnpm exec vitest run guard-catalogo-de-componentes catalogo-qc256` en verde.
+  *Enmienda E3, E4:* solo la fila de `SupplierSheet`; las de `RowActionsMenu`, `DataTable`,
+  `ConfirmDialog` y `cardFieldLabel` no cambian (se reutilizan sin extenderlas).
 
 ## Tanda 2 — Vitrina (depende de T0a) [P con 1]
 
@@ -54,6 +77,10 @@ están en `dev` y esta rama está rebasada sobre ellas.
   mismo commit.
 - [ ] **T2b [P]. Tarjeta de proveedor, tira y vacíos** (D2, R3–R5, R7, R8, R10). `supplier-showcase-row.tsx`,
   `supplier-showcase-section.tsx`, `supplier-showcase-params.ts` (`showcaseCountLabel`).
+  *Enmienda E6:* «Ver ficha del proveedor <nombre>» con `sr-only` dentro de `ArrowLink`, que no
+  admite `aria-label`.
+- *Enmienda E15 (T2a, T2d):* la fila de `guard-piezas-base` está en `:242`; `supplier-showcase-skeleton.tsx`
+  se restila y no se borra (lo exige `:678`).
 - [ ] **T2c [P]. Tarjeta de producto** (D3, R5, R6). `showcase-line-card.tsx`.
 - [ ] **T2d. Lista general** (D2, R9; depende de T2b). `supplier-showcase-list.tsx`,
   `supplier-showcase-skeleton.tsx`; `showcase-load-trigger.tsx` sin tocar.
@@ -76,6 +103,12 @@ están en `dev` y esta rama está rebasada sobre ellas.
   permiso, «Dar de baja <nombre>», `Notice` `warning` en el diálogo, no encontrado con `role="alert"` y
   su vuelta con flecha. `supplier-detail-page.test.tsx`, `catalog-pdf-upload.test.tsx` y
   `supplier-detail-upload.test.tsx` actualizados.
+  *Enmienda E1, E7:* la página arma `upload` con los tres estados de hoy y la cabecera lo recibe con
+  `units` (no `canUpload`). El test nuevo cubre los tres: sin permiso nada; con proveedor IA, el
+  disparador activo en tercer lugar; sin él, deshabilitado dentro de `AiProviderRequiredTooltip`, en el
+  mismo sitio. La baja del proveedor lleva el icono de peligro con `delete-supplier-icon` (R44,
+  P16). `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` sigue verde (si la página pide algo
+  nuevo, se simula allí).
 - [ ] **T3b. Menú como datos y anfitrión** (D6, R14, R16; depende de T3a). `catalog-line-row-actions.tsx`,
   `catalog-columns.tsx`, `catalog-table.tsx`, `index.ts`. Test nuevo
   `tests/unit/proveedores-ui/catalog-row-actions.test.tsx`: orden «Editar», separador, «Dar de baja»
@@ -83,19 +116,31 @@ están en `dev` y esta rama está rebasada sobre ellas.
   abre su panel o diálogo para su línea, nunca dos, el cerrado sigue montado para animar.
   `catalog-columns.test.tsx`, `catalog-line-sheet.test.tsx`, `delete-catalog-line-dialog.test.tsx`,
   `confirm-dialog-montado.test.tsx` actualizados.
+  *Enmienda E4, E5, E7, E13:* `CatalogLineRowActionsSpec` local con `triggerDataAttributes`; el
+  anfitrión imita a `recipe-table.tsx`; `delete-catalog-line-dialog.tsx` gana el icono de peligro
+  (`delete-catalog-line-icon`, R44); `tests/unit/marca/tablas-marca.test.tsx:261-263` pasa de
+  `rowActions` a `onAction`.
 - [ ] **T3c. Tarjetas** (D7, R13, R15; depende de T3b). `catalog-table.tsx`. Test nuevo
   `tests/unit/proveedores-ui/catalog-cards.test.tsx` (con el helper de viewport heredado): tarjeta con
   imagen, costo, nombre y los datos del R15, «Acciones» que abre el diálogo centrado con el nombre e
   ítems de 48 px; vacío sin segundo «Nueva línea». Snapshots de `catalogo-paridad`,
   `acciones-por-fila` y `confirmaciones-paridad` (filas de `design.md > 6`).
+  *Enmienda E8, E18:* `catalog-columns.tsx` pasa por `withCardFieldLabel` las celdas de mínimo de
+  compra, tiempo de entrega y actualizado (P17); el test afirma el rótulo dentro de
+  `data-table-card-<id>` y que en la fila de tabla no se ve. `catalogo-paridad` se regenera sobre el
+  de QC-264, que ya está en `dev`.
 
 ## Tanda 4 — Revisión del catálogo (depende de T0a) [P con 3]
 
 - [ ] **T4a [P]. Cabecera** (D8, R20). `importar/[documentoId]/page.tsx`.
+  *Enmienda E2:* las tres primeras líneas (`requirePagePermission` ×2 y `requirePageAddon('lectura_pdf')`)
+  no se mueven; `tests/guards/guard-pantallas-de-anadido.test.ts` sigue verde.
 - [ ] **T4b [P]. Filas, tonos y selector** (D8, R21–R23, R27). `catalog-import-row.tsx` (`KIND_TONES`),
   `crop-picker.tsx`, `components/index.ts`.
 - [ ] **T4c [P]. Unidades, barra y resumen** (D8, R24–R26). `new-presentation-units.tsx`,
   `catalog-import-review.tsx`, `catalog-import-summary.tsx`.
+  *Enmienda E9:* la barra es una `Card` `sticky bottom-0`, como el tablero; no se usa ni se sube
+  `FormFooterBar` de Fórmulas.
 - [ ] **T4d. Tests** (depende de T4a–T4c). Nuevo `tests/unit/proveedores-ui/catalog-import-rediseno.test.tsx`:
   vuelta con flecha, miga con el proveedor enlazado y el paso actual, un `h1`, «N filas leídas» (y «1
   fila leída»); por fila, casilla «Incluir fila N» de 44 px sin etiqueta visible, «Fila N», tono de cada
@@ -109,16 +154,23 @@ están en `dev` y esta rama está rebasada sobre ellas.
 - [ ] **T5a. Cabecera** (D9, R28). `clientes/page.tsx`, `customer-table.tsx` (sin `toolbarActions`).
   Test nuevo `tests/unit/clientes-ui/clientes-page-header.test.tsx`: un `h1` con su testid; «Nuevo
   cliente» dentro de `page-header-actions` solo con permiso y nunca en la barra de la tabla.
+  *Enmienda E17:* `page-header-actions` es el `data-slot` de `PageHeader`, no un `data-testid`; el test
+  lo busca por `[data-slot="page-header-actions"]`.
 - [ ] **T5b. Menú como datos y anfitrión** (D9, R30, R32; depende de T5a). `customer-row-actions.tsx`,
   `customer-columns.tsx`, `customer-table.tsx`, `customer-labels.ts`, `index.ts`. Test nuevo
   `tests/unit/clientes-ui/customer-row-actions.test.tsx`: orden con separador y «Eliminar» destructivo,
   sin permiso ningún ítem ni «Acciones», cada ítem abre su panel o diálogo para su cliente, nunca dos;
   `editCustomerLabel` y `deleteCustomerLabel` siguen exportadas.
+  *Enmienda E4, E7, E13:* `CustomerRowActionsSpec` local con `triggerDataAttributes`;
+  `delete-customer-dialog.tsx` gana el icono de peligro (`delete-customer-icon`, R44, P16), que el test
+  afirma; `tests/unit/marca/tablas-marca.test.tsx:249` pasa de `rowActions` a `onAction` y `canModify`.
 - [ ] **T5c. Tarjetas y vacío** (D9, R29, R31, R33; depende de T5b). Test nuevo
   `tests/unit/clientes-ui/customer-cards.test.tsx`: tarjeta con los siete datos y «Acciones» que abre
   el diálogo centrado con el nombre completo; buscador, orden, paginación y los cinco estados como hoy;
   vacío con icono y alta con permiso. Tests de `design.md > 7` de `clientes-ui` acotados al cuerpo
   visible. Snapshots de `clientes-paridad` y `acciones-por-fila`.
+  *Enmienda E8:* la celda de fecha de alta pasa por `withCardFieldLabel('Fecha de alta', …)` (P17); el
+  test afirma el rótulo en la tarjeta y que en la tabla no se ve.
 
 ## Tanda 6 — Modales y avisos (depende de T3, T4, T5)
 
@@ -142,12 +194,25 @@ están en `dev` y esta rama está rebasada sobre ellas.
   (QC-266) por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA y darse de alta
   en ella es su punto de extension por diseno. El ancla NO se relaja -el archivo se nombra, uno a uno-.
   Lo que ejercita: …». *Hecho:* pasa en Chromium y WebKit; las dos guardias en verde.
+  *Enmienda E2, E12:* dos altas más, con su comentario: en la lista cerrada de
+  `tests/unit/proveedores/scope.test.ts:355-369` (antes de `'proveedores.spec.ts'`) y en
+  `E2E_PERMITIDOS` de `tests/unit/clientes/scope.test.ts:340-351`. El E2E llama a
+  `enableAllAddons(companyId)` y siembra la revisión como `catalogo-desde-pdf.spec.ts`. A 1440 también
+  mide el orden de las cuatro acciones con «Subir PDFs» activo o deshabilitado (los dos llevan
+  `document-upload-open`). *Hecho* añade: `pnpm exec vitest run scope alcance guard-identificador` en
+  verde.
 - [ ] **T7b. E2E existentes** (R41). Acotar a `data-table-row-<id>` los localizadores de página que T0a
   marcó en `e2e/clientes.spec.ts`, `movimiento.spec.ts`, `pedido-con-cliente.spec.ts` y los que salgan;
   `proveedores.spec.ts`, `aislamiento-proveedores.spec.ts`, `catalogo-desde-pdf.spec.ts` y
   `documentos.spec.ts` pasan con los testids conservados. *Hecho:* cada spec tocado pasa por separado.
+  *Enmienda E14:* la lista de clientes es `clientes.spec.ts`, `movimiento.spec.ts` y
+  `marca-componentes.spec.ts`; `pedido-con-cliente.spec.ts` no recorre la pantalla y sale.
+  `modulos-por-empresa.spec.ts` se corre una vez para comprobar que las pantallas de proveedores
+  siguen en 404 con el añadido apagado (R41, E2).
 - [ ] **T7c. Deudas y cierre.** `progress/deudas.md`: D53 ampliada al catálogo y a Clientes; nuevas de
   P2, P9, P10 y P14 si quedan por defecto. `./init.sh --completo` en verde.
+  *Enmienda E7, E16:* también la deuda de la vuelta en los errores de la revisión (E16) y, solo si P16
+  se rechaza, D56 ampliada a las tres bajas.
 
 ## Trazabilidad R → test
 
@@ -159,22 +224,23 @@ están en `dev` y esta rama está rebasada sobre ellas.
 | R7, R8 | `tests/unit/proveedores-ui/supplier-showcase-rediseno.test.tsx`, `tests/unit/proveedores-ui/supplier-showcase-row.test.tsx` |
 | R9 | `tests/unit/proveedores-ui/supplier-showcase-rediseno.test.tsx`, `tests/unit/proveedores-ui/supplier-showcase-list.test.tsx`, `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts` |
 | R10 | `tests/unit/proveedores-ui/supplier-showcase-rediseno.test.tsx`, `tests/unit/proveedores-ui/supplier-showcase-page.test.tsx` |
-| R11, R12, R17, R18, R19 | `tests/unit/proveedores-ui/supplier-detail-header.test.tsx`, `tests/unit/documentos-ui/supplier-detail-upload.test.tsx` (R19), `e2e/proveedores-clientes-rediseno.spec.ts` (R11, R12) |
-| R13, R15 | `tests/unit/proveedores-ui/catalog-cards.test.tsx`, `e2e/proveedores-clientes-rediseno.spec.ts` (R15) |
+| R11, R12, R17, R18, R19 | `tests/unit/proveedores-ui/supplier-detail-header.test.tsx` (R19 con sus tres estados, *enmienda E1*), `tests/unit/documentos-ui/supplier-detail-upload.test.tsx` (R19), `e2e/proveedores-clientes-rediseno.spec.ts` (R11, R12) |
+| R13, R15 | `tests/unit/proveedores-ui/catalog-cards.test.tsx` (R15 con los rótulos, *enmienda E8*), `e2e/proveedores-clientes-rediseno.spec.ts` (R15) |
 | R14, R16 | `tests/unit/proveedores-ui/catalog-row-actions.test.tsx`, `e2e/proveedores-clientes-rediseno.spec.ts` (R14) |
 | R20–R27 | `tests/unit/proveedores-ui/catalog-import-rediseno.test.tsx`, `e2e/proveedores-clientes-rediseno.spec.ts` (R20, R23, R25), `e2e/catalogo-desde-pdf.spec.ts` (R22) |
 | R28 | `tests/unit/clientes-ui/clientes-page-header.test.tsx`, `e2e/proveedores-clientes-rediseno.spec.ts` |
-| R29, R31, R33 | `tests/unit/clientes-ui/customer-cards.test.tsx`, `e2e/proveedores-clientes-rediseno.spec.ts` (R31) |
+| R29, R31, R33 | `tests/unit/clientes-ui/customer-cards.test.tsx` (R31 con el rótulo, *enmienda E8*), `e2e/proveedores-clientes-rediseno.spec.ts` (R31) |
 | R30, R32 | `tests/unit/clientes-ui/customer-row-actions.test.tsx`, `e2e/proveedores-clientes-rediseno.spec.ts` (R30) |
 | R34 | `e2e/proveedores-clientes-rediseno.spec.ts` |
 | R35 | `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx`, `tests/unit/proveedores-ui/delete-catalog-line-dialog.test.tsx`, `tests/unit/clientes-ui/customer-sheet.test.tsx`, `tests/unit/clientes-ui/delete-customer-dialog.test.tsx`, `tests/unit/shared/supplier-sheet.test.tsx` |
 | R36, R37 | `tests/unit/proveedores-ui/proveedores-toasts.test.tsx`, `tests/unit/clientes-ui/clientes-toasts.test.tsx` (R36) |
-| R38 | `tests/unit/shared-ui/row-actions-menu-separator.test.tsx` |
+| R38 | `tests/unit/shared-ui/row-actions-menu-separator.test.tsx` (ya en `dev`, *enmienda E3*), `tests/unit/proveedores-ui/catalog-row-actions.test.tsx`, `tests/unit/clientes-ui/customer-row-actions.test.tsx` (el separador en cada menú) |
 | R39 | `tests/unit/shared/supplier-sheet.test.tsx` |
 | R40 | `tests/guards/guard-catalogo-de-componentes.test.ts`, `tests/unit/shared-ui/catalogo-qc256.test.ts` |
-| R41 | `tests/unit/paridad/proveedores-paridad.test.tsx`, `tests/unit/paridad/catalogo-paridad.test.tsx`, `tests/unit/paridad/clientes-paridad.test.tsx`, `tests/unit/proveedores-ui/supplier-route-contract.test.ts`, `tests/unit/proveedores-ui/catalog-route-contract.test.ts`, `tests/unit/clientes-ui/customers-route-contract.test.ts`, `e2e/proveedores.spec.ts`, `e2e/catalogo-desde-pdf.spec.ts`, `e2e/clientes.spec.ts` |
+| R41 | `tests/unit/paridad/proveedores-paridad.test.tsx`, `tests/unit/paridad/catalogo-paridad.test.tsx`, `tests/unit/paridad/clientes-paridad.test.tsx`, `tests/unit/proveedores-ui/supplier-route-contract.test.ts`, `tests/unit/proveedores-ui/catalog-route-contract.test.ts`, `tests/unit/clientes-ui/customers-route-contract.test.ts`, `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`, `tests/guards/guard-pantallas-de-anadido.test.ts` (*enmienda E2*), `e2e/proveedores.spec.ts`, `e2e/catalogo-desde-pdf.spec.ts`, `e2e/clientes.spec.ts`, `e2e/modulos-por-empresa.spec.ts` (*enmienda E2*) |
 | R42 | `e2e/proveedores-clientes-rediseno.spec.ts` |
 | R43 | `tests/guards/guard-proveedores-clientes-rediseno.test.ts` |
+| R44 | `tests/unit/proveedores-ui/supplier-detail-header.test.tsx` (baja del proveedor), `tests/unit/proveedores-ui/catalog-row-actions.test.tsx` (baja de la línea), `tests/unit/clientes-ui/customer-row-actions.test.tsx` (eliminar el cliente), `tests/unit/paridad/confirmaciones-paridad.test.tsx` (*enmienda E7*) |
 
 ## Archivos esperados
 
@@ -218,9 +284,11 @@ Producción:
 - `app/(private)/clientes/components/delete-customer-dialog.tsx`
 - `app/(private)/clientes/components/customer-list-section.tsx`
 - `components/shared/supplier/supplier-sheet.tsx`
-- `components/shared/row-actions-menu.tsx` (solo si P1 cambia y QC-262 no está en `dev`)
-- `components/shared/data-table/data-table-types.ts` (solo si falta `triggerDataAttributes` en `RowActionsSpec`)
 - `components/shared/CATALOGO.md`
+
+*Enmienda E3, E4:* salen el menú de acciones de fila y el contrato de tipos de la tabla compartida:
+los dos están en dev como hacen falta y no se tocan (rutas en design.md, sección 12; aquí sin
+comillas para que el detector de archivos en vuelo no los cuente).
 
 Tests y guardias:
 
@@ -266,8 +334,10 @@ Tests y guardias:
 - `tests/unit/shared/supplier-sheet.test.tsx`
 - `tests/unit/shared-ui/confirm-dialog-montado.test.tsx`
 - `tests/unit/shared-ui/catalogo-qc256.test.ts`
-- `tests/unit/shared-ui/row-actions-menu-separator.test.tsx` (solo si P1 cambia)
-- `tests/unit/shared-ui/row-actions-menu-centrado.test.tsx` (solo si P1 cambia)
+- `tests/unit/marca/tablas-marca.test.tsx`
+- `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` (solo si la página pide algo que hoy no simula)
+- `tests/unit/proveedores/scope.test.ts` (lista cerrada de E2E; alta de QC-266)
+- `tests/unit/clientes/scope.test.ts` (`E2E_PERMITIDOS`; alta de QC-266)
 - `tests/unit/paridad/proveedores-paridad.test.tsx`
 - `tests/unit/paridad/__snapshots__/proveedores-paridad.test.tsx.snap`
 - `tests/unit/paridad/catalogo-paridad.test.tsx`
@@ -299,10 +369,11 @@ E2E:
 - `e2e/documentos.spec.ts`
 - `e2e/clientes.spec.ts`
 - `e2e/movimiento.spec.ts`
-- `e2e/pedido-con-cliente.spec.ts`
-- `e2e/entregar-producto-terminado.spec.ts`
-- `e2e/anular-entrega.spec.ts`
 - `e2e/marca-componentes.spec.ts`
+
+*Enmienda E3, E14:* salen los dos tests del separador y del menú centrado y los E2E de pedido con
+cliente, entrega de producto terminado y anulación de entrega: no se tocan (rutas en design.md,
+sección 12).
 
 Estado:
 

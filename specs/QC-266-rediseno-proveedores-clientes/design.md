@@ -1,5 +1,8 @@
 # QC-266 — rediseno-proveedores-clientes · design.md
 
+> **Enmienda contra dev (2026-10-19)** (§ 12, E1–E18). Las secciones de abajo se escribieron el
+> 2026-10-13; donde `dev` las cambia llevan una nota *Enmienda En* y la tabla del § 12 manda.
+
 ## Lo que ya existe
 
 **Términos buscados.** En el board (`feature_list.json`, todos los estados): «proveedor», «cliente»,
@@ -17,16 +20,17 @@ para tests, e2e y textos): `SupplierShowcaseRow`, `ShowcaseLineCard`, `SupplierD
 | Los nueve toasts del tablero ya existen con su texto exacto (incluidos «Proveedor creado.» y «Proveedor actualizado.», que el tablero marca «[por confirmar]») | `components/shared/supplier/supplier-sheet.tsx`, `delete-supplier-dialog.tsx`, `catalog-line-sheet.tsx`, `delete-catalog-line-dialog.tsx`, `customer-sheet.tsx`, `delete-customer-dialog.tsx` (vía `useEntitySheet` o `toast.success`) | No se añade ninguno; un test los fija (D10, P13). Solo «Cliente creado.» tenía test |
 | QC-256 (`done`): `PageShell`, `PageHeader`, `StatusBadge`, `Notice`, `ArrowLink`, `RowActionsMenu` centrado, `DataTable` con `card` y `actionsColumn({ menu })` | `components/shared/` | Se reutilizan |
 | QC-257 (`done`): cabecera, menú lateral, `ThemeToggle` | `app/(private)/layout.tsx` | Nada que hacer |
-| QC-262 (`spec_ready`, sin implementar): define `separatorBefore` en `RowActionMenuItem` y el patrón «menú como datos + un anfitrión por tabla» | `.worktrees/QC-262-rediseno-pedidos/specs/QC-262-rediseno-pedidos/design.md > D5, D7` | Se usa su contrato tal cual (R38, P1) y su patrón (D6, D9) |
-| QC-264 (`spec_ready`, sin implementar): restila `components/shared/document-upload/` y actualiza en `catalogo-paridad` el diálogo de subida del detalle de proveedor (su P1) | `.worktrees/QC-264-rediseno-formulas/specs/QC-264-rediseno-formulas/design.md > D4, § 6` | No se duplica: aquí solo se mueve el disparador (R19, D5) |
-| QC-263 y QC-264: `RowActionsSpec` no lleva `triggerDataAttributes`; las dos lo añaden «solo si falta» | `components/shared/data-table/data-table-types.ts:65` | Igual aquí (D6): la fila de tabla conserva `data-catalog-line-id` y `data-customer-id` |
-| QC-263: tarjeta con `primary` = columna de imagen | `.worktrees/QC-263-rediseno-inventario/.../design.md:164` | Mismo criterio en el catálogo (D7) |
+| QC-262 (*enmienda E5:* `done`, en `dev`): `separatorBefore` en `RowActionMenuItem` y el patrón «menú como datos + un anfitrión por tabla» | `specs/QC-262-rediseno-pedidos/design.md > D5, D7`; `components/shared/row-actions-menu.tsx:53-54, 83-85` | Se usa su contrato tal cual (R38, P1 resuelta, E3) y su patrón (D6, D9) |
+| QC-264 (*enmienda E5, E18:* `done`, en `dev`): restiló `components/shared/document-upload/` (tonos, `disabled`) | `specs/QC-264-rediseno-formulas/design.md > D4, § 6, § 12`; `components/shared/CATALOGO.md:69` | No se duplica: aquí solo se mueve el disparador (R19, D5) |
+| QC-263 y QC-264: `RowActionsSpec` no lleva `triggerDataAttributes` | `components/shared/data-table/data-table-types.ts:65` | *Enmienda E4:* sigue sin llevarlo; se usa un tipo local en la ruta (D6), como QC-262, QC-263 y QC-264 |
+| QC-263: tarjeta con `primary` = columna de imagen | `specs/QC-263-rediseno-inventario/design.md` | Mismo criterio en el catálogo (D7) |
 | QC-265 (`done`): menú ⋯, tarjetas y altas en las listas cerradas; D53 (esqueletos sin tarjeta) | `specs/QC-265-rediseno-operario/`, `progress/deudas.md > D53` | Se imita; D53 se amplía (§ 11) |
 | D48: `editCustomerLabel`, `deleteCustomerLabel` exportadas sin consumidor por QC-232 R5 | `progress/deudas.md > D48` | Se conservan (R41) |
-| `guard-piezas-base > CONSTANTES_QUE_NO_SON_EL_PAR` nombra `TOUCH_TARGET` de `supplier-showcase-filters.tsx` | `tests/guards/guard-piezas-base.test.ts:238` | Si la constante desaparece, su fila sale en el mismo commit (D1) |
+| `guard-piezas-base > CONSTANTES_QUE_NO_SON_EL_PAR` nombra `TOUCH_TARGET` de `supplier-showcase-filters.tsx` | `tests/guards/guard-piezas-base.test.ts:242` (*enmienda E15*; `:678` exige además que `supplier-showcase-skeleton.tsx` exista) | Si la constante desaparece, su fila sale en el mismo commit (D1); el esqueleto se restila, no se borra |
 | `guard-convenciones-showcase` (QC-140 R18, D8): `react-intersection-observer` solo en `showcase-load-trigger.tsx`, ningún `IntersectionObserver` ni `scroll` a mano | `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts` | El «Cargar más» visible llama a la misma `loadMore`; el centinela no cambia (D2) |
 | Textos visibles sin tilde en las dos rutas | Grep | Ninguno: D9 no aplica |
-| QC-236, QC-239, QC-244 (`pending`) tocan clientes; QC-139 (`pending`) proveedores de lo que falta | `feature_list.json` | No se solapan con esta ficha; riesgo de choque en § 9 |
+| QC-236, QC-239 (`pending`) tocan clientes; QC-139 (`pending`) proveedores de lo que falta. *Enmienda E10:* QC-244 ya está en `dev` (`/clientes/contactos`, grupo «Clientes» en el menú) | `feature_list.json`; `progress/features/QC-244.md` | No se solapan con esta ficha; riesgo de choque en § 9 |
+| *Enmienda (E1, E7, E8, E9):* piezas que trajo `dev` | `AiProviderRequiredTooltip` (`CATALOGO.md:51`), `ConfirmDialog` con `icon` (`:57`), `cardFieldLabel`/`withCardFieldLabel` (`:55`), `ArrowLink` con `disabled` (`:52`), `FormFooterBar` (solo en `app/(private)/produccion/formulas/components/form-footer-bar.tsx`) | Se reutilizan las tres primeras (paso 1); `FormFooterBar` no (§ 12, E9) |
 
 **Filas de `components/shared/CATALOGO.md` consultadas y paso de la regla de decisión**
 (`docs/perfil-agentes.md > Regla de decisión para componentes`):
@@ -40,7 +44,10 @@ para tests, e2e y textos): `SupplierShowcaseRow`, `ShowcaseLineCard`, `SupplierD
 | Estado de la fila de la importación | `StatusBadge`, `STATUS_TONES` | 1 · reutiliza | — | `Estados.dc.html`, `ProveedorImportar.dc.html` |
 | Aviso de arrastre del catálogo | `Notice` (`warning`), `ConfirmDialog` (`aside`) | 1 · reutiliza | — | `ModalesProveedores.dc.html`, `Avisos.dc.html` |
 | Menú ⋯ y tarjetas | `RowActionsMenu`, `DataTable` (`card`, `actionsColumn({ menu })`) | 1 · reutiliza | — | `Tabla.dc.html` |
-| Separador del menú | `RowActionsMenu` | 2 · el punto de extensión `separatorBefore` de QC-262 (P1) | `RowActionsMenu` no separa grupos hoy | `Tabla.dc.html` |
+| Separador del menú | `RowActionsMenu` | *Enmienda E3:* 1 · reutiliza (`separatorBefore` ya está en `dev`) | — | `Tabla.dc.html` |
+| *Enmienda E1:* «Subir PDFs» deshabilitado sin proveedor IA | `AiProviderRequiredTooltip` | 1 · reutiliza (la página ya lo monta hoy) | — | `ProveedorIA.dc.html` |
+| *Enmienda E7:* icono de los tres diálogos de baja | `ConfirmDialog` (`icon`), `DeleteConfirmDialog` | 1 · reutiliza (P16) | — | `ModalesProveedores.dc.html` |
+| *Enmienda E8:* rótulos de cifras en las tarjetas | `cardFieldLabel`, `withCardFieldLabel` | 1 · reutiliza (P17) | — | `InventarioColumnasLotes.dc.html`, `Formulas.dc.html` |
 | Disparador «Editar» del proveedor | `SupplierSheet` | 2 · cambio visual del disparador de edición (solo lo usan las rutas de esta ficha) | Hoy es un lápiz sin texto en `ghost` | `ProveedorDetalle.dc.html` |
 | Paneles, diálogos, toasts | `FormSheet`, `Sheet`, `ConfirmDialog`, `DeleteConfirmDialog`, `Dialog`, `Toaster`, `useEntitySheet` | 1 · reutiliza | — | `ModalesProveedores.dc.html` |
 | Subida de PDF | `DocumentUploadDialog` | 1 · reutiliza (el restilado es de QC-264) | — | `ModalesProveedores.dc.html`, `ModalesProduccion.dc.html` |
@@ -88,7 +95,10 @@ y `SHOWCASE_FILTERS_TEXTS`. Si `TOUCH_TARGET` desaparece del archivo, su fila de
   vacía con 0; P3); a la derecha `ArrowLink direction="forward" variant="outline" size="sm"` con
   «Ver ficha del proveedor», `testId="supplier-detail-link"` y `aria-label="Ver ficha del proveedor
   <nombre>"` (contiene el texto visible). Con `@max-[760px]:` el botón pasa debajo a todo el ancho y
-  44 px. El `Link` del nombre desaparece.
+  44 px. El `Link` del nombre desaparece. *Enmienda E6:* `ArrowLink` no acepta `aria-label`
+  (`components/shared/arrow-link.tsx:11-23`); el nombre accesible sale de un
+  `<span className="sr-only"> <nombre></span>` dentro de sus `children`, como QC-264 E12. La pieza no
+  se toca.
 - Tira: el `<ul>` de hoy (`overflow-x-auto snap-x snap-mandatory`, `tabIndex={0}`, la `section
   aria-label="Productos de <nombre>"`). «Cargar más» pasa a ser el último `<li>` de la tira: `Button
   variant="outline" touch` con `PlusIcon`, envuelto en `Tooltip` cuyo contenido es su
@@ -127,6 +137,15 @@ muestra u oculta con él. Mismo `data-testid`.
   descripción: § 8 A6) con `PhoneIcon` y `MailIcon` y los `data-testid` de hoy; `@max-[760px]:` lo
   apila. La cabecera conserva `data-testid="supplier-detail"`. El `div justify-end` de la subida y el
   `CatalogLineSheet` de encima de la tabla desaparecen de `page.tsx` y `catalog-list-section.tsx`.
+  *Enmienda E1:* la subida tiene tres estados en `dev` (`[id]/page.tsx:101, 126-141`). La página
+  sigue calculando `canUpload` y, solo con él, `getAiProviderReadinessAction()`, y baja a la cabecera
+  la prop `upload: ReactNode | null` ya armada (`CatalogPdfUpload`, o `CatalogPdfUpload disabled`
+  dentro de `AiProviderRequiredTooltip`, o `null`). `SupplierDetailHeader` recibe `supplier`, `units`
+  y `upload`, y no lee la sesión ni llama a ninguna action (sigue sin `'use client'`).
+- *Enmienda E7 (P16):* `delete-supplier-dialog.tsx` pasa además
+  `icon={{ glyph: CircleSlashIcon, tone: 'danger', testId: 'delete-supplier-icon' }}`;
+  `delete-catalog-line-dialog.tsx` lo mismo con `testId: 'delete-catalog-line-icon'`. Precedente:
+  `app/(private)/produccion/formulas/components/delete-recipe-dialog.tsx:173`.
 - `delete-supplier-dialog.tsx`: el disparador pasa a `variant="outline"` con `CircleSlashIcon`, el texto
   «Dar de baja», clase de color de peligro y el `aria-label` y `data-testid` de hoy; el `aside` pasa a
   `<Notice tone="warning" testId="delete-supplier-cascade">` con el texto de hoy.
@@ -137,6 +156,8 @@ muestra u oculta con él. Mismo `data-testid`.
 **D5 — «Subir PDFs» (R19).** `CatalogPdfUpload` no cambia: solo se monta dentro de las acciones de la
 cabecera. Ningún archivo de `components/shared/document-upload/` está en `## Archivos esperados`. Si
 QC-264 ya está en `dev`, el disparador y el diálogo llegan restilados; si no, siguen como hoy.
+*Enmienda E1, E18:* QC-264 está en `dev`: llegan restilados. El estado deshabilitado conserva el
+globo de QC-275 y su `document-upload-open`; `ai-provider-required-tooltip.tsx` tampoco se toca.
 
 **D6 — Catálogo: menú como datos y un anfitrión por tabla (R14, R16).** Patrón de QC-262 D5:
 
@@ -162,12 +183,29 @@ QC-264 ya está en `dev`, el disparador y el diálogo llegan restilados; si no, 
   `triggerDataAttributes` cuando se implemente, se añade a su `Pick` en
   `components/shared/data-table/data-table-types.ts` (mismo cambio que QC-263 y QC-264 declaran «solo
   si falta»; el primero que llegue lo hace).
+  *Enmienda E4:* sustituido. Ninguna de las tres lo añadió: cada una declaró un tipo local y
+  `actionsColumn` lo propaga a `RowActionsMenu` en la fila y en la tarjeta
+  (`components/shared/data-table/actions-column.tsx:27-28`). Aquí igual:
+  `export type CatalogLineRowActionsSpec = RowActionsSpec & Pick<RowActionsMenuProps, 'triggerDataAttributes'>`
+  en `catalog-line-row-actions.tsx`, y `catalogLineRowActionsSpec` lo devuelve con
+  `triggerDataAttributes: { 'data-catalog-line-id': line.id }` (precedentes:
+  `app/(private)/inventario/components/product-row-actions.tsx:41-43, 127`,
+  `app/(private)/produccion/formulas/components/recipe-row-actions.tsx:36, 70`). `data-table-types.ts` no
+  se toca (además lo vigila `tests/unit/clientes-ui/data-table-intacta-clientes.test.ts:163-203`).
+- *Enmienda E5:* el anfitrión único sigue el de Fórmulas (`recipe-table.tsx:166-174, 258-262`:
+  `active` con `open`, un solo montaje, `open: false` sin soltar la fila). El nombre `onAction` de las
+  deps tiene precedente en `app/(private)/maestro/empresas/components/company-columns.tsx:37-40`.
 
 **D7 — Catálogo en tarjetas (R15).** `CatalogTable` pasa a `DataTable`
 `card={{ primary: IMAGE_COLUMN_ID, status: 'cost', title: 'name', meta: ['presentationId', 'unitId',
 'minPurchase', 'deliveryTime', 'material', 'measurements'], footer: 'updatedAt' }}` (precedente de
 QC-263) y `CATALOG_TABLE_TEXTS` gana `cardActions: 'Acciones'` y `closeMenu: 'Cerrar'`. El umbral es el
 de `DataTable` (P8).
+*Enmienda E8 (P17):* en `catalog-columns.tsx` las celdas de `minPurchase`, `deliveryTime` y
+`updatedAt` pasan por `withCardFieldLabel(<encabezado de la columna>, <celda de hoy>)`; `withCardFieldLabel`
+deja sin rótulo una celda `null`, así que la marca de vacío sale sola. En la tabla el rótulo está
+oculto (`data-card-label`), así que el texto de la celda no cambia. Las doce columnas de `dev`
+(incluida «Creado», que no sale en la tarjeta) no cambian.
 
 **D8 — Revisión del catálogo (R20–R27).**
 
@@ -194,7 +232,12 @@ de `DataTable` (P8).
   una columna `@max-[760px]:`.
 - `catalog-import-review.tsx`: la confirmación pasa a una `Card` `sticky bottom-0` con los motivos de
   bloqueo y el `ErrorAlert` encima del botón; «Confirmar» con `Spinner` delante mientras
-  `isConfirming` (R25). Reglas, envío y reclasificación sin cambios.
+  `isConfirming` (R25). Reglas, envío y reclasificación sin cambios. *Enmienda E9:* no se usa
+  `FormFooterBar` de Fórmulas: el tablero (`ProveedorImportar.dc.html:73`) dibuja una tarjeta
+  `sticky; bottom: 0`, no la barra de borde a borde, y la pieza vive en otra ruta.
+- *Enmienda E2:* las tres primeras líneas de `importar/[documentoId]/page.tsx` (`:66-68`, dos
+  permisos y `requirePageAddon('lectura_pdf')`) no se mueven; las vigila
+  `tests/guards/guard-pantallas-de-anadido.test.ts:40`.
 - `catalog-import-summary.tsx`: `Card` `role="status"` con `CircleCheckIcon` en tono éxito, el texto de
   hoy, el `<dl>` en cuatro columnas que pasan a una `@max-[760px]:`, y `ArrowLink direction="back"`
   con el `testId` de hoy.
@@ -215,6 +258,11 @@ de `DataTable` (P8).
   y `deleteCustomerLabel` siguen exportadas (D48).
 - `customer-columns.tsx`: `actionsColumn({ menu })` con `onAction` y `canModify` en sus deps;
   `CUSTOMER_SKELETON_COLUMN_COUNT` no cambia (9).
+- *Enmienda E4, E7, E8:* `CustomerRowActionsSpec` local, igual que el del catálogo, con
+  `triggerDataAttributes: { 'data-customer-id': customer.id }`; `delete-customer-dialog.tsx` pasa a
+  `DeleteConfirmDialogBody` `icon={{ glyph: Trash2Icon, tone: 'danger', testId: 'delete-customer-icon' }}`
+  (P16; la prop está en `ConfirmDialogBodyBaseProps`, `confirm-dialog.tsx:182`); la celda de
+  `createdAt` pasa por `withCardFieldLabel('Fecha de alta', …)` (P17).
 
 **D10 — `SupplierSheet` (R39).** En edición el disparador pasa de `ghost` con lápiz solo a
 `variant="outline" touch` con `PencilIcon` y el texto «Editar»; `aria-label` «Editar <nombre>» y
@@ -252,10 +300,12 @@ Lleva un caso con fuente fabricada que demuestra que muerde.
 | `CatalogTable` | `children` del vacío con el alta | sin él; `card` y línea activa |
 | `KIND_TONES` | — | nuevo en `catalog-import-row.tsx` |
 | `CropPicker` | `triggerTestId` | + `rowNumber` |
-| `SupplierDetailHeader` | `supplier` | + `canUpload`, `units` (para las acciones) |
+| `SupplierDetailHeader` | `supplier` | + `units` y `upload: ReactNode \| null` (*enmienda E1*: sustituye a `canUpload`) |
 | `SupplierSheet` (edición) | `ghost`, solo lápiz | `outline`, lápiz y «Editar» |
-| `RowActionMenuItem` | — | `separatorBefore?` (de QC-262; aquí solo si P1 cambia) |
-| `RowActionsSpec` | sin `triggerDataAttributes` | + `triggerDataAttributes` (solo si falta) |
+| `RowActionMenuItem` | — | *Enmienda E3:* no cambia (`separatorBefore?` ya está en `dev`) |
+| `RowActionsSpec` | sin `triggerDataAttributes` | *Enmienda E4:* no cambia |
+| `CatalogLineRowActionsSpec`, `CustomerRowActionsSpec` | — | *Enmienda E4:* nuevos, locales a su ruta (`RowActionsSpec & Pick<RowActionsMenuProps, 'triggerDataAttributes'>`) |
+| `DeleteSupplierDialog`, `DeleteCatalogLineDialog`, `DeleteCustomerDialog` | sin icono | *Enmienda E7 (P16):* `icon` de peligro; props públicas sin cambio |
 
 ## 6. Snapshots y árboles que cambian (aceptados)
 
@@ -267,13 +317,15 @@ Toda diferencia de paridad que no esté aquí es un fallo de la tanda:
 | `tests/unit/paridad/catalogo-paridad.test.tsx` (+ `.snap`) | cabecera del detalle, vuelta, columna de acciones de `actionsColumn`, tarjetas, no encontrado; **no** el diálogo de subida (QC-264) | R11–R17 |
 | `tests/unit/paridad/clientes-paridad.test.tsx` (+ `.snap`) | `PageHeader`, columna de acciones, tarjetas, vacío con icono | R28–R33 |
 | `tests/unit/paridad/acciones-por-fila.test.tsx` (+ `.snap`) | menú de catálogo y de clientes con separador | R14, R30 |
-| `tests/unit/paridad/confirmaciones-paridad.test.tsx` (+ `.snap`) | baja de proveedor con `Notice` y disparador con texto | R18 |
+| `tests/unit/paridad/confirmaciones-paridad.test.tsx` (+ `.snap`) | baja de proveedor con `Notice` y disparador con texto; *enmienda E7:* icono de peligro en las bajas que monte | R18, R44 |
 | `tests/unit/paridad/formularios-paridad.test.tsx` (+ `.snap`) | disparador de edición de `SupplierSheet`; ningún campo | R39 |
 | `tests/unit/paridad/campos-paridad.test.tsx`, `buscadores-paridad.test.tsx` (+ `.snap`) | ninguno esperado; se listan porque montan piezas de las dos rutas | — |
 
 La tanda 0 no regenera nada; cada snapshot se actualiza en la tanda que cambia la pantalla y el commit
 cita la fila. `catalogo-paridad.snap` lo toca también QC-264: el segundo que llegue a `dev` regenera
-sobre el primero (§ 9).
+sobre el primero (§ 9). *Enmienda E18:* QC-264 ya llegó; esta ficha regenera sobre su snapshot.
+*Enmienda E8:* el rótulo oculto de `withCardFieldLabel` entra en el árbol de la tabla, así que
+`catalogo-paridad` y `clientes-paridad` cambian también en esas celdas (R15, R31).
 
 ## 7. Tests y E2E que se tocan (barrido con grep, 2026-10-13)
 
@@ -289,8 +341,11 @@ sobre el primero (§ 9).
 | `tests/unit/shared/supplier-sheet.test.tsx` | disparador de edición con texto |
 | `tests/unit/clientes-ui/clientes-page.test.tsx`, `customer-table.test.tsx`, `customer-columns.test.tsx`, `customer-list-section.test.tsx`, `customer-list-empty.test.tsx`, `customer-list-error.test.tsx`, `customer-list-skeleton.test.tsx`, `clientes-viewport.test.tsx`, `customer-sheet.test.tsx`, `delete-customer-dialog.test.tsx`, `clientes-convenciones.test.ts` | alta en la cabecera, columna con `menu`, anfitrión, tarjetas: los que cuentan disparadores o celdas en toda la página se acotan al cuerpo visible (`data-table-row-<id>` / `data-table-card-<id>`) |
 | `tests/unit/shared-ui/confirm-dialog-montado.test.tsx` | monta los diálogos de baja; el diálogo sigue montado tras cerrar |
-| `tests/unit/shared-ui/catalogo-qc256.test.ts` | fila de `SupplierSheet` (y de `RowActionsMenu` si P1 cambia) |
-| `tests/guards/guard-piezas-base.test.ts` | fila de `TOUCH_TARGET` de los filtros, si la constante sale |
+| `tests/unit/shared-ui/catalogo-qc256.test.ts` | fila de `SupplierSheet` (*enmienda E3:* la de `RowActionsMenu` ya no cambia) |
+| `tests/guards/guard-piezas-base.test.ts` | fila de `TOUCH_TARGET` de los filtros (`:242`), si la constante sale |
+| *Enmienda E13:* `tests/unit/marca/tablas-marca.test.tsx` | llama `buildCustomerColumns({ rowActions })` (`:249`) y `buildCatalogColumns({ …, rowActions })` (`:261-263`): pasan a `onAction` (y `canModify` en clientes) |
+| *Enmienda E13:* `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` | monta `ProveedoresPage` y `ProveedorDetallePage` (`:12-13, 230-240`) con las actions simuladas; solo cambia si la página nueva pide algo que hoy no simula |
+| *Enmienda E13:* `tests/unit/documentos-ui/document-upload-*.test.tsx`, `tests/unit/shared/ai-provider-required-tooltip*` | no cambian (la pieza no se toca); se corren por `vitest related` al mover el disparador |
 
 **Tests nuevos:** `tests/unit/proveedores-ui/supplier-showcase-rediseno.test.tsx` (R1–R10),
 `supplier-detail-header.test.tsx` (R11, R12, R17–R19), `catalog-row-actions.test.tsx` (R14, R16),
@@ -299,6 +354,10 @@ sobre el primero (§ 9).
 `customer-row-actions.test.tsx` (R30, R32), `customer-cards.test.tsx` (R29, R31, R33),
 `clientes-toasts.test.tsx` (R36); `tests/guards/guard-proveedores-clientes-rediseno.test.ts` (R43); y,
 solo si P1 cambia, `tests/unit/shared-ui/row-actions-menu-separator.test.tsx` (R38).
+*Enmienda E3:* P1 no cambia: `row-actions-menu-separator.test.tsx` ya existe en `dev` y cubre R38 sin
+tocarse. *Enmienda E7:* R44 se fija en `supplier-detail-header.test.tsx` (baja del proveedor),
+`catalog-row-actions.test.tsx` (baja de la línea) y `customer-row-actions.test.tsx` (eliminar el
+cliente): icono con su `testId`, `data-tone="danger"` y `aria-hidden`.
 
 **E2E que pueden cambiar** (corren en el PR a producción; T7 los corre por spec):
 
@@ -308,7 +367,8 @@ solo si P1 cambia, `tests/unit/shared-ui/row-actions-menu-separator.test.tsx` (R
 | `e2e/aislamiento-proveedores.spec.ts` | usa `supplier-detail-link`, `supplier-delete-open`, `supplier-create-open`: se conservan |
 | `e2e/catalogo-desde-pdf.spec.ts` | `toHaveText('Nueva')` sobre `catalog-import-row-kind-*` sigue valiendo (la etiqueta va dentro del `StatusBadge`); la casilla sin etiqueta «Incluir» |
 | `e2e/documentos.spec.ts` | si abre «Subir PDFs» del detalle |
-| `e2e/clientes.spec.ts`, `e2e/movimiento.spec.ts`, `e2e/pedido-con-cliente.spec.ts`, `e2e/entregar-producto-terminado.spec.ts`, `e2e/anular-entrega.spec.ts`, `e2e/marca-componentes.spec.ts` | `customer-create-open` en la cabecera (dos en el vacío, P6); `customer-row-actions` duplicado por la tarjeta: acotar a `data-table-row-<id>` |
+| `e2e/clientes.spec.ts`, `e2e/movimiento.spec.ts`, `e2e/marca-componentes.spec.ts` | `customer-create-open` en la cabecera (dos en el vacío, P6); `customer-row-actions` duplicado por la tarjeta: acotar a `data-table-row-<id>`. *Enmienda E14:* `pedido-con-cliente`, `entregar-producto-terminado` y `anular-entrega` salen: siembran clientes por Prisma y no nombran ningún testid de la pantalla (`tests/unit/clientes/scope.test.ts:313-327`; grep de `customer-(create\|row\|action)` en `e2e/` solo da los tres de esta fila) |
+| *Enmienda E2, E14:* `e2e/modulos-por-empresa.spec.ts`, `e2e/integraciones-proveedor-ia.spec.ts` | no cambian: el primero solo pide `SUPPLIERS_ROUTE` con el añadido apagado (`:52-57`); el segundo mide «Subir PDFs» en Fórmulas |
 
 **E2E nuevo:** `e2e/proveedores-clientes-rediseno.spec.ts` (Chromium y WebKit), a 1440 × 900 y a
 390 × 844 sobre las cuatro pantallas:
@@ -326,6 +386,14 @@ Se da de alta en `E2E_ESPERADOS` de `tests/guards/guard-identificador-de-request
 cerrada de `tests/unit/shared/data-table-alcance.test.ts`, en su sitio por orden alfabético, con el
 comentario «Alta el <fecha> (QC-266) por el MISMO motivo y en el MISMO sitio que las demas: …», como
 las de QC-265.
+
+*Enmienda E12:* por su nombre, el E2E cae además en otras dos listas cerradas que el spec no nombraba:
+`tests/unit/proveedores/scope.test.ts:355-369` (casa con `PATRON_PROVEEDORES` por la ruta, `:59, 66-72`;
+va antes de `'proveedores.spec.ts'` en orden alfabético) y `E2E_PERMITIDOS` de
+`tests/unit/clientes/scope.test.ts:340-351` (casa con `/cliente/i` por el nombre, `:362`). Las dos
+altas llevan su comentario, como las de QC-262 y QC-275. El E2E llama a `enableAllAddons(companyId)`
+(`e2e/helpers/addons.ts:15`) como `proveedores.spec.ts`, porque `proveedores` y `lectura_pdf` son
+añadidos (E2), y siembra la revisión como `e2e/catalogo-desde-pdf.spec.ts`.
 
 ## 8. Alternativas descartadas
 
@@ -347,6 +415,16 @@ las de QC-265.
   QC-263 y QC-264 también pueden abrir, por la tipografía de una ranura.
 - **A8 — Toast al confirmar la importación** (P13). Repetiría lo que ya dice el resumen `role="status"`
   que la sustituye.
+- **A9 — Subir `FormFooterBar` a `components/shared` y usarlo en la revisión** (*enmienda E9*). Es la
+  segunda ruta que lo pediría y la regla lo permite, pero el tablero de esta pantalla dibuja otra cosa
+  (una tarjeta pegada abajo, no una barra de borde a borde con desenfoque) y en lo visual manda el
+  tablero; además tocaría tres archivos de Fórmulas recién cerrados.
+- **A10 — Añadir `triggerDataAttributes` al `Pick` de `RowActionsSpec`** (*enmienda E4*). Es lo que
+  decía D6, pero las tres fichas que pasaron antes eligieron el tipo local; hacerlo aquí abriría
+  `data-table-types.ts` para dos rutas y dejaría tres tipos locales redundantes.
+- **A11 — Pasar `canUpload` y la disposición del proveedor IA a la cabecera y que ella decida**
+  (*enmienda E1*). Obligaría a `SupplierDetailHeader` a conocer `AiProviderRequiredTooltip` y el resultado
+  de una action; la página ya arma los tres estados hoy y basta con bajarlos como nodo.
 
 ## 9. Riesgos y coordinación
 
@@ -362,6 +440,19 @@ las de QC-265.
 - **QC-236 y QC-244** (`pending`) tocarán el formulario de cliente y el menú: si entran antes, se rebasa;
   ninguno de sus archivos está aquí salvo `customer-columns.tsx` si QC-236 cambia la celda de teléfono.
 - **Gate rápido y listas cerradas:** lección de QC-261 y QC-265; T7 cierra con `./init.sh --completo`.
+- *Enmienda (E3, E4, E18):* QC-262, QC-263 y QC-264 están en `dev`: esta ficha ya no comparte con ellas
+  `row-actions-menu.tsx` ni `data-table-types.ts` (no se tocan). Siguen en común, por apéndice,
+  `CATALOGO.md` y las listas cerradas de E2E.
+- *Enmienda E11:* `tests/unit/proveedores/module-contract.test.ts:370-376` prohíbe `/proveedores|supplier/i`
+  en todo archivo de `app/` fuera de `app/(private)/proveedores`, y `tests/unit/proveedores/scope.test.ts:343-350`
+  prohíbe esa palabra en la ruta de cualquier archivo de `components/` fuera de `components/shared/supplier/`.
+  Los archivos de `app/(private)/clientes/` de esta ficha no la nombran (ni en código ni en textos), y
+  el guardia nuevo vive en `tests/guards/`. Si algún texto con esa palabra tuviera que salir de
+  `app/(private)/proveedores`, va a `lib/shared/ui/` (precedente QC-278 E17). Simétrico para clientes:
+  `tests/unit/clientes/scope.test.ts:632-684` (R38) prohíbe marcas de clientes fuera de
+  `app/(private)/clientes/`.
+- *Enmienda E10:* QC-244 dejó `/clientes/contactos` y su barrel; esta ficha no los toca y
+  `clientes/scope.test.ts:203-205` los admite por ruta exacta.
 
 ## 10. Enmiendas a specs cerrados
 
@@ -372,15 +463,68 @@ las de QC-265.
 | QC-158 (revisión) | La etiqueta visible «Incluir» sale (queda el nombre «Incluir fila N»); «Cambiar» pasa a «Elige una imagen del archivo»; la clase de fila pasa a `StatusBadge` | D3, D14 |
 | QC-155 (Clientes) | «Nuevo cliente» sale de la barra de la tabla a la cabecera; el panel y el diálogo los monta un anfitrión por tabla | D2, D14 |
 | QC-55 (`tests/unit/shared/data-table-alcance.test.ts`) | La lista cerrada de E2E gana `e2e/proveedores-clientes-rediseno.spec.ts` | § 7 |
+| *Enmienda E12:* QC-43/QC-44 (`tests/unit/proveedores/scope.test.ts`) y QC-155 (`tests/unit/clientes/scope.test.ts`, R28) | Sus listas cerradas de E2E ganan el mismo spec | § 7 |
 
 ## 11. Deudas
 
 - **D53** (esqueletos sin tarjeta) se amplía al catálogo del proveedor y a Clientes.
 - **Nuevas, si se confirman por defecto:** presentación bajo el producto de la vitrina (P2), nombre del
   PDF en la revisión (P10), contador de filas incluidas (P9) y animaciones de entrada (P14).
+- *Enmienda E16:* los tres estados de error de la revisión siguen sin vuelta al detalle (Fórmulas sí
+  la tiene: `app/(private)/produccion/formulas/importar/[documentoId]/page.tsx:60`). Fuera del alcance
+  aprobado; se anota.
+- *Enmienda E7:* si P16 se rechaza, D56 se amplía a las tres bajas de esta ficha.
 
 ## Dependencias de terceros
 
 Ninguna nueva. `@base-ui/react` (Menu, Dialog, AlertDialog, Sheet, Select, Checkbox, Tooltip),
 `sonner`, `lucide-react`, `@tanstack/react-table` y `react-intersection-observer` ya están en
-`docs/dependencias.md`.
+`docs/dependencias.md`. *Enmienda:* la enmienda tampoco añade ninguna.
+
+## 12. Enmienda contra dev (2026-10-19)
+
+**Por qué.** El spec se escribió y aprobó el 2026-10-13 (P1–P15 por defecto). El 2026-10-19 la rama
+recibió `origin/dev` (687 commits): QC-262, QC-263, QC-264 (#274), QC-244 (#270), QC-275/QC-280,
+QC-277, QC-278 (#268), QC-165, QC-166 y cambios directos de Inventario y Pedidos. **Regla del humano:**
+en lo visual manda el tablero (`docs/diseno/canvas/`); en columnas, costos y datos, lo mergeado en
+`dev`. No se cambia conducta aprobada salvo que `dev` la haga imposible o la haya resuelto distinto;
+lo que no sale del código ni de los docs queda como pregunta nueva con su defecto (P16, P17).
+
+**Cómo se leyó `dev`.** Sin shell ni git: se leyó el árbol del worktree tras el merge (código de las
+cuatro rutas y de las piezas compartidas, tests, guardias, E2E, tableros, `components/shared/CATALOGO.md`,
+`progress/deudas.md`, `progress/features/QC-244.md` y `feature_list.json`) con Grep y Read. Los
+cambios directos a `dev` se leyeron por su efecto en el árbol, no por commit. Las citas son
+`archivo:línea` del árbol tras el merge.
+
+| # | Qué decía el spec | Qué hay en `dev` (cita) | Qué cambia aquí | R / P / T |
+| --- | --- | --- | --- | --- |
+| E1 | R19/D4: «Subir PDFs» se pinta o no según `canUpload`, que baja a la cabecera | Tres estados: sin `canUpload` nada; con proveedor IA, `CatalogPdfUpload`; sin él, `CatalogPdfUpload disabled` dentro de `AiProviderRequiredTooltip` (`app/(private)/proveedores/[id]/page.tsx:101, 126-141`; QC-275, QC-280; `CATALOGO.md:51`). El tablero no dibuja el deshabilitado (`ProveedorDetalle.dc.html:45`); su globo es el de `ProveedorIA.dc.html` | R19 nombra los tres estados y el tercer puesto del R12. D4: `SupplierDetailHeader` recibe `upload: ReactNode \| null` armado por la página (A11) | R12, R19; T3a |
+| E2 | R41: «mismos permisos de página» | `proveedores` es un añadido (`lib/modules/identity/domain/company-addons.ts:3, 8`): apagado, `proveedores.*` sale del permiso efectivo y las tres pantallas responden 404 por `requirePagePermission` (`e2e/modulos-por-empresa.spec.ts:52-57`). La revisión corta además con `requirePageAddon('lectura_pdf')` (`importar/[documentoId]/page.tsx:68`), vigilado por `tests/guards/guard-pantallas-de-anadido.test.ts:40` | R41 nombra los dos cortes; D8 no mueve las tres primeras líneas; el E2E nuevo llama a `enableAllAddons` | R41; T4a, T7a |
+| E3 | P1/T1a/R38: `separatorBefore` «si no está en `dev`» | Está: `components/shared/row-actions-menu.tsx:53-54, 83-85`, con `tests/unit/shared-ui/row-actions-menu-separator.test.tsx` (QC-262 D7); fila de `RowActionsMenu` al día (`CATALOGO.md:91`) | P1 resuelta; T1a solo verifica; `row-actions-menu.tsx`, sus dos tests y la fila de `RowActionsMenu` salen de `Archivos esperados` | R38; P1; T1a, T1d |
+| E4 | D6/T1b: añadir `triggerDataAttributes` al `Pick` de `RowActionsSpec` «solo si falta» | No está (`components/shared/data-table/data-table-types.ts:65`). QC-262, QC-263 y QC-264 usan un tipo local que `actionsColumn` propaga (`actions-column.tsx:27-28`; `inventario/components/product-row-actions.tsx:41-43`, `pedidos/components/order-row-actions.tsx:195`, `produccion/formulas/components/recipe-row-actions.tsx:36`). `tests/unit/clientes-ui/data-table-intacta-clientes.test.ts:163-203` vigila que el contrato compartido no gane mecanismos de acciones | `CatalogLineRowActionsSpec` y `CustomerRowActionsSpec` locales; `data-table-types.ts` no se toca (A10); T1b no aplica | R14, R30; T1b, T3b, T5b |
+| E5 | «Lo que ya existe»: QC-262/QC-263/QC-264 «sin implementar», specs en `.worktrees/` | En `dev` (`done`); specs en `specs/QC-262-rediseno-pedidos/`, `specs/QC-263-rediseno-inventario/`, `specs/QC-264-rediseno-formulas/`. Anfitrión único en `produccion/formulas/components/recipe-table.tsx:166-174, 258-262`; deps `onAction` en `maestro/empresas/components/company-columns.tsx:37-40` (otras rutas usan `menu`, `recipe-columns.tsx:35-38`) | Citas corregidas; D6 y D9 siguen ese patrón y conservan `onAction` | R14, R16, R30, R32 |
+| E6 | D2: «Ver ficha del proveedor» con `aria-label` | `ArrowLink` no tiene `aria-label` (`components/shared/arrow-link.tsx:11-23`); ganó `disabled` | Nombre accesible con `sr-only` dentro del enlace (QC-264 E12); la pieza no se toca | R3; T2b |
+| E7 | — (los diálogos de baja sin icono) | `ConfirmDialog` tiene `icon` (`components/shared/confirm-dialog.tsx:182, 233-239`; `CATALOGO.md:57`), en el cuerpo también (`DeleteConfirmDialogBody`, que usa `delete-customer-dialog.tsx:98`); QC-264 R50 lo usa (`delete-recipe-dialog.tsx:173`); D56 «en parte resuelta» (`progress/deudas.md:442-454`). El tablero lo dibuja en las tres bajas (`ModalesProveedores.dc.html:33, 68, 119`, `dlg-ic danger`: círculo tachado, círculo tachado, papelera) | P16 (defecto: sí). R44 nuevo; D4 y D9 pasan `icon` | R44; P16; T3a, T3b, T5b |
+| E8 | R15/R31: la tarjeta pinta las cifras sin decir qué son | `cardFieldLabel`/`withCardFieldLabel` (`components/shared/card-field-label.tsx`; `CATALOGO.md:55`), usado en `inventario/components/product-columns.tsx:393, 633-666` y `produccion/formulas/components/recipe-columns.tsx:76-93`. El tablero de la tarjeta del catálogo solo enumera su contenido (`ProveedorDetalleMovil.dc.html:24`) | P17 (defecto: rótulo en mínimo de compra, tiempo de entrega, actualizado y fecha de alta). R15 y R31 lo nombran; D7 y D9 lo aplican | R15, R31; P17; T3c, T5c |
+| E9 | D8: la barra de «Confirmar» como `Card` `sticky` | `FormFooterBar` existe solo en Fórmulas (`app/(private)/produccion/formulas/components/form-footer-bar.tsx:12-22`; `formula-import-review.tsx:471`), barra de borde a borde con desenfoque. El tablero de esta pantalla dibuja una tarjeta `position: sticky; bottom: 0` (`ProveedorImportar.dc.html:73`) | D8 no cambia (manda el tablero); `FormFooterBar` ni se reutiliza ni se sube (A9) | R25; T4c |
+| E10 | «Lo que NO entra»: el menú de Clientes con Contactos (QC-244) `pending` | En `dev` (`progress/features/QC-244.md:36`, PR #270): `app/(private)/clientes/contactos/page.tsx`, grupo «Clientes» en `lib/shared/navigation/private-nav.ts`; `tests/unit/clientes/scope.test.ts:203-205` admite su `page.tsx` | Se corrige el texto; `/clientes/contactos` no entra ni se toca; R28 sigue hablando solo de `/clientes` | R28; § 9 |
+| E11 | — | `tests/unit/proveedores/module-contract.test.ts:370-376` prohíbe `/proveedores\|supplier/i` en `app/` fuera de `app/(private)/proveedores`; `tests/unit/proveedores/scope.test.ts:343-350` lo prohíbe en rutas de `components/` fuera de `components/shared/supplier/` | Restricción escrita en § 9. Ningún archivo de esta ficha la rompe: los de clientes no nombran proveedores; si un texto tuviera que salir, va a `lib/shared/ui/` (QC-278 E17) | R41, R43 |
+| E12 | § 7: el E2E nuevo entra en dos listas cerradas | Por su nombre cae también en `tests/unit/proveedores/scope.test.ts:355-369` (`PATRON_PROVEEDORES`, `:59`) y en `E2E_PERMITIDOS` de `tests/unit/clientes/scope.test.ts:340-351` (`/cliente/i`, `:362`) | Cuatro altas en T7a; los dos `scope.test.ts` entran en `Archivos esperados` | R42; T7a |
+| E13 | § 7: censo del 2026-10-13 | `tests/unit/marca/tablas-marca.test.tsx:249, 261-263` llama `build*Columns({ rowActions })`; `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx:12-13, 230-240` monta las dos páginas de proveedores | § 7 ampliado; T0a, T3b y T5b los incluyen | R14, R30, R41; T0a |
+| E14 | § 7: seis E2E de clientes «pueden cambiar» | Solo `clientes.spec.ts`, `movimiento.spec.ts` (`:507` ya usa `.first()`) y `marca-componentes.spec.ts` nombran testids o la ruta de la pantalla; `pedido-con-cliente`, `entregar-producto-terminado` y `anular-entrega` siembran por Prisma (`clientes/scope.test.ts:313-327`) | Los tres últimos salen de § 7, T7b y `Archivos esperados` | R41; T7b |
+| E15 | «Lo que ya existe»: `guard-piezas-base.test.ts:238` | La fila está en `:242`; `:678` exige que `supplier-showcase-skeleton.tsx` exista | Cita corregida; D2 restila el esqueleto, no lo borra | R9; T2a, T2d |
+| E16 | — | Los errores de la revisión no tienen vuelta (`importar/[documentoId]/page.tsx:27-45, 78-100`); los de Fórmulas sí (`produccion/formulas/importar/[documentoId]/page.tsx:60`) | Fuera del alcance aprobado; se anota en § 11 | — |
+| E17 | Comprobado sin cambios | `PageHeader` con `title`, `titleTestId`, `actions`, `breadcrumb` y `data-slot="page-header-actions"` (`page-header.tsx:10-18, 63-69`; es un `data-slot`, no un `data-testid`); `Notice`, `StatusBadge` (`waiting`), `EmptyState` (`icon`), `DataTableCardLayout` y `cardActions`/`closeMenu` (`data-table-types.ts:114-120, 184-187`); las doce columnas del catálogo, incluida «Creado» (`catalog-columns.tsx:157-271`), igual que el tablero (`ProveedorDetalleMovil.dc.html:22`); las nueve de clientes (`customer-columns.tsx:53-124`); los nueve textos de toast; `KIND_LABELS` (`catalog-import-row.tsx:29-35`); `CropPicker` (`crop-picker.tsx:11-25`); la vitrina y sus filtros. El catálogo del proveedor no tiene corte por permiso de costos (`canViewUnitCosts` es de Inventario). D53 sigue vigente. `StepReader` con `panel` no aplica a esta ficha | Sin cambio | — |
+| E18 | D5/§ 6: «si QC-264 ya está en `dev`» | Está: `DocumentUploadDialog` con `disabled` y tonos `BROWSER_PHASE_TONES`/`FILE_STATUS_TONES` (`CATALOGO.md:69`), tests `tests/unit/documentos-ui/document-upload-tones.test.tsx`, `document-upload-dialog.test.tsx`, `document-upload-errors.test.tsx`; el snapshot de `catalogo-paridad` ya lo trae | El detalle hereda el diálogo; ningún archivo de la subida entra en `Archivos esperados` | R19; T3a, T3c |
+
+**Requisitos antes de la enmienda** (para el reviewer):
+
+- R15 no nombraba los rótulos de la tarjeta.
+- R19 decía: «DONDE la sesión puede subir documentos, el disparador «Subir PDFs» de la cabecera DEBE ser
+  el de la pieza compartida de subida con la estrategia de catálogo y la revisión de este proveedor; SI
+  no puede, ENTONCES NO DEBE pintarse. Esta ficha NO DEBE modificar ningún archivo de
+  `components/shared/document-upload/`.»
+- R31 no nombraba el rótulo de la fecha de alta.
+- R38 terminaba en «*(supuesto P1)*».
+- R41 no nombraba los cortes por añadido.
+- R44 es nuevo.
