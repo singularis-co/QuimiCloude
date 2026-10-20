@@ -153,6 +153,8 @@ const MODULE_CODE_FILES = [
   'adapters/driven/security/webhook-signature-hmac.ts',
   'adapters/driving/ai-provider-actions.ts',
   'adapters/driving/whatsapp-connection-actions.ts',
+  // QC-239 2026-10-20: las cuatro Server Actions de vincular, desvincular y bloquear un contacto.
+  'adapters/driving/whatsapp-contact-actions.ts',
   'adapters/driving/whatsapp-webhook-route.ts',
   'domain/actor.ts',
   'domain/ai-provider-failure.ts',

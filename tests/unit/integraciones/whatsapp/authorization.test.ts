@@ -1,4 +1,5 @@
-// Autorizacion de los seis casos de uso de la conexion de WhatsApp. Los puertos son dobles que
+// Autorizacion de los seis casos de uso de la conexion de WhatsApp y de las cuatro acciones sobre
+// un contacto (QC-239). Los puertos son dobles que
 // FALLAN SI LOS LLAMAN: no basta con que la operacion lance, tiene que lanzar sin tocar nada.
 
 import { describe, expect, it, vi } from 'vitest'
@@ -7,14 +8,19 @@ import type { Actor } from '@/lib/modules/integraciones/domain/actor'
 import { createCreateWhatsappConnection } from '@/lib/modules/integraciones/domain/create-whatsapp-connection'
 import { UnauthorizedError } from '@/lib/modules/integraciones/domain/errors'
 import { createGetWhatsappConnection } from '@/lib/modules/integraciones/domain/get-whatsapp-connection'
+import { createLinkWhatsappContact } from '@/lib/modules/integraciones/domain/link-whatsapp-contact'
 import { createRegenerateWhatsappVerifyToken } from '@/lib/modules/integraciones/domain/regenerate-whatsapp-verify-token'
 import { createSetWhatsappConnectionEnabled } from '@/lib/modules/integraciones/domain/set-whatsapp-connection-enabled'
+import { createSetWhatsappContactBlocked } from '@/lib/modules/integraciones/domain/set-whatsapp-contact-blocked'
 import { createTestWhatsappConnection } from '@/lib/modules/integraciones/domain/test-whatsapp-connection'
+import { createUnlinkWhatsappContact } from '@/lib/modules/integraciones/domain/unlink-whatsapp-contact'
 import { createUpdateWhatsappConnection } from '@/lib/modules/integraciones/domain/update-whatsapp-connection'
 import type { RandomSource } from '@/lib/modules/integraciones/ports/random-source'
 import type { SecretCipher } from '@/lib/modules/integraciones/ports/secret-cipher'
 import type { SecretDigest } from '@/lib/modules/integraciones/ports/secret-digest'
 import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository'
+import type { WhatsappContactRepository } from '@/lib/modules/integraciones/ports/whatsapp-contact-repository'
+import type { WhatsappContactUnitOfWork } from '@/lib/modules/integraciones/ports/whatsapp-contact-unit-of-work'
 import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client'
 
 import {
@@ -99,6 +105,110 @@ describe('autorizacion de los casos de uso de la conexion de WhatsApp', () => {
       })
     }
   }
+})
+
+// QC-239 (2026-10-20): las cuatro acciones sobre un contacto exigen `clientes.modificar` y el
+// anadido `integraciones` (R43, R44). Mismo criterio que arriba: puertos que explotan si los llaman.
+function explodingContactDeps() {
+  const explota = (nombre: string) =>
+    vi.fn(() => {
+      throw new Error(`${nombre} no debe llamarse sin autorizacion`)
+    })
+  const contacts = {
+    findById: explota('contacts.findById'),
+    findByWaIds: explota('contacts.findByWaIds'),
+    setLink: explota('contacts.setLink'),
+    setBlocked: explota('contacts.setBlocked'),
+  }
+  const unitOfWork = { run: explota('unitOfWork.run') }
+  return {
+    deps: {
+      contacts: contacts as unknown as WhatsappContactRepository,
+      unitOfWork: unitOfWork as unknown as WhatsappContactUnitOfWork,
+      now: explota('now') as unknown as () => Date,
+    },
+    espias: [...Object.values(contacts), unitOfWork.run],
+  }
+}
+
+type InvocacionDeContacto = (
+  actor: Actor | null | undefined,
+  deps: ReturnType<typeof explodingContactDeps>['deps'],
+) => Promise<unknown>
+
+// Entradas basura a proposito: el permiso y el anadido se comprueban antes de validar.
+const OPERACIONES_DE_CONTACTO: ReadonlyArray<[string, InvocacionDeContacto]> = [
+  ['vincular', (actor, deps) => createLinkWhatsappContact(deps)({ basura: true }, actor)],
+  ['desvincular', (actor, deps) => createUnlinkWhatsappContact(deps)({ basura: true }, actor)],
+  ['bloquear', (actor, deps) => createSetWhatsappContactBlocked(deps)({ contactId: 'no-es-uuid', blocked: true }, actor)],
+  ['desbloquear', (actor, deps) => createSetWhatsappContactBlocked(deps)({ contactId: 'no-es-uuid', blocked: false }, actor)],
+]
+
+const CON_TODO = { permissions: ['clientes.modificar'], addons: ['integraciones'] }
+
+const ACTORES_SIN_ACCESO_A_CONTACTOS: ReadonlyArray<[string, string, Actor | null | undefined]> = [
+  ['R43', 'actor nulo (sin sesion)', null],
+  ['R43', 'actor indefinido', undefined],
+  ['R43', 'sin empresa', { id: ACTOR_ID, companyId: '', ...CON_TODO }],
+  ['R43', 'sin permisos', { id: ACTOR_ID, companyId: COMPANY_ID, permissions: [], addons: ['integraciones'] }],
+  [
+    'R43',
+    'solo con integraciones.modificar',
+    { id: ACTOR_ID, companyId: COMPANY_ID, permissions: ['integraciones.modificar'], addons: ['integraciones'] },
+  ],
+  ['R44', 'el anadido integraciones apagado', { id: ACTOR_ID, companyId: COMPANY_ID, ...CON_TODO, addons: [] }],
+  [
+    'R44',
+    'otro anadido activo pero no integraciones',
+    { id: ACTOR_ID, companyId: COMPANY_ID, ...CON_TODO, addons: ['documentos'] },
+  ],
+  [
+    'R44',
+    'sin la lista de anadidos',
+    { id: ACTOR_ID, companyId: COMPANY_ID, permissions: ['clientes.modificar'] },
+  ],
+]
+
+describe('autorizacion de las acciones sobre un contacto de WhatsApp (QC-239)', () => {
+  for (const [operacion, invocar] of OPERACIONES_DE_CONTACTO) {
+    for (const [requisito, quien, actor] of ACTORES_SIN_ACCESO_A_CONTACTOS) {
+      it(`${requisito}: ${operacion} con ${quien} rechaza con unauthorized sin tocar ningun puerto`, async () => {
+        const { deps, espias } = explodingContactDeps()
+        const promesa = invocar(actor, deps)
+        await expect(promesa).rejects.toBeInstanceOf(UnauthorizedError)
+        await expect(promesa).rejects.toMatchObject({ code: 'unauthorized' })
+        for (const espia of espias) expect(espia).not.toHaveBeenCalled()
+      })
+    }
+  }
+
+  it('R44: sin el anadido la respuesta es identica a la de sin permiso', async () => {
+    for (const [operacion, invocar] of OPERACIONES_DE_CONTACTO) {
+      const sinPermiso = await invocar(
+        { id: ACTOR_ID, companyId: COMPANY_ID, permissions: [], addons: ['integraciones'] },
+        explodingContactDeps().deps,
+      ).catch((error: unknown) => error)
+      const sinAnadido = await invocar(
+        { id: ACTOR_ID, companyId: COMPANY_ID, ...CON_TODO, addons: [] },
+        explodingContactDeps().deps,
+      ).catch((error: unknown) => error)
+      expect(sinAnadido, operacion).toBeInstanceOf(UnauthorizedError)
+      expect(sinPermiso, operacion).toBeInstanceOf(UnauthorizedError)
+      expect((sinAnadido as UnauthorizedError).code, operacion).toBe((sinPermiso as UnauthorizedError).code)
+      expect((sinAnadido as UnauthorizedError).message, operacion).toBe((sinPermiso as UnauthorizedError).message)
+    }
+  })
+
+  it('R43: con clientes.modificar y el anadido activo pasa la autorizacion y llega a validar la entrada', async () => {
+    for (const [operacion, invocar] of OPERACIONES_DE_CONTACTO) {
+      const { deps, espias } = explodingContactDeps()
+      const error = await invocar({ id: ACTOR_ID, companyId: COMPANY_ID, ...CON_TODO }, deps).catch(
+        (caught: unknown) => caught,
+      )
+      expect(error, operacion).not.toBeInstanceOf(UnauthorizedError)
+      for (const espia of espias) expect(espia).not.toHaveBeenCalled()
+    }
+  })
 })
 
 describe('ambito de empresa', () => {

@@ -83,7 +83,7 @@
   y `whatsapp-webhook-route.int.test.ts` (R39, R15).
 - **Hecho:** verdes; los tests de QC-238 siguen verdes sin relajarse.
 
-## T9 [P] — Server Actions (depende de T7)
+## [x] T9 [P] — Server Actions (depende de T7)
 - `adapters/driving/whatsapp-contact-actions.ts` (design § 8).
 - Tests: `whatsapp-contact-actions.test.ts` (R46) y `authorization.test.ts` de integraciones (R43,
   R44).
