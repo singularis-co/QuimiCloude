@@ -222,6 +222,9 @@ export const E2E_ESPERADOS = [
   'inventario.spec.ts',
   'login-skin.spec.ts',
   'login.spec.ts',
+  // Alta con el mismo patron que las demas (QC-137 T22): la campana y su panel. No lee ni afirma
+  // nada sobre el identificador de peticion ni sobre `reference`.
+  'notificaciones.spec.ts',
   // Alta el 2026-10-02 (QC-138) por el MISMO motivo y en el MISMO sitio que las demas: la lista
   // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
   // -el archivo se nombra, uno a uno-. Lo que ejercita: un alta de pedido sin material suficiente
@@ -772,9 +775,16 @@ export const MIGRACIONES_ESPERADAS = [
   // y sin pedido; no tocan el identificador.
   '20261016130000_inventory_movement_kind_direct_delivery',
   '20261016130100_direct_deliveries',
+  // QC-137 2026-10-19: las tablas de avisos y su añadido; no tocan el identificador.
+  '20261019120000_notifications',
+  '20261019120100_notifications_addon',
   // 2026-10-19: correctiva, quita `whatsapp_connections.meta_app_id` que QC-237 retiro editando la
   // migracion original; no toca el identificador.
   '20261019120000_whatsapp_connections_drop_meta_app_id',
+  // QC-137 2026-10-19: el nombre original de cada archivo de una tanda; no toca el identificador.
+  '20261019120200_document_files_original_name',
+  // QC-137 2026-10-19: retira el permiso y el añadido de notificaciones; no toca el identificador.
+  '20261019120300_notifications_addon_removal',
   // 2026-10-19: telefono internacional del cliente; no toca el identificador.
   '20261019130000_customers_phone_e164',
   // QC-238 2026-10-19: contactos y mensajes de WhatsApp; no toca el identificador.

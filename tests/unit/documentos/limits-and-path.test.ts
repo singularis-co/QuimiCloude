@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { buildDocumentPath, isPathInCompany } from '@/lib/modules/documentos/domain/document-path';
+import { buildDocumentPath, companyIdOfPath, isPathInCompany } from '@/lib/modules/documentos/domain/document-path';
 import {
   MAX_FILES_PER_BATCH,
   MAX_PDF_BYTES,
@@ -109,6 +109,27 @@ describe('documentos — limites, firma del PDF y ruta de empresa', () => {
       }
       // Y una empresa vacia no autoriza nada, ni siquiera una ruta que empiece por `/`.
       expect(isPathInCompany('/x.pdf', '')).toBe(false);
+    });
+
+    it('R12 — companyIdOfPath saca la empresa de una ruta construida y de la de un recorte', () => {
+      const empresa = '33333333-3333-4333-8333-333333333333';
+      expect(companyIdOfPath(buildDocumentPath(empresa))).toBe(empresa);
+      expect(companyIdOfPath(`${empresa}/archivo-1/2-1.png`)).toBe(empresa);
+    });
+
+    it('R12 — companyIdOfPath da null si el prefijo no es una empresa valida', () => {
+      const empresa = '33333333-3333-4333-8333-333333333333';
+      for (const ruta of [
+        'empresa-1/archivo-1.pdf',
+        `/${empresa}/x.pdf`,
+        `${empresa}`,
+        `${empresa}/`,
+        `${empresa}/../otra/x.pdf`,
+        `${empresa}x/a.pdf`,
+        '',
+      ]) {
+        expect(companyIdOfPath(ruta), ruta).toBeNull();
+      }
     });
   });
 

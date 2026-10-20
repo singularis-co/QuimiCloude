@@ -20,6 +20,7 @@ import type {
 } from '../../../domain/company-view';
 import type { ListQuery } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
+import type { CompanyMembershipReader } from '../../../ports/company-membership-reader';
 import type { CompanyDuplicate, CompanyRepository } from '../../../ports/company-repository';
 import type { DuplicateKey } from '../../../ports/user-admin-repository';
 
@@ -410,6 +411,25 @@ export function createCompanyRepository(db: PrismaLike = prisma): CompanyReposit
         }),
       );
       return buildPage(items, total, page, limit);
+    },
+  };
+}
+
+export function createCompanyMembershipReader(db: PrismaLike = prisma): CompanyMembershipReader {
+  return {
+    async isUserInCompany(userId, companyId) {
+      const row = await db.user.findFirst({
+        where: { id: userId, companyId, deletedAt: null },
+        select: { id: true },
+      });
+      return row !== null;
+    },
+    async isCompanyActive(companyId) {
+      const row = await db.company.findFirst({
+        where: { id: companyId, deletedAt: null },
+        select: { id: true },
+      });
+      return row !== null;
     },
   };
 }

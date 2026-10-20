@@ -140,3 +140,12 @@ describe('assertAddon / hasAddon', () => {
     expect(() => assertAddon(portador, 'dashboard', onDenied)).not.toThrow()
   })
 })
+
+describe('QC-137 — las notificaciones son núcleo', () => {
+  it('QC-137 R18: ADDONS no incluye notificaciones', () => {
+    // Lista escrita a mano: un añadido nuevo rompe la igualdad sin tener que nombrarlo aquí.
+    expect([...ADDONS]).toEqual(['dashboard', 'proveedores', 'lectura_pdf', 'importacion_excel', 'integraciones'])
+    expect(Object.keys(ADDON_PERMISSIONS).sort()).toEqual([...ADDONS].sort())
+    expect(Object.keys(ADDON_REQUIRES).sort()).toEqual([...ADDONS].sort())
+  })
+})

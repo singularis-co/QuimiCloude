@@ -15,3 +15,12 @@ export async function listActiveCompanyIds(): Promise<readonly string[]> {
   });
   return rows.map((row) => row.id);
 }
+
+/** También las dadas de baja: sus datos siguen en la base hasta que se borren físicamente. */
+export async function listAllCompanyIds(): Promise<readonly string[]> {
+  const rows = await prisma.company.findMany({
+    select: { id: true },
+    orderBy: { id: 'asc' },
+  });
+  return rows.map((row) => row.id);
+}

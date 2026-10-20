@@ -1446,3 +1446,23 @@ describe('el Administrador no consulta la pantalla «Asignación»', () => {
     }
   })
 })
+
+describe('QC-137 — las notificaciones no tienen permiso propio', () => {
+  // El catalogo y cada rol se comparan con listas escritas a mano: si alguien vuelve a sumar un
+  // permiso de consultar avisos, cambia la igualdad exacta sin tener que nombrarlo aqui.
+  it('QC-137 R21: el catálogo no tiene notificaciones.consultar y cada rol tiene los permisos de antes de QC-137', () => {
+    expect(PERMISSIONS.map((permiso) => permiso.code)).toEqual([...CODIGOS_DEL_REQUISITO])
+    expect(Object.keys(SEED_ROLE_PERMISSIONS).sort()).toEqual(
+      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_ACONDICIONAMIENTO].sort(),
+    )
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_ADMINISTRADOR])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
+      'asignaciones.consultar',
+      'terminados.consultar',
+      'empaque.modificar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual([...CODIGOS_DE_EMPRESAS])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]).toEqual([CONSULTAR_ASIGNACIONES, ACONDICIONAMIENTO])
+  })
+})

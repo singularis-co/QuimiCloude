@@ -1036,6 +1036,7 @@ model DocumentFile {
   batchId        String             @map("batch_id") @db.Uuid
   companyId      String             @map("company_id") @db.Uuid
   path           String
+  originalName   String?            @map("original_name")
   status         DocumentFileStatus @default(queued)
   extractedText  String?            @map("extracted_text")
   errorCode      String?            @map("error_code")
@@ -1367,4 +1368,45 @@ model AiProviderConnection {
 
   @@index([provider], map: "ai_provider_connections_provider_idx")
   @@map("ai_provider_connections")
+}
+
+/// Sin `@relation`: las FK a `companies`, `users` y `roles` cruzan de módulo y están escritas a mano
+/// en la migración, igual que sus CHECK. `notifications_id_company_id_key` es la clave candidata a la
+/// que apunta la FK compuesta de `notification_reads`: quitarla la rompe.
+/// @module notificaciones
+model Notification {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  eventKey        String    @map("event_key")
+  tone            String
+  title           String
+  body            String
+  bodyTime        DateTime? @map("body_time") @db.Timestamptz(6)
+  linkLabel       String    @map("link_label")
+  targetKind      String?   @map("target_kind")
+  targetParams    Json?     @map("target_params")
+  recipientUserId String?   @map("recipient_user_id") @db.Uuid
+  recipientRole   String?   @map("recipient_role")
+  dedupeKey       String    @map("dedupe_key")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([companyId, dedupeKey], map: "notifications_company_id_dedupe_key_key")
+  @@unique([id, companyId], map: "notifications_id_company_id_key")
+  @@index([companyId, recipientUserId, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_company_id_recipient_user_id_created_at_id_idx")
+  @@index([companyId, recipientRole, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_company_id_recipient_role_created_at_id_idx")
+  @@index([companyId, createdAt], map: "notifications_company_id_created_at_idx")
+  @@map("notifications")
+}
+
+/// La FK a `notifications` es compuesta con `company_id`: una lectura de otra empresa no puede
+/// existir. Va escrita a mano en la migración, como la de `users`.
+/// @module notificaciones
+model NotificationRead {
+  notificationId String   @map("notification_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  readAt         DateTime @default(now()) @map("read_at") @db.Timestamptz(6)
+
+  @@id([notificationId, userId], map: "notification_reads_pkey")
+  @@map("notification_reads")
 }

@@ -1242,6 +1242,43 @@
       "x": 1520,
       "y": 0
     },
+    "Notificaciones.dc.html": {
+      "expand": "fill",
+      "h": 1000,
+      "is_interactive": true,
+      "page": "notificaciones",
+      "title": "Campana de notificaciones (QC-137)",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "NotificacionesTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "notificaciones",
+      "title": "NotificacionesTablet",
+      "w": 904,
+      "x": 1520,
+      "y": 0
+    },
+    "NotificacionesMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "notificaciones",
+      "title": "NotificacionesMovil",
+      "w": 960,
+      "x": 2504,
+      "y": 0
+    },
+    "NotificacionesEstados.dc.html": {
+      "h": 3820,
+      "is_interactive": true,
+      "page": "notificaciones",
+      "title": "Estados de notificaciones (QC-137)",
+      "w": 2500,
+      "x": 0,
+      "y": 1640
+    },
     "TelefonoCliente.dc.html": {
       "h": 2140,
       "is_interactive": true,
@@ -1812,6 +1849,28 @@
       "w": 240,
       "x": 0,
       "y": 6620
+    },
+    "c_Notificaciones": {
+      "bold": true,
+      "fill": "gray",
+      "maxH": 70,
+      "page": "notificaciones",
+      "size": 40,
+      "text": "Notificaciones: campana con panel (QC-137)  ·  escritorio · tablet · teléfono",
+      "w": 1400,
+      "x": 0,
+      "y": -110
+    },
+    "c_NotificacionesEstados": {
+      "bold": true,
+      "fill": "gray",
+      "maxH": 70,
+      "page": "notificaciones",
+      "size": 40,
+      "text": "Notificaciones: estados (QC-137)",
+      "w": 1400,
+      "x": 0,
+      "y": 1530
     }
   },
   "order": [
@@ -1949,7 +2008,11 @@
     "ProductoTerminadoEvidenciaMovil.dc.html",
     "EntregaSinPedido.dc.html",
     "EntregaSinPedidoTablet.dc.html",
-    "EntregaSinPedidoMovil.dc.html"
+    "EntregaSinPedidoMovil.dc.html",
+    "Notificaciones.dc.html",
+    "NotificacionesTablet.dc.html",
+    "NotificacionesMovil.dc.html",
+    "NotificacionesEstados.dc.html"
   ],
   "pages": [
     {
@@ -1983,6 +2046,10 @@
     {
       "id": "configuracion",
       "name": "8 · Configuración e integraciones"
+    },
+    {
+      "id": "notificaciones",
+      "name": "9 · Notificaciones"
     }
   ],
   "title": "QuimiCloude — Rediseño"
