@@ -2,7 +2,7 @@
 
 ## Vuelta 1 (HEAD 4391def3, base origin/dev 6e8695b2)
 
-**Veredicto: RECHAZADO** (2 bloqueantes; ver «Hallazgos»).
+**Veredicto vuelta 1: RECHAZADO** (2 bloqueantes; ver «Hallazgos»). **Vuelta 2: OK** (ver al final).
 
 ### Verificación ejecutada por el reviewer (2026-10-19)
 
@@ -214,3 +214,52 @@ se relajó.
 ### Para la vuelta 2
 
 Cerrar B1 y B2 (y con ellos B3). La revisión se acota al rango nuevo, contra B1–B3 y sus regresiones.
+
+## Vuelta 2 (acotada a fd79e2ef..30ceee6a)
+
+**Veredicto: OK.** Cerrados B1, B2 y B3, y m4 queda anotado. No hay bloqueantes nuevos.
+
+### Verificación ejecutada por el reviewer
+
+- `vitest run guard-qc238 receive-whatsapp-webhook.test.ts whatsapp-webhook-route.test.ts`:
+  `Test Files 3 passed (3)`, `Tests 47 passed (47)`. En esta rama, el caso del diff de la guardia nueva
+  **corre**, no se salta.
+- `pnpm exec vitest run guard`: `Test Files 82 passed (82)`, `Tests 1134 passed | 20 skipped`.
+- `pnpm run typecheck`: exit 0.
+- `eslint` sobre los 5 archivos tocados: sin problemas.
+- Grep sobre las líneas añadidas en `lib/`: ninguna cita `QC-<n>`, `R<n>` ni `design.md`.
+
+### Hallazgos de la vuelta 1
+
+- [x] **B1 (R33).** La guardia es `tests/guards/guard-qc238-limites-de-la-ficha.test.ts`.
+  - Censa el diff de la rama contra el merge-base con `origin/dev`/`dev`, árbol de trabajo incluido.
+    Mira `package.json`, `pnpm-lock.yaml`, `.env.example`, `permissions.ts`, `private-nav.ts`,
+    `error-codes.ts` y `error-catalog.ts`.
+  - Tiene ancla anti-vacuidad (diff no vacío) y comprueba que los siete archivos existen.
+  - Un caso sintético prueba cada prohibido en rojo y las rutas parecidas (`.env.example.bak`, un
+    `package.json` en fixtures, `permissions.test.ts`) en verde.
+  - Fuera de la rama hace un `ctx.skip` ruidoso, con su propio test.
+  - La fila R33 del mapa en `impl_QC-238.md` apunta a la guardia.
+- [x] **B2 (R15).**
+  - Ahora `stored` lleva `skipped { changes, messages, statuses }`.
+  - El driving escribe `console.warn('whatsapp_webhook_changes_skipped', { connectionId, changes,
+    messages, statuses })` solo si hay algo saltado: números y el id validado como UUID, sin
+    `phone_number_id`.
+  - Tests:
+    - `receive-…test.ts > R15` con un cambio de otro número, un mensaje ilegible y un status
+      desconocido; afirma los conteos y que el número ajeno no aparece en el resultado;
+    - `whatsapp-webhook-route.test.ts > R15` comprueba una sola línea, con argumentos exactos;
+    - «R16: stored sin nada saltado ⇒ sin log» se acota al caso sin saltados;
+    - R27 suma `PHONE_NUMBER_ID` a `SENSIBLES` y recorre el resultado con saltados.
+  - En `design.md` §3.2 (742cba6d), la fila de `stored` queda partida en dos, coherente con R15 y §4.3.
+- [x] **B3 (T17).** Está marcada `[x]`. La evidencia está en `impl_QC-238.md`: typecheck, lint, guardias
+  82/82 y tests de la feature 53/53. Mis corridas de arriba la confirman. `./init.sh` sigue rojo por el
+  board, que es del leader y no de la feature.
+- [x] **m4.** Queda como D71 en `progress/deudas.md`, con origen, riesgo, qué falta y dueño.
+
+### Sigue abierto, sin bloquear
+
+- m1: T16 sigue `[ ]`. La verificación manual con Meta la hace el humano antes del merge a producción;
+  el leader la anota en `progress/features/QC-238.md`.
+- m5: `progress/features/QC-238.md` desactualizado (leader).
+- `gate-completo` en CI: lo comprueba el leader cuando abra el PR.
