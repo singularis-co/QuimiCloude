@@ -162,8 +162,9 @@
 > reglas de cierre que arriba. Diseño en `design.md > 18`; decisiones E1–E16 en `requirements.md >
 > Enmienda 2026-10-20`.
 >
-> **Antes de T24** (bloqueante): el humano ha aprobado o cambiado [P10]–[P18] (vienen con el spec). Si
-> cambia [P11] (lista de constantes), se ajusta el catálogo de §18.4 antes de escribirlo.
+> [P10], [P11], [P13], [P14], [P16] y [P18] aprobadas por el humano el 2026-10-20. De [P11] siguen
+> abiertos el dato de `nombre` y la forma de `pedido_numero`: no bloquean T24 (el catálogo solo declara
+> de qué dato sale cada constante); los cierra la ficha que escribe el resolvedor.
 >
 > **Antes de T26**: contrastar con la documentación vigente de la Cloud API la forma en que `GET
 > message_templates` devuelve los componentes (sobre todo `example`) frente a lo que se envía al crear
@@ -190,7 +191,7 @@
 
 ## Bloque H — Dominio puro (enmienda)
 
-- [ ] **T24 — Constantes y variable propia** (R53–R55). Depende de: T23 y la aprobación de [P10]/[P11]
+- [ ] **T24 — Constantes y variable propia** (R53–R55). Depende de: T23
   - `domain/whatsapp-system-variables.ts` y `domain/whatsapp-variable-key.ts` (§18.4).
   - `tests/unit/integraciones/whatsapp/templates/whatsapp-variable-key.test.ts`.
   - **Hecho:** casos de §18.10 en el límite y en el límite + 1; los dos archivos solo importan `zod` y

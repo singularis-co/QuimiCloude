@@ -7,7 +7,8 @@
 > **R53–R86** y **T22–T35**. R1–R52 y T1–T21 están implementados y mergeados a `dev` (PR #281); la
 > enmienda los mantiene salvo R6, R10, R11, R13, R14, R16, R23, R46 y R47, que cambian donde lo dice
 > `## Enmienda 2026-10-20` (cada uno lleva su marca). Decisiones del humano E1–E9 cerradas; propuestas
-> del spec **[P10]–[P18]**, pendientes de aprobación.
+> del spec **[P10]–[P18]**: P10, P11, P13, P14, P16 y P18 aprobadas por el humano el 2026-10-20 (en
+> la tabla de decisiones de la enmienda); P12, P15 y P17 retiradas.
 >
 > **Alcance** (ficha de Jira QC-242, copiada sin cambios de fondo). El Administrador puede crear
 > plantillas de mensaje en Meta desde la app, ver su estado de aprobación y eliminarlas. La app guarda
@@ -337,6 +338,12 @@ quedan descartadas (`design.md > 18.12`).
 | E13 | **Habilitar no exige `APPROVED`.** «Habilitada» es solo un indicador interno de que la plantilla tiene disponible la fuente de los datos de todas sus variables; el estado de Meta va aparte. | R77 |
 | E14 | **El valor de una variable propia es obligatorio** y no vacío, con **como mucho 50 caracteres**, fijo (no depende de Meta). 50 cabe en el límite de todos los componentes de esta fase (header 60, body 1024, URL 2000). | R54 |
 | E15 | **El ejemplo que se manda a Meta al crear es la etiqueta** de la entrada relacionada, para las constantes y para las variables propias. El usuario no escribe ejemplos y no hay campo de ejemplo aparte. Si la etiqueta excede algún límite de Meta para el ejemplo, la app la deja pasar; si Meta rechaza, se traduce su error como los demás (R19). | R53, R67 |
+| P10 (2026-10-20) | Claves de constantes y propias con la misma forma, `^[a-z][a-z0-9_]*$`, de 1 a 40 caracteres; una propia no puede usar la clave de una constante. Quien añada una constante nueva comprueba antes en los datos que ninguna propia usa esa clave. Etiqueta de 1 a 60, sin exigir que sea única. Los 40 y 60 son del spec, no de Meta. Aprobado por el humano como propuesta. | R54, R56, R66 |
+| P11 (2026-10-20) | Lista inicial de constantes: `nombre` («Nombre del cliente», del cliente), `pedido_numero` («Número de pedido», del pedido) y `empresa_nombre` («Nombre de la empresa», `Company.name`). Esta ficha declara el catálogo (clave, etiqueta, de qué dato sale) y lo expone en el contrato; el resolvedor que lee el dato real lo implementa la ficha que envía (QC-245, QC-247). Aprobado por el humano como propuesta. Quedan abiertos los dos datos que el spec no propuso (ver «Preguntas abiertas»). | R53, R55 |
+| P13 (2026-10-20) | Etiqueta y valor de una variable propia se pueden modificar aunque esté en uso; el valor nuevo vale desde el siguiente envío. Aprobado por el humano como propuesta. | R57 |
+| P14 (2026-10-20) | Quitar una relación a una plantilla habilitada la deja «sin relacionar» y la deshabilita sola, igual que E12. Aprobado por el humano como propuesta. | R72 |
+| P16 (2026-10-20) | Una plantilla no relacionable (header con archivo, botones de otro tipo, OTP) queda siempre «sin relacionar», aunque no tenga variables, y nunca se habilita. El sistema no sabe enviar esos componentes. Aprobado por el humano como propuesta. | R64, R65 |
+| P18 (2026-10-20) | Desde la app solo se crea con claves; un `{{1}}` en el borrador es inválido. Así toda plantilla creada nace relacionada (E5). Aprobado por el humano como propuesta. | R66 |
 | E16 | **Flujo canónico**: a Meta se le envía siempre el texto posicional (`Hola {{1}}`); en el mapeo de la plantilla se guarda `1 = nombre`; `nombre` es una constante del sistema que el código resuelve al enviar con el nombre del cliente (`cliente.name`). Una variable propia (p. ej. `cuenta_numero`) se resuelve con su valor guardado. | R53, R64, R67, R68, R81 |
 
 **Requisitos de R1–R52 que cambian** (el texto original se queda en su sitio con una marca; aquí, qué
@@ -545,47 +552,22 @@ datos de Meta y de la plataforma, que no cambian la propuesta aprobada:
   un requisito.
 - **[P9] [POR CONFIRMAR]** Límite de crons del plan de Vercel del proyecto.
 
-### De la enmienda 2026-10-20 (pendientes de aprobación del humano)
+### De la enmienda 2026-10-20
 
-Cada una trae la propuesta del spec; los requisitos marcados están escritos con ella. Si el humano
-elige otra cosa, cambia ese requisito y nada más.
+El humano aprobó la enmienda el 2026-10-20 («aprobado»): P10, P11, P13, P14, P16 y P18 pasan a
+«Decisiones cerradas» de la enmienda; P12, P15 y P17 se retiraron antes (E14, E15). Queda abierto:
 
-E1–E14 están cerradas. Quedan estas propuestas:
-
-- **[P10] Formato de las claves y la etiqueta.** Propuesta: la misma forma para constantes y
-  propias, `^[a-z][a-z0-9_]*$`, de 1 a 40 caracteres (como `nombre` y `cuenta_numero` de E16); una
-  propia no puede usar la clave de una constante (R56). Riesgo: si el código añade más adelante una
-  constante cuya clave ya usa una propia de alguna empresa, chocan; quien añada la constante tiene que
-  comprobarlo en los datos. Alternativa que lo evita: las constantes con punto (`cliente.nombre`), que
-  una propia no puede tener. Etiqueta de 1 a 60, sin exigir que sea única (también es el ejemplo de
-  Meta, E15). Los 40 y 60 son del spec, no de Meta.
-- **[P11] Qué constantes trae el sistema y dónde vive su resolvedor.** Propuesta de lista inicial: la
-  de E16, `nombre` («Nombre del cliente»), más `pedido_numero` («Número de pedido») y `empresa_nombre`
-  («Nombre de la empresa»). **Ojo con E16:** en el esquema actual el cliente no tiene `name`, tiene
-  `Customer.firstNames` y `Customer.lastNames`; ¿`nombre` es solo los nombres, o nombres y apellidos?
-  La forma en que la app muestra el número de pedido (`orderYear`/`orderSequence`) está **[POR
-  CONFIRMAR]**; `empresa_nombre` sale de `Company.name`. Esta enmienda declara el catálogo (clave,
-  etiqueta y de qué dato sale: cliente, pedido o empresa) y lo expone en el contrato; **el resolvedor
-  que lee el dato real lo implementa la ficha que envía** (QC-245, QC-247), que es la que tiene el
-  cliente o el pedido a mano. ¿Se acepta la lista y el reparto?
-- **[P12]** Retirada: E15 la resolvió (el ejemplo es la etiqueta).
-- **[P13] Modificar etiqueta y valor de una variable en uso.** Propuesta: permitido (E7 solo restringe
-  borrar y renombrar la clave). El valor nuevo se usa desde el siguiente envío; Meta no se entera:
-  la etiqueta solo cuenta como ejemplo al crear.
-- **[P14] Quitar una relación a una plantilla habilitada.** Propuesta: igual que E12, la plantilla pasa
-  a «sin relacionar» y se deshabilita sola. Alternativa: rechazar el cambio hasta que el Administrador
-  la deshabilite.
-- **[P15]** Retirada: E14 (50 caracteres, fijo) la resolvió; 50 cabe en todos los componentes.
-- **[P16] Plantilla no relacionable** (header con archivo, botones de otro tipo, OTP). Propuesta:
-  siempre «sin relacionar», aunque no tenga variables, y por tanto nunca habilitada: el sistema no
-  sabe enviar esos componentes.
-- **[P17]** Retirada: E15 la resolvió (el usuario no escribe ejemplos).
-- **[P18] Borrador con `{{1}}`.** Propuesta: desde la app solo se crea con claves; un `{{1}}` en el
-  borrador es inválido. Así toda plantilla creada nace relacionada (E5). Consecuencia para QC-243:
-  «Duplicar» una plantilla sin relaciones abre un borrador con `{{n}}` que no se puede enviar hasta
-  cambiarlos por claves.
+- **[P11] Dos datos que el spec no propuso** (los dejó como pregunta, no como propuesta; la aprobación
+  no los fija, y no se inventan aquí):
+  - si la constante `nombre` sale solo de `Customer.firstNames` o de nombres y apellidos
+    (`firstNames` + `lastNames`);
+  - la forma del número de pedido de `pedido_numero` a partir de `orderYear`/`orderSequence`
+    (**[POR CONFIRMAR]**: la que ya muestra la app).
+  No bloquean esta ficha: el catálogo solo declara de qué dato sale cada constante, y el resolvedor
+  lo escribe la ficha que envía (QC-245, QC-247), que tiene que cerrarlos antes de implementarlo.
 
 Riesgo, no pregunta: E6 compara los componentes guardados con los que lista Meta. Las creadas desde
 la app guardan lo **enviado**; si el `GET` de Meta los devuelve con otra forma, cada creada perdería su
 relación en la primera sincronización. `design.md > 18.5` compara el contenido normalizado y T26 lo
-fija con un test; la forma del `GET` es **[POR CONFIRMAR]** (P4) y se contrasta antes de T26.
+fija con un test; la forma del `GET` es **[POR CONFIRMAR]** (P4): el implementer la contrasta con la
+documentación vigente de Meta antes de T26.

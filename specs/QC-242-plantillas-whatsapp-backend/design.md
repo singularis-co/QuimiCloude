@@ -961,7 +961,9 @@ de prueba, ver el webhook `APPROVED`, borrarla; evidencia a `progress/impl_QC-24
 
 ## 18. Enmienda 2026-10-20 — diccionario de variables (R53–R86)
 
-Decisiones del humano E1–E14 en `requirements.md > Enmienda 2026-10-20`; propuestas [P10]–[P18].
+Decisiones del humano E1–E16 y P10, P11, P13, P14, P16, P18 (aprobadas el 2026-10-20) en
+`requirements.md > Enmienda 2026-10-20`. De P11 siguen abiertos el dato de `nombre` y la forma de
+`pedido_numero` (comentarios del catálogo en §18.4).
 
 ### 18.0 Lo que ya existe
 
