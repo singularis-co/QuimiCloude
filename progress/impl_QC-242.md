@@ -387,3 +387,67 @@ vitest run tests/unit/integraciones-ui/ -> Test Files 9 passed; Tests 131 passed
 ```
 
 R49 -> `whatsapp-page.test.tsx` «R49: la guia incluye un paso que pide suscribir messages, message_template_status_update y template_category_update».
+
+## Tanda 8 — T20, T21 (cierre)
+
+Archivos:
+- `tests/integration/integraciones/whatsapp-template-flow.int.test.ts`, más su entrada `commit` en
+  `tests/integration/aislamiento.json`. Usa la fachada real, el `POST` firmado, el doble `canned`
+  (`INTEGRATIONS_E2E_DOUBLES=1`) y `after` mockeado como cola. **No se ha ejecutado**: no hay base
+  en el worktree; lo corre CI.
+- `tests/guards/guard-qc242-limites-de-la-ficha.test.ts`: R52. El diff contra el merge-base no toca
+  `package.json`, `pnpm-lock.yaml` ni `.env.example`. Mismo patrón que el de QC-238.
+
+Salida:
+```
+pnpm run typecheck / lint (T20 y la guardia) -> sin errores / 0 errors, 10 warnings preexistentes
+vitest run guard-aislamiento -> 6 passed
+vitest run guard-qc242       -> 4 passed (la rama es la de la ficha: el caso del diff corrió de verdad)
+vitest run guard             -> Test Files 84 passed (84); Tests 1166 passed | 21 skipped (1187)
+git diff 66dc2f13 -- package.json .env.example pnpm-lock.yaml -> vacío
+./init.sh (rápido), cortado a los 295 s por la regla de los 5 min:
+  ✓ node, dependencias, fichas, assignee, cupo, specs, perfil, cliente Prisma, tipos de ruta
+  ✓ typecheck paso
+  ✓ lint paso (0 errors, 10 warnings)
+  ✗ test:rapido no terminó: `vitest related` sobre `errores/domain/*` y `lib/composition/index.ts`
+    arrastra casi toda la suite, e incluye los `.int` que exigen DATABASE_URL. Queda para
+    `gate-completo` en CI.
+```
+
+## Mapa R<n> -> test (consolidado)
+
+Detalle caso a caso en cada tanda. Todos los R1–R52 tienen al menos un caso con su `R<n>` en el
+nombre, dentro de los archivos de test que toca esta rama (comprobado con grep sobre el diff).
+
+| R | Test |
+|---|---|
+| R1, R2 | `whatsapp-template-prisma.int.test.ts` («R1 — …», `describe R2`); `whatsapp-template-migration.int.test.ts` «R1 R50: …» |
+| R3 | `whatsapp-template-prisma.int.test.ts` `describe R3`; `guard-ambito-empresa-integraciones.test.ts` «R3 — …» y su sensibilidad |
+| R4 | `whatsapp-template-draft.test.ts`, `whatsapp-template-meta.test.ts` («R4: IN_APPEAL da OTHER…») |
+| R5 | create/delete/list/sync-whatsapp-templates.test.ts «R5: …»; `whatsapp-template-actions.test.ts` «R5: …» |
+| R6–R13 | `whatsapp-template-draft.test.ts` (`describe R6`…`R13`, límite y límite+1); `module-shape.test.ts` caso R6 |
+| R14–R21 | `create-whatsapp-template.test.ts`; R15/R20/R21 también delete y sync; R19/R21 en `template-graph-failure.test.ts`; R14 R17 en `whatsapp-template-flow.int.test.ts` |
+| R22–R28 | `sync-whatsapp-templates.test.ts`; R23–R25 en `template-sync-plan.test.ts` y `whatsapp-template-prisma.int.test.ts`; R26 en meta; R27 en los dos tests del cliente Graph |
+| R29, R30 | `create-whatsapp-connection.test.ts` «importacion de plantillas»; `whatsapp-connection-actions.test.ts` |
+| R31, R33, R35 | `whatsapp-template-cron-route.test.ts`; R32 R33 `sync-all-whatsapp-templates.test.ts` |
+| R34 | `tests/unit/pedidos/vercel-cron.test.ts` «R34: …» |
+| R36, R37, R39, R41 | `whatsapp-webhook-payload.test.ts` «cambios de plantillas»; `receive-whatsapp-webhook.test.ts`; R36 R37 en `whatsapp-template-prisma.int` y `whatsapp-template-flow.int` |
+| R38, R40 | `receive-whatsapp-webhook.test.ts`, `whatsapp-webhook-route.test.ts`, `sync-whatsapp-templates.test.ts` (reintento), `whatsapp-template-flow.int.test.ts` |
+| R42, R43 | `delete-whatsapp-template.test.ts`; R43 en `template-graph-failure.test.ts`; R42 en `whatsapp-template-flow.int.test.ts` |
+| R44–R46 | `list-whatsapp-templates.test.ts`; R46 en `whatsapp-template-components.test.ts` |
+| R47, R48 | `whatsapp-template-actions.test.ts`; R47 en `module-shape.test.ts` (contrato) |
+| R49 | `whatsapp-page.test.tsx` «R49: …» |
+| R50 | `whatsapp-template-migration.int.test.ts` (5 casos); `guard-rls-force` |
+| R51 | `tests/unit/errores/catalogo.test.ts` |
+| R52 | `guard-qc242-limites-de-la-ficha.test.ts` (4 casos «R52: …») |
+
+## Abierto para el reviewer y el leader
+
+- Los `.int` nuevos (`whatsapp-template-prisma`, `-migration`, `-flow`) y los dos `.int` ajustados
+  (`whatsapp-connection-prisma`, `whatsapp-inbox-prisma`) **no se han corrido**: no hay base.
+- La migración no se aplicó ni se revirtió en local.
+- El límite de crons del plan de Vercel (P9) sigue [POR CONFIRMAR].
+- Desvíos que anotó cada tanda: alta sin transacción y cursor sin `after` (tanda 3);
+  `syncConnectionTemplates` con `cipher` y el conteo `deleted` en una carrera (tanda 4); el cron
+  con `isOn`/`findLive` dentro del `try` (tanda 5); U+0000 rechazado en el validador (tanda 2).
+  Para QC-243: el doble `canned` no refleja un `APPROVED` llegado por webhook.

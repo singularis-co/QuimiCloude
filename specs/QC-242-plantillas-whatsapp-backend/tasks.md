@@ -150,7 +150,7 @@
   - **Hecho:** crear ⇒ `PENDING`; webhook `APPROVED`/`REJECTED`/categoría; id desconocido ⇒
     resincroniza; eliminar en un idioma no toca el otro.
 
-- [ ] **T21 — Cierre** (R52). Depende de: T1–T20
+- [x] **T21 — Cierre** (R52). Depende de: T1–T20
   - `pnpm exec vitest run guard`, `./init.sh` en verde; `package.json` y `.env.example` sin cambios.
   - `progress/impl_QC-242.md` con el mapa `R<n> → test` y las diferencias encontradas al contrastar
     con Meta.
