@@ -11,9 +11,11 @@
   - `pnpm exec vitest related --run <archivos>`
   - `pnpm exec vitest run guard`
 - **Preguntas abiertas:** ninguna. P1–P3 quedaron cerradas el 2026-10-19 como D11–D13.
-- **Enmienda del 2026-10-19 (D14–D20, tras la implementación):** corrige el texto de T1, T3, T5, T7,
+- **Enmienda del 2026-10-19 (D14–D21, tras la implementación):** corrige el texto de T1, T3, T5, T7,
   T8, T10, T11 y T12 a lo que ya está hecho en la rama y añade T13 (R35) y T14 (R24, empresas
   activas), las dos pendientes.
+- **Enmienda de la vuelta 2 de revisión (D22 y D23, 2026-10-19):** añade R36 (la fila pendiente de
+  relleno) y T15, que renombra sus tests. El código ya está en la rama.
 
 ## Bloque A — Datos
 
@@ -64,7 +66,7 @@
     - `formatPhoneNational` y `formatPhoneInternational` dan lo mismo que `formatNational()` y
       `formatInternational()` de la librería, sin formato propio (en `CO`, `300 1234567` y
       `+57 300 1234567`; D14);
-    - `describeCustomerPhone` en sus tres casos (R29, R30).
+    - `describeCustomerPhone` en sus cuatro casos (R29, R30 y, la variante `legacy`, R36).
 
 - [x] **T4 · Esquema de entrada, errores y casos de uso** (R8, R9, R10, R11, R12, R17). Depende de:
   T3.
@@ -210,9 +212,9 @@
   - **Hecho cuando:** `pnpm exec playwright test <spec>` sale verde y los casos de
     `e2e/clientes.spec.ts` que tocaban `phone` están actualizados.
 
-- [ ] **T12 · Cierre**. Depende de: todo, también T13 y T14.
+- [ ] **T12 · Cierre**. Depende de: todo, también T13, T14 y T15.
   - **Qué se hace:**
-    - el mapa `R1…R35 → test` en `progress/impl_QC-236.md`, con la salida real de los tests;
+    - el mapa `R1…R36 → test` en `progress/impl_QC-236.md`, con la salida real de los tests;
     - la revisión visual contra `TelefonoCliente.dc.html` a 1440, 820 y 375 px, leída con las
       enmiendas de `design.md § 1` (formato de D14 y sin tarjeta de la lista, D18);
     - `./init.sh` en verde (el gate completo lo corre CI en el PR).
@@ -239,6 +241,34 @@
     - `tests/integration/clientes/legacy-phone-backfill.int.test.ts` tiene «R24 — los clientes de
       una empresa desactivada quedan sin tocar», con `phone_country`, `phone_e164` y `phone_issue`
       nulos tras el relleno.
+
+## Bloque F — Enmienda de la vuelta 2 de revisión (D22, D23)
+
+- [ ] **T15 · La fila pendiente de relleno, trazada a R36** (R36, R10). Depende de: T13.
+  - **Qué se hace:** solo renombrar tests; el código y los casos ya están en la rama
+    (`design.md § 4.1`, § 4.5, § 8.1, § 8.4). Los casos de la fila pendiente se llaman hoy `R34 —`,
+    `R35 —` o `R29 —` (en el commit `38a432da`), y ninguno de esos requisitos la describe. Pasan a
+    `R36 —`, sin cambiar el resto del nombre ni el cuerpo. El de la l. 543 pasa a `R36, R35 —`,
+    porque también afirma el país de R35:
+
+    | Archivo | Nombre en `38a432da` | Pasa a |
+    | --- | --- | --- |
+    | `tests/unit/clientes/customer-phone.test.ts` (l. 137) | «R34 — pendiente de relleno (phone sin phoneE164 ni phoneIssue): el texto antiguo, sin etiqueta» | «R36 — pendiente de relleno (…)» |
+    | `tests/ui/clientes/customer-columns-phone.test.tsx` (l. 86) | «R29 — un cliente pendiente de relleno muestra su teléfono antiguo en gris y en mono, sin etiqueta» | «R36 — un cliente pendiente de relleno …» |
+    | `tests/ui/clientes/customer-phone-field.test.tsx` (l. 543) | «R35 — un cliente pendiente de relleno abre con el número vacío, sin etiqueta y con la ayuda de que se conserva» | «R36, R35 — un cliente pendiente de relleno abre …» |
+    | `tests/ui/clientes/customer-phone-field.test.tsx` (l. 556) | «R34 — guardar un cliente pendiente de relleno con el número vacío manda phoneNumber vacío sin errores» | «R36 — guardar un cliente pendiente de relleno …» |
+    | `tests/integration/clientes/customer-phone-uniqueness.int.test.ts` (l. 291) | «R34 — editar una fila pendiente de relleno con el numero vacio conserva phone y deja phone_country, phone_e164 y phone_issue nulos» | «R36 — editar una fila pendiente de relleno …» |
+
+  - **No se renombra** «R34 — edicion con el numero vacio: al puerto llega keep_legacy_or_clear y no
+    los cuatro nulos» (`tests/unit/clientes/customer-service.test.ts`): cubre a la vez R34 y R36, y
+    en el mapa de T12 se cita para los dos.
+  - **Hecho cuando:**
+    - `grep -rn "pendiente de relleno" tests/` solo da nombres que empiezan por `R36 —` o
+      `R36, R35 —`;
+    - el caso de `customer-phone-field.test.tsx` (l. 543) afirma el texto exacto de D23: «Antes:
+      <phone>. Escribe un número para reemplazarlo; si lo dejas vacío, se conserva.»;
+    - los tests de los tres archivos de UI y unitarios salen verdes; el `.int` corre en CI (T12);
+    - el mapa de T12 lleva R36 a esos cinco casos.
 
 ## Archivos esperados
 
@@ -270,6 +300,7 @@
 - `lib/modules/errores/domain/error-catalog.ts`
 - `lib/composition/index.ts`
 - `components/shared/country-select.tsx`
+- `components/shared/text-field.tsx`
 - `components/shared/CATALOGO.md`
 - `app/(private)/clientes/page.tsx`
 - `app/(private)/clientes/components/index.ts`
@@ -305,6 +336,8 @@
 - `tests/ui/clientes/customer-phone-field.test.tsx`
 - `tests/ui/clientes/customer-columns-phone.test.tsx`
 - `tests/ui/shared/country-select-pinned.test.tsx`
+- `tests/ui/shared/text-field-extension.test.tsx`
+- `tests/unit/paridad/__snapshots__/formularios-paridad.test.tsx.snap`
 - `e2e/clientes.spec.ts`
 - `e2e/clientes-telefono.spec.ts`
 - `progress/impl_QC-236.md`

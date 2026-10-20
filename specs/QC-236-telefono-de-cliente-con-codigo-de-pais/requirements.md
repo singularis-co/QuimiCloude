@@ -1,8 +1,9 @@
 # QC-236 — Teléfono de cliente con código de país · requirements
 
 > Fuente: la ficha de Jira QC-236 (alcance, D1–D6 y criterios de aceptación), las decisiones del
-> humano del 2026-10-19 (D7–D10), la enmienda posterior a la implementación (D14–D20, humano y
-> leader, 2026-10-19) y el tablero aprobado `docs/diseno/canvas/TelefonoCliente.dc.html`.
+> humano del 2026-10-19 (D7–D10), la enmienda posterior a la implementación (D14–D21, humano y
+> leader, 2026-10-19), la enmienda de la vuelta 2 de revisión (D22 y D23, leader y humano,
+> 2026-10-19) y el tablero aprobado `docs/diseno/canvas/TelefonoCliente.dc.html`.
 > El cómo técnico vive en `design.md`; el desglose, en `tasks.md`.
 
 ## Alcance
@@ -79,6 +80,8 @@ Al correo y a los demás campos esas reglas les siguen aplicando igual.
 | D19 | Al editar un cliente sin `phone_country`, el país viene marcado con el de la empresa, igual que en el alta (humano y leader, 2026-10-19) | El mismo criterio que D2: el país correcto es el de los clientes de la empresa. | R35 |
 | D20 | `CountrySelect` gana la prop opcional `errorId` (humano y leader, 2026-10-19) | El error del país va bajo toda la fila del teléfono, fuera de la columna del selector, y debe quedar enlazado al disparador. Sin la prop, los usos de hoy no cambian. | R8 |
 | D21 | La edición que conserva el teléfono antiguo (R34) usa dos `UPDATE` dentro de una transacción, con la condición repetida en el `where`, y no `SELECT … FOR UPDATE` (leader, 2026-10-19) | La misma guardia que en D17: `guard-ambito-empresa-clientes` prohíbe el SQL crudo con `company_id` fuera de `company-scope.ts`. | R10, R34 |
+| D22 | Una fila pendiente de relleno (con `phone`, sin `phone_e164` y sin `phone_issue`) cuenta como teléfono antiguo. Guardarla con el número vacío conserva `phone`. La lista la muestra en gris, mono y sin etiqueta (variante `{ kind: 'legacy' }` de `describeCustomerPhone`). En la edición, el número abre vacío (leader, 2026-10-19, por D6 y D12) | Igual que con un migrado (D12): editar otro dato del cliente no puede borrar sin querer un teléfono que el relleno aún no ha convertido. | R10, R36 |
+| D23 | La ayuda de la edición de una fila pendiente de relleno es «Antes: <phone>. Escribe un número para reemplazarlo; si lo dejas vacío, se conserva.» (humano, 2026-10-19) | El tablero no dibuja ese estado; el texto sigue el de los migrados (R31), sin etiqueta porque no hay aviso. | R36 |
 
 ## Requisitos (EARS)
 
@@ -115,7 +118,9 @@ Al correo y a los demás campos esas reglas les siguen aplicando igual.
   - El servidor debe rechazar el guardado con el código `customer_phone_invalid`, sin escribir nada.
 - **R10.** SI el número está vacío o solo tiene espacios, ENTONCES el sistema DEBE guardar el cliente
   sin teléfono: `phone`, `phone_country`, `phone_e164` y `phone_issue` nulos, sea cual sea el país
-  marcado. La única excepción es la edición de un cliente migrado con `phone_issue` (R34).
+  marcado. Hay dos excepciones, las dos en la edición, en las que el teléfono antiguo se conserva:
+  - un cliente migrado con `phone_issue` (R34);
+  - un cliente pendiente de relleno, con `phone` y sin `phone_e164` ni `phone_issue` (R36, D22).
 
 ### Guardado y datos
 
@@ -223,6 +228,17 @@ Al correo y a los demás campos esas reglas les siguen aplicando igual.
   alta (R2, D19), y el número vacío.
   - Si la empresa no tiene país, el selector queda en «Sin país» (como R3).
   - Un cliente con `phone_country` sigue mostrando el suyo (R4, R31).
+- **R36.** SI un cliente vivo tiene `phone` y no tiene `phone_e164` ni `phone_issue` (pendiente de
+  relleno, D22), ENTONCES el sistema DEBE tratar su `phone` como teléfono antiguo:
+  - en la columna «Teléfono» de la lista, DEBE mostrar su `phone` en gris y en letra monoespaciada,
+    sin etiqueta;
+  - al abrir su edición, DEBE mostrar el número vacío, el país según R35 y, bajo el campo y sin
+    etiqueta, la ayuda «Antes: <phone>. Escribe un número para reemplazarlo; si lo dejas vacío, se
+    conserva.» (D23);
+  - al guardar su edición con el número vacío o solo con espacios, DEBE conservar sin cambios `phone`,
+    `phone_country`, `phone_e164` y `phone_issue` (los tres últimos, nulos) y guardar normalmente los
+    demás datos del cliente. Elegir otro país sin escribir número no cambia nada del teléfono.
+  - Con un número válido, rige R11 y R12, como en cualquier guardado.
 
 ### Plataformas
 
@@ -257,4 +273,5 @@ Al correo y a los demás campos esas reglas les siguen aplicando igual.
 
 Ninguna. P1, P2 y P3 las cerró el humano el 2026-10-19 al aprobar el spec: ahora son D11, D12 y D13.
 Los siete puntos que dejó abiertos la implementación los cerraron el humano y el leader el mismo día:
-son D14–D20.
+son D14–D21. Lo que dejó abierto la vuelta 2 de revisión (la fila pendiente de relleno, V2-H1) lo
+cerraron el leader y el humano el mismo día: son D22 y D23.
