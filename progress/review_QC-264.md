@@ -123,3 +123,34 @@ Revisor: reviewer (F2.2), 2026-10-19. HEAD `a940f221`: es `bb60ca3e` más un com
 `recipe-step-editor.tsx:203` cita `R20`. El resto pasa: trazabilidad completa, tasks cerradas,
 typecheck, lint, tests relacionados, guardias y paridad en verde. Basta un commit que quite la cita
 para la vuelta 2.
+
+## Vuelta 2 (acotada a 8cb8dcd6..4de481b4 + 62e3ce1a)
+
+HEAD revisado: `4de481b4`. `62e3ce1a` es ancestro de HEAD.
+
+### Hallazgos de la vuelta 1
+
+- [x] **M1 — corregido** (`4de481b4`): en `recipe-step-editor.tsx:203` el comentario ya no cita
+  «(R20)». Volví a pasar el filtro de la regla 9 sobre todo el diff `6fcbafe6..HEAD` en `app/` y
+  `components/`, y no queda ningún comentario añadido que cite `QC-<n>`, `R<n>`, `design.md` ni
+  «decisión cerrada».
+- [x] **m1 — corregido** (`4de481b4`): «acompañan» (`recipe-form.tsx`), «página» y «animación»
+  (`step-reader.tsx`).
+- [x] **m2 — corregido** (`631e76a6`): `design.md > 6` cuadra con los snapshots reales.
+  `recetas-paridad` incluye el diálogo de subida, `acciones-por-fila` queda «ninguno» y de
+  `confirmaciones-paridad` sale propagar. La decisión humana sobre los tres snapshots que no se dan
+  de alta queda citada.
+- [x] **m3 — cerrado**: el humano aceptó el rótulo en mono como deuda D63
+  (`progress/features/QC-264.md:61`).
+- [x] **m4 — cerrado** (`62e3ce1a`): D71 en `progress/deudas.md`, con origen, qué falta y dueño
+  candidato (QC-291).
+
+### Regresiones
+
+Ninguna. El cambio en producción se limita a 4 líneas de comentario y no altera ni código ni marcado.
+No hay tests nuevos que pedir. El leader informa de que el gate local está verde. Typecheck, lint y
+tests no los volví a correr: el diff no cambia nada que se pueda ejecutar.
+
+### Veredicto vuelta 2
+
+**OK.**
