@@ -42,6 +42,7 @@
  * **2026-10-16**: `company_last_administrator`.
  * **2026-10-19**: `customer_phone_country_required`, `customer_phone_invalid`,
  * `customer_duplicate_phone`.
+ * **2026-10-20**: `whatsapp_contact_not_found`, `whatsapp_contact_number_invalid`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -238,6 +239,10 @@ export const ERROR_CODES = [
   // elegido.
   'customer_phone_invalid',
   'customer_duplicate_phone',
+  // Distinto de `whatsapp_connection_not_found`: la conexion existe, lo que falta es la conversacion.
+  'whatsapp_contact_not_found',
+  // Distinto de `customer_phone_invalid`: no lo escribio nadie, es el numero que trae WhatsApp.
+  'whatsapp_contact_number_invalid',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

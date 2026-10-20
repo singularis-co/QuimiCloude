@@ -3,14 +3,14 @@ import { isCustomerId } from './customer-id';
 import { phoneIssueReason, updateCustomerSchema } from './customer-input';
 import { normalizeCustomerText } from './customer-text';
 import type { CustomerScope } from './customer-scope';
-import { CustomerDuplicatePhoneError, CustomerNotFoundError, inputError } from './errors';
+import { CustomerNotFoundError, inputError } from './errors';
 
 import type { NewCustomerPhone } from './customer-view';
 
-import type { CustomerRepository } from '../ports/customer-repository';
+import type { CustomerWriteRepository } from '../ports/customer-write-repository';
 
 export type UpdateCustomerDeps = {
-  readonly customers: CustomerRepository;
+  readonly customers: CustomerWriteRepository;
   readonly now?: () => Date;
 };
 
@@ -60,6 +60,5 @@ export function createUpdateCustomer(
 
     // Inexistente, dado de baja o de otra empresa son el mismo caso para el dominio.
     if (result === 'not_found') throw new CustomerNotFoundError();
-    if (result === 'duplicate_phone') throw new CustomerDuplicatePhoneError();
   };
 }

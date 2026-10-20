@@ -11,7 +11,9 @@
 // design.md > 5.1): el resolutor de empresa del webhook, con su forma fijada aqui mismo.
 //
 // Como en la de `clientes`, el puerto se ata a su adaptador LEYENDO `lib/composition`: lo que se
-// comprueba es la funcion que de verdad se cablea, no una tabla escrita aqui.
+// comprueba es la funcion que de verdad se cablea, no una tabla escrita aqui. Un puerto que vive
+// dentro de una transaccion se ata en su propia fabrica `create…(db)` del adaptador: ahi se lee su
+// cableado, y cada miembro tiene que delegar en una funcion con nombre que recibe `db` y el ambito.
 //
 // TECNICA: barrido de TEXTO sobre el disco, como el resto de `tests/guards/`.
 
@@ -41,6 +43,7 @@ const PERSISTENCE_ROOT = join(MODULE_ROOT, 'adapters', 'driven', 'persistence')
 const PUNTO_UNICO = 'company-scope.ts'
 const ADAPTADOR = 'whatsapp-connection-prisma.ts'
 const ADAPTADOR_INBOX = 'whatsapp-inbox-prisma.ts'
+const ADAPTADOR_CONTACTOS = 'whatsapp-contact-prisma.ts'
 
 const FORMA_DE_AMBITO = {
   identificador: 'scope',
@@ -56,6 +59,8 @@ type PuertoVigilado = {
   readonly adaptador: string
   /** Funciones del adaptador que tocan la base sin estar cableadas: ayudantes privados, vigilados igual. */
   readonly ayudantes: readonly string[]
+  /** Si existe, el cableado se lee de esta fabrica del adaptador y no de `lib/composition`. */
+  readonly fabrica?: string
 }
 
 const PUERTO: PuertoVigilado = {
@@ -76,7 +81,17 @@ const PUERTO_INBOX: PuertoVigilado = {
   ayudantes: ['applyStatus', 'upsertContact'],
 }
 
-const PUERTOS: readonly PuertoVigilado[] = [PUERTO, PUERTO_INBOX]
+const PUERTO_CONTACTOS: PuertoVigilado = {
+  nombre: 'WhatsappContactRepository',
+  ruta: join(MODULE_ROOT, 'ports', 'whatsapp-contact-repository.ts'),
+  constante: 'whatsappContactRepository',
+  metodosEsperados: 4,
+  adaptador: ADAPTADOR_CONTACTOS,
+  ayudantes: [],
+  fabrica: 'createWhatsappContactRepository',
+}
+
+const PUERTOS: readonly PuertoVigilado[] = [PUERTO, PUERTO_INBOX, PUERTO_CONTACTOS]
 
 /**
  * Archivos exentos por NOMBRE del barrido de ambito, como en la guardia de `pedidos`. Una sola
@@ -208,7 +223,7 @@ function envolturasImportadas(source: string): readonly string[] {
     .filter((nombre) => nombre.length > 0)
 }
 
-const TOCA_LA_BASE = /\b(?:prisma|tx)\s*\.\s*(?:\$\w+|\w+\s*\.\s*\w+)\s*[(<]/g
+const TOCA_LA_BASE = /\b(?:prisma|tx|db)\s*\.\s*(?:\$\w+|\w+\s*\.\s*\w+)\s*[(<]/g
 const tocaLaBase = (cuerpo: string): boolean => new RegExp(TOCA_LA_BASE.source).test(cuerpo)
 
 const LECTURA_SUELTA: readonly RegExp[] = [
@@ -416,6 +431,58 @@ function cableadoDe(constante: string, interfaz: string): ReadonlyMap<string, st
   return cableado ?? new Map<string, string>()
 }
 
+/**
+ * El objeto que devuelve la fabrica `fabrica(db: PrismaLike [= prisma]): interfaz` del fuente:
+ * `{ metodo -> funcion }`. Solo cuenta un miembro `metodo: (a, b) => funcion(db, a, b)`, con `db`
+ * primero y los parametros reenviados tal cual y en orden; cualquier otra forma queda con un
+ * valor que no es un nombre. `null` si la fabrica no esta, no tiene esa firma o no devuelve un objeto.
+ */
+function cableadoEnFabrica(
+  fuente: string,
+  fabrica: string,
+  interfaz: string,
+): ReadonlyMap<string, string> | null {
+  const source = vaciarCadenas(sinComentarios(fuente))
+  const firma = new RegExp(
+    `^export\\s+function\\s+${fabrica}\\s*\\(\\s*db\\s*:\\s*PrismaLike(?:\\s*=\\s*prisma)?\\s*\\)\\s*:\\s*${interfaz}\\s*\\{`,
+    'm',
+  ).exec(source)
+  if (firma === null) return null
+  const abreCuerpo = firma.index + firma[0].length - 1
+  const cuerpo = source.slice(abreCuerpo + 1, cierreEquilibrado(source, abreCuerpo, '{', '}')).trim()
+  if (!/^return\s*\{/.test(cuerpo)) return null
+  const abre = cuerpo.indexOf('{')
+  const cierra = cierreEquilibrado(cuerpo, abre, '{', '}')
+  if (!/^\s*;?\s*$/.test(cuerpo.slice(cierra + 1))) return null
+  const objeto = cuerpo.slice(abre + 1, cierra)
+
+  const cableado = new Map<string, string>()
+  for (const entrada of porComasDeNivelCero(objeto)) {
+    const delegada = /^(\w+)\s*:\s*\(([^()]*)\)\s*=>\s*(\w+)\s*\(([^()]*)\)$/.exec(entrada)
+    if (delegada === null) {
+      cableado.set(/^(\w+)\s*:/.exec(entrada)?.[1] ?? entrada, '')
+      continue
+    }
+    const parametros = porComasDeNivelCero(delegada[2] ?? '')
+    const argumentos = porComasDeNivelCero(delegada[4] ?? '')
+    const reenvia = argumentos.join(',') === ['db', ...parametros].join(',')
+    const funcion = delegada[3] ?? ''
+    cableado.set(delegada[1] ?? '', reenvia ? funcion : `${funcion}(${argumentos.join(', ')})`)
+  }
+  return cableado
+}
+
+function cableadoDelPuerto(puerto: PuertoVigilado): ReadonlyMap<string, string> {
+  if (puerto.fabrica === undefined) return cableadoDe(puerto.constante, puerto.nombre)
+  const fuente = readFileSync(join(PERSISTENCE_ROOT, puerto.adaptador), 'utf8')
+  const cableado = cableadoEnFabrica(fuente, puerto.fabrica, puerto.nombre)
+  expect(
+    cableado,
+    `${puerto.adaptador} no declara \`export function ${puerto.fabrica}(db: PrismaLike): ${puerto.nombre}\` que devuelva un objeto`,
+  ).not.toBeNull()
+  return cableado ?? new Map<string, string>()
+}
+
 // --- Casos -------------------------------------------------------------------------------------
 
 describe('R2 — el punto unico de integraciones es de verdad UNA definicion', () => {
@@ -452,16 +519,17 @@ describe('R2 — el punto unico de integraciones es de verdad UNA definicion', (
 describe.each(PUERTOS)('R2 — cada metodo de $nombre declara Y consume el ambito de empresa', (PUERTO) => {
   const ADAPTADOR = PUERTO.adaptador
   const metodos = metodosDeLaInterfaz(PUERTO.ruta, PUERTO.nombre)
-  const cableado = cableadoDe(PUERTO.constante, PUERTO.nombre)
+  const cableado = cableadoDelPuerto(PUERTO)
   const adaptador = analizar(ADAPTADOR)
+  const dondeSeCablea = PUERTO.fabrica === undefined ? 'lib/composition' : `su fabrica ${PUERTO.fabrica}`
 
-  it(`${PUERTO.nombre}: los ${String(PUERTO.metodosEsperados)} metodos estan cableados en lib/composition, con nombre, y ninguno se queda fuera`, () => {
+  it(`${PUERTO.nombre}: los ${String(PUERTO.metodosEsperados)} metodos estan cableados en ${dondeSeCablea}, con nombre, y ninguno se queda fuera`, () => {
     expect(metodos.size).toBe(PUERTO.metodosEsperados)
     expect([...cableado.keys()].sort()).toEqual([...metodos.keys()].sort())
     for (const [metodo, implementacion] of cableado) {
       expect(
         implementacion,
-        `${PUERTO.constante}.${metodo} no esta cableado a una funcion con nombre del adaptador: la guardia no puede seguir una lambda, un bind ni un spread`,
+        `${PUERTO.constante}.${metodo} no esta cableado a una funcion con nombre del adaptador: la guardia no puede seguir una lambda con cuerpo, un bind, un spread ni un reenvio que no pase \`db\` y todos sus parametros`,
       ).toMatch(/^\w+$/)
     }
   })
@@ -512,6 +580,31 @@ describe('R2 — las escrituras sobre una conexion existente llevan el ambito en
   })
 })
 
+describe('R45 — las escrituras sobre un contacto llevan el ambito en el `where` de cada `updateMany`', () => {
+  const cableado = cableadoDelPuerto(PUERTO_CONTACTOS)
+  const adaptador = analizar(ADAPTADOR_CONTACTOS)
+
+  it.each([
+    ['setLink', 1],
+    ['setBlocked', 1],
+  ] as const)('%s: sus %i `updateMany` llevan `whatsappContactCompanyScope(scope)` en el `where`', (metodo, esperadas) => {
+    const funcion = adaptador.funciones.find((f) => f.nombre === cableado.get(metodo))
+    expect(funcion).toBeTruthy()
+    const cuerpo = funcion?.cuerpo ?? ''
+    const llamadas = [...cuerpo.matchAll(/\bdb\s*\.\s*whatsappContact\s*\.\s*updateMany\s*\(/g)]
+    expect(llamadas, 'la escritura tiene que ser un `updateMany` acotado').toHaveLength(esperadas)
+    for (const llamada of llamadas) {
+      const abre = cuerpo.indexOf('(', llamada.index)
+      const argumentos = cuerpo.slice(abre + 1, cierreEquilibrado(cuerpo, abre, '(', ')'))
+      expect(objetoDeLaClave(argumentos, 'where') ?? '').toMatch(/\bwhatsappContactCompanyScope\s*\(\s*scope\s*\)/)
+    }
+  })
+
+  it('el adaptador no escribe un contacto por `update`, `upsert`, `create` ni `delete`', () => {
+    expect(adaptador.codigo).not.toMatch(/\bdb\s*\.\s*whatsappContact\s*\.\s*(?:update|upsert|create|createMany|delete|deleteMany)\s*\(/)
+  })
+})
+
 describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo la UNICA exencion con nombre', () => {
   const archivos = readdirSync(PERSISTENCE_ROOT).filter((archivo) => archivo.endsWith('.ts'))
 
@@ -520,7 +613,7 @@ describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo la 
     for (const exento of EXENTOS_DEL_AMBITO.keys()) expect(archivos).toContain(exento)
     for (const puerto of PUERTOS) {
       expect(archivos).toContain(puerto.adaptador)
-      const cableado = cableadoDe(puerto.constante, puerto.nombre)
+      const cableado = cableadoDelPuerto(puerto)
       const conConsulta = analizar(puerto.adaptador)
         .funciones.filter((f) => tocaLaBase(f.cuerpo))
         .map((f) => f.nombre)
@@ -636,6 +729,78 @@ describe('R2 — sensibilidad: la guardia muerde con fuentes sinteticos', () => 
       '  return prisma.whatsappConnection.findFirst({ where: whereOf(id, scope) })\n' +
       '}\n'
     expect(hallazgosDe('x.ts', analizarFuente(fuente), false)).toEqual([])
+  })
+})
+
+describe('R45 — sensibilidad: los adaptadores con `db` y su fabrica no escapan al barrido', () => {
+  const CABECERA = "import { whatsappContactCompanyScope } from './company-scope'\n"
+  const FABRICA = 'createWhatsappContactRepository'
+  const INTERFAZ = 'WhatsappContactRepository'
+  const fabrica = (miembros: string): string =>
+    `export function ${FABRICA}(db: PrismaLike = prisma): ${INTERFAZ} {\n` +
+    '  return {\n' +
+    miembros +
+    '  };\n' +
+    '}\n'
+
+  it('una consulta por `db` sin `scope` en la firma da hallazgo', () => {
+    const fuente =
+      CABECERA +
+      'export async function leak(db: PrismaLike, id: string) {\n' +
+      '  return db.whatsappContact.findFirst({ where: { id } })\n' +
+      '}\n'
+    expect(hallazgosDe('x.ts', analizarFuente(fuente), false).join('\n')).toMatch(/sin declarar/)
+  })
+
+  it('una consulta por `db` que declara el ambito y no lo lleva al punto unico da hallazgo', () => {
+    const fuente =
+      CABECERA +
+      'export async function leak(db: PrismaLike, id: string, scope: IntegracionesScope) {\n' +
+      '  return db.whatsappContact.findFirst({ where: { id } })\n' +
+      '}\n'
+    expect(hallazgosDe('x.ts', analizarFuente(fuente), false).join('\n')).toMatch(/no lo lleva/)
+  })
+
+  it('una consulta por `db` escrita dentro de la propia fabrica da hallazgo', () => {
+    const fuente = CABECERA + fabrica('    findById: (id, scope) => db.whatsappContact.findFirst({ where: { id } }),\n')
+    expect(hallazgosDe('x.ts', analizarFuente(fuente), false).join('\n')).toMatch(/sin declarar/)
+  })
+
+  it('control: un miembro que reenvia `db` y todos sus parametros a una funcion con nombre se lee con su nombre', () => {
+    const cableado = cableadoEnFabrica(
+      fabrica('    findById: (id, scope) => findWhatsappContactById(db, id, scope),\n'),
+      FABRICA,
+      INTERFAZ,
+    )
+    expect([...(cableado?.entries() ?? [])]).toEqual([['findById', 'findWhatsappContactById']])
+  })
+
+  it('un miembro que pierde el ambito, cambia el orden, no pasa `db`, tiene cuerpo o es un spread no queda cableado con nombre', () => {
+    const cableado = cableadoEnFabrica(
+      fabrica(
+        '    findById: (id, scope) => findWhatsappContactById(db, id),\n' +
+          '    findByWaIds: (waIds, scope) => findWhatsappContactsByWaIds(db, scope, waIds),\n' +
+          '    setLink: (id, link, scope) => setWhatsappContactLink(prisma, id, link, scope),\n' +
+          '    setBlocked: async (id, blocked, scope) => { return setWhatsappContactBlocked(db, id, blocked, scope) },\n' +
+          '    ...otro,\n',
+      ),
+      FABRICA,
+      INTERFAZ,
+    )
+    expect(cableado).not.toBeNull()
+    expect(cableado?.size).toBe(5)
+    expect([...(cableado?.values() ?? [])].filter((nombre) => /^\w+$/.test(nombre))).toEqual([])
+  })
+
+  it('una fabrica sin la firma `(db: PrismaLike): Interfaz`, o que no devuelve solo un objeto, no se lee', () => {
+    const miembro = '    findById: (id, scope) => findWhatsappContactById(db, id, scope),\n'
+    const sinTipo = fabrica(miembro).replace(`): ${INTERFAZ} {`, ') {')
+    const sinTipoDeCliente = fabrica(miembro).replace('db: PrismaLike = prisma', 'db = prisma')
+    const sinObjeto = `export function ${FABRICA}(db: PrismaLike): ${INTERFAZ} {\n  return otro(db)\n}\n`
+    const conMasCodigo = fabrica(miembro).replace('  };\n}', '  };\n  leak()\n}')
+    for (const fuente of [sinTipo, sinTipoDeCliente, sinObjeto, conMasCodigo, 'const x = {}\n']) {
+      expect(cableadoEnFabrica(fuente, FABRICA, INTERFAZ)).toBeNull()
+    }
   })
 })
 

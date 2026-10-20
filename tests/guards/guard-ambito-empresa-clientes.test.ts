@@ -4,14 +4,18 @@
 // que justifica una guardia mas.
 //
 // POR QUE EXISTE. El ambito esta en la firma del puerto, asi que una LLAMADA que lo omita no
-// compila: los cinco metodos de `CustomerRepository` exigen `scope: CustomerScope` al final de
-// la firma. Pero una IMPLEMENTACION que lo omita SI COMPILA. TypeScript admite asignar una
+// compila: cada metodo de `CustomerRepository`, `CustomerWriteRepository` y
+// `CustomerPhoneRepository` exige `scope: CustomerScope` al final de la firma. Pero una
+// IMPLEMENTACION que lo omita SI COMPILA. TypeScript admite asignar una
 // funcion de MENOR aridad donde se espera una de mayor, y asi es exactamente como
 // `lib/composition/index.ts` ata las funciones sueltas del adaptador driven al puerto:
 //
 //     interface Repo { findAliveById(id: string, scope: Scope): Promise<Row | null> }
 //     async function findAliveById(id: string): Promise<Row | null> { ... }
 //     const repo: Repo = { findAliveById }            // COMPILA, exit 0
+//
+// Lo mismo pasa con los puertos que se atan en una FABRICA del adaptador (`create…(db)`), con un
+// miembro por metodo que llama a una funcion con nombre: `db` primero y `scope` al final.
 //
 // Un `findFirst` nuevo sin ambito compila, se cablea y lee los clientes de TODAS las empresas.
 //
@@ -181,8 +185,11 @@ function envolturasImportadas(source: string): readonly string[] {
     .filter((nombre) => nombre.length > 0)
 }
 
-/** «Toca la base» = ejecuta algo por el cliente (`prisma.`): un modelo (`prisma.customer.findFirst(`). */
-const TOCA_LA_BASE = /\b(?:prisma|tx)\s*\.\s*(?:\$\w+|\w+\s*\.\s*\w+)\s*[(<]/g
+/** «Toca la base» = ejecuta algo por el cliente global (`prisma.`), por el de una transaccion
+ *  (`tx.`) o por el que recibe una fabrica (`db.`): un modelo (`db.customer.findFirst(`) o un
+ *  metodo crudo (`db.$transaction(`). Sin `db`, las funciones de las fabricas no contarian como
+ *  consultas y el barrido pasaria en verde sin mirarlas. */
+const TOCA_LA_BASE = /\b(?:prisma|tx|db)\s*\.\s*(?:\$\w+|\w+\s*\.\s*\w+)\s*[(<]/g
 const tocaLaBase = (cuerpo: string): boolean => new RegExp(TOCA_LA_BASE.source).test(cuerpo)
 
 /** Lectura SUELTA de la empresa del ambito, fuera del punto unico. */
@@ -200,8 +207,9 @@ type ArchivoAnalizado = {
   readonly consumidoras: ReadonlySet<string>
 }
 
-function analizar(archivo: string): ArchivoAnalizado {
-  const source = readFileSync(join(PERSISTENCE_ROOT, archivo), 'utf8')
+/** El analisis sobre TEXTO, separado de la lectura del disco para que los casos de sensibilidad
+ *  le den un fuente sintetico. */
+function analizarFuente(archivo: string, source: string): ArchivoAnalizado {
   const codigo = vaciarCadenas(sinComentarios(source))
   const funciones = funcionesDe(codigo)
   const envolturas = envolturasImportadas(source)
@@ -228,20 +236,24 @@ function analizar(archivo: string): ArchivoAnalizado {
   return { archivo, codigo, funciones, envolturas, consumidoras }
 }
 
+function analizar(archivo: string): ArchivoAnalizado {
+  return analizarFuente(archivo, readFileSync(join(PERSISTENCE_ROOT, archivo), 'utf8'))
+}
+
 // --- El puerto y su cableado --------------------------------------------------------------
 
 /** El cuerpo `{ … }` de `export interface <interfaz>`, ya sin comentarios ni cadenas. */
-function cuerpoDeLaInterfaz(ruta: string, interfaz: string): string {
-  const source = vaciarCadenas(sinComentarios(readFileSync(ruta, 'utf8')))
+function cuerpoDeLaInterfaz(fuente: string, interfaz: string): string {
+  const source = vaciarCadenas(sinComentarios(fuente))
   const inicio = source.indexOf(`export interface ${interfaz} {`)
-  expect(inicio, `no se encontro la interfaz ${interfaz} en ${ruta}`).toBeGreaterThan(-1)
+  expect(inicio, `no se encontro la interfaz ${interfaz}`).toBeGreaterThan(-1)
   const abre = source.indexOf('{', inicio)
   return source.slice(abre + 1, cierreEquilibrado(source, abre, '{', '}'))
 }
 
-/** Metodo -> sus parametros, tal como los declara la interfaz. */
-function metodosDeLaInterfaz(ruta: string, interfaz: string): ReadonlyMap<string, string> {
-  const cuerpo = cuerpoDeLaInterfaz(ruta, interfaz)
+/** Metodo -> sus parametros, tal como los declara la interfaz en `fuente`. */
+function metodosDeInterfazEnFuente(fuente: string, interfaz: string): ReadonlyMap<string, string> {
+  const cuerpo = cuerpoDeLaInterfaz(fuente, interfaz)
   const metodos = new Map<string, string>()
   for (const match of cuerpo.matchAll(/^\s{2}(\w+)\s*\(/gm)) {
     const abre = cuerpo.indexOf('(', match.index)
@@ -295,18 +307,134 @@ function cableadoDe(constante: string, interfaz: string): ReadonlyMap<string, st
   return cableado
 }
 
-const PUERTO = {
-  nombre: 'CustomerRepository',
-  ruta: join(MODULE_ROOT, 'ports', 'customer-repository.ts'),
-  constante: 'customerRepository',
-  adaptador: 'customer-prisma.ts',
-  metodosEsperados: 5,
-} as const
+/** Lo que una fabrica `export function <fabrica>(db: …)` del adaptador ata a cada metodo. */
+type MiembroDeFabrica = {
+  /** La funcion con nombre del adaptador a la que delega, o `''` si no se puede seguir. */
+  readonly funcion: string
+  readonly hallazgo: string | null
+}
+
+/**
+ * Cada miembro de la fabrica tiene que ser `metodo: (…, scope) => funcion(db, …, scope)`: una
+ * flecha que solo llama a una funcion con nombre del mismo archivo, con el `db` de la fabrica
+ * PRIMERO y el `scope` del metodo entre sus argumentos. Un cuerpo en linea, un `bind`, un spread o
+ * una llamada sin `db` o sin `scope` sale como hallazgo con su nombre.
+ */
+function cableadoDeFabrica(fuente: string, fabrica: string): ReadonlyMap<string, MiembroDeFabrica> {
+  const codigo = vaciarCadenas(sinComentarios(fuente))
+  const declaracion = new RegExp(`^export\\s+function\\s+${fabrica}\\s*\\(\\s*db\\s*:`, 'm').exec(codigo)
+  expect(declaracion, `no se encontro la fabrica \`${fabrica}(db: …)\``).not.toBeNull()
+  if (declaracion === null) return new Map()
+
+  const abreParams = codigo.indexOf('(', declaracion.index)
+  const abreCuerpo = inicioDelCuerpo(codigo, cierreEquilibrado(codigo, abreParams, '(', ')'))
+  const cuerpo = codigo.slice(abreCuerpo + 1, cierreEquilibrado(codigo, abreCuerpo, '{', '}'))
+  const retorno = /^\s*return\s*\{/.exec(cuerpo)
+  expect(retorno, `${fabrica} tiene que ser solo \`return { … }\``).not.toBeNull()
+  if (retorno === null) return new Map()
+  const abre = cuerpo.indexOf('{', retorno.index)
+  const objeto = cuerpo.slice(abre + 1, cierreEquilibrado(cuerpo, abre, '{', '}'))
+
+  const miembros = new Map<string, MiembroDeFabrica>()
+  for (const entrada of porComasDeNivelCero(objeto)) {
+    const flecha = /^(\w+)\s*:\s*\(([^()]*)\)\s*=>\s*(\w+)\s*\(([\s\S]*)\)$/.exec(entrada)
+    if (flecha === null) {
+      miembros.set(/^(\w+)/.exec(entrada)?.[1] ?? entrada, {
+        funcion: '',
+        hallazgo: `${fabrica}: el miembro \`${entrada}\` no es una flecha que llame a una funcion con nombre del adaptador: la guardia no puede seguir un cuerpo en linea, un bind ni un spread`,
+      })
+      continue
+    }
+    const [, metodo = '', parametros = '', funcion = '', argumentos = ''] = flecha
+    const args = porComasDeNivelCero(argumentos)
+    const hallazgo =
+      args[0] !== 'db'
+        ? `${fabrica}.${metodo}: \`${funcion}\` no recibe primero el \`db\` de la fabrica`
+        : !/\bscope\b/.test(parametros) || !args.includes(FORMA_DE_AMBITO.identificador)
+          ? `${fabrica}.${metodo}: el \`scope\` del metodo no llega a \`${funcion}\``
+          : null
+    miembros.set(metodo, { funcion, hallazgo })
+  }
+  return miembros
+}
+
+/** Los metodos de una interfaz que no EXIGEN `scope: CustomerScope`, o lo declaran opcional. */
+function hallazgosDeFirma(interfaz: string, metodos: ReadonlyMap<string, string>): readonly string[] {
+  const hallazgos: string[] = []
+  for (const [metodo, parametros] of metodos) {
+    if (!FORMA_DE_AMBITO.declaracion.test(parametros)) {
+      hallazgos.push(`${interfaz}.${metodo} no exige \`${LITERAL}\` en su firma (R12)`)
+    }
+    if (/\bscope\s*\?\s*:/.test(parametros) || /\bscope\s*:[^,)]*=/.test(parametros)) {
+      hallazgos.push(
+        `${interfaz}.${metodo} declara el ambito OPCIONAL: entonces la llamada que lo olvide vuelve a compilar (R12)`,
+      )
+    }
+  }
+  return hallazgos
+}
+
+type Puerto = {
+  readonly nombre: string
+  readonly ruta: string
+  readonly adaptador: string
+  readonly metodosEsperados: number
+  /** Donde se ata: un objeto de `lib/composition` o una fabrica `create…(db)` del adaptador. */
+  readonly cableado: { readonly constante: string } | { readonly fabrica: string }
+}
+
+const PUERTOS: readonly Puerto[] = [
+  {
+    nombre: 'CustomerRepository',
+    ruta: join(MODULE_ROOT, 'ports', 'customer-repository.ts'),
+    adaptador: 'customer-prisma.ts',
+    metodosEsperados: 3,
+    cableado: { constante: 'customerRepository' },
+  },
+  {
+    nombre: 'CustomerWriteRepository',
+    ruta: join(MODULE_ROOT, 'ports', 'customer-write-repository.ts'),
+    adaptador: 'customer-prisma.ts',
+    metodosEsperados: 2,
+    cableado: { fabrica: 'createCustomerWriteRepository' },
+  },
+  {
+    nombre: 'CustomerPhoneRepository',
+    ruta: join(MODULE_ROOT, 'ports', 'customer-phone-repository.ts'),
+    adaptador: 'customer-phone-prisma.ts',
+    metodosEsperados: 7,
+    cableado: { fabrica: 'createCustomerPhoneRepository' },
+  },
+]
+
+/** Metodo -> funcion con nombre del adaptador (`''` si no se puede seguir), y los hallazgos del
+ *  propio cableado. */
+function cableadoDelPuerto(puerto: Puerto): {
+  readonly funciones: ReadonlyMap<string, string>
+  readonly hallazgos: readonly string[]
+} {
+  if ('constante' in puerto.cableado) {
+    const cableado = cableadoDe(puerto.cableado.constante, puerto.nombre)
+    const hallazgos = [...cableado]
+      .filter(([, implementacion]) => !/^\w+$/.test(implementacion))
+      .map(
+        ([metodo]) =>
+          `${puerto.nombre}.${metodo} no esta cableado a una funcion con nombre del adaptador: la guardia no puede seguir una lambda, un bind ni un spread`,
+      )
+    return { funciones: cableado, hallazgos }
+  }
+  const fuente = readFileSync(join(PERSISTENCE_ROOT, puerto.adaptador), 'utf8')
+  const miembros = cableadoDeFabrica(fuente, puerto.cableado.fabrica)
+  return {
+    funciones: new Map([...miembros].map(([metodo, m]) => [metodo, m.funcion])),
+    hallazgos: [...miembros.values()].flatMap((m) => (m.hallazgo === null ? [] : [m.hallazgo])),
+  }
+}
 
 const LITERAL = 'scope: CustomerScope'
 
 describe('R12 — el punto unico es de verdad UNA definicion', () => {
-  it('company-scope.ts: `companyScope` es privada, es la unica lectura del ambito y las DOS envolturas delegan en ella', () => {
+  it('company-scope.ts: `companyScope` es privada, es la unica lectura del ambito y las CUATRO envolturas delegan en ella', () => {
     const analizado = analizar(PUNTO_UNICO)
     const exportadas = analizado.funciones.filter((f) =>
       new RegExp(`^export\\s+function\\s+${f.nombre}\\b`, 'm').test(analizado.codigo),
@@ -314,6 +442,8 @@ describe('R12 — el punto unico es de verdad UNA definicion', () => {
     expect(exportadas.map((f) => f.nombre).sort()).toEqual([
       'companyScopeColumns',
       'customerCompanyScope',
+      'customerPhoneNumberCompanyScope',
+      'phoneNumberCompanyScope',
     ])
 
     for (const envoltura of exportadas) {
@@ -339,88 +469,92 @@ describe('R12 — el punto unico es de verdad UNA definicion', () => {
   })
 })
 
-describe('R12 — cada metodo del puerto declara Y consume el ambito de empresa', () => {
-  const metodos = metodosDeLaInterfaz(PUERTO.ruta, PUERTO.nombre)
-  const cableado = cableadoDe(PUERTO.constante, PUERTO.nombre)
-  const adaptador = analizar(PUERTO.adaptador)
+for (const puerto of PUERTOS) {
+  describe(`R12 — ${puerto.nombre}: cada metodo declara Y consume el ambito de empresa`, () => {
+    const metodos = metodosDeInterfazEnFuente(readFileSync(puerto.ruta, 'utf8'), puerto.nombre)
+    const { funciones, hallazgos } = cableadoDelPuerto(puerto)
+    const adaptador = analizar(puerto.adaptador)
+    const donde = 'constante' in puerto.cableado ? 'lib/composition' : puerto.cableado.fabrica
 
-  it(`${PUERTO.nombre}: los ${String(PUERTO.metodosEsperados)} metodos estan cableados, con nombre, y ninguno se queda fuera`, () => {
-    expect(metodos.size).toBe(PUERTO.metodosEsperados)
-    expect([...cableado.keys()].sort()).toEqual([...metodos.keys()].sort())
-    for (const [metodo, implementacion] of cableado) {
-      expect(
-        implementacion,
-        `${PUERTO.constante}.${metodo} no esta cableado a una funcion con nombre del adaptador: la guardia no puede seguir una lambda, un bind ni un spread`,
-      ).toMatch(/^\w+$/)
-    }
-  })
-
-  it(`${PUERTO.nombre}: el propio puerto EXIGE \`${LITERAL}\` en la firma de cada metodo`, () => {
-    for (const [metodo, parametros] of metodos) {
-      expect(
-        FORMA_DE_AMBITO.declaracion.test(parametros),
-        `${PUERTO.nombre}.${metodo} ya no exige \`${LITERAL}\` en su firma (R12)`,
-      ).toBe(true)
-      expect(
-        /\bscope\s*\?\s*:/.test(parametros) || /\bscope\s*:[^,)]*=/.test(parametros),
-        `${PUERTO.nombre}.${metodo} declara el ambito OPCIONAL: entonces la llamada que lo olvide vuelve a compilar (R12)`,
-      ).toBe(false)
-    }
-  })
-
-  for (const metodo of metodos.keys()) {
-    it(`${PUERTO.nombre}.${metodo} declara \`${LITERAL}\` y lo lleva hasta el punto unico`, () => {
-      const implementacion = cableado.get(metodo)
-      expect(implementacion, `${metodo} no esta cableado en lib/composition`).toBeTruthy()
-
-      const funcion = adaptador.funciones.find((f) => f.nombre === implementacion)
-      expect(
-        funcion,
-        `${PUERTO.adaptador} no declara la funcion ${implementacion ?? '?'} que cablea ${metodo}`,
-      ).toBeTruthy()
-      if (funcion === undefined) return
-
-      // 1. LA DECLARA. El compilador NO lo exige: una implementacion de menor aridad satisface
-      //    la firma del puerto. Esta linea es lo unico que lo impide.
-      expect(
-        declaraElAmbito(funcion),
-        `${PUERTO.adaptador}:${funcion.nombre} implementa ${PUERTO.nombre}.${metodo} SIN declarar \`${LITERAL}\`. TypeScript lo acepta -una funcion de menos parametros satisface la firma-, asi que la unica forma de que no se cuele es esta (R12)`,
-      ).toBe(true)
-
-      // 2. LO USA. Declararlo y no usarlo seria la misma fuga con mejor cara.
-      expect(
-        adaptador.consumidoras.has(funcion.nombre),
-        `${PUERTO.adaptador}:${funcion.nombre} declara el ambito pero NO lo lleva hasta \`./company-scope\`: \`scope\` tiene que acabar en una de sus envolturas (${adaptador.envolturas.join(', ') || 'el archivo no importa ninguna'}), aqui o en un ayudante de este mismo archivo al que se le pase (R12)`,
-      ).toBe(true)
+    it(`${puerto.nombre}: los ${String(puerto.metodosEsperados)} metodos estan cableados en ${donde}, con nombre, y ninguno se queda fuera`, () => {
+      expect(metodos.size).toBe(puerto.metodosEsperados)
+      expect([...funciones.keys()].sort()).toEqual([...metodos.keys()].sort())
+      expect(hallazgos).toEqual([])
     })
-  }
-})
+
+    it(`${puerto.nombre}: el propio puerto EXIGE \`${LITERAL}\` en la firma de cada metodo`, () => {
+      expect(hallazgosDeFirma(puerto.nombre, metodos)).toEqual([])
+    })
+
+    for (const metodo of metodos.keys()) {
+      it(`${puerto.nombre}.${metodo} declara \`${LITERAL}\` y lo lleva hasta el punto unico`, () => {
+        const implementacion = funciones.get(metodo)
+        expect(implementacion, `${metodo} no esta cableado en ${donde}`).toBeTruthy()
+
+        const funcion = adaptador.funciones.find((f) => f.nombre === implementacion)
+        expect(
+          funcion,
+          `${puerto.adaptador} no declara la funcion ${implementacion ?? '?'} que cablea ${metodo}`,
+        ).toBeTruthy()
+        if (funcion === undefined) return
+
+        // 1. LA DECLARA. El compilador NO lo exige: una implementacion de menor aridad satisface
+        //    la firma del puerto. Esta linea es lo unico que lo impide.
+        expect(
+          declaraElAmbito(funcion),
+          `${puerto.adaptador}:${funcion.nombre} implementa ${puerto.nombre}.${metodo} SIN declarar \`${LITERAL}\`. TypeScript lo acepta -una funcion de menos parametros satisface la firma-, asi que la unica forma de que no se cuele es esta (R12)`,
+        ).toBe(true)
+
+        // 2. LO USA. Declararlo y no usarlo seria la misma fuga con mejor cara.
+        expect(
+          adaptador.consumidoras.has(funcion.nombre),
+          `${puerto.adaptador}:${funcion.nombre} declara el ambito pero NO lo lleva hasta \`./company-scope\`: \`scope\` tiene que acabar en una de sus envolturas (${adaptador.envolturas.join(', ') || 'el archivo no importa ninguna'}), aqui o en un ayudante de este mismo archivo al que se le pase (R12)`,
+        ).toBe(true)
+      })
+    }
+  })
+}
 
 describe('R12 — las escrituras sobre filas existentes llevan el ambito en el `where`', () => {
-  const adaptador = analizar('customer-prisma.ts')
-
-  function argumentosDe(cuerpo: string, patron: RegExp): string {
-    const match = patron.exec(cuerpo)
-    if (match === null) return ''
-    const abre = cuerpo.indexOf('(', match.index)
-    const cierra = cierreEquilibrado(cuerpo, abre, '(', ')')
-    return cierra === -1 ? '' : cuerpo.slice(abre + 1, cierra)
+  function argumentosDeTodas(cuerpo: string, patron: RegExp): readonly string[] {
+    const todas: string[] = []
+    for (const match of cuerpo.matchAll(new RegExp(patron.source, 'g'))) {
+      const abre = cuerpo.indexOf('(', match.index)
+      const cierra = cierreEquilibrado(cuerpo, abre, '(', ')')
+      todas.push(cierra === -1 ? '' : cuerpo.slice(abre + 1, cierra))
+    }
+    return todas
   }
 
-  it.each(['updateAliveCustomer', 'softDeleteAliveCustomer'])('%s acota su `updateMany` con el ambito', (nombre) => {
-    const funcion = adaptador.funciones.find((f) => f.nombre === nombre)
+  const ESCRITURAS = [
+    ['customer-prisma.ts', 'updateAliveCustomer', 'customer', 'customerCompanyScope'],
+    ['customer-prisma.ts', 'writeAlivePhone', 'customer', 'customerCompanyScope'],
+    ['customer-prisma.ts', 'softDeleteAliveCustomer', 'customer', 'customerCompanyScope'],
+    ['customer-phone-prisma.ts', 'removeCustomerPhoneLinks', 'customerPhoneNumber', 'customerPhoneNumberCompanyScope'],
+    ['customer-phone-prisma.ts', 'setCustomerPhoneLinkMain', 'customerPhoneNumber', 'customerPhoneNumberCompanyScope'],
+    ['customer-phone-prisma.ts', 'writeCustomerMainMirror', 'customer', 'customerCompanyScope'],
+  ] as const
+
+  it.each(ESCRITURAS)('%s:%s acota cada `%s.updateMany` con `%s(scope)`', (archivo, nombre, modelo, envoltura) => {
+    const funcion = analizar(archivo).funciones.find((f) => f.nombre === nombre)
     expect(funcion, `deberia existir ${nombre}`).toBeTruthy()
     if (funcion === undefined) return
 
-    const argumentos = argumentosDe(funcion.cuerpo, /\bprisma\s*\.\s*customer\s*\.\s*updateMany\s*\(/)
-    expect(
-      /\bcustomerCompanyScope\s*\(\s*scope\s*\)/.test(argumentos),
-      `${nombre}: el \`updateMany\` tiene que acotar su \`where\` con el ambito (R12)`,
-    ).toBe(true)
+    const llamadas = argumentosDeTodas(
+      funcion.cuerpo,
+      new RegExp(`\\b(?:prisma|tx|db)\\s*\\.\\s*${modelo}\\s*\\.\\s*updateMany\\s*\\(`),
+    )
+    expect(llamadas.length, `${nombre} deberia escribir con \`${modelo}.updateMany\``).toBeGreaterThan(0)
+    for (const argumentos of llamadas) {
+      expect(
+        new RegExp(`\\b${envoltura}\\s*\\(\\s*scope\\s*\\)`).test(argumentos),
+        `${nombre}: el \`updateMany\` tiene que acotar su \`where\` con \`${envoltura}(scope)\` (R12)`,
+      ).toBe(true)
+    }
   })
 
   it('el listado cuenta con el MISMO objeto `where` que trae', () => {
-    const funcion = adaptador.funciones.find((f) => f.nombre === 'listAliveCustomers')
+    const funcion = analizar('customer-prisma.ts').funciones.find((f) => f.nombre === 'listAliveCustomers')
     expect(funcion, 'deberia existir listAliveCustomers').toBeTruthy()
     if (funcion === undefined) return
     expect(
@@ -430,12 +564,73 @@ describe('R12 — las escrituras sobre filas existentes llevan el ambito en el `
   })
 })
 
+describe('R12 — sensibilidad: la guardia muerde con fuentes sinteticos', () => {
+  it('un metodo de puerto sin `scope: CustomerScope`, o con el ambito opcional, sale como hallazgo', () => {
+    const fuente = `export interface Repo {
+  bien(id: string, scope: CustomerScope): Promise<void>;
+  sinAmbito(id: string): Promise<void>;
+  opcional(id: string, scope?: CustomerScope): Promise<void>;
+}
+`
+    const hallazgos = hallazgosDeFirma('Repo', metodosDeInterfazEnFuente(fuente, 'Repo'))
+    expect(hallazgos.some((h) => h.startsWith('Repo.sinAmbito no exige'))).toBe(true)
+    expect(hallazgos.some((h) => h.startsWith('Repo.opcional declara el ambito OPCIONAL'))).toBe(true)
+    expect(hallazgos.some((h) => h.startsWith('Repo.bien'))).toBe(false)
+  })
+
+  it('una fabrica con un miembro sin funcion con nombre, sin `db` primero o sin `scope` sale como hallazgo', () => {
+    const fuente = `export function createRepo(db: PrismaLike): Repo {
+  return {
+    bien: (id, scope) => findThing(db, id, scope),
+    enLinea: async (id, scope) => {
+      return db.customer.findFirst({ where: { id } });
+    },
+    ligada: findThing.bind(null, db),
+    sinDb: (id, scope) => findThing(prisma, id, scope),
+    sinAmbito: (id, scope) => findThing(db, id, { companyId: id }),
+  };
+}
+`
+    const miembros = cableadoDeFabrica(fuente, 'createRepo')
+    expect(miembros.get('bien')).toEqual({ funcion: 'findThing', hallazgo: null })
+    for (const metodo of ['enLinea', 'ligada', 'sinDb', 'sinAmbito']) {
+      expect(miembros.get(metodo)?.hallazgo, metodo).toEqual(expect.any(String))
+    }
+    expect(miembros.get('enLinea')?.funcion).toBe('')
+    expect(miembros.get('ligada')?.funcion).toBe('')
+  })
+
+  it('una funcion que consulta por el `db` de una fabrica sin declarar ni consumir el ambito sale como hallazgo', () => {
+    const fuente = `import { customerCompanyScope } from './company-scope'
+
+async function sinAmbito(db: PrismaLike, id: string): Promise<unknown> {
+  return db.customer.findFirst({ where: { id } });
+}
+
+async function declaradoSinUsar(db: PrismaLike, id: string, scope: CustomerScope): Promise<unknown> {
+  return db.phoneNumber.findMany({ where: { id } });
+}
+
+async function bien(db: PrismaLike, id: string, scope: CustomerScope): Promise<unknown> {
+  return db.customer.findFirst({ where: { id, ...customerCompanyScope(scope) } });
+}
+`
+    const analizado = analizarFuente('sintetico.ts', fuente)
+    const conConsulta = analizado.funciones.filter((f) => tocaLaBase(f.cuerpo)).map((f) => f.nombre)
+    expect(conConsulta).toEqual(['sinAmbito', 'declaradoSinUsar', 'bien'])
+    expect(declaraElAmbito(analizado.funciones[0] as FuncionDeclarada)).toBe(false)
+    expect(analizado.consumidoras.has('declaradoSinUsar')).toBe(false)
+    expect(analizado.consumidoras.has('bien')).toBe(true)
+  })
+})
+
 describe('R12 — ninguna consulta del modulo se queda sin ambito, y NO hay lista de excepciones', () => {
   /** Los archivos de persistencia del modulo, leidos del disco y no de una lista a mano. */
   const archivos = readdirSync(PERSISTENCE_ROOT).filter((archivo) => archivo.endsWith('.ts'))
 
   it('los archivos de persistencia se barren todos, y el troceo VE las consultas', () => {
     expect(archivos).toContain('customer-prisma.ts')
+    expect(archivos).toContain('customer-phone-prisma.ts')
     expect(archivos).toContain(PUNTO_UNICO)
 
     // ANTI-PLACEBO del troceador. Si `funcionesDe` dejara de reconocer las declaraciones -o se
@@ -448,6 +643,20 @@ describe('R12 — ninguna consulta del modulo se queda sin ambito, y NO hay list
 
     expect(conConsulta('customer-prisma.ts').length).toBeGreaterThanOrEqual(5)
     expect(conConsulta('customer-prisma.ts')).toContain('softDeleteAliveCustomer')
+    // Las siete funciones de la fabrica de telefonos consultan por `db.`: sin `db` en
+    // `TOCA_LA_BASE` esta lista saldria vacia.
+    expect(conConsulta('customer-phone-prisma.ts')).toEqual([
+      'isAliveCustomer',
+      'listAliveCustomerPhoneLinks',
+      'addCustomerPhoneLink',
+      'removeCustomerPhoneLinks',
+      'setCustomerPhoneLinkMain',
+      'writeCustomerMainMirror',
+      'findAliveCustomerOwners',
+    ])
+    expect(conConsulta('customer-prisma.ts')).toEqual(
+      expect.arrayContaining(['createCustomer', 'updateAliveCustomer', 'writeAlivePhone']),
+    )
   })
 
   for (const archivo of archivos) {

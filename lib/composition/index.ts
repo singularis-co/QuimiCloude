@@ -653,11 +653,10 @@ import { processLegacyPhonesOfCompany } from '@/lib/modules/clientes/adapters/dr
 import type { LegacyPhoneRepository } from '@/lib/modules/clientes/ports/legacy-phone-repository';
 import type { CompanyCountryLookup } from '@/lib/modules/clientes/ports/company-country-lookup';
 import {
-  createCustomer,
+  createCustomerWriteRepository,
   findAliveCustomerById,
   listAliveCustomers,
   softDeleteAliveCustomer,
-  updateAliveCustomer,
 } from '@/lib/modules/clientes/adapters/driven/persistence/customer-prisma';
 import type { ListQueryLog as ClientesListQueryLog } from '@/lib/modules/clientes/ports/list-query-log';
 import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository';
@@ -2653,12 +2652,12 @@ export const documentos = {
 const clientesListQueryLog: ClientesListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
 const customerRepository: CustomerRepository = {
-  create: createCustomer,
   findAliveById: findAliveCustomerById,
-  updateAlive: updateAliveCustomer,
   softDeleteAlive: softDeleteAliveCustomer,
   listAlive: listAliveCustomers,
 };
+
+const customerWriteRepository = createCustomerWriteRepository();
 
 const legacyPhoneRepository: LegacyPhoneRepository = {
   processCompany: processLegacyPhonesOfCompany,
@@ -2674,8 +2673,8 @@ const companyCountryLookup: CompanyCountryLookup = identity.getCompanyCountry;
  * recibe por parametro, y quien lo obtiene de las dos caras de la sesion es la Server Action.
  */
 export const clientes = {
-  createCustomer: createCreateCustomer({ customers: customerRepository }),
-  updateCustomer: createUpdateCustomer({ customers: customerRepository }),
+  createCustomer: createCreateCustomer({ customers: customerWriteRepository }),
+  updateCustomer: createUpdateCustomer({ customers: customerWriteRepository }),
   deleteCustomer: createDeleteCustomer({ customers: customerRepository }),
   getCustomer: createGetCustomer({ customers: customerRepository }),
   listCustomers: createListCustomers({ customers: customerRepository, log: clientesListQueryLog }),

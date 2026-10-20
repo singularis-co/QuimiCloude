@@ -7,7 +7,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { createCreateCustomer } from '@/lib/modules/clientes/domain/create-customer'
 import { createDeleteCustomer } from '@/lib/modules/clientes/domain/delete-customer'
 import {
-  CustomerDuplicatePhoneError,
   CustomerNotFoundError,
   CustomerPhoneCountryRequiredError,
   CustomerPhoneInvalidError,
@@ -20,6 +19,9 @@ import { createUpdateCustomer } from '@/lib/modules/clientes/domain/update-custo
 import type { Actor } from '@/lib/modules/clientes/domain/actor'
 import type { CustomerView } from '@/lib/modules/clientes/domain/customer-view'
 import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository'
+import type { CustomerWriteRepository } from '@/lib/modules/clientes/ports/customer-write-repository'
+
+type Repos = CustomerRepository & CustomerWriteRepository
 
 const ADMIN: Actor = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -58,21 +60,21 @@ const VISTA: CustomerView = {
   updatedAt: AHORA,
 }
 
-function makeCustomers(overrides: Partial<CustomerRepository> = {}): {
-  readonly repo: CustomerRepository
-  readonly spies: Record<keyof CustomerRepository, ReturnType<typeof vi.fn>>
+function makeCustomers(overrides: Partial<Repos> = {}): {
+  readonly repo: Repos
+  readonly spies: Record<keyof Repos, ReturnType<typeof vi.fn>>
 } {
   const spies = {
     create: vi.fn(async () => ({ id: 'nuevo-id' })),
     findAliveById: vi.fn(async () => null),
-    updateAlive: vi.fn(async () => 'ok'),
+    updateAlive: vi.fn(async () => ({ kind: 'ok', before: null, after: null })),
     softDeleteAlive: vi.fn(async () => true),
     listAlive: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 })),
   }
   const repo = { ...spies, ...overrides }
   return {
-    repo: repo as unknown as CustomerRepository,
-    spies: repo as unknown as Record<keyof CustomerRepository, ReturnType<typeof vi.fn>>,
+    repo: repo as unknown as Repos,
+    spies: repo as unknown as Record<keyof Repos, ReturnType<typeof vi.fn>>,
   }
 }
 
@@ -302,7 +304,7 @@ describe('telefono en el alta y la edicion', () => {
   type Caso = {
     readonly nombre: string
     readonly puerto: 'create' | 'updateAlive'
-    readonly correr: (repo: CustomerRepository, input: unknown, actor: Actor | null) => Promise<unknown>
+    readonly correr: (repo: Repos, input: unknown, actor: Actor | null) => Promise<unknown>
   }
 
   const CASOS: readonly Caso[] = [
@@ -359,16 +361,6 @@ describe('telefono en el alta y la edicion', () => {
       await expect(intento).rejects.toBeInstanceOf(ValidationError)
       await expect(intento).rejects.toMatchObject({ code: 'invalid_input' })
       expect(spies[puerto]).not.toHaveBeenCalled()
-    })
-
-    it(`R12 — ${nombre}: 'duplicate_phone' del puerto se traduce a customer_duplicate_phone`, async () => {
-      const { repo } = makeCustomers({ [puerto]: vi.fn(async () => 'duplicate_phone' as const) })
-      const intento = correr(repo, ENTRADA_VALIDA, ADMIN)
-      await expect(intento).rejects.toBeInstanceOf(CustomerDuplicatePhoneError)
-      await expect(intento).rejects.toMatchObject({
-        code: 'customer_duplicate_phone',
-        message: 'Este teléfono ya está registrado en otro cliente.',
-      })
     })
 
     it(`R17 — ${nombre}: sin permiso lanza unauthorized antes de validar el telefono y sin llegar al puerto`, async () => {

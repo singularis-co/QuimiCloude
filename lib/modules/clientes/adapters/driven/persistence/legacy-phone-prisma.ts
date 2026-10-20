@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { customerCompanyScope } from './company-scope';
-import { isPhoneUniqueViolation } from './customer-prisma';
 
 import type { CustomerScope } from '../../../domain/customer-scope';
 import type { LegacyPhoneOutcome, LegacyPhonePlan } from '../../../domain/legacy-phone-backfill';
@@ -31,7 +30,7 @@ function summarize(outcomes: readonly LegacyPhoneOutcome[]): LegacyPhoneCompanyR
  * se haya movido desde la lectura (dentro del mismo milisegundo, que es lo que un `Date` guarda):
  * una edicion que no saca la fila de pendiente no se devuelve atras.
  */
-async function processCompanyOnce(
+export async function processLegacyPhonesOfCompany(
   plan: LegacyPhonePlan,
   scope: CustomerScope,
 ): Promise<LegacyPhoneCompanyResult> {
@@ -81,21 +80,4 @@ async function processCompanyOnce(
     },
     { maxWait: 10_000, timeout: 60_000 },
   );
-}
-
-/**
- * Un alta con el mismo numero entre la lectura y la escritura choca con el indice y deshace la
- * empresa entera. Se repite una vez: en la segunda vuelta ese numero ya esta tomado y la fila
- * sale como duplicada.
- */
-export async function processLegacyPhonesOfCompany(
-  plan: LegacyPhonePlan,
-  scope: CustomerScope,
-): Promise<LegacyPhoneCompanyResult> {
-  try {
-    return await processCompanyOnce(plan, scope);
-  } catch (error) {
-    if (!isPhoneUniqueViolation(error)) throw error;
-    return processCompanyOnce(plan, scope);
-  }
 }

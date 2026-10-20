@@ -51,6 +51,11 @@ export {
 } from './domain/customer-phone';
 export { phoneMatchesWaId, waIdCandidates } from './domain/phone-matches-wa-id';
 export {
+  createCustomerPhoneLinks,
+  type CustomerPhoneLinksDeps,
+  type CustomerPhoneLinksService,
+} from './domain/customer-phone-links';
+export {
   planLegacyPhoneBackfill,
   type LegacyPhoneRow,
   type LegacyPhoneOutcome,

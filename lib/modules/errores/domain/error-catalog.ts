@@ -111,6 +111,8 @@ export const ERROR_MESSAGE_KEY = {
   customer_phone_country_required: 'errors.customer_phone_country_required',
   customer_phone_invalid: 'errors.customer_phone_invalid',
   customer_duplicate_phone: 'errors.customer_duplicate_phone',
+  whatsapp_contact_not_found: 'errors.whatsapp_contact_not_found',
+  whatsapp_contact_number_invalid: 'errors.whatsapp_contact_number_invalid',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -278,4 +280,6 @@ export const ERROR_MESSAGES_ES = {
   'errors.customer_phone_country_required': 'Elige el país del teléfono.',
   'errors.customer_phone_invalid': 'Este número no es válido para el país elegido.',
   'errors.customer_duplicate_phone': 'Este teléfono ya está registrado en otro cliente.',
+  'errors.whatsapp_contact_not_found': 'La conversación no existe.',
+  'errors.whatsapp_contact_number_invalid': 'El número de esta conversación no es un teléfono válido.',
 } as const satisfies Record<ErrorMessageKey, string>;

@@ -21,6 +21,7 @@ import { createUpdateCustomer } from '@/lib/modules/clientes/domain/update-custo
 
 import type { Actor } from '@/lib/modules/clientes/domain/actor'
 import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository'
+import type { CustomerWriteRepository } from '@/lib/modules/clientes/ports/customer-write-repository'
 import type { ListQueryLog } from '@/lib/modules/clientes/ports/list-query-log'
 
 const moduloDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'lib', 'modules', 'clientes')
@@ -55,7 +56,7 @@ function dobles() {
   const log = { ignoredFields: explota('log.ignoredFields') }
 
   return {
-    customers: customers as unknown as CustomerRepository,
+    customers: customers as unknown as CustomerRepository & CustomerWriteRepository,
     log: log as unknown as ListQueryLog,
     espias: [...Object.values(customers), ...Object.values(log)],
   }

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
@@ -12,17 +12,19 @@ import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-
 import type { Page } from '../../../domain/page';
 import type { CustomerScope } from '../../../domain/customer-scope';
 import type { CustomerPhoneIssue } from '../../../domain/customer-phone';
-import type { CustomerPhoneColumns, NewCustomer, CustomerView } from '../../../domain/customer-view';
+import type { CustomerPhoneColumns, NewCustomer, NewCustomerPhone, CustomerView } from '../../../domain/customer-view';
+import type { CustomerUpdateResult, CustomerWriteRepository } from '../../../ports/customer-write-repository';
 
 /**
- * Implementa `CustomerRepository` con Prisma. Junto con `company-scope.ts` y
- * `customer-catalog-prisma.ts` son los UNICOS archivos del modulo que importan `@prisma/client`.
- * Ninguna consulta nombra otro modelo.
+ * Implementa `CustomerRepository` y `CustomerWriteRepository` con Prisma. Ninguna consulta nombra
+ * otro modelo.
  *
  * `deleted_at IS NULL` va en el `where` de toda lectura y de toda escritura que exija que la
  * fila siga viva, nunca en un `if` posterior: el filtro es del puerto, y por eso ningun caso de
  * uso puede olvidarlo.
  */
+
+type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 /** `select` unico para las dos lecturas. `deleted_at`, `company_id` y las tres formas
  *  normalizadas NO salen: nunca son dato de salida. */
@@ -71,28 +73,6 @@ function toCustomerView(row: CustomerRow): CustomerView {
   };
 }
 
-const PHONE_UNIQUE_INDEX = 'customers_company_phone_e164_key';
-const PHONE_E164_COLUMN = 'phone_e164';
-
-function targetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string[] {
-  const target = error.meta?.target;
-  if (typeof target === 'string') return [target];
-  if (Array.isArray(target)) return target.filter((item): item is string => typeof item === 'string');
-  return [];
-}
-
-/**
- * El indice parcial vive solo en la migracion, y `meta.target` puede traer su nombre o sus
- * columnas (`user-admin-prisma.ts`). `phone_e164` no esta en ningun otro indice unico de
- * `customers`.
- */
-export function isPhoneUniqueViolation(error: unknown): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
-  return targetsOf(error).some(
-    (target) => target.includes(PHONE_UNIQUE_INDEX) || target.includes(PHONE_E164_COLUMN),
-  );
-}
-
 type BusinessColumns = Pick<
   Prisma.CustomerUncheckedUpdateManyInput,
   | 'firstNames'
@@ -121,41 +101,36 @@ function businessColumns(data: NewCustomer): BusinessColumns {
 const NO_PHONE = { phone: null, phoneCountry: null, phoneE164: null, phoneIssue: null } as const;
 
 /**
- * `create` de `CustomerRepository`. Escribe `created_by` Y `updated_by` con el mismo
- * `actorId`, y los seis datos junto con las tres formas normalizadas que ya trae `data`: este
- * adaptador no vuelve a normalizar nada.
+ * Escribe `created_by` Y `updated_by` con el mismo `actorId`, y los seis datos junto con las tres
+ * formas normalizadas que ya trae `data`: este adaptador no vuelve a normalizar nada.
  */
 export async function createCustomer(
+  db: PrismaLike,
   data: NewCustomer & { readonly phone: CustomerPhoneColumns },
   actorId: string,
   now: Date,
   scope: CustomerScope,
-): Promise<{ id: string } | 'duplicate_phone'> {
-  try {
-    const created = await prisma.customer.create({
-      data: {
-        ...companyScopeColumns(scope),
-        firstNames: data.firstNames,
-        firstNamesNormalized: data.firstNamesNormalized,
-        lastNames: data.lastNames,
-        lastNamesNormalized: data.lastNamesNormalized,
-        city: data.city,
-        cityNormalized: data.cityNormalized,
-        ...data.phone,
-        email: data.email,
-        address: data.address,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: actorId,
-        updatedBy: actorId,
-      },
-      select: { id: true },
-    });
-    return { id: created.id };
-  } catch (error) {
-    if (isPhoneUniqueViolation(error)) return 'duplicate_phone';
-    throw error;
-  }
+): Promise<{ id: string }> {
+  const created = await db.customer.create({
+    data: {
+      ...companyScopeColumns(scope),
+      firstNames: data.firstNames,
+      firstNamesNormalized: data.firstNamesNormalized,
+      lastNames: data.lastNames,
+      lastNamesNormalized: data.lastNamesNormalized,
+      city: data.city,
+      cityNormalized: data.cityNormalized,
+      ...data.phone,
+      email: data.email,
+      address: data.address,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: actorId,
+      updatedBy: actorId,
+    },
+    select: { id: true },
+  });
+  return { id: created.id };
 }
 
 /** `findAliveById`: `deleted_at IS NULL` y el ambito de empresa en el `where`. */
@@ -170,62 +145,88 @@ export async function findAliveCustomerById(
   return row === null ? null : toCustomerView(row);
 }
 
-/**
- * `updateAlive`. `updateMany` con `deletedAt: null` en el `where`: si el cliente no existe, ya
- * esta dado de baja o es de otra empresa, `count` sale 0 y se devuelve `'not_found'` en vez de
- * lanzar. `data` NUNCA incluye `createdBy` ni `createdAt`.
- */
-export async function updateAliveCustomer(
-  id: string,
-  data: NewCustomer,
-  actorId: string,
-  now: Date,
-  scope: CustomerScope,
-): Promise<'ok' | 'not_found' | 'duplicate_phone'> {
-  if ('kind' in data.phone) return updateKeepingLegacyPhone(id, data, actorId, now, scope);
-  try {
-    const { count } = await prisma.customer.updateMany({
-      where: { id, deletedAt: null, ...customerCompanyScope(scope) },
-      data: { ...businessColumns(data), ...data.phone, updatedAt: now, updatedBy: actorId },
-    });
-    return count === 1 ? 'ok' : 'not_found';
-  } catch (error) {
-    if (isPhoneUniqueViolation(error)) return 'duplicate_phone';
-    throw error;
-  }
+function isRootClient(db: PrismaLike): db is PrismaClient {
+  return '$transaction' in db;
 }
 
 /**
- * Edicion con el numero vacio. El primer `UPDATE` deja la fila bloqueada hasta el final de la
- * transaccion, asi que el segundo decide con lo que hay en la base. El telefono antiguo se
- * conserva si la fila tiene aviso o si aun no ha pasado por el relleno (`phone` sin
- * `phone_e164`); en cualquier otro caso se borra.
+ * `updateMany` con `deletedAt: null` en el `where`: si el cliente no existe, ya esta dado de baja
+ * o es de otra empresa, `count` sale 0 y se devuelve `'not_found'` en vez de lanzar. `data` NUNCA
+ * incluye `createdBy` ni `createdAt`.
+ *
+ * El primer `UPDATE` deja la fila bloqueada hasta el final de la transaccion, asi que lo que se
+ * lee despues es lo que queda. Sin una transaccion abierta por quien llama, abre la suya.
  */
-async function updateKeepingLegacyPhone(
+export async function updateAliveCustomer(
+  db: PrismaLike,
   id: string,
   data: NewCustomer,
   actorId: string,
   now: Date,
   scope: CustomerScope,
-): Promise<'ok' | 'not_found'> {
-  return prisma.$transaction(async (tx) => {
-    const { count } = await tx.customer.updateMany({
-      where: { id, deletedAt: null, ...customerCompanyScope(scope) },
-      data: { ...businessColumns(data), updatedAt: now, updatedBy: actorId },
+): Promise<CustomerUpdateResult> {
+  if (isRootClient(db)) {
+    return db.$transaction((tx) => updateAliveCustomer(tx, id, data, actorId, now, scope), {
+      maxWait: 10_000,
+      timeout: 30_000,
     });
-    if (count !== 1) return 'not_found';
-    await tx.customer.updateMany({
-      where: {
-        id,
-        deletedAt: null,
-        phoneIssue: null,
-        OR: [{ phone: null }, { phoneE164: { not: null } }],
-        ...customerCompanyScope(scope),
-      },
-      data: { ...NO_PHONE, updatedAt: now, updatedBy: actorId },
-    });
-    return 'ok';
+  }
+  const { count } = await db.customer.updateMany({
+    where: { id, deletedAt: null, ...customerCompanyScope(scope) },
+    data: { ...businessColumns(data), updatedAt: now, updatedBy: actorId },
   });
+  if (count !== 1) return 'not_found';
+
+  const before = await readAlivePhoneE164(db, id, scope);
+  await writeAlivePhone(db, id, data.phone, actorId, now, scope);
+  const after = await readAlivePhoneE164(db, id, scope);
+  return { kind: 'ok', before, after };
+}
+
+async function readAlivePhoneE164(db: PrismaLike, id: string, scope: CustomerScope): Promise<string | null> {
+  const row = await db.customer.findFirst({
+    where: { id, deletedAt: null, ...customerCompanyScope(scope) },
+    select: { phoneE164: true },
+  });
+  return row?.phoneE164 ?? null;
+}
+
+/**
+ * Con el numero vacio, el telefono antiguo se conserva si la fila tiene aviso o si aun no ha
+ * pasado por el relleno (`phone` sin `phone_e164`); en cualquier otro caso se borra.
+ */
+async function writeAlivePhone(
+  db: PrismaLike,
+  id: string,
+  phone: NewCustomerPhone,
+  actorId: string,
+  now: Date,
+  scope: CustomerScope,
+): Promise<void> {
+  if (!('kind' in phone)) {
+    await db.customer.updateMany({
+      where: { id, deletedAt: null, ...customerCompanyScope(scope) },
+      data: { ...phone, updatedAt: now, updatedBy: actorId },
+    });
+    return;
+  }
+  await db.customer.updateMany({
+    where: {
+      id,
+      deletedAt: null,
+      phoneIssue: null,
+      OR: [{ phone: null }, { phoneE164: { not: null } }],
+      ...customerCompanyScope(scope),
+    },
+    data: { ...NO_PHONE, updatedAt: now, updatedBy: actorId },
+  });
+}
+
+export function createCustomerWriteRepository(db: PrismaLike = prisma): CustomerWriteRepository {
+  return {
+    create: (data, actorId, now, scope) => createCustomer(db, data, actorId, now, scope),
+    updateAlive: (id, data, actorId, now, scope) => updateAliveCustomer(db, id, data, actorId, now, scope),
+  };
 }
 
 /**

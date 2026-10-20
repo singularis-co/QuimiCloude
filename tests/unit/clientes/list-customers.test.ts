@@ -27,9 +27,7 @@ function paginaVacia(): Page<CustomerView> {
 function montar() {
   const listAlive = vi.fn<CustomerRepository['listAlive']>(async () => paginaVacia())
   const customers = {
-    create: vi.fn<CustomerRepository['create']>(),
     findAliveById: vi.fn<CustomerRepository['findAliveById']>(),
-    updateAlive: vi.fn<CustomerRepository['updateAlive']>(),
     softDeleteAlive: vi.fn<CustomerRepository['softDeleteAlive']>(),
     listAlive,
   } satisfies CustomerRepository

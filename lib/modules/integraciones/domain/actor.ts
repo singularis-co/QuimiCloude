@@ -1,4 +1,4 @@
-import { assertPermission } from '@/lib/modules/identity';
+import { assertAddon, assertPermission } from '@/lib/modules/identity';
 
 import { UnauthorizedError } from './errors';
 
@@ -6,6 +6,7 @@ export type Actor = {
   readonly id: string;
   readonly companyId: string;
   readonly permissions: readonly string[];
+  readonly addons?: readonly string[];
 };
 
 const CONFIGURE_PERMISSION = 'integraciones.modificar';
@@ -16,6 +17,18 @@ const CONFIGURE_PERMISSION = 'integraciones.modificar';
  */
 export function requirePermission(actor: Actor | null | undefined): asserts actor is Actor {
   assertPermission(actor, CONFIGURE_PERMISSION, () => new UnauthorizedError());
+  if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
+    throw new UnauthorizedError();
+  }
+}
+
+/**
+ * Las acciones sobre el vínculo de un contacto escriben en los teléfonos del cliente, así que
+ * exigen el permiso de `clientes`. El añadido apagado se rechaza igual que la falta de permiso.
+ */
+export function requireCustomerLinkPermission(actor: Actor | null | undefined): asserts actor is Actor {
+  assertPermission(actor, 'clientes.modificar', () => new UnauthorizedError());
+  assertAddon(actor, 'integraciones', () => new UnauthorizedError());
   if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
     throw new UnauthorizedError();
   }

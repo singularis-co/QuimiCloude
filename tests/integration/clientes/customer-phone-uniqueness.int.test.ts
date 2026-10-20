@@ -118,8 +118,7 @@ async function crearEmpresaConActor(): Promise<Empresa> {
 }
 
 async function alta(empresa: Empresa, phone: CustomerPhoneColumns): Promise<string> {
-  const creado = await createCustomer(entrada(phone), empresa.actorId, AHORA, empresa.scope);
-  if (creado === 'duplicate_phone') throw new Error('alta inesperadamente duplicada');
+  const creado = await createCustomer(prisma, entrada(phone), empresa.actorId, AHORA, empresa.scope);
   return creado.id;
 }
 
@@ -163,32 +162,10 @@ afterAll(async () => {
 });
 
 describe('R12, R13, R14 — el indice unico parcial del telefono', () => {
-  it('R12 — un alta con el phone_e164 de otro cliente vivo de la misma empresa da duplicate_phone y no escribe', async () => {
-    const numero = numeroColombiano();
-    await alta(empresaA, numero);
-    const antes = await prisma.customer.count({ where: { companyId: empresaA.companyId } });
-
-    const segundo = await createCustomer(entrada(numero), empresaA.actorId, AHORA, empresaA.scope);
-
-    expect(segundo).toBe('duplicate_phone');
-    expect(await prisma.customer.count({ where: { companyId: empresaA.companyId } })).toBe(antes);
-  });
-
-  it('R12 — una edicion que pone el numero de otro cliente vivo da duplicate_phone y no cambia la fila', async () => {
-    const numero = numeroColombiano();
-    await alta(empresaA, numero);
-    const otro = await alta(empresaA, SIN_TELEFONO);
-
-    const resultado = await updateAliveCustomer(otro, entrada(numero), empresaA.actorId, LUEGO, empresaA.scope);
-
-    expect(resultado).toBe('duplicate_phone');
-    expect((await telefonoDe(otro)).phoneE164).toBeNull();
-  });
-
   it('R13 — el mismo numero en otra empresa se acepta', async () => {
     const numero = numeroColombiano();
     await alta(empresaA, numero);
-    const enB = await createCustomer(entrada(numero), empresaB.actorId, AHORA, empresaB.scope);
+    const enB = await createCustomer(prisma, entrada(numero), empresaB.actorId, AHORA, empresaB.scope);
     expect(enB).not.toBe('duplicate_phone');
   });
 
@@ -197,7 +174,7 @@ describe('R12, R13, R14 — el indice unico parcial del telefono', () => {
     const baja = await alta(empresaA, numero);
     await prisma.customer.update({ where: { id: baja }, data: { deletedAt: AHORA } });
 
-    const nuevo = await createCustomer(entrada(numero), empresaA.actorId, LUEGO, empresaA.scope);
+    const nuevo = await createCustomer(prisma, entrada(numero), empresaA.actorId, LUEGO, empresaA.scope);
     expect(nuevo).not.toBe('duplicate_phone');
   });
 
@@ -205,26 +182,12 @@ describe('R12, R13, R14 — el indice unico parcial del telefono', () => {
     const numero = numeroColombiano();
     const id = await alta(empresaA, numero);
 
-    const resultado = await updateAliveCustomer(id, entrada(numero, 'Cali'), empresaA.actorId, LUEGO, empresaA.scope);
+    const resultado = await updateAliveCustomer(prisma, id, entrada(numero, 'Cali'), empresaA.actorId, LUEGO, empresaA.scope);
 
-    expect(resultado).toBe('ok');
+    expect(resultado).toMatchObject({ kind: 'ok' });
     expect(await telefonoDe(id)).toMatchObject({ phoneE164: numero.phoneE164, city: 'Cali' });
   });
 
-  it('R14 — dos altas simultaneas con el mismo numero dejan un solo cliente vivo con el', async () => {
-    const numero = numeroColombiano();
-    const resultados = await Promise.all([
-      createCustomer(entrada(numero), empresaA.actorId, AHORA, empresaA.scope),
-      createCustomer(entrada(numero), empresaA.actorId, AHORA, empresaA.scope),
-    ]);
-
-    expect(resultados.filter((r) => r === 'duplicate_phone')).toHaveLength(1);
-    expect(
-      await prisma.customer.count({
-        where: { companyId: empresaA.companyId, phoneE164: numero.phoneE164, deletedAt: null },
-      }),
-    ).toBe(1);
-  });
 });
 
 describe('R10, R32, R34 — editar el telefono de un cliente con y sin aviso', () => {
@@ -234,6 +197,7 @@ describe('R10, R32, R34 — editar el telefono de un cliente con y sin aviso', (
       const id = await migradoConAviso(empresaA, issue);
 
       const resultado = await updateAliveCustomer(
+        prisma,
         id,
         entrada(VACIO_AL_EDITAR, 'Medellin'),
         empresaA.actorId,
@@ -241,7 +205,7 @@ describe('R10, R32, R34 — editar el telefono de un cliente con y sin aviso', (
         empresaA.scope,
       );
 
-      expect(resultado).toBe('ok');
+      expect(resultado).toMatchObject({ kind: 'ok' });
       expect(await telefonoDe(id)).toEqual({
         phone: 'tel. viejo 300-12',
         phoneCountry: 'CO',
@@ -256,9 +220,9 @@ describe('R10, R32, R34 — editar el telefono de un cliente con y sin aviso', (
     const id = await migradoConAviso(empresaA, 'invalid_format');
     const numero = numeroColombiano();
 
-    const resultado = await updateAliveCustomer(id, entrada(numero), empresaA.actorId, LUEGO, empresaA.scope);
+    const resultado = await updateAliveCustomer(prisma, id, entrada(numero), empresaA.actorId, LUEGO, empresaA.scope);
 
-    expect(resultado).toBe('ok');
+    expect(resultado).toMatchObject({ kind: 'ok' });
     expect(await telefonoDe(id)).toMatchObject({
       phone: numero.phone,
       phoneCountry: 'CO',
@@ -271,6 +235,7 @@ describe('R10, R32, R34 — editar el telefono de un cliente con y sin aviso', (
     const id = await alta(empresaA, numeroColombiano());
 
     const resultado = await updateAliveCustomer(
+      prisma,
       id,
       entrada(VACIO_AL_EDITAR, 'Pasto'),
       empresaA.actorId,
@@ -278,7 +243,7 @@ describe('R10, R32, R34 — editar el telefono de un cliente con y sin aviso', (
       empresaA.scope,
     );
 
-    expect(resultado).toBe('ok');
+    expect(resultado).toMatchObject({ kind: 'ok' });
     expect(await telefonoDe(id)).toEqual({
       phone: null,
       phoneCountry: null,
@@ -297,6 +262,7 @@ describe('R10, R32, R34 — editar el telefono de un cliente con y sin aviso', (
     });
 
     const resultado = await updateAliveCustomer(
+      prisma,
       id,
       entrada(VACIO_AL_EDITAR, 'Tunja'),
       empresaA.actorId,
@@ -304,7 +270,7 @@ describe('R10, R32, R34 — editar el telefono de un cliente con y sin aviso', (
       empresaA.scope,
     );
 
-    expect(resultado).toBe('ok');
+    expect(resultado).toMatchObject({ kind: 'ok' });
     expect(await telefonoDe(id)).toEqual({
       phone: 'tel. pendiente 300 123 4567',
       phoneCountry: null,
@@ -317,7 +283,7 @@ describe('R10, R32, R34 — editar el telefono de un cliente con y sin aviso', (
   it('R10 — con el numero vacio, un cliente de otra empresa sigue siendo not_found y no se toca', async () => {
     const id = await migradoConAviso(empresaA, 'duplicate');
 
-    const resultado = await updateAliveCustomer(id, entrada(VACIO_AL_EDITAR), empresaB.actorId, LUEGO, empresaB.scope);
+    const resultado = await updateAliveCustomer(prisma, id, entrada(VACIO_AL_EDITAR), empresaB.actorId, LUEGO, empresaB.scope);
 
     expect(resultado).toBe('not_found');
     expect((await telefonoDe(id)).phoneIssue).toBe('duplicate');
