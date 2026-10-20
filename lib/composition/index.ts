@@ -533,7 +533,7 @@ import {
   listActiveCompanyIds,
   listAllCompanyIds,
 } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
-import { createSetCompanyCountry } from '@/lib/modules/identity';
+import { createGetCompanyCountry, createSetCompanyCountry } from '@/lib/modules/identity';
 import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
 import {
   createCreateCompany,
@@ -650,12 +650,16 @@ import { requestScoped } from '@/lib/shared/request-scope';
 // `clientes`. Imports al final del bloque, bloque de cableado al final del archivo: no
 // reordena ni reformatea nada de lo que hay arriba.
 import {
+  createBackfillLegacyPhones,
   createCreateCustomer,
   createDeleteCustomer,
   createGetCustomer,
   createListCustomers,
   createUpdateCustomer,
 } from '@/lib/modules/clientes';
+import { processLegacyPhonesOfCompany } from '@/lib/modules/clientes/adapters/driven/persistence/legacy-phone-prisma';
+import type { LegacyPhoneRepository } from '@/lib/modules/clientes/ports/legacy-phone-repository';
+import type { CompanyCountryLookup } from '@/lib/modules/clientes/ports/company-country-lookup';
 import {
   createCustomer,
   findAliveCustomerById,
@@ -1009,6 +1013,7 @@ export const identity = {
   }),
   // Operacion de plataforma: el actor no lleva empresa.
   setCompanyCountry: createSetCompanyCountry({ companies: createCompanyCountryRepository() }),
+  getCompanyCountry: createGetCompanyCountry({ companies: createCompanyCountryRepository() }),
   // Operaciones de plataforma sobre empresas: el actor no lleva empresa.
   createCompany: createCreateCompany({
     companies: companyRepository,
@@ -2696,6 +2701,13 @@ const customerRepository: CustomerRepository = {
   listAlive: listAliveCustomers,
 };
 
+const legacyPhoneRepository: LegacyPhoneRepository = {
+  processCompany: processLegacyPhonesOfCompany,
+};
+
+/** `clientes` no importa `identity`: el pais de la empresa le llega por su propio puerto. */
+const companyCountryLookup: CompanyCountryLookup = identity.getCompanyCountry;
+
 /**
  * Fachada del modulo `clientes` ya cableada. Es lo que consume la Server Action.
  *
@@ -2708,6 +2720,11 @@ export const clientes = {
   deleteCustomer: createDeleteCustomer({ customers: customerRepository }),
   getCustomer: createGetCustomer({ customers: customerRepository }),
   listCustomers: createListCustomers({ customers: customerRepository, log: clientesListQueryLog }),
+  backfillLegacyPhones: createBackfillLegacyPhones({
+    listCompanyIds: listActiveCompanyIds,
+    legacyPhones: legacyPhoneRepository,
+    companyCountryOf: companyCountryLookup,
+  }),
 } as const;
 
 /** Servicio de lectura que `clientes` ofrece a `pedidos`. El ambito interno de `clientes` se

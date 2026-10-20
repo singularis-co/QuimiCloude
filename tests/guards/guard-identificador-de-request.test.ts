@@ -170,6 +170,11 @@ export const E2E_ESPERADOS = [
   // lee ni afirma nada sobre el identificador ni sobre `reference`, asi que ese diferimiento
   // sigue INTACTO.
   'clientes.spec.ts',
+  // Alta el 2026-10-19 (QC-236) por el MISMO motivo y en el MISMO sitio que las demas. Lo que
+  // ejercita: el alta con el pais de la empresa marcado, lo que queda en la base, el duplicado bajo
+  // el numero, la empresa sin pais, los avisos de los migrados en la lista y el campo a 390 px. NO
+  // lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'clientes-telefono.spec.ts',
   // Alta el 2026-10-09 (QC-219) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
   // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
   // archivo se nombra, uno a uno-. Lo que ejercita: el acondicionador ve Terminar bloqueado, la
@@ -780,6 +785,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261019120200_document_files_original_name',
   // QC-137 2026-10-19: retira el permiso y el añadido de notificaciones; no toca el identificador.
   '20261019120300_notifications_addon_removal',
+  // 2026-10-19: telefono internacional del cliente; no toca el identificador.
+  '20261019130000_customers_phone_e164',
   // QC-238 2026-10-19: contactos y mensajes de WhatsApp; no toca el identificador.
   '20261019140000_whatsapp_contacts_and_messages',
 ] as const

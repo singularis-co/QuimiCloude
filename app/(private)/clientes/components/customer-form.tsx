@@ -1,11 +1,12 @@
 'use client';
 
-import { useActionState, useEffect, useId } from 'react';
+import { useActionState, useEffect, useId, useMemo } from 'react';
+import type { CountryCode } from 'libphonenumber-js';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { FormSheet } from '@/components/shared/form-sheet';
 import { TextField } from '@/components/shared/text-field';
-import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
+import { errorMessage, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import {
   createCustomerSchema,
   CUSTOMER_FIRST_NAMES_MAX_LENGTH,
@@ -21,6 +22,14 @@ import {
   updateCustomerAction,
 } from '@/lib/modules/clientes/adapters/driving/customer-actions';
 
+import {
+  CUSTOMER_PHONE_COUNTRY_FIELD,
+  CUSTOMER_PHONE_NUMBER_FIELD,
+  CustomerPhoneField,
+  phoneNumberInvalidMessage,
+  type CustomerPhoneFieldErrors,
+} from './customer-phone-field';
+
 /**
  * Formulario de alta y edicion de cliente.
  *
@@ -31,9 +40,8 @@ import {
  * barrel publico de `clientes`), asi que los largos y la obligatoriedad no se reescriben aqui.
  * El servidor revalida igual: el cliente nunca es la frontera.
  *
- * El modulo no tiene ningun codigo de rechazo que identifique un campo (ni duplicado, ni
- * bloqueo): todo lo que devuelve la operacion va a la region general del formulario, y solo la
- * validacion previa pinta errores junto a un campo.
+ * Los rechazos del telefono se pintan bajo su campo; el resto de lo que devuelve la operacion va
+ * a la region general del formulario.
  *
  * `bind` y no un argumento de mas: `updateCustomerAction` tiene la firma
  * `(id, prevState, formData)`, que no es la que `useActionState` espera.
@@ -42,19 +50,30 @@ import {
 export const CUSTOMER_FIRST_NAMES_FIELD = 'firstNames';
 export const CUSTOMER_LAST_NAMES_FIELD = 'lastNames';
 export const CUSTOMER_CITY_FIELD = 'city';
-export const CUSTOMER_PHONE_FIELD = 'phone';
 export const CUSTOMER_EMAIL_FIELD = 'email';
 export const CUSTOMER_ADDRESS_FIELD = 'address';
 
-/** Fuente unica de los seis campos de negocio. */
+/** Fuente unica de los campos de negocio que viajan en el formulario. */
 export const CUSTOMER_BUSINESS_FIELDS = [
   CUSTOMER_FIRST_NAMES_FIELD,
   CUSTOMER_LAST_NAMES_FIELD,
   CUSTOMER_CITY_FIELD,
-  CUSTOMER_PHONE_FIELD,
+  CUSTOMER_PHONE_COUNTRY_FIELD,
+  CUSTOMER_PHONE_NUMBER_FIELD,
   CUSTOMER_EMAIL_FIELD,
   CUSTOMER_ADDRESS_FIELD,
 ] as const;
+
+const TEXT_FIELDS_BEFORE_PHONE = [
+  CUSTOMER_FIRST_NAMES_FIELD,
+  CUSTOMER_LAST_NAMES_FIELD,
+  CUSTOMER_CITY_FIELD,
+] as const;
+const TEXT_FIELDS_AFTER_PHONE = [CUSTOMER_EMAIL_FIELD, CUSTOMER_ADDRESS_FIELD] as const;
+
+type CustomerTextFieldName =
+  | (typeof TEXT_FIELDS_BEFORE_PHONE)[number]
+  | (typeof TEXT_FIELDS_AFTER_PHONE)[number];
 
 /** Los tres obligatorios: nombres, apellidos y ciudad. Telefono, correo y direccion no lo son. */
 export const CUSTOMER_REQUIRED_FIELDS = [
@@ -78,7 +97,8 @@ export const CUSTOMER_FIELD_TESTIDS: Readonly<Record<CustomerFieldName, string>>
   firstNames: 'customer-field-first-names',
   lastNames: 'customer-field-last-names',
   city: 'customer-field-city',
-  phone: 'customer-field-phone',
+  phoneCountry: 'customer-field-phone-country',
+  phoneNumber: 'customer-field-phone-number',
   email: 'customer-field-email',
   address: 'customer-field-address',
 };
@@ -87,35 +107,35 @@ export const CUSTOMER_ERROR_TESTIDS: Readonly<Record<CustomerFieldName, string>>
   firstNames: 'customer-error-first-names',
   lastNames: 'customer-error-last-names',
   city: 'customer-error-city',
-  phone: 'customer-error-phone',
+  phoneCountry: 'customer-error-phone-country',
+  phoneNumber: 'customer-error-phone-number',
   email: 'customer-error-email',
   address: 'customer-error-address',
 };
 
-const FIELD_LABELS: Readonly<Record<CustomerFieldName, string>> = {
+export const CUSTOMER_PHONE_ISSUE_TESTID = 'customer-phone-issue';
+
+const FIELD_LABELS: Readonly<Record<CustomerTextFieldName, string>> = {
   firstNames: 'Nombres',
   lastNames: 'Apellidos',
   city: 'Ciudad',
-  phone: 'Teléfono',
   email: 'Correo',
   address: 'Dirección',
 };
 
 /**
- * Solo `email` y `phone` llevan un `inputMode` especifico: ninguno usa `type="email"` ni
- * `pattern`, porque el navegador bloquearia un envio que el servidor aceptaria.
+ * Solo `email` lleva un `inputMode` especifico: no usa `type="email"` ni `pattern`, porque el
+ * navegador bloquearia un envio que el servidor aceptaria.
  */
-const FIELD_INPUT_MODE: Readonly<Partial<Record<CustomerFieldName, 'email' | 'tel'>>> = {
+const FIELD_INPUT_MODE: Readonly<Partial<Record<CustomerTextFieldName, 'email'>>> = {
   email: 'email',
-  phone: 'tel',
 };
 
 /** El `maxLength` de cada campo sale del esquema publicado, nunca de un numero suelto. */
-const FIELD_MAX_LENGTH: Readonly<Record<CustomerFieldName, number>> = {
+const FIELD_MAX_LENGTH: Readonly<Record<CustomerTextFieldName, number>> = {
   firstNames: CUSTOMER_FIRST_NAMES_MAX_LENGTH,
   lastNames: CUSTOMER_LAST_NAMES_MAX_LENGTH,
   city: CUSTOMER_CITY_MAX_LENGTH,
-  phone: CUSTOMER_PHONE_MAX_LENGTH,
   email: CUSTOMER_EMAIL_MAX_LENGTH,
   address: CUSTOMER_ADDRESS_MAX_LENGTH,
 };
@@ -124,16 +144,20 @@ const FIELD_MAX_LENGTH: Readonly<Record<CustomerFieldName, number>> = {
  * Copy del error de campo de la validacion previa. La regla que describe sigue siendo la del
  * esquema; aqui solo se traduce su incumplimiento.
  */
-const FIELD_MESSAGES: Readonly<Record<CustomerFieldName, string>> = {
+const FIELD_MESSAGES: Readonly<Record<CustomerTextFieldName, string>> = {
   firstNames: `Escribe los nombres (máximo ${CUSTOMER_FIRST_NAMES_MAX_LENGTH} caracteres).`,
   lastNames: `Escribe los apellidos (máximo ${CUSTOMER_LAST_NAMES_MAX_LENGTH} caracteres).`,
   city: `Escribe la ciudad (máximo ${CUSTOMER_CITY_MAX_LENGTH} caracteres).`,
-  phone: `El teléfono es demasiado largo (máximo ${CUSTOMER_PHONE_MAX_LENGTH} caracteres).`,
   email: `El correo es demasiado largo (máximo ${CUSTOMER_EMAIL_MAX_LENGTH} caracteres).`,
   address: `La dirección es demasiado larga (máximo ${CUSTOMER_ADDRESS_MAX_LENGTH} caracteres).`,
 };
 
+const PHONE_TOO_LONG_MESSAGE = `El teléfono es demasiado largo (máximo ${CUSTOMER_PHONE_MAX_LENGTH} caracteres).`;
+
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
+const PHONE_COUNTRY_REQUIRED_CODE = 'customer_phone_country_required' satisfies ErrorCode;
+const PHONE_INVALID_CODE = 'customer_phone_invalid' satisfies ErrorCode;
+const DUPLICATE_PHONE_CODE = 'customer_duplicate_phone' satisfies ErrorCode;
 const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
 
 type FieldErrors = Partial<Record<CustomerFieldName, string>>;
@@ -157,6 +181,41 @@ const INITIAL_STATE: CustomerFormState = { status: 'idle' };
 function readString(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === 'string' ? value : '';
+}
+
+function isTextField(field: string): field is CustomerTextFieldName {
+  return field in FIELD_MESSAGES;
+}
+
+/** Los rechazos de la validacion previa en el pais o el numero, con su mensaje. */
+function phonePrevalidationError(
+  field: string,
+  issue: { readonly code: string; readonly params?: Record<string, unknown> },
+  values: FieldValues,
+): FieldErrors {
+  if (field === CUSTOMER_PHONE_NUMBER_FIELD) {
+    if (issue.code !== 'custom') return { phoneNumber: PHONE_TOO_LONG_MESSAGE };
+    const message = phoneNumberInvalidMessage(values.phoneCountry);
+    return message === null ? {} : { phoneNumber: message };
+  }
+  if (field === CUSTOMER_PHONE_COUNTRY_FIELD && issue.params?.reason === 'country_required') {
+    return { phoneCountry: errorMessage(PHONE_COUNTRY_REQUIRED_CODE) };
+  }
+  return {};
+}
+
+/** Los rechazos del servidor que se pintan bajo el telefono y no en la region general. */
+function phoneServerError(error: ErrorState, values: FieldValues): FieldErrors {
+  switch (error.code) {
+    case PHONE_COUNTRY_REQUIRED_CODE:
+      return { phoneCountry: error.message };
+    case PHONE_INVALID_CODE:
+      return { phoneNumber: phoneNumberInvalidMessage(values.phoneCountry) ?? error.message };
+    case DUPLICATE_PHONE_CODE:
+      return { phoneNumber: error.message };
+    default:
+      return {};
+  }
 }
 
 function readValues(formData: FormData): FieldValues {
@@ -188,9 +247,11 @@ export type CustomerFormProps = {
   readonly customer?: CustomerView;
   /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar. */
   readonly onSaved: () => void;
+  /** País de la empresa: marca el teléfono en el alta y va arriba en la lista de países. */
+  readonly companyCountry?: CountryCode | null;
 };
 
-export function CustomerForm({ customer, onSaved }: CustomerFormProps) {
+export function CustomerForm({ customer, onSaved, companyCountry = null }: CustomerFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
   const isEdit = customer !== undefined;
@@ -205,7 +266,8 @@ export function CustomerForm({ customer, onSaved }: CustomerFormProps) {
       firstNames: values.firstNames ?? '',
       lastNames: values.lastNames ?? '',
       city: values.city ?? '',
-      phone: values.phone,
+      phoneCountry: values.phoneCountry,
+      phoneNumber: values.phoneNumber,
       email: values.email,
       address: values.address,
     };
@@ -214,10 +276,14 @@ export function CustomerForm({ customer, onSaved }: CustomerFormProps) {
     if (!parsed.success) {
       const fieldErrors: FieldErrors = {};
       for (const issue of parsed.error.issues) {
-        const field = String(issue.path[0] ?? '') as CustomerFieldName;
-        if (field in FIELD_MESSAGES && fieldErrors[field] === undefined) {
-          fieldErrors[field] = FIELD_MESSAGES[field];
+        const field = String(issue.path[0] ?? '');
+        if (isTextField(field)) {
+          fieldErrors[field] ??= FIELD_MESSAGES[field];
+          continue;
         }
+        const phone = phonePrevalidationError(field, issue, values);
+        if (phone.phoneCountry !== undefined) fieldErrors.phoneCountry ??= phone.phoneCountry;
+        if (phone.phoneNumber !== undefined) fieldErrors.phoneNumber ??= phone.phoneNumber;
       }
 
       // Rechazo de la validacion previa: ni se llama a la operacion.
@@ -232,8 +298,8 @@ export function CustomerForm({ customer, onSaved }: CustomerFormProps) {
     const result = await submit(customer?.id, formData);
 
     if (result.status === 'error') {
-      // Ningun codigo de este modulo identifica un campo: todo va a la region general.
-      return { status: 'error', serverError: result, fieldErrors: {}, values };
+      const fieldErrors = phoneServerError(result, values);
+      return { status: 'error', serverError: result, fieldErrors, values };
     }
 
     return { status: 'success' };
@@ -253,8 +319,38 @@ export function CustomerForm({ customer, onSaved }: CustomerFormProps) {
       ? state.serverError
       : undefined;
 
-  const valueOf = (field: CustomerFieldName): string =>
+  const valueOf = (field: CustomerTextFieldName): string =>
     values?.[field] ?? (customer?.[field] ?? '');
+
+  const phoneErrors = useMemo<CustomerPhoneFieldErrors | undefined>(
+    () =>
+      state.status === 'error'
+        ? { country: state.fieldErrors.phoneCountry, number: state.fieldErrors.phoneNumber }
+        : undefined,
+    [state],
+  );
+
+  const renderTextField = (field: CustomerTextFieldName) => {
+    const required = (CUSTOMER_REQUIRED_FIELDS as readonly string[]).includes(field);
+    return (
+      <TextField
+        key={field}
+        id={`${fieldId}-${field}`}
+        name={field}
+        label={FIELD_LABELS[field]}
+        inputMode={FIELD_INPUT_MODE[field]}
+        autoComplete="off"
+        required={required}
+        ariaRequired={required}
+        maxLength={FIELD_MAX_LENGTH[field]}
+        defaultValue={valueOf(field)}
+        remountOnDefault
+        error={fieldErrors[field]}
+        testId={CUSTOMER_FIELD_TESTIDS[field]}
+        errorTestId={CUSTOMER_ERROR_TESTIDS[field]}
+      />
+    );
+  };
 
   return (
     <FormSheet
@@ -287,27 +383,20 @@ export function CustomerForm({ customer, onSaved }: CustomerFormProps) {
         />
       )}
 
-      {CUSTOMER_BUSINESS_FIELDS.map((field) => {
-        const required = (CUSTOMER_REQUIRED_FIELDS as readonly string[]).includes(field);
-        return (
-          <TextField
-            key={field}
-            id={`${fieldId}-${field}`}
-            name={field}
-            label={FIELD_LABELS[field]}
-            inputMode={FIELD_INPUT_MODE[field]}
-            autoComplete="off"
-            required={required}
-            ariaRequired={required}
-            maxLength={FIELD_MAX_LENGTH[field]}
-            defaultValue={valueOf(field)}
-            remountOnDefault
-            error={fieldErrors[field]}
-            testId={CUSTOMER_FIELD_TESTIDS[field]}
-            errorTestId={CUSTOMER_ERROR_TESTIDS[field]}
-          />
-        );
-      })}
+      {TEXT_FIELDS_BEFORE_PHONE.map(renderTextField)}
+      <CustomerPhoneField
+        companyCountry={companyCountry}
+        customer={customer}
+        errors={phoneErrors}
+        testIds={{
+          country: CUSTOMER_FIELD_TESTIDS.phoneCountry,
+          number: CUSTOMER_FIELD_TESTIDS.phoneNumber,
+          countryError: CUSTOMER_ERROR_TESTIDS.phoneCountry,
+          numberError: CUSTOMER_ERROR_TESTIDS.phoneNumber,
+          issue: CUSTOMER_PHONE_ISSUE_TESTID,
+        }}
+      />
+      {TEXT_FIELDS_AFTER_PHONE.map(renderTextField)}
     </FormSheet>
   );
 }

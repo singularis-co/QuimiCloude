@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition, type MouseEvent } from 'react';
+import type { CountryCode } from 'libphonenumber-js';
 
 import { DataTable, type DataTableParams, type DataTableStates } from '@/components/shared/data-table';
 import { buttonVariants } from '@/components/ui/button';
@@ -85,6 +86,8 @@ export type CustomerTableProps = CustomerTableStatusProps & {
   readonly totalPages: number;
   /** Si la sesion trae `clientes.modificar`. Decision de presentacion, bajada por props. */
   readonly canModify: boolean;
+  /** País de la empresa, para el teléfono del alta y de la edición. */
+  readonly companyCountry?: CountryCode | null;
   /**
    * Presente solo con cero filas y sin termino ni filtro vigentes: el vacio sustituye a toda la
    * tabla. Con `firstPageHref` es la pagina que se quedo atras, y entonces no se ofrece el alta.
@@ -108,6 +111,7 @@ function buildStates(
   canModify: boolean,
   error: ErrorState | undefined,
   empty: CustomerTableProps['empty'],
+  companyCountry: CountryCode | null,
 ): DataTableStates {
   return {
     loading: {
@@ -150,7 +154,10 @@ function buildStates(
                     testId: CUSTOMER_LIST_FIRST_PAGE_TESTID,
                   },
                 }),
-            children: empty.firstPageHref === undefined && canModify ? <CustomerSheet /> : null,
+            children:
+              empty.firstPageHref === undefined && canModify ? (
+                <CustomerSheet companyCountry={companyCountry} />
+              ) : null,
           },
         }),
   };
@@ -161,6 +168,7 @@ export function CustomerTable({
   params,
   totalPages,
   canModify,
+  companyCountry = null,
   status = 'idle',
   error,
   empty,
@@ -202,9 +210,15 @@ export function CustomerTable({
   const columns = useMemo(
     () =>
       buildCustomerColumns({
-        rowActions: (customer) => <CustomerRowActions customer={customer} canModify={canModify} />,
+        rowActions: (customer) => (
+          <CustomerRowActions
+            customer={customer}
+            canModify={canModify}
+            companyCountry={companyCountry}
+          />
+        ),
       }),
-    [canModify],
+    [canModify, companyCountry],
   );
 
   /*
@@ -250,7 +264,7 @@ export function CustomerTable({
       totalPages={totalPages}
       onParamsChange={handleParamsChange}
       status={status}
-      states={buildStates(params, canModify, error, empty)}
+      states={buildStates(params, canModify, error, empty, companyCountry)}
       texts={
         outOfRange !== undefined
           ? { ...CUSTOMER_TABLE_TEXTS, empty: CUSTOMER_OUT_OF_RANGE_MESSAGE }
@@ -258,7 +272,7 @@ export function CustomerTable({
             ? CUSTOMER_TABLE_TEXTS
             : { ...CUSTOMER_TABLE_TEXTS, empty: CUSTOMER_NO_MATCHES_MESSAGE }
       }
-      toolbarActions={canModify ? <CustomerSheet /> : undefined}
+      toolbarActions={canModify ? <CustomerSheet companyCountry={companyCountry} /> : undefined}
       emptyAction={
         outOfRange !== undefined ? (
           <Link

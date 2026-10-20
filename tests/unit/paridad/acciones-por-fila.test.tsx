@@ -98,7 +98,12 @@ vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () =
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: vi.fn(async () => null) },
-  identity: { getSessionUser: entorno.getSessionUserMock, endSession: vi.fn() },
+  identity: {
+    getSessionUser: entorno.getSessionUserMock,
+    getSessionContext: vi.fn(async () => null),
+    getCompanyCountry: vi.fn(async () => null),
+    endSession: vi.fn(),
+  },
 }));
 
 vi.mock('@/lib/modules/clientes/adapters/driving/customer-actions', () => ({
@@ -384,6 +389,9 @@ const CLIENTE: CustomerView = {
   lastNames: 'Lopez',
   city: 'Bogota',
   phone: '3001234567',
+  phoneCountry: null,
+  phoneE164: null,
+  phoneIssue: null,
   email: null,
   address: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
