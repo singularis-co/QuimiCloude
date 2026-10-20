@@ -23,6 +23,7 @@ import {
   makeGraph,
   makeRandom,
   makeRepository,
+  makeTemplateRepository,
   storedConnection,
   validCreateInput,
 } from './whatsapp-doubles'
@@ -33,15 +34,17 @@ function setup(probe: GraphProbeResult = GOOD_PROBE, initial: Parameters<typeof 
   const graph = makeGraph(probe)
   const digest = makeDigest()
   const random = makeRandom(['verify-token-nuevo'])
+  const templates = makeTemplateRepository()
   const create = createCreateWhatsappConnection({
     connections: repo.connections,
     graph: graph.graph,
+    templates: templates.templates,
     cipher: cipher.cipher,
     digest,
     random,
     now: () => NOW,
   })
-  return { repo, cipher, graph, digest, random, create }
+  return { repo, cipher, graph, digest, random, templates, create }
 }
 
 describe('crear la conexion de WhatsApp', () => {
@@ -192,5 +195,87 @@ describe('crear la conexion de WhatsApp', () => {
     const result = await create(validCreateInput({ phoneNumberId: 'abc-1' }), admin())
     expect(result).toEqual({ status: 'test_failed', message: 'Unsupported get request. Object with ID abc-1 does not exist' })
     expect(repo.create).not.toHaveBeenCalled()
+  })
+})
+
+describe('crear la conexion de WhatsApp: importacion de plantillas', () => {
+  const metaItem = {
+    id: '7001',
+    name: 'bienvenida',
+    language: 'es',
+    status: 'APPROVED',
+    category: 'UTILITY',
+    components: [{ type: 'BODY', text: 'Hola' }],
+  }
+
+  it('R29: tras guardar la conexion sincroniza sus plantillas con el token del formulario y la WABA escrita', async () => {
+    const { repo, graph, templates, create } = setup()
+    graph.listTemplatesPage.mockResolvedValueOnce({ ok: true, items: [metaItem], next: null })
+
+    const result = await create(validCreateInput(), admin())
+
+    expect(graph.listTemplatesPage).toHaveBeenCalledTimes(1)
+    expect(graph.listTemplatesPage).toHaveBeenCalledWith({ wabaId: '2345678901', accessToken: ACCESS_TOKEN, after: null })
+    expect(repo.create.mock.invocationCallOrder[0]).toBeLessThan(
+      graph.listTemplatesPage.mock.invocationCallOrder[0] ?? Number.NaN,
+    )
+    expect(templates.applySync).toHaveBeenCalledWith(NEW_CONNECTION_ID, expect.anything(), NOW, NOW, { companyId: COMPANY_ID })
+    expect(templates.all()).toMatchObject([
+      { connectionId: NEW_CONNECTION_ID, companyId: COMPANY_ID, metaTemplateId: '7001', status: 'APPROVED', createdById: null },
+    ])
+    expect(result).toMatchObject({
+      status: 'created',
+      templateImport: { ok: true, summary: { imported: 1, updated: 0, deleted: 0, skipped: 0, syncedAt: NOW.toISOString() } },
+    })
+  })
+
+  it('R29: no vuelve a descifrar el token guardado: usa el recien validado', async () => {
+    const { cipher, create } = setup()
+    await create(validCreateInput(), admin())
+    expect(cipher.decrypt).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['Meta rechaza la lista', { ok: false, kind: 'rejected', message: `token ${ACCESS_TOKEN} invalido` }, 'whatsapp_meta_rejected'],
+    ['Meta no responde', { ok: false, kind: 'unreachable', message: null }, 'whatsapp_meta_unreachable'],
+  ] as const)(
+    'R30: si %s la conexion queda creada con su verify token y el resultado lleva solo el codigo del fallo',
+    async (_caso, page, code) => {
+      const { repo, graph, templates, create } = setup()
+      graph.listTemplatesPage.mockResolvedValueOnce(page)
+
+      const result = await create(validCreateInput(), admin())
+
+      expect(repo.create).toHaveBeenCalledTimes(1)
+      expect(repo.row(NEW_CONNECTION_ID)).toBeDefined()
+      expect(templates.applySync).not.toHaveBeenCalled()
+      expect(result).toMatchObject({
+        status: 'created',
+        verifyToken: 'verify-token-nuevo',
+        connection: { id: NEW_CONNECTION_ID },
+        templateImport: { ok: false, code },
+      })
+      if (result.status === 'created') expect(Object.keys(result.templateImport).sort()).toEqual(['code', 'ok'])
+      const json = JSON.stringify(result)
+      expect(json).not.toContain(ACCESS_TOKEN)
+      expect(json).not.toContain(APP_SECRET)
+    },
+  )
+
+  it('R30: un fallo al escribir las plantillas tampoco deshace el alta y sale como su codigo o unexpected', async () => {
+    const { templates, create } = setup()
+    templates.applySync.mockRejectedValueOnce(new Error(`la base fallo con ${ACCESS_TOKEN}`))
+
+    const result = await create(validCreateInput(), admin())
+
+    expect(result).toMatchObject({ status: 'created', templateImport: { ok: false, code: 'unexpected' } })
+    expect(JSON.stringify(result)).not.toContain(ACCESS_TOKEN)
+  })
+
+  it('R29: una prueba fallida no crea la conexion ni toca las plantillas', async () => {
+    const { graph, templates, create } = setup({ ok: false, kind: 'unreachable', message: null })
+    await create(validCreateInput(), admin())
+    expect(graph.listTemplatesPage).not.toHaveBeenCalled()
+    expect(templates.applySync).not.toHaveBeenCalled()
   })
 })

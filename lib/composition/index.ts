@@ -2827,6 +2827,7 @@ const whatsappWebhookDeps = {
   cipher: secretCipher,
   signature: webhookSignature,
   inbox: whatsappInboxRepository,
+  templates: whatsappTemplateRepository,
 };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };

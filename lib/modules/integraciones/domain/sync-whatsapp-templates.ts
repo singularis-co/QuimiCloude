@@ -106,7 +106,7 @@ export type ResyncWhatsappTemplatesOutcome =
   | { readonly kind: 'failed'; readonly code: string };
 
 /** Solo el código del catálogo, nunca el mensaje: va a una línea de log. */
-function codeOf(error: unknown): string {
+export function syncFailureCodeOf(error: unknown): string {
   if (
     error !== null &&
     typeof error === 'object' &&
@@ -130,7 +130,7 @@ export function createResyncWhatsappTemplates(
       const accessToken = await decryptStoredSecret(deps, record, ACCESS_TOKEN_FIELD, scope);
       return { kind: 'synced', summary: await syncConnectionTemplates(deps, record, accessToken, scope) };
     } catch (error) {
-      return { kind: 'failed', code: codeOf(error) };
+      return { kind: 'failed', code: syncFailureCodeOf(error) };
     }
   };
 }

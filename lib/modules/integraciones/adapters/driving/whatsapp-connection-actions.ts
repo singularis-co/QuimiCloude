@@ -135,6 +135,12 @@ export async function createWhatsappConnectionAction(
     if (result.status === 'test_failed') {
       return { status: 'test_failed', message: result.message };
     }
+    if (!result.templateImport.ok) {
+      console.error('whatsapp_templates_initial_sync_failed', {
+        connectionId: result.connection.id,
+        code: result.templateImport.code,
+      });
+    }
     refreshScreen();
     return {
       status: 'created',

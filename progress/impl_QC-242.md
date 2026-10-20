@@ -250,3 +250,83 @@ vitest run tests/unit/integraciones/whatsapp/templates/ tests/unit/integraciones
 vitest run guard   -> Test Files 83 passed (83); Tests 1161 passed | 21 skipped (1182)
 ```
 Veredicto: T10 y T11 hechos y verdes; sin cablear en composición ni contrato (T15).
+
+## Tanda 5 — T12, T13, T14 (backend_dev)
+
+Archivos:
+- nuevos en `lib/modules/integraciones/domain/`: `sync-all-whatsapp-templates.ts` (`createSyncAllWhatsappTemplates`,
+  `SyncAllResult`, `SyncAllFailure`), `whatsapp-template-webhook.ts` (`interpretTemplateChange`,
+  `isTemplateWebhookField`, `TEMPLATE_REJECTED_REASON_MAX_LENGTH = 500`).
+- `domain/create-whatsapp-connection.ts`: deps con `templates`; tras `connections.create` corre
+  `syncConnectionTemplates` con el token del formulario; resultado `created` con `templateImport`.
+- `domain/sync-whatsapp-templates.ts`: el `codeOf` privado pasa a exportarse como `syncFailureCodeOf` (lo usan el
+  reintento, el alta y el cron; sin triplicarlo).
+- `domain/whatsapp-webhook-payload.ts`: firma `parseWhatsappWebhook(json, phoneNumberId, wabaId)`; `templateUpdates` y
+  `skipped.templates` en `InboundBatch`.
+- `domain/receive-whatsapp-webhook.ts`: deps con `templates`; `applyWebhookUpdates` tras `inbox.record` solo si hay
+  cambios; `skipped.templates` y `followUp: 'resync_templates' | null` en `stored`.
+- `adapters/driving/whatsapp-connection-actions.ts`: `console.error('whatsapp_templates_initial_sync_failed',
+  { connectionId, code })` si `templateImport.ok === false`.
+- `lib/composition/index.ts` (mínimo para compilar): `templates` en `whatsappWebhookDeps`. El alta ya lo recibía
+  (`whatsappDeps`). La ruta del webhook no cambia (el `after` es T18).
+- tests: `templates/sync-all-whatsapp-templates.test.ts` (nuevo); ampliados `create-whatsapp-connection.test.ts`,
+  `whatsapp-connection-actions.test.ts`, `whatsapp-webhook-payload.test.ts`, `receive-whatsapp-webhook.test.ts`;
+  `module-shape.test.ts` (2 archivos nuevos en la lista); `authorization.test.ts` (deps con `templates`, que también
+  explotan si los llaman).
+- integración (solo para compilar; no corren aquí): `whatsapp-connection-prisma.int.test.ts` (el alta del R9 recibe el
+  repositorio real de plantillas: con el doble `canned` sincroniza contra la base) y `whatsapp-inbox-prisma.int.test.ts`
+  (`templateUpdates: []`, `skipped.templates: 0` en el lote).
+
+Tests de QC-237/QC-238 tensados (no relajados): los `toEqual` del resultado `stored` y de `skipped` llevan ahora
+`templates: 0` y `followUp: null`; `parseSpy` se espera con la WABA; el R14 de QC-238 usa `account_update` como campo
+ajeno (antes usaba `message_template_status_update`, que ahora sí se procesa).
+
+Decisiones / desvíos (abiertos para revisión):
+- Cron: `integrations.isOn` y `connections.findLive` van **dentro** del `try` por empresa (§4.8 solo nombra
+  `decryptStoredSecret` y `syncConnectionTemplates`): un fallo leyendo el añadido o la conexión de una empresa queda como
+  `stage: 'connection'` con su `companyId` y el cron sigue (R33), en vez de tumbar la vuelta entera.
+- Cron: `graph` se tipa `SyncTemplatesGraph` (solo `listTemplatesPage`), como el núcleo.
+- Webhook: un `message_template_id` numérico que no es entero seguro (> 2^53) se salta (R41): `JSON.parse` ya lo cambió
+  y cruzarlo podría tocar otra plantilla. Un texto de dígitos se acepta tal cual. Cero delante (`'0123'`) se salta por
+  la regla `/^[1-9]\d*$/` de §7.2.
+- Webhook: `reason` vacío, solo espacios, `"NONE"`, `null` o ausente ⇒ `null`; si no, se guarda tal cual recortado a 500
+  puntos de código (sin `trim`). Con un estado distinto de `REJECTED`, `null` aunque Meta mande motivo (R36).
+- Webhook: un `entry` sin `id` no se toma por la WABA ⇒ salto con conteo (R39).
+- Webhook: se rechaza U+0000 en `event`, `reason`, `message_template_name` y `message_template_language` (R41); en
+  categoría basta con que no sea una de las tres.
+- Alta: `syncConnectionTemplates` recibe `{ ...deps, now }`; el reloj del alta es el mismo de la sincronización.
+- La ruta del webhook aún no registra `skipped.templates` en su línea de saltos ni usa `followUp` (T18).
+
+R → test:
+- R29: create-connection `R29: tras guardar la conexion sincroniza…`, `R29: no vuelve a descifrar…`,
+  `R29: una prueba fallida no crea la conexion ni toca las plantillas`
+- R30: create-connection `R30: si %s la conexion queda creada…` (2), `R30: un fallo al escribir…`;
+  actions `R30 — el alta con la importacion de plantillas fallida…`, `R30 — con la importacion bien no se escribe ningun log`
+- R32: sync-all `R32: sincroniza la conexion ACTIVE…`, `R32: no sincroniza una conexion %s…` (3),
+  `R32: una empresa con el anadido apagado…`, `R32: una empresa sin conexion viva…`, `R32: recorre las empresas de una en una…`
+  (cada `findLive` con el ámbito de una sola empresa; `findLiveById` nunca), `R27 R32: el cron nunca crea ni borra…`
+- R33: sync-all `R33: si falla la segunda conexion sigue con la tercera…`, `R33: el fallo no lleva el mensaje…`,
+  `R33: un token ilegible…`, `R33: un fallo al escribir o al leer el anadido…`, `R33: un fallo al listar las empresas…`,
+  `R33: con el presupuesto agotado…` (el 500/200 y la línea de log son de la ruta, T16)
+- R36: payload `R36: un cambio de estado…`, `R36: REJECTED guarda el motivo…`, `R36: con un estado que no es REJECTED…`,
+  `R36 R4: el evento %s se guarda como OTHER…` (5); receive `R36: un APPROVED…`, `R36: REJECTED guarda el motivo; R37: …`
+- R37: payload `R37: el cambio de categoria hecho…`, `R37: el aviso previo…`; receive `R36: …; R37: la categoria nueva se guarda`
+- R38: receive `R38: un id que no esta en la copia local pide resincronizar, una sola vez…`, `R38: recibir no sincroniza…`
+  (el `after` y que el fallo no cambie la respuesta, T18)
+- R39: payload `R39: un cambio de otra WABA…`, `R39: un entry sin id…`, `R39: %s se salta con conteo` (6); receive
+  `R39 R41: lo saltado de otra WABA o ilegible…`, `R39: la WABA que se compara es la de la conexion guardada`
+- R40: receive `R40: un POST con mensajes y cambios de plantillas guarda los dos`, `R40: si falla guardar los cambios…`,
+  `R40: sin cambios de plantillas no se llama al repositorio…`
+- R41: payload `R41: un cambio de estado con %s se salta…` (9), `R41: un id de texto con digitos…`; receive `R39 R41: …`
+- R14 (QC-238): payload `R14: un change de otro field…` con `account_update`, `R14: los cambios de plantillas no cuentan…`
+
+Salida:
+```
+pnpm run typecheck -> tsc --noEmit sin errores (antes del ajuste: authorization.test.ts y los dos .int.test.ts sin `templates`)
+pnpm run lint      -> 0 errors, 10 warnings (preexistentes)
+vitest run tests/unit/integraciones/whatsapp/ tests/unit/integraciones/module-shape.test.ts
+                   -> Test Files 32 passed (32); Tests 718 passed | 1 skipped (719)
+vitest run guard   -> Test Files 83 passed (83); Tests 1161 passed | 21 skipped (1182)
+.int.test.ts       -> no corridos (sin base en el worktree); los corre CI
+```
+Veredicto: T12, T13 y T14 hechos; unit y guardias verdes, integración pendiente de CI; la ruta del webhook sin `after` (T18).

@@ -16,6 +16,7 @@ import type { SecretCipher } from '@/lib/modules/integraciones/ports/secret-ciph
 import type { SecretDigest } from '@/lib/modules/integraciones/ports/secret-digest'
 import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository'
 import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client'
+import type { WhatsappTemplateRepository } from '@/lib/modules/integraciones/ports/whatsapp-template-repository'
 
 import {
   ACTOR_ID,
@@ -28,6 +29,7 @@ import {
   makeGraph,
   makeRandom,
   makeRepository,
+  makeTemplateRepository,
   storedConnection,
   validCreateInput,
 } from './whatsapp-doubles'
@@ -43,7 +45,14 @@ function explodingDeps() {
     create: explota('connections.create'),
     update: explota('connections.update'),
   }
-  const graph = { fetchPhoneNumber: explota('graph.fetchPhoneNumber') }
+  const graph = {
+    fetchPhoneNumber: explota('graph.fetchPhoneNumber'),
+    listTemplatesPage: explota('graph.listTemplatesPage'),
+  }
+  const templates = {
+    listForSync: explota('templates.listForSync'),
+    applySync: explota('templates.applySync'),
+  }
   const cipher = { encrypt: explota('cipher.encrypt'), decrypt: explota('cipher.decrypt') }
   const digest = { digestOf: explota('digest.digestOf'), matches: explota('digest.matches') }
   const random = { newId: explota('random.newId'), newVerifyToken: explota('random.newVerifyToken') }
@@ -51,6 +60,7 @@ function explodingDeps() {
     deps: {
       connections: connections as unknown as WhatsappConnectionRepository,
       graph: graph as unknown as WhatsappGraphClient,
+      templates: templates as unknown as WhatsappTemplateRepository,
       cipher: cipher as unknown as SecretCipher,
       digest: digest as unknown as SecretDigest,
       random: random as unknown as RandomSource,
@@ -59,6 +69,7 @@ function explodingDeps() {
     espias: [
       ...Object.values(connections),
       ...Object.values(graph),
+      ...Object.values(templates),
       ...Object.values(cipher),
       ...Object.values(digest),
       ...Object.values(random),
@@ -108,6 +119,7 @@ describe('ambito de empresa', () => {
     const create = createCreateWhatsappConnection({
       connections: repo.connections,
       graph: makeGraph().graph,
+      templates: makeTemplateRepository().templates,
       cipher,
       digest: makeDigest(),
       random: makeRandom(),

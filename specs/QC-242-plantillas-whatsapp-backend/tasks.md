@@ -95,18 +95,18 @@
   - **Hecho:** una página fallida ⇒ `applySync` no se llama; `createTemplate`/`deleteTemplate`
     nunca llamados; el reintento no lanza.
 
-- [ ] **T12 [P] — Importación al crear la conexión** (R29, R30). Depende de: T11
+- [x] **T12 [P] — Importación al crear la conexión** (R29, R30). Depende de: T11
   - `domain/create-whatsapp-connection.ts` (§4.7);
     `adapters/driving/whatsapp-connection-actions.ts` (log).
   - Tests `create-whatsapp-connection.test.ts` y `whatsapp-connection-actions.test.ts` ampliados.
   - **Hecho:** con la lista de Graph fallando, la conexión se crea y queda una línea de log sin
     secretos; los casos de QC-237 siguen verdes.
 
-- [ ] **T13 [P] — El cron (dominio)** (R32, R33). Depende de: T11
+- [x] **T13 [P] — El cron (dominio)** (R32, R33). Depende de: T11
   - `domain/sync-all-whatsapp-templates.ts` (§4.8) y `sync-all-whatsapp-templates.test.ts`.
   - **Hecho:** casos de §14.1; ninguna llamada a `findLive` con dos empresas.
 
-- [ ] **T14 [P] — Webhook** (R36–R41). Depende de: T4, T9, T11
+- [x] **T14 [P] — Webhook** (R36–R41). Depende de: T4, T9, T11
   - `domain/whatsapp-template-webhook.ts`, `whatsapp-webhook-payload.ts`,
     `receive-whatsapp-webhook.ts` (§7.1–7.3).
   - `whatsapp-webhook-payload.test.ts` (R14 de QC-238 con `account_update`) y

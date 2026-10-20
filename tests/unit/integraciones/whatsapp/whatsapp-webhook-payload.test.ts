@@ -5,6 +5,7 @@ import {
   parseWhatsappWebhook,
   type InboundBatch,
 } from '@/lib/modules/integraciones/domain/whatsapp-webhook-payload'
+import { TEMPLATE_REJECTED_REASON_MAX_LENGTH } from '@/lib/modules/integraciones/domain/whatsapp-template-webhook'
 
 import {
   FOREIGN_PHONE_NUMBER_ID,
@@ -13,6 +14,7 @@ import {
   SENDER,
   SENDER_USER_ID,
   TIMESTAMP,
+  WABA_ID,
   change,
   contact,
   imageMessage,
@@ -26,7 +28,7 @@ import {
 } from './whatsapp-webhook-fixtures'
 
 function parse(json: unknown): InboundBatch {
-  const batch = parseWhatsappWebhook(json, PHONE_NUMBER_ID)
+  const batch = parseWhatsappWebhook(json, PHONE_NUMBER_ID, WABA_ID)
   if (batch === null) throw new Error('se esperaba un lote')
   return batch
 }
@@ -37,7 +39,7 @@ function onlyMessage(raw: Record<string, unknown>) {
   return batch.messages[0]
 }
 
-const NO_SKIPS = { changes: 0, messages: 0, statuses: 0 }
+const NO_SKIPS = { changes: 0, messages: 0, statuses: 0, templates: 0 }
 
 describe('parseWhatsappWebhook: forma de la notificación', () => {
   it.each([
@@ -50,18 +52,18 @@ describe('parseWhatsappWebhook: forma de la notificación', () => {
     ['entry sin changes', { object: 'whatsapp_business_account', entry: [{ id: '1' }] }],
     ['un change sin field', { object: 'whatsapp_business_account', entry: [{ changes: [{ value: {} }] }] }],
   ])('R13: %s ⇒ null', (_caso, json) => {
-    expect(parseWhatsappWebhook(json, PHONE_NUMBER_ID)).toBeNull()
+    expect(parseWhatsappWebhook(json, PHONE_NUMBER_ID, WABA_ID)).toBeNull()
   })
 
   it('R13: una notificación sin cambios es un lote vacío', () => {
-    expect(parse(notification())).toEqual({ contacts: [], messages: [], statuses: [], skipped: NO_SKIPS })
+    expect(parse(notification())).toEqual({ contacts: [], messages: [], statuses: [], templateUpdates: [], skipped: NO_SKIPS })
   })
 
   it('R14: un change de otro field se salta sin error y los demás se procesan', () => {
     const text = textMessage()
     const batch = parse(
       notification(
-        change({ event: 'APPROVED', message_template_id: 1 }, 'message_template_status_update'),
+        change({ ban_info: { waba_ban_state: 'SCHEDULE_FOR_DISABLE' }, event: 'DISABLED_UPDATE' }, 'account_update'),
         change(value({ contacts: [contact()], messages: [text] })),
       ),
     )
@@ -81,7 +83,7 @@ describe('parseWhatsappWebhook: forma de la notificación', () => {
 
     expect(batch.messages.map((m) => m.wamid)).toEqual([own.id])
     expect(batch.contacts.map((c) => c.waId)).toEqual([SENDER])
-    expect(batch.skipped).toEqual({ changes: 1, messages: 0, statuses: 0 })
+    expect(batch.skipped).toEqual({ changes: 1, messages: 0, statuses: 0, templates: 0 })
   })
 
   it('R14: un value de messages sin metadata se salta con conteo y no tumba el resto', () => {
@@ -290,7 +292,7 @@ describe('parseWhatsappWebhook: cada tipo de mensaje', () => {
     const batch = parse(messagesNotification([broken, good]))
 
     expect(batch.messages.map((m) => m.wamid)).toEqual([good.id])
-    expect(batch.skipped).toEqual({ changes: 0, messages: 1, statuses: 0 })
+    expect(batch.skipped).toEqual({ changes: 0, messages: 1, statuses: 0, templates: 0 })
   })
 
   it('R18: un mismo wamid dos veces en el lote ⇒ se queda el primero', () => {
@@ -477,7 +479,7 @@ describe('parseWhatsappWebhook: statuses', () => {
     )
 
     expect(batch.statuses.map((s) => s.wamid)).toEqual([known])
-    expect(batch.skipped).toEqual({ changes: 0, messages: 0, statuses: 1 })
+    expect(batch.skipped).toEqual({ changes: 0, messages: 0, statuses: 1, templates: 0 })
   })
 
   it('R22: un status sin id se salta con conteo', () => {
@@ -494,5 +496,138 @@ describe('parseWhatsappWebhook: statuses', () => {
 
     expect(batch.messages.map((m) => m.wamid)).toEqual([text.id])
     expect(batch.statuses.map((s) => s.wamid)).toEqual([id])
+  })
+})
+
+describe('parseWhatsappWebhook: cambios de plantillas', () => {
+  const statusChange = (extra: Record<string, unknown> = {}) =>
+    change(
+      {
+        event: 'APPROVED',
+        message_template_id: 594425479261596,
+        message_template_name: 'pedido_listo',
+        message_template_language: 'en-US',
+        reason: 'NONE',
+        ...extra,
+      },
+      'message_template_status_update',
+    )
+  const categoryChange = (extra: Record<string, unknown> = {}) =>
+    change(
+      { message_template_id: 594425479261596, message_template_name: 'pedido_listo', message_template_language: 'es', ...extra },
+      'template_category_update',
+    )
+
+  it('R36: un cambio de estado de la WABA de la conexion pone el estado; el id entero llega como texto', () => {
+    const batch = parse(notification(statusChange()))
+    expect(batch.templateUpdates).toEqual([
+      { kind: 'status', metaTemplateId: '594425479261596', status: 'APPROVED', statusRaw: null, rejectedReason: null },
+    ])
+    expect(batch.skipped).toEqual(NO_SKIPS)
+  })
+
+  it('R36: REJECTED guarda el motivo recortado a 500; NONE, null, vacio o ausente dejan el motivo vacio', () => {
+    const largo = 'x'.repeat(TEMPLATE_REJECTED_REASON_MAX_LENGTH + 10)
+    const reasons = (raw: unknown[]) =>
+      parse(notification(...raw.map((reason) => statusChange({ event: 'REJECTED', reason })))).templateUpdates.map(
+        (update) => (update.kind === 'status' ? update.rejectedReason : 'no-status'),
+      )
+
+    expect(reasons(['INVALID_FORMAT', largo, 'NONE', null, '', '   '])).toEqual([
+      'INVALID_FORMAT',
+      'x'.repeat(TEMPLATE_REJECTED_REASON_MAX_LENGTH),
+      null,
+      null,
+      null,
+      null,
+    ])
+    const sinReason = parse(notification(change({ event: 'REJECTED', message_template_id: 1 }, 'message_template_status_update')))
+    expect(sinReason.templateUpdates).toMatchObject([{ status: 'REJECTED', rejectedReason: null }])
+  })
+
+  it('R36: con un estado que no es REJECTED el motivo queda vacio aunque Meta mande uno', () => {
+    const batch = parse(notification(statusChange({ event: 'PAUSED', reason: 'LOW_QUALITY' })))
+    expect(batch.templateUpdates).toMatchObject([{ status: 'PAUSED', rejectedReason: null }])
+  })
+
+  it.each(['UNARCHIVED', 'FLAGGED', 'LOCKED', 'REINSTATED', 'IN_APPEAL'])(
+    'R36 R4: el evento %s se guarda como OTHER con su valor crudo',
+    (event) => {
+      const batch = parse(notification(statusChange({ event })))
+      expect(batch.templateUpdates).toEqual([
+        { kind: 'status', metaTemplateId: '594425479261596', status: 'OTHER', statusRaw: event, rejectedReason: null },
+      ])
+    },
+  )
+
+  it('R37: el cambio de categoria hecho (previous_category + new_category) pone la nueva', () => {
+    const batch = parse(notification(categoryChange({ previous_category: 'UTILITY', new_category: 'MARKETING' })))
+    expect(batch.templateUpdates).toEqual([{ kind: 'category', metaTemplateId: '594425479261596', category: 'MARKETING' }])
+  })
+
+  it('R37: el aviso previo (correct_category + new_category) tambien se lee por new_category', () => {
+    const batch = parse(notification(categoryChange({ correct_category: 'MARKETING', new_category: 'UTILITY', campo_nuevo: 1 })))
+    expect(batch.templateUpdates).toEqual([{ kind: 'category', metaTemplateId: '594425479261596', category: 'UTILITY' }])
+  })
+
+  it('R39: un cambio de otra WABA se salta con conteo y no impide los demas del mismo POST', () => {
+    const text = textMessage()
+    const json = {
+      object: 'whatsapp_business_account',
+      entry: [
+        { id: '9999999999', changes: [statusChange()] },
+        { id: WABA_ID, changes: [categoryChange({ new_category: 'MARKETING' }), change(value({ contacts: [contact()], messages: [text] }))] },
+      ],
+    }
+    const batch = parse(json)
+
+    expect(batch.templateUpdates).toEqual([{ kind: 'category', metaTemplateId: '594425479261596', category: 'MARKETING' }])
+    expect(batch.messages.map((m) => m.wamid)).toEqual([text.id])
+    expect(batch.skipped).toEqual({ ...NO_SKIPS, templates: 1 })
+  })
+
+  it('R39: un entry sin id no se toma por la WABA de la conexion', () => {
+    const batch = parse({ object: 'whatsapp_business_account', entry: [{ changes: [statusChange()] }] })
+    expect(batch.templateUpdates).toEqual([])
+    expect(batch.skipped.templates).toBe(1)
+  })
+
+  it.each([
+    ['sin event', change({ message_template_id: 1 }, 'message_template_status_update')],
+    ['sin id', change({ event: 'APPROVED' }, 'message_template_status_update')],
+    ['value que no es objeto', change('APPROVED', 'message_template_status_update')],
+    ['event que no es texto', change({ event: 3, message_template_id: 1 }, 'message_template_status_update')],
+    ['categoria sin new_category', change({ message_template_id: 1, previous_category: 'UTILITY' }, 'template_category_update')],
+    ['categoria desconocida', change({ message_template_id: 1, new_category: 'OTP' }, 'template_category_update')],
+  ])('R39: %s se salta con conteo, sin error', (_caso, raw) => {
+    const batch = parse(notification(raw, statusChange()))
+    expect(batch.templateUpdates).toHaveLength(1)
+    expect(batch.skipped).toEqual({ ...NO_SKIPS, templates: 1 })
+  })
+
+  it.each([
+    ['id 0', { message_template_id: 0 }],
+    ['id negativo', { message_template_id: -5 }],
+    ['id decimal', { message_template_id: 1.5 }],
+    ['id con letras', { message_template_id: '12ab' }],
+    ['id con cero delante', { message_template_id: '0123' }],
+    ['id por encima del entero seguro', { message_template_id: 2 ** 53 + 2 }],
+    ['event con NUL', { event: 'APPRO\u0000VED' }],
+    ['reason con NUL', { event: 'REJECTED', reason: 'mal\u0000' }],
+    ['nombre con NUL', { message_template_name: 'a\u0000' }],
+  ])('R41: un cambio de estado con %s se salta con conteo sin tumbar el POST', (_caso, extra) => {
+    const batch = parse(notification(statusChange(extra), categoryChange({ new_category: 'UTILITY' })))
+    expect(batch.templateUpdates).toEqual([{ kind: 'category', metaTemplateId: '594425479261596', category: 'UTILITY' }])
+    expect(batch.skipped).toEqual({ ...NO_SKIPS, templates: 1 })
+  })
+
+  it('R41: un id de texto con digitos se acepta igual que el entero', () => {
+    const batch = parse(notification(statusChange({ message_template_id: '594425479261596' })))
+    expect(batch.templateUpdates).toMatchObject([{ metaTemplateId: '594425479261596' }])
+  })
+
+  it('R14: los cambios de plantillas no cuentan como changes de messages saltados', () => {
+    const batch = parse(notification(statusChange(), change({}, 'account_update')))
+    expect(batch.skipped.changes).toBe(0)
   })
 })
