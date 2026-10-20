@@ -69,7 +69,7 @@
 - **Hecho:** verdes. Tras una pasada no queda ningún `duplicate` vivo y la segunda pasada no cambia
   nada (R49; R27 de QC-236 sigue verde). Las `invalid_format` siguen intactas.
 
-## T7 — Vincular, desvincular, bloquear (depende de T5)
+## [x] T7 — Vincular, desvincular, bloquear (depende de T5)
 - `link-whatsapp-contact.ts`, `unlink-whatsapp-contact.ts` y `set-whatsapp-contact-blocked.ts`;
   barrel de `integraciones`; composición (`whatsappContactUnitOfWork`, tres miembros nuevos).
 - Tests unitarios (R26, R30–R38, R43, R44) y `whatsapp-contact-links.int.test.ts` (R10 de punta

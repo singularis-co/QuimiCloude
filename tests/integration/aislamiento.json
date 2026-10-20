@@ -687,6 +687,11 @@
       "desde": "2026-10-19"
     },
     {
+      "archivo": "integraciones/whatsapp-contact-links.int.test.ts",
+      "motivo": "T7 (QC-239): recorre vincular, desvincular y bloquear contactos, y el alta y la edicion de clientes, por la fachada real de lib/composition: withWhatsappContactTransaction y withCustomerTransaction abren su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no las envolveria, y el caso del fallo forzado necesita que la transaccion real se deshaga. Cada caso siembra sus numeros irrepetibles en dos empresas efimeras con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra por 'company_id' mensajes -> contactos -> conexiones -> vinculos -> numeros -> clientes, afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
       "archivo": "recetas/step-evidence-flag.int.test.ts",
       "motivo": "QC-214 T1: ejercita `createRecipe`, `createRecipeVersion`, `replaceAliveRecipe` y `findAliveRecipeById` de `recipe-prisma.ts` y `findRecipeExecutionContentById` / `findRecipePackingStepsById` de `recipe-catalog-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria. Una empresa efimera (randomUUID) nace en `beforeAll` y muere en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-13"

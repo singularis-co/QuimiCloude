@@ -2755,8 +2755,14 @@ import {
   createUpdateWhatsappConnection,
   createVerifyWhatsappWebhook,
   createRefreshWhatsappContactLinks,
+  createLinkWhatsappContact,
+  createUnlinkWhatsappContact,
+  createSetWhatsappContactBlocked,
 } from '@/lib/modules/integraciones';
 import { createWhatsappContactRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-prisma';
+import { withWhatsappContactTransaction } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-unit-of-work-prisma';
+import type { WhatsappContactRepository } from '@/lib/modules/integraciones/ports/whatsapp-contact-repository';
+import type { WhatsappContactUnitOfWork } from '@/lib/modules/integraciones/ports/whatsapp-contact-unit-of-work';
 import { integrationsE2EDoublesEnabled } from '@/lib/modules/integraciones/adapters/driven/config/e2e-doubles-env';
 import { readPublicBaseUrl } from '@/lib/modules/integraciones/adapters/driven/config/public-base-url-env';
 import { whatsappGraphClientCanned } from '@/lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned';
@@ -2824,6 +2830,16 @@ const whatsappWebhookDeps = {
   cipher: secretCipher,
   signature: webhookSignature,
   inbox: whatsappInboxRepository,
+};
+
+const whatsappContactRepository: WhatsappContactRepository = createWhatsappContactRepository();
+
+const whatsappContactUnitOfWork: WhatsappContactUnitOfWork = {
+  run: (work) =>
+    withWhatsappContactTransaction((tx) => {
+      const links = customerPhoneLinksOn(tx);
+      return work({ contacts: createWhatsappContactRepository(tx), customerPhones: links, owners: links });
+    }),
 };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
@@ -2932,4 +2948,7 @@ export const integraciones = {
   reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
   verifyWhatsappWebhook: createVerifyWhatsappWebhook(whatsappWebhookDeps),
   receiveWhatsappWebhook: createReceiveWhatsappWebhook(whatsappWebhookDeps),
+  linkWhatsappContact: createLinkWhatsappContact({ unitOfWork: whatsappContactUnitOfWork }),
+  unlinkWhatsappContact: createUnlinkWhatsappContact({ unitOfWork: whatsappContactUnitOfWork }),
+  setWhatsappContactBlocked: createSetWhatsappContactBlocked({ contacts: whatsappContactRepository }),
 } as const;

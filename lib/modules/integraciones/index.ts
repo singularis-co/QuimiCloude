@@ -7,6 +7,9 @@ export {
   WhatsappConnectionExistsError,
   WhatsappPhoneNumberTakenError,
   ActionNotAllowedError,
+  WhatsappContactNotFoundError,
+  WhatsappContactNumberInvalidError,
+  LinkedCustomerNotFoundError,
 } from './domain/errors';
 export type { SecretContext } from './domain/secret-context';
 export type { Actor } from './domain/actor';
@@ -24,6 +27,10 @@ export {
   type RefreshWhatsappContactLinks,
   type RefreshWhatsappContactLinksDeps,
 } from './domain/refresh-whatsapp-contact-links';
+export { resolveContactLink, type ContactLink } from './domain/whatsapp-contact-link';
+export { createLinkWhatsappContact } from './domain/link-whatsapp-contact';
+export { createUnlinkWhatsappContact } from './domain/unlink-whatsapp-contact';
+export { createSetWhatsappContactBlocked } from './domain/set-whatsapp-contact-blocked';
 export type {
   AiProviderCode,
   AiProviderConnectionStatus,
