@@ -144,6 +144,7 @@ const MODULE_CODE_FILES = [
   'adapters/driven/persistence/company-scope.ts',
   'adapters/driven/persistence/whatsapp-connection-prisma.ts',
   'adapters/driven/persistence/whatsapp-inbox-prisma.ts',
+  'adapters/driven/persistence/whatsapp-template-prisma.ts',
   'adapters/driven/persistence/whatsapp-webhook-directory-prisma.ts',
   'adapters/driven/security/random-source-node.ts',
   'adapters/driven/security/secret-cipher-aes-gcm.ts',
@@ -151,6 +152,8 @@ const MODULE_CODE_FILES = [
   'adapters/driven/security/webhook-signature-hmac.ts',
   'adapters/driving/ai-provider-actions.ts',
   'adapters/driving/whatsapp-connection-actions.ts',
+  'adapters/driving/whatsapp-template-actions.ts',
+  'adapters/driving/whatsapp-template-cron-route.ts',
   'adapters/driving/whatsapp-webhook-route.ts',
   'domain/actor.ts',
   'domain/ai-provider-failure.ts',
@@ -159,6 +162,8 @@ const MODULE_CODE_FILES = [
   'domain/connection-secrets.ts',
   'domain/connection-status.ts',
   'domain/create-whatsapp-connection.ts',
+  'domain/create-whatsapp-template.ts',
+  'domain/delete-whatsapp-template.ts',
   'domain/disconnect-ai-provider.ts',
   'domain/errors.ts',
   'domain/get-ai-provider-connection.ts',
@@ -166,6 +171,7 @@ const MODULE_CODE_FILES = [
   'domain/get-whatsapp-connection.ts',
   'domain/graph-failure.ts',
   'domain/integraciones-scope.ts',
+  'domain/list-whatsapp-templates.ts',
   'domain/receive-whatsapp-webhook.ts',
   'domain/regenerate-whatsapp-verify-token.ts',
   'domain/report-ai-provider-outcome.ts',
@@ -174,6 +180,11 @@ const MODULE_CODE_FILES = [
   'domain/secret-context.ts',
   'domain/set-whatsapp-connection-enabled.ts',
   'domain/stored-secret.ts',
+  'domain/sync-all-whatsapp-templates.ts',
+  'domain/sync-whatsapp-templates.ts',
+  'domain/template-connection.ts',
+  'domain/template-graph-failure.ts',
+  'domain/template-sync-plan.ts',
   'domain/test-ai-provider-key.ts',
   'domain/test-saved-ai-provider.ts',
   'domain/test-whatsapp-connection.ts',
@@ -185,6 +196,12 @@ const MODULE_CODE_FILES = [
   'domain/whatsapp-inbound-message.ts',
   'domain/whatsapp-message-status.ts',
   'domain/whatsapp-message.ts',
+  'domain/whatsapp-template-components.ts',
+  'domain/whatsapp-template-draft.ts',
+  'domain/whatsapp-template-languages.ts',
+  'domain/whatsapp-template-meta.ts',
+  'domain/whatsapp-template-webhook.ts',
+  'domain/whatsapp-template.ts',
   'domain/whatsapp-webhook-payload.ts',
   'index.ts',
   'ports/ai-provider-catalog.ts',
@@ -198,6 +215,7 @@ const MODULE_CODE_FILES = [
   'ports/whatsapp-connection-repository.ts',
   'ports/whatsapp-graph-client.ts',
   'ports/whatsapp-inbox-repository.ts',
+  'ports/whatsapp-template-repository.ts',
   'ports/whatsapp-webhook-directory.ts',
 ] as const
 
@@ -349,7 +367,7 @@ describe('la forma del modulo integraciones', () => {
     expect(adaptadores).toEqual(['driven/', 'driving/'])
   })
 
-  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso (con las dos del webhook, QC-238), y solo desde ./domain', () => {
+  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso (con las dos del webhook, QC-238, y las de plantillas, QC-242), y solo desde ./domain', () => {
     const { otherStatements, reexports } = contractReexports(readFileSync(join(moduleDir, 'index.ts'), 'utf8'))
 
     expect(otherStatements, 'el contrato solo reexporta: ni declaraciones ni export *').toBe(0)
@@ -370,36 +388,62 @@ describe('la forma del modulo integraciones', () => {
       'AiProviderStatus',
       'AiProviderTestResult',
       'AiReadUse',
+      'CREATABLE_TEMPLATE_CATEGORIES',
       'IntegracionesError',
       'SaveAiProviderConnectionResult',
       'SecretContext',
       'SecretUnreadableError',
+      'TEMPLATE_LIMITS',
+      'TemplateSyncSummary',
       'TestSavedAiProviderResult',
       'UnauthorizedError',
       'ValidationError',
+      'WHATSAPP_TEMPLATE_LANGUAGES',
       'WhatsappConnectionExistsError',
       'WhatsappConnectionNotFoundError',
       'WhatsappConnectionStatus',
       'WhatsappConnectionView',
+      'WhatsappMetaRejectedError',
+      'WhatsappMetaUnreachableError',
       'WhatsappPhoneNumberTakenError',
+      'WhatsappTemplateButton',
+      'WhatsappTemplateCategory',
+      'WhatsappTemplateContent',
+      'WhatsappTemplateDraft',
+      'WhatsappTemplateIssue',
+      'WhatsappTemplateList',
+      'WhatsappTemplateNameTakenError',
+      'WhatsappTemplateNotFoundError',
+      'WhatsappTemplateRateLimitedError',
+      'WhatsappTemplateRejectedError',
+      'WhatsappTemplateStatus',
+      'WhatsappTemplateView',
       'createCreateWhatsappConnection',
+      'createCreateWhatsappTemplate',
+      'createDeleteWhatsappTemplate',
       'createDisconnectAiProvider',
       'createGetAiProviderConnection',
       'createGetAiProviderReadiness',
       'createGetAiProviderStatus',
       'createGetWhatsappConnection',
+      'createGetWhatsappTemplate',
+      'createListWhatsappTemplates',
       'createReceiveWhatsappWebhook',
       'createRegenerateWhatsappVerifyToken',
       'createReportAiProviderOutcome',
       'createResolveAiProviderForReading',
+      'createResyncWhatsappTemplates',
       'createSaveAiProviderConnection',
       'createSetWhatsappConnectionEnabled',
+      'createSyncAllWhatsappTemplates',
+      'createSyncWhatsappTemplates',
       'createTestAiProviderKey',
       'createTestSavedAiProvider',
       'createTestWhatsappConnection',
       'createUpdateWhatsappConnection',
       'createVerifyWhatsappWebhook',
       'isAccountFailure',
+      'validateWhatsappTemplateDraft',
     ])
     expect(reexports.filter((r) => r.typeOnly).map((r) => r.name).sort()).toEqual([
       'Actor',
@@ -419,9 +463,18 @@ describe('la forma del modulo integraciones', () => {
       'AiReadUse',
       'SaveAiProviderConnectionResult',
       'SecretContext',
+      'TemplateSyncSummary',
       'TestSavedAiProviderResult',
       'WhatsappConnectionStatus',
       'WhatsappConnectionView',
+      'WhatsappTemplateButton',
+      'WhatsappTemplateCategory',
+      'WhatsappTemplateContent',
+      'WhatsappTemplateDraft',
+      'WhatsappTemplateIssue',
+      'WhatsappTemplateList',
+      'WhatsappTemplateStatus',
+      'WhatsappTemplateView',
     ])
     for (const reexport of reexports) {
       expect(reexport.from, reexport.name).toMatch(/^\.\/domain(\/|$)/)
@@ -482,7 +535,25 @@ describe('la forma del modulo integraciones', () => {
     expect(hallazgos.join('\n')).toContain('node:crypto')
   })
 
-  it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes, y la ruta del webhook (QC-238)', () => {
+  it('R6: el validador de borradores de plantilla y lo que importa solo usan zod y archivos de domain/ que tampoco salen de ahi', () => {
+    const pendientes = ['domain/whatsapp-template-draft.ts']
+    const vistos = new Set<string>()
+    const ajenos: string[] = []
+    while (pendientes.length > 0) {
+      const rel = pendientes.pop() as string
+      if (vistos.has(rel)) continue
+      vistos.add(rel)
+      for (const spec of importSpecifiers(readFileSync(join(moduleDir, rel), 'utf8'))) {
+        if (spec === 'zod') continue
+        if (spec.startsWith('./') && !spec.slice(2).includes('/')) pendientes.push(`domain/${spec.slice(2)}.ts`)
+        else ajenos.push(`${rel} -> ${spec}`)
+      }
+    }
+    expect(vistos.size).toBeGreaterThan(1)
+    expect(ajenos).toEqual([])
+  })
+
+  it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes, la ruta del webhook (QC-238) y la del cron de plantillas (QC-242)', () => {
     expect(filesImportingTheModule()).toEqual([
       'lib/composition/index.ts',
       'lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic.ts',
@@ -506,6 +577,7 @@ describe('la forma del modulo integraciones', () => {
       'app/(private)/integraciones/whatsapp/page.tsx',
       'app/(private)/produccion/formulas/page.tsx',
       'app/(private)/proveedores/[id]/page.tsx',
+      'app/api/cron/sincronizar-plantillas-whatsapp/route.ts',
       'app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts',
     ])
   })
@@ -548,29 +620,37 @@ describe('la forma del modulo integraciones', () => {
     ])
   })
 
-  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones, la URL del webhook y su recepcion (QC-238), con sus puertos tipados', () => {
+  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones, la URL del webhook y su recepcion (QC-238), las plantillas y el secreto del cron (QC-242), con sus puertos tipados', () => {
     const cableado = integracionesWiring(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8'))
 
     expect(cableado, 'lib/composition/index.ts deberia exportar const integraciones = { ... }').not.toBeNull()
     expect([...(cableado?.members ?? [])].sort()).toEqual([
       'createWhatsappConnection',
+      'createWhatsappTemplate',
+      'deleteWhatsappTemplate',
       'disconnectAiProvider',
       'getAiProviderConnection',
       'getAiProviderReadiness',
       'getAiProviderStatus',
       'getWhatsappConnection',
+      'getWhatsappTemplate',
+      'listWhatsappTemplates',
       'receiveWhatsappWebhook',
       'regenerateWhatsappVerifyToken',
       'reportAiProviderOutcome',
       'resolveAiProviderForReading',
+      'resyncWhatsappTemplates',
       'saveAiProviderConnection',
       'secretCipher',
       'secretDigest',
       'setWhatsappConnectionEnabled',
+      'syncAllWhatsappTemplates',
+      'syncWhatsappTemplates',
       'testAiProviderKey',
       'testSavedAiProvider',
       'testWhatsappConnection',
       'updateWhatsappConnection',
+      'verifyCronSecret',
       'verifyWhatsappWebhook',
       'whatsappWebhookUrl',
     ])
@@ -578,6 +658,7 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.typeOf.secretDigest).toBe('SecretDigest')
     expect(cableado?.typeOf.whatsappGraphClient).toBe('WhatsappGraphClient')
     expect(cableado?.typeOf.whatsappConnectionRepository).toBe('WhatsappConnectionRepository')
+    expect(cableado?.typeOf.whatsappTemplateRepository).toBe('WhatsappTemplateRepository')
     expect(cableado?.typeOf.randomSource).toBe('RandomSource')
     expect(cableado?.typeOf.aiProviderConnectionRepository).toBe('AiProviderConnectionRepository')
     expect(cableado?.typeOf.aiProviderCatalog).toBe('AiProviderCatalog')
@@ -650,7 +731,7 @@ describe('la forma del modulo integraciones', () => {
     expect(branchRange(FEATURE_BRANCH, 'abc')).toEqual({ mergeBase: 'abc' })
   })
 
-  it('R13: db/schema.prisma tiene exactamente cinco modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), AiProvider y AiProviderConnection', () => {
+  it('R13: db/schema.prisma tiene exactamente seis modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), WhatsappTemplate (QC-242), AiProvider y AiProviderConnection', () => {
     const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8').replace(/\r\n/g, '\n')
     // El `/// @module` va encima del `model`, con solo lineas `///` entre medias.
     const modelos = [
@@ -662,10 +743,11 @@ describe('la forma del modulo integraciones', () => {
       'WhatsappConnection',
       'WhatsappContact',
       'WhatsappMessage',
+      'WhatsappTemplate',
       'AiProvider',
       'AiProviderConnection',
     ])
-    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(5)
+    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(6)
     expect(esquema).toMatch(/@module\s+identity\b/)
   })
 })

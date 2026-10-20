@@ -24,6 +24,10 @@ export function whatsappMessageCompanyScope(scope: IntegracionesScope): Prisma.W
   return companyScope(scope);
 }
 
+export function whatsappTemplateCompanyScope(scope: IntegracionesScope): Prisma.WhatsappTemplateWhereInput {
+  return companyScope(scope);
+}
+
 /** Para el `data` de un `create`: en un `WhereInput` la columna es opcional y admite un filtro. */
 export function companyScopeColumns(scope: IntegracionesScope): { readonly companyId: string } {
   return companyScope(scope);

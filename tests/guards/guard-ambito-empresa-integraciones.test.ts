@@ -41,6 +41,7 @@ const PERSISTENCE_ROOT = join(MODULE_ROOT, 'adapters', 'driven', 'persistence')
 const PUNTO_UNICO = 'company-scope.ts'
 const ADAPTADOR = 'whatsapp-connection-prisma.ts'
 const ADAPTADOR_INBOX = 'whatsapp-inbox-prisma.ts'
+const ADAPTADOR_PLANTILLAS = 'whatsapp-template-prisma.ts'
 
 const FORMA_DE_AMBITO = {
   identificador: 'scope',
@@ -76,7 +77,16 @@ const PUERTO_INBOX: PuertoVigilado = {
   ayudantes: ['applyStatus', 'upsertContact'],
 }
 
-const PUERTOS: readonly PuertoVigilado[] = [PUERTO, PUERTO_INBOX]
+const PUERTO_PLANTILLAS: PuertoVigilado = {
+  nombre: 'WhatsappTemplateRepository',
+  ruta: join(MODULE_ROOT, 'ports', 'whatsapp-template-repository.ts'),
+  constante: 'whatsappTemplateRepository',
+  metodosEsperados: 8,
+  adaptador: ADAPTADOR_PLANTILLAS,
+  ayudantes: [],
+}
+
+const PUERTOS: readonly PuertoVigilado[] = [PUERTO, PUERTO_INBOX, PUERTO_PLANTILLAS]
 
 /**
  * Archivos exentos por NOMBRE del barrido de ambito, como en la guardia de `pedidos`. Una sola
@@ -208,7 +218,8 @@ function envolturasImportadas(source: string): readonly string[] {
     .filter((nombre) => nombre.length > 0)
 }
 
-const TOCA_LA_BASE = /\b(?:prisma|tx)\s*\.\s*(?:\$\w+|\w+\s*\.\s*\w+)\s*[(<]/g
+// El acento grave cubre `prisma.$queryRaw` usado como plantilla etiquetada, sin parentesis.
+const TOCA_LA_BASE = /\b(?:prisma|tx)\s*\.\s*(?:\$\w+|\w+\s*\.\s*\w+)\s*[(<`]/g
 const tocaLaBase = (cuerpo: string): boolean => new RegExp(TOCA_LA_BASE.source).test(cuerpo)
 
 const LECTURA_SUELTA: readonly RegExp[] = [
@@ -419,7 +430,7 @@ function cableadoDe(constante: string, interfaz: string): ReadonlyMap<string, st
 // --- Casos -------------------------------------------------------------------------------------
 
 describe('R2 — el punto unico de integraciones es de verdad UNA definicion', () => {
-  it('company-scope.ts: `companyScope` es privada, es la unica lectura del ambito y las cuatro envolturas delegan en ella', () => {
+  it('company-scope.ts: `companyScope` es privada, es la unica lectura del ambito y las cinco envolturas delegan en ella', () => {
     const analizado = analizar(PUNTO_UNICO)
     const exportadas = analizado.funciones.filter((f) =>
       new RegExp(`^export\\s+function\\s+${f.nombre}\\b`, 'm').test(analizado.codigo),
@@ -429,6 +440,7 @@ describe('R2 — el punto unico de integraciones es de verdad UNA definicion', (
       'whatsappConnectionCompanyScope',
       'whatsappContactCompanyScope',
       'whatsappMessageCompanyScope',
+      'whatsappTemplateCompanyScope',
     ])
 
     for (const envoltura of exportadas) {
@@ -509,6 +521,92 @@ describe('R2 — las escrituras sobre una conexion existente llevan el ambito en
       expect(/\bwhatsappConnectionCompanyScope\s*\(\s*scope\s*\)/.test(argumentos)).toBe(true)
       expect(/\bdeletedAt\s*:\s*null\b/.test(argumentos)).toBe(true)
     }
+  })
+})
+
+/** Las llamadas `prisma.<modelo>.<operacion>(` de `cuerpo` cuyo argumento no lleva `<envoltura>(scope)`. */
+function escriturasSinAmbito(cuerpo: string, modelo: string, operacion: string, envoltura: string): {
+  readonly llamadas: number
+  readonly sinAmbito: number
+} {
+  const patron = new RegExp(`\\bprisma\\s*\\.\\s*${modelo}\\s*\\.\\s*${operacion}\\s*\\(`, 'g')
+  const llamadas = [...cuerpo.matchAll(patron)]
+  const sinAmbito = llamadas.filter((llamada) => {
+    const abre = cuerpo.indexOf('(', llamada.index)
+    const argumentos = cuerpo.slice(abre + 1, cierreEquilibrado(cuerpo, abre, '(', ')'))
+    return !new RegExp(`\\b${envoltura}\\s*\\(\\s*scope\\s*\\)`).test(argumentos)
+  })
+  return { llamadas: llamadas.length, sinAmbito: sinAmbito.length }
+}
+
+describe('R3 — las escrituras de plantillas llevan el ambito en cada `updateMany`, y el alta en su SQL', () => {
+  const cableado = cableadoDe(PUERTO_PLANTILLAS.constante, PUERTO_PLANTILLAS.nombre)
+  const adaptador = analizar(ADAPTADOR_PLANTILLAS)
+  const funcionDe = (metodo: string) => adaptador.funciones.find((f) => f.nombre === cableado.get(metodo))
+
+  it.each([
+    ['markDeleted', 1],
+    ['applySync', 3],
+    ['applyWebhookUpdates', 1],
+  ] as const)('%s: sus %i `updateMany` de plantillas llevan `whatsappTemplateCompanyScope(scope)`', (metodo, esperadas) => {
+    const funcion = funcionDe(metodo)
+    expect(funcion).toBeTruthy()
+    const { llamadas, sinAmbito } = escriturasSinAmbito(
+      funcion?.cuerpo ?? '',
+      'whatsappTemplate',
+      'updateMany',
+      'whatsappTemplateCompanyScope',
+    )
+    expect(llamadas).toBe(esperadas)
+    expect(sinAmbito).toBe(0)
+  })
+
+  it('applySync: la hora en la conexion va por `whatsappConnectionCompanyScope(scope)` y solo a una viva; las altas llevan `companyScopeColumns(scope)`', () => {
+    const cuerpo = funcionDe('applySync')?.cuerpo ?? ''
+    const conexion = escriturasSinAmbito(cuerpo, 'whatsappConnection', 'updateMany', 'whatsappConnectionCompanyScope')
+    expect(conexion).toEqual({ llamadas: 1, sinAmbito: 0 })
+    const llamada = /\bprisma\s*\.\s*whatsappConnection\s*\.\s*updateMany\s*\(/.exec(cuerpo)
+    const abre = cuerpo.indexOf('(', llamada?.index ?? 0)
+    expect(cuerpo.slice(abre, cierreEquilibrado(cuerpo, abre, '(', ')'))).toMatch(/\bdeletedAt\s*:\s*null\b/)
+    expect(cuerpo).toMatch(/\bconst\s+columns\s*=\s*companyScopeColumns\s*\(\s*scope\s*\)/)
+    expect(escriturasSinAmbito(cuerpo, 'whatsappTemplate', 'createMany', 'companyScopeColumns').llamadas).toBe(1)
+    expect(cuerpo).toMatch(/createMany\s*\(\s*\{\s*data\s*:[\s\S]*\.\.\.columns\b/)
+  })
+
+  it('insertCreated: la empresa del SQL sale de `companyScopeColumns(scope)` y el `DO UPDATE` no toca otra empresa', () => {
+    const funcion = funcionDe('insertCreated')
+    expect(funcion).toBeTruthy()
+    expect(funcion?.cuerpo ?? '').toMatch(/\bconst\s+columns\s*=\s*companyScopeColumns\s*\(\s*scope\s*\)/)
+    const fuente = sinComentarios(readFileSync(join(PERSISTENCE_ROOT, ADAPTADOR_PLANTILLAS), 'utf8'))
+    const texto = fuente.slice(funcion?.inicio ?? 0, (funcion?.fin ?? 0) + 1)
+    expect(texto).toMatch(/\$\{\s*columns\.companyId\s*\}::uuid/)
+    expect(texto).toMatch(/DO UPDATE[\s\S]*WHERE\s+"whatsapp_templates"\."company_id"\s*=\s*EXCLUDED\."company_id"/)
+  })
+})
+
+describe('R3 — sensibilidad: las comprobaciones de plantillas muerden', () => {
+  it('un `updateMany` de plantillas sin la envoltura se cuenta como sin ambito', () => {
+    const cuerpo =
+      'await prisma.whatsappTemplate.updateMany({ where: { id, ...whatsappTemplateCompanyScope(scope) }, data })\n' +
+      'await prisma.whatsappTemplate.updateMany({ where: { id }, data })\n'
+    expect(escriturasSinAmbito(cuerpo, 'whatsappTemplate', 'updateMany', 'whatsappTemplateCompanyScope')).toEqual({
+      llamadas: 2,
+      sinAmbito: 1,
+    })
+  })
+
+  it('la envoltura de OTRA tabla no cuenta como ambito de plantillas', () => {
+    const cuerpo = 'await prisma.whatsappTemplate.updateMany({ where: { id, ...whatsappConnectionCompanyScope(scope) } })\n'
+    expect(escriturasSinAmbito(cuerpo, 'whatsappTemplate', 'updateMany', 'whatsappTemplateCompanyScope').sinAmbito).toBe(1)
+  })
+
+  it('un `$queryRaw` como plantilla etiquetada sin `scope` en la firma da hallazgo', () => {
+    const fuente =
+      "import { whatsappTemplateCompanyScope } from './company-scope'\n" +
+      'export async function leak(id: string) {\n' +
+      '  return prisma.$queryRaw`SELECT * FROM whatsapp_templates WHERE id = ${id}`\n' +
+      '}\n'
+    expect(hallazgosDe('x.ts', analizarFuente(fuente), false).join('\n')).toMatch(/sin declarar/)
   })
 })
 

@@ -52,6 +52,10 @@ export const RUTAS_FUERA_DE_SESION: Readonly<Record<string, Clasificacion>> = {
     anadido: 'integraciones',
     prueba: 'tests/unit/integraciones/whatsapp/receive-whatsapp-webhook.test.ts',
   },
+  'app/api/cron/sincronizar-plantillas-whatsapp/route.ts': {
+    anadido: 'integraciones',
+    prueba: 'tests/unit/integraciones/whatsapp/templates/sync-all-whatsapp-templates.test.ts',
+  },
 };
 
 export function listApiRoutes(root: string): readonly string[] {
@@ -129,6 +133,14 @@ describe('guardia: rutas que corren sin sesión', () => {
     expect(RUTAS_FUERA_DE_SESION['app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts']).toEqual({
       anadido: 'integraciones',
       prueba: 'tests/unit/integraciones/whatsapp/receive-whatsapp-webhook.test.ts',
+    });
+  });
+
+  it('QC-242 R35: el cron de plantillas es del añadido `integraciones`, con la prueba de R32', () => {
+    expect(rutas).toContain('app/api/cron/sincronizar-plantillas-whatsapp/route.ts');
+    expect(RUTAS_FUERA_DE_SESION['app/api/cron/sincronizar-plantillas-whatsapp/route.ts']).toEqual({
+      anadido: 'integraciones',
+      prueba: 'tests/unit/integraciones/whatsapp/templates/sync-all-whatsapp-templates.test.ts',
     });
   });
 

@@ -42,6 +42,9 @@
  * **2026-10-16**: `company_last_administrator`.
  * **2026-10-19**: `customer_phone_country_required`, `customer_phone_invalid`,
  * `customer_duplicate_phone`.
+ * **2026-10-20**: `whatsapp_template_not_found`, `whatsapp_template_name_taken`,
+ * `whatsapp_template_rate_limited`, `whatsapp_template_rejected`, `whatsapp_meta_rejected`,
+ * `whatsapp_meta_unreachable`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -238,6 +241,12 @@ export const ERROR_CODES = [
   // elegido.
   'customer_phone_invalid',
   'customer_duplicate_phone',
+  'whatsapp_template_not_found',
+  'whatsapp_template_name_taken',
+  'whatsapp_template_rate_limited',
+  'whatsapp_template_rejected',
+  'whatsapp_meta_rejected',
+  'whatsapp_meta_unreachable',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

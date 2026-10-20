@@ -2758,10 +2758,17 @@ const secretDigest: SecretDigest = secretDigestSha256;
 
 import {
   createCreateWhatsappConnection,
+  createCreateWhatsappTemplate,
+  createDeleteWhatsappTemplate,
   createGetWhatsappConnection,
+  createGetWhatsappTemplate,
+  createListWhatsappTemplates,
   createReceiveWhatsappWebhook,
   createRegenerateWhatsappVerifyToken,
+  createResyncWhatsappTemplates,
   createSetWhatsappConnectionEnabled,
+  createSyncAllWhatsappTemplates,
+  createSyncWhatsappTemplates,
   createTestWhatsappConnection,
   createUpdateWhatsappConnection,
   createVerifyWhatsappWebhook,
@@ -2778,6 +2785,16 @@ import {
   updateLiveWhatsappConnection,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma';
 import { recordWhatsappInbound } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma';
+import {
+  applyWhatsappTemplateSync,
+  applyWhatsappTemplateWebhookUpdates,
+  findLiveWhatsappTemplateById,
+  findLiveWhatsappTemplateByNameAndLanguage,
+  insertCreatedWhatsappTemplate,
+  listLiveWhatsappTemplates,
+  listWhatsappTemplatesForSync,
+  markWhatsappTemplateDeleted,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-template-prisma';
 import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
 import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
@@ -2787,6 +2804,7 @@ import type { WebhookSignature } from '@/lib/modules/integraciones/ports/webhook
 import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository';
 import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client';
 import type { WhatsappInboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-inbox-repository';
+import type { WhatsappTemplateRepository } from '@/lib/modules/integraciones/ports/whatsapp-template-repository';
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory';
 import { whatsappWebhookPath } from '@/lib/shared/routes';
 
@@ -2796,6 +2814,18 @@ const whatsappGraphClient: WhatsappGraphClient = {
     integrationsE2EDoublesEnabled()
       ? whatsappGraphClientCanned.fetchPhoneNumber(input)
       : whatsappGraphClientFetch.fetchPhoneNumber(input),
+  createTemplate: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.createTemplate(input)
+      : whatsappGraphClientFetch.createTemplate(input),
+  listTemplatesPage: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.listTemplatesPage(input)
+      : whatsappGraphClientFetch.listTemplatesPage(input),
+  deleteTemplate: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.deleteTemplate(input)
+      : whatsappGraphClientFetch.deleteTemplate(input),
 };
 
 const whatsappConnectionRepository: WhatsappConnectionRepository = {
@@ -2806,10 +2836,22 @@ const whatsappConnectionRepository: WhatsappConnectionRepository = {
   recordWebhookHandshake: recordWhatsappWebhookHandshake,
 };
 
+const whatsappTemplateRepository: WhatsappTemplateRepository = {
+  listLive: listLiveWhatsappTemplates,
+  findLiveById: findLiveWhatsappTemplateById,
+  findLiveByNameAndLanguage: findLiveWhatsappTemplateByNameAndLanguage,
+  insertCreated: insertCreatedWhatsappTemplate,
+  markDeleted: markWhatsappTemplateDeleted,
+  listForSync: listWhatsappTemplatesForSync,
+  applySync: applyWhatsappTemplateSync,
+  applyWebhookUpdates: applyWhatsappTemplateWebhookUpdates,
+};
+
 const randomSource: RandomSource = randomSourceNode;
 
 const whatsappDeps = {
   connections: whatsappConnectionRepository,
+  templates: whatsappTemplateRepository,
   graph: whatsappGraphClient,
   cipher: secretCipher,
   digest: secretDigest,
@@ -2824,7 +2866,7 @@ const integrationsSwitch: IntegrationsSwitch = {
   isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'integraciones'),
 };
 
-/** Sin Graph ni cola: recibir un webhook no llama hacia fuera. */
+/** `graph` solo lo usa la resincronización, que corre después de responder a Meta. */
 const whatsappWebhookDeps = {
   directory: whatsappWebhookDirectory,
   integrations: integrationsSwitch,
@@ -2833,7 +2875,11 @@ const whatsappWebhookDeps = {
   cipher: secretCipher,
   signature: webhookSignature,
   inbox: whatsappInboxRepository,
+  templates: whatsappTemplateRepository,
+  graph: whatsappGraphClient,
 };
+
+const whatsappTemplateCronDeps = { ...whatsappWebhookDeps, listCompanyIds: listActiveCompanyIds };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
 
@@ -2941,6 +2987,14 @@ export const integraciones = {
   reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
   verifyWhatsappWebhook: createVerifyWhatsappWebhook(whatsappWebhookDeps),
   receiveWhatsappWebhook: createReceiveWhatsappWebhook(whatsappWebhookDeps),
+  listWhatsappTemplates: createListWhatsappTemplates(whatsappDeps),
+  getWhatsappTemplate: createGetWhatsappTemplate(whatsappDeps),
+  createWhatsappTemplate: createCreateWhatsappTemplate(whatsappDeps),
+  syncWhatsappTemplates: createSyncWhatsappTemplates(whatsappDeps),
+  deleteWhatsappTemplate: createDeleteWhatsappTemplate(whatsappDeps),
+  resyncWhatsappTemplates: createResyncWhatsappTemplates(whatsappWebhookDeps),
+  syncAllWhatsappTemplates: createSyncAllWhatsappTemplates(whatsappTemplateCronDeps),
+  verifyCronSecret,
 } as const;
 
 import {
