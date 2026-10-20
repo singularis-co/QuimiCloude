@@ -779,6 +779,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261019130000_customers_phone_e164',
   // QC-238 2026-10-19: contactos y mensajes de WhatsApp; no toca el identificador.
   '20261019140000_whatsapp_contacts_and_messages',
+  // QC-239 2026-10-20: telefonos de cliente n:m y vinculo de contactos; no toca el identificador.
+  '20261020120000_customer_phone_numbers',
 ] as const
 
 export function hallazgosDeMigraciones(

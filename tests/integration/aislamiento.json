@@ -23,6 +23,7 @@
     "asignaciones/responsible-eligibility.int.test.ts",
     "asignaciones/step-evidence-constraints.int.test.ts",
     "asignaciones/unassign.int.test.ts",
+    "clientes/customer-phone-numbers-migration.int.test.ts",
     "clientes/customers-constraints.int.test.ts",
     "clientes/customers-migration.int.test.ts",
     "clientes/customers-phone-migration.int.test.ts",

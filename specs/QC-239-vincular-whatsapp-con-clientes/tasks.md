@@ -8,7 +8,7 @@
 > número, reconversión de `duplicate`, acciones de teléfonos en QC-303, vincular reemplaza el
 > teléfono antiguo) ya están en `requirements.md` y en `design.md`.
 
-## T1 — Esquema y migración
+## [x] T1 — Esquema y migración
 - `db/schema.prisma`: `PhoneNumber`, `CustomerPhoneNumber` (`/// @module clientes`) y las tres
   columnas de `WhatsappContact` (design § 2). Reescribir el `///` de `Customer`: ya no hay índice
   único de teléfono.
@@ -19,7 +19,7 @@
 - **Hecho:** UP → DOWN → UP verde en la base de test. El caso de duplicados del DOWN, verde.
   `guard-empresa-en-esquema` y `guard-rls-force`, verdes.
 
-## T2 — Dominio puro de números (depende de T1)
+## [x] T2 — Dominio puro de números (depende de T1)
 - `waIdCandidates` en `phone-matches-wa-id.ts`, `parseWaIdPhone` en `customer-phone.ts`, y sus
   exportaciones en el barrel.
 - Tests: `phone-matches-wa-id.test.ts` (propiedad, R19) y `customer-phone.test.ts` (R30).

@@ -101,10 +101,10 @@ function findRepoRoot(startDir: string): string {
   }
 }
 
-function locateMigrationDir(): string {
+function locateMigrationDir(pattern: RegExp = /^\d{14}_customers_phone_e164$/): string {
   const migrationsDir = join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), 'db', 'migrations')
-  const carpetas = readdirSync(migrationsDir).filter((name) => /^\d{14}_customers_phone_e164$/.test(name))
-  expect(carpetas, 'debe existir exactamente una migracion *_customers_phone_e164').toHaveLength(1)
+  const carpetas = readdirSync(migrationsDir).filter((name) => pattern.test(name))
+  expect(carpetas, `debe existir exactamente una migracion ${pattern.source}`).toHaveLength(1)
   return join(migrationsDir, carpetas[0] as string)
 }
 
@@ -123,6 +123,13 @@ function statementsOf(sql: string): readonly string[] {
 const migrationDir = locateMigrationDir()
 const UP_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'migration.sql'), 'utf8'))
 const DOWN_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'down.sql'), 'utf8'))
+
+// Nota 2026-10-20: `*_customer_phone_numbers` retira el indice unico de esta migracion y copia
+// `phone_e164` a la tabla puente. Un rollback real la revierte antes que esta y la reaplica despues;
+// las aserciones del indice se hacen sobre el estado que deja su DOWN.
+const phoneNumbersDir = locateMigrationDir(/^\d{14}_customer_phone_numbers$/)
+const PHONE_NUMBERS_UP = statementsOf(readFileSync(join(phoneNumbersDir, 'migration.sql'), 'utf8'))
+const PHONE_NUMBERS_DOWN = statementsOf(readFileSync(join(phoneNumbersDir, 'down.sql'), 'utf8'))
 
 async function applyStatements(tx: Prisma.TransactionClient, statements: readonly string[]): Promise<void> {
   for (const statement of statements) {
@@ -179,6 +186,7 @@ describe('migracion customers_phone_e164 contra Postgres real', () => {
 
       expect(await phoneColumns(tx)).toEqual(['phone', 'phone_country', 'phone_e164', 'phone_issue'])
 
+      await applyStatements(tx, PHONE_NUMBERS_DOWN)
       await applyStatements(tx, DOWN_STATEMENTS)
       expect(await phoneColumns(tx)).toEqual(['phone'])
       const trasDown = await tx.$queryRaw<{ phone: string | null }[]>`
@@ -186,6 +194,7 @@ describe('migracion customers_phone_e164 contra Postgres real', () => {
       expect(trasDown).toEqual([{ phone: '300 123 4567' }])
 
       await applyStatements(tx, UP_STATEMENTS)
+      await applyStatements(tx, PHONE_NUMBERS_UP)
       expect(await phoneColumns(tx)).toEqual(['phone', 'phone_country', 'phone_e164', 'phone_issue'])
       const trasUp = await tx.$queryRaw<
         { phone: string | null; phone_country: string | null; phone_e164: string | null; phone_issue: string | null }[]
@@ -276,8 +285,9 @@ describe('migracion customers_phone_e164 contra Postgres real', () => {
     })
   })
 
-  it('R14: el indice parcial rechaza el mismo phone_e164 entre vivos de la misma empresa y admite baja u otra empresa', async () => {
+  it('R14: el indice parcial rechaza el mismo phone_e164 entre vivos de la misma empresa y admite baja u otra empresa (sin la migracion que lo retira, QC-239 R7)', async () => {
     await inRolledBackTransaction(async (tx) => {
+      await applyStatements(tx, PHONE_NUMBERS_DOWN)
       const companyId = await createCompany(tx)
       const otraEmpresa = await createCompany(tx)
       const numero = { phone: '+57 300 123 4567', phoneCountry: 'CO', phoneE164: '573001234567' }

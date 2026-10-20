@@ -1051,9 +1051,9 @@ model DocumentFile {
   @@map("document_files")
 }
 
-/// Lo unico que no se repite es `phoneE164` entre los vivos de una empresa; ese indice es parcial
-/// y vive solo en la migracion, como sus CHECK de formato. Las tres columnas `*Normalized` son
-/// derivadas, escritas por la aplicacion para la busqueda sin acentos; no llevan `@unique` ni
+/// `phoneE164` puede repetirse entre clientes: es el espejo del telefono principal de
+/// `CustomerPhoneNumber`, y sus CHECK de formato viven solo en la migracion. Las tres columnas
+/// `*Normalized` son derivadas, escritas por la aplicacion para la busqueda sin acentos; no llevan `@unique` ni
 /// `@@index` porque sus indices de trigramas son parciales y viven solo en la migracion.
 /// `companyId`, `createdBy` y `updatedBy` van sin `@relation` para que un `include` no cruce a
 /// otro modulo; sus FK estan escritas a mano y son drift. `customers_company_id_id_key` es la
@@ -1084,6 +1084,37 @@ model Customer {
   @@index([createdBy], map: "customers_created_by_idx")
   @@index([updatedBy], map: "customers_updated_by_idx")
   @@map("customers")
+}
+
+/// Un numero por empresa. Nunca se borra: un numero sin clientes es una fila sin uso.
+/// @module clientes
+model PhoneNumber {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  e164      String   @db.VarChar(15)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([companyId, e164], map: "phone_numbers_company_id_e164_key")
+  @@unique([companyId, id], map: "phone_numbers_company_id_id_key")
+  @@map("phone_numbers")
+}
+
+/// FK compuestas con company_id escritas a mano en la migracion; los indices unicos son parciales
+/// y viven solo en la migracion.
+/// @module clientes
+model CustomerPhoneNumber {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  customerId    String    @map("customer_id") @db.Uuid
+  phoneNumberId String    @map("phone_number_id") @db.Uuid
+  main          Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([companyId, phoneNumberId], map: "customer_phone_numbers_company_phone_idx")
+  @@map("customer_phone_numbers")
 }
 
 enum OrderExecutionAction {
@@ -1237,20 +1268,25 @@ enum WhatsappMessageOrigin {
   @@map("whatsapp_message_origin")
 }
 
-/// Sin `@relation`: las FK compuestas con `company_id` (a la conexion y, en los mensajes, al
-/// contacto) estan escritas a mano en la migracion, para que ningun `include` cruce de empresa.
+/// Sin `@relation`: las FK compuestas con `company_id` (a la conexion, al cliente y, en los
+/// mensajes, al contacto) estan escritas a mano en la migracion, para que ningun `include` cruce
+/// de empresa. `customerLinkedBy` no nulo marca el vinculo elegido por un usuario: el recalculo
+/// automatico no lo pisa mientras el cliente conserve el numero.
 /// @module integraciones
 model WhatsappContact {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId     String    @map("company_id") @db.Uuid
-  connectionId  String    @map("connection_id") @db.Uuid
-  waId          String    @map("wa_id")
-  profileName   String?   @map("profile_name")
-  customerId    String?   @map("customer_id") @db.Uuid
-  lastInboundAt DateTime? @map("last_inbound_at") @db.Timestamptz(6)
-  lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz(6)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String    @map("company_id") @db.Uuid
+  connectionId     String    @map("connection_id") @db.Uuid
+  waId             String    @map("wa_id")
+  profileName      String?   @map("profile_name")
+  customerId       String?   @map("customer_id") @db.Uuid
+  customerLinkedBy String?   @map("customer_linked_by") @db.Uuid
+  blockedAt        DateTime? @map("blocked_at") @db.Timestamptz(6)
+  blockedBy        String?   @map("blocked_by") @db.Uuid
+  lastInboundAt    DateTime? @map("last_inbound_at") @db.Timestamptz(6)
+  lastMessageAt    DateTime? @map("last_message_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([connectionId, waId], map: "whatsapp_contacts_connection_id_wa_id_key")
   @@unique([companyId, id], map: "whatsapp_contacts_company_id_id_key")

@@ -43,12 +43,13 @@ export {
   formatPhoneInternational,
   countryFromInternationalInput,
   describeCustomerPhone,
+  parseWaIdPhone,
   type CustomerPhoneIssue,
   type ParsedCustomerPhone,
   type ParsedLegacyPhone,
   type CustomerPhoneDescription,
 } from './domain/customer-phone';
-export { phoneMatchesWaId } from './domain/phone-matches-wa-id';
+export { phoneMatchesWaId, waIdCandidates } from './domain/phone-matches-wa-id';
 export {
   planLegacyPhoneBackfill,
   type LegacyPhoneRow,
