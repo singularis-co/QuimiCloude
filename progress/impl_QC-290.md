@@ -224,3 +224,59 @@ Grafo (MCP) no consultado en esta tanda: Grep/Read sobre el worktree.
 
 T5 hecho: sheet, tope, paso a `ENTREGADO` y estado del listado esperan reales − libres; acondicionamiento
 y «Reparto» siguen con reales. Sin bloqueos.
+
+## T7 — Diálogo sin bloqueo y con aviso (frontend_dev, 2026-10-20)
+
+### Archivos
+
+- `app/(private)/asignacion/empaque/[id]/components/packing-finish-dialog.tsx`: fuera `maxPackagesForLine`,
+  `TEXTS.exceeds`, `LineView.exceeds` y `overQuantity` (el total del pie ya no se pinta en `text-destructive`).
+  El error de stock del envase se evalúa igual para toda línea por encima del plan. `describeLines` calcula
+  `packingSurplusByLine` con los mismos datos del total y devuelve `surplus` solo si ninguna línea tiene error y
+  el excedente no es 0. Aviso: `Notice tone="info"` (role `status`) como primer hijo del pie, `w-full flex-none`
+  (encima de «Envasado: …»), título «Sobran <excedente> sobre el pedido.» y cuerpo «Quedan libres en stock: …» o
+  «Ningún envase queda libre: …». Textos nuevos: `surplus`, `freePackages`, `surplusFree`, `surplusNoneFree`;
+  testid nuevo `PACKING_FINISH_SURPLUS_TESTID`.
+- `app/(private)/asignacion/empaque/[id]/components/index.ts`: exporta `PACKING_FINISH_SURPLUS_TESTID`.
+- `lib/modules/pedidos/domain/packing-count.ts`, `lib/modules/pedidos/index.ts`: borrada `maxPackagesForLine`.
+  `grep maxPackagesForLine` fuera de `specs/` y `progress/`: sin resultados.
+- `tests/unit/pedidos/packing-count.test.ts`: borrado el bloque `describe('maxPackagesForLine')`.
+- `tests/unit/asignaciones-ui/packing-finish-dialog.test.tsx`: el bloque «tope de la cantidad del pedido» (L412-439)
+  pasa a «con excedente sobre el pedido»; el `T.exceeds` de L541 pasa a los textos del aviso.
+
+### R → test (T7), en `tests/unit/asignaciones-ui/packing-finish-dialog.test.tsx`
+
+| R | Test |
+|---|---|
+| R19 | «R19, R24: Galón 16 supera 72 L → sin error de línea, insignia normal, total sin tono de error y Terminar activo»; «R19: con excedente y motivos, Terminar envía el conteo real»; «R1–R10, R19, R20: los textos con plantilla…» (`exceeds` ya no existe) |
+| R20 | «R20: estado del tablero (Galón 16, Botella 17) → un aviso informativo encima del pie…»; «R20: varios envases libres de una presentación van en plural»; «R20: si lo que sobra no llega a un envase entero…»; «R20: con una línea con error de conteo no hay aviso…» |
+| R21 | «R21: igual o por debajo de la cantidad no hay aviso ni error»; «R21: al volver por debajo de la cantidad el aviso desaparece» |
+| R22 | «R22: %s → los libres del aviso son los de packingSurplusByLine» (3 casos) |
+| R23 | «R23: con excedente el stock del envase sigue bloqueando y sin aviso»; «R23: con excedente siguen los motivos de «más», el motivo obligatorio y la ayuda de envases vacíos»; «R23: con excedente un conteo vacío sigue siendo error y deshabilita Terminar» |
+| R24 | «R19, R24: …»; «R24: el pie dice siempre «Envasado: total de cantidad», también por encima» |
+
+### Salida real
+
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`; los 10 avisos son previos y en archivos que T7 no toca
+  (`step-evidence.tsx`, `list-execution-traces.test.ts`, `confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest run tests/unit/asignaciones-ui/packing-finish-dialog.test.tsx tests/unit/pedidos/packing-count.test.ts`:
+  `Test Files 2 passed (2)`, `Tests 104 passed (104)`.
+- `pnpm exec vitest related --run <dialog, packing-count.ts, pedidos/index.ts>`: «No test files found, exiting with
+  code 0» en este worktree (causa no investigada; T5 lo corrió con el `.env` del repo principal). En su lugar, los consumidores directos del barril de
+  componentes de empaque: `packing-order-evidence`, `packing-order-page`, `packing-order-screen`,
+  `qc195-lineas-antiguas`, `asignacion-acondicionamiento-paridad`, `confirmaciones-paridad`,
+  `recipe-route-contract`, `step-reader`: `Test Files 8 passed (8)`, `Tests 304 passed (304)`.
+
+### Desviaciones respecto al tablero
+
+- Orden de la lista de libres: el tablero la arma en el orden de reparto de los libres (mayor contenido primero);
+  el diálogo la lista en el orden de las líneas del reparto. Coinciden en el estado aprobado (Galón, Botella) y
+  los números son siempre los de `packingSurplusByLine`; solo cambia el orden del texto si una línea de menor
+  contenido va antes en el reparto.
+- Formato de cantidades: el excedente pasa por `formatDecimalDisplay`, igual que el total del pie
+  (en jsdom «5.48 L»; el tablero muestra «5,48 L»), sin cambio respecto a cómo el diálogo ya pinta el total.
+
+### Veredicto T7
+
+Hecho: el exceso ya no bloquea ni pinta error; aviso informativo con los libres de `packingSurplusByLine`; el stock del envase sigue bloqueando; `maxPackagesForLine` borrada. Sin bloqueos.

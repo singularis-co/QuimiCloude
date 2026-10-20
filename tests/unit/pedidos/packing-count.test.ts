@@ -6,7 +6,6 @@ import {
   PACKING_REASON_OTHER_MAX,
   checkPackingCounts,
   effectivePackages,
-  maxPackagesForLine,
   orderedPackages,
   packedTotalInOrderUnit,
   packingSurplusByLine,
@@ -187,32 +186,6 @@ describe('packedTotalInOrderUnit', () => {
   it('R15: una unidad inconvertible se informa, no se suma', () => {
     const result = packedTotalInOrderUnit(LITRO, [packed({ lineId: 'a', unit: KILO, presentationId: 'p-kilo' })]);
     expect(result).toEqual({ kind: 'incompatible_units', presentationId: 'p-kilo' });
-  });
-});
-
-describe('maxPackagesForLine', () => {
-  it('R8, R15: mayor entero que no supera la cantidad con las demas lineas fijas', () => {
-    const lines = [
-      packed({ lineId: 'a', packedPackages: 3, content: '5', unit: LITRO }),
-      packed({ lineId: 'b', packedPackages: 40, content: '250', unit: MILILITRO }),
-    ];
-    expect(maxPackagesForLine('20', LITRO, lines, 'b')).toBe(20);
-    expect(maxPackagesForLine('20', LITRO, lines, 'a')).toBe(2);
-  });
-
-  it('R8, R15: con cantidad exacta el maximo llena justo la cantidad', () => {
-    const lines = [packed({ lineId: 'a', packedPackages: 1, content: '2.5' })];
-    expect(maxPackagesForLine('10', LITRO, lines, 'a')).toBe(4);
-    expect(maxPackagesForLine('9.99', LITRO, lines, 'a')).toBe(3);
-  });
-
-  it('R8: si ni con 0 cabe, no hay maximo', () => {
-    const lines = [packed({ lineId: 'a', content: '1' }), packed({ lineId: 'b', packedPackages: 30, content: '1' })];
-    expect(maxPackagesForLine('20', LITRO, lines, 'a')).toBeNull();
-  });
-
-  it('R8: una linea que no esta en la lista no tiene maximo', () => {
-    expect(maxPackagesForLine('20', LITRO, [packed({ lineId: 'a' })], 'z')).toBeNull();
   });
 });
 

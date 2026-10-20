@@ -68,7 +68,7 @@
     espera 10; excedente = 2).
   - Hecho: test verde; el resto de tests de QC-288 sigue verde.
 
-- [ ] **T7 — Diálogo sin bloqueo y con aviso** (frontend). **Depende de T1 aprobado** y de T0. R19–R24.
+- [x] **T7 — Diálogo sin bloqueo y con aviso** (frontend). **Depende de T1 aprobado** y de T0. R19–R24.
   - `packing-finish-dialog.tsx` según design §5 y el tablero de T1.
   - Borrar `maxPackagesForLine` de `packing-count.ts` y `pedidos/index.ts`, y su bloque en
     `packing-count.test.ts`.

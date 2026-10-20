@@ -143,42 +143,6 @@ export function packedTotalInOrderUnit(
   return sumInOrderUnit(orderUnit, toDistributionLines(lines));
 }
 
-/**
- * El mayor numero de envases de `lineId` que, con las demas lineas como estan, no supera la
- * cantidad del pedido. `null` si ni con 0 cabe, o si alguna linea no se puede convertir.
- */
-export function maxPackagesForLine(
-  quantity: string,
-  orderUnit: UnitConversion,
-  lines: readonly PackedDistributionLine[],
-  lineId: string,
-): number | null {
-  if (!lines.some((line) => line.lineId === lineId)) return null;
-
-  const fits = (packages: number): boolean =>
-    validateDistribution(
-      quantity,
-      orderUnit,
-      toDistributionLines(lines.map((line) => (line.lineId === lineId ? { ...line, packedPackages: packages } : line))),
-    ).kind === 'ok';
-
-  if (!fits(0)) return null;
-
-  let low = 0;
-  let high = 1;
-  while (fits(high)) {
-    if (high >= Number.MAX_SAFE_INTEGER) return Number.MAX_SAFE_INTEGER;
-    low = high;
-    high = Math.min(high * 2, Number.MAX_SAFE_INTEGER);
-  }
-  while (high - low > 1) {
-    const middle = low + Math.floor((high - low) / 2);
-    if (fits(middle)) low = middle;
-    else high = middle;
-  }
-  return low;
-}
-
 export type SurplusLine = PackedDistributionLine & { readonly plan: number };
 
 export type PackingSurplus =

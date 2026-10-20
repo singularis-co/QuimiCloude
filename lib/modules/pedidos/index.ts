@@ -186,7 +186,6 @@ export {
   PACKING_REASON_OTHER_MAX,
   checkPackingCounts,
   effectivePackages,
-  maxPackagesForLine,
   orderedPackages,
   packedTotalInOrderUnit,
   packingSurplusByLine,
