@@ -10,8 +10,10 @@ import type { CompanyRow } from '@/lib/modules/identity';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { maestroCompanyRoute } from '@/lib/shared/routes';
 
+import { CompanyAddonAvatars } from './company-addon-avatars';
 import {
   COMPANY_COLUMN_LABELS,
+  COMPANY_CONTACT_EMPTY_LABELS,
   COMPANY_CREATED_PREFIX,
   COMPANY_MENU_LABELS,
   COMPANY_STATUS_LABELS,
@@ -26,11 +28,43 @@ import { CREATED_AT_COLUMN_ID, NAME_COLUMN_ID, STATUS_COLUMN_ID } from './compan
 export const TAX_ID_COLUMN_ID = 'taxId';
 export const COUNTRY_COLUMN_ID = 'country';
 export const USERS_COLUMN_ID = 'liveUserCount';
+export const CONTACT_COLUMN_ID = 'contact';
+export const MODULES_COLUMN_ID = 'modules';
 
-export const COMPANY_COLUMN_COUNT = 7;
+export const COMPANY_COLUMN_COUNT = 9;
 
 // Solo se ven en la tarjeta: en la tabla la cabecera de la columna ya dice qué es el dato.
 const CARD_ONLY = 'hidden @max-[760px]:inline';
+
+function ContactLine({ value, emptyLabel }: { readonly value: string | null; readonly emptyLabel: string }) {
+  return value === null ? (
+    <span aria-label={emptyLabel} data-empty="true" className="text-muted-foreground">
+      {EMPTY_MARK}
+    </span>
+  ) : (
+    <span className="break-all">{value}</span>
+  );
+}
+
+function CompanyContact({ company }: { readonly company: CompanyRow }) {
+  if (company.contactEmail === null && company.contactPhone === null) {
+    return (
+      <span aria-label={COMPANY_CONTACT_EMPTY_LABELS.both} data-testid="company-contact" data-empty="true">
+        {EMPTY_MARK}
+      </span>
+    );
+  }
+  return (
+    <span className="flex flex-col" data-testid="company-contact">
+      <span data-testid="company-contact-email">
+        <ContactLine value={company.contactEmail} emptyLabel={COMPANY_CONTACT_EMPTY_LABELS.email} />
+      </span>
+      <span data-testid="company-contact-phone" className="tabular-nums">
+        <ContactLine value={company.contactPhone} emptyLabel={COMPANY_CONTACT_EMPTY_LABELS.phone} />
+      </span>
+    </span>
+  );
+}
 
 export type CompanyRowAction = 'edit' | 'delete' | 'reactivate';
 
@@ -132,6 +166,12 @@ export function buildCompanyColumns(deps: CompanyColumnsDeps): readonly DataTabl
         ),
     },
     {
+      id: CONTACT_COLUMN_ID,
+      label: COMPANY_COLUMN_LABELS.contact,
+      align: 'start',
+      cell: (company) => <CompanyContact company={company} />,
+    },
+    {
       id: COUNTRY_COLUMN_ID,
       label: COMPANY_COLUMN_LABELS.country,
       align: 'start',
@@ -155,6 +195,12 @@ export function buildCompanyColumns(deps: CompanyColumnsDeps): readonly DataTabl
           <span className={CARD_ONLY}>{COMPANY_USERS_SUFFIX}</span>
         </span>
       ),
+    },
+    {
+      id: MODULES_COLUMN_ID,
+      label: COMPANY_COLUMN_LABELS.modules,
+      align: 'start',
+      cell: (company) => <CompanyAddonAvatars addons={company.activeAddons} />,
     },
     {
       id: CREATED_AT_COLUMN_ID,

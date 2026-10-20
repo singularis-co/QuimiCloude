@@ -19,13 +19,27 @@ export const NO_COUNTRY_LABEL = 'Sin país';
 export const COMPANY_COLUMN_LABELS = {
   name: 'Nombre',
   taxId: 'Identificación fiscal',
+  contact: 'Contacto',
   country: 'País',
   liveUserCount: 'Usuarios',
+  modules: 'Módulos',
   createdAt: 'Creada',
   status: 'Estado',
 } as const;
 
 export const COMPANY_USERS_SUFFIX = ' usuarios';
+
+export const COMPANY_CONTACT_EMPTY_LABELS = {
+  both: 'Sin contacto',
+  email: 'Sin correo de contacto',
+  phone: 'Sin teléfono de contacto',
+} as const;
+
+export const COMPANY_NO_MODULES_LABEL = 'Sin módulos';
+
+export function companyModulesOverflowLabel(names: readonly string[]): string {
+  return `${names.length} módulos más: ${names.join(', ')}`;
+}
 export const COMPANY_CREATED_PREFIX = 'creada ';
 
 export const COMPANY_MENU_LABELS = {
