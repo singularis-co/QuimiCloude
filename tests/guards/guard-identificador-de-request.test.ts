@@ -777,6 +777,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261019120000_whatsapp_connections_drop_meta_app_id',
   // 2026-10-19: telefono internacional del cliente; no toca el identificador.
   '20261019130000_customers_phone_e164',
+  // QC-238 2026-10-19: contactos y mensajes de WhatsApp; no toca el identificador.
+  '20261019140000_whatsapp_contacts_and_messages',
 ] as const
 
 export function hallazgosDeMigraciones(

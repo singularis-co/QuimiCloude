@@ -610,3 +610,16 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   del botón. El archivo también lo toca QC-291 (Rediseño de la pantalla del operario). Frena el PR a
   producción, donde corre el E2E.
 - **Dueño:** sin asignar (candidato: QC-291).
+
+## QC-238 (review, 2026-10-19)
+
+### D77 — Un mensaje «veneno» firmado del webhook de WhatsApp se reintenta en bucle
+- **Origen:** review de QC-238, vuelta 1 (m4).
+- **Qué pasa:** en dos casos Prisma lanza, la ruta responde `500` y Meta reintenta el lote entero
+  hasta rendirse, tapando el resto de mensajes del lote:
+  - un `timestamp` con demasiados dígitos da `Invalid Date`;
+  - un `\u0000` en un texto, que `text`/`jsonb` de Postgres rechazan.
+- **Riesgo:** bajo, porque el mensaje tiene que traer la firma de Meta.
+- **Qué falta:** acotar `timestamp` en el zod de la cabecera y limpiar `\u0000`, o mandar esos
+  mensajes a `UNSUPPORTED`. Puede ir en QC-239.
+- **Dueño:** Christian Quevedo.

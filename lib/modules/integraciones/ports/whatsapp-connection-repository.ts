@@ -36,6 +36,7 @@ export type WhatsappConnectionPatch = {
   readonly status?: WhatsappConnectionStatus;
   readonly lastError?: string | null;
   readonly lastCheckedAt?: Date | null;
+  readonly lastWebhookAt?: Date | null;
 };
 
 /**
@@ -51,4 +52,9 @@ export interface WhatsappConnectionRepository {
     patch: WhatsappConnectionPatch,
     scope: IntegracionesScope,
   ): Promise<WhatsappConnectionRecord | null>;
+  /**
+   * Anota la llegada del handshake y deja `ACTIVE` una conexión `PENDING`. No toca una conexión
+   * `DISABLED`, aunque la apaguen entre la lectura y esta escritura.
+   */
+  recordWebhookHandshake(id: string, at: Date, scope: IntegracionesScope): Promise<void>;
 }
