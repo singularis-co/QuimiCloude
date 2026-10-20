@@ -820,3 +820,28 @@ Ya lo soporta:
 - `tests/integration/documentos/batch-notice.int.test.ts`, «la base rechaza un nombre vacío…»: sigue siendo válido, porque prueba el CHECK de la columna y no el esquema. No se corrió: no hay base.
 
 Veredicto: menores 3 y 4 resueltos, con tests en verde. Los `.int` quedan sin correr por falta de base.
+
+Commits: `1e86535f` (menor 3) y `5c1dbc51` (menor 4).
+
+## Segunda integración de dev y verificación final (2026-10-20)
+
+`git fetch origin dev` + `git merge origin/dev` (hasta `c1dcf6ad`, QC-236; merge y no rebase), commit `5a48198d`. Cierra el **menor n.º 1**. Sin push.
+
+### Conflictos (se conservan las dos partes, como en `74075c80`)
+- `lib/composition/index.ts`: `listActiveCompanyIds` + `listAllCompanyIds` (QC-137) y `createGetCompanyCountry` + `createSetCompanyCountry` (QC-236).
+- `tests/guards/guard-identificador-de-request.test.ts`: `…120200_document_files_original_name`, `…120300_notifications_addon_removal` y `…130000_customers_phone_e164`, en orden lexicográfico, delante de `…140000`.
+- `docs/diseno/canvas/canvas.json`: fusión del JSON a tres vías. Placas, notas y página de Notificaciones (QC-137), más la placa `TelefonoCliente.dc.html` (dev), con su posición de dev en `order`. Formato de la rama, sin salto final.
+
+### Verificación (salida real)
+- `prisma generate` tras el merge (las columnas `phone*` de QC-236).
+- `pnpm run typecheck`: 0 errores. `pnpm run lint`: 0 errores y 10 avisos previos.
+- `pnpm exec vitest run guard`: 84 archivos; 1148 pass y 21 skipped.
+- `pnpm exec vitest related --run --project node --project ui` sobre los archivos de los menores y los conflictos: 431 archivos; 7281 pass y 2 skipped.
+- Base desechable `qc137_v3` (servidor del `.env` principal, cargado solo en el entorno; no copiado, commiteado ni impreso):
+  - `db:migrate`: «All migrations have been successfully applied», incluida `20261019130000_customers_phone_e164`. Segunda corrida: «No pending migrations to apply». `migrate status`: «Database schema is up to date!».
+  - Unit e integración de notificaciones y documentos, más catalog-line: 127 archivos; 1322 pass, 30 skipped y 1 fail (catalog-line R32).
+  - `pnpm exec playwright test e2e/notificaciones.spec.ts` (chromium + webkit): `14 passed (2.9m)`.
+  - Al terminar: `DROP DATABASE qc137_v3 WITH (FORCE)`. `QuimiCloude` no se ha tocado.
+
+### Rojos
+- `tests/integration/proveedores/catalog-line.int.test.ts` › R32: sigue rojo. Es ajeno (dev) y no está en `tests/baseline-rojos.json`.
