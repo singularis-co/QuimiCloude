@@ -26,7 +26,11 @@
 //      traves de un ayudante del mismo archivo al que se le pasa-. Declararlo y no usarlo seria
 //      la misma fuga con mejor cara.
 //
-// **SIN LISTA DE EXCEPCIONES.** No hay ninguna en el modulo y esta guardia no crea ninguna.
+// **UNA SOLA EXENCION, POR NOMBRE** (2026-10-20, QC-239, decision del humano): el archivo que
+// solo abre la transaccion de los telefonos del cliente (`customer-unit-of-work-prisma.ts`), con la
+// misma forma estricta que `order-unit-of-work-prisma.ts` en la guardia de `pedidos` (QC-141 D21):
+// todo `prisma.` que trae es `prisma.$transaction`, ningun `tx.<algo>`, una sola funcion y ningun
+// alias de `prisma`. Antes de esa fecha esta guardia no admitia ninguna.
 //
 // TECNICA: barrido de TEXTO sobre el disco, como el resto de `tests/guards/`. No se importa
 // ningun modulo ni se mira el grafo de imports: lo que se vigila es lo que esta ESCRITO, que es
@@ -238,6 +242,79 @@ function analizarFuente(archivo: string, source: string): ArchivoAnalizado {
 
 function analizar(archivo: string): ArchivoAnalizado {
   return analizarFuente(archivo, readFileSync(join(PERSISTENCE_ROOT, archivo), 'utf8'))
+}
+
+// --- La unica exencion por nombre -------------------------------------------------------------
+
+/**
+ * Archivos exentos por NOMBRE del barrido de ambito, como en la guardia de `pedidos`. Una sola
+ * entrada, aprobada por el humano (2026-10-20, QC-239): la funcion que abre la transaccion de los
+ * telefonos del cliente no filtra ninguna tabla por su cuenta; las consultas las hacen, con su
+ * ambito, los repositorios que la composicion construye sobre su `tx`.
+ */
+const EXENTOS_DEL_AMBITO: ReadonlyMap<string, string> = new Map([
+  [
+    'customer-unit-of-work-prisma.ts',
+    'Solo abre la transaccion de los telefonos del cliente (prisma.$transaction) y la reintenta una ' +
+      'vez; no lee ni escribe tablas. Excepcion aprobada por el humano en QC-239 (2026-10-20), con ' +
+      'la forma de QC-141 D21.',
+  ],
+])
+
+/** La unica funcion que el archivo exento puede declarar. */
+const FUNCION_EXENTA = 'withCustomerTransaction'
+
+/** En el exento, todo `prisma.…` tiene que ser `prisma.$transaction`. Sobre el codigo ya vaciado de
+ *  comentarios y cadenas, para que los casos de sensibilidad lo ejerciten sin pasar por el disco. */
+function accesosPrismaFueraDeTransaction(codigoSinComentariosNiCadenas: string): readonly string[] {
+  const accesos = codigoSinComentariosNiCadenas.match(/\bprisma\s*\.\s*\$?\w+/g) ?? []
+  return accesos.filter((acceso) => !/^prisma\s*\.\s*\$transaction\b/.test(acceso.replace(/\s+/g, ' ')))
+}
+
+/** En el exento, `tx` -o el `db` de una fabrica- no puede tocar nada: el archivo solo abre la
+ *  transaccion y reenvia `run`. Un `tx.<algo>` es la misma fuga que un `prisma.` suelto. */
+function accesosTxEnArchivoExento(codigoSinComentariosNiCadenas: string): readonly string[] {
+  return codigoSinComentariosNiCadenas.match(/\b(?:tx|db)\s*\.\s*\$?\w+/g) ?? []
+}
+
+/** ¿El archivo importa `prisma` con un alias? Sobre el fuente original, con las tres formas del
+ *  import de `@/lib/shared/db/prisma` que caza la guardia de `pedidos`. */
+function aliasDePrisma(source: string): string | null {
+  const importacion = /import\s*(?:\{([^}]*)\}|\*\s*as\s+(\w+))\s*from\s*(['"])@\/lib\/shared\/db\/prisma\3/g
+  for (const match of source.matchAll(importacion)) {
+    const especificadores = match[1]
+    const namespaceAlias = match[2]
+    if (namespaceAlias !== undefined) return namespaceAlias
+    if (especificadores === undefined) continue
+    for (const especificador of especificadores.split(',')) {
+      const conAlias = /^\s*prisma\s+as\s+(\w+)\s*$/.exec(especificador)
+      if (conAlias !== null) return conAlias[1] ?? null
+    }
+  }
+  return null
+}
+
+/** Todo lo que se sale de la forma aprobada del exento, en una lista. */
+function hallazgosDelExento(archivo: string, analizado: ArchivoAnalizado, source: string): readonly string[] {
+  const hallazgos: string[] = []
+  // Toda declaracion `function`, a cualquier nivel y con genericos: el troceador general no ve
+  // `function f<T>(`, y aqui no puede escaparse ninguna.
+  const nombres = [...analizado.codigo.matchAll(/\bfunction\s*\*?\s*(\w+)/g)].map((m) => m[1] ?? '')
+  if (nombres.length !== 1 || nombres[0] !== FUNCION_EXENTA) {
+    hallazgos.push(`${archivo}: tiene que declarar exactamente una funcion, \`${FUNCION_EXENTA}\`; declara [${nombres.join(', ')}]`)
+  }
+  for (const acceso of accesosPrismaFueraDeTransaction(analizado.codigo)) {
+    hallazgos.push(`${archivo}: \`${acceso}\` no es \`prisma.$transaction\`: el exento no consulta ninguna tabla`)
+  }
+  for (const acceso of accesosTxEnArchivoExento(analizado.codigo)) {
+    hallazgos.push(`${archivo}: \`${acceso}\` consulta por la transaccion; el exento solo la abre y reenvia \`run\``)
+  }
+  if (/\$(?:queryRaw|executeRaw)\w*/.test(analizado.codigo)) {
+    hallazgos.push(`${archivo}: no puede ejecutar SQL crudo`)
+  }
+  const alias = aliasDePrisma(source)
+  if (alias !== null) hallazgos.push(`${archivo}: importa \`prisma\` con el alias \`${alias}\`, que la guardia no ve`)
+  return hallazgos
 }
 
 // --- El puerto y su cableado --------------------------------------------------------------
@@ -624,7 +701,7 @@ async function bien(db: PrismaLike, id: string, scope: CustomerScope): Promise<u
   })
 })
 
-describe('R12 — ninguna consulta del modulo se queda sin ambito, y NO hay lista de excepciones', () => {
+describe('R12 — ninguna consulta del modulo se queda sin ambito, salvo la UNICA exencion con nombre que aprobo el humano', () => {
   /** Los archivos de persistencia del modulo, leidos del disco y no de una lista a mano. */
   const archivos = readdirSync(PERSISTENCE_ROOT).filter((archivo) => archivo.endsWith('.ts'))
 
@@ -645,6 +722,7 @@ describe('R12 — ninguna consulta del modulo se queda sin ambito, y NO hay list
     expect(conConsulta('customer-prisma.ts')).toContain('softDeleteAliveCustomer')
     // Las siete funciones de la fabrica de telefonos consultan por `db.`: sin `db` en
     // `TOCA_LA_BASE` esta lista saldria vacia.
+    for (const exento of EXENTOS_DEL_AMBITO.keys()) expect(archivos).toContain(exento)
     expect(conConsulta('customer-phone-prisma.ts')).toEqual([
       'isAliveCustomer',
       'listAliveCustomerPhoneLinks',
@@ -660,6 +738,15 @@ describe('R12 — ninguna consulta del modulo se queda sin ambito, y NO hay list
   })
 
   for (const archivo of archivos) {
+    const motivoExencion = EXENTOS_DEL_AMBITO.get(archivo)
+    if (motivoExencion !== undefined) {
+      it(`${archivo}: exento por nombre (${motivoExencion}) — una sola funcion, todo \`prisma.\` es \`prisma.$transaction\` y ningun \`tx.<modelo>\``, () => {
+        const source = readFileSync(join(PERSISTENCE_ROOT, archivo), 'utf8')
+        expect(hallazgosDelExento(archivo, analizarFuente(archivo, source), source)).toEqual([])
+      })
+      continue
+    }
+
     it(`${archivo}: toda funcion que toca la base declara y consume el ambito`, () => {
       const analizado = analizar(archivo)
 
@@ -701,19 +788,25 @@ describe('R12 — ninguna consulta del modulo se queda sin ambito, y NO hay list
     }
   }
 
-  it('no existe NINGUNA lista de excepciones de ambito, ni en esta guardia ni en el modulo', () => {
+  // 2026-10-20, QC-239, decision del humano: hasta esta fecha el caso exigia que no hubiera
+  // NINGUNA lista. Ahora hay una sola, `EXENTOS_DEL_AMBITO`, con una sola entrada.
+  it('R12 — la lista de exentos tiene UNA sola entrada, la transaccion de los telefonos del cliente', () => {
+    expect([...EXENTOS_DEL_AMBITO.keys()]).toEqual(['customer-unit-of-work-prisma.ts'])
+  })
+
+  it('R12 — hay UNA sola lista de exentos en esta guardia y ninguna en el modulo', () => {
     const estaGuardia = readFileSync(fileURLToPath(import.meta.url), 'utf8')
-    const NOMBRES_DE_LISTA = ['SIN_AMBITO_POR_DECISION_APROBADA', 'EXCEPCIONES', 'EXENTAS']
+    const NOMBRES_DE_LISTA = ['SIN_AMBITO_POR_DECISION_APROBADA', 'EXCEPCIONES', 'EXENTAS', 'EXENTOS_DEL_AMBITO']
     const marcas = NOMBRES_DE_LISTA.map(
       (nombre) => new RegExp(`^\\s*(?:const|let|type|enum)\\s+${nombre}\\b`, 'm'),
     )
 
-    for (const [indice, marca] of marcas.entries()) {
-      expect(
-        marca.test(sinComentarios(estaGuardia)),
-        `esta guardia declara una lista de excepciones (${NOMBRES_DE_LISTA[indice] ?? ''}): no se admite ninguna`,
-      ).toBe(false)
-    }
+    const declaradas = NOMBRES_DE_LISTA.flatMap((nombre) =>
+      [...sinComentarios(estaGuardia).matchAll(new RegExp(`^\\s*(?:const|let|type|enum)\\s+${nombre}\\b`, 'gm'))].map(
+        (m) => m[0].trim(),
+      ),
+    )
+    expect(declaradas, 'esta guardia declara una sola lista de exentos').toEqual(['const EXENTOS_DEL_AMBITO'])
 
     // Anti-placebo del patron: sobre un texto que SI la declararia, cae.
     expect(marcas.some((marca) => marca.test('const EXCEPCIONES = new Set([])'))).toBe(true)
@@ -731,5 +824,67 @@ describe('R12 — ninguna consulta del modulo se queda sin ambito, y NO hay list
         expect(marca.test(codigo), `${ruta} declara una lista de excepciones de ambito`).toBe(false)
       }
     }
+  })
+})
+
+describe('R12 — sensibilidad: la exencion de la transaccion de los telefonos no es un cheque en blanco', () => {
+  const EXENTO = 'customer-unit-of-work-prisma.ts'
+  const IMPORT = "import { prisma } from '@/lib/shared/db/prisma';\n"
+  const BUENA =
+    IMPORT +
+    'export async function withCustomerTransaction(run) {\n' +
+    '  try {\n' +
+    '    return await prisma.$transaction(run, { maxWait: 10_000, timeout: 30_000 });\n' +
+    '  } catch (error) {\n' +
+    '    if (!isCustomerPhoneLinkConflict(error)) throw error;\n' +
+    '    return prisma.$transaction(run, { maxWait: 10_000, timeout: 30_000 });\n' +
+    '  }\n' +
+    '}\n'
+  const hallazgos = (fuente: string): readonly string[] =>
+    hallazgosDelExento(EXENTO, analizarFuente(EXENTO, fuente), fuente)
+
+  it('control: la forma aprobada no da hallazgo', () => {
+    expect(hallazgos(BUENA)).toEqual([])
+  })
+
+  it('un `tx.customer.findMany` dentro del callback de `$transaction` da hallazgo', () => {
+    const fuente =
+      IMPORT +
+      'export async function withCustomerTransaction(run) {\n' +
+      '  return prisma.$transaction(async (tx) => {\n' +
+      '    await tx.customer.findMany();\n' +
+      '    return run(tx);\n' +
+      '  });\n' +
+      '}\n'
+    expect(hallazgos(fuente).join('\n')).toMatch(/consulta por la transaccion/)
+  })
+
+  it('una consulta por `prisma.` en el archivo exento da hallazgo, dentro o fuera de su funcion', () => {
+    const dentro = BUENA.replace('try {\n', 'try {\n    await prisma.customer.findMany();\n')
+    expect(hallazgos(dentro).join('\n')).toMatch(/no es `prisma\.\$transaction`/)
+
+    const otraFuncion = BUENA + 'export async function seCuela() {\n  return prisma.customer.findMany();\n}\n'
+    expect(hallazgos(otraFuncion).join('\n')).toMatch(/no es `prisma\.\$transaction`/)
+    expect(hallazgos(otraFuncion).join('\n')).toMatch(/exactamente una funcion/)
+  })
+
+  it('una segunda funcion sin consulta, o la misma con otro nombre, da hallazgo', () => {
+    expect(hallazgos(BUENA + 'export function helper(x) {\n  return x;\n}\n').join('\n')).toMatch(/exactamente una funcion/)
+    expect(hallazgos(BUENA.replace('withCustomerTransaction', 'withAnything')).join('\n')).toMatch(/exactamente una funcion/)
+  })
+
+  it('SQL crudo o un alias de `prisma` en el archivo exento dan hallazgo', () => {
+    expect(hallazgos(BUENA.replace('try {\n', 'try {\n    await prisma.$queryRaw`SELECT 1`;\n')).join('\n')).toMatch(/SQL crudo/)
+    const conAlias = BUENA.replace('{ prisma }', '{ prisma as db0 }')
+    expect(hallazgos(conAlias).join('\n')).toMatch(/alias/)
+    expect(aliasDePrisma("import * as db0 from '@/lib/shared/db/prisma';\n")).toBe('db0')
+  })
+
+  it('el mismo fuente aprobado con OTRO nombre de archivo no esta exento: pasa por el barrido general', () => {
+    expect(EXENTOS_DEL_AMBITO.has('customer-unit-of-work-prisma-copia.ts')).toBe(false)
+    const analizado = analizarFuente('customer-unit-of-work-prisma-copia.ts', BUENA)
+    const conConsulta = analizado.funciones.filter((f) => tocaLaBase(f.cuerpo))
+    expect(conConsulta.map((f) => f.nombre)).toEqual(['withCustomerTransaction'])
+    expect(declaraElAmbito(conConsulta[0] as FuncionDeclarada)).toBe(false)
   })
 })

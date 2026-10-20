@@ -489,6 +489,10 @@ Se exportan por el barrel como fábricas que reciben `{ phones }`, igual que las
     escrituras simultáneas del mismo cliente), reintenta la unidad entera una vez en una
     transacción nueva, como `withOrderTransaction`.
   - Si vuelve a chocar, el error sube.
+  - **Exención de la guardia de ámbito** (decisión del humano, 2026-10-20): entra por nombre en
+    `guard-ambito-empresa-clientes`, con la forma estricta de `order-unit-of-work-prisma.ts`
+    (QC-141 D21): una sola función que solo abre `$transaction`, sin `tx.` dentro ni consultas.
+    Casos de sensibilidad: el archivo exento que use `tx.` o haga una consulta ⇒ hallazgo.
 - **`legacy-phone-prisma.ts`**: por cada fila convertida o reconvertida (`count === 1`), en la
   misma transacción, `addLink(…, main: true)` con el repositorio de teléfonos sobre `tx` (driven →
   driven del mismo módulo, permitido) (R13, R49). Sin reintento por unicidad: ya no hay índice que
@@ -534,6 +538,9 @@ Se exportan por el barrel como fábricas que reciben `{ phones }`, igual que las
   - Es **la primera línea** de las cuatro acciones, antes de zod y de cualquier puerto.
 - Por qué no se usa el `requirePermission` de `clientes`: lanzaría un `ClientesError`, y el
   traductor de errores de las acciones de `integraciones` reconoce `IntegracionesError`.
+- **El literal del permiso no se escribe en `integraciones`** (decisión del humano, 2026-10-20):
+  `clientes` exporta desde su `index.ts` la constante del permiso `clientes.modificar` y
+  `actor.ts` la importa. La lista cerrada de R26 (QC-153) en `scope.test.ts` no se amplía.
 
 ### 6.2 Recálculo (`domain/refresh-whatsapp-contact-links.ts`)
 
@@ -654,6 +661,10 @@ export interface WhatsappContactUnitOfWork { run<T>(work: (s: WhatsappContactTra
   declaran `scope: IntegracionesScope` y usan `whatsappContactCompanyScope`.
 - `whatsapp-contact-unit-of-work-prisma.ts`: `withWhatsappContactTransaction(run)`, con el mismo
   reintento único de § 5.6.
+  - **Exención de la guardia de ámbito** (decisión del humano, 2026-10-20): segunda entrada por
+    nombre en `guard-ambito-empresa-integraciones`, con la misma forma estricta que
+    `order-unit-of-work-prisma.ts` (QC-141 D21). El caso R32 de QC-238 pasa de «una sola
+    entrada» a «dos entradas», con nota fechada en el test.
 
 ---
 
@@ -829,8 +840,8 @@ Descartado: entregarlas ya (ver § 14, alternativa 5).
 
 | Archivo | Cambio |
 |---|---|
-| `tests/guards/guard-ambito-empresa-clientes.test.ts` | + `CustomerPhoneRepository` (7 métodos) y `CustomerWriteRepository` (2) en el barrido. Las funciones con `db` primero y `scope` al final cuentan como cableadas a través de su fábrica `create…(db)`. 4 envolturas. Casos de sensibilidad: un método sin `scope` y una fábrica con un miembro sin función con nombre ⇒ hallazgo |
-| `tests/guards/guard-ambito-empresa-integraciones.test.ts` | + `WhatsappContactRepository` (4 métodos) con el mismo barrido. La exención única de QC-238 no cambia |
+| `tests/guards/guard-ambito-empresa-clientes.test.ts` | + `CustomerPhoneRepository` (7 métodos) y `CustomerWriteRepository` (2) en el barrido. Las funciones con `db` primero y `scope` al final cuentan como cableadas a través de su fábrica `create…(db)`. 4 envolturas. Casos de sensibilidad: un método sin `scope` y una fábrica con un miembro sin función con nombre ⇒ hallazgo. **+ exención estricta por nombre de `customer-unit-of-work-prisma.ts`** (decisión del humano 2026-10-20, forma de QC-141 D21), con sensibilidad: `tx.` o una consulta en el exento ⇒ hallazgo |
+| `tests/guards/guard-ambito-empresa-integraciones.test.ts` | + `WhatsappContactRepository` (4 métodos) con el mismo barrido. La exención de QC-238 se conserva y **se añade una segunda, `whatsapp-contact-unit-of-work-prisma.ts`**, con la forma estricta de QC-141 D21 (decisión del humano 2026-10-20). R32 pasa a «dos entradas», con nota fechada; sensibilidad: `tx.` o una consulta en el exento ⇒ hallazgo |
 | `tests/unit/integraciones/module-shape.test.ts` | Lista de archivos, contrato, cableado y quién importa el módulo, con lo nuevo de § 1 |
 | `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts` | Dobles de los puertos nuevos |
 

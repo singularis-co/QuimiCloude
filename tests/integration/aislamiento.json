@@ -517,9 +517,14 @@
       "desde": "2026-10-06"
     },
     {
-      "archivo": "clientes/customer-phone-uniqueness.int.test.ts",
-      "motivo": "T5 (QC-236): ejercita createCustomer y updateAliveCustomer de customer-prisma.ts contra el indice unico parcial del telefono, y dos altas simultaneas con el mismo numero. Usan el cliente Prisma GLOBAL (y la edicion con el numero vacio abre su propia transaccion), asi que una transaccion del test con ROLLBACK no los envolveria. Dos empresas efimeras (randomUUID, con usuario, rol y tipo de documento) nacen en beforeAll; afterAll borra sus clientes por company_id, cuenta que no quedo ninguno y despues borra usuarios, rol, tipo de documento y empresa. Se apoya en que la base de la corrida es suya.",
-      "desde": "2026-10-19"
+      "archivo": "clientes/customer-phone-shared.int.test.ts",
+      "motivo": "T5 (QC-236), renombrado y reescrito en T5 (QC-239): ejercita createCustomer y updateAliveCustomer de customer-prisma.ts, y el alta y la edicion de lib/composition con su unidad de trabajo real (withCustomerTransaction), que abre su propia transaccion sobre el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria. Dos empresas efimeras (randomUUID, con usuario, rol y tipo de documento) nacen en beforeAll; afterAll borra por company_id, en el orden de las FK, vinculos de telefono, numeros y clientes, cuenta que no quedo ninguno y despues borra usuarios, rol, tipo de documento y empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
+      "archivo": "clientes/customer-phone-numbers.int.test.ts",
+      "motivo": "T3 y T5 (QC-239): ejercita customer-phone-prisma.ts sobre el cliente Prisma GLOBAL, withCustomerTransaction (que abre su propia transaccion y la reintenta) y el alta y la edicion de lib/composition, asi que una transaccion del test con ROLLBACK no los envolveria. Cada caso siembra sus propios clientes y numeros, irrepetibles entre corridas; afterAll borra por company_id, en el orden de las FK, vinculos, numeros, clientes, usuario, rol, tipo de documento y empresa, y cuenta que no quedo ninguno. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
     },
     {
       "archivo": "clientes/legacy-phone-backfill.int.test.ts",

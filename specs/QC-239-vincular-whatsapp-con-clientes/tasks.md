@@ -25,7 +25,7 @@
 - Tests: `phone-matches-wa-id.test.ts` (propiedad, R19) y `customer-phone.test.ts` (R30).
 - **Hecho:** tests verdes; `guard-arquitectura-modulos` verde.
 
-## T3 [P] — `clientes`: puertos, teléfonos y unidad de trabajo (depende de T2)
+## [x] T3 [P] — `clientes`: puertos, teléfonos y unidad de trabajo (depende de T2)
 - Puertos `customer-phone-repository.ts`, `customer-write-repository.ts` y
   `customer-unit-of-work.ts`. `customer-repository.ts` pierde `create`/`updateAlive` y
   `'duplicate_phone'`.
@@ -38,7 +38,7 @@
 - **Hecho:** tests verdes; `guard-ambito-empresa-clientes` tensada y verde, con sus casos de
   sensibilidad.
 
-## T4 [P] — `integraciones`: regla, puertos y adaptador de contactos (depende de T2)
+## [x] T4 [P] — `integraciones`: regla, puertos y adaptador de contactos (depende de T2)
 - `domain/whatsapp-contact-link.ts`, `domain/refresh-whatsapp-contact-links.ts` y
   `domain/whatsapp-contact-input.ts`; `actor.ts` (`addons`, `requireCustomerLinkPermission`);
   `errors.ts` (+3).
@@ -49,7 +49,7 @@
   R21–R25); dobles en `whatsapp-doubles.ts`.
 - **Hecho:** tests verdes; `guard-ambito-empresa-integraciones` tensada y verde.
 
-## T5 — Alta y edición por la unidad de trabajo; retirar el duplicado (depende de T3 y T4)
+## [x] T5 — Alta y edición por la unidad de trabajo; retirar el duplicado (depende de T3 y T4)
 - `create-customer.ts`, `update-customer.ts` (design § 5.5); `errors.ts` y barrel sin
   `CustomerDuplicatePhoneError`.
 - `error-codes.ts`/`error-catalog.ts` sin `customer_duplicate_phone`, con su nota fechada.

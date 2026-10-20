@@ -1,3 +1,4 @@
+import { CUSTOMER_MODIFY_PERMISSION } from '@/lib/modules/clientes';
 import { assertAddon, assertPermission } from '@/lib/modules/identity';
 
 import { UnauthorizedError } from './errors';
@@ -27,7 +28,7 @@ export function requirePermission(actor: Actor | null | undefined): asserts acto
  * exigen el permiso de `clientes`. El añadido apagado se rechaza igual que la falta de permiso.
  */
 export function requireCustomerLinkPermission(actor: Actor | null | undefined): asserts actor is Actor {
-  assertPermission(actor, 'clientes.modificar', () => new UnauthorizedError());
+  assertPermission(actor, CUSTOMER_MODIFY_PERMISSION, () => new UnauthorizedError());
   assertAddon(actor, 'integraciones', () => new UnauthorizedError());
   if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
     throw new UnauthorizedError();

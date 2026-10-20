@@ -19,7 +19,6 @@ import {
 } from '@/lib/modules/clientes/adapters/driving/customer-actions'
 import { errorMessage } from '@/lib/modules/errores'
 import {
-  CustomerDuplicatePhoneError,
   CustomerNotFoundError,
   CustomerPhoneCountryRequiredError,
   CustomerPhoneInvalidError,
@@ -347,11 +346,12 @@ describe('Server Actions de clientes — telefono con pais (QC-236)', () => {
     expect(createCustomerMock.mock.calls[0]?.[0]).toMatchObject({ phoneCountry: undefined, phoneNumber: undefined })
   })
 
-  it('R8, R9, R12 (QC-236) — los tres errores del telefono salen con su code estable', async () => {
+  // 2026-10-20, QC-239 R7: el duplicado de telefono deja de existir; quedan los dos errores del
+  // telefono que todavia pueden llegar.
+  it('R8, R9 (QC-236) — los dos errores del telefono salen con su code estable', async () => {
     const CASOS = [
       { error: new CustomerPhoneCountryRequiredError(), code: 'customer_phone_country_required' },
       { error: new CustomerPhoneInvalidError(), code: 'customer_phone_invalid' },
-      { error: new CustomerDuplicatePhoneError(), code: 'customer_duplicate_phone' },
     ] as const
 
     for (const caso of CASOS) {
@@ -363,6 +363,5 @@ describe('Server Actions de clientes — telefono con pais (QC-236)', () => {
       const edicion = await updateCustomerAction(CUSTOMER_ID, CUSTOMER_MUTATION_INITIAL, formDataOf(VALID_CUSTOMER_FIELDS))
       expect(edicion).toEqual({ status: 'error', code: caso.code, message: errorMessage(caso.code) })
     }
-    expect(errorMessage('customer_duplicate_phone')).toBe('Este teléfono ya está registrado en otro cliente.')
   })
 })

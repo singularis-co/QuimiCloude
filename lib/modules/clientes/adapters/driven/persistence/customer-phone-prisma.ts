@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { phoneMatchesWaId, waIdCandidates } from '../../../domain/phone-matches-wa-id';
 
@@ -16,6 +16,20 @@ import type { CustomerPhoneLink, CustomerPhoneRepository } from '../../../ports/
 type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 const NO_PHONE = { phone: null, phoneCountry: null, phoneE164: null, phoneIssue: null } as const;
+
+/**
+ * Choque contra uno de los dos unicos parciales de los vinculos vivos de un cliente. Prisma no trae
+ * el nombre del indice sino sus columnas (`["customer_id"]` o `["customer_id","phone_number_id"]`),
+ * y los dos son los unicos de la tabla que llevan `customer_id`.
+ */
+export function isCustomerPhoneLinkConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
+  const meta = error.meta ?? {};
+  if (meta.modelName !== 'CustomerPhoneNumber') return false;
+  const target = meta.target;
+  const columns = typeof target === 'string' ? [target] : Array.isArray(target) ? target : [];
+  return columns.some((column) => typeof column === 'string' && column.includes('customer_id'));
+}
 
 async function isAliveCustomer(db: PrismaLike, customerId: string, scope: CustomerScope): Promise<boolean> {
   const row = await db.customer.findFirst({

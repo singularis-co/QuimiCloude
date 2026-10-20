@@ -1,7 +1,8 @@
 /**
  * Los telefonos de cliente contra Postgres REAL: `customer-phone-prisma.ts` sobre las tablas
  * `phone_numbers` y `customer_phone_numbers`, sus dos indices unicos parciales y el ambito de
- * empresa de cada metodo.
+ * empresa de cada metodo. El invariante del espejo (R8) se comprueba tras cada escritor, con el alta
+ * y la edicion de `lib/composition` y con `withCustomerTransaction` real.
  *
  * AISLAMIENTO: el repositorio se construye sobre el cliente Prisma GLOBAL, como en produccion fuera
  * de una transaccion, asi que un ROLLBACK del test no lo envolveria. Cada caso siembra sus propios
@@ -19,6 +20,9 @@ import {
   updateAliveCustomer,
 } from '@/lib/modules/clientes/adapters/driven/persistence/customer-prisma';
 import { createCustomerPhoneRepository } from '@/lib/modules/clientes/adapters/driven/persistence/customer-phone-prisma';
+import { withCustomerTransaction } from '@/lib/modules/clientes/adapters/driven/persistence/customer-unit-of-work-prisma';
+import { createCustomerPhoneLinks } from '@/lib/modules/clientes';
+import { clientes } from '@/lib/composition';
 import { normalizeCustomerText } from '@/lib/modules/clientes/domain/customer-text';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -395,5 +399,198 @@ describe('el espejo del principal y la edicion que lo reporta', () => {
       after: null,
     });
     expect(await updateAliveCustomer(prisma, id, entrada(vacio), empresaB.actorId, LUEGO, empresaB.scope)).toBe('not_found');
+  });
+});
+
+describe('R8 — el espejo y la tabla puente no divergen tras ningun escritor', () => {
+  /** El invariante de R8 sobre la base: con `phone_e164`, exactamente un principal vivo con ese
+   *  numero; sin el, ningun principal vivo. Devuelve la violacion en texto, o `null`. */
+  async function violacionDeR8(customerId: string): Promise<string | null> {
+    const { phoneE164 } = await prisma.customer.findUniqueOrThrow({ where: { id: customerId }, select: { phoneE164: true } });
+    const principales = await prisma.customerPhoneNumber.findMany({
+      where: { customerId, main: true, deletedAt: null },
+      select: { phoneNumberId: true },
+    });
+    if (phoneE164 === null) {
+      return principales.length === 0 ? null : `sin phone_e164 y con ${String(principales.length)} principal(es) vivo(s)`;
+    }
+    if (principales.length !== 1) return `con phone_e164 ${phoneE164} y ${String(principales.length)} principales vivos`;
+    const numero = await prisma.phoneNumber.findUniqueOrThrow({
+      where: { id: principales[0]?.phoneNumberId ?? '' },
+      select: { e164: true },
+    });
+    return numero.e164 === phoneE164 ? null : `el principal es ${numero.e164} y phone_e164 es ${phoneE164}`;
+  }
+
+  const actor = () => ({ id: empresaA.actorId, companyId: empresaA.companyId, permissions: ['clientes.modificar'] });
+
+  function formulario(e164: string | null) {
+    return {
+      firstNames: `Nombre ${token()}`,
+      lastNames: `Apellido ${token()}`,
+      city: 'Bogota',
+      phoneCountry: 'CO',
+      phoneNumber: e164 === null ? '' : e164.slice(2),
+      email: null,
+      address: null,
+    };
+  }
+
+  /** El servicio de telefonos de `clientes` sobre una transaccion real, como lo cablea la composicion. */
+  function enTransaccion<T>(work: (links: ReturnType<typeof createCustomerPhoneLinks>) => Promise<T>): Promise<T> {
+    return withCustomerTransaction((tx) => work(createCustomerPhoneLinks({ phones: createCustomerPhoneRepository(tx) })))
+  }
+
+  it('R8, R9 — alta con numero y alta sin numero', async () => {
+    const conNumero = await clientes.createCustomer(formulario(numeroColombiano()), actor());
+    const sinNumero = await clientes.createCustomer(formulario(null), actor());
+
+    expect(await violacionDeR8(conNumero.id)).toBeNull();
+    expect(await violacionDeR8(sinNumero.id)).toBeNull();
+    expect(await vinculosDe(sinNumero.id)).toEqual([]);
+  });
+
+  it('R8, R10, R12 — edicion que cambia el numero, que lo repite y que vuelve a un secundario', async () => {
+    const primero = numeroColombiano();
+    const segundo = numeroColombiano();
+    const { id } = await clientes.createCustomer(formulario(primero), actor());
+
+    await clientes.updateCustomer(id, formulario(segundo), actor());
+    expect(await violacionDeR8(id)).toBeNull();
+    expect((await phones.listAliveLinks(id, empresaA.scope)).map(({ e164, main }) => ({ e164, main }))).toEqual(
+      expect.arrayContaining([
+        { e164: primero, main: false },
+        { e164: segundo, main: true },
+      ]),
+    );
+
+    await clientes.updateCustomer(id, formulario(segundo), actor());
+    expect(await violacionDeR8(id)).toBeNull();
+    expect(await phones.listAliveLinks(id, empresaA.scope)).toHaveLength(2);
+
+    await clientes.updateCustomer(id, formulario(primero), actor());
+    expect(await violacionDeR8(id)).toBeNull();
+    expect(await phones.listAliveLinks(id, empresaA.scope)).toHaveLength(2);
+  });
+
+  it('R8, R11 — edicion que vacia el numero: quita el principal de quien tenia phone_e164 y no toca al migrado con aviso', async () => {
+    const { id } = await clientes.createCustomer(formulario(numeroColombiano()), actor());
+    await clientes.updateCustomer(id, formulario(null), actor());
+    expect(await violacionDeR8(id)).toBeNull();
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id }, select: { phoneE164: true } })).phoneE164).toBeNull();
+
+    const migrado = await alta(empresaA);
+    await prisma.customer.update({
+      where: { id: migrado },
+      data: { phone: 'tel. viejo 300-12', phoneCountry: 'CO', phoneIssue: 'invalid_format' },
+    });
+    await clientes.updateCustomer(migrado, formulario(null), actor());
+    expect(await violacionDeR8(migrado)).toBeNull();
+    expect(await vinculosDe(migrado)).toEqual([]);
+    expect(
+      await prisma.customer.findUniqueOrThrow({ where: { id: migrado }, select: { phone: true, phoneIssue: true } }),
+    ).toEqual({ phone: 'tel. viejo 300-12', phoneIssue: 'invalid_format' });
+  });
+
+  it('R8, R27, R28 — vincular sin principal escribe el espejo; vincular con principal no lo toca', async () => {
+    const sinPrincipal = await alta(empresaA);
+    const waId = numeroColombiano();
+    await enTransaccion((links) => links.addWaId(sinPrincipal, waId, empresaA.actorId, LUEGO, empresaA.companyId));
+    expect(await violacionDeR8(sinPrincipal)).toBeNull();
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id: sinPrincipal }, select: { phoneE164: true } })).phoneE164).toBe(waId);
+
+    const conPrincipal = await clientes.createCustomer(formulario(numeroColombiano()), actor());
+    await enTransaccion((links) => links.addWaId(conPrincipal.id, numeroColombiano(), empresaA.actorId, LUEGO, empresaA.companyId));
+    expect(await violacionDeR8(conPrincipal.id)).toBeNull();
+    expect(await phones.listAliveLinks(conPrincipal.id, empresaA.scope)).toHaveLength(2);
+  });
+
+  it('R8, R35 — desvincular el principal deja el espejo a nulo; desvincular un secundario no lo toca', async () => {
+    const principal = numeroColombiano();
+    const secundario = numeroColombiano();
+    const { id } = await clientes.createCustomer(formulario(principal), actor());
+    await enTransaccion((links) => links.addWaId(id, secundario, empresaA.actorId, LUEGO, empresaA.companyId));
+
+    await enTransaccion((links) => links.removeWaId(id, secundario, empresaA.actorId, LUEGO, empresaA.companyId));
+    expect(await violacionDeR8(id)).toBeNull();
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id }, select: { phoneE164: true } })).phoneE164).toBe(principal);
+
+    await enTransaccion((links) => links.removeWaId(id, principal, empresaA.actorId, LUEGO, empresaA.companyId));
+    expect(await violacionDeR8(id)).toBeNull();
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id }, select: { phoneE164: true } })).phoneE164).toBeNull();
+  });
+
+  it('R8 — anti-placebo: un principal que no coincide con phone_e164 se detecta', async () => {
+    const id = await alta(empresaA, columnas(numeroColombiano()));
+    await phones.addLink(id, numeroColombiano(), true, AHORA, empresaA.scope);
+    expect(await violacionDeR8(id)).toMatch(/el principal es/);
+
+    const sinEspejo = await alta(empresaA);
+    await phones.addLink(sinEspejo, numeroColombiano(), true, AHORA, empresaA.scope);
+    expect(await violacionDeR8(sinEspejo)).toMatch(/sin phone_e164/);
+  });
+});
+
+describe('R9 — withCustomerTransaction confirma o deshace el cliente y sus telefonos juntos, y reintenta UNA vez un choque de vinculos', () => {
+  it('R9 — un fallo dentro de la unidad, despues de escribir cliente y principal, no deja ni el cliente ni el vinculo', async () => {
+    const numero = numeroColombiano();
+    const marca = `Rollback ${token()}`;
+
+    await expect(
+      withCustomerTransaction(async (tx) => {
+        const { id } = await createCustomer(tx, entrada(columnas(numero)), empresaA.actorId, AHORA, empresaA.scope);
+        await createCustomerPhoneRepository(tx).addLink(id, numero, true, AHORA, empresaA.scope);
+        await tx.customer.update({ where: { id }, data: { city: marca } });
+        throw new Error('fallo forzado');
+      }),
+    ).rejects.toThrow('fallo forzado');
+
+    expect(await prisma.customer.count({ where: { companyId: empresaA.companyId, city: marca } })).toBe(0);
+    expect(await phones.findAliveOwners(numero, empresaA.scope)).toEqual([]);
+  });
+
+  it('R3, R9 — un choque contra un unico parcial de los vinculos se reintenta una vez en una transaccion nueva', async () => {
+    const id = await alta(empresaA);
+    await phones.addLink(id, numeroColombiano(), true, AHORA, empresaA.scope);
+    let intentos = 0;
+
+    const resultado = await withCustomerTransaction(async (tx) => {
+      intentos += 1;
+      if (intentos === 1) await createCustomerPhoneRepository(tx).addLink(id, numeroColombiano(), true, AHORA, empresaA.scope);
+      return 'confirmado';
+    });
+
+    expect(resultado).toBe('confirmado');
+    expect(intentos).toBe(2);
+    expect((await phones.listAliveLinks(id, empresaA.scope)).filter((l) => l.main)).toHaveLength(1);
+  });
+
+  it('R3 — si el reintento vuelve a chocar, el error sube y no queda nada escrito', async () => {
+    const id = await alta(empresaA);
+    await phones.addLink(id, numeroColombiano(), true, AHORA, empresaA.scope);
+    let intentos = 0;
+
+    const fallo = await withCustomerTransaction(async (tx) => {
+      intentos += 1;
+      await createCustomerPhoneRepository(tx).addLink(id, numeroColombiano(), true, AHORA, empresaA.scope);
+    }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(intentos).toBe(2);
+    expect(sqlStateOf(fallo)).toBe('P2002');
+    expect(await phones.listAliveLinks(id, empresaA.scope)).toHaveLength(1);
+  });
+
+  it('R3 — cualquier otro error sube sin reintentar', async () => {
+    let intentos = 0;
+    await expect(
+      withCustomerTransaction(async () => {
+        intentos += 1;
+        throw new Error('otro fallo');
+      }),
+    ).rejects.toThrow('otro fallo');
+    expect(intentos).toBe(1);
   });
 });

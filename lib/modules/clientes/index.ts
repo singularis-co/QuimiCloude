@@ -2,7 +2,7 @@
 // Solo reexporta simbolos de ./domain. Nada de 'use server', @prisma/client ni next/* en su
 // cierre de imports. El adaptador driving no pasa por aqui.
 export { type Customer } from './domain/customer';
-export { requirePermission, type Actor } from './domain/actor';
+export { requirePermission, CUSTOMER_MODIFY_PERMISSION, type Actor } from './domain/actor';
 export { type CustomerScope } from './domain/customer-scope';
 export {
   ClientesError,
@@ -11,7 +11,6 @@ export {
   ValidationError,
   CustomerPhoneCountryRequiredError,
   CustomerPhoneInvalidError,
-  CustomerDuplicatePhoneError,
 } from './domain/errors';
 export { type Page } from './domain/page';
 export { CUSTOMER_QUERYABLE } from './domain/customer-queryable';

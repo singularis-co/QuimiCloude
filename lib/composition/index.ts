@@ -644,11 +644,15 @@ import { requestScoped } from '@/lib/shared/request-scope';
 import {
   createBackfillLegacyPhones,
   createCreateCustomer,
+  createCustomerPhoneLinks,
   createDeleteCustomer,
   createGetCustomer,
   createListCustomers,
   createUpdateCustomer,
 } from '@/lib/modules/clientes';
+import { createCustomerPhoneRepository } from '@/lib/modules/clientes/adapters/driven/persistence/customer-phone-prisma';
+import { withCustomerTransaction } from '@/lib/modules/clientes/adapters/driven/persistence/customer-unit-of-work-prisma';
+import type { CustomerUnitOfWork, WhatsappLinkRefresher } from '@/lib/modules/clientes/ports/customer-unit-of-work';
 import { processLegacyPhonesOfCompany } from '@/lib/modules/clientes/adapters/driven/persistence/legacy-phone-prisma';
 import type { LegacyPhoneRepository } from '@/lib/modules/clientes/ports/legacy-phone-repository';
 import type { CompanyCountryLookup } from '@/lib/modules/clientes/ports/company-country-lookup';
@@ -2657,7 +2661,34 @@ const customerRepository: CustomerRepository = {
   listAlive: listAliveCustomers,
 };
 
-const customerWriteRepository = createCustomerWriteRepository();
+type CustomerTransactionClient = Parameters<Parameters<typeof withCustomerTransaction>[0]>[0];
+
+/** El servicio de telefonos de `clientes` sobre la transaccion abierta: lo usan el recalculo de
+ *  contactos y las acciones de `integraciones` que escriben los telefonos de un cliente. */
+function customerPhoneLinksOn(tx: CustomerTransactionClient) {
+  return createCustomerPhoneLinks({ phones: createCustomerPhoneRepository(tx) });
+}
+
+/** `clientes` no importa `integraciones`: el recalculo de los contactos le llega por su puerto,
+ *  sobre el mismo `tx`. */
+function whatsappLinkRefreshOn(tx: CustomerTransactionClient): WhatsappLinkRefresher {
+  const refresh = createRefreshWhatsappContactLinks({
+    contacts: createWhatsappContactRepository(tx),
+    owners: { ownersOf: customerPhoneLinksOn(tx).ownersOf },
+  });
+  return { refresh: (numbers, companyId) => refresh(numbers, { companyId }) };
+}
+
+const customerUnitOfWork: CustomerUnitOfWork = {
+  run: (work) =>
+    withCustomerTransaction((tx) =>
+      work({
+        customers: createCustomerWriteRepository(tx),
+        phones: createCustomerPhoneRepository(tx),
+        whatsappLinks: whatsappLinkRefreshOn(tx),
+      }),
+    ),
+};
 
 const legacyPhoneRepository: LegacyPhoneRepository = {
   processCompany: processLegacyPhonesOfCompany,
@@ -2673,8 +2704,8 @@ const companyCountryLookup: CompanyCountryLookup = identity.getCompanyCountry;
  * recibe por parametro, y quien lo obtiene de las dos caras de la sesion es la Server Action.
  */
 export const clientes = {
-  createCustomer: createCreateCustomer({ customers: customerWriteRepository }),
-  updateCustomer: createUpdateCustomer({ customers: customerWriteRepository }),
+  createCustomer: createCreateCustomer({ unitOfWork: customerUnitOfWork }),
+  updateCustomer: createUpdateCustomer({ unitOfWork: customerUnitOfWork }),
   deleteCustomer: createDeleteCustomer({ customers: customerRepository }),
   getCustomer: createGetCustomer({ customers: customerRepository }),
   listCustomers: createListCustomers({ customers: customerRepository, log: clientesListQueryLog }),
@@ -2723,7 +2754,9 @@ import {
   createTestWhatsappConnection,
   createUpdateWhatsappConnection,
   createVerifyWhatsappWebhook,
+  createRefreshWhatsappContactLinks,
 } from '@/lib/modules/integraciones';
+import { createWhatsappContactRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-prisma';
 import { integrationsE2EDoublesEnabled } from '@/lib/modules/integraciones/adapters/driven/config/e2e-doubles-env';
 import { readPublicBaseUrl } from '@/lib/modules/integraciones/adapters/driven/config/public-base-url-env';
 import { whatsappGraphClientCanned } from '@/lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned';

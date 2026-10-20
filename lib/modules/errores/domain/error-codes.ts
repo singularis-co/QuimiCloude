@@ -43,6 +43,8 @@
  * **2026-10-19**: `customer_phone_country_required`, `customer_phone_invalid`,
  * `customer_duplicate_phone`.
  * **2026-10-20**: `whatsapp_contact_not_found`, `whatsapp_contact_number_invalid`.
+ * **2026-10-20**: se retira `customer_duplicate_phone`: un mismo numero puede ser de varios clientes
+ * de la empresa y ya no hay duplicado que rechazar.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -238,7 +240,6 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: el numero tiene forma de texto valida, pero no existe en el pais
   // elegido.
   'customer_phone_invalid',
-  'customer_duplicate_phone',
   // Distinto de `whatsapp_connection_not_found`: la conexion existe, lo que falta es la conversacion.
   'whatsapp_contact_not_found',
   // Distinto de `customer_phone_invalid`: no lo escribio nadie, es el numero que trae WhatsApp.

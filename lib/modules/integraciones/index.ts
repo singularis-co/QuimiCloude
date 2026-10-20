@@ -19,6 +19,11 @@ export { createSetWhatsappConnectionEnabled } from './domain/set-whatsapp-connec
 export { createRegenerateWhatsappVerifyToken } from './domain/regenerate-whatsapp-verify-token';
 export { createVerifyWhatsappWebhook } from './domain/verify-whatsapp-webhook';
 export { createReceiveWhatsappWebhook } from './domain/receive-whatsapp-webhook';
+export {
+  createRefreshWhatsappContactLinks,
+  type RefreshWhatsappContactLinks,
+  type RefreshWhatsappContactLinksDeps,
+} from './domain/refresh-whatsapp-contact-links';
 export type {
   AiProviderCode,
   AiProviderConnectionStatus,

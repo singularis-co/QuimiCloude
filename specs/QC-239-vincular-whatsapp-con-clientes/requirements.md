@@ -258,6 +258,8 @@ respondidas en la tabla de decisiones.
 | 2026-10-20 | Clientes migrados con `phone_issue = 'duplicate'` | Se reconvierten: su número válido pasa a principal en la tabla n:m y pierden la etiqueta. |
 | 2026-10-20 | Server Actions de teléfonos (listar, agregar, quitar, marcar principal) | No entran aquí: van en QC-303 (`telefonos-de-cliente-backend`), bloqueada por QC-239 y que bloquea a QC-302. |
 | 2026-10-20 | Vincular a un cliente que solo tiene un teléfono antiguo con aviso | El de WhatsApp pasa a principal y reemplaza ese texto. |
+| 2026-10-20 (humano, en implementación) | Los adaptadores de unidad de trabajo abren `$transaction` sin ámbito y las guardias de ámbito los rechazan | Exención estricta por nombre, con la misma forma que `order-unit-of-work-prisma.ts` (QC-141 D21): `customer-unit-of-work-prisma.ts` en la guardia de `clientes` y `whatsapp-contact-unit-of-work-prisma.ts` en la de `integraciones` (que pasa de una a dos exenciones). Una sola función que solo abre `$transaction`, sin `tx.` dentro ni consultas; con casos de sensibilidad. |
+| 2026-10-20 (humano, en implementación) | ¿Cómo nombra `integraciones` el permiso `clientes.modificar` sin romper R26 de QC-153? | `clientes` exporta desde su `index.ts` la constante del permiso y `integraciones/domain/actor.ts` la importa. La lista cerrada de R26 en `scope.test.ts` no se amplía. |
 | heredado | Borrado lógico, `created_at`/`updated_at`/`deleted_at`, identificadores en inglés | QC-4. |
 | heredado | `phone_e164` solo dígitos; `phoneMatchesWaId` con variantes MX/AR/BR | QC-236 (D4). |
 | heredado | Recepción en una transacción, sin cola | QC-238 (D1). |

@@ -118,6 +118,8 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       // QC-239 2026-10-20: telefonos de cliente.
       'adapters/driven/persistence/customer-phone-prisma.ts',
       'adapters/driven/persistence/customer-prisma.ts',
+      // QC-239 2026-10-20: la transaccion de los telefonos del cliente.
+      'adapters/driven/persistence/customer-unit-of-work-prisma.ts',
       'adapters/driven/persistence/legacy-phone-prisma.ts',
       'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driving/customer-actions.ts',

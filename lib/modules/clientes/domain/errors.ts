@@ -63,15 +63,6 @@ export class CustomerPhoneInvalidError extends ClientesError {
   }
 }
 
-/** Otro cliente vivo de la misma empresa ya tiene ese numero. */
-export class CustomerDuplicatePhoneError extends ClientesError {
-  readonly code = 'customer_duplicate_phone';
-
-  constructor(diagnostic?: string) {
-    super('customer_duplicate_phone', diagnostic);
-  }
-}
-
 /**
  * Fallo del esquema de entrada -> el error que toca. Los dos problemas de telefono que la pantalla
  * pinta bajo su campo tienen codigo propio; el resto es `invalid_input`.

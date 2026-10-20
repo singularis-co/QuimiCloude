@@ -7,8 +7,10 @@
 // empresas, con sus secretos cifrados.
 //
 // De cada funcion de persistencia del modulo comprueba las dos mitades: que DECLARA el ambito y que
-// ese valor LLEGA hasta una envoltura de `./company-scope`. Una sola excepcion con nombre (QC-238 P1,
-// design.md > 5.1): el resolutor de empresa del webhook, con su forma fijada aqui mismo.
+// ese valor LLEGA hasta una envoltura de `./company-scope`. Dos excepciones con nombre, cada una con
+// su forma fijada aqui mismo: el resolutor de empresa del webhook (QC-238 P1, design.md > 5.1) y,
+// desde el 2026-10-20 (QC-239, decision del humano), la funcion que solo abre la transaccion de los
+// contactos, con la forma estricta de `order-unit-of-work-prisma.ts` (QC-141 D21).
 //
 // Como en la de `clientes`, el puerto se ata a su adaptador LEYENDO `lib/composition`: lo que se
 // comprueba es la funcion que de verdad se cablea, no una tabla escrita aqui. Un puerto que vive
@@ -94,10 +96,15 @@ const PUERTO_CONTACTOS: PuertoVigilado = {
 const PUERTOS: readonly PuertoVigilado[] = [PUERTO, PUERTO_INBOX, PUERTO_CONTACTOS]
 
 /**
- * Archivos exentos por NOMBRE del barrido de ambito, como en la guardia de `pedidos`. Una sola
- * entrada, aprobada por el humano en el spec (QC-238 P1, R32): la URL del webhook solo trae el id
- * de la conexion y hasta saber su empresa no hay ambito con que filtrar. No es un cheque en blanco:
- * `formaDeLaExencion` fija lo unico que ese archivo puede hacer.
+ * Archivos exentos por NOMBRE del barrido de ambito, como en la guardia de `pedidos`. Cada entrada la
+ * aprobo un humano en un spec, y ninguna es un cheque en blanco: su forma fija lo unico que ese
+ * archivo puede hacer.
+ *
+ * - El resolutor de empresa del webhook (QC-238 P1, R32): la URL solo trae el id de la conexion y
+ *   hasta saber su empresa no hay ambito con que filtrar. Forma: `formaDeLaExencion`.
+ * - La transaccion de los contactos (QC-239, decision del humano del 2026-10-20): solo abre
+ *   `prisma.$transaction` y la reintenta una vez; las consultas las hacen, con su ambito, los
+ *   repositorios que la composicion construye sobre su `tx`. Forma: `formaDeLaTransaccion`.
  */
 const EXENTOS_DEL_AMBITO: ReadonlyMap<string, string> = new Map([
   [
@@ -106,7 +113,16 @@ const EXENTOS_DEL_AMBITO: ReadonlyMap<string, string> = new Map([
       'fila viva; la fila se lee despues con su ambito. Excepcion aprobada por el humano en QC-238, ' +
       'decision P1 (design.md > 5.1, R32)',
   ],
+  [
+    'whatsapp-contact-unit-of-work-prisma.ts',
+    'solo abre la transaccion de vincular y desvincular (prisma.$transaction) y la reintenta una vez; ' +
+      'no lee ni escribe tablas. Excepcion aprobada por el humano en QC-239 (2026-10-20), con la forma ' +
+      'de QC-141 D21',
+  ],
 ])
+
+/** La unica funcion que el exento de la transaccion de los contactos puede declarar. */
+const FUNCION_TRANSACCION_EXENTA = 'withWhatsappContactTransaction'
 
 /** Lo unico que el resolutor exento puede ser: su funcion, su consulta, su `select` y su `where`. */
 const FORMA_EXENTA = {
@@ -355,8 +371,48 @@ function formaDeLaExencion(nombre: string, analizado: ArchivoAnalizado): readonl
   return hallazgos
 }
 
-/** Un archivo exento por NOMBRE pasa por su forma; cualquier otro, por la regla general. */
+/**
+ * La forma estricta de `order-unit-of-work-prisma.ts` (QC-141 D21): una sola funcion con su nombre,
+ * todo `prisma.` es `prisma.$transaction`, ningun `tx.<algo>` (ni `db.<algo>`), sin SQL crudo y sin
+ * alias de `prisma`. Trabaja sobre el codigo ya vaciado de comentarios y cadenas.
+ */
+function formaDeLaTransaccion(nombre: string, analizado: ArchivoAnalizado): readonly string[] {
+  const hallazgos: string[] = []
+
+  // Toda declaracion `function`, a cualquier nivel y con genericos: el troceador general no ve
+  // `function f<T>(`, y aqui no puede escaparse ninguna.
+  const nombres = [...analizado.codigo.matchAll(/\bfunction\s*\*?\s*(\w+)/g)].map((m) => m[1] ?? '')
+  if (nombres.length !== 1 || nombres[0] !== FUNCION_TRANSACCION_EXENTA) {
+    hallazgos.push(
+      `${nombre}: tiene que declarar exactamente una funcion, \`${FUNCION_TRANSACCION_EXENTA}\`; declara [${nombres.join(', ')}]`,
+    )
+  }
+  const prismaSuelto = (analizado.codigo.match(/\bprisma\s*\.\s*\$?\w+/g) ?? []).filter(
+    (acceso) => !/^prisma\s*\.\s*\$transaction\b/.test(acceso.replace(/\s+/g, ' ')),
+  )
+  for (const acceso of prismaSuelto) {
+    hallazgos.push(`${nombre}: \`${acceso}\` no es \`prisma.$transaction\`: el exento no consulta ninguna tabla`)
+  }
+  for (const acceso of analizado.codigo.match(/\b(?:tx|db)\s*\.\s*\$?\w+/g) ?? []) {
+    hallazgos.push(`${nombre}: \`${acceso}\` consulta por la transaccion; el exento solo la abre y reenvia \`run\``)
+  }
+  if (/\$(?:queryRaw|executeRaw)\w*/.test(analizado.codigo)) {
+    hallazgos.push(`${nombre}: no puede ejecutar SQL crudo`)
+  }
+  // Las cadenas ya estan vaciadas: un import de namespace no deja ver de que modulo es, asi que en
+  // el exento no se admite ninguno.
+  if (/\bprisma\s+as\b/.test(analizado.codigo) || /\bimport\s*\*\s*as\s+\w+/.test(analizado.codigo)) {
+    hallazgos.push(`${nombre}: importa \`prisma\` con un alias que la guardia no ve`)
+  }
+
+  return hallazgos
+}
+
+/** Un archivo exento por NOMBRE pasa por SU forma; cualquier otro, por la regla general. */
 function hallazgosDelArchivo(nombre: string, analizado: ArchivoAnalizado): readonly string[] {
+  if (nombre === 'whatsapp-contact-unit-of-work-prisma.ts' && EXENTOS_DEL_AMBITO.has(nombre)) {
+    return formaDeLaTransaccion(nombre, analizado)
+  }
   if (EXENTOS_DEL_AMBITO.has(nombre)) return formaDeLaExencion(nombre, analizado)
   return hallazgosDe(nombre, analizado, nombre === PUNTO_UNICO)
 }
@@ -605,7 +661,7 @@ describe('R45 — las escrituras sobre un contacto llevan el ambito en el `where
   })
 })
 
-describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo la UNICA exencion con nombre', () => {
+describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo las exenciones con nombre que aprobo el humano', () => {
   const archivos = readdirSync(PERSISTENCE_ROOT).filter((archivo) => archivo.endsWith('.ts'))
 
   it('los archivos de persistencia se barren todos, y el troceo VE las consultas', () => {
@@ -626,14 +682,20 @@ describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo la 
     const titulo =
       motivo === undefined
         ? `${archivo}: toda funcion que toca la base declara y consume el ambito, y nadie lee la empresa a mano`
-        : `${archivo}: exento por nombre (${motivo}), con la forma exacta de design.md > 5.1`
+        : `${archivo}: exento por nombre (${motivo}), con su forma exacta`
     it(titulo, () => {
       expect(hallazgosDelArchivo(archivo, analizar(archivo))).toEqual([])
     })
   }
 
-  it('R32 — la lista de exentos tiene UNA sola entrada: el resolutor de empresa del webhook', () => {
-    expect([...EXENTOS_DEL_AMBITO.keys()]).toEqual(['whatsapp-webhook-directory-prisma.ts'])
+  // 2026-10-20, QC-239, decision del humano: hasta esta fecha la lista tenia UNA sola entrada, el
+  // resolutor de empresa del webhook. Se suma la transaccion de los contactos, con la forma estricta
+  // de QC-141 D21. Una tercera entrada pone este caso en rojo.
+  it('R32 — la lista de exentos tiene DOS entradas: el resolutor de empresa del webhook y la transaccion de los contactos', () => {
+    expect([...EXENTOS_DEL_AMBITO.keys()]).toEqual([
+      'whatsapp-webhook-directory-prisma.ts',
+      'whatsapp-contact-unit-of-work-prisma.ts',
+    ])
   })
 
   it('R32 — el resolutor exento es lo que lib/composition cablea al puerto `WhatsappWebhookDirectory`', () => {
@@ -643,7 +705,7 @@ describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo la 
     expect([...metodos.keys()]).toEqual([metodo])
   })
 
-  it('R32 — la unica exencion es la del resolutor de empresa del webhook: no hay otra lista de excepciones', () => {
+  it('R32 — las exenciones viven en UNA sola lista de exentos: no hay otra lista de excepciones', () => {
     const nombresDeLista = ['SIN_AMBITO_POR_DECISION_APROBADA', 'EXCEPCIONES', 'EXENTAS', 'EXENTOS_DEL_AMBITO']
     const marcas = nombresDeLista.map((nombre) => new RegExp(`^\\s*(?:const|let|type|enum)\\s+${nombre}\\b`, 'm'))
     expect(marcas.some((marca) => marca.test('const EXCEPCIONES = new Set([])'))).toBe(true)
@@ -879,5 +941,72 @@ describe('R32 — sensibilidad: la exencion del resolutor de empresa no es un ch
     expect(hallazgosDelArchivo('whatsapp-connection-lookup-prisma.ts', analizarFuente(real)).join('\n')).toMatch(
       /sin declarar/,
     )
+  })
+})
+
+describe('R32 — sensibilidad: la exencion de la transaccion de los contactos no es un cheque en blanco', () => {
+  const EXENTO = 'whatsapp-contact-unit-of-work-prisma.ts'
+  const IMPORT = "import { prisma } from '@/lib/shared/db/prisma'\n"
+  const BUENA =
+    IMPORT +
+    'export async function withWhatsappContactTransaction(run) {\n' +
+    '  try {\n' +
+    '    return await prisma.$transaction(run, { maxWait: 10_000, timeout: 30_000 })\n' +
+    '  } catch (error) {\n' +
+    '    if (!isCustomerPhoneLinkConflict(error)) throw error\n' +
+    '    return prisma.$transaction(run, { maxWait: 10_000, timeout: 30_000 })\n' +
+    '  }\n' +
+    '}\n'
+  const hallazgosComoExento = (fuente: string): string => hallazgosDelArchivo(EXENTO, analizarFuente(fuente)).join('\n')
+
+  it('control: la forma aprobada no da hallazgo, y el fuente real tampoco', () => {
+    expect(hallazgosDelArchivo(EXENTO, analizarFuente(BUENA))).toEqual([])
+    const real = readFileSync(join(PERSISTENCE_ROOT, EXENTO), 'utf8')
+    expect(hallazgosDelArchivo(EXENTO, analizarFuente(real))).toEqual([])
+  })
+
+  it('un `tx.whatsappContact.findMany` dentro del callback de `$transaction` da hallazgo', () => {
+    const fuente =
+      IMPORT +
+      'export async function withWhatsappContactTransaction(run) {\n' +
+      '  return prisma.$transaction(async (tx) => {\n' +
+      '    await tx.whatsappContact.findMany()\n' +
+      '    return run(tx)\n' +
+      '  })\n' +
+      '}\n'
+    expect(hallazgosComoExento(fuente)).toMatch(/consulta por la transaccion/)
+  })
+
+  it('una consulta por `prisma.` en el exento da hallazgo, dentro o fuera de su funcion', () => {
+    const dentro = BUENA.replace('try {\n', 'try {\n    await prisma.whatsappContact.findMany()\n')
+    expect(hallazgosComoExento(dentro)).toMatch(/no es `prisma\.\$transaction`/)
+    const otraFuncion = BUENA + 'export async function seCuela() {\n  return prisma.whatsappContact.findMany({})\n}\n'
+    expect(hallazgosComoExento(otraFuncion)).toMatch(/no es `prisma\.\$transaction`/)
+    expect(hallazgosComoExento(otraFuncion)).toMatch(/exactamente una funcion/)
+  })
+
+  it('una segunda funcion sin consulta, o la misma con otro nombre, da hallazgo', () => {
+    expect(hallazgosComoExento(BUENA + 'export function helper(x: string) {\n  return x\n}\n')).toMatch(/exactamente una funcion/)
+    expect(hallazgosComoExento(BUENA.replace('withWhatsappContactTransaction', 'withAnything'))).toMatch(/exactamente una funcion/)
+  })
+
+  it('SQL crudo, un alias de `prisma` o un import de namespace en el exento dan hallazgo', () => {
+    expect(hallazgosComoExento(BUENA.replace('try {\n', 'try {\n    await prisma.$queryRaw`SELECT 1`\n'))).toMatch(/SQL crudo/)
+    expect(hallazgosComoExento(BUENA.replace('{ prisma }', '{ prisma as db0 }'))).toMatch(/alias/)
+    expect(hallazgosComoExento(BUENA.replace('import { prisma }', 'import * as db0'))).toMatch(/alias/)
+  })
+
+  it('el mismo fuente aprobado con OTRO nombre de archivo da hallazgo: la exencion es por nombre', () => {
+    expect(hallazgosDelArchivo('whatsapp-contact-unit-of-work-prisma-copia.ts', analizarFuente(BUENA)).join('\n')).toMatch(
+      /sin declarar/,
+    )
+  })
+
+  it('la forma de la transaccion no sirve para el resolutor, ni la del resolutor para la transaccion', () => {
+    expect(hallazgosDelArchivo('whatsapp-webhook-directory-prisma.ts', analizarFuente(BUENA)).join('\n')).toMatch(
+      /exactamente una funcion/,
+    )
+    const resolutor = readFileSync(join(PERSISTENCE_ROOT, 'whatsapp-webhook-directory-prisma.ts'), 'utf8')
+    expect(hallazgosComoExento(resolutor)).toMatch(/no es `prisma\.\$transaction`/)
   })
 })

@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -78,6 +78,20 @@ export async function setWhatsappContactBlocked(
     select: { id: true },
   });
   return existing === null ? 'not_found' : 'ok';
+}
+
+/**
+ * Choque contra uno de los dos únicos parciales de los vínculos vivos de un cliente, la tabla que
+ * escribe `clientes` dentro de la misma transacción. Prisma trae sus columnas y no el nombre del
+ * índice; los dos son los únicos de esa tabla que llevan `customer_id`.
+ */
+export function isCustomerPhoneLinkConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
+  const meta = error.meta ?? {};
+  if (meta.modelName !== 'CustomerPhoneNumber') return false;
+  const target = meta.target;
+  const columns = typeof target === 'string' ? [target] : Array.isArray(target) ? target : [];
+  return columns.some((column) => typeof column === 'string' && column.includes('customer_id'));
 }
 
 /** Fábrica y no objeto ya construido: dentro de una transacción tiene que escribir por su `tx`. */

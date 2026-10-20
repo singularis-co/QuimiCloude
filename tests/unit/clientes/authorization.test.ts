@@ -21,7 +21,7 @@ import { createUpdateCustomer } from '@/lib/modules/clientes/domain/update-custo
 
 import type { Actor } from '@/lib/modules/clientes/domain/actor'
 import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository'
-import type { CustomerWriteRepository } from '@/lib/modules/clientes/ports/customer-write-repository'
+import type { CustomerUnitOfWork } from '@/lib/modules/clientes/ports/customer-unit-of-work'
 import type { ListQueryLog } from '@/lib/modules/clientes/ports/list-query-log'
 
 const moduloDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'lib', 'modules', 'clientes')
@@ -47,18 +47,19 @@ function dobles() {
     })
 
   const customers = {
-    create: explota('customers.create'),
     findAliveById: explota('customers.findAliveById'),
-    updateAlive: explota('customers.updateAlive'),
     softDeleteAlive: explota('customers.softDeleteAlive'),
     listAlive: explota('customers.listAlive'),
   }
+  // El alta y la edicion escriben dentro de la unidad de trabajo: abrirla ya es tocar la base.
+  const unitOfWork = { run: explota('unitOfWork.run') }
   const log = { ignoredFields: explota('log.ignoredFields') }
 
   return {
-    customers: customers as unknown as CustomerRepository & CustomerWriteRepository,
+    customers: customers as unknown as CustomerRepository,
+    unitOfWork: unitOfWork as unknown as CustomerUnitOfWork,
     log: log as unknown as ListQueryLog,
-    espias: [...Object.values(customers), ...Object.values(log)],
+    espias: [...Object.values(customers), ...Object.values(unitOfWork), ...Object.values(log)],
   }
 }
 
@@ -91,15 +92,15 @@ const CASOS_DE_ESCRITURA: readonly Caso[] = [
   {
     nombre: 'createCustomer',
     permiso: MODIFICAR,
-    ejecutar: (d, actor) => createCreateCustomer({ customers: d.customers })(ENTRADA_VALIDA, actor),
-    ejecutarConBasura: (d, actor) => createCreateCustomer({ customers: d.customers })(BASURA, actor),
+    ejecutar: (d, actor) => createCreateCustomer({ unitOfWork: d.unitOfWork })(ENTRADA_VALIDA, actor),
+    ejecutarConBasura: (d, actor) => createCreateCustomer({ unitOfWork: d.unitOfWork })(BASURA, actor),
   },
   {
     nombre: 'updateCustomer',
     permiso: MODIFICAR,
     ejecutar: (d, actor) =>
-      createUpdateCustomer({ customers: d.customers })(CUSTOMER_ID, ENTRADA_VALIDA, actor),
-    ejecutarConBasura: (d, actor) => createUpdateCustomer({ customers: d.customers })(CUSTOMER_ID, BASURA, actor),
+      createUpdateCustomer({ unitOfWork: d.unitOfWork })(CUSTOMER_ID, ENTRADA_VALIDA, actor),
+    ejecutarConBasura: (d, actor) => createUpdateCustomer({ unitOfWork: d.unitOfWork })(CUSTOMER_ID, BASURA, actor),
   },
   {
     nombre: 'deleteCustomer',

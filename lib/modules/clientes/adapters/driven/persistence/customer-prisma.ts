@@ -145,17 +145,13 @@ export async function findAliveCustomerById(
   return row === null ? null : toCustomerView(row);
 }
 
-function isRootClient(db: PrismaLike): db is PrismaClient {
-  return '$transaction' in db;
-}
-
 /**
  * `updateMany` con `deletedAt: null` en el `where`: si el cliente no existe, ya esta dado de baja
  * o es de otra empresa, `count` sale 0 y se devuelve `'not_found'` en vez de lanzar. `data` NUNCA
  * incluye `createdBy` ni `createdAt`.
  *
- * El primer `UPDATE` deja la fila bloqueada hasta el final de la transaccion, asi que lo que se
- * lee despues es lo que queda. Sin una transaccion abierta por quien llama, abre la suya.
+ * Dentro de la transaccion de quien llama, el primer `UPDATE` deja la fila bloqueada hasta el final,
+ * asi que lo que se lee despues es lo que queda.
  */
 export async function updateAliveCustomer(
   db: PrismaLike,
@@ -165,12 +161,6 @@ export async function updateAliveCustomer(
   now: Date,
   scope: CustomerScope,
 ): Promise<CustomerUpdateResult> {
-  if (isRootClient(db)) {
-    return db.$transaction((tx) => updateAliveCustomer(tx, id, data, actorId, now, scope), {
-      maxWait: 10_000,
-      timeout: 30_000,
-    });
-  }
   const { count } = await db.customer.updateMany({
     where: { id, deletedAt: null, ...customerCompanyScope(scope) },
     data: { ...businessColumns(data), updatedAt: now, updatedBy: actorId },
@@ -222,7 +212,7 @@ async function writeAlivePhone(
   });
 }
 
-export function createCustomerWriteRepository(db: PrismaLike = prisma): CustomerWriteRepository {
+export function createCustomerWriteRepository(db: PrismaLike): CustomerWriteRepository {
   return {
     create: (data, actorId, now, scope) => createCustomer(db, data, actorId, now, scope),
     updateAlive: (id, data, actorId, now, scope) => updateAliveCustomer(db, id, data, actorId, now, scope),

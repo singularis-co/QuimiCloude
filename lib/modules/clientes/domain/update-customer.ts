@@ -1,16 +1,17 @@
-import { requirePermission, type Actor } from './actor';
+import { CUSTOMER_MODIFY_PERMISSION, requirePermission, type Actor } from './actor';
 import { isCustomerId } from './customer-id';
 import { phoneIssueReason, updateCustomerSchema } from './customer-input';
+import { syncMainPhone } from './customer-phone-links';
 import { normalizeCustomerText } from './customer-text';
 import type { CustomerScope } from './customer-scope';
 import { CustomerNotFoundError, inputError } from './errors';
 
 import type { NewCustomerPhone } from './customer-view';
 
-import type { CustomerWriteRepository } from '../ports/customer-write-repository';
+import type { CustomerUnitOfWork } from '../ports/customer-unit-of-work';
 
 export type UpdateCustomerDeps = {
-  readonly customers: CustomerWriteRepository;
+  readonly unitOfWork: CustomerUnitOfWork;
   readonly now?: () => Date;
 };
 
@@ -29,7 +30,7 @@ export function createUpdateCustomer(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requirePermission(actor, 'clientes.modificar');
+    requirePermission(actor, CUSTOMER_MODIFY_PERMISSION);
 
     const scope: CustomerScope = { companyId: actor.companyId };
 
@@ -44,21 +45,23 @@ export function createUpdateCustomer(
     const phoneWrite: NewCustomerPhone =
       phoneE164 === null ? { kind: 'keep_legacy_or_clear' } : { phone, phoneCountry, phoneE164, phoneIssue };
 
-    const result = await deps.customers.updateAlive(
-      id,
-      {
-        ...rest,
-        phone: phoneWrite,
-        firstNamesNormalized: normalizeCustomerText(rest.firstNames),
-        lastNamesNormalized: normalizeCustomerText(rest.lastNames),
-        cityNormalized: normalizeCustomerText(rest.city),
-      },
-      actor.id,
-      now(),
-      scope,
-    );
+    const at = now();
+    const data = {
+      ...rest,
+      phone: phoneWrite,
+      firstNamesNormalized: normalizeCustomerText(rest.firstNames),
+      lastNamesNormalized: normalizeCustomerText(rest.lastNames),
+      cityNormalized: normalizeCustomerText(rest.city),
+    };
 
-    // Inexistente, dado de baja o de otra empresa son el mismo caso para el dominio.
-    if (result === 'not_found') throw new CustomerNotFoundError();
+    await deps.unitOfWork.run(async ({ customers, phones, whatsappLinks }) => {
+      const result = await customers.updateAlive(id, data, actor.id, at, scope);
+      // Inexistente, dado de baja o de otra empresa son el mismo caso para el dominio.
+      if (result === 'not_found') throw new CustomerNotFoundError();
+      // El numero que quedo en la fila y no el de la entrada: con el numero vacio, un telefono
+      // antiguo con aviso se conserva y no tiene principal que quitar.
+      const numbers = await syncMainPhone(phones, id, result.after, at, scope);
+      await whatsappLinks.refresh(numbers, scope.companyId);
+    });
   };
 }
