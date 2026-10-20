@@ -485,9 +485,13 @@ Se exportan por el barrel como fábricas que reciben `{ phones }`, igual que las
   `return companyScope(scope)`.
 - **`customer-unit-of-work-prisma.ts`** (nuevo): `withCustomerTransaction(run)` =
   `prisma.$transaction(run, { maxWait: 10_000, timeout: 30_000 })`.
-  - Si choca contra `customer_phone_numbers_customer_main_key` o `…_customer_phone_key`, o contra `phone_numbers_company_id_e164_key` (vuelta 1 de review: el `upsert` no es `ON CONFLICT`) (dos
-    escrituras simultáneas del mismo cliente), reintenta la unidad entera una vez en una
-    transacción nueva, como `withOrderTransaction`.
+  - Reintenta la unidad entera una vez en una transacción nueva, como `withOrderTransaction`,
+    ante dos choques:
+    - contra `customer_phone_numbers_customer_main_key` o `…_customer_phone_key`: dos escrituras
+      simultáneas del mismo cliente;
+    - contra `phone_numbers_company_id_e164_key`: dos clientes distintos de la misma empresa añaden
+      a la vez el mismo número nuevo. El `upsert` de Prisma 6.19.3 sale como SELECT + INSERT, no
+      como `ON CONFLICT`, así que los dos pueden no ver la fila y el segundo INSERT choca.
   - Si vuelve a chocar, el error sube.
   - **Exención de la guardia de ámbito** (decisión del humano, 2026-10-20): entra por nombre en
     `guard-ambito-empresa-clientes`, con la forma estricta de `order-unit-of-work-prisma.ts`
@@ -495,10 +499,9 @@ Se exportan por el barrel como fábricas que reciben `{ phones }`, igual que las
     Casos de sensibilidad: el archivo exento que use `tx.` o haga una consulta ⇒ hallazgo.
 - **`legacy-phone-prisma.ts`**: por cada fila convertida o reconvertida (`count === 1`), en la
   misma transacción, `addLink(…, main: true)` con el repositorio de teléfonos sobre `tx` (driven →
-  driven del mismo módulo, permitido) (R13, R49). Si choca contra `phone_numbers_company_id_e164_key` (el `upsert` de Prisma 6.19.3 es
-  SELECT + INSERT, no `ON CONFLICT`; otro escritor añadió el mismo número nuevo a la vez), reintenta
-  la transacción una vez, releyendo y repitiendo la condición de candidata; si vuelve a chocar, el
-  error sube (decisión del humano, 2026-10-20, vuelta 1 de review). Mismo detector
+  driven del mismo módulo, permitido) (R13, R49). Si choca contra `phone_numbers_company_id_e164_key` porque otro escritor
+  añadió a la vez el mismo número nuevo a otro cliente, reintenta la transacción una vez, releyendo y
+  repitiendo la condición de candidata; si vuelve a chocar, el error sube. Mismo detector
   (`isCustomerPhoneLinkConflict`) que las unidades de trabajo. El filtro de pendiente cambia según § 5.7.
   - **No recalcula contactos.** El relleno no está entre los cambios que lo exigen (Alcance), y el
     siguiente mensaje entrante aplica la regla.

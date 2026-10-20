@@ -154,3 +154,66 @@ declaración vale como excepción al checkpoint E2E.
 Lo que vuelve al implementer: B1, actualizar las dos listas cerradas de claves de la fachada
 `integraciones` y dejar su salida verde en la bitácora. Los menores no impiden el OK. m1 y m3 son
 baratos y conviene cerrarlos en la misma vuelta.
+
+## Vuelta 2 (acotada a 4a7c0e45..f61e220d)
+
+Reviewer, 2026-10-20. Commits `eaf51c38` y `f61e220d`. Solo reviso los arreglos contra los hallazgos
+de la vuelta 1 y sus posibles regresiones. No toca esquema ni migraciones, así que no hay ampliación.
+
+### Verificación ejecutada (en serie)
+
+| Comando | Resultado |
+|---|---|
+| `pnpm run typecheck` | sin errores |
+| `pnpm run lint` | 0 errores, 10 avisos (los mismos de la vuelta 1, en archivos ajenos) |
+| `pnpm exec vitest run guard` | 83 archivos, 1199 passed, 21 skipped |
+| `vitest run encryption-keys-env.test.ts tests/unit/composition legacy-phone-prisma.test.ts customer-service.test.ts` | 9 archivos, 143 passed |
+| `.int`: `customer-phone-numbers`, `legacy-phone-backfill`, `whatsapp-contact-links` | 3 archivos, 54 passed |
+
+No corrí el E2E. Su salida está en la bitácora (5/5, `5 passed (1.3m)`).
+
+### Hallazgos de la vuelta 1
+
+- [x] **B1 (M1) — cerrado.**
+  - Las dos listas (`encryption-keys-env.test.ts` e `integraciones-graph-doubles.test.ts`) tienen 23 claves en orden y nota fechada, y conservan el `toEqual` exacto.
+  - Un grep de `Object.keys(…integraciones|clientes)` en `tests/` solo encuentra esas dos.
+  - `customer-service.test.ts`, que también fija claves, sigue verde.
+  - No queda otra lista fija rota en lo que se corrió.
+- [x] **m1 — cerrado.** `customer-phone-numbers.int.test.ts` tiene un describe `R14` con dos casos directos:
+  - el primer caso recorre alta, edición que cambia y que vacía, vincular y desvincular, y compara en cada paso la fila de la lista con la ficha del formulario (`describeCustomerPhone` y columnas);
+  - el segundo cubre al migrado con aviso y al pendiente sin principal, que muestran su teléfono antiguo, y comprueba que vincular lo sustituye.
+- [x] **m2 — cerrado.** La fila de `guard-ambito-empresa-integraciones` en design § 12.3 recoge el cambio de T8: lectura por fábrica, `deps`, `findBlockedWaIds` y los casos de sensibilidad.
+- [x] **m3 — aceptado como deuda.** Anotado en `impl_QC-239.md` («m3, deuda conocida»). Las dos copias del detector siguen idénticas tras el cambio de m4.
+- [x] **m4 — cerrado.**
+  - `isCustomerPhoneLinkConflict`, en sus dos copias, reconoce también `P2002` con `modelName: PhoneNumber` y una columna `e164`.
+  - Las dos unidades de trabajo lo usan para su único reintento.
+  - Hay tests de concurrencia reales: `pg_stat_activity` comprueba que la segunda transacción queda bloqueada esperando a la primera.
+    - En `customer-phone-numbers.int` (dos altas): la segunda hace 2 intentos, queda una sola fila de número y los dos clientes son dueños.
+    - En `whatsapp-contact-links.int` (dos vincular): mismo resultado.
+  - La bitácora documenta las contrapruebas: sin el reintento falla con `Unique constraint failed`, y con el detector de `integraciones` revertido falla el R33.
+- [x] **Nuevo: reintento en el relleno.**
+  - `legacy-phone-prisma.ts` saca el cuerpo a `processLegacyPhonesInTransaction` y reintenta una vez ante el mismo choque.
+  - El reintento relee las candidatas y repite la condición de cada `UPDATE`. Lo del primer intento se deshizo con su transacción, así que nada se cuenta dos veces.
+  - Los tests unitarios cubren los tres caminos: el choque reintenta una vez y relee; un segundo choque sube sin tercer intento; cualquier otro error sube sin reintentar.
+  - Hay un `.int` de concurrencia con el alta: 2 intentos, resumen `converted: 1`, una sola fila de número y los dos dueños.
+  - design § 5.6 está corregido.
+- [x] **Decisiones nuevas en requirements.md:** el reintento ante el choque de `phone_numbers` y la excepción E2E del webhook (aceptada por el humano el 2026-10-20). **m5 deja de ser hallazgo.**
+- [x] **T11:** marcada `[x]`. El E2E `e2e/clientes-telefono.spec.ts` da 5/5 y su salida está en la bitácora.
+- [x] **Regresiones:** ninguna en lo que se corrió. Las guardias siguen verdes, incluidas las dos exenciones estrictas: los archivos exentos solo cambian su comentario. Ninguna línea de producción añadida cita `QC-<n>`, `R<n>`, `design.md` ni «decisión».
+
+### Hallazgos nuevos
+
+- **m6 — menor (documentación).** En design § 5.6 el inciso nuevo quedó metido a mitad de frase.
+  - La frase queda así: «… o contra `phone_numbers_company_id_e164_key` (vuelta 1 de review: …) (dos escrituras simultáneas del mismo cliente), reintenta…».
+  - Mal leída, da a entender que el choque en `phone_numbers` también es «del mismo cliente», cuando es entre clientes distintos.
+  - Además, «vuelta 1 de review» es historia del proceso dentro del diseño.
+  - Lo reescribe el spec_author o el leader. No afecta al código.
+
+### Pendiente de proceso (no es hallazgo del código)
+
+- T12 sigue sin marcar, a la espera de `gate-completo` en CI (decisión del humano).
+
+### Veredicto de la vuelta 2
+
+**OK** — 0 bloqueantes. Queda un menor nuevo (m6, de documentación) y la deuda m3, anotada. El cierre
+de la feature sigue condicionado a que `gate-completo` salga verde en el PR.
