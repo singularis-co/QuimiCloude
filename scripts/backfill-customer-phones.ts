@@ -1,8 +1,8 @@
 /**
  * db:backfill:customer-phones — interpreta el telefono de texto libre de los clientes que todavia
- * no tienen `phone_e164` ni `phone_issue`. Corre en el build justo despues de
- * `prisma migrate deploy` (`scripts/build.mjs`). Idempotente: una segunda corrida no encuentra
- * filas pendientes.
+ * no tienen `phone_e164` y cuyo `phone_issue` es nulo o `duplicate`. Corre en el build justo despues
+ * de `prisma migrate deploy` (`scripts/build.mjs`). Idempotente: una segunda corrida no encuentra
+ * filas candidatas.
  *
  * Cascara fina, como `scripts/seed.ts`: carga el entorno, pide el caso de uso a la composicion,
  * imprime una linea de resumen y traduce exito/fallo a codigo de salida. Si falla, el build falla.
@@ -24,7 +24,7 @@ async function main(): Promise<void> {
     const { clientes } = await import('../lib/composition')
     const summary = await clientes.backfillLegacyPhones()
     console.log(
-      `[backfill-telefonos] empresas: ${summary.companies} - convertidos: ${summary.converted} - sin formato valido: ${summary.invalid} - duplicados: ${summary.duplicate}`,
+      `[backfill-telefonos] empresas: ${summary.companies} - convertidos: ${summary.converted} - sin formato valido: ${summary.invalid} - reconvertidos: ${summary.reconverted}`,
     )
   } finally {
     await prisma.$disconnect()

@@ -59,7 +59,6 @@ export {
   type LegacyPhoneRow,
   type LegacyPhoneOutcome,
   type LegacyPhonePlan,
-  type TakenE164,
 } from './domain/legacy-phone-backfill';
 export {
   createBackfillLegacyPhones,

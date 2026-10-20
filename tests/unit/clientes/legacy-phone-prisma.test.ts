@@ -1,15 +1,19 @@
 // El resumen de `processLegacyPhonesOfCompany` cuenta las filas que el `updateMany` escribio de
-// verdad, no las del plan. Y que el `UPDATE` reescribe el `updatedAt` LEIDO: sin el, el
-// `@updatedAt` de Prisma lo sellaria con la hora de la corrida (R27, D6).
+// verdad, no las del plan; separa convertidas de reconvertidas por el `phone_issue` LEIDO; y crea
+// el vinculo principal solo de las filas escritas con numero. Y que el `UPDATE` reescribe el
+// `updatedAt` LEIDO: sin el, el `@updatedAt` de Prisma lo sellaria con la hora de la corrida.
 //
 // HONESTIDAD: este archivo NO toca Postgres. El cliente Prisma se sustituye por un doble: aqui
-// solo se fija como se suma el `count` de cada `UPDATE`. Que el `UPDATE` con `PENDING` se salte
-// una fila editada entre la lectura y la escritura lo cubre `legacy-phone-backfill.int.test.ts`.
+// solo se fija como se suma el `count` de cada `UPDATE` y que se llama al vinculo. Que el `UPDATE`
+// se salte una fila editada entre la lectura y la escritura, y que el vinculo exista de verdad, lo
+// cubre `legacy-phone-backfill.int.test.ts`.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const tx = vi.hoisted(() => ({
   customer: { findMany: vi.fn(), updateMany: vi.fn() },
+  phoneNumber: { upsert: vi.fn() },
+  customerPhoneNumber: { create: vi.fn() },
 }))
 
 const prismaDouble = vi.hoisted(() => ({
@@ -19,9 +23,8 @@ const prismaDouble = vi.hoisted(() => ({
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: prismaDouble }))
 
 import { processLegacyPhonesOfCompany } from '@/lib/modules/clientes/adapters/driven/persistence/legacy-phone-prisma'
-import type { LegacyPhoneOutcome, LegacyPhonePlan } from '@/lib/modules/clientes'
+import type { LegacyPhoneOutcome, LegacyPhonePlan, LegacyPhoneRow } from '@/lib/modules/clientes'
 
-const ENERO = new Date('2026-01-10T10:00:00Z')
 const FEBRERO = new Date('2026-02-10T10:00:00Z')
 const SCOPE = { companyId: '00000000-0000-4000-8000-000000000001' }
 
@@ -29,52 +32,122 @@ const PLAN_FIJO: readonly LegacyPhoneOutcome[] = [
   { id: 'a', phoneCountry: 'CO', phoneE164: '573001234567', phoneIssue: null },
   { id: 'b', phoneCountry: 'CO', phoneE164: '573001234568', phoneIssue: null },
   { id: 'c', phoneCountry: 'CO', phoneE164: null, phoneIssue: 'invalid_format' },
-  { id: 'd', phoneCountry: 'CO', phoneE164: null, phoneIssue: 'duplicate' },
+  { id: 'd', phoneCountry: 'MX', phoneE164: '525512345678', phoneIssue: null },
+  { id: 'e', phoneCountry: 'MX', phoneE164: null, phoneIssue: 'invalid_format' },
 ]
-const plan: LegacyPhonePlan = () => PLAN_FIJO
+const LEIDO: Record<string, { phoneIssue: string | null; phoneCountry: string | null }> = {
+  a: { phoneIssue: null, phoneCountry: null },
+  b: { phoneIssue: null, phoneCountry: null },
+  c: { phoneIssue: null, phoneCountry: null },
+  d: { phoneIssue: 'duplicate', phoneCountry: 'MX' },
+  e: { phoneIssue: 'duplicate', phoneCountry: 'MX' },
+}
+let recibidas: readonly LegacyPhoneRow[] = []
+const plan: LegacyPhonePlan = (rows) => {
+  recibidas = rows
+  return PLAN_FIJO
+}
 
 beforeEach(() => {
+  recibidas = []
   tx.customer.findMany.mockReset()
   tx.customer.updateMany.mockReset()
-  tx.customer.findMany
-    .mockResolvedValueOnce(
-      PLAN_FIJO.map((o) => ({ id: o.id, phone: `tel ${o.id}`, createdAt: ENERO, updatedAt: FEBRERO })),
-    )
-    .mockResolvedValueOnce([])
+  tx.phoneNumber.upsert.mockReset()
+  tx.customerPhoneNumber.create.mockReset()
+  tx.phoneNumber.upsert.mockResolvedValue({ id: 'numero' })
+  tx.customerPhoneNumber.create.mockResolvedValue({ id: 'vinculo' })
+  tx.customer.findMany.mockResolvedValueOnce(
+    PLAN_FIJO.map((o) => ({ id: o.id, phone: `tel ${o.id}`, ...LEIDO[o.id], updatedAt: FEBRERO })),
+  )
 })
 
-describe('processLegacyPhonesOfCompany — el resumen', () => {
-  it('R24, R25, R26 — con todas las filas escritas, cuenta convertidas, invalidas y duplicadas', async () => {
-    tx.customer.updateMany.mockResolvedValue({ count: 1 })
-
-    await expect(processLegacyPhonesOfCompany(plan, SCOPE)).resolves.toEqual({
-      converted: 2,
-      invalid: 1,
-      duplicate: 1,
-    })
-  })
-
-  it('R24 — una fila que dejo de estar pendiente (count 0) no entra en el resumen', async () => {
-    tx.customer.updateMany.mockImplementation(async ({ where }: { where: { id: string } }) => ({
-      count: where.id === 'b' || where.id === 'c' ? 0 : 1,
-    }))
-
-    await expect(processLegacyPhonesOfCompany(plan, SCOPE)).resolves.toEqual({
-      converted: 1,
-      invalid: 0,
-      duplicate: 1,
-    })
-    expect(tx.customer.updateMany).toHaveBeenCalledTimes(PLAN_FIJO.length)
-  })
-})
-
-describe('processLegacyPhonesOfCompany — updated_at', () => {
-  it('R27 — cada UPDATE reescribe el updatedAt leido y exige que no se haya movido', async () => {
+describe('processLegacyPhonesOfCompany — candidatas', () => {
+  it('R49 — lee las vivas con phone, sin phone_e164 y con phone_issue nulo o duplicate', async () => {
     tx.customer.updateMany.mockResolvedValue({ count: 1 })
 
     await processLegacyPhonesOfCompany(plan, SCOPE)
 
-    expect(tx.customer.findMany.mock.calls[0]?.[0]).toMatchObject({ select: { updatedAt: true } })
+    expect(tx.customer.findMany.mock.calls[0]?.[0]).toMatchObject({
+      where: {
+        deletedAt: null,
+        phone: { not: null },
+        phoneE164: null,
+        OR: [{ phoneIssue: null }, { phoneIssue: 'duplicate' }],
+        companyId: SCOPE.companyId,
+      },
+      select: { updatedAt: true, phoneIssue: true, phoneCountry: true },
+    })
+  })
+
+  it('R49 — al plan le llega el pais solo de las duplicate; la pendiente va sin pais', async () => {
+    tx.customer.updateMany.mockResolvedValue({ count: 1 })
+
+    await processLegacyPhonesOfCompany(plan, SCOPE)
+
+    expect(recibidas.map((r) => [r.id, r.phoneCountry])).toEqual([
+      ['a', null],
+      ['b', null],
+      ['c', null],
+      ['d', 'MX'],
+      ['e', 'MX'],
+    ])
+  })
+})
+
+describe('processLegacyPhonesOfCompany — el resumen', () => {
+  it('R13, R49 — con todas las filas escritas, cuenta convertidas, invalidas y reconvertidas', async () => {
+    tx.customer.updateMany.mockResolvedValue({ count: 1 })
+
+    await expect(processLegacyPhonesOfCompany(plan, SCOPE)).resolves.toEqual({
+      converted: 2,
+      invalid: 2,
+      reconverted: 1,
+    })
+  })
+
+  it('R49 — una fila que dejo de ser candidata (count 0) no entra en el resumen ni recibe vinculo', async () => {
+    tx.customer.updateMany.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+      count: where.id === 'b' || where.id === 'd' ? 0 : 1,
+    }))
+
+    await expect(processLegacyPhonesOfCompany(plan, SCOPE)).resolves.toEqual({
+      converted: 1,
+      invalid: 2,
+      reconverted: 0,
+    })
+    expect(tx.customer.updateMany).toHaveBeenCalledTimes(PLAN_FIJO.length)
+    expect(tx.customerPhoneNumber.create).toHaveBeenCalledTimes(1)
+    expect(tx.customerPhoneNumber.create.mock.calls[0]?.[0]).toMatchObject({ data: { customerId: 'a' } })
+  })
+})
+
+describe('processLegacyPhonesOfCompany — vinculo principal', () => {
+  it('R8, R13, R49 — cada fila escrita con numero recibe su vinculo main en la misma transaccion', async () => {
+    tx.customer.updateMany.mockResolvedValue({ count: 1 })
+
+    await processLegacyPhonesOfCompany(plan, SCOPE)
+
+    expect(prismaDouble.$transaction).toHaveBeenCalled()
+    expect(tx.phoneNumber.upsert.mock.calls.map(([args]) => args.create.e164)).toEqual([
+      '573001234567',
+      '573001234568',
+      '525512345678',
+    ])
+    const vinculos = tx.customerPhoneNumber.create.mock.calls.map(([args]) => args.data)
+    expect(vinculos.map((v) => [v.customerId, v.main, v.companyId])).toEqual([
+      ['a', true, SCOPE.companyId],
+      ['b', true, SCOPE.companyId],
+      ['d', true, SCOPE.companyId],
+    ])
+  })
+})
+
+describe('processLegacyPhonesOfCompany — updated_at', () => {
+  it('R49 — cada UPDATE reescribe el updatedAt leido y repite la condicion de candidata leida', async () => {
+    tx.customer.updateMany.mockResolvedValue({ count: 1 })
+
+    await processLegacyPhonesOfCompany(plan, SCOPE)
+
     expect(tx.customer.updateMany).toHaveBeenCalledTimes(PLAN_FIJO.length)
     for (const [args] of tx.customer.updateMany.mock.calls) {
       expect(args.data.updatedAt).toEqual(FEBRERO)
@@ -83,7 +156,12 @@ describe('processLegacyPhonesOfCompany — updated_at', () => {
         gte: FEBRERO,
         lt: new Date(FEBRERO.getTime() + 1),
       })
-      expect(args.where).toMatchObject({ phoneE164: null, phoneIssue: null, deletedAt: null })
+      expect(args.where).toMatchObject({
+        phoneE164: null,
+        phoneIssue: LEIDO[args.where.id]?.phoneIssue,
+        deletedAt: null,
+        companyId: SCOPE.companyId,
+      })
     }
   })
 })

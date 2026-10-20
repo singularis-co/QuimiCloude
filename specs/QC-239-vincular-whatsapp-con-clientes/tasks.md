@@ -59,7 +59,7 @@
   en `customer-phone-numbers.int.test.ts`.
 - **Hecho:** tests de `clientes`, `catalogo.test.ts` y `customer-phone-field.test.tsx` verdes.
 
-## T6 — Relleno sin duplicados, reconversión de `duplicate` y principal (depende de T5)
+## [x] T6 — Relleno sin duplicados, reconversión de `duplicate` y principal (depende de T5)
 - `legacy-phone-backfill.ts` (sin `taken`; `LegacyPhoneRow.phoneCountry`), `backfill-legacy-phones.ts`,
   `ports/legacy-phone-repository.ts` (resumen con `reconverted`), `legacy-phone-prisma.ts`
   (candidatas con `phone_issue` nulo o `duplicate`) y `scripts/backfill-customer-phones.ts`

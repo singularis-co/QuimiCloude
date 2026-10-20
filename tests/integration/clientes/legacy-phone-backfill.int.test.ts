@@ -8,9 +8,9 @@
  * nunca toca filas de otros archivos.
  *
  * AISLAMIENTO: el adaptador abre su propia transaccion sobre el cliente Prisma GLOBAL, asi que una
- * transaccion del test con ROLLBACK no lo envolveria. `afterAll` borra los clientes por
- * `company_id`, cuenta que no quedo ninguno y despues borra usuario, rol, tipo de documento y
- * empresa.
+ * transaccion del test con ROLLBACK no lo envolveria. `afterAll` borra, por `company_id` y en el
+ * orden que exigen las FK, vinculos, numeros y clientes, cuenta que no quedo ninguno y despues
+ * borra usuario, rol, tipo de documento y empresa.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -72,12 +72,15 @@ async function crearEmpresa(country: string | null): Promise<Empresa> {
   return empresa;
 }
 
-/** Un cliente como estaba antes de la migracion: texto libre y las tres columnas nuevas nulas. */
+/**
+ * Un cliente como estaba antes de la migracion: texto libre y las tres columnas nuevas nulas. Con
+ * `phoneIssue`, como lo dejo una pasada anterior del relleno.
+ */
 async function clienteAntiguo(
   empresa: Empresa,
   phone: string | null,
   createdAt: Date,
-  extra: { deletedAt?: Date } = {},
+  extra: { deletedAt?: Date; phoneCountry?: string; phoneIssue?: string } = {},
 ): Promise<string> {
   const row = await prisma.customer.create({
     data: {
@@ -94,6 +97,8 @@ async function clienteAntiguo(
       createdBy: empresa.actorId,
       updatedBy: empresa.actorId,
       deletedAt: extra.deletedAt ?? null,
+      phoneCountry: extra.phoneCountry ?? null,
+      phoneIssue: extra.phoneIssue ?? null,
     },
     select: { id: true },
   });
@@ -115,6 +120,35 @@ function filasDe(empresa: Empresa) {
   });
 }
 
+/** Los vinculos vivos de la empresa, con el numero de cada uno. */
+async function vinculosDe(empresa: Empresa) {
+  const links = await prisma.customerPhoneNumber.findMany({
+    where: { companyId: empresa.companyId, deletedAt: null },
+    orderBy: { id: 'asc' },
+  });
+  const numbers = await prisma.phoneNumber.findMany({ where: { companyId: empresa.companyId } });
+  const e164ById = new Map(numbers.map((n) => [n.id, n.e164]));
+  return links.map((l) => ({ ...l, e164: e164ById.get(l.phoneNumberId) }));
+}
+
+/**
+ * El invariante del espejo sobre los clientes vivos indicados: con `phone_e164`, exactamente un
+ * vinculo principal vivo con ese numero; sin el, ninguno.
+ */
+async function esperarInvariante(empresa: Empresa, ids: readonly string[]): Promise<void> {
+  const vinculos = await vinculosDe(empresa);
+  const filas = await filasDe(empresa);
+  for (const id of ids) {
+    const fila = filas.find((f) => f.id === id);
+    const principales = vinculos.filter((v) => v.customerId === id && v.main);
+    if (fila?.deletedAt === null && fila.phoneE164 !== null) {
+      expect(principales.map((v) => v.e164), `cliente ${id}`).toEqual([fila.phoneE164]);
+    } else {
+      expect(principales, `cliente ${id}`).toEqual([]);
+    }
+  }
+}
+
 const ENERO = new Date('2026-01-10T10:00:00Z');
 const FEBRERO = new Date('2026-02-10T10:00:00Z');
 const MARZO = new Date('2026-03-10T10:00:00Z');
@@ -133,7 +167,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   for (const empresa of empresas) {
+    await prisma.customerPhoneNumber.deleteMany({ where: { companyId: empresa.companyId } });
+    await prisma.phoneNumber.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.customer.deleteMany({ where: { companyId: empresa.companyId } });
+    expect(await prisma.customerPhoneNumber.count({ where: { companyId: empresa.companyId } })).toBe(0);
+    expect(await prisma.phoneNumber.count({ where: { companyId: empresa.companyId } })).toBe(0);
     expect(await prisma.customer.count({ where: { companyId: empresa.companyId } })).toBe(0);
   }
   for (const empresa of empresas) {
@@ -146,37 +184,33 @@ afterAll(async () => {
 });
 
 describe('R24–R27 — el relleno sobre filas sembradas con texto libre', () => {
-  it('R24, R25, R26 — convierte las validas y marca invalid_format y duplicate (con un numero ya tomado)', async () => {
+  it('R13, R8 — convierte las validas aunque compartan numero, sin duplicate, cada una con su principal', async () => {
     const valido = await clienteAntiguo(colombia, '300 123 4567', ENERO);
     const invalido = await clienteAntiguo(colombia, 'llamar despues', ENERO);
-    const dupViejo = await clienteAntiguo(colombia, '310 765 4321', ENERO);
-    const dupNuevo = await clienteAntiguo(colombia, '+57 310 765 4321', MARZO);
+    const mismoViejo = await clienteAntiguo(colombia, '310 765 4321', ENERO);
+    const mismoNuevo = await clienteAntiguo(colombia, '+57 310 765 4321', MARZO);
     const extranjero = await clienteAntiguo(colombia, '+593 99 123 4567', FEBRERO);
     const sinTelefono = await clienteAntiguo(colombia, null, ENERO);
     const dadoDeBaja = await clienteAntiguo(colombia, '315 222 3333', ENERO, { deletedAt: FEBRERO });
 
-    // Un cliente vivo guardado ya con el numero nuevo: el texto antiguo que da el mismo numero
-    // sale duplicado entero.
-    const tomado = await clienteAntiguo(colombia, '+57 320 000 1111', MARZO);
-    await prisma.customer.update({
-      where: { id: tomado },
-      data: { phoneCountry: 'CO', phoneE164: '573200001111' },
-    });
-    const contraTomado = await clienteAntiguo(colombia, '320 000 1111', FEBRERO);
-
     const resumen = await backfillDe(colombia.companyId)();
 
-    expect(resumen).toEqual({ companies: 1, converted: 3, invalid: 1, duplicate: 2 });
+    expect(resumen).toEqual({ companies: 1, converted: 4, invalid: 1, reconverted: 0 });
     const porId = new Map((await filasDe(colombia)).map((f) => [f.id, f]));
     expect(porId.get(valido)).toMatchObject({ phoneCountry: 'CO', phoneE164: '573001234567', phoneIssue: null });
     expect(porId.get(invalido)).toMatchObject({ phoneCountry: 'CO', phoneE164: null, phoneIssue: 'invalid_format' });
-    expect(porId.get(dupNuevo)).toMatchObject({ phoneCountry: 'CO', phoneE164: '573107654321', phoneIssue: null });
-    expect(porId.get(dupViejo)).toMatchObject({ phoneCountry: 'CO', phoneE164: null, phoneIssue: 'duplicate' });
+    expect(porId.get(mismoNuevo)).toMatchObject({ phoneCountry: 'CO', phoneE164: '573107654321', phoneIssue: null });
+    expect(porId.get(mismoViejo)).toMatchObject({ phoneCountry: 'CO', phoneE164: '573107654321', phoneIssue: null });
     expect(porId.get(extranjero)).toMatchObject({ phoneCountry: 'EC', phoneE164: '593991234567', phoneIssue: null });
-    expect(porId.get(contraTomado)).toMatchObject({ phoneE164: null, phoneIssue: 'duplicate' });
-    expect(porId.get(tomado)).toMatchObject({ phoneE164: '573200001111', phoneIssue: null });
     expect(porId.get(sinTelefono)).toMatchObject({ phone: null, phoneCountry: null, phoneE164: null, phoneIssue: null });
     expect(porId.get(dadoDeBaja)).toMatchObject({ phoneCountry: null, phoneE164: null, phoneIssue: null });
+
+    // Los dos clientes del mismo numero comparten la fila de `phone_numbers`.
+    const vinculos = await vinculosDe(colombia);
+    const delMismo = vinculos.filter((v) => v.customerId === mismoViejo || v.customerId === mismoNuevo);
+    expect(delMismo).toHaveLength(2);
+    expect(new Set(delMismo.map((v) => v.phoneNumberId)).size).toBe(1);
+    await esperarInvariante(colombia, [valido, invalido, mismoViejo, mismoNuevo, extranjero, sinTelefono, dadoDeBaja]);
   });
 
   it('R24 — usa CO cuando la empresa no tiene pais, y el pais de la empresa cuando lo tiene', async () => {
@@ -227,7 +261,7 @@ describe('R24–R27 — el relleno sobre filas sembradas con texto libre', () =>
 
     const segunda = await backfillDe(colombia.companyId)();
 
-    expect(segunda).toEqual({ companies: 1, converted: 0, invalid: 0, duplicate: 0 });
+    expect(segunda).toEqual({ companies: 1, converted: 0, invalid: 0, reconverted: 0 });
     expect(await filasDe(colombia)).toEqual(antes);
   });
 
@@ -247,7 +281,7 @@ describe('R24–R27 — el relleno sobre filas sembradas con texto libre', () =>
       companyCountryOf: createGetCompanyCountry({ companies: createCompanyCountryRepository() }),
     })();
 
-    expect(resumen).toEqual({ companies: 1, converted: 1, invalid: 0, duplicate: 0 });
+    expect(resumen).toEqual({ companies: 1, converted: 1, invalid: 0, reconverted: 0 });
     expect(await prisma.customer.findUniqueOrThrow({ where: { id: enActiva } })).toMatchObject({
       phoneCountry: 'CO',
       phoneE164: '573045556677',
@@ -266,8 +300,71 @@ describe('R24–R27 — el relleno sobre filas sembradas con texto libre', () =>
       companies: 1,
       converted: 0,
       invalid: 0,
-      duplicate: 0,
+      reconverted: 0,
     });
     expect(await prisma.customer.count({ where: { companyId: vacia.companyId } })).toBe(0);
+  });
+});
+
+describe('R49 — la reconversion de los clientes que una pasada anterior dejo en duplicate', () => {
+  it('R49, R8 — la duplicate valida queda con su numero y su principal; la que ya no lo es, invalid_format; las invalid_format no se tocan', async () => {
+    const empresa = await crearEmpresa('CO');
+    // Una pasada anterior la leyo con MX: se vuelve a leer con MX, no con el CO de la empresa.
+    const dupMexico = await clienteAntiguo(empresa, '55 1234 5678', ENERO, { phoneCountry: 'MX', phoneIssue: 'duplicate' });
+    const dupColombia = await clienteAntiguo(empresa, '300 123 4567', ENERO, { phoneCountry: 'CO', phoneIssue: 'duplicate' });
+    const dupInvalida = await clienteAntiguo(empresa, '300 12', ENERO, { phoneCountry: 'CO', phoneIssue: 'duplicate' });
+    const yaInvalida = await clienteAntiguo(empresa, '300 123 4567', ENERO, {
+      phoneCountry: 'CO',
+      phoneIssue: 'invalid_format',
+    });
+    const dupDeBaja = await clienteAntiguo(empresa, '300 123 4567', ENERO, {
+      phoneCountry: 'CO',
+      phoneIssue: 'duplicate',
+      deletedAt: FEBRERO,
+    });
+    const pendiente = await clienteAntiguo(empresa, '300 123 4567', FEBRERO);
+    const antes = new Map((await filasDe(empresa)).map((f) => [f.id, f]));
+
+    const resumen = await backfillDe(empresa.companyId)();
+
+    expect(resumen).toEqual({ companies: 1, converted: 1, invalid: 1, reconverted: 2 });
+    const porId = new Map((await filasDe(empresa)).map((f) => [f.id, f]));
+    expect(porId.get(dupMexico)).toMatchObject({ phoneCountry: 'MX', phoneIssue: null });
+    expect(porId.get(dupMexico)?.phoneE164?.startsWith('52')).toBe(true);
+    expect(porId.get(dupColombia)).toMatchObject({ phoneCountry: 'CO', phoneE164: '573001234567', phoneIssue: null });
+    expect(porId.get(dupInvalida)).toMatchObject({ phoneCountry: 'CO', phoneE164: null, phoneIssue: 'invalid_format' });
+    expect(porId.get(pendiente)).toMatchObject({ phoneCountry: 'CO', phoneE164: '573001234567', phoneIssue: null });
+    expect(porId.get(yaInvalida)).toEqual(antes.get(yaInvalida));
+    expect(porId.get(dupDeBaja)).toEqual(antes.get(dupDeBaja));
+    // Ni `phone` ni `updated_at`/`updated_by` cambian en las reconvertidas.
+    for (const id of [dupMexico, dupColombia, dupInvalida]) {
+      expect(porId.get(id)).toMatchObject({
+        phone: antes.get(id)?.phone,
+        updatedAt: antes.get(id)?.updatedAt,
+        updatedBy: antes.get(id)?.updatedBy,
+      });
+    }
+
+    const vivasEnDuplicate = await prisma.customer.count({
+      where: { companyId: empresa.companyId, deletedAt: null, phoneIssue: 'duplicate' },
+    });
+    expect(vivasEnDuplicate).toBe(0);
+    await esperarInvariante(empresa, [dupMexico, dupColombia, dupInvalida, yaInvalida, dupDeBaja, pendiente]);
+  });
+
+  it('R49 — la segunda pasada no cambia ninguna fila ni ningun vinculo y no cuenta nada', async () => {
+    const empresa = await crearEmpresa('CO');
+    await clienteAntiguo(empresa, '300 123 4567', ENERO, { phoneCountry: 'CO', phoneIssue: 'duplicate' });
+    await clienteAntiguo(empresa, 'nada', ENERO, { phoneCountry: 'CO', phoneIssue: 'duplicate' });
+    await clienteAntiguo(empresa, '300 123 4567', FEBRERO);
+    await backfillDe(empresa.companyId)();
+    const filasAntes = await filasDe(empresa);
+    const vinculosAntes = await vinculosDe(empresa);
+
+    const segunda = await backfillDe(empresa.companyId)();
+
+    expect(segunda).toEqual({ companies: 1, converted: 0, invalid: 0, reconverted: 0 });
+    expect(await filasDe(empresa)).toEqual(filasAntes);
+    expect(await vinculosDe(empresa)).toEqual(vinculosAntes);
   });
 });
