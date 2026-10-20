@@ -264,8 +264,9 @@ test.describe('notificaciones', () => {
     });
     expect(uploads.count(), 'el PDF sube sus bytes desde el navegador').toBe(1);
 
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('document-upload-dialog')).toHaveCount(0, { timeout: 30_000 });
+    // `keepMounted`: el dialogo cerrado sigue en el DOM, solo se oculta.
+    await page.getByTestId('document-upload-close').click();
+    await expect(page.getByTestId('document-upload-dialog')).toBeHidden({ timeout: 30_000 });
 
     // Sin recargar: lo trae la consulta periódica.
     await expect(bell(page)).toHaveAccessibleName('Notificaciones, 1 sin leer', {
@@ -331,8 +332,9 @@ test.describe('notificaciones', () => {
     });
     expect(uploads.count(), 'los dos PDFs suben sus bytes desde el navegador').toBe(2);
 
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('document-upload-dialog')).toHaveCount(0, { timeout: 30_000 });
+    // `keepMounted`: el dialogo cerrado sigue en el DOM, solo se oculta.
+    await page.getByTestId('document-upload-close').click();
+    await expect(page.getByTestId('document-upload-dialog')).toBeHidden({ timeout: 30_000 });
 
     // Un solo aviso para la tanda entera, no uno por archivo.
     await expect(bell(page)).toHaveAccessibleName('Notificaciones, 1 sin leer', {

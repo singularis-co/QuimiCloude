@@ -735,3 +735,22 @@ Commits: `19e2c07b` (servidor: T24, T25, T26, T28), `d1434ee1` (navegador: T24, 
   - `document-storage-memory.ts` (doble de E2E) pasa a ser una fábrica: con un nombre original que contiene `e2e-ilegible` devuelve bytes que no son PDF.
   - Solo funciona con la estrategia de catálogo.
   - Busca el nombre en `document_files.original_name`.
+
+## Tanda 4 — cierre de T21 y T22 (implementer, decisiones del humano del 2026-10-19)
+
+- **T21 [x]. Decisión del humano:** «la ruta de design §4.4 cambia a docs/modulos/». El README está en `docs/modulos/notificaciones.md`, sacado del borrador de backend_dev, con las rutas completas desde la raíz del repo. Comprobado: los 14 archivos que nombra existen y los cuatro tests que cita (R6 en `add-event`, R9 en `notificaciones-wiring`, R10 y R11 en `channel-factory`) existen con ese nombre. `guard-arquitectura-modulos` no se ha tocado. Nota añadida en `tasks.md > T21`.
+- **T22 [x].** `e2e/notificaciones.spec.ts`, puntos 1, 1b y 2–6.
+  - **Entorno (autorizado por el humano).** El `.env` del checkout principal se usa solo cargado en el entorno: no se ha copiado ni commiteado, y no se ha impreso ningún secreto.
+  - **Base desechable (fuera de lo pedido).** El E2E no ha corrido sobre `QuimiCloude`. Esa base tiene migraciones de otras ramas que esta no tiene (`20260922160000…`, `20260922160100…`, `20261016130000…`, `20261016130100…` y `20261019120000_whatsapp_connections_drop_meta_app_id`) y le faltan las cuatro de QC-137. Migrarla habría mezclado esquemas en la base con la que trabaja el humano. En su lugar:
+    - se creó `qc137_e2e_tmp` en el mismo servidor;
+    - `db:migrate` aplicó todo hasta `20261019120300`;
+    - `db:seed` la sembró;
+    - se corrió el E2E con `DATABASE_URL` y `DIRECT_URL` apuntando a ella;
+    - al terminar se borró (`DROP DATABASE … WITH (FORCE)`).
+  - **Primera vuelta: 2 failed, 12 did not run.** El caso 1, en los dos navegadores, fallaba en `toHaveCount(0)` del `document-upload-dialog` tras pulsar Escape. Era un fallo del spec: el diálogo usa `keepMounted` y se queda en el DOM aunque esté cerrado. frontend_dev lo cerró como `e2e/movimiento.spec.ts`: clic en `document-upload-close` y espera con `toBeHidden`. Lo mismo en el 1b. Producción no ha cambiado.
+  - **Vuelta final (salida real, chromium + webkit):** `14 passed (1.8m)`.
+  - **Tras el arreglo:** `pnpm run typecheck` 0 errores; `pnpm run lint` 0 errores y 10 avisos que ya estaban; `pnpm exec vitest run guard` 81 archivos, 1102 pass y 20 skipped.
+
+Mapa R → test del E2E: R13 en los casos 1, 1b, 2 y 3; R19 en el 5; R24 en el 1 y el 6; R25 y R27 en el 4; R46 y R49 en el 1 y el 1b; R50 y R51 en el 1b (nombre original del archivo fallido).
+
+Tasks de la tanda 4 cerradas: T21, T22, T24, T25, T26, T27 y T28. Queda T23, la QA manual del humano.

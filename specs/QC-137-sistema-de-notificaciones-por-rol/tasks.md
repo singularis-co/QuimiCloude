@@ -311,10 +311,13 @@ Todo en `app/(private)/components/notifications/` (design §1, «Piezas nuevas»
 
 ## Bloque G — Documentación, E2E y QA
 
-- [ ] **T21. README del módulo** `[P]` (design §4.4). Depende de T11.
+- [x] **T21. README del módulo** `[P]` (design §4.4). Depende de T11.
   - `lib/modules/notificaciones/README.md`: cómo agregar un evento y cómo agregar un canal.
+  - **Decisión del humano del 2026-10-19:** la ruta de design §4.4 cambia a `docs/modulos/`. El
+    README va en `docs/modulos/notificaciones.md`, porque `tests/guards/guard-arquitectura-modulos.test.ts`
+    (R1) solo admite `index.ts` en la raíz de `lib/modules/<m>/`. La guardia no se toca.
   - **Hecho:** cada paso del README nombra el archivo real y el test de R6/R10 que lo demuestra.
-- [ ] **T22. E2E de aislamiento, primer evento y scroll** (R13, R19, R24, R25, R27, R46, R49,
+- [x] **T22. E2E de aislamiento, primer evento y scroll** (R13, R19, R24, R25, R27, R46, R49,
   R50, R51). Depende de T18, T19, T11 y, por la enmienda del 2026-10-19, T24.
   - `e2e/notificaciones.spec.ts`, con los dobles de `e2e/formula-desde-pdf.spec.ts` (lector
     enlatado y cola en línea):
