@@ -620,3 +620,50 @@ Casos borrados:
 
 ### Veredicto
 La parte servidor de T24, T25, T26 y T28 está hecha y en verde, salvo `polling-feed.test.ts`, que es de frontend_dev. T21 está escrita pero sin colocar, porque la guardia de arquitectura la bloquea.
+
+## Tanda 4 — parte frontend: T24 (navegador), T27, T28 (UI), T22 (frontend_dev)
+
+Sin commit (lo hace el leader).
+
+### Archivos creados
+- `e2e/notificaciones.spec.ts` (T22, puntos 1, 2, 3, 4, 5 y 6; el 1b no, ver «Abierto»).
+- `e2e/helpers/notifications.ts`: `seedNotifications` y `deleteCompanyNotifications`.
+
+### Archivos modificados
+- `tests/unit/notificaciones-ui/polling-feed.test.ts`: fuera el caso `forbidden`; R40 y R56.
+- `tests/unit/notificaciones-ui/notification-bell.test.tsx`: los dos casos de montaje con «R19» en el nombre; R36 y R56.
+- `app/globals.css`: `@keyframes notification-bell-swing` y `@utility animate-notification-bell-swing` (700 ms, `var(--ease-standard)`, una vez, origen 50 % 10 % como el tablero).
+- `app/(private)/components/notifications/notification-bell.tsx`: el icono lleva `motion-safe:animate-notification-bell-swing` cuando `summary.arrivals > 0`, con `key={summary.arrivals}` para que vuelva a arrancar en cada llegada.
+- `tests/guards/guard-movimiento.test.ts`: `EXCEPCIONES_DE_DURACION` (una entrada, con su motivo), cabecera, caso R36 con sus negativos y caso del login ajustado.
+- `tests/guards/guard-identificador-de-request.test.ts`: la lista cerrada de E2E gana `notificaciones.spec.ts`.
+
+`rg` de `forbidden|notificaciones\.consultar|isCompanyAddonActive|'notificaciones'` en `app/` y `tests/unit/notificaciones-ui`: solo la aserción negativa de R19 en `notification-bell.test.tsx` y el `existsSync` de `solo-campana.test.ts`. Ningún `forbidden` de notificaciones.
+
+### Mapa R<n> → test (tanda 4, frontend)
+| R | Test |
+| --- | --- |
+| R19 | `notification-bell.test.tsx` › «R19: con sesión monta la campana en la cabecera aunque no tenga ningún permiso (las notificaciones son núcleo)» y «R19: el layout no condiciona la campana a ningún permiso ni añadido de notificaciones»; `e2e/notificaciones.spec.ts` › «5. sin permiso ni añadido…» |
+| R36 | `notification-bell.test.tsx` › «R36: al llegar un aviso la campana se balancea bajo motion-safe, y no al cargar»; `guard-movimiento.test.ts` › «QC-137 R36: la excepción del balanceo de la campana admite solo ese nombre, en esos archivos y a 700 ms» (negativos: `notification-bell-swingy` y `otra-animacion` a 700 ms, el mismo nombre en `app/otro.css` y `components/x.css`, el mismo a 701 ms) y «el bloque del login y la excepción del balanceo de la campana son lo único que la guardia deja fuera» |
+| R40 | `polling-feed.test.ts` › «R40: se para con unauthorized» |
+| R56 | `polling-feed.test.ts` › «R56: un resumen vacío no detiene la consulta»; `notification-bell.test.tsx` › «R56: con el resumen vacío del Maestro, campana sin insignia, "ninguna sin leer" y panel "No tienes notificaciones." sin error» |
+| R13, R24, R25, R27, R46, R49 | `e2e/notificaciones.spec.ts`, casos 1–4 y 6 (sin ejecutar, ver «Abierto») |
+
+### Verificación (salida real)
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 10 avisos, todos de archivos que no toqué.
+- `pnpm exec vitest run tests/unit/notificaciones-ui`: 10 archivos, 107 pass.
+- `pnpm exec vitest related --run <mis archivos>`: 23 archivos, 394 pass.
+- `pnpm exec vitest run guard`: 81 archivos, 1102 pass y 20 skipped. La primera vuelta dio 1 rojo, `guard-identificador-de-request` (el spec nuevo no estaba en la lista cerrada); se arregló dándolo de alta.
+- `pnpm exec playwright test e2e/notificaciones.spec.ts`: el servidor arranca (`Ready in 5.3s`), pero el `beforeAll` cae en los dos navegadores con `PrismaClientInitializationError … Environment variable not found: DATABASE_URL`. 2 fallan y 10 no corren (serie). El worktree no tiene `.env` y en el shell no hay `DATABASE_URL`.
+
+### Decisiones fuera del spec (a validar)
+1. La duración del balanceo vive en `globals.css` (`@utility`), y no en una clase arbitraria `animate-[…_700ms…]` en el `.tsx`. El detector de duraciones de la guardia solo mide declaraciones de CSS; una clase arbitraria se le escaparía, y medirlas todas pondría en rojo `status-badge` (1,6 s) y `spinner` (0,9 s). Así la excepción es la que deja pasar los 700 ms. El `.tsx` sigue en `archivos`, como dice design §9.5, aunque hoy solo nombra la utilidad.
+2. Los casos del E2E corren en serie (`mode: 'serial'`), porque comparten la empresa A y el conteo del Administrador de A.
+3. El punto 5 comprueba en la base que no quedan permiso, asignación, añadido ni excepción de notificaciones, antes de abrir la campana.
+
+### Abierto / bloqueo
+- **T22 1b, sin escribir.** El lector enlatado (`ai-reader-canned.ts`) devuelve siempre éxito y no ve el nombre del archivo. El almacenamiento en memoria tampoco falla nunca una ruta firmada. No hay forma de que falle uno de dos PDFs sin cambiar un doble de `documentos`, y eso es backend. Hace falta, por ejemplo, que el doble falle con una marca.
+- **E2E sin ejecutar:** falta `DATABASE_URL` en el worktree. Tampoco sé si la base de desarrollo tiene aplicadas las migraciones de QC-137.
+
+### Veredicto
+T24 (navegador), T27 y T28 (UI) están hechas y en verde. T22 está escrita salvo el 1b, pero sin ejecutar: falta la base del E2E.

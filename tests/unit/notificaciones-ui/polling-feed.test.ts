@@ -136,8 +136,8 @@ describe('createPollingFeed', () => {
     expect(fetchSummary).toHaveBeenCalledTimes(3);
   });
 
-  it.each(['unauthorized', 'forbidden'] as const)('R40: con %s deja de consultar y avisa', async (code) => {
-    const fetchSummary = vi.fn(async (): Promise<SummaryResult> => ({ ok: false, code }));
+  it('R40: se para con unauthorized', async () => {
+    const fetchSummary = vi.fn(async (): Promise<SummaryResult> => ({ ok: false, code: 'unauthorized' }));
     const visibility = fakeVisibility();
     const onStop = vi.fn();
     const onSummary = vi.fn();
@@ -145,7 +145,7 @@ describe('createPollingFeed', () => {
 
     feed.start(onSummary, onStop);
     await vi.advanceTimersByTimeAsync(0);
-    expect(onStop).toHaveBeenCalledWith(code);
+    expect(onStop).toHaveBeenCalledWith('unauthorized');
 
     await vi.advanceTimersByTimeAsync(300_000);
     visibility.set(false);
@@ -154,6 +154,28 @@ describe('createPollingFeed', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchSummary).toHaveBeenCalledTimes(1);
     expect(onSummary).not.toHaveBeenCalled();
+  });
+
+  it('R56: un resumen vacío no detiene la consulta', async () => {
+    const EMPTY: SummaryResult = { ok: true, data: { unreadCount: 0, newest: null } };
+    const fetchSummary = vi.fn(async () => EMPTY);
+    const visibility = fakeVisibility();
+    const onStop = vi.fn();
+    const summaries: NotificationSummary[] = [];
+    const feed = createPollingFeed({ fetchSummary, intervalMs: 30_000, visibility: visibility.port, timers: browserTimers });
+
+    feed.start((s) => summaries.push(s), onStop);
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(fetchSummary).toHaveBeenCalledTimes(3);
+    expect(onStop).not.toHaveBeenCalled();
+    expect(summaries).toEqual([
+      { status: 'ready', unreadCount: 0, newest: null },
+      { status: 'ready', unreadCount: 0, newest: null },
+      { status: 'ready', unreadCount: 0, newest: null },
+    ]);
   });
 
   it('un error deja summary.status = error y el ciclo sigue', async () => {

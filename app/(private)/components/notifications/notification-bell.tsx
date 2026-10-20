@@ -33,6 +33,7 @@ const SKELETON_ROWS = 5;
 export const PHONE_PANEL_COLLISION_PADDING = { top: 8, right: 8, bottom: 16, left: 8 } as const;
 export const PHONE_PANEL_WIDTH_CLASS = 'w-[calc(100vw-16px)]';
 const PANEL_SIDE_OFFSET = 8;
+const BELL_SWING_CLASS = 'motion-safe:animate-notification-bell-swing';
 
 function entranceOf(list: NotificationListState, id: string): NotificationEntrance | undefined {
   if (list.freshIds.includes(id)) return 'arrive';
@@ -108,7 +109,13 @@ export function NotificationBell({ texts = NOTIFICATION_BELL_TEXTS }: Notificati
             />
           }
         >
-          <BellIcon aria-hidden="true" />
+          <BellIcon
+            // La clave nueva vuelve a montar el icono y así el balanceo arranca otra vez.
+            key={summary.arrivals}
+            aria-hidden="true"
+            data-testid="notification-bell-icon"
+            className={cn(summary.arrivals > 0 && BELL_SWING_CLASS)}
+          />
           <UnreadCountBadge className="absolute -top-1.5 -right-1.5 shadow-[0_0_0_2px_var(--background)]" />
         </TooltipTrigger>
         <TooltipContent side="bottom">{texts.title}</TooltipContent>

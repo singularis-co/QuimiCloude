@@ -378,6 +378,49 @@ describe('NotificationBell', () => {
 
     for (const row of rows()) expect(row.className.split(/\s+/)).toContain('min-h-11');
   });
+
+  it('R36: al llegar un aviso la campana se balancea bajo motion-safe, y no al cargar', () => {
+    const { emit } = renderBell();
+    const icon = () => screen.getByTestId('notification-bell-icon');
+    const classes = () => (icon().getAttribute('class') ?? '').split(/\s+/);
+
+    emit(2, 2);
+    expect(classes().some((c) => c.includes('notification-bell-swing'))).toBe(false);
+
+    emit(2, 2);
+    expect(classes().some((c) => c.includes('notification-bell-swing'))).toBe(false);
+
+    emit(3, 3);
+    expect(classes()).toContain('motion-safe:animate-notification-bell-swing');
+    expect(classes().filter((c) => c.includes('notification-bell-swing'))).toEqual([
+      'motion-safe:animate-notification-bell-swing',
+    ]);
+
+    const css = readFileSync(join(RAIZ, 'app', 'globals.css'), 'utf8');
+    expect(css).toMatch(/@keyframes notification-bell-swing\s*\{/);
+    const utility = /@utility animate-notification-bell-swing\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(utility).toMatch(/animation:\s*notification-bell-swing 700ms var\(--ease-(standard|enter|exit)\) both;/);
+    expect(utility).not.toMatch(/infinite/);
+  });
+
+  it('R56: con el resumen vacío del Maestro, campana sin insignia, "ninguna sin leer" y panel "No tienes notificaciones." sin error', async () => {
+    const { emit, actions } = renderBell();
+    emit(0, null);
+
+    expect(bell()).toHaveAccessibleName('Notificaciones, ninguna sin leer');
+    expect(within(bell()).queryByTestId('unread-count-badge')).toBeNull();
+
+    await openWith(actions, batch([], null));
+
+    expect(await within(panel()).findByText(NOTIFICATION_BELL_TEXTS.empty)).toBeInTheDocument();
+    expect(within(panel()).queryByRole('alert')).toBeNull();
+    expect(within(panel()).queryByText(NOTIFICATION_BELL_TEXTS.firstError)).toBeNull();
+    expect(within(panel()).queryByRole('button', { name: NOTIFICATION_BELL_TEXTS.markAll })).toBeNull();
+
+    emit(0, null);
+    expect(bell()).toHaveAccessibleName('Notificaciones, ninguna sin leer');
+    expect(within(panel()).getByText(NOTIFICATION_BELL_TEXTS.empty)).toBeInTheDocument();
+  });
 });
 
 const RAIZ = join(__dirname, '..', '..', '..');
@@ -395,7 +438,7 @@ describe('montaje en el layout privado', () => {
     cookiesMock.mockResolvedValue({ get: () => undefined });
   });
 
-  it('con sesión monta la campana en la cabecera aunque no tenga ningún permiso (las notificaciones son núcleo)', async () => {
+  it('R19: con sesión monta la campana en la cabecera aunque no tenga ningún permiso (las notificaciones son núcleo)', async () => {
     for (const permissions of [[], ['inventario.consultar']]) {
       getSessionUserMock.mockResolvedValueOnce(usuario(permissions));
       render(await PrivateLayout({ children: <div /> }));
@@ -408,7 +451,7 @@ describe('montaje en el layout privado', () => {
     }
   });
 
-  it('el layout no condiciona la campana a ningún permiso ni añadido de notificaciones', () => {
+  it('R19: el layout no condiciona la campana a ningún permiso ni añadido de notificaciones', () => {
     const fuente = readFileSync(join(RAIZ, 'app', '(private)', 'layout.tsx'), 'utf8');
     expect(fuente).toContain('<NotificationBell />');
     expect(fuente).not.toMatch(/notificaciones\.consultar/);

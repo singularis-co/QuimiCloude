@@ -217,6 +217,9 @@ export const E2E_ESPERADOS = [
   'inventario.spec.ts',
   'login-skin.spec.ts',
   'login.spec.ts',
+  // Alta con el mismo patron que las demas (QC-137 T22): la campana y su panel. No lee ni afirma
+  // nada sobre el identificador de peticion ni sobre `reference`.
+  'notificaciones.spec.ts',
   // Alta el 2026-10-02 (QC-138) por el MISMO motivo y en el MISMO sitio que las demas: la lista
   // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
   // -el archivo se nombra, uno a uno-. Lo que ejercita: un alta de pedido sin material suficiente
