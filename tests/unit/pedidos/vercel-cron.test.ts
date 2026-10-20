@@ -1,6 +1,6 @@
 // Cada proceso diario tiene que estar declarado como tarea programada de la plataforma de
 // despliegue, con una sola ejecucion al dia y apuntando a la ruta de su handler. Cada cron se busca
-// por su `path`: un cron de otra ficha no cambia lo que se exige a este.
+// por su `path`: un cron de otra ficha no cambia lo que se exige a este, y no se fija el total.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -10,6 +10,8 @@ const RUTA = join(process.cwd(), 'vercel.json')
 
 type VercelCron = { readonly path: string; readonly schedule: string }
 type VercelConfig = { readonly crons?: readonly VercelCron[] }
+
+const RUTA_CADUCIDAD = '/api/cron/caducar-pedidos'
 
 function leer(): VercelConfig {
   return JSON.parse(readFileSync(RUTA, 'utf8')) as VercelConfig
@@ -25,6 +27,9 @@ function expectUnaVezAlDia(schedule: string): void {
   // minuto hora dia-mes mes dia-semana: los CINCO campos de una expresion cron estandar.
   expect(campos).toHaveLength(5)
   const [minuto, hora, diaMes, mes, diaSemana] = campos
+  // Un minuto y una hora FIJOS -sin `*`, `/` ni `,`- son los que garantizan una sola
+  // ejecucion por dia; los otros tres campos sin acotar (`*`) es lo que hace que sea TODOS
+  // los dias, no una fecha concreta.
   expect(minuto).toMatch(/^\d+$/)
   expect(hora).toMatch(/^\d+$/)
   expect(diaMes).toBe('*')
@@ -33,12 +38,12 @@ function expectUnaVezAlDia(schedule: string): void {
 }
 
 describe('vercel.json — el cron de caducidad de pedidos', () => {
-  it('R23 — declara UNA sola tarea apuntando a /api/cron/caducar-pedidos', () => {
-    expect(cronesCon('/api/cron/caducar-pedidos')).toHaveLength(1)
+  it('R23 — declara UNA sola tarea apuntando a /api/cron/caducar-pedidos, sin fijar cuantas hay en total', () => {
+    expect(cronesCon(RUTA_CADUCIDAD)).toHaveLength(1)
   })
 
-  it('R23 — la expresion cron es UNA sola ejecucion al dia', () => {
-    expectUnaVezAlDia(cronesCon('/api/cron/caducar-pedidos')[0]?.schedule ?? '')
+  it('R23 — la expresion cron de la caducidad es UNA sola ejecucion al dia', () => {
+    expectUnaVezAlDia(cronesCon(RUTA_CADUCIDAD)[0]?.schedule ?? '')
   })
 })
 

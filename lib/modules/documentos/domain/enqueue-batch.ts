@@ -33,7 +33,7 @@ export function createEnqueueBatch(
     const parsed = enqueueBatchSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
-    const { strategy, paths } = parsed.data;
+    const { strategy, paths, names } = parsed.data;
     if (!paths.every((path) => isPathInCompany(path, actor.companyId))) {
       throw new ValidationError();
     }
@@ -43,6 +43,7 @@ export function createEnqueueBatch(
       strategy,
       createdBy: actor.id,
       paths,
+      ...(names === undefined ? {} : { originalNames: names }),
     });
 
     // Ningun `await` en paralelo aqui: publicar y anotar el mensaje de un archivo no debe

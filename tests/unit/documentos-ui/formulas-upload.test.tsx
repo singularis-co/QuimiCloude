@@ -199,6 +199,7 @@ describe('el boton de subida en el listado de formulas', () => {
     expect(encolado).toEqual({
       strategy: 'formula',
       paths: signedUploads(1).map((upload) => upload.path),
+      names: ['formula.pdf'],
     });
   });
 

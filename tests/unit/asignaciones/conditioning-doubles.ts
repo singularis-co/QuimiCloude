@@ -50,6 +50,7 @@ export function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): 
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'POR_ACONDICIONAR',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     presentationLines: [],
     unitId: UNIDAD,
     finishedAt: null,

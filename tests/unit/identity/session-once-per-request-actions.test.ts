@@ -649,6 +649,16 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/integraciones/adapters/driving/whatsapp-template-actions')
       ).listWhatsappTemplatesAction(),
   },
+  {
+    // QC-137: el resumen de la campana, que el navegador consulta cada 30 s. Sin permisos responde
+    // `forbidden` antes de tocar la bandeja.
+    archivo: 'lib/modules/notificaciones/adapters/driving/notification-actions.ts',
+    nombre: 'getNotificationSummaryAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/notificaciones/adapters/driving/notification-actions')
+      ).getNotificationSummaryAction(),
+  },
 ];
 
 /**

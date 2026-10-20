@@ -6,6 +6,7 @@
  */
 import { requirePermission, type Actor, DOCUMENT_UPLOAD_PERMISSION } from './actor';
 import { MILLISECONDS_PER_SECOND } from './limits';
+import { createNotifyIfBatchFinished, type BatchFinishedDeps } from './notify-if-batch-finished';
 
 import type { BatchStatus } from './batch-status';
 import type { DocumentBatchRepository } from '../ports/document-batch-repository';
@@ -16,12 +17,15 @@ export type GetBatchStatusDeps = {
   readonly config: ProcessingConfig;
   /** El instante de la consulta, inyectable: la caducidad se cuenta desde el, no desde `new Date()`. */
   readonly now?: () => Date;
+  readonly batchFinished?: BatchFinishedDeps;
 };
 
 export function createGetBatchStatus(
   deps: GetBatchStatusDeps,
 ): (actor: Actor | null | undefined, batchId: string) => Promise<BatchStatus | null> {
   const now = deps.now ?? ((): Date => new Date());
+  const notifyIfBatchFinished =
+    deps.batchFinished === undefined ? null : createNotifyIfBatchFinished(deps.batchFinished);
 
   return async function getBatchStatus(
     actor: Actor | null | undefined,
@@ -33,6 +37,8 @@ export function createGetBatchStatus(
       now().getTime() - deps.config.timeoutSeconds() * MILLISECONDS_PER_SECOND,
     );
     await deps.repository.expireStale(batchId, actor.companyId, olderThan);
+    // La caducidad también cierra archivos: sin esto, una tanda con uno colgado nunca avisaría.
+    await notifyIfBatchFinished?.(batchId, actor.companyId);
 
     return deps.repository.readBatch(batchId, actor.companyId);
   };

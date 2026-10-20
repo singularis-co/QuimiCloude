@@ -294,6 +294,8 @@ export type AssignedOrderSummary = {
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
+  /** La fecha de solicitud del pedido. */
+  readonly createdAt: Date;
   /** `[]` = sin reparto todavia: el contrato que `asignaciones` usa para pintarlo. */
   readonly presentationLines: readonly AssignedOrderPresentationLine[];
   /** La unidad en que se expresa `quantity`; `null` en los pedidos que no la tienen
