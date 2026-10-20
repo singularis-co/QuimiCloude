@@ -288,7 +288,7 @@ describe('R10, R32, R34 — editar el telefono de un cliente con y sin aviso', (
     });
   });
 
-  it('R34 — editar una fila pendiente de relleno con el numero vacio conserva phone y deja phone_country, phone_e164 y phone_issue nulos', async () => {
+  it('R36 — editar una fila pendiente de relleno con el numero vacio conserva phone y deja phone_country, phone_e164 y phone_issue nulos', async () => {
     // Pendiente: el texto antiguo, sin phone_e164 ni phone_issue, como antes de pasar el relleno.
     const id = await alta(empresaA, SIN_TELEFONO);
     await prisma.customer.update({

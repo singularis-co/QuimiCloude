@@ -540,7 +540,7 @@ describe('CustomerPhoneField · clientes migrados', () => {
     );
   });
 
-  it('R35 — un cliente pendiente de relleno abre con el número vacío, sin etiqueta y con la ayuda de que se conserva', async () => {
+  it('R36, R35 — un cliente pendiente de relleno abre con el número vacío, sin etiqueta y con la ayuda de que se conserva', async () => {
     await openEdit(PENDING_LEGACY, 'CO');
 
     expect(numberInput()).toHaveValue('');
@@ -553,7 +553,7 @@ describe('CustomerPhoneField · clientes migrados', () => {
     expect(within(group.parentElement!).getByText('300-123-4567 casa')).toHaveClass('font-mono');
   });
 
-  it('R34 — guardar un cliente pendiente de relleno con el número vacío manda phoneNumber vacío sin errores', async () => {
+  it('R36 — guardar un cliente pendiente de relleno con el número vacío manda phoneNumber vacío sin errores', async () => {
     const user = setupUser();
     await openEdit(PENDING_LEGACY, 'CO');
 

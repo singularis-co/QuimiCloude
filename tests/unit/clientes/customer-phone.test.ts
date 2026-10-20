@@ -134,7 +134,7 @@ describe('describeCustomerPhone', () => {
     ).toEqual({ kind: 'issue', legacyPhone: '300 123 4567', issue: 'duplicate', label: 'Duplicado: revisar' })
   })
 
-  it('R34 — pendiente de relleno (phone sin phoneE164 ni phoneIssue): el texto antiguo, sin etiqueta', () => {
+  it('R36 — pendiente de relleno (phone sin phoneE164 ni phoneIssue): el texto antiguo, sin etiqueta', () => {
     expect(describeCustomerPhone({ phone: '300 123 4567', phoneE164: null, phoneIssue: null })).toEqual({
       kind: 'legacy',
       legacyPhone: '300 123 4567',

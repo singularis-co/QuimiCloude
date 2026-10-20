@@ -83,7 +83,7 @@ describe('columna «Teléfono» de la lista de clientes', () => {
     expect(issue).not.toHaveTextContent('Teléfono duplicado: revisar');
   });
 
-  it('R29 — un cliente pendiente de relleno muestra su teléfono antiguo en gris y en mono, sin etiqueta', () => {
+  it('R36 — un cliente pendiente de relleno muestra su teléfono antiguo en gris y en mono, sin etiqueta', () => {
     renderPhoneCell({ ...BASE, phone: '300-123-4567 casa' });
 
     const legacy = screen.getByTestId(`customer-phone-legacy-${BASE.id}`);

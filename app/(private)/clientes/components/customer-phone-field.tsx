@@ -117,7 +117,7 @@ export type CustomerPhoneFieldProps = {
   readonly testIds: CustomerPhoneFieldTestIds;
 };
 
-// Sin teléfono, la edición abre con el país de la empresa, como el alta (humano, 2026-10-19).
+// Sin teléfono, la edición abre con el país de la empresa, como el alta.
 function initialCountry(
   customer: CustomerView | undefined,
   companyCountry: CountryCode | null,

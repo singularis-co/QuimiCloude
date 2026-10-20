@@ -257,7 +257,7 @@ T10 hecho y en verde; T11 escrito, compila y se enumera, sin correr por falta de
 
 ## Cierre · implementer (2026-10-19)
 
-### Mapa consolidado R1–R34 → test
+### Mapa consolidado R1–R36 → test
 
 Detalle por caso en las secciones de arriba. «[int]» = integración escrita y sin correr (no hay
 `DATABASE_URL` en el worktree); «[e2e]» = E2E escrito, enumerado por `playwright --list`, sin correr.
@@ -288,6 +288,13 @@ Detalle por caso en las secciones de arriba. «[int]» = integración escrita y 
 | R32 | `customer-service.test.ts`, `customer-phone-field.test.tsx`, `customer-phone-uniqueness.int.test.ts` [int] |
 | R33 | `country-select-pinned.test.tsx`, `customer-phone-field.test.tsx`, [e2e] |
 | R34 | `customer-service.test.ts`, `customer-phone-field.test.tsx`, `customer-phone-uniqueness.int.test.ts` [int] |
+| R35 | `customer-phone-field.test.tsx` (los casos «R35 —» y «R36, R35 —») |
+| R36 | `customer-phone.test.ts` «R36 — pendiente de relleno (phone sin phoneE164 ni phoneIssue)…»; `customer-columns-phone.test.tsx` «R36 — un cliente pendiente de relleno muestra su teléfono antiguo…»; `customer-phone-field.test.tsx` «R36, R35 — un cliente pendiente de relleno abre con el número vacío…» y «R36 — guardar un cliente pendiente de relleno…»; `customer-phone-uniqueness.int.test.ts` «R36 — editar una fila pendiente de relleno…» [int] |
+
+R36 (2026-10-19): los casos de la fila pendiente de relleno, antes bajo R29, R34 o R35, pasan a
+«R36 —» con el resto del nombre igual. Las secciones de arriba citan los nombres viejos.
+Salida: `pnpm run typecheck` sin errores; `vitest related --run --project ui --project node` sobre
+los archivos tocados → `Test Files 23 passed (23)`, `Tests 478 passed (478)`. Sin instantáneas rotas.
 
 ### Sin correr
 
