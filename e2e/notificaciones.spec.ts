@@ -1,13 +1,16 @@
 /**
  * E2E de la campana de avisos: el primer evento (fin de una tanda de PDFs de fórmula) llega sin
- * recargar y lleva a fórmulas; ningún aviso cruza de empresa ni de rol; el panel carga el
+ * recargar y lleva a fórmulas; una tanda de catálogo con un archivo ilegible deja un solo aviso que
+ * lo nombra y lleva a proveedores; ningún aviso cruza de empresa ni de rol; el panel carga el
  * historial al hacer scroll con el observador real del navegador; la campana es núcleo (sin permiso
  * ni añadido en la base); y no hay página `/notificaciones` ni ítem en el menú. En Chromium y en
  * WebKit.
  *
  * SIN RED. El `webServer` de `playwright.config.ts` arranca con los dobles de `documentos`
  * (lector enlatado y cola en línea), como `e2e/formula-desde-pdf.spec.ts`. Lo único que sale del
- * navegador es el `PUT` de la subida, interceptado más abajo.
+ * navegador es el `PUT` de la subida, interceptado más abajo. El archivo que falla en el caso 1b
+ * lleva `UNREADABLE_E2E_NAME_MARK` en su nombre: con esa marca el almacenamiento en memoria devuelve
+ * bytes que no son un PDF.
  *
  * DATOS: todo lleva el prefijo `qc137_e2e_` con el `RUN_ID` del worker. El `afterAll` borra por
  * los ids y nombres exactos de este worker aunque un caso reviente. Los avisos de rol y la docena
@@ -19,10 +22,12 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
+import { UNREADABLE_E2E_NAME_MARK } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-memory';
 import { normalizeCompanyName, ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { normalizeSupplierName } from '@/lib/modules/proveedores';
 import { prisma } from '@/lib/shared/db/prisma';
-import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
 import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
@@ -50,6 +55,7 @@ const NOTIFICATIONS_ADDON = 'notificaciones';
 const PANEL_EMPTY = 'No tienes notificaciones.';
 const PANEL_END = 'No hay más avisos. Se conservan 90 días.';
 const FORMULA_BATCH_TITLE = 'Tanda de PDFs procesada';
+const PARTIAL_BATCH_TITLE = 'Tanda procesada con errores';
 
 type Credentials = { readonly username: string; readonly password: string };
 
@@ -67,6 +73,10 @@ const ALL_USERS = [adminA, operatorA, readerA, adminB];
 const companyAName = `${FIXTURE_PREFIX}empresa_a_${RUN_ID}`;
 const companyBName = `${FIXTURE_PREFIX}empresa_b_${RUN_ID}`;
 const fileName = `${FIXTURE_PREFIX}formula_${RUN_ID}.pdf`;
+const supplierName = `${FIXTURE_PREFIX}proveedor_${RUN_ID}`;
+// Cortos a propósito: el aviso acorta a 60 caracteres el nombre que cita.
+const readableCatalogName = `${FIXTURE_PREFIX}catalogo_${RUN_ID.slice(0, 12)}.pdf`;
+const unreadableCatalogName = `${FIXTURE_PREFIX}${UNREADABLE_E2E_NAME_MARK}_${RUN_ID.slice(0, 12)}.pdf`;
 const roleNoticeTitle = `${FIXTURE_PREFIX}aviso_rol_${RUN_ID}`;
 const scrollTitle = (n: number) => `${FIXTURE_PREFIX}historial_${String(n).padStart(2, '0')}_${RUN_ID}`;
 const SCROLL_NOTICES = 12;
@@ -127,6 +137,7 @@ test.beforeAll(async () => {
     await prisma.aiProviderConnection.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.supplier.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   await prisma.user.deleteMany({
     where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -168,6 +179,7 @@ test.afterAll(async () => {
       await prisma.aiProviderConnection.deleteMany({ where: { companyId: { in: companyIds } } });
       await prisma.recipe.deleteMany({ where: { companyId: { in: companyIds } } });
       await prisma.product.deleteMany({ where: { companyId: { in: companyIds } } });
+      await prisma.supplier.deleteMany({ where: { companyId: { in: companyIds } } });
     }
   } finally {
     try {
@@ -197,7 +209,7 @@ async function interceptSignedUploads(page: Page): Promise<{ count(): number }> 
       await route.fulfill({ status: 204, headers });
       return;
     }
-    intercepted += 1;
+    if (route.request().method() === 'PUT') intercepted += 1;
     await route.fulfill({ status: 200, headers, body: '' });
   });
   return { count: () => intercepted };
@@ -279,6 +291,79 @@ test.describe('notificaciones', () => {
     });
     expect(stored).toEqual([
       expect.objectContaining({ title: FORMULA_BATCH_TITLE, targetKind: 'formulas' }),
+    ]);
+  });
+
+  test('1b. desde un proveedor, una tanda de dos PDFs con uno ilegible deja un solo aviso «Tanda procesada con errores» que lo nombra y lleva a proveedores (R13, R46, R49)', async ({
+    page,
+  }) => {
+    const supplier = await prisma.supplier.create({
+      data: {
+        name: supplierName,
+        nameNormalized: normalizeSupplierName(supplierName),
+        phone: '+573000000001',
+        companyId: companyAId as string,
+      },
+      select: { id: true },
+    });
+
+    const uploads = await interceptSignedUploads(page);
+    await loginAndLand(page, adminA);
+
+    await page.goto(supplierDetailRoute(supplier.id));
+    await expect(page.getByTestId('supplier-detail-name')).toHaveText(supplierName, { timeout: 60_000 });
+    await expect(bell(page)).toHaveAccessibleName('Notificaciones, ninguna sin leer', { timeout: 60_000 });
+
+    await page.getByTestId('document-upload-open').click();
+    await expect(page.getByTestId('document-upload')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('document-upload-input').setInputFiles([
+      { name: readableCatalogName, mimeType: PDF_MIME_TYPE, buffer: pdfBytes },
+      { name: unreadableCatalogName, mimeType: PDF_MIME_TYPE, buffer: pdfBytes },
+    ]);
+    await expect(page.getByTestId('document-upload-row-name-0')).toHaveText(readableCatalogName);
+    await expect(page.getByTestId('document-upload-row-name-1')).toHaveText(unreadableCatalogName);
+    await page.getByTestId('document-upload-submit').click();
+    await expect(page.getByTestId('document-upload-row-status-0')).toHaveAttribute('data-status', 'done', {
+      timeout: 120_000,
+    });
+    await expect(page.getByTestId('document-upload-row-status-1')).toHaveAttribute('data-status', 'error', {
+      timeout: 120_000,
+    });
+    expect(uploads.count(), 'los dos PDFs suben sus bytes desde el navegador').toBe(2);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('document-upload-dialog')).toHaveCount(0, { timeout: 30_000 });
+
+    // Un solo aviso para la tanda entera, no uno por archivo.
+    await expect(bell(page)).toHaveAccessibleName('Notificaciones, 1 sin leer', {
+      timeout: BELL_UPDATE_TIMEOUT_MS,
+    });
+    await expect(bell(page).getByTestId('unread-count-badge')).toHaveText('1');
+
+    await openPanel(page);
+    await expect(panelRows(page)).toHaveCount(2);
+    const row = panelRows(page).first();
+    await expect(row).toHaveAccessibleName(new RegExp(`^${PARTIAL_BATCH_TITLE}\\.`));
+    await expect(row).toContainText(`"${unreadableCatalogName}"`);
+    await expect(row).not.toContainText(readableCatalogName);
+    await expect(row).toContainText('Ver proveedores');
+    await expect(row).toHaveAttribute('href', SUPPLIERS_ROUTE);
+
+    await row.click();
+    await page.waitForURL((url) => url.pathname === SUPPLIERS_ROUTE, { timeout: 60_000 });
+    await expect(panel(page)).toHaveCount(0);
+    await expect(bell(page)).toHaveAccessibleName('Notificaciones, ninguna sin leer', { timeout: 30_000 });
+
+    const stored = await prisma.notification.findMany({
+      where: { companyId: companyAId as string, title: { not: FORMULA_BATCH_TITLE } },
+      select: { title: true, body: true, targetKind: true },
+    });
+    expect(stored).toEqual([
+      expect.objectContaining({
+        title: PARTIAL_BATCH_TITLE,
+        targetKind: 'suppliers',
+        body: expect.stringContaining(`"${unreadableCatalogName}"`),
+      }),
     ]);
   });
 

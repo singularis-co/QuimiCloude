@@ -667,3 +667,71 @@ Sin commit (lo hace el leader).
 
 ### Veredicto
 T24 (navegador), T27 y T28 (UI) están hechas y en verde. T22 está escrita salvo el 1b, pero sin ejecutar: falta la base del E2E.
+
+## Tanda 4 — T22 punto 1b (backend_dev)
+
+Sin commit (lo hace el leader).
+
+### Archivos
+- Modificado `lib/modules/documentos/adapters/driven/storage/document-storage-memory.ts` (doble de E2E; producción intacta): fábrica `createDocumentStorageMemory({ originalNameOf })`, la constante exportada `UNREADABLE_E2E_NAME_MARK = 'e2e-ilegible'` y `documentStorageMemory` atado a una lectura de `document_files.original_name` por ruta (Prisma, en el propio módulo `documentos`). Si el nombre original lleva la marca, `download` devuelve bytes que no son un PDF; sin la marca, el mismo PDF mínimo de antes. La comprobación de rutas firmadas no cambia.
+- Creado `tests/unit/documentos/document-storage-memory.test.ts` (6 casos: sin marca, sin nombre, con marca, marca parecida, ruta sin firmar, instancias separadas).
+- Modificado `e2e/notificaciones.spec.ts`: caso «1b» entre el 1 y el 2; proveedor y nombres de archivo del worker; `supplier.deleteMany` en `beforeAll` (huérfanos) y en `afterAll`; el interceptor solo cuenta los `PUT`.
+
+### Cómo falla el archivo marcado
+El nombre es lo único del archivo que llega al servidor: los bytes los intercepta el navegador y la ruta la pone el servidor (`buildDocumentPath`). Los bytes ilegibles hacen fallar `countPages`/`renderPages` en `read-pdf-with-ai` → `unexpected`, que es definitivo (`error`). Un fallo de descarga no servía: es `requeue` y la cola en línea no reintenta, así que la tanda no terminaría. Solo afecta a la estrategia que lee por imágenes (catálogo); en fórmula, la parte `pdf` va directa al lector enlatado.
+
+### R → test
+- R13, R46, R49 (aviso de tanda parcial, nombre original, destino proveedores): `e2e/notificaciones.spec.ts` › «1b. …» (sin ejecutar).
+
+### Verificación (salida real)
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores y 10 avisos; `eslint` sobre los 3 archivos tocados: 0.
+- `pnpm exec vitest run tests/unit/documentos/document-storage-memory.test.ts`: 6 pass.
+- `pnpm exec vitest related --run --project node --project ui <3 archivos>`: 359 archivos; 6079 pass, 1 skipped y 1 fail. El fallo es `tests/unit/marca/tablas-marca.test.tsx` › «R11, R13: en 'product-columns.tsx'…», ya anotado como ajeno. Sin `--project`, el proyecto `integration` cae en el `globalSetup` por falta de `DATABASE_URL`.
+- `pnpm exec vitest run guard`: 81 archivos, 1102 pass y 20 skipped.
+- `pnpm exec playwright test e2e/notificaciones.spec.ts`: el servidor arranca (`Ready in 1411ms`); el `beforeAll` cae con `PrismaClientInitializationError: Environment variable not found: DATABASE_URL`. 2 fallan y 12 no corren.
+
+### Bloqueo
+- No hay base para el E2E. El shell no tiene `DATABASE_URL`. Hay un Postgres en `localhost:5432`, pero pide contraseña (`SCRAM`), y la base efímera (`scripts/test-db`) también parte de `DATABASE_URL`. No he leído `.env` ni secretos de otros worktrees.
+
+### Veredicto
+El 1b está escrito y el doble falla de forma determinista con la marca (tests unitarios y guardias en verde). El E2E sigue sin ejecutar: falta `DATABASE_URL`.
+
+## Tanda 4 — cierre (implementer)
+
+Commits: `19e2c07b` (servidor: T24, T25, T26, T28), `d1434ee1` (navegador: T24, T27, T28 y E2E puntos 1–6), y este (T22 1b, doble de documentos y marcado de tasks). Sin push.
+
+- Cerradas `[x]`: T24, T25, T26, T27, T28.
+- **T21 abierta, bloqueada.** `tests/guards/guard-arquitectura-modulos.test.ts` (R1) no admite archivos en la raíz de `lib/modules/<m>/` salvo `index.ts`. Por eso `lib/modules/notificaciones/README.md` (design §4.4) la pone roja. El borrador está fuera del repo, en el scratchpad de la sesión. Lo decide el humano: una excepción en la guardia o una ruta nueva (y entonces se enmiendan §4.4 y T21).
+- **T22 abierta.** El spec está escrito entero (1, 1b, 2–6), pero no se ha podido ejecutar: el worktree no tiene `DATABASE_URL`. El servidor arranca y el `beforeAll` cae con `PrismaClientInitializationError`. Hace falta que el humano dé la base del E2E, con las migraciones aplicadas hasta `20261019120300`.
+- T23: es del humano.
+- Rojo ajeno conocido: `tests/unit/marca/tablas-marca.test.tsx`. No se ha tocado.
+
+### Verificación consolidada (salida de los subagentes, última vuelta)
+| Comando | Resultado |
+| --- | --- |
+| `pnpm run typecheck` | 0 errores |
+| `pnpm run lint` | 0 errores; 10 avisos que ya estaban, ninguno en archivos de la tanda |
+| `vitest run tests/unit/notificaciones-ui` | 10 archivos, 107 pass |
+| Unitarios de servidor tocados | 74 archivos: 1278 pass, 1 fail. El fallo era `polling-feed`, arreglado después en `d1434ee1` |
+| Integración (base efímera) | identity: 7 archivos, 87 pass; notificaciones + batch-notice: 27 pass |
+| `vitest related --run` (node + ui) del 1b | 359 archivos: 6079 pass, 1 fail (`tablas-marca`, el ajeno) |
+| `pnpm exec vitest run guard` | 81 archivos: 1102 pass, 20 skipped |
+| `db:migrate` / `db:rollback` de `20261019120300` | En verde en los dos casos: sobre base nueva y con `20261019120100` aplicada antes |
+| `playwright test e2e/notificaciones.spec.ts` | No ejecutado: falta `DATABASE_URL` |
+
+### Decisiones fuera del spec de esta tanda (a validar por el reviewer)
+- **Servidor:**
+  - `is-company-active.ts` va como caso de uso propio.
+  - La entrada se valida antes de mirar la empresa: el Maestro recibe `invalid_input` si la entrada es mala.
+  - `Actor.permissions` sale del tipo.
+  - Los nombres de los tests de R18 y R21 nombran el permiso (los fija la tabla de Enmiendas).
+- **UI:**
+  - Los 700 ms van en una `@utility` de `globals.css`, no en una clase arbitraria, para que la guardia los mida.
+  - El E2E corre en modo serial.
+  - El punto 5 comprueba primero la base.
+  - `notificaciones.spec.ts` entra en la lista cerrada de E2E de `guard-identificador-de-request`.
+- **1b:**
+  - `document-storage-memory.ts` (doble de E2E) pasa a ser una fábrica: con un nombre original que contiene `e2e-ilegible` devuelve bytes que no son PDF.
+  - Solo funciona con la estrategia de catálogo.
+  - Busca el nombre en `document_files.original_name`.

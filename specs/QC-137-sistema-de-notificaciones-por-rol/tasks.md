@@ -352,7 +352,7 @@ T22 depende de T24. T26 y T27 van después de T24 porque comparten archivos con 
 (`lib/composition/index.ts` y `notificaciones-wiring.test.ts` con T26; `notification-bell.test.tsx`
 con T27). T25 es independiente.
 
-- [ ] **T24. Notificaciones núcleo: quitar permiso, añadido y su migración de datos; descartar
+- [x] **T24. Notificaciones núcleo: quitar permiso, añadido y su migración de datos; descartar
   empresas dadas de baja** (E1, E8; R15, R18, R19, R21, R22, R37, R40, R54, R57; design §3.2.4,
   §4.2, §7, §8, §9). No depende de ninguna tarea abierta.
   - **Empresa dada de baja (E8, R57):** puerto nuevo `ports/company-status.ts` (`CompanyStatus.isActive`)
@@ -406,14 +406,14 @@ con T27). T25 es independiente.
     - `pnpm run db:migrate` y `db:rollback` de la migración nueva contra una base desechable, en
       los dos casos: con la `20261019120100` aplicada antes y sobre una base nueva;
     - `pnpm exec vitest run guard` en verde.
-- [ ] **T25. Usuario dado de baja no es miembro** `[P]` (E2; R12, R55; design §7). No depende de
+- [x] **T25. Usuario dado de baja no es miembro** `[P]` (E2; R12, R55; design §7). No depende de
   ninguna tarea abierta.
   - Sin cambio de producción esperado: el adaptador ya filtra `deletedAt: null`. Si el JSDoc del
     puerto `company-membership-reader.ts` no lo dice, se añade una línea.
   - **Hecho:** `tests/integration/identity/company-membership.int.test.ts` › «QC-137 R55: un
     usuario dado de baja de esa empresa da false», y `tests/unit/notificaciones/notify.test.ts`
     con un caso «R55» (o el caso R12 existente renombrado si ya lo cubre), en verde.
-- [ ] **T26. El cron borra también avisos de empresas dadas de baja** (E4; R17; design §11).
+- [x] **T26. El cron borra también avisos de empresas dadas de baja** (E4; R17; design §11).
   Depende de T24.
   - `company-directory-prisma.ts` gana `listAllCompanyIds()`; la fachada `notificaciones` de
     `lib/composition/index.ts` lo usa en `listCompanyIds`. El cron de pedidos no cambia.
@@ -425,7 +425,7 @@ con T27). T25 es independiente.
       es la de todas, no la de activas»;
     - `tests/unit/notificaciones/purge-route.test.ts` › «R17: recorre también las empresas dadas de
       baja».
-- [ ] **T27. Balanceo de la campana con excepción en la guardia de movimiento** (E5; R36;
+- [x] **T27. Balanceo de la campana con excepción en la guardia de movimiento** (E5; R36;
   design §9.5). Depende de T24: los dos tocan `notification-bell.test.tsx`.
   - `@keyframes notification-bell-swing` (700 ms, una vez, curva de un token `--ease-*`) en
     `app/globals.css`, aplicado bajo `motion-safe:` en `notification-bell.tsx` al llegar un aviso
@@ -439,7 +439,7 @@ con T27). T25 es independiente.
       ese nombre, en esos archivos y a 700 ms», con tres casos negativos (otro nombre a 700 ms, el
       mismo nombre en otro archivo, el mismo nombre a 701 ms) que la ponen roja;
     - `pnpm exec vitest run guard` en verde.
-- [ ] **T28. El Maestro ve la campana vacía, sin errores** (E7; R56; design §8.2). Depende de T24:
+- [x] **T28. El Maestro ve la campana vacía, sin errores** (E7; R56; design §8.2). Depende de T24:
   los dos tocan `notification-actions.ts`, `notification-actions.test.ts`, `polling-feed.test.ts` y
   `notification-bell.test.tsx`.
   - `notification-actions.ts`: `currentActor()` distingue sin sesión, sesión sin empresa y sesión
