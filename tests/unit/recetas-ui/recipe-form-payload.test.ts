@@ -128,7 +128,7 @@ describe('buildRecipePayload — en el alta el valor nulo nunca viaja (R36, en n
 
   it('cleared en alta es un estado que la interfaz nunca ofrece, y buildRecipePayload lo rechaza en vez de enviar null', () => {
     // R36: "el sistema NO DEBE enviar el valor nulo explícito en el alta". El control de quitar
-    // no se ofrece en modo alta (`recipe-image-field.tsx`), así que si este estado llegara de
+    // no se ofrece en modo alta (`components/shared/image-field.tsx`), así que si este estado llegara de
     // todos modos sería un error de programación del formulario -no un caso válido para el que
     // haya que inventar una representación-.
     expect(() =>

@@ -237,7 +237,13 @@ function informe(hallazgos: readonly Hallazgo[]): string {
 // Lo que el diff de la rama no toca (R21), no edita (R4) y no anade (R22)
 // ---------------------------------------------------------------------------------------------
 
-/** Archivos en vuelo de otra persona y el buscador de clientes, que se queda como esta (R21). */
+/** Archivos en vuelo de otra persona y el buscador de clientes, que se queda como esta (R21).
+ *
+ *  Nota 2026-10-19 (QC-288, TC): registro HISTORICO de QC-233. Solo se aplica al diff de la rama
+ *  `RAMA_DE_LA_FICHA` (fuera de ella el caso se salta), asi que la lista se conserva tal cual se
+ *  escribio. QC-288 F1 movio el buscador de clientes a `components/shared/order-customer-picker.tsx`
+ *  (design.md §7.1, sin cambiar su API); la ruta `app/(private)/pedidos/components/order-customer-picker.tsx`
+ *  de abajo ya no existe en el arbol y nombra el archivo como era cuando QC-233 lo congelo. */
 export const NO_SE_TOCAN_R21 = [
   'app/(private)/inventario/components/batch-history.tsx',
   'app/(private)/pedidos/components/index.ts',
@@ -534,6 +540,9 @@ describe('las reglas de los buscadores MUERDEN (muestras sinteticas)', () => {
   })
 
   it('R21: el detector ve QC-223, OrderCustomerPicker, cualquier barrel de ruta y app/(public)', () => {
+    // Nota 2026-10-19 (QC-288, TC): caso sintetico del detector de QC-233. La ruta del buscador es
+    // la que congelo QC-233 (`NO_SE_TOCAN_R21`); hoy vive en `components/shared/order-customer-picker.tsx`
+    // (QC-288 F1). Se conserva el texto historico: el detector compara contra esa lista.
     const lista = [
       'app/(private)/pedidos/components/order-table.tsx',
       'app/(private)/inventario/components/batch-history.tsx',

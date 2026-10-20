@@ -37,6 +37,7 @@ import {
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { listOrderDeliveryProgressByIdsIncludingDeleted } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import {
   createRecipeExecutionReader,
@@ -133,6 +134,7 @@ const listOrders = createListOrders({
   units,
   customerCatalog,
   log: { ignoredFields: () => undefined },
+  deliveryProgress: { listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted },
 });
 
 // ---------------------------------------------------------------------------

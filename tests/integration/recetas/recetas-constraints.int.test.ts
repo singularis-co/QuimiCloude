@@ -438,9 +438,13 @@ describe('estructura de la receta', () => {
       const rareRecipe = await tx.recipe.findUniqueOrThrow({ where: { id: rareId } })
       expect(rareRecipe.steps).toEqual(raro)
 
+      // `order_step_evidence` (QC-214) guarda fotos de evidencia de un PEDIDO, no pasos de
+      // receta: se excluye por nombre exacto. Cualquier otra tabla con `step` sigue rompiendo
+      // la invariante de que los pasos de la formula viven solo en el JSONB `recipes.steps`.
       const stepTables = await tx.$queryRaw<{ tablename: string }[]>`
         SELECT tablename FROM pg_tables
-        WHERE schemaname = 'public' AND tablename LIKE '%step%'`
+        WHERE schemaname = 'public' AND tablename LIKE '%step%'
+          AND tablename <> 'order_step_evidence'`
       expect(stepTables).toEqual([])
     })
   })

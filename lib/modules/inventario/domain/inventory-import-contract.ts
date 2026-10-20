@@ -26,10 +26,9 @@ export const INVENTORY_IMPORT_COLUMNS = [
   { key: 'unit',         header: 'Unidad',               headerRequired: false, rules: { PRODUCT: 'required',  PACKAGING: 'forbidden', MACHINE: 'forbidden', FINISHED_PRODUCT: 'forbidden' } },
   { key: 'presentation', header: 'Presentación',         headerRequired: false, rules: { PRODUCT: 'forbidden', PACKAGING: 'required',  MACHINE: 'forbidden', FINISHED_PRODUCT: 'required'  } },
   { key: 'formula',      header: 'Fórmula',              headerRequired: false, rules: { PRODUCT: 'forbidden', PACKAGING: 'forbidden', MACHINE: 'forbidden', FINISHED_PRODUCT: 'required'  } },
-  { key: 'stock',        header: 'Existencia',           headerRequired: true,  rules: { PRODUCT: 'required',  PACKAGING: 'required',  MACHINE: 'required',  FINISHED_PRODUCT: 'required'  } },
-  { key: 'unitCost',     header: 'Costo unitario',       headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
-  { key: 'totalCost',    header: 'Costo total',          headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
-  { key: 'lot',          header: 'Lote',                 headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
+  { key: 'stock',        header: 'Cantidad',             headerRequired: true,  rules: { PRODUCT: 'required',  PACKAGING: 'required',  MACHINE: 'required',  FINISHED_PRODUCT: 'required'  } },
+  { key: 'unitCost',     header: 'Costo unitario',       headerRequired: false, rules: { PRODUCT: 'required',  PACKAGING: 'required',  MACHINE: 'optional',  FINISHED_PRODUCT: 'required'  } },
+  { key: 'lot',         header: 'Lote',                 headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
   { key: 'purchaseDate', header: 'Fecha de compra',      headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'optional',  MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
   { key: 'expiryDate',   header: 'Fecha de vencimiento', headerRequired: false, rules: { PRODUCT: 'optional',  PACKAGING: 'forbidden', MACHINE: 'optional',  FINISHED_PRODUCT: 'optional'  } },
   { key: 'qtyAlert',     header: 'Alerta de cantidad',   headerRequired: false, rules: { PRODUCT: 'required',  PACKAGING: 'required',  MACHINE: 'forbidden', FINISHED_PRODUCT: 'forbidden' } },
@@ -48,7 +47,6 @@ export type ImportCells = Readonly<Record<ImportColumnKey, string>>;
 export const IMPORT_ROW_ISSUE_CODES = [
   'type_invalid',
   'value_required',
-  'column_not_applicable',
   'name_too_long',
   'unit_not_found',
   'unit_ambiguous',
@@ -59,13 +57,11 @@ export const IMPORT_ROW_ISSUE_CODES = [
   'finished_product_homonym',
   'stock_invalid',
   'stock_not_whole',
-  'cost_required',
   'cost_invalid',
   'total_cost_too_low',
   'qty_alert_invalid',
   'number_format_invalid',
   'lot_invalid',
-  'lot_used_by_other_product',
   'purchase_date_invalid',
   'purchase_date_future',
   'expiry_date_invalid',
@@ -89,6 +85,8 @@ type ImportRowBase = {
   readonly type: ImportRowType | null;
   /** Nombre con el que queda el producto (en terminado, el derivado). `null` si no se pudo resolver. */
   readonly productName: string | null;
+  /** Columnas con valor que el tipo no usa: no se importan y la fila sigue. Ausente si no hay. */
+  readonly ignoredColumns?: readonly ImportColumnKey[];
 };
 
 /** A qué producto se suma el lote: uno que ya existe, o el que crea una fila anterior del mismo archivo. */

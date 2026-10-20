@@ -14,6 +14,7 @@ import {
   OLDER_DELIVERY_ID,
   OPEN_LINE_ID,
   SECOND_BATCH_ID,
+  SECOND_CUSTOMER_ID,
   THIRD_BATCH_ID,
   VOID_ORDER_ID,
   VOID_REASON,
@@ -50,8 +51,8 @@ const PEDIDO: OrderRow = fakeOrderRow({
 })
 
 const REPARTO: readonly FinishPackingLine[] = [
-  { id: OPEN_LINE_ID, presentationId: BOTELLA, packages: 10, presentationContent: '1.0000', packagingProductId: null },
-  { id: VOIDED_LINE_ID, presentationId: GALON, packages: 3, presentationContent: '4.0000', packagingProductId: null },
+  { id: OPEN_LINE_ID, presentationId: BOTELLA, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null },
+  { id: VOIDED_LINE_ID, presentationId: GALON, packages: 3, presentationContent: '4.0000', packagingProductId: null, packedPackages: null },
 ]
 
 const PRESENTACIONES: readonly PresentationRef[] = [
@@ -61,11 +62,12 @@ const PRESENTACIONES: readonly PresentationRef[] = [
 
 /** Cliente dado de baja: su nombre se sigue mostrando. */
 const CLIENTE: CustomerRef = { id: CLIENTE_ID, firstNames: 'Ana', lastNames: 'Perez', isDeleted: true }
+const SEGUNDO_CLIENTE: CustomerRef = { id: SECOND_CUSTOMER_ID, firstNames: 'Bruno', lastNames: 'Diaz', isDeleted: false }
 
 /** Laura esta dada de baja (inactiva): su nombre se sigue mostrando. */
 const PERSONAS: readonly PersonRef[] = [
-  { id: LAURA, displayName: 'Laura Gomez', isActive: false, permissions: [] },
-  { id: CARLOS, displayName: 'Carlos Ruiz', isActive: true, permissions: [] },
+  { id: LAURA, displayName: 'Laura Gomez', isActive: false, permissions: [], roleName: 'Operador' },
+  { id: CARLOS, displayName: 'Carlos Ruiz', isActive: true, permissions: [], roleName: 'Operador' },
 ]
 
 const LOTES = new Map([
@@ -74,30 +76,32 @@ const LOTES = new Map([
   [THIRD_BATCH_ID, 'L-2026-0103'],
 ])
 
+// 2026-10-15: el cliente va en cada linea. La entrega mas reciente tiene dos clientes, como
+// `deliveryHistoryView`: el segundo lleva la presentacion que el primero tiene anulada, sin anular.
 /** Lo que devuelve el lector, ya ordenado: la mas reciente primero. Reproduce `deliveryHistoryView`. */
 const FILAS: readonly DeliveryHistoryRow[] = [
   {
     id: NEWER_DELIVERY_ID,
-    customerId: CLIENTE_ID,
     createdBy: LAURA,
     createdAt: new Date('2026-10-08T15:30:00.000Z'),
     lines: [
-      { presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, void: null },
+      { customerId: CLIENTE_ID, presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, void: null },
       {
+        customerId: CLIENTE_ID,
         presentationLineId: VOIDED_LINE_ID,
         batchId: THIRD_BATCH_ID,
         packages: 3,
         void: { reason: VOID_REASON, createdBy: LAURA, createdAt: new Date('2026-10-09T09:00:00.000Z') },
       },
-      { presentationLineId: OPEN_LINE_ID, batchId: SECOND_BATCH_ID, packages: 2, void: null },
+      { customerId: CLIENTE_ID, presentationLineId: OPEN_LINE_ID, batchId: SECOND_BATCH_ID, packages: 2, void: null },
+      { customerId: SECOND_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, batchId: THIRD_BATCH_ID, packages: 2, void: null },
     ],
   },
   {
     id: OLDER_DELIVERY_ID,
-    customerId: CLIENTE_ID,
     createdBy: CARLOS,
     createdAt: new Date('2026-10-07T11:00:00.000Z'),
-    lines: [{ presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, void: null }],
+    lines: [{ customerId: CLIENTE_ID, presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, void: null }],
   },
 ]
 
@@ -127,7 +131,7 @@ function montar(
   const listByOrder = vi.fn(async () => opciones.filas ?? FILAS)
   const findPresentationLinesForFinish = vi.fn(async () => REPARTO)
   const findRefs = vi.fn(async () => PRESENTACIONES)
-  const findRefsIncludingDeleted = vi.fn(async () => opciones.clientes ?? [CLIENTE])
+  const findRefsIncludingDeleted = vi.fn(async () => opciones.clientes ?? [CLIENTE, SEGUNDO_CLIENTE])
   const findRefsIncludingDeletedInCompany = vi.fn(async () => opciones.personas ?? PERSONAS)
   const findLots = vi.fn(async () => opciones.lotes ?? LOTES)
   const explota = (nombre: string) =>
@@ -186,7 +190,7 @@ describe('listOrderDeliveries — acceso (R4)', () => {
     const listar = createListOrderDeliveries(m.deps)
     const soloEntregas: Actor = { ...CONSULTOR, permissions: ['entregas.anular', 'entregas.modificar', 'pedidos.modificar'] }
 
-    for (const actor of [null, undefined, { ...CONSULTOR, permissions: [] }, soloEntregas]) {
+    for (const actor of [null, undefined, { ...CONSULTOR, permissions: [], roleName: 'Operador' }, soloEntregas]) {
       expect(await codigoDelFallo(() => listar(VOID_ORDER_ID, actor))).toBe('unauthorized')
       expect(await codigoDelFallo(() => listar('no-es-uuid', actor))).toBe('unauthorized')
     }
@@ -238,7 +242,8 @@ describe('listOrderDeliveries — pedido (R6)', () => {
     expect(m.listByOrder).toHaveBeenCalledWith(VOID_ORDER_ID, SCOPE)
     expect(m.findPresentationLinesForFinish).toHaveBeenCalledWith(VOID_ORDER_ID, SCOPE)
     expect(m.findRefs).toHaveBeenCalledWith([BOTELLA, GALON], EMPRESA)
-    expect(m.findRefsIncludingDeleted).toHaveBeenCalledWith([CLIENTE_ID], EMPRESA)
+    // 2026-10-15: los clientes salen de las lineas, una vez cada uno.
+    expect(m.findRefsIncludingDeleted).toHaveBeenCalledWith([CLIENTE_ID, SECOND_CUSTOMER_ID], EMPRESA)
     expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledWith(EMPRESA, [LAURA, CARLOS], AHORA)
     expect(m.findLots).toHaveBeenCalledWith([FIRST_BATCH_ID, THIRD_BATCH_ID, SECOND_BATCH_ID], EMPRESA)
   })
@@ -260,11 +265,11 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
   it('R7: agrupa por presentacion las lineas de una entrega, aunque lleguen intercaladas, y suma sus lotes', async () => {
     const m = montar()
     const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
-    expect(reciente?.presentations.map((p) => [p.presentationLineId, p.packages])).toEqual([
+    expect(reciente?.customers[0]?.presentations.map((p) => [p.presentationLineId, p.packages])).toEqual([
       [OPEN_LINE_ID, 6],
       [VOIDED_LINE_ID, 3],
     ])
-    expect(reciente?.presentations[0]?.batches).toEqual([
+    expect(reciente?.customers[0]?.presentations[0]?.batches).toEqual([
       { batchId: FIRST_BATCH_ID, lot: 'L-2026-0101', packages: 4 },
       { batchId: SECOND_BATCH_ID, lot: 'L-2026-0102', packages: 2 },
     ])
@@ -273,7 +278,7 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
   it('R7: muestra el cliente y el autor aunque esten dados de baja', async () => {
     const m = montar()
     const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)
-    expect(vista.deliveries.map((d) => [d.customerName, d.authorName])).toEqual([
+    expect(vista.deliveries.map((d) => [d.customers[0]?.customerName, d.authorName])).toEqual([
       ['Ana Perez', 'Laura Gomez'],
       ['Ana Perez', 'Carlos Ruiz'],
     ])
@@ -282,10 +287,10 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
   it('R7: un nombre que no vuelve de su catalogo se muestra como identificador corto, sin lanzar', async () => {
     const m = montar({ personas: [], clientes: [], lotes: new Map() })
     const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
-    expect(reciente?.customerName).toBe(CLIENTE_ID.slice(0, 8))
+    expect(reciente?.customers[0]?.customerName).toBe(CLIENTE_ID.slice(0, 8))
     expect(reciente?.authorName).toBe(LAURA.slice(0, 8))
-    expect(reciente?.presentations[0]?.batches[0]?.lot).toBe(FIRST_BATCH_ID.slice(0, 8))
-    expect(reciente?.presentations[1]?.void?.authorName).toBe(LAURA.slice(0, 8))
+    expect(reciente?.customers[0]?.presentations[0]?.batches[0]?.lot).toBe(FIRST_BATCH_ID.slice(0, 8))
+    expect(reciente?.customers[0]?.presentations[1]?.void?.authorName).toBe(LAURA.slice(0, 8))
   })
 
   it('R8: un pedido sin entregas devuelve la lista vacia sin consultar catalogos', async () => {
@@ -302,14 +307,14 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
   it('R9: la presentacion anulada lleva motivo, autor y fecha de su anulacion, junto a sus envases y lotes', async () => {
     const m = montar()
     const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
-    expect(reciente?.presentations[1]).toEqual({
+    expect(reciente?.customers[0]?.presentations[1]).toEqual({
       presentationLineId: VOIDED_LINE_ID,
       presentationName: 'Galon 4 L',
       packages: 3,
       batches: [{ batchId: THIRD_BATCH_ID, lot: 'L-2026-0103', packages: 3 }],
       void: { reason: VOID_REASON, authorName: 'Laura Gomez', createdAt: '2026-10-09T09:00:00.000Z' },
     })
-    expect(reciente?.presentations[0]?.void).toBeNull()
+    expect(reciente?.customers[0]?.presentations[0]?.void).toBeNull()
   })
 
   it('R9: el autor de la anulacion se resuelve aunque solo aparezca como autor de una anulacion', async () => {
@@ -324,10 +329,73 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
     )
     const m = montar({
       filas,
-      personas: [...PERSONAS, { id: OTRA, displayName: 'Marta Diaz', isActive: true, permissions: [] }],
+      personas: [...PERSONAS, { id: OTRA, displayName: 'Marta Diaz', isActive: true, permissions: [], roleName: 'Operador' }],
     })
     const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
     expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledWith(EMPRESA, [LAURA, CARLOS, OTRA], AHORA)
-    expect(reciente?.presentations[1]?.void?.authorName).toBe('Marta Diaz')
+    expect(reciente?.customers[0]?.presentations[1]?.void?.authorName).toBe('Marta Diaz')
+  })
+})
+
+describe('listOrderDeliveries — por cliente (R33, R34)', () => {
+  it('R33: cada entrega trae su total de envases, anulados incluidos, y un subbloque por cliente', async () => {
+    const m = montar()
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)
+    expect(vista.deliveries.map((d) => [d.packages, d.customers.length])).toEqual([
+      [11, 2],
+      [4, 1],
+    ])
+    expect(vista.deliveries[0]?.customers.map((c) => [c.customerId, c.customerName])).toEqual([
+      [CLIENTE_ID, 'Ana Perez'],
+      [SECOND_CUSTOMER_ID, 'Bruno Diaz'],
+    ])
+    expect(vista.deliveries[0]?.customers[1]?.presentations).toEqual([
+      {
+        presentationLineId: VOIDED_LINE_ID,
+        presentationName: 'Galon 4 L',
+        packages: 2,
+        batches: [{ batchId: THIRD_BATCH_ID, lot: 'L-2026-0103', packages: 2 }],
+        void: null,
+      },
+    ])
+  })
+
+  it('R33: los clientes van por nombre ascendente aunque sus lineas lleguen en otro orden, y a igualdad por id', async () => {
+    const [reciente] = FILAS
+    if (reciente === undefined) throw new Error('falta la entrega reciente')
+    const invertidas = [{ ...reciente, lines: [...reciente.lines].reverse() }]
+
+    const porNombre = montar({ filas: invertidas })
+    const vista = await createListOrderDeliveries(porNombre.deps)(VOID_ORDER_ID, CONSULTOR)
+    expect(vista.deliveries[0]?.customers.map((c) => c.customerName)).toEqual(['Ana Perez', 'Bruno Diaz'])
+
+    const homonimos = montar({
+      filas: invertidas,
+      clientes: [CLIENTE, { ...SEGUNDO_CLIENTE, firstNames: 'Ana', lastNames: 'Perez' }],
+    })
+    const empate = await createListOrderDeliveries(homonimos.deps)(VOID_ORDER_ID, CONSULTOR)
+    expect(empate.deliveries[0]?.customers.map((c) => c.customerId)).toEqual([CLIENTE_ID, SECOND_CUSTOMER_ID])
+  })
+
+  it('R33: el nombre de un cliente dado de baja se sigue mostrando en su subbloque', async () => {
+    const m = montar()
+    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
+    expect(CLIENTE.isDeleted).toBe(true)
+    expect(reciente?.customers[0]?.customerName).toBe('Ana Perez')
+  })
+
+  it('R34: la presentacion anulada de un cliente no sale anulada en el subbloque de otro cliente', async () => {
+    const m = montar()
+    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
+    const anuladaDe = (customerId: string) =>
+      reciente?.customers
+        .find((c) => c.customerId === customerId)
+        ?.presentations.find((p) => p.presentationLineId === VOIDED_LINE_ID)?.void
+    expect(anuladaDe(CLIENTE_ID)).toEqual({
+      reason: VOID_REASON,
+      authorName: 'Laura Gomez',
+      createdAt: '2026-10-09T09:00:00.000Z',
+    })
+    expect(anuladaDe(SECOND_CUSTOMER_ID)).toBeNull()
   })
 })

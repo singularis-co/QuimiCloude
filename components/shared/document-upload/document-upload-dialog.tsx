@@ -1,5 +1,7 @@
 'use client';
 
+import { UploadIcon } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,16 +28,22 @@ export type DocumentUploadDialogProps = {
   readonly strategy: PdfStrategy;
   /** Opcional: se pasa tal cual a `DocumentUpload`. */
   readonly reviewHrefFor?: (documentFileId: string) => string;
+  readonly disabled?: boolean;
 };
 
 /**
  * Ventana emergente que envuelve `DocumentUpload`. `keepMounted` mantiene la subida montada mientras
  * la ventana esta cerrada, para que una tanda en curso siga sondeandose y se vea igual al reabrir.
  */
-export function DocumentUploadDialog({ strategy, reviewHrefFor }: DocumentUploadDialogProps) {
+export function DocumentUploadDialog({
+  strategy,
+  reviewHrefFor,
+  disabled = false,
+}: DocumentUploadDialogProps) {
   return (
     <Dialog>
       <DialogTrigger
+        disabled={disabled}
         render={
           <Button
             variant="outline"
@@ -44,13 +52,14 @@ export function DocumentUploadDialog({ strategy, reviewHrefFor }: DocumentUpload
           />
         }
       >
+        <UploadIcon aria-hidden />
         {OPEN_LABEL}
       </DialogTrigger>
       <DialogContent
         keepMounted
         showCloseButton={false}
         data-testid={DOCUMENT_UPLOAD_DIALOG_TESTID}
-        className="sm:max-w-lg max-h-[85dvh] overflow-y-auto"
+        className="max-sm:w-[calc(100vw-32px)] sm:max-w-[640px] max-h-[calc(100dvh-32px)] overflow-y-auto"
       >
         <DialogHeader>
           <DialogTitle>{DIALOG_TITLE}</DialogTitle>

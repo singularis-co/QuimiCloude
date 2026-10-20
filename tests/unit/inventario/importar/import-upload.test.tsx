@@ -5,6 +5,15 @@ import {
   ImportFileRejection,
   ImportTemplateButton,
   ImportUploadField,
+  InventoryImportScreen,
+  REVIEWING_TESTID,
+  REVIEW_BUTTON_LABEL,
+  REVIEW_BUTTON_TESTID,
+  UPLOAD_CHANGE_LABEL,
+  UPLOAD_EMPTY_TESTID,
+  UPLOAD_FILE_SIZE_TESTID,
+  UPLOAD_FORMATS_LABEL,
+  UPLOAD_TRIGGER_LABEL,
   REJECTION_COLUMN_TESTID,
   REJECTION_MESSAGE_TESTID,
   REJECTION_TESTID,
@@ -15,25 +24,39 @@ import {
   UPLOAD_TRIGGER_TESTID,
   formatBytes,
   formatCount,
+  uploadHint,
 } from '@/app/(private)/inventario/importar/components';
 import {
   INVENTORY_IMPORT_ACCEPT,
   INVENTORY_IMPORT_MAX_FILE_BYTES,
   INVENTORY_IMPORT_MAX_ROWS,
-  buildInventoryImportTemplate,
-  type ImportDownload,
   type ImportFileRejection as Rejection,
 } from '@/lib/modules/inventario';
 
+import type { DownloadableFile } from '@/app/(private)/inventario/importar/components/download-file';
+
 import { setupUser } from '../../../helpers/user-event';
 
-const { downloadFileMock } = vi.hoisted(() => ({
-  downloadFileMock: vi.fn<(download: ImportDownload) => void>(),
+const { downloadFileMock, templateActionMock, toastErrorMock, previewActionMock } = vi.hoisted(() => ({
+  downloadFileMock: vi.fn<(download: DownloadableFile) => void>(),
+  templateActionMock: vi.fn(),
+  toastErrorMock: vi.fn(),
+  previewActionMock: vi.fn(),
 }));
 
-vi.mock('@/app/(private)/inventario/importar/components/download-file', () => ({
+vi.mock('@/app/(private)/inventario/importar/components/download-file', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/(private)/inventario/importar/components/download-file')>()),
   downloadFile: downloadFileMock,
 }));
+
+vi.mock('@/lib/modules/inventario/adapters/driving/inventory-import-actions', () => ({
+  getInventoryImportTemplateAction: templateActionMock,
+  previewInventoryImportAction: previewActionMock,
+}));
+
+vi.mock('sonner', () => ({ toast: { error: toastErrorMock } }));
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 function archivo(nombre: string, bytes: number): File {
   return new File([new Uint8Array(bytes)], nombre, { type: 'text/csv' });
@@ -97,6 +120,79 @@ describe('campo de subida', () => {
   });
 });
 
+describe('zona del archivo (paso 1)', () => {
+  it('R34 sin archivo pinta la zona con el icono de subida, «.xlsx · .csv» y «Elegir archivo» de 44 px', () => {
+    render(<ImportUploadField file={null} onSelect={vi.fn()} />);
+
+    const zona = screen.getByTestId(UPLOAD_EMPTY_TESTID);
+    expect(zona).toHaveClass('border-dashed');
+    expect(zona.querySelector('svg')).not.toBeNull();
+    expect(within(zona).getByText(UPLOAD_FORMATS_LABEL)).toHaveClass('font-mono');
+    const elegir = within(zona).getByTestId(UPLOAD_TRIGGER_TESTID);
+    expect(elegir).toHaveTextContent(UPLOAD_TRIGGER_LABEL);
+    expect(elegir).toHaveClass('min-h-11');
+    expect(screen.queryByTestId(UPLOAD_FILE_NAME_TESTID)).toBeNull();
+  });
+
+  it('R34 con archivo pinta su nombre en cifras tabulares, su tamaño y «Elegir otro archivo»', () => {
+    const elegido = archivo('inventario-octubre.xlsx', 32_000);
+    render(<ImportUploadField file={elegido} onSelect={vi.fn()} />);
+
+    expect(screen.queryByTestId(UPLOAD_EMPTY_TESTID)).toBeNull();
+    const nombre = within(screen.getByTestId(UPLOAD_FILE_NAME_TESTID)).getByText('inventario-octubre.xlsx');
+    expect(nombre).toHaveClass('font-mono', 'tabular-nums');
+    expect(screen.getByTestId(UPLOAD_FILE_SIZE_TESTID)).toHaveTextContent(formatBytes(32_000));
+    expect(screen.getByTestId(UPLOAD_TRIGGER_TESTID)).toHaveTextContent(UPLOAD_CHANGE_LABEL);
+    expect(screen.getByTestId(UPLOAD_TRIGGER_TESTID)).toHaveClass('min-h-11');
+  });
+
+  it('R34 la ayuda de límites se conserva con y sin archivo', () => {
+    const ayuda = uploadHint(INVENTORY_IMPORT_MAX_FILE_BYTES, INVENTORY_IMPORT_MAX_ROWS);
+    render(<ImportUploadField file={null} onSelect={vi.fn()} />);
+    expect(screen.getByText(ayuda)).toBeInTheDocument();
+    cleanup();
+
+    render(<ImportUploadField file={archivo('a.csv', 10)} onSelect={vi.fn()} />);
+    expect(screen.getByText(ayuda)).toBeInTheDocument();
+  });
+
+  it('R34 «Revisar archivo» lleva flecha y queda deshabilitado sin archivo válido', async () => {
+    const user = setupUser();
+    render(<InventoryImportScreen units={[]} />);
+
+    const revisar = screen.getByTestId(REVIEW_BUTTON_TESTID);
+    expect(revisar).toHaveTextContent(REVIEW_BUTTON_LABEL);
+    expect(revisar).toBeDisabled();
+    expect(revisar.querySelector('svg')).not.toBeNull();
+
+    await user.upload(screen.getByTestId(UPLOAD_INPUT_TESTID), archivo('grande.csv', INVENTORY_IMPORT_MAX_FILE_BYTES + 1));
+    expect(screen.getByTestId(UPLOAD_TOO_LARGE_TESTID)).toBeInTheDocument();
+    expect(revisar).toBeDisabled();
+
+    await user.upload(screen.getByTestId(UPLOAD_INPUT_TESTID), archivo('bien.csv', 10));
+    expect(revisar).toBeEnabled();
+  });
+
+  it('R34 mientras se revisa, «Revisar archivo» muestra el icono de carga y aria-busy', async () => {
+    let responder: (value: unknown) => void = () => undefined;
+    previewActionMock.mockReturnValue(new Promise((resolve) => (responder = resolve)));
+    const user = setupUser();
+    render(<InventoryImportScreen units={[]} />);
+    await user.upload(screen.getByTestId(UPLOAD_INPUT_TESTID), archivo('inventario.csv', 10));
+
+    await user.click(screen.getByTestId(REVIEW_BUTTON_TESTID));
+
+    const revisar = await screen.findByTestId(REVIEW_BUTTON_TESTID);
+    expect(revisar).toHaveAttribute('aria-busy', 'true');
+    expect(revisar.querySelectorAll('svg')).toHaveLength(1);
+    expect(revisar.querySelector('svg[class*="spin"]')).not.toBeNull();
+    expect(screen.getByTestId(REVIEWING_TESTID)).toHaveAttribute('role', 'status');
+    responder({ status: 'success', data: { kind: 'file_rejected', rejection: { code: 'empty' } } });
+    await vi.waitFor(() => expect(screen.queryByTestId(REVIEWING_TESTID)).toBeNull());
+    expect(screen.getByTestId(REVIEW_BUTTON_TESTID)).toHaveAttribute('aria-busy', 'false');
+  });
+});
+
 describe('rechazo del archivo entero', () => {
   const sinDetalle: readonly Rejection[] = [
     { code: 'unsupported_format' },
@@ -150,25 +246,41 @@ describe('rechazo del archivo entero', () => {
 
   for (const code of conColumnas) {
     it(`R4 «${code}» nombra cada columna`, () => {
-      render(<ImportFileRejection rejection={{ code, columns: ['Existencia', 'Costo unitarios'] }} />);
+      render(<ImportFileRejection rejection={{ code, columns: ['Cantidad', 'Costo unitarios'] }} />);
 
       const columnas = within(screen.getByTestId(REJECTION_TESTID))
         .getAllByTestId(REJECTION_COLUMN_TESTID)
         .map((item) => item.textContent);
-      expect(columnas).toEqual(['Existencia', 'Costo unitarios']);
+      expect(columnas).toEqual(['Cantidad', 'Costo unitarios']);
     });
   }
 });
 
 describe('plantilla', () => {
-  it('R3 descarga lo que construye buildInventoryImportTemplate', async () => {
+  it('R3 descarga la plantilla que arma el servidor, con sus bytes, nombre y tipo', async () => {
+    const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
+    templateActionMock.mockResolvedValue({
+      status: 'success',
+      data: { fileName: 'plantilla-inventario.xlsx', mimeType: XLSX_MIME, base64: Buffer.from(bytes).toString('base64') },
+    });
     const user = setupUser();
     render(<ImportTemplateButton />);
 
     await user.click(screen.getByTestId(TEMPLATE_BUTTON_TESTID));
 
-    expect(downloadFileMock).toHaveBeenCalledTimes(1);
-    expect(downloadFileMock).toHaveBeenCalledWith(buildInventoryImportTemplate());
+    await vi.waitFor(() => expect(downloadFileMock).toHaveBeenCalledTimes(1));
+    expect(downloadFileMock).toHaveBeenCalledWith({ fileName: 'plantilla-inventario.xlsx', mimeType: XLSX_MIME, content: bytes });
+  });
+
+  it('R3 si el servidor rechaza, no descarga y avisa', async () => {
+    templateActionMock.mockResolvedValue({ status: 'error', code: 'unauthorized', message: 'Sin permiso.' });
+    const user = setupUser();
+    render(<ImportTemplateButton />);
+
+    await user.click(screen.getByTestId(TEMPLATE_BUTTON_TESTID));
+
+    await vi.waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('Sin permiso.'));
+    expect(downloadFileMock).not.toHaveBeenCalled();
   });
 });
 
@@ -191,7 +303,7 @@ describe('downloadFile', () => {
         clicks.push(this);
       });
 
-    const plantilla = buildInventoryImportTemplate();
+    const plantilla = { fileName: 'plantilla-inventario.xlsx', mimeType: XLSX_MIME, content: new Uint8Array([1, 2]) };
     downloadFile(plantilla);
 
     expect(creados).toHaveLength(1);

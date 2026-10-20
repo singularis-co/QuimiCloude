@@ -11,8 +11,9 @@
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
+import { trabajoConProveedor } from './run-document-job-doubles';
+
 import { POST } from '@/lib/modules/documentos/adapters/driving/document-job-route';
-import { createRunDocumentJob } from '@/lib/modules/documentos/domain/run-document-job';
 
 import type { BatchStatus } from '@/lib/modules/documentos/domain/batch-status';
 import type { StrategyRunResult } from '@/lib/modules/documentos/domain/process-pdf-by-strategy';
@@ -98,7 +99,7 @@ function cablearRunDocumentJobReal() {
     }),
   );
 
-  const runDocumentJob = createRunDocumentJob({
+  const runDocumentJob = trabajoConProveedor({
     repository,
     storage,
     processPdfByStrategy: procesar,

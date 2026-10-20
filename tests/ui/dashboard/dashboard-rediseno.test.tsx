@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import DashboardPage from '@/app/(private)/dashboard/page';
 import {
-  ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
   DashboardContent,
   EXECUTION_TRACE_SECTION_TESTID,
@@ -69,8 +68,12 @@ const ACTIVO: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:30:00.000Z'),
-  duration: { kind: 'open', ms: 45 * 60 * 1000 },
+  active: true,
+  totalDuration: { kind: 'open', ms: 45 * 60 * 1000 },
   goBackCount: 2,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -81,8 +84,12 @@ const DE_BAJA: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-06T08:00:00.000Z'),
   lastAt: new Date('2026-10-06T09:00:00.000Z'),
-  duration: { kind: 'open', ms: 60 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
   goBackCount: 0,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
 };
 
 const ENTREGADO: ExecutionTraceRow = {
@@ -93,8 +100,12 @@ const ENTREGADO: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-05T08:00:00.000Z'),
   lastAt: new Date('2026-10-05T09:05:00.000Z'),
-  duration: { kind: 'closed', ms: 65 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'closed', ms: 65 * 60 * 1000 },
   goBackCount: 0,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
 };
 
 const ROWS = [ACTIVO, DE_BAJA, ENTREGADO];
@@ -202,6 +213,9 @@ describe('R3 - columnas', () => {
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
     const esperadas = [
       'Nº de pedido',
+      'Foto',
+      'Fórmula',
+      'Presentaciones',
       'Estado',
       'Personas',
       'Primera anotación',
@@ -255,7 +269,7 @@ describe('R5 - vueltas atrás', () => {
   });
 });
 
-describe('R6 - marcas de baja y en curso', () => {
+describe('R6 - marca de baja, sin chip «En curso»', () => {
   it('R6 - un pedido dado de baja lleva «Dado de baja» en tono muted junto al número y nunca «En curso»', () => {
     montar();
     const numero = celda(DE_BAJA, 'orderNumber');
@@ -265,12 +279,11 @@ describe('R6 - marcas de baja y en curso', () => {
     expect(within(numero).queryByTestId('execution-trace-active')).toBeNull();
   });
 
-  it('R6 - un pedido activo lleva «En curso» en tono progress junto al número', () => {
+  it('R6 - un pedido activo no lleva chip «En curso» junto al número: el estado ya dice el paso', () => {
     montar();
     const numero = celda(ACTIVO, 'orderNumber');
-    const activa = within(numero).getByTestId('execution-trace-active');
-    expect(activa).toHaveTextContent(ACTIVE_ORDER_MARK);
-    expect(activa).toHaveAttribute('data-tone', 'progress');
+    expect(within(numero).queryByTestId('execution-trace-active')).toBeNull();
+    expect(numero.textContent).not.toContain('En curso');
     expect(within(numero).queryByTestId('execution-trace-deleted')).toBeNull();
   });
 });

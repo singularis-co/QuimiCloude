@@ -78,12 +78,12 @@ describe('RecipeVersionList', () => {
     const seccion = screen.getByRole('region', { name: 'Versiones' });
     expect(within(seccion).getByRole('heading', { name: 'Versiones' })).toBeInTheDocument();
 
-    const enlaces = filas().map((fila) => within(fila).getByTestId('recipe-version-link'));
-    expect(enlaces.map((e) => e.textContent)).toEqual([
+    expect(filas().map((fila) => within(fila).getByTitle(/.+/).textContent)).toEqual([
       'Zeta concentrada',
       'Alfa diluida',
       'Media carga',
     ]);
+    const enlaces = filas().map((fila) => within(fila).getByTestId('recipe-version-link'));
     expect(enlaces.map((e) => e.getAttribute('href'))).toEqual([
       `/produccion/formulas/${ORIGINAL_ID}/versiones/v-zeta`,
       `/produccion/formulas/${ORIGINAL_ID}/versiones/v-alfa`,
@@ -160,5 +160,85 @@ describe('RecipeVersionList', () => {
     for (const control of controles) {
       expect(control).toHaveClass(...AREA_TACTIL);
     }
+  });
+});
+
+describe('RecipeVersionList — rediseño (QC-264)', () => {
+  it('R30: el nombre va en una línea, cortado con elipsis y con el nombre completo como title, y deja de ser enlace', () => {
+    render(<RecipeVersionList originalId={ORIGINAL_ID} versions={VERSIONES} />);
+
+    for (const [fila, esperada] of filas().map((f, i) => [f, VERSIONES[i]] as const)) {
+      const nombre = within(fila).getByTitle(esperada.name);
+      expect(nombre).toHaveTextContent(esperada.name);
+      expect(nombre).toHaveClass('truncate', 'min-w-0');
+      expect(nombre.closest('a')).toBeNull();
+      expect(fila).toHaveClass('min-h-12');
+    }
+  });
+
+  it('R30: «Por revisar» es un StatusBadge en tono waiting, en una sola línea', () => {
+    render(<RecipeVersionList originalId={ORIGINAL_ID} versions={VERSIONES} />);
+
+    const marca = screen.getByTestId('recipe-version-under-review');
+    expect(marca).toHaveAttribute('data-slot', 'badge');
+    expect(marca).toHaveAttribute('data-tone', 'waiting');
+    expect(marca).toHaveClass('whitespace-nowrap');
+    expect(marca).toHaveTextContent('Por revisar');
+  });
+
+  it('R30: «Abrir» lleva flecha hacia delante, nombre accesible «Abrir la versión X» y la dirección de la versión', () => {
+    render(<RecipeVersionList originalId={ORIGINAL_ID} versions={VERSIONES} />);
+
+    for (const [fila, esperada] of filas().map((f, i) => [f, VERSIONES[i]] as const)) {
+      const abrir = within(fila).getByRole('link', { name: `Abrir la versión ${esperada.name}` });
+      expect(abrir).toHaveAttribute('data-testid', 'recipe-version-link');
+      expect(abrir).toHaveAttribute('data-direction', 'forward');
+      expect(abrir).toHaveAttribute(
+        'href',
+        `/produccion/formulas/${ORIGINAL_ID}/versiones/${esperada.id}`,
+      );
+      expect(abrir.querySelector('svg[aria-hidden]')).not.toBeNull();
+      expect(abrir).toHaveClass(...AREA_TACTIL);
+    }
+  });
+
+  it('R30: cada fila conserva el borrado de versión de hoy', () => {
+    render(<RecipeVersionList originalId={ORIGINAL_ID} versions={VERSIONES} />);
+
+    for (const [fila, esperada] of filas().map((f, i) => [f, VERSIONES[i]] as const)) {
+      expect(within(fila).getByRole('button', { name: `Borrar ${esperada.name}` })).toHaveAttribute(
+        'data-testid',
+        'recipe-delete-open',
+      );
+    }
+  });
+
+  it('R31: «Nueva versión» es un enlace pequeño con icono de más hacia el alta de versión', () => {
+    render(<RecipeVersionList originalId={ORIGINAL_ID} versions={VERSIONES} />);
+
+    const nueva = screen.getByTestId('recipe-version-new');
+    expect(nueva.tagName).toBe('A');
+    expect(nueva).toHaveAccessibleName('Nueva versión');
+    expect(nueva).toHaveAttribute('href', `/produccion/formulas/${ORIGINAL_ID}/versiones/nueva`);
+    expect(nueva).toHaveAttribute('data-slot', 'button');
+    expect(nueva.querySelector('svg[aria-hidden]')).not.toBeNull();
+    expect(nueva).toHaveClass(...AREA_TACTIL);
+  });
+
+  it('R14: en el alta (originalId null) «Nueva versión» está deshabilitado y se pinta el vacío', () => {
+    render(<RecipeVersionList originalId={null} versions={[]} />);
+
+    const nueva = screen.getByTestId('recipe-version-new');
+    expect(nueva.tagName).toBe('BUTTON');
+    expect(nueva).toBeDisabled();
+    expect(nueva).toHaveAccessibleName('Nueva versión');
+    expect(nueva.querySelector('svg[aria-hidden]')).not.toBeNull();
+    expect(nueva).toHaveClass(...AREA_TACTIL);
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByTestId('recipe-versions-empty')).toHaveTextContent(
+      'Esta receta todavía no tiene versiones.',
+    );
+    expect(screen.queryAllByTestId('recipe-version-row')).toHaveLength(0);
+    expect(screen.getByRole('region', { name: 'Versiones' })).toBeInTheDocument();
   });
 });

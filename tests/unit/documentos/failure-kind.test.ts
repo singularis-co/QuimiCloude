@@ -25,7 +25,26 @@ describe('documentos — failureKind (R15, R16)', () => {
     expect(failureKind('invalid_input')).toBe('definitive');
   });
 
-  it('un codigo ajeno a los tres conocidos se trata como definitivo', () => {
+  it('R24 — `ai_provider_missing` (la empresa ya no tiene proveedor IA) es definitivo', () => {
+    expect(failureKind('ai_provider_missing')).toBe('definitive');
+  });
+
+  it('R25 — `ai_provider_error` (el proveedor rechazo la cuenta) es definitivo', () => {
+    expect(failureKind('ai_provider_error')).toBe('definitive');
+  });
+
+  it('R26 — con los dos codigos nuevos, `ai_unavailable` sigue siendo el UNICO reintentable', () => {
+    const codigos = [
+      'ai_unavailable',
+      'unexpected',
+      'invalid_input',
+      'ai_provider_missing',
+      'ai_provider_error',
+    ] as const;
+    expect(codigos.filter((codigo) => failureKind(codigo) === 'retryable')).toEqual(['ai_unavailable']);
+  });
+
+  it('un codigo ajeno a los cinco conocidos se trata como definitivo', () => {
     expect(failureKind('product_not_found')).toBe('definitive');
   });
 });

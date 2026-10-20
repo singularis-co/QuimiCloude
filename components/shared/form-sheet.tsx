@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { FormEventHandler, ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,8 @@ export type FormSheetProps = {
   /** Se pinta dentro del `<form>`, antes de la cabecera (p. ej. un diálogo anidado). */
   readonly beforeHeader?: ReactNode;
   readonly formAction: (formData: FormData) => void;
+  /** Corre antes de la action; un `preventDefault` aquí la detiene (p. ej. para confirmar antes). */
+  readonly onSubmit?: FormEventHandler<HTMLFormElement>;
   readonly noValidate?: boolean;
   /** Contenido del cuerpo con scroll. */
   readonly children: ReactNode;
@@ -76,6 +78,7 @@ export function FormSheet({
   headerExtra,
   beforeHeader,
   formAction,
+  onSubmit,
   noValidate,
   children,
   bodyClassName = DEFAULT_BODY_CLASS_NAME,
@@ -129,7 +132,7 @@ export function FormSheet({
       data-testid={testIds.sheet}
       {...sheetData}
       isForm
-      formProps={{ action: formAction, noValidate, 'data-testid': testIds.form }}
+      formProps={{ action: formAction, onSubmit, noValidate, 'data-testid': testIds.form }}
       footer={
         footerWrapperClassName === undefined ? (
           actions

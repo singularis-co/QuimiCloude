@@ -53,7 +53,7 @@ describe('producto terminado importado', () => {
       {
         ...csvFile([
           { type: 'Producto terminado', formula: datos.formula, presentation: datos.presentacion, stock: '3', unitCost: '1,5', lot: lote },
-          { type: 'Producto terminado', formula: datos.formula.toUpperCase(), presentation: datos.presentacion, stock: '2', totalCost: '8' },
+          { type: 'Producto terminado', formula: datos.formula.toUpperCase(), presentation: datos.presentacion, stock: '2', unitCost: '2' },
         ]),
         importKey: crypto.randomUUID(),
       },

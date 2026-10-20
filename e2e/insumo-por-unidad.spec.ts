@@ -110,6 +110,14 @@ async function abrirPanelDeLotes(page: Page): Promise<Locator> {
   return sheet;
 }
 
+/**
+ * Las cantidades de los lotes, leidas de las filas de la tabla del panel: cada lote sale tambien
+ * como tarjeta (oculta en un panel ancho) con las mismas celdas.
+ */
+function cantidadesDeLotes(sheet: Locator): Locator {
+  return sheet.locator('[data-testid^="data-table-row-"]').getByTestId('product-batch-quantity');
+}
+
 async function cerrarPanelDeLotes(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Close' }).click();
   await expect(page.getByTestId('product-batches-sheet')).toHaveCount(0, { timeout: 60_000 });
@@ -261,7 +269,7 @@ test.describe('alta de insumo por unidad', () => {
     );
 
     let sheet = await abrirPanelDeLotes(page);
-    await expect(sheet.getByTestId('product-batch-quantity')).toHaveText(
+    await expect(cantidadesDeLotes(sheet)).toHaveText(
       `${firstStock} ${kg.label}`,
       { timeout: 60_000 },
     );
@@ -302,7 +310,7 @@ test.describe('alta de insumo por unidad', () => {
     await abrirInventarioFiltrado(page);
     await expect(filaDelProducto(page)).toHaveCount(1, { timeout: 60_000 });
     sheet = await abrirPanelDeLotes(page);
-    const quantities = sheet.getByTestId('product-batch-quantity');
+    const quantities = cantidadesDeLotes(sheet);
     await expect(quantities).toHaveCount(2, { timeout: 60_000 });
     expect([...(await quantities.allTextContents())].map((text) => text.trim()).sort()).toEqual(
       [`${firstStock} ${kg.label}`, `${secondStock} ${kg.label}`].sort(),

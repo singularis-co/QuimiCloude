@@ -71,9 +71,15 @@ Reglas de lectura:
   `progress/deudas.md`. La lista se amplía en `arnes.config.json > equipo.archivos_compartidos`
   (sustituye a la de por defecto). Edítalos añadiendo, sin reordenar, como `progress/deudas.md`.
 - `specs/` y `progress/` nunca cuentan: cada feature escribe en su carpeta.
+- **Mismo dueño: AVISO, no CHOCA.** Las fichas de una misma persona (mismo `assignee`) no se
+  bloquean entre sí: el dueño decide su orden y lo anota en cada `progress/features/<key>.md`.
+- **Otra persona: CHOCA, salvo aceptación del humano.** Con `--acepto <key>[,<key>]` el choque se
+  imprime como `CHOCA ACEPTADO` y no bloquea. Solo vale con una decisión humana escrita en
+  `progress/features/<candidata>.md > Decisiones` (fecha y frase). El conflicto lo resuelve quien
+  mergee segundo, en F2.3: integra la rama de integración, resuelve y regenera snapshots.
 
-Si choca, la candidata espera. Para que esto funcione, **cada tanda termina con `git push`**: una
-rama sin publicar es invisible para los demás, y el script lo avisa.
+Si choca sin aceptación, la candidata espera. Para que esto funcione, **cada tanda termina con
+`git push`**: una rama sin publicar es invisible para los demás, y el script lo avisa.
 
 ### Por qué
 
@@ -83,6 +89,11 @@ rama sin publicar es invisible para los demás, y el script lo avisa.
   candado se volvió ruido y dejó de distinguir el choque de verdad (QC-180 con QC-167 en
   `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`). Lo prueba
   `tests/guards/guard-archivos-en-vuelo-sin-ruido.test.ts`.
+- 2026-10-13: el script cuenta `spec_ready` como en vuelo, así que cinco specs aprobados de un
+  mismo dueño (QC-262/263/264/266/267), con orden acordado, chocaban entre sí y ninguno
+  arrancaba; y QC-262 quedaba parada por un solo test de paridad compartido con QC-214, de otra
+  persona. Humano: «necesito que podamos avanzar sin bloqueantes, ya si es necesario al final
+  podemos arreglar conflictos». Lo prueba la misma guardia.
 
 ## Dónde se edita `progress/deudas.md`
 

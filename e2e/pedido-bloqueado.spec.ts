@@ -25,10 +25,11 @@ import { normalizePresentationName, normalizeProductName } from '@/lib/modules/i
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
-import { INVENTORY_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, INVENTORY_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { submitOrderWithLeftover } from './helpers/order-distribution';
 
 const FIXTURE_PREFIX = 'qc138_e2e_';
 
@@ -144,7 +145,8 @@ async function submitNewOrder(page: Page, quantity: string): Promise<void> {
   await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
   await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
-  await page.getByTestId('order-form-submit').click();
+  // Sin reparto toda la cantidad queda sin envasar: Guardar pregunta antes.
+  await submitOrderWithLeftover(page, page.getByTestId('order-form'));
 }
 
 /** Da de alta por Inventario un lote nuevo del insumo del fixture, con su unidad preseleccionada. */
@@ -459,6 +461,7 @@ test.describe('pedido bloqueado por inventario insuficiente', () => {
     // Con la sesion del admin viva, `/login` redirige fuera y el formulario no aparece.
     await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId('asignacion-title')).toBeVisible({ timeout: 60_000 });
 
     const assignedRow = rowByNumber(page, orderNumber);

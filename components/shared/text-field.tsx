@@ -36,6 +36,8 @@ export type TextFieldProps = {
    */
   readonly remountOnDefault?: boolean;
   readonly required?: boolean;
+  /** Valor que se ve, se enfoca y viaja en el `FormData`, pero no se edita (p. ej. un derivado). */
+  readonly readOnly?: boolean;
   readonly ariaRequired?: boolean;
   readonly inputMode?: HTMLAttributes<HTMLInputElement>['inputMode'];
   readonly autoComplete?: string;
@@ -80,6 +82,7 @@ export function TextField({
   onBlur,
   remountOnDefault = false,
   required,
+  readOnly,
   ariaRequired,
   inputMode,
   autoComplete,
@@ -125,6 +128,7 @@ export function TextField({
       inputMode={inputMode}
       autoComplete={autoComplete}
       required={required}
+      readOnly={readOnly}
       aria-required={ariaRequired}
       maxLength={maxLength}
       pattern={pattern}

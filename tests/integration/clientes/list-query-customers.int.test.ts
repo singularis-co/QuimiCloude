@@ -201,15 +201,18 @@ describe('R26: pagina por defecto y tope de 25', () => {
   });
 });
 
-describe('R29: sin orden pedido ordena por apellidos y nombres, y el recorrido de paginas no repite ni omite, con empates', () => {
-  it('R29 — sin orden pedido ordena por apellidos y nombres y recorre las paginas sin repetir ni omitir', async () => {
+describe('R29: sin orden pedido van los mas nuevos primero (QC-289), y el recorrido de paginas no repite ni omite, con empates', () => {
+  it('R29 — sin orden pedido ordena por created_at DESC (QC-289) y recorre las paginas sin repetir ni omitir', async () => {
     const marca = `r29${token().slice(0, 8)}`;
+    // `created_at` creciente con el apellido: el orden por defecto (mas nuevos primero) es el
+    // INVERSO del alfabetico, asi que este caso distingue un orden del otro.
     const ids = await sembrar(
       empresaA.actorId,
       empresaA.scope,
       Array.from({ length: 12 }, (_, i) => ({
         firstNames: `Nombre ${MARCA} ${marca}`,
         lastNames: `Apellido ${MARCA} ${marca} ${String(i).padStart(2, '0')}`,
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, i)),
       })),
     );
     const sembrados = new Set(ids);
@@ -231,12 +234,13 @@ describe('R29: sin orden pedido ordena por apellidos y nombres, y el recorrido d
     const esperado = await prisma.customer.findMany({
       where: { id: { in: ids } },
       select: { id: true },
-      orderBy: [{ lastNames: 'asc' }, { firstNames: 'asc' }, { id: 'asc' }],
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     });
     expect(mios).toEqual(esperado.map((c) => c.id));
+    expect(mios).toEqual([...ids].reverse());
   });
 
-  it('cuatro filas empatadas en apellidos y nombres no se repiten ni se pierden entre paginas (desempate por id)', async () => {
+  it('cuatro filas empatadas en created_at no se repiten ni se pierden entre paginas (desempate por id)', async () => {
     const marca = `r29empate${token().slice(0, 8)}`;
     const ids = await sembrar(
       empresaA.actorId,
@@ -255,7 +259,8 @@ describe('R29: sin orden pedido ordena por apellidos y nombres, y el recorrido d
 
     expect(vistos).toHaveLength(4);
     expect(new Set(vistos).size).toBe(4);
-    // Todas empatan en apellidos y nombres: solo el desempate por id define el orden.
+    // Todas empatan en `created_at` (el mismo instante por defecto de `sembrar`): solo el
+    // desempate por id define el orden.
     expect([...vistos].sort()).toEqual(vistos);
     expect(vistos.sort()).toEqual([...ids].sort());
   });

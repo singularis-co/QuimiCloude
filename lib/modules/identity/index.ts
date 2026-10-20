@@ -333,6 +333,8 @@ export {
 // ---------------------------------------------------------------------------------------
 export type { PersonRef, PeopleDirectory, PeopleRefFilters } from './domain/people-directory';
 export { ACTIVE_ACCOUNTS_ONLY } from './domain/people-directory';
+// Quien puede ser responsable de un pedido: filtro del directorio y su pregunta.
+export { ORDER_RESPONSIBLE_FILTERS, isOrderResponsible } from './domain/order-responsible';
 export type { WorkGroupSnapshot, WorkGroupDirectory } from './domain/work-group-directory';
 
 // ---------------------------------------------------------------------------------------
@@ -363,3 +365,101 @@ export {
 export type { PlatformActor } from './domain/platform-actor';
 export { CompanyNotFoundError } from './domain/errors';
 export { createSetCompanyCountry, type SetCompanyCountryDeps } from './domain/set-company-country';
+
+// Gestion de empresas por el Maestro: casos de uso de plataforma, sus vistas y el historial.
+export {
+  CompanyDuplicateNameError,
+  CompanyDuplicateTaxIdError,
+  CompanyNameMismatchError,
+  CompanyNotDeletedError,
+} from './domain/errors';
+export type {
+  CompanyDeletionImpact,
+  CompanyDetail,
+  CompanyEventView,
+  CompanyRow,
+  CompanyStatus,
+} from './domain/company-view';
+export {
+  COMPANY_EVENT_KINDS,
+  type CompanyEventKind,
+  type CompanyField,
+} from './domain/company-event';
+export {
+  createCreateCompany,
+  type CreateCompanyDeps,
+  type CreateCompanyResult,
+} from './domain/create-company';
+export { createUpdateCompany, type UpdateCompanyDeps } from './domain/update-company';
+export { createDeleteCompany, type DeleteCompanyDeps } from './domain/delete-company';
+export { createReactivateCompany, type ReactivateCompanyDeps } from './domain/reactivate-company';
+export { createListCompanies, type ListCompaniesDeps } from './domain/list-companies';
+export { createGetCompany, type GetCompanyDeps } from './domain/get-company';
+export {
+  createGetCompanyDeletionImpact,
+  type GetCompanyDeletionImpactDeps,
+} from './domain/get-company-deletion-impact';
+export { createListCompanyEvents, type ListCompanyEventsDeps } from './domain/list-company-events';
+export {
+  ADDONS,
+  ADDON_PERMISSIONS,
+  ADDON_REQUIRES,
+  CORE_PERMISSIONS,
+  assertAddon,
+  effectiveAddons,
+  effectivePermissions,
+  hasAddon,
+  isAddon,
+  type Addon,
+  type AddonBearer,
+} from './domain/company-addons';
+export {
+  createIsCompanyAddonActive,
+  type IsCompanyAddonActiveDeps,
+} from './domain/is-company-addon-active';
+export {
+  companyAddonsQuerySchema,
+  setAllCompanyAddonsSchema,
+  setCompanyAddonSchema,
+  type CompanyAddonsQueryInput,
+  type SetAllCompanyAddonsInput,
+  type SetCompanyAddonInput,
+} from './domain/company-addon-input';
+export type { CompanyAddonState, CompanyAddonsView } from './domain/company-addons-view';
+export { createGetCompanyAddons, type GetCompanyAddonsDeps } from './domain/get-company-addons';
+export { createSetCompanyAddon, type SetCompanyAddonDeps } from './domain/set-company-addon';
+export {
+  createSetAllCompanyAddons,
+  type SetAllCompanyAddonsDeps,
+} from './domain/set-all-company-addons';
+
+// Administradores de cualquier empresa, gestionados desde la plataforma.
+export { CompanyLastAdministratorError } from './domain/errors';
+export {
+  administratorIdSchema,
+  createAdministratorSchema,
+  updateAdministratorSchema,
+  type AdministratorIdInput,
+  type CreateAdministratorInput,
+  type UpdateAdministratorInput,
+} from './domain/administrator-input';
+export type {
+  AdministratorCompany,
+  AdministratorDetail,
+  AdministratorRow,
+} from './domain/administrator-view';
+export { ADMINISTRATOR_QUERYABLE } from './domain/administrator-queryable';
+export { createListAdministrators, type ListAdministratorsDeps } from './domain/list-administrators';
+export { createGetAdministrator, type GetAdministratorDeps } from './domain/get-administrator';
+export {
+  createCreateAdministrator,
+  type CreateAdministratorDeps,
+  type CreateAdministratorResult,
+} from './domain/create-administrator';
+export { createUpdateAdministrator, type UpdateAdministratorDeps } from './domain/update-administrator';
+export { createDeleteAdministrator, type DeleteAdministratorDeps } from './domain/delete-administrator';
+export {
+  createResendAdministratorLink,
+  type ResendAdministratorLinkDeps,
+  type ResendAdministratorLinkResult,
+} from './domain/resend-administrator-link';

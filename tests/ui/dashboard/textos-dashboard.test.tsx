@@ -23,6 +23,7 @@ import {
 } from '@/app/(private)/dashboard/recorrido/[id]/components';
 import PrivateNotFound from '@/app/(private)/not-found';
 import type {
+  ConditioningAction,
   ExecutionAction,
   ExecutionTraceDetail as ExecutionTraceDetailData,
   ExecutionTraceDetailStep,
@@ -76,6 +77,9 @@ const TEXTOS = {
   },
   columnas: [
     'Nº de pedido',
+    'Foto',
+    'Fórmula',
+    'Presentaciones',
     'Estado',
     'Personas',
     'Primera anotación',
@@ -95,11 +99,19 @@ const TEXTOS = {
     error: 'No se pudo cargar la lista de pedidos ejecutados.',
     reintentar: 'Reintentar',
   },
-  marcas: { baja: 'Dado de baja', enCurso: 'En curso', vueltaAtras: 'Vuelta atrás' },
+  marcas: { baja: 'Dado de baja', vueltaAtras: 'Vuelta atrás' },
   recorrido: {
     volver: 'Volver a la lista',
     titulo: (numero: string) => `Recorrido del pedido ${numero}`,
-    datos: ['Estado', 'Duración', 'Vueltas atrás'],
+    datos: [
+      'Estado',
+      'Duración de producción',
+      'Duración de empaque',
+      'Duración de acondicionamiento',
+      'Vueltas atrás',
+    ],
+    faseEnCurso: 'En curso',
+    faseSinCierre: 'Sin cierre anotado',
     anotaciones: 'Anotaciones',
     paso: (n: number) => `Paso ${n}`,
     motivo: 'Motivo',
@@ -116,6 +128,9 @@ const TEXTOS = {
     finish: 'Finalizar',
     pack_start: 'Comenzar empaque',
     pack_finish: 'Terminar empaque',
+    conditioning_start: 'Comenzar acondicionamiento',
+    conditioning_batch_save: 'Guardado de datos de lote',
+    conditioning_finish: 'Terminar acondicionamiento',
   } satisfies Record<ExecutionAction, string>,
   noEncontrada: {
     etiqueta: '404',
@@ -138,8 +153,12 @@ const ACTIVO: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:30:00.000Z'),
-  duration: { kind: 'open', ms: 45 * 60 * 1000 },
+  active: true,
+  totalDuration: { kind: 'open', ms: 45 * 60 * 1000 },
   goBackCount: 2,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -150,8 +169,12 @@ const DE_BAJA: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-06T08:00:00.000Z'),
   lastAt: new Date('2026-10-06T09:00:00.000Z'),
-  duration: { kind: 'open', ms: 60 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
   goBackCount: 0,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
 };
 
 const ROWS = [ACTIVO, DE_BAJA];
@@ -200,9 +223,10 @@ async function resolverPagina(nodo: ReactNode): Promise<ReactNode> {
 const ORDER_ID = '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718';
 const MIN = 60 * 1000;
 
-function step(
-  overrides: Partial<ExecutionTraceDetailStep> & Pick<ExecutionTraceDetailStep, 'id' | 'action'>,
-): ExecutionTraceDetailStep {
+// Los pasos de produccion y empaque no llevan `batchLines`.
+type ProductionStep = Exclude<ExecutionTraceDetailStep, { readonly action: ConditioningAction }>;
+
+function step(overrides: Partial<ProductionStep> & Pick<ProductionStep, 'id' | 'action'>): ProductionStep {
   return {
     orderId: ORDER_ID,
     userId: 'u1',
@@ -235,7 +259,12 @@ const TRACE: ExecutionTraceDetailData = {
   deleted: false,
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:20:00.000Z'),
-  duration: { kind: 'open', ms: 20 * MIN },
+  active: true,
+  durations: {
+    production: { kind: 'closed', ms: 20 * MIN },
+    packing: { kind: 'unclosed', ms: 5 * MIN },
+    conditioning: { kind: 'open', ms: 10 * MIN },
+  },
   goBackCount: 1,
   steps: STEPS,
 };
@@ -274,7 +303,7 @@ describe('R21 - textos del Dashboard', () => {
     expect(screen.getByText(TEXTOS.dashboard.soloCancelados)).toBeVisible();
   });
 
-  it('R21 - las columnas se llaman «Nº de pedido», «Estado», «Personas», «Primera anotación», «Última anotación», «Duración», «Vueltas atrás»', () => {
+  it('R21 - las columnas se llaman «Nº de pedido», «Foto», «Fórmula», «Presentaciones», «Estado», «Personas», «Primera anotación», «Última anotación», «Duración», «Vueltas atrás»', () => {
     montarTabla();
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
     TEXTOS.columnas.forEach((etiqueta, indice) => {
@@ -332,14 +361,12 @@ describe('R21 - textos del Dashboard', () => {
     );
   });
 
-  it('R21 - las marcas de la lista dicen «Dado de baja» y «En curso»', () => {
+  it('R21 - la marca de la lista dice «Dado de baja»; una fila activa no lleva chip «En curso»', () => {
     montarTabla();
     const filaBaja = screen.getByTestId(`data-table-row-${DE_BAJA.orderId}`);
     expect(within(filaBaja).getByTestId('execution-trace-deleted').textContent).toBe(TEXTOS.marcas.baja);
     const filaActiva = screen.getByTestId(`data-table-row-${ACTIVO.orderId}`);
-    expect(within(filaActiva).getByTestId('execution-trace-active').textContent).toBe(
-      TEXTOS.marcas.enCurso,
-    );
+    expect(within(filaActiva).queryByTestId('execution-trace-active')).toBeNull();
   });
 });
 
@@ -348,7 +375,7 @@ describe('R21 - textos del Dashboard', () => {
 // ---------------------------------------------------------------------------------------------
 
 describe('R21 - textos del recorrido', () => {
-  it('R21 - «Volver a la lista», «Recorrido del pedido {n}», «Estado», «Duración», «Vueltas atrás» y «Anotaciones»', () => {
+  it('R21 - R25 - «Volver a la lista», «Recorrido del pedido {n}», «Estado», una «Duración de …» por fase, «Vueltas atrás» y «Anotaciones»', () => {
     const { container } = render(<ExecutionTraceDetail trace={TRACE} backHref={BACK_HREF} />);
 
     expect(screen.getByRole('link', { name: TEXTOS.recorrido.volver })).toBeInTheDocument();
@@ -358,6 +385,8 @@ describe('R21 - textos del recorrido', () => {
     expect(Array.from(container.querySelectorAll('dt')).map((dt) => dt.textContent)).toEqual(
       TEXTOS.recorrido.datos,
     );
+    expect(screen.getByTestId('execution-trace-phase-open').textContent).toBe(TEXTOS.recorrido.faseEnCurso);
+    expect(screen.getByTestId('execution-trace-phase-unclosed').textContent).toBe(TEXTOS.recorrido.faseSinCierre);
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(TEXTOS.recorrido.anotaciones);
     expect(screen.getByRole('list', { name: TEXTOS.recorrido.anotaciones })).toBeInTheDocument();
   });
@@ -384,18 +413,23 @@ describe('R21 - textos del recorrido', () => {
     );
   });
 
+  // `TEXTOS.acciones` tiene tambien las tres del acondicionamiento, que este recorrido no anota; se
+  // comparan las ocho que si pinta.
   it('R21 - las ocho acciones dicen «Arrancar», «Retomar», «Avanzar», «Retroceder», «Cancelar», «Finalizar», «Comenzar empaque», «Terminar empaque»', () => {
     render(<ExecutionTraceDetail trace={TRACE} backHref={BACK_HREF} />);
     const vistas = screen
       .getAllByTestId('execution-trace-step-action')
       .map((nodo) => nodo.textContent)
       .sort();
-    expect(vistas).toEqual(Object.values(TEXTOS.acciones).sort());
+    const ocho = (['start', 'resume', 'advance', 'go_back', 'cancel', 'finish', 'pack_start', 'pack_finish'] as const).map(
+      (accion) => TEXTOS.acciones[accion],
+    );
+    expect(vistas).toEqual(ocho.sort());
   });
 
-  it('R21 - las marcas del recorrido dicen «En curso», «Dado de baja» y «Vuelta atrás»', () => {
+  it('R21 - las marcas del recorrido dicen «Dado de baja» y «Vuelta atrás», sin chip «En curso»', () => {
     render(<ExecutionTraceDetail trace={TRACE} backHref={BACK_HREF} />);
-    expect(screen.getByTestId('execution-trace-active').textContent).toBe(TEXTOS.marcas.enCurso);
+    expect(screen.queryByTestId('execution-trace-active')).toBeNull();
     expect(screen.getByTestId('execution-trace-step-go-back').textContent).toBe(TEXTOS.marcas.vueltaAtras);
     cleanup();
 

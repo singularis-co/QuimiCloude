@@ -131,6 +131,11 @@ const {
   listPresentationsActionMock: vi.fn<(query: unknown) => Promise<PresentationListResult>>(),
 }));
 
+// La empresa tiene proveedor IA conectado: la pantalla pinta el boton de subida de siempre.
+vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () => ({
+  getAiProviderReadinessAction: vi.fn(async () => ({ configured: true, canConfigure: true })),
+}));
+
 // QC-75 (T6): la pagina exige su permiso con `requirePagePermission`, que resuelve la sesion por
 // `@/lib/composition`. Sin este mock la pantalla responderia 404 y este archivo no mediria nada.
 // El usuario lleva el CATALOGO ENTERO, derivado de `PERMISSIONS` y nunca escrito a mano: aqui no

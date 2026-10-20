@@ -341,8 +341,14 @@ describe('Prisma.dmmf — el autor del cambio es un ESCALAR, no una relacion (de
     // cerradas una a una-. Es VIRTUAL: no anade ninguna columna ni ningun indice a `users`.
     // Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`, y sigue diciendo
     // lo que QC-65 queria que dijera: el autor del cambio de estado NO es una relacion.
+    // RETENSADO 2026-10-14 (QC-162): entra `CompanyEvent`, el lado inverso del autor del
+    // historial de empresas (QC-162 `design.md > 2.1`). Es VIRTUAL y sigue la igualdad EXACTA.
+    // RETENSADO 2026-10-15 (QC-277, D13–D16): entra `CompanyAddonOverride`, el lado inverso del
+    // autor de una excepcion de añadido (QC-277 `design.md > 2.2`). Tambien VIRTUAL.
     expect(relationTargets('User')).toEqual([
       'Company',
+      'CompanyAddonOverride',
+      'CompanyEvent',
       'CredentialSetupToken',
       'DocumentType',
       'RevokedSession',

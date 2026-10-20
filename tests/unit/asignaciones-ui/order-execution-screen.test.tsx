@@ -11,8 +11,9 @@ import {
   ORDER_CANCEL_TEXTS,
   ORDER_CANCEL_TRIGGER_TESTID,
   ORDER_EXECUTION_ACTIONS_TESTID,
+  ORDER_EXECUTION_BACK_LINK_TESTID,
   ORDER_EXECUTION_LINES_TESTID,
-  ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID,
+  ORDER_EXECUTION_MATERIALS_PANEL_TESTID,
   ORDER_EXECUTION_MATERIALS_TESTID,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   ORDER_EXECUTION_FINISH_CONFIRM_TEXTS,
@@ -20,13 +21,20 @@ import {
   ORDER_EXECUTION_ORDER_ID_FIELD,
   ORDER_EXECUTION_ORDER_QUANTITY_TESTID,
   ORDER_EXECUTION_PRESENTATION_TESTID,
+  ORDER_EXECUTION_NOT_STARTED_TESTID,
   ORDER_EXECUTION_SCREEN_TESTID,
+  ORDER_EXECUTION_START_BUTTON_TESTID,
+  ORDER_EXECUTION_START_CONFIRM_TESTID,
+  ORDER_EXECUTION_START_DIALOG_TESTID,
+  ORDER_EXECUTION_START_ERROR_TESTID,
   ORDER_EXECUTION_STEP_POSITION_FIELD,
   ORDER_EXECUTION_TEXTS,
   ORDER_EXECUTION_TITLE_TESTID,
   ORDER_EXECUTION_TOOLS_TESTID,
   OrderExecutionScreen,
+  assignedOrderStartConfirmTexts,
 } from '@/app/(private)/asignacion/[id]/components';
+import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { STEP_READER_SIDE_COLUMN_RESERVE } from '@/app/(private)/asignacion/components/operator-screen-frame';
 import type { StartedOrderExecution } from '@/lib/modules/asignaciones';
 
@@ -37,14 +45,16 @@ import { esperarInteractiva, setupUser } from '../../helpers/user-event';
  * lista de pedidos asignados, no en esta pantalla: ver `assigned-orders-states.test.tsx`.
  */
 
-const { finishAssignedOrderActionMock } = vi.hoisted(() => ({
+const { finishAssignedOrderActionMock, startAssignedOrderActionMock } = vi.hoisted(() => ({
   finishAssignedOrderActionMock: vi.fn(),
+  startAssignedOrderActionMock: vi.fn(),
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-execution-actions', () => ({
   finishAssignedOrderAction: finishAssignedOrderActionMock,
   recordStepMoveAction: vi.fn(() => Promise.resolve({ status: 'success' })),
   cancelAssignedOrderAction: vi.fn(),
+  startAssignedOrderAction: startAssignedOrderActionMock,
 }));
 
 afterEach(() => {
@@ -86,9 +96,10 @@ const EXECUTION: StartedOrderExecution = {
     },
   ],
   tools: [],
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],
   unitId: null,
   unitLabel: null,
+  evidence: [],
   resumeStepPosition: null,
 };
 
@@ -421,21 +432,38 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
     expect(linea).toHaveTextContent('5 × Caja x 12');
   });
 
-  it('QC-170 R26: con varias lineas pinta la primera y «+N»', () => {
+  it('QC-170 R26: con varias lineas pinta todas separadas por coma', () => {
     render(
       <OrderExecutionScreen
         execution={{
           ...EXECUTION,
           presentationLines: [
-            { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+            { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
+            { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1, presentationContent: null, presentationUnitLabel: null },
           ],
         }}
       />,
     );
 
     expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
-      'Presentación: 5 × Botella 200 ml +1',
+      'Presentación: 5 × Botella 200 ml, 1 × Bidón 20L',
+    );
+  });
+
+  it('una linea con envase y volumen conocido pinta el envase y el volumen', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{
+          ...EXECUTION,
+          presentationLines: [
+            { lineId: 'linea-4', packedPackages: null, presentationId: 'pres-3', presentationName: '300 ml', packagingName: 'Embase pequeño 2', packages: 9, presentationContent: '300.0000', presentationUnitLabel: 'ml' },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
+      'Presentación: 9 × Embase pequeño 2 · 300 ml',
     );
   });
 
@@ -596,25 +624,28 @@ describe('pantalla de ejecucion — materiales y herramientas en su propio conte
     expect(sideReserve).toBe(readerReserve);
   });
 
-  it('QC-265 R24: con herramientas, un divisor separa las herramientas de los materiales', () => {
+  it('con herramientas, herramientas y materiales van en Cards distintas, herramientas primero', () => {
     render(
       <OrderExecutionScreen
         execution={{ ...EXECUTION, tools: [{ productName: 'Espátula', quantity: 1 }] }}
       />,
     );
 
-    const divisor = screen.getByTestId(ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID);
-    const lineas = screen.getByTestId(ORDER_EXECUTION_LINES_TESTID);
+    const materiales = screen.getByTestId(ORDER_EXECUTION_MATERIALS_PANEL_TESTID);
     const herramientas = screen.getByTestId(ORDER_EXECUTION_TOOLS_TESTID);
-    expect(herramientas.compareDocumentPosition(divisor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(divisor.compareDocumentPosition(lineas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(materiales).toContainElement(screen.getByTestId(ORDER_EXECUTION_LINES_TESTID));
+    expect(materiales).not.toContainElement(herramientas);
+    expect(herramientas.compareDocumentPosition(materiales) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByTestId('order-execution-materials-divider')).toBeNull();
   });
 
-  it('sin herramientas no pinta el divisor', () => {
+  it('sin herramientas solo queda la Card de materiales', () => {
     render(<OrderExecutionScreen execution={{ ...EXECUTION, tools: [] }} />);
 
     expect(screen.queryByTestId(ORDER_EXECUTION_TOOLS_TESTID)).toBeNull();
-    expect(screen.queryByTestId(ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID)).toBeNull();
+    expect(screen.getByTestId(ORDER_EXECUTION_MATERIALS_PANEL_TESTID)).toContainElement(
+      screen.getByTestId(ORDER_EXECUTION_LINES_TESTID),
+    );
   });
 });
 
@@ -723,15 +754,15 @@ describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
         execution={{
           ...EXECUTION,
           presentationLines: [
-            { presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: 'Caja cartón 12 u', packages: 5 },
-            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+            { lineId: 'linea-4', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: 'Caja cartón 12 u', packages: 5, presentationContent: null, presentationUnitLabel: null },
+            { lineId: 'linea-5', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1, presentationContent: null, presentationUnitLabel: null },
           ],
         }}
       />,
     );
 
     const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
-    expect(linea.textContent).toBe('Presentación: 5 × Caja cartón 12 u +1');
+    expect(linea.textContent).toBe('Presentación: 5 × Caja cartón 12 u, 1 × Bidón 20L');
     expect(within(linea).getByTestId('order-distribution')).toHaveAttribute(
       'title',
       '5 × Caja cartón 12 u, 1 × Bidón 20L',
@@ -744,5 +775,97 @@ describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
     expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
       'Presentación: 5 × Caja x 12',
     );
+  });
+});
+
+describe('pantalla de ejecucion — entrar es libre: «Comenzar» dentro de la pantalla', () => {
+  const PENDIENTE: StartedOrderExecution = { ...EXECUTION, status: 'PENDIENTE' };
+
+  it('PENDIENTE: pinta «Comenzar» en el pie, sin paso a paso ni Finalizar', () => {
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toHaveTextContent(
+      ORDER_EXECUTION_TEXTS.start,
+    );
+    expect(screen.getByTestId(ORDER_EXECUTION_NOT_STARTED_TESTID)).toBeVisible();
+    expect(screen.queryByText('Verifica el equipo antes de cargar')).toBeNull();
+    expect(screen.queryByTestId('step-reader-finish')).toBeNull();
+  });
+
+  it('PENDIENTE: la vuelta es un enlace habilitado a la lista de pedidos asignados', () => {
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    const back = screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID);
+    expect(back.tagName).toBe('A');
+    expect(back).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
+    expect(back).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('pulsar «Comenzar» abre la confirmacion con sus textos y no comienza todavia', () => {
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    expect(screen.queryByTestId(ORDER_EXECUTION_START_DIALOG_TESTID)).toBeNull();
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
+
+    const texts = assignedOrderStartConfirmTexts();
+    const dialog = screen.getByTestId(ORDER_EXECUTION_START_DIALOG_TESTID);
+    expect(dialog).toHaveTextContent(texts.title);
+    expect(dialog).toHaveTextContent(texts.description);
+    expect(screen.getByTestId(ORDER_EXECUTION_START_CONFIRM_TESTID)).toHaveTextContent(texts.confirm);
+    expect(startAssignedOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('cancelar la confirmacion no comienza el pedido', () => {
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
+    fireEvent.click(screen.getByRole('button', { name: assignedOrderStartConfirmTexts().cancel }));
+
+    expect(startAssignedOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('confirmar comienza el pedido y pinta la ejecucion: paso a paso y la vuelta deshabilitada', async () => {
+    startAssignedOrderActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ...PENDIENTE, status: 'EN_CURSO', resumeStepPosition: 1 },
+    });
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_CONFIRM_TESTID));
+
+    expect(await screen.findByText('Verifica el equipo antes de cargar')).toBeVisible();
+    expect(startAssignedOrderActionMock).toHaveBeenCalledTimes(1);
+    expect(startAssignedOrderActionMock).toHaveBeenCalledWith(PENDIENTE.orderId);
+    expect(screen.queryByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toBeNull();
+    expect(screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID)).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('si comenzar falla, sigue sin comenzar y pinta el error', async () => {
+    startAssignedOrderActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'order_blocked',
+      message: 'Falta material.',
+    });
+    render(<OrderExecutionScreen execution={PENDIENTE} />);
+
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_CONFIRM_TESTID));
+
+    expect(await screen.findByTestId(ORDER_EXECUTION_START_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID).tagName).toBe('A');
+  });
+
+  it('EN_CURSO: la vuelta se ve pero esta deshabilitada, sin href ni foco', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    const back = screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID);
+    expect(back.tagName).not.toBe('A');
+    expect(back).not.toHaveAttribute('href');
+    expect(back).not.toHaveAttribute('tabindex');
+    expect(back).toHaveAttribute('aria-disabled', 'true');
+    expect(back).toHaveTextContent(ORDER_EXECUTION_TEXTS.back);
+    expect(screen.queryByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toBeNull();
   });
 });

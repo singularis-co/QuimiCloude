@@ -128,6 +128,27 @@ const SPECS_E2E_AJENOS_QUE_COINCIDEN_POR_NOMBRE = new Set(['e2e/pedidos-asignado
 const RUTA_CRON_CADUCIDAD = 'app/api/cron/caducar-pedidos/route.ts'
 
 /**
+ * AMPLIADA el 2026-10-19 (QC-288, entrega-sin-pedido, TC). La entrega sin pedido se registra y se
+ * anula desde `/inventario` (design.md §2.7, §7.2 y §7.4), y tres piezas de la pantalla de pedidos
+ * subieron a `components/shared` porque las necesita una segunda ruta (design.md §7.1; precedente:
+ * `document-upload` importa las actions de `documentos`). Estos archivos consumen `pedidos` por su
+ * contrato publico o por el driving por ruta exacta -`consumosPorDentroDelModulo` lo sigue
+ * vigilando-. Exclusion NOMBRADA, por ARCHIVO y no por carpeta: cualquier otro archivo de
+ * `inventario` o de `components/` que importe `pedidos` sigue cayendo igual que antes.
+ */
+export const CONSUMIDORES_DE_LA_ENTREGA_SIN_PEDIDO: ReadonlySet<string> = new Set([
+  'app/(private)/inventario/components/direct-delivery-draft.ts',
+  'app/(private)/inventario/components/direct-delivery-sheet.tsx',
+  'app/(private)/inventario/components/direct-delivery-surplus-card.tsx',
+  'app/(private)/inventario/components/finished-stock-list-section.tsx',
+  'app/(private)/inventario/components/use-direct-delivery-draft.ts',
+  'app/(private)/inventario/producto-terminado/[id]/components/direct-delivery-void-dialog.tsx',
+  'app/(private)/inventario/producto-terminado/[id]/page.tsx',
+  'components/shared/order-customer-label.ts',
+  'components/shared/order-customer-picker.tsx',
+])
+
+/**
  * R57, INVERTIDO por QC-35: la pantalla de pedidos vive en `carpetaDeLaPantalla` -derivada de
  * `ORDERS_ROUTE`- y en NINGUN otro sitio de `app/` ni de `components/`.
  *
@@ -187,6 +208,9 @@ export function consumidoresDeUiFueraDeSuCarpeta(
     // El Route Handler del cron consume el driving de `pedidos` por su ruta exacta, no la
     // pantalla (ver `RUTA_CRON_CADUCIDAD` arriba).
     .filter((entrada) => entrada.nombre !== RUTA_CRON_CADUCIDAD)
+    // QC-288 2026-10-19: la entrega sin pedido, por archivo (ver
+    // `CONSUMIDORES_DE_LA_ENTREGA_SIN_PEDIDO` arriba).
+    .filter((entrada) => !CONSUMIDORES_DE_LA_ENTREGA_SIN_PEDIDO.has(entrada.nombre))
     .map((entrada) => entrada.nombre)
 }
 
@@ -394,7 +418,7 @@ describe('QC-34 — limite de alcance de la feature', () => {
     ])
   })
 
-  it('los specs E2E de pedidos son estos SEIS -QC-35, QC-102, QC-60, QC-145, QC-122 y QC-151-, y la lista sigue cerrada (R57)', () => {
+  it('los specs E2E de pedidos son estos SIETE -QC-35, QC-102, QC-60, QC-145, QC-122, QC-151 y QC-262-, y la lista sigue cerrada (R57)', () => {
     // CENTINELA INVERTIDO el 2026-09-07 (QC-35). El E2E estaba diferido a esa ficha y el
     // humano lo aprobo el 2026-09-06 (R48, R49). La lista es CERRADA: un spec de pedidos sin
     // ficha que lo respalde vuelve a poner esto en rojo.
@@ -445,11 +469,21 @@ describe('QC-34 — limite de alcance de la feature', () => {
     // cosa: la cotizacion del coste. La lista se AMPLIA y se TENSA -el ancla pasa de cinco entradas
     // a seis-, nunca se afloja: sigue CERRADA y un SEPTIMO spec de pedidos sin ficha que lo
     // respalde vuelve a ponerla en rojo.
+    //
+    // AMPLIADA el 2026-10-13 (QC-262, rediseno-pedidos, T6a): entra la SEPTIMA entrada, el spec
+    // e2e/pedidos-rediseno.spec.ts. Mide la pantalla a 1440, 820 y 390 px: una sola barra de filtros
+    // en orden y sin desbordar, el menu de fila con su orden, separador y destructivos, la tabla con
+    // el numero fijado, las tarjetas con «Acciones» en dialogo centrado, los dialogos enteros y los
+    // paneles a todo el ancho. No sustituye a ninguno de los seis anteriores porque lo que ejercita
+    // es otra cosa: la maquetacion del rediseno. La lista se AMPLIA y se TENSA -el ancla pasa de seis
+    // entradas a siete-, nunca se afloja: sigue CERRADA y un OCTAVO spec de pedidos sin ficha que lo
+    // respalde vuelve a ponerla en rojo.
     expect(rutasE2e.length).toBeGreaterThan(0)
     expect(specsE2eDePedidos(rutasE2e)).toEqual([
       'e2e/aislamiento-pedidos.spec.ts',
       'e2e/pedidos-busqueda.spec.ts',
       'e2e/pedidos-cotizacion.spec.ts',
+      'e2e/pedidos-rediseno.spec.ts',
       'e2e/pedidos-responsables.spec.ts',
       'e2e/pedidos-terminados.spec.ts',
       'e2e/pedidos.spec.ts',
@@ -458,6 +492,7 @@ describe('QC-34 — limite de alcance de la feature', () => {
       'e2e/aislamiento-pedidos.spec.ts',
       'e2e/pedidos-busqueda.spec.ts',
       'e2e/pedidos-cotizacion.spec.ts',
+      'e2e/pedidos-rediseno.spec.ts',
       'e2e/pedidos-responsables.spec.ts',
       'e2e/pedidos-terminados.spec.ts',
       'e2e/pedidos.spec.ts',
@@ -489,6 +524,35 @@ describe('QC-34 — limite de alcance de la feature', () => {
         carpetaDeLaPantallaRel,
       ),
     ).toEqual(['<sintetico>'])
+
+    // QC-288 2026-10-19: la exclusion de la entrega sin pedido es por ARCHIVO. Cada nombre existe
+    // y consume de verdad el modulo -si uno deja de hacerlo, la lista se recorta-, y otro archivo
+    // de `inventario` o de `components/shared` que importe `pedidos` sigue cayendo.
+    const consumidoresReales = new Set(
+      entradasDeUi
+        .filter((entrada) => /@\/lib\/modules\/pedidos/.test(soloCodigo(entrada.fuente)))
+        .map((entrada) => entrada.nombre),
+    )
+    for (const nombre of CONSUMIDORES_DE_LA_ENTREGA_SIN_PEDIDO) {
+      expect(consumidoresReales.has(nombre), `${nombre} ya no consume pedidos: recorta la lista`).toBe(
+        true,
+      )
+    }
+    expect(
+      consumidoresDeUiFueraDeSuCarpeta(
+        [
+          {
+            nombre: 'app/(private)/inventario/components/otra-pieza.tsx',
+            fuente: "import { x } from '@/lib/modules/pedidos'",
+          },
+          {
+            nombre: 'components/shared/otra-pieza.tsx',
+            fuente: "import { x } from '@/lib/modules/pedidos'",
+          },
+        ],
+        carpetaDeLaPantallaRel,
+      ),
+    ).toEqual(['app/(private)/inventario/components/otra-pieza.tsx', 'components/shared/otra-pieza.tsx'])
 
     // Y consumir el modulo POR DENTRO tambien, aunque sea desde la propia pantalla.
     expect(

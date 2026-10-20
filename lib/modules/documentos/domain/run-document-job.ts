@@ -7,18 +7,31 @@
  * SOLO para la estrategia `catalogo`: es la unica que rasteriza las paginas para mandarlas a la
  * IA, asi que es la unica que puede pedirle donde estan sus imagenes. Corre ANTES de cerrar la
  * fila para que un fallo suyo pueda dejarla en error con su motivo, y si falla el PDF NO se borra.
+ *
+ * El lector es el del proveedor IA de la empresa dueña del archivo, con el modelo del uso de la
+ * estrategia, y se pide antes de descargar: sin conexión o con la key ilegible no se baja nada.
+ * Qué cuenta como fallo de la cuenta y cuándo se recupera la conexión se decide aquí, al terminar.
  */
+import { USE_BY_STRATEGY } from './ai-read-use';
+import { AiProviderError } from './errors';
 import { failureKind, STORAGE_FAILURE_KIND } from './failure-kind';
 import { createDownloadDocument } from './read-document';
 
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import { isAccountFailure } from '@/lib/modules/integraciones';
 
 import type { Actor } from './actor';
 import type { CropCatalogImagesInput, CropCatalogImagesResult } from './crop-catalog-images';
 import type { ProcessPdfByStrategyInput, StrategyRunResult } from './process-pdf-by-strategy';
+import type { AiProviderGateway } from '../ports/ai-provider-gateway';
+import type { AiReader } from '../ports/ai-reader';
 import type { DocumentBatchRepository, JobOutcome } from '../ports/document-batch-repository';
 import type { DocumentJobLog } from '../ports/document-job-log';
 import type { DocumentStorage } from '../ports/document-storage';
+import type { PdfReadingSwitch } from '../ports/pdf-reading-switch';
+
+// Lo publica el contrato desde aqui, su unico consumidor de dominio: la composicion lo implementa.
+export type { AiProviderGateway, AiReaderLookup } from '../ports/ai-provider-gateway';
 
 export type RunDocumentJobMessage = {
   readonly documentFileId: string;
@@ -32,11 +45,19 @@ export type RunDocumentJobResult =
   | { readonly kind: 'error' }
   | { readonly kind: 'requeue' };
 
+/** La cadena de lectura construida sobre un lector concreto. */
+export type DocumentPipeline = {
+  readonly processPdfByStrategy: (input: ProcessPdfByStrategyInput) => Promise<StrategyRunResult>;
+  readonly cropCatalogImages: (input: CropCatalogImagesInput) => Promise<CropCatalogImagesResult>;
+};
+
 export type RunDocumentJobDeps = {
   readonly repository: DocumentBatchRepository;
   readonly storage: DocumentStorage;
-  readonly processPdfByStrategy: (input: ProcessPdfByStrategyInput) => Promise<StrategyRunResult>;
-  readonly cropCatalogImages: (input: CropCatalogImagesInput) => Promise<CropCatalogImagesResult>;
+  readonly aiProvider: AiProviderGateway;
+  readonly pdfReading: PdfReadingSwitch;
+  /** El lector depende de la empresa y del uso, así que la cadena se construye por trabajo. */
+  readonly pipelineFor: (reader: AiReader) => DocumentPipeline;
   /** Opcional para que quien no observa el trabajo no tenga que pasar un doble mudo. */
   readonly log?: DocumentJobLog;
 };
@@ -53,6 +74,27 @@ function causaDe(error: unknown): string {
 
 function outcomeKindOf(kind: ReturnType<typeof failureKind>): 'requeue' | 'error' {
   return kind === 'retryable' ? 'requeue' : 'error';
+}
+
+/** Deja pasar la lectura tal cual y recuerda el último fallo de cuenta que la atravesó. */
+function observeAccountFailures(reader: AiReader): {
+  readonly reader: AiReader;
+  readonly lastFailure: () => AiProviderError | null;
+} {
+  let last: AiProviderError | null = null;
+  return {
+    reader: {
+      async read(request) {
+        try {
+          return await reader.read(request);
+        } catch (error) {
+          if (error instanceof AiProviderError) last = error;
+          throw error;
+        }
+      },
+    },
+    lastFailure: () => last,
+  };
 }
 
 export function createRunDocumentJob(
@@ -72,6 +114,15 @@ export function createRunDocumentJob(
         ? { fileId, outcome: outcome.kind }
         : { fileId, outcome: outcome.kind, code: outcome.code, reason: outcome.reason },
     );
+  }
+
+  // El archivo ya terminó: un fallo al informar a la conexión se avisa y no cambia su desenlace.
+  async function informar(fileId: string, accion: () => Promise<void>): Promise<void> {
+    try {
+      await accion();
+    } catch (error) {
+      log.warn('informe al proveedor ia fallido', { fileId, cause: causaDe(error) });
+    }
   }
 
   return async function runDocumentJob(
@@ -101,6 +152,17 @@ export function createRunDocumentJob(
     }
     log.info('fila reclamada', { fileId: claimed.id, batchId: claimed.batchId });
 
+    // Lo que quedó en cola al apagar se descarta: definitivo, sin descargar ni llamar a la IA.
+    if (!(await deps.pdfReading.isOn(claimed.companyId))) {
+      const outcome = {
+        kind: outcomeKindOf(failureKind('unauthorized')),
+        code: 'unauthorized',
+        reason: 'run-document-job: la lectura de PDF no esta activa en la empresa',
+      } as const;
+      await terminar(claimed.id, outcome);
+      return { kind: outcome.kind };
+    }
+
     // Permisos vacios a proposito: es el ambito minimo que `downloadDocument` necesita para
     // comprobar la empresa, sin conceder nada mas.
     const scope: Actor = { id: claimed.id, companyId: claimed.companyId, permissions: [] };
@@ -119,6 +181,34 @@ export function createRunDocumentJob(
       return { kind: outcome.kind };
     }
 
+    const lookup = await deps.aiProvider.readerFor(
+      claimed.companyId,
+      USE_BY_STRATEGY[batch.strategy],
+    );
+    if (lookup.status !== 'ready') {
+      // Con la key ilegible, `integraciones` ya dejó la conexión en error al resolverla.
+      const code = lookup.status === 'missing' ? 'ai_provider_missing' : 'ai_provider_error';
+      const outcome = {
+        kind: outcomeKindOf(failureKind(code)),
+        code,
+        reason:
+          lookup.status === 'missing'
+            ? 'run-document-job: la empresa no tiene proveedor IA conectado'
+            : 'run-document-job: la key guardada del proveedor IA no se pudo leer',
+      } as const;
+      await terminar(claimed.id, outcome);
+      return { kind: outcome.kind };
+    }
+    const observado = observeAccountFailures(lookup.reader);
+    const pipeline = deps.pipelineFor(observado.reader);
+
+    const { id: fileId, companyId } = claimed;
+    async function informarFallo(): Promise<void> {
+      const fallo = observado.lastFailure();
+      if (fallo === null || !isAccountFailure(fallo.failure)) return;
+      await informar(fileId, () => deps.aiProvider.reportAccountFailure(companyId, fallo.failure));
+    }
+
     let bytes: Uint8Array;
     try {
       bytes = await downloadDocument(scope, claimed.path);
@@ -133,7 +223,7 @@ export function createRunDocumentJob(
     }
     log.info('pdf descargado', { fileId: claimed.id, byteLength: bytes.byteLength });
 
-    const result = await deps.processPdfByStrategy({
+    const result = await pipeline.processPdfByStrategy({
       strategy: batch.strategy,
       path: claimed.path,
       bytes,
@@ -153,7 +243,7 @@ export function createRunDocumentJob(
 
     if (result.ok) {
       if (batch.strategy === 'catalogo') {
-        const crop = await deps.cropCatalogImages({
+        const crop = await pipeline.cropCatalogImages({
           documentFileId: claimed.id,
           companyId: claimed.companyId,
           path: claimed.path,
@@ -166,6 +256,7 @@ export function createRunDocumentJob(
             reason: crop.reason,
           } as const;
           await terminar(claimed.id, outcome);
+          await informarFallo();
           return { kind: outcome.kind };
         }
         log.info('imagenes recortadas', {
@@ -183,6 +274,9 @@ export function createRunDocumentJob(
       } catch (error) {
         log.warn('borrado final fallido', { fileId: claimed.id, cause: causaDe(error) });
       }
+      if (lookup.connectionStatus === 'ERROR') {
+        await informar(claimed.id, () => deps.aiProvider.reportRecovered(claimed.companyId));
+      }
       return { kind: 'done' };
     }
 
@@ -192,6 +286,7 @@ export function createRunDocumentJob(
       reason: result.reason,
     } as const;
     await terminar(claimed.id, outcome);
+    await informarFallo();
     return { kind: outcome.kind };
   }
 }

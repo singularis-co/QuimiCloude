@@ -7,6 +7,7 @@ import type {
   GetBatchStatusResult,
 } from '@/lib/modules/documentos/adapters/driving/document-batch-actions';
 import type { IssueUploadLinksResult } from '@/lib/modules/documentos/adapters/driving/document-upload-actions';
+import type { AiProviderReadiness } from '@/lib/modules/integraciones';
 import type { DeleteRecipeFormState, RecipeListResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 
 const {
@@ -19,6 +20,7 @@ const {
   issueUploadLinksActionMock,
   enqueueBatchActionMock,
   getBatchStatusActionMock,
+  getAiProviderReadinessActionMock,
 } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   usePathnameMock: vi.fn<() => string>(),
@@ -36,6 +38,7 @@ const {
   issueUploadLinksActionMock: vi.fn<(input: unknown) => Promise<IssueUploadLinksResult>>(),
   enqueueBatchActionMock: vi.fn<(input: unknown) => Promise<EnqueueBatchResult>>(),
   getBatchStatusActionMock: vi.fn<(batchId: string) => Promise<GetBatchStatusResult>>(),
+  getAiProviderReadinessActionMock: vi.fn<() => Promise<AiProviderReadiness>>(),
 }));
 
 // `requirePagePermission` resuelve la sesion por `@/lib/composition`; sin este doble la pantalla
@@ -69,7 +72,16 @@ vi.mock('@/lib/modules/documentos/adapters/driving/document-batch-actions', () =
   getBatchStatusAction: getBatchStatusActionMock,
 }));
 
+vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () => ({
+  getAiProviderReadinessAction: getAiProviderReadinessActionMock,
+}));
+
 import FormulasPage from '@/app/(private)/produccion/formulas/page';
+import {
+  AI_PROVIDER_REQUIRED_TOOLTIP_LINK_TESTID,
+  AI_PROVIDER_REQUIRED_TOOLTIP_TESTID,
+  AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID,
+} from '@/components/shared/ai-provider-required-tooltip';
 import {
   DOCUMENT_UPLOAD_DIALOG_TESTID,
   DOCUMENT_UPLOAD_INPUT_TESTID,
@@ -77,9 +89,14 @@ import {
   DOCUMENT_UPLOAD_SUBMIT_TESTID,
   DOCUMENT_UPLOAD_TESTID,
 } from '@/components/shared/document-upload';
-import { PERMISSIONS } from '@/lib/modules/identity';
+import {
+  PERMISSIONS,
+  ROLE_ADMINISTRADOR,
+  SEED_ROLE_PERMISSIONS,
+  effectivePermissions,
+} from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
-import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { AI_PROVIDER_INTEGRATION_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
 
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, clearSidebarStateCookie, resetViewport, setViewportWidth } from '../../helpers/viewport';
@@ -133,6 +150,7 @@ beforeEach(() => {
     data: { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE, totalPages: 1 },
   });
   deleteRecipeActionMock.mockResolvedValue({ status: 'success' });
+  getAiProviderReadinessActionMock.mockResolvedValue({ configured: true, canConfigure: false });
 
   issueUploadLinksActionMock.mockResolvedValue({
     status: 'success',
@@ -199,6 +217,40 @@ describe('el boton de subida en el listado de formulas', () => {
     expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).toBeNull();
   });
 
+  it('R38: sin documentos.modificar no hay aviso de proveedor IA aunque la empresa no lo tenga, y ni se consulta', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: 'u-test-43',
+      username: 'nora.paz',
+      displayName: 'Nora Paz',
+      roleName: 'Operador',
+      permissions: ['recetas.consultar', 'documentos.consultar', 'integraciones.modificar'],
+    });
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: true });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).toBeNull();
+    expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R15 R23 con los permisos del Administrador recortados por la empresa sin añadidos no hay boton ni subida', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: 'u-test-44',
+      username: 'carla.duarte',
+      displayName: 'Carla Duarte Salas',
+      roleName: ROLE_ADMINISTRADOR,
+      permissions: effectivePermissions(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [], []),
+      addons: [],
+    });
+
+    await renderPantalla();
+
+    expect(screen.getAllByTestId('recipe-create-open').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeNull();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).toBeNull();
+  });
+
   it('el boton comparte contenedor padre con «Nueva formula» (R22)', async () => {
     getSessionUserMock.mockResolvedValue({
       id: 'u-test-42',
@@ -238,5 +290,68 @@ describe('el boton de subida en el listado de formulas', () => {
     const abrir = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
 
     expect(abrir.parentElement).toBe(crear.parentElement);
+  });
+});
+
+describe('el boton de subida sin proveedor IA en el listado de formulas', () => {
+  const conSubida = {
+    id: 'u-test-42',
+    username: 'carla.duarte',
+    displayName: 'Carla Duarte Salas',
+    roleName: 'Administrador',
+    permissions: ['recetas.consultar', 'documentos.modificar'],
+  };
+
+  it('con la empresa conectada el boton esta habilitado y sin globo de proveedor IA', async () => {
+    getSessionUserMock.mockResolvedValue(conSubida);
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: true, canConfigure: true });
+
+    await renderPantalla();
+
+    const abrir = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
+    expect(abrir).toBeVisible();
+    expect(abrir).toBeEnabled();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).toBeNull();
+    expect(getAiProviderReadinessActionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin conexion el boton sigue en su sitio pero deshabilitado, y no abre la ventana', async () => {
+    getSessionUserMock.mockResolvedValue(conSubida);
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: false });
+
+    await renderPantalla();
+
+    const abrir = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
+    expect(abrir).toBeDisabled();
+    const envoltorio = screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID);
+    expect(envoltorio).toContainElement(abrir);
+    // En el sitio del boton: la misma fila de acciones que «Nueva formula».
+    expect(
+      envoltorio.parentElement?.querySelector(':scope > [data-testid="recipe-create-open"]'),
+    ).not.toBeNull();
+    expect(screen.queryByTestId('ai-provider-required-notice')).toBeNull();
+
+    const user = setupUser();
+    await user.click(abrir);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeVisible();
+  });
+
+  it('sin conexion, al pasar el puntero, el globo enlaza a Proveedor IA aunque falte integraciones.modificar', async () => {
+    getSessionUserMock.mockResolvedValue(conSubida);
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: false });
+
+    await renderPantalla();
+
+    const user = setupUser();
+    await user.hover(screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID));
+
+    expect(await screen.findByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TESTID)).toHaveTextContent(
+      'Para leer PDF, conecta el proveedor IA de tu empresa',
+    );
+    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_LINK_TESTID)).toHaveAttribute(
+      'href',
+      AI_PROVIDER_INTEGRATION_ROUTE,
+    );
   });
 });

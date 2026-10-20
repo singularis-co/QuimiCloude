@@ -58,7 +58,7 @@ import {
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
-import { addPackagingLine, openOrderRowMenu } from './helpers/order-distribution';
+import { addPackagingLine, openOrderRowMenu, submitOrderWithLeftover } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc170_e2e_';
@@ -213,8 +213,11 @@ function ordersUrl(): string {
   return `${ORDERS_ROUTE}?${query.toString()}`;
 }
 
+/** Dentro de la fila: la tarjeta de la lista repite el disparador con el mismo `data-order-id`. */
 function rowActions(page: Page, orderId: string): Locator {
-  return page.locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${orderId}"]`);
+  return page
+    .getByTestId(`data-table-row-${orderId}`)
+    .locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${orderId}"]`);
 }
 
 function distributionLine(scope: Locator, presentationId: string): Locator {
@@ -311,6 +314,7 @@ async function expectAvailability(scope: Locator, exceeds: boolean): Promise<voi
 /** El Operador entra al pedido asignado y lo finaliza; queda `POR_EMPACAR`. */
 async function finishProduction(page: Page, orderId: string, numberText: string): Promise<void> {
   await switchUser(page, operatorUser);
+  await page.goto(ASSIGNED_ORDERS_ROUTE);
   await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
   await page.goto(assignedOrderRoute(orderId));
@@ -618,7 +622,8 @@ test.describe('pedido en varias presentaciones', () => {
     await expectAvailability(createForm, false);
     await expect(createForm.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
 
-    await createForm.getByTestId(ORDER_FORM_SUBMIT_TESTID).click();
+    // 4 x 1 + 6 x 0.5 = 7 de 10: queda sobrante y Guardar pregunta antes.
+    await submitOrderWithLeftover(page, createForm);
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
     const created = await prisma.order.findFirstOrThrow({

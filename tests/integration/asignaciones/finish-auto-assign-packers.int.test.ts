@@ -12,9 +12,6 @@
  * AISLAMIENTO: `transaccion` (ver la cabecera de `./use-case-fixture.ts` y el censo en
  * `tests/integration/aislamiento.json`).
  */
-import { randomUUID } from 'node:crypto';
-
-import type { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 
 // El Proxy que hace que los adaptadores que importan el cliente Prisma GLOBAL hablen por la
@@ -28,6 +25,7 @@ vi.mock('@/lib/shared/db/prisma', async () => {
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
+import { ROLE_EMPACADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
@@ -41,22 +39,10 @@ import {
   NOW,
   readRows,
   actorOf,
+  findSeedRoleId,
 } from './use-case-fixture';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
-
-async function createRoleWithPermissions(
-  tx: Prisma.TransactionClient,
-  permissionCodes: readonly string[],
-): Promise<string> {
-  const role = await tx.role.create({
-    data: { name: `rol-autoempacador-${randomUUID()}`, description: 'Rol de prueba' },
-    select: { id: true },
-  });
-  for (const permissionCode of permissionCodes) {
-    await tx.rolePermission.create({ data: { roleId: role.id, permissionCode } });
-  }
-  return role.id;
-}
+import { evidenceRepositoryUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
 
 /**
  * Transicion doblada: exito sin pasar por inventario. El `'ok'` del puerto es el literal: el
@@ -90,8 +76,8 @@ function ordersDoblados(orderId: string): OrderCatalog {
 describe('asignaciones · el Finalizar asigna al empacador vinculado (integracion)', () => {
   it('R1: el empacador que se unio al equipo despues de asignar queda asignado al finalizar', async () => {
     await inRolledBackTransaction(async (fixture) => {
-      const rolOperario = await createRoleWithPermissions(fixture.tx, ['asignaciones.consultar']);
-      const rolEmpacador = await createRoleWithPermissions(fixture.tx, ['empaque.modificar']);
+      const rolOperario = await findSeedRoleId(fixture.tx, ROLE_OPERADOR);
+      const rolEmpacador = await findSeedRoleId(fixture.tx, ROLE_EMPACADOR);
       const operarioActor = await createPerson({ tx: fixture.tx, roleId: rolOperario }, fixture.companyA);
       const operarioEquipo = await createPerson({ tx: fixture.tx, roleId: rolOperario }, fixture.companyA);
       const empacador = await createPerson({ tx: fixture.tx, roleId: rolEmpacador }, fixture.companyA);
@@ -116,6 +102,8 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
+        recipes: recipesWithoutEvidence,
+        evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido, stepPosition: null });
@@ -132,7 +120,7 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
 
   it('R2: sin empacadores vinculados el Finalizar no crea ninguna fila', async () => {
     await inRolledBackTransaction(async (fixture) => {
-      const rolOperario = await createRoleWithPermissions(fixture.tx, ['asignaciones.consultar']);
+      const rolOperario = await findSeedRoleId(fixture.tx, ROLE_OPERADOR);
       const operarioActor = await createPerson({ tx: fixture.tx, roleId: rolOperario }, fixture.companyA);
       const operarioEquipo = await createPerson({ tx: fixture.tx, roleId: rolOperario }, fixture.companyA);
       const equipo = await createWorkGroup(fixture.tx, fixture.companyA);
@@ -152,6 +140,8 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
+        recipes: recipesWithoutEvidence,
+        evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido, stepPosition: null });
@@ -165,8 +155,8 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
 
   it('R5: el empacador ya asignado conserva su origen y no se duplica', async () => {
     await inRolledBackTransaction(async (fixture) => {
-      const rolOperario = await createRoleWithPermissions(fixture.tx, ['asignaciones.consultar']);
-      const rolEmpacador = await createRoleWithPermissions(fixture.tx, ['empaque.modificar']);
+      const rolOperario = await findSeedRoleId(fixture.tx, ROLE_OPERADOR);
+      const rolEmpacador = await findSeedRoleId(fixture.tx, ROLE_EMPACADOR);
       const operarioActor = await createPerson({ tx: fixture.tx, roleId: rolOperario }, fixture.companyA);
       const operarioEquipo = await createPerson({ tx: fixture.tx, roleId: rolOperario }, fixture.companyA);
       const empacador = await createPerson({ tx: fixture.tx, roleId: rolEmpacador }, fixture.companyA);
@@ -188,6 +178,8 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
+        recipes: recipesWithoutEvidence,
+        evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido, stepPosition: null });

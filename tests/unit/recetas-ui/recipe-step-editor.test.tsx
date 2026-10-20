@@ -473,6 +473,35 @@ describe('RecipeStepEditor', () => {
       }
     });
 
+    it('R16: los tres botones miden 44 x 44, llevan aria-pressed y un icono oculto a lectores, sin glifo de texto ni borde propio', async () => {
+      await montar();
+
+      for (const nombre of ['Negrilla', 'Cursiva', 'Lista de verificacion']) {
+        const boton = screen.getByRole('button', { name: nombre });
+        expect(boton.className).toContain('min-h-11');
+        expect(boton.className).toContain('min-w-11');
+        expect(boton).toHaveAttribute('aria-pressed', 'false');
+        expect(boton.className.split(/\s+/)).not.toContain('border');
+        expect(boton.textContent).toBe('');
+        const icono = boton.querySelector('svg');
+        expect(icono).not.toBeNull();
+        expect(icono).toHaveAttribute('aria-hidden', 'true');
+      }
+    });
+
+    it('R16: el botón activo toma el fondo de tarjeta sobre la barra', async () => {
+      const usuario = setupUser();
+      await montar();
+      const negrilla = screen.getByRole('button', { name: 'Negrilla' });
+      expect(negrilla.className).not.toMatch(/(^|\s)bg-card(\s|$)/);
+
+      await activarConElTeclado(usuario, negrilla, '{Enter}');
+      await waitFor(() => {
+        expect(negrilla).toHaveAttribute('aria-pressed', 'true');
+      });
+      expect(negrilla.className).toMatch(/(^|\s)bg-card(\s|$)/);
+    });
+
     it('R26: no se usa 100vh y ninguna accion vive detras de :hover', async () => {
       for (const fuente of [FUENTE_EDITOR, FUENTE_ESQUEMA]) {
         expect(fuente).not.toContain('100vh');
@@ -493,5 +522,91 @@ describe('RecipeStepEditor', () => {
         expect(screen.getByRole('button', { name: nombre })).toBeVisible();
       }
     });
+  });
+});
+
+function EvidenceHarness({ inicial = false }: { readonly inicial?: boolean }) {
+  const [documento, setDocumento] = useState<RecipeStepDocument>(DOC_VACIO);
+  const [marcado, setMarcado] = useState(inicial);
+  return (
+    <RecipeStepEditor
+      document={documento}
+      onChange={setDocumento}
+      label="Paso 1"
+      editableTestId={TEST_ID}
+      evidence={{
+        checked: marcado,
+        onCheckedChange: setMarcado,
+        label: 'Requiere evidencia en el paso 1',
+      }}
+    />
+  );
+}
+
+describe('RecipeStepEditor — «Requiere evidencia»', () => {
+  it('R1: sin la prop evidence no hay interruptor', async () => {
+    await montar();
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByText('Requiere evidencia')).toBeNull();
+  });
+
+  it('R2: con la prop evidence apagada, el interruptor sale apagado y sin línea de ayuda', async () => {
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    const control = screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1' });
+    expect(control).toHaveAttribute('aria-checked', 'false');
+    expect(control).toHaveTextContent('Requiere evidencia');
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
+  });
+
+  it('R1, R5: se enciende con teclado y muestra la línea de ayuda; se apaga y la quita', async () => {
+    const user = setupUser();
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+    const control = screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1' });
+
+    control.focus();
+    await user.keyboard(' ');
+    expect(control).toHaveAttribute('aria-checked', 'true');
+    const ayuda = screen.getByTestId(`${TEST_ID}-evidence-help`);
+    expect(ayuda).toHaveTextContent('Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.');
+    expect(control).toHaveAttribute('aria-describedby', ayuda.id);
+
+    await user.click(control);
+    expect(control).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
+  });
+
+  it('R16: la barra lleva fondo apagado y borde inferior; formato a la izquierda y el interruptor en su grupo, que baja de línea en teléfono', async () => {
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    const barra = screen.getByTestId(`${TEST_ID}-bar`);
+    expect(barra.className).toContain('bg-muted');
+    expect(barra.className).toContain('border-b');
+    expect(barra.className).toContain('flex-wrap');
+    const formato = screen.getByTestId(`${TEST_ID}-toolbar`);
+    const grupo = screen.getByTestId(`${TEST_ID}-row-tools`);
+    expect(barra.firstElementChild).toBe(formato);
+    expect(grupo).toContainElement(screen.getByTestId(`${TEST_ID}-evidence`));
+    expect(grupo.className).toContain('w-full');
+    expect(grupo.className).toContain('md:ml-auto');
+    expect(grupo.className).toContain('md:w-auto');
+  });
+
+  it('R20: el grupo del interruptor y las acciones se parte en líneas para no desbordar a 390 px', async () => {
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    const grupo = screen.getByTestId(`${TEST_ID}-row-tools`);
+    expect(grupo.className).toContain('flex-wrap');
+  });
+
+  it('R1: el interruptor no entra en la barra de formato, que sigue con tres acciones', async () => {
+    render(<EvidenceHarness inicial />);
+    const barra = await screen.findByTestId(`${TEST_ID}-toolbar`);
+    expect(barra.querySelector('[role="switch"]')).toBeNull();
+    expect(screen.getAllByRole('button')).toHaveLength(3);
   });
 });

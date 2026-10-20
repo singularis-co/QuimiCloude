@@ -9,6 +9,7 @@ import {
   RecipeWithoutLinesError,
   ValidationError,
 } from './errors';
+import { assertEvidenceComplete } from './evidence-photos';
 import { ExecutionAbortedError, isExecutionSuccess } from './execution-entry';
 import { assertOrderAcceptsWrites } from './order-state';
 
@@ -18,6 +19,7 @@ import type {
   NewAssignment,
   OrderAssignmentRepository,
 } from '../ports/order-assignment-repository';
+import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 import type {
   PeopleDirectory,
   PermissionCode,
@@ -25,6 +27,7 @@ import type {
 } from '@/lib/modules/identity';
 
 import { formatOrderNumber, type OrderAssignmentTarget, type OrderCatalog } from '@/lib/modules/pedidos';
+import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 const finishAssignedOrderSchema = z.strictObject({
   orderId: z.string().uuid(),
@@ -38,6 +41,8 @@ export type FinishAssignedOrderDeps = {
   readonly groups: WorkGroupDirectory;
   readonly log: ExecutionLogRepository;
   readonly transaction: ExecutionTransaction;
+  readonly recipes: RecipeCatalog;
+  readonly evidence: StepEvidenceRepository;
   readonly now?: () => Date;
 };
 
@@ -203,6 +208,11 @@ export function createFinishAssignedOrder(
     const summary = summaryPage.items[0];
     if (summary === undefined) throw new OrderNotFoundError();
     const numberText = formatOrderNumber(summary.number);
+
+    // Fuera de la transaccion: quitar la ultima foto justo al finalizar lo provoca la misma
+    // persona desde su pantalla, que ya bloquea el boton.
+    const content = await deps.recipes.findExecutionContentById(summary.recipeId, actor.companyId);
+    await assertEvidenceComplete(deps.evidence, actor.companyId, orderId, 'manufacturing', content?.steps ?? []);
 
     const now = deps.now?.() ?? new Date();
     // El auto-asignado del empacador, ANTES de transicionar y UNA sola vez: el reintento

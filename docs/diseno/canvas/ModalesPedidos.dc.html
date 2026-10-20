@@ -30,7 +30,6 @@
           <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 10px"><div class="f"><label for="mn-q">Cantidad <span class="req">*</span></label><input id="mn-q" class="in mono num" type="text"></div><div class="f"><label for="mn-u">Unidad</label><button id="mn-u" class="in trig" type="button"><span>kg</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
           <div class="f"><label for="mn-p">Prioridad</label><button id="mn-p" class="in trig" type="button"><span>Media</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
           <div class="card" style="padding: 16px; gap: 10px"><span class="h3">Reparto en envases</span><div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px; align-items: end"><div class="f"><label>Envase</label><button class="in trig" type="button"><span class="dim">[Elige un envase]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div><div class="f"><label>Cantidad</label><input class="in mono num" type="text"></div><button class="b b-out" type="button" style="height: 40px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir</button></div></div>
-          <div class="f"><span class="fl">Responsables</span><div style="display: flex; gap: 8px"><label class="wrap-ic" style="flex: 1"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" placeholder="Buscar personas para asignar"></label><button class="b b-out" type="button" style="height: 40px" disabled>Asignar</button></div></div>
         </div>
         <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
       </aside>
@@ -81,15 +80,6 @@
             <div class="rm"><div class="rm-top"><span class="strong">Tensoactivo no iónico</span><span class="mono">$ 324.000</span></div><div class="rm-meta"><span class="mono">15,00 %</span><span class="mono">18,00 kg</span></div></div>
             <div class="rm"><div class="rm-top"><span class="strong">Secuestrante EDTA</span><span class="mono">$ 53.660</span></div><div class="rm-meta"><span class="mono">3,00 %</span><span class="mono">3,60 kg</span></div></div>
           </div></div></div>
-
-          <div class="f"><span class="fl">Responsables</span>
-            <div style="display: flex; gap: 8px"><label class="wrap-ic" style="flex: 1"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" placeholder="Buscar personas para asignar"></label><button class="b b-out" type="button" style="height: 40px">Asignar</button></div>
-            <span class="cap" style="margin-top: 6px">Asignados directamente</span>
-            <div class="person"><span class="av sm">LG</span>Laura Gómez<button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del pedido</button></div>
-            <div class="person"><span class="av sm c2">MS</span>Mateo Sánchez<button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del pedido</button></div>
-            <span class="cap" style="margin-top: 6px">Grupos de trabajo</span>
-            <div class="person"><span class="avs"><span class="av sm c3">VH</span><span class="av sm c4">SV</span></span>[Envasado turno A]<span class="count">2</span><button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar el grupo entero</button></div>
-          </div>
         </div>
         <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
       </aside>
@@ -99,7 +89,7 @@
     <div class="stage for-sheet">
       <span class="stage-cap">Sheet · Entregar pedido</span>
       <aside class="sheet wide static" role="dialog" aria-modal="true" aria-labelledby="mp-en">
-        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-en" class="h2">Entregar pedido <span class="mono">2026-0000006</span></h2><p class="sub">Elige el cliente y, por presentación, de qué lotes salen los envases.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-en" class="h2">Limpiador multiusos limón</h2><p class="sub">Pedido <span class="mono">2026-0000006</span></p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
         <div class="sheet-bd">
           <div class="f"><label for="men-c">Cliente</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="men-c" class="in" type="text" value="Laura Gómez"></label></div>
           <div style="display: flex; flex-direction: column; gap: 8px">
@@ -133,11 +123,22 @@
       </aside>
     </div>
 
-    <!-- 4. Responsables -->
-    <div class="stage">
-      <span class="stage-cap">Dialog · Responsables</span>
-      <div class="dlg wide static" role="dialog" aria-modal="true" aria-labelledby="mp-rs">
-        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-rs" class="h2">Responsables</h2><p class="sub">[Pedido <span class="mono">2026-0000003</span>. Asigna personas o grupos de trabajo.]</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <!-- 4. Sheet Responsables: ficha del pedido en solo lectura + gestión de responsables -->
+    <div class="stage for-sheet" id="sheet-responsables">
+      <span class="stage-cap">Sheet · Responsables</span>
+      <aside class="sheet wide static" role="dialog" aria-modal="true" aria-labelledby="mp-rs">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-rs" class="h2">Responsables</h2><p class="sub">Pedido <span class="mono">2026-0000003</span></p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+        <section class="card" aria-labelledby="mp-rs-ficha" style="padding: 16px; gap: 12px">
+          <div style="display: flex; align-items: center; gap: 12px"><span class="thumb lg photo" role="img" aria-label="Desengrasante alcalino"></span><div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span id="mp-rs-ficha" class="h3">Desengrasante alcalino</span><span class="sub">Pedido <span class="mono">2026-0000003</span></span></div><span class="sb t-progress" style="margin-left: auto"><i></i>En curso</span></div>
+          <dl class="spec" style="font-size: 13px">
+            <dt>Cantidad</dt><dd class="mono">120,00 kg</dd>
+            <dt>Reparto</dt><dd>Garrafa 20 L × 4 · Galón 3,78 L × 10</dd>
+            <dt>Prioridad</dt><dd><span class="pm"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor"></rect></svg>Alta</span></dd>
+            <dt>Cliente</dt><dd>Mateo Sánchez</dd>
+          </dl>
+        </section>
+        <span class="h3">Responsables</span>
         <div class="tabs" role="tablist" aria-label="Tipo de responsable"><button class="tab" type="button" role="tab" aria-selected="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Personas</button><button class="tab" type="button" role="tab" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg>Grupos de trabajo</button></div>
         <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in focus" type="text" placeholder="Buscar personas para asignar" value="Va"></label>
         <div class="lbox">
@@ -153,8 +154,11 @@
             <div class="person"><span class="avs"><span class="av sm c3">VH</span><span class="av sm c4">SV</span></span>[Envasado turno A]<button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar el grupo entero</button></div>
           </div>
         </div>
-        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Asignar</button></div>
-      </div>
+        <div style="display: flex; justify-content: flex-end"><button class="b b-pri" type="button">Asignar</button></div>
+        <p class="sub">[Pedido entregado o cancelado: la ficha y la lista se ven igual, sin buscador, sin «Asignar» y sin «Quitar».]</p>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cerrar</button></div>
+      </aside>
     </div>
 
     <!-- 5. Cancelar el pedido -->

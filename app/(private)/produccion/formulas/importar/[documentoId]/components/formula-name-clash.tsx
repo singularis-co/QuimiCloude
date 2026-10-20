@@ -1,5 +1,6 @@
 'use client';
 
+import { Notice } from '@/components/shared/notice';
 import { Button } from '@/components/ui/button';
 
 type FormulaNameClashProps = {
@@ -15,28 +16,26 @@ type FormulaNameClashProps = {
  */
 export function FormulaNameClash({ recipeName, onReplace, onRename }: FormulaNameClashProps) {
   return (
-    <div
-      role="alert"
-      className="flex flex-col gap-3 rounded-lg border border-destructive/40 p-4"
-      data-testid="formula-import-clash"
-    >
-      <p className="text-sm" data-testid="formula-import-clash-message">
-        {`Ya existe la fórmula «${recipeName}». Reemplazarla cambia sus ingredientes, pasos y descripción; los pedidos que la usan no cambian su coste guardado.`}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" touch onClick={onReplace} data-testid="formula-import-clash-replace">
-          Reemplazar
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          touch
-          onClick={onRename}
-          data-testid="formula-import-clash-rename"
-        >
-          Cambiar el nombre
-        </Button>
+    <Notice tone="warning" testId="formula-import-clash">
+      <div className="flex flex-col gap-3">
+        <p data-testid="formula-import-clash-message">
+          {`Ya existe la fórmula «${recipeName}». Reemplazarla cambia sus ingredientes, pasos y descripción; los pedidos que la usan no cambian su coste guardado.`}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            touch
+            onClick={onRename}
+            data-testid="formula-import-clash-rename"
+          >
+            Cambiar el nombre
+          </Button>
+          <Button type="button" variant="destructive" touch onClick={onReplace} data-testid="formula-import-clash-replace">
+            Reemplazar
+          </Button>
+        </div>
       </div>
-    </div>
+    </Notice>
   );
 }

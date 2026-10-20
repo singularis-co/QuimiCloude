@@ -447,6 +447,19 @@ describe('PeopleDirectory — quien vuelve y con que `isActive`', () => {
       );
     });
   });
+
+  it('QC-274 — `roleName` trae el nombre del rol de la persona', async () => {
+    await withCompany(async (companyId) => {
+      const operador = await seedUser(companyId, { lastNames: 'Aaa', roleId: operadorRoleId });
+      const administrador = await seedUser(companyId, { lastNames: 'Bbb', roleId: administradorRoleId });
+
+      const refs = await findAliveRefsInCompany(companyId, [operador, administrador], AHORA);
+      const byId = new Map(refs.map((ref) => [ref.id, ref]));
+
+      expect(byId.get(operador)?.roleName).toBe(ROLE_OPERADOR);
+      expect(byId.get(administrador)?.roleName).toBe(ROLE_ADMINISTRADOR);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -561,17 +574,46 @@ describe('listAliveInCompany — personas vivas de la empresa, ordenadas y acota
     });
   });
 
-  it('el `take` va antes del filtro: con filtro la respuesta puede traer menos del tope', async () => {
+  it('QC-274 — el tope va DESPUES del filtro de estado: una activa por debajo de inactivas no se pierde', async () => {
     await withCompany(async (companyId) => {
-      // Las dos primeras por orden estan inactivas: el `take: 2` las trae a ellas y el
-      // filtro las saca a las dos, aunque mas abajo haya una activa.
+      // Las dos primeras por orden estan inactivas; antes el `take: 2` las traia a ellas y el
+      // filtro las sacaba, perdiendo la activa de mas abajo.
       await seedUser(companyId, { lastNames: 'Aaa', accountStatus: 'inactive' });
       await seedUser(companyId, { lastNames: 'Bbb', accountStatus: 'inactive' });
-      await seedUser(companyId, { lastNames: 'Ccc', accountStatus: 'active' });
+      const activa = await seedUser(companyId, { lastNames: 'Ccc', accountStatus: 'active' });
+      const otraActiva = await seedUser(companyId, { lastNames: 'Ddd', accountStatus: 'active' });
+      await seedUser(companyId, { lastNames: 'Eee', accountStatus: 'active' });
 
       const refs = await listAliveInCompany(companyId, AHORA, 2, { accountStatus: ['active'] });
 
-      expect(refs).toEqual([]);
+      expect(refs.map((ref) => ref.id)).toEqual([activa, otraActiva]);
+    });
+  });
+
+  it('QC-274 — `roles` filtra por nombre de rol en la consulta, ANTES del tope', async () => {
+    await withCompany(async (companyId) => {
+      // Tres Administradores ordenan antes que el Operador: con el tope en 2, si el filtro fuera
+      // despues del `take` el Operador se perderia.
+      await seedUser(companyId, { lastNames: 'Aaa', roleId: administradorRoleId });
+      await seedUser(companyId, { lastNames: 'Bbb', roleId: administradorRoleId });
+      await seedUser(companyId, { lastNames: 'Ccc', roleId: administradorRoleId });
+      const operador = await seedUser(companyId, { lastNames: 'Zzz', roleId: operadorRoleId });
+
+      const refs = await listAliveInCompany(companyId, AHORA, 2, { roles: [ROLE_OPERADOR] });
+
+      expect(refs.map((ref) => ref.id)).toEqual([operador]);
+      expect(refs[0]?.roleName).toBe(ROLE_OPERADOR);
+    });
+  });
+
+  it('QC-274 — `roles` vacio no acota', async () => {
+    await withCompany(async (companyId) => {
+      await seedUser(companyId, { lastNames: 'Aaa', roleId: administradorRoleId });
+      await seedUser(companyId, { lastNames: 'Bbb', roleId: operadorRoleId });
+
+      const refs = await listAliveInCompany(companyId, AHORA, 25, { roles: [] });
+
+      expect(refs).toHaveLength(2);
     });
   });
 });

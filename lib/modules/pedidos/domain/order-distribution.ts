@@ -12,7 +12,8 @@ import { convertQuantity, IncompatibleUnitsError, type UnitConversion } from '@/
  *  `null` si falta) y la conversion de la unidad de esa presentacion. */
 export type DistributionLine = {
   readonly presentationId: string;
-  /** Entero positivo: validado rio arriba, esta funcion no lo repite. */
+  /** Entero >= 0: validado rio arriba, esta funcion no lo repite. El plan nunca es 0; el conteo
+   *  real al terminar el empaque si puede serlo. */
   readonly packages: number;
   readonly content: string | null;
   readonly unit: UnitConversion;

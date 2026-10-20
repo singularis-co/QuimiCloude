@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Terminar el empaque con envases reales</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.et-dlg{padding:0;gap:0;max-height:calc(100% - 48px)}
+.et-hd{padding:24px 24px 14px;display:flex;flex-direction:column;gap:12px}
+.et-bd{flex:1;min-height:0;overflow:auto;padding:0 24px 12px;display:flex;flex-direction:column;border-top:1px solid var(--border)}
+.et-ft{padding:14px 24px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px 16px;flex-wrap:wrap}
+.et-line{display:grid;grid-template-columns:80px minmax(0,1fr) auto;gap:10px 14px;align-items:center;padding:16px 0;border-bottom:1px solid var(--border)}
+.et-step{display:flex;align-items:center;gap:6px}
+.et-step .in{width:80px;text-align:center;font-size:18px}
+.et-badge{min-width:48px;display:flex;justify-content:flex-end}
+.et-more{grid-column:2 / -1;display:flex;flex-direction:column;gap:10px}
+.et-reveal{animation:qc-rise var(--d-b) var(--e-in) both}
+.env-img{width:80px;height:80px;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);background:var(--muted);color:var(--muted-fg);display:inline-flex;align-items:center;justify-content:center;flex:none;overflow:hidden;padding:0;font:inherit}
+.env-img .ic{width:30px;height:30px}
+.env-img.photo{background:linear-gradient(160deg,oklch(0.93 0.03 200),oklch(0.84 0.06 190));border-color:transparent;color:oklch(0.38 0.06 190);cursor:zoom-in;transition:box-shadow var(--d-i)}
+.env-img.photo:hover{box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 35%,transparent)}
+.env-img.photo:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.ov.zoom-ov{z-index:44}
+.dlg.zoom-dlg{z-index:45;width:min(420px,calc(100% - 32px))}
+.zoom-pic{width:100%;aspect-ratio:1;border-radius:12px;background:linear-gradient(160deg,oklch(0.93 0.03 200),oklch(0.84 0.06 190));color:oklch(0.38 0.06 190);display:flex;align-items:center;justify-content:center}
+.zoom-pic .ic{width:96px;height:96px;stroke-width:1.2}
+.et-ta{height:auto;padding:10px 12px;line-height:1.45;resize:vertical}
+.et-pop{top:calc(100% + 4px);left:0;right:0}
+.et-sum{font-size:14px;display:flex;flex-direction:column;gap:2px}
+.et-sum .over{color:var(--d-fg)}
+@container (max-width: 760px){
+.et-dlg{max-height:none}
+.et-hd{padding:20px 16px 12px}
+.et-bd{padding:0 16px 12px}
+.et-ft{padding:12px 16px calc(14px + env(safe-area-inset-bottom));flex-direction:column;align-items:stretch}
+.et-ft .actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+.et-line{grid-template-columns:80px minmax(0,1fr)}
+.et-step{grid-column:1 / -1}
+.et-step .in{flex:1;width:auto}
+.et-more{grid-column:1 / -1}
+}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="scroller" style="padding-bottom: 112px">
+    <header class="op-hd">
+      <div style="max-width: 1064px; margin: 0 auto; padding: 12px 20px 14px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+          <a class="b b-out b-back b-touch" href="Asignacion.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a «Por empacar»</a>
+          <button class="b b-out b-ico b-touch" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span></button>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap">
+          <div class="ph-t" style="gap: 2px"><span class="mono cap">2026-0000004</span><h1 class="op-t">Limpiador multiusos limón</h1></div>
+          <span class="{{ stCls }}"><i></i>{{ st }}</span>
+        </div>
+      </div>
+    </header>
+
+    <div style="max-width: 1064px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 20px">
+      <div class="cq-2" style="display: grid; grid-template-columns: 300px minmax(0, 720px); gap: 20px 24px; justify-content: center; align-items: start">
+        <section class="card" style="padding: 18px; gap: 14px" aria-labelledby="et-rep">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px"><span class="dim">Cantidad:</span><span class="mono strong" style="font-size: 18px">72,00 L</span></div>
+          <div class="sep" style="margin: 0"></div>
+          <h2 id="et-rep" class="h3">Reparto</h2>
+          <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 15px">
+            <li style="display: flex; align-items: center; gap: 12px"><button class="env-img photo" type="button" aria-label="Ver imagen de Galón 3,78 L" onClick="{{ zoomG }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></button><span style="display: flex; flex-direction: column"><span class="strong">Galón 3,78 L</span><span class="cap"><span class="mono">14</span> envases</span></span></li>
+            <li style="display: flex; align-items: center; gap: 12px"><span class="env-img" role="img" aria-label="Botella 1 L: sin imagen" title="Sin imagen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 2l20 20M9 3h10a2 2 0 0 1 2 2v10M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 .6-1.4M14.1 14.1 11 17l-2-2-4 4"></path></svg></span><span style="display: flex; flex-direction: column"><span class="strong">Botella 1 L</span><span class="cap"><span class="mono">15</span> envases</span></span></li>
+          </ul>
+        </section>
+
+        <section class="card" style="padding: 18px" aria-labelledby="et-pasos">
+          <h2 id="et-pasos" class="h2">Pasos de envasado</h2>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column">
+            <li style="display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 14px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 16px; line-height: 1.5"><span class="num-dot mono">1</span><span>[PASO DE ENVASADO DE LA RECETA]</span></li>
+            <li style="display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 14px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 16px; line-height: 1.5"><span class="num-dot mono">2</span><span>[PASO DE ENVASADO DE LA RECETA]</span></li>
+          </ol>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <footer class="op-ft">
+    <div style="max-width: 1064px; margin: 0 auto">
+      <div class="cq-2" style="display: grid; grid-template-columns: 300px minmax(0, 720px); gap: 0 24px; justify-content: center">
+        <div></div>
+        <div class="g2">
+          <button class="b b-out b-xl" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg>Comenzar</button>
+          <button class="{{ terCls }}" type="button" disabled="{{ terDis }}" onClick="{{ openEnd }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Terminar</button>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <div class="{{ endCls }}" role="dialog" aria-modal="true" aria-labelledby="et-t" aria-describedby="et-d">
+    <div class="et-hd">
+      <div class="dlg-hd">
+        <div style="display: flex; gap: 14px; align-items: flex-start">
+          <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+            <h2 id="et-t" class="h2">¿Terminar el empaque?</h2>
+            <p class="cap" style="margin: 0"><span class="mono">2026-0000004</span> · Limpiador multiusos limón · Cantidad <span class="mono">72,00 L</span></p>
+          </div>
+        </div>
+        <button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}" style="width: 44px; height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+      </div>
+      <p id="et-d" class="sub">Cuenta los envases que salieron de verdad. Ya vienen con el plan: cambia solo los que no coinciden. Terminar el empaque no se puede deshacer.</p>
+    </div>
+
+    <div class="et-bd">
+      <sc-for list="{{ lines }}" as="l" hint-placeholder-count="2">
+        <div class="et-line" role="group" aria-labelledby="{{ l.hid }}">
+          <sc-if value="{{ l.photo }}" hint-placeholder-val="{{ true }}"><button class="env-img photo" type="button" aria-label="{{ l.imgLabel }}" onClick="{{ l.zoom }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></button></sc-if>
+          <sc-if value="{{ l.noPhoto }}" hint-placeholder-val="{{ false }}"><span class="env-img" role="img" aria-label="{{ l.imgLabel }}" title="Sin imagen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 2l20 20M9 3h10a2 2 0 0 1 2 2v10M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 .6-1.4M14.1 14.1 11 17l-2-2-4 4"></path></svg></span></sc-if>
+          <span style="display: flex; flex-direction: column; min-width: 0"><span id="{{ l.hid }}" class="strong" style="font-size: 15px">{{ l.name }}</span><span class="cap">Plan: <span class="mono">{{ l.plan }}</span> envases</span></span>
+          <div class="et-step">
+            <button class="b b-out b-ico b-touch" type="button" aria-label="{{ l.decLabel }}" onClick="{{ l.dec }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+            <input id="{{ l.iid }}" class="in in-touch mono" type="text" inputmode="numeric" aria-label="{{ l.inLabel }}" aria-invalid="{{ l.inv }}" value="{{ l.v }}" onChange="{{ l.change }}">
+            <button class="b b-out b-ico b-touch" type="button" aria-label="{{ l.incLabel }}" onClick="{{ l.inc }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+            <span class="et-badge"><sc-if value="{{ l.hasDiff }}" hint-placeholder-val="{{ false }}"><span class="{{ l.badgeCls }}" aria-label="{{ l.badgeLabel }}"><i></i>{{ l.badge }}</span></sc-if></span>
+          </div>
+
+          <sc-if value="{{ l.hasErr }}" hint-placeholder-val="{{ false }}">
+            <div class="et-more"><span class="err" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; flex: none"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>{{ l.err }}</span></div>
+          </sc-if>
+
+          <sc-if value="{{ l.hasDiff }}" hint-placeholder-val="{{ false }}">
+            <div class="et-more et-reveal">
+              <div class="f" style="position: relative">
+                <label for="{{ l.mid }}">Motivo de la diferencia <span class="req">*</span></label>
+                <button id="{{ l.mid }}" class="in in-touch trig" type="button" aria-haspopup="listbox" aria-expanded="{{ l.openStr }}" aria-invalid="{{ l.mInv }}" onClick="{{ l.toggle }}"><span class="{{ l.mCls }}">{{ l.mLabel }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                <div class="{{ l.popCls }}" role="listbox" aria-label="{{ l.popLabel }}">
+                  <sc-for list="{{ l.opts }}" as="o" hint-placeholder-count="5">
+                    <button class="{{ o.cls }}" type="button" role="option" aria-selected="{{ o.sel }}" onClick="{{ o.pick }}" style="min-height: 44px">{{ o.label }}</button>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ l.mErr }}" hint-placeholder-val="{{ false }}"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Elige un motivo.</span></sc-if>
+                <sc-if value="{{ l.isUp }}" hint-placeholder-val="{{ false }}"><span class="cap">Para envases de más solo valen Conteo físico, Error de carga u Otro.</span></sc-if>
+              </div>
+              <sc-if value="{{ l.isOther }}" hint-placeholder-val="{{ false }}">
+                <div class="f et-reveal">
+                  <label for="{{ l.oid }}">Describe el motivo <span class="req">*</span></label>
+                  <textarea id="{{ l.oid }}" class="in in-touch et-ta" rows="2" aria-invalid="{{ l.oInv }}" value="{{ l.o }}" onChange="{{ l.changeO }}"></textarea>
+                  <sc-if value="{{ l.oErr }}" hint-placeholder-val="{{ false }}"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Escribe el motivo.</span></sc-if>
+                </div>
+              </sc-if>
+              <sc-if value="{{ l.hasHelp }}" hint-placeholder-val="{{ true }}"><p class="help" style="margin: 0">{{ l.help }}</p></sc-if>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+
+    <div class="et-ft">
+      <div class="et-sum" aria-live="polite">
+        <span>Envasado: <span class="{{ sumCls }}">{{ sumTxt }}</span> de <span class="mono">72,00 L</span></span>
+        <span class="cap">{{ gateMsg }}</span>
+      </div>
+      <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri b-touch" type="button" disabled="{{ blocked }}" onClick="{{ finish }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Terminar</button></div>
+    </div>
+  </div>
+
+  <div class="{{ zovCls }}" onClick="{{ zoomClose }}"></div>
+  <div class="{{ zoomCls }}" role="dialog" aria-modal="true" aria-labelledby="et-z">
+    <div class="dlg-hd"><h2 id="et-z" class="h3">{{ zoomName }}</h2><button class="xbtn" type="button" aria-label="Cerrar la imagen" onClick="{{ zoomClose }}" style="width: 44px; height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="zoom-pic" role="img" aria-label="{{ zoomAlt }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite" style="bottom: 104px"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"estado":{"editor":"enum","options":["igual","diferencia","otro","tope","stock","cero","sinMotivo","zoom"],"default":"diferencia"},"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+toast(text) { clearTimeout(this.t); this.setState({ toast: text }); this.t = setTimeout(() => this.setState({ toast: null }), 3200); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const est = this.props.estado || 'diferencia';
+const PRESETS = {
+igual: {},
+diferencia: { g: { v: '13', m: 'rotura' } },
+otro: { b: { v: '14', m: 'otro', o: 'Se cayó una caja al pasarla a la estiba.' } },
+tope: { g: { v: '16', m: 'conteo_fisico' } },
+stock: { b: { v: '19', m: 'error_de_carga' } },
+cero: { b: { v: '0', m: 'merma' } },
+sinMotivo: { g: { v: '13' } },
+zoom: {}
+};
+const preset = PRESETS[est] || {};
+const MOTIVOS = [['merma', 'Merma'], ['rotura', 'Rotura'], ['conteo_fisico', 'Conteo físico'], ['error_de_carga', 'Error de carga'], ['otro', 'Otro']];
+const UP = ['conteo_fisico', 'error_de_carga', 'otro'];
+const PED = 72;
+const LINES = [
+{ id: 'g', name: 'Galón 3,78 L', vol: 3.78, plan: 14, libre: 6, photo: true },
+{ id: 'b', name: 'Botella 1 L', vol: 1, plan: 15, libre: 2, photo: false }
+];
+const vals = s.vals || {};
+const get = (l) => Object.assign({ v: String(l.plan), m: null, o: '' }, preset[l.id] || {}, vals[l.id] || {});
+const put = (l, patch, extra) => this.setState(Object.assign({ vals: Object.assign({}, vals, { [l.id]: Object.assign({}, get(l), patch) }) }, extra || {}));
+const num = (v) => { if (!/^[0-9]+$/.test(String(v))) return null; return parseInt(v, 10); };
+const fmt = (n) => n.toFixed(2).replace('.', ',');
+const pl = (n, a, b) => n === 1 ? a : b;
+const rows = LINES.map((l) => { const x = get(l); return { l: l, x: x, n: num(x.v) }; });
+const total = rows.reduce((a, r) => a + (r.n || 0) * r.l.vol, 0);
+const tried = s.tried !== undefined ? s.tried : est === 'sinMotivo';
+const open = s.open || null;
+const lines = rows.map((r) => {
+const l = r.l, x = r.x, n = r.n;
+const diff = n === null ? 0 : n - l.plan;
+const hasDiff = n !== null && diff !== 0;
+let err = '';
+if (n === null) err = 'Escribe un número entero: 0 o más.';
+else if (diff > 0 && total > PED + 1e-9) {
+const others = total - n * l.vol;
+const max = Math.floor((PED - others) / l.vol + 1e-9);
+err = 'Supera la cantidad del pedido: con ' + n + ' envases se envasan ' + fmt(total) + ' L de ' + fmt(PED) + ' L. Máximo en esta línea: ' + max + '.';
+} else if (diff > 0 && diff > l.libre) {
+err = 'No alcanza el stock del envase: hacen falta ' + diff + ' envases vacíos de ' + l.name + ' y quedan ' + l.libre + ' libres.';
+}
+let help = '';
+if (hasDiff && n === 0) help = 'Esta línea no da de alta lote. Se liberan sus ' + l.plan + ' envases apartados.';
+else if (hasDiff && diff < 0) help = pl(-diff, 'Se libera 1 envase apartado.', 'Se liberan ' + (-diff) + ' envases apartados.');
+else if (hasDiff && diff > 0 && !err) help = pl(diff, 'Sale 1 envase vacío', 'Salen ' + diff + ' envases vacíos') + ' del stock libre (quedan ' + l.libre + ').';
+const allowed = diff > 0 ? MOTIVOS.filter((m) => UP.indexOf(m[0]) >= 0) : MOTIVOS;
+const mOk = !!x.m && allowed.some((m) => m[0] === x.m);
+const mLab = mOk ? (allowed.find((m) => m[0] === x.m) || [null, ''])[1] : '';
+const isOpen = open === l.id;
+return {
+hid: 'et-' + l.id + '-h', iid: 'et-' + l.id + '-in', mid: 'et-' + l.id + '-m', oid: 'et-' + l.id + '-o',
+name: l.name, plan: l.plan, v: x.v,
+photo: l.photo, noPhoto: !l.photo,
+imgLabel: l.photo ? 'Ver imagen de ' + l.name : l.name + ': sin imagen',
+zoom: () => this.setState({ zoom: l.id }),
+inLabel: 'Envases reales de ' + l.name, decLabel: 'Quitar un envase de ' + l.name, incLabel: 'Añadir un envase de ' + l.name,
+inv: err ? 'true' : 'false',
+change: (e) => put(l, { v: String(e.target.value).replace(/[^0-9]/g, '') }),
+dec: () => put(l, { v: String(Math.max(0, (n === null ? l.plan : n) - 1)) }),
+inc: () => put(l, { v: String((n === null ? l.plan : n) + 1) }),
+hasDiff: hasDiff,
+badge: diff > 0 ? '+' + diff : '−' + (-diff),
+badgeLabel: (diff > 0 ? diff + ' más' : (-diff) + ' menos') + ' que el plan',
+badgeCls: err ? 'sb t-danger' : 'sb t-waiting',
+hasErr: !!err, err: err,
+openStr: isOpen ? 'true' : 'false',
+toggle: () => this.setState({ open: isOpen ? null : l.id }),
+popCls: isOpen ? 'pop open et-pop' : 'pop et-pop',
+popLabel: 'Motivos de ' + l.name,
+mLabel: mLab || 'Elegir', mCls: mLab ? '' : 'dim',
+mErr: tried && hasDiff && !mOk, mInv: tried && hasDiff && !mOk ? 'true' : 'false',
+isUp: diff > 0,
+opts: allowed.map((m) => ({ label: m[1], cls: x.m === m[0] ? 'opt hl' : 'opt', sel: x.m === m[0] ? 'true' : 'false', pick: () => put(l, { m: m[0] }, { open: null }) })),
+isOther: mOk && x.m === 'otro', o: x.o,
+changeO: (e) => put(l, { o: e.target.value }),
+oErr: tried && hasDiff && mOk && x.m === 'otro' && !String(x.o).trim(), oInv: tried && hasDiff && mOk && x.m === 'otro' && !String(x.o).trim() ? 'true' : 'false',
+hasHelp: !!help, help: help,
+_err: !!err, _miss: hasDiff && (!mOk || (x.m === 'otro' && !String(x.o).trim()))
+};
+});
+const blocked = lines.some((l) => l._err);
+const missing = lines.some((l) => l._miss);
+const phase = s.phase || 'en';
+const dlgOpen = s.dlg !== undefined ? s.dlg : true;
+const ST = { en: ['En empaque', 'progress'], fin: ['Por acondicionar', 'waiting'] };
+const NAMES = { g: 'Galón 3,78 L', b: 'Botella 1 L' };
+const zoom = s.zoom !== undefined ? s.zoom : (est === 'zoom' ? 'g' : null);
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+st: ST[phase][0], stCls: 'sb t-' + ST[phase][1],
+terCls: phase === 'en' ? 'b b-pri b-xl' : 'b b-out b-xl', terDis: phase !== 'en',
+openEnd: () => { if (phase === 'en') this.setState({ dlg: true }); },
+lines: lines,
+sumTxt: fmt(total) + ' L', sumCls: total > PED + 1e-9 ? 'mono strong over' : 'mono strong',
+gateMsg: blocked ? 'Corrige las líneas marcadas para poder terminar.' : (tried && missing ? 'Falta el motivo en las líneas que no coinciden con el plan.' : ''),
+blocked: blocked,
+finish: () => {
+if (blocked) return;
+if (missing) { this.setState({ tried: true }); return; }
+this.setState({ dlg: false, phase: 'fin', open: null });
+this.toast('[Empaque terminado.]');
+},
+endCls: dlgOpen ? 'dlg wide full-m et-dlg open' : 'dlg wide full-m et-dlg',
+ovCls: dlgOpen ? 'ov open' : 'ov',
+closeAll: () => this.setState({ dlg: false, open: null }),
+zovCls: zoom ? 'ov zoom-ov open' : 'ov zoom-ov',
+zoomCls: zoom ? 'dlg zoom-dlg open' : 'dlg zoom-dlg',
+zoomName: zoom ? NAMES[zoom] : '', zoomAlt: zoom ? 'Imagen de ' + NAMES[zoom] : '',
+zoomClose: () => this.setState({ zoom: null }),
+zoomG: () => this.setState({ zoom: 'g' }),
+toastCls: s.toast ? 'toast show' : 'toast', toastText: s.toast || ''
+};
+}
+}
+</script>
+</body>
+</html>

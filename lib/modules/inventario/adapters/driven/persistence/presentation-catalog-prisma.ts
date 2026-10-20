@@ -102,3 +102,18 @@ export async function findPresentationsByNormalizedNames(
 
   return rows.map(toPresentationByName);
 }
+
+async function listScopedPresentationNames(scope: InventoryScope): Promise<readonly { readonly name: string }[]> {
+  return prisma.presentation.findMany({
+    where: presentationCompanyScope(scope),
+    select: { name: true },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  });
+}
+
+/** Los nombres de todas las presentaciones de la empresa, tal como estan guardados. */
+export async function listPresentationNames(companyId: string): Promise<readonly string[]> {
+  const rows = await listScopedPresentationNames({ companyId });
+
+  return rows.map((row) => row.name);
+}

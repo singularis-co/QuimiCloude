@@ -1,9 +1,11 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
+import { withCardFieldLabel } from '@/components/shared/card-field-label';
+import { actionsColumn, type DataTableColumn, type RowActionsSpec } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { Button } from '@/components/ui/button';
 import type {
@@ -12,20 +14,26 @@ import type {
   PackagedStockEntry,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import {
   ACTIONS_COLUMN_ID,
   ACTIONS_COLUMN_LABEL,
+  BELOW_ALERT_CLASS,
+  BelowAlertMark,
   IMAGE_COLUMN_ID,
   IMAGE_COLUMN_LABEL,
   isBelowAlert,
+  PRODUCT_CARD_LABELS,
   productUnitLabel,
   qtyAlertCell,
   stockAmountCell,
   unitLabel,
 } from './product-columns';
+import { productNameWithoutPresentation } from './product-base-name';
 
 /** Fila que pinta la tabla: la del pedido (o sin pedido) y, desplegada, una por producto. */
 export type FinishedStockTableRow =
@@ -62,8 +70,15 @@ export function finishedStockRowTitle(row: FinishedStockRow): string {
 
 /** Lo que pinta la columna «Nombre» en la fila agrupadora: el producto, sin el pedido. */
 export function finishedStockRowName(row: FinishedStockRow): string {
-  if (row.kind === 'withoutOrder') return row.products[0].product.name;
+  if (row.kind === 'withoutOrder') return productNameWithoutPresentation(row.products[0].product);
   return row.recipeName ?? EMPTY_MARK;
+}
+
+/** La presentacion va en su columna; la fila de un pedido no tiene una sola. */
+function presentationCell(item: FinishedStockTableRow): ReactNode {
+  if (item.kind === 'line') return item.line.product.presentationName ?? EMPTY_MARK;
+  if (item.row.kind === 'order') return null;
+  return item.row.products[0].product.presentationName ?? EMPTY_MARK;
 }
 
 function orderNumberCell(row: FinishedStockRow): ReactNode {
@@ -87,10 +102,11 @@ function packagedStockCell(
     <span
       data-testid="finished-stock-packaged"
       data-alert={alerted ? 'true' : undefined}
-      className={alerted ? 'font-semibold text-destructive' : undefined}
+      className={alerted ? BELOW_ALERT_CLASS : undefined}
       title={label}
       aria-label={label}
     >
+      {alerted ? <BelowAlertMark /> : null}
       {label}
     </span>
   );
@@ -111,23 +127,26 @@ function lineStockCell(
   return stockAmountCell(line.stock, productUnitLabel(line.product, units), alerted);
 }
 
+/** La fila del pedido no tiene menú: sin ítems, no se pinta. */
+const NO_GROUP_ACTIONS: RowActionsSpec = { items: [], triggerLabel: '' };
+
 export type FinishedStockColumnsDeps = {
   readonly onToggle: (key: string) => void;
-  /** Acciones de producto de una sub-fila: las enchufa quien monta la tabla. */
-  readonly lineActions: (parent: FinishedStockRow, line: FinishedStockProductLine) => ReactNode;
+  /** El menú de una línea de producto, como datos: lo pintan la fila y la tarjeta. */
+  readonly menu: (parent: FinishedStockRow, line: FinishedStockProductLine) => RowActionsSpec;
   readonly units?: readonly UnitRef[];
 };
 
 export function buildFinishedStockColumns({
   onToggle,
-  lineActions,
+  menu,
   units,
 }: FinishedStockColumnsDeps): readonly DataTableColumn<FinishedStockTableRow>[] {
   return [
     {
       id: IMAGE_COLUMN_ID,
       label: IMAGE_COLUMN_LABEL,
-      align: 'start',
+      align: 'center',
       defaultPinned: 'left',
       cell: (item) =>
         item.kind === 'group' ? (
@@ -159,8 +178,19 @@ export function buildFinishedStockColumns({
       cell: (item) => {
         if (item.kind === 'line') {
           return (
-            <span className="block pl-12" data-testid="finished-stock-line-name">
-              {item.line.product.name}
+            <span className="block pl-12">
+              <Link
+                href={finishedProductDetailRoute(item.line.product.id)}
+                data-testid="finished-stock-line-link"
+                className={cn(
+                  'inline-flex max-w-full items-center rounded-lg font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none',
+                  touchTarget,
+                )}
+              >
+                <span className="min-w-0 break-words" data-testid="finished-stock-line-name">
+                  {productNameWithoutPresentation(item.line.product)}
+                </span>
+              </Link>
             </span>
           );
         }
@@ -191,25 +221,37 @@ export function buildFinishedStockColumns({
       },
     },
     {
+      id: 'presentationName',
+      label: 'Presentación',
+      align: 'start',
+      cell: presentationCell,
+    },
+    {
       id: 'stock',
       label: 'Existencia',
       tabular: true,
-      align: 'center',
+      align: 'end',
       cell: (item) =>
-        item.kind === 'group' ? groupStockCell(item.row, units) : lineStockCell(item.line, units),
+        withCardFieldLabel(
+          PRODUCT_CARD_LABELS.stock,
+          item.kind === 'group' ? groupStockCell(item.row, units) : lineStockCell(item.line, units),
+        ),
     },
     {
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
       tabular: true,
-      align: 'center',
-      cell: (item) => (item.kind === 'line' ? qtyAlertCell(item.line.product, units) : null),
+      align: 'end',
+      cell: (item) =>
+        item.kind === 'line'
+          ? withCardFieldLabel(PRODUCT_CARD_LABELS.qtyAlert, qtyAlertCell(item.line.product, units))
+          : null,
     },
     actionsColumn<FinishedStockTableRow>({
       id: ACTIONS_COLUMN_ID,
       label: ACTIONS_COLUMN_LABEL,
       defaultPinned: 'right',
-      cell: (item) => (item.kind === 'line' ? lineActions(item.parent, item.line) : null),
+      menu: (item) => (item.kind === 'line' ? menu(item.parent, item.line) : NO_GROUP_ACTIONS),
     }),
   ];
 }

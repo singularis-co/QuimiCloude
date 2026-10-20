@@ -106,7 +106,6 @@
       <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 10px"><div class="f"><label for="pd-q">Cantidad</label><input id="pd-q" class="in mono num" type="text" value="120,00"></div><div class="f"><label for="pd-u">Unidad</label><button id="pd-u" class="in trig" type="button"><span>kg</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
       <div class="f"><label for="pd-p">Prioridad</label><button id="pd-p" class="in trig" type="button"><span>Media</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
       <div class="card" style="padding: 16px; gap: 10px"><span class="h3">Reparto en envases</span><div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px; align-items: end"><div class="f"><label>Envase</label><button class="in trig" type="button"><span>Garrafa 20 L</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div><div class="f"><label>Cantidad</label><input class="in mono num" type="text" value="6"></div><button class="b b-out" type="button" style="height: 40px">Añadir</button></div><span class="cap">Disponible <span class="mono">18</span> · Cubre <span class="mono">120,00 kg</span></span></div>
-      <div class="f"><span class="fl">Responsables</span><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" placeholder="Buscar personas para asignar"></label><span class="cap">Asignados directamente</span><div class="person"><span class="av sm">LG</span>Laura Gómez<button class="b b-gho b-sm" type="button" style="margin-left: auto" onClick="{{ removeResp }}">Quitar del pedido</button></div></div>
     </div>
     <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ save }}">Guardar</button></div>
   </aside>
@@ -126,16 +125,29 @@
     <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ doDelete }}">Eliminar</button></div>
   </div>
 
-  <div class="{{ respCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-rs">
-    <div class="dlg-hd"><h2 id="pd-rs" class="h2">Responsables</h2><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
-    <p class="sub">Pedido <span class="mono">{{ curNo }}</span>.</p>
-    <div class="f"><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" placeholder="Buscar personas para asignar" aria-label="Buscar personas para asignar"></label></div>
-    <span class="cap">Asignados directamente</span>
-    <div class="lbox">
-      <div class="lrow"><span class="person"><span class="av sm">LG</span>Laura Gómez</span><button class="b b-gho b-sm" type="button" onClick="{{ removeResp }}">Quitar del pedido</button></div>
-      <div class="lrow"><span class="person"><span class="av sm c2">MS</span>Mateo Sánchez</span><button class="b b-gho b-sm" type="button" onClick="{{ removeResp }}">Quitar del pedido</button></div>
+  <aside class="{{ respCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-rs">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pd-rs" class="h2">Responsables</h2><p class="sub">Pedido <span class="mono">{{ curNo }}</span></p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <section class="card" aria-labelledby="pd-rs-ficha" style="padding: 16px; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 12px"><span class="thumb lg photo" role="img" aria-label="{{ curRec }}"></span><div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span id="pd-rs-ficha" class="h3">{{ curRec }}</span><span class="sub">Pedido <span class="mono">{{ curNo }}</span></span></div><span class="{{ curStCls }}" style="margin-left: auto"><i></i>{{ curSt }}</span></div>
+        <dl class="spec" style="font-size: 13px">
+          <dt>Cantidad</dt><dd class="mono">{{ curQty }}</dd>
+          <dt>Reparto</dt><dd>{{ curPres }}</dd>
+          <dt>Prioridad</dt><dd>{{ curPr }}</dd>
+          <dt>Cliente</dt><dd>{{ curCli }}</dd>
+        </dl>
+      </section>
+      <span class="h3">Responsables</span>
+      <div class="f"><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" placeholder="Buscar personas para asignar" aria-label="Buscar personas para asignar"></label></div>
+      <span class="cap">Asignados directamente</span>
+      <div class="lbox">
+        <div class="lrow"><span class="person"><span class="av sm">LG</span>Laura Gómez</span><button class="b b-gho b-sm" type="button" onClick="{{ removeResp }}">Quitar del pedido</button></div>
+        <div class="lrow"><span class="person"><span class="av sm c2">MS</span>Mateo Sánchez</span><button class="b b-gho b-sm" type="button" onClick="{{ removeResp }}">Quitar del pedido</button></div>
+      </div>
+      <div style="display: flex; justify-content: flex-end"><button class="b b-pri" type="button" onClick="{{ doAssign }}">Asignar</button></div>
     </div>
-    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ doAssign }}">Asignar</button></div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cerrar</button></div>
+  </aside>
   </div>
 
   <div class="{{ cliCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-cl">
@@ -155,7 +167,7 @@
   </div>
 
   <aside class="{{ deliverCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-en">
-    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pd-en" class="h2">Entregar pedido <span class="mono">{{ curNo }}</span></h2><p class="sub">Elige el cliente y, por presentación, de qué lotes salen los envases.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pd-en" class="h2">{{ curRec }}</h2><p class="sub">Pedido <span class="mono">{{ curNo }}</span></p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
     <div class="sheet-bd">
       <div class="f"><label for="pd-ec">Cliente</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="pd-ec" class="in" type="text" value="Mateo Sánchez" placeholder="Busca un cliente por su nombre"></label></div>
       <span class="h3">Garrafa 20 L</span>
@@ -216,6 +228,7 @@ const data = [
 ];
 const toast = (text, extra) => { this.setState(Object.assign({ sheet: null, dlg: null, acts: null, toast: text }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: null }), 3200); };
 const openDlg = (kind) => () => this.setState({ dlg: kind, open: null, acts: null, cur: s.open || s.acts || '2026-0000003' });
+const curRow = data.find((d) => d[0] === (s.cur || '2026-0000003')) || data[0];
 const filtered = !!s.filtered;
 const list = filtered ? data.filter((d) => d[2] === 'progress') : data;
 const open = s.open;
@@ -234,8 +247,9 @@ bodyCls: k % 2 ? 'fade' : '',
 rows: list.map((d, i) => ({ no: d[0], st: d[1], stCls: 'sb t-' + d[2], pr: d[3], pmCls: d[4] === 4 ? 'pm crit' : 'pm', o2: d[4] >= 2 ? '1' : '0.2', o3: d[4] >= 3 ? '1' : '0.2', rec: d[5], cli: d[6], qty: d[7], pres: d[8], date: d[9], mot: d[12] || '—',cov: d[10], covCls: 'sb t-' + d[11], open: open === d[0] ? 'true' : 'false', menuCls: 'pop right at-row' +(i >= list.length - 3 ? ' up' : '') + (open === d[0] ? ' open' : ''), menuLabel: 'Acciones del pedido ' + d[0], toggle: () => this.setState({ open: open === d[0] ? null : d[0] }), mobileActs: () => this.setState({ acts: d[0] }) })),
 actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsNo: s.acts || '',
 curNo: s.cur || '2026-0000003',
+curRec: curRow[5], curSt: curRow[1], curStCls: 'sb t-' + curRow[2], curPr: curRow[3], curCli: curRow[6], curQty: curRow[7], curPres: curRow[8],
 openResp: openDlg('resp'), openCli: openDlg('cli'), openRep: openDlg('rep'), openDeliver: openDlg('deliver'),
-respCls: s.dlg === 'resp' ? 'dlg open' : 'dlg',
+respCls: s.dlg === 'resp' ? 'sheet wide open' : 'sheet wide',
 cliCls: s.dlg === 'cli' ? 'dlg open' : 'dlg',
 repCls: s.dlg === 'rep' ? 'dlg open' : 'dlg',
 deliverCls: s.dlg === 'deliver' ? 'sheet wide open' : 'sheet wide',

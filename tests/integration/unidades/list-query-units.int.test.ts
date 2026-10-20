@@ -5,7 +5,7 @@
  * POR QUE ESTE ARCHIVO EXISTE Y NO BASTA UN UNITARIO: un doble del puerto puede afirmar que la
  * consulta saneada llego al repositorio, pero NO que el motor ordeno y busco sobre el conjunto
  * completo ANTES de paginar (R13). Por eso el caso central siembra MAS FILAS QUE UNA PAGINA y
- * comprueba que la fila que corresponde aparece en la pagina 1 aunque en el orden de hoy
+ * comprueba que la fila que corresponde aparece en la pagina 1 aunque en el orden por defecto
  * estuviera en la 3.
  *
  * AISLAMIENTO: los dos adaptadores llaman al cliente Prisma GLOBAL, no a un `tx` inyectado, asi
@@ -69,7 +69,7 @@ function consulta(partial: Partial<ListQuery> = {}): ListQuery {
   return { page: 1, sort: null, filters: {}, search: MARCA, ...partial };
 }
 
-type Semilla = { readonly name: string; readonly symbol?: string | null };
+type Semilla = { readonly name: string; readonly symbol?: string | null; readonly createdAt?: Date };
 
 /**
  * QC-76 (R15, decision cerrada 28): el simbolo pasa a ser UNICO dentro del ambito cuando existe,
@@ -93,6 +93,7 @@ async function sembrar(semillas: readonly Semilla[]): Promise<void> {
         name: semilla.name,
         nameNormalized: normalizeUnitName(semilla.name),
         symbol: semilla.symbol ?? null,
+        ...(semilla.createdAt === undefined ? {} : { createdAt: semilla.createdAt }),
       },
       select: { id: true },
     });
@@ -113,35 +114,42 @@ describe('el orden y la busqueda se aplican sobre el CONJUNTO COMPLETO y antes d
   );
 
   beforeAll(async () => {
-    // El simbolo es indiferente para este bloque -ordena y busca por NOMBRE-, pero tiene que
-    // ser irrepetible desde QC-76 R15: doce filas de sistema con `'u'` no caben.
+    // El simbolo es indiferente para este bloque, pero tiene que ser irrepetible desde QC-76
+    // R15: doce filas de sistema con `'u'` no caben. El `created_at` va EXPLICITO y creciente con
+    // el nombre: el orden por defecto de la pagina (QC-289) es `created_at DESC`, y no puede
+    // depender de que dos altas seguidas no empaten en el reloj.
     await sembrar(
-      NOMBRES.map((name, i) => ({ name, symbol: simbolo(LOCAL, String(i).padStart(2, '0')) })),
+      NOMBRES.map((name, i) => ({
+        name,
+        symbol: simbolo(LOCAL, String(i).padStart(2, '0')),
+        createdAt: new Date(Date.UTC(2031, 0, 1, 0, 0, i)),
+      })),
     );
   });
 
-  it('la fila que en el orden de hoy esta en la pagina 3 aparece en la 1 al ordenar al reves', async () => {
-    // R13 — el aserto que distingue ordenar en la BASE de ordenar la pagina ya traida.
-    const nombreDeLaUltima = NOMBRES[NOMBRES.length - 1];
+  it('la fila que en el orden por defecto esta en la pagina 3 aparece en la 1 al ordenar al reves', async () => {
+    // R13 — el aserto que distingue ordenar en la BASE de ordenar la pagina ya traida. Por
+    // defecto van las mas nuevas primero (QC-289): la PRIMERA sembrada cae en la pagina 3.
+    const nombreDeLaPrimera = NOMBRES[0];
 
     const porDefectoPagina3 = await listUnitsPage(
       consulta({ page: 3, pageSize: 5, search: LOCAL }),
     );
-    expect(porDefectoPagina3.items.map((u) => u.name)).toContain(nombreDeLaUltima);
+    expect(porDefectoPagina3.items.map((u) => u.name)).toContain(nombreDeLaPrimera);
     const porDefectoPagina1 = await listUnitsPage(
       consulta({ page: 1, pageSize: 5, search: LOCAL }),
     );
-    expect(porDefectoPagina1.items.map((u) => u.name)).not.toContain(nombreDeLaUltima);
+    expect(porDefectoPagina1.items.map((u) => u.name)).not.toContain(nombreDeLaPrimera);
 
-    const desc = await listUnitsPage(
+    const asc = await listUnitsPage(
       consulta({
         page: 1,
         pageSize: 5,
         search: LOCAL,
-        sort: { columnId: 'name', direction: 'desc' },
+        sort: { columnId: 'name', direction: 'asc' },
       }),
     );
-    expect(desc.items[0]?.name).toBe(nombreDeLaUltima);
+    expect(asc.items[0]?.name).toBe(nombreDeLaPrimera);
   });
 
   it('el total y el numero de paginas describen el conjunto YA FILTRADO (R14)', async () => {
@@ -162,11 +170,11 @@ describe('el orden y la busqueda se aplican sobre el CONJUNTO COMPLETO y antes d
     expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
   });
 
-  it('sin orden explicito, el orden es el de HOY: nombre ascendente (R11)', async () => {
-    // R11 — ni la pagina ni el catalogo se mueven para quien no pide orden.
+  it('sin orden explicito, la pagina va created_at DESC y el catalogo sigue por nombre (R11, QC-289)', async () => {
+    // QC-289 — la PAGINA pone las mas nuevas primero (sembradas con `created_at` creciente: el
+    // inverso del de siembra); el CATALOGO entero, que alimenta los selectores, sigue alfabetico.
     const pagina = await listUnitsPage(consulta({ pageSize: 25, search: LOCAL }));
-    const nombres = pagina.items.map((u) => u.name);
-    expect([...nombres].sort()).toEqual(nombres);
+    expect(pagina.items.map((u) => u.name)).toEqual([...NOMBRES].reverse());
 
     const catalogo = await listUnits(MAX_UNITS, consulta({ search: LOCAL }));
     const nombresDelCatalogo = catalogo.map((u) => u.name);

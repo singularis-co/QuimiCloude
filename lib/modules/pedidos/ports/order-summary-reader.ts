@@ -11,8 +11,11 @@ import type { Page } from '../domain/page';
 /** Una linea del reparto tal como sale de la base: con el id del envase, todavia sin su nombre,
  *  que es de `inventario`. `null` = linea guardada antes de que el reparto nombrara envases. */
 export type OrderSummaryLineRecord = {
+  readonly id: string;
   readonly presentationId: string;
   readonly packages: number;
+  readonly packedPackages: number | null;
+  readonly presentationContent: string | null;
   readonly packagingProductId: string | null;
 };
 

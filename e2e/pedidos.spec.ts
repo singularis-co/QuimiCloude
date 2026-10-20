@@ -77,6 +77,7 @@ import {
   openOrderRowMenu,
   packagingLine,
   rowMenuTrigger,
+  submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
 
@@ -495,7 +496,8 @@ test.describe('pantalla de pedidos', () => {
 
     // --- 7. Guardar: la Server Action REAL de `pedidos` (QC-34) contra Postgres, sin `fetch` de
     // por medio (R41).
-    await page.getByTestId('order-form-submit').click();
+    // 12.5 en 12 envases de 1: queda sobrante y Guardar pregunta antes.
+    await submitOrderWithLeftover(page, orderForm);
 
     // --- 8. Con exito el panel se cierra y avisa por el `<Toaster />` que el layout privado YA
     // monta (R35, R36). Se afirma que HAY un aviso, no cual es su texto.

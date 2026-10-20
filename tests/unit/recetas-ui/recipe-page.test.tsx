@@ -49,6 +49,7 @@ import type {
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { getAiProviderReadinessAction } from '@/lib/modules/integraciones/adapters/driving/ai-provider-actions';
 
 import {
   NARROW_VIEWPORT,
@@ -123,6 +124,11 @@ const { readRequestIdHeaderMock } = vi.hoisted(() => {
   return { readRequestIdHeaderMock: vi.fn(async () => id) };
 });
 
+// La empresa tiene proveedor IA conectado: la pantalla pinta el boton de subida de siempre.
+vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () => ({
+  getAiProviderReadinessAction: vi.fn(async () => ({ configured: true, canConfigure: true })),
+}));
+
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
   identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
@@ -172,6 +178,17 @@ const testId = {
   imagen: 'recipe-image',
   imagenMarcador: 'recipe-image-placeholder',
 } as const;
+
+const SIN_MENU = { menu: () => ({ items: [], triggerLabel: '' }) } as const;
+
+// Con tarjetas, el menú y la miniatura están también en la lista de tarjetas: se acotan a la fila.
+function primeraFila(): HTMLElement {
+  return screen.getAllByTestId(testId.fila)[0] as HTMLElement;
+}
+
+function disparadorDeLaFila(): HTMLElement {
+  return within(primeraFila()).getByTestId(testId.menuFila);
+}
 
 const COLUMNAS_ORDENABLES: readonly RecipeColumnId[] = ['name', 'createdAt', 'updatedAt'];
 
@@ -394,6 +411,76 @@ describe('pantalla de recetas — ubicacion y navegacion', () => {
   });
 });
 
+describe('pantalla de recetas — cabecera', () => {
+  const SUBIR = 'document-upload-open';
+  const GLOBO_PROVEEDOR_IA = 'ai-provider-required-tooltip-trigger';
+
+  function sigueA(antes: HTMLElement, despues: HTMLElement): boolean {
+    return (antes.compareDocumentPosition(despues) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  }
+
+  it('R1: la cabecera es un PageHeader dentro de PageShell con «Fórmulas» como único h1', async () => {
+    await renderPantalla();
+
+    const titulo = screen.getByTestId(testId.titulo);
+    expect(screen.getAllByRole('heading', { level: 1 })).toEqual([titulo]);
+    expect(titulo).toHaveTextContent(RECIPES_LABEL);
+
+    const cabecera = titulo.closest('[data-slot="page-header"]');
+    expect(cabecera).not.toBeNull();
+    const armazon = cabecera?.closest('[data-slot="page-shell"]');
+    expect(armazon).not.toBeNull();
+    expect(armazon).toContainElement(screen.getByTestId(testId.tabla));
+  });
+
+  it('R1: «Subir PDFs» va antes que «Nueva fórmula», las dos en las acciones de la cabecera, y crear lleva icono', async () => {
+    await renderPantalla();
+
+    const acciones = screen
+      .getByTestId(testId.titulo)
+      .closest('[data-slot="page-header"]')
+      ?.querySelector('[data-slot="page-header-actions"]') as HTMLElement;
+    const subir = within(acciones).getByTestId(SUBIR);
+    const crear = within(acciones).getByTestId(testId.crear);
+
+    expect(subir).toBeEnabled();
+    expect(sigueA(subir, crear)).toBe(true);
+    expect(crear).toHaveTextContent('Nueva fórmula');
+    expect(crear.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('R1: sin permiso de subir documentos no se pinta «Subir PDFs» y «Nueva fórmula» sigue', async () => {
+    getSessionUserMock.mockResolvedValue({
+      ...USUARIO_DEL_TEST,
+      permissions: USUARIO_DEL_TEST.permissions.filter((codigo) => !codigo.startsWith('documentos.')),
+    });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(SUBIR)).toBeNull();
+    expect(screen.queryByTestId(GLOBO_PROVEEDOR_IA)).toBeNull();
+    expect(screen.getByTestId(testId.crear)).toBeInTheDocument();
+  });
+
+  it('R1: sin proveedor IA «Subir PDFs» sale deshabilitado dentro del globo, en el mismo sitio y antes de «Nueva fórmula»', async () => {
+    vi.mocked(getAiProviderReadinessAction).mockResolvedValueOnce({
+      configured: false,
+      canConfigure: false,
+    });
+
+    await renderPantalla();
+
+    const subir = screen.getByTestId(SUBIR);
+    const globo = screen.getByTestId(GLOBO_PROVEEDOR_IA);
+    const crear = screen.getByTestId(testId.crear);
+    expect(subir).toBeDisabled();
+    expect(globo).toContainElement(subir);
+    expect(globo.parentElement).toBe(crear.parentElement);
+    expect(globo.parentElement).toHaveAttribute('data-slot', 'page-header-actions');
+    expect(sigueA(globo, crear)).toBe(true);
+  });
+});
+
 describe('pantalla de recetas — columnas', () => {
   it('R2: la lista presenta imagen, nombre, pasos, creado, actualizado y acciones, y nunca la descripcion', async () => {
     const laReceta = receta();
@@ -401,7 +488,7 @@ describe('pantalla de recetas — columnas', () => {
 
     await renderPantalla();
 
-    const columnas = buildRecipeColumns({ rowActions: () => null });
+    const columnas = buildRecipeColumns(SIN_MENU);
     expect(columnas.map((columna) => columna.id)).toEqual([
       'image',
       'name',
@@ -438,7 +525,7 @@ describe('pantalla de recetas — columnas', () => {
     expect(document.body.textContent).not.toContain(AUTOR_QUE_NO_DEBE_VERSE);
     expect(document.body.textContent).not.toContain(EDITOR_QUE_NO_DEBE_VERSE);
 
-    const columnas = buildRecipeColumns({ rowActions: () => null });
+    const columnas = buildRecipeColumns(SIN_MENU);
     for (const prohibida of ['id', 'createdBy', 'updatedBy', 'imageUrl']) {
       expect(
         columnas.some((columna) => String(columna.id) === prohibida),
@@ -457,7 +544,10 @@ describe('pantalla de recetas — columnas', () => {
     listRecipesActionMock.mockResolvedValue(paginaDeRecetas([conImagen]));
 
     await renderPantalla();
-    expect(screen.getByTestId(testId.imagen)).toHaveAttribute('src', conImagen.imageUrl as string);
+    expect(within(primeraFila()).getByTestId(testId.imagen)).toHaveAttribute(
+      'src',
+      conImagen.imageUrl as string,
+    );
     expect(screen.queryByTestId(testId.imagenMarcador)).toBeNull();
 
     cleanup();
@@ -466,17 +556,17 @@ describe('pantalla de recetas — columnas', () => {
     await renderPantalla();
 
     expect(screen.queryByTestId(testId.imagen)).toBeNull();
-    expect(screen.getByTestId(testId.imagenMarcador)).toBeInTheDocument();
+    expect(within(primeraFila()).getByTestId(testId.imagenMarcador)).toBeInTheDocument();
     // Un `src` vacio dispara en algunos navegadores una peticion a la propia pagina.
     expect(document.querySelector('img[src=""]')).toBeNull();
   });
 
   it('R18: el esqueleto cuenta tantas celdas como columnas declara la lista', () => {
-    expect(RECIPE_SKELETON_COLUMN_COUNT).toBe(buildRecipeColumns({ rowActions: () => null }).length);
+    expect(RECIPE_SKELETON_COLUMN_COUNT).toBe(buildRecipeColumns(SIN_MENU).length);
   });
 
   it('R7, R11: cada columna ordena y filtra exactamente lo que declara la lista blanca, y nada de la lista blanca queda sin columna', () => {
-    const columnas = buildRecipeColumns({ rowActions: () => null });
+    const columnas = buildRecipeColumns(SIN_MENU);
     const ids: readonly string[] = columnas.map((columna) => columna.id);
 
     for (const columna of columnas) {
@@ -501,7 +591,7 @@ describe('pantalla de recetas — columnas', () => {
   it('R21: las acciones van en una columna que no se puede fijar, tras un disparador siempre visible de 44x44 y con items tactiles', async () => {
     await renderPantalla();
 
-    const acciones = buildRecipeColumns({ rowActions: () => null }).find(
+    const acciones = buildRecipeColumns(SIN_MENU).find(
       (columna) => columna.id === ACTIONS_COLUMN_ID,
     );
     expect(acciones?.pinnable).toBe(false);
@@ -533,7 +623,7 @@ describe('pantalla de recetas — columnas', () => {
 
     const editar = await getRowActionItem(
       setupUser(),
-      screen.getByTestId(testId.menuFila),
+      disparadorDeLaFila(),
       testId.editar,
     );
     expect(editar.tagName).toBe('A');
@@ -552,7 +642,7 @@ describe('pantalla de recetas — orden, busqueda y filtro', () => {
 
     expect(screen.getAllByRole('searchbox')).toEqual([screen.getByTestId(testId.busqueda)]);
 
-    const columnas = buildRecipeColumns({ rowActions: () => null });
+    const columnas = buildRecipeColumns(SIN_MENU);
     expect(columnas.filter((columna) => columna.sortable === true).map((columna) => columna.id)).toEqual(
       COLUMNAS_ORDENABLES,
     );
@@ -657,7 +747,7 @@ describe('pantalla de recetas — orden, busqueda y filtro', () => {
     expect(ultimoDestino().has(CREATED_FROM_PARAM)).toBe(false);
     expect(ultimoDestino().has(CREATED_TO_PARAM)).toBe(false);
 
-    const filtrables = buildRecipeColumns({ rowActions: () => null })
+    const filtrables = buildRecipeColumns(SIN_MENU)
       .filter((columna) => columna.filter !== undefined)
       .map((columna) => columna.id);
     expect(filtrables).toEqual([CREATED_AT_COLUMN_ID]);
@@ -1156,7 +1246,7 @@ describe('pantalla de recetas — borrado (QC-26 R24, R39)', () => {
     listRecipesActionMock.mockResolvedValue(paginaDeRecetas([laReceta]));
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
+    await clickRowAction(user, disparadorDeLaFila(), testId.abrirBorrado);
 
     const dialogo = await screen.findByTestId(testId.dialogoBorrado);
     expect(within(dialogo).getByTestId(testId.mensajeBorrado)).toHaveTextContent(laReceta.name);
@@ -1166,7 +1256,7 @@ describe('pantalla de recetas — borrado (QC-26 R24, R39)', () => {
     await waitFor(() => expect(screen.queryByTestId(testId.dialogoBorrado)).toBeNull());
     expect(deleteRecipeActionMock).not.toHaveBeenCalled();
 
-    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
+    await clickRowAction(user, disparadorDeLaFila(), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -1178,7 +1268,7 @@ describe('pantalla de recetas — borrado (QC-26 R24, R39)', () => {
     const user = setupUser();
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
+    await clickRowAction(user, disparadorDeLaFila(), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -1196,7 +1286,7 @@ describe('pantalla de recetas — borrado (QC-26 R24, R39)', () => {
     });
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
+    await clickRowAction(user, disparadorDeLaFila(), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -1242,7 +1332,7 @@ describe('borrado de receta — el identificador del error inesperado (QC-71 R17
     deleteRecipeActionMock.mockResolvedValue(errorInesperado());
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
+    await clickRowAction(user, disparadorDeLaFila(), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -1262,7 +1352,7 @@ describe('borrado de receta — el identificador del error inesperado (QC-71 R17
     });
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
+    await clickRowAction(user, disparadorDeLaFila(), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 

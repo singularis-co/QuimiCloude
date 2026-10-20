@@ -229,7 +229,7 @@ describe('updateProductAction', () => {
   });
 
   it('llama al caso de uso con el id, la entrada convertida y el actor de la sesion', async () => {
-    updateProductMock.mockResolvedValue(undefined);
+    updateProductMock.mockResolvedValue({ warnings: [] });
 
     await updateProductAction('product-1', MUTATION_INITIAL, formDataOf(VALID_PRODUCT_FIELDS));
 
@@ -260,7 +260,7 @@ describe('updateProductAction', () => {
 describe('los campos que el producto perdio no cruzan la Server Action', () => {
   it('no los lee del FormData aunque vengan, ni al crear ni al editar', async () => {
     createProductMock.mockResolvedValue({ id: 'product-1' });
-    updateProductMock.mockResolvedValue(undefined);
+    updateProductMock.mockResolvedValue({ warnings: [] });
 
     const conSobras = formDataOf({
       ...VALID_PRODUCT_FIELDS,
@@ -445,7 +445,7 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
   });
 
   it('la edicion no envia ningun campo de lote aunque el FormData los traiga (R26)', async () => {
-    updateProductMock.mockResolvedValue(undefined);
+    updateProductMock.mockResolvedValue({ warnings: [] });
 
     await updateProductAction(
       'product-1',
@@ -467,7 +467,7 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
   });
 
   it('la edicion no lee la existencia del FormData aunque venga: R9', async () => {
-    updateProductMock.mockResolvedValue(undefined);
+    updateProductMock.mockResolvedValue({ warnings: [] });
 
     await updateProductAction('product-1', MUTATION_INITIAL, formDataOf(VALID_PRODUCT_FIELDS));
 
@@ -527,7 +527,7 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
   });
 
   it('la edicion no lee `unitId` del FormData, aunque venga', async () => {
-    updateProductMock.mockResolvedValue(undefined);
+    updateProductMock.mockResolvedValue({ warnings: [] });
 
     await updateProductAction(
       'product-1',
@@ -631,7 +631,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
   });
 
   it('la edicion sigue sin ningun campo de lote, tampoco purchaseDate, aunque el FormData lo traiga', async () => {
-    updateProductMock.mockResolvedValue(undefined);
+    updateProductMock.mockResolvedValue({ warnings: [] });
 
     await updateProductAction(
       'product-1',
@@ -808,7 +808,7 @@ describe('QC-49 R12 — la empresa sale de getSessionContext y nunca del FormDat
     // Un campo oculto manipulado, o un `curl`: si el borde leyera la entrada, quien invoca la
     // action ELEGIRIA la empresa en cuyo nombre se escribe.
     createProductMock.mockResolvedValue({ id: 'product-1' });
-    updateProductMock.mockResolvedValue(undefined);
+    updateProductMock.mockResolvedValue({ warnings: [] });
 
     const conEmpresaColada = formDataOf({
       ...VALID_PRODUCT_FIELDS,
@@ -837,7 +837,7 @@ describe('QC-49 R12 — la empresa sale de getSessionContext y nunca del FormDat
 describe('QC-49 R19/R31 — ni la empresa sale al navegador ni cambian las firmas publicas', () => {
   it('ningun estado devuelto por las cinco actions contiene la empresa (R19)', async () => {
     createProductMock.mockResolvedValue({ id: 'product-1' });
-    updateProductMock.mockResolvedValue(undefined);
+    updateProductMock.mockResolvedValue({ warnings: [] });
     deleteProductMock.mockResolvedValue(undefined);
     getProductMock.mockResolvedValue({ id: 'product-1', name: 'Bidon 20 L' });
     listProductsMock.mockResolvedValue({
@@ -868,11 +868,61 @@ describe('QC-49 R19/R31 — ni la empresa sale al navegador ni cambian las firma
 
   it('las cinco Server Actions conservan su firma publica (R31)', () => {
     // Un parametro de mas -la empresa colada como argumento, por ejemplo- cambiaria el contrato
-    // que consume la pantalla. La empresa entra por la sesion; la firma no se mueve.
-    expect(createProductAction).toHaveLength(2);
-    expect(updateProductAction).toHaveLength(3);
+    // que consume la pantalla. La empresa entra por la sesion; la firma no se mueve. El ultimo
+    // parametro del alta y de la edicion es la imagen, que viaja aparte del `FormData`.
+    expect(createProductAction).toHaveLength(3);
+    expect(updateProductAction).toHaveLength(4);
     expect(deleteProductAction).toHaveLength(2);
     expect(getProductAction).toHaveLength(1);
     expect(listProductsAction).toHaveLength(1);
+  });
+});
+
+describe('imagen del producto en las Server Actions', () => {
+  const JPEG = { bytes: new Uint8Array([0xff, 0xd8, 0xff, 0]) };
+
+  it('el alta sin imagen no manda la clave image al caso de uso', async () => {
+    createProductMock.mockResolvedValue({ id: 'product-1' });
+
+    await createProductAction(CREATE_INITIAL, formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS }));
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    expect('image' in candidato).toBe(false);
+  });
+
+  it('el alta con imagen pasa los bytes tal cual al caso de uso', async () => {
+    createProductMock.mockResolvedValue({ id: 'product-1' });
+
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS }),
+      JPEG,
+    );
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    expect(candidato.image).toBe(JPEG);
+  });
+
+  it('la edicion distingue imagen ausente, null y nueva', async () => {
+    updateProductMock.mockResolvedValue({ warnings: [] });
+
+    await updateProductAction('product-1', MUTATION_INITIAL, formDataOf(VALID_PRODUCT_FIELDS));
+    await updateProductAction('product-1', MUTATION_INITIAL, formDataOf(VALID_PRODUCT_FIELDS), null);
+    await updateProductAction('product-1', MUTATION_INITIAL, formDataOf(VALID_PRODUCT_FIELDS), JPEG);
+
+    const candidatos = updateProductMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
+    expect('image' in candidatos[0]!).toBe(false);
+    expect(candidatos[1]!.image).toBeNull();
+    expect(candidatos[2]!.image).toBe(JPEG);
+  });
+
+  it('un borrado de imagen fallido no convierte la edicion en error', async () => {
+    updateProductMock.mockResolvedValue({
+      warnings: [{ operation: 'remove', path: 'productos/vieja.jpg', message: 'sin red' }],
+    });
+
+    const result = await updateProductAction('product-1', MUTATION_INITIAL, formDataOf(VALID_PRODUCT_FIELDS), null);
+
+    expect(result).toEqual({ status: 'success' });
   });
 });

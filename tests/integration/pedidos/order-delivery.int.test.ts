@@ -15,6 +15,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import {
   borrarEmpresaDeEntrega,
+  clientesDeEntrega,
   crearCliente,
   crearEmpresaDeEntrega,
   crearLote,
@@ -103,6 +104,7 @@ async function codigoDe(promesa: Promise<unknown>): Promise<string> {
   return 'no-fallo';
 }
 
+// 2026-10-15: las entregas de QC-223 van como un solo cliente en `customers`.
 describe('deliverOrder contra Postgres', () => {
   it('R17: un pedido de la empresa B es order_not_found y un pedido no TERMINADO es action_not_allowed, sin escribir nada', async () => {
     const e = await crearEscenario();
@@ -122,8 +124,7 @@ describe('deliverOrder contra Postgres', () => {
             {
               orderId: orderB,
               deliveryKey: randomUUID(),
-              customerId: e.customerId,
-              allocations: [{ presentationLineId: linesB[0], batchId: e.batchId, packages: 1 }],
+              customers: [{ customerId: e.customerId, allocations: [{ presentationLineId: linesB[0], batchId: e.batchId, packages: 1 }] }],
             },
             e.a.actor,
           ),
@@ -135,8 +136,7 @@ describe('deliverOrder contra Postgres', () => {
             {
               orderId: enCurso,
               deliveryKey: randomUUID(),
-              customerId: e.customerId,
-              allocations: [{ presentationLineId: linesEnCurso[0], batchId: e.batchId, packages: 1 }],
+              customers: [{ customerId: e.customerId, allocations: [{ presentationLineId: linesEnCurso[0], batchId: e.batchId, packages: 1 }] }],
             },
             e.a.actor,
           ),
@@ -166,8 +166,7 @@ describe('deliverOrder contra Postgres', () => {
               {
                 orderId: e.orderId,
                 deliveryKey: randomUUID(),
-                customerId,
-                allocations: [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 1 }],
+                customers: [{ customerId, allocations: [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 1 }] }],
               },
               e.a.actor,
             ),
@@ -190,11 +189,10 @@ describe('deliverOrder contra Postgres', () => {
         {
           orderId: e.orderId,
           deliveryKey,
-          customerId: e.otherCustomerId,
-          allocations: [
+          customers: [{ customerId: e.otherCustomerId, allocations: [
             { presentationLineId: e.lineId, batchId: e.batchId, packages: 2 },
             { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 1 },
-          ],
+          ] }],
         },
         e.a.actor,
       );
@@ -202,12 +200,13 @@ describe('deliverOrder contra Postgres', () => {
       expect(resultado).toEqual({ status: 'delivered', orderStatus: 'TERMINADO' });
 
       const entrega = await prisma.orderDelivery.findFirstOrThrow({ where: { companyId: e.a.companyId } });
+      // 2026-10-15: el cliente ya no se guarda en la entrega sino en cada linea.
       expect(entrega).toMatchObject({
         orderId: e.orderId,
-        customerId: e.otherCustomerId,
         deliveryKey,
         createdBy: e.a.actor.id,
       });
+      expect(await clientesDeEntrega(entrega.id)).toEqual([e.otherCustomerId]);
       const lineas = await prisma.orderDeliveryLine.findMany({
         where: { deliveryId: entrega.id },
         orderBy: { packages: 'desc' },
@@ -245,8 +244,7 @@ describe('deliverOrder contra Postgres', () => {
         {
           orderId: e.orderId,
           deliveryKey: randomUUID(),
-          customerId: e.customerId,
-          allocations: [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 2 }],
+          customers: [{ customerId: e.customerId, allocations: [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 2 }] }],
         },
         e.a.actor,
       );
@@ -256,12 +254,11 @@ describe('deliverOrder contra Postgres', () => {
         {
           orderId: e.orderId,
           deliveryKey: randomUUID(),
-          customerId: e.customerId,
-          allocations: [
+          customers: [{ customerId: e.customerId, allocations: [
             { presentationLineId: e.lineId, batchId: e.batchId, packages: 2 },
             { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
             { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 3 },
-          ],
+          ] }],
         },
         e.a.actor,
       );
@@ -286,11 +283,10 @@ describe('deliverOrder contra Postgres', () => {
       const entrada = {
         orderId: e.orderId,
         deliveryKey: randomUUID(),
-        customerId: e.customerId,
-        allocations: [
+        customers: [{ customerId: e.customerId, allocations: [
           { presentationLineId: e.lineId, batchId: e.batchId, packages: 2 },
           { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
-        ],
+        ] }],
       };
 
       expect(await pedidos.deliverOrder(entrada, e.a.actor)).toEqual({ status: 'delivered', orderStatus: 'TERMINADO' });
@@ -313,12 +309,11 @@ describe('deliverOrder contra Postgres', () => {
       const entrada = {
         orderId: e.orderId,
         deliveryKey: randomUUID(),
-        customerId: e.customerId,
-        allocations: [
+        customers: [{ customerId: e.customerId, allocations: [
           { presentationLineId: e.lineId, batchId: e.batchId, packages: 4 },
           { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
           { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 3 },
-        ],
+        ] }],
       };
 
       expect(await pedidos.deliverOrder(entrada, e.a.actor)).toEqual({ status: 'delivered', orderStatus: 'ENTREGADO' });
@@ -344,18 +339,16 @@ describe('deliverOrder contra Postgres', () => {
       const parcial = {
         orderId: e.orderId,
         deliveryKey: randomUUID(),
-        customerId: e.customerId,
-        allocations: [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 2 }],
+        customers: [{ customerId: e.customerId, allocations: [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 2 }] }],
       };
       const resto = {
         orderId: e.orderId,
         deliveryKey: randomUUID(),
-        customerId: e.customerId,
-        allocations: [
+        customers: [{ customerId: e.customerId, allocations: [
           { presentationLineId: e.lineId, batchId: e.batchId, packages: 2 },
           { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
           { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 3 },
-        ],
+        ] }],
       };
 
       expect(await pedidos.deliverOrder(parcial, e.a.actor)).toEqual({ status: 'delivered', orderStatus: 'TERMINADO' });
@@ -387,11 +380,10 @@ describe('deliverOrder contra Postgres', () => {
           {
             orderId: e.orderId,
             deliveryKey: randomUUID(),
-            customerId: e.customerId,
-            allocations: [
+            customers: [{ customerId: e.customerId, allocations: [
               { presentationLineId: e.lineId, batchId: e.batchId, packages: 1 },
               { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 4 },
-            ],
+            ] }],
           },
           e.a.actor,
         ),
@@ -409,6 +401,315 @@ describe('deliverOrder contra Postgres', () => {
   });
 });
 
+describe('QC-282 deliverOrder con varios clientes contra Postgres', () => {
+  type Asignacion = { presentationLineId: string; batchId: string; packages: number };
+  const cliente = (customerId: string, allocations: Asignacion[]) => ({ customerId, allocations });
+  const entrada = (e: Escenario, customers: ReturnType<typeof cliente>[], deliveryKey: string = randomUUID()) => ({
+    orderId: e.orderId,
+    deliveryKey,
+    customers,
+  });
+
+  async function nadaEscrito(e: Escenario, antes: Awaited<ReturnType<typeof pedido>>): Promise<void> {
+    expect(await escritoPorEntregas(e.a.companyId)).toEqual({ entregas: 0, lineas: 0, asientos: 0 });
+    expect(await stockDeLote(e.batchId)).toBe('8.0000');
+    expect(await stockDeLote(e.secondBatchId)).toBe('6.0000');
+    expect(await stockDeLote(e.smallBatchId)).toBe('6.0000');
+    expect(await stockDeProducto(e.productId)).toBe('14.0000');
+    expect(await stockDeProducto(e.smallProductId)).toBe('6.0000');
+    expect(await pedido(e.orderId)).toEqual(antes);
+  }
+
+  it('QC-282 R25, R26: guarda una sola entrega sin cliente propio, una linea por cliente y lote, un asiento por lote con la suma, y no toca orders.customer_id', async () => {
+    const e = await crearEscenario();
+    try {
+      const deliveryKey = randomUUID();
+      const resultado = await pedidos.deliverOrder(
+        entrada(
+          e,
+          [
+            cliente(e.customerId, [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 2 }]),
+            cliente(e.otherCustomerId, [
+              { presentationLineId: e.lineId, batchId: e.batchId, packages: 1 },
+              { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 1 },
+            ]),
+          ],
+          deliveryKey,
+        ),
+        e.a.actor,
+      );
+
+      expect(resultado).toEqual({ status: 'delivered', orderStatus: 'TERMINADO' });
+      expect(await escritoPorEntregas(e.a.companyId)).toEqual({ entregas: 1, lineas: 3, asientos: 2 });
+
+      const entrega = await prisma.orderDelivery.findFirstOrThrow({ where: { companyId: e.a.companyId } });
+      expect(entrega).toMatchObject({ orderId: e.orderId, deliveryKey, createdBy: e.a.actor.id });
+      expect(await clientesDeEntrega(entrega.id)).toEqual([e.customerId, e.otherCustomerId].sort());
+
+      const lineas = await prisma.orderDeliveryLine.findMany({ where: { deliveryId: entrega.id } });
+      const porCliente = lineas
+        .map((l) => [l.customerId === e.customerId ? 'A' : 'B', l.orderPresentationLineId, l.batchId, l.packages, l.quantity.toFixed(4)])
+        .sort((x, y) => String(x[0]).localeCompare(String(y[0])) || Number(y[3]) - Number(x[3]));
+      expect(porCliente).toEqual([
+        ['A', e.lineId, e.batchId, 2, '4.0000'],
+        ['B', e.lineId, e.batchId, 1, '2.0000'],
+        ['B', e.smallLineId, e.smallBatchId, 1, '1.0000'],
+      ]);
+
+      const asientos = await prisma.inventoryMovement.findMany({
+        where: { orderDeliveryId: entrega.id },
+        orderBy: { quantity: 'asc' },
+      });
+      expect(asientos.map((m) => [m.kind, m.batchId, m.quantity.toFixed(4)])).toEqual([
+        ['delivery', e.batchId, '-6.0000'],
+        ['delivery', e.smallBatchId, '-1.0000'],
+      ]);
+
+      expect(await stockDeLote(e.batchId)).toBe('2.0000');
+      expect(await stockDeLote(e.smallBatchId)).toBe('5.0000');
+      const fila = await pedido(e.orderId);
+      expect(fila.status).toBe('TERMINADO');
+      expect(fila.customerId).toBe(e.customerId);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('QC-282 R27: si la suma de los clientes completa todas las presentaciones el pedido pasa a ENTREGADO', async () => {
+    const e = await crearEscenario();
+    try {
+      const resultado = await pedidos.deliverOrder(
+        entrada(e, [
+          cliente(e.customerId, [
+            { presentationLineId: e.lineId, batchId: e.batchId, packages: 4 },
+            { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 1 },
+          ]),
+          cliente(e.otherCustomerId, [
+            { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+            { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 2 },
+          ]),
+        ]),
+        e.a.actor,
+      );
+
+      expect(resultado).toEqual({ status: 'delivered', orderStatus: 'ENTREGADO' });
+      expect((await pedido(e.orderId)).status).toBe('ENTREGADO');
+      expect(await escritoPorEntregas(e.a.companyId)).toEqual({ entregas: 1, lineas: 4, asientos: 3 });
+      expect(await stockDeLote(e.smallBatchId)).toBe('3.0000');
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('QC-282 R27: si a una presentacion le siguen faltando envases el pedido sigue TERMINADO', async () => {
+    const e = await crearEscenario();
+    try {
+      const resultado = await pedidos.deliverOrder(
+        entrada(e, [
+          cliente(e.customerId, [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 4 }]),
+          cliente(e.otherCustomerId, [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 }]),
+        ]),
+        e.a.actor,
+      );
+
+      expect(resultado).toEqual({ status: 'delivered', orderStatus: 'TERMINADO' });
+      expect((await pedido(e.orderId)).status).toBe('TERMINADO');
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('QC-282 R21: el mismo cliente dos veces, un cliente sin envases, una linea de otro pedido o la forma de QC-223 son invalid_input sin escribir nada', async () => {
+    const e = await crearEscenario();
+    try {
+      const antes = await pedido(e.orderId);
+      const presentationId = (await prisma.orderPresentationLine.findUniqueOrThrow({ where: { id: e.lineId } })).presentationId;
+      const { lineIds: deOtroPedido } = await crearPedido(e.a, 'TERMINADO', e.customerId, [{ presentationId, packages: 2 }]);
+      const una = { presentationLineId: e.lineId, batchId: e.batchId, packages: 1 };
+      const invalidas: unknown[] = [
+        entrada(e, [cliente(e.customerId, [una]), cliente(e.customerId, [{ ...una, batchId: e.secondBatchId }])]),
+        entrada(e, [cliente(e.customerId, [una]), cliente(e.otherCustomerId, [])]),
+        entrada(e, []),
+        entrada(e, [cliente(e.customerId, [una]), cliente(e.otherCustomerId, [{ ...una, presentationLineId: deOtroPedido[0] as string }])]),
+        { orderId: e.orderId, deliveryKey: randomUUID(), customerId: e.customerId, allocations: [una] },
+      ];
+
+      for (const invalida of invalidas) {
+        expect(await codigoDe(pedidos.deliverOrder(invalida, e.a.actor))).toBe('invalid_input');
+      }
+      await nadaEscrito(e, antes);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('QC-282 R22: un segundo cliente de la empresa B, dado de baja o sin forma de uuid es customer_not_found sin escribir nada', async () => {
+    const e = await crearEscenario();
+    try {
+      const antes = await pedido(e.orderId);
+      const customerB = await crearCliente(e.b, 'Ajeno');
+      const baja = await crearCliente(e.a, 'DeBaja', new Date());
+      const una = { presentationLineId: e.lineId, batchId: e.batchId, packages: 1 };
+
+      for (const segundo of [customerB, baja, 'cliente-b']) {
+        expect(
+          await codigoDe(pedidos.deliverOrder(entrada(e, [cliente(e.customerId, [una]), cliente(segundo, [una])]), e.a.actor)),
+        ).toBe('customer_not_found');
+      }
+      await nadaEscrito(e, antes);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('QC-282 R23: dos clientes que por separado caben pero juntos superan lo que falta a una presentacion es delivery_exceeds_remaining sin escribir nada', async () => {
+    const e = await crearEscenario();
+    try {
+      const antes = await pedido(e.orderId);
+      // A la presentacion de 2 L le faltan 5: 3 + 3 los supera, y los lotes tienen de sobra.
+      const codigo = await codigoDe(
+        pedidos.deliverOrder(
+          entrada(e, [
+            cliente(e.customerId, [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 3 }]),
+            cliente(e.otherCustomerId, [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 3 }]),
+          ]),
+          e.a.actor,
+        ),
+      );
+
+      expect(codigo).toBe('delivery_exceeds_remaining');
+      await nadaEscrito(e, antes);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('QC-282 R24: dos clientes que juntos superan los envases de un lote es delivery_batch_insufficient sin escribir nada de la entrega', async () => {
+    const e = await crearEscenario();
+    try {
+      const antes = await pedido(e.orderId);
+      // El lote tiene 4 envases: 3 + 2 los superan; la presentacion admite 5.
+      const codigo = await codigoDe(
+        pedidos.deliverOrder(
+          entrada(e, [
+            cliente(e.customerId, [
+              { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 1 },
+              { presentationLineId: e.lineId, batchId: e.batchId, packages: 3 },
+            ]),
+            cliente(e.otherCustomerId, [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 2 }]),
+          ]),
+          e.a.actor,
+        ),
+      );
+
+      expect(codigo).toBe('delivery_batch_insufficient');
+      await nadaEscrito(e, antes);
+      const negativos = await prisma.productBatch.count({ where: { companyId: e.a.companyId, stock: { lt: 0 } } });
+      expect(negativos).toBe(0);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('QC-282 R28: la misma clave dos veces con varios clientes deja una sola entrega y la segunda es already_registered', async () => {
+    const e = await crearEscenario();
+    try {
+      const misma = entrada(e, [
+        cliente(e.customerId, [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 2 }]),
+        cliente(e.otherCustomerId, [
+          { presentationLineId: e.lineId, batchId: e.batchId, packages: 1 },
+          { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 1 },
+        ]),
+      ]);
+
+      expect(await pedidos.deliverOrder(misma, e.a.actor)).toEqual({ status: 'delivered', orderStatus: 'TERMINADO' });
+      expect(await pedidos.deliverOrder(misma, e.a.actor)).toEqual({ status: 'already_registered', orderStatus: 'TERMINADO' });
+
+      expect(await escritoPorEntregas(e.a.companyId)).toEqual({ entregas: 1, lineas: 3, asientos: 2 });
+      expect(await stockDeLote(e.batchId)).toBe('2.0000');
+      expect(await stockDeLote(e.smallBatchId)).toBe('5.0000');
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('QC-282 R29: si falla el lote del segundo cliente despues de despachar lo del primero, no queda nada escrito', async () => {
+    const e = await crearEscenario();
+    try {
+      const antes = await pedido(e.orderId);
+      // Se despacha primero la presentacion de 1 L (primer cliente); el segundo pide 4 envases a un
+      // lote que tiene 3.
+      const codigo = await codigoDe(
+        pedidos.deliverOrder(
+          entrada(e, [
+            cliente(e.customerId, [{ presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 2 }]),
+            cliente(e.otherCustomerId, [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 4 }]),
+          ]),
+          e.a.actor,
+        ),
+      );
+
+      expect(codigo).toBe('delivery_batch_insufficient');
+      await nadaEscrito(e, antes);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  // Cruce QC-281 x QC-282 (2026-10-15): el tope por envases reales limita la suma de los clientes.
+  // La presentacion de 2 L tiene plan 5 y se le fijan 4 envases reales (con motivo, por el CHECK).
+  async function conRealesEnLaLinea(e: Escenario): Promise<void> {
+    await prisma.orderPresentationLine.update({
+      where: { id: e.lineId },
+      data: { packedPackages: 4, packedReason: 'merma', packedReasonOther: null },
+    });
+  }
+
+  it('QC-282 R23 + QC-281: A=2 y B=3 con packedPackages: 4 sobre un plan de 5 es delivery_exceeds_remaining sin escribir nada', async () => {
+    const e = await crearEscenario();
+    try {
+      await conRealesEnLaLinea(e);
+      const antes = await pedido(e.orderId);
+      const codigo = await codigoDe(
+        pedidos.deliverOrder(
+          entrada(e, [
+            cliente(e.customerId, [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 2 }]),
+            cliente(e.otherCustomerId, [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 3 }]),
+          ]),
+          e.a.actor,
+        ),
+      );
+
+      expect(codigo).toBe('delivery_exceeds_remaining');
+      await nadaEscrito(e, antes);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
+  it('QC-282 R23 + QC-281: A=1 y B=3 con packedPackages: 4 se acepta y el pedido sigue TERMINADO', async () => {
+    const e = await crearEscenario();
+    try {
+      await conRealesEnLaLinea(e);
+      const resultado = await pedidos.deliverOrder(
+        entrada(e, [
+          cliente(e.customerId, [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 1 }]),
+          cliente(e.otherCustomerId, [{ presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 3 }]),
+        ]),
+        e.a.actor,
+      );
+
+      // A la presentacion de 1 L le siguen faltando 3.
+      expect(resultado).toEqual({ status: 'delivered', orderStatus: 'TERMINADO' });
+      expect(await escritoPorEntregas(e.a.companyId)).toEqual({ entregas: 1, lineas: 2, asientos: 2 });
+      expect(await stockDeLote(e.batchId)).toBe('6.0000');
+      expect(await stockDeLote(e.secondBatchId)).toBe('0.0000');
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+});
+
 describe('getOrderDelivery contra Postgres', () => {
   it('R5, R6, R7, R9: devuelve pedidos, entregados y faltan por linea, los lotes entregables y el cliente vivo del pedido', async () => {
     const e = await crearEscenario();
@@ -417,8 +718,7 @@ describe('getOrderDelivery contra Postgres', () => {
         {
           orderId: e.orderId,
           deliveryKey: randomUUID(),
-          customerId: e.customerId,
-          allocations: [{ presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 3 }],
+          customers: [{ customerId: e.customerId, allocations: [{ presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 3 }] }],
         },
         e.a.actor,
       );

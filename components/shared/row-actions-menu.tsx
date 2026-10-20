@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ComponentType, type ReactNode } from 'react';
+import { Fragment, useState, type ComponentType, type ReactNode } from 'react';
 
 import { EllipsisIcon, MoreVerticalIcon, XIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -11,8 +11,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +50,8 @@ export type RowActionMenuItem = {
   readonly destructive?: boolean;
   /** `data-testid` de ESTE item del menu. Sin valor, no lleva ninguno. */
   readonly testId?: string;
+  /** Línea divisoria delante de este ítem. En el primer ítem no se pinta. */
+  readonly separatorBefore?: boolean;
 } & (
   | { readonly onSelect: () => void; readonly href?: undefined }
   /** Item enlace: se pinta como `<a href>` y navega a esa ruta. */
@@ -74,6 +78,11 @@ export type RowActionsMenuProps = {
 
 const ACTIONS_FALLBACK = 'Acciones';
 const CLOSE_FALLBACK = 'Cerrar';
+
+/** El primer ítem no lleva línea delante: no hay nada que separar. */
+function hasSeparatorBefore(item: RowActionMenuItem, index: number): boolean {
+  return index > 0 && item.separatorBefore === true;
+}
 
 const CENTERED_ITEM_CLASS = 'min-h-12 w-full justify-start gap-3 px-3 text-base font-normal';
 
@@ -121,23 +130,25 @@ export function RowActionsMenu({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent side="bottom" align="end" className={`min-w-[200px] ${CONTENT_PADDING}`}>
-        {items.map((item) => {
+        {items.map((item, index) => {
           const Icon = item.icon;
           return (
-            <DropdownMenuItem
-              key={item.key}
-              variant={item.destructive ? 'destructive' : 'default'}
-              disabled={item.disabled}
-              data-testid={item.testId}
-              className={ITEM_TOUCH_TARGET}
-              render={item.href === undefined ? undefined : <Link href={item.href} />}
-              // El primitivo de Base UI (`components/ui/dropdown-menu.tsx`) expone `onClick`, no
-              // `onSelect`: aqui se traduce el callback semantico del item a ese evento.
-              onClick={item.onSelect}
-            >
-              <Icon aria-hidden="true" />
-              {item.label}
-            </DropdownMenuItem>
+            <Fragment key={item.key}>
+              {hasSeparatorBefore(item, index) ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuItem
+                variant={item.destructive ? 'destructive' : 'default'}
+                disabled={item.disabled}
+                data-testid={item.testId}
+                className={ITEM_TOUCH_TARGET}
+                render={item.href === undefined ? undefined : <Link href={item.href} />}
+                // El primitivo de Base UI (`components/ui/dropdown-menu.tsx`) expone `onClick`, no
+                // `onSelect`: aqui se traduce el callback semantico del item a ese evento.
+                onClick={item.onSelect}
+              >
+                <Icon aria-hidden="true" />
+                {item.label}
+              </DropdownMenuItem>
+            </Fragment>
           );
         })}
       </DropdownMenuContent>
@@ -195,8 +206,11 @@ function CenteredRowActions({
         </div>
 
         <div className="flex flex-col">
-          {items.map((item) => {
+          {items.map((item, index) => {
             const Icon = item.icon;
+            const separator = hasSeparatorBefore(item, index) ? (
+              <Separator className="my-1" />
+            ) : null;
             const select = () => {
               item.onSelect?.();
               setOpen(false);
@@ -208,32 +222,36 @@ function CenteredRowActions({
 
             if (item.href !== undefined && item.disabled !== true) {
               return (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  data-testid={item.testId}
-                  className={cn(buttonVariants({ variant: 'ghost' }), className)}
-                  onClick={select}
-                >
-                  <Icon aria-hidden="true" />
-                  {item.label}
-                </Link>
+                <Fragment key={item.key}>
+                  {separator}
+                  <Link
+                    href={item.href}
+                    data-testid={item.testId}
+                    className={cn(buttonVariants({ variant: 'ghost' }), className)}
+                    onClick={select}
+                  >
+                    <Icon aria-hidden="true" />
+                    {item.label}
+                  </Link>
+                </Fragment>
               );
             }
 
             return (
-              <Button
-                key={item.key}
-                type="button"
-                variant="ghost"
-                disabled={item.disabled}
-                data-testid={item.testId}
-                className={className}
-                onClick={select}
-              >
-                <Icon aria-hidden="true" />
-                {item.label}
-              </Button>
+              <Fragment key={item.key}>
+                {separator}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={item.disabled}
+                  data-testid={item.testId}
+                  className={className}
+                  onClick={select}
+                >
+                  <Icon aria-hidden="true" />
+                  {item.label}
+                </Button>
+              </Fragment>
             );
           })}
         </div>

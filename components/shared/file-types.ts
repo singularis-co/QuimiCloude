@@ -66,15 +66,24 @@ export function describeAcceptedTypes(accept: readonly UploadableFileType[]): st
   return `${labels.slice(0, -1).join(', ')} o ${labels[labels.length - 1]}`;
 }
 
+/**
+ * Unidades DECIMALES (SI): 1 KB = 1000 B y 1 MB = 1 000 000 B. Los limites de los modulos se
+ * escriben en bytes decimales (`4_400_000`, el corte del cuerpo de una Server Action en Vercel),
+ * y la importacion ya los describe asi; con 1024² un limite de 4 400 000 B saldria «4.2 MB» y un
+ * archivo rechazado por pasarse podria verse «4.3 MB», por debajo del limite anunciado.
+ */
+const BYTES_PER_KB = 1000;
+const BYTES_PER_MB = 1000 * 1000;
+
 /** Tamano en MB con como mucho un decimal, para los mensajes de limite. */
 export function formatMegabytes(bytes: number): string {
-  const megabytes = bytes / (1024 * 1024);
+  const megabytes = Math.round((bytes / BYTES_PER_MB) * 10) / 10;
   return Number.isInteger(megabytes) ? `${megabytes}` : megabytes.toFixed(1);
 }
 
 /** Tamaño legible de un archivo: `480 KB`, `2.1 MB`. Para el pie de la miniatura. */
 export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < BYTES_PER_KB) return `${bytes} B`;
+  if (bytes < BYTES_PER_MB) return `${Math.round(bytes / BYTES_PER_KB)} KB`;
   return `${formatMegabytes(bytes)} MB`;
 }

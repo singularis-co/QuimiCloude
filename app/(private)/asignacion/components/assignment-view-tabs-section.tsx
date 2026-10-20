@@ -31,7 +31,6 @@ export async function AssignmentViewTabsSection({
     por_empacar: (query) => asignaciones.listPackingOrders(actor, query),
     por_acondicionar: (query) => asignaciones.listConditioningOrders(actor, query),
     acondicionados: (query) => asignaciones.listConditionedOrders(actor, query),
-    acondicionados_entregados: (query) => asignaciones.listDeliveredConditionedOrders(actor, query),
   });
 
   return <AssignmentViewTabs current={current} views={views} counts={counts} />;

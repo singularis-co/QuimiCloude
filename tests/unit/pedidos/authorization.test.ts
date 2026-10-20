@@ -119,6 +119,10 @@ function dobles() {
   // ni a saber que su consulta traia campos no declarados.
   const log = { ignoredFields: explota('log.ignoredFields') }
 
+  const deliveryProgress = {
+    listDeliveryProgressByIdsIncludingDeleted: explota('deliveryProgress.listDeliveryProgressByIdsIncludingDeleted'),
+  }
+
   const llamadas = () =>
     [
       ...Object.values(orders as unknown as Record<string, ReturnType<typeof vi.fn>>),
@@ -128,10 +132,11 @@ function dobles() {
       ...Object.values(presentations as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(packaging as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(log as unknown as Record<string, ReturnType<typeof vi.fn>>),
+      deliveryProgress.listDeliveryProgressByIdsIncludingDeleted,
       unitOfWork.run as unknown as ReturnType<typeof vi.fn>,
     ] as readonly ReturnType<typeof vi.fn>[]
 
-  return { orders, recipes, products, units, presentations, packaging, customerCatalog, log, unitOfWork, llamadas }
+  return { orders, recipes, products, units, presentations, packaging, customerCatalog, log, deliveryProgress, unitOfWork, llamadas }
 }
 
 /** Los dobles de la invocacion en curso. Se renuevan en CADA caso para que el contador de uno
@@ -148,6 +153,7 @@ function depsDeTurno() {
     packaging: enCurso.packaging,
     customerCatalog: enCurso.customerCatalog,
     log: enCurso.log,
+    deliveryProgress: enCurso.deliveryProgress,
     unitOfWork: enCurso.unitOfWork,
   }
 }

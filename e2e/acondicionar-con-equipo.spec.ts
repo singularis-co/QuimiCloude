@@ -200,6 +200,8 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
   // El equipo y los miembros de grupo no declaran `@relation`: sus FK compuestas van a mano en la
   // migración, así que se borran explícitamente antes que pedidos, grupos y personas.
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    // Comenzar anota en el registro de ejecucion, que apunta al pedido.
+    () => prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.orderConditioningTeamMember.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.order.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.recipe.deleteMany({ where: { companyId: { in: ids } } }),

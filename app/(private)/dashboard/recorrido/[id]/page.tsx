@@ -6,7 +6,7 @@ import {
   parseExecutionTraceListParams,
   type ExecutionTraceListSearchParams,
 } from '@/app/(private)/dashboard/components';
-import { getExecutionTraceAction } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
+import { getExecutionEvidenceAction, getExecutionTraceAction } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
@@ -31,12 +31,12 @@ export default async function ExecutionTracePage({
 
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const backHref = executionTraceListHref(parseExecutionTraceListParams(query));
-  const result = await getExecutionTraceAction(id);
+  const [result, evidence] = await Promise.all([getExecutionTraceAction(id), getExecutionEvidenceAction(id)]);
 
   if (result.status === 'error') {
     if (result.code === 'order_not_found') notFound();
     return <ExecutionTraceDetailError error={result} backHref={backHref} />;
   }
 
-  return <ExecutionTraceDetail trace={result.data} backHref={backHref} />;
+  return <ExecutionTraceDetail trace={result.data} evidence={evidence} backHref={backHref} />;
 }

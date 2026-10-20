@@ -1,7 +1,15 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EntityImage, MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
+import {
+  ENTITY_IMAGE_ZOOM_LABEL,
+  ENTITY_IMAGE_ZOOM_TESTID,
+  ENTITY_IMAGE_ZOOM_TRIGGER_TESTID,
+  EntityImage,
+  MISSING_IMAGE_SRC,
+} from '@/components/shared/entity-image';
+
+import { setupUser } from '../../helpers/user-event';
 
 afterEach(cleanup);
 
@@ -79,31 +87,68 @@ describe('EntityImage size="fill"', () => {
 });
 
 describe('EntityImage size="thumbnail" (defecto)', () => {
-  it('R28: sin size pinta la miniatura de hoy, sin envoltorio', () => {
+  it('R28: sin size pinta la miniatura de 80px, lazy, dentro del boton que la amplia', () => {
     const { container } = render(<EntityImage path="/p.png" name="Producto" testId="thumb" />);
 
     const imagen = screen.getByTestId('thumb');
-    expect(container.firstElementChild).toBe(imagen);
+    const boton = screen.getByTestId(ENTITY_IMAGE_ZOOM_TRIGGER_TESTID);
+    expect(container.firstElementChild).toBe(boton);
+    expect(imagen.parentElement).toBe(boton);
     expect(imagen.tagName).toBe('IMG');
     expect(imagen).toHaveAttribute('src', '/p.png');
     expect(imagen).toHaveAttribute('alt', 'Producto');
-    expect(imagen).toHaveAttribute('width', '60');
-    expect(imagen).toHaveAttribute('height', '60');
+    expect(imagen).toHaveAttribute('width', '80');
+    expect(imagen).toHaveAttribute('height', '80');
     expect(imagen).toHaveAttribute('loading', 'lazy');
     expect(imagen).toHaveAttribute('decoding', 'async');
-    expect(imagen).toHaveStyle({ width: '60px', height: '60px' });
+    expect(imagen).toHaveStyle({ width: '80px', height: '80px' });
     expect(imagen.className).toBe('shrink-0 rounded-md border object-cover');
+  });
+
+  it('al pulsarla abre la imagen en grande y la X la cierra', async () => {
+    const user = setupUser();
+    render(<EntityImage path="/p.png" name="Producto" testId="thumb" />);
+    expect(screen.queryByTestId(ENTITY_IMAGE_ZOOM_TESTID)).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: `${ENTITY_IMAGE_ZOOM_LABEL}: Producto` }));
+
+    const grande = await screen.findByTestId(ENTITY_IMAGE_ZOOM_TESTID);
+    expect(grande).toHaveAttribute('src', '/p.png');
+    expect(grande).toHaveAttribute('loading', 'lazy');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByTestId(ENTITY_IMAGE_ZOOM_TESTID)).toBeNull());
+  });
+
+  it('el marcador de «sin imagen» no se puede ampliar', () => {
+    render(<EntityImage path={null} name="Producto" testId="thumb" />);
+
+    expect(screen.getByTestId(ENTITY_IMAGE_ZOOM_TRIGGER_TESTID)).toBeDisabled();
+    expect(screen.queryByRole('button', { name: new RegExp(ENTITY_IMAGE_ZOOM_LABEL) })).toBeNull();
+  });
+
+  it('si la imagen falla al cargar, la misma <img> pasa al marcador y deja de ampliarse', () => {
+    render(<EntityImage path="/rota.png" name="Producto" testId="thumb" />);
+    const imagen = screen.getByTestId('thumb');
+
+    fireEvent.error(imagen);
+
+    expect(imagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(screen.getByTestId(ENTITY_IMAGE_ZOOM_TRIGGER_TESTID)).toBeDisabled();
   });
 
   it('R28: size="thumbnail" explicito da el mismo marcado que sin size', () => {
     const { container: sinSize } = render(<EntityImage path={null} name="" testId="thumb" />);
-    const htmlSinSize = sinSize.innerHTML;
+    // Los `id` los genera el disparador del dialogo en cada montaje: no son marcado propio.
+    const sinIds = (html: string) => html.replace(/ id="[^"]*"/g, '');
+    const htmlSinSize = sinIds(sinSize.innerHTML);
     cleanup();
 
     const { container: conSize } = render(
       <EntityImage size="thumbnail" path={null} name="" testId="thumb" />,
     );
-    expect(conSize.innerHTML).toBe(htmlSinSize);
+    expect(sinIds(conSize.innerHTML)).toBe(htmlSinSize);
     expect(screen.getByTestId('thumb')).toHaveAttribute('alt', '');
     expect(screen.getByTestId('thumb')).toHaveAttribute('src', MISSING_IMAGE_SRC);
   });

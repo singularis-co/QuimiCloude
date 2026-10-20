@@ -33,7 +33,10 @@ import {
   OrderRowActions,
   acceptsDistributionEdit,
   isFinalOrderStatus,
+  orderRowActionsSpec,
+  type OrderRowAction,
 } from '@/app/(private)/pedidos/components';
+import { RowActionsMenu } from '@/components/shared/row-actions-menu';
 import {
   ORDER_STATUS_VALUES,
   formatOrderNumber,
@@ -86,7 +89,9 @@ function pedido(status: OrderStatus, overrides: Partial<OrderSummary> = {}): Ord
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -461,11 +466,11 @@ describe('la accion «Cliente»', () => {
 
     expect(screen.getAllByRole('menuitem').map((item) => item.getAttribute('data-testid'))).toEqual([
       'order-action-edit',
-      'order-action-cancel',
-      'order-action-delete',
       RESPONSABLES_TESTID,
       ORDER_ACTION_CUSTOMER_TESTID,
       ORDER_ACTION_DISTRIBUTION_TESTID,
+      'order-action-cancel',
+      'order-action-delete',
     ]);
   });
 });
@@ -508,7 +513,7 @@ describe('la accion «Entregar»', () => {
     expect(document.querySelector(`[data-testid="${ORDER_ACTION_DELIVER_TESTID}"]`)).toBeNull();
   });
 
-  it('R4: va al final del menu', async () => {
+  it('R4: va la ultima antes de «Cancelar» y «Eliminar»', async () => {
     render(<OrderRowActions order={pedido('TERMINADO')} canEditCustomer canDeliver />);
 
     abrirMenu();
@@ -516,13 +521,12 @@ describe('la accion «Entregar»', () => {
 
     expect(screen.getAllByRole('menuitem').map((item) => item.getAttribute('data-testid'))).toEqual([
       'order-action-edit',
-      'order-action-cancel',
-      'order-action-delete',
       RESPONSABLES_TESTID,
       ORDER_ACTION_CUSTOMER_TESTID,
-      // 2026-10-09: «Entregas» se ofrece en TERMINADO y va justo delante de «Entregar».
       'order-action-deliveries',
       ORDER_ACTION_DELIVER_TESTID,
+      'order-action-cancel',
+      'order-action-delete',
     ]);
   });
 });
@@ -571,13 +575,205 @@ describe('la accion «Entregas»', () => {
     expect(document.querySelector(`[data-testid="${ENTREGAS_TESTID}"]`)).toBeNull();
   });
 
-  it('R5: va justo delante de «Entregar», que sigue al final del menu', async () => {
+  it('R5: va justo delante de «Entregar»', async () => {
     render(<OrderRowActions order={pedido('TERMINADO')} canDeliver />);
 
     abrirMenu();
     await screen.findByTestId(ENTREGAS_TESTID);
 
     const ids = screen.getAllByRole('menuitem').map((item) => item.getAttribute('data-testid'));
-    expect(ids.slice(-2)).toEqual([ENTREGAS_TESTID, ORDER_ACTION_DELIVER_TESTID]);
+    expect(ids.indexOf(ORDER_ACTION_DELIVER_TESTID)).toBe(ids.indexOf(ENTREGAS_TESTID) + 1);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// El menu como datos: `orderRowActionsSpec` alimenta la fila y la tarjeta (R10, R11, R12).
+// La tabla de reglas esta escrita a mano, sin llamar a los predicados de produccion.
+// ---------------------------------------------------------------------------------------------
+
+const ORDEN_R11: readonly OrderRowAction[] = [
+  'edit',
+  'responsibles',
+  'customer',
+  'distribution',
+  'deliveries',
+  'deliver',
+  'cancel',
+  'delete',
+];
+
+const TESTID_DE: Readonly<Record<OrderRowAction, string>> = {
+  edit: 'order-action-edit',
+  responsibles: 'order-action-responsibles',
+  customer: 'order-action-customer',
+  distribution: 'order-action-distribution',
+  deliveries: 'order-action-deliveries',
+  deliver: 'order-action-deliver',
+  cancel: 'order-action-cancel',
+  delete: 'order-action-delete',
+};
+
+const FINALES: readonly OrderStatus[] = [
+  'POR_EMPACAR',
+  'EN_EMPAQUE',
+  'ENTREGADO',
+  'CANCELADO',
+  'POR_ACONDICIONAR',
+  'EN_ACONDICIONAMIENTO',
+  'TERMINADO',
+];
+
+type Permisos = {
+  readonly canEditDistribution: boolean;
+  readonly canEditCustomer: boolean;
+  readonly canDeliver: boolean;
+};
+
+/** Lo que el menu debe ofrecer: clave ausente = omitido; valor = si va deshabilitado. */
+function esperado(status: OrderStatus, permisos: Permisos): Partial<Record<OrderRowAction, boolean>> {
+  const final = FINALES.includes(status);
+  const reglas: Partial<Record<OrderRowAction, boolean>> = { edit: final, responsibles: false };
+  if (permisos.canEditCustomer) reglas.customer = status === 'ENTREGADO' || status === 'CANCELADO';
+  if (permisos.canEditDistribution && status === 'POR_EMPACAR') reglas.distribution = false;
+  if (status === 'TERMINADO' || status === 'ENTREGADO') reglas.deliveries = false;
+  if (permisos.canDeliver && status === 'TERMINADO') reglas.deliver = false;
+  reglas.cancel = final;
+  reglas.delete = final;
+  return reglas;
+}
+
+const COMBINACIONES: readonly Permisos[] = [false, true].flatMap((canEditDistribution) =>
+  [false, true].flatMap((canEditCustomer) =>
+    [false, true].map((canDeliver) => ({ canEditDistribution, canEditCustomer, canDeliver })),
+  ),
+);
+
+const TODOS_LOS_PERMISOS: Permisos = { canEditDistribution: true, canEditCustomer: true, canDeliver: true };
+
+function especificacion(
+  status: OrderStatus,
+  permisos: Permisos = TODOS_LOS_PERMISOS,
+  onAction: (action: OrderRowAction, order: OrderSummary) => void = vi.fn(),
+) {
+  return orderRowActionsSpec({ order: pedido(status), ...permisos, onAction });
+}
+
+function claves(status: OrderStatus, permisos: Permisos = TODOS_LOS_PERMISOS): string[] {
+  return especificacion(status, permisos).items.map((item) => item.key);
+}
+
+describe('orderRowActionsSpec: orden, separador y destructivos (R11)', () => {
+  it('R11: en POR_EMPACAR con todos los permisos, Editar, Responsables, Cliente, Reparto y unidad, Cancelar, Eliminar', () => {
+    expect(claves('POR_EMPACAR')).toEqual(['edit', 'responsibles', 'customer', 'distribution', 'cancel', 'delete']);
+  });
+
+  it('R11: en TERMINADO con todos los permisos, Entregas y Entregar van antes de Cancelar y Eliminar', () => {
+    expect(claves('TERMINADO')).toEqual([
+      'edit',
+      'responsibles',
+      'customer',
+      'deliveries',
+      'deliver',
+      'cancel',
+      'delete',
+    ]);
+  });
+
+  it.each(ORDER_STATUS_VALUES)('R11: en %s, con cualquier permiso, los items siguen el orden del menu', (status) => {
+    for (const permisos of COMBINACIONES) {
+      const orden = claves(status, permisos);
+      expect(orden).toEqual(ORDEN_R11.filter((accion) => orden.includes(accion)));
+    }
+  });
+
+  it.each(ORDER_STATUS_VALUES)('R11: en %s solo «Cancelar» lleva separador delante', (status) => {
+    const conSeparador = especificacion(status).items.filter((item) => item.separatorBefore === true);
+    expect(conSeparador.map((item) => item.key)).toEqual(['cancel']);
+  });
+
+  it.each(ORDER_STATUS_VALUES)('R11: en %s «Cancelar» y «Eliminar» son los unicos destructivos', (status) => {
+    const destructivos = especificacion(status).items.filter((item) => item.destructive === true);
+    expect(destructivos.map((item) => item.key)).toEqual(['cancel', 'delete']);
+  });
+
+  it('R11: cada item conserva su data-testid de hoy', () => {
+    for (const status of ['POR_EMPACAR', 'TERMINADO'] as const) {
+      for (const item of especificacion(status).items) {
+        expect(item.testId).toBe(TESTID_DE[item.key as OrderRowAction]);
+      }
+    }
+  });
+
+  it('R11, R14: abierto el menu, hay una linea divisoria justo antes de «Cancelar»', async () => {
+    render(<OrderRowActions order={pedido('PENDIENTE')} />);
+
+    abrirMenu();
+    const cancelar = await screen.findByTestId('order-action-cancel');
+
+    expect(screen.getAllByRole('separator')).toHaveLength(1);
+    expect(cancelar.previousElementSibling).toHaveAttribute('role', 'separator');
+  });
+});
+
+describe('orderRowActionsSpec: reglas por estado y permiso (R12)', () => {
+  const CASOS = ORDER_STATUS_VALUES.flatMap((status) =>
+    COMBINACIONES.map((permisos) => [status, permisos] as const),
+  );
+
+  it.each(CASOS)('R12: en %s con %o, cada item aparece, se deshabilita o se omite segun la regla', (status, permisos) => {
+    const reglas = esperado(status, permisos);
+    const items = especificacion(status, permisos).items;
+
+    expect(items.map((item) => item.key)).toEqual(ORDEN_R11.filter((accion) => accion in reglas));
+    for (const item of items) {
+      expect(item.disabled === true, `${item.key} en ${status}`).toBe(reglas[item.key as OrderRowAction]);
+    }
+  });
+});
+
+describe('orderRowActionsSpec: disparador, titulo y emision (R10)', () => {
+  it('R10: el disparador se llama «Acciones del pedido <numero>», con su testid y el id como dato', () => {
+    const spec = especificacion('PENDIENTE');
+    const elPedido = pedido('PENDIENTE');
+
+    expect(spec.triggerLabel).toBe(`Acciones del pedido ${elPedido.numberText}`);
+    expect(spec.triggerTestId).toBe('order-row-actions');
+    expect(spec.triggerDataAttributes).toEqual({ 'data-order-id': elPedido.id });
+  });
+
+  it('R10: el titulo del dialogo centrado es «Pedido <numero>»', () => {
+    expect(especificacion('PENDIENTE').title).toBe(`Pedido ${pedido('PENDIENTE').numberText}`);
+  });
+
+  it('R10: en el dialogo centrado, el disparador lleva el id y el titulo es «Pedido <numero>»', async () => {
+    const user = setupUser();
+    const elPedido = pedido('PENDIENTE');
+    render(<RowActionsMenu {...especificacion('PENDIENTE')} presentation="centered" />);
+
+    const disparador = screen.getByTestId('order-row-actions');
+    expect(disparador).toHaveAttribute('data-order-id', elPedido.id);
+    await user.click(disparador);
+
+    expect(await screen.findByRole('dialog', { name: `Pedido ${elPedido.numberText}` })).toBeInTheDocument();
+    expect(screen.getByTestId('order-action-cancel').previousElementSibling).toHaveAttribute('role', 'separator');
+  });
+
+  it('R10: cada item emite su accion con el pedido de la fila', () => {
+    const onAction = vi.fn();
+    const spec = especificacion('TERMINADO', TODOS_LOS_PERMISOS, onAction);
+
+    for (const item of spec.items) item.onSelect?.();
+
+    expect(onAction.mock.calls).toEqual(spec.items.map((item) => [item.key, pedido('TERMINADO')]));
+  });
+
+  it('R10: OrderRowActions es el mismo menu y emite `onAction`', async () => {
+    const onAction = vi.fn();
+    render(<OrderRowActions order={pedido('EN_CURSO')} onAction={onAction} />);
+
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId('order-action-responsibles'));
+
+    expect(onAction).toHaveBeenCalledExactlyOnceWith('responsibles', pedido('EN_CURSO'));
   });
 });

@@ -394,7 +394,9 @@ const PEDIDO: OrderSummary = {
   presentationLines: [],
   unitId: UNIDAD_KG.id,
   unitLabel: UNIDAD_KG.symbol,
+  pendingDelivery: { kind: 'not_packed' },
   customer: null,
+  recipeImageUrl: null,
 };
 
 const TEXTOS_DE_TABLA: DataTableTexts = {

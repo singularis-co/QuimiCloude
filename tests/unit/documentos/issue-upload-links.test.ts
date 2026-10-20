@@ -30,6 +30,9 @@ const PERSONA = '11111111-1111-4111-8111-111111111111';
 
 /** El instante de emision, fijo: sin un reloj inyectado la caducidad no se podria afirmar. */
 const EMISION = new Date('2026-09-16T10:00:00.000Z');
+
+/** La empresa tiene proveedor IA: estos casos no miran ese paso. */
+const CON_PROVEEDOR = { isConfigured: async (): Promise<boolean> => true };
 /**
  * DOS HORAS despues, escrito a mano a proposito: si el plazo cambiara, este caso se entera.
  *
@@ -77,7 +80,7 @@ function dobleDeAlmacenamiento() {
 }
 
 function emisor(storage: DocumentStorage) {
-  return createIssueUploadLinks({ storage, now: () => EMISION });
+  return createIssueUploadLinks({ storage, aiProvider: CON_PROVEEDOR, now: () => EMISION });
 }
 
 /** Una tanda de `cantidad` archivos validos. */
@@ -335,6 +338,7 @@ describe('documentos — emision de enlaces de subida', () => {
       let tic = 0;
       const emisorQueAvanza = createIssueUploadLinks({
         storage: doble.storage,
+        aiProvider: CON_PROVEEDOR,
         now: () => new Date(EMISION.getTime() + (tic += 1000)),
       });
 

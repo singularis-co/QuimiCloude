@@ -1,5 +1,7 @@
 import {
+  assertAddon,
   assertPermission,
+  type Addon,
   type PermissionBearer,
   type PermissionCode,
 } from '@/lib/modules/identity';
@@ -27,6 +29,7 @@ export type Actor = {
   readonly id: string;
   readonly companyId: string;
   readonly permissions: readonly string[];
+  readonly addons?: readonly string[];
 };
 
 /**
@@ -50,13 +53,22 @@ export function requirePermission(
 }
 
 /**
+ * Va justo después del permiso, antes de validar y de tocar un puerto. Lanza el mismo error que
+ * sin permiso, para que «añadido apagado» y «sin permiso» no se distingan; un actor sin `addons`
+ * falla cerrado.
+ */
+export function requireAddon(actor: Actor, addon: Addon): void {
+  assertAddon(actor, addon, () => new UnauthorizedError());
+}
+
+/**
  * El codigo de escritura de este modulo, escrito UNA sola vez y dentro del dominio: lo que
  * sale al exterior es la pregunta, no la cadena.
  */
 const INVENTARIO_MODIFICAR: PermissionCode = 'inventario.modificar';
 
 /** Error centinela, privado: assertPermission exige una fabrica pero esto nunca lanza afuera. */
-const DENEGADO = new Error('inventario: permiso de escritura ausente');
+const DENEGADO = new Error('inventario: permiso ausente');
 
 /**
  * Puede este conjunto de permisos ajustar el stock de un lote? Devuelve boolean y NO LANZA:
@@ -73,8 +85,33 @@ const DENEGADO = new Error('inventario: permiso de escritura ausente');
  * un Server Component con la sesion resuelta.
  */
 export function canAdjustBatchStock(actor: PermissionBearer | null | undefined): boolean {
+  return holds(actor, INVENTARIO_MODIFICAR);
+}
+
+/**
+ * El codigo que abre los costos unitarios del inventario. Hoy es `inventario.modificar`: entre los
+ * roles de empresa solo lo tiene el Administrador, y quien da de alta lotes ya escribe su costo.
+ * Si algun dia otro rol necesita modificar sin ver costos, aqui se cambia por un codigo propio del
+ * catalogo (que pide su migracion de datos), y nada mas.
+ */
+const INVENTARIO_COSTOS: PermissionCode = INVENTARIO_MODIFICAR;
+
+/**
+ * Puede este conjunto de permisos ver los costos unitarios del inventario (`averageUnitCost` del
+ * producto y `unitCost` del lote)? Devuelve boolean y NO LANZA.
+ *
+ * Es a la vez la pregunta de presentacion (la UI esconde la columna) y el corte de datos: los casos
+ * de uso de listado la usan para no leer ni devolver el costo a quien no la cumple, asi que el
+ * campo nunca viaja al cliente sin ella.
+ */
+export function canViewUnitCosts(actor: PermissionBearer | null | undefined): boolean {
+  return holds(actor, INVENTARIO_COSTOS);
+}
+
+/** Pertenencia sin lanzar, delegando en `assertPermission` -la unica implementacion de la regla-. */
+function holds(actor: PermissionBearer | null | undefined, permission: PermissionCode): boolean {
   try {
-    assertPermission(actor, INVENTARIO_MODIFICAR, () => DENEGADO);
+    assertPermission(actor, permission, () => DENEGADO);
     return true;
   } catch {
     return false;

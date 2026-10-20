@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { withFilter, type DataTableParams } from '@/components/shared/data-table';
 import { ORDER_CUSTOMER_PRESENCE_NONE } from '@/lib/modules/pedidos';
 
-import type { OrderCustomerChoice } from './order-customer-label';
-import { OrderCustomerPicker } from './order-customer-picker';
+import type { OrderCustomerChoice } from '@/components/shared/order-customer-label';
+import { OrderCustomerPicker } from '@/components/shared/order-customer-picker';
 import {
   CUSTOMER_COLUMN_ID,
   CUSTOMER_PRESENCE_COLUMN_ID,
@@ -64,7 +64,7 @@ export function OrderCustomerFilter({ params, value }: OrderCustomerFilterProps)
   }
 
   return (
-    <div className="w-full sm:w-64" data-testid={ORDER_CUSTOMER_FILTER_TESTID}>
+    <div className="w-64 max-w-full" data-testid={ORDER_CUSTOMER_FILTER_TESTID}>
       <OrderCustomerPicker
         // Remonta el campo cuando la direccion trae otro valor (Atras, otro enlace).
         key={choiceKey(value)}

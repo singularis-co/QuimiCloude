@@ -5,11 +5,11 @@
 // `inventario`, sin tocar material ni producto terminado.
 //
 // `createFinishPacking` implementa `OrderCatalog['finishPackingAliveById']` (Terminar):
-// abre `OrderUnitOfWork`, mueve el estado con `OrderWriteRepository.finishPackingAlive`, consume
-// los envases del reparto y da de alta, por cada linea, un lote de producto terminado con un
-// unico coste por unidad del pedido, expresado en la unidad de cada lote; todo en la MISMA
-// transaccion. `asignaciones` solo
-// conoce la firma de `OrderCatalog`, nunca este archivo.
+// abre `OrderUnitOfWork`, mueve el estado con `OrderWriteRepository.finishPackingAlive`, guarda
+// el conteo real de cada linea, liquida los envases con ese conteo y da de alta, por cada linea
+// con envases, un lote de producto terminado con un unico coste por unidad del pedido, expresado
+// en la unidad de cada lote; todo en la MISMA transaccion. `asignaciones` solo conoce la firma de
+// `OrderCatalog`, nunca este archivo.
 
 import { planFinishedGoodsLine } from '@/lib/modules/inventario';
 import { convertQuantity, type UnitConversion } from '@/lib/modules/unidades';
@@ -21,8 +21,9 @@ import {
   PresentationWithoutContentError,
   RecipeNotFoundError,
 } from './errors';
-import { sumInOrderUnit } from './order-distribution';
+import { sumInOrderUnit, validateDistribution } from './order-distribution';
 import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
+import { checkPackingCounts, type PackedLineCount } from './packing-count';
 import { resolveLotCost } from './resolve-ingredients-cost';
 import { assertTransition } from './order-transitions';
 
@@ -30,7 +31,7 @@ import type { FinishedGoodsReceipt, OrderCatalog } from './order-catalog';
 
 import type { OrderPackingRepository } from '../ports/order-packing-repository';
 import type { FinishPackingLine } from '../ports/order-write-repository';
-import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
+import type { OrderTransactionScope, OrderUnitOfWork } from '../ports/order-unit-of-work';
 
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -72,7 +73,24 @@ type ResolvedLine = {
   readonly line: FinishPackingLine;
   readonly content: string;
   readonly unitId: string;
+  readonly packedPackages: number;
 };
+
+type RejectedFinish = 'invalid_packing_count' | 'packed_exceeds_quantity' | 'packaging_stock_insufficient';
+
+/** Rechazo tras mover el estado: se lanza para que la unidad de trabajo deshaga el `UPDATE`. */
+class FinishPackingRejectedSignal extends Error {
+  constructor(readonly outcome: RejectedFinish) {
+    super(outcome);
+  }
+}
+
+/** `checkPackingCounts` ya exigio un conteo por linea: si falta, el flujo esta roto. */
+function requirePacked(packedById: ReadonlyMap<string, number>, lineId: string): number {
+  const packed = packedById.get(lineId);
+  if (packed === undefined) throw new Error(`finishPacking: la linea ${lineId} no tiene conteo`);
+  return packed;
+}
 
 /** Cada linea con su contenido -el copiado o, si falta, el vigente de la presentacion- y la
  *  unidad de su presentacion. Una linea sin ninguno de los dos contenidos deshace todo. */
@@ -80,6 +98,7 @@ async function resolveLines(
   presentations: Pick<PresentationCatalog, 'findRefs'>,
   companyId: string,
   lines: readonly FinishPackingLine[],
+  packedById: ReadonlyMap<string, number>,
 ): Promise<readonly ResolvedLine[]> {
   const presentationIds = [...new Set(lines.map((line) => line.presentationId))];
   const refById = new Map((await presentations.findRefs(presentationIds, companyId)).map((ref) => [ref.id, ref] as const));
@@ -92,7 +111,7 @@ async function resolveLines(
     if (content === null) throw new PresentationWithoutContentError(line.id);
     const plan = planFinishedGoodsLine({ packages: line.packages, content, unitCost: '0.0000' });
     if (plan.kind === 'no_content') throw new PresentationWithoutContentError(line.id);
-    return { line, content, unitId: ref.unitId };
+    return { line, content, unitId: ref.unitId, packedPackages: requirePacked(packedById, line.id) };
   });
 }
 
@@ -133,6 +152,28 @@ function requireUnit(unitById: ReadonlyMap<string, UnitConversion>, unitId: stri
   return unit;
 }
 
+function toDistributionLines(unitById: ReadonlyMap<string, UnitConversion>, lines: readonly ResolvedLine[]) {
+  return lines.map(({ line, content, unitId, packedPackages }) => ({
+    presentationId: line.presentationId,
+    packages: packedPackages,
+    content,
+    unit: requireUnit(unitById, unitId),
+  }));
+}
+
+/** Lo envasado de verdad no puede pasar de la cantidad del pedido, con la conversion del reparto. */
+function assertPackedWithinQuantity(
+  quantity: string,
+  orderUnit: UnitConversion,
+  unitById: ReadonlyMap<string, UnitConversion>,
+  lines: readonly ResolvedLine[],
+): void {
+  const result = validateDistribution(quantity, orderUnit, toDistributionLines(unitById, lines));
+  if (result.kind === 'exceeds_quantity') throw new FinishPackingRejectedSignal('packed_exceeds_quantity');
+  if (result.kind === 'incompatible_units') throw new IncompatibleUnitsError(result.presentationId);
+  if (result.kind === 'presentation_without_content') throw new PresentationWithoutContentError(result.presentationId);
+}
+
 /**
  * Coste unitario por cada unidad de presentacion del reparto. El total producido se suma en la
  * unidad del pedido para que el coste por unidad del pedido sea uno solo; despues se expresa en
@@ -148,12 +189,7 @@ function unitCostByPresentationUnit(
 ): ReadonlyMap<string, string> {
   const summed = sumInOrderUnit(
     orderUnit,
-    lines.map(({ line, content, unitId }) => ({
-      presentationId: line.presentationId,
-      packages: line.packages,
-      content,
-      unit: requireUnit(unitById, unitId),
-    })),
+    toDistributionLines(unitById, lines),
   );
   if (summed.kind === 'incompatible_units') throw new IncompatibleUnitsError(summed.presentationId);
   if (summed.kind === 'presentation_without_content') throw new PresentationWithoutContentError(summed.presentationId);
@@ -167,9 +203,85 @@ function unitCostByPresentationUnit(
   return costs;
 }
 
+/** La necesidad de envases de unas lineas, una por producto, con la cantidad ya sumada. */
+function packagingRequirementOf(
+  quantity: string,
+  lines: readonly { readonly packagingProductId: string | null; readonly packages: number }[],
+) {
+  const requirement = buildOrderRequirement({
+    recipeLines: [],
+    quantity,
+    packagingLines: packagingLinesOf(lines),
+    phase: 'materials_consumed',
+    // Sin receta no hay ninguna linea que convertir: las unidades no se leen.
+    units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
+  });
+  if (requirement.kind !== 'ok') {
+    throw new Error('finishPacking: los envases no se convierten y aun asi la necesidad no salio ok');
+  }
+  return requirement.lines;
+}
+
+/**
+ * Liquida los envases con el conteo real. Un envase que es tambien ingrediente ya se consumio con
+ * la receta al pasar a POR_EMPACAR: de el solo se consume lo que siga apartado, nunca su
+ * disponible, y por eso no entra en la liquidacion con el conteo.
+ */
+async function settlePackaging(
+  scope: OrderTransactionScope,
+  input: {
+    readonly orderId: string;
+    readonly companyId: string;
+    readonly recipeId: string;
+    readonly quantity: string;
+    readonly lines: readonly ResolvedLine[];
+    readonly actorId: string;
+    readonly now: Date;
+  },
+): Promise<void> {
+  const real = packagingRequirementOf(
+    input.quantity,
+    input.lines.map(({ line, packedPackages }) => ({ packagingProductId: line.packagingProductId, packages: packedPackages })),
+  );
+  if (real.length === 0) return;
+
+  const content = await scope.recipes.findExecutionContentById(input.recipeId, input.companyId);
+  if (content === null) throw new RecipeNotFoundError();
+  const ingredientIds = new Set(content.lines.map((line) => line.productId));
+
+  const settled = real.filter((line) => !ingredientIds.has(line.productId));
+  if (settled.length > 0) {
+    const outcome = await scope.reservations.settlePackagingForOrder({
+      orderId: input.orderId,
+      companyId: input.companyId,
+      requirement: settled,
+      actorId: input.actorId,
+      now: input.now,
+    });
+    if (outcome.kind === 'insufficient') throw new FinishPackingRejectedSignal('packaging_stock_insufficient');
+  }
+
+  const ingredientPackaging = real.filter((line) => ingredientIds.has(line.productId)).map((line) => line.productId);
+  if (ingredientPackaging.length > 0) {
+    const consumption = await scope.reservations.consumeForOrder({
+      orderId: input.orderId,
+      companyId: input.companyId,
+      fallbackRequirement: [],
+      productIds: ingredientPackaging,
+      actorId: input.actorId,
+      now: input.now,
+    });
+    if (consumption.kind === 'insufficient') throw new InsufficientMaterialError();
+  }
+}
+
+function packedByLineId(counts: readonly PackedLineCount[]): ReadonlyMap<string, number> {
+  return new Map(counts.map((count) => [count.lineId, count.packedPackages] as const));
+}
+
 /** Firma exacta de `OrderCatalog['finishPackingAliveById']`. */
 export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['finishPackingAliveById'] {
-  return async function finishPackingAliveById(id, companyId, packerId, now) {
+  return async function finishPackingAliveById(id, companyId, packerId, now, counts) {
     assertTransition('EN_EMPAQUE', 'POR_ACONDICIONAR');
 
     try {
@@ -178,42 +290,35 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         if (updated.kind !== 'ok') return updated.kind;
 
         const lines = await scope.orders.findPresentationLinesForFinish(id, { companyId });
+        if (checkPackingCounts(lines, counts).kind !== 'ok') {
+          throw new FinishPackingRejectedSignal('invalid_packing_count');
+        }
         if (lines.length === 0) return { kind: 'ok' as const, finishedGoods: [] };
 
-        // Las lineas antiguas no tienen envase: sin envases no hay nada que consumir.
-        const packagingLines = packagingLinesOf(lines);
-        if (packagingLines.length > 0) {
-          // Sin receta no hay ninguna linea que convertir: las unidades no se leen.
-          const requirement = buildOrderRequirement({
-            recipeLines: [],
-            quantity: updated.quantity,
-            packagingLines,
-            phase: 'materials_consumed',
-            units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
-          });
-          if (requirement.kind !== 'ok') {
-            throw new Error('finishPacking: los envases no se convierten y aun asi la necesidad no salio ok');
-          }
-          const packagingRequirement = requirement.lines;
-          // Un envase que es tambien ingrediente ya se consumio con la receta al pasar a
-          // POR_EMPACAR: aqui solo cuenta lo que siga apartado de el, nunca su disponible.
-          const content = await scope.recipes.findExecutionContentById(updated.recipeId, companyId);
-          if (content === null) throw new RecipeNotFoundError();
-          const ingredientIds = new Set(content.lines.map((line) => line.productId));
-          const consumption = await scope.reservations.consumeForOrder({
-            orderId: id,
-            companyId,
-            fallbackRequirement: packagingRequirement.filter((line) => !ingredientIds.has(line.productId)),
-            productIds: packagingRequirement.map((line) => line.productId),
-            actorId: packerId,
-            now,
-          });
-          if (consumption.kind === 'insufficient') throw new InsufficientMaterialError();
-        }
+        if (updated.unitId === null) throw new OrderWithoutUnitError(id);
+        const resolvedLines = await resolveLines(deps.presentations, companyId, lines, packedByLineId(counts));
+        const unitIds = [...new Set([updated.unitId, ...resolvedLines.map((line) => line.unitId)])];
+        const unitById = new Map((await deps.units.findRefs(unitIds, companyId)).map((ref) => [ref.id, ref] as const));
+        const orderUnit = requireUnit(unitById, updated.unitId);
+        assertPackedWithinQuantity(updated.quantity, orderUnit, unitById, resolvedLines);
+
+        await scope.orders.recordPackedCounts(id, counts, { companyId });
+
+        await settlePackaging(scope, {
+          orderId: id,
+          companyId,
+          recipeId: updated.recipeId,
+          quantity: updated.quantity,
+          lines: resolvedLines,
+          actorId: packerId,
+          now,
+        });
 
         const [recipeRef] = await deps.recipes.findRefsIncludingDeleted([updated.recipeId], companyId);
         if (recipeRef === undefined) throw new RecipeNotFoundError();
 
+        // El coste del pedido sale del plan, envases incluidos: el conteo real solo cambia entre
+        // cuantas unidades se reparte.
         const lotCost =
           updated.ingredientsCost !== null
             ? updated.ingredientsCost
@@ -222,20 +327,17 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
                 updated.recipeId,
                 updated.quantity,
                 updated.unitId,
-                packagingLines,
+                packagingLinesOf(lines),
                 companyId,
                 { orderId: id },
               );
 
-        if (updated.unitId === null) throw new OrderWithoutUnitError(id);
-        const resolvedLines = await resolveLines(deps.presentations, companyId, lines);
-
-        const unitIds = [...new Set([updated.unitId, ...resolvedLines.map((line) => line.unitId)])];
-        const unitById = new Map((await deps.units.findRefs(unitIds, companyId)).map((ref) => [ref.id, ref] as const));
-        const unitCosts = unitCostByPresentationUnit(lotCost, requireUnit(unitById, updated.unitId), unitById, resolvedLines);
+        const packedLines = resolvedLines.filter((line) => line.packedPackages > 0);
+        if (packedLines.length === 0) return { kind: 'ok' as const, finishedGoods: [] };
+        const unitCosts = unitCostByPresentationUnit(lotCost, orderUnit, unitById, resolvedLines);
 
         const finishedGoods: FinishedGoodsReceipt[] = [];
-        for (const { line, content, unitId } of resolvedLines) {
+        for (const { line, content, unitId, packedPackages } of packedLines) {
           const outcome = await scope.finishedGoods.receiveFromOrder({
             orderId: id,
             companyId,
@@ -243,7 +345,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
             recipeName: recipeRef.name,
             presentationId: line.presentationId,
             orderPresentationLineId: line.id,
-            packages: line.packages,
+            packages: packedPackages,
             orderContent: content,
             unitCost: unitCosts.get(unitId) ?? '0.0000',
             actorId: packerId,
@@ -259,6 +361,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         return { kind: 'ok' as const, finishedGoods };
       });
     } catch (err) {
+      if (err instanceof FinishPackingRejectedSignal) return err.outcome;
       if (err instanceof InsufficientMaterialError) return 'insufficient_material';
       if (err instanceof RecipeNotFoundError) return 'recipe_not_found';
       if (err instanceof PresentationWithoutContentError) return 'presentation_without_content';

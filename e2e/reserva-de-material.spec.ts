@@ -62,12 +62,12 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
 import { addPackagingLine, openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
-import { openRowActionsMenuItem } from './helpers/row-actions-menu';
+import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc141_e2e_';
 
@@ -276,6 +276,14 @@ async function coverageOf(page: Page, numberText: string): Promise<string | null
   await page.goto(ordersUrl());
   const row = await findOrderRow(page, numberText);
   return row.getByTestId('order-coverage').getAttribute('data-coverage');
+}
+
+/**
+ * Fila de un lote en el panel «Lotes». El panel pinta cada lote como fila y como tarjeta (oculta
+ * en un contenedor ancho), y sus celdas repiten los mismos `data-testid`: se acota a la fila.
+ */
+function batchRowInSheet(page: Page, batchId: string): Locator {
+  return page.getByTestId('product-batches-sheet').getByTestId(`data-table-row-${batchId}`);
 }
 
 /** El total, lo reservado y lo disponible del producto del fixture, leidos de su fila. */
@@ -701,11 +709,12 @@ test.describe('reserva de material del pedido', () => {
     // vacia el frasco de cookies antes de entrar como Operador.
     await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const assignedRowB = rowByNumber(page, orderBNumber);
     await expect(assignedRowB).toHaveCount(1, { timeout: 60_000 });
-    await clickAndConfirm(page, assignedRowB.getByTestId(ASSIGNED_ORDER_ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, assignedRowB.getByTestId(ASSIGNED_ORDER_ENTER_TESTID));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderB.id), {
       timeout: 60_000,
     });
@@ -755,17 +764,22 @@ test.describe('reserva de material del pedido', () => {
       )
     ).click();
     await expect(page.getByTestId('product-batches-sheet')).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId(`product-batch-${batchId}`)).toBeVisible({ timeout: 60_000 });
+    const batchRow = batchRowInSheet(page, batchId);
+    await expect(batchRow).toBeVisible({ timeout: 60_000 });
 
-    await page.getByTestId('batch-history-trigger').click();
+    await (
+      await openRowActionsMenuItem(page, batchActionsTrigger(batchRow), 'batch-history-trigger')
+    ).click();
     await expect(page.getByTestId('batch-history-list')).toBeVisible({ timeout: 60_000 });
 
+    // Cada asiento sale como fila y como tarjeta (oculta en un dialogo ancho): se cuentan filas.
     const historyList = page.getByTestId('batch-history-list');
-    const consumeEntry = historyList.locator('li').filter({ hasText: 'Consumo' });
+    const historyRows = historyList.locator('[data-testid^="data-table-row-"]');
+    const consumeEntry = historyRows.filter({ hasText: 'Consumo' });
     await expect(consumeEntry).toHaveCount(1, { timeout: 60_000 });
     await expect(consumeEntry.getByTestId('batch-history-entry-quantity')).toHaveText('1500');
 
-    const consumptionEntry = historyList.locator('li').filter({ hasText: 'Salida por entrega' });
+    const consumptionEntry = historyRows.filter({ hasText: 'Salida por entrega' });
     await expect(consumptionEntry).toHaveCount(1, { timeout: 60_000 });
     await expect(consumptionEntry.getByTestId('batch-history-entry-quantity')).toHaveText('-1500');
   });

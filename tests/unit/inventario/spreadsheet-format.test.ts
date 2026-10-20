@@ -5,7 +5,7 @@ import { INVENTORY_IMPORT_MAX_FILE_BYTES } from '@/lib/modules/inventario';
 
 const encoder = new TextEncoder();
 const ZIP = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00, 0x08, 0x00, 0xff, 0xfe]);
-const CSV = encoder.encode('Tipo;Nombre;Existencia\r\nInsumo;Ácido;25\r\n');
+const CSV = encoder.encode('Tipo;Nombre;Cantidad\r\nInsumo;Ácido;25\r\n');
 
 describe('detectImportFileFormat', () => {
   it('R4 acepta un .xlsx que empieza por la firma ZIP', () => {

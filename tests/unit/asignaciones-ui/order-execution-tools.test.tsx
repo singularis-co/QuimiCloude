@@ -39,6 +39,7 @@ function execution(tools: readonly ExecutionToolView[], orderQuantity = '250'): 
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    evidence: [],
     resumeStepPosition: null,
   };
 }
