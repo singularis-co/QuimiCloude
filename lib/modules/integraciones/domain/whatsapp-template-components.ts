@@ -50,7 +50,13 @@ export function toMetaComponents(content: WhatsappTemplateContent): MetaTemplate
 
 const metaButtonSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('QUICK_REPLY'), text: z.string() }),
-  z.object({ type: z.literal('URL'), text: z.string(), url: z.string(), example: z.array(z.string()).optional() }),
+  // El ejemplo llega como texto o como lista: las dos formas son el mismo contenido.
+  z.object({
+    type: z.literal('URL'),
+    text: z.string(),
+    url: z.string(),
+    example: z.union([z.string(), z.array(z.string())]).optional(),
+  }),
   z.object({ type: z.literal('PHONE_NUMBER'), text: z.string(), phone_number: z.string() }),
 ]);
 
@@ -78,7 +84,8 @@ function buttonOf(button: ParsedButton): WhatsappTemplateButton {
   if (button.type === 'PHONE_NUMBER') {
     return { type: 'PHONE_NUMBER', text: button.text, phoneNumber: button.phone_number };
   }
-  return { type: 'URL', text: button.text, url: button.url, example: button.example?.[0] ?? null };
+  const example = typeof button.example === 'string' ? button.example : (button.example?.[0] ?? null);
+  return { type: 'URL', text: button.text, url: button.url, example };
 }
 
 function onlyOne<T extends ParsedComponent['type']>(

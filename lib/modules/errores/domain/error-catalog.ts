@@ -117,6 +117,11 @@ export const ERROR_MESSAGE_KEY = {
   whatsapp_template_rejected: 'errors.whatsapp_template_rejected',
   whatsapp_meta_rejected: 'errors.whatsapp_meta_rejected',
   whatsapp_meta_unreachable: 'errors.whatsapp_meta_unreachable',
+  whatsapp_variable_key_not_found: 'errors.whatsapp_variable_key_not_found',
+  whatsapp_variable_key_taken: 'errors.whatsapp_variable_key_taken',
+  whatsapp_variable_key_in_use: 'errors.whatsapp_variable_key_in_use',
+  whatsapp_template_not_mapped: 'errors.whatsapp_template_not_mapped',
+  whatsapp_template_not_mappable: 'errors.whatsapp_template_not_mappable',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -294,4 +299,12 @@ export const ERROR_MESSAGES_ES = {
     'Meta rechazó la solicitud. Intenta de nuevo o revisa la conexión.',
   'errors.whatsapp_meta_unreachable':
     'No se pudo contactar con Meta. Intenta de nuevo en unos minutos.',
+  'errors.whatsapp_variable_key_not_found': 'No se encontró la variable.',
+  'errors.whatsapp_variable_key_taken': 'Ya existe una variable con esa clave.',
+  'errors.whatsapp_variable_key_in_use':
+    'La variable se usa en una o más plantillas. Quítala de ellas antes de eliminarla o cambiar su clave.',
+  'errors.whatsapp_template_not_mapped':
+    'Relaciona todas las variables de la plantilla antes de habilitarla.',
+  'errors.whatsapp_template_not_mappable':
+    'Esta plantilla tiene contenido que la app todavía no admite y no se puede relacionar.',
 } as const satisfies Record<ErrorMessageKey, string>;

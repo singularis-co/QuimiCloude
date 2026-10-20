@@ -174,7 +174,7 @@
 
 ## Bloque G — Base (enmienda)
 
-- [ ] **T22 — Esquema y migración** (R53, R63, R80, R84, R86). Depende de: —
+- [x] **T22 — Esquema y migración** (R53, R63, R80, R84, R86). Depende de: —
   - `db/schema.prisma`: enum `WhatsappTemplateMappingStatus`, modelos `WhatsappVariableKey` y
     `WhatsappTemplateVariable` con `/// @module integraciones`; `mappingStatus`, `enabled` y el único
     `(companyId, id)` en `WhatsappTemplate` (§18.2).
@@ -184,20 +184,20 @@
     aplicar; `prisma validate` y `generate` en verde; `guard-empresa-en-esquema` y `guard-rls-force`
     en verde.
 
-- [ ] **T23 [P] — Códigos de error** (R85). Depende de: —
+- [x] **T23 [P] — Códigos de error** (R85). Depende de: —
   - `error-codes.ts`, `error-catalog.ts`: los 5 códigos de §18.9; `domain/errors.ts`: las 5 clases.
   - `tests/unit/errores/catalogo.test.ts`: cuenta + 5.
   - **Hecho:** catálogo y su test verdes.
 
 ## Bloque H — Dominio puro (enmienda)
 
-- [ ] **T24 — Constantes y variable propia** (R53–R55). Depende de: T23
+- [x] **T24 — Constantes y variable propia** (R53–R55). Depende de: T23
   - `domain/whatsapp-system-variables.ts` y `domain/whatsapp-variable-key.ts` (§18.4).
   - `tests/unit/integraciones/whatsapp/templates/whatsapp-variable-key.test.ts`.
   - **Hecho:** casos de §18.10 en el límite y en el límite + 1; los dos archivos solo importan `zod` y
     `domain/`.
 
-- [ ] **T25 — Huecos, estado del mapeo, traducción y borrador con claves** (R6, R64–R67, R81).
+- [x] **T25 — Huecos, estado del mapeo, traducción y borrador con claves** (R6, R64–R67, R81).
   Depende de: T24
   - `domain/whatsapp-template-variables.ts` (§18.5), `domain/whatsapp-template-keyed-draft.ts` (§18.6),
     `domain/whatsapp-template-draft.ts` (+ `unknown_key`).
@@ -282,7 +282,7 @@
 > implementadas **sin commit** sobre la versión anterior: T36–T38 las corrigen encima, sin rehacerlas
 > desde cero. [P19]–[P22] aprobadas por el humano el 2026-10-20 como se propusieron.
 
-- [ ] **T36 — Corregir T22** (R88, R84). Depende de: —
+- [x] **T36 — Corregir T22** (R88, R84). Depende de: —
   - Migración `20261020180000_whatsapp_variable_keys`: `CHECK whatsapp_template_variables_system_key_format`
     a la forma de constante de §19.2 (la migración no se ha aplicado fuera del worktree: se edita, no se
     añade otra). `down.sql` no cambia. Comentario del modelo en `db/schema.prisma`.
@@ -291,14 +291,14 @@
     `whatsapp_templates_enabled_requires_mapped` (§19.1).
   - **Hecho:** la migración se aplica, se revierte y se vuelve a aplicar; los dos casos verdes.
 
-- [ ] **T37 — Corregir T24** (R87–R90). Depende de: T36
+- [x] **T37 — Corregir T24** (R87–R90). Depende de: T36
   - Borrar `domain/whatsapp-system-variables.ts` y su export; `domain/whatsapp-variable-key.ts` con
     `WHATSAPP_CONSTANT_KEY_PATTERN` y la vista sin rama `system` (§19.2, §19.5).
   - `whatsapp-variable-key.test.ts`: fuera los casos del catálogo; casos de R88 (dos segmentos, tres
     segmentos, segmento de 41, punto en una propia).
   - **Hecho:** ningún archivo importa el catálogo; los 5 códigos de T23 sin cambio.
 
-- [ ] **T38 — Corregir T25** (R91, R92, R95). Depende de: T37
+- [x] **T38 — Corregir T25** (R91, R92, R95). Depende de: T37
   - `domain/whatsapp-template-keyed-draft.ts` (§19.3, §19.4) y `domain/whatsapp-template-variables.ts`
     (`variableSlotsOf` con marcas no numéricas ⇒ `null`).
   - Tests `whatsapp-template-keyed-draft.test.ts` (ejemplo corregido de `Hola {{cliente.nombre}}`;
@@ -306,7 +306,7 @@
     `whatsapp-template-variables.test.ts` (`{{first_name}}` ⇒ no relacionable).
   - **Hecho:** casos verdes; T3 sigue verde sin cambiar sus casos.
 
-- [ ] **T39 [P] — `contentOf` con el ejemplo de URL como texto** (R96). Depende de: —
+- [x] **T39 [P] — `contentOf` con el ejemplo de URL como texto** (R96). Depende de: —
   - `domain/whatsapp-template-components.ts` (§19.5) y `whatsapp-template-components.test.ts`.
   - **Hecho:** los dos formatos dan el mismo contenido; la ida y vuelta de T4 sigue verde.
 

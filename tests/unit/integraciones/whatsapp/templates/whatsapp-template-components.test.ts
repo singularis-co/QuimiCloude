@@ -72,6 +72,25 @@ describe('contentOf', () => {
     })
   })
 
+  it('R96: el ejemplo del boton URL como texto o como lista da el mismo contenido', () => {
+    const withExample = (example: unknown) => [
+      { type: 'BODY', text: 'x' },
+      { type: 'BUTTONS', buttons: [{ type: 'URL', text: 'Ver', url: 'https://ejemplo.test/p/{{1}}', example }] },
+    ]
+    const asText = contentOf(withExample('https://ejemplo.test/p/A-102'))
+    const asList = contentOf(withExample(['https://ejemplo.test/p/A-102']))
+    expect(asText).not.toBeNull()
+    expect(asText).toEqual(asList)
+    expect(asText?.buttons[0]).toEqual({
+      type: 'URL',
+      text: 'Ver',
+      url: 'https://ejemplo.test/p/{{1}}',
+      example: 'https://ejemplo.test/p/A-102',
+    })
+    expect(contentOf(withExample(['https://ejemplo.test/p/A-102', 'https://ejemplo.test/p/B-7']))).toEqual(asText)
+    expect(contentOf(withExample(42))).toBeNull()
+  })
+
   it('R46: un header con archivo da null', () => {
     for (const format of ['IMAGE', 'VIDEO', 'DOCUMENT', 'LOCATION']) {
       expect(contentOf([{ type: 'HEADER', format }, { type: 'BODY', text: 'x' }])).toBeNull()

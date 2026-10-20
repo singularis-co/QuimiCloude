@@ -1312,26 +1312,72 @@ enum WhatsappTemplateStatus {
 /// el unico parcial de nombre e idioma entre las vivas estan escritos a mano en la migracion.
 /// @module integraciones
 model WhatsappTemplate {
-  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId      String                   @map("company_id") @db.Uuid
-  connectionId   String                   @map("connection_id") @db.Uuid
-  metaTemplateId String                   @map("meta_template_id")
+  id             String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String                        @map("company_id") @db.Uuid
+  connectionId   String                        @map("connection_id") @db.Uuid
+  metaTemplateId String                        @map("meta_template_id")
   name           String
   language       String
   category       WhatsappTemplateCategory
-  components     Json                     @default("[]")
+  components     Json                          @default("[]")
   status         WhatsappTemplateStatus
-  statusRaw      String?                  @map("status_raw")
-  rejectedReason String?                  @map("rejected_reason")
-  lastSyncedAt   DateTime?                @map("last_synced_at") @db.Timestamptz(6)
-  createdById    String?                  @map("created_by") @db.Uuid
-  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt      DateTime?                @map("deleted_at") @db.Timestamptz(6)
+  statusRaw      String?                       @map("status_raw")
+  rejectedReason String?                       @map("rejected_reason")
+  lastSyncedAt   DateTime?                     @map("last_synced_at") @db.Timestamptz(6)
+  createdById    String?                       @map("created_by") @db.Uuid
+  createdAt      DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?                     @map("deleted_at") @db.Timestamptz(6)
+  mappingStatus  WhatsappTemplateMappingStatus @default(UNMAPPED) @map("mapping_status")
+  enabled        Boolean                       @default(false)
 
   @@unique([connectionId, metaTemplateId], map: "whatsapp_templates_connection_meta_id_key")
+  @@unique([companyId, id], map: "whatsapp_templates_company_id_id_key")
   @@index([createdById], map: "whatsapp_templates_created_by_idx")
   @@map("whatsapp_templates")
+}
+
+enum WhatsappTemplateMappingStatus {
+  UNMAPPED
+  MAPPED
+
+  @@map("whatsapp_template_mapping_status")
+}
+
+/// Variables propias de la empresa. Las constantes las define el front y no tienen fila: solo su
+/// clave se guarda en la relacion.
+/// Borrado fisico: con `deleted_at` la FK de las relaciones no impediria borrar una en uso.
+/// @module integraciones
+model WhatsappVariableKey {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  key       String
+  label     String
+  value     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([companyId, key], map: "whatsapp_variable_keys_company_key_key")
+  @@unique([companyId, id], map: "whatsapp_variable_keys_company_id_id_key")
+  @@map("whatsapp_variable_keys")
+}
+
+/// Que entrada del diccionario llena cada hueco de una plantilla: una variable propia o una
+/// constante, nunca las dos. Sin `@relation`: las FK compuestas con `company_id` y los CHECK estan
+/// escritos a mano en la migracion.
+/// @module integraciones
+model WhatsappTemplateVariable {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  templateId    String   @map("template_id") @db.Uuid
+  slot          String
+  variableKeyId String?  @map("variable_key_id") @db.Uuid
+  systemKey     String?  @map("system_key")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([templateId, slot], map: "whatsapp_template_variables_template_slot_key")
+  @@index([variableKeyId], map: "whatsapp_template_variables_variable_key_idx")
+  @@map("whatsapp_template_variables")
 }
 
 enum EvidencePhase {

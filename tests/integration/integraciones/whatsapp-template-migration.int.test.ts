@@ -64,7 +64,9 @@ const DOWN_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'down.sql')
 
 const TABLE = 'whatsapp_templates'
 const ENUMS = ['whatsapp_template_category', 'whatsapp_template_status'] as const
+// `company_id_id_key` lo pone la migracion del diccionario de variables, destino de su FK compuesta.
 const INDEXES = [
+  'whatsapp_templates_company_id_id_key',
   'whatsapp_templates_connection_meta_id_key',
   'whatsapp_templates_created_by_idx',
   'whatsapp_templates_name_language_live_key',
@@ -203,6 +205,7 @@ describe('migracion whatsapp_templates contra Postgres real', () => {
       )
       const checks = (await schemaSnapshot(tx)).constraints.filter((c) => c.def.startsWith('CHECK')).map((c) => c.conname)
       expect(checks.sort()).toEqual([
+        'whatsapp_templates_enabled_requires_mapped',
         'whatsapp_templates_language_not_empty',
         'whatsapp_templates_meta_template_id_not_empty',
         'whatsapp_templates_name_not_empty',

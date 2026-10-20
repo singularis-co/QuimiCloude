@@ -44,7 +44,8 @@
  * `customer_duplicate_phone`.
  * **2026-10-20**: `whatsapp_template_not_found`, `whatsapp_template_name_taken`,
  * `whatsapp_template_rate_limited`, `whatsapp_template_rejected`, `whatsapp_meta_rejected`,
- * `whatsapp_meta_unreachable`.
+ * `whatsapp_meta_unreachable`, `whatsapp_variable_key_not_found`, `whatsapp_variable_key_taken`,
+ * `whatsapp_variable_key_in_use`, `whatsapp_template_not_mapped`, `whatsapp_template_not_mappable`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -247,6 +248,11 @@ export const ERROR_CODES = [
   'whatsapp_template_rejected',
   'whatsapp_meta_rejected',
   'whatsapp_meta_unreachable',
+  'whatsapp_variable_key_not_found',
+  'whatsapp_variable_key_taken',
+  'whatsapp_variable_key_in_use',
+  'whatsapp_template_not_mapped',
+  'whatsapp_template_not_mappable',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

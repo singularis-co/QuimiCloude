@@ -125,3 +125,44 @@ export class WhatsappMetaUnreachableError extends IntegracionesError {
     super('whatsapp_meta_unreachable', diagnostic);
   }
 }
+
+/** La variable propia no existe o es de otra empresa: el texto no distingue los dos casos. */
+export class WhatsappVariableKeyNotFoundError extends IntegracionesError {
+  readonly code = 'whatsapp_variable_key_not_found';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_variable_key_not_found', diagnostic);
+  }
+}
+
+export class WhatsappVariableKeyTakenError extends IntegracionesError {
+  readonly code = 'whatsapp_variable_key_taken';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_variable_key_taken', diagnostic);
+  }
+}
+
+export class WhatsappVariableKeyInUseError extends IntegracionesError {
+  readonly code = 'whatsapp_variable_key_in_use';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_variable_key_in_use', diagnostic);
+  }
+}
+
+export class WhatsappTemplateNotMappedError extends IntegracionesError {
+  readonly code = 'whatsapp_template_not_mapped';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_template_not_mapped', diagnostic);
+  }
+}
+
+export class WhatsappTemplateNotMappableError extends IntegracionesError {
+  readonly code = 'whatsapp_template_not_mappable';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_template_not_mappable', diagnostic);
+  }
+}

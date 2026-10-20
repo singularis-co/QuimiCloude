@@ -475,3 +475,79 @@ nombre, dentro de los archivos de test que toca esta rama (comprobado con grep s
   - `pnpm exec vitest run tests/unit/integraciones/whatsapp/templates/whatsapp-template-prisma-errors.test.ts` → 1 file, 9 passed.
   - `pnpm typecheck` → limpio. `pnpm lint` → 0 errores, 10 warnings preexistentes ajenos (los dos archivos tocados: sin issues). Guardias (`vitest run guard`) → 85 files passed.
 - **Veredicto:** traduccion corregida segun la forma medida; los tres `.int` de plantillas en verde en local.
+
+## Enmienda — Tanda E1: T22-T25 (backend_dev, 2026-10-20)
+
+Archivos: `db/schema.prisma` (enum `WhatsappTemplateMappingStatus`, `WhatsappVariableKey`,
+`WhatsappTemplateVariable`, `mappingStatus`/`enabled`/`@@unique([companyId,id])` en `WhatsappTemplate`;
+`prisma format` solo en ese bloque), `db/migrations/20261020180000_whatsapp_variable_keys/{migration,down}.sql`,
+`errores/domain/{error-codes,error-catalog}.ts` (+5 al final), `integraciones/domain/errors.ts` (+5 clases),
+`domain/whatsapp-system-variables.ts`, `domain/whatsapp-variable-key.ts`, `domain/whatsapp-template-variables.ts`,
+`domain/whatsapp-template-keyed-draft.ts`, `domain/whatsapp-template-draft.ts` (+`unknown_key`).
+Tests: `tests/unit/errores/catalogo.test.ts` (112 -> 117 + describe R85), `whatsapp-variable-key.test.ts`,
+`whatsapp-template-variables.test.ts`, `whatsapp-template-keyed-draft.test.ts` (nuevos),
+`tests/guards/guard-identificador-de-request.test.ts` (+ la migracion en `MIGRACIONES_ESPERADAS`).
+
+Mapa: R53, R54, R55 -> `whatsapp-variable-key.test.ts`; R64, R65, R71, R81 -> `whatsapp-template-variables.test.ts`;
+R66, R67, R6 -> `whatsapp-template-keyed-draft.test.ts`; R85 -> `catalogo.test.ts`.
+
+Migracion: probada con una sonda temporal (borrada) en la base efimera: aplicada (plantilla
+`qct_tpl_4c4ddbb224a1` construida y "esquema al dia"), `down.sql` la revierte y la reaplicacion deja el
+mismo esquema (columnas, indices, constraints, RLS), relleno sobre 6 filas (plana -> MAPPED/true; `{{1}}`,
+header IMAGE, boton OTP, eliminada, sin BODY -> UNMAPPED/false). 3/3 verdes.
+
+Salidas: typecheck 0 errores; lint 0 errores (11 warnings preexistentes, ninguno en lo tocado);
+catalogo 61/61; whatsapp-variable-key 20/20; whatsapp-template-variables 18/18; keyed-draft + draft T3 54/54;
+template-sync-plan y components verdes; guardias 85/85 archivos (1172 passed).
+
+Rojo esperado, de otras tasks: `module-shape.test.ts` 2 casos (R18 lista de archivos, R13 seis modelos) ->
+T34; `whatsapp-template-migration.int.test.ts` 2 casos (lista exacta de indices y de CHECK de
+`whatsapp_templates` gana `whatsapp_templates_company_id_id_key` y `whatsapp_templates_enabled_requires_mapped`)
+-> sin task asignada, a decidir.
+
+Veredicto: T22-T25 hechas; quedan dos rojos que pertenecen a T34 y a una decision sobre el test de migracion de T1.
+
+## Contraste con Meta antes de T26 (forma del GET frente a lo creado), 2026-10-20
+
+Fuentes:
+- Graph API v26.0 `whats-app-business-account/message_templates` (developers.facebook.com/docs/graph-api/reference/…; sin fecha visible): el GET devuelve `components` con la misma forma que el POST; el `example` del boton URL esta tipado `array<string>` en la creacion.
+- templates/template-management (actualizada 2026-07-02, tambien en `.md`): ejemplo «Get all templates» POSITIONAL con header TEXT.
+- templates/components (2026-06-24) y templates/overview (2026-05-21; `parameter_format` a nivel plantilla).
+
+| Campo | Enviado (`toMetaComponents`) | GET (doc) | `contentOf` lo absorbe |
+|---|---|---|---|
+| HEADER TEXT | `{type,format,text,example:{header_text:[s]}}` | identico | si |
+| BODY | `{type,text,example:{body_text:[[...]]}}` | identico (`body_text_named_params` solo en NAMED) | si |
+| `example` ausente | se omite | se omite sin parametros | si (opcional) |
+| FOOTER, QUICK_REPLY, URL estatico, PHONE_NUMBER | `{type,text,…}` | identico | si |
+| URL con `{{1}}` | `example:[s]` | **no documentado** en el GET | si llega como array; como texto ⇒ `null` (lo cubre T39, R96) |
+| claves de mas / orden | — | `parameter_format`, `id`, … fuera de `components` | si (zod no estricto, campo a campo) |
+
+No documentado: si Meta reformatea `phone_number` o recorta espacios (daria «cambio»). El doble `canned` lista lo mismo que recibio: T26 no prueba la forma real ([P4]).
+
+Veredicto: **no rompe** la comparacion normalizada de §18.5. Sin pregunta al humano.
+
+## Enmienda (T22–T35) y enmienda 2 (T36–T40)
+
+### Tanda E1 — T22–T25 corregidas por T36–T39 (backend_dev), 2026-10-20
+
+La sección de T22–T25 de arriba se escribió sobre la versión con catálogo de constantes en el back;
+T36–T39 la corrigen (enmienda 2, F1–F4). Estado final:
+
+- Migración `20261020180000_whatsapp_variable_keys`: `CHECK whatsapp_template_variables_system_key_format`
+  = `^[a-z][a-z0-9_]{0,39}\.[a-z][a-z0-9_]{0,39}$` (R88); `down.sql` sin cambio.
+- Borrado `domain/whatsapp-system-variables.ts` (R87): nadie lo importa.
+- `whatsapp-variable-key.ts`: `WHATSAPP_CONSTANT_KEY_PATTERN`, `isOwnKey`, `isConstantKey`; vista del diccionario solo con propias.
+- `whatsapp-template-keyed-draft.ts`: clasifica por forma (§19.3), `constantLabels` (§19.4, `nullish`); constante sin etiqueta ⇒ `example_missing`.
+- `whatsapp-template-variables.ts`: `variableSlotsOf` ⇒ `null` si una marca no es `{{n}}` (R95).
+- `whatsapp-template-components.ts`: ejemplo de URL como texto o lista (R96).
+- `whatsapp-template-migration.int.test.ts`: las dos listas exactas ganan los dos nombres nuevos.
+- Nuevo (adelanto de T29): `whatsapp-variable-keys-migration.int.test.ts` + entrada en `aislamiento.json`.
+- `guard-identificador-de-request.test.ts`: la migración nueva en `MIGRACIONES_ESPERADAS`.
+
+Salidas (un comando por llamada):
+- `pnpm run typecheck` → limpio. `pnpm run lint` → 0 errores, 10 warnings ajenos.
+- vitest: variable-key 27/27, template-variables 24/24, keyed-draft 28/28, template-draft (T3, sin cambios) 32/32, template-components 8/8, catalogo 61/61.
+- `vitest run guard` → 85 files, 1172 passed, 21 skipped.
+- `--project integration whatsapp-template-migration.int` → 6/6; `whatsapp-variable-keys-migration.int` → 6/6 (aplica, revierte, reaplica con el mismo esquema).
+- Rojo conocido hasta T34: `module-shape.test.ts` (lista de archivos y número de modelos).
