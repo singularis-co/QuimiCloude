@@ -264,11 +264,29 @@ $ pnpm exec playwright test e2e/clientes-telefono.spec.ts --project=chromium --w
     - en los dos, la segunda unidad reintenta una vez (2 intentos), queda una sola fila en
       `phone_numbers` y los dos clientes son dueños;
     - contraprueba: con el detector de `integraciones` revertido, el test falla.
-  - **Punto abierto, pendiente de decisión:** el relleno (`legacy-phone-prisma.ts`) llama a
-    `addLink` en su propia `$transaction` y no reintenta. Design § 5.6 dice «Sin reintento por
-    unicidad: ya no hay índice que choque», y eso ya no es cierto para `phone_numbers`. Un relleno
-    y un alta simultáneos con el mismo número nuevo pueden chocar. No se tocó porque contradice el
-    design.
+  - **El relleno, resuelto (decisión del humano, 2026-10-20):** `legacy-phone-prisma.ts`
+    reconoce el mismo `P2002` (reutiliza `isCustomerPhoneLinkConflict` del mismo módulo) y
+    reintenta la transacción **una vez**. El reintento relee las candidatas y repite la condición
+    de candidata y el `updatedAt`. Si vuelve a chocar, el error sube; cualquier otro error sube sin
+    reintentar. Design § 5.6 y requirements («Decisiones cerradas») ya lo recogen.
+    - Unitarios en `legacy-phone-prisma.test.ts`:
+      - «R13, R49 — un choque en phone_numbers reintenta UNA vez en una transaccion nueva que relee las candidatas»
+      - «R13, R49 — si el reintento vuelve a chocar, el error sube sin un tercer intento»
+      - «R13, R49 — cualquier otro error sube sin reintentar»
+    - Integración en `legacy-phone-backfill.int.test.ts`: «R13, R49 — el relleno espera al alta,
+      choca en phone_numbers_company_id_e164_key y su unico reintento reutiliza el numero».
+      - Hay 2 intentos y el resumen es `{converted:1, invalid:0, reconverted:0}`.
+      - Queda una fila en `phone_numbers` y los dos clientes son dueños.
+      - El `updatedAt` se conserva y el espejo se cumple.
+      - Contraprueba: sin el reintento el caso falla con `Unique constraint failed on the fields:
+        (company_id,e164)`.
+    - Resultados: `legacy-phone-prisma.test.ts` 9/9, `legacy-phone-backfill.int.test.ts` 9/9 y
+      `guard-ambito-empresa-clientes` 50/50. Typecheck limpio después de regenerar
+      `.next/dev/types`, que el `next dev` del E2E dejó corrupto. Lint con 0 errores.
+- **m5, excepción aceptada (decisión del humano, 2026-10-20):** la ficha no tiene E2E propio del
+  webhook. Lo cubre `whatsapp-webhook-route.int.test.ts`, que va sobre la composición y contra
+  Postgres. El E2E completo llega con QC-246. Está anotado en requirements («Decisiones
+  cerradas»).
 
 | Comando (en serie) | Resultado |
 |---|---|
@@ -283,7 +301,6 @@ $ pnpm exec playwright test e2e/clientes-telefono.spec.ts --project=chromium --w
 
 ## Rojos conocidos y pendientes para el reviewer
 
-- El relleno no reintenta ante el choque de `phone_numbers` (ver m4, punto abierto).
 - **Lo que cambió en las guardias de integraciones (T8):** el inbox se cablea por fábrica
   (`createWhatsappInboxRecorder({ ownersOn })`), como pide design § 7. Para que eso encaje, la
   guardia lee ahora `PUERTO_INBOX` de esa fábrica, vigila `findBlockedWaIds` y suma casos de

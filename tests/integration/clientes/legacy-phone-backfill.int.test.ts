@@ -16,12 +16,16 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createBackfillLegacyPhones } from '@/lib/modules/clientes';
+import { createBackfillLegacyPhones, planLegacyPhoneBackfill } from '@/lib/modules/clientes';
+import { createCustomerPhoneRepository } from '@/lib/modules/clientes/adapters/driven/persistence/customer-phone-prisma';
+import { withCustomerTransaction } from '@/lib/modules/clientes/adapters/driven/persistence/customer-unit-of-work-prisma';
 import { processLegacyPhonesOfCompany } from '@/lib/modules/clientes/adapters/driven/persistence/legacy-phone-prisma';
 import { createGetCompanyCountry, normalizeCompanyName } from '@/lib/modules/identity';
 import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
 import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
+
+import type { LegacyPhonePlan } from '@/lib/modules/clientes';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -80,7 +84,7 @@ async function clienteAntiguo(
   empresa: Empresa,
   phone: string | null,
   createdAt: Date,
-  extra: { deletedAt?: Date; phoneCountry?: string; phoneIssue?: string } = {},
+  extra: { deletedAt?: Date; phoneCountry?: string; phoneE164?: string; phoneIssue?: string } = {},
 ): Promise<string> {
   const row = await prisma.customer.create({
     data: {
@@ -98,6 +102,7 @@ async function clienteAntiguo(
       updatedBy: empresa.actorId,
       deletedAt: extra.deletedAt ?? null,
       phoneCountry: extra.phoneCountry ?? null,
+      phoneE164: extra.phoneE164 ?? null,
       phoneIssue: extra.phoneIssue ?? null,
     },
     select: { id: true },
@@ -366,5 +371,69 @@ describe('R49 — la reconversion de los clientes que una pasada anterior dejo e
     expect(segunda).toEqual({ companies: 1, converted: 0, invalid: 0, reconverted: 0 });
     expect(await filasDe(empresa)).toEqual(filasAntes);
     expect(await vinculosDe(empresa)).toEqual(vinculosAntes);
+  });
+});
+
+describe('R13, R49 — el relleno y un alta simultanea del mismo numero nuevo', () => {
+  /** Espera a que alguna sesion de esta base quede bloqueada esperando a otra transaccion. */
+  async function esperarUnaSesionBloqueada(): Promise<void> {
+    for (let vuelta = 0; vuelta < 200; vuelta += 1) {
+      const [fila] = await prisma.$queryRaw<{ esperando: number }[]>`
+        SELECT count(*)::int AS esperando FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock'`;
+      if ((fila?.esperando ?? 0) > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error('el relleno nunca quedo esperando al alta');
+  }
+
+  it('R13, R49 — el relleno espera al alta, choca en phone_numbers_company_id_e164_key y su unico reintento reutiliza el numero', async () => {
+    const empresa = await crearEmpresa('CO');
+    const siete = String(Math.floor(Math.random() * 10 ** 7)).padStart(7, '0');
+    const numero = `57300${siete}`;
+    const antiguo = await clienteAntiguo(empresa, `300 ${siete.slice(0, 3)} ${siete.slice(3)}`, ENERO);
+    // El cliente del alta ya trae su telefono normalizado: no es candidato del relleno.
+    const delAlta = await clienteAntiguo(empresa, `+${numero}`, FEBRERO, { phoneCountry: 'CO', phoneE164: numero });
+    const scope = { companyId: empresa.companyId };
+
+    let soltarElAlta = (): void => undefined;
+    const puerta = new Promise<void>((resolve) => {
+      soltarElAlta = resolve;
+    });
+    let avisarEscrito = (): void => undefined;
+    const escrito = new Promise<void>((resolve) => {
+      avisarEscrito = resolve;
+    });
+    let intentosDelRelleno = 0;
+    const plan: LegacyPhonePlan = (rows) => {
+      intentosDelRelleno += 1;
+      return planLegacyPhoneBackfill(rows, 'CO');
+    };
+
+    const alta = withCustomerTransaction(async (tx) => {
+      await createCustomerPhoneRepository(tx).addLink(delAlta, numero, true, MARZO, scope);
+      avisarEscrito();
+      await puerta;
+    });
+    await escrito;
+    const relleno = processLegacyPhonesOfCompany(plan, scope);
+    try {
+      await esperarUnaSesionBloqueada();
+    } finally {
+      soltarElAlta();
+    }
+    const [, resumen] = await Promise.all([alta, relleno]);
+
+    expect(intentosDelRelleno).toBe(2);
+    expect(resumen).toEqual({ converted: 1, invalid: 0, reconverted: 0 });
+    expect(await prisma.phoneNumber.count({ where: { companyId: empresa.companyId, e164: numero } })).toBe(1);
+    expect(await createCustomerPhoneRepository(prisma).findAliveOwners(numero, scope)).toEqual([antiguo, delAlta].sort());
+    expect(await prisma.customer.findUniqueOrThrow({ where: { id: antiguo } })).toMatchObject({
+      phoneCountry: 'CO',
+      phoneE164: numero,
+      phoneIssue: null,
+      updatedAt: ENERO,
+    });
+    await esperarInvariante(empresa, [antiguo, delAlta]);
   });
 });

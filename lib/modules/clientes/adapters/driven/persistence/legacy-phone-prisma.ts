@@ -3,7 +3,7 @@ import { isSupportedCountry, type CountryCode } from 'libphonenumber-js/max';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { customerCompanyScope } from './company-scope';
-import { createCustomerPhoneRepository } from './customer-phone-prisma';
+import { createCustomerPhoneRepository, isCustomerPhoneLinkConflict } from './customer-phone-prisma';
 
 import type { Prisma } from '@prisma/client';
 
@@ -51,59 +51,77 @@ function summarize(written: readonly Written[]): LegacyPhoneCompanyResult {
  * `UPDATE` que no lo traiga. Por eso se reescribe el valor LEIDO. El `where` exige ademas que no
  * se haya movido desde la lectura (dentro del mismo milisegundo, que es lo que un `Date` guarda).
  */
+async function processLegacyPhonesInTransaction(
+  tx: Prisma.TransactionClient,
+  plan: LegacyPhonePlan,
+  scope: CustomerScope,
+): Promise<LegacyPhoneCompanyResult> {
+  const rows = await tx.customer.findMany({
+    where: { ...CANDIDATE, ...customerCompanyScope(scope) },
+    select: { id: true, phone: true, phoneCountry: true, phoneIssue: true, updatedAt: true },
+    orderBy: { id: 'asc' },
+  });
+  if (rows.length === 0) return NOTHING;
+
+  const outcomes = plan(
+    rows.map((row) => ({
+      id: row.id,
+      phone: row.phone ?? '',
+      phoneCountry: countryOfDuplicate(row.phoneIssue, row.phoneCountry),
+    })),
+  );
+
+  const phones = createCustomerPhoneRepository(tx);
+  const now = new Date();
+  const readById = new Map(rows.map((row) => [row.id, row]));
+  // El resumen cuenta lo que se escribio, no el plan: una fila que dejo de ser candidata da
+  // `count` 0 y no entra.
+  const written: Written[] = [];
+  for (const outcome of outcomes) {
+    const read = readById.get(outcome.id);
+    if (read === undefined) continue;
+    const { count } = await tx.customer.updateMany({
+      where: {
+        id: outcome.id,
+        deletedAt: null,
+        phone: { not: null },
+        phoneE164: null,
+        phoneIssue: read.phoneIssue,
+        updatedAt: { gte: read.updatedAt, lt: new Date(read.updatedAt.getTime() + 1) },
+        ...customerCompanyScope(scope),
+      },
+      data: {
+        phoneCountry: outcome.phoneCountry,
+        phoneE164: outcome.phoneE164,
+        phoneIssue: outcome.phoneIssue,
+        updatedAt: read.updatedAt,
+      },
+    });
+    if (count !== 1) continue;
+    if (outcome.phoneE164 !== null) await phones.addLink(outcome.id, outcome.phoneE164, true, now, scope);
+    written.push({ outcome, wasDuplicate: read.phoneIssue === DUPLICATE });
+  }
+  return summarize(written);
+}
+
+const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 60_000 } as const;
+
+/**
+ * El vinculo principal puede chocar en `phone_numbers` con un alta simultanea del mismo numero
+ * nuevo (el `upsert` de Prisma es un SELECT y un INSERT). La transaccion que choco ya no admite
+ * sentencias: el unico reintento abre otra, relee las candidatas y repite la condicion de cada
+ * `UPDATE`, asi que lo ya escrito por el primer intento se deshizo y nada se cuenta dos veces. Si
+ * vuelve a chocar, el error sube.
+ */
 export async function processLegacyPhonesOfCompany(
   plan: LegacyPhonePlan,
   scope: CustomerScope,
 ): Promise<LegacyPhoneCompanyResult> {
-  return prisma.$transaction(
-    async (tx) => {
-      const rows = await tx.customer.findMany({
-        where: { ...CANDIDATE, ...customerCompanyScope(scope) },
-        select: { id: true, phone: true, phoneCountry: true, phoneIssue: true, updatedAt: true },
-        orderBy: { id: 'asc' },
-      });
-      if (rows.length === 0) return NOTHING;
-
-      const outcomes = plan(
-        rows.map((row) => ({
-          id: row.id,
-          phone: row.phone ?? '',
-          phoneCountry: countryOfDuplicate(row.phoneIssue, row.phoneCountry),
-        })),
-      );
-
-      const phones = createCustomerPhoneRepository(tx);
-      const now = new Date();
-      const readById = new Map(rows.map((row) => [row.id, row]));
-      // El resumen cuenta lo que se escribio, no el plan: una fila que dejo de ser candidata da
-      // `count` 0 y no entra.
-      const written: Written[] = [];
-      for (const outcome of outcomes) {
-        const read = readById.get(outcome.id);
-        if (read === undefined) continue;
-        const { count } = await tx.customer.updateMany({
-          where: {
-            id: outcome.id,
-            deletedAt: null,
-            phone: { not: null },
-            phoneE164: null,
-            phoneIssue: read.phoneIssue,
-            updatedAt: { gte: read.updatedAt, lt: new Date(read.updatedAt.getTime() + 1) },
-            ...customerCompanyScope(scope),
-          },
-          data: {
-            phoneCountry: outcome.phoneCountry,
-            phoneE164: outcome.phoneE164,
-            phoneIssue: outcome.phoneIssue,
-            updatedAt: read.updatedAt,
-          },
-        });
-        if (count !== 1) continue;
-        if (outcome.phoneE164 !== null) await phones.addLink(outcome.id, outcome.phoneE164, true, now, scope);
-        written.push({ outcome, wasDuplicate: read.phoneIssue === DUPLICATE });
-      }
-      return summarize(written);
-    },
-    { maxWait: 10_000, timeout: 60_000 },
-  );
+  const run = (tx: Prisma.TransactionClient) => processLegacyPhonesInTransaction(tx, plan, scope);
+  try {
+    return await prisma.$transaction(run, TRANSACTION_OPTIONS);
+  } catch (error) {
+    if (!isCustomerPhoneLinkConflict(error)) throw error;
+    return prisma.$transaction(run, TRANSACTION_OPTIONS);
+  }
 }

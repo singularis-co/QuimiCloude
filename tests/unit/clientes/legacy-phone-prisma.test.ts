@@ -8,6 +8,7 @@
 // se salte una fila editada entre la lectura y la escritura, y que el vinculo exista de verdad, lo
 // cubre `legacy-phone-backfill.int.test.ts`.
 
+import { Prisma } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const tx = vi.hoisted(() => ({
@@ -50,6 +51,7 @@ const plan: LegacyPhonePlan = (rows) => {
 
 beforeEach(() => {
   recibidas = []
+  prismaDouble.$transaction.mockClear()
   tx.customer.findMany.mockReset()
   tx.customer.updateMany.mockReset()
   tx.phoneNumber.upsert.mockReset()
@@ -163,5 +165,53 @@ describe('processLegacyPhonesOfCompany — updated_at', () => {
         companyId: SCOPE.companyId,
       })
     }
+  })
+})
+
+/** El P2002 que Prisma da cuando dos transacciones dan de alta el mismo numero nuevo. */
+function choqueEnPhoneNumbers(): Prisma.PrismaClientKnownRequestError {
+  return new Prisma.PrismaClientKnownRequestError('Unique constraint failed on the fields: (`company_id`,`e164`)', {
+    code: 'P2002',
+    clientVersion: 'test',
+    meta: { modelName: 'PhoneNumber', target: ['company_id', 'e164'] },
+  })
+}
+
+function filasLeidas() {
+  return PLAN_FIJO.map((o) => ({ id: o.id, phone: `tel ${o.id}`, ...LEIDO[o.id], updatedAt: FEBRERO }))
+}
+
+describe('processLegacyPhonesOfCompany — choque en phone_numbers', () => {
+  it('R13, R49 — un choque en phone_numbers reintenta UNA vez en una transaccion nueva que relee las candidatas', async () => {
+    tx.customer.updateMany.mockResolvedValue({ count: 1 })
+    tx.customer.findMany.mockResolvedValueOnce(filasLeidas())
+    tx.phoneNumber.upsert.mockRejectedValueOnce(choqueEnPhoneNumbers())
+
+    await expect(processLegacyPhonesOfCompany(plan, SCOPE)).resolves.toEqual({
+      converted: 2,
+      invalid: 2,
+      reconverted: 1,
+    })
+    expect(prismaDouble.$transaction).toHaveBeenCalledTimes(2)
+    expect(tx.customer.findMany).toHaveBeenCalledTimes(2)
+  })
+
+  it('R13, R49 — si el reintento vuelve a chocar, el error sube sin un tercer intento', async () => {
+    tx.customer.updateMany.mockResolvedValue({ count: 1 })
+    tx.customer.findMany.mockResolvedValueOnce(filasLeidas())
+    const segundo = choqueEnPhoneNumbers()
+    tx.phoneNumber.upsert.mockRejectedValueOnce(choqueEnPhoneNumbers()).mockRejectedValueOnce(segundo)
+
+    await expect(processLegacyPhonesOfCompany(plan, SCOPE)).rejects.toBe(segundo)
+    expect(prismaDouble.$transaction).toHaveBeenCalledTimes(2)
+  })
+
+  it('R13, R49 — cualquier otro error sube sin reintentar', async () => {
+    tx.customer.updateMany.mockResolvedValue({ count: 1 })
+    const otro = new Error('otro fallo')
+    tx.phoneNumber.upsert.mockRejectedValueOnce(otro)
+
+    await expect(processLegacyPhonesOfCompany(plan, SCOPE)).rejects.toBe(otro)
+    expect(prismaDouble.$transaction).toHaveBeenCalledTimes(1)
   })
 })
