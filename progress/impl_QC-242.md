@@ -371,3 +371,19 @@ R<n> -> test:
 - R40: `whatsapp-webhook-route.test.ts`, 2 casos «R40: …».
 - R47: `whatsapp-template-actions.test.ts`, 8 casos «R47: …»; `module-shape.test.ts` «R20: el contrato reexporta exactamente…».
 - R48: `whatsapp-template-actions.test.ts`, 6 casos «R48: …».
+
+## Tanda 7 — T19 (frontend_dev)
+
+Archivos:
+- `app/(private)/integraciones/whatsapp/components/whatsapp-setup-guide.tsx`: el paso del webhook,
+  al final de `WHATSAPP_SETUP_GUIDE_STEPS`.
+- `tests/unit/integraciones-ui/whatsapp-page.test.tsx`
+
+Salida:
+```
+pnpm run typecheck -> sin errores
+pnpm run lint      -> 0 errors, 10 warnings (preexistentes)
+vitest run tests/unit/integraciones-ui/ -> Test Files 9 passed; Tests 131 passed
+```
+
+R49 -> `whatsapp-page.test.tsx` «R49: la guia incluye un paso que pide suscribir messages, message_template_status_update y template_category_update».
