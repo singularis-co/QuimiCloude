@@ -40,11 +40,12 @@ export function createCreateCompany(
     if (!parsed.success) throw new ValidationError();
 
     const company = toCompanyWrite(parsed.data.company);
-    const { administrator } = parsed.data;
+    const { administrator, country } = parsed.data;
     const instante = now();
 
     const created = await deps.companies.createWithAdministrator({
       company,
+      country,
       administrator: { ...administrator, birthDate: toBirthDate(administrator.birthDate) },
       actorId: actor.id,
       now: instante,

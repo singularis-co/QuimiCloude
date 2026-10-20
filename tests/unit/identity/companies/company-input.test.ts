@@ -113,6 +113,29 @@ describe('createCompanySchema', () => {
     expect(createCompanySchema.safeParse({ company: DATOS, administrator: ADMINISTRADOR }).success).toBe(true);
   });
 
+  it('country: un codigo ISO valido se guarda tal cual', () => {
+    const datos = createCompanySchema.parse({ company: DATOS, administrator: ADMINISTRADOR, country: 'CO' });
+    expect(datos.country).toBe('CO');
+  });
+
+  it('country: vacio, null o ausente es «sin pais»', () => {
+    expect(createCompanySchema.parse({ company: DATOS, administrator: ADMINISTRADOR, country: '' }).country).toBeNull();
+    expect(createCompanySchema.parse({ company: DATOS, administrator: ADMINISTRADOR, country: null }).country).toBeNull();
+    expect(createCompanySchema.parse({ company: DATOS, administrator: ADMINISTRADOR }).country).toBeNull();
+  });
+
+  for (const country of ['co', 'XX', 'COL', ' CO', 57]) {
+    it(`country: ${JSON.stringify(country)} → no pasa`, () => {
+      expect(createCompanySchema.safeParse({ company: DATOS, administrator: ADMINISTRADOR, country }).success).toBe(false);
+    });
+  }
+
+  it('sigue estricto: una clave no prevista junto al pais no pasa', () => {
+    expect(
+      createCompanySchema.safeParse({ company: DATOS, administrator: ADMINISTRADOR, country: 'CO', otra: 1 }).success,
+    ).toBe(false);
+  });
+
   for (const clave of ['roleId', 'credential', 'companyId', 'password', 'accountStatus']) {
     it(`R12: el Administrador con ${clave} → no pasa`, () => {
       const administrator = { ...ADMINISTRADOR, [clave]: 'x' };
@@ -135,9 +158,10 @@ describe('createCompanySchema', () => {
     expect(companyAdministratorSchema.safeParse({ ...ADMINISTRADOR, username: '   ' }).success).toBe(false);
   });
 
-  it('R5: el alta con una clave no prevista al nivel superior → no pasa', () => {
+  // El pais del alta va al nivel superior (`country`), no dentro de `company`.
+  it('R5: el alta con una clave no prevista al nivel superior o el pais dentro de company → no pasa', () => {
     expect(
-      createCompanySchema.safeParse({ company: DATOS, administrator: ADMINISTRADOR, country: 'CO' }).success,
+      createCompanySchema.safeParse({ company: DATOS, administrator: ADMINISTRADOR, otra: 'CO' }).success,
     ).toBe(false);
     expect(
       createCompanySchema.safeParse({ company: { ...DATOS, country: 'CO' }, administrator: ADMINISTRADOR }).success,

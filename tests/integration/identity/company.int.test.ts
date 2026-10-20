@@ -489,6 +489,28 @@ describe('createWithAdministrator', () => {
     })
   })
 
+  it('country: el alta con pais lo guarda en la misma transaccion, con un unico evento company.created', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createCompanyRepository(tx)
+      const actorId = await createMaestro(tx)
+      const data = write(`Alta pais ${tag()}`)
+
+      const result = await repo.createWithAdministrator({
+        company: data,
+        country: 'CO',
+        administrator: administrator(),
+        actorId,
+        now: NOW,
+      })
+      if (typeof result === 'string') throw new Error(`el alta no debia fallar, y devolvio \`${result}\``)
+
+      expect(await readCompany(tx, result.companyId)).toMatchObject({ country: 'CO' })
+      expect(
+        await tx.companyEvent.findMany({ where: { companyId: result.companyId }, select: { kind: true } }),
+      ).toEqual([{ kind: 'company.created' }])
+    })
+  })
+
   it('R13, R14: el usuario del Maestro (sin distinguir mayusculas) → username, sin empresa ni evento', async () => {
     await inRolledBackTransaction(async (tx) => {
       const repo = createCompanyRepository(tx)

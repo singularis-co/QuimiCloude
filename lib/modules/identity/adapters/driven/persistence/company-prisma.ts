@@ -179,7 +179,7 @@ function addonOf(details: Prisma.JsonValue | null): string | null {
 
 export function createCompanyRepository(db: PrismaLike = prisma): CompanyRepository {
   return {
-    async createWithAdministrator({ company, administrator, actorId, now }) {
+    async createWithAdministrator({ company, country = null, administrator, actorId, now }) {
       let writingEvent = false;
       try {
         return await atomically(db, async (tx) => {
@@ -190,7 +190,7 @@ export function createCompanyRepository(db: PrismaLike = prisma): CompanyReposit
           if (role === null) throw new Error(`no existe el rol ${ROLE_ADMINISTRADOR}`);
 
           const created = await tx.company.create({
-            data: { ...company, createdAt: now, updatedAt: now },
+            data: { ...company, country, createdAt: now, updatedAt: now },
             select: { id: true },
           });
           const user = await tx.user.create({

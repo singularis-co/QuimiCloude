@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { companyCountrySchema } from './company-country-input';
 import { normalizeCompanyName } from './company-name';
 import { ValidationError } from './errors';
 import { normalizeKey } from './normalize-key';
@@ -35,9 +36,13 @@ export const companyDataSchema = z.strictObject({
 
 export const companyAdministratorSchema = createUserSchema.omit({ roleId: true, credential: true });
 
+// El pais va fuera de `company`: los datos de la empresa los comparte la edicion, y ahi el pais tiene
+// su propio camino. En el alta no hay pais que vaciar por accidente, asi que ausente o `null` es
+// «sin pais», igual que `''`.
 export const createCompanySchema = z.strictObject({
   company: companyDataSchema,
   administrator: companyAdministratorSchema,
+  country: companyCountrySchema.nullish().transform((country) => country ?? null),
 });
 
 export const updateCompanySchema = companyDataSchema.extend({ companyId: z.string().uuid() });
