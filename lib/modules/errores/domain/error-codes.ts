@@ -42,6 +42,9 @@
  * **2026-10-16**: `company_last_administrator`.
  * **2026-10-19**: `customer_phone_country_required`, `customer_phone_invalid`,
  * `customer_duplicate_phone`.
+ * **2026-10-20**: `whatsapp_contact_not_found`, `whatsapp_contact_number_invalid`.
+ * **2026-10-20**: se retira `customer_duplicate_phone`: un mismo numero puede ser de varios clientes
+ * de la empresa y ya no hay duplicado que rechazar.
  * **2026-10-20**: `whatsapp_template_not_found`, `whatsapp_template_name_taken`,
  * `whatsapp_template_rate_limited`, `whatsapp_template_rejected`, `whatsapp_meta_rejected`,
  * `whatsapp_meta_unreachable`.
@@ -240,7 +243,10 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: el numero tiene forma de texto valida, pero no existe en el pais
   // elegido.
   'customer_phone_invalid',
-  'customer_duplicate_phone',
+  // Distinto de `whatsapp_connection_not_found`: la conexion existe, lo que falta es la conversacion.
+  'whatsapp_contact_not_found',
+  // Distinto de `customer_phone_invalid`: no lo escribio nadie, es el numero que trae WhatsApp.
+  'whatsapp_contact_number_invalid',
   'whatsapp_template_not_found',
   'whatsapp_template_name_taken',
   'whatsapp_template_rate_limited',

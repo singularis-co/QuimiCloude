@@ -4,8 +4,8 @@
 // Aislamiento: `commit`. `companyOfWhatsappConnection` lee con el cliente Prisma GLOBAL, asi que
 // solo ve filas confirmadas; las altas que la base debe rechazar no dejan nada. Cada caso fabrica su
 // empresa efimera (tipo de documento, rol, empresa, usuario y conexion) y `afterAll` borra
-// mensajes -> contactos -> conexiones por `company_id`, afirma contando que no queda nada y despues
-// borra usuario -> rol -> tipo de documento -> empresa.
+// mensajes -> contactos -> conexiones -> clientes por `company_id`, afirma contando que no queda
+// nada y despues borra usuario -> rol -> tipo de documento -> empresa.
 
 import { randomUUID } from 'node:crypto'
 
@@ -123,9 +123,11 @@ afterAll(async () => {
   await prisma.whatsappMessage.deleteMany(enEmpresas)
   await prisma.whatsappContact.deleteMany(enEmpresas)
   await prisma.whatsappConnection.deleteMany(enEmpresas)
+  await prisma.customer.deleteMany(enEmpresas)
   expect(await prisma.whatsappMessage.count(enEmpresas)).toBe(0)
   expect(await prisma.whatsappContact.count(enEmpresas)).toBe(0)
   expect(await prisma.whatsappConnection.count(enEmpresas)).toBe(0)
+  expect(await prisma.customer.count(enEmpresas)).toBe(0)
   for (const empresa of empresas) {
     await prisma.user.delete({ where: { id: empresa.userId } })
     await prisma.role.delete({ where: { id: empresa.roleId } })
@@ -333,5 +335,122 @@ describe('R32: el resolutor de empresa del webhook', () => {
 
     expect(await companyOfWhatsappConnection(borrada)).toBeNull()
     expect(await companyOfWhatsappConnection(randomUUID())).toBeNull()
+  })
+})
+
+// --- Vinculo con clientes y bloqueo de contactos -------------------------------------------------
+
+async function cliente(empresa: Pick<Empresa, 'companyId'>): Promise<string> {
+  const { id } = await prisma.customer.create({
+    data: {
+      companyId: empresa.companyId,
+      firstNames: 'Cliente',
+      lastNames: 'De Prueba',
+      city: 'Bogota',
+      firstNamesNormalized: 'cliente',
+      lastNamesNormalized: 'de prueba',
+      cityNormalized: 'bogota',
+    },
+    select: { id: true },
+  })
+  return id
+}
+
+type ContactoConMarcas = {
+  readonly customerId?: string | null
+  readonly customerLinkedBy?: string | null
+  readonly blockedAt?: Date | null
+  readonly blockedBy?: string | null
+}
+
+function contactoCon(empresa: Pick<Empresa, 'companyId' | 'connectionId'>, marcas: ContactoConMarcas) {
+  return prisma.whatsappContact.create({
+    data: {
+      companyId: empresa.companyId,
+      connectionId: empresa.connectionId,
+      waId: `57300${token().slice(0, 8)}`,
+      ...marcas,
+    },
+  })
+}
+
+describe('R47: un contacto solo apunta a un cliente de su empresa (QC-239)', () => {
+  it('R47: un contacto de A con un cliente de B lo rechaza la FK compuesta, y no queda nada', async () => {
+    const a = await crearEmpresa()
+    const b = await crearEmpresa()
+    const deB = await cliente(b)
+
+    expect(await codigoDeRechazo(contactoCon(a, { customerId: deB }))).toBe('P2003')
+    expect(await prisma.whatsappContact.count({ where: { companyId: a.companyId } })).toBe(0)
+  })
+
+  it('R47: mover un contacto de A a un cliente de B lo rechaza la FK compuesta y el contacto no cambia', async () => {
+    const a = await crearEmpresa()
+    const b = await crearEmpresa()
+    const deA = await cliente(a)
+    const deB = await cliente(b)
+    const creado = await contactoCon(a, { customerId: deA })
+
+    expect(
+      await codigoDeRechazo(prisma.whatsappContact.update({ where: { id: creado.id }, data: { customerId: deB } })),
+    ).toBe('P2003')
+    expect(await prisma.whatsappContact.findUniqueOrThrow({ where: { id: creado.id } })).toMatchObject({
+      customerId: deA,
+    })
+  })
+
+  it('R47 (control): un contacto con un cliente de su empresa entra, como automatico o como manual', async () => {
+    const a = await crearEmpresa()
+    const deA = await cliente(a)
+
+    await expect(contactoCon(a, { customerId: deA })).resolves.toMatchObject({ customerId: deA, customerLinkedBy: null })
+    await expect(contactoCon(a, { customerId: deA, customerLinkedBy: a.userId })).resolves.toMatchObject({
+      customerId: deA,
+      customerLinkedBy: a.userId,
+    })
+  })
+})
+
+describe('CHECK de whatsapp_contacts: vinculo manual y bloqueo (QC-239)', () => {
+  it('whatsapp_contacts_customer_link_check: una marca de vinculo manual sin cliente se rechaza', async () => {
+    const a = await crearEmpresa()
+
+    await expect(contactoCon(a, { customerLinkedBy: a.userId })).rejects.toThrow(/whatsapp_contacts_customer_link_check/)
+    expect(await prisma.whatsappContact.count({ where: { companyId: a.companyId } })).toBe(0)
+  })
+
+  it('whatsapp_contacts_customer_link_check: quitar el cliente y dejar la marca manual se rechaza', async () => {
+    const a = await crearEmpresa()
+    const deA = await cliente(a)
+    const creado = await contactoCon(a, { customerId: deA, customerLinkedBy: a.userId })
+
+    await expect(
+      prisma.whatsappContact.update({ where: { id: creado.id }, data: { customerId: null } }),
+    ).rejects.toThrow(/whatsapp_contacts_customer_link_check/)
+    expect(await prisma.whatsappContact.findUniqueOrThrow({ where: { id: creado.id } })).toMatchObject({
+      customerId: deA,
+      customerLinkedBy: a.userId,
+    })
+  })
+
+  it('whatsapp_contacts_blocked_check: fecha de bloqueo sin usuario, o usuario sin fecha, se rechaza', async () => {
+    const a = await crearEmpresa()
+
+    await expect(contactoCon(a, { blockedAt: new Date('2026-10-20T10:00:00.000Z') })).rejects.toThrow(
+      /whatsapp_contacts_blocked_check/,
+    )
+    await expect(contactoCon(a, { blockedBy: a.userId })).rejects.toThrow(/whatsapp_contacts_blocked_check/)
+    expect(await prisma.whatsappContact.count({ where: { companyId: a.companyId } })).toBe(0)
+  })
+
+  it('whatsapp_contacts_blocked_check (control): bloqueado con fecha y usuario, o sin ninguno de los dos, entra', async () => {
+    const a = await crearEmpresa()
+    const bloqueadoEn = new Date('2026-10-20T10:00:00.000Z')
+
+    await expect(contactoCon(a, { blockedAt: bloqueadoEn, blockedBy: a.userId })).resolves.toMatchObject({
+      blockedAt: bloqueadoEn,
+      blockedBy: a.userId,
+    })
+    await expect(contactoCon(a, {})).resolves.toMatchObject({ blockedAt: null, blockedBy: null })
   })
 })

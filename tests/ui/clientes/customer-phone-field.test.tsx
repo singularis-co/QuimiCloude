@@ -19,7 +19,6 @@ import {
   CustomerSheet,
 } from '@/app/(private)/clientes/components';
 import {
-  CustomerDuplicatePhoneError,
   CustomerPhoneCountryRequiredError,
   CustomerPhoneInvalidError,
   formatPhoneNational,
@@ -70,7 +69,6 @@ const PHONE = 390;
 
 const COUNTRY_REQUIRED = new CustomerPhoneCountryRequiredError();
 const PHONE_INVALID = new CustomerPhoneInvalidError();
-const DUPLICATE = new CustomerDuplicatePhoneError();
 
 const E164 = '573001234567';
 const NATIONAL = formatPhoneNational(E164, 'CO');
@@ -447,45 +445,8 @@ describe('CustomerPhoneField · errores', () => {
     );
   });
 
-  it('R12 — customer_duplicate_phone del servidor se pinta bajo el número, no en la región general', async () => {
-    const user = setupUser();
-    createCustomerActionMock.mockResolvedValue({
-      status: 'error',
-      code: DUPLICATE.code,
-      message: DUPLICATE.message,
-    });
-    await openCreate(user, 'CO');
-    await fillRequired(user);
-    await user.type(numberInput(), '3001234567');
-    await user.click(screen.getByTestId(CUSTOMER_FORM_SUBMIT_TESTID));
-
-    const error = await screen.findByTestId(CUSTOMER_ERROR_TESTIDS.phoneNumber);
-    expect(error).toHaveTextContent('Este teléfono ya está registrado en otro cliente.');
-    expect(numberInput()).toHaveAttribute('aria-describedby', error.id);
-    expect(screen.queryByTestId(CUSTOMER_FORM_ERROR_TESTID)).toBeNull();
-    expect(numberInput()).toHaveValue(NATIONAL);
-  });
-
-  it('R12 — el duplicado sigue a la vista si se sale del número sin cambiarlo', async () => {
-    const user = setupUser();
-    createCustomerActionMock.mockResolvedValue({
-      status: 'error',
-      code: DUPLICATE.code,
-      message: DUPLICATE.message,
-    });
-    await openCreate(user, 'CO');
-    await fillRequired(user);
-    await user.type(numberInput(), '3001234567');
-    await user.click(screen.getByTestId(CUSTOMER_FORM_SUBMIT_TESTID));
-    await screen.findByTestId(CUSTOMER_ERROR_TESTIDS.phoneNumber);
-
-    await user.click(numberInput());
-    await user.tab();
-
-    expect(screen.getByTestId(CUSTOMER_ERROR_TESTIDS.phoneNumber)).toHaveTextContent(
-      DUPLICATE.message,
-    );
-  });
+  // 2026-10-20, QC-239 R7: `customer_duplicate_phone` deja de existir -un número puede ser de
+  // varios clientes- y con él los dos casos de R12 que lo pintaban bajo el número.
 });
 
 describe('CustomerPhoneField · lo que se envía', () => {

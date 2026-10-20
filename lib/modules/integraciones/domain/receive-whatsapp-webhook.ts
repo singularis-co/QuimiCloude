@@ -77,7 +77,7 @@ export function createReceiveWhatsappWebhook(
     const batch = parseWhatsappWebhook(decoded.json, record.phoneNumberId, record.wabaId);
     if (batch === null) return { kind: 'ignored', reason: 'unparseable' };
 
-    await deps.inbox.record(batch, record.id, now(), scope);
+    const { discardedBlocked } = await deps.inbox.record(batch, record.id, now(), scope);
     // Va aparte de los mensajes: los dos son idempotentes y el reintento de Meta repite ambos.
     const { unknown } =
       batch.templateUpdates.length === 0
@@ -85,7 +85,7 @@ export function createReceiveWhatsappWebhook(
         : await deps.templates.applyWebhookUpdates(record.id, batch.templateUpdates, scope);
     return {
       kind: 'stored',
-      counts: { messages: batch.messages.length, statuses: batch.statuses.length },
+      counts: { messages: batch.messages.length - discardedBlocked, statuses: batch.statuses.length },
       skipped: {
         changes: batch.skipped.changes,
         messages: batch.skipped.messages,

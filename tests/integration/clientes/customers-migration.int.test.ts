@@ -120,6 +120,10 @@ const DOWN_STATEMENTS = statementsOf(DOWN_SOURCE)
  * entrega choca con 2BP01 igual. Se recorre en orden de timestamp y entra toda migracion que
  * referencie `customers` o una tabla creada por una dependiente ya detectada. Las aserciones de
  * antes se conservan.
+ *
+ * Nota 2026-10-20: entra tambien toda migracion posterior que agrega columnas a `customers`. El
+ * `DROP TABLE` se las lleva y el UP de esta tabla no las recrea; desde que la de telefonos n:m
+ * copia `customers.phone_e164` en su UP, sin el UP de esas columnas delante falla con 42703.
  */
 const timestampDe = (nombre: string): string => nombre.split('_')[0] as string
 const TABLAS_DEPENDIENTES = new Set<string>(['customers'])
@@ -129,6 +133,7 @@ const DEPENDIENTES_POSTERIORES = readdirSync(migrationsDir)
   .sort()
   .filter((nombre) => {
     const sql = readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8')
+    if (/ALTER\s+TABLE\s+"customers"\s+ADD\s+COLUMN/.test(sql)) return true
     const referenciadas = [...sql.matchAll(/REFERENCES\s+"(\w+)"/g)].map((m) => m[1] as string)
     if (!referenciadas.some((tabla) => TABLAS_DEPENDIENTES.has(tabla))) return false
     for (const m of sql.matchAll(/CREATE\s+TABLE\s+"(\w+)"/g)) TABLAS_DEPENDIENTES.add(m[1] as string)

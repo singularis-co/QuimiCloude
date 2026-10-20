@@ -119,8 +119,15 @@ describe('customers.phone_* — migration.sql (R23, R15, R16, R14)', () => {
     expect(noTocaPhoneNiFilas(downSource)).toBe(true)
   })
 
-  it('R14: el indice es UNIQUE sobre (company_id, phone_e164) solo entre vivos con numero', () => {
+  // Nota 2026-10-20: `*_customer_phone_numbers` retira este indice (un numero puede ser de varios
+  // clientes) y su down.sql lo recrea igual. Esta migracion no cambia: sigue creandolo.
+  it('R14: el indice es UNIQUE sobre (company_id, phone_e164) solo entre vivos con numero (QC-239 R7: lo retira una posterior)', () => {
     expect(statements(upSource)).toContain(CREATE_INDEX)
+    const retiradas = readdirSync(migrationsDir)
+      .filter((name) => /^\d{14}_customer_phone_numbers$/.test(name))
+      .map((name) => statements(readFileSync(join(migrationsDir, name, 'migration.sql'), 'utf8')))
+    expect(retiradas).toHaveLength(1)
+    expect(retiradas[0]).toContain('DROP INDEX "customers_company_phone_e164_key"')
   })
 
   it('R15: phone_country solo admite dos letras mayusculas', () => {

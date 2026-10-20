@@ -8,6 +8,8 @@ import {
   formatPhoneNational,
   parseCustomerPhone,
   parseCustomerPhoneText,
+  parseWaIdPhone,
+  phoneMatchesWaId,
 } from '@/lib/modules/clientes'
 
 // Los metadatos de libphonenumber-js formatean los moviles de Colombia como `300 1234567`
@@ -143,5 +145,48 @@ describe('describeCustomerPhone', () => {
 
   it('R29 — sin telefono, none', () => {
     expect(describeCustomerPhone({ phone: null, phoneE164: null, phoneIssue: null })).toEqual({ kind: 'none' })
+  })
+})
+
+// Los ejemplos se contrastaron con libphonenumber-js 1.13.15 (metadatos `max`): el movil de Mexico
+// con el `1` y el de Brasil sin el noveno digito no son validos; su otra forma si.
+describe('QC-239 parseWaIdPhone', () => {
+  it('QC-239 R30 — Mexico con el 1: se queda la forma sin el 1, que es la valida, con su pais', () => {
+    expect(parseWaIdPhone('5215512345678')).toEqual({ e164: '525512345678', country: 'MX' })
+  })
+
+  it('QC-239 R30 — Mexico sin el 1: el mismo numero', () => {
+    expect(parseWaIdPhone('525512345678')).toEqual({ e164: '525512345678', country: 'MX' })
+  })
+
+  it('QC-239 R30 — Argentina, Brasil, Colombia y EE. UU.: el numero tal cual cuando ya es valido', () => {
+    expect(parseWaIdPhone('5491123456789')).toEqual({ e164: '5491123456789', country: 'AR' })
+    expect(parseWaIdPhone('5511987654321')).toEqual({ e164: '5511987654321', country: 'BR' })
+    expect(parseWaIdPhone('573001234567')).toEqual({ e164: '573001234567', country: 'CO' })
+    expect(parseWaIdPhone('14155552671')).toEqual({ e164: '14155552671', country: 'US' })
+  })
+
+  it('QC-239 R30 — Brasil sin el noveno digito: se queda la forma con el 9', () => {
+    expect(parseWaIdPhone('551187654321')).toEqual({ e164: '5511987654321', country: 'BR' })
+  })
+
+  it('QC-239 R30, R19 — el numero devuelto sigue coincidiendo con el wa_id', () => {
+    for (const waId of ['5215512345678', '525512345678', '5491123456789', '551187654321', '573001234567']) {
+      const parsed = parseWaIdPhone(waId)
+      expect(parsed, waId).not.toBeNull()
+      expect(phoneMatchesWaId(parsed?.e164 ?? '', waId), waId).toBe(true)
+    }
+  })
+
+  it('QC-239 R30 — un wa_id que no es valido en ninguna de sus variantes da null', () => {
+    expect(parseWaIdPhone('999123456789')).toBeNull()
+    expect(parseWaIdPhone('543511234567')).toBeNull()
+    expect(parseWaIdPhone('5493511234567')).toBeNull()
+  })
+
+  it('QC-239 R30 — un wa_id vacio o con algo que no es un digito da null', () => {
+    expect(parseWaIdPhone('')).toBeNull()
+    expect(parseWaIdPhone('+573001234567')).toBeNull()
+    expect(parseWaIdPhone('57 300 123 4567')).toBeNull()
   })
 })

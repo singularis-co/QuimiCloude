@@ -4,16 +4,21 @@
 
 import { vi } from 'vitest'
 
+import { phoneMatchesWaId } from '@/lib/modules/clientes'
+
 import type { Actor } from '@/lib/modules/integraciones/domain/actor'
 import { SecretUnreadableError, WhatsappTemplateNameTakenError } from '@/lib/modules/integraciones/domain/errors'
 import type { IntegracionesScope } from '@/lib/modules/integraciones/domain/integraciones-scope'
 import type { SecretContext } from '@/lib/modules/integraciones/domain/secret-context'
 import type { TemplateSyncPlan } from '@/lib/modules/integraciones/domain/template-sync-plan'
 import type { WhatsappConnectionRecord } from '@/lib/modules/integraciones/domain/whatsapp-connection'
+import type { ContactLink } from '@/lib/modules/integraciones/domain/whatsapp-contact-link'
 import type {
   TemplateWebhookUpdate,
   WhatsappTemplateRecord,
 } from '@/lib/modules/integraciones/domain/whatsapp-template'
+import type { CustomerPhoneLinks } from '@/lib/modules/integraciones/ports/customer-phone-links'
+import type { CustomerPhoneOwners } from '@/lib/modules/integraciones/ports/customer-phone-owners'
 import type { IntegrationsSwitch } from '@/lib/modules/integraciones/ports/integrations-switch'
 import type { RandomSource } from '@/lib/modules/integraciones/ports/random-source'
 import type { SecretCipher } from '@/lib/modules/integraciones/ports/secret-cipher'
@@ -24,6 +29,15 @@ import type {
   WhatsappConnectionRepository,
 } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository'
 import type { GraphProbeResult, WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client'
+import type {
+  WhatsappContactBlock,
+  WhatsappContactLinkRow,
+  WhatsappContactRepository,
+} from '@/lib/modules/integraciones/ports/whatsapp-contact-repository'
+import type {
+  WhatsappContactTransactionScope,
+  WhatsappContactUnitOfWork,
+} from '@/lib/modules/integraciones/ports/whatsapp-contact-unit-of-work'
 import type {
   NewCreatedTemplateRow,
   TemplateSyncRow,
@@ -243,6 +257,31 @@ export function makeIntegrationsSwitch(on = true) {
   return { integrations, isOn }
 }
 
+export const CONTACT_ID = '00000000-0000-4000-8000-0000000000d1'
+export const OTHER_CONTACT_ID = '00000000-0000-4000-8000-0000000000d2'
+export const CUSTOMER_ID = '00000000-0000-4000-8000-0000000000e1'
+export const OTHER_CUSTOMER_ID = '00000000-0000-4000-8000-0000000000e2'
+export const THIRD_CUSTOMER_ID = '00000000-0000-4000-8000-0000000000e3'
+
+export type ContactDoubleRow = {
+  readonly id: string
+  readonly companyId: string
+  readonly waId: string
+  readonly link: ContactLink
+  readonly blocked: WhatsappContactBlock | null
+}
+
+export function contactRow(overrides: Partial<ContactDoubleRow> = {}): ContactDoubleRow {
+  return {
+    id: CONTACT_ID,
+    companyId: COMPANY_ID,
+    waId: '573001234567',
+    link: { customerId: null, linkedBy: null },
+    blocked: null,
+    ...overrides,
+  }
+}
+
 export const TEMPLATE_ID = '00000000-0000-4000-8000-000000000101'
 
 /** Una plantilla guardada de la conexion por defecto. */
@@ -265,6 +304,71 @@ export function storedTemplate(overrides: Partial<WhatsappTemplateRecord> = {}):
     deletedAt: null,
     ...overrides,
   }
+}
+
+/** Contactos en memoria que respetan el ambito: uno de otra empresa no se ve ni se escribe. */
+export function makeContactRepository(initial: readonly ContactDoubleRow[] = []) {
+  const rows = new Map(initial.map((row) => [row.id, { ...row }]))
+  const visible = (row: ContactDoubleRow | undefined, scope: IntegracionesScope): row is ContactDoubleRow =>
+    row !== undefined && row.companyId === scope.companyId
+  const toLinkRow = (row: ContactDoubleRow): WhatsappContactLinkRow => ({ id: row.id, waId: row.waId, link: row.link })
+
+  const findById = vi.fn<WhatsappContactRepository['findById']>(async (id, scope) => {
+    const row = rows.get(id)
+    return visible(row, scope) ? toLinkRow(row) : null
+  })
+  const findByWaIds = vi.fn<WhatsappContactRepository['findByWaIds']>(async (waIds, scope) =>
+    [...rows.values()].filter((row) => visible(row, scope) && waIds.includes(row.waId)).map(toLinkRow),
+  )
+  const setLink = vi.fn<WhatsappContactRepository['setLink']>(async (id, link, scope) => {
+    const row = rows.get(id)
+    if (visible(row, scope)) rows.set(id, { ...row, link })
+  })
+  const setBlocked = vi.fn<WhatsappContactRepository['setBlocked']>(async (id, blocked, scope) => {
+    const row = rows.get(id)
+    if (!visible(row, scope)) return 'not_found'
+    if (blocked === null || row.blocked === null) rows.set(id, { ...row, blocked })
+    return 'ok'
+  })
+
+  const contacts: WhatsappContactRepository = { findById, findByWaIds, setLink, setBlocked }
+  return { contacts, findById, findByWaIds, setLink, setBlocked, row: (id: string) => rows.get(id) }
+}
+
+/**
+ * Duenos de numeros con la regla real de coincidencia: `phones` dice que numeros vivos tiene cada
+ * cliente vivo, por empresa. Un cliente dado de baja o un vinculo quitado simplemente no esta.
+ */
+export function makeOwners(phones: Record<string, Record<string, readonly string[]>> = {}) {
+  const ownersOf = vi.fn<CustomerPhoneOwners['ownersOf']>(async (waId, companyId) =>
+    Object.entries(phones[companyId] ?? {})
+      .filter(([, numbers]) => numbers.some((number) => phoneMatchesWaId(number, waId)))
+      .map(([customerId]) => customerId),
+  )
+  const owners: CustomerPhoneOwners = { ownersOf }
+  return { owners, ownersOf }
+}
+
+/** Telefonos de cliente: devuelve lo que el test fije y anota cada llamada. */
+export function makeCustomerPhoneLinks(
+  results: {
+    add?: Awaited<ReturnType<CustomerPhoneLinks['addWaId']>>
+    remove?: Awaited<ReturnType<CustomerPhoneLinks['removeWaId']>>
+  } = {},
+) {
+  const addWaId = vi.fn<CustomerPhoneLinks['addWaId']>(async () => results.add ?? { numbers: [] })
+  const removeWaId = vi.fn<CustomerPhoneLinks['removeWaId']>(async () => results.remove ?? { numbers: [] })
+  const customerPhones: CustomerPhoneLinks = { addWaId, removeWaId }
+  return { customerPhones, addWaId, removeWaId }
+}
+
+/** Unidad de trabajo sin base: corre el trabajo con los puertos dados y cuenta las aperturas. */
+export function makeContactUnitOfWork(scope: WhatsappContactTransactionScope) {
+  const run = vi.fn((work: (s: WhatsappContactTransactionScope) => Promise<unknown>) => work(scope))
+  const unitOfWork: WhatsappContactUnitOfWork = {
+    run: <T,>(work: (s: WhatsappContactTransactionScope) => Promise<T>) => run(work) as Promise<T>,
+  }
+  return { unitOfWork, run }
 }
 
 type TemplateRows = Map<string, WhatsappTemplateRecord>

@@ -89,8 +89,12 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-288 2026-10-19 (merge de dev): 103 y no 102: entra también `delivery_exceeds_surplus`.
       // 2026-10-19: 106 y no 103: entran `customer_phone_country_required`,
       // `customer_phone_invalid` y `customer_duplicate_phone`.
-      // 2026-10-20: 112 y no 106: entran los seis codigos de plantillas y de Meta de WhatsApp.
-      expect(ERROR_CODES).toHaveLength(112)
+      // 2026-10-20: 108 y no 106: entran `whatsapp_contact_not_found` y
+      // `whatsapp_contact_number_invalid`.
+      // QC-239 2026-10-20: 107 y no 108: sale `customer_duplicate_phone`.
+      // QC-242 2026-10-20: 112 y no 106: entran los seis codigos de plantillas y de Meta de WhatsApp.
+      // Merge de dev en QC-239 (2026-10-20): 113 = 106 + 2 de contactos - 1 retirado + 6 de plantillas.
+      expect(ERROR_CODES).toHaveLength(113)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

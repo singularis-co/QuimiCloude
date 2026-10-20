@@ -8,6 +8,9 @@ import { UnauthorizedError } from './errors';
  * mas. Sin nombre de rol: este modulo no lo lee ni lo compara, quien decide es la pertenencia
  * exacta del codigo al conjunto.
  */
+/** Otros modulos que escriben en los telefonos de un cliente exigen este mismo permiso. */
+export const CUSTOMER_MODIFY_PERMISSION: PermissionCode = 'clientes.modificar';
+
 export type Actor = {
   readonly id: string;
   readonly companyId: string;

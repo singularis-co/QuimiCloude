@@ -58,7 +58,7 @@ function makeSignature() {
 }
 
 function makeInbox() {
-  const record = vi.fn<WhatsappInboxRepository['record']>(async () => undefined)
+  const record = vi.fn<WhatsappInboxRepository['record']>(async () => ({ discardedBlocked: 0 }))
   const inbox: WhatsappInboxRepository = { record }
   return { inbox, record }
 }
@@ -169,6 +169,41 @@ describe('receiveWhatsappWebhook: POST firmado', () => {
       followUp: null,
     })
     expect(inbox.record).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('receiveWhatsappWebhook: contactos bloqueados', () => {
+  it('R39, R41: los mensajes que el inbox descarta por bloqueo no cuentan como guardados, y la respuesta sigue siendo stored', async () => {
+    const { receive, inbox } = setup()
+    inbox.record.mockResolvedValueOnce({ discardedBlocked: 2 })
+    const body = messagesNotification([textMessage(), textMessage(), textMessage()])
+
+    const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })
+
+    expect(result).toEqual({
+      kind: 'stored',
+      counts: { messages: 1, statuses: 0 },
+      skipped: { changes: 0, messages: 0, statuses: 0, templates: 0 },
+      followUp: null,
+    })
+    expect(inbox.record).toHaveBeenCalledTimes(1)
+  })
+
+  it('R40: con todo el lote descartado por bloqueo los statuses se siguen contando', async () => {
+    const { receive, inbox } = setup()
+    inbox.record.mockResolvedValueOnce({ discardedBlocked: 1 })
+    const body = notification(
+      change(value({ messages: [textMessage()], statuses: [status('wamid.saliente', 'delivered')] })),
+    )
+
+    const result = await receive({ connectionId: CONNECTION_ID, rawBody: bytesOf(body), signature: GOOD_SIGNATURE })
+
+    expect(result).toEqual({
+      kind: 'stored',
+      counts: { messages: 0, statuses: 1 },
+      skipped: { changes: 0, messages: 0, statuses: 0, templates: 0 },
+      followUp: null,
+    })
   })
 })
 
