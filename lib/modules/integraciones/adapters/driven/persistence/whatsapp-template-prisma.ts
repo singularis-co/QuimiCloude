@@ -108,7 +108,26 @@ function sqlStateOf(error: unknown): string | null {
   return null;
 }
 
-function isNameLanguageTaken(error: unknown): boolean {
+/** `meta.target` llega como cadena o como array según el motor; se normaliza a array. */
+function targetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string[] {
+  const target = error.meta?.target;
+  if (typeof target === 'string') return [target];
+  if (Array.isArray(target)) return target.filter((item): item is string => typeof item === 'string');
+  return [];
+}
+
+/**
+ * Un índice parcial creado en SQL crudo llega como `P2002` con las COLUMNAS en `meta.target`
+ * (`["connection_id","name","language"]`), no con su nombre (`user-admin-prisma.ts`). Se acepta
+ * también el nombre, y el `P2010` con SQLSTATE `23505` que nombra el índice en el texto. El otro
+ * único de la tabla, `(connection_id, meta_template_id)`, no lleva `name` ni `language`.
+ */
+export function isNameLanguageTaken(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    const targets = targetsOf(error);
+    if (targets.some((target) => target.includes(NAME_LANGUAGE_LIVE_INDEX))) return true;
+    return targets.includes('name') && targets.includes('language');
+  }
   if (sqlStateOf(error) !== UNIQUE_VIOLATION || !(error instanceof Error)) return false;
   const meta = error instanceof Prisma.PrismaClientKnownRequestError ? JSON.stringify(error.meta ?? {}) : '';
   return `${error.message} ${meta}`.includes(NAME_LANGUAGE_LIVE_INDEX);

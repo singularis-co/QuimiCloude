@@ -451,3 +451,13 @@ nombre, dentro de los archivos de test que toca esta rama (comprobado con grep s
   `syncConnectionTemplates` con `cipher` y el conteo `deleted` en una carrera (tanda 4); el cron
   con `isOn`/`findLive` dentro del `try` (tanda 5); U+0000 rechazado en el validador (tanda 2).
   Para QC-243: el doble `canned` no refleja un `APPROVED` llegado por webhook.
+
+## Rojo de CI, PR #281
+
+- **Fallo:** run 39486830175, shard 3 — `whatsapp-template-prisma.int.test.ts > R2 — dos vivas con la misma conexion, nombre e idioma no entran` recibia un `PrismaClientKnownRequestError` en vez de `WhatsappTemplateNameTakenError`.
+- **Causa:** el traductor solo reconocia SQLSTATE `23505` (de `meta.code`) con el nombre del indice en el texto; Prisma 6.19.3 da `P2002` para el `$queryRaw` y, en un indice unico parcial de SQL crudo, pone las COLUMNAS en `meta.target` (`["connection_id","name","language"]`), no el nombre del indice (mismo hallazgo que `user-admin-prisma.ts`).
+- **Arreglo:** `isNameLanguageTaken` (ahora exportada) acepta `P2002` cuyo `meta.target` incluya `name` y `language`, o el nombre `whatsapp_templates_name_language_live_key`; conserva la via `P2010`/`23505` por texto. El otro unico, `(connection_id, meta_template_id)`, no lleva esas columnas y no se confunde (ademas lo absorbe el `ON CONFLICT`). `applyWhatsappTemplateSync` no traduce P2002 (usa `skipDuplicates`).
+- **Archivos:** `lib/modules/integraciones/adapters/driven/persistence/whatsapp-template-prisma.ts`; nuevo `tests/unit/integraciones/whatsapp/templates/whatsapp-template-prisma-errors.test.ts`.
+- **R2 → test:** `whatsapp-template-prisma-errors.test.ts > R2: el unico parcial de nombre e idioma...` (6 casos, sin base), ademas del `.int` existente.
+- **Salida:** `pnpm exec vitest run <test unitario>` → 1 file, 6 passed. `pnpm typecheck` → limpio. `pnpm lint` → 0 errores, 10 warnings preexistentes ajenos.
+- **Veredicto:** traduccion corregida; el `.int` se confirma en CI (no hay base local).
