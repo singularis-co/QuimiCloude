@@ -1,12 +1,22 @@
 # QC-267 — Rediseño de Configuración · requirements.md
 
+> **Enmienda contra dev (2026-10-19).** El spec se aprobó el 2026-10-13 (P1–P16 por defecto) y se
+> enmendó tras el merge de `origin/dev` en la rama, que trajo QC-262, QC-263, QC-264, QC-275/QC-280,
+> QC-277, QC-278, QC-165/QC-166 y cambios directos a `dev`. Regla: en lo visual manda el tablero; en
+> columnas, datos y conducta, lo mergeado. Lista completa de cambios, con su cita, en
+> `design.md > 12` (E1–E20). Requisitos tocados: R23, R24, R25, R26, R28, R31, R37. Requisito nuevo:
+> R39 *(supuesto P17)*. Preguntas nuevas P17 y P18 (`## Preguntas abiertas > Preguntas de la
+> enmienda 2026-10-19`); P1 y P14 quedan resueltas por `dev` y P13 obsoleta. Lo que decían los
+> requisitos tocados queda en `design.md > 12`.
+
 ## Alcance
 
 Lleva al diseño del canvas (página 8) las pantallas de Configuración y sus modales: **Usuarios**
 (`/configuracion/usuarios`, pestañas Personas y Grupos), **Presentaciones**
 (`/configuracion/presentaciones`), **Unidades** (`/configuracion/unidades`) y la **pantalla
-provisional de Integraciones** (`/integraciones/proveedor-ia` e `/integraciones/inventarios`, las
-dos que pintan `IntegrationPlaceholder`). Fuente: `docs/diseno/canvas/Usuarios*.dc.html`,
+provisional de Integraciones** (`/integraciones/inventarios`, la única que pinta
+`IntegrationPlaceholder`; *Enmienda E1:* `/integraciones/proveedor-ia` dejó de ser cascarón con
+QC-275 y sale del alcance). Fuente: `docs/diseno/canvas/Usuarios*.dc.html`,
 `Presentaciones*`, `Unidades*`, `Integraciones*` y `ModalesConfiguracion.dc.html`
 (`_trabajo/rediseno/canvas/` es la misma fuente sin versionar) y `progress/rediseno.md`. **El diseño
 manda sobre lo visual**; el comportamiento (permisos, acciones, campos enviados, paginación, búsqueda,
@@ -29,13 +39,17 @@ de 760 px o menos, tablas en tarjetas con «Acciones» que abre el menú centrad
 - **La pantalla de WhatsApp** (`/integraciones/whatsapp`) y todo lo que dejó QC-237 en
   `app/(private)/integraciones/whatsapp/` y `lib/modules/integraciones/`: es de QC-237 (D13). La
   tarjeta de conexión del tablero no se construye.
+- *Enmienda E1:* **la pantalla de Proveedor IA** (`/integraciones/proveedor-ia`) y todo
+  `app/(private)/integraciones/proveedor-ia/`: es de QC-275 (en `dev`, con su tablero
+  `ProveedorIA.dc.html`), aunque `Integraciones.dc.html` la siga pintando como vacío.
 - **«Cerrar todas las sesiones de X» en el menú de la fila** (tablero `Usuarios.dc.html`): QC-101 R8
   lo prohibió; sigue solo en el panel de edición (P2).
 - **El conteo «N miembros»** en la tarjeta del grupo: es QC-100 (`pending`) (P3).
 - **El rol debajo de cada miembro** en el panel del grupo: `WorkGroupMemberRow` no lo trae y añadirlo
   es trabajo de módulo (P4).
-- **Icono en la cabecera de los diálogos** (`dlg-ic` del tablero): `ConfirmDialog` no lo tiene, igual
-  que QC-262 P5 y QC-264 (P13).
+- ~~**Icono en la cabecera de los diálogos** (`dlg-ic` del tablero): `ConfirmDialog` no lo tiene, igual
+  que QC-262 P5 y QC-264 (P13).~~ *Enmienda E7:* `ConfirmDialog` ya tiene `icon`; entra con R39
+  *(supuesto P17)*.
 - **Insignias de estado dentro del selector** del diálogo «Cambiar el estado de la cuenta»:
   `SelectField` solo admite opciones de texto, igual que QC-262 P10 (P12).
 - **«Factor» deshabilitado mientras «No deriva de ninguna»** y la coma decimal de la equivalencia
@@ -61,7 +75,7 @@ las abre este spec.
 | D7 | Tallas de botón: sm 32 · default 36 · touch 44 · xl 52 | humano, 2026-10-10 (D7) | — | R1, R7, R13, R18, R30 |
 | D10 / ficha 2 | Agregar los toasts que faltan (p. ej. «Usuario actualizado.») | humano, 2026-10-10 (D10) y descripción de QC-267 | — | R32 |
 | D13 / ficha 3 | La tarjeta de WhatsApp del tablero de Integraciones es solo referencia para QC-237; no se construye aquí | humano, 2026-10-10 (D13) y descripción de QC-267 | — | R24 |
-| D14 | Lo demás del canvas queda aprobado; cada pantalla en escritorio, tablet y teléfono | humano, 2026-10-10 (D14) | — | R1, R2, R4, R9, R13, R14, R18, R19, R23, R26–R30, R37 |
+| D14 | Lo demás del canvas queda aprobado; cada pantalla en escritorio, tablet y teléfono | humano, 2026-10-10 (D14) | — | R1, R2, R4, R9, R13, R14, R18, R19, R23, R26–R30, R37, R39 |
 | QC-262 D7 / R14 | El menú ⋯ separa grupos con `separatorBefore` por ítem de `RowActionsMenu`, sin cambiar el árbol de quien no lo pide | humano, 2026-10-13 (aprobación de QC-262) | — | R6, R10, R15, R20, R33 |
 | QC-261 P5 / QC-262 P2 | En tablet las listas salen en tarjetas por el umbral de `DataTable` (contenedor ≤ 760 px) | humano, 2026-10-12 / 2026-10-13 | — | R7, R11, R16, R21 |
 | QC-101 R8 | La fila de usuarios no gana acciones: el cierre de todas las sesiones de otra persona vive solo en el panel de edición | humano, 2026-09-13 (`specs/QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla/requirements.md`) | — | R6 (P2) |
@@ -178,33 +192,36 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
 
 ### Integraciones provisionales
 
-- **R23.** CUANDO alguien con `integraciones.modificar` abre `/integraciones/proveedor-ia` o
-  `/integraciones/inventarios`, el sistema DEBE pintar dentro de `PageShell` un `PageHeader` con la
-  miga «Integraciones › <etiqueta>» y la etiqueta del menú como único `h1`
-  (`data-testid="integration-title"`), y debajo un recuadro `role="status"` con un icono oculto a los
-  lectores de pantalla y el texto exacto «Próximamente podrás configurar esta integración.»
-  (`data-testid="integration-empty"`, cuyo texto es solo ese); la página NO DEBE pintar ningún
-  formulario, campo, selector, botón ni enlace. *(supuesto P14)*
-- **R24.** Esta ficha NO DEBE modificar ningún archivo de `app/(private)/integraciones/whatsapp/` ni de
-  `lib/modules/integraciones/`, y la pantalla `/integraciones/whatsapp` DEBE pintarse igual que hoy.
-- **R25.** Las dos páginas cascarón DEBEN conservar su `requirePagePermission('integraciones.modificar')`
-  como primera sentencia, sus `metadata` y sus importaciones de hoy; el cambio vive solo en la pieza
-  compartida de la ruta (`IntegrationPlaceholder`).
+- **R23.** CUANDO alguien con `integraciones.modificar` abre `/integraciones/inventarios`, el sistema
+  DEBE pintar dentro de `PageShell` un `PageHeader` con la miga «Integraciones › <etiqueta>» y la
+  etiqueta del menú como único `h1` (`data-testid="integration-title"`), y debajo un recuadro
+  `role="status"` con un icono oculto a los lectores de pantalla y el texto exacto «Próximamente
+  podrás configurar esta integración.» (`data-testid="integration-empty"`, cuyo texto es solo ese);
+  la página NO DEBE pintar ningún formulario, campo, selector, botón ni enlace. *(Enmienda E1, E2:
+  solo inventarios; la miga, como la de Proveedor IA en `dev`.)*
+- **R24.** Esta ficha NO DEBE modificar ningún archivo de `app/(private)/integraciones/whatsapp/`, de
+  `app/(private)/integraciones/proveedor-ia/` ni de `lib/modules/integraciones/`, y las pantallas
+  `/integraciones/whatsapp` e `/integraciones/proveedor-ia` DEBEN pintarse igual que hoy. *(Enmienda
+  E1.)*
+- **R25.** La página cascarón de inventarios DEBE conservar su
+  `requirePagePermission('integraciones.modificar')` como primera sentencia, su `metadata` y sus
+  importaciones de hoy; el cambio vive solo en la pieza compartida de la ruta
+  (`IntegrationPlaceholder`). *(Enmienda E1.)*
 
 ### Paneles y modales
 
 - **R26.** MIENTRAS la ventana mide más de 760 px, los paneles de alta y edición de usuario y de grupo
   DEBEN medir 600 px de ancho y los de presentación y unidad 460 px (o el ancho visible, si es menor);
   MIENTRAS mide 760 px o menos, cualquier panel de la ficha DEBE ocupar todo el ancho, con sus campos
-  en una columna y su pie visible. *(supuesto P7)*
+  en una columna y su pie visible. *(supuestos P7, P18)*
 - **R27.** MIENTRAS el panel de edición de un usuario carga la ficha, el sistema DEBE pintar el título
   «Editar usuario», la descripción «Cambia los datos de la persona.» y, en el cuerpo, una región
   `role="status"` con `aria-busy` (`user-sheet-loading`) con el giro de carga, el texto «Cargando los
   datos de la persona…» y el esqueleto de los campos.
 - **R28.** En el panel de un grupo, el buscador de personas DEBE pintar cada candidata con su avatar,
-  su nombre, su rol (oculto MIENTRAS el contenedor mide 760 px o menos) y el botón «Agregar»; CUANDO la
+  su nombre, su rol (oculto MIENTRAS la ventana mide 760 px o menos) y el botón «Agregar»; CUANDO la
   persona ya está añadida, el botón DEBE decir «Agregado» con una marca, deshabilitado como hoy, sin
-  cambiar de ancho.
+  cambiar de ancho. *(Enmienda E9: la ventana, no el contenedor.)*
 - **R29.** En el panel «Editar grupo», cada miembro DEBE pintarse con su avatar, su nombre y «Quitar
   del grupo», y la paginación de miembros con su texto de hoy («Página X de Y · N en total»).
   *(supuesto P4)*
@@ -214,7 +231,13 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   centrado en la pantalla visible con botones de al menos 44 px.
 - **R31.** Los paneles y diálogos de la ficha DEBEN conservar sus títulos, descripciones, etiquetas,
   ayudas, opciones, disposición de campos desde `sm`, errores y botones de hoy, salvo lo que dicen
-  R26–R29. *(supuestos P8, P9, P11, P12, P13)*
+  R26–R29 y R39. *(supuestos P8, P9, P11, P12; Enmienda E7: P13 sale, la sustituye R39)*
+- **R39.** CUANDO se abre uno de los seis diálogos de la ficha, el sistema DEBE pintar delante del
+  título el icono del tablero, oculto a los lectores de pantalla: «Cambiar el estado de la cuenta»
+  con un candado en tono `info`; «¿Cerrar todas las sesiones de X?» con el icono de salida en tono
+  `warning`; «Eliminar al usuario», «Eliminar el grupo», «Eliminar la presentación» y «Eliminar la
+  unidad» con una papelera en tono `danger`; cada icono con su `data-testid`. *(supuesto P17;
+  Enmienda E7)*
 
 ### Avisos emergentes (D10)
 
@@ -247,8 +270,8 @@ abierta `Pn`; si el humano elige otra, se reescriben antes de implementar.
   editar y eliminar un grupo, añadir y quitar miembros, y crear, editar y eliminar presentaciones y
   unidades DEBEN enviar los mismos campos a las mismas Server Actions que hoy, con los mismos permisos
   de página y las mismas direcciones; los exports de los barrels de las rutas DEBEN seguir existiendo.
-- **R37.** CUANDO se abre cada pantalla de la ficha (Personas, Grupos, Presentaciones, Unidades y las
-  dos integraciones provisionales) en ventanas de 1440 × 900 y de 390 × 844, la página NO DEBE
+- **R37.** CUANDO se abre cada pantalla de la ficha (Personas, Grupos, Presentaciones, Unidades y la
+  integración provisional de inventarios; *Enmienda E1*) en ventanas de 1440 × 900 y de 390 × 844, la página NO DEBE
   desbordar en horizontal, la cabecera y la primera fila o tarjeta DEBEN quedar dentro del ancho
   visible y, a 1440 × 900, cada lista DEBE pintarse como tabla y no como tarjetas.
 - **R38.** El código de producción de `app/(private)/configuracion/` NO DEBE importar
@@ -265,7 +288,9 @@ Cada una lleva su opción por defecto, con la que están escritos los requisitos
   `dev`; entonces R33 solo se verifica. Si el humano prefiere no esperar, la tanda 1 implementa
   `separatorBefore` con el MISMO contrato, el MISMO test (`row-actions-menu-separator.test.tsx`) y la
   misma fila del catálogo, y QC-262 lo reutiliza al rebasar. `triggerDataAttributes` lo añade quien
-  llegue primero.
+  llegue primero. *Enmienda E4, E5 (resuelta por `dev`):* `separatorBefore` está en `dev` con su
+  test; R33 solo se verifica. `triggerDataAttributes` sigue fuera de `RowActionsSpec` y QC-262, QC-263
+  y QC-264 no lo añadieron: usaron un tipo local en la ruta; esta ficha hace lo mismo.
 - **P2. Cierre de sesiones en el menú de la fila.** El tablero pone «Cerrar todas las sesiones de X»
   en el menú ⋯; QC-101 R8 (humano, 2026-09-13) lo dejó solo en el panel porque expulsa a alguien que
   puede estar trabajando. *Por defecto:* QC-101: el menú queda con tres ítems y el cierre sigue en el
@@ -285,7 +310,8 @@ Cada una lleva su opción por defecto, con la que están escritos los requisitos
   tanda 0 mide a 1440 px que Presentaciones sigue en tabla y, si no, el ancho sube a 800 px y se anota
   como desviación.
 - **P7. Ancho de los paneles.** Hoy miden `sm:max-w-md` (448 px); el tablero pinta 600 px los de
-  usuario y grupo y 460 px los de presentación y unidad. *Por defecto:* los del tablero.
+  usuario y grupo y 460 px los de presentación y unidad. *Por defecto:* los del tablero. *Enmienda
+  E8:* la premisa no vale para usuario y grupo, que hoy miden 70vw; ver P18.
 - **P8. Disposición del formulario de usuario.** El tablero pinta «Fecha de nacimiento» sola y
   «Correo»/«Teléfono» en dos columnas; el código lleva una decisión humana de poner los tres en una
   fila. *Por defecto:* la decisión humana; en teléfono, una columna.
@@ -300,14 +326,37 @@ Cada una lleva su opción por defecto, con la que están escritos los requisitos
   pone `DataTable`. *Por defecto:* los textos de hoy; ningún marcador nuevo en el selector de rol.
 - **P12. Insignias dentro del selector de estado.** *Por defecto:* fuera; el selector sigue con
   opciones de texto.
-- **P13. Icono en la cabecera de los diálogos.** *Por defecto:* fuera, como QC-262 P5.
+- **P13. Icono en la cabecera de los diálogos.** *Por defecto:* fuera, como QC-262 P5. *Enmienda E7
+  (obsoleta):* `ConfirmDialog` ya tiene `icon`; la sustituye P17.
 - **P14. Miga de Integraciones.** El tablero pinta «Integraciones ›» sobre el `h1`; `PageHeader` marca
   como actual el último paso de la miga. *Por defecto:* miga de dos pasos «Integraciones › <etiqueta>»
   sin enlaces (la etiqueta se repite en el `h1`). La pantalla de WhatsApp (QC-237) queda con su
-  cabecera de hoy, aunque las tres integraciones dejen de verse iguales.
+  cabecera de hoy, aunque las tres integraciones dejen de verse iguales. *Enmienda E2 (resuelta por
+  `dev`):* la página de Proveedor IA de QC-275 ya pinta esa misma miga de dos pasos sin enlaces
+  (`app/(private)/integraciones/proveedor-ia/page.tsx:37-44`); el cascarón la copia.
 - **P15. Toasts que faltan (D10).** Los dieciséis del R32 ya existen hoy con el texto del tablero,
   incluido «Usuario actualizado.», pero ninguno tiene test que fije su texto. *Por defecto:* no se
   añade ninguno nuevo; un test fija los dieciséis y que un fallo no lanza ninguno.
 - **P16. Animaciones del tablero.** *Por defecto:* entran el giro y el esqueleto de carga del panel de
   usuario (R27) y «Agregar» → «Agregado» sin salto (R28); la entrada escalonada y los fundidos de la
   tabla quedan fuera como deuda.
+
+### Preguntas de la enmienda 2026-10-19
+
+- **P17. Icono en los seis diálogos (E7).** `ConfirmDialog` ganó `icon` (glifo, tono `neutral`,
+  `danger`, `warning`, `info` o `success` y `testId`; `components/shared/confirm-dialog.tsx:80-87`),
+  que ya usan el Maestro y los borrados de Fórmulas (QC-264 P17); D56 consta «en parte resuelta». Los
+  seis diálogos de la ficha llegan a esa prop (`ConfirmDialog`, `ConfirmDialogBody`,
+  `DeleteConfirmDialog` y `DeleteConfirmDialogBody` la reenvían). El tablero
+  `ModalesConfiguracion.dc.html:169-222` pinta candado `info` en el estado, salida `warn` en el cierre
+  de sesiones y papelera `danger` en los cuatro borrados. *Por defecto:* los seis con el icono y el
+  tono del tablero (R39). El glifo de las sesiones es `LogOutIcon`, el mismo del botón «Cerrar todas
+  las sesiones» del panel (`user-form.tsx:3`): el tablero dibuja una flecha que entra, que dice lo
+  contrario de la acción. Alternativa: fuera, como pedía P13, y D56 ampliada.
+- **P18. Ancho de los paneles de usuario y de grupo (E8).** P7 partía de que hoy miden 448 px. No es
+  así: `user-form.tsx:399` y `work-group-form.tsx:366` pasan `minScreenWidth={70}` y ese mínimo de
+  70vw gana al `max-width` de las clases (`components/ui/sheet.tsx:88-97`): a 1440 px miden unos
+  1008 px, y el estado de carga del panel de usuario (`user-sheet.tsx:169`) mide 448, así que el
+  panel salta de ancho al terminar de cargar. *Por defecto:* el tablero (600 px; R26 no cambia): los
+  dos formularios dejan de pasar `minScreenWidth`. Pedidos lo conserva (QC-262 D8), es otra pantalla.
+  Alternativa: conservar 70vw y anotar la desviación del tablero.
