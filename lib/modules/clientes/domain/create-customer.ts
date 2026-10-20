@@ -1,8 +1,8 @@
 import { requirePermission, type Actor } from './actor';
-import { createCustomerSchema } from './customer-input';
+import { createCustomerSchema, phoneIssueReason } from './customer-input';
 import { normalizeCustomerText } from './customer-text';
 import type { CustomerScope } from './customer-scope';
-import { ValidationError } from './errors';
+import { CustomerDuplicatePhoneError, inputError } from './errors';
 
 import type { CustomerRepository } from '../ports/customer-repository';
 
@@ -31,20 +31,25 @@ export function createCreateCustomer(
     const scope: CustomerScope = { companyId: actor.companyId };
 
     const parsed = createCustomerSchema.safeParse(input);
-    if (!parsed.success) throw new ValidationError();
+    if (!parsed.success) throw inputError(phoneIssueReason(parsed.error));
 
+    const { phone, phoneCountry, phoneE164, phoneIssue, ...rest } = parsed.data;
     // Las tres formas normalizadas se calculan aqui, con la unica funcion del modulo, y viajan
     // emparejadas con su dato.
-    return deps.customers.create(
+    const result = await deps.customers.create(
       {
-        ...parsed.data,
-        firstNamesNormalized: normalizeCustomerText(parsed.data.firstNames),
-        lastNamesNormalized: normalizeCustomerText(parsed.data.lastNames),
-        cityNormalized: normalizeCustomerText(parsed.data.city),
+        ...rest,
+        phone: { phone, phoneCountry, phoneE164, phoneIssue },
+        firstNamesNormalized: normalizeCustomerText(rest.firstNames),
+        lastNamesNormalized: normalizeCustomerText(rest.lastNames),
+        cityNormalized: normalizeCustomerText(rest.city),
       },
       actor.id,
       now(),
       scope,
     );
+
+    if (result === 'duplicate_phone') throw new CustomerDuplicatePhoneError();
+    return result;
   };
 }

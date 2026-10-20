@@ -164,9 +164,9 @@ const operatorUser: Credentials = {
 };
 
 /**
- * Los seis datos capturados en el alta. Solo los tres obligatorios: telefono, correo y
- * direccion se dejan vacios a proposito, que ya cubren `customer-form.test.tsx` y
- * `customer-columns.test.tsx`.
+ * Los datos capturados en el alta. Solo los tres obligatorios: telefono, correo y direccion se
+ * dejan vacios a proposito. El telefono con pais tiene su propio recorrido en
+ * `e2e/clientes-telefono.spec.ts`.
  *
  * **El apellido lleva tilde** (ver cabecera): se busca despues por el mismo apellido sin ella.
  */
@@ -306,7 +306,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('pantalla de clientes', () => {
-  test('el Administrador entra por la URL, da de alta un cliente, lo encuentra sin tilde, lo edita y lo da de baja (R41)', async ({
+  test('el Administrador entra por la URL, da de alta un cliente, lo encuentra sin tilde, lo edita y lo da de baja (R41; QC-236 R10)', async ({
     page,
   }) => {
     await loginAndLand(page, adminUser);
@@ -346,14 +346,26 @@ test.describe('pantalla de clientes', () => {
     await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 60_000 });
 
     // --- 7. Lo guardo el backend de verdad, no solo lo pinto la pantalla: la fila existe, cuelga
-    // de la empresa DEL ACTOR (que el formulario no envia) y los tres opcionales quedaron sin
-    // valor -nunca cadena vacia-.
+    // de la empresa DEL ACTOR (que el formulario no envia) y los opcionales quedaron sin valor
+    // -nunca cadena vacia-. Sin numero, ninguna de las cuatro columnas del telefono se llena.
     const created = await prisma.customer.findFirstOrThrow({
       where: { lastNames: nuevoCliente.lastNames },
-      select: { id: true, companyId: true, phone: true, email: true, address: true },
+      select: {
+        id: true,
+        companyId: true,
+        phone: true,
+        phoneCountry: true,
+        phoneE164: true,
+        phoneIssue: true,
+        email: true,
+        address: true,
+      },
     });
     expect(created.companyId, 'la empresa sale del actor, no del formulario').toBe(companyId);
     expect(created.phone).toBeNull();
+    expect(created.phoneCountry).toBeNull();
+    expect(created.phoneE164).toBeNull();
+    expect(created.phoneIssue).toBeNull();
     expect(created.email).toBeNull();
     expect(created.address).toBeNull();
 

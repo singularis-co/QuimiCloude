@@ -116,14 +116,17 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       // QC-156: el adaptador del servicio que `clientes` ofrece a otros modulos.
       'adapters/driven/persistence/customer-catalog-prisma.ts',
       'adapters/driven/persistence/customer-prisma.ts',
+      'adapters/driven/persistence/legacy-phone-prisma.ts',
       'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driving/customer-actions.ts',
       'domain/actor.ts',
+      'domain/backfill-legacy-phones.ts',
       'domain/create-customer.ts',
       // QC-156: el contrato de ese servicio.
       'domain/customer-catalog.ts',
       'domain/customer-id.ts',
       'domain/customer-input.ts',
+      'domain/customer-phone.ts',
       'domain/customer-queryable.ts',
       'domain/customer-scope.ts',
       'domain/customer-text.ts',
@@ -132,12 +135,16 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'domain/delete-customer.ts',
       'domain/errors.ts',
       'domain/get-customer.ts',
+      'domain/legacy-phone-backfill.ts',
       'domain/list-customers.ts',
       'domain/list-query.ts',
       'domain/page.ts',
+      'domain/phone-matches-wa-id.ts',
       'domain/update-customer.ts',
       'index.ts',
+      'ports/company-country-lookup.ts',
       'ports/customer-repository.ts',
+      'ports/legacy-phone-repository.ts',
       'ports/list-query-log.ts',
     ]
     const archivosReales = filesIn(moduloDir, /\.tsx?$/)
@@ -337,6 +344,11 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
   // fijado por specs/QC-288-entrega-sin-pedido/tasks.md). Siembra dos clientes por Prisma -la
   // entrega sin pedido se reparte entre ellos- con la normalizacion del barrel de `clientes`, la
   // unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
+  // 2026-10-19 (QC-236): entra `clientes-telefono.spec.ts`, el E2E del telefono de cliente con
+  // pais (nombre fijado por specs/QC-236-telefono-de-cliente-con-codigo-de-pais/tasks.md > T11).
+  // Recorre la pantalla de clientes: alta con el pais de la empresa, duplicado, empresa sin pais,
+  // avisos de los migrados en la lista y el campo en telefono. Siembra clientes por Prisma con la
+  // normalizacion del barrel de `clientes`, la unica definicion. La lista sigue CERRADA.
   const E2E_PERMITIDOS: ReadonlySet<string> = new Set([
     'clientes.spec.ts',
     'pedido-con-cliente.spec.ts',
@@ -348,6 +360,7 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
     'pedidos-rediseno.spec.ts',
     'entrega-a-varios-clientes.spec.ts',
     'entrega-sin-pedido.spec.ts',
+    'clientes-telefono.spec.ts',
   ])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 
@@ -531,6 +544,9 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       'lastNames',
       'city',
       'phone',
+      'phoneCountry',
+      'phoneE164',
+      'phoneIssue',
       'email',
       'address',
       // F1.4: las tres unicas columnas nuevas de esta ficha.
@@ -574,6 +590,7 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       '20261006160000_orders_customer',
       '20261008150100_order_deliveries',
       '20261015130000_order_delivery_lines_customer',
+      '20261019130000_customers_phone_e164',
     ])
   })
 

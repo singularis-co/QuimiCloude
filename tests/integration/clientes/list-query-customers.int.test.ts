@@ -29,7 +29,7 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import type { CustomerScope } from '@/lib/modules/clientes/domain/customer-scope';
 import type { ListFilterValue, ListQuery } from '@/lib/modules/clientes/domain/list-query';
-import type { NewCustomer } from '@/lib/modules/clientes/domain/customer-view';
+import type { CustomerPhoneColumns, NewCustomer } from '@/lib/modules/clientes/domain/customer-view';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -46,7 +46,9 @@ type CustomerOverrides = Partial<{
   deletedAt: Date | null;
 }>;
 
-function customerInput(overrides: CustomerOverrides = {}): NewCustomer {
+function customerInput(
+  overrides: CustomerOverrides = {},
+): NewCustomer & { readonly phone: CustomerPhoneColumns } {
   const firstNames = overrides.firstNames ?? `Nombre ${MARCA}`;
   const lastNames = overrides.lastNames ?? `Apellido ${MARCA}`;
   const city = overrides.city ?? `Ciudad ${MARCA}`;
@@ -57,7 +59,7 @@ function customerInput(overrides: CustomerOverrides = {}): NewCustomer {
     lastNamesNormalized: normalizeCustomerText(lastNames),
     city,
     cityNormalized: normalizeCustomerText(city),
-    phone: null,
+    phone: { phone: null, phoneCountry: null, phoneE164: null, phoneIssue: null },
     email: null,
     address: null,
   };
@@ -140,6 +142,7 @@ async function sembrar(
       semilla.createdAt ?? new Date('2026-01-01T00:00:00Z'),
       scope,
     );
+    if (created === 'duplicate_phone') throw new Error('la semilla no lleva telefono');
     if (semilla.deletedAt !== undefined && semilla.deletedAt !== null) {
       await prisma.customer.update({
         where: { id: created.id },

@@ -6,7 +6,14 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createCreateCustomer } from '@/lib/modules/clientes/domain/create-customer'
 import { createDeleteCustomer } from '@/lib/modules/clientes/domain/delete-customer'
-import { CustomerNotFoundError } from '@/lib/modules/clientes/domain/errors'
+import {
+  CustomerDuplicatePhoneError,
+  CustomerNotFoundError,
+  CustomerPhoneCountryRequiredError,
+  CustomerPhoneInvalidError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/modules/clientes/domain/errors'
 import { createGetCustomer } from '@/lib/modules/clientes/domain/get-customer'
 import { createUpdateCustomer } from '@/lib/modules/clientes/domain/update-customer'
 
@@ -28,7 +35,8 @@ const ENTRADA_VALIDA = {
   firstNames: 'Maria',
   lastNames: 'Perez',
   city: 'Bogota',
-  phone: '3001112233',
+  phoneCountry: 'CO',
+  phoneNumber: '3001112233',
   email: null,
   address: null,
 }
@@ -39,6 +47,9 @@ const VISTA: CustomerView = {
   lastNames: 'Perez',
   city: 'Bogota',
   phone: '3001112233',
+  phoneCountry: null,
+  phoneE164: null,
+  phoneIssue: null,
   email: null,
   address: null,
   createdBy: ADMIN.id,
@@ -107,10 +118,11 @@ describe('casos de uso del cliente', () => {
     ])
   })
 
-  it('R19 — dos clientes vivos con los mismos seis datos se crean los dos, sin error de duplicado', async () => {
+  it('R19 — dos clientes vivos con los mismos datos y sin telefono se crean los dos, sin error de duplicado', async () => {
     const { repo } = makeCustomers()
-    const uno = await createCreateCustomer({ customers: repo, now })(ENTRADA_VALIDA, ADMIN)
-    const otro = await createCreateCustomer({ customers: repo, now })(ENTRADA_VALIDA, ADMIN)
+    const sinTelefono = { ...ENTRADA_VALIDA, phoneNumber: '' }
+    const uno = await createCreateCustomer({ customers: repo, now })(sinTelefono, ADMIN)
+    const otro = await createCreateCustomer({ customers: repo, now })(sinTelefono, ADMIN)
     expect(uno).toEqual({ id: 'nuevo-id' })
     expect(otro).toEqual({ id: 'nuevo-id' })
   })
@@ -120,7 +132,15 @@ describe('casos de uso del cliente', () => {
 
     await createUpdateCustomer({ customers: repo, now })(
       CUSTOMER_ID,
-      { firstNames: 'Ana', lastNames: 'Gomez', city: 'Cali', phone: '   ', email: null, address: undefined },
+      {
+        firstNames: 'Ana',
+        lastNames: 'Gomez',
+        city: 'Cali',
+        phoneCountry: 'CO',
+        phoneNumber: '   ',
+        email: null,
+        address: undefined,
+      },
       ADMIN,
     )
 
@@ -128,7 +148,7 @@ describe('casos de uso del cliente', () => {
       firstNames: 'Ana',
       lastNames: 'Gomez',
       city: 'Cali',
-      phone: null,
+      phone: { kind: 'keep_legacy_or_clear' },
       email: null,
       address: null,
       firstNamesNormalized: 'ana',
@@ -170,6 +190,9 @@ describe('casos de uso del cliente', () => {
         'id',
         'lastNames',
         'phone',
+        'phoneCountry',
+        'phoneE164',
+        'phoneIssue',
         'updatedAt',
         'updatedBy',
       ].sort(),
@@ -270,5 +293,140 @@ describe('casos de uso del cliente', () => {
       expect(item).not.toHaveProperty('lastNamesNormalized')
       expect(item).not.toHaveProperty('cityNormalized')
     }
+  })
+})
+
+describe('telefono en el alta y la edicion', () => {
+  const SIN_PERMISO: Actor = { ...ADMIN, permissions: ['clientes.consultar'] }
+
+  type Caso = {
+    readonly nombre: string
+    readonly puerto: 'create' | 'updateAlive'
+    readonly correr: (repo: CustomerRepository, input: unknown, actor: Actor | null) => Promise<unknown>
+  }
+
+  const CASOS: readonly Caso[] = [
+    {
+      nombre: 'alta',
+      puerto: 'create',
+      correr: (repo, input, actor) => createCreateCustomer({ customers: repo, now })(input, actor),
+    },
+    {
+      nombre: 'edicion',
+      puerto: 'updateAlive',
+      correr: (repo, input, actor) =>
+        createUpdateCustomer({ customers: repo, now })(CUSTOMER_ID, input, actor),
+    },
+  ]
+
+  /** El `NewCustomer` que llego al puerto: primer argumento del alta, segundo de la edicion. */
+  function datosEnElPuerto(spy: ReturnType<typeof vi.fn>, puerto: Caso['puerto']): unknown {
+    const args = spy.mock.calls[0] as unknown as readonly unknown[]
+    return args[puerto === 'create' ? 0 : 1]
+  }
+
+  for (const { nombre, puerto, correr } of CASOS) {
+    it(`R11 — ${nombre}: un numero valido llega al puerto con pais, e164, formato internacional y sin aviso`, async () => {
+      const { repo, spies } = makeCustomers()
+      await correr(repo, { ...ENTRADA_VALIDA, phoneCountry: 'CO', phoneNumber: '300 123 4567' }, ADMIN)
+      expect(datosEnElPuerto(spies[puerto], puerto)).toMatchObject({
+        phone: { phone: '+57 300 1234567', phoneCountry: 'CO', phoneE164: '573001234567', phoneIssue: null },
+      })
+    })
+
+    it(`R8 — ${nombre}: numero sin pais lanza customer_phone_country_required sin llegar al puerto`, async () => {
+      const { repo, spies } = makeCustomers()
+      const intento = correr(repo, { ...ENTRADA_VALIDA, phoneCountry: '', phoneNumber: '300 123 4567' }, ADMIN)
+      await expect(intento).rejects.toBeInstanceOf(CustomerPhoneCountryRequiredError)
+      await expect(intento).rejects.toMatchObject({
+        code: 'customer_phone_country_required',
+        message: 'Elige el país del teléfono.',
+      })
+      expect(spies[puerto]).not.toHaveBeenCalled()
+    })
+
+    it(`R9 — ${nombre}: numero no valido para el pais lanza customer_phone_invalid sin llegar al puerto`, async () => {
+      const { repo, spies } = makeCustomers()
+      const intento = correr(repo, { ...ENTRADA_VALIDA, phoneCountry: 'CO', phoneNumber: '600 123 4567' }, ADMIN)
+      await expect(intento).rejects.toBeInstanceOf(CustomerPhoneInvalidError)
+      await expect(intento).rejects.toMatchObject({ code: 'customer_phone_invalid' })
+      expect(spies[puerto]).not.toHaveBeenCalled()
+    })
+
+    it(`R15 — ${nombre}: un pais fuera de la lista lanza invalid_input sin llegar al puerto`, async () => {
+      const { repo, spies } = makeCustomers()
+      const intento = correr(repo, { ...ENTRADA_VALIDA, phoneCountry: 'ZZ', phoneNumber: '300 123 4567' }, ADMIN)
+      await expect(intento).rejects.toBeInstanceOf(ValidationError)
+      await expect(intento).rejects.toMatchObject({ code: 'invalid_input' })
+      expect(spies[puerto]).not.toHaveBeenCalled()
+    })
+
+    it(`R12 — ${nombre}: 'duplicate_phone' del puerto se traduce a customer_duplicate_phone`, async () => {
+      const { repo } = makeCustomers({ [puerto]: vi.fn(async () => 'duplicate_phone' as const) })
+      const intento = correr(repo, ENTRADA_VALIDA, ADMIN)
+      await expect(intento).rejects.toBeInstanceOf(CustomerDuplicatePhoneError)
+      await expect(intento).rejects.toMatchObject({
+        code: 'customer_duplicate_phone',
+        message: 'Este teléfono ya está registrado en otro cliente.',
+      })
+    })
+
+    it(`R17 — ${nombre}: sin permiso lanza unauthorized antes de validar el telefono y sin llegar al puerto`, async () => {
+      const { repo, spies } = makeCustomers()
+      for (const input of [
+        { ...ENTRADA_VALIDA, phoneCountry: '', phoneNumber: '300 123 4567' },
+        { ...ENTRADA_VALIDA, phoneCountry: 'CO', phoneNumber: '300 12' },
+      ]) {
+        await expect(correr(repo, input, SIN_PERMISO)).rejects.toBeInstanceOf(UnauthorizedError)
+        await expect(correr(repo, input, null)).rejects.toBeInstanceOf(UnauthorizedError)
+      }
+      expect(spies[puerto]).not.toHaveBeenCalled()
+    })
+
+    it(`R17 — ${nombre}: la empresa que llega al puerto es la del actor aunque la entrada traiga otra`, async () => {
+      const { repo, spies } = makeCustomers()
+      await correr(repo, { ...ENTRADA_VALIDA, companyId: '33333333-3333-4333-8333-333333333333' }, ADMIN)
+      const args = spies[puerto].mock.calls[0] as unknown as readonly unknown[]
+      expect(args[args.length - 1]).toStrictEqual({ companyId: ADMIN.companyId })
+    })
+  }
+
+  it('R10 — alta con el numero vacio y pais marcado: al puerto llegan los cuatro campos nulos', async () => {
+    const { repo, spies } = makeCustomers()
+    await createCreateCustomer({ customers: repo, now })(
+      { ...ENTRADA_VALIDA, phoneCountry: 'CO', phoneNumber: '  ' },
+      ADMIN,
+    )
+    expect(datosEnElPuerto(spies.create, 'create')).toMatchObject({
+      phone: { phone: null, phoneCountry: null, phoneE164: null, phoneIssue: null },
+    })
+  })
+
+  it('R34 — edicion con el numero vacio: al puerto llega keep_legacy_or_clear y no los cuatro nulos', async () => {
+    const { repo, spies } = makeCustomers()
+    for (const phoneNumber of ['', '   ', undefined, null]) {
+      await createUpdateCustomer({ customers: repo, now })(
+        CUSTOMER_ID,
+        { ...ENTRADA_VALIDA, phoneCountry: 'EC', phoneNumber },
+        ADMIN,
+      )
+    }
+    expect(spies.updateAlive).toHaveBeenCalledTimes(4)
+    for (const llamada of spies.updateAlive.mock.calls) {
+      const datos = (llamada as unknown as readonly unknown[])[1] as { readonly phone: unknown }
+      expect(datos.phone).toEqual({ kind: 'keep_legacy_or_clear' })
+    }
+  })
+
+  it('R32 — edicion con un numero valido: al puerto llegan las columnas con phoneIssue nulo, no la variante', async () => {
+    const { repo, spies } = makeCustomers()
+    await createUpdateCustomer({ customers: repo, now })(
+      CUSTOMER_ID,
+      { ...ENTRADA_VALIDA, phoneCountry: 'CO', phoneNumber: '3001234567' },
+      ADMIN,
+    )
+    expect(datosEnElPuerto(spies.updateAlive, 'updateAlive')).toMatchObject({
+      phone: { phone: '+57 300 1234567', phoneCountry: 'CO', phoneE164: '573001234567', phoneIssue: null },
+    })
   })
 })

@@ -11,7 +11,8 @@ import { dateRangeCondition } from './list-query-sql';
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
 import type { CustomerScope } from '../../../domain/customer-scope';
-import type { NewCustomer, CustomerView } from '../../../domain/customer-view';
+import type { CustomerPhoneIssue } from '../../../domain/customer-phone';
+import type { CustomerPhoneColumns, NewCustomer, CustomerView } from '../../../domain/customer-view';
 
 /**
  * Implementa `CustomerRepository` con Prisma. Junto con `company-scope.ts` y
@@ -31,6 +32,9 @@ const CUSTOMER_SELECT = {
   lastNames: true,
   city: true,
   phone: true,
+  phoneCountry: true,
+  phoneE164: true,
+  phoneIssue: true,
   email: true,
   address: true,
   createdAt: true,
@@ -41,7 +45,13 @@ const CUSTOMER_SELECT = {
 
 type CustomerRow = Prisma.CustomerGetPayload<{ select: typeof CUSTOMER_SELECT }>;
 
-/** Fila de Prisma -> `CustomerView` del puerto. Sin ninguna traduccion de negocio. */
+/** La base solo admite estos dos valores (CHECK); cualquier otro seria un bug de datos. */
+function toPhoneIssue(value: string | null): CustomerPhoneIssue | null {
+  if (value === null || value === 'invalid_format' || value === 'duplicate') return value;
+  throw new Error(`customers.phone_issue con un valor desconocido: ${value}`);
+}
+
+/** Fila de Prisma -> `CustomerView` del puerto. */
 function toCustomerView(row: CustomerRow): CustomerView {
   return {
     id: row.id,
@@ -49,6 +59,9 @@ function toCustomerView(row: CustomerRow): CustomerView {
     lastNames: row.lastNames,
     city: row.city,
     phone: row.phone,
+    phoneCountry: row.phoneCountry,
+    phoneE164: row.phoneE164,
+    phoneIssue: toPhoneIssue(row.phoneIssue),
     email: row.email,
     address: row.address,
     createdAt: row.createdAt,
@@ -58,37 +71,91 @@ function toCustomerView(row: CustomerRow): CustomerView {
   };
 }
 
+const PHONE_UNIQUE_INDEX = 'customers_company_phone_e164_key';
+const PHONE_E164_COLUMN = 'phone_e164';
+
+function targetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string[] {
+  const target = error.meta?.target;
+  if (typeof target === 'string') return [target];
+  if (Array.isArray(target)) return target.filter((item): item is string => typeof item === 'string');
+  return [];
+}
+
+/**
+ * El indice parcial vive solo en la migracion, y `meta.target` puede traer su nombre o sus
+ * columnas (`user-admin-prisma.ts`). `phone_e164` no esta en ningun otro indice unico de
+ * `customers`.
+ */
+export function isPhoneUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
+  return targetsOf(error).some(
+    (target) => target.includes(PHONE_UNIQUE_INDEX) || target.includes(PHONE_E164_COLUMN),
+  );
+}
+
+type BusinessColumns = Pick<
+  Prisma.CustomerUncheckedUpdateManyInput,
+  | 'firstNames'
+  | 'firstNamesNormalized'
+  | 'lastNames'
+  | 'lastNamesNormalized'
+  | 'city'
+  | 'cityNormalized'
+  | 'email'
+  | 'address'
+>;
+
+function businessColumns(data: NewCustomer): BusinessColumns {
+  return {
+    firstNames: data.firstNames,
+    firstNamesNormalized: data.firstNamesNormalized,
+    lastNames: data.lastNames,
+    lastNamesNormalized: data.lastNamesNormalized,
+    city: data.city,
+    cityNormalized: data.cityNormalized,
+    email: data.email,
+    address: data.address,
+  };
+}
+
+const NO_PHONE = { phone: null, phoneCountry: null, phoneE164: null, phoneIssue: null } as const;
+
 /**
  * `create` de `CustomerRepository`. Escribe `created_by` Y `updated_by` con el mismo
  * `actorId`, y los seis datos junto con las tres formas normalizadas que ya trae `data`: este
  * adaptador no vuelve a normalizar nada.
  */
 export async function createCustomer(
-  data: NewCustomer,
+  data: NewCustomer & { readonly phone: CustomerPhoneColumns },
   actorId: string,
   now: Date,
   scope: CustomerScope,
-): Promise<{ id: string }> {
-  const created = await prisma.customer.create({
-    data: {
-      ...companyScopeColumns(scope),
-      firstNames: data.firstNames,
-      firstNamesNormalized: data.firstNamesNormalized,
-      lastNames: data.lastNames,
-      lastNamesNormalized: data.lastNamesNormalized,
-      city: data.city,
-      cityNormalized: data.cityNormalized,
-      phone: data.phone,
-      email: data.email,
-      address: data.address,
-      createdAt: now,
-      updatedAt: now,
-      createdBy: actorId,
-      updatedBy: actorId,
-    },
-    select: { id: true },
-  });
-  return { id: created.id };
+): Promise<{ id: string } | 'duplicate_phone'> {
+  try {
+    const created = await prisma.customer.create({
+      data: {
+        ...companyScopeColumns(scope),
+        firstNames: data.firstNames,
+        firstNamesNormalized: data.firstNamesNormalized,
+        lastNames: data.lastNames,
+        lastNamesNormalized: data.lastNamesNormalized,
+        city: data.city,
+        cityNormalized: data.cityNormalized,
+        ...data.phone,
+        email: data.email,
+        address: data.address,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: actorId,
+        updatedBy: actorId,
+      },
+      select: { id: true },
+    });
+    return { id: created.id };
+  } catch (error) {
+    if (isPhoneUniqueViolation(error)) return 'duplicate_phone';
+    throw error;
+  }
 }
 
 /** `findAliveById`: `deleted_at IS NULL` y el ambito de empresa en el `where`. */
@@ -114,24 +181,51 @@ export async function updateAliveCustomer(
   actorId: string,
   now: Date,
   scope: CustomerScope,
+): Promise<'ok' | 'not_found' | 'duplicate_phone'> {
+  if ('kind' in data.phone) return updateKeepingLegacyPhone(id, data, actorId, now, scope);
+  try {
+    const { count } = await prisma.customer.updateMany({
+      where: { id, deletedAt: null, ...customerCompanyScope(scope) },
+      data: { ...businessColumns(data), ...data.phone, updatedAt: now, updatedBy: actorId },
+    });
+    return count === 1 ? 'ok' : 'not_found';
+  } catch (error) {
+    if (isPhoneUniqueViolation(error)) return 'duplicate_phone';
+    throw error;
+  }
+}
+
+/**
+ * Edicion con el numero vacio. El primer `UPDATE` deja la fila bloqueada hasta el final de la
+ * transaccion, asi que el segundo decide con lo que hay en la base. El telefono antiguo se
+ * conserva si la fila tiene aviso o si aun no ha pasado por el relleno (`phone` sin
+ * `phone_e164`); en cualquier otro caso se borra.
+ */
+async function updateKeepingLegacyPhone(
+  id: string,
+  data: NewCustomer,
+  actorId: string,
+  now: Date,
+  scope: CustomerScope,
 ): Promise<'ok' | 'not_found'> {
-  const { count } = await prisma.customer.updateMany({
-    where: { id, deletedAt: null, ...customerCompanyScope(scope) },
-    data: {
-      firstNames: data.firstNames,
-      firstNamesNormalized: data.firstNamesNormalized,
-      lastNames: data.lastNames,
-      lastNamesNormalized: data.lastNamesNormalized,
-      city: data.city,
-      cityNormalized: data.cityNormalized,
-      phone: data.phone,
-      email: data.email,
-      address: data.address,
-      updatedAt: now,
-      updatedBy: actorId,
-    },
+  return prisma.$transaction(async (tx) => {
+    const { count } = await tx.customer.updateMany({
+      where: { id, deletedAt: null, ...customerCompanyScope(scope) },
+      data: { ...businessColumns(data), updatedAt: now, updatedBy: actorId },
+    });
+    if (count !== 1) return 'not_found';
+    await tx.customer.updateMany({
+      where: {
+        id,
+        deletedAt: null,
+        phoneIssue: null,
+        OR: [{ phone: null }, { phoneE164: { not: null } }],
+        ...customerCompanyScope(scope),
+      },
+      data: { ...NO_PHONE, updatedAt: now, updatedBy: actorId },
+    });
+    return 'ok';
   });
-  return count === 1 ? 'ok' : 'not_found';
 }
 
 /**

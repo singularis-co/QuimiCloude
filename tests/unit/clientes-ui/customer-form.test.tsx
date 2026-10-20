@@ -32,6 +32,7 @@ import {
   CustomerNotFoundError,
   UnauthorizedError,
   ValidationError,
+  formatPhoneNational,
   type CustomerView,
 } from '@/lib/modules/clientes';
 import type {
@@ -44,6 +45,7 @@ import {
   esperarSinIdentificador,
 } from '../../helpers/identificador-de-request';
 import { setupUser } from '../../helpers/user-event';
+import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
 
 const { routerMock, createCustomerActionMock, updateCustomerActionMock } = vi.hoisted(() => ({
   routerMock: {
@@ -97,7 +99,10 @@ const CLIENTE: CustomerView = {
   firstNames: 'Ana María',
   lastNames: 'Pérez Gómez',
   city: 'Bogotá',
-  phone: '3001234567',
+  phone: '+57 300 1234567',
+  phoneCountry: 'CO',
+  phoneE164: '573001234567',
+  phoneIssue: null,
   email: 'ana@example.com',
   address: 'Calle 1 # 2-3',
   createdBy: null,
@@ -106,8 +111,12 @@ const CLIENTE: CustomerView = {
   updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 };
 
+const NUMERO_NACIONAL = formatPhoneNational('573001234567', 'CO');
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // El selector de pais del telefono decide popup u hoja con `matchMedia`, que jsdom no trae.
+  setViewportWidth(WIDE_VIEWPORT);
   createCustomerActionMock.mockResolvedValue({ status: 'success', id: crypto.randomUUID() });
   updateCustomerActionMock.mockResolvedValue({ status: 'success' });
 });
@@ -115,6 +124,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  resetViewport();
 });
 
 async function abrirAlta(user: ReturnType<typeof setupUser>) {
@@ -145,7 +155,8 @@ describe('los seis campos, y ninguno mas (R25)', () => {
     const user = setupUser();
     await abrirAlta(user);
 
-    for (const field of CUSTOMER_BUSINESS_FIELDS) {
+    // El pais del telefono es el disparador de un selector, no un control con `required`.
+    for (const field of CUSTOMER_BUSINESS_FIELDS.filter((f) => f !== 'phoneCountry')) {
       const control = screen.getByTestId(CUSTOMER_FIELD_TESTIDS[field]);
       const esObligatorio = (CUSTOMER_REQUIRED_FIELDS as readonly string[]).includes(field);
       expect(control).toHaveAttribute('aria-required', String(esObligatorio));
@@ -232,43 +243,41 @@ describe('validacion previa con el esquema del contrato (R26)', () => {
     await abrirAlta(user);
 
     await rellenarObligatorios(user);
-    const telefono = screen.getByTestId(CUSTOMER_FIELD_TESTIDS.phone) as HTMLInputElement;
+    const telefono = screen.getByTestId(CUSTOMER_FIELD_TESTIDS.phoneNumber) as HTMLInputElement;
     telefono.removeAttribute('maxlength');
     await user.type(telefono, '1'.repeat(CUSTOMER_PHONE_MAX_LENGTH + 1));
     await user.click(screen.getByTestId(CUSTOMER_FORM_SUBMIT_TESTID));
 
-    await screen.findByTestId(CUSTOMER_ERROR_TESTIDS.phone);
+    await screen.findByTestId(CUSTOMER_ERROR_TESTIDS.phoneNumber);
     expect(createCustomerActionMock).not.toHaveBeenCalled();
   });
 
-  it('el correo y el telefono son `type="text"` sin `pattern`, y con el `inputMode` correcto', async () => {
+  it('el correo es `type="text"` y el numero de telefono `type="tel"`, sin `pattern` y con el `inputMode` correcto', async () => {
     const user = setupUser();
     await abrirAlta(user);
 
     const correo = screen.getByTestId(CUSTOMER_FIELD_TESTIDS.email);
-    const telefono = screen.getByTestId(CUSTOMER_FIELD_TESTIDS.phone);
+    const telefono = screen.getByTestId(CUSTOMER_FIELD_TESTIDS.phoneNumber);
 
     expect(correo).toHaveAttribute('type', 'text');
     expect(correo).not.toHaveAttribute('pattern');
     expect(correo).toHaveAttribute('inputmode', 'email');
 
-    expect(telefono).toHaveAttribute('type', 'text');
+    expect(telefono).toHaveAttribute('type', 'tel');
     expect(telefono).not.toHaveAttribute('pattern');
     expect(telefono).toHaveAttribute('inputmode', 'tel');
   });
 
-  it('el correo y el telefono aceptan texto sin formato, sin bloquear el envio', async () => {
+  it('el correo acepta texto sin formato, sin bloquear el envio', async () => {
     const user = setupUser();
     await abrirAlta(user);
 
     await rellenarObligatorios(user);
     await user.type(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.email), 'no-es-un-correo');
-    await user.type(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.phone), 'no-es-un-telefono');
     await user.click(screen.getByTestId(CUSTOMER_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(createCustomerActionMock).toHaveBeenCalledTimes(1));
     expect(createCustomerActionMock.mock.calls[0]![1].get('email')).toBe('no-es-un-correo');
-    expect(createCustomerActionMock.mock.calls[0]![1].get('phone')).toBe('no-es-un-telefono');
   });
 
   it('los limites usados son los que exporta el contrato publico, no numeros sueltos', () => {
@@ -288,7 +297,7 @@ describe('precarga y reemplazo completo en la edicion (R27)', () => {
     expect(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.firstNames)).toHaveValue(CLIENTE.firstNames);
     expect(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.lastNames)).toHaveValue(CLIENTE.lastNames);
     expect(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.city)).toHaveValue(CLIENTE.city);
-    expect(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.phone)).toHaveValue(CLIENTE.phone);
+    expect(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.phoneNumber)).toHaveValue(NUMERO_NACIONAL);
     expect(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.email)).toHaveValue(CLIENTE.email);
     expect(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.address)).toHaveValue(CLIENTE.address);
   });
@@ -304,7 +313,8 @@ describe('precarga y reemplazo completo en la edicion (R27)', () => {
     const [idRecibido, , datos] = updateCustomerActionMock.mock.calls[0]!;
     expect(idRecibido).toBe(CLIENTE.id);
     expect(datos.get('firstNames')).toBe(CLIENTE.firstNames);
-    expect(datos.get('phone')).toBe(CLIENTE.phone);
+    expect(datos.get('phoneCountry')).toBe(CLIENTE.phoneCountry);
+    expect(datos.get('phoneNumber')).toBe(NUMERO_NACIONAL);
     expect(createCustomerActionMock).not.toHaveBeenCalled();
   });
 
@@ -313,11 +323,11 @@ describe('precarga y reemplazo completo en la edicion (R27)', () => {
     render(<CustomerSheet customer={CLIENTE} open onOpenChange={() => {}} />);
     await screen.findByTestId(CUSTOMER_FORM_TESTID);
 
-    await user.clear(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.phone));
+    await user.clear(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.phoneNumber));
     await user.click(screen.getByTestId(CUSTOMER_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(updateCustomerActionMock).toHaveBeenCalledTimes(1));
-    expect(updateCustomerActionMock.mock.calls[0]![2].get('phone')).toBe('');
+    expect(updateCustomerActionMock.mock.calls[0]![2].get('phoneNumber')).toBe('');
   });
 });
 

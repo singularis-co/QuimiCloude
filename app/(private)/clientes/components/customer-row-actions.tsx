@@ -2,6 +2,7 @@
 
 import { PencilIcon, TrashIcon } from 'lucide-react';
 import { useState } from 'react';
+import type { CountryCode } from 'libphonenumber-js';
 
 import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
 import type { CustomerView } from '@/lib/modules/clientes';
@@ -53,9 +54,14 @@ export type CustomerRowActionsProps = {
   readonly customer: CustomerView;
   /** Si la sesion trae `clientes.modificar`. Decision de presentacion, bajada por props. */
   readonly canModify: boolean;
+  readonly companyCountry?: CountryCode | null;
 };
 
-export function CustomerRowActions({ customer, canModify }: CustomerRowActionsProps) {
+export function CustomerRowActions({
+  customer,
+  canModify,
+  companyCountry = null,
+}: CustomerRowActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
   // `null`: el dialogo aun no se abrio nunca y no se monta.
   const [deleteOpen, setDeleteOpen] = useState<boolean | null>(null);
@@ -89,7 +95,12 @@ export function CustomerRowActions({ customer, canModify }: CustomerRowActionsPr
         triggerDataAttributes={{ 'data-customer-id': customer.id }}
       />
 
-      <CustomerSheet customer={customer} open={editOpen} onOpenChange={setEditOpen} />
+      <CustomerSheet
+        customer={customer}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        companyCountry={companyCountry}
+      />
       {deleteOpen === null ? null : (
         <DeleteCustomerDialog
           customer={customer}
