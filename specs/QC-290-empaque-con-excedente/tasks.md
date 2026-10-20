@@ -17,7 +17,7 @@
     borra junto con su bloque de tests.
   - Hecho: tests nuevos verdes; typecheck verde.
 
-- [ ] **T1 [P] — Pase `/design` del aviso informativo** (humano + `/design`). P2; desbloquea R20, R22.
+- [x] **T1 [P] — Pase `/design` del aviso informativo** (humano + `/design`). P2; desbloquea R20, R22.
   - Añadir el estado «Con excedente» a `docs/diseno/canvas/EmpaqueTerminarEstados.dc.html` (y a
     `EmpaqueTerminar.dc.html`, `EmpaqueTerminarMovil.dc.html`, `EmpaqueTerminarTablet.dc.html` si el
     aviso cambia el layout): texto, tono, ubicación (línea o pie), si detalla los libres, y la

@@ -117,9 +117,11 @@ Vocabulario de esta ficha (no es implementación, es para que los requisitos se 
   motivo, NO DEBE pintar el total del pie en tono de error y NO DEBE deshabilitar «Terminar» por ese
   motivo. [Qué ve el Empacador, ¿Se puede envasar más?]
 - **R20**: MIENTRAS el envasado del diálogo supera la cantidad del pedido y ninguna línea tiene error
-  de conteo, el sistema DEBE mostrar un aviso informativo (no de error, no bloqueante). Su texto,
-  tono, ubicación y si detalla los envases libres por línea los fija **P2** con el pase `/design`;
-  hasta entonces este requisito no se implementa. [Qué ve el Empacador]
+  de conteo, el sistema DEBE mostrar un único aviso informativo (no de error, no bloqueante) encima
+  del pie: «Sobran <excedente> sobre el pedido.» y, en segunda línea, «Quedan libres en stock: <N>
+  envase(s) de <presentación>[, …].» o, si ningún envase queda libre, «Ningún envase queda libre: lo
+  que sobra no llega a un envase entero y sigue en el pedido.» Tablero:
+  `docs/diseno/canvas/EmpaqueTerminar.dc.html` (estado `excedente`). [Qué ve el Empacador, (P2)]
 - **R21**: MIENTRAS el envasado del diálogo no supera la cantidad del pedido, el sistema NO DEBE
   mostrar el aviso de R20.
 - **R22**: DONDE el aviso de R20 muestre envases libres, el sistema DEBE calcularlos con la misma
@@ -169,10 +171,7 @@ Vocabulario de esta ficha (no es implementación, es para que los requisitos se 
 
 ## Preguntas abiertas
 
-- **P2:** texto y tono del aviso informativo. Necesita pase `/design` aprobado
-  (`docs/perfil-agentes.md > Pase de diseño para componentes nuevos`) y el humano fija el texto.
-  Bloquea R20 (y R22 si el aviso detalla los libres). Lo abierto: texto y tono, si va por línea o en
-  el pie, y si dice cuántos envases quedan libres y de qué presentación.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -194,4 +193,5 @@ Vocabulario de esta ficha (no es implementación, es para que los requisitos se 
 | 2026-10-20 | (P3) Varias líneas pasan su plan y el excedente no alcanza para todas | Mayor contenido primero; a igual contenido, orden del reparto (R7). Ej.: excedente 5 L, 1 L +4 y 5 L +1 → 1 libre de 5 L, 0 de 1 L. |
 | 2026-10-20 | (P4) ¿Se muestran los libres fuera del aviso? | No por ahora: solo el aviso del diálogo; se ven como existencia del lote y en «Entrega sin pedido» (QC-288). Otra vista va en otra ficha. |
 | 2026-10-20 | Pase `/design` | Se hace antes de aprobar el spec, sin excepción (`docs/perfil-agentes.md > Pase de diseño`). Cierra P2. |
+| 2026-10-20 | (P2) Texto y tono del aviso | Aprobado el tablero `EmpaqueTerminar*.dc.html` (estado `excedente`): un aviso informativo encima del pie, detallado. Ej.: «Sobran 5,48 L sobre el pedido.» / «Quedan libres en stock: 1 envase de Galón 3,78 L, 1 envase de Botella 1 L.» Sin libres: «Ningún envase queda libre: lo que sobra no llega a un envase entero y sigue en el pedido.» Sin «(estimados)». |
 | 2026-10-20 | QC-304 | Duplicado de esta ficha: cancelada, decisiones absorbidas aquí. |

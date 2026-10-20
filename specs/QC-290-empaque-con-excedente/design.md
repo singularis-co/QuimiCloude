@@ -1,7 +1,7 @@
 # QC-290 — empaque-con-excedente · design.md
 
 > Zona fullstack · Complejidad high · Requisitos en `requirements.md` (R1–R29). Preguntas abiertas:
-> P2 (bloquea la UI del aviso: R20, R22; se cierra con el pase `/design`). P3 y P4 cerradas el 2026-10-20.
+> Sin preguntas abiertas: P2 (pase `/design` aprobado), P3 y P4 cerradas el 2026-10-20.
 > Sin dependencias nuevas (R28).
 
 ## Lo que ya existe
@@ -55,15 +55,15 @@ información), `Alert` (sin tono de información, `role="alert"` fijo), `StatusB
 ya en uso) y `FieldError` (ya en uso para errores de línea).
 
 - Aviso informativo (R20): **paso 1, reutiliza `Notice`** con tono de información. Es la propuesta;
-  la confirma o cambia el pase `/design` de T1 (P2). `Alert` se descarta: no tiene tono de
+  confirmada por el pase `/design` aprobado (P2). `Alert` se descarta: no tiene tono de
   información y anuncia como alerta, que es justo lo que R19 quita.
 - No se crea ningún componente. Sí hay **cambio visual** de uno existente (el diálogo deja de pintar
   un estado de error y gana un aviso), así que va pase `/design` sobre los tableros aprobados de
   QC-281: `docs/diseno/canvas/EmpaqueTerminar.dc.html`, `EmpaqueTerminarEstados.dc.html`,
-  `EmpaqueTerminarMovil.dc.html` y `EmpaqueTerminarTablet.dc.html`. **Hoy ninguno tiene el estado
-  «con excedente»**: la UI (T7) no se implementa hasta que el humano apruebe ese pase
-  (`docs/perfil-agentes.md > Pase de diseño para componentes nuevos`). El servidor y la entrega no
-  dependen de él.
+  `EmpaqueTerminarMovil.dc.html` y `EmpaqueTerminarTablet.dc.html`. **Pase aprobado por el humano
+  el 2026-10-20**: estado `excedente` en `docs/diseno/canvas/EmpaqueTerminar.dc.html` (caja 5 de
+  `EmpaqueTerminarEstados.dc.html`, enmienda en `EmpaqueTerminarMovil.dc.html`), con `Notice` en
+  tono de información encima del pie. Textos en `requirements.md > R20`.
 
 ## 1. Modelo de datos
 
@@ -258,7 +258,7 @@ En `packing-finish-dialog.tsx`, **después** del pase `/design` aprobado (T1):
   mismos datos que ya arma para el total (`content`, `unit`, `plan`) y devuelve el excedente y los
   libres para el aviso (R20–R22). Con `incompatible_units` o sin contenido, sin aviso (el servidor
   rechaza como hoy, R3).
-- El aviso: `Notice` en tono de información (propuesta, §UI). Texto, ubicación y detalle: P2.
+- El aviso: `Notice` en tono de información encima del pie (tablero aprobado, §UI). Textos: R20.
 
 No cambia `PackingFinishView` ni su lector: ya trae cantidad, unidad, plan, contenido y unidad por
 línea.

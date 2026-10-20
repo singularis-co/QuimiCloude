@@ -13,7 +13,7 @@
 <style>body{margin:0}</style>
 </helmet>
 <div class="qc" style="width: 2500px; height: 3000px; box-sizing: border-box; padding: 40px; display: flex; flex-direction: column; gap: 24px">
-  <div class="ph-t"><h1 class="h1">¿Terminar el empaque? · estados (QC-281)</h1><p class="sub">Cada caja es la pantalla de empaque a 780 px con el diálogo abierto en un estado. Pedido de 72,00 L: Galón 3,78 L × 14 (6 libres, con imagen) y Botella 1 L × 15 (2 libres, sin imagen: marcador).</p></div>
+  <div class="ph-t"><h1 class="h1">¿Terminar el empaque? · estados (QC-281, QC-290)</h1><p class="sub">Cada caja es la pantalla de empaque a 780 px con el diálogo abierto en un estado. Pedido de 72,00 L: Galón 3,78 L × 14 (6 libres, con imagen) y Botella 1 L × 15 (2 libres, sin imagen: marcador).</p></div>
   <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px 40px">
     <sc-for list="{{ states }}" as="e" hint-placeholder-count="8">
       <div style="display: flex; flex-direction: column; gap: 10px">
@@ -32,7 +32,7 @@ return { states: [
 { k: 'diferencia', t: '2 · Con diferencia + motivo', d: 'Galón 13 de 14 · Rotura · se libera 1 apartado.' },
 { k: 'otro', t: '3 · «Otro» con texto', d: 'Botella 14 de 15 · texto libre obligatorio.' },
 { k: 'sinMotivo', t: '4 · Falta el motivo', d: 'Pulsó Terminar con una línea distinta y sin motivo.' },
-{ k: 'tope', t: '5 · Error de tope', d: 'Galón 16: 75,48 L supera 72,00 L · máximo 15 · Terminar deshabilitado.' },
+{ k: 'excedente', t: '5 · Con excedente', d: 'Galón 16 + Botella 17: 77,48 L de 72,00 L · aviso informativo: sobran 5,48 L, quedan libres 1 Galón y 1 Botella · Terminar activo.' },
 { k: 'stock', t: '6 · Error de stock del envase', d: 'Botella 19: hacen falta 4 vacías y quedan 2 · Terminar deshabilitado.' },
 { k: 'cero', t: '7 · Línea en 0', d: 'Botella 0 · Merma · no da de alta lote y libera sus 15 apartados.' },
 { k: 'zoom', t: '8 · Imagen del envase ampliada', d: 'Tocó la imagen del Galón: diálogo encima del conteo (P3).' }
