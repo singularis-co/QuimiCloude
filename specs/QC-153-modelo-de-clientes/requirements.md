@@ -150,6 +150,11 @@ asignaciones.
 **R28.** El sistema NO DEBE añadir en esta ficha ningún test E2E: no hay flujo navegable que visitar,
 y cada requisito se verifica con tests unitarios, estáticos o de integración.
 
+> **Nota 2026-10-19 (enmienda QC-288).** La guardia de R28 (`tests/unit/clientes/scope.test.ts`)
+> mantiene la lista cerrada de E2E que pueden nombrar clientes; entra `e2e/entrega-sin-pedido.spec.ts`
+> (R56 de QC-288), que siembra dos clientes por Prisma con la normalización del barrel de `clientes`
+> y no recorre la pantalla de clientes. Mismo criterio que las altas anteriores (QC-156, QC-282).
+
 **R29.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
 requisitos anteriores.
 

@@ -45,6 +45,8 @@ dudas que quedan van en `## Preguntas abiertas`.
 | C6 | Se reutiliza antes de crear (reutiliza, extiende, compón, crea) y toda pieza nueva o con cambio visual cita su tablero | humano, 2026-10-10 (regla dura) | R23 |
 | C7 | El dashboard conserva las garantías de QC-12 / QC-167 R25: un único `h1`, ningún landmark nuevo, `dashboard-content` con la lista y nada más | QC-167 R25 (cerrado) | R1 |
 | C8 | La página no encontrada no delata permisos ni módulos y no resuelve «la primera pantalla disponible» | QC-75 R7, R9 (cerrado) | R19 |
+| C9 | Se quita el chip «En curso» de actividad bajo el número del pedido y junto al estado del detalle; se conservan «Dado de baja», la marca de fase abierta y el sufijo « (en curso)» de la duración. Enmienda aprobada por el usuario, sin tarjeta (commit `0f135128`) | usuario, 2026-10-16 | R6, R21 |
+| C10 | El estado `EN_CURSO` se lee «En fabricación» (antes «En curso»); solo cambia el texto, no el código ni el tono. Enmienda aprobada por el usuario, sin tarjeta (commit `440ff5b2`, #256) | usuario, 2026-10-16 | R4 |
 
 ## Requisitos (EARS)
 
@@ -80,9 +82,16 @@ pintar «0» sin insignia y atenuado. La cifra DEBE ser la del dominio y DEBE co
 
 **R6.** SI un pedido está dado de baja, ENTONCES el sistema DEBE pintar, junto a su número en la
 fila y junto a su estado en el detalle, un `StatusBadge` de tono `muted` con «Dado de baja»
-(`data-testid="execution-trace-deleted"`); SI está activo, ENTONCES DEBE pintar en los mismos sitios
-un `StatusBadge` de tono `progress` con «En curso» (`data-testid="execution-trace-active"`). Un
-pedido dado de baja NO DEBE llevar la marca «En curso». *(Ubicación y forma: P4.)*
+(`data-testid="execution-trace-deleted"`). El sistema NO DEBE pintar, ni en la fila ni en el
+detalle, ninguna marca «En curso» de actividad (`data-testid="execution-trace-active"`), esté el
+pedido activo o dado de baja: el estado ya dice en qué paso va. *(Ubicación y forma: P4.)*
+
+> **Enmendado el 2026-10-16 (enmienda aprobada por el usuario, sin tarjeta; commit `0f135128`).**
+> Texto original: «…SI está activo, ENTONCES DEBE pintar en los mismos sitios un `StatusBadge` de
+> tono `progress` con «En curso» (`data-testid="execution-trace-active"`). Un pedido dado de baja NO
+> DEBE llevar la marca «En curso».» La marca de actividad desaparece de la fila y del detalle. Se
+> conservan «Dado de baja» y la duración abierta con su sufijo « (en curso)» (QC-167 R3, QC-283 R26)
+> y la insignia «En curso» de una fase abierta en el detalle (QC-283 R25).
 
 **R7.** Ninguna celda de la lista DEBE contener un enlace «Ver recorrido». Cada fila DEBE tener un
 menú de acciones cuyo disparador tenga el nombre accesible «Acciones del pedido {número}» y un
@@ -178,7 +187,7 @@ accesibles, con su ortografía:
 | Columnas | «Nº de pedido», «Estado», «Personas», «Primera anotación», «Última anotación», «Duración», «Vueltas atrás» |
 | Menú de fila | «Acciones del pedido {número}» · «Ver recorrido» · «Acciones» · «Pedido {número}» · «Cerrar» |
 | Estados de la lista | «No hay pedidos ejecutados que mostrar.» · «No se pudo cargar la lista de pedidos ejecutados.» · «Reintentar» |
-| Marcas | «Dado de baja» · «En curso» · «Vuelta atrás» |
+| Marcas | «Dado de baja» · ~~«En curso»~~ (quitada el 2026-10-16, R6) · «Vuelta atrás» |
 | Recorrido | «Volver a la lista» · «Recorrido del pedido {número}» · «Estado» · «Duración» · «Vueltas atrás» · «Anotaciones» · «Paso {n}» · «Motivo» · «Hasta la siguiente:» · «Sin dato» · «No se pudo cargar el recorrido.» |
 | Acciones | «Arrancar», «Retomar», «Avanzar», «Retroceder», «Cancelar», «Finalizar», «Comenzar empaque», «Terminar empaque» |
 | No encontrada | «404» · «No encontramos esta página» · «Revisa la dirección e inténtalo de nuevo, o continúa desde el menú lateral.» |
@@ -221,6 +230,8 @@ comentarlas, se cierran con esa opción.
   pedido (QC-167 D12) y va junto al número; «En curso» se conserva junto al número; las dos como
   `StatusBadge` (R6); la vuelta atrás se marca con el tono ámbar, su icono y «Retroceder», con
   «Vuelta atrás» solo para lectores de pantalla (R15).
+  **Enmienda 2026-10-16 (`0f135128`):** «En curso» deja de pintarse junto al número y junto al
+  estado; ver R6 y la fila C9.
 - **P5 — Tablet.** `DashboardTablet` dibuja la tabla con scroll horizontal a 820 px, pero
   `DataTable` (QC-256) pasa a tarjetas cuando su contenedor mide 760 px o menos, y a 820 px con la
   barra lateral en modo icono el contenedor queda por debajo. **Por defecto: se acepta el

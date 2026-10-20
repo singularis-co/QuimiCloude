@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PRODUCT_TYPES, type ProductView } from '@/lib/modules/inventario';
 import type { ProductListResult } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { PERMISSIONS } from '@/lib/modules/identity';
-import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import type {
   ConfirmFormulaImportResult,
@@ -252,7 +252,8 @@ describe('el archivo que no se pudo interpretar o no esta disponible (R3, R32)',
       'No se pudo abrir esta revisión.',
     );
     expect(screen.getByTestId('formula-import-error-code')).toHaveTextContent('invalid_input');
-    expect(screen.getByTestId('formula-import-error-back-link')).toBeInTheDocument();
+    expect(screen.getByTestId('formula-import-error-back-link')).toHaveAttribute('href', FORMULAS_ROUTE);
+    expect(screen.getByTestId('formula-import-error-back-link')).toHaveAttribute('data-direction', 'back');
     expect(screen.queryByTestId('formula-import-review')).toBeNull();
     expect(screen.queryByTestId(/^formula-import-row-/)).toBeNull();
   });

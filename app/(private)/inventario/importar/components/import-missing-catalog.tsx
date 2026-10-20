@@ -1,9 +1,10 @@
 'use client';
 
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, TriangleAlertIcon } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import type { ImportMissingEntry } from '@/lib/modules/inventario';
 import type { UnitView } from '@/lib/modules/unidades';
 
@@ -44,20 +45,20 @@ function MissingList({
 }) {
   if (entries.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium">{title}</h3>
+    <div className="flex min-w-0 flex-col gap-2">
+      <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
       <ul className="flex flex-col gap-2">
         {entries.map((entry) => (
           <li
             key={entry.name}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 px-3 py-2.5"
             data-testid={itemTestId}
           >
             <span className="flex min-w-0 flex-col">
-              <span className="font-medium break-words" data-testid={MISSING_NAME_TESTID}>
+              <span className="font-semibold break-words" data-testid={MISSING_NAME_TESTID}>
                 {entry.name}
               </span>
-              <span className="text-xs text-muted-foreground" data-testid={MISSING_ROWS_TESTID}>
+              <span className="text-xs text-muted-foreground tabular-nums" data-testid={MISSING_ROWS_TESTID}>
                 {missingRowsLabel(entry.rowNumbers)}
               </span>
             </span>
@@ -111,27 +112,37 @@ export function ImportMissingCatalog({
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-dashed p-4" data-testid={MISSING_SECTION_TESTID}>
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">{MISSING_SECTION_TITLE}</h2>
-        <p className="text-sm text-muted-foreground">{MISSING_SECTION_DESCRIPTION}</p>
+    <Card
+      className="gap-4 rounded-[14px] border border-warning-border px-5 py-5 ring-0"
+      data-testid={MISSING_SECTION_TESTID}
+    >
+      <div className="flex items-start gap-2.5">
+        <span className="flex size-9 flex-none items-center justify-center rounded-[10px] bg-warning-subtle text-warning-text">
+          <TriangleAlertIcon className="size-4" aria-hidden />
+        </span>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="text-lg font-semibold">{MISSING_SECTION_TITLE}</h2>
+          <p className="text-sm text-muted-foreground">{MISSING_SECTION_DESCRIPTION}</p>
+        </div>
       </div>
-      <MissingList
-        title={MISSING_UNITS_TITLE}
-        entries={missingUnits}
-        canCreate={canCreateUnits}
-        itemTestId={MISSING_UNIT_TESTID}
-        disabled={disabled}
-        onCreate={(name) => setTarget({ kind: 'unit', name })}
-      />
-      <MissingList
-        title={MISSING_PRESENTATIONS_TITLE}
-        entries={missingPresentations}
-        canCreate={canCreatePresentations}
-        itemTestId={MISSING_PRESENTATION_TESTID}
-        disabled={disabled}
-        onCreate={(name) => setTarget({ kind: 'presentation', name })}
-      />
+      <div className="grid grid-cols-2 gap-4 @max-[760px]:grid-cols-1" data-slot="missing-catalog-columns">
+        <MissingList
+          title={MISSING_UNITS_TITLE}
+          entries={missingUnits}
+          canCreate={canCreateUnits}
+          itemTestId={MISSING_UNIT_TESTID}
+          disabled={disabled}
+          onCreate={(name) => setTarget({ kind: 'unit', name })}
+        />
+        <MissingList
+          title={MISSING_PRESENTATIONS_TITLE}
+          entries={missingPresentations}
+          canCreate={canCreatePresentations}
+          itemTestId={MISSING_PRESENTATION_TESTID}
+          disabled={disabled}
+          onCreate={(name) => setTarget({ kind: 'presentation', name })}
+        />
+      </div>
       {target?.kind === 'unit' ? (
         <ImportCreateUnitDialog
           key={target.name}
@@ -150,6 +161,6 @@ export function ImportMissingCatalog({
           onCreated={created}
         />
       ) : null}
-    </section>
+    </Card>
   );
 }

@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Empresa del Maestro</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}
+.sw{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 8px;border:0;border-radius:8px;background:none;color:var(--fg);font:500 13px 'IBM Plex Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.sw:hover{background:var(--muted)}
+.sw:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.sw[aria-disabled="true"]{cursor:not-allowed;opacity:.5}
+.sw[aria-disabled="true"]:hover{background:none}
+.sw-t{position:relative;width:36px;height:20px;flex:none;border-radius:999px;background:var(--input);transition:background-color var(--d-b) var(--e-std)}
+.sw-t i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:var(--card);box-shadow:0 1px 2px rgb(0 0 0 / .3);transition:translate var(--d-b) var(--e-std)}
+.sw[aria-checked="true"] .sw-t{background:var(--primary)}
+.sw[aria-checked="true"] .sw-t i{translate:16px 0}
+.mods{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:14px;background:var(--card);overflow:hidden}
+.mod{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);animation:qc-rise var(--d-s) var(--e-in) both}
+.mod:last-child{border-bottom:0}
+.mod-ic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--muted);color:var(--muted-fg);transition:background-color var(--d-b),color var(--d-b)}
+.mod.on .mod-ic{background:var(--p-bg);color:var(--p-fg)}
+.mod-t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mod-n{font-size:14px;font-weight:600}
+.dep{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-fg)}
+.dep.warn{color:var(--w-fg)}
+.core{display:flex;flex-wrap:wrap;gap:8px}
+.core span{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:13px;color:var(--fg)}
+.core svg{width:14px;height:14px;color:var(--muted-fg)}
+.kv{display:grid;grid-template-columns:200px minmax(0,1fr);gap:0;margin:0}
+.kv dt,.kv dd{margin:0;padding:12px 0;border-bottom:1px solid var(--border);font-size:14px}
+.kv dt{color:var(--muted-fg)}
+.kv dt:last-of-type,.kv dd:last-of-type{border-bottom:0}
+@container (max-width: 760px){.mod{grid-template-columns:36px minmax(0,1fr) auto;row-gap:8px}.mod .mod-st{grid-column:2}.mod .sw{grid-column:3;grid-row:1;min-height:44px}.kv{grid-template-columns:minmax(0,1fr)}.kv dt{padding-bottom:0;border-bottom:0}.kv dd{padding-top:4px}}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" area="maestro" active="empresas" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><a class="crumb" href="MaestroEmpresas.dc.html" style="text-decoration: none">Empresas<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg></a><div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h1 class="h1">{{ coName }}</h1><span class="{{ stCls }}"><i></i>{{ stLabel }}</span></div></div>
+          <div class="ph-act" style="display: flex; gap: 8px">
+            <sc-if value="{{ live }}" hint-placeholder-val="{{ true }}"><button class="b b-out b-touch-m" type="button" onClick="{{ openEdit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button><button class="b b-out b-touch-m" type="button" onClick="{{ openDel }}" style="color: var(--d-fg)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Dar de baja</button></sc-if>
+            <sc-if value="{{ gone }}" hint-placeholder-val="{{ false }}"><button class="b b-pri b-touch-m" type="button" onClick="{{ openReact }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reactivar</button></sc-if>
+          </div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Secciones de la empresa">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3"><button class="tab" type="button" role="tab" aria-selected="{{ t.sel }}" onClick="{{ t.pick }}">{{ t.label }}</button></sc-for>
+        </div>
+
+        <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 12px" aria-busy="true"><span class="cap" style="display: flex; align-items: center; gap: 8px"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg>Cargando los módulos…</span><span class="sk" style="height: 68px"></span><span class="sk" style="height: 68px"></span><span class="sk" style="height: 68px"></span><span class="sk" style="height: 68px"></span></div>
+        </sc-if>
+
+        <sc-if value="{{ loadError }}" hint-placeholder-val="{{ false }}">
+          <div class="box error" role="alert"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg></span><span class="h3">No pudimos cargar los módulos</span><p class="sub">Ocurrio un error inesperado. Intentalo de nuevo. · Referencia <span class="mono">[REF]</span></p><button class="b b-out" type="button">Reintentar</button></div>
+        </sc-if>
+
+        <sc-if value="{{ showMods }}" hint-placeholder-val="{{ true }}">
+        <div class="{{ panelCls }}" role="tabpanel" aria-label="Módulos" style="display: flex; flex-direction: column; gap: 22px">
+          <sc-if value="{{ gone }}" hint-placeholder-val="{{ false }}">
+            <div class="nt n-w"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span><b>Esta empresa está de baja</b>Reactívala para cambiar sus módulos.</span></div>
+          </sc-if>
+          <section aria-labelledby="mo-add" style="display: flex; flex-direction: column; gap: 12px">
+            <div class="card-hd">
+              <div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mo-add" class="h2">Añadidos</h2><p class="sub"><span class="mono">{{ onCount }}</span> de <span class="mono">5</span> prendidos. Al apagar uno, desaparece para todos los usuarios de la empresa desde su siguiente acción.</p></div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap"><button class="b b-out b-touch-m" type="button" aria-disabled="{{ allOnDis }}" onClick="{{ allOn }}">Prender todos</button><button class="b b-out b-touch-m" type="button" aria-disabled="{{ allOffDis }}" onClick="{{ askAllOff }}">Apagar todos</button></div>
+            </div>
+            <div class="mods">
+              <sc-for list="{{ mods }}" as="m" hint-placeholder-count="5">
+                <div class="{{ m.cls }}">
+                  <span class="mod-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ m.icon }}"></path></svg></span>
+                  <span class="mod-t"><span class="mod-n">{{ m.name }}</span><span class="cap">{{ m.desc }}</span><sc-if value="{{ m.hasDep }}" hint-placeholder-val="{{ false }}"><span class="{{ m.depCls }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg>{{ m.depText }}</span></sc-if></span>
+                  <span class="mod-st"><span class="{{ m.stCls }}"><i></i>{{ m.st }}</span></span>
+                  <button class="sw" type="button" role="switch" aria-checked="{{ m.on }}" aria-disabled="{{ m.dis }}" aria-label="{{ m.swLabel }}" onClick="{{ m.toggle }}"><sc-if value="{{ m.busy }}" hint-placeholder-val="{{ false }}"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></sc-if><span class="sw-t"><i></i></span></button>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+          <section aria-labelledby="mo-core" style="display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mo-core" class="h2">Núcleo</h2><p class="sub">Siempre prendido en todas las empresas. No se puede apagar.</p></div>
+            <div class="core">
+              <sc-for list="{{ core }}" as="c" hint-placeholder-count="11"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 1 1 8 0v4"></path></svg>{{ c }}</span></sc-for>
+            </div>
+          </section>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ showData }}" hint-placeholder-val="{{ false }}">
+        <div class="{{ panelCls }}" role="tabpanel" aria-label="Datos">
+          <div class="card" style="max-width: 760px">
+            <dl class="kv">
+              <dt>Nombre</dt><dd class="strong">{{ coName }}</dd>
+              <dt>Identificación fiscal</dt><dd class="mono">900.481.227-3</dd>
+              <dt>Correo de contacto</dt><dd>contacto@quimicosvalle.co</dd>
+              <dt>Teléfono de contacto</dt><dd class="mono">602 488 1200</dd>
+              <dt>País</dt><dd>Colombia (+57)</dd>
+              <dt>Creada</dt><dd class="mono">14/09/2026</dd>
+              <dt>Dada de baja</dt><dd class="mono">{{ deletedAt }}</dd>
+            </dl>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ showHist }}" hint-placeholder-val="{{ false }}">
+        <div class="{{ panelCls }}" role="tabpanel" aria-label="Historial" style="max-width: 760px">
+          <ol class="tl">
+            <sc-for list="{{ events }}" as="e" hint-placeholder-count="5">
+              <li class="ev"><span class="ev-dot"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ e.icon }}"></path></svg></span><div class="ev-body"><span class="strong" style="font-size: 14px">{{ e.text }}</span><span class="cap">{{ e.who }} · <span class="mono">{{ e.when }}</span></span></div></li>
+            </sc-for>
+          </ol>
+          <div class="pg" style="border-top: 0"><span>Página <span class="mono">1</span> de <span class="mono">1</span> · <span class="mono">{{ evCount }}</span> en total</span></div>
+        </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" area="maestro" active="empresas" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="{{ offCls }}" role="alertdialog" aria-modal="true" aria-labelledby="mo-off">
+    <div class="dlg-ic warn"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"></path></svg></div>
+    <h2 id="mo-off" class="h2">{{ offTitle }}</h2>
+    <p class="sub">Desaparece del menú y de las pantallas de todos los usuarios de <span class="strong">{{ coName }}</span> desde su siguiente acción. Lo ya confirmado no se borra.</p>
+    <sc-if value="{{ offHasExtra }}" hint-placeholder-val="{{ true }}"><ul class="sub" style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px"><sc-for list="{{ offExtra }}" as="x" hint-placeholder-count="2"><li>{{ x }}</li></sc-for></ul></sc-if>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmOff }}">{{ offCta }}</button></div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"pestana":{"editor":"enum","options":["datos","modulos","historial"],"default":"modulos"},"estado":{"editor":"enum","options":["activa","de-baja","cargando","error"],"default":"activa"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.bt); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const co = 'Químicos del Valle S.A.S.';
+const estado = s.estado || this.props.estado || 'activa';
+const live = estado !== 'de-baja';
+const tab = s.tab || this.props.pestana || 'modulos';
+const A = [
+{ id: 'dashboard', name: 'Dashboard y recorrido', desc: '[DESCRIPCIÓN: indicadores y recorrido del pedido]', icon: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z', req: [] },
+{ id: 'proveedores', name: 'Proveedores', desc: '[DESCRIPCIÓN: directorio de proveedores y su catálogo]', icon: 'M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z', req: [] },
+{ id: 'lectura_pdf', name: 'Lectura de PDF con IA', desc: '[DESCRIPCIÓN: lee fórmulas y catálogos desde un PDF]', icon: 'M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h4', req: ['integraciones'] },
+{ id: 'importacion_excel', name: 'Importación desde Excel', desc: '[DESCRIPCIÓN: carga datos desde una hoja de cálculo]', icon: 'M4 3h16v18H4zM4 9h16M4 15h16M10 3v18', req: [] },
+{ id: 'integraciones', name: 'Integraciones', desc: 'Proveedor IA, Inventarios y WhatsApp.', icon: 'M14 3v3a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 0 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 0 0-4H3V3z', req: [] }
+];
+const nameOf = {}; A.forEach((a) => { nameOf[a.id] = a.name; });
+const base = { dashboard: true, proveedores: true, lectura_pdf: true, importacion_excel: false, integraciones: false };
+const en = Object.assign({}, base, s.en || {});
+const flash = (msg, extra) => { this.setState(Object.assign({ toast: true, toastMsg: msg }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+const save = (patch, msg) => { this.setState({ busy: Object.keys(patch), dlg: null }); clearTimeout(this.bt); this.bt = setTimeout(() => flash(msg, { en: Object.assign({}, en, patch), busy: null }), 600); };
+const busy = s.busy || [];
+const EXTRA = {
+lectura_pdf: ['Las lecturas de PDF en cola terminan como fallidas.', 'Las revisiones sin confirmar quedan ocultas hasta que lo vuelvas a prender.'],
+importacion_excel: ['Las revisiones sin confirmar quedan ocultas hasta que lo vuelvas a prender.'],
+integraciones: ['Lectura de PDF con IA deja de funcionar aunque siga prendida, porque la necesita.']
+};
+const mods = A.map((a, i) => {
+const on = !!en[a.id];
+const depsOn = a.req.every((r) => !!en[r]);
+const active = on && depsOn;
+const isBusy = busy.indexOf(a.id) >= 0;
+const noEffect = on && !depsOn;
+return { name: a.name, desc: a.desc, icon: a.icon,
+cls: active ? 'mod on' : 'mod',
+hasDep: a.req.length > 0,
+depText: noEffect ? 'Necesita ' + a.req.map((r) => nameOf[r]).join(', ') + '. Préndela para que funcione.' : 'Necesita ' + a.req.map((r) => nameOf[r]).join(', ') + '.',
+depCls: noEffect ? 'dep warn' : 'dep',
+st: active ? 'Prendido' : (noEffect ? 'Sin efecto' : 'Apagado'),
+stCls: active ? 'sb t-success' : (noEffect ? 'sb t-waiting' : 'sb t-muted'),
+on: on ? 'true' : 'false', dis: (!live || isBusy) ? 'true' : 'false', busy: isBusy,
+swLabel: (on ? 'Apagar ' : 'Prender ') + a.name,
+toggle: () => { if (!live || isBusy) return; if (on) this.setState({ dlg: { ids: [a.id] } }); else { const p = {}; p[a.id] = true; save(p, a.name + ' prendido.'); } } };
+});
+const onIds = A.filter((a) => en[a.id]).map((a) => a.id);
+const offIds = A.filter((a) => !en[a.id]).map((a) => a.id);
+const dlg = s.dlg;
+const dIds = dlg ? dlg.ids : [];
+const many = dIds.length > 1;
+let extra = [];
+dIds.forEach((id) => { (EXTRA[id] || []).forEach((x) => { if (!(many && id === 'integraciones') && extra.indexOf(x) < 0) extra.push(x); }); });
+const T = [['datos', 'Datos'], ['modulos', 'Módulos'], ['historial', 'Historial']];
+const k = s.k || 0;
+const ev = [
+['M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0', 'Apagó Importación desde Excel', '15/10/2026 16:40'],
+['M12 5v14M5 12h14', 'Prendió Lectura de PDF con IA', '15/10/2026 16:38'],
+['M4 20h4L19 9l-4-4L4 16z', 'Editó País y Teléfono de contacto', '02/10/2026 09:12'],
+['M12 5v14M5 12h14', 'Prendió Proveedores', '14/09/2026 11:05'],
+['M4 21V5l8-3v19M12 8h8v13M4 21h18', 'Dio de alta la empresa', '14/09/2026 11:02']
+];
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false', openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+coName: co, live: live, gone: !live,
+stLabel: live ? 'Activa' : 'De baja', stCls: live ? 'sb t-success' : 'sb t-muted',
+openEdit: () => {}, openDel: () => {},
+openReact: () => flash('Empresa reactivada.', { estado: 'activa' }),
+tabs: T.map((t) => ({ label: t[1], sel: t[0] === tab ? 'true' : 'false', pick: () => this.setState({ tab: t[0], k: k + 1 }) })),
+panelCls: k % 2 ? 'fade' : 'enter',
+loading: tab === 'modulos' && estado === 'cargando', loadError: tab === 'modulos' && estado === 'error',
+showMods: tab === 'modulos' && (estado === 'activa' || estado === 'de-baja'),
+showData: tab === 'datos', showHist: tab === 'historial',
+deletedAt: live ? '—' : '15/10/2026',
+mods: mods, onCount: onIds.length,
+core: ['Usuarios y grupos', 'Unidades', 'Presentaciones', 'Inventario', 'Fórmulas', 'Pedidos', 'Asignación y ejecución', 'Empaque', 'Acondicionamiento', 'Terminados y entregas', 'Clientes'],
+allOnDis: (!live || offIds.length === 0) ? 'true' : 'false', allOffDis: (!live || onIds.length === 0) ? 'true' : 'false',
+allOn: () => { if (!live || !offIds.length) return; const p = {}; offIds.forEach((id) => { p[id] = true; }); save(p, 'Se prendieron ' + offIds.length + ' módulos.'); },
+askAllOff: () => { if (!live || !onIds.length) return; this.setState({ dlg: { ids: onIds } }); },
+offCls: dlg ? 'dlg open' : 'dlg',
+offTitle: many ? '¿Apagar los ' + dIds.length + ' módulos prendidos?' : '¿Apagar ' + (nameOf[dIds[0]] || '') + '?',
+offCta: many ? 'Apagar todos' : 'Apagar',
+offHasExtra: extra.length > 0, offExtra: extra,
+confirmOff: () => { const p = {}; dIds.forEach((id) => { p[id] = false; }); save(p, many ? 'Se apagaron ' + dIds.length + ' módulos.' : nameOf[dIds[0]] + ' apagado.'); },
+events: ev.map((e) => ({ icon: e[0], text: e[1], when: e[2], who: '[NOMBRE DEL MAESTRO]' })), evCount: ev.length,
+ovCls: (dlg || s.menu) ? 'ov open' : 'ov', closeAll: () => this.setState({ dlg: null, menu: false }),
+toastCls: s.toast ? 'toast show' : 'toast', toastMsg: s.toastMsg || ''
+};
+}
+}
+</script>
+</body>
+</html>

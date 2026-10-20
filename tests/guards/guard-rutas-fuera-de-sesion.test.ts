@@ -48,6 +48,10 @@ export const RUTAS_FUERA_DE_SESION: Readonly<Record<string, Clasificacion>> = {
     nucleo: true,
     prueba: 'tests/unit/notificaciones/purge-route.test.ts',
   },
+  'app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts': {
+    anadido: 'integraciones',
+    prueba: 'tests/unit/integraciones/whatsapp/receive-whatsapp-webhook.test.ts',
+  },
 };
 
 export function listApiRoutes(root: string): readonly string[] {
@@ -115,9 +119,17 @@ const existeEnElRepo = (archivo: string): boolean => existsSync(join(repoRoot, .
 describe('guardia: rutas que corren sin sesión', () => {
   const rutas = listApiRoutes(repoRoot);
 
-  it('R26: ancla anti-vacuidad: el barrido encuentra el cron y el webhook de documentos', () => {
+  it('R26, QC-238 R31: ancla anti-vacuidad: el barrido encuentra el cron, el webhook de documentos y el de WhatsApp', () => {
     expect(rutas).toContain('app/api/cron/caducar-pedidos/route.ts');
     expect(rutas).toContain('app/api/documentos/trabajos/route.ts');
+    expect(rutas).toContain('app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts');
+  });
+
+  it('QC-238 R31: el webhook de WhatsApp es del añadido `integraciones`, con la prueba que comprueba el interruptor', () => {
+    expect(RUTAS_FUERA_DE_SESION['app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts']).toEqual({
+      anadido: 'integraciones',
+      prueba: 'tests/unit/integraciones/whatsapp/receive-whatsapp-webhook.test.ts',
+    });
   });
 
   it('R26: toda ruta de app/api está clasificada, cada entrada tiene ruta y su prueba existe', () => {

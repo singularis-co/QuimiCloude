@@ -1,7 +1,10 @@
+import { UploadIcon } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import { buttonVariants } from '@/components/ui/button';
 import { identity } from '@/lib/composition';
 import { hasAddon } from '@/lib/modules/identity';
@@ -92,25 +95,27 @@ export default async function InventarioPage({
     formUnitsResult.status === 'success' ? formUnitsResult.data : [];
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 data-testid="inventario-title" className="text-2xl font-semibold">
-          Inventario
-        </h1>
-        <div className="flex flex-wrap items-center gap-2">
-          {canImport ? (
-            <Link
-              href={INVENTORY_IMPORT_ROUTE}
-              data-slot="button"
-              data-testid="inventory-import-link"
-              className={cn(buttonVariants({ variant: 'outline' }), touchTarget)}
-            >
-              Importar
-            </Link>
-          ) : null}
-          <ProductSheet units={units} formUnits={formUnits} />
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Inventario"
+        titleTestId="inventario-title"
+        actions={
+          <>
+            {canImport ? (
+              <Link
+                href={INVENTORY_IMPORT_ROUTE}
+                data-slot="button"
+                data-testid="inventory-import-link"
+                className={cn(buttonVariants({ variant: 'outline' }), touchTarget)}
+              >
+                <UploadIcon aria-hidden="true" />
+                Importar
+              </Link>
+            ) : null}
+            <ProductSheet units={units} formUnits={formUnits} />
+          </>
+        }
+      />
       {/*
         SIN `key`: este limite NO se vuelve a montar en cada cambio de consulta. La llevaba (la
         cadena canonica) para que el esqueleto reapareciera en cada cambio, pero remontar el
@@ -133,6 +138,6 @@ export default async function InventarioPage({
       >
         <ProductListSection params={params} units={units} formUnits={formUnits} />
       </Suspense>
-    </div>
+    </PageShell>
   );
 }

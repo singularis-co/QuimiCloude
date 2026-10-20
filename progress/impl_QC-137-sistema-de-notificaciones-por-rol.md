@@ -754,3 +754,35 @@ Commits: `19e2c07b` (servidor: T24, T25, T26, T28), `d1434ee1` (navegador: T24, 
 Mapa R → test del E2E: R13 en los casos 1, 1b, 2 y 3; R19 en el 5; R24 en el 1 y el 6; R25 y R27 en el 4; R46 y R49 en el 1 y el 1b; R50 y R51 en el 1b (nombre original del archivo fallido).
 
 Tasks de la tanda 4 cerradas: T21, T22, T24, T25, T26, T27 y T28. Queda T23, la QA manual del humano.
+
+## Integración de dev (2026-10-20)
+
+`git merge origin/dev` (264 commits, merge y no rebase). No se ha hecho push.
+
+### Conflictos y cómo se resolvieron (se conservan las dos partes)
+- `lib/composition/index.ts`: el import de `company-prisma` lleva `createCompanyMembershipReader` (QC-137) y `createCompanyRepository`. Se conservan las factories de administradores y `createAdministratorRepository` (dev). Se cablean las dos constantes: `companyMembershipReader` y `administratorRepository`.
+- `tests/guards/guard-identificador-de-request.test.ts`: la lista cerrada de migraciones queda con las de dev (`20261016130000…`, `20261016130100…`, `20261019120000_whatsapp_connections_drop_meta_app_id`, `20261019140000_whatsapp_contacts_and_messages`) y las cuatro de QC-137, en orden lexicográfico.
+- `tests/guards/guard-rutas-fuera-de-sesion.test.ts`: quedan las dos entradas, `cron/purgar-notificaciones` (QC-137) y `integraciones/whatsapp/webhook/[conexionId]` (dev).
+- `docs/diseno/canvas/canvas.json`: el merge se hizo sobre el JSON, en tres vías. Se mantienen las placas y notas de Notificaciones (QC-137) y las de EntregaSinPedido (dev). En `order` van las de dev y detrás las de QC-137. Se añade la página `notificaciones`. El formato es el de dev.
+- Ajuste de test por el merge (frontend_dev): `tests/unit/notificaciones-ui/solo-campana.test.ts`, R24. Con QC-166, en dev el Maestro aterriza en `MAESTRO_COMPANIES_ROUTE` y no en `null`. La fila se iguala a dev, como pide design §R24 («`firstVisibleNavHref` queda como en dev»). Producción no cambia.
+
+### Migraciones
+`20261019120000_notifications` y `20261019120000_whatsapp_connections_drop_meta_app_id` llevan el mismo timestamp; el orden lexicográfico pone primero la de notificaciones. La `20261019140000` de dev queda después de las cuatro de QC-137. Ninguna migración se ha renombrado. Las de una rama y las de la otra no comparten tablas.
+- Base desechable vacía `qc137_merge_mig`: `db:migrate` aplica todo, las seis de 2026-10-19 intercaladas. La segunda corrida da «No pending migrations to apply» y `migrate status` «Database schema is up to date!».
+- Base desechable `qc137_merge_ooo`: primero se migró con las de `origin/dev` (copia de `db/` de dev) y después con la rama. Las cuatro de QC-137 se aplican fuera de orden sin errores («All migrations have been successfully applied»).
+- Las dos bases se borraron al terminar (`DROP DATABASE … WITH (FORCE)`). La base `QuimiCloude` no se ha tocado. El `.env` del checkout principal solo se cargó en el entorno: no se ha copiado, commiteado ni impreso.
+
+### Verificación (salida real)
+- El lockfile no cambia. Se ejecutó `prisma generate`.
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores y 10 avisos, los que ya había.
+- `pnpm exec vitest related --run <110 archivos ts/tsx del diff contra origin/dev>`: 998 archivos; 2 failed, 16339 passed y 16 skipped. Los dos fallos:
+  - `solo-campana` R24: se arregló después y queda 8/8;
+  - `tests/integration/proveedores/catalog-line.int.test.ts` › R32: ajeno, ver «Rojos».
+- `pnpm exec vitest run guard`: 84 archivos; 1144 pass y 21 skipped.
+- Unit e integración de notificaciones y documentos, más catalog-line (`tests/unit/{notificaciones,notificaciones-ui,documentos}`, `tests/integration/{notificaciones,documentos}`): 127 archivos; 1316 pass, 30 skipped y 1 fail. El fallo es catalog-line.
+- `pnpm exec playwright test e2e/notificaciones.spec.ts` sobre `qc137_merge_mig` (migrada y sembrada), en chromium y webkit: `14 passed (2.1m)`.
+
+### Rojos
+- `tests/unit/marca/tablas-marca.test.tsx` (el ajeno de las tandas anteriores): **desaparece** con el merge; corrido solo, pasa.
+- `tests/integration/proveedores/catalog-line.int.test.ts` › «R32: la base rechaza la presentacion y la unidad inexistentes…»: `TypeError: .toMatch() expects to receive a string, but got object` en la línea 784. Falla siempre, también corrido solo. Es **ajeno**: el test, `lib/modules/proveedores`, `tests/helpers`, `package.json` y el lockfile son idénticos a `origin/dev`. No está en `tests/baseline-rojos.json`. No se ha tocado.

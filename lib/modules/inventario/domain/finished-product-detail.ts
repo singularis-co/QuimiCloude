@@ -97,6 +97,8 @@ export type FinishedProductDeliveryRow = {
   /** Positiva. */
   readonly quantity: string;
   readonly void: { readonly reason: string } | null;
+  readonly withoutOrder: boolean;
+  readonly note: string | null;
 };
 
 /** Solo las lineas no anuladas, de todas las entregas del producto. */
@@ -132,7 +134,9 @@ export type ProducedProductLink = {
 export type FinishedDeliveryLineRecord = {
   readonly id: string;
   readonly orderDeliveryId: string;
-  readonly orderId: string;
+  /** `null` en una entrega sin pedido. */
+  readonly orderId: string | null;
+  readonly note: string | null;
   /** ISO, el de la entrega. */
   readonly createdAt: string;
   readonly customerId: string;

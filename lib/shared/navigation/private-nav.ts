@@ -1,11 +1,14 @@
 import {
   AI_PROVIDER_INTEGRATION_ROUTE,
   ASSIGNED_ORDERS_ROUTE,
+  CUSTOMER_CONTACTS_ROUTE,
   CUSTOMERS_ROUTE,
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_INTEGRATION_ROUTE,
   INVENTORY_ROUTE,
+  MAESTRO_ADMINISTRATORS_ROUTE,
+  MAESTRO_COMPANIES_ROUTE,
   ORDERS_ROUTE,
   PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
@@ -117,6 +120,7 @@ export const USERS_LABEL = 'Usuarios';
  * Mismo criterio que `SUPPLIERS_LABEL`, `ORDERS_LABEL`, `PRESENTATIONS_LABEL` y `UNITS_LABEL`.
  */
 export const CUSTOMERS_LABEL = 'Clientes';
+export const CUSTOMER_CONTACTS_LABEL = 'Contactos';
 
 /** Lleva tilde a proposito: es el texto que se lee en pantalla, no el segmento de la URL. */
 export const ASSIGNED_ORDERS_LABEL = 'Asignación';
@@ -125,6 +129,9 @@ export const INTEGRATIONS_LABEL = 'Integraciones';
 export const AI_PROVIDER_INTEGRATION_LABEL = 'Proveedor IA';
 export const INVENTORY_INTEGRATION_LABEL = 'Inventarios';
 export const WHATSAPP_INTEGRATION_LABEL = 'WhatsApp';
+
+export const COMPANIES_LABEL = 'Empresas';
+export const ADMINISTRATORS_LABEL = 'Administradores';
 
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
@@ -141,6 +148,7 @@ export const NAV_SECTION_OPERATION = 'Operación';
 export const NAV_SECTION_PRODUCTION = 'Producción';
 export const NAV_SECTION_DIRECTORY = 'Directorio';
 export const NAV_SECTION_CONFIGURATION = 'Configuración';
+export const NAV_SECTION_PLATFORM = 'Plataforma';
 
 /**
  * Nombre del icono de un item. **Es una cadena y no el componente a proposito.**
@@ -176,7 +184,9 @@ export type NavIconName =
   | 'contact'
   | 'puzzle'
   | 'ruler'
-  | 'square-user';
+  | 'square-user'
+  | 'building-2'
+  | 'shield-user';
 
 export type NavLink = {
   readonly kind: 'link';
@@ -315,16 +325,31 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     icon: 'truck',
     section: NAV_SECTION_DIRECTORY,
   },
-  // El permiso es el mismo que exige la pantalla con `requirePagePermission`; lo vigila
-  // `tests/unit/clientes-ui/private-nav-clientes.test.ts`, que lo lee de la fuente de `page.tsx`.
+  // El permiso de cada hijo es el que exige su pantalla con `requirePagePermission`; lo vigila
+  // `tests/unit/clientes-ui/private-nav-clientes.test.ts`, que lo lee de la fuente de cada
+  // `page.tsx`.
   {
-    kind: 'link',
-    href: CUSTOMERS_ROUTE,
+    kind: 'group',
     label: CUSTOMERS_LABEL,
     testId: 'nav-clientes',
-    permission: 'clientes.consultar',
     icon: 'square-user',
     section: NAV_SECTION_DIRECTORY,
+    items: [
+      {
+        kind: 'link',
+        href: CUSTOMERS_ROUTE,
+        label: CUSTOMERS_LABEL,
+        testId: 'nav-clientes-lista',
+        permission: 'clientes.consultar',
+      },
+      {
+        kind: 'link',
+        href: CUSTOMER_CONTACTS_ROUTE,
+        label: CUSTOMER_CONTACTS_LABEL,
+        testId: 'nav-clientes-contactos',
+        permission: 'clientes.consultar',
+      },
+    ],
   },
   // El permiso es el mismo que exige la pantalla con `requirePagePermission`; lo vigila
   // `tests/unit/configuracion-ui/private-nav-usuarios.test.ts`, que lo lee de la fuente de
@@ -390,6 +415,26 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
         permission: 'integraciones.modificar',
       },
     ],
+  },
+  // Al final a propósito: ningún rol de empresa tiene `empresas.*`, así que su aterrizaje no
+  // cambia, y para el Maestro el primer enlace visible es Empresas.
+  {
+    kind: 'link',
+    href: MAESTRO_COMPANIES_ROUTE,
+    label: COMPANIES_LABEL,
+    testId: 'nav-empresas',
+    permission: 'empresas.consultar',
+    icon: 'building-2',
+    section: NAV_SECTION_PLATFORM,
+  },
+  {
+    kind: 'link',
+    href: MAESTRO_ADMINISTRATORS_ROUTE,
+    label: ADMINISTRATORS_LABEL,
+    testId: 'nav-administradores',
+    permission: 'empresas.consultar',
+    icon: 'shield-user',
+    section: NAV_SECTION_PLATFORM,
   },
 ];
 

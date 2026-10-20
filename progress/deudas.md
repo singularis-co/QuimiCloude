@@ -191,6 +191,9 @@
   `TOUCH_TARGET = 'min-h-11 min-w-11'`. `guard-piezas-base` lo excluye por D11 con motivo que cita
   QC-232. Pasar a `touchTarget` y retirar la exclusión.
 - **Dueño:** ficha **QC-223**.
+- **Resuelta (2026-10-16, QC-263, P15/R46):** `batch-history.tsx` es ahora un diálogo sin
+  `TOUCH_TARGET` y `guard-piezas-base` lo pasa a `D11_SIN_HALLAZGOS` (sigue en `ARCHIVOS_D11`
+  porque R33 de QC-231 vigila esa lista).
 
 ### D42 — Asignación: `OrderDistributionFull` sin mover a shared (QC-232 → QC-217)
 - **Origen:** QC-232 (2026-10-09), `design.md > 7` (último punto de la ficha).
@@ -406,6 +409,19 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   No rompe ningún requisito: R21 habla de la lista, no de la carga.
 - **Ampliada (2026-10-13, QC-262, P12):** `/pedidos` igual. `OrderListSkeleton` pinta filas de
   tabla también en teléfono, donde la lista ya sale en tarjetas.
+- **Ampliada (2026-10-16, QC-263, T0b, P22):** `/inventario` igual. El esqueleto de
+  `product-columns-skeleton.ts` pinta 9 columnas y sin tarjeta; la tabla real tiene 10 en «Todos»,
+  9 con un tipo filtrado y 7 en «Producto terminado», y bajo 760 px sale en tarjetas.
+- **Ampliada (2026-10-19, QC-264; derivada del código, no medida):** `/produccion/formulas` sale en
+  tarjetas bajo 760 px de contenedor, y su esqueleto de carga, que es el `TableSkeleton` de
+  `DataTable`, sigue siendo tabla.
+- **Medida de nuevo tras el merge (2026-10-16, QC-263, T8h, F9; derivada del código):** `ProductTable`
+  pinta el esqueleto con su número real de columnas, así que cuadra en «Todos» (10 con Costo / 9
+  sin permiso de costos), con un tipo filtrado (9 / 8) y en «Producto» (8 / 7). Queda descuadre en
+  «Producto terminado»: mientras carga se pinta el esqueleto de `ProductTable` (9 / 8) y la tabla
+  real, `FinishedStockTable`, tiene 7. `PRODUCT_SKELETON_COLUMN_COUNT` (8) solo se usa en el error de
+  esa tabla. Bajo 760 px el esqueleto sigue siendo tabla: `DataTable` devuelve `TableSkeleton` antes
+  del contenedor `@container`.
 - **Dueño:** sin asignar.
 
 ### D54 — `guard-dobles-e2e` lee `.env.example` con una regex que cruza líneas
@@ -417,6 +433,10 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 ### D55 — La X de cerrar de `Dialog` y `Sheet` compartidos mide 32 px
 - **Origen:** censo de QC-262 (T0b, 2026-10-13), medido a 390 px en «Cliente», «Reparto y unidad» y el panel de entrega de `/pedidos`.
 - **Qué falta:** el botón de cerrar de las primitivas compartidas `Dialog` y `Sheet` no llega al objetivo táctil de 44 px que cumplen los botones de acción. Se arregla en la primitiva compartida, una sola vez para todas las pantallas, con la revisión visual de cada diálogo. El leader decidió dejarlo fuera de QC-262 (R18 cuenta los botones de acción).
+- **Ampliada (2026-10-16, QC-263, m3 del review):** en `/inventario` hay dos cierres locales de
+  44 px (`showCloseButton={false}` más un `DialogClose` propio `size="icon"` + `touch`, como
+  `batch-evidence-dialog.tsx`) en `batch-history.tsx` y `adjust-batch-dialog.tsx`: se retiran al
+  arreglar la primitiva. La X de 32 px del `Sheet` «Lotes» sigue (preexistente; R42 no nombra el panel).
 - **Dueño:** sin asignar.
 
 ### D56 — `ConfirmDialog` sin icono en la cabecera (QC-262, P5)
@@ -425,6 +445,15 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   título de «Cancelar el pedido», «Eliminar el pedido» y «Material insuficiente» (`dlg-ic`).
   `ConfirmDialog` no lo admite y lo usan todos los módulos: es una ficha transversal sobre la pieza
   compartida, con la revisión visual de cada confirmación.
+- **Ampliada (2026-10-16, QC-263):** `/inventario` igual: el diálogo de borrado de producto
+  (`DeleteConfirmDialog`) sale sin el icono que dibuja `ModalesInventario.dc.html`.
+- **Estado (2026-10-16):** en parte resuelta por QC-166: `ConfirmDialog` ya tiene la prop opcional
+  `icon` (glifo y tono, pintada en `AlertDialogMedia`, fila del catálogo al día). Solo falta usarla
+  en los diálogos de pedidos («Cancelar el pedido», «Eliminar el pedido», «Material insuficiente»)
+  con su revisión visual.
+- **Ampliada (2026-10-19, QC-264, P17):** en `/produccion/formulas` los dos borrados (receta y
+  versión) ya llevan el icono; falta el diálogo de propagar cambios a las versiones
+  (`propagate-versions-dialog.tsx`), que es un `AlertDialog` propio y no pasa por `ConfirmDialog`.
 - **Dueño:** sin asignar.
 
 ### D57 — Selector de prioridad del pedido sin `PriorityMark` (QC-262, P10)
@@ -457,3 +486,140 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   composición, pero no E2E: los E2E de documentos recorren el webhook con todo prendido
   (`enableAllAddons`). Falta el camino «descartado» de punta a punta.
 - **Dueño:** sin asignar.
+
+### D61 — Inventario: cifras y fechas sin el formato del tablero (QC-263, P4)
+- **Origen:** QC-263 (2026-10-16), `requirements.md > P4` cerrada por defecto.
+- **Qué falta:** los tableros de inventario escriben `120,00` y `12/09/2026 10:14`; la app sigue con
+  `formatDecimalDisplay` y `YYYY-MM-DD HH:mm`. Cambiarlo es transversal (todas las tablas), no de
+  una ruta.
+- **Dueño:** sin asignar.
+
+### D62 — Importar inventario: sin arrastrar y soltar (QC-263, P10)
+- **Origen:** QC-263 (2026-10-16), `requirements.md > P10` cerrada por defecto.
+- **Qué falta:** el tablero pide la zona de `FileField` con arrastrar y soltar; `FileField` no
+  admite `.xlsx`, comprime imágenes y entrega bytes, no el `File` que necesita la action. Se quedó
+  `ImportUploadField` con el aspecto de la zona y sin arrastrar y soltar (R34). Extender `FileField`
+  o la zona propia con `drop`.
+- **Dueño:** sin asignar.
+
+### D63 — Inventario: rótulos y pie de tarjeta hechos en la ruta (QC-263, A12)
+- **Origen:** QC-263 (2026-10-16), enmienda 2, H2·H3 y `design.md > 8 > A12`.
+- **Qué falta:** `DataTableCards` no tiene rótulos por campo ni pie propio. `/inventario` los hace
+  dentro de la ruta: `cardFieldLabel`/`withCardFieldLabel` (`card-field-label.tsx`, rótulo con
+  `[table_&]:hidden`), la columna `batchesToggle` oculta en la tabla como `footer` de la tarjeta y
+  `PRODUCT_TABLE_SCOPE_CLASS` (fondo y entrada de las sub-filas). Si una segunda ruta lo necesita, se
+  sube a `DataTableCards` (paso 2 de la regla de decisión, con su fila de catálogo y tablero) y se
+  retira el apaño.
+- **En parte resuelta (2026-10-19, QC-264, decisión del humano):** `card-field-label.tsx` subió a
+  `components/shared` (fila en el catálogo) y lo usan inventario y `/produccion/formulas`. Sigue en
+  la ruta de inventario el pie de tarjeta (`batchesToggle`) y `PRODUCT_TABLE_SCOPE_CLASS`. Queda
+  además que el rótulo sale en mono, como la cifra: `DataTableCards` pone `font-mono` al campo
+  entero de una columna `tabular`, y los tableros (`Formulas.dc.html:66`) solo ponen la cifra en mono.
+  Cambiarlo toca `DataTableCards` y los snapshots de inventario.
+- **Dueño:** sin asignar.
+
+### D64 — La hoja de `CountrySelect` cambia de altura al filtrar en teléfono (QC-235)
+- **Origen:** revisión visual de QC-166 (2026-10-16), m10 (`progress/impl_QC-166.md > m10`,
+  capturas `progress/qc166-revision-visual/country-select-375-*.png`).
+- **Qué falta:** a 375 px la hoja inferior no tiene altura fija y se ajusta al número de
+  resultados: con la lista completa mide 690 px (arranca en y=122), con «rep» 301 px (y=511) y con
+  «zzz» 197 px (y=615). Mientras se escribe, el título y el buscador saltan hacia abajo; con el
+  teclado abierto en un teléfono real el campo se movería bajo el dedo. El tablero solo dibuja la
+  hoja con la lista llena. Pieza de QC-235; QC-166 no la tocó.
+- **Dueño:** sin asignar.
+
+### D65 — El popup de `CountrySelect` tapa ~6 px de los botones del panel en escritorio (QC-235)
+- **Origen:** revisión visual de QC-166 (2026-10-16), m10 (`progress/impl_QC-166.md > m10`,
+  capturas `progress/qc166-revision-visual/country-select-1440-*.png`).
+- **Qué falta:** a 1440 px, en el panel «Editar empresa», el popup abierto con la lista completa
+  cubre con su borde inferior unos 6 px de la parte de arriba de «Cancelar» y «Guardar». Pieza de
+  QC-235; QC-166 no la tocó.
+- **Dueño:** sin asignar.
+
+## QC-288 (review, 2026-10-19)
+
+### D66 — E2E rojo en `detalle-de-producto-terminado.spec.ts:548` heredado de QC-263
+- **Origen:** review de QC-288, hallazgo H5. Lo causa `c09844b7` (QC-263): la tabla de producto terminado pasa `card=` al DataTable, que pinta a la vez las filas y las tarjetas, y el locator `finished-stock-name` encuentra 2 elementos.
+- **Qué falta:** acotar el locator a la tabla, o no montar las tarjetas en escritorio. El spec y los componentes son idénticos en `origin/dev`; QC-288 ni lo causa ni lo empeora.
+- **Dueño:** sin ficha. Bloquea el PR a producción, que corre E2E; no bloquea el PR a `dev`.
+
+### D67 — `srOnlyLabel` se ignora en columnas ordenables
+- **Origen:** review de QC-288, vuelta 2, hallazgo H6 (menor). En `components/shared/data-table/data-table-header-menu.tsx`, `srOnlyLabel` solo se aplica a columnas no ordenables.
+- **Qué falta:** documentarlo en el tipo y en `CATALOGO.md`, o aplicarlo también al botón de ordenar. Hoy no afecta a nada: `actionsColumn` nunca es ordenable.
+
+### D68 — `confirmaciones-paridad.test.tsx` intermitente («R1 R13 — pendiente, con la operacion en vuelo»)
+- **Origen:** CI del PR #269 (QC-288), 2026-10-19. Falló una vez con la instantánea del estado de usuario distinta y pasó al relanzar la ejecución completa sin cambios de código. QC-288 no toca ese componente.
+- **Qué falta:** estabilizar el caso «en vuelo» (esperar el estado pendiente antes de la instantánea, o no capturar el popover). Si vuelve a fallar en otra rama, va al baseline con su motivo.
+
+### D69 — Restos del worktree de QC-244 en disco
+- **Origen:** cierre de QC-244 (2026-10-19).
+- **Qué falta:** `./scripts/wt.sh done QC-244-menu-clientes-desplegable` desregistró el worktree, pero
+  no pudo borrar `.worktrees/QC-244-menu-clientes-desplegable/` (archivo en uso en Windows). Siguen la
+  rama local y la remota `feature/QC-244-menu-clientes-desplegable`, ya integradas en `dev` (PR #270).
+  Borrar la carpeta y las ramas cuando nada la tenga abierta.
+- **Dueño:** Christian Quevedo.
+
+### D70 — E2E de QC-244 sin correr en local
+- **Origen:** cierre de QC-244 (2026-10-19).
+- **Qué falta:** `e2e/clientes.spec.ts` y `e2e/movimiento.spec.ts` se escribieron sin correrlos en
+  local, porque el worktree no tenía `.env`. R6 (navegar a cada página desde el grupo) solo lo cubren
+  ellos. Correrlos en local, o confirmar que pasan en el E2E del PR a producción.
+- **Dueño:** Christian Quevedo.
+
+### D71 — Fórmulas: sin tiempo de espera por paso en el editor (QC-264, P6)
+- **Origen:** QC-264 (2026-10-19), P6 por defecto.
+- **Qué falta:** el tablero `Formula.dc.html` pone un campo de espera en la barra de cada paso. La
+  espera es hoy de la empresa (`minStepSeconds`, QC-125); hacerla por paso cambia el modelo
+  (`lib/modules/recetas`) y el lector (`StepReader`).
+- **Dueño:** sin asignar.
+
+### D72 — Versión de receta: sin «Devolver» un ingrediente quitado (QC-264, P8)
+- **Origen:** QC-264 (2026-10-19), P8 por defecto.
+- **Qué falta:** `FormulaVersion.dc.html` dibuja «Devolver» en cada ingrediente quitado y el texto
+  «No se quitó nada de la original.» cuando no hay quitados. Es conducta nueva, marcada «por confirmar»
+  en el tablero; el rediseño solo pinta el quitado (`StatusBadge` `danger` y nombre tachado).
+- **Dueño:** sin asignar.
+
+### D73 — Revisión de importación sin el nombre del PDF (QC-264, P10)
+- **Origen:** QC-264 (2026-10-19), P10 por defecto.
+- **Qué falta:** `ImportarFormula.dc.html` pinta el nombre del PDF bajo «Revisar fórmula». La vista
+  previa del módulo `documentos` no lo devuelve; es trabajo de módulo, no de pantalla.
+- **Dueño:** sin asignar.
+
+### D74 — Tildes pendientes en el editor de pasos y en `recipe-input.ts` (QC-264, P18)
+- **Origen:** QC-264 (2026-10-19), E17 con P18 por defecto.
+- **Qué falta:** «Lista de verificacion» y «el maximo es» (`recipe-step-editor.tsx`), «Elemento de la
+  lista de verificacion» (`recipe-step-schema.ts`) y dos mensajes de
+  `lib/modules/recetas/domain/recipe-input.ts`. Hay tests que afirman esos textos; cambiarlos es una
+  ficha propia con su censo.
+- **Dueño:** sin asignar.
+
+### D75 — «Volver a la lista» de «no encontrada» sigue como enlace de texto (QC-264, E18)
+- **Origen:** QC-264 (2026-10-19), enmienda E18.
+- **Qué falta:** las ramas «receta no encontrada» (`app/(private)/produccion/formulas/[id]/page.tsx`,
+  `components/recipe-form.tsx`) y las de las páginas de versión pintan el «Volver» como enlace de
+  texto, no como `ArrowLink` con flecha (D2 del humano). Ningún requisito de QC-264 lo cubría.
+- **Dueño:** sin asignar.
+
+### D76 — E2E `pasos-de-envasado` R32 rojo por el cronómetro del botón (dev, cb39a83d)
+- **Origen:** tanda 9 de QC-264 (2026-10-19); review v1 m4. No lo causa QC-264: el reviewer lo
+  comprobó con `git merge-base` (cb39a83d es ancestro del merge 6fcbafe6).
+- **Qué falta:** `e2e/pasos-de-envasado.spec.ts:435` espera el botón «Terminar» y recibe
+  «Terminar00:01». El cronómetro en el botón entró con cb39a83d («materiales plegables y cronómetro en
+  el botón Siguiente») sin ajustar este E2E. Hay que decidir si cambia el E2E o el nombre accesible
+  del botón. El archivo también lo toca QC-291 (Rediseño de la pantalla del operario). Frena el PR a
+  producción, donde corre el E2E.
+- **Dueño:** sin asignar (candidato: QC-291).
+
+## QC-238 (review, 2026-10-19)
+
+### D77 — Un mensaje «veneno» firmado del webhook de WhatsApp se reintenta en bucle
+- **Origen:** review de QC-238, vuelta 1 (m4).
+- **Qué pasa:** en dos casos Prisma lanza, la ruta responde `500` y Meta reintenta el lote entero
+  hasta rendirse, tapando el resto de mensajes del lote:
+  - un `timestamp` con demasiados dígitos da `Invalid Date`;
+  - un `\u0000` en un texto, que `text`/`jsonb` de Postgres rechazan.
+- **Riesgo:** bajo, porque el mensaje tiene que traer la firma de Meta.
+- **Qué falta:** acotar `timestamp` en el zod de la cabecera y limpiar `\u0000`, o mandar esos
+  mensajes a `UNSUPPORTED`. Puede ir en QC-239.
+- **Dueño:** Christian Quevedo.

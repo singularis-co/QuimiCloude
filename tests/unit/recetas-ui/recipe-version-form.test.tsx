@@ -281,6 +281,39 @@ describe('RecipeVersionForm — guardado con éxito', () => {
   });
 });
 
+describe('RecipeVersionForm — pie fijo (R36)', () => {
+  it('R36 — el pie va dentro del <form>, pegado abajo con el margen seguro, con «Cancelar» y «Guardar» de 44 px', () => {
+    renderEdit();
+
+    const form = screen.getByTestId('recipe-version-form');
+    const footer = screen.getByTestId('recipe-version-form-footer');
+    expect(footer.tagName).toBe('FOOTER');
+    expect(footer).toHaveAttribute('data-slot', 'form-footer-bar');
+    expect(form.contains(footer)).toBe(true);
+    expect(footer).toHaveClass(
+      'sticky',
+      'bottom-0',
+      'border-t',
+      'pb-[calc(14px+env(safe-area-inset-bottom))]',
+      '-mx-4',
+      '-mb-6',
+      'md:-mx-7',
+      'md:-mb-8',
+    );
+
+    const cancelar = within(footer).getByTestId('recipe-version-form-cancel');
+    const guardar = within(footer).getByTestId('recipe-version-form-submit');
+    expect(cancelar).toHaveTextContent('Cancelar');
+    expect(guardar).toHaveTextContent('Guardar');
+    expect(guardar).toHaveAttribute('type', 'submit');
+    expect((guardar as HTMLButtonElement).form).toBe(form);
+    expect(cancelar.compareDocumentPosition(guardar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    for (const boton of [cancelar, guardar]) {
+      expect(boton).toHaveClass('min-h-11', 'min-w-11');
+    }
+  });
+});
+
 describe('RecipeVersionForm — cancelar', () => {
   it('R14 — «Cancelar» es un enlace a la ficha de la original y no invoca nada', async () => {
     const user = setupUser();
@@ -340,7 +373,13 @@ describe('RecipeVersionForm — errores del guardado', () => {
       const region = await screen.findByTestId('recipe-version-form-error');
       expect(region).toHaveAttribute('role', 'alert');
       expect(within(region).getByTestId('recipe-version-form-error-message')).toHaveTextContent(message);
-      expect(within(region).getByTestId('recipe-version-form-error-code')).toHaveTextContent(code);
+      if (code === 'invalid_input') {
+        // `invalid_input` no se pinta: el mensaje ya dice qué hacer.
+        expect(within(region).queryByTestId('recipe-version-form-error-code')).toBeNull();
+        expect(region).not.toHaveTextContent('invalid_input');
+      } else {
+        expect(within(region).getByTestId('recipe-version-form-error-code')).toHaveTextContent(code);
+      }
       expect(screen.queryByTestId('recipe-version-error-name')).toBeNull();
       expect(screen.getByTestId('recipe-version-field-name')).toHaveValue('Escrito a mano');
       expect(percentageValues()).toEqual(['70,00', '30,00']);

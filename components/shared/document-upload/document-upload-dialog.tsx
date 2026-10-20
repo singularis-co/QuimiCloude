@@ -1,5 +1,7 @@
 'use client';
 
+import { UploadIcon } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -50,13 +52,14 @@ export function DocumentUploadDialog({
           />
         }
       >
+        <UploadIcon aria-hidden />
         {OPEN_LABEL}
       </DialogTrigger>
       <DialogContent
         keepMounted
         showCloseButton={false}
         data-testid={DOCUMENT_UPLOAD_DIALOG_TESTID}
-        className="sm:max-w-lg max-h-[85dvh] overflow-y-auto"
+        className="max-sm:w-[calc(100vw-32px)] sm:max-w-[640px] max-h-[calc(100dvh-32px)] overflow-y-auto"
       >
         <DialogHeader>
           <DialogTitle>{DIALOG_TITLE}</DialogTitle>

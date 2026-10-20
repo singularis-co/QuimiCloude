@@ -5,7 +5,7 @@
 // Las violaciones esperadas van dentro de un SAVEPOINT para no abortar la transaccion. El mensaje
 // de Postgres sale en el idioma del servidor: se reconoce por SQLSTATE y por la columna de la clave.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { Prisma } from '@prisma/client'
@@ -63,6 +63,47 @@ function statementsOf(sql: string): readonly string[] {
 
 const UP_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'migration.sql'), 'utf8'))
 const DOWN_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'down.sql'), 'utf8'))
+
+/**
+ * Las migraciones POSTERIORES con una FK hacia `whatsapp_connections`. Un rollback real las revierte
+ * antes que esta: sin su `down.sql` delante, el `DROP TABLE "whatsapp_connections"` choca con 2BP01.
+ * Mismo recorrido que `clientes/customers-migration.int.test.ts`: se detectan por texto, se sigue la
+ * dependencia de forma TRANSITIVA (entra toda migracion que referencie esta tabla o una creada por
+ * una dependiente ya detectada), los DOWN van de la mas reciente a la mas antigua y los UP al reves.
+ *
+ * Nota 2026-10-19: `20261019140000_whatsapp_contacts_and_messages` crea `whatsapp_contacts` y
+ * `whatsapp_messages` con FK compuestas a `whatsapp_connections`; desde entonces el DOWN de esta
+ * migracion, aplicado solo, falla con 2BP01. Las aserciones de antes se conservan; la del DOWN
+ * descuenta ademas las tablas que crean las dependientes, que su propio `down.sql` quita.
+ */
+const timestampDe = (nombre: string): string => nombre.split('_')[0] as string
+const TABLAS_DEPENDIENTES = new Set<string>(['whatsapp_connections'])
+const TABLAS_DE_DEPENDIENTES = new Set<string>()
+const DEPENDIENTES_POSTERIORES = readdirSync(migrationsDir)
+  .filter((nombre) => timestampDe(nombre) > timestampDe(basename(migrationDir)))
+  .filter((nombre) => existsSync(join(migrationsDir, nombre, 'migration.sql')))
+  .sort()
+  .filter((nombre) => {
+    const sql = readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8')
+    const referenciadas = [...sql.matchAll(/REFERENCES\s+"(\w+)"/g)].map((m) => m[1] as string)
+    if (!referenciadas.some((tabla) => TABLAS_DEPENDIENTES.has(tabla))) return false
+    for (const m of sql.matchAll(/CREATE\s+TABLE\s+"(\w+)"/g)) {
+      TABLAS_DEPENDIENTES.add(m[1] as string)
+      TABLAS_DE_DEPENDIENTES.add(m[1] as string)
+    }
+    return true
+  })
+expect(
+  DEPENDIENTES_POSTERIORES,
+  'se esperaba encontrar la migracion de contactos y mensajes de WhatsApp como dependiente',
+).toContain('20261019140000_whatsapp_contacts_and_messages')
+
+const DOWN_DE_DEPENDIENTES = [...DEPENDIENTES_POSTERIORES]
+  .reverse()
+  .flatMap((nombre) => statementsOf(readFileSync(join(migrationsDir, nombre, 'down.sql'), 'utf8')))
+const UP_DE_DEPENDIENTES = DEPENDIENTES_POSTERIORES.flatMap((nombre) =>
+  statementsOf(readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8')),
+)
 
 async function applyStatements(tx: Prisma.TransactionClient, statements: readonly string[]): Promise<void> {
   for (const statement of statements) {
@@ -247,12 +288,15 @@ describe('migracion whatsapp_connections contra Postgres real', () => {
       const tablasAntes = await publicTables(tx)
       expect(tablasAntes).toContain(TABLE)
 
+      await applyStatements(tx, DOWN_DE_DEPENDIENTES)
       await applyStatements(tx, DOWN_STATEMENTS)
 
       const snapshot = await tableSnapshot(tx)
       expect(snapshot.columns).toEqual([])
       expect(snapshot.enums).toEqual([])
-      expect(await publicTables(tx)).toEqual(tablasAntes.filter((name) => name !== TABLE))
+      expect(await publicTables(tx)).toEqual(
+        tablasAntes.filter((name) => name !== TABLE && !TABLAS_DE_DEPENDIENTES.has(name)),
+      )
     })
   })
 
@@ -261,8 +305,10 @@ describe('migracion whatsapp_connections contra Postgres real', () => {
       const antes = await tableSnapshot(tx)
       expect(antes.columns.length).toBeGreaterThan(0)
 
+      await applyStatements(tx, DOWN_DE_DEPENDIENTES)
       await applyStatements(tx, DOWN_STATEMENTS)
       await applyStatements(tx, UP_STATEMENTS)
+      await applyStatements(tx, UP_DE_DEPENDIENTES)
 
       expect(await tableSnapshot(tx)).toEqual(antes)
     })
@@ -273,8 +319,10 @@ describe('migracion whatsapp_connections contra Postgres real', () => {
     expect(upSinForce, 'la mutacion no quito ninguna sentencia').toHaveLength(UP_STATEMENTS.length - 1)
 
     await inRolledBackTransaction(async (tx) => {
+      await applyStatements(tx, DOWN_DE_DEPENDIENTES)
       await applyStatements(tx, DOWN_STATEMENTS)
       await applyStatements(tx, upSinForce)
+      await applyStatements(tx, UP_DE_DEPENDIENTES)
       expect((await tableSnapshot(tx)).rls).toEqual([{ relrowsecurity: true, relforcerowsecurity: false }])
     })
   })

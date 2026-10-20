@@ -1,13 +1,16 @@
 'use client';
 
-import Link from 'next/link';
+import { FileIcon } from 'lucide-react';
 
+import { ArrowLink } from '@/components/shared/arrow-link';
+import { StatusBadge } from '@/components/shared/status-badge';
 import type { DocumentFileStatusEntry } from '@/lib/modules/documentos';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import {
   BROWSER_PHASE_LABELS,
+  BROWSER_PHASE_TONES,
   FILE_STATUS_LABELS,
+  FILE_STATUS_TONES,
   REVIEW_LABEL,
   fileErrorMessage,
   type BrowserPhase,
@@ -49,21 +52,46 @@ export function DocumentUploadRow({
   return (
     <li
       data-testid={rowTestId(index)}
-      className="flex flex-wrap items-center gap-2 border-b py-2 text-base last:border-b-0"
+      className="flex min-h-12 flex-wrap items-center gap-3 border-b py-2.5 text-base last:border-b-0"
     >
-      <span data-testid={rowNameTestId(index)} className="grow break-all">
+      <span
+        aria-hidden="true"
+        className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground"
+      >
+        <FileIcon className="size-5" />
+      </span>
+
+      <span data-testid={rowNameTestId(index)} className="min-w-0 grow basis-40 break-all">
         {fileName}
       </span>
 
       {entry === null ? (
-        <span data-testid={rowPhaseTestId(index)} data-phase={phase}>
-          {BROWSER_PHASE_LABELS[phase]}
-        </span>
+        <StatusBadge
+          tone={BROWSER_PHASE_TONES[phase]}
+          label={BROWSER_PHASE_LABELS[phase]}
+          data-testid={rowPhaseTestId(index)}
+          data-phase={phase}
+        />
       ) : (
-        <span data-testid={rowStatusTestId(index)} data-status={entry.status}>
-          {FILE_STATUS_LABELS[entry.status]}
-        </span>
+        <StatusBadge
+          tone={FILE_STATUS_TONES[entry.status]}
+          label={FILE_STATUS_LABELS[entry.status]}
+          data-testid={rowStatusTestId(index)}
+          data-status={entry.status}
+        />
       )}
+
+      {reviewHref !== null ? (
+        <ArrowLink
+          href={reviewHref}
+          direction="forward"
+          size="sm"
+          touch
+          testId={rowReviewLinkTestId(index)}
+        >
+          {REVIEW_LABEL}
+        </ArrowLink>
+      ) : null}
 
       {entry !== null && entry.status === 'error' ? (
         <p data-testid={rowErrorTestId(index)} className="basis-full text-sm text-destructive">
@@ -75,16 +103,6 @@ export function DocumentUploadRow({
         <p data-testid={rowReasonTestId(index)} className="basis-full text-sm text-muted-foreground">
           {entry.errorReason}
         </p>
-      ) : null}
-
-      {reviewHref !== null ? (
-        <Link
-          href={reviewHref}
-          data-testid={rowReviewLinkTestId(index)}
-          className={`inline-flex ${touchTarget} items-center text-base underline`}
-        >
-          {REVIEW_LABEL}
-        </Link>
       ) : null}
     </li>
   );

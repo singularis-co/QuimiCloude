@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Empresas del Maestro en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="MaestroEmpresas" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Empresas (Maestro) · ficha</h2>
+    <dl class="spec">
+      <dt>Ruta</dt><dd><span class="mono">/maestro/empresas</span> (decidida en QC-235). El Maestro aterriza aquí al iniciar sesión.</dd>
+      <dt>Reutiliza</dt><dd><span class="mono">shared/data-table · row-actions-menu · form-sheet · save-button · status-badge · notice · confirm-dialog · country-select · text-field · date-picker · select-field · empty-state · error-state · page-header · ui/sonner · private/app-sidebar</span> (con la lista de navegación del área)</dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Menu, Dialog, AlertDialog, Sheet) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>Barra lateral propia del área («Plataforma»: Empresas, Administradores), sin módulos del ERP · columnas Nombre, Identificación fiscal, País («Colombia (+57)» o «Sin país»), Usuarios (activos), Creada, Estado (Activa / De baja) · orden por Nombre y Creada · filtro único «Estado» · el nombre abre la empresa · ⋯ con Abrir, Editar, Módulos, Dar de baja; en una de baja solo Abrir y Reactivar · «Nueva empresa» abre un Sheet ancho con la empresa y su Administrador inicial</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · tabla con scroll horizontal dentro de su caja · Sheets anchos (600 px)</dd>
+      <dt>Teléfono</dt><dd>Tabla a tarjetas (nombre, estado, identificación, país, usuarios y fecha) · «Acciones» abre el menú centrado con objetivos de 48 px · Sheets a pantalla completa; los pares de campos pasan a una columna</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · cambio de filtro con fundido de la tabla · Sheet 300/150 ms · «Calculando el impacto…» antes de mostrar usuarios activos y pedidos abiertos en la baja · toasts «Empresa creada. Enviamos el enlace al Administrador.», «Empresa actualizada.», «Empresa dada de baja.», «Empresa reactivada.»</dd>
+      <dt>Por confirmar</dt><dd>Qué pasa con los usuarios y los pedidos de una empresa de baja (texto entre corchetes del diálogo) · toast si el correo al Administrador falla ([EMPRESA CREADA, PERO NO SE PUDO ENVIAR EL CORREO]) · nombre que se muestra del Maestro en la barra lateral · si QuimiCloud se lista o se oculta (no se puede borrar, QC-162 P5)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

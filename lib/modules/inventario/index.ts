@@ -140,6 +140,7 @@ export {
   createListBatchMovements,
   type ListBatchMovementsDeps,
 } from './domain/list-batch-movements';
+export type { DeliveryCustomerDirectory } from './domain/list-batch-movements';
 export {
   FINISHED_PRODUCT_MOVEMENT_DIRECTIONS,
   packagedQuantityOf,
@@ -213,6 +214,14 @@ export {
   type FinishedGoodsDispatch,
   type FinishedGoodsDispatchInput,
   type FinishedGoodsDispatchOutcome,
+} from './domain/finished-goods-dispatch';
+export type {
+  FinishedGoodsDirectDispatch,
+  FinishedGoodsDirectDispatchInput,
+  FinishedProductDeliveryCatalog,
+  FinishedProductDeliveryLock,
+  FinishedProductForDelivery,
+  FinishedProductSurplusBase,
 } from './domain/finished-goods-dispatch';
 export type {
   BatchLotDirectory,

@@ -29,6 +29,7 @@ import {
   SORT_PARAM,
   SORT_SEPARATOR,
   PRODUCT_SKELETON_COLUMN_COUNT,
+  BELOW_ALERT_LABEL,
   buildProductColumns,
   parseProductListParams,
 } from '@/app/(private)/inventario/components';
@@ -53,7 +54,7 @@ import type {
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
-import { INVENTORY_ROUTE } from '@/lib/shared/routes';
+import { INVENTORY_IMPORT_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 import {
   REFERENCIA_DEL_CASO,
@@ -216,6 +217,15 @@ vi.mock('@/lib/modules/inventario/adapters/driving/batch-actions', () => ({
   adjustBatchStockAction: adjustBatchStockActionMock,
 }));
 
+// 2026-10-16: el barrel de la ruta exporta el sheet de entrega sin pedido, que importa las actions
+// de pedidos; sin este doble se cargaria la composicion real.
+vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
+  getDirectDeliveryAction: vi.fn(),
+  deliverDirectAction: vi.fn(),
+  listDirectDeliverySurplusAction: vi.fn(async () => ({ status: 'success', data: {} })),
+  searchOrderCustomersAction: vi.fn(),
+}));
+
 const testId = {
   content: 'private-content',
   titulo: 'inventario-title',
@@ -340,8 +350,16 @@ function paginaDeProductoTerminado(productoTerminado: ProductView): FinishedStoc
 }
 
 /** Despliega el pedido de la pestana «Producto terminado» para ver sus productos. */
+/**
+ * jsdom no evalua las consultas de contenedor: la tabla y sus tarjetas estan las dos en el arbol,
+ * con las mismas celdas. Se mira la tabla, que es la primera.
+ */
+function enLaTabla() {
+  return within(screen.getAllByRole('table')[0]!);
+}
+
 async function desplegarPedido(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getByTestId('finished-stock-toggle'));
+  await user.click(enLaTabla().getByTestId('finished-stock-toggle'));
 }
 
 /** Unidad de las presentaciones de los dobles (QC-80 R1: `PresentationView.unitId` es
@@ -608,8 +626,11 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    // El usuario del test es Administrador: ve tambien la columna «Costo».
-    const columnas = buildProductColumns({ rowActions: () => null, showCost: true });
+    // El usuario del test es Administrador: ve tambien la columna «Costo unitario».
+    const columnas = buildProductColumns({
+      menu: () => ({ items: [], triggerLabel: '' }),
+      showCost: true,
+    });
     for (const columna of columnas) {
       expect(
         screen.getByTestId(`data-table-head-${columna.id}`),
@@ -624,7 +645,7 @@ describe('pantalla de productos — lista', () => {
     // El esqueleto por defecto cuenta las columnas por defecto (sin «Costo»): su constante no
     // puede quedarse atras.
     expect(PRODUCT_SKELETON_COLUMN_COUNT).toBe(
-      buildProductColumns({ rowActions: () => null }).length,
+      buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }) }).length,
     );
 
     // Las columnas de la tabla, por su clave: si alguna desaparece de la declaracion, esto se
@@ -645,10 +666,10 @@ describe('pantalla de productos — lista', () => {
       'name',
       'presentationName',
       'stock',
-      'averageUnitCost',
-      'qtyAlert',
-      'reserved',
       'available',
+      'reserved',
+      'qtyAlert',
+      'averageUnitCost',
       'actions',
     ]);
   });
@@ -667,7 +688,8 @@ describe('pantalla de productos — lista', () => {
     });
     await renderPantalla();
     expect(screen.getByTestId('data-table-head-averageUnitCost')).toBeInTheDocument();
-    expect(screen.getByTestId('product-cost')).toHaveTextContent(/^\$1,234\.56$/);
+    const fila = screen.getAllByTestId(testId.fila)[0] as HTMLElement;
+    expect(within(fila).getByTestId('product-cost')).toHaveTextContent(/^\$1,234\.56$/);
     cleanup();
 
     getSessionUserMock.mockResolvedValue({
@@ -679,6 +701,25 @@ describe('pantalla de productos — lista', () => {
     expect(screen.getByTestId('product-list')).toBeInTheDocument();
     expect(screen.queryByTestId('data-table-head-averageUnitCost')).toBeNull();
     expect(screen.queryByTestId('product-cost')).toBeNull();
+  });
+
+  it('el Administrador lee el «Costo unitario» por la unidad del producto: «$1,234.56 / kg»', async () => {
+    const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ averageUnitCost: '1234.5600', unitId: UNIDAD_KG.id })]),
+    );
+    getSessionUserMock.mockResolvedValue({
+      ...USUARIO_DEL_TEST,
+      roleName: ROLE_ADMINISTRADOR,
+      permissions: SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR],
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveTextContent('Costo unitario');
+    const fila = screen.getAllByTestId(testId.fila)[0] as HTMLElement;
+    expect(within(fila).getByTestId('product-cost')).toHaveTextContent(/^\$1,234\.56 \/ kg$/);
   });
 
   it('la unidad no es su propia columna: se lee junto a la existencia', async () => {
@@ -693,7 +734,7 @@ describe('pantalla de productos — lista', () => {
 
     expect(document.body.textContent).not.toContain(UNIDAD_QUE_NO_DEBE_VERSE);
 
-    const columnas = buildProductColumns({ rowActions: () => null });
+    const columnas = buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }) });
     // `imagePath` esta en la lista de prohibidos: la imagen SE VE, pero su columna se llama
     // `image` y pinta una miniatura. La RUTA no es una columna.
     for (const prohibida of ['id', 'unitId', 'imagePath']) {
@@ -759,7 +800,7 @@ describe('pantalla de productos — lista', () => {
       expect(screen.queryByTestId(`data-table-cell-${campo}`), campo).toBeNull();
     }
 
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     for (const campo of ['cost', 'minPurchase', 'deliveryTime']) {
@@ -768,7 +809,7 @@ describe('pantalla de productos — lista', () => {
     }
   });
 
-  it('R17 — la existencia se pinta en rojo cuando la alerta de cantidad supera la existencia guardada', async () => {
+  it('R17, R7 — la existencia se pinta en ámbar, no en rojo, cuando la alerta de cantidad supera la existencia guardada', async () => {
     const UNIDAD_A = crypto.randomUUID();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([
@@ -781,11 +822,16 @@ describe('pantalla de productos — lista', () => {
     await renderPantalla();
 
     const celdas = screen.getAllByTestId('product-stock');
-    // Por debajo de la alerta: en rojo.
+    // Por debajo de la alerta: en el tono de advertencia, con su aviso, nunca en el de error.
     expect(celdas[0]).toHaveAttribute('data-alert', 'true');
+    expect(celdas[0]).toHaveClass('text-warning-text');
+    expect(within(celdas[0]).getByTitle(BELOW_ALERT_LABEL)).toBeInTheDocument();
+    for (const celda of celdas) expect(celda.className).not.toContain('text-destructive');
     // Justo en la alerta y por encima: no. La alarma salta cuando la SUPERA, no al igualarla.
     expect(celdas[1]).not.toHaveAttribute('data-alert');
     expect(celdas[2]).not.toHaveAttribute('data-alert');
+    expect(celdas[1]).not.toHaveClass('text-warning-text');
+    expect(celdas[2]).not.toHaveClass('text-warning-text');
 
     // La alerta nunca se tine a si misma: la que esta en alarma es la existencia.
     for (const celda of screen.getAllByTestId('data-table-cell-qtyAlert')) {
@@ -801,7 +847,7 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    expect(screen.getByTestId('product-stock')).toHaveAttribute('data-alert', 'true');
+    expect(enLaTabla().getByTestId('product-stock')).toHaveAttribute('data-alert', 'true');
   });
 
   it('R17 — sin cantidad de alerta configurada, la existencia no se marca, tenga o no lotes', async () => {
@@ -830,7 +876,7 @@ describe('pantalla de productos — lista', () => {
     await renderPantalla();
 
     expect(screen.getByTestId('data-table-cell-name').textContent).toBe('Glicerina');
-    expect(screen.getByTestId('product-stock')).toHaveTextContent('3 kg');
+    expect(enLaTabla().getByTestId('product-stock')).toHaveTextContent('3 kg');
   });
 
   it('un terminado pinta el nombre sin su presentacion, y la presentacion en su columna', async () => {
@@ -859,7 +905,7 @@ describe('pantalla de productos — lista', () => {
     await renderPantalla();
 
     expect(screen.getByTestId('data-table-cell-presentationName')).toHaveTextContent(EMPTY_MARK);
-    const columna = buildProductColumns({ rowActions: () => null }).find(
+    const columna = buildProductColumns({ menu: () => ({ items: [], triggerLabel: '' }) }).find(
       (candidata) => candidata.id === 'presentationName',
     );
     expect(columna?.sortable).toBeFalsy();
@@ -891,7 +937,7 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    expect(screen.getByTestId('product-stock')).toHaveTextContent('15 kg');
+    expect(enLaTabla().getByTestId('product-stock')).toHaveTextContent('15 kg');
   });
 
   it('R16 — un producto sin unidad muestra su existencia como 0', async () => {
@@ -901,7 +947,7 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    expect(screen.getByTestId('product-stock')).toHaveTextContent('0');
+    expect(enLaTabla().getByTestId('product-stock')).toHaveTextContent('0');
   });
 
   it('sin catalogo de unidades, la celda pinta la cantidad sin etiqueta', async () => {
@@ -912,7 +958,7 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    expect(screen.getByTestId('product-stock')).toHaveTextContent('10');
+    expect(enLaTabla().getByTestId('product-stock')).toHaveTextContent('10');
   });
 
   it('R6 — la existencia se pinta a dos decimales, con la cifra exacta en el title y el aria-label', async () => {
@@ -941,6 +987,26 @@ describe('pantalla de productos — lista', () => {
     expect(celda3).toHaveAttribute('aria-label', '12345.6789');
   });
 
+  it('R6 — las cifras, «Costo» incluido, van a la derecha en cabecera y celda; «Tipo» y «Presentación», a la izquierda', async () => {
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
+
+    await renderPantalla();
+
+    for (const columna of ['stock', 'averageUnitCost', 'qtyAlert', 'reserved', 'available']) {
+      expect(screen.getByTestId(`data-table-head-${columna}`), columna).toHaveClass('text-right');
+      expect(screen.getByTestId(`data-table-cell-${columna}`), columna).toHaveClass('text-right');
+    }
+    for (const columna of ['type', 'presentationName']) {
+      for (const celda of [
+        screen.getByTestId(`data-table-head-${columna}`),
+        screen.getByTestId(`data-table-cell-${columna}`),
+      ]) {
+        expect(celda, columna).not.toHaveClass('text-right');
+        expect(celda, columna).not.toHaveClass('text-center');
+      }
+    }
+  });
+
   it('R6 — la alerta de cantidad se pinta a dos decimales, con la cifra exacta en el title y el aria-label', async () => {
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([producto({ id: crypto.randomUUID(), qtyAlert: '12345.6789' })]),
@@ -948,7 +1014,7 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    const celda = screen.getByTestId('product-qty-alert');
+    const celda = enLaTabla().getByTestId('product-qty-alert');
     expect(celda).toHaveTextContent('12345.68');
     expect(celda).toHaveAttribute('title', '12345.6789');
     expect(celda).toHaveAttribute('aria-label', '12345.6789');
@@ -963,7 +1029,7 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    const celda = screen.getByTestId('product-qty-alert');
+    const celda = enLaTabla().getByTestId('product-qty-alert');
     expect(celda).toHaveTextContent('10 kg');
     expect(celda).toHaveAttribute('aria-label', '10 kg');
   });
@@ -975,7 +1041,7 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    const celda = screen.getByTestId('product-qty-alert');
+    const celda = enLaTabla().getByTestId('product-qty-alert');
     expect(celda.textContent).toBe('10');
     expect(celda).toHaveAttribute('aria-label', '10');
   });
@@ -996,12 +1062,12 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    const reservado = screen.getByTestId('product-reserved');
+    const reservado = enLaTabla().getByTestId('product-reserved');
     expect(reservado).toHaveTextContent('3.5 kg');
     expect(reservado).toHaveAttribute('title', '3.5001');
     expect(reservado).toHaveAttribute('aria-label', '3.5001 kg');
 
-    const disponible = screen.getByTestId('product-available');
+    const disponible = enLaTabla().getByTestId('product-available');
     expect(disponible).toHaveTextContent('11.5 kg');
     expect(disponible).toHaveAttribute('title', '11.4999');
     expect(disponible).toHaveAttribute('aria-label', '11.4999 kg');
@@ -1263,7 +1329,7 @@ describe('pantalla de productos — lista', () => {
 
       expect(screen.getByTestId(testId.tabla), `tabla a ${ancho}px`).toBeVisible();
       expect(screen.getByTestId(testId.abrirAlta), `alta a ${ancho}px`).toBeVisible();
-      const menu = await openRowActionsMenu(setupUser(), screen.getByTestId(testId.menuDeFila));
+      const menu = await openRowActionsMenu(setupUser(), enLaTabla().getByTestId(testId.menuDeFila));
       expect(within(menu).getByTestId(testId.abrirEdicion), `edicion a ${ancho}px`).toBeVisible();
       expect(within(menu).getByTestId(testId.abrirBorrado), `borrado a ${ancho}px`).toBeVisible();
       expect(screen.getByTestId(testId.tamanoPagina), `tamano a ${ancho}px`).toBeVisible();
@@ -1273,21 +1339,18 @@ describe('pantalla de productos — lista', () => {
   });
 
   it('R5 — ofrece una pestaña «Producto terminado» que filtra el listado por ese tipo', async () => {
-    const user = setupUser();
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()], { total: 40 }));
 
-    await renderPantalla();
+    await renderPantalla({ [PAGE_PARAM]: '2' });
 
+    // La pestaña es un enlace: filtrar no pasa por el router de cliente.
     const pestana = screen.getByRole('tab', { name: 'Producto terminado' });
-    await user.click(pestana);
-
-    await waitFor(() => expect(routerMock.push).toHaveBeenCalled());
-    const destino = new URLSearchParams(
-      String(routerMock.push.mock.calls.at(-1)?.[0]).split('?')[1],
-    );
+    expect(pestana.tagName).toBe('A');
+    const destino = new URLSearchParams(String(pestana.getAttribute('href')).split('?')[1]);
     expect(destino.get('type')).toBe(PRODUCT_TYPES.FINISHED_PRODUCT);
     // Filtrar vuelve a la primera pagina, igual que la busqueda y el orden.
     expect(destino.get(PAGE_PARAM)).toBe('1');
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 
   it('R5 — con el filtro de tipo en la URL, la pestaña llega marcada y la consulta lo lleva', async () => {
@@ -1298,7 +1361,7 @@ describe('pantalla de productos — lista', () => {
     await renderPantalla({ type: PRODUCT_TYPES.FINISHED_PRODUCT });
 
     expect(screen.getByRole('tab', { name: 'Producto terminado', selected: true })).toBeInTheDocument();
-    expect(screen.getByText('Producto terminado', { selector: 'strong' })).toBeInTheDocument();
+    expect(screen.queryByText(/Filtrando por/)).toBeNull();
 
     // La pantalla no filtra en el cliente: la pestana pide al backend su propia lista, la
     // agrupada por pedido, que no ordena ni filtra.
@@ -1310,6 +1373,66 @@ describe('pantalla de productos — lista', () => {
       filters: {},
     });
     expect(listProductsActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('pantalla de productos — cabecera', () => {
+  it('R1 — «Inventario» es el único h1, con PageHeader dentro de PageShell', async () => {
+    await renderPantalla();
+
+    const titulos = screen.getAllByRole('heading', { level: 1 });
+    expect(titulos).toHaveLength(1);
+    expect(titulos[0]).toHaveTextContent('Inventario');
+    expect(titulos[0]).toHaveAttribute('data-testid', testId.titulo);
+    const cabecera = titulos[0].closest('[data-slot="page-header"]');
+    expect(cabecera).not.toBeNull();
+    expect(cabecera?.closest('[data-slot="page-shell"]')).not.toBeNull();
+  });
+
+  it('R1 — con permiso de importar, «Importar» (contorno, con icono, a /inventario/importar) va antes de «Nuevo producto»', async () => {
+    await renderPantalla();
+
+    const acciones = screen
+      .getByTestId(testId.titulo)
+      .closest('[data-slot="page-header"]')
+      ?.querySelector('[data-slot="page-header-actions"]');
+    expect(acciones).not.toBeNull();
+    const importar = within(acciones as HTMLElement).getByTestId('inventory-import-link');
+    const alta = within(acciones as HTMLElement).getByTestId(testId.abrirAlta);
+    expect(importar).toHaveAttribute('href', INVENTORY_IMPORT_ROUTE);
+    expect(importar).toHaveTextContent('Importar');
+    expect(importar.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(importar.className).toContain('border');
+    expect(alta).toHaveTextContent('Nuevo producto');
+    expect(importar.compareDocumentPosition(alta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('R1 — sin permiso de importar, la cabecera solo ofrece «Nuevo producto»', async () => {
+    getSessionUserMock.mockResolvedValue({
+      ...USUARIO_DEL_TEST,
+      permissions: USUARIO_DEL_TEST.permissions.filter((codigo) => codigo !== 'inventario.modificar'),
+    });
+
+    await renderPantalla();
+
+    const acciones = screen
+      .getByTestId(testId.titulo)
+      .closest('[data-slot="page-header"]')
+      ?.querySelector('[data-slot="page-header-actions"]') as HTMLElement;
+    expect(within(acciones).queryByTestId('inventory-import-link')).toBeNull();
+    expect(within(acciones).getByTestId(testId.abrirAlta)).toBeInTheDocument();
+  });
+
+  it('R2 — con 760 px o menos las acciones se reparten el ancho y miden al menos 44 px', async () => {
+    await renderPantalla();
+
+    const acciones = screen
+      .getByTestId(testId.titulo)
+      .closest('[data-slot="page-header"]')
+      ?.querySelector('[data-slot="page-header-actions"]') as HTMLElement;
+    expect(acciones).toHaveClass('@max-[760px]:w-full', '@max-[760px]:*:flex-1');
+    expect(screen.getByTestId('inventory-import-link')).toHaveClass('min-h-11');
+    expect(screen.getByTestId(testId.abrirAlta)).toHaveClass('min-h-11');
   });
 });
 
@@ -1376,7 +1499,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     const precargado: Record<string, string> = {
@@ -1587,7 +1710,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     await user.click(screen.getByTestId(testId.enviar));
@@ -1607,7 +1730,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     );
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     const formulario = await screen.findByTestId(testId.formulario);
 
     const campo = screen.getByTestId('product-field-qtyAlert');
@@ -1622,7 +1745,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     );
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     const formulario = await screen.findByTestId(testId.formulario);
 
     expect(screen.getByTestId('product-field-qtyAlert')).toHaveValue('0.1255');
@@ -1729,7 +1852,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     expect(screen.queryByTestId('presentation-select')).toBeNull();
@@ -1917,7 +2040,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     await user.click(screen.getByTestId(testId.enviar));
@@ -2046,7 +2169,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     expect(screen.queryByTestId('product-field-purchaseDate')).toBeNull();
@@ -2182,7 +2305,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     );
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     await user.click(screen.getByLabelText('Tipo'));
@@ -2201,7 +2324,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     await renderPantalla({ type: PRODUCT_TYPES.FINISHED_PRODUCT });
     await desplegarPedido(user);
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     expect(screen.getByTestId('product-field-type-readonly')).toHaveTextContent(
@@ -2231,7 +2354,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     await renderPantalla({ type: PRODUCT_TYPES.FINISHED_PRODUCT });
     await desplegarPedido(user);
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     await user.click(screen.getByTestId(testId.enviar));
@@ -2400,7 +2523,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirBorrado);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirBorrado);
 
     const dialogo = await screen.findByTestId(testId.dialogoBorrado);
     // El dialogo NOMBRA el producto: el nombre es dato del fixture, no copy de la pantalla.
@@ -2413,7 +2536,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(deleteProductActionMock).not.toHaveBeenCalled();
 
     // Solo al confirmar se invoca la operacion, con el id del producto.
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirBorrado);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -2426,7 +2549,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     const user = setupUser();
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirBorrado);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -2588,7 +2711,7 @@ describe('pantalla de productos — el identificador del error inesperado (QC-71
     deleteProductActionMock.mockResolvedValue(errorInesperado());
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirBorrado);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -2608,7 +2731,7 @@ describe('pantalla de productos — el identificador del error inesperado (QC-71
     });
 
     await renderPantalla();
-    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirBorrado);
+    await clickRowAction(user, enLaTabla().getByTestId(testId.menuDeFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 

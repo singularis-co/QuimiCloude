@@ -21,6 +21,7 @@ import {
   ASSIGNED_ORDERS_ROUTE,
   DASHBOARD_ROUTE,
   INVENTORY_ROUTE,
+  MAESTRO_COMPANIES_ROUTE,
   PRIVATE_ROUTE_PREFIXES,
 } from '@/lib/shared/routes';
 
@@ -62,7 +63,7 @@ describe('la campana es el único sitio de los avisos', () => {
     ['Operador', ROLE_OPERADOR, INVENTORY_ROUTE],
     ['Empacador', ROLE_EMPACADOR, ASSIGNED_ORDERS_ROUTE],
     ['Acondicionamiento', ROLE_ACONDICIONAMIENTO, ASSIGNED_ORDERS_ROUTE],
-    ['Maestro', ROLE_MAESTRO, null],
+    ['Maestro', ROLE_MAESTRO, MAESTRO_COMPANIES_ROUTE],
   ])('R24: %s aterriza donde antes, tenga o no permisos de notificaciones', (_nombre, rol, esperado) => {
     const permisos = permisosDe(rol);
     const sinNotificaciones = permisos.filter((permiso) => !permiso.startsWith('notificaciones.'));

@@ -175,7 +175,6 @@ const TESTIDS = {
 const TAB_TESTIDS = {
   porAcondicionar: 'assignment-view-tab-por_acondicionar',
   acondicionados: 'assignment-view-tab-acondicionados',
-  entregados: 'assignment-view-tab-acondicionados_entregados',
 } as const;
 
 const SIDEBAR = '[data-slot="sidebar"]';
@@ -778,7 +777,6 @@ test.describe('R9 — contadores de las pestañas', () => {
     const expected: ReadonlyArray<readonly [string, string, string]> = [
       [TAB_TESTIDS.porAcondicionar, 'Por acondicionar', '2'],
       [TAB_TESTIDS.acondicionados, 'Acondicionados', '1'],
-      [TAB_TESTIDS.entregados, 'Entregados', '0'],
     ];
     for (const [testId, label, count] of expected) {
       const tab = viewTab(page, testId);

@@ -428,6 +428,8 @@ enum InventoryMovementKind {
   production
   delivery
   delivery_void
+  direct_delivery
+  direct_delivery_void
 }
 
 /// Un asiento no se corrige: se corrige con otro. Sin `updatedAt` ni `deletedAt`, a proposito.
@@ -860,21 +862,25 @@ model OrderPresentationLine {
   @@map("order_presentation_lines")
 }
 
-/// Una entrega del producto terminado de un pedido, a uno o varios clientes: el cliente va en cada
-/// linea, no aqui. Solo de insercion: sin `updatedAt` ni `deletedAt`. `deliveryKey` la hace
-/// idempotente por empresa. `createdBy` y `companyId` no llevan `@relation`: `User` y `Company` son
-/// de otros modulos; sus FK estan escritas a mano y son drift, y la del autor es compuesta con
-/// `companyId`. La FK de `order` tambien es compuesta en la base (`(order_id, company_id)`).
+/// Una entrega de producto terminado, a uno o varios clientes: el cliente va en cada linea, no
+/// aqui. Es de un pedido (`orderId`) o de un producto sin pedido (`productId`), nunca de los dos;
+/// solo la que no tiene pedido lleva `note`. Solo de insercion: sin `updatedAt` ni `deletedAt`.
+/// `deliveryKey` la hace idempotente por empresa. `createdBy`, `companyId` y `productId` no llevan
+/// `@relation`: `User`, `Company` y `Product` son de otros modulos; sus FK estan escritas a mano y
+/// son drift, y las del autor y del producto son compuestas con `companyId`. La FK de `order`
+/// tambien es compuesta en la base (`(order_id, company_id)`). Los CHECK son drift.
 /// @module pedidos
 model OrderDelivery {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId   String   @map("company_id") @db.Uuid
-  orderId     String   @map("order_id") @db.Uuid
+  orderId     String?  @map("order_id") @db.Uuid
+  productId   String?  @map("product_id") @db.Uuid
+  note        String?
   deliveryKey String   @map("delivery_key") @db.Uuid
   createdBy   String   @map("created_by") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  order Order               @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  order Order?              @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   lines OrderDeliveryLine[]
   voids OrderDeliveryVoid[]
 
@@ -882,27 +888,29 @@ model OrderDelivery {
   @@unique([companyId, deliveryKey], map: "order_deliveries_company_key_unique")
   @@index([orderId], map: "order_deliveries_order_id_idx")
   @@index([createdBy], map: "order_deliveries_created_by_idx")
+  @@index([companyId, productId], map: "order_deliveries_product_id_idx")
   @@map("order_deliveries")
 }
 
-/// Un lote dentro de una entrega para un cliente: cuantos envases salen de el para una linea del
-/// reparto y su cantidad. Solo de insercion. `customerId` y `batchId` no llevan `@relation`:
-/// `Customer` es de `clientes` y `ProductBatch` de `inventario`; sus FK son compuestas con
-/// `companyId`, escritas a mano y drift. Las FK de `delivery` y `presentationLine` tambien son
-/// compuestas en la base. Los CHECK de positivos son drift.
+/// Un lote dentro de una entrega para un cliente: cuantos envases salen de el y su cantidad. La de
+/// una entrega de pedido lleva su linea del reparto; la de una entrega sin pedido no, y su lote es
+/// del producto de la entrega (disparador, drift). Solo de insercion. `customerId` y `batchId` no
+/// llevan `@relation`: `Customer` es de `clientes` y `ProductBatch` de `inventario`; sus FK son
+/// compuestas con `companyId`, escritas a mano y drift. Las FK de `delivery` y `presentationLine`
+/// tambien son compuestas en la base. Los CHECK de positivos son drift.
 /// @module pedidos
 model OrderDeliveryLine {
   id                      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId               String  @map("company_id") @db.Uuid
   deliveryId              String  @map("delivery_id") @db.Uuid
   customerId              String  @map("customer_id") @db.Uuid
-  orderPresentationLineId String  @map("order_presentation_line_id") @db.Uuid
+  orderPresentationLineId String? @map("order_presentation_line_id") @db.Uuid
   batchId                 String  @map("batch_id") @db.Uuid
   packages                Int
   quantity                Decimal @db.Decimal(14, 4)
 
   delivery         OrderDelivery         @relation(fields: [deliveryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  presentationLine OrderPresentationLine @relation(fields: [orderPresentationLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  presentationLine OrderPresentationLine? @relation(fields: [orderPresentationLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   voidLine         OrderDeliveryVoidLine?
 
   @@unique([deliveryId, customerId, batchId], map: "order_delivery_lines_delivery_customer_batch_unique")
@@ -1181,6 +1189,100 @@ model WhatsappConnection {
   @@unique([companyId, id], map: "whatsapp_connections_company_id_id_key")
   @@index([createdById], map: "whatsapp_connections_created_by_idx")
   @@map("whatsapp_connections")
+}
+
+enum WhatsappMessageDirection {
+  IN
+  OUT
+
+  @@map("whatsapp_message_direction")
+}
+
+enum WhatsappMessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+  STICKER
+  LOCATION
+  CONTACTS
+  REACTION
+  BUTTON
+  INTERACTIVE
+  TEMPLATE
+  UNSUPPORTED
+
+  @@map("whatsapp_message_type")
+}
+
+enum WhatsappMessageStatus {
+  RECEIVED
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+
+  @@map("whatsapp_message_status")
+}
+
+enum WhatsappMessageOrigin {
+  USER
+  SYSTEM
+
+  @@map("whatsapp_message_origin")
+}
+
+/// Sin `@relation`: las FK compuestas con `company_id` (a la conexion y, en los mensajes, al
+/// contacto) estan escritas a mano en la migracion, para que ningun `include` cruce de empresa.
+/// @module integraciones
+model WhatsappContact {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  connectionId  String    @map("connection_id") @db.Uuid
+  waId          String    @map("wa_id")
+  profileName   String?   @map("profile_name")
+  customerId    String?   @map("customer_id") @db.Uuid
+  lastInboundAt DateTime? @map("last_inbound_at") @db.Timestamptz(6)
+  lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([connectionId, waId], map: "whatsapp_contacts_connection_id_wa_id_key")
+  @@unique([companyId, id], map: "whatsapp_contacts_company_id_id_key")
+  @@unique([companyId, connectionId, id], map: "whatsapp_contacts_company_connection_id_key")
+  @@index([customerId], map: "whatsapp_contacts_customer_id_idx")
+  @@map("whatsapp_contacts")
+}
+
+/// @module integraciones
+model WhatsappMessage {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String                   @map("company_id") @db.Uuid
+  connectionId   String                   @map("connection_id") @db.Uuid
+  contactId      String                   @map("contact_id") @db.Uuid
+  direction      WhatsappMessageDirection
+  wamid          String?                  @unique(map: "whatsapp_messages_wamid_key")
+  type           WhatsappMessageType
+  body           String?
+  payload        Json                     @default("{}")
+  status         WhatsappMessageStatus
+  errorCode      String?                  @map("error_code")
+  errorReason    String?                  @map("error_reason")
+  metaTimestamp  DateTime?                @map("meta_timestamp") @db.Timestamptz(6)
+  origin         WhatsappMessageOrigin?
+  sentById       String?                  @map("sent_by") @db.Uuid
+  templateName   String?                  @map("template_name")
+  attempts       Int                      @default(0)
+  queueMessageId String?                  @map("queue_message_id")
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([connectionId, contactId, metaTimestamp], map: "whatsapp_messages_connection_contact_ts_idx")
+  @@index([sentById], map: "whatsapp_messages_sent_by_idx")
+  @@map("whatsapp_messages")
 }
 
 enum EvidencePhase {

@@ -5,6 +5,7 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  useDndContext,
   useSensor,
   useSensors,
   type Announcements,
@@ -29,6 +30,7 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 import {
   createLocalKey,
   isStepDocumentEmpty,
+  type RecipeStepErrorMessages,
   type RecipeStepErrors,
   type RecipeStepFormValue,
 } from './recipe-form-state';
@@ -76,6 +78,16 @@ function emptyStepDocument(): RecipeStepDocument {
 export { isStepDocumentEmpty };
 
 /** Título y ayuda de la sección de envasado; los comparten el alta, la edición y la importación. */
+/**
+ * Textos propios para los issues de forma de zod sobre un paso: el genérico de zod sale en inglés.
+ * Los que escribe el esquema («Un paso no puede quedar vacio.», el ítem vacío, el tope de
+ * elementos) pasan tal cual (`recipe-form-state.ts`).
+ */
+export const RECIPE_STEP_ERROR_MESSAGES: RecipeStepErrorMessages = {
+  checklistWithoutItems: 'Una lista de verificación necesita al menos un ítem.',
+  invalid: 'Revisa el contenido de este paso.',
+};
+
 export const PACKING_STEPS_FIELD_TEXTS = {
   title: 'Pasos de envasado',
   optionalHelp:
@@ -88,6 +100,8 @@ const FIELD_TEXTS = {
   addAfter: (position: number) => `Añadir un paso después del ${position}`,
   remove: (position: number) => `Quitar paso ${position}`,
 } as const;
+
+const CARD_TRANSITION = 'box-shadow 200ms, border-color 200ms, scale 200ms';
 
 const EVIDENCE_TEXTS = {
   summary: (count: number) =>
@@ -347,37 +361,60 @@ function RecipeStepRow({
     id: step.key,
     disabled: locked,
   });
+  const { active } = useDndContext();
   const evidenceOn = showEvidenceSwitch && step.document.requiresEvidence === true;
-  const style = { transform: CSS.Transform.toString(transform), transition };
+  const lifted = !locked && isDragging;
+  const dropTarget = !locked && !isDragging && active !== null;
+  // El estilo en línea de dnd-kit pisaría la transición de la clase mientras se reordena.
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: transition === undefined ? undefined : `${transition}, ${CARD_TRANSITION}`,
+  };
   const errorId = `${testIdPrefix}-error-${index}`;
+  const stateClass = lifted
+    ? 'z-10 border-primary shadow-lg scale-[1.01] motion-reduce:scale-100'
+    : dropTarget
+      ? 'border-dashed border-primary'
+      : evidenceOn
+        ? 'border-[color-mix(in_oklch,var(--primary)_45%,var(--border))]'
+        : '';
 
   return (
     <li
       ref={setNodeRef}
       style={style}
       data-testid={`${testIdPrefix}-row`}
-      className={`flex items-start gap-2 rounded-lg border p-2 ${isDragging ? 'opacity-70' : ''} ${
-        evidenceOn ? 'border-[color-mix(in_oklch,var(--primary)_45%,var(--border))]' : ''
-      }`}
+      data-dragging={lifted ? 'true' : undefined}
+      data-drop-target={dropTarget ? 'true' : undefined}
+      className={`relative grid grid-cols-[44px_minmax(0,1fr)] items-start gap-2.5 rounded-xl border bg-card p-3 transition-[box-shadow,border-color,scale] duration-200 ${stateClass}`}
     >
-      {/* Asa de arrastre: SIEMPRE visible, >= 44x44 px, y con nombre accesible que INCLUYE la posición (R34, R50). */}
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className={`${touchTarget} flex shrink-0 touch-none items-center justify-center rounded-lg border bg-muted disabled:cursor-not-allowed disabled:opacity-50`}
-        disabled={locked}
-        aria-label={
-          locked
-            ? EVIDENCE_TEXTS.lockedHandle(index + 1)
-            : `Arrastrar el paso en la posición ${index + 1} de ${total}`
-        }
-        data-testid={`${testIdPrefix}-handle-${index}`}
-      >
-        <GripVerticalIcon aria-hidden="true" />
-      </button>
+      <div className="flex flex-col items-center gap-1.5">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className={`${touchTarget} flex shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50`}
+          disabled={locked}
+          aria-label={
+            locked
+              ? EVIDENCE_TEXTS.lockedHandle(index + 1)
+              : `Arrastrar el paso en la posición ${index + 1} de ${total}`
+          }
+          data-testid={`${testIdPrefix}-handle-${index}`}
+        >
+          <GripVerticalIcon aria-hidden="true" />
+        </button>
+        {/* Oculto a lectores: la posición ya va en el nombre del asa. */}
+        <span
+          aria-hidden="true"
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[13px] font-semibold"
+          data-testid={`${testIdPrefix}-number-${index}`}
+        >
+          {index + 1}
+        </span>
+      </div>
 
-      <div className="flex flex-1 flex-col gap-1">
+      <div className="flex min-w-0 flex-col gap-1">
         {/* El NOMBRE ACCESIBLE del area editable sigue siendo «Paso N», el mismo que daba la
             etiqueta del campo de texto de QC-26. Ahora viaja por la prop `label` del editor, que
             lo pone como `aria-label` sobre el `contenteditable`, y no por una etiqueta con

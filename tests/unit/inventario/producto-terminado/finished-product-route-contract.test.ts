@@ -180,6 +180,24 @@ const LECTURAS_PERMITIDAS = new Set([
 const ACCIONES_DE_EVIDENCIA = '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
 const LECTURAS_DE_EVIDENCIA = new Set(['getOrderEvidenceAction', 'countOrderEvidenceAction']);
 
+// 2026-10-16 (QC-288, enmienda de QC-225 R7): la ficha entrega sin pedido y, en Entregas, anula las
+// entregas sin pedido. De las actions de `pedidos` admite solo esas dos escrituras y la lectura que
+// pinta el diálogo de anular; las demás de `pedidos` y todas las de producto y lote siguen prohibidas.
+const ACCIONES_DE_PEDIDOS = ACCIONES_DE_ESCRITURA[3];
+const ESCRITURAS_SIN_PEDIDO = new Set(['deliverDirectAction', 'voidDirectDeliveryAction']);
+// 2026-10-16 (enmienda QC-288, decisión del humano tras el bloqueo de F3): la página lee además el
+// excedente del producto para decidir si pinta «Entregar» en la cabecera. Es una lectura; las
+// aserciones previas no cambian.
+const LECTURAS_SIN_PEDIDO = new Set(['getDirectDeliveryForVoidAction', 'listDirectDeliverySurplusAction']);
+
+function nombreDePedidosPermitido(nombre: string): boolean {
+  return (
+    ESCRITURAS_SIN_PEDIDO.has(nombre) ||
+    LECTURAS_SIN_PEDIDO.has(nombre) ||
+    /(Result|Input)$/.test(nombre)
+  );
+}
+
 const ACCIONES_DE_ESCRITURA_DE_EVIDENCIA = '@/lib/modules/asignaciones/adapters/driving/step-evidence-actions';
 const PIEZA_DE_EVIDENCIA = '@/components/shared/step-evidence';
 
@@ -211,6 +229,7 @@ describe('contrato de la ficha de producto terminado', () => {
     for (const ruta of FUENTES_DE_LA_RUTA) {
       const codigo = leer(ruta);
       for (const especificador of especificadores(codigo)) {
+        if (especificador === ACCIONES_DE_PEDIDOS) continue;
         if ((ACCIONES_DE_ESCRITURA as readonly string[]).includes(especificador)) {
           hallazgos.push(`${ruta} -> ${especificador}`);
           continue;
@@ -235,6 +254,16 @@ describe('contrato de la ficha de producto terminado', () => {
           hallazgos.push(`${ruta} -> ${nombre}`);
         }
       }
+      for (const nombre of nombresImportadosDe(codigo, ACCIONES_DE_PEDIDOS)) {
+        if (!nombreDePedidosPermitido(nombre)) hallazgos.push(`${ruta} -> ${nombre}`);
+      }
+      // Un `import *` o un `import()` esquivaría la lista de nombres.
+      const conLlaves = /import\s+(?:type\s+)?\{[^}]*\}\s+from\s+(['"])([^'"]+)\1/g;
+      const usosConLlaves = [...sinComentarios(codigo).matchAll(conLlaves)].filter(
+        (encaje) => encaje[2] === ACCIONES_DE_PEDIDOS,
+      ).length;
+      const usos = especificadores(codigo).filter((especificador) => especificador === ACCIONES_DE_PEDIDOS).length;
+      if (usos !== usosConLlaves) hallazgos.push(`${ruta} -> ${ACCIONES_DE_PEDIDOS} sin nombres`);
       if (/voidDelivery/i.test(sinComentarios(codigo))) hallazgos.push(`${ruta} -> voidDelivery`);
     }
 
@@ -249,6 +278,39 @@ describe('contrato de la ficha de producto terminado', () => {
     expect(especificadores(fabricada)).toContain(ACCIONES_DE_ESCRITURA[3]);
     expect(nombresImportadosDe(fabricada, ACCIONES_DE_LECTURA)).toEqual(['listProducedProductsAction']);
     expect(LECTURAS_PERMITIDAS.has('listProducedProductsAction')).toBe(false);
+  });
+
+  it('QC-225 R7 (enmienda QC-288), R43 — de las actions de pedidos la ruta solo usa la entrega y la anulación sin pedido', () => {
+    const usados = new Set<string>();
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      for (const nombre of nombresImportadosDe(leer(ruta), ACCIONES_DE_PEDIDOS)) {
+        if (!/(Result|Input)$/.test(nombre)) usados.add(nombre);
+      }
+    }
+
+    expect(usados.has('voidDirectDeliveryAction')).toBe(true);
+    expect(usados.has('listDirectDeliverySurplusAction')).toBe(true);
+    expect(nombresImportadosDe(leer(PAGE_PATH), ACCIONES_DE_PEDIDOS)).toEqual(['listDirectDeliverySurplusAction']);
+    for (const nombre of usados) {
+      expect(ESCRITURAS_SIN_PEDIDO.has(nombre) || LECTURAS_SIN_PEDIDO.has(nombre), nombre).toBe(true);
+    }
+  });
+
+  it('QC-225 R7 (enmienda QC-288) — la guardia sigue mordiendo con voidDeliveryAction y las demás de pedidos', () => {
+    const fabricada = [
+      `import { deliverOrderAction, voidDirectDeliveryAction, type VoidDirectDeliveryInput } from '${ACCIONES_DE_PEDIDOS}';`,
+      `import { voidDeliveryAction } from '${ACCIONES_DE_PEDIDOS}';`,
+    ].join('\n');
+    const prohibidos = nombresImportadosDe(fabricada, ACCIONES_DE_PEDIDOS).filter(
+      (nombre) => !nombreDePedidosPermitido(nombre),
+    );
+    expect(prohibidos).toEqual(['deliverOrderAction', 'voidDeliveryAction']);
+    expect(/voidDelivery/i.test('voidDirectDeliveryAction')).toBe(false);
+    expect(ACCIONES_DE_ESCRITURA.slice(0, 3)).toEqual([
+      '@/lib/modules/inventario/adapters/driving/product-actions',
+      '@/lib/modules/inventario/adapters/driving/batch-actions',
+      '@/lib/modules/inventario/adapters/driving/inventory-import-actions',
+    ]);
   });
 
   it('R26 — ningun archivo de la ruta sube, cambia ni quita fotos de evidencia', () => {

@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 
-import { ProductField, ProductForm } from '@/app/(private)/inventario/components';
+import { ProductCostFields, ProductField, ProductForm } from '@/app/(private)/inventario/components';
 import { Sheet } from '@/components/ui/sheet';
 import { PRODUCT_TYPES, type ProductView } from '@/lib/modules/inventario';
 
@@ -90,5 +90,35 @@ describe('ProductForm · campo de existencia', () => {
       </Sheet>,
     );
     expect(screen.queryByTestId('product-field-stock')).toBeNull();
+  });
+});
+
+describe('ProductCostFields · costo total de solo lectura', () => {
+  function montarCostos() {
+    render(
+      <ProductCostFields
+        unitCostLabel="Costo unitario"
+        totalCostLabel="Costo total"
+        initialUnitCost="2.5"
+        quantity="4"
+      />,
+    );
+  }
+
+  it('el costo total es de solo lectura y se ve como tal', () => {
+    montarCostos();
+
+    const total = screen.getByTestId('product-field-totalCost');
+    expect(total).toHaveAttribute('readonly');
+    expect(total).toHaveClass('bg-input/50', 'text-muted-foreground', 'cursor-default');
+  });
+
+  it('el costo unitario, que si se escribe, no lleva el estilo de solo lectura', () => {
+    montarCostos();
+
+    const unitario = screen.getByTestId('product-field-unitCost');
+    expect(unitario).not.toHaveAttribute('readonly');
+    expect(unitario).not.toHaveClass('bg-input/50');
+    expect(unitario).not.toHaveClass('cursor-default');
   });
 });

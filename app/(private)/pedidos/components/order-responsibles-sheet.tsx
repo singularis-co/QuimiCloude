@@ -19,7 +19,7 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-import { orderCustomerLabel } from './order-customer-label';
+import { orderCustomerLabel } from '@/components/shared/order-customer-label';
 import { OrderRecipeImage } from './order-recipe-image';
 import {
   EMPTY_RESPONSIBLES_CATALOG,

@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ProductTable } from '@/app/(private)/inventario/components';
+import { PRODUCT_TABLE_SCOPE_CLASS, ProductTable } from '@/app/(private)/inventario/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { PRODUCT_TYPES, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
@@ -81,8 +81,13 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+/** jsdom no evalua las consultas de contenedor: la tabla y sus tarjetas estan las dos en el arbol. */
+function enLaTabla() {
+  return within(screen.getByRole('table'));
+}
+
 function toggle(name = 'Acido citrico') {
-  return screen.getByRole('button', { name: `Mostrar lotes de ${name}` });
+  return enLaTabla().getByRole('button', { name: `Mostrar lotes de ${name}` });
 }
 
 beforeEach(() => {
@@ -104,11 +109,11 @@ describe('desplegar los lotes de un producto', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} />);
 
     expect(toggle()).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('product-batch-row')).toBeNull();
+    expect(enLaTabla().queryByTestId('product-batch-row')).toBeNull();
 
     await user.click(toggle());
     expect(toggle()).toHaveAttribute('aria-expanded', 'true');
-    const fila = await screen.findByTestId('product-batch-row');
+    const fila = await enLaTabla().findByTestId('product-batch-row');
     expect(within(fila).getByTestId('product-batch-row-lot')).toHaveTextContent('L-001');
     expect(within(fila).getByTestId('product-batch-row-purchase-date')).toHaveTextContent('2026-03-05');
     expect(within(fila).getByTestId('product-batch-row-expiry-date')).toHaveTextContent(EMPTY_MARK);
@@ -122,7 +127,7 @@ describe('desplegar los lotes de un producto', () => {
 
     await user.click(toggle());
     expect(toggle()).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('product-batch-row')).toBeNull();
+    expect(enLaTabla().queryByTestId('product-batch-row')).toBeNull();
   });
 
   it('pide los lotes una sola vez por producto aunque se pliegue y despliegue', async () => {
@@ -131,11 +136,11 @@ describe('desplegar los lotes de un producto', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    await screen.findByTestId('product-batch-row');
+    await enLaTabla().findByTestId('product-batch-row');
     await user.click(toggle());
     await user.click(toggle());
 
-    expect(screen.getByTestId('product-batch-row')).toBeInTheDocument();
+    expect(enLaTabla().getByTestId('product-batch-row')).toBeInTheDocument();
     expect(listAliveProductBatchesActionMock).toHaveBeenCalledTimes(1);
   });
 
@@ -146,11 +151,11 @@ describe('desplegar los lotes de un producto', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    expect(screen.getByTestId('product-batches-row-loading')).toHaveTextContent('Cargando lotes…');
+    expect(enLaTabla().getByTestId('product-batches-row-loading')).toHaveTextContent('Cargando lotes…');
 
     pendiente.resolve({ status: 'success', data: [lote()] });
-    await screen.findByTestId('product-batch-row');
-    expect(screen.queryByTestId('product-batches-row-loading')).toBeNull();
+    await enLaTabla().findByTestId('product-batch-row');
+    expect(enLaTabla().queryByTestId('product-batches-row-loading')).toBeNull();
   });
 
   it('con error pinta el mensaje y el reintento vuelve a pedir los lotes', async () => {
@@ -163,14 +168,14 @@ describe('desplegar los lotes de un producto', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    const error = await screen.findByTestId('product-batches-row-error');
+    const error = await enLaTabla().findByTestId('product-batches-row-error');
     expect(error).toHaveTextContent('No tienes permiso.');
 
     listAliveProductBatchesActionMock.mockResolvedValueOnce({ status: 'success', data: [lote()] });
     await user.click(within(error).getByRole('button', { name: 'Reintentar' }));
 
-    await screen.findByTestId('product-batch-row');
-    expect(screen.queryByTestId('product-batches-row-error')).toBeNull();
+    await enLaTabla().findByTestId('product-batch-row');
+    expect(enLaTabla().queryByTestId('product-batches-row-error')).toBeNull();
     expect(listAliveProductBatchesActionMock).toHaveBeenCalledTimes(2);
   });
 
@@ -192,13 +197,13 @@ describe('desplegar los lotes de un producto', () => {
     await act(async () => {
       vieja.resolve({ status: 'success', data: [lote({ id: 'viejo', lot: 'L-VIEJO' })] });
     });
-    expect(screen.getByTestId('product-batches-row-loading')).toBeInTheDocument();
-    expect(screen.queryByText('L-VIEJO')).toBeNull();
+    expect(enLaTabla().getByTestId('product-batches-row-loading')).toBeInTheDocument();
+    expect(enLaTabla().queryByText('L-VIEJO')).toBeNull();
 
     await act(async () => {
       nueva.resolve({ status: 'success', data: [lote({ id: 'nuevo', lot: 'L-NUEVO' })] });
     });
-    expect(screen.getAllByTestId('product-batch-row-lot').map((dd) => dd.textContent)).toEqual([
+    expect(enLaTabla().getAllByTestId('product-batch-row-lot').map((dd) => dd.textContent)).toEqual([
       'L-NUEVO',
     ]);
   });
@@ -209,7 +214,7 @@ describe('desplegar los lotes de un producto', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    expect(await screen.findByTestId('product-batches-row-error')).toBeInTheDocument();
+    expect(await enLaTabla().findByTestId('product-batches-row-error')).toBeInTheDocument();
   });
 
   it('pide solo los lotes vivos al servidor y pinta tal cual lo que devuelve; sin ninguno, el vacio', async () => {
@@ -230,21 +235,21 @@ describe('desplegar los lotes de un producto', () => {
     );
 
     await user.click(toggle());
-    await screen.findAllByTestId('product-batch-row');
+    await enLaTabla().findAllByTestId('product-batch-row');
     expect(listAliveProductBatchesActionMock).toHaveBeenCalledWith('product-1');
-    expect(screen.getAllByTestId('product-batch-row-lot').map((dd) => dd.textContent)).toEqual([
+    expect(enLaTabla().getAllByTestId('product-batch-row-lot').map((dd) => dd.textContent)).toEqual([
       'L-VIVO',
       'L-OTRO',
     ]);
 
     listAliveProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [] });
     await user.click(toggle('Glicerina'));
-    expect(await screen.findByTestId('product-batches-row-empty')).toBeInTheDocument();
+    expect(await enLaTabla().findByTestId('product-batches-row-empty')).toBeInTheDocument();
   });
 });
 
 describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
-  it('pinta en rojo el vencimiento de un lote a menos de 30 dias, y no el lejano', async () => {
+  it('R48 — pinta en ámbar el vencimiento de un lote a menos de 30 dias o vencido, y no el de 30 o más', async () => {
     listAliveProductBatchesActionMock.mockResolvedValue({
       status: 'success',
       data: [
@@ -257,7 +262,7 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    await screen.findAllByTestId('product-batch-row');
+    await enLaTabla().findAllByTestId('product-batch-row');
 
     const vencimiento = (batchId: string) =>
       within(screen.getByTestId(`data-table-row-product-1--batch-${batchId}`)).getByTestId(
@@ -265,9 +270,11 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
       );
     for (const id of ['cerca', 'vencido']) {
       expect(vencimiento(id)).toHaveAttribute('data-expiring', 'true');
-      expect(vencimiento(id)).toHaveClass('text-destructive');
+      expect(vencimiento(id)).toHaveClass('text-warning-text', 'font-semibold');
+      expect(vencimiento(id)).not.toHaveClass('text-destructive');
     }
     expect(vencimiento('lejos')).not.toHaveAttribute('data-expiring');
+    expect(vencimiento('lejos')).not.toHaveClass('text-warning-text');
     expect(vencimiento('lejos')).not.toHaveClass('text-destructive');
   });
 
@@ -287,7 +294,7 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    await screen.findAllByTestId('product-batch-row');
+    await enLaTabla().findAllByTestId('product-batch-row');
 
     const vencimiento = (batchId: string) =>
       within(screen.getByTestId(`data-table-row-product-1--batch-${batchId}`)).getByTestId(
@@ -302,12 +309,12 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     expect(relativo('manana')).toHaveTextContent('(vence en 1 día)');
     expect(vencimiento('cerca')).toHaveTextContent('2026-11-04 (vence en 20 días)');
     expect(relativo('lejos')).toHaveTextContent('(vence en 90 días)');
-    // El rojo sigue solo bajo 30 dias: el relativo hereda el color de la fecha.
-    expect(vencimiento('cerca')).toHaveClass('text-destructive');
-    expect(vencimiento('lejos')).not.toHaveClass('text-destructive');
+    // El ámbar sigue solo bajo 30 dias: el relativo hereda el color de la fecha.
+    expect(vencimiento('cerca')).toHaveClass('text-warning-text');
+    expect(vencimiento('lejos')).not.toHaveClass('text-warning-text');
   });
 
-  it('el vencido lleva el chip «Vencido» y data-expired; el proximo y el lejano no', async () => {
+  it('R48 — el vencido lleva el chip «Vencido» en danger y data-expired, con la fecha en ámbar; el proximo y el lejano no', async () => {
     listAliveProductBatchesActionMock.mockResolvedValue({
       status: 'success',
       data: [
@@ -322,14 +329,15 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    await screen.findAllByTestId('product-batch-row');
+    await enLaTabla().findAllByTestId('product-batch-row');
 
     const vencimiento = (batchId: string) =>
       within(screen.getByTestId(`data-table-row-product-1--batch-${batchId}`)).getByTestId(
         'product-batch-row-expiry-date',
       );
     expect(vencimiento('vencido')).toHaveAttribute('data-expired', 'true');
-    expect(vencimiento('vencido')).toHaveClass('text-destructive');
+    expect(vencimiento('vencido')).toHaveClass('text-warning-text');
+    expect(vencimiento('vencido')).not.toHaveClass('text-destructive');
     const chip = within(vencimiento('vencido')).getByTestId('product-batch-row-expired');
     expect(chip).toHaveTextContent('Vencido');
     expect(chip).toHaveAttribute('data-tone', 'danger');
@@ -338,7 +346,8 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
       expect(vencimiento(id)).not.toHaveAttribute('data-expired');
       expect(within(vencimiento(id)).queryByTestId('product-batch-row-expired')).toBeNull();
     }
-    expect(vencimiento('cerca')).toHaveClass('text-destructive');
+    expect(vencimiento('cerca')).toHaveClass('text-warning-text');
+    expect(vencimiento('cerca')).not.toHaveClass('text-destructive');
   });
 
   it('cada clave va en negrita y seguida de «:», en su propio bloque', async () => {
@@ -347,7 +356,7 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
 
     await user.click(toggle());
-    const fila = await screen.findByTestId('product-batch-row');
+    const fila = await enLaTabla().findByTestId('product-batch-row');
     const claves = within(fila).getAllByRole('term');
     expect(claves.map((dt) => dt.textContent)).toEqual([
       'Lote:',
@@ -360,11 +369,13 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
     }
   });
 
-  it('resalta el nombre del producto segun nextExpiryDate, sin desplegar', () => {
+  it('R48 — resalta en ámbar el nombre del producto segun nextExpiryDate, sin desplegar', () => {
     render(
       <ProductTable
         products={[
           producto({ id: 'cerca', name: 'Cerca', nextExpiryDate: '2026-10-20' }),
+          producto({ id: 'vencido', name: 'Vencido', nextExpiryDate: '2026-10-01' }),
+          producto({ id: 'treinta', name: 'Treinta', nextExpiryDate: '2026-11-14' }),
           producto({ id: 'lejos', name: 'Lejos', nextExpiryDate: '2027-01-01' }),
           producto({ id: 'sin-fecha', name: 'Sin fecha', nextExpiryDate: null }),
           producto({ id: 'sin-dato', name: 'Sin dato' }),
@@ -376,10 +387,14 @@ describe('aviso de vencimiento cercano (hoy = 2026-10-15)', () => {
 
     const nombre = (id: string) =>
       within(screen.getByTestId(`data-table-row-${id}`)).getByTestId('product-name');
-    expect(nombre('cerca')).toHaveAttribute('data-expiring', 'true');
-    expect(nombre('cerca')).toHaveClass('text-destructive', 'font-semibold');
-    for (const id of ['lejos', 'sin-fecha', 'sin-dato']) {
+    for (const id of ['cerca', 'vencido']) {
+      expect(nombre(id)).toHaveAttribute('data-expiring', 'true');
+      expect(nombre(id)).toHaveClass('text-warning-text', 'font-semibold');
+      expect(nombre(id)).not.toHaveClass('text-destructive');
+    }
+    for (const id of ['treinta', 'lejos', 'sin-fecha', 'sin-dato']) {
       expect(nombre(id)).not.toHaveAttribute('data-expiring');
+      expect(nombre(id)).not.toHaveClass('text-warning-text');
       expect(nombre(id)).not.toHaveClass('text-destructive');
     }
     expect(listAliveProductBatchesActionMock).not.toHaveBeenCalled();
@@ -394,9 +409,9 @@ describe('la columna «Tipo» convive con las filas de lotes', () => {
 
     expect(screen.getByTestId('data-table-head-type')).toBeInTheDocument();
     await user.click(toggle());
-    await screen.findByTestId('product-batch-row');
+    await enLaTabla().findByTestId('product-batch-row');
 
-    expect(screen.getAllByTestId('product-type')).toHaveLength(1);
+    expect(enLaTabla().getAllByTestId('product-type')).toHaveLength(1);
     expect(
       within(screen.getByTestId('data-table-row-product-1--batch-batch-1')).queryByTestId(
         'product-type',
@@ -408,27 +423,120 @@ describe('la columna «Tipo» convive con las filas de lotes', () => {
 describe('sin cambio de anchura de la tabla', () => {
   it('el chevron vive en la celda del nombre: no hay columna nueva', () => {
     render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
-    const celdaNombre = screen.getByTestId('data-table-cell-name');
+    const celdaNombre = enLaTabla().getByTestId('data-table-cell-name');
     expect(within(celdaNombre).getByTestId('product-batches-toggle')).toBeInTheDocument();
   });
 });
 
-describe('columna «Costo» de la tabla de productos', () => {
-  it('pinta la cabecera «Costo» justo despues de la existencia', () => {
+describe('columna «Costo unitario» de la tabla de productos', () => {
+  it('pinta la cabecera «Costo unitario» la ultima de datos, justo antes de las acciones', () => {
     render(
       <ProductTable products={[producto()]} params={TODOS} totalPages={1} units={UNITS} canSeeCost />,
     );
 
-    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveTextContent('Costo');
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveTextContent('Costo unitario');
     const cabeceras = screen
       .getAllByRole('columnheader')
       .map((celda) => celda.getAttribute('data-testid'));
     expect(cabeceras.indexOf('data-table-head-averageUnitCost')).toBe(
-      cabeceras.indexOf('data-table-head-stock') + 1,
+      cabeceras.indexOf('data-table-head-actions') - 1,
+    );
+    expect(cabeceras.indexOf('data-table-head-averageUnitCost')).toBe(
+      cabeceras.indexOf('data-table-head-qtyAlert') + 1,
     );
   });
 
-  it('la fila del producto pinta su costo promedio como dinero: «$», miles y dos decimales', () => {
+  it('R6 — «Costo» va a la derecha en la cabecera y en la celda, como las demás cifras', () => {
+    render(
+      <ProductTable
+        products={[producto({ averageUnitCost: '9' })]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+        canSeeCost
+      />,
+    );
+
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveClass('text-right');
+    const fila = screen.getByTestId('data-table-row-product-1');
+    expect(within(fila).getByTestId('data-table-cell-averageUnitCost')).toHaveClass('text-right');
+  });
+
+  it('R6, R47, R53 — la sub-fila de lote alinea sus cifras como su columna y «Tipo», «Presentación» y «Costo» se conservan', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [lote({ unitCost: '3.1250' })],
+    });
+    const user = setupUser();
+    render(
+      <ProductTable
+        products={[producto({ averageUnitCost: '9', presentationName: 'Saco 25 kg' })]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+        canSeeCost
+      />,
+    );
+
+    await user.click(toggle());
+    await enLaTabla().findByTestId('product-batch-row');
+
+    const filaProducto = screen.getByTestId('data-table-row-product-1');
+    const filaLote = screen.getByTestId('data-table-row-product-1--batch-batch-1');
+    for (const columna of ['stock', 'averageUnitCost', 'qtyAlert', 'reserved', 'available']) {
+      expect(screen.getByTestId(`data-table-head-${columna}`), columna).toHaveClass('text-right');
+      expect(within(filaProducto).getByTestId(`data-table-cell-${columna}`), columna).toHaveClass(
+        'text-right',
+      );
+      expect(within(filaLote).getByTestId(`data-table-cell-${columna}`), columna).toHaveClass(
+        'text-right',
+      );
+    }
+    // «start» es la alineación natural: la tabla no le añade clase.
+    for (const columna of ['type', 'presentationName']) {
+      for (const celda of [
+        screen.getByTestId(`data-table-head-${columna}`),
+        within(filaProducto).getByTestId(`data-table-cell-${columna}`),
+        within(filaLote).getByTestId(`data-table-cell-${columna}`),
+      ]) {
+        expect(celda, columna).not.toHaveClass('text-right');
+        expect(celda, columna).not.toHaveClass('text-center');
+      }
+    }
+
+    expect(within(filaProducto).getByTestId('product-type')).toBeInTheDocument();
+    expect(within(filaProducto).getByTestId('data-table-cell-presentationName')).toHaveTextContent(
+      'Saco 25 kg',
+    );
+    expect(within(filaProducto).getByTestId('product-cost')).toHaveTextContent(/^\$9\.00 \/ kg$/);
+    expect(within(filaLote).getByTestId('product-batch-row-cost')).toHaveTextContent(/^\$3\.13 \/ kg$/);
+  });
+
+  it('R6 — «Disponible» va en negrita en la fila del producto y no en la del lote', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({ status: 'success', data: [lote()] });
+    const user = setupUser();
+    render(
+      <ProductTable
+        products={[producto({ reserved: '2', available: '10' })]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+      />,
+    );
+
+    await user.click(toggle());
+    await enLaTabla().findByTestId('product-batch-row');
+
+    const filaProducto = screen.getByTestId('data-table-row-product-1');
+    expect(within(filaProducto).getByTestId('product-available')).toHaveClass('font-semibold');
+    expect(within(filaProducto).getByTestId('product-reserved')).not.toHaveClass('font-semibold');
+    const filaLote = screen.getByTestId('data-table-row-product-1--batch-batch-1');
+    expect(within(filaLote).getByTestId('product-batch-row-available')).not.toHaveClass(
+      'font-semibold',
+    );
+  });
+
+  it('la fila del producto pinta su costo promedio como dinero por unidad: «$», miles, dos decimales y «/ kg»', () => {
     render(
       <ProductTable
         products={[
@@ -444,18 +552,58 @@ describe('columna «Costo» de la tabla de productos', () => {
     );
 
     const fila1 = within(screen.getByTestId('data-table-row-product-1')).getByTestId('product-cost');
-    expect(fila1).toHaveTextContent(/^\$12\.50$/);
+    expect(fila1).toHaveTextContent(/^\$12\.50 \/ kg$/);
     // Sin perdida: lo pintado ya es exacto, asi que no hay `title` que repita lo que se ve.
     expect(fila1).not.toHaveAttribute('title');
 
     // Redondeado se lee «$0.00», pero el valor exacto queda a un hover.
     const fila2 = within(screen.getByTestId('data-table-row-product-2')).getByTestId('product-cost');
-    expect(fila2).toHaveTextContent(/^\$0\.00$/);
+    expect(fila2).toHaveTextContent(/^\$0\.00 \/ kg$/);
     expect(fila2).toHaveAttribute('title', '0.0025');
 
     const fila3 = within(screen.getByTestId('data-table-row-product-3')).getByTestId('product-cost');
-    expect(fila3).toHaveTextContent(/^\$1,234\.57$/);
+    expect(fila3).toHaveTextContent(/^\$1,234\.57 \/ kg$/);
     expect(fila3).toHaveAttribute('title', '1234.565');
+  });
+
+  it('sin unidad conocida (sin unidad o fuera del catalogo), el costo se pinta solo, sin «/» ni «—»', () => {
+    render(
+      <ProductTable
+        products={[
+          producto({ averageUnitCost: '12.5000', unitId: null }),
+          producto({ id: 'product-2', name: 'Sal', averageUnitCost: '3.0000', unitId: 'unit-otra' }),
+        ]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+        canSeeCost
+      />,
+    );
+
+    for (const [id, importe] of [
+      ['product-1', /^\$12\.50$/],
+      ['product-2', /^\$3\.00$/],
+    ] as const) {
+      const fila = within(screen.getByTestId(`data-table-row-${id}`));
+      expect(fila.getByTestId('product-cost')).toHaveTextContent(importe);
+    }
+  });
+
+  it('el costo va en la MISMA unidad que la existencia de la fila', () => {
+    render(
+      <ProductTable
+        products={[producto({ averageUnitCost: '2500.0000' })]}
+        params={TODOS}
+        totalPages={1}
+        units={UNITS}
+        canSeeCost
+      />,
+    );
+
+    const fila = within(screen.getByTestId('data-table-row-product-1'));
+    const unidad = fila.getByTestId('product-stock').textContent?.split(' ').at(-1);
+    expect(unidad).toBe('kg');
+    expect(fila.getByTestId('product-cost')).toHaveTextContent(`$2,500.00 / ${unidad}`);
   });
 
   it('sin costo (null o ausente), la fila del producto pinta el marcador de vacio', () => {
@@ -495,14 +643,14 @@ describe('columna «Costo» de la tabla de productos', () => {
     );
 
     await user.click(toggle());
-    await screen.findByTestId('product-batch-row');
+    await enLaTabla().findByTestId('product-batch-row');
 
     const filaLote = screen.getByTestId('data-table-row-product-1--batch-batch-1');
     const costoLote = within(filaLote).getByTestId('product-batch-row-cost');
-    expect(costoLote).toHaveTextContent(/^\$3\.13$/);
+    expect(costoLote).toHaveTextContent(/^\$3\.13 \/ kg$/);
     expect(costoLote).toHaveAttribute('title', '3.125');
     const filaProducto = screen.getByTestId('data-table-row-product-1');
-    expect(within(filaProducto).getByTestId('product-cost')).toHaveTextContent(/^\$9\.00$/);
+    expect(within(filaProducto).getByTestId('product-cost')).toHaveTextContent(/^\$9\.00 \/ kg$/);
   });
 
   it('sin costo (null o ausente), la fila del lote pinta el marcador de vacio', async () => {
@@ -516,7 +664,7 @@ describe('columna «Costo» de la tabla de productos', () => {
     );
 
     await user.click(toggle());
-    await screen.findAllByTestId('product-batch-row');
+    await enLaTabla().findAllByTestId('product-batch-row');
 
     for (const id of ['batch-1', 'batch-2']) {
       const filaLote = screen.getByTestId(`data-table-row-product-1--batch-${id}`);
@@ -545,11 +693,140 @@ describe('columna «Costo» de la tabla de productos', () => {
     );
 
     await user.click(toggle());
-    await screen.findByTestId('product-batch-row');
+    await enLaTabla().findByTestId('product-batch-row');
 
     expect(screen.queryByTestId('data-table-head-averageUnitCost')).toBeNull();
     expect(screen.queryAllByTestId('data-table-cell-averageUnitCost')).toEqual([]);
     expect(screen.queryByTestId('product-cost')).toBeNull();
     expect(screen.queryByTestId('product-batch-row-cost')).toBeNull();
+  });
+});
+
+describe('«Costo unitario» de la enmienda 2', () => {
+  const LITRO = { id: 'unit-l', name: 'Litro', symbol: 'L' } as UnitRef;
+
+  it('R6, R53, R54 — con `canSeeCost`, al final antes de acciones y a la derecha, en moneda con unidad, exacto en `title` y el costo del lote en su sub-fila', async () => {
+    listAliveProductBatchesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [lote({ unitId: 'unit-l', unitCost: '2400.0050' })],
+    });
+    const user = setupUser();
+    render(
+      <ProductTable
+        products={[
+          producto({ unitId: 'unit-l', averageUnitCost: '2500.0040' }),
+          producto({ id: 'product-2', name: 'Sal', unitId: 'unit-l', averageUnitCost: null }),
+        ]}
+        params={TODOS}
+        totalPages={1}
+        units={[LITRO]}
+        canSeeCost
+      />,
+    );
+
+    const cabeceras = enLaTabla()
+      .getAllByRole('columnheader')
+      .map((celda) => celda.getAttribute('data-testid'))
+      .filter((id) => id !== 'data-table-head-batchesToggle');
+    expect(cabeceras.slice(-2)).toEqual(['data-table-head-averageUnitCost', 'data-table-head-actions']);
+    expect(screen.getByTestId('data-table-head-averageUnitCost')).toHaveClass('text-right');
+
+    const fila = screen.getByTestId('data-table-row-product-1');
+    expect(within(fila).getByTestId('data-table-cell-averageUnitCost')).toHaveClass('text-right');
+    const costo = within(fila).getByTestId('product-cost');
+    expect(costo.textContent).toBe('$2,500.00 / L');
+    expect(costo).toHaveAttribute('title', '2500.004');
+
+    const sinCosto = screen.getByTestId('data-table-row-product-2');
+    expect(within(sinCosto).getByTestId('data-table-cell-averageUnitCost')).toHaveTextContent(EMPTY_MARK);
+    expect(within(sinCosto).queryByTestId('product-cost')).toBeNull();
+
+    await user.click(toggle());
+    await enLaTabla().findByTestId('product-batch-row');
+    const costoLote = within(screen.getByTestId('data-table-row-product-1--batch-batch-1')).getByTestId(
+      'product-batch-row-cost',
+    );
+    expect(costoLote.textContent).toBe('$2,400.01 / L');
+    expect(costoLote).toHaveAttribute('title', '2400.005');
+  });
+});
+
+describe('aspecto de las sub-filas de lote', () => {
+  it('R57 — `data-batch-subrow` marca la sub-fila de lote, la de cargando, la vacia y la de error, y no la del producto', async () => {
+    const pendiente = deferred<unknown>();
+    listAliveProductBatchesActionMock
+      .mockReturnValueOnce(pendiente.promise)
+      .mockResolvedValueOnce({ status: 'success', data: [] })
+      .mockResolvedValueOnce({ status: 'error', code: 'UNAUTHORIZED', message: 'No tienes permiso.' });
+    const user = setupUser();
+    render(
+      <ProductTable
+        products={[
+          producto(),
+          producto({ id: 'product-2', name: 'Glicerina' }),
+          producto({ id: 'product-3', name: 'Sal' }),
+        ]}
+        params={TODOS}
+        totalPages={1}
+      />,
+    );
+
+    await user.click(toggle());
+    await user.click(toggle('Glicerina'));
+    await user.click(toggle('Sal'));
+    await enLaTabla().findByTestId('product-batches-row-empty');
+    await enLaTabla().findByTestId('product-batches-row-error');
+
+    const subFilas = [
+      enLaTabla().getByTestId('product-batches-row-loading'),
+      enLaTabla().getByTestId('product-batches-row-empty'),
+      enLaTabla().getByTestId('product-batches-row-error'),
+    ];
+    await act(async () => {
+      pendiente.resolve({ status: 'success', data: [lote()] });
+    });
+    subFilas[0] = await enLaTabla().findByTestId('product-batch-row');
+
+    for (const raiz of subFilas) {
+      expect(raiz, raiz.getAttribute('data-testid') ?? '').toHaveAttribute('data-batch-subrow');
+      expect(raiz.closest('td')).toHaveAttribute('data-testid', 'data-table-cell-name');
+    }
+    for (const id of ['product-1', 'product-2', 'product-3']) {
+      expect(screen.getByTestId(`data-table-row-${id}`).querySelector('[data-batch-subrow]')).toBeNull();
+    }
+  });
+
+  it('R57 — mientras carga, la sub-fila de estado tambien lleva la marca', async () => {
+    listAliveProductBatchesActionMock.mockReturnValue(new Promise(() => undefined));
+    const user = setupUser();
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    await user.click(toggle());
+
+    expect(enLaTabla().getByTestId('product-batches-row-loading')).toHaveAttribute('data-batch-subrow');
+  });
+
+  it('R57 — la clase de ambito pone fondo y entrada (solo con movimiento) en la fila y en la tarjeta, y la sangria de tarjeta', () => {
+    render(<ProductTable products={[producto()]} params={TODOS} totalPages={1} />);
+
+    const envoltorio = screen.getByTestId('data-table').parentElement as HTMLElement;
+    expect(envoltorio.className).toBe(PRODUCT_TABLE_SCOPE_CLASS);
+    const clases = PRODUCT_TABLE_SCOPE_CLASS.split(' ');
+    const entrada = 'animate-[screen-enter_var(--dur-slow)_var(--ease-enter)_both]';
+    expect(clases).toEqual(
+      expect.arrayContaining([
+        '[&_tr:has([data-batch-subrow])>td]:bg-[color-mix(in_oklch,var(--muted)_55%,var(--card))]',
+        `motion-safe:[&_tr:has([data-batch-subrow])>td]:${entrada}`,
+        '[&_li:has([data-batch-subrow])]:ml-5',
+        '[&_li:has([data-batch-subrow])]:rounded-lg',
+        '[&_li:has([data-batch-subrow])]:bg-muted',
+        `motion-safe:[&_li:has([data-batch-subrow])]:${entrada}`,
+      ]),
+    );
+    // Sin `motion-safe` no hay animacion: con movimiento reducido no entra.
+    expect(clases.filter((clase) => clase.includes('animate-'))).toHaveLength(2);
+    for (const clase of clases.filter((c) => c.includes('animate-'))) {
+      expect(clase.startsWith('motion-safe:')).toBe(true);
+    }
   });
 });

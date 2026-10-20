@@ -201,6 +201,8 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
    *  pantalla y el item del menu que la enlaza, cada uno acotado a su archivo exacto -nunca a la
    *  carpeta de componentes de la ruta, que sigue en rojo. */
   const PANTALLA_PERMITIDA = 'app/(private)/clientes/page.tsx'
+  // El corte de la pantalla hermana de contactos, tambien por ruta exacta.
+  const PANTALLA_CONTACTOS_PERMITIDA = 'app/(private)/clientes/contactos/page.tsx'
   const NAV_PERMITIDA = 'lib/shared/navigation/private-nav.ts'
 
   function permisoPermitidoEn(relativo: string): boolean {
@@ -209,6 +211,7 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
       relativo === CATALOGO_DE_ANADIDOS ||
       relativo.startsWith('lib/modules/clientes/domain/') ||
       relativo === PANTALLA_PERMITIDA ||
+      relativo === PANTALLA_CONTACTOS_PERMITIDA ||
       relativo === NAV_PERMITIDA
     )
   }
@@ -226,7 +229,7 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
     return hallazgos
   }
 
-  it('R26 (QC-153), R35 (QC-154), R37 (QC-155) — el literal de los dos permisos solo aparece en permissions.ts, en company-addons.ts, en lib/modules/clientes/domain, en app/(private)/clientes/page.tsx o en private-nav.ts', () => {
+  it('R26 (QC-153), R35 (QC-154), R37 (QC-155) — el literal de los dos permisos solo aparece en permissions.ts, en company-addons.ts, en lib/modules/clientes/domain, en app/(private)/clientes/page.tsx, en app/(private)/clientes/contactos/page.tsx o en private-nav.ts', () => {
     const hallazgos = detectarLiteralesDePermiso()
     expect(
       hallazgos,
@@ -285,6 +288,19 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
       rmSync(raiz, { recursive: true, force: true })
     }
   })
+
+  it('R3, R14 — el literal en app/(private)/clientes/contactos/components/ SI dispara: la admision es solo su page.tsx', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc244-scope-'))
+    try {
+      const relativoFabricado = 'app/(private)/clientes/contactos/components/__sensibilidad_literal__.ts'
+      const rutaFabricada = join(raiz, relativoFabricado)
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
+      expect(detectarLiteralesDePermiso(raiz)).toContain(relativoFabricado)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------------------------
@@ -317,6 +333,10 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
   // fijado por specs/QC-282-entrega-a-varios-clientes/tasks.md > TI). Siembra dos clientes por
   // Prisma -la entrega se reparte entre ellos- con la normalizacion del barrel de `clientes`, la
   // unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
+  // 2026-10-19 (QC-288): entra `entrega-sin-pedido.spec.ts`, el E2E de R56 de QC-288 (nombre
+  // fijado por specs/QC-288-entrega-sin-pedido/tasks.md). Siembra dos clientes por Prisma -la
+  // entrega sin pedido se reparte entre ellos- con la normalizacion del barrel de `clientes`, la
+  // unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
   const E2E_PERMITIDOS: ReadonlySet<string> = new Set([
     'clientes.spec.ts',
     'pedido-con-cliente.spec.ts',
@@ -327,6 +347,7 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
     'detalle-de-producto-terminado.spec.ts',
     'pedidos-rediseno.spec.ts',
     'entrega-a-varios-clientes.spec.ts',
+    'entrega-sin-pedido.spec.ts',
   ])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 

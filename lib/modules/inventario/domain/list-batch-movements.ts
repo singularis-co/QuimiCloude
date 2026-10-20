@@ -8,6 +8,22 @@ import type { ProductRepository } from '../ports/product-repository';
 // (`docs/architecture.md > La regla de dependencias`). Solo el tipo: el contrato de este modulo lo
 // carga un componente de cliente y no puede arrastrar servidor.
 import type { PeopleDirectory } from '@/lib/modules/identity';
+import type { CustomerCatalog } from '@/lib/modules/clientes';
+
+/** Hueco para `pedidos`: las lineas de entrega son suyas. Sin permisos: autoriza quien llama. */
+export interface DeliveryCustomerDirectory {
+  /** Por id de asiento, los clientes de las lineas de esa entrega, o de las anuladas por esa
+   *  anulacion, en ese lote. Una consulta por tipo de referencia, nunca una por asiento. */
+  findCustomerIds(
+    companyId: string,
+    refs: readonly {
+      readonly movementId: string;
+      readonly batchId: string;
+      readonly deliveryId: string | null;
+      readonly voidId: string | null;
+    }[],
+  ): Promise<ReadonlyMap<string, readonly string[]>>;
+}
 
 export type ListBatchMovementsDeps = {
   readonly products: ProductRepository;
@@ -15,6 +31,8 @@ export type ListBatchMovementsDeps = {
   readonly people: PeopleDirectory;
   /** El numero visible de cada pedido citado en el historial. */
   readonly orders: OrderNumberDirectory;
+  readonly deliveryCustomers: DeliveryCustomerDirectory;
+  readonly customers: Pick<CustomerCatalog, 'findRefsIncludingDeleted'>;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
 };
@@ -72,16 +90,49 @@ export function createListBatchMovements(
       ),
     ];
 
-    const [refs, orderNumbers] = await Promise.all([
+    type DeliveryRef = Parameters<DeliveryCustomerDirectory['findCustomerIds']>[1][number];
+    const deliveryRefs = movements.flatMap((movement): DeliveryRef[] => {
+      if (movement.kind === 'direct_delivery') {
+        return [{ movementId: movement.id, batchId, deliveryId: movement.orderDeliveryId ?? null, voidId: null }];
+      }
+      if (movement.kind === 'direct_delivery_void') {
+        return [{ movementId: movement.id, batchId, deliveryId: null, voidId: movement.orderDeliveryVoidId ?? null }];
+      }
+      return [];
+    });
+
+    const [refs, orderNumbers, customerIdsByMovement] = await Promise.all([
       deps.people.findRefsIncludingDeletedInCompany(actor.companyId, authorIds, now),
       orderIds.length === 0
         ? Promise.resolve(new Map<string, string>())
         : deps.orders.findNumberTexts(actor.companyId, orderIds),
+      deliveryRefs.length === 0
+        ? Promise.resolve(new Map<string, readonly string[]>())
+        : deps.deliveryCustomers.findCustomerIds(actor.companyId, deliveryRefs),
     ]);
     const displayNames = new Map(refs.map((ref) => [ref.id, ref.displayName] as const));
 
+    const customerIds = [...new Set([...customerIdsByMovement.values()].flat())];
+    const customers =
+      customerIds.length === 0 ? [] : await deps.customers.findRefsIncludingDeleted(customerIds, actor.companyId);
+    const customerNames = new Map(
+      customers.map((customer) => [customer.id, `${customer.firstNames} ${customer.lastNames}`] as const),
+    );
+
+    const namesOf = (movementId: string): readonly string[] =>
+      (customerIdsByMovement.get(movementId) ?? [])
+        .map((id) => customerNames.get(id) ?? id)
+        .sort((a, b) => a.localeCompare(b, 'es'));
+
+    // Campo a campo: las referencias a la entrega son de la persistencia y no salen del caso de uso.
     return movements.map((movement) => ({
-      ...movement,
+      id: movement.id,
+      kind: movement.kind,
+      quantity: movement.quantity,
+      reason: movement.reason,
+      createdAt: movement.createdAt,
+      previousStock: movement.previousStock,
+      countedStock: movement.countedStock,
       authorName:
         movement.authorName === null
           ? null
@@ -90,6 +141,8 @@ export function createListBatchMovements(
         movement.orderNumberText === null
           ? null
           : (orderNumbers.get(movement.orderNumberText) ?? movement.orderNumberText),
+      customerNames:
+        movement.kind === 'direct_delivery' || movement.kind === 'direct_delivery_void' ? namesOf(movement.id) : null,
     }));
   };
 }

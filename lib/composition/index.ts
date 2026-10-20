@@ -131,8 +131,15 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import { createFinishedBatchLabels } from '@/lib/modules/inventario/adapters/driven/persistence/finished-batch-labels-prisma';
-import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
-import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
+import {
+  createFinishedGoodsDirectDispatch,
+  createFinishedGoodsDispatch,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
+import {
+  findDeliverableBatches,
+  findForDelivery,
+  findSurplusBases,
+} from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
   findAliveFinishedProduct,
@@ -327,6 +334,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
+  findCustomerIdsForMovements,
   listDeliveryLinesByBatchIds,
   summarizeDeliveredByBatchIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
@@ -353,6 +361,23 @@ import {
   createFinishedGoodsReturn,
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma';
 import type { OrderDeliveryVoidUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-void-unit-of-work';
+import {
+  createDeliverDirect,
+  createGetDirectDelivery,
+  createGetDirectDeliveryForVoid,
+  createListDirectDeliverySurplus,
+  createVoidDirectDelivery,
+} from '@/lib/modules/pedidos';
+import type {
+  DirectDeliveryUnitOfWork,
+  DirectDeliveryVoidUnitOfWork,
+} from '@/lib/modules/pedidos/ports/direct-delivery-unit-of-work';
+import {
+  createDirectDeliveryRepository,
+  createWaitingOrdersLock,
+  createWaitingOrdersReader,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma';
+import type { DeliveryCustomerDirectory, FinishedProductDeliveryCatalog } from '@/lib/modules/inventario';
 import {
   createRecipeExecutionReader,
   findAliveRecipeByNormalizedName,
@@ -472,7 +497,6 @@ import {
   createListConditionedOrders,
   createGetConditioningOrder,
   createListConditioningTeamCandidates,
-  createListDeliveredConditionedOrders,
   createSaveConditioningBatchData,
   createRequestEvidenceUpload,
   createRegisterEvidence,
@@ -525,6 +549,15 @@ import {
   createCompanyMembershipReader,
   createCompanyRepository,
 } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
+import {
+  createCreateAdministrator,
+  createDeleteAdministrator,
+  createGetAdministrator,
+  createListAdministrators,
+  createResendAdministratorLink,
+  createUpdateAdministrator,
+} from '@/lib/modules/identity';
+import { createAdministratorRepository } from '@/lib/modules/identity/adapters/driven/persistence/administrator-prisma';
 import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma';
 import {
   createGetCompanyAddons,
@@ -844,6 +877,7 @@ const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAlive
 const companyRepository = createCompanyRepository();
 const companyAddonRepository = createCompanyAddonRepository();
 const companyMembershipReader = createCompanyMembershipReader();
+const administratorRepository = createAdministratorRepository();
 
 // `orders` es de `pedidos`: `identity` solo ve el puerto.
 const companyOpenOrdersCounter: CompanyOpenOrdersCounter = {
@@ -999,6 +1033,27 @@ export const identity = {
   getCompanyAddons: createGetCompanyAddons({ addons: companyAddonRepository }),
   setCompanyAddon: createSetCompanyAddon({ addons: companyAddonRepository }),
   setAllCompanyAddons: createSetAllCompanyAddons({ addons: companyAddonRepository }),
+  // Operaciones de plataforma sobre los Administradores de cualquier empresa: el actor no lleva
+  // empresa.
+  listAdministrators: createListAdministrators({
+    administrators: administratorRepository,
+    log: identityListQueryLog,
+  }),
+  getAdministrator: createGetAdministrator({ administrators: administratorRepository }),
+  createAdministrator: createCreateAdministrator({
+    administrators: administratorRepository,
+    secrets: credentialSetupSecrets,
+    links: credentialSetupLinkRepository,
+    mailer: credentialSetupMailer,
+  }),
+  updateAdministrator: createUpdateAdministrator({ administrators: administratorRepository }),
+  deleteAdministrator: createDeleteAdministrator({ administrators: administratorRepository }),
+  resendAdministratorLink: createResendAdministratorLink({
+    administrators: administratorRepository,
+    secrets: credentialSetupSecrets,
+    links: credentialSetupLinkRepository,
+    mailer: credentialSetupMailer,
+  }),
 } as const;
 
 /**
@@ -1053,6 +1108,8 @@ const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
   listDeliveryLines: listDeliveryLinesByBatchIds,
   summarizeDelivered: summarizeDeliveredByBatchIds,
 };
+
+const deliveryCustomerDirectory: DeliveryCustomerDirectory = { findCustomerIds: findCustomerIdsForMovements };
 
 const finishedDistributionDirectory: FinishedDistributionDirectory = {
   listPackedLines: listPackedLinesByCombination,
@@ -1187,6 +1244,10 @@ export const inventario = {
     products: productRepository,
     people: assignmentDirectoryPrisma,
     orders: orderNumberDirectory,
+    deliveryCustomers: deliveryCustomerDirectory,
+    customers: {
+      findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
+    },
   }),
   listOrderBatches: createListOrderBatches({ finishedOrders: finishedOrderRepository }),
   listFinishedStock: createListFinishedStock({
@@ -1634,6 +1695,32 @@ const orderDeliveryVoidUnitOfWork: OrderDeliveryVoidUnitOfWork = {
     ),
 };
 
+const finishedProductDeliveryCatalog: FinishedProductDeliveryCatalog = { findForDelivery, findSurplusBases };
+
+/** La entrega sin pedido y la salida de `inventario` confirman o se deshacen juntas. */
+const directDeliveryUnitOfWork: DirectDeliveryUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        deliveries: createDirectDeliveryRepository(tx),
+        waiting: createWaitingOrdersReader(tx),
+        waitingLock: createWaitingOrdersLock(tx),
+        finishedGoods: createFinishedGoodsDirectDispatch(tx),
+      }),
+    ),
+};
+
+/** La anulacion sin pedido y la devolucion a `inventario` confirman o se deshacen juntas. */
+const directDeliveryVoidUnitOfWork: DirectDeliveryVoidUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        voids: createOrderDeliveryVoidRepository(tx),
+        finishedGoods: createFinishedGoodsReturn(tx),
+      }),
+    ),
+};
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1741,6 +1828,29 @@ export const pedidos = {
     unitOfWork: orderDeliveryVoidUnitOfWork,
     voids: createOrderDeliveryVoidRepository(),
     orders: orderRepository,
+  }),
+  getDirectDelivery: createGetDirectDelivery({
+    catalog: finishedProductDeliveryCatalog,
+    waiting: createWaitingOrdersReader(),
+  }),
+  listDirectDeliverySurplus: createListDirectDeliverySurplus({
+    catalog: finishedProductDeliveryCatalog,
+    waiting: createWaitingOrdersReader(),
+  }),
+  deliverDirect: createDeliverDirect({
+    customerCatalog,
+    catalog: finishedProductDeliveryCatalog,
+    unitOfWork: directDeliveryUnitOfWork,
+    deliveries: createDirectDeliveryRepository(),
+  }),
+  getDirectDeliveryForVoid: createGetDirectDeliveryForVoid({
+    voids: createOrderDeliveryVoidRepository(),
+    catalog: finishedProductDeliveryCatalog,
+    customerCatalog,
+  }),
+  voidDirectDelivery: createVoidDirectDelivery({
+    unitOfWork: directDeliveryVoidUnitOfWork,
+    voids: createOrderDeliveryVoidRepository(),
   }),
 } as const;
 
@@ -2188,15 +2298,6 @@ export const asignaciones = {
     groups: workGroupDirectory,
     now: () => new Date(),
   }),
-  listDeliveredConditionedOrders: createListDeliveredConditionedOrders({
-    orders: orderCatalog,
-    assignments: orderAssignmentRepository,
-    recipes: recipeCatalog,
-    people: peopleDirectory,
-    presentations: presentationCatalog,
-    units: unitCatalog,
-    now: () => new Date(),
-  }),
   saveConditioningBatchData: createSaveConditioningBatchData({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
@@ -2641,10 +2742,12 @@ const secretDigest: SecretDigest = secretDigestSha256;
 import {
   createCreateWhatsappConnection,
   createGetWhatsappConnection,
+  createReceiveWhatsappWebhook,
   createRegenerateWhatsappVerifyToken,
   createSetWhatsappConnectionEnabled,
   createTestWhatsappConnection,
   createUpdateWhatsappConnection,
+  createVerifyWhatsappWebhook,
 } from '@/lib/modules/integraciones';
 import { integrationsE2EDoublesEnabled } from '@/lib/modules/integraciones/adapters/driven/config/e2e-doubles-env';
 import { readPublicBaseUrl } from '@/lib/modules/integraciones/adapters/driven/config/public-base-url-env';
@@ -2654,12 +2757,20 @@ import {
   findLiveWhatsappConnection,
   findLiveWhatsappConnectionById,
   insertWhatsappConnection,
+  recordWhatsappWebhookHandshake,
   updateLiveWhatsappConnection,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma';
+import { recordWhatsappInbound } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma';
+import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
+import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
+import type { IntegrationsSwitch } from '@/lib/modules/integraciones/ports/integrations-switch';
 import type { RandomSource } from '@/lib/modules/integraciones/ports/random-source';
+import type { WebhookSignature } from '@/lib/modules/integraciones/ports/webhook-signature';
 import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository';
 import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client';
+import type { WhatsappInboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-inbox-repository';
+import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory';
 import { whatsappWebhookPath } from '@/lib/shared/routes';
 
 /** El doble se elige en cada llamada: la variable puede cambiar dentro del mismo proceso. */
@@ -2675,6 +2786,7 @@ const whatsappConnectionRepository: WhatsappConnectionRepository = {
   findLiveById: findLiveWhatsappConnectionById,
   create: insertWhatsappConnection,
   update: updateLiveWhatsappConnection,
+  recordWebhookHandshake: recordWhatsappWebhookHandshake,
 };
 
 const randomSource: RandomSource = randomSourceNode;
@@ -2685,6 +2797,25 @@ const whatsappDeps = {
   cipher: secretCipher,
   digest: secretDigest,
   random: randomSource,
+};
+
+const whatsappWebhookDirectory: WhatsappWebhookDirectory = { companyOfConnection: companyOfWhatsappConnection };
+const whatsappInboxRepository: WhatsappInboxRepository = { record: recordWhatsappInbound };
+const webhookSignature: WebhookSignature = webhookSignatureHmac;
+/** La clave del anadido vive aqui, no en el modulo. */
+const integrationsSwitch: IntegrationsSwitch = {
+  isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'integraciones'),
+};
+
+/** Sin Graph ni cola: recibir un webhook no llama hacia fuera. */
+const whatsappWebhookDeps = {
+  directory: whatsappWebhookDirectory,
+  integrations: integrationsSwitch,
+  connections: whatsappConnectionRepository,
+  digest: secretDigest,
+  cipher: secretCipher,
+  signature: webhookSignature,
+  inbox: whatsappInboxRepository,
 };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
@@ -2791,6 +2922,8 @@ export const integraciones = {
   getAiProviderStatus: createGetAiProviderStatus(aiProviderDeps),
   resolveAiProviderForReading: createResolveAiProviderForReading(aiProviderDeps),
   reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
+  verifyWhatsappWebhook: createVerifyWhatsappWebhook(whatsappWebhookDeps),
+  receiveWhatsappWebhook: createReceiveWhatsappWebhook(whatsappWebhookDeps),
 } as const;
 
 import {

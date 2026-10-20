@@ -199,6 +199,14 @@ function exactText(value: string): RegExp {
   return new RegExp(`^\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
 }
 
+/**
+ * La fecha de vencimiento EXACTA de la celda, que lleva detras sus dias relativos entre parentesis
+ * («2027-10-16 (vence en 365 días)»): la fecha no puede casar con el prefijo de otra.
+ */
+function exactExpiryDate(value: string): RegExp {
+  return new RegExp(`^\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s*\\([^)]*\\))?\\s*$`);
+}
+
 function seeded(): Seeded {
   if (fixture === null) throw new Error('el fixture no existe: falló el beforeAll');
   return fixture;
@@ -444,10 +452,11 @@ async function expectAdminSeesBatchData(
 
       const sheet = page.getByTestId(BATCHES_SHEET_TESTID);
       await expect(sheet).toBeVisible({ timeout: 60_000 });
-      const batch = sheet.getByTestId(`product-batch-${line.batchId}`);
+      // La fila del lote en la tabla del panel; su tarjeta (oculta en un panel ancho) repite celdas.
+      const batch = sheet.getByTestId(`${TABLE_ROW_TESTID_PREFIX}${line.batchId}`);
       await expect(batch).toBeVisible({ timeout: 60_000 });
       await expect(batch.getByTestId(BATCH_LOT_TESTID)).toHaveText(exactText(input.lot));
-      await expect(batch.getByTestId(BATCH_EXPIRY_TESTID)).toHaveText(exactText(input.expiryDate));
+      await expect(batch.getByTestId(BATCH_EXPIRY_TESTID)).toHaveText(exactExpiryDate(input.expiryDate));
     }
   } finally {
     await context.close();

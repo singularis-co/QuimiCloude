@@ -8,7 +8,7 @@ import { TableSkeleton } from '@/components/shared/table-skeleton';
  * este esqueleto lo renderiza un Server Component. Un test ata esta constante a
  * `ORDER_COLUMNS.length`.
  */
-export const ORDER_SKELETON_COLUMN_COUNT = 13;
+export const ORDER_SKELETON_COLUMN_COUNT = 12;
 
 export function OrderListSkeleton({ rows }: { readonly rows: number }) {
   return (

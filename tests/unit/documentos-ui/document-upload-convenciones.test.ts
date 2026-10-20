@@ -103,9 +103,9 @@ describe('lo que la pieza de subida NO trae', () => {
       CODIGO_DEL_COMPONENTE.flatMap(({ codigo }) => importesDe(codigo)).filter(esPaquete),
     );
 
-    // `react` para el sondeo (`useEffect` + `setTimeout`) y `next/link` para el enlace de
-    // revision opcional: nada mas.
-    expect([...paquetes].sort()).toEqual(['next/link', 'react']);
+    // `react` para el sondeo (`useEffect` + `setTimeout`) y `lucide-react` para los iconos, ya
+    // en el stack; el enlace de revision llega por `ArrowLink`: nada mas.
+    expect([...paquetes].sort()).toEqual(['lucide-react', 'react']);
 
     const manifiesto = JSON.parse(leer('package.json')) as {
       dependencies: Record<string, string>;

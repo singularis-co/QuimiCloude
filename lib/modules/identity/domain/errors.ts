@@ -439,3 +439,12 @@ export class CompanyNotDeletedError extends IdentityError {
     super('company_not_deleted', diagnostic);
   }
 }
+
+/** Dar de baja al unico Administrador vivo de su empresa: primero hay que crear otro. */
+export class CompanyLastAdministratorError extends IdentityError {
+  readonly code = 'company_last_administrator';
+
+  constructor(diagnostic?: string) {
+    super('company_last_administrator', diagnostic);
+  }
+}

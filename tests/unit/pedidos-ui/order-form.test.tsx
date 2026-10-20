@@ -864,6 +864,7 @@ describe('formulario de edicion de pedido (R7, R28, R34)', () => {
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(screen.getByTestId('order-error-quantity')).toBeInTheDocument());
+    expect(screen.getByTestId('order-error-quantity')).toHaveTextContent('Ingresa un número mayor a 0.');
     expect(updateOrderActionMock).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
   });
