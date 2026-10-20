@@ -422,14 +422,19 @@ Toda diferencia de paridad que no esté aquí es un fallo de la tanda:
 
 | Archivo | Cambio | Requisito |
 | --- | --- | --- |
-| `tests/unit/paridad/recetas-paridad.test.tsx` (+ `.snap`) | cabecera con `PageHeader` y `ArrowLink`; columnas alineadas; `actionsColumn({ menu })` y tarjetas; formulario en tarjetas, pestañas con contador, pasos en tarjeta, pie fijo, sección de versiones al costado; marcas con `StatusBadge`; revisión de importación | R1–R5, R10–R17, R30–R43 |
-| `tests/unit/paridad/acciones-por-fila.test.tsx` (+ `.snap`) | menú de recetas con separador; un diálogo por tabla | R3, R4 |
-| `tests/unit/paridad/confirmaciones-paridad.test.tsx` (+ `.snap`) | solo los casos de borrar receta o versión y de propagar; *enmienda (E16):* + icono en los dos borrados | R27–R29, R50 |
+| `tests/unit/paridad/recetas-paridad.test.tsx` (+ `.snap`) | cabecera con `PageHeader` y `ArrowLink`; columnas alineadas; `actionsColumn({ menu })` y tarjetas; formulario en tarjetas, pestañas con contador, pasos en tarjeta, pie fijo, sección de versiones al costado; marcas con `StatusBadge`; *real (tanda 1):* + el diálogo de subida de PDFs (T1c), la misma pieza que `catalogo-paridad` (P1) | R1–R5, R7–R17, R30–R43 |
+| `tests/unit/paridad/acciones-por-fila.test.tsx` (+ `.snap`) | ninguno: el snapshot quedó igual y pasa (*real:* se suponía el menú de recetas con separador y un diálogo por tabla) | — |
+| `tests/unit/paridad/confirmaciones-paridad.test.tsx` (+ `.snap`) | solo los casos de borrar receta o versión; *enmienda (E16):* + icono en los dos borrados | R50 |
 | `tests/unit/paridad/catalogo-paridad.test.tsx` (+ `.snap`) | solo el diálogo de subida del detalle de proveedor (P1) | R7–R9 |
 | `tests/unit/paridad/buscadores-paridad.test.tsx` | ninguno esperado; se lista porque monta el selector de producto de la ruta | — |
 
 La tanda 0 no regenera nada; cada snapshot se actualiza en la tanda que cambia la pantalla y el commit
 cita la fila.
+
+**Decisión humana (Carlos Restrepo, 2026-10-19, `progress/features/QC-264.md > Tandas`):** esta
+sección suponía tres snapshots nuevos que no se dan de alta, porque los cubren los tests nuevos de la
+feature: propagar, en `confirmaciones-paridad` (R27–R29), y revisión de importación y formulario con
+datos, en `recetas-paridad`. Su ausencia no es un fallo de la tanda.
 
 ## 7. Tests y E2E que se tocan (barrido con grep, 2026-10-13)
 
