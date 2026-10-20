@@ -3,6 +3,9 @@
 > Zona: `backend` · Complejidad: `medium` · depends_on: QC-237, QC-238 · Rama:
 > `feature/QC-242-plantillas-whatsapp-backend`
 >
+> **Enmienda 2 — 2026-10-20 (tarde), constantes del front (R87–R96): §19.** Cambia §18.2, §18.3,
+> §18.4, §18.6, §18.7 y §3.4 donde lo dice §19.
+>
 > **Enmienda 2026-10-20 (diccionario de variables, R53–R86): §18.** §1–§17 describen lo implementado
 > en el PR #281 y siguen valiendo; donde §18 cambia algo de ellas, lo dice con la sección afectada
 > (§3.3, §3.4, §4.3, §4.4, §4.5, §4.6, §5, §9, §11, §12).
@@ -1134,6 +1137,8 @@ migración. Sin filas de permisos nuevas.
 
 ### 18.4 Dominio: constantes y variables propias — R53–R55, R60
 
+> **[La parte de constantes queda derogada por §19.2: no hay catálogo en el backend.]**
+
 **Constantes (`domain/whatsapp-system-variables.ts`)**, lista inicial de [P11]:
 
 ```ts
@@ -1544,3 +1549,74 @@ R76 reutiliza `action_not_allowed` (ya existe).
 ### 18.13 Dependencias y entorno
 
 Ninguna (R52). `jsonb_path_exists` es de Postgres 12+, ya en uso por Supabase. Ninguna variable nueva.
+
+---
+
+## 19. Enmienda 2 — 2026-10-20 (tarde): las constantes las define el front (R87–R96)
+
+Decisiones F1–F4 y propuestas [P19]–[P22] en `requirements.md > Enmienda 2`.
+
+### 19.1 Lo que ya existe (sin commit en el worktree, hecho sobre §18)
+
+| Archivo | Tarea | Qué hay | Qué cambia |
+|---|---|---|---|
+| `db/migrations/20261020180000_whatsapp_variable_keys/{migration,down}.sql`, `db/schema.prisma` | T22 | `system_key` con `CHECK` de forma sin punto; `whatsapp_variable_keys_key_format` sin punto | Solo el `CHECK` `whatsapp_template_variables_system_key_format` pasa a la forma de constante de §19.2; el de la clave propia ya es correcto (no admite punto). El comentario del modelo en `schema.prisma` deja de decir «constante del catálogo». La columna se queda: guarda la clave de constante tal cual |
+| `lib/modules/integraciones/domain/whatsapp-system-variables.ts` | T24 | Catálogo `WHATSAPP_SYSTEM_VARIABLES`, `systemVariableOf` | **Se borra**, con su export en `index.ts` y sus casos de test (R87) |
+| `domain/whatsapp-variable-key.ts` | T24 | `WHATSAPP_VARIABLE_KEY_PATTERN`, validador, `WhatsappDictionaryEntryView` con `kind: 'system' \| 'company'` | Gana `WHATSAPP_CONSTANT_KEY_PATTERN` e `isConstantKey`/`isOwnKey` (R88); la vista del diccionario pierde la rama `system` (R90). El validador de la propia ya rechaza el punto |
+| `domain/whatsapp-template-variables.ts` | T25 | Huecos, `mappingStatusOf`, `componentsChanged`, `showKeys`; binding `kind: 'system'` | `variableSlotsOf` da `null` (no relacionable) si un texto trae una marca que no es `{{n}}` (R95, [P21]). El binding `system` se queda: es la relación a una constante, solo cambia de dónde sale |
+| `domain/whatsapp-template-keyed-draft.ts` | T25 | `DictionaryEntry` con constantes del catálogo; etiqueta como ejemplo | El diccionario son solo propias; cada clave se clasifica por su forma (§19.3); las constantes toman la etiqueta de `constantLabels` ([P20]) |
+| 5 códigos de error | T23 | `whatsapp_variable_key_not_found`, `_taken`, `_in_use`, `whatsapp_template_not_mapped`, `whatsapp_template_not_mappable` | **Se mantienen los cinco** con su texto. `_taken` ahora solo salta entre propias (R89) |
+| `tests/integration/integraciones/whatsapp-template-migration.int.test.ts` | T9 (QC-242 original) | Fija los índices y `CHECK` exactos de `whatsapp_templates` | Sus dos casos de lista exacta fallan desde T22, porque la migración nueva añade `whatsapp_templates_company_id_id_key` y `whatsapp_templates_enabled_requires_mapped`. Los actualiza **T36**: es una consecuencia de esa migración, no un relajamiento |
+
+### 19.2 Forma de las claves (R88)
+
+```ts
+export const WHATSAPP_VARIABLE_KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;                          // propia
+export const WHATSAPP_CONSTANT_KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}\.[a-z][a-z0-9_]{0,39}$/;    // entidad.campo
+```
+
+Exactamente dos segmentos. En la base, `CHECK ("system_key" IS NULL OR "system_key" ~
+'^[a-z][a-z0-9_]{0,39}\.[a-z][a-z0-9_]{0,39}$')`. Una propia nunca casa con la de constante ni al
+revés: no hay choque posible y R56 deja de necesitar «la clave de una constante» (R89).
+
+### 19.3 Clasificar una clave (R91, R93)
+
+`classifyKey(key, ownByKey)`:
+1. Casa con la forma de constante ⇒ `{ kind: 'system', systemKey: key }`. No se consulta nada (F1).
+2. Casa con la forma propia y está en `ownByKey` ⇒ `{ kind: 'company', variableKeyId }`.
+3. Casa con la forma propia y no está ⇒ clave desconocida ([P19]): `unknown_key` en el borrador,
+   `WhatsappVariableKeyNotFoundError` al relacionar.
+4. Ninguna forma ⇒ `invalid_variable` en el borrador, `ValidationError` al relacionar.
+
+Con todos los huecos relacionados, `mappingStatusOf` da `MAPPED` (F2): no cambia.
+
+### 19.4 Crear (cambia §18.6 y §18.7 «Crear»)
+
+`createWhatsappTemplateAction(draft)`: el borrador gana `constantLabels?: Record<string, string>`
+([P20]). `validateKeyedTemplateDraft(input, ownEntries)`: ejemplo de una constante =
+`constantLabels[key]`; si falta o está vacía ⇒ problema `example_missing` en el campo donde aparece la
+clave (R92). No se valida su largo (E15). Las etiquetas de constantes no se guardan.
+
+### 19.5 Listar, vista y `contentOf`
+
+- `createListWhatsappDictionary` devuelve solo propias (R90); `countSystemKeyUsage` sale del puerto.
+- Vista (R94): una relación a constante sale con `kind: 'system'`, la clave y `label: null`.
+- `contentOf` (§3.4, R96, [P22]): el `example` del botón URL se acepta como `string` o `string[]`; con
+  lista se toma el primero. `componentsChanged` compara el contenido, así que las dos formas no
+  cuentan como cambio. Test nuevo en `whatsapp-template-components.test.ts`.
+
+### 19.6 Fronteras (F3)
+
+Al enviar, QC-245 y QC-247 reciben del front los valores de las constantes ya resueltos y completan las
+propias con su `value`. La función que arma los parámetros posicionales es de esas fichas; esta deja
+los datos: los huecos con su clave y tipo (R81) y el valor de cada propia (R90). QC-243 define el
+catálogo de constantes en el front y manda `constantLabels` al crear.
+
+### 19.7 Alternativas descartadas
+
+1. **Mantener el catálogo en el backend** (§18.4): el humano lo descarta (F1); además duplicaría en
+   dos sitios las claves que el front ya conoce.
+2. **Guardar la etiqueta de la constante en la relación**: la vista podría devolverla, pero sería una
+   copia del front que se queda vieja si el front la cambia.
+3. **Constantes sin punto, distinguidas solo por no existir como propia** ([P19], alternativa): una
+   propia creada más tarde con esa clave cambiaría el sentido de relaciones ya guardadas.

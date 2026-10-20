@@ -10,6 +10,11 @@
 > del spec **[P10]–[P18]**: P10, P11, P13, P14, P16 y P18 aprobadas por el humano el 2026-10-20 (en
 > la tabla de decisiones de la enmienda); P12, P15 y P17 retiradas.
 >
+> **Enmienda 2 — 2026-10-20 (tarde), las constantes las define el front.** Rango nuevo: **R87–R96** y
+> **T36–T40**. Reemplaza R53, R55, R56, R60 y R66; cambia R67, R74, R75 y R81 (cada uno lleva su
+> marca); reemplaza P10 y retira P11. Decisiones F1–F4 cerradas; propuestas **[P19]–[P22]**
+> pendientes.
+>
 > **Alcance** (ficha de Jira QC-242, copiada sin cambios de fondo). El Administrador puede crear
 > plantillas de mensaje en Meta desde la app, ver su estado de aprobación y eliminarlas. La app guarda
 > una copia local que se mantiene al día por webhook y por sincronización (automática y manual). Esta
@@ -338,13 +343,13 @@ quedan descartadas (`design.md > 18.12`).
 | E13 | **Habilitar no exige `APPROVED`.** «Habilitada» es solo un indicador interno de que la plantilla tiene disponible la fuente de los datos de todas sus variables; el estado de Meta va aparte. | R77 |
 | E14 | **El valor de una variable propia es obligatorio** y no vacío, con **como mucho 50 caracteres**, fijo (no depende de Meta). 50 cabe en el límite de todos los componentes de esta fase (header 60, body 1024, URL 2000). | R54 |
 | E15 | **El ejemplo que se manda a Meta al crear es la etiqueta** de la entrada relacionada, para las constantes y para las variables propias. El usuario no escribe ejemplos y no hay campo de ejemplo aparte. Si la etiqueta excede algún límite de Meta para el ejemplo, la app la deja pasar; si Meta rechaza, se traduce su error como los demás (R19). | R53, R67 |
-| P10 (2026-10-20) | Claves de constantes y propias con la misma forma, `^[a-z][a-z0-9_]*$`, de 1 a 40 caracteres; una propia no puede usar la clave de una constante. Quien añada una constante nueva comprueba antes en los datos que ninguna propia usa esa clave. Etiqueta de 1 a 60, sin exigir que sea única. Los 40 y 60 son del spec, no de Meta. Aprobado por el humano como propuesta. | R54, R56, R66 |
-| P11 (2026-10-20) | Lista inicial de constantes: `nombre` («Nombre del cliente», del cliente), `pedido_numero` («Número de pedido», del pedido) y `empresa_nombre` («Nombre de la empresa», `Company.name`). Esta ficha declara el catálogo (clave, etiqueta, de qué dato sale) y lo expone en el contrato; el resolvedor que lee el dato real lo implementa la ficha que envía (QC-245, QC-247). Aprobado por el humano como propuesta. Quedan abiertos los dos datos que el spec no propuso (ver «Preguntas abiertas»). | R53, R55 |
+| P10 (2026-10-20) | **[Reemplazada por F4 / R88.]** Claves de constantes y propias con la misma forma, `^[a-z][a-z0-9_]*$`, de 1 a 40 caracteres; una propia no puede usar la clave de una constante. Quien añada una constante nueva comprueba antes en los datos que ninguna propia usa esa clave. Etiqueta de 1 a 60, sin exigir que sea única. Los 40 y 60 son del spec, no de Meta. Aprobado por el humano como propuesta. | R54, R56, R66 |
+| P11 (2026-10-20) | **[Retirada por F1: las constantes las decide el front.]** Lista inicial de constantes: `nombre` («Nombre del cliente», del cliente), `pedido_numero` («Número de pedido», del pedido) y `empresa_nombre` («Nombre de la empresa», `Company.name`). Esta ficha declara el catálogo (clave, etiqueta, de qué dato sale) y lo expone en el contrato; el resolvedor que lee el dato real lo implementa la ficha que envía (QC-245, QC-247). Aprobado por el humano como propuesta. Quedan abiertos los dos datos que el spec no propuso (ver «Preguntas abiertas»). | R53, R55 |
 | P13 (2026-10-20) | Etiqueta y valor de una variable propia se pueden modificar aunque esté en uso; el valor nuevo vale desde el siguiente envío. Aprobado por el humano como propuesta. | R57 |
 | P14 (2026-10-20) | Quitar una relación a una plantilla habilitada la deja «sin relacionar» y la deshabilita sola, igual que E12. Aprobado por el humano como propuesta. | R72 |
 | P16 (2026-10-20) | Una plantilla no relacionable (header con archivo, botones de otro tipo, OTP) queda siempre «sin relacionar», aunque no tenga variables, y nunca se habilita. El sistema no sabe enviar esos componentes. Aprobado por el humano como propuesta. | R64, R65 |
 | P18 (2026-10-20) | Desde la app solo se crea con claves; un `{{1}}` en el borrador es inválido. Así toda plantilla creada nace relacionada (E5). Aprobado por el humano como propuesta. | R66 |
-| E16 | **Flujo canónico**: a Meta se le envía siempre el texto posicional (`Hola {{1}}`); en el mapeo de la plantilla se guarda `1 = nombre`; `nombre` es una constante del sistema que el código resuelve al enviar con el nombre del cliente (`cliente.name`). Una variable propia (p. ej. `cuenta_numero`) se resuelve con su valor guardado. | R53, R64, R67, R68, R81 |
+| E16 | **[El ejemplo canónico y quién resuelve las constantes cambian: Enmienda 2, F1–F3.]** **Flujo canónico**: a Meta se le envía siempre el texto posicional (`Hola {{1}}`); en el mapeo de la plantilla se guarda `1 = nombre`; `nombre` es una constante del sistema que el código resuelve al enviar con el nombre del cliente (`cliente.name`). Una variable propia (p. ej. `cuenta_numero`) se resuelve con su valor guardado. | R53, R64, R67, R68, R81 |
 
 **Requisitos de R1–R52 que cambian** (el texto original se queda en su sitio con una marca; aquí, qué
 cambia):
@@ -378,7 +383,7 @@ borrador (R46: contenido no vacío). «Estado del mapeo» es «sin relacionar» 
 
 ### Diccionario de variables
 
-**R53.** El diccionario de una empresa DEBE estar formado por las **constantes del sistema**,
+**R53.** **[Reemplazado por R87 y R88 (F1, F4).]** El diccionario de una empresa DEBE estar formado por las **constantes del sistema**,
 declaradas en el código con clave, etiqueta y el dato del que sale su valor, iguales para todas las
 empresas y sin valor guardado, más las **variables propias** que guarda la empresa con
 clave, etiqueta y valor fijo; la base DEBE rechazar dos variables propias con la misma clave en la
@@ -391,10 +396,10 @@ distinto de minúsculas `a-z`, dígitos y `_` o supera 40 caracteres, SI la etiq
 la variable DEBE ser inválida, y crear o modificar DEBE rechazar con `invalid_input` sin escribir.
 **[P10]** (valor: E14)
 
-**R55.** Las constantes del sistema NO DEBEN poder crearse, modificarse ni eliminarse desde la app, y
+**R55.** **[Reemplazado por R87 (F1).]** Las constantes del sistema NO DEBEN poder crearse, modificarse ni eliminarse desde la app, y
 su vista NO DEBE traer id ni valor.
 
-**R56.** CUANDO el Administrador crea una variable propia válida, el sistema DEBE guardarla en su
+**R56.** **[Reemplazado por R89 (F1, F4).]** CUANDO el Administrador crea una variable propia válida, el sistema DEBE guardarla en su
 empresa y devolver su vista; SI su clave ya está en el diccionario de la empresa (propia o constante),
 ENTONCES DEBE rechazar con `whatsapp_variable_key_taken` sin escribir.
 
@@ -409,7 +414,7 @@ está relacionada, ENTONCES DEBE rechazar con `whatsapp_variable_key_in_use` sin
 de una plantilla viva, el sistema DEBE borrarla; SI lo está, ENTONCES DEBE rechazar con
 `whatsapp_variable_key_in_use` sin borrar nada.
 
-**R60.** CUANDO el Administrador lista el diccionario, el sistema DEBE devolver las constantes del
+**R60.** **[Reemplazado por R90 (F1).]** CUANDO el Administrador lista el diccionario, el sistema DEBE devolver las constantes del
 sistema y las variables propias de su empresa ordenadas por clave, cada una con exactamente su tipo
 (constante o propia), id, clave, etiqueta, valor y cuántas plantillas vivas la usan.
 
@@ -439,13 +444,13 @@ relaciones o sus componentes. **[P16]**
 
 ### Crear con claves
 
-**R66.** El borrador de creación DEBE escribir las variables como `{{clave}}`, con la clave de una
+**R66.** **[Reemplazado por R91 (F2, F4).]** El borrador de creación DEBE escribir las variables como `{{clave}}`, con la clave de una
 constante o de una variable propia; SI contiene una marca `{{…}}` cuyo interior no tiene el formato de
 una clave (incluido `{{1}}`), ENTONCES el borrador DEBE ser inválido, y SI nombra una clave que no está
 en el diccionario de la empresa, ENTONCES DEBE ser inválido con un problema propio de clave
 desconocida en ese campo. **[P18]**
 
-**R67.** CUANDO se valida o se crea un borrador con claves, el sistema DEBE traducir, en cada
+**R67.** **[Cambia el ejemplo de las constantes: R92.]** CUANDO se valida o se crea un borrador con claves, el sistema DEBE traducir, en cada
 componente por separado, cada clave distinta a `{{n}}` por orden de primera aparición desde 1 (la misma
 clave repetida en un componente lleva el mismo número), DEBE tomar como ejemplo de cada `{{n}}` la
 etiqueta de su entrada (en un botón URL, la URL con la variable sustituida por esa etiqueta), DEBE
@@ -483,13 +488,13 @@ quitarle sus relaciones y deshabilitarla; los cambios de estado y de categoría 
 
 ### Relacionar las variables de una plantilla
 
-**R74.** CUANDO el Administrador relaciona las variables de una plantilla viva de la conexión viva de
+**R74.** **[Cambia cómo se clasifica cada clave: R93.]** CUANDO el Administrador relaciona las variables de una plantilla viva de la conexión viva de
 su empresa con una lista de pares hueco → clave (de una constante o de una variable propia), el sistema
 DEBE sustituir todas las relaciones de la plantilla por esa lista (un hueco que no viene queda sin
 relación), recalcular su estado del mapeo (R65), no llamar a Meta, no exigir que la conexión esté
 habilitada y devolver la vista de R81.
 
-**R75.** SI al relacionar la plantilla no es relacionable, ENTONCES el sistema DEBE rechazar con
+**R75.** **[La rama de clave desconocida cambia: R93.]** SI al relacionar la plantilla no es relacionable, ENTONCES el sistema DEBE rechazar con
 `whatsapp_template_not_mappable`; SI la lista nombra un hueco que la plantilla no tiene o repite un
 hueco, ENTONCES con `invalid_input`; SI nombra una clave que no está en el diccionario de
 la empresa, ENTONCES con `whatsapp_variable_key_not_found`; SI la plantilla no cumple R45, ENTONCES con
@@ -515,7 +520,7 @@ R68, R69, R70 y R77 habilitan.
 
 ### Listar, consultar y vista
 
-**R81.** La vista de una plantilla (R46) DEBE traer además exactamente: su estado del mapeo, si está
+**R81.** **[La etiqueta de una constante cambia: R94.]** La vista de una plantilla (R46) DEBE traer además exactamente: su estado del mapeo, si está
 habilitada, y la lista de sus huecos, cada uno con su identificador, su número, y el tipo, la clave y
 la etiqueta de su entrada (vacíos si no tiene relación); y en el contenido, cada variable de un hueco
 relacionado DEBE aparecer como `{{clave}}` y la de uno sin relación como `{{n}}`.
@@ -540,6 +545,68 @@ español.
 con el estado del mapeo de R65 y habilitada solo si queda «relacionada» sin huecos (como una
 importada, R70).
 
+## Enmienda 2 — 2026-10-20 (tarde): las constantes las define el front (R87–R96)
+
+Decisión del humano posterior a la aprobación de la enmienda. Cambia lo aprobado solo donde lo dice;
+el resto de R53–R86 sigue. T22–T25 ya están implementadas sin commit sobre la versión anterior: qué
+cambia en cada una está en `tasks.md > Enmienda 2`.
+
+| Id | Decisión del humano (no reabrir) | Cubierta por |
+| --- | --- | --- |
+| F1 | **Las constantes del sistema las define el front; el back solo almacena.** No hay catálogo de constantes en el backend ni se valida contra uno. Reemplaza la parte de E3 y E16 que decía «el código las resuelve» y retira P11. | R87, R90, R94 |
+| F2 | **Al relacionar un `{{n}}`, el back acepta cualquier clave con formato válido**: si coincide con una variable propia de la empresa, es una relación a esa propia; si no, se trata como constante del front. Con todas sus variables con clave, la plantilla queda «relacionada». | R91, R93 |
+| F3 | **Al enviar** (QC-245, QC-247): el front manda ya resueltos los valores de las constantes; el back completa las variables propias con su valor guardado. | (frontera: `design.md > 19.6`) |
+| F4 | **Formato**: las constantes llevan punto, `entidad.campo` (`cliente.nombre`, `pedido.numero`); las propias no admiten punto, así que nunca chocan. Reemplaza P10. | R88, R89 |
+
+**Ejemplo canónico, corregido (sustituye al de E16).** La pantalla escribe `Hola {{cliente.nombre}}`.
+A Meta se le envía `Hola {{1}}`. La plantilla guarda `body.1 = cliente.nombre` (constante: el back no
+sabe qué es, solo guarda la clave). Al enviar, el front manda el valor de `cliente.nombre`; una
+propia como `{{cuenta_numero}}` la completa el back con su valor guardado.
+
+**R87.** El sistema DEBE guardar como diccionario solo las variables propias de cada empresa (clave,
+etiqueta y valor) y NO DEBE tener un catálogo de constantes del sistema ni rechazar una constante por
+no estar en uno. (F1)
+
+**R88.** Una clave DEBE ser de una de dos formas: **propia**, una minúscula `a-z` seguida de minúsculas,
+dígitos o `_`, de 1 a 40 caracteres y sin punto; o **constante**, dos segmentos de esa misma forma
+unidos por un punto (`entidad.campo`), cada segmento de 1 a 40 caracteres; cualquier otra cosa NO
+DEBE ser una clave. (F4)
+
+**R89.** SI al crear o modificar una variable propia su clave no tiene la forma propia de R88 (incluida
+una con punto), ENTONCES el sistema DEBE rechazar con `invalid_input`; SI otra variable propia de la
+empresa ya tiene esa clave, ENTONCES con `whatsapp_variable_key_taken`; en los dos casos sin escribir.
+
+**R90.** CUANDO el Administrador lista el diccionario, el sistema DEBE devolver las variables propias de
+su empresa ordenadas por clave, cada una con exactamente id, clave, etiqueta, valor y cuántas plantillas
+vivas la usan.
+
+**R91.** El borrador de creación DEBE escribir las variables como `{{clave}}`; SI una marca `{{…}}` no
+es una clave de R88 (incluido `{{1}}`), ENTONCES el borrador DEBE ser inválido; una clave con forma de
+constante DEBE aceptarse sin consultar ningún catálogo; SI una clave con forma propia no es una
+variable propia de la empresa, ENTONCES el borrador DEBE ser inválido con el problema de clave
+desconocida en ese campo. **[P19]**
+
+**R92.** CUANDO se crea un borrador que usa constantes, el ejemplo de cada `{{n}}` de una constante
+DEBE ser la etiqueta que la petición trae para esa clave, y SI la petición no trae etiqueta para una
+constante usada, ENTONCES el borrador DEBE ser inválido en ese campo; el ejemplo de una propia sigue
+siendo su etiqueta guardada (E15). **[P20]**
+
+**R93.** CUANDO se relacionan las variables de una plantilla, el sistema DEBE tratar cada clave con
+forma de constante como una relación a esa constante y cada clave con forma propia como una relación
+a la variable propia de la empresa con esa clave; SI una clave no tiene la forma de R88, ENTONCES DEBE
+rechazar con `invalid_input`, y SI una clave con forma propia no es una variable propia de la
+empresa, ENTONCES con `whatsapp_variable_key_not_found`, sin escribir. **[P19]** (F2)
+
+**R94.** En la vista (R81), un hueco relacionado con una constante DEBE traer su tipo y su clave, y la
+etiqueta vacía. (F1: la etiqueta la conoce el front.)
+
+**R95.** SI el texto de un componente de una plantilla trae una marca `{{…}}` que no es `{{<entero ≥
+1>}}` (p. ej. una variable con nombre `{{first_name}}`), ENTONCES la plantilla NO DEBE ser
+relacionable (R64), y la migración (R86) DEBE dejarla igual. **[P21]**
+
+**R96.** SI el ejemplo de un botón URL llega de Meta como texto o como lista de textos, ENTONCES el
+contenido de la plantilla (R46) DEBE ser el mismo en los dos casos. **[P22]**
+
 ## Preguntas abiertas
 
 P1–P9 cerradas por el humano el 2026-10-20 (ver «Decisiones cerradas»). Quedan sin confirmar solo
@@ -557,6 +624,27 @@ datos de Meta y de la plataforma, que no cambian la propuesta aprobada:
 El humano aprobó la enmienda el 2026-10-20 («aprobado»): P10, P11, P13, P14, P16 y P18 pasan a
 «Decisiones cerradas» de la enmienda; P12, P15 y P17 se retiraron antes (E14, E15). Queda abierto:
 
+- **Enmienda 2 (propuestas del spec, pendientes de aprobación):**
+  - **[P19] Clave con forma propia que no existe en la empresa** (p. ej. `{{nombre}}` sin variable
+    propia `nombre`). F2 dice «si no coincide con una propia, es constante», pero F4 dice que las
+    constantes llevan punto. Propuesta: se rechaza (clave desconocida al crear,
+    `whatsapp_variable_key_not_found` al relacionar), porque sin punto no puede ser una constante.
+    Alternativa: aceptarla como constante, y entonces las constantes también podrían ir sin punto y F4
+    dejaría de garantizar que no chocan.
+  - **[P20] Etiqueta de una constante al crear.** E15 manda la etiqueta como ejemplo a Meta, pero el
+    back ya no conoce las constantes (F1). Propuesta: la petición de crear trae
+    `constantLabels: { "<clave>": "<etiqueta>" }` con la etiqueta de cada constante usada, y el back la
+    usa como ejemplo sin guardarla. Alternativa: mandar la clave misma (`cliente.nombre`) como ejemplo.
+  - **[P21] Plantilla de Meta con variables con nombre** (`{{first_name}}`). Hoy el dominio no ve
+    huecos y la da por «relacionada», y el relleno SQL la deja «sin relacionar»: no coinciden.
+    Propuesta: no relacionable, siempre «sin relacionar» y nunca habilitada (R95), igual que el relleno.
+    Las variables `NAMED` están fuera de alcance de la ficha.
+  - **[P22] `example` de un botón URL como texto en el `GET`.** El contraste de T26 salió sin bloqueo,
+    salvo que Meta puede devolver ese `example` como texto y no como lista. Propuesta: `contentOf`
+    acepta los dos y toma el primer elemento si es lista (R96); así `componentsChanged` no ve un cambio
+    donde solo cambia la forma.
+- **[P11]** Retirada por F1. Los dos datos que tenía abiertos (`nombre` y `pedido_numero`) los decide
+  el front. Texto anterior, para la historia:
 - **[P11] Dos datos que el spec no propuso** (los dejó como pregunta, no como propuesta; la aprobación
   no los fija, y no se inventan aquí):
   - si la constante `nombre` sale solo de `Customer.firstNames` o de nombres y apellidos
