@@ -1,7 +1,7 @@
 # QC-290 — empaque-con-excedente · design.md
 
 > Zona fullstack · Complejidad high · Requisitos en `requirements.md` (R1–R29). Preguntas abiertas:
-> P2 (bloquea la UI del aviso: R20, R22), P3 (orden de los libres, propuesta en R7), P4 (no bloquea).
+> P2 (bloquea la UI del aviso: R20, R22; se cierra con el pase `/design`). P3 y P4 cerradas el 2026-10-20.
 > Sin dependencias nuevas (R28).
 
 ## Lo que ya existe
@@ -286,7 +286,7 @@ línea.
   presentación, no en cantidad.
 - **A4 — Reparto de los libres que maximice la cantidad libre (búsqueda exhaustiva).** Da el óptimo
   en casos raros donde el orden «mayor contenido primero» no lo da, pero es combinatorio y difícil de
-  explicar al Empacador. Queda como opción si el humano responde otra cosa en P3.
+  explicar al Empacador. Descartada: el humano cerró P3 con «mayor contenido primero» (2026-10-20).
 - **A5 — Mantener `maxPackagesForLine` como umbral del aviso.** El aviso no depende de una línea sino
   del total del pedido; el máximo por línea solo tenía sentido como tope.
 

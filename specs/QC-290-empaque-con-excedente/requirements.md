@@ -61,7 +61,7 @@ Vocabulario de esta ficha (no es implementación, es para que los requisitos se 
   superan su plan de mayor a menor contenido de un envase en la unidad del pedido (a igual
   contenido, en el orden del reparto) y dar a cada una el mayor número entero de libres que cumple
   R6 con lo que quede del excedente tras las anteriores. Lo que quede del excedente por debajo del
-  contenido de un envase sigue siendo del pedido. **Pendiente de confirmar en P3.** [(P1)]
+  contenido de un envase sigue siendo del pedido. [(P1), (P3)]
 - **R8**: CUANDO Terminar se acepta, el sistema DEBE guardar los envases libres de cada línea del
   reparto en esa línea, en la misma transacción que el conteo real y el cambio de estado; SI Terminar
   se rechaza, ENTONCES NO DEBE guardar ninguno (QC-281 R22).
@@ -173,18 +173,6 @@ Vocabulario de esta ficha (no es implementación, es para que los requisitos se 
   (`docs/perfil-agentes.md > Pase de diseño para componentes nuevos`) y el humano fija el texto.
   Bloquea R20 (y R22 si el aviso detalla los libres). Lo abierto: texto y tono, si va por línea o en
   el pie, y si dice cuántos envases quedan libres y de qué presentación.
-- **P3** (spec_author, 2026-10-20): cuando **varias** líneas superan su plan y el excedente no
-  alcanza para dejar libre todo lo que cada una pasó, ¿de cuáles salen los libres? La fila (P1) dice
-  «sale de las líneas que pasaron su plan», pero no el orden. Ejemplo: plan 5×1 L + 1×5 L + 2×2 L
-  (14 L), real 8×1 L + 2×5 L + 0×2 L (18 L), excedente 4 L: con la propuesta de R7 (mayor contenido
-  primero) el 5 L no cabe (5 > 4) y quedan 3 libres de 1 L; el pedido espera 5×1 L + 2×5 L (15 L).
-  Con excedente 5 L (p. ej. real 9×1 L + 2×5 L + 0×2 L = 19 L) la propuesta deja 1 libre de 5 L y
-  0 de 1 L (el pedido espera 9×1 L + 1×5 L = 14 L). Propuesta del spec: R7 tal cual (mayor
-  contenido primero, a igual contenido el orden del reparto): es determinista y el diálogo y el
-  servidor lo calculan igual. Si el humano prefiere otro orden, solo cambia R7.
-- **P4** (spec_author, 2026-10-20, no bloquea): ¿se muestran los envases libres en algún sitio
-  además del aviso del Empacador (tab «Reparto», sheet de entrega)? Este spec **no** los muestra:
-  el sheet ya enseña lo que espera el pedido (R15) y el excedente sin pedido ya se ve en QC-288.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -203,4 +191,7 @@ Vocabulario de esta ficha (no es implementación, es para que los requisitos se 
 | 2026-10-20 | ¿E2E? | Sí (inventario, `docs/checkpoints-proyecto.md > Flujos criticos`). Se amplía `e2e/envases-reales-empaque.spec.ts`. |
 | 2026-10-20 | ¿Dependencias? | Ninguna nueva. |
 | 2026-10-20 | (P1) Caso mixto que supera el total: plan 5×1 L + 1×5 L, real 12×1 L + 0×5 L = 12 L | Lo libre nunca supera lo que excede el pedido (12 − 10 = 2 L), y sale de las líneas que pasaron su plan: 2 envases de 1 L libres. El pedido espera, por línea, envases reales − libres de esa línea (aquí 10×1 L + 0×5 L). Afecta al tope de entrega por presentación de QC-223 D3: el spec lo cubre. |
+| 2026-10-20 | (P3) Varias líneas pasan su plan y el excedente no alcanza para todas | Mayor contenido primero; a igual contenido, orden del reparto (R7). Ej.: excedente 5 L, 1 L +4 y 5 L +1 → 1 libre de 5 L, 0 de 1 L. |
+| 2026-10-20 | (P4) ¿Se muestran los libres fuera del aviso? | No por ahora: solo el aviso del diálogo; se ven como existencia del lote y en «Entrega sin pedido» (QC-288). Otra vista va en otra ficha. |
+| 2026-10-20 | Pase `/design` | Se hace antes de aprobar el spec, sin excepción (`docs/perfil-agentes.md > Pase de diseño`). Cierra P2. |
 | 2026-10-20 | QC-304 | Duplicado de esta ficha: cancelada, decisiones absorbidas aquí. |
