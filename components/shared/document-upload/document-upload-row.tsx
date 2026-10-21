@@ -5,6 +5,7 @@ import { FileIcon } from 'lucide-react';
 import { ArrowLink } from '@/components/shared/arrow-link';
 import { StatusBadge } from '@/components/shared/status-badge';
 import type { DocumentFileStatusEntry } from '@/lib/modules/documentos';
+import { cn } from '@/lib/utils';
 
 import {
   BROWSER_PHASE_LABELS,
@@ -23,7 +24,8 @@ export const DEFAULT_ROW_SCOPE = 'document-upload';
  * El `scope` distingue las filas que se pintan en dos sitios a la vez (la ventana y el panel): sin
  * el, dos filas del mismo archivo compartiran `data-testid` y nadie podria senalar una sola.
  */
-export const rowTestId = (index: number, scope = DEFAULT_ROW_SCOPE): string => `${scope}-row-${index}`;
+export const rowTestId = (index: number, scope = DEFAULT_ROW_SCOPE): string =>
+  `${scope}-row-${index}`;
 export const rowNameTestId = (index: number, scope = DEFAULT_ROW_SCOPE): string =>
   `${scope}-row-name-${index}`;
 export const rowPhaseTestId = (index: number, scope = DEFAULT_ROW_SCOPE): string =>
@@ -73,11 +75,17 @@ export function DocumentUploadRow({
   return (
     <li
       data-testid={rowTestId(index, scope)}
-      className="flex min-h-12 flex-wrap items-center gap-3 border-b py-2.5 text-base last:border-b-0"
+      className={cn(
+        'flex min-h-12 flex-wrap items-center gap-3',
+        'border-b py-2.5 text-base last:border-b-0',
+      )}
     >
       <span
         aria-hidden="true"
-        className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground"
+        className={cn(
+          'inline-flex size-[40px] shrink-0 items-center justify-center',
+          'rounded-lg border bg-muted text-muted-foreground',
+        )}
       >
         <FileIcon className="size-5" />
       </span>
@@ -124,7 +132,10 @@ export function DocumentUploadRow({
       ) : null}
 
       {entry !== null && entry.status === 'error' ? (
-        <p data-testid={rowErrorTestId(index, scope)} className="basis-full text-sm text-destructive">
+        <p
+          data-testid={rowErrorTestId(index, scope)}
+          className="basis-full text-sm text-destructive"
+        >
           {fileErrorMessage(entry.errorCode)}
         </p>
       ) : null}

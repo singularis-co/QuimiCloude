@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { BatchStatus } from '@/lib/modules/documentos';
-import { getBatchStatusAction } from '@/lib/modules/documentos/adapters/driving/document-batch-actions';
+import {
+  getBatchStatusAction,
+} from '@/lib/modules/documentos/adapters/driving/document-batch-actions';
 import type { ErrorState } from '@/lib/modules/errores';
 
 export const BATCH_STATUS_POLL_INTERVAL_MS = 2000;

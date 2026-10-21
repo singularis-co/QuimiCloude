@@ -193,18 +193,18 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T13 — Formato
 
-- [ ] Escribir primero el caso R36/R37 en `document-upload-convenciones.test.ts`: salto de línea
+- [x] Escribir primero el caso R36/R37 en `document-upload-convenciones.test.ts`: salto de línea
   final y como mucho 100 columnas, **solo** en los archivos de producción de esta feature.
-- [ ] Restaurar el salto de línea final de los 12 archivos.
-- [ ] Partir las líneas de más de 100 columnas.
-- [ ] No tocar `docs/` ni `eslint.config.mjs`.
+- [x] Restaurar el salto de línea final de los 12 archivos.
+- [x] Partir las líneas de más de 100 columnas.
+- [x] No tocar `docs/` ni `eslint.config.mjs`.
 
 **Hecho cuando:** el caso está en verde y `git diff` no muestra «\ No newline at end of file».
 
 ### T14 — Fila del catálogo
 
-- [ ] Escribir primero el caso R38 en `document-upload-convenciones.test.ts`.
-- [ ] Actualizar la fila 69 de `CATALOGO.md`:
+- [x] Escribir primero el caso R38 en `document-upload-convenciones.test.ts`.
+- [x] Actualizar la fila 69 de `CATALOGO.md`:
   - el punto que falta;
   - quitar «entre pestañas» de lo no cubierto;
   - el almacén de sondeo compartido;

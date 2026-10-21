@@ -10,8 +10,12 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { identity } from '@/lib/composition';
 import { canUploadDocuments } from '@/lib/modules/documentos';
-import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
-import { getAiProviderReadinessAction } from '@/lib/modules/integraciones/adapters/driving/ai-provider-actions';
+import {
+  requirePagePermission,
+} from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import {
+  getAiProviderReadinessAction,
+} from '@/lib/modules/integraciones/adapters/driving/ai-provider-actions';
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 
@@ -57,7 +61,8 @@ export default async function FormulasPage({
                 <FormulaPdfUpload disabled registryScope={registryScope} />
               </AiProviderRequiredTooltip>
             )}
-            {/* Un enlace y no `Button` con `render`: Base UI le pondría `role="button"` al `<a>`. */}
+            {/* Un enlace y no `Button` con `render`: Base UI le pondría `role="button"` al
+                `<a>`. */}
             <Link
               href={NEW_RECIPE_ROUTE}
               data-slot="button"
