@@ -29,17 +29,17 @@ Las decisiones P1–P8 están cerradas (2026-10-21). R18 y R28 están retirados.
 
 ### T1 [P] — Renombrar los tests del backend
 
-- [ ] Renombrar los casos de `document-batch-repository-prisma.test.ts`, `get-batch-status.test.ts`
+- [x] Renombrar los casos de `document-batch-repository-prisma.test.ts`, `get-batch-status.test.ts`
   y `batch-status.test.ts` a R1–R4 de este spec.
-- [ ] No tocar ninguna aserción.
+- [x] No tocar ninguna aserción.
 
 **Hecho cuando:** los tests están en verde y cada uno de R1–R4 aparece en al menos un caso.
 
 ### T2 [P] — Renombrar los tests del panel y del envoltorio
 
-- [ ] Renombrar los casos de `document-batch-panel.test.tsx` y `formula-pdf-upload.test.tsx` a
+- [x] Renombrar los casos de `document-batch-panel.test.tsx` y `formula-pdf-upload.test.tsx` a
   R5–R14 y R16.
-- [ ] Retirar el caso «con la subida deshabilitada el panel tampoco se pinta»: lo sustituye la R35.
+- [x] Retirar el caso «con la subida deshabilitada el panel tampoco se pinta»: lo sustituye la R35.
 
 **Hecho cuando:** los tests están en verde y cada uno de esos `R<n>` aparece en al menos un caso.
 
@@ -126,7 +126,7 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T9 [P] — Tope de «Intento N de M» y rótulos
 
-- [ ] Escribir primero `tests/unit/documentos-ui/labels.test.ts` con estos casos:
+- [x] Escribir primero `tests/unit/documentos-ui/labels.test.ts` con estos casos:
   - R32: los valores 0→1, 2→2 y 5→4 sobre un tope de 4;
   - R33: con un `now` fijo, «Tanda de hoy, 14:32», «Tanda de ayer, 14:32», «Tanda del 15/10, 09:12»
     (sin año en el año actual y con él en otro año) y « · 3 archivos»;
@@ -136,8 +136,8 @@ verde y no hay `.subscribe(` en la carpeta.
     tanda en curso con un archivo en error cuenta en las dos partes; una tanda desconocida sola da
     «Todas terminadas»;
   - R35: el texto exacto del aviso de solo lectura.
-- [ ] Acotar `attemptLabel`.
-- [ ] Añadir a `labels.ts` `batchLabel`, `discardBatchLabel`, `resumeBatchLabel`, `batchesSummary` y
+- [x] Acotar `attemptLabel`.
+- [x] Añadir a `labels.ts` `batchLabel`, `discardBatchLabel`, `resumeBatchLabel`, `batchesSummary` y
   `READ_ONLY_NOTICE`.
 
 **Hecho cuando:** el test está en verde.
