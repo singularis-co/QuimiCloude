@@ -1,18 +1,22 @@
 import type { CustomerScope } from '../domain/customer-scope';
 import type { LegacyPhonePlan } from '../domain/legacy-phone-backfill';
 
+/**
+ * `converted`: pendientes que quedaron con numero. `reconverted`: las que estaban en `duplicate` y
+ * quedaron con numero. `invalid`: las de cualquiera de las dos que quedaron en `invalid_format`.
+ */
 export type LegacyPhoneCompanyResult = {
   readonly converted: number;
   readonly invalid: number;
-  readonly duplicate: number;
+  readonly reconverted: number;
 };
 
 /**
- * Pendiente = cliente vivo con `phone` y sin `phone_e164` ni `phone_issue`. Ningun guardado deja
- * una fila asi, por eso una segunda pasada no encuentra nada.
+ * Candidata = cliente vivo con `phone`, sin `phone_e164`, y con `phone_issue` nulo o `duplicate`.
+ * Ninguna escritura deja una fila asi, por eso una segunda pasada no encuentra nada.
  */
 export interface LegacyPhoneRepository {
-  /** Lee los pendientes de la empresa y los `phone_e164` ya tomados, aplica `plan` y escribe solo
-   *  las tres columnas del telefono, todo en una transaccion. */
+  /** Lee las candidatas de la empresa, aplica `plan`, escribe solo las columnas del telefono y crea
+   *  el vinculo principal de cada fila que quedo con numero, todo en una transaccion. */
   processCompany(plan: LegacyPhonePlan, scope: CustomerScope): Promise<LegacyPhoneCompanyResult>;
 }

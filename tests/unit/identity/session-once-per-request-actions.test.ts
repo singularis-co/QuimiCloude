@@ -609,6 +609,19 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).getWhatsappConnectionAction(),
   },
   {
+    // QC-239 2026-10-20: las acciones sobre un contacto de WhatsApp resuelven las dos caras de la
+    // sesion. La accion captura el `unauthorized` del caso de uso y devuelve un estado.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-contact-actions.ts',
+    nombre: 'linkWhatsappContactAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-contact-actions')
+      ).linkWhatsappContactAction({
+        contactId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        customerId: '9c4f3d62-5e7f-4a8b-9c3a-2f6d8b4a0e53',
+      }),
+  },
+  {
     // Las fotos de evidencia por paso: la accion captura el error de un pedido inexistente y
     // devuelve un estado, asi que la invocacion no rompe.
     archivo: 'lib/modules/asignaciones/adapters/driving/step-evidence-actions.ts',

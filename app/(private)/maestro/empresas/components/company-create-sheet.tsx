@@ -1,7 +1,8 @@
 'use client';
 
+import type { CountryCode } from 'libphonenumber-js';
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useId } from 'react';
+import { useActionState, useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -10,9 +11,11 @@ import {
   administratorFieldName,
   type AdministratorFieldName,
 } from '@/components/shared/administrator-fields';
+import { CountrySelect } from '@/components/shared/country-select';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { FormSheet } from '@/components/shared/form-sheet';
 import { Notice } from '@/components/shared/notice';
+import { nextUsernameCandidate } from '@/components/shared/username-from-names';
 import { Sheet } from '@/components/ui/sheet';
 import { useEntitySheet } from '@/hooks/use-entity-sheet';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
@@ -23,6 +26,7 @@ import {
   COMPANY_ADMIN_SECTION_LABEL,
   COMPANY_CREATE_TEXTS,
   COMPANY_DATA_SECTION_LABEL,
+  COMPANY_FIELD_LABELS,
   COMPANY_MAIL_NOTICE,
 } from './company-labels';
 
@@ -31,6 +35,7 @@ export const COMPANY_CREATE_FORM_TESTID = 'company-create-form';
 export const COMPANY_CREATE_CANCEL_TESTID = 'company-create-cancel';
 export const COMPANY_CREATE_SUBMIT_TESTID = 'company-create-submit';
 export const COMPANY_CREATE_ERROR_TESTID = 'company-create-error';
+export const COMPANY_CREATE_COUNTRY_TESTID = 'company-create-country';
 export const COMPANY_CREATE_FIELD_PREFIX = 'company-create';
 export const COMPANY_CREATE_ADMIN_PREFIX = 'company-create-admin';
 
@@ -115,6 +120,8 @@ export function CompanyCreateSheet({ open, onOpenChange }: CompanyCreateSheetPro
   const errorId = useId();
   const router = useRouter();
   const [state, formAction] = useActionState(save, INITIAL_STATE);
+  // Arranca sin país; un rechazo no lo borra porque vive en el estado del panel, no en `values`.
+  const [country, setCountry] = useState<CountryCode | null>(null);
   const { changeOpen, handleSaved } = useEntitySheet({
     open,
     onOpenChange,
@@ -136,6 +143,10 @@ export function CompanyCreateSheet({ open, onOpenChange }: CompanyCreateSheetPro
   const field = state.status === 'error' ? state.field : undefined;
   const message = state.status === 'error' ? state.error.message : '';
   const formError = state.status === 'error' && field === undefined ? state.error : undefined;
+  const usernameSuggestion =
+    state.status === 'error' && state.error.code === 'duplicate_username'
+      ? nextUsernameCandidate(values.adminUsername ?? '')
+      : undefined;
 
   return (
     <Sheet open={open} onOpenChange={changeOpen}>
@@ -171,6 +182,14 @@ export function CompanyCreateSheet({ open, onOpenChange }: CompanyCreateSheetPro
             defaultValues={values}
             errors={field === undefined ? {} : { [field]: message }}
           />
+          <CountrySelect
+            id={`${errorId}-country`}
+            value={country}
+            onChange={setCountry}
+            label={COMPANY_FIELD_LABELS.country}
+            testId={COMPANY_CREATE_COUNTRY_TESTID}
+          />
+          <input type="hidden" name="country" value={country ?? ''} />
         </section>
 
         <section
@@ -185,6 +204,8 @@ export function CompanyCreateSheet({ open, onOpenChange }: CompanyCreateSheetPro
             testIdPrefix={COMPANY_CREATE_ADMIN_PREFIX}
             defaultValues={adminValues(values)}
             errors={adminErrors(field, message)}
+            usernameAutofill
+            usernameSuggestion={usernameSuggestion}
           />
           <Notice tone="info" testId="company-create-mail-notice">
             {COMPANY_MAIL_NOTICE}

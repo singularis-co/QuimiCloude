@@ -169,10 +169,37 @@ describe('createCompany', () => {
         contactEmail: 'Contacto@Quimi.co',
         contactPhone: null,
       },
+      country: null,
       administrator: { ...ADMINISTRADOR, birthDate: new Date('1990-05-01T00:00:00.000Z') },
       actorId: MAESTRO.id,
       now: NOW,
     });
+  });
+
+  it('country: el alta con pais lo pasa al puerto en la misma llamada que crea la empresa', async () => {
+    const { createCompany, createWithAdministrator } = setup();
+
+    await createCompany(MAESTRO, { ...ENTRADA, country: 'CO' });
+
+    expect(createWithAdministrator).toHaveBeenCalledTimes(1);
+    expect(createWithAdministrator).toHaveBeenCalledWith(expect.objectContaining({ country: 'CO' }));
+  });
+
+  it('country: el alta sin pais (vacio) pasa null al puerto', async () => {
+    const { createCompany, createWithAdministrator } = setup();
+
+    await createCompany(MAESTRO, { ...ENTRADA, country: '' });
+
+    expect(createWithAdministrator).toHaveBeenCalledWith(expect.objectContaining({ country: null }));
+  });
+
+  it('country: un codigo invalido → invalid_input sin tocar ningun puerto', async () => {
+    const { createCompany, llamadas } = setupSinTocarNada();
+
+    await expect(createCompany(MAESTRO, { ...ENTRADA, country: 'XX' })).rejects.toMatchObject({
+      code: 'invalid_input',
+    });
+    expect(llamadas()).toBe(0);
   });
 
   it('R11: devuelve el id de la empresa y el del Administrador', async () => {

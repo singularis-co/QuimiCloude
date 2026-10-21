@@ -1,7 +1,7 @@
 // El alta de empresa con su Administrador inicial. La Server Action está simulada: es el borde del
 // módulo; lo que se afirma es el `FormData` que recibe y lo que la pantalla hace con su respuesta.
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   COMPANY_CREATE_ADMIN_PREFIX,
@@ -13,11 +13,13 @@ import {
 import {
   administratorFieldErrorTestId,
   administratorFieldTestId,
+  administratorUsernameSuggestionTestIds,
 } from '@/components/shared/administrator-fields';
 import type { ErrorState } from '@/lib/modules/errores';
 import { DOCUMENT_TYPE_CODES } from '@/lib/modules/identity';
 
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
+import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { routerMock, createCompanyActionMock, toastMock } = vi.hoisted(() => ({
   routerMock: {
@@ -51,8 +53,9 @@ vi.mock('@/lib/modules/identity/adapters/driving/company-actions', () => ({
   reactivateCompanyAction: vi.fn(),
 }));
 
-const DOCE_NOMBRES = [
+const NOMBRES_DEL_ALTA = [
   'name',
+  'country',
   'taxId',
   'contactEmail',
   'contactPhone',
@@ -94,6 +97,12 @@ function escribir() {
   fireEvent.change(campoAdmin('username'), { target: { value: 'pgil' } });
 }
 
+async function elegirPais(user: ReturnType<typeof setupUser>, code: string) {
+  await user.click(screen.getByTestId('company-create-country'));
+  await screen.findByRole('listbox');
+  await user.click(await esperarInteractiva(screen.getByTestId(`company-create-country-option-${code}`)));
+}
+
 async function enviar(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId('company-create-submit'));
   await waitFor(() => expect(createCompanyActionMock).toHaveBeenCalled());
@@ -103,12 +112,22 @@ function rechazo(code: Exclude<ErrorState['code'], 'unexpected'>, message: strin
   return { status: 'error', code, message };
 }
 
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
+afterAll(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
+  setViewportWidth(WIDE_VIEWPORT);
 });
 
 afterEach(() => {
   cleanup();
+  resetViewport();
 });
 
 describe('el panel «Nueva empresa»', () => {
@@ -133,15 +152,43 @@ describe('el panel «Nueva empresa»', () => {
     expect(screen.getByTestId('company-create-submit')).toHaveTextContent('Crear empresa');
   });
 
-  it('R17: el panel no pide pais ni rol', async () => {
+  it('el panel pide el pais en la seccion Empresa, arranca sin pais y no pide rol', async () => {
     await abrir();
     const panel = screen.getByTestId('company-create-sheet');
-    expect(within(panel).queryByText(/País/)).toBeNull();
+    const empresa = within(panel).getByRole('region', { name: 'Empresa' });
+    expect(within(empresa).getByText('País')).toBeInTheDocument();
+    expect(within(empresa).getByTestId('company-create-country')).toHaveTextContent('Sin país');
     expect(within(panel).queryByText(/Rol/)).toBeNull();
-    expect(panel.querySelector('[name="country"]')).toBeNull();
   });
 
-  it('R17: el FormData lleva exactamente los doce nombres de la accion', async () => {
+  it('envia el pais elegido en country', async () => {
+    createCompanyActionMock.mockResolvedValue({
+      status: 'success',
+      companyId: 'c',
+      administratorId: 'a',
+      mail: 'sent',
+    });
+    const user = await abrir();
+    escribir();
+    await elegirPais(user, 'EC');
+    await enviar(user);
+    expect(createCompanyActionMock.mock.calls[0]![1].get('country')).toBe('EC');
+  });
+
+  it('sin elegir pais envia country vacio', async () => {
+    createCompanyActionMock.mockResolvedValue({
+      status: 'success',
+      companyId: 'c',
+      administratorId: 'a',
+      mail: 'sent',
+    });
+    const user = await abrir();
+    escribir();
+    await enviar(user);
+    expect(createCompanyActionMock.mock.calls[0]![1].get('country')).toBe('');
+  });
+
+  it('R17: el FormData lleva exactamente los nombres de la accion', async () => {
     createCompanyActionMock.mockResolvedValue({
       status: 'success',
       companyId: 'c',
@@ -152,7 +199,7 @@ describe('el panel «Nueva empresa»', () => {
     escribir();
     await enviar(user);
     const formData = createCompanyActionMock.mock.calls[0]![1];
-    expect([...new Set(formData.keys())].sort()).toEqual([...DOCE_NOMBRES].sort());
+    expect([...new Set(formData.keys())].sort()).toEqual([...NOMBRES_DEL_ALTA].sort());
     expect(formData.get('name')).toBe('Aseo Caribe');
     expect(formData.get('adminUsername')).toBe('pgil');
   });
@@ -169,6 +216,15 @@ describe('el panel «Nueva empresa»', () => {
     await enviar(user);
     const formData = createCompanyActionMock.mock.calls[0]![1];
     expect(formData.get('adminDocumentTypeCode')).toBe(DOCUMENT_TYPE_CODES[0]);
+  });
+
+  it('propone el nombre de usuario del administrador a partir de nombres y apellidos', async () => {
+    const user = await abrir();
+
+    await user.type(campoAdmin('firstNames'), 'Paula Andrea');
+    await user.type(campoAdmin('lastNames'), 'Gil');
+
+    expect(campoAdmin('username')).toHaveValue('paulaag');
   });
 
   it('R6: sin empresas.modificar no hay disparador ni panel', () => {
@@ -251,6 +307,33 @@ describe('rechazos', () => {
       expect(routerMock.refresh).not.toHaveBeenCalled();
     },
   );
+
+  it('duplicate_username recomienda el siguiente nombre de usuario y el boton lo aplica', async () => {
+    createCompanyActionMock.mockResolvedValue(rechazo('duplicate_username', 'Ya existe.'));
+    const user = await abrir();
+    escribir();
+    await enviar(user);
+
+    const ids = administratorUsernameSuggestionTestIds(COMPANY_CREATE_ADMIN_PREFIX);
+    await user.click(within(await screen.findByTestId(ids.suggestion)).getByTestId(ids.apply));
+
+    expect(campoAdmin('username')).toHaveValue('pgil1');
+    expect(screen.queryByTestId(ids.suggestion)).toBeNull();
+  });
+
+  it('otro codigo no recomienda nombre de usuario', async () => {
+    createCompanyActionMock.mockResolvedValue(rechazo('duplicate_email', 'Ya existe.'));
+    const user = await abrir();
+    escribir();
+    await enviar(user);
+
+    await screen.findByTestId(administratorFieldErrorTestId(COMPANY_CREATE_ADMIN_PREFIX, 'email'));
+    expect(
+      screen.queryByTestId(
+        administratorUsernameSuggestionTestIds(COMPANY_CREATE_ADMIN_PREFIX).suggestion,
+      ),
+    ).toBeNull();
+  });
 
   it('R19: un codigo sin campo va a la region de error del panel', async () => {
     createCompanyActionMock.mockResolvedValue(rechazo('invalid_input', 'Los datos no son validos.'));

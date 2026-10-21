@@ -293,6 +293,7 @@ type OrderDeliveryProgressRow = {
     readonly presentationId: string;
     readonly packages: number;
     readonly packedPackages: number | null;
+    readonly packedSurplusPackages: number;
     readonly deliveryLines: readonly { readonly packages: number }[];
   }[];
 };
@@ -306,6 +307,7 @@ export function toOrderDeliveryProgress(row: OrderDeliveryProgressRow): OrderDel
       presentationId: line.presentationId,
       packages: line.packages,
       packedPackages: line.packedPackages,
+      packedSurplusPackages: line.packedSurplusPackages,
       deliveredPackages: line.deliveryLines.reduce((total, delivery) => total + delivery.packages, 0),
     })),
   };
@@ -332,6 +334,7 @@ export async function listOrderDeliveryProgressByIdsIncludingDeleted(
           presentationId: true,
           packages: true,
           packedPackages: true,
+          packedSurplusPackages: true,
           deliveryLines: { where: { voidLine: { is: null } }, select: { packages: true } },
         },
         orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],

@@ -186,16 +186,21 @@ export {
   PACKING_REASON_OTHER_MAX,
   checkPackingCounts,
   effectivePackages,
-  maxPackagesForLine,
+  largestPackageFirst,
+  orderedPackages,
   packedTotalInOrderUnit,
+  packingSurplusByLine,
 } from './domain/packing-count';
 export type {
+  LargestPackageFirst,
   PackedDistributionLine,
   PackedLineCount,
   PackingCountCheck,
   PackingDifferenceReason,
   PackingLineError,
   PackingPlanLine,
+  PackingSurplus,
+  SurplusLine,
 } from './domain/packing-count';
 
 /** Implementan `OrderCatalog['startConditioningAliveById']` y `['finishConditioningAliveById']`:

@@ -9,6 +9,7 @@ import {
 } from 'libphonenumber-js/max';
 
 import type { Customer } from './customer';
+import { waIdCandidates } from './phone-matches-wa-id';
 
 export type CustomerPhoneIssue = 'invalid_format' | 'duplicate';
 
@@ -76,6 +77,21 @@ export function parseCustomerPhoneText(text: string, country: CountryCode): Pars
     return { kind: 'invalid' };
   }
   return { kind: 'ok', phoneCountry: parsed.country, phoneE164: digitsOf(parsed) };
+}
+
+/**
+ * El `wa_id` como telefono: el primero de sus candidatos que la libreria da por valido, con su
+ * pais. WhatsApp puede mandar una forma que la libreria no da por valida (Mexico con el `1`, un
+ * movil de Brasil sin el noveno digito) cuando la otra si lo es.
+ */
+export function parseWaIdPhone(waId: string): { readonly e164: string; readonly country: CountryCode } | null {
+  for (const digits of waIdCandidates(waId)) {
+    const parsed = parsePhoneNumberFromString(`+${digits}`);
+    if (parsed !== undefined && parsed.isValid() && parsed.country !== undefined) {
+      return { e164: digitsOf(parsed), country: parsed.country };
+    }
+  }
+  return null;
 }
 
 function parseE164(e164: string, country?: CountryCode): PhoneNumber | undefined {

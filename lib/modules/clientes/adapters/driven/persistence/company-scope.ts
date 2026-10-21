@@ -22,6 +22,14 @@ export function customerCompanyScope(scope: CustomerScope): Prisma.CustomerWhere
   return companyScope(scope);
 }
 
+export function phoneNumberCompanyScope(scope: CustomerScope): Prisma.PhoneNumberWhereInput {
+  return companyScope(scope);
+}
+
+export function customerPhoneNumberCompanyScope(scope: CustomerScope): Prisma.CustomerPhoneNumberWhereInput {
+  return companyScope(scope);
+}
+
 /**
  * La misma definicion para una escritura: en un `WhereInput` la columna es opcional y puede ser
  * un filtro, asi que no sirve para parametrizar el `data` de un `create`.

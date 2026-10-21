@@ -1,6 +1,6 @@
 /**
- * `recordPackedCounts` y la lectura de `packed_packages` de `findPresentationLinesForFinish`,
- * contra Postgres REAL, y los CHECK de las columnas del conteo.
+ * `recordPackedCounts` y la lectura de `packed_packages` y `packed_surplus_packages` de
+ * `findPresentationLinesForFinish`, contra Postgres REAL, y los CHECK de las columnas del conteo.
  *
  * AISLAMIENTO: cada `it` corre en una transaccion que siempre termina en `ROLLBACK`; el
  * adaptador recibe ese `tx`, igual que dentro de `OrderUnitOfWork`. Lo que se espera que la base
@@ -17,6 +17,7 @@ import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/drive
 import { prisma } from '@/lib/shared/db/prisma'
 
 import type { PackedLineCount } from '@/lib/modules/pedidos'
+import type { RecordedPackedLine } from '@/lib/modules/pedidos/ports/order-write-repository'
 
 class RollbackSignal extends Error {
   constructor() {
@@ -166,8 +167,28 @@ async function storedCount(tx: Prisma.TransactionClient, lineId: string): Promis
 
 const SIN_CONTAR: Omit<StoredCount, 'packages'> = { packedPackages: null, packedReason: null, packedReasonOther: null }
 
-function count(lineId: string, packedPackages: number, reason: PackedLineCount['reason'] = null, reasonOther: string | null = null): PackedLineCount {
-  return { lineId, packedPackages, reason, reasonOther }
+function count(
+  lineId: string,
+  packedPackages: number,
+  reason: PackedLineCount['reason'] = null,
+  reasonOther: string | null = null,
+  packedSurplusPackages = 0,
+): RecordedPackedLine {
+  return { lineId, packedPackages, reason, reasonOther, packedSurplusPackages }
+}
+
+async function storedSurplus(tx: Prisma.TransactionClient, lineId: string): Promise<number> {
+  const row = await tx.orderPresentationLine.findUniqueOrThrow({ where: { id: lineId }, select: { packedSurplusPackages: true } })
+  return row.packedSurplusPackages
+}
+
+/** `UPDATE` a mano de los libres, sin pasar por el dominio: solo el CHECK puede frenarlo. */
+function rawSetSurplus(tx: Prisma.TransactionClient, lineId: string, surplus: number): Promise<number> {
+  return tx.$executeRaw(Prisma.sql`
+    UPDATE "order_presentation_lines"
+       SET "packed_surplus_packages" = ${surplus}::integer
+     WHERE "id" = ${lineId}::uuid
+  `)
 }
 
 /** `UPDATE` a mano, sin pasar por el dominio: lo unico que puede frenarlo son los CHECK. */
@@ -249,6 +270,76 @@ describe('recordPackedCounts — escribe el conteo en las lineas del pedido', ()
       expect((await repo.findPresentationLinesForFinish(orderId, scope)).map((l) => [l.id, l.packages, l.packedPackages])).toEqual([
         [linea, 6, 5],
       ])
+    })
+  })
+})
+
+describe('recordPackedCounts — envases libres', () => {
+  it('R8: guarda los libres de cada linea con su conteo; findPresentationLinesForFinish da 0 antes y lo guardado despues', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const empresa = await seedCompany(tx, 'propia')
+      const orderId = await seedOrder(tx, empresa)
+      const unLitro = await seedLine(tx, empresa, orderId, 5)
+      const cincoLitros = await seedLine(tx, empresa, orderId, 1)
+      const repo = createOrderWriteRepository(tx)
+      const scope = { companyId: empresa.companyId }
+
+      expect((await repo.findPresentationLinesForFinish(orderId, scope)).map((l) => [l.id, l.packedSurplusPackages])).toEqual([
+        [unLitro, 0],
+        [cincoLitros, 0],
+      ])
+
+      await repo.recordPackedCounts(
+        orderId,
+        [count(unLitro, 12, 'conteo_fisico', null, 2), count(cincoLitros, 0, 'rotura')],
+        scope,
+      )
+
+      expect(await storedCount(tx, unLitro)).toEqual({ packages: 5, packedPackages: 12, packedReason: 'conteo_fisico', packedReasonOther: null })
+      expect(await storedSurplus(tx, unLitro)).toBe(2)
+      expect(await storedSurplus(tx, cincoLitros)).toBe(0)
+      expect(
+        (await repo.findPresentationLinesForFinish(orderId, scope)).map((l) => [l.id, l.packages, l.packedPackages, l.packedSurplusPackages]),
+      ).toEqual([
+        [unLitro, 5, 12, 2],
+        [cincoLitros, 1, 0, 0],
+      ])
+    })
+  })
+
+  it('R8, R11: un conteo sin libres guarda 0 y deja la linea como una sin excedente', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const empresa = await seedCompany(tx, 'propia')
+      const orderId = await seedOrder(tx, empresa)
+      const linea = await seedLine(tx, empresa, orderId, 5)
+      const repo = createOrderWriteRepository(tx)
+      const scope = { companyId: empresa.companyId }
+
+      await repo.recordPackedCounts(orderId, [count(linea, 7, 'conteo_fisico', null, 2)], scope)
+      await repo.recordPackedCounts(orderId, [count(linea, 7, 'conteo_fisico')], scope)
+
+      expect(await storedSurplus(tx, linea)).toBe(0)
+      expect(await storedCount(tx, linea)).toEqual({ packages: 5, packedPackages: 7, packedReason: 'conteo_fisico', packedReasonOther: null })
+    })
+  })
+
+  it('R8: unos libres por encima de lo que la linea paso de su plan los rechaza la base, sin escribir ni el conteo', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const empresa = await seedCompany(tx, 'propia')
+      const orderId = await seedOrder(tx, empresa)
+      const linea = await seedLine(tx, empresa, orderId, 5)
+      const repo = createOrderWriteRepository(tx)
+
+      expect(
+        await expectRejectedByDatabase(
+          tx,
+          () => repo.recordPackedCounts(orderId, [count(linea, 7, 'conteo_fisico', null, 3)], { companyId: empresa.companyId }),
+          'libres > reales - plan',
+        ),
+      ).toBe(CHECK_VIOLATION)
+
+      expect(await storedCount(tx, linea)).toEqual({ packages: 5, ...SIN_CONTAR })
+      expect(await storedSurplus(tx, linea)).toBe(0)
     })
   })
 })
@@ -354,6 +445,27 @@ describe('CHECK de las columnas del conteo, con UPDATE escrito a mano', () => {
 
       expect(await rawSetCount(tx, linea, 4, 'otro', 'x'.repeat(200))).toBe(1)
       expect((await storedCount(tx, linea)).packedReasonOther).toHaveLength(200)
+    })
+  })
+
+  it('R6, R8: los libres solo caben en una linea contada y por encima de su plan, y nunca mas que lo que paso del plan', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const empresa = await seedCompany(tx, 'propia')
+      const orderId = await seedOrder(tx, empresa)
+      const linea = await seedLine(tx, empresa, orderId, 5)
+
+      expect(await expectRejectedByDatabase(tx, () => rawSetSurplus(tx, linea, 1), 'libres sin contar')).toBe(CHECK_VIOLATION)
+      expect(await expectRejectedByDatabase(tx, () => rawSetSurplus(tx, linea, -1), 'libres negativos')).toBe(CHECK_VIOLATION)
+
+      expect(await rawSetCount(tx, linea, 5, null, null)).toBe(1)
+      expect(await expectRejectedByDatabase(tx, () => rawSetSurplus(tx, linea, 1), 'libres con el plan justo')).toBe(CHECK_VIOLATION)
+
+      expect(await rawSetCount(tx, linea, 7, 'conteo_fisico', null)).toBe(1)
+      expect(await expectRejectedByDatabase(tx, () => rawSetSurplus(tx, linea, 3), 'libres > reales - plan')).toBe(CHECK_VIOLATION)
+      expect(await storedSurplus(tx, linea)).toBe(0)
+
+      expect(await rawSetSurplus(tx, linea, 2)).toBe(1)
+      expect(await storedSurplus(tx, linea)).toBe(2)
     })
   })
 })

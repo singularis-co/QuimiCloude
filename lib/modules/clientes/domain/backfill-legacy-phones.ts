@@ -14,7 +14,7 @@ export type BackfillLegacyPhonesSummary = {
   readonly companies: number;
   readonly converted: number;
   readonly invalid: number;
-  readonly duplicate: number;
+  readonly reconverted: number;
 };
 
 const FALLBACK_COUNTRY = 'CO';
@@ -31,19 +31,19 @@ export function createBackfillLegacyPhones(
     const companyIds = await deps.listCompanyIds();
     let converted = 0;
     let invalid = 0;
-    let duplicate = 0;
+    let reconverted = 0;
 
     for (const companyId of companyIds) {
       const country = (await deps.companyCountryOf(companyId)) ?? FALLBACK_COUNTRY;
       const result = await deps.legacyPhones.processCompany(
-        (rows, taken) => planLegacyPhoneBackfill(rows, country, taken),
+        (rows) => planLegacyPhoneBackfill(rows, country),
         { companyId },
       );
       converted += result.converted;
       invalid += result.invalid;
-      duplicate += result.duplicate;
+      reconverted += result.reconverted;
     }
 
-    return { companies: companyIds.length, converted, invalid, duplicate };
+    return { companies: companyIds.length, converted, invalid, reconverted };
   };
 }

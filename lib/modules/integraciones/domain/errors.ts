@@ -77,6 +77,33 @@ export class ActionNotAllowedError extends IntegracionesError {
   }
 }
 
+/** El contacto no existe o es de otra empresa: el texto no distingue los dos casos. */
+export class WhatsappContactNotFoundError extends IntegracionesError {
+  readonly code = 'whatsapp_contact_not_found';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_contact_not_found', diagnostic);
+  }
+}
+
+/** Ninguna variante del número del contacto es un teléfono válido: no hay qué añadir al cliente. */
+export class WhatsappContactNumberInvalidError extends IntegracionesError {
+  readonly code = 'whatsapp_contact_number_invalid';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_contact_number_invalid', diagnostic);
+  }
+}
+
+/** Con el código de `clientes`, pero subclase de este módulo para que su traductor la reconozca. */
+export class LinkedCustomerNotFoundError extends IntegracionesError {
+  readonly code = 'customer_not_found';
+
+  constructor(diagnostic?: string) {
+    super('customer_not_found', diagnostic);
+  }
+}
+
 /** La plantilla no existe, está eliminada o es de otra empresa: el texto no distingue los tres casos. */
 export class WhatsappTemplateNotFoundError extends IntegracionesError {
   readonly code = 'whatsapp_template_not_found';

@@ -7,11 +7,15 @@
 // empresas, con sus secretos cifrados.
 //
 // De cada funcion de persistencia del modulo comprueba las dos mitades: que DECLARA el ambito y que
-// ese valor LLEGA hasta una envoltura de `./company-scope`. Una sola excepcion con nombre (QC-238 P1,
-// design.md > 5.1): el resolutor de empresa del webhook, con su forma fijada aqui mismo.
+// ese valor LLEGA hasta una envoltura de `./company-scope`. Dos excepciones con nombre, cada una con
+// su forma fijada aqui mismo: el resolutor de empresa del webhook (QC-238 P1, design.md > 5.1) y,
+// desde el 2026-10-20 (QC-239, decision del humano), la funcion que solo abre la transaccion de los
+// contactos, con la forma estricta de `order-unit-of-work-prisma.ts` (QC-141 D21).
 //
 // Como en la de `clientes`, el puerto se ata a su adaptador LEYENDO `lib/composition`: lo que se
-// comprueba es la funcion que de verdad se cablea, no una tabla escrita aqui.
+// comprueba es la funcion que de verdad se cablea, no una tabla escrita aqui. Un puerto que vive
+// dentro de una transaccion se ata en su propia fabrica `create…(db)` del adaptador: ahi se lee su
+// cableado, y cada miembro tiene que delegar en una funcion con nombre que recibe `db` y el ambito.
 //
 // TECNICA: barrido de TEXTO sobre el disco, como el resto de `tests/guards/`.
 
@@ -41,6 +45,7 @@ const PERSISTENCE_ROOT = join(MODULE_ROOT, 'adapters', 'driven', 'persistence')
 const PUNTO_UNICO = 'company-scope.ts'
 const ADAPTADOR = 'whatsapp-connection-prisma.ts'
 const ADAPTADOR_INBOX = 'whatsapp-inbox-prisma.ts'
+const ADAPTADOR_CONTACTOS = 'whatsapp-contact-prisma.ts'
 const ADAPTADOR_PLANTILLAS = 'whatsapp-template-prisma.ts'
 const ADAPTADOR_VARIABLES = 'whatsapp-variable-key-prisma.ts'
 
@@ -58,7 +63,15 @@ type PuertoVigilado = {
   readonly adaptador: string
   /** Funciones del adaptador que tocan la base sin estar cableadas: ayudantes privados, vigilados igual. */
   readonly ayudantes: readonly string[]
+  /** Si existe, el cableado se lee de esta fabrica del adaptador y no de `lib/composition`. */
+  readonly fabrica?: string
+  /** El unico parametro de la fabrica, que cada miembro reenvia primero. Sin el, `db: PrismaLike`. */
+  readonly parametroDeFabrica?: ParametroDeFabrica
 }
+
+type ParametroDeFabrica = { readonly nombre: string; readonly tipo: string }
+
+const PARAMETRO_DB: ParametroDeFabrica = { nombre: 'db', tipo: 'PrismaLike(?:\\s*=\\s*prisma)?' }
 
 const PUERTO: PuertoVigilado = {
   nombre: 'WhatsappConnectionRepository',
@@ -75,7 +88,19 @@ const PUERTO_INBOX: PuertoVigilado = {
   constante: 'whatsappInboxRepository',
   metodosEsperados: 1,
   adaptador: ADAPTADOR_INBOX,
-  ayudantes: ['applyStatus', 'upsertContact'],
+  ayudantes: ['applyStatus', 'findBlockedWaIds', 'upsertContact'],
+  fabrica: 'createWhatsappInboxRecorder',
+  parametroDeFabrica: { nombre: 'deps', tipo: 'WhatsappInboxRecorderDeps' },
+}
+
+const PUERTO_CONTACTOS: PuertoVigilado = {
+  nombre: 'WhatsappContactRepository',
+  ruta: join(MODULE_ROOT, 'ports', 'whatsapp-contact-repository.ts'),
+  constante: 'whatsappContactRepository',
+  metodosEsperados: 4,
+  adaptador: ADAPTADOR_CONTACTOS,
+  ayudantes: [],
+  fabrica: 'createWhatsappContactRepository',
 }
 
 const PUERTO_PLANTILLAS: PuertoVigilado = {
@@ -96,13 +121,18 @@ const PUERTO_VARIABLES: PuertoVigilado = {
   ayudantes: ['liveUsage', 'lockedKey'],
 }
 
-const PUERTOS: readonly PuertoVigilado[] = [PUERTO, PUERTO_INBOX, PUERTO_PLANTILLAS, PUERTO_VARIABLES]
+const PUERTOS: readonly PuertoVigilado[] = [PUERTO, PUERTO_INBOX, PUERTO_CONTACTOS, PUERTO_PLANTILLAS, PUERTO_VARIABLES]
 
 /**
- * Archivos exentos por NOMBRE del barrido de ambito, como en la guardia de `pedidos`. Una sola
- * entrada, aprobada por el humano en el spec (QC-238 P1, R32): la URL del webhook solo trae el id
- * de la conexion y hasta saber su empresa no hay ambito con que filtrar. No es un cheque en blanco:
- * `formaDeLaExencion` fija lo unico que ese archivo puede hacer.
+ * Archivos exentos por NOMBRE del barrido de ambito, como en la guardia de `pedidos`. Cada entrada la
+ * aprobo un humano en un spec, y ninguna es un cheque en blanco: su forma fija lo unico que ese
+ * archivo puede hacer.
+ *
+ * - El resolutor de empresa del webhook (QC-238 P1, R32): la URL solo trae el id de la conexion y
+ *   hasta saber su empresa no hay ambito con que filtrar. Forma: `formaDeLaExencion`.
+ * - La transaccion de los contactos (QC-239, decision del humano del 2026-10-20): solo abre
+ *   `prisma.$transaction` y la reintenta una vez; las consultas las hacen, con su ambito, los
+ *   repositorios que la composicion construye sobre su `tx`. Forma: `formaDeLaTransaccion`.
  */
 const EXENTOS_DEL_AMBITO: ReadonlyMap<string, string> = new Map([
   [
@@ -111,7 +141,16 @@ const EXENTOS_DEL_AMBITO: ReadonlyMap<string, string> = new Map([
       'fila viva; la fila se lee despues con su ambito. Excepcion aprobada por el humano en QC-238, ' +
       'decision P1 (design.md > 5.1, R32)',
   ],
+  [
+    'whatsapp-contact-unit-of-work-prisma.ts',
+    'solo abre la transaccion de vincular y desvincular (prisma.$transaction) y la reintenta una vez; ' +
+      'no lee ni escribe tablas. Excepcion aprobada por el humano en QC-239 (2026-10-20), con la forma ' +
+      'de QC-141 D21',
+  ],
 ])
+
+/** La unica funcion que el exento de la transaccion de los contactos puede declarar. */
+const FUNCION_TRANSACCION_EXENTA = 'withWhatsappContactTransaction'
 
 /** Lo unico que el resolutor exento puede ser: su funcion, su consulta, su `select` y su `where`. */
 const FORMA_EXENTA = {
@@ -229,7 +268,7 @@ function envolturasImportadas(source: string): readonly string[] {
 }
 
 // El acento grave cubre `prisma.$queryRaw` usado como plantilla etiquetada, sin parentesis.
-const TOCA_LA_BASE = /\b(?:prisma|tx)\s*\.\s*(?:\$\w+|\w+\s*\.\s*\w+)\s*[(<`]/g
+const TOCA_LA_BASE = /\b(?:prisma|tx|db)\s*\.\s*(?:\$\w+|\w+\s*\.\s*\w+)\s*[(<`]/g
 const tocaLaBase = (cuerpo: string): boolean => new RegExp(TOCA_LA_BASE.source).test(cuerpo)
 
 const LECTURA_SUELTA: readonly RegExp[] = [
@@ -361,8 +400,48 @@ function formaDeLaExencion(nombre: string, analizado: ArchivoAnalizado): readonl
   return hallazgos
 }
 
-/** Un archivo exento por NOMBRE pasa por su forma; cualquier otro, por la regla general. */
+/**
+ * La forma estricta de `order-unit-of-work-prisma.ts` (QC-141 D21): una sola funcion con su nombre,
+ * todo `prisma.` es `prisma.$transaction`, ningun `tx.<algo>` (ni `db.<algo>`), sin SQL crudo y sin
+ * alias de `prisma`. Trabaja sobre el codigo ya vaciado de comentarios y cadenas.
+ */
+function formaDeLaTransaccion(nombre: string, analizado: ArchivoAnalizado): readonly string[] {
+  const hallazgos: string[] = []
+
+  // Toda declaracion `function`, a cualquier nivel y con genericos: el troceador general no ve
+  // `function f<T>(`, y aqui no puede escaparse ninguna.
+  const nombres = [...analizado.codigo.matchAll(/\bfunction\s*\*?\s*(\w+)/g)].map((m) => m[1] ?? '')
+  if (nombres.length !== 1 || nombres[0] !== FUNCION_TRANSACCION_EXENTA) {
+    hallazgos.push(
+      `${nombre}: tiene que declarar exactamente una funcion, \`${FUNCION_TRANSACCION_EXENTA}\`; declara [${nombres.join(', ')}]`,
+    )
+  }
+  const prismaSuelto = (analizado.codigo.match(/\bprisma\s*\.\s*\$?\w+/g) ?? []).filter(
+    (acceso) => !/^prisma\s*\.\s*\$transaction\b/.test(acceso.replace(/\s+/g, ' ')),
+  )
+  for (const acceso of prismaSuelto) {
+    hallazgos.push(`${nombre}: \`${acceso}\` no es \`prisma.$transaction\`: el exento no consulta ninguna tabla`)
+  }
+  for (const acceso of analizado.codigo.match(/\b(?:tx|db)\s*\.\s*\$?\w+/g) ?? []) {
+    hallazgos.push(`${nombre}: \`${acceso}\` consulta por la transaccion; el exento solo la abre y reenvia \`run\``)
+  }
+  if (/\$(?:queryRaw|executeRaw)\w*/.test(analizado.codigo)) {
+    hallazgos.push(`${nombre}: no puede ejecutar SQL crudo`)
+  }
+  // Las cadenas ya estan vaciadas: un import de namespace no deja ver de que modulo es, asi que en
+  // el exento no se admite ninguno.
+  if (/\bprisma\s+as\b/.test(analizado.codigo) || /\bimport\s*\*\s*as\s+\w+/.test(analizado.codigo)) {
+    hallazgos.push(`${nombre}: importa \`prisma\` con un alias que la guardia no ve`)
+  }
+
+  return hallazgos
+}
+
+/** Un archivo exento por NOMBRE pasa por SU forma; cualquier otro, por la regla general. */
 function hallazgosDelArchivo(nombre: string, analizado: ArchivoAnalizado): readonly string[] {
+  if (nombre === 'whatsapp-contact-unit-of-work-prisma.ts' && EXENTOS_DEL_AMBITO.has(nombre)) {
+    return formaDeLaTransaccion(nombre, analizado)
+  }
   if (EXENTOS_DEL_AMBITO.has(nombre)) return formaDeLaExencion(nombre, analizado)
   return hallazgosDe(nombre, analizado, nombre === PUNTO_UNICO)
 }
@@ -437,6 +516,61 @@ function cableadoDe(constante: string, interfaz: string): ReadonlyMap<string, st
   return cableado ?? new Map<string, string>()
 }
 
+/**
+ * El objeto que devuelve la fabrica `fabrica(db: PrismaLike [= prisma]): interfaz` del fuente (o la
+ * de otro parametro unico, como `deps: WhatsappInboxRecorderDeps`): `{ metodo -> funcion }`. Solo
+ * cuenta un miembro `metodo: (a, b) => funcion(db, a, b)`, con ese parametro primero y los demas
+ * reenviados tal cual y en orden; cualquier otra forma queda con un valor que no es un nombre.
+ * `null` si la fabrica no esta, no tiene esa firma o no devuelve un objeto.
+ */
+function cableadoEnFabrica(
+  fuente: string,
+  fabrica: string,
+  interfaz: string,
+  parametro: ParametroDeFabrica = PARAMETRO_DB,
+): ReadonlyMap<string, string> | null {
+  const source = vaciarCadenas(sinComentarios(fuente))
+  const firma = new RegExp(
+    `^export\\s+function\\s+${fabrica}\\s*\\(\\s*${parametro.nombre}\\s*:\\s*${parametro.tipo}\\s*\\)\\s*:\\s*${interfaz}\\s*\\{`,
+    'm',
+  ).exec(source)
+  if (firma === null) return null
+  const abreCuerpo = firma.index + firma[0].length - 1
+  const cuerpo = source.slice(abreCuerpo + 1, cierreEquilibrado(source, abreCuerpo, '{', '}')).trim()
+  if (!/^return\s*\{/.test(cuerpo)) return null
+  const abre = cuerpo.indexOf('{')
+  const cierra = cierreEquilibrado(cuerpo, abre, '{', '}')
+  if (!/^\s*;?\s*$/.test(cuerpo.slice(cierra + 1))) return null
+  const objeto = cuerpo.slice(abre + 1, cierra)
+
+  const cableado = new Map<string, string>()
+  for (const entrada of porComasDeNivelCero(objeto)) {
+    const delegada = /^(\w+)\s*:\s*\(([^()]*)\)\s*=>\s*(\w+)\s*\(([^()]*)\)$/.exec(entrada)
+    if (delegada === null) {
+      cableado.set(/^(\w+)\s*:/.exec(entrada)?.[1] ?? entrada, '')
+      continue
+    }
+    const parametros = porComasDeNivelCero(delegada[2] ?? '')
+    const argumentos = porComasDeNivelCero(delegada[4] ?? '')
+    const reenvia = argumentos.join(',') === [parametro.nombre, ...parametros].join(',')
+    const funcion = delegada[3] ?? ''
+    cableado.set(delegada[1] ?? '', reenvia ? funcion : `${funcion}(${argumentos.join(', ')})`)
+  }
+  return cableado
+}
+
+function cableadoDelPuerto(puerto: PuertoVigilado): ReadonlyMap<string, string> {
+  if (puerto.fabrica === undefined) return cableadoDe(puerto.constante, puerto.nombre)
+  const fuente = readFileSync(join(PERSISTENCE_ROOT, puerto.adaptador), 'utf8')
+  const parametro = puerto.parametroDeFabrica ?? PARAMETRO_DB
+  const cableado = cableadoEnFabrica(fuente, puerto.fabrica, puerto.nombre, parametro)
+  expect(
+    cableado,
+    `${puerto.adaptador} no declara \`export function ${puerto.fabrica}(${parametro.nombre}: ...): ${puerto.nombre}\` que devuelva un objeto`,
+  ).not.toBeNull()
+  return cableado ?? new Map<string, string>()
+}
+
 // --- Casos -------------------------------------------------------------------------------------
 
 describe('R2 — el punto unico de integraciones es de verdad UNA definicion', () => {
@@ -476,16 +610,17 @@ describe('R2 — el punto unico de integraciones es de verdad UNA definicion', (
 describe.each(PUERTOS)('R2 — cada metodo de $nombre declara Y consume el ambito de empresa', (PUERTO) => {
   const ADAPTADOR = PUERTO.adaptador
   const metodos = metodosDeLaInterfaz(PUERTO.ruta, PUERTO.nombre)
-  const cableado = cableadoDe(PUERTO.constante, PUERTO.nombre)
+  const cableado = cableadoDelPuerto(PUERTO)
   const adaptador = analizar(ADAPTADOR)
+  const dondeSeCablea = PUERTO.fabrica === undefined ? 'lib/composition' : `su fabrica ${PUERTO.fabrica}`
 
-  it(`${PUERTO.nombre}: los ${String(PUERTO.metodosEsperados)} metodos estan cableados en lib/composition, con nombre, y ninguno se queda fuera`, () => {
+  it(`${PUERTO.nombre}: los ${String(PUERTO.metodosEsperados)} metodos estan cableados en ${dondeSeCablea}, con nombre, y ninguno se queda fuera`, () => {
     expect(metodos.size).toBe(PUERTO.metodosEsperados)
     expect([...cableado.keys()].sort()).toEqual([...metodos.keys()].sort())
     for (const [metodo, implementacion] of cableado) {
       expect(
         implementacion,
-        `${PUERTO.constante}.${metodo} no esta cableado a una funcion con nombre del adaptador: la guardia no puede seguir una lambda, un bind ni un spread`,
+        `${PUERTO.constante}.${metodo} no esta cableado a una funcion con nombre del adaptador: la guardia no puede seguir una lambda con cuerpo, un bind, un spread ni un reenvio que no pase \`db\` y todos sus parametros`,
       ).toMatch(/^\w+$/)
     }
   })
@@ -533,6 +668,31 @@ describe('R2 — las escrituras sobre una conexion existente llevan el ambito en
       expect(/\bwhatsappConnectionCompanyScope\s*\(\s*scope\s*\)/.test(argumentos)).toBe(true)
       expect(/\bdeletedAt\s*:\s*null\b/.test(argumentos)).toBe(true)
     }
+  })
+})
+
+describe('R45 — las escrituras sobre un contacto llevan el ambito en el `where` de cada `updateMany`', () => {
+  const cableado = cableadoDelPuerto(PUERTO_CONTACTOS)
+  const adaptador = analizar(ADAPTADOR_CONTACTOS)
+
+  it.each([
+    ['setLink', 1],
+    ['setBlocked', 1],
+  ] as const)('%s: sus %i `updateMany` llevan `whatsappContactCompanyScope(scope)` en el `where`', (metodo, esperadas) => {
+    const funcion = adaptador.funciones.find((f) => f.nombre === cableado.get(metodo))
+    expect(funcion).toBeTruthy()
+    const cuerpo = funcion?.cuerpo ?? ''
+    const llamadas = [...cuerpo.matchAll(/\bdb\s*\.\s*whatsappContact\s*\.\s*updateMany\s*\(/g)]
+    expect(llamadas, 'la escritura tiene que ser un `updateMany` acotado').toHaveLength(esperadas)
+    for (const llamada of llamadas) {
+      const abre = cuerpo.indexOf('(', llamada.index)
+      const argumentos = cuerpo.slice(abre + 1, cierreEquilibrado(cuerpo, abre, '(', ')'))
+      expect(objetoDeLaClave(argumentos, 'where') ?? '').toMatch(/\bwhatsappContactCompanyScope\s*\(\s*scope\s*\)/)
+    }
+  })
+
+  it('el adaptador no escribe un contacto por `update`, `upsert`, `create` ni `delete`', () => {
+    expect(adaptador.codigo).not.toMatch(/\bdb\s*\.\s*whatsappContact\s*\.\s*(?:update|upsert|create|createMany|delete|deleteMany)\s*\(/)
   })
 })
 
@@ -733,7 +893,7 @@ describe('R3 — sensibilidad: las comprobaciones de plantillas muerden', () => 
   })
 })
 
-describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo la UNICA exencion con nombre', () => {
+describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo las exenciones con nombre que aprobo el humano', () => {
   const archivos = readdirSync(PERSISTENCE_ROOT).filter((archivo) => archivo.endsWith('.ts'))
 
   it('los archivos de persistencia se barren todos, y el troceo VE las consultas', () => {
@@ -741,7 +901,7 @@ describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo la 
     for (const exento of EXENTOS_DEL_AMBITO.keys()) expect(archivos).toContain(exento)
     for (const puerto of PUERTOS) {
       expect(archivos).toContain(puerto.adaptador)
-      const cableado = cableadoDe(puerto.constante, puerto.nombre)
+      const cableado = cableadoDelPuerto(puerto)
       const conConsulta = analizar(puerto.adaptador)
         .funciones.filter((f) => tocaLaBase(f.cuerpo))
         .map((f) => f.nombre)
@@ -754,14 +914,20 @@ describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo la 
     const titulo =
       motivo === undefined
         ? `${archivo}: toda funcion que toca la base declara y consume el ambito, y nadie lee la empresa a mano`
-        : `${archivo}: exento por nombre (${motivo}), con la forma exacta de design.md > 5.1`
+        : `${archivo}: exento por nombre (${motivo}), con su forma exacta`
     it(titulo, () => {
       expect(hallazgosDelArchivo(archivo, analizar(archivo))).toEqual([])
     })
   }
 
-  it('R32 — la lista de exentos tiene UNA sola entrada: el resolutor de empresa del webhook', () => {
-    expect([...EXENTOS_DEL_AMBITO.keys()]).toEqual(['whatsapp-webhook-directory-prisma.ts'])
+  // 2026-10-20, QC-239, decision del humano: hasta esta fecha la lista tenia UNA sola entrada, el
+  // resolutor de empresa del webhook. Se suma la transaccion de los contactos, con la forma estricta
+  // de QC-141 D21. Una tercera entrada pone este caso en rojo.
+  it('R32 — la lista de exentos tiene DOS entradas: el resolutor de empresa del webhook y la transaccion de los contactos', () => {
+    expect([...EXENTOS_DEL_AMBITO.keys()]).toEqual([
+      'whatsapp-webhook-directory-prisma.ts',
+      'whatsapp-contact-unit-of-work-prisma.ts',
+    ])
   })
 
   it('R32 — el resolutor exento es lo que lib/composition cablea al puerto `WhatsappWebhookDirectory`', () => {
@@ -771,7 +937,7 @@ describe('R2, R32 — ninguna consulta del modulo se queda sin ambito, salvo la 
     expect([...metodos.keys()]).toEqual([metodo])
   })
 
-  it('R32 — la unica exencion es la del resolutor de empresa del webhook: no hay otra lista de excepciones', () => {
+  it('R32 — las exenciones viven en UNA sola lista de exentos: no hay otra lista de excepciones', () => {
     const nombresDeLista = ['SIN_AMBITO_POR_DECISION_APROBADA', 'EXCEPCIONES', 'EXENTAS', 'EXENTOS_DEL_AMBITO']
     const marcas = nombresDeLista.map((nombre) => new RegExp(`^\\s*(?:const|let|type|enum)\\s+${nombre}\\b`, 'm'))
     expect(marcas.some((marca) => marca.test('const EXCEPCIONES = new Set([])'))).toBe(true)
@@ -860,6 +1026,140 @@ describe('R2 — sensibilidad: la guardia muerde con fuentes sinteticos', () => 
   })
 })
 
+describe('R45 — sensibilidad: los adaptadores con `db` y su fabrica no escapan al barrido', () => {
+  const CABECERA = "import { whatsappContactCompanyScope } from './company-scope'\n"
+  const FABRICA = 'createWhatsappContactRepository'
+  const INTERFAZ = 'WhatsappContactRepository'
+  const fabrica = (miembros: string): string =>
+    `export function ${FABRICA}(db: PrismaLike = prisma): ${INTERFAZ} {\n` +
+    '  return {\n' +
+    miembros +
+    '  };\n' +
+    '}\n'
+
+  it('una consulta por `db` sin `scope` en la firma da hallazgo', () => {
+    const fuente =
+      CABECERA +
+      'export async function leak(db: PrismaLike, id: string) {\n' +
+      '  return db.whatsappContact.findFirst({ where: { id } })\n' +
+      '}\n'
+    expect(hallazgosDe('x.ts', analizarFuente(fuente), false).join('\n')).toMatch(/sin declarar/)
+  })
+
+  it('una consulta por `db` que declara el ambito y no lo lleva al punto unico da hallazgo', () => {
+    const fuente =
+      CABECERA +
+      'export async function leak(db: PrismaLike, id: string, scope: IntegracionesScope) {\n' +
+      '  return db.whatsappContact.findFirst({ where: { id } })\n' +
+      '}\n'
+    expect(hallazgosDe('x.ts', analizarFuente(fuente), false).join('\n')).toMatch(/no lo lleva/)
+  })
+
+  it('una consulta por `db` escrita dentro de la propia fabrica da hallazgo', () => {
+    const fuente = CABECERA + fabrica('    findById: (id, scope) => db.whatsappContact.findFirst({ where: { id } }),\n')
+    expect(hallazgosDe('x.ts', analizarFuente(fuente), false).join('\n')).toMatch(/sin declarar/)
+  })
+
+  it('control: un miembro que reenvia `db` y todos sus parametros a una funcion con nombre se lee con su nombre', () => {
+    const cableado = cableadoEnFabrica(
+      fabrica('    findById: (id, scope) => findWhatsappContactById(db, id, scope),\n'),
+      FABRICA,
+      INTERFAZ,
+    )
+    expect([...(cableado?.entries() ?? [])]).toEqual([['findById', 'findWhatsappContactById']])
+  })
+
+  it('un miembro que pierde el ambito, cambia el orden, no pasa `db`, tiene cuerpo o es un spread no queda cableado con nombre', () => {
+    const cableado = cableadoEnFabrica(
+      fabrica(
+        '    findById: (id, scope) => findWhatsappContactById(db, id),\n' +
+          '    findByWaIds: (waIds, scope) => findWhatsappContactsByWaIds(db, scope, waIds),\n' +
+          '    setLink: (id, link, scope) => setWhatsappContactLink(prisma, id, link, scope),\n' +
+          '    setBlocked: async (id, blocked, scope) => { return setWhatsappContactBlocked(db, id, blocked, scope) },\n' +
+          '    ...otro,\n',
+      ),
+      FABRICA,
+      INTERFAZ,
+    )
+    expect(cableado).not.toBeNull()
+    expect(cableado?.size).toBe(5)
+    expect([...(cableado?.values() ?? [])].filter((nombre) => /^\w+$/.test(nombre))).toEqual([])
+  })
+
+  it('una fabrica sin la firma `(db: PrismaLike): Interfaz`, o que no devuelve solo un objeto, no se lee', () => {
+    const miembro = '    findById: (id, scope) => findWhatsappContactById(db, id, scope),\n'
+    const sinTipo = fabrica(miembro).replace(`): ${INTERFAZ} {`, ') {')
+    const sinTipoDeCliente = fabrica(miembro).replace('db: PrismaLike = prisma', 'db = prisma')
+    const sinObjeto = `export function ${FABRICA}(db: PrismaLike): ${INTERFAZ} {\n  return otro(db)\n}\n`
+    const conMasCodigo = fabrica(miembro).replace('  };\n}', '  };\n  leak()\n}')
+    for (const fuente of [sinTipo, sinTipoDeCliente, sinObjeto, conMasCodigo, 'const x = {}\n']) {
+      expect(cableadoEnFabrica(fuente, FABRICA, INTERFAZ)).toBeNull()
+    }
+  })
+})
+
+// 2026-10-20, QC-239: la recepcion lee los duenos de un numero por su propia transaccion, asi que
+// su adaptador es una fabrica que recibe `deps` y no `db`. Hasta esta fecha el puerto se cableaba
+// en lib/composition a `recordWhatsappInbound` por nombre; ahora se lee de la fabrica, y
+// lib/composition tiene que construir el puerto con ella.
+describe('R2 — la recepcion se cablea por su fabrica, y la fabrica no escapa al barrido', () => {
+  const FABRICA = 'createWhatsappInboxRecorder'
+  const INTERFAZ = 'WhatsappInboxRepository'
+  const DEPS = PUERTO_INBOX.parametroDeFabrica ?? PARAMETRO_DB
+  const fabrica = (miembros: string, firma = `deps: WhatsappInboxRecorderDeps`): string =>
+    `export function ${FABRICA}(${firma}): ${INTERFAZ} {\n` +
+    '  return {\n' +
+    miembros +
+    '  };\n' +
+    '}\n'
+
+  it('lib/composition construye `whatsappInboxRepository` con la fabrica del adaptador, y con nada mas', () => {
+    const fuente = vaciarCadenas(sinComentarios(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8')))
+    expect(fuente).toMatch(new RegExp(`\\bconst\\s+whatsappInboxRepository\\s*:\\s*${INTERFAZ}\\s*=\\s*${FABRICA}\\s*\\(`))
+    expect(fuente).not.toMatch(/\brecordWhatsappInbound\b/)
+  })
+
+  it('control: el miembro que reenvia `deps` y todos sus parametros se lee con su nombre', () => {
+    const cableado = cableadoEnFabrica(
+      fabrica('    record: (batch, connectionId, receivedAt, scope) => recordWhatsappInbound(deps, batch, connectionId, receivedAt, scope),\n'),
+      FABRICA,
+      INTERFAZ,
+      DEPS,
+    )
+    expect([...(cableado?.entries() ?? [])]).toEqual([['record', 'recordWhatsappInbound']])
+  })
+
+  it('un miembro que pierde el ambito, no pasa `deps` primero o tiene cuerpo no queda cableado con nombre', () => {
+    for (const miembro of [
+      '    record: (batch, connectionId, receivedAt, scope) => recordWhatsappInbound(deps, batch, connectionId, receivedAt),\n',
+      '    record: (batch, connectionId, receivedAt, scope) => recordWhatsappInbound(batch, connectionId, receivedAt, scope),\n',
+      '    record: async (batch, connectionId, receivedAt, scope) => { return recordWhatsappInbound(deps, batch, connectionId, receivedAt, scope) },\n',
+    ]) {
+      const cableado = cableadoEnFabrica(fabrica(miembro), FABRICA, INTERFAZ, DEPS)
+      expect(cableado).not.toBeNull()
+      expect([...(cableado?.values() ?? [])].filter((nombre) => /^\w+$/.test(nombre))).toEqual([])
+    }
+  })
+
+  it('una fabrica con otro parametro o sin el tipo del puerto no se lee', () => {
+    const miembro = '    record: (b, c, r, scope) => recordWhatsappInbound(deps, b, c, r, scope),\n'
+    for (const fuente of [
+      fabrica(miembro, 'db: PrismaLike'),
+      fabrica(miembro, 'deps: unknown'),
+      fabrica(miembro).replace(`): ${INTERFAZ} {`, ') {'),
+    ]) {
+      expect(cableadoEnFabrica(fuente, FABRICA, INTERFAZ, DEPS)).toBeNull()
+    }
+  })
+
+  it('una consulta escrita dentro de la propia fabrica da hallazgo', () => {
+    const fuente =
+      "import { whatsappContactCompanyScope } from './company-scope'\n" +
+      fabrica('    record: (b, c, r, scope) => prisma.whatsappContact.findMany({ where: { waId: b } }),\n')
+    expect(hallazgosDe('x.ts', analizarFuente(fuente), false).join('\n')).toMatch(/sin declarar/)
+  })
+})
+
 describe('R32 — sensibilidad: la exencion del resolutor de empresa no es un cheque en blanco', () => {
   const EXENTO = 'whatsapp-webhook-directory-prisma.ts'
   const IMPORT = "import { prisma } from '@/lib/shared/db/prisma'\n"
@@ -935,5 +1235,72 @@ describe('R32 — sensibilidad: la exencion del resolutor de empresa no es un ch
     expect(hallazgosDelArchivo('whatsapp-connection-lookup-prisma.ts', analizarFuente(real)).join('\n')).toMatch(
       /sin declarar/,
     )
+  })
+})
+
+describe('R32 — sensibilidad: la exencion de la transaccion de los contactos no es un cheque en blanco', () => {
+  const EXENTO = 'whatsapp-contact-unit-of-work-prisma.ts'
+  const IMPORT = "import { prisma } from '@/lib/shared/db/prisma'\n"
+  const BUENA =
+    IMPORT +
+    'export async function withWhatsappContactTransaction(run) {\n' +
+    '  try {\n' +
+    '    return await prisma.$transaction(run, { maxWait: 10_000, timeout: 30_000 })\n' +
+    '  } catch (error) {\n' +
+    '    if (!isCustomerPhoneLinkConflict(error)) throw error\n' +
+    '    return prisma.$transaction(run, { maxWait: 10_000, timeout: 30_000 })\n' +
+    '  }\n' +
+    '}\n'
+  const hallazgosComoExento = (fuente: string): string => hallazgosDelArchivo(EXENTO, analizarFuente(fuente)).join('\n')
+
+  it('control: la forma aprobada no da hallazgo, y el fuente real tampoco', () => {
+    expect(hallazgosDelArchivo(EXENTO, analizarFuente(BUENA))).toEqual([])
+    const real = readFileSync(join(PERSISTENCE_ROOT, EXENTO), 'utf8')
+    expect(hallazgosDelArchivo(EXENTO, analizarFuente(real))).toEqual([])
+  })
+
+  it('un `tx.whatsappContact.findMany` dentro del callback de `$transaction` da hallazgo', () => {
+    const fuente =
+      IMPORT +
+      'export async function withWhatsappContactTransaction(run) {\n' +
+      '  return prisma.$transaction(async (tx) => {\n' +
+      '    await tx.whatsappContact.findMany()\n' +
+      '    return run(tx)\n' +
+      '  })\n' +
+      '}\n'
+    expect(hallazgosComoExento(fuente)).toMatch(/consulta por la transaccion/)
+  })
+
+  it('una consulta por `prisma.` en el exento da hallazgo, dentro o fuera de su funcion', () => {
+    const dentro = BUENA.replace('try {\n', 'try {\n    await prisma.whatsappContact.findMany()\n')
+    expect(hallazgosComoExento(dentro)).toMatch(/no es `prisma\.\$transaction`/)
+    const otraFuncion = BUENA + 'export async function seCuela() {\n  return prisma.whatsappContact.findMany({})\n}\n'
+    expect(hallazgosComoExento(otraFuncion)).toMatch(/no es `prisma\.\$transaction`/)
+    expect(hallazgosComoExento(otraFuncion)).toMatch(/exactamente una funcion/)
+  })
+
+  it('una segunda funcion sin consulta, o la misma con otro nombre, da hallazgo', () => {
+    expect(hallazgosComoExento(BUENA + 'export function helper(x: string) {\n  return x\n}\n')).toMatch(/exactamente una funcion/)
+    expect(hallazgosComoExento(BUENA.replace('withWhatsappContactTransaction', 'withAnything'))).toMatch(/exactamente una funcion/)
+  })
+
+  it('SQL crudo, un alias de `prisma` o un import de namespace en el exento dan hallazgo', () => {
+    expect(hallazgosComoExento(BUENA.replace('try {\n', 'try {\n    await prisma.$queryRaw`SELECT 1`\n'))).toMatch(/SQL crudo/)
+    expect(hallazgosComoExento(BUENA.replace('{ prisma }', '{ prisma as db0 }'))).toMatch(/alias/)
+    expect(hallazgosComoExento(BUENA.replace('import { prisma }', 'import * as db0'))).toMatch(/alias/)
+  })
+
+  it('el mismo fuente aprobado con OTRO nombre de archivo da hallazgo: la exencion es por nombre', () => {
+    expect(hallazgosDelArchivo('whatsapp-contact-unit-of-work-prisma-copia.ts', analizarFuente(BUENA)).join('\n')).toMatch(
+      /sin declarar/,
+    )
+  })
+
+  it('la forma de la transaccion no sirve para el resolutor, ni la del resolutor para la transaccion', () => {
+    expect(hallazgosDelArchivo('whatsapp-webhook-directory-prisma.ts', analizarFuente(BUENA)).join('\n')).toMatch(
+      /exactamente una funcion/,
+    )
+    const resolutor = readFileSync(join(PERSISTENCE_ROOT, 'whatsapp-webhook-directory-prisma.ts'), 'utf8')
+    expect(hallazgosComoExento(resolutor)).toMatch(/no es `prisma\.\$transaction`/)
   })
 })

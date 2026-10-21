@@ -5,7 +5,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { companyScopeColumns, orderCompanyScope } from './company-scope';
 
 import { formatOrderNumber } from '../../../domain/order-number';
-import { effectivePackages } from '../../../domain/packing-count';
+import { orderedPackages } from '../../../domain/packing-count';
 
 import type { OrderScope } from '../../../domain/order-scope';
 import type {
@@ -114,6 +114,7 @@ async function listWaitingOrderLines(
       presentationId: true,
       packages: true,
       packedPackages: true,
+      packedSurplusPackages: true,
       order: { select: { id: true, recipeId: true, orderYear: true, orderSequence: true } },
     },
     orderBy: [{ order: { orderYear: 'asc' } }, { order: { orderSequence: 'asc' } }, { id: 'asc' }],
@@ -136,7 +137,7 @@ async function listWaitingOrderLines(
   return lines.map((line) => ({
     orderId: line.order.id,
     numberText: formatOrderNumber({ year: line.order.orderYear, sequence: line.order.orderSequence }),
-    orderedPackages: effectivePackages(line),
+    orderedPackages: orderedPackages(line),
     deliveredPackages: deliveredByLine.get(line.id) ?? 0,
     recipeId: line.order.recipeId,
     presentationId: line.presentationId,

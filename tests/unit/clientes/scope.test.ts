@@ -115,7 +115,11 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'adapters/driven/persistence/company-scope.ts',
       // QC-156: el adaptador del servicio que `clientes` ofrece a otros modulos.
       'adapters/driven/persistence/customer-catalog-prisma.ts',
+      // QC-239 2026-10-20: telefonos de cliente.
+      'adapters/driven/persistence/customer-phone-prisma.ts',
       'adapters/driven/persistence/customer-prisma.ts',
+      // QC-239 2026-10-20: la transaccion de los telefonos del cliente.
+      'adapters/driven/persistence/customer-unit-of-work-prisma.ts',
       'adapters/driven/persistence/legacy-phone-prisma.ts',
       'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driving/customer-actions.ts',
@@ -126,6 +130,8 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'domain/customer-catalog.ts',
       'domain/customer-id.ts',
       'domain/customer-input.ts',
+      // QC-239 2026-10-20: orquestacion de los telefonos de un cliente.
+      'domain/customer-phone-links.ts',
       'domain/customer-phone.ts',
       'domain/customer-queryable.ts',
       'domain/customer-scope.ts',
@@ -143,7 +149,11 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'domain/update-customer.ts',
       'index.ts',
       'ports/company-country-lookup.ts',
+      // QC-239 2026-10-20: telefonos, escritura transaccional y unidad de trabajo del cliente.
+      'ports/customer-phone-repository.ts',
       'ports/customer-repository.ts',
+      'ports/customer-unit-of-work.ts',
+      'ports/customer-write-repository.ts',
       'ports/legacy-phone-repository.ts',
       'ports/list-query-log.ts',
     ]
@@ -566,7 +576,7 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
     ])
   })
 
-  it('solo tres migraciones del repo tocan la tabla customers: la de QC-153, la de esta ficha y la de QC-156', () => {
+  it('solo las siete migraciones de la lista cerrada nombran la tabla customers, cada una con su motivo', () => {
     const migracionesDir = join(repoRoot, 'db', 'migrations')
     const tocanCustomers = readdirSync(migracionesDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -584,6 +594,8 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
     // compuesta desde la tabla nueva; no altera `customers`.
     // QC-282 2026-10-15: + `order_delivery_lines_customer`, que mueve esa FK compuesta de
     // `order_deliveries` a `order_delivery_lines`; tampoco altera `customers`.
+    // QC-239 2026-10-20: + `customer_phone_numbers`, que copia los telefonos de `customers` a la
+    // tabla puente, la referencia con una FK compuesta y retira su indice unico de telefono.
     expect(tocanCustomers).toEqual([
       '20260924120000_customers',
       '20260924200000_customers_search_normalized',
@@ -591,6 +603,7 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       '20261008150100_order_deliveries',
       '20261015130000_order_delivery_lines_customer',
       '20261019130000_customers_phone_e164',
+      '20261020120000_customer_phone_numbers',
     ])
   })
 

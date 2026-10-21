@@ -9,11 +9,13 @@
 // **Ningun assert sobre literales de copy** (R41): rol ARIA, `data-testid` exportado como
 // constante, o constantes del propio contrato del modulo.
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  USER_BIRTH_DATE_FIELD,
+  USER_BIRTH_DATE_VALUE_TESTID,
   USER_BUSINESS_FIELDS,
   USER_DOCUMENT_TYPE_OPTION_TESTID,
   USER_ERROR_TESTIDS,
@@ -29,20 +31,15 @@ import {
   USER_USERNAME_SUGGESTION_APPLY_TESTID,
   USER_USERNAME_SUGGESTION_TESTID,
   UserForm,
-  nextUsernameCandidate,
-  usernameFromNames,
   endUserSessionsLabel,
   type UserFieldName,
   type UserFormEndSessions,
 } from '@/app/(private)/configuracion/usuarios/components';
+import { nextUsernameCandidate } from '@/components/shared/username-from-names';
 import { Sheet } from '@/components/ui/sheet';
+import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
 import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
-import {
-  DOCUMENT_TYPE_CODES,
-  USER_USERNAME_MAX_LENGTH,
-  type RoleOption,
-  type UserDetail,
-} from '@/lib/modules/identity';
+import { DOCUMENT_TYPE_CODES, type RoleOption, type UserDetail } from '@/lib/modules/identity';
 import type {
   CreateUserFormState,
   UserMutationFormState,
@@ -102,11 +99,15 @@ const ROLES: readonly RoleOption[] = [
   { id: 'r-operario', name: 'Operario' },
 ];
 
+/** El dia 15 del mes que abre el calendario: cualquier fecha pasada o presente vale. */
+const HOY = new Date();
+const FECHA_ELEGIDA = formatDateLocalISO(new Date(HOY.getFullYear(), HOY.getMonth(), 15));
+
 /** Lo que se teclea. Son DATOS del caso, no copy de la interfaz. */
 const ESCRITO: Readonly<Record<Exclude<UserFieldName, 'documentTypeCode' | 'roleId'>, string>> = {
   firstNames: 'Ana Maria',
   lastNames: 'Lopez Perez',
-  birthDate: '1990-04-17',
+  birthDate: FECHA_ELEGIDA,
   email: 'ana.lopez@example.com',
   phone: '3001234567',
   documentNumber: '1020304050',
@@ -189,14 +190,22 @@ async function elegirRol(user: ReturnType<typeof setupUser>, indice: number) {
   await user.click(await esperarInteractiva(opciones[indice]!));
 }
 
+/** Abre el calendario de la fecha de nacimiento y elige `FECHA_ELEGIDA`. */
+async function elegirFechaDeNacimiento(user: ReturnType<typeof setupUser>) {
+  await user.click(screen.getByTestId(USER_FIELD_TESTIDS.birthDate));
+  const dia = await waitFor(() => {
+    const boton = document.querySelector<HTMLElement>(`td[data-day="${FECHA_ELEGIDA}"] button`);
+    expect(boton).not.toBeNull();
+    return boton!;
+  });
+  await user.click(await esperarInteractiva(dia));
+}
+
 /** Rellena los nueve y envia. El tipo de documento ya viene del conjunto cerrado por defecto. */
 async function rellenarYEnviar(user: ReturnType<typeof setupUser>) {
   await user.type(screen.getByTestId(USER_FIELD_TESTIDS.firstNames), ESCRITO.firstNames);
   await user.type(screen.getByTestId(USER_FIELD_TESTIDS.lastNames), ESCRITO.lastNames);
-  // El campo de fecha no se teclea caracter a caracter: se le da su valor `YYYY-MM-DD`.
-  fireEvent.change(screen.getByTestId(USER_FIELD_TESTIDS.birthDate), {
-    target: { value: ESCRITO.birthDate },
-  });
+  await elegirFechaDeNacimiento(user);
   await user.type(screen.getByTestId(USER_FIELD_TESTIDS.email), ESCRITO.email);
   await user.type(screen.getByTestId(USER_FIELD_TESTIDS.phone), ESCRITO.phone);
   await user.type(screen.getByTestId(USER_FIELD_TESTIDS.documentNumber), ESCRITO.documentNumber);
@@ -242,9 +251,7 @@ describe('el formulario captura EXACTAMENTE los nueve campos (R23, R35)', () => 
 
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.firstNames), ESCRITO.firstNames);
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.lastNames), ESCRITO.lastNames);
-    fireEvent.change(screen.getByTestId(USER_FIELD_TESTIDS.birthDate), {
-      target: { value: ESCRITO.birthDate },
-    });
+    await elegirFechaDeNacimiento(user);
     // Con mayusculas a proposito: normalizar el correo es del esquema del modulo, no de aqui.
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.email), 'ANA.LOPEZ@EXAMPLE.COM');
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.phone), ESCRITO.phone);
@@ -258,12 +265,33 @@ describe('el formulario captura EXACTAMENTE los nueve campos (R23, R35)', () => 
     expect(enviado.get('email')).toBe('ANA.LOPEZ@EXAMPLE.COM');
     expect(enviado.get('firstNames')).toBe(ESCRITO.firstNames);
     expect(enviado.get(USER_ROLE_FIELD)).toBe(ROLES[1]!.id);
+    expect(enviado.get(USER_BIRTH_DATE_FIELD)).toBe(FECHA_ELEGIDA);
   });
 
-  it('la fecha de nacimiento es un campo de fecha, que es lo que el esquema espera (R26)', () => {
+  it('la fecha de nacimiento se elige en el calendario y viaja como `YYYY-MM-DD` (R26)', async () => {
+    const user = setupUser();
     montar();
 
-    expect(screen.getByTestId(USER_FIELD_TESTIDS.birthDate)).toHaveAttribute('type', 'date');
+    const valor = screen.getByTestId(USER_BIRTH_DATE_VALUE_TESTID);
+    expect(valor).toHaveAttribute('type', 'hidden');
+    expect(valor).toHaveAttribute('name', USER_BIRTH_DATE_FIELD);
+    expect(valor).toHaveValue('');
+
+    await elegirFechaDeNacimiento(user);
+
+    expect(valor).toHaveValue(FECHA_ELEGIDA);
+    expect((valor as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(screen.getByTestId(USER_FIELD_TESTIDS.birthDate)).toHaveTextContent(FECHA_ELEGIDA);
+  });
+
+  it('la edicion arranca con la fecha de nacimiento de la ficha', () => {
+    render(
+      <Sheet open onOpenChange={() => {}}>
+        <UserForm user={FICHA} roles={ROLES} rolesError={null} onSaved={onSaved} />
+      </Sheet>,
+    );
+
+    expect(screen.getByTestId(USER_BIRTH_DATE_VALUE_TESTID)).toHaveValue('1990-04-17');
   });
 });
 
@@ -394,7 +422,7 @@ describe('cada codigo de error pinta donde le toca (R27)', () => {
     expect(screen.getByTestId(USER_FIELD_TESTIDS.documentNumber)).toHaveValue(
       ESCRITO.documentNumber,
     );
-    expect(screen.getByTestId(USER_FIELD_TESTIDS.birthDate)).toHaveValue(ESCRITO.birthDate);
+    expect(screen.getByTestId(USER_BIRTH_DATE_VALUE_TESTID)).toHaveValue(ESCRITO.birthDate);
     // El rol elegido sigue elegido: viaja por el `input` oculto del primitivo.
     expect(document.querySelector<HTMLInputElement>(`input[name="${USER_ROLE_FIELD}"]`)?.value).toBe(
       ROLES[0]!.id,
@@ -561,46 +589,6 @@ describe('el alta propone el nombre de usuario a partir de nombres y apellidos',
     await user.type(screen.getByTestId(USER_FIELD_TESTIDS.lastNames), ' Nunez');
 
     expect(screen.getByTestId(USER_FIELD_TESTIDS.username)).toHaveValue(FICHA.username);
-  });
-});
-
-describe('`usernameFromNames`: primer nombre entero mas iniciales', () => {
-  it.each([
-    ['José Carlos', 'Pérez Núñez', 'josecpn'],
-    ['Ana', 'López', 'anal'],
-    ['  María   Fernanda  ', 'Restrepo de la Hoz', 'mariafrdlh'],
-    ['Peña', '', 'pena'],
-    ["O'Neil 2", 'Ñandú', 'oneil2n'],
-    ['', 'Pérez', ''],
-    ['   ', 'Pérez', ''],
-  ])('(%j, %j) -> %j', (nombres, apellidos, esperado) => {
-    expect(usernameFromNames(nombres, apellidos)).toBe(esperado);
-  });
-
-  it('recorta al maximo del contrato', () => {
-    const largo = 'a'.repeat(USER_USERNAME_MAX_LENGTH + 10);
-    expect(usernameFromNames(largo, 'Perez')).toHaveLength(USER_USERNAME_MAX_LENGTH);
-  });
-});
-
-describe('`nextUsernameCandidate`: el sufijo numerico final, mas uno', () => {
-  it.each([
-    ['josecpn', 'josecpn1'],
-    ['josecpn1', 'josecpn2'],
-    ['josecpn9', 'josecpn10'],
-    ['josecpn99', 'josecpn100'],
-    ['ana2lopez', 'ana2lopez1'],
-    ['', '1'],
-  ])('%j -> %j', (enviado, esperado) => {
-    expect(nextUsernameCandidate(enviado)).toBe(esperado);
-  });
-
-  it('recorta la base para no pasar del maximo del contrato', () => {
-    const lleno = 'a'.repeat(USER_USERNAME_MAX_LENGTH);
-    expect(nextUsernameCandidate(lleno)).toBe(`${'a'.repeat(USER_USERNAME_MAX_LENGTH - 1)}1`);
-
-    const conNueve = `${'a'.repeat(USER_USERNAME_MAX_LENGTH - 1)}9`;
-    expect(nextUsernameCandidate(conNueve)).toBe(`${'a'.repeat(USER_USERNAME_MAX_LENGTH - 2)}10`);
   });
 });
 

@@ -157,7 +157,6 @@ const PHONE_TOO_LONG_MESSAGE = `El teléfono es demasiado largo (máximo ${CUSTO
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const PHONE_COUNTRY_REQUIRED_CODE = 'customer_phone_country_required' satisfies ErrorCode;
 const PHONE_INVALID_CODE = 'customer_phone_invalid' satisfies ErrorCode;
-const DUPLICATE_PHONE_CODE = 'customer_duplicate_phone' satisfies ErrorCode;
 const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
 
 type FieldErrors = Partial<Record<CustomerFieldName, string>>;
@@ -211,8 +210,6 @@ function phoneServerError(error: ErrorState, values: FieldValues): FieldErrors {
       return { phoneCountry: error.message };
     case PHONE_INVALID_CODE:
       return { phoneNumber: phoneNumberInvalidMessage(values.phoneCountry) ?? error.message };
-    case DUPLICATE_PHONE_CODE:
-      return { phoneNumber: error.message };
     default:
       return {};
   }

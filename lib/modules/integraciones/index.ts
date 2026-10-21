@@ -7,6 +7,9 @@ export {
   WhatsappConnectionExistsError,
   WhatsappPhoneNumberTakenError,
   ActionNotAllowedError,
+  WhatsappContactNotFoundError,
+  WhatsappContactNumberInvalidError,
+  LinkedCustomerNotFoundError,
   WhatsappTemplateNotFoundError,
   WhatsappTemplateNameTakenError,
   WhatsappTemplateRateLimitedError,
@@ -30,6 +33,15 @@ export { createSetWhatsappConnectionEnabled } from './domain/set-whatsapp-connec
 export { createRegenerateWhatsappVerifyToken } from './domain/regenerate-whatsapp-verify-token';
 export { createVerifyWhatsappWebhook } from './domain/verify-whatsapp-webhook';
 export { createReceiveWhatsappWebhook } from './domain/receive-whatsapp-webhook';
+export {
+  createRefreshWhatsappContactLinks,
+  type RefreshWhatsappContactLinks,
+  type RefreshWhatsappContactLinksDeps,
+} from './domain/refresh-whatsapp-contact-links';
+export { resolveContactLink, type ContactLink } from './domain/whatsapp-contact-link';
+export { createLinkWhatsappContact } from './domain/link-whatsapp-contact';
+export { createUnlinkWhatsappContact } from './domain/unlink-whatsapp-contact';
+export { createSetWhatsappContactBlocked } from './domain/set-whatsapp-contact-blocked';
 export type {
   AiProviderCode,
   AiProviderConnectionStatus,

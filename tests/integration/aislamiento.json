@@ -23,6 +23,7 @@
     "asignaciones/responsible-eligibility.int.test.ts",
     "asignaciones/step-evidence-constraints.int.test.ts",
     "asignaciones/unassign.int.test.ts",
+    "clientes/customer-phone-numbers-migration.int.test.ts",
     "clientes/customers-constraints.int.test.ts",
     "clientes/customers-migration.int.test.ts",
     "clientes/customers-phone-migration.int.test.ts",
@@ -527,9 +528,14 @@
       "desde": "2026-10-06"
     },
     {
-      "archivo": "clientes/customer-phone-uniqueness.int.test.ts",
-      "motivo": "T5 (QC-236): ejercita createCustomer y updateAliveCustomer de customer-prisma.ts contra el indice unico parcial del telefono, y dos altas simultaneas con el mismo numero. Usan el cliente Prisma GLOBAL (y la edicion con el numero vacio abre su propia transaccion), asi que una transaccion del test con ROLLBACK no los envolveria. Dos empresas efimeras (randomUUID, con usuario, rol y tipo de documento) nacen en beforeAll; afterAll borra sus clientes por company_id, cuenta que no quedo ninguno y despues borra usuarios, rol, tipo de documento y empresa. Se apoya en que la base de la corrida es suya.",
-      "desde": "2026-10-19"
+      "archivo": "clientes/customer-phone-shared.int.test.ts",
+      "motivo": "T5 (QC-236), renombrado y reescrito en T5 (QC-239): ejercita createCustomer y updateAliveCustomer de customer-prisma.ts, y el alta y la edicion de lib/composition con su unidad de trabajo real (withCustomerTransaction), que abre su propia transaccion sobre el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria. Dos empresas efimeras (randomUUID, con usuario, rol y tipo de documento) nacen en beforeAll; afterAll borra por company_id, en el orden de las FK, vinculos de telefono, numeros y clientes, cuenta que no quedo ninguno y despues borra usuarios, rol, tipo de documento y empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
+      "archivo": "clientes/customer-phone-numbers.int.test.ts",
+      "motivo": "T3 y T5 (QC-239): ejercita customer-phone-prisma.ts sobre el cliente Prisma GLOBAL, withCustomerTransaction (que abre su propia transaccion y la reintenta) y el alta y la edicion de lib/composition, asi que una transaccion del test con ROLLBACK no los envolveria. Cada caso siembra sus propios clientes y numeros, irrepetibles entre corridas; afterAll borra por company_id, en el orden de las FK, vinculos, numeros, clientes, usuario, rol, tipo de documento y empresa, y cuenta que no quedo ninguno. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
     },
     {
       "archivo": "clientes/legacy-phone-backfill.int.test.ts",
@@ -678,18 +684,23 @@
     },
     {
       "archivo": "integraciones/whatsapp-inbox-prisma.int.test.ts",
-      "motivo": "Ejercita 'recordWhatsappInbound' de whatsapp-inbox-prisma.ts, que abre su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria; ademas el caso de dos 'record' concurrentes del mismo numero necesita dos transacciones que confirmen de verdad contra el unico (connection_id, wa_id). Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "motivo": "Ejercita 'recordWhatsappInbound' de whatsapp-inbox-prisma.ts, que abre su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria; ademas el caso de dos 'record' concurrentes del mismo numero necesita dos transacciones que confirmen de verdad contra el unico (connection_id, wa_id). Los duenos de cada numero se leen con el servicio real de telefonos de clientes sobre esa misma transaccion, y los clientes se dan de alta por clientes.createCustomer de lib/composition, que abre su propia transaccion. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones -> vinculos -> numeros -> clientes por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-19"
     },
     {
       "archivo": "integraciones/whatsapp-webhook-route.int.test.ts",
-      "motivo": "Recorre los GET/POST exportados por whatsapp-webhook-route.ts con la composicion real: el POST guarda en la PROPIA 'prisma.$transaction' de recordWhatsappInbound sobre el cliente GLOBAL, y el handshake y el descifrado ilegible escriben la conexion con el mismo cliente, asi que una transaccion del test con ROLLBACK no los envolveria; el caso de la transaccion que falla necesita ademas que el reintento confirme de verdad. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa con o sin el anadido integraciones, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa (los anadidos caen en cascada). Se apoya en que la base de la corrida es suya.",
+      "motivo": "Recorre los GET/POST exportados por whatsapp-webhook-route.ts con la composicion real: el POST guarda en la PROPIA 'prisma.$transaction' de recordWhatsappInbound sobre el cliente GLOBAL, y el handshake y el descifrado ilegible escriben la conexion con el mismo cliente, asi que una transaccion del test con ROLLBACK no los envolveria; el caso de la transaccion que falla necesita ademas que el reintento confirme de verdad. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa con o sin el anadido integraciones, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones -> vinculos -> numeros -> clientes por 'company_id' (los clientes los da de alta clientes.createCustomer de lib/composition, que abre su propia transaccion), afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa (los anadidos caen en cascada). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-19"
     },
     {
       "archivo": "integraciones/whatsapp-messages-constraints.int.test.ts",
-      "motivo": "Ejercita 'companyOfWhatsappConnection' de whatsapp-webhook-directory-prisma.ts y las altas de conexion de whatsapp-connection-prisma.ts, que usan el cliente Prisma GLOBAL y no un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria. Las altas que la base debe rechazar (unicos, CHECK y FK compuestas de empresa) no dejan fila. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "motivo": "Ejercita 'companyOfWhatsappConnection' de whatsapp-webhook-directory-prisma.ts y las altas de conexion de whatsapp-connection-prisma.ts, que usan el cliente Prisma GLOBAL y no un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria. Las altas que la base debe rechazar (unicos, CHECK y FK compuestas de empresa) no dejan fila. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones -> clientes por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-19"
+    },
+    {
+      "archivo": "integraciones/whatsapp-contact-links.int.test.ts",
+      "motivo": "T7 (QC-239): recorre vincular, desvincular y bloquear contactos, y el alta y la edicion de clientes, por la fachada real de lib/composition: withWhatsappContactTransaction y withCustomerTransaction abren su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no las envolveria, y el caso del fallo forzado necesita que la transaccion real se deshaga. Cada caso siembra sus numeros irrepetibles en dos empresas efimeras con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra por 'company_id' mensajes -> contactos -> conexiones -> vinculos -> numeros -> clientes, afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
     },
     {
       "archivo": "integraciones/whatsapp-template-prisma.int.test.ts",

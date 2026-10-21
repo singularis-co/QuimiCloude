@@ -13,7 +13,7 @@ export const DIRECT_DELIVERY_SURPLUS_MAX_PRODUCTS = 200;
 export type WaitingOrderLine = {
   readonly orderId: string;
   readonly numberText: string;
-  /** Los envases que cuentan para el pedido (`effectivePackages`). */
+  /** Los envases que espera el pedido (`orderedPackages`): los libres quedan para el excedente. */
   readonly orderedPackages: number;
   /** Sin las lineas anuladas. */
   readonly deliveredPackages: number;

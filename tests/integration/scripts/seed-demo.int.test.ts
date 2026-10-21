@@ -71,6 +71,9 @@ async function deleteCompany(company: string): Promise<void> {
   await prisma.recipe.deleteMany({ where: scope })
   await prisma.supplierCatalogLine.deleteMany({ where: scope })
   await prisma.supplier.deleteMany({ where: scope })
+  // Los vinculos y los numeros apuntan a los clientes y a la empresa con FK RESTRICT: van antes.
+  await prisma.customerPhoneNumber.deleteMany({ where: scope })
+  await prisma.phoneNumber.deleteMany({ where: scope })
   await prisma.customer.deleteMany({ where: scope })
   await prisma.presentation.deleteMany({ where: scope })
   await prisma.unit.deleteMany({ where: scope })

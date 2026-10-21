@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { pedidos } from '@/lib/composition';
+import { listOrderDeliveryProgressByIdsIncludingDeleted } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import {
@@ -761,6 +762,96 @@ describe('getOrderDelivery contra Postgres', () => {
       expect(await codigoDe(pedidos.getOrderDelivery(entregado, e.a.actor))).toBe('action_not_allowed');
     } finally {
       await borrarEscenario(e);
+    }
+  });
+});
+
+// QC-290: el pedido termino con 12 envases reales de 1 L sobre un plan de 10 y 2 quedaron libres.
+// El lote tiene los 12; el pedido solo espera 10.
+describe('QC-290 — la entrega espera solo lo pedido, contra Postgres', () => {
+  type ConLibres = {
+    readonly a: EmpresaDeEntrega;
+    readonly customerId: string;
+    readonly orderId: string;
+    readonly lineId: string;
+    readonly productId: string;
+    readonly batchId: string;
+  };
+
+  async function crearConLibres(): Promise<ConLibres> {
+    const a = await crearEmpresaDeEntrega('A');
+    const customerId = await crearCliente(a, 'Garcia');
+    const presentationId = await crearPresentacion(a, '1.0000');
+    const { orderId, lineIds } = await crearPedido(a, 'TERMINADO', customerId, [{ presentationId, packages: 10 }]);
+    const lineId = lineIds[0] as string;
+    await prisma.orderPresentationLine.update({
+      where: { id: lineId },
+      data: { packedPackages: 12, packedReason: 'conteo_fisico', packedReasonOther: null, packedSurplusPackages: 2 },
+    });
+    const productId = await crearTerminado(a, presentationId);
+    const batchId = await crearLote(a, productId, presentationId, '12.0000', '1.0000');
+    return { a, customerId, orderId, lineId, productId, batchId };
+  }
+
+  function entregaDe(e: ConLibres, packages: number) {
+    return {
+      orderId: e.orderId,
+      deliveryKey: randomUUID(),
+      customers: [{ customerId: e.customerId, allocations: [{ presentationLineId: e.lineId, batchId: e.batchId, packages }] }],
+    };
+  }
+
+  it('R12, R15: el sheet y el progreso del listado leen la columna y esperan 10, no los 12 reales', async () => {
+    const e = await crearConLibres();
+    try {
+      const vista = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+      expect(vista.lines).toHaveLength(1);
+      expect(vista.lines[0]).toMatchObject({
+        presentationLineId: e.lineId,
+        orderedPackages: 10,
+        deliveredPackages: 0,
+        remainingPackages: 10,
+      });
+      expect(vista.lines[0]?.batches.map((batch) => [batch.batchId, batch.availablePackages])).toEqual([[e.batchId, 12]]);
+
+      const progreso = await listOrderDeliveryProgressByIdsIncludingDeleted(e.a.companyId, [e.orderId]);
+      expect(progreso).toEqual([
+        {
+          id: e.orderId,
+          recipeId: expect.any(String),
+          lines: [{ presentationId: expect.any(String), packages: 10, packedPackages: 12, packedSurplusPackages: 2, deliveredPackages: 0 }],
+        },
+      ]);
+    } finally {
+      await borrarEmpresaDeEntrega(e.a);
+    }
+  });
+
+  it('R13: pedir 11 envases de 1 L con 12 reales y 2 libres es delivery_exceeds_remaining sin escribir nada', async () => {
+    const e = await crearConLibres();
+    try {
+      expect(await codigoDe(pedidos.deliverOrder(entregaDe(e, 11), e.a.actor))).toBe('delivery_exceeds_remaining');
+
+      expect(await escritoPorEntregas(e.a.companyId)).toEqual({ entregas: 0, lineas: 0, asientos: 0 });
+      expect(await stockDeLote(e.batchId)).toBe('12.0000');
+      expect((await pedido(e.orderId)).status).toBe('TERMINADO');
+    } finally {
+      await borrarEmpresaDeEntrega(e.a);
+    }
+  });
+
+  it('R13, R14: entregar los 10 que espera el pedido lo deja ENTREGADO y los 2 libres siguen en la existencia del lote', async () => {
+    const e = await crearConLibres();
+    try {
+      const resultado = await pedidos.deliverOrder(entregaDe(e, 10), e.a.actor);
+
+      expect(resultado).toEqual({ status: 'delivered', orderStatus: 'ENTREGADO' });
+      expect((await pedido(e.orderId)).status).toBe('ENTREGADO');
+      expect(await stockDeLote(e.batchId)).toBe('2.0000');
+      expect(await stockDeProducto(e.productId)).toBe('2.0000');
+      expect(await escritoPorEntregas(e.a.companyId)).toEqual({ entregas: 1, lineas: 1, asientos: 1 });
+    } finally {
+      await borrarEmpresaDeEntrega(e.a);
     }
   });
 });

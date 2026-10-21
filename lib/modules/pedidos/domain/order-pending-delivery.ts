@@ -1,5 +1,5 @@
 import { remainingPackages } from './order-delivery';
-import { effectivePackages } from './packing-count';
+import { orderedPackages } from './packing-count';
 
 import type { OrderDeliveryProgress } from './order-catalog';
 import type { OrderStatus } from './order-classification';
@@ -28,8 +28,8 @@ const NOT_PACKED: OrderDeliveryState = { kind: 'not_packed' };
 const DELIVERED: OrderDeliveryState = { kind: 'delivered' };
 
 /**
- * El estado de entrega con el mismo criterio que el sheet de entrega: lo contado al empacar
- * (`effectivePackages`) menos lo entregado sin anular.
+ * El estado de entrega con el mismo criterio que el sheet de entrega: lo que espera el pedido
+ * (`orderedPackages`) menos lo entregado sin anular.
  *
  * `ENTREGADO` es `delivered` aunque no tenga lineas: un entregado anterior a las entregas por
  * linea no tiene nada anotado y ya no debe nada. Antes de terminar el empaque -y en `CANCELADO`-
@@ -51,7 +51,7 @@ export function deliveryStateOf(
   let pendingTotal = 0;
   const items: OrderPendingDelivery[] = [];
   for (const line of progress?.lines ?? []) {
-    const packages = effectivePackages(line);
+    const packages = orderedPackages(line);
     packed += packages;
     const quantity = remainingPackages({
       presentationLineId: line.presentationId,

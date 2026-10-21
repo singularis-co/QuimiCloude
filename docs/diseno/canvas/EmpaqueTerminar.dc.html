@@ -34,7 +34,8 @@ body{margin:0}
 .et-ta{height:auto;padding:10px 12px;line-height:1.45;resize:vertical}
 .et-pop{top:calc(100% + 4px);left:0;right:0}
 .et-sum{font-size:14px;display:flex;flex-direction:column;gap:2px}
-.et-sum .over{color:var(--d-fg)}
+.et-ft .nt{flex:none;width:100%}
+.et-ft .nt b{margin-bottom:0}
 @container (max-width: 760px){
 .et-dlg{max-height:none}
 .et-hd{padding:20px 16px 12px}
@@ -43,7 +44,7 @@ body{margin:0}
 .et-ft .actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
 .et-line{grid-template-columns:80px minmax(0,1fr)}
 .et-step{grid-column:1 / -1}
-.et-step .in{flex:1;width:auto}
+.et-step .in{flex:1;width:auto;min-width:0}
 .et-more{grid-column:1 / -1}
 }
 </style>
@@ -160,6 +161,7 @@ body{margin:0}
     </div>
 
     <div class="et-ft">
+      <sc-if value="{{ hasSurplus }}" hint-placeholder-val="{{ false }}"><div class="nt n-i enter" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><div><b>{{ surplusTxt }}</b><span>{{ freeTxt }}</span></div></div></sc-if>
       <div class="et-sum" aria-live="polite">
         <span>Envasado: <span class="{{ sumCls }}">{{ sumTxt }}</span> de <span class="mono">72,00 L</span></span>
         <span class="cap">{{ gateMsg }}</span>
@@ -177,7 +179,7 @@ body{margin:0}
   <div class="toastwrap" aria-live="polite" style="bottom: 104px"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"estado":{"editor":"enum","options":["igual","diferencia","otro","tope","stock","cero","sinMotivo","zoom"],"default":"diferencia"},"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+<script type="text/x-dc" data-dc-script data-props='{"estado":{"editor":"enum","options":["igual","diferencia","otro","excedente","stock","cero","sinMotivo","zoom"],"default":"diferencia"},"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
 class Component extends DCLogic {
 componentWillUnmount() { clearTimeout(this.t); }
 toast(text) { clearTimeout(this.t); this.setState({ toast: text }); this.t = setTimeout(() => this.setState({ toast: null }), 3200); }
@@ -189,7 +191,13 @@ const PRESETS = {
 igual: {},
 diferencia: { g: { v: '13', m: 'rotura' } },
 otro: { b: { v: '14', m: 'otro', o: 'Se cayó una caja al pasarla a la estiba.' } },
-tope: { g: { v: '16', m: 'conteo_fisico' } },
+// excedente (QC-290): Galón 16 (+2) y Botella 17 (+2), cada una con motivo de «más».
+// Total = 16 × 3,78 + 17 × 1 = 60,48 + 17,00 = 77,48 L; excedente = 77,48 − 72,00 = 5,48 L.
+// Libres, mayor contenido primero y nunca más que lo que pasó su plan:
+//   Galón: min(+2, ⌊5,48 / 3,78⌋ = 1) = 1 libre → quedan 5,48 − 3,78 = 1,70 L;
+//   Botella: min(+2, ⌊1,70 / 1⌋ = 1) = 1 libre → quedan 0,70 L, que siguen siendo del pedido.
+// Stock del envase: +2 ≤ 6 libres (Galón) y +2 ≤ 2 libres (Botella) → sin error.
+excedente: { g: { v: '16', m: 'conteo_fisico' }, b: { v: '17', m: 'error_de_carga' } },
 stock: { b: { v: '19', m: 'error_de_carga' } },
 cero: { b: { v: '0', m: 'merma' } },
 sinMotivo: { g: { v: '13' } },
@@ -219,11 +227,7 @@ const diff = n === null ? 0 : n - l.plan;
 const hasDiff = n !== null && diff !== 0;
 let err = '';
 if (n === null) err = 'Escribe un número entero: 0 o más.';
-else if (diff > 0 && total > PED + 1e-9) {
-const others = total - n * l.vol;
-const max = Math.floor((PED - others) / l.vol + 1e-9);
-err = 'Supera la cantidad del pedido: con ' + n + ' envases se envasan ' + fmt(total) + ' L de ' + fmt(PED) + ' L. Máximo en esta línea: ' + max + '.';
-} else if (diff > 0 && diff > l.libre) {
+else if (diff > 0 && diff > l.libre) {
 err = 'No alcanza el stock del envase: hacen falta ' + diff + ' envases vacíos de ' + l.name + ' y quedan ' + l.libre + ' libres.';
 }
 let help = '';
@@ -266,6 +270,16 @@ _err: !!err, _miss: hasDiff && (!mOk || (x.m === 'otro' && !String(x.o).trim()))
 };
 });
 const blocked = lines.some((l) => l._err);
+// Excedente (QC-290 R19–R22): sin error ni bloqueo; aviso informativo con los envases libres.
+const r2 = (x) => Math.round(x * 100) / 100;
+const exc = r2(total - PED);
+const hasSurplus = exc > 0 && !blocked;
+let rest = exc;
+const free = [];
+rows.filter((r) => r.n !== null && r.n > r.l.plan).slice().sort((a, b) => b.l.vol - a.l.vol).forEach((r) => {
+const k = Math.min(r.n - r.l.plan, Math.floor(rest / r.l.vol + 1e-9));
+if (k > 0) { free.push(k + ' ' + pl(k, 'envase', 'envases') + ' de ' + r.l.name); rest = r2(rest - k * r.l.vol); }
+});
 const missing = lines.some((l) => l._miss);
 const phase = s.phase || 'en';
 const dlgOpen = s.dlg !== undefined ? s.dlg : true;
@@ -279,7 +293,10 @@ st: ST[phase][0], stCls: 'sb t-' + ST[phase][1],
 terCls: phase === 'en' ? 'b b-pri b-xl' : 'b b-out b-xl', terDis: phase !== 'en',
 openEnd: () => { if (phase === 'en') this.setState({ dlg: true }); },
 lines: lines,
-sumTxt: fmt(total) + ' L', sumCls: total > PED + 1e-9 ? 'mono strong over' : 'mono strong',
+sumTxt: fmt(total) + ' L', sumCls: 'mono strong',
+hasSurplus: hasSurplus,
+surplusTxt: 'Sobran ' + fmt(exc) + ' L sobre el pedido.',
+freeTxt: free.length ? 'Quedan libres en stock: ' + free.join(', ') + '.' : 'Ningún envase queda libre: lo que sobra no llega a un envase entero y sigue en el pedido.',
 gateMsg: blocked ? 'Corrige las líneas marcadas para poder terminar.' : (tried && missing ? 'Falta el motivo en las líneas que no coinciden con el plan.' : ''),
 blocked: blocked,
 finish: () => {
