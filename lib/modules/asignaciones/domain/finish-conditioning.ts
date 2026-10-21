@@ -2,7 +2,8 @@
 /**
  * Terminar el acondicionamiento: `EN_ACONDICIONAMIENTO -> TERMINADO`, con `finished_at`, solo si el
  * actor es quien acondiciona el pedido, completo los pasos de acondicionamiento de la formula
- * actual y todas las lineas del reparto tienen sus datos de lote. No toca inventario. La transicion y su anotacion en el registro de ejecucion van en una transaccion.
+ * actual y todas las lineas del reparto tienen sus datos de lote. No toca inventario. La transicion
+ * y su anotacion en el registro de ejecucion van en una transaccion.
  *
  * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `TERMINADO`, el
  * filtro de estado con el que se leyo ya no lo encontraria.

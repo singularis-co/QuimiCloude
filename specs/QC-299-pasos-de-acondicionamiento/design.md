@@ -323,6 +323,10 @@ o el `ErrorState` traducido, calco de `saveConditioningBatchDataAction`. Composi
 - `recipe-steps-field.tsx`: prop `showAssignmentSwitch?: boolean` (por defecto `false`); el resumen
   `<prefijo>-evidence-summary` añade «· N piden responsables» cuando la hay (R11). Prefijo
   `recipe-conditioning-step`; ayuda por `optionalHelp`.
+  - **Enmienda 2026-10-21 (implementación):** la ayuda es una prop nueva `optionalDescription`
+    (texto visible bajo el título, como el tablero, más la marca «(opcional)») y no
+    `optionalHelp`, que pinta un tooltip «!» y pide un texto «Qué son los pasos de…» que no fija
+    ningún documento. «Envasado» sigue con `optionalHelp` como estaba.
 - `recipe-form.tsx` / `recipe-form-state.ts`: `conditioningSteps` en estado, carga (R13) y payload
   (R12); `extractStepErrors(issues, 'conditioningSteps')`; tercera sección tras un segundo
   `Separator` (`recipe-form-conditioning-separator`) (R8). La vista previa no cambia.
@@ -334,6 +338,11 @@ o el `ErrorState` traducido, calco de `saveConditioningBatchDataAction`. Composi
 
 - `page.tsx`: `stepsPending = order.conditioningSteps !== null && completedCount < steps.length`;
   `canFinish` sigue igual; `Terminar` se oculta mientras `stepsPending` (R25).
+  - **Enmienda 2026-10-21 (implementación):** `page.tsx` no cambia. `stepsPending` y el ocultar
+    «Terminar» viven en `conditioning-order-screen.tsx`, que pasa a `'use client'`: los completados
+    se toman como el máximo entre lo que trae el servidor y lo que devolvió la última
+    `recordConditioningStepAction`, para que «Terminar» aparezca justo al completar y para
+    «Volver a los pasos» sin depender del refresco de la ruta. El comportamiento de R25 no cambia.
 - `conditioning-steps-panel.tsx` (nuevo, `'use client'`): `StepReader mode="ejecucion"`,
   `minStepSeconds={5}`, `title="Pasos de acondicionamiento"`, `finishLabel="Completar pasos"`,
   `initialStepPosition={completedCount + 1}`. `renderStepAddon` compone el addon de

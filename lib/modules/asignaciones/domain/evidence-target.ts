@@ -3,8 +3,8 @@
  * Quien puede tocar las fotos de evidencia de un pedido, y con que lista de pasos. Fabricacion:
  * `asignaciones.ejecutar`, responsable asignado y `EN_CURSO`. Envasado: `empaque.modificar`,
  * `EN_EMPAQUE` y quien empaca es el actor. Acondicionamiento: `acondicionamiento.modificar`,
- * `EN_ACONDICIONAMIENTO` y quien acondiciona es el actor. Cualquier otro caso es `order_not_found`: «no es tuyo»,
- * «no existe» y «ya no esta en curso» son la misma respuesta desde fuera.
+ * `EN_ACONDICIONAMIENTO` y quien acondiciona es el actor. Cualquier otro caso es `order_not_found`:
+ * «no es tuyo», «no existe» y «ya no esta en curso» son la misma respuesta desde fuera.
  *
  * Los pasos son los de la formula ACTUAL, leidos en cada llamada: un switch encendido despues de
  * empezar tambien rige.
