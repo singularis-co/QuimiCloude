@@ -60,6 +60,8 @@
 | 2026-10-21 | Tablero: ¿qué aviso se muestra en solo lectura? | El texto exacto: «La subida de PDFs está desactivada. Las tandas que ya enviaste siguen procesándose: puedes revisarlas y descartarlas.» | R35 |
 | 2026-10-21 | Tablero: ¿qué nombre accesible lleva «Reanudar» en el error de consulta? | El mismo patrón que «Descartar»: «Reanudar la tanda de hoy, 10:47». | R40 |
 | 2026-10-21 | Tablero: ¿qué muestra la cabecera del panel? | Un contador de tandas y un resumen: «1 en curso», «Todas terminadas», «1 en curso · 1 con errores». | R41 |
+| 2026-10-21 | R41: ¿qué cuenta como «con errores»? | Cualquier tanda con al menos un archivo en error, **aunque siga en curso**. Una tanda puede contar a la vez en «en curso» y en «con errores». | R41 |
+| 2026-10-21 | R41: ¿cómo cuenta una tanda desconocida (que ya no existe)? | Suma **solo** en el contador total, no en «en curso» ni en «con errores». Si no hay otras, el resumen dice «Todas terminadas». | R41 |
 
 ## Requisitos (EARS)
 
@@ -242,18 +244,18 @@ según R33.
 
 #### Cabecera del panel (tablero)
 
-**R41** — La cabecera del panel DEBE mostrar el número de tandas recordadas visibles y un resumen de
-su estado:
+**R41** — La cabecera del panel DEBE mostrar el número de tandas recordadas visibles, incluidas las
+desconocidas, y un resumen de su estado:
 - «N en curso» si hay tandas sin terminar;
-- «N con errores» si hay tandas terminadas con algún archivo en error;
+- «N con errores» si hay tandas con al menos un archivo en error, aunque sigan en curso. Una tanda
+  puede contar a la vez en «en curso» y en «con errores»;
 - las dos partes unidas por « · » cuando se dan las dos («1 en curso · 1 con errores»);
 - «Todas terminadas» cuando no hay ninguna de las dos.
 
+Una tanda desconocida (que ya no existe) suma solo en el contador, no en «en curso» ni en «con
+errores».
+
 ## Preguntas abiertas
 
-Ninguna. P1–P8 y los detalles del tablero se cerraron el 2026-10-21 y están en
-`## Decisiones cerradas`.
-
-Una interpretación queda pendiente de confirmar contra el tablero (R41): que «con errores» cuenta
-tandas terminadas con al menos un archivo en error. Tampoco consta qué muestra una tanda
-desaparecida en el resumen. Si el tablero dice otra cosa, se corrige la R41 antes de aprobar.
+Ninguna. P1–P8, los detalles del tablero y el resumen de la cabecera se cerraron el 2026-10-21 y
+están en `## Decisiones cerradas`.

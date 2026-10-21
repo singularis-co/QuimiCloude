@@ -132,7 +132,9 @@ verde y no hay `.subscribe(` en la carpeta.
     (sin año en el año actual y con él en otro año) y « · 3 archivos»;
   - R34: «Descartar la tanda de hoy, 14:32»;
   - R40: «Reanudar la tanda de hoy, 10:47»;
-  - R41: «1 en curso», «Todas terminadas», «1 con errores» y «1 en curso · 1 con errores»;
+  - R41: «1 en curso», «Todas terminadas», «1 con errores» y «1 en curso · 1 con errores»; una
+    tanda en curso con un archivo en error cuenta en las dos partes; una tanda desconocida sola da
+    «Todas terminadas»;
   - R35: el texto exacto del aviso de solo lectura.
 - [ ] Acotar `attemptLabel`.
 - [ ] Añadir a `labels.ts` `batchLabel`, `discardBatchLabel`, `resumeBatchLabel`, `batchesSummary` y

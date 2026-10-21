@@ -72,6 +72,12 @@ Lo que fijó el tablero está en las decisiones cerradas de `requirements.md`:
 
 Donde el dibujo y el spec difieran, manda el spec.
 
+**Diferencia aceptada (2026-10-21).** El resumen programado en `PanelTandas.dc.html` solo distingue
+«N en curso» y «Todas terminadas»: no calcula «con errores». Ese texto aparece solo como texto fijo
+en `PanelTandasEstados.dc.html`. Manda la R41: «con errores» cuenta cualquier tanda con un archivo en
+error, aunque siga en curso, y una tanda desconocida suma solo en el contador. El tablero no se
+corrige.
+
 ## 1. Modelo de datos
 
 - **Sin tablas nuevas, sin cambios de RLS y sin migraciones.**
@@ -243,7 +249,7 @@ R28 están retirados y no tienen test.
 | R34 | `labels.test.ts` («Descartar la tanda de hoy, 14:32») y `document-batch-panel.test.tsx`: `getByRole('button', { name })` es único por tanda, y cada `listitem` tiene su nombre accesible |
 | R35 | `formula-pdf-upload.test.tsx`: con `disabled` y tandas recordadas, el panel muestra el estado, «Revisar», «Descartar» y el aviso con el texto exacto, y no hay ningún control de subida dentro del panel |
 | R40 | `labels.test.ts` («Reanudar la tanda de hoy, 10:47») y `document-batch-panel.test.tsx`: con dos tandas en error de consulta, `getByRole('button', { name })` es único por tanda |
-| R41 | `labels.test.ts`: `batchesSummary` da «1 en curso», «Todas terminadas», «1 con errores» y «1 en curso · 1 con errores». `document-batch-panel.test.tsx`: el contador coincide con las tandas visibles y el resumen sigue visible con el panel plegado. |
+| R41 | `labels.test.ts`: `batchesSummary` da «1 en curso», «Todas terminadas», «1 con errores» y «1 en curso · 1 con errores». Una sola tanda en curso con un archivo en error da «1 en curso · 1 con errores». Una tanda desconocida sola da «Todas terminadas» con el contador a 1. `document-batch-panel.test.tsx`: el contador coincide con las tandas visibles y el resumen sigue visible con el panel plegado. |
 | R36, R37 | `tests/unit/documentos-ui/document-upload-convenciones.test.ts`: un caso nuevo que lee los archivos de producción de la feature (salto de línea final y como mucho 100 columnas) |
 | R38 | `document-upload-convenciones.test.ts`: la fila del catálogo cita un `.dc.html` existente que no es `Formulas` ni `ModalesProduccion`, y no contiene «entre pestañas» como no cubierto |
 | R39 | `document-batch-panel.test.tsx`: plegar oculta la lista y deja el título y el control; desplegar la muestra |
