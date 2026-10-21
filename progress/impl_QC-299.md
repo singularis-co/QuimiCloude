@@ -107,3 +107,57 @@ QC-299 aplicadas. No se tocó.
 - R21 → `evidence-target.test.ts` («acondicionamiento (QC-299: R21, R32)», «requireEvidenceAccess (QC-299: R21)»); `read-order-evidence.test.ts` («acondicionamiento (QC-299: R21, R32)»); `step-evidence.test.ts`
 - R32 → `evidence-target.test.ts`, `count-evidence-locking-orders.test.ts`, `read-order-evidence.test.ts` (casos de otra empresa)
 - R34 → `count-evidence-locking-orders.test.ts` («acondicionamiento (QC-299: R34, R32)»)
+
+## Tanda 3 — T10–T14
+
+### Archivos
+- T10: nuevo `lib/modules/asignaciones/domain/record-conditioning-step.ts`; `domain/errors.ts` (4 errores nuevos); `lib/modules/errores/domain/{error-codes,error-catalog}.ts` (4 códigos); tests `record-conditioning-step.test.ts`, `conditioning-doubles.ts`, `tests/unit/errores/catalogo.test.ts` (102 → 106).
+- T11: `domain/{conditioning-order-view,get-conditioning-order,finish-conditioning}.ts`, `index.ts`; tests `get-conditioning-order.test.ts`, `finish-conditioning.test.ts`; `tests/unit/identity/roles/acondicionamiento-rol.test.ts` (12 → 14 rutas, incluye `evidence-target.ts` de T9); fixtures `conditioningSteps: null` en `asignaciones-ui/conditioning-order-screen.test.tsx` y `paridad/asignacion-acondicionamiento-paridad.test.tsx`; `integration/asignaciones/finished-orders.int.test.ts` (deps).
+- T12: `domain/get-execution-trace.ts` (`TracePerson`, variantes nuevas), `index.ts`; tests `get-execution-trace.test.ts` (+8), `list-execution-traces.test.ts` (+1); `tests/fixtures/execution-trace-conditioning.ts`.
+- T13: `adapters/driving/order-conditioning-actions.ts` (`recordConditioningStepAction`), `lib/composition/index.ts`; tests `order-conditioning-actions.test.ts`, `tests/unit/composition/asignaciones-facade.test.ts` (35 → 36 operaciones).
+- T14: nuevo `tests/integration/asignaciones/conditioning-steps-progress.int.test.ts` (+ alta en `aislamiento.json`).
+- Arreglo del rojo de la tanda 2: `tests/unit/recetas/module-contract.test.ts` (alta de `recipe-conditioning-steps-reader.ts`).
+
+### Confirmado en T14: target real del P2002
+Segundo `CONDITIONING_STEP_ADVANCE` en la misma posición → `P2002`,
+`meta = {"modelName":"OrderExecutionEntry","target":["order_id","step_position"]}`. El adaptador lo
+traduce a `'step_already_completed'` sin cambios; el int lo verifica contra la base.
+
+### Desvíos / lecturas
+- Responsable repetido y responsables en paso sin «Asignación requerida» → `ValidationError` (`invalid_input`), como `startConditioningSchema`.
+- Candidatos: el acondicionador sale una vez, primero, con `isSelf`, aunque esté en su equipo.
+- `recordConditioningStepAction` revalida la ruta del detalle al tener éxito (calco de `saveConditioningBatchDataAction`); T17 lo tiene en cuenta.
+- T14 caso 2 dobla `listEntriesForOrders` para forzar la carrera de forma determinista; escritura e índice reales.
+- R35 «cifra de fotos por paso»: no va en el caso de uso (design 4.7); la pinta la UI (T18, design 5.3).
+
+### PUNTO ABIERTO (preguntado al humano, sin resolver)
+Responsables de posiciones que la fórmula ya no tiene: `composeConditioningStepsView`
+(`conditioning-order-view.ts`) pasa el mapa de `conditioningProgress` tal cual, así que la vista los
+incluye. Ningún test fija ese caso. `recordConditioningStep` no depende de ello (solo revisita
+posiciones ≤ `completedCount`, ya recortado). Si se decide filtrar, el cambio va solo en esa función.
+
+### Verificación de cierre de la tanda 3 (corrida por el implementer)
+- `pnpm run typecheck`: **0 errores**.
+- `pnpm run lint`: 0 errores, 10 warnings (preexistentes).
+- `pnpm exec vitest run guard`: 80 archivos, 1096 verdes, 20 skipped.
+- Unitarios T10/T11: 9 archivos, 392 verdes. T12: 80/80.
+- Integración: `conditioning-steps-progress.int` + `conditioning-execution-log.int`, `finish-conditioning-batch-data.int`, `start-conditioning-team.int`, `seed-demo.int`: 5 archivos, 28/28.
+- `vitest related` (con `.env`): 6446 verdes, 3 rojos → `asignaciones-facade` (corregido, 60/60 al repetir), `adjust-batch-dialog.test.tsx` (inestable con carga, pasa solo; inventario no se toca), `tablas-marca.test.tsx` (ajeno).
+- Rojos ajenos fuera de `tests/baseline-rojos.json`: `tests/unit/marca/tablas-marca.test.tsx` (columna «Cantidad» de `order-columns.tsx`) y `tests/integration/proveedores/catalog-line.int.test.ts` (lee `error.meta?.constraint` de un P2003 como string; con `@prisma/client` 6.19.3 llega objeto; archivo idéntico a `dev`). No tocados.
+
+## Mapa R<n> -> test (tanda 3)
+- R17 → `get-conditioning-order.test.ts` («en %s no entrega pasos ni avance, y no llama al lector…»)
+- R19 → `get-conditioning-order.test.ts` («con una receta %s, conditioningSteps es null…», «sin pasos, el resto del detalle es el mismo…»); `finish-conditioning.test.ts` («una receta %s termina como hoy sin leer el registro»)
+- R21 → `record-conditioning-step.test.ts` («…pide evidencia sin ninguna foto…», «con una foto en ese paso lo completa»)
+- R22 → `get-conditioning-order.test.ts` («los candidatos son el propio acondicionador primero…»)
+- R23 → `record-conditioning-step.test.ts` (sin responsable, fuera del equipo, paso sin asignación, repetido, cambio validado)
+- R25 → `finish-conditioning.test.ts` («con un paso sin completar rechaza con conditioning_steps_pending…», «sin ningun paso completado…», «con todos los pasos completados termina como hoy»)
+- R27 → `record-conditioning-step.test.ts` (saltar, paso inexistente, otra pestaña); `conditioning-steps-progress.int.test.ts` (casos 1–4, concurrencia real)
+- R28 → `record-conditioning-step.test.ts` (cambio anota, mismo conjunto no escribe, compara contra el último cambio); `conditioning-steps-progress.int.test.ts` (caso 1)
+- R29 → `record-conditioning-step.test.ts` («%s rechaza sin leer los pasos ni escribir», terminado)
+- R30 → `get-conditioning-order.test.ts` («el detalle no lee los pasos del operador ni los de envasado»)
+- R31 → `record-conditioning-step.test.ts`, `get-conditioning-order.test.ts`, `finish-conditioning.test.ts` (permisos); `order-conditioning-actions.test.ts` («QC-299 T13», 4 casos); `asignaciones-facade.test.ts` («QC-299 R31»)
+- R32 → `record-conditioning-step.test.ts`, `get-conditioning-order.test.ts`, `finish-conditioning.test.ts` (empresa del actor); `conditioning-steps-progress.int.test.ts` (casos 5–6)
+- R35 → `get-execution-trace.test.ts` (Avanzar/Completar pasos con responsables, misma lectura de directorio, cuentan en la fase); `record-conditioning-step.test.ts` («completar un paso con asignacion anota sus responsables»)
+- R36 → `get-execution-trace.test.ts` (cambio con anterior y nuevo, encadenado, anterior vacío, registro corrupto)
+- R37 → `get-execution-trace.test.ts` (pasos de producción sin responsables); `list-execution-traces.test.ts` (fila sin cambios)

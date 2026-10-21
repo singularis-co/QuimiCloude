@@ -60,27 +60,27 @@ nombre de cada caso de test. Antes de T1: las preguntas abiertas P1–P6 resuelt
   Hecho: subir/quitar en `conditioning` exige `acondicionamiento.modificar`, `EN_ACONDICIONAMIENTO`
   y ser quien acondiciona; un pedido `EN_ACONDICIONAMIENTO` con fotos cuenta para el bloqueo.
   Casos `R21`, `R32`, `R34`.
-- [ ] **T10. `recordConditioningStep`** — dep: T5, T8, T9.
+- [x] **T10. `recordConditioningStep`** — dep: T5, T8, T9.
   Caso de uso, errores en `asignaciones` y en `errores` (`design.md > 4.3`).
   Hecho: autoriza antes de validar; completa solo el siguiente; rechaza saltos, pasos inexistentes,
   pedido de otro o terminado; exige foto y responsables cuando el paso los pide; rechaza
   responsables fuera del equipo, repetidos o en paso sin marca; revisitar con otro conjunto anota un
   cambio y con el mismo no escribe. Casos `R21`, `R23`, `R27`, `R28`, `R29`, `R31`, `R32`.
-- [ ] **T11. `getConditioningOrder` y `finishConditioning`** — dep: T8, T9.
+- [x] **T11. `getConditioningOrder` y `finishConditioning`** — dep: T8, T9.
   `design.md > 4.4`, `> 4.5`.
   Hecho: los pasos y su avance solo salen en `EN_ACONDICIONAMIENTO` del actor y sin llamar al lector
   en los demás casos; sin pasos, `null`; los candidatos son el actor y el equipo; Terminar con pasos
   pendientes lanza `conditioning_steps_pending` sin tocar el pedido. Casos `R17`, `R19`, `R25`,
   `R30`, `R31`.
-- [ ] **T12. Recorrido** — dep: T8.
+- [x] **T12. Recorrido** — dep: T8.
   `get-execution-trace.ts`, `list-execution-traces.ts` (`design.md > 4.7`).
   Hecho: las anotaciones de paso traen responsables con nombre; el cambio trae anterior y nuevo; la
   lista no cambia. Casos `R35`, `R36`, `R37`.
-- [ ] **T13. Server Action y composición** — dep: T10, T11.
+- [x] **T13. Server Action y composición** — dep: T10, T11.
   `order-conditioning-actions.ts`, `lib/composition/index.ts`.
   Hecho: la acción traduce errores como las demás de acondicionamiento; `vitest run guard` verde.
   Caso `R31`.
-- [ ] **T14. Integración de `asignaciones`** — dep: T13.
+- [x] **T14. Integración de `asignaciones`** — dep: T13.
   Hecho: contra base real, completar, revisitar y cambiar escriben las anotaciones esperadas; el
   segundo completado concurrente falla; otra empresa no ve ni escribe nada. Casos `R27`, `R28`,
   `R32`.

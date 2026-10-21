@@ -67,6 +67,7 @@ const ROW: ConditioningOrderDetail = {
   conditionedById: 'user-2',
   team: [],
   batchData: null,
+  conditioningSteps: null,
 };
 
 const CANDIDATES: ConditioningTeamCandidates = {

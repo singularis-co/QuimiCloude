@@ -731,3 +731,56 @@ describe('listExecutionTraces — formula y presentaciones', () => {
     expect(m.findRecipeRefs).not.toHaveBeenCalled();
   });
 });
+
+describe('listExecutionTraces — pasos de acondicionamiento', () => {
+  const CARLA = uuid('4');
+  const DIEGO = uuid('5');
+
+  function paso(
+    action: 'conditioning_step_advance' | 'conditioning_steps_complete' | 'conditioning_responsibles_change',
+    offsetMin: number,
+    stepPosition: number,
+    responsibleUserIds: readonly string[] | null,
+    userId = BEA,
+  ): ExecutionEntryRecord {
+    return { ...anotacion(PEDIDO_A, action, offsetMin, userId), stepPosition, responsibleUserIds };
+  }
+
+  it('R37: la fila no cambia: los responsables no entran en people ni hay campos nuevos', async () => {
+    const entries = [
+      anotacion(PEDIDO_A, 'conditioning_start', 0, ANA),
+      paso('conditioning_step_advance', 5, 1, [CARLA]),
+      paso('conditioning_responsibles_change', 8, 1, [DIEGO], ANA),
+      paso('conditioning_steps_complete', 12, 2, null),
+      anotacion(PEDIDO_A, 'conditioning_finish', 30, ANA),
+    ];
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'TERMINADO' })],
+      entries,
+      people: [persona(ANA, 'Ana Perez'), persona(BEA, 'Bea Gomez'), persona(CARLA, 'Carla Diaz'), persona(DIEGO, 'Diego Sanz')],
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    expect(fila.people).toEqual([
+      { userId: ANA, displayName: 'Ana Perez' },
+      { userId: BEA, displayName: 'Bea Gomez' },
+    ]);
+    expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledWith(EMPRESA, [ANA, BEA], NOW);
+    expect(Object.keys(fila).sort()).toEqual([
+      'active',
+      'deleted',
+      'firstAt',
+      'formulaImageUrl',
+      'formulaName',
+      'goBackCount',
+      'lastAt',
+      'numberText',
+      'orderId',
+      'people',
+      'presentations',
+      'status',
+      'totalDuration',
+    ]);
+    expect(fila.totalDuration).toEqual({ kind: 'closed', ms: 30 * MIN });
+    expect(fila.goBackCount).toBe(0);
+  });
+});

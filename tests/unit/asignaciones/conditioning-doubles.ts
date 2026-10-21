@@ -3,8 +3,14 @@
 import { vi } from 'vitest';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
-import type { ComposeOrderRowsDeps } from '@/lib/modules/asignaciones/domain/compose-order-rows';
-import type { NewExecutionEntry } from '@/lib/modules/asignaciones/domain/execution-entry';
+import type { GetConditioningOrderDeps } from '@/lib/modules/asignaciones/domain/get-conditioning-order';
+import type {
+  ExecutionAppendOutcome,
+  ExecutionEntryRecord,
+  NewExecutionEntry,
+} from '@/lib/modules/asignaciones/domain/execution-entry';
+import type { RecordConditioningStepDeps } from '@/lib/modules/asignaciones/domain/record-conditioning-step';
+import type { StepEvidenceRow } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
 import type {
   ConditioningTeamMemberRow,
   ConditioningTeamRepository,
@@ -20,7 +26,7 @@ import type {
   PresentationRef,
 } from '@/lib/modules/inventario';
 import type { AssignedOrderSummary, OrderCatalog, Page } from '@/lib/modules/pedidos';
-import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
+import type { ConditioningStepView, RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 export function uuid(seed: string): string {
@@ -87,6 +93,10 @@ type Opciones = {
   readonly team?: readonly ConditioningTeamMemberRow[];
   /** QC-219: los lotes de produccion del pedido que devuelve `listOfOrder`. */
   readonly batches?: readonly FinishedBatchOfOrderLine[];
+  /** QC-299: lo que devuelve el lector de pasos de acondicionamiento (`null` = receta no encontrada). */
+  readonly pasos?: readonly ConditioningStepView[] | null;
+  readonly anotaciones?: readonly ExecutionEntryRecord[];
+  readonly fotos?: readonly StepEvidenceRow[];
 };
 
 function pagina(
@@ -119,6 +129,10 @@ export function montar(options?: Opciones) {
   const findRefsUnits = vi.fn(async () => options?.units ?? []);
   const listTeamByOrderInCompany = vi.fn<ConditioningTeamRepository['listByOrderInCompany']>(async () => options?.team ?? []);
   const listOfOrder = vi.fn<FinishedBatchLabels['listOfOrder']>(async () => options?.batches ?? []);
+  const findConditioningStepsById = vi.fn(async () => (options?.pasos === undefined ? [] : options.pasos));
+  const listEntriesForOrders = vi.fn(async () => options?.anotaciones ?? []);
+  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+  const createSignedReadUrl = vi.fn(async (path: string) => `firmada:${path}`);
 
   const deps = {
     assignments: {
@@ -136,12 +150,12 @@ export function montar(options?: Opciones) {
     units: { findRefs: findRefsUnits } as unknown as UnitCatalog,
     team: { insertAll: vi.fn(), listByOrderInCompany: listTeamByOrderInCompany, listByOrdersInCompany: vi.fn() },
     batches: { listOfOrder },
+    conditioningSteps: { findConditioningStepsById },
+    log: { listEntriesForOrders },
+    evidence: { listByOrder: listEvidenceByOrder },
+    storage: { createSignedReadUrl },
     now: () => AHORA,
-  } as unknown as ComposeOrderRowsDeps & {
-    readonly orders: OrderCatalog;
-    readonly team: ConditioningTeamRepository;
-    readonly batches: Pick<FinishedBatchLabels, 'listOfOrder'>;
-  };
+  } as unknown as GetConditioningOrderDeps;
 
   return {
     deps,
@@ -154,7 +168,15 @@ export function montar(options?: Opciones) {
     findRefsUnits,
     listTeamByOrderInCompany,
     listOfOrder,
+    findConditioningStepsById,
+    listEntriesForOrders,
+    listEvidenceByOrder,
+    createSignedReadUrl,
     todos: [
+      findConditioningStepsById,
+      listEntriesForOrders,
+      listEvidenceByOrder,
+      createSignedReadUrl,
       listAliveSummariesInCompany,
       listAliveSummariesByIds,
       listByOrdersInCompany,
@@ -232,4 +254,100 @@ export function transaccionDeAcondicionamiento(options?: {
   });
   const transaction = { run } as ExecutionTransaction;
   return { transaction, run, writeForOrder, finishConditioningAliveById, append, pasos };
+}
+
+/** Una anotacion de paso de acondicionamiento leida del registro de `PEDIDO_1`. */
+export function anotacionDePaso(
+  action: 'conditioning_step_advance' | 'conditioning_steps_complete' | 'conditioning_responsibles_change',
+  stepPosition: number,
+  responsibleUserIds: readonly string[] | null,
+  seq = stepPosition,
+): ExecutionEntryRecord {
+  return {
+    id: `anotacion-${String(seq)}`,
+    orderId: PEDIDO_1,
+    userId: ANA,
+    action,
+    stepPosition,
+    reason: null,
+    batchLines: null,
+    responsibleUserIds,
+    occurredAt: new Date(AHORA.getTime() - 60_000 + seq * 1_000),
+  };
+}
+
+/** Una foto de acondicionamiento de `PEDIDO_1` en ese paso. */
+export function fotoDeAcondicionamiento(stepPosition: number, slot = 1): StepEvidenceRow {
+  return {
+    id: `foto-${String(stepPosition)}-${String(slot)}`,
+    orderId: PEDIDO_1,
+    phase: 'conditioning',
+    stepPosition,
+    slot,
+    path: `${EMPRESA}/${PEDIDO_1}/foto-${String(stepPosition)}-${String(slot)}`,
+  };
+}
+
+/**
+ * Los puertos de `recordConditioningStep` sobre `PEDIDO_1`, `EN_ACONDICIONAMIENTO` a nombre de Ana
+ * por defecto. `pasos` es lo que devuelve el lector de la formula (`null` = receta que no se
+ * encuentra); `anotaciones`, el registro del pedido.
+ */
+export function montarRegistroDePaso(options?: {
+  readonly status?: AssignedOrderSummary['status'];
+  readonly conditionedBy?: string | null;
+  readonly target?: null;
+  readonly pasos?: readonly ConditioningStepView[] | null;
+  readonly anotaciones?: readonly ExecutionEntryRecord[];
+  readonly equipo?: readonly ConditioningTeamMemberRow[];
+  readonly fotos?: readonly StepEvidenceRow[];
+  readonly desenlace?: ExecutionAppendOutcome;
+}) {
+  const status = options?.status ?? 'EN_ACONDICIONAMIENTO';
+  const conditionedBy = options?.conditionedBy === undefined ? ANA : options.conditionedBy;
+  const findAliveById = vi.fn<OrderCatalog['findAliveById']>(async () =>
+    options?.target === null ? null : { id: PEDIDO_1, status },
+  );
+  const listAliveSummariesByIds = vi.fn(
+    async (_companyId: string, _ids: readonly string[], _statuses: readonly string[], page: number, pageSize?: number) =>
+      pagina([resumen(PEDIDO_1, { status, conditionedBy })], 1, page, pageSize),
+  );
+  const findConditioningStepsById = vi.fn(async () => (options?.pasos === undefined ? [] : options.pasos));
+  const listByOrderInCompany = vi.fn<ConditioningTeamRepository['listByOrderInCompany']>(
+    async () => options?.equipo ?? [],
+  );
+  const listEntriesForOrders = vi.fn(async () => options?.anotaciones ?? []);
+  const append = vi.fn<(entry: NewExecutionEntry) => Promise<ExecutionAppendOutcome>>(
+    async () => options?.desenlace ?? 'ok',
+  );
+  const listByOrder = vi.fn(async () => options?.fotos ?? []);
+
+  const deps = {
+    orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
+    conditioningSteps: { findConditioningStepsById },
+    team: { listByOrderInCompany },
+    log: { append, listEntriesForOrders },
+    evidence: { listByOrder },
+    now: () => AHORA,
+  } satisfies RecordConditioningStepDeps;
+
+  return {
+    deps,
+    findAliveById,
+    listAliveSummariesByIds,
+    findConditioningStepsById,
+    listByOrderInCompany,
+    listEntriesForOrders,
+    append,
+    listByOrder,
+    todos: [
+      findAliveById,
+      listAliveSummariesByIds,
+      findConditioningStepsById,
+      listByOrderInCompany,
+      listEntriesForOrders,
+      append,
+      listByOrder,
+    ],
+  };
 }

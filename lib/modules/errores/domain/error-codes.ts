@@ -39,6 +39,8 @@
  * `company_not_deleted`.
  * **2026-10-14**: `packed_exceeds_quantity`, `packaging_stock_insufficient`.
  * **2026-10-16**: `company_last_administrator`.
+ * **2026-10-21**: `conditioning_step_out_of_order`, `conditioning_responsibles_required`,
+ * `conditioning_responsible_not_allowed`, `conditioning_steps_pending`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -226,6 +228,17 @@ export const ERROR_CODES = [
   // Distinto de `last_administrator`: cuenta los Administradores vivos de la empresa, sea cual sea su
   // estado de cuenta, no los que estan en `active`.
   'company_last_administrator',
+  // Distinto de `invalid_input`: la peticion es valida, pero la pantalla quedo atras del avance
+  // guardado o de la formula.
+  'conditioning_step_out_of_order',
+  // Distinto de `conditioning_team_empty`: el equipo existe, lo que falta es elegir a alguien en
+  // ese paso.
+  'conditioning_responsibles_required',
+  // Distinto de `conditioning_team_member_not_allowed`: no se compone el equipo, se elige dentro
+  // de el.
+  'conditioning_responsible_not_allowed',
+  // Distinto de `conditioning_batch_data_missing`: los datos de lote pueden estar, faltan pasos.
+  'conditioning_steps_pending',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

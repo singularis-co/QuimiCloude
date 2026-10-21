@@ -223,7 +223,7 @@ const FORMULARIO_COMPARTIDO: ConditioningBatchForm = {
 };
 
 function detalle(overrides: Partial<ConditioningOrderDetail> = {}): ConditioningOrderDetail {
-  return { ...POR_ACONDICIONAR, team: [], batchData: null, ...overrides };
+  return { ...POR_ACONDICIONAR, team: [], batchData: null, conditioningSteps: null, ...overrides };
 }
 
 const MIO = {

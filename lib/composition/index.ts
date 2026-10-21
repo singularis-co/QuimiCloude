@@ -475,6 +475,7 @@ import {
   createListConditioningTeamCandidates,
   createListDeliveredConditionedOrders,
   createSaveConditioningBatchData,
+  createRecordConditioningStep,
   createRequestEvidenceUpload,
   createRegisterEvidence,
   createRemoveEvidence,
@@ -2174,6 +2175,8 @@ export const asignaciones = {
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
     transaction: executionTransaction,
+    conditioningSteps: { findConditioningStepsById: findRecipeConditioningStepsById },
+    log: executionLogRepository,
     now: () => new Date(),
   }),
   listConditioningOrders: createListConditioningOrders({
@@ -2203,6 +2206,10 @@ export const asignaciones = {
     units: unitCatalog,
     team: createConditioningTeamRepository(),
     batches: createFinishedBatchLabels(),
+    conditioningSteps: { findConditioningStepsById: findRecipeConditioningStepsById },
+    log: executionLogRepository,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
     now: () => new Date(),
   }),
   listConditioningTeamCandidates: createListConditioningTeamCandidates({
@@ -2224,6 +2231,14 @@ export const asignaciones = {
     batches: createFinishedBatchLabels(),
     presentations: presentationCatalog,
     transaction: executionTransaction,
+    now: () => new Date(),
+  }),
+  recordConditioningStep: createRecordConditioningStep({
+    orders: orderCatalog,
+    conditioningSteps: { findConditioningStepsById: findRecipeConditioningStepsById },
+    team: createConditioningTeamRepository(),
+    log: executionLogRepository,
+    evidence: stepEvidenceRepository,
     now: () => new Date(),
   }),
   requestEvidenceUpload: createRequestEvidenceUpload({

@@ -107,6 +107,10 @@ export const ERROR_MESSAGE_KEY = {
   packed_exceeds_quantity: 'errors.packed_exceeds_quantity',
   packaging_stock_insufficient: 'errors.packaging_stock_insufficient',
   company_last_administrator: 'errors.company_last_administrator',
+  conditioning_step_out_of_order: 'errors.conditioning_step_out_of_order',
+  conditioning_responsibles_required: 'errors.conditioning_responsibles_required',
+  conditioning_responsible_not_allowed: 'errors.conditioning_responsible_not_allowed',
+  conditioning_steps_pending: 'errors.conditioning_steps_pending',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -269,4 +273,8 @@ export const ERROR_MESSAGES_ES = {
   'errors.packaging_stock_insufficient': 'No alcanza el stock del envase.',
   'errors.company_last_administrator':
     'Es el único Administrador de la empresa: crea otro antes de darlo de baja.',
+  'errors.conditioning_step_out_of_order': 'La pantalla quedó desactualizada. Recárgala para seguir.',
+  'errors.conditioning_responsibles_required': 'Elige al menos un responsable para avanzar.',
+  'errors.conditioning_responsible_not_allowed': 'Solo puedes elegir a personas del equipo o a ti.',
+  'errors.conditioning_steps_pending': 'Completa los pasos de acondicionamiento antes de terminar.',
 } as const satisfies Record<ErrorMessageKey, string>;
