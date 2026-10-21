@@ -10,6 +10,7 @@ import { issueUploadLinksAction } from '@/lib/modules/documentos/adapters/drivin
 import type { ErrorState } from '@/lib/modules/errores';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
+import { rememberBatch } from './batch-memory';
 import { DocumentUploadRow } from './document-upload-row';
 import {
   CLEAR_LABEL,
@@ -152,6 +153,7 @@ export function DocumentUpload({ strategy, reviewHrefFor }: DocumentUploadProps)
     }
 
     setBatchId(enqueued.data.batchId);
+    rememberBatch(enqueued.data.batchId, strategy);
     setBusy(false);
   }
 

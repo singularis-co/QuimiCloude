@@ -59,3 +59,15 @@ export const CLOSE_LABEL = 'Cerrar';
 export function dialogDescription(max: number): string {
   return `Solo PDF, hasta ${max} archivos por tanda.`;
 }
+
+/**
+ * `attempts` cuenta entregas ya consumidas; con 0 la primera entrega sigue en camino, y «intento 1
+ * de N» es lo mas honesto que se puede decir mientras nadie ha reclamado el archivo.
+ */
+export function attemptLabel(attempts: number, maxAttempts: number): string {
+  return `Intento ${Math.max(1, attempts)} de ${maxAttempts}`;
+}
+
+export const PANEL_TITLE = 'Tandas de PDFs';
+export const PANEL_BATCH_LABEL = 'Tanda';
+export const DISCARD_BATCH_LABEL = 'Descartar';
