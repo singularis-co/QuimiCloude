@@ -40,7 +40,7 @@ import {
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
- * Las TRECE columnas de la lista de pedidos (doce de datos y la de acciones), declaradas
+ * Las CATORCE columnas de la lista de pedidos (trece de datos y la de acciones), declaradas
  * **como datos** (R8-R12, R14, R19, R23, `design.md > 7`).
  *
  * **Modulo de CLIENTE, y no por gusto** (`design.md > 6.1`): la columna de acciones devuelve
@@ -78,9 +78,8 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
  * vez por pagina y reparte por fila (`design.md > 1`). La columna **no ordena y no filtra**, y el
  * esqueleto sube a nueve con ella (R22).
  *
- * **2026-10-20: COSTO DE PRODUCCION** (decision humana, sin spec), ultima columna de datos, justo
- * antes de las acciones. No ordena ni filtra. Deja sin efecto el «no hay columna de importe» de
- * QC-123 R18 para el costo: lo que se pinta es un coste guardado, no un precio de venta.
+ * **Costo estimado y costo real**, las dos ultimas columnas de datos, justo antes de las acciones.
+ * No ordenan ni filtran. Son costes guardados, no precios de venta.
  */
 
 /** Id de la columna del correlativo. Se exporta porque la tabla la fija por defecto (R19). */
@@ -95,9 +94,11 @@ export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
 export const COVERAGE_COLUMN_ID = 'coverage';
 /** QC-102 R16 — la columna propia de responsables. */
 export const RESPONSIBLES_COLUMN_ID = 'responsibles';
-/** Costo de produccion del pedido (2026-10-20). Ultima columna de datos. */
+/** Costo estimado del pedido. El id conserva el nombre antiguo para no perder preferencias guardadas. */
 export const PRODUCTION_COST_COLUMN_ID = 'productionCost';
 export const PRODUCTION_COST_TESTID = 'order-production-cost';
+export const ACTUAL_COST_COLUMN_ID = 'actualCost';
+export const ACTUAL_COST_TESTID = 'order-actual-cost';
 export const ACTIONS_COLUMN_ID = 'actions';
 
 /** Glifo del marcador de ausencia. Constante para que ningun test dependa del caracter. */
@@ -217,17 +218,25 @@ function producedProductsOf(
 }
 
 /**
- * Celda «Costo de produccion»: `ingredientsCost` y NADA MAS. El guardado ya es el total de
- * ingredientes + envases (`calculateOrderCost`/`storedOrderCost`); `packagingCost` es solo la parte
- * de envases que va dentro, asi que sumarlo contaria los envases dos veces. Se pinta como dinero
- * con el valor exacto en el `title`, como el costo de inventario; sin costo, el marcador de ausencia.
+ * Celda de importe. El estimado es `ingredientsCost` y NADA MAS: ya incluye los envases, y sumar
+ * `packagingCost` los contaria dos veces. Sin importe, el marcador de ausencia; nunca `0`.
  */
-function ProductionCost({ order }: { readonly order: OrderSummary }) {
-  const cost = order.ingredientsCost;
-  if (cost === null) return <MissingValue field={PRODUCTION_COST_COLUMN_ID} />;
+const COST_TESTIDS = {
+  [PRODUCTION_COST_COLUMN_ID]: PRODUCTION_COST_TESTID,
+  [ACTUAL_COST_COLUMN_ID]: ACTUAL_COST_TESTID,
+} as const;
+
+function CostCell({
+  value,
+  field,
+}: {
+  readonly value: string | null;
+  readonly field: keyof typeof COST_TESTIDS;
+}) {
+  if (value === null) return <MissingValue field={field} />;
   return (
-    <span data-testid={PRODUCTION_COST_TESTID} title={exactDecimalTitle(cost)}>
-      {formatMoneyDisplay(cost)}
+    <span data-testid={COST_TESTIDS[field]} title={exactDecimalTitle(value)}>
+      {formatMoneyDisplay(value)}
     </span>
   );
 }
@@ -371,11 +380,17 @@ export function buildOrderColumns({
     },
     {
       id: PRODUCTION_COST_COLUMN_ID,
-      label: 'Costo de producción',
+      label: 'Costo estimado',
       align: 'end',
       tabular: true,
-      // Solo informa: sin `sortable` y sin `filter`.
-      cell: (order) => <ProductionCost order={order} />,
+      cell: (order) => <CostCell value={order.ingredientsCost} field={PRODUCTION_COST_COLUMN_ID} />,
+    },
+    {
+      id: ACTUAL_COST_COLUMN_ID,
+      label: 'Costo real',
+      align: 'end',
+      tabular: true,
+      cell: (order) => <CostCell value={order.actualCost} field={ACTUAL_COST_COLUMN_ID} />,
     },
     actionsColumn({
       id: ACTIONS_COLUMN_ID,

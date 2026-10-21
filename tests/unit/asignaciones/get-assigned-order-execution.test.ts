@@ -961,3 +961,47 @@ describe('getAssignedOrderExecution — evidencia (R14, R33)', () => {
     expect(d.createSignedReadUrl).not.toHaveBeenCalled();
   });
 });
+
+// QC-305 T6 — R24: la pantalla de ejecucion no lleva NINGUN importe, ni el real ni el estimado.
+// Se recorre la vista ENTERA (pasos, lineas, reparto, evidencia) buscando claves de importe, y el
+// resumen del doble trae a proposito esos campos colados -como si el catalogo de `pedidos` los
+// filtrara por error-: la vista no puede copiarlos.
+const CLAVE_DE_IMPORTE = /cost|coste|importe|price|precio|amount/i;
+
+function clavesDeImporte(valor: unknown, ruta = ''): string[] {
+  if (Array.isArray(valor)) return valor.flatMap((item, i) => clavesDeImporte(item, `${ruta}[${String(i)}]`));
+  if (valor === null || typeof valor !== 'object' || valor instanceof Date) return [];
+  return Object.entries(valor).flatMap(([clave, hijo]) => [
+    ...(CLAVE_DE_IMPORTE.test(clave) ? [`${ruta}.${clave}`] : []),
+    ...clavesDeImporte(hijo, `${ruta}.${clave}`),
+  ]);
+}
+
+describe('QC-305 — la pantalla de ejecucion no lleva el coste real (R24)', () => {
+  it('R24: ninguna clave de importe (actualCost, ingredientsCost, packagingCost...) en toda la vista, aunque el resumen las traiga', async () => {
+    const conImportes = {
+      ...resumen({ status: 'EN_CURSO', presentationLines: [{ id: uuid('5'), presentationId: PRESENTACION, packages: 2, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] }),
+      actualCost: '27.1250',
+      ingredientsCost: '30.0000',
+      packagingCost: '4.5000',
+    } as unknown as AssignedOrderSummary;
+    const { deps } = montar({
+      order: { id: PEDIDO, status: 'EN_CURSO' },
+      summary: conImportes,
+      presentations: [presentacion()],
+    });
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(view.orderId).toBe(PEDIDO);
+    expect(view.lines.length).toBeGreaterThan(0);
+    expect(clavesDeImporte(view)).toEqual([]);
+  });
+
+  it('R24: el contrato de la vista no declara actualCost (comprobacion de tipo)', () => {
+    const sinReal: 'actualCost' extends keyof AssignedOrderExecutionView ? false : true = true;
+    const sinEstimado: 'ingredientsCost' extends keyof AssignedOrderExecutionView ? false : true = true;
+    const resumenSinReal: 'actualCost' extends keyof AssignedOrderSummary ? false : true = true;
+    expect([sinReal, sinEstimado, resumenSinReal]).toEqual([true, true, true]);
+  });
+});

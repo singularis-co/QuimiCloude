@@ -17,6 +17,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ACTIONS_COLUMN_ID,
+  ACTUAL_COST_COLUMN_ID,
+  ACTUAL_COST_TESTID,
   CANCELLATION_REASON_COLUMN_ID,
   COVERAGE_COLUMN_ID,
   CREATED_AT_COLUMN_ID,
@@ -125,10 +127,10 @@ afterEach(() => {
 // tabla `orders` hacia arriba-, asi que sus dos columnas ya no tienen dato que pintar y la lista
 // acordada baja a ocho. Luego sube a diez con RESPONSABLES, a ONCE con COBERTURA, a DOCE con
 // CLIENTE y a TRECE con POR ENTREGAR, que llega desde el dashboard. El 2026-10-16 baja a DOCE: sale
-// CANTIDAD (decision humana). El 2026-10-20 sube a TRECE con COSTO DE PRODUCCION (decision
-// humana). Sigue siendo cerrada y en un orden acordado.
-describe('las columnas declaradas son exactamente las trece acordadas (R8, R20, R35)', () => {
-  it('en positivo: los trece ids, en el orden acordado', () => {
+// CANTIDAD (decision humana). El 2026-10-20 sube a TRECE con el costo y despues a CATORCE con el
+// costo real. Sigue siendo cerrada y en un orden acordado.
+describe('las columnas declaradas son exactamente las catorce acordadas (R8, R20, R35)', () => {
+  it('en positivo: los catorce ids, en el orden acordado', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
@@ -142,9 +144,10 @@ describe('las columnas declaradas son exactamente las trece acordadas (R8, R20, 
       COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
       PRODUCTION_COST_COLUMN_ID,
+      ACTUAL_COST_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(ORDER_COLUMNS).toHaveLength(13);
+    expect(ORDER_COLUMNS).toHaveLength(14);
   });
 
   it('en negativo: ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio', () => {
@@ -197,6 +200,7 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
       COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
       PRODUCTION_COST_COLUMN_ID,
+      ACTUAL_COST_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
     // `quantity` sigue en `ORDER_QUERYABLE.sortable` -una URL vieja con ese orden no rompe-, pero
@@ -575,17 +579,17 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
 // QC-123 T9 (R18) — el importe NO se pinta en esta ficha (lo pinta QC-122). En positivo, la
 // lista blanca de ids sigue sin ninguna columna de importe; en negativo, las celdas que SI se
 // pueden pintar sin montar el resto de la pantalla (router, dialogos) no dejan escapar el valor.
-// 2026-10-20 (decision humana): el costo SI se pinta, pero solo en su columna propia
-// (`PRODUCTION_COST_COLUMN_ID`, cubierta abajo); las demas celdas siguen sin dejarlo escapar.
+// Los costes SI se pintan, pero solo en sus columnas propias (cubiertas abajo); las demas celdas
+// siguen sin dejarlos escapar.
 describe('la tabla de pedidos no pinta el importe (R18)', () => {
   it('la tabla de pedidos no pinta el importe (R18)', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
     expect(ids).not.toContain('ingredientsCost');
     expect(ids).not.toContain('importe');
-    expect(ids).toHaveLength(13);
+    expect(ids).toHaveLength(14);
 
     const VALOR_DELATOR = '999999.9999';
-    const order = pedido({ ingredientsCost: VALOR_DELATOR });
+    const order = pedido({ ingredientsCost: VALOR_DELATOR, actualCost: VALOR_DELATOR });
     const idsRenderizablesSinContexto = [
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
@@ -604,23 +608,93 @@ describe('la tabla de pedidos no pinta el importe (R18)', () => {
   });
 });
 
-// 2026-10-20 — COSTO DE PRODUCCION (decision humana, sin spec): ultima columna de datos.
-describe('la columna «Costo de producción»', () => {
-  it('existe y es la ultima columna de datos, justo antes de las acciones', () => {
+describe('las columnas «Costo estimado» y «Costo real»', () => {
+  it('R19: son contiguas, en ese orden, justo antes de las acciones', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
 
     expect(ids.at(-1)).toBe(ACTIONS_COLUMN_ID);
-    expect(ids.at(-2)).toBe(PRODUCTION_COST_COLUMN_ID);
+    expect(ids.at(-2)).toBe(ACTUAL_COST_COLUMN_ID);
+    expect(ids.at(-3)).toBe(PRODUCTION_COST_COLUMN_ID);
   });
 
-  it('no ordena ni filtra', () => {
-    const costo = ORDER_COLUMNS.find((column) => column.id === PRODUCTION_COST_COLUMN_ID);
+  it('R19: se rotulan «Costo estimado» y «Costo real», y el rotulo viejo ya no esta', () => {
+    const porId = new Map(ORDER_COLUMNS.map((column) => [column.id, column]));
 
-    expect(costo?.sortable).not.toBe(true);
-    expect(costo?.filter).toBeUndefined();
+    expect(porId.get(PRODUCTION_COST_COLUMN_ID)?.label).toBe('Costo estimado');
+    expect(porId.get(ACTUAL_COST_COLUMN_ID)?.label).toBe('Costo real');
+    expect(ORDER_COLUMNS.map((column) => column.label)).not.toContain('Costo de producción');
   });
 
-  it('pinta el importe como dinero, con el valor exacto en el `title` si se redondea', () => {
+  it('R19: el estimado conserva su id para no perder preferencias guardadas', () => {
+    expect(PRODUCTION_COST_COLUMN_ID).toBe('productionCost');
+    expect(ACTUAL_COST_COLUMN_ID).toBe('actualCost');
+  });
+
+  it('R19: ninguna de las dos ordena ni filtra', () => {
+    for (const id of [PRODUCTION_COST_COLUMN_ID, ACTUAL_COST_COLUMN_ID]) {
+      const costo = ORDER_COLUMNS.find((column) => column.id === id);
+      expect(costo?.sortable, id).not.toBe(true);
+      expect(costo?.filter, id).toBeUndefined();
+    }
+  });
+
+  it('R19: las dos alinean al final y en cifras tabulares', () => {
+    for (const id of [PRODUCTION_COST_COLUMN_ID, ACTUAL_COST_COLUMN_ID]) {
+      const costo = ORDER_COLUMNS.find((column) => column.id === id);
+      expect(costo?.align, id).toBe('end');
+      expect(costo?.tabular, id).toBe(true);
+    }
+  });
+
+  it('R20: sin coste real pinta el guion con el rotulo «Sin dato», nunca 0 ni vacio', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCost: '50.0000', actualCost: null }));
+
+    expect(screen.queryByTestId(ACTUAL_COST_TESTID)).toBeNull();
+    const guion = screen.getByTestId(`order-missing-${ACTUAL_COST_COLUMN_ID}`);
+    expect(guion).toHaveTextContent(MISSING_VALUE_MARK);
+    expect(guion).toHaveAccessibleName('Sin dato');
+    expect(guion).not.toHaveTextContent('0');
+  });
+
+  it('R20: sin estimado pinta el guion con el rotulo «Sin dato», como hoy', () => {
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: null, packagingCost: null }));
+
+    expect(screen.queryByTestId(PRODUCTION_COST_TESTID)).toBeNull();
+    const guion = screen.getByTestId(`order-missing-${PRODUCTION_COST_COLUMN_ID}`);
+    expect(guion).toHaveTextContent(MISSING_VALUE_MARK);
+    expect(guion).toHaveAccessibleName('Sin dato');
+  });
+
+  it('R20: el real no cae al estimado cuando falta', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCost: '50.0000', actualCost: null }));
+
+    expect(document.body).not.toHaveTextContent('50.00');
+  });
+
+  it('R21: un importe exacto a dos decimales no lleva `title`', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ actualCost: '120.0000' }));
+
+    const celda = screen.getByTestId(ACTUAL_COST_TESTID);
+    expect(celda).toHaveTextContent('120.00');
+    expect(celda).not.toHaveAttribute('title');
+  });
+
+  it('R21: un importe que se redondea expone el exacto en el `title`', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ actualCost: '12752.5512' }));
+
+    const celda = screen.getByTestId(ACTUAL_COST_TESTID);
+    expect(celda).toHaveTextContent('12,752.55');
+    expect(celda).toHaveAttribute('title', '12752.5512');
+  });
+
+  it('R21: el real se pinta de `actualCost` y no del estimado', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCost: '99.0000', actualCost: '120.0000' }));
+
+    expect(screen.getByTestId(ACTUAL_COST_TESTID)).toHaveTextContent('120.00');
+    expect(screen.getByTestId(ACTUAL_COST_TESTID)).not.toHaveTextContent('99.00');
+  });
+
+  it('el estimado pinta el importe como dinero, con el valor exacto en el `title` si se redondea', () => {
     pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: '1234.5670', packagingCost: '0.0000' }));
 
     const celda = screen.getByTestId(PRODUCTION_COST_TESTID);
@@ -628,22 +702,12 @@ describe('la columna «Costo de producción»', () => {
     expect(celda).toHaveAttribute('title', '1234.567');
   });
 
-  it('sin costo pinta el marcador de ausencia', () => {
-    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: null, packagingCost: null }));
-
-    expect(screen.queryByTestId(PRODUCTION_COST_TESTID)).toBeNull();
-    expect(screen.getByTestId(`order-missing-${PRODUCTION_COST_COLUMN_ID}`)).toHaveTextContent(
-      MISSING_VALUE_MARK,
-    );
-  });
-
-  it('NO suma `packagingCost`: los envases ya van dentro de `ingredientsCost`', () => {
+  it('el estimado NO suma `packagingCost`: los envases ya van dentro de `ingredientsCost`', () => {
     pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: '12.5000', packagingCost: '2.0000' }));
 
     const celda = screen.getByTestId(PRODUCTION_COST_TESTID);
     expect(celda).toHaveTextContent('$12.50');
     expect(celda).not.toHaveTextContent('$14.50');
-    // Exacto a dos decimales: sin `title`.
     expect(celda).not.toHaveAttribute('title');
   });
 });

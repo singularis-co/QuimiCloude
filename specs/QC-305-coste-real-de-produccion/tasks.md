@@ -82,7 +82,7 @@
     escriben el estimado); R14 con el test de escritores de design §2.4.
   - Hecho: tests verdes; los de QC-123, QC-151 y QC-141 en `PENDIENTE` siguen verdes sin tocarlos.
 
-- [ ] **T6 [P] — El real llega a las salidas y no a `asignaciones`** (backend). Depende de T4. R24.
+- [x] **T6 [P] — El real llega a las salidas y no a `asignaciones`** (backend). Depende de T4. R24.
   - Tests: `tests/unit/pedidos/get-order.test.ts` y `tests/unit/pedidos/list-orders.test.ts`
     (`actualCost` presente con `pedidos.consultar`; sin permiso, rechazo como hoy);
     `tests/unit/asignaciones/get-assigned-order-execution.test.ts` y

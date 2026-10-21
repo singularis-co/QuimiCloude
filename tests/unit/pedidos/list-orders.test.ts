@@ -1083,3 +1083,44 @@ describe('listOrders — por entregar', () => {
     expect(d.listDeliveryProgress).not.toHaveBeenCalled()
   })
 })
+
+// QC-305 T6 — el listado exige `pedidos.consultar` y es la otra salida por la que viaja el coste
+// real. Cada fila lo lleva tal como lo guarda el pedido: cadena de 4 decimales o `null`.
+describe('QC-305 — listOrders: el coste real y quien lo ve (R24)', () => {
+  it('R24: con pedidos.consultar cada fila trae actualCost como cadena de 4 decimales o null', async () => {
+    const d = dobles({
+      pagina: pagina([
+        fila({ id: 'o-1', status: 'TERMINADO', ingredientsCost: '150.0000', actualCost: '142.5000' }),
+        fila({ id: 'o-2', status: 'EN_CURSO', ingredientsCost: '80.0000' }),
+      ]),
+    })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(salida.items.map((item) => [item.id, item.actualCost])).toEqual([
+      ['o-1', '142.5000'],
+      ['o-2', null],
+    ])
+    expect(salida.items[0]?.actualCost).toMatch(/^\d+\.\d{4}$/)
+    for (const item of salida.items) expect(item).toHaveProperty('actualCost')
+    // El real no pisa el estimado.
+    expect(salida.items[0]?.ingredientsCost).toBe('150.0000')
+  })
+
+  for (const [etiqueta, actor] of [
+    ['al Operador', OPERADOR],
+    ['al actor ausente', null],
+  ] as const) {
+    it(`R24: rechaza ${etiqueta} como hoy, sin llegar al repositorio ni a los catalogos`, async () => {
+      const d = dobles({ pagina: pagina([fila({ id: 'o-1', actualCost: '142.5000' })]) })
+
+      await expect(createListOrders(d)({ page: 1 }, actor)).rejects.toBeInstanceOf(UnauthorizedError)
+      expect(d.listAlive).not.toHaveBeenCalled()
+      expect(d.findRefsIncludingDeleted).not.toHaveBeenCalled()
+      expect(d.findRefs).not.toHaveBeenCalled()
+      expect(d.findUnitRefs).not.toHaveBeenCalled()
+      expect(d.findCustomerRefs).not.toHaveBeenCalled()
+      expect(d.listDeliveryProgress).not.toHaveBeenCalled()
+    })
+  }
+})

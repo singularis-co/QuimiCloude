@@ -59,6 +59,8 @@ export {
   PRESENTATION_NAME_COLUMN_ID,
   PRODUCTION_COST_COLUMN_ID,
   PRODUCTION_COST_TESTID,
+  ACTUAL_COST_COLUMN_ID,
+  ACTUAL_COST_TESTID,
   RECIPE_NAME_COLUMN_ID,
   RESPONSIBLES_COLUMN_ID,
   buildOrderColumns,
@@ -214,6 +216,7 @@ export {
 export {
   ORDER_COST_QUOTE_DEBOUNCE_MS,
   useOrderCostQuote,
+  type OrderCostQuoteOptions,
   type OrderCostQuoteState,
 } from './use-order-cost-quote';
 export {

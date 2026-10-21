@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { OrderNotFoundError } from '@/lib/modules/pedidos/domain/errors'
+import { OrderNotFoundError, UnauthorizedError } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder, toOrderView } from '@/lib/modules/pedidos/domain/get-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
@@ -331,4 +331,40 @@ describe('getOrder — el importe y su parte de envases', () => {
     expect(vista.ingredientsCost).toBeNull()
     expect(vista.packagingCost).toBeNull()
   })
+})
+
+// QC-305 T6 — el coste real sale por la ficha, que exige `pedidos.consultar`, y por ninguna otra
+// puerta: sin el permiso, el rechazo llega antes que el repositorio y los catalogos.
+describe('QC-305 — getOrder: el coste real y quien lo ve (R24)', () => {
+  it('R24: con pedidos.consultar la ficha trae actualCost como cadena de 4 decimales, tal como viene de la fila', async () => {
+    const d = dobles({ ...fila(ORIGINAL), status: 'TERMINADO', ingredientsCost: '30.0000', actualCost: '27.1250' })
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.actualCost).toBe('27.1250')
+    expect(vista.actualCost).toMatch(/^\d+\.\d{4}$/)
+    // El real no pisa el estimado: los dos viajan juntos y distintos.
+    expect(vista.ingredientsCost).toBe('30.0000')
+  })
+
+  it('R24: un pedido sin coste real sale con actualCost null, no "0.0000" ni ausente', async () => {
+    const vista = await createGetOrder(dobles(fila(ORIGINAL)))(ORDER_ID, ADMIN)
+
+    expect(vista).toHaveProperty('actualCost')
+    expect(vista.actualCost).toBeNull()
+  })
+
+  for (const [etiqueta, actor] of [
+    ['un actor sin pedidos.consultar', { id: 'operador-1', companyId: COMPANY, permissions: ['asignaciones.consultar'] }],
+    ['un actor ausente', null],
+  ] as const) {
+    it(`R24: ${etiqueta} se rechaza como hoy, sin llegar al repositorio ni a los catalogos`, async () => {
+      const d = dobles({ ...fila(ORIGINAL), actualCost: '27.1250' })
+
+      await expect(createGetOrder(d)(ORDER_ID, actor)).rejects.toBeInstanceOf(UnauthorizedError)
+      expect(d.orders.findAliveById).not.toHaveBeenCalled()
+      expect(d.findRefsIncludingDeleted).not.toHaveBeenCalled()
+      expect(d.findCustomerRefs).not.toHaveBeenCalled()
+    })
+  }
 })

@@ -234,3 +234,116 @@ Verificacion (salida real):
   Nota: a mitad de la tanda el Postgres local estuvo ~1 min en recuperacion (57P03); se reintento.
 
 Veredicto T4b: CHECK retirado con su down, P1/R17 verde en la base, lectores ya trataban NULL como «sin coste»; T4 desbloqueada.
+
+## T6 — el real llega a las salidas de `pedidos.consultar` y no a `asignaciones` (R24)
+
+Solo tests; ningun cambio de codigo: `getOrder`/`listOrders` ya copian `actualCost` de la fila tras
+`requirePermission(actor, 'pedidos.consultar')`, y las vistas de `asignaciones` no lo declaran ni lo copian.
+
+Archivos modificados (solo tests):
+- `tests/unit/pedidos/get-order.test.ts` (+4 casos; importa `UnauthorizedError`).
+- `tests/unit/pedidos/list-orders.test.ts` (+3 casos).
+- `tests/unit/asignaciones/get-assigned-order-execution.test.ts` (+2 casos).
+- `tests/unit/asignaciones/list-assigned-orders.test.ts` (+2 casos).
+Los cuatro archivos que pedia `tasks.md` existian; no hizo falta buscar equivalentes.
+
+Mapa R24 -> test:
+- `get-order.test.ts` «QC-305 — getOrder: el coste real y quien lo ve (R24)»:
+  «R24: con pedidos.consultar la ficha trae actualCost como cadena de 4 decimales, tal como viene de la fila»;
+  «R24: un pedido sin coste real sale con actualCost null, no "0.0000" ni ausente»;
+  «R24: un actor sin pedidos.consultar se rechaza como hoy, sin llegar al repositorio ni a los catalogos»;
+  «R24: un actor ausente se rechaza como hoy, sin llegar al repositorio ni a los catalogos».
+- `list-orders.test.ts` «QC-305 — listOrders: el coste real y quien lo ve (R24)»:
+  «R24: con pedidos.consultar cada fila trae actualCost como cadena de 4 decimales o null»;
+  «R24: rechaza al Operador como hoy, sin llegar al repositorio ni a los catalogos»;
+  «R24: rechaza al actor ausente como hoy, sin llegar al repositorio ni a los catalogos».
+- `get-assigned-order-execution.test.ts` «QC-305 — la pantalla de ejecucion no lleva el coste real (R24)»:
+  «R24: ninguna clave de importe (actualCost, ingredientsCost, packagingCost...) en toda la vista, aunque el resumen las traiga»
+  (recorrido recursivo con `/cost|coste|importe|price|precio|amount/i`, resumen con los tres importes colados);
+  «R24: el contrato de la vista no declara actualCost (comprobacion de tipo)».
+- `list-assigned-orders.test.ts` «QC-305 — la lista de pedidos asignados no lleva el coste real (R24)»:
+  «R24: ninguna clave de importe (actualCost, ingredientsCost, packagingCost...) en ninguna fila, aunque el resumen las traiga»;
+  «R24: el contrato del resumen asignado no declara actualCost (comprobacion de tipo)».
+Nota: `list-assigned-orders.test.ts` y `get-assigned-order-execution.test.ts` ya tenian titulos «R24: ...» de
+otra feature (presentacion / insumo sin unidad); los de QC-305 se distinguen por su `describe` «QC-305 — ...».
+
+Verificacion (salida real):
+- `pnpm run typecheck`: `tsc --noEmit`, exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)` (los mismos 10 preexistentes); eslint de los 4 tocados: limpio.
+- `pnpm exec vitest run <los 4 archivos>`: `Test Files 4 passed (4)`, `Tests 168 passed (168)`.
+- `pnpm exec vitest run guard`: primera pasada `1 failed | 84 passed (85)`, `2 failed` (con el frontend_dev editando
+  `app/(private)/pedidos/**` en paralelo; no se identifico cual); tercera pasada `Test Files 85 passed (85)`,
+  `Tests 1255 passed | 22 skipped (1277)`.
+
+Veredicto T6: R24 cubierto en los cuatro archivos, verde, sin tocar codigo de produccion.
+
+## T7 (frontend_dev) — UI: columnas del listado y formulario en `EN_CURSO` — 2026-10-21
+
+Archivos de produccion:
+- `app/(private)/pedidos/components/order-columns.tsx`: `PRODUCTION_COST_COLUMN_ID` rotula «Costo estimado» (id
+  `productionCost` sin cambio); nace `ACTUAL_COST_COLUMN_ID = 'actualCost'` justo despues, «Costo real», `align: 'end'`,
+  `tabular: true`, sin `sortable` ni `filter`, testid `order-actual-cost` (`ACTUAL_COST_TESTID`). `ProductionCost` pasa a
+  `CostCell({ value, field })` (el testid sale de `field`). Cabecera del modulo: CATORCE columnas.
+- `app/(private)/pedidos/components/use-order-cost-quote.ts`: cuarto argumento `{ frozen }` (`OrderCostQuoteOptions`);
+  con `frozen` los cuatro manejadores no hacen nada y el estado se queda en el importe inicial.
+- `app/(private)/pedidos/components/order-form.tsx`: pasa `frozen: order !== undefined && STARTED_ORDER_STATUSES.includes(order.status)`.
+- `app/(private)/pedidos/components/order-list-skeleton.tsx`: `ORDER_SKELETON_COLUMN_COUNT` 13 -> 14 (un test lo ata a
+  `ORDER_COLUMNS.length`).
+- `app/(private)/pedidos/components/index.ts`: reexporta `ACTUAL_COST_COLUMN_ID`, `ACTUAL_COST_TESTID`, `OrderCostQuoteOptions`.
+- `lib/modules/pedidos/index.ts`: **una linea**, reexporta `STARTED_ORDER_STATUSES`. La UI no puede importar `domain/`
+  (guard-arquitectura-modulos R13) y el barrel no lo exportaba; es la unica via publica. Fuera del alcance estricto de
+  frontend: lo revisa el leader.
+
+Tests:
+- `tests/unit/pedidos-ui/order-columns.test.tsx` (79): lista de ids y no ordenables ampliadas con `actualCost`, 13 -> 14;
+  bloque «las columnas «Costo estimado» y «Costo real»» sustituye al de «Costo de producción».
+- `tests/unit/pedidos-ui/use-order-cost-quote.test.ts` (6): bloque «estimado congelado».
+- `tests/unit/pedidos-ui/order-form-quote.test.tsx` (27): bloque «R15 — en EN_CURSO el estimado esta congelado»; el
+  pedido por defecto del archivo pasa de `EN_CURSO` a `PENDIENTE` (los casos de R12/R65 son de un pedido no comenzado).
+- Ajustados: `tests/unit/marca/tablas-marca.test.tsx` (rotulos tabulares «Costo estimado», «Costo real»),
+  `tests/unit/pedidos-ui/pedidos-viewport.test.tsx` (13 -> 14), snapshot de `tests/unit/paridad/pedidos-paridad.test.tsx`
+  (`-u`; el diff es solo el rotulo nuevo, la cabecera «Costo real» y la celda `order-missing-actualCost`).
+
+Mapa R -> test:
+- R15: `use-order-cost-quote.test.ts` «R15: con frozen ningun manejador pide cotizacion y queda el importe inicial»,
+  «R15: con frozen y sin importe guardado queda el guion, no 0», «R15: sin frozen se cotiza como hoy»;
+  `order-form-quote.test.tsx` «R15: se ve el guardado y cambiar cantidad, receta o unidad no pide cotizacion»,
+  «R15: sin estimado guardado se ve el guion y tampoco se cotiza», «R15: en PENDIENTE la edicion sigue cotizando como hoy».
+- R19: `order-columns.test.tsx` «R19: son contiguas, en ese orden, justo antes de las acciones», «R19: se rotulan «Costo
+  estimado» y «Costo real», y el rotulo viejo ya no esta», «R19: el estimado conserva su id para no perder preferencias
+  guardadas», «R19: ninguna de las dos ordena ni filtra», «R19: las dos alinean al final y en cifras tabulares». La
+  tarjeta sale de las mismas columnas (snapshot de paridad).
+- R20: `order-columns.test.tsx` «R20: sin coste real pinta el guion con el rotulo «Sin dato», nunca 0 ni vacio», «R20:
+  sin estimado pinta el guion con el rotulo «Sin dato», como hoy», «R20: el real no cae al estimado cuando falta».
+- R21: `order-columns.test.tsx` «R21: un importe exacto a dos decimales no lleva `title`», «R21: un importe que se
+  redondea expone el exacto en el `title`», «R21: el real se pinta de `actualCost` y no del estimado». **Abierto**: ver
+  bloqueo de formato abajo; los asserts de texto miran `120.00` / `12,752.55` sin fijar el prefijo.
+- R22: sin cambio de UI (design §5.3); se cubre en integracion/E2E (T8).
+
+Bloqueo de formato (R21 contra design §5.1): R21 y tasks piden `$ 120.00` / `$ 12,752.55` (con espacio), y design
+§5.1 dice `formatMoneyDisplay`, que pinta `$120.00` sin espacio (`MONEY_SYMBOL` + cifra; el estimado hoy se ve `$1,234.57`
+y su test lo fija). El formato con espacio ya existe en la ruta: `order-amount.ts > formatOrderAmount` (bloque de coste
+del formulario). Se dejo `formatMoneyDisplay` (lo que dice el design, y las dos columnas iguales). Decide el humano:
+(a) R21 se lee sin espacio y se corrige el texto de R21/tasks; o (b) las dos columnas pasan a `formatOrderAmount`
+(cambia tambien como se ve el estimado y su test).
+
+Preferencia de columnas guardada: `DataTable` solo persiste el **fijado** (`use-pinned-columns.ts`, `localStorage`,
+`{ left, right }` de ids; los ids que ya no existen se descartan). No hay preferencia de visibilidad ni de orden
+(`columnVisibilityFeature`/`columnOrderingFeature` no se activan). Una preferencia vieja **no esconde** «Costo real»:
+nace sin fijar y visible. Unico efecto: quien tenga `productionCost` fijada a un borde la ve en ese borde y «Costo real»
+queda en su sitio, asi que para esa persona dejan de verse contiguas hasta que desfije. No se cambia `DataTable`.
+
+Capturas: no se levanto servidor; quedan para el E2E (T8).
+
+Verificacion (salida real):
+- `pnpm run typecheck`: `tsc --noEmit`, exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, todos en archivos no tocados (step-evidence.tsx,
+  list-execution-traces, confirm-catalog-import, order-service.test).
+- `pnpm exec vitest run` de order-columns, use-order-cost-quote, order-form-quote, pedidos-viewport, tablas-marca,
+  pedidos-paridad: `Test Files 6 passed (6)`, `Tests 160 passed (160)`.
+- `pnpm exec vitest run` de order-form, order-form-customer, order-form-leftover, order-form-image-paridad, order-cards,
+  order-table, order-list-section, order-list-section-produced, order-row-wiring, read-only, pedidos-convenciones,
+  a11y-tactil (+ paridad antes del `-u`): `12 passed`, solo los 2 snapshots de paridad en rojo, luego actualizados.
+- `pnpm exec vitest run guard-arquitectura guard-catalogo`: `Test Files 4 passed (4)`, `Tests 163 passed (163)`.
+
+Veredicto T7: R15, R19, R20 verdes; R21 verde salvo el prefijo `$ ` pendiente de decision; R22 sin UI.

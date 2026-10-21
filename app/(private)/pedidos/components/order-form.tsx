@@ -22,6 +22,7 @@ import { SelectField } from '@/components/shared/select-field';
 import {
   DEFAULT_ORDER_PRIORITY,
   ORDER_PRIORITY_VALUES,
+  STARTED_ORDER_STATUSES,
   createOrderSchema,
   updateOrderSchema,
   type OrderSummary,
@@ -414,7 +415,11 @@ export function OrderForm({
   const [lines, setLines] = useState<readonly OrderDistributionLine[]>(() =>
     fromOrderPresentationLines(order?.presentationLines ?? []),
   );
-  const quote = useOrderCostQuote(order?.ingredientsCost ?? null, order?.id, lines);
+  const quote = useOrderCostQuote(order?.ingredientsCost ?? null, order?.id, lines, {
+    frozen:
+      order !== undefined &&
+      (STARTED_ORDER_STATUSES as readonly OrderSummary['status'][]).includes(order.status),
+  });
   const availability = useOrderDistributionAvailability({ quantity, unitId, lines });
   const unitLabel = orderUnitLabel(units, unitId, order);
   const compatibleIds = useMemo(() => compatibleUnitIds(units, unitId), [units, unitId]);

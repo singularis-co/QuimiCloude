@@ -15,6 +15,7 @@ export {
   ORDER_STATUS_FLOW,
   DEFAULT_ORDER_PRIORITY,
   DEFAULT_ORDER_STATUS,
+  STARTED_ORDER_STATUSES,
 } from './domain/order-classification';
 export type { OrderPriority, OrderStatus } from './domain/order-classification';
 export type { OrderContents } from './domain/order-contents';
