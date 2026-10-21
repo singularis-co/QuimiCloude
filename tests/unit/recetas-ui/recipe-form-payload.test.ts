@@ -79,6 +79,7 @@ function baseState(overrides: Partial<RecipeFormState> = {}): RecipeFormState {
     tools: [],
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     image: { kind: 'untouched' },
     ...overrides,
   };

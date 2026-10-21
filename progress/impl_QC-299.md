@@ -161,3 +161,57 @@ posiciones ≤ `completedCount`, ya recortado). Si se decide filtrar, el cambio 
 - R35 → `get-execution-trace.test.ts` (Avanzar/Completar pasos con responsables, misma lectura de directorio, cuentan en la fase); `record-conditioning-step.test.ts` («completar un paso con asignacion anota sus responsables»)
 - R36 → `get-execution-trace.test.ts` (cambio con anterior y nuevo, encadenado, anterior vacío, registro corrupto)
 - R37 → `get-execution-trace.test.ts` (pasos de producción sin responsables); `list-execution-traces.test.ts` (fila sin cambios)
+
+## Tanda 4 — UI (T15–T18) + decisión de responsables huérfanos
+
+### Archivos
+- T15: `app/(private)/produccion/formulas/components/{recipe-step-editor.tsx,recipe-steps-field.tsx,recipe-form.tsx,recipe-form-state.ts}`. `recipe-step-editor.tsx` estaba en CRLF en HEAD y queda en LF (`.gitattributes` pide LF); sin espacios de línea el diff es +78/−14.
+- T16: `recipe-version-form.tsx`.
+- T17: nuevos `app/(private)/asignacion/acondicionamiento/[id]/components/{conditioning-steps-panel.tsx,conditioning-step-responsibles-picker.tsx}`; modificados `conditioning-batch-data-form.tsx` (prop `locked`), `conditioning-order-screen.tsx` (pasa a `'use client'`), `index.ts`. `page.tsx` sin cambios.
+- T18: `app/(private)/dashboard/components/execution-trace-format.ts`, `app/(private)/dashboard/recorrido/[id]/components/{execution-timeline.tsx,conditioning-step-details.tsx}`.
+- Tests nuevos: `tests/unit/recetas-ui/recipe-form-conditioning-steps.test.tsx`, `tests/unit/asignaciones-ui/{conditioning-steps-panel,conditioning-step-responsibles-picker}.test.tsx`. Ampliados: `recipe-step-editor`, `recipe-steps-field`, `recipe-version-form`, `conditioning-order-screen`, `conditioning-batch-data-form`, `tests/ui/dashboard/execution-trace-detail.test.tsx`.
+- Tests existentes ajustados: `recipe-form-evidence-lock`, `recipe-form-payload`, `recipe-form-state`, `recipe-lines-unavailable` (nombres accesibles «… de <sección>», `conditioningSteps: []`); `conditioning-order-page.test.tsx` (`conditioningSteps: null`); `recipe-route-contract.test.ts` (cuarto montador del asistente: `conditioning-steps-panel.tsx`, design 5.2); `tests/unit/recetas/scope.test.ts` (censo de `Recipe` + `conditioningSteps`, rojo desde la tanda 1 sin detectar).
+
+### Refresh tras `recordConditioningStepAction` (T17)
+Las props se leen solo al montar (paso de entrada, fotos iniciales, responsables guardados, aviso), así que el refresh no mueve el paso en curso ni borra marcas. Completados = máx(servidor, última respuesta de la acción). Envíos en cola en orden; «Completar pasos» sin doble envío; volver atrás no escribe; si el servidor rechaza, vuelve a ese paso con el error. Lo cubre un test que repinta con props nuevas.
+
+### Desvíos respecto a los tableros (decisiones de los frontend_dev)
+- Formulario: tooltip sin «mantener pulsado» en táctil (Base UI no lo trae; el nombre accesible lleva el texto, design 5.4). Ayuda de la sección visible bajo el título (prop `optionalDescription` en vez de `optionalHelp` de design 5.1, que pedía un texto no especificado). Formulario de versión sin switches (R16/P5), con marcas en texto. «+», «×» y asa conservan su nombre accesible.
+- Paso a paso: `StepReader` no se toca → h2 «Pasos de acondicionamiento» con «Paso N de M» debajo, pie centrado a 720 px, motivos de bloqueo en el pie. Texto de evidencia de esta pantalla «Sube al menos una foto para avanzar.» (R21) sin tocar el hook compartido. «Pasos completos» con el pie de hoy (R24). «Retomaste donde ibas» en la columna izquierda. «Equipo» reutiliza `ConditioningTeamList` sin la fila «(acondiciona)». Toast «Pasos completos.».
+- Recorrido: «Paso N» sin «de M» (P2, design 5.3). Singular «1 foto de evidencia» (añadido; el spec solo trae «N fotos de evidencia»: **confirmar**). La cifra va en la última «Avanzar»/«Completar pasos» de la posición, no en un cambio de responsables. Antes vacío se pinta «—».
+
+### Decisión del humano 2026-10-21: responsables huérfanos
+Anotada en `requirements.md > Decisiones cerradas`. `composeConditioningStepsView` filtra los responsables de posiciones que ya no existen; el registro los conserva y el recorrido los sigue mostrando.
+- Código: `lib/modules/asignaciones/domain/conditioning-order-view.ts` (filtro `1 <= stepPosition <= steps.length`).
+- Tests: `get-conditioning-order.test.ts` («R28, R26: si la formula perdio pasos, la vista ignora los responsables de posiciones que ya no existen»); `get-execution-trace.test.ts` («R35, R36: el recorrido sigue mostrando como historia los responsables de posiciones que la formula ya no tiene»).
+
+### Verificación de cierre de la tanda 4 (corrida por el implementer)
+- `pnpm run typecheck`: **0 errores**.
+- `pnpm run lint`: 0 errores, 10 warnings (preexistentes).
+- `pnpm exec vitest run guard`: 80 archivos, 1096 verdes, 20 skipped (una corrida en paralelo con otros agentes dio timeout en `guard-asignacion-componentizada`; repetida sola, verde).
+- UI: `vitest run tests/unit/recetas tests/unit/recetas-ui tests/unit/asignaciones-ui tests/ui/dashboard tests/unit/paridad tests/unit/dashboard tests/unit/identity/session-once-per-request-render.test.tsx` → 153 archivos, 2590/2590.
+- Tras el filtro: `tests/unit/asignaciones` + `tests/unit/asignaciones-ui` → 120 archivos, 2667/2667.
+- A vigilar en CI por tiempo con carga: `session-once-per-request-render.test.tsx` (`beforeAll` 60 s; pasa solo), `formula-import-review.test.tsx` («más de 500 caracteres», ~20,7 s también en HEAD).
+
+## Mapa R<n> -> test (tanda 4)
+- R8 → `recipe-form-conditioning-steps.test.tsx` («R8: el alta la muestra tras «Envasado»…», «R8: una fila vacía…no se envía», reordenar teclado/arrastre); `recipe-steps-field.test.tsx` («R8: la sección se marca «(opcional)»…»)
+- R9 → `recipe-steps-field.test.tsx` («R9: cada fila ofrece…», «R9: «Pasos» y «Envasado» siguen ofreciendo solo…»); `recipe-step-editor.test.tsx` («R9: sin la prop assignment…»); `recipe-form-conditioning-steps.test.tsx` («R9: solo «Acondicionamiento»…»)
+- R10 → `recipe-step-editor.test.tsx` (solo icono, tooltip por hover y por foco, línea de ayuda); `recipe-steps-field.test.tsx` (nombre accesible); `recipe-form-conditioning-steps.test.tsx` («R10: en las tres secciones…»)
+- R11 → `recipe-steps-field.test.tsx` («R11: la cabecera resume…», «R11: con la fila en blanco…»); `recipe-form-conditioning-steps.test.tsx`
+- R12 → `recipe-form-conditioning-steps.test.tsx` (envío con marcas, paso vacío, error en su sección); `recipe-steps-field.test.tsx`
+- R13 → `recipe-form-conditioning-steps.test.tsx` («R13: formato, lista de verificación y las dos marcas…», «R13: una lectura sin la clave…»)
+- R16 → `recipe-version-form.test.tsx` (2 casos «R16 —»)
+- R18 → `conditioning-steps-panel.test.tsx` («R18: un paso por pantalla…»); `conditioning-order-screen.test.tsx` («QC-299 R18…»)
+- R19 → `conditioning-order-screen.test.tsx` (2 casos «QC-299 R19»)
+- R20 → `conditioning-steps-panel.test.tsx` (2 casos «R20», temporizadores falsos)
+- R21 → `conditioning-steps-panel.test.tsx` (2 casos «R21»)
+- R22 → `conditioning-steps-panel.test.tsx` (5 casos «R22»); `conditioning-step-responsibles-picker.test.tsx` (5 casos «R22», incluido ≥ 44 px)
+- R24 → `conditioning-steps-panel.test.tsx` (6 casos «R24»)
+- R25 → `conditioning-steps-panel.test.tsx` («R24 R25»); `conditioning-order-screen.test.tsx` (3 «QC-299 R25»); `conditioning-batch-data-form.test.tsx` (3 «QC-299 R25»)
+- R26 → `conditioning-steps-panel.test.tsx` (5 casos «R26»); `get-conditioning-order.test.ts` («R28, R26: …»)
+- R28 → `get-conditioning-order.test.ts` («R28, R26: si la formula perdio pasos…»)
+- R35 → `tests/ui/dashboard/execution-trace-detail.test.tsx` (6 casos «QC-299 R35»); `get-execution-trace.test.ts` («R35, R36: el recorrido sigue mostrando como historia…»)
+- R36 → `execution-trace-detail.test.tsx` (3 casos «QC-299 R36»)
+- R37 → `tests/unit/paridad/recorridos-paridad.test.tsx` (paridad del detalle intacta)
+
+Pendientes: T19 (E2E, R39) y T20 (cierre).

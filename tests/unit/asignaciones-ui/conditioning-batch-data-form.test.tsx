@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +7,7 @@ import { setupUser } from '../../helpers/user-event';
 import {
   CONDITIONING_BATCH_DATA_DIVERGENT_TESTID,
   CONDITIONING_BATCH_DATA_ERROR_TESTID,
+  CONDITIONING_BATCH_DATA_LOCKED_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_BATCH_DATA_TEXTS,
   ConditioningBatchDataForm,
@@ -23,6 +24,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions'
   startConditioningAction: vi.fn(),
   finishConditioningAction: vi.fn(),
   saveConditioningBatchDataAction: saveActionMock,
+  recordConditioningStepAction: vi.fn(),
 }));
 
 let toastExito: ReturnType<typeof vi.spyOn>;
@@ -252,5 +254,42 @@ describe('guardar', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('No se encontro el pedido.');
     for (const campo of Object.values(campos())) expect(campo).not.toHaveAttribute('aria-invalid');
     expect(toastExito).not.toHaveBeenCalled();
+  });
+});
+
+describe('«Datos de lote» bloqueada hasta completar los pasos', () => {
+  it('QC-299 R25: con `locked`, los campos y «Guardar datos de lote» van deshabilitados y la nota dice «Al completar los pasos»', () => {
+    render(<ConditioningBatchDataForm orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} locked />);
+
+    const nota = screen.getByTestId(CONDITIONING_BATCH_DATA_LOCKED_TESTID);
+    expect(nota).toHaveTextContent('Al completar los pasos');
+    for (const campo of Object.values(campos())) {
+      expect(campo).toBeDisabled();
+      expect(campo).toHaveAttribute('aria-describedby', nota.id);
+    }
+    expect(guardar()).toBeDisabled();
+    expect(guardar()).toHaveAttribute('aria-describedby', nota.id);
+  });
+
+  it('QC-299 R25: bloqueada, enviar el formulario no llama a la acción', () => {
+    render(<ConditioningBatchDataForm orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} locked />);
+
+    fireEvent.click(guardar());
+
+    expect(saveActionMock).not.toHaveBeenCalled();
+  });
+
+  it('QC-299 R25: sin `locked` (o en falso) nada cambia: sin nota y con todo habilitado', () => {
+    const { container } = pintar(SHARED);
+    const sinProp = container.innerHTML;
+    cleanup();
+    const { container: enFalso } = render(
+      <ConditioningBatchDataForm orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} locked={false} />,
+    );
+
+    expect(screen.queryByTestId(CONDITIONING_BATCH_DATA_LOCKED_TESTID)).toBeNull();
+    for (const campo of Object.values(campos())) expect(campo).toBeEnabled();
+    expect(guardar()).toBeEnabled();
+    expect(enFalso.innerHTML.replace(/_r_[\w]+_/g, 'id')).toBe(sinProp.replace(/_r_[\w]+_/g, 'id'));
   });
 });

@@ -565,6 +565,28 @@ describe('getExecutionTrace — pasos de acondicionamiento y responsables', () =
     await expect(m2.abrir(ACTOR, { orderId: PEDIDO }, NOW)).rejects.toThrow(/no tiene los responsables/);
   });
 
+  it('R35, R36: el recorrido sigue mostrando como historia los responsables de posiciones que la formula ya no tiene', async () => {
+    // La formula actual tiene menos pasos que los anotados: el recorrido no la lee ni recorta.
+    const entries = [
+      anotacion('conditioning_start', 0, ANA, null),
+      paso('conditioning_step_advance', 5, 7, [CARLA]),
+      paso('conditioning_responsibles_change', 9, 7, [DIEGO], ANA),
+    ];
+    const m = montar({ order: resumen({ status: 'EN_ACONDICIONAMIENTO' }), entries, people: directorio });
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    expect(recorrido.steps[1]).toMatchObject({
+      action: 'conditioning_step_advance',
+      stepPosition: 7,
+      responsibles: [{ userId: CARLA, displayName: 'Carla Diaz' }],
+    });
+    expect(recorrido.steps[2]).toMatchObject({
+      action: 'conditioning_responsibles_change',
+      stepPosition: 7,
+      previous: [{ userId: CARLA, displayName: 'Carla Diaz' }],
+      responsibles: [{ userId: DIEGO, displayName: 'Diego Sanz' }],
+    });
+  });
+
   it('R37: los pasos de produccion siguen sin campos de responsables', async () => {
     const m = montar();
     const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);

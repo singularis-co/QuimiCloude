@@ -1330,6 +1330,14 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx';
 
   /**
+   * CUARTO montador (QC-299 design.md 5.2, T17): el panel de pasos de acondicionamiento reutiliza
+   * el asistente en modo ejecucion («Reutiliza StepReader mode=ejecucion»). Lo monta por props desde
+   * una pantalla, no le da ruta propia, asi que R12 sigue intacta. Archivo EXACTO, nunca la carpeta.
+   */
+  const MONTADOR_DE_ACONDICIONAMIENTO =
+    'app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-steps-panel.tsx';
+
+  /**
    * La edicion de una version pinta el documento con la vista sin estado del asistente, no con el
    * asistente: se acepta solo ese archivo y solo ese import exacto.
    */
@@ -1489,7 +1497,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     );
   });
 
-  it('el asistente solo se importa desde sus tres montadores y la vista sin estado, ademas, desde recipe-version-form.tsx', () => {
+  it('el asistente solo se importa desde sus cuatro montadores y la vista sin estado, ademas, desde recipe-version-form.tsx', () => {
     const importadores: string[] = [];
 
     const vista = fuenteSinComentarios(MONTADOR_DE_LA_VISTA);
@@ -1512,7 +1520,12 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     }
 
     expect(importadores.sort()).toEqual(
-      [MONTADOR_DE_EJECUCION, MONTADOR_DE_EMPAQUE, UNICO_MONTADOR].sort(),
+      [
+        MONTADOR_DE_EJECUCION,
+        MONTADOR_DE_EMPAQUE,
+        MONTADOR_DE_ACONDICIONAMIENTO,
+        UNICO_MONTADOR,
+      ].sort(),
     );
   });
 

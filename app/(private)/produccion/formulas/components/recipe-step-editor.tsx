@@ -1,10 +1,11 @@
 'use client';
 
 import { EditorContent, useEditor, useEditorState, type Content } from '@tiptap/react';
-import { CameraIcon, CheckIcon } from 'lucide-react';
+import { CameraIcon, CheckIcon, UserPlusIcon } from 'lucide-react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   MAX_STEP_ELEMENTS,
   countRecipeStepElements,
@@ -44,8 +45,12 @@ const TEXTS = {
   italic: 'Cursiva',
   checklist: 'Lista de verificacion',
   toolbar: 'Formato del paso',
-  requiresEvidence: 'Requiere evidencia',
+  evidenceTooltip: 'Requiere evidencia: al ejecutar, el paso pide de 1 a 3 fotos antes de avanzar.',
   evidenceHelp: 'Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.',
+  assignmentTooltip:
+    'Asignación requerida: al ejecutar, hay que elegir uno o más responsables del equipo que hicieron el paso.',
+  assignmentHelp:
+    'Al ejecutar, hay que elegir uno o más responsables del equipo antes de avanzar.',
   tooManyElements: (count: number, max: number) =>
     `Este paso tiene ${count} elementos y el maximo es ${max}. Quita elementos antes de guardar.`,
 } as const;
@@ -60,15 +65,17 @@ export type RecipeStepEditorProps = {
   readonly error?: string;
   readonly errorId?: string;
   /** Sin ella no se pinta el interruptor «Requiere evidencia». */
-  readonly evidence?: RecipeStepEvidenceControl;
+  readonly evidence?: RecipeStepSwitchControl;
+  /** Sin ella no se pinta el interruptor «Asignación requerida». */
+  readonly assignment?: RecipeStepSwitchControl;
   /** Botones de la fila (añadir, quitar), en el mismo grupo que el interruptor. */
   readonly actions?: ReactNode;
 };
 
-export type RecipeStepEvidenceControl = {
+export type RecipeStepSwitchControl = {
   readonly checked: boolean;
   readonly onCheckedChange: (checked: boolean) => void;
-  /** Nombre accesible del interruptor, por ejemplo «Requiere evidencia en el paso 1». */
+  /** Nombre accesible completo, por ejemplo «Requiere evidencia en el paso 1 de Pasos». */
   readonly label: string;
 };
 
@@ -89,11 +96,15 @@ export function RecipeStepEditor({
   error,
   errorId,
   evidence,
+  assignment,
   actions,
 }: RecipeStepEditorProps) {
   const warningId = useId();
   const evidenceHelpId = useId();
+  const assignmentHelpId = useId();
   const evidenceOn = evidence?.checked === true;
+  const assignmentOn = assignment?.checked === true;
+  const hasSwitches = evidence !== undefined || assignment !== undefined;
 
   // `onChange` puede cambiar de identidad en cada render del formulario, pero el editor se crea
   // UNA vez: sin esta referencia, `onUpdate` se quedaria con la primera version para siempre.
@@ -194,23 +205,31 @@ export function RecipeStepEditor({
             <span aria-hidden="true">&#9745;</span>
           </ToolbarButton>
         </div>
-        {evidence === undefined && actions === undefined ? null : (
+        {!hasSwitches && actions === undefined ? null : (
           // En teléfono el interruptor baja a su propia línea; desde md se alinea a la derecha.
           <div
             className="flex w-full items-center gap-1 md:ml-auto md:w-auto"
             data-testid={`${editableTestId}-row-tools`}
           >
             {evidence === undefined ? null : (
-              <Switch
-                checked={evidenceOn}
-                onCheckedChange={(checked) => evidence.onCheckedChange(checked)}
-                aria-label={evidence.label}
-                aria-describedby={evidenceOn ? evidenceHelpId : undefined}
-                data-testid={`${editableTestId}-evidence`}
+              <IconSwitch
+                control={evidence}
+                tooltip={TEXTS.evidenceTooltip}
+                helpId={evidenceOn ? evidenceHelpId : undefined}
+                testId={`${editableTestId}-evidence`}
               >
                 <CameraIcon aria-hidden="true" className="size-4" />
-                {TEXTS.requiresEvidence}
-              </Switch>
+              </IconSwitch>
+            )}
+            {assignment === undefined ? null : (
+              <IconSwitch
+                control={assignment}
+                tooltip={TEXTS.assignmentTooltip}
+                helpId={assignmentOn ? assignmentHelpId : undefined}
+                testId={`${editableTestId}-assignment`}
+              >
+                <UserPlusIcon aria-hidden="true" className="size-4" />
+              </IconSwitch>
             )}
             {actions === undefined ? null : <div className="ml-auto flex gap-1">{actions}</div>}
           </div>
@@ -243,7 +262,52 @@ export function RecipeStepEditor({
           {TEXTS.evidenceHelp}
         </p>
       ) : null}
+
+      {assignmentOn ? (
+        <p
+          id={assignmentHelpId}
+          className="flex animate-in items-center gap-1.5 text-xs text-primary duration-(--dur-slow) ease-(--ease-enter) fade-in slide-in-from-bottom-[10px]"
+          data-testid={`${editableTestId}-assignment-help`}
+        >
+          <CheckIcon aria-hidden="true" className="size-4 shrink-0" />
+          {TEXTS.assignmentHelp}
+        </p>
+      ) : null}
     </div>
+  );
+}
+
+type IconSwitchProps = {
+  readonly control: RecipeStepSwitchControl;
+  readonly tooltip: string;
+  readonly helpId: string | undefined;
+  readonly testId: string;
+  readonly children: ReactNode;
+};
+
+/**
+ * Interruptor que solo enseña su icono. El texto completo va en el nombre accesible y en un
+ * tooltip; el envoltorio es el disparador para que el globo abra tanto al pasar el puntero como al
+ * enfocar el interruptor con el teclado.
+ */
+function IconSwitch({ control, tooltip, helpId, testId, children }: IconSwitchProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex" data-testid={`${testId}-trigger`} />}>
+        <Switch
+          checked={control.checked}
+          onCheckedChange={(checked) => control.onCheckedChange(checked)}
+          aria-label={control.label}
+          aria-describedby={helpId}
+          data-testid={testId}
+        >
+          {children}
+        </Switch>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="end" className="max-w-65" data-testid={`${testId}-tooltip`}>
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

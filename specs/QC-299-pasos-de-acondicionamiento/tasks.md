@@ -87,16 +87,16 @@ nombre de cada caso de test. Antes de T1: las preguntas abiertas P1–P6 resuelt
 
 ## Bloque D — UI
 
-- [ ] **T15. Editor y sección del formulario** [P con T17] — dep: T3.
+- [x] **T15. Editor y sección del formulario** [P con T17] — dep: T3.
   `recipe-step-editor.tsx`, `recipe-steps-field.tsx`, `recipe-form.tsx`, `recipe-form-state.ts`
   (`design.md > 5.1`, tablero `FormulaAcondicionamiento*`).
   Hecho: tercera sección tras divisor con ayuda y «(opcional)»; dos switches solo en
   acondicionamiento; switches solo-icono con tooltip por hover y foco y nombre accesible completo en
   las tres secciones; resumen de la cabecera; filas vacías no se envían; errores en su sección;
   carga y guarda intactos. Casos `R8`, `R9`, `R10`, `R11`, `R12`, `R13`.
-- [ ] **T16. Formulario de versión** [P con T15] — dep: T4.
+- [x] **T16. Formulario de versión** [P con T15] — dep: T4.
   Hecho: bloque `inert` con los heredados o el aviso. Caso `R16`.
-- [ ] **T17. Paso a paso del acondicionador** — dep: T13.
+- [x] **T17. Paso a paso del acondicionador** — dep: T13.
   `conditioning-steps-panel.tsx`, `conditioning-step-responsibles-picker.tsx`,
   `conditioning-batch-data-form.tsx`, `conditioning-order-screen.tsx`, `page.tsx`, barrel
   (`design.md > 5.2`, tablero `AcondicionamientoPasos*`).
@@ -104,7 +104,7 @@ nombre de cada caso de test. Antes de T1: las preguntas abiertas P1–P6 resuelt
   texto; «Completar pasos» lleva a «Pasos completos» y aparece «Terminar»; «Datos de lote» bloqueada
   hasta completar; entra en el primer pendiente con el aviso; sin pasos la pantalla es la de hoy;
   objetivos ≥ 44 px. Casos `R18`, `R19`, `R20`, `R21`, `R22`, `R24`, `R25`, `R26`.
-- [ ] **T18. Recorrido** — dep: T12.
+- [x] **T18. Recorrido** — dep: T12.
   `execution-trace-format.ts`, `execution-timeline.tsx`, `conditioning-step-details.tsx`
   (`design.md > 5.3`, tablero `RecorridoPasosAcondicionamiento*`).
   Hecho: «Avanzar» / «Completar pasos» con responsables y cifra de fotos; «Cambio de responsables»

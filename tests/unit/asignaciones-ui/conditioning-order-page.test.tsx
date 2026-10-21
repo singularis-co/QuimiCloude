@@ -84,6 +84,7 @@ const ROW = {
   conditionedById: null,
   team: [],
   batchData: null,
+  conditioningSteps: null,
 };
 
 const CANDIDATES = {

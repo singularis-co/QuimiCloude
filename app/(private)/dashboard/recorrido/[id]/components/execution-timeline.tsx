@@ -20,14 +20,25 @@ import {
   formatElapsed,
   formatTraceInstant,
 } from '@/app/(private)/dashboard/components';
-import type { ExecutionAction, ExecutionTraceDetailStep, OrderEvidenceGroup } from '@/lib/modules/asignaciones';
+import type {
+  ConditioningAction,
+  ExecutionAction,
+  ExecutionTraceDetailStep,
+  OrderEvidenceGroup,
+} from '@/lib/modules/asignaciones';
 import type { ExecutionEvidenceResult } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 import { avatarTone } from '@/lib/shared/ui/avatar-tone';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { getInitials } from '@/lib/shared/ui/initials';
 import type { StatusTone } from '@/lib/shared/ui/status-tone';
 
-import { ConditioningBatchSaveBody, ConditioningStartBody, MISSING_DATA_LABEL } from './conditioning-step-details';
+import {
+  ConditioningBatchSaveBody,
+  ConditioningResponsiblesChangeBody,
+  ConditioningStartBody,
+  ConditioningStepBody,
+  MISSING_DATA_LABEL,
+} from './conditioning-step-details';
 import { placeManufacturingEvidence, type TraceEvidencePlacement } from './trace-evidence-placement';
 import { TraceEvidenceReadError, TraceOtherStepsEvidence } from './trace-other-steps-evidence';
 import { TraceStepEvidence } from './trace-step-evidence';
@@ -93,7 +104,18 @@ function StepPerson({ step }: { readonly step: ExecutionTraceDetailStep }) {
   );
 }
 
-function StepBody({ step }: { readonly step: ExecutionTraceDetailStep }) {
+function StepMeta({ step }: { readonly step: ExecutionTraceDetailStep }) {
+  return (
+    <div className={STEP_META_CLASS}>
+      {step.stepPosition === null ? null : (
+        <span data-testid="execution-trace-step-position">Paso {step.stepPosition}</span>
+      )}
+      <StepPerson step={step} />
+    </div>
+  );
+}
+
+function StepBody({ step, photoCount }: { readonly step: ExecutionTraceDetailStep; readonly photoCount: number }) {
   switch (step.action) {
     case 'conditioning_start':
       return <ConditioningStartBody supervisor={<StepPerson step={step} />} team={step.team} />;
@@ -105,15 +127,23 @@ function StepBody({ step }: { readonly step: ExecutionTraceDetailStep }) {
           <StepPerson step={step} />
         </div>
       );
+    case 'conditioning_step_advance':
+    case 'conditioning_steps_complete':
+      return (
+        <ConditioningStepBody meta={<StepMeta step={step} />} responsibles={step.responsibles} photoCount={photoCount} />
+      );
+    case 'conditioning_responsibles_change':
+      return (
+        <ConditioningResponsiblesChangeBody
+          meta={<StepMeta step={step} />}
+          previous={step.previous}
+          responsibles={step.responsibles}
+        />
+      );
     default:
       return (
         <>
-          <div className={STEP_META_CLASS}>
-            {step.stepPosition === null ? null : (
-              <span data-testid="execution-trace-step-position">Paso {step.stepPosition}</span>
-            )}
-            <StepPerson step={step} />
-          </div>
+          <StepMeta step={step} />
           {step.action === 'cancel' && step.reason !== null ? (
             <p className="m-0 text-xs text-foreground" data-testid="execution-trace-step-reason">
               <span className="font-semibold">Motivo</span> · {step.reason}
@@ -128,10 +158,12 @@ function TimelineStep({
   step,
   index,
   evidence,
+  conditioningPhotoCount,
 }: {
   readonly step: ExecutionTraceDetailStep;
   readonly index: number;
   readonly evidence: OrderEvidenceGroup | undefined;
+  readonly conditioningPhotoCount: number;
 }) {
   const { tone, icon: Icon } = EXECUTION_TIMELINE_ACTIONS[step.action];
   return (
@@ -165,7 +197,7 @@ function TimelineStep({
             {formatTraceInstant(step.occurredAt)}
           </time>
         </div>
-        <StepBody step={step} />
+        <StepBody step={step} photoCount={conditioningPhotoCount} />
         {step.gapToNextMs === null ? null : (
           <p className="m-0 text-xs text-muted-foreground" data-testid="execution-trace-step-gap">
             Hasta la siguiente: {formatElapsed(step.gapToNextMs)}
@@ -189,9 +221,42 @@ export type ExecutionTimelineProps = {
 
 const NO_PLACEMENT: TraceEvidencePlacement = { byStepId: new Map(), others: [] };
 
+/** Exhaustivo: una acción de acondicionamiento nueva no compila hasta decidir aquí. */
+const IS_CONDITIONING_ACTION: Readonly<Record<ConditioningAction, true>> = {
+  conditioning_start: true,
+  conditioning_batch_save: true,
+  conditioning_finish: true,
+  conditioning_step_advance: true,
+  conditioning_steps_complete: true,
+  conditioning_responsibles_change: true,
+};
+
+function isConditioningAction(action: ExecutionAction): action is ConditioningAction {
+  return Object.hasOwn(IS_CONDITIONING_ACTION, action);
+}
+
+/**
+ * Los pasos de acondicionamiento también llevan número: la fabricación solo se coloca en las
+ * anotaciones de producción, y la cifra de fotos de un paso de acondicionamiento va en el último
+ * «Avanzar» o «Completar pasos» de esa posición (el que recoge el estado final de sus fotos).
+ */
+function placeEvidence(
+  steps: readonly ExecutionTraceDetailStep[],
+  evidence: ExecutionEvidenceResult | undefined,
+): { readonly manufacturing: TraceEvidencePlacement; readonly conditioning: TraceEvidencePlacement } {
+  if (evidence?.status !== 'success') return { manufacturing: NO_PLACEMENT, conditioning: NO_PLACEMENT };
+  const productionSteps = steps.filter((step) => !isConditioningAction(step.action));
+  const completingSteps = steps.filter(
+    (step) => step.action === 'conditioning_step_advance' || step.action === 'conditioning_steps_complete',
+  );
+  return {
+    manufacturing: placeManufacturingEvidence(productionSteps, evidence.data.manufacturing),
+    conditioning: placeManufacturingEvidence(completingSteps, evidence.data.conditioning),
+  };
+}
+
 export function ExecutionTimeline({ steps, evidence }: ExecutionTimelineProps) {
-  const placement =
-    evidence?.status === 'success' ? placeManufacturingEvidence(steps, evidence.data.manufacturing) : NO_PLACEMENT;
+  const { manufacturing: placement, conditioning } = placeEvidence(steps, evidence);
   return (
     <Card className="px-4" data-testid="execution-trace-timeline">
       <div className="flex items-center gap-2">
@@ -210,7 +275,13 @@ export function ExecutionTimeline({ steps, evidence }: ExecutionTimelineProps) {
         className="relative m-0 list-none p-0 before:absolute before:top-5 before:bottom-5 before:left-[19px] before:w-0.5 before:bg-border"
       >
         {steps.map((step, index) => (
-          <TimelineStep key={step.id} step={step} index={index} evidence={placement.byStepId.get(step.id)} />
+          <TimelineStep
+            key={step.id}
+            step={step}
+            index={index}
+            evidence={placement.byStepId.get(step.id)}
+            conditioningPhotoCount={conditioning.byStepId.get(step.id)?.photoCount ?? 0}
+          />
         ))}
       </ol>
       {evidence?.status === 'error' ? <TraceEvidenceReadError /> : null}

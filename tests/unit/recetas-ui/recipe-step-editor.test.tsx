@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
 import { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -527,7 +527,9 @@ describe('RecipeStepEditor — «Requiere evidencia»', () => {
 
     const control = screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1' });
     expect(control).toHaveAttribute('aria-checked', 'false');
-    expect(control).toHaveTextContent('Requiere evidencia');
+    // Solo icono: el texto va en el nombre accesible y en el tooltip.
+    expect(control.textContent).toBe('');
+    expect(control.querySelector('svg')).not.toBeNull();
     expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
   });
 
@@ -554,5 +556,127 @@ describe('RecipeStepEditor — «Requiere evidencia»', () => {
     const barra = await screen.findByTestId(`${TEST_ID}-toolbar`);
     expect(barra.querySelector('[role="switch"]')).toBeNull();
     expect(screen.getAllByRole('button')).toHaveLength(3);
+  });
+});
+
+function SwitchesHarness({ conAsignacion = true }: { readonly conAsignacion?: boolean }) {
+  const [documento, setDocumento] = useState<RecipeStepDocument>(DOC_VACIO);
+  const [evidencia, setEvidencia] = useState(false);
+  const [asignacion, setAsignacion] = useState(false);
+  return (
+    <RecipeStepEditor
+      document={documento}
+      onChange={setDocumento}
+      label="Paso 2"
+      editableTestId={TEST_ID}
+      evidence={{
+        checked: evidencia,
+        onCheckedChange: setEvidencia,
+        label: 'Requiere evidencia en el paso 2 de Acondicionamiento',
+      }}
+      assignment={
+        conAsignacion
+          ? {
+              checked: asignacion,
+              onCheckedChange: setAsignacion,
+              label: 'Asignación requerida en el paso 2 de Acondicionamiento',
+            }
+          : undefined
+      }
+    />
+  );
+}
+
+const TOOLTIP_EVIDENCIA =
+  'Requiere evidencia: al ejecutar, el paso pide de 1 a 3 fotos antes de avanzar.';
+const TOOLTIP_ASIGNACION =
+  'Asignación requerida: al ejecutar, hay que elegir uno o más responsables del equipo que hicieron el paso.';
+const AYUDA_ASIGNACION =
+  'Al ejecutar, hay que elegir uno o más responsables del equipo antes de avanzar.';
+
+describe('RecipeStepEditor — «Asignación requerida» y switches solo-icono (QC-299)', () => {
+  it('R9: sin la prop assignment no hay interruptor de asignación; con ella, los dos salen apagados', async () => {
+    const { unmount } = render(<SwitchesHarness conAsignacion={false} />);
+    await screen.findByTestId(TEST_ID);
+    expect(screen.getAllByRole('switch')).toHaveLength(1);
+    expect(screen.queryByRole('switch', { name: /Asignación requerida/ })).toBeNull();
+    unmount();
+
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+    expect(
+      screen.getByRole('switch', { name: 'Requiere evidencia en el paso 2 de Acondicionamiento' }),
+    ).toHaveAttribute('aria-checked', 'false');
+    expect(
+      screen.getByRole('switch', { name: 'Asignación requerida en el paso 2 de Acondicionamiento' }),
+    ).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('R10: cada switch muestra solo su icono, sin texto visible ni icono «!» aparte', async () => {
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    const herramientas = screen.getByTestId(`${TEST_ID}-row-tools`);
+    for (const control of screen.getAllByRole('switch')) {
+      expect(control.textContent).toBe('');
+      expect(control.querySelectorAll('svg')).toHaveLength(1);
+    }
+    expect(herramientas.textContent).toBe('');
+    expect(within(herramientas).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.getByTestId(`${TEST_ID}-evidence`).querySelector('svg')?.getAttribute('class')).toContain(
+      'lucide-camera',
+    );
+    expect(
+      screen.getByTestId(`${TEST_ID}-assignment`).querySelector('svg')?.getAttribute('class'),
+    ).toContain('lucide-user-plus');
+  });
+
+  it('R10: el tooltip con el texto completo abre al pasar el ratón', async () => {
+    const user = setupUser();
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-tooltip`)).toBeNull();
+    await user.hover(screen.getByTestId(`${TEST_ID}-assignment`));
+    expect(await screen.findByTestId(`${TEST_ID}-assignment-tooltip`)).toHaveTextContent(
+      TOOLTIP_ASIGNACION,
+    );
+  });
+
+  it('R10: el tooltip con el texto completo abre al recibir el foco del teclado', async () => {
+    const user = setupUser();
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+    const evidencia = screen.getByTestId(`${TEST_ID}-evidence`);
+
+    while (document.activeElement !== evidencia) await user.tab();
+    expect(await screen.findByTestId(`${TEST_ID}-evidence-tooltip`)).toHaveTextContent(
+      TOOLTIP_EVIDENCIA,
+    );
+  });
+
+  it('R10: encendido, cada switch pinta su línea de ayuda debajo del editor y la referencia', async () => {
+    const user = setupUser();
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+    const asignacion = screen.getByTestId(`${TEST_ID}-assignment`);
+
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-help`)).toBeNull();
+    await user.click(asignacion);
+    expect(asignacion).toHaveAttribute('aria-checked', 'true');
+    const ayuda = screen.getByTestId(`${TEST_ID}-assignment-help`);
+    expect(ayuda).toHaveTextContent(AYUDA_ASIGNACION);
+    expect(asignacion).toHaveAttribute('aria-describedby', ayuda.id);
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
+    const editable = screen.getByTestId(TEST_ID);
+    expect(editable.compareDocumentPosition(ayuda) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+
+    await user.click(screen.getByTestId(`${TEST_ID}-evidence`));
+    expect(screen.getByTestId(`${TEST_ID}-evidence-help`)).toHaveTextContent(
+      'Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.',
+    );
+
+    await user.click(asignacion);
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-help`)).toBeNull();
   });
 });

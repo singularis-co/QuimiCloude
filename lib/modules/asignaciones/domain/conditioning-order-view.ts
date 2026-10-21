@@ -116,7 +116,10 @@ export function composeConditioningStepsView(
   return {
     steps,
     completedCount: progress.completedCount,
+    // Como el avance, se recorta a la lista actual: la formula pudo perder pasos. El registro
+    // los conserva y el recorrido los sigue mostrando como historia.
     responsibles: [...progress.responsibles.entries()]
+      .filter(([stepPosition]) => stepPosition >= 1 && stepPosition <= steps.length)
       .sort(([a], [b]) => a - b)
       .map(([stepPosition, userIds]) => ({ stepPosition, userIds })),
     candidates: [self, ...others],

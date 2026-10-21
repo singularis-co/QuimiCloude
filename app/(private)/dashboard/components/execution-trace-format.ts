@@ -103,7 +103,11 @@ export const CONDITIONING_TEXTS = {
   expiresPrefix: 'Vence',
   producedPrefix: 'Producido',
   snapshotNotice: 'Datos tal como se guardaron en ese momento',
+  responsibles: 'Responsables',
+  responsiblesBefore: 'Antes:',
+  evidencePhotos: (count: number) => (count === 1 ? '1 foto de evidencia' : `${count} fotos de evidencia`),
 } as const;
+
 
 /** UTC y sin configuracion regional: servidor y navegador pintan la misma cadena. */
 export function formatTraceInstant(value: Date): string {

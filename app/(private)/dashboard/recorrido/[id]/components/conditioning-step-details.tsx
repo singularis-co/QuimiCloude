@@ -1,11 +1,15 @@
 import type { ReactNode } from 'react';
 import { useId } from 'react';
-import { Camera, Users } from 'lucide-react';
+import { ArrowRight, Camera, Users } from 'lucide-react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CONDITIONING_TEXTS, formatSnapshotDate } from '@/app/(private)/dashboard/components';
-import type { ConditioningBatchSnapshotLine, ExecutionTraceTeamMember } from '@/lib/modules/asignaciones';
+import type {
+  ConditioningBatchSnapshotLine,
+  ExecutionTraceTeamMember,
+  TracePerson,
+} from '@/lib/modules/asignaciones';
 import { avatarTone } from '@/lib/shared/ui/avatar-tone';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { getInitials } from '@/lib/shared/ui/initials';
@@ -184,6 +188,96 @@ export function ConditioningBatchSaveBody({ savedBy, lines }: ConditioningBatchS
       <p className="m-0 inline-flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="execution-trace-batch-notice">
         <Camera aria-hidden="true" className="size-3.5" />
         {CONDITIONING_TEXTS.snapshotNotice}
+      </p>
+    </div>
+  );
+}
+
+function ResponsibleChip({ person }: { readonly person: TracePerson }) {
+  if (person.displayName === null) return <MissingMark />;
+  return (
+    <span className="inline-flex min-h-8 items-center gap-1.5 text-[13px] text-foreground">
+      <Avatar size="sm" tone={avatarTone(person.userId)} aria-hidden="true">
+        <AvatarFallback>{getInitials(person.displayName)}</AvatarFallback>
+      </Avatar>
+      {person.displayName}
+    </span>
+  );
+}
+
+export type ConditioningStepBodyProps = {
+  /** «Paso N» y quien lo completó, ya pintados por la línea de tiempo. */
+  readonly meta: ReactNode;
+  /** Vacío si el paso no pide asignación: entonces no hay línea «Responsables». */
+  readonly responsibles: readonly TracePerson[];
+  /** Fotos de evidencia del paso; `0` no pinta la cifra. */
+  readonly photoCount: number;
+};
+
+/** Cuerpo de «Avanzar» y «Completar pasos» de acondicionamiento. */
+export function ConditioningStepBody({ meta, responsibles, photoCount }: ConditioningStepBodyProps) {
+  const labelId = useId();
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="execution-trace-conditioning-step">
+      {meta}
+      {responsibles.length === 0 ? null : (
+        <div className="flex flex-wrap items-center gap-2" data-testid="execution-trace-responsibles">
+          <span id={labelId} className={SECTION_LABEL_CLASS}>
+            {CONDITIONING_TEXTS.responsibles}
+          </span>
+          <ul aria-labelledby={labelId} className="m-0 flex list-none flex-wrap items-center gap-x-3 gap-y-1 p-0">
+            {responsibles.map((person) => (
+              <li key={person.userId} data-testid="execution-trace-responsible">
+                <ResponsibleChip person={person} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {photoCount > 0 ? (
+        <p className="m-0 text-xs text-muted-foreground" data-testid="execution-trace-step-photo-count">
+          {CONDITIONING_TEXTS.evidencePhotos(photoCount)}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function PeopleNames({ people }: { readonly people: readonly TracePerson[] }) {
+  if (people.length === 0) return <MissingMark />;
+  return (
+    <>
+      {people.map((person, index) => (
+        <span key={person.userId}>
+          {index > 0 ? ', ' : null}
+          {person.displayName === null ? <MissingMark /> : person.displayName}
+        </span>
+      ))}
+    </>
+  );
+}
+
+export type ConditioningResponsiblesChangeBodyProps = {
+  /** «Paso N» y quien hizo el cambio, ya pintados por la línea de tiempo. */
+  readonly meta: ReactNode;
+  readonly previous: readonly TracePerson[];
+  readonly responsibles: readonly TracePerson[];
+};
+
+/** «Antes:» tachado → el conjunto nuevo. `del`/`ins` dan a los lectores el sentido del tachado. */
+export function ConditioningResponsiblesChangeBody({ meta, previous, responsibles }: ConditioningResponsiblesChangeBodyProps) {
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="execution-trace-responsibles-change">
+      {meta}
+      <p className="m-0 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+        <span>{CONDITIONING_TEXTS.responsiblesBefore}</span>
+        <del className="line-through" data-testid="execution-trace-responsibles-before">
+          <PeopleNames people={previous} />
+        </del>
+        <ArrowRight aria-hidden="true" className="size-3.5" />
+        <ins className="text-foreground no-underline" data-testid="execution-trace-responsibles-after">
+          <PeopleNames people={responsibles} />
+        </ins>
       </p>
     </div>
   );

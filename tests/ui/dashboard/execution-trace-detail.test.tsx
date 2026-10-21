@@ -15,9 +15,17 @@ import {
   executionTraceListHref,
   formatElapsed,
 } from '@/app/(private)/dashboard/components';
-import type { ExecutionTraceDetail as ExecutionTraceDetailData } from '@/lib/modules/asignaciones';
+import type {
+  ExecutionTraceDetail as ExecutionTraceDetailData,
+  ExecutionTraceDetailStep,
+  TracePerson,
+} from '@/lib/modules/asignaciones';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
-import { ORDER_EVIDENCE_EMPTY, ORDER_EVIDENCE_ERROR_STATES } from '@/tests/fixtures/order-evidence';
+import {
+  ORDER_EVIDENCE_EMPTY,
+  ORDER_EVIDENCE_ERROR_STATES,
+  orderEvidenceGroup,
+} from '@/tests/fixtures/order-evidence';
 import {
   CONDITIONING_DURATION_MS,
   CORRECTION_SAVE_LINES,
@@ -609,5 +617,197 @@ describe('R12 - R18 - las tres anotaciones de acondicionamiento en la linea de t
     tarjetas.forEach((tarjeta, i) => {
       for (const dato of filas[i]) expect(tarjeta).toHaveTextContent(dato);
     });
+  });
+});
+
+describe('QC-299 R35 - R36 - pasos de acondicionamiento en la linea de tiempo', () => {
+  const { laura, mateo, valentina, santiago } = TRACE_PEOPLE;
+
+  type PasoCompletado = {
+    readonly action: 'conditioning_step_advance' | 'conditioning_steps_complete';
+    readonly stepPosition: number;
+    readonly responsibles: readonly TracePerson[];
+  };
+  type CambioDeResponsables = {
+    readonly action: 'conditioning_responsibles_change';
+    readonly stepPosition: number;
+    readonly previous: readonly TracePerson[];
+    readonly responsibles: readonly TracePerson[];
+  };
+
+  function anotacion(id: string, time: string, paso: PasoCompletado | CambioDeResponsables): ExecutionTraceDetailStep {
+    return {
+      id,
+      orderId: FINISHED_CONDITIONING_TRACE.orderId,
+      userId: santiago.userId,
+      userDisplayName: santiago.displayName,
+      occurredAt: new Date(`2026-10-02T${time}:00.000Z`),
+      gapToNextMs: null,
+      isGoBack: false,
+      reason: null,
+      ...paso,
+    };
+  }
+
+  // Las anotaciones del tablero `RecorridoPasosAcondicionamiento`, tras «Comenzar acondicionamiento».
+  const PASOS: readonly ExecutionTraceDetailStep[] = [
+    anotacion('c1', '13:10', { action: 'conditioning_step_advance', stepPosition: 1, responsibles: [] }),
+    anotacion('c2', '13:31', { action: 'conditioning_step_advance', stepPosition: 2, responsibles: [laura, santiago] }),
+    anotacion('c3', '13:55', { action: 'conditioning_step_advance', stepPosition: 3, responsibles: [mateo] }),
+    anotacion('c4', '14:02', {
+      action: 'conditioning_responsibles_change',
+      stepPosition: 3,
+      previous: [mateo],
+      responsibles: [mateo, valentina],
+    }),
+    anotacion('c5', '14:10', { action: 'conditioning_steps_complete', stepPosition: 4, responsibles: [] }),
+  ];
+
+  function conPasos(steps: readonly ExecutionTraceDetailStep[]): ExecutionTraceDetailData {
+    const todos = [...FINISHED_CONDITIONING_TRACE.steps];
+    const comenzar = todos.findIndex((step) => step.action === 'conditioning_start');
+    todos.splice(comenzar + 1, 0, ...steps);
+    return { ...FINISHED_CONDITIONING_TRACE, steps: todos };
+  }
+
+  const TRAZA = conPasos(PASOS);
+
+  /** Acondicionamiento: pasos 2 (2 fotos) y 3 (1). Fabricacion: paso 2 (3), que no va al acondicionamiento. */
+  const EVIDENCIA = {
+    status: 'success' as const,
+    data: {
+      manufacturing: [orderEvidenceGroup('m', 2, 3)],
+      packing: [],
+      conditioning: [orderEvidenceGroup('p', 2, 2), orderEvidenceGroup('p', 3, 1)],
+    },
+  };
+
+  function porId(id: string): HTMLElement {
+    const instante = PASOS.find((p) => p.id === id)?.occurredAt.toISOString();
+    const li = pasos().find(
+      (el) => within(el).getByTestId('execution-trace-step-instant').getAttribute('dateTime') === instante,
+    );
+    if (li === undefined) throw new Error(`no hay anotacion ${id}`);
+    return li;
+  }
+
+  function nombres(li: HTMLElement): string[] {
+    return within(li)
+      .queryAllByTestId('execution-trace-responsible')
+      .map((el) => el.textContent ?? '');
+  }
+
+  it('R35 - «Avanzar» y «Completar pasos» con «Paso N» (sin «de M»), quien, tono e icono', () => {
+    render(<ExecutionTraceDetail trace={TRAZA} evidence={EVIDENCIA} backHref={DASHBOARD_ROUTE} />);
+    const esperado = [
+      ['c1', 'conditioning_step_advance', 'Avanzar', 'Paso 1'],
+      ['c2', 'conditioning_step_advance', 'Avanzar', 'Paso 2'],
+      ['c3', 'conditioning_step_advance', 'Avanzar', 'Paso 3'],
+      ['c5', 'conditioning_steps_complete', 'Completar pasos', 'Paso 4'],
+    ] as const;
+    for (const [id, action, nombre, posicion] of esperado) {
+      const li = porId(id);
+      expect(li).toHaveAttribute('data-action', action);
+      expect(li).toHaveAttribute('data-tone', 'neutral');
+      expect(within(li).getByTestId('execution-trace-step-action')).toHaveTextContent(nombre);
+      expect(within(li).getByTestId('execution-trace-step-position').textContent).toBe(posicion);
+      expect(within(li).getByTestId('execution-trace-step-person')).toHaveTextContent(santiago.displayName);
+      expect(within(li).getByTestId('execution-trace-step-dot').querySelector('svg')).toHaveClass('lucide-arrow-right');
+    }
+  });
+
+  it('R35 - los responsables del paso con avatar y nombre, en una lista «Responsables»', () => {
+    render(<ExecutionTraceDetail trace={TRAZA} evidence={EVIDENCIA} backHref={DASHBOARD_ROUTE} />);
+    const paso2 = porId('c2');
+    const lista = within(paso2).getByRole('list', { name: 'Responsables' });
+    expect(within(lista).getAllByRole('listitem')).toHaveLength(2);
+    expect(nombres(paso2)).toEqual([`LG${laura.displayName}`, `SV${santiago.displayName}`]);
+    expect(nombres(porId('c3'))).toEqual([`MS${mateo.displayName}`]);
+  });
+
+  it('R35 - un paso sin asignacion no pinta la linea «Responsables»', () => {
+    render(<ExecutionTraceDetail trace={TRAZA} evidence={EVIDENCIA} backHref={DASHBOARD_ROUTE} />);
+    for (const id of ['c1', 'c5']) {
+      expect(within(porId(id)).queryByTestId('execution-trace-responsibles')).toBeNull();
+      expect(within(porId(id)).queryByRole('list', { name: 'Responsables' })).toBeNull();
+    }
+  });
+
+  it('R35 - un responsable que el directorio no devuelve se pinta «—» con «Sin dato»', () => {
+    const sinNombre = PASOS.map((step) =>
+      step.id === 'c3' && step.action === 'conditioning_step_advance'
+        ? { ...step, responsibles: [{ userId: mateo.userId, displayName: null }] }
+        : step,
+    );
+    render(<ExecutionTraceDetail trace={conPasos(sinNombre)} backHref={DASHBOARD_ROUTE} />);
+    const responsable = within(porId('c3')).getByTestId('execution-trace-responsible');
+    expect(within(responsable).getByLabelText('Sin dato')).toHaveTextContent('—');
+  });
+
+  it('R35 - la cifra de fotos de evidencia del paso sale de la fase de acondicionamiento', () => {
+    render(<ExecutionTraceDetail trace={TRAZA} evidence={EVIDENCIA} backHref={DASHBOARD_ROUTE} />);
+    expect(within(porId('c2')).getByTestId('execution-trace-step-photo-count').textContent).toBe(
+      '2 fotos de evidencia',
+    );
+    expect(within(porId('c3')).getByTestId('execution-trace-step-photo-count').textContent).toBe(
+      '1 foto de evidencia',
+    );
+    // Sin fotos no hay cifra; el cambio de responsables no la repite.
+    for (const id of ['c1', 'c4', 'c5']) {
+      expect(within(porId(id)).queryByTestId('execution-trace-step-photo-count')).toBeNull();
+    }
+    // Las fotos de fabricacion del paso 2 siguen en la anotacion de produccion del paso 2.
+    const fabricacionPaso2 = pasos().filter(
+      (li) =>
+        !(li.getAttribute('data-action') ?? '').startsWith('conditioning_') &&
+        within(li).queryByTestId('execution-trace-step-position')?.textContent === 'Paso 2',
+    );
+    const conFotos = fabricacionPaso2.filter((li) => within(li).queryByTestId('trace-step-evidence') !== null);
+    expect(conFotos).toHaveLength(1);
+    expect(within(porId('c2')).queryByTestId('trace-step-evidence')).toBeNull();
+  });
+
+  it('R35 - sin lectura de fotos no hay cifra y la anotacion se pinta igual', () => {
+    render(<ExecutionTraceDetail trace={TRAZA} backHref={DASHBOARD_ROUTE} />);
+    expect(screen.queryByTestId('execution-trace-step-photo-count')).toBeNull();
+    expect(nombres(porId('c2'))).toHaveLength(2);
+  });
+
+  it('R36 - «Cambio de responsables» con paso, quien, antes tachado y despues', () => {
+    render(<ExecutionTraceDetail trace={TRAZA} evidence={EVIDENCIA} backHref={DASHBOARD_ROUTE} />);
+    const cambio = porId('c4');
+    expect(cambio).toHaveAttribute('data-action', 'conditioning_responsibles_change');
+    expect(cambio).toHaveAttribute('data-tone', 'waiting');
+    expect(within(cambio).getByTestId('execution-trace-step-action')).toHaveTextContent('Cambio de responsables');
+    expect(within(cambio).getByTestId('execution-trace-step-dot').querySelector('svg')).toHaveClass('lucide-user-plus');
+    expect(within(cambio).getByTestId('execution-trace-step-position').textContent).toBe('Paso 3');
+    expect(within(cambio).getByTestId('execution-trace-step-person')).toHaveTextContent(santiago.displayName);
+
+    const antes = within(cambio).getByTestId('execution-trace-responsibles-before');
+    expect(antes.tagName).toBe('DEL');
+    expect(antes).toHaveClass('line-through');
+    expect(antes.textContent).toBe(mateo.displayName);
+    const despues = within(cambio).getByTestId('execution-trace-responsibles-after');
+    expect(despues.tagName).toBe('INS');
+    expect(despues.textContent).toBe(`${mateo.displayName}, ${valentina.displayName}`);
+    expect(antes.parentElement?.textContent).toBe(
+      `Antes:${mateo.displayName}${mateo.displayName}, ${valentina.displayName}`,
+    );
+    expect(antes.parentElement?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(cambio).queryByTestId('execution-trace-responsibles')).toBeNull();
+  });
+
+  it('R36 - un paso sin responsables antes del cambio pinta «—» con «Sin dato»', () => {
+    const sinPrevios = PASOS.map((step) =>
+      step.id === 'c4' && step.action === 'conditioning_responsibles_change' ? { ...step, previous: [] } : step,
+    );
+    render(<ExecutionTraceDetail trace={conPasos(sinPrevios)} backHref={DASHBOARD_ROUTE} />);
+    const antes = within(porId('c4')).getByTestId('execution-trace-responsibles-before');
+    expect(within(antes).getByLabelText('Sin dato')).toHaveTextContent('—');
+  });
+
+  it('R36 - el cambio es una anotacion nueva: el «Avanzar» del paso conserva sus responsables', () => {
+    render(<ExecutionTraceDetail trace={TRAZA} evidence={EVIDENCIA} backHref={DASHBOARD_ROUTE} />);
+    expect(nombres(porId('c3'))).toEqual([`MS${mateo.displayName}`]);
   });
 });

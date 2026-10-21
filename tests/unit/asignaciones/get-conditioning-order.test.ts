@@ -573,6 +573,28 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
     });
   });
 
+  it('R28, R26: si la formula perdio pasos, la vista ignora los responsables de posiciones que ya no existen', async () => {
+    const dobles = montarPasos(MIO, {
+      pasos: PASOS.slice(0, 2),
+      anotaciones: [
+        anotacionDePaso('conditioning_step_advance', 1, [BETO]),
+        anotacionDePaso('conditioning_step_advance', 2, [CARLA]),
+        anotacionDePaso('conditioning_step_advance', 3, [ANA]),
+        anotacionDePaso('conditioning_responsibles_change', 3, [BETO, CARLA], 10),
+      ],
+    });
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.conditioningSteps).toMatchObject({
+      completedCount: 2,
+      responsibles: [
+        { stepPosition: 1, userIds: [BETO] },
+        { stepPosition: 2, userIds: [CARLA] },
+      ],
+    });
+  });
+
   it('R31: un acondicionador sin recetas.consultar recibe los pasos', async () => {
     const actor = { ...ACONDICIONADOR, permissions: ['acondicionamiento.modificar'] };
     const dobles = montarPasos(MIO);

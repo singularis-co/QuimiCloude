@@ -19,6 +19,7 @@ export const CONDITIONING_BATCH_DATA_FORM_TESTID = 'conditioning-batch-data-form
 export const CONDITIONING_BATCH_DATA_DIVERGENT_TESTID = 'conditioning-batch-data-divergent';
 export const CONDITIONING_BATCH_DATA_SUBMIT_TESTID = 'conditioning-batch-data-submit';
 export const CONDITIONING_BATCH_DATA_ERROR_TESTID = 'conditioning-batch-data-error';
+export const CONDITIONING_BATCH_DATA_LOCKED_TESTID = 'conditioning-batch-data-locked';
 
 export const CONDITIONING_BATCH_DATA_FIELDS = {
   orderId: 'orderId',
@@ -33,6 +34,7 @@ export const CONDITIONING_BATCH_DATA_TEXTS = {
   expiryDate: 'Vencimiento',
   productionDate: 'Día de producción',
   submit: 'Guardar datos de lote',
+  locked: 'Al completar los pasos',
   saved: 'Datos de lote guardados.',
   divergentTitle: 'Hoy las líneas tienen lotes distintos.',
   divergentClosing: 'Al guardar, el lote, el vencimiento y el día de producción pasan a todas las líneas.',
@@ -66,12 +68,20 @@ export type ConditioningBatchDataFormProps = {
   readonly form: ConditioningBatchForm;
   /** Cada línea ya escrita como en el reparto, por `presentationId`; la compone la pantalla de servidor. */
   readonly divergentLabels: Readonly<Record<string, string>>;
+  /** Campos y botón deshabilitados hasta completar los pasos de acondicionamiento. */
+  readonly locked?: boolean;
 };
 
-export function ConditioningBatchDataForm({ orderId, form, divergentLabels }: ConditioningBatchDataFormProps) {
+export function ConditioningBatchDataForm({
+  orderId,
+  form,
+  divergentLabels,
+  locked = false,
+}: ConditioningBatchDataFormProps) {
   const baseId = useId();
   const headingId = `${baseId}-heading`;
   const errorId = `${baseId}-error`;
+  const lockedId = `${baseId}-locked`;
   const [values, setValues] = useState<Values>(() => initialValues(form));
   const [state, formAction, isPending] = useActionState(saveConditioningBatchDataAction, INITIAL_STATE);
 
@@ -83,7 +93,7 @@ export function ConditioningBatchDataForm({ orderId, form, divergentLabels }: Co
 
   const error = state.status === 'error' ? state : undefined;
   const culprit = error === undefined ? undefined : CULPRIT_BY_CODE[error.code];
-  const disabled = form.kind === 'no_batches';
+  const disabled = form.kind === 'no_batches' || locked;
 
   // Sin el reinicio automático de `<form action>`: tras un rechazo, lo escrito se queda.
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
@@ -111,7 +121,7 @@ export function ConditioningBatchDataForm({ orderId, form, divergentLabels }: Co
           required
           disabled={disabled}
           aria-invalid={invalid ? true : undefined}
-          aria-describedby={invalid ? errorId : undefined}
+          aria-describedby={invalid ? errorId : locked ? lockedId : undefined}
           className={FIELD_CLASS}
         />
       </div>
@@ -124,13 +134,25 @@ export function ConditioningBatchDataForm({ orderId, form, divergentLabels }: Co
       className="flex flex-col gap-3"
       data-testid={CONDITIONING_BATCH_DATA_SECTION_TESTID}
     >
-      <h2 id={headingId} className="text-base font-medium">
-        {CONDITIONING_BATCH_DATA_TEXTS.title}
-      </h2>
+      {locked ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id={headingId} className="text-base font-medium">
+            {CONDITIONING_BATCH_DATA_TEXTS.title}
+          </h2>
+          <p id={lockedId} className="text-sm text-muted-foreground" data-testid={CONDITIONING_BATCH_DATA_LOCKED_TESTID}>
+            {CONDITIONING_BATCH_DATA_TEXTS.locked}
+          </p>
+        </div>
+      ) : (
+        <h2 id={headingId} className="text-base font-medium">
+          {CONDITIONING_BATCH_DATA_TEXTS.title}
+        </h2>
+      )}
       <form
         onSubmit={handleSubmit}
-        className="flex flex-col gap-4"
+        className={locked ? 'flex flex-col gap-4 opacity-55' : 'flex flex-col gap-4'}
         data-testid={CONDITIONING_BATCH_DATA_FORM_TESTID}
+        data-locked={locked ? 'true' : undefined}
       >
         <input type="hidden" name={CONDITIONING_BATCH_DATA_FIELDS.orderId} value={orderId} />
 
@@ -176,6 +198,7 @@ export function ConditioningBatchDataForm({ orderId, form, divergentLabels }: Co
           className="w-fit"
           disabled={disabled || isPending}
           aria-busy={isPending}
+          aria-describedby={locked ? lockedId : undefined}
           data-testid={CONDITIONING_BATCH_DATA_SUBMIT_TESTID}
         >
           {CONDITIONING_BATCH_DATA_TEXTS.submit}
