@@ -20,9 +20,9 @@ const MESSAGE_SIN_COSTO = 'Indica el costo unitario o el costo total.';
 const MESSAGE_ENVASES = 'La existencia de un producto terminado es un numero entero de envases mayor que 0.';
 
 /**
- * Fila de producto terminado: la existencia son envases enteros y hace falta uno de los dos costos,
- * porque la base exige `unit_cost` en todo lote con `package_content`. Los subesquemas son los del
- * alta manual de un lote.
+ * Fila de producto terminado: la existencia son envases enteros y hace falta uno de los dos costos.
+ * La base ya no lo exige (QC-305 retira el CHECK para el lote de un pedido sin coste real); la
+ * importacion sigue pidiendolo. Los subesquemas son los del alta manual de un lote.
  */
 export const importFinishedGoodsRowSchema = z
   .strictObject({

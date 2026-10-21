@@ -46,7 +46,7 @@
     coste → `unitCost: null`.
   - Hecho: test verde; guardia de fronteras de módulo verde.
 
-- [ ] **T4 — Terminar guarda el real y reparte el real** (backend). Depende de T1, T2, T3. R5, R6,
+- [x] **T4 — Terminar guarda el real y reparte el real** (backend). Depende de T1, T2, T3. R5, R6,
   R8, R9, R16, R17, R18.
   - `OrderTransactionScope.consumption` y cableado en `lib/composition/index.ts`; doble en
     `tests/helpers/order-unit-of-work-double.ts` (design §3).
@@ -55,6 +55,11 @@
   - `order-packing.ts` según design §2.3: real tras `settlePackaging`, también sin reparto y con todo
     en 0; `lotCost = actualCost`; `unitCost: null` sin real. `FinishedGoodsIntake.receiveFromOrder`
     acepta `unitCost: string | null` (dominio y adaptador de `inventario`).
+  - Migración `<ts>_finished_goods_lot_cost_optional` con `down.sql`: quita el CHECK
+    `product_batches_package_content_requires_unit_cost` (decisión 2026-10-21, R17); los lectores de
+    lotes de producto terminado tratan `unit_cost` NULL como «sin coste», con un test por cada uno que
+    cambie. El test de QC-150 «un ingrediente con material pero sin costo cuenta cero…» se reescribe
+    para afirmar P1.
   - Retirar `resolveLotCost` y lo que quede sin llamadores (`FinishPackingDeps.products`,
     `.packaging`), comprobado con el grafo.
   - Tests: `tests/unit/pedidos/order-packing.test.ts` (real guardado; estimado intacto; rechazo no

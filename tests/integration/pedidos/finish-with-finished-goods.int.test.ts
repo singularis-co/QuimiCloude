@@ -893,7 +893,10 @@ describe('R18 — el coste del lote', () => {
     }
   });
 
-  it('un ingrediente con material pero sin costo cuenta cero, y el pedido sigue sin importe guardado', async () => {
+  // QC-305 P1 retira la regla de QC-150 («el ingrediente sin costo cuenta cero»): un lote
+  // consumido sin coste deja el pedido sin coste real y su lote de producto terminado sin coste
+  // unitario; nunca 0 ni el reparto de lo que si tiene coste.
+  it('QC-305 P1 / R7, R17: un ingrediente con material pero sin costo deja el pedido sin coste real y su lote de producto terminado sin coste unitario', async () => {
     const fixture = await crearFixture('1.0000');
     const { productId: productoConCosto } = await crearProductoConLote(fixture, '100', '5.0000');
     const { productId: maquinaSinCosto } = await crearMaquinaSinCosto(fixture, '50');
@@ -913,12 +916,22 @@ describe('R18 — el coste del lote', () => {
       expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '10' }] });
 
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
-      const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
-      // Solo el ingrediente con costo cuenta: 60% de 10 x 5.0000 = 30.0000, mas 10 envases a
-      // 0.5000 (QC-195 R31), entre 10 (cantidad que entra) = 3.5000. La maquina sin costo aporta cero.
-      expect(lote.unitCost?.toFixed(4)).toBe('3.5000');
+      const lote = await prisma.productBatch.findFirstOrThrow({
+        where: { productId: producto?.id },
+        select: { unitCost: true, packageContent: true, stock: true },
+      });
+      // R17: el lote nace igual (10 envases con su contenido), pero sin coste unitario: ni
+      // 0.0000 ni 3.5000, que seria contar la maquina como cero (la regla de QC-150 retirada).
+      expect(lote.stock.toFixed(4)).toBe('10.0000');
+      expect(lote.packageContent).not.toBeNull();
+      expect(lote.unitCost).toBeNull();
 
-      const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
+      const despues = await prisma.order.findUniqueOrThrow({
+        where: { id: creado.id },
+        select: { ingredientsCost: true, actualCost: true },
+      });
+      // R7 / P1: un lote consumido sin coste deja el real sin importe; el estimado sigue nulo.
+      expect(despues.actualCost).toBeNull();
       expect(despues.ingredientsCost).toBeNull();
     } finally {
       await borrarFixture(fixture, [productoConCosto, maquinaSinCosto]);

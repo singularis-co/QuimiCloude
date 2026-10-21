@@ -799,6 +799,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261020180000_whatsapp_variable_keys',
   // QC-305 2026-10-21: coste real de produccion en el pedido; no toca el identificador.
   '20261021140000_orders_actual_cost',
+  // QC-305 2026-10-21: lote de producto terminado sin coste unitario; no toca el identificador.
+  '20261021150000_finished_goods_lot_cost_optional',
 ] as const
 
 export function hallazgosDeMigraciones(

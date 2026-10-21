@@ -165,3 +165,72 @@ sin real, el lote nace a `0.0000` (lo admite `product_batches_unit_cost_positive
 - `grep resolveLotCost lib/`: sin resultados.
 
 Veredicto: T4 montada y verde salvo R17 en la base, que choca con un CHECK existente; para hasta que el humano decida.
+
+### T4b — CHECK de unit_cost (2026-10-21)
+
+Decision humana 2026-10-21: opcion (a), P2 se mantiene: sin real, el lote de producto terminado
+nace con `unit_cost` NULL; nunca 0 ni el estimado.
+
+Migracion (a mano, deuda D3): `db/migrations/20261021150000_finished_goods_lot_cost_optional/`.
+- `migration.sql`: `DROP CONSTRAINT "product_batches_package_content_requires_unit_cost"`, nada mas.
+  `product_batches_unit_cost_positive` intacto (un NULL lo pasa).
+- `down.sql`: lo recrea exacto como `20260924190100`; comentario AVISO: falla (23514) si ya hay
+  lotes con `package_content` y `unit_cost` NULL, y no los rellena.
+- Ciclo up -> down -> up sobre una copia desechable de la plantilla `qct_tpl_06ae9a5f7969` (script en
+  el scratchpad, base borrada al final): migracion aplicada en la plantilla; 13 restricciones en
+  `product_batches` sin el CHECK, 14 tras `down.sql` (solo el suyo), 13 e identicas tras reaplicar.
+  El fallo del `down.sql` con datos no se pudo probar: la plantilla no tiene lotes.
+- Base de desarrollo sin tocar. `schema.prisma` sin cambio (`unitCost Decimal?` ya era opcional).
+
+Lectores de lotes de producto terminado revisados:
+- Ya correctos, sin cambio de codigo:
+  - Tab «Costo de produccion»: `list-finished-product-costs.ts:72-73` (`totalCost` null si `unitCost` null);
+    adaptador `finished-product-detail-prisma.ts:241` (`decimalOrNull`). Prueba:
+    `list-finished-product-costs.test.ts:164-168` y `actual-order-cost.int.test.ts` «R7, R17, R22».
+  - Lista de lotes del producto y de lotes de un pedido: `product-prisma.ts` `toBatchView` (null -> null),
+    `list-product-batches.ts`, `list-order-batches.ts`. Prueba nueva en «R7, R17, R22»
+    (`inventario.listProductBatches` devuelve `unitCost: null`).
+  - Columna «Costo» del listado (medio ponderado): `unit-cost.ts:123` salta el lote sin coste y
+    `findAverageUnitCostByProduct` filtra `unitCost: { not: null }`; sin lotes con coste, `null`.
+    Prueba: `weighted-average-unit-cost.test.ts` (casos con `unitCost: null`, lineas 39, 59, 75).
+  - Costeo de recetas (estimado): `product-catalog-prisma.ts` filtra `unitCost: { not: null }`;
+    `toCostingBatch` lanza con null. Prueba: `product-catalog-costing.test.ts:188`.
+  - Consumos del pedido: `order-consumption-prisma.ts:42` (null -> null). Prueba:
+    `order-consumption-ledger.int.test.ts:261-270`.
+  - Entregas/despachos y existencias PT (`finished-stock-prisma.ts`, `product-prisma.ts` ajustes y
+    raw SQL): no leen `unit_cost`.
+  - Importacion: sigue exigiendo costo por regla propia; solo se corrige el comentario de
+    `import-finished-goods.ts`, que decia que lo exigia la base.
+- UI (no tocada; ya pinta el vacio con null): `finished-product-costs-table.tsx:20-21`
+  (`amountText` -> `EMPTY_MARK`), `product-columns.tsx:306` (`unitCostCell`). Nada pendiente para frontend_dev.
+- No hay en `lib/` valoracion de inventario ni exportaciones con costo de lotes PT.
+
+Tests:
+- Nuevo `tests/unit/inventario/schema/finished-goods-lot-cost-optional-migration.test.ts` (5).
+- `tests/guards/guard-identificador-de-request.test.ts`: la migracion entra en `MIGRACIONES_ESPERADAS`.
+- `finish-with-finished-goods.int.test.ts`: el caso de QC-150 pasa a «QC-305 P1 / R7, R17: un ingrediente
+  con material pero sin costo deja el pedido sin coste real y su lote de producto terminado sin coste
+  unitario» (`actualCost` null, lote con `package_content` y `unit_cost` null).
+- `actual-order-cost.int.test.ts` «R7, R17, R22»: verde; anade la lista de lotes.
+- `tests/unit/inventario/schema/inventory-movements-migration.test.ts`: el censo R15(b) estaba ROJO desde
+  T3 (`inventoryMovement.groupBy` de `order-consumption-prisma.ts`, de solo lectura); se admite `groupBy`.
+- El test estatico de `finished-products-and-content-copies` sigue fijando el ADD original (correcto: esa
+  migracion no cambia).
+
+Mapa R -> test (T4b): R17 -> `finished-goods-lot-cost-optional-migration.test.ts`, `actual-order-cost.int`
+«R7, R17, R22», `finish-with-finished-goods.int` «QC-305 P1 / R7, R17»; R7 -> los dos ultimos; R22 -> «R7, R17, R22».
+
+Verificacion (salida real):
+- `pnpm run typecheck`: exit 0. `pnpm run lint`: `0 errors, 10 warnings` (los mismos 10); eslint de los tocados: limpio.
+- `pnpm exec vitest run guard`: 85 archivos, 1255 pasan, 22 omitidos.
+- Unitarios: `tests/unit/inventario/schema/` + `tests/unit/pedidos/schema/` + vecinos: 45 archivos, 615/0
+  (`finished-goods-lot-cost-optional-migration` 5/0, `inventory-movements-migration` 9/0,
+  `finished-products-and-content-copies-migration` 24/0, `list-finished-product-costs` 10/0,
+  `weighted-average-unit-cost` 8/0, `order-packing` 69/0, `orders-actual-cost-migration` 8/0).
+- Integracion: 12 archivos, 118/0 (`actual-order-cost` 6/0, `finish-with-finished-goods` 33/0,
+  `order-packing` 15/0, `order-conditioning-states-rollback` 2/0, `inventario/finished-goods` 10/0,
+  `finished-goods-receipts` 6/0, `finished-product-detail` 13/0, `inventory-import-finished-goods` 3/0,
+  `order-batches` 6/0, `order-consumption-ledger` 8/0, `finished-goods-dispatch` 12/0, `deliverable-batches` 4/0).
+  Nota: a mitad de la tanda el Postgres local estuvo ~1 min en recuperacion (57P03); se reintento.
+
+Veredicto T4b: CHECK retirado con su down, P1/R17 verde en la base, lectores ya trataban NULL como «sin coste»; T4 desbloqueada.

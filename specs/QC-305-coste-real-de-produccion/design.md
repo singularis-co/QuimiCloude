@@ -152,9 +152,14 @@ Consecuencias:
   del cableado, y `resolveLotCost` (con `calculateLotPackagingCost` si queda sin uso) se borra de
   `resolve-ingredients-cost.ts`. El implementer confirma con el grafo que no tienen otros llamadores
   antes de borrar.
-- `inventario > FinishedGoodsIntake.receiveFromOrder` pasa `unitCost: string` → `string | null`. Su
-  adaptador ya escribe en una columna anulable (`product_batches.unit_cost`). `list-finished-product-costs.ts`
-  ya trata `null` como guion (R22): sin cambio.
+- `inventario > FinishedGoodsIntake.receiveFromOrder` pasa `unitCost: string` → `string | null`.
+  **Corrección (2026-10-21, al implementar T4):** la columna `product_batches.unit_cost` es anulable,
+  pero el CHECK `product_batches_package_content_requires_unit_cost`
+  (`20260924190100_finished_products_and_content_copies`) exigía coste a todo lote con
+  `package_content`, es decir, a todo lote de producto terminado. Una migración nueva con `down.sql`
+  lo quita (`product_batches_unit_cost_positive` se queda; el `down.sql` lo recrea y falla si ya hay
+  lotes de PT sin coste). Todo lector de lotes de producto terminado trata `unit_cost` NULL como
+  «sin coste» (guion), nunca como 0; `list-finished-product-costs.ts` ya lo hacía (R22).
 - Ningún paso de Terminar escribe `ingredients_cost` ni `packaging_cost` (R6): `finishPackingAlive`
   no los toca hoy y `setActualCost` solo escribe `actual_cost`.
 

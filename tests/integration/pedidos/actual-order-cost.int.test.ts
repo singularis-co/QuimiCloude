@@ -486,6 +486,10 @@ describe('Terminar guarda el coste real de lo consumido', () => {
 
       const tab = await inventario.listFinishedProductCosts(lote.productId, {}, actorDeInventario(fixture));
       expect(tab.items[0]).toMatchObject({ batchId: lote.batchId, unitCost: null, totalCost: null });
+
+      // La lista de lotes del producto terminado tampoco lo convierte en 0: sale `null`.
+      const lotes = await inventario.listProductBatches(lote.productId, actorDeInventario(fixture));
+      expect(lotes).toEqual([expect.objectContaining({ id: lote.batchId, unitCost: null })]);
     } finally {
       await borrarFixture(fixture);
     }
