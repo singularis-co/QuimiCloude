@@ -360,6 +360,7 @@ import {
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipePackingStepsById,
+  findRecipeConditioningStepsById,
   findRecipeRefsWithImageIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -1918,6 +1919,7 @@ const evidenceTargetDeps = {
   orders: orderCatalog,
   recipes: recipeCatalog,
   packingSteps: { findPackingStepsById: findRecipePackingStepsById },
+  conditioningSteps: { findConditioningStepsById: findRecipeConditioningStepsById },
 };
 
 /**

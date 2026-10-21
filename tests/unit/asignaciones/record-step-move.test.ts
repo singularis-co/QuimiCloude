@@ -54,6 +54,7 @@ function montar(options?: {
   const findAliveById = vi.fn(async () => (status === null ? null : { id: PEDIDO, status }));
   const append = vi.fn<ExecutionLogRepository['append']>(async () => {
     if (options?.appendFalla) throw options.appendFalla;
+    return 'ok';
   });
   const findLastStepPosition = vi.fn(async () => null);
 

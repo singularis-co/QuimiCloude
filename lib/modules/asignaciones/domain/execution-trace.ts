@@ -66,6 +66,9 @@ const PHASE_OF_ACTION: Readonly<Record<Exclude<ExecutionAction, 'cancel'>, Execu
   conditioning_start: 'conditioning',
   conditioning_batch_save: 'conditioning',
   conditioning_finish: 'conditioning',
+  conditioning_step_advance: 'conditioning',
+  conditioning_steps_complete: 'conditioning',
+  conditioning_responsibles_change: 'conditioning',
 };
 
 /** Un `cancel` hereda la fase de la anotacion que lo precede; el primero de todos no tiene fase. */

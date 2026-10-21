@@ -21,40 +21,40 @@ nombre de cada caso de test. Antes de T1: las preguntas abiertas P1–P6 resuelt
 
 ## Bloque B — `recetas`
 
-- [ ] **T3. Esquemas de entrada** [P con T5] — dep: ninguna.
+- [x] **T3. Esquemas de entrada** [P con T5] — dep: ninguna.
   `conditioningStepSchema`, `conditioningSteps` en alta (`default([])`) y edición (opcional)
   (`design.md > 3.1`).
   Hecho: aceptan sin la clave, con 50+50+50; rechazan 51, paso vacío, 31 elementos, clave
   desconocida; `requiresAssignment` se acepta en acondicionamiento y se rechaza en `steps` y
   `packingSteps`; los esquemas de versión descartan la clave. Casos `R1`, `R2`, `R3`, `R5`, `R14`.
-- [ ] **T4. Tipos, puerto, casos de uso y adaptador** — dep: T1, T3.
+- [x] **T4. Tipos, puerto, casos de uso y adaptador** — dep: T1, T3.
   `design.md > 3.2`. Ajustar fixtures de `RecipeRow` que no compilen (solo añadir
   `conditioningSteps: []`).
   Hecho: alta y edición pasan la lista en orden; edición sin la clave conserva la guardada; versión
   escribe `[]`; `getRecipe` de una versión devuelve los de la original; sin `recetas.modificar`
   rechaza sin tocar el repositorio; mover/quitar pasos de acondicionamiento con pedidos con fotos
   lanza `RecipeStepsLockedError` y encender un switch no. Casos `R4`, `R6`, `R14`, `R15`, `R34`.
-- [ ] **T5. Lector de pasos de acondicionamiento** [P con T3] — dep: T1.
+- [x] **T5. Lector de pasos de acondicionamiento** [P con T3] — dep: T1.
   `design.md > 3.3`.
   Hecho: `toRecipeConditioningSteps` devuelve los propios o los de la original, tolera inválidos;
   los `select` de ejecución y de envasado no piden `conditioningSteps`. Casos `R15`, `R30`.
-- [ ] **T6. Importación desde PDF** — dep: T4.
+- [x] **T6. Importación desde PDF** — dep: T4.
   Hecho: confirmar una importación que crea deja `[]`; una que reemplaza conserva los pasos de
   acondicionamiento; la revisión no pinta sección nueva. Caso `R7`.
-- [ ] **T7. Integración de `recetas`** — dep: T4, T5.
+- [x] **T7. Integración de `recetas`** — dep: T4, T5.
   Hecho: contra base real, las tres listas salen intactas y separadas; versión lee la original;
   receta dada de baja sigue devolviendo sus pasos; otra empresa da `null`. Casos `R4`, `R15`,
   `R32`, `R33`.
 
 ## Bloque C — `asignaciones` (dominio)
 
-- [ ] **T8. Registro de ejecución y avance puro** — dep: T1.
+- [x] **T8. Registro de ejecución y avance puro** — dep: T1.
   `execution-entry.ts`, `conditioning-trace.ts`, `conditioning-steps.ts`, `execution-trace.ts`,
   `execution-log-prisma.ts` (`design.md > 4.1`, `> 4.2`).
   Hecho: `conditioningProgress` cuenta completados, recorta a la lista y da los responsables
   vigentes por posición; el adaptador valida responsables al escribir y al leer y traduce el índice
   único; la duración de la fase no cambia con las anotaciones nuevas. Casos `R27`, `R28`, `R38`.
-- [ ] **T9. Fotos de la fase `conditioning`** [P con T8] — dep: T1, T5.
+- [x] **T9. Fotos de la fase `conditioning`** [P con T8] — dep: T1, T5.
   `step-evidence.ts`, `evidence-target.ts`, `count-evidence-locking-orders.ts`,
   `read-order-evidence.ts`, `order-evidence.ts`, adaptador de evidencias (`design.md > 4.6`).
   Hecho: subir/quitar en `conditioning` exige `acondicionamiento.modificar`, `EN_ACONDICIONAMIENTO`

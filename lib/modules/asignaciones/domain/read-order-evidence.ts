@@ -39,16 +39,18 @@ export async function readOrderEvidence(
   );
   if (!summaries.items.some((item) => item.id === orderId)) throw new OrderNotFoundError();
 
-  const [manufacturingRows, packingRows] = await Promise.all([
+  const [manufacturingRows, packingRows, conditioningRows] = await Promise.all([
     deps.evidence.listByOrder(companyId, orderId, 'manufacturing'),
     deps.evidence.listByOrder(companyId, orderId, 'packing'),
+    deps.evidence.listByOrder(companyId, orderId, 'conditioning'),
   ]);
   const manufacturing = groupEvidenceRows(manufacturingRows);
   const packing = groupEvidenceRows(packingRows);
-  const rows = [...manufacturing, ...packing].flatMap((group) => group.rows);
+  const conditioning = groupEvidenceRows(conditioningRows);
+  const rows = [...manufacturing, ...packing, ...conditioning].flatMap((group) => group.rows);
 
   if (rows.length === 0) {
-    return { evidence: { manufacturing: [], packing: [] }, signingFailure: null };
+    return { evidence: { manufacturing: [], packing: [], conditioning: [] }, signingFailure: null };
   }
 
   const signing = await signAll(deps.storage, rows);
@@ -56,6 +58,7 @@ export async function readOrderEvidence(
     evidence: {
       manufacturing: toGroups(manufacturing, signing),
       packing: toGroups(packing, signing),
+      conditioning: toGroups(conditioning, signing),
     },
     signingFailure: 'failure' in signing ? signing.failure : null,
   };

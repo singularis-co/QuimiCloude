@@ -144,6 +144,7 @@ export function createUpdateRecipe(
       description: data.description ?? null,
       steps: data.steps,
       packingSteps: data.packingSteps,
+      ...(data.conditioningSteps === undefined ? {} : { conditioningSteps: data.conditioningSteps }),
       lines: data.lines,
       imagePath,
       tools: data.tools ?? null,
@@ -179,12 +180,15 @@ export function createUpdateRecipe(
 async function assertStepsNotLocked(
   deps: UpdateRecipeDeps,
   existing: RecipeRow,
-  data: Pick<NewRecipe, 'steps' | 'packingSteps'>,
+  data: Pick<NewRecipe, 'steps' | 'packingSteps' | 'conditioningSteps'>,
   scope: RecipeScope,
 ): Promise<void> {
   const change =
     detectLockedStepChange(existing.steps, data.steps) ??
-    detectLockedStepChange(existing.packingSteps, data.packingSteps);
+    detectLockedStepChange(existing.packingSteps, data.packingSteps) ??
+    (data.conditioningSteps === undefined
+      ? null
+      : detectLockedStepChange(existing.conditioningSteps, data.conditioningSteps));
   if (change === null) return;
 
   const versionIds = await deps.recipes.listVersionIdsIncludingDeleted(existing.id, scope);

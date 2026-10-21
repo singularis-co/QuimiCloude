@@ -49,6 +49,7 @@ function filaConLineaVieja(): RecipeRow {
     description: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     imagePath: null,
     createdBy: ADMIN.id,
     updatedBy: ADMIN.id,

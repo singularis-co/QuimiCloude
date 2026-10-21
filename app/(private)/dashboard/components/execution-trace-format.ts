@@ -21,6 +21,9 @@ export const EXECUTION_ACTION_LABELS: Readonly<Record<ExecutionAction, string>> 
   conditioning_start: 'Comenzar acondicionamiento',
   conditioning_batch_save: 'Guardado de datos de lote',
   conditioning_finish: 'Terminar acondicionamiento',
+  conditioning_step_advance: 'Avanzar',
+  conditioning_steps_complete: 'Completar pasos',
+  conditioning_responsibles_change: 'Cambio de responsables',
 };
 
 export const TRACE_ORDER_STATUS_LABELS: Readonly<Record<ExecutionTraceRow['status'], string>> =

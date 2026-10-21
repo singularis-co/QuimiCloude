@@ -45,6 +45,7 @@ const ORIGINAL: RecipeRow = {
   description: null,
   steps: [],
   packingSteps: [],
+  conditioningSteps: [],
   imagePath: null,
   createdBy: 'actor-1',
   updatedBy: 'actor-1',
@@ -62,7 +63,7 @@ const VERSION: RecipeRow = {
   ...ORIGINAL,
   id: 'version-1',
   name: 'Sin perfume',
-  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, packingSteps: [], steps: [] },
+  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, packingSteps: [], conditioningSteps: [], steps: [] },
 };
 
 function repositorio(row: RecipeRow = ORIGINAL): RecipeRepository {

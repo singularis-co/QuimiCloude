@@ -62,6 +62,7 @@ function anotacion(
     stepPosition: action === 'pack_start' || action === 'pack_finish' || action.startsWith('conditioning_') ? null : 1,
     reason: action === 'cancel' ? 'sin material' : null,
     batchLines: null,
+    responsibleUserIds: null,
     occurredAt: new Date(T0 + offsetMin * MIN),
   };
 }

@@ -15,6 +15,7 @@ const PAGE_SIZE = 25;
 const PHASE_BY_STATUS = {
   EN_CURSO: 'manufacturing',
   EN_EMPAQUE: 'packing',
+  EN_ACONDICIONAMIENTO: 'conditioning',
 } as const satisfies Partial<Record<OrderStatus, EvidencePhase>>;
 
 const IN_PROGRESS_STATUSES = Object.keys(PHASE_BY_STATUS) as (keyof typeof PHASE_BY_STATUS)[];
@@ -27,7 +28,9 @@ export type CountEvidenceLockingOrdersDeps = {
 export type CountEvidenceLockingOrders = (companyId: string, recipeIds: readonly string[]) => Promise<number>;
 
 function phaseOf(status: OrderStatus): EvidencePhase | null {
-  return status === 'EN_CURSO' || status === 'EN_EMPAQUE' ? PHASE_BY_STATUS[status] : null;
+  return status === 'EN_CURSO' || status === 'EN_EMPAQUE' || status === 'EN_ACONDICIONAMIENTO'
+    ? PHASE_BY_STATUS[status]
+    : null;
 }
 
 export function createCountEvidenceLockingOrders(deps: CountEvidenceLockingOrdersDeps): CountEvidenceLockingOrders {

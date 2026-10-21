@@ -9,6 +9,7 @@ import {
   Package,
   Play,
   RotateCcw,
+  UserPlus,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -52,6 +53,9 @@ export const EXECUTION_TIMELINE_ACTIONS: Record<
   conditioning_start: { tone: 'progress', icon: ClipboardList },
   conditioning_batch_save: { tone: 'neutral', icon: Download },
   conditioning_finish: { tone: 'success', icon: ClipboardCheck },
+  conditioning_step_advance: { tone: 'neutral', icon: ArrowRight },
+  conditioning_steps_complete: { tone: 'neutral', icon: ArrowRight },
+  conditioning_responsibles_change: { tone: 'waiting', icon: UserPlus },
 };
 
 const DOT_TONE_CLASS: Record<TimelineTone, string> = {

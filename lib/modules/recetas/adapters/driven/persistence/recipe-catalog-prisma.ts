@@ -1,12 +1,12 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { recipeStepSchema } from '../../../domain/recipe-input';
+import { conditioningStepSchema, recipeStepSchema } from '../../../domain/recipe-input';
 import { normalizeRecipeName } from '../../../domain/recipe-name';
 import { isVersionUnderReview, recipeDisplayName } from '../../../domain/recipe-version';
 
 import type { RecipeCatalog, RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
 import type { RecipeScope } from '../../../domain/recipe-scope';
-import type { RecipeStepView } from '../../../domain/recipe-view';
+import type { ConditioningStepView, RecipeStepView } from '../../../domain/recipe-view';
 import type { RecipeImageStorage } from '../../../ports/recipe-image-storage';
 
 import { recipeImagePublicUrl } from '../storage/recipe-image-supabase';
@@ -312,4 +312,37 @@ export async function findRecipePackingStepsById(
   });
 
   return row === null ? null : toRecipePackingSteps(row);
+}
+
+type RecipeConditioningStepsRow = {
+  readonly conditioningSteps: unknown;
+  readonly parent: { readonly conditioningSteps: unknown } | null;
+};
+
+/** Fila de Prisma -> pasos de acondicionamiento. Una version se acondiciona con los de su
+ *  original; el elemento invalido se descarta conservando el orden. */
+export function toRecipeConditioningSteps(row: RecipeConditioningStepsRow): readonly ConditioningStepView[] {
+  const steps = row.parent === null ? row.conditioningSteps : row.parent.conditioningSteps;
+  if (!Array.isArray(steps)) return [];
+
+  const parsed: ConditioningStepView[] = [];
+  for (const step of steps) {
+    const result = conditioningStepSchema.safeParse(step);
+    if (result.success) parsed.push(result.data);
+  }
+  return parsed;
+}
+
+/** Sin `deleted_at IS NULL`: una receta dada de baja se sigue acondicionando. */
+export async function findRecipeConditioningStepsById(
+  id: RecipeId,
+  companyId: string,
+): Promise<readonly ConditioningStepView[] | null> {
+  const scope: RecipeScope = { companyId };
+  const row = await prisma.recipe.findFirst({
+    where: { AND: [recipeCompanyScope(scope), { id }] },
+    select: { conditioningSteps: true, parent: { select: { conditioningSteps: true } } },
+  });
+
+  return row === null ? null : toRecipeConditioningSteps(row);
 }

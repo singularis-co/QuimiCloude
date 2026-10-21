@@ -45,6 +45,7 @@ function anotacion(action: ExecutionAction, offsetMin: number, userId = ANA, ste
     stepPosition,
     reason: action === 'cancel' ? 'sin material' : null,
     batchLines: null,
+    responsibleUserIds: null,
     occurredAt: new Date(T0 + offsetMin * MIN),
   } satisfies ExecutionEntryRecord;
 }

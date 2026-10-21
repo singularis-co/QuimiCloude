@@ -457,6 +457,11 @@
       "desde": "2026-09-25"
     },
     {
+      "archivo": "recetas/conditioning-steps.int.test.ts",
+      "motivo": "QC-299 T7: ejercita `createRecipe`, `createRecipeVersion`, `replaceAliveRecipe`, `replaceAliveRecipeWithPropagation`, `softDeleteAliveRecipe` y `findAliveRecipeById` de `recipe-prisma.ts` y `findRecipeConditioningStepsById` / `findRecipePackingStepsById` / `findRecipeExecutionContentById` de `recipe-catalog-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria. Dos empresas efimeras (randomUUID) nacen en `beforeAll` y mueren en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-21"
+    },
+    {
       "archivo": "recetas/packing-steps.int.test.ts",
       "motivo": "QC-211 T6: ejercita `createRecipe`, `createRecipeVersion`, `replaceAliveRecipe`, `softDeleteAliveRecipe` y `findAliveRecipeById` de `recipe-prisma.ts` y `findRecipePackingStepsById` / `findRecipeExecutionContentById` de `recipe-catalog-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria. Dos empresas efimeras (randomUUID) nacen en `beforeAll` y mueren en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-05"

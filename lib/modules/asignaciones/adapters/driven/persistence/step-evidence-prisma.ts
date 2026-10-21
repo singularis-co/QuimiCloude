@@ -2,7 +2,7 @@ import { Prisma, type EvidencePhase as DbEvidencePhase, type PrismaClient } from
 
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { MAX_EVIDENCE_PER_STEP, type EvidencePhase } from '../../../domain/step-evidence';
+import { EVIDENCE_PHASES, MAX_EVIDENCE_PER_STEP, type EvidencePhase } from '../../../domain/step-evidence';
 
 import type {
   NewStepEvidence,
@@ -13,11 +13,13 @@ import type {
 const TO_DB_PHASE: Readonly<Record<EvidencePhase, DbEvidencePhase>> = {
   manufacturing: 'MANUFACTURING',
   packing: 'PACKING',
+  conditioning: 'CONDITIONING',
 };
 
 const FROM_DB_PHASE: Readonly<Record<DbEvidencePhase, EvidencePhase>> = {
   MANUFACTURING: 'manufacturing',
   PACKING: 'packing',
+  CONDITIONING: 'conditioning',
 };
 
 const ROW_SELECT = {
@@ -165,7 +167,7 @@ export function createStepEvidenceRepository(db: PrismaClient = prisma): StepEvi
     async listOrderIdsWithEvidence(companyId, candidates) {
       const idsOf = (phase: EvidencePhase): string[] =>
         candidates.filter((candidate) => candidate.phase === phase).map((candidate) => candidate.orderId);
-      const conditions = (['manufacturing', 'packing'] as const)
+      const conditions = EVIDENCE_PHASES
         .map((phase) => ({ phase: TO_DB_PHASE[phase], orderId: { in: idsOf(phase) } }))
         .filter((condition) => condition.orderId.in.length > 0);
       if (conditions.length === 0) return [];

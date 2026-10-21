@@ -2,7 +2,8 @@
 /**
  * Quien puede tocar las fotos de evidencia de un pedido, y con que lista de pasos. Fabricacion:
  * `asignaciones.ejecutar`, responsable asignado y `EN_CURSO`. Envasado: `empaque.modificar`,
- * `EN_EMPAQUE` y quien empaca es el actor. Cualquier otro caso es `order_not_found`: «no es tuyo»,
+ * `EN_EMPAQUE` y quien empaca es el actor. Acondicionamiento: `acondicionamiento.modificar`,
+ * `EN_ACONDICIONAMIENTO` y quien acondiciona es el actor. Cualquier otro caso es `order_not_found`: «no es tuyo»,
  * «no existe» y «ya no esta en curso» son la misma respuesta desde fuera.
  *
  * Los pasos son los de la formula ACTUAL, leidos en cada llamada: un switch encendido despues de
@@ -14,13 +15,19 @@ import { OrderBlockedError, OrderNotFoundError } from './errors';
 import type { EvidencePhase } from './step-evidence';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
-import type { RecipeCatalog, RecipePackingStepsReader, RecipeStepView } from '@/lib/modules/recetas';
+import type {
+  RecipeCatalog,
+  RecipeConditioningStepsReader,
+  RecipePackingStepsReader,
+  RecipeStepView,
+} from '@/lib/modules/recetas';
 
 export type EvidenceTargetDeps = {
   readonly assignments: OrderAssignmentRepository;
   readonly orders: OrderCatalog;
   readonly recipes: RecipeCatalog;
   readonly packingSteps: RecipePackingStepsReader;
+  readonly conditioningSteps: RecipeConditioningStepsReader;
 };
 
 export type EvidenceTarget = {
@@ -62,6 +69,19 @@ async function resolvePacking(
   return { recipeId: summary.recipeId, steps: steps ?? [] };
 }
 
+async function resolveConditioning(
+  deps: EvidenceTargetDeps,
+  actor: Actor,
+  orderId: string,
+): Promise<EvidenceTarget> {
+  const page = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], ['EN_ACONDICIONAMIENTO'], 1, 1);
+  const summary = page.items[0];
+  if (summary?.conditionedBy !== actor.id) throw new OrderNotFoundError();
+
+  const steps = await deps.conditioningSteps.findConditioningStepsById(summary.recipeId, actor.companyId);
+  return { recipeId: summary.recipeId, steps: steps ?? [] };
+}
+
 /** Autoriza antes de tocar ningun puerto; la empresa sale siempre del actor. */
 export async function resolveEvidenceTarget(
   deps: EvidenceTargetDeps,
@@ -73,8 +93,12 @@ export async function resolveEvidenceTarget(
     requirePermission(actor, 'asignaciones.ejecutar');
     return resolveManufacturing(deps, actor, orderId);
   }
-  requirePermission(actor, 'empaque.modificar');
-  return resolvePacking(deps, actor, orderId);
+  if (phase === 'packing') {
+    requirePermission(actor, 'empaque.modificar');
+    return resolvePacking(deps, actor, orderId);
+  }
+  requirePermission(actor, 'acondicionamiento.modificar');
+  return resolveConditioning(deps, actor, orderId);
 }
 
 /**
@@ -82,5 +106,5 @@ export async function resolveEvidenceTarget(
  * que aqui solo se exige poder tocar alguna. `resolveEvidenceTarget` exige despues el de la fase.
  */
 export function requireEvidenceAccess(actor: Actor | null | undefined): asserts actor is Actor {
-  requireAnyPermission(actor, ['asignaciones.ejecutar', 'empaque.modificar']);
+  requireAnyPermission(actor, ['asignaciones.ejecutar', 'empaque.modificar', 'acondicionamiento.modificar']);
 }

@@ -105,6 +105,10 @@ function toDetailStep(
       return { ...base, action: step.action, stepPosition: null, reason: null, lines: step.batchLines };
     case 'conditioning_finish':
       return { ...base, action: step.action, stepPosition: null, reason: null };
+    case 'conditioning_step_advance':
+    case 'conditioning_steps_complete':
+    case 'conditioning_responsibles_change':
+      throw new Error(`El recorrido no sabe pintar la anotacion ${step.id} (${step.action})`);
     default:
       return { ...base, action: step.action, stepPosition: step.stepPosition, reason: step.reason };
   }

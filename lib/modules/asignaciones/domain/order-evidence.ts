@@ -19,6 +19,8 @@ export type OrderEvidence = {
   /** Por `stepPosition` ascendente. */
   readonly manufacturing: readonly OrderEvidenceGroup[];
   readonly packing: readonly OrderEvidenceGroup[];
+  /** Para la cifra de fotos del recorrido; la ficha de producto terminado no lo pinta. */
+  readonly conditioning: readonly OrderEvidenceGroup[];
 };
 
 export type OrderEvidenceCount = { readonly orderId: string; readonly photoCount: number };

@@ -33,6 +33,7 @@ const ORIGINAL: RecipeRow = {
   description: 'Base',
   steps: [{ blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] }],
   packingSteps: [],
+  conditioningSteps: [],
   imagePath: null,
   createdBy: 'actor-1',
   updatedBy: 'actor-1',
@@ -56,7 +57,7 @@ const VERSION: RecipeRow = {
     { id: 'l-3', productId: P_A, percentage: '50.00' },
     { id: 'l-4', productId: P_B, percentage: '50.00' },
   ],
-  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: 'Base', imagePath: null, packingSteps: [], steps: ORIGINAL.steps },
+  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: 'Base', imagePath: null, packingSteps: [], conditioningSteps: [], steps: ORIGINAL.steps },
 };
 
 function repositorio(fila: RecipeRow | null = VERSION, overrides: Partial<RecipeRepository> = {}): RecipeRepository {
@@ -115,7 +116,7 @@ describe('updateRecipeVersion', () => {
     expect(resultado).toEqual({ id: VERSION.id });
     expect(recipes.findAliveById).toHaveBeenCalledWith(VERSION.id, { companyId: EMPRESA });
     expect(recipes.replaceAlive).toHaveBeenCalledTimes(1);
-    const datos: NewRecipe = { name: 'Sin perfume 2', description: null, packingSteps: [], steps: [], lines: LINEAS, imagePath: null, tools: null };
+    const datos: NewRecipe = { name: 'Sin perfume 2', description: null, packingSteps: [], conditioningSteps: [], steps: [], lines: LINEAS, imagePath: null, tools: null };
     expect(recipes.replaceAlive).toHaveBeenCalledWith(VERSION.id, datos, ACTOR.id, AHORA, { companyId: EMPRESA });
     expect(recipes.replaceAliveWithPropagation).not.toHaveBeenCalled();
   });

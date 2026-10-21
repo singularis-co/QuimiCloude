@@ -246,6 +246,7 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [stepView('Mezclar')],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [lineView()],
     tools: [],
     original: null,

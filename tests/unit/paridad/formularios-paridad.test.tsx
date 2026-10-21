@@ -342,6 +342,7 @@ const DETALLE_RECETA: RecipeDetail = {
   updatedBy: null,
   steps: [],
   packingSteps: [],
+  conditioningSteps: [],
   lines: [
     {
       id: 'linea-1',

@@ -35,6 +35,7 @@ export function orderEvidenceGroup(phase: 'm' | 'p', stepPosition: number, count
 export const ORDER_EVIDENCE: OrderEvidence = {
   manufacturing: [orderEvidenceGroup('m', 1, 2), orderEvidenceGroup('m', 2, 3), orderEvidenceGroup('m', 4, 1)],
   packing: [orderEvidenceGroup('p', 1, 2)],
+  conditioning: [],
 };
 
 export const ORDER_EVIDENCE_PHOTO_TOTAL = 9;
@@ -43,15 +44,17 @@ export const ORDER_EVIDENCE_PHOTO_TOTAL = 9;
 export const ORDER_EVIDENCE_UNSIGNED: OrderEvidence = {
   manufacturing: ORDER_EVIDENCE.manufacturing.map((group) => ({ ...group, photos: null })),
   packing: ORDER_EVIDENCE.packing.map((group) => ({ ...group, photos: null })),
+  conditioning: [],
 };
 
 /** Solo fabricacion: el grupo de envasado no se pinta. */
 export const ORDER_EVIDENCE_MANUFACTURING_ONLY: OrderEvidence = {
   manufacturing: ORDER_EVIDENCE.manufacturing,
   packing: [],
+  conditioning: [],
 };
 
-export const ORDER_EVIDENCE_EMPTY: OrderEvidence = { manufacturing: [], packing: [] };
+export const ORDER_EVIDENCE_EMPTY: OrderEvidence = { manufacturing: [], packing: [], conditioning: [] };
 
 export const ORDER_EVIDENCE_COUNTS: readonly OrderEvidenceCount[] = [
   { orderId: EVIDENCE_ORDER_ID, photoCount: ORDER_EVIDENCE_PHOTO_TOTAL },
