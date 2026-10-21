@@ -1,26 +1,57 @@
 import { requirePermission, type Actor } from './actor';
 import { ValidationError, WhatsappTemplateNameTakenError } from './errors';
-import { scopeOf } from './integraciones-scope';
-import { toWhatsappTemplateView } from './list-whatsapp-templates';
+import { scopeOf, type IntegracionesScope } from './integraciones-scope';
+import { ownKeyIndexOf, toWhatsappTemplateView } from './list-whatsapp-templates';
 import { requireTemplateConnection, templateFailureSecrets } from './template-connection';
 import { templateGraphErrorOf } from './template-graph-failure';
-import { isWhatsappTemplateCategory, type WhatsappTemplateView } from './whatsapp-template';
-import { toMetaComponents } from './whatsapp-template-components';
-import { validateWhatsappTemplateDraft } from './whatsapp-template-draft';
-import { mappingStatusOf } from './whatsapp-template-variables';
+import { isWhatsappTemplateCategory, type WhatsappTemplateRecord, type WhatsappTemplateView } from './whatsapp-template';
+import { contentOf, toMetaComponents } from './whatsapp-template-components';
+import { validateKeyedTemplateDraft } from './whatsapp-template-keyed-draft';
+import {
+  mappingStatusOf,
+  variableSlotsOf,
+  type TemplateSlot,
+  type TemplateVariableBinding,
+} from './whatsapp-template-variables';
 
 import type { SecretCipher } from '../ports/secret-cipher';
 import type { WhatsappConnectionRepository } from '../ports/whatsapp-connection-repository';
 import type { WhatsappGraphClient } from '../ports/whatsapp-graph-client';
 import type { WhatsappTemplateRepository } from '../ports/whatsapp-template-repository';
+import type { WhatsappVariableKeyRepository } from '../ports/whatsapp-variable-key-repository';
 
 export type CreateWhatsappTemplateDeps = {
   readonly connections: WhatsappConnectionRepository;
   readonly cipher: SecretCipher;
   readonly graph: Pick<WhatsappGraphClient, 'createTemplate'>;
   readonly templates: WhatsappTemplateRepository;
+  readonly variableKeys: Pick<WhatsappVariableKeyRepository, 'listAll'>;
   readonly now?: () => Date;
 };
+
+function sameSlots(a: readonly TemplateSlot[] | null, b: readonly TemplateSlot[]): boolean {
+  if (a === null || a.length !== b.length) return false;
+  const inB = new Set(b);
+  return a.every((slot) => inB.has(slot));
+}
+
+/**
+ * Si la sincronización ya había guardado la plantilla, gana su fila: se le pone la relación de la
+ * creación solo si no tiene ninguna y sus huecos son los creados.
+ */
+async function adoptRaceRow(
+  deps: CreateWhatsappTemplateDeps,
+  record: WhatsappTemplateRecord,
+  bindings: readonly TemplateVariableBinding[],
+  scope: IntegracionesScope,
+): Promise<WhatsappTemplateRecord> {
+  const slots = variableSlotsOf(contentOf(record.components));
+  if (record.variables.length > 0 || !sameSlots(slots, bindings.map((binding) => binding.slot))) return record;
+  const mappingStatus = mappingStatusOf(record.components, bindings);
+  const mapping = { mappingStatus, enabled: mappingStatus === 'MAPPED' };
+  const replaced = await deps.templates.replaceVariables(record.id, bindings, mapping, record.components, scope);
+  return replaced ? { ...record, ...mapping, variables: bindings } : record;
+}
 
 /**
  * Nace `PENDING` aunque Meta conteste otro estado: el webhook o la siguiente sincronización lo
@@ -35,12 +66,13 @@ export function createCreateWhatsappTemplate(
     requirePermission(actor);
     const scope = scopeOf(actor);
 
-    const validated = validateWhatsappTemplateDraft(input);
+    const ownKeys = await deps.variableKeys.listAll(scope);
+    const validated = validateKeyedTemplateDraft(input, ownKeys);
     if (!validated.ok) {
       const codes = validated.issues.map((issue) => `${issue.field}:${issue.code}`).join(', ');
       throw new ValidationError(`borrador de plantilla: ${codes}`);
     }
-    const draft = validated.draft;
+    const { draft, bindings } = validated;
 
     const { record: connection, accessToken } = await requireTemplateConnection(deps, scope);
 
@@ -63,8 +95,8 @@ export function createCreateWhatsappTemplate(
 
     const category =
       created.category !== null && isWhatsappTemplateCategory(created.category) ? created.category : draft.category;
-    const mappingStatus = mappingStatusOf(components, []);
-    const { record } = await deps.templates.insertCreated(
+    const mappingStatus = mappingStatusOf(components, bindings);
+    const { record, inserted } = await deps.templates.insertCreated(
       {
         metaTemplateId: created.id,
         name: draft.name,
@@ -74,13 +106,14 @@ export function createCreateWhatsappTemplate(
         status: 'PENDING',
         createdById: actor.id,
         lastSyncedAt: now(),
-        variables: [],
+        variables: bindings,
         mappingStatus,
         enabled: mappingStatus === 'MAPPED',
       },
       connection.id,
       scope,
     );
-    return toWhatsappTemplateView(record);
+    const final = inserted ? record : await adoptRaceRow(deps, record, bindings, scope);
+    return toWhatsappTemplateView(final, ownKeyIndexOf(ownKeys));
   };
 }

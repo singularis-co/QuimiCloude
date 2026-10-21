@@ -237,21 +237,21 @@
 
 ## Bloque J — Casos de uso (enmienda)
 
-- [ ] **T30 — Diccionario** (R55–R62). Depende de: T27
+- [x] **T30 — Diccionario** (R55–R62). Depende de: T27
   - `domain/manage-whatsapp-variable-keys.ts` (§18.7) y `manage-whatsapp-variable-keys.test.ts`.
   - **Hecho:** sin permiso, ningún puerto llamado; una clave de constante ⇒ `taken` sin puerto.
 
-- [ ] **T31 [P] — Crear con claves** (R14, R66–R69). Depende de: T27
+- [x] **T31 [P] — Crear con claves** (R14, R66–R69). Depende de: T27
   - `domain/create-whatsapp-template.ts` (§18.7, «Crear») y `create-whatsapp-template.test.ts`
     ampliado.
   - **Hecho:** casos de §18.10; los casos de T10 de crear se reescriben solo en su borrador (`{{n}}` ⇒
     `{{clave}}`), no en lo que comprueban.
 
-- [ ] **T32 [P] — Relacionar, habilitar, deshabilitar** (R72, R74–R80). Depende de: T27
+- [x] **T32 [P] — Relacionar, habilitar, deshabilitar** (R72, R74–R80). Depende de: T27
   - `domain/relate-whatsapp-template-variables.ts` (§18.7) y `relate-whatsapp-template-variables.test.ts`.
   - **Hecho:** casos de §18.10; ninguna llamada a Graph en ningún caso.
 
-- [ ] **T33 [P] — Listar, consultar y vista** (R81, R82). Depende de: T27
+- [x] **T33 [P] — Listar, consultar y vista** (R81, R82). Depende de: T27
   - `domain/list-whatsapp-templates.ts` (§18.7, «Listar») y `list-whatsapp-templates.test.ts` ampliado.
   - **Hecho:** claves exactas de la vista; los casos de T10 de listar siguen verdes salvo la lista
     exacta de claves de R46, que se amplía.

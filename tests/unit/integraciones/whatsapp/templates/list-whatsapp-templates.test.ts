@@ -4,6 +4,7 @@ import { UnauthorizedError, ValidationError, WhatsappTemplateNotFoundError } fro
 import {
   createGetWhatsappTemplate,
   createListWhatsappTemplates,
+  ownKeyIndexOf,
   toWhatsappTemplateView,
 } from '@/lib/modules/integraciones/domain/list-whatsapp-templates'
 import { toMetaComponents } from '@/lib/modules/integraciones/domain/whatsapp-template-components'
@@ -14,6 +15,7 @@ import {
   TEMPLATE_ID,
   admin,
   storedTemplate,
+  storedVariableKey,
 } from '../whatsapp-doubles'
 import { explodingTemplateDeps, setupTemplates, type TemplateSetupOptions } from './template-use-case-setup'
 
@@ -159,6 +161,7 @@ describe('vista de una plantilla', () => {
         statusRaw: 'IN_APPEAL',
         lastSyncedAt: new Date('2026-10-03T00:00:00.000Z'),
       }),
+      new Map(),
     )
 
     expect(Object.keys(view).sort()).toEqual(
@@ -191,19 +194,157 @@ describe('vista de una plantilla', () => {
       createdAt: '2026-10-01T00:00:00.000Z',
       mappingStatus: 'MAPPED',
       enabled: true,
-      variables: [],
+      variables: [
+        { slot: 'header', position: 1, kind: null, key: null, label: null },
+        { slot: 'body.1', position: 1, kind: null, key: null, label: null },
+      ],
     })
   })
 
   it('R46: el contenido viene vacio si un componente no es de esta fase', () => {
     const view = toWhatsappTemplateView(
       storedTemplate({ components: [{ type: 'HEADER', format: 'IMAGE' }, { type: 'BODY', text: 'Hola' }] }),
+      new Map(),
     )
 
     expect(view.content).toBeNull()
   })
 
   it('R46: sin hora de sincronizacion la vista la trae vacia', () => {
-    expect(toWhatsappTemplateView(storedTemplate({ lastSyncedAt: null })).lastSyncedAt).toBeNull()
+    expect(toWhatsappTemplateView(storedTemplate({ lastSyncedAt: null }), new Map()).lastSyncedAt).toBeNull()
+  })
+})
+
+const CUENTA = storedVariableKey()
+
+describe('vista de una plantilla: variables', () => {
+  const components = toMetaComponents({
+    header: { text: 'Cuenta {{1}}', example: 'Numero' },
+    body: { text: 'Hola {{1}}, {{2}} y {{3}}', examples: ['Ana', 'B', 'C'] },
+    footer: null,
+    buttons: [
+      { type: 'QUICK_REPLY', text: 'Ok' },
+      { type: 'URL', text: 'Ver', url: 'https://tienda.test/p/{{1}}', example: 'https://tienda.test/p/77' },
+    ],
+  })
+  const variables = [
+    { slot: 'header', kind: 'company', variableKeyId: CUENTA.id },
+    { slot: 'body.1', kind: 'system', systemKey: 'cliente.nombre' },
+    { slot: 'body.3', kind: 'company', variableKeyId: CUENTA.id },
+    { slot: 'button.1', kind: 'system', systemKey: 'pedido.numero' },
+  ] as const
+
+  it('R81 R94: un hueco por posicion con su numero, tipo, clave y etiqueta; la constante sin etiqueta y el libre vacio', () => {
+    const view = toWhatsappTemplateView(storedTemplate({ components, variables }), ownKeyIndexOf([CUENTA]))
+
+    expect(view.variables).toEqual([
+      { slot: 'header', position: 1, kind: 'company', key: 'cuenta_numero', label: CUENTA.label },
+      { slot: 'body.1', position: 1, kind: 'system', key: 'cliente.nombre', label: null },
+      { slot: 'body.2', position: 2, kind: null, key: null, label: null },
+      { slot: 'body.3', position: 3, kind: 'company', key: 'cuenta_numero', label: CUENTA.label },
+      { slot: 'button.1', position: 1, kind: 'system', key: 'pedido.numero', label: null },
+    ])
+    for (const variable of view.variables) {
+      expect(Object.keys(variable).sort()).toEqual(['key', 'kind', 'label', 'position', 'slot'])
+    }
+  })
+
+  it('R81: el contenido muestra {{clave}} en los huecos relacionados y {{n}} en el libre; los ejemplos no cambian', () => {
+    const view = toWhatsappTemplateView(storedTemplate({ components, variables }), ownKeyIndexOf([CUENTA]))
+
+    expect(view.content).toEqual({
+      header: { text: 'Cuenta {{cuenta_numero}}', example: 'Numero' },
+      body: { text: 'Hola {{cliente.nombre}}, {{2}} y {{cuenta_numero}}', examples: ['Ana', 'B', 'C'] },
+      footer: null,
+      buttons: [
+        { type: 'QUICK_REPLY', text: 'Ok' },
+        { type: 'URL', text: 'Ver', url: 'https://tienda.test/p/{{pedido.numero}}', example: 'https://tienda.test/p/77' },
+      ],
+    })
+  })
+
+  it('R81: el estado del mapeo y la habilitacion son los guardados: la vista no los recalcula', () => {
+    const view = toWhatsappTemplateView(
+      storedTemplate({ components, variables: [], mappingStatus: 'UNMAPPED', enabled: false }),
+      ownKeyIndexOf([CUENTA]),
+    )
+
+    expect(view).toMatchObject({ mappingStatus: 'UNMAPPED', enabled: false })
+    expect(view.variables.every((variable) => variable.kind === null)).toBe(true)
+  })
+
+  it.each([
+    ['un header con archivo', [{ type: 'HEADER', format: 'IMAGE' }, { type: 'BODY', text: 'Hola {{1}}' }]],
+    ['una variable con nombre', [{ type: 'BODY', text: 'Hola {{first_name}}' }]],
+  ])('R81: una plantilla no relacionable (%s) no trae huecos', (_caso, rowComponents) => {
+    const view = toWhatsappTemplateView(storedTemplate({ components: rowComponents }), new Map())
+
+    expect(view.variables).toEqual([])
+  })
+})
+
+describe('listar plantillas: variables', () => {
+  const body = [{ type: 'BODY', text: 'Hola {{1}}', example: { body_text: [['Ana']] } }]
+
+  it('R82: «solo aprobadas» devuelve las APPROVED sin relacionar y deshabilitadas, con los dos campos', async () => {
+    const { list } = setup({
+      templates: [
+        storedTemplate({ id: idOf(1), metaTemplateId: '1', name: 'a', components: body, mappingStatus: 'UNMAPPED', enabled: false }),
+        storedTemplate({ id: idOf(2), metaTemplateId: '2', name: 'b', mappingStatus: 'MAPPED', enabled: false }),
+        storedTemplate({ id: idOf(3), metaTemplateId: '3', name: 'c', mappingStatus: 'MAPPED', enabled: true }),
+        storedTemplate({ id: idOf(4), metaTemplateId: '4', name: 'd', status: 'PENDING' }),
+      ],
+    })
+
+    const result = await list({ onlyApproved: true }, admin())
+
+    expect(result.templates.map(({ name, mappingStatus, enabled }) => ({ name, mappingStatus, enabled }))).toEqual([
+      { name: 'a', mappingStatus: 'UNMAPPED', enabled: false },
+      { name: 'b', mappingStatus: 'MAPPED', enabled: false },
+      { name: 'c', mappingStatus: 'MAPPED', enabled: true },
+    ])
+  })
+
+  it('R81: lee las variables propias una sola vez por llamada y muestra su clave en cada plantilla', async () => {
+    const own = [{ slot: 'body.1' as const, kind: 'company' as const, variableKeyId: CUENTA.id }]
+    const { list, variableKeys } = setup({
+      variableKeys: [CUENTA],
+      templates: [
+        storedTemplate({ id: idOf(1), metaTemplateId: '1', name: 'a', components: body, variables: own }),
+        storedTemplate({ id: idOf(2), metaTemplateId: '2', name: 'b', components: body, variables: own }),
+      ],
+    })
+
+    const result = await list({}, admin())
+
+    expect(variableKeys.listAll).toHaveBeenCalledTimes(1)
+    expect(variableKeys.listAll).toHaveBeenCalledWith({ companyId: admin().companyId })
+    expect(result.templates.map((template) => template.content?.body.text)).toEqual([
+      'Hola {{cuenta_numero}}',
+      'Hola {{cuenta_numero}}',
+    ])
+  })
+
+  it('R81: consultar lee las variables propias una vez y devuelve la vista con claves', async () => {
+    const own = [{ slot: 'body.1' as const, kind: 'company' as const, variableKeyId: CUENTA.id }]
+    const { get, variableKeys } = setup({
+      variableKeys: [CUENTA],
+      templates: [storedTemplate({ components: body, variables: own })],
+    })
+
+    const view = await get(TEMPLATE_ID, admin())
+
+    expect(variableKeys.listAll).toHaveBeenCalledTimes(1)
+    expect(view.variables).toEqual([
+      { slot: 'body.1', position: 1, kind: 'company', key: 'cuenta_numero', label: CUENTA.label },
+    ])
+  })
+
+  it('R81: sin conexion viva no lee las variables propias', async () => {
+    const { list, variableKeys } = setup({ connection: null })
+
+    await list({}, admin())
+
+    expect(variableKeys.listAll).not.toHaveBeenCalled()
   })
 })

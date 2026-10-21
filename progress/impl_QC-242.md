@@ -560,3 +560,11 @@ Salidas (un comando por llamada):
 - Decisión anotada: las lecturas no hacen la «tercera consulta» de §18.8 (claves de propias por `id in`): el binding `company` solo lleva `variableKeyId`; la clave la pone la vista con `listAll` una vez por llamada (§18.7, T33).
 
 Salidas: typecheck limpio; lint 0 errores (10 warnings ajenos); plan 31/31; `vitest run tests/unit/integraciones/whatsapp` 37 files 760/760; `tests/unit/composition` 80/80; guard 85 files 1197 passed 21 skipped; `.int` uno por llamada: template-prisma 35/35, variable-key-prisma 19/19, connection-prisma 16/16, template-flow 7/7. Rojo conocido hasta T34: `module-shape` (2).
+
+### Tanda E3 — T30–T33 (backend_dev), 2026-10-20
+
+- Nuevos: `domain/manage-whatsapp-variable-keys.ts` (4 fábricas, solo propias, R89/R90), `domain/relate-whatsapp-template-variables.ts` (relacionar con §19.3, habilitar, deshabilitar); tests `manage-whatsapp-variable-keys.test.ts`, `relate-whatsapp-template-variables.test.ts`.
+- Modificados: `create-whatsapp-template.ts` (borrador con claves sobre `listAll` + `constantLabels`, relaciones, carrera R69), `list-whatsapp-templates.ts` (vista por hueco, `{{clave}}`, constante con `label: null`, `toWhatsappTemplateView(record, ownKeys)`); tests `create-`/`list-whatsapp-templates.test.ts`, `template-use-case-setup.ts`.
+- Decisión abierta para el reviewer: `usedBy` de la vista que devuelve modificar no lo fija el diseño; se relee `listWithUsage` tras guardar (alternativa: 0, como al crear).
+
+Salidas: typecheck limpio; lint 0 errores (10 warnings ajenos); create 34/34, list 31/31, manage 35/35, relate 39/39; `tests/unit/integraciones/whatsapp` 39 files 854/854; guard 85 files 1197 passed 21 skipped; `whatsapp-template-flow.int` 7/7. Rojo conocido hasta T34: `module-shape` (2).
