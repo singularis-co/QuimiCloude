@@ -260,6 +260,7 @@ export type {
   OrderNumberDirectory,
   BatchHistoryEntry,
 } from './domain/reservation';
+export type { ConsumedLot, OrderConsumptionLedger } from './domain/order-consumption';
 export { planReservation } from './domain/plan-reservation';
 export {
   INVENTORY_IMPORT_MAX_ROWS,

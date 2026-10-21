@@ -21,14 +21,14 @@
   - Hecho: nada que hacer; el implementer lo confirma con el grafo antes de T1 y anota en
     `progress/impl_QC-305.md` cualquier diferencia con `design.md > Lo que ya existe`.
 
-- [ ] **T1 — Migración y esquema** (backend). R10, R25.
+- [x] **T1 — Migración y esquema** (backend). R10, R25.
   - `pnpm run db:migrate:create` → `<ts>_orders_actual_cost` con `migration.sql` y `down.sql` de
     design §1.2; `actualCost` en `db/schema.prisma > Order`.
   - Test `tests/unit/pedidos/schema/orders-actual-cost-migration.test.ts`: columna anulable
     `DECIMAL(14,4)`, los dos CHECK, ningún `UPDATE` de backfill, `down.sql` revierte exactamente.
   - Hecho: la migración aplica y revierte sobre la base de test; test de esquema y guardias verdes.
 
-- [ ] **T2 [P] — Cálculo puro del real** (backend). Depende de T0. R1, R7, R23.
+- [x] **T2 [P] — Cálculo puro del real** (backend). Depende de T0. R1, R7, R23.
   - `lib/modules/pedidos/domain/actual-order-cost.ts > calculateActualOrderCost` (design §2.2).
   - Tests `tests/unit/pedidos/actual-order-cost.test.ts`: 8×10 + 2×20 = `120.0000` (no `150.0000`);
     sin lotes → `null`; un lote con `unitCost: null` → `null` (P1); suma que no cabe en
@@ -36,7 +36,7 @@
     daría otro resultado); salida siempre con 4 decimales.
   - Hecho: tests verdes; sin `number` ni `parseFloat` en el archivo.
 
-- [ ] **T3 [P] — Lectura de los asientos en `inventario`** (backend). Depende de T0. R2, R3, R4.
+- [x] **T3 [P] — Lectura de los asientos en `inventario`** (backend). Depende de T0. R2, R3, R4.
   - `inventario/domain/order-consumption.ts` (`ConsumedLot`, `OrderConsumptionLedger`),
     `inventario/adapters/driven/persistence/order-consumption-prisma.ts`
     (`createOrderConsumptionLedger`), export en `inventario/index.ts` (design §2.1).
@@ -65,7 +65,7 @@
     reparto del estimado.
   - Hecho: tests verdes; `grep resolveLotCost lib/` sin resultados.
 
-- [ ] **T5 [P] — Estimado congelado desde Comenzar** (backend). Depende de T0. R11, R12, R13, R14.
+- [x] **T5 [P] — Estimado congelado desde Comenzar** (backend). Depende de T0. R11, R12, R13, R14.
   - `STARTED_ORDER_STATUSES` en `pedidos/domain/order-classification.ts`.
   - `update-order.ts`: en `EN_CURSO`, sin `resolveStoredOrderCost` y `updateAlive(…, 'keep', …)`;
     `updateAlive` acepta `'keep'` en el puerto y en `order-prisma.ts` (design §2.4, §3).

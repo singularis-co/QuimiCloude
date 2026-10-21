@@ -797,6 +797,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261020160000_order_presentation_lines_packed_surplus',
   // QC-242 2026-10-20: diccionario de variables de WhatsApp; no toca el identificador.
   '20261020180000_whatsapp_variable_keys',
+  // QC-305 2026-10-21: coste real de produccion en el pedido; no toca el identificador.
+  '20261021140000_orders_actual_cost',
 ] as const
 
 export function hallazgosDeMigraciones(

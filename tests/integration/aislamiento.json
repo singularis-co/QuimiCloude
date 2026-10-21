@@ -63,6 +63,7 @@
     "inventario/product-batch-write.int.test.ts",
     "inventario/product-unit.int.test.ts",
     "inventario/qc195-packaging-constraints.int.test.ts",
+    "inventario/order-consumption-ledger.int.test.ts",
     "inventario/reservations-and-decimal-stock-migration.int.test.ts",
     "inventario/reserve-existing-orders-migration.int.test.ts",
     "notificaciones/notification-inbox.int.test.ts",

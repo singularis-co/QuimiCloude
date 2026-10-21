@@ -11,8 +11,8 @@
 // `finishAssignedOrder` con `startAssignedOrder`—: solo hay un llamador.
 //
 // Corre en la unidad de trabajo compartida con `inventario`: el reparto nombra envases y lo
-// apartado tiene que seguirlo. Nunca toca `quantity` ni la receta, pero si el importe, que
-// incluye los envases.
+// apartado tiene que seguirlo. Nunca toca `quantity` ni la receta. Antes de Comenzar tambien
+// recalcula el importe, que incluye los envases; desde Comenzar lo conserva.
 
 import type { Actor } from './actor';
 import {
@@ -21,13 +21,12 @@ import {
   OrderUnitNotConvertibleError,
   OrderWouldBlockError,
 } from './errors';
-import { ingredientsPartOf, storedOrderCost, type PackagingCostLine, type StoredOrderCost } from './order-cost';
 import { validateDistribution } from './order-distribution';
-import type { OrderStatus } from './order-classification';
+import { isStartedOrderStatus, type OrderStatus } from './order-classification';
 import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
 import { loadRequirementUnits, requireConvertibleRequirement } from './order-requirement-units';
 import type { OrderScope } from './order-scope';
-import { resolvePackagingCost, resolveStoredOrderCost, type OrderCostCatalogs } from './resolve-ingredients-cost';
+import { resolveStoredOrderCost, type OrderCostCatalogs } from './resolve-ingredients-cost';
 import {
   resolveDistributionLines,
   type DistributionCatalogs,
@@ -35,7 +34,7 @@ import {
 } from './resolve-distribution';
 
 import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
-import type { LockedOrderRow, OrderWriteRepository } from '../ports/order-write-repository';
+import type { OrderWriteRepository } from '../ports/order-write-repository';
 
 /**
  * El reparto y la unidad se pueden editar hasta Comenzar empaque. `'BLOQUEADO'` entra porque el
@@ -203,18 +202,18 @@ export function createUpdateOrderPresentationLines(
           // La receta y la cantidad salen de la fila bloqueada, asi que el importe se calcula aqui
           // y no antes de abrir la transaccion. Los catalogos leen lo ya confirmado, igual que la
           // cotizacion, y `orderId` cuenta lo apartado por este pedido como suyo.
-          const cost = materialsConsumed
-            ? await packedOrderCost(deps, locked, packagingLines, companyId, orderId)
-            : await resolveStoredOrderCost(
-                deps,
-                locked.recipeId,
-                locked.quantity,
-                input.unitId,
-                packagingLines,
-                companyId,
-                { orderId },
-              );
-          await transaction.orders.setIngredientsCost(orderId, cost, actorId, instant, scope);
+          if (!isStartedOrderStatus(locked.status)) {
+            const cost = await resolveStoredOrderCost(
+              deps,
+              locked.recipeId,
+              locked.quantity,
+              input.unitId,
+              packagingLines,
+              companyId,
+              { orderId },
+            );
+            await transaction.orders.setIngredientsCost(orderId, cost, actorId, instant, scope);
+          }
         }
 
         await transaction.orders.setReservedAt(orderId, reservation.kind === 'reserved' ? instant : null, scope);
@@ -228,23 +227,6 @@ export function createUpdateOrderPresentationLines(
       throw error;
     }
   };
-}
-
-/** Con la receta ya consumida sus ingredientes no tienen disponible que costear: se conserva la
- *  parte de ingredientes guardada y solo se recalculan los envases. Sin importe guardado, sin
- *  importe. */
-async function packedOrderCost(
-  deps: UpdateOrderPresentationLinesDeps,
-  locked: LockedOrderRow,
-  packagingLines: readonly PackagingCostLine[],
-  companyId: string,
-  orderId: string,
-): Promise<StoredOrderCost | null> {
-  if (locked.ingredientsCost === null || locked.packagingCost === null) return null;
-  const ingredients = ingredientsPartOf({ total: locked.ingredientsCost, packaging: locked.packagingCost });
-  if (ingredients === null) return null;
-  const packaging = await resolvePackagingCost(deps.packaging, packagingLines, companyId, { orderId });
-  return storedOrderCost(ingredients, packaging);
 }
 
 /** La fila ya esta bloqueada por `lockAliveById`: cualquier resultado distinto de `ok` es que el

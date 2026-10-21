@@ -73,13 +73,14 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<OrderRow>;
 
-  /** Edicion como reemplazo completo. No puede escribir `CANCELADO` ni motivo. */
+  /** Edicion como reemplazo completo. No puede escribir `CANCELADO` ni motivo. Con `'keep'` el
+   *  importe guardado no se toca. */
   updateAlive(
     id: string,
     data: OrderEdit,
     actorId: string,
     now: Date,
-    cost: StoredOrderCost | null,
+    cost: StoredOrderCost | null | 'keep',
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
 

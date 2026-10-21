@@ -18,7 +18,7 @@ import {
 import { OrderPresentationLineNotEditableError } from '@/lib/modules/pedidos/domain/errors';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
-import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
+import { STARTED_ORDER_STATUSES, type OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { LockedOrderRow, OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type {
@@ -679,7 +679,8 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
     return { ...doble, update, costo, packaging: catalogos.packaging };
   }
 
-  it.each<OrderStatus>(['PENDIENTE', 'EN_CURSO'])(
+  // QC-305 R13: desde Comenzar el importe ya no se recalcula; EN_CURSO salio de este caso.
+  it.each<OrderStatus>(['PENDIENTE'])(
     'R45: en %s guarda el importe nuevo -ingredientes 20 + envases 1.2- con el apartado del propio pedido',
     async (status) => {
       const { update, setIngredientsCost, costo, packaging } = montarConCosto(
@@ -742,41 +743,53 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
     expect(costo.findCostingBatches).not.toHaveBeenCalled();
   });
 
-  it('R47: en POR_EMPACAR conserva la parte de ingredientes guardada (25 - 5 = 20) y suma los envases nuevos (1.2)', async () => {
-    const { update, setIngredientsCost, costo, packaging } = montarConCosto(
-      filaBloqueada({ status: 'POR_EMPACAR', ingredientsCost: '25.0000', packagingCost: '5.0000' }),
-    );
+  // QC-305 R13 sustituye a QC-195 R47: en POR_EMPACAR el importe ya no se recompone.
+  it.each<OrderStatus>(['EN_CURSO', 'POR_EMPACAR'])(
+    'R13: en %s guardar el reparto y la unidad no escribe el estimado ni lo calcula',
+    async (status) => {
+      const { update, setIngredientsCost, costo, packaging, updatePresentationLinesAlive } = montarConCosto(
+        filaBloqueada({ status, ingredientsCost: '25.0000', packagingCost: '5.0000' }),
+      );
 
-    await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
-    expect(setIngredientsCost).toHaveBeenCalledWith(
-      PEDIDO,
-      { total: '21.2000', packaging: '1.2000' },
-      ACTOR_ID,
-      AHORA,
-      ESCOPO,
-    );
-    // Los ingredientes no se recalculan: ni la receta ni sus lotes se leen.
-    expect(costo.findExecutionContentById).not.toHaveBeenCalled();
-    expect(costo.findCostingBatches).not.toHaveBeenCalled();
-    expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE_A], EMPRESA, { excludeOrderId: PEDIDO });
-  });
+      await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
+      expect(updatePresentationLinesAlive).toHaveBeenCalledTimes(1);
+      expect(setIngredientsCost).not.toHaveBeenCalled();
+      expect(costo.findCostingBatches).not.toHaveBeenCalled();
+      expect(packaging.findCostingBatches).not.toHaveBeenCalled();
+    },
+  );
 
-  it('R47: en POR_EMPACAR sin importe guardado queda sin importe', async () => {
-    const { update, setIngredientsCost } = montarConCosto(filaBloqueada({ status: 'POR_EMPACAR' }));
+  it.each<OrderStatus>(['EN_CURSO', 'POR_EMPACAR'])(
+    'R13: en %s sin importe guardado tampoco se escribe el estimado',
+    async (status) => {
+      const { update, setIngredientsCost } = montarConCosto(filaBloqueada({ status }));
 
-    await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
-    expect(setIngredientsCost).toHaveBeenCalledWith(PEDIDO, null, ACTOR_ID, AHORA, ESCOPO);
-  });
+      await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
+      expect(setIngredientsCost).not.toHaveBeenCalled();
+    },
+  );
 
-  it('R47: en POR_EMPACAR, si el costo de los envases nuevos es «sin importe», queda sin importe', async () => {
-    const { update, setIngredientsCost } = montarConCosto(
-      filaBloqueada({ status: 'POR_EMPACAR', ingredientsCost: '25.0000', packagingCost: '5.0000' }),
-      [],
-    );
+  it.each([...STARTED_ORDER_STATUSES])(
+    'R14: con el pedido en %s ningun escritor del estimado se llama desde el reparto, alcance o no el material',
+    async (status) => {
+      const resultados: ReservationOutcome[] = [{ kind: 'reserved' }, { kind: 'insufficient', productIds: [ENVASE_A] }];
+      for (const resultado of resultados) {
+        const doble = ordersDoble(filaBloqueada({ status, ingredientsCost: '25.0000', packagingCost: '5.0000' }));
+        const update = montar({
+          orders: doble.orders,
+          reservations: fakeMaterialReservations({ syncForOrder: vi.fn(async () => resultado) }),
+          recipeLines: RECETA,
+          costo: catalogosDeCosto(RECETA, [LOTE_MATERIA]),
+        });
 
-    await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
-    expect(setIngredientsCost).toHaveBeenCalledWith(PEDIDO, null, ACTOR_ID, AHORA, ESCOPO);
-  });
+        const respuesta = await update(PEDIDO, ACTOR, { ...LINEAS, confirmBlocked: true });
+
+        // `create` y `updateAlive` del doble lanzan: si se llamaran, la respuesta no seria un codigo.
+        expect(typeof respuesta).toBe('string');
+        expect(doble.setIngredientsCost).not.toHaveBeenCalled();
+      }
+    },
+  );
 });
 
 describe('QC-204 updateOrderPresentationLines — la necesidad y el importe con la unidad nueva', () => {

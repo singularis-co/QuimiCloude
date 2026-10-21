@@ -527,8 +527,8 @@ async function replacePresentationLines(
  * `updatedAt` se escribe con el `now` INYECTADO y no con el `@updatedAt` de Prisma, para que
  * el reloj sea el mismo que fijo el caso de uso.
  *
- * `ingredientsCost` se SUSTITUYE entero, igual que el resto de `data`: la edicion recalcula, y
- * el valor nuevo reemplaza al anterior aunque sea `null`.
+ * `ingredientsCost` se SUSTITUYE entero, igual que el resto de `data`, aunque sea `null`; con
+ * `'keep'` las dos columnas del importe quedan fuera del `UPDATE`.
  *
  * `presentationId`/`presentationContent` de la fila YA NO SE ESCRIBEN: el
  * reparto vive en `order_presentation_lines` (`replacePresentationLines`, misma transaccion) y
@@ -540,7 +540,7 @@ export async function updateAliveOrder(
   data: OrderEdit,
   actorId: string,
   now: Date,
-  cost: StoredOrderCost | null,
+  cost: StoredOrderCost | null | 'keep',
   scope: OrderScope,
   tx: PrismaLike = prisma,
 ): Promise<'ok' | 'not_found'> {
@@ -550,7 +550,7 @@ export async function updateAliveOrder(
       recipeId: data.recipeId,
       quantity: toDecimalInput(data.quantity),
       priority: data.priority,
-      ...costColumns(cost),
+      ...(cost === 'keep' ? {} : costColumns(cost)),
       updatedAt: now,
       updatedBy: actorId,
       unitId: data.unitId,
