@@ -1320,7 +1320,7 @@ export async function receiveFinishedGoods(
     readonly orderPresentationLineId: string;
     readonly packages: number;
     readonly orderContent: string | null;
-    readonly unitCost: string;
+    readonly unitCost: string | null;
     readonly actorId: string;
     readonly now: Date;
   },

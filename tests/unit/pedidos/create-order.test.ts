@@ -71,6 +71,7 @@ function filaCreada(): OrderRow {
     cancellationReason: null,
     ingredientsCost: null,
     packagingCost: null,
+    actualCost: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: ACTOR_A.id,

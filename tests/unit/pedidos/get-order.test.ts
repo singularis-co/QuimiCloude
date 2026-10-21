@@ -52,6 +52,7 @@ function fila(recipeId: string): OrderRow {
     cancellationReason: null,
     ingredientsCost: null,
     packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',

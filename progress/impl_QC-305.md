@@ -96,3 +96,72 @@ los `down.sql` antiguos que recrean el enum `OrderStatus` (probados en
   - `tests/integration/pedidos/order-packing-states-rollback.int.test.ts` 2/0
 
 Veredicto: T1, T2 y T3 hechas y en verde; T4 puede montarse encima.
+
+## T4 (backend_dev): Terminar guarda el real y reparte el real — 2026-10-21
+
+Grafo: este worktree sigue sin indexar; todo con Grep/Read.
+
+### Archivos
+
+Produccion:
+- `lib/modules/pedidos/ports/order-unit-of-work.ts` (`OrderTransactionScope.consumption`)
+- `lib/composition/index.ts` (`orderTransactionScopeOn` cabla `createOrderConsumptionLedger(tx)`; las dos llamadas a `createFinishPacking` sin `products` ni `packaging`)
+- `lib/modules/pedidos/ports/order-write-repository.ts` (`setActualCost`; `FinishPackingOrderRow` pierde `ingredientsCost`, que solo leia `resolveLotCost`)
+- `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (`actualCost` en `ORDER_SELECT`/`toOrderRow`/alta; `setActualCost` por `$executeRaw`, sin mover `updated_at`; `finishPackingAlive` ya no relee el estimado)
+- `lib/modules/pedidos/domain/order-view.ts`, `get-order.ts` (`actualCost` en `OrderRow`/`OrderView`)
+- `lib/modules/pedidos/domain/order-packing.ts` (`saveActualCost` tras `settlePackaging`, tambien sin reparto y con todo en 0; `unitCost` = reparto del real o `null`; `FinishPackingDeps` sin `products` ni `packaging`)
+- `lib/modules/pedidos/domain/resolve-ingredients-cost.ts` (fuera `resolveLotCost` y `resolveLotIngredientsCost`, sin llamadores)
+- `lib/modules/pedidos/domain/order-cost.ts` (fuera `calculateLotIngredientsCost` y `calculateLotPackagingCost`, sin llamadores; `calculatePackagingLineCost` pierde el parametro `requireCoverage`, que siempre era `true`)
+- `lib/modules/inventario/domain/finished-goods.ts`, `adapters/driven/persistence/product-prisma.ts` (`receiveFromOrder` / `receiveFinishedGoods` / `planFinishedGoodsLine` aceptan `unitCost: string | null`; `finished-goods-prisma.ts` lo pasa tal cual, sin cambio)
+
+Tests:
+- Nuevo `tests/integration/pedidos/actual-order-cost.int.test.ts` (+ entrada `commit` en `tests/integration/aislamiento.json`)
+- `tests/unit/pedidos/order-packing.test.ts` (dobles sin catalogos de coste, `consumidos`; bloque nuevo «createFinishPacking guarda el coste real de lo consumido»; fuera los casos de `resolveLotCost`)
+- `tests/integration/pedidos/finish-with-finished-goods.int.test.ts` (los dos casos que fijaban el reparto del estimado pasan a fijar el real; dos titulos de «R18 — el coste del lote» reescritos), `order-packing.int.test.ts` (cableado), `order-ingredients-cost.int.test.ts` y `tests/unit/pedidos/order-cost.test.ts`, `resolve-ingredients-cost.test.ts` (fuera los casos de las funciones borradas)
+- `tests/helpers/order-unit-of-work-double.ts` (`setActualCost`, `fakeOrderConsumptionLedger`, `consumption`, `actualCost: null`), `tests/helpers/order-scope-readers.ts` (`consumption`)
+- `tests/guards/guard-ambito-empresa-pedidos.test.ts` (cableado de `createFinishPacking` y el ambito con siete miembros)
+- `actualCost: null` en las fixtures de `OrderRow`/`OrderView`/`OrderSummary` de 45 archivos de `tests/unit/**` (sin cambio de comportamiento)
+
+### Mapa R -> test (T4)
+
+| R | Test |
+|---|---|
+| R5 | `order-packing.test.ts` («R5: lee los consumos del pedido en la transaccion y guarda el real ponderado…», «R5: el real se lee despues de liquidar los envases y se guarda antes de dar de alta los lotes», «R5: un Terminar rechazado antes del calculo no guarda ningun real», «R5: un rechazo despues de guardar el real deshace la transaccion entera…»); `actual-order-cost.int.test.ts` («R1, R5, R6, R16, R22: …») |
+| R6 | `order-packing.test.ts` («R6: Terminar no escribe el estimado del pedido»); `actual-order-cost.int.test.ts` («R1, R5, R6, R16, R22»: estimado 155.0000 intacto frente a real 145.0000); `finish-with-finished-goods.int.test.ts` («QC-305 R16, R6: …», dos casos) |
+| R7 | `order-packing.test.ts` («R7, R8: un pedido sin ningun consumo guarda el real sin importe…») |
+| R8 | `order-packing.test.ts` («R8: sin reparto calcula y guarda el real…», «R8: con todas las lineas en 0…»); `actual-order-cost.int.test.ts` («R8: con todas las lineas en 0 guarda el real y no nace ningun lote») |
+| R9 | `actual-order-cost.int.test.ts` («R9: un ajuste de existencia, un cambio del coste de un lote, una entrega y su anulacion posteriores no cambian el real») |
+| R16 | `order-packing.test.ts` («R16: deriva un unico coste unitario del coste real…», «R16: los lotes llevan el real entre lo envasado…», «R16: el coste real se reparte entre los 12 L envasados…», «R16: el coste real se reparte entre lo envasado de verdad…»); `actual-order-cost.int.test.ts` («R1, R5, R6, R16, R22», «R16, R18: un segundo Terminar…») |
+| R17 | `order-packing.test.ts` («R17: si un lote consumido no tiene coste…», «R17: un pedido con reparto y sin ningun consumo…») — verdes; el de integracion («R7, R17, R22») esta ROJO, ver Bloqueo |
+| R18 | `actual-order-cost.int.test.ts` («R16, R18: un segundo Terminar…», «R18: un lote de producto terminado nacido con el estimado, antes de esta ficha, conserva su coste…») |
+| R22 | `actual-order-cost.int.test.ts` («R1, R5, R6, R16, R22»: la tab devuelve `unitCost` 14.5000 y `totalCost` 145.0000); la mitad «guion sin real» es el caso rojo de R17 |
+
+### Bloqueo: R17 choca con un CHECK de la base
+
+`db/migrations/20260924190100_finished_products_and_content_copies/migration.sql` crea
+`product_batches_package_content_requires_unit_cost` = `CHECK ("package_content" IS NULL OR "unit_cost" IS NOT NULL)`.
+Todo lote de producto terminado lleva `package_content`, asi que un lote sin coste unitario (R17, P2)
+no se puede escribir: el `INSERT` de `receiveFinishedGoods` falla con 23514 y Terminar entero se
+deshace (error 500, no un rechazo de dominio). `design.md §2.3` da por hecho que la columna admite
+`NULL` para estos lotes; no es asi.
+
+Efecto hoy, con el codigo de T4: cualquier pedido con reparto que consuma un lote sin `unit_cost`
+(p. ej. un ingrediente MACHINE sin coste) ya no puede Terminar. Lo muestran en rojo:
+- `actual-order-cost.int.test.ts` > «R7, R17, R22: un lote consumido sin coste deja el real sin importe…»
+- `finish-with-finished-goods.int.test.ts` > «un ingrediente con material pero sin costo cuenta cero…» (QC-150; fija el comportamiento retirado y no se toca hasta decidir)
+
+Pregunta al humano (sin decidir aqui): (a) migracion nueva que retire o relaje ese CHECK, con su
+`down.sql`, y revisar quien lee lotes de producto terminado suponiendo coste; (b) cambiar P2/R17:
+sin real, el lote nace a `0.0000` (lo admite `product_batches_unit_cost_positive` con
+`package_content`), lo que contradice «nunca 0»; (c) otra regla.
+
+### Verificacion (salida real)
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `0 errors, 10 warnings` (los mismos 10 de antes, en archivos que T4 no toca; `eslint` de los tocados, limpio).
+- `pnpm exec vitest run guard`: 85 archivos pasan, 1255 tests pasan, 22 omitidos.
+- Unitarios: los 47 archivos de `tests/unit` tocados mas `asignaciones/finish-packing`, `authorization`, `acondicionamiento-authorization`, `start-packing`, `pedidos/actual-order-cost`, `qc145-estado-solo-planta`: 53 archivos, 1690 tests, todos verdes (`order-packing.test.ts` 69/0, `order-cost.test.ts` 37/0, `resolve-ingredients-cost.test.ts` 8/0).
+- Integracion (base efimera): `actual-order-cost` 5/1, `finish-with-finished-goods` 32/1, `order-packing`, `asignaciones/finished-orders`, `order-ingredients-cost`, `order-unit-of-work`, `inventario/order-consumption-ledger` verdes; 86 pasan, 2 fallan (los dos del Bloqueo).
+- `grep resolveLotCost lib/`: sin resultados.
+
+Veredicto: T4 montada y verde salvo R17 en la base, que choca con un CHECK existente; para hasta que el humano decida.

@@ -174,7 +174,7 @@ const orderCatalog: OrderCatalog = {
   transitionAliveById: createTransitionOrder({ unitOfWork }),
   // T14: Comenzar y Terminar, cableados exactamente como `lib/composition`.
   startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
-  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, products, units, presentations, packaging: packagingCatalog }),
+  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, units, presentations }),
   startConditioningAliveById: async () => {
     throw new Error('este archivo no ejercita el acondicionamiento');
   },
@@ -698,10 +698,8 @@ describe('R19 — un fallo forzado tras el lote deshace la transaccion entera', 
       packing: orderPackingRepository,
       unitOfWork: unitOfWorkQueForzaFallo,
       recipes,
-      products,
       units,
       presentations,
-      packaging: packagingCatalog,
     });
 
     try {
@@ -830,7 +828,7 @@ describe('R26 — el Finalizar de asignaciones exige el permiso primero, sin dar
 });
 
 describe('R18 — el coste del lote', () => {
-  it('con importe guardado, el lote entra a ese coste dividido entre la cantidad que entra, y el pedido no cambia', async () => {
+  it('QC-305 R16, R6: el lote entra al coste real dividido entre la cantidad que entra, y el estimado del pedido no cambia', async () => {
     const fixture = await crearFixture('1.0000');
     const { productId } = await crearProductoConLote(fixture, '100', '2.0000');
     const recipeId = await crearReceta(fixture);
@@ -848,7 +846,7 @@ describe('R18 — el coste del lote', () => {
 
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
-      // 25.0000 (importe guardado) / 10 (cantidad que entra) = 2.5000
+      // Real: 10 x 2.0000 consumidos + 10 envases consumidos a 0.5000 = 25.0000, entre 10 = 2.5000.
       expect(lote.unitCost?.toFixed(4)).toBe('2.5000');
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
@@ -858,7 +856,7 @@ describe('R18 — el coste del lote', () => {
     }
   });
 
-  it('con importe nulo, se recalcula al Terminar con la receta que el pedido tiene en ese instante', async () => {
+  it('QC-305 R16, R6: sin estimado, el lote entra al coste real de lo que consumio la receta que el pedido tiene en ese instante', async () => {
     const fixture = await crearFixture('1.0000');
     const { productId, batchId } = await crearProductoConLote(fixture, '100', '3.0000');
     const recipeVacia = await crearReceta(fixture);
@@ -882,13 +880,13 @@ describe('R18 — el coste del lote', () => {
 
       const producto = await finishedProductDe(fixture.companyId, recipeConLinea, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
-      // Sin importe guardado, se recalcula: 10 (100% de 10) x 3.0000 = 30.0000 mas 10 envases a
-      // 0.5000 (QC-195 R31), dividido entre 10 (cantidad que entra) = 3.5000.
+      // Real: 10 (100% de 10) x 3.0000 consumidos = 30.0000 mas 10 envases a 0.5000, entre 10
+      // (cantidad que entra) = 3.5000.
       expect(lote.unitCost?.toFixed(4)).toBe('3.5000');
       expect(await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { stock: true } }).then((b) => b.stock.toFixed(4))).toBe('90.0000');
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
-      // El importe guardado del pedido sigue nulo: el recalculo del lote no lo escribe.
+      // El estimado sigue nulo: Terminar no lo escribe.
       expect(despues.ingredientsCost).toBeNull();
     } finally {
       await borrarFixture(fixture, [productId]);
@@ -1506,10 +1504,13 @@ describe('Terminar con el conteo real de envases', () => {
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { stock: true, unitCost: true } });
       expect(lote.stock.toFixed(4)).toBe('5.0000');
-      // R21: 34.0000 entre los 5 envasados de verdad, no entre los 10 del plan.
-      expect(lote.unitCost?.toFixed(4)).toBe('6.8000');
-      expect(Number(lote.stock) * Number(lote.unitCost)).toBeCloseTo(34, 4);
-      expect((await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } })).ingredientsCost?.toFixed(4)).toBe('34.0000');
+      // QC-305 R16: se reparte el real -10 x 3.0000 consumidos + 5 envases consumidos a 0.5000 =
+      // 32.5000- entre los 5 envasados de verdad; el estimado (34.0000) no cambia (R6).
+      const costes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true, actualCost: true } });
+      expect(costes.actualCost?.toFixed(4)).toBe('32.5000');
+      expect(lote.unitCost?.toFixed(4)).toBe('6.5000');
+      expect(Number(lote.stock) * Number(lote.unitCost)).toBeCloseTo(32.5, 4);
+      expect(costes.ingredientsCost?.toFixed(4)).toBe('34.0000');
     } finally {
       await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
@@ -1645,12 +1646,13 @@ describe('Terminar con el conteo real de envases', () => {
       const [lote] = lotes;
       expect(lote?.stock.toFixed(4)).toBe('12.0000');
 
-      // R10: el coste del pedido no cambia y se reparte entre los 12 L envasados.
-      expect((await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } })).ingredientsCost?.toFixed(4)).toBe(
-        costeDelPedido.toFixed(4),
-      );
-      expect(lote?.unitCost?.toFixed(4)).toBe(costeDelPedido.dividedBy(12).toFixed(4));
-      expect(Number(lote?.stock) * Number(lote?.unitCost)).toBeCloseTo(Number(costeDelPedido), 2);
+      // R10 con QC-305 R16: el estimado no cambia y lo que se reparte entre los 12 L envasados es
+      // el real, que cuenta los 12 envases consumidos.
+      const costes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true, actualCost: true } });
+      expect(costes.ingredientsCost?.toFixed(4)).toBe(costeDelPedido.toFixed(4));
+      if (costes.actualCost === null) throw new Error('el pedido no tiene coste real');
+      expect(lote?.unitCost?.toFixed(4)).toBe(costes.actualCost.dividedBy(12).toFixed(4));
+      expect(Number(lote?.stock) * Number(lote?.unitCost)).toBeCloseTo(Number(costes.actualCost), 2);
     } finally {
       await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });

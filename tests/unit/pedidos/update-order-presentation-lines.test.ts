@@ -35,6 +35,7 @@ import {
   fakeScopeProducts,
   fakeScopeUnits,
   fakeMaterialReservations,
+  fakeOrderConsumptionLedger,
   fakeOrderUnitOfWork,
   fakeRecipeExecutionReader,
 } from '../../helpers/order-unit-of-work-double';
@@ -65,6 +66,7 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
     cancellationReason: null,
     ingredientsCost: null,
     packagingCost: null,
+    actualCost: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: ACTOR_ID,
@@ -221,6 +223,7 @@ function montar(deps: {
       finishedGoods: fakeFinishedGoodsIntake(),
       products: deps.scopeProducts ?? fakeScopeProducts(),
       units: deps.scopeUnits ?? fakeScopeUnits(),
+      consumption: fakeOrderConsumptionLedger(),
     }),
     now: () => AHORA,
   };

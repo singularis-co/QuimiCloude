@@ -130,6 +130,7 @@ import {
   createReservationQueries,
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
+import { createOrderConsumptionLedger } from '@/lib/modules/inventario/adapters/driven/persistence/order-consumption-prisma';
 import { createFinishedBatchLabels } from '@/lib/modules/inventario/adapters/driven/persistence/finished-batch-labels-prisma';
 import {
   createFinishedGoodsDirectDispatch,
@@ -1614,6 +1615,7 @@ function orderTransactionScopeOn(tx: OrderTransactionClient): OrderTransactionSc
     finishedGoods: createFinishedGoodsIntake(tx),
     products: { findRefs: (ids, companyId) => findProductRefs(ids, companyId, tx) },
     units: createUnitCatalogReader(tx),
+    consumption: createOrderConsumptionLedger(tx),
   };
 }
 
@@ -1939,17 +1941,14 @@ const orderCatalog: OrderCatalog = {
   // cableados mas abajo para quien todavia los usa-.
   transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork }),
   startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
-  // Terminar SI necesita los tres catalogos globales -receta y coste del lote, mismo criterio
-  // que Finalizar usaba antes de dejar de dar de alta el lote- y `presentationCatalog`, para
-  // rechazar en profundidad una linea sin contenido copiado ni vigente.
+  // Terminar lee por los catalogos globales el nombre de la receta, las unidades y
+  // `presentationCatalog`, para rechazar en profundidad una linea sin contenido copiado ni vigente.
   finishPackingAliveById: createFinishPacking({
     packing: orderPackingRepository,
     unitOfWork: orderUnitOfWork,
     recipes: recipeCatalog,
-    products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
-    packaging: packagingCatalog,
   }),
   startConditioningAliveById: createStartConditioning({ conditioning: orderConditioningRepository }),
   finishConditioningAliveById: createFinishConditioning({ conditioning: orderConditioningRepository }),
@@ -2039,10 +2038,8 @@ const executionTransaction: ExecutionTransaction = {
             packing: createOrderPackingRepository(tx),
             unitOfWork: joinOrderUnitOfWork(tx),
             recipes: recipeCatalog,
-            products: productCatalog,
             units: unitCatalog,
             presentations: presentationCatalog,
-            packaging: packagingCatalog,
           }),
         },
         log: createExecutionLogRepository(tx),

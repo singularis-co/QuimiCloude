@@ -19,7 +19,6 @@ import { Prisma } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
-import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import {
   findPresentationRefs,
@@ -44,17 +43,13 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
-import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
-import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { packedCountsOfPlan } from '../../helpers/packed-counts';
-
-const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
@@ -80,9 +75,6 @@ const recipes: RecipeCatalog = {
   findIdsMatchingName: findRecipeIdsMatchingName,
   findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 };
-const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts: async () => {
-  throw new Error('este archivo no ejercita "Por empacar"');
-} };
 const presentations: PresentationCatalog = {
   findRefs: findPresentationRefs,
   findByNormalizedNames: findPresentationsByNormalizedNames,
@@ -95,7 +87,7 @@ const units: UnitCatalog = {
 };
 
 const startPackingAliveById = createStartPacking({ packing: orderPackingRepository });
-const finishPackingAliveById = createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, products, units, presentations, packaging: packagingCatalog });
+const finishPackingAliveById = createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, units, presentations });
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');

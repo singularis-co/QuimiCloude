@@ -65,6 +65,7 @@ function filaExistente(): OrderRow {
     cancellationReason: null,
     ingredientsCost: null,
     packagingCost: null,
+    actualCost: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: 'admin-0',
