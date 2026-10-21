@@ -12,6 +12,7 @@ import type { DeleteRecipeFormState, RecipeListResult } from '@/lib/modules/rece
 
 const {
   getSessionUserMock,
+  getSessionContextMock,
   usePathnameMock,
   routerMock,
   listRecipesActionMock,
@@ -23,6 +24,7 @@ const {
   getAiProviderReadinessActionMock,
 } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
+  getSessionContextMock: vi.fn<() => Promise<unknown>>(),
   usePathnameMock: vi.fn<() => string>(),
   routerMock: {
     push: vi.fn<(href: string) => void>(),
@@ -46,7 +48,11 @@ const {
 // El arbol de la pagina arrastra `product-picker`, que pide a la composicion el traductor de
 // errores; sin `observabilidad` en el doble el import de esa rama no carga.
 vi.mock('@/lib/composition', () => ({
-  identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
+  identity: {
+    getSessionUser: getSessionUserMock,
+    getSessionContext: getSessionContextMock,
+    endSession: vi.fn<() => Promise<void>>(),
+  },
   observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
 }));
 
@@ -83,11 +89,19 @@ import {
   AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID,
 } from '@/components/shared/ai-provider-required-tooltip';
 import {
+  DOCUMENT_BATCH_PANEL_TESTID,
   DOCUMENT_UPLOAD_DIALOG_TESTID,
   DOCUMENT_UPLOAD_INPUT_TESTID,
   DOCUMENT_UPLOAD_OPEN_TESTID,
   DOCUMENT_UPLOAD_SUBMIT_TESTID,
   DOCUMENT_UPLOAD_TESTID,
+  PANEL_ROW_SCOPE,
+  REMEMBERED_BATCHES_STORAGE_KEY,
+  forgetBatch,
+  panelBatchTestId,
+  rememberBatch,
+  rememberedBatches,
+  rowReviewLinkTestId,
 } from '@/components/shared/document-upload';
 import {
   PERMISSIONS,
@@ -96,7 +110,11 @@ import {
   effectivePermissions,
 } from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
-import { AI_PROVIDER_INTEGRATION_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
+import {
+  AI_PROVIDER_INTEGRATION_ROUTE,
+  FORMULAS_ROUTE,
+  formulaImportRoute,
+} from '@/lib/shared/routes';
 
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, clearSidebarStateCookie, resetViewport, setViewportWidth } from '../../helpers/viewport';
@@ -137,6 +155,8 @@ async function renderPantalla() {
 }
 
 const fetchMock = vi.fn<() => Promise<Response>>();
+const AMBITO_DE_LA_SESION = 'u-test-42:empresa-1';
+const ARCHIVO_ID = '22222222-2222-4222-8222-222222222222';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -145,6 +165,15 @@ beforeEach(() => {
 
   setViewportWidth(WIDE_VIEWPORT);
   usePathnameMock.mockReturnValue(FORMULAS_ROUTE);
+  window.localStorage.clear();
+  for (const { batchId } of rememberedBatches(AMBITO_DE_LA_SESION)) {
+    forgetBatch(AMBITO_DE_LA_SESION, batchId);
+  }
+  getSessionContextMock.mockResolvedValue({
+    userId: 'u-test-42',
+    companyId: 'empresa-1',
+    roleName: 'Administrador',
+  });
   listRecipesActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE, totalPages: 1 },
@@ -201,6 +230,27 @@ describe('el boton de subida en el listado de formulas', () => {
       paths: signedUploads(1).map((upload) => upload.path),
       names: ['formula.pdf'],
     });
+  });
+
+  it('R26 — la tanda encolada queda en el registro del ambito usuario:empresa de la sesion', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: 'u-test-42',
+      username: 'carla.duarte',
+      displayName: 'Carla Duarte Salas',
+      roleName: 'Administrador',
+      permissions: ['recetas.consultar', 'documentos.modificar'],
+    });
+
+    await renderPantalla();
+
+    const user = setupUser();
+    await user.click(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID));
+    await user.upload(screen.getByTestId(DOCUMENT_UPLOAD_INPUT_TESTID), [pdf('formula.pdf')]);
+    await user.click(screen.getByTestId(DOCUMENT_UPLOAD_SUBMIT_TESTID));
+
+    await waitFor(() => expect(enqueueBatchActionMock).toHaveBeenCalledTimes(1));
+    const clave = `${REMEMBERED_BATCHES_STORAGE_KEY}:u-test-42:empresa-1`;
+    await waitFor(() => expect(window.localStorage.getItem(clave)).toContain('batch-1'));
   });
 
   it('sin documentos.modificar no hay boton ni subida en el DOM (R11)', async () => {
@@ -354,5 +404,42 @@ describe('el boton de subida sin proveedor IA en el listado de formulas', () => 
       'href',
       AI_PROVIDER_INTEGRATION_ROUTE,
     );
+  });
+});
+
+describe('el panel de tandas en el listado de formulas', () => {
+  it('R17 — el panel va a todo el ancho debajo de la cabecera, fuera de sus acciones', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: 'u-test-42',
+      username: 'carla.duarte',
+      displayName: 'Carla Duarte Salas',
+      roleName: 'Administrador',
+      permissions: ['recetas.consultar', 'documentos.modificar'],
+    });
+    rememberBatch(AMBITO_DE_LA_SESION, 'tanda-catalogo', 'catalogo');
+    rememberBatch(AMBITO_DE_LA_SESION, 'batch-1', 'formula');
+    getBatchStatusActionMock.mockResolvedValue({
+      status: 'success',
+      data: batch([entry({ id: ARCHIVO_ID, status: 'done' })]),
+    });
+
+    const { container } = await renderPantalla();
+
+    const panel = await screen.findByTestId(DOCUMENT_BATCH_PANEL_TESTID);
+    const cabecera = container.querySelector('[data-slot="page-header"]');
+    const acciones = container.querySelector('[data-slot="page-header-actions"]');
+    expect(cabecera).not.toBeNull();
+    expect(acciones).toContainElement(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID));
+    expect(cabecera).not.toContainElement(panel);
+    expect(cabecera?.parentElement).toBe(panel.parentElement);
+    expect(
+      (cabecera?.compareDocumentPosition(panel) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    expect(await screen.findByTestId(rowReviewLinkTestId(0, PANEL_ROW_SCOPE))).toHaveAttribute(
+      'href',
+      formulaImportRoute(ARCHIVO_ID),
+    );
+    expect(screen.queryByTestId(panelBatchTestId(1))).toBeNull();
   });
 });

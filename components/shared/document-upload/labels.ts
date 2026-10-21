@@ -72,7 +72,6 @@ export function attemptLabel(attempts: number, maxAttempts: number): string {
 }
 
 export const PANEL_TITLE = 'Tandas de PDFs';
-export const PANEL_BATCH_LABEL = 'Tanda';
 export const DISCARD_BATCH_LABEL = 'Descartar';
 
 export const READ_ONLY_NOTICE =

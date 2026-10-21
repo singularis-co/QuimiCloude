@@ -15,7 +15,13 @@ import { getAiProviderReadinessAction } from '@/lib/modules/integraciones/adapte
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 
-import { FormulaPdfUpload, parseRecipeListParams, RecipeListSection, RecipeTable } from './components';
+import {
+  FormulaBatchPanel,
+  FormulaPdfUpload,
+  parseRecipeListParams,
+  RecipeListSection,
+  RecipeTable,
+} from './components';
 
 export const metadata: Metadata = {
   title: `${RECIPES_LABEL} · ${BRAND_LABEL}`,
@@ -32,7 +38,10 @@ export default async function FormulasPage({
 
   const params = parseRecipeListParams(await searchParams);
   const canUpload = canUploadDocuments(await identity.getSessionUser());
-  const readiness = canUpload ? await getAiProviderReadinessAction() : null;
+  const [readiness, context] = canUpload
+    ? await Promise.all([getAiProviderReadinessAction(), identity.getSessionContext()])
+    : [null, null];
+  const registryScope = context === null ? undefined : `${context.userId}:${context.companyId}`;
 
   return (
     <PageShell>
@@ -42,10 +51,10 @@ export default async function FormulasPage({
         actions={
           <>
             {readiness === null ? null : readiness.configured ? (
-              <FormulaPdfUpload />
+              <FormulaPdfUpload registryScope={registryScope} />
             ) : (
               <AiProviderRequiredTooltip>
-                <FormulaPdfUpload disabled />
+                <FormulaPdfUpload disabled registryScope={registryScope} />
               </AiProviderRequiredTooltip>
             )}
             {/* Un enlace y no `Button` con `render`: Base UI le pondría `role="button"` al `<a>`. */}
@@ -61,6 +70,9 @@ export default async function FormulasPage({
           </>
         }
       />
+      {readiness === null || registryScope === undefined ? null : (
+        <FormulaBatchPanel registryScope={registryScope} disabled={!readiness.configured} />
+      )}
       {/* Sin `key`: remontar el límite en cada consulta borraría el foco del campo de búsqueda. */}
       <Suspense
         fallback={<RecipeTable status="loading" recipes={[]} params={params} totalPages={0} />}

@@ -43,6 +43,8 @@ export type DocumentUploadProps = {
    * Ausente, el componente se comporta exactamente como antes de que esta prop existiera.
    */
   readonly reviewHrefFor?: (documentFileId: string) => string;
+  /** `<userId>:<companyId>`. Sin él, la tanda encolada no se recuerda. */
+  readonly registryScope?: string;
 };
 
 type SelectedFile = {
@@ -51,7 +53,7 @@ type SelectedFile = {
   readonly path: string | null;
 };
 
-export function DocumentUpload({ strategy, reviewHrefFor }: DocumentUploadProps) {
+export function DocumentUpload({ strategy, reviewHrefFor, registryScope }: DocumentUploadProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<readonly SelectedFile[]>([]);
@@ -153,7 +155,9 @@ export function DocumentUpload({ strategy, reviewHrefFor }: DocumentUploadProps)
     }
 
     setBatchId(enqueued.data.batchId);
-    rememberBatch(enqueued.data.batchId, strategy);
+    if (registryScope !== undefined) {
+      rememberBatch(registryScope, enqueued.data.batchId, strategy);
+    }
     setBusy(false);
   }
 

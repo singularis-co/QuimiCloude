@@ -28,6 +28,8 @@ export type DocumentUploadDialogProps = {
   readonly strategy: PdfStrategy;
   /** Opcional: se pasa tal cual a `DocumentUpload`. */
   readonly reviewHrefFor?: (documentFileId: string) => string;
+  /** Opcional: se pasa tal cual a `DocumentUpload`. */
+  readonly registryScope?: string;
   readonly disabled?: boolean;
 };
 
@@ -38,6 +40,7 @@ export type DocumentUploadDialogProps = {
 export function DocumentUploadDialog({
   strategy,
   reviewHrefFor,
+  registryScope,
   disabled = false,
 }: DocumentUploadDialogProps) {
   return (
@@ -66,7 +69,11 @@ export function DocumentUploadDialog({
           <DialogDescription>{dialogDescription(MAX_FILES_PER_BATCH)}</DialogDescription>
         </DialogHeader>
 
-        <DocumentUpload strategy={strategy} reviewHrefFor={reviewHrefFor} />
+        <DocumentUpload
+          strategy={strategy}
+          reviewHrefFor={reviewHrefFor}
+          registryScope={registryScope}
+        />
 
         <DialogFooter>
           <DialogClose

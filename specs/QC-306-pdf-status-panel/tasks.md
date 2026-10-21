@@ -47,7 +47,7 @@ Las decisiones P1–P8 están cerradas (2026-10-21). R18 y R28 están retirados.
 
 ### T3 — Tests del registro (en rojo)
 
-- [ ] Crear `tests/unit/documentos-ui/batch-memory.test.ts` con `vi.resetModules()` y casos para:
+- [x] Crear `tests/unit/documentos-ui/batch-memory.test.ts` con `vi.resetModules()` y casos para:
   - lo precargado sobrevive a la recarga (R19);
   - JSON corrupto y un valor que no es lista (R20);
   - forma antigua (R21);
@@ -63,23 +63,25 @@ Las decisiones P1–P8 están cerradas (2026-10-21). R18 y R28 están retirados.
 
 ### T4 — Implementar el registro (Dep.: T3)
 
-- [ ] Reescribir `batch-memory.ts` según la sección 2.3 del diseño:
+- [x] Reescribir `batch-memory.ts` según la sección 2.3 del diseño:
   - ámbito como primer argumento;
   - clave `document-upload-remembered-batches:<userId>:<companyId>`;
   - hidratación por ámbito;
   - listener de `storage` mientras haya oyentes;
   - leer, fusionar y escribir;
   - borrado de la clave global antigua.
-- [ ] Ajustar `use-remembered-batches.ts` a `(scope, strategy)` con la foto cacheada por ámbito.
+- [x] Ajustar `use-remembered-batches.ts` a `(scope, strategy)` con la foto cacheada por ámbito.
 
 **Hecho cuando:** T3 está en verde, la guardia R15 de `document-upload-convenciones.test.ts` sigue en
 verde y no hay `.subscribe(` en la carpeta.
 
 ### T5 [P] — Leer `userId` y `companyId` en el servidor
 
-- [ ] Localizar el acceso al `SessionContext` que ya existe.
-- [ ] Si `page.tsx` no puede leer `companyId` sin ampliar `SessionUser`, añadir una lectura en el
+- [x] Localizar el acceso al `SessionContext` que ya existe.
+- [x] Si `page.tsx` no puede leer `companyId` sin ampliar `SessionUser`, añadir una lectura en el
   módulo `documentos` que devuelva solo `{ userId, companyId }`.
+  - **Resuelto sin código nuevo:** `page.tsx` ya importa `identity` de `@/lib/composition`, y
+    `identity.getSessionContext()` devuelve `{ userId, companyId, roleName }` sin tocar `SessionUser`.
   - Escribir antes su test: `tests/unit/documentos/remembered-batches-scope.test.ts`.
 
 **Hecho cuando:**
@@ -88,10 +90,10 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T6 — Conectar el ámbito (Dep.: T4, T5)
 
-- [ ] `page.tsx` construye `registryScope = "<userId>:<companyId>"` y lo pasa a la ventana y al
+- [x] `page.tsx` construye `registryScope = "<userId>:<companyId>"` y lo pasa a la ventana y al
   panel.
-- [ ] `registryScope` es opcional en la ventana: sin ella, no se registra nada.
-- [ ] Actualizar los tests existentes del panel y del envoltorio para que pasen el ámbito.
+- [x] `registryScope` es opcional en la ventana: sin ella, no se registra nada.
+- [x] Actualizar los tests existentes del panel y del envoltorio para que pasen el ámbito.
 
 **Hecho cuando:**
 - `document-batch-panel.test.tsx`, `formula-pdf-upload.test.tsx` y `formulas-upload.test.tsx`
@@ -117,6 +119,9 @@ verde y no hay `.subscribe(` en la carpeta.
 - [ ] Crear `batch-status-store.ts` (sección 2.4 del diseño).
 - [ ] Hacer que `useBatchStatus` se apoye en él sin cambiar `UseBatchStatusResult`.
 - [ ] No persistir ninguna foto (P5).
+  - **PARADA (2026-10-21):** la memoria de módulo de R25 rompe 7 casos de
+    `use-batch-status.test.tsx` y `document-upload-errors.test.tsx`, que reutilizan `batch-1` sin
+    reiniciar el módulo. Espera decisión humana.
 
 **Hecho cuando:**
 - T7 está en verde;
@@ -151,6 +156,7 @@ verde y no hay `.subscribe(` en la carpeta.
     muestra;
   - R41: el contador coincide con las tandas visibles, y el resumen sigue visible con el panel
     plegado.
+  - **Hecho salvo R41** (contador y resumen de la cabecera): espera la decisión sobre T8.
 - [ ] En `document-batch-panel.tsx`:
   - `aria-labelledby` en cada bloque;
   - `aria-label` en «Descartar» y en «Reanudar»;
@@ -162,14 +168,14 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T11 — Ubicación y solo lectura (Dep.: T0, T6, T10)
 
-- [ ] Escribir primero estos casos:
+- [x] Escribir primero estos casos:
   - R17 en `formulas-upload.test.tsx` y `formula-pdf-upload.test.tsx`: el panel queda fuera de
     `actions`, debajo de la cabecera;
   - R35 en `formula-pdf-upload.test.tsx`: con `disabled`, el panel muestra el estado, «Revisar»,
     «Descartar» y el aviso con el texto exacto, sin acción de subida.
-- [ ] Partir `formula-pdf-upload.tsx`: la ventana sigue en `actions` y el panel va en una sección a
+- [x] Partir `formula-pdf-upload.tsx`: la ventana sigue en `actions` y el panel va en una sección a
   todo el ancho que monta `page.tsx`.
-- [ ] Quitar el `return null` por `disabled` en `document-batch-panel.tsx`.
+- [x] Quitar el `return null` por `disabled` en `document-batch-panel.tsx`.
 
 **Hecho cuando:**
 - los casos están en verde;
@@ -178,7 +184,7 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T12 [P] — Hidratación (Dep.: T4)
 
-- [ ] Añadir a `document-batch-panel.test.tsx` el caso R15: `renderToString` da una salida vacía, y
+- [x] Añadir a `document-batch-panel.test.tsx` el caso R15: `renderToString` da una salida vacía, y
   al hidratar no hay aviso.
 
 **Hecho cuando:** el caso está en verde.

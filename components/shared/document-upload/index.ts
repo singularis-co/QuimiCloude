@@ -6,6 +6,7 @@
 export {
   DOCUMENT_BATCH_PANEL_TESTID,
   DocumentBatchPanel,
+  PANEL_READ_ONLY_NOTICE_TESTID,
   PANEL_ROW_SCOPE,
   panelBatchTestId,
   panelDiscardTestId,
@@ -61,7 +62,6 @@ export {
   FILE_STATUS_LABELS,
   FILE_STATUS_TONES,
   OPEN_LABEL,
-  PANEL_BATCH_LABEL,
   PANEL_TITLE,
   REVIEW_LABEL,
   attemptLabel,

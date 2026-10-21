@@ -131,7 +131,11 @@ vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () =
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
-  identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
+  identity: {
+    getSessionUser: getSessionUserMock,
+    getSessionContext: vi.fn(async () => null),
+    endSession: vi.fn<() => Promise<void>>(),
+  },
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
