@@ -119,9 +119,9 @@ verde y no hay `.subscribe(` en la carpeta.
 - [ ] Crear `batch-status-store.ts` (sección 2.4 del diseño).
 - [ ] Hacer que `useBatchStatus` se apoye en él sin cambiar `UseBatchStatusResult`.
 - [ ] No persistir ninguna foto (P5).
-  - **PARADA (2026-10-21):** la memoria de módulo de R25 rompe 7 casos de
-    `use-batch-status.test.tsx` y `document-upload-errors.test.tsx`, que reutilizan `batch-1` sin
-    reiniciar el módulo. Espera decisión humana.
+- [ ] Exportar `resetBatchStatusStore()` y llamarla en `beforeEach` de `use-batch-status.test.tsx`
+  y `document-upload-errors.test.tsx`. Solo cambia la preparación, no lo que se comprueba
+  (decisión humana del 2026-10-21, `design.md` 2.4).
 
 **Hecho cuando:**
 - T7 está en verde;

@@ -156,6 +156,12 @@ configuración, y tocarlo sería tocar la política de reintentos, que está fue
 
 - El contrato público `UseBatchStatusResult` (`status`, `error`, `missing`, `resume`) **no cambia**.
   Los consumidores y `use-batch-status.test.tsx` siguen igual.
+- **Excepción aceptada (decisión humana, 2026-10-21).** La memoria de módulo de R25 se filtra entre
+  los casos de `use-batch-status.test.tsx` y `document-upload-errors.test.tsx`, que reutilizan
+  `'batch-1'` sin reiniciar el módulo (7 casos). `batch-status-store.ts` exporta
+  `resetBatchStatusStore()`, solo para tests, y esos dos archivos la llaman en `beforeEach`. Solo
+  cambia la preparación: lo que comprueba cada caso no cambia. Registrada en
+  `progress/features/QC-306.md > Decisiones`.
 - La memoria de fotos finales vive en el módulo: dura lo que dura la carga de la aplicación y no se
   persiste.
 - Se sigue el mismo criterio que hoy: el siguiente temporizador se arma cuando responde la consulta
