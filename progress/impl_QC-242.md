@@ -568,3 +568,73 @@ Salidas: typecheck limpio; lint 0 errores (10 warnings ajenos); plan 31/31; `vit
 - Decisión abierta para el reviewer: `usedBy` de la vista que devuelve modificar no lo fija el diseño; se relee `listWithUsage` tras guardar (alternativa: 0, como al crear).
 
 Salidas: typecheck limpio; lint 0 errores (10 warnings ajenos); create 34/34, list 31/31, manage 35/35, relate 39/39; `tests/unit/integraciones/whatsapp` 39 files 854/854; guard 85 files 1197 passed 21 skipped; `whatsapp-template-flow.int` 7/7. Rojo conocido hasta T34: `module-shape` (2).
+
+### Tanda E4 — T34, T35 (backend_dev) y T40, 2026-10-20
+
+- Nuevos: `adapters/driving/whatsapp-variable-key-actions.ts` (4 acciones), `tests/unit/integraciones/whatsapp/templates/whatsapp-variable-key-actions.test.ts`.
+- Modificados: `lib/modules/integraciones/index.ts` (gana `WHATSAPP_CONSTANT_KEY_PATTERN`, las 6 fábricas, validadores, errores y tipos; sale `validateWhatsappTemplateDraft` — nadie fuera del módulo lo importaba, buscado en `app/`, `components/` y los demás worktrees), `whatsapp-template-actions.ts` (+ relacionar y habilitar), `lib/composition/index.ts` (6 miembros de la fachada), `module-shape.test.ts` (tensado: 8 archivos nuevos, contrato, 8 modelos, R6 sobre `validateKeyedTemplateDraft`), `whatsapp-template-actions.test.ts`, `whatsapp-template-flow.int.test.ts` (recorrido; la limpieza borra antes las relaciones por las FK RESTRICT). Tocados también porque fijan listas exactas: `tests/unit/integraciones/encryption-keys-env.test.ts`, `tests/unit/composition/integraciones-graph-doubles.test.ts`, `tests/unit/identity/session-once-per-request-actions.test.ts`.
+
+Salidas (un comando por llamada, ninguno pasó de 5 min):
+- `pnpm run typecheck` → limpio (repetido por el implementer tras el último cambio). `pnpm run lint` → 0 errores, 10 warnings ajenos.
+- module-shape 104 passed, 1 skipped (R22, solo en su rama); template-actions 23/23; variable-key-actions 14/14; `tests/unit/integraciones` 66 files 1353 passed 1 skipped; `tests/unit/composition` 80/80; session-once-per-request 106/106; guard 85 files 1197 passed 21 skipped.
+- `.int` (`--project integration`, uno por llamada): template-flow 8/8, template-prisma 35/35, variable-key-prisma 19/19, variable-keys-migration 6/6, template-migration 6/6.
+- `git diff 2bd8ddc4 -- package.json .env.example pnpm-lock.yaml` → vacío (R52).
+
+### Mapa R53–R96 → test (enmiendas 1 y 2)
+
+Rutas: `U/` = `tests/unit/integraciones/whatsapp/templates/`, `I/` = `tests/integration/integraciones/`.
+
+| R | Test |
+|---|---|
+| R53 | Reemplazado por R87/R88 |
+| R54 | `U/whatsapp-variable-key.test.ts` > «R54: …» (clave 40/41, formas inválidas, etiqueta 60/61 y espacios, valor ausente/vacío/50/51/`{{`); `U/manage-whatsapp-variable-keys.test.ts` > R54 |
+| R55, R56 | Reemplazados por R87 y R89 |
+| R57 | `U/manage-whatsapp-variable-keys.test.ts` > «R57 …» |
+| R58 | `U/manage-…` > «R58 …» (sin uso guarda; con uso `in_use`; clave de otra `taken`); `I/whatsapp-variable-key-prisma.int.test.ts` > «R58 — …»; `I/whatsapp-template-flow.int.test.ts` (borrar en uso) |
+| R59 | `U/manage-…` > R59; `I/whatsapp-variable-key-prisma.int` > «R59 — en uso ⇒ in_use», «la FK impide borrarla en uso» |
+| R60 | Reemplazado por R90; conteo `usedBy`: `I/whatsapp-variable-key-prisma.int` > «R60 — ordena por clave y cuenta plantillas vivas distintas» |
+| R61 | `U/manage-…` > R61 (no UUID, no existe, otra empresa) |
+| R62 | `U/manage-…`, `U/relate-whatsapp-template-variables.test.ts`, `U/whatsapp-variable-key-actions.test.ts` > «R62 …» |
+| R63 | `I/whatsapp-variable-key-prisma.int` > «R63 — …» (B no ve ni borra; FK compuesta; dos columnas o ninguna); `tests/guards/guard-ambito-empresa-integraciones.test.ts` > «R63 — …» |
+| R64 | `U/whatsapp-template-variables.test.ts` > «R64: …» |
+| R65 | `U/whatsapp-template-variables.test.ts` > «R65: …» |
+| R66 | Reemplazado por R91 |
+| R67 | `U/whatsapp-template-keyed-draft.test.ts` > «R67 …»; `U/create-whatsapp-template.test.ts` > R67 (rechazo de Meta por el ejemplo ⇒ `whatsapp_template_rejected`) |
+| R68 | `U/create-…` > R68; `I/whatsapp-template-prisma.int.test.ts` > «R68 — inserta las relaciones…» |
+| R69 | `U/create-…` > R69 (3 casos de carrera); `I/whatsapp-template-prisma.int` > «R69 — … inserted false» |
+| R70 | `U/template-sync-plan.test.ts` > «R70: …»; `I/whatsapp-template-prisma.int` > «R70 — …» |
+| R71 | `U/template-sync-plan.test.ts` > «R71: cambia %s», «lo creado y lo que lista el doble canned…»; `I/whatsapp-template-prisma.int` > «R71 …» |
+| R72 | `U/template-sync-plan.test.ts` > «R71 R72 …»; `U/relate-…` > R72; `I/whatsapp-template-prisma.int` > «R71 R72 …» |
+| R73 | `I/whatsapp-template-prisma.int` > «R73 — …» (applySync, markDeleted, otra empresa, webhook no toca) |
+| R74 | `U/relate-…` > «R74 …» (sustituye todo, conexión deshabilitada, sin Graph) |
+| R75 | `U/relate-…` > «R75 …» (todas las ramas) |
+| R76 | `U/relate-…` > R76; `I/whatsapp-template-prisma.int` > «R76 — …» (4 casos) |
+| R77 | `U/relate-…` > «R77 …» (APPROVED/PENDING/REJECTED, E13; UNMAPPED ⇒ `not_mapped`) |
+| R78 | `U/relate-…` > R78 |
+| R79 | `U/relate-…` > R79 |
+| R80 | `U/relate-…` > R80; `I/whatsapp-template-prisma.int` > «R80 — el CHECK rechaza enabled con UNMAPPED» |
+| R81 | `U/list-whatsapp-templates.test.ts` > «R81 R94 …»; `U/whatsapp-template-variables.test.ts` (`showKeys`) |
+| R82 | `U/list-whatsapp-templates.test.ts` > R82 |
+| R83 | `U/whatsapp-variable-key-actions.test.ts` > «R83: …»; `U/whatsapp-template-actions.test.ts` > «R83: relacionar y habilitar por el mismo contrato» |
+| R84 | `I/whatsapp-variable-keys-migration.int.test.ts` > «R84: …» (RLS, CHECK por nombre, DOWN, ida-vuelta-ida) |
+| R85 | `tests/unit/errores/catalogo.test.ts` > «R85: …» (2 casos) |
+| R86 | `I/whatsapp-variable-keys-migration.int` > «R86 R95: el relleno…» |
+| R87 | `U/whatsapp-variable-key.test.ts` > «R87: el dominio no tiene catalogo…»; `U/whatsapp-template-keyed-draft.test.ts` > «R87 R91 …»; `U/manage-…` > R90/R87 |
+| R88 | `U/whatsapp-variable-key.test.ts` > «R88: …»; `I/whatsapp-variable-key-prisma.int` > «R88 — constante de un segmento se rechaza», «propia con punto no entra»; `I/whatsapp-variable-keys-migration.int` > «R84 R88 …» |
+| R89 | `U/manage-…` > «R89 …» (punto ⇒ `invalid_input` sin puerto al crear y modificar); `U/whatsapp-variable-key.test.ts` > «R89 …» |
+| R90 | `U/manage-…` > «R90/R87: solo propias, por clave, campos exactos» |
+| R91 | `U/whatsapp-template-keyed-draft.test.ts` > «R91 …», «R91 P19: propia desconocida ⇒ unknown_key»; `U/create-…` > R14/R91 |
+| R92 | `U/whatsapp-template-keyed-draft.test.ts` > «R92 P20: constante sin etiqueta ⇒ example_missing», «R67 R92 E16: Hola {{cliente.nombre}} ⇒ Hola {{1}}»; `I/whatsapp-template-flow.int` (Meta recibe las etiquetas) |
+| R93 | `U/relate-…` > «R74/R93 …» |
+| R94 | `U/list-whatsapp-templates.test.ts` > «R81/R94 … label: null»; `I/whatsapp-template-flow.int` |
+| R95 | `U/whatsapp-template-variables.test.ts` > «R95 P21: {{first_name}} …», «R95: una marca que no es {{n}}…»; `I/whatsapp-variable-keys-migration.int` > «R86 R95» |
+| R96 | `U/whatsapp-template-components.test.ts` > «R96: …»; `U/template-sync-plan.test.ts` > «R96: el ejemplo del boton URL listado como texto…» |
+
+Criterios E/F en el recorrido (`I/whatsapp-template-flow.int.test.ts` > «el recorrido de las variables de una plantilla»): E1/E2/E15/E16 (Meta recibe `Hola {{1}}, tu cuenta {{2}}` con las etiquetas), E4, E5/E11, E2/R74/R79/F2, E8/R77, E6/E12, E7/R58, F1. F3 es frontera, sin test.
+
+Abierto para el reviewer:
+- `usedBy` en la vista que devuelve modificar: se relee `listWithUsage` (el diseño no lo fija).
+- Lecturas sin la «tercera consulta» de §18.8: la clave de una propia la pone la vista con `listAll`.
+- La forma del `GET` sigue siendo [P4]: no está documentado si Meta reformatea `phone_number`.
+
+Veredicto: T22–T40 implementadas; R53–R96 mapeados (los reemplazados remiten a su sustituto).

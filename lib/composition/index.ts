@@ -2772,6 +2772,12 @@ import {
   createTestWhatsappConnection,
   createUpdateWhatsappConnection,
   createVerifyWhatsappWebhook,
+  createCreateWhatsappVariableKey,
+  createDeleteWhatsappVariableKey,
+  createListWhatsappDictionary,
+  createRelateWhatsappTemplateVariables,
+  createSetWhatsappTemplateEnabled,
+  createUpdateWhatsappVariableKey,
 } from '@/lib/modules/integraciones';
 import { integrationsE2EDoublesEnabled } from '@/lib/modules/integraciones/adapters/driven/config/e2e-doubles-env';
 import { readPublicBaseUrl } from '@/lib/modules/integraciones/adapters/driven/config/public-base-url-env';
@@ -3017,6 +3023,12 @@ export const integraciones = {
   deleteWhatsappTemplate: createDeleteWhatsappTemplate(whatsappDeps),
   resyncWhatsappTemplates: createResyncWhatsappTemplates(whatsappWebhookDeps),
   syncAllWhatsappTemplates: createSyncAllWhatsappTemplates(whatsappTemplateCronDeps),
+  listWhatsappDictionary: createListWhatsappDictionary(whatsappDeps),
+  createWhatsappVariableKey: createCreateWhatsappVariableKey(whatsappDeps),
+  updateWhatsappVariableKey: createUpdateWhatsappVariableKey(whatsappDeps),
+  deleteWhatsappVariableKey: createDeleteWhatsappVariableKey(whatsappDeps),
+  relateWhatsappTemplateVariables: createRelateWhatsappTemplateVariables(whatsappDeps),
+  setWhatsappTemplateEnabled: createSetWhatsappTemplateEnabled(whatsappDeps),
   verifyCronSecret,
 } as const;
 

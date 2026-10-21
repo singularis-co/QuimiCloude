@@ -13,6 +13,11 @@ export {
   WhatsappTemplateRejectedError,
   WhatsappMetaRejectedError,
   WhatsappMetaUnreachableError,
+  WhatsappVariableKeyNotFoundError,
+  WhatsappVariableKeyTakenError,
+  WhatsappVariableKeyInUseError,
+  WhatsappTemplateNotMappedError,
+  WhatsappTemplateNotMappableError,
 } from './domain/errors';
 export type { SecretContext } from './domain/secret-context';
 export type { Actor } from './domain/actor';
@@ -64,6 +69,7 @@ export type {
   WhatsappTemplateCategory,
   WhatsappTemplateList,
   WhatsappTemplateStatus,
+  WhatsappTemplateVariableView,
   WhatsappTemplateView,
 } from './domain/whatsapp-template';
 export { CREATABLE_TEMPLATE_CATEGORIES } from './domain/whatsapp-template';
@@ -74,7 +80,26 @@ export type {
   WhatsappTemplateDraft,
   WhatsappTemplateIssue,
 } from './domain/whatsapp-template-draft';
-export { TEMPLATE_LIMITS, validateWhatsappTemplateDraft } from './domain/whatsapp-template-draft';
+export { TEMPLATE_LIMITS } from './domain/whatsapp-template-draft';
+export type { WhatsappTemplateKeyedDraft } from './domain/whatsapp-template-keyed-draft';
+export { validateKeyedTemplateDraft } from './domain/whatsapp-template-keyed-draft';
+export type { WhatsappDictionaryEntryView } from './domain/whatsapp-variable-key';
+export {
+  WHATSAPP_CONSTANT_KEY_PATTERN,
+  WHATSAPP_VARIABLE_KEY_LIMITS,
+  WHATSAPP_VARIABLE_KEY_PATTERN,
+  validateWhatsappVariableKeyInput,
+} from './domain/whatsapp-variable-key';
+export {
+  createCreateWhatsappVariableKey,
+  createDeleteWhatsappVariableKey,
+  createListWhatsappDictionary,
+  createUpdateWhatsappVariableKey,
+} from './domain/manage-whatsapp-variable-keys';
+export {
+  createRelateWhatsappTemplateVariables,
+  createSetWhatsappTemplateEnabled,
+} from './domain/relate-whatsapp-template-variables';
 export { createGetWhatsappTemplate, createListWhatsappTemplates } from './domain/list-whatsapp-templates';
 export { createCreateWhatsappTemplate } from './domain/create-whatsapp-template';
 export { createDeleteWhatsappTemplate } from './domain/delete-whatsapp-template';

@@ -258,7 +258,7 @@
 
 ## Bloque K — Bordes y cierre (enmienda)
 
-- [ ] **T34 — Composición, contrato y Server Actions** (R83). Depende de: T28–T33
+- [x] **T34 — Composición, contrato y Server Actions** (R83). Depende de: T28–T33
   - `lib/composition/index.ts`, `lib/modules/integraciones/index.ts` (§18.9);
     `adapters/driving/whatsapp-variable-key-actions.ts` (nuevo) y `whatsapp-template-actions.ts`.
   - Tests `whatsapp-variable-key-actions.test.ts`, `whatsapp-template-actions.test.ts` ampliado,
@@ -267,7 +267,7 @@
   - **Hecho:** `module-shape`, `guard-arquitectura-modulos` y el test de una lectura de sesión por
     petición verdes con las acciones nuevas.
 
-- [ ] **T35 — Recorrido y cierre** (criterios de E1–E16). Depende de: T34
+- [x] **T35 — Recorrido y cierre** (criterios de E1–E16). Depende de: T34
   - `tests/integration/integraciones/whatsapp-template-flow.int.test.ts` ampliado con el recorrido de
     §18.10.
   - `pnpm exec vitest run guard`, `./init.sh` en verde; `package.json` y `.env.example` sin cambios
@@ -310,7 +310,7 @@
   - `domain/whatsapp-template-components.ts` (§19.5) y `whatsapp-template-components.test.ts`.
   - **Hecho:** los dos formatos dan el mismo contenido; la ida y vuelta de T4 sigue verde.
 
-- [ ] **T40 — Cierre de la enmienda 2** (R87–R96). Depende de: T36–T39 y T26–T35
+- [x] **T40 — Cierre de la enmienda 2** (R87–R96). Depende de: T36–T39 y T26–T35
   - `progress/impl_QC-242.md`: mapa `R87…R96 → test`.
   - **Hecho:** cada `R87…R96` mapeado a un test concreto.
 
