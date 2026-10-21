@@ -234,3 +234,184 @@ se resolverá al integrar.
 
 **OK.** 0 bloqueantes, 9 menores. El merge sigue condicionado a `gate-completo` en verde (m5) y a
 que el leader lleve m1 a un sitio que QC-243 lea.
+
+## Enmienda, vuelta 1 (completa, 2bd8ddc4..07694f38)
+
+Alcance: T22–T40, R53–R96, E1–E16, F1–F4, P10–P22. No se re-revisa T1–T21 (PR #281), salvo donde la
+enmienda lo cambia. Leído: `requirements.md` (enmiendas 1 y 2), `design.md` §18–§19, `tasks.md`
+(bloques G–K y enmienda 2), `progress/impl_QC-242.md` («Contraste con Meta antes de T26» y
+«Enmienda (T22–T35) y enmienda 2 (T36–T40)»), `docs/perfil-agentes.md`, `CHECKPOINTS.md`,
+`docs/checkpoints-proyecto.md`. Leído el diff de producción entero, más los tests nuevos y los
+tocados. El grafo no se usó: el worktree no está indexado tras el merge, igual que en la vuelta 1. Se
+usaron Grep y Read.
+
+### Verificación ejecutada por el reviewer
+
+```
+pnpm run typecheck                                    -> tsc --noEmit sin errores
+pnpm run lint                                         -> 0 errors, 10 warnings (ajenos)
+vitest run tests/unit/integraciones tests/unit/errores tests/unit/composition
+                                                      -> 78 files; 1528 passed | 1 skipped
+vitest run guard tests/unit/identity/session-once-per-request-actions.test.ts
+                                                      -> 86 files; 1303 passed | 21 skipped
+--project integration whatsapp-variable-keys-migration.int  -> 6/6
+--project integration whatsapp-template-prisma.int          -> 35/35
+--project integration whatsapp-variable-key-prisma.int      -> 19/19
+--project integration whatsapp-template-flow.int            -> 8/8
+--project integration whatsapp-template-migration.int + whatsapp-connection-prisma.int -> 22/22
+Sonda propia contra Postgres local (Prisma $queryRawUnsafe): el predicado del relleno (paso 6) sobre
+  4 JSON -> CAROUSEL true, LIMITED_TIME_OFFER true, HEADER sin format true, BODY simple true
+```
+
+### Checklist — CHECKPOINTS.md
+
+- [x] Requisitos EARS R53–R96. Cada R reemplazado lleva su marca y remite a su sustituto (R53→R87/R88,
+  R55→R87, R56→R89, R60→R90, R66→R91).
+- [x] Alternativas descartadas: §18.12 y §19.7.
+- [x] `tasks.md`: T22–T40 todas `[x]`. No queda ninguna `[ ]` en el archivo.
+- [x] `## Lo que ya existe`: lo cubren §18.0 y §19.1. El diff no re-crea nada de la lista: amplía
+  `contentOf`, el plan, el repositorio y las acciones. Borra `whatsapp-system-variables.ts` (R87), y un
+  test fija que no exista.
+- [x] Cada R53–R96 mapea a un test con contenido. Ver «Trazabilidad».
+- [x] Mapa R→test en `impl_QC-242.md > Mapa R53–R96 → test`.
+- [x] Typecheck y lint, corridos aquí.
+- [ ] `gate-completo`: pendiente del PR.
+- [~] E2E de flujo crítico: no hay pantalla. La sustituye `whatsapp-template-flow.int` (recorrido de
+  variables), con el mismo criterio que la vuelta 1, m6.
+- [x] Sin dependencias: `package.json`, `pnpm-lock.yaml` y `.env.example` sin diff.
+- [x] Sin secretos ni valores de entorno hardcodeados.
+- [x] Webhooks: sin cambios de firma ni de idempotencia. La importación por id desconocido usa
+  `importedMapping`.
+- [ ] `./init.sh`: no se corrió, por instrucción del leader. Lo cubre CI.
+- [x] Este informe.
+
+### Checklist — docs/checkpoints-proyecto.md y perfil del reviewer (5–11)
+
+- [x] Empresa en las dos tablas nuevas. RLS `ENABLE` + `FORCE` sin policies (R84, lo prueba el `.int`).
+  FK compuestas `(company_id, template_id)` y `(company_id, variable_key_id)`. El acceso cruzado se
+  rechaza en `whatsapp-variable-key-prisma.int > R63`. Las guardias de empresa en esquema y RLS están en verde.
+- [x] Toda consulta nueva filtra por empresa. Las envolturas nuevas de `company-scope.ts` están vigiladas
+  por `guard-ambito-empresa-integraciones` (cuarto puerto, `ayudantes` declarados, patrón ampliado a
+  `tx.`). El SQL crudo (`lockIfUnchanged`, `lockedKey` y los dos `DELETE … USING`) lleva `company_id`
+  explícito.
+- [x] El permiso se valida en el dominio (`requirePermission` antes de parsear) y tiene test por
+  acción (R62).
+- [x] Migración versionada con `down.sql` exacto. La ida, la vuelta y la ida dejan el mismo esquema (`.int`).
+- [x] `domain/` y `ports/` solo usan `zod` y `domain/`. `module-shape` R6 sigue el grafo de imports
+  desde el validador con claves.
+- [x] `'use server'` no se reexporta. Las acciones nuevas piden su caso de uso a `lib/composition`.
+- [x] Modelos nuevos con `/// @module integraciones` (`module-shape` R13: de 6 a 8).
+- [x] La lógica está en `domain/`: las acciones solo resuelven el actor, delegan y traducen.
+- [x] Comentarios (n.º 9): ninguna línea añadida en producción cita `QC-`, `R<n>`, `design.md`,
+  `[P<n>]`, `E<n>` ni `F<n>` (grep sobre `lib`, `db` y `app` del diff).
+- [x] Multiplataforma, duplicados y diseño (6, 10, 11): no hay UI en el diff (`app/` y `components/`
+  sin cambios).
+
+### Lo que pidió mirar el leader
+
+1. **Migración `20261020180000_whatsapp_variable_keys`.** El up y el down son correctos.
+   `whatsapp_variable_keys_key_format` es `^[a-z][a-z0-9_]{0,39}$`, sin punto.
+   `whatsapp_template_variables_system_key_format` exige `entidad.campo`, dos segmentos de 1–40.
+   `whatsapp_templates_enabled_requires_mapped` es `NOT enabled OR mapping_status = 'MAPPED'`.
+   `one_target` aplica el XOR. Al revertir se borra primero la tabla de relaciones y el tipo al final.
+   **El relleno no**: ver B1.
+2. **P21 y sincronización.** `variableSlotsOf` da `null` con cualquier marca que no sea `{{n}}`, en
+   header, body, footer y botones. `mappingStatusOf` da entonces `UNMAPPED`. El relleno lo respeta con
+   `position('{{')`. Un cambio de componentes (`componentsChanged` compara el contenido) quita las
+   relaciones. La plantilla vuelve a `UNMAPPED` y se deshabilita si tiene huecos o deja de ser
+   relacionable. Sin huecos conserva su habilitación. Revivir la trata como importada. Lo cubren
+   `template-sync-plan.test` R71/R72 y `whatsapp-template-prisma.int` R71 R72.
+3. **Habilitar exige «relacionada», no `APPROVED`.** `createSetWhatsappTemplateEnabled` solo mira
+   `record.mappingStatus` (R77 con APPROVED, PENDING y REJECTED). Deshabilitar no tiene condición.
+   Ojo: mira el estado guardado, no lo recalcula. Por eso B1 tiene consecuencias.
+4. **Borrar o renombrar una clave en uso.** Dentro de la transacción: `FOR UPDATE` sobre la variable,
+   después `liveUsage` (solo plantillas vivas) y `in_use`. La FK `RESTRICT` cubre lo que quede, como
+   `P2003` ⇒ `in_use`. Probado en el `.int` (R58, R59 y «la FK impide borrarla»). Ver m1 para una
+   carrera menor.
+5. **Las tres decisiones del implementer.** Las tres se aceptan:
+   - `usedBy` al modificar se relee con `listWithUsage`. Es el valor correcto (R90 pide el uso real),
+     aunque lea todo el diccionario para una entrada. Aceptable con diccionarios pequeños.
+   - La clave de una propia en la vista sale de `listAll`, una consulta por llamada, y no de la
+     «tercera consulta» de §18.8. El binding solo guarda el id y la FK `RESTRICT` impide que el id
+     quede colgado. El resultado es el mismo.
+   - `sameComponents` y `canonical` se mueven a `whatsapp-template-components.ts` para romper el ciclo
+     de imports. Ningún consumidor fuera del dominio y del doble lo importaba, y no cambia el comportamiento.
+6. **Sale `validateWhatsappTemplateDraft` del contrato.** Coincide con §18.9 y con la nota de R6. No lo
+   importa nadie fuera del módulo: buscado en `app/`, `components/`, `specs/` y en los demás worktrees.
+   `module-shape` R20 fija la lista exacta, y R6 exige que el validador con claves pase por
+   `whatsapp-template-draft.ts`.
+7. **Los 4 tests ajenos.** Los cuatro se endurecen o se mantienen; ninguno se relaja. Solo suman
+   entradas a una lista exacta:
+   - `guard-identificador-de-request`: `+1` migración en `MIGRACIONES_ESPERADAS`.
+   - `encryption-keys-env` y `integraciones-graph-doubles`: `+6` miembros en el `toEqual` exacto de la
+     fachada.
+   - `session-once-per-request-actions`: `+1` acción, de lectura, que ahora también se vigila.
+
+   No se quita ningún caso ni se cambia ningún `toEqual` por `toContain`. Además,
+   `whatsapp-template-migration.int` gana los dos nombres que pone la migración nueva (§19.1), y
+   `guard-ambito-empresa-integraciones` se endurece (más métodos, ayudantes y el patrón `tx.`).
+
+### Trazabilidad R53–R96
+
+Comprobado que cada test citado existe y comprueba algo: R54 (variable-key 40/41, 60/61, 50/51,
+`{{`), R57–R59, R61, R62, R63 (`.int` + guardia), R64–R65, R67–R82, R83 (acciones), R84–R86
+(`.int` de migración), R87–R96. Los R53, R55, R56, R60 y R66 están reemplazados y remiten a R87–R91.
+Sin huecos. El de R86 existe y pasa, pero no cubre los casos de B1.
+
+### Hallazgos
+
+**B1 — BLOQUEANTE (R86, P16, R80).** El relleno de la migración (paso 6) marca `MAPPED` y
+`enabled = true` plantillas que el dominio declara no relacionables. Comprobado contra Postgres con el
+mismo predicado:
+- una plantilla con un componente `CAROUSEL`;
+- una con `LIMITED_TIME_OFFER`;
+- cualquier otro `type` de componente que `contentOf` no conoce.
+
+Las tres dan `true`. La causa: el predicado solo excluye un HEADER no `TEXT` y botones de otro tipo, no
+los componentes de tipo desconocido. Para `contentOf` (esquema `discriminatedUnion` de cuatro tipos)
+esas plantillas son `null`. `variableSlotsOf` da `null` y `mappingStatusOf` da `UNMAPPED`. Pasa lo
+mismo con un HEADER sin `format`, aunque eso es menos probable.
+
+El comentario de la migración y §18.3 dicen que la aproximación solo falla con componentes repetidos,
+y no es así. El efecto no se corrige solo:
+- la sincronización no la toca, porque con componentes iguales `componentsChanged` da `false`;
+- habilitar y la vista confían en el `mapping_status` guardado.
+
+Así, una plantilla no relacionable queda habilitada para siempre, contra P16 («nunca se habilita»).
+Si `dev` llega a producción junto con la primera migración, el relleno corre sobre cero filas. Pero en
+cualquier base donde ya corrió `20261020120000` (dev, staging, locales con sincronización real) sí
+hay filas.
+
+Qué falta:
+- en el `WHERE` del paso 6, exigir que todo componente sea de `HEADER|BODY|FOOTER|BUTTONS` y que el
+  HEADER tenga `format = "TEXT"`. Por ejemplo,
+  `NOT jsonb_path_exists(components, '$[*] ? (@.type != "HEADER" && @.type != "BODY" && @.type != "FOOTER" && @.type != "BUTTONS")')`,
+  más la condición del HEADER con `format` presente. Mejor aún, que el predicado salga de
+  `contentOf` y no de una aproximación;
+- casos `CAROUSEL` y `LIMITED_TIME_OFFER` (con `mapped: false`) en
+  `whatsapp-variable-keys-migration.int > R86 R95`;
+- que el comentario del paso 6 y el SQL de `design.md §18.3` digan lo mismo.
+
+La migración no se ha aplicado fuera del worktree: se edita, como en T36.
+
+**m1 — menor.** Hay una carrera entre renombrar y relacionar. Relacionar resuelve la clave a su id
+(`findByKeys`) antes de su transacción. Si entre medias se renombra esa variable (todavía sin uso,
+así que el renombre pasa), la relación se inserta con el id. El hueco queda ligado a la clave nueva,
+que el usuario no eligió. El `FOR UPDATE` de `lockedKey` solo protege el orden contrario. Es poco
+probable y no lo pide ningún R (R76 cubre los componentes, no el diccionario). Se puede cerrar
+releyendo la clave dentro de `replaceVariables`, o anotándolo como deuda.
+
+**m2 — menor.** `design.md §18.9` sigue listando `WHATSAPP_SYSTEM_VARIABLES` y `SystemVariable` en el
+contrato, sin marca de reemplazo. §19.1 y `tasks.md > T34` dicen que salen, y el código es correcto,
+pero el lector de §18.9 se confunde. Le basta una marca «[Reemplazado por §19]».
+
+**m3 — menor.** `toBinding` usa `variableKeyId ?? ''` como reserva. El CHECK `one_target` hace
+imposible el caso, pero si se diera, la vista mostraría un hueco `company` con clave `null`. Sería
+más honesto lanzar el error.
+
+### Veredicto
+
+**RECHAZADO.** 1 bloqueante (B1: el relleno de la migración habilita plantillas no relacionables) y 3
+menores. Todo lo demás de la enmienda (P21, sincronización, habilitar sin `APPROVED`, clave en uso,
+contrato, tests ajenos y trazabilidad) está correcto y verificado. La vuelta 2 puede acotarse al paso
+6 de la migración, a su `.int` y a §18.3.
