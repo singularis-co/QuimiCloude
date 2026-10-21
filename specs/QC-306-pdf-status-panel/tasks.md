@@ -219,7 +219,7 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T15 — Informe y mapa de trazabilidad
 
-- [ ] Escribir `progress/impl_QC-306-pdf-status-panel.md` con el mapa R1–R41 → test, sin entradas
+- [ ] Escribir `progress/impl_QC-306.md` con el mapa R1–R41 → test, sin entradas
   vacías salvo R18 y R28, que están retirados.
 - [ ] Pasar `./init.sh` en verde.
 
@@ -274,4 +274,4 @@ verde y no hay `.subscribe(` en la carpeta.
 - `specs/QC-306-pdf-status-panel/requirements.md`
 - `specs/QC-306-pdf-status-panel/design.md`
 - `specs/QC-306-pdf-status-panel/tasks.md`
-- `progress/impl_QC-306-pdf-status-panel.md`
+- `progress/impl_QC-306.md`
