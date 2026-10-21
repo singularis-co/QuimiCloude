@@ -1118,13 +1118,29 @@ A mano, en orden:
    UPDATE "whatsapp_templates" SET "mapping_status" = 'MAPPED', "enabled" = true
    WHERE "deleted_at" IS NULL
      AND position('{{' in "components"::text) = 0
+     AND jsonb_typeof("components") = 'array'
      AND jsonb_path_exists("components", '$[*] ? (@.type == "BODY")')
-     AND NOT jsonb_path_exists("components", '$[*] ? (@.type == "HEADER" && @.format != "TEXT")')
-     AND NOT jsonb_path_exists("components", '$[*].buttons[*] ? (@.type != "QUICK_REPLY" && @.type != "URL" && @.type != "PHONE_NUMBER")');
+     AND NOT jsonb_path_exists("components", '$[*] ? (!(@.type == "HEADER" || @.type == "BODY" || @.type == "FOOTER" || @.type == "BUTTONS"))')
+     AND NOT jsonb_path_exists("components", '$[*] ? (@.type == "HEADER" && !(@.format == "TEXT"))')
+     AND NOT jsonb_path_exists("components", '$[*] ? (@.type == "HEADER" && !(exists (@.format)))')
+     AND NOT jsonb_path_exists("components", '$[*].buttons[*] ? (!(@.type == "QUICK_REPLY" || @.type == "URL" || @.type == "PHONE_NUMBER"))');
    ```
-   Es una aproximación de `contentOf` (no detecta componentes repetidos); el test de migración fija los
-   casos de §18.10. Si `dev` y la migración de §2.2 llegan juntas a producción, el relleno corre sobre
-   cero filas.
+   La regla es la de `contentOf` (§3.4): **todos** los componentes son `HEADER`, `BODY`, `FOOTER` o
+   `BUTTONS` (uno de tipo desconocido, como `CAROUSEL` o `LIMITED_TIME_OFFER`, la deja «sin
+   relacionar»); el `HEADER`, si está, trae `format = TEXT` (sin `format`, o con otro, también «sin
+   relacionar»); hay un `BODY`; y todos los botones son de los tres tipos. Los predicados se escriben
+   en positivo y negados (`!(… == …)`) a propósito: en jsonpath, `@.x != "v"` sobre una clave que no
+   existe no es verdadero, así que con `!=` un componente sin `type` o un `HEADER` sin `format` pasarían
+   el filtro. El `exists` separado cubre el `HEADER` sin `format`, por si `!(…)` sobre un desconocido no
+   lo cubre en la versión de Postgres del entorno; el test de migración lo fija.
+
+   Lo que el SQL **no** replica de `contentOf`: componentes repetidos (dos `BODY`) y la forma interna de
+   cada componente (un `BODY` sin `text`, un botón sin `text`). Esas filas quedan «relacionadas» por el
+   relleno y el dominio las vería no relacionables; las corrige la primera sincronización de esa
+   plantilla solo si Meta la cambia. Se acepta porque Meta no devuelve esas formas, y el relleno corre
+   sobre cero filas si `dev` y la migración de §2.2 llegan juntas a producción. El test de migración fija
+   los casos de §18.10 más `CAROUSEL`, `LIMITED_TIME_OFFER` y `HEADER` sin `format` ⇒ `UNMAPPED` y
+   deshabilitada.
 7. `ENABLE` y `FORCE ROW LEVEL SECURITY` en las dos tablas nuevas, sin policies (R84).
 
 `down.sql`: `DROP TABLE "whatsapp_template_variables"`, `ALTER TABLE "whatsapp_templates" DROP
@@ -1229,7 +1245,8 @@ export function validateKeyedTemplateDraft(input: unknown, dictionary: readonly 
   | { ok: false; issues: readonly WhatsappTemplateIssue[] };
 ```
 
-`dictionary` = `WHATSAPP_SYSTEM_VARIABLES` + las propias de la empresa. La pantalla lo recibe de
+`dictionary` = `WHATSAPP_SYSTEM_VARIABLES` + las propias de la empresa **[reemplazado por la enmienda
+2, F1: solo las propias; las constantes se reconocen por su forma, §19.3]**. La pantalla lo recibe de
 `listWhatsappDictionaryAction` (§18.9) y el caso de uso de crear lo arma igual.
 
 1. zod con `.strip()` (por defecto): un `example`/`examples` que llegue se descarta (R67, E15); así
@@ -1262,7 +1279,8 @@ por `mappingStatusOf` y por la regla «si queda `UNMAPPED`, `enabled = false`» 
 
 **Crear (§4.4 cambia en los pasos 2, 7 y 8).** `deps` gana `variableKeys`.
 
-2. `dictionary = [...WHATSAPP_SYSTEM_VARIABLES, ...await variableKeys.listAll(scope)]`;
+2. `dictionary = [...WHATSAPP_SYSTEM_VARIABLES, ...await variableKeys.listAll(scope)]`
+   **[reemplazado por la enmienda 2, F1: `await variableKeys.listAll(scope)` y `constantLabels`, §19.4]**;
    `validateKeyedTemplateDraft(input, dictionary)`; inválido ⇒ `ValidationError` (R14). Leer el
    diccionario no es escribir: R14 se mantiene.
 7. `templates.insertCreated({ …, variables: bindings, mappingStatus: 'MAPPED', enabled: true },
@@ -1445,9 +1463,11 @@ de crear, listar, consultar, relacionar y habilitar; seis fábricas nuevas en `i
 `createUpdateWhatsappVariableKey`, `createDeleteWhatsappVariableKey`,
 `createRelateWhatsappTemplateVariables`, `createSetWhatsappTemplateEnabled`,
 `validateKeyedTemplateDraft`, `validateWhatsappVariableKeyInput`, `WHATSAPP_VARIABLE_KEY_LIMITS`,
-`WHATSAPP_VARIABLE_KEY_PATTERN`, `WHATSAPP_SYSTEM_VARIABLES` (con `source` y `field`, para que QC-245 y
-QC-247 escriban sus resolvedores, [P11]), los 5 errores y los tipos `WhatsappDictionaryEntryView`,
-`WhatsappTemplateVariableView`, `WhatsappTemplateKeyedDraft`, `SystemVariable`. Sale
+`WHATSAPP_VARIABLE_KEY_PATTERN`, ~~`WHATSAPP_SYSTEM_VARIABLES` (con `source` y `field`, para que QC-245 y
+QC-247 escriban sus resolvedores, [P11])~~ **[reemplazado por la enmienda 2, F1: no entra en el
+contrato; en su lugar `WHATSAPP_CONSTANT_KEY_PATTERN`, §19.2]**, los 5 errores y los tipos
+`WhatsappDictionaryEntryView`, `WhatsappTemplateVariableView`, `WhatsappTemplateKeyedDraft`,
+~~`SystemVariable`~~ **[reemplazado por la enmienda 2, F1]**. Sale
 `validateWhatsappTemplateDraft` (§18.6). Se mantienen `TEMPLATE_LIMITS` y `WhatsappTemplateDraft` (la
 pantalla pinta contadores).
 
