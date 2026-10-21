@@ -696,6 +696,10 @@ export const MIGRACIONES_ESPERADAS = [
   '20261015190000_company_addons',
   // QC-289 2026-10-16: el ultimo lote cargado de cada producto; no toca el identificador.
   '20261016120000_products_last_batch_at',
+  // QC-299 2026-10-21: los pasos de acondicionamiento (valores de enum, columnas, CHECK e indice);
+  // no tocan el identificador.
+  '20261021120000_conditioning_step_actions',
+  '20261021120001_conditioning_steps',
 ] as const
 
 export function hallazgosDeMigraciones(

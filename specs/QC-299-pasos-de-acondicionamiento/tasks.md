@@ -8,11 +8,11 @@ nombre de cada caso de test. Antes de T1: las preguntas abiertas P1–P6 resuelt
 
 ## Bloque A — modelo
 
-- [ ] **T1. Migraciones y esquema Prisma.**
+- [x] **T1. Migraciones y esquema Prisma.**
   Según `design.md > 2`. `<ts>` posterior a la última migración de `dev`; la 2 un segundo después.
   Hecho: `pnpm run db:migrate` y `pnpm run db:rollback` (las dos, en orden inverso) aplican sin
   error en local; `prisma generate` ok; el down de la 1 aborta con filas de los valores nuevos.
-- [ ] **T2. Tests de esquema y migración** — dep: T1.
+- [x] **T2. Tests de esquema y migración** — dep: T1.
   Enmendar `recetas-schema.test.ts` (tres `Json`). Integración: UP deja `conditioning_steps = '[]'`
   con `steps` y `packing_steps` idénticos; DOWN quita columnas, CHECK e índice y nada más; los CHECK
   rechazan responsables en otra acción, lista vacía y paso sin posición; el índice rechaza completar

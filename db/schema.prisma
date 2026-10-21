@@ -560,6 +560,7 @@ model Recipe {
   description    String?
   steps          Json      @default("[]")
   packingSteps   Json      @default("[]") @map("packing_steps")
+  conditioningSteps Json      @default("[]") @map("conditioning_steps")
   imagePath      String?   @map("image_path")
   companyId      String    @map("company_id") @db.Uuid
   createdBy      String?   @map("created_by") @db.Uuid
@@ -1087,6 +1088,9 @@ enum OrderExecutionAction {
   CONDITIONING_START
   CONDITIONING_BATCH_SAVE
   CONDITIONING_FINISH
+  CONDITIONING_STEP_ADVANCE
+  CONDITIONING_STEPS_COMPLETE
+  CONDITIONING_RESPONSIBLES_CHANGE
 }
 
 /// Una fila por movimiento sobre la ejecucion de un pedido. Solo se inserta: no se edita ni se
@@ -1106,6 +1110,7 @@ model OrderExecutionEntry {
   reason       String?
   occurredAt   DateTime             @map("occurred_at") @db.Timestamptz(6)
   batchLines   Json?                @map("batch_lines")
+  responsibleUserIds Json?                @map("responsible_user_ids")
 
   @@index([orderId, occurredAt(sort: Desc)], map: "order_execution_entries_order_id_occurred_at_idx")
   @@index([userId], map: "order_execution_entries_user_id_idx")
@@ -1185,6 +1190,7 @@ model WhatsappConnection {
 enum EvidencePhase {
   MANUFACTURING
   PACKING
+  CONDITIONING
 
   @@map("evidence_phase")
 }
